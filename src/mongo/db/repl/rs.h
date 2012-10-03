@@ -19,6 +19,7 @@
 #pragma once
 
 #include "mongo/db/commands.h"
+#include "mongo/db/index.h"
 #include "mongo/db/oplog.h"
 #include "mongo/db/oplogreader.h"
 #include "mongo/db/repl/rs_config.h"
@@ -543,6 +544,8 @@ namespace mongo {
         void syncThread();
         const OpTime lastOtherOpTime() const;
         static void setMinValid(BSONObj obj);
+        
+        int oplogVersion;
     private:
         IndexPrefetchConfig _indexPrefetchConfig;
     };
@@ -676,17 +679,31 @@ namespace mongo {
             _hbinfo.health = 1.0;
     }
 
-    inline bool ignoreUniqueIndexes() {
-        if (theReplSet) {
-            // see SERVER-6671
-            MemberState ms = theReplSet->state();
-            if ((ms == MemberState::RS_STARTUP2) ||
-                (ms == MemberState::RS_RECOVERING) ||
-                (ms == MemberState::RS_ROLLBACK)) {
-                return true;
-            }
+    inline bool ignoreUniqueIndex(IndexDetails& idx) {
+        if (!idx.unique()) {
+            return false;
         }
-        return false;
+        if (!theReplSet) {
+            return false;
+        }
+        // see SERVER-6671
+        MemberState ms = theReplSet->state();
+        if (! ((ms == MemberState::RS_STARTUP2) ||
+               (ms == MemberState::RS_RECOVERING) ||
+               (ms == MemberState::RS_ROLLBACK))) {
+            return false;
+        }
+        // 2 is the oldest oplog version where operations
+        // are fully idempotent.
+        if (theReplSet->oplogVersion < 2) {
+            return false;
+        }
+        // Never ignore _id index
+        if (idx.isIdIndex()) {
+            return false;
+        }
+        
+        return true;
     }
 
 }

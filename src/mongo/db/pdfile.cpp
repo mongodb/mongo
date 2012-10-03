@@ -1229,6 +1229,8 @@ namespace mongo {
         for ( int idxNo = 0; idxNo < d->nIndexes; idxNo++ ) {
             if( d->idx(idxNo).unique() ) {
                 IndexDetails& idx = d->idx(idxNo);
+                if (ignoreUniqueIndex(idx))
+                    continue;
                 BSONObjSet keys;
                 idx.getKeysFromObject(obj, keys);
                 BSONObj order = idx.keyPattern();
@@ -1448,13 +1450,13 @@ namespace mongo {
         }
 
         int lenWHdr = d->getRecordAllocationSize( len + Record::HeaderSize );
-
+        fassert( 16440, lenWHdr >= ( len + Record::HeaderSize ) );
+        
         // If the collection is capped, check if the new object will violate a unique index
         // constraint before allocating space.
         if (d->nIndexes && 
             d->isCapped() && 
-            !god &&
-            !ignoreUniqueIndexes()) {
+            !god) {
             checkNoIndexConflicts( d, BSONObj( reinterpret_cast<const char *>( obuf ) ) );
         }
 

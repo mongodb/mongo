@@ -1451,7 +1451,7 @@ namespace mongo {
                     }
                 }
                 else {
-                    errmsg = str::stream() << "unknown command: " << e.fieldName();
+                    errmsg = str::stream() << "unknown option to collMod: " << e.fieldName();
                     ok = false;
                 }
             }

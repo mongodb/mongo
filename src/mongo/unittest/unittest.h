@@ -27,8 +27,6 @@
 #include <boost/bind.hpp>
 #include <boost/function.hpp>
 #include <boost/noncopyable.hpp>
-#include <boost/preprocessor/cat.hpp>
-#include <boost/preprocessor/stringize.hpp>
 #include <boost/scoped_ptr.hpp>
 #include <boost/shared_ptr.hpp>
 
@@ -111,92 +109,6 @@
             _TEST_TYPE_NAME(CASE_NAME, TEST_NAME)::_agent(#CASE_NAME, #TEST_NAME); \
     void _TEST_TYPE_NAME(CASE_NAME, TEST_NAME)::_doTest()
 
-/** Define a templated test. The template<...> portion goes above.
- *
- *  Usage:
- *
- *  template<int a, int b>
- *  TEMPLATE_TEST(Silly, Example) {
- *      ASSERT_EQUALS(a, b);
- *  }
- *
- *  TEMPLATE_TEST_INSTANCE(Silly, Example, 1, 1); // passes
- *  TEMPLATE_TEST_INSTANCE(Silly, Example, 1, 2); // fails
- *
- *  Note this must be used with TEMPLATE_TEST_INSTANCE
- */
-#define TEMPLATE_TEST(CASE_NAME, TEST_NAME) \
-    void _TEST_TYPE_NAME(CASE_NAME, TEST_NAME)()
-
-/** Instantiate and register a template test with specified template arguments.
- *
- *  Usage: see TEMPLATE_TEST
- */
-#define TEMPLATE_TEST_INSTANCE(CASE_NAME, TEST_NAME, ...) \
-    static bool BOOST_PP_CAT(runCode_, __LINE__) = \
-        (::mongo::unittest::Suite::getSuite(#CASE_NAME) \
-            ->add((#TEST_NAME  BOOST_PP_STRINGIZE((__VA_ARGS__))), \
-                ::mongo::unittest::TestFunction( \
-                    _TEST_TYPE_NAME(CASE_NAME, TEST_NAME)<__VA_ARGS__>)) \
-        , &BOOST_PP_CAT(runCode_, __LINE__))  /* makes run_code not be considered unused */
-
-
-/** Put this at the top of a templated test suite class
- *
- *  Usage:
- *
- *  template <int a, int b>
- *  class Example {
- *      TEMPLATE_SUITE_BOILERPLATE;
- *
- *      TEMPLATE_SUITE_TEST(Example, Equals) {
- *          ASSERT_EQUALS(a, b);
- *      }
- *
- *      TEMPLATE_SUITE_TEST(Example, NotEquals) {
- *          ASSERT_NOT_EQUALS(a, b);
- *      }
- *  };
- *
- *  TEMPLATE_SUITE_INSTANCE(Example, 1, 1); // pass then fail
- *  TEMPLATE_SUITE_INSTANCE(Example, 1, 2); // fail then pass
- */
-#define TEMPLATE_SUITE_BOILERPLATE \
-    static const char* suiteName()
-
-/** Define a test inside of a templated test suite.
- *
- *  Note: You must pass the exact class name in CASE_NAME
- *
- *  Usage: See TEMPLATE_SUITE_BOILERPLATE
- */
-#define TEMPLATE_SUITE_TEST(CASE_NAME, TEST_NAME) \
-    class _TEST_TYPE_NAME(CASE_NAME, TEST_NAME) { \
-    public: \
-        class runner : public ::mongo::unittest::Test { \
-            virtual void _doTest() { CASE_NAME::TEST_NAME(); } \
-        }; \
-        _TEST_TYPE_NAME(CASE_NAME, TEST_NAME) () { \
-            ::mongo::unittest::Test::RegistrationAgent<runner> agent(suite(), test()); \
-        } \
-        static const char* suite() { return CASE_NAME::suiteName(); }\
-        static const char* test() { return #TEST_NAME; } \
-    } TEST_NAME##_metadata; \
-    static void TEST_NAME()
-
-/** Instantiate and register a templated test suite with specified template arguments.
- *
- *  Note: automatically registers all tests in the suite for these arguments.
- *
- *  Usage: See TEMPLATE_SUITE_BOILERPLATE
- */
-#define TEMPLATE_SUITE_INSTANCE(CASE_NAME, ...) \
-    template <> \
-    const char* CASE_NAME<__VA_ARGS__>::suiteName() { \
-        return #CASE_NAME BOOST_PP_STRINGIZE((__VA_ARGS__)); \
-    } \
-    CASE_NAME<__VA_ARGS__> BOOST_PP_CAT(CASE_NAME##_instance_, __LINE__)
-
 /**
  * Construct a single test named TEST_NAME that has access to a common class (a "fixture")
  * named "FIXTURE_NAME".
@@ -260,13 +172,6 @@ namespace mongo {
             TestFunction _fn;
         };
 
-        /// Registration agent for adding tests to suites, used by TEMPLATE_SUITE_TEST macro.
-        template <typename Test>
-        class TemplateSuiteRegistrationAgent : private boost::noncopyable {
-        public:
-            TemplateSuiteRegistrationAgent();
-        };
-
         /**
          * Base type for unit test fixtures.  Also, the default fixture type used
          * by the TEST() macro.
@@ -278,6 +183,7 @@ namespace mongo {
 
             void run();
 
+        protected:
             /**
              * Registration agent for adding tests to suites, used by TEST macro.
              */
@@ -287,8 +193,6 @@ namespace mongo {
                 RegistrationAgent(const std::string& suiteName, const std::string& testName);
             };
 
-
-        protected:
             /**
              * This exception class is used to exercise the testing framework itself. If a test
              * case throws it, the framework would not consider it an error.
