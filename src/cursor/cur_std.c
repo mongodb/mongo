@@ -285,42 +285,47 @@ __wt_cursor_set_value(WT_CURSOR *cursor, ...)
 	WT_ITEM *buf, *item;
 	WT_SESSION_IMPL *session;
 	const char *fmt, *str;
-	size_t sz;
 	va_list ap;
+	size_t sz;
 
 	CURSOR_API_CALL(cursor, session, set_value, NULL);
 
 	va_start(ap, cursor);
 	fmt = F_ISSET(cursor, WT_CURSOR_RAW_OK) ? "u" : cursor->value_format;
-	/* Fast path some common cases: single strings or byte arrays. */
+
+	/* Fast path some common cases: single strings, byte arrays and bits. */
 	if (strcmp(fmt, "S") == 0) {
 		str = va_arg(ap, const char *);
 		sz = strlen(str) + 1;
 		cursor->value.data = str;
-	} else if (strcmp(fmt, "u") == 0) {
+	} else if (F_ISSET(cursor, WT_CURSOR_RAW_OK) || strcmp(fmt, "u") == 0) {
 		item = va_arg(ap, WT_ITEM *);
 		sz = item->size;
 		cursor->value.data = item->data;
+	} else if (strcmp(fmt, "t") == 0 ||
+	    (isdigit(fmt[0]) && strcmp(fmt + 1, "t"))) {
+		sz = 1;
+		WT_ERR(__wt_buf_initsize(session, buf, sz));
+		*(uint8_t *)cursor->value.data = (uint8_t)va_arg(ap, int);
 	} else {
-		buf = &cursor->value;
-		ret = __wt_struct_sizev(session, &sz, cursor->value_format, ap);
+		WT_ERR(
+		    __wt_struct_sizev(session, &sz, cursor->value_format, ap));
 		va_end(ap);
-		WT_ERR(ret);
 		va_start(ap, cursor);
-		if ((ret = __wt_buf_initsize(session, buf, sz)) != 0 ||
-		    (ret = __wt_struct_packv(session, buf->mem, sz,
-		    cursor->value_format, ap)) != 0) {
-			cursor->saved_err = ret;
-			F_CLR(cursor, WT_CURSTD_VALUE_SET);
-			goto err;
-		}
-		cursor->value.data = buf->mem;
+		buf = &cursor->value;
+		WT_ERR(__wt_buf_initsize(session, buf, sz));
+		WT_ERR(__wt_struct_packv(session, buf->mem, sz,
+		    cursor->value_format, ap));
 	}
 	F_SET(cursor, WT_CURSTD_VALUE_SET);
 	cursor->value.size = WT_STORE_SIZE(sz);
-	va_end(ap);
 
-err:	API_END(session);
+	if (0) {
+err:		cursor->saved_err = ret;
+		F_CLR(cursor, WT_CURSTD_VALUE_SET);
+	}
+	va_end(ap);
+	API_END(session);
 }
 
 /*
