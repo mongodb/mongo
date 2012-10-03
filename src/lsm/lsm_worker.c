@@ -78,7 +78,6 @@ __wt_lsm_checkpoint_worker(void *arg)
 			chunk = cookie.chunk_array[i];
 			if (F_ISSET(chunk, WT_LSM_CHUNK_ONDISK))
 				continue;
-			++j;
 
 			/*
 			 * NOTE: we pass a non-NULL config, because otherwise
@@ -88,6 +87,7 @@ __wt_lsm_checkpoint_worker(void *arg)
 			    ret = __wt_schema_worker(session, chunk->uri,
 			    __wt_checkpoint, cfg, 0));
 			if (ret == 0) {
+				++j;
 				__wt_spin_lock(session, &lsm_tree->lock);
 				F_SET(chunk, WT_LSM_CHUNK_ONDISK);
 				lsm_tree->dsk_gen++;
@@ -96,7 +96,8 @@ __wt_lsm_checkpoint_worker(void *arg)
 				     "LSM worker checkpointed %d.", i);
 			}
 		}
-		__wt_sleep(0, 10);
+		if (j == 0)
+			__wt_sleep(0, 10);
 	}
 err:	__wt_free(session, cookie.chunk_array);
 
