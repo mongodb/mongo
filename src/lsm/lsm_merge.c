@@ -136,8 +136,8 @@ __wt_lsm_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	if (nchunks > (int)lsm_tree->merge_max)
 		nchunks = (int)lsm_tree->merge_max;
 
-	for (record_count = 0, i = start_chunk; i < nchunks; i++)
-		record_count += lsm_tree->chunk[i]->count;
+	for (record_count = 0, i = 0; i < nchunks; i++)
+		record_count += lsm_tree->chunk[start_chunk + i]->count;
 	__wt_spin_unlock(session, &lsm_tree->lock);
 
 	if (nchunks <= 1)
