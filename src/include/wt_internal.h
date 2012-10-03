@@ -227,7 +227,6 @@ struct __wt_update;
 #include "log.i"
 #include "mutex.i"
 #include "packing.i"
-#include "serial.i"
 #include "serial_funcs.i"
 
 #if defined(__cplusplus)

@@ -10,13 +10,12 @@ class SerialArg:
 		self.sized = sized
 
 class Serial:
-	def __init__(self, name, op, args):
+	def __init__(self, name, args):
 		self.name = name
-		self.op = op
 		self.args = args
 
 msgtypes = [
-Serial('col_append', 'WT_SERIAL_FUNC', [
+Serial('col_append', [
 		SerialArg('WT_PAGE *', 'page'),
 		SerialArg('uint32_t', 'write_gen'),
 		SerialArg('WT_INSERT_HEAD **', 'insheadp'),
@@ -27,7 +26,7 @@ Serial('col_append', 'WT_SERIAL_FUNC', [
 		SerialArg('u_int', 'skipdepth'),
 	]),
 
-Serial('insert', 'WT_SERIAL_FUNC', [
+Serial('insert', [
 		SerialArg('WT_PAGE *', 'page'),
 		SerialArg('uint32_t', 'write_gen'),
 		SerialArg('WT_INSERT_HEAD **', 'inshead'),
@@ -38,17 +37,17 @@ Serial('insert', 'WT_SERIAL_FUNC', [
 		SerialArg('u_int', 'skipdepth'),
 	]),
 
-Serial('row_key', 'WT_SERIAL_FUNC', [
+Serial('row_key', [
 		SerialArg('WT_PAGE *', 'page'),
 		SerialArg('WT_ROW *', 'row_arg'),
 		SerialArg('WT_IKEY *', 'ikey'),
 	]),
 
-Serial('sync_file', 'WT_SERIAL_EVICT', [
+Serial('sync_file', [
 		SerialArg('int', 'syncop'),
 	]),
 
-Serial('update', 'WT_SERIAL_FUNC', [
+Serial('update', [
 		SerialArg('WT_PAGE *', 'page'),
 		SerialArg('uint32_t', 'write_gen'),
 		SerialArg('WT_UPDATE **', 'srch_upd'),
@@ -118,9 +117,9 @@ typedef struct {
 ''')
 		else:
 			f.write('\targs->' + l.name + ' = ' + l.name + ';\n\n')
-	f.write('\tret = __wt_session_serialize_func(session,\n')
-	f.write('\t    ' + entry.op +
-		', __wt_' + entry.name + '_serial_func, args);\n\n')
+	f.write('\t__wt_spin_lock(session, &S2C(session)->serial_lock);\n')
+	f.write('\tret = __wt_' + entry.name + '_serial_func(session, args);\n')
+	f.write('\t__wt_spin_unlock(session, &S2C(session)->serial_lock);\n\n')
 	for l in entry.args:
 		if not l.sized:
 			continue
@@ -131,7 +130,7 @@ typedef struct {
 
 	# unpack function
 	f.write('static inline void\n__wt_' + entry.name + '_unpack(\n')
-	o = 'WT_SESSION_IMPL *session'
+	o = 'void *untyped_args'
 	for l in entry.args:
 		o += ', ' + decl_p(l)
 	o +=')'
@@ -139,7 +138,7 @@ typedef struct {
 	f.write('''
 {
 \t__wt_''' + entry.name + '''_args *args =
-\t    (__wt_''' + entry.name + '''_args *)session->wq_args;
+\t    (__wt_''' + entry.name + '''_args *)untyped_args;
 
 ''')
 	for l in entry.args:
@@ -150,10 +149,11 @@ typedef struct {
 	for l in entry.args:
 		if l.sized:
 			f.write('''
-static inline void\n__wt_''' + entry.name + '_' + l.name + '''_taken(WT_SESSION_IMPL *session, WT_PAGE *page)
+static inline void\n__wt_''' + entry.name + '_' + l.name + '''_taken(\n
+\t    WT_SESSION_IMPL *session, void *untyped_args, WT_PAGE *page)
 {
 \t__wt_''' + entry.name + '''_args *args =
-\t    (__wt_''' + entry.name + '''_args *)session->wq_args;
+\t    (__wt_''' + entry.name + '''_args *)untyped_args;
 
 \targs->''' + l.name + '''_taken = 1;
 
