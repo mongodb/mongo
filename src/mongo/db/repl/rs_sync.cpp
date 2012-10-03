@@ -265,8 +265,8 @@ namespace replset {
                     break;
                 }
             }
-
-
+            setOplogVersion(ops.getDeque().front());
+            
             multiApply(ops.getDeque(), func);
 
             n += ops.getDeque().size();
@@ -309,6 +309,19 @@ namespace replset {
 
     void SyncTail::oplogApplication(const BSONObj& applyGTEObj, const BSONObj& minValidObj) {
         oplogApplySegment(applyGTEObj, minValidObj, multiSyncApply);
+    }
+
+    void SyncTail::setOplogVersion(const BSONObj& op) {
+        BSONElement version = op["v"];
+        // old primaries do not get the unique index ignoring feature
+        // because some of their ops are not imdepotent, see
+        // SERVER-7186
+        if (version.eoo()) {
+            theReplSet->oplogVersion = 1;
+            RARELY log() << "warning replset primary is an older version than we are; upgrade recommended" << endl;
+        } else {
+            theReplSet->oplogVersion = version.Int();
+        }
     }
 
     /* tail an oplog.  ok to return, will be re-called. */
@@ -379,6 +392,7 @@ namespace replset {
             }
 
             const BSONObj& lastOp = ops.getDeque().back();
+            setOplogVersion(lastOp);
             handleSlaveDelay(lastOp);
 
             // Set minValid to the last op to be applied in this next batch.
@@ -415,6 +429,7 @@ namespace replset {
             // otherwise, apply what we have
             return true;
         }
+
         // check for commands
         if ((op["op"].valuestrsafe()[0] == 'c') ||
             // Index builds are acheived through the use of an insert op, not a command op.

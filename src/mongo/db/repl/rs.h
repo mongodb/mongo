@@ -544,6 +544,8 @@ namespace mongo {
         void syncThread();
         const OpTime lastOtherOpTime() const;
         static void setMinValid(BSONObj obj);
+        
+        int oplogVersion;
     private:
         IndexPrefetchConfig _indexPrefetchConfig;
     };
@@ -682,15 +684,18 @@ namespace mongo {
         if (!theReplSet) return false;
         // see SERVER-6671
         MemberState ms = theReplSet->state();
-        if ((ms == MemberState::RS_STARTUP2) ||
-            (ms == MemberState::RS_RECOVERING) ||
-            (ms == MemberState::RS_ROLLBACK)) {
-            // Never ignore _id index
-            if (!idx.isIdIndex()) {
-                return true;
-            }
+        if (! ((ms == MemberState::RS_STARTUP2) ||
+               (ms == MemberState::RS_RECOVERING) ||
+               (ms == MemberState::RS_ROLLBACK))) {
+            return false;
         }
-        return false;
+        // 2 is the oldest oplog version where operations
+        // are fully idempotent.
+        if (theReplSet->oplogVersion < 2) return false;
+        // Never ignore _id index
+        if (idx.isIdIndex()) return false;
+        
+        return true;
     }
 
 }
