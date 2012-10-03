@@ -31,7 +31,7 @@ main(int argc, char *argv[])
 	char *config_open;
 	const char **confp, **objp;
 	const char *objs[] = { "file:__wt", "table:__wt", "lsm:__wt", NULL };
-	/* LSM needs configuration or it fails the minimum cachesize check. */
+	/* LSM needs configuration or it fails the minimum cache size check. */
 	const char *configs[] = { NULL, NULL,
 	    "lsm_chunk_size=1m,lsm_merge_max=2,leaf_page_max=256k", NULL };
 
