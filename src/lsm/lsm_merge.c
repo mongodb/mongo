@@ -147,8 +147,8 @@ __wt_lsm_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	dest_id = WT_ATOMIC_ADD(lsm_tree->last, 1);
 
 	WT_VERBOSE_RET(session, lsm,
-	    "Merging chunks %d-%d into %d\n",
-	    start_chunk, start_chunk + nchunks, dest_id);
+	    "Merging chunks %d-%d into %d (%" PRIu64 " records)\n",
+	    start_chunk, start_chunk + nchunks, dest_id, record_count);
 
 	if (record_count != 0) {
 		WT_RET(__wt_scr_alloc(session, 0, &bbuf));
