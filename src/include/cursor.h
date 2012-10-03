@@ -197,3 +197,6 @@ struct __wt_cursor_table {
 	if (!F_ISSET(cursor, WT_CURSTD_VALUE_SET))			\
 		WT_ERR(__wt_cursor_kv_not_set(cursor, 0));		\
 } while (0)
+
+#define	WT_CURSOR_RAW_OK						\
+	WT_CURSTD_DUMP_HEX | WT_CURSTD_DUMP_PRINT | WT_CURSTD_RAW
