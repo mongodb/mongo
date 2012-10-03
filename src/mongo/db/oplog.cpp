@@ -124,10 +124,30 @@ namespace mongo {
         *b = EOO;
     }
 
+    /* we write to local.oplog.rs:
+         { ts : ..., h: ..., v: ..., op: ..., ns: ..., o: ... }
+       ts: an OpTime timestamp
+       h: hash
+       v: version
+       op:
+        "i" insert
+        "u" update
+        "d" delete
+        "c" db cmd
+        "db" declares presence of a database (ns is set to the db name + '.')
+        "n" no op
+       logNS: always null! DEPRECATED
+       bb:
+         if not null, specifies a boolean to pass along to the other side as b: param.
+         used for "justOne" or "upsert" flags on 'd', 'u'
+
+    */
+
     // global is safe as we are in write lock. we put the static outside the function to avoid the implicit mutex 
     // the compiler would use if inside the function.  the reason this is static is to avoid a malloc/free for this
     // on every logop call.
     static BufBuilder logopbufbuilder(8*1024);
+    const static int OPLOG_VERSION = 2;
     static void _logOpRS(const char *opstr, const char *ns, const char *logNS, const BSONObj& obj, BSONObj *o2, bool *bb, bool fromMigrate ) {
         Lock::DBWrite lk1("local");
 
@@ -159,6 +179,7 @@ namespace mongo {
         BSONObjBuilder b(logopbufbuilder);
         b.appendTimestamp("ts", ts.asDate());
         b.append("h", hashNew);
+        b.append("v", OPLOG_VERSION);
         b.append("op", opstr);
         b.append("ns", ns);
         if (fromMigrate) 
@@ -205,26 +226,6 @@ namespace mongo {
         }
     }
 
-    /* we write to local.oplog.$main:
-         { ts : ..., op: ..., ns: ..., o: ... }
-       ts: an OpTime timestamp
-       op:
-        "i" insert
-        "u" update
-        "d" delete
-        "c" db cmd
-        "db" declares presence of a database (ns is set to the db name + '.')
-        "n" no op
-       logNS: where to log it.  0/null means "local.oplog.$main".
-       bb:
-         if not null, specifies a boolean to pass along to the other side as b: param.
-         used for "justOne" or "upsert" flags on 'd', 'u'
-       first: true
-         when set, indicates this is the first thing we have logged for this database.
-         thus, the slave does not need to copy down all the data when it sees this.
-
-       note this is used for single collection logging even when --replSet is enabled.
-    */
     static void _logOpOld(const char *opstr, const char *ns, const char *logNS, const BSONObj& obj, BSONObj *o2, bool *bb, bool fromMigrate ) {
         Lock::DBWrite lk("local");
         static BufBuilder bufbuilder(8*1024); // todo there is likely a mutex on this constructor

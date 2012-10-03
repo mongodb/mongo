@@ -423,6 +423,7 @@ namespace mongo {
         ghost(0),
         _writerPool(replWriterThreadCount),
         _prefetcherPool(replPrefetcherThreadCount),
+        oplogVersion(0),
         _indexPrefetchConfig(PREFETCH_ALL) {
     }
 
