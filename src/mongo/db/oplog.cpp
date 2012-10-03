@@ -125,7 +125,7 @@ namespace mongo {
     }
 
     /* we write to local.oplog.rs:
-         { ts : ..., h: ..., v: ..., op: ..., ns: ..., o: ... }
+         { ts : ..., h: ..., v: ..., op: ..., etc }
        ts: an OpTime timestamp
        h: hash
        v: version
@@ -136,8 +136,8 @@ namespace mongo {
         "c" db cmd
         "db" declares presence of a database (ns is set to the db name + '.')
         "n" no op
-       logNS: always null! DEPRECATED
-       bb:
+
+       bb param:
          if not null, specifies a boolean to pass along to the other side as b: param.
          used for "justOne" or "upsert" flags on 'd', 'u'
 

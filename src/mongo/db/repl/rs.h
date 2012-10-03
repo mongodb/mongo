@@ -674,8 +674,12 @@ namespace mongo {
     }
 
     inline bool ignoreUniqueIndex(IndexDetails& idx) {
-        if (!idx.unique()) return false;
-        if (!theReplSet) return false;
+        if (!idx.unique()) {
+            return false;
+        }
+        if (!theReplSet) {
+            return false;
+        }
         // see SERVER-6671
         MemberState ms = theReplSet->state();
         if (! ((ms == MemberState::RS_STARTUP2) ||
@@ -685,9 +689,13 @@ namespace mongo {
         }
         // 2 is the oldest oplog version where operations
         // are fully idempotent.
-        if (theReplSet->oplogVersion < 2) return false;
+        if (theReplSet->oplogVersion < 2) {
+            return false;
+        }
         // Never ignore _id index
-        if (idx.isIdIndex()) return false;
+        if (idx.isIdIndex()) {
+            return false;
+        }
         
         return true;
     }
