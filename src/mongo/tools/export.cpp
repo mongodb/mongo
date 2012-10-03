@@ -43,6 +43,8 @@ public:
         ("jsonArray", "output to a json array rather than one object per line")
         ("slaveOk,k", po::value<bool>()->default_value(true) , "use secondaries for export if available, default true")
         ("forceTableScan", "force a table scan (do not use $snapshot)" )
+        ("skip", po::value<int>()->default_value(0), "documents to skip, default 0")
+        ("limit", po::value<int>()->default_value(0), "limit the numbers of documents returned, default all")
         ;
         _usesstdout = false;
     }
@@ -196,7 +198,7 @@ public:
 
         bool slaveOk = _params["slaveOk"].as<bool>();
 
-        auto_ptr<DBClientCursor> cursor = conn().query( ns.c_str() , q , 0 , 0 , fieldsToReturn , ( slaveOk ? QueryOption_SlaveOk : 0 ) | QueryOption_NoCursorTimeout );
+        auto_ptr<DBClientCursor> cursor = conn().query( ns.c_str() , q , getParam("limit", 0), getParam("skip", 0) , fieldsToReturn , ( slaveOk ? QueryOption_SlaveOk : 0 ) | QueryOption_NoCursorTimeout );
 
         if ( csv ) {
             for ( vector<string>::iterator i=_fields.begin(); i != _fields.end(); i++ ) {
