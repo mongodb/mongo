@@ -54,7 +54,8 @@ __wt_page_in_func(
 			 * safe to wait for eviction if we are holding it.
 			 */
 			if (read_lockout &&
-			   !F_ISSET(session, WT_SESSION_SCHEMA_LOCKED))
+			   !F_ISSET(session, WT_SESSION_SCHEMA_LOCKED) &&
+			   !F_ISSET(session->btree, WT_BTREE_NO_CACHE))
 				break;
 
 			WT_RET(__wt_cache_read(session, parent, ref));
