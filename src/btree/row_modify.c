@@ -269,7 +269,9 @@ err:	__wt_session_serialize_wrapup(session, page, ret);
 int
 __wt_update_check(WT_SESSION_IMPL *session, WT_PAGE *page, WT_UPDATE *next)
 {
+	WT_DECL_RET;
 	WT_TXN *txn;
+	int lockout, wake = 1;
 
 	/* Discard obsolete WT_UPDATE structures. */
 	if (next != NULL)
@@ -277,6 +279,21 @@ __wt_update_check(WT_SESSION_IMPL *session, WT_PAGE *page, WT_UPDATE *next)
 
 	/* Before allocating anything, make sure this update is permitted. */
 	WT_RET(__wt_txn_update_check(session, next));
+
+	/*
+	 * Pause if the cache is full.
+	 * This matches the logic in __wt_page_in_func.
+	 */
+	for (;;) {
+		__wt_eviction_check(session, &lockout, wake);
+		wake = 0;
+		if (!lockout)
+			break;
+		if ((ret = __wt_evict_lru_page(session, 1)) == EBUSY)
+			__wt_yield();
+		else
+			WT_RET_NOTFOUND_OK(ret);
+	}
 
 	/*
 	 * Record the transaction ID for the first update to a page.
