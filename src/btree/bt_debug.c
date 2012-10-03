@@ -208,12 +208,15 @@ int
 __wt_debug_off(
     WT_SESSION_IMPL *session, uint32_t offset, uint32_t size, const char *ofile)
 {
+	WT_BTREE *btree;
 	WT_DECL_ITEM(buf);
 	WT_DECL_RET;
 
+	btree = session->btree;
+
 	WT_RET(__wt_scr_alloc(session, size, &buf));
-	WT_ERR(__wt_block_read_off(
-	    session, session->btree->block, buf, offset, size, 0));
+	WT_ERR(__wt_block_read_off(session,
+	    btree->block, buf, offset, size, WT_BLOCK_CHECKSUM_NOT_SET));
 	ret = __wt_debug_disk(session, buf->mem, ofile);
 err:	__wt_scr_free(&buf);
 

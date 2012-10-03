@@ -10,6 +10,7 @@
 WT_CONNECTION *conn;				/* WiredTiger connection */
 u_int nops;					/* Operations */
 const char *uri;				/* Object */
+const char *config;				/* Object config */
 
 static char *progname;				/* Program name */
 static FILE *logfp;				/* Log file */
@@ -28,8 +29,11 @@ main(int argc, char *argv[])
 	u_int nthreads;
 	int ch, cnt, runs;
 	char *config_open;
-	const char **objp;
+	const char **confp, **objp;
 	const char *objs[] = { "file:__wt", "table:__wt", "lsm:__wt", NULL };
+	/* LSM needs configuration or it fails the minimum cache size check. */
+	const char *configs[] = { NULL, NULL,
+	    "lsm_chunk_size=1m,lsm_merge_max=2,leaf_page_max=256k", NULL };
 
 	if ((progname = strrchr(argv[0], '/')) == NULL)
 		progname = argv[0];
@@ -78,8 +82,10 @@ main(int argc, char *argv[])
 	for (cnt = 1; runs == 0 || cnt <= runs; ++cnt) {
 		shutdown();			/* Clean up previous runs */
 
-		for (objp = objs; *objp != NULL; objp++) {
+		for (objp = objs, confp = configs; *objp != NULL;
+		    objp++, confp++) {
 			uri = *objp;
+			config = *confp;
 			printf("%5d: %u threads on %s\n", cnt, nthreads, uri);
 			wt_startup(config_open);
 			if (fop_start(nthreads))
@@ -104,15 +110,16 @@ wt_startup(char *config_open)
 		NULL
 	};
 	int ret;
-	char config[128];
+	char config_buf[128];
 
-	snprintf(config, sizeof(config),
+	snprintf(config_buf, sizeof(config_buf),
 	    "create,error_prefix=\"%s\",cache_size=5MB%s%s",
 	    progname,
 	    config_open == NULL ? "" : ",",
 	    config_open == NULL ? "" : config_open);
 
-	if ((ret = wiredtiger_open(NULL, &event_handler, config, &conn)) != 0)
+	if ((ret = wiredtiger_open(
+	    NULL, &event_handler, config_buf, &conn)) != 0)
 		die("wiredtiger_open", ret);
 }
 

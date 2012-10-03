@@ -170,8 +170,7 @@ __wt_cursor_get_keyv(WT_CURSOR *cursor, uint32_t flags, va_list ap)
 			*va_arg(ap, uint64_t *) = cursor->recno;
 	} else {
 		fmt = cursor->key_format;
-		if (LF_ISSET(
-		    WT_CURSTD_DUMP_HEX | WT_CURSTD_DUMP_PRINT | WT_CURSTD_RAW))
+		if (LF_ISSET(WT_CURSOR_RAW_OK))
 			fmt = "u";
 		ret = __wt_struct_unpackv(
 		    session, cursor->key.data, cursor->key.size, fmt, ap);
@@ -212,17 +211,14 @@ __wt_cursor_set_keyv(WT_CURSOR *cursor, uint32_t flags, va_list ap)
 		sz = sizeof(cursor->recno);
 	} else {
 		fmt = cursor->key_format;
-		if (LF_ISSET(
-		    WT_CURSTD_DUMP_HEX | WT_CURSTD_DUMP_PRINT | WT_CURSTD_RAW))
-			fmt = "u";
-		if (strcmp(fmt, "S") == 0) {
-			str = va_arg(ap, const char *);
-			sz = strlen(str) + 1;
-			cursor->key.data = (void *)str;
-		} else if (strcmp(fmt, "u") == 0) {
+		if (LF_ISSET(WT_CURSOR_RAW_OK) || strcmp(fmt, "u") == 0) {
 			item = va_arg(ap, WT_ITEM *);
 			sz = item->size;
 			cursor->key.data = (void *)item->data;
+		} else if (strcmp(fmt, "S") == 0) {
+			str = va_arg(ap, const char *);
+			sz = strlen(str) + 1;
+			cursor->key.data = (void *)str;
 		} else {
 			buf = &cursor->key;
 
@@ -269,9 +265,7 @@ __wt_cursor_get_value(WT_CURSOR *cursor, ...)
 	WT_CURSOR_NEEDVALUE(cursor);
 
 	va_start(ap, cursor);
-	fmt = F_ISSET(cursor,
-	    WT_CURSTD_DUMP_HEX | WT_CURSTD_DUMP_PRINT | WT_CURSTD_RAW) ?
-	    "u" : cursor->value_format;
+	fmt = F_ISSET(cursor, WT_CURSOR_RAW_OK) ? "u" : cursor->value_format;
 	ret = __wt_struct_unpackv(session,
 	    cursor->value.data, cursor->value.size, fmt, ap);
 	va_end(ap);
@@ -297,38 +291,42 @@ __wt_cursor_set_value(WT_CURSOR *cursor, ...)
 	CURSOR_API_CALL(cursor, session, set_value, NULL);
 
 	va_start(ap, cursor);
-	fmt = F_ISSET(cursor,
-	    WT_CURSTD_DUMP_HEX | WT_CURSTD_DUMP_PRINT | WT_CURSTD_RAW) ?
-	    "u" : cursor->value_format;
-	/* Fast path some common cases: single strings or byte arrays. */
+	fmt = F_ISSET(cursor, WT_CURSOR_RAW_OK) ? "u" : cursor->value_format;
+
+	/* Fast path some common cases: single strings, byte arrays and bits. */
 	if (strcmp(fmt, "S") == 0) {
 		str = va_arg(ap, const char *);
 		sz = strlen(str) + 1;
 		cursor->value.data = str;
-	} else if (strcmp(fmt, "u") == 0) {
+	} else if (F_ISSET(cursor, WT_CURSOR_RAW_OK) || strcmp(fmt, "u") == 0) {
 		item = va_arg(ap, WT_ITEM *);
 		sz = item->size;
 		cursor->value.data = item->data;
-	} else {
+	} else if (strcmp(fmt, "t") == 0 ||
+	    (isdigit(fmt[0]) && strcmp(fmt + 1, "t"))) {
+		sz = 1;
 		buf = &cursor->value;
-		ret = __wt_struct_sizev(session, &sz, cursor->value_format, ap);
+		WT_ERR(__wt_buf_initsize(session, buf, sz));
+		*(uint8_t *)buf->mem = (uint8_t)va_arg(ap, int);
+	} else {
+		WT_ERR(
+		    __wt_struct_sizev(session, &sz, cursor->value_format, ap));
 		va_end(ap);
-		WT_ERR(ret);
 		va_start(ap, cursor);
-		if ((ret = __wt_buf_initsize(session, buf, sz)) != 0 ||
-		    (ret = __wt_struct_packv(session, buf->mem, sz,
-		    cursor->value_format, ap)) != 0) {
-			cursor->saved_err = ret;
-			F_CLR(cursor, WT_CURSTD_VALUE_SET);
-			goto err;
-		}
-		cursor->value.data = buf->mem;
+		buf = &cursor->value;
+		WT_ERR(__wt_buf_initsize(session, buf, sz));
+		WT_ERR(__wt_struct_packv(session, buf->mem, sz,
+		    cursor->value_format, ap));
 	}
 	F_SET(cursor, WT_CURSTD_VALUE_SET);
 	cursor->value.size = WT_STORE_SIZE(sz);
-	va_end(ap);
 
-err:	API_END(session);
+	if (0) {
+err:		cursor->saved_err = ret;
+		F_CLR(cursor, WT_CURSTD_VALUE_SET);
+	}
+	va_end(ap);
+	API_END(session);
 }
 
 /*

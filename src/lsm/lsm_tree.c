@@ -7,6 +7,7 @@
 
 #include "wt_internal.h"
 
+static int __lsm_tree_open_check(WT_SESSION_IMPL *, WT_LSM_TREE *);
 static int __lsm_tree_open(WT_SESSION_IMPL *, const char *, WT_LSM_TREE **);
 
 /*
@@ -261,14 +262,46 @@ __wt_lsm_tree_create(WT_SESSION_IMPL *session,
 	__lsm_tree_discard(session, lsm_tree);
 	lsm_tree = NULL;
 
-	/* Open our new tree and add it to the handle cache. */
-	WT_ERR(__lsm_tree_open(session, uri, &lsm_tree));
+	/*
+	 * Open our new tree and add it to the handle cache. Don't discard on
+	 * error the returned handle is NULL on error, and the metadata tracking
+	 *  macros handle cleaning up on failure.
+	 */
+	ret = __lsm_tree_open(session, uri, &lsm_tree);
 
 	if (0) {
 err:		__lsm_tree_discard(session, lsm_tree);
 	}
 	__wt_scr_free(&buf);
 	return (ret);
+}
+
+/*
+ * __lsm_tree_open_check --
+ *	Validate the configuration of an LSM tree.
+ */
+static int
+__lsm_tree_open_check(
+    WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
+{
+	WT_CONFIG_ITEM cval;
+	const char *cfg[] = API_CONF_DEFAULTS(
+	    session, create, lsm_tree->file_config);
+	uint32_t maxleafpage;
+	uint64_t req;
+
+	WT_RET(__wt_config_gets(
+	    session, cfg, "leaf_page_max", &cval));
+	maxleafpage = (uint32_t)cval.val;
+
+	/* Three chunks, plus one page for each participant in a merge. */
+	req = 3 * lsm_tree->chunk_size + (lsm_tree->merge_max *  maxleafpage);
+	if (S2C(session)->cache_size < req)
+		WT_RET_MSG(session, EINVAL,
+		    "The LSM configuration requires a cache size of at least %"
+		    PRIu64 ". Configured size is %" PRIu64,
+		    req, S2C(session)->cache_size);
+	return (0);
 }
 
 /*
@@ -295,6 +328,12 @@ __lsm_tree_open(
 	WT_ERR(__wt_strdup(session, uri, &lsm_tree->name));
 	lsm_tree->filename = lsm_tree->name + strlen("lsm:");
 	WT_ERR(__wt_lsm_meta_read(session, lsm_tree));
+
+	/*
+	 * Sanity check the configuration. Do it now since this is the first
+	 * time we have the LSM tree configuration.
+	 */
+	WT_ERR(__lsm_tree_open_check(session, lsm_tree));
 
 	if (lsm_tree->nchunks == 0)
 		WT_ERR(__wt_lsm_tree_switch(session, lsm_tree));

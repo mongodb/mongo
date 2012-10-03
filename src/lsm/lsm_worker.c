@@ -18,51 +18,15 @@ static int __lsm_copy_chunks(WT_LSM_TREE *, WT_LSM_WORKER_COOKIE *);
 void *
 __wt_lsm_worker(void *arg)
 {
-	WT_DECL_RET;
-	WT_LSM_CHUNK *chunk;
 	WT_LSM_TREE *lsm_tree;
-	WT_LSM_WORKER_COOKIE cookie;
 	WT_SESSION_IMPL *session;
-	const char *cfg[] = API_CONF_DEFAULTS(session, checkpoint, NULL);
-	int i, progress;
+	int progress;
 
 	lsm_tree = arg;
 	session = lsm_tree->worker_session;
 
-	memset(&cookie, 0, sizeof(cookie));
-	F_SET(&cookie, WT_LSM_WORKER_MERGE);
-
 	while (F_ISSET(lsm_tree, WT_LSM_TREE_WORKING)) {
 		progress = 0;
-
-		WT_ERR(__lsm_copy_chunks(lsm_tree, &cookie));
-
-		/*
-		 * Write checkpoints in all completed files, then find
-		 * something to merge.
-		 */
-		for (i = 0; i < cookie.nchunks; i++) {
-			chunk = cookie.chunk_array[i];
-			if (F_ISSET(chunk, WT_LSM_CHUNK_ONDISK) ||
-			    chunk->ncursor > 0)
-				continue;
-
-			/* XXX durability: need to checkpoint the metadata? */
-			/*
-			 * NOTE: we pass a non-NULL config, because otherwise
-			 * __wt_checkpoint thinks we're closing the file.
-			 */
-			WT_WITH_SCHEMA_LOCK(session,
-			    ret =__wt_schema_worker(session, chunk->uri,
-			    __wt_checkpoint, cfg, 0));
-			if (ret == 0) {
-				__wt_spin_lock(session, &lsm_tree->lock);
-				F_SET(lsm_tree->chunk[i], WT_LSM_CHUNK_ONDISK);
-				lsm_tree->dsk_gen++;
-				__wt_spin_unlock(session, &lsm_tree->lock);
-				progress = 1;
-			}
-		}
 
 		/* Clear any state from previous worker thread iterations. */
 		session->btree = NULL;
@@ -80,8 +44,6 @@ __wt_lsm_worker(void *arg)
 		if (!progress)
 			__wt_sleep(0, 10);
 	}
-
-err:	__wt_free(session, cookie.chunk_array);
 
 	return (NULL);
 }
@@ -116,7 +78,6 @@ __wt_lsm_checkpoint_worker(void *arg)
 			chunk = cookie.chunk_array[i];
 			if (F_ISSET(chunk, WT_LSM_CHUNK_ONDISK))
 				continue;
-			++j;
 
 			/*
 			 * NOTE: we pass a non-NULL config, because otherwise
@@ -126,16 +87,17 @@ __wt_lsm_checkpoint_worker(void *arg)
 			    ret = __wt_schema_worker(session, chunk->uri,
 			    __wt_checkpoint, cfg, 0));
 			if (ret == 0) {
+				++j;
 				__wt_spin_lock(session, &lsm_tree->lock);
 				F_SET(chunk, WT_LSM_CHUNK_ONDISK);
 				lsm_tree->dsk_gen++;
 				__wt_spin_unlock(session, &lsm_tree->lock);
+				WT_VERBOSE_ERR(session, lsm,
+				     "LSM worker checkpointed %d.", i);
 			}
 		}
-		if (j != 0)
-			WT_VERBOSE_ERR(session, lsm,
-			     "LSM worker checkpointed %d.", j);
-		__wt_sleep(0, 10);
+		if (j == 0)
+			__wt_sleep(0, 10);
 	}
 err:	__wt_free(session, cookie.chunk_array);
 

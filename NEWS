@@ -1,3 +1,62 @@
+WiredTiger release 1.3.2, 2012-10-03
+------------------------------------
+
+This is a bugfix and performance tuning release, primarily related to LSM
+trees.  The changes are as follows:
+
+* Implement minor merges for LSM trees, prefer them to major merges.
+
+* Update hazard references, so the active array grows as needed.  Change
+  the default hazard_max to 1000.
+
+* Abort transactions if the cache is so full that they cannot make
+  progress.
+
+* Fix a bug where verify could crash if an empty checkpoint exists.
+
+* Make the maximum number of chunks for merges configurable, rather than
+  deriving a value from the number of hazard references available.
+
+* Switch to an atomic add to allocate transaction IDs.  This fixes a subtle
+  race before where two threads could temporarily have the same ID in the
+  global state table.  If one of the threads timed out and the other thread
+  committed its transaction with that ID, the commit would not become
+  visible immediately.  This could lead to deadlock errors in workloads
+  that are logically conflict-free.
+
+* Have auto-commit transactions retry deadlocks.  This requires that we
+  keep the user's key and value in the cursor.
+
+* Simplify the code handling updated records in variable-length
+  column-store reconciliation.
+
+* Never wait for eviction when holding the schema lock.  This avoids
+  deadlocks between opening a column store file and taking a checkpoint.
+
+* Take care with the loop termination when walking files for eviction.  We
+  were making one extra call into __wt_tree_walk, which would leave a leaf
+  page in the WT_REF_EVICT_WALK state, unable to be evicted.  In some
+  workloads, including LSM loads, we could end up with many files all
+  consisting of a single leaf page, none of which could be evicted.
+
+* Pause updates when the cache is full.
+
+* In files marked as "out of cache", don't wait for eviction when reading a
+  page.
+
+* Fix the record count calculation for minor merges.  This was leading to
+  no Bloom filter being created for minor merges after running for some
+  time, leading to merges taking increasingly long to complete.
+
+* Only sleep in the LSM checkpoint thread if no work is done.
+
+* Add sanity check of cache size to LSM open.
+
+[#338] Create fake checkpoints until an object is modified, so that a
+       checkpoint between the cursor create and the bulk load doesn't make
+       it impossible to do a bulk-load on the cursor.
+
+
 WiredTiger release 1.3.1, 2012-09-25
 ------------------------------------
 
