@@ -504,7 +504,7 @@ private:
             ::abort();
         }
 
-        massert(16439, str::stream() << "Error calling getLastError: " << err["errmsg"],
+        massert(16441, str::stream() << "Error calling getLastError: " << err["errmsg"],
                 err["ok"].trueValue());
     }
 };
