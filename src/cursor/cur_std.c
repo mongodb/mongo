@@ -305,8 +305,9 @@ __wt_cursor_set_value(WT_CURSOR *cursor, ...)
 	} else if (strcmp(fmt, "t") == 0 ||
 	    (isdigit(fmt[0]) && strcmp(fmt + 1, "t"))) {
 		sz = 1;
+		buf = &cursor->value;
 		WT_ERR(__wt_buf_initsize(session, buf, sz));
-		*(uint8_t *)cursor->value.data = (uint8_t)va_arg(ap, int);
+		*(uint8_t *)buf->mem = (uint8_t)va_arg(ap, int);
 	} else {
 		WT_ERR(
 		    __wt_struct_sizev(session, &sz, cursor->value_format, ap));
