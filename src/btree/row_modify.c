@@ -280,8 +280,6 @@ __wt_update_check(WT_SESSION_IMPL *session, WT_PAGE *page, WT_UPDATE *next)
 	/* Before allocating anything, make sure this update is permitted. */
 	WT_RET(__wt_txn_update_check(session, next));
 
-	{
-
 	/*
 	 * Pause if the cache is full.
 	 * This matches the logic in __wt_page_in_func.
