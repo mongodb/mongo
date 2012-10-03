@@ -7,9 +7,9 @@
 
 #include "wt_internal.h"
 
-static int __block_merge(WT_SESSION_IMPL *, WT_EXTLIST *, off_t, off_t);
 static int __block_ext_overlap(WT_SESSION_IMPL *,
 	WT_BLOCK *, WT_EXTLIST *, WT_EXT **, WT_EXTLIST *, WT_EXT **);
+static int __block_merge(WT_SESSION_IMPL *, WT_EXTLIST *, off_t, off_t);
 
 /*
  * __block_off_srch --
@@ -197,6 +197,29 @@ __block_off_insert(
 	ext->depth = (uint8_t)skipdepth;
 	return (__block_ext_insert(session, el, ext));
 }
+
+#ifdef HAVE_DIAGNOSTIC
+/*
+ * __wt_block_off_match --
+ *	Return if any part of a specified range appears on a specified extent
+ * list.
+ */
+int
+__wt_block_off_match(WT_EXTLIST *el, off_t off, off_t size)
+{
+	WT_EXT *before, *after;
+
+	/* Search for before and after entries for the offset. */
+	__block_off_srch_pair(el, off, &before, &after);
+
+	/* If "before" or "after" overlaps, we have a winner. */
+	if (before != NULL && before->off + before->size > off)
+		return (1);
+	if (after != NULL && off + size > after->off)
+		return (1);
+	return (0);
+}
+#endif
 
 /*
  * __block_off_remove --
