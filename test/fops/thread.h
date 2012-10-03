@@ -26,6 +26,7 @@ extern WT_CONNECTION *conn;			/* WiredTiger connection */
 extern u_int nops;				/* Operations per thread */
 
 extern const char *uri;				/* Object */
+extern const char *config;			/* Object config */
 
 #if defined (__GNUC__)
 void die(const char *, int) __attribute__((noreturn));
