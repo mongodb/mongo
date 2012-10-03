@@ -575,7 +575,9 @@ env.Alias( "core", [ '#/%s' % b for b in [ add_exe( "mongo" ), add_exe( "mongod"
 
 #headers
 if installSetup.headers:
-    for id in [ "", "util/", "util/net/", "util/mongoutils/", "util/concurrency/", "db/", "db/stats/", "db/repl/", "db/ops/", "client/", "bson/", "bson/util/", "s/", "scripting/" ]:
+    for id in [ "", "util/", "util/net/", "util/mongoutils/", "util/concurrency/", "db/",
+                "db/stats/", "db/repl/", "db/ops/", "client/", "bson/", "bson/util/", "s/",
+                "scripting/", "base/", "platform/" ]:
         env.Install( "$INSTALL_DIR/include/" + id, Glob( id + "*.h" ) )
         env.Install( "$INSTALL_DIR/include/" + id, Glob( id + "*.hpp" ) )
 
