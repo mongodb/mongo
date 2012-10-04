@@ -18,9 +18,9 @@
 
 #pragma once
 
-#include "mongo/pch.h"
 #include <boost/program_options.hpp>
 #include <list>
+#include <string>
 
 namespace mongo {
 
@@ -32,7 +32,7 @@ namespace mongo {
      */
     class Module {
     public:
-        Module( const string& name );
+        Module( const std::string& name );
         virtual ~Module();
 
         boost::program_options::options_description_easy_init add_options() {
@@ -54,7 +54,7 @@ namespace mongo {
          */
         virtual void shutdown() = 0;
 
-        const string& getName() { return _name; }
+        const std::string& getName() { return _name; }
 
         // --- static things
 
@@ -64,7 +64,7 @@ namespace mongo {
 
     private:
         static std::list<Module*> * _all;
-        string _name;
+        std::string _name;
         boost::program_options::options_description _options;
     };
 }
