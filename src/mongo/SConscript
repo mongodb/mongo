@@ -99,12 +99,15 @@ commonFiles = [ "pch.cpp",
                 "client/distlock.cpp",
                 ]
 
+env.StaticLibrary("fail_point", "util/fail_point.cpp", LIBDEPS=["foundation", "bson"])
+
 env.StaticLibrary('mongocommon', commonFiles,
                   LIBDEPS=['bson',
                            'foundation',
                            'md5',
                            'stacktrace',
                            'stringutils',
+                           'fail_point',
                            '$BUILD_DIR/third_party/pcrecpp',
                            '$BUILD_DIR/third_party/murmurhash3/murmurhash3',
                            '$BUILD_DIR/third_party/shim_boost'],)
@@ -353,6 +356,10 @@ env.CppUnitTest( "balancer_policy_test" , [ "s/balancer_policy_tests.cpp" ] ,
                  LIBDEPS=["mongoscore", "coreshard","mongocommon","coreserver","coredb","dbcmdline","mongodandmongos"] ,
                  NO_CRUTCH=True)
 
+# Should only need stuff from util, unittest and platform
+env.CppUnitTest("fail_point_test", [ "util/fail_point_test.cpp" ],
+                LIBDEPS=["fail_point"])
+
 serverOnlyFiles += [ "s/d_logic.cpp",
                      "s/d_writeback.cpp",
                      "s/d_migrate.cpp",
@@ -450,8 +457,14 @@ if has_option( "sharedclient" ):
 
 # dbtests test binary
 env.StaticLibrary('testframework', ['dbtests/framework.cpp'], LIBDEPS=['unittest/unittest'])
-env.StaticLibrary('mocklib', [f for f in Glob( "dbtests/mock/*.cpp" )],
-  LIBDEPS=['unittest/unittest', 'mongocommon'])
+env.StaticLibrary('mocklib', [
+        'dbtests/mock/mock_dbclient_connection.cpp',
+        'dbtests/mock/mock_remote_db_server.cpp',
+        'dbtests/mock/mock_replica_set.cpp'
+    ],
+    LIBDEPS=['unittest/unittest', 'mongocommon'])
+
+
 
 test = testEnv.Install(
     '#/',
@@ -575,7 +588,9 @@ env.Alias( "core", [ '#/%s' % b for b in [ add_exe( "mongo" ), add_exe( "mongod"
 
 #headers
 if installSetup.headers:
-    for id in [ "", "util/", "util/net/", "util/mongoutils/", "util/concurrency/", "db/", "db/stats/", "db/repl/", "db/ops/", "client/", "bson/", "bson/util/", "s/", "scripting/" ]:
+    for id in [ "", "util/", "util/net/", "util/mongoutils/", "util/concurrency/", "db/",
+                "db/stats/", "db/repl/", "db/ops/", "client/", "bson/", "bson/util/", "s/",
+                "scripting/", "base/", "platform/" ]:
         env.Install( "$INSTALL_DIR/include/" + id, Glob( id + "*.h" ) )
         env.Install( "$INSTALL_DIR/include/" + id, Glob( id + "*.hpp" ) )
 

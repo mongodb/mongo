@@ -27,7 +27,7 @@ namespace mongo {
     // see also mongoutils/str.h - perhaps move these there?
     // see also text.h
 
-    void splitStringDelim( const string& str , std::vector<std::string>* res , char delim );
+    void splitStringDelim( const std::string& str , std::vector<std::string>* res , char delim );
 
     void joinStringDelim( const std::vector<std::string>& strs , std::string* res , char delim );
 
