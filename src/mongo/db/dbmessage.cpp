@@ -76,7 +76,7 @@ namespace mongo {
 
     void replyToQuery(int queryResultFlags,
                       AbstractMessagingPort* p, Message& requestMsg,
-                      BSONObj& responseObj) {
+                      const BSONObj& responseObj) {
         replyToQuery(queryResultFlags,
                      p, requestMsg,
                      (void *) responseObj.objdata(), responseObj.objsize(), 1);

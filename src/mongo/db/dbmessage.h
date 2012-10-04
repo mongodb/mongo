@@ -266,7 +266,7 @@ namespace mongo {
     /* object reply helper. */
     void replyToQuery(int queryResultFlags,
                       AbstractMessagingPort* p, Message& requestMsg,
-                      BSONObj& responseObj);
+                      const BSONObj& responseObj);
 
     /* helper to do a reply using a DbResponse object */
     void replyToQuery( int queryResultFlags, Message& m, DbResponse& dbresponse, BSONObj obj );
