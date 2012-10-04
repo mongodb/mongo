@@ -450,8 +450,14 @@ if has_option( "sharedclient" ):
 
 # dbtests test binary
 env.StaticLibrary('testframework', ['dbtests/framework.cpp'], LIBDEPS=['unittest/unittest'])
-env.StaticLibrary('mocklib', [f for f in Glob( "dbtests/mock/*.cpp" )],
-  LIBDEPS=['unittest/unittest', 'mongocommon'])
+env.StaticLibrary('mocklib', [
+        'dbtests/mock/mock_dbclient_connection.cpp',
+        'dbtests/mock/mock_remote_db_server.cpp',
+        'dbtests/mock/mock_replica_set.cpp'
+    ],
+    LIBDEPS=['unittest/unittest', 'mongocommon'])
+
+
 
 test = testEnv.Install(
     '#/',
