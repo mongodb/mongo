@@ -17,6 +17,7 @@
 */
 
 #include "pch.h"
+#include "../server.h"
 #include "shard.h"
 #include "config.h"
 #include "request.h"
@@ -116,18 +117,23 @@ namespace mongo {
             // Now only check top-level shard connections
             for ( unsigned i=0; i<all.size(); i++ ) {
 
-                string sconnString = all[i].getConnString();
-                Status* &s = _hosts[sconnString];
+                Shard& shard = all[i];
+                try {
+                    string sconnString = shard.getConnString();
+                    Status* &s = _hosts[sconnString];
 
-                if ( ! s ){
-                    s = new Status();
+                    if ( ! s ){
+                        s = new Status();
+                    }
+
+                    if( ! s->avail )
+                        s->avail = shardConnectionPool.get( sconnString );
+
+                    versionManager.checkShardVersionCB( s->avail, ns, false, 1 );
+                } catch(...) { 
+                    LOGATMOST(2) << "exception in checkAllVersions shard:" << shard.getName() << endl;
+                    throw;
                 }
-
-                if( ! s->avail )
-                    s->avail = shardConnectionPool.get( sconnString );
-
-                versionManager.checkShardVersionCB( s->avail, ns, false, 1 );
-
             }
         }
 
