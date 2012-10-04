@@ -217,11 +217,10 @@ __col_insert_alloc(WT_SESSION_IMPL *session,
  * __wt_col_append_serial_func --
  *	Server function to append an WT_INSERT entry to the tree.
  */
-void
-__wt_col_append_serial_func(WT_SESSION_IMPL *session)
+int
+__wt_col_append_serial_func(WT_SESSION_IMPL *session, void *args)
 {
 	WT_BTREE *btree;
-	WT_DECL_RET;
 	WT_INSERT *ins, *new_ins, ***ins_stack;
 	WT_INSERT_HEAD *inshead, **insheadp, **new_inslist, *new_inshead;
 	WT_PAGE *page;
@@ -231,11 +230,11 @@ __wt_col_append_serial_func(WT_SESSION_IMPL *session)
 
 	btree = session->btree;
 
-	__wt_col_append_unpack(session, &page, &write_gen, &insheadp,
+	__wt_col_append_unpack(args, &page, &write_gen, &insheadp,
 	    &ins_stack, &new_inslist, &new_inshead, &new_ins, &skipdepth);
 
 	/* Check the page's write-generation. */
-	WT_ERR(__wt_page_write_gen_check(session, page, write_gen));
+	WT_RET(__wt_page_write_gen_check(session, page, write_gen));
 
 	if ((inshead = *insheadp) == NULL)
 		inshead = new_inshead;
@@ -255,7 +254,7 @@ __wt_col_append_serial_func(WT_SESSION_IMPL *session)
 
 	/* If we find the record number, there's been a race. */
 	if (ins != NULL && WT_INSERT_RECNO(ins) == recno)
-		WT_ERR(WT_RESTART);
+		WT_RET(WT_RESTART);
 
 	/*
 	 * Publish: First, point the new WT_INSERT item's skiplist references
@@ -273,7 +272,7 @@ __wt_col_append_serial_func(WT_SESSION_IMPL *session)
 		*ins_stack[i] = new_ins;
 	}
 
-	__wt_col_append_new_ins_taken(session, page);
+	__wt_col_append_new_ins_taken(session, args, page);
 
 	/*
 	 * If the insert head does not yet have an insert list, our caller
@@ -284,7 +283,7 @@ __wt_col_append_serial_func(WT_SESSION_IMPL *session)
 	 */
 	if (*insheadp == NULL) {
 		WT_PUBLISH(*insheadp, new_inshead);
-		__wt_col_append_new_inshead_taken(session, page);
+		__wt_col_append_new_inshead_taken(session, args, page);
 	}
 
 	/*
@@ -296,7 +295,7 @@ __wt_col_append_serial_func(WT_SESSION_IMPL *session)
 	 */
 	if (page->modify->append == NULL) {
 		page->modify->append = new_inslist;
-		__wt_col_append_new_inslist_taken(session, page);
+		__wt_col_append_new_inslist_taken(session, args, page);
 	}
 
 	/*
@@ -306,7 +305,8 @@ __wt_col_append_serial_func(WT_SESSION_IMPL *session)
 	if (recno > btree->last_recno)
 		btree->last_recno = recno;
 
-err:	__wt_session_serialize_wrapup(session, page, ret);
+	__wt_page_and_tree_modify_set(session, page);
+	return (0);
 }
 
 /*

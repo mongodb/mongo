@@ -155,6 +155,26 @@ __wt_page_modify_set(WT_PAGE *page)
 }
 
 /*
+ * __wt_page_and_tree_modify_set --
+ *	Mark both the page and tree dirty.
+ */
+static inline void
+__wt_page_and_tree_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page)
+{
+	WT_BTREE *btree;
+
+	btree = session->btree;
+
+	/*
+	 * A memory barrier is required for setting the tree's modified value,
+	 * we depend on the barrier called in setting the page's modified value.
+	 */
+	btree->modified = 1;
+
+	__wt_page_modify_set(page);
+}
+
+/*
  * __wt_page_is_modified --
  *	Return if the page is dirty.
  */

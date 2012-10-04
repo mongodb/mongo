@@ -164,13 +164,13 @@ __wt_evict_server_wake(WT_SESSION_IMPL *session)
  *	Eviction serialization function called when a tree is being flushed
  *	or closed.
  */
-void
-__wt_sync_file_serial_func(WT_SESSION_IMPL *session)
+int
+__wt_sync_file_serial_func(WT_SESSION_IMPL *session, void *args)
 {
 	WT_CACHE *cache;
 	int syncop;
 
-	__wt_sync_file_unpack(session, &syncop);
+	__wt_sync_file_unpack(args, &syncop);
 
 	/*
 	 * Publish: there must be a barrier to ensure the structure fields are
@@ -181,6 +181,8 @@ __wt_sync_file_serial_func(WT_SESSION_IMPL *session)
 	/* We're serialized at this point, no lock needed. */
 	cache = S2C(session)->cache;
 	++cache->sync_request;
+
+	return (0);
 }
 
 /*
@@ -456,7 +458,6 @@ __evict_file_request_walk(WT_SESSION_IMPL *session)
 	WT_CACHE *cache;
 	WT_CONNECTION_IMPL *conn;
 	WT_SESSION_IMPL *request_session;
-	WT_DECL_RET;
 	uint32_t i, session_cnt;
 	int syncop;
 
@@ -515,9 +516,13 @@ __evict_file_request_walk(WT_SESSION_IMPL *session)
 		__wt_spin_lock(session, &cache->evict_lock);
 	}
 
-	ret = __evict_file_request(request_session, syncop);
-
-	__wt_session_serialize_wrapup(request_session, NULL, ret);
+	/*
+	 * Publish: there must be a barrier to ensure the return value is set
+	 * before the requesting thread wakes.
+	 */
+	WT_PUBLISH(request_session->syncop_ret,
+	    __evict_file_request(request_session, syncop));
+	__wt_cond_signal(request_session, request_session->cond);
 
 	return (0);
 }

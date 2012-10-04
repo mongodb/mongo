@@ -99,10 +99,6 @@ struct __wt_session_impl {
 		int line;
 	} *scratch_track;
 #endif
-					/* Serialized operation state */
-	void	*wq_args;		/* Operation arguments */
-	int	wq_sleeping;		/* Thread is blocked */
-	int	wq_ret;			/* Return value */
 
 	WT_TXN_ISOLATION isolation;
 	WT_TXN	txn;			/* Transaction state */
@@ -118,6 +114,7 @@ struct __wt_session_impl {
 #define	WT_SYNC_DISCARD		2	/* Sync the file, discard pages */
 #define	WT_SYNC_DISCARD_NOWRITE	3	/* Discard the file */
 	int syncop;			/* File operation */
+	int syncop_ret;			/* Return value */
 
 	uint32_t id;			/* Offset in conn->session_array */
 
