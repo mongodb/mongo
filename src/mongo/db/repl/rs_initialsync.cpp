@@ -204,8 +204,8 @@ namespace mongo {
                     (m->hbinfo().ping > closest->hbinfo().ping))
                     continue;
 
-                if ( attempts == 0 &&
-                     myConfig().slaveDelay < m->config().slaveDelay ) {
+                if (attempts == 0 &&
+                    (myConfig().slaveDelay < m->config().slaveDelay || m->config().hidden)) {
                     continue; // skip this one in the first attempt
                 }
 
