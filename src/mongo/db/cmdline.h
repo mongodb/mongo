@@ -16,8 +16,10 @@
 
 #pragma once
 
-#include "mongo/pch.h"
-#include "jsobj.h"
+#include <string>
+#include <vector>
+
+#include "mongo/db/jsobj.h"
 
 namespace boost {
     namespace program_options {
@@ -40,8 +42,8 @@ namespace mongo {
 
         CmdLine();
 
-        string binaryName;     // mongod or mongos
-        string cwd;            // cwd of when process started
+        std::string binaryName;     // mongod or mongos
+        std::string cwd;            // cwd of when process started
 
         // this is suboptimal as someone could rename a binary.  todo...
         bool isMongos() const { return binaryName == "mongos"; }
@@ -54,25 +56,25 @@ namespace mongo {
         };
         bool isDefaultPort() const { return port == DefaultDBPort; }
 
-        string bind_ip;        // --bind_ip
+        std::string bind_ip;        // --bind_ip
         bool rest;             // --rest
         bool jsonp;            // --jsonp
 
-        string _replSet;       // --replSet[/<seedlist>]
-        string ourSetName() const {
-            string setname;
+        std::string _replSet;       // --replSet[/<seedlist>]
+        std::string ourSetName() const {
+            std::string setname;
             size_t sl = _replSet.find('/');
-            if( sl == string::npos )
+            if( sl == std::string::npos )
                 return _replSet;
             return _replSet.substr(0, sl);
         }
         bool usingReplSets() const { return !_replSet.empty(); }
 
-        string rsIndexPrefetch;// --indexPrefetch
+        std::string rsIndexPrefetch;// --indexPrefetch
 
         // for master/slave replication
-        string source;         // --source
-        string only;           // --only
+        std::string source;    // --source
+        std::string only;      // --only
 
         bool quiet;            // --quiet
         bool noTableScan;      // --notablescan no table scans allowed
@@ -115,7 +117,7 @@ namespace mongo {
 
         bool noUnixSocket;     // --nounixsocket
         bool doFork;           // --fork
-        string socket;         // UNIX domain socket directory
+        std::string socket;    // UNIX domain socket directory
 
         bool keyFile;
 
@@ -126,8 +128,8 @@ namespace mongo {
 
 #ifdef MONGO_SSL
         bool sslOnNormalPorts;      // --sslOnNormalPorts
-        string sslPEMKeyFile;       // --sslPEMKeyFile
-        string sslPEMKeyPassword;   // --sslPEMKeyPassword
+        std::string sslPEMKeyFile;       // --sslPEMKeyFile
+        std::string sslPEMKeyPassword;   // --sslPEMKeyPassword
 
         SSLManager* sslServerManager; // currently leaks on close
 #endif
@@ -142,7 +144,7 @@ namespace mongo {
                                        boost::program_options::options_description& hidden );
 
 
-        static void parseConfigFile( istream &f, stringstream &ss);
+        static void parseConfigFile( istream &f, std::stringstream &ss);
         /**
          * @return true if should run program, false if should exit
          */
@@ -188,7 +190,7 @@ namespace mongo {
     void setupLaunchSignals();
     void setupCoreSignals();
 
-    string prettyHostName();
+    std::string prettyHostName();
 
     void printCommandLineOpts();
 
@@ -201,15 +203,15 @@ namespace mongo {
      */
     class ParameterValidator {
     public:
-        ParameterValidator( const string& name );
+        ParameterValidator( const std::string& name );
         virtual ~ParameterValidator() {}
 
-        virtual bool isValid( BSONElement e , string& errmsg ) const = 0;
+        virtual bool isValid( BSONElement e , std::string& errmsg ) const = 0;
 
-        static ParameterValidator * get( const string& name );
+        static ParameterValidator * get( const std::string& name );
 
     private:
-        const string _name;
+        const std::string _name;
     };
 
 }
