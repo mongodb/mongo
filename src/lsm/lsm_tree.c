@@ -241,6 +241,9 @@ __wt_lsm_tree_create(WT_SESSION_IMPL *session,
 	WT_ERR(__wt_strndup(session, cval.str, cval.len,
 	    &lsm_tree->value_format));
 
+	WT_ERR(__wt_config_gets(session, cfg, "lsm_bloom", &cval));
+	lsm_tree->bloom = (cval.val == 0 ? 0 : 1);
+
 	WT_ERR(__wt_config_gets(session, cfg, "lsm_bloom_bit_count", &cval));
 	lsm_tree->bloom_bit_count = (uint32_t)cval.val;
 	WT_ERR(__wt_config_gets(session, cfg, "lsm_bloom_hash_count", &cval));

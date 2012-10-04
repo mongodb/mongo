@@ -303,7 +303,7 @@ __wt_cursor_set_value(WT_CURSOR *cursor, ...)
 		sz = item->size;
 		cursor->value.data = item->data;
 	} else if (strcmp(fmt, "t") == 0 ||
-	    (isdigit(fmt[0]) && strcmp(fmt + 1, "t"))) {
+	    (isdigit(fmt[0]) && strcmp(fmt + 1, "t") == 0)) {
 		sz = 1;
 		buf = &cursor->value;
 		WT_ERR(__wt_buf_initsize(session, buf, sz));

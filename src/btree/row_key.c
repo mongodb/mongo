@@ -394,14 +394,14 @@ __wt_row_ikey_alloc(WT_SESSION_IMPL *session,
  * __wt_row_key_serial_func --
  *	Server function to instantiate a key during a row-store search.
  */
-void
-__wt_row_key_serial_func(WT_SESSION_IMPL *session)
+int
+__wt_row_key_serial_func(WT_SESSION_IMPL *session, void *args)
 {
 	WT_IKEY *ikey;
 	WT_PAGE *page;
 	WT_ROW *rip;
 
-	__wt_row_key_unpack(session, &page, &rip, &ikey);
+	__wt_row_key_unpack(args, &page, &rip, &ikey);
 
 	/*
 	 * We don't care about the page's write generation -- there's a simpler
@@ -413,6 +413,5 @@ __wt_row_key_serial_func(WT_SESSION_IMPL *session)
 		__wt_cache_page_inmem_incr(
 		    session, page, sizeof(WT_IKEY) + ikey->size);
 	}
-
-	__wt_session_serialize_wrapup(session, NULL, 0);
+	return (0);
 }

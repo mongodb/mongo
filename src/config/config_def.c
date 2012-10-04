@@ -112,9 +112,10 @@ __wt_confdfl_file_meta =
 	"checksum=,collator=,columns=,dictionary=0,huffman_key=,"
 	"huffman_value=,internal_item_max=0,internal_key_truncate=,"
 	"internal_page_max=2KB,key_format=u,key_gap=10,leaf_item_max=0,"
-	"leaf_page_max=1MB,lsm_bloom_bit_count=8,lsm_bloom_hash_count=4,"
-	"lsm_chunk_size=2MB,lsm_merge_max=15,prefix_compression=,split_pct=75"
-	",type=btree,value_format=u,version=(major=0,minor=0)";
+	"leaf_page_max=1MB,lsm_bloom=,lsm_bloom_bit_count=8,"
+	"lsm_bloom_hash_count=4,lsm_chunk_size=2MB,lsm_merge_max=15,"
+	"prefix_compression=,split_pct=75,type=btree,value_format=u,"
+	"version=(major=0,minor=0)";
 
 WT_CONFIG_CHECK
 __wt_confchk_file_meta[] = {
@@ -135,6 +136,7 @@ __wt_confchk_file_meta[] = {
 	{ "key_gap", "int", "min=0" },
 	{ "leaf_item_max", "int", "min=0" },
 	{ "leaf_page_max", "int", "min=512B,max=512MB" },
+	{ "lsm_bloom", "boolean", NULL },
 	{ "lsm_bloom_bit_count", "int", "min=2,max=1000" },
 	{ "lsm_bloom_hash_count", "int", "min=2,max=100" },
 	{ "lsm_chunk_size", "int", "min=512K,max=500MB" },
@@ -212,8 +214,8 @@ __wt_confdfl_session_create =
 	"colgroups=,collator=,columns=,columns=,dictionary=0,exclusive=0,"
 	"filename=,huffman_key=,huffman_value=,internal_item_max=0,"
 	"internal_key_truncate=,internal_page_max=2KB,key_format=u,"
-	"key_format=u,key_gap=10,leaf_item_max=0,leaf_page_max=1MB,"
-	"lsm_bloom_bit_count=8,lsm_bloom_hash_count=4,lsm_chunk_size=2MB,"
+	"key_format=u,key_gap=10,leaf_item_max=0,leaf_page_max=1MB,lsm_bloom="
+	",lsm_bloom_bit_count=8,lsm_bloom_hash_count=4,lsm_chunk_size=2MB,"
 	"lsm_merge_max=15,prefix_compression=,split_pct=75,type=btree,"
 	"value_format=u,value_format=u";
 
@@ -240,6 +242,7 @@ __wt_confchk_session_create[] = {
 	{ "key_gap", "int", "min=0" },
 	{ "leaf_item_max", "int", "min=0" },
 	{ "leaf_page_max", "int", "min=512B,max=512MB" },
+	{ "lsm_bloom", "boolean", NULL },
 	{ "lsm_bloom_bit_count", "int", "min=2,max=1000" },
 	{ "lsm_bloom_hash_count", "int", "min=2,max=100" },
 	{ "lsm_chunk_size", "int", "min=512K,max=500MB" },

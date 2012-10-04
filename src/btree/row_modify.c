@@ -192,21 +192,20 @@ __wt_row_insert_alloc(WT_SESSION_IMPL *session,
  * __wt_insert_serial_func --
  *	Server function to add an WT_INSERT entry to the page.
  */
-void
-__wt_insert_serial_func(WT_SESSION_IMPL *session)
+int
+__wt_insert_serial_func(WT_SESSION_IMPL *session, void *args)
 {
-	WT_DECL_RET;
 	WT_INSERT *new_ins, ***ins_stack;
 	WT_INSERT_HEAD *inshead, **insheadp, **new_inslist, *new_inshead;
 	WT_PAGE *page;
 	uint32_t write_gen;
 	u_int i, skipdepth;
 
-	__wt_insert_unpack(session, &page, &write_gen, &insheadp,
+	__wt_insert_unpack(args, &page, &write_gen, &insheadp,
 	    &ins_stack, &new_inslist, &new_inshead, &new_ins, &skipdepth);
 
 	/* Check the page's write-generation. */
-	WT_ERR(__wt_page_write_gen_check(session, page, write_gen));
+	WT_RET(__wt_page_write_gen_check(session, page, write_gen));
 
 	/*
 	 * Publish: First, point the new WT_INSERT item's skiplist references
@@ -226,7 +225,7 @@ __wt_insert_serial_func(WT_SESSION_IMPL *session)
 		*ins_stack[i] = new_ins;
 	}
 
-	__wt_insert_new_ins_taken(session, page);
+	__wt_insert_new_ins_taken(session, args, page);
 
 	/*
 	 * If the insert head does not yet have an insert list, our caller
@@ -237,7 +236,7 @@ __wt_insert_serial_func(WT_SESSION_IMPL *session)
 	 */
 	if (*insheadp == NULL) {
 		WT_PUBLISH(*insheadp, new_inshead);
-		__wt_insert_new_inshead_taken(session, page);
+		__wt_insert_new_inshead_taken(session, args, page);
 	}
 
 	/*
@@ -250,15 +249,15 @@ __wt_insert_serial_func(WT_SESSION_IMPL *session)
 	if (page->type == WT_PAGE_ROW_LEAF) {
 		if (page->u.row.ins == NULL) {
 			page->u.row.ins = new_inslist;
-			__wt_insert_new_inslist_taken(session, page);
+			__wt_insert_new_inslist_taken(session, args, page);
 		}
 	} else
 		if (page->modify->update == NULL) {
 			page->modify->update = new_inslist;
-			__wt_insert_new_inslist_taken(session, page);
+			__wt_insert_new_inslist_taken(session, args, page);
 		}
-
-err:	__wt_session_serialize_wrapup(session, page, ret);
+	__wt_page_and_tree_modify_set(session, page);
+	return (0);
 }
 
 /*
@@ -431,19 +430,17 @@ __wt_row_leaf_obsolete(WT_SESSION_IMPL *session, WT_PAGE *page)
  * __wt_update_serial_func --
  *	Server function to add an WT_UPDATE entry in the page array.
  */
-void
-__wt_update_serial_func(WT_SESSION_IMPL *session)
+int
+__wt_update_serial_func(WT_SESSION_IMPL *session, void *args)
 {
-	WT_DECL_RET;
 	WT_PAGE *page;
 	WT_UPDATE **new_upd, *upd, **upd_entry;
 	uint32_t write_gen;
 
-	__wt_update_unpack(
-	    session, &page, &write_gen, &upd_entry, &new_upd, &upd);
+	__wt_update_unpack(args, &page, &write_gen, &upd_entry, &new_upd, &upd);
 
 	/* Check the page's write-generation. */
-	WT_ERR(__wt_page_write_gen_check(session, page, write_gen));
+	WT_RET(__wt_page_write_gen_check(session, page, write_gen));
 
 	upd->next = *upd_entry;
 	/*
@@ -451,7 +448,7 @@ __wt_update_serial_func(WT_SESSION_IMPL *session)
 	 * pointer is set before we update the linked list.
 	 */
 	WT_PUBLISH(*upd_entry, upd);
-	__wt_update_upd_taken(session, page);
+	__wt_update_upd_taken(session, args, page);
 
 	/*
 	 * If the page needs an update array (column-store pages and inserts on
@@ -464,8 +461,9 @@ __wt_update_serial_func(WT_SESSION_IMPL *session)
 	 */
 	if (new_upd != NULL && page->u.row.upd == NULL) {
 		page->u.row.upd = new_upd;
-		__wt_update_new_upd_taken(session, page);
+		__wt_update_new_upd_taken(session, args, page);
 	}
 
-err:	__wt_session_serialize_wrapup(session, page, ret);
+	__wt_page_and_tree_modify_set(session, page);
+	return (0);
 }
