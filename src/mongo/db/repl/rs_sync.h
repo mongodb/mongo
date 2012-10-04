@@ -105,6 +105,9 @@ namespace replset {
         // Initial Sync and Sync Tail each use a different function.
         void multiApply(std::deque<BSONObj>& ops, MultiSyncApplyFunc applyFunc);
 
+        // The version of the last op to be read
+        int oplogVersion;
+
     private:
         BackgroundSyncInterface* _networkQueue;
 

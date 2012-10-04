@@ -416,7 +416,8 @@ namespace ReplSetTests {
 
     class TestRSSync : public Base {
 
-        void addOp(const string& op, BSONObj o, BSONObj* o2 = 0, const char* coll = 0) {
+        void addOp(const string& op, BSONObj o, BSONObj* o2 = NULL, const char* coll = NULL, 
+                   int version = 0) {
             OpTime ts;
             {
                 Lock::GlobalWrite lk;
@@ -425,6 +426,9 @@ namespace ReplSetTests {
 
             BSONObjBuilder b;
             b.appendTimestamp("ts", ts.asLL());
+            if (version != 0) {
+                b.append("v", version);
+            }
             b.append("op", op);
             b.append("o", o);
 
@@ -448,6 +452,12 @@ namespace ReplSetTests {
             }
         }
 
+        void addVersionedInserts(int expected) {
+            for (int i=0; i < expected; i++) {
+                addOp("i", BSON("_id" << i << "x" << 789), NULL, NULL, i);
+            }
+        }
+            
         void addUpdates() {
             BSONObj id = BSON("_id" << "123456something");
             addOp("i", id);
@@ -479,6 +489,12 @@ namespace ReplSetTests {
 
             drop();
             addInserts(100);
+            applyOplog();
+
+            ASSERT_EQUALS(expected, static_cast<int>(client()->count(ns())));
+
+            drop();
+            addVersionedInserts(100);
             applyOplog();
 
             ASSERT_EQUALS(expected, static_cast<int>(client()->count(ns())));
