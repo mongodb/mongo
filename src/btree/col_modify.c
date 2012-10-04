@@ -23,7 +23,7 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int op)
 	WT_INSERT_HEAD **inshead, *new_inshead, **new_inslist;
 	WT_ITEM *value, _value;
 	WT_PAGE *page;
-	WT_UPDATE *upd;
+	WT_UPDATE *upd, *upd_obsolete;
 	size_t ins_size, new_inshead_size, new_inslist_size, upd_size;
 	uint64_t recno;
 	u_int skipdepth;
@@ -87,7 +87,12 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int op)
 		WT_ERR(__wt_update_alloc(session, value, &upd, &upd_size));
 		logged = 1;
 		WT_ERR(__wt_update_serial(session, page,
-		    cbt->write_gen, &cbt->ins->upd, NULL, 0, &upd, upd_size));
+		    cbt->write_gen, &cbt->ins->upd, NULL, 0, &upd, upd_size,
+		    &upd_obsolete));
+
+		/* Discard any obsolete WT_UPDATE structures. */
+		if (upd_obsolete != NULL)
+			__wt_update_obsolete_free(session, page, upd_obsolete);
 	} else {
 		/* There may be no insert list, allocate as necessary. */
 		new_inshead_size = new_inslist_size = 0;
@@ -316,24 +321,33 @@ __wt_col_append_serial_func(WT_SESSION_IMPL *session, void *args)
 void
 __wt_col_leaf_obsolete(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
-	WT_INSERT *ins;
-	WT_COL *cip;
 	uint32_t i;
+	WT_COL *cip;
+	WT_INSERT *ins;
+	WT_UPDATE *upd;
 
 	switch (page->type) {
 	case WT_PAGE_COL_FIX:
 		WT_SKIP_FOREACH(ins, WT_COL_UPDATE_SINGLE(page))
-			__wt_update_obsolete(session, page, ins->upd);
+			if ((upd = __wt_update_obsolete_check(
+			    session, ins->upd)) != NULL)
+				__wt_update_obsolete_free(session, page, upd);
 		break;
 
 	case WT_PAGE_COL_VAR:
 		WT_COL_FOREACH(page, cip, i)
 			WT_SKIP_FOREACH(ins, WT_COL_UPDATE(page, cip))
-				__wt_update_obsolete(session, page, ins->upd);
+				if ((upd = __wt_update_obsolete_check(
+				    session, ins->upd)) != NULL)
+					__wt_update_obsolete_free(
+					    session, page, upd);
 		break;
 	}
 
 	/* Walk any append list. */
-	WT_SKIP_FOREACH(ins, WT_COL_APPEND(page))
-		__wt_update_obsolete(session, page, ins->upd);
+	WT_SKIP_FOREACH(ins, WT_COL_APPEND(page)) {
+		if ((upd =
+		    __wt_update_obsolete_check(session, ins->upd)) != NULL)
+			__wt_update_obsolete_free(session, page, upd);
+	}
 }

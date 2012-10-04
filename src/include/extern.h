@@ -451,7 +451,9 @@ extern int __wt_update_alloc(WT_SESSION_IMPL *session,
     WT_ITEM *value,
     WT_UPDATE **updp,
     size_t *sizep);
-extern void __wt_update_obsolete(WT_SESSION_IMPL *session,
+extern WT_UPDATE *__wt_update_obsolete_check(WT_SESSION_IMPL *session,
+    WT_UPDATE *upd);
+extern void __wt_update_obsolete_free( WT_SESSION_IMPL *session,
     WT_PAGE *page,
     WT_UPDATE *upd);
 extern void __wt_row_leaf_obsolete(WT_SESSION_IMPL *session, WT_PAGE *page);

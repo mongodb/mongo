@@ -53,6 +53,7 @@ Serial('update', [
 		SerialArg('WT_UPDATE **', 'srch_upd'),
 		SerialArg('WT_UPDATE **', 'new_upd', 1),
 		SerialArg('WT_UPDATE *', 'upd', 1),
+		SerialArg('WT_UPDATE **', 'upd_obsolete', 0),
 	]),
 ]
 
