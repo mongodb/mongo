@@ -39,16 +39,6 @@ SConsignFile( scons_data_dir + "/sconsign" )
 
 DEFAULT_INSTALL_DIR = "/usr/local"
 
-def _rpartition(string, sep):
-    """A replacement for str.rpartition which is missing in Python < 2.5
-    """
-    idx = string.rfind(sep)
-    if idx == -1:
-        return '', '', string
-    return string[:idx], sep, string[idx + 1:]
-
-
-
 buildscripts.bb.checkOk()
 
 def findSettingsSetup():
@@ -1014,14 +1004,13 @@ env.AlwaysBuild( "push" )
 
 # ---- deploying ---
 
-def s3push( localName , remoteName=None , remotePrefix=None , fixName=True , platformDir=True ):
+def s3push(localName, remoteName=None, platformDir=True):
     localName = str( localName )
 
-    if remotePrefix is None:
-        if isBuildingLatest:
-            remotePrefix = utils.getGitBranchString( "-" ) + "-latest"
-        else:
-            remotePrefix = "-" + distName
+    if isBuildingLatest:
+        remotePrefix = utils.getGitBranchString("-") + "-latest"
+    else:
+        remotePrefix = "-" + distName
 
     findSettingsSetup()
 
@@ -1033,15 +1022,11 @@ def s3push( localName , remoteName=None , remotePrefix=None , fixName=True , pla
     if remoteName is None:
         remoteName = localName
 
-    if fixName:
-        (root,dot,suffix) = _rpartition( localName, "." )
-        name = remoteName + "-" + getSystemInstallName()
-        name += remotePrefix
-        if dot == "." :
-            name += "." + suffix
-        name = name.lower()
-    else:
-        name = remoteName
+    name = '%s-%s%s' % (remoteName , getSystemInstallName(), remotePrefix)
+    lastDotIndex = localName.rfind('.')
+    if lastDotIndex != -1:
+        name += localName[lastDotIndex:]
+    name = name.lower()
 
     if platformDir:
         name = platform + "/" + name
