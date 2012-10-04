@@ -95,11 +95,13 @@ namespace mongo {
 
         virtual const char* what() const throw() { return _ei.msg.c_str(); }
         virtual int getCode() const { return _ei.code; }
-
         virtual void appendPrefix( std::stringstream& ss ) const { }
         virtual void addContext( const std::string& str ) {
             _ei.msg = str + causedBy( _ei.msg );
         }
+
+        // context when applicable. otherwise ""
+        std::string _shard;
 
         virtual std::string toString() const;
 

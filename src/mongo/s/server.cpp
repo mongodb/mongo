@@ -117,6 +117,9 @@ namespace mongo {
                 }
             }
             catch ( DBException& e ) {
+                // note that e.toString() is more detailed on a SocketException than 
+                // e.what().  we should think about what is the right level of detail both 
+                // for logging and return code.
                 log() << "DBException in process: " << e.what() << endl;
 
                 le->raiseError( e.getCode() , e.what() );
@@ -124,8 +127,12 @@ namespace mongo {
                 m.header()->id = r.id();
 
                 if ( r.expectResponse() ) {
-                    BSONObj err = BSON( "$err" << e.what() << "code" << e.getCode() );
-                    replyToQuery( ResultFlag_ErrSet, p , m , err );
+                    BSONObjBuilder b;
+                    b.append("$err",e.what()).append("code",e.getCode());
+                    if( !e._shard.empty() ) {
+                        b.append("shard",e._shard);
+                    }
+                    replyToQuery( ResultFlag_ErrSet, p , m , b.obj() );
                 }
             }
         }
