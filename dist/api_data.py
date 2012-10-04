@@ -86,6 +86,9 @@ lsm_config = [
 	Config('lsm_bloom_bit_count', '8', r'''
 		the number of bits used per item for LSM bloom filters.''',
 		min='2', max='1000'),
+	Config('lsm_bloom', 'true', r'''
+		create bloom filters for LSM trees.''',
+		type='boolean'),
 	Config('lsm_chunk_size', '2MB', r'''
 		the maximum size of the in-memory chunk of an LSM tree''',
 		min='512K', max='500MB'),

@@ -56,6 +56,7 @@ struct __wt_lsm_tree {
 	uint32_t bloom_hash_count;
 	uint32_t chunk_size;
 	uint32_t merge_max;
+	uint32_t bloom;			/* Is bloom enabled. */
 
 	WT_SESSION_IMPL *worker_session;/* Passed to thread_create */
 	pthread_t worker_tid;		/* LSM worker thread */
