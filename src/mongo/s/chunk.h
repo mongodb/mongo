@@ -220,7 +220,11 @@ namespace mongo {
 
         // methods, etc..
 
-        /**
+        /** Returns the highest or lowest existing value in the shard-key space.
+         *  Warning: this assumes that the shard key is not "special"- that is, the shardKeyPattern
+         *           is simply an ordered list of ascending/descending field names. Examples:
+         *           {a : 1, b : -1} is not special. {a : "hashed"} is.
+         *
          * if sort 1, return lowest key
          * if sort -1, return highest key
          * will return empty object if have none

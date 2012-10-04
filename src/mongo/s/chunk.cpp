@@ -224,22 +224,27 @@ namespace mongo {
                 splitPoint.push_back( medianKey );
         }
 
-        // We assume that if the chunk being split is the first (or last) one on the collection, this chunk is
-        // likely to see more insertions. Instead of splitting mid-chunk, we use the very first (or last) key
-        // as a split point.
-        if ( minIsInf() ) {
-            splitPoint.clear();
-            BSONObj key = _getExtremeKey( 1 );
-            if ( ! key.isEmpty() ) {
-                splitPoint.push_back( key );
+        // We assume that if the chunk being split is the first (or last) one on the collection,
+        // this chunk is likely to see more insertions. Instead of splitting mid-chunk, we use
+        // the very first (or last) key as a split point.
+        // This heuristic is skipped for "special" shard key patterns that are not likely to
+        // produce monotonically increasing or decreasing values (e.g. hashed shard keys).
+        // TODO: need better way to detect when shard keys vals are increasing/decreasing, and
+        // use that better method to determine whether to apply heuristic here.
+        if ( ! skey().isSpecial() ){
+            if ( minIsInf() ) {
+                splitPoint.clear();
+                BSONObj key = _getExtremeKey( 1 );
+                if ( ! key.isEmpty() ) {
+                    splitPoint.push_back( key );
+                }
             }
-
-        }
-        else if ( maxIsInf() ) {
-            splitPoint.clear();
-            BSONObj key = _getExtremeKey( -1 );
-            if ( ! key.isEmpty() ) {
-                splitPoint.push_back( key );
+            else if ( maxIsInf() ) {
+                splitPoint.clear();
+                BSONObj key = _getExtremeKey( -1 );
+                if ( ! key.isEmpty() ) {
+                    splitPoint.push_back( key );
+                }
             }
         }
 

@@ -61,6 +61,16 @@ namespace mongo {
         return pattern.isPrefixOf( otherPattern );
     }
 
+    bool ShardKeyPattern::isSpecial() const {
+        BSONForEach(e, pattern) {
+            int fieldVal = e.numberInt();
+            if ( fieldVal != 1 && fieldVal != -1 ){
+                return true;
+            }
+        }
+        return false;
+    }
+
     string ShardKeyPattern::toString() const {
         return pattern.toString();
     }
@@ -169,6 +179,21 @@ namespace mongo {
             verify( k.extractKey( fromjson("{a:1,sub:{b:2,c:3}}") ).binaryEqual(x) );
             verify( k.extractKey( fromjson("{sub:{b:2,c:3},a:1}") ).binaryEqual(x) );
         }
+
+        void isSpecialTest() {
+            ShardKeyPattern k1( BSON( "a" << 1) );
+            verify( ! k1.isSpecial() );
+
+            ShardKeyPattern k2( BSON( "a" << -1 << "b" << 1 ) );
+            verify( ! k2.isSpecial() );
+
+            ShardKeyPattern k3( BSON( "a" << "hashed") );
+            verify( k3.isSpecial() );
+
+            ShardKeyPattern k4( BSON( "a" << 1 << "b" << "hashed") );
+            verify( k4.isSpecial() );
+        }
+
         void moveToFrontTest() {
             ShardKeyPattern sk (BSON("a" << 1 << "b" << 1));
 
@@ -231,6 +256,8 @@ namespace mongo {
             BSONObj b = BSON( "key" << 999 );
 
             verify( k.extractKey( a ) <  k.extractKey( b ) );
+
+            isSpecialTest();
 
             // add middle multitype tests
 
