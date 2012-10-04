@@ -321,7 +321,7 @@ namespace mongo {
 
                 int checkpoint = timer.millis();
                 timer.reset();
-                tryHeartbeat(&info, &theirConfigVersion);
+                ok = tryHeartbeat(&info, &theirConfigVersion);
                 mem.ping = static_cast<unsigned int>(timer.millis());
                 totalSecs = (checkpoint + mem.ping)/1000;
 
