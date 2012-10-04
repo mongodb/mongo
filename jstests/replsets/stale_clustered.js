@@ -93,7 +93,18 @@ rsA.waitForState( rsA.getSecondaries(), rsA.SECONDARY, 5 * 60 * 1000 )
 
 prt("10: check our regular and slaveOk query")
 
-assert.eq( coll.find().itcount(), collSOk.find().itcount() )
+function compareCount() {
+    try {
+         return coll.find().itcount() == collSOk.find().itcount();
+    } catch (x) {
+        return false;
+    }
+};
+
+// there may have been a stepdown caused by step 8, so we run this twice in a row. The first time
+// can error out
+compareCount();
+assert(compareCount())
 
 prt("DONE\n\n\n");
 
