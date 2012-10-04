@@ -2871,6 +2871,13 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 					    unpack->data, unpack->size));
 				}
 
+				/*
+				 * We aren't actually creating the key so we
+				 * can't use bytes from this key to provide
+				 * prefix information for a subsequent key.
+				 */
+				tmpkey->size = 0;
+
 				/* Proceed with appended key/value pairs. */
 				goto leaf_insert;
 			}
