@@ -39,7 +39,7 @@ namespace mongo {
 namespace replset {
 
     SyncTail::SyncTail(BackgroundSyncInterface *q) :
-        Sync(""), _networkQueue(q)
+        Sync(""), oplogVersion(0), _networkQueue(q)
     {}
 
     SyncTail::~SyncTail() {}
@@ -444,6 +444,28 @@ namespace replset {
             return true;
         }
 
+        // check for oplog version change
+        BSONElement elemVersion = op["v"];
+        int curVersion = 0;
+        if (elemVersion.eoo())
+            // missing version means version 1
+            curVersion = 1;
+        else
+            curVersion = elemVersion.Int();
+
+        if (curVersion != oplogVersion) {
+            // Version changes cause us to end a batch.
+            // If we are starting a new batch, reset version number
+            // and continue.
+            if (ops->empty()) {
+                oplogVersion = curVersion;
+            } 
+            else {
+                // End batch early
+                return true;
+            }
+        }
+    
         // Copy the op to the deque and remove it from the bgsync queue.
         ops->push_back(op);
         _networkQueue->consume();
