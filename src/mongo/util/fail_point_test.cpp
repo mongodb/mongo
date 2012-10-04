@@ -209,16 +209,7 @@ namespace mongo_test {
 
         static void simpleTask(FailPoint* failPoint) {
             while (true) {
-                if (MONGO_FAIL_POINT((*failPoint))) {
-                    const mongo::BSONObj& data = failPoint->getData();
-
-                    if (data["a"].numberInt() != 44) {
-                        mongo::error() << "simpleTask thread detected anomaly - "
-                                << " data: " << data << std::endl;
-                        ASSERT(false);
-                    }
-                }
-
+                MONGO_FAIL_POINT((*failPoint));
                 boost::this_thread::interruption_point();
             }
         }

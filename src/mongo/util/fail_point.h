@@ -36,6 +36,13 @@ namespace mongo {
      * // Somewhere in the code
      * return false || MONGO_FAIL_POINT(makeBadThingsHappen);
      *
+     * // MONGO_FAIL_POINT bad usage example
+     * if (MONGO_FAIL_POINT(makeBadThingsHappen)) {
+     *     // Important! - You must not call getData() here.
+     *     // Use MONGO_FAIL_POINT_BLOCK instead if you need to.
+     *     const BSONObj& data = makeBadThingsHappen.getData();
+     * }
+     *
      * or
      *
      * // Somewhere in the code
