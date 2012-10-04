@@ -39,9 +39,31 @@ namespace replset {
         SyncTail(BackgroundSyncInterface *q);
         virtual ~SyncTail();
         virtual bool syncApply(const BSONObj &o, bool convertUpdateToUpsert = false);
-        void oplogApplySegment(const BSONObj& applyGTEObj, const BSONObj& minValidObj,
+
+        /**
+         * Apply ops from applyGTEObj's ts to at least minValidObj's ts.  Note that, due to
+         * batching, this may end up applying ops beyond minValidObj's ts.
+         *
+         * @param applyGTEObj the op to start replicating at.  This is actually not used except in
+         *                    comparision to minValidObj: the background sync thread keeps its own
+         *                    record of where we're synced to and starts providing ops from that
+         *                    point.
+         * @param minValidObj the op to finish syncing at.  This function cannot return (other than
+         *                    fatally erroring out) without applying at least this op.
+         * @param func        whether this should use initial sync logic (recloning docs) or
+         *                    "normal" logic.
+         * @return BSONObj    the op that was synced to.  This may be greater than minValidObj, as a
+         *                    single batch might blow right by minvalid. If applyGTEObj is the same
+         *                    op as minValidObj, this will be applyGTEObj.
+         */
+        BSONObj oplogApplySegment(const BSONObj& applyGTEObj, const BSONObj& minValidObj,
                                MultiSyncApplyFunc func);
-        virtual void oplogApplication(const BSONObj& applyGTEObj, const BSONObj& minValidObj);
+
+        /**
+         * Runs oplogApplySegment without allowing recloning documents.
+         */
+        virtual BSONObj oplogApplication(const BSONObj& applyGTEObj, const BSONObj& minValidObj);
+
         void oplogApplication();
         bool peek(BSONObj* obj);
 
@@ -107,7 +129,12 @@ namespace replset {
     public:
         virtual ~InitialSync();
         InitialSync(BackgroundSyncInterface *q);
-        void oplogApplication(const BSONObj& applyGTEObj, const BSONObj& minValidObj);
+
+        /**
+         * Creates the initial oplog entry: applies applyGTEObj and writes it to the oplog.  Then
+         * this runs oplogApplySegment allowing recloning documents.
+         */
+        BSONObj oplogApplication(const BSONObj& applyGTEObj, const BSONObj& minValidObj);
     };
 
     // TODO: move hbmsg into an error-keeping class (SERVER-4444)

@@ -295,7 +295,7 @@ namespace mongo {
         // apply startingTS..mvoptime portion of the oplog
         {
             try {
-                syncer.oplogApplication(lastOp, minValid);
+                minValid = syncer.oplogApplication(lastOp, minValid);
             }
             catch (const DBException&) {
                 log() << "replSet initial sync failed during oplog application phase" << rsLog;
