@@ -1909,45 +1909,6 @@ __rec_col_var_helper(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 }
 
 /*
- * __rec_onpage_ovfl --
- *	Get/set overflow records we need to track over the life of the page.
- */
-static int
-__rec_onpage_ovfl(WT_SESSION_IMPL *session,
-    WT_PAGE *page, WT_CELL_UNPACK *unpack, WT_ITEM *buf)
-{
-	int found;
-
-	/*
-	 * We're dealing with an overflow cell we may encounter repeatedly and
-	 * which we can re-use (unless it's discarded).  If it's discarded, we
-	 * may still (in the case of row-store page keys), need to know the
-	 * original value so we can re-create it.  As we can't get the original
-	 * value of the overflow cell's blocks from disk after the blocks are
-	 * discarded, we have to be able to get a copy from the tracking system.
-	 *
-	 * First, check in with the tracking system, and if we find it, we have
-	 * a copy and we're done.
-	 */
-	WT_RET(__wt_rec_track_onpage_srch(
-	    session, page, unpack->data, unpack->size, &found, buf));
-	if (found)
-		return (0);
-
-	/*
-	 * Read the original (possibly Huffman encoded) value from disk, and
-	 * enter it into the tracking system.
-	 *
-	 * There are implications to this call: the overflow item is discarded
-	 * when reconciliation completes, if not subsequently marked for re-use.
-	 */
-	WT_RET(__wt_ovfl_in(session, buf, unpack->data, unpack->size));
-	WT_RET(__wt_rec_track(session, page,
-	    unpack->data, unpack->size, buf->data, buf->size, WT_TRK_ONPAGE));
-	return (0);
-}
-
-/*
  * __rec_col_var --
  *	Reconcile a variable-width column-store leaf page.
  */
@@ -2147,7 +2108,7 @@ record_loop:	/*
 					    session, r, salvage,
 					    last, 0, 1, repeat_count));
 
-					/* Track the page has overflow items. */
+					/* Track if page has overflow items. */
 					r->ovfl_items = 1;
 
 					ovfl_state = OVFL_USED;
@@ -2314,9 +2275,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	WT_BTREE *btree;
 	WT_CELL *cell;
 	WT_CELL_UNPACK *kpack, _kpack, *vpack, _vpack;
-	WT_DECL_RET;
 	WT_IKEY *ikey;
-	WT_DECL_ITEM(tmpkey);
 	WT_KV *key, *val;
 	WT_PAGE *rp;
 	WT_REF *ref;
@@ -2333,9 +2292,6 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	vpack = &_vpack;
 
 	WT_RET(__rec_split_init(session, r, page, 0ULL, btree->maxintlpage));
-
-	/* Temporary buffer in which to instantiate any uninstantiated keys. */
-	WT_RET(__wt_scr_alloc(session, 0, &tmpkey));
 
 	/*
 	 * Ideally, we'd never store the 0th key on row-store internal pages
@@ -2380,7 +2336,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		vtype = 0;
 		addr = NULL;
 		rp = ref->page;
-		WT_ERR(__rec_page_modified(session, r, page, ref, &modified));
+		WT_RET(__rec_page_modified(session, r, page, ref, &modified));
 
 		/*
 		 * A modified WT_REF with no child page must be a page marked
@@ -2388,23 +2344,25 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		 */
 		if (modified && rp == NULL) {
 			/*
-			 * Overflow keys referencing discarded pages are
-			 * no longer useful.  We can't just discard them
-			 * though: if the page is re-filled, they may be
-			 * necessary for a subsequent reconciliation,
-			 * enter them into the tracking system.
-			 */
-			if (onpage_ovfl)
-				WT_ERR(__rec_onpage_ovfl(
-				    session, page, kpack, tmpkey));
-
-			/*
 			 * If the WT_REF addr field is cleared, not only is the
 			 * leaf page deleted, but there are no older readers in
 			 * the system, and there's no need to write this cell.
 			 */
-			if (ref->addr == NULL)
+			if (ref->addr == NULL) {
+				/*
+				 * Overflow keys referencing discarded pages are
+				 * no longer useful, schedule them for discard.
+				 * Don't worry about instantiation, internal
+				 * page keys are always instantiated.  Don't
+				 * worry about reuse, reusing this key in this
+				 * reconciliation is unlikely.
+				 */
+				if (onpage_ovfl)
+					WT_RET(__wt_rec_track_onpage_addr(
+					    session, page,
+					    kpack->data, kpack->size));
 				continue;
+			}
 
 			/*
 			 * There must be older readers in the system, write a
@@ -2452,15 +2410,17 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 			switch (F_ISSET(rp->modify, WT_PM_REC_MASK)) {
 			case WT_PM_REC_EMPTY:
 				/*
-				 * Overflow keys referencing discarded pages are
-				 * no longer useful.  We can't just discard them
-				 * though: if the page is re-filled, they may be
-				 * necessary for a subsequent reconciliation,
-				 * enter them into the tracking system.
+				 * Overflow keys referencing empty pages are no
+				 * longer useful, schedule them for discard.
+				 * Don't worry about instantiation, internal
+				 * page keys are always instantiated.  Don't
+				 * worry about reuse, reusing this key in this
+				 * reconciliation is unlikely.
 				 */
 				if (onpage_ovfl)
-					WT_ERR(__rec_onpage_ovfl(
-					    session, page, kpack, tmpkey));
+					WT_RET(__wt_rec_track_onpage_addr(
+					    session, page,
+					    kpack->data, kpack->size));
 				continue;
 			case WT_PM_REC_REPLACE:
 				/*
@@ -2473,19 +2433,20 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 			case WT_PM_REC_SPLIT_MERGE:
 				/*
 				 * Overflow keys referencing split pages are no
-				 * no longer useful (the interesting key is the
-				 * key for the split page).  We can't just
-				 * discard them, though: if the page shrinks,
-				 * they may be necessary for a subsequent
-				 * reconciliation, enter them into the tracking
-				 * system.
+				 * longer useful (the split page's key is the
+				 * interesting key); schedule them for discard.
+				 * Don't worry about instantiation, internal
+				 * page keys are always instantiated.  Don't
+				 * worry about reuse, reusing this key in this
+				 * reconciliation is unlikely.
 				 */
 				if (onpage_ovfl)
-					WT_ERR(__rec_onpage_ovfl(
-					    session, page, kpack, tmpkey));
+					WT_RET(__wt_rec_track_onpage_addr(
+					    session, page,
+					    kpack->data, kpack->size));
 
 				r->merge_ref = ref;
-				WT_ERR(__rec_row_merge(session, r,
+				WT_RET(__rec_row_merge(session, r,
 				    F_ISSET(rp->modify, WT_PM_REC_SPLIT_MERGE) ?
 				    rp : rp->modify->u.split));
 				continue;
@@ -2495,7 +2456,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 				 * we want to reference the original page.
 				 */
 				break;
-			WT_ILLEGAL_VALUE_ERR(session);
+			WT_ILLEGAL_VALUE(session);
 			}
 
 		/*
@@ -2524,65 +2485,31 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		__rec_cell_build_addr(r, p, size, vtype, 0);
 
 		/*
+		 * If the key is an overflow key, check to see if we've entered
+		 * the key into the tracking system.  In that case, the original
+		 * overflow key blocks have been freed, we have to build a new
+		 * key.  If there's no tracking entry, use the original blocks.
+		 */
+		if (onpage_ovfl) {
+			WT_RET(__wt_rec_track_onpage_srch(session,
+			    page, kpack->data, kpack->size, &found, NULL));
+			if (found)
+				onpage_ovfl = 0;
+		}
+
+		/*
 		 * Build key cell.
-		 *
-		 * If the key is an overflow item, check to see if it's been
-		 * entered into the tracking system (if an overflow key were
-		 * to reference an empty page during a previous reconciliation,
-		 * its blocks would have been discarded, and the only copy that
-		 * remains is in the tracking system).  If we don't find it in
-		 * the tracking system, assume prefix compression won't make
-		 * things better, and simply copy the key from the disk image.
-		 *
-		 * We have the key in-hand (we instantiate all internal page
-		 * keys when the page is brought into memory), so it would be
-		 * easy to check prefix compression, I'm just not bothering.
-		 * If we did gain by prefix compression, we'd have to discard
-		 * the old overflow key and write a new one to make it worth
-		 * doing, and this isn't a likely path anyway.
 		 *
 		 * Truncate any 0th key, internal pages don't need 0th keys.
 		 */
-		if (onpage_ovfl) {
-			WT_ERR(__wt_rec_track_onpage_srch(session,
-			    page, kpack->data, kpack->size, &found, tmpkey));
-			if (found) {
-				/*
-				 * If the key is Huffman encoded, decode it and
-				 * build a new key cell, which re-encodes the
-				 * key, wasting some work: this isn't a likely
-				 * path, a deleted key we then re-instantiate,
-				 * it's not worth handling Huffman encoded
-				 * keys separately to avoid the additional work,
-				 * we still have to write the key which is more
-				 * time than anything else.
-				 */
-				if (btree->huffman_key != NULL)
-					WT_ERR(__wt_huffman_decode(session,
-					    btree->huffman_key,
-					    tmpkey->data, tmpkey->size,
-					    tmpkey));
-
-				WT_ERR(__rec_cell_build_key(session, r,
-				    tmpkey->data,
-				    r->cell_zero ? 1 : tmpkey->size,
-				    1, &ovfl_key));
-
-				/*
-				 * Clear the on-page overflow key flag: we've
-				 * built a real key, we're not copying from a
-				 * page.
-				 */
-				onpage_ovfl = 0;
-			} else {
-				key->buf.data = cell;
-				key->buf.size = __wt_cell_total_len(kpack);
-				key->cell_len = 0;
-				key->len = key->buf.size;
-				ovfl_key = 1;
-			}
+		 if (onpage_ovfl) {
+			key->buf.data = cell;
+			key->buf.size = __wt_cell_total_len(kpack);
+			key->cell_len = 0;
+			key->len = key->buf.size;
+			ovfl_key = 1;
 		} else
-			WT_ERR(__rec_cell_build_key(session, r,
+			WT_RET(__rec_cell_build_key(session, r,
 			    WT_IKEY_DATA(ikey), r->cell_zero ? 1 : ikey->size,
 			    1, &ovfl_key));
 		r->cell_zero = 0;
@@ -2597,10 +2524,12 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 			 * we have to build the actual key now because we are
 			 * about to promote it.
 			 */
-			if (onpage_ovfl)
-				WT_ERR(__wt_cell_unpack_copy(
-				    session, kpack, r->cur));
-			WT_ERR(__rec_split(session, r));
+			if (onpage_ovfl) {
+				WT_RET(__wt_buf_set(session,
+				    r->cur, WT_IKEY_DATA(ikey), ikey->size));
+				onpage_ovfl = 0;
+			}
+			WT_RET(__rec_split(session, r));
 
 			/*
 			 * Turn off prefix compression until a full key written
@@ -2610,7 +2539,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 			 */
 			r->key_pfx_compress = 0;
 			if (!ovfl_key)
-				WT_ERR(__rec_cell_build_key(
+				WT_RET(__rec_cell_build_key(
 				    session, r, NULL, 0, 1, &ovfl_key));
 		}
 
@@ -2623,10 +2552,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	}
 
 	/* Write the remnant page. */
-	ret = __rec_split_finish(session, r);
-
-err:	__wt_scr_free(&tmpkey);
-	return (ret);
+	return (__rec_split_finish(session, r));
 }
 
 /*
@@ -2905,7 +2831,7 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 				val->cell_len = 0;
 				val->len = val->buf.size;
 
-				/* Track the page has overflow items. */
+				/* Track if page has overflow items. */
 				if (unpack->ovfl)
 					r->ovfl_items = 1;
 			}
@@ -2925,23 +2851,25 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 			if (WT_UPDATE_DELETED_ISSET(upd)) {
 				/*
 				 * Overflow keys referencing discarded values
-				 * are no longer useful.  We can't just discard
-				 * overflow keys as we did overflow values: if
-				 * the value gets replaced, we'll need the key
-				 * again for a subsequent reconciliation.  Add
-				 * the key to the tracking system.
+				 * are no longer useful, schedule the discard
+				 * of the backing blocks.  Don't worry about
+				 * reuse, reusing the key in this reconciliation
+				 * is unlikely.
+				 *
+				 * Keys are part of the name-space though, we
+				 * can't remove them from the in-memory tree;
+				 * if an overflow key was never instantiated,
+				 * do it now.
 				 */
 				__wt_cell_unpack(cell, unpack);
-				if (unpack->ovfl)
-					WT_ERR(__rec_onpage_ovfl(
-					    session, page, unpack, tmpkey));
-
-				/*
-				 * We aren't actually creating the key so we
-				 * can't use bytes from this key to provide
-				 * prefix information for a subsequent key.
-				 */
-				tmpkey->size = 0;
+				if (unpack->ovfl) {
+					if (ikey == NULL)
+						WT_ERR(__wt_row_key_copy(
+						    session, page, rip, NULL));
+					WT_ERR(__wt_rec_track_onpage_addr(
+					    session, page,
+					    unpack->data, unpack->size));
+				}
 
 				/* Proceed with appended key/value pairs. */
 				goto leaf_insert;
@@ -2963,64 +2891,40 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 		}
 
 		/*
-		 * Build key cell.
-		 *
-		 * If the key is an overflow item, check to see if it's been
-		 * entered into the tracking system (if an overflow key were
-		 * referenced a deleted value during a previous reconciliation,
-		 * its blocks would have been discarded, and the only copy that
-		 * remains is in the tracking system).  If we don't find it in
-		 * the tracking system, assume prefix compression won't make
-		 * things better, and simply copy the key from the disk image.
+		 * If the key is an overflow key, check to see if we've entered
+		 * the key into the tracking system.  In that case, the original
+		 * overflow key blocks have been freed, we have to build a new
+		 * key.  If there's no tracking entry, use the original blocks.
 		 */
 		__wt_cell_unpack(cell, unpack);
 		onpage_ovfl = unpack->ovfl;
 		if (onpage_ovfl) {
 			WT_ERR(__wt_rec_track_onpage_srch(session,
-			    page, unpack->data, unpack->size, &found, tmpkey));
+			    page, unpack->data, unpack->size, &found, NULL));
 			if (found) {
-				/*
-				 * If the key is Huffman encoded, decode it and
-				 * build a new key cell, which re-encodes the
-				 * key, wasting some work: this isn't a likely
-				 * path, a deleted key we then re-instantiate,
-				 * it's not worth handling Huffman encoded
-				 * keys separately to avoid the additional work,
-				 * we still have to write the key which is more
-				 * time than anything else.
-				 */
-				if (btree->huffman_key != NULL)
-					WT_ERR(__wt_huffman_decode(session,
-					    btree->huffman_key,
-					    tmpkey->data, tmpkey->size,
-					    tmpkey));
-
-				WT_ERR(__rec_cell_build_key(session, r,
-				    tmpkey->data, tmpkey->size, 0, &ovfl_key));
-
-				/*
-				 * Clear the on-page overflow key flag: we've
-				 * built a real key, we're not copying from a
-				 * page.
-				 */
 				onpage_ovfl = 0;
-			} else {
-				key->buf.data = cell;
-				key->buf.size = __wt_cell_total_len(unpack);
-				key->cell_len = 0;
-				key->len = key->buf.size;
-				ovfl_key = 1;
-
-				/*
-				 * We aren't actually creating the key so we
-				 * can't use bytes from this key to provide
-				 * prefix information for a subsequent key.
-				 */
-				tmpkey->size = 0;
-
-				/* Track the page has overflow items. */
-				r->ovfl_items = 1;
+				WT_ASSERT(session, ikey != NULL);
 			}
+		}
+
+		/*
+		 * Build key cell.
+		 */
+		if (onpage_ovfl) {
+			key->buf.data = cell;
+			key->buf.size = __wt_cell_total_len(unpack);
+			key->cell_len = 0;
+			key->len = key->buf.size;
+			ovfl_key = 1;
+
+			/*
+			 * We aren't creating a key so we can't use this key as
+			 * a prefix for a subsequent key.
+			 */
+			tmpkey->size = 0;
+
+			/* Track if page has overflow items. */
+			r->ovfl_items = 1;
 		} else {
 			/*
 			 * Use an already instantiated key, or
@@ -3092,9 +2996,11 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 			 * we have to build the actual key now because we are
 			 * about to promote it.
 			 */
-			if (onpage_ovfl)
+			if (onpage_ovfl) {
 				WT_ERR(__wt_cell_unpack_copy(
 				    session, unpack, r->cur));
+				onpage_ovfl = 0;
+			}
 			WT_ERR(__rec_split(session, r));
 
 			/*
@@ -3804,7 +3710,7 @@ __rec_cell_build_ovfl(WT_SESSION_IMPL *session,
 	btree = session->btree;
 	page = r->page;
 
-	/* Track the page has overflow items. */
+	/* Track if page has overflow items. */
 	r->ovfl_items = 1;
 
 	/*

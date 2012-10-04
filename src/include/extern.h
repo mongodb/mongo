@@ -49,6 +49,7 @@ extern int __wt_block_checkpoint(WT_SESSION_IMPL *session,
 extern int __wt_block_checkpoint_resolve(WT_SESSION_IMPL *session,
     WT_BLOCK *block);
 extern uint32_t __wt_cksum(const void *chunk, size_t len);
+extern int __wt_block_off_match(WT_EXTLIST *el, off_t off, off_t size);
 extern int __wt_block_off_remove_overlap( WT_SESSION_IMPL *session,
     WT_EXTLIST *el,
     off_t off,
