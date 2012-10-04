@@ -464,6 +464,14 @@ __inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *inmem_sizep)
 
 		/*
 		 * Allocate and initialize the instantiated key.
+		 *
+		 * Note: all keys on internal pages are instantiated, we assume
+		 * they're more likely to be useful than keys on leaf pages.
+		 * It's possible that's wrong (imagine a cursor reading a table
+		 * that's never randomly searched, the internal page keys are
+		 * unnecessary).  If this policy changes, it has implications
+		 * for reconciliation, the row-store reconciliation function
+		 * depends on keys always be instantiated.
 		 */
 		WT_ERR(__wt_row_ikey_alloc(session,
 		    WT_PAGE_DISK_OFFSET(page, cell),
