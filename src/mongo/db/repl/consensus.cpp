@@ -132,11 +132,10 @@ namespace mongo {
 
     bool Consensus::shouldRelinquish() const {
         int vUp = rs._self->config().votes;
-        const long long T = rs.config().ho.heartbeatTimeoutMillis * rs.config().ho.heartbeatConnRetries;
         for( Member *m = rs.head(); m; m=m->next() ) {
-            long long dt = m->hbinfo().timeDown();
-            if( dt < T )
+            if (m->hbinfo().up()) {
                 vUp += m->config().votes;
+            }
         }
 
         // the manager will handle calling stepdown if another node should be

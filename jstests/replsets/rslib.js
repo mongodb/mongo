@@ -78,9 +78,7 @@ var waitForAllMembers = function(master, timeout) {
         } catch ( e ) {
             // Connection can get reset on replica set failover causing a socket exception
             print( "Calling replSetGetStatus failed" );
-            printjson( e );
-            failCount++;
-            assert.lt( failCount, 3, "replSetGetStatus failed 3 times in a row" );
+            print( e );
             return false;
         }
         occasionally(function() { printjson(state); }, 10);

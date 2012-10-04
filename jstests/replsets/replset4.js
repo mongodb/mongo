@@ -17,11 +17,6 @@ doTest = function (signal) {
 
     print("replset4.js 1");
 
-    var result = master.getDB("admin").runCommand({ ismaster: 1 });
-
-    print("replset4.js 2");
-    printjson(result);
-
     assert.soon(
         function () {
             try {
