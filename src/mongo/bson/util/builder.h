@@ -247,13 +247,10 @@ namespace mongo {
         void decouple(); // not allowed. not implemented.
     };
 
-    namespace {
 #if defined(_WIN32)
-        int (*mongo_snprintf)(char *str, size_t size, const char *format, ...) = &sprintf_s;
-#else
-        int (*mongo_snprintf)(char *str, size_t size, const char *format, ...) = &snprintf;
+#pragma push_macro("snprintf")
+#define snprintf _snprintf
 #endif
-    }
 
     /** stringstream deals with locale so this is a lot faster than std::stringstream for UTF8 */
     template <typename Allocator>
@@ -301,7 +298,7 @@ namespace mongo {
             const int prev = _buf.l;
             const int maxSize = 32; 
             char * start = _buf.grow( maxSize );
-            int z = mongo_snprintf( start , maxSize , "%.16g" , x );
+            int z = snprintf( start , maxSize , "%.16g" , x );
             verify( z >= 0 );
             verify( z < maxSize );
             _buf.l = prev + z;
@@ -335,7 +332,7 @@ namespace mongo {
         template <typename T>
         StringBuilderImpl& SBNUM(T val,int maxSize,const char *macro)  {
             int prev = _buf.l;
-            int z = mongo_snprintf( _buf.grow(maxSize) , maxSize , macro , (val) );
+            int z = snprintf( _buf.grow(maxSize) , maxSize , macro , (val) );
             verify( z >= 0 );
             verify( z < maxSize );
             _buf.l = prev + z;
@@ -346,4 +343,8 @@ namespace mongo {
     typedef StringBuilderImpl<TrivialAllocator> StringBuilder;
     typedef StringBuilderImpl<StackAllocator> StackStringBuilder;
 
+#if defined(_WIN32)
+#undef snprintf
+#pragma pop_macro("snprintf")
+#endif
 } // namespace mongo
