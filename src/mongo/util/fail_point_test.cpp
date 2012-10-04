@@ -171,7 +171,14 @@ namespace mongo_test {
             while (true) {
                 MONGO_FAIL_POINT_BLOCK((*failPoint)) {
                     const mongo::BSONObj& data = failPoint->getData();
-                    ASSERT_EQUALS(44, data["a"].numberInt());
+
+                    // Expanded ASSERT_EQUALS since the error is not being
+                    // printed out properly
+                    if (data["a"].numberInt() != 44) {
+                        mongo::error() << "blockTask thread detected anomaly"
+                                << " - data: " << data << std::endl;
+                        ASSERT(false);
+                    }
                 }
 
                 boost::this_thread::interruption_point();
@@ -183,7 +190,13 @@ namespace mongo_test {
                 try {
                     MONGO_FAIL_POINT_BLOCK((*failPoint)) {
                         const mongo::BSONObj& data = failPoint->getData();
-                        ASSERT_EQUALS(44, data["a"].numberInt());
+
+                        if (data["a"].numberInt() != 44) {
+                            mongo::error() << "blockWithExceptionTask thread detected anomaly"
+                                    << " - data: " << data << std::endl;
+                            ASSERT(false);
+                        }
+
                         throw std::logic_error("blockWithExceptionTask threw");
                     }
                 }
@@ -198,7 +211,12 @@ namespace mongo_test {
             while (true) {
                 if (MONGO_FAIL_POINT((*failPoint))) {
                     const mongo::BSONObj& data = failPoint->getData();
-                    ASSERT_EQUALS(44, data["a"].numberInt());
+
+                    if (data["a"].numberInt() != 44) {
+                        mongo::error() << "simpleTask thread detected anomaly - "
+                                << " data: " << data << std::endl;
+                        ASSERT(false);
+                    }
                 }
 
                 boost::this_thread::interruption_point();
