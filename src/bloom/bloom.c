@@ -198,6 +198,7 @@ __wt_bloom_get(WT_BLOOM *bloom, WT_ITEM *key)
 	WT_CURSOR *c;
 	WT_DECL_RET;
 	WT_SESSION *wt_session;
+	int result;
 	uint32_t i;
 	uint64_t h1, h2;
 	uint8_t bit;
@@ -230,15 +231,19 @@ __wt_bloom_get(WT_BLOOM *bloom, WT_ITEM *key)
 	if (bit == 0)
 		return (WT_NOTFOUND);
 	h2 = __wt_hash_city64(key->data, key->size);
+	result = 0;
 	for (i = 0, h1 += h2; i < bloom->k - 1; i++, h1 += h2) {
 		c->set_key(c, (h1 % bloom->m) + 1);
 		WT_ERR(c->search(c));
 		WT_ERR(c->get_value(c, &bit));
 
-		if (bit == 0)
-			return (WT_NOTFOUND);
+		if (bit == 0) {
+			result = WT_NOTFOUND;
+			break;
+		}
 	}
-	return (0);
+	WT_ERR(c->reset(c));
+	return (result);
 
 err:	/* Don't return WT_NOTFOUND from a failed search. */
 	if (ret == WT_NOTFOUND)
