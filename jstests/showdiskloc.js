@@ -20,6 +20,19 @@ t.save( {} );
 checkResults( t.find().batchSize( 2 )._addSpecial("$showDiskLoc" , true).toArray() );
 
 // Check with a covered index.
+t.save( { a:1234 } );
 t.ensureIndex( { a:1 } );
-checkResults
-( t.find( {}, { _id:0, a:1 } ).hint( { a:1 } )._addSpecial("$showDiskLoc" , true).toArray() );
+checkResults( t.find( {}, { _id:0, a:1 } ).hint( { a:1 } )._addSpecial("$showDiskLoc" , true).toArray() );
+
+t.save( { _id: 1, a:123 } );
+t.save( { _id: 2, a:123 } );
+t.save( { _id: 3, a:123 } );
+
+checkResults( t.find( {}, { _id:0, a:1 } ).hint( { a:1 } )._addSpecial("$showDiskLoc" , true).toArray() );
+
+t.ensureIndex( { _id:1 } );
+checkResults( t.find( {}, { _id:1 } ).hint( { _id:1 } )._addSpecial("$showDiskLoc" , true).toArray() );
+
+checkResults( t.find( {}, { _id:1 } ).batchSize ( 2 ).hint( { _id:1 } )._addSpecial("$showDiskLoc" , true).toArray() );
+
+t.drop();
