@@ -393,9 +393,12 @@ __wt_lsm_tree_switch(
 {
 	WT_DECL_RET;
 	WT_LSM_CHUNK *chunk;
+	int new_id;
+
+	new_id = WT_ATOMIC_ADD(lsm_tree->last, 1); 
 
 	WT_VERBOSE_RET(session, lsm,
-	    "Tree switch to: %d because %d > %d", lsm_tree->last + 1,
+	    "Tree switch to: %d because %d > %d", new_id,
 	    (lsm_tree->memsizep == NULL ? 0 : (int)*lsm_tree->memsizep),
 	    (int)lsm_tree->chunk_size);
 
@@ -411,8 +414,7 @@ __wt_lsm_tree_switch(
 
 	WT_ERR(__wt_calloc_def(session, 1, &chunk));
 	lsm_tree->chunk[lsm_tree->nchunks++] = chunk;
-	WT_ERR(__wt_lsm_tree_create_chunk(session,
-	    lsm_tree, WT_ATOMIC_ADD(lsm_tree->last, 1),
+	WT_ERR(__wt_lsm_tree_create_chunk(session, lsm_tree, new_id,
 	    &chunk->uri));
 
 	++lsm_tree->dsk_gen;
