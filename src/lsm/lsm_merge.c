@@ -132,11 +132,11 @@ __wt_lsm_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 		nchunks = end_chunk - start_chunk + 1;
 
 		/*
-		 * If the next chunk isn't within 20% of the efficiency of the
-		 * set we already have, stop.
+		 * If the next chunk is more than half of all of the ones we
+		 * have already, stop.
 		 */
-		if (nchunks > 1 &&
-		    10 * chunk->count > 12 * record_count / (uint64_t)nchunks)
+		if (nchunks > 2 &&
+		    chunk->count > record_count / 2)
 			break;
 
 		record_count += chunk->count;
