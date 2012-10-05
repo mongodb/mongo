@@ -93,18 +93,23 @@ rsA.waitForState( rsA.getSecondaries(), rsA.SECONDARY, 5 * 60 * 1000 )
 
 prt("10: check our regular and slaveOk query")
 
-function compareCount() {
-    try {
-         return coll.find().itcount() == collSOk.find().itcount();
-    } catch (x) {
-        return false;
-    }
-};
+var sOKCount = collSOk.find().itcount();
 
-// there may have been a stepdown caused by step 8, so we run this twice in a row. The first time
-// can error out
-compareCount();
-assert(compareCount())
+var collCount = null
+try{
+    collCount = coll.find().itcount();
+}
+catch(e){
+    printjson(e);
+    
+    // there may have been a stepdown caused by step 8, so we run this twice in a row. The first time
+    // can error out
+    
+    prt("Error may have been caused by stepdown, try again.")
+    collCount = coll.find().itcount();
+}
+
+assert.eq( collCount, sOKCount );
 
 prt("DONE\n\n\n");
 
