@@ -2845,7 +2845,7 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 			 */
 			if (val_cell != NULL && unpack->ovfl)
 				WT_ERR(__wt_ovfl_in_cache(session,
-				    page, upd, unpack->data, unpack->size));
+				    page, rip, unpack->data, unpack->size));
 
 			/* If this key/value pair was deleted, we're done. */
 			if (WT_UPDATE_DELETED_ISSET(upd)) {

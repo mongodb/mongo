@@ -332,7 +332,7 @@ extern int __wt_ovfl_in(WT_SESSION_IMPL *session,
     uint32_t addr_size);
 extern int __wt_ovfl_in_cache(WT_SESSION_IMPL *session,
     WT_PAGE *page,
-    WT_UPDATE *upd_arg,
+    WT_ROW *rip,
     const uint8_t *addr,
     uint32_t addr_size);
 extern int
