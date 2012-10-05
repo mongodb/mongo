@@ -38,7 +38,7 @@ namespace mongo_test {
             return _remoteServer->runCommand(_remoteServerInstanceID, dbname, cmdObj,
                     info, options, auth);
         }
-        catch (const mongo::SocketException& exp) {
+        catch (const mongo::SocketException&) {
             _isFailed = true;
             throw;
         }
@@ -57,7 +57,7 @@ namespace mongo_test {
             return _remoteServer->query(_remoteServerInstanceID, ns, query, nToReturn,
                     nToSkip, fieldsToReturn, queryOptions, batchSize);
         }
-        catch (const mongo::SocketException& exp) {
+        catch (const mongo::SocketException&) {
             _isFailed = true;
             throw;
         }
