@@ -219,7 +219,7 @@ __wt_block_checkpoint(WT_SESSION_IMPL *session,
 	 * lazy checkpoints, but we don't support them yet).  Regardless, we're
 	 * not holding any locks, other writers can proceed while we wait.
 	 */
-	if (!F_ISSET(S2C(session), WT_CONN_NOSYNC))
+	if (F_ISSET(S2C(session), WT_CONN_SYNC))
 		WT_RET(__wt_fsync(session, block->fh));
 
 	return (0);

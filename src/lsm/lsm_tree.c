@@ -62,7 +62,8 @@ __lsm_tree_close(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 
 	if (F_ISSET(lsm_tree, WT_LSM_TREE_WORKING)) {
 		F_CLR(lsm_tree, WT_LSM_TREE_WORKING);
-		WT_TRET(__wt_thread_join(lsm_tree->worker_tid));
+		if (F_ISSET(S2C(session), WT_CONN_LSM_MERGE))
+			WT_TRET(__wt_thread_join(lsm_tree->worker_tid));
 		WT_TRET(__wt_thread_join(lsm_tree->ckpt_tid));
 	}
 
@@ -160,8 +161,7 @@ __wt_lsm_tree_create_chunk(
 
 	WT_RET(__wt_scr_alloc(session, 0, &buf));
 	WT_ERR(__wt_lsm_tree_chunk_name(session, lsm_tree, i, buf));
-	WT_ERR(__wt_schema_create(session,
-	    buf->data, lsm_tree->file_config));
+	WT_ERR(__wt_schema_create(session, buf->data, lsm_tree->file_config));
 	*urip = __wt_buf_steal(session, buf, NULL);
 
 err:	__wt_scr_free(&buf);
@@ -190,8 +190,9 @@ __lsm_tree_start_worker(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	F_SET(lsm_tree, WT_LSM_TREE_WORKING);
 	/* The new thread will rely on the WORKING value being visible. */
 	WT_FULL_BARRIER();
-	WT_RET(__wt_thread_create(
-	    &lsm_tree->worker_tid, __wt_lsm_worker, lsm_tree));
+	if (F_ISSET(S2C(session), WT_CONN_LSM_MERGE))
+		WT_RET(__wt_thread_create(
+		    &lsm_tree->worker_tid, __wt_lsm_worker, lsm_tree));
 	WT_RET(__wt_thread_create(
 	    &lsm_tree->ckpt_tid, __wt_lsm_checkpoint_worker, lsm_tree));
 
@@ -393,9 +394,12 @@ __wt_lsm_tree_switch(
 {
 	WT_DECL_RET;
 	WT_LSM_CHUNK *chunk;
+	int new_id;
+
+	new_id = WT_ATOMIC_ADD(lsm_tree->last, 1); 
 
 	WT_VERBOSE_RET(session, lsm,
-	    "Tree switch to: %d because %d > %d", lsm_tree->last + 1,
+	    "Tree switch to: %d because %d > %d", new_id,
 	    (lsm_tree->memsizep == NULL ? 0 : (int)*lsm_tree->memsizep),
 	    (int)lsm_tree->chunk_size);
 
@@ -411,8 +415,7 @@ __wt_lsm_tree_switch(
 
 	WT_ERR(__wt_calloc_def(session, 1, &chunk));
 	lsm_tree->chunk[lsm_tree->nchunks++] = chunk;
-	WT_ERR(__wt_lsm_tree_create_chunk(session,
-	    lsm_tree, WT_ATOMIC_ADD(lsm_tree->last, 1),
+	WT_ERR(__wt_lsm_tree_create_chunk(session, lsm_tree, new_id,
 	    &chunk->uri));
 
 	++lsm_tree->dsk_gen;

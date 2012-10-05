@@ -425,6 +425,9 @@ methods = {
 	Config('logging', 'false', r'''
 		enable logging''',
 		type='boolean'),
+	Config('lsm_merge', 'true', r'''
+		merge LSM chunks where possible''',
+		type='boolean'),
 	Config('multiprocess', 'false', r'''
 		permit sharing between processes (will automatically start an
 		RPC server for primary processes and use RPC for secondary
@@ -477,7 +480,8 @@ flags = {
 # Structure flag declarations
 ###################################################
 	'conn' : [
-		'CONN_NOSYNC',
+		'CONN_LSM_MERGE',
+		'CONN_SYNC',
 		'CONN_TRANSACTIONAL',
 		'SERVER_RUN'
 	],
