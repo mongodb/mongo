@@ -1027,6 +1027,41 @@ namespace ReplTests {
             }
         };
 
+        class SingletonNoRename : public Base {
+        public:
+            void doIt() const {
+                client()->update( ns(), BSONObj(), fromjson("{$rename:{a:'b'}}" ) );
+
+            }
+            using ReplTests::Base::check;
+            void check() const {
+                ASSERT_EQUALS( 1, count() );
+                check( fromjson( "{_id:0,z:1}" ), one(fromjson("{'_id':0}" ) ) );
+            }
+            void reset() const {
+                deleteAll( ns() );
+                insert( fromjson( "{'_id':0,z:1}" ) );
+            }
+        };
+
+        class IndexedSingletonNoRename : public Base {
+        public:
+            void doIt() const {
+                client()->update( ns(), BSONObj(), fromjson("{$rename:{a:'b'}}" ) );
+            }
+            using ReplTests::Base::check;
+            void check() const {
+                ASSERT_EQUALS( 1, count() );
+                check( fromjson( "{_id:0,z:1}" ), one(fromjson("{'_id':0}" ) ) );
+            }
+            void reset() const {
+                deleteAll( ns() );
+                // Add an index on 'a'.  This prevents the update from running 'in place'.
+                client()->ensureIndex( ns(), BSON( "a" << 1 ) );
+                insert( fromjson( "{'_id':0,z:1}" ) );
+            }
+        };
+
         class AddToSetEmptyMissing : public Base {
         public:
             void doIt() const {
@@ -1266,6 +1301,8 @@ namespace ReplTests {
             add< Idempotence::RenameOverwrite >();
             add< Idempotence::NoRename >();
             add< Idempotence::NestedNoRename >();
+            add< Idempotence::SingletonNoRename >();
+            add< Idempotence::IndexedSingletonNoRename >();
             add< Idempotence::AddToSetEmptyMissing >();
             add< DeleteOpIsIdBased >();
             add< DatabaseIgnorerBasic >();
