@@ -93,10 +93,17 @@ rsA.waitForState( rsA.getSecondaries(), rsA.SECONDARY, 5 * 60 * 1000 )
 
 prt("10: check our regular and slaveOk query")
 
+// We need to make sure our nodes are considered accessible from mongos - otherwise we fail
+// See SERVER-7274
+ReplSetTest.awaitRSClientHosts(coll.getMongo(), rsA.nodes, { ok : true })
+ReplSetTest.awaitRSClientHosts(coll.getMongo(), rsB.nodes, { ok : true })
+
+prt("SlaveOK Query...")
 var sOKCount = collSOk.find().itcount();
 
 var collCount = null
 try{
+    prt("Normal query...")
     collCount = coll.find().itcount();
 }
 catch(e){
