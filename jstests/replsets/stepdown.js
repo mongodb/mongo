@@ -75,6 +75,15 @@ catch (e) {
 print("\nawait");
 replTest.awaitReplication();
 
+assert.soon(function() {
+    try {
+        var result = master.getDB("admin").runCommand({isMaster: 1});
+        return /31000$/.test(result.primary);
+    } catch (x) {
+        return false;
+    }
+});
+
 master = replTest.getMaster();
 var firstMaster = master;
 print("\nmaster is now "+firstMaster);
