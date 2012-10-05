@@ -187,8 +187,10 @@ int main(int argc, char **argv)
 	char *cc_buf, *tc_buf;
 	int ch, debug, ret;
 	pthread_t *read_threads;
-	uint32_t i, last_ops, req_len, slept;
+	uint32_t i, slept;
+	uint64_t last_ops, req_len;
 
+	return (0);
 	/* Setup the default configuration values. */
 	memcpy(&cfg, &default_cfg, sizeof(cfg));
 	debug = 0;
@@ -294,7 +296,7 @@ int main(int argc, char **argv)
 
 	if (cfg.report_interval > cfg.read_time)
 		cfg.report_interval = cfg.read_time;
-	for (slept = last_ops = 0; slept < cfg.read_time;
+	for (slept = 0, last_ops = 0; slept < cfg.read_time;
 	    slept += cfg.report_interval) {
 		sleep(cfg.report_interval);
 		if (cfg.verbose > 0) {
