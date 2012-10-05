@@ -1515,7 +1515,7 @@ __wt_rec_col_fix_bulk_insert(WT_CURSOR_BULK *cbulk)
 			WT_RET(__rec_split(session, r));
 		}
 		cbulk->entry = 0;
-		cbulk->nrecs = r->space_avail / btree->bitcnt;
+		cbulk->nrecs = r->space_avail * 8 / btree->bitcnt;
 	}
 
 	__bit_setv(r->first_free,
@@ -1715,7 +1715,7 @@ __rec_col_fix(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 
 	/* Calculate the number of entries per page remainder. */
 	entry = page->entries;
-	nrecs = (r->space_avail / btree->bitcnt) - page->entries;
+	nrecs = (r->space_avail * 8 / btree->bitcnt) - page->entries;
 	r->recno += entry;
 
 	/* Walk any append list. */
@@ -1756,7 +1756,7 @@ __rec_col_fix(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 
 			/* Calculate the number of entries per page. */
 			entry = 0;
-			nrecs = r->space_avail / btree->bitcnt;
+			nrecs = r->space_avail * 8 / btree->bitcnt;
 		}
 	}
 
@@ -1802,7 +1802,7 @@ __rec_col_fix_slvg(WT_SESSION_IMPL *session,
 	for (;;) {
 		/* Calculate the number of entries per page. */
 		entry = 0;
-		nrecs = r->space_avail / btree->bitcnt;
+		nrecs = r->space_avail * 8 / btree->bitcnt;
 
 		for (; nrecs > 0 && salvage->missing > 0;
 		    --nrecs, --salvage->missing, ++entry)
