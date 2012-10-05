@@ -289,7 +289,8 @@ methods = {
 		that may only be used for newly created objects. Cursors
 		configured for bulk load only support the WT_CURSOR::insert
 		and WT_CURSOR::close methods''',
-		type='boolean'),
+		# type='boolean'),  -- API kludge to pass through "bitmap" special
+		),
 	Config('checkpoint', '', r'''
 		the name of a checkpoint to open (the reserved name
 		"WiredTigerCheckpoint" opens the most recent internal

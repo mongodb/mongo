@@ -291,7 +291,7 @@ __wt_confdfl_session_open_cursor =
 WT_CONFIG_CHECK
 __wt_confchk_session_open_cursor[] = {
 	{ "append", "boolean", NULL },
-	{ "bulk", "boolean", NULL },
+	{ "bulk", "string", NULL },
 	{ "checkpoint", "string", NULL },
 	{ "dump", "string", "choices=[\"hex\",\"print\"]" },
 	{ "next_random", "boolean", NULL },

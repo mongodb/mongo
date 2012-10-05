@@ -137,6 +137,9 @@ struct __wt_cursor_bulk {
 	uint32_t entry;				/* Entry count */
 	uint32_t nrecs;				/* Max records per chunk */
 
+	/* Special bitmap bulk load for fixed-length column stores. */
+	int	bitmap;
+
 	void	*reconcile;			/* Reconciliation information */
 };
 

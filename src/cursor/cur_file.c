@@ -312,7 +312,7 @@ __wt_curfile_create(WT_SESSION_IMPL *session,
 	WT_CURSOR_BTREE *cbt;
 	WT_DECL_RET;
 	size_t csize;
-	int bulk;
+	int bitmap, bulk;
 
 	cbt = NULL;
 
@@ -320,7 +320,13 @@ __wt_curfile_create(WT_SESSION_IMPL *session,
 	WT_ASSERT(session, btree != NULL);
 
 	WT_RET(__wt_config_gets_defno(session, cfg, "bulk", &cval));
-	bulk = (cval.val != 0);
+	if ((cval.type == ITEM_ID || cval.type == ITEM_STRING) &&
+	    WT_STRING_MATCH("bitmap", cval.str, cval.len)) {
+		bitmap = bulk = 1;
+	} else {
+		bitmap = 0;
+		bulk = (cval.val != 0);
+	}
 
 	csize = bulk ? sizeof(WT_CURSOR_BULK) : sizeof(WT_CURSOR_BTREE);
 	WT_RET(__wt_calloc(session, 1, csize, &cbt));
@@ -334,7 +340,7 @@ __wt_curfile_create(WT_SESSION_IMPL *session,
 
 	cbt->btree = session->btree;
 	if (bulk)
-		WT_ERR(__wt_curbulk_init((WT_CURSOR_BULK *)cbt));
+		WT_ERR(__wt_curbulk_init((WT_CURSOR_BULK *)cbt, bitmap));
 
 	/*
 	 * no_cache

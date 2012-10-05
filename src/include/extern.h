@@ -601,7 +601,7 @@ extern int __wt_curbackup_open(WT_SESSION_IMPL *session,
     const char *uri,
     const char *cfg[],
     WT_CURSOR **cursorp);
-extern int __wt_curbulk_init(WT_CURSOR_BULK *cbulk);
+extern int __wt_curbulk_init(WT_CURSOR_BULK *cbulk, int bitmap);
 extern int __wt_curconfig_open(WT_SESSION_IMPL *session,
     const char *uri,
     const char *cfg[],
