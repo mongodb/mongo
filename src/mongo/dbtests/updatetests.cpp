@@ -640,8 +640,23 @@ namespace UpdateTests {
                 test( BSON( "$push" << BSON( "a" << 5 ) ) , fromjson( "{a:[1]}" ) , fromjson( "{a:[1,5]}" ) );
             }
         };
-        
-        class IncRewrite {
+
+
+        class IncRewriteInPlace {
+        public:
+            void run() {
+                BSONObj obj = BSON( "a" << 2 );
+                BSONObj mod = BSON( "$inc" << BSON( "a" << 1 ) );
+                ModSet modSet( mod );
+                auto_ptr<ModSetState> modSetState = modSet.prepare( obj );
+                ASSERT_TRUE( modSetState->canApplyInPlace() );
+                modSetState->applyModsInPlace(false);
+                ASSERT_EQUALS( BSON( "$set" << BSON( "a" << 3 ) ), modSetState->getOpLogRewrite() );
+            }
+        };
+
+        // Check if not applying in place changes anything.
+        class InRewriteForceNotInPlace {
         public:
             void run() {
                 BSONObj obj = BSON( "a" << 2 );
@@ -649,11 +664,10 @@ namespace UpdateTests {
                 ModSet modSet( mod );
                 auto_ptr<ModSetState> modSetState = modSet.prepare( obj );
                 modSetState->createNewFromMods();
-                ASSERT( modSetState->needOpLogRewrite() );
                 ASSERT_EQUALS( BSON( "$set" << BSON( "a" << 3 ) ), modSetState->getOpLogRewrite() );
             }
         };
-   
+
         class IncRewriteNestedArray {
         public:
             void run() {
@@ -661,13 +675,410 @@ namespace UpdateTests {
                 BSONObj mod = BSON( "$inc" << BSON( "a.0" << 1 ) );
                 ModSet modSet( mod );
                 auto_ptr<ModSetState> modSetState = modSet.prepare( obj );
-                modSetState->createNewFromMods();
-                ASSERT( modSetState->needOpLogRewrite() );
+                ASSERT_TRUE( modSetState->canApplyInPlace() );
+                modSetState->applyModsInPlace(false);
                 ASSERT_EQUALS( BSON( "$set" << BSON( "a.0" << 3 ) ),
-                              modSetState->getOpLogRewrite() );
+                               modSetState->getOpLogRewrite() );
+                // XXX we want inc to do a full $set to start with, not a positional one.
+                // XXX fix me.
             }
         };
 
+        class IncRewriteExistingField {
+        public:
+            void run() {
+                BSONObj obj = BSON( "a" << 2 );
+                BSONObj mod = BSON( "$inc" << BSON( "a" << 1 ) << "$set" << BSON( "b" << 2) );
+                ModSet modSet( mod );
+                auto_ptr<ModSetState> modSetState = modSet.prepare( obj );
+                ASSERT_FALSE( modSetState->canApplyInPlace() );
+                modSetState->createNewFromMods();
+                ASSERT_EQUALS( BSON( "$set" << BSON( "a" << 3 ) << "$set" << BSON("b" << 2)),
+                               modSetState->getOpLogRewrite() );
+            }
+        };
+
+        class IncRewriteNonExistingField {
+        public:
+            void run() {
+                BSONObj obj = BSON( "c" << 1 );
+                BSONObj mod = BSON( "$inc" << BSON( "a" << 1 ) << "$set" << BSON( "b" << 2) );
+                ModSet modSet( mod );
+                auto_ptr<ModSetState> modSetState = modSet.prepare( obj );
+                ASSERT_FALSE( modSetState->canApplyInPlace() );
+                modSetState->createNewFromMods();
+                ASSERT_EQUALS( BSON( "$set" << BSON( "a" << 1 ) << "$set" << BSON("b" << 2)),
+                               modSetState->getOpLogRewrite() );
+            }
+        };
+
+        // Push is never applied in place
+        class PushRewriteExistingField {
+        public:
+            void run() {
+                BSONObj obj = BSON( "a" << BSON_ARRAY( 1 << 2 ) );
+                BSONObj mod = BSON( "$push" << BSON( "a" << 3 ) );
+                ModSet modSet( mod );
+                auto_ptr<ModSetState> modSetState = modSet.prepare( obj );
+                ASSERT_FALSE( modSetState->canApplyInPlace() );
+                modSetState->createNewFromMods();
+                ASSERT_EQUALS( BSON( "$set" << BSON( "a" << BSON_ARRAY( 1 << 2 << 3 ) ) ),
+                                     modSetState->getOpLogRewrite() );
+            }
+        };
+
+        class PushRewriteNonExistingField {
+        public:
+            void run() {
+                BSONObj obj = BSON( "b" << 1 );
+                BSONObj mod = BSON( "$push" << BSON( "a" << 1 ) );
+                ModSet modSet( mod );
+                auto_ptr<ModSetState> modSetState = modSet.prepare( obj );
+                ASSERT_FALSE( modSetState->canApplyInPlace() );
+                modSetState->createNewFromMods();
+                ASSERT_EQUALS( BSON( "$set" << BSON( "a" << BSON_ARRAY( 1 ) ) ),
+                                     modSetState->getOpLogRewrite() );
+            }
+        };
+
+        class PushAllRewriteExistingField {
+        public:
+            void run() {
+                BSONObj obj = BSON( "a" << BSON_ARRAY( 1 << 2 ) );
+                BSONObj modAll = BSON( "$pushAll" << BSON( "a" << BSON_ARRAY( 3 << 4 << 5 ) ) );
+                ModSet modSetAll( modAll );
+                auto_ptr<ModSetState> modSetStateAll = modSetAll.prepare( obj );
+                ASSERT_FALSE( modSetStateAll->canApplyInPlace() );
+                modSetStateAll->createNewFromMods();
+                ASSERT_EQUALS( BSON( "$set" << BSON( "a" << BSON_ARRAY( 1 << 2 << 3 << 4 << 5) ) ),
+                                     modSetStateAll->getOpLogRewrite() );
+            }
+        };
+
+        class PushAllRewriteNonExistingField {
+        public:
+            void run() {
+                BSONObj obj = BSON( "b" << 1 );
+                BSONObj modAll = BSON( "$pushAll" << BSON( "a" << BSON_ARRAY( 1 << 2 << 3) ) );
+                ModSet modSetAll( modAll );
+                auto_ptr<ModSetState> modSetStateAll = modSetAll.prepare( obj );
+                ASSERT_FALSE( modSetStateAll->canApplyInPlace() );
+                modSetStateAll->createNewFromMods();
+                ASSERT_EQUALS( BSON( "$set" << BSON( "a" << BSON_ARRAY( 1 << 2 << 3 ) ) ),
+                               modSetStateAll->getOpLogRewrite() );
+            }
+        };
+
+        // Pull is only in place if it's a no-op.
+        class PullRewriteInPlace {
+        public:
+            void run() {
+                BSONObj obj = BSON( "a" << BSON_ARRAY( 1 << 2 ) );
+                BSONObj modMatcher = BSON( "$pull" << BSON( "a" << BSON( "$gt" << 3 ) ) );
+                ModSet modSetMatcher( modMatcher );
+                auto_ptr<ModSetState> modSetStateMatcher = modSetMatcher.prepare( obj );
+                ASSERT_TRUE( modSetStateMatcher->canApplyInPlace() );
+                modSetStateMatcher->applyModsInPlace(false);
+                ASSERT_EQUALS( BSON( "$set" << BSON( "a" << BSON_ARRAY( 1 << 2) ) ),
+                               modSetStateMatcher->getOpLogRewrite() );
+            }
+        };
+
+        class PullRewriteForceNotInPlace {
+        public:
+            void run() {
+                BSONObj obj = BSON( "a" << BSON_ARRAY( 1 << 2 ) );
+                BSONObj modMatcher = BSON( "$pull" << BSON( "a" << BSON( "$gt" << 3 ) ) );
+                ModSet modSetMatcher( modMatcher );
+                auto_ptr<ModSetState> modSetStateMatcher = modSetMatcher.prepare( obj );
+                modSetStateMatcher->createNewFromMods();
+                ASSERT_EQUALS( BSON( "$set" << BSON( "a" << BSON_ARRAY( 1 << 2) ) ),
+                               modSetStateMatcher->getOpLogRewrite() );
+            }
+        };
+
+        class PullRewriteNonExistingUnsets {
+        public:
+            void run() {
+                BSONObj obj;
+                BSONObj modMatcher = BSON( "$pull" << BSON( "a" << BSON( "$gt" << 3 ) ) );
+                ModSet modSetMatcher( modMatcher );
+                auto_ptr<ModSetState> modSetStateMatcher = modSetMatcher.prepare( obj );
+                ASSERT_FALSE( modSetStateMatcher->canApplyInPlace() );
+                modSetStateMatcher->createNewFromMods();
+                ASSERT_EQUALS( BSON( "$unset" << BSON( "a" << 1 ) ),
+                               modSetStateMatcher->getOpLogRewrite() );
+            }
+        };
+
+        class PullRewriteExistingField {
+        public:
+            void run() {
+                BSONObj obj = BSON( "a" << BSON_ARRAY( 1 << 2 ) );
+                BSONObj mod = BSON( "$pull" << BSON( "a" << 1 ) );
+                ModSet modSet( mod );
+                auto_ptr<ModSetState> modSetState = modSet.prepare( obj );
+                ASSERT_FALSE( modSetState->canApplyInPlace() );
+                modSetState->createNewFromMods();
+                ASSERT_EQUALS( BSON( "$set" << BSON( "a" << BSON_ARRAY( 2 ) ) ),
+                               modSetState->getOpLogRewrite() );
+            }
+        };
+
+        class PullRewriteLastExistingField {
+        public:
+            void run() {
+                // check last pull corner case
+                BSONObj obj = BSON( "a" << BSON_ARRAY( 2 ) );
+                BSONObj mod = BSON( "$pull" << BSON( "a" << 2 ) );
+                ModSet modSetLast( mod );
+                auto_ptr<ModSetState> modSetStateLast = modSetLast.prepare( obj );
+                ASSERT_FALSE( modSetStateLast->canApplyInPlace() );
+                modSetStateLast->createNewFromMods();
+                ASSERT_EQUALS( BSON( "$set" << BSON( "a" << BSONArray() ) ),
+                               modSetStateLast->getOpLogRewrite() );
+            }
+        };
+
+        class PullRewriteNonExistingField {
+        public:
+            void run() {
+                BSONObj obj = BSON( "b" << 1 );
+                BSONObj mod = BSON( "$pull" << BSON( "a" << 1 ) );
+                ModSet modSet( mod );
+                auto_ptr<ModSetState> modSetState = modSet.prepare( obj );
+                ASSERT_FALSE( modSetState->canApplyInPlace() );
+                modSetState->createNewFromMods();
+                ASSERT_EQUALS( BSON( "$unset" << BSON( "a" << 1 ) ),
+                               modSetState->getOpLogRewrite() );
+            }
+        };
+
+        // Pop is only applied in place if the target array remains the same size (i.e. if
+        // it is empty already.
+        class PopRewriteEmptyArray {
+        public:
+            void run() {
+                BSONObj obj = BSON( "a" << BSONArray() );
+                BSONObj mod = BSON( "$pop" << BSON( "a" << 1 ) );
+                ModSet modSet( mod );
+                auto_ptr<ModSetState> modSetState = modSet.prepare( obj );
+                ASSERT_TRUE( modSetState->canApplyInPlace() );
+                modSetState->applyModsInPlace(false);
+                ASSERT_EQUALS( BSON( "$set" << BSON( "a" << BSONArray() ) ),
+                               modSetState->getOpLogRewrite() );
+            }
+        };
+
+        class PopRewriteLastElement {
+        public:
+            void run() {
+                BSONObj obj = BSON( "a" << BSON_ARRAY( 1 ) );
+                BSONObj mod = BSON( "$pop" << BSON( "a" << 1 ) );
+                ModSet modSet( mod );
+                auto_ptr<ModSetState> modSetState = modSet.prepare( obj );
+                ASSERT_FALSE( modSetState->canApplyInPlace() );
+                modSetState->createNewFromMods();
+                ASSERT_EQUALS( BSON( "$set" << BSON( "a" << BSONArray() ) ),
+                               modSetState->getOpLogRewrite() );
+            }
+        };
+
+        class PopRewriteExistingField {
+        public:
+            void run() {
+                BSONObj obj = BSON( "a" << BSON_ARRAY( 1 << 2) );
+                BSONObj mod = BSON( "$pop" << BSON( "a" << 1 ) );
+                ModSet modSet( mod );
+                auto_ptr<ModSetState> modSetState = modSet.prepare( obj );
+                ASSERT_FALSE( modSetState->canApplyInPlace() );
+                modSetState->createNewFromMods();
+                ASSERT_EQUALS( BSON( "$set" << BSON( "a" << BSON_ARRAY( 1 ) ) ),
+                               modSetState->getOpLogRewrite() );
+            }
+        };
+
+        class PopRewriteNonExistingField {
+        public:
+            void run() {
+                BSONObj obj = BSON( "a" << BSON_ARRAY( 1 ) );
+                BSONObj mod = BSON( "$pop" << BSON( "b" << 1 ) );
+                ModSet modSet( mod );
+                auto_ptr<ModSetState> modSetState = modSet.prepare( obj );
+                ASSERT_FALSE( modSetState->canApplyInPlace() );
+                modSetState->createNewFromMods();
+                ASSERT_EQUALS( BSON( "$unset" << BSON( "b" << 1 ) ),
+                               modSetState->getOpLogRewrite() );
+            }
+        };
+
+        // AddToSet is in place if it is a no-op.
+        class AddToSetRewriteInPlace {
+        public:
+            void run() {
+                BSONObj obj = BSON( "a" << BSON_ARRAY( 1 ) );
+                BSONObj mod = BSON( "$addToSet" << BSON( "a" << 1 ) );
+                ModSet modSet( mod );
+                auto_ptr<ModSetState> modSetState = modSet.prepare( obj );
+                ASSERT_TRUE( modSetState->canApplyInPlace() );
+                modSetState->applyModsInPlace(false);
+                ASSERT_EQUALS( BSON( "$set" << BSON( "a" << BSON_ARRAY( 1 ) ) ),
+                               modSetState->getOpLogRewrite() );
+            }
+        };
+
+        class AddToSetRewriteForceNotInPlace {
+        public:
+            void run() {
+                BSONObj obj = BSON( "a" << BSON_ARRAY( 1 ) );
+                BSONObj mod = BSON( "$addToSet" << BSON( "a" << 1 ) );
+                ModSet modSet( mod );
+                auto_ptr<ModSetState> modSetState = modSet.prepare( obj );
+                modSetState->createNewFromMods();
+                ASSERT_EQUALS( BSON( "$set" << BSON( "a" << BSON_ARRAY( 1 ) ) ),
+                               modSetState->getOpLogRewrite() );
+            }
+        };
+
+        class AddToSetRewriteExistingField {
+        public:
+            void run() {
+                BSONObj obj = BSON( "a" << BSON_ARRAY( 1 ) );
+                BSONObj mod = BSON( "$addToSet" << BSON( "a" << 2 ) );
+                ModSet modSet( mod );
+                auto_ptr<ModSetState> modSetState = modSet.prepare( obj );
+                ASSERT_FALSE( modSetState->canApplyInPlace() );
+                modSetState->createNewFromMods();
+                ASSERT_EQUALS( BSON( "$set" << BSON( "a" << BSON_ARRAY( 1 << 2 ) ) ),
+                               modSetState->getOpLogRewrite() );
+            }
+        };
+
+        class AddToSetRewriteNonExistingField {
+        public:
+            void run() {
+                BSONObj obj = BSON( "a" << BSON_ARRAY( 1 ) );
+                BSONObj mod = BSON( "$addToSet" << BSON( "b" << 1 ) );
+                ModSet modSet( mod );
+                auto_ptr<ModSetState> modSetState = modSet.prepare( obj );
+                ASSERT_FALSE( modSetState->canApplyInPlace() );
+                modSetState->createNewFromMods();
+                ASSERT_EQUALS( BSON( "$set" << BSON( "b" << BSON_ARRAY( 1 ) ) ),
+                               modSetState->getOpLogRewrite() );
+            }
+        };
+
+        // Rename doesn't log if both fields are not present.
+        class RenameRewriteBothNonExistent {
+        public:
+            void run() {
+                BSONObj obj = BSON( "a" << 1 );
+                BSONObj mod = BSON( "$rename" << BSON( "b" << "c" ) );
+                ModSet modSet( mod );
+                                auto_ptr<ModSetState> modSetState = modSet.prepare( obj );
+                ASSERT_TRUE( modSetState->canApplyInPlace() );
+                modSetState->applyModsInPlace(false);
+                ASSERT_EQUALS( BSONObj(), modSetState->getOpLogRewrite() );
+            }
+        };
+
+        class RenameRewriteExistingToField {
+        public:
+            void run() {
+                BSONObj obj = BSON( "b" << 100 );
+                BSONObj mod = BSON( "$rename" << BSON( "a" << "b" ) );
+                ModSet modSet( mod );
+                                auto_ptr<ModSetState> modSetState = modSet.prepare( obj );
+                ASSERT_TRUE( modSetState->canApplyInPlace() );
+                modSetState->applyModsInPlace(false);
+                ASSERT_EQUALS( BSONObj(), modSetState->getOpLogRewrite() );
+            }
+        };
+
+        class RenameRewriteExistingFromField {
+        public:
+            void run() {
+                BSONObj obj = BSON( "a" << 100 );
+                BSONObj mod = BSON( "$rename" << BSON( "a" << "b" ) );
+                ModSet modSet( mod );
+                                auto_ptr<ModSetState> modSetState = modSet.prepare( obj );
+                ASSERT_FALSE( modSetState->canApplyInPlace() );
+                modSetState->createNewFromMods();
+                ASSERT_EQUALS( BSON( "$unset" << BSON( "a" << 1 ) << "$set" << BSON ( "b" << 100 ) ),
+                               modSetState->getOpLogRewrite() );
+            }
+        };
+
+        class RenameRewriteBothExistingField {
+        public:
+            void run() {
+                BSONObj obj = BSON( "a" << 100 << "b" << 200);
+                BSONObj mod = BSON( "$rename" << BSON( "a" << "b" ) );
+                ModSet modSet( mod );
+                                auto_ptr<ModSetState> modSetState = modSet.prepare( obj );
+                ASSERT_FALSE( modSetState->canApplyInPlace() );
+                modSetState->createNewFromMods();
+                ASSERT_EQUALS( BSON( "$unset" << BSON( "a" << 1 ) << "$set" << BSON ( "b" << 100 ) ),
+                               modSetState->getOpLogRewrite() );
+            }
+        };
+
+        // $bit is never applied in place currently
+        class BitRewriteExistingField {
+        public:
+            void run() {
+                BSONObj obj = BSON( "a" << 0 );
+                BSONObj mod = BSON( "$bit" << BSON( "a" << BSON( "or" << 1 ) ) );
+                ModSet modSet( mod );
+                auto_ptr<ModSetState> modSetState = modSet.prepare( obj );
+                ASSERT_FALSE( modSetState->canApplyInPlace() );
+                modSetState->createNewFromMods();
+                ASSERT_EQUALS( BSON( "$set" << BSON( "a" << 1 ) ),
+                               modSetState->getOpLogRewrite() );
+            }
+        };
+
+        class BitRewriteNonExistingField {
+        public:
+            void run() {
+                BSONObj obj = BSON( "a" << 0 );
+                BSONObj mod = BSON( "$bit" << BSON( "b" << BSON( "or" << 1 ) ) );
+                ModSet modSet( mod );
+                auto_ptr<ModSetState> modSetState = modSet.prepare( obj );
+                ASSERT_FALSE( modSetState->canApplyInPlace() );
+                modSetState->createNewFromMods();
+                ASSERT_EQUALS( BSON( "$set" << BSON( "b" << 1 ) ),
+                               modSetState->getOpLogRewrite() );
+            }
+        };
+
+        class SetIsNotRewritten {
+        public:
+            void run() {
+                BSONObj obj = BSON( "a" << 0 );
+                BSONObj mod = BSON( "$set" << BSON( "b" << 1 ) );
+                ModSet modSet( mod );
+                auto_ptr<ModSetState> modSetState = modSet.prepare( obj );
+                ASSERT_FALSE( modSetState->canApplyInPlace() );
+                modSetState->createNewFromMods();
+                ASSERT_EQUALS( BSON( "$set" << BSON( "b" << 1 ) ),
+                               modSetState->getOpLogRewrite() );
+            }
+        };
+
+        class UnsetIsNotRewritten {
+        public:
+            void run() {
+                BSONObj obj = BSON( "a" << 0 );
+                BSONObj mod = BSON( "$unset" << BSON( "a" << 1 ) );
+                ModSet modSet( mod );
+                auto_ptr<ModSetState> modSetState = modSet.prepare( obj );
+                ASSERT_FALSE( modSetState->canApplyInPlace() );
+                modSetState->createNewFromMods();
+                ASSERT_EQUALS( BSON( "$unset" << BSON( "a" << 1 ) ),
+                               modSetState->getOpLogRewrite() );
+            }
+        };
     };
 
     namespace basic {
@@ -933,8 +1344,39 @@ namespace UpdateTests {
             add< ModSetTests::inc2 >();
             add< ModSetTests::set1 >();
             add< ModSetTests::push1 >();
-            add< ModSetTests::IncRewrite >();
+
+            add< ModSetTests::IncRewriteInPlace >();
+            add< ModSetTests::InRewriteForceNotInPlace >();
             add< ModSetTests::IncRewriteNestedArray >();
+            add< ModSetTests::IncRewriteExistingField >();
+            add< ModSetTests::IncRewriteNonExistingField >();
+            add< ModSetTests::PushRewriteExistingField >();
+            add< ModSetTests::PushRewriteNonExistingField >();
+            add< ModSetTests::PushAllRewriteExistingField >();
+            add< ModSetTests::PushAllRewriteNonExistingField >();
+            add< ModSetTests::PullRewriteInPlace >();
+            add< ModSetTests::PullRewriteForceNotInPlace >();
+            add< ModSetTests::PullRewriteNonExistingUnsets >();
+            add< ModSetTests::PullRewriteExistingField >();
+            add< ModSetTests::PullRewriteLastExistingField >();
+            add< ModSetTests::PullRewriteNonExistingField >();
+            add< ModSetTests::PopRewriteEmptyArray >();
+            add< ModSetTests::PopRewriteLastElement >();
+            add< ModSetTests::PopRewriteExistingField >();
+            add< ModSetTests::PopRewriteNonExistingField >();
+            add< ModSetTests::AddToSetRewriteInPlace >();
+            add< ModSetTests::AddToSetRewriteForceNotInPlace >();
+            add< ModSetTests::AddToSetRewriteExistingField >();
+            add< ModSetTests::AddToSetRewriteNonExistingField >();
+            add< ModSetTests::RenameRewriteBothNonExistent >();
+            add< ModSetTests::RenameRewriteExistingToField >();
+            add< ModSetTests::RenameRewriteExistingFromField >();
+            add< ModSetTests::RenameRewriteBothExistingField >();
+            add< ModSetTests::BitRewriteExistingField >();
+            // XXX $bit over non-existing field is missing. Probably out of scope to fix it here.
+            // add< ModSetTests::BitRewriteNonExistingField >();
+            add< ModSetTests::SetIsNotRewritten >();
+            add< ModSetTests::UnsetIsNotRewritten >();
 
             add< basic::inc1 >();
             add< basic::inc2 >();
