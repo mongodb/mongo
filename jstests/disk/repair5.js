@@ -9,7 +9,11 @@ repairpath = dbpath + "repairDir/"
 resetDbpath( dbpath );
 resetDbpath( repairpath );
 
-m = startMongoProgram( "mongod", "--port", port, "--dbpath", dbpath, "--repairpath", repairpath, "--nohttpinterface", "--bind_ip", "127.0.0.1" );
+m = startMongodTest(port,
+                    baseName + "/",
+                    true,
+                    {repairpath : repairpath, nohttpinterface : "", bind_ip : "127.0.0.1"});
+
 db = m.getDB( baseName );
 
 big = new Array( 5000 ).toString();
