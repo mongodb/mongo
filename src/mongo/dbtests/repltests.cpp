@@ -1009,6 +1009,41 @@ namespace ReplTests {
             }
         };
 
+        class NestedNoRename : public Base {
+        public:
+            void doIt() const {
+                client()->update( ns(), BSON( "_id" << 0 ),
+                                  fromjson( "{$rename:{'a.b':'c.d'},$set:{z:1}}"
+                                      ) );
+            }
+            using ReplTests::Base::check;
+            void check() const {
+                ASSERT_EQUALS( 1, count() );
+                check( BSON( "_id" << 0 << "z" << 1 ) , one( fromjson("{'_id':0}" ) ) );
+            }
+            void reset() const {
+                deleteAll( ns() );
+                insert( fromjson( "{'_id':0}" ) );
+            }
+        };
+
+        class AddToSetEmptyMissing : public Base {
+        public:
+            void doIt() const {
+                client()->update( ns(), BSON( "_id" << 0 ), fromjson(
+                                      "{$addToSet:{a:{$each:[]}}}" ) );
+            }
+            using ReplTests::Base::check;
+            void check() const {
+                ASSERT_EQUALS( 1, count() );
+                check( fromjson( "{_id:0,a:[]}" ), one( fromjson("{'_id':0}" ) )
+                    );
+            }
+            void reset() const {
+                deleteAll( ns() );
+                insert( fromjson( "{'_id':0}" ) );
+            }
+        };
 
     } // namespace Idempotence
 
@@ -1230,6 +1265,8 @@ namespace ReplTests {
             add< Idempotence::RenameReplace >();
             add< Idempotence::RenameOverwrite >();
             add< Idempotence::NoRename >();
+            add< Idempotence::NestedNoRename >();
+            add< Idempotence::AddToSetEmptyMissing >();
             add< DeleteOpIsIdBased >();
             add< DatabaseIgnorerBasic >();
             add< DatabaseIgnorerUpdate >();
