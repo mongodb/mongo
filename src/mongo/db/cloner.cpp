@@ -719,6 +719,9 @@ namespace mongo {
 
     class CmdRenameCollection : public Command {
     public:
+        // Namespace is 128 incl NUL
+        // Namespace is 128 minus .$ and $extra so 120 before additions
+        static const int maxNamespaceLen = 120;
         CmdRenameCollection() : Command( "renameCollection" ) {}
         virtual bool adminOnly() const {
             return true;
@@ -742,6 +745,30 @@ namespace mongo {
             if ( source.empty() || target.empty() ) {
                 errmsg = "invalid command syntax";
                 return false;
+            }
+
+            char from[256];
+            nsToDatabase( source.c_str(), from );
+            char to[256];
+            nsToDatabase( target.c_str(), to );
+            string databaseName = from;
+            databaseName += ".system.indexes";
+
+            int longestIndexNameLength = 0;
+            vector<BSONObj> oldIndSpec = Helpers::findAll(databaseName, BSON("ns" << source ));
+            for (size_t i = 0; i < oldIndSpec.size(); ++i) {
+                int thisLength = oldIndSpec[i].getField("name").valuesize();
+                if (thisLength > longestIndexNameLength) {
+                     longestIndexNameLength = thisLength;
+                }
+            }
+            unsigned int longestAllowed = maxNamespaceLen - longestIndexNameLength - 1;
+            if (target.size() > longestAllowed) {
+                StringBuilder sb;
+                sb << "collection name length of " << target.size()
+                << " exceeds maximum length of " << longestAllowed
+                << ", allowing for index names";
+                uasserted(16445, sb.str().c_str());
             }
 
             bool capped = false;
@@ -771,10 +798,6 @@ namespace mongo {
             // if we are renaming in the same database, just
             // rename the namespace and we're done.
             {
-                char from[256];
-                nsToDatabase( source.c_str(), from );
-                char to[256];
-                nsToDatabase( target.c_str(), to );
                 if ( strcmp( from, to ) == 0 ) {
                     renameNamespace( source.c_str(), target.c_str(), cmdObj["stayTemp"].trueValue() );
                     // make sure we drop counters etc
