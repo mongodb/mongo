@@ -181,7 +181,7 @@ __wt_ovfl_in_cache(WT_SESSION_IMPL *session,
 	 *
 	 * If there's no globally visible update using our cached copy of the
 	 * oldest ID required in the system, refresh that ID and rescan, it's
-	 * cheaper than doing I/O.
+	 * better than doing I/O and caching copies of the overflow item.
 	 */
 	for (pass = 0; pass < 2; pass++) {
 		for (upd = WT_ROW_UPDATE(page, rip);; upd = upd->next) {
