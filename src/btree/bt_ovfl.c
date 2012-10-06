@@ -64,7 +64,12 @@ __wt_ovfl_in(WT_SESSION_IMPL *session,
 	 * WiredTiger supports large page sizes, overflow items should be rare.
 	 *
 	 * The address might have been cleared (if we race with reconciliation),
-	 * restart those operations.
+	 * restart those operations.  It's tempting to look-aside into the area
+	 * where values are cached instead of returning restart, but that won't
+	 * work: the code caching updated overflow values doesn't bother if it
+	 * finds a globally visible update in the update chain, but our search
+	 * for a row's value might have not see that update, so we must restart
+	 * the search.
 	 */
 	__wt_readlock(session, btree->ovfl_lock);
 	ret = __ovfl_addr_cleared(addr, addr_size) ?
