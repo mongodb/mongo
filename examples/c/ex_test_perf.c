@@ -56,25 +56,79 @@ typedef struct {
 } CONFIG;
 
 /* Forward function definitions. */
+int execute_reads(CONFIG *);
 int populate(CONFIG *);
-void print_config(CONFIG *cfg);
-void *read_thread(void *arg);
+void print_config(CONFIG *);
+void *read_thread(void *);
 void usage(void);
 
-/* Default values - these are small, we want the basic run to be fast. */
+/* Default values - these are tiny, we want the basic run to be fast. */
 CONFIG default_cfg = {
 	"WT_TEST",	/* home */
 	"lsm:test",	/* uri */
-	"create,cache_size=2GB", /* conn_config */
+	"create,cache_size=200MB", /* conn_config */
+	"key_format=S,value_format=S",	/* table_config */
+	1,		/* create */
+	14023954,	/* rand_seed */
+	5000,		/* icount */
+	100,		/* data_sz */
+	20,		/* key_sz */
+	2,		/* report_interval */
+	2,		/* read_time */
+	2,		/* read_threads */
+	0,		/* verbose */
+	NULL
+};
+/* Small config values - these are small. */
+CONFIG small_cfg = {
+	"WT_TEST",	/* home */
+	"lsm:test",	/* uri */
+	"create,cache_size=500MB", /* conn_config */
+	"key_format=S,value_format=S,lsm_chunk_size=5MB,"
+	    "leaf_page_max=16k,internal_page_max=16kb", /* table_config */
+	1,		/* create */
+	14023954,	/* rand_seed */
+	500000,		/* icount 0.5 million */
+	100,		/* data_sz */
+	20,		/* key_sz */
+	10,		/* report_interval */
+	20,		/* read_time */
+	8,		/* read_threads */
+	0,		/* verbose */
+	NULL
+};
+/* Default values - these are small, we want the basic run to be fast. */
+CONFIG med_cfg = {
+	"WT_TEST",	/* home */
+	"lsm:test",	/* uri */
+	"create,cache_size=1GB", /* conn_config */
 	"key_format=S,value_format=S,lsm_chunk_size=20MB,"
 	    "leaf_page_max=16k,internal_page_max=16kb", /* table_config */
 	1,		/* create */
 	14023954,	/* rand_seed */
-	500000,		/* icount */
+	50000000,	/* icount 50 million */
 	100,		/* data_sz */
 	20,		/* key_sz */
 	20,		/* report_interval */
-	10,		/* read_time */
+	100,		/* read_time */
+	16,		/* read_threads */
+	0,		/* verbose */
+	NULL
+};
+/* Default values - these are small, we want the basic run to be fast. */
+CONFIG large_cfg = {
+	"WT_TEST",	/* home */
+	"lsm:test",	/* uri */
+	"create,cache_size=2GB", /* conn_config */
+	"key_format=S,value_format=S,lsm_chunk_size=50MB,"
+	    "leaf_page_max=16k,internal_page_max=16kb", /* table_config */
+	1,		/* create */
+	14023954,	/* rand_seed */
+	500000000,	/* icount 500 million */
+	100,		/* data_sz */
+	20,		/* key_sz */
+	20,		/* report_interval */
+	600,		/* read_time */
 	16,		/* read_threads */
 	0,		/* verbose */
 	NULL
@@ -143,14 +197,25 @@ int populate(CONFIG *cfg)
 		return (ENOMEM);
 
 	/* Open a session for the current thread's work. */
-	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
+	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0) {
 		fprintf(stderr, "Error opening a session on %s: %s\n",
 		    cfg->home, wiredtiger_strerror(ret));
+		return (ret);
+	}
 
-	ret = session->create(session, cfg->uri, cfg->table_config);
+	if ((ret = session->create(
+	    session, cfg->uri, cfg->table_config)) != 0) {
+		fprintf(stderr, "Error creating table %s: %s\n",
+		    cfg->uri, wiredtiger_strerror(ret));
+		return (ret);
+	}
 
-	ret = session->open_cursor(
-	    session, cfg->uri, NULL, "bulk", &cursor);
+	if ((ret = session->open_cursor(
+	    session, cfg->uri, NULL, "bulk", &cursor)) != 0) {
+		fprintf(stderr, "Error opening cursor %s: %s\n",
+		    cfg->uri, wiredtiger_strerror(ret));
+		return (ret);
+	}
 
 	memset(data_buf, 'a', cfg->data_sz - 1);
 	cursor->set_value(cursor, data_buf);
@@ -166,7 +231,7 @@ int populate(CONFIG *cfg)
 		cursor->set_key(cursor, key_buf);
 		if ((ret = cursor->insert(cursor)) != 0) {
 			fprintf(stderr, "Failed inserting with: %d\n", ret);
-			return (1);
+			return (ret);
 		}
 	}
 	cursor->close(cursor);
@@ -184,18 +249,40 @@ int main(int argc, char **argv)
 	CONFIG cfg;
 	WT_CONNECTION *conn;
 	const char *user_cconfig, *user_tconfig;
+	const char *opts = "C:R:T:d:eh:i:k:r:s:u:v:SML";
 	char *cc_buf, *tc_buf;
-	int ch, debug, ret;
-	pthread_t *read_threads;
-	uint32_t i, slept;
-	uint64_t last_ops, req_len;
+	int ch, ret;
+	uint64_t req_len;
 
-	return (0);
 	/* Setup the default configuration values. */
 	memcpy(&cfg, &default_cfg, sizeof(cfg));
-	debug = 0;
 	cc_buf = tc_buf = NULL;
-	while ((ch = getopt(argc, argv, "C:DR:T:d:eh:i:k:r:s:u:v:")) != EOF)
+	user_cconfig = user_tconfig = NULL;
+	conn = NULL;
+
+	/*
+	 * First parse different config structures - other options override
+	 * fields within the structure.
+	 */
+	while ((ch = getopt(argc, argv, opts)) != EOF)
+		switch (ch) {
+		case 'S':
+			memcpy(&cfg, &small_cfg, sizeof(cfg));
+			break;
+		case 'M':
+			memcpy(&cfg, &med_cfg, sizeof(cfg));
+			break;
+		case 'L':
+			memcpy(&cfg, &large_cfg, sizeof(cfg));
+			break;
+		default:
+			/* Validation is provided on the next parse. */
+			break;
+		}
+
+	/* Parse other options */
+	optind = 1;
+	while ((ch = getopt(argc, argv, opts)) != EOF)
 		switch (ch) {
 		case 'd':
 			cfg.data_sz = atoi(optarg);
@@ -227,14 +314,15 @@ int main(int argc, char **argv)
 		case 'C':
 			user_cconfig = optarg;
 			break;
-		case 'D':
-			debug = 1;
-			break;
 		case 'R':
 			cfg.read_threads = atoi(optarg);
 			break;
 		case 'T':
 			user_tconfig = optarg;
+			break;
+		case 'L':
+		case 'M':
+		case 'S':
 			break;
 		case '?':
 		default:
@@ -243,28 +331,36 @@ int main(int argc, char **argv)
 			return (EINVAL);
 		}
 
-	/* Handle non-const configuration strings. */
-	if (debug || user_cconfig) {
-		req_len = strlen(cfg.conn_config) + strlen(debug_cconfig) +
-			strlen(user_cconfig);
+	/* Concatenate non-default configuration strings. */
+	if (cfg.verbose > 1 || user_cconfig != NULL) {
+		req_len = strlen(cfg.conn_config) + strlen(debug_cconfig) + 3;
+		if (user_cconfig != NULL)
+			req_len += strlen(user_cconfig);
 		cc_buf = calloc(req_len, 1);
-		if (cc_buf == NULL)
-			exit(ENOMEM);
+		if (cc_buf == NULL) {
+			ret = ENOMEM;
+			goto err;
+		}
 		snprintf(cc_buf, req_len, "%s%s%s%s%s",
 		    cfg.conn_config,
-		    debug ? "," : "", debug ? debug_cconfig : "",
+		    cfg.verbose > 1 ? "," : "",
+		    cfg.verbose > 1 ? debug_cconfig : "",
 		    user_cconfig ? "," : "", user_cconfig ? user_cconfig : "");
 		cfg.conn_config = cc_buf;
 	}
-	if (debug || user_tconfig) {
-		req_len = strlen(cfg.table_config) + strlen(debug_tconfig) +
-			strlen(user_tconfig);
+	if (cfg.verbose > 1 || user_tconfig != NULL) {
+		req_len = strlen(cfg.table_config) + strlen(debug_tconfig) + 3;
+		if (user_tconfig != NULL)
+			req_len += strlen(user_tconfig);
 		tc_buf = calloc(req_len, 1);
-		if (tc_buf == NULL)
-			exit(ENOMEM);
+		if (tc_buf == NULL) {
+			ret = ENOMEM;
+			goto err;
+		}
 		snprintf(tc_buf, req_len, "%s%s%s%s%s",
 		    cfg.table_config,
-		    debug ? "," : "", debug ? debug_tconfig : "",
+		    cfg.verbose > 1 ? "," : "",
+		    cfg.verbose > 1 ? debug_tconfig : "",
 		    user_tconfig ? "," : "", user_tconfig ? user_tconfig : "");
 		cfg.table_config = tc_buf;
 	}
@@ -276,49 +372,85 @@ int main(int argc, char **argv)
 
 	/* Open a connection to the database, creating it if necessary. */
 	if ((ret = wiredtiger_open(
-	    cfg.home, NULL, cfg.conn_config, &conn)) != 0)
+	    cfg.home, NULL, cfg.conn_config, &conn)) != 0) {
 		fprintf(stderr, "Error connecting to %s: %s\n",
 		    cfg.home, wiredtiger_strerror(ret));
+		goto err;
+	}
 
 	cfg.conn = conn;
-	if (cfg.create)
-		populate(&cfg);
+	if (cfg.create != 0 && (ret = populate(&cfg)) != 0)
+		goto err;
 
-	if (cfg.verbose > 0)
+	if (cfg.read_time != 0 && cfg.read_threads != 0)
+		if ((ret = execute_reads(&cfg)) != 0)
+			goto err;
+
+	printf("Ran performance test example with %d threads for %d seconds.\n",
+	    cfg.read_threads, cfg.read_time);
+	printf("Executed %" PRIu64 " read operations\n", nops);
+
+	/* Cleanup. */
+err:	if (conn != NULL && (ret = conn->close(conn, NULL)) != 0)
+		fprintf(stderr, "Error connecting to %s: %s\n",
+		    cfg.home, wiredtiger_strerror(ret));
+	if (cc_buf != NULL)
+		free(cc_buf);
+	if (tc_buf != NULL)
+		free(tc_buf);
+
+	return (ret);
+}
+
+int execute_reads(CONFIG *cfg)
+{
+	pthread_t *read_threads;
+	int ret;
+	uint32_t i, slept;
+	uint64_t last_ops;
+
+	if (cfg->verbose > 0)
 		printf("Starting read threads\n");
+
 	running = 1;
 	nops = 0;
-	read_threads = calloc(cfg.read_threads, sizeof(pthread_t *));
-	if (read_threads == NULL)
-		exit(ENOMEM);
-	for (i = 0; i < cfg.read_threads; i++)
-		ret = pthread_create(&read_threads[i], NULL, read_thread, &cfg);
 
-	if (cfg.report_interval > cfg.read_time)
-		cfg.report_interval = cfg.read_time;
-	for (slept = 0, last_ops = 0; slept < cfg.read_time;
-	    slept += cfg.report_interval) {
-		sleep(cfg.report_interval);
-		if (cfg.verbose > 0) {
+	read_threads = calloc(cfg->read_threads, sizeof(pthread_t *));
+	if (read_threads == NULL)
+		return (ENOMEM);
+	for (i = 0; i < cfg->read_threads; i++) {
+		if ((ret = pthread_create(
+		    &read_threads[i], NULL, read_thread, cfg)) != 0) {
+			fprintf(stderr, "Error creating thread: %d\n", i);
+			return (ret);
+		}
+	}
+
+	/* Sanity check reporting interval. */
+	if (cfg->report_interval > cfg->read_time)
+		cfg->report_interval = cfg->read_time;
+
+	for (slept = 0, last_ops = 0; slept < cfg->read_time;
+	    slept += cfg->report_interval) {
+		sleep(cfg->report_interval);
+		if (cfg->verbose > 0) {
 			printf("%" PRIu64 " ops in %d secs\n",
-			    nops - last_ops, cfg.report_interval);
+			    nops - last_ops, cfg->report_interval);
 			fflush(stdout);
 		}
 		last_ops = nops;
 	}
 	running = 0;
 
-	for (i = 0; i < cfg.read_threads; i++)
-		ret = pthread_join(read_threads[i], NULL);
+	for (i = 0; i < cfg->read_threads; i++) {
+		if ((ret = pthread_join(read_threads[i], NULL)) != 0) {
+			fprintf(stderr, "Error joining thread %d\n", i);
+			return (ret);
+		}
+	}
 
-	/* Note: closing the connection implicitly closes open session(s). */
-	if ((ret = conn->close(conn, NULL)) != 0)
-		fprintf(stderr, "Error connecting to %s: %s\n",
-		    cfg.home, wiredtiger_strerror(ret));
-
-	printf("Ran performance test example with %d threads for %d seconds.\n",
-	    cfg.read_threads, cfg.read_time);
-	printf("Executed %" PRIu64 " read operations\n", nops);
+	if (read_threads != NULL)
+		free(read_threads);
 	return (ret);
 }
 
@@ -342,9 +474,11 @@ void print_config(CONFIG *cfg)
 
 void usage(void)
 {
-	printf("ex_perf_test [-CDRTdehikrsuv]\n");
+	printf("ex_perf_test [-CDLMRSTdehikrsuv]\n");
+	printf("\t-S Use a small default configuration\n");
+	printf("\t-M Use a medium default configuration\n");
+	printf("\t-L Use a large default configuration\n");
 	printf("\t-C <string> additional connection configuration\n");
-	printf("\t-D debug configuration\n");
 	printf("\t-R <int> number of read threads\n");
 	printf("\t-T <string> additional table configuration\n");
 	printf("\t-d <int> data item size\n");
