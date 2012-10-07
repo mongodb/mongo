@@ -147,6 +147,7 @@ __val_ovfl_cache_col(
 		WT_ERR(__ovfl_read(session, &value, addr, addr_size));
 #else
 	WT_UNUSED(upd);
+	WT_ERR(__ovfl_read(session, &value, addr, addr_size));
 #endif
 
 	WT_ERR(__wt_rec_track(session,
