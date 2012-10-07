@@ -333,9 +333,9 @@ extern int __wt_ovfl_cache_col_restart(WT_SESSION_IMPL *session,
     WT_PAGE *page,
     WT_CELL_UNPACK *unpack,
     WT_ITEM *store);
-extern int __wt_val_ovfl_cache( WT_SESSION_IMPL *session,
+extern int __wt_val_ovfl_cache(WT_SESSION_IMPL *session,
     WT_PAGE *page,
-    void *ip,
+    void *cookie,
     WT_CELL_UNPACK *unpack);
 extern int
 __wt_page_in_func(

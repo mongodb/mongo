@@ -97,7 +97,7 @@ __ovfl_cache_visible(WT_SESSION_IMPL *session, WT_UPDATE *upd_arg)
  */
 static int
 __val_ovfl_cache_col(
-    WT_SESSION_IMPL *session, WT_PAGE *page, WT_CELL_UNPACK *unpack)
+    WT_SESSION_IMPL *session, WT_PAGE *page, WT_UPDATE *upd, WT_CELL_UNPACK *unpack)
 {
 	WT_DECL_RET;
 	WT_ITEM value;
@@ -116,16 +116,11 @@ __val_ovfl_cache_col(
 	 * the original overflow value was for records 100-200, we've replaced
 	 * each of those records individually, but there exists a reader that
 	 * might read any one of those records, and all of those records have
-	 * different WT_UPDATE entries with different transaction IDs.  Given
-	 * it's to infeasible to determine if there's a globally visible update
-	 * for each reader for each record, we don't even try: cache the record.
+	 * different WT_UPDATE entries with different transaction IDs.  Since
+	 * it's infeasible to determine if there's a globally visible update 
+	 * for each reader for each record, we test one simple case, otherwise,
+	 * we cache the record.
 	 *
-	 * XXX
-	 * Here's where we'll do a simple test: if the record is for a single
-	 * recno, check its update list -- pass in unpack.
-	 */
-
-	/*
 	 * Enter this address into the tracking system, discarding the blocks
 	 * when reconciliation completes.  Unlike row-store, we include the
 	 * underlying overflow value with the address because cached overflow
@@ -141,7 +136,19 @@ __val_ovfl_cache_col(
 	WT_ASSERT(session, found == 0);
 	}
 #endif
-	WT_ERR(__ovfl_read(session, &value, addr, addr_size));
+#if 0
+	/*
+	 * Here's a quick test for a probably common case: a single matching
+	 * record with a single, globally visible update.
+	 */
+	if (__wt_cell_rle(unpack) != 1 ||
+	    upd == NULL ||				/* Sanity check. */
+	    !__wt_txn_visible_all(session, upd->txnid))
+		WT_ERR(__ovfl_read(session, &value, addr, addr_size));
+#else
+	WT_UNUSED(upd);
+#endif
+
 	WT_ERR(__wt_rec_track(session,
 	    page, addr, addr_size, value.data, value.size, WT_TRK_ONPAGE));
 
@@ -277,8 +284,8 @@ err:		__wt_free(session, new);
  *	Handle deletion of an overflow value.
  */
 int
-__wt_val_ovfl_cache(
-    WT_SESSION_IMPL *session, WT_PAGE *page, void *ip, WT_CELL_UNPACK *unpack)
+__wt_val_ovfl_cache(WT_SESSION_IMPL *session,
+    WT_PAGE *page, void *cookie, WT_CELL_UNPACK *unpack)
 {
 	WT_BTREE *btree;
 	WT_DECL_RET;
@@ -334,10 +341,10 @@ __wt_val_ovfl_cache(
 	/* Discard the original blocks and cache the deleted overflow value. */
 	switch (page->type) {
 	case WT_PAGE_COL_VAR:
-		WT_ERR(__val_ovfl_cache_col(session, page, unpack));
+		WT_ERR(__val_ovfl_cache_col(session, page, cookie, unpack));
 		break;
 	case WT_PAGE_ROW_LEAF:
-		WT_ERR(__val_ovfl_cache_row(session, page, ip , unpack));
+		WT_ERR(__val_ovfl_cache_row(session, page, cookie , unpack));
 		break;
 	WT_ILLEGAL_VALUE_ERR(session);
 	}

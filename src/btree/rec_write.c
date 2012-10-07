@@ -2196,7 +2196,7 @@ compare:		/*
 		 */
 		if (ovfl_state == OVFL_UNUSED)
 			WT_ERR(
-			    __wt_val_ovfl_cache(session, page, NULL, unpack));
+			    __wt_val_ovfl_cache(session, page, upd, unpack));
 	}
 
 	/* Walk any append list. */
