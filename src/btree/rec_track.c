@@ -190,9 +190,9 @@ __wt_rec_track_onpage_srch(WT_SESSION_IMPL *session, WT_PAGE *page,
 
 		/* Optionally return a copy of the object's data. */
 		if (copy != NULL) {
-			WT_ASSERT(session, track->size != 0);
-			WT_RET(__wt_buf_set(
-			    session, copy, track->data, track->size));
+			copy->data = track->data;
+			copy->size = track->size;
+			WT_ASSERT(session, copy->size != 0);
 		}
 		*foundp = 1;
 		return (0);
