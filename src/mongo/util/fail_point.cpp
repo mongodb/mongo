@@ -127,4 +127,10 @@ namespace mongo {
             _failPoint->shouldFailCloseBlock();
         }
     }
+
+    const BSONObj& ScopedFailPoint::getData() const {
+        // Assert when attempting to get data without incrementing ref counter.
+        fassert(16445, _shouldClose);
+        return _failPoint->getData();
+    }
 }

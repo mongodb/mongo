@@ -29,15 +29,16 @@ namespace mongo_test {
     TEST(FailPoint, InitialState) {
         FailPoint failPoint;
         ASSERT_FALSE(failPoint.shouldFail());
-        ASSERT(failPoint.getData().isEmpty());
-        ASSERT_FALSE(failPoint.shouldFail());
     }
 
     TEST(FailPoint, AlwaysOn) {
         FailPoint failPoint;
         failPoint.setMode(FailPoint::alwaysOn);
         ASSERT(failPoint.shouldFail());
-        ASSERT(failPoint.getData().isEmpty());
+
+        MONGO_FAIL_POINT_BLOCK(failPoint, scopedFp) {
+            ASSERT(scopedFp.getData().isEmpty());
+        }
 
         for (size_t x = 0; x < 50; x++) {
             ASSERT(failPoint.shouldFail());
@@ -61,7 +62,7 @@ namespace mongo_test {
         FailPoint failPoint;
         bool called = false;
 
-        MONGO_FAIL_POINT_BLOCK(failPoint) {
+        MONGO_FAIL_POINT_BLOCK(failPoint, scopedFp) {
             called = true;
         }
 
@@ -73,7 +74,7 @@ namespace mongo_test {
         failPoint.setMode(FailPoint::alwaysOn);
         bool called = false;
 
-        MONGO_FAIL_POINT_BLOCK(failPoint) {
+        MONGO_FAIL_POINT_BLOCK(failPoint, scopedFp) {
             called = true;
         }
 
@@ -86,7 +87,7 @@ namespace mongo_test {
         size_t counter = 0;
 
         for (size_t x = 0; x < 10; x++) {
-            MONGO_FAIL_POINT_BLOCK(failPoint) {
+            MONGO_FAIL_POINT_BLOCK(failPoint, scopedFp) {
                 counter++;
             }
         }
@@ -100,7 +101,7 @@ namespace mongo_test {
         bool threw = false;
 
         try {
-            MONGO_FAIL_POINT_BLOCK(failPoint) {
+            MONGO_FAIL_POINT_BLOCK(failPoint, scopedFp) {
                 throw std::logic_error("BlockWithException threw");
             }
         }
@@ -118,8 +119,8 @@ namespace mongo_test {
         FailPoint failPoint;
         failPoint.setMode(FailPoint::alwaysOn, 0, BSON("x" << 20));
 
-        MONGO_FAIL_POINT_BLOCK(failPoint) {
-            ASSERT_EQUALS(20, failPoint.getData()["x"].numberInt());
+        MONGO_FAIL_POINT_BLOCK(failPoint, scopedFp) {
+            ASSERT_EQUALS(20, scopedFp.getData()["x"].numberInt());
         }
     }
 
@@ -169,8 +170,8 @@ namespace mongo_test {
     private:
         static void blockTask(FailPoint* failPoint) {
             while (true) {
-                MONGO_FAIL_POINT_BLOCK((*failPoint)) {
-                    const mongo::BSONObj& data = failPoint->getData();
+                MONGO_FAIL_POINT_BLOCK((*failPoint), scopedFp) {
+                    const mongo::BSONObj& data = scopedFp.getData();
 
                     // Expanded ASSERT_EQUALS since the error is not being
                     // printed out properly
@@ -188,8 +189,8 @@ namespace mongo_test {
         static void blockWithExceptionTask(FailPoint* failPoint) {
             while (true) {
                 try {
-                    MONGO_FAIL_POINT_BLOCK((*failPoint)) {
-                        const mongo::BSONObj& data = failPoint->getData();
+                    MONGO_FAIL_POINT_BLOCK((*failPoint), scopedFp) {
+                        const mongo::BSONObj& data = scopedFp.getData();
 
                         if (data["a"].numberInt() != 44) {
                             mongo::error() << "blockWithExceptionTask thread detected anomaly"

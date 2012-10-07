@@ -36,18 +36,11 @@ namespace mongo {
      * // Somewhere in the code
      * return false || MONGO_FAIL_POINT(makeBadThingsHappen);
      *
-     * // MONGO_FAIL_POINT bad usage example
-     * if (MONGO_FAIL_POINT(makeBadThingsHappen)) {
-     *     // Important! - You must not call getData() here.
-     *     // Use MONGO_FAIL_POINT_BLOCK instead if you need to.
-     *     const BSONObj& data = makeBadThingsHappen.getData();
-     * }
-     *
      * or
      *
      * // Somewhere in the code
-     * MONGO_FAIL_POINT_BLOCK(makeBadThingsHappen) {
-     *     const BSONObj& data = makeBadThingsHappen.getData();
+     * MONGO_FAIL_POINT_BLOCK(makeBadThingsHappen, blockMakeBadThingsHappen) {
+     *     const BSONObj& data = blockMakeBadThingsHappen.getData();
      *     // Do something
      * }
      *
@@ -122,12 +115,6 @@ namespace mongo {
          */
         void setMode(Mode mode, ValType val = 0, const BSONObj& extra = BSONObj());
 
-        /**
-         * @return the stored BSONObj in this fail point. Note that this cannot be safely
-         *      read if this fail point is off.
-         */
-        const BSONObj& getData() const;
-
     private:
         static const ValType ACTIVE_BIT = 1 << 31;
         static const ValType REF_COUNTER_MASK = ~ACTIVE_BIT;
@@ -154,11 +141,20 @@ namespace mongo {
          * slow path for #shouldFailOpenBlock
          */
         RetCode slowShouldFailOpenBlock();
+
+        /**
+         * @return the stored BSONObj in this fail point. Note that this cannot be safely
+         *      read if this fail point is off.
+         */
+        const BSONObj& getData() const;
+
+        friend class ScopedFailPoint;
     };
 
     /**
      * Helper class for making sure that FailPoint#shouldFailCloseBlock is called when
-     * FailPoint#shouldFailOpenBlock was called.
+     * FailPoint#shouldFailOpenBlock was called. This should only by the
+     * MONGO_FAIL_POINT_BLOCK macro.
      */
     class ScopedFailPoint {
     public:
@@ -180,6 +176,12 @@ namespace mongo {
             return ret == FailPoint::slowOn;
         }
 
+        /**
+         * @return the data stored in the fail point. #isActive must be true
+         *     before you can call this.
+         */
+        const BSONObj& getData() const;
+
     private:
         FailPoint* _failPoint;
         bool _once;
@@ -187,6 +189,12 @@ namespace mongo {
     };
 
     #define MONGO_FAIL_POINT(symbol) MONGO_unlikely(symbol.shouldFail())
-    #define MONGO_FAIL_POINT_BLOCK(symbol) for (mongo::ScopedFailPoint scopedFP(&symbol); \
-        MONGO_unlikely(scopedFP.isActive()); )
+
+    /**
+     * Macro for creating a fail point with block context. Also use this when
+     * you want to access the data stored in the fail point.
+     */
+    #define MONGO_FAIL_POINT_BLOCK(symbol, blockSymbol) \
+        for (mongo::ScopedFailPoint blockSymbol(&symbol); \
+            MONGO_unlikely(blockSymbol.isActive()); )
 }
