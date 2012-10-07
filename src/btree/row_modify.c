@@ -69,9 +69,12 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 		/* Make sure the update can proceed. */
 		WT_ERR(__wt_update_check(session, page, *upd_entry));
 
-		/* Allocate and insert a WT_UPDATE structure. */
+		/* Allocate the WT_UPDATE structure and transaction ID. */
 		WT_ERR(__wt_update_alloc(session, value, &upd, &upd_size));
+		WT_ERR(__wt_txn_modify(session, &upd->txnid));
 		logged = 1;
+
+		/* Serialize the update. */
 		WT_ERR(__wt_update_serial(session, page, cbt->write_gen,
 		    upd_entry, &new_upd, new_upd_size, &upd, upd_size,
 		    &upd_obsolete));
@@ -80,6 +83,9 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 		if (upd_obsolete != NULL)
 			__wt_update_obsolete_free(session, page, upd_obsolete);
 	} else {
+		/* Make sure the update can proceed. */
+		WT_ERR(__wt_update_check(session, page, NULL));
+
 		/*
 		 * Allocate insert array if necessary, and set the array
 		 * reference.
@@ -94,8 +100,6 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 		 */
 		ins_slot = F_ISSET(
 		    cbt, WT_CBT_SEARCH_SMALLEST) ? page->entries : cbt->slot;
-
-		WT_ERR(__wt_update_check(session, page, NULL));
 
 		new_inshead_size = new_inslist_size = 0;
 		if (page->u.row.ins == NULL) {
@@ -126,12 +130,13 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 		skipdepth = __wt_skip_choose_depth();
 
 		/*
-		 * Allocate a WT_INSERT/WT_UPDATE pair, and update the cursor
-		 * to reference it.
+		 * Allocate a WT_INSERT/WT_UPDATE pair and transaction ID, and
+		 * update the cursor to reference it.
 		 */
 		WT_ERR(__wt_row_insert_alloc(
 		    session, key, skipdepth, &ins, &ins_size));
 		WT_ERR(__wt_update_alloc(session, value, &upd, &upd_size));
+		WT_ERR(__wt_txn_modify(session, &upd->txnid));
 		logged = 1;
 		ins->upd = upd;
 		ins_size += upd_size;
@@ -316,7 +321,6 @@ int
 __wt_update_alloc(WT_SESSION_IMPL *session,
     WT_ITEM *value, WT_UPDATE **updp, size_t *sizep)
 {
-	WT_DECL_RET;
 	WT_UPDATE *upd;
 	size_t size;
 
@@ -331,16 +335,6 @@ __wt_update_alloc(WT_SESSION_IMPL *session,
 	else {
 		upd->size = WT_STORE_SIZE(size);
 		memcpy(WT_UPDATE_DATA(upd), value->data, size);
-	}
-
-	/*
-	 * This must come last: after __wt_txn_modify succeeds, we must return
-	 * a non-NULL upd so our callers can call __wt_txn_unmodify on any
-	 * subsequent failure.
-	 */
-	if ((ret = __wt_txn_modify(session, &upd->txnid)) != 0) {
-		__wt_free(session, upd);
-		return (ret);
 	}
 
 	*updp = upd;

@@ -83,9 +83,12 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int op)
 		/* Make sure the update can proceed. */
 		WT_ERR(__wt_update_check(session, page, cbt->ins->upd));
 
-		/* Allocate and insert a WT_UPDATE structure. */
+		/* Allocate the WT_UPDATE structure and transaction ID. */
 		WT_ERR(__wt_update_alloc(session, value, &upd, &upd_size));
+		WT_ERR(__wt_txn_modify(session, &upd->txnid));
 		logged = 1;
+
+		/* Serialize the update. */
 		WT_ERR(__wt_update_serial(session, page,
 		    cbt->write_gen, &cbt->ins->upd, NULL, 0, &upd, upd_size,
 		    &upd_obsolete));
@@ -94,6 +97,9 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int op)
 		if (upd_obsolete != NULL)
 			__wt_update_obsolete_free(session, page, upd_obsolete);
 	} else {
+		/* Make sure the update can proceed. */
+		WT_ERR(__wt_update_check(session, page, NULL));
+
 		/* There may be no insert list, allocate as necessary. */
 		new_inshead_size = new_inslist_size = 0;
 		if (op == 1) {
@@ -137,21 +143,19 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int op)
 		skipdepth = __wt_skip_choose_depth();
 
 		/*
-		 * Allocate a WT_INSERT/WT_UPDATE pair, and update the cursor
-		 * to reference it.
+		 * Allocate a WT_INSERT/WT_UPDATE pair and transaction ID, and
+		 * update the cursor to reference it.
 		 */
 		WT_ERR(__col_insert_alloc(
 		    session, recno, skipdepth, &ins, &ins_size));
-		WT_ERR(__wt_update_check(session, page, NULL));
 		WT_ERR(__wt_update_alloc(session, value, &upd, &upd_size));
+		WT_ERR(__wt_txn_modify(session, &upd->txnid));
 		logged = 1;
 		ins->upd = upd;
 		ins_size += upd_size;
 		cbt->ins = ins;
 
-		/*
-		 * Insert or append the WT_INSERT structure.
-		 */
+		/* Insert or append the WT_INSERT structure. */
 		if (op == 1) {
 			/*
 			 * The serialized function clears ins: take a copy of

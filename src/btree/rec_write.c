@@ -2195,8 +2195,8 @@ compare:		/*
 		 * might read the original value.
 		 */
 		if (ovfl_state == OVFL_UNUSED)
-			WT_ERR(__wt_ovfl_in_cache(
-			    session, page, upd, unpack->data, unpack->size));
+			WT_ERR(
+			    __wt_val_ovfl_cache(session, page, NULL, unpack));
 	}
 
 	/* Walk any append list. */
@@ -2844,8 +2844,8 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 			 * might read the original value.
 			 */
 			if (val_cell != NULL && unpack->ovfl)
-				WT_ERR(__wt_ovfl_in_cache(session,
-				    page, rip, unpack->data, unpack->size));
+				WT_ERR(__wt_val_ovfl_cache(
+				    session, page, rip, unpack));
 
 			/* If this key/value pair was deleted, we're done. */
 			if (WT_UPDATE_DELETED_ISSET(upd)) {
