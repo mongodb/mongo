@@ -3,6 +3,7 @@
 // tests write passthrough
 
 s = new ShardingTest( "shard5" , 2 , 50 , 2 );
+s.stopBalancer();
 
 s2 = s._mongos[1];
 
