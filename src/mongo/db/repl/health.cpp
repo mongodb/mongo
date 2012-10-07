@@ -439,7 +439,7 @@ namespace mongo {
             bb.append("pingMs", m->hbinfo().ping);
             string s = m->lhb();
             if( !s.empty() )
-                bb.append("errmsg", s);
+                bb.append("lastHeartbeatMessage", s);
 
             if (m->hbinfo().authIssue) {
                 bb.append("authenticated", false);
