@@ -26,14 +26,19 @@ static void wt_shutdown(void);
 int
 main(int argc, char *argv[])
 {
+	static struct config {
+		char *uri;
+		char *config;
+	} *cp, configs[] = {
+		{ "file:__wt",	NULL },
+		{ "table:__wt",	NULL },
+		{ "lsm:__wt",
+		    "lsm_chunk_size=1m,lsm_merge_max=2,leaf_page_max=256k" },
+		{ NULL,		NULL }
+	};
 	u_int nthreads;
 	int ch, cnt, runs;
 	char *config_open;
-	const char **confp, **objp;
-	const char *objs[] = { "file:__wt", "table:__wt", "lsm:__wt", NULL };
-	/* LSM needs configuration or it fails the minimum cache size check. */
-	const char *configs[] = { NULL, NULL,
-	    "lsm_chunk_size=1m,lsm_merge_max=2,leaf_page_max=256k", NULL };
 
 	if ((progname = strrchr(argv[0], '/')) == NULL)
 		progname = argv[0];
@@ -82,14 +87,16 @@ main(int argc, char *argv[])
 	for (cnt = 1; runs == 0 || cnt <= runs; ++cnt) {
 		shutdown();			/* Clean up previous runs */
 
-		for (objp = objs, confp = configs; *objp != NULL;
-		    objp++, confp++) {
-			uri = *objp;
-			config = *confp;
+		for (cp = configs; cp->uri != NULL; ++cp) {
+			uri = cp->uri;
+			config = cp->config;
 			printf("%5d: %u threads on %s\n", cnt, nthreads, uri);
+
 			wt_startup(config_open);
+
 			if (fop_start(nthreads))
 				return (EXIT_FAILURE);
+
 			wt_shutdown();
 			printf("\n");
 		}
