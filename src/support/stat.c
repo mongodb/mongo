@@ -182,3 +182,31 @@ __wt_stat_clear_connection_stats(WT_STATS *stats_arg)
 	stats->txn_fail_cache.v = 0;
 	stats->txn_rollback.v = 0;
 }
+
+int
+__wt_stat_alloc_lsm_stats(WT_SESSION_IMPL *session, WT_LSM_STATS **statsp)
+{
+	WT_LSM_STATS *stats;
+
+	WT_RET(__wt_calloc_def(session, 1, &stats));
+
+	stats->bloom_hits.desc = "Number of successful bloom filter lookups";
+	stats->bloom_misses.desc =
+	    "Number of successful bloom filter false positives";
+	stats->bloom_skips.desc =
+	    "Number of unsuccessful bloom filter lookups";
+
+	*statsp = stats;
+	return (0);
+}
+
+void
+__wt_stat_clear_lsm_stats(WT_STATS *stats_arg)
+{
+	WT_LSM_STATS *stats;
+
+	stats = (WT_LSM_STATS *)stats_arg;
+	stats->bloom_hits.v = 0;
+	stats->bloom_misses.v = 0;
+	stats->bloom_skips.v = 0;
+}
