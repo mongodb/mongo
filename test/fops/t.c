@@ -27,8 +27,8 @@ int
 main(int argc, char *argv[])
 {
 	static struct config {
-		char *uri;
-		char *config;
+		const char *uri;
+		const char *config;
 	} *cp, configs[] = {
 		{ "file:__wt",	NULL },
 		{ "table:__wt",	NULL },
