@@ -807,7 +807,7 @@ namespace DocumentTests {
                     // A long that cannot be exactly represented as a double.
                     return Value::createDouble( 0x8fffffffffffffffLL );
                 }
-                double expected() { return (double)0x8fffffffffffffffLL; }
+                double expected() { return static_cast<double>( 0x8fffffffffffffffLL ); }
             };
             
             /** Coerce double to double. */
