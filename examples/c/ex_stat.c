@@ -98,7 +98,7 @@ print_lsm_stats(WT_SESSION *session)
 
 	/* Create an LSM tree, and add some content. */
 	ret = session->create(session,
-	    "lsm:access", "key_format=S,value_format=S,lsm_chunk_size=1MB");
+	    "lsm:access", "key_format=S,value_format=S");
 
 	/*! [statistics lsm function] */
 	if ((ret = session->open_cursor(session,
