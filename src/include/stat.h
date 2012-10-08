@@ -46,6 +46,15 @@ struct __wt_stats {
 /* Statistics section: BEGIN */
 
 /*
+ * Statistics entries for LSM handle.
+ */
+struct __wt_lsm_stats {
+	WT_STATS bloom_misses;
+	WT_STATS bloom_hits;
+	WT_STATS bloom_skips;
+};
+
+/*
  * Statistics entries for BTREE handle.
  */
 struct __wt_btree_stats {

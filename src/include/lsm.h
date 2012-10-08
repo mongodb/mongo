@@ -59,6 +59,8 @@ struct __wt_lsm_tree {
 	WT_RWLOCK *rwlock;
 	TAILQ_ENTRY(__wt_lsm_tree) q;
 
+	WT_LSM_STATS *stats;		/* LSM statistics */
+
 	WT_SPINLOCK lock;
 	uint64_t dsk_gen;
 	uint32_t *memsizep;
