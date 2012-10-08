@@ -244,7 +244,8 @@ stat_worker(void *arg)
 		sleep(cfg->report_interval);
 		/* Generic header. */
 		fprintf(logf, "=========================================\n");
-		fprintf(logf, "reads completed: %" PRIu64", elapsed time: ~%d\n",
+		fprintf(logf,
+		    "reads completed: %" PRIu64", elapsed time: ~%d\n",
 		    nops, cfg->elapsed_time);
 		/* Report LSM tree stats, if using LSM. */
 		if (lsm_uri != NULL) {

@@ -514,7 +514,8 @@ __clsm_search(WT_CURSOR *cursor)
 		if ((bloom = clsm->blooms[i]) != NULL) {
 			ret = __wt_bloom_get(bloom, &cursor->key);
 			if (ret == WT_NOTFOUND) {
-				WT_STAT_INCR(clsm->lsm_tree->stats, bloom_skips);
+				WT_STAT_INCR(
+				    clsm->lsm_tree->stats, bloom_skips);
 				continue;
 			} else if (ret == 0)
 				WT_STAT_INCR(clsm->lsm_tree->stats, bloom_hits);
