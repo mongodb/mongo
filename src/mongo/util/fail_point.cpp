@@ -116,6 +116,16 @@ namespace mongo {
         }
     }
 
+    BSONObj FailPoint::toBSON() const {
+        BSONObjBuilder builder;
+
+        scoped_lock scoped(_modMutex);
+        builder.append("mode", _mode);
+        builder.append("data", _data);
+
+        return builder.obj();
+    }
+
     ScopedFailPoint::ScopedFailPoint(FailPoint* failPoint):
             _failPoint(failPoint),
             _once(false),

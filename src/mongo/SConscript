@@ -99,7 +99,10 @@ commonFiles = [ "pch.cpp",
                 "client/distlock.cpp",
                 ]
 
-env.StaticLibrary("fail_point", "util/fail_point.cpp", LIBDEPS=["foundation", "bson"])
+env.StaticLibrary("fail_point",
+                  ["util/fail_point.cpp",
+                   "util/fail_point_registry.cpp"],
+                  LIBDEPS=["foundation", "bson"])
 
 env.StaticLibrary('mongocommon', commonFiles,
                   LIBDEPS=['bson',
@@ -117,6 +120,7 @@ env.StaticLibrary("coredb", [
         "db/commands.cpp",
         "db/commands/hashcmd.cpp",
         "db/commands/isself.cpp",
+        "db/fail_point_service.cpp",
         "db/pipeline/pipeline.cpp",
         "db/dbcommands_generic.cpp",
         "db/dbwebserver.cpp",

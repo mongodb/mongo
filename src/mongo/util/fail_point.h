@@ -16,6 +16,7 @@
 
 #pragma once
 
+#include "mongo/base/disallow_copying.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/concurrency/mutex.h"
@@ -51,6 +52,8 @@ namespace mongo {
      * 2. Client visible fail point states are read-only when active.
      */
     class FailPoint {
+        MONGO_DISALLOW_COPYING(FailPoint);
+
     public:
         typedef AtomicUInt32::WordType ValType;
         enum Mode { off, alwaysOn, random, nTimes, numModes };
@@ -115,6 +118,11 @@ namespace mongo {
          */
         void setMode(Mode mode, ValType val = 0, const BSONObj& extra = BSONObj());
 
+        /**
+         * @returns a BSON object showing the current mode and data stored.
+         */
+        BSONObj toBSON() const;
+
     private:
         static const ValType ACTIVE_BIT = 1 << 31;
         static const ValType REF_COUNTER_MASK = ~ACTIVE_BIT;
@@ -130,7 +138,7 @@ namespace mongo {
         BSONObj _data;
 
         // protects _mode, _timesOrPeriod, _data
-        mutex _modMutex;
+        mutable mutex _modMutex;
 
         /**
          * Disables this fail point.
@@ -153,10 +161,12 @@ namespace mongo {
 
     /**
      * Helper class for making sure that FailPoint#shouldFailCloseBlock is called when
-     * FailPoint#shouldFailOpenBlock was called. This should only by the
+     * FailPoint#shouldFailOpenBlock was called. This should only be used within the
      * MONGO_FAIL_POINT_BLOCK macro.
      */
     class ScopedFailPoint {
+        MONGO_DISALLOW_COPYING(ScopedFailPoint);
+
     public:
         ScopedFailPoint(FailPoint* failPoint);
         ~ScopedFailPoint();

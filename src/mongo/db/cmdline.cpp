@@ -76,6 +76,8 @@ namespace mongo {
         ("logappend" , "append to logpath instead of over-writing" )
         ("pidfilepath", po::value<string>(), "full path to pidfile (if not set, no pidfile is created)")
         ("keyFile", po::value<string>(), "private key for cluster authentication")
+        ("enableFaultInjection", "enable the fault injection framework, for debugging."
+                " DO NOT USE IN PRODUCTION")
 #ifndef _WIN32
         ("nounixsocket", "disable listening on unix sockets")
         ("unixSocketPrefix", po::value<string>(), "alternative directory for UNIX domain sockets (defaults to /tmp)")

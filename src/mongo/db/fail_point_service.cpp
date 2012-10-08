@@ -14,11 +14,13 @@
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "fail_point_manager.h"
+#include "mongo/db/fail_point_service.h"
 
 #include "mongo/db/commands.h"
 
 namespace mongo {
+    MONGO_FP_DECLARE(dummy); // used by jstests/libs/fail_point.js
+
     /**
      * Command for modifying installed fail points.
      *
@@ -28,8 +30,8 @@ namespace mongo {
      *    mode: <string|Object>, // the new mode to set. Can have one of the
      *        following format:
      *
-     *        1. ‘off’ - disable fail point.
-     *        2. ‘alwaysOn’ - fail point is always active.
+     *        1. 'off' - disable fail point.
+     *        2. 'alwaysOn' - fail point is always active.
      *        3. { period: <n> } - n should be within the range of a 32 bit signed
      *            integer and this would be the approximate period for every activation.
      *            For example, for { period: 120 }, the probability of the fail point to
@@ -43,7 +45,7 @@ namespace mongo {
      */
     class FaultInjectCmd: public Command {
     public:
-        FaultInjectCmd(): Command("faultInject") {}
+        FaultInjectCmd(): Command("configureFailPoint") {}
 
         virtual bool slaveOk() const {
             return true;
@@ -68,7 +70,7 @@ namespace mongo {
                 BSONObjBuilder& result,
                 bool fromRepl) {
             const string failPointName(cmdObj.firstElement().str());
-            FailPointRegistry* registry = FailPointManager::getRegistry();
+            FailPointRegistry* registry = getGlobalFailPointRegistry();
             FailPoint* failPoint = registry->getFailPoint(failPointName);
 
             if (failPoint == NULL) {
@@ -81,7 +83,8 @@ namespace mongo {
 
             const BSONElement modeElem(cmdObj["mode"]);
             if (modeElem.eoo()) {
-                // TODO: return error or display state?
+                result.appendElements(failPoint->toBSON());
+                return true;
             }
             else if (modeElem.type() == String) {
                 const string modeStr(modeElem.valuestr());
@@ -128,28 +131,32 @@ namespace mongo {
                 return false;
             }
 
+            BSONObj dataObj;
             if (cmdObj.hasField("data")) {
-                const BSONObj dataObj(cmdObj["data"].Obj());
-                failPoint->setMode(mode, val, &dataObj);
-            }
-            else {
-                failPoint->setMode(mode, val);
+                dataObj = cmdObj["data"].Obj();
             }
 
+            failPoint->setMode(mode, val, dataObj);
             return true;
         }
     };
 
-    scoped_ptr<FaultInjectCmd> faultInjectCmd;
+    scoped_ptr<FaultInjectCmd> _faultInjectCmd(NULL);
+    scoped_ptr<FailPointRegistry> _fpRegistry(NULL);
 
-    FailPointRegistry FailPointManager::_fpRegistry;
-
-    FailPointRegistry* FailPointManager::getRegistry() {
-        return &_fpRegistry;
+    MONGO_INITIALIZER(FailPointRegistry)(::mongo::InitializerContext* context) {
+        _fpRegistry.reset(new FailPointRegistry());
+        return Status::OK();
     }
 
-    void FailPointManager::init() {
-        faultInjectCmd.reset(new FaultInjectCmd);
-        _fpRegistry.freeze();
+    MONGO_INITIALIZER_GROUP(AllFaillPointsRegistered, (), ());
+
+    FailPointRegistry* getGlobalFailPointRegistry() {
+        return _fpRegistry.get();
+    }
+
+    void enableFailPointCmd() {
+        _faultInjectCmd.reset(new FaultInjectCmd);
+        _fpRegistry->freeze();
     }
 }

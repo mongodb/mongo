@@ -51,6 +51,7 @@ namespace mongo {
             HostNotFound = 7,
             UnknownError = 8,
             FailedToParse = 9,
+            CannotMutateObject = 10,
             MaxError
         };
 
@@ -76,6 +77,8 @@ namespace mongo {
                 return "UnknownError";
             case FailedToParse:
                 return "FailedToParse";
+            case CannotMutateObject:
+                return "CannotMutateObject";
             default:
                 return "Unknown error code";
             }
