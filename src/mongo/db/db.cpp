@@ -776,8 +776,15 @@ static int mongoDbMain(int argc, char* argv[], char **envp) {
             return 0;
         }
 
-        if ( ! CmdLine::store( argc , argv , visible_options , hidden_options , positional_options , params ) )
+        if (!CmdLine::store(std::vector<std::string>(argv, argv + argc),
+                            visible_options,
+                            hidden_options,
+                            positional_options,
+                            params)) {
             return EXIT_FAILURE;
+        }
+
+        CmdLine::censor(argc, argv);
 
         if (!initializeServerGlobalState(params.count("shutdown")))
             return EXIT_FAILURE;

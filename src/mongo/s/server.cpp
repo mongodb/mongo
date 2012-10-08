@@ -345,8 +345,14 @@ int _main(int argc, char* argv[]) {
 
     // parse options
     po::variables_map params;
-    if ( ! CmdLine::store( argc, argv, visible_options, hidden_options, positional_options, params ) )
+    if (!CmdLine::store(std::vector<std::string>(argv, argv + argc),
+                        visible_options,
+                        hidden_options,
+                        positional_options,
+                        params)) {
         return EXIT_FAILURE;
+    }
+    CmdLine::censor(argc, argv);
 
     if (!initializeServerGlobalState())
         return EXIT_FAILURE;

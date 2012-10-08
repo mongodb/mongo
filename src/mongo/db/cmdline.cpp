@@ -18,7 +18,6 @@
 
 #include "pch.h"
 #include "cmdline.h"
-#include "commands.h"
 #include "../util/password.h"
 #include "../util/net/listen.h"
 #include "../bson/util/builder.h"
@@ -35,6 +34,9 @@
 namespace po = boost::program_options;
 
 namespace mongo {
+
+    static bool _isPasswordArgument(char const* argumentName);
+    static bool _isPasswordSwitch(char const* switchName);
 
 namespace {
     BSONArray argvArray;
@@ -143,12 +145,15 @@ namespace {
         return;
     }
 
-    bool CmdLine::store( int argc , char ** argv ,
+    bool CmdLine::store( const std::vector<std::string>& argv,
                          boost::program_options::options_description& visible,
                          boost::program_options::options_description& hidden,
                          boost::program_options::positional_options_description& positional,
                          boost::program_options::variables_map &params ) {
 
+
+        if (argv.empty())
+            return false;
 
         {
             // setup binary name
@@ -183,7 +188,8 @@ namespace {
             all.add( visible );
             all.add( hidden );
 
-            po::store( po::command_line_parser(argc, argv)
+            po::store( po::command_line_parser(std::vector<std::string>(argv.begin() + 1,
+                                                                        argv.end()))
                        .options( all )
                        .positional( positional )
                        .style( style )
@@ -215,21 +221,10 @@ namespace {
 
         {
             BSONArrayBuilder b;
-            for (int i=0; i < argc; i++) {
-                b << argv[i];
-                if ( mongoutils::str::equals(argv[i], "--sslPEMKeyPassword")
-                     || mongoutils::str::equals(argv[i], "-sslPEMKeyPassword")
-                     || mongoutils::str::equals(argv[i], "--servicePassword")
-                     || mongoutils::str::equals(argv[i], "-servicePassword")) {
-                    b << "<password>";
-                    i++;
-
-                    // hide password from ps output
-                    char* arg = argv[i];
-                    while (*arg) {
-                        *arg++ = 'x';
-                    }
-                }
+            std::vector<std::string> censoredArgv = argv;
+            censor(&censoredArgv);
+            for (size_t i=0; i < censoredArgv.size(); i++) {
+                b << censoredArgv[i];
             }
             argvArray = b.arr();
         }
@@ -246,7 +241,7 @@ namespace {
                         if (value.as<string>().empty())
                             b.appendBool(key, true); // boost po uses empty string for flags like --quiet
                         else {
-                            if ( key == "servicePassword" || key == "sslPEMKeyPassword" ) {
+                            if ( _isPasswordArgument(key.c_str()) ) {
                                 b.append( key, "<password>" );
                             }
                             else {
@@ -369,25 +364,87 @@ namespace {
         return true;
     }
 
+    static bool _isPasswordArgument(const char* argumentName) {
+        static const char* const passwordArguments[] = {
+            "sslPEMKeyPassword",
+            "servicePassword",
+            NULL  // Last entry sentinel.
+        };
+        for (const char* const* current = passwordArguments; *current; ++current) {
+            if (mongoutils::str::equals(argumentName, *current))
+                return true;
+        }
+        return false;
+    }
+
+    static bool _isPasswordSwitch(const char* switchName) {
+        if (switchName[0] != '-')
+            return false;
+        size_t i = 1;
+        if (switchName[1] == '-')
+            i = 2;
+        switchName += i;
+
+        return _isPasswordArgument(switchName);
+    }
+
+    static void _redact(char* arg) {
+        for (; *arg; ++arg)
+            *arg = 'x';
+    }
+
+    void CmdLine::censor(std::vector<std::string>* args) {
+        for (size_t i = 0; i < args->size(); ++i) {
+            std::string& arg = args->at(i);
+            const std::string::iterator endSwitch = std::find(arg.begin(), arg.end(), '=');
+            std::string switchName(arg.begin(), endSwitch);
+            if (_isPasswordSwitch(switchName.c_str())) {
+                if (endSwitch == arg.end()) {
+                    if (i + 1 < args->size()) {
+                        args->at(i + 1) = "<password>";
+                    }
+                }
+                else {
+                    arg = switchName + "=<password>";
+                }
+            }
+        }
+    }
+
+    void CmdLine::censor(int argc, char** argv) {
+        // Algorithm:  For each arg in argv:
+        //   Look for an equal sign in arg; if there is one, temporarily nul it out.
+        //   check to see if arg is a password switch.  If so, overwrite the value
+        //     component with xs.
+        //   restore the nul'd out equal sign, if any.
+        for (int i = 0; i < argc; ++i) {
+
+            char* const arg = argv[i];
+            char* const firstEqSign = strchr(arg, '=');
+            if (NULL != firstEqSign) {
+                *firstEqSign = '\0';
+            }
+
+            if (_isPasswordSwitch(arg)) {
+                if (NULL == firstEqSign) {
+                    if (i + 1 < argc) {
+                        _redact(argv[i + 1]);
+                    }
+                }
+                else {
+                    _redact(firstEqSign + 1);
+                }
+            }
+
+            if (NULL != firstEqSign) {
+                *firstEqSign = '=';
+            }
+        }
+    }
+
     void printCommandLineOpts() {
         log() << "options: " << parsedOpts << endl;
     }
-
-    class CmdGetCmdLineOpts : Command {
-    public:
-        CmdGetCmdLineOpts(): Command("getCmdLineOpts") {}
-        void help(stringstream& h) const { h << "get argv"; }
-        virtual LockType locktype() const { return NONE; }
-        virtual bool adminOnly() const { return true; }
-        virtual bool slaveOk() const { return true; }
-
-        virtual bool run(const string&, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-            result.append("argv", argvArray);
-            result.append("parsed", parsedOpts);
-            return true;
-        }
-
-    } cmdGetCmdLineOpts;
 
     casi< map<string,ParameterValidator*> * > pv_all (NULL);
 
