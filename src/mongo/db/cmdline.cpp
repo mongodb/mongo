@@ -281,8 +281,6 @@ namespace mongo {
             }
         }
 
-        string logpath;
-
 #ifndef _WIN32
         if (params.count("unixSocketPrefix")) {
             cmdLine.socket = params["unixSocketPrefix"].as<string>();
@@ -301,26 +299,6 @@ namespace mongo {
             if ( ! params.count( "logpath" ) && ! params.count( "syslog" ) ) {
                 cout << "--fork has to be used with --logpath or --syslog" << endl;
                 ::_exit(EXIT_BADOPTIONS);
-            }
-
-            if ( params.count( "logpath" ) ) {
-                // test logpath
-                logpath = params["logpath"].as<string>();
-                verify( logpath.size() );
-                if ( logpath[0] != '/' ) {
-                    logpath = cmdLine.cwd + "/" + logpath;
-                }
-                bool exists = boost::filesystem::exists( logpath );
-                FILE * test = fopen( logpath.c_str() , "a" );
-                if ( ! test ) {
-                    cout << "can't open [" << logpath << "] for log file: " << errnoWithDescription() << endl;
-                    ::_exit(-1);
-                }
-                fclose( test );
-                // if we created a file, unlink it (to avoid confusing log rotation code)
-                if ( ! exists ) {
-                    unlink( logpath.c_str() );
-                }
             }
 
             cout.flush();
@@ -402,11 +380,18 @@ namespace mongo {
                 cout << "Cant use both a logpath and syslog " << endl;
                 ::_exit(EXIT_BADOPTIONS);
             }
-            
-            if ( logpath.size() == 0 )
-                logpath = params["logpath"].as<string>();
+            string logpath = params["logpath"].as<string>();
+            if (logpath.empty()) {
+                cout << "Empty logpath option.";
+                ::_exit(EXIT_BADOPTIONS);
+            }
+            logpath = boost::filesystem::complete(logpath, cmdLine.cwd).native_file_string();
+
             uassert( 10033 ,  "logpath has to be non-zero" , logpath.size() );
-            initLogging( logpath , params.count( "logappend" ) );
+            if (!initLogging(logpath, params.count("logappend"))) {
+                cout << "Bad logpath value: \"" << logpath << "\"; terminating." << endl;
+                ::_exit(EXIT_BADOPTIONS);
+            }
         }
 
         if ( params.count("pidfilepath")) {
