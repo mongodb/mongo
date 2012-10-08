@@ -689,6 +689,7 @@ extern int __wt_lsm_merge_update_tree(WT_SESSION_IMPL *session,
 extern int __wt_lsm_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree);
 extern int __wt_lsm_meta_read(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree);
 extern int __wt_lsm_meta_write(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree);
+extern int __wt_lsm_stat_init(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree);
 extern int __wt_lsm_tree_close_all(WT_SESSION_IMPL *session);
 extern int __wt_lsm_tree_bloom_name( WT_SESSION_IMPL *session,
     WT_LSM_TREE *lsm_tree,
@@ -1177,6 +1178,9 @@ extern void __wt_stat_clear_btree_stats(WT_STATS *stats_arg);
 extern int __wt_stat_alloc_connection_stats(WT_SESSION_IMPL *session,
     WT_CONNECTION_STATS **statsp);
 extern void __wt_stat_clear_connection_stats(WT_STATS *stats_arg);
+extern int __wt_stat_alloc_lsm_stats(WT_SESSION_IMPL *session,
+    WT_LSM_STATS **statsp);
+extern void __wt_stat_clear_lsm_stats(WT_STATS *stats_arg);
 extern int __wt_txnid_cmp(const void *v1, const void *v2);
 extern void __wt_txn_release_snapshot(WT_SESSION_IMPL *session);
 extern void __wt_txn_get_snapshot(WT_SESSION_IMPL *session, wt_txnid_t max_id);
