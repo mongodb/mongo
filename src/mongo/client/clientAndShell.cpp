@@ -79,11 +79,6 @@ namespace mongo {
         return false;
     }
 
-    string prettyHostName() {
-        verify(0);
-        return "";
-    }
-
     ClientBasic* ClientBasic::getCurrent() {
         return 0;
     }

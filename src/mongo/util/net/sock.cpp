@@ -334,6 +334,14 @@ namespace mongo {
         return temp;
     }
 
+    string prettyHostName() {
+        StringBuilder s;
+        s << getHostNameCached();
+        if( cmdLine.port != CmdLine::DefaultDBPort )
+            s << ':' << mongo::cmdLine.port;
+        return s.str();
+    }
+
     // --------- SocketException ----------
 
 #ifdef MSG_NOSIGNAL

@@ -536,14 +536,6 @@ namespace mongo {
 
     } cmdGetCmdLineOpts;
 
-    string prettyHostName() {
-        StringBuilder s;
-        s << getHostNameCached();
-        if( cmdLine.port != CmdLine::DefaultDBPort )
-            s << ':' << mongo::cmdLine.port;
-        return s.str();
-    }
-
     casi< map<string,ParameterValidator*> * > pv_all (NULL);
 
     ParameterValidator::ParameterValidator( const string& name ) : _name( name ) {
