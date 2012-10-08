@@ -20,6 +20,7 @@
 #include <vector>
 
 #include "mongo/db/jsobj.h"
+#include "mongo/util/net/listen.h"
 
 namespace boost {
     namespace program_options {
@@ -119,7 +120,14 @@ namespace mongo {
         bool doFork;           // --fork
         std::string socket;    // UNIX domain socket directory
 
-        bool keyFile;
+        int maxConns;          // Maximum number of simultaneous open connections.
+
+        std::string keyFile;   // Path to keyfile, or empty if none.
+        std::string pidFile;   // Path to pid file, or empty if none.
+
+        std::string logpath;   // Path to log file, if logging to a file; otherwise, empty.
+        bool logAppend;        // True if logging to a file in append mode.
+        bool logWithSyslog;    // True if logging to syslog; must not be set if logpath is set.
 
 #ifndef _WIN32
         pid_t parentProc;      // --fork pid of initial process
@@ -154,6 +162,9 @@ namespace mongo {
                            boost::program_options::positional_options_description& positional,
                            boost::program_options::variables_map &output );
 
+        static BSONArray getArgvArray();
+        static BSONObj getParsedOpts();
+
         time_t started;
     };
 
@@ -164,7 +175,8 @@ namespace mongo {
         configsvr(false), quota(false), quotaFiles(8), cpu(false),
         durOptions(0), objcheck(false), oplogSize(0), defaultProfile(0),
         slowMS(100), defaultLocalThresholdMillis(15), pretouch(0), moveParanoia( true ),
-        syncdelay(60), noUnixSocket(false), doFork(0), socket("/tmp") 
+        syncdelay(60), noUnixSocket(false), doFork(0), socket("/tmp"), maxConns(DEFAULT_MAX_CONN),
+        logAppend(false), logWithSyslog(false)
     {
         started = time(0);
 
@@ -184,11 +196,8 @@ namespace mongo {
         sslServerManager = 0;
 #endif
     }
-            
-    extern CmdLine cmdLine;
 
-    void setupLaunchSignals();
-    void setupCoreSignals();
+    extern CmdLine cmdLine;
 
     void printCommandLineOpts();
 

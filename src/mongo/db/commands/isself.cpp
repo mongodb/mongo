@@ -217,7 +217,7 @@ namespace mongo {
                 return false;
             }
 
-            if (!noauth && cmdLine.keyFile ) {
+            if (!noauth && !cmdLine.keyFile.empty() ) {
                 if (!conn.auth("local", internalSecurity.user, internalSecurity.pwd, errmsg, false)) {
                     return false;
                 }

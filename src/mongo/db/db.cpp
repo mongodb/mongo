@@ -33,6 +33,7 @@
 #include "mongo/db/dbwebserver.h"
 #include "mongo/db/dur.h"
 #include "mongo/db/fail_point_service.h"
+#include "mongo/db/initialize_server_global_state.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/introspect.h"
 #include "mongo/db/json.h"
@@ -780,7 +781,10 @@ static int mongoDbMain(int argc, char* argv[], char **envp) {
         }
 
         if ( ! CmdLine::store( argc , argv , visible_options , hidden_options , positional_options , params ) )
-            return 0;
+            return EXIT_FAILURE;
+
+        if (!initializeServerGlobalState(params.count("shutdown")))
+            return EXIT_FAILURE;
 
         if (params.count("help")) {
             show_help_text(visible_options);

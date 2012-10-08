@@ -389,6 +389,7 @@ env.StaticLibrary("serveronly", serverOnlyFiles,
 # These files go into mongos and mongod only, not into the shell or any tools.
 mongodAndMongosFiles = [
     "db/connection_factory.cpp",
+    "db/initialize_server_global_state.cpp",
     "util/net/message_server_port.cpp",
     ]
 env.StaticLibrary("mongodandmongos", mongodAndMongosFiles)

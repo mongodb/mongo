@@ -20,33 +20,34 @@
 #include "cmdline.h"
 #include "commands.h"
 #include "../util/password.h"
-#include "../util/processinfo.h"
 #include "../util/net/listen.h"
 #include "../bson/util/builder.h"
-#include "security_common.h"
 #include "mongo/util/mongoutils/str.h"
 #ifdef _WIN32
 #include <direct.h>
-#else
-#include <sys/types.h>
-#include <sys/wait.h>
 #endif
 #include "globals.h"
 
 #define MAX_LINE_LENGTH 256
 
 #include <fstream>
-#include <boost/filesystem/operations.hpp>
 
 namespace po = boost::program_options;
-namespace fs = boost::filesystem;
 
 namespace mongo {
 
-    void setupSignals( bool inFork );
-    string getHostNameCached();
-    static BSONArray argvArray;
-    static BSONObj parsedOpts;
+namespace {
+    BSONArray argvArray;
+    BSONObj parsedOpts;
+}  // namespace
+
+    BSONArray CmdLine::getArgvArray() {
+        return argvArray;
+    }
+
+    BSONObj CmdLine::getParsedOpts() {
+        return parsedOpts;
+    }
 
     void CmdLine::addGlobalOptions( boost::program_options::options_description& general ,
                                     boost::program_options::options_description& hidden ,
@@ -142,32 +143,6 @@ namespace mongo {
         return;
     }
 
-#ifndef _WIN32
-    // support for exit value propagation with fork
-    void launchSignal( int sig ) {
-        if ( sig == SIGUSR2 ) {
-            pid_t cur = getpid();
-            
-            if ( cur == cmdLine.parentProc || cur == cmdLine.leaderProc ) {
-                // signal indicates successful start allowing us to exit
-                _exit(0);
-            } 
-        }
-    }
-
-    void setupLaunchSignals() {
-        verify( signal(SIGUSR2 , launchSignal ) != SIG_ERR );
-    }
-
-
-    void CmdLine::launchOk() {
-        if ( cmdLine.doFork ) {
-            // killing leader will propagate to parent
-            verify( kill( cmdLine.leaderProc, SIGUSR2 ) == 0 );
-        }
-    }
-#endif
-
     bool CmdLine::store( int argc , char ** argv ,
                          boost::program_options::options_description& visible,
                          boost::program_options::options_description& hidden,
@@ -238,206 +213,27 @@ namespace mongo {
             return false;
         }
 
-        if (params.count("verbose")) {
-            logLevel = 1;
-        }
+        {
+            BSONArrayBuilder b;
+            for (int i=0; i < argc; i++) {
+                b << argv[i];
+                if ( mongoutils::str::equals(argv[i], "--sslPEMKeyPassword")
+                     || mongoutils::str::equals(argv[i], "-sslPEMKeyPassword")
+                     || mongoutils::str::equals(argv[i], "--servicePassword")
+                     || mongoutils::str::equals(argv[i], "-servicePassword")) {
+                    b << "<password>";
+                    i++;
 
-        for (string s = "vv"; s.length() <= 12; s.append("v")) {
-            if (params.count(s)) {
-                logLevel = s.length();
-            }
-        }
-
-        if (params.count("quiet")) {
-            cmdLine.quiet = true;
-        }
-
-        if (params.count("traceExceptions")) {
-            DBException::traceExceptions = true;
-        }
-
-        if ( params.count( "maxConns" ) ) {
-            int newSize = params["maxConns"].as<int>();
-            if ( newSize < 5 ) {
-                out() << "maxConns has to be at least 5" << endl;
-                ::_exit( EXIT_BADOPTIONS );
-            }
-            else if ( newSize >= 10000000 ) {
-                out() << "maxConns can't be greater than 10000000" << endl;
-                ::_exit( EXIT_BADOPTIONS );
-            }
-            Listener::globalTicketHolder.resize( newSize );
-        }
-
-        if (params.count("objcheck")) {
-            cmdLine.objcheck = true;
-        }
-
-        if (params.count("bind_ip")) {
-            // passing in wildcard is the same as default behavior; remove and warn
-            if ( cmdLine.bind_ip ==  "0.0.0.0" ) {
-                cout << "warning: bind_ip of 0.0.0.0 is unnecessary; listens on all ips by default" << endl;
-                cmdLine.bind_ip = "";
-            }
-        }
-
-#ifndef _WIN32
-        if (params.count("unixSocketPrefix")) {
-            cmdLine.socket = params["unixSocketPrefix"].as<string>();
-            if (!fs::is_directory(cmdLine.socket)) {
-                cout << cmdLine.socket << " must be a directory" << endl;
-                ::_exit(-1);
-            }
-        }
-
-        if (params.count("nounixsocket")) {
-            cmdLine.noUnixSocket = true;
-        }
-
-        if (params.count("fork") && !params.count("shutdown")) {
-            cmdLine.doFork = true;
-            if ( ! params.count( "logpath" ) && ! params.count( "syslog" ) ) {
-                cout << "--fork has to be used with --logpath or --syslog" << endl;
-                ::_exit(EXIT_BADOPTIONS);
-            }
-
-            cout.flush();
-            cerr.flush();
-            
-            cmdLine.parentProc = getpid();
-            
-            // facilitate clean exit when child starts successfully
-            setupLaunchSignals();
-
-            pid_t c = fork();
-            if ( c ) {
-                int pstat;
-                waitpid(c, &pstat, 0);
-
-                if ( WIFEXITED(pstat) ) {
-                    if ( ! WEXITSTATUS(pstat) ) {
-                        cout << "child process started successfully, parent exiting" << endl;
+                    // hide password from ps output
+                    char* arg = argv[i];
+                    while (*arg) {
+                        *arg++ = 'x';
                     }
-
-                    _exit( WEXITSTATUS(pstat) );
                 }
-
-                _exit(50);
             }
-
-            if ( chdir("/") < 0 ) {
-                cout << "Cant chdir() while forking server process: " << strerror(errno) << endl;
-                ::_exit(-1);
-            }
-            setsid();
-            
-            cmdLine.leaderProc = getpid();
-
-            pid_t c2 = fork();
-            if ( c2 ) {
-                int pstat;
-                cout << "forked process: " << c2 << endl;
-                waitpid(c2, &pstat, 0);
-
-                if ( WIFEXITED(pstat) ) {
-                    _exit( WEXITSTATUS(pstat) );
-                }
-
-                _exit(51);
-            }
-
-            // stdout handled in initLogging
-            //fclose(stdout);
-            //freopen("/dev/null", "w", stdout);
-
-            fclose(stderr);
-            fclose(stdin);
-
-            FILE* f = freopen("/dev/null", "w", stderr);
-            if ( f == NULL ) {
-                cout << "Cant reassign stderr while forking server process: " << strerror(errno) << endl;
-                ::_exit(-1);
-            }
-
-            f = freopen("/dev/null", "r", stdin);
-            if ( f == NULL ) {
-                cout << "Cant reassign stdin while forking server process: " << strerror(errno) << endl;
-                ::_exit(-1);
-            }
-
-            setupCoreSignals();
-            setupSignals( true );
-        }
-        
-        if (params.count("syslog")) {
-            StringBuilder sb;
-            sb << cmdLine.binaryName << "." << cmdLine.port;
-            Logstream::useSyslog( sb.str().c_str() );
-        }
-#endif
-        if (params.count("logpath") && !params.count("shutdown")) {
-            if ( params.count("syslog") ) {
-                cout << "Cant use both a logpath and syslog " << endl;
-                ::_exit(EXIT_BADOPTIONS);
-            }
-            string logpath = params["logpath"].as<string>();
-            if (logpath.empty()) {
-                cout << "Empty logpath option.";
-                ::_exit(EXIT_BADOPTIONS);
-            }
-            logpath = boost::filesystem::complete(logpath, cmdLine.cwd).native_file_string();
-
-            uassert( 10033 ,  "logpath has to be non-zero" , logpath.size() );
-            if (!initLogging(logpath, params.count("logappend"))) {
-                cout << "Bad logpath value: \"" << logpath << "\"; terminating." << endl;
-                ::_exit(EXIT_BADOPTIONS);
-            }
+            argvArray = b.arr();
         }
 
-        if ( params.count("pidfilepath")) {
-            writePidFile( params["pidfilepath"].as<string>() );
-        }
-
-        if (params.count("keyFile")) {
-            const string f = params["keyFile"].as<string>();
-
-            if (!setUpSecurityKey(f)) {
-                // error message printed in setUpPrivateKey
-                ::_exit(EXIT_BADOPTIONS);
-            }
-
-            cmdLine.keyFile = true;
-            noauth = false;
-        }
-        else {
-            cmdLine.keyFile = false;
-        }
-
-#ifdef MONGO_SSL
-        if (params.count("sslOnNormalPorts") ) {
-            cmdLine.sslOnNormalPorts = true;
-
-            if ( cmdLine.sslPEMKeyPassword.size() == 0 ) {
-                log() << "need sslPEMKeyPassword" << endl;
-                ::_exit(EXIT_BADOPTIONS);
-            }
-            
-            if ( cmdLine.sslPEMKeyFile.size() == 0 ) {
-                log() << "need sslPEMKeyFile" << endl;
-                ::_exit(EXIT_BADOPTIONS);
-            }
-            
-            cmdLine.sslServerManager = new SSLManager( false );
-            if ( ! cmdLine.sslServerManager->setupPEM( cmdLine.sslPEMKeyFile , cmdLine.sslPEMKeyPassword ) ) {
-                ::_exit(EXIT_BADOPTIONS);
-            }
-        }
-        else if ( cmdLine.sslPEMKeyFile.size() || cmdLine.sslPEMKeyPassword.size() ) {
-            log() << "need to enable sslOnNormalPorts" << endl;
-            ::_exit(EXIT_BADOPTIONS);
-        }
-#endif
-        
         {
             BSONObjBuilder b;
             for (po::variables_map::const_iterator it(params.begin()), end(params.end()); it != end; it++){
@@ -479,26 +275,96 @@ namespace mongo {
             parsedOpts = b.obj();
         }
 
-        {
-            BSONArrayBuilder b;
-            for (int i=0; i < argc; i++) {
-                b << argv[i];
-                if ( mongoutils::str::equals(argv[i], "--sslPEMKeyPassword")
-                     || mongoutils::str::equals(argv[i], "-sslPEMKeyPassword")
-                     || mongoutils::str::equals(argv[i], "--servicePassword")
-                     || mongoutils::str::equals(argv[i], "-servicePassword")) {
-                    b << "<password>";
-                    i++;
-
-                    // hide password from ps output
-                    char* arg = argv[i];
-                    while (*arg) {
-                        *arg++ = 'x';
-                    }
-                }
-            }
-            argvArray = b.arr();
+        if (params.count("verbose")) {
+            logLevel = 1;
         }
+
+        for (string s = "vv"; s.length() <= 12; s.append("v")) {
+            if (params.count(s)) {
+                logLevel = s.length();
+            }
+        }
+
+        if (params.count("quiet")) {
+            cmdLine.quiet = true;
+        }
+
+        if (params.count("traceExceptions")) {
+            DBException::traceExceptions = true;
+        }
+
+        if (params.count("maxConns")) {
+            cmdLine.maxConns = params["maxConns"].as<int>();
+
+            if ( cmdLine.maxConns < 5 ) {
+                out() << "maxConns has to be at least 5" << endl;
+                return false;
+            }
+            else if ( cmdLine.maxConns > MAX_MAX_CONN ) {
+                out() << "maxConns can't be greater than " << MAX_MAX_CONN << endl;
+                return false;
+            }
+        }
+
+        if (params.count("objcheck")) {
+            cmdLine.objcheck = true;
+        }
+
+        if (params.count("bind_ip")) {
+            // passing in wildcard is the same as default behavior; remove and warn
+            if ( cmdLine.bind_ip ==  "0.0.0.0" ) {
+                cout << "warning: bind_ip of 0.0.0.0 is unnecessary; listens on all ips by default" << endl;
+                cmdLine.bind_ip = "";
+            }
+        }
+
+#ifndef _WIN32
+        if (params.count("unixSocketPrefix")) {
+            cmdLine.socket = params["unixSocketPrefix"].as<string>();
+        }
+
+        if (params.count("nounixsocket")) {
+            cmdLine.noUnixSocket = true;
+        }
+
+        if (params.count("fork") && !params.count("shutdown")) {
+            cmdLine.doFork = true;
+        }
+#endif  // _WIN32
+
+        if (params.count("logpath")) {
+            cmdLine.logpath = params["logpath"].as<string>();
+            if (cmdLine.logpath.empty()) {
+                cout << "logpath cannot be empty if supplied" << endl;
+                return false;
+            }
+        }
+
+        cmdLine.logWithSyslog = params.count("syslog");
+        cmdLine.logAppend = params.count("logappend");
+        if (!cmdLine.logpath.empty() && cmdLine.logWithSyslog) {
+            cout << "Cant use both a logpath and syslog " << endl;
+            return false;
+        }
+
+        if (cmdLine.doFork && cmdLine.logpath.empty() && !cmdLine.logWithSyslog) {
+            cout << "--fork has to be used with --logpath or --syslog" << endl;
+            return false;
+        }
+
+        if (params.count("keyFile")) {
+            cmdLine.keyFile = params["keyFile"].as<string>();
+        }
+
+        if ( params.count("pidfilepath")) {
+            cmdLine.pidFile = params["pidfilepath"].as<string>();
+        }
+
+#ifdef MONGO_SSL
+        if (params.count("sslOnNormalPorts") ) {
+            cmdLine.sslOnNormalPorts = true;
+        }
+#endif
 
         return true;
     }
@@ -506,35 +372,6 @@ namespace mongo {
     void printCommandLineOpts() {
         log() << "options: " << parsedOpts << endl;
     }
-
-    void ignoreSignal( int sig ) {}
-
-    static void rotateLogsOrDie(int sig) {
-        fassert(16176, rotateLogs());
-    }
-
-    void setupCoreSignals() {
-#if !defined(_WIN32)
-        verify( signal(SIGUSR1 , rotateLogsOrDie ) != SIG_ERR );
-        verify( signal(SIGHUP , ignoreSignal ) != SIG_ERR );
-#endif
-    }
-
-    class CmdGetCmdLineOpts : Command {
-    public:
-        CmdGetCmdLineOpts(): Command("getCmdLineOpts") {}
-        void help(stringstream& h) const { h << "get argv"; }
-        virtual LockType locktype() const { return NONE; }
-        virtual bool adminOnly() const { return true; }
-        virtual bool slaveOk() const { return true; }
-
-        virtual bool run(const string&, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-            result.append("argv", argvArray);
-            result.append("parsed", parsedOpts);
-            return true;
-        }
-
-    } cmdGetCmdLineOpts;
 
     casi< map<string,ParameterValidator*> * > pv_all (NULL);
 

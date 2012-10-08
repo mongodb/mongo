@@ -32,7 +32,8 @@ namespace mongo {
 
     bool CmdAuthenticate::getUserObj(const string& dbname, const string& user, BSONObj& userObj, string& pwd) {
         if (user == internalSecurity.user) {
-            uassert(15890, "key file must be used to log in with internal user", cmdLine.keyFile);
+            uassert(15890, "key file must be used to log in with internal user",
+                    !cmdLine.keyFile.empty());
             pwd = internalSecurity.pwd;
         }
         else {
