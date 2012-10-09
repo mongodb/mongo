@@ -96,8 +96,8 @@ __ovfl_cache_visible(WT_SESSION_IMPL *session, WT_UPDATE *upd_arg)
  *	Cache a deleted overflow value for a variable-length column-store.
  */
 static int
-__val_ovfl_cache_col(
-    WT_SESSION_IMPL *session, WT_PAGE *page, WT_UPDATE *upd, WT_CELL_UNPACK *unpack)
+__val_ovfl_cache_col(WT_SESSION_IMPL *session,
+    WT_PAGE *page, WT_UPDATE *upd, WT_CELL_UNPACK *unpack)
 {
 	WT_DECL_RET;
 	WT_ITEM value;
@@ -117,7 +117,7 @@ __val_ovfl_cache_col(
 	 * each of those records individually, but there exists a reader that
 	 * might read any one of those records, and all of those records have
 	 * different WT_UPDATE entries with different transaction IDs.  Since
-	 * it's infeasible to determine if there's a globally visible update 
+	 * it's infeasible to determine if there's a globally visible update
 	 * for each reader for each record, we test one simple case, otherwise,
 	 * we cache the record.
 	 *
@@ -136,19 +136,14 @@ __val_ovfl_cache_col(
 	WT_ASSERT(session, found == 0);
 	}
 #endif
-#if 0
 	/*
 	 * Here's a quick test for a probably common case: a single matching
 	 * record with a single, globally visible update.
 	 */
 	if (__wt_cell_rle(unpack) != 1 ||
-	    upd == NULL ||				/* Sanity check. */
+	    upd == NULL ||		/* Sanity: upd should always be set. */
 	    !__wt_txn_visible_all(session, upd->txnid))
 		WT_ERR(__ovfl_read(session, &value, addr, addr_size));
-#else
-	WT_UNUSED(upd);
-	WT_ERR(__ovfl_read(session, &value, addr, addr_size));
-#endif
 
 	WT_ERR(__wt_rec_track(session,
 	    page, addr, addr_size, value.data, value.size, WT_TRK_ONPAGE));
