@@ -94,3 +94,13 @@ btree_stats = [
 	Stat('rec_written', 'reconcile: pages written'),
 	Stat('update_conflict', 'update conflicts'),
 ]
+
+##########################################
+# LSM statistics
+##########################################
+lsm_stats = [
+	Stat('bloom_hits', 'Number of successful bloom filter lookups'),
+	Stat('bloom_misses', 'Number of successful bloom filter false positives'),
+	Stat('bloom_skips', 'Number of unsuccessful bloom filter lookups'),
+]
+

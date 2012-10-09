@@ -1780,6 +1780,20 @@ extern int wiredtiger_extension_init(WT_SESSION *session,
 /*! write generation conflicts */
 #define	WT_STAT_file_write_conflicts			44
 /*! @} */
+
+/*!
+ * @}
+ * @name Statistics for lsm objects
+ * @anchor statistics_lsm
+ * @{
+ */
+/*! Number of successful bloom filter false positives */
+#define	WT_STAT_bloom_misses				0
+/*! Number of successful bloom filter lookups */
+#define	WT_STAT_bloom_hits				1
+/*! Number of unsuccessful bloom filter lookups */
+#define	WT_STAT_bloom_skips				2
+/*! @} */
 /*
  * Statistics section: END
  * DO NOT EDIT: automatically built by dist/api_stat.py.

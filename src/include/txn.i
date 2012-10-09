@@ -264,10 +264,9 @@ __wt_txn_read_first(WT_SESSION_IMPL *session)
 
 	if (txn->isolation == TXN_ISO_READ_COMMITTED ||
 	    (!F_ISSET(txn, TXN_RUNNING) &&
-	    txn->isolation == TXN_ISO_SNAPSHOT)) {
-		__wt_txn_get_snapshot(session, WT_TXN_NONE);
-		txn_state->snap_min = txn->snap_min;
-	} else if (!F_ISSET(txn, TXN_RUNNING))
+	    txn->isolation == TXN_ISO_SNAPSHOT))
+		__wt_txn_get_snapshot(session, WT_TXN_NONE, WT_TXN_NONE);
+	else if (!F_ISSET(txn, TXN_RUNNING))
 		txn_state->snap_min = txn_global->current;
 }
 
@@ -286,8 +285,9 @@ __wt_txn_read_last(WT_SESSION_IMPL *session)
 
 	/* Release the snap_min ID we put in the global table. */
 	if (txn->isolation == TXN_ISO_READ_COMMITTED ||
-	    !F_ISSET(txn, TXN_RUNNING)) {
+	    (!F_ISSET(txn, TXN_RUNNING) &&
+	    txn->isolation == TXN_ISO_SNAPSHOT))
 		__wt_txn_release_snapshot(session);
+	else if (!F_ISSET(txn, TXN_RUNNING))
 		txn_state->snap_min = WT_TXN_NONE;
-	}
 }

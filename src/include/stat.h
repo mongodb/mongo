@@ -126,4 +126,13 @@ struct __wt_connection_stats {
 	WT_STATS txn_rollback;
 };
 
+/*
+ * Statistics entries for LSM handle.
+ */
+struct __wt_lsm_stats {
+	WT_STATS bloom_misses;
+	WT_STATS bloom_hits;
+	WT_STATS bloom_skips;
+};
+
 /* Statistics section: END */

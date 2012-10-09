@@ -117,7 +117,7 @@ __val_ovfl_cache_col(
 	 * each of those records individually, but there exists a reader that
 	 * might read any one of those records, and all of those records have
 	 * different WT_UPDATE entries with different transaction IDs.  Since
-	 * it's infeasible to determine if there's a globally visible update 
+	 * it's infeasible to determine if there's a globally visible update
 	 * for each reader for each record, we test one simple case, otherwise,
 	 * we cache the record.
 	 *

@@ -513,8 +513,12 @@ __clsm_search(WT_CURSOR *cursor)
 		/* If there is a Bloom filter, see if we can skip the read. */
 		if ((bloom = clsm->blooms[i]) != NULL) {
 			ret = __wt_bloom_get(bloom, &cursor->key);
-			if (ret == WT_NOTFOUND)
+			if (ret == WT_NOTFOUND) {
+				WT_STAT_INCR(
+				    clsm->lsm_tree->stats, bloom_skips);
 				continue;
+			} else if (ret == 0)
+				WT_STAT_INCR(clsm->lsm_tree->stats, bloom_hits);
 			WT_RET(ret);
 		}
 		c->set_key(c, &cursor->key);
@@ -527,6 +531,9 @@ __clsm_search(WT_CURSOR *cursor)
 			goto done;
 		} else if (ret != WT_NOTFOUND)
 			goto err;
+		else if (bloom != NULL) {
+			WT_STAT_INCR(clsm->lsm_tree->stats, bloom_misses);
+		}
 	}
 	ret = WT_NOTFOUND;
 
