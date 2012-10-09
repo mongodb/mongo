@@ -161,6 +161,8 @@ namespace mongo {
         printWindowsStackTrace( context, os );
     }
 
+    static SimpleMutex _stackTraceMutex( "stackTraceMutex" );
+
     /**
      * Print stack trace (using a specified stack context) to "os"
      * 
@@ -168,6 +170,7 @@ namespace mongo {
      * @param os        ostream& to receive printed stack backtrace
      */
     void printWindowsStackTrace( CONTEXT& context, std::ostream& os ) {
+        SimpleMutex::scoped_lock lk(_stackTraceMutex);
         HANDLE process = GetCurrentProcess();
         BOOL ret = SymInitialize( process, NULL, TRUE );
         if ( ret == FALSE ) {
