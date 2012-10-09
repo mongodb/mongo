@@ -62,12 +62,25 @@ namespace mongo {
         _data = extra.copy();
 
         if (_mode != off) {
-            _fpInfo.store(ACTIVE_BIT);
+            enableFailPoint();
         }
     }
 
     const BSONObj& FailPoint::getData() const {
         return _data;
+    }
+
+    void FailPoint::enableFailPoint() {
+        // TODO: Better to replace with a bitwise OR, once available for AU32
+        ValType currentVal = _fpInfo.load();
+        ValType expectedCurrentVal;
+        ValType newVal;
+
+        do {
+            expectedCurrentVal = currentVal;
+            newVal = expectedCurrentVal | ACTIVE_BIT;
+            currentVal = _fpInfo.compareAndSwap(expectedCurrentVal, newVal);
+        } while (expectedCurrentVal != currentVal);
     }
 
     void FailPoint::disableFailPoint() {

@@ -141,6 +141,11 @@ namespace mongo {
         mutable mutex _modMutex;
 
         /**
+         * Enables this fail point.
+         */
+        void enableFailPoint();
+
+        /**
          * Disables this fail point.
          */
         void disableFailPoint();

@@ -234,7 +234,7 @@ namespace mongo_test {
 
     TEST_F(FailPointStress, Basic) {
         startTest();
-        mongo::sleepsecs(120);
+        mongo::sleepsecs(30);
         stopTest();
     }
 }
