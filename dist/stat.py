@@ -6,7 +6,7 @@ from dist import compare_srcfile
 from dist import source_paths_list
 
 # Read the source files.
-from stat_data import btree_stats, connection_stats
+from stat_data import btree_stats, connection_stats, lsm_stats
 
 # print_struct --
 #	Print the structures for the stat.h file.
@@ -37,6 +37,7 @@ for line in open('../src/include/stat.h', 'r'):
 		skip = 1
 		print_struct('BTREE', 'btree', btree_stats)
 		print_struct('CONNECTION', 'connection', connection_stats)
+		print_struct('LSM', 'lsm', lsm_stats)
 f.close()
 compare_srcfile(tmp_file, '../src/include/stat.h')
 
@@ -70,6 +71,20 @@ def print_define():
  */
 ''')
 	for v, l in enumerate(sorted(btree_stats, key=attrgetter('desc'))):
+		f.write('/*! %s */\n' % '\n * '.join(textwrap.wrap(l.desc, 70)))
+		f.write('#define\tWT_STAT_' + l.name + "\t" *
+		    max(1, 6 - int((len('WT_STAT_') + len(l.name)) / 8)) +
+		    str(v) + '\n')
+	f.write('/*! @} */\n')
+	f.write('''
+/*!
+ * @}
+ * @name Statistics for lsm objects
+ * @anchor statistics_lsm
+ * @{
+ */
+''')
+	for v, l in enumerate(sorted(lsm_stats, key=attrgetter('desc'))):
 		f.write('/*! %s */\n' % '\n * '.join(textwrap.wrap(l.desc, 70)))
 		f.write('#define\tWT_STAT_' + l.name + "\t" *
 		    max(1, 6 - int((len('WT_STAT_') + len(l.name)) / 8)) +
@@ -141,5 +156,6 @@ f.write('#include "wt_internal.h"\n')
 
 print_func('btree', btree_stats)
 print_func('connection', connection_stats)
+print_func('lsm', lsm_stats)
 f.close()
 compare_srcfile(tmp_file, '../src/support/stat.c')

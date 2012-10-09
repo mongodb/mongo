@@ -1152,6 +1152,8 @@ struct __wt_connection {
  * @config{hazard_max, maximum number of simultaneous hazard references per
  * session handle.,an integer greater than or equal to 15; default \c 1000.}
  * @config{logging, enable logging.,a boolean flag; default \c false.}
+ * @config{lsm_merge, merge LSM chunks where possible.,a boolean flag; default
+ * \c true.}
  * @config{multiprocess, permit sharing between processes (will automatically
  * start an RPC server for primary processes and use RPC for secondary
  * processes). <b>Not yet supported in WiredTiger</b>.,a boolean flag; default
@@ -1775,6 +1777,20 @@ extern int wiredtiger_extension_init(WT_SESSION *session,
 #define	WT_STAT_update_conflict				42
 /*! write generation conflicts */
 #define	WT_STAT_file_write_conflicts			43
+/*! @} */
+
+/*!
+ * @}
+ * @name Statistics for lsm objects
+ * @anchor statistics_lsm
+ * @{
+ */
+/*! Number of successful bloom filter false positives */
+#define	WT_STAT_bloom_misses				0
+/*! Number of successful bloom filter lookups */
+#define	WT_STAT_bloom_hits				1
+/*! Number of unsuccessful bloom filter lookups */
+#define	WT_STAT_bloom_skips				2
 /*! @} */
 /*
  * Statistics section: END

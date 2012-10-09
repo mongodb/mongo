@@ -52,9 +52,13 @@ void
 __wt_txn_release_snapshot(WT_SESSION_IMPL *session)
 {
 	WT_TXN *txn;
+	WT_TXN_STATE *txn_state;
 
 	txn = &session->txn;
+	txn_state = &S2C(session)->txn_global.states[session->id];
+
 	txn->snapshot_count = 0;
+	txn_state->snap_min = WT_TXN_NONE;
 }
 
 /*
@@ -62,18 +66,20 @@ __wt_txn_release_snapshot(WT_SESSION_IMPL *session)
  *	Set up a snapshot in the current transaction, without allocating an ID.
  */
 void
-__wt_txn_get_snapshot(WT_SESSION_IMPL *session, wt_txnid_t max_id)
+__wt_txn_get_snapshot(
+    WT_SESSION_IMPL *session, wt_txnid_t my_id, wt_txnid_t max_id)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_TXN *txn;
 	WT_TXN_GLOBAL *txn_global;
-	WT_TXN_STATE *s;
+	WT_TXN_STATE *s, *txn_state;
 	wt_txnid_t current_id, id, oldest_snap_min;
 	uint32_t i, n, session_cnt;
 
 	conn = S2C(session);
 	txn = &session->txn;
 	txn_global = &conn->txn_global;
+	txn_state = &txn_global->states[session->id];
 
 	do {
 		/* Take a copy of the current session ID. */
@@ -84,6 +90,9 @@ __wt_txn_get_snapshot(WT_SESSION_IMPL *session, wt_txnid_t max_id)
 		for (i = n = 0, s = txn_global->states;
 		    i < session_cnt;
 		    i++, s++) {
+			/* Ignore the session's own transaction. */
+			if (i == session->id)
+				continue;
 			if ((id = s->snap_min) != WT_TXN_NONE)
 				if (TXNID_LT(id, oldest_snap_min))
 					oldest_snap_min = id;
@@ -103,6 +112,9 @@ __wt_txn_get_snapshot(WT_SESSION_IMPL *session, wt_txnid_t max_id)
 	__txn_sort_snapshot(session, n,
 	    (max_id != WT_TXN_NONE) ? max_id : current_id,
 	    oldest_snap_min);
+	txn_state->snap_min =
+	    (my_id == WT_TXN_NONE || TXNID_LT(txn->snap_min, my_id)) ?
+	    txn->snap_min : my_id;
 }
 
 /*
@@ -141,6 +153,11 @@ __wt_txn_get_evict_snapshot(WT_SESSION_IMPL *session)
 	} while (current_id != txn_global->current);
 
 	__txn_sort_snapshot(session, 0, oldest_snap_min, oldest_snap_min);
+	/*
+	 * Note that we carefully don't update the global table with this
+	 * snap_min value: there is already a running transaction in this
+	 * session with its own value in the global table.
+	 */
 }
 
 /*
@@ -230,7 +247,7 @@ __wt_txn_begin(WT_SESSION_IMPL *session, const char *cfg[])
 		}
 
 		/*
-		 * Ensure the snapshot reads are scheduled before re-checking
+		 * Ensure the snapshot reads are complete before re-checking
 		 * the global current ID.
 		 */
 		WT_READ_BARRIER();
@@ -257,11 +274,16 @@ __wt_txn_release(WT_SESSION_IMPL *session)
 	WT_ASSERT(session, txn_state->id != WT_TXN_NONE &&
 	    txn->id != WT_TXN_NONE);
 	WT_PUBLISH(txn_state->id, WT_TXN_NONE);
-	txn_state->snap_min = WT_TXN_NONE;
-
-	/* Reset the transaction state to not running. */
 	txn->id = WT_TXN_NONE;
-	__wt_txn_release_snapshot(session);
+
+	/*
+	 * Reset the transaction state to not running.
+	 *
+	 * Auto-commit transactions (identified by having active cursors)
+	 * handle this at a higher level.
+	 */
+	if (session->ncursors == 0)
+		__wt_txn_release_snapshot(session);
 	txn->isolation = session->isolation;
 	F_CLR(txn, TXN_ERROR | TXN_RUNNING);
 }
@@ -283,6 +305,16 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 	if (!F_ISSET(txn, TXN_RUNNING))
 		WT_RET_MSG(session, EINVAL, "No transaction is active");
 
+	/*
+	 * Auto-commit transactions need a new transaction snapshot so that the
+	 * committed changes are visible to subsequent reads.  However, cursor
+	 * keys and values will point to the data that was just modified, so
+	 * the snapshot cannot be so new that updates could be freed underneath
+	 * the cursor.  Get the new snapshot before releasing the ID for the
+	 * commit.
+	 */
+	if (session->ncursors > 0)
+		__wt_txn_get_snapshot(session, txn->id, WT_TXN_NONE);
 	__wt_txn_release(session);
 	return (0);
 }

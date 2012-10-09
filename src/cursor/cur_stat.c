@@ -337,6 +337,28 @@ __curstat_file_init(WT_SESSION_IMPL *session,
 }
 
 /*
+ * __curstat_lsm_init --
+ *	Initialize the statistics for a LSM tree.
+ */
+static int
+__curstat_lsm_init(WT_SESSION_IMPL *session,
+    const char *uri, WT_CURSOR_STAT *cst, int statistics_clear)
+{
+	WT_LSM_TREE *lsm_tree;
+
+	WT_RET(__wt_lsm_tree_get(session, uri, &lsm_tree));
+
+	WT_RET(__wt_lsm_stat_init(session, lsm_tree));
+
+	cst->btree = NULL;
+	cst->notpositioned = 1;
+	cst->stats_first = (WT_STATS *)lsm_tree->stats;
+	cst->stats_count = sizeof(WT_LSM_STATS) / sizeof(WT_STATS);
+	cst->clear_func = statistics_clear ? __wt_stat_clear_lsm_stats : NULL;
+	return (0);
+}
+
+/*
  * __wt_curstat_open --
  *	WT_SESSION->open_cursor method for the statistics cursor type.
  */
@@ -400,6 +422,9 @@ __wt_curstat_open(WT_SESSION_IMPL *session,
 		__curstat_conn_init(session, cst, statistics_clear);
 	else if (WT_PREFIX_MATCH(uri, "statistics:file:"))
 		WT_ERR(__curstat_file_init(session,
+		    uri + strlen("statistics:"), cst, statistics_clear));
+	else if (WT_PREFIX_MATCH(uri, "statistics:lsm:"))
+		WT_ERR(__curstat_lsm_init(session,
 		    uri + strlen("statistics:"), cst, statistics_clear));
 	else
 		WT_ERR(__wt_bad_object_type(session, uri));

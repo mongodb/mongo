@@ -321,20 +321,16 @@ struct __wt_connection_impl {
 	if (__autotxn) {						\
 		if (F_ISSET(&(s)->txn, TXN_AUTOCOMMIT))			\
 			F_CLR(&(s)->txn, TXN_AUTOCOMMIT);		\
-		else if (ret == 0 && !F_ISSET(&(s)->txn, TXN_ERROR)) {	\
-			if ((s)->ncursors != 0) {			\
-				__wt_txn_read_last(session);		\
-				__wt_txn_read_first(session);		\
-			}						\
+		else if (ret == 0 && !F_ISSET(&(s)->txn, TXN_ERROR))	\
 			ret = __wt_txn_commit((s), NULL);		\
-		} else {						\
-			(void)__wt_txn_rollback((s), NULL);		\
+		else {							\
+			WT_TRET(__wt_txn_rollback((s), NULL));		\
 			if (ret == 0 || ret == WT_DEADLOCK) {		\
 				ret = 0;				\
 				continue;				\
 			}						\
 		}							\
-	} else if ((ret) != 0 &&					\
+	} else if (F_ISSET(&(s)->txn, TXN_RUNNING) && (ret) != 0 &&	\
 	    (ret) != WT_NOTFOUND &&					\
 	    (ret) != WT_DUPLICATE_KEY)					\
 		F_SET(&(s)->txn, TXN_ERROR);				\
@@ -386,7 +382,8 @@ extern WT_PROCESS __wt_process;
  * DO NOT EDIT: automatically built by dist/api_flags.py.
  * API flags section: BEGIN
  */
-#define	WT_CONN_NOSYNC					0x00000004
+#define	WT_CONN_LSM_MERGE				0x00000008
+#define	WT_CONN_SYNC					0x00000004
 #define	WT_CONN_TRANSACTIONAL				0x00000002
 #define	WT_DIRECTIO_DATA				0x00000002
 #define	WT_DIRECTIO_LOG					0x00000001
