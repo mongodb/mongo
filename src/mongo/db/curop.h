@@ -19,13 +19,15 @@
 
 #pragma once
 
-#include "namespace-inl.h"
-#include "client.h"
-#include "../bson/util/atomic_int.h"
-#include "../util/concurrency/spin_lock.h"
-#include "../util/time_support.h"
-#include "../util/net/hostandport.h"
-#include "../util/progress_meter.h"
+#include <vector>
+
+#include "mongo/bson/util/atomic_int.h"
+#include "mongo/db/client.h"
+#include "mongo/db/namespace-inl.h"
+#include "mongo/util/concurrency/spin_lock.h"
+#include "mongo/util/net/hostandport.h"
+#include "mongo/util/progress_meter.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 
@@ -264,33 +266,5 @@ namespace mongo {
         // so this should be 30000 in that case
         long long _expectedLatencyMs; 
                                      
-
     };
-
-    /* _globalKill: we are shutting down
-       otherwise kill attribute set on specified CurOp
-       this class does not handle races between interruptJs and the checkForInterrupt functions - those must be
-       handled by the client of this class
-    */
-    extern class KillCurrentOp {
-    public:
-        void killAll();
-        void kill(AtomicUInt i);
-
-        /** @return true if global interrupt and should terminate the operation */
-        bool globalInterruptCheck() const { return _globalKill; }
-
-        /**
-         * @param heedMutex if true and have a write lock, won't kill op since it might be unsafe
-         */
-        void checkForInterrupt( bool heedMutex = true );
-
-        /** @return "" if not interrupted.  otherwise, you should stop. */
-        const char *checkForInterruptNoAssert();
-
-    private:
-        void interruptJs( AtomicUInt *op );
-        volatile bool _globalKill;
-    } killCurrentOp;
-
 }

@@ -2,9 +2,12 @@
 
 #pragma once
 
-#include "dur_journalformat.h"
-#include "../util/concurrency/mutex.h"
-#include "../util/file.h"
+#include <boost/filesystem/operations.hpp>
+#include <list>
+
+#include "mongo/db/dur_journalformat.h"
+#include "mongo/util/concurrency/mutex.h"
+#include "mongo/util/file.h"
 
 namespace mongo {
     class MongoMMF;

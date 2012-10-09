@@ -40,6 +40,7 @@
 #include "../db/clientcursor.h"
 #include "../db/pagefault.h"
 #include "../db/repl.h"
+#include "../db/kill_current_op.h"
 
 #include "../client/connpool.h"
 #include "../client/distlock.h"

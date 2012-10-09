@@ -14,9 +14,11 @@
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "pch.h"
-#include "pdfile.h"
-#include "curop-inl.h"
+#include "mongo/pch.h"
+
+#include "mongo/db/curop-inl.h"
+#include "mongo/db/kill_current_op.h"
+#include "mongo/db/pdfile.h"
 
 namespace mongo {
 

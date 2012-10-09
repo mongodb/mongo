@@ -23,34 +23,37 @@ _ coalesce deleted
 _ disallow system* manipulations from the database.
 */
 
-#include "pch.h"
-#include "pdfile.h"
-#include "mongo/db/pdfile_private.h"
-#include "db.h"
-#include "../util/mmap.h"
-#include "../util/hashtab.h"
-#include "../util/file_allocator.h"
-#include "../util/processinfo.h"
-#include "../util/file.h"
-#include "btree.h"
-#include "btreebuilder.h"
-#include <algorithm>
-#include <list>
-#include "repl.h"
-#include "dbhelpers.h"
-#include "namespace-inl.h"
-#include "extsort.h"
-#include "curop-inl.h"
-#include "background.h"
-#include "compact.h"
-#include "ops/delete.h"
-#include "instance.h"
-#include "replutil.h"
-#include "memconcept.h"
-#include "mongo/db/lasterror.h"
-#include "mongo/db/index_update.h"
+#include "mongo/pch.h"
 
+#include "mongo/db/pdfile.h"
+
+#include <algorithm>
 #include <boost/filesystem/operations.hpp>
+#include <list>
+
+#include "mongo/db/pdfile_private.h"
+#include "mongo/db/background.h"
+#include "mongo/db/btree.h"
+#include "mongo/db/btreebuilder.h"
+#include "mongo/db/compact.h"
+#include "mongo/db/curop-inl.h"
+#include "mongo/db/db.h"
+#include "mongo/db/dbhelpers.h"
+#include "mongo/db/extsort.h"
+#include "mongo/db/index_update.h"
+#include "mongo/db/instance.h"
+#include "mongo/db/kill_current_op.h"
+#include "mongo/db/lasterror.h"
+#include "mongo/db/memconcept.h"
+#include "mongo/db/namespace-inl.h"
+#include "mongo/db/ops/delete.h"
+#include "mongo/db/repl.h"
+#include "mongo/db/replutil.h"
+#include "mongo/util/file.h"
+#include "mongo/util/file_allocator.h"
+#include "mongo/util/hashtab.h"
+#include "mongo/util/mmap.h"
+#include "mongo/util/processinfo.h"
 
 namespace mongo {
 

@@ -20,22 +20,25 @@
    to an open socket (or logical connection if pooling on sockets) from a client.
 */
 
-#include "pch.h"
-#include "db.h"
-#include "client.h"
-#include "curop-inl.h"
-#include "json.h"
-#include "security.h"
-#include "commands.h"
-#include "instance.h"
-#include "../s/d_logic.h"
-#include "dbwebserver.h"
-#include "../util/mongoutils/html.h"
-#include "../util/mongoutils/checksum.h"
-#include "../util/file_allocator.h"
-#include "repl/rs.h"
-#include "../scripting/engine.h"
-#include "pagefault.h"
+#include "mongo/pch.h"
+
+#include "mongo/db/client.h"
+
+#include "mongo/db/db.h"
+#include "mongo/db/commands.h"
+#include "mongo/db/curop-inl.h"
+#include "mongo/db/kill_current_op.h"
+#include "mongo/db/dbwebserver.h"
+#include "mongo/db/instance.h"
+#include "mongo/db/json.h"
+#include "mongo/db/pagefault.h"
+#include "mongo/db/repl/rs.h"
+#include "mongo/s/d_logic.h"
+#include "mongo/scripting/engine.h"
+#include "mongo/db/security.h"
+#include "mongo/util/file_allocator.h"
+#include "mongo/util/mongoutils/checksum.h"
+#include "mongo/util/mongoutils/html.h"
 
 namespace mongo {
   
@@ -384,43 +387,6 @@ namespace mongo {
         if ( !c )
             return "no client";
         return c->toString();
-    }
-
-    void KillCurrentOp::interruptJs( AtomicUInt *op ) {
-        if ( !globalScriptEngine )
-            return;
-        if ( !op ) {
-            globalScriptEngine->interruptAll();
-        }
-        else {
-            globalScriptEngine->interrupt( *op );
-        }
-    }
-
-    void KillCurrentOp::killAll() {
-        _globalKill = true;
-        interruptJs( 0 );
-    }
-
-    void KillCurrentOp::kill(AtomicUInt i) {
-        bool found = false;
-        {
-            scoped_lock l( Client::clientsMutex );
-            for( set< Client* >::const_iterator j = Client::clients.begin(); !found && j != Client::clients.end(); ++j ) {
-                for( CurOp *k = ( *j )->curop(); !found && k; k = k->parent() ) {
-                    if ( k->opNum() == i ) {
-                        k->kill();
-                        for( CurOp *l = ( *j )->curop(); l != k; l = l->parent() ) {
-                            l->kill();
-                        }
-                        found = true;
-                    }
-                }
-            }
-        }
-        if ( found ) {
-            interruptJs( &i );
-        }
     }
 
     void Client::gotHandshake( const BSONObj& o ) {

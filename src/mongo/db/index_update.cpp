@@ -25,6 +25,7 @@
 #include "mongo/db/compact.h"
 #include "mongo/db/extsort.h"
 #include "mongo/db/index.h"
+#include "mongo/db/kill_current_op.h"
 #include "mongo/db/namespace_details.h"
 #include "mongo/db/pdfile_private.h"
 #include "mongo/db/replutil.h"

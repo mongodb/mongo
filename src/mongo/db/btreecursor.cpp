@@ -16,12 +16,14 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "pch.h"
-#include "btree.h"
-#include "pdfile.h"
-#include "jsobj.h"
-#include "curop-inl.h"
-#include "queryutil.h"
+#include "mongo/pch.h"
+
+#include "mongo/db/btree.h"
+#include "mongo/db/curop-inl.h"
+#include "mongo/db/jsobj.h"
+#include "mongo/db/kill_current_op.h"
+#include "mongo/db/pdfile.h"
+#include "mongo/db/queryutil.h"
 
 namespace mongo {
 

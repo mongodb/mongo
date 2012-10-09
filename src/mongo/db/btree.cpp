@@ -16,21 +16,24 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "pch.h"
-#include "db.h"
-#include "btree.h"
-#include "index_insertion_continuation.h"
-#include "pdfile.h"
-#include "json.h"
-#include "clientcursor.h"
-#include "client.h"
-#include "dbhelpers.h"
-#include "curop-inl.h"
-#include "stats/counters.h"
-#include "dur_commitjob.h"
-#include "btreebuilder.h"
+#include "mongo/pch.h"
+
+#include "mongo/db/btree.h"
+
+#include "mongo/db/btreebuilder.h"
+#include "mongo/db/client.h"
+#include "mongo/db/clientcursor.h"
+#include "mongo/db/curop-inl.h"
+#include "mongo/db/db.h"
+#include "mongo/db/dbhelpers.h"
+#include "mongo/db/dur_commitjob.h"
+#include "mongo/db/index_insertion_continuation.h"
+#include "mongo/db/json.h"
+#include "mongo/db/kill_current_op.h"
+#include "mongo/db/pdfile.h"
+#include "mongo/db/stats/counters.h"
+#include "mongo/server.h"
 #include "mongo/util/startup_test.h"
-#include "../server.h"
 
 namespace mongo {
 

@@ -23,6 +23,7 @@
 #include <string>
 
 #include "mongo/db/curop.h"
+#include "mongo/db/kill_current_op.h"
 #include "mongo/db/pdfile.h"
 #include "mongo/db/database.h"
 #include "mongo/util/mmap.h"

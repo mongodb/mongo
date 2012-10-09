@@ -16,42 +16,43 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "pch.h"
+#include "mongo/pch.h"
 
 #include <boost/thread/thread.hpp>
-
-#include "../util/time_support.h"
-#include "db.h"
-#include "../bson/util/atomic_int.h"
-#include "introspect.h"
-#include "repl.h"
-#include "dbmessage.h"
-#include "instance.h"
-#include "lasterror.h"
-#include "security.h"
-#include "json.h"
-#include "replutil.h"
-#include "../s/d_logic.h"
-#include "../util/file_allocator.h"
-#include "../util/goodies.h"
-#include "cmdline.h"
+#include <fstream>
+#include <boost/filesystem/operations.hpp>
 #if !defined(_WIN32)
 #include <sys/file.h>
 #endif
-#include "stats/counters.h"
-#include "background.h"
-#include "dur_journal.h"
-#include "dur_recover.h"
-#include "d_concurrency.h"
-#include "ops/count.h"
-#include "ops/delete.h"
-#include "ops/query.h"
-#include "ops/update.h"
-#include "pagefault.h"
-#include <fstream>
-#include <boost/filesystem/operations.hpp>
-#include "dur_commitjob.h"
+
+#include "mongo/util/time_support.h"
+#include "mongo/bson/util/atomic_int.h"
+#include "mongo/db/background.h"
+#include "mongo/db/cmdline.h"
 #include "mongo/db/commands/fsync.h"
+#include "mongo/db/d_concurrency.h"
+#include "mongo/db/db.h"
+#include "mongo/db/dbmessage.h"
+#include "mongo/db/dur_commitjob.h"
+#include "mongo/db/dur_journal.h"
+#include "mongo/db/dur_recover.h"
+#include "mongo/db/instance.h"
+#include "mongo/db/introspect.h"
+#include "mongo/db/json.h"
+#include "mongo/db/kill_current_op.h"
+#include "mongo/db/lasterror.h"
+#include "mongo/db/ops/count.h"
+#include "mongo/db/ops/delete.h"
+#include "mongo/db/ops/query.h"
+#include "mongo/db/ops/update.h"
+#include "mongo/db/pagefault.h"
+#include "mongo/db/repl.h"
+#include "mongo/db/replutil.h"
+#include "mongo/db/security.h"
+#include "mongo/db/stats/counters.h"
+#include "mongo/s/d_logic.h"
+#include "mongo/util/file_allocator.h"
+#include "mongo/util/goodies.h"
 
 namespace mongo {
     

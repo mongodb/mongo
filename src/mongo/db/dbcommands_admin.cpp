@@ -22,23 +22,25 @@
 */
 
 
-#include "pch.h"
-#include "jsobj.h"
-#include "pdfile.h"
-#include "namespace-inl.h"
-#include "commands.h"
-#include "cmdline.h"
-#include "btree.h"
-#include "curop-inl.h"
-#include "../util/background.h"
-#include "../util/logfile.h"
-#include "../util/alignedbuilder.h"
-#include "../util/paths.h"
-#include "../scripting/engine.h"
-#include "../util/timer.h"
+#include "mongo/pch.h"
 
 #include <boost/filesystem/convenience.hpp>
 #include <boost/filesystem/operations.hpp>
+
+#include "mongo/db/btree.h"
+#include "mongo/db/cmdline.h"
+#include "mongo/db/commands.h"
+#include "mongo/db/curop-inl.h"
+#include "mongo/db/jsobj.h"
+#include "mongo/db/kill_current_op.h"
+#include "mongo/db/namespace-inl.h"
+#include "mongo/db/pdfile.h"
+#include "mongo/scripting/engine.h"
+#include "mongo/util/alignedbuilder.h"
+#include "mongo/util/background.h"
+#include "mongo/util/logfile.h"
+#include "mongo/util/paths.h"
+#include "mongo/util/timer.h"
 
 namespace mongo {
 

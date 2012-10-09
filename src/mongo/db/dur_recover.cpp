@@ -16,31 +16,34 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "pch.h"
+#include "mongo/pch.h"
 
-#include "dur.h"
-#include "dur_stats.h"
-#include "dur_recover.h"
-#include "dur_journal.h"
-#include "dur_journalformat.h"
-#include "durop.h"
-#include "namespace.h"
-#include "../util/mongoutils/str.h"
-#include "../util/bufreader.h"
-#include "../util/concurrency/race.h"
-#include "pdfile.h"
-#include "database.h"
-#include "db.h"
-#include "../util/startup_test.h"
-#include "../util/checksum.h"
-#include "cmdline.h"
-#include "curop.h"
-#include "mongommf.h"
-#include "../util/compress.h"
-#include <sys/stat.h>
-#include <fcntl.h>
-#include "dur_commitjob.h"
+#include "mongo/db/dur_recover.h"
+
 #include <boost/filesystem/operations.hpp>
+#include <fcntl.h>
+#include <sys/stat.h>
+
+#include "mongo/db/cmdline.h"
+#include "mongo/db/curop.h"
+#include "mongo/db/database.h"
+#include "mongo/db/db.h"
+#include "mongo/db/dur.h"
+#include "mongo/db/dur_commitjob.h"
+#include "mongo/db/dur_journal.h"
+#include "mongo/db/dur_journalformat.h"
+#include "mongo/db/dur_stats.h"
+#include "mongo/db/durop.h"
+#include "mongo/db/kill_current_op.h"
+#include "mongo/db/mongommf.h"
+#include "mongo/db/namespace.h"
+#include "mongo/db/pdfile.h"
+#include "mongo/util/bufreader.h"
+#include "mongo/util/checksum.h"
+#include "mongo/util/compress.h"
+#include "mongo/util/concurrency/race.h"
+#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/startup_test.h"
 
 using namespace mongoutils;
 

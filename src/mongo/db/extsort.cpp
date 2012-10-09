@@ -16,23 +16,24 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "pch.h"
+#include "mongo/pch.h"
+
+#include "mongo/db/extsort.h"
 
 #if defined(_WIN32)
 #   include <io.h>
 #endif
 
-#include "extsort.h"
-#include "namespace-inl.h"
-#include "../util/file.h"
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <fcntl.h>
-#include <fstream>
 #include <boost/filesystem/convenience.hpp>
 #include <boost/filesystem/operations.hpp>
+#include <fcntl.h>
+#include <fstream>
+#include <sys/stat.h>
+#include <sys/types.h>
 
-
+#include "mongo/db/kill_current_op.h"
+#include "mongo/db/namespace-inl.h"
+#include "mongo/util/file.h"
 
 namespace mongo {
 

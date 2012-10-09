@@ -14,9 +14,10 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "pch.h"
-#include "curop.h"
-#include "database.h"
+#include "mongo/pch.h"
+
+#include "mongo/db/curop.h"
+#include "mongo/db/database.h"
 
 namespace mongo {
 
@@ -179,26 +180,6 @@ namespace mongo {
         b.append( "lockStats" , _lockStat.report() );
 
         return b.obj();
-    }
-
-    void KillCurrentOp::checkForInterrupt( bool heedMutex ) {
-        Client& c = cc();
-        if ( heedMutex && Lock::somethingWriteLocked() && c.hasWrittenThisPass() )
-            return;
-        if( _globalKill )
-            uasserted(11600,"interrupted at shutdown");
-        if( c.curop()->killed() ) {
-            uasserted(11601,"operation was interrupted");
-        }
-    }
-    
-    const char * KillCurrentOp::checkForInterruptNoAssert() {
-        Client& c = cc();
-        if( _globalKill )
-            return "interrupted at shutdown";
-        if( c.curop()->killed() )
-            return "interrupted";
-        return "";
     }
 
 

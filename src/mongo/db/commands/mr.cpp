@@ -28,6 +28,7 @@
 #include "../../s/d_chunk_manager.h"
 #include "../../s/d_logic.h"
 #include "../../s/grid.h"
+#include "mongo/db/kill_current_op.h"
 
 #include "mr.h"
 
