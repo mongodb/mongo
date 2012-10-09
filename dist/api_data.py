@@ -329,6 +329,10 @@ methods = {
 		reset statistics counters when the cursor is closed; valid
 		only for statistics cursors''',
 		type='boolean'),
+	Config('statistics_fast', 'false', r'''
+		only gather statistics that don't require traversing the tree;
+		valid only for statistics cursors''',
+		type='boolean'),
 	Config('target', '', r'''
 		if non-empty, backup the list of objects; valid only for a
 		backup data source''',

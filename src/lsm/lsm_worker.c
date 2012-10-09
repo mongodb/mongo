@@ -8,8 +8,6 @@
 #include "wt_internal.h"
 
 static int __lsm_free_chunks(WT_SESSION_IMPL *, WT_LSM_TREE *);
-static int __lsm_copy_chunks(
-    WT_SESSION_IMPL *, WT_LSM_TREE *, WT_LSM_WORKER_COOKIE *);
 
 /*
  * __wt_lsm_worker --
@@ -71,7 +69,7 @@ __wt_lsm_checkpoint_worker(void *arg)
 	WT_CLEAR(cookie);
 
 	while (F_ISSET(lsm_tree, WT_LSM_TREE_WORKING)) {
-		WT_ERR(__lsm_copy_chunks(session, lsm_tree, &cookie));
+		WT_ERR(__wt_lsm_copy_chunks(session, lsm_tree, &cookie));
 
 		/* Write checkpoints in all completed files. */
 		for (i = 0, j = 0; i < cookie.nchunks; i++) {
@@ -108,11 +106,12 @@ err:	__wt_free(session, cookie.chunk_array);
 }
 
 /*
- * Take a copy of part of the LSM tree chunk array so that we can work on
- * the contents without holding the LSM tree handle lock long term.
+ * __wt_lsm_copy_chunks --
+ *	 Take a copy of part of the LSM tree chunk array so that we can work on
+ *	 the contents without holding the LSM tree handle lock long term.
  */
-static int
-__lsm_copy_chunks(WT_SESSION_IMPL *session,
+int
+__wt_lsm_copy_chunks(WT_SESSION_IMPL *session,
     WT_LSM_TREE *lsm_tree, WT_LSM_WORKER_COOKIE *cookie)
 {
 	WT_DECL_RET;

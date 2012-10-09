@@ -302,16 +302,16 @@ __curstat_close(WT_CURSOR *cursor)
  */
 static void
 __curstat_conn_init(
-    WT_SESSION_IMPL *session, WT_CURSOR_STAT *cst, int statistics_clear)
+    WT_SESSION_IMPL *session, WT_CURSOR_STAT *cst, uint32_t flags)
 {
-	__wt_conn_stat_init(session);
+	__wt_conn_stat_init(session, flags);
 
 	cst->btree = NULL;
 	cst->notpositioned = 1;
 	cst->stats_first = (WT_STATS *)S2C(session)->stats;
 	cst->stats_count = sizeof(WT_CONNECTION_STATS) / sizeof(WT_STATS);
-	cst->clear_func =
-	    statistics_clear ? __wt_stat_clear_connection_stats : NULL;
+	cst->clear_func = LF_ISSET(WT_STATISTICS_CLEAR) ?
+	    __wt_stat_clear_connection_stats : NULL;
 }
 
 /*
@@ -320,19 +320,20 @@ __curstat_conn_init(
  */
 static int
 __curstat_file_init(WT_SESSION_IMPL *session,
-    const char *uri, WT_CURSOR_STAT *cst, int statistics_clear)
+    const char *uri, const char *cfg[], WT_CURSOR_STAT *cst, uint32_t flags)
 {
 	WT_BTREE *btree;
 
-	WT_RET(__wt_session_get_btree(session, uri, NULL, NULL, 0));
+	WT_RET(__wt_session_get_btree_ckpt(session, uri, cfg, 0));
 	btree = session->btree;
-	WT_RET(__wt_btree_stat_init(session));
+	WT_RET(__wt_btree_stat_init(session, flags));
 
 	cst->btree = btree;
 	cst->notpositioned = 1;
 	cst->stats_first = (WT_STATS *)session->btree->stats;
 	cst->stats_count = sizeof(WT_BTREE_STATS) / sizeof(WT_STATS);
-	cst->clear_func = statistics_clear ? __wt_stat_clear_btree_stats : NULL;
+	cst->clear_func = LF_ISSET(WT_STATISTICS_CLEAR) ?
+	    __wt_stat_clear_btree_stats : NULL;
 	return (0);
 }
 
@@ -342,19 +343,20 @@ __curstat_file_init(WT_SESSION_IMPL *session,
  */
 static int
 __curstat_lsm_init(WT_SESSION_IMPL *session,
-    const char *uri, WT_CURSOR_STAT *cst, int statistics_clear)
+    const char *uri, WT_CURSOR_STAT *cst, uint32_t flags)
 {
 	WT_LSM_TREE *lsm_tree;
 
 	WT_RET(__wt_lsm_tree_get(session, uri, &lsm_tree));
 
-	WT_RET(__wt_lsm_stat_init(session, lsm_tree));
+	WT_RET(__wt_lsm_stat_init(session, lsm_tree, flags));
 
 	cst->btree = NULL;
 	cst->notpositioned = 1;
 	cst->stats_first = (WT_STATS *)lsm_tree->stats;
 	cst->stats_count = sizeof(WT_LSM_STATS) / sizeof(WT_STATS);
-	cst->clear_func = statistics_clear ? __wt_stat_clear_lsm_stats : NULL;
+	cst->clear_func = LF_ISSET(WT_STATISTICS_CLEAR) ?
+	    __wt_stat_clear_lsm_stats : NULL;
 	return (0);
 }
 
@@ -398,12 +400,17 @@ __wt_curstat_open(WT_SESSION_IMPL *session,
 	WT_CURSOR *cursor;
 	WT_CURSOR_STAT *cst;
 	WT_DECL_RET;
-	int statistics_clear;
+	uint32_t flags;
 
 	cst = NULL;
+	flags = 0;
 
 	WT_RET(__wt_config_gets_defno(session, cfg, "statistics_clear", &cval));
-	statistics_clear = (cval.val != 0);
+	if (cval.val != 0)
+		LF_SET(WT_STATISTICS_CLEAR);
+	WT_RET(__wt_config_gets_defno(session, cfg, "statistics_fast", &cval));
+	if (cval.val != 0)
+		LF_SET(WT_STATISTICS_FAST);
 
 	WT_ERR(__wt_calloc_def(session, 1, &cst));
 	cursor = &cst->iface;
@@ -419,13 +426,13 @@ __wt_curstat_open(WT_SESSION_IMPL *session,
 	cursor->value_format = "SSq";
 
 	if (strcmp(uri, "statistics:") == 0)
-		__curstat_conn_init(session, cst, statistics_clear);
+		__curstat_conn_init(session, cst, flags);
 	else if (WT_PREFIX_MATCH(uri, "statistics:file:"))
 		WT_ERR(__curstat_file_init(session,
-		    uri + strlen("statistics:"), cst, statistics_clear));
+		    uri + strlen("statistics:"), cfg, cst, flags));
 	else if (WT_PREFIX_MATCH(uri, "statistics:lsm:"))
 		WT_ERR(__curstat_lsm_init(session,
-		    uri + strlen("statistics:"), cst, statistics_clear));
+		    uri + strlen("statistics:"), cst, flags));
 	else
 		WT_ERR(__wt_bad_object_type(session, uri));
 

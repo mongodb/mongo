@@ -577,7 +577,7 @@ void print_config(CONFIG *cfg)
 	printf("\t %s\n", cfg->create ? "Creating" : "Using existing");
 	printf("\t Random seed: %d\n", cfg->rand_seed);
 	if (cfg->create)
-		printf("\tInsert count: %d\n", cfg->icount);
+		printf("\t Insert count: %d\n", cfg->icount);
 	printf("\t key size: %d data size: %d\n", cfg->key_sz, cfg->data_sz);
 	printf("\t Reporting interval: %d\n", cfg->report_interval);
 	printf("\t Read workload period: %d\n", cfg->read_time);
