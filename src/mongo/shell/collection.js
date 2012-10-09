@@ -35,9 +35,9 @@ DBCollection.prototype.help = function () {
     print("\tdb." + shortName + ".copyTo(newColl) - duplicates collection by copying all documents to newColl; no indexes are copied.");
     print("\tdb." + shortName + ".convertToCapped(maxBytes) - calls {convertToCapped:'" + shortName + "', size:maxBytes}} command");
     print("\tdb." + shortName + ".dataSize()");
-    print("\tdb." + shortName + ".distinct( key ) - eg. db." + shortName + ".distinct( 'x' )");
+    print("\tdb." + shortName + ".distinct( key ) - e.g. db." + shortName + ".distinct( 'x' )");
     print("\tdb." + shortName + ".drop() drop the collection");
-    print("\tdb." + shortName + ".dropIndex(name)");
+    print("\tdb." + shortName + ".dropIndex(index) - e.g. db." + shortName + ".dropIndex( \"indexName\" ) or db." + shortName + ".dropIndex( { \"indexKey\" : 1 } )");
     print("\tdb." + shortName + ".dropIndexes()");
     print("\tdb." + shortName + ".ensureIndex(keypattern[,options]) - options is an object with these possible fields: name, unique, dropDups");
     print("\tdb." + shortName + ".reIndex()");
@@ -464,21 +464,19 @@ DBCollection.prototype.clean = function() {
  * <p>Drop a specified index.</p>
  *
  * <p>
- * Name is the name of the index in the system.indexes name field. (Run db.system.indexes.find() to
- *  see example data.)
+ * "index" is the name of the index in the system.indexes name field (run db.system.indexes.find() to
+ *  see example data), or an object holding the key(s) used to create the index.
+ * For example:
+ *  db.collectionName.dropIndex( "myIndexName" );
+ *  db.collectionName.dropIndex( { "indexKey" : 1 } );
  * </p>
  *
- * <p>Note :  alpha: space is not reclaimed </p>
- * @param {String} name of index to delete.
+ * @param {String} name or key object of index to delete.
  * @return A result object.  result.ok will be true if successful.
  */
 DBCollection.prototype.dropIndex =  function(index) {
-    assert(index , "need to specify index to dropIndex" );
-
-    if ( ! isString( index ) && isObject( index ) )
-    	index = this._genIndexName( index );
-
-    var res = this._dbCommand( "deleteIndexes" ,{ index: index } );
+    assert(index, "need to specify index to dropIndex" );
+    var res = this._dbCommand( "deleteIndexes", { index: index } );
     this.resetIndexCache();
     return res;
 }
