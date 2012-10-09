@@ -348,7 +348,7 @@ extern int __wt_kv_return(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt);
 extern int __wt_bt_salvage( WT_SESSION_IMPL *session,
     WT_CKPT *ckptbase,
     const char *cfg[]);
-extern int __wt_btree_stat_init(WT_SESSION_IMPL *session);
+extern int __wt_btree_stat_init(WT_SESSION_IMPL *session, uint32_t flags);
 extern int __wt_bt_cache_force_write(WT_SESSION_IMPL *session);
 extern int __wt_bt_cache_flush(WT_SESSION_IMPL *session,
     WT_CKPT *ckptbase,
@@ -596,7 +596,7 @@ extern int __wt_connection_init(WT_CONNECTION_IMPL *conn);
 extern void __wt_connection_destroy(WT_CONNECTION_IMPL *conn);
 extern int __wt_connection_open(WT_CONNECTION_IMPL *conn, const char *cfg[]);
 extern int __wt_connection_close(WT_CONNECTION_IMPL *conn);
-extern void __wt_conn_stat_init(WT_SESSION_IMPL *session);
+extern void __wt_conn_stat_init(WT_SESSION_IMPL *session, uint32_t flags);
 extern int __wt_curbackup_open(WT_SESSION_IMPL *session,
     const char *uri,
     const char *cfg[],
@@ -689,7 +689,9 @@ extern int __wt_lsm_merge_update_tree(WT_SESSION_IMPL *session,
 extern int __wt_lsm_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree);
 extern int __wt_lsm_meta_read(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree);
 extern int __wt_lsm_meta_write(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree);
-extern int __wt_lsm_stat_init(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree);
+extern int __wt_lsm_stat_init( WT_SESSION_IMPL *session,
+    WT_LSM_TREE *lsm_tree,
+    uint32_t flags);
 extern int __wt_lsm_tree_close_all(WT_SESSION_IMPL *session);
 extern int __wt_lsm_tree_bloom_name( WT_SESSION_IMPL *session,
     WT_LSM_TREE *lsm_tree,
@@ -730,6 +732,9 @@ extern int __wt_lsm_tree_worker(WT_SESSION_IMPL *session,
     uint32_t open_flags);
 extern void *__wt_lsm_worker(void *arg);
 extern void *__wt_lsm_checkpoint_worker(void *arg);
+extern int __wt_lsm_copy_chunks(WT_SESSION_IMPL *session,
+    WT_LSM_TREE *lsm_tree,
+    WT_LSM_WORKER_COOKIE *cookie);
 extern int __wt_metadata_get(WT_SESSION *session,
     const char *uri,
     const char **valuep);
