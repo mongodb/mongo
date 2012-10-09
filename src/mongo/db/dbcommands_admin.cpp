@@ -178,7 +178,10 @@ namespace mongo {
         }
 
     private:
-        void validateNS(const char *ns, NamespaceDetails *d, const BSONObj& cmdObj, BSONObjBuilder& result) {
+        void validateNS(const char *ns,
+                        NamespaceDetails *d,
+                        const BSONObj& cmdObj,
+                        BSONObjBuilder& result) {
             const bool full = cmdObj["full"].trueValue();
             const bool scanData = full || cmdObj["scandata"].trueValue();
 
@@ -189,60 +192,109 @@ namespace mongo {
                 result.appendNumber("max", d->maxCappedDocs());
             }
 
-            result.append("firstExtent", str::stream() << d->firstExtent.toString() << " ns:" << d->firstExtent.ext()->nsDiagnostic.toString());
-            result.append( "lastExtent", str::stream() <<  d->lastExtent.toString() << " ns:" <<  d->lastExtent.ext()->nsDiagnostic.toString());
-            
-            BSONArrayBuilder extentData;
+            result.append("firstExtent", str::stream() << d->firstExtent.toString()
+                                    << " ns:" << d->firstExtent.ext()->nsDiagnostic.toString());
+            result.append( "lastExtent", str::stream() <<  d->lastExtent.toString()
+                                    << " ns:" <<  d->lastExtent.ext()->nsDiagnostic.toString());
 
+            BSONArrayBuilder extentData;
+            int extentCount = 0;
             try {
                 d->firstExtent.ext()->assertOk();
                 d->lastExtent.ext()->assertOk();
 
-                DiskLoc el = d->firstExtent;
-                int ne = 0;
-                while( !el.isNull() ) {
-                    Extent *e = el.ext();
-                    e->assertOk();
-                    if ( full )
-                        extentData << e->dump();
-                    if (!e->validates(el, &errors)) {
+                DiskLoc extentDiskLoc = d->firstExtent;
+                while (!extentDiskLoc.isNull()) {
+                    Extent* thisExtent = extentDiskLoc.ext();
+                    if (full) {
+                        extentData << thisExtent->dump();
+                    }
+                    if (!thisExtent->validates(extentDiskLoc, &errors)) {
                         valid = false;
                     }
-                    el = e->xnext;
-                    ne++;
+                    DiskLoc nextDiskLoc = thisExtent->xnext;
+                    if (extentCount > 0 && !nextDiskLoc.isNull()
+                                        &&  nextDiskLoc.ext()->xprev != extentDiskLoc) {
+                        StringBuilder sb;
+                        sb << "'xprev' pointer " << nextDiskLoc.ext()->xprev.toString()
+                           << " in extent " << nextDiskLoc.toString()
+                           << " does not point to extent " << extentDiskLoc.toString();
+                        errors << sb.str();
+                        valid = false;
+                    }
+                    if (nextDiskLoc.isNull() && extentDiskLoc != d->lastExtent) {
+                        StringBuilder sb;
+                        sb << "'lastExtent' pointer " << d->lastExtent.toString()
+                           << " does not point to last extent in list " << extentDiskLoc.toString();
+                        errors << sb.str();
+                        valid = false;
+                    }
+                    extentDiskLoc = nextDiskLoc;
+                    extentCount++;
                     killCurrentOp.checkForInterrupt();
                 }
-                result.append("extentCount", ne);
             }
-            catch (...) {
-                valid=false;
-                errors << "extent asserted";
+            catch (const DBException& e) {
+                StringBuilder sb;
+                sb << "exception validating extent " << extentCount
+                   << ": " << e.what();
+                errors << sb.str();
+                valid = false;
             }
+            result.append("extentCount", extentCount);
 
             if ( full )
                 result.appendArray( "extents" , extentData.arr() );
 
-            
             result.appendNumber("datasize", d->stats.datasize);
             result.appendNumber("nrecords", d->stats.nrecords);
             result.appendNumber("lastExtentSize", d->lastExtentSize);
             result.appendNumber("padding", d->paddingFactor());
-            
 
             try {
 
+                bool testingLastExtent = false;
                 try {
-                    result.append("firstExtentDetails", d->firstExtent.ext()->dump());
-                    if (!d->firstExtent.ext()->xprev.isNull()) {
-                        StringBuilder sb;
-                        sb << "'xprev' pointer in first extent " << d->firstExtent.toString()
-                           << " is not null";
-                        errors << sb.str();
+                    if (d->firstExtent.isNull()) {
+                        errors << "'firstExtent' pointer is null";
                         valid=false;
                     }
+                    else {
+                        result.append("firstExtentDetails", d->firstExtent.ext()->dump());
+                        if (!d->firstExtent.ext()->xprev.isNull()) {
+                            StringBuilder sb;
+                            sb << "'xprev' pointer in 'firstExtent' " << d->firstExtent.toString()
+                               << " is " << d->firstExtent.ext()->xprev.toString()
+                               << ", should be null";
+                            errors << sb.str();
+                            valid=false;
+                        }
+                    }
+                    testingLastExtent = true;
+                    if (d->lastExtent.isNull()) {
+                        errors << "'lastExtent' pointer is null";
+                        valid=false;
+                    }
+                    else {
+                        if (d->firstExtent != d->lastExtent) {
+                            result.append("lastExtentDetails", d->lastExtent.ext()->dump());
+                            if (!d->lastExtent.ext()->xnext.isNull()) {
+                                StringBuilder sb;
+                                sb << "'xnext' pointer in 'lastExtent' " << d->lastExtent.toString()
+                                   << " is " << d->lastExtent.ext()->xnext.toString()
+                                   << ", should be null";
+                                errors << sb.str();
+                                valid = false;
+                            }
+                        }
+                    }
                 }
-                catch (...) {
-                    errors << "exception firstextent";
+                catch (const DBException& e) {
+                    StringBuilder sb;
+                    sb << "exception processing '"
+                       << (testingLastExtent ? "lastExtent" : "firstExtent")
+                       << "': " << e.what();
+                    errors << sb.str();
                     valid = false;
                 }
 
