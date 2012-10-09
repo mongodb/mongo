@@ -1726,60 +1726,62 @@ extern int wiredtiger_extension_init(WT_SESSION *session,
 #define	WT_STAT_free					15
 /*! file: overflow pages read from the file */
 #define	WT_STAT_overflow_read				16
+/*! file: pages evicted from the file */
+#define	WT_STAT_page_evict				17
 /*! file: pages read from the file */
-#define	WT_STAT_page_read				17
+#define	WT_STAT_page_read				18
 /*! file: pages written to the file */
-#define	WT_STAT_page_write				18
+#define	WT_STAT_page_write				19
 /*! file: size */
-#define	WT_STAT_file_size				19
+#define	WT_STAT_file_size				20
 /*! fixed-record size */
-#define	WT_STAT_file_fixed_len				20
+#define	WT_STAT_file_fixed_len				21
 /*! magic number */
-#define	WT_STAT_file_magic				21
+#define	WT_STAT_file_magic				22
 /*! major version number */
-#define	WT_STAT_file_major				22
+#define	WT_STAT_file_major				23
 /*! maximum internal page item size */
-#define	WT_STAT_file_maxintlitem			23
+#define	WT_STAT_file_maxintlitem			24
 /*! maximum internal page size */
-#define	WT_STAT_file_maxintlpage			24
+#define	WT_STAT_file_maxintlpage			25
 /*! maximum leaf page item size */
-#define	WT_STAT_file_maxleafitem			25
+#define	WT_STAT_file_maxleafitem			26
 /*! maximum leaf page size */
-#define	WT_STAT_file_maxleafpage			26
+#define	WT_STAT_file_maxleafpage			27
 /*! minor version number */
-#define	WT_STAT_file_minor				27
+#define	WT_STAT_file_minor				28
 /*! overflow pages */
-#define	WT_STAT_file_overflow				28
+#define	WT_STAT_file_overflow				29
 /*! page size allocation unit */
-#define	WT_STAT_file_allocsize				29
+#define	WT_STAT_file_allocsize				30
 /*! reconcile: deleted or temporary pages merged */
-#define	WT_STAT_rec_page_merge				30
+#define	WT_STAT_rec_page_merge				31
 /*! reconcile: dictionary match */
-#define	WT_STAT_rec_dictionary				31
+#define	WT_STAT_rec_dictionary				32
 /*! reconcile: internal pages split */
-#define	WT_STAT_rec_split_intl				32
+#define	WT_STAT_rec_split_intl				33
 /*! reconcile: leaf pages split */
-#define	WT_STAT_rec_split_leaf				33
+#define	WT_STAT_rec_split_leaf				34
 /*! reconcile: overflow key */
-#define	WT_STAT_rec_ovfl_key				34
+#define	WT_STAT_rec_ovfl_key				35
 /*! reconcile: overflow value */
-#define	WT_STAT_rec_ovfl_value				35
+#define	WT_STAT_rec_ovfl_value				36
 /*! reconcile: pages deleted */
-#define	WT_STAT_rec_page_delete				36
+#define	WT_STAT_rec_page_delete				37
 /*! reconcile: pages written */
-#define	WT_STAT_rec_written				37
+#define	WT_STAT_rec_written				38
 /*! reconcile: unable to acquire hazard reference */
-#define	WT_STAT_rec_hazard				38
+#define	WT_STAT_rec_hazard				39
 /*! row-store internal pages */
-#define	WT_STAT_file_row_int_pages			39
+#define	WT_STAT_file_row_int_pages			40
 /*! row-store leaf pages */
-#define	WT_STAT_file_row_leaf_pages			40
+#define	WT_STAT_file_row_leaf_pages			41
 /*! total entries */
-#define	WT_STAT_file_entries				41
+#define	WT_STAT_file_entries				42
 /*! update conflicts */
-#define	WT_STAT_update_conflict				42
+#define	WT_STAT_update_conflict				43
 /*! write generation conflicts */
-#define	WT_STAT_file_write_conflicts			43
+#define	WT_STAT_file_write_conflicts			44
 /*! @} */
 
 /*!
@@ -1790,28 +1792,30 @@ extern int wiredtiger_extension_init(WT_SESSION *session,
  */
 /*! Number of bloom filters in the LSM tree */
 #define	WT_STAT_bloom_count				0
+/*! Number of bloom pages evicted from cache */
+#define	WT_STAT_bloom_cache_evict			1
 /*! Number of bloom pages read into cache */
-#define	WT_STAT_bloom_cache_read			1
-/*! Number of bloom pages written from cache */
-#define	WT_STAT_bloom_cache_write			2
+#define	WT_STAT_bloom_cache_read			2
 /*! Number of chunks in the LSM tree */
 #define	WT_STAT_chunk_count				3
+/*! Number of pages evicted from LSM chunks */
+#define	WT_STAT_chunk_cache_evict			4
+/*! Number of pages evicted from cache */
+#define	WT_STAT_cache_evict				5
 /*! Number of pages read into LSM chunks */
-#define	WT_STAT_chunk_cache_read			4
+#define	WT_STAT_chunk_cache_read			6
 /*! Number of pages read into cache */
-#define	WT_STAT_cache_read				5
+#define	WT_STAT_cache_read				7
 /*! Number of pages written from cache */
-#define	WT_STAT_cache_write				6
-/*! Number of pages written from chunks */
-#define	WT_STAT_chunk_cache_write			7
+#define	WT_STAT_cache_write				8
 /*! Number of successful bloom filter false positives */
-#define	WT_STAT_bloom_misses				8
+#define	WT_STAT_bloom_misses				9
 /*! Number of successful bloom filter lookups */
-#define	WT_STAT_bloom_hits				9
+#define	WT_STAT_bloom_hits				10
 /*! Number of unsuccessful bloom filter lookups */
-#define	WT_STAT_bloom_skips				10
+#define	WT_STAT_bloom_skips				11
 /*! Total space used by bloom filters */
-#define	WT_STAT_bloom_space				11
+#define	WT_STAT_bloom_space				12
 /*! @} */
 /*
  * Statistics section: END
