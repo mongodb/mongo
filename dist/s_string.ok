@@ -192,6 +192,7 @@ URIs
 UTF
 UnixLib
 VARCHAR
+Vanishingly
 Vc
 Vixie
 Vo
@@ -431,12 +432,14 @@ incrementing
 incrv
 indices
 indx
+infeasible
 init
 initn
 initsize
 inmem
 insertK
 insertV
+instantiation
 intl
 intpack
 ints
@@ -566,6 +569,7 @@ readserver
 realloc
 recno
 req
+rescan
 resizing
 ret
 retp
