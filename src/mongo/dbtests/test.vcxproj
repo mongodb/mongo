@@ -514,6 +514,7 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClInclude Include="..\db\dur_journal.h" />
     <ClInclude Include="..\db\d_concurrency.h" />
     <ClInclude Include="..\db\explain.h" />
+    <ClInclude Include="..\db\fail_point_service.h" />
     <ClInclude Include="..\db\hasher.h" />
     <ClInclude Include="..\db\index_update.h" />
     <ClInclude Include="..\db\jsobjmanipulator.h" />
@@ -606,6 +607,8 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClInclude Include="..\util\concurrency\qlock.h" />
     <ClInclude Include="..\util\concurrency\task.h" />
     <ClInclude Include="..\util\concurrency\value.h" />
+    <ClInclude Include="..\util\fail_point.h" />
+    <ClInclude Include="..\util\fail_point_registry.h" />
     <ClInclude Include="..\util\file.h" />
     <ClInclude Include="..\util\goodies.h" />
     <ClInclude Include="..\util\hashtab.h" />
@@ -1250,6 +1253,7 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClCompile Include="..\db\d_concurrency.cpp" />
     <ClCompile Include="..\db\d_globals.cpp" />
     <ClCompile Include="..\db\explain.cpp" />
+    <ClCompile Include="..\db\fail_point_service.cpp" />
     <ClCompile Include="..\db\geo\2d.cpp" />
     <ClCompile Include="..\db\geo\haystack.cpp" />
     <ClCompile Include="..\db\hasher.cpp" />
@@ -1368,6 +1372,8 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClCompile Include="..\util\concurrency\task.cpp" />
     <ClCompile Include="..\util\concurrency\thread_pool.cpp" />
     <ClCompile Include="..\util\debug_util.cpp" />
+    <ClCompile Include="..\util\fail_point.cpp" />
+    <ClCompile Include="..\util\fail_point_registry.cpp" />
     <ClCompile Include="..\util\file_allocator.cpp" />
     <ClCompile Include="..\util\histogram.cpp" />
     <ClCompile Include="..\util\log.cpp" />

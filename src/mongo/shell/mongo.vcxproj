@@ -884,8 +884,11 @@ cscript //Nologo createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClCompile Include="..\client\authentication_table.cpp" />
     <ClCompile Include="..\client\connection_factory.cpp" />
     <ClCompile Include="..\db\dbmessage.cpp" />
+    <ClCompile Include="..\db\fail_point_service.cpp" />
     <ClCompile Include="..\scripting\bson_template_evaluator.cpp" />
     <ClCompile Include="..\util\concurrency\mutexdebugger.cpp" />
+    <ClCompile Include="..\util\fail_point.cpp" />
+    <ClCompile Include="..\util\fail_point_registry.cpp" />
     <ClCompile Include="..\util\safe_num.cpp" />
     <ClCompile Include="..\util\time_support.cpp" />
     <ClCompile Include="linenoise_utf8.cpp" />
@@ -1115,6 +1118,7 @@ cscript //Nologo createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClInclude Include="..\bson\bson_field.h" />
     <ClInclude Include="..\client\authentication_table.h" />
     <ClInclude Include="..\client\dbclientinterface.h" />
+    <ClInclude Include="..\db\fail_point_service.h" />
     <ClInclude Include="..\platform\atomic_intrinsics.h" />
     <ClInclude Include="..\platform\atomic_intrinsics_win32.h" />
     <ClInclude Include="..\platform\atomic_word.h" />
@@ -1128,6 +1132,8 @@ cscript //Nologo createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClInclude Include="..\platform\unordered_set.h" />
     <ClInclude Include="..\platform\windows_basic.h" />
     <ClInclude Include="..\scripting\bson_template_evaluator.h" />
+    <ClInclude Include="..\util\fail_point.h" />
+    <ClInclude Include="..\util\fail_point_registry.h" />
     <ClInclude Include="..\util\safe_num.h" />
     <ClInclude Include="linenoise_utf8.h" />
     <ClInclude Include="mk_wcwidth.h" />

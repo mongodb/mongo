@@ -747,6 +747,15 @@
     <ClInclude Include="..\base\status.h">
       <Filter>base</Filter>
     </ClInclude>
+    <ClInclude Include="..\db\fail_point_service.h">
+      <Filter>db\Header Files\e to n</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\fail_point.h">
+      <Filter>util\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\fail_point_registry.h">
+      <Filter>util\Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\client\connpool.cpp">
@@ -1644,6 +1653,15 @@
     </ClCompile>
     <ClCompile Include="..\base\status.cpp">
       <Filter>base</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\fail_point_service.cpp">
+      <Filter>db\Source Files\e to n</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\fail_point.cpp">
+      <Filter>util\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\fail_point_registry.cpp">
+      <Filter>util\Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

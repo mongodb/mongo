@@ -950,6 +950,15 @@
     <ClCompile Include="..\base\make_string_vector.cpp">
       <Filter>base</Filter>
     </ClCompile>
+    <ClCompile Include="fail_point_service.cpp">
+      <Filter>db\Source Files\e to n</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\fail_point.cpp">
+      <Filter>util\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\fail_point_registry.cpp">
+      <Filter>util\Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\targetver.h" />
@@ -1766,6 +1775,15 @@
     </ClInclude>
     <ClInclude Include="..\platform\unordered_set.h">
       <Filter>platform</Filter>
+    </ClInclude>
+    <ClInclude Include="fail_point_service.h">
+      <Filter>db\Header Files\e to n</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\fail_point.h">
+      <Filter>util\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\fail_point_registry.h">
+      <Filter>util\Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

@@ -1088,6 +1088,8 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClCompile Include="..\util\concurrency\task.cpp" />
     <ClCompile Include="..\util\concurrency\thread_pool.cpp" />
     <ClCompile Include="..\util\debug_util.cpp" />
+    <ClCompile Include="..\util\fail_point.cpp" />
+    <ClCompile Include="..\util\fail_point_registry.cpp" />
     <ClCompile Include="..\util\file_allocator.cpp" />
     <ClCompile Include="..\util\histogram.cpp" />
     <ClCompile Include="..\util\intrusive_counter.cpp" />
@@ -1114,6 +1116,7 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClCompile Include="btreebuilder.cpp" />
     <ClCompile Include="cap.cpp" />
     <ClCompile Include="commands\distinct.cpp" />
+    <ClCompile Include="fail_point_service.cpp" />
     <ClCompile Include="pipeline\document_source_cursor.cpp" />
     <ClCompile Include="commands\find_and_modify.cpp" />
     <ClCompile Include="commands\fsync.cpp" />
@@ -1275,6 +1278,8 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClInclude Include="..\s\d_writeback.h" />
     <ClInclude Include="..\util\concurrency\mutexdebugger.h" />
     <ClInclude Include="..\util\concurrency\simplerwlock.h" />
+    <ClInclude Include="..\util\fail_point.h" />
+    <ClInclude Include="..\util\fail_point_registry.h" />
     <ClInclude Include="..\util\histogram.h" />
     <ClInclude Include="..\util\progress_meter.h" />
     <ClInclude Include="..\util\safe_num.h" />
@@ -1285,6 +1290,7 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClInclude Include="..\util\timer.h" />
     <ClInclude Include="..\util\touch_pages.h" />
     <ClInclude Include="explain.h" />
+    <ClInclude Include="fail_point_service.h" />
     <ClInclude Include="hasher.h" />
     <ClInclude Include="hashindex.h" />
     <ClInclude Include="index_insertion_continuation.h" />
