@@ -43,13 +43,14 @@ var setupConf = function(){
 };
 
 var replConf = setupConf();
-jsTest.log( 'New rs config: ' + tojson( primaryNode.getDB( 'local' ).system.replset.findOne() ));
 
 var conn = st.s;
 
 // Wait until the ReplicaSetMonitor refreshes its view and see the tags
 ReplSetTest.awaitRSClientHosts( conn, primaryNode,
         { ok: true, tags: PRI_TAG }, replTest.name );
+
+jsTest.log( 'New rs config: ' + tojson( primaryNode.getDB( 'local' ).system.replset.findOne() ));
 
 jsTest.log( 'connpool: ' + tojson(conn.getDB('admin').runCommand({ connPoolStats: 1 })));
 
