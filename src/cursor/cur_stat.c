@@ -403,6 +403,7 @@ __wt_curstat_open(WT_SESSION_IMPL *session,
 	uint32_t flags;
 
 	cst = NULL;
+	flags = 0;
 
 	WT_RET(__wt_config_gets_defno(session, cfg, "statistics_clear", &cval));
 	if (cval.val != 0)
