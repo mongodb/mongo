@@ -46,6 +46,7 @@ __lsm_tree_discard(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 		__wt_free(session, chunk);
 	}
 	__wt_free(session, lsm_tree->old_chunks);
+	__wt_free(session, lsm_tree->stats);
 
 	__wt_free(session, lsm_tree);
 }
@@ -331,6 +332,8 @@ __lsm_tree_open(
 	__wt_spin_init(session, &lsm_tree->lock);
 	WT_ERR(__wt_strdup(session, uri, &lsm_tree->name));
 	lsm_tree->filename = lsm_tree->name + strlen("lsm:");
+	WT_ERR(__wt_stat_alloc_lsm_stats(session, &lsm_tree->stats));
+
 	WT_ERR(__wt_lsm_meta_read(session, lsm_tree));
 
 	/*

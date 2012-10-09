@@ -185,3 +185,50 @@ __wt_stat_clear_connection_stats(WT_STATS *stats_arg)
 	stats->txn_fail_cache.v = 0;
 	stats->txn_rollback.v = 0;
 }
+
+int
+__wt_stat_alloc_lsm_stats(WT_SESSION_IMPL *session, WT_LSM_STATS **statsp)
+{
+	WT_LSM_STATS *stats;
+
+	WT_RET(__wt_calloc_def(session, 1, &stats));
+
+	stats->bloom_cache_read.desc = "Number of bloom pages read into cache";
+	stats->bloom_cache_write.desc =
+	    "Number of bloom pages written from cache";
+	stats->bloom_count.desc = "Number of bloom filters in the LSM tree";
+	stats->bloom_hits.desc = "Number of successful bloom filter lookups";
+	stats->bloom_misses.desc =
+	    "Number of successful bloom filter false positives";
+	stats->bloom_skips.desc =
+	    "Number of unsuccessful bloom filter lookups";
+	stats->bloom_space.desc = "Total space used by bloom filters";
+	stats->cache_read.desc = "Number of pages read into cache";
+	stats->cache_write.desc = "Number of pages written from cache";
+	stats->chunk_cache_read.desc = "Number of pages read into LSM chunks";
+	stats->chunk_cache_write.desc = "Number of pages written from chunks";
+	stats->chunk_count.desc = "Number of chunks in the LSM tree";
+
+	*statsp = stats;
+	return (0);
+}
+
+void
+__wt_stat_clear_lsm_stats(WT_STATS *stats_arg)
+{
+	WT_LSM_STATS *stats;
+
+	stats = (WT_LSM_STATS *)stats_arg;
+	stats->bloom_cache_read.v = 0;
+	stats->bloom_cache_write.v = 0;
+	stats->bloom_count.v = 0;
+	stats->bloom_hits.v = 0;
+	stats->bloom_misses.v = 0;
+	stats->bloom_skips.v = 0;
+	stats->bloom_space.v = 0;
+	stats->cache_read.v = 0;
+	stats->cache_write.v = 0;
+	stats->chunk_cache_read.v = 0;
+	stats->chunk_cache_write.v = 0;
+	stats->chunk_count.v = 0;
+}

@@ -552,6 +552,9 @@ struct __wt_session {
 	 * @config{statistics_clear, reset statistics counters when the cursor
 	 * is closed; valid only for statistics cursors.,a boolean flag; default
 	 * \c false.}
+	 * @config{statistics_fast, only gather statistics that don't require
+	 * traversing the tree; valid only for statistics cursors.,a boolean
+	 * flag; default \c false.}
 	 * @config{target, if non-empty\, backup the list of objects; valid only
 	 * for a backup data source.,a list of strings; default empty.}
 	 * @configend
@@ -1779,6 +1782,38 @@ extern int wiredtiger_extension_init(WT_SESSION *session,
 #define	WT_STAT_update_conflict				43
 /*! write generation conflicts */
 #define	WT_STAT_file_write_conflicts			44
+/*! @} */
+
+/*!
+ * @}
+ * @name Statistics for lsm objects
+ * @anchor statistics_lsm
+ * @{
+ */
+/*! Number of bloom filters in the LSM tree */
+#define	WT_STAT_bloom_count				0
+/*! Number of bloom pages read into cache */
+#define	WT_STAT_bloom_cache_read			1
+/*! Number of bloom pages written from cache */
+#define	WT_STAT_bloom_cache_write			2
+/*! Number of chunks in the LSM tree */
+#define	WT_STAT_chunk_count				3
+/*! Number of pages read into LSM chunks */
+#define	WT_STAT_chunk_cache_read			4
+/*! Number of pages read into cache */
+#define	WT_STAT_cache_read				5
+/*! Number of pages written from cache */
+#define	WT_STAT_cache_write				6
+/*! Number of pages written from chunks */
+#define	WT_STAT_chunk_cache_write			7
+/*! Number of successful bloom filter false positives */
+#define	WT_STAT_bloom_misses				8
+/*! Number of successful bloom filter lookups */
+#define	WT_STAT_bloom_hits				9
+/*! Number of unsuccessful bloom filter lookups */
+#define	WT_STAT_bloom_skips				10
+/*! Total space used by bloom filters */
+#define	WT_STAT_bloom_space				11
 /*! @} */
 /*
  * Statistics section: END

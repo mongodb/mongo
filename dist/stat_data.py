@@ -94,3 +94,22 @@ btree_stats = [
 	Stat('rec_written', 'reconcile: pages written'),
 	Stat('update_conflict', 'update conflicts'),
 ]
+
+##########################################
+# LSM statistics
+##########################################
+lsm_stats = [
+	Stat('chunk_cache_read', 'Number of pages read into LSM chunks'),
+	Stat('chunk_cache_write', 'Number of pages written from chunks'),
+	Stat('bloom_hits', 'Number of successful bloom filter lookups'),
+	Stat('bloom_misses', 'Number of successful bloom filter false positives'),
+	Stat('bloom_skips', 'Number of unsuccessful bloom filter lookups'),
+	Stat('bloom_space', 'Total space used by bloom filters'),
+	Stat('bloom_cache_read', 'Number of bloom pages read into cache'),
+	Stat('bloom_cache_write', 'Number of bloom pages written from cache'),
+	Stat('chunk_count', 'Number of chunks in the LSM tree'),
+	Stat('bloom_count', 'Number of bloom filters in the LSM tree'),
+	Stat('cache_read', 'Number of pages read into cache'),
+	Stat('cache_write', 'Number of pages written from cache'),
+]
+

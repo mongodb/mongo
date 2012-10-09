@@ -286,7 +286,8 @@ __wt_confchk_session_log_printf[] = {
 const char *
 __wt_confdfl_session_open_cursor =
 	"append=0,bulk=0,checkpoint=,dump=,next_random=0,no_cache=0,"
-	"overwrite=0,raw=0,statistics=0,statistics_clear=0,target=";
+	"overwrite=0,raw=0,statistics=0,statistics_clear=0,statistics_fast=0,"
+	"target=";
 
 WT_CONFIG_CHECK
 __wt_confchk_session_open_cursor[] = {
@@ -300,6 +301,7 @@ __wt_confchk_session_open_cursor[] = {
 	{ "raw", "boolean", NULL },
 	{ "statistics", "boolean", NULL },
 	{ "statistics_clear", "boolean", NULL },
+	{ "statistics_fast", "boolean", NULL },
 	{ "target", "list", NULL },
 	{ NULL, NULL, NULL }
 };
