@@ -676,7 +676,6 @@ namespace mongo {
 
         virtual bool isMultiKey() const { return _mps->hasMultiKey(); }
 
-        virtual shared_ptr< CoveredIndexMatcher > matcherPtr() const { return _matcher; }
         virtual CoveredIndexMatcher* matcher() const { return _matcher.get(); }
 
         virtual bool capped() const { return _c->capped(); }

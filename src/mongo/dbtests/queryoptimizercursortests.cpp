@@ -637,7 +637,6 @@ namespace QueryOptimizerCursorTests {
             // _id 10 {_id:1}
             ASSERT_EQUALS( 10, c->current().getIntField( "_id" ) );
             ASSERT( !c->matcher()->matchesCurrent( c.get() ) );
-            ASSERT( !c->matcherPtr()->matchesCurrent( c.get() ) );
             ASSERT( c->advance() );
             
             // _id 0 {a:1}
@@ -653,7 +652,6 @@ namespace QueryOptimizerCursorTests {
             // _id 11 {_id:1}
             ASSERT_EQUALS( BSON( "_id" << 11 << "a" << 12 ), c->current() );
             ASSERT( c->matcher()->matchesCurrent( c.get() ) );
-            ASSERT( c->matcherPtr()->matchesCurrent( c.get() ) );
             ASSERT( !c->getsetdup( c->currLoc() ) );
             ASSERT( c->advance() );
             

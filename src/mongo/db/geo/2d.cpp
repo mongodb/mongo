@@ -1557,11 +1557,6 @@ namespace mongo {
             else return GeoCursorBase::emptyMatcher.get();
         }
 
-        virtual shared_ptr< CoveredIndexMatcher > matcherPtr() const {
-            if( _matcher.get() ) return _matcher;
-            else return GeoCursorBase::emptyMatcher;
-        }
-
         // Are we finished getting points?
         virtual bool moreToDo() {
             return _state != DONE;
@@ -2515,11 +2510,6 @@ namespace mongo {
         virtual CoveredIndexMatcher* matcher() const {
             if( _s->_matcher.get() ) return _s->_matcher.get();
             else return emptyMatcher.get();
-        }
-
-        virtual shared_ptr< CoveredIndexMatcher > matcherPtr() const {
-            if( _s->_matcher.get() ) return _s->_matcher;
-            else return emptyMatcher;
         }
 
         shared_ptr<GeoSearch> _s;
