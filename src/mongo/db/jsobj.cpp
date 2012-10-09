@@ -425,11 +425,16 @@ namespace mongo {
     }
 
     bool BSONObj::valid() const {
+        int mySize = objsize();
+
         try {
             BSONObjIterator it(*this);
             while( it.moreWithEOO() ) {
                 // both throw exception on failure
                 BSONElement e = it.next(true);
+                if ( e.size() >= mySize )
+                    return false;
+
                 e.validate();
 
                 if (e.eoo()) {

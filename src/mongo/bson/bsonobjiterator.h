@@ -61,8 +61,18 @@ namespace mongo {
         /** @return the next element in the object. For the final element, element.eoo() will be true. */
         BSONElement next( bool checkEnd ) {
             verify( _pos <= _theend );
-            BSONElement e( _pos, checkEnd ? (int)(_theend + 1 - _pos) : -1 );
-            _pos += e.size( checkEnd ? (int)(_theend + 1 - _pos) : -1 );
+            
+            int maxLen = -1;
+            if ( checkEnd ) {
+                maxLen = _theend + 1 - _pos;
+                verify( maxLen > 0 );
+            }
+
+            BSONElement e( _pos, maxLen );
+            int esize = e.size( maxLen );
+            massert( 16442, "BSONElement has bad size", esize > 0 );
+            _pos += esize;
+
             return e;
         }
         BSONElement next() {
