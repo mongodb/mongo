@@ -52,6 +52,9 @@ namespace mongo {
             UnknownError = 8,
             FailedToParse = 9,
             CannotMutateObject = 10,
+            UserNotFound = 11,
+            UnsupportedFormat = 12,
+            Unauthorized = 13,
             MaxError
         };
 
