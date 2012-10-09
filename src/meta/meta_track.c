@@ -183,8 +183,10 @@ free:	trk->op = WT_ST_EMPTY;
 int
 __wt_meta_track_off(WT_SESSION_IMPL *session, int unroll)
 {
+	WT_BTREE *saved_btree;
 	WT_DECL_RET;
 	WT_META_TRACK *trk, *trk_orig;
+	const char *ckpt_cfg[] = API_CONF_DEFAULTS(session, checkpoint, NULL);
 
 	if (!WT_META_TRACKING(session))
 		return (0);
@@ -197,6 +199,14 @@ __wt_meta_track_off(WT_SESSION_IMPL *session, int unroll)
 
 	while (--trk >= trk_orig)
 		WT_TRET(__meta_track_apply(session, trk, unroll));
+
+	/* If the operation succeeded, checkpoint the metadata. */
+	if (!unroll && ret == 0 && session->metafile != NULL) {
+		saved_btree = session->btree;
+		session->btree = session->metafile;
+		ret = __wt_checkpoint(session, ckpt_cfg);
+		session->btree = saved_btree;
+	}
 
 	return (ret);
 }
