@@ -342,12 +342,13 @@ __config_next(WT_CONFIG *conf, WT_CONFIG_ITEM *key, WT_CONFIG_ITEM *value)
 {
 	WT_CONFIG_ITEM *out = key;
 	int utf8_remain = 0;
-	static WT_CONFIG_ITEM default_value = {
+	static const WT_CONFIG_ITEM true_value = {
 		"", 0, 1, ITEM_NUM
 	};
 
 	key->len = 0;
-	*value = default_value;
+	/* Keys with no value default to true. */
+	*value = true_value;
 
 	if (conf->go == NULL)
 		conf->go = gostruct;
@@ -662,25 +663,26 @@ int
 __wt_config_gets_defno(WT_SESSION_IMPL *session,
     const char **cfg, const char *key, WT_CONFIG_ITEM *value)
 {
+	static const WT_CONFIG_ITEM false_value = {
+		"", 0, 0, ITEM_NUM
+	};
+
 	/*
-	 * This is a performance hack: it's expensive to parse configuration
-	 * strings, so don't do it unless it's necessary in performance paths
-	 * like cursor creation.  Assume the second configuration string is
-	 * the application's configuration string, and if it's not set (which
-	 * is true most of the time), then assume the default answer is "no",
-	 * and return that.  This makes it much faster to open cursors when
-	 * checking for obscure open configuration strings like "next_random".
+	 * This is a performance hack: it's expensive to repeatedly parse
+	 * configuration strings, so don't do it unless it's necessary in
+	 * performance paths like cursor creation.  Assume the second
+	 * configuration string is the application's configuration string, and
+	 * if it's not set (which is true most of the time), then assume the
+	 * default answer is "false", and return that.  This makes it much
+	 * faster to open cursors when checking for obscure open configuration
+	 * strings like "next_random".
 	 */
-	value->len = 0;
-	value->val = 0;
+	*value = false_value;
 	if (cfg == NULL || cfg[1] == NULL)
 		return (0);
-	else if (cfg[2] == NULL) {
-		int ret = __wt_config_getones(session, cfg[1], key, value);
-		if (ret == WT_NOTFOUND)
-			ret = 0;
-		return (ret);
-	}
+	else if (cfg[2] == NULL)
+		WT_RET_NOTFOUND_OK(
+		    __wt_config_getones(session, cfg[1], key, value));
 	return (__wt_config_gets(session, cfg, key, value));
 }
 
