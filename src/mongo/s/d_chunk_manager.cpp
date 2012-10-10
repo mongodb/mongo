@@ -182,12 +182,7 @@ namespace mongo {
         BSONElement e = collectionDoc["key"];
         uassert( 13542 , str::stream() << "collection doesn't have a key: " << collectionDoc , ! e.eoo() && e.isABSONObj() );
 
-        BSONObj keys = e.Obj().getOwned();
-        BSONObjBuilder b;
-        BSONForEach( key , keys ) {
-            b.append( key.fieldName() , 1 );
-        }
-        _key = b.obj();
+        _key = e.Obj().getOwned();
     }
 
     void ShardChunkManager::_fillChunks( DBClientCursorInterface* cursor ) {
