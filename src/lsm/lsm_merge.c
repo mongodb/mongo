@@ -150,7 +150,7 @@ __wt_lsm_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	WT_ASSERT(session, nchunks <= max_chunks);
 
 	if (nchunks <= 1)
-		return (0);
+		return (WT_NOTFOUND);
 
 	/* Allocate an ID for the merge. */
 	dest_id = WT_ATOMIC_ADD(lsm_tree->last, 1);
