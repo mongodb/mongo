@@ -64,7 +64,7 @@ namespace {
         log() << "RandomData: didn't crash valid/total: " << numValid << "/" << numToRun << " (want few valid ones)" 
               << " jsonSize: " << jsonSize << endl;
     }
-
+#if 0
     TEST(BSONValidate, MuckingData1) {
 
         unsigned seed = 17;
@@ -89,7 +89,7 @@ namespace {
         int numToRun = 1000;
         long long jsonSize = 0;
         
-        for ( int i=4; i<theObject.objsize(); i++ ) {
+        for ( int i=4; i<theObject.objsize()-1; i++ ) {
             BSONObj mine = theObject.copy();
             
             char* data = const_cast<char*>(mine.objdata());
@@ -120,4 +120,5 @@ namespace {
         log() << "MuckingData1: didn't crash valid/total: " << numValid << "/" << numToRun << " (want few valid ones) " 
               << " jsonSize: " << jsonSize << endl;        
     }
+#endif
 }
