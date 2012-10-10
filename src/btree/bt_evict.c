@@ -335,7 +335,8 @@ __evict_page(WT_SESSION_IMPL *session, WT_PAGE *page)
 		WT_ASSERT(session, txn->snapshot == NULL ||
 		    txn->snapshot != saved_txn.snapshot);
 		__wt_txn_destroy(session);
-	}
+	} else
+		__wt_txn_release_snapshot(session);
 
 	*txn = saved_txn;
 	return (ret);
