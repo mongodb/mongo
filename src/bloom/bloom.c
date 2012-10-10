@@ -168,6 +168,7 @@ __wt_bloom_finalize(WT_BLOOM *bloom)
 	uint64_t i;
 
 	wt_session = (WT_SESSION *)bloom->session;
+	WT_CLEAR(values);
 
 	/*
 	 * Create a bit table to store the bloom filter in.
@@ -179,7 +180,7 @@ __wt_bloom_finalize(WT_BLOOM *bloom)
 
 	/* Add the entries from the array into the table. */
 	for (i = 0; i < bloom->m; i += values.size) {
-		values.data = bloom->bitstring;
+		values.data = bloom->bitstring + i;
 		/*
 		 * Shave off some bytes for pure paranoia, in case WiredTiger
 		 * reserves some special sizes.
