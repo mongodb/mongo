@@ -65,23 +65,23 @@ __wt_lsm_stat_init(
 		    F_ISSET(chunk, WT_LSM_CHUNK_ONDISK) ? disk_cfg : cfg,
 		    &stat_cursor));
 		stat_cursor->set_key(stat_cursor, WT_STAT_page_evict);
-		stat_cursor->search(stat_cursor);
+		WT_ERR(stat_cursor->search(stat_cursor));
 		WT_ERR(stat_cursor->get_value(
 		    stat_cursor, &desc, &pvalue, &value));
 		WT_STAT_INCRV(lsm_tree->stats, cache_evict, value);
 		WT_STAT_INCRV(lsm_tree->stats, chunk_cache_evict, value);
 		stat_cursor->set_key(stat_cursor, WT_STAT_page_read);
-		stat_cursor->search(stat_cursor);
+		WT_ERR(stat_cursor->search(stat_cursor));
 		WT_ERR(stat_cursor->get_value(
 		    stat_cursor, &desc, &pvalue, &value));
 		WT_STAT_INCRV(lsm_tree->stats, cache_read, value);
 		WT_STAT_INCRV(lsm_tree->stats, chunk_cache_read, value);
 		stat_cursor->set_key(stat_cursor, WT_STAT_page_write);
-		stat_cursor->search(stat_cursor);
+		WT_ERR(stat_cursor->search(stat_cursor));
 		WT_ERR(stat_cursor->get_value(
 		    stat_cursor, &desc, &pvalue, &value));
 		WT_STAT_INCRV(lsm_tree->stats, cache_write, value);
-		stat_cursor->close(stat_cursor);
+		WT_ERR(stat_cursor->close(stat_cursor));
 
 		if (chunk->bloom_uri != NULL) {
 			WT_STAT_INCR(lsm_tree->stats, bloom_count);
@@ -97,29 +97,29 @@ __wt_lsm_stat_init(
 			WT_ERR(__wt_curstat_open(session, uri,
 			    cfg, &stat_cursor));
 			stat_cursor->set_key(stat_cursor, WT_STAT_page_evict);
-			stat_cursor->search(stat_cursor);
+			WT_ERR(stat_cursor->search(stat_cursor));
 			WT_ERR(stat_cursor->get_value(
 			    stat_cursor, &desc, &pvalue, &value));
 			WT_STAT_INCRV(lsm_tree->stats, cache_evict, value);
 			WT_STAT_INCRV(lsm_tree->stats,
 			    bloom_cache_evict, value);
 			stat_cursor->set_key(stat_cursor, WT_STAT_page_read);
-			stat_cursor->search(stat_cursor);
+			WT_ERR(stat_cursor->search(stat_cursor));
 			WT_ERR(stat_cursor->get_value(
 			    stat_cursor, &desc, &pvalue, &value));
 			WT_STAT_INCRV(lsm_tree->stats, cache_read, value);
 			WT_STAT_INCRV(lsm_tree->stats,
 			    bloom_cache_read, value);
 			stat_cursor->set_key(stat_cursor, WT_STAT_page_write);
-			stat_cursor->search(stat_cursor);
+			WT_ERR(stat_cursor->search(stat_cursor));
 			WT_ERR(stat_cursor->get_value(
 			    stat_cursor, &desc, &pvalue, &value));
 			WT_STAT_INCRV(lsm_tree->stats, cache_write, value);
-			stat_cursor->close(stat_cursor);
+			WT_ERR(stat_cursor->close(stat_cursor));
 		}
 	}
 err:	__wt_free(session, cookie.chunk_array);
 	__wt_free(session, uri);
 
-	return (0);
+	return (ret);
 }
