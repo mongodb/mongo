@@ -139,16 +139,6 @@ __wt_hazard_clear(WT_SESSION_IMPL *session, WT_PAGE *page)
 	    hp < session->hazard + session->hazard_size; ++hp)
 		if (hp->page == page) {
 			/*
-			 * Check to see if the page has grown too big and force
-			 * eviction.  We have to request eviction while holding
-			 * a hazard reference (else the page might disappear out
-			 * from under us), but we can't wake the eviction server
-			 * until we've released our hazard reference because our
-			 * hazard reference blocks the page eviction.  A little
-			 * dance: check the page, schedule the forced eviction,
-			 * clear/publish the hazard reference, wake the eviction
-			 * server.
-			 *
 			 * We don't publish the hazard reference clear in the
 			 * general case.  It's not required for correctness;
 			 * it gives the page server thread faster access to the
@@ -156,12 +146,7 @@ __wt_hazard_clear(WT_SESSION_IMPL *session, WT_PAGE *page)
 			 * generation number was just set, so it's unlikely the
 			 * page will be selected for eviction.
 			 */
-			if (__wt_eviction_page_check(session, page)) {
-				__wt_evict_page_request(session, page);
-				WT_PUBLISH(hp->page, NULL);
-				__wt_evict_server_wake(session);
-			} else
-				hp->page = NULL;
+			hp->page = NULL;
 
 			/*
 			 * If this was the last hazard reference in the session,
