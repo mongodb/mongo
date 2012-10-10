@@ -42,6 +42,8 @@ __wt_stat_alloc_btree_stats(WT_SESSION_IMPL *session, WT_BTREE_STATS **statsp)
 	stats->file_write_conflicts.desc = "write generation conflicts";
 	stats->free.desc = "file: block frees";
 	stats->overflow_read.desc = "file: overflow pages read from the file";
+	stats->overflow_value_cache.desc =
+	    "file: overflow values cached in memory";
 	stats->page_evict.desc = "file: pages evicted from the file";
 	stats->page_read.desc = "file: pages read from the file";
 	stats->page_write.desc = "file: pages written to the file";
@@ -100,6 +102,7 @@ __wt_stat_clear_btree_stats(WT_STATS *stats_arg)
 	stats->file_write_conflicts.v = 0;
 	stats->free.v = 0;
 	stats->overflow_read.v = 0;
+	stats->overflow_value_cache.v = 0;
 	stats->page_evict.v = 0;
 	stats->page_read.v = 0;
 	stats->page_write.v = 0;

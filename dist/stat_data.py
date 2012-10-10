@@ -80,6 +80,7 @@ btree_stats = [
 	Stat('file_write_conflicts', 'write generation conflicts'),
 	Stat('free', 'file: block frees'),
 	Stat('overflow_read', 'file: overflow pages read from the file'),
+	Stat('overflow_value_cache', 'file: overflow values cached in memory'),
 	Stat('page_evict', 'file: pages evicted from the file'),
 	Stat('page_read', 'file: pages read from the file'),
 	Stat('page_write', 'file: pages written to the file'),
