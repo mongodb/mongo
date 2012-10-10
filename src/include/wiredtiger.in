@@ -525,7 +525,13 @@ struct __wt_session {
 	 * @config{bulk, configure the cursor for bulk loads\, a fast load path
 	 * that may only be used for newly created objects. Cursors configured
 	 * for bulk load only support the WT_CURSOR::insert and WT_CURSOR::close
-	 * methods.,a string; default \c false.}
+	 * methods.  The value is usually a true/false flag\, but the the
+	 * special value \c "bitmap" is for use with fixed-length column
+	 * stores\, and allows chunks of a memory resident bitmap to be loaded
+	 * directly into a file by passing a \c WT_ITEM to WT_CURSOR::set_value
+	 * where the \c size field indicates the number of records in the bitmap
+	 * (as specified by the file's \c value_format).,a string; default \c
+	 * false.}
 	 * @config{checkpoint, the name of a checkpoint to open (the reserved
 	 * name "WiredTigerCheckpoint" opens the most recent internal checkpoint
 	 * taken for the object).  The cursor does not support data
