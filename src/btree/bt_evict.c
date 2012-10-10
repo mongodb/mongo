@@ -25,15 +25,6 @@ static int  __evict_worker(WT_SESSION_IMPL *);
 #define	WT_EVICT_WALK_BASE	50	/* Pages tracked across file visits */
 
 /*
- * WT_EVICT_REQ_FOREACH --
- *	Walk the list of forced page eviction requests.
- */
-#define	WT_EVICT_REQ_FOREACH(er, er_end, cache)				\
-	for ((er) = (cache)->evict_request,				\
-	    (er_end) = (er) + (cache)->max_evict_request;		\
-	    (er) < (er_end); ++(er))
-
-/*
  * __evict_list_clr --
  *	Clear an entry in the LRU eviction list.
  */
