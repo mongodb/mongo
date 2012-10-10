@@ -36,44 +36,29 @@ __wt_eviction_check(WT_SESSION_IMPL *session, int *read_lockoutp, int wake)
 }
 
 /*
- * __wt_eviction_page_check --
- *	Return if a page should be forcibly evicted.
+ * __wt_cache_full_check --
+ *      Wait for there to be space in the cache before a read or update.
  */
 static inline int
-__wt_eviction_page_check(WT_SESSION_IMPL *session, WT_PAGE *page)
+__wt_cache_full_check(WT_SESSION_IMPL *session)
 {
-	WT_CONNECTION_IMPL *conn;
-	WT_PAGE_MODIFY *mod;
-
-	conn = S2C(session);
-	mod = page->modify;
+	WT_DECL_RET;
+	int lockout, wake;
 
 	/*
-	 * Root pages and clean pages are never forcibly evicted.
-	 * Nor are pages from files that are purely cache resident.
+	 * Only wake the eviction server the first time through here (if the
+	 * cache is too full), or after we fail to evict a page.  Otherwise, we
+	 * are just wasting effort and making a busy mutex busier.
 	 */
-	if (WT_PAGE_IS_ROOT(page) ||
-	    !__wt_page_is_modified(page) ||
-	    F_ISSET(session->btree, WT_BTREE_NO_EVICTION))
-		return (0);
-
-	/*
-	 * Check the page's memory footprint - evict pages that take up more
-	 * than their fair share of the cache. We define a fair share as
-	 * approximately half the cache size per open writable btree handle.
-	 */
-	if ((int64_t)page->memory_footprint >
-	    conn->cache_size / (2 * (conn->open_btree_count + 1)))
-		return (1);
-
-	/*
-	 * If the page's write-generation has wrapped and caught up with the
-	 * page's disk generation (wildly unlikely as it requires 4B updates
-	 * between page reconciliations, but is technically possible), forcibly
-	 * evict the page.
-	 */
-	if (mod != NULL && mod->write_gen + 1 == mod->disk_gen)
-		return (1);
-
-	return (0);
+	for (wake = 1;; wake = 0) {
+		__wt_eviction_check(session, &lockout, wake);
+		if (!lockout ||
+		    F_ISSET(session, WT_SESSION_SCHEMA_LOCKED) ||
+		    F_ISSET(session->btree, WT_BTREE_NO_CACHE))
+			return (0);
+		if ((ret = __wt_evict_lru_page(session, 1)) == EBUSY)
+			__wt_yield();
+		else
+			WT_RET_NOTFOUND_OK(ret);
+	}
 }
