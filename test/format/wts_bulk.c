@@ -22,13 +22,16 @@ wts_load(void)
 	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
 		die(ret, "connection.open_session");
 
+	if (g.logging != 0)
+		(void)session->msg_printf(session,
+		    "=============== bulk load start ===============");
+
 	/*
 	 * Avoid bulk load with a custom collator, because the order of
 	 * insertion will not match the collation order.
 	 */
 	if ((ret = session->open_cursor(session, g.uri, NULL,
-	    (g.type == ROW && g.c_reverse) ? NULL : "bulk",
-	    &cursor)) != 0)
+	    (g.type == ROW && g.c_reverse) ? NULL : "bulk", &cursor)) != 0)
 		die(ret, "session.open_cursor");
 
 	/* Set up the default key buffer. */
@@ -96,6 +99,10 @@ wts_load(void)
 
 	if ((ret = cursor->close(cursor)) != 0)
 		die(ret, "cursor.close");
+
+	if (g.logging != 0)
+		(void)session->msg_printf(session,
+		    "=============== bulk load stop ===============");
 
 	if ((ret = session->close(session, NULL)) != 0)
 		die(ret, "session.close");

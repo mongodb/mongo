@@ -28,22 +28,17 @@ wts_ops(void)
 	TINFO *tinfo, total;
 	WT_CONNECTION *conn;
 	WT_SESSION *session;
-	time_t now;
 	int ret, running;
 	uint32_t i;
 
 	conn = g.wts_conn;
 
 	/* Open a session. */
-	session = NULL;
-	if (g.logging == LOG_OPS) {
+	if (g.logging != 0) {
 		if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
 			die(ret, "connection.open_session");
-
-		(void)time(&now);
 		(void)session->msg_printf(session,
-		    "===============\nthread ops start: %s===============",
-		    ctime(&now));
+		    "=============== thread ops start ===============");
 	}
 
 	if (SINGLETHREADED) {
@@ -92,12 +87,9 @@ wts_ops(void)
 		free(tinfo);
 	}
 
-	if (session != NULL) {
-		(void)time(&now);
+	if (g.logging != 0) {
 		(void)session->msg_printf(session,
-		    "===============\nthread ops stop: %s===============",
-		    ctime(&now));
-
+		    "=============== thread ops stop ===============");
 		if ((ret = session->close(session, NULL)) != 0)
 			die(ret, "session.close");
 	}
