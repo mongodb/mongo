@@ -48,11 +48,12 @@ __wt_cache_full_check(WT_SESSION_IMPL *session)
 
 	/*
 	 * Only wake the eviction server the first time through here (if the
-	 * cache is too full).  Otherwise, we are just wasting effort and
-	 * making a busy condition variable busier.
+	 * cache is too full), or every hundred times after that.  Otherwise,
+	 * we are just wasting effort and making a busy condition variable
+	 * busier.
 	 */
-	for (wake = 1;; wake = 0) {
-		__wt_eviction_check(session, &lockout, wake);
+	for (wake = 0;; wake = (wake + 1) % 100) {
+		__wt_eviction_check(session, &lockout, wake == 0);
 		if (!lockout ||
 		    F_ISSET(session, WT_SESSION_SCHEMA_LOCKED))
 			return (0);
