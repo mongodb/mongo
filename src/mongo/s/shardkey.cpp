@@ -61,6 +61,14 @@ namespace mongo {
         return pattern.isPrefixOf( otherPattern );
     }
 
+    bool ShardKeyPattern::isUniqueIndexCompatible( const BSONObj& uniqueIndexPattern ) const {
+        if ( ! uniqueIndexPattern.isEmpty() &&
+             str::equals( uniqueIndexPattern.firstElementFieldName(), "_id" ) ){
+            return true;
+        }
+        return pattern.isFieldNamePrefixOf( uniqueIndexPattern );
+    }
+
     bool ShardKeyPattern::isSpecial() const {
         BSONForEach(e, pattern) {
             int fieldVal = e.numberInt();
@@ -210,6 +218,18 @@ namespace mongo {
 
         }
 
+        void uniqueIndexCompatibleTest() {
+            ShardKeyPattern k1( BSON( "a" << 1 ) );
+            verify( k1.isUniqueIndexCompatible( BSON( "_id" << 1 ) ) );
+            verify( k1.isUniqueIndexCompatible( BSON( "a" << 1 << "b" << 1 ) ) );
+            verify( k1.isUniqueIndexCompatible( BSON( "a" << -1 ) ) );
+            verify( ! k1.isUniqueIndexCompatible( BSON( "b" << 1 ) ) );
+
+            ShardKeyPattern k2( BSON( "a" <<  "hashed") );
+            verify( k2.isUniqueIndexCompatible( BSON( "a" << 1 ) ) );
+            verify( ! k2.isUniqueIndexCompatible( BSON( "b" << 1 ) ) );
+        }
+
         void moveToFrontBenchmark(int numFields) {
             BSONObjBuilder bb;
             bb.append("_id", 1);
@@ -262,6 +282,8 @@ namespace mongo {
             // add middle multitype tests
 
             moveToFrontTest();
+
+            uniqueIndexCompatibleTest();
 
             if (0) { // toggle to run benchmark
                 moveToFrontBenchmark(0);

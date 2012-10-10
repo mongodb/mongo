@@ -87,6 +87,29 @@ namespace mongo {
 
         /**
          * @return
+         * true if this shard key is compatible with a unique index on 'uniqueIndexPattern'.
+         *      Primarily this just checks whether 'this' is a prefix of 'uniqueIndexPattern',
+         *      However it does not need to be an exact syntactic prefix due to "hashed"
+         *      indexes or mismatches in ascending/descending order.  Also, uniqueness of the
+         *      _id field is guaranteed by the generation process (or by the user) so every
+         *      index that begins with _id is unique index compatible with any shard key.
+         *      Examples:
+         *        shard key {a : 1} is compatible with a unique index on {_id : 1}
+         *        shard key {a : 1} is compatible with a unique index on {a : 1 , b : 1}
+         *        shard key {a : 1} is compatible with a unique index on {a : -1 , b : 1 }
+         *        shard key {a : "hashed"} is compatible with a unique index on {a : 1}
+         *        shard key {a : 1} is not compatible with a unique index on {b : 1}
+         *        shard key {a : "hashed" , b : 1 } is not compatible with unique index on { b : 1 }
+         *      Note:
+         *        this method assumes that 'uniqueIndexPattern' is a valid index pattern,
+         *        and is capable of being a unique index.  A pattern like { k : "hashed" }
+         *        is never capable of being a unique index, and thus is an invalid setting
+         *        for the 'uniqueIndexPattern' argument.
+         */
+        bool isUniqueIndexCompatible( const BSONObj& uniqueIndexPattern ) const;
+
+        /**
+         * @return
          * true if keyPattern contains any computed values, (e.g. {a : "hashed"})
          * false if keyPattern consists of only ascending/descending fields (e.g. {a : 1, b : -1})
          *       With our current index expression language, "special" shard keys are any keys

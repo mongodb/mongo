@@ -331,6 +331,14 @@ namespace mongo {
          */
         bool isPrefixOf( const BSONObj& otherObj ) const;
 
+        /**
+         * @param otherObj
+         * @return returns true if the list of field names in 'this' is a prefix
+         * of the list of field names in otherObj.  Similar to 'isPrefixOf',
+         * but ignores the field values and only looks at field names.
+         */
+        bool isFieldNamePrefixOf( const BSONObj& otherObj ) const;
+
         /** This is "shallow equality" -- ints and doubles won't match.  for a
            deep equality test use woCompare (which is slower).
         */

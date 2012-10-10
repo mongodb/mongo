@@ -490,10 +490,35 @@ namespace mongo {
                     return false;
                 }
 
-                BSONForEach(e, proposedKey) {
-                    if (!e.isNumber() || e.number() != 1.0) {
-                        errmsg = "shard keys must all be ascending";
+                // Currently the allowable shard keys are either
+                // i) a hashed single field, e.g. { a : "hashed" }, or
+                // ii) a compound list of ascending fields, e.g. { a : 1 , b : 1 }
+                if ( proposedKey.firstElementType() == mongo::String ) {
+                    // case i)
+                    if ( !str::equals( proposedKey.firstElement().valuestrsafe() , "hashed" ) ) {
+                        errmsg = "unrecognized string: " + proposedKey.firstElement().str();
                         return false;
+                    }
+                    if ( proposedKey.nFields() > 1 ) {
+                        errmsg = "hashed shard keys currently only support single field keys";
+                        return false;
+                    }
+                    if ( cmdObj["unique"].trueValue() ) {
+                        // it's possible to ensure uniqueness on the hashed field by
+                        // declaring an additional (non-hashed) unique index on the field,
+                        // but the hashed shard key itself should not be declared unique
+                        errmsg = "hashed shard keys cannot be declared unique.";
+                        return false;
+                    }
+                } else {
+                    // case ii)
+                    BSONForEach(e, proposedKey) {
+                        if (!e.isNumber() || e.number() != 1.0) {
+                            errmsg = str::stream() << "Unsupported shard key pattern.  Pattern must"
+                                                   << " either be a single hashed field, or a list"
+                                                   << " of ascending fields.";
+                            return false;
+                        }
                     }
                 }
 
@@ -553,11 +578,11 @@ namespace mongo {
                 auto_ptr<DBClientCursor> uniqueQueryResult =
                                 conn->get()->query( indexNS , uniqueQuery );
 
+                ShardKeyPattern proposedShardKey( proposedKey );
                 while ( uniqueQueryResult->more() ) {
                     BSONObj idx = uniqueQueryResult->next();
                     BSONObj currentKey = idx["key"].embeddedObject();
-                    bool isCurrentID = str::equals( currentKey.firstElementFieldName() , "_id" );
-                    if( ! isCurrentID && ! proposedKey.isPrefixOf( currentKey) ) {
+                    if( ! proposedShardKey.isUniqueIndexCompatible( currentKey ) ) {
                         errmsg = str::stream() << "can't shard collection '" << ns << "' "
                                                << "with unique index on " << currentKey << " "
                                                << "and proposed shard key " << proposedKey << ". "

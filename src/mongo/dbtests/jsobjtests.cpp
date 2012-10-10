@@ -198,6 +198,11 @@ namespace JsobjTests {
                     verify( ! k.isPrefixOf( BSON( "x" << "hi" ) ) );
                     verify( k.isPrefixOf( BSON( "x" << 1 << "a" << "hi" ) ) );
                 }
+                {
+                    BSONObj k = BSON( "x" << 1 );
+                    verify( k.isFieldNamePrefixOf( BSON( "x" << "hi" ) ) );
+                    verify( ! k.isFieldNamePrefixOf( BSON( "a" << 1  ) ) );
+                }
             }
         };
 

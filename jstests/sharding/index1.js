@@ -3,7 +3,7 @@
 s = new ShardingTest( "shard_index", 2, 0, 1 )
 
 // Regenerate fully because of SERVER-2782
-for ( var i = 0; i < 15; i++ ) {
+for ( var i = 0; i < 19; i++ ) {
 		
 	var coll = s.admin._mongo.getDB( "test" ).getCollection( "foo" + i )
 	coll.drop()
@@ -274,6 +274,66 @@ for ( var i = 0; i < 15; i++ ) {
         }
         assert( !passed , "Should not be able to shard collection with mulikey index");
 
+    }
+    if ( i == 15 ) {
+
+        // try sharding with a hashed index
+        coll.ensureIndex( { num : "hashed"} );
+
+        try{
+            s.adminCommand( { shardcollection : "" + coll, key : { num : "hashed" } } );
+        }
+        catch( e ){
+            print(e);
+            assert( false, "Should be able to shard collection with hashed index.");
+        }
+    }
+    if ( i == 16 ) {
+
+        // create hashed index, but try to declare it unique when sharding
+        coll.ensureIndex( { num : "hashed"} )
+
+        passed = false;
+        try{
+            s.adminCommand({ shardcollection : "" + coll, key : { num : "hashed" }, unique : true});
+            passed = true;
+        }
+        catch( e ){
+            print(e);
+        }
+        assert( !passed , "Should not be able to declare hashed shard key unique.");
+
+    }
+    if ( i == 17 ) {
+
+        // create hashed index, but unrelated unique index present
+        coll.ensureIndex( { x : "hashed" } );
+        coll.ensureIndex( { num : 1 }, { unique : true} );
+
+        passed = false;
+        try {
+            s.adminCommand( { shardcollection : "" + coll, key : { x : "hashed" } } );
+            passed = true;
+        }
+        catch (e) {
+            print( e );
+        }
+        assert( !passed, "Should not be able to shard on hashed index with another unique index" );
+
+    }
+    if ( i == 18 ) {
+
+        // create hashed index, and a regular unique index exists on same field
+        coll.ensureIndex( { num : "hashed" } );
+        coll.ensureIndex( { num : 1 }, { unique : true } );
+
+        try{
+            s.adminCommand({ shardcollection : "" + coll, key : { num : "hashed" } } );
+        }
+        catch( e ){
+            print(e);
+            assert( false, "Should be able to shard coll with hashed and regular unique index");
+        }
     }
 }
 
