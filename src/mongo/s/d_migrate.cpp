@@ -1530,7 +1530,7 @@ namespace mongo {
                         numCloned++;
                         clonedBytes += o.objsize();
 
-                        if ( secondaryThrottle ) {
+                        if ( secondaryThrottle && thisTime > 0 ) {
                             if ( ! waitForReplication( cc().getLastOp(), 2, 60 /* seconds to wait */ ) ) {
                                 warning() << "secondaryThrottle on, but doc insert timed out after 60 seconds, continuing" << endl;
                             }

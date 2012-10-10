@@ -328,7 +328,7 @@ namespace mongo {
 
             Timer secondaryThrottleTime;
 
-            if ( secondaryThrottle ) {
+            if ( secondaryThrottle && numDeleted > 0 ) {
                 if ( ! waitForReplication( c.getLastOp(), 2, 60 /* seconds to wait */ ) ) {
                     warning() << "replication to secondaries for removeRange at least 60 seconds behind" << endl;
                 }
