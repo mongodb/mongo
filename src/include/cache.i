@@ -42,20 +42,22 @@ __wt_eviction_check(WT_SESSION_IMPL *session, int *read_lockoutp, int wake)
 static inline int
 __wt_cache_full_check(WT_SESSION_IMPL *session)
 {
+	WT_BTREE *btree;
 	WT_DECL_RET;
 	int lockout, wake;
 
 	/*
 	 * Only wake the eviction server the first time through here (if the
-	 * cache is too full), or after we fail to evict a page.  Otherwise, we
-	 * are just wasting effort and making a busy mutex busier.
+	 * cache is too full).  Otherwise, we are just wasting effort and
+	 * making a busy condition variable busier.
 	 */
 	for (wake = 1;; wake = 0) {
 		__wt_eviction_check(session, &lockout, wake);
 		if (!lockout ||
-		    F_ISSET(session, WT_SESSION_SCHEMA_LOCKED) ||
-		    (session->btree != NULL &&
-                    F_ISSET(session->btree, WT_BTREE_NO_CACHE)))
+		    F_ISSET(session, WT_SESSION_SCHEMA_LOCKED))
+			return (0);
+		if ((btree = session->btree) != NULL && F_ISSET(btree,
+		    WT_BTREE_BULK | WT_BTREE_NO_CACHE | WT_BTREE_NO_EVICTION))
 			return (0);
 		if ((ret = __wt_evict_lru_page(session, 1)) == EBUSY)
 			__wt_yield();
