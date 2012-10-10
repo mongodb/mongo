@@ -16,10 +16,10 @@
  */
 
 
-#include "pch.h"
-#include "top.h"
-#include "../../util/net/message.h"
-#include "../commands.h"
+#include "mongo/pch.h"
+#include "mongo/db/stats/top.h"
+#include "mongo/util/net/message.h"
+#include "mongo/db/commands.h"
 
 namespace mongo {
 
