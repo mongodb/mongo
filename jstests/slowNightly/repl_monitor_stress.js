@@ -54,7 +54,7 @@ for (var node = NODE_COUNT - 1; node >= 0; node--) {
         var replView = connPoolStats.replicaSets[replTest.name];
         print('Current replView: ' + tojson(replView));
         return replView.master == node;
-    }, 'timed out waiting for node " + node + " to become master', 60000);
+    }, 'timed out waiting for node ' + node + ' to become master', 60000);
 
     // Remove first node from set
     confDoc.members.shift();
@@ -62,11 +62,17 @@ for (var node = NODE_COUNT - 1; node >= 0; node--) {
 
     jsTest.log('Removing node, new conf: ' + tojson(confDoc));
 
-    try {
-        replTest.getPrimary().getDB('admin').adminCommand({ replSetReconfig: confDoc });
-    } catch (x) {
-        print('Expected exception because of reconfig: ' + x);
-    }
+    assert.soon(function() {
+        try {
+            replTest.getPrimary().getDB('admin').adminCommand({ replSetReconfig: confDoc });
+            var newConf = replTest.getPrimary().getDB('local').system.replset.findOne();
+            print('Current config after attempting to remove: ' + tojson(newConf));
+            return newConf.members.length == confDoc.members.length;
+        } catch (x) {
+            print('Expected exception because of reconfig: ' + x);
+            return false;
+        }
+    }, 'timed out trying to remove node from config');
 
     var waitNodeCount = function(count) {
         var connPoolStats = mongos.getDB('admin').runCommand('connPoolStats');
