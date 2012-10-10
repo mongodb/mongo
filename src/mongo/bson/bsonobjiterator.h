@@ -70,7 +70,7 @@ namespace mongo {
 
             BSONElement e( _pos, maxLen );
             int esize = e.size( maxLen );
-            massert( 16442, "BSONElement has bad size", esize > 0 );
+            massert( 16446, "BSONElement has bad size", esize > 0 );
             _pos += esize;
 
             return e;
