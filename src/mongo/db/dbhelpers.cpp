@@ -249,8 +249,9 @@ namespace mongo {
         }
         while( pat.more() ){
             BSONElement patElt = pat.next();
-            verify( patElt.isNumber() );
-            if( minOrMax * patElt.numberInt() == 1){
+            // for non 1/-1 field values, like {a : "hashed"}, treat order as ascending
+            int order = patElt.isNumber() ? patElt.numberInt() : 1;
+            if( minOrMax * order == 1 ){
                 newBound.appendMaxKey("");
             }
             else {
