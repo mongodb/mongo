@@ -19,6 +19,8 @@
 
 #include <boost/date_time/posix_time/posix_time.hpp>
 
+#include "mongo/platform/unordered_map.h"
+
 namespace mongo {
 
     /**
@@ -61,7 +63,7 @@ namespace mongo {
             UsageData commands;
         };
 
-        typedef map<string,CollectionData> UsageMap;
+        typedef unordered_map<string,CollectionData> UsageMap;
 
     public:
         void record( const StringData& ns , int op , int lockType , long long micros , bool command );
