@@ -207,7 +207,7 @@ namespace mongo {
         b.append("local", nestableLocks[Lock::local]->stats.report());
         {
             mapsf<string,WrapperForRWLock*>::ref r(dblocks);
-            for( map<string,WrapperForRWLock*>::const_iterator i = r.r.begin(); i != r.r.end(); i++ ) {
+            for( unordered_map<string,WrapperForRWLock*>::const_iterator i = r.r.begin(); i != r.r.end(); i++ ) {
                 b.append(i->first, i->second->stats.report());
             }
         }

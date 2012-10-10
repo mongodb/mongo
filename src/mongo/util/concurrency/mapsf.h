@@ -1,5 +1,7 @@
 #pragma once
 
+#include "mongo/platform/unordered_map.h"
+
 namespace mongo {
 
     /** Thread safe map.  
@@ -25,11 +27,11 @@ namespace mongo {
     template< class K, class V >
     struct mapsf : boost::noncopyable {
         SimpleMutex m;
-        map<K,V> val;
+        unordered_map<K,V> val;
         friend struct ref;
     public:
         mapsf() : m("mapsf") { }
-        void swap(map<K,V>& rhs) {
+        void swap(unordered_map<K,V>& rhs) {
             SimpleMutex::scoped_lock lk(m);
             val.swap(rhs);
         }
@@ -40,7 +42,7 @@ namespace mongo {
         // safe as we pass by value:
         V get(K k) { 
             SimpleMutex::scoped_lock lk(m);
-            typename map<K,V>::iterator i = val.find(k);
+            typename unordered_map<K,V>::iterator i = val.find(k);
             if( i == val.end() )
                 return V();
             return i->second;
@@ -50,7 +52,7 @@ namespace mongo {
         struct ref {
             SimpleMutex::scoped_lock lk;
         public:
-            map<K,V> &r;
+            unordered_map<K,V> &r;
             ref(mapsf<K,V> &m) : lk(m.m), r(m.val) { }
             V& operator[](const K& k) { return r[k]; }
         };
