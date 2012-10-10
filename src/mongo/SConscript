@@ -33,6 +33,7 @@ env.StaticLibrary('foundation',
                     ],
                   LIBDEPS=['stacktrace',
                            '$BUILD_DIR/mongo/base/base',
+                           '$BUILD_DIR/mongo/platform/platform',
                            '$BUILD_DIR/third_party/shim_allocator',
                            '$BUILD_DIR/third_party/shim_boost'])
 
