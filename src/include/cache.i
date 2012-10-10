@@ -54,7 +54,8 @@ __wt_cache_full_check(WT_SESSION_IMPL *session)
 		__wt_eviction_check(session, &lockout, wake);
 		if (!lockout ||
 		    F_ISSET(session, WT_SESSION_SCHEMA_LOCKED) ||
-		    F_ISSET(session->btree, WT_BTREE_NO_CACHE))
+		    (session->btree != NULL &&
+                    F_ISSET(session->btree, WT_BTREE_NO_CACHE)))
 			return (0);
 		if ((ret = __wt_evict_lru_page(session, 1)) == EBUSY)
 			__wt_yield();

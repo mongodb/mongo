@@ -306,6 +306,7 @@ struct __wt_connection_impl {
 #define	TXN_API_CALL_NOCONF(s, h, n, cur, bt) do {			\
 	int __autotxn = 0;						\
 	API_CALL_NOCONF(s, h, n, cur, bt);				\
+	WT_ERR(__wt_cache_full_check(s));				\
 	__autotxn = F_ISSET(S2C(s), WT_CONN_TRANSACTIONAL) &&		\
 	    !F_ISSET(&(s)->txn, TXN_AUTOCOMMIT | TXN_RUNNING);		\
 	if (__autotxn)							\
