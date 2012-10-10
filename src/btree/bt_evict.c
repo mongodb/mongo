@@ -719,7 +719,7 @@ __evict_walk(WT_SESSION_IMPL *session)
 	WT_CACHE *cache;
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
-	u_int elem, i;
+	u_int elem, file_count, i;
 
 	conn = S2C(session);
 	cache = S2C(session)->cache;
@@ -729,8 +729,7 @@ __evict_walk(WT_SESSION_IMPL *session)
 	 * get some pages from each underlying file.  In practice, a realloc
 	 * is rarely needed, so it is worth avoiding the LRU lock.
 	 */
-	elem = WT_EVICT_WALK_BASE +
-	    (conn->open_btree_count * WT_EVICT_WALK_PER_TABLE);
+	elem = WT_EVICT_WALK_BASE + 2 * WT_EVICT_GROUP;
 	if (elem > cache->evict_entries) {
 		__wt_spin_lock(session, &cache->evict_lock);
 		/* Save the offset of the eviction point. */
@@ -749,7 +748,11 @@ __evict_walk(WT_SESSION_IMPL *session)
 	 * servicing eviction requests.
 	 */
 	i = WT_EVICT_WALK_BASE;
+	file_count = 0;
 	TAILQ_FOREACH(btree, &conn->btqh, q) {
+		if (file_count++ < cache->evict_file_next)
+			continue;
+
 		/*
 		 * Skip files that aren't open or don't have a root page.
 		 *
@@ -770,9 +773,10 @@ __evict_walk(WT_SESSION_IMPL *session)
 		ret = __evict_walk_file(session, &i);
 		WT_CLEAR_BTREE_IN_SESSION(session);
 
-		if (ret != 0)
+		if (ret != 0 || i == cache->evict_entries)
 			break;
 	}
+	cache->evict_file_next = (btree == NULL) ? 0 : file_count;
 
 	if (0) {
 err:		__wt_spin_unlock(session, &cache->evict_lock);
