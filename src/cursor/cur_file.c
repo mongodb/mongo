@@ -321,9 +321,9 @@ __wt_curfile_create(WT_SESSION_IMPL *session,
 
 	WT_RET(__wt_config_gets_defno(session, cfg, "bulk", &cval));
 	if ((cval.type == ITEM_ID || cval.type == ITEM_STRING) &&
-	    WT_STRING_MATCH("bitmap", cval.str, cval.len)) {
+	    WT_STRING_MATCH("bitmap", cval.str, cval.len))
 		bitmap = bulk = 1;
-	} else {
+	else {
 		bitmap = 0;
 		bulk = (cval.val != 0);
 	}

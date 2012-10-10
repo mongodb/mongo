@@ -1505,7 +1505,6 @@ __wt_rec_col_fix_bulk_insert(WT_CURSOR_BULK *cbulk)
 	cursor = &cbulk->cbt.iface;
 
 	if (cbulk->bitmap) {
-		/* FIXME: for more than 4B entries in a bitmap. */
 		for (data = cursor->value.data, entries = cursor->value.size;
 		    entries > 0;
 		    entries -= page_entries, data += page_size) {
