@@ -18,7 +18,11 @@
 #pragma once
 
 #include <cstdlib>
+#ifdef _WIN32
+#include <cstdint>
+#else
 #include <inttypes.h>
+#endif
 
 namespace mongo {
     

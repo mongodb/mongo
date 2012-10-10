@@ -21,6 +21,7 @@
 namespace mongo {
 
 #ifdef _WIN32
+#pragma warning( disable : 4715 ) // not all control paths return a value
     int32_t PseudoRandom::nextInt32() {
         if ( rand_s(&_seed) == 0 ) {
             // SUCCESS
