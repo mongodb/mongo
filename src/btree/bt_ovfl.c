@@ -65,18 +65,13 @@ __wt_ovfl_read(WT_SESSION_IMPL *session, WT_ITEM *store, WT_CELL_UNPACK *unpack)
 }
 
 /*
- * __val_ovfl_cache_col --
- *	Cache a deleted overflow value for a variable-length column-store.
+ * __ovfl_cache_col_visible --
+ *	Check to see if there's already an update everybody can see.
  */
 static int
-__val_ovfl_cache_col(WT_SESSION_IMPL *session,
-    WT_PAGE *page, WT_UPDATE *upd, WT_CELL_UNPACK *unpack)
+__ovfl_cache_col_visible(
+    WT_SESSION_IMPL *session, WT_UPDATE *upd, WT_CELL_UNPACK *unpack)
 {
-	WT_DECL_RET;
-	WT_ITEM value;
-	const uint8_t *addr;
-	uint32_t addr_size;
-
 	/*
 	 * Column-store is harder than row_store: we're here because there's a
 	 * reader in the system that might read the original version of an
@@ -93,13 +88,32 @@ __val_ovfl_cache_col(WT_SESSION_IMPL *session,
 	if (__wt_cell_rle(unpack) == 1 &&
 	    upd != NULL &&		/* Sanity: upd should always be set. */
 	    __wt_txn_visible_all(session, upd->txnid))
-		return (0);
+		return (1);
+	return (0);
+}
 
+/*
+ * __val_ovfl_cache_col --
+ *	Cache a deleted overflow value for a variable-length column-store.
+ */
+static int
+__val_ovfl_cache_col(
+    WT_SESSION_IMPL *session, WT_PAGE *page, WT_CELL_UNPACK *unpack)
+{
+	WT_DECL_RET;
+	WT_ITEM value;
+	const uint8_t *addr;
+	uint32_t addr_size;
+
+	WT_CLEAR(value);
 	addr = unpack->data;
 	addr_size = unpack->size;
-	WT_CLEAR(value);
 
-	/* Enter this value into the tracking system. */
+	/*
+	 * Because column-store values potentially match some number of records,
+	 * there's no single WT_UPDATE chain we can use to cache the value, so
+	 * we enter the value into the reconciliation tracking system.
+	 */
 	WT_ERR(__ovfl_read(session, &value, addr, addr_size));
 	WT_ERR(__wt_rec_track(session, page, addr, addr_size,
 	    value.data, value.size, WT_TRK_ONPAGE | WT_TRK_OVFL_VALUE));
@@ -125,9 +139,7 @@ __wt_ovfl_cache_col_restart(WT_SESSION_IMPL *session,
 	 * A variable-length column-store overflow read returned restart: check
 	 * the on-page cell (for sanity, this is currently the only reason an
 	 * overflow read might return restart), then look up the cached overflow
-	 * value in the page's reconciliation tracking information.  We handle
-	 * the case where the record isn't found, but that should never happen,
-	 * it indicates a fatal problem if it does.
+	 * value in the page's reconciliation tracking information.
 	 */
 	if (__wt_cell_type_raw(unpack->cell) != WT_CELL_VALUE_OVFL_RM)
 		return (WT_RESTART);
@@ -135,6 +147,12 @@ __wt_ovfl_cache_col_restart(WT_SESSION_IMPL *session,
 	found =
 	    __wt_rec_track_ovfl_srch(page, unpack->data, unpack->size, store);
 	WT_ASSERT(session, found == 1);
+	WT_ASSERT(session, store->size != 0);
+
+	/*
+	 * We handle the case where the record isn't found, but that should
+	 * never happen, it indicates a fatal problem if it does.
+	 */
 	return (found ? 0 : WT_NOTFOUND);
 }
 
@@ -181,18 +199,10 @@ __val_ovfl_cache_row(WT_SESSION_IMPL *session,
 	uint32_t addr_size;
 	const uint8_t *addr;
 
-	/*
-	 * Check for a globally visible update; if there's no globally visible
-	 * update, there's a reader in the system that might try and read the
-	 * old value.
-	 */
-	if (__ovfl_cache_row_visible(session, page, rip))
-		return (0);
-
+	WT_CLEAR(value);
+	new = NULL;
 	addr = unpack->data;
 	addr_size = unpack->size;
-	new = NULL;
-	WT_CLEAR(value);
 
 	/*
 	 * We handle readers needing cached values using the WT_UPDATE chain,
@@ -302,13 +312,21 @@ __wt_val_ovfl_cache(WT_SESSION_IMPL *session,
 	if (__wt_cell_type_raw(unpack->cell) == WT_CELL_VALUE_OVFL_RM)
 		goto err;
 
-	/* Cache the deleted overflow value. */
+	/*
+	 * Check for a globally visible update; if there's no globally visible
+	 * update, there's a reader in the system that might try and read the
+	 * old value, cache the deleted overflow value.
+	 */
 	switch (page->type) {
 	case WT_PAGE_COL_VAR:
-		WT_ERR(__val_ovfl_cache_col(session, page, cookie, unpack));
+		if (__ovfl_cache_col_visible(session, cookie, unpack))
+			goto err;
+		WT_ERR(__val_ovfl_cache_col(session, page, unpack));
 		break;
 	case WT_PAGE_ROW_LEAF:
-		WT_ERR(__val_ovfl_cache_row(session, page, cookie , unpack));
+		if (__ovfl_cache_row_visible(session, page, cookie))
+			goto err;
+		WT_ERR(__val_ovfl_cache_row(session, page, cookie, unpack));
 		break;
 	WT_ILLEGAL_VALUE_ERR(session);
 	}
