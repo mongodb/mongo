@@ -132,7 +132,7 @@ __wt_rec_track(WT_SESSION_IMPL *session, WT_PAGE *page,
 	 * if reconciliation fails.
 	 */
 	track->flags = (uint8_t)flags | WT_TRK_OBJECT;
-	if (!LF_ISSET(WT_TRK_OVFL_VALUE))
+	if (!F_ISSET(track, WT_TRK_OVFL_VALUE))
 		F_SET(track, WT_TRK_JUST_ADDED);
 	track->addr.addr = p;
 	track->addr.size = addr_size;
@@ -205,10 +205,11 @@ __wt_rec_track_onpage_srch(
 		 * We don't care if the object is currently in-use or not, just
 		 * if it's there.
 		 *
-		 * Ignore empty slots and objects not loaded from a page, then
-		 * check for an address match.
+		 * Ignore cached overflow values and objects not loaded from a
+		 * page, then check for an address match.
 		 */
 		if (F_ISSET(track, WT_TRK_ONPAGE) &&
+		    !F_ISSET(track, WT_TRK_OVFL_VALUE) &&
 		    track->addr.size == addr_size &&
 		    memcmp(addr, track->addr.addr, addr_size) == 0)
 			return (1);
