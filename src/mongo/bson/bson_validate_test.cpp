@@ -15,6 +15,7 @@
 
 #include "mongo/db/jsobj.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/platform/random.h"
 
 namespace {
     
@@ -28,11 +29,9 @@ namespace {
         ASSERT_TRUE( x.valid() );
     }
 
-#ifndef _WIN32 // this is temporary till I commit a new Random class
-    
     TEST(BSONValidate, RandomData) {
         
-        unsigned seed = 17;
+        PseudoRandom r(17);
 
         int numValid = 0;
         int numToRun = 1000;
@@ -46,7 +45,7 @@ namespace {
             xx[0] = size;
             
             for ( int i=4; i<size; i++ ) {
-                x[i] = rand_r(&seed) % 255;
+                x[i] = r.nextInt32( 255 );
             }
             
             x[size-1] = 0;
@@ -66,7 +65,6 @@ namespace {
         log() << "RandomData: didn't crash valid/total: " << numValid << "/" << numToRun << " (want few valid ones)" 
               << " jsonSize: " << jsonSize << endl;
     }
-#endif
 
     TEST(BSONValidate, MuckingData1) {
 
