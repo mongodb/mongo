@@ -180,7 +180,11 @@ __wt_bloom_finalize(WT_BLOOM *bloom)
 	/* Add the entries from the array into the table. */
 	for (i = 0; i < bloom->m; i += values.size) {
 		values.data = bloom->bitstring;
-		values.size = (uint32_t)WT_MIN(bloom->m - i, 1000000);
+		/*
+		 * Shave off some bytes for pure paranoia, in case WiredTiger
+		 * reserves some special sizes.
+		 */
+		values.size = (uint32_t)WT_MIN(bloom->m - i, UINT32_MAX - 100);
 		c->set_value(c, &values);
 		WT_ERR(c->insert(c));
 	}
