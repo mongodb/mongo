@@ -260,26 +260,76 @@ namespace CursorTests {
             }
             virtual BSONObj idx() const { return BSON( "a" << 1 << "b" << 1 ); }
         };
-        
+
+        /**
+         * BtreeCursor::advance() may skip to new btree positions multiple times.  A cutoff (tested
+         * here) has been implemented to avoid excessive iteration in such cases.  See SERVER-3448.
+         */
         class AbortImplicitScan : public Base {
         public:
             void run() {
+                // Set up a compound index with some data.
                 IndexSpec idx( BSON( "a" << 1 << "b" << 1 ) );
                 _c.ensureIndex( ns(), idx.keyPattern );
                 for( int i = 0; i < 300; ++i ) {
-                    _c.insert( ns(), BSON( "a" << i << "b" << 5 ) );
+                    _c.insert( ns(), BSON( "a" << i << "b" << i ) );
                 }
-                FieldRangeSet frs( ns(), BSON( "b" << 3 ), true, true );
+                _c.insert( ns(), BSON( "a" << 300 << "b" << 30 ) );
+
+                // Set up a cursor on the { a:1, b:1 } index, the same cursor that would be created
+                // for the query { b:30 }.  Because this query has no constraint on 'a' (the
+                // first field of the compound index), the cursor will examine every distinct value
+                // of 'a' in the index and check for an index key with that value for 'a' and 'b'
+                // equal to 30.
+                FieldRangeSet frs( ns(), BSON( "b" << 30 ), true, true );
                 boost::shared_ptr<FieldRangeVector> frv( new FieldRangeVector( frs, idx, 1 ) );
                 Client::WriteContext ctx( ns() );
-                scoped_ptr<BtreeCursor> c( BtreeCursor::make( nsdetails( ns() ), nsdetails( ns() )->idx(1), frv, 1 ) );
-                long long initialNscanned = c->nscanned();
-                ASSERT( initialNscanned < 200 );
+                scoped_ptr<BtreeCursor> c( BtreeCursor::make( nsdetails( ns() ),
+                                                              nsdetails( ns() )->idx(1),
+                                                              frv,
+                                                              1 ) );
+
+                // BtreeCursor::init() and BtreeCursor::advance() attempt to advance the cursor to
+                // the next matching key, which may entail examining many successive distinct values
+                // of 'a' having no index key where b equals 30.  To prevent excessive iteration
+                // within init() and advance(), examining distinct 'a' values is aborted once an
+                // nscanned cutoff is reached.  We test here that this cutoff is applied, and that
+                // if it is applied before a matching key is found, then
+                // BtreeCursor::currentMatches() returns false appropriately.
+
                 ASSERT( c->ok() );
-                c->advance();
-                ASSERT( c->nscanned() > initialNscanned );
+                // The starting iterate found by BtreeCursor::init() does not match.  This is a key
+                // before the {'':30,'':30} key, because init() is aborted prematurely.
+                ASSERT( !c->currentMatches() );
+                // And init() stopped iterating before scanning the whole btree (with ~300 keys).
                 ASSERT( c->nscanned() < 200 );
-                ASSERT( c->ok() );
+
+                ASSERT( c->advance() );
+                // The next iterate matches (this is the {'':30,'':30} key).
+                ASSERT( c->currentMatches() );
+
+                int oldNscanned = c->nscanned();
+                ASSERT( c->advance() );
+                // Check that nscanned has increased ...
+                ASSERT( c->nscanned() > oldNscanned );
+                // ... but that advance() stopped iterating before the whole btree (with ~300 keys)
+                // was scanned.
+                ASSERT( c->nscanned() < 200 );
+                // Because advance() is aborted prematurely, the current iterate does not match.
+                ASSERT( !c->currentMatches() );
+
+                // Iterate through the remainder of the btree.
+                bool foundLastMatch = false;
+                while( c->advance() ) {
+                    bool bMatches = ( c->current()[ "b" ].number() == 30 );
+                    // The current iterate only matches if it has the proper 'b' value.
+                    ASSERT_EQUALS( bMatches, c->currentMatches() );
+                    if ( bMatches ) {
+                        foundLastMatch = true;
+                    }
+                }
+                // Check that the final match, on key {'':300,'':30}, is found.
+                ASSERT( foundLastMatch );
             }
         };
 

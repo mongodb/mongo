@@ -1097,6 +1097,8 @@ namespace mongo {
 
         virtual CoveredIndexMatcher *matcher() const { return _matcher.get(); }
 
+        virtual bool currentMatches( MatchDetails* details = 0 );
+
         virtual void setMatcher( shared_ptr< CoveredIndexMatcher > matcher ) { _matcher = matcher;  }
 
         virtual const Projection::KeyOnly *keyFieldsOnly() const { return _keyFieldsOnly.get(); }
@@ -1122,7 +1124,16 @@ namespace mongo {
         virtual bool skipUnusedKeys() = 0;
 
         bool skipOutOfRangeKeysAndCheckEnd();
+
+        /**
+         * Attempt to locate the next btree key matching _bounds.  This may mean advancing to the
+         * next successive key in the btree, or skipping to a new position in the btree.  If an
+         * internal iteration cutoff is reached before a matching key is found, then the search for
+         * a matching key will be aborted, leaving the cursor pointing at a key that is not within
+         * bounds.
+         */
         void skipAndCheck();
+
         void checkEnd();
 
         /** selective audits on construction */
@@ -1159,6 +1170,10 @@ namespace mongo {
         DiskLoc locAtKeyOfs;
         shared_ptr< FieldRangeVector > _bounds;
         auto_ptr< FieldRangeVectorIterator > _boundsIterator;
+        bool _boundsMustMatch; // If iteration is aborted before a key matching _bounds is
+                               // identified, the cursor may be left pointing at a key that is not
+                               // within bounds (_bounds->matchesKey( currKey() ) may be false).
+                               // _boundsMustMatch will be set to false accordingly.
         shared_ptr< CoveredIndexMatcher > _matcher;
         shared_ptr<Projection::KeyOnly> _keyFieldsOnly;
         bool _independentFieldRanges;

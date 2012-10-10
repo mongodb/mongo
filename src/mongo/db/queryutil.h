@@ -637,7 +637,19 @@ namespace mongo {
          * FieldRangeVector.  This function is used for $or clause deduping.
          */
         bool matches( const BSONObj &obj ) const;
-        
+
+        /**
+         * @return true if all values in the provided index key are contained within the field
+         * ranges of their respective fields in this FieldRangeVector.
+         *
+         * For example, given a query { a:3, b:4 } and index { a:1, b:1 }, the FieldRangeVector is
+         * [ [[ 3, 3 ]], [[ 4, 4 ]] ], consisting of field range [[ 3, 3 ]] on field 'a' and
+         * [[ 4, 4 ]] on field 'b'.  The index key { '':3, '':4 } matches, but the index key
+         * { '':3, '':5 } does not match because the value 5 in the second field is not contained in
+         * the field range [[ 4, 4 ]] for field 'b'.
+         */
+        bool matchesKey( const BSONObj& key ) const;
+
         /**
          * @return first key of 'obj' that would be encountered by a forward
          * index scan using this FieldRangeVector, BSONObj() if no such key.
@@ -649,7 +661,6 @@ namespace mongo {
     private:
         int matchingLowElement( const BSONElement &e, int i, bool direction, bool &lowEquality ) const;
         bool matchesElement( const BSONElement &e, int i, bool direction ) const;
-        bool matchesKey( const BSONObj &key ) const;
         vector<FieldRange> _ranges;
         const IndexSpec _indexSpec;
         int _direction;
