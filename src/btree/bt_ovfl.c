@@ -320,19 +320,26 @@ __wt_val_ovfl_cache(WT_SESSION_IMPL *session,
 	switch (page->type) {
 	case WT_PAGE_COL_VAR:
 		if (__ovfl_cache_col_visible(session, cookie, unpack))
-			goto err;
+			break;
 		WT_ERR(__val_ovfl_cache_col(session, page, unpack));
+		WT_BSTAT_INCR(session, overflow_value_cache);
 		break;
 	case WT_PAGE_ROW_LEAF:
 		if (__ovfl_cache_row_visible(session, page, cookie))
-			goto err;
+			break;
 		WT_ERR(__val_ovfl_cache_row(session, page, cookie, unpack));
+		WT_BSTAT_INCR(session, overflow_value_cache);
 		break;
 	WT_ILLEGAL_VALUE_ERR(session);
 	}
-	WT_BSTAT_INCR(session, overflow_value_cache);
 
-	/* Reset the on-page cell. */
+	/*
+	 * Reset the on-page cell, even if we didn't cache the overflow value.
+	 * There may be a sleeping thread of control that's already walked the
+	 * WT_UPDATE list and will read the on-page cell when it wakes up, and
+	 * the cell has to be reset in order to cause that thread to return
+	 * WT_RESTART to its caller.
+	 */
 	__wt_cell_type_reset(unpack->cell, WT_CELL_VALUE_OVFL_RM);
 
 err:	__wt_rwunlock(session, btree->val_ovfl_lock);
