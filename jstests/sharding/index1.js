@@ -166,7 +166,7 @@ for ( var i = 0; i < 15; i++ ) {
 
 		// Unique index exists on a different field as well
 		coll.ensureIndex( { num : 1 }, { unique : true } )
-		coll.ensureIndex( { x : 1 }, { unique : true} )
+		coll.ensureIndex( { x : 1 } )
 
         passed = false
 		try {
