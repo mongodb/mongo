@@ -86,7 +86,7 @@ __wt_bt_cache_flush(WT_SESSION_IMPL *session, WT_CKPT *ckptbase, int op)
 	case WT_SYNC_DISCARD:
 	case WT_SYNC_DISCARD_NOWRITE:
 		/* If discarding the tree, the root page should be gone. */
-		WT_ASSERT(session, btree->root_page == NULL);
+		WT_ASSERT(session, ret != 0 || btree->root_page == NULL);
 		break;
 	}
 
