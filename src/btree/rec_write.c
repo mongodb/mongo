@@ -2217,9 +2217,11 @@ compare:		/*
 		 * on-disk version if there's a transaction in the system that
 		 * might read the original value.
 		 */
-		if (ovfl_state == OVFL_UNUSED)
-			WT_ERR(
-			    __wt_val_ovfl_cache(session, page, upd, unpack));
+		if (ovfl_state == OVFL_UNUSED) {
+			WT_ERR(__wt_rec_track_onpage_addr(
+			    session, page, unpack->data, unpack->size));
+			WT_ERR(__wt_val_ovfl_cache(session, page, upd, unpack));
+		}
 	}
 
 	/* Walk any append list. */
@@ -2304,7 +2306,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	WT_REF *ref;
 	uint32_t i, size;
 	u_int vtype;
-	int found, modified, onpage_ovfl, ovfl_key;
+	int modified, onpage_ovfl, ovfl_key;
 	const void *p;
 
 	btree = session->btree;
@@ -2513,12 +2515,9 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		 * overflow key blocks have been freed, we have to build a new
 		 * key.  If there's no tracking entry, use the original blocks.
 		 */
-		if (onpage_ovfl) {
-			WT_RET(__wt_rec_track_onpage_srch(session,
-			    page, kpack->data, kpack->size, &found, NULL));
-			if (found)
-				onpage_ovfl = 0;
-		}
+		if (onpage_ovfl &&
+		    __wt_rec_track_onpage_srch(page, kpack->data, kpack->size))
+			onpage_ovfl = 0;
 
 		/*
 		 * Build key cell.
@@ -2756,7 +2755,7 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 	WT_UPDATE *upd;
 	uint64_t slvg_skip;
 	uint32_t i, size;
-	int dictionary, found, onpage_ovfl, ovfl_key;
+	int dictionary, onpage_ovfl, ovfl_key;
 	const void *p;
 
 	btree = session->btree;
@@ -2866,9 +2865,12 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 			 * version if there's a transaction in the system that
 			 * might read the original value.
 			 */
-			if (val_cell != NULL && unpack->ovfl)
+			if (val_cell != NULL && unpack->ovfl) {
+				WT_ERR(__wt_rec_track_onpage_addr(
+				    session, page, unpack->data, unpack->size));
 				WT_ERR(__wt_val_ovfl_cache(
 				    session, page, rip, unpack));
+			}
 
 			/* If this key/value pair was deleted, we're done. */
 			if (WT_UPDATE_DELETED_ISSET(upd)) {
@@ -2928,13 +2930,11 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 		 */
 		__wt_cell_unpack(cell, unpack);
 		onpage_ovfl = unpack->ovfl;
-		if (onpage_ovfl) {
-			WT_ERR(__wt_rec_track_onpage_srch(session,
-			    page, unpack->data, unpack->size, &found, NULL));
-			if (found) {
-				onpage_ovfl = 0;
-				WT_ASSERT(session, ikey != NULL);
-			}
+		if (onpage_ovfl &&
+		    __wt_rec_track_onpage_srch(
+		    page, unpack->data, unpack->size)) {
+			onpage_ovfl = 0;
+			WT_ASSERT(session, ikey != NULL);
 		}
 
 		/*

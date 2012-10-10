@@ -166,6 +166,7 @@ struct __wt_page_modify {
 #define	WT_TRK_JUST_ADDED	0x004	/* Object added this reconciliation */
 #define	WT_TRK_OBJECT		0x008	/* Slot set (not empty) */
 #define	WT_TRK_ONPAGE		0x010	/* Object was referenced from a page */
+#define	WT_TRK_OVFL_VALUE	0x020	/* Cached deleted overflow value */
 		uint8_t  flags;
 	} *track;			/* Array of tracked objects */
 	uint32_t track_entries;		/* Total track slots */
