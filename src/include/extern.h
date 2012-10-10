@@ -293,7 +293,6 @@ extern void __wt_page_out(WT_SESSION_IMPL *session,
 extern void __wt_evict_list_clr_page(WT_SESSION_IMPL *session, WT_PAGE *page);
 extern void __wt_evict_server_wake(WT_SESSION_IMPL *session);
 extern int __wt_sync_file_serial_func(WT_SESSION_IMPL *session, void *args);
-extern void __wt_evict_page_request(WT_SESSION_IMPL *session, WT_PAGE *page);
 extern void *__wt_cache_evict_server(void *arg);
 extern int __wt_evict_lru_page(WT_SESSION_IMPL *session, int is_app);
 extern int __wt_btree_create(WT_SESSION_IMPL *session, const char *filename);
@@ -611,7 +610,7 @@ extern int __wt_curbackup_open(WT_SESSION_IMPL *session,
     const char *uri,
     const char *cfg[],
     WT_CURSOR **cursorp);
-extern int __wt_curbulk_init(WT_CURSOR_BULK *cbulk);
+extern int __wt_curbulk_init(WT_CURSOR_BULK *cbulk, int bitmap);
 extern int __wt_curconfig_open(WT_SESSION_IMPL *session,
     const char *uri,
     const char *cfg[],

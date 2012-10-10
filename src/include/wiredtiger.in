@@ -525,7 +525,13 @@ struct __wt_session {
 	 * @config{bulk, configure the cursor for bulk loads\, a fast load path
 	 * that may only be used for newly created objects. Cursors configured
 	 * for bulk load only support the WT_CURSOR::insert and WT_CURSOR::close
-	 * methods.,a boolean flag; default \c false.}
+	 * methods.  The value is usually a true/false flag\, but the the
+	 * special value \c "bitmap" is for use with fixed-length column
+	 * stores\, and allows chunks of a memory resident bitmap to be loaded
+	 * directly into a file by passing a \c WT_ITEM to WT_CURSOR::set_value
+	 * where the \c size field indicates the number of records in the bitmap
+	 * (as specified by the file's \c value_format).,a string; default \c
+	 * false.}
 	 * @config{checkpoint, the name of a checkpoint to open (the reserved
 	 * name "WiredTigerCheckpoint" opens the most recent internal checkpoint
 	 * taken for the object).  The cursor does not support data
@@ -1726,8 +1732,8 @@ extern int wiredtiger_extension_init(WT_SESSION *session,
 #define	WT_STAT_free					15
 /*! file: overflow pages read from the file */
 #define	WT_STAT_overflow_read				16
-/*! file: overflow values cached in memory */
-#define	WT_STAT_overflow_value_cache			17
+/*! file: pages evicted from the file */
+#define	WT_STAT_page_evict				17
 /*! file: pages read from the file */
 #define	WT_STAT_page_read				18
 /*! file: pages written to the file */
@@ -1792,28 +1798,30 @@ extern int wiredtiger_extension_init(WT_SESSION *session,
  */
 /*! Number of bloom filters in the LSM tree */
 #define	WT_STAT_bloom_count				0
+/*! Number of bloom pages evicted from cache */
+#define	WT_STAT_bloom_cache_evict			1
 /*! Number of bloom pages read into cache */
-#define	WT_STAT_bloom_cache_read			1
-/*! Number of bloom pages written from cache */
-#define	WT_STAT_bloom_cache_write			2
+#define	WT_STAT_bloom_cache_read			2
 /*! Number of chunks in the LSM tree */
 #define	WT_STAT_chunk_count				3
+/*! Number of pages evicted from LSM chunks */
+#define	WT_STAT_chunk_cache_evict			4
+/*! Number of pages evicted from cache */
+#define	WT_STAT_cache_evict				5
 /*! Number of pages read into LSM chunks */
-#define	WT_STAT_chunk_cache_read			4
+#define	WT_STAT_chunk_cache_read			6
 /*! Number of pages read into cache */
-#define	WT_STAT_cache_read				5
+#define	WT_STAT_cache_read				7
 /*! Number of pages written from cache */
-#define	WT_STAT_cache_write				6
-/*! Number of pages written from chunks */
-#define	WT_STAT_chunk_cache_write			7
+#define	WT_STAT_cache_write				8
 /*! Number of successful bloom filter false positives */
-#define	WT_STAT_bloom_misses				8
+#define	WT_STAT_bloom_misses				9
 /*! Number of successful bloom filter lookups */
-#define	WT_STAT_bloom_hits				9
+#define	WT_STAT_bloom_hits				10
 /*! Number of unsuccessful bloom filter lookups */
-#define	WT_STAT_bloom_skips				10
+#define	WT_STAT_bloom_skips				11
 /*! Total space used by bloom filters */
-#define	WT_STAT_bloom_space				11
+#define	WT_STAT_bloom_space				12
 /*! @} */
 /*
  * Statistics section: END

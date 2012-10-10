@@ -161,30 +161,40 @@ __wt_bloom_insert(WT_BLOOM *bloom, WT_ITEM *key)
 int
 __wt_bloom_finalize(WT_BLOOM *bloom)
 {
-	WT_SESSION *wt_session;
 	WT_CURSOR *c;
+	WT_DECL_RET;
+	WT_ITEM values;
+	WT_SESSION *wt_session;
 	uint64_t i;
 
 	wt_session = (WT_SESSION *)bloom->session;
+	WT_CLEAR(values);
 
 	/*
 	 * Create a bit table to store the bloom filter in.
 	 * TODO: should this call __wt_schema_create directly?
 	 */
 	WT_RET(wt_session->create(wt_session, bloom->uri, bloom->config));
-
 	WT_RET(wt_session->open_cursor(
-	    wt_session, bloom->uri, NULL, "bulk", &c));
+	    wt_session, bloom->uri, NULL, "bulk=bitmap", &c));
+
 	/* Add the entries from the array into the table. */
-	for (i = 0; i < bloom->m; i++) {
-		c->set_value(c, __bit_test(bloom->bitstring, i));
-		WT_RET(c->insert(c));
+	for (i = 0; i < bloom->m; i += values.size) {
+		values.data = bloom->bitstring + i;
+		/*
+		 * Shave off some bytes for pure paranoia, in case WiredTiger
+		 * reserves some special sizes.
+		 */
+		values.size = (uint32_t)WT_MIN(bloom->m - i, UINT32_MAX - 100);
+		c->set_value(c, &values);
+		WT_ERR(c->insert(c));
 	}
-	WT_RET(c->close(c));
+
+err:	WT_TRET(c->close(c));
 	__wt_free(bloom->session, bloom->bitstring);
 	bloom->bitstring = NULL;
 
-	return (0);
+	return (ret);
 }
 
 /*

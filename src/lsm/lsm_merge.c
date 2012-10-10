@@ -132,11 +132,10 @@ __wt_lsm_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 		nchunks = end_chunk - start_chunk + 1;
 
 		/*
-		 * If the next chunk is more than half of all of the ones we
-		 * have already, stop.
+		 * If the next chunk is more than double the average size of
+		 * the chunks we have so far, stop.
 		 */
-		if (nchunks > 2 &&
-		    chunk->count > record_count / 2)
+		if (nchunks > 2 && chunk->count > 2 * record_count / nchunks)
 			break;
 
 		record_count += chunk->count;
@@ -150,7 +149,7 @@ __wt_lsm_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	WT_ASSERT(session, nchunks <= max_chunks);
 
 	if (nchunks <= 1)
-		return (0);
+		return (WT_NOTFOUND);
 
 	/* Allocate an ID for the merge. */
 	dest_id = WT_ATOMIC_ADD(lsm_tree->last, 1);
@@ -159,7 +158,7 @@ __wt_lsm_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	    "Merging chunks %d-%d into %d (%" PRIu64 " records)\n",
 	    start_chunk, end_chunk, dest_id, record_count);
 
-	if (lsm_tree->bloom != 0) {
+	if (lsm_tree->bloom != 0 && start_chunk > 0 && record_count > 0) {
 		WT_RET(__wt_scr_alloc(session, 0, &bbuf));
 		WT_ERR(__wt_lsm_tree_bloom_name(
 		    session, lsm_tree, dest_id, bbuf));

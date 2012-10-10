@@ -70,7 +70,7 @@ __curbulk_close(WT_CURSOR *cursor)
  *	Initialize a bulk cursor.
  */
 int
-__wt_curbulk_init(WT_CURSOR_BULK *cbulk)
+__wt_curbulk_init(WT_CURSOR_BULK *cbulk, int bitmap)
 {
 	WT_CURSOR *c = &cbulk->cbt.iface;
 
@@ -83,6 +83,10 @@ __wt_curbulk_init(WT_CURSOR_BULK *cbulk)
 	__wt_cursor_set_notsup(c);
 	c->insert = __curbulk_insert;
 	c->close = __curbulk_close;
+
+	cbulk->bitmap = bitmap;
+	if (bitmap)
+		F_SET(c, WT_CURSTD_RAW);
 
 	return (__wt_bulk_init(cbulk));
 }

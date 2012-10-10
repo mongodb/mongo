@@ -1496,11 +1496,34 @@ __wt_rec_col_fix_bulk_insert(WT_CURSOR_BULK *cbulk)
 	WT_CURSOR *cursor;
 	WT_RECONCILE *r;
 	WT_SESSION_IMPL *session;
+	const uint8_t *data;
+	uint32_t entries, page_entries, page_size;
 
 	session = (WT_SESSION_IMPL *)cbulk->cbt.iface.session;
 	r = cbulk->reconcile;
 	btree = session->btree;
 	cursor = &cbulk->cbt.iface;
+
+	if (cbulk->bitmap) {
+		for (data = cursor->value.data, entries = cursor->value.size;
+		    entries > 0;
+		    entries -= page_entries, data += page_size) {
+			page_entries = WT_MIN(entries,
+			    r->space_avail * 8 / btree->bitcnt);
+			page_size = __bitstr_size(page_entries * btree->bitcnt);
+
+			memcpy(r->first_free, data, page_size);
+			r->recno += page_entries;
+
+			/* Leave the last page for wrapup. */
+			if (entries > page_entries) {
+				__rec_incr(session, r, page_entries, page_size);
+				WT_RET(__rec_split(session, r));
+			} else
+				cbulk->entry = page_entries;
+		}
+		return (0);
+	}
 
 	if (cbulk->entry == cbulk->nrecs) {
 		if (cbulk->entry != 0) {
