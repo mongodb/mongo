@@ -22,6 +22,7 @@
 #include <boost/thread/mutex.hpp>
 
 #include "mongo/bson/util/atomic_int.h"
+#include "mongo/base/disallow_copying.h"
 
 namespace mongo {
 
@@ -30,10 +31,23 @@ namespace mongo {
        this class does not handle races between interruptJs and the checkForInterrupt functions - those must be
        handled by the client of this class
     */
-    extern class KillCurrentOp {
+    class KillCurrentOp {
+        MONGO_DISALLOW_COPYING(KillCurrentOp);
     public:
+        KillCurrentOp() : _globalKill(false) {}
         void killAll();
-        void kill(AtomicUInt i);
+        /**
+         * @param i opid of operation to kill
+         * @return if operation was found 
+         **/
+        bool kill(AtomicUInt i);
+           
+        /** 
+         * blocks until kill is acknowledged by the killee.
+         *
+         * Note: Does not wait for nested ops, only the top level op. 
+         */
+        void blockingKill(AtomicUInt opId);
 
         /** @return true if global interrupt and should terminate the operation */
         bool globalInterruptCheck() const { return _globalKill; }
@@ -46,9 +60,24 @@ namespace mongo {
         /** @return "" if not interrupted.  otherwise, you should stop. */
         const char *checkForInterruptNoAssert();
 
+        /** set all flags for all the threads waiting for the current thread's operation to
+         *  end; part of internal synchronous kill mechanism
+        **/
+        void notifyAllWaiters();
+
     private:
         void interruptJs( AtomicUInt *op );
         volatile bool _globalKill;
-    } killCurrentOp;
+        boost::condition _condvar;
+        boost::mutex _mtx;
 
+        /** 
+         * @param i opid of operation to kill
+         * @param pNotifyFlag optional bool to be set to true when kill actually happens
+         * @return if operation was found 
+         **/
+        bool killImpl(AtomicUInt i, bool* pNotifyFlag = NULL);        
+    };
+
+    extern KillCurrentOp killCurrentOp;
 }

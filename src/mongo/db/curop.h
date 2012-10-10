@@ -223,8 +223,8 @@ namespace mongo {
         string getMessage() const { return _message.toString(); }
         ProgressMeter& getProgressMeter() { return _progressMeter; }
         CurOp *parent() const { return _wrapped; }
-        void kill() { _killed = true; }
-        bool killed() const { return _killed; }
+        void kill(bool* pNotifyFlag = NULL); 
+        bool killPending() const { return _killPending.load(); }
         void yielded() { _numYields++; }
         int numYields() const { return _numYields; }
         void suppressFromCurop() { _suppressFromCurop = true; }
@@ -236,6 +236,8 @@ namespace mongo {
         
         const LockStat& lockStat() const { return _lockStat; }
         LockStat& lockStat() { return _lockStat; }
+
+        void setKillWaiterFlags();
     private:
         friend class Client;
         void _reset();
@@ -257,14 +259,15 @@ namespace mongo {
         OpDebug _debug;
         ThreadSafeString _message;
         ProgressMeter _progressMeter;
-        volatile bool _killed;
+        AtomicInt32 _killPending;
         int _numYields;
         LockStat _lockStat;
+        // _notifyList is protected by the global killCurrentOp's mtx.
+        std::vector<bool*> _notifyList;
         
         // this is how much "extra" time a query might take
         // a writebacklisten for example will block for 30s 
         // so this should be 30000 in that case
         long long _expectedLatencyMs; 
-                                     
     };
 }

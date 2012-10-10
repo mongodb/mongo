@@ -41,14 +41,35 @@ namespace mongo {
         interruptJs( 0 );
     }
 
-    void KillCurrentOp::kill(AtomicUInt i) {
+    bool KillCurrentOp::kill(AtomicUInt i) {
+        return killImpl(i);
+    }
+
+    void KillCurrentOp::blockingKill(AtomicUInt opId) {
+        bool killed = false;
+        LOG(3) << "KillCurrentOp: starting blockingkill" << endl;
+        boost::unique_lock<boost::mutex> lck(_mtx);
+        bool foundId = killImpl(opId, &killed);
+        if (!foundId) return; // don't wait if not found
+
+        // block until the killed operation stops
+        LOG(3) << "KillCurrentOp: waiting for confirmation of kill" << endl;
+        while (killed == false) {
+            _condvar.wait(lck);
+        }
+        LOG(3) << "KillCurrentOp: kill syncing complete" << endl;
+    }
+
+    bool KillCurrentOp::killImpl(AtomicUInt i, bool* pNotifyFlag /* = NULL */) {
         bool found = false;
         {
             scoped_lock l( Client::clientsMutex );
-            for( set< Client* >::const_iterator j = Client::clients.begin(); !found && j != Client::clients.end(); ++j ) {
+            for( set< Client* >::const_iterator j = Client::clients.begin(); 
+                 !found && j != Client::clients.end(); 
+                 ++j ) {
                 for( CurOp *k = ( *j )->curop(); !found && k; k = k->parent() ) {
                     if ( k->opNum() == i ) {
-                        k->kill();
+                        k->kill(pNotifyFlag);
                         for( CurOp *l = ( *j )->curop(); l != k; l = l->parent() ) {
                             l->kill();
                         }
@@ -60,6 +81,16 @@ namespace mongo {
         if ( found ) {
             interruptJs( &i );
         }
+        return found;
+    }
+
+
+    void KillCurrentOp::notifyAllWaiters() {
+        boost::unique_lock<boost::mutex> lck(_mtx);
+        if (!haveClient()) 
+            return;
+        cc().curop()->setKillWaiterFlags();
+        _condvar.notify_all();
     }
 
     void KillCurrentOp::checkForInterrupt( bool heedMutex ) {
@@ -68,7 +99,8 @@ namespace mongo {
             return;
         if( _globalKill )
             uasserted(11600,"interrupted at shutdown");
-        if( c.curop()->killed() ) {
+        if( c.curop()->killPending() ) {
+            notifyAllWaiters();
             uasserted(11601,"operation was interrupted");
         }
     }
@@ -77,12 +109,8 @@ namespace mongo {
         Client& c = cc();
         if( _globalKill )
             return "interrupted at shutdown";
-        if( c.curop()->killed() )
+        if( c.curop()->killPending() )
             return "interrupted";
         return "";
     }
-
-
-
-
 }
