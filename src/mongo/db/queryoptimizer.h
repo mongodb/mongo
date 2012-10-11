@@ -75,10 +75,13 @@ namespace mongo {
         /** @return true if ScanAndOrder processing will be required for result set. */
         bool scanAndOrderRequired() const { return _scanAndOrderRequired; }
         /**
-         * @return true if the index we are using has keys such that it can completely resolve the
-         * query expression to match by itself without ever checking the main object.
+         * @return false if document matching can be determined entirely using index keys and the
+         * FieldRangeSetPair generated for the query, without using a Matcher.  This function may
+         * return false positives but not false negatives.  For example, if the field range set's
+         * mustBeExactMatchRepresentation() returns a false negative, this function will return a
+         * false positive.
          */
-        bool exactKeyMatch() const { return _exactKeyMatch; }
+        bool mayBeMatcherNecessary() const { return _matcherNecessary; }
         /** @return true if this QueryPlan would perform an unindexed scan. */
         bool willScanTable() const { return _idxNo < 0 && ( _utility != Impossible ); }
         /** @return 'special' attribute of the plan, which was either set explicitly or generated from the index. */
@@ -145,7 +148,7 @@ namespace mongo {
         shared_ptr<const ParsedQuery> _parsedQuery;
         const IndexDetails * _index;
         bool _scanAndOrderRequired;
-        bool _exactKeyMatch;
+        bool _matcherNecessary;
         int _direction;
         shared_ptr<FieldRangeVector> _frv;
         shared_ptr<FieldRangeVector> _originalFrv;

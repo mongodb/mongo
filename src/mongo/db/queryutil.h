@@ -655,7 +655,15 @@ namespace mongo {
          * index scan using this FieldRangeVector, BSONObj() if no such key.
          */
         BSONObj firstMatch( const BSONObj &obj ) const;
-        
+
+        /**
+         * @return true if all ranges within the field range set on fields of this index are
+         * represented in this field range vector.  May be false in certain multikey index cases
+         * when intervals on two fields cannot both be used, see comments related to SERVER-958 in
+         * FieldRangeVector().
+         */
+        bool hasAllIndexedRanges() const { return _hasAllIndexedRanges; }
+
         string toString() const;
         
     private:
@@ -665,6 +673,7 @@ namespace mongo {
         const IndexSpec _indexSpec;
         int _direction;
         vector<BSONObj> _queries; // make sure mem owned
+        bool _hasAllIndexedRanges;
         friend class FieldRangeVectorIterator;
     };
     

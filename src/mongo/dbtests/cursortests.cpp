@@ -268,6 +268,7 @@ namespace CursorTests {
         class AbortImplicitScan : public Base {
         public:
             void run() {
+                _c.dropCollection( ns() );
                 // Set up a compound index with some data.
                 IndexSpec idx( BSON( "a" << 1 << "b" << 1 ) );
                 _c.ensureIndex( ns(), idx.keyPattern );
@@ -333,6 +334,188 @@ namespace CursorTests {
             }
         };
 
+        /**
+         * A BtreeCursor typically moves from one index match to another when its advance() method
+         * is called.  However, to prevent excessive iteration advance() may bail out early before
+         * the next index match is identified (SERVER-3448).  The BtreeCursor must indicate that
+         * these iterates are not matches in matchesCurrent() to prevent them from being matched
+         * when requestMatcher == false.
+         */
+        class DontMatchOutOfIndexBoundsDocuments : public Base {
+        public:
+            void run() {
+                _c.dropCollection( ns() );
+                _c.ensureIndex( ns(), BSON( "a" << 1 ) );
+                // Save 'a' values 0, 0.5, 1.5, 2.5 ... 97.5, 98.5, 99.
+                _c.insert( ns(), BSON( "a" << 0 ) );
+                _c.insert( ns(), BSON( "a" << 99 ) );
+                for( int i = 0; i < 99; ++i ) {
+                    _c.insert( ns(), BSON( "a" << ( i + 0.5 ) ) );
+                }
+                // Query 'a' values $in 0, 1, 2, ..., 99.
+                BSONArrayBuilder inVals;
+                for( int i = 0; i < 100; ++i ) {
+                    inVals << i;
+                }
+                BSONObj query = BSON( "a" << BSON( "$in" << inVals.arr() ) );
+                int matchCount = 0;
+                Client::ReadContext ctx( ns() );
+                shared_ptr<Cursor> c =
+                        NamespaceDetailsTransient::getCursor( ns(),
+                                                              query,
+                                                              BSONObj(),
+                                                              QueryPlanSelectionPolicy::any(),
+                                                              /* requestMatcher */ false );
+                // The BtreeCursor attempts to find each of the values 0, 1, 2, ... etc in the
+                // btree.  Because the values 0.5, 1.5, etc are present in the btree, the
+                // BtreeCursor will explicitly look for all the values in the $in list during
+                // successive calls to advance().  Because there are a large number of $in values to
+                // iterate over, BtreeCursor::advance() will bail out on intermediate values of 'a'
+                // (for example 20.5) that do not match the query if nscanned increases by more than
+                // 20.  We test here that these intermediate results are not matched.  Only the two
+                // correct matches a:0 and a:99 are matched.
+                while( c->ok() ) {
+                    ASSERT( !c->matcher() );
+                    if ( c->currentMatches() ) {
+                        double aVal = c->current()[ "a" ].number();
+                        // Only the expected values of a are matched.
+                        ASSERT( aVal == 0 || aVal == 99 );
+                        ++matchCount;
+                    }
+                    c->advance();
+                }
+                // Only the two expected documents a:0 and a:99 are matched.
+                ASSERT_EQUALS( 2, matchCount );
+            }
+        };
+
+        /**
+         * When using a multikey index, two constraints on the same field cannot be intersected for
+         * a non $elemMatch query (SERVER-958).  For example, using a single key index on { a:1 }
+         * the query { a:{ $gt:0, $lt:5 } } would generate the field range [[ 0, 5 ]].  But for a
+         * multikey index the field range is [[ 0, max_number ]].  In this case, the field range
+         * does not exactly represent the query, so a Matcher is required.
+         */
+        class MatcherRequiredTwoConstraintsSameField : public Base {
+        public:
+            void run() {
+                _c.dropCollection( ns() );
+                _c.ensureIndex( ns(), BSON( "a" << 1 ) );
+                _c.insert( ns(), BSON( "_id" << 0 << "a" << BSON_ARRAY( 1 << 2 ) ) );
+                _c.insert( ns(), BSON( "_id" << 1 << "a" << 9 ) );
+                Client::ReadContext ctx( ns() );
+                shared_ptr<Cursor> c =
+                        NamespaceDetailsTransient::getCursor( ns(),
+                                                              BSON( "a" << GT << 0 << LT << 5 ),
+                                                              BSONObj(),
+                                                              QueryPlanSelectionPolicy::any(),
+                                                              /* requestMatcher */ false );
+                while( c->ok() ) {
+                    // A Matcher is provided even though 'requestMatcher' is false.
+                    ASSERT( c->matcher() );
+                    if ( c->currentMatches() ) {
+                        // Even though a:9 is in the field range [[ 0, max_number ]], that result
+                        // does not match because the Matcher rejects it.  Only the _id:0 document
+                        // matches.
+                        ASSERT_EQUALS( 0, c->current()[ "_id" ].number() );
+                    }
+                    c->advance();
+                }
+            }
+        };
+
+        /**
+         * When using a multikey index, two constraints on fields with a shared parent cannot be
+         * intersected for a non $elemMatch query (SERVER-958).  For example, using a single key
+         * compound index on { 'a.b':1, 'a.c':1 } the query { 'a.b':2, 'a.c':2 } would generate the
+         * field range vector [ [[ 2, 2 ]], [[ 2, 2 ]] ].  But for a multikey index the field range
+         * vector is [ [[ 2, 2 ]], [[ minkey, maxkey ]] ].  In this case, the field range does not
+         * exactly represent the query, so a Matcher is required.
+         */
+        class MatcherRequiredTwoConstraintsDifferentFields : public Base {
+        public:
+            void run() {
+                _c.dropCollection( ns() );
+                _c.ensureIndex( ns(), BSON( "a.b" << 1 << "a.c" << 1 ) );
+                _c.insert( ns(), BSON( "a" << BSON_ARRAY( BSON( "b" << 2 << "c" << 3 ) <<
+                                                          BSONObj() ) ) );
+                Client::ReadContext ctx( ns() );
+                shared_ptr<Cursor> c =
+                        NamespaceDetailsTransient::getCursor( ns(),
+                                                              BSON( "a.b" << 2 << "a.c" << 2 ),
+                                                              BSONObj(),
+                                                              QueryPlanSelectionPolicy::any(),
+                                                              /* requestMatcher */ false );
+                while( c->ok() ) {
+                    // A Matcher is provided even though 'requestMatcher' is false.
+                    ASSERT( c->matcher() );
+                    // Even though { a:[ { b:2, c:3 } ] } is matched by the field range vector
+                    // [ [[ 2, 2 ]], [[ minkey, maxkey ]] ], that resut is not matched because the
+                    // Matcher rejects the document.
+                    ASSERT( !c->currentMatches() );
+                    c->advance();
+                }                
+            }
+        };
+
+        /**
+         * The upper bound of a $gt:string query is the empty object.  This upper bound must be
+         * exclusive so that empty objects do not match without a Matcher.
+         */
+        class TypeBracketedUpperBoundWithoutMatcher : public Base {
+        public:
+            void run() {
+                _c.dropCollection( ns() );
+                _c.ensureIndex( ns(), BSON( "a" << 1 ) );
+                _c.insert( ns(), BSON( "_id" << 0 << "a" << "a" ) );
+                _c.insert( ns(), BSON( "_id" << 1 << "a" << BSONObj() ) );
+                Client::ReadContext ctx( ns() );
+                shared_ptr<Cursor> c =
+                        NamespaceDetailsTransient::getCursor( ns(),
+                                                              BSON( "a" << GTE << "" ),
+                                                              BSONObj(),
+                                                              QueryPlanSelectionPolicy::any(),
+                                                              /* requestMatcher */ false );
+                while( c->ok() ) {
+                    ASSERT( !c->matcher() );
+                    if ( c->currentMatches() ) {
+                        // Only a:'a' matches, not a:{}.
+                        ASSERT_EQUALS( 0, c->current()[ "_id" ].number() );
+                    }
+                    c->advance();
+                }
+            }
+        };
+
+        /**
+         * The lower bound of a $lt:date query is the bson value 'true'.  This lower bound must be
+         * exclusive so that 'true' values do not match without a Matcher.
+         */
+        class TypeBracketedLowerBoundWithoutMatcher : public Base {
+        public:
+            void run() {
+                _c.dropCollection( ns() );
+                _c.ensureIndex( ns(), BSON( "a" << 1 ) );
+                _c.insert( ns(), BSON( "_id" << 0 << "a" << Date_t( 1 ) ) );
+                _c.insert( ns(), BSON( "_id" << 1 << "a" << true ) );
+                Client::ReadContext ctx( ns() );
+                shared_ptr<Cursor> c =
+                        NamespaceDetailsTransient::getCursor( ns(),
+                                                              BSON( "a" << LTE << Date_t( 1 ) ),
+                                                              BSONObj(),
+                                                              QueryPlanSelectionPolicy::any(),
+                                                              /* requestMatcher */ false );
+                while( c->ok() ) {
+                    ASSERT( !c->matcher() );
+                    if ( c->currentMatches() ) {
+                        // Only a:Date_t( 1 ) matches, not a:true.
+                        ASSERT_EQUALS( 0, c->current()[ "_id" ].number() );
+                    }
+                    c->advance();
+                }                
+            }
+        };
+        
     } // namespace BtreeCursor
     
     namespace ClientCursor {
@@ -564,6 +747,11 @@ namespace CursorTests {
             add<BtreeCursor::RangeEq>();
             add<BtreeCursor::RangeIn>();
             add<BtreeCursor::AbortImplicitScan>();
+            add<BtreeCursor::DontMatchOutOfIndexBoundsDocuments>();
+            add<BtreeCursor::MatcherRequiredTwoConstraintsSameField>();
+            add<BtreeCursor::MatcherRequiredTwoConstraintsDifferentFields>();
+            add<BtreeCursor::TypeBracketedUpperBoundWithoutMatcher>();
+            add<BtreeCursor::TypeBracketedLowerBoundWithoutMatcher>();
             add<ClientCursor::HandleDelete>();
             add<ClientCursor::AboutToDelete>();
             add<ClientCursor::AboutToDeleteDuplicate>();

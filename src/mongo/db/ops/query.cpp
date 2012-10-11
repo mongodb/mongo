@@ -673,7 +673,7 @@ namespace mongo {
         else {
             cursor =
                 NamespaceDetailsTransient::getCursor( ns.c_str(), query, order, QueryPlanSelectionPolicy::any(),
-                                                      0, pq_shared, false, &queryPlan );
+                                                      true, pq_shared, false, &queryPlan );
         }
         verify( cursor );
         

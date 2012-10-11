@@ -257,7 +257,7 @@ namespace mongo {
                         const BSONObj &query,
                         const BSONObj &order,
                         const QueryPlanSelectionPolicy &planPolicy,
-                        bool *simpleEqualityMatch,
+                        bool requestMatcher,
                         const shared_ptr<const ParsedQuery> &parsedQuery,
                         bool requireOrder,
                         QueryPlanSummary *singlePlanSummary );
@@ -288,7 +288,7 @@ namespace mongo {
         BSONObj _query;
         BSONObj _order;
         const QueryPlanSelectionPolicy &_planPolicy;
-        bool *_simpleEqualityMatch;
+        bool _requestMatcher;
         shared_ptr<const ParsedQuery> _parsedQuery;
         bool _requireOrder;
         QueryPlanSummary *_singlePlanSummary;

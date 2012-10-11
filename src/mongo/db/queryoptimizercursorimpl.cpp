@@ -386,12 +386,12 @@ namespace mongo {
                                          const BSONObj &query,
                                          const BSONObj &order,
                                          const QueryPlanSelectionPolicy &planPolicy,
-                                         bool *simpleEqualityMatch,
+                                         bool requestMatcher,
                                          const shared_ptr<const ParsedQuery> &parsedQuery,
                                          bool requireOrder,
                                          QueryPlanSummary *singlePlanSummary ) {
 
-        CursorGenerator generator( ns, query, order, planPolicy, simpleEqualityMatch, parsedQuery,
+        CursorGenerator generator( ns, query, order, planPolicy, requestMatcher, parsedQuery,
                                    requireOrder, singlePlanSummary );
         return generator.generate();
     }
@@ -400,7 +400,7 @@ namespace mongo {
                                      const BSONObj &query,
                                      const BSONObj &order,
                                      const QueryPlanSelectionPolicy &planPolicy,
-                                     bool *simpleEqualityMatch,
+                                     bool requestMatcher,
                                      const shared_ptr<const ParsedQuery> &parsedQuery,
                                      bool requireOrder,
                                      QueryPlanSummary *singlePlanSummary ) :
@@ -408,14 +408,11 @@ namespace mongo {
     _query( query ),
     _order( order ),
     _planPolicy( planPolicy ),
-    _simpleEqualityMatch( simpleEqualityMatch ),
+    _requestMatcher( requestMatcher ),
     _parsedQuery( parsedQuery ),
     _requireOrder( requireOrder ),
     _singlePlanSummary( singlePlanSummary ) {
         // Initialize optional return variables.
-        if ( _simpleEqualityMatch ) {
-            *_simpleEqualityMatch = false;
-        }
         if ( _singlePlanSummary ) {
             *_singlePlanSummary = QueryPlanSummary();
         }
@@ -492,15 +489,24 @@ namespace mongo {
         }
         shared_ptr<Cursor> single = singlePlan->newCursor();
         if ( !_query.isEmpty() && !single->matcher() ) {
-            single->setMatcher( singlePlan->matcher() );
+
+            // The query plan must have a matcher.  The matcher's constructor performs some aspects
+            // of query validation that should occur before a cursor is returned.
+            fassert( 16449, singlePlan->matcher() );
+
+            if ( // If a matcher is requested or ...
+                 _requestMatcher ||
+                 // ... the index ranges do not exactly match the query or ...
+                 singlePlan->mayBeMatcherNecessary() ||
+                 // ... the matcher must look at the full record ...
+                 singlePlan->matcher()->needRecord() ) {
+
+                // ... then set the cursor's matcher to the query plan's matcher.
+                single->setMatcher( singlePlan->matcher() );
+            }
         }
         if ( singlePlan->keyFieldsOnly() ) {
             single->setKeyFieldsOnly( singlePlan->keyFieldsOnly() );
-        }
-        if ( _simpleEqualityMatch ) {
-            if ( singlePlan->exactKeyMatch() && !single->matcher()->needRecord() ) {
-                *_simpleEqualityMatch = true;
-            }
         }
         return single;
     }

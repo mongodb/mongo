@@ -38,23 +38,6 @@ namespace mongo {
         return 1;
     }
 
-    bool exactKeyMatchSimpleQuery( const BSONObj &query, const int expectedFieldCount ) {
-        if ( query.nFields() != expectedFieldCount ) {
-            return false;
-        }
-        BSONObjIterator i( query );
-        while( i.more() ) {
-            BSONElement e = i.next();
-            if ( e.fieldName()[0] == '$' ) {
-                return false;
-            }
-            if ( e.mayEncapsulate() ) {
-                return false;
-            }
-        }
-        return true;
-    }
-    
     // returns an IndexDetails * for a hint, 0 if hint is $natural.
     // hint must not be eoo()
     IndexDetails *parseHint( const BSONElement &hint, NamespaceDetails *d ) {
@@ -119,7 +102,7 @@ namespace mongo {
         _parsedQuery( parsedQuery ),
         _index( 0 ),
         _scanAndOrderRequired( true ),
-        _exactKeyMatch( false ),
+        _matcherNecessary( true ),
         _direction( 0 ),
         _endKeyInclusive(),
         _utility( Helpful ),
@@ -228,13 +211,20 @@ doneCheckOrder:
         if ( !_scanAndOrderRequired &&
                 ( optimalIndexedQueryCount == _frs.numNonUniversalRanges() ) )
             _utility = Optimal;
-        if ( exactIndexedQueryCount == _frs.numNonUniversalRanges() &&
-            orderFieldsUnindexed.size() == 0 &&
-            exactIndexedQueryCount == idxKey.nFields() &&
-            exactKeyMatchSimpleQuery( _originalQuery, exactIndexedQueryCount ) ) {
-            _exactKeyMatch = true;
-        }
         _frv.reset( new FieldRangeVector( _frs, idxSpec, _direction ) );
+
+        if ( // If all field range constraints are on indexed fields and ...
+             _utility == Optimal &&
+             // ... the field ranges exactly represent the query and ...
+             _frs.mustBeExactMatchRepresentation() &&
+             // ... all indexed ranges are represented in the field range vector ...
+             _frv->hasAllIndexedRanges() ) {
+
+            // ... then the field range vector is sufficient to perform query matching against index
+            // keys.  No matcher is required.
+            _matcherNecessary = false;
+        }
+
         if ( originalFrsp ) {
             _originalFrv.reset( new FieldRangeVector( originalFrsp->frsForIndex( _d, _idxNo ),
                                                      idxSpec, _direction ) );
