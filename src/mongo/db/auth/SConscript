@@ -2,17 +2,23 @@
 
 Import("env")
 
-env.StaticLibrary('auth', ['action_set.cpp',
-                           'action_type.cpp',
-                           'capability.cpp',
-                           'capability_set.cpp',
-                           'principal.cpp',
-                           'principal_set.cpp'],
-                  LIBDEPS=['$BUILD_DIR/mongo/base/base', '$BUILD_DIR/mongo/stringutils'])
-
 env.StaticLibrary('serverauth', ['mongo_authentication_session.cpp'])
 
-env.CppUnitTest('action_set_test', 'action_set_test.cpp', LIBDEPS=['auth'])
-env.CppUnitTest('action_type_test', 'action_type_test.cpp', LIBDEPS=['auth'])
-env.CppUnitTest('capability_set_test', 'capability_set_test.cpp', LIBDEPS=['auth'])
-env.CppUnitTest('principal_set_test', 'principal_set_test.cpp', LIBDEPS=['auth'])
+# Just the data structures used
+env.StaticLibrary('authcore', ['action_set.cpp',
+                               'action_type.cpp',
+                               'authorization_manager.cpp',
+                               'capability.cpp',
+                               'capability_set.cpp',
+                               'principal.cpp',
+                               'principal_set.cpp'],
+                  LIBDEPS=['$BUILD_DIR/mongo/base/base', '$BUILD_DIR/mongo/stringutils'])
+
+env.StaticLibrary('auth', ['external_state.cpp'], LIBDEPS=['authcore'])
+
+env.CppUnitTest('action_set_test', 'action_set_test.cpp', LIBDEPS=['authcore'])
+env.CppUnitTest('action_type_test', 'action_type_test.cpp', LIBDEPS=['authcore'])
+env.CppUnitTest('capability_set_test', 'capability_set_test.cpp', LIBDEPS=['authcore'])
+env.CppUnitTest('principal_set_test', 'principal_set_test.cpp', LIBDEPS=['authcore'])
+env.CppUnitTest('authorization_manager_test', 'authorization_manager_test.cpp',
+                LIBDEPS=['authcore'])
