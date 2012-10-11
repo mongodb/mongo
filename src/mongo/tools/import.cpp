@@ -302,9 +302,16 @@ public:
     bool checkLastError() { 
         string s = conn().getLastError();
         if( !s.empty() ) { 
-            lastErrorFailures++;
-            log() << "error: " << s << endl;
-            return false;
+            if( str::contains(s,"uplicate") ) {
+                // we don't want to return an error from the mongoimport process for
+                // dup key errors
+                log() << s << endl;
+            }
+            else {
+                lastErrorFailures++;
+                log() << "error: " << s << endl;
+                return false;
+            }
         }
         return true;
     }
