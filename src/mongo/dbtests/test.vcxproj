@@ -518,6 +518,7 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClInclude Include="..\db\hasher.h" />
     <ClInclude Include="..\db\index_update.h" />
     <ClInclude Include="..\db\jsobjmanipulator.h" />
+    <ClInclude Include="..\db\kill_current_op.h" />
     <ClInclude Include="..\db\lockstat.h" />
     <ClInclude Include="..\db\lockstate.h" />
     <ClInclude Include="..\db\mongommf.h" />
@@ -541,6 +542,7 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClInclude Include="..\platform\compiler.h" />
     <ClInclude Include="..\platform\compiler_msvc.h" />
     <ClInclude Include="..\platform\float_utils.h" />
+    <ClInclude Include="..\platform\random.h" />
     <ClInclude Include="..\platform\strtoll.h" />
     <ClInclude Include="..\platform\unordered_map.h" />
     <ClInclude Include="..\platform\unordered_set.h" />
@@ -1259,6 +1261,7 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClCompile Include="..\db\hasher.cpp" />
     <ClCompile Include="..\db\index_update.cpp" />
     <ClCompile Include="..\db\key.cpp" />
+    <ClCompile Include="..\db\kill_current_op.cpp" />
     <ClCompile Include="..\db\lockstat.cpp" />
     <ClCompile Include="..\db\lockstate.cpp" />
     <ClCompile Include="..\db\mongommf.cpp" />
@@ -1287,6 +1290,7 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClCompile Include="..\db\restapi.cpp" />
     <ClCompile Include="..\db\scanandorder.cpp" />
     <ClCompile Include="..\db\security_common.cpp" />
+    <ClCompile Include="..\platform\random.cpp" />
     <ClCompile Include="..\scripting\bson_template_evaluator.cpp" />
     <ClCompile Include="..\scripting\sm_db.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>

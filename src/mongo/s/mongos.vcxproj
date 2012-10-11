@@ -991,6 +991,7 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClCompile Include="..\client\dbclient_rs.cpp" />
     <ClCompile Include="..\client\distlock.cpp" />
     <ClCompile Include="..\db\fail_point_service.cpp" />
+    <ClCompile Include="..\db\initialize_server_global_state.cpp" />
     <ClCompile Include="..\db\pipeline\pipeline.cpp" />
     <ClCompile Include="..\db\common.cpp" />
     <ClCompile Include="..\db\dbmessage.cpp" />
@@ -1030,6 +1031,7 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClCompile Include="..\db\security_commands.cpp" />
     <ClCompile Include="..\db\security_common.cpp" />
     <ClCompile Include="..\db\stats\top.cpp" />
+    <ClCompile Include="..\platform\random.cpp" />
     <ClCompile Include="..\scripting\bench.cpp" />
     <ClCompile Include="..\scripting\bson_template_evaluator.cpp" />
     <ClCompile Include="..\scripting\sm_db.cpp">
@@ -1239,6 +1241,7 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClInclude Include="..\client\authentication_table.h" />
     <ClInclude Include="..\client\authlevel.h" />
     <ClInclude Include="..\db\fail_point_service.h" />
+    <ClInclude Include="..\db\initialize_server_global_state.h" />
     <ClInclude Include="..\db\pipeline\pipeline.h" />
     <ClInclude Include="..\db\interrupt_status.h" />
     <ClInclude Include="..\db\pipeline\accumulator.h" />
@@ -1259,6 +1262,7 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClInclude Include="..\platform\compiler.h" />
     <ClInclude Include="..\platform\compiler_msvc.h" />
     <ClInclude Include="..\platform\float_utils.h" />
+    <ClInclude Include="..\platform\random.h" />
     <ClInclude Include="..\platform\strtoll.h" />
     <ClInclude Include="..\platform\unordered_map.h" />
     <ClInclude Include="..\platform\unordered_set.h" />

@@ -885,6 +885,7 @@ cscript //Nologo createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClCompile Include="..\client\connection_factory.cpp" />
     <ClCompile Include="..\db\dbmessage.cpp" />
     <ClCompile Include="..\db\fail_point_service.cpp" />
+    <ClCompile Include="..\platform\random.cpp" />
     <ClCompile Include="..\scripting\bson_template_evaluator.cpp" />
     <ClCompile Include="..\util\concurrency\mutexdebugger.cpp" />
     <ClCompile Include="..\util\fail_point.cpp" />
@@ -1127,6 +1128,7 @@ cscript //Nologo createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClInclude Include="..\platform\compiler.h" />
     <ClInclude Include="..\platform\compiler_msvc.h" />
     <ClInclude Include="..\platform\float_utils.h" />
+    <ClInclude Include="..\platform\random.h" />
     <ClInclude Include="..\platform\strtoll.h" />
     <ClInclude Include="..\platform\unordered_map.h" />
     <ClInclude Include="..\platform\unordered_set.h" />

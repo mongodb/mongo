@@ -959,6 +959,30 @@
     <ClCompile Include="..\util\fail_point_registry.cpp">
       <Filter>util\Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="auth\action_set.cpp">
+      <Filter>db\auth</Filter>
+    </ClCompile>
+    <ClCompile Include="auth\capability.cpp">
+      <Filter>db\auth</Filter>
+    </ClCompile>
+    <ClCompile Include="auth\capability_set.cpp">
+      <Filter>db\auth</Filter>
+    </ClCompile>
+    <ClCompile Include="auth\principal.cpp">
+      <Filter>db\auth</Filter>
+    </ClCompile>
+    <ClCompile Include="auth\principal_set.cpp">
+      <Filter>db\auth</Filter>
+    </ClCompile>
+    <ClCompile Include="kill_current_op.cpp">
+      <Filter>db\Source Files\e to n</Filter>
+    </ClCompile>
+    <ClCompile Include="initialize_server_global_state.cpp">
+      <Filter>db\Source Files\e to n</Filter>
+    </ClCompile>
+    <ClCompile Include="..\platform\random.cpp">
+      <Filter>platform</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\targetver.h" />
@@ -1785,6 +1809,30 @@
     <ClInclude Include="..\util\fail_point_registry.h">
       <Filter>util\Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="auth\action_set.h">
+      <Filter>db\auth</Filter>
+    </ClInclude>
+    <ClInclude Include="auth\capability.h">
+      <Filter>db\auth</Filter>
+    </ClInclude>
+    <ClInclude Include="auth\capability_set.h">
+      <Filter>db\auth</Filter>
+    </ClInclude>
+    <ClInclude Include="auth\principal.h">
+      <Filter>db\auth</Filter>
+    </ClInclude>
+    <ClInclude Include="auth\principal_set.h">
+      <Filter>db\auth</Filter>
+    </ClInclude>
+    <ClInclude Include="kill_current_op.h">
+      <Filter>db\Header Files\e to n</Filter>
+    </ClInclude>
+    <ClInclude Include="initialize_server_global_state.h">
+      <Filter>db\Header Files\e to n</Filter>
+    </ClInclude>
+    <ClInclude Include="..\platform\random.h">
+      <Filter>platform</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="mongo.ico">
@@ -1929,6 +1977,9 @@
     </Filter>
     <Filter Include="base">
       <UniqueIdentifier>{54fa01f6-b02c-4626-9752-9b4ac1c73994}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="db\auth">
+      <UniqueIdentifier>{9431025a-8834-44a1-b94a-8a20c616206d}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>

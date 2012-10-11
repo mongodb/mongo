@@ -1030,6 +1030,7 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClCompile Include="..\client\distlock.cpp" />
     <ClCompile Include="..\client\distlock_test.cpp" />
     <ClCompile Include="..\client\model.cpp" />
+    <ClCompile Include="..\platform\random.cpp" />
     <ClCompile Include="..\scripting\bson_template_evaluator.cpp" />
     <ClCompile Include="..\scripting\sm_db.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
@@ -1113,10 +1114,17 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClCompile Include="..\util\touch_pages.cpp" />
     <ClCompile Include="..\util\trace.cpp" />
     <ClCompile Include="..\util\version.cpp" />
+    <ClCompile Include="auth\action_set.cpp" />
+    <ClCompile Include="auth\capability.cpp" />
+    <ClCompile Include="auth\capability_set.cpp" />
+    <ClCompile Include="auth\principal.cpp" />
+    <ClCompile Include="auth\principal_set.cpp" />
     <ClCompile Include="btreebuilder.cpp" />
     <ClCompile Include="cap.cpp" />
     <ClCompile Include="commands\distinct.cpp" />
     <ClCompile Include="fail_point_service.cpp" />
+    <ClCompile Include="initialize_server_global_state.cpp" />
+    <ClCompile Include="kill_current_op.cpp" />
     <ClCompile Include="pipeline\document_source_cursor.cpp" />
     <ClCompile Include="commands\find_and_modify.cpp" />
     <ClCompile Include="commands\fsync.cpp" />
@@ -1268,6 +1276,7 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClInclude Include="..\platform\compiler.h" />
     <ClInclude Include="..\platform\compiler_msvc.h" />
     <ClInclude Include="..\platform\float_utils.h" />
+    <ClInclude Include="..\platform\random.h" />
     <ClInclude Include="..\platform\strtoll.h" />
     <ClInclude Include="..\platform\unordered_map.h" />
     <ClInclude Include="..\platform\unordered_set.h" />
@@ -1289,12 +1298,19 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClInclude Include="..\util\timer-win32-inl.h" />
     <ClInclude Include="..\util\timer.h" />
     <ClInclude Include="..\util\touch_pages.h" />
+    <ClInclude Include="auth\action_set.h" />
+    <ClInclude Include="auth\capability.h" />
+    <ClInclude Include="auth\capability_set.h" />
+    <ClInclude Include="auth\principal.h" />
+    <ClInclude Include="auth\principal_set.h" />
     <ClInclude Include="explain.h" />
     <ClInclude Include="fail_point_service.h" />
     <ClInclude Include="hasher.h" />
     <ClInclude Include="hashindex.h" />
     <ClInclude Include="index_insertion_continuation.h" />
     <ClInclude Include="index_update.h" />
+    <ClInclude Include="initialize_server_global_state.h" />
+    <ClInclude Include="kill_current_op.h" />
     <ClInclude Include="lockstat.h" />
     <ClInclude Include="lockstate.h" />
     <ClInclude Include="namespace_details-inl.h" />

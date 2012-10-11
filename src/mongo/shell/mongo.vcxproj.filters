@@ -560,6 +560,9 @@
     <ClCompile Include="..\util\fail_point_registry.cpp">
       <Filter>util\Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\platform\random.cpp">
+      <Filter>platform</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="collection.js">
@@ -1324,6 +1327,9 @@
     </ClInclude>
     <ClInclude Include="..\util\fail_point_registry.h">
       <Filter>util\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\platform\random.h">
+      <Filter>platform</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
