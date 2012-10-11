@@ -439,7 +439,7 @@ namespace mongo {
     };
 
     extern Tee* const warnings; // Things put here go in serverStatus
-    extern Tee* startupWarningsLog;
+    extern Tee* const startupWarningsLog; // Things put here get reported in MMS
 
     string errnoWithDescription(int errorcode = -1);
     void rawOut( const string &s );

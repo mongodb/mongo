@@ -505,6 +505,45 @@ namespace mongo {
         return cc().curop()->opNum();
     }
 
+    /// warn if readahead > 256KB (gridfs chunk size)
+    static void checkReadAhead(const string& dir) {
+#ifdef __linux__
+        const dev_t dev = getPartition(dir);
+
+        // This path handles the case where the filesystem uses the whole device (including LVM)
+        string path = str::stream() <<
+            "/sys/dev/block/" << major(dev) << ':' << minor(dev) << "/queue/read_ahead_kb";
+
+        if (!boost::filesystem::exists(path)){
+            // This path handles the case where the filesystem is on a partition.
+            path = str::stream()
+                << "/sys/dev/block/" << major(dev) << ':' << minor(dev) // this is a symlink
+                << "/.." // parent directory of a partition is for the whole device
+                << "/queue/read_ahead_kb";
+        }
+
+        if (boost::filesystem::exists(path)) {
+            ifstream file (path.c_str());
+            if (file.is_open()) {
+                int kb;
+                file >> kb;
+                if (kb > 256) {
+                    log() << startupWarningsLog;
+
+                    log() << "** WARNING: Readahead for " << dir << " is set to " << kb << "KB"
+                            << startupWarningsLog;
+
+                    log() << "**          We suggest setting it to 256KB (512 sectors) or less"
+                            << startupWarningsLog;
+
+                    log() << "**          http://www.mongodb.org/display/DOCS/Readahead"
+                            << startupWarningsLog;
+                }
+            }
+        }
+#endif // __linux__
+    }
+
     void _initAndListen(int listenPort ) {
 
         Client::initThread("initandlisten");
@@ -549,6 +588,9 @@ namespace mongo {
             ss << "repairpath (" << repairpath << ") does not exist";
             uassert( 12590 ,  ss.str().c_str(), boost::filesystem::exists( repairpath ) );
         }
+
+        // TODO check non-journal subdirs if using directory-per-db
+        checkReadAhead(dbpath);
 
         acquirePathLock(forceRepair);
         boost::filesystem::remove_all( dbpath + "/_tmp/" );
