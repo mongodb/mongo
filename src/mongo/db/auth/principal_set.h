@@ -45,7 +45,7 @@ namespace mongo {
         // Ownership of the returned Principal remains with the PrincipalSet.  The pointer
         // returned is only guaranteed to remain valid until the next non-const method is called
         // on the PrincipalSet.
-        const Principal* lookup(const std::string& name) const;
+        Principal* lookup(const std::string& name) const;
 
     private:
         // Key is principal name.

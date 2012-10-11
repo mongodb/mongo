@@ -33,7 +33,7 @@ namespace {
         Principal user1("user1");
         Principal user2("user2");
 
-        ASSERT_OK(ActionSet::parseActionSetFromString("r,w,u,p", &actions));
+        ASSERT_OK(ActionSet::parseActionSetFromString("r,w,u,d", &actions));
         Capability fooAdmin("foo", &user1, actions);
 
         ASSERT_OK(ActionSet::parseActionSetFromString("r,w", &actions));
@@ -48,53 +48,53 @@ namespace {
 
         const Capability* capPtr;
         // No capabilities
-        ASSERT(!capSet.getCapabilityForAction("foo", ActionSet::READ));
+        ASSERT(!capSet.getCapabilityForAction("foo", ActionType::READ));
 
         capSet.grantCapability(fooUser);
-        capPtr = capSet.getCapabilityForAction("foo", ActionSet::READ);
-        ASSERT_TRUE(capPtr->includesAction(ActionSet::READ));
-        ASSERT_FALSE(capPtr->includesAction(ActionSet::PRODUCTION_ADMIN));
+        capPtr = capSet.getCapabilityForAction("foo", ActionType::READ);
+        ASSERT_TRUE(capPtr->includesAction(ActionType::READ));
+        ASSERT_FALSE(capPtr->includesAction(ActionType::DB_ADMIN));
 
-        ASSERT(!capSet.getCapabilityForAction("foo", ActionSet::PRODUCTION_ADMIN));
+        ASSERT(!capSet.getCapabilityForAction("foo", ActionType::DB_ADMIN));
 
         capSet.grantCapability(fooAdmin);
-        capPtr = capSet.getCapabilityForAction("foo", ActionSet::USER_ADMIN);
-        ASSERT_TRUE(capPtr->includesAction(ActionSet::READ));
-        ASSERT_TRUE(capPtr->includesAction(ActionSet::PRODUCTION_ADMIN));
+        capPtr = capSet.getCapabilityForAction("foo", ActionType::USER_ADMIN);
+        ASSERT_TRUE(capPtr->includesAction(ActionType::READ));
+        ASSERT_TRUE(capPtr->includesAction(ActionType::DB_ADMIN));
 
         // No capabilities
-        ASSERT(!capSet.getCapabilityForAction("bar", ActionSet::READ));
+        ASSERT(!capSet.getCapabilityForAction("bar", ActionType::READ));
 
         capSet.grantCapability(barReadOnly);
-        capPtr = capSet.getCapabilityForAction("bar", ActionSet::READ);
-        ASSERT_TRUE(capPtr->includesAction(ActionSet::READ));
-        ASSERT_FALSE(capPtr->includesAction(ActionSet::WRITE));
-        ASSERT_FALSE(capPtr->includesAction(ActionSet::PRODUCTION_ADMIN));
+        capPtr = capSet.getCapabilityForAction("bar", ActionType::READ);
+        ASSERT_TRUE(capPtr->includesAction(ActionType::READ));
+        ASSERT_FALSE(capPtr->includesAction(ActionType::READ_WRITE));
+        ASSERT_FALSE(capPtr->includesAction(ActionType::DB_ADMIN));
 
-        ASSERT(!capSet.getCapabilityForAction("bar", ActionSet::WRITE));
+        ASSERT(!capSet.getCapabilityForAction("bar", ActionType::READ_WRITE));
 
         capSet.grantCapability(barUser);
-        capPtr = capSet.getCapabilityForAction("bar", ActionSet::WRITE);
-        ASSERT_TRUE(capPtr->includesAction(ActionSet::READ));
-        ASSERT_TRUE(capPtr->includesAction(ActionSet::WRITE));
-        ASSERT_FALSE(capPtr->includesAction(ActionSet::PRODUCTION_ADMIN));
+        capPtr = capSet.getCapabilityForAction("bar", ActionType::READ_WRITE);
+        ASSERT_TRUE(capPtr->includesAction(ActionType::READ));
+        ASSERT_TRUE(capPtr->includesAction(ActionType::READ_WRITE));
+        ASSERT_FALSE(capPtr->includesAction(ActionType::DB_ADMIN));
 
         // Now let's start revoking capabilities
         capSet.revokeCapabilitiesFromPrincipal(&user1);
 
-        capPtr = capSet.getCapabilityForAction("foo", ActionSet::READ);
-        ASSERT_TRUE(capPtr->includesAction(ActionSet::READ));
-        ASSERT_FALSE(capPtr->includesAction(ActionSet::PRODUCTION_ADMIN));
+        capPtr = capSet.getCapabilityForAction("foo", ActionType::READ);
+        ASSERT_TRUE(capPtr->includesAction(ActionType::READ));
+        ASSERT_FALSE(capPtr->includesAction(ActionType::DB_ADMIN));
 
-        capPtr = capSet.getCapabilityForAction("bar", ActionSet::READ);
-        ASSERT_TRUE(capPtr->includesAction(ActionSet::READ));
-        ASSERT_FALSE(capPtr->includesAction(ActionSet::WRITE));
-        ASSERT_FALSE(capPtr->includesAction(ActionSet::PRODUCTION_ADMIN));
+        capPtr = capSet.getCapabilityForAction("bar", ActionType::READ);
+        ASSERT_TRUE(capPtr->includesAction(ActionType::READ));
+        ASSERT_FALSE(capPtr->includesAction(ActionType::READ_WRITE));
+        ASSERT_FALSE(capPtr->includesAction(ActionType::DB_ADMIN));
 
 
         capSet.revokeCapabilitiesFromPrincipal(&user2);
-        ASSERT(!capSet.getCapabilityForAction("foo", ActionSet::READ));
-        ASSERT(!capSet.getCapabilityForAction("bar", ActionSet::READ));
+        ASSERT(!capSet.getCapabilityForAction("foo", ActionType::READ));
+        ASSERT(!capSet.getCapabilityForAction("bar", ActionType::READ));
     }
 
 }  // namespace

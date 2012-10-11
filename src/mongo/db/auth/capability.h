@@ -16,11 +16,12 @@
 
 #pragma once
 
-#include <stdint.h>
 #include <string>
 
 #include "mongo/db/auth/action_set.h"
+#include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/principal.h"
+#include "mongo/platform/cstdint.h"
 
 namespace mongo {
 
@@ -44,7 +45,7 @@ namespace mongo {
         const ActionSet& getActions() const;
 
         // Checks if the given action is present in the Capability.
-        bool includesAction(const ActionSet::ActionType& action) const;
+        bool includesAction(const ActionType& action) const;
 
     private:
 

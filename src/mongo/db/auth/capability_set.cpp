@@ -22,6 +22,7 @@
 #include <string>
 
 #include "mongo/db/auth/action_set.h"
+#include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/capability.h"
 #include "mongo/db/auth/principal.h"
 
@@ -31,8 +32,8 @@ namespace mongo {
         _capabilities.insert(std::make_pair(capability.getResource(), capability));
     }
 
-    const Capability* CapabilitySet::getCapabilityForAction(
-            const std::string& resource, const ActionSet::ActionType& action) const {
+    const Capability* CapabilitySet::getCapabilityForAction(const std::string& resource,
+                                                            const ActionType& action) const {
         CapabilitySetConstRange range;
         CapabilityRangeConstIterator it;
 

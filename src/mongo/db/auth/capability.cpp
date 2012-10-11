@@ -16,12 +16,13 @@
 
 #include "mongo/db/auth/capability.h"
 
-#include <stdint.h>
 #include <string>
 #include <vector>
 
 #include "mongo/db/auth/action_set.h"
+#include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/principal.h"
+#include "mongo/platform/cstdint.h"
 
 namespace mongo {
 
@@ -45,7 +46,7 @@ namespace mongo {
         return _actions;
     }
 
-    bool Capability::includesAction(const ActionSet::ActionType& action) const {
+    bool Capability::includesAction(const ActionType& action) const {
         return _actions.contains(action);
     }
 

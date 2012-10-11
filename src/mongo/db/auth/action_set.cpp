@@ -21,49 +21,22 @@
 #include <string>
 
 #include "mongo/base/status.h"
+#include "mongo/bson/util/builder.h"
 #include "mongo/util/log.h"
-#include "mongo/util/mongoutils/str.h"
 #include "mongo/util/stringutils.h"
 
 namespace mongo {
 
     void ActionSet::addAction(const ActionType& action) {
-        _actions |= action;
+        _actions |= (1 << action.getIdentifier());
     }
 
     bool ActionSet::contains(const ActionType& action) const {
-        return _actions & action;
+        return _actions & (1 << action.getIdentifier());
     }
 
     bool ActionSet::isSupersetOf(const ActionSet& other) const {
         return (_actions & other._actions) == other._actions;
-    }
-
-
-    Status ActionSet::parseActionFromString(const std::string& action,
-                                            ActionSet::ActionType* result) {
-        if(action == "r") {
-            *result = ActionSet::READ;
-            return Status::OK();
-        } else if (action == "w") {
-            *result = ActionSet::WRITE;
-            return Status::OK();
-        } else if (action == "u") {
-            *result = ActionSet::USER_ADMIN;
-            return Status::OK();
-        } else if (action == "p") {
-            *result = ActionSet::PRODUCTION_ADMIN;
-            return Status::OK();
-        } else if (action == "a") {
-            *result = ActionSet::SUPER_ADMIN;
-            return Status::OK();
-        } else {
-            *result = ActionSet::NONE;
-            return Status(ErrorCodes::FailedToParse,
-                          mongoutils::str::stream() << "Unrecognized action capability string: "
-                                                    << action,
-                          0);
-        }
     }
 
     Status ActionSet::parseActionSetFromString(const std::string& actionsString,
@@ -72,8 +45,8 @@ namespace mongo {
         splitStringDelim(actionsString, &actionsList, ',');
         ActionSet actions;
         for (size_t i = 0; i < actionsList.size(); i++) {
-            ActionSet::ActionType action;
-            Status status = parseActionFromString(actionsList[i], &action);
+            ActionType action;
+            Status status = ActionType::parseActionFromString(actionsList[i], &action);
             if (status != Status::OK()) {
                 ActionSet empty;
                 *result = empty;
@@ -85,14 +58,20 @@ namespace mongo {
         return Status::OK();
     }
 
-    // Takes an ActionType and returns the string representation
-    std::string ActionSet::actionToString(const ActionSet::ActionType& action) {
-        return ""; // TODO
-    }
-
-    // Takes an ActionSet and returns the string representation
-    std::string ActionSet::actionSetToString(const ActionSet& actionSet) {
-        return ""; // TODO
+    std::string ActionSet::toString() const {
+        StringBuilder str;
+        bool addedOne = false;
+        for (int i = 0; i < ActionType::ACTION_TYPE_END_VALUE; i++) {
+            ActionType action(i);
+            if (contains(action)) {
+                if (addedOne) {
+                    str << ",";
+                }
+                str << ActionType::actionToString(action);
+                addedOne = true;
+            }
+        }
+        return str.str();
     }
 
 } // namespace mongo

@@ -21,6 +21,7 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/db/auth/action_set.h"
+#include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/capability.h"
 #include "mongo/db/auth/principal.h"
 
@@ -49,7 +50,7 @@ namespace mongo {
         // returned is only guaranteed to remain valid until the next non-const method is called
         // on the CapabilitySet.
         const Capability* getCapabilityForAction(const std::string& resource,
-                                                 const ActionSet::ActionType& action) const;
+                                                 const ActionType& action) const;
 
     private:
 
