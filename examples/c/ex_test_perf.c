@@ -32,6 +32,7 @@
 #include <string.h>
 #include <errno.h>
 #include <stdlib.h>
+#include <sys/time.h>
 #include <pthread.h>
 #include <inttypes.h>
 #include <unistd.h>
@@ -55,6 +56,7 @@ typedef struct {
 	uint32_t verbose;
 	uint32_t stat_thread;	/* Whether to create a stat thread. */
 	WT_CONNECTION *conn;
+	FILE *logf;
 } CONFIG;
 
 /* Forward function definitions. */
@@ -62,6 +64,7 @@ int execute_reads(CONFIG *);
 int populate(CONFIG *);
 void print_config(CONFIG *);
 void *read_thread(void *);
+int setup_log_file(CONFIG *);
 void *stat_worker(void *);
 void usage(void);
 
@@ -82,7 +85,8 @@ CONFIG default_cfg = {
 	2,		/* read_threads */
 	0,		/* verbose */
 	0,		/* stat_thread */
-	NULL
+	NULL,		/* conn */
+	NULL		/* logf */
 };
 /* Small config values - these are small. */
 CONFIG small_cfg = {
@@ -102,7 +106,8 @@ CONFIG small_cfg = {
 	8,		/* read_threads */
 	0,		/* verbose */
 	0,		/* stat_thread */
-	NULL
+	NULL,		/* conn */
+	NULL		/* logf */
 };
 /* Default values - these are small, we want the basic run to be fast. */
 CONFIG med_cfg = {
@@ -122,7 +127,8 @@ CONFIG med_cfg = {
 	16,		/* read_threads */
 	0,		/* verbose */
 	0,		/* stat_thread */
-	NULL
+	NULL,		/* conn */
+	NULL		/* logf */
 };
 /* Default values - these are small, we want the basic run to be fast. */
 CONFIG large_cfg = {
@@ -142,7 +148,8 @@ CONFIG large_cfg = {
 	16,		/* read_threads */
 	0,		/* verbose */
 	0,		/* stat_thread */
-	NULL
+	NULL,		/* conn */
+	NULL		/* logf */
 };
 
 const char *debug_cconfig = "verbose=[lsm]";
@@ -196,16 +203,14 @@ stat_worker(void *arg)
 	WT_CONNECTION *conn;
 	WT_SESSION *session;
 	WT_CURSOR *cursor;
-	FILE *logf;
 	const char *desc, *pvalue;
-	char *fname, *lsm_uri;
-	int offset, ret;
+	char *lsm_uri;
+	int ret;
 	uint64_t value;
 
 	cfg = (CONFIG *)arg;
 	conn = cfg->conn;
-	fname = lsm_uri = NULL;
-	logf = NULL;
+	lsm_uri = NULL;
 
 	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0) {
 		fprintf(stderr,
@@ -221,30 +226,12 @@ stat_worker(void *arg)
 		}
 		sprintf(lsm_uri, "statistics:%s", cfg->uri);
 	}
-	/* Open the file for logging statistics information. */
-	if ((fname = calloc(strlen(cfg->home) +
-	    strlen(cfg->uri) + strlen(".stat") + 1, 1)) == NULL) {
-		fprintf(stderr, "No memory in stat thread\n");
-		goto err;
-	}
-	for (offset = 0;
-	    cfg->uri[offset] != 0 && cfg->uri[offset] != ':';
-	    offset++) {}
-	if (cfg->uri[offset] == 0)
-		offset = 0;
-	else
-		++offset;
-	sprintf(fname, "%s/%s.stat", cfg->home, cfg->uri + offset);
-	if ((logf = fopen(fname, "w")) == NULL) {
-		fprintf(stderr, "Statistics failed to open log file.\n");
-		goto err;
-	}
 
 	while (running) {
 		sleep(cfg->report_interval);
 		/* Generic header. */
-		fprintf(logf, "=========================================\n");
-		fprintf(logf,
+		fprintf(cfg->logf, "=======================================\n");
+		fprintf(cfg->logf,
 		    "reads completed: %" PRIu64", elapsed time: ~%d\n",
 		    nops, cfg->elapsed_time);
 		/* Report LSM tree stats, if using LSM. */
@@ -259,18 +246,15 @@ stat_worker(void *arg)
 			    (ret = cursor->next(cursor)) == 0 &&
 			    (ret = cursor->get_value(
 			    cursor, &desc, &pvalue, &value)) == 0)
-				fprintf(logf, "stat:lsm:%s=%s\n", desc, pvalue);
+				fprintf(cfg->logf,
+				    "stat:lsm:%s=%s\n", desc, pvalue);
 			cursor->close(cursor);
 		}
-		fflush(logf);
+		fflush(cfg->logf);
 	}
 err:	session->close(session, NULL);
 	if (lsm_uri != NULL)
 		free(lsm_uri);
-	if (fname != NULL)
-		free(fname);
-	if (logf != NULL)
-		fclose(logf);
 	return (arg);
 }
 
@@ -280,7 +264,9 @@ int populate(CONFIG *cfg)
 	WT_CURSOR *cursor;
 	WT_SESSION *session;
 	char *data_buf, *key_buf;
+	double secs;
 	int ret;
+	struct timeval e, s;
 	uint32_t i;
 
 	conn = cfg->conn;
@@ -316,6 +302,7 @@ int populate(CONFIG *cfg)
 	memset(data_buf, 'a', cfg->data_sz - 1);
 	cursor->set_value(cursor, data_buf);
 	/* Populate the database. */
+	gettimeofday(&s, NULL);
 	for (i = 0; i < cfg->icount; i++) {
 		if (cfg->verbose > 0) {
 			if (i % 1000000 == 0)
@@ -330,14 +317,55 @@ int populate(CONFIG *cfg)
 			return (ret);
 		}
 	}
+	gettimeofday(&e, NULL);
 	cursor->close(cursor);
 	session->close(session, NULL);
-	if (cfg->verbose > 0)
-		printf("Finished bulk load of %d items\n", cfg->icount);
+	if (cfg->verbose > 0) {
+		fprintf(cfg->logf,
+		    "Finished bulk load of %d items\n", cfg->icount);
+		secs = e.tv_sec + e.tv_usec / 1000000.0;
+		secs -= (s.tv_sec + s.tv_usec / 1000000.0);
+		if (secs == 0)
+			++secs;
+		fprintf(cfg->logf,
+		    "Load time: %.2f\nload ops/sec: %.2f\n",
+		    secs, cfg->icount / secs);
+	}
 
 	free(data_buf);
 	free(key_buf);
 	return (ret);
+}
+
+/* Setup the logging output mechanism. */
+int setup_log_file(CONFIG *cfg)
+{
+	char *fname;
+	int offset;
+
+	if (cfg->verbose < 1 && cfg->stat_thread == 0)
+		return (0);
+
+	if ((fname = calloc(strlen(cfg->home) +
+	    strlen(cfg->uri) + strlen(".stat") + 1, 1)) == NULL) {
+		fprintf(stderr, "No memory in stat thread\n");
+		return (ENOMEM);
+	}
+	for (offset = 0;
+	    cfg->uri[offset] != 0 && cfg->uri[offset] != ':';
+	    offset++) {}
+	if (cfg->uri[offset] == 0)
+		offset = 0;
+	else
+		++offset;
+	sprintf(fname, "%s/%s.stat", cfg->home, cfg->uri + offset);
+	if ((cfg->logf = fopen(fname, "w")) == NULL) {
+		fprintf(stderr, "Statistics failed to open log file.\n");
+		return (EINVAL);
+	}
+	if (fname != NULL)
+		free(fname);
+	return (0);
 }
 
 int main(int argc, char **argv)
@@ -432,6 +460,9 @@ int main(int argc, char **argv)
 			return (EINVAL);
 		}
 
+	if ((ret = setup_log_file(&cfg)) != 0)
+		goto err;
+
 	/* Concatenate non-default configuration strings. */
 	if (cfg.verbose > 1 || user_cconfig != NULL) {
 		req_len = strlen(cfg.conn_config) + strlen(debug_cconfig) + 3;
@@ -496,9 +527,13 @@ int main(int argc, char **argv)
 		if ((ret = execute_reads(&cfg)) != 0)
 			goto err;
 
-	printf("Ran performance test example with %d threads for %d seconds.\n",
-	    cfg.read_threads, cfg.read_time);
-	printf("Executed %" PRIu64 " read operations\n", nops);
+	if (cfg.verbose > 0) {
+		fprintf(cfg.logf,
+	    "Ran performance test example with %d threads for %d seconds.\n",
+		    cfg.read_threads, cfg.read_time);
+		fprintf(cfg.logf,
+		    "Executed %" PRIu64 " read operations\n", nops);
+	}
 
 	/* Cleanup. */
 err:	if (stat_created != 0 && (ret = pthread_join(stat, NULL)) != 0)
@@ -510,6 +545,10 @@ err:	if (stat_created != 0 && (ret = pthread_join(stat, NULL)) != 0)
 		free(cc_buf);
 	if (tc_buf != NULL)
 		free(tc_buf);
+	if (cfg.logf != NULL) {
+		fflush(cfg.logf);
+		fclose(cfg.logf);
+	}
 
 	return (ret);
 }
@@ -522,7 +561,7 @@ int execute_reads(CONFIG *cfg)
 	uint64_t last_ops;
 
 	if (cfg->verbose > 0)
-		printf("Starting read threads\n");
+		fprintf(cfg->logf, "Starting read threads\n");
 
 	running = 1;
 	nops = 0;
@@ -547,9 +586,8 @@ int execute_reads(CONFIG *cfg)
 	    cfg->elapsed_time += cfg->report_interval) {
 		sleep(cfg->report_interval);
 		if (cfg->verbose > 0) {
-			printf("%" PRIu64 " ops in %d secs\n",
+			fprintf(cfg->logf, "%" PRIu64 " ops in %d secs\n",
 			    nops - last_ops, cfg->report_interval);
-			fflush(stdout);
 		}
 		last_ops = nops;
 	}
