@@ -815,6 +815,23 @@ namespace ReplTests {
             }
         };
 
+        class PushWithDollarSigns : public Base {
+            void doIt() const {
+                client()->update( ns(),
+                                  BSON( "_id" << 0),
+                                  BSON( "$push" << BSON( "a" << BSON( "$foo" << 1 ) ) ) );
+            }
+            using ReplTests::Base::check;
+            void check() const {
+                ASSERT_EQUALS( 1, count() );
+                check( fromjson( "{'_id':0, a:[0, {'$foo':1}]}"), one( fromjson( "{'_id':0}" ) ) );
+            }
+            void reset() const {
+                deleteAll( ns() );
+                insert( BSON( "_id" << 0 << "a" << BSON_ARRAY( 0 ) ) );
+            }
+        };
+
         class PushAllUpsert : public Base {
         public:
             void doIt() const {
@@ -1288,6 +1305,7 @@ namespace ReplTests {
             add< Idempotence::EmptyPush >();
             add< Idempotence::EmptyPushSparseIndex >();
             add< Idempotence::PushAll >();
+            add< Idempotence::PushWithDollarSigns >();
             add< Idempotence::PushAllUpsert >();
             add< Idempotence::EmptyPushAll >();
             add< Idempotence::Pull >();
