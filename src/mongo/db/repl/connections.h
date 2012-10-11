@@ -90,6 +90,11 @@ namespace mongo {
                 cc->_logLevel = 2;
             }
 
+            void tagPort() {
+                MessagingPort& mp = cc->port();
+                mp.tag |= 1;
+            }
+
             void setTimeout(time_t timeout) {
                 _timeout = timeout;
                 cc->setSoTimeout(_timeout);
@@ -115,6 +120,7 @@ namespace mongo {
             return false;
           }
           connInfo->connected = true;
+          connInfo->tagPort();
 
           // if we cannot authenticate against a member, then either its key file
           // or our key file has to change.  if our key file has to change, we'll
