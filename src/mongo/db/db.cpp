@@ -627,12 +627,13 @@ int main(int argc, char* argv[], char** envp) {
     ::_exit(exitCode);
 }
 
-static int mongoDbMain(int argc, char* argv[], char **envp) {
-    static StaticObserver staticObserver;
+static void buildOptionsDescriptions(po::options_description *pVisible,
+                                     po::options_description *pHidden,
+                                     po::positional_options_description *pPositional) {
 
-    mongo::runGlobalInitializersOrDie(argc, argv, envp);
-
-    getcurns = ourgetns;
+    po::options_description& visible_options = *pVisible;
+    po::options_description& hidden_options = *pHidden;
+    po::positional_options_description& positional_options = *pPositional;
 
     po::options_description general_options("General options");
 #if defined(_WIN32)
@@ -642,11 +643,7 @@ static int mongoDbMain(int argc, char* argv[], char **envp) {
     po::options_description ms_options("Master/slave options");
     po::options_description rs_options("Replica set options");
     po::options_description sharding_options("Sharding options");
-    po::options_description visible_options("Allowed options");
-    po::options_description hidden_options("Hidden options");
     po::options_description ssl_options("SSL options");
-
-    po::positional_options_description positional_options;
 
     CmdLine::addGlobalOptions( general_options , hidden_options , ssl_options );
 
@@ -745,7 +742,13 @@ static int mongoDbMain(int argc, char* argv[], char **envp) {
     visible_options.add(ssl_options);
 #endif
     Module::addOptions( visible_options );
+}
 
+static int mongoDbMain(int argc, char* argv[], char **envp) {
+    static StaticObserver staticObserver;
+
+    getcurns = ourgetns;
+    mongo::runGlobalInitializersOrDie(argc, argv, envp);
 
     setupCoreSignals();
     setupSignals( false );
@@ -765,6 +768,11 @@ static int mongoDbMain(int argc, char* argv[], char **envp) {
 
     if( argc == 1 )
         cout << dbExecCommand << " --help for help and startup options" << endl;
+
+    po::options_description visible_options("Allowed options");
+    po::options_description hidden_options("Hidden options");
+    po::positional_options_description positional_options;
+    buildOptionsDescriptions(&visible_options, &hidden_options, &positional_options);
 
     {
         po::variables_map params;
