@@ -296,6 +296,19 @@ public:
         out << "Import CSV, TSV or JSON data into MongoDB.\n" << endl;
     }
 
+    unsigned long long lastErrorFailures;
+
+    /** @return true if ok */
+    bool checkLastError() { 
+        string s = conn().getLastError();
+        if( !s.empty() ) { 
+            lastErrorFailures++;
+            log() << "error: " << s << endl;
+            return false;
+        }
+        return true;
+    }
+
     int run() {
         string filename = getParam( "file" );
         long long fileSize = 0;
@@ -395,6 +408,7 @@ public:
         ProgressMeter pm( fileSize );
         int num = 0;
         int errors = 0;
+        lastErrorFailures = 0;
         int len = 0;
         // buffer and line are only used when parsing a jsonArray
         boost::scoped_array<char> buffer(new char[BUF_SIZE+2]);
@@ -464,14 +478,18 @@ public:
             }
         }
 
-        log() << "imported " << ( num - headerRows ) << " objects" << endl;
+        checkLastError();
 
-        conn().getLastError();
+        bool hadErrors = lastErrorFailures || errors;
 
-        if ( errors == 0 )
+        // the message is vague on lastErrorFailures as we don't call it on every single operation. 
+        // so if we have a lastErrorFailure there might be more than just what has been counted.
+        log() << (lastErrorFailures ? "tried to import " : "imported ") << ( num - headerRows ) << " objects" << endl;
+
+        if ( !hadErrors )
             return 0;
 
-        error() << "encountered " << errors << " error" << ( errors == 1 ? "" : "s" ) << endl;
+        error() << "encountered " << (lastErrorFailures?"at least ":"") << lastErrorFailures+errors <<  " error(s)" << ( lastErrorFailures+errors == 1 ? "" : "s" ) << endl;
         return -1;
     }
 };
