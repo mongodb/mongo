@@ -623,6 +623,8 @@ struct __wt_session {
 	 * @config{exclusive, fail if the object exists.  When false (the
 	 * default)\, if the object exists\, check that its settings match the
 	 * specified configuration.,a boolean flag; default \c false.}
+	 * @config{format, the file format.,a string\, chosen from the following
+	 * options: \c "btree"; default \c btree.}
 	 * @config{huffman_key, configure Huffman encoding for keys.  Permitted
 	 * values are empty (off)\, \c "english"\, \c "utf8<file>" or \c
 	 * "utf16<file>".  See @ref huffman for more information.,a string;
@@ -682,8 +684,10 @@ struct __wt_session {
 	 * will be split into smaller pages\, where each page is the specified
 	 * percentage of the maximum Btree page size.,an integer between 25 and
 	 * 100; default \c 75.}
-	 * @config{type, the file type.,a string\, chosen from the following
-	 * options: \c "btree"; default \c btree.}
+	 * @config{type, set the data source type.  This setting overrides the
+	 * URI prefix for the data source\, if no \c source configuration
+	 * setting is provided.,a string\, chosen from the following options: \c
+	 * "file"\, \c "lsm"; default \c file.}
 	 * @config{value_format, the format of the data packed into value items.
 	 * See @ref schema_format_types for details.  By default\, the
 	 * value_format is \c 'u' and applications use a WT_ITEM structure to

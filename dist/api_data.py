@@ -57,10 +57,12 @@ column_meta = [
 
 source_meta = [
 	Config('source', '', r'''
-		override the default data source URI derived from the object name'''),
+		override the default data source URI derived from the object
+		name'''),
 	Config('type', 'file', r'''
-		set the data source type.  This setting overrides the URI prefix for
-		the data source, if no \c source configuration setting is provided'''),
+		set the data source type.  This setting overrides the URI
+		prefix for the data source, if no \c source configuration
+		setting is provided''',
 		choices=['file', 'lsm']),
 ]
 
@@ -85,7 +87,8 @@ format_meta = column_meta + [
 
 lsm_config = [
 	Config('lsm_bloom_hash_count', '4', r'''
-		the number of hash values per item used for LSM bloom filters.''',
+		the number of hash values per item used for LSM bloom
+		filters.''',
 		min='2', max='100'),
 	Config('lsm_bloom_bit_count', '8', r'''
 		the number of bits used per item for LSM bloom filters.''',

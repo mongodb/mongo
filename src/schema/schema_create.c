@@ -87,7 +87,8 @@ __wt_schema_colgroup_source(WT_SESSION_IMPL *session,
 	if (cgname == NULL)
 		WT_RET(__wt_buf_fmt(session, buf, "file:%s.wt", tablename));
 	else
-		WT_RET(__wt_buf_fmt(session, buf, "file:%s_%s.wt", tablename, cgname));
+		WT_RET(__wt_buf_fmt(
+		    session, buf, "file:%s_%s.wt", tablename, cgname));
 
 	return (0);
 }
@@ -199,7 +200,8 @@ __wt_schema_index_source(WT_SESSION_IMPL *session,
 	const char *tablename;
 
 	tablename = table->name + strlen("table:");
-	WT_RET(__wt_buf_fmt(session, buf, "file:%s_%s.wti", tablename, idxname));
+	WT_RET(
+	    __wt_buf_fmt(session, buf, "file:%s_%s.wti", tablename, idxname));
 
 	return (0);
 }
@@ -246,10 +248,11 @@ __create_index(WT_SESSION_IMPL *session,
 		    "%.*s", (int)cval.len, cval.str));
 		source = namebuf.data;
 	} else {
-		WT_ERR(__wt_schema_index_source(session, table, idxname, &namebuf));
+		WT_ERR(__wt_schema_index_source(
+		    session, table, idxname, &namebuf));
 		source = namebuf.data;
 
-		/* Add the sourcename to the index config before collapsing. */
+		/* Add the source name to the index config before collapsing. */
 		WT_ERR(__wt_buf_catfmt(session, &confbuf,
 		    ",source=\"%s\"", source));
 	}

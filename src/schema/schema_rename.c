@@ -111,7 +111,7 @@ __rename_tree(WT_SESSION_IMPL *session,
 	    is_colgroup ? "colgroup:" : "index:",
 	    newname,
 	    (suffix == NULL) ? "" : suffix));
-	
+
 	/* Skip the colon, if any. */
 	if (suffix != NULL)
 		++suffix;
