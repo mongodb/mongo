@@ -722,7 +722,7 @@ namespace UpdateTests {
                 auto_ptr<ModSetState> modSetState = modSet.prepare( obj );
                 ASSERT_FALSE( modSetState->canApplyInPlace() );
                 modSetState->createNewFromMods();
-                ASSERT_EQUALS( BSON( "$set" << BSON( "a" << BSON_ARRAY( 1 << 2 << 3 ) ) ),
+                ASSERT_EQUALS( BSON( "$set" << BSON( "a.2" <<  3 ) ),
                                      modSetState->getOpLogRewrite() );
             }
         };
@@ -949,7 +949,7 @@ namespace UpdateTests {
                 auto_ptr<ModSetState> modSetState = modSet.prepare( obj );
                 ASSERT_FALSE( modSetState->canApplyInPlace() );
                 modSetState->createNewFromMods();
-                ASSERT_EQUALS( BSON( "$set" << BSON( "a" << BSON_ARRAY( 1 << 2 ) ) ),
+                ASSERT_EQUALS( BSON( "$set" << BSON( "a.1" << 2 ) ),
                                modSetState->getOpLogRewrite() );
             }
         };

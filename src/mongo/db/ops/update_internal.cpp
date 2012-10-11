@@ -21,6 +21,7 @@
 #include "mongo/db/oplog.h"
 #include "mongo/db/jsobjmanipulator.h"
 #include "mongo/db/pdfile.h"
+#include "mongo/util/mongoutils/str.h"
 
 #include "update_internal.h"
 
@@ -124,9 +125,21 @@ namespace mongo {
             }
 
             bb.append( elt );
-            ms.fixedOpName = "$set";
-            ms.forceEmptyArray = true;
-            ms.fixedArray = BSONArray(bb.done().getOwned());
+
+            // We don't want to log a $set for which the '_checkForAppending' test won't pass. If we're
+            // in that case, fall back to non-optimized logging.
+            if ( (elt.type() == Object && elt.embeddedObject().okForStorage()) || (elt.type() != Object) ) {
+                ms.fixedOpName = "$set";
+                ms.forcePositional = true;
+                ms.position = bb.arrSize() - 1;
+                bb.done();
+            }
+            else {
+                ms.fixedOpName = "$set";
+                ms.forceEmptyArray = true;
+                ms.fixedArray = BSONArray( bb.done().getOwned() );
+            }
+
             break;
         }
 
@@ -157,6 +170,9 @@ namespace mongo {
                     }
                 }
 
+                ms.fixedOpName = "$set";
+                ms.forceEmptyArray = true;
+                ms.fixedArray = BSONArray(bb.done().getOwned());
             }
             else {
 
@@ -169,14 +185,20 @@ namespace mongo {
                         found = true;
                 }
 
-                if ( ! found )
+                if ( ! found ) {
                     bb.append( elt );
+                    ms.fixedOpName = "$set";
+                    ms.forcePositional = true;
+                    ms.position = bb.arrSize() - 1;
+                    bb.done();
 
+                } else {
+                    ms.fixedOpName = "$set";
+                    ms.forceEmptyArray = true;
+                    ms.fixedArray = BSONArray(bb.done().getOwned());
+                }
             }
 
-            ms.fixedOpName = "$set";
-            ms.forceEmptyArray = true;
-            ms.fixedArray = BSONArray(bb.done().getOwned());
             break;
         }
 
@@ -567,6 +589,10 @@ namespace mongo {
         }
         else if ( ! fixedArray.isEmpty() || forceEmptyArray ) {
             bb.append( m->fieldName, fixedArray );
+        }
+        else if ( forcePositional ) {
+            string positionalField = str::stream() << m->fieldName << "." << position;
+            bb.appendAs( m->elt, positionalField.c_str() );
         }
         else {
             bb.appendAs( m->elt , m->fieldName );

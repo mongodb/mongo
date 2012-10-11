@@ -401,6 +401,8 @@ namespace mongo {
         BSONElement* fixed;
         BSONArray fixedArray;
         bool forceEmptyArray;
+        bool forcePositional;
+        int position;
         int DEPRECATED_pushStartSize;
 
         BSONType incType;
@@ -414,6 +416,8 @@ namespace mongo {
             fixedOpName = 0;
             fixed = 0;
             forceEmptyArray = false;
+            forcePositional = false;
+            position = 0;
             DEPRECATED_pushStartSize = -1;
             incType = EOO;
             dontApply = false;
