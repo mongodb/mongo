@@ -33,6 +33,7 @@ Bsearch
 Btree
 Bzip
 CAS
+CDLMRSTdehikrsuv
 CELL's
 CELLs
 CKPT
@@ -163,6 +164,7 @@ SCHED
 SIMD
 SLIST
 SLVG
+SML
 SQL
 SSq
 STAILQ
@@ -190,6 +192,7 @@ URIs
 UTF
 UnixLib
 VARCHAR
+Vanishingly
 Vc
 Vixie
 Vo
@@ -421,6 +424,7 @@ huffman
 hval
 iS
 iSh
+icount
 ikey
 imref
 incr
@@ -428,18 +432,21 @@ incrementing
 incrv
 indices
 indx
+infeasible
 init
 initn
 initsize
 inmem
 insertK
 insertV
+instantiation
 intl
 intpack
 ints
 inuse
 io
 ispo
+kb
 kcell
 keycmp
 keyname
@@ -460,6 +467,7 @@ loadtext
 logput
 lookup
 lookups
+lr
 lru
 lsm
 lsn
@@ -531,6 +539,7 @@ ovfl
 packv
 patchp
 pathnames
+perf
 pfx
 posint
 posix
@@ -561,6 +570,7 @@ readserver
 realloc
 recno
 req
+rescan
 resizing
 ret
 retp
@@ -629,6 +639,7 @@ sunique
 superset
 sys
 syserr
+sz
 t's
 tV
 tablename

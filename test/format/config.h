@@ -72,7 +72,7 @@ static CONFIG c[] = {
 
 	{ "dictionary",
 	  "if values are dictionary compressed",	/* 20% */
-	  C_ROW, C_BOOL, 20, 0, &g.c_dictionary, NULL },
+	  C_ROW | C_VAR, C_BOOL, 20, 0, &g.c_dictionary, NULL },
 
 	{ "file_type",
 	  "type of file to create (fix | var | row)",

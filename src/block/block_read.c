@@ -51,6 +51,22 @@ __wt_block_read_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	    "off %" PRIuMAX ", size %" PRIu32 ", cksum %" PRIu32,
 	    (uintmax_t)offset, size, cksum);
 
+#ifdef HAVE_DIAGNOSTIC
+	{
+	const char *name = NULL;
+	__wt_spin_lock(session, &block->live_lock);
+	if (__wt_block_off_match(&block->live.avail, offset, size))
+		name = "available";
+	else if (__wt_block_off_match(&block->live.discard, offset, size))
+		name = "discard";
+	__wt_spin_unlock(session, &block->live_lock);
+	if (name != NULL)
+		WT_RET_MSG(session, WT_ERROR,
+		    "read failed: %" PRIuMAX "/%" PRIu32 " is on the %s list",
+		    (uintmax_t)offset, size, name);
+	}
+#endif
+
 	/*
 	 * If we're compressing the file blocks, place the initial read into a
 	 * scratch buffer, we're going to have to re-allocate more memory for

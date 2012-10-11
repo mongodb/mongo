@@ -7,6 +7,7 @@
 
 #include "wt_internal.h"
 
+static int __lsm_tree_open_check(WT_SESSION_IMPL *, WT_LSM_TREE *);
 static int __lsm_tree_open(WT_SESSION_IMPL *, const char *, WT_LSM_TREE **);
 
 /*
@@ -45,6 +46,7 @@ __lsm_tree_discard(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 		__wt_free(session, chunk);
 	}
 	__wt_free(session, lsm_tree->old_chunks);
+	__wt_free(session, lsm_tree->stats);
 
 	__wt_free(session, lsm_tree);
 }
@@ -61,7 +63,8 @@ __lsm_tree_close(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 
 	if (F_ISSET(lsm_tree, WT_LSM_TREE_WORKING)) {
 		F_CLR(lsm_tree, WT_LSM_TREE_WORKING);
-		WT_TRET(__wt_thread_join(lsm_tree->worker_tid));
+		if (F_ISSET(S2C(session), WT_CONN_LSM_MERGE))
+			WT_TRET(__wt_thread_join(lsm_tree->worker_tid));
 		WT_TRET(__wt_thread_join(lsm_tree->ckpt_tid));
 	}
 
@@ -159,8 +162,7 @@ __wt_lsm_tree_create_chunk(
 
 	WT_RET(__wt_scr_alloc(session, 0, &buf));
 	WT_ERR(__wt_lsm_tree_chunk_name(session, lsm_tree, i, buf));
-	WT_ERR(__wt_schema_create(session,
-	    buf->data, lsm_tree->file_config));
+	WT_ERR(__wt_schema_create(session, buf->data, lsm_tree->file_config));
 	*urip = __wt_buf_steal(session, buf, NULL);
 
 err:	__wt_scr_free(&buf);
@@ -189,8 +191,9 @@ __lsm_tree_start_worker(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	F_SET(lsm_tree, WT_LSM_TREE_WORKING);
 	/* The new thread will rely on the WORKING value being visible. */
 	WT_FULL_BARRIER();
-	WT_RET(__wt_thread_create(
-	    &lsm_tree->worker_tid, __wt_lsm_worker, lsm_tree));
+	if (F_ISSET(S2C(session), WT_CONN_LSM_MERGE))
+		WT_RET(__wt_thread_create(
+		    &lsm_tree->worker_tid, __wt_lsm_worker, lsm_tree));
 	WT_RET(__wt_thread_create(
 	    &lsm_tree->ckpt_tid, __wt_lsm_checkpoint_worker, lsm_tree));
 
@@ -240,6 +243,9 @@ __wt_lsm_tree_create(WT_SESSION_IMPL *session,
 	WT_ERR(__wt_strndup(session, cval.str, cval.len,
 	    &lsm_tree->value_format));
 
+	WT_ERR(__wt_config_gets(session, cfg, "lsm_bloom", &cval));
+	lsm_tree->bloom = (cval.val == 0 ? 0 : 1);
+
 	WT_ERR(__wt_config_gets(session, cfg, "lsm_bloom_bit_count", &cval));
 	lsm_tree->bloom_bit_count = (uint32_t)cval.val;
 	WT_ERR(__wt_config_gets(session, cfg, "lsm_bloom_hash_count", &cval));
@@ -261,14 +267,46 @@ __wt_lsm_tree_create(WT_SESSION_IMPL *session,
 	__lsm_tree_discard(session, lsm_tree);
 	lsm_tree = NULL;
 
-	/* Open our new tree and add it to the handle cache. */
-	WT_ERR(__lsm_tree_open(session, uri, &lsm_tree));
+	/*
+	 * Open our new tree and add it to the handle cache. Don't discard on
+	 * error the returned handle is NULL on error, and the metadata tracking
+	 *  macros handle cleaning up on failure.
+	 */
+	ret = __lsm_tree_open(session, uri, &lsm_tree);
 
 	if (0) {
 err:		__lsm_tree_discard(session, lsm_tree);
 	}
 	__wt_scr_free(&buf);
 	return (ret);
+}
+
+/*
+ * __lsm_tree_open_check --
+ *	Validate the configuration of an LSM tree.
+ */
+static int
+__lsm_tree_open_check(
+    WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
+{
+	WT_CONFIG_ITEM cval;
+	const char *cfg[] = API_CONF_DEFAULTS(
+	    session, create, lsm_tree->file_config);
+	uint32_t maxleafpage;
+	uint64_t req;
+
+	WT_RET(__wt_config_gets(
+	    session, cfg, "leaf_page_max", &cval));
+	maxleafpage = (uint32_t)cval.val;
+
+	/* Three chunks, plus one page for each participant in a merge. */
+	req = 3 * lsm_tree->chunk_size + (lsm_tree->merge_max *  maxleafpage);
+	if (S2C(session)->cache_size < req)
+		WT_RET_MSG(session, EINVAL,
+		    "The LSM configuration requires a cache size of at least %"
+		    PRIu64 ". Configured size is %" PRIu64,
+		    req, S2C(session)->cache_size);
+	return (0);
 }
 
 /*
@@ -294,7 +332,15 @@ __lsm_tree_open(
 	__wt_spin_init(session, &lsm_tree->lock);
 	WT_ERR(__wt_strdup(session, uri, &lsm_tree->name));
 	lsm_tree->filename = lsm_tree->name + strlen("lsm:");
+	WT_ERR(__wt_stat_alloc_lsm_stats(session, &lsm_tree->stats));
+
 	WT_ERR(__wt_lsm_meta_read(session, lsm_tree));
+
+	/*
+	 * Sanity check the configuration. Do it now since this is the first
+	 * time we have the LSM tree configuration.
+	 */
+	WT_ERR(__lsm_tree_open_check(session, lsm_tree));
 
 	if (lsm_tree->nchunks == 0)
 		WT_ERR(__wt_lsm_tree_switch(session, lsm_tree));
@@ -351,9 +397,12 @@ __wt_lsm_tree_switch(
 {
 	WT_DECL_RET;
 	WT_LSM_CHUNK *chunk;
+	int new_id;
+
+	new_id = WT_ATOMIC_ADD(lsm_tree->last, 1); 
 
 	WT_VERBOSE_RET(session, lsm,
-	    "Tree switch to: %d because %d > %d", lsm_tree->last + 1,
+	    "Tree switch to: %d because %d > %d", new_id,
 	    (lsm_tree->memsizep == NULL ? 0 : (int)*lsm_tree->memsizep),
 	    (int)lsm_tree->chunk_size);
 
@@ -369,8 +418,7 @@ __wt_lsm_tree_switch(
 
 	WT_ERR(__wt_calloc_def(session, 1, &chunk));
 	lsm_tree->chunk[lsm_tree->nchunks++] = chunk;
-	WT_ERR(__wt_lsm_tree_create_chunk(session,
-	    lsm_tree, WT_ATOMIC_ADD(lsm_tree->last, 1),
+	WT_ERR(__wt_lsm_tree_create_chunk(session, lsm_tree, new_id,
 	    &chunk->uri));
 
 	++lsm_tree->dsk_gen;

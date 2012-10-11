@@ -208,12 +208,15 @@ int
 __wt_debug_off(
     WT_SESSION_IMPL *session, uint32_t offset, uint32_t size, const char *ofile)
 {
+	WT_BTREE *btree;
 	WT_DECL_ITEM(buf);
 	WT_DECL_RET;
 
+	btree = session->btree;
+
 	WT_RET(__wt_scr_alloc(session, size, &buf));
-	WT_ERR(__wt_block_read_off(
-	    session, session->btree->block, buf, offset, size, 0));
+	WT_ERR(__wt_block_read_off(session,
+	    btree->block, buf, offset, size, WT_BLOCK_CHECKSUM_NOT_SET));
 	ret = __wt_debug_disk(session, buf->mem, ofile);
 err:	__wt_scr_free(&buf);
 
@@ -860,6 +863,7 @@ __debug_cell(WT_DBG *ds, WT_PAGE_HEADER *dsk, WT_CELL_UNPACK *unpack)
 		case WT_CELL_DEL:
 		case WT_CELL_VALUE:
 		case WT_CELL_VALUE_OVFL:
+		case WT_CELL_VALUE_OVFL_RM:
 			__dmsg(ds, ", rle: %" PRIu64, __wt_cell_rle(unpack));
 			break;
 		}
@@ -887,6 +891,7 @@ __debug_cell(WT_DBG *ds, WT_PAGE_HEADER *dsk, WT_CELL_UNPACK *unpack)
 		goto addr;
 	case WT_CELL_KEY_OVFL:
 	case WT_CELL_VALUE_OVFL:
+	case WT_CELL_VALUE_OVFL_RM:
 		type = "ovfl";
 addr:		WT_RET(__wt_scr_alloc(session, 128, &buf));
 		if ((ret = __wt_bm_addr_string(
@@ -940,6 +945,7 @@ deleted:	__debug_item(ds, tag, "deleted", strlen("deleted"));
 	case WT_CELL_VALUE:
 	case WT_CELL_VALUE_COPY:
 	case WT_CELL_VALUE_OVFL:
+	case WT_CELL_VALUE_OVFL_RM:
 	case WT_CELL_VALUE_SHORT:
 		WT_RET(__wt_scr_alloc(session, 256, &buf));
 		if ((ret = __wt_cell_unpack_copy(session, unpack, buf)) == 0)

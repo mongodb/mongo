@@ -90,6 +90,9 @@ lsm_config = [
 	Config('lsm_bloom_bit_count', '8', r'''
 		the number of bits used per item for LSM bloom filters.''',
 		min='2', max='1000'),
+	Config('lsm_bloom', 'true', r'''
+		create bloom filters for LSM trees.''',
+		type='boolean'),
 	Config('lsm_chunk_size', '2MB', r'''
 		the maximum size of the in-memory chunk of an LSM tree''',
 		min='512K', max='500MB'),
@@ -286,11 +289,17 @@ methods = {
 		number key; valid only for cursors with record number keys''',
 		type='boolean'),
 	Config('bulk', 'false', r'''
-		configure the cursor for bulk loads, a fast load path
-		that may only be used for newly created objects. Cursors
-		configured for bulk load only support the WT_CURSOR::insert
-		and WT_CURSOR::close methods''',
-		type='boolean'),
+		configure the cursor for bulk loads, a fast load path that may
+		only be used for newly created objects. Cursors configured for
+		bulk load only support the WT_CURSOR::insert and
+		WT_CURSOR::close methods.  The value is usually a true/false
+		flag, but the the special value \c "bitmap" is for use with
+		fixed-length column stores, and allows chunks of a memory
+		resident bitmap to be loaded directly into a file by passing a
+		\c WT_ITEM to WT_CURSOR::set_value where the \c size field
+		indicates the number of records in the bitmap (as specified by
+		the file's \c value_format)''',
+		type='string'),
 	Config('checkpoint', '', r'''
 		the name of a checkpoint to open (the reserved name
 		"WiredTigerCheckpoint" opens the most recent internal
@@ -328,6 +337,10 @@ methods = {
 	Config('statistics_clear', 'false', r'''
 		reset statistics counters when the cursor is closed; valid
 		only for statistics cursors''',
+		type='boolean'),
+	Config('statistics_fast', 'false', r'''
+		only gather statistics that don't require traversing the tree;
+		valid only for statistics cursors''',
 		type='boolean'),
 	Config('target', '', r'''
 		if non-empty, backup the list of objects; valid only for a
@@ -426,6 +439,9 @@ methods = {
 	Config('logging', 'false', r'''
 		enable logging''',
 		type='boolean'),
+	Config('lsm_merge', 'true', r'''
+		merge LSM chunks where possible''',
+		type='boolean'),
 	Config('multiprocess', 'false', r'''
 		permit sharing between processes (will automatically start an
 		RPC server for primary processes and use RPC for secondary
@@ -478,7 +494,8 @@ flags = {
 # Structure flag declarations
 ###################################################
 	'conn' : [
-		'CONN_NOSYNC',
+		'CONN_LSM_MERGE',
+		'CONN_SYNC',
 		'CONN_TRANSACTIONAL',
 		'SERVER_RUN'
 	],

@@ -61,10 +61,24 @@ __wt_bt_cache_flush(WT_SESSION_IMPL *session, WT_CKPT *ckptbase, int op)
 	 * already works that way.   None of these problems can't be fixed, but
 	 * I don't see a reason to change at this time, either.
 	 */
-	btree->ckpt = ckptbase;
-	ret = __wt_sync_file_serial(session, op);
-	btree->ckpt = NULL;
-	WT_RET(ret);
+
+	/*
+	 * XXX
+	 * Set the checkpoint reference for reconciliation -- this is ugly,
+	 * but there's no data structure path from here to reconciliation.
+	 * Publish: there must be a barrier to ensure the structure fields are
+	 * set before the eviction thread can see the request.
+	 */
+	WT_PUBLISH(btree->ckpt, ckptbase);
+
+	/*
+	 * Schedule and wake the eviction server, then wait for the eviction
+	 * server to wake us.
+	 */
+	WT_ERR(__wt_sync_file_serial(session, op));
+	__wt_evict_server_wake(session);
+	__wt_cond_wait(session, session->cond);
+	ret = session->syncop_ret;
 
 	switch (op) {
 	case WT_SYNC:
@@ -72,9 +86,10 @@ __wt_bt_cache_flush(WT_SESSION_IMPL *session, WT_CKPT *ckptbase, int op)
 	case WT_SYNC_DISCARD:
 	case WT_SYNC_DISCARD_NOWRITE:
 		/* If discarding the tree, the root page should be gone. */
-		WT_ASSERT(session, btree->root_page == NULL);
+		WT_ASSERT(session, ret != 0 || btree->root_page == NULL);
 		break;
 	}
 
-	return (0);
+err:	btree->ckpt = NULL;
+	return (ret);
 }

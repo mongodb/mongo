@@ -17,7 +17,7 @@ obj_bulk(void)
 	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
 		die("conn.session", ret);
 
-	if ((ret = session->create(session, uri, NULL)) != 0)
+	if ((ret = session->create(session, uri, config)) != 0)
 		if (ret != EEXIST && ret != EBUSY)
 			die("session.create", ret);
 
@@ -44,7 +44,7 @@ obj_create(void)
 	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
 		die("conn.session", ret);
 
-	if ((ret = session->create(session, uri, NULL)) != 0)
+	if ((ret = session->create(session, uri, config)) != 0)
 		if (ret != EEXIST && ret != EBUSY)
 			die("session.create", ret);
 

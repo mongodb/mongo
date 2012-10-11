@@ -40,6 +40,10 @@ struct __wt_stats {
 #define	WT_CSTAT_INCR(session, fld)					\
 	WT_STAT_INCR(S2C(session)->stats, fld)
 
+/* Flags used by statistics initialization. */
+#define	WT_STATISTICS_CLEAR	0x01
+#define	WT_STATISTICS_FAST	0x02
+
 /*
  * DO NOT EDIT: automatically built by dist/stat.py.
  */
@@ -66,6 +70,8 @@ struct __wt_btree_stats {
 	WT_STATS extend;
 	WT_STATS free;
 	WT_STATS overflow_read;
+	WT_STATS overflow_value_cache;
+	WT_STATS page_evict;
 	WT_STATS page_read;
 	WT_STATS page_write;
 	WT_STATS file_size;
@@ -123,6 +129,25 @@ struct __wt_connection_stats {
 	WT_STATS txn_begin;
 	WT_STATS txn_commit;
 	WT_STATS txn_rollback;
+};
+
+/*
+ * Statistics entries for LSM handle.
+ */
+struct __wt_lsm_stats {
+	WT_STATS bloom_count;
+	WT_STATS bloom_cache_evict;
+	WT_STATS bloom_cache_read;
+	WT_STATS chunk_count;
+	WT_STATS chunk_cache_evict;
+	WT_STATS cache_evict;
+	WT_STATS chunk_cache_read;
+	WT_STATS cache_read;
+	WT_STATS cache_write;
+	WT_STATS bloom_misses;
+	WT_STATS bloom_hits;
+	WT_STATS bloom_skips;
+	WT_STATS bloom_space;
 };
 
 /* Statistics section: END */

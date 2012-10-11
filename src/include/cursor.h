@@ -103,7 +103,7 @@ struct __wt_cursor_btree {
 	 */
 	uint8_t v;			/* Fixed-length return value */
 
-#define	WT_CBT_ACTIVE		0x01	/* Col-store: iterating append list */
+#define	WT_CBT_ACTIVE		0x01	/* Active in the tree */
 #define	WT_CBT_ITERATE_APPEND	0x02	/* Col-store: iterating append list */
 #define	WT_CBT_ITERATE_NEXT	0x04	/* Next iteration configuration */
 #define	WT_CBT_ITERATE_PREV	0x08	/* Prev iteration configuration */
@@ -136,6 +136,9 @@ struct __wt_cursor_bulk {
 	 */
 	uint32_t entry;				/* Entry count */
 	uint32_t nrecs;				/* Max records per chunk */
+
+	/* Special bitmap bulk load for fixed-length column stores. */
+	int	bitmap;
 
 	void	*reconcile;			/* Reconciliation information */
 };
@@ -197,3 +200,6 @@ struct __wt_cursor_table {
 	if (!F_ISSET(cursor, WT_CURSTD_VALUE_SET))			\
 		WT_ERR(__wt_cursor_kv_not_set(cursor, 0));		\
 } while (0)
+
+#define	WT_CURSOR_RAW_OK						\
+	WT_CURSTD_DUMP_HEX | WT_CURSTD_DUMP_PRINT | WT_CURSTD_RAW

@@ -20,7 +20,6 @@
     </tab>
     <tab type="examples" visible="yes" title="" intro=""/>  
     <tab type="user" url="license.html" visible="yes" title="License"/>
-    <tab type="user" url="https://github.com/wiredtiger/wiredtiger/downloads/" visible="yes" title="Download"/>
   </navindex>
 
   <!-- Layout definition for a class page -->

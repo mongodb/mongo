@@ -31,7 +31,7 @@ wt_SOURCES =\
 	src/utilities/util_write.c
 
 include_HEADERS= wiredtiger.h
-INCLUDES = -I$(srcdir)/src/include
+AM_CPPFLAGS = -I$(srcdir)/src/include
 
 pkgconfigdir = $(libdir)/pkgconfig
 pkgconfig_DATA = wiredtiger.pc

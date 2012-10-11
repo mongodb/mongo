@@ -219,7 +219,7 @@ __wt_block_checkpoint(WT_SESSION_IMPL *session,
 	 * lazy checkpoints, but we don't support them yet).  Regardless, we're
 	 * not holding any locks, other writers can proceed while we wait.
 	 */
-	if (!F_ISSET(S2C(session), WT_CONN_NOSYNC))
+	if (F_ISSET(S2C(session), WT_CONN_SYNC))
 		WT_RET(__wt_fsync(session, block->fh));
 
 	return (0);
@@ -236,8 +236,16 @@ __ckpt_extlist_fblocks(
 {
 	if (el->offset == WT_BLOCK_INVALID_OFFSET)
 		return (0);
+
+	/*
+	 * Free blocks used to write checkpoint extents into the live system's
+	 * checkpoint avail list (they were never on any alloc list).   Do not
+	 * use the live systems avail list because that list is used to decide
+	 * if the file can be truncated, and we can't truncate any part of the
+	 * file that contains previous checkpoint's extents.
+	 */
 	return (__wt_block_insert_ext(
-	    session, &block->live.avail, el->offset, el->size));
+	    session, &block->live.ckpt_avail, el->offset, el->size));
 }
 
 /*
@@ -404,9 +412,8 @@ __ckpt_process(
 
 		/*
 		 * Free the blocks used to hold the "from" checkpoint's extent
-		 * lists directly to the live system's avail list, they were
-		 * never on any alloc list.   Include the "from" checkpoint's
-		 * avail list, it's going away.
+		 * lists.  Include the "from" checkpoint's avail list, it's
+		 * going away.
 		 */
 		WT_ERR(__ckpt_extlist_fblocks(session, block, &a->alloc));
 		WT_ERR(__ckpt_extlist_fblocks(session, block, &a->avail));

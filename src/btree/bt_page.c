@@ -28,35 +28,18 @@ __wt_page_in_func(
 {
 	WT_DECL_RET;
 	WT_PAGE *page;
-	int busy, read_lockout, wake;
-
-	/*
-	 * Only wake the eviction server the first time through here (if the
-	 * cache is too full), or after we fail to evict a page.  Otherwise, we
-	 * are just wasting effort and making a busy mutex busier.
-	 */
-	wake = 1;
+	int busy;
 
 	for (;;) {
 		switch (ref->state) {
 		case WT_REF_DISK:
 		case WT_REF_DELETED:
-			/* The page isn't in memory, attempt to read it. */
-
-			/* Check if there is space in the cache. */
-			__wt_eviction_check(session, &read_lockout, wake);
-			wake = 0;
-
 			/*
-			 * If the cache is full, give up, but only if we are
-			 * not holding the schema lock.  The schema lock can
-			 * block checkpoints, and thus eviction, so it is not
-			 * safe to wait for eviction if we are holding it.
+			 * The page isn't in memory, attempt to read it.
+			 *
+			 * First make sure there is space in the cache.
 			 */
-			if (read_lockout &&
-			   !F_ISSET(session, WT_SESSION_SCHEMA_LOCKED))
-				break;
-
+			WT_RET(__wt_cache_full_check(session));
 			WT_RET(__wt_cache_read(session, parent, ref));
 			continue;
 		case WT_REF_EVICT_FORCE:
@@ -91,12 +74,12 @@ __wt_page_in_func(
 			 * Ensure the page doesn't have ancient updates on it.
 			 * If it did, reading the page could ignore committed
 			 * updates.  This should be extremely unlikely in real
-			 * applications, force eviction of the page to avoid
+			 * applications, wait for eviction of the page to avoid
 			 * the issue.
 			 */
 			if (page->modify != NULL &&
 			    __wt_txn_ancient(session, page->modify->first_id)) {
-				__wt_evict_page_request(session, page);
+				page->read_gen = 0;
 				__wt_hazard_clear(session, page);
 				__wt_evict_server_wake(session);
 				break;
@@ -113,13 +96,8 @@ __wt_page_in_func(
 		WT_ILLEGAL_VALUE(session);
 		}
 
-		/* Find a page to evict -- if the page is busy, keep trying. */
-		if ((ret = __wt_evict_lru_page(session, 1)) == EBUSY)
-			__wt_yield();
-		else if (ret == WT_NOTFOUND)
-			wake = 1;
-		else
-			WT_RET(ret);
+		/* We failed to get the page -- yield before retrying. */
+		__wt_yield();
 	}
 }
 
@@ -463,6 +441,14 @@ __inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *inmem_sizep)
 
 		/*
 		 * Allocate and initialize the instantiated key.
+		 *
+		 * Note: all keys on internal pages are instantiated, we assume
+		 * they're more likely to be useful than keys on leaf pages.
+		 * It's possible that's wrong (imagine a cursor reading a table
+		 * that's never randomly searched, the internal page keys are
+		 * unnecessary).  If this policy changes, it has implications
+		 * for reconciliation, the row-store reconciliation function
+		 * depends on keys always be instantiated.
 		 */
 		WT_ERR(__wt_row_ikey_alloc(session,
 		    WT_PAGE_DISK_OFFSET(page, cell),

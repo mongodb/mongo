@@ -114,9 +114,9 @@ __clsm_open_cursors(WT_CURSOR_LSM *clsm, int start_chunk)
 	WT_LSM_TREE *lsm_tree;
 	WT_SESSION_IMPL *session;
 	const char *ckpt_cfg[] = API_CONF_DEFAULTS(session, open_cursor,
-	    "checkpoint=WiredTigerCheckpoint");
+	    "checkpoint=WiredTigerCheckpoint,raw");
 	const char *merge_cfg[] = API_CONF_DEFAULTS(session, open_cursor,
-	    "checkpoint=WiredTigerCheckpoint,no_cache");
+	    "checkpoint=WiredTigerCheckpoint,no_cache,raw");
 	int i, nchunks;
 
 	session = (WT_SESSION_IMPL *)clsm->iface.session;
@@ -513,8 +513,12 @@ __clsm_search(WT_CURSOR *cursor)
 		/* If there is a Bloom filter, see if we can skip the read. */
 		if ((bloom = clsm->blooms[i]) != NULL) {
 			ret = __wt_bloom_get(bloom, &cursor->key);
-			if (ret == WT_NOTFOUND)
+			if (ret == WT_NOTFOUND) {
+				WT_STAT_INCR(
+				    clsm->lsm_tree->stats, bloom_skips);
 				continue;
+			} else if (ret == 0)
+				WT_STAT_INCR(clsm->lsm_tree->stats, bloom_hits);
 			WT_RET(ret);
 		}
 		c->set_key(c, &cursor->key);
@@ -527,6 +531,9 @@ __clsm_search(WT_CURSOR *cursor)
 			goto done;
 		} else if (ret != WT_NOTFOUND)
 			goto err;
+		else if (bloom != NULL) {
+			WT_STAT_INCR(clsm->lsm_tree->stats, bloom_misses);
+		}
 	}
 	ret = WT_NOTFOUND;
 

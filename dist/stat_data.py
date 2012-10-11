@@ -80,6 +80,8 @@ btree_stats = [
 	Stat('file_write_conflicts', 'write generation conflicts'),
 	Stat('free', 'file: block frees'),
 	Stat('overflow_read', 'file: overflow pages read from the file'),
+	Stat('overflow_value_cache', 'file: overflow values cached in memory'),
+	Stat('page_evict', 'file: pages evicted from the file'),
 	Stat('page_read', 'file: pages read from the file'),
 	Stat('page_write', 'file: pages written to the file'),
 	Stat('rec_dictionary', 'reconcile: dictionary match'),
@@ -93,3 +95,23 @@ btree_stats = [
 	Stat('rec_written', 'reconcile: pages written'),
 	Stat('update_conflict', 'update conflicts'),
 ]
+
+##########################################
+# LSM statistics
+##########################################
+lsm_stats = [
+	Stat('chunk_cache_evict', 'Number of pages evicted from LSM chunks'),
+	Stat('chunk_cache_read', 'Number of pages read into LSM chunks'),
+	Stat('bloom_hits', 'Number of successful bloom filter lookups'),
+	Stat('bloom_misses', 'Number of successful bloom filter false positives'),
+	Stat('bloom_skips', 'Number of unsuccessful bloom filter lookups'),
+	Stat('bloom_space', 'Total space used by bloom filters'),
+	Stat('bloom_cache_evict', 'Number of bloom pages evicted from cache'),
+	Stat('bloom_cache_read', 'Number of bloom pages read into cache'),
+	Stat('chunk_count', 'Number of chunks in the LSM tree'),
+	Stat('bloom_count', 'Number of bloom filters in the LSM tree'),
+	Stat('cache_evict', 'Number of pages evicted from cache'),
+	Stat('cache_read', 'Number of pages read into cache'),
+	Stat('cache_write', 'Number of pages written from cache'),
+]
+

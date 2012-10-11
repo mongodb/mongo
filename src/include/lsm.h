@@ -5,6 +5,10 @@
  * See the file LICENSE for redistribution information.
  */
 
+/*
+ * WT_CURSOR_LSM --
+ *	An LSM cursor.
+ */
 struct __wt_cursor_lsm {
 	WT_CURSOR iface;
 
@@ -28,6 +32,10 @@ struct __wt_cursor_lsm {
 	uint32_t flags;
 };
 
+/*
+ * WT_LSM_CHUNK --
+ *	A single chunk (file) in an LSM tree.
+ */
 struct __wt_lsm_chunk {
 	const char *uri;		/* Data source for this chunk. */
 	const char *bloom_uri;		/* URI of Bloom filter, if any. */
@@ -38,6 +46,10 @@ struct __wt_lsm_chunk {
 	uint32_t flags;
 };
 
+/*
+ * WT_LSM_TREE --
+ *	An LSM tree.
+ */
 struct __wt_lsm_tree {
 	const char *name, *config, *filename;
 	const char *key_format, *value_format, *file_config;
@@ -46,6 +58,8 @@ struct __wt_lsm_tree {
 
 	WT_RWLOCK *rwlock;
 	TAILQ_ENTRY(__wt_lsm_tree) q;
+
+	WT_LSM_STATS *stats;		/* LSM statistics */
 
 	WT_SPINLOCK lock;
 	uint64_t dsk_gen;
@@ -56,6 +70,7 @@ struct __wt_lsm_tree {
 	uint32_t bloom_hash_count;
 	uint32_t chunk_size;
 	uint32_t merge_max;
+	uint32_t bloom;			/* Is bloom enabled. */
 
 	WT_SESSION_IMPL *worker_session;/* Passed to thread_create */
 	pthread_t worker_tid;		/* LSM worker thread */
@@ -77,17 +92,22 @@ struct __wt_lsm_tree {
 	uint32_t flags;
 };
 
+/*
+ * WT_LSM_DATA_SOURCE --
+ *	Implementation of the WT_DATA_SOURCE interface for LSM.
+ */
 struct __wt_lsm_data_source {
 	WT_DATA_SOURCE iface;
 
 	WT_RWLOCK *rwlock;
 };
 
+/*
+ * WT_LSM_WORKER_COOKIE --
+ *	State for an LSM worker thread.
+ */
 struct __wt_lsm_worker_cookie {
     WT_LSM_CHUNK **chunk_array;
     size_t chunk_alloc;
     int nchunks;
-#define	WT_LSM_WORKER_MERGE		0x01
-#define	WT_LSM_WORKER_CHECKPOINT	0x02
-    uint32_t flags;
 };

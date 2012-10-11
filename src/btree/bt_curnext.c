@@ -165,6 +165,7 @@ __cursor_var_next(WT_CURSOR_BTREE *cbt, int newpage)
 	WT_CELL *cell;
 	WT_CELL_UNPACK unpack;
 	WT_COL *cip;
+	WT_DECL_RET;
 	WT_ITEM *val;
 	WT_SESSION_IMPL *session;
 	WT_UPDATE *upd;
@@ -228,8 +229,21 @@ new_page:	/* Find the matching WT_COL slot. */
 				}
 				/* FALLTHROUGH */
 			default:
-				WT_RET(__wt_cell_unpack_copy(
-				    session, &unpack, &cbt->tmp));
+				/*
+				 * Restart for a variable-length column-store.
+				 * We could catch restart higher up the call-
+				 * stack but there's no point to it: unlike
+				 * row-store (where the normal search path finds
+				 * cached overflow values), we have to access
+				 * the page's reconciliation structures, and
+				 * that's as easily done here as higher up the
+				 * stack.
+				 */
+				if ((ret = __wt_cell_unpack_copy(
+				    session, &unpack, &cbt->tmp)) == WT_RESTART)
+					WT_RET(__wt_ovfl_cache_col_restart(
+					    session,
+					    cbt->page, &unpack, &cbt->tmp));
 			}
 			cbt->cip_saved = cip;
 		}
@@ -402,7 +416,7 @@ __wt_btcur_next(WT_CURSOR_BTREE *cbt, int discard)
 	if (discard)
 		LF_SET(WT_TREE_DISCARD);
 
-	__cursor_func_init(cbt, 0);
+retry:	__cursor_func_init(cbt, 0);
 	__cursor_position_clear(cbt);
 
 	/*
@@ -488,7 +502,9 @@ __wt_btcur_next(WT_CURSOR_BTREE *cbt, int discard)
 		}
 	}
 
-err:	__cursor_func_resolve(cbt, ret);
+err:	if (ret == WT_RESTART)
+		goto retry;
+	__cursor_func_resolve(cbt, ret);
 	return (ret);
 }
 
@@ -507,7 +523,7 @@ __wt_btcur_next_random(WT_CURSOR_BTREE *cbt)
 	btree = cbt->btree;
 	WT_BSTAT_INCR(session, cursor_read_next);
 
-	__cursor_func_init(cbt, 1);
+retry:	__cursor_func_init(cbt, 1);
 	__cursor_position_clear(cbt);
 
 	/*
@@ -519,7 +535,8 @@ __wt_btcur_next_random(WT_CURSOR_BTREE *cbt)
 	ret = cbt->compare == 0 ?
 	    __wt_kv_return(session, cbt) : WT_NOTFOUND;
 
-err:	__cursor_func_resolve(cbt, ret);
-
+err:	if (ret == WT_RESTART)
+		goto retry;
+	__cursor_func_resolve(cbt, ret);
 	return (ret);
 }

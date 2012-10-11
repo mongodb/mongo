@@ -848,9 +848,12 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	conn->hazard_max = (uint32_t)cval.val;
 	WT_ERR(__wt_config_gets(session, cfg, "session_max", &cval));
 	conn->session_size = (uint32_t)cval.val + WT_NUM_INTERNAL_SESSIONS;
+	WT_ERR(__wt_config_gets(session, cfg, "lsm_merge", &cval));
+	if (cval.val)
+		F_SET(conn, WT_CONN_LSM_MERGE);
 	WT_ERR(__wt_config_gets(session, cfg, "sync", &cval));
-	if (!cval.val)
-		F_SET(conn, WT_CONN_NOSYNC);
+	if (cval.val)
+		F_SET(conn, WT_CONN_SYNC);
 	WT_ERR(__wt_config_gets(session, cfg, "transactional", &cval));
 	if (cval.val)
 		F_SET(conn, WT_CONN_TRANSACTIONAL);

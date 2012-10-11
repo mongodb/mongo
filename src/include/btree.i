@@ -13,8 +13,8 @@ static inline void
 __wt_cache_page_inmem_incr(
     WT_SESSION_IMPL *session, WT_PAGE *page, size_t size)
 {
-	WT_ATOMIC_ADD(S2C(session)->cache->bytes_inmem, size);
-	WT_ATOMIC_ADD(page->memory_footprint, WT_STORE_SIZE(size));
+	(void)WT_ATOMIC_ADD(S2C(session)->cache->bytes_inmem, size);
+	(void)WT_ATOMIC_ADD(page->memory_footprint, WT_STORE_SIZE(size));
 }
 
 /*
@@ -25,8 +25,8 @@ static inline void
 __wt_cache_page_inmem_decr(
     WT_SESSION_IMPL *session, WT_PAGE *page, size_t size)
 {
-	WT_ATOMIC_SUB(S2C(session)->cache->bytes_inmem, size);
-	WT_ATOMIC_SUB(page->memory_footprint, WT_STORE_SIZE(size));
+	(void)WT_ATOMIC_SUB(S2C(session)->cache->bytes_inmem, size);
+	(void)WT_ATOMIC_SUB(page->memory_footprint, WT_STORE_SIZE(size));
 }
 
 /*
@@ -42,9 +42,9 @@ __wt_cache_page_read(WT_SESSION_IMPL *session, WT_PAGE *page, size_t size)
 
 	WT_ASSERT(session, size != 0);
 
-	WT_ATOMIC_ADD(cache->pages_read, 1);
-	WT_ATOMIC_ADD(cache->bytes_read, size);
-	WT_ATOMIC_ADD(page->memory_footprint, WT_STORE_SIZE(size));
+	(void)WT_ATOMIC_ADD(cache->pages_read, 1);
+	(void)WT_ATOMIC_ADD(cache->bytes_read, size);
+	(void)WT_ATOMIC_ADD(page->memory_footprint, WT_STORE_SIZE(size));
 }
 
 /*
@@ -60,8 +60,8 @@ __wt_cache_page_evict(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 	WT_ASSERT(session, page->memory_footprint != 0);
 
-	WT_ATOMIC_ADD(cache->pages_evict, 1);
-	WT_ATOMIC_ADD(cache->bytes_evict, page->memory_footprint);
+	(void)WT_ATOMIC_ADD(cache->pages_evict, 1);
+	(void)WT_ATOMIC_ADD(cache->bytes_evict, page->memory_footprint);
 
 	page->memory_footprint = 0;
 }
@@ -152,6 +152,26 @@ __wt_page_modify_set(WT_PAGE *page)
 
 	/* The page is dirty if the disk and write generations differ. */
 	++page->modify->write_gen;
+}
+
+/*
+ * __wt_page_and_tree_modify_set --
+ *	Mark both the page and tree dirty.
+ */
+static inline void
+__wt_page_and_tree_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page)
+{
+	WT_BTREE *btree;
+
+	btree = session->btree;
+
+	/*
+	 * A memory barrier is required for setting the tree's modified value,
+	 * we depend on the barrier called in setting the page's modified value.
+	 */
+	btree->modified = 1;
+
+	__wt_page_modify_set(page);
 }
 
 /*

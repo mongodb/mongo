@@ -1,4 +1,4 @@
-INCLUDES = -I$(abs_top_builddir)
+AM_CPPFLAGS = -I$(abs_top_builddir)
 
 PYSRC = $(top_srcdir)/lang/python
 if DEBUG

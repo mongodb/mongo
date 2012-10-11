@@ -38,6 +38,7 @@
 int print_cursor(WT_CURSOR *);
 int print_database_stats(WT_SESSION *);
 int print_file_stats(WT_SESSION *);
+int print_lsm_stats(WT_SESSION *);
 int print_overflow_pages(WT_SESSION *);
 
 const char *home = "WT_TEST";
@@ -90,6 +91,25 @@ print_file_stats(WT_SESSION *session)
 }
 
 int 
+print_lsm_stats(WT_SESSION *session)
+{
+	WT_CURSOR *cursor;
+	int ret;
+
+	/* Create an LSM tree, and add some content. */
+	ret = session->create(session,
+	    "lsm:access", "key_format=S,value_format=S");
+
+	/*! [statistics lsm function] */
+	if ((ret = session->open_cursor(session,
+	    "statistics:lsm:access", NULL, NULL, &cursor)) != 0)
+		return (ret);
+
+	return (print_cursor(cursor));
+	/*! [statistics lsm function] */
+}
+
+int 
 print_overflow_pages(WT_SESSION *session)
 {
 	/*! [statistics retrieve by key] */
@@ -126,6 +146,8 @@ main(void)
 	ret = print_database_stats(session);
 
 	ret = print_file_stats(session);
+
+	ret = print_lsm_stats(session);
 
 	ret = print_overflow_pages(session);
 

@@ -1,4 +1,4 @@
-INCLUDES = -I$(top_builddir)
+AM_CPPFLAGS = -I$(top_builddir)
 
 noinst_PROGRAMS = t
 t_LDADD = $(top_builddir)/libwiredtiger.la

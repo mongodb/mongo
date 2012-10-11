@@ -133,6 +133,8 @@ struct __wt_lsm_chunk;
     typedef struct __wt_lsm_chunk WT_LSM_CHUNK;
 struct __wt_lsm_data_source;
     typedef struct __wt_lsm_data_source WT_LSM_DATA_SOURCE;
+struct __wt_lsm_stats;
+    typedef struct __wt_lsm_stats WT_LSM_STATS;
 struct __wt_lsm_tree;
     typedef struct __wt_lsm_tree WT_LSM_TREE;
 struct __wt_lsm_worker_cookie;
@@ -227,7 +229,6 @@ struct __wt_update;
 #include "log.i"
 #include "mutex.i"
 #include "packing.i"
-#include "serial.i"
 #include "serial_funcs.i"
 
 #if defined(__cplusplus)

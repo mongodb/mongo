@@ -17,7 +17,7 @@ __wt_lsm_merge_update_tree(WT_SESSION_IMPL *session,
     WT_LSM_TREE *lsm_tree, int start_chunk, int nchunks, WT_LSM_CHUNK **chunkp)
 {
 	WT_LSM_CHUNK *chunk;
-	size_t chunk_sz;
+	size_t chunk_sz, chunks_after_merge;
 	int i, j;
 
 	/* Setup the array of obsolete chunks. */
@@ -44,9 +44,10 @@ __wt_lsm_merge_update_tree(WT_SESSION_IMPL *session,
 	WT_ASSERT(session, j == nchunks);
 
 	/* Update the current chunk list. */
+	chunks_after_merge = lsm_tree->nchunks - (nchunks + start_chunk);
 	memmove(lsm_tree->chunk + start_chunk + 1,
 	    lsm_tree->chunk + start_chunk + nchunks,
-	    (lsm_tree->nchunks - nchunks) * sizeof(*lsm_tree->chunk));
+	    chunks_after_merge * sizeof(*lsm_tree->chunk));
 	lsm_tree->nchunks -= nchunks - 1;
 	memset(lsm_tree->chunk + lsm_tree->nchunks, 0,
 	    (nchunks - 1) * sizeof(*lsm_tree->chunk));
@@ -74,11 +75,12 @@ __wt_lsm_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	WT_SESSION *wt_session;
 	const char *dest_uri;
 	uint64_t insert_count, record_count;
-	int dest_id, i, nchunks, start_chunk;
+	int dest_id, end_chunk, max_chunks, nchunks, start_chunk;
 
 	src = dest = NULL;
 	dest_uri = NULL;
 	bloom = NULL;
+	max_chunks = (int)lsm_tree->merge_max;
 
 	/*
 	 * Take a copy of the latest chunk id. This value needs to be atomically
@@ -103,53 +105,60 @@ __wt_lsm_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	 */
 	__wt_spin_lock(session, &lsm_tree->lock);
 
-	/* Only include chunks that are on disk */
-	while (nchunks > 1 &&
-	    (!F_ISSET(lsm_tree->chunk[nchunks - 1], WT_LSM_CHUNK_ONDISK) ||
-	    lsm_tree->chunk[nchunks - 1]->ncursor > 0))
-		--nchunks;
+	/* Only include chunks that are stable on disk. */
+	end_chunk = nchunks - 1;
+	while (end_chunk > 0 &&
+	    (!F_ISSET(lsm_tree->chunk[end_chunk], WT_LSM_CHUNK_ONDISK) ||
+	    lsm_tree->chunk[end_chunk]->ncursor > 0))
+		--end_chunk;
 
 	/*
-	 * Look for a minor merge to do in preference to a major merge.
+	 * Look for the most efficient merge we can do.  We define efficiency
+	 * as collapsing as many levels as possible while processing the
+	 * smallest number of rows.
 	 *
-	 * The difference is whether the oldest chunk is involved: if it is, we
-	 * can discard tombstones, because there can be no older record to
-	 * marked deleted.
+	 * We make a distinction between "major" and "minor" merges.  The
+	 * difference is whether the oldest chunk is involved: if it is, we can
+	 * discard tombstones, because there can be no older record to marked
+	 * deleted.
 	 *
-	 * We look at the Bloom URI to decide whether a chunk is the result of
-	 * an earlier merge.  In a minor merge, we take as many chunks as we
-	 * can that have not yet been merged.  If there are less than 2 "new"
-	 * chunks, fall back to a major merge.
+	 * Respect the configured limit on the number of chunks to merge: start
+	 * with the most recent set of chunks and work backwards until going
+	 * further becomes significantly less efficient.
 	 */
-	for (i = 0; i < nchunks; i++)
-		if (lsm_tree->chunk[i]->bloom_uri == NULL)
+	for (start_chunk = end_chunk + 1, record_count = 0;
+	    start_chunk > 0; ) {
+		chunk = lsm_tree->chunk[start_chunk - 1];
+		nchunks = end_chunk - start_chunk + 1;
+
+		/*
+		 * If the next chunk is more than double the average size of
+		 * the chunks we have so far, stop.
+		 */
+		if (nchunks > 2 && chunk->count > 2 * record_count / nchunks)
 			break;
 
-	if (i < nchunks - 2) {
-		start_chunk = i;
-		nchunks -= i;
-	} else
-		start_chunk = 0;
+		record_count += chunk->count;
+		--start_chunk;
 
-	/* Respect the configured limit on the number of chunks to merge. */
-	if (nchunks > (int)lsm_tree->merge_max)
-		nchunks = (int)lsm_tree->merge_max;
-
-	for (record_count = 0, i = start_chunk; i < nchunks; i++)
-		record_count += lsm_tree->chunk[i]->count;
+		if (nchunks == max_chunks)
+			record_count -= lsm_tree->chunk[end_chunk--]->count;
+	}
 	__wt_spin_unlock(session, &lsm_tree->lock);
 
+	WT_ASSERT(session, nchunks <= max_chunks);
+
 	if (nchunks <= 1)
-		return (0);
+		return (WT_NOTFOUND);
 
 	/* Allocate an ID for the merge. */
 	dest_id = WT_ATOMIC_ADD(lsm_tree->last, 1);
 
 	WT_VERBOSE_RET(session, lsm,
-	    "Merging chunks %d-%d into %d\n",
-	    start_chunk, start_chunk + nchunks, dest_id);
+	    "Merging chunks %d-%d into %d (%" PRIu64 " records)\n",
+	    start_chunk, end_chunk, dest_id, record_count);
 
-	if (record_count != 0) {
+	if (lsm_tree->bloom != 0 && start_chunk > 0 && record_count > 0) {
 		WT_RET(__wt_scr_alloc(session, 0, &bbuf));
 		WT_ERR(__wt_lsm_tree_bloom_name(
 		    session, lsm_tree, dest_id, bbuf));
