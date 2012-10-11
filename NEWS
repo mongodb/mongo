@@ -1,3 +1,56 @@
+WiredTiger release 1.3.3, 2012-10-11
+------------------------------------
+
+This is a bugfix and performance tuning release, primarily related to LSM
+trees.  The changes are as follows:
+
+[#350] Checkpoint the metadata after successful schema-level operations.
+       Otherwise, if process exits without closing the connection or
+       running a checkpoint, created objects exist but there is no record
+       in the metadata.
+
+[#351] Don't put checkpoint extent blocks on the available list, blocks on
+       it are considered for truncation; they have to go on the "checkpoint
+       available" list.
+
+* Choose LSM merges based on a measure of efficiency (levels collapsed per
+  record), rather than simply choosing a minor or a major merge.  Tweak the
+  merge heuristic so we don't end up with runs of smaller chunks in the
+  middle of the tree.
+
+* Add a connection-wide flag to disable LSM merges.
+
+* Don't create Bloom filters for the oldest chunk in the system.  Add the
+  ability to disable Bloom filters entirely.
+
+* Fix fast-path for bit values in WT_CURSOR::set_value.
+
+* Clean up allocation of LSM chunk IDs.
+
+* Update bloom_get so that it doesn't hold a cursor position.
+
+* Respect the page size for fixed-length column stores, remembering there
+  are 8 bits per byte.
+
+* Support bulk loading a bitmap into a fixed-length column store, update
+  Bloom filter code to use this.
+
+* Add an example program, ex_test_perf, to demonstrate basic LSM usage.
+
+* Add a new statistics cursor type "statistics:lsm".  Update ex_stat.c to
+  demonstrate usage.
+
+* Add a statistics_fast flag to file statistics cursors.  Update LSM
+  statistics so that they aggregate some cache statistics.  Add ability to
+  open a statistics cursor on a checkpoint.
+
+* Walk a constant number of pages for LRU eviction.
+
+* Move the cache full check to after an update operation completes, when it
+  is no longer holding hazard references.  This improves behavior with
+  small caches.
+
+
 WiredTiger release 1.3.2, 2012-10-03
 ------------------------------------
 
