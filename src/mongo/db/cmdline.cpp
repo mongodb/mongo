@@ -373,6 +373,22 @@ namespace {
         log() << "options: " << parsedOpts << endl;
     }
 
+    class CmdGetCmdLineOpts : Command {
+    public:
+        CmdGetCmdLineOpts(): Command("getCmdLineOpts") {}
+        void help(stringstream& h) const { h << "get argv"; }
+        virtual LockType locktype() const { return NONE; }
+        virtual bool adminOnly() const { return true; }
+        virtual bool slaveOk() const { return true; }
+
+        virtual bool run(const string&, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+            result.append("argv", argvArray);
+            result.append("parsed", parsedOpts);
+            return true;
+        }
+
+    } cmdGetCmdLineOpts;
+
     casi< map<string,ParameterValidator*> * > pv_all (NULL);
 
     ParameterValidator::ParameterValidator( const string& name ) : _name( name ) {
