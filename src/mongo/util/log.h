@@ -110,6 +110,17 @@ namespace mongo {
         int _level;
     };
 
+    inline bool operator<( const LabeledLevel& ll, const int i ) { return ll.getLevel() < i; }
+    inline bool operator<( const int i, const LabeledLevel& ll ) { return i < ll.getLevel(); }
+    inline bool operator>( const LabeledLevel& ll, const int i ) { return ll.getLevel() > i; }
+    inline bool operator>( const int i, const LabeledLevel& ll ) { return i > ll.getLevel(); }
+    inline bool operator<=( const LabeledLevel& ll, const int i ) { return ll.getLevel() <= i; }
+    inline bool operator<=( const int i, const LabeledLevel& ll ) { return i <= ll.getLevel(); }
+    inline bool operator>=( const LabeledLevel& ll, const int i ) { return ll.getLevel() >= i; }
+    inline bool operator>=( const int i, const LabeledLevel& ll ) { return i >= ll.getLevel(); }
+    inline bool operator==( const LabeledLevel& ll, const int i ) { return ll.getLevel() == i; }
+    inline bool operator==( const int i, const LabeledLevel& ll ) { return i == ll.getLevel(); }
+
     class LazyString {
     public:
         virtual ~LazyString() {}
@@ -382,7 +393,9 @@ namespace mongo {
         return Logstream::get().prolog();
     }
 
-#define MONGO_LOG(level) if ( MONGO_likely(logLevel < (level)) ) { } else log( level )
+#define MONGO_LOG(requiredLevel) \
+    ( MONGO_likely( ::mongo::logLevel < (requiredLevel) ) ) \
+    ? ::mongo::log() : ::mongo::log()
 #define LOG MONGO_LOG
 
     inline Nullstream& log( LogLevel l ) {
