@@ -25,7 +25,7 @@ m = runMongoProgram( "mongod", "--keyFile", path+"key1", "--port", port[0], "--d
 
 
 print("should fail with wrong permissions");
-assert.eq(m, _isWindows()? 100 : 2, "mongod should exit w/ 2: permissions too open");
+assert.eq(m, _isWindows()? 100 : 1, "mongod should exit w/ 1 (EXIT_FAILURE): permissions too open");
 stopMongod(port[0]);
 
 
