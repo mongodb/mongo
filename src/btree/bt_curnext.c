@@ -241,9 +241,10 @@ new_page:	/* Find the matching WT_COL slot. */
 				 */
 				if ((ret = __wt_cell_unpack_copy(
 				    session, &unpack, &cbt->tmp)) == WT_RESTART)
-					WT_RET(__wt_ovfl_cache_col_restart(
+					ret = __wt_ovfl_cache_col_restart(
 					    session,
-					    cbt->page, &unpack, &cbt->tmp));
+					    cbt->page, &unpack, &cbt->tmp);
+				WT_RET(ret);
 			}
 			cbt->cip_saved = cip;
 		}
