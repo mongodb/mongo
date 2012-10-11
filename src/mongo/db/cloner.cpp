@@ -719,7 +719,7 @@ namespace mongo {
 
     class CmdRenameCollection : public Command {
     public:
-        // Namespace is 128 incl NUL
+        // Absolute maximum Namespace is 128 incl NUL
         // Namespace is 128 minus .$ and $extra so 120 before additions
         static const int maxNamespaceLen = 120;
         CmdRenameCollection() : Command( "renameCollection" ) {}
