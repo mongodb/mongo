@@ -249,9 +249,6 @@ extern int __wt_cache_config(WT_CONNECTION_IMPL *conn, const char *cfg[]);
 extern int __wt_cache_create(WT_CONNECTION_IMPL *conn, const char *cfg[]);
 extern void __wt_cache_stats_update(WT_CONNECTION_IMPL *conn);
 extern void __wt_cache_destroy(WT_CONNECTION_IMPL *conn);
-extern int __wt_cell_unpack_copy( WT_SESSION_IMPL *session,
-    WT_CELL_UNPACK *unpack,
-    WT_ITEM *retb);
 extern void __wt_btcur_iterate_setup(WT_CURSOR_BTREE *cbt, int next);
 extern int __wt_btcur_next(WT_CURSOR_BTREE *cbt, int discard);
 extern int __wt_btcur_next_random(WT_CURSOR_BTREE *cbt);
@@ -326,8 +323,8 @@ extern const char *__wt_addr_string( WT_SESSION_IMPL *session,
     const uint8_t *addr,
     uint32_t size);
 extern int __wt_ovfl_read(WT_SESSION_IMPL *session,
-    WT_ITEM *store,
-    WT_CELL_UNPACK *unpack);
+    WT_CELL_UNPACK *unpack,
+    WT_ITEM *store);
 extern int __wt_ovfl_cache_col_restart(WT_SESSION_IMPL *session,
     WT_PAGE *page,
     WT_CELL_UNPACK *unpack,

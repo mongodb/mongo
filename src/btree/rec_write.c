@@ -2037,26 +2037,15 @@ __rec_col_var(WT_SESSION_IMPL *session,
 			}
 
 			/*
-			 * Check for the common case where the underlying value
-			 * is simple and avoid a copy.
+			 * If data is Huffman encoded, we have to decode it in
+			 * order to compare it with the last item we saw, which
+			 * may have been an update string.  This guarantees we
+			 * find every single pair of objects we can RLE encode,
+			 * including applications updating an existing record
+			 * where the new value happens (?) to match a Huffman-
+			 * encoded value in a previous or next record.
 			 */
-			if (btree->huffman_value == NULL) {
-				orig->data = unpack->data;
-				orig->size = unpack->size;
-				goto record_loop;
-			}
-
-			/*
-			 * The data is Huffman encoded, which means we have to
-			 * decode it in order to compare it with the last item
-			 * we saw, which may have been an update string.  This
-			 * guarantees we find every single pair of objects we
-			 * can RLE encode, including applications updating an
-			 * existing record where the new value happens (?) to
-			 * match a Huffman-encoded value in a previous or next
-			 * record.
-			 */
-			WT_ERR(__wt_cell_unpack_copy(session, unpack, orig));
+			WT_ERR(__wt_cell_unpack_ref(session, unpack, orig));
 		}
 
 record_loop:	/*
@@ -2142,7 +2131,7 @@ record_loop:	/*
 					 * it for a key and now we need another
 					 * copy; read it into memory.
 					 */
-					WT_ERR(__wt_cell_unpack_copy(
+					WT_ERR(__wt_cell_unpack_ref(
 					    session, unpack, orig));
 
 					ovfl_state = OVFL_IGNORE;

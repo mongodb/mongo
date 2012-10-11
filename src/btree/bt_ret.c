@@ -105,19 +105,14 @@ __wt_kv_return(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 
 	/* The value is an on-page cell, unpack and expand it as necessary. */
 	__wt_cell_unpack(cell, &unpack);
-	if (btree->huffman_value == NULL && unpack.type == WT_CELL_VALUE) {
-		cursor->value.data = unpack.data;
-		cursor->value.size = unpack.size;
-		return (0);
-	}
-	ret = __wt_cell_unpack_copy(session, &unpack, &cursor->value);
+	ret = __wt_cell_unpack_ref(session, &unpack, &cursor->value);
 
 	/*
 	 * Restart for a variable-length column-store.  We could catch restart
 	 * higher up the call-stack but there's no point to it: unlike row-store
-	 * (where the normal search path finds cached overflow values), we have
-	 * to access the page's reconciliation structures, and that's as easily
-	 * done here as higher up the stack.
+	 * (where a normal search path finds cached overflow values), we have to
+	 * access the page's reconciliation structures, and that's as easy here
+	 * as higher up the stack.
 	 */
 	if (ret == WT_RESTART && page->type == WT_PAGE_COL_VAR)
 		ret = __wt_ovfl_cache_col_restart(

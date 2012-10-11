@@ -948,7 +948,7 @@ deleted:	__debug_item(ds, tag, "deleted", strlen("deleted"));
 	case WT_CELL_VALUE_OVFL_RM:
 	case WT_CELL_VALUE_SHORT:
 		WT_RET(__wt_scr_alloc(session, 256, &buf));
-		if ((ret = __wt_cell_unpack_copy(session, unpack, buf)) == 0)
+		if ((ret = __wt_cell_unpack_ref(session, unpack, buf)) == 0)
 			__debug_item(ds, tag, buf->data, buf->size);
 		__wt_scr_free(&buf);
 		break;

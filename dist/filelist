@@ -16,7 +16,6 @@ src/block/block_write.c
 src/bloom/bloom.c
 src/btree/bt_bulk.c
 src/btree/bt_cache.c
-src/btree/bt_cell.c
 src/btree/bt_curnext.c
 src/btree/bt_curprev.c
 src/btree/bt_cursor.c
