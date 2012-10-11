@@ -79,7 +79,7 @@ namespace mongo {
             {
                 AbstractMessagingPort *mp = cc().port();
                 if( mp )
-                    mp->tag |= 1;
+                    mp->tag |= ScopedConn::keepOpen;
             }
 
             if( cmdObj["pv"].Int() != 1 ) {

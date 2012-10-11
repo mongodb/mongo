@@ -46,7 +46,11 @@ namespace mongo {
     bool replSet = false;
     ReplSet *theReplSet = 0;
 
-    bool isCurrentlyAReplSetPrimary() { 
+    // This is a bitmask with the first bit set. It's used to mark connections that should be kept
+    // open during stepdowns
+    const unsigned ScopedConn::keepOpen = 1;
+
+    bool isCurrentlyAReplSetPrimary() {
         return theReplSet && theReplSet->isPrimary();
     }
 
@@ -164,7 +168,7 @@ namespace mongo {
                    with "not master" (of course client could check result code, but in case they are not)
                 */
                 log() << "replSet closing client sockets after relinquishing primary" << rsLog;
-                MessagingPort::closeAllSockets(1);
+                MessagingPort::closeAllSockets(ScopedConn::keepOpen);
             }
 
             // now that all connections were closed, strip this mongod from all sharding details
