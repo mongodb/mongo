@@ -87,6 +87,9 @@
     <Filter Include="bson\util">
       <UniqueIdentifier>{1155795b-d16c-4027-9943-12e4e61d2e7a}</UniqueIdentifier>
     </Filter>
+    <Filter Include="db\auth">
+      <UniqueIdentifier>{a8303268-06c5-45c6-9f68-93ea9e6e1348}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="balance.cpp">
@@ -789,6 +792,21 @@
     <ClCompile Include="..\db\initialize_server_global_state.cpp">
       <Filter>db\Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\db\auth\action_set.cpp">
+      <Filter>db\auth</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\auth\capability.cpp">
+      <Filter>db\auth</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\auth\capability_set.cpp">
+      <Filter>db\auth</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\auth\principal.cpp">
+      <Filter>db\auth</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\auth\principal_set.cpp">
+      <Filter>db\auth</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\pch.h" />
@@ -1250,6 +1268,21 @@
     </ClInclude>
     <ClInclude Include="..\db\initialize_server_global_state.h">
       <Filter>db\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\auth\action_set.h">
+      <Filter>db\auth</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\auth\capability.h">
+      <Filter>db\auth</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\auth\capability_set.h">
+      <Filter>db\auth</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\auth\principal.h">
+      <Filter>db\auth</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\auth\principal_set.h">
+      <Filter>db\auth</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
