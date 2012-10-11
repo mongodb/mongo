@@ -2524,7 +2524,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		 *
 		 * Truncate any 0th key, internal pages don't need 0th keys.
 		 */
-		 if (onpage_ovfl) {
+		if (onpage_ovfl) {
 			key->buf.data = cell;
 			key->buf.size = __wt_cell_total_len(kpack);
 			key->cell_len = 0;
