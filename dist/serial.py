@@ -53,6 +53,7 @@ Serial('update', [
 		SerialArg('WT_UPDATE **', 'srch_upd'),
 		SerialArg('WT_UPDATE **', 'new_upd', 1),
 		SerialArg('WT_UPDATE *', 'upd', 1),
+		SerialArg('WT_UPDATE **', 'upd_obsolete', 0),
 	]),
 ]
 
@@ -134,11 +135,10 @@ typedef struct {
 	for l in entry.args:
 		o += ', ' + decl_p(l)
 	o +=')'
-	f.write('\n'.join('\t' + l for l in textwrap.wrap(o, 70)))
+	f.write('\n'.join('    ' + l for l in textwrap.wrap(o, 70)))
 	f.write('''
 {
-\t__wt_''' + entry.name + '''_args *args =
-\t    (__wt_''' + entry.name + '''_args *)untyped_args;
+\t__wt_''' + entry.name + '''_args *args = (__wt_''' + entry.name + '''_args *)untyped_args;
 
 ''')
 	for l in entry.args:
@@ -149,11 +149,10 @@ typedef struct {
 	for l in entry.args:
 		if l.sized:
 			f.write('''
-static inline void\n__wt_''' + entry.name + '_' + l.name + '''_taken(\n
-\t    WT_SESSION_IMPL *session, void *untyped_args, WT_PAGE *page)
+static inline void\n__wt_''' + entry.name + '_' + l.name + '''_taken(
+    WT_SESSION_IMPL *session, void *untyped_args, WT_PAGE *page)
 {
-\t__wt_''' + entry.name + '''_args *args =
-\t    (__wt_''' + entry.name + '''_args *)untyped_args;
+\t__wt_''' + entry.name + '''_args *args = (__wt_''' + entry.name + '''_args *)untyped_args;
 
 \targs->''' + l.name + '''_taken = 1;
 

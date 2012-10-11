@@ -143,6 +143,8 @@ __wt_btree_close(WT_SESSION_IMPL *session)
 	/* Free allocated memory. */
 	__wt_free(session, btree->key_format);
 	__wt_free(session, btree->value_format);
+	if (btree->val_ovfl_lock != NULL)
+		__wt_rwlock_destroy(session, &btree->val_ovfl_lock);
 	__wt_free(session, btree->stats);
 
 	btree->bulk_load_ok = 0;
@@ -246,17 +248,17 @@ __btree_conf(WT_SESSION_IMPL *session, const char *cfg[])
 	/* Reconciliation configuration. */
 	WT_RET(__wt_config_getones(session, config, "dictionary", &cval));
 	btree->dictionary = (u_int)cval.val;
-
 	WT_RET(__wt_config_getones(
 	    session, config, "internal_key_truncate", &cval));
 	btree->internal_key_truncate = cval.val == 0 ? 0 : 1;
-
 	WT_RET(
 	    __wt_config_getones(session, config, "prefix_compression", &cval));
 	btree->prefix_compression = cval.val == 0 ? 0 : 1;
-
 	WT_RET(__wt_config_getones(session, config, "split_pct", &cval));
 	btree->split_pct = (u_int)cval.val;
+
+	WT_RET(__wt_rwlock_alloc(
+	    session, "btree overflow lock", &btree->val_ovfl_lock));
 
 	WT_RET(__wt_stat_alloc_btree_stats(session, &btree->stats));
 

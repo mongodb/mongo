@@ -1732,62 +1732,64 @@ extern int wiredtiger_extension_init(WT_SESSION *session,
 #define	WT_STAT_free					15
 /*! file: overflow pages read from the file */
 #define	WT_STAT_overflow_read				16
+/*! file: overflow values cached in memory */
+#define	WT_STAT_overflow_value_cache			17
 /*! file: pages evicted from the file */
-#define	WT_STAT_page_evict				17
+#define	WT_STAT_page_evict				18
 /*! file: pages read from the file */
-#define	WT_STAT_page_read				18
+#define	WT_STAT_page_read				19
 /*! file: pages written to the file */
-#define	WT_STAT_page_write				19
+#define	WT_STAT_page_write				20
 /*! file: size */
-#define	WT_STAT_file_size				20
+#define	WT_STAT_file_size				21
 /*! fixed-record size */
-#define	WT_STAT_file_fixed_len				21
+#define	WT_STAT_file_fixed_len				22
 /*! magic number */
-#define	WT_STAT_file_magic				22
+#define	WT_STAT_file_magic				23
 /*! major version number */
-#define	WT_STAT_file_major				23
+#define	WT_STAT_file_major				24
 /*! maximum internal page item size */
-#define	WT_STAT_file_maxintlitem			24
+#define	WT_STAT_file_maxintlitem			25
 /*! maximum internal page size */
-#define	WT_STAT_file_maxintlpage			25
+#define	WT_STAT_file_maxintlpage			26
 /*! maximum leaf page item size */
-#define	WT_STAT_file_maxleafitem			26
+#define	WT_STAT_file_maxleafitem			27
 /*! maximum leaf page size */
-#define	WT_STAT_file_maxleafpage			27
+#define	WT_STAT_file_maxleafpage			28
 /*! minor version number */
-#define	WT_STAT_file_minor				28
+#define	WT_STAT_file_minor				29
 /*! overflow pages */
-#define	WT_STAT_file_overflow				29
+#define	WT_STAT_file_overflow				30
 /*! page size allocation unit */
-#define	WT_STAT_file_allocsize				30
+#define	WT_STAT_file_allocsize				31
 /*! reconcile: deleted or temporary pages merged */
-#define	WT_STAT_rec_page_merge				31
+#define	WT_STAT_rec_page_merge				32
 /*! reconcile: dictionary match */
-#define	WT_STAT_rec_dictionary				32
+#define	WT_STAT_rec_dictionary				33
 /*! reconcile: internal pages split */
-#define	WT_STAT_rec_split_intl				33
+#define	WT_STAT_rec_split_intl				34
 /*! reconcile: leaf pages split */
-#define	WT_STAT_rec_split_leaf				34
+#define	WT_STAT_rec_split_leaf				35
 /*! reconcile: overflow key */
-#define	WT_STAT_rec_ovfl_key				35
+#define	WT_STAT_rec_ovfl_key				36
 /*! reconcile: overflow value */
-#define	WT_STAT_rec_ovfl_value				36
+#define	WT_STAT_rec_ovfl_value				37
 /*! reconcile: pages deleted */
-#define	WT_STAT_rec_page_delete				37
+#define	WT_STAT_rec_page_delete				38
 /*! reconcile: pages written */
-#define	WT_STAT_rec_written				38
+#define	WT_STAT_rec_written				39
 /*! reconcile: unable to acquire hazard reference */
-#define	WT_STAT_rec_hazard				39
+#define	WT_STAT_rec_hazard				40
 /*! row-store internal pages */
-#define	WT_STAT_file_row_int_pages			40
+#define	WT_STAT_file_row_int_pages			41
 /*! row-store leaf pages */
-#define	WT_STAT_file_row_leaf_pages			41
+#define	WT_STAT_file_row_leaf_pages			42
 /*! total entries */
-#define	WT_STAT_file_entries				42
+#define	WT_STAT_file_entries				43
 /*! update conflicts */
-#define	WT_STAT_update_conflict				43
+#define	WT_STAT_update_conflict				44
 /*! write generation conflicts */
-#define	WT_STAT_file_write_conflicts			44
+#define	WT_STAT_file_write_conflicts			45
 /*! @} */
 
 /*!

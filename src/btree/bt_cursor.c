@@ -137,7 +137,7 @@ __wt_btcur_search(WT_CURSOR_BTREE *cbt)
 	if (btree->type == BTREE_ROW)
 		WT_RET(__cursor_size_chk(session, &cursor->key));
 
-	__cursor_func_init(cbt, 1);
+retry:	__cursor_func_init(cbt, 1);
 
 	WT_ERR(btree->type == BTREE_ROW ?
 	    __wt_row_search(session, cbt, 0) :
@@ -157,8 +157,9 @@ __wt_btcur_search(WT_CURSOR_BTREE *cbt)
 	} else
 		ret = __wt_kv_return(session, cbt);
 
-err:	__cursor_func_resolve(cbt, ret);
-
+err:	if (ret == WT_RESTART)
+		goto retry;
+	__cursor_func_resolve(cbt, ret);
 	return (ret);
 }
 
@@ -182,7 +183,7 @@ __wt_btcur_search_near(WT_CURSOR_BTREE *cbt, int *exact)
 	if (btree->type == BTREE_ROW)
 		WT_RET(__cursor_size_chk(session, &cursor->key));
 
-	__cursor_func_init(cbt, 1);
+retry:	__cursor_func_init(cbt, 1);
 
 	WT_ERR(btree->type == BTREE_ROW ?
 	    __wt_row_search(session, cbt, 0) :
@@ -224,7 +225,9 @@ __wt_btcur_search_near(WT_CURSOR_BTREE *cbt, int *exact)
 			*exact = -1;
 	}
 
-err:	__cursor_func_resolve(cbt, ret);
+err:	if (ret == WT_RESTART)
+		goto retry;
+	__cursor_func_resolve(cbt, ret);
 	return (ret);
 }
 
@@ -287,13 +290,11 @@ retry:	__cursor_func_init(cbt, 1);
 		 */
 		if (!F_ISSET(cursor, WT_CURSTD_OVERWRITE) &&
 		    ((cbt->compare == 0 && !__cursor_invalid(cbt)) ||
-		    (cbt->compare != 0 && __cursor_fix_implicit(btree, cbt)))) {
-			ret = WT_DUPLICATE_KEY;
-			break;
-		}
-		if ((ret = __wt_col_modify(session, cbt, 3)) == WT_RESTART)
-			goto retry;
-		if (F_ISSET(cursor, WT_CURSTD_APPEND) && ret == 0)
+		    (cbt->compare != 0 && __cursor_fix_implicit(btree, cbt))))
+			WT_ERR(WT_DUPLICATE_KEY);
+
+		WT_ERR(__wt_col_modify(session, cbt, 3));
+		if (F_ISSET(cursor, WT_CURSTD_APPEND))
 			cbt->iface.recno = cbt->recno;
 		break;
 	case BTREE_ROW:
@@ -306,18 +307,17 @@ retry:	__cursor_func_init(cbt, 1);
 		WT_ERR(__wt_row_search(session, cbt, 1));
 		if (cbt->compare == 0 &&
 		    !__cursor_invalid(cbt) &&
-		    !F_ISSET(cursor, WT_CURSTD_OVERWRITE)) {
-			ret = WT_DUPLICATE_KEY;
-			break;
-		}
-		if ((ret = __wt_row_modify(session, cbt, 0)) == WT_RESTART)
-			goto retry;
+		    !F_ISSET(cursor, WT_CURSTD_OVERWRITE))
+			WT_ERR(WT_DUPLICATE_KEY);
+
+		ret = __wt_row_modify(session, cbt, 0);
 		break;
 	WT_ILLEGAL_VALUE_ERR(session);
 	}
 
-err:	__cursor_func_resolve(cbt, ret);
-
+err:	if (ret == WT_RESTART)
+		goto retry;
+	__cursor_func_resolve(cbt, ret);
 	return (ret);
 }
 
@@ -364,23 +364,22 @@ retry:	__cursor_func_init(cbt, 1);
 			 */
 			cbt->recno = cursor->recno;
 		} else
-			if ((ret =
-			    __wt_col_modify(session, cbt, 2)) == WT_RESTART)
-			goto retry;
+			ret = __wt_col_modify(session, cbt, 2);
 		break;
 	case BTREE_ROW:
 		/* Remove the record if it exists. */
 		WT_ERR(__wt_row_search(session, cbt, 1));
 		if (cbt->compare != 0 || __cursor_invalid(cbt))
-			ret = WT_NOTFOUND;
-		else if ((ret = __wt_row_modify(session, cbt, 1)) == WT_RESTART)
-			goto retry;
+			WT_ERR(WT_NOTFOUND);
+
+		ret = __wt_row_modify(session, cbt, 1);
 		break;
 	WT_ILLEGAL_VALUE_ERR(session);
 	}
 
-err:	__cursor_func_resolve(cbt, ret);
-
+err:	if (ret == WT_RESTART)
+		goto retry;
+	__cursor_func_resolve(cbt, ret);
 	return (ret);
 }
 
@@ -426,23 +425,22 @@ retry:	__cursor_func_init(cbt, 1);
 		 */
 		if ((cbt->compare != 0 || __cursor_invalid(cbt)) &&
 		    !__cursor_fix_implicit(btree, cbt))
-			ret = WT_NOTFOUND;
-		else if ((ret = __wt_col_modify(session, cbt, 3)) == WT_RESTART)
-			goto retry;
+			WT_ERR(WT_NOTFOUND);
+		ret = __wt_col_modify(session, cbt, 3);
 		break;
 	case BTREE_ROW:
 		/* Update the record it it exists. */
 		WT_ERR(__wt_row_search(session, cbt, 1));
 		if (cbt->compare != 0 || __cursor_invalid(cbt))
-			ret = WT_NOTFOUND;
-		else if ((ret = __wt_row_modify(session, cbt, 0)) == WT_RESTART)
-			goto retry;
+			WT_ERR(WT_NOTFOUND);
+		ret = __wt_row_modify(session, cbt, 0);
 		break;
 	WT_ILLEGAL_VALUE_ERR(session);
 	}
 
-err:	__cursor_func_resolve(cbt, ret);
-
+err:	if (ret == WT_RESTART)
+		goto retry;
+	__cursor_func_resolve(cbt, ret);
 	return (ret);
 }
 

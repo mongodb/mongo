@@ -86,11 +86,14 @@
 #define	WT_CELL_ADDR_LNO	(2 << 4)	/* Block location (lno) */
 #define	WT_CELL_DEL		(3 << 4)	/* Deleted value */
 #define	WT_CELL_KEY		(4 << 4)	/* Key */
-#define	WT_CELL_KEY_OVFL	(5 << 4)	/* Key overflow */
+#define	WT_CELL_KEY_OVFL	(5 << 4)	/* Overflow key */
 #define	WT_CELL_VALUE		(6 << 4)	/* Value */
 #define	WT_CELL_VALUE_COPY	(7 << 4)	/* Value copy */
-#define	WT_CELL_VALUE_OVFL	(8 << 4)	/* Value overflow */
-#define	WT_CELL_TYPE(v)		((v) & 0x0f << 4)
+#define	WT_CELL_VALUE_OVFL	(8 << 4)	/* Removed overflow value */
+#define	WT_CELL_VALUE_OVFL_RM	(9 << 4)	/* Cached overflow value */
+
+#define	WT_CELL_TYPE_MASK	(0x0f << 4)
+#define	WT_CELL_TYPE(v)		((v) & WT_CELL_TYPE_MASK)
 
 /*
  * WT_CELL --
@@ -115,6 +118,8 @@ struct __wt_cell {
  *	Unpacked cell.
  */
 struct __wt_cell_unpack {
+	WT_CELL *cell;			/* Cell's disk image address */
+
 	uint64_t v;			/* RLE count or recno */
 
 	const void *data;		/* Data */
@@ -397,6 +402,17 @@ __wt_cell_total_len(WT_CELL_UNPACK *unpack)
 }
 
 /*
+ * __wt_cell_type_reset --
+ *	Reset the cell's type.
+ */
+static inline void
+__wt_cell_type_reset(WT_CELL *cell, u_int type)
+{
+	cell->__chunk[0] =
+	    (cell->__chunk[0] & ~WT_CELL_TYPE_MASK) | WT_CELL_TYPE(type);
+}
+
+/*
  * __wt_cell_type --
  *	Return the cell's type (collapsing special types).
  */
@@ -417,8 +433,27 @@ __wt_cell_type(WT_CELL *cell)
 
 	if (type == WT_CELL_ADDR_DEL || type == WT_CELL_ADDR_LNO)
 		return (WT_CELL_ADDR);
+	if (type == WT_CELL_VALUE_OVFL_RM)
+		return (WT_CELL_VALUE_OVFL);
 
 	return (type);
+}
+
+/*
+ * __wt_cell_type_raw --
+ *	Return the cell's type.
+ */
+static inline u_int
+__wt_cell_type_raw(WT_CELL *cell)
+{
+	/*
+	 * NOTE: WT_CELL_VALUE_SHORT MUST BE CHECKED BEFORE WT_CELL_KEY_SHORT.
+	 */
+	if (cell->__chunk[0] & WT_CELL_VALUE_SHORT)
+		return (WT_CELL_VALUE_SHORT);
+	if (cell->__chunk[0] & WT_CELL_KEY_SHORT)
+		return (WT_CELL_KEY_SHORT);
+	return (WT_CELL_TYPE(cell->__chunk[0]));
 }
 
 /*
@@ -448,6 +483,7 @@ __wt_cell_unpack_safe(WT_CELL *cell, WT_CELL_UNPACK *unpack, uint8_t *end)
 } while (0)
 
 	memset(unpack, 0, sizeof(*unpack));
+	unpack->cell = cell;
 
 	/*
 	 * Check the cell description byte, then get the cell type.
@@ -466,6 +502,8 @@ __wt_cell_unpack_safe(WT_CELL *cell, WT_CELL_UNPACK *unpack, uint8_t *end)
 		if (unpack->raw == WT_CELL_ADDR_DEL ||
 		    unpack->raw == WT_CELL_ADDR_LNO)
 			unpack->type = WT_CELL_ADDR;
+		else if (unpack->raw == WT_CELL_VALUE_OVFL_RM)
+			unpack->type = WT_CELL_VALUE_OVFL;
 		else
 			unpack->type = unpack->raw;
 	}
@@ -545,6 +583,7 @@ __wt_cell_unpack_safe(WT_CELL *cell, WT_CELL_UNPACK *unpack, uint8_t *end)
 
 	case WT_CELL_KEY_OVFL:
 	case WT_CELL_VALUE_OVFL:
+	case WT_CELL_VALUE_OVFL_RM:
 		/*
 		 * Set overflow flags.
 		 */

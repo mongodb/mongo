@@ -28,7 +28,7 @@ __wt_cell_unpack_copy(
 		break;
 	case WT_CELL_KEY_OVFL:
 	case WT_CELL_VALUE_OVFL:
-		WT_RET(__wt_ovfl_in(session, retb, unpack->data, unpack->size));
+		WT_RET(__wt_ovfl_read(session, retb, unpack));
 		break;
 	WT_ILLEGAL_VALUE(session);
 	}

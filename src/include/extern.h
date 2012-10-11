@@ -49,6 +49,7 @@ extern int __wt_block_checkpoint(WT_SESSION_IMPL *session,
 extern int __wt_block_checkpoint_resolve(WT_SESSION_IMPL *session,
     WT_BLOCK *block);
 extern uint32_t __wt_cksum(const void *chunk, size_t len);
+extern int __wt_block_off_match(WT_EXTLIST *el, off_t off, off_t size);
 extern int __wt_block_off_remove_overlap( WT_SESSION_IMPL *session,
     WT_EXTLIST *el,
     off_t off,
@@ -324,10 +325,17 @@ extern const char *__wt_addr_string( WT_SESSION_IMPL *session,
     WT_ITEM *buf,
     const uint8_t *addr,
     uint32_t size);
-extern int __wt_ovfl_in( WT_SESSION_IMPL *session,
+extern int __wt_ovfl_read(WT_SESSION_IMPL *session,
     WT_ITEM *store,
-    const uint8_t *addr,
-    uint32_t len);
+    WT_CELL_UNPACK *unpack);
+extern int __wt_ovfl_cache_col_restart(WT_SESSION_IMPL *session,
+    WT_PAGE *page,
+    WT_CELL_UNPACK *unpack,
+    WT_ITEM *store);
+extern int __wt_val_ovfl_cache(WT_SESSION_IMPL *session,
+    WT_PAGE *page,
+    void *cookie,
+    WT_CELL_UNPACK *unpack);
 extern int
 __wt_page_in_func(
  WT_SESSION_IMPL *session, WT_PAGE *parent, WT_REF *ref
@@ -380,12 +388,13 @@ extern int __wt_rec_track(WT_SESSION_IMPL *session,
     const void *data,
     uint32_t data_size,
     uint32_t flags);
-extern int __wt_rec_track_onpage_srch(WT_SESSION_IMPL *session,
-    WT_PAGE *page,
+extern int __wt_rec_track_ovfl_srch( WT_PAGE *page,
     const uint8_t *addr,
     uint32_t addr_size,
-    int *foundp,
-    WT_ITEM *copy);
+    WT_ITEM *data);
+extern int __wt_rec_track_onpage_srch( WT_PAGE *page,
+    const uint8_t *addr,
+    uint32_t addr_size);
 extern int __wt_rec_track_onpage_addr(WT_SESSION_IMPL *session,
     WT_PAGE *page,
     const uint8_t *addr,
@@ -444,7 +453,9 @@ extern int __wt_update_alloc(WT_SESSION_IMPL *session,
     WT_ITEM *value,
     WT_UPDATE **updp,
     size_t *sizep);
-extern void __wt_update_obsolete(WT_SESSION_IMPL *session,
+extern WT_UPDATE *__wt_update_obsolete_check(WT_SESSION_IMPL *session,
+    WT_UPDATE *upd);
+extern void __wt_update_obsolete_free( WT_SESSION_IMPL *session,
     WT_PAGE *page,
     WT_UPDATE *upd);
 extern void __wt_row_leaf_obsolete(WT_SESSION_IMPL *session, WT_PAGE *page);
@@ -1187,6 +1198,7 @@ extern int __wt_stat_alloc_lsm_stats(WT_SESSION_IMPL *session,
 extern void __wt_stat_clear_lsm_stats(WT_STATS *stats_arg);
 extern int __wt_txnid_cmp(const void *v1, const void *v2);
 extern void __wt_txn_release_snapshot(WT_SESSION_IMPL *session);
+extern void __wt_txn_get_oldest(WT_SESSION_IMPL *session);
 extern void __wt_txn_get_snapshot( WT_SESSION_IMPL *session,
     wt_txnid_t my_id,
     wt_txnid_t max_id);

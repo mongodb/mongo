@@ -70,6 +70,7 @@ struct __wt_btree_stats {
 	WT_STATS extend;
 	WT_STATS free;
 	WT_STATS overflow_read;
+	WT_STATS overflow_value_cache;
 	WT_STATS page_evict;
 	WT_STATS page_read;
 	WT_STATS page_write;
