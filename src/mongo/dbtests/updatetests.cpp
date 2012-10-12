@@ -935,7 +935,7 @@ namespace UpdateTests {
                 ModSet modSet( mod );
                 auto_ptr<ModSetState> modSetState = modSet.prepare( obj );
                 modSetState->createNewFromMods();
-                ASSERT_EQUALS( BSON( "$set" << BSON( "a" << BSON_ARRAY( 1 ) ) ),
+                ASSERT_EQUALS( BSON( "$set" << BSON( "a.0" <<  1 ) ),
                                modSetState->getOpLogRewrite() );
             }
         };
