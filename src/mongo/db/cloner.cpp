@@ -747,15 +747,13 @@ namespace mongo {
                 return false;
             }
 
-            char from[256];
-            nsToDatabase( source.c_str(), from );
-            char to[256];
-            nsToDatabase( target.c_str(), to );
-            string databaseName = from;
+            string sourceDB = nsToDatabase(source);
+            string targetDB = nsToDatabase(target);
+            string databaseName = sourceDB;
             databaseName += ".system.indexes";
 
             int longestIndexNameLength = 0;
-            vector<BSONObj> oldIndSpec = Helpers::findAll(databaseName, BSON("ns" << source ));
+            vector<BSONObj> oldIndSpec = Helpers::findAll(databaseName, BSON("ns" << source));
             for (size_t i = 0; i < oldIndSpec.size(); ++i) {
                 int thisLength = oldIndSpec[i].getField("name").valuesize();
                 if (thisLength > longestIndexNameLength) {
@@ -798,7 +796,7 @@ namespace mongo {
             // if we are renaming in the same database, just
             // rename the namespace and we're done.
             {
-                if ( strcmp( from, to ) == 0 ) {
+                if ( sourceDB == targetDB ) {
                     renameNamespace( source.c_str(), target.c_str(), cmdObj["stayTemp"].trueValue() );
                     // make sure we drop counters etc
                     Top::global.collectionDropped( source );
