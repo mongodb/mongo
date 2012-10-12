@@ -80,7 +80,7 @@ catch (e) {
     print(e);
 }
 
-print("\nget a master");
+print("\nget new master (31001)");
 replTest.getMaster();
 
 assert.soon(function() {
@@ -89,7 +89,7 @@ assert.soon(function() {
     }, 'making sure '+firstMaster+' isn\'t still master', 60000);
 
 
-print("\ncheck shutdown command");
+print("\ncheck shutdown command on 31000");
 
 master = replTest.liveNodes.master;
 var slave = replTest.liveNodes.slaves[0];
@@ -102,9 +102,12 @@ catch (e) {
     print(e);
 }
 
-print("\nsleeping");
+print("\nwait until 31001 knows 31000 is down");
 
-sleep(2000);
+assert.soon(function() {
+    var result = master.adminCommand({replSetGetStatus: 1});
+    return result.members[0].health == 0;
+});
 
 print("\nrunning shutdown without force on master: "+master);
 
