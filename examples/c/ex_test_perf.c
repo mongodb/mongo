@@ -635,7 +635,7 @@ void usage(void)
 	printf("\t-d <int> data item size\n");
 	printf("\t-e use existing database (skip population phase)\n");
 	printf("\t-h <string> Wired Tiger home must exist, default WT_TEST \n");
-	printf("\t-i <int> number of records to insert\n");
+	printf("\t-i <int> number of records to insert in thousands\n");
 	printf("\t-k <int> key item size\n");
 	printf("\t-r <int> number of seconds to run read phase\n");
 	printf("\t-s <int> seed for random number generator\n");
