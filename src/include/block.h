@@ -158,7 +158,7 @@ struct __wt_block {
 	int	   verify;		/* If performing verification */
 	off_t	   verify_size;		/* Checkpoint's file size */
 	WT_EXTLIST verify_alloc;	/* Verification allocation list */
-	uint32_t   frags;		/* Maximum frags in the file */
+	uint64_t   frags;		/* Maximum frags in the file */
 	uint8_t   *fragfile;		/* Per-file frag tracking list */
 	uint8_t   *fragckpt;		/* Per-checkpoint frag tracking list */
 };

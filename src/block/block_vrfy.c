@@ -66,17 +66,8 @@ __wt_block_verify_start(
 	 * we do with the extents, but that has its own failure mode, where we
 	 * verify many non-contiguous blocks creating too many entries on the
 	 * list to fit into memory.
-	 *
-	 * We also have a minimum maximum verifiable file size of 16TB because
-	 * the underlying bit package takes a 32-bit count of bits to allocate:
-	 *
-	 *	2^32 * 512 * 8 = 16 * 2^40
 	 */
-	if (fh->file_size / block->allocsize > UINT32_MAX)
-		WT_RET_MSG(
-		    session, WT_ERROR, "the file is too large to verify");
-
-	block->frags = WT_OFF_TO_FRAG(block, fh->file_size);
+	block->frags = (uint64_t)WT_OFF_TO_FRAG(block, fh->file_size);
 	WT_RET(__bit_alloc(session, block->frags, &block->fragfile));
 
 	/*
@@ -168,7 +159,7 @@ __wt_verify_ckpt_load(
 {
 	WT_EXTLIST *el;
 	WT_EXT *ext;
-	uint32_t frag, frags;
+	uint64_t frag, frags;
 
 	/* Set the maximum file size for this checkpoint. */
 	block->verify_size = ci->file_size;
@@ -234,8 +225,8 @@ __wt_verify_ckpt_load(
 	WT_RET(__bit_alloc(session, block->frags, &block->fragckpt));
 	el = &block->verify_alloc;
 	WT_EXT_FOREACH(ext, el->off) {
-		frag = (uint32_t)WT_OFF_TO_FRAG(block, ext->off);
-		frags = (uint32_t)(ext->size / block->allocsize);
+		frag = (uint64_t)WT_OFF_TO_FRAG(block, ext->off);
+		frags = (uint64_t)(ext->size / block->allocsize);
 		__bit_nset(block->fragckpt, frag, frag + (frags - 1));
 	}
 
@@ -273,14 +264,14 @@ __wt_block_verify(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_ITEM *buf,
 {
 	WT_DECL_ITEM(tmp);
 	WT_DECL_RET;
-	uint32_t frag, frags, i, match;
+	uint64_t frag, frags, i, match;
 
 	/*
 	 * If we've already verify this block's physical image, we know it's
 	 * good, we don't have to verify it again.
 	 */
-	frag = (uint32_t)WT_OFF_TO_FRAG(block, offset);
-	frags = (uint32_t)(size / block->allocsize);
+	frag = (uint64_t)WT_OFF_TO_FRAG(block, offset);
+	frags = (uint64_t)(size / block->allocsize);
 	for (match = i = 0; i < frags; ++i)
 		if (__bit_test(block->fragfile, frag++))
 			++match;
@@ -356,7 +347,7 @@ static int
 __verify_filefrag_add(WT_SESSION_IMPL *session,
     WT_BLOCK *block, off_t offset, off_t size, int nodup)
 {
-	uint32_t f, frag, frags, i;
+	uint64_t f, frag, frags, i;
 
 	WT_VERBOSE_RET(session, verify,
 	    "adding file block at %" PRIuMAX "-%" PRIuMAX " (%" PRIuMAX ")",
@@ -369,8 +360,8 @@ __verify_filefrag_add(WT_SESSION_IMPL *session,
 		    "non-existent file blocks",
 		    (uintmax_t)offset, (uintmax_t)(offset + size));
 
-	frag = (uint32_t)WT_OFF_TO_FRAG(block, offset);
-	frags = (uint32_t)(size / block->allocsize);
+	frag = (uint64_t)WT_OFF_TO_FRAG(block, offset);
+	frags = (uint64_t)(size / block->allocsize);
 
 	/* It may be illegal to reference a particular chunk more than once. */
 	if (nodup)
@@ -451,7 +442,7 @@ static int
 __verify_ckptfrag_add(
     WT_SESSION_IMPL *session, WT_BLOCK *block, off_t offset, off_t size)
 {
-	uint32_t f, frag, frags, i;
+	uint64_t f, frag, frags, i;
 
 	WT_VERBOSE_RET(session, verify,
 	    "add checkpoint block at %" PRIuMAX "-%" PRIuMAX " (%" PRIuMAX ")",
@@ -467,8 +458,8 @@ __verify_ckptfrag_add(
 		    "file blocks outside the checkpoint",
 		    (uintmax_t)offset, (uintmax_t)(offset + size));
 
-	frag = (uint32_t)WT_OFF_TO_FRAG(block, offset);
-	frags = (uint32_t)(size / block->allocsize);
+	frag = (uint64_t)WT_OFF_TO_FRAG(block, offset);
+	frags = (uint64_t)(size / block->allocsize);
 
 	/* It is illegal to reference a particular chunk more than once. */
 	for (f = frag, i = 0; i < frags; ++f, ++i)
