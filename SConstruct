@@ -14,7 +14,6 @@
 # several, subordinate SConscript files, which describe specific build rules.
 
 import buildscripts
-import buildscripts.bb
 import datetime
 import imp
 import os
