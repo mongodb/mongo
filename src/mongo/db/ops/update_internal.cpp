@@ -126,9 +126,10 @@ namespace mongo {
 
             bb.append( elt );
 
-            // We don't want to log a $set for which the '_checkForAppending' test won't pass. If we're
-            // in that case, fall back to non-optimized logging.
-            if ( (elt.type() == Object && elt.embeddedObject().okForStorage()) || (elt.type() != Object) ) {
+            // We don't want to log a positional $set for which the '_checkForAppending' test
+            // won't pass. If we're in that case, fall back to non-optimized logging.
+            if ( (elt.type() == Object && elt.embeddedObject().okForStorage()) ||
+                 (elt.type() != Object) ) {
                 ms.fixedOpName = "$set";
                 ms.forcePositional = true;
                 ms.position = bb.arrSize() - 1;
@@ -185,14 +186,20 @@ namespace mongo {
                         found = true;
                 }
 
-                if ( ! found ) {
+                if ( !found ) {
                     bb.append( elt );
+                }
+
+                // We don't want to log a positional $set for which the '_checkForAppending'
+                // test won't pass. If we're in that case, fall back to non-optimized logging.
+                if ( (elt.type() == Object && elt.embeddedObject().okForStorage()) ||
+                     (elt.type() != Object) ) {
                     ms.fixedOpName = "$set";
                     ms.forcePositional = true;
                     ms.position = bb.arrSize() - 1;
                     bb.done();
-
-                } else {
+                }
+                else {
                     ms.fixedOpName = "$set";
                     ms.forceEmptyArray = true;
                     ms.fixedArray = BSONArray(bb.done().getOwned());
@@ -201,8 +208,6 @@ namespace mongo {
 
             break;
         }
-
-
 
         case PUSH_ALL: {
             uassert( 10132 ,  "$pushAll can only be applied to an array" , in.type() == Array );
