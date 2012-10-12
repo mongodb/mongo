@@ -83,6 +83,9 @@ extern int __wt_block_insert_ext( WT_SESSION_IMPL *session,
     WT_EXTLIST *el,
     off_t off,
     off_t size);
+extern int __wt_block_extlist_read_avail( WT_SESSION_IMPL *session,
+    WT_BLOCK *block,
+    WT_EXTLIST *el);
 extern int __wt_block_extlist_read( WT_SESSION_IMPL *session,
     WT_BLOCK *block,
     WT_EXTLIST *el);
@@ -223,7 +226,7 @@ extern int __wt_block_write_off(WT_SESSION_IMPL *session,
     off_t *offsetp,
     uint32_t *sizep,
     uint32_t *cksump,
-    int force_extend);
+    int locked);
 extern int __wt_bloom_create( WT_SESSION_IMPL *session,
     const char *uri,
     const char *config,
