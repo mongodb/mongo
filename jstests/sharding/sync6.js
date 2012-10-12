@@ -8,7 +8,7 @@
 // in all tests.
 var bitbucket;
 if ( _isWindows() ) {
-    bitbucket = "NUL:";
+    bitbucket = "NUL";
 }
 else {
     bitbucket = "/dev/null";
