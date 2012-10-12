@@ -135,6 +135,7 @@ struct __wt_connection_stats {
  * Statistics entries for LSM handle.
  */
 struct __wt_lsm_stats {
+	WT_STATS generation_max;
 	WT_STATS bloom_count;
 	WT_STATS bloom_cache_evict;
 	WT_STATS bloom_cache_read;

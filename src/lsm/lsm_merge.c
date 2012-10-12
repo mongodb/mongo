@@ -74,8 +74,9 @@ __wt_lsm_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	WT_LSM_CHUNK *chunk;
 	WT_SESSION *wt_session;
 	const char *dest_uri;
+	uint32_t generation;
 	uint64_t insert_count, record_count;
-	int dest_id, end_chunk, max_chunks, nchunks, start_chunk;
+	int dest_id, end_chunk, i, max_chunks, nchunks, start_chunk;
 
 	src = dest = NULL;
 	dest_uri = NULL;
@@ -167,6 +168,10 @@ __wt_lsm_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 		    NULL, record_count, lsm_tree->bloom_bit_count,
 		    lsm_tree->bloom_hash_count, &bloom));
 	}
+	/* Find the merge generation. */
+	for (generation = 0, i = start_chunk; i < end_chunk; i++)
+		if (lsm_tree->chunk[i]->generation > generation)
+			generation = lsm_tree->chunk[i]->generation;
 
 	/*
 	 * Special setup for the merge cursor:
@@ -220,6 +225,7 @@ __wt_lsm_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	if (bbuf != NULL)
 		chunk->bloom_uri = __wt_buf_steal(session, bbuf, 0);
 	chunk->count = insert_count;
+	chunk->generation = ++generation;
 	F_SET(chunk, WT_LSM_CHUNK_ONDISK);
 
 	ret = __wt_lsm_meta_write(session, lsm_tree);

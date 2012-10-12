@@ -40,6 +40,7 @@ struct __wt_lsm_chunk {
 	const char *uri;		/* Data source for this chunk. */
 	const char *bloom_uri;		/* URI of Bloom filter, if any. */
 	uint64_t count;			/* Approximate count of records. */
+	uint32_t generation;		/* Merge generation. */
 
 	uint32_t ncursor;		/* Cursors with the chunk as primary. */
 #define	WT_LSM_CHUNK_ONDISK	0x01

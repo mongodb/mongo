@@ -34,14 +34,15 @@ util_stat(WT_SESSION *session, int argc, char *argv[])
 	/*
 	 * If there are no arguments, the statistics cursor operates on the
 	 * connection, otherwise, the optional remaining argument is a file
-	 * name.
+	 * or LSM name.
 	 */
 	switch (argc) {
 	case 0:
 		objname = (char *)"";
 		break;
 	case 1:
-		if ((objname = util_name(*argv, "file", UTIL_FILE_OK)) == NULL)
+		if ((objname = util_name(*argv,
+		    "file", UTIL_FILE_OK | UTIL_LSM_OK)) == NULL)
 			return (1);
 		objname_free = 1;
 		break;

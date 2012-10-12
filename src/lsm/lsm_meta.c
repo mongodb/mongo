@@ -66,6 +66,11 @@ __wt_lsm_meta_read(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 					chunk->count = lv.val;
 					continue;
 				}
+				if (WT_STRING_MATCH(
+				    "generation", lk.str, lk.len)) {
+					chunk->generation = (uint32_t)lv.val;
+					continue;
+				}
 				if ((nchunks + 1) * chunk_sz >
 				    lsm_tree->chunk_alloc)
 					WT_ERR(__wt_realloc(session,
@@ -157,6 +162,8 @@ __wt_lsm_meta_write(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 		if (chunk->count != 0)
 			WT_ERR(__wt_buf_catfmt(
 			    session, buf, ",count=%" PRIu64, chunk->count));
+		WT_ERR(__wt_buf_catfmt(
+		    session, buf, ",generation=%" PRIu32, chunk->generation));
 	}
 	WT_ERR(__wt_buf_catfmt(session, buf, "]"));
 	WT_ERR(__wt_buf_catfmt(session, buf, ",old_chunks=["));

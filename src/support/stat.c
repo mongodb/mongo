@@ -212,6 +212,8 @@ __wt_stat_alloc_lsm_stats(WT_SESSION_IMPL *session, WT_LSM_STATS **statsp)
 	    "Number of pages evicted from LSM chunks";
 	stats->chunk_cache_read.desc = "Number of pages read into LSM chunks";
 	stats->chunk_count.desc = "Number of chunks in the LSM tree";
+	stats->generation_max.desc =
+	    "Highest merge generation in the LSM tree";
 
 	*statsp = stats;
 	return (0);
@@ -236,4 +238,5 @@ __wt_stat_clear_lsm_stats(WT_STATS *stats_arg)
 	stats->chunk_cache_evict.v = 0;
 	stats->chunk_cache_read.v = 0;
 	stats->chunk_count.v = 0;
+	stats->generation_max.v = 0;
 }

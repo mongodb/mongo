@@ -1798,32 +1798,34 @@ extern int wiredtiger_extension_init(WT_SESSION *session,
  * @anchor statistics_lsm
  * @{
  */
+/*! Highest merge generation in the LSM tree */
+#define	WT_STAT_generation_max				0
 /*! Number of bloom filters in the LSM tree */
-#define	WT_STAT_bloom_count				0
+#define	WT_STAT_bloom_count				1
 /*! Number of bloom pages evicted from cache */
-#define	WT_STAT_bloom_cache_evict			1
+#define	WT_STAT_bloom_cache_evict			2
 /*! Number of bloom pages read into cache */
-#define	WT_STAT_bloom_cache_read			2
+#define	WT_STAT_bloom_cache_read			3
 /*! Number of chunks in the LSM tree */
-#define	WT_STAT_chunk_count				3
+#define	WT_STAT_chunk_count				4
 /*! Number of pages evicted from LSM chunks */
-#define	WT_STAT_chunk_cache_evict			4
+#define	WT_STAT_chunk_cache_evict			5
 /*! Number of pages evicted from cache */
-#define	WT_STAT_cache_evict				5
+#define	WT_STAT_cache_evict				6
 /*! Number of pages read into LSM chunks */
-#define	WT_STAT_chunk_cache_read			6
+#define	WT_STAT_chunk_cache_read			7
 /*! Number of pages read into cache */
-#define	WT_STAT_cache_read				7
+#define	WT_STAT_cache_read				8
 /*! Number of pages written from cache */
-#define	WT_STAT_cache_write				8
+#define	WT_STAT_cache_write				9
 /*! Number of successful bloom filter false positives */
-#define	WT_STAT_bloom_misses				9
+#define	WT_STAT_bloom_misses				10
 /*! Number of successful bloom filter lookups */
-#define	WT_STAT_bloom_hits				10
+#define	WT_STAT_bloom_hits				11
 /*! Number of unsuccessful bloom filter lookups */
-#define	WT_STAT_bloom_skips				11
+#define	WT_STAT_bloom_skips				12
 /*! Total space used by bloom filters */
-#define	WT_STAT_bloom_space				12
+#define	WT_STAT_bloom_space				13
 /*! @} */
 /*
  * Statistics section: END

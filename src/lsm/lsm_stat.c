@@ -43,6 +43,7 @@ __wt_lsm_stat_init(
 	WT_STAT_SET(lsm_tree->stats, cache_read, 0);
 	WT_STAT_SET(lsm_tree->stats, cache_write, 0);
 	WT_STAT_SET(lsm_tree->stats, bloom_space, 0);
+	WT_STAT_SET(lsm_tree->stats, generation_max, 0);
 
 	/* Grab a snapshot of the LSM tree chunks. */
 	WT_CLEAR(cookie);
@@ -52,13 +53,17 @@ __wt_lsm_stat_init(
 	WT_STAT_SET(lsm_tree->stats, chunk_count, cookie.nchunks);
 	for (i = 0; i < cookie.nchunks; i++) {
 		chunk = cookie.chunk_array[i];
+		if (chunk->generation >
+		    (uint32_t)WT_STAT(lsm_tree->stats, generation_max))
+			WT_STAT_SET(lsm_tree->stats,
+			    generation_max, chunk->generation);
 		uri_len = strlen("statistics:") + strlen(chunk->uri) + 1;
 		if (uri_len > alloc_len)
 			WT_ERR(__wt_realloc(
 			    session, &alloc_len, uri_len, &uri));
 		snprintf(uri, alloc_len, "statistics:%s", chunk->uri);
 		/*
-		 * LSM chunks reads happen from a checkpoint, so get the
+		 * LSM chunk reads happen from a checkpoint, so get the
 		 * statistics for a checkpoint if one exists.
 		 */
 		WT_ERR(__wt_curstat_open(session, uri,

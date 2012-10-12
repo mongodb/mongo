@@ -113,5 +113,6 @@ lsm_stats = [
 	Stat('cache_evict', 'Number of pages evicted from cache'),
 	Stat('cache_read', 'Number of pages read into cache'),
 	Stat('cache_write', 'Number of pages written from cache'),
+	Stat('generation_max', 'Highest merge generation in the LSM tree'),
 ]
 
