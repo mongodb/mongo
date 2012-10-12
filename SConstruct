@@ -39,7 +39,6 @@ SConsignFile( scons_data_dir + "/sconsign" )
 
 DEFAULT_INSTALL_DIR = "/usr/local"
 
-buildscripts.bb.checkOk()
 
 def findSettingsSetup():
     sys.path.append( "." )
