@@ -361,9 +361,11 @@ __wt_block_alloc(
 		    (intmax_t)size, block->allocsize);
 
 	/*
-	 * Allocation is first-fit by size: search the by-size skiplist for the
-	 * requested size and take the first entry on the by-size offset list.
-	 * If we don't have anything large enough, extend the file.
+	 * Allocation is first-fit by size, then by lowest offset: search the
+	 * by-size skiplist for the requested size and take the first entry on
+	 * the by-size offset list.  This means we prefer best-fit over lower
+	 * offset, but within a size we'll prefer an offset appearing earlier
+	 * in the file.  If we don't have anything big enough, extend the file.
 	 */
 	__block_size_srch(block->live.avail.sz, size, sstack);
 	szp = *sstack[0];
