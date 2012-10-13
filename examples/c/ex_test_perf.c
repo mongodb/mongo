@@ -328,7 +328,7 @@ int populate(CONFIG *cfg)
 		if (secs == 0)
 			++secs;
 		fprintf(cfg->logf,
-		    "Load time: %.2f\nload ops/sec: %.2f\n",
+		    "Load time: %.2f\n" "load ops/sec: %.2f\n",
 		    secs, cfg->icount / secs);
 	}
 
