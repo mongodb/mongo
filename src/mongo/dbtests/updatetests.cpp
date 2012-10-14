@@ -307,7 +307,7 @@ namespace UpdateTests {
         void run() {
             client().insert( ns(), fromjson( "{'_id':0,a:1}" ) );
             client().update( ns(), Query(), BSON( "$set" << BSON( "a.b" << 1 ) ) );
-            ASSERT( client().findOne( ns(), Query() ).woCompare( fromjson( "{'_id':0,a:1}" ) ) == 0 );
+            ASSERT( client().findOne( ns(), Query() ).woCompare( fromjson( "{'_id':0,a:{b:1}}" ) ) == 0 );
         }
     };
 
@@ -428,9 +428,9 @@ namespace UpdateTests {
     class SetEncapsulationConflictsWithExistingType : public SetBase {
     public:
         void run() {
-            client().insert( ns(), fromjson( "{'_id':0,a:{b:4}}" ) );
+            client().insert( ns(), fromjson( "{'_id':0,a:{b:4},d:1}" ) );
             client().update( ns(), Query(), BSON( "$set" << BSON( "a.b.c" << 4.0 ) ) );
-            ASSERT( client().findOne( ns(), Query() ).woCompare( fromjson( "{'_id':0,a:{b:4}}" ) ) == 0 );
+            ASSERT( client().findOne( ns(), Query() ).woCompare( fromjson( "{'_id':0,a:{b:{c:4}},d:1}" ) ) == 0 );
         }
     };
 
