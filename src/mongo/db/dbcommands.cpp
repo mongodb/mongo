@@ -493,6 +493,7 @@ namespace mongo {
         }
 
         bool run(const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+
             long long start = Listener::getElapsedTimeMillis();
             BSONObjBuilder timeBuilder(128);
 
@@ -680,6 +681,12 @@ namespace mongo {
 
             timeBuilder.appendNumber( "after dur" , Listener::getElapsedTimeMillis() - start );
 
+            if ( cmdObj["workingSet"].trueValue() ) {
+                BSONObjBuilder bb( result.subobjStart( "workingSet" ) );
+                Record::appendWorkingSetInfo( bb );
+                bb.done();
+            }
+
             {
                 RamLog* rl = RamLog::get( "warnings" );
                 massert(15880, "no ram log for warnings?" , rl);
@@ -694,6 +701,8 @@ namespace mongo {
                     arr.done();
                 }
             }
+
+            // ----- cleaning up stuff
 
             if ( ! authed )
                 result.append( "note" , "run against admin for more info" );

@@ -5,6 +5,8 @@
 #include "mongo/db/pagefault.h"
 #include "mongo/db/pdfile.h"
 #include "mongo/db/record.h"
+#include "mongo/platform/bits.h"
+#include "mongo/platform/unordered_set.h"
 #include "mongo/util/net/listen.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/stack_introspect.h"
@@ -78,7 +80,7 @@ namespace mongo {
                 if ( ! e )
                     return Unk;
                 
-                return ( e->value & ( ((unsigned long long)1) << offset ) ) ? In : Out;
+                return ( e->value & ( 1ULL << offset ) ) ? In : Out;
             }
             
             /**
@@ -91,8 +93,24 @@ namespace mongo {
                 if ( ! e )
                     return false;
                 
-                e->value |= ((unsigned long long)1) << offset;
+                e->value |= 1ULL << offset;
                 return true;
+            }
+
+
+            void addPages( unordered_set<size_t>* pages ) {
+                for ( int i = 0; i < SliceSize; i++ ) {
+                    unsigned long long v = _data[i].value;
+                    
+                    while ( v ) {
+                        int offset = firstBitSet( v ) - 1;
+                        
+                        size_t page = ( _data[i].region << 6 | offset );
+                        pages->insert( page );
+
+                        v &= ~( 1ULL << offset );
+                    }
+                }
             }
 
         private:
@@ -147,7 +165,7 @@ namespace mongo {
                 SimpleMutex::scoped_lock lk( _lock );
 
                 static int rarely_count = 0;
-                if ( rarely_count++ % 2048 == 0 ) {
+                if ( rarely_count++ % ( 2048 / BigHashSize ) == 0 ) {
                     long long now = Listener::getElapsedTimeMillis();
                     RARELY if ( now == 0 ) {
                         tlog() << "warning Listener::getElapsedTimeMillis returning 0ms" << endl;
@@ -179,7 +197,24 @@ namespace mongo {
                 }
                 return false;
             }
-            
+
+            /**
+             * @param pages OUT adds each page to the set
+             * @param mySlices temporary space for copy
+             */
+            void addPages( unordered_set<size_t>* pages, Slice* mySlices ) {
+                {
+                    // by doing this, we're in the lock only about half as long as the naive way
+                    // that's measure with a small data set
+                    // Assumption is that with a large data set, actually adding to set may get more costly
+                    // so this way the time in lock should be totally constant
+                    SimpleMutex::scoped_lock lk( _lock );
+                    memcpy( mySlices, _slices, NumSlices * sizeof(Slice) );
+                }
+                for ( int i = 0; i < NumSlices; i++ ) {
+                    mySlices[i].addPages( pages );
+                }
+            }
         private:
             
             void _rotate() {
@@ -290,6 +325,23 @@ namespace mongo {
             Data* getData();
 
         };
+     
+        void appendWorkingSetInfo( BSONObjBuilder& b ) {
+            
+            boost::scoped_array<Slice> mySlices( new Slice[NumSlices] );
+            
+            unordered_set<size_t> totalPages;
+            Timer t;
+            
+            for ( int i = 0; i < BigHashSize; i++ ) {
+                rolling[i].addPages( &totalPages, mySlices.get() );
+            }
+            
+            b.append( "note", "thisIsAnEstimate" );
+            b.appendNumber( "pagesInMemory", totalPages.size() );
+            b.appendNumber( "computationTimeMicros", static_cast<long long>(t.micros()) );
+
+        }
         
     }
 
@@ -336,6 +388,15 @@ namespace mongo {
     }
 
     const bool blockSupported = ProcessInfo::blockCheckSupported();
+
+    void Record::appendWorkingSetInfo( BSONObjBuilder& b ) {
+        if ( ! blockSupported ) {
+            b.append( "info", "not supported" );
+            return;
+        }
+        
+        ps::appendWorkingSetInfo( b );
+    }
 
     bool Record::blockCheckSupported() { 
         return ProcessInfo::blockCheckSupported();
