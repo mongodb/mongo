@@ -31,4 +31,17 @@ namespace mongo {
 #endif
     }
 
+#if defined(MONGO_SYSTEM_FFS)
+    TEST( BitsTest, FIRST_BIT_SET ) {
+        ASSERT_EQUALS( firstBitSet(0), mongo_firstBitSet(0) );
+        ASSERT_EQUALS( firstBitSet(0x1234), mongo_firstBitSet(0x1234) );
+        
+        for ( int i = 0; i < 64; i++ ) {
+            unsigned long long x = 1ULL << i;
+            ASSERT_EQUALS( firstBitSet(x), mongo_firstBitSet(x) );
+            x &= 0x5;
+            ASSERT_EQUALS( firstBitSet(x), mongo_firstBitSet(x) );
+        }
+    }
+#endif
 }
