@@ -16,7 +16,7 @@ namespace mongo {
         /* Have to update config from the server, usually $err is also set */
         ResultFlag_ShardConfigStale = 4,
 
-        /* for backward compatability: this let's us know the server supports
+        /* for backward compatibility: this let's us know the server supports
            the QueryOption_AwaitData option. if it doesn't, a repl slave client should sleep
         a little between getMore's.
         */

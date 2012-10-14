@@ -75,7 +75,7 @@ namespace mongo {
         }
 
         /**
-         * @param in incrememnts the actual value inside in
+         * @param in increments the actual value inside in
          */
         void incrementMe( BSONElement& in ) const {
             BSONElementManipulator manip( in );
@@ -347,7 +347,7 @@ namespace mongo {
 
         /**
          * creates a ModSetState suitable for operation on obj
-         * doesn't change or modify this ModSet or any underying Mod
+         * doesn't change or modify this ModSet or any underlying Mod
          */
         auto_ptr<ModSetState> prepare( const BSONObj& obj ) const;
 

@@ -84,7 +84,7 @@ namespace mongo {
          * say( to )
          * recv( from )
          * Note: if you fail to call recv and someone else uses this port,
-         *       horrible things will happend
+         *       horrible things will happen
          */
         bool recv( const Message& sent , Message& response );
 

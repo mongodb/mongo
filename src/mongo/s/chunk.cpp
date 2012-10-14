@@ -355,7 +355,7 @@ namespace mongo {
                 return false;
             
             if ( ! getManager()->_splitHeuristics._splitTickets.tryAcquire() ) {
-                LOG(1) << "won't auto split becaue not enough tickets: " << getManager()->getns() << endl;
+                LOG(1) << "won't auto split because not enough tickets: " << getManager()->getns() << endl;
                 return false;
             }
             TicketHolderReleaser releaser( &(getManager()->_splitHeuristics._splitTickets) );

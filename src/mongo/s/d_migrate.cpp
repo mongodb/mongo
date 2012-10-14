@@ -572,7 +572,7 @@ namespace mongo {
                 }
                 
                 if ( recordToTouch ) {
-                    // its safe to touch here bceause we have a LockMongoFilesShared
+                    // its safe to touch here because we have a LockMongoFilesShared
                     // we can't do where we get the lock because we would have to unlock the main readlock and tne _trackerLocks
                     // simpler to handle this out there
                     recordToTouch->touch();

@@ -20,7 +20,7 @@
 
 namespace mongo {
 
-    /* DONT USE THIS.  it was a dumb idea.
+    /* DON'T USE THIS.  it was a dumb idea.
     
        this class uses a mutex for writes, but not for reads.
        we can get fancier later...

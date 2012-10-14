@@ -57,7 +57,7 @@ namespace mongo {
 
     void DocumentSource::dispose() {
         if ( pSource ) {
-            // This is requried for the DocumentSourceCursor to release its read lock, see
+            // This is required for the DocumentSourceCursor to release its read lock, see
             // SERVER-6123.
             pSource->dispose();
         }

@@ -3,7 +3,7 @@
  * will be fully operational after the execution of this constructor function.
  * 
  * @param {Object} testName Contains the key value pair for the cluster
- *   configuration. Accpeted keys are:
+ *   configuration. Accepted keys are:
  * 
  *   {
  *     name {string}: name for this test

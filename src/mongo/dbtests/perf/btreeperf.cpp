@@ -79,8 +79,8 @@ protected:
  *
  * TODO In the contexts where this class is currently used, duplicate keys are
  * either impossible or highly unlikely.  And an occasional duplicate value will
- * not much affect the procedure by wich a random element is chosen.  We could
- * stop checking for duplicates in push(), eliminate _set from the implementaiton,
+ * not much affect the procedure by which a random element is chosen.  We could
+ * stop checking for duplicates in push(), eliminate _set from the implementation,
  * and potentially improve performance and memory requirements somewhat.
  */
 template< class T >

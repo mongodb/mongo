@@ -95,7 +95,7 @@ namespace mongo {
 
             /** Commit if enough bytes have been modified. Current threshold is 50MB
 
-                The idea is that long running write operations that dont yield
+                The idea is that long running write operations that don't yield
                 (like creating an index or update with $atomic) can call this
                 whenever the db is in a sane state and it will prevent commits
                 from growing too large.

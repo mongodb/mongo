@@ -100,7 +100,7 @@ namespace mongo {
             C &node = map.find(p);
             node.p = p;
             node.c = concept::err;
-            // len is not used currenntly. hmmm.
+            // len is not used currently. hmmm.
         }
 #endif
 

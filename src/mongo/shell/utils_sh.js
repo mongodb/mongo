@@ -52,7 +52,7 @@ sh.help = function() {
 }
 
 sh.status = function( verbose , configDB ) { 
-    // TODO: move the actual commadn here
+    // TODO: move the actual command here
     printShardingStatus( configDB , verbose );
 }
 

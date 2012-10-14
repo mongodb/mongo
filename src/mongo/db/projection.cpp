@@ -62,7 +62,7 @@ namespace mongo {
                     }
                 }
                 else if ( mongoutils::str::equals( e2.fieldName(), "$elemMatch" ) ) {
-                    // validate $elemMatch arguments and dependancies
+                    // validate $elemMatch arguments and dependencies
                     uassert( 16342, "elemMatch: invalid argument.  object required.",
                              e2.type() == Object );
                     uassert( 16343, "Cannot specify positional operator and $elemMatch"

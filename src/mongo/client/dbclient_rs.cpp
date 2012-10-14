@@ -1507,7 +1507,7 @@ namespace mongo {
     }
 
     void DBClientReplicaSet::killCursor( long long cursorID ) {
-        // we should neve call killCursor on a replica set conncetion
+        // we should never call killCursor on a replica set connection
         // since we don't know which server it belongs to
         // can't assume master because of slave ok
         // and can have a cursor survive a master change

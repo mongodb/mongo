@@ -421,7 +421,7 @@ namespace mongo {
 
        todo: cleanup code, need abstractions and separation
     */
-    // todo: multiple db's with the same name (repairDatbase) is not handled herein.  that may be 
+    // todo: multiple db's with the same name (repairDatabase) is not handled herein.  that may be
     //       the way to go, if not used by repair, but need some sort of enforcement / asserts.
     class NamespaceDetailsTransient : boost::noncopyable {
         BOOST_STATIC_ASSERT( sizeof(NamespaceDetails) == 496 );

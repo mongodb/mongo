@@ -40,4 +40,4 @@ namespace mongo {
         }
     }
 
-}  // namesapce mongo
+}  // namespace mongo

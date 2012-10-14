@@ -100,7 +100,7 @@ namespace boost_hash_detect_float_functions {
 // Important: when using 'using namespace' at namespace level, include as
 // little as possible in that namespace, as Visual C++ has an odd bug which
 // can cause the namespace to be imported at the global level. This seems to
-// happen mainly when there's a template in the same namesapce.
+// happen mainly when there's a template in the same namespace.
 
 #define BOOST_HASH_CALL_FLOAT_FUNC(cpp_func, c99_func, type1, type2)    \
 namespace boost_hash_detect_float_functions {                           \

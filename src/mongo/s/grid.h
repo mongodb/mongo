@@ -76,10 +76,10 @@ namespace mongo {
 
         /**
          *
-         * addShard will create a new shard in the grid. It expects a mongod process to be runing
+         * addShard will create a new shard in the grid. It expects a mongod process to be running
          * on the provided address. Adding a shard that is a replica set is supported.
          *
-         * @param name is an optional string with the name of the shard. if ommited, grid will
+         * @param name is an optional string with the name of the shard. if omitted, grid will
          *        generate one and update the parameter.
          * @param servers is the connection string of the shard being added
          * @param maxSize is the optional space quota in bytes. Zeros means there's no limitation to

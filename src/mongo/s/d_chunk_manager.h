@@ -62,7 +62,7 @@ namespace mongo {
         /**
          * Same as the regular constructor but used in unittest (no access to configDB required).
          *
-         * @param collectionDoc simulates config.collection's entry for one colleciton
+         * @param collectionDoc simulates config.collection's entry for one collection
          * @param chunksDocs simulates config.chunks' entries for one collection's shard
          */
         ShardChunkManager( const BSONObj& collectionDoc , const BSONArray& chunksDoc );
