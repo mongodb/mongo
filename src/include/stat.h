@@ -73,6 +73,7 @@ struct __wt_btree_stats {
 	WT_STATS overflow_value_cache;
 	WT_STATS page_evict;
 	WT_STATS page_read;
+	WT_STATS page_evict_fail;
 	WT_STATS page_write;
 	WT_STATS file_size;
 	WT_STATS file_fixed_len;
@@ -144,6 +145,7 @@ struct __wt_lsm_stats {
 	WT_STATS cache_evict;
 	WT_STATS chunk_cache_read;
 	WT_STATS cache_read;
+	WT_STATS cache_evict_fail;
 	WT_STATS cache_write;
 	WT_STATS bloom_misses;
 	WT_STATS bloom_hits;

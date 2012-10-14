@@ -37,12 +37,16 @@ __wt_lsm_stat_init(
 	 * consistent view? If so should the copy belong to the stat cursor?
 	 */
 	/* Clear the statistics we are about to recalculate. */
-	WT_STAT_SET(lsm_tree->stats, bloom_count, 0);
 	WT_STAT_SET(lsm_tree->stats, bloom_cache_read, 0);
-	WT_STAT_SET(lsm_tree->stats, chunk_cache_read, 0);
+	WT_STAT_SET(lsm_tree->stats, bloom_cache_evict, 0);
+	WT_STAT_SET(lsm_tree->stats, bloom_count, 0);
+	WT_STAT_SET(lsm_tree->stats, bloom_space, 0);
+	WT_STAT_SET(lsm_tree->stats, cache_evict, 0);
+	WT_STAT_SET(lsm_tree->stats, cache_evict_fail, 0);
 	WT_STAT_SET(lsm_tree->stats, cache_read, 0);
 	WT_STAT_SET(lsm_tree->stats, cache_write, 0);
-	WT_STAT_SET(lsm_tree->stats, bloom_space, 0);
+	WT_STAT_SET(lsm_tree->stats, chunk_cache_evict, 0);
+	WT_STAT_SET(lsm_tree->stats, chunk_cache_read, 0);
 	WT_STAT_SET(lsm_tree->stats, generation_max, 0);
 
 	/* Grab a snapshot of the LSM tree chunks. */
@@ -69,6 +73,11 @@ __wt_lsm_stat_init(
 		WT_ERR(__wt_curstat_open(session, uri,
 		    F_ISSET(chunk, WT_LSM_CHUNK_ONDISK) ? disk_cfg : cfg,
 		    &stat_cursor));
+		stat_cursor->set_key(stat_cursor, WT_STAT_page_evict_fail);
+		WT_ERR(stat_cursor->search(stat_cursor));
+		WT_ERR(stat_cursor->get_value(
+		    stat_cursor, &desc, &pvalue, &value));
+		WT_STAT_INCRV(lsm_tree->stats, cache_evict_fail, value);
 		stat_cursor->set_key(stat_cursor, WT_STAT_page_evict);
 		WT_ERR(stat_cursor->search(stat_cursor));
 		WT_ERR(stat_cursor->get_value(
@@ -108,6 +117,12 @@ __wt_lsm_stat_init(
 			WT_STAT_INCRV(lsm_tree->stats, cache_evict, value);
 			WT_STAT_INCRV(lsm_tree->stats,
 			    bloom_cache_evict, value);
+			stat_cursor->set_key(
+			    stat_cursor, WT_STAT_page_evict_fail);
+			WT_ERR(stat_cursor->search(stat_cursor));
+			WT_ERR(stat_cursor->get_value(
+			    stat_cursor, &desc, &pvalue, &value));
+			WT_STAT_INCRV(lsm_tree->stats, cache_evict_fail, value);
 			stat_cursor->set_key(stat_cursor, WT_STAT_page_read);
 			WT_ERR(stat_cursor->search(stat_cursor));
 			WT_ERR(stat_cursor->get_value(

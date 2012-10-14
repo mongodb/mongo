@@ -250,7 +250,6 @@ stat_worker(void *arg)
 				    "stat:lsm:%s=%s\n", desc, pvalue);
 			cursor->close(cursor);
 		}
-		fflush(cfg->logf);
 	}
 err:	session->close(session, NULL);
 	if (lsm_uri != NULL)
@@ -363,6 +362,8 @@ int setup_log_file(CONFIG *cfg)
 		fprintf(stderr, "Statistics failed to open log file.\n");
 		return (EINVAL);
 	}
+	/* Turn off buffering for the log file. */
+	(void)setvbuf(cfg->logf, NULL, _IONBF, 0);
 	if (fname != NULL)
 		free(fname);
 	return (0);

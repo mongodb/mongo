@@ -1738,58 +1738,60 @@ extern int wiredtiger_extension_init(WT_SESSION *session,
 #define	WT_STAT_page_evict				18
 /*! file: pages read from the file */
 #define	WT_STAT_page_read				19
+/*! file: pages that were selected for eviction that could not be evicted */
+#define	WT_STAT_page_evict_fail				20
 /*! file: pages written to the file */
-#define	WT_STAT_page_write				20
+#define	WT_STAT_page_write				21
 /*! file: size */
-#define	WT_STAT_file_size				21
+#define	WT_STAT_file_size				22
 /*! fixed-record size */
-#define	WT_STAT_file_fixed_len				22
+#define	WT_STAT_file_fixed_len				23
 /*! magic number */
-#define	WT_STAT_file_magic				23
+#define	WT_STAT_file_magic				24
 /*! major version number */
-#define	WT_STAT_file_major				24
+#define	WT_STAT_file_major				25
 /*! maximum internal page item size */
-#define	WT_STAT_file_maxintlitem			25
+#define	WT_STAT_file_maxintlitem			26
 /*! maximum internal page size */
-#define	WT_STAT_file_maxintlpage			26
+#define	WT_STAT_file_maxintlpage			27
 /*! maximum leaf page item size */
-#define	WT_STAT_file_maxleafitem			27
+#define	WT_STAT_file_maxleafitem			28
 /*! maximum leaf page size */
-#define	WT_STAT_file_maxleafpage			28
+#define	WT_STAT_file_maxleafpage			29
 /*! minor version number */
-#define	WT_STAT_file_minor				29
+#define	WT_STAT_file_minor				30
 /*! overflow pages */
-#define	WT_STAT_file_overflow				30
+#define	WT_STAT_file_overflow				31
 /*! page size allocation unit */
-#define	WT_STAT_file_allocsize				31
+#define	WT_STAT_file_allocsize				32
 /*! reconcile: deleted or temporary pages merged */
-#define	WT_STAT_rec_page_merge				32
+#define	WT_STAT_rec_page_merge				33
 /*! reconcile: dictionary match */
-#define	WT_STAT_rec_dictionary				33
+#define	WT_STAT_rec_dictionary				34
 /*! reconcile: internal pages split */
-#define	WT_STAT_rec_split_intl				34
+#define	WT_STAT_rec_split_intl				35
 /*! reconcile: leaf pages split */
-#define	WT_STAT_rec_split_leaf				35
+#define	WT_STAT_rec_split_leaf				36
 /*! reconcile: overflow key */
-#define	WT_STAT_rec_ovfl_key				36
+#define	WT_STAT_rec_ovfl_key				37
 /*! reconcile: overflow value */
-#define	WT_STAT_rec_ovfl_value				37
+#define	WT_STAT_rec_ovfl_value				38
 /*! reconcile: pages deleted */
-#define	WT_STAT_rec_page_delete				38
+#define	WT_STAT_rec_page_delete				39
 /*! reconcile: pages written */
-#define	WT_STAT_rec_written				39
+#define	WT_STAT_rec_written				40
 /*! reconcile: unable to acquire hazard reference */
-#define	WT_STAT_rec_hazard				40
+#define	WT_STAT_rec_hazard				41
 /*! row-store internal pages */
-#define	WT_STAT_file_row_int_pages			41
+#define	WT_STAT_file_row_int_pages			42
 /*! row-store leaf pages */
-#define	WT_STAT_file_row_leaf_pages			42
+#define	WT_STAT_file_row_leaf_pages			43
 /*! total entries */
-#define	WT_STAT_file_entries				43
+#define	WT_STAT_file_entries				44
 /*! update conflicts */
-#define	WT_STAT_update_conflict				44
+#define	WT_STAT_update_conflict				45
 /*! write generation conflicts */
-#define	WT_STAT_file_write_conflicts			45
+#define	WT_STAT_file_write_conflicts			46
 /*! @} */
 
 /*!
@@ -1816,16 +1818,18 @@ extern int wiredtiger_extension_init(WT_SESSION *session,
 #define	WT_STAT_chunk_cache_read			7
 /*! Number of pages read into cache */
 #define	WT_STAT_cache_read				8
+/*! Number of pages selected for eviction that could not be evicted */
+#define	WT_STAT_cache_evict_fail			9
 /*! Number of pages written from cache */
-#define	WT_STAT_cache_write				9
+#define	WT_STAT_cache_write				10
 /*! Number of successful bloom filter false positives */
-#define	WT_STAT_bloom_misses				10
+#define	WT_STAT_bloom_misses				11
 /*! Number of successful bloom filter lookups */
-#define	WT_STAT_bloom_hits				11
+#define	WT_STAT_bloom_hits				12
 /*! Number of unsuccessful bloom filter lookups */
-#define	WT_STAT_bloom_skips				12
+#define	WT_STAT_bloom_skips				13
 /*! Total space used by bloom filters */
-#define	WT_STAT_bloom_space				13
+#define	WT_STAT_bloom_space				14
 /*! @} */
 /*
  * Statistics section: END
