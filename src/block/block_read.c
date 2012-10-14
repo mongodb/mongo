@@ -52,18 +52,28 @@ __wt_block_read_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	    (uintmax_t)offset, size, cksum);
 
 #ifdef HAVE_DIAGNOSTIC
-	{
-	const char *name = NULL;
-	__wt_spin_lock(session, &block->live_lock);
-	if (__wt_block_off_match(&block->live.avail, offset, size))
-		name = "available";
-	else if (__wt_block_off_match(&block->live.discard, offset, size))
-		name = "discard";
-	__wt_spin_unlock(session, &block->live_lock);
-	if (name != NULL)
-		WT_RET_MSG(session, WT_ERROR,
-		    "read failed: %" PRIuMAX "/%" PRIu32 " is on the %s list",
-		    (uintmax_t)offset, size, name);
+	/*
+	 * In diagnostic mode, verify the block we're about to read isn't on
+	 * either the available or discard lists (it might be on some other
+	 * checkpoint's lists, but this check has proved valuable in finding
+	 * problems).   We don't check during salvage, it's quite possible
+	 * we're trying to read an overflow page that was freed long ago.
+	 */
+	if (!F_ISSET(session, WT_SESSION_SALVAGE_QUIET_ERR)) {
+		const char *name = NULL;
+		__wt_spin_lock(session, &block->live_lock);
+		if (__wt_block_off_match(&block->live.avail, offset, size))
+			name = "available";
+		else if (
+		    __wt_block_off_match(&block->live.discard, offset, size))
+			name = "discard";
+		__wt_spin_unlock(session, &block->live_lock);
+		if (name != NULL) {
+			WT_RET_MSG(session, WT_ERROR,
+			    "read failed: %" PRIuMAX "/%" PRIu32 " is on "
+			    "the %s list",
+			    (uintmax_t)offset, size, name);
+		}
 	}
 #endif
 

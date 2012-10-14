@@ -356,12 +356,13 @@ __slvg_read(WT_SESSION_IMPL *session, WT_STUFF *ss)
 		}
 
 		/*
-		 * Next, verify the page.  It's vanishingly unlikely a page
-		 * could pass checksum and still be broken, but a degree of
-		 * paranoia is healthy in salvage.  Regardless, verify does
-		 * return failure because it detects failures we'd expect to
-		 * see in a corrupted file, like overflow references past the
-		 * end of the file, might as well discard these pages now.
+		 * Verify the page.  It's unlikely a page could have a valid
+		 * checksum and still be broken, but paranoia is healthy in
+		 * salvage.  Regardless, verify does return failure because
+		 * it detects failures we'd expect to see in a corrupted file,
+		 * like overflow references past the the end of the file or
+		 * overflow references to non-existent pages, might as well
+		 * discard these pages now.
 		 */
 		if (__wt_verify_dsk(session, (char *)as->data, buf) != 0) {
 			WT_VERBOSE_ERR(session, salvage,
