@@ -35,7 +35,7 @@ namespace mongo {
      *
      * Instances of this class are used in two phases.  In the first phase, the graph is constructed
      * by repeated calls to addInitializer().  In the second phase, a user calls the topSort()
-     * method to produce an initialization order that respects the dependences among operations, and
+     * method to produce an initialization order that respects the dependencies among operations, and
      * then uses the getInitializerFunction() to get the behavior function for each operation, in
      * turn.
      *
@@ -53,8 +53,8 @@ namespace mongo {
 
         /**
          * Add a new initializer node, named "name", to the dependency graph, with the given
-         * behavior, "fn", and the given "prerequisites" (input dependences) and "dependents"
-         * (output dependences).
+         * behavior, "fn", and the given "prerequisites" (input dependencies) and "dependents"
+         * (output dependencies).
          *
          * If "!fn" (fn is NULL in function pointer parlance), returns status with code
          * ErrorCodes::badValue.  If "name" is a duplicate of a name already present in the graph,

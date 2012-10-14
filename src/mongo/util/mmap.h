@@ -80,7 +80,7 @@ namespace mongo {
         };
 
         /** @param fun is called for each MongoFile.
-            calledl from within a mutex that MongoFile uses. so be careful not to deadlock.
+            called from within a mutex that MongoFile uses. so be careful not to deadlock.
         */
         template < class F >
         static void forEach( F fun );

@@ -18,7 +18,7 @@
  * /usr/local:
  *
  *     scons --release --use-cpu-profiler \
- *         --cpppath=/usr/local/include --libpath=/usr/loca/lib
+ *         --cpppath=/usr/local/include --libpath=/usr/local/lib
  */
 
 #include "google/profiler.h"

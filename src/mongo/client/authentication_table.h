@@ -46,7 +46,7 @@ namespace mongo {
 
         Auth getAuthForDb( const std::string& dbname ) const;
 
-        // Takes the authentication state from the given BSONObj, replcacing whatever state it had.
+        // Takes the authentication state from the given BSONObj, replacing whatever state it had.
         void setFromBSON( const BSONObj& obj );
 
         BSONObj toBSON() const;

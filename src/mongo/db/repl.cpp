@@ -1354,7 +1354,7 @@ namespace mongo {
                 if( s == 1 ) {
                     if( nApplied == 0 ) s = 2;
                     else if( nApplied > 100 ) {
-                        // sleep very little - just enought that we aren't truly hammering master
+                        // sleep very little - just enough that we aren't truly hammering master
                         sleepmillis(75);
                         s = 0;
                     }

@@ -53,7 +53,7 @@ namespace mongo {
                 
         /**
          * simple hash map for region -> status
-         * this constitures a single region of time
+         * this constitutes a single region of time
          * it does chaining, but very short chains
          */
         class Slice {

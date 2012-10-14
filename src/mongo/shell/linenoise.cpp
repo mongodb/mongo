@@ -65,7 +65,7 @@
  *    Effect: if n is 1, clear from beginning of line to cursor
  *    Effect: if n is 2, clear entire line
  *
- * CUF (CUrsor Forward)
+ * CUF (Cursor Forward)
  *    Sequence: ESC [ n C
  *    Effect: moves cursor forward of n chars
  *

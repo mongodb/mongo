@@ -56,7 +56,7 @@ namespace mongo {
 
         static void ensureLength(int fd, long size);
 
-        /** @return the singletone */
+        /** @return the singleton */
         static FileAllocator * get();
         
     private:

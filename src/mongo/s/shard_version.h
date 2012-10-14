@@ -21,7 +21,7 @@
 namespace mongo {
 
     /*
-     * Install chunk shard vesion callbaks in shardconnection code. This activates
+     * Install chunk shard version callbacks in shardconnection code. This activates
      * the chunk shard version control that mongos needs.
      *
      * MUST be called before accepting any connections.

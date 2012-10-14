@@ -58,7 +58,7 @@ namespace mongo {
             // might be a pointer into mmaped Journal file
             const char *dbName;
 
-            // thse are pointers into the memory mapped journal file
+            // those are pointers into the memory mapped journal file
             const JEntry *e;  // local db sentinel is already parsed out here into dbName
 
             // if not one of the two simple JEntry's above, this is the operation:
@@ -88,7 +88,7 @@ namespace mongo {
                 if( i != m.begin() && m.count(i->first - 1) == 0 ) {
                     uasserted(13532,
                     str::stream() << "unexpected file in journal directory " << dir.string()
-                      << " : " << boost::filesystem::path(i->second).leaf().string() << " : can't find its preceeding file");
+                      << " : " << boost::filesystem::path(i->second).leaf().string() << " : can't find its preceding file");
                 }
                 files.push_back(i->second);
             }

@@ -397,7 +397,7 @@ namespace mongo {
         // so in practice, a migrate somewhere may force this split to pick up a version that has the major portion higher
         // than the one that this shard has been using
         //
-        // TODO drop the uniqueness constraint and tigthen the check below so that only the minor portion of version changes
+        // TODO drop the uniqueness constraint and tighten the check below so that only the minor portion of version changes
         if ( version <= _version ) {
             uasserted( 14039 , str::stream() << "version " << version.toString() << " not greater than " << _version.toString() );
         }

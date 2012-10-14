@@ -99,7 +99,7 @@ namespace mongo {
         Generally, use ScopedDbConnection and do not call these directly.
 
         This class, so far, is suitable for use with unauthenticated connections.
-        Support for authenticated connections requires some adjustements: please
+        Support for authenticated connections requires some adjustments: please
         request...
 
         Usage:

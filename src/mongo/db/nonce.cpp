@@ -80,7 +80,7 @@ namespace mongo {
     }
 
     nonce64 Security::getNonceDuringInit() {
-        // the mutex might not be inited yet.  init phase should be one thread anyway (hopefully we don't spawn threads therein)
+        // the mutex might not be initialized yet.  init phase should be one thread anyway (hopefully we don't spawn threads therein)
         if( !security._initialized )
             security.init();
         return security.__getNonce();

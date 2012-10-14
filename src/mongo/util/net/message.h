@@ -91,7 +91,7 @@ namespace mongo {
         int messageLength; // total message size, including this
         int requestID;     // identifier for this message
         int responseTo;    // requestID from the original request
-        //   (used in reponses from db)
+        //   (used in responses from db)
         int opCode;
     };
 #pragma pack()

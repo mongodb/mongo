@@ -19,7 +19,7 @@
 namespace mongo {
 
     /** only used on _DEBUG builds.
-        MutexDebugger checks that we always acquire locks for multiple mutexes in a consistant (acyclic) order.
+        MutexDebugger checks that we always acquire locks for multiple mutexes in a consistent (acyclic) order.
         If we were inconsistent we could deadlock.
     */
     class MutexDebugger {

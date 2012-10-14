@@ -68,7 +68,7 @@ namespace mongo {
 
             pCurrent.reset();
 
-            // This is requried for the DocumentSourceCursor to release its read lock, see
+            // This is required for the DocumentSourceCursor to release its read lock, see
             // SERVER-6123.
             pSource->dispose();
 
