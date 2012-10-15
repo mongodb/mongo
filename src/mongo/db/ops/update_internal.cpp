@@ -802,6 +802,9 @@ namespace mongo {
             switch ( cmp ) {
 
             case LEFT_SUBFIELD: { // Mod is embedded under this element
+                uassert( 10145,
+                         str::stream() << "LEFT_SUBFIELD only supports Object: " << field
+                         << " not: " << e.type() , e.type() == Object || e.type() == Array );
                 if ( onedownseen.count( e.fieldName() ) == 0 ) {
                     onedownseen.insert( e.fieldName() );
                     if ( e.type() == Object ) {
@@ -810,22 +813,11 @@ namespace mongo {
                         createNewObjFromMods( nr.str() , bb , e.Obj() );
                         bb.done();
                     }
-                    else if ( e.type() == Array ) {
+                    else {
                         BSONArrayBuilder ba( builder.subarrayStart( e.fieldName() ) );
                         stringstream nr; nr << root << e.fieldName() << ".";
                         createNewArrayFromMods( nr.str() , ba , BSONArray( e.embeddedObject() ) );
                         ba.done();
-                    }
-                    else {
-                        // We have a sub-object being added to a field that was not of a
-                        // complex type (ie, it was a scalar). For instance, we're $set-ing
-                        // 'a.b' to be 1, when the current value of 'a' is, say, null. This
-                        // addition will force the field to change to such complex type,
-                        // effectively removing what was there before.
-                        BSONObjBuilder be( builder.subobjStart( e.fieldName() ) );
-                        stringstream nr; nr << root << e.fieldName() << ".";
-                        createNewObjFromMods( nr.str() , be , BSONObj() );
-                        be.done();
                     }
                     // inc both as we handled both
                     e = es.next();
