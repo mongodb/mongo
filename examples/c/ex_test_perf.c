@@ -247,9 +247,26 @@ stat_worker(void *arg)
 			    (ret = cursor->get_value(
 			    cursor, &desc, &pvalue, &value)) == 0)
 				fprintf(cfg->logf,
-				    "stat:lsm:%s=%s\n", desc, pvalue);
+				    "stat:lsm: %s=%s\n", desc, pvalue);
 			cursor->close(cursor);
+			fprintf(cfg->logf, "\n");
 		}
+
+		/* Dump the connection statistics since last time. */
+		if ((ret = session->open_cursor(session, "statistics:",
+		    NULL, "statistics_clear", &cursor)) != 0) {
+			fprintf(stderr,
+			    "open_cursor statistics: %d\n", ret);
+			goto err;
+		}
+		while (
+		    (ret = cursor->next(cursor)) == 0 &&
+		    (ret = cursor->get_value(
+		    cursor, &desc, &pvalue, &value)) == 0)
+			fprintf(cfg->logf,
+			    "stat:conn: %s=%s\n", desc, pvalue);
+		cursor->close(cursor);
+
 	}
 err:	session->close(session, NULL);
 	if (lsm_uri != NULL)
@@ -362,8 +379,8 @@ int setup_log_file(CONFIG *cfg)
 		fprintf(stderr, "Statistics failed to open log file.\n");
 		return (EINVAL);
 	}
-	/* Turn off buffering for the log file. */
-	(void)setvbuf(cfg->logf, NULL, _IONBF, 0);
+	/* Use line buffering for the log file. */
+	(void)setvbuf(cfg->logf, NULL, _IOLBF, 0);
 	if (fname != NULL)
 		free(fname);
 	return (0);
