@@ -24,12 +24,12 @@ namespace mongo {
 
     TEST( NamespaceStringTest, DatabaseValidNames ) {
         ASSERT( NamespaceString::validDBName( "foo" ) );
-        ASSERT( ! NamespaceString::validDBName( "foo/bar" ) );
-        ASSERT( ! NamespaceString::validDBName( "foo bar" ) );
-        ASSERT( ! NamespaceString::validDBName( "foo.bar" ) );
+        ASSERT( !NamespaceString::validDBName( "foo/bar" ) );
+        ASSERT( !NamespaceString::validDBName( "foo bar" ) );
+        ASSERT( !NamespaceString::validDBName( "foo.bar" ) );
         
         ASSERT( NamespaceString::normal( "asdads" ) );
-        ASSERT( ! NamespaceString::normal( "asda$ds" ) );
+        ASSERT( !NamespaceString::normal( "asda$ds" ) );
         ASSERT( NamespaceString::normal( "local.oplog.$main" ) );
     }
 
