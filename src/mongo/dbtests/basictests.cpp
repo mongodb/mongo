@@ -782,7 +782,6 @@ namespace BasicTests {
             add< LexNumCmp >();
             add< LexNumCmpLexOnly >();
 
-            add< DatabaseValidNames >();
             add< DatabaseOwnsNS >();
 
             add< NSValidNames >();
