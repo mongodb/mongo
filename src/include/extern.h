@@ -695,7 +695,7 @@ extern int __wt_lsm_merge_update_tree(WT_SESSION_IMPL *session,
     WT_LSM_TREE *lsm_tree,
     int start_chunk,
     int nchunks,
-    WT_LSM_CHUNK **chunkp);
+    WT_LSM_CHUNK *chunk);
 extern int __wt_lsm_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree);
 extern int __wt_lsm_meta_read(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree);
 extern int __wt_lsm_meta_write(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree);
@@ -711,10 +711,11 @@ extern int __wt_lsm_tree_chunk_name( WT_SESSION_IMPL *session,
     WT_LSM_TREE *lsm_tree,
     int i,
     WT_ITEM *buf);
-extern int __wt_lsm_tree_create_chunk( WT_SESSION_IMPL *session,
+extern int __wt_lsm_tree_setup_chunk(WT_SESSION_IMPL *session,
     WT_LSM_TREE *lsm_tree,
     int i,
-    const char **urip);
+    WT_LSM_CHUNK *chunk,
+    int create_bloom);
 extern int __wt_lsm_tree_create(WT_SESSION_IMPL *session,
     const char *uri,
     int exclusive,

@@ -97,7 +97,7 @@ __wt_lsm_stat_init(
 		WT_STAT_INCRV(lsm_tree->stats, cache_write, value);
 		WT_ERR(stat_cursor->close(stat_cursor));
 
-		if (chunk->bloom_uri != NULL) {
+		if (F_ISSET(chunk, WT_LSM_CHUNK_BLOOM)) {
 			WT_STAT_INCR(lsm_tree->stats, bloom_count);
 			WT_STAT_INCRV(lsm_tree->stats, bloom_space,
 			    (chunk->count * lsm_tree->bloom_bit_count) / 8);
