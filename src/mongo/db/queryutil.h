@@ -25,6 +25,9 @@ namespace mongo {
     
     extern const int MaxBytesToReturnToClientAtOnce;
     
+    //maximum number of intervals produced by $in queries.
+    static const unsigned MAX_IN_COMBINATIONS = 4000000;
+
     /* This is for languages whose "objects" are not well ordered (JSON is well ordered).
      [ { a : ... } , { b : ... } ] -> { a : ..., b : ... }
      */
@@ -381,15 +384,6 @@ namespace mongo {
                                        // _elemMatchContext for the FieldRange on 'a.b' is the query
                                        // element having field name '$elemMatch'.
     };
-    
-    /**
-     * A BoundList contains intervals specified by inclusive start
-     * and end bounds.  The intervals should be nonoverlapping and occur in
-     * the specified direction of traversal.  For example, given a simple index {i:1}
-     * and direction +1, one valid BoundList is: (1, 2); (4, 6).  The same BoundList
-     * would be valid for index {i:-1} with direction -1.
-     */
-    typedef vector<pair<BSONObj,BSONObj> > BoundList;
 
     class QueryPattern;
     
@@ -477,18 +471,6 @@ namespace mongo {
         const FieldRangeSet &operator-=( const FieldRangeSet &other );
         /** @return intersection of 'this' with 'other'. */
         const FieldRangeSet &operator&=( const FieldRangeSet &other );
-        
-        /**
-         * @return an ordered list of bounds generated using an index key pattern
-         * and traversal direction.
-         *
-         * The value of matchPossible() should be true, otherwise this function
-         * may @throw.
-         *
-         * NOTE This function is deprecated in the query optimizer and only
-         * currently used by sharding code.
-         */
-        BoundList indexBounds( const BSONObj &keyPattern, int direction ) const;
 
         /**
          * @return - A new FieldRangeSet based on this FieldRangeSet, but with only
@@ -597,16 +579,15 @@ namespace mongo {
          * already been scanned.
          */
         FieldRangeSetPair &operator-=( const FieldRangeSet &scanned );
-
-        BoundList shardKeyIndexBounds( const BSONObj &keyPattern ) const {
-            return _singleKey.indexBounds( keyPattern, 1 );
-        }
         
-        bool matchPossibleForShardKey( const BSONObj &keyPattern ) const {
+        bool matchPossibleForSingleKeyFRS( const BSONObj &keyPattern ) const {
             return _singleKey.matchPossibleForIndex( keyPattern );
         }
         
         BSONObj originalQuery() const { return _singleKey.originalQuery(); }
+
+        const FieldRangeSet getSingleKeyFRS() const { return _singleKey; }
+        const FieldRangeSet getMultiKeyFRS() const { return _singleKey; }
 
         string toString() const;
     private:

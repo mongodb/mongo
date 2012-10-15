@@ -26,7 +26,7 @@
 namespace mongo {
 
     ShardKeyPattern::ShardKeyPattern( BSONObj p ) : pattern( p.getOwned() ) {
-        pattern.getFieldNames(patternfields);
+        pattern.toBSON().getFieldNames( patternfields );
 
         BSONObjBuilder min;
         BSONObjBuilder max;
@@ -57,26 +57,16 @@ namespace mongo {
         return true;
     }
 
-    bool ShardKeyPattern::isPrefixOf( const BSONObj& otherPattern ) const {
+    bool ShardKeyPattern::isPrefixOf( const KeyPattern& otherPattern ) const {
         return pattern.isPrefixOf( otherPattern );
     }
 
-    bool ShardKeyPattern::isUniqueIndexCompatible( const BSONObj& uniqueIndexPattern ) const {
-        if ( ! uniqueIndexPattern.isEmpty() &&
-             str::equals( uniqueIndexPattern.firstElementFieldName(), "_id" ) ){
+    bool ShardKeyPattern::isUniqueIndexCompatible( const KeyPattern& uniqueIndexPattern ) const {
+        if ( ! uniqueIndexPattern.toBSON().isEmpty() &&
+             str::equals( uniqueIndexPattern.toBSON().firstElementFieldName(), "_id" ) ){
             return true;
         }
-        return pattern.isFieldNamePrefixOf( uniqueIndexPattern );
-    }
-
-    bool ShardKeyPattern::isSpecial() const {
-        BSONForEach(e, pattern) {
-            int fieldVal = e.numberInt();
-            if ( fieldVal != 1 && fieldVal != -1 ){
-                return true;
-            }
-        }
-        return false;
+        return pattern.toBSON().isFieldNamePrefixOf( uniqueIndexPattern.toBSON() );
     }
 
     string ShardKeyPattern::toString() const {
@@ -86,7 +76,7 @@ namespace mongo {
     BSONObj ShardKeyPattern::moveToFront(const BSONObj& obj) const {
         vector<const char*> keysToMove;
         keysToMove.push_back("_id");
-        BSONForEach(e, pattern) {
+        BSONForEach(e, pattern.toBSON()) {
             if (strchr(e.fieldName(), '.') == NULL && strcmp(e.fieldName(), "_id") != 0)
                 keysToMove.push_back(e.fieldName());
         }

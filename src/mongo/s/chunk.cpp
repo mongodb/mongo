@@ -1101,8 +1101,8 @@ namespace mongo {
                 return;
             }
             
-            if ( frsp->matchPossibleForShardKey( _key.key() ) ) {
-                BoundList ranges = frsp->shardKeyIndexBounds(_key.key());
+            if ( frsp->matchPossibleForSingleKeyFRS( _key.key() ) ) {
+                BoundList ranges = _key.keyBounds( frsp->getSingleKeyFRS() );
                 for (BoundList::const_iterator it=ranges.begin(), end=ranges.end();
                      it != end; ++it) {
 

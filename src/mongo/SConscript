@@ -129,6 +129,7 @@ env.StaticLibrary("coredb", [
         "db/pipeline/pipeline.cpp",
         "db/dbcommands_generic.cpp",
         "db/dbwebserver.cpp",
+        "db/keypattern.cpp",
         "db/matcher.cpp",
         "db/pipeline/accumulator.cpp",
         "db/pipeline/accumulator_add_to_set.cpp",
