@@ -919,76 +919,8 @@ env.AlwaysBuild( "style" )
 
 
 def doLint( env , target , source ):
-    import buildscripts.cpplint
-    import codecs
-
-    filters = []
-
-    # errors are as of 10/14
-    # idea is not to let it any new type of error
-    # as we knock one out, we should remove line
-    # note: not all of these are things we want, so please check first
-
-    filters.append( '-build/header_guard' ) # errors found: 345
-    filters.append( '-build/include' ) # errors found: 924
-    filters.append( '-build/include_order' ) # errors found: 511
-    filters.append( '-build/include_what_you_use' ) # errors found: 986
-    filters.append( '-build/namespaces' ) # errors found: 131
-    filters.append( '-legal/copyright' ) # errors found: 65
-    filters.append( '-readability/braces' ) # errors found: 880
-    filters.append( '-readability/casting' ) # errors found: 748
-    filters.append( '-readability/function' ) # errors found: 49
-    filters.append( '-readability/streams' ) # errors found: 72
-    filters.append( '-readability/todo' ) # errors found: 309
-    filters.append( '-runtime/arrays' ) # errors found: 5
-    filters.append( '-runtime/explicit' ) # errors found: 322
-    filters.append( '-runtime/int' ) # errors found: 1420
-    filters.append( '-runtime/printf' ) # errors found: 29
-    filters.append( '-runtime/references' ) # errors found: 1338
-    filters.append( '-runtime/rtti' ) # errors found: 36
-    filters.append( '-runtime/sizeof' ) # errors found: 57
-    filters.append( '-runtime/string' ) # errors found: 6
-    filters.append( '-runtime/threadsafe_fn' ) # errors found: 46
-    filters.append( '-whitespace/blank_line' ) # errors found: 2080
-    filters.append( '-whitespace/braces' ) # errors found: 962
-    filters.append( '-whitespace/comma' ) # errors found: 621
-    filters.append( '-whitespace/comments' ) # errors found: 2189
-    filters.append( '-whitespace/end_of_line' ) # errors found: 4340
-    filters.append( '-whitespace/indent' ) # errors found: 8
-    filters.append( '-whitespace/labels' ) # errors found: 58
-    filters.append( '-whitespace/line_length' ) # errors found: 14500
-    filters.append( '-whitespace/newline' ) # errors found: 1520
-    filters.append( '-whitespace/operators' ) # errors found: 2297
-    filters.append( '-whitespace/parens' ) # errors found: 49058
-    filters.append( '-whitespace/semicolon' ) # errors found: 121
-    filters.append( '-whitespace/tab' ) # errors found: 233
-
-    sourceFiles = utils.getAllSourceFiles( prefix="src/mongo/" )
-    args = [ "--filter=" + ",".join( filters ) , "--counting=detailed" ] + sourceFiles
-    filenames = buildscripts.cpplint.ParseArguments( args  )
-
-    def _ourIsTestFilename(fn):
-        if fn.find( "dbtests" ) >= 0:
-            return True
-        if fn.endswith( "_test.cpp" ):
-            return True
-        return False
-    
-    buildscripts.cpplint._IsTestFilename = _ourIsTestFilename
-
-    # Change stderr to write with replacement characters so we don't die
-    # if we try to print something containing non-ASCII characters.
-    sys.stderr = codecs.StreamReaderWriter(sys.stderr,
-                                           codecs.getreader('utf8'),
-                                           codecs.getwriter('utf8'),
-                                           'replace')
-    
-    buildscripts.cpplint._cpplint_state.ResetErrorCounts()
-    for filename in filenames:
-        buildscripts.cpplint.ProcessFile(filename, buildscripts.cpplint._cpplint_state.verbose_level)
-    buildscripts.cpplint._cpplint_state.PrintErrorCounts()
-    
-    if buildscripts.cpplint._cpplint_state.error_count > 0:
+    import buildscripts.lint
+    if not buildscripts.lint.run_lint():
         raise Exception( "lint errors" )
 
 env.Alias( "lint" , [] , [ doLint ] )
