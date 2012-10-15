@@ -56,9 +56,20 @@ namespace mongo {
         testEqualsBothWays( "foo.a" , "foo.a" );
         testEqualsBothWays( "foo.a" , "foo.b" );
 
+        testEqualsBothWays( "" , "" );
+        testEqualsBothWays( "" , "." );
+        testEqualsBothWays( "" , ".x" );
+
         testNotEqualsBothWays( "foo" , "bar" );
         testNotEqualsBothWays( "foo" , "food" );
         testNotEqualsBothWays( "foo." , "food" );
+
+        testNotEqualsBothWays( "" , "x" );
+        testNotEqualsBothWays( "" , "x." );
+        testNotEqualsBothWays( "" , "x.y" );
+        testNotEqualsBothWays( "." , "x" );
+        testNotEqualsBothWays( "." , "x." );
+        testNotEqualsBothWays( "." , "x.y" );
     }
 
 }
