@@ -1004,7 +1004,7 @@ namespace mongo {
         result.append("ns", name.c_str());
         ClientCursor::invalidate(name.c_str());
         Top::global.collectionDropped( name );
-        NamespaceDetailsTransient::eraseForPrefix( name.c_str() );
+        NamespaceDetailsTransient::eraseCollection( name );
         dropNS(name);
     }
 

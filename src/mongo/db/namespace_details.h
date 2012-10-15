@@ -19,15 +19,16 @@
 #pragma once
 
 #include "mongo/pch.h"
-
 #include "mongo/db/d_concurrency.h"
 #include "mongo/db/diskloc.h"
 #include "mongo/db/index.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/mongommf.h"
 #include "mongo/db/namespace.h"
+#include "mongo/db/namespacestring.h"
 #include "mongo/db/queryoptimizercursor.h"
 #include "mongo/db/querypattern.h"
+#include "mongo/platform/unordered_map.h"
 #include "mongo/util/hashtab.h"
 
 namespace mongo {
@@ -429,18 +430,33 @@ namespace mongo {
         //Database *database;
         const string _ns;
         void reset();
-        static std::map< string, shared_ptr< NamespaceDetailsTransient > > _nsdMap;
+        
+        // < db -> < fullns -> NDT > >
+        typedef unordered_map< string, shared_ptr<NamespaceDetailsTransient> > CMap;
+        typedef unordered_map< string, CMap*, NamespaceDBHash, NamespaceDBEquals > DMap;
+        static DMap _nsdMap;
 
-        NamespaceDetailsTransient(Database*,const char *ns);
+        NamespaceDetailsTransient(Database*,const string& ns);
     public:
         ~NamespaceDetailsTransient();
         void addedIndex() { reset(); }
         void deletedIndex() { reset(); }
-        /* Drop cached information on all namespaces beginning with the specified prefix.
-           Can be useful as index namespaces share the same start as the regular collection.
-           SLOW - sequential scan of all NamespaceDetailsTransient objects */
-        static void clearForPrefix(const char *prefix);
-        static void eraseForPrefix(const char *prefix);
+
+        /**
+         * reset stats for a given collection
+         */
+        static void resetCollection(const string& ns );
+
+        /**
+         * remove entry for a collection
+         */
+        static void eraseCollection(const string& ns);
+
+        /**
+         * remove all entries for db
+         */
+        static void eraseDB(const string& db);
+
 
         /**
          * @return a cursor interface to the query optimizer.  The implementation may utilize a
@@ -538,7 +554,8 @@ namespace mongo {
     private:
         int _qcWriteCount;
         map<QueryPattern,CachedQueryPlan> _qcCache;
-        static NamespaceDetailsTransient& make_inlock(const char *ns);
+        static NamespaceDetailsTransient& make_inlock(const string& ns);
+        static CMap& get_cmap_inlock(const string& ns);
     public:
         static SimpleMutex _qcMutex;
 
@@ -548,7 +565,7 @@ namespace mongo {
            Creates a NamespaceDetailsTransient before returning if one DNE. 
            todo: avoid creating too many on erroneous ns queries.
            */
-        static NamespaceDetailsTransient& get_inlock(const char *ns);
+        static NamespaceDetailsTransient& get_inlock(const string& ns);
 
         static NamespaceDetailsTransient& get(const char *ns) {
             // todo : _qcMutex will create bottlenecks in our parallelism
@@ -577,10 +594,11 @@ namespace mongo {
 
     }; /* NamespaceDetailsTransient */
 
-    inline NamespaceDetailsTransient& NamespaceDetailsTransient::get_inlock(const char *ns) {
-        std::map< string, shared_ptr< NamespaceDetailsTransient > >::iterator i = _nsdMap.find(ns);
-        if( i != _nsdMap.end() && 
-            i->second.get() ) { // could be null ptr from clearForPrefix
+    inline NamespaceDetailsTransient& NamespaceDetailsTransient::get_inlock(const string& ns) {
+        CMap& m = get_cmap_inlock(ns);
+        CMap::iterator i = m.find( ns );
+        if ( i != m.end() && 
+             i->second.get() ) { // could be null ptr from clearForPrefix
             return *i->second;
         }
         return make_inlock(ns);

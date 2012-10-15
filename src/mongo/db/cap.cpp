@@ -433,7 +433,7 @@ namespace mongo {
 
         // Clear all references to this namespace.
         ClientCursor::invalidate( ns );
-        NamespaceDetailsTransient::clearForPrefix( ns );
+        NamespaceDetailsTransient::resetCollection( ns );
 
         // Get a writeable reference to 'this' and reset all pertinent
         // attributes.
