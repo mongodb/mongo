@@ -19,9 +19,11 @@
 #pragma once
 
 #include "mongo/db/jsobj.h"
+#include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 
+    class FieldInterval;
     class FieldRangeSet;
 
     /**
@@ -90,18 +92,52 @@ namespace mongo {
          */
         BSONObj extractSingleKey( const BSONObj& doc ) const;
 
-        /**@param fromQuery a FieldRangeSet formed from parsing a query
-         * @return an ordered list of bounds generated using this KeyPattern
-         * and the constraints from the FieldRangeSet
+
+        /**@param queryConstraints a FieldRangeSet, usually formed from parsing a query
+         * @return an ordered list of bounds generated using this KeyPattern and the
+         * constraints from the FieldRangeSet.  This function is used in sharding to
+         * determine where to route queries according to the shard key pattern.
          *
-         * The value of frsp->matchPossibleForSingleKeyFRS(fromQuery) should be true,
-         * otherwise this function could throw.
+         * Examples:
+         * If this KeyPattern is { a : 1  }
+         * FieldRangeSet( {a : 5 } ) --> returns [{a : 5}, {a : 5 } ]
+         * FieldRangeSet( {a : {$gt : 3}} ) --> returns [({a : 3} , { a : MaxInt})]
+         *
+         * If this KeyPattern is { a : "hashed }
+         * FieldRangeSet( {a : 5 } --> returns [ ({ a : hash(5) }, {a : hash(5) }) ]
+         *
+         * The bounds returned by this function may be a superset of those defined
+         * by the constraints.  For instance, if this KeyPattern is {a : 1}
+         * FieldRanget( { a : {$in : [1,2]} , b : {$in : [3,4,5]} } )
+         *        --> returns [({a : 1 , b : 3} , {a : 1 , b : 5}]),
+         *                    [({a : 2 , b : 3} , {a : 2 , b : 5}])
+         *
+         * The queryConstraints should be defined for all the fields in this keypattern
+         * (i.e. the value of frsp->matchPossibleForSingleKeyFRS(_pattern) should be true,
+         * otherwise this function could throw).
          *
          */
         BoundList keyBounds( const FieldRangeSet& queryConstraints ) const;
 
     private:
         BSONObj _pattern;
+        bool isAscending( const BSONElement& fieldExpression ) const {
+            return ( fieldExpression.isNumber()  && fieldExpression.numberInt() == 1 );
+        }
+        bool isDescending( const BSONElement& fieldExpression ) const {
+            return ( fieldExpression.isNumber()  && fieldExpression.numberInt() == -1 );
+        }
+        bool isHashed( const BSONElement& fieldExpression ) const {
+            return mongoutils::str::equals( fieldExpression.valuestrsafe() , "hashed" );
+        }
+
+        /* Takes a list of intervals corresponding to constraints on a given field
+         * in this keypattern, and transforms them into a list of bounds
+         * based on the expression for 'field'
+         */
+        BoundList _transformFieldBounds( const vector<FieldInterval>& oldIntervals ,
+                                         const BSONElement& field ) const;
+
     };
 
 
