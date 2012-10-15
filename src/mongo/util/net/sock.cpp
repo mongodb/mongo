@@ -15,12 +15,9 @@
  *    limitations under the License.
  */
 
-#include "pch.h"
-#include "sock.h"
-#include "../background.h"
-#include "../concurrency/value.h"
-#include "../mongoutils/str.h"
-#include "../../db/cmdline.h"
+#include "mongo/pch.h"
+
+#include "mongo/util/net/sock.h"
 
 #if !defined(_WIN32)
 # include <sys/socket.h>
@@ -42,7 +39,10 @@
 #include <openssl/ssl.h>
 #endif
 
-using namespace mongoutils;
+#include "mongo/util/background.h"
+#include "mongo/util/concurrency/value.h"
+#include "mongo/util/mongoutils/str.h"
+#include "mongo/db/cmdline.h"
 
 namespace mongo {
 
@@ -151,7 +151,7 @@ namespace mongo {
             target = "127.0.0.1";
         }
 
-        if( str::contains(target, '/') ) {
+        if( mongoutils::str::contains(target, '/') ) {
 #ifdef _WIN32
             uassert(13080, "no unix socket support on windows", false);
 #endif
@@ -234,14 +234,14 @@ namespace mongo {
         }
     }
     
-    string SockAddr::getAddr() const {
+    std::string SockAddr::getAddr() const {
         switch (getType()) {
         case AF_INET:
         case AF_INET6: {
             const int buflen=128;
             char buffer[buflen];
             int ret = getnameinfo(raw(), addressSize, buffer, buflen, NULL, 0, NI_NUMERICHOST);
-            massert(13082, str::stream() << "getnameinfo error " << getAddrInfoStrError(ret), ret == 0);
+            massert(13082, mongoutils::str::stream() << "getnameinfo error " << getAddrInfoStrError(ret), ret == 0);
             return buffer;
         }
             
@@ -804,7 +804,7 @@ namespace mongo {
             if ( WSAStartup(MAKEWORD(2,2), &d) != 0 ) {
                 out() << "ERROR: wsastartup failed " << errnoWithDescription() << endl;
                 problem() << "ERROR: wsastartup failed " << errnoWithDescription() << endl;
-                dbexit( EXIT_NTSERVICE_ERROR );
+                _exit(EXIT_NTSERVICE_ERROR);
             }
         }
     } winsock_init;
