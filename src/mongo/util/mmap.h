@@ -87,7 +87,7 @@ namespace mongo {
 
         /** note: you need to be in mmmutex when using this. forEach (above) handles that for you automatically. 
 */
-        static set<MongoFile*>& getAllFiles()  { return mmfiles; }
+        static set<MongoFile*>& getAllFiles();
 
         // callbacks if you need them
         static void (*notifyPreFlush)();
@@ -124,10 +124,6 @@ namespace mongo {
         void destroyed(); 
 
         virtual unsigned long long length() const = 0;
-
-        static set<MongoFile*> mmfiles;
-    public:
-        static map<string,MongoFile*> pathToFile;
     };
 
     /** look up a MMF by filename. scoped mutex locking convention.
@@ -138,15 +134,10 @@ namespace mongo {
     */
     class MongoFileFinder : boost::noncopyable {
     public:
-        MongoFileFinder() { }
-
         /** @return The MongoFile object associated with the specified file name.  If no file is open
                     with the specified name, returns null.
         */
-        MongoFile* findByPath(const std::string& path) {
-            map<string,MongoFile*>::iterator i = MongoFile::pathToFile.find(path);
-            return  i == MongoFile::pathToFile.end() ? NULL : i->second;
-        }
+        MongoFile* findByPath(const std::string& path) const;
 
     private:
         LockMongoFilesShared _lk;
@@ -238,7 +229,8 @@ namespace mongo {
     template < class F >
     inline void MongoFile::forEach( F p ) {
         LockMongoFilesShared lklk;
-        for ( set<MongoFile*>::iterator i = mmfiles.begin(); i != mmfiles.end(); i++ )
+        const set<MongoFile*>& mmfiles = MongoFile::getAllFiles();
+        for ( set<MongoFile*>::const_iterator i = mmfiles.begin(); i != mmfiles.end(); i++ )
             p(*i);
     }
 

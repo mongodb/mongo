@@ -24,6 +24,7 @@
 #include "mongo/db/cmdline.h"
 #include "mongo/db/namespace.h"
 #include "mongo/util/concurrency/rwlock.h"
+#include "mongo/util/map_util.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/progress_meter.h"
@@ -38,8 +39,10 @@ namespace mongo {
         fassert( 16327, (minOSPageSizeBytes & (minOSPageSizeBytes - 1)) == 0);
     }
 
-    set<MongoFile*> MongoFile::mmfiles;
-    map<string,MongoFile*> MongoFile::pathToFile;
+namespace {
+    set<MongoFile*> mmfiles;
+    map<string,MongoFile*> pathToFile;
+}  // namespace
 
     /* Create. Must not exist.
     @param zero fill file with zeros when true
@@ -90,6 +93,8 @@ namespace mongo {
 
     RWLockRecursiveNongreedy LockMongoFilesShared::mmmutex("mmmutex",10*60*1000 /* 10 minutes */);
     unsigned LockMongoFilesShared::era = 99; // note this rolls over
+
+    set<MongoFile*>& MongoFile::getAllFiles() { return mmfiles; }
 
     /* subclass must call in destructor (or at close).
         removes this from pathToFile and other maps
@@ -193,11 +198,16 @@ namespace mongo {
     void MongoFile::setFilename(const std::string& fn) {
         LockMongoFilesExclusive lk;
         verify( _filename.empty() );
-        _filename = fn;
-        MongoFile *&ptf = pathToFile[fn];
+        _filename = boost::filesystem::absolute(fn).generic_string();
+        MongoFile *&ptf = pathToFile[_filename];
         massert(13617, "MongoFile : multiple opens of same filename", ptf == 0);
         ptf = this;
     }
 
+    MongoFile* MongoFileFinder::findByPath(const std::string& path) const {
+        return mapFindWithDefault(pathToFile,
+                                  boost::filesystem::absolute(path).generic_string(),
+                                  static_cast<MongoFile*>(NULL));
+    }
 
 } // namespace mongo
