@@ -625,7 +625,10 @@ namespace mongo {
                     {
                         scoped_lock lk( _lock );
                         probablePrimaryIdx = _find_inlock( maybePrimary );
-                        probablePrimaryConn = _nodes[probablePrimaryIdx].conn;
+
+                        if (probablePrimaryIdx >= 0) {
+                            probablePrimaryConn = _nodes[probablePrimaryIdx].conn;
+                        }
                     }
 
                     if ( probablePrimaryIdx >= 0 ) {
