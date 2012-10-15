@@ -1114,6 +1114,10 @@ namespace QueryUtilTests {
                 EqualEmptyArray() : NotExactMatchRepresentation( fromjson( "{a:[]}" ) ) {}
             };
             
+            struct EqualNull : public NotExactMatchRepresentation {
+                EqualNull() : NotExactMatchRepresentation( fromjson( "{a:null}" ) ) {}
+            };
+
             struct InArray : public NotExactMatchRepresentation {
                 InArray() : NotExactMatchRepresentation( fromjson( "{a:{$in:[[1]]}}" ) ) {}
             };
@@ -1122,6 +1126,10 @@ namespace QueryUtilTests {
                 InRegex() : NotExactMatchRepresentation( fromjson( "{a:{$in:[/^a/]}}" ) ) {}
             };
             
+            struct InNull : public NotExactMatchRepresentation {
+                InNull() : NotExactMatchRepresentation( fromjson( "{a:{$in:[null]}}" ) ) {}
+            };
+
             struct Exists : public NotExactMatchRepresentation {
                 Exists() : NotExactMatchRepresentation( fromjson( "{a:{$exists:false}}" ) ) {}
             };
@@ -1142,6 +1150,14 @@ namespace QueryUtilTests {
                 GtArray() : NotExactMatchRepresentation( fromjson( "{a:{$gt:[0]}}" ) ) {}
             };
             
+            struct GtNull : public NotExactMatchRepresentation {
+                GtNull() : NotExactMatchRepresentation( fromjson( "{a:{$gt:null}}" ) ) {}
+            };
+
+            struct LtObject : public NotExactMatchRepresentation {
+                LtObject() : NotExactMatchRepresentation( fromjson( "{a:{$lt:{}}}" ) ) {}
+            };
+
             /** Descriptive test - behavior could potentially be different. */
             struct NotNe : public NotExactMatchRepresentation {
                 NotNe() : NotExactMatchRepresentation( fromjson( "{a:{$not:{$ne:4}}}" ) ) {}
@@ -2724,13 +2740,17 @@ namespace QueryUtilTests {
             add<FieldRangeTests::IntersectSpecial>();
             add<FieldRangeTests::ExactMatchRepresentation::EqualArray>();
             add<FieldRangeTests::ExactMatchRepresentation::EqualEmptyArray>();
+            add<FieldRangeTests::ExactMatchRepresentation::EqualNull>();
             add<FieldRangeTests::ExactMatchRepresentation::InArray>();
             add<FieldRangeTests::ExactMatchRepresentation::InRegex>();
+            add<FieldRangeTests::ExactMatchRepresentation::InNull>();
             add<FieldRangeTests::ExactMatchRepresentation::Exists>();
             add<FieldRangeTests::ExactMatchRepresentation::UntypedRegex>();
             add<FieldRangeTests::ExactMatchRepresentation::NotIn>();
             add<FieldRangeTests::ExactMatchRepresentation::NotGt>();
             add<FieldRangeTests::ExactMatchRepresentation::GtArray>();
+            add<FieldRangeTests::ExactMatchRepresentation::GtNull>();
+            add<FieldRangeTests::ExactMatchRepresentation::LtObject>();
             add<FieldRangeTests::ExactMatchRepresentation::NotNe>();
             add<FieldRangeTests::ExactMatchRepresentation::MultikeyIntersection>();
             add<FieldRangeTests::ExactMatchRepresentation::Intersection>();

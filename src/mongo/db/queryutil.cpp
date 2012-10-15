@@ -193,6 +193,12 @@ namespace mongo {
                         }                        
                         vals.insert( temp );
                     }
+                    if ( ie.isNull() ) {
+                        // A null index key will not always match a null query value (eg
+                        // SERVER-4529).  As a result, a field range containing null cannot be an
+                        // exact match representation.
+                        exactMatchesOnly = false;
+                    }
                 }
             }
 
@@ -284,14 +290,27 @@ namespace mongo {
             }
             return;
         }
-        
-        if ( optimize && !isNot && ( e.type() != Array ) ) {
+
+        // Identify simple cases where this FieldRange represents the exact set of BSONElement
+        // values matching the query expression element used to construct the FieldRange.
+
+        if ( // If type bracketing is enabled (see 'optimize' case at the end of this function) ...
+             optimize &&
+             // ... and the operator isn't within a $not clause ...
+             !isNot &&
+             // ... and the operand is of a type that implements exact type bracketing and will be
+             // exactly represented in an index key (eg is not null or an array) ...
+             e.isSimpleType() ) {
             switch( op ) {
+                // ... and the operator is one for which this constructor will determine exact
+                // bounds on the values that match ...
                 case BSONObj::Equality:
                 case BSONObj::LT:
                 case BSONObj::LTE:
                 case BSONObj::GT:
                 case BSONObj::GTE:
+                    // ... then this FieldRange exactly characterizes those documents that match the
+                    // operator.
                     _exactMatchRepresentation = true;
                 default:
                     break;
@@ -440,6 +459,12 @@ namespace mongo {
         default:
             break;
         }
+
+        // If 'optimize' is set, then bracket the field range by bson type.  For example, if this
+        // FieldRange is constructed with the operator { $gt:5 }, then the lower bound will be 5
+        // at this point but the upper bound will be MaxKey.  If 'optimize' is true, the upper bound
+        // is bracketed to the highest possible bson numeric value.  This is consistent with the
+        // Matcher's $gt implementation.
 
         if ( optimize ) {
             if ( lower.type() != MinKey && upper.type() == MaxKey && lower.isSimpleType() ) { // TODO: get rid of isSimpleType
