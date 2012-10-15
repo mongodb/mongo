@@ -774,8 +774,14 @@ namespace mongo {
         ShardPtr primary;
 
         string prefix;
-        if( _totalTries > 0 ) prefix = str::stream() << "retrying (" << _totalTries << " tries)";
-        else prefix = "creating";
+        if (MONGO_unlikely(logLevel >= pc)) {
+            if( _totalTries > 0 ) {
+                prefix = str::stream() << "retrying (" << _totalTries << " tries)";
+            }
+            else {
+                prefix = "creating";
+            }
+        }
         LOG( pc ) << prefix << " pcursor over " << _qSpec << " and " << _cInfo << endl;
 
         set<Shard> todoStorage;
@@ -790,8 +796,16 @@ namespace mongo {
             // Try to get either the chunk manager or the primary shard
             config->getChunkManagerOrPrimary( ns, manager, primary );
 
-            if( manager ) vinfo = ( str::stream() << "[" << manager->getns() << " @ " << manager->getVersion().toString() << "]" );
-            else vinfo = (str::stream() << "[unsharded @ " << primary->toString() << "]" );
+            if (MONGO_unlikely(logLevel >= pc)) {
+                if (manager) {
+                    vinfo = str::stream() << "[" << manager->getns() << " @ "
+                        << manager->getVersion().toString() << "]";
+                }
+                else {
+                    vinfo = str::stream() << "[unsharded @ "
+                        << primary->toString() << "]";
+                }
+            }
 
             if( manager ) manager->getShardsForQuery( todo, specialFilter ? _cInfo.cmdFilter : _qSpec.filter() );
             else if( primary ) todo.insert( *primary );
@@ -810,8 +824,9 @@ namespace mongo {
 
             // Don't use version to get shards here
             todo = _qShards;
-            vinfo = str::stream() << "[" << _qShards.size() << " shards specified]";
-
+            if (MONGO_unlikely(logLevel >= pc)) {
+                vinfo = str::stream() << "[" << _qShards.size() << " shards specified]";
+            }
         }
 
         verify( todo.size() );
