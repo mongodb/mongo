@@ -760,8 +760,8 @@ namespace mongo {
                 if( !o.getObjectID(_id) ) {
                     /* No _id.  This will be very slow. */
                     Timer t;
-                    updateObjects(ns, o, o, true, false, false, debug, false,
-                                  QueryPlanSelectionPolicy::idElseNatural() );
+                    updateObjectsForReplication(ns, o, o, true, false, false, debug, false,
+                                                QueryPlanSelectionPolicy::idElseNatural() );
                     if( t.millis() >= 2 ) {
                         RARELY OCCASIONALLY log() << "warning, repl doing slow updates (no _id field) for " << ns << endl;
                     }
@@ -776,8 +776,8 @@ namespace mongo {
                               */
                     BSONObjBuilder b;
                     b.append(_id);
-                    updateObjects(ns, o, b.done(), true, false, false , debug, false,
-                                  QueryPlanSelectionPolicy::idElseNatural() );
+                    updateObjectsForReplication(ns, o, b.done(), true, false, false , debug, false,
+                                                QueryPlanSelectionPolicy::idElseNatural() );
                 }
             }
         }
@@ -791,10 +791,16 @@ namespace mongo {
             OpDebug debug;
             BSONObj updateCriteria = op.getObjectField("o2");
             bool upsert = fields[3].booleanSafe() || convertUpdateToUpsert;
-            UpdateResult ur = updateObjects(ns, o, updateCriteria, upsert, /*multi*/ false,
-                                            /*logop*/ false , debug, /*fromMigrate*/ false,
-                                            QueryPlanSelectionPolicy::idElseNatural() );
-            if( ur.num == 0 ) { 
+            UpdateResult ur = updateObjectsForReplication(ns,
+                                                          o,
+                                                          updateCriteria,
+                                                          upsert,
+                                                          /*multi*/ false,
+                                                          /*logop*/ false,
+                                                          debug,
+                                                          /*fromMigrate*/ false,
+                                                          QueryPlanSelectionPolicy::idElseNatural() );
+            if( ur.num == 0 ) {
                 if( ur.mod ) {
                     if( updateCriteria.nFields() == 1 ) {
                         // was a simple { _id : ... } update criteria

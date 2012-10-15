@@ -1114,6 +1114,34 @@ namespace ReplTests {
             }
         };
 
+        //
+        // replay cases
+        //
+
+        class ReplaySetPreexistingNoOpPull : public Base {
+        public:
+            void doIt() const {
+                client()->update( ns(), BSONObj(), fromjson( "{$unset:{z:1}}" ));
+
+                // This is logged as {$set:{'a.b':[]},$set:{z:1}}, which might not be
+                // replayable against future versions of a document (here {_id:0,a:1,z:1}) due
+                // to SERVER-4781. As a result the $set:{z:1} will not be replayed in such
+                // cases (and also an exception may abort replication). If this were instead
+                // logged as {$set:{z:1}}, SERVER-4781 would not be triggered.
+                client()->update( ns(), BSONObj(), fromjson( "{$pull:{'a.b':1}, $set:{z:1}}" ) );
+                client()->update( ns(), BSONObj(), fromjson( "{$set:{a:1}}" ) );
+            }
+            using ReplTests::Base::check;
+            void check() const {
+                ASSERT_EQUALS( 1, count() );
+                check( fromjson( "{_id:0,a:1,z:1}" ), one( fromjson("{'_id':0}") ) );
+            }
+            void reset() const {
+                deleteAll( ns() );
+                insert( fromjson( "{'_id':0,a:{b:[]},z:1}" ) );
+            }
+        };
+
     } // namespace Idempotence
 
     class DeleteOpIsIdBased : public Base {
@@ -1340,6 +1368,7 @@ namespace ReplTests {
             add< Idempotence::IndexedSingletonNoRename >();
             add< Idempotence::AddToSetEmptyMissing >();
             add< Idempotence::AddToSetWithDollarSigns >();
+            add< Idempotence::ReplaySetPreexistingNoOpPull >();
             add< DeleteOpIsIdBased >();
             add< DatabaseIgnorerBasic >();
             add< DatabaseIgnorerUpdate >();

@@ -679,8 +679,6 @@ namespace UpdateTests {
                 modSetState->applyModsInPlace(false);
                 ASSERT_EQUALS( BSON( "$set" << BSON( "a.0" << 3 ) ),
                                modSetState->getOpLogRewrite() );
-                // XXX we want inc to do a full $set to start with, not a positional one.
-                // XXX fix me.
             }
         };
 

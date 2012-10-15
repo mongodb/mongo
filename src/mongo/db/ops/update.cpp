@@ -137,7 +137,8 @@ namespace mongo {
                                  OpDebug& debug,
                                  RemoveSaver* rs,
                                  bool fromMigrate,
-                                 const QueryPlanSelectionPolicy& planPolicy ) {
+                                 const QueryPlanSelectionPolicy& planPolicy,
+                                 bool forReplication ) {
 
         DEBUGUPDATE( "update: " << ns
                      << " update: " << updateobj
@@ -163,10 +164,10 @@ namespace mongo {
             if( d && d->indexBuildInProgress ) {
                 set<string> bgKeys;
                 d->inProgIdx().keyPattern().getFieldNames(bgKeys);
-                mods.reset( new ModSet(updateobj, nsdt->indexKeys(), &bgKeys) );
+                mods.reset( new ModSet(updateobj, nsdt->indexKeys(), &bgKeys, forReplication) );
             }
             else {
-                mods.reset( new ModSet(updateobj, nsdt->indexKeys()) );
+                mods.reset( new ModSet(updateobj, nsdt->indexKeys(), 0, forReplication) );
             }
             modsIsIndexed = mods->isIndexed();
         }
@@ -451,6 +452,18 @@ namespace mongo {
         return UpdateResult( 0 , isOperatorUpdate , 0 , BSONObj() );
     }
 
+    void assertUpdate( const char* ns , const BSONObj& updateobj, const BSONObj& patternOrig ) {
+        uassert( 10155 , "cannot update reserved $ collection", strchr(ns, '$') == 0 );
+        if ( strstr(ns, ".system.") ) {
+            /* dm: it's very important that system.indexes is never updated as IndexDetails
+               has pointers into it */
+            uassert( 10156,
+                     str::stream() << "cannot update system collection: "
+                                   << ns << " q: " << patternOrig << " u: " << updateobj,
+                     legalClientSystemNS( ns , true ) );
+        }
+    }
+
     UpdateResult updateObjects( const char* ns,
                                 const BSONObj& updateobj,
                                 const BSONObj& patternOrig,
@@ -461,17 +474,30 @@ namespace mongo {
                                 bool fromMigrate,
                                 const QueryPlanSelectionPolicy& planPolicy ) {
 
-        uassert( 10155 , "cannot update reserved $ collection", strchr(ns, '$') == 0 );
-        if ( strstr(ns, ".system.") ) {
-            /* dm: it's very important that system.indexes is never updated as IndexDetails has pointers into it */
-            uassert( 10156,
-                     str::stream() << "cannot update system collection: " << ns << " q: " << patternOrig << " u: " << updateobj,
-                     legalClientSystemNS( ns , true ) );
-        }
+        assertUpdate( ns , updateobj , patternOrig );
 
         UpdateResult ur = _updateObjects(false, ns, updateobj, patternOrig,
                                          upsert, multi, logop,
                                          debug, 0, fromMigrate, planPolicy );
+        debug.nupdated = ur.num;
+        return ur;
+    }
+
+    UpdateResult updateObjectsForReplication( const char* ns,
+                                              const BSONObj& updateobj,
+                                              const BSONObj& patternOrig,
+                                              bool upsert,
+                                              bool multi,
+                                              bool logop ,
+                                              OpDebug& debug,
+                                              bool fromMigrate,
+                                              const QueryPlanSelectionPolicy& planPolicy ) {
+
+        assertUpdate( ns , updateobj , patternOrig );
+
+        UpdateResult ur = _updateObjects(false, ns, updateobj, patternOrig,
+                                         upsert, multi, logop,
+                                         debug, 0, fromMigrate, planPolicy, true /* for replication */ );
         debug.nupdated = ur.num;
         return ur;
     }
