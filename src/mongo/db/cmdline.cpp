@@ -16,16 +16,19 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "pch.h"
-#include "cmdline.h"
-#include "../util/password.h"
-#include "../util/net/listen.h"
-#include "../bson/util/builder.h"
+#include "mongo/pch.h"
+
+#include "mongo/db/cmdline.h"
+
+#include "mongo/util/map_util.h"
+#include "mongo/bson/util/builder.h"
 #include "mongo/util/mongoutils/str.h"
+#include "mongo/util/net/listen.h"
+#include "mongo/util/password.h"
+
 #ifdef _WIN32
 #include <direct.h>
 #endif
-#include "globals.h"
 
 #define MAX_LINE_LENGTH 256
 
@@ -446,19 +449,16 @@ namespace {
         log() << "options: " << parsedOpts << endl;
     }
 
-    casi< map<string,ParameterValidator*> * > pv_all (NULL);
+    map<string,ParameterValidator*>* pv_all(NULL);
 
     ParameterValidator::ParameterValidator( const string& name ) : _name( name ) {
         if ( ! pv_all)
-            pv_all.ref() = new map<string,ParameterValidator*>();
-        (*pv_all.ref())[_name] = this;
+            pv_all = new map<string,ParameterValidator*>();
+        (*pv_all)[_name] = this;
     }
-    
-    ParameterValidator * ParameterValidator::get( const string& name ) {
-        map<string,ParameterValidator*>::const_iterator i = pv_all.get()->find( name );
-        if ( i == pv_all.get()->end() )
-            return NULL;
-        return i->second;
+
+    ParameterValidator* ParameterValidator::get( const string& name ) {
+        return mapFindWithDefault(*pv_all, name, static_cast<ParameterValidator*>(NULL));
     }
 
 }
