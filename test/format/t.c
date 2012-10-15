@@ -79,6 +79,9 @@ main(int argc, char *argv[])
 	for (; *argv != NULL; ++argv)
 		config_single(*argv, 1);
 
+	/* Use line buffering on stdout so status updates aren't buffered. */
+	(void)setvbuf(stdout, NULL, _IOLBF, 0);
+
 	/* Clean up on signal. */
 	(void)signal(SIGINT, onint);
 
