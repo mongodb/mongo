@@ -170,7 +170,8 @@ __clsm_open_cursors(WT_CURSOR_LSM *clsm, int start_chunk)
 			    chunk->uri, &clsm->iface, NULL, cp);
 		WT_ERR(ret);
 
-		if (chunk->bloom_uri != NULL && !F_ISSET(clsm, WT_CLSM_MERGE))
+		if (F_ISSET(chunk, WT_LSM_CHUNK_BLOOM) &&
+		    !F_ISSET(clsm, WT_CLSM_MERGE))
 			WT_ERR(__wt_bloom_open(session, chunk->bloom_uri,
 			    lsm_tree->bloom_bit_count,
 			    lsm_tree->bloom_hash_count,

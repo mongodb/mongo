@@ -44,6 +44,7 @@ struct __wt_lsm_chunk {
 
 	uint32_t ncursor;		/* Cursors with the chunk as primary. */
 #define	WT_LSM_CHUNK_ONDISK	0x01
+#define	WT_LSM_CHUNK_BLOOM	0x02
 	uint32_t flags;
 };
 
@@ -71,7 +72,11 @@ struct __wt_lsm_tree {
 	uint32_t bloom_hash_count;
 	uint32_t chunk_size;
 	uint32_t merge_max;
-	uint32_t bloom;			/* Is bloom enabled. */
+#define	WT_LSM_BLOOM_MERGED				0x00000001
+#define	WT_LSM_BLOOM_NEWEST				0x00000002
+#define	WT_LSM_BLOOM_OFF				0x00000004
+#define	WT_LSM_BLOOM_OLDEST				0x00000008
+	uint32_t bloom;			/* Bloom creation policy. */
 
 	WT_SESSION_IMPL *worker_session;/* Passed to thread_create */
 	pthread_t worker_tid;		/* LSM worker thread */
