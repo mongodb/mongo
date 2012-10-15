@@ -964,10 +964,18 @@ def doLint( env , target , source ):
     filters.append( '-whitespace/tab' ) # errors found: 233
 
     sourceFiles = utils.getAllSourceFiles( prefix="src/mongo/" )
-    sourceFiles.
     args = [ "--filter=" + ",".join( filters ) , "--counting=detailed" ] + sourceFiles
     filenames = buildscripts.cpplint.ParseArguments( args  )
+
+    def _ourIsTestFilename(fn):
+        if fn.find( "dbtests" ) >= 0:
+            return True
+        if fn.endswith( "_test.cpp" ):
+            return True
+        return False
     
+    buildscripts.cpplint._IsTestFilename = _ourIsTestFilename
+
     # Change stderr to write with replacement characters so we don't die
     # if we try to print something containing non-ASCII characters.
     sys.stderr = codecs.StreamReaderWriter(sys.stderr,
