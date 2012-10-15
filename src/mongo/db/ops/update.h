@@ -58,6 +58,23 @@ namespace mongo {
                                bool fromMigrate = false,
                                const QueryPlanSelectionPolicy& planPolicy = QueryPlanSelectionPolicy::any());
 
+    /*
+     * Similar to updateObjects but not strict about applying mods that can fail during initial
+     * replication.
+     *
+     * Reference ticket: SERVER-4781
+     */
+    UpdateResult updateObjectsForReplication(const char* ns,
+                                             const BSONObj& updateobj,
+                                             const BSONObj& pattern,
+                                             bool upsert,
+                                             bool multi,
+                                             bool logop,
+                                             OpDebug& debug,
+                                             bool fromMigrate = false,
+                                             const QueryPlanSelectionPolicy& planPolicy =
+                                                 QueryPlanSelectionPolicy::any());
+
     UpdateResult _updateObjects(bool su,
                                 const char* ns,
                                 const BSONObj& updateobj,
@@ -68,7 +85,8 @@ namespace mongo {
                                 OpDebug& debug,
                                 RemoveSaver* rs = 0,
                                 bool fromMigrate = false,
-                                const QueryPlanSelectionPolicy& planPolicy = QueryPlanSelectionPolicy::any());
+                                const QueryPlanSelectionPolicy& planPolicy = QueryPlanSelectionPolicy::any(),
+                                bool forReplication = false);
 
 
     /**
