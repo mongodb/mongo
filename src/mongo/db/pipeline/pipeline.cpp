@@ -67,7 +67,7 @@ namespace mongo {
          DocumentSourceLimit::createFromBson},
         {DocumentSourceMatch::matchName,
          DocumentSourceMatch::createFromBson},
-#ifdef LATER /* https://jira.mongodb.org/browse/SERVER-3253 */
+#ifdef LATER // https://jira.mongodb.org/browse/SERVER-3253 
         {DocumentSourceOut::outName,
          DocumentSourceOut::createFromBson},
 #endif

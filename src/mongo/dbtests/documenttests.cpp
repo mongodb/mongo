@@ -662,7 +662,7 @@ namespace DocumentTests {
                 intrusive_ptr<const Value> value() { return Value::createDate(0); }
             };
             
-            /** Coerce // to bool. */
+            /** Coerce js literal regex to bool. */
             class RegexToBool : public ToBoolTrue {
                 intrusive_ptr<const Value> value() { return fromBson( fromjson( "{''://}" ) ); }
             };

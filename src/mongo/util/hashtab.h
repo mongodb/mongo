@@ -35,10 +35,7 @@ namespace mongo {
        int Key::hash() return > 0 always.
     */
 
-    template <
-    class Key,
-          class Type
-          >
+    template <class Key,class Type>
     class HashTable : boost::noncopyable {
     public:
         const char *name;

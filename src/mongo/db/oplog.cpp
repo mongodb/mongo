@@ -148,7 +148,7 @@ namespace mongo {
     // the compiler would use if inside the function.  the reason this is static is to avoid a malloc/free for this
     // on every logop call.
     static BufBuilder logopbufbuilder(8*1024);
-    const static int OPLOG_VERSION = 2;
+    static const int OPLOG_VERSION = 2;
     static void _logOpRS(const char *opstr, const char *ns, const char *logNS, const BSONObj& obj, BSONObj *o2, bool *bb, bool fromMigrate ) {
         Lock::DBWrite lk1("local");
 
