@@ -464,6 +464,9 @@ int main(int argc, char **argv)
 	if ((ret = setup_log_file(&cfg)) != 0)
 		goto err;
 
+	/* Make stdout line buffered, so verbose output appears quickly. */
+	(void)setvbuf(stdout, NULL, _IOLBF, 0);
+
 	/* Concatenate non-default configuration strings. */
 	if (cfg.verbose > 1 || user_cconfig != NULL) {
 		req_len = strlen(cfg.conn_config) + strlen(debug_cconfig) + 3;
@@ -588,6 +591,8 @@ int execute_reads(CONFIG *cfg)
 		sleep(cfg->report_interval);
 		if (cfg->verbose > 0) {
 			fprintf(cfg->logf, "%" PRIu64 " ops in %d secs\n",
+			    nops - last_ops, cfg->report_interval);
+			printf("%" PRIu64 " ops in %d secs\n",
 			    nops - last_ops, cfg->report_interval);
 		}
 		last_ops = nops;
