@@ -241,7 +241,8 @@ namespace mongo {
         	    // responses.
                 
         	    warning() << "could not get last error from a shard " << theShard << causedBy( e ) << endl;
-                conn->done();
+                if (conn)
+                    conn->done();
                 
                 return false;
             }
