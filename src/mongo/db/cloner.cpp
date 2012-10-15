@@ -768,7 +768,7 @@ namespace mongo {
                 sb << "collection name length of " << target.size()
                 << " exceeds maximum length of " << longestAllowed
                 << ", allowing for index names";
-                uasserted(16445, sb.str());
+                uasserted(16451, sb.str());
             }
 
             bool capped = false;
