@@ -852,7 +852,21 @@ namespace mongo {
             while( i.more() ) {
                 BSONElement e = i.next();
                 if ( strcmp( e.fieldName(), "ns" ) != 0 )
-                    newIndexSpecB.append( e );
+                //Check if the new namespace for this index with the new collection name will go over the 128 char limit
+                    if (strcmp( e.fieldName(), "name" ) != 0){
+                        newIndexSpecB.append( e );
+                    } else {
+                        int newTotalNsLen = (strlen(to) + e.valuesize());
+                        //119 as 128 is the max length and we concatenate NS and Index with a .$ ,  6 for $extra and a terminator
+                        if(newTotalNsLen > 119){
+                            char newNameString[120];
+                            strncpy(newNameString, e.valuestrsafe(), (119-strlen(to)));
+                            newNameString[119-strlen(to)] = 0;
+                            newIndexSpecB << "name" << newNameString;
+                        } else {
+                            newIndexSpecB.append( e );
+                        }
+                    }
                 else
                     newIndexSpecB << "ns" << to;
             }
