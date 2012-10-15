@@ -70,14 +70,12 @@ __wt_lsm_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	WT_ITEM key, value;
 	WT_LSM_CHUNK *chunk;
 	WT_SESSION *wt_session;
-	const char *dest_uri;
 	uint32_t generation;
 	uint64_t insert_count, record_count;
 	int create_bloom, dest_id, end_chunk, i;
 	int max_chunks, nchunks, start_chunk;
 
 	src = dest = NULL;
-	dest_uri = NULL;
 	bloom = NULL;
 	max_chunks = (int)lsm_tree->merge_max;
 	create_bloom = 0;
