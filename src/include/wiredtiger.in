@@ -1808,34 +1808,37 @@ extern int wiredtiger_extension_init(WT_SESSION *session,
  */
 /*! Highest merge generation in the LSM tree */
 #define	WT_STAT_generation_max				0
+/*! Number of bloom filter false positives */
+#define	WT_STAT_bloom_false_positives			1
+/*! Number of bloom filter hits */
+#define	WT_STAT_bloom_hits				2
+/*! Number of bloom filter misses */
+#define	WT_STAT_bloom_misses				3
 /*! Number of bloom filters in the LSM tree */
-#define	WT_STAT_bloom_count				1
+#define	WT_STAT_bloom_count				4
 /*! Number of bloom pages evicted from cache */
-#define	WT_STAT_bloom_cache_evict			2
+#define	WT_STAT_bloom_cache_evict			5
 /*! Number of bloom pages read into cache */
-#define	WT_STAT_bloom_cache_read			3
+#define	WT_STAT_bloom_cache_read			6
 /*! Number of chunks in the LSM tree */
-#define	WT_STAT_chunk_count				4
+#define	WT_STAT_chunk_count				7
 /*! Number of pages evicted from LSM chunks */
-#define	WT_STAT_chunk_cache_evict			5
+#define	WT_STAT_chunk_cache_evict			8
 /*! Number of pages evicted from cache */
-#define	WT_STAT_cache_evict				6
+#define	WT_STAT_cache_evict				9
 /*! Number of pages read into LSM chunks */
-#define	WT_STAT_chunk_cache_read			7
+#define	WT_STAT_chunk_cache_read			10
 /*! Number of pages read into cache */
-#define	WT_STAT_cache_read				8
+#define	WT_STAT_cache_read				11
 /*! Number of pages selected for eviction that could not be evicted */
-#define	WT_STAT_cache_evict_fail			9
+#define	WT_STAT_cache_evict_fail			12
 /*! Number of pages written from cache */
-#define	WT_STAT_cache_write				10
-/*! Number of successful bloom filter false positives */
-#define	WT_STAT_bloom_misses				11
-/*! Number of successful bloom filter lookups */
-#define	WT_STAT_bloom_hits				12
-/*! Number of unsuccessful bloom filter lookups */
-#define	WT_STAT_bloom_skips				13
+#define	WT_STAT_cache_write				13
+/*! Number of queries that could have benefited from a bloom filter that
+ * did not exist */
+#define	WT_STAT_search_miss_no_bloom			14
 /*! Total space used by bloom filters */
-#define	WT_STAT_bloom_space				14
+#define	WT_STAT_bloom_space				15
 /*! @} */
 /*
  * Statistics section: END

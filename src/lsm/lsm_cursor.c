@@ -516,7 +516,7 @@ __clsm_search(WT_CURSOR *cursor)
 			ret = __wt_bloom_get(bloom, &cursor->key);
 			if (ret == WT_NOTFOUND) {
 				WT_STAT_INCR(
-				    clsm->lsm_tree->stats, bloom_skips);
+				    clsm->lsm_tree->stats, bloom_misses);
 				continue;
 			} else if (ret == 0)
 				WT_STAT_INCR(clsm->lsm_tree->stats, bloom_hits);
@@ -532,9 +532,13 @@ __clsm_search(WT_CURSOR *cursor)
 			goto done;
 		} else if (ret != WT_NOTFOUND)
 			goto err;
-		else if (bloom != NULL) {
-			WT_STAT_INCR(clsm->lsm_tree->stats, bloom_misses);
-		}
+		else if (bloom != NULL)
+			WT_STAT_INCR(
+			    clsm->lsm_tree->stats, bloom_false_positives);
+		/* The active chunk can't have a bloom filter. */
+		else if (i != clsm->nchunks)
+			WT_STAT_INCR(
+			    clsm->lsm_tree->stats, search_miss_no_bloom);
 	}
 	ret = WT_NOTFOUND;
 

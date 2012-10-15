@@ -103,9 +103,10 @@ btree_stats = [
 lsm_stats = [
 	Stat('chunk_cache_evict', 'Number of pages evicted from LSM chunks'),
 	Stat('chunk_cache_read', 'Number of pages read into LSM chunks'),
-	Stat('bloom_hits', 'Number of successful bloom filter lookups'),
-	Stat('bloom_misses', 'Number of successful bloom filter false positives'),
-	Stat('bloom_skips', 'Number of unsuccessful bloom filter lookups'),
+	Stat('bloom_false_positives', 'Number of bloom filter false positives'),
+	Stat('bloom_hits', 'Number of bloom filter hits'),
+	Stat('bloom_misses', 'Number of bloom filter misses'),
+	Stat('search_miss_no_bloom', 'Number of queries that could have benefited from a bloom filter that did not exist'),
 	Stat('bloom_space', 'Total space used by bloom filters'),
 	Stat('bloom_cache_evict', 'Number of bloom pages evicted from cache'),
 	Stat('bloom_cache_read', 'Number of bloom pages read into cache'),
