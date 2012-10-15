@@ -518,6 +518,7 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClInclude Include="..\db\hasher.h" />
     <ClInclude Include="..\db\index_update.h" />
     <ClInclude Include="..\db\jsobjmanipulator.h" />
+    <ClInclude Include="..\db\keypattern.h" />
     <ClInclude Include="..\db\kill_current_op.h" />
     <ClInclude Include="..\db\lockstat.h" />
     <ClInclude Include="..\db\lockstate.h" />
@@ -1261,6 +1262,7 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClCompile Include="..\db\hasher.cpp" />
     <ClCompile Include="..\db\index_update.cpp" />
     <ClCompile Include="..\db\key.cpp" />
+    <ClCompile Include="..\db\keypattern.cpp" />
     <ClCompile Include="..\db\kill_current_op.cpp" />
     <ClCompile Include="..\db\lockstat.cpp" />
     <ClCompile Include="..\db\lockstate.cpp" />

@@ -1124,6 +1124,7 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClCompile Include="commands\distinct.cpp" />
     <ClCompile Include="fail_point_service.cpp" />
     <ClCompile Include="initialize_server_global_state.cpp" />
+    <ClCompile Include="keypattern.cpp" />
     <ClCompile Include="kill_current_op.cpp" />
     <ClCompile Include="pipeline\document_source_cursor.cpp" />
     <ClCompile Include="commands\find_and_modify.cpp" />
@@ -1310,6 +1311,7 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClInclude Include="index_insertion_continuation.h" />
     <ClInclude Include="index_update.h" />
     <ClInclude Include="initialize_server_global_state.h" />
+    <ClInclude Include="keypattern.h" />
     <ClInclude Include="kill_current_op.h" />
     <ClInclude Include="lockstat.h" />
     <ClInclude Include="lockstate.h" />
