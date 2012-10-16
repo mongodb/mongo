@@ -192,6 +192,11 @@ __wt_lsm_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	    wt_session, chunk->uri, NULL, "raw,bulk", &dest));
 
 	for (insert_count = 0; (ret = src->next(src)) == 0; insert_count++) {
+		if (insert_count % 1000 &&
+		    !F_ISSET(lsm_tree, WT_LSM_TREE_WORKING)) {
+			ret = EINTR;
+			goto err;
+		}
 		WT_ERR(src->get_key(src, &key));
 		dest->set_key(dest, &key);
 		WT_ERR(src->get_value(src, &value));
@@ -237,11 +242,23 @@ err:	if (src != NULL)
 		WT_TRET(__wt_bloom_close(bloom));
 	__wt_scr_free(&bbuf);
 	if (ret != 0) {
+		/*
+		 * Ideally we would drop the new chunk on error, but that
+		 * introduces potential deadlock problems. It is relatively
+		 * harmless to leave the file - it does not interfere
+		 * with later re-use.
+		WT_WITH_SCHEMA_LOCK(session,
+		    (void)wt_session->drop(wt_session, chunk->uri, NULL));
+		 */
 		__wt_free(session, chunk->bloom_uri);
 		__wt_free(session, chunk->uri);
 		__wt_free(session, chunk);
-		WT_VERBOSE_VOID(session, lsm,
-		    "Merge failed with %s\n", wiredtiger_strerror(ret));
+		if (ret == EINTR)
+			WT_VERBOSE_VOID(session, lsm,
+			    "Merge aborted due to close");
+		else
+			WT_VERBOSE_VOID(session, lsm,
+			    "Merge failed with %s", wiredtiger_strerror(ret));
 	}
 	return (ret);
 }
