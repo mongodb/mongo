@@ -170,7 +170,8 @@ __clsm_open_cursors(WT_CURSOR_LSM *clsm, int start_chunk)
 			    chunk->uri, &clsm->iface, NULL, cp);
 		WT_ERR(ret);
 
-		if (chunk->bloom_uri != NULL && !F_ISSET(clsm, WT_CLSM_MERGE))
+		if (F_ISSET(chunk, WT_LSM_CHUNK_BLOOM) &&
+		    !F_ISSET(clsm, WT_CLSM_MERGE))
 			WT_ERR(__wt_bloom_open(session, chunk->bloom_uri,
 			    lsm_tree->bloom_bit_count,
 			    lsm_tree->bloom_hash_count,
@@ -515,7 +516,7 @@ __clsm_search(WT_CURSOR *cursor)
 			ret = __wt_bloom_get(bloom, &cursor->key);
 			if (ret == WT_NOTFOUND) {
 				WT_STAT_INCR(
-				    clsm->lsm_tree->stats, bloom_skips);
+				    clsm->lsm_tree->stats, bloom_misses);
 				continue;
 			} else if (ret == 0)
 				WT_STAT_INCR(clsm->lsm_tree->stats, bloom_hits);
@@ -531,9 +532,13 @@ __clsm_search(WT_CURSOR *cursor)
 			goto done;
 		} else if (ret != WT_NOTFOUND)
 			goto err;
-		else if (bloom != NULL) {
-			WT_STAT_INCR(clsm->lsm_tree->stats, bloom_misses);
-		}
+		else if (bloom != NULL)
+			WT_STAT_INCR(
+			    clsm->lsm_tree->stats, bloom_false_positives);
+		/* The active chunk can't have a bloom filter. */
+		else if (i != clsm->nchunks)
+			WT_STAT_INCR(
+			    clsm->lsm_tree->stats, search_miss_no_bloom);
 	}
 	ret = WT_NOTFOUND;
 

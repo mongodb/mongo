@@ -782,7 +782,10 @@ __wt_evict_lru_page(WT_SESSION_IMPL *session, int is_app)
 	WT_SET_BTREE_IN_SESSION(session, btree);
 
 	ret = __evict_page(session, page);
-	WT_BSTAT_INCR(session, page_evict);
+	if (ret == 0)
+		WT_BSTAT_INCR(session, page_evict);
+	else
+		WT_BSTAT_INCR(session, page_evict_fail);
 
 	(void)WT_ATOMIC_SUB(btree->lru_count, 1);
 

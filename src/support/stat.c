@@ -45,6 +45,8 @@ __wt_stat_alloc_btree_stats(WT_SESSION_IMPL *session, WT_BTREE_STATS **statsp)
 	stats->overflow_value_cache.desc =
 	    "file: overflow values cached in memory";
 	stats->page_evict.desc = "file: pages evicted from the file";
+	stats->page_evict_fail.desc =
+	    "file: pages that were selected for eviction that could not be evicted";
 	stats->page_read.desc = "file: pages read from the file";
 	stats->page_write.desc = "file: pages written to the file";
 	stats->rec_dictionary.desc = "reconcile: dictionary match";
@@ -104,6 +106,7 @@ __wt_stat_clear_btree_stats(WT_STATS *stats_arg)
 	stats->overflow_read.v = 0;
 	stats->overflow_value_cache.v = 0;
 	stats->page_evict.v = 0;
+	stats->page_evict_fail.v = 0;
 	stats->page_read.v = 0;
 	stats->page_write.v = 0;
 	stats->rec_dictionary.v = 0;
@@ -199,19 +202,24 @@ __wt_stat_alloc_lsm_stats(WT_SESSION_IMPL *session, WT_LSM_STATS **statsp)
 	    "Number of bloom pages evicted from cache";
 	stats->bloom_cache_read.desc = "Number of bloom pages read into cache";
 	stats->bloom_count.desc = "Number of bloom filters in the LSM tree";
-	stats->bloom_hits.desc = "Number of successful bloom filter lookups";
-	stats->bloom_misses.desc =
-	    "Number of successful bloom filter false positives";
-	stats->bloom_skips.desc =
-	    "Number of unsuccessful bloom filter lookups";
+	stats->bloom_false_positives.desc =
+	    "Number of bloom filter false positives";
+	stats->bloom_hits.desc = "Number of bloom filter hits";
+	stats->bloom_misses.desc = "Number of bloom filter misses";
 	stats->bloom_space.desc = "Total space used by bloom filters";
 	stats->cache_evict.desc = "Number of pages evicted from cache";
+	stats->cache_evict_fail.desc =
+	    "Number of pages selected for eviction that could not be evicted";
 	stats->cache_read.desc = "Number of pages read into cache";
 	stats->cache_write.desc = "Number of pages written from cache";
 	stats->chunk_cache_evict.desc =
 	    "Number of pages evicted from LSM chunks";
 	stats->chunk_cache_read.desc = "Number of pages read into LSM chunks";
 	stats->chunk_count.desc = "Number of chunks in the LSM tree";
+	stats->generation_max.desc =
+	    "Highest merge generation in the LSM tree";
+	stats->search_miss_no_bloom.desc =
+	    "Number of queries that could have benefited from a bloom filter that did not exist";
 
 	*statsp = stats;
 	return (0);
@@ -226,14 +234,17 @@ __wt_stat_clear_lsm_stats(WT_STATS *stats_arg)
 	stats->bloom_cache_evict.v = 0;
 	stats->bloom_cache_read.v = 0;
 	stats->bloom_count.v = 0;
+	stats->bloom_false_positives.v = 0;
 	stats->bloom_hits.v = 0;
 	stats->bloom_misses.v = 0;
-	stats->bloom_skips.v = 0;
 	stats->bloom_space.v = 0;
 	stats->cache_evict.v = 0;
+	stats->cache_evict_fail.v = 0;
 	stats->cache_read.v = 0;
 	stats->cache_write.v = 0;
 	stats->chunk_cache_evict.v = 0;
 	stats->chunk_cache_read.v = 0;
 	stats->chunk_count.v = 0;
+	stats->generation_max.v = 0;
+	stats->search_miss_no_bloom.v = 0;
 }

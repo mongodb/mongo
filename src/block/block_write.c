@@ -63,8 +63,8 @@ __wt_block_write(WT_SESSION_IMPL *session,
  * checksum.
  */
 int
-__wt_block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_ITEM *buf,
-    off_t *offsetp, uint32_t *sizep, uint32_t *cksump, int force_extend)
+__wt_block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
+    WT_ITEM *buf, off_t *offsetp, uint32_t *sizep, uint32_t *cksump, int locked)
 {
 	WT_BLOCK_HEADER *blk;
 	WT_DECL_ITEM(tmp);
@@ -223,29 +223,18 @@ not_compressed:	/*
 	} else
 		blk->cksum = WT_BLOCK_CHECKSUM_NOT_SET;
 
-	/*
-	 * Allocate space from the underlying file and write the block.  Always
-	 * extend the file when writing checkpoint extents, that's easier than
-	 * distinguishing between extents allocated from the live avail list,
-	 * and those which can't be allocated from the live avail list such as
-	 * blocks for writing the live avail list itself.
-	 *
-	 * In the case of forced extension, we're holding the necessary locks,
-	 * don't re-acquire them (and note that if we have to free the blocks
-	 * should the write fail).
-	 */
-	if (force_extend)
-		WT_ERR(__wt_block_extend(
-		    session, block, &offset, (off_t)align_size));
-	else
-		WT_ERR(__wt_block_alloc(
-		    session, block, &offset, (off_t)align_size));
+	if (!locked)
+		__wt_spin_lock(session, &block->live_lock);
+	WT_ERR(__wt_block_alloc(session, block, &offset, (off_t)align_size));
+	if (!locked)
+		__wt_spin_unlock(session, &block->live_lock);
+
 	if ((ret =
 	    __wt_write(session, block->fh, offset, align_size, dsk)) != 0) {
-		if (!force_extend)
+		if (!locked)
 			__wt_spin_lock(session, &block->live_lock);
 		(void)__wt_block_off_free(session, block, offset, align_size);
-		if (!force_extend)
+		if (!locked)
 			__wt_spin_unlock(session, &block->live_lock);
 		WT_ERR(ret);
 	}

@@ -804,9 +804,6 @@ __debug_ref(WT_DBG *ds, WT_REF *ref, WT_PAGE *page)
 	case WT_REF_DELETED:
 		__dmsg(ds, "deleted");
 		break;
-	case WT_REF_EVICT_FORCE:
-		__dmsg(ds, "evict-force %p", ref->page);
-		break;
 	case WT_REF_EVICT_WALK:
 		__dmsg(ds, "evict-walk %p", ref->page);
 		break;
@@ -948,7 +945,7 @@ deleted:	__debug_item(ds, tag, "deleted", strlen("deleted"));
 	case WT_CELL_VALUE_OVFL_RM:
 	case WT_CELL_VALUE_SHORT:
 		WT_RET(__wt_scr_alloc(session, 256, &buf));
-		if ((ret = __wt_cell_unpack_copy(session, unpack, buf)) == 0)
+		if ((ret = __wt_cell_unpack_ref(session, unpack, buf)) == 0)
 			__debug_item(ds, tag, buf->data, buf->size);
 		__wt_scr_free(&buf);
 		break;

@@ -79,6 +79,7 @@ Fasttrack
 FreeBSD
 FreeBSD's
 Freelist
+Fsync
 GCC
 GIDs
 Geoff
@@ -464,6 +465,7 @@ llll
 llu
 lno
 loadtext
+logf
 logput
 lookup
 lookups

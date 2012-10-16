@@ -83,6 +83,9 @@ extern int __wt_block_insert_ext( WT_SESSION_IMPL *session,
     WT_EXTLIST *el,
     off_t off,
     off_t size);
+extern int __wt_block_extlist_read_avail( WT_SESSION_IMPL *session,
+    WT_BLOCK *block,
+    WT_EXTLIST *el);
 extern int __wt_block_extlist_read( WT_SESSION_IMPL *session,
     WT_BLOCK *block,
     WT_EXTLIST *el);
@@ -223,7 +226,7 @@ extern int __wt_block_write_off(WT_SESSION_IMPL *session,
     off_t *offsetp,
     uint32_t *sizep,
     uint32_t *cksump,
-    int force_extend);
+    int locked);
 extern int __wt_bloom_create( WT_SESSION_IMPL *session,
     const char *uri,
     const char *config,
@@ -249,9 +252,6 @@ extern int __wt_cache_config(WT_CONNECTION_IMPL *conn, const char *cfg[]);
 extern int __wt_cache_create(WT_CONNECTION_IMPL *conn, const char *cfg[]);
 extern void __wt_cache_stats_update(WT_CONNECTION_IMPL *conn);
 extern void __wt_cache_destroy(WT_CONNECTION_IMPL *conn);
-extern int __wt_cell_unpack_copy( WT_SESSION_IMPL *session,
-    WT_CELL_UNPACK *unpack,
-    WT_ITEM *retb);
 extern void __wt_btcur_iterate_setup(WT_CURSOR_BTREE *cbt, int next);
 extern int __wt_btcur_next(WT_CURSOR_BTREE *cbt, int discard);
 extern int __wt_btcur_next_random(WT_CURSOR_BTREE *cbt);
@@ -326,8 +326,8 @@ extern const char *__wt_addr_string( WT_SESSION_IMPL *session,
     const uint8_t *addr,
     uint32_t size);
 extern int __wt_ovfl_read(WT_SESSION_IMPL *session,
-    WT_ITEM *store,
-    WT_CELL_UNPACK *unpack);
+    WT_CELL_UNPACK *unpack,
+    WT_ITEM *store);
 extern int __wt_ovfl_cache_col_restart(WT_SESSION_IMPL *session,
     WT_PAGE *page,
     WT_CELL_UNPACK *unpack,
@@ -695,7 +695,7 @@ extern int __wt_lsm_merge_update_tree(WT_SESSION_IMPL *session,
     WT_LSM_TREE *lsm_tree,
     int start_chunk,
     int nchunks,
-    WT_LSM_CHUNK **chunkp);
+    WT_LSM_CHUNK *chunk);
 extern int __wt_lsm_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree);
 extern int __wt_lsm_meta_read(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree);
 extern int __wt_lsm_meta_write(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree);
@@ -711,10 +711,11 @@ extern int __wt_lsm_tree_chunk_name( WT_SESSION_IMPL *session,
     WT_LSM_TREE *lsm_tree,
     int i,
     WT_ITEM *buf);
-extern int __wt_lsm_tree_create_chunk( WT_SESSION_IMPL *session,
+extern int __wt_lsm_tree_setup_chunk(WT_SESSION_IMPL *session,
     WT_LSM_TREE *lsm_tree,
     int i,
-    const char **urip);
+    WT_LSM_CHUNK *chunk,
+    int create_bloom);
 extern int __wt_lsm_tree_create(WT_SESSION_IMPL *session,
     const char *uri,
     int exclusive,

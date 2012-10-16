@@ -13,8 +13,6 @@ static int __verify_filefrag_add(
 	WT_SESSION_IMPL *, WT_BLOCK *, off_t, off_t, int);
 static int __verify_filefrag_chk(WT_SESSION_IMPL *, WT_BLOCK *);
 static int __verify_start_avail(WT_SESSION_IMPL *, WT_BLOCK *, WT_CKPT *);
-static int __verify_start_filesize(
-	WT_SESSION_IMPL *, WT_BLOCK *, WT_CKPT *, off_t *);
 
 /* The bit list ignores the first sector: convert to/from a frag/offset. */
 #define	WT_OFF_TO_FRAG(block, off)					\
@@ -30,22 +28,27 @@ int
 __wt_block_verify_start(
     WT_SESSION_IMPL *session, WT_BLOCK *block, WT_CKPT *ckptbase)
 {
-	off_t file_size;
+	WT_FH *fh;
 
 	/*
 	 * We're done if the file has no data pages (this happens if we verify
-	 * a file immediately after creation).
+	 * a file immediately after creation).  Otherwise, verify doesn't make
+	 * sense if we don't have a checkpoint.
 	 */
-	if (block->fh->file_size == WT_BLOCK_DESC_SECTOR)
+	fh = block->fh;
+	if (fh->file_size == WT_BLOCK_DESC_SECTOR)
 		return (0);
+	if (ckptbase[0].name == NULL)
+		WT_RET_MSG(session, WT_ERROR,
+		    "%s has no checkpoints to verify", block->name);
 
 	/*
-	 * Opening a WiredTiger file truncates it back to the checkpoint we are
-	 * rolling forward, which means it's OK if there are blocks written
-	 * after that checkpoint, they'll be ignored.  Find the largest file
-	 * size referenced by any checkpoint.
+	 * The file size should be a multiple of the allocsize, offset by the
+	 * size of the descriptor sector, the first 512B of the file.
 	 */
-	WT_RET(__verify_start_filesize(session, block, ckptbase, &file_size));
+	if ((fh->file_size - WT_BLOCK_DESC_SECTOR) % block->allocsize != 0)
+		WT_RET_MSG(session, WT_ERROR,
+		    "the file size is not a multiple of the allocation size");
 
 	/*
 	 * Allocate a bit array, where each bit represents a single allocation
@@ -63,17 +66,8 @@ __wt_block_verify_start(
 	 * we do with the extents, but that has its own failure mode, where we
 	 * verify many non-contiguous blocks creating too many entries on the
 	 * list to fit into memory.
-	 *
-	 * We also have a minimum maximum verifiable file size of 16TB because
-	 * the underlying bit package takes a 32-bit count of bits to allocate:
-	 *
-	 *	2^32 * 512 * 8 = 16 * 2^40
 	 */
-	if (file_size / block->allocsize > UINT32_MAX)
-		WT_RET_MSG(
-		    session, WT_ERROR, "the file is too large to verify");
-
-	block->frags = (uint32_t)(file_size / block->allocsize);
+	block->frags = (uint64_t)WT_OFF_TO_FRAG(block, fh->file_size);
 	WT_RET(__bit_alloc(session, block->frags, &block->fragfile));
 
 	/*
@@ -90,56 +84,6 @@ __wt_block_verify_start(
 	WT_RET(__verify_start_avail(session, block, ckptbase));
 
 	block->verify = 1;
-	return (0);
-}
-
-/*
- * __verify_start_filesize --
- *	Set the file size for the last checkpoint.
- */
-static int
-__verify_start_filesize(WT_SESSION_IMPL *session,
-    WT_BLOCK *block, WT_CKPT *ckptbase, off_t *file_sizep)
-{
-	WT_BLOCK_CKPT *ci, _ci;
-	WT_CKPT *ckpt;
-	off_t file_size;
-
-	ci = &_ci;
-
-	/*
-	 * Find the largest file size referenced by any checkpoint: that should
-	 * be the last checkpoint taken, but out of sheer, raving paranoia, look
-	 * through the list, future changes to checkpoints might break this code
-	 * if we make that assumption.
-	 */
-	file_size = 0;
-	WT_CKPT_FOREACH(ckptbase, ckpt) {
-		/* Skip empty checkpoints. */
-		if (ckpt->raw.size == 0)
-			continue;
-		WT_RET(__wt_block_buffer_to_ckpt(
-		    session, block, ckpt->raw.data, ci));
-		if (ci->file_size > file_size)
-			file_size = ci->file_size;
-	}
-
-	/* Verify doesn't make any sense if we don't have a checkpoint. */
-	if (file_size <= WT_BLOCK_DESC_SECTOR)
-		WT_RET_MSG(session, WT_ERROR,
-		    "%s has no checkpoints to verify", block->name);
-
-	/*
-	 * The file size should be a multiple of the allocsize, offset by the
-	 * size of the descriptor sector, the first 512B of the file.
-	 */
-	file_size -= WT_BLOCK_DESC_SECTOR;
-	if (file_size % block->allocsize != 0)
-		WT_RET_MSG(session, WT_ERROR,
-		    "the checkpoint file size is not a multiple of the "
-		    "allocation size");
-
-	*file_sizep = file_size;
 	return (0);
 }
 
@@ -171,7 +115,7 @@ __verify_start_avail(
 
 	el = &ci->avail;
 	if (el->offset != WT_BLOCK_INVALID_OFFSET) {
-		WT_ERR(__wt_block_extlist_read(session, block, el));
+		WT_ERR(__wt_block_extlist_read_avail(session, block, el));
 		WT_EXT_FOREACH(ext, el->off)
 			if ((ret = __verify_filefrag_add(
 			    session, block, ext->off, ext->size, 1)) != 0)
@@ -215,7 +159,7 @@ __wt_verify_ckpt_load(
 {
 	WT_EXTLIST *el;
 	WT_EXT *ext;
-	uint32_t frag, frags;
+	uint64_t frag, frags;
 
 	/* Set the maximum file size for this checkpoint. */
 	block->verify_size = ci->file_size;
@@ -281,8 +225,8 @@ __wt_verify_ckpt_load(
 	WT_RET(__bit_alloc(session, block->frags, &block->fragckpt));
 	el = &block->verify_alloc;
 	WT_EXT_FOREACH(ext, el->off) {
-		frag = (uint32_t)WT_OFF_TO_FRAG(block, ext->off);
-		frags = (uint32_t)(ext->size / block->allocsize);
+		frag = (uint64_t)WT_OFF_TO_FRAG(block, ext->off);
+		frags = (uint64_t)(ext->size / block->allocsize);
 		__bit_nset(block->fragckpt, frag, frag + (frags - 1));
 	}
 
@@ -320,14 +264,14 @@ __wt_block_verify(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_ITEM *buf,
 {
 	WT_DECL_ITEM(tmp);
 	WT_DECL_RET;
-	uint32_t frag, frags, i, match;
+	uint64_t frag, frags, i, match;
 
 	/*
 	 * If we've already verify this block's physical image, we know it's
 	 * good, we don't have to verify it again.
 	 */
-	frag = (uint32_t)WT_OFF_TO_FRAG(block, offset);
-	frags = (uint32_t)(size / block->allocsize);
+	frag = (uint64_t)WT_OFF_TO_FRAG(block, offset);
+	frags = (uint64_t)(size / block->allocsize);
 	for (match = i = 0; i < frags; ++i)
 		if (__bit_test(block->fragfile, frag++))
 			++match;
@@ -403,7 +347,7 @@ static int
 __verify_filefrag_add(WT_SESSION_IMPL *session,
     WT_BLOCK *block, off_t offset, off_t size, int nodup)
 {
-	uint32_t f, frag, frags, i;
+	uint64_t f, frag, frags, i;
 
 	WT_VERBOSE_RET(session, verify,
 	    "adding file block at %" PRIuMAX "-%" PRIuMAX " (%" PRIuMAX ")",
@@ -416,8 +360,8 @@ __verify_filefrag_add(WT_SESSION_IMPL *session,
 		    "non-existent file blocks",
 		    (uintmax_t)offset, (uintmax_t)(offset + size));
 
-	frag = (uint32_t)WT_OFF_TO_FRAG(block, offset);
-	frags = (uint32_t)(size / block->allocsize);
+	frag = (uint64_t)WT_OFF_TO_FRAG(block, offset);
+	frags = (uint64_t)(size / block->allocsize);
 
 	/* It may be illegal to reference a particular chunk more than once. */
 	if (nodup)
@@ -444,11 +388,31 @@ __verify_filefrag_chk(WT_SESSION_IMPL *session, WT_BLOCK *block)
 	WT_DECL_RET;
 	uint64_t first, last;
 
+	/* If there's nothing to verify, it was a fast run. */
+	if (block->frags == 0)
+		return (0);
+
 	/*
-	 * Check for file fragments we haven't verified -- every time we find
-	 * a bit that's clear, complain.  We re-start the search each time
-	 * after setting the clear bit(s) we found: it's simpler and this isn't
-	 * supposed to happen a lot.
+	 * It's OK if we have not verified blocks at the end of the file: that
+	 * happens if the file is truncated during a checkpoint or load or was
+	 * extended after writing a checkpoint.  We should never see unverified
+	 * blocks anywhere else, though.
+	 *
+	 * I'm deliberately testing for a last fragment of 0, it makes no sense
+	 * there would be no fragments verified, complain if the first fragment
+	 * in the file wasn't verified.
+	 */
+	for (last = block->frags - 1; last != 0; --last) {
+		if (__bit_test(block->fragfile, last))
+			break;
+		__bit_set(block->fragfile, last);
+	}
+
+	/*
+	 * Check for any other file fragments we haven't verified -- every time
+	 * we find a bit that's clear, complain.  We re-start the search each
+	 * time after setting the clear bit(s) we found: it's simpler and this
+	 * isn't supposed to happen a lot.
 	 */
 	for (;;) {
 		if (__bit_ffc(block->fragfile, block->frags, &first) != 0)
@@ -478,7 +442,7 @@ static int
 __verify_ckptfrag_add(
     WT_SESSION_IMPL *session, WT_BLOCK *block, off_t offset, off_t size)
 {
-	uint32_t f, frag, frags, i;
+	uint64_t f, frag, frags, i;
 
 	WT_VERBOSE_RET(session, verify,
 	    "add checkpoint block at %" PRIuMAX "-%" PRIuMAX " (%" PRIuMAX ")",
@@ -494,8 +458,8 @@ __verify_ckptfrag_add(
 		    "file blocks outside the checkpoint",
 		    (uintmax_t)offset, (uintmax_t)(offset + size));
 
-	frag = (uint32_t)WT_OFF_TO_FRAG(block, offset);
-	frags = (uint32_t)(size / block->allocsize);
+	frag = (uint64_t)WT_OFF_TO_FRAG(block, offset);
+	frags = (uint64_t)(size / block->allocsize);
 
 	/* It is illegal to reference a particular chunk more than once. */
 	for (f = frag, i = 0; i < frags; ++f, ++i)

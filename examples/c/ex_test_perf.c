@@ -247,10 +247,26 @@ stat_worker(void *arg)
 			    (ret = cursor->get_value(
 			    cursor, &desc, &pvalue, &value)) == 0)
 				fprintf(cfg->logf,
-				    "stat:lsm:%s=%s\n", desc, pvalue);
+				    "stat:lsm: %s=%s\n", desc, pvalue);
 			cursor->close(cursor);
+			fprintf(cfg->logf, "\n");
 		}
-		fflush(cfg->logf);
+
+		/* Dump the connection statistics since last time. */
+		if ((ret = session->open_cursor(session, "statistics:",
+		    NULL, "statistics_clear", &cursor)) != 0) {
+			fprintf(stderr,
+			    "open_cursor statistics: %d\n", ret);
+			goto err;
+		}
+		while (
+		    (ret = cursor->next(cursor)) == 0 &&
+		    (ret = cursor->get_value(
+		    cursor, &desc, &pvalue, &value)) == 0)
+			fprintf(cfg->logf,
+			    "stat:conn: %s=%s\n", desc, pvalue);
+		cursor->close(cursor);
+
 	}
 err:	session->close(session, NULL);
 	if (lsm_uri != NULL)
@@ -328,7 +344,7 @@ int populate(CONFIG *cfg)
 		if (secs == 0)
 			++secs;
 		fprintf(cfg->logf,
-		    "Load time: %.2f\nload ops/sec: %.2f\n",
+		    "Load time: %.2f\n" "load ops/sec: %.2f\n",
 		    secs, cfg->icount / secs);
 	}
 
@@ -363,6 +379,8 @@ int setup_log_file(CONFIG *cfg)
 		fprintf(stderr, "Statistics failed to open log file.\n");
 		return (EINVAL);
 	}
+	/* Use line buffering for the log file. */
+	(void)setvbuf(cfg->logf, NULL, _IOLBF, 0);
 	if (fname != NULL)
 		free(fname);
 	return (0);
@@ -462,6 +480,9 @@ int main(int argc, char **argv)
 
 	if ((ret = setup_log_file(&cfg)) != 0)
 		goto err;
+
+	/* Make stdout line buffered, so verbose output appears quickly. */
+	(void)setvbuf(stdout, NULL, _IOLBF, 0);
 
 	/* Concatenate non-default configuration strings. */
 	if (cfg.verbose > 1 || user_cconfig != NULL) {
@@ -588,6 +609,8 @@ int execute_reads(CONFIG *cfg)
 		if (cfg->verbose > 0) {
 			fprintf(cfg->logf, "%" PRIu64 " ops in %d secs\n",
 			    nops - last_ops, cfg->report_interval);
+			printf("%" PRIu64 " ops in %d secs\n",
+			    nops - last_ops, cfg->report_interval);
 		}
 		last_ops = nops;
 	}
@@ -635,7 +658,7 @@ void usage(void)
 	printf("\t-d <int> data item size\n");
 	printf("\t-e use existing database (skip population phase)\n");
 	printf("\t-h <string> Wired Tiger home must exist, default WT_TEST \n");
-	printf("\t-i <int> number of records to insert\n");
+	printf("\t-i <int> number of records to insert in thousands\n");
 	printf("\t-k <int> key item size\n");
 	printf("\t-r <int> number of seconds to run read phase\n");
 	printf("\t-s <int> seed for random number generator\n");

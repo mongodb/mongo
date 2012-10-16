@@ -640,3 +640,69 @@ __wt_cell_next(WT_CELL *cell)
 	__wt_cell_unpack(cell, &unpack);
 	return ((WT_CELL *)((uint8_t *)cell + unpack.__len));
 }
+
+/*
+ * __wt_cell_unpack_ref --
+ *	Set a buffer to reference the data from an unpacked cell.
+ */
+static inline int
+__wt_cell_unpack_ref(
+    WT_SESSION_IMPL *session, WT_CELL_UNPACK *unpack, WT_ITEM *store)
+{
+	WT_BTREE *btree;
+	void *huffman;
+
+	btree = session->btree;
+
+	/* Reference the cell's data, optionally decode it. */
+	switch (unpack->type) {
+	case WT_CELL_KEY:
+		store->data = unpack->data;
+		store->size = unpack->size;
+		huffman = btree->huffman_key;
+		break;
+	case WT_CELL_VALUE:
+		store->data = unpack->data;
+		store->size = unpack->size;
+		huffman = btree->huffman_value;
+		break;
+	case WT_CELL_KEY_OVFL:
+		WT_RET(__wt_ovfl_read(session, unpack, store));
+		huffman = btree->huffman_key;
+		break;
+	case WT_CELL_VALUE_OVFL:
+		WT_RET(__wt_ovfl_read(session, unpack, store));
+		huffman = btree->huffman_value;
+		break;
+	WT_ILLEGAL_VALUE(session);
+	}
+
+	return (huffman == NULL ? 0 :
+	    __wt_huffman_decode(
+	    session, huffman, store->data, store->size, store));
+}
+
+/*
+ * __wt_cell_unpack_copy --
+ *	Copy the data from an unpacked cell into a buffer.
+ */
+static inline int
+__wt_cell_unpack_copy(
+    WT_SESSION_IMPL *session, WT_CELL_UNPACK *unpack, WT_ITEM *store)
+{
+	/*
+	 * We have routines to both copy and reference a cell's information.  In
+	 * most cases, all we need is a reference and we prefer that, especially
+	 * when returning key/value items.  In a few we need a real copy: call
+	 * the standard reference function and get a reference.  In some cases,
+	 * a copy will be made (for example, when reading an overflow item from
+	 * the underlying object.  If that happens, we're done, otherwise make
+	 * a copy.
+	 */
+	WT_RET(__wt_cell_unpack_ref(session, unpack, store));
+	if (store->mem != NULL &&
+	    store->data >= store->mem &&
+	    (uint8_t *)store->data < (uint8_t *)store->mem + store->memsize)
+		return (0);
+	return (__wt_buf_set(session, store, store->data, store->size));
+}

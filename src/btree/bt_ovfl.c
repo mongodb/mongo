@@ -37,7 +37,7 @@ __ovfl_read(WT_SESSION_IMPL *session,
  *	Bring an overflow item into memory.
  */
 int
-__wt_ovfl_read(WT_SESSION_IMPL *session, WT_ITEM *store, WT_CELL_UNPACK *unpack)
+__wt_ovfl_read(WT_SESSION_IMPL *session, WT_CELL_UNPACK *unpack, WT_ITEM *store)
 {
 	WT_BTREE *btree;
 	WT_DECL_RET;

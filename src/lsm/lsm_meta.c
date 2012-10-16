@@ -39,7 +39,7 @@ __wt_lsm_meta_read(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 			WT_ERR(__wt_strndup(session,
 			    cv.str, cv.len, &lsm_tree->value_format));
 		} else if (WT_STRING_MATCH("lsm_bloom", ck.str, ck.len))
-			lsm_tree->bloom = (cv.val == 0 ? 0 : 1);
+			lsm_tree->bloom = (uint32_t)cv.val;
 		else if (WT_STRING_MATCH(
 		    "lsm_bloom_bit_count", ck.str, ck.len))
 			lsm_tree->bloom_bit_count = (uint32_t)cv.val;
@@ -60,10 +60,16 @@ __wt_lsm_meta_read(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 				if (WT_STRING_MATCH("bloom", lk.str, lk.len)) {
 					WT_ERR(__wt_strndup(session,
 					    lv.str, lv.len, &chunk->bloom_uri));
+					F_SET(chunk, WT_LSM_CHUNK_BLOOM);
 					continue;
 				}
 				if (WT_STRING_MATCH("count", lk.str, lk.len)) {
 					chunk->count = lv.val;
+					continue;
+				}
+				if (WT_STRING_MATCH(
+				    "generation", lk.str, lk.len)) {
+					chunk->generation = (uint32_t)lv.val;
 					continue;
 				}
 				if ((nchunks + 1) * chunk_sz >
@@ -77,7 +83,7 @@ __wt_lsm_meta_read(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 				lsm_tree->chunk[nchunks++] = chunk;
 				WT_ERR(__wt_strndup(session,
 				    lk.str, lk.len, &chunk->uri));
-				chunk->flags = WT_LSM_CHUNK_ONDISK;
+				F_SET(chunk, WT_LSM_CHUNK_ONDISK);
 			}
 			WT_ERR_NOTFOUND_OK(ret);
 			lsm_tree->nchunks = nchunks;
@@ -86,6 +92,12 @@ __wt_lsm_meta_read(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 			chunk_sz = sizeof(*lsm_tree->old_chunks);
 			for (nchunks = 0; (ret =
 			    __wt_config_next(&lparser, &lk, &lv)) == 0; ) {
+				if (WT_STRING_MATCH("bloom", lk.str, lk.len)) {
+					WT_ERR(__wt_strndup(session,
+					    lv.str, lv.len, &chunk->bloom_uri));
+					F_SET(chunk, WT_LSM_CHUNK_BLOOM);
+					continue;
+				}
 				if ((nchunks + 1) * chunk_sz >
 				    lsm_tree->old_avail * chunk_sz) {
 					alloc = lsm_tree->old_alloc;
@@ -105,7 +117,7 @@ __wt_lsm_meta_read(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 				lsm_tree->old_chunks[nchunks++] = chunk;
 				WT_ERR(__wt_strndup(session,
 				    lk.str, lk.len, &chunk->uri));
-				chunk->flags = WT_LSM_CHUNK_ONDISK;
+				F_SET(chunk, WT_LSM_CHUNK_ONDISK);
 				--lsm_tree->old_avail;
 			}
 			WT_ERR_NOTFOUND_OK(ret);
@@ -157,6 +169,8 @@ __wt_lsm_meta_write(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 		if (chunk->count != 0)
 			WT_ERR(__wt_buf_catfmt(
 			    session, buf, ",count=%" PRIu64, chunk->count));
+		WT_ERR(__wt_buf_catfmt(
+		    session, buf, ",generation=%" PRIu32, chunk->generation));
 	}
 	WT_ERR(__wt_buf_catfmt(session, buf, "]"));
 	WT_ERR(__wt_buf_catfmt(session, buf, ",old_chunks=["));
@@ -170,6 +184,9 @@ __wt_lsm_meta_write(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 		else
 			WT_ERR(__wt_buf_catfmt(session, buf, ","));
 		WT_ERR(__wt_buf_catfmt(session, buf, "\"%s\"", chunk->uri));
+		if (chunk->bloom_uri != NULL)
+			WT_ERR(__wt_buf_catfmt(
+			    session, buf, ",bloom=\"%s\"", chunk->bloom_uri));
 	}
 	WT_ERR(__wt_buf_catfmt(session, buf, "]"));
 	__wt_spin_lock(session, &S2C(session)->metadata_lock);

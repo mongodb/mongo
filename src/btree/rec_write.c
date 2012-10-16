@@ -248,10 +248,6 @@ static void __rec_dictionary_reset(WT_RECONCILE *);
  *
  * We clearly want to consider all normal, in-memory pages (WT_REF_MEM).
  *
- * While we are processing a sync request in case (1), pages in the file may be
- * awaiting forced eviction (WT_REF_EVICT_FORCE).  Those pages must be included
- * in the sync, otherwise it will be incomplete.
- *
  * During LRU eviction in case (3), the eviction code has already locked the
  * subtree, so locked pages should be included in the merge (WT_REF_LOCKED).
  *
@@ -294,7 +290,6 @@ __rec_page_modified(WT_SESSION_IMPL *session,
 			    __rec_page_deleted(session, r, page, ref, modifyp);
 			WT_PUBLISH(ref->state, WT_REF_DELETED);
 			return (ret);
-		case WT_REF_EVICT_FORCE:
 		case WT_REF_EVICT_WALK:
 		case WT_REF_LOCKED:
 		case WT_REF_MEM:
@@ -2037,26 +2032,15 @@ __rec_col_var(WT_SESSION_IMPL *session,
 			}
 
 			/*
-			 * Check for the common case where the underlying value
-			 * is simple and avoid a copy.
+			 * If data is Huffman encoded, we have to decode it in
+			 * order to compare it with the last item we saw, which
+			 * may have been an update string.  This guarantees we
+			 * find every single pair of objects we can RLE encode,
+			 * including applications updating an existing record
+			 * where the new value happens (?) to match a Huffman-
+			 * encoded value in a previous or next record.
 			 */
-			if (btree->huffman_value == NULL) {
-				orig->data = unpack->data;
-				orig->size = unpack->size;
-				goto record_loop;
-			}
-
-			/*
-			 * The data is Huffman encoded, which means we have to
-			 * decode it in order to compare it with the last item
-			 * we saw, which may have been an update string.  This
-			 * guarantees we find every single pair of objects we
-			 * can RLE encode, including applications updating an
-			 * existing record where the new value happens (?) to
-			 * match a Huffman-encoded value in a previous or next
-			 * record.
-			 */
-			WT_ERR(__wt_cell_unpack_copy(session, unpack, orig));
+			WT_ERR(__wt_cell_unpack_ref(session, unpack, orig));
 		}
 
 record_loop:	/*
@@ -2142,7 +2126,7 @@ record_loop:	/*
 					 * it for a key and now we need another
 					 * copy; read it into memory.
 					 */
-					WT_ERR(__wt_cell_unpack_copy(
+					WT_ERR(__wt_cell_unpack_ref(
 					    session, unpack, orig));
 
 					ovfl_state = OVFL_IGNORE;
@@ -2524,7 +2508,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		 *
 		 * Truncate any 0th key, internal pages don't need 0th keys.
 		 */
-		 if (onpage_ovfl) {
+		if (onpage_ovfl) {
 			key->buf.data = cell;
 			key->buf.size = __wt_cell_total_len(kpack);
 			key->cell_len = 0;

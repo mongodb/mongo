@@ -289,6 +289,8 @@ __wt_block_off_remove_overlap(
 	WT_EXT *before, *after, *ext;
 	off_t a_off, a_size, b_off, b_size;
 
+	WT_ASSERT(session, off != WT_BLOCK_INVALID_OFFSET);
+
 	/* Search for before and after entries for the offset. */
 	__block_off_srch_pair(el, off, &before, &after);
 
@@ -348,7 +350,6 @@ int
 __wt_block_alloc(
     WT_SESSION_IMPL *session, WT_BLOCK *block, off_t *offp, off_t size)
 {
-	WT_DECL_RET;
 	WT_EXT *ext;
 	WT_SIZE *szp, **sstack[WT_SKIP_MAXDEPTH];
 
@@ -359,28 +360,28 @@ __wt_block_alloc(
 		    "a multiple of the allocation size %" PRIu32,
 		    (intmax_t)size, block->allocsize);
 
-	__wt_spin_lock(session, &block->live_lock);
-
 	/*
-	 * Allocation is first-fit by size: search the by-size skiplist for the
-	 * requested size and take the first entry on the by-size offset list.
-	 * If we don't have anything large enough, extend the file.
+	 * Allocation is first-fit by size, then by lowest offset: search the
+	 * by-size skiplist for the requested size and take the first entry on
+	 * the by-size offset list.  This means we prefer best-fit over lower
+	 * offset, but within a size we'll prefer an offset appearing earlier
+	 * in the file.  If we don't have anything big enough, extend the file.
 	 */
 	__block_size_srch(block->live.avail.sz, size, sstack);
 	szp = *sstack[0];
 	if (szp == NULL) {
-		WT_ERR(__wt_block_extend(session, block, offp, size));
+		WT_RET(__wt_block_extend(session, block, offp, size));
 		goto done;
 	}
 
 	/* Remove the first record, and set the returned offset. */
 	ext = szp->off[0];
-	WT_ERR(__block_off_remove(session, &block->live.avail, ext->off, &ext));
+	WT_RET(__block_off_remove(session, &block->live.avail, ext->off, &ext));
 	*offp = ext->off;
 
 	/* If doing a partial allocation, adjust the record and put it back. */
 	if (ext->size > size) {
-		WT_VERBOSE_ERR(session, block,
+		WT_VERBOSE_RET(session, block,
 		    "allocate %" PRIdMAX " from range %" PRIdMAX "-%"
 		    PRIdMAX ", range shrinks to %" PRIdMAX "-%" PRIdMAX,
 		    (intmax_t)size,
@@ -390,21 +391,18 @@ __wt_block_alloc(
 
 		ext->off += size;
 		ext->size -= size;
-		WT_ERR(__block_ext_insert(session, &block->live.avail, ext));
+		WT_RET(__block_ext_insert(session, &block->live.avail, ext));
 	} else {
-		WT_VERBOSE_ERR(session, block,
+		WT_VERBOSE_RET(session, block,
 		    "allocate range %" PRIdMAX "-%" PRIdMAX,
 		    (intmax_t)ext->off, (intmax_t)(ext->off + ext->size));
 
 		__wt_free(session, ext);
 	}
 
-	/* Add the newly allocated extent to the list of allocations. */
-done:	WT_ERR(__block_merge(
-	    session, &block->live.alloc, *offp, (off_t)size));
-
-err:	__wt_spin_unlock(session, &block->live_lock);
-	return (ret);
+done:	/* Add the newly allocated extent to the list of allocations. */
+	WT_RET(__block_merge(session, &block->live.alloc, *offp, (off_t)size));
+	return (0);
 }
 
 /*
@@ -892,6 +890,30 @@ __block_merge(WT_SESSION_IMPL *session, WT_EXTLIST *el, off_t off, off_t size)
 }
 
 /*
+ * __wt_block_extlist_read_avail --
+ *	Read an avail extent list, includes minor special handling.
+ */
+int
+__wt_block_extlist_read_avail(
+    WT_SESSION_IMPL *session, WT_BLOCK *block, WT_EXTLIST *el)
+{
+	/* If there isn't a list, we're done. */
+	if (el->offset == WT_BLOCK_INVALID_OFFSET)
+		return (0);
+
+	WT_RET(__wt_block_extlist_read(session, block, el));
+
+	/*
+	 * Extent blocks are allocated from the available list: if reading the
+	 * avail list, the extent blocks might be included, remove them.
+	 */
+	WT_RET_NOTFOUND_OK(
+	    __wt_block_off_remove_overlap(session, el, el->offset, el->size));
+
+	return (0);
+}
+
+/*
  * __wt_block_extlist_read --
  *	Read an extent list.
  */
@@ -1054,6 +1076,7 @@ __wt_block_extlist_truncate(
 {
 	WT_EXT *ext;
 	WT_FH *fh;
+	off_t file_size;
 
 	fh = block->fh;
 
@@ -1070,10 +1093,15 @@ __wt_block_extlist_truncate(
 	    "truncate file from %" PRIdMAX " to %" PRIdMAX,
 	    (intmax_t)fh->file_size, (intmax_t)ext->off);
 
-	fh->file_size = ext->off;
-	WT_RET(__wt_ftruncate(session, fh, fh->file_size));
-
-	WT_RET(__block_off_remove(session, el, ext->off, NULL));
+	/*
+	 * We're about to remove the extent list entry, save the value, we need
+	 * it to reset the cached file size, and that can't happen until after
+	 * truncate and extent list removal succeed.
+	 */
+	file_size = ext->off;
+	WT_RET(__wt_ftruncate(session, fh, file_size));
+	WT_RET(__block_off_remove(session, el, file_size, NULL));
+	fh->file_size = file_size;
 
 	return (0);
 }
