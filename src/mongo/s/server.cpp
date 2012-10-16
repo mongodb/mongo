@@ -56,11 +56,12 @@
 namespace mongo {
 
 #if defined(_WIN32)
-    ntServiceDefaultStrings defaultServiceStrings = {
+    ntservice::NtServiceDefaultStrings defaultServiceStrings = {
         L"MongoS",
         L"Mongo DB Router",
         L"Mongo DB Sharding Router"
     };
+    static void initService();
 #endif
 
     CmdLine cmdLine;
@@ -459,13 +460,16 @@ int _main(int argc, char* argv[]) {
 #if defined(_WIN32)
     vector<string> disallowedOptions;
     disallowedOptions.push_back( "upgrade" );
-    if ( serviceParamsCheck( params, "", defaultServiceStrings, disallowedOptions, argc, argv ) ) {
-        return 0;   // this means that we are running as a service, and we won't
-                    // reach this statement until initService() has run and returned,
-                    // but it usually exits directly so we never actually get here
+    ntservice::configureService(initService,
+                                params,
+                                defaultServiceStrings,
+                                disallowedOptions,
+                                std::vector<std::string>(argv, argv + argc));
+    if (ntservice::shouldStartService()) {
+        ntservice::startService();
+        // if we reach here, then we are not running as a service.  service installation
+        // exits directly and so never reaches here either.
     }
-    // if we reach here, then we are not running as a service.  service installation
-    // exits directly and so never reaches here either.
 #endif
 
     runMongosServer( params.count( "upgrade" ) > 0 );
@@ -474,15 +478,12 @@ int _main(int argc, char* argv[]) {
 
 #if defined(_WIN32)
 namespace mongo {
-
-    bool initService() {
-        ServiceController::reportStatus( SERVICE_RUNNING );
+    static void initService() {
+        ntservice::reportStatus( SERVICE_RUNNING );
         log() << "Service running" << endl;
         runMongosServer( false );
-        return true;
     }
-
-} // namespace mongo
+}  // namespace mongo
 #endif
 
 int main(int argc, char* argv[], char** envp) {
