@@ -212,6 +212,7 @@ namespace mongo {
             const char *r = checkInterrupt();
             return r && r[ 0 ];
         }
+        static std::string getInterpreterVersionString();
 
     protected:
         virtual Scope * createScope() = 0;

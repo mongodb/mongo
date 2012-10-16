@@ -345,6 +345,10 @@ namespace mongo {
         }
     }
 
+    std::string ScriptEngine::getInterpreterVersionString() {
+        return "V8 3.12.19";
+    }
+
     void V8ScriptEngine::interrupt( unsigned opSpec ) {
         v8::Locker l;
         v8Locks::InterruptLock il;
