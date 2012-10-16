@@ -349,11 +349,12 @@ __session_compact(WT_SESSION *wt_session, const char *uri, const char *config)
 	 * need to have done is done in the underlying block manager.
 	 */
 	WT_RET(__wt_scr_alloc(session, 0, &t));
-	WT_ERR(__wt_buf_fmt(session, t, "target=(\"%s\"),force=1", uri));
+	WT_ERR(__wt_buf_fmt(session, t, "target=(\"%s\")", uri));
 	WT_ERR(__session_checkpoint(wt_session, t->data));
 
 	WT_ERR(__session_compact_worker(wt_session, uri, config));
 
+	WT_ERR(__wt_buf_fmt(session, t, "target=(\"%s\"),force=1", uri));
 	WT_ERR(__session_checkpoint(wt_session, t->data));
 	WT_ERR(__session_checkpoint(wt_session, t->data));
 
