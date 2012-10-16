@@ -17,19 +17,13 @@
 
 #pragma once
 
-#ifdef _WIN32
-#include <cstdint>
-#else
-#include <inttypes.h>
-#endif
-
-#include <cstdlib>
+#include "mongo/platform/cstdint.h"
 
 namespace mongo {
-    
+
     class PseudoRandom {
     public:
-        PseudoRandom( unsigned seed ) 
+        PseudoRandom( unsigned seed )
             : _seed( seed ) {
         }
 

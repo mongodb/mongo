@@ -15,8 +15,11 @@
  *    limitations under the License.
  */
 
-#include "mongo/platform/basic.h"
 #include "mongo/platform/random.h"
+
+#include <cstdlib>
+
+#include "mongo/platform/basic.h"
 
 namespace mongo {
 
