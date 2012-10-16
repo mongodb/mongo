@@ -307,8 +307,10 @@ namespace mongo {
 
     DBClientBase& Tool::conn( bool slaveIfPaired ) {
         if ( slaveIfPaired && _conn->type() == ConnectionString::SET ) {
-            if (!_slaveConn)
-                _slaveConn = &((DBClientReplicaSet*)_conn)->slaveConn();
+            if (!_slaveConn) {
+                DBClientReplicaSet* rs = static_cast<DBClientReplicaSet*>(_conn);
+                _slaveConn = &rs->slaveConn();
+            }
             return *_slaveConn;
         }
         return *_conn;

@@ -1,8 +1,4 @@
-/* hashcmd.cpp
- *
- * Defines a shell command for hashing a BSONElement value
- */
-
+// hashcmd.cpp
 
 /**
 *    Copyright (C) 2012 10gen Inc.
@@ -19,6 +15,11 @@
 *    You should have received a copy of the GNU Affero General Public License
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
+
+/*
+ * Defines a shell command for hashing a BSONElement value
+ */
+
 
 #include "mongo/db/commands.h"
 #include "mongo/db/hasher.h"

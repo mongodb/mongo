@@ -36,4 +36,4 @@ namespace mongo {
         return result;
     }
 
-}  // namspace mongo
+}  // namespace mongo

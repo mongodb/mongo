@@ -51,12 +51,12 @@
  * to the MD5 library.  Typical compilation:
  *  gcc -o md5main -lm md5main.c md5.c
  */
-static const char *const usage = "\
-Usage:\n\
-    md5main --test		# run the self-test (A.5 of RFC 1321)\n\
-    md5main --t-values		# print the T values for the library\n\
-    md5main --version		# print the version of the package\n\
-";
+static const char *const usage = 
+    "Usage:\n"
+    "    md5main --test		# run the self-test (A.5 of RFC 1321)\n     "
+    "    md5main --t-values		# print the T values for the library\n   "
+    "    md5main --version		# print the version of the package\n     ";
+
 static const char *const version = "2002-04-13";
 
 /* modified: not static, renamed */

@@ -53,7 +53,7 @@ namespace mongo {
         };
         char lines[N][C];
         unsigned h; // current position
-        unsigned n; // numer of lines stores 0 o N
+        unsigned n; // number of lines stores 0 o N
         string _name;
 
         typedef map<string,RamLog*> RM;

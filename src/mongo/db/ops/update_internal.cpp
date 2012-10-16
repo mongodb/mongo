@@ -126,9 +126,10 @@ namespace mongo {
 
             bb.append( elt );
 
-            // We don't want to log a $set for which the '_checkForAppending' test won't pass. If we're
-            // in that case, fall back to non-optimized logging.
-            if ( (elt.type() == Object && elt.embeddedObject().okForStorage()) || (elt.type() != Object) ) {
+            // We don't want to log a positional $set for which the '_checkForAppending' test
+            // won't pass. If we're in that case, fall back to non-optimized logging.
+            if ( (elt.type() == Object && elt.embeddedObject().okForStorage()) ||
+                 (elt.type() != Object) ) {
                 ms.fixedOpName = "$set";
                 ms.forcePositional = true;
                 ms.position = bb.arrSize() - 1;
@@ -185,14 +186,20 @@ namespace mongo {
                         found = true;
                 }
 
-                if ( ! found ) {
+                if ( !found ) {
                     bb.append( elt );
+                }
+
+                // We don't want to log a positional $set for which the '_checkForAppending'
+                // test won't pass. If we're in that case, fall back to non-optimized logging.
+                if ( (elt.type() == Object && elt.embeddedObject().okForStorage()) ||
+                     (elt.type() != Object) ) {
                     ms.fixedOpName = "$set";
                     ms.forcePositional = true;
                     ms.position = bb.arrSize() - 1;
                     bb.done();
-
-                } else {
+                }
+                else {
                     ms.fixedOpName = "$set";
                     ms.forceEmptyArray = true;
                     ms.fixedArray = BSONArray(bb.done().getOwned());
@@ -201,8 +208,6 @@ namespace mongo {
 
             break;
         }
-
-
 
         case PUSH_ALL: {
             uassert( 10132 ,  "$pushAll can only be applied to an array" , in.type() == Array );
@@ -797,9 +802,23 @@ namespace mongo {
             switch ( cmp ) {
 
             case LEFT_SUBFIELD: { // Mod is embedded under this element
-                uassert( 10145,
-                         str::stream() << "LEFT_SUBFIELD only supports Object: " << field
-                         << " not: " << e.type() , e.type() == Object || e.type() == Array );
+
+                // SERVER-4781
+                bool isObjOrArr = e.type() == Object || e.type() == Array;
+                if ( ! isObjOrArr ) {
+                    if (m->second->m->strictApply) {
+                        uasserted( 10145,
+                                   str::stream() << "LEFT_SUBFIELD only supports Object: " << field
+                                   << " not: " << e.type() );
+                    }
+                    else {
+                        // skip both as we're not applying this mod
+                        e = es.next();
+                        m++;
+                        continue;
+                    }
+                }
+
                 if ( onedownseen.count( e.fieldName() ) == 0 ) {
                     onedownseen.insert( e.fieldName() );
                     if ( e.type() == Object ) {
@@ -928,7 +947,8 @@ namespace mongo {
     ModSet::ModSet(
         const BSONObj& from ,
         const set<string>& idxKeys,
-        const set<string>* backgroundKeys)
+        const set<string>* backgroundKeys,
+        bool forReplication)
         : _isIndexed(0) , _hasDynamicArray( false ) {
 
         BSONObjIterator it(from);
@@ -1017,13 +1037,13 @@ namespace mongo {
                              strstr( target , ".$" ) == 0 );
 
                     Mod from;
-                    from.init( Mod::RENAME_FROM, f );
+                    from.init( Mod::RENAME_FROM, f , forReplication );
                     from.setFieldName( fieldName );
                     updateIsIndexed( from, idxKeys, backgroundKeys );
                     _mods[ from.fieldName ] = from;
 
                     Mod to;
-                    to.init( Mod::RENAME_TO, f );
+                    to.init( Mod::RENAME_TO, f , forReplication );
                     to.setFieldName( target );
                     updateIsIndexed( to, idxKeys, backgroundKeys );
                     _mods[ to.fieldName ] = to;
@@ -1035,7 +1055,7 @@ namespace mongo {
                 _hasDynamicArray = _hasDynamicArray || strstr( fieldName , ".$" ) > 0;
 
                 Mod m;
-                m.init( op , f );
+                m.init( op , f , forReplication );
                 m.setFieldName( f.fieldName() );
                 updateIsIndexed( m, idxKeys, backgroundKeys );
                 _mods[m.fieldName] = m;

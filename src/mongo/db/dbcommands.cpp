@@ -1,6 +1,7 @@
 // dbcommands.cpp
 
 /**
+*    Copyright (C) 2012 10gen Inc.
 *
 *    This program is free software: you can redistribute it and/or  modify
 *    it under the terms of the GNU Affero General Public License, version 3,
@@ -17,7 +18,7 @@
 
 /* SHARDING: 
    I believe this file is for mongod only.
-   See s/commnands_public.cpp for mongos.
+   See s/commands_public.cpp for mongos.
 */
 
 #include "mongo/pch.h"
@@ -495,6 +496,7 @@ namespace mongo {
         }
 
         bool run(const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+
             long long start = Listener::getElapsedTimeMillis();
             BSONObjBuilder timeBuilder(128);
 
@@ -682,6 +684,12 @@ namespace mongo {
 
             timeBuilder.appendNumber( "after dur" , Listener::getElapsedTimeMillis() - start );
 
+            if ( cmdObj["workingSet"].trueValue() ) {
+                BSONObjBuilder bb( result.subobjStart( "workingSet" ) );
+                Record::appendWorkingSetInfo( bb );
+                bb.done();
+            }
+
             {
                 RamLog* rl = RamLog::get( "warnings" );
                 massert(15880, "no ram log for warnings?" , rl);
@@ -696,6 +704,8 @@ namespace mongo {
                     arr.done();
                 }
             }
+
+            // ----- cleaning up stuff
 
             if ( ! authed )
                 result.append( "note" , "run against admin for more info" );

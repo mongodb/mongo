@@ -63,7 +63,7 @@ namespace mongo {
         bool hasTag( const string& tag ) const;
         
         /**
-         * @return true if a shard cannot receive any new chunks bacause it reache 'shardLimits'.
+         * @return true if a shard cannot receive any new chunks because it reaches 'shardLimits'.
          * Expects the optional fields "maxSize", can in size in MB, and "usedSize", currently used size
          * in MB, on 'shardLimits'.
          */

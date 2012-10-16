@@ -258,7 +258,7 @@ namespace mongo {
             }
 
             DiskLoc fr = theCapExtent()->firstRecord;
-            theDataFileMgr.deleteRecord(ns, fr.rec(), fr, true); // ZZZZZZZZZZZZ
+            theDataFileMgr.deleteRecord(this, ns, fr.rec(), fr, true); // ZZZZZZZZZZZZ
             compact();
             if( ++passes > maxPasses ) {
                 log() << "passes ns:" << ns << " len:" << len << " maxPasses: " << maxPasses << '\n';
@@ -353,7 +353,7 @@ namespace mongo {
 
             // Delete the newest record, and coalesce the new deleted
             // record with existing deleted records.
-            theDataFileMgr.deleteRecord(ns, curr.rec(), curr, true);
+            theDataFileMgr.deleteRecord(this, ns, curr.rec(), curr, true);
             compact();
 
             // This is the case where we have not yet had to remove any
@@ -433,7 +433,7 @@ namespace mongo {
 
         // Clear all references to this namespace.
         ClientCursor::invalidate( ns );
-        NamespaceDetailsTransient::clearForPrefix( ns );
+        NamespaceDetailsTransient::resetCollection( ns );
 
         // Get a writeable reference to 'this' and reset all pertinent
         // attributes.

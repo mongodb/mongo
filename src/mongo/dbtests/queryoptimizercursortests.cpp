@@ -1765,7 +1765,7 @@ namespace QueryOptimizerCursorTests {
             }
         };
         
-        /** Yield with BacicCursor takeover cursor. */
+        /** Yield with BasicCursor takeover cursor. */
         class TakeoverBasic : public Base {
         public:
             void run() {
@@ -3980,7 +3980,7 @@ namespace QueryOptimizerCursorTests {
             static void checkInvalidQueryAssertions() {
                 Client::ReadContext ctx( ns() );
                 
-                // An invalid query generaing a single query plan asserts.
+                // An invalid query generating a single query plan asserts.
                 BSONObj invalidQuery = fromjson( "{$and:[{$atomic:true}]}" );
                 assertInvalidQueryAssertion( invalidQuery );
                 
@@ -4630,7 +4630,7 @@ namespace QueryOptimizerCursorTests {
         /** nYields reporting of a QueryOptimizerCursor before it enters takeover mode. */
         class NYieldsAdvanceBasic : public NYieldsAdvanceBase {
             virtual int aValueToDelete() const {
-                // Before the MutiCursor takes over at 101 matches.
+                // Before the MultiCursor takes over at 101 matches.
                 return 50;
             }
         };

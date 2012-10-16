@@ -51,6 +51,12 @@ namespace mongo {
 
         static ReplSetConfig* make(BSONObj cfg, bool force=false);
 
+        /**
+         * This uses DBDirectClient to check itself for a config.  This way we don't need to connect
+         * to ourselves over the network to fetch our own config.
+         */
+        static ReplSetConfig* makeDirect();
+
         bool ok() const { return _ok; }
 
         struct TagRule;

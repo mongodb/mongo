@@ -93,7 +93,7 @@ namespace mongo {
                     uasserted(13145, "set name does not match the set name host " + i->h.toString() + " expects");
                 if( *res.getStringField("set") ) {
                     if( cfg.version <= 1 ) {
-                        // this was to be initiation, no one shoudl be initiated already.
+                        // this was to be initiation, no one should be initiated already.
                         uasserted(13256, "member " + i->h.toString() + " is already initiated");
                     }
                     else {

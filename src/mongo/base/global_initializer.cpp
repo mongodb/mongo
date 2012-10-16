@@ -33,4 +33,4 @@ namespace {
 
 }  // namespace
 
-}  // namesapce mongo
+}  // namespace mongo

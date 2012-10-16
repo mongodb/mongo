@@ -80,7 +80,7 @@ namespace mongo {
        if (st != StatusSuccess)
            return st;
        return StatusSuccess;
-   }
+    }
 
     BsonTemplateEvaluator::Status BsonTemplateEvaluator::evalRandInt(BsonTemplateEvaluator* btl,
                                                                      const char* fieldName,

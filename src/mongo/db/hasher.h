@@ -64,6 +64,13 @@ namespace mongo {
 
     class BSONElementHasher : private boost::noncopyable  {
     public:
+
+        /* The hash function we use can be given a seed, to effectively randomize it
+         * by choosing from among a family of hash functions. When it is not specified,
+         * use this.
+         */
+        static const int DEFAULT_HASH_SEED = 0;
+
         /* This computes a 64-bit hash of the value part of BSONElement "e",
          * preceded by the seed "seed".  Squashes element (and any sub-elements)
          * of the same canonical type, so hash({a:{b:4}}) will be the same

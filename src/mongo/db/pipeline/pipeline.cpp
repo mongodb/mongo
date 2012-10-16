@@ -67,7 +67,7 @@ namespace mongo {
          DocumentSourceLimit::createFromBson},
         {DocumentSourceMatch::matchName,
          DocumentSourceMatch::createFromBson},
-#ifdef LATER /* https://jira.mongodb.org/browse/SERVER-3253 */
+#ifdef LATER // https://jira.mongodb.org/browse/SERVER-3253 
         {DocumentSourceOut::outName,
          DocumentSourceOut::createFromBson},
 #endif
@@ -438,7 +438,7 @@ namespace mongo {
           For now, this should be a BSON source array.
           In future, we might have a more clever way of getting this, when
           we have more interleaved fetching between shards.  The DocumentSource
-          interface will have to change to accomodate that.
+          interface will have to change to accommodate that.
          */
         DocumentSourceBsonArray *pSourceBsonArray =
             dynamic_cast<DocumentSourceBsonArray *>(pInputSource.get());

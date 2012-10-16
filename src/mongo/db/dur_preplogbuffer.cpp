@@ -82,7 +82,7 @@ namespace mongo {
             */
 
             JEntry e;
-            e.len = min(i->length(), (unsigned)(mmf->length() - ofs)); //dont write past end of file
+            e.len = min(i->length(), (unsigned)(mmf->length() - ofs)); //don't write past end of file
             verify( ofs <= 0x80000000 );
             e.ofs = (unsigned) ofs;
             e.setFileNo( mmf->fileSuffixNo() );

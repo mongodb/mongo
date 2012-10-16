@@ -1,12 +1,4 @@
-/** @file bson_db.h
-
-    This file contains the implementation of BSON-related methods that are required
-    by the MongoDB database server.
-
-    Normally, for standalone BSON usage, you do not want this file - it will tend to
-    pull in some other files from the MongoDB project. Thus, bson.h (the main file
-    one would use) does not include this file.
-*/
+/** @file bson_db.h */
 
 /*    Copyright 2009 10gen Inc.
  *
@@ -22,6 +14,15 @@
  *    See the License for the specific language governing permissions and
  *    limitations under the License.
  */
+
+/*
+    This file contains the implementation of BSON-related methods that are required
+    by the MongoDB database server.
+
+    Normally, for standalone BSON usage, you do not want this file - it will tend to
+    pull in some other files from the MongoDB project. Thus, bson.h (the main file
+    one would use) does not include this file.
+*/
 
 #pragma once
 

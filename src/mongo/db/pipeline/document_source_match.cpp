@@ -66,7 +66,7 @@ namespace mongo {
             // can't use the Matcher API because this would segfault the constructor
             uassert(16395, "$where is not allowed inside of a $match aggregation expression",
                     ! str::equals(e.fieldName(), "$where"));
-            // geo breaks if it is not the first portion of the pipline
+            // geo breaks if it is not the first portion of the pipeline
             uassert(16424, "$near is not allowed inside of a $match aggregation expression",
                     ! str::equals(e.fieldName(), "$near"));
             uassert(16425, "$within is not allowed inside of a $match aggregation expression",

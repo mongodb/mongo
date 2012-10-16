@@ -1806,7 +1806,7 @@ namespace mongo {
                     _convertor->setProperty( _global , "args" , JSVAL_NULL );
                 }
                 else {
-                    setObject( "args" , *args , true ); // this is for backwards compatability
+                    setObject( "args" , *args , true ); // this is for backwards compatibility
                 }
             }
             catch ( const AssertionException& e ) {

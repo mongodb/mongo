@@ -728,7 +728,7 @@ namespace AccumulatorTests {
             }
         };
 
-        /** Two ints nagative overflow. */
+        /** Two ints negative overflow. */
         class IntIntNegativeOverflow : public TypeConversionBase {
             BSONObj summand1() { return BSON( "d" << -numeric_limits<int>::max() ); }
             BSONObj summand2() { return BSON( "d" << -10 ); }

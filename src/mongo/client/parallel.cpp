@@ -1639,7 +1639,7 @@ namespace mongo {
             }
         }
         catch ( std::exception& e ) {
-            error() << "Future::spawnComand (part 1) exception: " << e.what() << endl;
+            error() << "Future::spawnCommand (part 1) exception: " << e.what() << endl;
             _ok = false;
             _done = true;
         }
@@ -1678,13 +1678,13 @@ namespace mongo {
                 if( staleNS.size() == 0 ) staleNS = _db;
 
                 if( i >= maxRetries ){
-                    error() << "Future::spawnComand (part 2) stale config exception" << causedBy( e ) << endl;
+                    error() << "Future::spawnCommand (part 2) stale config exception" << causedBy( e ) << endl;
                     throw e;
                 }
 
                 if( i >= maxRetries / 2 ){
                     if( ! versionManager.forceRemoteCheckShardVersionCB( staleNS ) ){
-                        error() << "Future::spawnComand (part 2) no config detected" << causedBy( e ) << endl;
+                        error() << "Future::spawnCommand (part 2) no config detected" << causedBy( e ) << endl;
                         throw e;
                     }
                 }
@@ -1708,7 +1708,7 @@ namespace mongo {
                 continue;
             }
             catch ( std::exception& e ) {
-                error() << "Future::spawnComand (part 2) exception: " << causedBy( e ) << endl;
+                error() << "Future::spawnCommand (part 2) exception: " << causedBy( e ) << endl;
                 break;
             }
 

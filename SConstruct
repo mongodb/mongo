@@ -14,7 +14,6 @@
 # several, subordinate SConscript files, which describe specific build rules.
 
 import buildscripts
-import buildscripts.bb
 import datetime
 import imp
 import os
@@ -39,7 +38,6 @@ SConsignFile( scons_data_dir + "/sconsign" )
 
 DEFAULT_INSTALL_DIR = "/usr/local"
 
-buildscripts.bb.checkOk()
 
 def findSettingsSetup():
     sys.path.append( "." )
@@ -915,6 +913,18 @@ def doStyling( env , target , source ):
 
 env.Alias( "style" , [] , [ doStyling ] )
 env.AlwaysBuild( "style" )
+
+# --- lint ----
+
+
+
+def doLint( env , target , source ):
+    import buildscripts.lint
+    if not buildscripts.lint.run_lint( [ "src/mongo/" ] ):
+        raise Exception( "lint errors" )
+
+env.Alias( "lint" , [] , [ doLint ] )
+env.AlwaysBuild( "lint" )
 
 
 #  ----  INSTALL -------

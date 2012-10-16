@@ -404,7 +404,7 @@ namespace mongo {
         /**
          * Preconditions:
          *  - key / recordLoc are > all existing keys
-         *  - The keys in prevChild and their descendents are between all existing
+         *  - The keys in prevChild and their descendants are between all existing
          *    keys and 'key'.
          * Postconditions:
          *  - If there is space for key without packing, it is inserted as the
@@ -607,7 +607,7 @@ namespace mongo {
      * so assignment of const is sometimes nonideal.
      *
      * TODO There are several cases in which the 'this' pointer is invalidated
-     * as a result of deallocation.  A seperate class representing a btree would
+     * as a result of deallocation.  A separate class representing a btree would
      * alleviate some fragile cases where the implementation must currently
      * behave correctly if the 'this' pointer is suddenly invalidated by a
      * callee.

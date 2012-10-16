@@ -450,7 +450,7 @@ DB.prototype._getExtraInfo = function(action) {
     var res = this.getLastErrorCmd(1); 
     if (res) {
         if (res.err != undefined && res.err != null) {
-            // error occured, display it
+            // error occurred, display it
             print(res.err);
             return;
         }

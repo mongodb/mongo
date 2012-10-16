@@ -677,7 +677,7 @@ namespace mongo {
             try {
                 OwnedPointerVector<ReplSetConfig> configs;
                 try {
-                    configs.vector().push_back( ReplSetConfig::make(HostAndPort::me()) );
+                    configs.vector().push_back(ReplSetConfig::makeDirect());
                 }
                 catch(DBException& e) {
                     log() << "replSet exception loading our local replset configuration object : " << e.toString() << rsLog;

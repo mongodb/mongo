@@ -38,6 +38,7 @@
 #include "matcher.h"
 #include "projection.h"
 #include "s/d_chunk_manager.h"
+#include "mongo/db/keypattern.h"
 
 namespace mongo {
 
@@ -290,6 +291,13 @@ namespace mongo {
         */
         BSONObj extractFields(const BSONObj &pattern , bool fillWithNull = false) ;
 
+        /** Extract elements from the object this cursor currently points to, using the expression
+         *  specified in KeyPattern. Will use a covered index if the one in this cursor is usable.
+         *  TODO: there are some cases where a covered index could be used but is not, for instance
+         *  if both this index and the keyPattern are {a : "hashed"}
+         */
+        BSONObj extractKey( const KeyPattern& usingKeyPattern ) const;
+
         void fillQueryResultFromObj( BufBuilder &b, const MatchDetails* details = NULL ) const;
 
         bool currentIsDup() { return _c->getsetdup( _c->currLoc() ); }
@@ -383,7 +391,7 @@ namespace mongo {
 
     private: // methods
 
-        // cursors normally timeout after an inactivy period to prevent excess memory use
+        // cursors normally timeout after an inactivity period to prevent excess memory use
         // setting this prevents timeout of the cursor in question.
         void noTimeout() { _pinValue++; }
 

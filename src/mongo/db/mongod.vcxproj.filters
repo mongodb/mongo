@@ -983,6 +983,9 @@
     <ClCompile Include="..\platform\random.cpp">
       <Filter>platform</Filter>
     </ClCompile>
+    <ClCompile Include="keypattern.cpp">
+      <Filter>db\Source Files\e to n</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\targetver.h" />
@@ -1832,6 +1835,9 @@
     </ClInclude>
     <ClInclude Include="..\platform\random.h">
       <Filter>platform</Filter>
+    </ClInclude>
+    <ClInclude Include="keypattern.h">
+      <Filter>db\Header Files\e to n</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

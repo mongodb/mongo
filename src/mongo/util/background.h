@@ -46,10 +46,10 @@ namespace mongo {
     class BackgroundJob : boost::noncopyable {
     protected:
         /**
-         * sub-class must intantiate the BackgrounJob
+         * sub-class must instantiate the BackgroundJob
          *
          * @param selfDelete if set to true, object will destruct itself after the run() finished
-         * @note selfDelete instantes cannot be wait()-ed upon
+         * @note selfDelete instances cannot be wait()-ed upon
          */
         explicit BackgroundJob(bool selfDelete = false);
 
@@ -78,7 +78,7 @@ namespace mongo {
 
         /**
          * starts job.
-         * returns immediatelly after dispatching.
+         * returns immediately after dispatching.
          *
          * @note the BackgroundJob object must live for as long the thread is still running, ie
          * until getState() returns Done.
@@ -88,7 +88,7 @@ namespace mongo {
         /**
          * wait for completion.
          *
-         * @param msTimeOut maximum amount of time to wait in millisecons
+         * @param msTimeOut maximum amount of time to wait in milliseconds
          * @return true if did not time out. false otherwise.
          *
          * @note you can call wait() more than once if the first call times out.

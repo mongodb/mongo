@@ -355,7 +355,7 @@ namespace mongo {
                 return false;
             
             if ( ! getManager()->_splitHeuristics._splitTickets.tryAcquire() ) {
-                LOG(1) << "won't auto split becaue not enough tickets: " << getManager()->getns() << endl;
+                LOG(1) << "won't auto split because not enough tickets: " << getManager()->getns() << endl;
                 return false;
             }
             TicketHolderReleaser releaser( &(getManager()->_splitHeuristics._splitTickets) );
@@ -1101,8 +1101,8 @@ namespace mongo {
                 return;
             }
             
-            if ( frsp->matchPossibleForShardKey( _key.key() ) ) {
-                BoundList ranges = frsp->shardKeyIndexBounds(_key.key());
+            if ( frsp->matchPossibleForSingleKeyFRS( _key.key() ) ) {
+                BoundList ranges = _key.keyBounds( frsp->getSingleKeyFRS() );
                 for (BoundList::const_iterator it=ranges.begin(), end=ranges.end();
                      it != end; ++it) {
 

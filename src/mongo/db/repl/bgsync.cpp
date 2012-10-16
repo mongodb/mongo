@@ -526,7 +526,7 @@ namespace replset {
         _lastH = theReplSet->lastH;
 
         LOG(1) << "replset bgsync fetch queue set to: " << _lastOpTimeFetched << " " << _lastH << rsLog;
-   }
+    }
 
 } // namespace replset
 } // namespace mongo

@@ -25,8 +25,6 @@
 
 namespace mongo {
 
-    static const unsigned maxCombinations = 4000000;
-
     ParsedQuery::ParsedQuery( QueryMessage& qm )
     : _ns( qm.ns ) , _ntoskip( qm.ntoskip ) , _ntoreturn( qm.ntoreturn ) , _options( qm.queryOptions ) {
         init( qm.query );
@@ -1163,7 +1161,7 @@ namespace mongo {
             verify( !_ranges.back().empty() );
         }
         uassert( 13385, "combinatorial limit of $in partitioning of result set exceeded",
-                size() < maxCombinations );
+                size() < MAX_IN_COMBINATIONS );
     }    
 
     BSONObj FieldRangeVector::startKey() const {
@@ -1258,71 +1256,6 @@ namespace mongo {
 
     QueryPattern FieldRangeSet::pattern( const BSONObj &sort ) const {
         return QueryPattern( *this, sort );
-    }
-
-    // TODO get rid of this
-    BoundList FieldRangeSet::indexBounds( const BSONObj &keyPattern, int direction ) const {
-        typedef vector<pair<shared_ptr<BSONObjBuilder>, shared_ptr<BSONObjBuilder> > > BoundBuilders;
-        BoundBuilders builders;
-        builders.push_back( make_pair( shared_ptr<BSONObjBuilder>( new BSONObjBuilder() ), shared_ptr<BSONObjBuilder>( new BSONObjBuilder() ) ) );
-        BSONObjIterator i( keyPattern );
-        bool equalityOnly = true; // until equalityOnly is false, we are just dealing with equality (no range or $in querys).
-        while( i.more() ) {
-            BSONElement e = i.next();
-            const FieldRange &fr = range( e.fieldName() );
-            int number = (int) e.number(); // returns 0.0 if not numeric
-            bool forward = ( ( number >= 0 ? 1 : -1 ) * ( direction >= 0 ? 1 : -1 ) > 0 );
-            if ( equalityOnly ) {
-                if ( fr.equality() ) {
-                    for( BoundBuilders::const_iterator j = builders.begin(); j != builders.end(); ++j ) {
-                        j->first->appendAs( fr.min(), "" );
-                        j->second->appendAs( fr.min(), "" );
-                    }
-                }
-                else {
-                    equalityOnly = false;
-
-                    BoundBuilders newBuilders;
-                    const vector<FieldInterval> &intervals = fr.intervals();
-                    for( BoundBuilders::const_iterator i = builders.begin(); i != builders.end(); ++i ) {
-                        BSONObj first = i->first->obj();
-                        BSONObj second = i->second->obj();
-
-                        if ( forward ) {
-                            for( vector<FieldInterval>::const_iterator j = intervals.begin(); j != intervals.end(); ++j ) {
-                                uassert( 13303, "combinatorial limit of $in partitioning of result set exceeded", newBuilders.size() < maxCombinations );
-                                newBuilders.push_back( make_pair( shared_ptr<BSONObjBuilder>( new BSONObjBuilder() ), shared_ptr<BSONObjBuilder>( new BSONObjBuilder() ) ) );
-                                newBuilders.back().first->appendElements( first );
-                                newBuilders.back().second->appendElements( second );
-                                newBuilders.back().first->appendAs( j->_lower._bound, "" );
-                                newBuilders.back().second->appendAs( j->_upper._bound, "" );
-                            }
-                        }
-                        else {
-                            for( vector<FieldInterval>::const_reverse_iterator j = intervals.rbegin(); j != intervals.rend(); ++j ) {
-                                uassert( 13304, "combinatorial limit of $in partitioning of result set exceeded", newBuilders.size() < maxCombinations );
-                                newBuilders.push_back( make_pair( shared_ptr<BSONObjBuilder>( new BSONObjBuilder() ), shared_ptr<BSONObjBuilder>( new BSONObjBuilder() ) ) );
-                                newBuilders.back().first->appendElements( first );
-                                newBuilders.back().second->appendElements( second );
-                                newBuilders.back().first->appendAs( j->_upper._bound, "" );
-                                newBuilders.back().second->appendAs( j->_lower._bound, "" );
-                            }
-                        }
-                    }
-                    builders = newBuilders;
-                }
-            }
-            else {
-                for( BoundBuilders::const_iterator j = builders.begin(); j != builders.end(); ++j ) {
-                    j->first->appendAs( forward ? fr.min() : fr.max(), "" );
-                    j->second->appendAs( forward ? fr.max() : fr.min(), "" );
-                }
-            }
-        }
-        BoundList ret;
-        for( BoundBuilders::const_iterator i = builders.begin(); i != builders.end(); ++i )
-            ret.push_back( make_pair( i->first->obj(), i->second->obj() ) );
-        return ret;
     }
 
     int FieldRangeSet::numNonUniversalRanges() const {

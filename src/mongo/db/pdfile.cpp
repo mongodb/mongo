@@ -1004,7 +1004,7 @@ namespace mongo {
         result.append("ns", name.c_str());
         ClientCursor::invalidate(name.c_str());
         Top::global.collectionDropped( name );
-        NamespaceDetailsTransient::eraseForPrefix( name.c_str() );
+        NamespaceDetailsTransient::eraseCollection( name );
         dropNS(name);
     }
 
@@ -1065,9 +1065,12 @@ namespace mongo {
     }
 
     void DataFileMgr::deleteRecord(const char *ns, Record *todelete, const DiskLoc& dl, bool cappedOK, bool noWarn, bool doLog ) {
+        deleteRecord( nsdetails(ns), ns, todelete, dl, cappedOK, noWarn, doLog );
+    }
+
+    void DataFileMgr::deleteRecord(NamespaceDetails* d, const char *ns, Record *todelete, const DiskLoc& dl, bool cappedOK, bool noWarn, bool doLog ) {
         dassert( todelete == dl.rec() );
 
-        NamespaceDetails* d = nsdetails(ns);
         if ( d->isCapped() && !cappedOK ) {
             out() << "failing remove on a capped ns " << ns << endl;
             uassert( 10089 ,  "can't remove from a capped collection" , 0 );

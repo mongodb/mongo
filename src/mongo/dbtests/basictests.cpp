@@ -499,20 +499,6 @@ namespace BasicTests {
         }
     };
 
-    class DatabaseValidNames {
-    public:
-        void run() {
-            ASSERT( NamespaceString::validDBName( "foo" ) );
-            ASSERT( ! NamespaceString::validDBName( "foo/bar" ) );
-            ASSERT( ! NamespaceString::validDBName( "foo bar" ) );
-            ASSERT( ! NamespaceString::validDBName( "foo.bar" ) );
-
-            ASSERT( NamespaceString::normal( "asdads" ) );
-            ASSERT( ! NamespaceString::normal( "asda$ds" ) );
-            ASSERT( NamespaceString::normal( "local.oplog.$main" ) );
-        }
-    };
-
     class DatabaseOwnsNS {
     public:
         void run() {
@@ -796,7 +782,6 @@ namespace BasicTests {
             add< LexNumCmp >();
             add< LexNumCmpLexOnly >();
 
-            add< DatabaseValidNames >();
             add< DatabaseOwnsNS >();
 
             add< NSValidNames >();

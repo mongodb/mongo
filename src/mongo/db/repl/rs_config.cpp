@@ -581,6 +581,7 @@ namespace mongo {
     }
 
     ReplSetConfig::ReplSetConfig() :
+        version(EMPTYCONFIG),
         _ok(false),
         _majority(-1),
         _heartbeatTimeout(DEFAULT_HB_TIMEOUT) {
@@ -610,6 +611,18 @@ namespace mongo {
         auto_ptr<ReplSetConfig> ret(new ReplSetConfig());
         ret->init(h);
         return ret.release();
+    }
+
+    ReplSetConfig* ReplSetConfig::makeDirect() {
+        DBDirectClient cli;
+        BSONObj config = cli.findOne(rsConfigNs, Query()).getOwned();
+
+        // Check for no local config
+        if (config.isEmpty()) {
+            return new ReplSetConfig();
+        }
+
+        return make(config, false);
     }
 
     void ReplSetConfig::init(const HostAndPort& h) {

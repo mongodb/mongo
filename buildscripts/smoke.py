@@ -341,6 +341,8 @@ def skipTest(path):
             return True
         if parentDir == "dur": # SERVER-7317
             return True
+        if parentDir == "disk": # SERVER-7356
+            return True
 
         authTestsToSkip = [("sharding", "read_pref_rs_client.js"), # SERVER-6972
                            ("sharding", "sync_conn_cmd.js"), #SERVER-6327

@@ -156,6 +156,8 @@ namespace mongo {
 
         void deleteRecord(const char *ns, Record *todelete, const DiskLoc& dl, bool cappedOK = false, bool noWarn = false, bool logOp=false);
 
+        void deleteRecord(NamespaceDetails* d, const char *ns, Record *todelete, const DiskLoc& dl, bool cappedOK = false, bool noWarn = false, bool logOp=false);
+
         /* does not clean up indexes, etc. : just deletes the record in the pdfile. use deleteRecord() to unindex */
         void _deleteRecord(NamespaceDetails *d, const char *ns, Record *todelete, const DiskLoc& dl);
 
@@ -284,6 +286,8 @@ namespace mongo {
          * and how many times we throw a PageFaultException
          */
         static void appendStats( BSONObjBuilder& b );
+
+        static void appendWorkingSetInfo( BSONObjBuilder& b );
     private:
         
         int _netLength() const { return _lengthWithHeaders - HeaderSize; }

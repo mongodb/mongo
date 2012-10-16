@@ -807,6 +807,12 @@
     <ClCompile Include="..\db\auth\principal_set.cpp">
       <Filter>db\auth</Filter>
     </ClCompile>
+    <ClCompile Include="..\db\keypattern.cpp">
+      <Filter>db\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\hasher.cpp">
+      <Filter>db\Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\pch.h" />
@@ -1283,6 +1289,12 @@
     </ClInclude>
     <ClInclude Include="..\db\auth\principal_set.h">
       <Filter>db\auth</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\keypattern.h">
+      <Filter>db\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\hasher.h">
+      <Filter>db\Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

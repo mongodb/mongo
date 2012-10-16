@@ -1,5 +1,22 @@
 #pragma once
 
+/**
+*    Copyright (C) 2012 10gen Inc.
+*
+*    This program is free software: you can redistribute it and/or  modify
+*    it under the terms of the GNU Affero General Public License, version 3,
+*    as published by the Free Software Foundation.
+*
+*    This program is distributed in the hope that it will be useful,
+*    but WITHOUT ANY WARRANTY; without even the implied warranty of
+*    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+*    GNU Affero General Public License for more details.
+*
+*    You should have received a copy of the GNU Affero General Public License
+*    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+*/
+
+
 /* The idea here is to 'name' memory pointers so that we can do diagnostics.
    these diagnostics might involve concurrency or other things.  mainly would
    be for _DEBUG builds.  Experimental we'll see how useful.
@@ -37,12 +54,12 @@ namespace mongo {
 
         /** note you can be more than one thing; a datafile header is also the starting pointer
             for a file */
-        void is(void *p, concept c, std::string desc = "", unsigned len=0);
+        void is(void *p, concept c, const std::string desc = "", unsigned len=0);
 
 #if 1
 //#if !defined(_DEBUG)
         inline void invalidate(void *p, unsigned len) { }
-        inline void is(void *p, concept c, std::string, unsigned) { }
+        inline void is(void *p, concept c, const std::string, unsigned) { }
 #endif
 
     }

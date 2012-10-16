@@ -65,6 +65,9 @@ env.CppUnitTest('bson_field_test', ['bson/bson_field_test.cpp'],
 env.CppUnitTest('bson_validate_test', ['bson/bson_validate_test.cpp'],
                 LIBDEPS=['bson'])
 
+env.CppUnitTest('namespacestring_test', ['db/namespacestring_test.cpp'],
+                LIBDEPS=['bson'])
+
 commonFiles = [ "pch.cpp",
                 "buildinfo.cpp",
                 "db/hasher.cpp",
@@ -129,6 +132,7 @@ env.StaticLibrary("coredb", [
         "db/pipeline/pipeline.cpp",
         "db/dbcommands_generic.cpp",
         "db/dbwebserver.cpp",
+        "db/keypattern.cpp",
         "db/matcher.cpp",
         "db/pipeline/accumulator.cpp",
         "db/pipeline/accumulator_add_to_set.cpp",
@@ -322,7 +326,8 @@ serverOnlyFiles = [ "db/curop.cpp",
                     "db/pipeline/document_source_cursor.cpp",
                     "db/driverHelpers.cpp" ]
 
-env.Library( "dbcmdline", "db/cmdline.cpp" )
+env.Library( "dbcmdline", "db/cmdline.cpp", LIBDEPS=['bson'] )
+env.CppUnitTest('cmdline_test', 'db/cmdline_test.cpp', LIBDEPS=['dbcmdline'])
 
 env.Library('stacktrace', 'util/stacktrace.cpp')
 
