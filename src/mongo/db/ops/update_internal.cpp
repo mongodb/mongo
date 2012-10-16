@@ -836,6 +836,11 @@ namespace mongo {
                     // inc both as we handled both
                     e = es.next();
                     m++;
+                    while ( m != mend &&
+                            ( compareDottedFieldNames( m->second->m->fieldName , field , lexNumCmp ) ==
+                              LEFT_SUBFIELD ) ) {
+                        m++;
+                    }
                 }
                 else {
                     massert( 16069 , "ModSet::createNewFromMods - "
@@ -911,7 +916,7 @@ namespace mongo {
                     // we have something like { x : { $gt : 5 } }
                     // this can be a query piece
                     // or can be a dbref or something
-                    
+
                     int op = e.embeddedObject().firstElement().getGtLtOp( -1 );
                     if ( op >= 0 ) {
                         // this means this is a $gt type filter, so don't make part of the new object
