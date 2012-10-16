@@ -118,6 +118,13 @@ __wt_compact_evict(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * in-memory page's original disk addresses might have been fine for
 	 * compaction, but its replacement addresses might be a problem.
 	 *
+	 * Ignore the root: it may not have a replacement address, and besides,
+	 * if anything else gets written, so will it.
+	 */
+	if (WT_PAGE_IS_ROOT(page))
+		return (0);
+
+	/*
 	 * If the page is already dirty, skip some work, it will be written in
 	 * any case.
 	 */
@@ -125,10 +132,9 @@ __wt_compact_evict(WT_SESSION_IMPL *session, WT_PAGE *page)
 		return (0);
 
 	/*
-	 * If the page is clean, test the original addresses.  Otherwise, test
-	 * the replacement addresses if the page is a 1-to-1 replacement, and
-	 * just write any split pages, it's simpler than figuring out if they
-	 * need to be written or not.
+	 * If the page is clean, test the original addresses.
+	 * If the page is a 1-to-1 replacement, test the replacement addresses.
+	 * If the page is a split, ignore it, it will be merged into the parent.
 	 */
 	if (mod == NULL)
 		goto disk;
@@ -146,13 +152,6 @@ disk:		__wt_get_addr(page->parent, page->ref, &addr, &addr_size);
 	case WT_PM_REC_EMPTY:
 		return (0);
 	case WT_PM_REC_REPLACE:
-		/*
-		 * Ignore the root: it may not have a replacement address, and
-		 * if anything else gets written, so will it.
-		 */
-		if (WT_PAGE_IS_ROOT(page))
-			return (0);
-
 		WT_RET(__wt_bm_compact_page_skip(
 		    session, mod->u.replace.addr, mod->u.replace.size, &skip));
 		if (skip)
@@ -160,7 +159,7 @@ disk:		__wt_get_addr(page->parent, page->ref, &addr, &addr_size);
 		break;
 	case WT_PM_REC_SPLIT:
 	case WT_PM_REC_SPLIT_MERGE:
-		break;
+		return (0);
 	}
 
 	/* Mark the page and tree dirty, we want to write this page. */
