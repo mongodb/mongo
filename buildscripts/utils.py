@@ -29,6 +29,7 @@ def getAllSourceFiles( arr=None , prefix="." ):
             getAllSourceFiles( arr , full )
         else:
             if full.endswith( ".cpp" ) or full.endswith( ".h" ) or full.endswith( ".c" ):
+                full = full.replace( "//" , "/" )
                 arr.append( full )
 
     return arr
