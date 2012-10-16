@@ -32,7 +32,7 @@
 #define testName "btree"
 #define BTVERSION 0
 namespace BtreeTests0 {
- #include "btreetests.inl"
+#include "btreetests.inl"
 }
 
 #undef BtreeBucket
@@ -48,7 +48,7 @@ namespace BtreeTests0 {
 #undef BTVERSION
 #define BTVERSION 1
 namespace BtreeTests1 {
- #include "btreetests.inl"
+#include "btreetests.inl"
 }
 
 #undef testName
@@ -56,5 +56,5 @@ namespace BtreeTests1 {
 #define TESTTWOSTEP 1
 
 namespace BtreeTests2 {
- #include "btreetests.inl"
+#include "btreetests.inl"
 }

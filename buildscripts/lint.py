@@ -40,7 +40,6 @@ def run_lint( paths, nudgeOn=False ):
     later.append( '-whitespace/comma' ) # errors found: 621
     later.append( '-whitespace/comments' ) # errors found: 2189
     later.append( '-whitespace/end_of_line' ) # errors found: 4340
-    nudge.append( '-whitespace/indent' ) # errors found: 8
     later.append( '-whitespace/labels' ) # errors found: 58
     later.append( '-whitespace/line_length' ) # errors found: 14500
     later.append( '-whitespace/newline' ) # errors found: 1520
