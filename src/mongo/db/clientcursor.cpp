@@ -427,6 +427,16 @@ namespace mongo {
         return b.obj();
     }
     
+    BSONObj ClientCursor::extractKey( const KeyPattern& usingKeyPattern ) const {
+        KeyPattern currentIndex( _c->indexKeyPattern() );
+        if ( usingKeyPattern.isCoveredBy( currentIndex ) && ! currentIndex.isSpecial() ){
+            BSONObj currKey = _c->currKey();
+            BSONObj prettyKey = currKey.replaceFieldNames( currentIndex.toBSON() );
+            return usingKeyPattern.extractSingleKey( prettyKey );
+        }
+        return usingKeyPattern.extractSingleKey( _c->current() );
+    }
+
     void ClientCursor::fillQueryResultFromObj( BufBuilder &b, const MatchDetails* details ) const {
         const Projection::KeyOnly *keyFieldsOnly = c()->keyFieldsOnly();
         if ( keyFieldsOnly ) {

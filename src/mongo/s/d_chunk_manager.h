@@ -105,12 +105,13 @@ namespace mongo {
          * @param obj document containing sharding keys (and, optionally, other attributes)
          * @return true if shards hold the object
          */
-        bool belongsToMe( const BSONObj& obj ) const;
+        bool belongsToMe( const BSONObj& doc ) const;
 
         /**
-         * Checks whether a document belongs to this shard.
+         * Checks whether the document currently pointed to by this cursor belongs to this shard.
+         * This version of the function will use a covered index if there is one in the cursor.
          *
-         * @param obj document containing sharding keys (and, optionally, other attributes)
+         * @param cc cursor pointing to an object
          * @return true if shards hold the object
          */
         bool belongsToMe( ClientCursor* cc ) const;
@@ -137,9 +138,9 @@ namespace mongo {
         void _init( const string& configServer , const string& ns , const string& shardName, ShardChunkManagerPtr oldManager = ShardChunkManagerPtr() );
 
         /**
-         * @same as belongsToMe to but key has to be the shard key
+         * @same as belongsToMe but point is the extracted shard key
          */
-        bool _belongsToMe( const BSONObj& key ) const;
+        bool _belongsToMe( const BSONObj& point ) const;
 
         ShardChunkVersion _collVersion;
         // highest ShardChunkVersion for which this ShardChunkManager's information is accurate

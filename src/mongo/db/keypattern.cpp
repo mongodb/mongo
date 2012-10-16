@@ -47,6 +47,20 @@ namespace mongo {
         return false;
     }
 
+    bool KeyPattern::isCoveredBy( const KeyPattern& other ) const {
+        BSONForEach( e, _pattern ) {
+            BSONElement otherfield = other.getField( e.fieldName() );
+            if ( otherfield.eoo() ){
+                return false;
+            }
+
+            if ( otherfield.numberInt() != 1 && otherfield.numberInt() != -1 && otherfield != e ){
+                return false;
+            }
+        }
+        return true;
+    }
+
     typedef vector<pair<BSONObj,BSONObj> >::const_iterator BoundListIter;
 
     BoundList KeyPattern::keyBounds( const FieldRangeSet& queryConstraints ) const {

@@ -60,6 +60,12 @@ namespace mongo {
         bool hasField( const char* fieldname ) const { return _pattern.hasField( fieldname ); }
 
         /*
+         * Gets the element of this pattern corresponding to the given fieldname.
+         * Returns eoo if none exists.
+         */
+        BSONElement getField( const char* fieldname ) const { return _pattern[ fieldname ]; }
+
+        /*
          * Returns true if the key described by this KeyPattern is a prefix of
          * the (potentially) compound key described by 'other'
          */
@@ -74,6 +80,13 @@ namespace mongo {
          * are any patterns that are not a simple list of field names and 1/-1 values.
          */
         bool isSpecial() const;
+
+        /**
+         * Returns true if the quantities stored in this KeyPattern can be used to compute all the
+         * quantities in "other". Useful for determining whether an index based on one KeyPattern
+         * can be used as a covered index for a query based on another.
+         */
+        bool isCoveredBy( const KeyPattern& other ) const;
 
         string toString() const{ return toBSON().toString(); }
 
@@ -91,7 +104,6 @@ namespace mongo {
          *   { a: 1 } --> returns { a : NumberLong("5902408780260971510")  }
          */
         BSONObj extractSingleKey( const BSONObj& doc ) const;
-
 
         /**@param queryConstraints a FieldRangeSet, usually formed from parsing a query
          * @return an ordered list of bounds generated using this KeyPattern and the

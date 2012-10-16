@@ -244,22 +244,24 @@ namespace mongo {
         if ( _rangesMap.size() == 0 )
             return false;
         
-        return _belongsToMe( cc->extractFields( _key , true ) );
+        KeyPattern pat( _key );
+        return _belongsToMe( cc->extractKey( pat ) );
     }
 
-    bool ShardChunkManager::belongsToMe( const BSONObj& obj ) const {
+    bool ShardChunkManager::belongsToMe( const BSONObj& doc ) const {
         if ( _rangesMap.size() == 0 )
             return false;
 
-        return _belongsToMe( obj.extractFields( _key , true ) );
+        KeyPattern pat( _key );
+        return _belongsToMe( pat.extractSingleKey( doc ) );
     }
 
-    bool ShardChunkManager::_belongsToMe( const BSONObj& x ) const {
-        RangeMap::const_iterator it = _rangesMap.upper_bound( x );
+    bool ShardChunkManager::_belongsToMe( const BSONObj& point ) const {
+        RangeMap::const_iterator it = _rangesMap.upper_bound( point );
         if ( it != _rangesMap.begin() )
             it--;
 
-        bool good = contains( it->first , it->second , x );
+        bool good = contains( it->first , it->second , point );
 
 #if 0
         if ( ! good ) {
