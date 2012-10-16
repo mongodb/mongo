@@ -280,6 +280,25 @@ err:	API_END_NOTFOUND_MAP(session, ret);
 }
 
 /*
+ * __session_compact --
+ *	WT_SESSION->compact method.
+ */
+static int
+__session_compact(WT_SESSION *wt_session, const char *uri, const char *config)
+{
+	WT_DECL_RET;
+	WT_SESSION_IMPL *session;
+
+	session = (WT_SESSION_IMPL *)wt_session;
+
+	SESSION_API_CALL(session, compact, config, cfg);
+	WT_WITH_SCHEMA_LOCK(session,
+	    ret = __wt_schema_worker(session, uri, __wt_compact, cfg, 0));
+
+err:	API_END_NOTFOUND_MAP(session, ret);
+}
+
+/*
  * __session_drop --
  *	WT_SESSION->drop method.
  */
@@ -297,25 +316,6 @@ __session_drop(WT_SESSION *wt_session, const char *uri, const char *config)
 
 err:	/* Note: drop operations cannot be unrolled (yet?). */
 	API_END_NOTFOUND_MAP(session, ret);
-}
-
-/*
- * __session_dumpfile --
- *	WT_SESSION->dumpfile method.
- */
-static int
-__session_dumpfile(WT_SESSION *wt_session, const char *uri, const char *config)
-{
-	WT_DECL_RET;
-	WT_SESSION_IMPL *session;
-
-	session = (WT_SESSION_IMPL *)wt_session;
-	SESSION_API_CALL(session, dumpfile, config, cfg);
-	WT_WITH_SCHEMA_LOCK(session,
-	    ret = __wt_schema_worker(session, uri,
-		__wt_dumpfile, cfg, WT_BTREE_EXCLUSIVE | WT_BTREE_VERIFY));
-
-err:	API_END_NOTFOUND_MAP(session, ret);
 }
 
 /*
@@ -641,6 +641,7 @@ __wt_open_session(WT_CONNECTION_IMPL *conn, int internal,
 		__session_reconfigure,
 		__session_open_cursor,
 		__session_create,
+		__session_compact,
 		__session_drop,
 		__session_rename,
 		__session_salvage,
@@ -651,7 +652,6 @@ __wt_open_session(WT_CONNECTION_IMPL *conn, int internal,
 		__session_commit_transaction,
 		__session_rollback_transaction,
 		__session_checkpoint,
-		__session_dumpfile,
 		__session_msg_printf
 	};
 	WT_DECL_RET;

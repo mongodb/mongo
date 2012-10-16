@@ -211,6 +211,15 @@ __wt_confchk_session_commit_transaction[] = {
 };
 
 const char *
+__wt_confdfl_session_compact =
+	"";
+
+WT_CONFIG_CHECK
+__wt_confchk_session_compact[] = {
+	{ NULL, NULL, NULL }
+};
+
+const char *
 __wt_confdfl_session_create =
 	"allocation_size=512B,block_compressor=,cache_resident=0,checksum=,"
 	"colgroups=,collator=,columns=,columns=,dictionary=0,exclusive=0,"
@@ -267,15 +276,6 @@ __wt_confdfl_session_drop =
 WT_CONFIG_CHECK
 __wt_confchk_session_drop[] = {
 	{ "force", "boolean", NULL },
-	{ NULL, NULL, NULL }
-};
-
-const char *
-__wt_confdfl_session_dumpfile =
-	"";
-
-WT_CONFIG_CHECK
-__wt_confchk_session_dumpfile[] = {
 	{ NULL, NULL, NULL }
 };
 
@@ -370,10 +370,13 @@ __wt_confchk_session_upgrade[] = {
 
 const char *
 __wt_confdfl_session_verify =
-	"";
+	"dump_address=0,dump_blocks=0,dump_pages=0";
 
 WT_CONFIG_CHECK
 __wt_confchk_session_verify[] = {
+	{ "dump_address", "boolean", NULL },
+	{ "dump_blocks", "boolean", NULL },
+	{ "dump_pages", "boolean", NULL },
 	{ NULL, NULL, NULL }
 };
 

@@ -119,8 +119,6 @@ main(int argc, char *argv[])
 			ret = util_drop(session, argc, argv);
 		else if (strcmp(command, "dump") == 0)
 			ret = util_dump(session, argc, argv);
-		else if (strcmp(command, "dumpfile") == 0)
-			ret = util_dumpfile(session, argc, argv);
 		else
 			ret = usage();
 		break;

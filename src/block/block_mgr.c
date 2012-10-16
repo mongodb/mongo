@@ -194,6 +194,38 @@ __wt_bm_checkpoint_unload(WT_SESSION_IMPL *session)
 }
 
 /*
+ * __wt_bm_compact_skip --
+ *	Return if a file can be compacted.
+ */
+int
+__wt_bm_compact_skip(WT_SESSION_IMPL *session, int *skipp)
+{
+	WT_BLOCK *block;
+
+	if ((block = session->btree->block) == NULL)
+		return (__bm_invalid(session));
+
+	return (__wt_block_compact_skip(session, block, skipp));
+}
+
+/*
+ * __wt_bm_compact_skip --
+ *	Return if a page is useful for compaction.
+ */
+int
+__wt_bm_compact_page_skip(WT_SESSION_IMPL *session,
+    const uint8_t *addr, uint32_t addr_size, int *skipp)
+{
+	WT_BLOCK *block;
+
+	if ((block = session->btree->block) == NULL)
+		return (__bm_invalid(session));
+
+	return (__wt_block_compact_page_skip(
+	    session, block, addr, addr_size, skipp));
+}
+
+/*
  * __wt_bm_truncate --
  *	Truncate a file.
  */

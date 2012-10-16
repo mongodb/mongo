@@ -26,6 +26,7 @@ __wt_stat_alloc_btree_stats(WT_SESSION_IMPL *session, WT_BTREE_STATS **statsp)
 	stats->file_col_int_pages.desc = "column-store internal pages";
 	stats->file_col_var_pages.desc =
 	    "column-store variable-size leaf pages";
+	stats->file_compact_rewrite.desc = "pages rewritten by compaction";
 	stats->file_entries.desc = "total entries";
 	stats->file_fixed_len.desc = "fixed-record size";
 	stats->file_magic.desc = "magic number";
@@ -88,6 +89,7 @@ __wt_stat_clear_btree_stats(WT_STATS *stats_arg)
 	stats->file_col_fix_pages.v = 0;
 	stats->file_col_int_pages.v = 0;
 	stats->file_col_var_pages.v = 0;
+	stats->file_compact_rewrite.v = 0;
 	stats->file_entries.v = 0;
 	stats->file_fixed_len.v = 0;
 	stats->file_magic.v = 0;

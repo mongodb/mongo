@@ -6,6 +6,7 @@ src/api/api_version.c
 src/block/block_addr.c
 src/block/block_ckpt.c
 src/block/block_cksum.c
+src/block/block_compact.c
 src/block/block_ext.c
 src/block/block_mgr.c
 src/block/block_open.c
@@ -16,6 +17,7 @@ src/block/block_write.c
 src/bloom/bloom.c
 src/btree/bt_bulk.c
 src/btree/bt_cache.c
+src/btree/bt_compact.c
 src/btree/bt_curnext.c
 src/btree/bt_curprev.c
 src/btree/bt_cursor.c

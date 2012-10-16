@@ -108,25 +108,6 @@ Dump all characters in a hexadecimal encoding (the default is to leave
 printable characters unencoded).
 
 <hr>
-@section util_dumpfile wt dumpfile
-Dump a file in a debugging format.
-
-The \c dumpfile command dumps the specified physical file in a non-portable,
-debugging format, exiting success if the file is correct, and failure if the
-file is corrupted.
-
-@subsection util_dumpfile_synopsis Synopsis
-<code>wt [-Vv] [-C config] [-h directory] dumpfile [-f output] file</code>
-
-@subsection util_dumpfile_options Options
-The following are command-specific options for the \c dumpfile command:
-
-@par <code>-f</code>
-By default, the \c dumpfile command output is written to the standard
-output; the \c -f option re-directs the output to the specified
-file.
-
-<hr>
 @section util_list wt list
 List the tables and files in the database.
 

@@ -56,7 +56,7 @@ usage(void)
 {
 	(void)fprintf(stderr,
 	    "usage: %s %s "
-	    "upgrade file\n",
+	    "upgrade uri\n",
 	    progname, usage_prefix);
 	return (1);
 }
