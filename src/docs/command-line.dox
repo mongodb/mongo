@@ -48,6 +48,19 @@ database; the \c -t option changes the \c backup command to do a hot
 backup of only the named objects.
 
 <hr>
+@section util_compact wt compact
+Compact a table or file.
+
+The \c compact command attempts to rewrite the specified table or file
+to consume less disk space.
+
+@subsection util_compact_synopsis Synopsis
+<code>wt [-Vv] [-C config] [-h directory] compact uri</code>
+
+@subsection util_compact_options Options
+The \c compact command has no command-specific options.
+
+<hr>
 @section util_create wt create
 Create a table or file.
 
