@@ -24,6 +24,7 @@ __wt_hazard_set(WT_SESSION_IMPL *session, WT_REF *ref, int *busyp
 {
 	WT_BTREE *btree;
 	WT_HAZARD *hp;
+	int restarts = 0;
 
 	btree = session->btree;
 	*busyp = 0;
@@ -45,12 +46,23 @@ __wt_hazard_set(WT_SESSION_IMPL *session, WT_REF *ref, int *busyp
 	 * reference before it discards the page (the eviction server sets the
 	 * state to WT_REF_LOCKED, then flushes memory and checks the hazard
 	 * references).
+	 *
+	 * For sessions with many active hazard references, skip most of the
+	 * active slots: there may be a free slot in there, but checking is
+	 * expensive.  Most hazard references are released quickly: optimize
+	 * for that case.
 	 */
-	for (hp = session->hazard; ; ++hp) {
+	for (hp = session->hazard + session->nhazard;; ++hp) {
 		/* Expand the number of hazard references if available.*/
 		if (hp >= session->hazard + session->hazard_size) {
 			if (session->hazard_size >= S2C(session)->hazard_max)
 				break;
+			/* Restart the search. */
+			if (session->nhazard < session->hazard_size &&
+			    restarts++ == 0) {
+				hp = session->hazard;
+				continue;
+			}
 			WT_PUBLISH(session->hazard_size,
 			    WT_MIN(session->hazard_size + WT_HAZARD_INCR,
 			    S2C(session)->hazard_max));
@@ -134,9 +146,13 @@ __wt_hazard_clear(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 */
 	WT_ASSERT(session, page != NULL);
 
-	/* Clear the caller's hazard pointer. */
-	for (hp = session->hazard;
-	    hp < session->hazard + session->hazard_size; ++hp)
+	/*
+	 * Clear the caller's hazard pointer.
+	 * The common pattern is LIFO, so do a reverse search.
+	 */
+	for (hp = session->hazard + session->hazard_size - 1;
+	    hp >= session->hazard;
+	    --hp)
 		if (hp->page == page) {
 			/*
 			 * We don't publish the hazard reference clear in the

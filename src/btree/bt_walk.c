@@ -245,8 +245,7 @@ descend:	for (;;) {
 			set_read_gen = 0;
 			if (eviction) {
 				if (!WT_ATOMIC_CAS(ref->state,
-				    WT_REF_MEM, WT_REF_EVICT_WALK) &&
-				    ref->state != WT_REF_EVICT_FORCE)
+				    WT_REF_MEM, WT_REF_EVICT_WALK))
 					break;
 			} else if (discard) {
 				/*
