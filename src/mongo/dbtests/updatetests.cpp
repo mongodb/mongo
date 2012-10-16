@@ -861,7 +861,6 @@ namespace UpdateTests {
                 auto_ptr<ModSetState> modSetState = modSet.prepare( obj );
                 ASSERT_FALSE( modSetState->canApplyInPlace() );
                 modSetState->createNewFromMods();
-                // This is incorrectly logged as { $set:{ 'a.b':[ 1 ]}, $unset:{ 'a.c':1 } }.
                 ASSERT_EQUALS( fromjson( "{ $set:{ 'a.b':[ 1 ] }, $set:{ 'a.c':[ 1 ] } }" ),
                                modSetState->getOpLogRewrite() );
             }
