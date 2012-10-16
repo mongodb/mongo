@@ -31,6 +31,7 @@
 
 #include "mongo/db/dbhelpers.h"
 #include "../db/commands.h"
+#include "mongo/db/hasher.h"
 #include "../db/jsobj.h"
 #include "../db/cmdline.h"
 #include "../db/queryoptimizer.h"
@@ -241,9 +242,12 @@ namespace mongo {
 
     };
 
-    bool isInRange( const BSONObj& obj , const BSONObj& min , const BSONObj& max ) {
-        BSONObj k = obj.extractFields( min, true );
-
+    bool isInRange( const BSONObj& obj ,
+                    const BSONObj& min ,
+                    const BSONObj& max ,
+                    const BSONObj& shardKeyPattern ) {
+        ShardKeyPattern shardKey( shardKeyPattern );
+        BSONObj k = shardKey.extractKey( obj );
         return k.woCompare( min ) >= 0 && k.woCompare( max ) < 0;
     }
 
@@ -363,7 +367,7 @@ namespace mongo {
 
             }
 
-            if ( ! isInRange( it , _min , _max ) )
+            if ( ! isInRange( it , _min , _max , _shardKeyPattern ) )
                 return;
 
             _reload.push_back( ide.wrap() );
@@ -1693,7 +1697,7 @@ namespace mongo {
                     // do not apply deletes if they do not belong to the chunk being migrated
                     BSONObj fullObj;
                     if ( Helpers::findById( cc() , ns.c_str() , id, fullObj ) ) {
-                        if ( ! isInRange( fullObj , min , max ) ) {
+                        if ( ! isInRange( fullObj , min , max , shardKeyPattern ) ) {
                             log() << "not applying out of range deletion: " << fullObj << migrateLog;
 
                             continue;
@@ -1945,13 +1949,23 @@ namespace mongo {
         void run() {
             BSONObj min = BSON( "x" << 1 );
             BSONObj max = BSON( "x" << 5 );
+            BSONObj skey = BSON( "x" << 1 );
 
-            verify( ! isInRange( BSON( "x" << 0 ) , min , max ) );
-            verify( isInRange( BSON( "x" << 1 ) , min , max ) );
-            verify( isInRange( BSON( "x" << 3 ) , min , max ) );
-            verify( isInRange( BSON( "x" << 4 ) , min , max ) );
-            verify( ! isInRange( BSON( "x" << 5 ) , min , max ) );
-            verify( ! isInRange( BSON( "x" << 6 ) , min , max ) );
+            verify( ! isInRange( BSON( "x" << 0 ) , min , max , skey ) );
+            verify( isInRange( BSON( "x" << 1 ) , min , max , skey ) );
+            verify( isInRange( BSON( "x" << 3 ) , min , max , skey ) );
+            verify( isInRange( BSON( "x" << 4 ) , min , max , skey ) );
+            verify( ! isInRange( BSON( "x" << 5 ) , min , max , skey ) );
+            verify( ! isInRange( BSON( "x" << 6 ) , min , max , skey ) );
+
+            BSONObj obj = BSON( "n" << 3 );
+            BSONObj min2 = BSON( "x" << BSONElementHasher::hash64( obj.firstElement() , 0 ) - 2 );
+            BSONObj max2 = BSON( "x" << BSONElementHasher::hash64( obj.firstElement() , 0 ) + 2 );
+            BSONObj hashedKey =  BSON( "x" << "hashed" );
+
+            verify( isInRange( BSON( "x" << 3 ) , min2 , max2 , hashedKey ) );
+            verify( ! isInRange( BSON( "x" << 3 ) , min , max , hashedKey ) );
+            verify( ! isInRange( BSON( "x" << 4 ) , min2 , max2 , hashedKey ) );
 
             LOG(1) << "isInRangeTest passed" << migrateLog;
         }
