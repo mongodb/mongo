@@ -285,7 +285,7 @@ descend:	for (;;) {
 					if (skip)
 						break;
 					set_read_gen =
-					    ref->page == WT_REF_DISK ? 1 : 0;
+					    ref->state == WT_REF_DISK ? 1 : 0;
 				}
 
 				WT_RET(__wt_page_in(session, page, ref));
