@@ -2,7 +2,8 @@
 
 s = new ShardingTest( "sync2" , 3 , 50 , 2 , { sync : true } );
 
-s.stopBalancer()
+//s.stopBalancer()
+s.config.settings.update( { _id: "balancer" }, { $set : { stopped: true } } , true );
 
 s2 = s._mongos[1];
 
