@@ -74,6 +74,8 @@ __wt_block_compact_page_skip(WT_SESSION_IMPL *session,
 	uint32_t size, cksum;
 
 	WT_UNUSED(addr_size);
+	*skipp = 0;			/* Paranoia: skip on error. */
+
 	fh = block->fh;
 
 	/* Crack the cookie. */
