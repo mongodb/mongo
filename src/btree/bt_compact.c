@@ -20,35 +20,29 @@ __wt_compact(WT_SESSION_IMPL *session, const char *cfg[])
 
 	WT_UNUSED(cfg);
 
+	/* Check if compaction might be useful. */
 	WT_RET(__wt_bm_compact_skip(session, &skip));
 	if (skip)
 		return (0);
 
+	/*
+	 * Invoke the eviction server to review in-memory pages to see if they
+	 * need to be re-written (we must use the eviction server because it's
+	 * the only thread that can safely look at page reconciliation values).
+	 */
+	WT_RET(__wt_sync_file_serial(session, WT_SYNC_COMPACT));
+	__wt_evict_server_wake(session);
+	__wt_cond_wait(session, session->cond);
+	WT_RET(session->syncop_ret);
+
+	/*
+	 * Walk the tree reviewing all of the on-disk pages to see if they
+	 * need to be re-written.
+	 */
 	for (page = NULL;;) {
 		WT_RET(__wt_tree_walk(session, &page, WT_TREE_COMPACT));
 		if (page == NULL)
 			break;
-
-		/* If the page is already dirty, skip some work. */
-		if (__wt_page_is_modified(page))
-			continue;
-
-		/*
-		 * Reconciliation structures can be modified while the page is
-		 * being read, and we need to be careful about looking inside
-		 * them: for example, if the page is being replaced, we'd look
-		 * at the replacement address to decide if the page needs to be
-		 * re-written, not the original disk address.  However, if the
-		 * page were splitting, the replacement address is changing,
-		 * we don't have any kind of lock on that information.  We do
-		 * ignore pages we're going to discard anyway (expected after
-		 * a large delete), nothing involved in that test can move
-		 * underfoot, and the worst a race can cause is we incorrectly
-		 * re-write (or don't re-write), a page.
-		 */
-		if (page->modify != NULL &&
-		    F_ISSET(page->modify, WT_PM_REC_EMPTY))
-			continue;
 
 		/* Mark the page and tree dirty, we want to write this page. */
 		if ((ret = __wt_page_modify_init(session, page)) != 0) {
@@ -80,10 +74,20 @@ __wt_compact_page_skip(
 	 * rewrite won't help, we don't want to do I/O for nothing.  For that
 	 * reason, this check is done in a call from inside the tree-walking
 	 * routine.
-	 *	Test using the original disk address of the page.  That isn't
-	 * necessarily the best choice (if the page has been reconciled and
-	 * replaced, the replacement address is a better choice), but we don't
-	 * even have the page pinned, the original address is all we have).
+	 *
+	 * Ignore everything but on-disk pages, the eviction server has already
+	 * done a pass over the in-memory pages.
+	 */
+	if (ref->state != WT_REF_DISK) {
+		*skipp = 1;
+		return (0);
+	}
+
+	/*
+	 * We test using the original disk address of the page, because that's
+	 * all way have.  The eviction server was invoked to test the in-memory
+	 * pages because it's the only way to safely look at the reconciliation
+	 * information, which has newer addresses.
 	 */
 	__wt_get_addr(parent, ref, &addr, &addr_size);
 	if (addr == NULL) {
@@ -92,4 +96,82 @@ __wt_compact_page_skip(
 	}
 
 	return (__wt_bm_compact_page_skip(session, addr, addr_size, skipp));
+}
+
+/*
+ * __wt_compact_evict --
+ *	Helper routine for the eviction thread to decide if a file's size would
+ * benefit from re-writing this page.
+ */
+int
+__wt_compact_evict(WT_SESSION_IMPL *session, WT_PAGE *page)
+{
+	WT_PAGE_MODIFY *mod;
+	int skip;
+	uint32_t addr_size;
+	const uint8_t *addr;
+
+	mod = page->modify;
+
+	/*
+	 * We're using the eviction thread in compaction because it can safely
+	 * look at page reconciliation information, no pages are being evicted
+	 * if the eviction is busy here.  That's not good for performance and
+	 * implies compaction will impact performance, but right now it's the
+	 * only way to safely look at reconciliation information.
+	 *
+	 * The reason we need to look at reconciliation information is that an
+	 * in-memory page's original disk addresses might have been fine for
+	 * compaction, but its replacement addresses might be a problem.
+	 *
+	 * If the page is already dirty, skip some work.
+	 */
+	if (__wt_page_is_modified(page))
+		return (0);
+
+	/*
+	 * If the page is clean, test the original addresses.  Otherwise, test
+	 * the replacement addresses if the page is a 1-to-1 replacement, and
+	 * just write any split pages, it's simpler than figuring out if they
+	 * need to be written or not.
+	 */
+	if (mod == NULL)
+		goto disk;
+
+	switch (F_ISSET(mod, WT_PM_REC_MASK)) {
+	case 0:
+disk:		__wt_get_addr(page->parent, page->ref, &addr, &addr_size);
+		if (addr == NULL)
+			return (0);
+		WT_RET(
+		    __wt_bm_compact_page_skip(session, addr, addr_size, &skip));
+		if (skip)
+			return (0);
+		break;
+	case WT_PM_REC_EMPTY:
+		return (0);
+	case WT_PM_REC_REPLACE:
+		/*
+		 * Ignore the root: it may not have a replacement address, and
+		 * if anything else gets written, so will it.
+		 */
+		if (WT_PAGE_IS_ROOT(page))
+			return (0);
+
+		WT_RET(__wt_bm_compact_page_skip(
+		    session, mod->u.replace.addr, mod->u.replace.size, &skip));
+		if (skip)
+			return (0);
+		break;
+	case WT_PM_REC_SPLIT:
+	case WT_PM_REC_SPLIT_MERGE:
+		break;
+	}
+
+	/* Mark the page and tree dirty, we want to write this page. */
+	WT_RET(__wt_page_modify_init(session, page));
+	__wt_page_and_tree_modify_set(session, page);
+
+	WT_BSTAT_INCR(session, file_compact_rewrite);
+	return (0);
 }
