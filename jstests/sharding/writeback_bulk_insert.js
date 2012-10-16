@@ -58,7 +58,7 @@ var dataCloseTo8MB = data7MB;
 // WARNING - MAGIC NUMBERS HERE
 // The idea is to exceed the 16MB limit by just enough so that the message gets
 // passed in the
-// shell, but adding additional writeback information fails.
+// shell, but adding additional writeback information could fail.
 for ( var i = 0; i < 1031 * 1024 + 862; i++) {
     dataCloseTo8MB += "x"
 }
@@ -78,12 +78,13 @@ collB.insert([{_id : 0,
 // Will hang if overflow is not detected correctly
 jsTest.log("Waiting for GLE...")
 
-assert.neq(null, collB.getDB().getLastError())
+// No error thrown with new batching logic.
+assert.eq(null, collB.getDB().getLastError())
 
-print("GLE correctly returned error...")
+print("GLE correctly returned, error not thrown.")
 
-assert.eq(3, collA.find().itcount())
-assert.eq(3, collB.find().itcount())
+assert.eq(5, collA.find().itcount())
+assert.eq(5, collB.find().itcount())
 
 var data8MB = "";
 for ( var i = 0; i < 8; i++) {
@@ -97,9 +98,9 @@ print("Object size is: " + Object.bsonsize([{_id : 0,
 
 jsTest.log("Trigger wbl for mongosC...")
 
-collC.insert([{_id : 0,
+collC.insert([{_id : 2,
                d : data8MB},
-              {_id : 1,
+              {_id : 3,
                d : data8MB}])
 
 // Should succeed since our insert size is 16MB (plus very small overhead)
@@ -109,8 +110,8 @@ assert.eq(null, collC.getDB().getLastError())
 
 print("GLE Successful...")
 
-assert.eq(5, collA.find().itcount())
-assert.eq(5, collB.find().itcount())
-assert.eq(5, collC.find().itcount())
+assert.eq(7, collA.find().itcount())
+assert.eq(7, collB.find().itcount())
+assert.eq(7, collC.find().itcount())
 
 st.stop()
