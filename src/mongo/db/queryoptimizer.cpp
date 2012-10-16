@@ -1611,7 +1611,13 @@ doneCheckOrder:
             // No matches are possible in the index so the index may be useful.
             return true;   
         }
-        return d->idx( idxNo ).getSpec().suitability( frsp.simplifiedQueryForIndex( d, idxNo, keyPattern ), order ) != USELESS;
+        // Hashed index types can't use simplified query bounds, since they could turn equalities
+        // into ranges, e.g.{$in : [1,2] } into {$gte : 1 , $lte : 2}
+        // TODO: refactor suitability to take a FieldRangeSetPair, and get rid of this special case
+        // See SERVER-5858.
+        BSONObj query = ( d->idx( idxNo ).getSpec().getTypeName() == "hashed" ) ?
+                        frsp.originalQuery() : frsp.simplifiedQueryForIndex( d, idxNo, keyPattern );
+        return d->idx( idxNo ).getSpec().suitability( query, order ) != USELESS;
     }
     
     void QueryUtilIndexed::clearIndexesForPatterns( const FieldRangeSetPair &frsp, const BSONObj &order ) {
