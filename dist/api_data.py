@@ -407,6 +407,10 @@ methods = {
 		including the named checkpoint.  Checkpoints cannot be
 		dropped while a hot backup is in progress or if open in
 		a cursor''', type='list'),
+	Config('force', 'false', r'''
+		checkpoints may be skipped if the underlying object has not
+		been modified, this option forces the checkpoint''',
+		type='boolean'),
 	Config('name', '', r'''
 		if non-empty, specify a name for the checkpoint'''),
 	Config('target', '', r'''

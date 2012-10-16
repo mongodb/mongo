@@ -182,11 +182,12 @@ __wt_confchk_session_begin_transaction[] = {
 
 const char *
 __wt_confdfl_session_checkpoint =
-	"drop=,name=,target=";
+	"drop=,force=0,name=,target=";
 
 WT_CONFIG_CHECK
 __wt_confchk_session_checkpoint[] = {
 	{ "drop", "list", NULL },
+	{ "force", "boolean", NULL },
 	{ "name", "string", NULL },
 	{ "target", "list", NULL },
 	{ NULL, NULL, NULL }
