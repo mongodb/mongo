@@ -248,10 +248,6 @@ static void __rec_dictionary_reset(WT_RECONCILE *);
  *
  * We clearly want to consider all normal, in-memory pages (WT_REF_MEM).
  *
- * While we are processing a sync request in case (1), pages in the file may be
- * awaiting forced eviction (WT_REF_EVICT_FORCE).  Those pages must be included
- * in the sync, otherwise it will be incomplete.
- *
  * During LRU eviction in case (3), the eviction code has already locked the
  * subtree, so locked pages should be included in the merge (WT_REF_LOCKED).
  *
@@ -294,7 +290,6 @@ __rec_page_modified(WT_SESSION_IMPL *session,
 			    __rec_page_deleted(session, r, page, ref, modifyp);
 			WT_PUBLISH(ref->state, WT_REF_DELETED);
 			return (ret);
-		case WT_REF_EVICT_FORCE:
 		case WT_REF_EVICT_WALK:
 		case WT_REF_LOCKED:
 		case WT_REF_MEM:
