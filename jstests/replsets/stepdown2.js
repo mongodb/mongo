@@ -69,9 +69,12 @@ catch (e) {
 print("\nawait");
 replTest.awaitReplication();
 
-master = replTest.getMaster();
+assert.soon(function() {
+    master = replTest.getMaster();
+    return master == replTest.nodes[0];
+});
 var firstMaster = master;
-print("\nmaster is now "+firstMaster);
+print("\nmaster is now 31000");
 
 try {
     printjson(master.getDB("admin").runCommand({replSetStepDown : 100, force : true}));
@@ -92,8 +95,7 @@ assert.soon(function() {
 print("\ncheck shutdown command on 31000");
 
 master = replTest.liveNodes.master;
-var slave = replTest.liveNodes.slaves[0];
-var slaveId = replTest.getNodeId(slave);
+var slave = replTest.nodes[0];
 
 try {
     slave.adminCommand({shutdown :1})
