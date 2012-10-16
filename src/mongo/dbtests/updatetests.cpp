@@ -852,6 +852,22 @@ namespace UpdateTests {
             }
         };
 
+        class TwoNestedPulls {
+        public:
+            void run() {
+                BSONObj obj = fromjson( "{ a:{ b:[ 1, 2 ], c:[ 1, 2 ] } }" );
+                BSONObj mod = fromjson( "{ $pull:{ 'a.b':2, 'a.c':2 } }" );
+                ModSet modSet( mod );
+                auto_ptr<ModSetState> modSetState = modSet.prepare( obj );
+                ASSERT_FALSE( modSetState->canApplyInPlace() );
+                modSetState->createNewFromMods();
+                // This is incorrectly logged as { $set:{ 'a.b':[ 1 ]}, $unset:{ 'a.c':1 } }.
+                ASSERT_EQUALS( fromjson( "{ $set:{ 'a.b':[ 1 ] }, $set:{ 'a.c':[ 1 ] } }" ),
+                               modSetState->getOpLogRewrite() );
+            }
+        };
+
+
         // Pop is only applied in place if the target array remains the same size (i.e. if
         // it is empty already.
         class PopRewriteEmptyArray {
@@ -1358,6 +1374,7 @@ namespace UpdateTests {
             add< ModSetTests::PullRewriteExistingField >();
             add< ModSetTests::PullRewriteLastExistingField >();
             add< ModSetTests::PullRewriteNonExistingField >();
+            add< ModSetTests::TwoNestedPulls >();
             add< ModSetTests::PopRewriteEmptyArray >();
             add< ModSetTests::PopRewriteLastElement >();
             add< ModSetTests::PopRewriteExistingField >();
