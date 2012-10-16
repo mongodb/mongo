@@ -332,8 +332,6 @@ namespace mongo {
                                 gle = b.obj();
                             }
 
-                            log() << "GLE is " << gle << endl;
-
                             if ( gle["code"].numberInt() == 9517 ) {
 
                                 log() << "new version change detected, "
