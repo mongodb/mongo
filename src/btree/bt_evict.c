@@ -443,10 +443,7 @@ __evict_file_request(WT_SESSION_IMPL *session, int syncop)
 			break;
 		case WT_SYNC:
 		case WT_SYNC_DISCARD:
-			/*
-			 * Write dirty pages for sync and sync with discard.
-			 * Evict the page for sync with discard.
-			 */
+			/* Write dirty pages for sync and sync with discard. */
 			if (__wt_page_is_modified(page))
 				WT_ERR(__wt_rec_write(
 				    session, page, NULL, WT_REC_SINGLE));
@@ -454,6 +451,7 @@ __evict_file_request(WT_SESSION_IMPL *session, int syncop)
 				break;
 
 			/*
+			 * Evict the page for sync with discard.
 			 * Do not attempt to evict pages expected to be merged
 			 * into their parents, with the single exception that
 			 * the root page can't be merged into anything, it must

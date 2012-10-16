@@ -83,12 +83,6 @@ __wt_compact_page_skip(
 		return (0);
 	}
 
-	/*
-	 * We test using the original disk address of the page, because that's
-	 * all way have.  The eviction server was invoked to test the in-memory
-	 * pages because it's the only way to safely look at the reconciliation
-	 * information, which has newer addresses.
-	 */
 	__wt_get_addr(parent, ref, &addr, &addr_size);
 	if (addr == NULL) {
 		*skipp = 1;
@@ -124,7 +118,8 @@ __wt_compact_evict(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * in-memory page's original disk addresses might have been fine for
 	 * compaction, but its replacement addresses might be a problem.
 	 *
-	 * If the page is already dirty, skip some work.
+	 * If the page is already dirty, skip some work, it will be written in
+	 * any case.
 	 */
 	if (__wt_page_is_modified(page))
 		return (0);
