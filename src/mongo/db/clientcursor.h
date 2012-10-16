@@ -31,7 +31,6 @@
 #include "cursor.h"
 #include "jsobj.h"
 #include "../util/net/message.h"
-#include "../util/net/listen.h"
 #include "../util/background.h"
 #include "diskloc.h"
 #include "dbhelpers.h"
@@ -39,6 +38,7 @@
 #include "projection.h"
 #include "s/d_chunk_manager.h"
 #include "mongo/db/keypattern.h"
+#include "mongo/util/elapsed_tracker.h"
 
 namespace mongo {
 

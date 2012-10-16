@@ -30,6 +30,7 @@
 #include "ops/delete.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/repl/bgsync.h"
+#include "mongo/util/elapsed_tracker.h"
 
 namespace mongo {
 
