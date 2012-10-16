@@ -73,12 +73,13 @@ namespace mongo {
         uassert( 16244 , "Error: hashed indexes do not currently support array values" , fieldVal.type() != Array );
 
         if ( ! fieldVal.eoo() ) {
-            BSONObj key = _keyPattern.extractSingleKey( obj ) ;
+            BSONObj key = BSON( "" << makeSingleKey( fieldVal , _seed , _hashVersion  ) );
             keys.insert( key );
         }
         else if (! _isSparse ) {
             BSONObj nullobj = BSON( _hashedField << BSONNULL );
-            BSONObj key = _keyPattern.extractSingleKey( nullobj );
+            BSONElement nullElt = nullobj.firstElement();
+            BSONObj key = BSON( "" << makeSingleKey( nullElt , _seed , _hashVersion  ) );
             keys.insert( key );
         }
     }
