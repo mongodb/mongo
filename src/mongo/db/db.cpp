@@ -738,31 +738,7 @@ static void buildOptionsDescriptions(po::options_description *pVisible,
     Module::addOptions( visible_options );
 }
 
-static int mongoDbMain(int argc, char* argv[], char **envp) {
-    static StaticObserver staticObserver;
-
-    getcurns = ourgetns;
-    mongo::runGlobalInitializersOrDie(argc, argv, envp);
-
-    setupCoreSignals();
-    setupSignals( false );
-
-    dbExecCommand = argv[0];
-
-    srand(curTimeMicros());
-
-    {
-        unsigned x = 0x12345678;
-        unsigned char& b = (unsigned char&) x;
-        if ( b != 0x78 ) {
-            out() << "big endian cpus not yet supported" << endl;
-            return 33;
-        }
-    }
-
-    if( argc == 1 )
-        cout << dbExecCommand << " --help for help and startup options" << endl;
-
+static void processCommandLineOptions(const std::vector<std::string>& argv) {
     po::options_description visible_options("Allowed options");
     po::options_description hidden_options("Hidden options");
     po::positional_options_description positional_options;
@@ -771,7 +747,7 @@ static int mongoDbMain(int argc, char* argv[], char **envp) {
     {
         po::variables_map params;
 
-        if (!CmdLine::store(std::vector<std::string>(argv, argv + argc),
+        if (!CmdLine::store(argv,
                             visible_options,
                             hidden_options,
                             positional_options,
@@ -1077,12 +1053,25 @@ static int mongoDbMain(int argc, char* argv[], char **envp) {
         if( cmdLine.pretouch )
             log() << "--pretouch " << cmdLine.pretouch << endl;
 
+        if (sizeof(void*) == 4 && !journalExplicit){
+            // trying to make this stand out more like startup warnings
+            log() << endl;
+            warning() << "32-bit servers don't have journaling enabled by default. Please use --journal if you want durability." << endl;
+            log() << endl;
+        }
+
+        if (params.count("enableFaultInjection")) {
+            enableFailPointCmd();
+        }
+
+        Module::configAll(params);
+
 #ifdef _WIN32
         ntservice::configureService(initService,
                                     params,
                                     defaultServiceStrings,
                                     std::vector<std::string>(),
-                                    std::vector<std::string>(argv, argv + argc));
+                                    argv);
 #endif  // _WIN32
 
 #ifdef __linux__
@@ -1129,34 +1118,49 @@ static int mongoDbMain(int argc, char* argv[], char **envp) {
             ::_exit(EXIT_SUCCESS);
         }
 #endif
+    }
+}
 
-        CmdLine::censor(argc, argv);
+static int mongoDbMain(int argc, char* argv[], char **envp) {
+    static StaticObserver staticObserver;
 
-        if (!initializeServerGlobalState())
-            ::_exit(EXIT_FAILURE);
+    getcurns = ourgetns;
 
-        Module::configAll( params );
+    setupCoreSignals();
+    setupSignals( false );
 
-        dataFileSync.go();
+    dbExecCommand = argv[0];
 
-#if defined(_WIN32)
-        if (ntservice::shouldStartService()) {
-            ntservice::startService();
-            // exits directly and so never reaches here either.
-        }
-#endif
+    srand(curTimeMicros());
 
-        if (sizeof(void*) == 4 && !journalExplicit){
-            // trying to make this stand out more like startup warnings
-            log() << endl;
-            warning() << "32-bit servers don't have journaling enabled by default. Please use --journal if you want durability." << endl;
-            log() << endl;
-        }
-
-        if (params.count("enableFaultInjection")) {
-            enableFailPointCmd();
+    {
+        unsigned x = 0x12345678;
+        unsigned char& b = (unsigned char&) x;
+        if ( b != 0x78 ) {
+            out() << "big endian cpus not yet supported" << endl;
+            return 33;
         }
     }
+
+    if( argc == 1 )
+        cout << dbExecCommand << " --help for help and startup options" << endl;
+
+
+    processCommandLineOptions(std::vector<std::string>(argv, argv + argc));
+    mongo::runGlobalInitializersOrDie(argc, argv, envp);
+    CmdLine::censor(argc, argv);
+
+    if (!initializeServerGlobalState())
+        ::_exit(EXIT_FAILURE);
+
+    dataFileSync.go();
+
+#if defined(_WIN32)
+    if (ntservice::shouldStartService()) {
+        ntservice::startService();
+        // exits directly and so never reaches here either.
+    }
+#endif
 
     StartupTest::runTests();
     initAndListen(cmdLine.port);
