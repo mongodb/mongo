@@ -138,5 +138,6 @@ prefix = GetOption("prefix")
 env.Install(prefix + "/lib", '${LIBPREFIX}mongoclient${LIBSUFFIX}')
 
 for x in clientHeaderDirectories:
-    env.Install(prefix + "/include/mongo/" + x,
-                [Glob('mongo/%s*.h' % x), Glob('mongo/%s*.hpp' % x)])
+    inst = env.Install(prefix + "/include/mongo/" + x,
+                       [Glob('mongo/%s*.h' % x), Glob('mongo/%s*.hpp' % x)])
+    env.AddPostAction(inst, Chmod('$TARGET', 0644))
