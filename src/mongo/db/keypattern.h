@@ -23,7 +23,7 @@
 
 namespace mongo {
 
-    class FieldInterval;
+    struct FieldInterval;
     class FieldRangeSet;
 
     /**
