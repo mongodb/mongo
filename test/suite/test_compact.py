@@ -28,11 +28,12 @@
 import os
 import wiredtiger, wttest
 from helper import complex_populate, simple_populate, key_populate
+from suite_subprocess import suite_subprocess
 from wtscenario import multiply_scenarios, number_scenarios
 
 # test_compact.py
 #    session level compact operation
-class test_compact(wttest.WiredTigerTestCase):
+class test_compact(wttest.WiredTigerTestCase, suite_subprocess):
     name = 'test_compact'
 
     # Use a small page size because we want to create lots of pages.
@@ -43,11 +44,12 @@ class test_compact(wttest.WiredTigerTestCase):
         ('file', dict(uri='file:')),
         ('table', dict(uri='table:'))
         ]
-    reopen = [
-        ('yes', dict(reopen=1)),
-        ('no', dict(reopen=0)),
+    compact = [
+        ('method', dict(utility=0,reopen=0)),
+        ('method_reopen', dict(utility=0,reopen=1)),
+        ('utility', dict(utility=1,reopen=0)),
     ]
-    scenarios = number_scenarios(multiply_scenarios('.', types, reopen))
+    scenarios = number_scenarios(multiply_scenarios('.', types, compact))
 
     # Test compaction.
     def test_compact(self):
@@ -70,17 +72,23 @@ class test_compact(wttest.WiredTigerTestCase):
         c1.close()
         c2.close()
 
-        # Optionally reopen the connection so we do more on-disk tests.
-        if self.reopen == 1:
+        # Compact it, using either the session method or the utility.
+        if self.utility == 1:
             self.session.checkpoint(None)
-            self.reopen_conn()
+            self.close_conn();
+            self.runWt(["compact", uri])
+        else:
+            # Optionally reopen the connection so we do more on-disk tests.
+            if self.reopen == 1:
+                self.session.checkpoint(None)
+                self.reopen_conn()
 
-        # Compact it.
-        self.session.compact(uri, None)
+            self.session.compact(uri, None)
 
         # If it's a simple object, confirm it worked.
         if self.uri == "file:":
             self.assertLess(os.stat(self.name).st_size, 10 * 1024)
+
 
 if __name__ == '__main__':
     wttest.run()
