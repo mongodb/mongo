@@ -97,5 +97,18 @@ namespace {
         ASSERT_EQUALS(ErrorCodes::NoSuchKey, cvars.setVariable("v", "15"));
     }
 
+    TEST(ConfigurationVariableManagerTest, ParseBool) {
+        ConfigurationVariableManager cvars;
+        bool a;
+        ASSERT_OK(cvars.registerVariable("a", &a));
+        ASSERT_OK(cvars.setVariable("a", "false"));
+        ASSERT_FALSE(a);
+        ASSERT_OK(cvars.setVariable("a", "true"));
+        ASSERT_TRUE(a);
+        ASSERT_OK(cvars.setVariable("a", "false"));
+        ASSERT_FALSE(a);
+        ASSERT_EQUALS(ErrorCodes::FailedToParse, cvars.setVariable("a", "False"));
+    }
+
 }  // namespace
 }  // namespace mongo
