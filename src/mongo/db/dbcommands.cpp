@@ -157,7 +157,6 @@ namespace mongo {
                  << "  { fsync:true } - fsync before returning, or wait for journal commit if running with --journal\n"
                  << "  { j:true } - wait for journal commit if running with --journal\n"
                  << "  { w:n } - await replication to n servers (including self) before returning\n"
-                 << "  { w:'majority' } - await replication to majority of set\n"
                  << "  { wtimeout:m} - timeout for w in m milliseconds";
         }
         bool run(const string& dbname, BSONObj& _cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
@@ -232,16 +231,15 @@ namespace mongo {
                     if ( anyReplEnabled() ) {
                         result.append( "wnote" , "no write has been done on this connection" );
                     }
-                    else if ( e.numberInt() > 1 ) {
+                    else if ( e.isNumber() && e.numberInt() <= 1 ) {
+                        // don't do anything
+                        // w=1 and no repl, so this is fine
+                    }
+                    else {
                         // w=2 and no repl
                         result.append( "wnote" , "no replication has been enabled, so w=2+ won't work" );
                         result.append( "err", "norepl" );
                         return true;
-                    }
-                    else {
-                        // don't do anything
-                        // w=1 and no repl, so this is fine
-                        // w:majority lands here too
                     }
 
                     result.appendNull( "err" );
