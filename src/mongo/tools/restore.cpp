@@ -177,6 +177,7 @@ public:
     }
 
     void drillDown( boost::filesystem::path root, bool use_db, bool use_coll, bool top_level=false ) {
+        bool json_metadata = false;
         LOG(2) << "drillDown: " << root.string() << endl;
 
         // skip hidden files and directories
@@ -209,6 +210,11 @@ public:
                     }
                 }
 
+                // Ignore system.indexes.bson if we have *.metadata.json files
+                if ( endsWith( p.string().c_str() , ".metadata.json" ) ) {
+                    json_metadata = true;
+                }
+
                 // don't insert oplog
                 if (top_level && !use_db && p.leaf() == "oplog.bson")
                     continue;
@@ -220,8 +226,9 @@ public:
                 }
             }
 
-            if (!indexes.empty())
+            if (!indexes.empty() && !json_metadata) {
                 drillDown(indexes, use_db, use_coll);
+            }
 
             return;
         }

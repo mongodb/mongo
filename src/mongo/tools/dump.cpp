@@ -218,9 +218,12 @@ public:
               error() << "Cannot dump "  << name << ". Collection has '/' or null in the collection name." << endl;
               continue;
             }
-            
-            // Don't dump indexes
+
             if ( endsWith(name.c_str(), ".system.indexes") ) {
+              // Create system.indexes.bson for compatibility with pre 2.2 mongorestore
+              const string filename = name.substr( db.size() + 1 );
+              writeCollectionFile( name.c_str() , outdir / ( filename + ".bson" ) );
+              // Don't dump indexes as *.metadata.json
               continue;
             }
             
