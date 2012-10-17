@@ -82,8 +82,6 @@ namespace mongo {
 
     QueryResult* processGetMore(const char *ns, int ntoreturn, long long cursorid , CurOp& curop, int pass, bool& exhaust ) {
         exhaust = false;
-        ClientCursor::Pin p(cursorid);
-        ClientCursor *cc = p.c();
 
         int bufSize = 512 + sizeof( QueryResult ) + MaxBytesToReturnToClientAtOnce;
 
@@ -92,6 +90,14 @@ namespace mongo {
         int resultFlags = ResultFlag_AwaitCapable;
         int start = 0;
         int n = 0;
+
+        Client::ReadContext ctx(ns);
+        // call this readlocked so state can't change
+        replVerifyReadsOk();
+
+        ClientCursor::Pin p(cursorid);
+        ClientCursor *cc = p.c();
+
 
         if ( unlikely(!cc) ) {
             LOGSOME << "getMore: cursorid not found " << ns << " " << cursorid << endl;

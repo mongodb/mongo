@@ -678,10 +678,6 @@ namespace mongo {
                     }
                 }
 
-                Client::ReadContext ctx(ns);
-
-                // call this readlocked so state can't change
-                replVerifyReadsOk();
                 msgdata = processGetMore(ns, ntoreturn, cursorid, curop, pass, exhaust);
             }
             catch ( AssertionException& e ) {
