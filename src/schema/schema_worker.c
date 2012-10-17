@@ -55,7 +55,7 @@ __wt_schema_worker(WT_SESSION_IMPL *session,
 			WT_RET(ret);
 		}
 
-		/* Compaction affects index files as well. */
+		/* Compaction and checkpoint apply to index files as well. */
 		if (func == __wt_compact || func == __wt_checkpoint) {
 			WT_RET(__wt_schema_open_indices(session, table));
 			for (i = 0; i < table->nindices; i++) {
