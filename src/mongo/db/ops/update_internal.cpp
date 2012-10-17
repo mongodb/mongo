@@ -178,12 +178,16 @@ namespace mongo {
             else {
 
                 bool found = false;
-
+                int pos = 0;
+                int count = 0;
                 while ( i.more() ) {
                     BSONElement cur = i.next();
                     bb.append( cur );
-                    if ( elt.woCompare( cur , false ) == 0 )
+                    if ( elt.woCompare( cur , false ) == 0 ) {
                         found = true;
+                        pos = count;
+                    }
+                    count++;
                 }
 
                 if ( !found ) {
@@ -196,7 +200,7 @@ namespace mongo {
                      (elt.type() != Object) ) {
                     ms.fixedOpName = "$set";
                     ms.forcePositional = true;
-                    ms.position = bb.arrSize() - 1;
+                    ms.position = found ? pos : bb.arrSize() - 1;
                     bb.done();
                 }
                 else {

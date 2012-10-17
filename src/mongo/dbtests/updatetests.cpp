@@ -929,13 +929,13 @@ namespace UpdateTests {
         class AddToSetRewriteInPlace {
         public:
             void run() {
-                BSONObj obj = BSON( "a" << BSON_ARRAY( 1 ) );
+                BSONObj obj = BSON( "a" << BSON_ARRAY( 1 << 2 ) );
                 BSONObj mod = BSON( "$addToSet" << BSON( "a" << 1 ) );
                 ModSet modSet( mod );
                 auto_ptr<ModSetState> modSetState = modSet.prepare( obj );
                 ASSERT_TRUE( modSetState->canApplyInPlace() );
                 modSetState->applyModsInPlace(false);
-                ASSERT_EQUALS( BSON( "$set" << BSON( "a" << BSON_ARRAY( 1 ) ) ),
+                ASSERT_EQUALS( BSON( "$set" << BSON( "a" << BSON_ARRAY( 1 << 2 ) ) ),
                                modSetState->getOpLogRewrite() );
             }
         };
@@ -943,7 +943,7 @@ namespace UpdateTests {
         class AddToSetRewriteForceNotInPlace {
         public:
             void run() {
-                BSONObj obj = BSON( "a" << BSON_ARRAY( 1 ) );
+                BSONObj obj = BSON( "a" << BSON_ARRAY( 1 << 2 ) );
                 BSONObj mod = BSON( "$addToSet" << BSON( "a" << 1 ) );
                 ModSet modSet( mod );
                 auto_ptr<ModSetState> modSetState = modSet.prepare( obj );
