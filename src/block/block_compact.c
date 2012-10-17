@@ -34,7 +34,7 @@ __wt_block_compact_skip(
 	 * last half of the file to the first half of the file.
 	 */
 #define	WT_COMPACT_TRIGGER	30
-	if (fh->file_size <= WT_MEGABYTE)
+	if (fh->file_size <= 10 * 1024)
 		return (0);
 
 	__wt_spin_lock(session, &block->live_lock);
