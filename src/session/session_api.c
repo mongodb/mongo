@@ -313,6 +313,15 @@ __session_compact(WT_SESSION *wt_session, const char *uri, const char *config)
 
 	session = (WT_SESSION_IMPL *)wt_session;
 
+	/* Compaction makes no sense for LSM objects, ignore requests. */
+	if (WT_PREFIX_MATCH(uri, "lsm:"))
+		return (0);
+	if (!WT_PREFIX_MATCH(uri, "colgroup:") &&
+	    !WT_PREFIX_MATCH(uri, "file:") &&
+	    !WT_PREFIX_MATCH(uri, "index:") &&
+	    !WT_PREFIX_MATCH(uri, "table:"))
+		return (__wt_bad_object_type(session, uri));
+
 	/*
 	 * Compaction requires 2, and possibly 3 checkpoints, how many is block
 	 * manager specific: all block managers will need the first checkpoint,
