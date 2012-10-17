@@ -96,6 +96,7 @@ __wt_schema_destroy_index(WT_SESSION_IMPL *session, WT_INDEX *idx)
 	__wt_free(session, idx->name);
 	__wt_free(session, idx->source);
 	__wt_free(session, idx->config);
+	__wt_free(session, idx->key_format);
 	__wt_free(session, idx->key_plan);
 	__wt_free(session, idx->value_plan);
 	__wt_free(session, idx->idxkey_format);

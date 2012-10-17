@@ -192,7 +192,9 @@ read_thread(void *arg)
 		cursor->set_key(cursor, key_buf);
 		cursor->search(cursor);
 	}
+
 	session->close(session, NULL);
+	free(key_buf);
 	return (arg);
 }
 

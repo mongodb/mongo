@@ -289,9 +289,9 @@ __curindex_close(WT_CURSOR *cursor)
 	__wt_free(session, cindex->cg_cursors);
 	if (cindex->key_plan != idx->key_plan)
 		__wt_free(session, cindex->key_plan);
-	if (cindex->value_plan != idx->value_plan)
-		__wt_free(session, cindex->value_plan);
 	if (cursor->value_format != cindex->table->value_format)
+		__wt_free(session, cursor->value_format);
+	if (cindex->value_plan != idx->value_plan)
 		__wt_free(session, cindex->value_plan);
 
 	WT_TRET(__wt_btcur_close(&cindex->cbt));
