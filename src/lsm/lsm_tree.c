@@ -24,9 +24,18 @@ __lsm_tree_discard(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	if (F_ISSET(lsm_tree, WT_LSM_TREE_OPEN))
 		TAILQ_REMOVE(&S2C(session)->lsmqh, lsm_tree, q);
 
+	__wt_free(session, lsm_tree->name);
+	__wt_free(session, lsm_tree->config);
+	__wt_free(session, lsm_tree->key_format);
+	__wt_free(session, lsm_tree->value_format);
+	__wt_free(session, lsm_tree->file_config);
+
+	if (lsm_tree->rwlock != NULL)
+		__wt_rwlock_destroy(session, &lsm_tree->rwlock);
+
+	__wt_free(session, lsm_tree->stats);
 	__wt_spin_destroy(session, &lsm_tree->lock);
 
-	__wt_free(session, lsm_tree->name);
 	for (i = 0; i < lsm_tree->nchunks; i++) {
 		if ((chunk = lsm_tree->chunk[i]) == NULL)
 			continue;
@@ -46,8 +55,6 @@ __lsm_tree_discard(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 		__wt_free(session, chunk);
 	}
 	__wt_free(session, lsm_tree->old_chunks);
-	__wt_free(session, lsm_tree->stats);
-
 	__wt_free(session, lsm_tree);
 }
 
