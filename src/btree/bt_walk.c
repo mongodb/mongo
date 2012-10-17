@@ -58,24 +58,10 @@ __tree_walk_delete(
 
 	/*
 	 * If the page is already instantiated in-memory, other threads may be
-	 * using it: no fast delete.
-	 */
-	if (ref->state != WT_REF_DISK)
-		return (0);
-
-	/*
-	 * If the page references overflow items, we have to clean it up during
-	 * reconciliation, no fast delete.
-	 */
-	if (!__wt_off_page(page, ref->addr)) {
-		__wt_cell_unpack(ref->addr, &unpack);
-		if (unpack.raw != WT_CELL_ADDR_LNO)
-			return (0);
-	}
-
-	/*
-	 * Atomically switch the page's state to delete it.  If the page state
-	 * changed underneath us, no fast delete.
+	 * using it, no fast delete.
+	 *
+	 * Atomically switch the page's state to lock it.  If the page state
+	 * changes underneath us, no fast delete.
 	 *
 	 * Possible optimization: if the page is already deleted and the delete
 	 * is visible to us (the delete has been committed), we could skip the
@@ -83,29 +69,47 @@ __tree_walk_delete(
 	 * in the page.  While that's a huge amount of work to no purpose, it's
 	 * unclear optimizing for overlapping range deletes is worth the effort.
 	 */
-	if (!WT_ATOMIC_CAS(ref->state, WT_REF_DISK, WT_REF_READING))
+	if (ref->state != WT_REF_DISK ||
+	    !WT_ATOMIC_CAS(ref->state, WT_REF_DISK, WT_REF_READING))
 		return (0);
 
 	/*
-	 * We have the reference "locked":
+	 * If the page references overflow items, we have to clean it up during
+	 * reconciliation, no fast delete.   Check this after we have the page
+	 * locked down, instantiating the page in memory and modifying it could
+	 * theoretically point the address somewhere away from the on-page cell.
+	 */
+	__wt_cell_unpack(ref->addr, &unpack);
+	if (unpack.raw != WT_CELL_ADDR_LNO)
+		goto err;
+
+	/*
 	 * Record the change in the transaction structure and set the change's
 	 * transaction ID.
 	 */
 	WT_ERR(__wt_txn_modify_ref(session, ref));
 
 	/*
-	 * This action dirties the page: mark it dirty now, because there's no
+	 * This action dirties the parent page: mark it dirty now, there's no
 	 * future reconciliation of the child leaf page that will dirty it as
-	 * we flush the tree.
+	 * we write the tree.
 	 */
 	WT_ERR(__wt_page_modify_init(session, page));
 	__wt_page_modify_set(page);
 
 	*skipp = 1;
 
-	/* Release the page. */
-err:	WT_PUBLISH(ref->state, WT_REF_DELETED);
+	/* Delete the page. */
+	WT_PUBLISH(ref->state, WT_REF_DELETED);
+	return (0);
 
+err:	/*
+	 * Restore the page to on-disk status, we'll have to instantiate it.
+	 * We're don't have to back out adding this node to the transaction
+	 * modify list, that's OK because the rollback function ignores nodes
+	 * that aren't set to WT_REF_DELETED.
+	 */
+	WT_PUBLISH(ref->state, WT_REF_DISK);
 	return (ret);
 }
 
