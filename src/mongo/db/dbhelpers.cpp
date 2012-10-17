@@ -268,7 +268,12 @@ namespace mongo {
                                     bool secondaryThrottle ,
                                     RemoveCallback * callback,
                                     bool fromMigrate ) {
-        
+
+        Timer rangeRemoveTimer;
+
+        LOG(1) << "begin removal of " << min << " to " << max << " in " << ns
+               << (secondaryThrottle ? " (waiting for secondaries)" : "" ) << endl;
+
         Client& c = cc();
 
         long long numDeleted = 0;
@@ -349,6 +354,9 @@ namespace mongo {
             log() << "Helpers::removeRangeUnlocked time spent waiting for replication: "  
                   << millisWaitingForReplication << "ms" << endl;
         
+        LOG(1) << "end removal of " << min << " to " << max << " in " << ns
+               << " (took " << rangeRemoveTimer.millis() << "ms)" << endl;
+
         return numDeleted;
     }
 
