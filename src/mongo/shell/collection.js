@@ -146,13 +146,22 @@ DBCollection.prototype._validateForStorage = function( o ){
 
 
 DBCollection.prototype.find = function( query , fields , limit , skip, batchSize, options ){
-    return new DBQuery( this._mongo , this._db , this ,
+    var cursor = new DBQuery( this._mongo , this._db , this ,
                         this._fullName , this._massageObject( query ) , fields , limit , skip , batchSize , options || this.getQueryOptions() );
+
+    var connObj = this.getMongo();
+    var readPrefMode = connObj.getReadPrefMode();
+    if (readPrefMode != null) {
+        cursor.readPref(readPrefMode, connObj.getReadPrefTagSet());
+    }
+
+    return cursor;
 }
 
 DBCollection.prototype.findOne = function( query , fields, options ){
-    var cursor = this._mongo.find( this._fullName , this._massageObject( query ) || {} , fields , 
-        -1 /* limit */ , 0 /* skip*/, 0 /* batchSize */ , options || this.getQueryOptions() /* options */ );
+    var cursor = this.find(query, fields, -1 /* limit */, 0 /* skip*/,
+        0 /* batchSize */, options);
+
     if ( ! cursor.hasNext() )
         return null;
     var ret = cursor.next();

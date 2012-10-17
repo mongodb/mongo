@@ -10,7 +10,17 @@ env.Command(['mongo/base/error_codes.h', 'mongo/base/error_codes.cpp',],
             '$PYTHON $SOURCES $TARGETS')
 
 clientSource = [
+    'mongo/base/configuration_variable_manager.cpp',
     'mongo/base/error_codes.cpp',
+    'mongo/base/global_initializer.cpp',
+    'mongo/base/global_initializer_registerer.cpp',
+    'mongo/base/init.cpp',
+    'mongo/base/initializer.cpp',
+    'mongo/base/initializer_context.cpp',
+    'mongo/base/initializer_dependency_graph.cpp',
+    'mongo/base/make_string_vector.cpp',
+    'mongo/base/parse_number.cpp',
+    'mongo/base/status.cpp',
     'mongo/bson/oid.cpp',
     'mongo/buildinfo.cpp',
     "mongo/client/authentication_table.cpp",

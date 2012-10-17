@@ -1837,6 +1837,9 @@ namespace mongo {
                                          : str::equals("query", e.fieldName())))
             {
                 jsobj = e.embeddedObject();
+                if (_cmdobj.hasField("$readPreference")) {
+                    queryOptions |= QueryOption_SlaveOk;
+                }
             }
             else {
                 jsobj = _cmdobj;

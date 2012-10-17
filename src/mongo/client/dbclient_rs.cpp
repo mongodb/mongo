@@ -21,6 +21,7 @@
 
 #include <fstream>
 
+#include "mongo/base/init.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/client/connpool.h"
 #include "mongo/client/dbclientcursor.h"
@@ -32,6 +33,58 @@
 #include "mongo/util/timer.h"
 
 namespace mongo {
+    /*
+     * Set of commands that can be used with $readPreference
+     */
+    set<string> _secOkCmdList;
+
+    MONGO_INITIALIZER(PopulateReadPrefSecOkCmdList)(::mongo::InitializerContext* context) {
+        _secOkCmdList.insert("aggregate");
+        _secOkCmdList.insert("collStats");
+        _secOkCmdList.insert("count");
+        _secOkCmdList.insert("distinct");
+        _secOkCmdList.insert("dbStats");
+        _secOkCmdList.insert("geoNear");
+        _secOkCmdList.insert("geoSearch");
+        _secOkCmdList.insert("geoWalk");
+        _secOkCmdList.insert("group");
+
+        return Status::OK();
+    }
+
+    /**
+     * @param ns the namespace of the query
+     * @param queryObj the query object to check
+     *
+     * @return true if the given query can be sent to a secondary node.
+     */
+    bool isQueryOkToSecondary(const string& ns, const BSONObj& queryObj) {
+        // _secOkCmdList was not initialized! mongo::runGlobalInitializersOrDie
+        // probably was not called.
+        fassert(16464, !_secOkCmdList.empty());
+
+        if (ns.find(".$cmd") == string::npos) {
+            return true;
+        }
+
+        const string cmdName = queryObj.firstElementFieldName();
+        if (_secOkCmdList.count(cmdName) == 1) {
+            return true;
+        }
+
+        if (cmdName == "mapReduce" || cmdName == "mapreduce") {
+            if (!queryObj.hasField("out")) {
+                return false;
+            }
+
+            if (queryObj["out"]["inline"].trueValue()) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     /**
      * Selects the right node given the nodes to pick from and the preference.
      * This method does strict tag matching, and will not implicitly fallback
@@ -88,7 +141,7 @@ namespace mongo {
 
                 if (node.isLocalSecondary(localThresholdMillis)) {
                     // found a local node.  return early.
-                    LOG(2) << "dbclient_rs getSlave found local secondary for queries: "
+                    LOG(2) << "dbclient_rs _selectNode found local secondary for queries: "
                            << nextNodeIndex << ", ping time: " << node.pingTimeMillis << endl;
                     *lastHost = fallbackHost;
                     return fallbackHost;
@@ -1440,7 +1493,8 @@ namespace mongo {
                                                        int queryOptions,
                                                        int batchSize) {
         if ((queryOptions & QueryOption_SlaveOk) ||
-                query.obj.hasField("$readPreference")) {
+                (query.obj.hasField("$readPreference") &&
+                        isQueryOkToSecondary(ns, query.obj["query"].Obj()))) {
             ReadPreference pref;
             scoped_ptr<TagSet> tags(_extractReadPref(query.obj, &pref));
 
@@ -1584,6 +1638,7 @@ namespace mongo {
             // TODO: might be possible to do this faster by changing api
             DbMessage dm(toSend);
             QueryMessage qm(dm);
+
             const bool slaveOk = qm.queryOptions & QueryOption_SlaveOk;
             if (slaveOk || qm.query.hasField("$readPreference")) {
                 ReadPreference pref;
