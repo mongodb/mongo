@@ -1480,6 +1480,8 @@ __wt_rec_row_bulk_insert(WT_CURSOR_BULK *cbulk)
 	return (0);
 }
 
+#define	WT_FIX_ENTRIES(btree, bytes)	(((bytes) * 8) / (btree)->bitcnt)
+
 /*
  * __wt_rec_col_fix_bulk_insert --
  *	Fixed-length column-store bulk insert.
@@ -1504,7 +1506,7 @@ __wt_rec_col_fix_bulk_insert(WT_CURSOR_BULK *cbulk)
 		    entries > 0;
 		    entries -= page_entries, data += page_size) {
 			page_entries = WT_MIN(entries,
-			    r->space_avail * 8 / btree->bitcnt);
+			    WT_FIX_ENTRIES(btree, r->space_avail));
 			page_size = __bitstr_size(page_entries * btree->bitcnt);
 
 			memcpy(r->first_free, data, page_size);
@@ -1533,7 +1535,7 @@ __wt_rec_col_fix_bulk_insert(WT_CURSOR_BULK *cbulk)
 			WT_RET(__rec_split(session, r));
 		}
 		cbulk->entry = 0;
-		cbulk->nrecs = r->space_avail * 8 / btree->bitcnt;
+		cbulk->nrecs = WT_FIX_ENTRIES(btree, r->space_avail);
 	}
 
 	__bit_setv(r->first_free,
@@ -1733,7 +1735,7 @@ __rec_col_fix(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 
 	/* Calculate the number of entries per page remainder. */
 	entry = page->entries;
-	nrecs = (r->space_avail * 8 / btree->bitcnt) - page->entries;
+	nrecs = WT_FIX_ENTRIES(btree, r->space_avail) - page->entries;
 	r->recno += entry;
 
 	/* Walk any append list. */
@@ -1774,7 +1776,7 @@ __rec_col_fix(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 
 			/* Calculate the number of entries per page. */
 			entry = 0;
-			nrecs = r->space_avail * 8 / btree->bitcnt;
+			nrecs = WT_FIX_ENTRIES(btree, r->space_avail);
 		}
 	}
 
@@ -1820,7 +1822,7 @@ __rec_col_fix_slvg(WT_SESSION_IMPL *session,
 	for (;;) {
 		/* Calculate the number of entries per page. */
 		entry = 0;
-		nrecs = r->space_avail * 8 / btree->bitcnt;
+		nrecs = WT_FIX_ENTRIES(btree, r->space_avail);
 
 		for (; nrecs > 0 && salvage->missing > 0;
 		    --nrecs, --salvage->missing, ++entry)
