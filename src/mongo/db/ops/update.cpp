@@ -167,7 +167,7 @@ namespace mongo {
                 mods.reset( new ModSet(updateobj, nsdt->indexKeys(), &bgKeys, forReplication) );
             }
             else {
-                mods.reset( new ModSet(updateobj, nsdt->indexKeys(), 0, forReplication) );
+                mods.reset( new ModSet(updateobj, nsdt->indexKeys(), NULL, forReplication) );
             }
             modsIsIndexed = mods->isIndexed();
         }
@@ -452,7 +452,7 @@ namespace mongo {
         return UpdateResult( 0 , isOperatorUpdate , 0 , BSONObj() );
     }
 
-    void assertUpdate( const char* ns , const BSONObj& updateobj, const BSONObj& patternOrig ) {
+    void validateUpdate( const char* ns , const BSONObj& updateobj, const BSONObj& patternOrig ) {
         uassert( 10155 , "cannot update reserved $ collection", strchr(ns, '$') == 0 );
         if ( strstr(ns, ".system.") ) {
             /* dm: it's very important that system.indexes is never updated as IndexDetails
@@ -474,11 +474,11 @@ namespace mongo {
                                 bool fromMigrate,
                                 const QueryPlanSelectionPolicy& planPolicy ) {
 
-        assertUpdate( ns , updateobj , patternOrig );
+        validateUpdate( ns , updateobj , patternOrig );
 
         UpdateResult ur = _updateObjects(false, ns, updateobj, patternOrig,
                                          upsert, multi, logop,
-                                         debug, 0, fromMigrate, planPolicy );
+                                         debug, NULL, fromMigrate, planPolicy );
         debug.nupdated = ur.num;
         return ur;
     }
@@ -493,11 +493,20 @@ namespace mongo {
                                               bool fromMigrate,
                                               const QueryPlanSelectionPolicy& planPolicy ) {
 
-        assertUpdate( ns , updateobj , patternOrig );
+        validateUpdate( ns , updateobj , patternOrig );
 
-        UpdateResult ur = _updateObjects(false, ns, updateobj, patternOrig,
-                                         upsert, multi, logop,
-                                         debug, 0, fromMigrate, planPolicy, true /* for replication */ );
+        UpdateResult ur = _updateObjects(false,
+                                         ns,
+                                         updateobj,
+                                         patternOrig,
+                                         upsert,
+                                         multi,
+                                         logop,
+                                         debug,
+                                         NULL /* no remove saver */,
+                                         fromMigrate,
+                                         planPolicy,
+                                         true /* for replication */ );
         debug.nupdated = ur.num;
         return ur;
     }

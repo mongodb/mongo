@@ -45,7 +45,7 @@ namespace mongo {
         const char* fieldName;
         const char* shortFieldName;
 
-        // Detemines if this mod must absoluetly be applied. In some replication scenarios, a
+        // Determines if this mod must absoluetly be applied. In some replication scenarios, a
         // failed apply of a mod does not constitute an error. In those cases, setting strict
         // to off would not throw errors.
         bool strictApply;
