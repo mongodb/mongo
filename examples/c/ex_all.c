@@ -895,6 +895,8 @@ main(void)
 	const char *home = "WT_TEST";
 	ret = wiredtiger_open(home, NULL, "create,transactional", &conn);
 	/*! [Open a connection] */
+
+	(void)conn->close(conn, NULL);
 	}
 
 	/*! [Get the WiredTiger library version #1] */
@@ -909,8 +911,6 @@ main(void)
 	    major, minor, patch);
 	/*! [Get the WiredTiger library version #2] */
 	}
-
-	(void)conn->close(conn, NULL);
 
 	return (ret);
 }
