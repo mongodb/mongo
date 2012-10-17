@@ -17,12 +17,17 @@
 */
 
 #include "pch.h"
-#include "dur_commitjob.h"
-#include "dur_stats.h"
-#include "dur_recover.h"
-#include "../util/timer.h"
+
+#include "mongo/db/dur_commitjob.h"
+#include "mongo/db/dur_recover.h"
+#include "mongo/db/dur_stats.h"
+#include "mongo/util/concurrency/mutex.h"
+#include "mongo/util/timer.h"
 
 namespace mongo {
+#ifdef _WIN32
+    extern SimpleMutex globalFlushMutex; // defined in mongo/util/mmap_win.cpp
+#endif
     namespace dur {
 
         void debugValidateAllMapsMatch();
@@ -83,6 +88,9 @@ namespace mongo {
         */
 
         void WRITETODATAFILES(const JSectHeader& h, AlignedBuilder& uncompressed) {
+#ifdef _WIN32
+            SimpleMutex::scoped_lock _globalFlushMutex(globalFlushMutex);
+#endif
             Timer t;
             WRITETODATAFILES_Impl1(h, uncompressed);
             unsigned long long m = t.micros();
