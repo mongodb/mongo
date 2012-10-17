@@ -43,11 +43,11 @@ s1.adminCommand( { split : "test.foo" , middle : { num : 1 } } );
 s1.adminCommand( { split : "test.foo" , middle : { num : N } } );
 
 // s2 is now stale w.r.t boundaires around { num: 1 }
-res = s2.getDB( "admin" ).runCommand( { movechunk : "test.foo" , find : { num : 1 } , to : s1.getOther( s1.getServer( "test" ) ).name } );
+res = s2.getDB( "admin" ).runCommand( { movechunk : "test.foo" , find : { num : 1 } , to : s1.getOther( s1.getServer( "test" ) ).name, _waitForDelete : true } );
 assert.eq( 0 , res.ok , "a move with stale boundaries should not have succeeded" + tojson(res) ); 
 
 // s2 must have reloaded as a result of a failed move; retrying should work
-res = s2.getDB( "admin" ).runCommand( { movechunk : "test.foo" , find : { num : 1 } , to : s1.getOther( s1.getServer( "test" ) ).name } );
+res = s2.getDB( "admin" ).runCommand( { movechunk : "test.foo" , find : { num : 1 } , to : s1.getOther( s1.getServer( "test" ) ).name, _waitForDelete : true } );
 assert.eq( 1 , res.ok , "mongos did not reload after a failed migrate" + tojson(res) );
 
 // s1 is not stale about the boundaries of [MinKey->1) 

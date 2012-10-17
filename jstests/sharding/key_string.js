@@ -24,7 +24,7 @@ s.adminCommand( { split : "test.foo" , find : { name : "joe" } } ); // [Minkey -
 s.adminCommand( { split : "test.foo" , find : { name : "joe" } } ); // * [allan -> sara) , [sara -> Maxkey)
 s.adminCommand( { split : "test.foo" , find : { name : "joe" } } ); // [alan -> joe) , [joe -> sara]
 
-s.adminCommand( { movechunk : "test.foo" , find : { name : "allan" } , to : seconday.getMongo().name } );
+s.adminCommand( { movechunk : "test.foo" , find : { name : "allan" } , to : seconday.getMongo().name, _waitForDelete : true } );
 
 s.printChunks();
 
