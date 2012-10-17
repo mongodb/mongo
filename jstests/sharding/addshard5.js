@@ -36,8 +36,8 @@ coll.insert({ hello : "world" })
 assert.eq( null, coll.getDB().getLastError() )
 
 // Migrate the collection to and from shard2 so shard1 loads the shard2 host
-printjson( admin.runCommand({ moveChunk : coll + "", find : { _id : 0 }, to : shards[1]._id }) )
-printjson( admin.runCommand({ moveChunk : coll + "", find : { _id : 0 }, to : shards[0]._id }) )
+printjson( admin.runCommand({ moveChunk : coll + "", find : { _id : 0 }, to : shards[1]._id, _waitForDelete : true }) )
+printjson( admin.runCommand({ moveChunk : coll + "", find : { _id : 0 }, to : shards[0]._id, _waitForDelete : true }) )
 
 //
 // Drop and re-add shard with last shard's host

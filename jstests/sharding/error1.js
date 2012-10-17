@@ -24,7 +24,7 @@ db.foo2.save( { _id : 3 , num : 15 } );
 db.foo2.save( { _id : 4 , num : 20 } );
 
 s.adminCommand( { split : "test.foo2" , middle : { num : 10 } } );
-s.adminCommand( { movechunk : "test.foo2" , find : { num : 20 } , to : s.getOther( s.getServer( "test" ) ).name } );
+s.adminCommand( { movechunk : "test.foo2" , find : { num : 20 } , to : s.getOther( s.getServer( "test" ) ).name, _waitForDelete : true } );
 
 print( "a: " + a.foo2.count() );
 print( "b: " + b.foo2.count() );
