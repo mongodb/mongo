@@ -39,8 +39,6 @@ util_rename(WT_SESSION *session, int argc, char *argv[])
 		    progname, uri, newname, wiredtiger_strerror(ret));
 		goto err;
 	}
-	if (verbose)
-		printf("\n");
 
 	if (0) {
 err:		ret = 1;
