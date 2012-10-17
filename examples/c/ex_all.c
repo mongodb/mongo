@@ -910,5 +910,7 @@ main(void)
 	/*! [Get the WiredTiger library version #2] */
 	}
 
+	(void)conn->close(conn, NULL);
+
 	return (ret);
 }
