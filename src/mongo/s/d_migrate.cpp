@@ -195,6 +195,9 @@ namespace mongo {
             ShardForceVersionOkModeBlock sf;
             {
                 RemoveSaver rs("moveChunk",ns,"post-cleanup");
+
+                log() << "moveChunk starting delete for: " << this->toString() << migrateLog;
+
                 long long numDeleted =
                         Helpers::removeRange( ns ,
                                               min ,
@@ -204,7 +207,9 @@ namespace mongo {
                                               secondaryThrottle ,
                                               cmdLine.moveParanoia ? &rs : 0 , /*callback*/
                                               true ); /*fromMigrate*/
-                log() << "moveChunk deleted: " << numDeleted << migrateLog;
+
+                log() << "moveChunk deleted " << numDeleted << " documents for "
+                      << this->toString() << migrateLog;
             }
             
             
@@ -687,7 +692,9 @@ namespace mongo {
         if (!noauth) {
             cc().getAuthenticationInfo()->authorize("local", internalSecurity.user);
         }
-        log() << " (start) waiting to cleanup " << cleanup << "  # cursors:" << cleanup.initial.size() << migrateLog;
+
+        log() << " (start) waiting to cleanup " << cleanup
+              << ", # cursors remaining: " << cleanup.initial.size() << migrateLog;
 
         int loops = 0;
         Timer t;
@@ -1032,7 +1039,8 @@ namespace mongo {
                                                     res );
                 }
                 catch( DBException& e ){
-                    errmsg = str::stream() << "moveChunk could not contact to: shard " << to << " to start transfer" << causedBy( e );
+                    errmsg = str::stream() << "moveChunk could not contact to: shard "
+                                           << to << " to start transfer" << causedBy( e );
                     warning() << errmsg << endl;
                     return false;
                 }
@@ -1044,6 +1052,7 @@ namespace mongo {
                     verify( res["errmsg"].type() );
                     errmsg += res["errmsg"].String();
                     result.append( "cause" , res );
+                    warning() << errmsg << endl;
                     return false;
                 }
 
