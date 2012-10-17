@@ -255,7 +255,9 @@ namespace mongo {
     class MigrateFromStatus {
     public:
 
-        MigrateFromStatus() : _m("MigrateFromStatus") , _workLock("MigrateFromStatus::workLock") {
+        MigrateFromStatus() : _m("MigrateFromStatus") ,
+                              _cleanupTickets(1) /* only one cleanup thread at once */
+        {
             _active = false;
             _inCriticalSection = false;
             _memoryUsed = 0;
@@ -265,7 +267,9 @@ namespace mongo {
                     const BSONObj& min ,
                     const BSONObj& max ,
                     const BSONObj& shardKeyPattern ) {
-            scoped_lock ll(_workLock);
+
+            // Note: migrations not blocked by queued deletes using _workLock
+
             scoped_lock l(_m); // reads and writes _active
 
             verify( ! _active );
@@ -334,7 +338,7 @@ namespace mongo {
 
             case 'd': {
 
-                if ( getThreadName() == cleanUpThreadName ) {
+                if (getThreadName().find(cleanUpThreadName) == 0) {
                     // we don't want to xfer things we're cleaning
                     // as then they'll be deleted on TO
                     // which is bad
@@ -608,18 +612,12 @@ namespace mongo {
         bool isActive() const { return _getActive(); }
         
         void doRemove( OldDataCleanup& cleanup ) {
-            int it = 0;
-            while ( true ) { 
-                if ( it > 20 && it % 10 == 0 ) log() << "doRemote iteration " << it << " for: " << cleanup << endl;
-                {
-                    scoped_lock ll(_workLock);
-                    if ( ! _active ) {
-                        cleanup.doRemove();
-                        return;
-                    }
-                }
-                sleepmillis( 1000 );
-            }
+
+            log() << "waiting to remove documents for " << cleanup.toString() << endl;
+
+            ScopedTicket ticket(&_cleanupTickets);
+
+            cleanup.doRemove();
         }
 
     private:
@@ -646,8 +644,8 @@ namespace mongo {
         list<BSONObj> _deleted; // objects deleted during clone that should be deleted later
         long long _memoryUsed; // bytes in _reload + _deleted
 
-        mutable mongo::mutex _workLock; // this is used to make sure only 1 thread is doing serious work
-                                        // for now, this means migrate or removing old chunk data
+        // this is used to make sure only a certain number of threads are doing cleanup at once.
+        mutable TicketHolder _cleanupTickets;
 
         bool _getActive() const { scoped_lock l(_m); return _active; }
         void _setActive( bool b ) { scoped_lock l(_m); _active = b; }
@@ -667,7 +665,10 @@ namespace mongo {
     };
 
     void _cleanupOldData( OldDataCleanup cleanup ) {
-        Client::initThread( cleanUpThreadName );
+
+        Client::initThread((string(cleanUpThreadName) + string("-") +
+                                                        OID::gen().toString()).c_str());
+
         if (!noauth) {
             cc().getAuthenticationInfo()->authorize("local", internalSecurity.user);
         }
@@ -806,6 +807,12 @@ namespace mongo {
             if ( secondaryThrottle && ! anyReplEnabled() ) {
                 secondaryThrottle = false;
                 warning() << "secondaryThrottle selected but no replication" << endl;
+            }
+
+            // Do inline deletion
+            bool waitForDelete = cmdObj["waitForDelete"].trueValue();
+            if (waitForDelete) {
+                log() << "moveChunk waiting for full cleanup after move" << endl;
             }
 
             BSONObj min  = cmdObj["min"].Obj();
@@ -1334,17 +1341,17 @@ namespace mongo {
                 c.max = max.getOwned();
                 c.shardKeyPattern = shardKeyPattern.getOwned();
                 ClientCursor::find( ns , c.initial );
-                if ( c.initial.size() ) {
-                    log() << "forking for cleaning up chunk data" << migrateLog;
+
+                if (!waitForDelete) {
+                    // 7.
+                    log() << "forking for cleanup of chunk data" << migrateLog;
                     boost::thread t( boost::bind( &cleanupOldData , c ) );
                 }
                 else {
-                    log() << "doing delete inline" << migrateLog;
                     // 7.
+                    log() << "doing delete inline for cleanup of chunk data" << migrateLog;
                     c.doRemove();
                 }
-
-
             }
             timing.done(6);
 

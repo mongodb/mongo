@@ -844,7 +844,12 @@ namespace mongo {
                 }
 
                 BSONObj res;
-                if ( ! c->moveAndCommit( to , maxChunkSizeBytes , cmdObj["_secondaryThrottle"].trueValue() , res ) ) {
+                if ( ! c->moveAndCommit( to,
+                                         maxChunkSizeBytes,
+                                         cmdObj["_secondaryThrottle"].trueValue(),
+                                         cmdObj["_waitForDelete"].trueValue(),
+                                         res ) )
+                {
                     errmsg = "move failed";
                     result.append( "cause" , res );
                     return false;
