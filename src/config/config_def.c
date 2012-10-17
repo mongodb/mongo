@@ -182,11 +182,12 @@ __wt_confchk_session_begin_transaction[] = {
 
 const char *
 __wt_confdfl_session_checkpoint =
-	"drop=,name=,target=";
+	"drop=,force=0,name=,target=";
 
 WT_CONFIG_CHECK
 __wt_confchk_session_checkpoint[] = {
 	{ "drop", "list", NULL },
+	{ "force", "boolean", NULL },
 	{ "name", "string", NULL },
 	{ "target", "list", NULL },
 	{ NULL, NULL, NULL }
@@ -207,6 +208,15 @@ __wt_confdfl_session_commit_transaction =
 
 WT_CONFIG_CHECK
 __wt_confchk_session_commit_transaction[] = {
+	{ NULL, NULL, NULL }
+};
+
+const char *
+__wt_confdfl_session_compact =
+	"";
+
+WT_CONFIG_CHECK
+__wt_confchk_session_compact[] = {
 	{ NULL, NULL, NULL }
 };
 
@@ -267,15 +277,6 @@ __wt_confdfl_session_drop =
 WT_CONFIG_CHECK
 __wt_confchk_session_drop[] = {
 	{ "force", "boolean", NULL },
-	{ NULL, NULL, NULL }
-};
-
-const char *
-__wt_confdfl_session_dumpfile =
-	"";
-
-WT_CONFIG_CHECK
-__wt_confchk_session_dumpfile[] = {
 	{ NULL, NULL, NULL }
 };
 
@@ -370,10 +371,13 @@ __wt_confchk_session_upgrade[] = {
 
 const char *
 __wt_confdfl_session_verify =
-	"";
+	"dump_address=0,dump_blocks=0,dump_pages=0";
 
 WT_CONFIG_CHECK
 __wt_confchk_session_verify[] = {
+	{ "dump_address", "boolean", NULL },
+	{ "dump_blocks", "boolean", NULL },
+	{ "dump_pages", "boolean", NULL },
 	{ NULL, NULL, NULL }
 };
 

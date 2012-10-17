@@ -111,8 +111,9 @@ struct __wt_session_impl {
 	size_t	 excl_allocated;	/* Bytes allocated */
 
 #define	WT_SYNC			1	/* Sync the file */
-#define	WT_SYNC_DISCARD		2	/* Sync the file, discard pages */
-#define	WT_SYNC_DISCARD_NOWRITE	3	/* Discard the file */
+#define	WT_SYNC_COMPACT		2	/* Compact the file */
+#define	WT_SYNC_DISCARD		3	/* Sync the file, discard pages */
+#define	WT_SYNC_DISCARD_NOWRITE	4	/* Discard the file */
 	int syncop;			/* File operation */
 	int syncop_ret;			/* Return value */
 

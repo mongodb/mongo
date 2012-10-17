@@ -86,6 +86,7 @@ struct __wt_btree_stats {
 	WT_STATS file_minor;
 	WT_STATS file_overflow;
 	WT_STATS file_allocsize;
+	WT_STATS file_compact_rewrite;
 	WT_STATS rec_page_merge;
 	WT_STATS rec_dictionary;
 	WT_STATS rec_split_intl;

@@ -438,27 +438,21 @@ __evict_file_request(WT_SESSION_IMPL *session, int syncop)
 			break;
 		WT_ERR(__wt_tree_walk(session, &next_page, WT_TREE_EVICT));
 
-		/* Write dirty pages for sync, and sync with discard. */
 		switch (syncop) {
+		case WT_SYNC_COMPACT:
+			WT_ERR(__wt_compact_evict(session, page));
+			break;
 		case WT_SYNC:
 		case WT_SYNC_DISCARD:
+			/* Write dirty pages for sync and sync with discard. */
 			if (__wt_page_is_modified(page))
 				WT_ERR(__wt_rec_write(
 				    session, page, NULL, WT_REC_SINGLE));
-			break;
-		case WT_SYNC_DISCARD_NOWRITE:
-			break;
-		}
+			if (syncop == WT_SYNC)
+				break;
 
-		/*
-		 * Evict the page for sync with discard, simply discard the page
-		 * for discard alone.
-		 */
-		switch (syncop) {
-		case WT_SYNC:
-			break;
-		case WT_SYNC_DISCARD:
 			/*
+			 * Evict the page for sync with discard.
 			 * Do not attempt to evict pages expected to be merged
 			 * into their parents, with the single exception that
 			 * the root page can't be merged into anything, it must
@@ -472,10 +466,11 @@ __evict_file_request(WT_SESSION_IMPL *session, int syncop)
 			break;
 		case WT_SYNC_DISCARD_NOWRITE:
 			/*
-			 * When we discard the root page, clear the reference
-			 * from the btree handle.  It is important to do this
-			 * here, so that future eviction doesn't see root_page
-			 * pointing to freed memory.
+			 * Simply discard the page for discard alone.  When we
+			 * discard the root page, clear the reference from the
+			 * btree handle.  It is important to do this here, so
+			 * that future eviction doesn't see root_page pointing
+			 * to freed memory.
 			 */
 			if (WT_PAGE_IS_ROOT(page))
 				session->btree->root_page = NULL;

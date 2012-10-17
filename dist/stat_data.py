@@ -64,6 +64,7 @@ btree_stats = [
 	Stat('file_col_fix_pages', 'column-store fixed-size leaf pages'),
 	Stat('file_col_int_pages', 'column-store internal pages'),
 	Stat('file_col_var_pages', 'column-store variable-size leaf pages'),
+	Stat('file_compact_rewrite', 'pages rewritten by compaction'),
 	Stat('file_entries', 'total entries'),
 	Stat('file_fixed_len', 'fixed-record size'),
 	Stat('file_magic', 'magic number'),

@@ -111,6 +111,8 @@ main(int argc, char *argv[])
 	case 'c':
 		if (strcmp(command, "create") == 0)
 			ret = util_create(session, argc, argv);
+		else if (strcmp(command, "compact") == 0)
+			ret = util_compact(session, argc, argv);
 		else
 			ret = usage();
 		break;
@@ -119,8 +121,6 @@ main(int argc, char *argv[])
 			ret = util_drop(session, argc, argv);
 		else if (strcmp(command, "dump") == 0)
 			ret = util_dump(session, argc, argv);
-		else if (strcmp(command, "dumpfile") == 0)
-			ret = util_dumpfile(session, argc, argv);
 		else
 			ret = usage();
 		break;
@@ -193,28 +193,29 @@ usage(void)
 	    WIREDTIGER_VERSION_MAJOR, WIREDTIGER_VERSION_MINOR);
 	fprintf(stderr,
 	    "global options:\n"
-	    "\t-C\twiredtiger_open configuration\n"
-	    "\t-h\tdatabase directory\n"
-	    "\t-V\tdisplay library version and exit\n"
-	    "\t-v\tverbose\n");
+	    "\t" "-C\twiredtiger_open configuration\n"
+	    "\t" "-h\tdatabase directory\n"
+	    "\t" "-V\tdisplay library version and exit\n"
+	    "\t" "-v\tverbose\n");
 	fprintf(stderr,
 	    "commands:\n"
-	    "\tbackup database backup\n"
-	    "\tcopyright copyright information\n"
-	    "\tcreate\t  create an object\n"
-	    "\tdrop\t  drop an object\n"
-	    "\tdump\t  dump an object\n"
-	    "\tdumpfile  dump a physical file in debugging format\n"
-	    "\tlist\t  list database objects\n"
-	    "\tload\t  load an object\n"
-	    "\tprintlog  display the database log\n"
-	    "\tread\t  read values from an object\n"
-	    "\trename\t  rename an object\n"
-	    "\tsalvage\t  salvage a file\n"
-	    "\tstat\t  display statistics for an object\n"
-	    "\tupgrade\t  upgrade an object\n"
-	    "\tverify\t  verify an object\n"
-	    "\twrite\t  write values to an object\n");
+	    "\t" "backup database backup\n"
+	    "\t" "compact\t  compact an object\n"
+	    "\t" "copyright copyright information\n"
+	    "\t" "create\t  create an object\n"
+	    "\t" "drop\t  drop an object\n"
+	    "\t" "dump\t  dump an object\n"
+	    "\t" "dumpfile  dump a physical file in debugging format\n"
+	    "\t" "list\t  list database objects\n"
+	    "\t" "load\t  load an object\n"
+	    "\t" "printlog  display the database log\n"
+	    "\t" "read\t  read values from an object\n"
+	    "\t" "rename\t  rename an object\n"
+	    "\t" "salvage\t  salvage a file\n"
+	    "\t" "stat\t  display statistics for an object\n"
+	    "\t" "upgrade\t  upgrade an object\n"
+	    "\t" "verify\t  verify an object\n"
+	    "\t" "write\t  write values to an object\n");
 
 	return (EXIT_FAILURE);
 }

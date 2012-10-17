@@ -273,7 +273,7 @@ __wt_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_TXN *txn;
 	WT_TXN_ISOLATION saved_isolation;
 	const char *name;
-	int deleted, is_checkpoint, track_ckpt;
+	int deleted, force, is_checkpoint, track_ckpt;
 	char *name_alloc;
 
 	conn = S2C(session);
@@ -392,7 +392,15 @@ __wt_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	 * to open the checkpoint in a cursor after taking any checkpoint, which
 	 * means it must exist.
 	 */
+	force = 0;
 	if (!btree->modified) {
+		ret = __wt_config_gets(session, cfg, "force", &cval);
+		if (ret != 0 && ret != WT_NOTFOUND)
+			WT_ERR(ret);
+		if (ret == 0 && cval.val != 0)
+			force = 1;
+	}
+	if (!btree->modified && !force) {
 		if (!is_checkpoint)
 			goto skip;
 
@@ -400,9 +408,19 @@ __wt_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 		WT_CKPT_FOREACH(ckptbase, ckpt)
 			if (F_ISSET(ckpt, WT_CKPT_DELETE))
 				++deleted;
+		/*
+		 * Complicated test: if we only deleted a single checkpoint, and
+		 * it was the last checkpoint in the object, and it has the same
+		 * name as the checkpoint we're taking (correcting for internal
+		 * checkpoint names with their generational suffix numbers), we
+		 * can skip the checkpoint, there's nothing to do.
+		 */
 		if (deleted == 1 &&
 		    F_ISSET(ckpt - 1, WT_CKPT_DELETE) &&
-		    strcmp(name, (ckpt - 1)->name) == 0)
+		    (strcmp(name, (ckpt - 1)->name) == 0 ||
+		    (strncmp(name, WT_CHECKPOINT, strlen(WT_CHECKPOINT)) == 0 &&
+		    strncmp((ckpt - 1)->name,
+		    WT_CHECKPOINT, strlen(WT_CHECKPOINT)) == 0)))
 			goto skip;
 	}
 

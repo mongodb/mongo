@@ -60,7 +60,7 @@ usage(void)
 {
 	(void)fprintf(stderr,
 	    "usage: %s %s "
-	    "salvage [-F] file\n",
+	    "salvage [-F] uri\n",
 	    progname, usage_prefix);
 	return (1);
 }

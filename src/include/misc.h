@@ -174,9 +174,10 @@
 #define	WT_DECL_RET	int ret = 0
 
 /* Flags for the tree-walk function. */
-#define	WT_TREE_DISCARD	0x01			/* Discarding */
-#define	WT_TREE_EVICT	0x02			/* Eviction */
-#define	WT_TREE_PREV	0x04			/* Backward walk */
+#define	WT_TREE_COMPACT	0x01			/* Compaction */
+#define	WT_TREE_DISCARD	0x02			/* Discarding */
+#define	WT_TREE_EVICT	0x04			/* Eviction */
+#define	WT_TREE_PREV	0x08			/* Backward walk */
 
 /*
  * In diagnostic mode we track the locations from which hazard references and
