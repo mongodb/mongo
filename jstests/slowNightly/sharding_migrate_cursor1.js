@@ -57,6 +57,11 @@ print( "cursor should be gone" )
 
 join();
 
+assert.soon( function(){
+    print( "Waiting for migrate cleanup to complete..." );
+    return t.count() == t.find().itcount();
+})
+
 //assert.soon( function(){ return numDocs == t.count(); } , "at end 1" )
 sleep( 5000 )
 assert.eq( numDocs , t.count() , "at end 2" )
