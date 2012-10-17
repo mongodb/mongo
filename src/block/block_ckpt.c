@@ -232,7 +232,7 @@ __wt_block_checkpoint(WT_SESSION_IMPL *session,
 
 /*
  * __ckpt_extlist_read --
- *	Read a checkpoints extent lists and copy 
+ *	Read a checkpoints extent lists and copy
  */
 static int
 __ckpt_extlist_read(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_CKPT *ckpt)
