@@ -74,6 +74,11 @@ assert.soon( function() {
     return x < 2 && configDB.locks.findOne({ _id : 'test.foo' }).state == 0;
 }, "no balance happened", 60000 );
 
+assert.soon( function(){
+    print( "Waiting for migration cleanup to occur..." )
+    return testDB.foo.find().itcount() == testDB.foo.count();
+})
+
 var map = function() { emit (this.i, this.j) };
 var reduce = function( key, values ) {
     var jCount = 0;
@@ -232,12 +237,12 @@ var checkAdminWriteOps = function( hasWriteAuth ) {
         checkCommandSucceeded( adminDB, {split : 'test.foo', find : {i : 1, j : 1}} );
         chunk = configDB.chunks.findOne({ shard : st.rs0.name });
         checkCommandSucceeded( adminDB, {moveChunk : 'test.foo', find : chunk.min,
-                                         to : st.rs1.name} );
+                                         to : st.rs1.name, _waitForDelete : true} );
     } else {
         checkCommandFailed( adminDB, {split : 'test.foo', find : {i : 1, j : 1}} );
         chunkKey = { i : { $minKey : 1 }, j : { $minKey : 1 } };
         checkCommandFailed( adminDB, {moveChunk : 'test.foo', find : chunkKey,
-                                      to : st.rs1.name} );
+                                      to : st.rs1.name, _waitForDelete : true} );
     }
 }
 
