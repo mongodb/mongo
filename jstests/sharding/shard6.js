@@ -2,7 +2,7 @@
 
 summary = "";
 
-s = new ShardingTest( "shard6" , 2 , 0 , 2 );
+s = new ShardingTest( "shard6" , 2 , 0 , 2, { separateConfig : true } );
 
 s.config.settings.update( { _id: "balancer" }, { $set : { stopped: true } } , true );
 
