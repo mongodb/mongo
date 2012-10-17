@@ -369,6 +369,8 @@ __ckpt_process(
 	 * when writing the live extent lists.
 	 */
 	WT_CKPT_FOREACH(ckptbase, ckpt) {
+		if (F_ISSET(ckpt, WT_CKPT_FAKE))
+			continue;
 		if (!F_ISSET(ckpt, WT_CKPT_DELETE))
 			continue;
 
