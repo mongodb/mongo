@@ -158,7 +158,7 @@ __ckpt_name_ok(WT_SESSION_IMPL *session, const char *name, size_t len)
 	 */
 	if (len < strlen(WT_CHECKPOINT))
 		return (0);
-	if (strncmp(name, WT_CHECKPOINT, strlen(WT_CHECKPOINT)) != 0)
+	if (!WT_PREFIX_MATCH(name, WT_CHECKPOINT))
 		return (0);
 
 	WT_RET_MSG(session, EINVAL,
@@ -183,8 +183,7 @@ __drop(WT_CKPT *ckptbase, const char *name, size_t len)
 	 */
 	if (strncmp(WT_CHECKPOINT, name, len) == 0) {
 		WT_CKPT_FOREACH(ckptbase, ckpt)
-			if (strncmp(ckpt->name,
-			    WT_CHECKPOINT, strlen(WT_CHECKPOINT)) == 0)
+			if (WT_PREFIX_MATCH(ckpt->name, WT_CHECKPOINT))
 				F_SET(ckpt, WT_CKPT_DELETE);
 	} else
 		WT_CKPT_FOREACH(ckptbase, ckpt)
@@ -418,9 +417,8 @@ __wt_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 		if (deleted == 1 &&
 		    F_ISSET(ckpt - 1, WT_CKPT_DELETE) &&
 		    (strcmp(name, (ckpt - 1)->name) == 0 ||
-		    (strncmp(name, WT_CHECKPOINT, strlen(WT_CHECKPOINT)) == 0 &&
-		    strncmp((ckpt - 1)->name,
-		    WT_CHECKPOINT, strlen(WT_CHECKPOINT)) == 0)))
+		    (WT_PREFIX_MATCH(name, WT_CHECKPOINT) &&
+		    WT_PREFIX_MATCH((ckpt - 1)->name, WT_CHECKPOINT))))
 			goto skip;
 	}
 
@@ -451,9 +449,8 @@ __wt_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 			 * delete flag, and otherwise fail.
 			 */
 			if (conn->ckpt_backup) {
-				if (strncmp(ckpt->name,
-				    WT_CHECKPOINT,
-				    strlen(WT_CHECKPOINT)) == 0) {
+				if (WT_PREFIX_MATCH(
+				    ckpt->name, WT_CHECKPOINT)) {
 					F_CLR(ckpt, WT_CKPT_DELETE);
 					continue;
 				}
@@ -472,8 +469,8 @@ __wt_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 			    __wt_session_lock_checkpoint(session, ckpt->name);
 			if (ret == 0)
 				continue;
-			if (ret == EBUSY && strncmp(ckpt->name,
-			    WT_CHECKPOINT, strlen(WT_CHECKPOINT)) == 0) {
+			if (ret == EBUSY &&
+			    WT_PREFIX_MATCH(ckpt->name, WT_CHECKPOINT)) {
 				F_CLR(ckpt, WT_CKPT_DELETE);
 				continue;
 			}
