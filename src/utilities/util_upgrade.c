@@ -38,6 +38,8 @@ util_upgrade(WT_SESSION *session, int argc, char *argv[])
 		    progname, name, wiredtiger_strerror(ret));
 		goto err;
 	}
+
+	/* Verbose configures a progress counter, move to the next line. */
 	if (verbose)
 		printf("\n");
 
