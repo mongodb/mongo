@@ -791,15 +791,17 @@ namespace mongo {
             OpDebug debug;
             BSONObj updateCriteria = op.getObjectField("o2");
             bool upsert = fields[3].booleanSafe() || convertUpdateToUpsert;
-            UpdateResult ur = updateObjectsForReplication(ns,
-                                                          o,
-                                                          updateCriteria,
-                                                          upsert,
-                                                          /*multi*/ false,
-                                                          /*logop*/ false,
-                                                          debug,
-                                                          /*fromMigrate*/ false,
-                                                          QueryPlanSelectionPolicy::idElseNatural() );
+            UpdateResult ur =
+                updateObjectsForReplication(ns,
+                                            o,
+                                            updateCriteria,
+                                            upsert,
+                                            /*multi*/ false,
+                                            /*logop*/ false,
+                                            debug,
+                                            /*fromMigrate*/ false,
+                                            QueryPlanSelectionPolicy::idElseNatural() );
+
             if( ur.num == 0 ) {
                 if( ur.mod ) {
                     if( updateCriteria.nFields() == 1 ) {
