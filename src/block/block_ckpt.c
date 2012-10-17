@@ -346,7 +346,7 @@ __ckpt_process(
 		 * extent blocks if there is more than one deleted checkpoint).
 		 */
 		if (ckpt->bpriv == NULL)
-			__ckpt_extlist_read(session, block, ckpt);
+			WT_ERR(__ckpt_extlist_read(session, block, ckpt));
 
 		for (next_ckpt = ckpt + 1;; ++next_ckpt)
 			if (!F_ISSET(next_ckpt, WT_CKPT_FAKE))
@@ -358,7 +358,7 @@ __ckpt_process(
 		 */
 		if (next_ckpt->bpriv == NULL &&
 		    !F_ISSET(next_ckpt, WT_CKPT_ADD))
-			__ckpt_extlist_read(session, block, next_ckpt);
+			WT_ERR(__ckpt_extlist_read(session, block, next_ckpt));
 	}
 
 	/*
