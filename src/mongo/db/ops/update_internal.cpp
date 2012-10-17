@@ -812,9 +812,20 @@ namespace mongo {
                                    << " not: " << e.type() );
                     }
                     else {
-                        // skip both as we're not applying this mod
+                        // Since we're not applying the mod, we keep what was there before
+                        builder.append( e );
+
+                        // Skip both as we're not applying this mod. Note that we'll advance
+                        // the iterator on the mod side for all the mods that are under the
+                        // root we are now.
                         e = es.next();
                         m++;
+                        while ( m != mend &&
+                                ( compareDottedFieldNames( m->second->m->fieldName,
+                                                           field,
+                                                           lexNumCmp ) == LEFT_SUBFIELD ) ) {
+                            m++;
+                        }
                         continue;
                     }
                 }

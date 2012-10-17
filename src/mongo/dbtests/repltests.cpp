@@ -1142,6 +1142,23 @@ namespace ReplTests {
             }
         };
 
+        class ReplayArrayFieldNotAppended : public Base {
+        public:
+            void doIt() const {
+                client()->update( ns(), BSONObj(), fromjson( "{$push:{'a.0.b':2}}" ) );
+                client()->update( ns(), BSONObj(), fromjson( "{$set:{'a.0':1}}") );
+            }
+            using ReplTests::Base::check;
+            void check() const {
+                ASSERT_EQUALS( 1, count() );
+                check( fromjson( "{_id:0,a:[1,{b:[1]}]}" ), one(fromjson("{'_id':0}") ) );
+            }
+            void reset() const {
+                deleteAll( ns() );
+                insert( fromjson( "{'_id':0,a:[{b:[0]},{b:[1]}]}" ) );
+            }
+        };
+
     } // namespace Idempotence
 
     class DeleteOpIsIdBased : public Base {
@@ -1369,6 +1386,7 @@ namespace ReplTests {
             add< Idempotence::AddToSetEmptyMissing >();
             add< Idempotence::AddToSetWithDollarSigns >();
             add< Idempotence::ReplaySetPreexistingNoOpPull >();
+            add< Idempotence::ReplayArrayFieldNotAppended >();
             add< DeleteOpIsIdBased >();
             add< DatabaseIgnorerBasic >();
             add< DatabaseIgnorerUpdate >();
