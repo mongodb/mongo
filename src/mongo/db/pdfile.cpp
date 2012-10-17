@@ -1375,9 +1375,8 @@ namespace mongo {
                 }
             }
             else if ( !god ) {
-                // todo this should probably uasseert rather than doing this:
-                log() << "ERROR: attempt to insert in system namespace " << ns << endl;
-                return false;
+                uasserted(16459, str::stream() << "attempt to insert in system namespace '"
+                                               << ns << "'");
             }
         }
         return true;
