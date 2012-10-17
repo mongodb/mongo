@@ -199,13 +199,12 @@ usage(void)
 	    "\t" "-v\tverbose\n");
 	fprintf(stderr,
 	    "commands:\n"
-	    "\t" "backup database backup\n"
+	    "\t" "backup\t  database backup\n"
 	    "\t" "compact\t  compact an object\n"
 	    "\t" "copyright copyright information\n"
 	    "\t" "create\t  create an object\n"
 	    "\t" "drop\t  drop an object\n"
 	    "\t" "dump\t  dump an object\n"
-	    "\t" "dumpfile  dump a physical file in debugging format\n"
 	    "\t" "list\t  list database objects\n"
 	    "\t" "load\t  load an object\n"
 	    "\t" "printlog  display the database log\n"
