@@ -33,8 +33,8 @@ __wt_lsm_worker(void *arg)
 		/* Clear any state from previous worker thread iterations. */
 		session->btree = NULL;
 
-		/* Report stalls to merge in milliseconds. */
-		if (__wt_lsm_merge(session, lsm_tree, stalls) == 0)
+		/* Report stalls to merge in seconds. */
+		if (__wt_lsm_merge(session, lsm_tree, stalls / 1000) == 0)
 			progress = 1;
 
 		/* Clear any state from previous worker thread iterations. */
@@ -47,7 +47,7 @@ __wt_lsm_worker(void *arg)
 		if (progress)
 			stalls = 0;
 		else {
-			__wt_sleep(1, 0);
+			__wt_sleep(0, 1000);
 			++stalls;
 		}
 	}
