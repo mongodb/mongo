@@ -875,7 +875,7 @@ extern int __wt_cond_alloc(WT_SESSION_IMPL *session,
     WT_CONDVAR **condp);
 extern void __wt_cond_wait(WT_SESSION_IMPL *session,
     WT_CONDVAR *cond,
-    uint64_t usecs);
+    long usecs);
 extern void __wt_cond_signal(WT_SESSION_IMPL *session, WT_CONDVAR *cond);
 extern int __wt_cond_destroy(WT_SESSION_IMPL *session, WT_CONDVAR *cond);
 extern int __wt_rwlock_alloc( WT_SESSION_IMPL *session,
@@ -913,9 +913,7 @@ extern int __wt_thread_create(pthread_t *tidret,
     void *(*func)(void *),
     void *arg);
 extern int __wt_thread_join(pthread_t tid);
-extern int __wt_epoch(WT_SESSION_IMPL *session,
-    uintmax_t *secp,
-    uintmax_t *nsecp);
+extern int __wt_epoch(WT_SESSION_IMPL *session, struct timespec *tsp);
 extern void __wt_yield(void);
 extern int __wt_struct_check(WT_SESSION_IMPL *session,
     const char *fmt,
