@@ -37,6 +37,7 @@
 
 #ifdef MONGO_SSL
 #include <openssl/ssl.h>
+#include "mongo/util/net/ssl_manager.h"
 #endif
 
 namespace mongo {
@@ -166,29 +167,6 @@ namespace mongo {
         string _extra;
     };
 
-#ifdef MONGO_SSL
-    class SSLManager : boost::noncopyable {
-    public:
-        SSLManager( bool client );
-        
-        /** @return true if was successful, otherwise false */
-        bool setupPEM( const string& keyFile , const string& password );
-        void setupPubPriv( const string& privateKeyFile , const string& publicKeyFile );
-
-        /**
-         * creates an SSL context to be used for this file descriptor
-         * caller should delete
-         */
-        SSL * secure( int fd );
-        
-        static int password_cb( char *buf,int num, int rwflag,void *userdata );
-
-    private:
-        bool _client;
-        SSL_CTX* _context;
-        string _password;
-    };
-#endif
 
     /**
      * thin wrapped around file descriptor and system calls
