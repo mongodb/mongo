@@ -201,7 +201,7 @@ err:	__wt_spin_unlock(session, &lsm_tree->lock);
 }
 
 /* __wt_clsm_init_merge --
- *	Initialize an LSM cursor for a (major) merge.
+ *	Initialize an LSM cursor for a merge.
  */
 int
 __wt_clsm_init_merge(WT_CURSOR *cursor, int start_chunk, int nchunks)
