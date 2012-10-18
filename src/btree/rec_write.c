@@ -239,28 +239,27 @@ static void __rec_dictionary_reset(WT_RECONCILE *);
  *
  * The reconciliation code is used in the following situations:
  *
- * (1) by the eviction server during sync;
- * (2) by the eviction server during forced eviction of a page; and
- * (3) by any thread during LRU eviction.
+ * (1) by the eviction server during sync; and
+ * (2) by any thread during LRU eviction.
  *
  * The complexity is checking the page state of child pages when looking for
  * pages to merge.
  *
  * We clearly want to consider all normal, in-memory pages (WT_REF_MEM).
  *
- * During LRU eviction in case (3), the eviction code has already locked the
+ * During LRU eviction in case (2), the eviction code has already locked the
  * subtree, so locked pages should be included in the merge (WT_REF_LOCKED).
  *
  * To make this tractable, the eviction server guarantees that no thread is
- * doing LRU eviction in the tree when cases (1) and (2) occur.  That is, the
- * only state change that can occur during a sync or forced eviction is for a
- * reference to a page on disk to cause a page to be read (WT_REF_READING).
- * In the case of a read, we could safely ignore those pages because they are
- * unmodified by definition -- they are being read from disk, however, in the
- * current system, that state also includes fast-delete pages that are being
- * instantiated.  Those pages cannot be ignored, as they have been modified.
- * For this reason, we have to wait for the WT_REF_READING state to be resolved
- * to another state before we proceed.
+ * doing LRU eviction in the tree when case (1) occurs.  That is, the only
+ * state change that can occur during a sync is for a reference to a page on
+ * disk to cause a page to be read (WT_REF_READING).  In the case of a read, we
+ * could safely ignore those pages because they are unmodified by definition --
+ * they are being read from disk, however, in the current system, that state
+ * also includes fast-delete pages that are being instantiated.  Those pages
+ * cannot be ignored, as they have been modified.  For this reason, we have to
+ * wait for the WT_REF_READING state to be resolved to another state before we
+ * proceed.
  */
 static int
 __rec_page_modified(WT_SESSION_IMPL *session,
@@ -1480,6 +1479,8 @@ __wt_rec_row_bulk_insert(WT_CURSOR_BULK *cbulk)
 	return (0);
 }
 
+#define	WT_FIX_ENTRIES(btree, bytes)	(((bytes) * 8) / (btree)->bitcnt)
+
 /*
  * __wt_rec_col_fix_bulk_insert --
  *	Fixed-length column-store bulk insert.
@@ -1504,7 +1505,7 @@ __wt_rec_col_fix_bulk_insert(WT_CURSOR_BULK *cbulk)
 		    entries > 0;
 		    entries -= page_entries, data += page_size) {
 			page_entries = WT_MIN(entries,
-			    r->space_avail * 8 / btree->bitcnt);
+			    WT_FIX_ENTRIES(btree, r->space_avail));
 			page_size = __bitstr_size(page_entries * btree->bitcnt);
 
 			memcpy(r->first_free, data, page_size);
@@ -1533,7 +1534,7 @@ __wt_rec_col_fix_bulk_insert(WT_CURSOR_BULK *cbulk)
 			WT_RET(__rec_split(session, r));
 		}
 		cbulk->entry = 0;
-		cbulk->nrecs = r->space_avail * 8 / btree->bitcnt;
+		cbulk->nrecs = WT_FIX_ENTRIES(btree, r->space_avail);
 	}
 
 	__bit_setv(r->first_free,
@@ -1733,7 +1734,7 @@ __rec_col_fix(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 
 	/* Calculate the number of entries per page remainder. */
 	entry = page->entries;
-	nrecs = (r->space_avail * 8 / btree->bitcnt) - page->entries;
+	nrecs = WT_FIX_ENTRIES(btree, r->space_avail) - page->entries;
 	r->recno += entry;
 
 	/* Walk any append list. */
@@ -1774,7 +1775,7 @@ __rec_col_fix(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 
 			/* Calculate the number of entries per page. */
 			entry = 0;
-			nrecs = r->space_avail * 8 / btree->bitcnt;
+			nrecs = WT_FIX_ENTRIES(btree, r->space_avail);
 		}
 	}
 
@@ -1820,7 +1821,7 @@ __rec_col_fix_slvg(WT_SESSION_IMPL *session,
 	for (;;) {
 		/* Calculate the number of entries per page. */
 		entry = 0;
-		nrecs = r->space_avail * 8 / btree->bitcnt;
+		nrecs = WT_FIX_ENTRIES(btree, r->space_avail);
 
 		for (; nrecs > 0 && salvage->missing > 0;
 		    --nrecs, --salvage->missing, ++entry)

@@ -706,6 +706,18 @@ struct __wt_session {
 	int __F(create)(WT_SESSION *session,
 	    const char *name, const char *config);
 
+	/*! Compact an object.
+	 *
+	 * @snippet ex_all.c Compact a table
+	 *
+	 * @param session the session handle
+	 * @param name the URI of the object to drop, such as \c "table:stock"
+	 * @configempty{session.compact, see dist/api_data.py}
+	 * @errors
+	 */
+	int __F(compact)(WT_SESSION *session,
+	    const char *name, const char *config);
+
 	/*! Drop (delete) an object.
 	 *
 	 * @snippet ex_all.c Drop a table
@@ -812,7 +824,17 @@ struct __wt_session {
 	 *
 	 * @param session the session handle
 	 * @param name the URI of the file or table to verify
-	 * @configempty{session.verify, see dist/api_data.py}
+	 * @configstart{session.verify, see dist/api_data.py}
+	 * @config{dump_address, Display addresses and page types as pages are
+	 * verified\, using the application's message handler\, intended for
+	 * debugging.,a boolean flag; default \c false.}
+	 * @config{dump_blocks, Display the contents of on-disk blocks as they
+	 * are verified\, using the application's message handler\, intended for
+	 * debugging.,a boolean flag; default \c false.}
+	 * @config{dump_pages, Display the contents of in-memory pages as they
+	 * are verified\, using the application's message handler\, intended for
+	 * debugging.,a boolean flag; default \c false.}
+	 * @configend
 	 * @errors
 	 */
 	int __F(verify)(WT_SESSION *session,
@@ -904,6 +926,9 @@ struct __wt_session {
 	 * drop all checkpoints before and including the named checkpoint.
 	 * Checkpoints cannot be dropped while a hot backup is in progress or if
 	 * open in a cursor.,a list of strings; default empty.}
+	 * @config{force, checkpoints may be skipped if the underlying object
+	 * has not been modified\, this option forces the checkpoint.,a boolean
+	 * flag; default \c false.}
 	 * @config{name, if non-empty\, specify a name for the checkpoint.,a
 	 * string; default empty.}
 	 * @config{target, if non-empty\, checkpoint the list of objects.,a list
@@ -917,21 +942,6 @@ struct __wt_session {
 	/*! @name Debugging
 	 * @{
 	 */
-
-	/*! Dump a physical file in debugging mode.
-	 *
-	 * The specified file is displayed in a non-portable debugging mode to
-	 * the application's standard output.
-	 *
-	 * @snippet ex_all.c Dump a file
-	 *
-	 * @param session the session handle
-	 * @param name the URI of the file to dump
-	 * @configempty{session.dumpfile, see dist/api_data.py}
-	 * @errors
-	 */
-	int __F(dumpfile)(WT_SESSION *session,
-	    const char *name, const char *config);
 
 	/*! Send a string to the message handler for debugging.
 	 *
@@ -1774,34 +1784,36 @@ extern int wiredtiger_extension_init(WT_SESSION *session,
 #define	WT_STAT_file_overflow				31
 /*! page size allocation unit */
 #define	WT_STAT_file_allocsize				32
+/*! pages rewritten by compaction */
+#define	WT_STAT_file_compact_rewrite			33
 /*! reconcile: deleted or temporary pages merged */
-#define	WT_STAT_rec_page_merge				33
+#define	WT_STAT_rec_page_merge				34
 /*! reconcile: dictionary match */
-#define	WT_STAT_rec_dictionary				34
+#define	WT_STAT_rec_dictionary				35
 /*! reconcile: internal pages split */
-#define	WT_STAT_rec_split_intl				35
+#define	WT_STAT_rec_split_intl				36
 /*! reconcile: leaf pages split */
-#define	WT_STAT_rec_split_leaf				36
+#define	WT_STAT_rec_split_leaf				37
 /*! reconcile: overflow key */
-#define	WT_STAT_rec_ovfl_key				37
+#define	WT_STAT_rec_ovfl_key				38
 /*! reconcile: overflow value */
-#define	WT_STAT_rec_ovfl_value				38
+#define	WT_STAT_rec_ovfl_value				39
 /*! reconcile: pages deleted */
-#define	WT_STAT_rec_page_delete				39
+#define	WT_STAT_rec_page_delete				40
 /*! reconcile: pages written */
-#define	WT_STAT_rec_written				40
+#define	WT_STAT_rec_written				41
 /*! reconcile: unable to acquire hazard reference */
-#define	WT_STAT_rec_hazard				41
+#define	WT_STAT_rec_hazard				42
 /*! row-store internal pages */
-#define	WT_STAT_file_row_int_pages			42
+#define	WT_STAT_file_row_int_pages			43
 /*! row-store leaf pages */
-#define	WT_STAT_file_row_leaf_pages			43
+#define	WT_STAT_file_row_leaf_pages			44
 /*! total entries */
-#define	WT_STAT_file_entries				44
+#define	WT_STAT_file_entries				45
 /*! update conflicts */
-#define	WT_STAT_update_conflict				45
+#define	WT_STAT_update_conflict				46
 /*! write generation conflicts */
-#define	WT_STAT_file_write_conflicts			46
+#define	WT_STAT_file_write_conflicts			47
 /*! @} */
 
 /*!

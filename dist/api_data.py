@@ -277,6 +277,8 @@ methods = {
 
 'session.close' : Method([]),
 
+'session.compact' : Method([]),
+
 'session.create' : Method(table_meta + file_config + source_meta + [
 	Config('exclusive', 'false', r'''
 		fail if the object exists.  When false (the default), if the
@@ -291,7 +293,6 @@ methods = {
 		type='boolean'),
 	]),
 
-'session.dumpfile' : Method([]),
 'session.log_printf' : Method([]),
 
 'session.open_cursor' : Method([
@@ -368,7 +369,20 @@ methods = {
 ]),
 'session.truncate' : Method([]),
 'session.upgrade' : Method([]),
-'session.verify' : Method([]),
+'session.verify' : Method([
+	Config('dump_address', 'false', r'''
+	Display addresses and page types as pages are verified, using
+	the application's message handler, intended for debugging''',
+	type='boolean'),
+	Config('dump_blocks', 'false', r'''
+	Display the contents of on-disk blocks as they are verified, using
+	the application's message handler, intended for debugging''',
+	type='boolean'),
+	Config('dump_pages', 'false', r'''
+	Display the contents of in-memory pages as they are verified, using
+	the application's message handler, intended for debugging''',
+	type='boolean')
+]),
 
 'session.begin_transaction' : Method([
 	Config('isolation', '', r'''
@@ -400,6 +414,10 @@ methods = {
 		including the named checkpoint.  Checkpoints cannot be
 		dropped while a hot backup is in progress or if open in
 		a cursor''', type='list'),
+	Config('force', 'false', r'''
+		checkpoints may be skipped if the underlying object has not
+		been modified, this option forces the checkpoint''',
+		type='boolean'),
 	Config('name', '', r'''
 		if non-empty, specify a name for the checkpoint'''),
 	Config('target', '', r'''

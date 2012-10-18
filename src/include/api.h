@@ -111,8 +111,9 @@ struct __wt_session_impl {
 	size_t	 excl_allocated;	/* Bytes allocated */
 
 #define	WT_SYNC			1	/* Sync the file */
-#define	WT_SYNC_DISCARD		2	/* Sync the file, discard pages */
-#define	WT_SYNC_DISCARD_NOWRITE	3	/* Discard the file */
+#define	WT_SYNC_COMPACT		2	/* Compact the file */
+#define	WT_SYNC_DISCARD		3	/* Sync the file, discard pages */
+#define	WT_SYNC_DISCARD_NOWRITE	4	/* Discard the file */
 	int syncop;			/* File operation */
 	int syncop_ret;			/* Return value */
 
@@ -127,8 +128,9 @@ struct __wt_session_impl {
 	 * easily call a function to clear memory up to, but not including, the
 	 * hazard reference.
 	 */
-	uint32_t   hazard_size;		/* Count of used hazard references */
-	u_int nhazard;
+	uint32_t   hazard_size;		/* Allocated slots in hazard array. */
+	uint32_t   nhazard;		/* Count of active hazard references */
+
 #define	WT_SESSION_CLEAR(s)	memset(s, 0, WT_PTRDIFF(&(s)->hazard, s))
 	WT_HAZARD *hazard;		/* Hazard reference array */
 };

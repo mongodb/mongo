@@ -231,6 +231,38 @@ __wt_block_checkpoint(WT_SESSION_IMPL *session,
 }
 
 /*
+ * __ckpt_extlist_read --
+ *	Read a checkpoints extent lists and copy
+ */
+static int
+__ckpt_extlist_read(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_CKPT *ckpt)
+{
+	WT_BLOCK_CKPT *ci;
+
+	/*
+	 * Allocate a checkpoint structure, crack the cookie and read the
+	 * checkpoint's extent lists.
+	 *
+	 * Ignore the avail list: checkpoint avail lists are only useful if we
+	 * are rolling forward from the particular checkpoint and they represent
+	 * our best understanding of what blocks can be allocated.  If we are
+	 * not operating on the live checkpoint, subsequent checkpoints might
+	 * have allocated those blocks, and the avail list is useless.  We don't
+	 * discard it, because it is useful as part of verification, but we
+	 * don't re-write it either.
+	 */
+	WT_RET(__wt_calloc(session, 1, sizeof(WT_BLOCK_CKPT), &ckpt->bpriv));
+
+	ci = ckpt->bpriv;
+	WT_RET(__wt_block_ckpt_init(session, block, ci, ckpt->name, 0));
+	WT_RET(__wt_block_buffer_to_ckpt(session, block, ckpt->raw.data, ci));
+	WT_RET(__wt_block_extlist_read(session, block, &ci->alloc));
+	WT_RET(__wt_block_extlist_read(session, block, &ci->discard));
+
+	return (0);
+}
+
+/*
  * __ckpt_extlist_fblocks --
  *	If a checkpoint's extent list is going away, free its blocks.
  */
@@ -261,7 +293,7 @@ __ckpt_process(
     WT_SESSION_IMPL *session, WT_BLOCK *block, WT_CKPT *ckptbase)
 {
 	WT_BLOCK_CKPT *a, *b, *ci;
-	WT_CKPT *ckpt, *last_ckpt, *next_ckpt;
+	WT_CKPT *ckpt, *next_ckpt;
 	WT_DECL_ITEM(tmp);
 	WT_DECL_RET;
 	uint64_t ckpt_size;
@@ -297,55 +329,36 @@ __ckpt_process(
 	    session, &ci->ckpt_avail, "live", "ckpt_avail"));
 
 	/*
-	 * To delete a checkpoint, we'll need extent list for it, and we have to
-	 * read that from the disk.
+	 * To delete a checkpoint, we'll need checkpoint information for it and
+	 * the subsequent checkpoint into which it gets rolled; read them from
+	 * disk before we lock things down.
 	 */
-	last_ckpt = NULL;
 	deleting = 0;
 	WT_CKPT_FOREACH(ckptbase, ckpt) {
-		if (F_ISSET(ckpt, WT_CKPT_FAKE))
+		if (F_ISSET(ckpt, WT_CKPT_FAKE) ||
+		    !F_ISSET(ckpt, WT_CKPT_DELETE))
 			continue;
-
-		/*
-		 * To delete a checkpoint, we'll need checkpoint information for
-		 * it and the subsequent checkpoint.  The test is tricky, load
-		 * the current checkpoint's information if it's marked for
-		 * deletion or if it follows a checkpoint marked for deletion,
-		 * where the boundary cases are the first checkpoint in the list
-		 * and the last checkpoint in the list: if we're deleting the
-		 * last checkpoint in the list, there's no next checkpoint, the
-		 * checkpoint will be merged into the live tree.
-		 */
-		if (!F_ISSET(ckpt, WT_CKPT_DELETE) &&
-		    (F_ISSET(ckpt, WT_CKPT_ADD) ||
-		    last_ckpt == NULL || !F_ISSET(last_ckpt, WT_CKPT_DELETE))) {
-			last_ckpt = ckpt;
-			continue;
-		}
-		last_ckpt = ckpt;
 		deleting = 1;
 
 		/*
-		 * Allocate a checkpoint structure, crack the cookie and read
-		 * the checkpoint's extent lists.
-		 *
-		 * Ignore the avail list: checkpoint avail lists are only useful
-		 * if we are rolling forward from the particular checkpoint and
-		 * they represent our best understanding of what blocks can be
-		 * allocated.  If we are not operating on the live checkpoint,
-		 * subsequent checkpoints might have allocated those blocks, and
-		 * the avail list is useless.  We don't discard it, because it
-		 * is useful as part of verification, but we don't re-write it
-		 * either.
+		 * Read the checkpoint and next checkpoint extent lists if we
+		 * haven't already read them (we may have already read these
+		 * extent blocks if there is more than one deleted checkpoint).
 		 */
-		WT_ERR(__wt_calloc(
-		    session, 1, sizeof(WT_BLOCK_CKPT), &ckpt->bpriv));
-		ci = ckpt->bpriv;
-		WT_ERR(__wt_block_ckpt_init(session, block, ci, ckpt->name, 0));
-		WT_ERR(__wt_block_buffer_to_ckpt(
-		    session, block, ckpt->raw.data, ci));
-		WT_ERR(__wt_block_extlist_read(session, block, &ci->alloc));
-		WT_ERR(__wt_block_extlist_read(session, block, &ci->discard));
+		if (ckpt->bpriv == NULL)
+			WT_ERR(__ckpt_extlist_read(session, block, ckpt));
+
+		for (next_ckpt = ckpt + 1;; ++next_ckpt)
+			if (!F_ISSET(next_ckpt, WT_CKPT_FAKE))
+				break;
+
+		/*
+		 * The "next" checkpoint may be the live tree which has no
+		 * extent blocks to read.
+		 */
+		if (next_ckpt->bpriv == NULL &&
+		    !F_ISSET(next_ckpt, WT_CKPT_ADD))
+			WT_ERR(__ckpt_extlist_read(session, block, next_ckpt));
 	}
 
 	/*
@@ -369,7 +382,8 @@ __ckpt_process(
 	 * when writing the live extent lists.
 	 */
 	WT_CKPT_FOREACH(ckptbase, ckpt) {
-		if (!F_ISSET(ckpt, WT_CKPT_DELETE))
+		if (F_ISSET(ckpt, WT_CKPT_FAKE) ||
+		    !F_ISSET(ckpt, WT_CKPT_DELETE))
 			continue;
 
 		if (WT_VERBOSE_ISSET(session, ckpt)) {

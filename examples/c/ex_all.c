@@ -400,13 +400,13 @@ session_ops(WT_SESSION *session)
 	    "table:mytable", "key_format=r,value_format=S,cache_resident=true");
 	/*! [Create a cache-resident object] */
 
+	/*! [Compact a table] */
+	ret = session->compact(session, "table:mytable", NULL);
+	/*! [Compact a table] */
+
 	/*! [Drop a table] */
 	ret = session->drop(session, "table:mytable", NULL);
 	/*! [Drop a table] */
-
-	/*! [Dump a file] */
-	ret = session->dumpfile(session, "file:myfile", NULL);
-	/*! [Dump a file] */
 
 	/*! [Print to the message stream] */
 	ret = session->msg_printf(
@@ -895,6 +895,8 @@ main(void)
 	const char *home = "WT_TEST";
 	ret = wiredtiger_open(home, NULL, "create,transactional", &conn);
 	/*! [Open a connection] */
+
+	(void)conn->close(conn, NULL);
 	}
 
 	/*! [Get the WiredTiger library version #1] */

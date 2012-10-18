@@ -19,14 +19,16 @@ typedef struct {
 
 	uint64_t fcnt;				/* Progress counter */
 
-	int	 dumpfile;			/* Dump file stream */
+	int	 dump_address;
+	int	 dump_pages;
+	int	 dump_blocks;
 
 	WT_ITEM *tmp1;				/* Temporary buffer */
 	WT_ITEM *tmp2;				/* Temporary buffer */
 } WT_VSTUFF;
 
 static void __verify_checkpoint_reset(WT_VSTUFF *);
-static int  __verify_int(WT_SESSION_IMPL *, int);
+static int  __verify_config(WT_SESSION_IMPL *, const char *[], WT_VSTUFF *);
 static int  __verify_overflow(
 	WT_SESSION_IMPL *, const uint8_t *, uint32_t, WT_VSTUFF *);
 static int  __verify_overflow_cell(
@@ -44,41 +46,6 @@ static int  __verify_tree(WT_SESSION_IMPL *, WT_PAGE *, WT_VSTUFF *);
 int
 __wt_verify(WT_SESSION_IMPL *session, const char *cfg[])
 {
-	WT_UNUSED(cfg);
-
-	return (__verify_int(session, 0));
-}
-
-/*
- * __wt_dumpfile --
- *	Dump a file in debugging mode.
- */
-int
-__wt_dumpfile(WT_SESSION_IMPL *session, const char *cfg[])
-{
-	WT_UNUSED(cfg);
-
-#ifdef HAVE_DIAGNOSTIC
-	/*
-	 * We use the verification code to do debugging dumps because if we're
-	 * dumping in debugging mode, we want to confirm the page is OK before
-	 * walking it.
-	 */
-	return (__verify_int(session, 1));
-#else
-	WT_RET_MSG(session, ENOTSUP,
-	    "the WiredTiger library was not built in diagnostic mode");
-#endif
-}
-
-/*
- * __verify_int --
- *	Internal version of verify: verify a Btree, optionally dumping each
- * page in debugging mode.
- */
-static int
-__verify_int(WT_SESSION_IMPL *session, int dumpfile)
-{
 	WT_BTREE *btree;
 	WT_CKPT *ckptbase, *ckpt;
 	WT_DECL_RET;
@@ -90,11 +57,13 @@ __verify_int(WT_SESSION_IMPL *session, int dumpfile)
 
 	WT_CLEAR(_vstuff);
 	vs = &_vstuff;
-	vs->dumpfile = dumpfile;
 	WT_ERR(__wt_scr_alloc(session, 0, &vs->max_key));
 	WT_ERR(__wt_scr_alloc(session, 0, &vs->max_addr));
 	WT_ERR(__wt_scr_alloc(session, 0, &vs->tmp1));
 	WT_ERR(__wt_scr_alloc(session, 0, &vs->tmp2));
+
+	/* Check configuration strings. */
+	WT_ERR(__verify_config(session, cfg, vs));
 
 	/* Get a list of the checkpoints for this file. */
 	WT_ERR(__wt_meta_ckptlist_get(session, btree->name, &ckptbase));
@@ -106,6 +75,11 @@ __verify_int(WT_SESSION_IMPL *session, int dumpfile)
 	WT_CKPT_FOREACH(ckptbase, ckpt) {
 		WT_VERBOSE_ERR(session, verify,
 		    "%s: checkpoint %s", btree->name, ckpt->name);
+#ifdef HAVE_DIAGNOSTIC
+		if (vs->dump_address || vs->dump_blocks || vs->dump_pages)
+			WT_ERR(__wt_msg(session,
+			    "%s: checkpoint %s", btree->name, ckpt->name));
+#endif
 
 		/* Fake checkpoints require no work. */
 		if (F_ISSET(ckpt, WT_CKPT_FAKE))
@@ -157,6 +131,48 @@ err:	__wt_meta_ckptlist_free(session, ckptbase);
 }
 
 /*
+ * __verify_config --
+ *	Verification supports dumping pages in various formats.
+ */
+static int
+__verify_config(WT_SESSION_IMPL *session, const char *cfg[], WT_VSTUFF *vs)
+{
+	WT_CONFIG_ITEM cval;
+	WT_DECL_RET;
+
+	ret = __wt_config_gets(session, cfg, "dump_address", &cval);
+	if (ret != 0 && ret != WT_NOTFOUND)
+		WT_RET(ret);
+	if (ret == 0 && cval.val != 0)
+		vs->dump_address = 1;
+
+	ret = __wt_config_gets(session, cfg, "dump_blocks", &cval);
+	if (ret != 0 && ret != WT_NOTFOUND)
+		WT_RET(ret);
+	if (ret == 0 && cval.val != 0)
+		vs->dump_blocks = 1;
+
+	ret = __wt_config_gets(session, cfg, "dump_pages", &cval);
+	if (ret != 0 && ret != WT_NOTFOUND)
+		WT_RET(ret);
+	if (ret == 0 && cval.val != 0)
+		vs->dump_pages = 1;
+
+#ifdef HAVE_DIAGNOSTIC
+	/*
+	 * We use the verification code to do debugging dumps because if we're
+	 * dumping in debugging mode, we want to confirm the page is OK before
+	 * walking it.
+	 */
+#else
+	if (vs->dump_address || vs->dump_blocks || vs->dump_pages)
+		WT_RET_MSG(session, ENOTSUP,
+		    "the WiredTiger library was not built in diagnostic mode");
+#endif
+	return (0);
+}
+
+/*
  * __verify_checkpoint_reset --
  *	Reset anything needing to be reset for each new checkpoint verification.
  */
@@ -197,6 +213,12 @@ __verify_tree(WT_SESSION_IMPL *session, WT_PAGE *page, WT_VSTUFF *vs)
 	WT_VERBOSE_RET(session, verify, "%s %s",
 	    __wt_page_addr_string(session, vs->tmp1, page),
 	    __wt_page_type_string(page->type));
+#ifdef HAVE_DIAGNOSTIC
+	if (vs->dump_address)
+		WT_RET(__wt_msg(session, "%s %s",
+		    __wt_page_addr_string(session, vs->tmp1, page),
+		    __wt_page_type_string(page->type)));
+#endif
 
 	/*
 	 * The page's physical structure was verified when it was read into
@@ -226,11 +248,10 @@ __verify_tree(WT_SESSION_IMPL *session, WT_PAGE *page, WT_VSTUFF *vs)
 
 #ifdef HAVE_DIAGNOSTIC
 	/* Optionally dump the page in debugging mode. */
-	if (vs->dumpfile) {
+	if (vs->dump_blocks && page->dsk != NULL)
+		WT_RET(__wt_debug_disk(session, page->dsk, NULL));
+	if (vs->dump_pages)
 		WT_RET(__wt_debug_page(session, page, NULL));
-		if (page->dsk != NULL)
-			WT_RET(__wt_debug_disk(session, page->dsk, NULL));
-	}
 #endif
 
 	/*

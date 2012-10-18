@@ -61,7 +61,7 @@ __wt_lsm_merge_update_tree(WT_SESSION_IMPL *session,
  *	Merge a set of chunks of an LSM tree.
  */
 int
-__wt_lsm_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
+__wt_lsm_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, int stalls)
 {
 	WT_BLOOM *bloom;
 	WT_CURSOR *src, *dest;
@@ -85,7 +85,7 @@ __wt_lsm_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	 * read. We need a copy, since other threads may alter the chunk count
 	 * while we are doing a merge.
 	 */
-	nchunks = lsm_tree->nchunks - 1;
+	nchunks = lsm_tree->nchunks;
 
 	/*
 	 * If there aren't any chunks to merge, or some of the chunks aren't
@@ -106,8 +106,7 @@ __wt_lsm_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	/* Only include chunks that are stable on disk. */
 	end_chunk = nchunks - 1;
 	while (end_chunk > 0 &&
-	    (!F_ISSET(lsm_tree->chunk[end_chunk], WT_LSM_CHUNK_ONDISK) ||
-	    lsm_tree->chunk[end_chunk]->ncursor > 0))
+	    !F_ISSET(lsm_tree->chunk[end_chunk], WT_LSM_CHUNK_ONDISK))
 		--end_chunk;
 
 	/*
@@ -136,6 +135,11 @@ __wt_lsm_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 		if (nchunks > 2 && chunk->count > 2 * record_count / nchunks)
 			break;
 
+		/* Don't do any big merges until we have waited for 10s. */
+		if (nchunks > 0 && stalls < 10 &&
+		    chunk->count > lsm_tree->chunk[end_chunk]->count * 2)
+			break;
+
 		record_count += chunk->count;
 		--start_chunk;
 
@@ -146,7 +150,8 @@ __wt_lsm_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 
 	WT_ASSERT(session, nchunks <= max_chunks);
 
-	if (nchunks <= 1)
+	/* Don't do small merges unless we have waited for 2s. */
+	if (nchunks <= 1 || (stalls < 2 && nchunks < max_chunks / 2))
 		return (WT_NOTFOUND);
 
 	/* Allocate an ID for the merge. */
@@ -192,6 +197,11 @@ __wt_lsm_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	    wt_session, chunk->uri, NULL, "raw,bulk", &dest));
 
 	for (insert_count = 0; (ret = src->next(src)) == 0; insert_count++) {
+		if (insert_count % 1000 &&
+		    !F_ISSET(lsm_tree, WT_LSM_TREE_WORKING)) {
+			ret = EINTR;
+			goto err;
+		}
 		WT_ERR(src->get_key(src, &key));
 		dest->set_key(dest, &key);
 		WT_ERR(src->get_value(src, &value));
@@ -237,11 +247,23 @@ err:	if (src != NULL)
 		WT_TRET(__wt_bloom_close(bloom));
 	__wt_scr_free(&bbuf);
 	if (ret != 0) {
+		/*
+		 * Ideally we would drop the new chunk on error, but that
+		 * introduces potential deadlock problems. It is relatively
+		 * harmless to leave the file - it does not interfere
+		 * with later re-use.
+		WT_WITH_SCHEMA_LOCK(session,
+		    (void)wt_session->drop(wt_session, chunk->uri, NULL));
+		 */
 		__wt_free(session, chunk->bloom_uri);
 		__wt_free(session, chunk->uri);
 		__wt_free(session, chunk);
-		WT_VERBOSE_VOID(session, lsm,
-		    "Merge failed with %s\n", wiredtiger_strerror(ret));
+		if (ret == EINTR)
+			WT_VERBOSE_VOID(session, lsm,
+			    "Merge aborted due to close");
+		else
+			WT_VERBOSE_VOID(session, lsm,
+			    "Merge failed with %s", wiredtiger_strerror(ret));
 	}
 	return (ret);
 }

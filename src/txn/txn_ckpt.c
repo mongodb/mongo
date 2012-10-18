@@ -158,7 +158,7 @@ __ckpt_name_ok(WT_SESSION_IMPL *session, const char *name, size_t len)
 	 */
 	if (len < strlen(WT_CHECKPOINT))
 		return (0);
-	if (strncmp(name, WT_CHECKPOINT, strlen(WT_CHECKPOINT)) != 0)
+	if (!WT_PREFIX_MATCH(name, WT_CHECKPOINT))
 		return (0);
 
 	WT_RET_MSG(session, EINVAL,
@@ -183,8 +183,7 @@ __drop(WT_CKPT *ckptbase, const char *name, size_t len)
 	 */
 	if (strncmp(WT_CHECKPOINT, name, len) == 0) {
 		WT_CKPT_FOREACH(ckptbase, ckpt)
-			if (strncmp(ckpt->name,
-			    WT_CHECKPOINT, strlen(WT_CHECKPOINT)) == 0)
+			if (WT_PREFIX_MATCH(ckpt->name, WT_CHECKPOINT))
 				F_SET(ckpt, WT_CKPT_DELETE);
 	} else
 		WT_CKPT_FOREACH(ckptbase, ckpt)
@@ -273,7 +272,7 @@ __wt_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_TXN *txn;
 	WT_TXN_ISOLATION saved_isolation;
 	const char *name;
-	int deleted, is_checkpoint, track_ckpt;
+	int deleted, force, is_checkpoint, track_ckpt;
 	char *name_alloc;
 
 	conn = S2C(session);
@@ -392,7 +391,15 @@ __wt_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	 * to open the checkpoint in a cursor after taking any checkpoint, which
 	 * means it must exist.
 	 */
+	force = 0;
 	if (!btree->modified) {
+		ret = __wt_config_gets(session, cfg, "force", &cval);
+		if (ret != 0 && ret != WT_NOTFOUND)
+			WT_ERR(ret);
+		if (ret == 0 && cval.val != 0)
+			force = 1;
+	}
+	if (!btree->modified && !force) {
 		if (!is_checkpoint)
 			goto skip;
 
@@ -400,9 +407,18 @@ __wt_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 		WT_CKPT_FOREACH(ckptbase, ckpt)
 			if (F_ISSET(ckpt, WT_CKPT_DELETE))
 				++deleted;
+		/*
+		 * Complicated test: if we only deleted a single checkpoint, and
+		 * it was the last checkpoint in the object, and it has the same
+		 * name as the checkpoint we're taking (correcting for internal
+		 * checkpoint names with their generational suffix numbers), we
+		 * can skip the checkpoint, there's nothing to do.
+		 */
 		if (deleted == 1 &&
 		    F_ISSET(ckpt - 1, WT_CKPT_DELETE) &&
-		    strcmp(name, (ckpt - 1)->name) == 0)
+		    (strcmp(name, (ckpt - 1)->name) == 0 ||
+		    (WT_PREFIX_MATCH(name, WT_CHECKPOINT) &&
+		    WT_PREFIX_MATCH((ckpt - 1)->name, WT_CHECKPOINT))))
 			goto skip;
 	}
 
@@ -433,9 +449,8 @@ __wt_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 			 * delete flag, and otherwise fail.
 			 */
 			if (conn->ckpt_backup) {
-				if (strncmp(ckpt->name,
-				    WT_CHECKPOINT,
-				    strlen(WT_CHECKPOINT)) == 0) {
+				if (WT_PREFIX_MATCH(
+				    ckpt->name, WT_CHECKPOINT)) {
 					F_CLR(ckpt, WT_CKPT_DELETE);
 					continue;
 				}
@@ -454,8 +469,8 @@ __wt_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 			    __wt_session_lock_checkpoint(session, ckpt->name);
 			if (ret == 0)
 				continue;
-			if (ret == EBUSY && strncmp(ckpt->name,
-			    WT_CHECKPOINT, strlen(WT_CHECKPOINT)) == 0) {
+			if (ret == EBUSY &&
+			    WT_PREFIX_MATCH(ckpt->name, WT_CHECKPOINT)) {
 				F_CLR(ckpt, WT_CKPT_DELETE);
 				continue;
 			}

@@ -46,7 +46,7 @@ err:	__wt_free(session, cond);
  *	Lock a mutex.
  */
 void
-__wt_cond_wait(WT_SESSION_IMPL *session, WT_CONDVAR *cond)
+__wt_cond_wait(WT_SESSION_IMPL *session, WT_CONDVAR *cond, uint64_t usecs)
 {
 	WT_DECL_RET;
 
@@ -65,7 +65,17 @@ __wt_cond_wait(WT_SESSION_IMPL *session, WT_CONDVAR *cond)
 	 * it's known to return these errors on some systems.
 	 */
 	while (cond->locked) {
-		ret = pthread_cond_wait(&cond->cond, &cond->mtx);
+		if (usecs > 0) {
+			struct timeval tv;
+			struct timespec ts;
+
+			gettimeofday(&tv, NULL);
+			ts.tv_sec = tv.tv_sec + (tv.tv_usec + usecs) / 1000000;
+			ts.tv_nsec = 1000L * ((tv.tv_usec + usecs) % 1000000);
+			ret = pthread_cond_timedwait(
+			    &cond->cond, &cond->mtx, &ts);
+		} else
+			ret = pthread_cond_wait(&cond->cond, &cond->mtx);
 		if (ret != 0 &&
 		    ret != EINTR &&
 #ifdef ETIME
