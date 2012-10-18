@@ -239,28 +239,27 @@ static void __rec_dictionary_reset(WT_RECONCILE *);
  *
  * The reconciliation code is used in the following situations:
  *
- * (1) by the eviction server during sync;
- * (2) by the eviction server during forced eviction of a page; and
- * (3) by any thread during LRU eviction.
+ * (1) by the eviction server during sync; and
+ * (2) by any thread during LRU eviction.
  *
  * The complexity is checking the page state of child pages when looking for
  * pages to merge.
  *
  * We clearly want to consider all normal, in-memory pages (WT_REF_MEM).
  *
- * During LRU eviction in case (3), the eviction code has already locked the
+ * During LRU eviction in case (2), the eviction code has already locked the
  * subtree, so locked pages should be included in the merge (WT_REF_LOCKED).
  *
  * To make this tractable, the eviction server guarantees that no thread is
- * doing LRU eviction in the tree when cases (1) and (2) occur.  That is, the
- * only state change that can occur during a sync or forced eviction is for a
- * reference to a page on disk to cause a page to be read (WT_REF_READING).
- * In the case of a read, we could safely ignore those pages because they are
- * unmodified by definition -- they are being read from disk, however, in the
- * current system, that state also includes fast-delete pages that are being
- * instantiated.  Those pages cannot be ignored, as they have been modified.
- * For this reason, we have to wait for the WT_REF_READING state to be resolved
- * to another state before we proceed.
+ * doing LRU eviction in the tree when case (1) occurs.  That is, the only
+ * state change that can occur during a sync is for a reference to a page on
+ * disk to cause a page to be read (WT_REF_READING).  In the case of a read, we
+ * could safely ignore those pages because they are unmodified by definition --
+ * they are being read from disk, however, in the current system, that state
+ * also includes fast-delete pages that are being instantiated.  Those pages
+ * cannot be ignored, as they have been modified.  For this reason, we have to
+ * wait for the WT_REF_READING state to be resolved to another state before we
+ * proceed.
  */
 static int
 __rec_page_modified(WT_SESSION_IMPL *session,

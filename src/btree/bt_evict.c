@@ -383,9 +383,9 @@ __evict_file_request_walk(WT_SESSION_IMPL *session)
 	__evict_list_clr_all(session, 0);
 
 	/*
-	 * Wait for LRU eviction activity to drain.  It is much easier
-	 * to reason about sync or forced eviction if we know there are
-	 * no other threads evicting in the tree.
+	 * Wait for LRU eviction activity to drain.  It is much easier to
+	 * reason about checkpoints if we know there are no other threads
+	 * evicting in the tree.
 	 */
 	while (request_session->btree->lru_count > 0) {
 		__wt_spin_unlock(session, &cache->evict_lock);
@@ -721,9 +721,7 @@ __evict_get_page(
 		/*
 		 * Lock the page while holding the eviction mutex to prevent
 		 * multiple attempts to evict it.  For pages that are already
-		 * being evicted, including pages on the request queue for
-		 * forced eviction, this operation will fail and we will move
-		 * on.
+		 * being evicted, this operation will fail and we will move on.
 		 */
 		ref = evict->page->ref;
 		WT_ASSERT(session, evict->page == ref->page);

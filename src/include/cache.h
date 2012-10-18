@@ -55,12 +55,6 @@ struct __wt_cache {
 	u_int    evict_file_next;	/* LRU: next file to search */
 
 	/*
-	 * Forced-page eviction request information.
-	 */
-	WT_EVICT_ENTRY *evict_request;	/* Forced page eviction request list */
-	uint32_t max_evict_request;	/* Size of the eviction request array */
-
-	/*
 	 * Sync/flush request information.
 	 */
 	volatile uint64_t sync_request;	/* File sync requests */

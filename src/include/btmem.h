@@ -279,10 +279,7 @@ struct __wt_page {
 	 */
 	uint32_t entries;
 
-	/*
-	 * Memory attached to the page (although not exact or complete), used
-	 * to force eviction of a page tying too much memory down.
-	 */
+	/* Memory attached to the page. */
 	uint32_t memory_footprint;
 
 #define	WT_PAGE_INVALID		0	/* Invalid page */

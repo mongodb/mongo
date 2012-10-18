@@ -235,16 +235,6 @@ descend:	for (;;) {
 			 * the state to WT_REF_EVICT_WALK temporarily to avoid
 			 * the page being evicted by another thread while it is
 			 * being evaluated.
-			 *
-			 * We also return pages in the "evict-force" state,
-			 * which indicates they are waiting on the eviction
-			 * server getting to a request.  A sync call in the
-			 * meantime must write such a page to ensure all
-			 * modifications are written.  Since this is happening
-			 * inside the eviction server, and an LRU walk will
-			 * check the state before adding the page to the LRU
-			 * queue, there is no way for an evict-force page to
-			 * disappear from under us.
 			 */
 			set_read_gen = 0;
 			if (eviction) {

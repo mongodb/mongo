@@ -71,14 +71,6 @@ __wt_cache_create(WT_CONNECTION_IMPL *conn, const char *cfg[])
 	__wt_spin_init(session, &cache->evict_lock);
 
 	/*
-	 * Allocate the forced page eviction request array.  We size it to
-	 * allow one eviction page request per session.
-	 */
-	cache->max_evict_request = conn->session_size;
-	WT_ERR(__wt_calloc_def(
-	    session, cache->max_evict_request, &cache->evict_request));
-
-	/*
 	 * We pull some values from the cache statistics (rather than have two
 	 * copies).   Set them.
 	 */
@@ -127,8 +119,6 @@ __wt_cache_destroy(WT_CONNECTION_IMPL *conn)
 	if (cache->evict_cond != NULL)
 		(void)__wt_cond_destroy(session, cache->evict_cond);
 	__wt_spin_destroy(session, &cache->evict_lock);
-
-	__wt_free(session, cache->evict_request);
 
 	__wt_free(session, conn->cache);
 }

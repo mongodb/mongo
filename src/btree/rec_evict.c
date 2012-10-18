@@ -309,7 +309,7 @@ __rec_review(WT_SESSION_IMPL *session,
 	 * to evict split-merge pages, which means the only interesting case
 	 * is an empty page.  If the eviction thread picked an "empty" page
 	 * for eviction, it must have had reason, probably the empty page got
-	 * really, really full and is being forced out of the cache.
+	 * really, really full.
 	 */
 	mod = page->modify;
 	if (!top && (mod == NULL || !F_ISSET(mod,
