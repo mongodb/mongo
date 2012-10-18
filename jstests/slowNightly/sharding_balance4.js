@@ -3,6 +3,7 @@
 // check that doing updates done during a migrate all go to the right place
 
 s = new ShardingTest( "slow_sharding_balance4" , 2 , 1 , 1 , { chunksize : 1 } )
+s.stopBalancer();
 
 s.adminCommand( { enablesharding : "test" } );
 s.adminCommand( { shardcollection : "test.foo" , key : { _id : 1 } } );
@@ -63,7 +64,11 @@ function check( msg , dontAssert ){
             print( "not asserting for key failure: " + x + " want: " + e + " got: " + tojson(z) )
             return false;
         }
-
+        
+        s.s.getDB("admin").runCommand({ setParameter : 1, logLevel : 2 })
+        
+        printjson( db.foo.findOne( { _id : parseInt( x ) } ) )
+        
         // we will assert past this point but wait a bit to see if it is because the missing update
         // was being held in the writeback roundtrip
         sleep( 10000 );
@@ -84,6 +89,9 @@ function check( msg , dontAssert ){
 }
 
 function diff1(){
+    
+    jsTest.log("Running diff1...")
+    
     var myid = doUpdate( false )
     var le = db.getLastErrorCmd();
 
@@ -116,6 +124,8 @@ function sum(){
 
 assert.lt( 20 , diff1() ,"initial load" );
 print( diff1() )
+
+s.startBalancer();
 
 assert.soon( function(){
     
