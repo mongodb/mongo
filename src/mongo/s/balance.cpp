@@ -40,10 +40,7 @@ namespace mongo {
     Balancer::~Balancer() {
     }
 
-    int Balancer::_moveChunks( const vector<CandidateChunkPtr>* candidateChunks ,
-                               bool secondaryThrottle,
-                               bool waitForDelete )
-    {
+    int Balancer::_moveChunks( const vector<CandidateChunkPtr>* candidateChunks , bool secondaryThrottle ) {
         int movedCount = 0;
 
         for ( vector<CandidateChunkPtr>::const_iterator it = candidateChunks->begin(); it != candidateChunks->end(); ++it ) {
@@ -69,12 +66,7 @@ namespace mongo {
             }
 
             BSONObj res;
-            if ( c->moveAndCommit( Shard::make( chunkInfo.to ) ,
-                                   Chunk::MaxChunkSize ,
-                                   secondaryThrottle ,
-                                   waitForDelete,
-                                   res ) )
-            {
+            if ( c->moveAndCommit( Shard::make( chunkInfo.to ) , Chunk::MaxChunkSize , secondaryThrottle , res ) ) {
                 movedCount++;
                 continue;
             }
@@ -338,7 +330,7 @@ namespace mongo {
                 }
 
                 sleepTime = balancerConfig["_nosleep"].trueValue() ? 30 : 6;
-
+                
                 uassert( 13258 , "oids broken after resetting!" , _checkOIDs() );
 
                 {
@@ -357,14 +349,6 @@ namespace mongo {
                     
                     LOG(1) << "*** start balancing round" << endl;
 
-                    if (balancerConfig["_waitForDelete"].trueValue()) {
-                        LOG(1) << "balancer chunk moves will wait for cleanup" << endl;
-                    }
-
-                    if (balancerConfig["_secondaryThrottle"].trueValue()) {
-                        LOG(1) << "balancer chunk moves will wait for secondaries" << endl;
-                    }
-
                     vector<CandidateChunkPtr> candidateChunks;
                     _doBalanceRound( conn.conn() , &candidateChunks );
                     if ( candidateChunks.size() == 0 ) {
@@ -372,12 +356,9 @@ namespace mongo {
                         _balancedLastTime = 0;
                     }
                     else {
-                        _balancedLastTime =
-                                _moveChunks( &candidateChunks,
-                                             balancerConfig["_secondaryThrottle"].trueValue(),
-                                             balancerConfig["_waitForDelete"].trueValue());
+                        _balancedLastTime = _moveChunks( &candidateChunks, balancerConfig["_secondaryThrottle"].trueValue() );
                     }
-
+                    
                     LOG(1) << "*** end of balancing round" << endl;
                 }
 
