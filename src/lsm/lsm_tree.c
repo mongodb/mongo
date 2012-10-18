@@ -167,9 +167,15 @@ __wt_lsm_tree_setup_chunk(WT_SESSION_IMPL *session,
 	WT_DECL_ITEM(buf);
 	WT_DECL_ITEM(bbuf);
 	WT_DECL_RET;
+	const char *cfg[] = API_CONF_DEFAULTS(session, drop, "force");
 
 	WT_RET(__wt_scr_alloc(session, 0, &buf));
 	WT_ERR(__wt_lsm_tree_chunk_name(session, lsm_tree, i, buf));
+	/*
+	 * Drop the chunk first - there may be some content hanging over
+	 * from an aborted merge.
+	 */
+	WT_ERR(__wt_schema_drop(session, buf->data, cfg));
 	WT_ERR(__wt_schema_create(session, buf->data, lsm_tree->file_config));
 	chunk->uri = __wt_buf_steal(session, buf, NULL);
 	if (create_bloom) {
