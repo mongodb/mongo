@@ -913,13 +913,13 @@ namespace mongo {
         // Run a command.
         
         if ( pq.couldBeCommand() ) {
+            curop.markCommand();
             BufBuilder bb;
             bb.skip(sizeof(QueryResult));
             BSONObjBuilder cmdResBuf;
             if ( runCommands(ns, jsobj, curop, bb, cmdResBuf, false, queryOptions) ) {
                 curop.debug().iscommand = true;
                 curop.debug().query = jsobj;
-                curop.markCommand();
 
                 auto_ptr< QueryResult > qr;
                 qr.reset( (QueryResult *) bb.buf() );
