@@ -31,7 +31,7 @@ __wt_eviction_check(WT_SESSION_IMPL *session, int *read_lockoutp, int wake)
 		*read_lockoutp = (bytes_inuse > bytes_max);
 
 	/* Wake eviction when we're over the trigger cache size. */
-	if (wake && bytes_inuse > cache->eviction_trigger * (bytes_max / 100))
+	if (wake && bytes_inuse >= (cache->eviction_trigger * bytes_max) / 100)
 		__wt_evict_server_wake(session);
 }
 

@@ -157,30 +157,22 @@ __wt_cache_evict_server(void *arg)
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
-	int read_lockout;
 
 	session = arg;
 	conn = S2C(session);
 	cache = conn->cache;
 
 	while (F_ISSET(conn, WT_SERVER_RUN)) {
-		/*
-		 * Use the same logic as application threads to decide whether
-		 * there is work to do.
-		 */
-		__wt_eviction_check(session, &read_lockout, 0);
-
-		if (!read_lockout) {
-			WT_VERBOSE_ERR(session, evictserver, "sleeping");
-			__wt_cond_wait(session, cache->evict_cond);
-		}
+		/* Evict pages from the cache as needed. */
+		WT_ERR(__evict_worker(session));
 
 		if (!F_ISSET(conn, WT_SERVER_RUN))
 			break;
-		WT_VERBOSE_ERR(session, evictserver, "waking");
 
-		/* Evict pages from the cache as needed. */
-		WT_ERR(__evict_worker(session));
+		WT_VERBOSE_ERR(session, evictserver, "sleeping");
+		/* Don't rely on signals: check periodically. */
+		__wt_cond_wait(session, cache->evict_cond, 100000);
+		WT_VERBOSE_ERR(session, evictserver, "waking");
 	}
 
 	WT_VERBOSE_ERR(session, evictserver, "exiting");
@@ -214,7 +206,7 @@ __evict_worker(WT_SESSION_IMPL *session)
 {
 	WT_CACHE *cache;
 	WT_CONNECTION_IMPL *conn;
-	uint64_t bytes_start, bytes_inuse, bytes_max;
+	uint64_t bytes_inuse, bytes_max;
 	int loop;
 
 	conn = S2C(session);
@@ -238,7 +230,7 @@ __evict_worker(WT_SESSION_IMPL *session)
 		 */
 		bytes_inuse = __wt_cache_bytes_inuse(cache);
 		bytes_max = conn->cache_size;
-		if (bytes_inuse < cache->eviction_target * (bytes_max / 100))
+		if (bytes_inuse < (cache->eviction_target * bytes_max) / 100)
 			break;
 
 		WT_RET(__evict_lru(session));
@@ -248,9 +240,7 @@ __evict_worker(WT_SESSION_IMPL *session)
 		 * any progress at all, go back to sleep, it's not something
 		 * we can fix.
 		 */
-		bytes_start = bytes_inuse;
-		bytes_inuse = __wt_cache_bytes_inuse(cache);
-		if (bytes_start == bytes_inuse) {
+		if (__wt_cache_bytes_inuse(cache) >= bytes_inuse) {
 			if (loop == 10) {
 				WT_STAT_INCR(conn->stats, cache_evict_slow);
 				WT_VERBOSE_RET(session, evictserver,

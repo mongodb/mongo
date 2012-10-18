@@ -77,7 +77,7 @@ __wt_bt_cache_flush(WT_SESSION_IMPL *session, WT_CKPT *ckptbase, int op)
 	 */
 	WT_ERR(__wt_sync_file_serial(session, op));
 	__wt_evict_server_wake(session);
-	__wt_cond_wait(session, session->cond);
+	__wt_cond_wait(session, session->cond, 0);
 	ret = session->syncop_ret;
 
 	switch (op) {
