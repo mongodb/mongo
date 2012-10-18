@@ -90,6 +90,18 @@ __wt_open(WT_SESSION_IMPL *session,
 	/* Windows clones: we always want to treat the file as a binary. */
 	f |= O_BINARY;
 #endif
+#ifdef O_CLOEXEC
+	/*
+	 * Security:
+	 * The application may spawn a new process, and we don't want another
+	 * process to have access to our file handles.
+	 */
+	f |= O_CLOEXEC;
+#endif
+#ifdef O_NOATIME
+	f |= O_NOATIME;
+#endif
+
 	if (ok_create) {
 		f |= O_CREAT;
 		if (exclusive)
@@ -109,17 +121,24 @@ __wt_open(WT_SESSION_IMPL *session,
 	if (ret != 0)
 		WT_ERR_MSG(session, ret, "%s", name);
 
-#if defined(HAVE_FCNTL) && defined(FD_CLOEXEC)
+#if defined(HAVE_FCNTL) && defined(FD_CLOEXEC) && !defined(O_CLOEXEC)
 	/*
 	 * Security:
 	 * The application may spawn a new process, and we don't want another
 	 * process to have access to our file handles.  There's an obvious
-	 * race here...
+	 * race here, so we prefer the flag to open if available.
 	 */
 	if ((f = fcntl(fd, F_GETFD)) == -1 ||
 	    fcntl(fd, F_SETFD, f | FD_CLOEXEC) == -1)
 		WT_ERR_MSG(session, __wt_errno(), "%s: fcntl", name);
 #endif
+
+#if defined(HAVE_POSIX_FADVISE)
+	/* Disable read-ahead on trees: it slows down random read workloads. */
+	if (is_tree)
+		WT_ERR(posix_fadvise(fd, 0, 0, POSIX_FADV_RANDOM));
+#endif
+
 	WT_ERR(__open_directory_sync(session));
 
 	WT_ERR(__wt_calloc(session, 1, sizeof(WT_FH), &fh));
