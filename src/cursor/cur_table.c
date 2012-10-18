@@ -656,7 +656,7 @@ __curtable_open_colgroups(WT_CURSOR_TABLE *ctable, const char *cfg_arg[])
 	for (i = 0, cp = ctable->cg_cursors;
 	    i < WT_COLGROUPS(table);
 	    i++, cp++) {
-		WT_RET(__wt_curfile_open(session, table->cgroups[i]->source,
+		WT_RET(__wt_open_cursor(session, table->cgroups[i]->source,
 		    &ctable->iface, cfg, cp));
 		cfg[3] = "next_random=false";
 	}
@@ -687,7 +687,7 @@ __curtable_open_indices(WT_CURSOR_TABLE *ctable)
 	WT_RET(__wt_calloc_def(session, table->nindices, &ctable->idx_cursors));
 
 	for (i = 0, cp = ctable->idx_cursors; i < table->nindices; i++, cp++)
-		WT_RET(__wt_curfile_open(session, table->indices[i]->source,
+		WT_RET(__wt_open_cursor(session, table->indices[i]->source,
 		    &ctable->iface, cfg, cp));
 	return (0);
 }
@@ -732,7 +732,6 @@ __wt_curtable_open(WT_SESSION_IMPL *session,
 	WT_CURSOR_TABLE *ctable;
 	WT_DECL_RET;
 	WT_ITEM fmt, plan;
-	WT_SESSION *wt_session;
 	WT_TABLE *table;
 	size_t size;
 	const char *tablename, *columns;
@@ -751,12 +750,10 @@ __wt_curtable_open(WT_SESSION_IMPL *session,
 		size = WT_PTRDIFF(columns, tablename);
 	WT_RET(__wt_schema_get_table(session, tablename, size, 0, &table));
 
-	if (table->is_simple) {
+	if (table->is_simple)
 		/* Just return a cursor on the underlying data source. */
-		wt_session = &session->iface;
-		return (wt_session->open_cursor(wt_session,
-		    table->cgroups[0]->source, NULL, cfg[1], cursorp));
-	}
+		return (__wt_open_cursor(session,
+		    table->cgroups[0]->source, NULL, cfg, cursorp));
 
 	WT_RET(__wt_calloc_def(session, 1, &ctable));
 

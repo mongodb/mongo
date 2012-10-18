@@ -155,7 +155,7 @@ __clsm_open_cursors(WT_CURSOR_LSM *clsm, int start_chunk)
 		 * Once all cursors switch, the in-memory tree can be evicted.
 		 */
 		chunk = lsm_tree->chunk[i + start_chunk];
-		ret = __wt_curfile_open(session,
+		ret = __wt_open_cursor(session,
 		    chunk->uri, &clsm->iface,
 		    !F_ISSET(chunk, WT_LSM_CHUNK_ONDISK) ? NULL :
 		    (F_ISSET(clsm, WT_CLSM_MERGE) ? merge_cfg : ckpt_cfg), cp);
@@ -166,7 +166,7 @@ __clsm_open_cursors(WT_CURSOR_LSM *clsm, int start_chunk)
 		 * chunk instead.
 		 */
 		if (ret == WT_NOTFOUND && F_ISSET(chunk, WT_LSM_CHUNK_ONDISK))
-			ret = __wt_curfile_open(session,
+			ret = __wt_open_cursor(session,
 			    chunk->uri, &clsm->iface, NULL, cp);
 		WT_ERR(ret);
 

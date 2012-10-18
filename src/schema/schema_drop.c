@@ -154,11 +154,8 @@ __wt_schema_drop(WT_SESSION_IMPL *session, const char *uri, const char *cfg[])
 	WT_DECL_RET;
 	int force;
 
-	cval.val = 0;
-	ret = __wt_config_gets(session, cfg, "force", &cval);
-	if (ret != 0 && ret != WT_NOTFOUND)
-		WT_RET(ret);
-	force = cval.val == 0 ? 0 : 1;
+	WT_RET(__wt_config_gets_defno(session, cfg, "force", &cval));
+	force = (cval.val != 0);
 
 	/* Disallow drops from the WiredTiger name space. */
 	WT_RET(__wt_schema_name_check(session, uri));

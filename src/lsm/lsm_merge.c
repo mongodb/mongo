@@ -69,7 +69,8 @@ __wt_lsm_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, int stalls)
 	WT_DECL_RET;
 	WT_ITEM key, value;
 	WT_LSM_CHUNK *chunk;
-	WT_SESSION *wt_session;
+	const char *cur_cfg[] =
+	    API_CONF_DEFAULTS(session, open_cursor, "bulk,raw");
 	uint32_t generation;
 	uint64_t insert_count, record_count;
 	int create_bloom, dest_id, end_chunk, i;
@@ -179,9 +180,7 @@ __wt_lsm_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, int stalls)
 	 * then restrict the cursor to a specific number of chunks;
 	 * then set MERGE so the cursor doesn't track updates to the tree.
 	 */
-	wt_session = &session->iface;
-	WT_ERR(wt_session->open_cursor(
-	    wt_session, lsm_tree->name, NULL, NULL, &src));
+	WT_ERR(__wt_open_cursor(session, lsm_tree->name, NULL, NULL, &src));
 	F_SET(src, WT_CURSTD_RAW);
 	WT_ERR(__wt_clsm_init_merge(src, start_chunk, nchunks));
 
@@ -193,8 +192,7 @@ __wt_lsm_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, int stalls)
 		    NULL, record_count, lsm_tree->bloom_bit_count,
 		    lsm_tree->bloom_hash_count, &bloom));
 
-	WT_ERR(wt_session->open_cursor(
-	    wt_session, chunk->uri, NULL, "raw,bulk", &dest));
+	WT_ERR(__wt_open_cursor(session, chunk->uri, NULL, cur_cfg, &dest));
 
 	for (insert_count = 0; (ret = src->next(src)) == 0; insert_count++) {
 		if (insert_count % 1000 &&
@@ -253,7 +251,7 @@ err:	if (src != NULL)
 		 * harmless to leave the file - it does not interfere
 		 * with later re-use.
 		WT_WITH_SCHEMA_LOCK(session,
-		    (void)wt_session->drop(wt_session, chunk->uri, NULL));
+		    (void)__wt_schema_drop(session, chunk->uri, NULL));
 		 */
 		__wt_free(session, chunk->bloom_uri);
 		__wt_free(session, chunk->uri);

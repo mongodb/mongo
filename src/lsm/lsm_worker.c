@@ -174,7 +174,7 @@ __lsm_bloom_create(WT_SESSION_IMPL *session,
 	WT_CURSOR *src;
 	WT_DECL_RET;
 	WT_ITEM key;
-	WT_SESSION *wt_session;
+	const char *cur_cfg[] = API_CONF_DEFAULTS(session, open_cursor, "raw");
 	uint64_t insert_count;
 
 	if (!FLD_ISSET(lsm_tree->bloom, WT_LSM_BLOOM_NEWEST) ||
@@ -183,14 +183,12 @@ __lsm_bloom_create(WT_SESSION_IMPL *session,
 
 	WT_ASSERT(session, chunk->bloom_uri != NULL);
 
-	wt_session = &session->iface;
 	bloom = NULL;
 
 	WT_ERR(__wt_bloom_create(session, chunk->bloom_uri, NULL, chunk->count,
 	    lsm_tree->bloom_bit_count, lsm_tree->bloom_hash_count, &bloom));
 
-	WT_ERR(wt_session->open_cursor(
-	   wt_session, chunk->uri, NULL, "raw", &src));
+	WT_ERR(__wt_open_cursor(session, chunk->uri, NULL, cur_cfg, &src));
 
 	for (insert_count = 0; (ret = src->next(src)) == 0; insert_count++) {
 		WT_ERR(src->get_key(src, &key));
