@@ -115,8 +115,6 @@ __wt_open(WT_SESSION_IMPL *session,
 #ifdef O_DIRECT
 	if (is_tree && FLD_ISSET(conn->direct_io, WT_DIRECTIO_DATA))
 		f |= O_DIRECT;
-#else
-	WT_UNUSED(is_tree);
 #endif
 
 	WT_SYSCALL_RETRY(((fd = open(path, f, mode)) == -1 ? 1 : 0), ret);
@@ -168,6 +166,8 @@ err:		if (fh != NULL) {
 	}
 
 	__wt_free(session, path);
+
+	WT_UNUSED(is_tree);			/* Only used in #ifdef's. */
 	return (ret);
 }
 
