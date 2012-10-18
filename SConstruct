@@ -214,7 +214,7 @@ add_option( "use-system-all" , "use all system libraries", 0 , True )
 
 add_option( "use-cpu-profiler",
             "Link against the google-perftools profiler library",
-            0, True )
+            0, False )
 
 add_option("mongod-concurrency-level", "Concurrency level, \"global\" or \"db\"", 1, True,
            type="choice", choices=["global", "db"])
