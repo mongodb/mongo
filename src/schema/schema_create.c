@@ -79,16 +79,28 @@ err:	__wt_scr_free(&val);
 
 int
 __wt_schema_colgroup_source(WT_SESSION_IMPL *session,
-    WT_TABLE *table, const char *cgname, WT_ITEM *buf)
+    WT_TABLE *table, const char *cgname, const char *config, WT_ITEM *buf)
 {
-	const char *tablename;
+	WT_CONFIG_ITEM cval;
+	WT_DECL_RET;
+	const char *prefix, *suffix, *tablename;
 
 	tablename = table->name + strlen("table:");
+	prefix = "file:";
+	suffix = ".wt";
+	if ((ret = __wt_config_getones(session, config, "type", &cval)) == 0 &&
+	    WT_STRING_MATCH("lsm", cval.str, cval.len)) {
+		prefix = "lsm:";
+		suffix = "";
+	}
+	WT_RET_NOTFOUND_OK(ret);
+
 	if (cgname == NULL)
-		WT_RET(__wt_buf_fmt(session, buf, "file:%s.wt", tablename));
+		WT_RET(__wt_buf_fmt(session, buf, "%s%s%s",
+		    prefix, tablename, suffix));
 	else
-		WT_RET(__wt_buf_fmt(
-		    session, buf, "file:%s_%s.wt", tablename, cgname));
+		WT_RET(__wt_buf_fmt(session, buf, "%s%s_%s%s",
+		    prefix, tablename, cgname, suffix));
 
 	return (0);
 }
@@ -147,7 +159,7 @@ __create_colgroup(WT_SESSION_IMPL *session,
 		source = namebuf.data;
 	} else {
 		WT_ERR(__wt_schema_colgroup_source(
-		    session, table, cgname, &namebuf));
+		    session, table, cgname, config, &namebuf));
 		source = namebuf.data;
 		WT_ERR(__wt_buf_fmt(
 		    session, &confbuf, "source=\"%s\"", source));
@@ -195,13 +207,25 @@ err:	__wt_free(session, cgconf);
 
 int
 __wt_schema_index_source(WT_SESSION_IMPL *session,
-    WT_TABLE *table, const char *idxname, WT_ITEM *buf)
+    WT_TABLE *table, const char *idxname, const char *config, WT_ITEM *buf)
 {
-	const char *tablename;
+	WT_CONFIG_ITEM cval;
+	WT_DECL_RET;
+	const char *prefix, *suffix, *tablename;
 
 	tablename = table->name + strlen("table:");
-	WT_RET(
-	    __wt_buf_fmt(session, buf, "file:%s_%s.wti", tablename, idxname));
+	prefix = "file:";
+	suffix = ".wti";
+	if ((ret = __wt_config_getones(session, config, "type", &cval)) == 0 &&
+	    WT_STRING_MATCH("lsm", cval.str, cval.len)) {
+		prefix = "lsm:";
+		suffix = "_idx";
+	}
+	WT_RET_NOTFOUND_OK(ret);
+
+	tablename = table->name + strlen("table:");
+	WT_RET(__wt_buf_fmt(session, buf, "%s%s_%s%s",
+	    prefix, tablename, idxname, suffix));
 
 	return (0);
 }
@@ -249,7 +273,7 @@ __create_index(WT_SESSION_IMPL *session,
 		source = namebuf.data;
 	} else {
 		WT_ERR(__wt_schema_index_source(
-		    session, table, idxname, &namebuf));
+		    session, table, idxname, config, &namebuf));
 		source = namebuf.data;
 
 		/* Add the source name to the index config before collapsing. */

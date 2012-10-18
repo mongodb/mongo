@@ -948,10 +948,12 @@ extern int __wt_struct_unpack(WT_SESSION_IMPL *session,
 extern int __wt_schema_colgroup_source(WT_SESSION_IMPL *session,
     WT_TABLE *table,
     const char *cgname,
+    const char *config,
     WT_ITEM *buf);
 extern int __wt_schema_index_source(WT_SESSION_IMPL *session,
     WT_TABLE *table,
     const char *idxname,
+    const char *config,
     WT_ITEM *buf);
 extern int __wt_schema_create( WT_SESSION_IMPL *session,
     const char *name,
