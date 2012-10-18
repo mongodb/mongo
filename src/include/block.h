@@ -201,9 +201,8 @@ struct __wt_block_header {
 	 *
 	 * !!!
 	 * The write-generation is "owned" by the btree layer, but it's easier
-	 * to set it (when physically writing blocks), to persist it (in the
-	 * WT_BLOCK_DESC structure, rather than the metadata file), and restore
-	 * it during salvage, in the block-manager layer.
+	 * to set (when physically writing blocks) and restore (during salvage),
+	 * in the block-manager layer.
 	 */
 	uint64_t write_gen;		/* 00-07: write generation */
 
