@@ -615,6 +615,8 @@ __curtable_close(WT_CURSOR *cursor)
 
 	if (ctable->plan != ctable->table->plan)
 		__wt_free(session, ctable->plan);
+	if (cursor->value_format != ctable->table->value_format)
+		__wt_free(session, cursor->value_format);
 	__wt_free(session, ctable->cg_cursors);
 	__wt_free(session, ctable->idx_cursors);
 	/* The URI is owned by the table. */
