@@ -916,7 +916,7 @@ __wt_clsm_open(WT_SESSION_IMPL *session,
 	 * LSM cursors default to overwrite: if no setting was supplied, turn
 	 * it on.
 	 */
-	if (cfg[1] != NULL || __wt_config_getones(
+	if (cfg == NULL || cfg[1] == NULL || __wt_config_getones(
 	    session, cfg[1], "overwrite", &cval) == WT_NOTFOUND)
 		F_SET(cursor, WT_CURSTD_OVERWRITE);
 
