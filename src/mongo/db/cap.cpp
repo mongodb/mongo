@@ -267,9 +267,14 @@ namespace mongo {
             theDataFileMgr.deleteRecord(this, ns, fr.rec(), fr, true); // ZZZZZZZZZZZZ
             compact();
             if( ++passes > maxPasses ) {
-                log() << "passes ns:" << ns << " len:" << len << " maxPasses: " << maxPasses << endl;
-                log() << "passes max:" << maxCappedDocs() << " nrecords:" << stats.nrecords << " datasize: " << stats.datasize << endl;
-                massert( 10345 ,  "passes >= maxPasses in capped collection alloc", false );
+                StringBuilder sb;
+                sb << "passes >= maxPasses in NamespaceDetails::cappedAlloc: ns: " << ns
+                   << ", len: " << len
+                   << ", maxPasses: " << maxPasses
+                   << ", _maxDocsInCapped: " << _maxDocsInCapped
+                   << ", nrecords: " << stats.nrecords
+                   << ", datasize: " << stats.datasize;
+                msgasserted(10345, sb.str());
             }
         }
 
