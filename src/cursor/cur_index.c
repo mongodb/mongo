@@ -317,13 +317,11 @@ __curindex_open_colgroups(
 {
 	WT_TABLE *table;
 	WT_CURSOR **cp;
-	WT_SESSION *wt_session;
 	/* Child cursors are opened without dump disabled. */
 	const char *cfg[] = { cfg_arg[0], cfg_arg[1], "dump=\"\"", NULL };
 	char *proj;
 	uint32_t arg;
 
-	wt_session = &session->iface;
 	table = cindex->table;
 	WT_RET(__wt_calloc_def(session, WT_COLGROUPS(table), &cp));
 	cindex->cg_cursors = cp;
@@ -409,8 +407,6 @@ __wt_curindex_open(WT_SESSION_IMPL *session,
 
 	WT_RET(__wt_schema_open_index(session, table, idxname, namesize, &idx));
 	WT_RET(__wt_calloc_def(session, 1, &cindex));
-	WT_ERR(__wt_open_cursor(
-	    session, idx->source, &cindex->iface, cfg, &cindex->child));
 
 	cursor = &cindex->iface;
 	*cursor = iface;
@@ -424,6 +420,9 @@ __wt_curindex_open(WT_SESSION_IMPL *session,
 	cursor->uri = idx->name;
 	cursor->key_format = idx->idxkey_format;
 	cursor->value_format = table->value_format;
+
+	WT_ERR(__wt_open_cursor(
+	    session, idx->source, &cindex->iface, cfg, &cindex->child));
 
 	/*
 	 * XXX

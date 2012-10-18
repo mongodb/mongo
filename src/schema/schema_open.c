@@ -421,6 +421,7 @@ __wt_schema_get_colgroup(WT_SESSION_IMPL *session,
 
 	*colgroupp = NULL;
 
+	tablename = uri;
 	if (!WT_PREFIX_SKIP(tablename, "colgroup:") ||
 	    (tend = strchr(tablename, ':')) == NULL)
 		return (__wt_bad_object_type(session, uri));
@@ -457,6 +458,7 @@ __wt_schema_get_index(WT_SESSION_IMPL *session,
 
 	*indexp = NULL;
 
+	tablename = uri;
 	if (!WT_PREFIX_SKIP(tablename, "index:") ||
 	    (tend = strchr(tablename, ':')) == NULL)
 		return (__wt_bad_object_type(session, uri));
