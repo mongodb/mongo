@@ -21,10 +21,11 @@ __wt_lsm_worker(void *arg)
 {
 	WT_LSM_TREE *lsm_tree;
 	WT_SESSION_IMPL *session;
-	int progress;
+	int progress, stalls;
 
 	lsm_tree = arg;
 	session = lsm_tree->worker_session;
+	stalls = 0;
 
 	while (F_ISSET(lsm_tree, WT_LSM_TREE_WORKING)) {
 		progress = 0;
@@ -32,7 +33,8 @@ __wt_lsm_worker(void *arg)
 		/* Clear any state from previous worker thread iterations. */
 		session->btree = NULL;
 
-		if (__wt_lsm_merge(session, lsm_tree) == 0)
+		/* Report stalls to merge in milliseconds. */
+		if (__wt_lsm_merge(session, lsm_tree, stalls) == 0)
 			progress = 1;
 
 		/* Clear any state from previous worker thread iterations. */
@@ -42,8 +44,12 @@ __wt_lsm_worker(void *arg)
 		    __lsm_free_chunks(session, lsm_tree) == 0)
 			progress = 1;
 
-		if (!progress)
-			__wt_sleep(0, 10);
+		if (progress)
+			stalls = 0;
+		else {
+			__wt_sleep(1, 0);
+			++stalls;
+		}
 	}
 
 	return (NULL);
@@ -213,14 +219,14 @@ __lsm_free_chunks(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	WT_DECL_RET;
 	WT_LSM_CHUNK *chunk;
 	const char *drop_cfg[] = { NULL };
-	int found, i;
+	int locked, progress, i;
 
-	found = 0;
+	locked = progress = 0;
 	for (i = 0; i < lsm_tree->nold_chunks; i++) {
 		if ((chunk = lsm_tree->old_chunks[i]) == NULL)
 			continue;
-		if (!found) {
-			found = 1;
+		if (!locked) {
+			locked = 1;
 			/* TODO: Do we need the lsm_tree lock for all drops? */
 			__wt_spin_lock(session, &lsm_tree->lock);
 		}
@@ -232,6 +238,7 @@ __lsm_free_chunks(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 			 * be positioned on this old chunk.
 			 */
 			if (ret == 0) {
+				progress = 1;
 				F_CLR(chunk, WT_LSM_CHUNK_BLOOM);
 				__wt_free(session, chunk->bloom_uri);
 				chunk->bloom_uri = NULL;
@@ -250,6 +257,7 @@ __lsm_free_chunks(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 			 * be positioned on this old chunk.
 			 */
 			if (ret == 0) {
+				progress = 1;
 				__wt_free(session, chunk->uri);
 				chunk->uri = NULL;
 			} else if (ret != EBUSY)
@@ -262,10 +270,14 @@ __lsm_free_chunks(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 			++lsm_tree->old_avail;
 		}
 	}
-	if (found) {
-err:		ret = __wt_lsm_meta_write(session, lsm_tree);
+	if (locked) {
+err:		WT_TRET(__wt_lsm_meta_write(session, lsm_tree));
 		__wt_spin_unlock(session, &lsm_tree->lock);
 	}
+
 	/* Returning non-zero means there is no work to do. */
-	return (found ? 0 : WT_NOTFOUND);
+	if (!progress)
+		WT_TRET(WT_NOTFOUND);
+
+	return (ret);
 }

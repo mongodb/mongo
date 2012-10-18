@@ -61,7 +61,7 @@ __wt_lsm_merge_update_tree(WT_SESSION_IMPL *session,
  *	Merge a set of chunks of an LSM tree.
  */
 int
-__wt_lsm_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
+__wt_lsm_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, int stalls)
 {
 	WT_BLOOM *bloom;
 	WT_CURSOR *src, *dest;
@@ -85,7 +85,7 @@ __wt_lsm_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	 * read. We need a copy, since other threads may alter the chunk count
 	 * while we are doing a merge.
 	 */
-	nchunks = lsm_tree->nchunks - 1;
+	nchunks = lsm_tree->nchunks;
 
 	/*
 	 * If there aren't any chunks to merge, or some of the chunks aren't
@@ -106,8 +106,7 @@ __wt_lsm_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	/* Only include chunks that are stable on disk. */
 	end_chunk = nchunks - 1;
 	while (end_chunk > 0 &&
-	    (!F_ISSET(lsm_tree->chunk[end_chunk], WT_LSM_CHUNK_ONDISK) ||
-	    lsm_tree->chunk[end_chunk]->ncursor > 0))
+	    !F_ISSET(lsm_tree->chunk[end_chunk], WT_LSM_CHUNK_ONDISK))
 		--end_chunk;
 
 	/*
@@ -136,6 +135,11 @@ __wt_lsm_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 		if (nchunks > 2 && chunk->count > 2 * record_count / nchunks)
 			break;
 
+		/* Don't do any big merges until we have waited for 10s. */
+		if (nchunks > 0 && stalls < 10 &&
+		    chunk->count > lsm_tree->chunk[end_chunk]->count * 2)
+			break;
+
 		record_count += chunk->count;
 		--start_chunk;
 
@@ -146,7 +150,8 @@ __wt_lsm_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 
 	WT_ASSERT(session, nchunks <= max_chunks);
 
-	if (nchunks <= 1)
+	/* Don't do small merges unless we have waited for 2s. */
+	if (nchunks <= 1 || (stalls < 2 && nchunks < max_chunks / 2))
 		return (WT_NOTFOUND);
 
 	/* Allocate an ID for the merge. */
