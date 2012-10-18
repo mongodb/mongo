@@ -265,7 +265,13 @@ namespace mongo {
                     const BSONObj& min ,
                     const BSONObj& max ,
                     const BSONObj& shardKeyPattern ) {
-            scoped_lock ll(_workLock);
+
+            //
+            // Do not hold _workLock
+            //
+
+            //scoped_lock ll(_workLock);
+
             scoped_lock l(_m); // reads and writes _active
 
             verify( ! _active );
@@ -334,7 +340,7 @@ namespace mongo {
 
             case 'd': {
 
-                if ( getThreadName() == cleanUpThreadName ) {
+                if (getThreadName().find(cleanUpThreadName) == 0) {
                     // we don't want to xfer things we're cleaning
                     // as then they'll be deleted on TO
                     // which is bad
@@ -667,7 +673,10 @@ namespace mongo {
     };
 
     void _cleanupOldData( OldDataCleanup cleanup ) {
-        Client::initThread( cleanUpThreadName );
+
+        Client::initThread((string(cleanUpThreadName) + string("-") +
+                                                        OID::gen().toString()).c_str());
+
         if (!noauth) {
             cc().getAuthenticationInfo()->authorize("local", internalSecurity.user);
         }
