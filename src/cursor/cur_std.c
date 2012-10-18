@@ -398,18 +398,14 @@ __cursor_runtime_config(WT_CURSOR *cursor, const char *cfg[])
  */
 int
 __wt_cursor_dup(WT_SESSION_IMPL *session,
-    WT_CURSOR *to_dup, const char *config, WT_CURSOR **cursorp)
+    WT_CURSOR *to_dup, const char *cfg[], WT_CURSOR **cursorp)
 {
 	WT_CURSOR *cursor;
 	WT_DECL_RET;
 	WT_ITEM key;
-	WT_SESSION *wt_session;
-
-	wt_session = &session->iface;
 
 	/* Open a new cursor with the same URI. */
-	WT_ERR(wt_session->open_cursor(
-	    wt_session, to_dup->uri, NULL, config, &cursor));
+	WT_ERR(__wt_open_cursor(session, to_dup->uri, NULL, cfg, &cursor));
 
 	/*
 	 * Get a copy of the cursor's raw key, and set it in the new cursor,

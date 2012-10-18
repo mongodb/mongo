@@ -69,11 +69,15 @@ static int
 __curindex_move(WT_CURSOR_INDEX *cindex)
 {
 	WT_CURSOR **cp, *first;
+	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 	int i;
 
-	session = (WT_SESSION_IMPL *)cindex->cbt.iface.session;
+	session = (WT_SESSION_IMPL *)cindex->iface.session;
 	first = NULL;
+
+	/* Point the public cursor to the key in the child. */
+	__wt_cursor_set_raw_key(&cindex->iface, &cindex->child->key);
 
 	for (i = 0, cp = cindex->cg_cursors;
 	    i < WT_COLGROUPS(cindex->table);
@@ -86,10 +90,10 @@ __curindex_move(WT_CURSOR_INDEX *cindex)
 			 * key columns, so we have to use the full key format,
 			 * not just the public columns.
 			 */
-			WT_RET(__wt_schema_project_slice(session,
+			WT_ERR(__wt_schema_project_slice(session,
 			    cp, cindex->index->key_plan,
 			    1, cindex->index->key_format,
-			    &cindex->cbt.iface.key));
+			    &cindex->iface.key));
 			first = *cp;
 		} else {
 			(*cp)->key.data = first->key.data;
@@ -97,10 +101,14 @@ __curindex_move(WT_CURSOR_INDEX *cindex)
 			(*cp)->recno = first->recno;
 		}
 		F_SET(*cp, WT_CURSTD_KEY_SET);
-		WT_RET((*cp)->search(*cp));
+		WT_ERR((*cp)->search(*cp));
 	}
 
-	return (0);
+	F_SET(&cindex->iface, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
+	if (0) {
+err:		F_CLR(&cindex->iface, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
+	}
+	return (ret);
 }
 
 /*
@@ -115,9 +123,11 @@ __curindex_next(WT_CURSOR *cursor)
 	WT_SESSION_IMPL *session;
 
 	cindex = (WT_CURSOR_INDEX *)cursor;
-	CURSOR_API_CALL(cursor, session, next, cindex->cbt.btree);
-	if ((ret = __wt_btcur_next(&cindex->cbt, 0)) == 0)
+	CURSOR_API_CALL(cursor, session, next, NULL);
+	if ((ret = cindex->child->next(cindex->child)) == 0)
 		ret = __curindex_move(cindex);
+	else
+		F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
 	API_END(session);
 
 	return (ret);
@@ -135,9 +145,11 @@ __curindex_prev(WT_CURSOR *cursor)
 	WT_SESSION_IMPL *session;
 
 	cindex = (WT_CURSOR_INDEX *)cursor;
-	CURSOR_API_CALL(cursor, session, prev, cindex->cbt.btree);
-	if ((ret = __wt_btcur_prev(&cindex->cbt, 0)) == 0)
+	CURSOR_API_CALL(cursor, session, prev, NULL);
+	if ((ret = cindex->child->prev(cindex->child)) == 0)
 		ret = __curindex_move(cindex);
+	else
+		F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
 	API_END(session);
 
 	return (ret);
@@ -157,8 +169,8 @@ __curindex_reset(WT_CURSOR *cursor)
 	int i;
 
 	cindex = (WT_CURSOR_INDEX *)cursor;
-	CURSOR_API_CALL(cursor, session, reset, cindex->cbt.btree);
-	WT_TRET(__wt_btcur_reset(&cindex->cbt));
+	CURSOR_API_CALL(cursor, session, reset, NULL);
+	WT_TRET(cindex->child->reset(cindex->child));
 
 	for (i = 0, cp = cindex->cg_cursors;
 	    i < WT_COLGROUPS(cindex->table);
@@ -186,16 +198,7 @@ __curindex_search(WT_CURSOR *cursor)
 	int exact;
 
 	cindex = (WT_CURSOR_INDEX *)cursor;
-	CURSOR_API_CALL(cursor, session, search, cindex->cbt.btree);
-
-	/*
-	 * XXX
-	 * A very odd corner case is an index with a recno key.
-	 * The only way to get here is by creating an index on a column store
-	 * using only the primary's recno as the index key.  Disallow that for
-	 * now.
-	 */
-	WT_ASSERT(session, !WT_CURSOR_RECNO(cursor));
+	CURSOR_API_CALL(cursor, session, search, NULL);
 
 	/*
 	 * We expect partial matches, but we want the smallest item that
@@ -232,7 +235,10 @@ __curindex_search(WT_CURSOR *cursor)
 
 	WT_ERR(__curindex_move(cindex));
 
-err:	__wt_scr_free(&oldkeyp);
+	if (0) {
+err:		F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
+	}
+	__wt_scr_free(&oldkeyp);
 	API_END(session);
 
 	return (ret);
@@ -250,9 +256,12 @@ __curindex_search_near(WT_CURSOR *cursor, int *exact)
 	WT_SESSION_IMPL *session;
 
 	cindex = (WT_CURSOR_INDEX *)cursor;
-	CURSOR_API_CALL(cursor, session, search_near, cindex->cbt.btree);
-	if ((ret = __wt_btcur_search_near(&cindex->cbt, exact)) == 0)
+	CURSOR_API_CALL(cursor, session, search_near, NULL);
+	__wt_cursor_set_raw_key(cindex->child, &cursor->key);
+	if ((ret = cindex->child->search_near(cindex->child, exact)) == 0)
 		ret = __curindex_move(cindex);
+	else
+		F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
 	API_END(session);
 
 	return (ret);
@@ -265,7 +274,6 @@ __curindex_search_near(WT_CURSOR *cursor, int *exact)
 static int
 __curindex_close(WT_CURSOR *cursor)
 {
-	WT_BTREE *btree;
 	WT_CURSOR_INDEX *cindex;
 	WT_CURSOR **cp;
 	WT_DECL_RET;
@@ -275,9 +283,8 @@ __curindex_close(WT_CURSOR *cursor)
 
 	cindex = (WT_CURSOR_INDEX *)cursor;
 	idx = cindex->index;
-	btree = cindex->cbt.btree;
 
-	CURSOR_API_CALL(cursor, session, close, btree);
+	CURSOR_API_CALL(cursor, session, close, NULL);
 
 	for (i = 0, cp = (cindex)->cg_cursors;
 	    i < WT_COLGROUPS(cindex->table); i++, cp++)
@@ -294,9 +301,9 @@ __curindex_close(WT_CURSOR *cursor)
 	if (cindex->value_plan != idx->value_plan)
 		__wt_free(session, cindex->value_plan);
 
-	WT_TRET(__wt_btcur_close(&cindex->cbt));
-	WT_TRET(__wt_session_release_btree(session));
-	/* The URI is owned by the btree handle. */
+	if (cindex->child != NULL)
+		WT_TRET(cindex->child->close(cindex->child));
+	/* The URI is owned by the index. */
 	cursor->uri = NULL;
 	WT_TRET(__wt_cursor_close(cursor));
 	API_END(session);
@@ -310,11 +317,13 @@ __curindex_open_colgroups(
 {
 	WT_TABLE *table;
 	WT_CURSOR **cp;
+	WT_SESSION *wt_session;
 	/* Child cursors are opened without dump disabled. */
 	const char *cfg[] = { cfg_arg[0], cfg_arg[1], "dump=\"\"", NULL };
 	char *proj;
 	uint32_t arg;
 
+	wt_session = &session->iface;
 	table = cindex->table;
 	WT_RET(__wt_calloc_def(session, WT_COLGROUPS(table), &cp));
 	cindex->cg_cursors = cp;
@@ -325,9 +334,9 @@ __curindex_open_colgroups(
 		if ((*proj != WT_PROJ_KEY && *proj != WT_PROJ_VALUE) ||
 		    cp[arg] != NULL)
 			continue;
-		WT_RET(__wt_curfile_open(session,
+		WT_RET(__wt_open_cursor(session,
 		    table->cgroups[arg]->source,
-		    &cindex->cbt.iface, cfg, &cp[arg]));
+		    &cindex->iface, cfg, &cp[arg]));
 	}
 
 	return (0);
@@ -369,7 +378,6 @@ __wt_curindex_open(WT_SESSION_IMPL *session,
 		0			/* uint32_t flags */
 	};
 	WT_CURSOR_INDEX *cindex;
-	WT_CURSOR_BTREE *cbt;
 	WT_CURSOR *cursor;
 	WT_DECL_RET;
 	WT_INDEX *idx;
@@ -400,23 +408,31 @@ __wt_curindex_open(WT_SESSION_IMPL *session,
 		namesize = (size_t)(columns - idxname);
 
 	WT_RET(__wt_schema_open_index(session, table, idxname, namesize, &idx));
-	WT_RET(__wt_session_get_btree(session, idx->source, NULL, NULL, 0));
 	WT_RET(__wt_calloc_def(session, 1, &cindex));
+	WT_ERR(__wt_open_cursor(
+	    session, idx->source, &cindex->iface, cfg, &cindex->child));
 
-	cbt = &cindex->cbt;
-	cursor = &cbt->iface;
+	cursor = &cindex->iface;
 	*cursor = iface;
 	cursor->session = &session->iface;
-	cbt->btree = session->btree;
 
 	cindex->table = table;
 	cindex->index = idx;
 	cindex->key_plan = idx->key_plan;
 	cindex->value_plan = idx->value_plan;
 
-	cursor->uri = cbt->btree->name;
+	cursor->uri = idx->name;
 	cursor->key_format = idx->idxkey_format;
 	cursor->value_format = table->value_format;
+
+	/*
+	 * XXX
+	 * A very odd corner case is an index with a recno key.
+	 * The only way to get here is by creating an index on a column store
+	 * using only the primary's recno as the index key.  Disallow that for
+	 * now.
+	 */
+	WT_ASSERT(session, !WT_CURSOR_RECNO(cursor));
 
 	/* Handle projections. */
 	if (columns != NULL) {

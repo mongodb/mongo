@@ -732,6 +732,7 @@ __wt_curtable_open(WT_SESSION_IMPL *session,
 	WT_CURSOR_TABLE *ctable;
 	WT_DECL_RET;
 	WT_ITEM fmt, plan;
+	WT_SESSION *wt_session;
 	WT_TABLE *table;
 	size_t size;
 	const char *tablename, *columns;
@@ -750,13 +751,12 @@ __wt_curtable_open(WT_SESSION_IMPL *session,
 		size = WT_PTRDIFF(columns, tablename);
 	WT_RET(__wt_schema_get_table(session, tablename, size, 0, &table));
 
-	if (table->is_simple)
-		/*
-		 * The returned cursor should be public: it is not part of a
-		 * table cursor.
-		 */
-		return (__wt_curfile_open(
-		    session, table->cgroups[0]->source, NULL, cfg, cursorp));
+	if (table->is_simple) {
+		/* Just return a cursor on the underlying data source. */
+		wt_session = &session->iface;
+		return (wt_session->open_cursor(wt_session,
+		    table->cgroups[0]->source, NULL, cfg[1], cursorp));
+	}
 
 	WT_RET(__wt_calloc_def(session, 1, &ctable));
 

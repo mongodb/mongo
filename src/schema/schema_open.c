@@ -29,62 +29,6 @@ __wt_schema_colgroup_name(WT_SESSION_IMPL *session,
 }
 
 /*
- * __wt_schema_get_btree --
- *	Get the btree (into session->btree) for the named schema object
- *	(either a column group or an index).
- */
-int
-__wt_schema_get_btree(WT_SESSION_IMPL *session,
-    const char *objname, size_t len, const char *cfg[], uint32_t flags)
-{
-	WT_CONFIG_ITEM cval;
-	WT_CURSOR *cursor;
-	WT_DECL_RET;
-	WT_ITEM *uribuf;
-	const char *fileuri, *name, *objconf;
-
-	cursor = NULL;
-	uribuf = NULL;
-
-	name = objname;
-	if (len != strlen(objname))
-		WT_ERR(__wt_strndup(session, objname, len, &name));
-
-	WT_ERR(__wt_metadata_cursor(session, NULL, &cursor));
-	cursor->set_key(cursor, name);
-	WT_ERR(cursor->search(cursor));
-	WT_ERR(cursor->get_value(cursor, &objconf));
-
-	/* Get the data source from the metadata. */
-	WT_ERR(__wt_scr_alloc(session, 0, &uribuf));
-	WT_ERR(__wt_config_getones(session, objconf, "source", &cval));
-	WT_ERR(__wt_buf_fmt(session, uribuf, "%.*s", (int)cval.len, cval.str));
-	fileuri = uribuf->data;
-	if (!WT_PREFIX_MATCH(fileuri, "file:"))
-		WT_ERR_MSG(session, EINVAL,
-		    "Unexpected data source type for '%s': '%s'",
-		    objconf, fileuri);
-
-	/* !!! Close the schema cursor first, this overwrites session->btree. */
-	ret = cursor->close(cursor);
-	cursor = NULL;
-	if (ret != 0)
-		goto err;
-
-	ret = __wt_session_get_btree_ckpt(session, fileuri, cfg, flags);
-	if (ret == ENOENT)
-		__wt_errx(session,
-		    "%s created but '%s' is missing", objname, fileuri);
-
-err:	__wt_scr_free(&uribuf);
-	if (name != objname)
-		__wt_free(session, name);
-	if (cursor != NULL)
-		WT_TRET(cursor->close(cursor));
-	return (ret);
-}
-
-/*
  * __wt_schema_open_colgroups --
  *	Open the column groups for a table.
  */
@@ -460,4 +404,76 @@ err:		if (table != NULL)
 		WT_TRET(cursor->close(cursor));
 	__wt_free(session, tablename);
 	return (ret);
+}
+
+/*
+ * __wt_schema_get_colgroup --
+ *	Find a column group by URI.
+ */
+int
+__wt_schema_get_colgroup(WT_SESSION_IMPL *session,
+    const char *uri, WT_TABLE **tablep, WT_COLGROUP **colgroupp)
+{
+	WT_COLGROUP *colgroup;
+	WT_TABLE *table;
+	const char *tablename, *tend;
+	int i;
+
+	*colgroupp = NULL;
+
+	if (!WT_PREFIX_SKIP(tablename, "colgroup:") ||
+	    (tend = strchr(tablename, ':')) == NULL)
+		return (__wt_bad_object_type(session, uri));
+
+	WT_RET(__wt_schema_get_table(session,
+	    tablename, tend - tablename, 0, &table));
+
+	if (tablep != NULL)
+		*tablep = table;
+
+	for (i = 0; i < WT_COLGROUPS(table); i++) {
+		colgroup = table->cgroups[i];
+		if (strcmp(colgroup->name, uri) == 0) {
+			*colgroupp = colgroup;
+			return (0);
+		}
+	}
+
+	WT_RET_MSG(session, ENOENT, "%s not found in table", uri);
+}
+
+/*
+ * __wt_schema_get_index --
+ *	Find a column group by URI.
+ */
+int
+__wt_schema_get_index(WT_SESSION_IMPL *session,
+    const char *uri, WT_TABLE **tablep, WT_INDEX **indexp)
+{
+	WT_INDEX *idx;
+	WT_TABLE *table;
+	const char *tablename, *tend;
+	int i;
+
+	*indexp = NULL;
+
+	if (!WT_PREFIX_SKIP(tablename, "index:") ||
+	    (tend = strchr(tablename, ':')) == NULL)
+		return (__wt_bad_object_type(session, uri));
+
+	WT_RET(__wt_schema_get_table(session,
+	    tablename, tend - tablename, 0, &table));
+
+	if (tablep != NULL)
+		*tablep = table;
+
+	for (i = 0; i < table->nindices; i++) {
+		idx = table->indices[i];
+		if (strcmp(idx->name, uri) == 0) {
+			*indexp = idx;
+			return (0);
+		}
+	}
+
+	WT_RET_MSG(session, ENOENT, "%s not found in table", uri);
 }
