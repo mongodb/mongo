@@ -131,5 +131,27 @@ for(i = 0; i < 6; ++i) {
            'agg sharded test simple match failed');
 }
 
+function testSkipLimit(ops, expectedCount) {
+    if (expectedCount > 10) {
+        // make shard -> mongos intermediate results less than 16MB
+        ops.unshift({$project: {_id:1}})
+    }
+
+    ops.push({$group: {_id:1, count: {$sum: 1}}});
+
+    var out = db.runCommand({aggregate:"ts1", pipeline:ops});
+    assert.commandWorked(out);
+    assert.eq(out.result[0].count, expectedCount);
+}
+
+testSkipLimit([], nItems); // control
+testSkipLimit([{$skip:10}], nItems - 10);
+testSkipLimit([{$limit:10}], 10);
+testSkipLimit([{$skip:5}, {$limit:10}], 10);
+testSkipLimit([{$limit:10}, {$skip:5}], 10 - 5);
+testSkipLimit([{$skip:5}, {$skip: 3}, {$limit:10}], 10);
+testSkipLimit([{$skip:5}, {$limit:10}, {$skip: 3}], 10 - 3);
+testSkipLimit([{$limit:10}, {$skip:5}, {$skip: 3}], 10 - 3 - 5);
+
 // shut everything down
 shardedAggTest.stop();

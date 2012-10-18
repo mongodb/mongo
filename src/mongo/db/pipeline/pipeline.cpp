@@ -227,6 +227,35 @@ namespace mongo {
             }
         }
 
+        /* Move limits in front of skips. This is more optimal for sharding
+         * since currently, we can only split the pipeline at a single source
+         * and it is better to limit the results coming from each shard
+         */
+        for(int i = pSourceVector->size() - 1; i >= 1 /* not looking at 0 */; i--) {
+            DocumentSourceLimit* limit =
+                dynamic_cast<DocumentSourceLimit*>((*pSourceVector)[i].get());
+            DocumentSourceSkip* skip =
+                dynamic_cast<DocumentSourceSkip*>((*pSourceVector)[i-1].get());
+            if (limit && skip) {
+                // Increase limit by skip since the skipped docs now pass through the $limit
+                limit->setLimit(limit->getLimit() + skip->getSkip());
+                swap((*pSourceVector)[i], (*pSourceVector)[i-1]);
+
+                // Start at back again. This is needed to handle cases with more than 1 $limit
+                // (S means skip, L means limit)
+                //
+                // These two would work without second pass (assuming back to front ordering)
+                // SL   -> LS
+                // SSL  -> LSS
+                //
+                // The following cases need a second pass to handle the second limit
+                // SLL  -> LLS
+                // SSLL -> LLSS
+                // SLSL -> LLSS
+                i = pSourceVector->size(); // decremented before next pass
+            }
+        }
+
         /*
           Coalesce adjacent filters where possible.  Two adjacent filters
           are equivalent to one filter whose predicate is the conjunction of
