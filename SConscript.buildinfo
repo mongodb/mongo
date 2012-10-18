@@ -32,8 +32,8 @@ namespace mongo {
 
 def generate_buildinfo(env, target, source, **kw):
     git_version = buildscripts.utils.getGitVersion()
-    if env["MONGO_MODULES"]:
-        git_version += " modules: %s" % (", ".join(env["MONGO_MODULES"].keys()))
+    if len(env["MONGO_MODULES"]):
+        git_version += " modules: " + ", ".join(env["MONGO_MODULES"])
 
     contents = str(source[0]) % dict(git_version=git_version,
                                      sys_info=getSysInfo())
