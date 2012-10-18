@@ -27,9 +27,8 @@
 namespace mongo {
     const char DocumentSourceLimit::limitName[] = "$limit";
 
-    DocumentSourceLimit::DocumentSourceLimit(
-        const intrusive_ptr<ExpressionContext> &pExpCtx):
-        DocumentSource(pExpCtx),
+    DocumentSourceLimit::DocumentSourceLimit(const intrusive_ptr<ExpressionContext> &pExpCtx):
+        SplittableDocumentSource(pExpCtx),
         limit(0),
         count(0) {
     }
