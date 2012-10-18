@@ -21,16 +21,59 @@ function reduce2(key, values) { return values[0]; }
 var numdocs = 0;
 var numbatch = 100000;
 var nchunks = 0;
-for ( iter=0; iter<2; iter++ ){
+
+var numIterations = 2;
+
+for (var it = 0; it < numIterations; it++) {
+    
+    jsTest.log("Starting new insert batch...");
+    
     // add some more data for input so that chunks will get split further
-    for (i=0; i<numbatch; i++){ db.foo.save({a: Math.random() * 1000, y:str})}
-    db.getLastError();
+    for (i=0; i<numbatch; i++){ db.foo.save({a: Math.random() * 1000, y:str, i : numdocs + i})}
+    
+    assert.eq(null, db.getLastError());
+    
+    jsTest.log("No errors on insert batch.")
+    
     numdocs += numbatch
     
     var isBad = db.foo.find().itcount() != numdocs
     
+    if (isBad) jsTest.log("Insert count is smaller than full count!")
+    
+    if (isBad) {
+        
+        jsTest.log( "Showing document distribution because documents missed..." )
+        
+        // Stop balancing
+        s.stopBalancer();
+        
+        // Wait for writebacks
+        sleep( 10000 );
+        
+        s.printShardingStatus(true);
+        
+        var shards = config.shards.find().toArray();
+        
+        for (var i = 0; i < shards.length; i++){
+            
+            var shard = new Mongo(shards[i].host)
+            
+            var partialColl = shard.getCollection(db.foo + "").find();
+            
+            while (partialColl.hasNext()) {
+                var obj = partialColl.next();
+                delete obj.y;
+                print(tojson(obj));
+            }
+        }
+        
+        jsTest.log( "End document distribution." )
+    }
+    
     // Verify that wbl weirdness isn't causing this
     assert.soon( function(){ var c = db.foo.find().itcount(); print( "Count is " + c ); return c == numdocs } )
+   
     assert( ! isBad )
     //assert.eq( numdocs, db.foo.find().itcount(), "Not all data was saved!" )
     
