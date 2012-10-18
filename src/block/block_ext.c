@@ -200,12 +200,12 @@ __block_off_insert(
 
 #ifdef HAVE_DIAGNOSTIC
 /*
- * __wt_block_off_match --
+ * __block_off_match --
  *	Return if any part of a specified range appears on a specified extent
  * list.
  */
-int
-__wt_block_off_match(WT_EXTLIST *el, off_t off, off_t size)
+static int
+__block_off_match(WT_EXTLIST *el, off_t off, off_t size)
 {
 	WT_EXT *before, *after;
 
@@ -217,6 +217,39 @@ __wt_block_off_match(WT_EXTLIST *el, off_t off, off_t size)
 		return (1);
 	if (after != NULL && off + size > after->off)
 		return (1);
+	return (0);
+}
+
+/*
+ * __wt_block_misplaced --
+ *	Complain if a block appears on the available or discard lists.
+ */
+int
+__wt_block_misplaced(WT_SESSION_IMPL *session,
+   WT_BLOCK *block, const char *tag, off_t offset, uint32_t size)
+{
+	const char *name;
+
+	name = NULL;
+
+	/*
+	 * Verify a block the btree engine thinks it "owns" doesn't appear on
+	 * the available or discard lists (it might reasonably be on the alloc
+	 * list, if it was allocated since the last checkpoint).  The engine
+	 * "owns" a block if it's trying to read or free the block, and those
+	 * functions make this check.
+	 */
+	__wt_spin_lock(session, &block->live_lock);
+	if (__block_off_match(&block->live.avail, offset, size))
+		name = "available";
+	else if (__block_off_match(&block->live.discard, offset, size))
+		name = "discard";
+	__wt_spin_unlock(session, &block->live_lock);
+	if (name != NULL)
+		WT_RET_MSG(session, WT_ERROR,
+		    "%s failed: %" PRIuMAX "/%" PRIu32 " is on the %s list",
+		    tag, (uintmax_t)offset, size, name);
+
 	return (0);
 }
 #endif
@@ -458,20 +491,23 @@ __wt_block_free(WT_SESSION_IMPL *session,
     WT_BLOCK *block, const uint8_t *addr, uint32_t addr_size)
 {
 	WT_DECL_RET;
-	off_t off;
+	off_t offset;
 	uint32_t cksum, size;
 
 	WT_UNUSED(addr_size);
 	WT_BSTAT_INCR(session, free);
 
 	/* Crack the cookie. */
-	WT_RET(__wt_block_buffer_to_addr(block, addr, &off, &size, &cksum));
+	WT_RET(__wt_block_buffer_to_addr(block, addr, &offset, &size, &cksum));
 
 	WT_VERBOSE_RET(session, block,
-	    "free %" PRIdMAX "/%" PRIdMAX, (intmax_t)off, (intmax_t)size);
+	    "free %" PRIdMAX "/%" PRIdMAX, (intmax_t)offset, (intmax_t)size);
 
+#ifdef HAVE_DIAGNOSTIC
+	WT_RET(__wt_block_misplaced(session, block, "free", offset, size));
+#endif
 	__wt_spin_lock(session, &block->live_lock);
-	ret = __wt_block_off_free(session, block, off, (off_t)size);
+	ret = __wt_block_off_free(session, block, offset, (off_t)size);
 	__wt_spin_unlock(session, &block->live_lock);
 
 	return (ret);
@@ -483,7 +519,7 @@ __wt_block_free(WT_SESSION_IMPL *session,
  */
 int
 __wt_block_off_free(
-    WT_SESSION_IMPL *session, WT_BLOCK *block, off_t off, off_t size)
+    WT_SESSION_IMPL *session, WT_BLOCK *block, off_t offset, off_t size)
 {
 	WT_DECL_RET;
 
@@ -498,12 +534,12 @@ __wt_block_off_free(
 	 * list.
 	 */
 	if ((ret = __wt_block_off_remove_overlap(
-	    session, &block->live.alloc, off, size)) == 0)
+	    session, &block->live.alloc, offset, size)) == 0)
 		ret = __block_merge(
-		    session, &block->live.avail, off, (off_t)size);
+		    session, &block->live.avail, offset, (off_t)size);
 	else if (ret == WT_NOTFOUND)
 		ret = __block_merge(
-		    session, &block->live.discard, off, (off_t)size);
+		    session, &block->live.discard, offset, (off_t)size);
 	return (ret);
 }
 

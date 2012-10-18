@@ -57,7 +57,11 @@ extern int __wt_block_compact_page_skip(WT_SESSION_IMPL *session,
     const uint8_t *addr,
     uint32_t addr_size,
     int *skipp);
-extern int __wt_block_off_match(WT_EXTLIST *el, off_t off, off_t size);
+extern int __wt_block_misplaced(WT_SESSION_IMPL *session,
+    WT_BLOCK *block,
+    const char *tag,
+    off_t offset,
+    uint32_t size);
 extern int __wt_block_off_remove_overlap( WT_SESSION_IMPL *session,
     WT_EXTLIST *el,
     off_t off,
@@ -76,7 +80,7 @@ extern int __wt_block_free(WT_SESSION_IMPL *session,
     uint32_t addr_size);
 extern int __wt_block_off_free( WT_SESSION_IMPL *session,
     WT_BLOCK *block,
-    off_t off,
+    off_t offset,
     off_t size);
 extern int __wt_block_extlist_check( WT_SESSION_IMPL *session,
     WT_EXTLIST *al,
