@@ -205,7 +205,7 @@ __wt_open_cursor(WT_SESSION_IMPL *session,
 		ret = __wt_curtable_open(session, uri, cfg, cursorp);
 	else if ((ret = __wt_schema_get_source(session, uri, &dsrc)) == 0)
 		ret = dsrc->open_cursor(dsrc, &session->iface,
-		    uri, cfg, cursorp);
+		    uri, owner, cfg, cursorp);
 
 	return (ret);
 }

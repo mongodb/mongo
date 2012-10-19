@@ -705,6 +705,7 @@ extern int __wt_clsm_init_merge(WT_CURSOR *cursor,
     int nchunks);
 extern int __wt_clsm_open(WT_SESSION_IMPL *session,
     const char *uri,
+    WT_CURSOR *owner,
     const char *cfg[],
     WT_CURSOR **cursorp);
 extern int __wt_lsm_init(WT_CONNECTION *wt_conn, const char *config);
