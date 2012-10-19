@@ -511,6 +511,18 @@ __clsm_search(WT_CURSOR *cursor)
 	WT_LSM_ENTER(clsm, cursor, session, search);
 	WT_CURSOR_NEEDKEY(cursor);
 	F_CLR(clsm, WT_CLSM_ITERATE_NEXT | WT_CLSM_ITERATE_PREV);
+
+	/*
+	 * Reset any positioned cursor(s) to release pinned resources.
+	 *
+	 * TODO: generalize this and apply to all methods that don't preserve
+	 * position.
+	 */
+	if (clsm->current != NULL) {
+		WT_ERR(clsm->current->reset(clsm->current));
+		clsm->current = NULL;
+	}
+
 	FORALL_CURSORS(clsm, c, i) {
 		/* If there is a Bloom filter, see if we can skip the read. */
 		if ((bloom = clsm->blooms[i]) != NULL) {
@@ -521,7 +533,7 @@ __clsm_search(WT_CURSOR *cursor)
 				continue;
 			} else if (ret == 0)
 				WT_STAT_INCR(clsm->lsm_tree->stats, bloom_hits);
-			WT_RET(ret);
+			WT_ERR(ret);
 		}
 		c->set_key(c, &cursor->key);
 		if ((ret = c->search(c)) == 0) {
@@ -570,6 +582,17 @@ __clsm_search_near(WT_CURSOR *cursor, int *exactp)
 	WT_LSM_ENTER(clsm, cursor, session, search_near);
 	WT_CURSOR_NEEDKEY(cursor);
 	F_CLR(clsm, WT_CLSM_ITERATE_NEXT | WT_CLSM_ITERATE_PREV);
+
+	/*
+	 * Reset any positioned cursor(s) to release pinned resources.
+	 *
+	 * TODO: generalize this and apply to all methods that don't preserve
+	 * position.
+	 */
+	if (clsm->current != NULL) {
+		WT_ERR(clsm->current->reset(clsm->current));
+		clsm->current = NULL;
+	}
 
 	/*
 	 * search_near is somewhat fiddly: we can't just return a nearby key
@@ -649,8 +672,10 @@ __clsm_search_near(WT_CURSOR *cursor, int *exactp)
 			else {
 				WT_ERR(WT_LSM_CURCMP(session,
 				    clsm->lsm_tree, c, larger, cmp));
-				if (cmp < 0)
+				if (cmp < 0) {
+					WT_ERR(larger->reset(larger));
 					larger = c;
+				}
 			}
 		} else {
 			if (smaller == NULL)
@@ -658,17 +683,24 @@ __clsm_search_near(WT_CURSOR *cursor, int *exactp)
 			else {
 				WT_ERR(WT_LSM_CURCMP(session,
 				    clsm->lsm_tree, c, smaller, cmp));
-				if (cmp > 0)
+				if (cmp > 0) {
+					WT_ERR(smaller->reset(smaller));
 					smaller = c;
+				}
 			}
 		}
+
+		if (c != smaller && c != larger)
+			WT_ERR(c->reset(c));
 	}
 
 	if (larger != NULL) {
 		clsm->current = larger;
+		larger = NULL;
 		*exactp = 1;
 	} else if (smaller != NULL) {
 		clsm->current = smaller;
+		smaller = NULL;
 		*exactp = -1;
 	} else
 		ret = WT_NOTFOUND;
@@ -680,6 +712,11 @@ err:	API_END(session);
 		WT_TRET(c->get_key(c, &cursor->key));
 		WT_TRET(c->get_value(c, &cursor->value));
 	}
+	if (smaller != NULL)
+		WT_TRET(smaller->reset(smaller));
+	if (larger != NULL)
+		WT_TRET(larger->reset(larger));
+
 	if (ret == 0)
 		F_SET(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
 	else
