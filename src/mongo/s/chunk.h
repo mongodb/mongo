@@ -555,6 +555,11 @@ namespace mongo {
     */
     inline string Chunk::genID() const { return genID(_manager->getns(), _min); }
 
-    bool setShardVersion( DBClientBase & conn , const string& ns , ShardChunkVersion version , bool authoritative , BSONObj& result );
+    bool setShardVersion( DBClientBase & conn,
+                          const string& ns,
+                          ShardChunkVersion version,
+                          ChunkManagerPtr manager,
+                          bool authoritative,
+                          BSONObj& result );
 
 } // namespace mongo

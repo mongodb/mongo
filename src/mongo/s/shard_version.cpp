@@ -235,7 +235,7 @@ namespace mongo {
         const string versionableServerAddress(conn->getServerAddress());
 
         BSONObj result;
-        if ( setShardVersion( *conn , ns , version , authoritative , result ) ) {
+        if ( setShardVersion( *conn , ns , version , manager , authoritative , result ) ) {
             // success!
             LOG(1) << "      setShardVersion success: " << result << endl;
             connectionShardStatus.setSequence( conn , ns , officialSequenceNumber );
