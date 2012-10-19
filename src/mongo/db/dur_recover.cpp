@@ -217,7 +217,7 @@ namespace mongo {
             _mmfs.clear();
         }
 
-        RecoveryJob::Last::Last() { 
+        RecoveryJob::Last::Last() : mmf(NULL), fileNo(-1) { 
             // we are keeping invariants so we need to be sure things aren't disappearing out from under us:
             LockMongoFilesShared::assertAtLeastReadLocked();
         }
