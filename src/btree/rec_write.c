@@ -228,7 +228,7 @@ static int  __rec_write_wrapup_err(
 		WT_SESSION_IMPL *, WT_RECONCILE *, WT_PAGE *);
 
 static void __rec_dictionary_free(WT_SESSION_IMPL *, WT_RECONCILE *);
-static int  __rec_dictionary_init(WT_SESSION_IMPL *, WT_RECONCILE *);
+static int  __rec_dictionary_init(WT_SESSION_IMPL *, WT_RECONCILE *, u_int);
 static int  __rec_dictionary_lookup(
 		WT_SESSION_IMPL *, WT_RECONCILE *, WT_KV *, WT_DICTIONARY **);
 static void __rec_dictionary_reset(WT_RECONCILE *);
@@ -586,19 +586,14 @@ __rec_write_init(
 	 * seen.
 	 *
 	 * Per-page reconciliation: reset the dictionary.
+	 *
+	 * Sanity check the size: 100 slots is the smallest dictionary
+	 * we use.
 	 */
-	if (btree->dictionary != 0 && btree->dictionary > r->dictionary_slots) {
-		/*
-		 * Sanity check the size: 100 slots is the smallest dictionary
-		 * we use.
-		 */
-		r->dictionary_slots =
-		    btree->dictionary < 100 ? 100 : btree->dictionary;
-
-		WT_RET(__rec_dictionary_init(session, r));
-	}
-	if (btree->dictionary)
-		__rec_dictionary_reset(r);
+	if (btree->dictionary != 0 && btree->dictionary > r->dictionary_slots)
+		WT_RET(__rec_dictionary_init(session,
+		    r, btree->dictionary < 100 ? 100 : btree->dictionary));
+	__rec_dictionary_reset(r);
 
 	/* Per-page reconciliation: track skipped updates. */
 	r->upd_skipped = 0;
@@ -930,8 +925,7 @@ __rec_split(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 	dsk = r->dsk.mem;
 
 	/* Hitting a page boundary resets the dictionary, in all cases. */
-	if (btree->dictionary)
-		__rec_dictionary_reset(r);
+	__rec_dictionary_reset(r);
 
 	/*
 	 * There are 3 cases we have to handle.
@@ -1426,6 +1420,7 @@ __wt_rec_bulk_wrapup(WT_CURSOR_BULK *cbulk)
 int
 __wt_rec_row_bulk_insert(WT_CURSOR_BULK *cbulk)
 {
+	WT_BTREE *btree;
 	WT_CURSOR *cursor;
 	WT_KV *key, *val;
 	WT_RECONCILE *r;
@@ -1434,6 +1429,7 @@ __wt_rec_row_bulk_insert(WT_CURSOR_BULK *cbulk)
 
 	session = (WT_SESSION_IMPL *)cbulk->cbt.iface.session;
 	r = cbulk->reconcile;
+	btree = session->btree;
 
 	cursor = &cbulk->cbt.iface;
 	key = &r->k;
@@ -1468,7 +1464,7 @@ __wt_rec_row_bulk_insert(WT_CURSOR_BULK *cbulk)
 	/* Copy the key/value pair onto the page. */
 	__rec_copy_incr(session, r, key);
 	if (val->len != 0) {
-		if (r->dictionary != NULL)
+		if (btree->dictionary)
 			WT_RET(__rec_dict_replace(session, r, 0, val));
 		__rec_copy_incr(session, r, val);
 	}
@@ -1552,12 +1548,14 @@ __wt_rec_col_fix_bulk_insert(WT_CURSOR_BULK *cbulk)
 int
 __wt_rec_col_var_bulk_insert(WT_CURSOR_BULK *cbulk)
 {
-	WT_SESSION_IMPL *session;
+	WT_BTREE *btree;
 	WT_KV *val;
 	WT_RECONCILE *r;
+	WT_SESSION_IMPL *session;
 
 	session = (WT_SESSION_IMPL *)cbulk->cbt.iface.session;
 	r = cbulk->reconcile;
+	btree = session->btree;
 
 	val = &r->v;
 	WT_RET(__rec_cell_build_val(
@@ -1568,7 +1566,7 @@ __wt_rec_col_var_bulk_insert(WT_CURSOR_BULK *cbulk)
 		WT_RET(__rec_split(session, r));
 
 	/* Copy the value onto the page. */
-	if (r->dictionary != NULL)
+	if (btree->dictionary)
 		WT_RET(__rec_dict_replace(session, r, cbulk->rle, val));
 	__rec_copy_incr(session, r, val);
 
@@ -1862,8 +1860,10 @@ __rec_col_var_helper(WT_SESSION_IMPL *session, WT_RECONCILE *r,
     WT_SALVAGE_COOKIE *salvage,
     WT_ITEM *value, int deleted, int ovfl, uint64_t rle)
 {
+	WT_BTREE *btree;
 	WT_KV *val;
 
+	btree = session->btree;
 	val = &r->v;
 
 	/*
@@ -1917,7 +1917,7 @@ __rec_col_var_helper(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 		WT_RET(__rec_split(session, r));
 
 	/* Copy the value onto the page. */
-	if (!deleted && !ovfl && r->dictionary != NULL)
+	if (!deleted && !ovfl && btree->dictionary)
 		WT_RET(__rec_dict_replace(session, r, rle, val));
 	__rec_copy_incr(session, r, val);
 
@@ -3033,7 +3033,7 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 		/* Copy the key/value pair onto the page. */
 		__rec_copy_incr(session, r, key);
 		if (val->len != 0) {
-			if (dictionary && r->dictionary != NULL)
+			if (dictionary && btree->dictionary)
 				WT_ERR(__rec_dict_replace(session, r, 0, val));
 			__rec_copy_incr(session, r, val);
 		}
@@ -3061,10 +3061,12 @@ err:	__wt_scr_free(&tmpkey);
 static int
 __rec_row_leaf_insert(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins)
 {
+	WT_BTREE *btree;
 	WT_KV *key, *val;
 	WT_UPDATE *upd;
 	int ovfl_key;
 
+	btree = session->btree;
 	key = &r->k;
 	val = &r->v;
 
@@ -3107,7 +3109,7 @@ __rec_row_leaf_insert(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins)
 		/* Copy the key/value pair onto the page. */
 		__rec_copy_incr(session, r, key);
 		if (val->len != 0) {
-			if (r->dictionary != NULL)
+			if (btree->dictionary)
 				WT_RET(__rec_dict_replace(session, r, 0, val));
 			__rec_copy_incr(session, r, val);
 		}
@@ -3854,13 +3856,14 @@ __rec_dictionary_skip_insert(
  *	Allocate and initialize the dictionary.
  */
 static int
-__rec_dictionary_init(WT_SESSION_IMPL *session, WT_RECONCILE *r)
+__rec_dictionary_init(WT_SESSION_IMPL *session, WT_RECONCILE *r, u_int slots)
 {
 	u_int depth, i;
 
 	/* Free any previous dictionary. */
 	__rec_dictionary_free(session, r);
 
+	r->dictionary_slots = slots;
 	WT_RET(__wt_calloc(session,
 	    r->dictionary_slots, sizeof(WT_DICTIONARY *), &r->dictionary));
 	for (i = 0; i < r->dictionary_slots; ++i) {
@@ -3903,8 +3906,10 @@ __rec_dictionary_free(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 static void
 __rec_dictionary_reset(WT_RECONCILE *r)
 {
-	r->dictionary_next = 0;
-	memset(r->dictionary_head, 0, sizeof(r->dictionary_head));
+	if (r->dictionary_slots) {
+		r->dictionary_next = 0;
+		memset(r->dictionary_head, 0, sizeof(r->dictionary_head));
+	}
 }
 
 /*
