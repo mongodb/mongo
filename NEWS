@@ -1,3 +1,102 @@
+WiredTiger release 1.3.4, 2012-10-19
+------------------------------------
+
+This release includes several important new features, including:
+
+* support for online compaction of files;
+* support for tables, column groups and indices that use LSM trees for
+  storage; and
+* improved statistics and configuration for LSM trees and Bloom filters.
+
+In addition, there are some significant performance improvements and bug
+fixes.  The full list of changes is:
+
+[#248]	Add support for online compaction.
+
+[#310]	Fixed a bug where overflow blocks could be accessed by a
+	long-running reader after they had been freed in a checkpoint.
+
+[#358]	Allocate checkpoint blocks from the live system's list of available
+	blocks rather than always extending the file.
+
+[#361]	Sync the directory after creating a file: this is apparently
+	required for durability on Linux, according to the Linux fsync man
+	page.
+
+[#362]	Don't check if a page is on the avail or discard lists if we're
+	salvaging the file, that is okay.
+
+[#363]	Remove obsolete code dealing with forced eviction.
+
+[#366]	Fake checkpoints may have the delete flag set, ignore them when
+	rolling checkpoints forward.
+
+[#367]	All metadata reads should ignore the application's transactional
+	context.
+
+[#369]	Support LSM as a data source for tables, column groups and indices.
+
+* Add tuning options for LSM bloom filters, including controlling whether
+  the oldest level in the tree has a Bloom filter, whether newly-created
+  (level 0) files have Bloom filters, and passing arbitrary file
+  configuration for Bloom filters.
+
+* Add a merge generation to LSM chunks.  Add a statistic that reports the
+  highest merge generation in a tree.
+
+* Add a new LSM statistic tracking searches that could benefit from bloom
+  filters.
+
+* Enable LSM statistics in the "wt stat" utility.
+
+* Interrupt LSM merge operations, rather than waiting on close.
+
+* Wait for a while before looking for LSM major merges, in case merges
+  catch up with inserts.
+
+* Fix LSM index searches.  The main issue was LSM search_near was not
+  always returning the closest key to the search key, which calling code
+  expects.  It now tries hard to find the smallest cursor larger than the
+  search key, and only if no larger record exists does it return the
+  largest record smaller than the search key.
+
+* Reset any old cursor position before an LSM search.  This limits hazard
+  references in an LSM search to a single chunk.
+
+* Fix a memory leak in an error path in Bloom filters.
+
+* Tweak the search loops in hazard_{set,clear} in favor of
+  last-in-first-out ordering.
+
+* If there are many files open, some hotter than others, walk more files
+  looking for pages to evict.
+
+* Don't stop evicting until we reach the target, have eviction wake up
+  periodically regardless of whether the application signals it.  This
+  latter requires a "timed condition wait" operation.
+
+* Tweaks to file handle flags for out-of-cache read performance on Linux
+  (disable readahead and access time updates).
+
+* Replace the WT_SESSION::dumpfile method with configuration strings to
+  WT_SESSION::verify.
+
+* Fix a bug where we weren't skipping unnecessary default checkpoints
+  because we weren't handling the generational number included in the
+  internal checkpoint name.
+
+* Add a "force" configuration flag to WT_SESSION::checkpoint, object
+  compaction needs it because the work it wants done is done by the block
+  manager.
+
+* Make compact and checkpoint operate on a table's indices.
+
+* When doing a page truncate, lock down the page before we unpack the
+  on-page cell -- it's possible the page could be instantiated, modified
+  and reconciled while we're sleeping, in which case the WT_REF.addr field
+  would no longer point on-page.
+
+
 WiredTiger release 1.3.3, 2012-10-11
 ------------------------------------
 
