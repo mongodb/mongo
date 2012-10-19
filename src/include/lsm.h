@@ -54,7 +54,8 @@ struct __wt_lsm_chunk {
  */
 struct __wt_lsm_tree {
 	const char *name, *config, *filename;
-	const char *key_format, *value_format, *file_config;
+	const char *key_format, *value_format;
+	const char *bloom_config, *file_config;
 
 	WT_COLLATOR *collator;
 

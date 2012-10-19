@@ -113,8 +113,8 @@ __wt_confdfl_file_meta =
 	"checksum=,collator=,columns=,dictionary=0,format=btree,huffman_key=,"
 	"huffman_value=,internal_item_max=0,internal_key_truncate=,"
 	"internal_page_max=2KB,key_format=u,key_gap=10,leaf_item_max=0,"
-	"leaf_page_max=1MB,lsm_bloom=,lsm_bloom_bit_count=8,"
-	"lsm_bloom_hash_count=4,lsm_bloom_newest=0,lsm_bloom_oldest=0,"
+	"leaf_page_max=1MB,lsm_bloom=,lsm_bloom_bit_count=8,lsm_bloom_config="
+	",lsm_bloom_hash_count=4,lsm_bloom_newest=0,lsm_bloom_oldest=0,"
 	"lsm_chunk_size=2MB,lsm_merge_max=15,prefix_compression=,split_pct=75"
 	",value_format=u,version=(major=0,minor=0)";
 
@@ -140,6 +140,7 @@ __wt_confchk_file_meta[] = {
 	{ "leaf_page_max", "int", "min=512B,max=512MB" },
 	{ "lsm_bloom", "boolean", NULL },
 	{ "lsm_bloom_bit_count", "int", "min=2,max=1000" },
+	{ "lsm_bloom_config", "string", NULL },
 	{ "lsm_bloom_hash_count", "int", "min=2,max=100" },
 	{ "lsm_bloom_newest", "boolean", NULL },
 	{ "lsm_bloom_oldest", "boolean", NULL },
@@ -229,10 +230,10 @@ __wt_confdfl_session_create =
 	"format=btree,huffman_key=,huffman_value=,internal_item_max=0,"
 	"internal_key_truncate=,internal_page_max=2KB,key_format=u,"
 	"key_format=u,key_gap=10,leaf_item_max=0,leaf_page_max=1MB,lsm_bloom="
-	",lsm_bloom_bit_count=8,lsm_bloom_hash_count=4,lsm_bloom_newest=0,"
-	"lsm_bloom_oldest=0,lsm_chunk_size=2MB,lsm_merge_max=15,"
-	"prefix_compression=,source=,split_pct=75,type=file,value_format=u,"
-	"value_format=u";
+	",lsm_bloom_bit_count=8,lsm_bloom_config=,lsm_bloom_hash_count=4,"
+	"lsm_bloom_newest=0,lsm_bloom_oldest=0,lsm_chunk_size=2MB,"
+	"lsm_merge_max=15,prefix_compression=,source=,split_pct=75,type=file,"
+	"value_format=u,value_format=u";
 
 WT_CONFIG_CHECK
 __wt_confchk_session_create[] = {
@@ -259,6 +260,7 @@ __wt_confchk_session_create[] = {
 	{ "leaf_page_max", "int", "min=512B,max=512MB" },
 	{ "lsm_bloom", "boolean", NULL },
 	{ "lsm_bloom_bit_count", "int", "min=2,max=1000" },
+	{ "lsm_bloom_config", "string", NULL },
 	{ "lsm_bloom_hash_count", "int", "min=2,max=100" },
 	{ "lsm_bloom_newest", "boolean", NULL },
 	{ "lsm_bloom_oldest", "boolean", NULL },

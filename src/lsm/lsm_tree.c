@@ -28,6 +28,7 @@ __lsm_tree_discard(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	__wt_free(session, lsm_tree->config);
 	__wt_free(session, lsm_tree->key_format);
 	__wt_free(session, lsm_tree->value_format);
+	__wt_free(session, lsm_tree->bloom_config);
 	__wt_free(session, lsm_tree->file_config);
 
 	if (lsm_tree->rwlock != NULL)
@@ -280,6 +281,10 @@ __wt_lsm_tree_create(WT_SESSION_IMPL *session,
 		WT_ERR_MSG(session, EINVAL,
 		    "Bloom filters can only be created on newest and oldest "
 		    "chunks if bloom filters are enabled");
+
+	WT_ERR(__wt_config_gets(session, cfg, "lsm_bloom_config", &cval));
+	WT_ERR(__wt_strndup(session, cval.str, cval.len,
+	    &lsm_tree->bloom_config));
 
 	WT_ERR(__wt_config_gets(session, cfg, "lsm_bloom_bit_count", &cval));
 	lsm_tree->bloom_bit_count = (uint32_t)cval.val;

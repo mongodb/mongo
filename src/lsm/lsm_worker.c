@@ -185,7 +185,8 @@ __lsm_bloom_create(WT_SESSION_IMPL *session,
 
 	bloom = NULL;
 
-	WT_ERR(__wt_bloom_create(session, chunk->bloom_uri, NULL, chunk->count,
+	WT_ERR(__wt_bloom_create(session, chunk->bloom_uri,
+	    lsm_tree->bloom_config, chunk->count,
 	    lsm_tree->bloom_bit_count, lsm_tree->bloom_hash_count, &bloom));
 
 	WT_ERR(__wt_open_cursor(session, chunk->uri, NULL, cur_cfg, &src));

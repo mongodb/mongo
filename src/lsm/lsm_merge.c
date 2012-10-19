@@ -189,7 +189,8 @@ __wt_lsm_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, int stalls)
 	WT_ERR(ret);
 	if (create_bloom)
 		WT_ERR(__wt_bloom_create(session, chunk->bloom_uri,
-		    NULL, record_count, lsm_tree->bloom_bit_count,
+		    lsm_tree->bloom_config,
+		    record_count, lsm_tree->bloom_bit_count,
 		    lsm_tree->bloom_hash_count, &bloom));
 
 	WT_ERR(__wt_open_cursor(session, chunk->uri, NULL, cur_cfg, &dest));

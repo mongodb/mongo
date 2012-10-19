@@ -666,16 +666,19 @@ struct __wt_session {
 	 * transfer from a storage device.,an integer between 512B and 512MB;
 	 * default \c 1MB.}
 	 * @config{lsm_bloom, create bloom filters on LSM tree chunks as they
-	 * are merged..,a boolean flag; default \c true.}
+	 * are merged.,a boolean flag; default \c true.}
 	 * @config{lsm_bloom_bit_count, the number of bits used per item for LSM
-	 * bloom filters..,an integer between 2 and 1000; default \c 8.}
+	 * bloom filters.,an integer between 2 and 1000; default \c 8.}
+	 * @config{lsm_bloom_config, config string used when creating Bloom
+	 * filter files\, passed to WT_SESSION::create.,a string; default
+	 * empty.}
 	 * @config{lsm_bloom_hash_count, the number of hash values per item used
-	 * for LSM bloom filters..,an integer between 2 and 100; default \c 4.}
+	 * for LSM bloom filters.,an integer between 2 and 100; default \c 4.}
 	 * @config{lsm_bloom_newest, create a bloom filter on an LSM tree chunk
 	 * before it's first merge. Only supported if bloom filters are
-	 * enabled..,a boolean flag; default \c false.}
+	 * enabled.,a boolean flag; default \c false.}
 	 * @config{lsm_bloom_oldest, create a bloom filter on the oldest LSM
-	 * tree chunk. Only supported if bloom filters are enabled..,a boolean
+	 * tree chunk. Only supported if bloom filters are enabled.,a boolean
 	 * flag; default \c false.}
 	 * @config{lsm_chunk_size, the maximum size of the in-memory chunk of an
 	 * LSM tree.,an integer between 512K and 500MB; default \c 2MB.}

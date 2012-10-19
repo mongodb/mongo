@@ -25,7 +25,12 @@ __wt_lsm_meta_read(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	WT_RET(__wt_metadata_read(session, lsm_tree->name, &config));
 	WT_ERR(__wt_config_init(session, &cparser, config));
 	while ((ret = __wt_config_next(&cparser, &ck, &cv)) == 0) {
-		if (WT_STRING_MATCH("file_config", ck.str, ck.len)) {
+		if (WT_STRING_MATCH("bloom_config", ck.str, ck.len)) {
+			__wt_free(session, lsm_tree->bloom_config);
+			/* Don't include the brackets. */
+			WT_ERR(__wt_strndup(session,
+			    cv.str + 1, cv.len - 2, &lsm_tree->bloom_config));
+		} else if (WT_STRING_MATCH("file_config", ck.str, ck.len)) {
 			__wt_free(session, lsm_tree->file_config);
 			/* Don't include the brackets. */
 			WT_ERR(__wt_strndup(session,
@@ -147,8 +152,8 @@ __wt_lsm_meta_write(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 
 	WT_RET(__wt_scr_alloc(session, 0, &buf));
 	WT_ERR(__wt_buf_fmt(session, buf,
-	    "file_config=(%s),key_format=%s,value_format=%s",
-	    lsm_tree->file_config,
+	    "bloom_config=(%s),file_config=(%s),key_format=%s,value_format=%s",
+	    lsm_tree->bloom_config, lsm_tree->file_config,
 	    lsm_tree->key_format, lsm_tree->value_format));
 	WT_ERR(__wt_buf_catfmt(session, buf,
 	    ",last=%" PRIu32 ",lsm_chunk_size=%" PRIu64
