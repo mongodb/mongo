@@ -309,7 +309,16 @@ __create_index(WT_SESSION_IMPL *session,
 	}
 	if (ret != 0 && ret != WT_NOTFOUND)
 		goto err;
-	/* Index values are empty: all columns are packed into the index key. */
+
+	/*
+	 * Index values are normally empty: all columns are packed into the
+	 * index key.  The exception is LSM, which (currently) reserves empty
+	 * values as tombstones.  Use a single padding byte in that case.
+	 */
+	if (WT_PREFIX_MATCH(source, "lsm:"))
+		WT_ERR(__wt_buf_fmt(session, &fmt, "value_format=x,"));
+	else
+		WT_ERR(__wt_buf_fmt(session, &fmt, "value_format=,"));
 	WT_ERR(__wt_buf_fmt(session, &fmt, "value_format=,key_format="));
 	WT_ERR(__wt_struct_reformat(session, table,
 	    icols.str, icols.len, (const char *)extra_cols.data, 0, &fmt));
