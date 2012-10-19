@@ -3,7 +3,7 @@
 This section explains how to configure WiredTiger's builtin support for
 the bzip2 and snappy compression engines.
 
-@section bzip2 Using bzip2 compression
+@section compression_bzip2 Using bzip2 compression
 
 To use the builtin support for <a href="http://www.bzip.org/">bzip2</a>
 compression, first check that bzip2 is installed in include and library
@@ -31,7 +31,7 @@ python ../test/suite/run.py compress
 Review the test output to verify the bzip2 part of the test passes and
 was not skipped.
 
-@section snappy Using snappy compression
+@section compression_snappy Using snappy compression
 
 To use the builtin support for Google's
 <a href="http://code.google.com/p/snappy/">snappy</a> compression, first
@@ -60,7 +60,16 @@ python ../test/suite/run.py compress
 Review the test output to verify the snappy part of the test passes and
 was not skipped.
 
-@section custom Custom compression engines
+@section compression_upgrading Upgrading compression engines
+
+WiredTiger does not store information with file blocks to identify the
+compression engine used to compressed the block.  Applications wanting
+to upgrade to some future compression engine (without requiring a file
+dump and re-load), should ensure each compressed block includes enough
+information to identify the compression engine used, so its compression
+code can correctly decompress old and new blocks.
+
+@section compression_custom Custom compression engines
 
 WiredTiger may be extended by adding custom compression engines; see
 @ref WT_COMPRESSOR for more information.
