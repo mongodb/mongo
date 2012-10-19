@@ -579,6 +579,8 @@ __clsm_search_near(WT_CURSOR *cursor, int *exactp)
 	WT_SESSION_IMPL *session;
 	int cmp, deleted, i;
 
+	larger = smaller = NULL;
+
 	WT_LSM_ENTER(clsm, cursor, session, search_near);
 	WT_CURSOR_NEEDKEY(cursor);
 	F_CLR(clsm, WT_CLSM_ITERATE_NEXT | WT_CLSM_ITERATE_PREV);
@@ -602,10 +604,10 @@ __clsm_search_near(WT_CURSOR *cursor, int *exactp)
 	 * As we search down the chunks, we stop as soon as we find an exact
 	 * match.  Otherwise, we maintain the smallest cursor larger than the
 	 * search key and the largest cursor smaller than the search key.  At
-	 * the bottom, if one of those is set, we use it, otherwise we return
+	 * the bottom, we prefer the larger cursor, but if no record is larger,
+	 * return the smaller cursor, or if no record at all was found,
 	 * WT_NOTFOUND.
 	 */
-	larger = smaller = NULL;
 	FORALL_CURSORS(clsm, c, i) {
 		c->set_key(c, &cursor->key);
 		if ((ret = c->search_near(c, &cmp)) == WT_NOTFOUND) {
