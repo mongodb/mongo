@@ -98,6 +98,11 @@ __wt_open(WT_SESSION_IMPL *session,
 	 */
 	f |= O_CLOEXEC;
 #endif
+#ifdef O_NOATIME
+	/* Avoid updating metadata for read-only workloads. */
+	if (is_tree)
+		f |= O_NOATIME;
+#endif
 
 	if (ok_create) {
 		f |= O_CREAT;
