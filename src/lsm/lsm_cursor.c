@@ -236,10 +236,10 @@ __clsm_get_current(
 		if (!F_ISSET(c, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET))
 			continue;
 		if (current == NULL) {
-			cmp = (smallest ? -1 : 1);
-		} else
-			WT_RET(WT_LSM_CURCMP(session,
-			    clsm->lsm_tree, c, current, cmp));
+			current = c;
+			continue;
+		}
+		WT_RET(WT_LSM_CURCMP(session, clsm->lsm_tree, c, current, cmp));
 		if (smallest ? cmp < 0 : cmp > 0) {
 			current = c;
 			multiple = 0;
@@ -510,6 +510,7 @@ __clsm_search(WT_CURSOR *cursor)
 
 	WT_LSM_ENTER(clsm, cursor, session, search);
 	WT_CURSOR_NEEDKEY(cursor);
+	F_CLR(clsm, WT_CLSM_ITERATE_NEXT | WT_CLSM_ITERATE_PREV);
 	FORALL_CURSORS(clsm, c, i) {
 		/* If there is a Bloom filter, see if we can skip the read. */
 		if ((bloom = clsm->blooms[i]) != NULL) {
@@ -568,6 +569,7 @@ __clsm_search_near(WT_CURSOR *cursor, int *exactp)
 
 	WT_LSM_ENTER(clsm, cursor, session, search_near);
 	WT_CURSOR_NEEDKEY(cursor);
+	F_CLR(clsm, WT_CLSM_ITERATE_NEXT | WT_CLSM_ITERATE_PREV);
 
 	/*
 	 * search_near is somewhat fiddly: we can't just return a nearby key
@@ -599,6 +601,21 @@ __clsm_search_near(WT_CURSOR *cursor, int *exactp)
 		}
 
 		/*
+		 * Prefer larger cursors.  There are two reasons: (1) we expect
+		 * prefix searches to be a common case (as in our own indices);
+		 * and (2) we need a way to unambiguously know we have the
+		 * "closest" result.
+		 */
+		if (cmp < 0) {
+			if ((ret = c->next(c)) == 0)
+				cmp = 1;
+			else if (ret == WT_NOTFOUND)
+				ret = c->prev(c);
+			if (ret != 0)
+				goto err;
+		}
+
+		/*
 		 * If we land on a deleted item, try going forwards or
 		 * backwards to find one that isn't deleted.
 		 */
@@ -616,6 +633,16 @@ __clsm_search_near(WT_CURSOR *cursor, int *exactp)
 		WT_ERR_NOTFOUND_OK(ret);
 		if (deleted)
 			continue;
+
+		/*
+		 * We are trying to find the smallest cursor greater than the
+		 * search key, or, if there is no larger key, the largest
+		 * cursor smaller than the search key.
+		 *
+		 * It could happen that one cursor contains both of the closest
+		 * records.  In that case, we will track it in "larger", and it
+		 * will be the one we finally choose.
+		 */
 		if (cmp > 0) {
 			if (larger == NULL)
 				larger = c;
@@ -637,12 +664,12 @@ __clsm_search_near(WT_CURSOR *cursor, int *exactp)
 		}
 	}
 
-	if (smaller != NULL) {
-		clsm->current = smaller;
-		*exactp = -1;
-	} else if (larger != NULL) {
+	if (larger != NULL) {
 		clsm->current = larger;
 		*exactp = 1;
+	} else if (smaller != NULL) {
+		clsm->current = smaller;
+		*exactp = -1;
 	} else
 		ret = WT_NOTFOUND;
 

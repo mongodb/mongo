@@ -191,31 +191,22 @@ __curindex_reset(WT_CURSOR *cursor)
 static int
 __curindex_search(WT_CURSOR *cursor)
 {
+	WT_CURSOR *child;
 	WT_CURSOR_INDEX *cindex;
 	WT_DECL_RET;
-	WT_ITEM *oldkeyp;
 	WT_SESSION_IMPL *session;
 	int exact;
 
 	cindex = (WT_CURSOR_INDEX *)cursor;
+	child = cindex->child;
 	CURSOR_API_CALL(cursor, session, search, NULL);
 
 	/*
 	 * We expect partial matches, but we want the smallest item that
 	 * matches the prefix.  Fail if there is no matching item.
 	 */
-
-	/*
-	 * Take a copy of the search key.
-	 * XXX
-	 * We can avoid this with a cursor flag indicating when the application
-	 * owns the data.
-	 */
-	WT_ERR(__wt_scr_alloc(session, cursor->key.size, &oldkeyp));
-	memcpy(oldkeyp->mem, cursor->key.data, cursor->key.size);
-	oldkeyp->size = cursor->key.size;
-
-	WT_ERR(cursor->search_near(cursor, &exact));
+	__wt_cursor_set_raw_key(child, &cursor->key);
+	WT_ERR(child->search_near(child, &exact));
 
 	/*
 	 * We expect partial matches, and want the smallest record with a key
@@ -225,10 +216,10 @@ __curindex_search(WT_CURSOR *cursor)
 	 * but we don't disallow that (odd) case.
 	 */
 	if (exact < 0)
-		WT_ERR(cursor->next(cursor));
+		WT_ERR(child->next(child));
 
-	if (cursor->key.size < oldkeyp->size ||
-	    memcmp(oldkeyp->data, cursor->key.data, oldkeyp->size) != 0) {
+	if (child->key.size < cursor->key.size ||
+	    memcmp(child->key.data, cursor->key.data, cursor->key.size) != 0) {
 		ret = WT_NOTFOUND;
 		goto err;
 	}
@@ -238,7 +229,6 @@ __curindex_search(WT_CURSOR *cursor)
 	if (0) {
 err:		F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
 	}
-	__wt_scr_free(&oldkeyp);
 	API_END(session);
 
 	return (ret);
