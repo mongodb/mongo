@@ -235,7 +235,7 @@ class test_schema03(wttest.WiredTigerTestCase):
     # We need to have a large number of open files available
     # to run this test.  We probably don't need quite this many,
     # but boost it up to this limit anyway.
-    OPEN_FILE_LIMIT = 8192
+    OPEN_FILE_LIMIT = 1000
 
     restart_scenarios = [('table', dict(s_restart=['table'],P=0.3)),
                          ('colgroup0', dict(s_restart=['colgroup0'],P=0.3)),
