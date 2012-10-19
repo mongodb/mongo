@@ -3,6 +3,9 @@
 
 s = new ShardingTest( "limit_push", 2, 1, 1 );
 
+// Stop balancer since we do manual moves.
+s.stopBalancer();
+
 db = s.getDB( "test" );
 
 // Create some data
