@@ -155,7 +155,7 @@ __clsm_open_cursors(WT_CURSOR_LSM *clsm, int start_chunk)
 		 * Once all cursors switch, the in-memory tree can be evicted.
 		 */
 		chunk = lsm_tree->chunk[i + start_chunk];
-		ret = __wt_curfile_open(session,
+		ret = __wt_open_cursor(session,
 		    chunk->uri, &clsm->iface,
 		    !F_ISSET(chunk, WT_LSM_CHUNK_ONDISK) ? NULL :
 		    (F_ISSET(clsm, WT_CLSM_MERGE) ? merge_cfg : ckpt_cfg), cp);
@@ -166,7 +166,7 @@ __clsm_open_cursors(WT_CURSOR_LSM *clsm, int start_chunk)
 		 * chunk instead.
 		 */
 		if (ret == WT_NOTFOUND && F_ISSET(chunk, WT_LSM_CHUNK_ONDISK))
-			ret = __wt_curfile_open(session,
+			ret = __wt_open_cursor(session,
 			    chunk->uri, &clsm->iface, NULL, cp);
 		WT_ERR(ret);
 
@@ -201,7 +201,7 @@ err:	__wt_spin_unlock(session, &lsm_tree->lock);
 }
 
 /* __wt_clsm_init_merge --
- *	Initialize an LSM cursor for a (major) merge.
+ *	Initialize an LSM cursor for a merge.
  */
 int
 __wt_clsm_init_merge(WT_CURSOR *cursor, int start_chunk, int nchunks)
@@ -236,10 +236,10 @@ __clsm_get_current(
 		if (!F_ISSET(c, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET))
 			continue;
 		if (current == NULL) {
-			cmp = (smallest ? -1 : 1);
-		} else
-			WT_RET(WT_LSM_CURCMP(session,
-			    clsm->lsm_tree, c, current, cmp));
+			current = c;
+			continue;
+		}
+		WT_RET(WT_LSM_CURCMP(session, clsm->lsm_tree, c, current, cmp));
 		if (smallest ? cmp < 0 : cmp > 0) {
 			current = c;
 			multiple = 0;
@@ -510,6 +510,7 @@ __clsm_search(WT_CURSOR *cursor)
 
 	WT_LSM_ENTER(clsm, cursor, session, search);
 	WT_CURSOR_NEEDKEY(cursor);
+	F_CLR(clsm, WT_CLSM_ITERATE_NEXT | WT_CLSM_ITERATE_PREV);
 	FORALL_CURSORS(clsm, c, i) {
 		/* If there is a Bloom filter, see if we can skip the read. */
 		if ((bloom = clsm->blooms[i]) != NULL) {
@@ -568,6 +569,7 @@ __clsm_search_near(WT_CURSOR *cursor, int *exactp)
 
 	WT_LSM_ENTER(clsm, cursor, session, search_near);
 	WT_CURSOR_NEEDKEY(cursor);
+	F_CLR(clsm, WT_CLSM_ITERATE_NEXT | WT_CLSM_ITERATE_PREV);
 
 	/*
 	 * search_near is somewhat fiddly: we can't just return a nearby key
@@ -599,6 +601,21 @@ __clsm_search_near(WT_CURSOR *cursor, int *exactp)
 		}
 
 		/*
+		 * Prefer larger cursors.  There are two reasons: (1) we expect
+		 * prefix searches to be a common case (as in our own indices);
+		 * and (2) we need a way to unambiguously know we have the
+		 * "closest" result.
+		 */
+		if (cmp < 0) {
+			if ((ret = c->next(c)) == 0)
+				cmp = 1;
+			else if (ret == WT_NOTFOUND)
+				ret = c->prev(c);
+			if (ret != 0)
+				goto err;
+		}
+
+		/*
 		 * If we land on a deleted item, try going forwards or
 		 * backwards to find one that isn't deleted.
 		 */
@@ -616,6 +633,16 @@ __clsm_search_near(WT_CURSOR *cursor, int *exactp)
 		WT_ERR_NOTFOUND_OK(ret);
 		if (deleted)
 			continue;
+
+		/*
+		 * We are trying to find the smallest cursor greater than the
+		 * search key, or, if there is no larger key, the largest
+		 * cursor smaller than the search key.
+		 *
+		 * It could happen that one cursor contains both of the closest
+		 * records.  In that case, we will track it in "larger", and it
+		 * will be the one we finally choose.
+		 */
 		if (cmp > 0) {
 			if (larger == NULL)
 				larger = c;
@@ -637,12 +664,12 @@ __clsm_search_near(WT_CURSOR *cursor, int *exactp)
 		}
 	}
 
-	if (smaller != NULL) {
-		clsm->current = smaller;
-		*exactp = -1;
-	} else if (larger != NULL) {
+	if (larger != NULL) {
 		clsm->current = larger;
 		*exactp = 1;
+	} else if (smaller != NULL) {
+		clsm->current = smaller;
+		*exactp = -1;
 	} else
 		ret = WT_NOTFOUND;
 
@@ -849,7 +876,7 @@ __clsm_close(WT_CURSOR *cursor)
  */
 int
 __wt_clsm_open(WT_SESSION_IMPL *session,
-    const char *uri, const char *cfg[], WT_CURSOR **cursorp)
+    const char *uri, WT_CURSOR *owner, const char *cfg[], WT_CURSOR **cursorp)
 {
 	static WT_CURSOR iface = {
 		NULL,
@@ -910,13 +937,13 @@ __wt_clsm_open(WT_SESSION_IMPL *session,
 	clsm->dsk_gen = 0;
 
 	STATIC_ASSERT(offsetof(WT_CURSOR_LSM, iface) == 0);
-	WT_ERR(__wt_cursor_init(cursor, cursor->uri, NULL, cfg, cursorp));
+	WT_ERR(__wt_cursor_init(cursor, cursor->uri, owner, cfg, cursorp));
 
 	/*
 	 * LSM cursors default to overwrite: if no setting was supplied, turn
 	 * it on.
 	 */
-	if (cfg[1] != NULL || __wt_config_getones(
+	if (cfg == NULL || cfg[1] == NULL || __wt_config_getones(
 	    session, cfg[1], "overwrite", &cval) == WT_NOTFOUND)
 		F_SET(cursor, WT_CURSTD_OVERWRITE);
 

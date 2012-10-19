@@ -55,9 +55,15 @@ column_meta = [
 		type='list'),
 ]
 
-filename_meta = [
-	Config('filename', '', r'''
-		override the default filename derived from the object name'''),
+source_meta = [
+	Config('source', '', r'''
+		override the default data source URI derived from the object
+		name'''),
+	Config('type', 'file', r'''
+		set the data source type.  This setting overrides the URI
+		prefix for the data source, if no \c source configuration
+		setting is provided''',
+		choices=['file', 'lsm']),
 ]
 
 format_meta = column_meta + [
@@ -81,7 +87,8 @@ format_meta = column_meta + [
 
 lsm_config = [
 	Config('lsm_bloom_hash_count', '4', r'''
-		the number of hash values per item used for LSM bloom filters.''',
+		the number of hash values per item used for LSM bloom
+		filters.''',
 		min='2', max='100'),
 	Config('lsm_bloom_bit_count', '8', r'''
 		the number of bits used per item for LSM bloom filters.''',
@@ -137,6 +144,9 @@ file_config = format_meta + lsm_config + [
 		row-store leaf page value dictionary; see
 		@ref file_formats_compression for more information''',
 		min='0'),
+	Config('format', 'btree', r'''
+		the file format''',
+		choices=['btree']),
 	Config('huffman_key', '', r'''
 		configure Huffman encoding for keys.  Permitted values
 		are empty (off), \c "english", \c "utf8<file>" or \c
@@ -186,9 +196,6 @@ file_config = format_meta + lsm_config + [
 		split into smaller pages, where each page is the specified
 		percentage of the maximum Btree page size''',
 		min='25', max='100'),
-	Config('type', 'btree', r'''
-		the file type''',
-		choices=['btree']),
 ]
 
 # File metadata, including both configurable and non-configurable (internal)
@@ -210,9 +217,9 @@ table_only_meta = [
 		WT_SESSION::create''', type='list'),
 ]
 
-colgroup_meta = column_meta + filename_meta
+colgroup_meta = column_meta + source_meta
 
-index_meta = column_meta + format_meta + filename_meta
+index_meta = column_meta + format_meta + source_meta
 
 table_meta = format_meta + table_only_meta
 
@@ -272,7 +279,7 @@ methods = {
 
 'session.compact' : Method([]),
 
-'session.create' : Method(table_meta + file_config + filename_meta + [
+'session.create' : Method(table_meta + file_config + source_meta + [
 	Config('exclusive', 'false', r'''
 		fail if the object exists.  When false (the default), if the
 		object exists, check that its settings match the specified

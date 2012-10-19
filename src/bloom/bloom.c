@@ -124,7 +124,7 @@ __wt_bloom_open(WT_SESSION_IMPL *session,
 
 	/* Find the largest key, to get the size of the filter. */
 	cfg[1] = bloom->config;
-	WT_RET(__wt_curfile_open(session, bloom->uri, owner, cfg, &c));
+	WT_RET(__wt_open_cursor(session, bloom->uri, owner, cfg, &c));
 	WT_RET(c->prev(c));
 	WT_RET(c->get_key(c, &size));
 

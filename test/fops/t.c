@@ -28,13 +28,16 @@ main(int argc, char *argv[])
 {
 	static struct config {
 		const char *uri;
+		const char *desc;
 		const char *config;
 	} *cp, configs[] = {
-		{ "file:__wt",	NULL },
-		{ "table:__wt",	NULL },
-		{ "lsm:__wt",
-		    "lsm_chunk_size=1m,lsm_merge_max=2,leaf_page_max=256k" },
-		{ NULL,		NULL }
+		{ "file:__wt",	NULL, NULL },
+		{ "table:__wt",	NULL, NULL },
+/* Configure for a modest cache size. */
+#define	LSM_CONFIG	"lsm_chunk_size=1m,lsm_merge_max=2,leaf_page_max=4k"
+		{ "lsm:__wt",	NULL, LSM_CONFIG },
+		{ "table:__wt",	" [lsm]", "type=lsm," LSM_CONFIG },
+		{ NULL,		NULL, NULL }
 	};
 	u_int nthreads;
 	int ch, cnt, runs;
@@ -90,7 +93,8 @@ main(int argc, char *argv[])
 		for (cp = configs; cp->uri != NULL; ++cp) {
 			uri = cp->uri;
 			config = cp->config;
-			printf("%5d: %u threads on %s\n", cnt, nthreads, uri);
+			printf("%5d: %u threads on %s%s\n", cnt, nthreads, uri,
+			    cp->desc == NULL ? "" : cp->desc);
 
 			wt_startup(config_open);
 

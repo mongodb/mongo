@@ -672,7 +672,7 @@ extern void __wt_cursor_set_value(WT_CURSOR *cursor, ...);
 extern int __wt_cursor_close(WT_CURSOR *cursor);
 extern int __wt_cursor_dup(WT_SESSION_IMPL *session,
     WT_CURSOR *to_dup,
-    const char *config,
+    const char *cfg[],
     WT_CURSOR **cursorp);
 extern int __wt_cursor_init(WT_CURSOR *cursor,
     const char *uri,
@@ -705,6 +705,7 @@ extern int __wt_clsm_init_merge(WT_CURSOR *cursor,
     int nchunks);
 extern int __wt_clsm_open(WT_SESSION_IMPL *session,
     const char *uri,
+    WT_CURSOR *owner,
     const char *cfg[],
     WT_CURSOR **cursorp);
 extern int __wt_lsm_init(WT_CONNECTION *wt_conn, const char *config);
@@ -945,6 +946,16 @@ extern int __wt_struct_unpack(WT_SESSION_IMPL *session,
     size_t size,
     const char *fmt,
     ...);
+extern int __wt_schema_colgroup_source(WT_SESSION_IMPL *session,
+    WT_TABLE *table,
+    const char *cgname,
+    const char *config,
+    WT_ITEM *buf);
+extern int __wt_schema_index_source(WT_SESSION_IMPL *session,
+    WT_TABLE *table,
+    const char *idxname,
+    const char *config,
+    WT_ITEM *buf);
 extern int __wt_schema_create( WT_SESSION_IMPL *session,
     const char *name,
     const char *config);
@@ -973,11 +984,6 @@ extern int __wt_schema_colgroup_name(WT_SESSION_IMPL *session,
     const char *cgname,
     size_t len,
     WT_ITEM *buf);
-extern int __wt_schema_get_btree(WT_SESSION_IMPL *session,
-    const char *objname,
-    size_t len,
-    const char *cfg[],
-    uint32_t flags);
 extern int __wt_schema_open_colgroups(WT_SESSION_IMPL *session,
     WT_TABLE *table);
 extern int __wt_schema_open_index(WT_SESSION_IMPL *session,
@@ -990,6 +996,14 @@ extern int __wt_schema_open_table(WT_SESSION_IMPL *session,
     const char *name,
     size_t namelen,
     WT_TABLE **tablep);
+extern int __wt_schema_get_colgroup(WT_SESSION_IMPL *session,
+    const char *uri,
+    WT_TABLE **tablep,
+    WT_COLGROUP **colgroupp);
+extern int __wt_schema_get_index(WT_SESSION_IMPL *session,
+    const char *uri,
+    WT_TABLE **tablep,
+    WT_INDEX **indexp);
 extern int __wt_schema_colcheck(WT_SESSION_IMPL *session,
     const char *key_format,
     const char *value_format,
@@ -1050,6 +1064,11 @@ extern int __wt_schema_worker(WT_SESSION_IMPL *session,
     const char *[]),
     const char *cfg[],
     uint32_t open_flags);
+extern int __wt_open_cursor(WT_SESSION_IMPL *session,
+    const char *uri,
+    WT_CURSOR *owner,
+    const char *cfg[],
+    WT_CURSOR **cursorp);
 extern int __wt_session_create_strip( WT_SESSION *session,
     const char *v1,
     const char *v2,

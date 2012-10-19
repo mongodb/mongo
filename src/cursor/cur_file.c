@@ -404,10 +404,7 @@ __wt_curfile_open(WT_SESSION_IMPL *session, const char *uri,
 	/* TODO: handle projections. */
 
 	/* Get the handle and lock it while the cursor is using it. */
-	if (WT_PREFIX_MATCH(uri, "colgroup:") || WT_PREFIX_MATCH(uri, "index:"))
-		WT_RET(__wt_schema_get_btree(
-		    session, uri, strlen(uri), cfg, flags));
-	else if (WT_PREFIX_MATCH(uri, "file:"))
+	if (WT_PREFIX_MATCH(uri, "file:"))
 		WT_RET(__wt_session_get_btree_ckpt(session, uri, cfg, flags));
 	else
 		WT_RET(__wt_bad_object_type(session, uri));

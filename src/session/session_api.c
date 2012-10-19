@@ -172,6 +172,45 @@ err:	API_END_NOTFOUND_MAP(session, ret);
 }
 
 /*
+ * __wt_open_cursor --
+ *	Internal version of WT_SESSION::open_cursor.
+ */
+int
+__wt_open_cursor(WT_SESSION_IMPL *session,
+    const char *uri, WT_CURSOR *owner, const char *cfg[], WT_CURSOR **cursorp)
+{
+	WT_COLGROUP *colgroup;
+	WT_DATA_SOURCE *dsrc;
+	WT_DECL_RET;
+
+	if (WT_PREFIX_MATCH(uri, "backup:"))
+		ret = __wt_curbackup_open(session, uri, cfg, cursorp);
+	else if (WT_PREFIX_MATCH(uri, "colgroup:")) {
+		/*
+		 * Column groups are a special case: open a cursor on the
+		 * underlying data source.
+		 */
+		WT_RET(__wt_schema_get_colgroup(session, uri, NULL, &colgroup));
+		ret = __wt_open_cursor(
+		    session, colgroup->source, owner, cfg, cursorp);
+	} else if (WT_PREFIX_MATCH(uri, "config:"))
+		ret = __wt_curconfig_open(session, uri, cfg, cursorp);
+	else if (WT_PREFIX_MATCH(uri, "file:"))
+		ret = __wt_curfile_open(session, uri, owner, cfg, cursorp);
+	else if (WT_PREFIX_MATCH(uri, "index:"))
+		ret = __wt_curindex_open(session, uri, cfg, cursorp);
+	else if (WT_PREFIX_MATCH(uri, "statistics:"))
+		ret = __wt_curstat_open(session, uri, cfg, cursorp);
+	else if (WT_PREFIX_MATCH(uri, "table:"))
+		ret = __wt_curtable_open(session, uri, cfg, cursorp);
+	else if ((ret = __wt_schema_get_source(session, uri, &dsrc)) == 0)
+		ret = dsrc->open_cursor(dsrc, &session->iface,
+		    uri, owner, cfg, cursorp);
+
+	return (ret);
+}
+
+/*
  * __session_open_cursor --
  *	WT_SESSION->open_cursor method.
  */
@@ -179,7 +218,6 @@ static int
 __session_open_cursor(WT_SESSION *wt_session,
     const char *uri, WT_CURSOR *to_dup, const char *config, WT_CURSOR **cursorp)
 {
-	WT_DATA_SOURCE *dsrc;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 
@@ -198,26 +236,11 @@ __session_open_cursor(WT_SESSION *wt_session,
 		    WT_PREFIX_MATCH(uri, "file:") ||
 		    WT_PREFIX_MATCH(uri, "lsm:") ||
 		    WT_PREFIX_MATCH(uri, "table:"))
-			ret = __wt_cursor_dup(session, to_dup, config, cursorp);
+			ret = __wt_cursor_dup(session, to_dup, cfg, cursorp);
 		else
 			ret = __wt_bad_object_type(session, uri);
-	} else if (WT_PREFIX_MATCH(uri, "backup:"))
-		ret = __wt_curbackup_open(session, uri, cfg, cursorp);
-	else if (WT_PREFIX_MATCH(uri, "colgroup:"))
-		ret = __wt_curfile_open(session, uri, NULL, cfg, cursorp);
-	else if (WT_PREFIX_MATCH(uri, "config:"))
-		ret = __wt_curconfig_open(session, uri, cfg, cursorp);
-	else if (WT_PREFIX_MATCH(uri, "file:"))
-		ret = __wt_curfile_open(session, uri, NULL, cfg, cursorp);
-	else if (WT_PREFIX_MATCH(uri, "index:"))
-		ret = __wt_curindex_open(session, uri, cfg, cursorp);
-	else if (WT_PREFIX_MATCH(uri, "statistics:"))
-		ret = __wt_curstat_open(session, uri, cfg, cursorp);
-	else if (WT_PREFIX_MATCH(uri, "table:"))
-		ret = __wt_curtable_open(session, uri, cfg, cursorp);
-	else if ((ret = __wt_schema_get_source(session, uri, &dsrc)) == 0)
-		ret = dsrc->open_cursor(dsrc, &session->iface,
-		    uri, cfg, cursorp);
+	} else
+		ret = __wt_open_cursor(session, uri, NULL, cfg, cursorp);
 
 err:	API_END_NOTFOUND_MAP(session, ret);
 }
