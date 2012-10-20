@@ -36,6 +36,28 @@ obj_bulk(void)
 }
 
 void
+obj_cursor(void)
+{
+	WT_SESSION *session;
+	WT_CURSOR *cursor;
+	int ret;
+
+	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
+		die("conn.session", ret);
+
+	if ((ret =
+	    session->open_cursor(session, uri, NULL, NULL, &cursor)) != 0) {
+		if (ret != ENOENT && ret != EBUSY)
+			die("session.open_cursor", ret);
+	} else {
+		if ((ret = cursor->close(cursor)) != 0)
+			die("cursor.close", ret);
+	}
+	if ((ret = session->close(session, NULL)) != 0)
+		die("session.close", ret);
+}
+
+void
 obj_create(void)
 {
 	WT_SESSION *session;

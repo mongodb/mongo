@@ -12,9 +12,10 @@ static void  print_stats(u_int);
 
 typedef struct {
 	int bulk;				/* bulk load */
-	int create;				/* session.create */
-	int drop;				/* session.drop */
 	int ckpt;				/* session.checkpoint */
+	int create;				/* session.create */
+	int cursor;				/* session.open_cursor */
+	int drop;				/* session.drop */
 	int upgrade;				/* session.upgrade */
 	int verify;				/* session.verify */
 } STATS;
@@ -109,30 +110,34 @@ fop(void *arg)
 	s = &run_stats[id];
 
 	for (i = 0; i < nops; ++i, sched_yield())
-		switch (r() % 6) {
+		switch (r() % 7) {
 		case 0:
+			++s->bulk;
+			obj_bulk();
+			break;
+		case 1:
 			++s->create;
 			obj_create();
 			break;
-		case 1:
+		case 2:
+			++s->cursor;
+			obj_cursor();
+			break;
+		case 3:
 			++s->drop;
 			obj_drop();
 			break;
-		case 2:
+		case 4:
 			++s->ckpt;
 			obj_checkpoint();
 			break;
-		case 3:
+		case 5:
 			++s->upgrade;
 			obj_upgrade();
 			break;
-		case 4:
+		case 6:
 			++s->verify;
 			obj_verify();
-			break;
-		case 5:
-			++s->bulk;
-			obj_bulk();
 			break;
 		default:
 			break;
@@ -154,8 +159,8 @@ print_stats(u_int nthreads)
 	s = run_stats;
 	for (id = 0; id < nthreads; ++id, ++s)
 		printf(
-		    "%2d: bulk %4d, create %4d, drop %4d, ckpt %4d, "
-		    "upgrade %4d, verify %4d\n",
-		    id, s->bulk,
-		    s->create, s->drop, s->ckpt, s->upgrade, s->verify);
+		    "%2d: bulk %4d, create %4d,\n\tcursor %4d, drop %4d, "
+		    "ckpt %4d, upgrade %4d, verify %4d\n",
+		    id, s->bulk, s->create,
+		    s->cursor, s->drop, s->ckpt, s->upgrade, s->verify);
 }

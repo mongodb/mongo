@@ -37,6 +37,7 @@ int  fop_start(u_int);
 void obj_bulk(void);
 void obj_checkpoint(void);
 void obj_create(void);
+void obj_cursor(void);
 void obj_drop(void);
 void obj_upgrade(void);
 void obj_verify(void);
