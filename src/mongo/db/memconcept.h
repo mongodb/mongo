@@ -1,5 +1,3 @@
-#pragma once
-
 /**
 *    Copyright (C) 2012 10gen Inc.
 *
@@ -21,6 +19,10 @@
    these diagnostics might involve concurrency or other things.  mainly would
    be for _DEBUG builds.  Experimental we'll see how useful.
 */
+
+#pragma once
+
+#include "mongo/base/string_data.h"
 
 namespace mongo {
     namespace memconcept {
@@ -54,12 +56,12 @@ namespace mongo {
 
         /** note you can be more than one thing; a datafile header is also the starting pointer
             for a file */
-        void is(void *p, concept c, const std::string desc = "", unsigned len=0);
+        void is(void *p, concept c, const StringData& desc = StringData( "", 0 ), unsigned len=0);
 
 #if 1
 //#if !defined(_DEBUG)
         inline void invalidate(void *p, unsigned len) { }
-        inline void is(void *p, concept c, const std::string, unsigned) { }
+        inline void is(void *p, concept c, const StringData& desc, unsigned) { }
 #endif
 
     }

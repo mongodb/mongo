@@ -102,13 +102,13 @@ namespace mongo {
 
 #if 0 && defined(_DEBUG)
         bool d = false;
-        void is(void *p, concept c, const std::string& description, unsigned len) {
-            DDD( log() << "is  " << p << ' ' << c.toString() << ' ' << description << ' ' << len << endl; )
+        void is(void *p, concept c, const StringData& description, unsigned len) {
+            DDD( log() << "is  " << p << ' ' << c.toString() << ' ' << description.data() << ' ' << len << endl; )
             C &node = map.find(p);
             node.p = p;
             node.c = c;
             node.len = len;
-            strncpy(node.desc, description.c_str(), 15);
+            strncpy(node.desc, description.data(), 15);
         }
 
         void invalidate(void *p, unsigned len) {
