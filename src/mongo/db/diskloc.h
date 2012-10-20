@@ -80,7 +80,7 @@ namespace mongo {
             if ( isNull() )
                 return "null";
             stringstream ss;
-            ss << hex << _a << ':' << ofs;
+            ss << _a << ':' << hex << ofs;
             return ss.str();
         }
 
