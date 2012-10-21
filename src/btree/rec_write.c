@@ -700,7 +700,7 @@ __rec_copy_incr(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_KV *kv)
  */
 static int
 __rec_dict_replace(
-    WT_SESSION_IMPL *session, WT_RECONCILE *r, uint64_t rle, WT_KV *kv)
+    WT_SESSION_IMPL *session, WT_RECONCILE *r, uint64_t rle, WT_KV *val)
 {
 	WT_DICTIONARY *dp;
 	uint64_t offset;
@@ -719,9 +719,9 @@ __rec_dict_replace(
 	 * if we grow the cell after that test we'll potentially write off the
 	 * end of the buffer's memory.
 	 */
-	if (kv->buf.size <= WT_INTPACK32_MAXSIZE)
+	if (val->buf.size <= WT_INTPACK32_MAXSIZE)
 		return (0);
-	WT_RET(__rec_dictionary_lookup(session, r, kv, &dp));
+	WT_RET(__rec_dictionary_lookup(session, r, val, &dp));
 	if (dp == NULL)
 		return (0);
 
@@ -736,10 +736,10 @@ __rec_dict_replace(
 		dp->cell = r->first_free;
 	else {
 		offset = WT_PTRDIFF32(r->first_free, dp->cell);
-		kv->len = kv->cell_len =
-		   __wt_cell_pack_copy(&kv->cell, rle, offset);
-		kv->buf.data = NULL;
-		kv->buf.size = 0;
+		val->len = val->cell_len =
+		   __wt_cell_pack_copy(&val->cell, rle, offset);
+		val->buf.data = NULL;
+		val->buf.size = 0;
 	}
 	return (0);
 }
