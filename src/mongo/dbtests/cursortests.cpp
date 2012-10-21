@@ -601,7 +601,7 @@ namespace CursorTests {
                 ClientCursor::YieldData data;
                 clientCursor->prepareToYield( data );
                 // The cursor will be advanced in aboutToDelete().
-                ClientCursor::aboutToDelete( loc );
+                ClientCursor::aboutToDelete( nsdetails( ns() ), loc );
                 clientCursor->recoverFromYield( data );
                 ASSERT( clientCursor->ok() );
                 
