@@ -87,7 +87,7 @@ namespace mongo {
         // ofs 386 (16)
         int _systemFlags; // things that the system sets/cares about
     public:
-        DiskLoc capExtent;
+        DiskLoc capExtent; // the "current" extent we're writing too for a capped collection
         DiskLoc capFirstNewRecord;
         unsigned short dataFileVersion;       // NamespaceDetails version.  So we can do backward compatibility in the future. See filever.h
         unsigned short indexFileVersion;
