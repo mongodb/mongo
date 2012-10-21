@@ -46,6 +46,8 @@
  ^cappedListOfAllDeletedRecords()
 */
 
+//#define DDD(x) log() << "cap.cpp debug:" << x << endl;
+#define DDD(x)
 
 namespace mongo {
 
@@ -55,27 +57,30 @@ namespace mongo {
        (or 3...there will be a little unused sliver at the end of the extent.)
     */
     void NamespaceDetails::compact() {
+        DDD( "NamespaceDetails::compact enter" );
         verify( isCapped() );
-
-        list<DiskLoc> drecs;
-
+        
+        vector<DiskLoc> drecs;
+        
         // Pull out capExtent's DRs from deletedList
         DiskLoc i = cappedFirstDeletedInCurExtent();
-        for (; !i.isNull() && inCapExtent( i ); i = i.drec()->nextDeleted() )
+        for (; !i.isNull() && inCapExtent( i ); i = i.drec()->nextDeleted() ) {
+            DDD( "\t" << i );
             drecs.push_back( i );
+        }
 
         getDur().writingDiskLoc( cappedFirstDeletedInCurExtent() ) = i;
+        
+        std::sort( drecs.begin(), drecs.end() );
+        DDD( "\t drecs.size(): " << drecs.size() );
 
-        // This is the O(n^2) part.
-        drecs.sort();
-
-        list<DiskLoc>::iterator j = drecs.begin();
+        vector<DiskLoc>::const_iterator j = drecs.begin();
         verify( j != drecs.end() );
         DiskLoc a = *j;
         while ( 1 ) {
             j++;
             if ( j == drecs.end() ) {
-                DEBUGGING out() << "TEMP: compact adddelrec\n";
+                DDD( "\t compact adddelrec" );
                 addDeletedRec(a.drec(), a);
                 break;
             }
@@ -85,16 +90,17 @@ namespace mongo {
                 getDur().writingInt( a.drec()->lengthWithHeaders() ) += b.drec()->lengthWithHeaders();
                 j++;
                 if ( j == drecs.end() ) {
-                    DEBUGGING out() << "temp: compact adddelrec2\n";
+                    DDD( "\t compact adddelrec2" );
                     addDeletedRec(a.drec(), a);
                     return;
                 }
                 b = *j;
             }
-            DEBUGGING out() << "temp: compact adddelrec3\n";
+            DDD( "\t compact adddelrec3" );
             addDeletedRec(a.drec(), a);
             a = b;
         }
+
     }
 
     DiskLoc &NamespaceDetails::cappedFirstDeletedInCurExtent() {
