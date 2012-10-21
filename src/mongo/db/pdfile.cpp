@@ -1084,7 +1084,7 @@ namespace mongo {
         }
 
         /* check if any cursors point to us.  if so, advance them. */
-        ClientCursor::aboutToDelete(dl);
+        ClientCursor::aboutToDelete(d, dl);
 
         unindexRecord(d, todelete, dl, noWarn);
 

@@ -385,7 +385,7 @@ namespace mongo {
         static void appendStats( BSONObjBuilder& result );
         static unsigned numCursors() { return clientCursorsById.size(); }
         static void informAboutToDeleteBucket(const DiskLoc& b);
-        static void aboutToDelete(const DiskLoc& dl);
+        static void aboutToDelete(const NamespaceDetails* nsd, const DiskLoc& dl);
         static void find( const string& ns , set<CursorId>& all );
 
 
