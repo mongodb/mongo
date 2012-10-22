@@ -10,6 +10,8 @@ env.StaticLibrary('auth', ['action_set.cpp',
                            'principal_set.cpp'],
                   LIBDEPS=['$BUILD_DIR/mongo/base/base', '$BUILD_DIR/mongo/stringutils'])
 
+env.StaticLibrary('serverauth', ['mongo_authentication_session.cpp'])
+
 env.CppUnitTest('action_set_test', 'action_set_test.cpp', LIBDEPS=['auth'])
 env.CppUnitTest('action_type_test', 'action_type_test.cpp', LIBDEPS=['auth'])
 env.CppUnitTest('capability_set_test', 'capability_set_test.cpp', LIBDEPS=['auth'])
