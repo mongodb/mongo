@@ -78,10 +78,10 @@ fop_start(u_int nthreads)
 	(void)gettimeofday(&stop, NULL);
 	seconds = (stop.tv_sec - start.tv_sec) +
 	    (stop.tv_usec - start.tv_usec) * 1e-6;
-	fprintf(stderr, "timer: %.2lf seconds (%d ops/second)\n",
-	    seconds, (int)((nthreads * nops) / seconds));
 
 	print_stats(nthreads);
+	printf("timer: %.2lf seconds (%d ops/second)\n",
+	    seconds, (int)((nthreads * nops) / seconds));
 
 	free(run_stats);
 	free(tids);
@@ -103,8 +103,6 @@ fop(void *arg)
 
 	id = (int)(uintptr_t)arg;
 	tid = pthread_self();
-	printf(
-	    "file operation thread %2d starting: tid: %p\n", id, (void *)tid);
 	sched_yield();		/* Get all the threads created. */
 
 	s = &run_stats[id];
@@ -159,8 +157,8 @@ print_stats(u_int nthreads)
 	s = run_stats;
 	for (id = 0; id < nthreads; ++id, ++s)
 		printf(
-		    "%2d: bulk %4d, create %4d,\n\tcursor %4d, drop %4d, "
-		    "ckpt %4d, upgrade %4d, verify %4d\n",
-		    id, s->bulk, s->create,
-		    s->cursor, s->drop, s->ckpt, s->upgrade, s->verify);
+		    "%2d: bulk %3d, ckpt %3d, create %3d, cursor %3d, "
+		    "drop %3d, upg %3d, vrfy %3d\n",
+		    id, s->bulk, s->ckpt, s->create, s->cursor,
+		    s->drop, s->upgrade, s->verify);
 }
