@@ -712,6 +712,7 @@ unreferenced
 unsized
 untyped
 upd
+upg
 uri
 usr
 utf
@@ -725,6 +726,7 @@ versa
 vlcs
 vmsg
 vpack
+vrfy
 vsize
 vslot
 vunpack
