@@ -39,7 +39,6 @@ __wt_schema_worker(WT_SESSION_IMPL *session,
 		    session, colgroup->source, func, cfg, open_flags));
 	} else if (WT_PREFIX_SKIP(tablename, "index:")) {
 		idx = NULL;
-		WT_RET(__wt_schema_open_indices(session, table));
 		WT_RET(__wt_schema_get_index(session, uri, NULL, &idx));
 		WT_RET(__wt_schema_worker(
 		    session, idx->source, func, cfg, open_flags));

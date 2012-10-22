@@ -428,7 +428,7 @@ __wt_schema_get_colgroup(WT_SESSION_IMPL *session,
 		return (__wt_bad_object_type(session, uri));
 
 	WT_RET(__wt_schema_get_table(session,
-	    tablename, tend - tablename, 0, &table));
+	    tablename, WT_PTRDIFF(tend, tablename), 0, &table));
 
 	if (tablep != NULL)
 		*tablep = table;
@@ -465,11 +465,12 @@ __wt_schema_get_index(WT_SESSION_IMPL *session,
 		return (__wt_bad_object_type(session, uri));
 
 	WT_RET(__wt_schema_get_table(session,
-	    tablename, tend - tablename, 0, &table));
+	    tablename, WT_PTRDIFF(tend, tablename), 0, &table));
 
 	if (tablep != NULL)
 		*tablep = table;
 
+	/* Try to find the index in the table. */
 	for (i = 0; i < table->nindices; i++) {
 		idx = table->indices[i];
 		if (strcmp(idx->name, uri) == 0) {
@@ -477,6 +478,13 @@ __wt_schema_get_index(WT_SESSION_IMPL *session,
 			return (0);
 		}
 	}
+
+	/* Otherwise, open it. */
+	WT_RET(__wt_schema_open_index(
+	    session, table, tend + 1, strlen(tend + 1), indexp));
+
+	if (*indexp != NULL)
+		return (0);
 
 	WT_RET_MSG(session, ENOENT, "%s not found in table", uri);
 }
