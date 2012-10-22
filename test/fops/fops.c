@@ -97,12 +97,10 @@ static void *
 fop(void *arg)
 {
 	STATS *s;
-	pthread_t tid;
 	u_int i;
 	int id;
 
 	id = (int)(uintptr_t)arg;
-	tid = pthread_self();
 	sched_yield();		/* Get all the threads created. */
 
 	s = &run_stats[id];
