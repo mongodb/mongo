@@ -727,7 +727,7 @@ __rec_dict_replace(
 
 	/*
 	 * If the dictionary cell reference is not set, we're creating a new
-	 * entry in the dictionary, update it's location.
+	 * entry in the dictionary, update its location.
 	 *
 	 * If the dictionary cell reference is set, we have a matching value.
 	 * Create a copy cell instead.
