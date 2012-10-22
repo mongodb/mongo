@@ -284,7 +284,16 @@ namespace mongo {
 
         BSONObj query = queryB.obj();
 
-        // log() << "major version query from " << *_maxVersion << " and over " << _maxShardVersions->size() << " shards is " << query << endl;
+        LOG(2) << "major version query from " << *_maxVersion << " and over "
+               << _maxShardVersions->size() << " shards is " << query << endl;
+
+        //
+        // NOTE: IT IS IMPORTANT FOR CONSISTENCY THAT WE SORT BY ASC VERSION, TO HANDLE
+        // CURSOR YIELDING BETWEEN CHUNKS BEING MIGRATED.
+        //
+
+        Query queryObj(query);
+        queryObj.sort(BSON( "lastmod" << 1 ));
 
         return Query( query );
     }
