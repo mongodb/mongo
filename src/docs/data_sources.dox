@@ -16,32 +16,28 @@ cursors.
 The following are the builtin cursor types:
 
 <table>
-  @hrow{URI, Type}
+  @hrow{URI, Type, Notes}
    @row{<tt>backup:</tt>,
-hot backup cursor}
+hot backup cursor, See also: @ref hot_backup}
    @row{<tt>colgroup:\<tablename\>.\<columnset\></tt>,
-column group cursor}
+column group cursor,}
    @row{<tt>config:[\<uri\>]</tt>,
 object configuration cursor (key=config string\,
-value=config value)}
+value=config value),}
   @row{<tt>table:\<tablename\></tt>,
-table cursor (key=table key\, value=table value)}
+table cursor (key=table key\, value=table value),}
   @row{<tt>file:\<filename\></tt>,
-file cursor (key=file key\, value=file value)}
+file cursor (key=file key\, value=file value),}
   @row{<tt>index:\<tablename\>.\<indexname\></tt>,
-index cursor (key=index key\, value=table value)}
+index cursor (key=index key\, value=table value),}
   @row{<tt>join:\<cursor1\>\&\<cursor2\>[&\<cursor3\>...]</tt>,
-join cursor @notyet{join cursors}}
+join cursor, @notyet{join cursors}}
   @row{<tt>lsm:\<name\></tt>,
-LSM cursor (key=LSM key\, value=LSM value), see @ref lsm}
+LSM cursor (key=LSM key\, value=LSM value), See also: @ref lsm}
   @row{<tt>statistics:[file</tt><tt>:\<filename\>]</tt>,
   database or file statistics (key=(int)\,
-  value=(string)description\, (string)value\, (uint64_t)value)}
+  value=(string)description\, (string)value\, (uint64_t)value),}
 </table>
-
-@subsection data_backup Hot backup cursors
-
-See @ref hot_backup for more information.
 
 @subsection data_files Raw Files
 
