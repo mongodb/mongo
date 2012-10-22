@@ -678,12 +678,10 @@ namespace mongo {
         getEmptyLoc(nsname, myLoc, length, capped, emptyLoc, delRecLength);
 
         // todo: some dup code here and below in Extent::init
-        DeletedRecord *empty = DataFileMgr::makeDeletedRecord(emptyLoc, delRecLength);
-        empty = getDur().writing(empty);
+        DeletedRecord* empty = getDur().writing(DataFileMgr::getDeletedRecord(emptyLoc));
         empty->lengthWithHeaders() = delRecLength;
         empty->extentOfs() = myLoc.getOfs();
         empty->nextDeleted().Null();
-
         return emptyLoc;
     }
 
@@ -702,10 +700,10 @@ namespace mongo {
         int delRecLength;
         getEmptyLoc(nsname, myLoc, _length, capped, emptyLoc, delRecLength);
 
-        DeletedRecord *empty = getDur().writing( DataFileMgr::makeDeletedRecord(emptyLoc, delRecLength) );
+        DeletedRecord* empty = getDur().writing(DataFileMgr::getDeletedRecord(emptyLoc));
         empty->lengthWithHeaders() = delRecLength;
         empty->extentOfs() = myLoc.getOfs();
-
+        empty->nextDeleted().Null();
         return emptyLoc;
     }
 
