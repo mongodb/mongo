@@ -964,11 +964,6 @@ extern int __wt_schema_create( WT_SESSION_IMPL *session,
 extern int __wt_schema_drop(WT_SESSION_IMPL *session,
     const char *uri,
     const char *cfg[]);
-extern int __wt_schema_add_table( WT_SESSION_IMPL *session, WT_TABLE *table);
-extern int __wt_schema_find_table(WT_SESSION_IMPL *session,
-    const char *name,
-    size_t namelen,
-    WT_TABLE **tablep);
 extern int __wt_schema_get_table(WT_SESSION_IMPL *session,
     const char *name,
     size_t namelen,
