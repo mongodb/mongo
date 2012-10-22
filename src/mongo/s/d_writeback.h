@@ -56,10 +56,12 @@ namespace mongo {
          * @param remote server ID this operation came from
          * @param op the operation itself
          *
-         * Enqueues opeartion 'op' in server 'remote's queue. The operation will be written back to
-         * remote at a later stager.
+         * Enqueues operation 'op' in server 'remote's queue. The operation will be written back to
+         * remote at a later stage.
+         *
+         * @return the writebackId generated
          */
-        void queueWriteBack( const string& remote , const BSONObj& op );
+        OID queueWriteBack( const string& remote , BSONObjBuilder& opBuilder );
 
         /*
          * @param remote server ID
