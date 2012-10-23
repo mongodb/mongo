@@ -52,9 +52,9 @@ namespace mongo {
          * @param limit  The maximum number of results to return
          * @param geoField  Which field in the provided DiskLoc has the point to test.
          */
-        GeoHaystackSearchHopper(const BSONObj& near, double maxDistance, unsigned limit,
+        GeoHaystackSearchHopper(const BSONObj& nearObj, double maxDistance, unsigned limit,
                                 const string& geoField)
-            : _near(near), _maxDistance(maxDistance), _limit(limit), _geoField(geoField) { }
+            : _near(nearObj), _maxDistance(maxDistance), _limit(limit), _geoField(geoField) { }
 
         // Consider the point in loc, and keep it if it's within _maxDistance (and we have space for
         // it)
