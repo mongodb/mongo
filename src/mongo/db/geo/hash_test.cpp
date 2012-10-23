@@ -22,6 +22,7 @@
 #include <sstream>
 
 #include "mongo/db/geo/hash.h"
+#include "mongo/platform/random.h"
 #include "mongo/unittest/unittest.h"
 #include "util/assert_util.h"
 
@@ -37,8 +38,9 @@ namespace {
 
     static string makeRandomBitString(int length) {
         stringstream ss;
+        mongo::PseudoRandom random(31337);
         for (int i = 0; i < length; ++i) {
-            if (random() & 1) {
+            if (random.nextInt32() & 1) {
                 ss << "1";
             } else {
                 ss << "0";
