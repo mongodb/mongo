@@ -34,8 +34,6 @@
 namespace mongo {
 
     struct ShardNS {
-        static string shard;
-
         static string database;
         static string collection;
         static string chunk;
@@ -43,14 +41,6 @@ namespace mongo {
 
         static string mongos;
         static string settings;
-    };
-
-    /**
-     * Field names used in the 'shards' collection.
-     */
-    struct ShardFields {
-        static BSONField<bool> draining;      // is it draining chunks?
-        static BSONField<long long> maxSize;  // max allowed disk space usage
     };
 
     class ConfigServer;

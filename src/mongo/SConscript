@@ -340,7 +340,8 @@ serverOnlyFiles += mmapFiles
 
 serverOnlyFiles += [ "db/stats/snapshots.cpp" ]
 
-env.Library( "coreshard", [ "s/config.cpp",
+env.Library( "coreshard", [ "s/cluster_constants.cpp",
+                            "s/config.cpp",
                             "s/grid.cpp",
                             "s/chunk.cpp",
                             "s/shard.cpp",

@@ -17,16 +17,17 @@
 */
 
 #include "pch.h"
-#include "../util/net/message.h"
-#include "../client/connpool.h"
-#include "../client/model.h"
-#include "mongo/client/dbclientcursor.h"
-#include "../db/pdfile.h"
-#include "../db/cmdline.h"
 
-#include "server.h"
-#include "config.h"
-#include "chunk.h"
+#include "mongo/util/net/message.h"
+#include "mongo/client/connpool.h"
+#include "mongo/client/model.h"
+#include "mongo/client/dbclientcursor.h"
+#include "mongo/db/pdfile.h"
+#include "mongo/db/cmdline.h"
+#include "mongo/s/server.h"
+#include "mongo/s/config.h"
+#include "mongo/s/chunk.h"
+#include "mongo/s/cluster_constants.h"
 
 namespace mongo {
 
@@ -86,14 +87,14 @@ namespace mongo {
             // shards
             {
                 unsigned n = 0;
-                auto_ptr<DBClientCursor> c = conn->query( ShardNS::shard , BSONObj() );
+                auto_ptr<DBClientCursor> c = conn->query(ConfigNS::shard, BSONObj());
                 while ( c->more() ) {
                     BSONObj o = c->next();
                     string host = o["host"].String();
 
                     string name = "";
 
-                    BSONElement id = o["_id"];
+                    BSONElement id = o[ShardFields::name()];
                     if ( id.type() == String ) {
                         name = id.String();
                     }
@@ -111,10 +112,11 @@ namespace mongo {
                 verify( n == hostToShard.size() );
                 verify( n == shards.size() );
 
-                conn->remove( ShardNS::shard , BSONObj() );
+                conn->remove(ConfigNS::shard, BSONObj());
 
                 for ( map<string,string>::iterator i=hostToShard.begin(); i != hostToShard.end(); i++ ) {
-                    conn->insert( ShardNS::shard , BSON( "_id" << i->second << "host" << i->first ) );
+                    conn->insert(ConfigNS::shard,
+                                 BSON(ShardFields::name(i->second) << ShardFields::host(i->first)));
                 }
             }
 

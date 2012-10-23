@@ -17,27 +17,27 @@
 */
 
 #include "pch.h"
-#include "../util/net/message.h"
-#include "../util/stringutils.h"
-#include "../client/connpool.h"
-#include "../client/model.h"
-#include "mongo/client/dbclientcursor.h"
-#include "../db/pdfile.h"
-#include "../db/cmdline.h"
 
-
-#include "chunk.h"
-#include "config.h"
-#include "grid.h"
-#include "server.h"
 #include "pcrecpp.h"
+
+#include "mongo/client/connpool.h"
+#include "mongo/client/dbclientcursor.h"
+#include "mongo/client/model.h"
+#include "mongo/db/pdfile.h"
+#include "mongo/db/cmdline.h"
+#include "mongo/s/chunk.h"
+#include "mongo/s/cluster_constants.h"
+#include "mongo/s/config.h"
+#include "mongo/s/grid.h"
+#include "mongo/s/server.h"
+#include "mongo/util/net/message.h"
+#include "mongo/util/stringutils.h"
 
 namespace mongo {
 
     int ConfigServer::VERSION = 3;
     Shard Shard::EMPTY;
 
-    string ShardNS::shard = "config.shards";
     string ShardNS::database = "config.databases";
     string ShardNS::collection = "config.collections";
     string ShardNS::chunk = "config.chunks";
@@ -45,9 +45,6 @@ namespace mongo {
 
     string ShardNS::mongos = "config.mongos";
     string ShardNS::settings = "config.settings";
-
-    BSONField<bool>      ShardFields::draining("draining");
-    BSONField<long long> ShardFields::maxSize ("maxSize");
 
     OID serverID;
 
@@ -897,7 +894,7 @@ namespace mongo {
             uassert( 10189 ,  "should only have 1 thing in config.version" , ! c->more() );
         }
         else {
-            if ( conn.count( ShardNS::shard ) || conn.count( ShardNS::database ) ) {
+            if ( conn.count(ConfigNS::shard) || conn.count( ShardNS::database ) ) {
                 version = 1;
             }
         }
@@ -954,7 +951,7 @@ namespace mongo {
                                       BSON( "ns" << 1 << "shard" << 1 << "min" << 1 ),
                                       true );
             conn->get()->ensureIndex( ShardNS::chunk, BSON( "ns" << 1 << "lastmod" << 1 ), true );
-            conn->get()->ensureIndex( ShardNS::shard, BSON( "host" << 1 ), true );
+            conn->get()->ensureIndex(ConfigNS::shard, BSON(ShardFields::host() << 1), true);
 
             conn->done();
         }
@@ -1035,9 +1032,10 @@ namespace mongo {
             }
             scoped_ptr<ScopedDbConnection> conn( ScopedDbConnection::getScopedDbConnection(
                     configServer.getConnectionString().toString(), 30.0 ) );
-            conn->get()->update( ShardNS::shard,
-                                 BSON( "_id" << s.getName() ),
-                                 BSON( "$set" << BSON( "host" << monitor->getServerAddress() ) ) );
+            conn->get()->update(ConfigNS::shard,
+                                BSON(ShardFields::name(s.getName())),
+                                BSON("$set" <<
+                                     BSON(ShardFields::host(monitor->getServerAddress()))));
             conn->done();
         }
         catch ( DBException & ) {
