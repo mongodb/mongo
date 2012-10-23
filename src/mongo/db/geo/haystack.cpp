@@ -334,11 +334,11 @@ namespace mongo {
                 static_cast<GeoHaystackSearchIndex*>(id.getSpec().getType());
             verify(&id == si->getDetails());
 
-            BSONElement near = cmdObj["near"];
+            BSONElement nearElt = cmdObj["near"];
             BSONElement maxDistance = cmdObj["maxDistance"];
             BSONElement search = cmdObj["search"];
 
-            uassert(13318, "near needs to be an array", near.isABSONObj());
+            uassert(13318, "near needs to be an array", nearElt.isABSONObj());
             uassert(13319, "maxDistance needs a number", maxDistance.isNumber());
             uassert(13320, "search needs to be an object", search.type() == Object);
 
@@ -346,7 +346,7 @@ namespace mongo {
             if (cmdObj["limit"].isNumber())
                 limit = static_cast<unsigned>(cmdObj["limit"].numberInt());
 
-            si->searchCommand(nsd, idxNum, near.Obj(), maxDistance.numberDouble(), search.Obj(),
+            si->searchCommand(nsd, idxNum, nearElt.Obj(), maxDistance.numberDouble(), search.Obj(),
                               result, limit);
             return 1;
         }

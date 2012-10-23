@@ -23,7 +23,7 @@
 namespace mongo {
 
     class GeoHash;
-    class Point;
+    struct Point;
     std::ostream& operator<<(std::ostream &s, const GeoHash &h);
 
     /* This class maps an unsigned x,y coordinate pair to a hash value.
