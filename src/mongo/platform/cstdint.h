@@ -24,8 +24,8 @@
 #include <cstdint>
 #define _MONGO_STDINT_NAMESPACE std
 #elif defined(__GNUC__)
-#include <tr1/cstdint>
-#define _MONGO_STDINT_NAMESPACE std::tr1
+#include <stdint.h>
+#define _MONGO_STDINT_NAMESPACE
 #else
 #error "Unsupported compiler family"
 #endif
