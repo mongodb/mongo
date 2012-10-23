@@ -83,18 +83,24 @@ __wt_confchk_connection_open_session[] = {
 
 const char *
 __wt_confdfl_connection_reconfigure =
+	"cache_pool=,cache_pool_chunk=,cache_pool_quota=,cache_pool_size=,"
 	"cache_size=100MB,error_prefix=,eviction_target=80,"
 	"eviction_trigger=95,verbose=";
 
 WT_CONFIG_CHECK
 __wt_confchk_connection_reconfigure[] = {
+	{ "cache_pool", "string", NULL },
+	{ "cache_pool_chunk", "int", "min=1MB,max=10TB" },
+	{ "cache_pool_quota", "int", "min=1MB,max=10TB" },
+	{ "cache_pool_size", "int", "min=1MB,max=10TB" },
 	{ "cache_size", "int", "min=1MB,max=10TB" },
 	{ "error_prefix", "string", NULL },
 	{ "eviction_target", "int", "min=10,max=99" },
 	{ "eviction_trigger", "int", "min=10,max=99" },
-	{ "verbose", "list", "choices=[\"block\",\"ckpt\",\"evict\","
-	    "\"evictserver\",\"fileops\",\"hazard\",\"lsm\",\"mutex\",\"read\","
-	    "\"readserver\",\"reconcile\",\"salvage\",\"verify\",\"write\"]" },
+	{ "verbose", "list", "choices=[\"block\",\"cache_pool\",\"ckpt\","
+	    "\"evict\",\"evictserver\",\"fileops\",\"hazard\",\"lsm\",\"mutex\","
+	    "\"read\",\"readserver\",\"reconcile\",\"salvage\",\"verify\","
+	    "\"write\"]" },
 	{ NULL, NULL, NULL }
 };
 
@@ -401,14 +407,19 @@ __wt_confchk_table_meta[] = {
 
 const char *
 __wt_confdfl_wiredtiger_open =
-	"buffer_alignment=-1,cache_size=100MB,create=0,direct_io=,"
-	"error_prefix=,eviction_target=80,eviction_trigger=95,extensions=,"
-	"hazard_max=1000,logging=0,lsm_merge=,multiprocess=0,session_max=50,"
-	"sync=,transactional=,use_environment_priv=0,verbose=";
+	"buffer_alignment=-1,cache_pool=,cache_pool_chunk=,cache_pool_quota=,"
+	"cache_pool_size=,cache_size=100MB,create=0,direct_io=,error_prefix=,"
+	"eviction_target=80,eviction_trigger=95,extensions=,hazard_max=1000,"
+	"logging=0,lsm_merge=,multiprocess=0,session_max=50,sync=,"
+	"transactional=,use_environment_priv=0,verbose=";
 
 WT_CONFIG_CHECK
 __wt_confchk_wiredtiger_open[] = {
 	{ "buffer_alignment", "int", "min=-1,max=1MB" },
+	{ "cache_pool", "string", NULL },
+	{ "cache_pool_chunk", "int", "min=1MB,max=10TB" },
+	{ "cache_pool_quota", "int", "min=1MB,max=10TB" },
+	{ "cache_pool_size", "int", "min=1MB,max=10TB" },
 	{ "cache_size", "int", "min=1MB,max=10TB" },
 	{ "create", "boolean", NULL },
 	{ "direct_io", "list", "choices=[\"data\",\"log\"]" },
@@ -424,8 +435,9 @@ __wt_confchk_wiredtiger_open[] = {
 	{ "sync", "boolean", NULL },
 	{ "transactional", "boolean", NULL },
 	{ "use_environment_priv", "boolean", NULL },
-	{ "verbose", "list", "choices=[\"block\",\"ckpt\",\"evict\","
-	    "\"evictserver\",\"fileops\",\"hazard\",\"lsm\",\"mutex\",\"read\","
-	    "\"readserver\",\"reconcile\",\"salvage\",\"verify\",\"write\"]" },
+	{ "verbose", "list", "choices=[\"block\",\"cache_pool\",\"ckpt\","
+	    "\"evict\",\"evictserver\",\"fileops\",\"hazard\",\"lsm\",\"mutex\","
+	    "\"read\",\"readserver\",\"reconcile\",\"salvage\",\"verify\","
+	    "\"write\"]" },
 	{ NULL, NULL, NULL }
 };

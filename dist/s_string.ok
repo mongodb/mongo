@@ -211,6 +211,7 @@ XP
 __wt_epoch
 abcdef
 abcdefghijklmnopqrstuvwxyz
+abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyz
 addfrag
 addl
 addr
@@ -221,6 +222,7 @@ alfred
 alloc
 allocator
 allocsize
+amongst
 ao
 ap
 api

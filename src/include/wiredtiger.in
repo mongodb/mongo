@@ -991,6 +991,20 @@ struct __wt_connection {
 	 *
 	 * @param connection the connection handle
 	 * @configstart{connection.reconfigure, see dist/api_data.py}
+	 * @config{cache_pool, name of a cache pool that is shared between
+	 * databases.,a string; default empty.}
+	 * @config{cache_pool_chunk, the granularity that a cache pool is shared
+	 * out. Only valid if the cache_pool option is also specified. Only
+	 * valid in the first connection that uses the cache pool.,an integer
+	 * between 1MB and 10TB; default \c .}
+	 * @config{cache_pool_quota, the maximum amount of the cache pool a
+	 * single database can use. Only valid if the cache_pool option is also
+	 * specified. Only valid in the first connection that uses the cache
+	 * pool.,an integer between 1MB and 10TB; default \c .}
+	 * @config{cache_pool_size, size of a cache pool that is shared between
+	 * databases. Only valid if the cache_pool option is also specified.
+	 * Only valid in the first connection that uses the cache pool.,an
+	 * integer between 1MB and 10TB; default \c .}
 	 * @config{cache_size, maximum heap memory to allocate for the cache.,an
 	 * integer between 1MB and 10TB; default \c 100MB.}
 	 * @config{error_prefix, prefix string for error messages.,a string;
@@ -1004,10 +1018,11 @@ struct __wt_connection {
 	 * @config{verbose, enable messages for various events.  Options are
 	 * given as a list\, such as
 	 * <code>"verbose=[evictserver\,read]"</code>.,a list\, with values
-	 * chosen from the following options: \c "block"\, \c "ckpt"\, \c
-	 * "evict"\, \c "evictserver"\, \c "fileops"\, \c "hazard"\, \c "lsm"\,
-	 * \c "mutex"\, \c "read"\, \c "readserver"\, \c "reconcile"\, \c
-	 * "salvage"\, \c "verify"\, \c "write"; default empty.}
+	 * chosen from the following options: \c "block"\, \c "cache_pool"\, \c
+	 * "ckpt"\, \c "evict"\, \c "evictserver"\, \c "fileops"\, \c "hazard"\,
+	 * \c "lsm"\, \c "mutex"\, \c "read"\, \c "readserver"\, \c
+	 * "reconcile"\, \c "salvage"\, \c "verify"\, \c "write"; default
+	 * empty.}
 	 * @configend
 	 * @errors
 	 */
@@ -1162,6 +1177,20 @@ struct __wt_connection {
  * I/O.  By default\, a platform-specific alignment value is used (512 bytes on
  * Linux systems\, zero elsewhere).,an integer between -1 and 1MB; default \c
  * -1.}
+ * @config{cache_pool, name of a cache pool that is shared between databases.,a
+ * string; default empty.}
+ * @config{cache_pool_chunk, the granularity that a cache pool is shared out.
+ * Only valid if the cache_pool option is also specified. Only valid in the
+ * first connection that uses the cache pool.,an integer between 1MB and 10TB;
+ * default \c .}
+ * @config{cache_pool_quota, the maximum amount of the cache pool a single
+ * database can use. Only valid if the cache_pool option is also specified. Only
+ * valid in the first connection that uses the cache pool.,an integer between
+ * 1MB and 10TB; default \c .}
+ * @config{cache_pool_size, size of a cache pool that is shared between
+ * databases. Only valid if the cache_pool option is also specified. Only valid
+ * in the first connection that uses the cache pool.,an integer between 1MB and
+ * 10TB; default \c .}
  * @config{cache_size, maximum heap memory to allocate for the cache.,an integer
  * between 1MB and 10TB; default \c 100MB.}
  * @config{create, create the database if it does not exist.,a boolean flag;
@@ -1202,10 +1231,10 @@ struct __wt_connection {
  * information.,a boolean flag; default \c false.}
  * @config{verbose, enable messages for various events.  Options are given as a
  * list\, such as <code>"verbose=[evictserver\,read]"</code>.,a list\, with
- * values chosen from the following options: \c "block"\, \c "ckpt"\, \c
- * "evict"\, \c "evictserver"\, \c "fileops"\, \c "hazard"\, \c "lsm"\, \c
- * "mutex"\, \c "read"\, \c "readserver"\, \c "reconcile"\, \c "salvage"\, \c
- * "verify"\, \c "write"; default empty.}
+ * values chosen from the following options: \c "block"\, \c "cache_pool"\, \c
+ * "ckpt"\, \c "evict"\, \c "evictserver"\, \c "fileops"\, \c "hazard"\, \c
+ * "lsm"\, \c "mutex"\, \c "read"\, \c "readserver"\, \c "reconcile"\, \c
+ * "salvage"\, \c "verify"\, \c "write"; default empty.}
  * @configend
  * Additionally, if a file named \c WiredTiger.config appears in the WiredTiger
  * home directory, it is read for configuration values (see @ref config_file

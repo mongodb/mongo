@@ -228,6 +228,23 @@ table_meta = format_meta + table_only_meta
 
 # Connection runtime config, shared by conn.reconfigure and wiredtiger_open
 connection_runtime_config = [
+	Config('cache_pool', '', r'''
+		name of a cache pool that is shared between databases'''),
+	Config('cache_pool_size', '', r'''
+		size of a cache pool that is shared between databases. Only valid if
+		the cache_pool option is also specified. Only valid in the first
+		connection that uses the cache pool''',
+		min='1MB', max='10TB'),
+	Config('cache_pool_chunk', '', r'''
+		the granularity that a cache pool is shared out. Only valid if the
+		cache_pool option is also specified. Only valid in the first connection
+		that uses the cache pool''',
+		min='1MB', max='10TB'),
+	Config('cache_pool_quota', '', r'''
+		the maximum amount of the cache pool a single database can use. Only
+		valid if the cache_pool option is also specified. Only valid in the
+		first connection that uses the cache pool''',
+		min='1MB', max='10TB'),
 	Config('cache_size', '100MB', r'''
 		maximum heap memory to allocate for the cache''',
 		min='1MB', max='10TB'),
@@ -246,6 +263,7 @@ connection_runtime_config = [
 		list, such as <code>"verbose=[evictserver,read]"</code>''',
 		type='list', choices=[
 		    'block',
+			'cache_pool',
 		    'ckpt',
 		    'evict',
 		    'evictserver',
@@ -495,18 +513,20 @@ methods = {
 		variables regardless of whether or not the process is running
 		with special privileges.  See @ref home for more information''',
 		type='boolean'),
-]),
+])
 }
 
 flags = {
 ###################################################
 # Internal routine flag declarations
 ###################################################
+	'cache_pool' : [ 'CACHE_POOL_RUN' ],
 	'direct_io' : [ 'DIRECTIO_DATA', 'DIRECTIO_LOG' ],
 	'page_free' : [ 'PAGE_FREE_IGNORE_DISK' ],
 	'rec_evict' : [ 'REC_SINGLE' ],
 	'verbose' : [
 		'VERB_block',
+		'VERB_cache_pool',
 		'VERB_ckpt',
 		'VERB_evict',
 		'VERB_evictserver',
@@ -526,6 +546,7 @@ flags = {
 # Structure flag declarations
 ###################################################
 	'conn' : [
+		'CONN_CACHE_POOL',
 		'CONN_LSM_MERGE',
 		'CONN_SYNC',
 		'CONN_TRANSACTIONAL',

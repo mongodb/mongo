@@ -14,6 +14,7 @@ struct __wt_process {
 
 					/* Locked: connection queue */
 	TAILQ_HEAD(__wt_connection_impl_qh, __wt_connection_impl) connqh;
+	WT_CACHE_POOL *cache_pool;
 };
 
 /*******************************************
@@ -384,6 +385,8 @@ extern WT_PROCESS __wt_process;
  * DO NOT EDIT: automatically built by dist/api_flags.py.
  * API flags section: BEGIN
  */
+#define	WT_CACHE_POOL_RUN				0x00000001
+#define	WT_CONN_CACHE_POOL				0x00000010
 #define	WT_CONN_LSM_MERGE				0x00000008
 #define	WT_CONN_SYNC					0x00000004
 #define	WT_CONN_TRANSACTIONAL				0x00000002
@@ -395,7 +398,8 @@ extern WT_PROCESS __wt_process;
 #define	WT_SESSION_INTERNAL				0x00000004
 #define	WT_SESSION_SALVAGE_QUIET_ERR			0x00000002
 #define	WT_SESSION_SCHEMA_LOCKED			0x00000001
-#define	WT_VERB_block					0x00002000
+#define	WT_VERB_block					0x00004000
+#define	WT_VERB_cache_pool				0x00002000
 #define	WT_VERB_ckpt					0x00001000
 #define	WT_VERB_evict					0x00000800
 #define	WT_VERB_evictserver				0x00000400

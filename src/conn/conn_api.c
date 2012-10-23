@@ -728,6 +728,7 @@ __conn_verbose_config(WT_SESSION_IMPL *session, const char *cfg[])
 		uint32_t flag;
 	} *ft, verbtypes[] = {
 		{ "block",	WT_VERB_block },
+		{ "cache_pool",	WT_VERB_cache_pool },
 		{ "ckpt",	WT_VERB_ckpt },
 		{ "evict",	WT_VERB_evict },
 		{ "evictserver",WT_VERB_evictserver },
@@ -857,6 +858,8 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	WT_ERR(__wt_config_gets(session, cfg, "transactional", &cval));
 	if (cval.val)
 		F_SET(conn, WT_CONN_TRANSACTIONAL);
+
+	WT_ERR(__wt_conn_cache_pool_config(session, cfg));
 
 	/* Configure verbose flags. */
 	WT_ERR(__conn_verbose_config(session, cfg));

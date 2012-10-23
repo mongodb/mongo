@@ -28,17 +28,35 @@ struct __wt_stats {
 	(stats)->fld.v = (uint64_t)(value);				\
 } while (0)
 
-#define	WT_BSTAT_INCR(session, fld)					\
-	WT_STAT_INCR((session)->btree->stats, fld)
-#define	WT_BSTAT_INCRV(session, fld, v)					\
-	WT_STAT_INCRV((session)->btree->stats, fld, v)
-#define	WT_BSTAT_DECR(session, fld)					\
-	WT_STAT_DECR((session)->btree->stats, fld)
-#define	WT_BSTAT_SET(session, fld, v)					\
-	WT_STAT_SET((session)->btree->stats, fld, v)
+#define	WT_STAT_CHECK_SESSION(session)					\
+	((session) != NULL && (session) != S2C(session)->default_session)
 
-#define	WT_CSTAT_INCR(session, fld)					\
-	WT_STAT_INCR(S2C(session)->stats, fld)
+#define	WT_BSTAT_INCR(session, fld) do {				\
+	if (WT_STAT_CHECK_SESSION(session)) {				\
+		WT_STAT_INCR((session)->btree->stats, fld);		\
+	}								\
+} while (0)
+#define	WT_BSTAT_INCRV(session, fld, v) do {				\
+	if (WT_STAT_CHECK_SESSION(session)) {				\
+		WT_STAT_INCRV((session)->btree->stats, fld, v);		\
+	}								\
+} while (0)
+#define	WT_BSTAT_DECR(session, fld) do {				\
+	if (WT_STAT_CHECK_SESSION(session)) {				\
+		WT_STAT_DECR((session)->btree->stats, fld);		\
+	}								\
+} while (0)
+#define	WT_BSTAT_SET(session, fld, v) do {				\
+	if (WT_STAT_CHECK_SESSION(session)) {				\
+		WT_STAT_SET((session)->btree->stats, fld, v);		\
+	}								\
+} while (0)
+
+#define	WT_CSTAT_INCR(session, fld) do {				\
+	if (WT_STAT_CHECK_SESSION(session)) {				\
+		WT_STAT_INCR(S2C(session)->stats, fld);			\
+	}								\
+} while (0)
 
 /* Flags used by statistics initialization. */
 #define	WT_STATISTICS_CLEAR	0x01
