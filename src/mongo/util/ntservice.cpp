@@ -485,7 +485,7 @@ namespace {
 
     void startService() {
 
-        fassert(0, _startService);
+        fassert(16454, _startService);
 
         SERVICE_TABLE_ENTRYW dispTable[] = {
             { const_cast<LPWSTR>(_serviceName.c_str()), (LPSERVICE_MAIN_FUNCTION)initService },
