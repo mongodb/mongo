@@ -992,6 +992,9 @@
     <ClCompile Include="..\util\net\ssl_manager.cpp">
       <Filter>util\net</Filter>
     </ClCompile>
+    <ClCompile Include="..\s\cluster_constants.cpp">
+      <Filter>s</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\targetver.h" />
@@ -1859,6 +1862,18 @@
     </ClInclude>
     <ClInclude Include="memconcept.h">
       <Filter>db\Header Files\e to n</Filter>
+    </ClInclude>
+    <ClInclude Include="..\s\cluster_constants.h">
+      <Filter>s</Filter>
+    </ClInclude>
+    <ClInclude Include="..\s\config.h">
+      <Filter>s</Filter>
+    </ClInclude>
+    <ClInclude Include="..\s\d_chunk_manager.h">
+      <Filter>s</Filter>
+    </ClInclude>
+    <ClInclude Include="..\s\grid.h">
+      <Filter>s</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

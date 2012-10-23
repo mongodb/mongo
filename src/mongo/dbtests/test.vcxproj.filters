@@ -798,6 +798,9 @@
     <ClInclude Include="..\util\net\ssl_manager.h">
       <Filter>util\net</Filter>
     </ClInclude>
+    <ClInclude Include="..\s\cluster_constants.h">
+      <Filter>s</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\client\connpool.cpp">
@@ -1722,6 +1725,9 @@
     </ClCompile>
     <ClCompile Include="..\util\net\ssl_manager.cpp">
       <Filter>util\net</Filter>
+    </ClCompile>
+    <ClCompile Include="..\s\cluster_constants.cpp">
+      <Filter>s</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

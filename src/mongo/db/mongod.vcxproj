@@ -1042,6 +1042,7 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">true</ExcludedFromBuild>
     </ClCompile>
+    <ClCompile Include="..\s\cluster_constants.cpp" />
     <ClCompile Include="..\s\default_version.cpp" />
     <ClCompile Include="..\..\third_party\pcre-8.30\pcrecpp.cc" />
     <ClCompile Include="..\..\third_party\pcre-8.30\pcre_chartables.c" />
@@ -1289,7 +1290,11 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClInclude Include="..\scripting\bench.h" />
     <ClInclude Include="..\scripting\bson_template_evaluator.h" />
     <ClInclude Include="..\s\chunk.h" />
+    <ClInclude Include="..\s\cluster_constants.h" />
+    <ClInclude Include="..\s\config.h" />
+    <ClInclude Include="..\s\d_chunk_manager.h" />
     <ClInclude Include="..\s\d_writeback.h" />
+    <ClInclude Include="..\s\grid.h" />
     <ClInclude Include="..\util\concurrency\mutexdebugger.h" />
     <ClInclude Include="..\util\concurrency\simplerwlock.h" />
     <ClInclude Include="..\util\fail_point.h" />

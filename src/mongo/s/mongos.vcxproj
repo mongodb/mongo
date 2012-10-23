@@ -1082,6 +1082,7 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClCompile Include="balancer_policy.cpp" />
     <ClCompile Include="chunk.cpp" />
     <ClCompile Include="client_info.cpp" />
+    <ClCompile Include="cluster_constants.cpp" />
     <ClCompile Include="commands_admin.cpp" />
     <ClCompile Include="commands_public.cpp" />
     <ClCompile Include="config.cpp" />
@@ -1315,6 +1316,7 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClInclude Include="balancer_policy.h" />
     <ClInclude Include="chunk.h" />
     <ClInclude Include="client_info.h" />
+    <ClInclude Include="cluster_constants.h" />
     <ClInclude Include="config.h" />
     <ClInclude Include="cursors.h" />
     <ClInclude Include="d_chunk_manager.h" />
