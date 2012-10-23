@@ -215,18 +215,19 @@ namespace mongo {
         if( rand() % 2 ) numStaleMinorClauses = maxMinorVersionClauses;
 #endif
 
-        if( numStaleMinorClauses < maxMinorVersionClauses ){
+        queryB.append("ns", _ns);
 
-            BSONArrayBuilder queryOrB( queryB.subarrayStart( "$or" ) );
+        //
+        // If we have only a few minor versions to refresh, we can be more selective in our query
+        //
+        if( numStaleMinorClauses < maxMinorVersionClauses ){
 
             //
             // Get any version changes higher than we know currently
             //
-
+            BSONArrayBuilder queryOrB( queryB.subarrayStart( "$or" ) );
             {
                 BSONObjBuilder queryNewB( queryOrB.subobjStart() );
-
-                queryNewB.append( "ns", _ns );
                 {
                     BSONObjBuilder ts( queryNewB.subobjStart( "lastmod" ) );
                     // We should *always* pull at least a single chunk back, this lets us quickly
@@ -243,9 +244,8 @@ namespace mongo {
             // Needed since there could have been a split of the max version chunk of any shard
             // TODO: Ideally, we shouldn't care about these
             for( typename map<ShardType, ShardChunkVersion>::const_iterator it = _maxShardVersions->begin(); it != _maxShardVersions->end(); it++ ){
-                BSONObjBuilder queryShardB( queryOrB.subobjStart() );
 
-                queryShardB.append( "ns", _ns );
+                BSONObjBuilder queryShardB( queryOrB.subobjStart() );
                 queryShardB.append( "shard", nameFrom( it->first ) );
                 {
                     BSONObjBuilder ts( queryShardB.subobjStart( "lastmod" ) );
@@ -258,9 +258,8 @@ namespace mongo {
             // Get any minor version changes we've marked as interesting
             // TODO: Ideally we shouldn't care about these
             for( set<ShardChunkVersion>::const_iterator it = extraMinorVersions.begin(); it != extraMinorVersions.end(); it++ ){
-                BSONObjBuilder queryShardB( queryOrB.subobjStart() );
 
-                queryShardB.append( "ns", _ns );
+                BSONObjBuilder queryShardB( queryOrB.subobjStart() );
                 {
                     BSONObjBuilder ts( queryShardB.subobjStart( "lastmod" ) );
                     ts.appendTimestamp( "$gt", it->toLong() );
@@ -273,14 +272,6 @@ namespace mongo {
 
             queryOrB.done();
         }
-        else{
-
-            //
-            // We don't want to send a giant $or query to the server, so just get all the chunks
-            //
-
-            queryB.append( "ns", _ns );
-        }
 
         BSONObj query = queryB.obj();
 
@@ -290,6 +281,9 @@ namespace mongo {
         //
         // NOTE: IT IS IMPORTANT FOR CONSISTENCY THAT WE SORT BY ASC VERSION, TO HANDLE
         // CURSOR YIELDING BETWEEN CHUNKS BEING MIGRATED.
+        //
+        // This ensures that changes to chunk version (which will always be higher) will always
+        // come *after* our current position in the chunk cursor.
         //
 
         Query queryObj(query);
