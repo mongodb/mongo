@@ -144,12 +144,15 @@ namespace mongo {
     scoped_ptr<FaultInjectCmd> _faultInjectCmd(NULL);
     scoped_ptr<FailPointRegistry> _fpRegistry(NULL);
 
-    MONGO_INITIALIZER(FailPointRegistry)(::mongo::InitializerContext* context) {
+    MONGO_INITIALIZER(FailPointRegistry)(InitializerContext* context) {
         _fpRegistry.reset(new FailPointRegistry());
         return Status::OK();
     }
 
-    MONGO_INITIALIZER_GROUP(AllFaillPointsRegistered, (), ());
+    MONGO_INITIALIZER_GENERAL(AllFailPointsRegistered, (), ())(InitializerContext* context) {
+        _fpRegistry->freeze();
+        return Status::OK();
+    }
 
     FailPointRegistry* getGlobalFailPointRegistry() {
         return _fpRegistry.get();
@@ -157,6 +160,5 @@ namespace mongo {
 
     void enableFailPointCmd() {
         _faultInjectCmd.reset(new FaultInjectCmd);
-        _fpRegistry->freeze();
     }
 }

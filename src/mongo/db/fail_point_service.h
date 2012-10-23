@@ -41,7 +41,7 @@ namespace mongo {
      * never in a block with limited scope (ie, inside functions, loops, etc.)
      */
     #define MONGO_FP_DECLARE(fp) FailPoint fp; \
-        MONGO_INITIALIZER_GENERAL(fp, ("FailPointRegistry"), ("AllFaillPointsRegistered")) \
+        MONGO_INITIALIZER_GENERAL(fp, ("FailPointRegistry"), ("AllFailPointsRegistered")) \
                 (::mongo::InitializerContext* context) { \
             return getGlobalFailPointRegistry()->addFailPoint(#fp, &fp); \
         }
