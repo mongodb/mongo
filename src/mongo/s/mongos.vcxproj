@@ -1063,6 +1063,7 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClCompile Include="..\util\log.cpp" />
     <ClCompile Include="..\util\net\miniwebserver.cpp" />
     <ClCompile Include="..\util\net\listen.cpp" />
+    <ClCompile Include="..\util\net\ssl_manager.cpp" />
     <ClCompile Include="..\util\ntservice.cpp" />
     <ClCompile Include="..\util\processinfo.cpp" />
     <ClCompile Include="..\util\ramlog.cpp" />
@@ -1275,6 +1276,7 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClInclude Include="..\platform\bits.h" />
     <ClInclude Include="..\platform\compiler.h" />
     <ClInclude Include="..\platform\compiler_msvc.h" />
+    <ClInclude Include="..\platform\cstdint.h" />
     <ClInclude Include="..\platform\float_utils.h" />
     <ClInclude Include="..\platform\random.h" />
     <ClInclude Include="..\platform\strtoll.h" />
@@ -1289,6 +1291,14 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClInclude Include="..\util\fail_point.h" />
     <ClInclude Include="..\util\fail_point_registry.h" />
     <ClInclude Include="..\util\intrusive_counter.h" />
+    <ClInclude Include="..\util\net\hostandport.h" />
+    <ClInclude Include="..\util\net\listen.h" />
+    <ClInclude Include="..\util\net\message.h" />
+    <ClInclude Include="..\util\net\message_port.h" />
+    <ClInclude Include="..\util\net\message_server.h" />
+    <ClInclude Include="..\util\net\miniwebserver.h" />
+    <ClInclude Include="..\util\net\sock.h" />
+    <ClInclude Include="..\util\net\ssl_manager.h" />
     <ClInclude Include="..\util\ntservice.h" />
     <ClInclude Include="..\util\processinfo.h" />
     <ClInclude Include="..\util\concurrency\remap_lock.h" />

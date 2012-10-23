@@ -1098,6 +1098,7 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClCompile Include="..\util\logfile.cpp" />
     <ClCompile Include="..\util\net\listen.cpp" />
     <ClCompile Include="..\util\net\miniwebserver.cpp" />
+    <ClCompile Include="..\util\net\ssl_manager.cpp" />
     <ClCompile Include="..\util\processinfo.cpp" />
     <ClCompile Include="..\util\progress_meter.cpp" />
     <ClCompile Include="..\util\ramlog.cpp" />
@@ -1123,6 +1124,8 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClCompile Include="cap.cpp" />
     <ClCompile Include="commands\distinct.cpp" />
     <ClCompile Include="fail_point_service.cpp" />
+    <ClCompile Include="geo\hash.cpp" />
+    <ClCompile Include="geo\shapes.cpp" />
     <ClCompile Include="initialize_server_global_state.cpp" />
     <ClCompile Include="keypattern.cpp" />
     <ClCompile Include="kill_current_op.cpp" />
@@ -1276,6 +1279,7 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClInclude Include="..\platform\bits.h" />
     <ClInclude Include="..\platform\compiler.h" />
     <ClInclude Include="..\platform\compiler_msvc.h" />
+    <ClInclude Include="..\platform\cstdint.h" />
     <ClInclude Include="..\platform\float_utils.h" />
     <ClInclude Include="..\platform\random.h" />
     <ClInclude Include="..\platform\strtoll.h" />
@@ -1291,6 +1295,7 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClInclude Include="..\util\fail_point.h" />
     <ClInclude Include="..\util\fail_point_registry.h" />
     <ClInclude Include="..\util\histogram.h" />
+    <ClInclude Include="..\util\net\ssl_manager.h" />
     <ClInclude Include="..\util\progress_meter.h" />
     <ClInclude Include="..\util\safe_num.h" />
     <ClInclude Include="..\util\signal_handlers.h" />
@@ -1306,6 +1311,8 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClInclude Include="auth\principal_set.h" />
     <ClInclude Include="explain.h" />
     <ClInclude Include="fail_point_service.h" />
+    <ClInclude Include="geo\hash.h" />
+    <ClInclude Include="geo\shapes.h" />
     <ClInclude Include="hasher.h" />
     <ClInclude Include="hashindex.h" />
     <ClInclude Include="index_insertion_continuation.h" />
@@ -1315,6 +1322,7 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClInclude Include="kill_current_op.h" />
     <ClInclude Include="lockstat.h" />
     <ClInclude Include="lockstate.h" />
+    <ClInclude Include="memconcept.h" />
     <ClInclude Include="namespace_details-inl.h" />
     <ClInclude Include="namespace_details.h" />
     <ClInclude Include="ops\query.h" />
@@ -1363,7 +1371,6 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClCompile Include="matcher.cpp" />
     <ClCompile Include="matcher_covered.cpp" />
     <ClCompile Include="..\util\mmap_win.cpp" />
-    <ClCompile Include="modules\mms.cpp" />
     <ClCompile Include="module.cpp" />
     <ClCompile Include="namespace.cpp" />
     <ClCompile Include="nonce.cpp" />

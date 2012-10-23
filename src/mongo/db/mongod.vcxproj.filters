@@ -370,9 +370,6 @@
     <ClCompile Include="..\util\md5.cpp">
       <Filter>util\Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="modules\mms.cpp">
-      <Filter>db\modules</Filter>
-    </ClCompile>
     <ClCompile Include="..\util\mmap.cpp">
       <Filter>util\Source Files</Filter>
     </ClCompile>
@@ -985,6 +982,15 @@
     </ClCompile>
     <ClCompile Include="keypattern.cpp">
       <Filter>db\Source Files\e to n</Filter>
+    </ClCompile>
+    <ClCompile Include="geo\hash.cpp">
+      <Filter>db\geo</Filter>
+    </ClCompile>
+    <ClCompile Include="geo\shapes.cpp">
+      <Filter>db\geo</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\net\ssl_manager.cpp">
+      <Filter>util\net</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -1837,6 +1843,21 @@
       <Filter>platform</Filter>
     </ClInclude>
     <ClInclude Include="keypattern.h">
+      <Filter>db\Header Files\e to n</Filter>
+    </ClInclude>
+    <ClInclude Include="..\platform\cstdint.h">
+      <Filter>platform</Filter>
+    </ClInclude>
+    <ClInclude Include="geo\hash.h">
+      <Filter>db\geo</Filter>
+    </ClInclude>
+    <ClInclude Include="geo\shapes.h">
+      <Filter>db\geo</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\net\ssl_manager.h">
+      <Filter>util\net</Filter>
+    </ClInclude>
+    <ClInclude Include="memconcept.h">
       <Filter>db\Header Files\e to n</Filter>
     </ClInclude>
   </ItemGroup>
