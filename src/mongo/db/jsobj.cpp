@@ -873,10 +873,9 @@ namespace mongo {
 
             if ( strchr( name , '.' ) ||
                     strchr( name , '$' ) ) {
-                return
-                    strcmp( name , "$ref" ) == 0 ||
-                    strcmp( name , "$id" ) == 0
-                    ;
+                if ( strcmp( name , "$ref" ) != 0 &&
+                     strcmp( name , "$id" ) != 0 )
+                  return false;
             }
 
             if ( e.mayEncapsulate() ) {
