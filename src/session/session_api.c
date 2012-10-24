@@ -781,7 +781,7 @@ __wt_open_session(WT_CONNECTION_IMPL *conn, int internal,
 	session_ret->iface = stds;
 	session_ret->iface.connection = &conn->iface;
 
-	WT_ERR(__wt_cond_alloc(session, "session", 1, &session_ret->cond));
+	WT_ERR(__wt_cond_alloc(session, "session", 0, &session_ret->cond));
 
 	__wt_event_handler_set(session_ret,
 	    event_handler == NULL ? session->event_handler : event_handler);

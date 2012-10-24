@@ -67,7 +67,7 @@ __wt_cache_create(WT_CONNECTION_IMPL *conn, const char *cfg[])
 		    "eviction target must be lower than the eviction trigger");
 
 	WT_ERR(__wt_cond_alloc(session,
-	    "cache eviction server", 1, &cache->evict_cond));
+	    "cache eviction server", 0, &cache->evict_cond));
 	__wt_spin_init(session, &cache->evict_lock);
 
 	/*

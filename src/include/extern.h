@@ -871,7 +871,7 @@ extern int __wt_ftruncate(WT_SESSION_IMPL *session, WT_FH *fh, off_t len);
 extern int __wt_getline(WT_SESSION_IMPL *session, WT_ITEM *buf, FILE *fp);
 extern int __wt_cond_alloc(WT_SESSION_IMPL *session,
     const char *name,
-    int is_locked,
+    int is_signalled,
     WT_CONDVAR **condp);
 extern void __wt_cond_wait(WT_SESSION_IMPL *session,
     WT_CONDVAR *cond,
