@@ -55,6 +55,10 @@ from packing import pack, unpack
 		(*$1)->flags |= WT_CURSTD_RAW;
 		PyObject_SetAttrString($result, "is_column",
 		    PyBool_FromLong(strcmp((*$1)->key_format, "r") == 0));
+		PyObject_SetAttrString($result, "key_format",
+		    PyString_InternFromString((*$1)->key_format));
+		PyObject_SetAttrString($result, "value_format",
+		    PyString_InternFromString((*$1)->value_format));
 	}
 }
 
@@ -328,8 +332,8 @@ SELFHELPER(struct __wt_cursor, cursor)
 /* Remove / rename parts of the C API that we don't want in Python. */
 %immutable __wt_cursor::session;
 %immutable __wt_cursor::uri;
-%immutable __wt_cursor::key_format;
-%immutable __wt_cursor::value_format;
+%ignore __wt_cursor::key_format;
+%ignore __wt_cursor::value_format;
 %immutable __wt_session::connection;
 
 %ignore __wt_buf;
