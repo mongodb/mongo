@@ -1,0 +1,546 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
+
+<html>
+<head>
+<title>How To Use Gflags (formerly Google Commandline Flags)</title>
+
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<link href="designstyle.css" type="text/css" rel="stylesheet">
+<style type="text/css">
+<!--
+  ol.bluelist li {
+    color: #3366ff;
+    font-family: sans-serif;
+  }
+  ol.bluelist li p {
+    color: #000;
+    font-family: "Times Roman", times, serif;
+  }
+  ul.blacklist li {
+    color: #000;
+    font-family: "Times Roman", times, serif;
+  }
+//-->
+</style>
+</head>
+
+<body>
+
+<h1>How To Use Gflags (formerly Google Commandline Flags)</h1>
+<small>(as of
+<script type=text/javascript>
+  var lm = new Date(document.lastModified);
+  document.write(lm.toDateString());
+</script>)
+</small>
+<br>
+
+<blockquote><dl>
+  <dt> Table of contents </dt>
+  <dd> <a href="#intro">Introduction</a> </dd>
+  <dd> <a href="#define">DEFINE: Defining Flags In Program</A> </dd>
+  <dd> <a href="#using">Accessing the Flag</A> </dd>
+  <dd> <a href="#declare">DECLARE: Using the Flag in a Different File</a> </dd>
+  <dd> <a href="#validate">RegisterFlagValidator: Sanity-checking Flag Values</a> </dd>
+  <dd> <a href="#together">Putting It Together: How to Set Up Flags</a> </dd>
+  <dd> <a href="#commandline">Setting Flags on the Command Line</a> </dd>
+  <dd> <a href="#varz">Setting Flags at Runtime</a> </dd>
+  <dd> <a href="#default">Changing the Default Flag Value</a> </dd>
+  <dd> <a href="#special">Special Flags</a> </dd>
+  <dd> <a href="#api">The API</a> </dd>
+  <dd> <br/> </dd>
+</dl></blockquote>
+
+<h2> <A NAME=intro>Introduction, and Comparison to Other Commandline
+     Flags Libraries</A> </h2>
+
+<p><b>Commandline flags</b> are flags that users specify on the
+command line when they run an executable.  In the command</p>
+<pre>
+   fgrep -l -f /var/tmp/foo johannes brahms
+</pre>
+<p><code>-l</code> and <code>-f /var/tmp/foo</code> are the two
+commandline flags.  (<code>johannes</code> and <code>brahms</code>,
+which don't start with a dash, are <b>commandline arguments</b>.)</p>
+
+<p>Typically, an application lists what flags the user is allowed to
+pass in, and what arguments they take -- in this example,
+<code>-l</code> takes no argument, and <code>-f</code> takes a
+string (in particular, a filename) as an argument.  Users can use a
+library to help parse the commandline and store the flags in some data
+structure.</p>
+
+<p>Gflags, the commandline flags library used within Google,
+differs from other libraries,
+such as <code>getopt()</code>, in that flag definitions can be
+scattered around the source code, and not just listed in one place
+such as <code>main()</code>.  In practice, this means that a single
+source-code file will define and use flags that are meaningful to that
+file.  Any application that links in that file will get the flags, and
+the gflags library will automatically handle that
+flag appropriately.</p>
+
+<p>There's significant gain in flexibility, and ease of code reuse,
+due to this technique.  However, there is a danger that two files will
+define the same flag, and then give an error when they're linked
+together.</p>
+
+<p>The rest of this document describes how to use the commandlineflag
+library.  It's a C++ library, so examples are in C++.  However, there
+is a Python port with the same functionality, and this discussion
+translates directly to Python.</p>
+
+
+<h2> <A name=define>DEFINE: Defining Flags In Program</A> </h2>
+
+<p> Defining a flag is easy: just use the appropriate macro for the
+type you want the flag to be, as defined at the bottom of
+<code>gflags/gflags.h</code>.  Here's an example file,
+<code>foo.cc</code>:</p>
+
+<pre>
+   #include &lt;gflags/gflags.h&gt;
+
+   DEFINE_bool(big_menu, true, "Include 'advanced' options in the menu listing");
+   DEFINE_string(languages, "english,french,german",
+                 "comma-separated list of languages to offer in the 'lang' menu");
+</pre>
+
+<p><code>DEFINE_bool</code> defines a boolean flag.  Here are the
+types supported:</p>
+<ul>
+  <li> <code>DEFINE_bool</code>: boolean
+  <li> <code>DEFINE_int32</code>: 32-bit integer
+  <li> <code>DEFINE_int64</code>: 64-bit integer
+  <li> <code>DEFINE_uint64</code>: unsigned 64-bit integer
+  <li> <code>DEFINE_double</code>: double
+  <li> <code>DEFINE_string</code>: C++ string
+</ul>
+
+<p>Note that there are no 'complex' types like lists: the "languages"
+flag in our example is a list of strings, but is defined of type
+"string", not "list_of_string" or similar.  This is by design.  We'd
+rather use only simple types for the flags, and allow for complex,
+arbitrary parsing routines to parse them, than to try to put the logic
+inside the flags library proper.</p>
+
+<p>All DEFINE macros take the same three arguments: the name of the
+flag, its default value, and a 'help' string that describes its use.
+The 'help' string is displayed when the user runs the application with
+the <A HREF="#special"><code>--help</code> flag</A>.</p>
+
+<p>You can define a flag in any source-code file in your executable.
+Only define a flag once!  If you want to access a flag in more than
+one source file, DEFINE it in one file, and <A
+HREF="#declare">DECLARE</A> it in the others.  Even better, DEFINE it
+in <code>foo.cc</code> and DECLARE it in <code>foo.h</code>; then
+everyone who <code>#includes foo.h</code> can use the flag.</p>
+
+<p>
+Defining flags in libraries rather than in main() is powerful, but
+does have some costs. One is that a library might not have a good
+default value for its flags, for example if the flag holds a
+filename that might not exist in some environments. To mitigate such problems,
+you can use <a href="#validate">flag validators</a> to ensure prompt
+notification (in the form of a crash) of an invalid flag value.
+</p>
+
+<p>Note that while most functions in this library are defined in the
+<code>google</code> namespace, <code>DEFINE_foo</code> (and
+<code>DECLARE_foo</code>, <A HREF="#declare">below</A>), should always
+be in the global namespace.</p>
+
+
+<h2> <A name=using>Accessing the Flag</A> </h2>
+
+<p>All defined flags are available to the program as just a normal
+variable, with the prefix <code>FLAGS_</code> prepended.  In the above
+example, the macros define two variables, <code>FLAGS_big_menu</code>
+(a bool), and <code>FLAGS_languages</code> (a C++ string).</p>
+
+<p>You can read and write to the flag just like any other
+variable:</p>
+<pre>
+   if (FLAGS_consider_made_up_languages)
+     FLAGS_languages += ",klingon";   // implied by --consider_made_up_languages
+   if (FLAGS_languages.find("finnish") != string::npos)
+     HandleFinnish();
+</pre>
+
+<p>You can also get and set flag values via special functions in
+<code>gflags.h</code>.  That's a rarer use case, though.</p>
+
+
+<h2> <A name=declare>DECLARE: Using the Flag in a Different File</A> </h2>
+
+<p>Accessing a flag in the manner of the previous section only works
+if the flag was <code>DEFINE</code>-ed at the top of the file.  If it
+wasn't, you'll get an 'unknown variable' error.</p>
+
+<p>The <code>DECLARE_type</code> macro is available when you want to
+use a flag that's defined in another file.  For instance, if I were
+writing <code>bar.cc</code> but wanted to access the big_menu, flag, I
+would put this near the top of <code>bar.cc</code>:</p>
+<pre>
+   DECLARE_bool(big_menu);
+</pre>
+
+<p>This is functionally equivalent to saying <code>extern
+FLAGS_big_menu</code>.</p>
+
+<p>Note that such an extern declaration introduces a dependency
+between your file and the file that defines the <code>big_menu</code>
+flag: <code>foo.cc</code>, in this case.  Such implicit dependencies
+can be difficult to manage in large projects.  For that reason we
+recommend the following guideline:</p>
+
+<blockquote>
+If you DEFINE a flag in <code>foo.cc</code>, either don't DECLARE it
+at all, only DECLARE it in tightly related tests, or only DECLARE
+it in <code>foo.h</code>.
+</blockquote>
+
+<p>You should go the do-not-DECLARE route when the flag is only needed
+by <code>foo.cc</code>, and not in any other file. If you want to
+modify the value of the flag in the related test file to see if it is
+functioning as expected, DECLARE it in the <code>foo_test.cc</code>
+file.
+
+<p>If the flag does span multiple files, DECLARE it in the associated
+<code>.h</code> file, and make others <code>#include</code> that
+<code>.h</code> file if they want to access the flag.  The
+<code>#include</code> will make explicit the dependency between the
+two files. This causes the flag to be a global variable.</p>
+
+
+<h2> <A name=validate>RegisterFlagValidator: Sanity-checking Flag Values</A> </h2>
+
+<p>After DEFINE-ing a flag, you may optionally register a validator
+function with the flag.  If you do this, after the flag is parsed from
+the commandline, and whenever its value is changed via a call to
+<code>SetCommandLineOption()</code>, the validator function is called
+with the new value as an argument.  The validator function should
+return 'true' if the flag value is valid, and false otherwise.
+If the function returns false for the new setting of the
+flag, the flag will retain its current value. If it returns false for the
+default value, ParseCommandLineFlags will die.
+
+<p>Here is an example use of this functionality:</p>
+<pre>
+static bool ValidatePort(const char* flagname, int32 value) {
+   if (value > 0 && value < 32768)   // value is ok
+     return true;
+   printf("Invalid value for --%s: %d\n", flagname, (int)value);
+   return false;
+}
+DEFINE_int32(port, 0, "What port to listen on");
+static const bool port_dummy = RegisterFlagValidator(&FLAGS_port, &ValidatePort);
+</pre>
+
+<p>By doing the registration at global initialization time (right
+after the DEFINE), we ensure that the registration happens before
+the commandline is parsed at the beginning of <code>main()</code>.</p>
+
+<p><code>RegisterFlagValidator()</code> returns true if the
+registration is successful.  It return false if the registration fails
+because a) the first argument does not refer to a commandline flag, or
+b) a different validator has already been registered for this flag.</p>
+
+
+<h2> <A name=together>Putting It Together: How to Set Up Flags</A> </h2>
+
+<p>The final piece is the one that tells the executable to process the
+commandline flags, and set the <code>FLAGS_*</code> variables to the
+appropriate, non-default value based on what is seen on the
+commandline.  This is equivalent to the <code>getopt()</code> call in
+the getopt library, but has much less overhead to use.  In fact, it's
+just a single function call:</p>
+
+<pre>
+   google::ParseCommandLineFlags(&argc, &argv, true);
+</pre>
+
+<p>Usually, this code is at the beginning of <code>main()</code>.
+<code>argc</code> and <code>argv</code> are exactly as passed in to
+<code>main()</code>.  This routine might modify them, which is why
+pointers to them are passed in.</p>
+
+<p>The last argument is called "remove_flags".  If true, then
+<code>ParseCommandLineFlags</code> removes the flags and their
+arguments from <code>argv</code>, and modifies <code>argc</code>
+appropriately.  In this case, after the function call,
+<code>argv</code> will hold only commandline arguments, and not
+commandline flags.</p>
+
+<p>If, on the other hand, <code>remove_flags</code> is false, then
+<code>ParseCommandLineFlags</code> will leave argc unchanged, but will
+rearrange the arguments in argv so that the flags are all at the
+beginning.  For example, if the input is <code>"/bin/foo" "arg1" "-q"
+"arg2"</code> (which is legal but weird), the function will rearrange
+<code>argv</code> so it reads <code>"/bin/foo", "-q", "arg1",
+"arg2"</code>.  In this case, <code>ParseCommandLineFlags</code>
+returns the index into argv that holds the first commandline argument:
+that is, the index past the last flag.  (In this example, it would
+return 2, since <code>argv[2]</code> points to <code>arg1</code>.)</p>
+
+<p>In either case, the <code>FLAGS_*</code> variables are modified
+based on what was <A HREF="#commandline">passed in on the
+commandline</A>.</p>
+
+
+<h2> <A name=commandline>Setting Flags on the Command Line</A> </h2>
+
+<p>The reason you make something a flag instead of a compile-time
+constant, is so users can specify a non-default value on the
+commandline.  Here's how they might do it for an application that
+links in <code>foo.cc</code>:</p>
+<pre>
+   app_containing_foo --nobig_menu -languages="chinese,japanese,korean" ...
+</pre>
+
+<p>This sets <code>FLAGS_big_menu = false;</code> and
+<code>FLAGS_languages = "chinese,japanese,korean"</code>, when
+<code>ParseCommandLineFlags</code> is run.</p>
+
+<p>Note the atypical syntax for setting a boolean flag to false:
+putting "no" in front of its name.  There's a fair bit of flexibility
+to how flags may be specified.  Here's an example of all the ways to
+specify the "languages" flag:</p>
+<ul>
+  <li> <code>app_containing_foo --languages="chinese,japanese,korean"</code>
+  <li> <code>app_containing_foo -languages="chinese,japanese,korean"</code>
+  <li> <code>app_containing_foo --languages "chinese,japanese,korean"</code>
+  <li> <code>app_containing_foo -languages "chinese,japanese,korean"</code>
+</ul>
+
+<p>For boolean flags, the possibilities are slightly different:</p>
+<ul>
+  <li> <code>app_containing_foo --big_menu</code>
+  <li> <code>app_containing_foo --nobig_menu</code>
+  <li> <code>app_containing_foo --big_menu=true</code>
+  <li> <code>app_containing_foo --big_menu=false</code>
+</ul>
+<p>(as well as the single-dash variant on all of these).</p>
+
+<p>Despite this flexibility, we recommend using only a single form:
+<code>--variable=value</code> for non-boolean flags, and
+<code>--variable/--novariable</code> for boolean flags.  This
+consistency will make your code more readable, and is also the format
+required for certain special-use cases like <A
+HREF="#flagfiles">flagfiles</A>.</p>
+
+<p>It is a fatal error to specify a flag on the commandline that has
+not been DEFINED somewhere in the executable.  If you need that
+functionality for some reason -- say you want to use the same set of
+flags for several executables, but not all of them DEFINE every flag
+in your list -- you can specify <A
+HREF="#special"><code>--undefok</code></A> to suppress the error.</p>
+
+<p>As in getopt(), <code>--</code> by itself will terminate flags
+processing.  So in <code>foo -f1 1 -- -f2 2</code>, <code>f1</code> is
+considered a flag, but <code>-f2</code> is not.</p>
+
+<p>If a flag is specified more than once, only the last specification
+is used; the others are ignored.</p>
+
+<p>Note that flags do not have single-letter synonyms, like they do in
+the getopt library, nor do we allow "combining" flags behind a
+single dash, as in <code>ls -la</code>.</p>
+
+
+
+<h2> <A name=default>Changing the Default Flag Value</A> </h2>
+
+<p>Sometimes a flag is defined in a library, and you want to change
+its default value in one application but not others.  It's simple to
+do this: just assign a new value to the flag in <code>main()</code>,
+before calling <code>ParseCommandLineFlags()</code>:</p>
+<pre>
+   DECLARE_bool(lib_verbose);   // mylib has a lib_verbose flag, default is false
+   int main(int argc, char** argv) {
+     FLAGS_lib_verbose = true;  // in my app, I want a verbose lib by default
+     ParseCommandLineFlags(...);
+   }
+</pre>
+
+<p>For this application, users can still set the flag value on the
+commandline, but if they do not, the flag's value will default to
+true.</p>
+
+
+<h2> <A name="special">Special Flags</a> </h2>
+
+<p>There are a few flags defined by the commandlineflags module
+itself, and are available to all applications that use
+commandlineflags.  These fall into
+three categories.  First are the 'reporting' flags that, when found, cause
+the application to print some information about itself and exit.</p>
+
+<table><tr valign=top>
+  <td><code>--help</code></td>
+  <td>shows all flags from all files, sorted by file and then by name;
+      shows the flagname, its default value, and its help string</td>
+</tr><tr valign=top>
+  <td><code>--helpfull</code></td>
+  <td>same as -help, but unambiguously asks for all flags
+     (in case -help changes in the future)</td>
+</tr><tr valign=top>
+  <td><code>--helpshort</code></td>
+  <td>shows only flags for the file with the same name as the executable 
+      (usually the one containing <code>main()</code>)</td>
+</tr><tr valign=top>
+  <td><code>--helpxml</code></td>
+  <td>like --help, but output is in xml for easier parsing</td>
+</tr><tr valign=top>
+  <td><code>--helpon=FILE &nbsp;</code></td>
+  <td>shows only flags defined in FILE.*</td>
+</tr><tr valign=top>
+  <td><code>--helpmatch=S</code></td>
+  <td>shows only flags defined in *S*.*</td>
+</tr><tr valign=top>
+  <td><code>--helppackage</code></td>
+  <td>shows flags defined in files in same directory as <code>main()</code></td>
+</tr><tr valign=top>
+  <td><code>--version</code></td>
+  <td>prints version info for the executable</td>
+</tr></table>
+
+<p>Second are the flags that affect how other flags are parsed.</p>
+
+<table><tr valign=top>
+  <td><code>--undefok=flagname,flagname,...</code></td>
+  <td>for those names listed as the argument to <code>--undefok</code>,
+      suppress the normal error-exit that occurs when
+      <code>--name</code> is seen on the commandline, but
+      <code>name</code> has not been DEFINED anywhere in the
+      application
+</table>
+
+<p>Third are the 'recursive' flags, that cause other flag values to be
+set: <code>--fromenv</code>, <code>--tryfromenv</code>,
+<code>--flagfile</code>.  These are described below in more
+detail.</p>
+
+<h3> <code>--fromenv</code> </h3>
+
+<p><code>--fromenv=foo,bar</code> says to read the values for the
+<code>foo</code> and <code>bar</code> flags from the environment.
+In concert with this flag, you must actually set the values in the
+environment, via a line like one of the two below:</p>
+<pre>
+   export FLAGS_foo=xxx; export FLAGS_bar=yyy   # sh
+   setenv FLAGS_foo xxx; setenv FLAGS_bar yyy   # tcsh
+</pre>
+<p>This is equivalent to specifying <code>--foo=xxx</code>,
+<code>--bar=yyy</code> on the commandline.</p>
+
+<p>Note it is a fatal error to say <code>--fromenv=foo</code> if
+<code>foo</code> is not DEFINED somewhere in the application.  (Though
+you can suppress this error via <code>--undefok=foo</code>, just like
+for any other flag.)</p>
+
+<p>It is also a fatal error to say <code>--fromenv=foo</code> if
+<code>FLAGS_foo</code> is not actually defined in the environment.</p>
+
+<h3> <code>--tryfromenv</code> </h3>
+
+<p><code>--tryfromenv</code> is exactly like <code>--fromenv</code>,
+except it is <b>not</b> a fatal error to say
+<code>--tryfromenv=foo</code> if <code>FLAGS_foo</code> is not
+actually defined in the environment.  Instead, in such cases,
+<code>FLAGS_foo</code> just keeps its default value as specified in
+the application.</p>
+
+<p>Note it is still an error to say <code>--tryfromenv=foo</code> if
+<code>foo</code> is not DEFINED somewhere in the application.</p>
+
+<h3> <code>--flagfile</code> </h3>
+
+<p><code>--flagfile=f</code> tells the commandlineflags module to read
+the file <code>f</code>, and to run all the flag-assignments found in
+that file as if these flags had been specified on the commandline.</p>
+
+<p>In its simplest form, <code>f</code> should just be a list of flag
+assignments, one per line.  Unlike on the commandline, the equals sign
+separating a flagname from its argument is <i>required</i> for
+flagfiles.  An example flagfile, <code>/tmp/myflags</code>:</p>
+<pre>
+--nobig_menus
+--languages=english,french
+</pre>
+
+<p>With this flagfile, the following two lines are equivalent:<p>
+<pre>
+   ./myapp --foo --nobig_menus --languages=english,french --bar
+   ./myapp --foo --flagfile=/tmp/myflags --bar
+</pre>
+
+<p>Note that many errors are silently suppressed in flagfiles.  In
+particular, unrecognized flagnames are silently ignored, as are flags
+that are missing a required value (e.g., a flagfile that just says
+<code>--languages</code>).</p>
+
+<p>The general format of a flagfile is a bit more complicated than the
+simple, common case above.  It is: a sequence of filenames, one per
+line, followed by a sequence of flags, one per line, repeated as many
+times as desired.  Filenames in a flagfile can use wildcards
+(<code>*</code> and <code>?</code>), and the sequence of flags located
+after a sequence of filenames is processed only if the current
+executable's name matches one of the filenames.  It is possible to
+start the flagfile with a sequence of flags instead of a sequence of
+filenames; if such a sequence of flags is present, these flags are
+applied to the current executable no matter what it is.</p>
+
+<p>Lines that start with a <code>#</code> are ignored as comments.
+Leading whitespace is also ignored in flagfiles, as are blank
+lines.</p>
+
+<p>It is possible for a flagfile to use the <code>--flagfile</code>
+flag to include another flagfile.</p>
+
+<p>Flags are always processed in the expected order.  That is,
+processing begins by examining the flags specified directly on the
+command line.  If a flagfile is specified, its contents are processed,
+and then processing continues with remaining flags from the command
+line.</p>
+
+
+<h2> <A name="api">The API</a> </h2>
+
+<p>In addition to accessing <code>FLAGS_foo</code> directly, it is
+possible to access the flags programmatically, through an API.  It is
+also possible to access information about a flag, such as its default
+value and help-string.  A <code>FlagSaver</code> makes it easy to
+modify flags and then automatically undo the modifications later.
+Finally, there are somewhat unrelated, but useful, routines to easily
+access parts of <code>argv</code> outside main, including the program
+name (<code>argv[0]</code>).</p>
+
+<p>For more information about these routines, and other useful helper
+methods such as <code>google::SetUsageMessage()</code> and
+<code>google::SetVersionString</code>, see <code>gflags.h</code>.</p>
+
+
+<h2> <A name="misc">Miscellaneous Notes</code> </h2>
+
+<p>If your application has code like this:</p>
+<pre>
+   #define STRIP_FLAG_HELP 1    // this must go before the #include!
+   #include &lt;gflags/gflags.h&gt;
+</pre>
+<p>we will remove the help messages from the compiled source. This can
+reduce the size of the resulting binary somewhat, and may also be
+useful for security reasons.</p>
+
+
+<hr>
+<address>
+Craig Silverstein<br>
+<script type=text/javascript>
+  var lm = new Date(document.lastModified);
+  document.write(lm.toDateString());
+</script>
+</address>
+
+</body>
+</html>

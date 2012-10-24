@@ -1,0 +1,9 @@
+This repository contains a C++ of the Google commandline flags module.
+Documentation for the C++ implementation is in doc/. The python version of
+gflags is now shipped seperately as it is completely independent of this
+module.
+
+See INSTALL for (generic) installation instructions for C++: basically
+   ./configure && make && make install
+
+See README_windows.txt for instructions on using under windows.

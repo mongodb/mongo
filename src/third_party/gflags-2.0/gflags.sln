@@ -1,0 +1,32 @@
+Microsoft Visual Studio Solution File, Format Version 8.00
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "libgflags", "vsprojects\libgflags\libgflags.vcproj", "{FB27FBDB-E6C0-4D00-A7F8-1EEEF1B48ABC}"
+	ProjectSection(ProjectDependencies) = postProject
+	EndProjectSection
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "gflags_unittest", "vsprojects\gflags_unittest\gflags_unittest.vcproj", "{4B263748-5F0F-468C-8C5C-ED2682BB6BE3}"
+	ProjectSection(ProjectDependencies) = postProject
+		{FB27FBDB-E6C0-4D00-A7F8-1EEEF1B48ABC} = {FB27FBDB-E6C0-4D00-A7F8-1EEEF1B48ABC}
+	EndProjectSection
+EndProject
+Global
+	GlobalSection(SolutionConfiguration) = preSolution
+		Debug = Debug
+		Release = Release
+	EndGlobalSection
+	GlobalSection(ProjectDependencies) = postSolution
+	EndGlobalSection
+	GlobalSection(ProjectConfiguration) = postSolution
+		{FB27FBDB-E6C0-4D00-A7F8-1EEEF1B48ABC}.Debug.ActiveCfg = Debug|Win32
+		{FB27FBDB-E6C0-4D00-A7F8-1EEEF1B48ABC}.Debug.Build.0 = Debug|Win32
+		{FB27FBDB-E6C0-4D00-A7F8-1EEEF1B48ABC}.Release.ActiveCfg = Release|Win32
+		{FB27FBDB-E6C0-4D00-A7F8-1EEEF1B48ABC}.Release.Build.0 = Release|Win32
+		{4B263748-5F0F-468C-8C5C-ED2682BB6BE3}.Debug.ActiveCfg = Debug|Win32
+		{4B263748-5F0F-468C-8C5C-ED2682BB6BE3}.Debug.Build.0 = Debug|Win32
+		{4B263748-5F0F-468C-8C5C-ED2682BB6BE3}.Release.ActiveCfg = Release|Win32
+		{4B263748-5F0F-468C-8C5C-ED2682BB6BE3}.Release.Build.0 = Release|Win32
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+	EndGlobalSection
+	GlobalSection(ExtensibilityAddIns) = postSolution
+	EndGlobalSection
+EndGlobal

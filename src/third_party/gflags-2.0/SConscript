@@ -1,0 +1,16 @@
+# -*- mode: python -*-
+
+Import("env windows linux darwin solaris")
+
+env = env.Clone()
+
+# Sigh.  "config.h" is a very popular include and we want ours to be
+# the one used.
+env.Append(CCFLAGS=['-Isrc/third_party/gflags-2.0/src'])
+
+env.StaticLibrary(
+    "gflags",
+    [ "src/gflags.cc",
+      #"src/gflags_completions.cc",
+      #"src/gflags_reporting.cc",
+    ])
