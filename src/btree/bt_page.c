@@ -515,6 +515,14 @@ __inmem_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *inmem_sizep)
 		}
 	}
 
+	/*
+	 * We use the fact that cells exactly fill a page to detect the case of
+	 * a row-store leaf page where the last cell is a key (that is, there's
+	 * no subsequent value cell).  Assert that to be true, the bug would be
+	 * difficult to find/diagnose in the field.
+	 */
+	WT_ASSERT(session, cell == (WT_CELL *)((uint8_t *)dsk + dsk->size));
+
 	WT_RET((__wt_calloc_def(session, (size_t)nindx, &page->u.row.d)));
 	if (inmem_sizep != NULL)
 		*inmem_sizep += nindx * sizeof(*page->u.row.d);

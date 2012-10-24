@@ -1191,33 +1191,11 @@ static int
 __rec_split_write(WT_SESSION_IMPL *session,
     WT_RECONCILE *r, WT_BOUNDARY *bnd, WT_ITEM *buf, int checkpoint)
 {
-	WT_CELL *cell;
 	WT_PAGE_HEADER *dsk;
 	uint32_t size;
 	uint8_t addr[WT_BTREE_MAX_ADDR_COOKIE];
 
 	dsk = buf->mem;
-
-	/*
-	 * We always write an additional byte on row-store leaf pages after the
-	 * key value pairs.  The reason is that zero-length value items are not
-	 * written on the page and they're detected by finding two adjacent key
-	 * cells.  If the last value item on a page is zero length, we need a
-	 * key cell after it on the page to detect it.  The row-store leaf page
-	 * reconciliation code made sure we had a spare byte in the buffer, now
-	 * write a trailing zero-length key cell.  This isn't a valid key cell,
-	 * but since it's not referenced by the entries on the page, no code but
-	 * the code reading after the key cell, to find the key value, will ever
-	 * see it.
-	 */
-#define	WT_TRAILING_KEY_CELL	(sizeof(uint8_t))
-	if (dsk->type == WT_PAGE_ROW_LEAF) {
-		WT_ASSERT_RET(session, buf->size < buf->memsize);
-
-		cell = (WT_CELL *)&(((uint8_t *)buf->data)[buf->size]);
-		__wt_cell_pack_key_empty(cell);
-		++buf->size;
-	}
 
 	/*
 	 * Write the chunk and save the location information.  There is one big
@@ -1441,11 +1419,8 @@ __wt_rec_row_bulk_insert(WT_CURSOR_BULK *cbulk)
 
 	/*
 	 * Boundary, split or write the page.
-	 *
-	 * We write a trailing key cell on the page after the K/V pairs
-	 * (see WT_TRAILING_KEY_CELL for more information).
 	 */
-	while (key->len + val->len + WT_TRAILING_KEY_CELL > r->space_avail) {
+	while (key->len + val->len > r->space_avail) {
 		/* Split the page. */
 		WT_RET(__rec_split(session, r));
 
@@ -2999,12 +2974,8 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 
 		/*
 		 * Boundary, split or write the page.
-		 *
-		 * We write a trailing key cell on the page after the K/V pairs
-		 * (see WT_TRAILING_KEY_CELL for more information).
 		 */
-		while (key->len +
-		    val->len + WT_TRAILING_KEY_CELL > r->space_avail) {
+		while (key->len + val->len > r->space_avail) {
 			/*
 			 * In one path above, we copied the key from the page
 			 * rather than building the actual key.  In that case,
@@ -3086,12 +3057,8 @@ __rec_row_leaf_insert(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins)
 
 		/*
 		 * Boundary, split or write the page.
-		 *
-		 * We write a trailing key cell on the page after the K/V pairs
-		 * (see WT_TRAILING_KEY_CELL for more information).
 		 */
-		while (key->len +
-		    val->len + WT_TRAILING_KEY_CELL > r->space_avail) {
+		while (key->len + val->len > r->space_avail) {
 			WT_RET(__rec_split(session, r));
 
 			/*

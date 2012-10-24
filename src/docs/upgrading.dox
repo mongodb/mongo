@@ -1,5 +1,16 @@
 /*! @page upgrading Upgrading WiredTiger applications
 
+@section version_135 Upgrading to Version 1.3.5
+<dl>
+
+<dt>Version 1.3.5 file format changes</dt>
+<dd>
+The underlying file formats changed in the 1.3.5 release; tables and files
+should be dumped and re-loaded into a new database.
+</dd>
+
+</dl>
+<hr>
 @section version_13 Upgrading to Version 1.3
 
 <dl>

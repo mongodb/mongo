@@ -342,16 +342,17 @@ WT_CELL *
 __wt_row_value(WT_PAGE *page, WT_ROW *rip)
 {
 	WT_CELL *cell;
+	WT_CELL_UNPACK unpack;
 	u_int type;
 
 	cell = WT_ROW_KEY_COPY(rip);
 	/*
 	 * Key copied.
 	 *
-	 * Now, cell either references a WT_IKEY structure that has a value-cell
-	 * offset, or references the on-page key WT_CELL, and we can walk past
-	 * that to find the value WT_CELL.  Both can be processed regardless of
-	 * what other threads are doing.
+	 * Cell now either references a WT_IKEY structure with a cell offset,
+	 * or references the on-page key WT_CELL.  Both can be processed
+	 * regardless of what other threads are doing.  If it's the former,
+	 * use it to get the latter.
 	 */
 	if (__wt_off_page(page, cell))
 		cell = WT_PAGE_REF_OFFSET(page, ((WT_IKEY *)cell)->cell_offset);
@@ -359,10 +360,19 @@ __wt_row_value(WT_PAGE *page, WT_ROW *rip)
 	/*
 	 * Row-store leaf pages may have a single data cell between each key, or
 	 * keys may be adjacent (when the data cell is empty).  Move to the next
-	 * key.  The page reconciliation code guarantees there is always a key
-	 * cell after an empty data cell, so this is safe.
+	 * cell and check its type.
+	 *
+	 * One special case: if the last key on a page is a key without a value,
+	 * don't walk off the end of the page: the size of the underlying disk
+	 * image is exact, which means the end of the last cell on the page plus
+	 * the length of the cell should be the byte immediately after the page
+	 * disk image.
 	 */
-	cell = __wt_cell_next(cell);
+	__wt_cell_unpack(cell, &unpack);
+	cell = (WT_CELL *)((uint8_t *)cell + __wt_cell_total_len(&unpack));
+	if (__wt_off_page(page, cell))
+		return (NULL);
+
 	type = __wt_cell_type(cell);
 	return (type == WT_CELL_KEY || type == WT_CELL_KEY_OVFL ? NULL : cell);
 }
