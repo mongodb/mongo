@@ -232,18 +232,16 @@ connection_runtime_config = [
 		name of a cache pool that is shared between databases'''),
 	Config('cache_pool_size', '', r'''
 		size of a cache pool that is shared between databases. Only valid if
-		the cache_pool option is also specified. Only valid in the first
-		connection that uses the cache pool''',
+		the cache_pool option is also specified. Must be specified if this
+		connection may create the cache pool''',
 		min='1MB', max='10TB'),
 	Config('cache_pool_chunk', '', r'''
 		the granularity that a cache pool is shared out. Only valid if the
-		cache_pool option is also specified. Only valid in the first connection
-		that uses the cache pool''',
+		cache_pool option is also specified.''',
 		min='1MB', max='10TB'),
 	Config('cache_pool_quota', '', r'''
 		the maximum amount of the cache pool a single database can use. Only
-		valid if the cache_pool option is also specified. Only valid in the
-		first connection that uses the cache pool''',
+		valid if the cache_pool option is also specified.''',
 		min='1MB', max='10TB'),
 	Config('cache_size', '100MB', r'''
 		maximum heap memory to allocate for the cache''',

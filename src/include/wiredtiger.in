@@ -994,16 +994,14 @@ struct __wt_connection {
 	 * @config{cache_pool, name of a cache pool that is shared between
 	 * databases.,a string; default empty.}
 	 * @config{cache_pool_chunk, the granularity that a cache pool is shared
-	 * out. Only valid if the cache_pool option is also specified. Only
-	 * valid in the first connection that uses the cache pool.,an integer
-	 * between 1MB and 10TB; default \c .}
+	 * out. Only valid if the cache_pool option is also specified..,an
+	 * integer between 1MB and 10TB; default \c .}
 	 * @config{cache_pool_quota, the maximum amount of the cache pool a
 	 * single database can use. Only valid if the cache_pool option is also
-	 * specified. Only valid in the first connection that uses the cache
-	 * pool.,an integer between 1MB and 10TB; default \c .}
+	 * specified..,an integer between 1MB and 10TB; default \c .}
 	 * @config{cache_pool_size, size of a cache pool that is shared between
 	 * databases. Only valid if the cache_pool option is also specified.
-	 * Only valid in the first connection that uses the cache pool.,an
+	 * Must be specified if this connection may create the cache pool.,an
 	 * integer between 1MB and 10TB; default \c .}
 	 * @config{cache_size, maximum heap memory to allocate for the cache.,an
 	 * integer between 1MB and 10TB; default \c 100MB.}
@@ -1180,17 +1178,15 @@ struct __wt_connection {
  * @config{cache_pool, name of a cache pool that is shared between databases.,a
  * string; default empty.}
  * @config{cache_pool_chunk, the granularity that a cache pool is shared out.
- * Only valid if the cache_pool option is also specified. Only valid in the
- * first connection that uses the cache pool.,an integer between 1MB and 10TB;
- * default \c .}
- * @config{cache_pool_quota, the maximum amount of the cache pool a single
- * database can use. Only valid if the cache_pool option is also specified. Only
- * valid in the first connection that uses the cache pool.,an integer between
+ * Only valid if the cache_pool option is also specified..,an integer between
  * 1MB and 10TB; default \c .}
+ * @config{cache_pool_quota, the maximum amount of the cache pool a single
+ * database can use. Only valid if the cache_pool option is also specified..,an
+ * integer between 1MB and 10TB; default \c .}
  * @config{cache_pool_size, size of a cache pool that is shared between
- * databases. Only valid if the cache_pool option is also specified. Only valid
- * in the first connection that uses the cache pool.,an integer between 1MB and
- * 10TB; default \c .}
+ * databases. Only valid if the cache_pool option is also specified. Must be
+ * specified if this connection may create the cache pool.,an integer between
+ * 1MB and 10TB; default \c .}
  * @config{cache_size, maximum heap memory to allocate for the cache.,an integer
  * between 1MB and 10TB; default \c 100MB.}
  * @config{create, create the database if it does not exist.,a boolean flag;

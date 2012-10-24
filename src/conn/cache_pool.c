@@ -20,32 +20,40 @@ __wt_conn_cache_pool_config(WT_SESSION_IMPL *session, const char **cfg)
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	char *pool_name;
-	int created, create_server;
+	int created, create_server, pool_locked, process_locked;
 
 	conn = S2C(session);
-	created = 0;
+	created = pool_locked = process_locked = 0;
 
 	WT_ERR(__wt_config_gets(session, cfg, "cache_pool", &cval));
 	if (cval.len <= 0)
 		return (0);
 
 	WT_ERR(__wt_strndup(session, cval.str, cval.len, &pool_name));
-	WT_ERR(__wt_config_gets(session, cfg, "cache_pool_size", &cval));
-	if (cval.len > 0) {
-		/*
-		 * Check to ensure we can create the pool. If someone
-		 * beat us to creating it, return an error.
-		 */
+	__wt_spin_lock(conn->default_session, &__wt_process.spinlock);
+	process_locked = 1;
+	if (__wt_process.cache_pool == NULL) {
+		/* Create a cache pool. */
+		WT_ERR(__wt_config_gets(
+		    session, cfg, "cache_pool_size", &cval));
+		if (cval.len <= 0) {
+			__wt_spin_unlock(
+			    conn->default_session, &__wt_process.spinlock);
+			WT_ERR_MSG(session, WT_ERROR,
+			    "Attempting to join a cache pool that does not "
+			    "exist: %s. Must specify a pool size if creating.",
+			    pool_name);
+		}
 		WT_ERR(__wt_calloc(
 		    conn->default_session, sizeof(WT_CACHE_POOL), 1, &cp));
+		cp->size = cval.val;
 		cp->name = pool_name;
 		TAILQ_INIT(&cp->cache_pool_qh);
 		__wt_spin_init(conn->default_session, &cp->cache_pool_lock);
 		WT_ERR(__wt_cond_alloc(conn->default_session,
-		    "cache pool server", 1, &cp->cache_pool_cond));
+		    "cache pool server", 0, &cp->cache_pool_cond));
 		created = 1;
 
-		cp->size = cval.val;
 		WT_ERR(__wt_config_gets(
 		    session, cfg, "cache_pool_chunk", &cval));
 		if (cval.len > 0)
@@ -60,50 +68,43 @@ __wt_conn_cache_pool_config(WT_SESSION_IMPL *session, const char **cfg)
 		else
 			cp->quota = cp->size / 2;
 
-		/* Setup the cache pool in the WT_PROCESS handle. */
-		__wt_spin_lock(conn->default_session, &__wt_process.spinlock);
-		if (__wt_process.cache_pool != NULL) {
-			__wt_spin_unlock(
-			    conn->default_session, &__wt_process.spinlock);
-			WT_ERR_MSG(session, WT_ERROR,
-			    "Attempting to create cache pool when one "
-			    "already exists");
-		}
 		__wt_process.cache_pool = cp;
-		pool_name = NULL; /* It belongs to the cache pool now. */
-		/* Trade down to the pool lock. */
-		__wt_spin_lock(conn->default_session, &cp->cache_pool_lock);
-		__wt_spin_unlock(conn->default_session, &__wt_process.spinlock);
-	} else {
-		/* Validate the existing pool */
-		__wt_spin_lock(conn->default_session, &__wt_process.spinlock);
-		if (__wt_process.cache_pool == NULL ||
-		    !WT_STRING_MATCH(__wt_process.cache_pool->name,
-		    pool_name, strlen(pool_name))) {
-			__wt_spin_unlock(
-			    conn->default_session, &__wt_process.spinlock);
-			WT_ERR_MSG(session, WT_ERROR,
-			    "Attempting to join a cache pool that does not "
-			    "exist: %s", pool_name);
-		}
-		/* Trade down to the pool lock. */
+		pool_name = NULL; /* Belongs to the cache pool now. */
+		WT_VERBOSE_VOID(session, cache_pool,
+		    "Created cache pool %s. Size: %" PRIu64
+		    ", chunk size: %" PRIu64 ", quota: %" PRIu64,
+		    cp->name, cp->size, cp->chunk, cp->quota);
+	} else if (!WT_STRING_MATCH(
+	    __wt_process.cache_pool->name,
+	    pool_name, strlen(pool_name)))
+		WT_ERR_MSG(session, WT_ERROR,
+		    "Attempting to join a cache pool that does not "
+		    "exist: %s", pool_name);
+	else
 		cp = __wt_process.cache_pool;
-		__wt_spin_lock(conn->default_session, &cp->cache_pool_lock);
-		__wt_spin_unlock(conn->default_session, &__wt_process.spinlock);
-	}
+
+	/* Trade down to the pool lock. */
+	__wt_spin_lock(conn->default_session, &cp->cache_pool_lock);
+	pool_locked = 1;
+	__wt_spin_unlock(conn->default_session, &__wt_process.spinlock);
+	process_locked = 0;
 	/* Add this connection into the cache pool connection queue. */
 	WT_ERR(__wt_calloc(
 	    conn->default_session, sizeof(WT_CACHE_POOL_ENTRY), 1, &entry));
 	entry->conn = conn;
 	entry->active = 1;
+
 	/*
-	 * Figure this out while holding the lock, but don't start the thread
-	 * until we have released the lock.
+	 * Figure out if a manager thread is needed while holding the lock.
+	 * Don't start the thread until we have released the lock.
 	 */
 	create_server = TAILQ_EMPTY(&cp->cache_pool_qh);
 	TAILQ_INSERT_TAIL(&cp->cache_pool_qh, entry, q);
 	F_SET(conn, WT_CONN_CACHE_POOL);
 	__wt_spin_unlock(conn->default_session, &cp->cache_pool_lock);
+	pool_locked = 0;
+	WT_VERBOSE_VOID(session, cache_pool,
+	    "Added %s to cache pool %s.", entry->conn->home, cp->name);
 
 	/* Start the cache pool server if required. */
 	if (create_server) {
@@ -114,7 +115,12 @@ __wt_conn_cache_pool_config(WT_SESSION_IMPL *session, const char **cfg)
 	/* Wake up the cache pool server to get our initial chunk. */
 	__wt_cond_signal(conn->default_session, cp->cache_pool_cond);
 
-err:	__wt_free(conn->default_session, pool_name);
+err:	if (process_locked)
+		__wt_spin_unlock(
+		    conn->default_session, &__wt_process.spinlock);
+	if (pool_locked)
+		__wt_spin_unlock(conn->default_session, &cp->cache_pool_lock);
+	__wt_free(conn->default_session, pool_name);
 	if (ret != 0 && created)
 		__wt_free(conn->default_session, cp);
 	return (0);
@@ -122,13 +128,15 @@ err:	__wt_free(conn->default_session, pool_name);
 
 /*
  * __wt_conn_cache_pool_destroy --
- *	Remove our resources from the shared cache pool
+ *	Remove our resources from the shared cache pool. Remove the cache pool
+ *	if we were the last connection.
  */
 int
 __wt_conn_cache_pool_destroy(WT_CONNECTION_IMPL *conn)
 {
 	WT_CACHE_POOL *cp;
 	WT_CACHE_POOL_ENTRY *entry;
+	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 	int found;
 
@@ -138,39 +146,61 @@ __wt_conn_cache_pool_destroy(WT_CONNECTION_IMPL *conn)
 	if (!F_ISSET(conn, WT_CONN_CACHE_POOL))
 		return (0);
 
+	__wt_spin_lock(session, &__wt_process.cache_pool->cache_pool_lock);
 	cp = __wt_process.cache_pool;
-	__wt_spin_lock(session, &cp->cache_pool_lock);
 	TAILQ_FOREACH(entry, &cp->cache_pool_qh, q)
 		if (entry->conn == conn) {
 			found = 1;
 			break;
 		}
-	if (found) {
+
+	if (!found)
+		WT_RET_MSG(session, WT_ERROR,
+		    "Failed to find connection in shared cache pool.");
+	else {
+		WT_VERBOSE_VOID(session, cache_pool,
+		    "Removing %s from cache pool.", entry->conn->home);
 		TAILQ_REMOVE(&cp->cache_pool_qh, entry, q);
 		/* Give the connections resources back to the pool. */
 		WT_ASSERT(session, cp->currently_used >= conn->cache_size);
 		cp->currently_used -= conn->cache_size;
 		__wt_free(session, entry);
 	}
-	/*
-	 * TODO: Should the last connection free the cache pool? If so it
-	 * will need to get the process lock first.
-	 */
-
 	if (TAILQ_EMPTY(&cp->cache_pool_qh))
 		F_CLR(cp, WT_CACHE_POOL_RUN);
 
 	__wt_spin_unlock(session, &cp->cache_pool_lock);
-	if (!found)
-		WT_RET_MSG(session, WT_ERROR,
-		    "Failed to find connection in shared cache pool.");
+	if (!F_ISSET(cp, WT_CACHE_POOL_RUN)) {
+		__wt_spin_lock(session, &__wt_process.spinlock);
+		cp = __wt_process.cache_pool;
+		if (!TAILQ_EMPTY(&cp->cache_pool_qh)) {
+			/* Someone came in after the pool lock was released. */
+			__wt_spin_unlock(session, &__wt_process.spinlock);
+			return (0);
+		}
+		WT_VERBOSE_VOID(session, cache_pool, "Destroying cache pool.");
+		/*
+		 * Get the pool lock out of paranoia there should not be
+		 * any connections accessing the contents.
+		 */
+		__wt_spin_lock(session, &cp->cache_pool_lock);
+		__wt_process.cache_pool = NULL;
+		__wt_spin_unlock(session, &__wt_process.spinlock);
+		__wt_spin_unlock(session, &cp->cache_pool_lock);
 
-	return (0);
+		/* Now free the pool. */
+		__wt_free(session, cp->name);
+		__wt_spin_destroy(session, &cp->cache_pool_lock);
+		ret = __wt_cond_destroy(session, cp->cache_pool_cond);
+		__wt_free(session, cp);
+	}
+
+	return (ret);
 }
 
 /*
  * __wt_cache_pool_server --
- *	Thread to manage cache pool amongst connections.
+ *	Thread to manage cache pool among connections.
  */
 void *
 __wt_cache_pool_server(void *arg)
@@ -184,8 +214,8 @@ __wt_cache_pool_server(void *arg)
 	cp = __wt_process.cache_pool;
 
 	/*
-	 * TODO: Use a dummy session handle for calls to Wired Tiger functions
-	 * so that error handling works as expected.
+	 * TODO: Figure out what the best session handle to use is, so that
+	 * error reporting is reasonably handled.
 	 */
 	while (F_SET(cp, WT_CACHE_POOL_RUN)) {
 		__wt_cond_wait(NULL, cp->cache_pool_cond, 1000000);
