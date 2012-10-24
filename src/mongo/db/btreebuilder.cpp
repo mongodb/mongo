@@ -134,12 +134,12 @@ namespace mongo {
                     x->parent = upLoc;
                 }
                 else {
-		  if ( !x->nextChild.isNull() ) {
-		    DiskLoc ll = x->nextChild;
-		    ll.btreemod<V>()->parent = upLoc;
-		    //(x->nextChild.btreemod<V>())->parent = upLoc;
-		  }
-		  x->deallocBucket( xloc, idx );
+                    if ( !x->nextChild.isNull() ) {
+                        DiskLoc ll = x->nextChild;
+                        ll.btreemod<V>()->parent = upLoc;
+                        //(x->nextChild.btreemod<V>())->parent = upLoc;
+                    }
+                    x->deallocBucket( xloc, idx );
                 }
                 xloc = nextLoc;
             }
