@@ -110,7 +110,7 @@ namespace mongo {
         Stats::S * Stats::other() {
             return curr == &_a ? &_b : &_a;
         }
-                        string _CSVHeader();
+        string _CSVHeader();
 
         string Stats::S::_CSVHeader() { 
             return "cmts  jrnMB\twrDFMB\tcIWLk\tearly\tprpLgB  wrToJ\twrToDF\trmpPrVw";
@@ -311,12 +311,12 @@ namespace mongo {
 
         /** we may need to commit earlier than normal if data are being written at 
             very high rates. 
-        
+
             note you can call this unlocked, and that is a good idea as if you are in 
             say, a 'w' lock state, we can't do the commit
 
-	        @param force force a commit now even if seemingly not needed - ie the caller may 
- 	           know something we don't such as that files will be closed
+            @param force force a commit now even if seemingly not needed - ie the caller may 
+            know something we don't such as that files will be closed
 
             perf note: this function is called a lot, on every lock_w() ... and usually returns right away
         */
