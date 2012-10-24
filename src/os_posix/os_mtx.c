@@ -79,10 +79,6 @@ __wt_cond_wait(WT_SESSION_IMPL *session, WT_CONDVAR *cond, long usecs)
 			}
 			ret = pthread_cond_timedwait(
 			    &cond->cond, &cond->mtx, &ts);
-			if (ret == ETIMEDOUT) {
-				ret = 0;
-				break;
-			}
 		} else
 			ret = pthread_cond_wait(&cond->cond, &cond->mtx);
 
