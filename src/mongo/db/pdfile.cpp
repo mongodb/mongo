@@ -707,101 +707,101 @@ namespace mongo {
         return emptyLoc;
     }
 
-        bool Extent::validates(const DiskLoc diskLoc, BSONArrayBuilder* errors) {
-            bool extentOk = true;
-            if (magic != extentSignature) {
-                if (errors) {
-                    StringBuilder sb;
-                    sb << "bad extent signature " << toHex(&magic, 4)
-                       << " in extent " << diskLoc.toString();
-                    *errors << sb.str();
-                }
-                extentOk = false;
+    bool Extent::validates(const DiskLoc diskLoc, BSONArrayBuilder* errors) {
+        bool extentOk = true;
+        if (magic != extentSignature) {
+            if (errors) {
+                StringBuilder sb;
+                sb << "bad extent signature " << toHex(&magic, 4)
+                    << " in extent " << diskLoc.toString();
+                *errors << sb.str();
             }
-            if (myLoc != diskLoc) {
-                if (errors) {
-                    StringBuilder sb;
-                    sb << "extent " << diskLoc.toString()
-                       << " self-pointer is " << myLoc.toString();
-                    *errors << sb.str();
-                }
-                extentOk = false;
+            extentOk = false;
+        }
+        if (myLoc != diskLoc) {
+            if (errors) {
+                StringBuilder sb;
+                sb << "extent " << diskLoc.toString()
+                    << " self-pointer is " << myLoc.toString();
+                *errors << sb.str();
             }
-            if (firstRecord.isNull() != lastRecord.isNull()) {
-                if (errors) {
-                    StringBuilder sb;
-                    if (firstRecord.isNull()) {
-                        sb << "in extent " << diskLoc.toString()
-                           << ", firstRecord is null but lastRecord is "
-                           << lastRecord.toString();
-                    }
-                    else {
-                        sb << "in extent " << diskLoc.toString()
-                           << ", firstRecord is " << firstRecord.toString()
-                           << " but lastRecord is null";
-                    }
-                    *errors << sb.str();
+            extentOk = false;
+        }
+        if (firstRecord.isNull() != lastRecord.isNull()) {
+            if (errors) {
+                StringBuilder sb;
+                if (firstRecord.isNull()) {
+                    sb << "in extent " << diskLoc.toString()
+                        << ", firstRecord is null but lastRecord is "
+                        << lastRecord.toString();
                 }
-                extentOk = false;
-            }
-            if (length < minSize()) {
-                if (errors) {
-                    StringBuilder sb;
-                    sb << "length of extent " << diskLoc.toString()
-                       << " is " << length
-                       << ", which is less than minimum length of " << minSize();
-                    *errors << sb.str();
+                else {
+                    sb << "in extent " << diskLoc.toString()
+                        << ", firstRecord is " << firstRecord.toString()
+                        << " but lastRecord is null";
                 }
-                extentOk = false;
+                *errors << sb.str();
             }
-            return extentOk;
+            extentOk = false;
+        }
+        if (length < minSize()) {
+            if (errors) {
+                StringBuilder sb;
+                sb << "length of extent " << diskLoc.toString()
+                    << " is " << length
+                    << ", which is less than minimum length of " << minSize();
+                *errors << sb.str();
+            }
+            extentOk = false;
+        }
+        return extentOk;
+    }
+
+/*
+    Record* Extent::newRecord(int len) {
+        if( firstEmptyRegion.isNull() )8
+            return 0;
+
+        verify(len > 0);
+        int newRecSize = len + Record::HeaderSize;
+        DiskLoc newRecordLoc = firstEmptyRegion;
+        Record *r = getRecord(newRecordLoc);
+        int left = r->netLength() - len;
+        if( left < 0 ) {
+            //
+            firstEmptyRegion.Null();
+            return 0;
         }
 
-    /*
-      Record* Extent::newRecord(int len) {
-      if( firstEmptyRegion.isNull() )8
-      return 0;
+        DiskLoc nextEmpty = r->next.getNextEmpty(firstEmptyRegion);
+        r->lengthWithHeaders = newRecSize;
+        r->next.markAsFirstOrLastInExtent(this); // we're now last in the extent
+        if( !lastRecord.isNull() ) {
+            verify(getRecord(lastRecord)->next.lastInExtent()); // it was the last one
+            getRecord(lastRecord)->next.set(newRecordLoc); // until now
+            r->prev.set(lastRecord);
+        }
+        else {
+            r->prev.markAsFirstOrLastInExtent(this); // we are the first in the extent
+            verify( firstRecord.isNull() );
+            firstRecord = newRecordLoc;
+        }
+        lastRecord = newRecordLoc;
 
-      verify(len > 0);
-      int newRecSize = len + Record::HeaderSize;
-      DiskLoc newRecordLoc = firstEmptyRegion;
-      Record *r = getRecord(newRecordLoc);
-      int left = r->netLength() - len;
-      if( left < 0 ) {
-      //
-      firstEmptyRegion.Null();
-      return 0;
-      }
+        if( left < Record::HeaderSize + 32 ) {
+            firstEmptyRegion.Null();
+        }
+        else {
+            firstEmptyRegion.inc(newRecSize);
+            Record *empty = getRecord(firstEmptyRegion);
+            empty->next.set(nextEmpty); // not for empty records, unless in-use records, next and prev can be null.
+            empty->prev.Null();
+            empty->lengthWithHeaders = left;
+        }
 
-      DiskLoc nextEmpty = r->next.getNextEmpty(firstEmptyRegion);
-      r->lengthWithHeaders = newRecSize;
-      r->next.markAsFirstOrLastInExtent(this); // we're now last in the extent
-      if( !lastRecord.isNull() ) {
-      verify(getRecord(lastRecord)->next.lastInExtent()); // it was the last one
-      getRecord(lastRecord)->next.set(newRecordLoc); // until now
-      r->prev.set(lastRecord);
-      }
-      else {
-      r->prev.markAsFirstOrLastInExtent(this); // we are the first in the extent
-      verify( firstRecord.isNull() );
-      firstRecord = newRecordLoc;
-      }
-      lastRecord = newRecordLoc;
-
-      if( left < Record::HeaderSize + 32 ) {
-      firstEmptyRegion.Null();
-      }
-      else {
-      firstEmptyRegion.inc(newRecSize);
-      Record *empty = getRecord(firstEmptyRegion);
-      empty->next.set(nextEmpty); // not for empty records, unless in-use records, next and prev can be null.
-      empty->prev.Null();
-      empty->lengthWithHeaders = left;
-      }
-
-      return r;
-      }
-    */
+        return r;
+    }
+*/
 
     int Extent::maxSize() {
         int maxExtentSize = 0x7ff00000;
