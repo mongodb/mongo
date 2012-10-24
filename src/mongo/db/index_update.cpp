@@ -171,7 +171,7 @@ namespace mongo {
                                 _unindexRecord(d->idx(j), obj, loc, false);
                             }
                             catch(...) {
-                                log(3) << "unindex fails on rollback after unique key constraint prevented insert\n";
+                                LOG(3) << "unindex fails on rollback after unique key constraint prevented insert\n";
                             }
                         }
                         throw;
@@ -263,7 +263,7 @@ namespace mongo {
         }
         pm.finished();
         op->setMessage( "index: (3/3) btree-middle" );
-        log(t.seconds() > 10 ? 0 : 1 ) << "\t done building bottom layer, going to commit" << endl;
+        LOG(t.seconds() > 10 ? 0 : 1 ) << "\t done building bottom layer, going to commit" << endl;
         btBuilder.commit();
         if ( btBuilder.getn() != phase1->nkeys && ! dropDups ) {
             warning() << "not all entries were added to the index, probably some keys were too large" << endl;
@@ -321,7 +321,7 @@ namespace mongo {
         phase1->sorter->sort();
         if ( logLevel > 1 ) printMemInfo( "after final sort" );
 
-        log(t.seconds() > 5 ? 0 : 1) << "\t external sort used : " << sorter.numFiles() << " files " << " in " << t.seconds() << " secs" << endl;
+        LOG(t.seconds() > 5 ? 0 : 1) << "\t external sort used : " << sorter.numFiles() << " files " << " in " << t.seconds() << " secs" << endl;
 
         set<DiskLoc> dupsToDrop;
 
@@ -531,7 +531,7 @@ namespace mongo {
                         _unindexRecord(d->idx(j), obj, loc, false);
                     }
                     catch(...) {
-                        log(3) << "unindex fails on rollback after unique failure\n";
+                        LOG(3) << "unindex fails on rollback after unique failure\n";
                     }
                 }
                 throw;
@@ -605,7 +605,7 @@ namespace mongo {
 
         // delete a specific index or all?
         if ( *name == '*' && name[1] == 0 ) {
-            log(4) << "  d->nIndexes was " << d->nIndexes << '\n';
+            LOG(4) << "  d->nIndexes was " << d->nIndexes << '\n';
             anObjBuilder.append("nIndexesWas", (double)d->nIndexes);
             IndexDetails *idIndex = 0;
             if( d->nIndexes ) {
@@ -634,7 +634,7 @@ namespace mongo {
             // delete just one index
             int x = d->findIndexByName(name);
             if ( x >= 0 ) {
-                log(4) << "  d->nIndexes was " << d->nIndexes << endl;
+                LOG(4) << "  d->nIndexes was " << d->nIndexes << endl;
                 anObjBuilder.append("nIndexesWas", (double)d->nIndexes);
 
                 /* note it is  important we remove the IndexDetails with this

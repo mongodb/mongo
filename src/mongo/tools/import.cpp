@@ -127,7 +127,7 @@ class Import : public Tool {
 
             uassert(16329, str::stream() << "read error, or input line too long (max length: "
                     << BUF_SIZE << ")", !(in->rdstate() & ios_base::failbit));
-            log(1) << "got line:" << buf << endl;
+            LOG(1) << "got line:" << buf << endl;
         }
         uassert( 10263 ,  "unknown error reading file" ,
                  (!(in->rdstate() & ios_base::badbit)) &&
@@ -349,7 +349,7 @@ public:
             return -1;
         }
 
-        log(1) << "ns: " << ns << endl;
+        LOG(1) << "ns: " << ns << endl;
 
         auth();
 
@@ -411,7 +411,7 @@ public:
         }
 
         time_t start = time(0);
-        log(1) << "filesize: " << fileSize << endl;
+        LOG(1) << "filesize: " << fileSize << endl;
         ProgressMeter pm( fileSize );
         int num = 0;
         int lastNumChecked = num;

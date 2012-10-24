@@ -287,7 +287,7 @@ namespace mongo {
                         return false;
                     }
 
-                    log(1) << "commitIfNeeded upgrading from shared write to exclusive write state"
+                    LOG(1) << "commitIfNeeded upgrading from shared write to exclusive write state"
                            << endl;
                     Lock::DBWrite::UpgradeToExclusive ex;
                     if (ex.gotUpgrade()) {

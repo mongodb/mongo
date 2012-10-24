@@ -1342,7 +1342,7 @@ doneCheckOrder:
         massert( 10369 ,  "no plans", _plans.plans().size() > 0 );
         
         if ( _plans.plans().size() > 1 )
-            log(1) << "  running multiple plans" << endl;
+            LOG(1) << "  running multiple plans" << endl;
         for( QueryPlanSet::PlanVector::const_iterator i = _plans.plans().begin();
              i != _plans.plans().end(); ++i ) {
             shared_ptr<QueryPlanRunner> runner( _prototypeRunner.createChild() );

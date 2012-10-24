@@ -113,9 +113,9 @@ namespace mongo {
 
         Result * Suite::run( const std::string& filter, int runsPerTest ) {
 
-            log(1) << "\t about to setupTests" << std::endl;
+            LOG(1) << "\t about to setupTests" << std::endl;
             setupTests();
-            log(1) << "\t done setupTests" << std::endl;
+            LOG(1) << "\t done setupTests" << std::endl;
 
             Result * r = new Result( _name );
             Result::cur = r;
@@ -123,7 +123,7 @@ namespace mongo {
             for ( std::vector<TestHolder*>::iterator i=_tests.begin(); i!=_tests.end(); i++ ) {
                 TestHolder* tc = *i;
                 if ( filter.size() && tc->getName().find( filter ) == std::string::npos ) {
-                    log(1) << "\t skipping test: " << tc->getName() << " because doesn't match filter" << std::endl;
+                    LOG(1) << "\t skipping test: " << tc->getName() << " because doesn't match filter" << std::endl;
                     continue;
                 }
 

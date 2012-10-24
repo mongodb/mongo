@@ -82,7 +82,7 @@ namespace mongo {
         rootpath << "_tmp/esort." << time(0) << "." << thisUniqueNumber << "/";
         _root = rootpath.str();
 
-        log(1) << "external sort root: " << _root.string() << endl;
+        LOG(1) << "external sort root: " << _root.string() << endl;
 
         create_directories( _root );
         _compares = 0;
@@ -113,7 +113,7 @@ namespace mongo {
 
         if ( _cur && _files.size() == 0 ) {
             _sortInMem();
-            log(1) << "\t\t not using file.  size:" << _curSizeSoFar << " _compares:" << _compares << endl;
+            LOG(1) << "\t\t not using file.  size:" << _curSizeSoFar << " _compares:" << _compares << endl;
             return;
         }
 
@@ -147,7 +147,7 @@ namespace mongo {
 
         if (  _cur->hasSpace() == false ||  _curSizeSoFar > _maxFilesize ) {
             finishMap();
-            log(1) << "finishing map" << endl;
+            LOG(1) << "finishing map" << endl;
         }
 
     }
@@ -187,7 +187,7 @@ namespace mongo {
         _files.push_back( file );
         out.close();
 
-        log(2) << "Added file: " << file << " with " << num << "objects for external sort" << endl;
+        LOG(2) << "Added file: " << file << " with " << num << "objects for external sort" << endl;
     }
 
     // ---------------------------------

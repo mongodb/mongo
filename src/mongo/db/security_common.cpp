@@ -107,7 +107,7 @@ namespace mongo {
             return false;
         }
 
-        log(1) << "security key: " << str << endl;
+        LOG(1) << "security key: " << str << endl;
 
         // createPWDigest should really not be a member func
         DBClientConnection conn;

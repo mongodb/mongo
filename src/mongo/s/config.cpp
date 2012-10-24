@@ -806,7 +806,7 @@ namespace mongo {
         }
 
         if ( up == 1 ) {
-            log( LL_WARNING ) << "only 1 config server reachable, continuing" << endl;
+            LOG( LL_WARNING ) << "only 1 config server reachable, continuing" << endl;
             return true;
         }
 
@@ -826,7 +826,7 @@ namespace mongo {
 
             stringstream ss;
             ss << "config servers " << _config[firstGood] << " and " << _config[i] << " differ";
-            log( LL_WARNING ) << ss.str() << endl;
+            LOG( LL_WARNING ) << ss.str() << endl;
             if ( tries <= 1 ) {
                 ss << "\n" << c1 << "\t" << c2 << "\n" << d1 << "\t" << d2;
                 errmsg = ss.str();
@@ -846,7 +846,7 @@ namespace mongo {
         if ( checkConsistency ) {
             string errmsg;
             if ( ! checkConfigServersConsistent( errmsg ) ) {
-                log( LL_ERROR ) << "config servers not in sync! " << errmsg << warnings;
+                LOG( LL_ERROR ) << "config servers not in sync! " << errmsg << warnings;
                 return false;
             }
         }
@@ -1027,7 +1027,7 @@ namespace mongo {
         try {
             Shard s = Shard::lookupRSName(monitor->getName());
             if (s == Shard::EMPTY) {
-                log(1) << "replicaSetChange: shard not found for set: " << monitor->getServerAddress() << endl;
+                LOG(1) << "replicaSetChange: shard not found for set: " << monitor->getServerAddress() << endl;
                 return;
             }
             scoped_ptr<ScopedDbConnection> conn( ScopedDbConnection::getScopedDbConnection(

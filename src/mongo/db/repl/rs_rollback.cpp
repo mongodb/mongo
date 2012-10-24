@@ -430,7 +430,7 @@ namespace mongo {
             try {
                 bob res;
                 string errmsg;
-                log(1) << "replSet rollback drop: " << *i << rsLog;
+                LOG(1) << "replSet rollback drop: " << *i << rsLog;
                 dropCollection(*i, errmsg, res);
             }
             catch(...) {

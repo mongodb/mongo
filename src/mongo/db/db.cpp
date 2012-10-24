@@ -291,7 +291,7 @@ namespace mongo {
     static void repairDatabasesAndCheckVersion() {
         //        LastError * le = lastError.get( true );
         Client::GodScope gs;
-        log(1) << "enter repairDatabases (to check pdfile version #)" << endl;
+        LOG(1) << "enter repairDatabases (to check pdfile version #)" << endl;
 
         //verify(checkNsFilesOnLoad);
         checkNsFilesOnLoad = false; // we are mainly just checking the header - don't scan the whole .ns file for every db here.
@@ -301,7 +301,7 @@ namespace mongo {
         getDatabaseNames( dbNames );
         for ( vector< string >::iterator i = dbNames.begin(); i != dbNames.end(); ++i ) {
             string dbName = *i;
-            log(1) << "\t" << dbName << endl;
+            LOG(1) << "\t" << dbName << endl;
             Client::Context ctx( dbName );
             MongoDataFile *p = cc().database()->getFile( 0 );
             DataFileHeader *h = p->getHeader();
@@ -337,7 +337,7 @@ namespace mongo {
             }
         }
 
-        log(1) << "done repairDatabases" << endl;
+        LOG(1) << "done repairDatabases" << endl;
 
         if ( shouldRepairDatabases ) {
             log() << "finished checking dbs" << endl;
@@ -410,7 +410,7 @@ namespace mongo {
             else if( cmdLine.syncdelay == 1 )
                 log() << "--syncdelay 1" << endl;
             else if( cmdLine.syncdelay != 60 )
-                log(1) << "--syncdelay " << cmdLine.syncdelay << endl;
+                LOG(1) << "--syncdelay " << cmdLine.syncdelay << endl;
             int time_flushing = 0;
             while ( ! inShutdown() ) {
                 _diaglog.flush();

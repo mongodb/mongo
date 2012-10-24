@@ -79,7 +79,7 @@ namespace mongo {
         }
         if( !s.empty() ) {
             lastLogged = _hbmsgTime;
-            log(logLevel) << "replSet " << s << rsLog;
+            LOG(logLevel) << "replSet " << s << rsLog;
         }
     }
 
@@ -354,7 +354,7 @@ namespace mongo {
                 seedSet.insert(m);
                 //uassert(13101, "can't use localhost in replset host list", !m.isLocalHost());
                 if( m.isSelf() ) {
-                    log(1) << "replSet ignoring seed " << m.toString() << " (=self)" << rsLog;
+                    LOG(1) << "replSet ignoring seed " << m.toString() << " (=self)" << rsLog;
                 }
                 else
                     seeds.push_back(m);
@@ -649,7 +649,7 @@ namespace mongo {
         int n = 0;
         for( vector<ReplSetConfig*>::iterator i = cfgs.begin(); i != cfgs.end(); i++ ) {
             ReplSetConfig* cfg = *i;
-            DEV log(1) << n+1 << " config shows version " << cfg->version << rsLog;
+            DEV LOG(1) << n+1 << " config shows version " << cfg->version << rsLog;
             if( ++n == 1 ) myVersion = cfg->version;
             if( cfg->ok() && cfg->version > v ) {
                 highest = cfg;
@@ -700,7 +700,7 @@ namespace mongo {
                                 configs.vector().push_back( ReplSetConfig::make(HostAndPort(*i)) );
                             }
                             catch( DBException& ) {
-                                log(1) << "replSet exception trying to load config from discovered seed " << *i << rsLog;
+                                LOG(1) << "replSet exception trying to load config from discovered seed " << *i << rsLog;
                                 replSettings.discoveredSeeds.erase(*i);
                             }
                         }

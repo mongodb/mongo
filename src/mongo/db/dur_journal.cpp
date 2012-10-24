@@ -222,7 +222,7 @@ namespace mongo {
 
             flushMyDirectory(getJournalDir() / "file"); // flushes parent of argument (in this case journal dir)
 
-            log(1) << "removeJournalFiles end" << endl;
+            LOG(1) << "removeJournalFiles end" << endl;
         }
 
         /** at clean shutdown */

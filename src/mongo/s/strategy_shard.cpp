@@ -287,7 +287,7 @@ namespace mongo {
             // targeting we've done earlier
             //
 
-            log( retries == 0 ) << op << " will be retried b/c sharding config info is stale, "
+            LOG( retries == 0 ) << op << " will be retried b/c sharding config info is stale, "
                                 << " retries: " << retries
                                 << " ns: " << ns
                                 << " data: " << query << endl;
