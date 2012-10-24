@@ -683,7 +683,7 @@ namespace mongo {
                             // a later error from mongos, we shouldn't throw this error but the
                             // later one.
                             if (group.hasException() && continueOnError) warning() << errMsg;
-                            else uasserted(16451, errMsg);
+                            else uasserted(16460, errMsg);
                         }
 
                         //
