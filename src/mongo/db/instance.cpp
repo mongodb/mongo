@@ -470,10 +470,10 @@ namespace mongo {
         if ( currentOp.shouldDBProfile( debug.executionTime ) ) {
             // performance profiling is on
             if ( Lock::isReadLocked() ) {
-                mongo::log(1) << "note: not profiling because recursive read lock" << endl;
+                LOG(1) << "note: not profiling because recursive read lock" << endl;
             }
             else if ( lockedForWriting() ) {
-                mongo::log(1) << "note: not profiling because doing fsync+lock" << endl;
+                LOG(1) << "note: not profiling because doing fsync+lock" << endl;
             }
             else {
                 profile(c, op, currentOp);
@@ -493,14 +493,14 @@ namespace mongo {
         uassert( 13004 , str::stream() << "sent negative cursors to kill: " << n  , n >= 1 );
 
         if ( n > 2000 ) {
-            log( n < 30000 ? LL_WARNING : LL_ERROR ) << "receivedKillCursors, n=" << n << endl;
+            LOG( n < 30000 ? LL_WARNING : LL_ERROR ) << "receivedKillCursors, n=" << n << endl;
             verify( n < 30000 );
         }
 
         int found = ClientCursor::erase(n, (long long *) x);
 
         if ( logLevel > 0 || found != n ) {
-            log( found == n ) << "killcursors: found " << found << " of " << n << endl;
+            LOG( found == n ) << "killcursors: found " << found << " of " << n << endl;
         }
 
     }
@@ -1064,7 +1064,7 @@ namespace mongo {
 #endif
 
         // block the dur thread from doing any work for the rest of the run
-        log(2) << "shutdown: groupCommitMutex" << endl;
+        LOG(2) << "shutdown: groupCommitMutex" << endl;
         SimpleMutex::scoped_lock lk(dur::commitJob.groupCommitMutex);
 
 #ifdef _WIN32

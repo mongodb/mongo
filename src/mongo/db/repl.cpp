@@ -336,7 +336,7 @@ namespace mongo {
         BSONObj pattern = b.done();
 
         BSONObj o = jsobj();
-        log( 1 ) << "Saving repl source: " << o << endl;
+        LOG( 1 ) << "Saving repl source: " << o << endl;
 
         {
             OpDebug debug;
@@ -648,7 +648,7 @@ namespace mongo {
     */
     void ReplSource::sync_pullOpLog_applyOperation(BSONObj& op, bool alreadyLocked) {
         if( logLevel >= 6 ) // op.tostring is expensive so doing this check explicitly
-            log(6) << "processing op: " << op << endl;
+            LOG(6) << "processing op: " << op << endl;
 
         if( op.getStringField("op")[0] == 'n' )
             return;
@@ -730,7 +730,7 @@ namespace mongo {
         bool incompleteClone = incompleteCloneDbs.count( clientName ) != 0;
 
         if( logLevel >= 6 )
-            log(6) << "ns: " << ns << ", justCreated: " << ctx.justCreated() << ", empty: " << empty << ", incompleteClone: " << incompleteClone << endl;
+            LOG(6) << "ns: " << ns << ", justCreated: " << ctx.justCreated() << ", empty: " << empty << ", incompleteClone: " << incompleteClone << endl;
 
         // always apply admin command command
         // this is a bit hacky -- the semantics of replication/commands aren't well specified
@@ -794,7 +794,7 @@ namespace mongo {
     int ReplSource::sync_pullOpLog(int& nApplied) {
         int okResultCode = 1;
         string ns = string("local.oplog.$") + sourceName();
-        log(2) << "repl: sync_pullOpLog " << ns << " syncedTo:" << syncedTo.toStringLong() << '\n';
+        LOG(2) << "repl: sync_pullOpLog " << ns << " syncedTo:" << syncedTo.toStringLong() << '\n';
 
         bool tailing = true;
         oplogReader.tailCheck();
@@ -817,7 +817,7 @@ namespace mongo {
                     if ( !e.embeddedObject().getBoolField( "empty" ) ) {
                         if ( name != "local" ) {
                             if ( only.empty() || only == name ) {
-                                log( 2 ) << "adding to 'addDbNextPass': " << name << endl;
+                                LOG( 2 ) << "adding to 'addDbNextPass': " << name << endl;
                                 addDbNextPass.insert( name );
                             }
                         }
@@ -845,7 +845,7 @@ namespace mongo {
             tailing = false;
         }
         else {
-            log(2) << "repl: tailing=true\n";
+            LOG(2) << "repl: tailing=true\n";
         }
 
         if( !oplogReader.haveCursor() ) {
@@ -868,7 +868,7 @@ namespace mongo {
 
         if ( !oplogReader.more() ) {
             if ( tailing ) {
-                log(2) << "repl: tailing & no new activity\n";
+                LOG(2) << "repl: tailing & no new activity\n";
                 if( oplogReader.awaitCapable() )
                     okResultCode = 0; // don't sleep
 
@@ -907,9 +907,9 @@ namespace mongo {
             }
 
             nextOpTime = OpTime( ts.date() );
-            log(2) << "repl: first op time received: " << nextOpTime.toString() << '\n';
+            LOG(2) << "repl: first op time received: " << nextOpTime.toString() << '\n';
             if ( initial ) {
-                log(1) << "repl:   initial run\n";
+                LOG(1) << "repl:   initial run\n";
             }
             if( tailing ) {
                 if( !( syncedTo < nextOpTime ) ) {
@@ -1125,7 +1125,7 @@ namespace mongo {
         BSONObj res;
         bool ok = conn->runCommand( "admin" , cmd.obj() , res );
         // ignoring for now on purpose for older versions
-        log(ok) << "replHandshake res not: " << ok << " res: " << res << endl;
+        LOG(ok) << "replHandshake res not: " << ok << " res: " << res << endl;
         return true;
     }
 
@@ -1231,7 +1231,7 @@ namespace mongo {
         }
 
         if ( !oplogReader.connect(hostName) ) {
-            log(4) << "repl:  can't connect to sync source" << endl;
+            LOG(4) << "repl:  can't connect to sync source" << endl;
             return -1;
         }
 
@@ -1411,7 +1411,7 @@ namespace mongo {
                     }
                 }
                 else {
-                    log(5) << "couldn't logKeepalive" << endl;
+                    LOG(5) << "couldn't logKeepalive" << endl;
                     toSleep = 1;
                 }
             }
@@ -1482,12 +1482,12 @@ namespace mongo {
 
         if ( replSettings.slave ) {
             verify( replSettings.slave == SimpleSlave );
-            log(1) << "slave=true" << endl;
+            LOG(1) << "slave=true" << endl;
             boost::thread repl_thread(replSlaveThread);
         }
 
         if ( replSettings.master ) {
-            log(1) << "master=true" << endl;
+            LOG(1) << "master=true" << endl;
             replSettings.master = true;
             createOplog();
             boost::thread t(replMasterThread);

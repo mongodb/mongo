@@ -331,7 +331,7 @@ namespace mongo {
                                                    );
         fromconn->done();
 
-        log( worked ) << "moveChunk result: " << res << endl;
+        LOG( worked ) << "moveChunk result: " << res << endl;
 
         // if succeeded, needs to reload to pick up the new location
         // if failed, mongos may be stale
@@ -1327,7 +1327,7 @@ namespace mongo {
 
         }
         catch (...) {
-            log( LL_ERROR ) << "\t invalid ChunkRangeMap! printing ranges:" << endl;
+            LOG( LL_ERROR ) << "\t invalid ChunkRangeMap! printing ranges:" << endl;
 
             for (ChunkRangeMap::const_iterator it=_ranges.begin(), end=_ranges.end(); it != end; ++it)
                 cout << it->first << ": " << *it->second << endl;

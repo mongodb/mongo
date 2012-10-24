@@ -206,7 +206,7 @@ namespace mongo {
                 dropNS(ns.c_str());
             }
             catch(DBException& ) {
-                log(2) << "IndexDetails::kill(): couldn't drop ns " << ns << endl;
+                LOG(2) << "IndexDetails::kill(): couldn't drop ns " << ns << endl;
             }
             head.setInvalid();
             info.setInvalid();
@@ -317,7 +317,7 @@ namespace mongo {
         }
 
         if ( sourceNS.empty() || key.isEmpty() ) {
-            log(2) << "bad add index attempt name:" << (name?name:"") << "\n  ns:" <<
+            LOG(2) << "bad add index attempt name:" << (name?name:"") << "\n  ns:" <<
                    sourceNS << "\n  idxobj:" << io.toString() << endl;
             string s = "bad add index attempt " + sourceNS + " key:" + key.toString();
             uasserted(12504, s);
@@ -341,7 +341,7 @@ namespace mongo {
             return false;
         }
         if( sourceCollection->findIndexByKeyPattern(key) >= 0 ) {
-            log(2) << "index already exists with diff name " << name << ' ' << key.toString() << endl;
+            LOG(2) << "index already exists with diff name " << name << ' ' << key.toString() << endl;
             return false;
         }
 

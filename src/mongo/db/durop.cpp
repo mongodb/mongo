@@ -124,7 +124,7 @@ namespace mongo {
                     boost::filesystem::remove(full);
                 }
                 catch(std::exception& e) {
-                    log(1) << "recover info FileCreateOp::replay unlink " << e.what() << endl;
+                    LOG(1) << "recover info FileCreateOp::replay unlink " << e.what() << endl;
                 }
             }
 

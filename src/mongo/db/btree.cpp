@@ -1709,7 +1709,7 @@ namespace mongo {
         if ( found ) {
             const _KeyNode& kn = k(pos);
             if ( kn.isUnused() ) {
-                log(4) << "btree _insert: reusing unused key" << endl;
+                LOG(4) << "btree _insert: reusing unused key" << endl;
                 c.b = this;
                 c.pos = pos;
                 c.op = IndexInsertionContinuation::SetUsed;
@@ -1764,7 +1764,7 @@ namespace mongo {
         if ( found ) {
             const _KeyNode& kn = k(pos);
             if ( kn.isUnused() ) {
-                log(4) << "btree _insert: reusing unused key" << endl;
+                LOG(4) << "btree _insert: reusing unused key" << endl;
                 massert( 10285 , "_insert: reuse key but lchild is not null", lChild.isNull());
                 massert( 10286 , "_insert: reuse key but rchild is not null", rChild.isNull());
                 kn.writing().setUsed();

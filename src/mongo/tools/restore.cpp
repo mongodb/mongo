@@ -171,7 +171,7 @@ public:
     }
 
     void drillDown( boost::filesystem::path root, bool use_db, bool use_coll, bool top_level=false ) {
-        log(2) << "drillDown: " << root.string() << endl;
+        LOG(2) << "drillDown: " << root.string() << endl;
 
         // skip hidden files and directories
         if (root.leaf()[0] == '.' && root.leaf() != ".")
@@ -474,7 +474,7 @@ private:
             }
         }
         BSONObj o = bo.obj();
-        log(0) << "\tCreating index: " << o << endl;
+        LOG(0) << "\tCreating index: " << o << endl;
         conn().insert( _curdb + ".system.indexes" ,  o );
 
         // We're stricter about errors for indexes than for regular data

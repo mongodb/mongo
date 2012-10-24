@@ -310,7 +310,7 @@ namespace mongo {
     void gcCallback(GCType type, GCCallbackFlags flags) {
         HeapStatistics stats;
         V8::GetHeapStatistics( &stats );
-        log(1) << "V8 GC heap stats - "
+        LOG(1) << "V8 GC heap stats - "
                 << " total: " << stats.total_heap_size()
                 << " exec: " << stats.total_heap_size_executable()
                 << " used: " << stats.used_heap_size()<< " limit: "

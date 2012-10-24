@@ -176,7 +176,7 @@ namespace mongo {
 
             Timer t;
 
-            log(1) << "SEARCH near:" << n << " maxDistance:" << maxDistance << " search: " << search << endl;
+            LOG(1) << "SEARCH near:" << n << " maxDistance:" << maxDistance << " search: " << search << endl;
             int x,y;
             {
                 BSONObjIterator i( n );

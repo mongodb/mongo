@@ -937,7 +937,7 @@ namespace mongo {
 
             for ( list<BSONObj>::iterator i=all.begin(); i!=all.end(); i++ ) {
                 BSONObj o = *i;
-                log(1) << "reIndex ns: " << toDeleteNs << " index: " << o << endl;
+                LOG(1) << "reIndex ns: " << toDeleteNs << " index: " << o << endl;
                 theDataFileMgr.insertWithObjMod( Namespace( toDeleteNs.c_str() ).getSisterNS( "system.indexes" ).c_str() , o , true );
             }
 
@@ -1547,8 +1547,8 @@ namespace mongo {
             DiskLoc extent = nsd->firstExtent;
             for( ; excessSize > extent.ext()->length && extent != nsd->lastExtent; extent = extent.ext()->xnext ) {
                 excessSize -= extent.ext()->length;
-                log( 2 ) << "cloneCollectionAsCapped skipping extent of size " << extent.ext()->length << endl;
-                log( 6 ) << "excessSize: " << excessSize << endl;
+                LOG( 2 ) << "cloneCollectionAsCapped skipping extent of size " << extent.ext()->length << endl;
+                LOG( 6 ) << "excessSize: " << excessSize << endl;
             }
             DiskLoc startLoc = extent.ext()->firstRecord;
 
@@ -1862,7 +1862,7 @@ namespace mongo {
             }
         }
         catch ( SendStaleConfigException& e ){
-            log(1) << "command failed because of stale config, can retry" << causedBy( e ) << endl;
+            LOG(1) << "command failed because of stale config, can retry" << causedBy( e ) << endl;
             throw;
         }
         catch ( DBException& e ) {
@@ -1959,7 +1959,7 @@ namespace mongo {
         }
 
         if ( c->adminOnly() )
-            log( 2 ) << "command: " << cmdObj << endl;
+            LOG( 2 ) << "command: " << cmdObj << endl;
 
         if (c->maintenanceMode() && theReplSet && theReplSet->isSecondary()) {
             theReplSet->setMaintenanceMode(true);

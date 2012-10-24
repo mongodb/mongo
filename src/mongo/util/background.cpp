@@ -64,10 +64,10 @@ namespace mongo {
             run();
         }
         catch ( std::exception& e ) {
-            log( LL_ERROR ) << "backgroundjob " << name() << "error: " << e.what() << endl;
+            LOG( LL_ERROR ) << "backgroundjob " << name() << "error: " << e.what() << endl;
         }
         catch(...) {
-            log( LL_ERROR ) << "uncaught exception in BackgroundJob " << name() << endl;
+            LOG( LL_ERROR ) << "uncaught exception in BackgroundJob " << name() << endl;
         }
 
         {

@@ -363,11 +363,11 @@ namespace mongo {
                 bsonArrToNumVector<long long>(cmdObj["skewHosts"], skew);
             }
             else {
-                log( logLvl ) << "No host clocks to skew." << endl;
+                LOG( logLvl ) << "No host clocks to skew." << endl;
                 return;
             }
 
-            log( logLvl ) << "Skewing clocks of hosts " << cluster << endl;
+            LOG( logLvl ) << "Skewing clocks of hosts " << cluster << endl;
 
             unsigned s = 0;
             for(vector<long long>::iterator i = skew.begin(); i != skew.end(); ++i,s++) {
@@ -385,7 +385,7 @@ namespace mongo {
 
                     uassert(13678, str::stream() << "Could not communicate with server " << server.toString() << " in cluster " << cluster.toString() << " to change skew by " << *i, success );
 
-                    log( logLvl + 1 ) << " Skewed host " << server << " clock by " << *i << endl;
+                    LOG( logLvl + 1 ) << " Skewed host " << server << " clock by " << *i << endl;
                 }
                 catch(...) {
                     conn->done();

@@ -574,7 +574,7 @@ namespace mongo {
 
         _fd = socket(remote.getType(), SOCK_STREAM, 0);
         if ( _fd == INVALID_SOCKET ) {
-            log(_logLevel) << "ERROR: connect invalid socket " << errnoWithDescription() << endl;
+            LOG(_logLevel) << "ERROR: connect invalid socket " << errnoWithDescription() << endl;
             return false;
         }
 
@@ -639,12 +639,12 @@ namespace mongo {
                 const int mongo_errno = errno;
                 if ( ( mongo_errno == EAGAIN || mongo_errno == EWOULDBLOCK ) && _timeout != 0 ) {
 #endif
-                    log(_logLevel) << "Socket " << context << " send() timed out " << _remote.toString() << endl;
+                    LOG(_logLevel) << "Socket " << context << " send() timed out " << _remote.toString() << endl;
                     throw SocketException( SocketException::SEND_TIMEOUT , remoteString() );
                 }
                 else {
                     SocketException::Type t = SocketException::SEND_ERROR;
-                    log(_logLevel) << "Socket " << context << " send() " 
+                    LOG(_logLevel) << "Socket " << context << " send() "
                                    << errnoWithDescription(mongo_errno) << ' ' << remoteString() << endl;
                     throw SocketException( t , remoteString() );
                 }
@@ -702,11 +702,11 @@ namespace mongo {
             int ret = ::sendmsg( _fd , &meta , portSendFlags );
             if ( ret == -1 ) {
                 if ( errno != EAGAIN || _timeout == 0 ) {
-                    log(_logLevel) << "Socket " << context << " send() " << errnoWithDescription() << ' ' << remoteString() << endl;
+                    LOG(_logLevel) << "Socket " << context << " send() " << errnoWithDescription() << ' ' << remoteString() << endl;
                     throw SocketException( SocketException::SEND_ERROR , remoteString() );
                 }
                 else {
-                    log(_logLevel) << "Socket " << context << " send() remote timeout " << remoteString() << endl;
+                    LOG(_logLevel) << "Socket " << context << " send() remote timeout " << remoteString() << endl;
                     throw SocketException( SocketException::SEND_TIMEOUT , remoteString() );
                 }
             }
@@ -735,13 +735,13 @@ namespace mongo {
             int ret = unsafe_recv( buf , len );
             if ( ret > 0 ) {
                 if ( len <= 4 && ret != len )
-                    log(_logLevel) << "Socket recv() got " << ret << " bytes wanted len=" << len << endl;
+                    LOG(_logLevel) << "Socket recv() got " << ret << " bytes wanted len=" << len << endl;
                 verify( ret <= len );
                 len -= ret;
                 buf += ret;
             }
             else if ( ret == 0 ) {
-                log(3) << "Socket recv() conn closed? " << remoteString() << endl;
+                LOG(3) << "Socket recv() conn closed? " << remoteString() << endl;
                 throw SocketException( SocketException::CLOSED , remoteString() );
             }
             else { /* ret < 0  */                
@@ -763,11 +763,11 @@ namespace mongo {
                        ) && _timeout > 0 ) 
                 {
                     // this is a timeout
-                    log(_logLevel) << "Socket recv() timeout  " << remoteString() <<endl;
+                    LOG(_logLevel) << "Socket recv() timeout  " << remoteString() <<endl;
                     throw SocketException( SocketException::RECV_TIMEOUT, remoteString() );                    
                 }
 
-                log(_logLevel) << "Socket recv() " << errnoWithDescription(e) << " " << remoteString() <<endl;
+                LOG(_logLevel) << "Socket recv() " << errnoWithDescription(e) << " " << remoteString() <<endl;
                 throw SocketException( SocketException::RECV_ERROR , remoteString() );
             }
         }

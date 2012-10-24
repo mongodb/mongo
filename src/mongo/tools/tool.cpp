@@ -480,7 +480,7 @@ namespace mongo {
         posix_fadvise(fileno(file), 0, fileLength, POSIX_FADV_SEQUENTIAL);
 #endif
 
-        log(1) << "\t file size: " << fileLength << endl;
+        LOG(1) << "\t file size: " << fileLength << endl;
 
         unsigned long long read = 0;
         unsigned long long num = 0;

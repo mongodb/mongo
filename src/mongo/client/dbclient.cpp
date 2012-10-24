@@ -96,12 +96,12 @@ namespace mongo {
         case MASTER: {
             DBClientConnection * c = new DBClientConnection(true);
             c->setSoTimeout( socketTimeout );
-            log(1) << "creating new connection to:" << _servers[0] << endl;
+            LOG(1) << "creating new connection to:" << _servers[0] << endl;
             if ( ! c->connect( _servers[0] , errmsg ) ) {
                 delete c;
                 return 0;
             }
-            log(1) << "connected connection!" << endl;
+            LOG(1) << "connected connection!" << endl;
             return c;
         }
 
@@ -810,22 +810,22 @@ namespace mongo {
             throw SocketException( SocketException::FAILED_STATE , toString() );
 
         lastReconnectTry = time(0);
-        log(_logLevel) << "trying reconnect to " << _serverString << endl;
+        LOG(_logLevel) << "trying reconnect to " << _serverString << endl;
         string errmsg;
         _failed = false;
         if ( ! _connect(errmsg) ) {
             _failed = true;
-            log(_logLevel) << "reconnect " << _serverString << " failed " << errmsg << endl;
+            LOG(_logLevel) << "reconnect " << _serverString << " failed " << errmsg << endl;
             throw SocketException( SocketException::CONNECT_ERROR , toString() );
         }
 
-        log(_logLevel) << "reconnect " << _serverString << " ok" << endl;
+        LOG(_logLevel) << "reconnect " << _serverString << " ok" << endl;
         for( map< string, pair<string,string> >::iterator i = authCache.begin(); i != authCache.end(); i++ ) {
             const char *dbname = i->first.c_str();
             const char *username = i->second.first.c_str();
             const char *password = i->second.second.c_str();
             if( !DBClientBase::auth(dbname, username, password, errmsg, false) )
-                log(_logLevel) << "reconnect: auth failed db:" << dbname << " user:" << username << ' ' << errmsg << '\n';
+                LOG(_logLevel) << "reconnect: auth failed db:" << dbname << " user:" << username << ' ' << errmsg << '\n';
         }
     }
 
@@ -1049,7 +1049,7 @@ namespace mongo {
         if ( ! runCommand( nsToDatabase( ns.c_str() ) ,
                            BSON( "deleteIndexes" << NamespaceString( ns ).coll << "index" << indexName ) ,
                            info ) ) {
-            log(_logLevel) << "dropIndex failed: " << info << endl;
+            LOG(_logLevel) << "dropIndex failed: " << info << endl;
             uassert( 10007 ,  "dropIndex failed" , 0 );
         }
         resetIndexCache();

@@ -85,14 +85,14 @@ namespace mongo {
 
             string pingId = pingThreadId( addr, process );
 
-            log( DistributedLock::logLvl - 1 ) << "creating distributed lock ping thread for " << addr
+            LOG( DistributedLock::logLvl - 1 ) << "creating distributed lock ping thread for " << addr
                                                << " and process " << process
                                                << " (sleeping for " << sleepTime << "ms)" << endl;
 
             static int loops = 0;
             while( ! inShutdown() && ! shouldKill( addr, process ) ) {
 
-                log( DistributedLock::logLvl + 2 ) << "distributed lock pinger '" << pingId << "' about to ping." << endl;
+                LOG( DistributedLock::logLvl + 2 ) << "distributed lock pinger '" << pingId << "' about to ping." << endl;
 
                 Date_t pingTime;
 
@@ -155,7 +155,7 @@ namespace mongo {
                         conn->ensureIndex( DistributedLock::lockPingNS , BSON( "ping" << 1 ) );
                     }
 
-                    log( DistributedLock::logLvl - ( loops % 10 == 0 ? 1 : 0 ) ) << "cluster " << addr << " pinged successfully at " << pingTime
+                    LOG( DistributedLock::logLvl - ( loops % 10 == 0 ? 1 : 0 ) ) << "cluster " << addr << " pinged successfully at " << pingTime
                             << " by distributed lock pinger '" << pingId
                             << "', sleeping for " << sleepTime << "ms" << endl;
 
@@ -165,7 +165,7 @@ namespace mongo {
 
                     int numOldLocks = _oldLockOIDs.size();
                     if( numOldLocks > 0 )
-                        log( DistributedLock::logLvl - 1 ) << "trying to delete " << _oldLockOIDs.size() << " old lock entries for process " << process << endl;
+                        LOG( DistributedLock::logLvl - 1 ) << "trying to delete " << _oldLockOIDs.size() << " old lock entries for process " << process << endl;
 
                     bool removed = false;
                     for( list<OID>::iterator i = _oldLockOIDs.begin(); i != _oldLockOIDs.end();
@@ -179,11 +179,11 @@ namespace mongo {
 
                             // Either the update went through or it didn't, either way we're done trying to
                             // unlock
-                            log( DistributedLock::logLvl - 1 ) << "handled late remove of old distributed lock with ts " << *i << endl;
+                            LOG( DistributedLock::logLvl - 1 ) << "handled late remove of old distributed lock with ts " << *i << endl;
                             removed = true;
                         }
                         catch( UpdateNotTheSame& ) {
-                            log( DistributedLock::logLvl - 1 ) << "partially removed old distributed lock with ts " << *i << endl;
+                            LOG( DistributedLock::logLvl - 1 ) << "partially removed old distributed lock with ts " << *i << endl;
                             removed = true;
                         }
                         catch ( std::exception& e) {
@@ -194,7 +194,7 @@ namespace mongo {
                     }
 
                     if( numOldLocks > 0 && _oldLockOIDs.size() > 0 ){
-                        log( DistributedLock::logLvl - 1 ) << "not all old lock entries could be removed for process " << process << endl;
+                        LOG( DistributedLock::logLvl - 1 ) << "not all old lock entries could be removed for process " << process << endl;
                     }
 
                     conn.done();
@@ -319,7 +319,7 @@ namespace mongo {
           _lockTimeout( lockTimeout == 0 ? LOCK_TIMEOUT : lockTimeout ), _maxClockSkew( _lockTimeout / LOCK_SKEW_FACTOR ), _maxNetSkew( _maxClockSkew ), _lockPing( _maxClockSkew ),
           _mutex( "DistributedLock" )
     {
-        log( logLvl ) << "created new distributed lock for " << name << " on " << conn
+        LOG( logLvl ) << "created new distributed lock for " << name << " on " << conn
                       << " ( lock timeout : " << _lockTimeout
                       << ", ping interval : " << _lockPing << ", process : " << asProcess << " )" << endl;
 
@@ -427,7 +427,7 @@ namespace mongo {
                 // Skew is how much time we'd have to add to local to get to remote
                 avgSkews[s] += (long long) (remote - local);
 
-                log( logLvl + 1 ) << "skew from remote server " << server << " found: " << (long long) (remote - local) << endl;
+                LOG( logLvl + 1 ) << "skew from remote server " << server << " found: " << (long long) (remote - local) << endl;
 
             }
         }
@@ -459,11 +459,11 @@ namespace mongo {
 
         // Make sure our max skew is not more than our pre-set limit
         if(totalSkew > (long long) maxClockSkew) {
-            log( logLvl + 1 ) << "total clock skew of " << totalSkew << "ms for servers " << cluster << " is out of " << maxClockSkew << "ms bounds." << endl;
+            LOG( logLvl + 1 ) << "total clock skew of " << totalSkew << "ms for servers " << cluster << " is out of " << maxClockSkew << "ms bounds." << endl;
             return false;
         }
 
-        log( logLvl + 1 ) << "total clock skew of " << totalSkew << "ms for servers " << cluster << " is in " << maxClockSkew << "ms bounds." << endl;
+        LOG( logLvl + 1 ) << "total clock skew of " << totalSkew << "ms for servers " << cluster << " is in " << maxClockSkew << "ms bounds." << endl;
         return true;
     }
 
@@ -517,7 +517,7 @@ namespace mongo {
             // Case 1: No locks
             if ( o.isEmpty() ) {
                 try {
-                    log( logLvl ) << "inserting initial doc in " << locksNS << " for lock " << _name << endl;
+                    LOG( logLvl ) << "inserting initial doc in " << locksNS << " for lock " << _name << endl;
                     conn->insert( locksNS , BSON( "_id" << _name << "state" << 0 << "who" << "" ) );
                 }
                 catch ( UserException& e ) {
@@ -532,10 +532,10 @@ namespace mongo {
 
                 bool canReenter = reenter && o["process"].String() == _processId && ! distLockPinger.willUnlockOID( o["ts"].OID() ) && o["state"].numberInt() == 2;
                 if( reenter && ! canReenter ) {
-                    log( logLvl - 1 ) << "not re-entering distributed lock " << lockName;
-                    if( o["process"].String() != _processId ) log( logLvl - 1 ) << ", different process " << _processId << endl;
-                    else if( o["state"].numberInt() == 2 ) log( logLvl - 1 ) << ", state not finalized" << endl;
-                    else log( logLvl - 1 ) << ", ts " << o["ts"].OID() << " scheduled for late unlock" << endl;
+                    LOG( logLvl - 1 ) << "not re-entering distributed lock " << lockName;
+                    if( o["process"].String() != _processId ) LOG( logLvl - 1 ) << ", different process " << _processId << endl;
+                    else if( o["state"].numberInt() == 2 ) LOG( logLvl - 1 ) << ", state not finalized" << endl;
+                    else LOG( logLvl - 1 ) << ", ts " << o["ts"].OID() << " scheduled for late unlock" << endl;
 
                     // reset since we've been bounced by a previous lock not being where we thought it was,
                     // and should go through full forcing process if required.
@@ -546,7 +546,7 @@ namespace mongo {
 
                 BSONObj lastPing = conn->findOne( lockPingNS , o["process"].wrap( "_id" ) );
                 if ( lastPing.isEmpty() ) {
-                    log( logLvl ) << "empty ping found for process in lock '" << lockName << "'" << endl;
+                    LOG( logLvl ) << "empty ping found for process in lock '" << lockName << "'" << endl;
                     // TODO:  Using 0 as a "no time found" value Will fail if dates roll over, but then, so will a lot.
                     lastPing = BSON( "_id" << o["process"].String() << "ping" << (Date_t) 0 );
                 }
@@ -555,7 +555,7 @@ namespace mongo {
                 unsigned long long takeover = _lockTimeout;
                 PingData _lastPingCheck = getLastPing();
 
-                log( logLvl ) << "checking last ping for lock '" << lockName << "'" << " against process " << _lastPingCheck.id << " and ping " << _lastPingCheck.lastPing << endl;
+                LOG( logLvl ) << "checking last ping for lock '" << lockName << "'" << " against process " << _lastPingCheck.id << " and ping " << _lastPingCheck.lastPing << endl;
 
                 try {
 
@@ -592,17 +592,17 @@ namespace mongo {
                 }
 
                 if ( elapsed <= takeover && ! canReenter ) {
-                    log( logLvl ) << "could not force lock '" << lockName << "' because elapsed time " << elapsed << " <= takeover time " << takeover << endl;
+                    LOG( logLvl ) << "could not force lock '" << lockName << "' because elapsed time " << elapsed << " <= takeover time " << takeover << endl;
                     *other = o; other->getOwned(); conn.done();
                     return false;
                 }
                 else if( elapsed > takeover && canReenter ) {
-                    log( logLvl - 1 ) << "not re-entering distributed lock " << lockName << "' because elapsed time " << elapsed << " > takeover time " << takeover << endl;
+                    LOG( logLvl - 1 ) << "not re-entering distributed lock " << lockName << "' because elapsed time " << elapsed << " > takeover time " << takeover << endl;
                     *other = o; other->getOwned(); conn.done();
                     return false;
                 }
 
-                log( logLvl - 1 ) << ( canReenter ? "re-entering" : "forcing" ) << " lock '" << lockName << "' because "
+                LOG( logLvl - 1 ) << ( canReenter ? "re-entering" : "forcing" ) << " lock '" << lockName << "' because "
                                   << ( canReenter ? "re-entering is allowed, " : "" )
                                   << "elapsed time " << elapsed << " > takeover time " << takeover << endl;
 
@@ -631,7 +631,7 @@ namespace mongo {
 
                         // TODO: Clean up all the extra code to exit this method, probably with a refactor
                         if ( !errMsg.empty() || !err["n"].type() || err["n"].numberInt() < 1 ) {
-                            ( errMsg.empty() ? log( logLvl - 1 ) : warning() ) << "Could not force lock '" << lockName << "' "
+                            ( errMsg.empty() ? LOG( logLvl - 1 ) : warning() ) << "Could not force lock '" << lockName << "' "
                                     << ( !errMsg.empty() ? causedBy(errMsg) : string("(another force won)") ) << endl;
                             *other = o; other->getOwned(); conn.done();
                             return false;
@@ -673,7 +673,7 @@ namespace mongo {
 
                         // TODO: Clean up all the extra code to exit this method, probably with a refactor
                         if ( ! errMsg.empty() || ! err["n"].type() || err["n"].numberInt() < 1 ) {
-                            ( errMsg.empty() ? log( logLvl - 1 ) : warning() ) << "Could not re-enter lock '" << lockName << "' "
+                            ( errMsg.empty() ? LOG( logLvl - 1 ) : warning() ) << "Could not re-enter lock '" << lockName << "' "
                                                                                << ( !errMsg.empty() ? causedBy(errMsg) : string("(not sure lock is held)") ) 
                                                                                << " gle: " << err
                                                                                << endl;
@@ -694,14 +694,14 @@ namespace mongo {
                                              << lockName << causedBy( e ), 13660);
                     }
 
-                    log( logLvl - 1 ) << "re-entered distributed lock '" << lockName << "'" << endl;
+                    LOG( logLvl - 1 ) << "re-entered distributed lock '" << lockName << "'" << endl;
                     *other = o.getOwned(); 
                     conn.done();
                     return true;
 
                 }
 
-                log( logLvl - 1 ) << "lock '" << lockName << "' successfully forced" << endl;
+                LOG( logLvl - 1 ) << "lock '" << lockName << "' successfully forced" << endl;
 
                 // We don't need the ts value in the query, since we will only ever replace locks with state=0.
             }
@@ -730,7 +730,7 @@ namespace mongo {
 
             // Main codepath to acquire lock
 
-            log( logLvl ) << "about to acquire distributed lock '" << lockName << ":\n"
+            LOG( logLvl ) << "about to acquire distributed lock '" << lockName << ":\n"
                           <<  lockDetails.jsonString(Strict, true) << "\n"
                           << query.jsonString(Strict, true) << endl;
 
@@ -742,7 +742,7 @@ namespace mongo {
             currLock = conn->findOne( locksNS , _id );
 
             if ( !errMsg.empty() || !err["n"].type() || err["n"].numberInt() < 1 ) {
-                ( errMsg.empty() ? log( logLvl - 1 ) : warning() ) << "could not acquire lock '" << lockName << "' "
+                ( errMsg.empty() ? LOG( logLvl - 1 ) : warning() ) << "could not acquire lock '" << lockName << "' "
                         << ( !errMsg.empty() ? causedBy( errMsg ) : string("(another update won)") ) << endl;
                 *other = currLock;
                 other->getOwned();
@@ -821,11 +821,11 @@ namespace mongo {
             // Locks on all servers are now set and safe until forcing
 
             if ( currLock["ts"] == lockDetails["ts"] ) {
-                log( logLvl - 1 ) << "lock update won, completing lock propagation for '" << lockName << "'" << endl;
+                LOG( logLvl - 1 ) << "lock update won, completing lock propagation for '" << lockName << "'" << endl;
                 gotLock = true;
             }
             else {
-                log( logLvl - 1 ) << "lock update lost, lock '" << lockName << "' not propagated." << endl;
+                LOG( logLvl - 1 ) << "lock update lost, lock '" << lockName << "' not propagated." << endl;
 
                 // Register the lock for deletion, to speed up failover
                 // Not strictly necessary, but helpful
@@ -894,9 +894,9 @@ namespace mongo {
 
         // Log our lock results
         if(gotLock)
-            log( logLvl - 1 ) << "distributed lock '" << lockName << "' acquired, ts : " << currLock["ts"].OID() << endl;
+            LOG( logLvl - 1 ) << "distributed lock '" << lockName << "' acquired, ts : " << currLock["ts"].OID() << endl;
         else
-            log( logLvl - 1 ) << "distributed lock '" << lockName << "' was not acquired." << endl;
+            LOG( logLvl - 1 ) << "distributed lock '" << lockName << "' was not acquired." << endl;
 
         conn.done();
 
@@ -951,12 +951,12 @@ namespace mongo {
                     continue;
                 }
 
-                log( logLvl - 1 ) << "distributed lock '" << lockName << "' unlocked. " << endl;
+                LOG( logLvl - 1 ) << "distributed lock '" << lockName << "' unlocked. " << endl;
                 conn.done();
                 return;
             }
             catch( UpdateNotTheSame& ) {
-                log( logLvl - 1 ) << "distributed lock '" << lockName << "' unlocked (messily). " << endl;
+                LOG( logLvl - 1 ) << "distributed lock '" << lockName << "' unlocked (messily). " << endl;
                 conn.done();
                 break;
             }
@@ -972,7 +972,7 @@ namespace mongo {
 
         if( attempted > maxAttempts && ! oldLock.isEmpty() && ! oldLock["ts"].eoo() ) {
 
-            log( logLvl - 1 ) << "could not unlock distributed lock with ts " << oldLock["ts"].OID()
+            LOG( logLvl - 1 ) << "could not unlock distributed lock with ts " << oldLock["ts"].OID()
                               << ", will attempt again later" << endl;
 
             // We couldn't unlock the lock at all, so try again later in the pinging thread...

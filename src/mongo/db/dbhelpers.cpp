@@ -397,7 +397,7 @@ namespace mongo {
             _out = new ofstream();
             _out->open( _file.string().c_str() , ios_base::out | ios_base::binary );
             if ( ! _out->good() ) {
-                log( LL_WARNING ) << "couldn't create file: " << _file.string() << " for remove saving" << endl;
+                LOG( LL_WARNING ) << "couldn't create file: " << _file.string() << " for remove saving" << endl;
                 delete _out;
                 _out = 0;
                 return;

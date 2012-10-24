@@ -674,14 +674,14 @@ namespace mongo {
         }
         catch( DBException& e) {
             version = v;
-            log(level) << "replSet load config couldn't get from " << h.toString() << ' ' << e.what() << rsLog;
+            LOG(level) << "replSet load config couldn't get from " << h.toString() << ' ' << e.what() << rsLog;
             return;
         }
 
         from(cfg);
         checkRsConfig();
         _ok = true;
-        log(level) << "replSet load config ok from " << (h.isSelf() ? "self" : h.toString()) << rsLog;
+        LOG(level) << "replSet load config ok from " << (h.isSelf() ? "self" : h.toString()) << rsLog;
         _constructed = true;
     }
 

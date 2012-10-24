@@ -73,11 +73,11 @@ namespace mongo {
         addrs = NULL;
 
         if (logLevel >= 1) {
-            log(1) << "getMyAddrs():";
+            LOG(1) << "getMyAddrs():";
             for (vector<string>::const_iterator it=out.begin(), end=out.end(); it!=end; ++it) {
-                log(1) << " [" << *it << ']';
+                LOG(1) << " [" << *it << ']';
             }
-            log(1) << endl;
+            LOG(1) << endl;
         }
 
         return out;
@@ -117,11 +117,11 @@ namespace mongo {
         freeaddrinfo(addrs);
 
         if (logLevel >= 1) {
-            log(1) << "getallIPs(\"" << iporhost << "\"):";
+            LOG(1) << "getallIPs(\"" << iporhost << "\"):";
             for (vector<string>::const_iterator it=out.begin(), end=out.end(); it!=end; ++it) {
-                log(1) << " [" << *it << ']';
+                LOG(1) << " [" << *it << ']';
             }
-            log(1) << endl;
+            LOG(1) << endl;
         }
 
         return out;

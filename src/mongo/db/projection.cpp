@@ -176,7 +176,7 @@ namespace mongo {
                     MatchDetails arrayDetails;
                     arrayDetails.requestElemMatchKey();
                     if ( matcher->second->matches( in, &arrayDetails ) ) {
-                        log(4) << "Matched array on field: " << matcher->first  << endl
+                        LOG(4) << "Matched array on field: " << matcher->first  << endl
                                << " from array: " << in.getField( matcher->first ) << endl
                                << " in object: " << in << endl
                                << " at position: " << arrayDetails.elemMatchKey() << endl;
@@ -282,7 +282,7 @@ namespace mongo {
                 if ( details && arrayOpType == ARRAY_OP_POSITIONAL ) {
                     // $ positional operator specified
 
-                    log(4) << "projection: checking if element " << e << " matched spec: "
+                    LOG(4) << "projection: checking if element " << e << " matched spec: "
                            << getSpec() << " match details: " << *details << endl;
                     uassert( 16352, mongoutils::str::stream() << "positional operator ("
                                         << e.fieldName()
@@ -333,7 +333,7 @@ namespace mongo {
                         mongoutils::str::before( projectionElement.fieldName(), "." ) ) {
 
                     // found query spec that matches positional array projection spec
-                    log(4) << "Query specifies field named for positional operator: "
+                    LOG(4) << "Query specifies field named for positional operator: "
                            << queryElement.fieldName() << endl;
                     return;
                 }

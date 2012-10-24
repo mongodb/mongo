@@ -232,7 +232,7 @@ namespace mongo {
         int n = *x++;
 
         if ( n > 2000 ) {
-            log( n < 30000 ? LL_WARNING : LL_ERROR ) << "receivedKillCursors, n=" << n << endl;
+            LOG( n < 30000 ? LL_WARNING : LL_ERROR ) << "receivedKillCursors, n=" << n << endl;
         }
 
 
@@ -245,7 +245,7 @@ namespace mongo {
             LOG(_myLogLevel) << "CursorCache::gotKillCursors id: " << id << endl;
 
             if ( ! id ) {
-                log( LL_WARNING ) << " got cursor id of 0 to kill" << endl;
+                LOG( LL_WARNING ) << " got cursor id of 0 to kill" << endl;
                 continue;
             }
 
@@ -261,7 +261,7 @@ namespace mongo {
 
                 MapNormal::iterator j = _refs.find( id );
                 if ( j == _refs.end() ) {
-                    log( LL_WARNING ) << "can't find cursor: " << id << endl;
+                    LOG( LL_WARNING ) << "can't find cursor: " << id << endl;
                     continue;
                 }
                 server = j->second;
@@ -295,7 +295,7 @@ namespace mongo {
             if ( idleFor < TIMEOUT ) {
                 continue;
             }
-            log() << "killing old cursor " << i->second->getId() << " idle for: " << idleFor << "ms" << endl; // TODO: make log(1)
+            log() << "killing old cursor " << i->second->getId() << " idle for: " << idleFor << "ms" << endl; // TODO: make LOG(1)
             _cursors.erase( i );
             i = _cursors.begin(); // possible 2nd entry will get skipped, will get on next pass
             if ( i == _cursors.end() )

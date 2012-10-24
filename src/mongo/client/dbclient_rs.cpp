@@ -78,7 +78,7 @@ namespace mongo {
             const ReplicaSetMonitor::Node& node = nodes[nextNodeIndex];
 
             if (!node.ok) {
-                log(2) << "dbclient_rs not selecting " << node << ", not currently ok" << endl;
+                LOG(2) << "dbclient_rs not selecting " << node << ", not currently ok" << endl;
                 continue;
             }
 
@@ -93,7 +93,7 @@ namespace mongo {
 
                 if (node.isLocalSecondary(localThresholdMillis)) {
                     // found a local node.  return early.
-                    log(2) << "dbclient_rs getSlave found local secondary for queries: "
+                    LOG(2) << "dbclient_rs getSlave found local secondary for queries: "
                            << nextNodeIndex << ", ping time: " << node.pingTimeMillis << endl;
                     *lastHost = fallbackHost;
                     return fallbackHost;
@@ -287,7 +287,7 @@ namespace mongo {
         if ( createFromSeed ) {
             map<string,vector<HostAndPort> >::const_iterator j = _seedServers.find( name );
             if ( j != _seedServers.end() ) {
-                log(4) << "Creating ReplicaSetMonitor from cached address" << endl;
+                LOG(4) << "Creating ReplicaSetMonitor from cached address" << endl;
                 ReplicaSetMonitorPtr& m = _sets[name];
                 verify( !m );
                 m.reset( new ReplicaSetMonitor( name, j->second ) );
@@ -339,7 +339,7 @@ namespace mongo {
     }
 
     void ReplicaSetMonitor::_remove_inlock( const string& name, bool clearSeedCache ) {
-        log(2) << "Removing ReplicaSetMonitor for " << name << " from replica set table" << endl;
+        LOG(2) << "Removing ReplicaSetMonitor for " << name << " from replica set table" << endl;
         _sets.erase( name );
         if ( clearSeedCache ) {
             _seedServers.erase( name );
@@ -464,21 +464,21 @@ namespace mongo {
                         return fallbackNode;
                     else if ( _nodes[ _nextSlave ].isLocalSecondary( _localThresholdMillis ) ) {
                         // found a local slave.  return early.
-                        log(2) << "dbclient_rs getSlave found local secondary for queries: "
+                        LOG(2) << "dbclient_rs getSlave found local secondary for queries: "
                                << _nextSlave << ", ping time: "
                                << _nodes[ _nextSlave ].pingTimeMillis << endl;
                         return fallbackNode;
                     }
                 }
                 else
-                    log(2) << "dbclient_rs getSlave not selecting " << _nodes[_nextSlave]
+                    LOG(2) << "dbclient_rs getSlave not selecting " << _nodes[_nextSlave]
                            << ", not currently okForSecondaryQueries" << endl;
             }
         }
 
         if ( ! fallbackNode.empty() ) {
             // use a non-local secondary, even if local was preferred
-            log(1) << "dbclient_rs getSlave falling back to a non-local secondary node" << endl;
+            LOG(1) << "dbclient_rs getSlave falling back to a non-local secondary node" << endl;
             return fallbackNode;
         }
 
@@ -487,7 +487,7 @@ namespace mongo {
                 _master < static_cast<int>(_nodes.size()) && _nodes[_master].ok);
 
         // Fall back to primary
-        log(1) << "dbclient_rs getSlave no member in secondary state found, "
+        LOG(1) << "dbclient_rs getSlave no member in secondary state found, "
                   "returning primary " << _nodes[ _master ] << endl;
         return _nodes[_master].addr;
     }
@@ -739,7 +739,7 @@ namespace mongo {
                 node.lastIsMaster = o.copy();
             }
 
-            log( ! verbose ) << "ReplicaSetMonitor::_checkConnection: " << conn->toString()
+            LOG( ! verbose ) << "ReplicaSetMonitor::_checkConnection: " << conn->toString()
                              << ' ' << o << endl;
             
             // add other nodes
@@ -762,7 +762,7 @@ namespace mongo {
 
         }
         catch ( std::exception& e ) {
-            log( ! verbose ) << "ReplicaSetMonitor::_checkConnection: caught exception "
+            LOG( ! verbose ) << "ReplicaSetMonitor::_checkConnection: caught exception "
                              << conn->toString() << ' ' << e.what() << endl;
 
             errorOccured = true;

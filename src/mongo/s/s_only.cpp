@@ -100,7 +100,7 @@ namespace mongo {
                 log() << "command denied: " << cmdObj.toString() << endl;
                 return false;
             }
-            log( 2 ) << "command: " << cmdObj << endl;
+            LOG( 2 ) << "command: " << cmdObj << endl;
         }
 
         if (!client.getAuthenticationInfo()->isAuthorized(dbname)) {

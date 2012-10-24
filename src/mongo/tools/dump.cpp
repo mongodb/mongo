@@ -199,7 +199,7 @@ public:
 
             // skip namespaces with $ in them only if we don't specify a collection to dump
             if ( _coll == "" && name.find( ".$" ) != string::npos ) {
-                log(1) << "\tskipping collection: " << name << endl;
+                LOG(1) << "\tskipping collection: " << name << endl;
                 continue;
             }
 
@@ -287,7 +287,7 @@ public:
                 error() << "offset is 0 for record which should be impossible" << endl;
                 break;
             }
-            log(1) << loc << endl;
+            LOG(1) << loc << endl;
             Record* rec = loc.rec();
             BSONObj obj;
             try {

@@ -306,7 +306,7 @@ namespace mongo {
             verify( versionCmp("1.2.3-", "1.2.3") < 0 );
             verify( versionCmp("1.2.3-pre", "1.2.3") < 0 );
 
-            log(1) << "versionCmpTest passed" << endl;
+            LOG(1) << "versionCmpTest passed" << endl;
         }
     } versionCmpTest;
 
@@ -330,7 +330,7 @@ namespace mongo {
             verify( _versionArray("1.2.0-rc4-pre-") == BSON_ARRAY(1 << 2 << 0 << -6) );
             verify( _versionArray("2.0.0-rc5-pre-") == BSON_ARRAY(2 << 0 << 0 << -5) );
 
-            log(1) << "versionArrayTest passed" << endl;
+            LOG(1) << "versionArrayTest passed" << endl;
         }
     } versionArrayTest;
 }

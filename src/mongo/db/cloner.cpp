@@ -379,7 +379,7 @@ namespace mongo {
             while ( c->more() ) {
                 BSONObj collection = c->next();
 
-                log(2) << "\t cloner got " << collection << endl;
+                LOG(2) << "\t cloner got " << collection << endl;
 
                 BSONElement e = collection.getField("name");
                 if ( e.eoo() ) {
@@ -394,7 +394,7 @@ namespace mongo {
                     /* system.users and s.js is cloned -- but nothing else from system.
                      * system.indexes is handled specially at the end*/
                     if( legalClientSystemNS( from_name , true ) == 0 ) {
-                        log(2) << "\t\t not cloning because system collection" << endl;
+                        LOG(2) << "\t\t not cloning because system collection" << endl;
                         continue;
                     }
                 }
@@ -422,7 +422,7 @@ namespace mongo {
                 dbtempreleaseif r( opts.mayYield );
             }
             BSONObj collection = *i;
-            log(2) << "  really will clone: " << collection << endl;
+            LOG(2) << "  really will clone: " << collection << endl;
             const char * from_name = collection["name"].valuestr();
             BSONObj options = collection.getObjectField("options");
 
@@ -438,7 +438,7 @@ namespace mongo {
                 /* we defer building id index for performance - building it in batch is much faster */
                 userCreateNS(toname, options, err, opts.logForRepl, &wantIdIndex);
             }
-            log(1) << "\t\t cloning " << from_name << " -> " << to_name << endl;
+            LOG(1) << "\t\t cloning " << from_name << " -> " << to_name << endl;
             Query q;
             if( opts.snapshot )
                 q.snapshot();

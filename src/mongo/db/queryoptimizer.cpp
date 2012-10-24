@@ -1025,7 +1025,7 @@ doneCheckOrder:
         massert( 10369 ,  "no plans", _plans._plans.size() > 0 );
         
         if ( _plans._plans.size() > 1 )
-            log(1) << "  running multiple plans" << endl;
+            LOG(1) << "  running multiple plans" << endl;
         for( PlanSet::iterator i = _plans._plans.begin(); i != _plans._plans.end(); ++i ) {
             shared_ptr<QueryOp> op( _op.createChild() );
             op->setQueryPlan( i->get() );

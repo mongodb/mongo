@@ -94,7 +94,7 @@ namespace mongo {
             conn->get()->insert( getNS() , o );
             _id = o["_id"].wrap().getOwned();
 
-            log(4) << "inserted new model " << getNS() << "  " << o << endl;
+            LOG(4) << "inserted new model " << getNS() << "  " << o << endl;
         }
         else {
             if ( myId.eoo() ) {
@@ -110,7 +110,7 @@ namespace mongo {
             BSONObj q = qb.obj();
             BSONObj o = b.obj();
 
-            log(4) << "updated model" << getNS() << "  " << q << " " << o << endl;
+            LOG(4) << "updated model" << getNS() << "  " << q << " " << o << endl;
 
             conn->get()->update( getNS() , q , o , true );
 

@@ -166,7 +166,7 @@ namespace mongo {
     void ensureIdIndexForNewNs(const char *ns) {
         if ( ( strstr( ns, ".system." ) == 0 || legalClientSystemNS( ns , false ) ) &&
                 strstr( ns, FREELIST_NS ) == 0 ) {
-            log( 1 ) << "adding _id index for collection " << ns << endl;
+            LOG( 1 ) << "adding _id index for collection " << ns << endl;
             ensureHaveIdIndex( ns );
         }
     }
@@ -236,7 +236,7 @@ namespace mongo {
     }
 
     bool _userCreateNS(const char *ns, const BSONObj& options, string& err, bool *deferIdIndex) {
-        log(1) << "create collection " << ns << ' ' << options << endl;
+        LOG(1) << "create collection " << ns << ' ' << options << endl;
 
         if ( nsdetails(ns) ) {
             err = "collection already exists";
@@ -605,7 +605,7 @@ namespace mongo {
                 }
             }
 
-            if( n > 128 ) log( n < 512 ) << "warning: newExtent " << n << " scanned\n";
+            if( n > 128 ) LOG( n < 512 ) << "warning: newExtent " << n << " scanned\n";
 
             if( best ) {
                 Extent *e = best;
@@ -978,7 +978,7 @@ namespace mongo {
     }
 
     void dropCollection( const string &name, string &errmsg, BSONObjBuilder &result ) {
-        log(1) << "dropCollection: " << name << endl;
+        LOG(1) << "dropCollection: " << name << endl;
         NamespaceDetails *d = nsdetails(name.c_str());
         if( d == 0 )
             return;
@@ -997,7 +997,7 @@ namespace mongo {
             }
             verify( d->nIndexes == 0 );
         }
-        log(1) << "\t dropIndexes done" << endl;
+        LOG(1) << "\t dropIndexes done" << endl;
         result.append("ns", name.c_str());
         ClientCursor::invalidate(name.c_str());
         Top::global.collectionDropped( name );
@@ -1324,7 +1324,7 @@ namespace mongo {
     NOINLINE_DECL DiskLoc outOfSpace(const char *ns, NamespaceDetails *d, int lenWHdr, bool god, DiskLoc extentLoc) {
         DiskLoc loc;
         if ( ! d->isCapped() ) { // size capped doesn't grow
-            log(1) << "allocating new extent for " << ns << " padding:" << d->paddingFactor() << " lenWHdr: " << lenWHdr << endl;
+            LOG(1) << "allocating new extent for " << ns << " padding:" << d->paddingFactor() << " lenWHdr: " << lenWHdr << endl;
             cc().database()->allocExtent(ns, Extent::followupSize(lenWHdr, d->lastExtentSize), false, !god);
             loc = d->alloc(ns, lenWHdr, extentLoc);
             if ( loc.isNull() ) {
@@ -1687,7 +1687,7 @@ namespace mongo {
     }
 
     void dropDatabase(string db) {
-        log(1) << "dropDatabase " << db << endl;
+        LOG(1) << "dropDatabase " << db << endl;
         Lock::assertWriteLocked(db);
         Database *d = cc().database();
         verify( d );
@@ -1903,7 +1903,7 @@ namespace mongo {
         bool ok = false;
         MONGO_ASSERT_ON_EXCEPTION( ok = fo.apply( q ) );
         if ( ok )
-            log(2) << fo.op() << " file " << q.string() << endl;
+            LOG(2) << fo.op() << " file " << q.string() << endl;
         int i = 0;
         int extra = 10; // should not be necessary, this is defensive in case there are missing files
         while ( 1 ) {
@@ -1914,7 +1914,7 @@ namespace mongo {
             MONGO_ASSERT_ON_EXCEPTION( ok = fo.apply(q) );
             if ( ok ) {
                 if ( extra != 10 ) {
-                    log(1) << fo.op() << " file " << q.string() << endl;
+                    LOG(1) << fo.op() << " file " << q.string() << endl;
                     log() << "  _applyOpToDataFiles() warning: extra == " << extra << endl;
                 }
             }
@@ -1947,7 +1947,7 @@ namespace mongo {
         int nNotClosed = 0;
         for( set< string >::iterator i = dbs.begin(); i != dbs.end(); ++i ) {
             string name = *i;
-            log(2) << "DatabaseHolder::closeAll path:" << path << " name:" << name << endl;
+            LOG(2) << "DatabaseHolder::closeAll path:" << path << " name:" << name << endl;
             Client::Context ctx( name , path );
             if( !force && BackgroundOperation::inProgForDb(name.c_str()) ) {
                 log() << "WARNING: can't close database " << name << " because a bg job is in progress - try killOp command" << endl;

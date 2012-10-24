@@ -243,7 +243,7 @@ namespace mongo {
         if (theReplSet && !theReplSet->isPrimary()) {
             // we don't know the slave's port, so we make the replica set keep
             // a map of rids to slaves
-            log(2) << "percolating " << lastOp.toString() << " from " << rid << endl;
+            LOG(2) << "percolating " << lastOp.toString() << " from " << rid << endl;
             theReplSet->ghost->send( boost::bind(&GhostSync::percolate, theReplSet->ghost, rid, lastOp) );
         }
     }

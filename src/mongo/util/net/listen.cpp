@@ -1,4 +1,4 @@
-// listen.h
+// listen.cpp
 
 /*    Copyright 2009 10gen Inc.
  *
@@ -368,7 +368,7 @@ namespace mongo {
 
         int max = (int)(limit.rlim_cur * .8);
 
-        log(1) << "fd limit"
+        LOG(1) << "fd limit"
                << " hard:" << limit.rlim_max
                << " soft:" << limit.rlim_cur
                << " max conn: " << max
@@ -388,7 +388,7 @@ namespace mongo {
             if ( current < want ) {
                 // they want fewer than they can handle
                 // which is fine
-                log(1) << " only allowing " << current << " connections" << endl;
+                LOG(1) << " only allowing " << current << " connections" << endl;
                 return;
             }
             if ( current > want ) {
