@@ -819,6 +819,9 @@
     <ClCompile Include="cluster_constants.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\db\auth\action_type.cpp">
+      <Filter>db\auth</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\pch.h" />
@@ -1331,6 +1334,9 @@
     </ClInclude>
     <ClInclude Include="cluster_constants.h">
       <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\auth\action_type.h">
+      <Filter>db\auth</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

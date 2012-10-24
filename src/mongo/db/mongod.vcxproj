@@ -1090,6 +1090,7 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClCompile Include="..\util\concurrency\task.cpp" />
     <ClCompile Include="..\util\concurrency\thread_pool.cpp" />
     <ClCompile Include="..\util\debug_util.cpp" />
+    <ClCompile Include="..\util\elapsed_tracker.cpp" />
     <ClCompile Include="..\util\fail_point.cpp" />
     <ClCompile Include="..\util\fail_point_registry.cpp" />
     <ClCompile Include="..\util\file_allocator.cpp" />
@@ -1117,6 +1118,7 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClCompile Include="..\util\trace.cpp" />
     <ClCompile Include="..\util\version.cpp" />
     <ClCompile Include="auth\action_set.cpp" />
+    <ClCompile Include="auth\action_type.cpp" />
     <ClCompile Include="auth\capability.cpp" />
     <ClCompile Include="auth\capability_set.cpp" />
     <ClCompile Include="auth\principal.cpp" />
@@ -1297,6 +1299,7 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClInclude Include="..\s\grid.h" />
     <ClInclude Include="..\util\concurrency\mutexdebugger.h" />
     <ClInclude Include="..\util\concurrency\simplerwlock.h" />
+    <ClInclude Include="..\util\elapsed_tracker.h" />
     <ClInclude Include="..\util\fail_point.h" />
     <ClInclude Include="..\util\fail_point_registry.h" />
     <ClInclude Include="..\util\histogram.h" />
@@ -1310,6 +1313,7 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClInclude Include="..\util\timer.h" />
     <ClInclude Include="..\util\touch_pages.h" />
     <ClInclude Include="auth\action_set.h" />
+    <ClInclude Include="auth\action_type.h" />
     <ClInclude Include="auth\capability.h" />
     <ClInclude Include="auth\capability_set.h" />
     <ClInclude Include="auth\principal.h" />

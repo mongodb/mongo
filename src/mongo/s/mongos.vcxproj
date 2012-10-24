@@ -991,6 +991,7 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClCompile Include="..\client\dbclient_rs.cpp" />
     <ClCompile Include="..\client\distlock.cpp" />
     <ClCompile Include="..\db\auth\action_set.cpp" />
+    <ClCompile Include="..\db\auth\action_type.cpp" />
     <ClCompile Include="..\db\auth\capability.cpp" />
     <ClCompile Include="..\db\auth\capability_set.cpp" />
     <ClCompile Include="..\db\auth\principal.cpp" />
@@ -1250,6 +1251,7 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClInclude Include="..\client\authentication_table.h" />
     <ClInclude Include="..\client\authlevel.h" />
     <ClInclude Include="..\db\auth\action_set.h" />
+    <ClInclude Include="..\db\auth\action_type.h" />
     <ClInclude Include="..\db\auth\capability.h" />
     <ClInclude Include="..\db\auth\capability_set.h" />
     <ClInclude Include="..\db\auth\principal.h" />

@@ -995,6 +995,12 @@
     <ClCompile Include="..\s\cluster_constants.cpp">
       <Filter>s</Filter>
     </ClCompile>
+    <ClCompile Include="..\util\elapsed_tracker.cpp">
+      <Filter>util\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="auth\action_type.cpp">
+      <Filter>db\auth</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\targetver.h" />
@@ -1874,6 +1880,12 @@
     </ClInclude>
     <ClInclude Include="..\s\grid.h">
       <Filter>s</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\elapsed_tracker.h">
+      <Filter>util\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="auth\action_type.h">
+      <Filter>db\auth</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

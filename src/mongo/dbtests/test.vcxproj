@@ -615,6 +615,7 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClInclude Include="..\util\concurrency\qlock.h" />
     <ClInclude Include="..\util\concurrency\task.h" />
     <ClInclude Include="..\util\concurrency\value.h" />
+    <ClInclude Include="..\util\elapsed_tracker.h" />
     <ClInclude Include="..\util\fail_point.h" />
     <ClInclude Include="..\util\fail_point_registry.h" />
     <ClInclude Include="..\util\file.h" />
@@ -1393,6 +1394,7 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClCompile Include="..\util\concurrency\task.cpp" />
     <ClCompile Include="..\util\concurrency\thread_pool.cpp" />
     <ClCompile Include="..\util\debug_util.cpp" />
+    <ClCompile Include="..\util\elapsed_tracker.cpp" />
     <ClCompile Include="..\util\fail_point.cpp" />
     <ClCompile Include="..\util\fail_point_registry.cpp" />
     <ClCompile Include="..\util\file_allocator.cpp" />
