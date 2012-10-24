@@ -161,7 +161,7 @@ struct __wt_condvar {
 	pthread_mutex_t mtx;		/* Mutex */
 	pthread_cond_t  cond;		/* Condition variable */
 
-	int locked;			/* Mutex is locked */
+	int signalled;			/* Condition signalled */
 };
 
 /*

@@ -13,7 +13,7 @@
  */
 int
 __wt_cond_alloc(WT_SESSION_IMPL *session,
-    const char *name, int is_locked, WT_CONDVAR **condp)
+    const char *name, int is_signalled, WT_CONDVAR **condp)
 {
 	WT_CONDVAR *cond;
 
@@ -32,7 +32,7 @@ __wt_cond_alloc(WT_SESSION_IMPL *session,
 		goto err;
 
 	cond->name = name;
-	cond->locked = is_locked;
+	cond->signalled = is_signalled;
 
 	*condp = cond;
 	return (0);
@@ -67,7 +67,7 @@ __wt_cond_wait(WT_SESSION_IMPL *session, WT_CONDVAR *cond, long usecs)
 	WT_ERR(pthread_mutex_lock(&cond->mtx));
 	locked = 1;
 
-	while (cond->locked) {
+	while (!cond->signalled) {
 		if (usecs > 0) {
 			struct timespec ts;
 
@@ -79,6 +79,10 @@ __wt_cond_wait(WT_SESSION_IMPL *session, WT_CONDVAR *cond, long usecs)
 			}
 			ret = pthread_cond_timedwait(
 			    &cond->cond, &cond->mtx, &ts);
+			if (ret == ETIMEDOUT) {
+				ret = 0;
+				break;
+			}
 		} else
 			ret = pthread_cond_wait(&cond->cond, &cond->mtx);
 
@@ -95,10 +99,10 @@ __wt_cond_wait(WT_SESSION_IMPL *session, WT_CONDVAR *cond, long usecs)
 			WT_ERR(ret);
 	}
 
-	cond->locked = 1;
+	cond->signalled = 0;
 
 err:	if (locked)
-		WT_ERR(pthread_mutex_unlock(&cond->mtx));
+		WT_TRET(pthread_mutex_unlock(&cond->mtx));
 	if (ret == 0)
 		return;
 
@@ -124,8 +128,8 @@ __wt_cond_signal(WT_SESSION_IMPL *session, WT_CONDVAR *cond)
 		    session, mutex, "signal %s cond (%p)", cond->name, cond);
 
 	WT_ERR(pthread_mutex_lock(&cond->mtx));
-	if (cond->locked) {
-		cond->locked = 0;
+	if (!cond->signalled) {
+		cond->signalled = 1;
 		WT_ERR(pthread_cond_signal(&cond->cond));
 	}
 	WT_ERR(pthread_mutex_unlock(&cond->mtx));
