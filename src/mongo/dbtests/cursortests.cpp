@@ -360,7 +360,7 @@ namespace CursorTests {
                 BSONObj query = BSON( "a" << BSON( "$in" << inVals.arr() ) );
                 int matchCount = 0;
                 Client::ReadContext ctx( ns() );
-                shared_ptr<Cursor> c =
+                boost::shared_ptr<Cursor> c =
                         NamespaceDetailsTransient::getCursor( ns(),
                                                               query,
                                                               BSONObj(),
@@ -404,7 +404,7 @@ namespace CursorTests {
                 _c.insert( ns(), BSON( "_id" << 0 << "a" << BSON_ARRAY( 1 << 2 ) ) );
                 _c.insert( ns(), BSON( "_id" << 1 << "a" << 9 ) );
                 Client::ReadContext ctx( ns() );
-                shared_ptr<Cursor> c =
+                boost::shared_ptr<Cursor> c =
                         NamespaceDetailsTransient::getCursor( ns(),
                                                               BSON( "a" << GT << 0 << LT << 5 ),
                                                               BSONObj(),
@@ -440,7 +440,7 @@ namespace CursorTests {
                 _c.insert( ns(), BSON( "a" << BSON_ARRAY( BSON( "b" << 2 << "c" << 3 ) <<
                                                           BSONObj() ) ) );
                 Client::ReadContext ctx( ns() );
-                shared_ptr<Cursor> c =
+                boost::shared_ptr<Cursor> c =
                         NamespaceDetailsTransient::getCursor( ns(),
                                                               BSON( "a.b" << 2 << "a.c" << 2 ),
                                                               BSONObj(),
@@ -470,7 +470,7 @@ namespace CursorTests {
                 _c.insert( ns(), BSON( "_id" << 0 << "a" << "a" ) );
                 _c.insert( ns(), BSON( "_id" << 1 << "a" << BSONObj() ) );
                 Client::ReadContext ctx( ns() );
-                shared_ptr<Cursor> c =
+                boost::shared_ptr<Cursor> c =
                         NamespaceDetailsTransient::getCursor( ns(),
                                                               BSON( "a" << GTE << "" ),
                                                               BSONObj(),
@@ -499,7 +499,7 @@ namespace CursorTests {
                 _c.insert( ns(), BSON( "_id" << 0 << "a" << Date_t( 1 ) ) );
                 _c.insert( ns(), BSON( "_id" << 1 << "a" << true ) );
                 Client::ReadContext ctx( ns() );
-                shared_ptr<Cursor> c =
+                boost::shared_ptr<Cursor> c =
                         NamespaceDetailsTransient::getCursor( ns(),
                                                               BSON( "a" << LTE << Date_t( 1 ) ),
                                                               BSONObj(),
