@@ -28,11 +28,11 @@
 namespace mongo {
 
     void ActionSet::addAction(const ActionType& action) {
-        _actions |= (1 << action.getIdentifier());
+        _actions |= (1ULL << action.getIdentifier());
     }
 
     bool ActionSet::contains(const ActionType& action) const {
-        return _actions & (1 << action.getIdentifier());
+        return _actions & (1ULL << action.getIdentifier());
     }
 
     bool ActionSet::isSupersetOf(const ActionSet& other) const {
