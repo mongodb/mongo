@@ -283,6 +283,10 @@ __wt_lsm_tree_create(WT_SESSION_IMPL *session,
 		    "chunks if bloom filters are enabled");
 
 	WT_ERR(__wt_config_gets(session, cfg, "lsm_bloom_config", &cval));
+	if (cval.type == ITEM_STRUCT) {
+		cval.str++;
+		cval.len -= 2;
+	}
 	WT_ERR(__wt_strndup(session, cval.str, cval.len,
 	    &lsm_tree->bloom_config));
 
