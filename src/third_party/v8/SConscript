@@ -1,0 +1,542 @@
+# Copyright 2012 the V8 project authors. All rights reserved.
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are
+# met:
+#
+#     * Redistributions of source code must retain the above copyright
+#       notice, this list of conditions and the following disclaimer.
+#     * Redistributions in binary form must reproduce the above
+#       copyright notice, this list of conditions and the following
+#       disclaimer in the documentation and/or other materials provided
+#       with the distribution.
+#     * Neither the name of Google Inc. nor the names of its
+#       contributors may be used to endorse or promote products derived
+#       from this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+# "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+# LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+# A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+# OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+# SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+# LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+# DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+# THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+# (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+LIBRARY_FLAGS = {
+  'all': {
+    'CPPPATH': [src_dir],
+    'regexp:interpreted': {
+      'CPPDEFINES': ['V8_INTERPRETED_REGEXP']
+    },
+    'mode:debug': {
+      'CPPDEFINES': ['V8_ENABLE_CHECKS', 'OBJECT_PRINT']
+    },
+    'objectprint:on': {
+      'CPPDEFINES':   ['OBJECT_PRINT'],
+    },
+    'debuggersupport:on': {
+      'CPPDEFINES':   ['ENABLE_DEBUGGER_SUPPORT'],
+    },
+    'inspector:on': {
+      'CPPDEFINES':   ['INSPECTOR'],
+    },
+    'fasttls:off': {
+      'CPPDEFINES':   ['V8_NO_FAST_TLS'],
+    },
+    'liveobjectlist:on': {
+      'CPPDEFINES':   ['ENABLE_DEBUGGER_SUPPORT', 'INSPECTOR',
+                       'LIVE_OBJECT_LIST', 'OBJECT_PRINT'],
+    }
+  },
+  'gcc': {
+    'all': {
+      'CCFLAGS':      ['$DIALECTFLAGS', '$WARNINGFLAGS'],
+      'CXXFLAGS':     ['-fno-rtti', '-fno-exceptions'],
+    },
+    'visibility:hidden': {
+      # Use visibility=default to disable this.
+      'CXXFLAGS':     ['-fvisibility=hidden']
+    },
+    'strictaliasing:off': {
+      'CCFLAGS':      ['-fno-strict-aliasing']
+    },
+    'mode:debug': {
+      'CCFLAGS':      ['-g', '-O0'],
+      'CPPDEFINES':   ['ENABLE_DISASSEMBLER', 'DEBUG'],
+    },
+    'mode:release': {
+      'CCFLAGS':      ['-O3', '-fomit-frame-pointer', '-fdata-sections',
+                       '-ffunction-sections'],
+    },
+    'os:linux': {
+      'CCFLAGS':      ['-ansi'] + GCC_EXTRA_CCFLAGS,
+      'library:shared': {
+        'CPPDEFINES': ['V8_SHARED', 'BUILDING_V8_SHARED'],
+        'LIBS': ['pthread']
+      }
+    },
+    'os:macos': {
+      'CCFLAGS':      ['-ansi', '-mmacosx-version-min=10.4'],
+      'library:shared': {
+        'CPPDEFINES': ['V8_SHARED', 'BUILDING_V8_SHARED'],
+      }
+    },
+    'os:freebsd': {
+      'CPPPATH' : [src_dir, '/usr/local/include'],
+      'LIBPATH' : ['/usr/local/lib'],
+      'CCFLAGS':      ['-ansi'],
+      'LIBS': ['execinfo']
+    },
+    'os:openbsd': {
+      'CPPPATH' : [src_dir, '/usr/local/include'],
+      'LIBPATH' : ['/usr/local/lib'],
+      'CCFLAGS':      ['-ansi'],
+    },
+    'os:solaris': {
+      # On Solaris, to get isinf, INFINITY, fpclassify and other macros one
+      # needs to define __C99FEATURES__.
+      'CPPDEFINES': ['__C99FEATURES__'],
+      'CPPPATH' : [src_dir, '/usr/local/include'],
+      'LIBPATH' : ['/usr/local/lib'],
+      'CCFLAGS':      ['-ansi'],
+    },
+    'os:netbsd': {
+      'CPPPATH' : [src_dir, '/usr/pkg/include'],
+      'LIBPATH' : ['/usr/pkg/lib'],
+    },
+    'os:win32': {
+      'CCFLAGS':      ['-DWIN32'],
+      'CXXFLAGS':     ['-DWIN32'],
+    },
+    'arch:ia32': {
+      'CPPDEFINES':   ['V8_TARGET_ARCH_IA32'],
+      'CCFLAGS':      ['-m32'],
+      'LINKFLAGS':    ['-m32']
+    },
+    'arch:arm': {
+      'CPPDEFINES':   ['V8_TARGET_ARCH_ARM'],
+      'unalignedaccesses:on' : {
+        'CPPDEFINES' : ['CAN_USE_UNALIGNED_ACCESSES=1']
+      },
+      'unalignedaccesses:off' : {
+        'CPPDEFINES' : ['CAN_USE_UNALIGNED_ACCESSES=0']
+      },
+      'armeabi:soft' : {
+        'CPPDEFINES' : ['USE_EABI_HARDFLOAT=0'],
+        'simulator:none': {
+          'CCFLAGS':     ['-mfloat-abi=soft'],
+        }
+      },
+      'armeabi:softfp' : {
+        'CPPDEFINES' : ['USE_EABI_HARDFLOAT=0'],
+        'vfp3:on': {
+          'CPPDEFINES' : ['CAN_USE_VFP_INSTRUCTIONS']
+        },
+        'simulator:none': {
+          'CCFLAGS':     ['-mfloat-abi=softfp'],
+        }
+      },
+      'armeabi:hard' : {
+        'CPPDEFINES' : ['USE_EABI_HARDFLOAT=1'],
+        'vfp3:on': {
+          'CPPDEFINES' : ['CAN_USE_VFP_INSTRUCTIONS']
+        },
+        'simulator:none': {
+          'CCFLAGS':     ['-mfloat-abi=hard'],
+        }
+      }
+    },
+    'simulator:arm': {
+      'CCFLAGS':      ['-m32'],
+      'LINKFLAGS':    ['-m32'],
+    },
+    'arch:mips': {
+      'CPPDEFINES':   ['V8_TARGET_ARCH_MIPS'],
+      'mips_arch_variant:mips32r2': {
+        'CPPDEFINES':    ['_MIPS_ARCH_MIPS32R2']
+      },
+      'mips_arch_variant:loongson': {
+        'CPPDEFINES':    ['_MIPS_ARCH_LOONGSON']
+      },
+      'simulator:none': {
+        'CCFLAGS':      ['-EL'],
+        'LINKFLAGS':    ['-EL'],
+        'mips_arch_variant:mips32r2': {
+          'CCFLAGS':      ['-mips32r2', '-Wa,-mips32r2']
+        },
+        'mips_arch_variant:mips32r1': {
+          'CCFLAGS':      ['-mips32', '-Wa,-mips32']
+        },
+        'mips_arch_variant:loongson': {
+          'CCFLAGS':      ['-march=mips3', '-Wa,-march=mips3']
+        },
+        'library:static': {
+          'LINKFLAGS':    ['-static', '-static-libgcc']
+        },
+        'mipsabi:softfloat': {
+          'CCFLAGS':      ['-msoft-float'],
+          'LINKFLAGS':    ['-msoft-float']
+        },
+        'mipsabi:hardfloat': {
+          'CCFLAGS':      ['-mhard-float'],
+          'LINKFLAGS':    ['-mhard-float']
+        }
+      }
+    },
+    'simulator:mips': {
+      'CCFLAGS':      ['-m32'],
+      'LINKFLAGS':    ['-m32'],
+      'mipsabi:softfloat': {
+        'CPPDEFINES':    ['__mips_soft_float=1'],
+        'fpu:on': {
+          'CPPDEFINES' : ['CAN_USE_FPU_INSTRUCTIONS']
+        }
+      },
+      'mipsabi:hardfloat': {
+        'CPPDEFINES':    ['__mips_hard_float=1', 'CAN_USE_FPU_INSTRUCTIONS'],
+      }
+    },
+    'arch:x64': {
+      'CPPDEFINES':   ['V8_TARGET_ARCH_X64'],
+      'CCFLAGS':      ['-m64'],
+      'LINKFLAGS':    ['-m64'],
+    },
+    'gdbjit:on': {
+      'CPPDEFINES':   ['ENABLE_GDB_JIT_INTERFACE']
+    },
+    'compress_startup_data:bz2': {
+      'CPPDEFINES':   ['COMPRESS_STARTUP_DATA_BZ2']
+    }
+  },
+  'msvc': {
+    'all': {
+      'CCFLAGS':      ['$DIALECTFLAGS', '$WARNINGFLAGS'],
+      'CXXFLAGS':     ['/GR-', '/Gy'],
+      'CPPDEFINES':   ['WIN32'],
+      'LINKFLAGS':    ['/INCREMENTAL:NO', '/NXCOMPAT', '/IGNORE:4221'],
+      'CCPDBFLAGS':   ['/Zi']
+    },
+    'verbose:off': {
+      'DIALECTFLAGS': ['/nologo'],
+      'ARFLAGS':      ['/NOLOGO']
+    },
+    'arch:ia32': {
+      'CPPDEFINES':   ['V8_TARGET_ARCH_IA32', '_USE_32BIT_TIME_T'],
+      'LINKFLAGS':    ['/MACHINE:X86'],
+      'ARFLAGS':      ['/MACHINE:X86']
+    },
+    'arch:x64': {
+      'CPPDEFINES':   ['V8_TARGET_ARCH_X64'],
+      'LINKFLAGS':    ['/MACHINE:X64'],
+      'ARFLAGS':      ['/MACHINE:X64']
+    },
+    'mode:debug': {
+      'CCFLAGS':      ['/Od', '/Gm'],
+      'CPPDEFINES':   ['_DEBUG', 'ENABLE_DISASSEMBLER', 'DEBUG'],
+      'LINKFLAGS':    ['/DEBUG'],
+      'msvcrt:static': {
+        'CCFLAGS': ['/MTd']
+      },
+      'msvcrt:shared': {
+        'CCFLAGS': ['/MDd']
+      }
+    },
+    'mode:release': {
+      'CCFLAGS':      ['/O2'],
+      'LINKFLAGS':    ['/OPT:REF', '/OPT:ICF'],
+      'msvcrt:static': {
+        'CCFLAGS': ['/MT']
+      },
+      'msvcrt:shared': {
+        'CCFLAGS': ['/MD']
+      },
+      'msvcltcg:on': {
+        'CCFLAGS':      ['/GL'],
+        'ARFLAGS':      ['/LTCG'],
+        'pgo:off': {
+          'LINKFLAGS':    ['/LTCG'],
+        },
+        'pgo:instrument': {
+          'LINKFLAGS':    ['/LTCG:PGI']
+        },
+        'pgo:optimize': {
+          'LINKFLAGS':    ['/LTCG:PGO']
+        }
+      }
+    }
+  }
+}
+
+
+V8_EXTRA_FLAGS = {
+  'gcc': {
+    'all': {
+      'WARNINGFLAGS': ['-Wall',
+                       '-Werror',
+                       '-W',
+                       '-Wno-unused-parameter',
+                       '-Woverloaded-virtual',
+                       '-Wnon-virtual-dtor']
+    },
+    'os:win32': {
+      'WARNINGFLAGS': ['-pedantic',
+                       '-Wno-long-long',
+                       '-Wno-pedantic-ms-format'],
+      'library:shared': {
+        'LIBS': ['winmm', 'ws2_32']
+      }
+    },
+    'os:linux': {
+      'WARNINGFLAGS': ['-pedantic'],
+      'library:shared': {
+        'soname:on': {
+          'LINKFLAGS': ['-Wl,-soname,${SONAME}']
+        }
+      }
+    },
+    'os:macos': {
+      'WARNINGFLAGS': ['-pedantic']
+    },
+    'arch:arm': {
+      # This is to silence warnings about ABI changes that some versions of the
+      # CodeSourcery G++ tool chain produce for each occurrence of varargs.
+      'WARNINGFLAGS': ['-Wno-abi']
+    },
+    'disassembler:on': {
+      'CPPDEFINES':   ['ENABLE_DISASSEMBLER']
+    }
+  },
+  'msvc': {
+    'all': {
+      'WARNINGFLAGS': ['/W3', '/WX', '/wd4351', '/wd4355', '/wd4800']
+    },
+    'library:shared': {
+      'CPPDEFINES': ['BUILDING_V8_SHARED'],
+      'LIBS': ['winmm', 'ws2_32']
+    },
+    'arch:arm': {
+      'CPPDEFINES':   ['V8_TARGET_ARCH_ARM'],
+      # /wd4996 is to silence the warning about sscanf
+      # used by the arm simulator.
+      'WARNINGFLAGS': ['/wd4996']
+    },
+    'arch:mips': {
+      'CPPDEFINES':   ['V8_TARGET_ARCH_MIPS'],
+      'mips_arch_variant:mips32r2': {
+        'CPPDEFINES':    ['_MIPS_ARCH_MIPS32R2']
+      },
+    },
+    'disassembler:on': {
+      'CPPDEFINES':   ['ENABLE_DISASSEMBLER']
+    }
+  }
+}
+
+
+SOURCES = {
+  'all': Split("""
+    accessors.cc
+    allocation.cc
+    api.cc
+    assembler.cc
+    ast.cc
+    atomicops_internals_x86_gcc.cc
+    bignum-dtoa.cc
+    bignum.cc
+    bootstrapper.cc
+    builtins.cc
+    cached-powers.cc
+    checks.cc
+    circular-queue.cc
+    code-stubs.cc
+    codegen.cc
+    compilation-cache.cc
+    compiler.cc
+    contexts.cc
+    conversions.cc
+    counters.cc
+    cpu-profiler.cc
+    data-flow.cc
+    date.cc
+    dateparser.cc
+    debug-agent.cc
+    debug.cc
+    deoptimizer.cc
+    disassembler.cc
+    diy-fp.cc
+    dtoa.cc
+    elements-kind.cc
+    elements.cc
+    execution.cc
+    extensions/externalize-string-extension.cc
+    extensions/gc-extension.cc
+    extensions/statistics-extension.cc
+    factory.cc
+    fast-dtoa.cc
+    fixed-dtoa.cc
+    flags.cc
+    frames.cc
+    full-codegen.cc
+    func-name-inferrer.cc
+    gdb-jit.cc
+    global-handles.cc
+    handles.cc
+    heap-profiler.cc
+    heap.cc
+    hydrogen-instructions.cc
+    hydrogen.cc
+    ic.cc
+    incremental-marking.cc
+    inspector.cc
+    interface.cc
+    interpreter-irregexp.cc
+    isolate.cc
+    jsregexp.cc
+    lithium-allocator.cc
+    lithium.cc
+    liveedit.cc
+    liveobjectlist.cc
+    log-utils.cc
+    log.cc
+    mark-compact.cc
+    messages.cc
+    objects-printer.cc
+    objects-visiting.cc
+    objects.cc
+    once.cc
+    optimizing-compiler-thread.cc
+    parser.cc
+    preparse-data.cc
+    preparser.cc
+    profile-generator.cc
+    property.cc
+    regexp-macro-assembler-irregexp.cc
+    regexp-macro-assembler.cc
+    regexp-stack.cc
+    rewriter.cc
+    runtime-profiler.cc
+    runtime.cc
+    safepoint-table.cc
+    scanner-character-streams.cc
+    scanner.cc
+    scopeinfo.cc
+    scopes.cc
+    serialize.cc
+    snapshot-common.cc
+    spaces.cc
+    store-buffer.cc
+    string-search.cc
+    string-stream.cc
+    strtod.cc
+    stub-cache.cc
+    token.cc
+    transitions.cc
+    type-info.cc
+    unicode.cc
+    utils.cc
+    v8-counters.cc
+    v8.cc
+    v8conversions.cc
+    v8threads.cc
+    v8utils.cc
+    variables.cc
+    version.cc
+    zone.cc
+    """),
+  'arch:arm': Split("""
+    arm/builtins-arm.cc
+    arm/code-stubs-arm.cc
+    arm/codegen-arm.cc
+    arm/constants-arm.cc
+    arm/cpu-arm.cc
+    arm/debug-arm.cc
+    arm/deoptimizer-arm.cc
+    arm/disasm-arm.cc
+    arm/frames-arm.cc
+    arm/full-codegen-arm.cc
+    arm/ic-arm.cc
+    arm/lithium-arm.cc
+    arm/lithium-codegen-arm.cc
+    arm/lithium-gap-resolver-arm.cc
+    arm/macro-assembler-arm.cc
+    arm/regexp-macro-assembler-arm.cc
+    arm/stub-cache-arm.cc
+    arm/assembler-arm.cc
+    """),
+  'arch:mips': Split("""
+    mips/assembler-mips.cc
+    mips/builtins-mips.cc
+    mips/code-stubs-mips.cc
+    mips/codegen-mips.cc
+    mips/constants-mips.cc
+    mips/cpu-mips.cc
+    mips/debug-mips.cc
+    mips/deoptimizer-mips.cc
+    mips/disasm-mips.cc
+    mips/frames-mips.cc
+    mips/full-codegen-mips.cc
+    mips/ic-mips.cc
+    mips/lithium-codegen-mips.cc
+    mips/lithium-gap-resolver-mips.cc
+    mips/lithium-mips.cc
+    mips/macro-assembler-mips.cc
+    mips/regexp-macro-assembler-mips.cc
+    mips/stub-cache-mips.cc
+    """),
+  'arch:ia32': Split("""
+    ia32/assembler-ia32.cc
+    ia32/builtins-ia32.cc
+    ia32/code-stubs-ia32.cc
+    ia32/codegen-ia32.cc
+    ia32/cpu-ia32.cc
+    ia32/debug-ia32.cc
+    ia32/deoptimizer-ia32.cc
+    ia32/disasm-ia32.cc
+    ia32/frames-ia32.cc
+    ia32/full-codegen-ia32.cc
+    ia32/ic-ia32.cc
+    ia32/lithium-codegen-ia32.cc
+    ia32/lithium-gap-resolver-ia32.cc
+    ia32/lithium-ia32.cc
+    ia32/macro-assembler-ia32.cc
+    ia32/regexp-macro-assembler-ia32.cc
+    ia32/stub-cache-ia32.cc
+    """),
+  'arch:x64': Split("""
+    x64/assembler-x64.cc
+    x64/builtins-x64.cc
+    x64/code-stubs-x64.cc
+    x64/codegen-x64.cc
+    x64/cpu-x64.cc
+    x64/debug-x64.cc
+    x64/deoptimizer-x64.cc
+    x64/disasm-x64.cc
+    x64/frames-x64.cc
+    x64/full-codegen-x64.cc
+    x64/ic-x64.cc
+    x64/lithium-codegen-x64.cc
+    x64/lithium-gap-resolver-x64.cc
+    x64/lithium-x64.cc
+    x64/macro-assembler-x64.cc
+    x64/regexp-macro-assembler-x64.cc
+    x64/stub-cache-x64.cc
+    """),
+  'simulator:arm': ['arm/simulator-arm.cc'],
+  'simulator:mips': ['mips/simulator-mips.cc'],
+  'os:freebsd': ['platform-freebsd.cc', 'platform-posix.cc'],
+  'os:openbsd': ['platform-openbsd.cc', 'platform-posix.cc'],
+  'os:linux':   ['platform-linux.cc', 'platform-posix.cc'],
+  'os:android': ['platform-linux.cc', 'platform-posix.cc'],
+  'os:macos':   ['platform-macos.cc', 'platform-posix.cc'],
+  'os:solaris': ['platform-solaris.cc', 'platform-posix.cc'],
+  'os:cygwin':  ['platform-cygwin.cc', 'platform-posix.cc'],
+  'os:nullos':  ['platform-nullos.cc'],
+  'os:win32':   ['platform-win32.cc', 'win32-math.cc'],
+  'mode:release': [],
+  'mode:debug': [
+    'objects-debug.cc', 'prettyprinter.cc', 'regexp-macro-assembler-tracer.cc'
+  ]
+}
