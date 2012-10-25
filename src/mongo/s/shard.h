@@ -174,6 +174,7 @@ namespace mongo {
         bool      _isDraining; // shard is currently being removed
         set<string> _tags;
     };
+    typedef shared_ptr<Shard> ShardPtr;
 
     class ShardStatus {
     public:
