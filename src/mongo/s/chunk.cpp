@@ -331,7 +331,7 @@ namespace mongo {
                                                    );
         fromconn->done();
 
-        LOG( worked ) << "moveChunk result: " << res << endl;
+        LOG( worked ? 1 : 0 ) << "moveChunk result: " << res << endl;
 
         // if succeeded, needs to reload to pick up the new location
         // if failed, mongos may be stale

@@ -500,7 +500,7 @@ namespace mongo {
         int found = ClientCursor::erase(n, (long long *) x);
 
         if ( logLevel > 0 || found != n ) {
-            LOG( found == n ) << "killcursors: found " << found << " of " << n << endl;
+            LOG( found == n ? 1 : 0 ) << "killcursors: found " << found << " of " << n << endl;
         }
 
     }

@@ -605,7 +605,7 @@ namespace mongo {
                 }
             }
 
-            if( n > 128 ) LOG( n < 512 ) << "warning: newExtent " << n << " scanned\n";
+            if( n > 128 ) LOG( n < 512 ? 1 : 0 ) << "warning: newExtent " << n << " scanned\n";
 
             if( best ) {
                 Extent *e = best;
