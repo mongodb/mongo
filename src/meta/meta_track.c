@@ -36,7 +36,7 @@ __meta_track_next(WT_SESSION_IMPL *session, WT_META_TRACK **trkp)
 {
 	size_t offset, sub_off;
 
-	if (!WT_META_TRACKING(session))
+	if (session->meta_track_next == NULL)
 		session->meta_track_next = session->meta_track;
 
 	offset = WT_PTRDIFF(session->meta_track_next, session->meta_track);
@@ -83,7 +83,10 @@ __wt_meta_track_discard(WT_SESSION_IMPL *session)
 int
 __wt_meta_track_on(WT_SESSION_IMPL *session)
 {
-	return (__meta_track_next(session, NULL));
+	if (session->meta_track_nest++ == 0)
+		WT_RET(__meta_track_next(session, NULL));
+
+	return (0);
 }
 
 static int
@@ -188,7 +191,9 @@ __wt_meta_track_off(WT_SESSION_IMPL *session, int unroll)
 	WT_META_TRACK *trk, *trk_orig;
 	const char *ckpt_cfg[] = API_CONF_DEFAULTS(session, checkpoint, NULL);
 
-	if (!WT_META_TRACKING(session))
+	WT_ASSERT(session,
+	    WT_META_TRACKING(session) && session->meta_track_nest > 0);
+	if (--session->meta_track_nest != 0)
 		return (0);
 
 	trk_orig = session->meta_track;
