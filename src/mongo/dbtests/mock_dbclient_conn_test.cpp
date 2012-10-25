@@ -296,8 +296,7 @@ namespace mongo_test {
             mongo::Timer timer;
             conn.query("x.x");
             const int nowInMilliSec = timer.millis();
-            ASSERT_GREATER_THAN_OR_EQUALS(nowInMilliSec, 140);
-            ASSERT_LESS_THAN_OR_EQUALS(nowInMilliSec, 160);
+            ASSERT_GREATER_THAN_OR_EQUALS(nowInMilliSec, 149);
         }
 
         {
@@ -305,8 +304,7 @@ namespace mongo_test {
             BSONObj response;
             conn.runCommand("x.x", BSON("serverStatus" << 1), response);
             const int nowInMilliSec = timer.millis();
-            ASSERT_GREATER_THAN_OR_EQUALS(nowInMilliSec, 140);
-            ASSERT_LESS_THAN_OR_EQUALS(nowInMilliSec, 160);
+            ASSERT_GREATER_THAN_OR_EQUALS(nowInMilliSec, 149);
         }
 
         ASSERT_EQUALS(1U, server.getQueryCount());
