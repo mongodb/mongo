@@ -19,7 +19,6 @@ __wt_lsm_stat_init(
 	WT_DECL_ITEM(uribuf);
 	WT_DECL_RET;
 	WT_LSM_CHUNK *chunk;
-	WT_LSM_WORKER_COOKIE cookie;
 	const char *cfg[] = API_CONF_DEFAULTS(
 	    session, open_cursor, "statistics_fast=on");
 	const char *disk_cfg[] = API_CONF_DEFAULTS(session,
@@ -48,14 +47,13 @@ __wt_lsm_stat_init(
 	WT_STAT_SET(lsm_tree->stats, chunk_cache_read, 0);
 	WT_STAT_SET(lsm_tree->stats, generation_max, 0);
 
-	/* Grab a snapshot of the LSM tree chunks. */
-	WT_CLEAR(cookie);
-	WT_ERR(__wt_lsm_copy_chunks(session, lsm_tree, &cookie));
+	/* Hold the LSM lock so that we can safely walk through the chunks. */
+	__wt_spin_lock(session, &lsm_tree->lock);
 
 	/* Set the stats for this run. */
-	WT_STAT_SET(lsm_tree->stats, chunk_count, cookie.nchunks);
-	for (i = 0; i < cookie.nchunks; i++) {
-		chunk = cookie.chunk_array[i];
+	WT_STAT_SET(lsm_tree->stats, chunk_count, lsm_tree->nchunks);
+	for (i = 0; i < lsm_tree->nchunks; i++) {
+		chunk = lsm_tree->chunk[i];
 		if (chunk->generation >
 		    (uint32_t)WT_STAT(lsm_tree->stats, generation_max))
 			WT_STAT_SET(lsm_tree->stats,
@@ -147,7 +145,7 @@ __wt_lsm_stat_init(
 		WT_ERR(stat_cursor->close(stat_cursor));
 	}
 
-err:	__wt_free(session, cookie.chunk_array);
+err:	__wt_spin_unlock(session, &lsm_tree->lock);
 	__wt_scr_free(&uribuf);
 
 	return (ret);
