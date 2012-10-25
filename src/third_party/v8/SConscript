@@ -25,6 +25,9 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+Import("env windows linux darwin solaris freebsd debugBuild")
+
+# pared-down copies of the equivalent structures in v8's SConstruct/SConscript:
 LIBRARY_FLAGS = {
   'all': {
     'mode:debug': {
@@ -241,3 +244,93 @@ SOURCES = {
     'objects-debug.cc', 'prettyprinter.cc', 'regexp-macro-assembler-tracer.cc'
   ]
 }
+
+def get_flags(flag, toolchain, options):
+    ret = []
+    for t in (toolchain, 'all'):
+        for o in (options.values() + ['all']):
+            ret.extend(LIBRARY_FLAGS[t].get(o,{}).get(flag,[]))
+    return ret
+
+def get_options():
+    processor = env['PROCESSOR_ARCHITECTURE']
+    if processor == 'i386':
+        arch_string = 'arch:ia32'
+    elif processor == 'x86_64':
+        arch_string = 'arch:x64'
+    else:
+        assert False, "Unsupported architecture: " + processor
+
+    if linux:
+        os_string = 'os:linux'
+    elif darwin:
+        os_string = 'os:macos'
+    elif windows:
+        os_string = 'os:win32'
+    elif freebsd:
+        os_string = 'os:freebsd'
+    elif solaris:
+        os_string = 'os:solaris'
+    else:
+        os_string = 'os:nullos'
+
+    if debugBuild:
+        mode_string = 'mode:debug'
+    else:
+        mode_string = 'mode:release'
+
+    return {'mode': mode_string, 'os': os_string, 'arch': arch_string}
+
+def get_sources(options):
+    keys = options.values() + ['all']
+
+    sources = []
+    for i in keys:
+        sources.extend(('src/'+s) for s in SOURCES[i])
+
+    # v8 generates the following from .js files, but we've pregenerated
+    # them:
+    sources.append('libraries.cc')
+    sources.append('experimental-libraries.cc')
+
+    # we're building with v8 "snapshot=off", which requires this file:
+    sources.append('src/snapshot-empty.cc')
+
+    return sources
+
+def get_toolchain():
+    if windows:
+        return 'msvc'
+    else:
+        return 'gcc'
+
+# convert our SConstruct variables to their v8 equivalents:
+toolchain = get_toolchain()
+options = get_options()
+sources = get_sources(options)
+
+env = env.Clone()
+
+# remove -Iinclude and prepend -Isrc, to resolve namespace conflicts:
+#
+# mongo source needs to compile with include/v8.h, but v8 source
+# needs to compile with src/v8.h
+#
+# in addition, v8 source needs to compile with src/parser.h, which
+# is being placed here earlier in the search path than windows sdk's
+# Include/parser.h (v8 doesn't even use any of those header files)
+env['CPPPATH'].remove('$BUILD_DIR/third_party/v8/include')
+env.Prepend(CPPPATH='$BUILD_DIR/third_party/v8/src')
+
+# add v8 ccflags and cppdefines to environment if they're not already
+# present
+ccflags = get_flags('CCFLAGS', toolchain, options)
+ccflags = filter(lambda f :
+                     f not in env['CCFLAGS'] + env['CXXFLAGS'] + env['CFLAGS'],
+                 ccflags)
+env.Append(CCFLAGS=ccflags)
+cppdefines = get_flags('CPPDEFINES', toolchain, options)
+cppdefines = filter(lambda f : f not in env['CPPDEFINES'], cppdefines)
+env.Append(CPPDEFINES=cppdefines)
+
+env.StaticLibrary("v8", sources)
