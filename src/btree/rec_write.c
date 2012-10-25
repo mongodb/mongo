@@ -1452,45 +1452,16 @@ __wt_rec_row_bulk_insert(WT_CURSOR_BULK *cbulk)
 
 #define	WT_FIX_ENTRIES(btree, bytes)	(((bytes) * 8) / (btree)->bitcnt)
 
-/*
- * __wt_rec_col_fix_bulk_insert --
- *	Fixed-length column-store bulk insert.
- */
-int
-__wt_rec_col_fix_bulk_insert(WT_CURSOR_BULK *cbulk)
+static inline int
+__rec_bulk_insert_split_check(WT_CURSOR_BULK  *cbulk)
 {
 	WT_BTREE *btree;
-	WT_CURSOR *cursor;
 	WT_RECONCILE *r;
 	WT_SESSION_IMPL *session;
-	const uint8_t *data;
-	uint32_t entries, page_entries, page_size;
 
 	session = (WT_SESSION_IMPL *)cbulk->cbt.iface.session;
 	r = cbulk->reconcile;
 	btree = session->btree;
-	cursor = &cbulk->cbt.iface;
-
-	if (cbulk->bitmap) {
-		for (data = cursor->value.data, entries = cursor->value.size;
-		    entries > 0;
-		    entries -= page_entries, data += page_size) {
-			page_entries = WT_MIN(entries,
-			    WT_FIX_ENTRIES(btree, r->space_avail));
-			page_size = __bitstr_size(page_entries * btree->bitcnt);
-
-			memcpy(r->first_free, data, page_size);
-			r->recno += page_entries;
-
-			/* Leave the last page for wrapup. */
-			if (entries > page_entries) {
-				__rec_incr(session, r, page_entries, page_size);
-				WT_RET(__rec_split(session, r));
-			} else
-				cbulk->entry = page_entries;
-		}
-		return (0);
-	}
 
 	if (cbulk->entry == cbulk->nrecs) {
 		if (cbulk->entry != 0) {
@@ -1507,6 +1478,51 @@ __wt_rec_col_fix_bulk_insert(WT_CURSOR_BULK *cbulk)
 		cbulk->entry = 0;
 		cbulk->nrecs = WT_FIX_ENTRIES(btree, r->space_avail);
 	}
+	return (0);
+}
+
+/*
+ * __wt_rec_col_fix_bulk_insert --
+ *	Fixed-length column-store bulk insert.
+ */
+int
+__wt_rec_col_fix_bulk_insert(WT_CURSOR_BULK *cbulk)
+{
+	WT_BTREE *btree;
+	WT_CURSOR *cursor;
+	WT_RECONCILE *r;
+	WT_SESSION_IMPL *session;
+	const uint8_t *data;
+	uint32_t entries, offset, page_entries, page_size;
+
+	session = (WT_SESSION_IMPL *)cbulk->cbt.iface.session;
+	r = cbulk->reconcile;
+	btree = session->btree;
+	cursor = &cbulk->cbt.iface;
+
+	if (cbulk->bitmap) {
+		if (((r->recno - 1) * btree->bitcnt) & 0x7) {
+			WT_RET_MSG(session, EINVAL,
+			    "Bulk bitmap load not aligned on a byte boundary");
+			return (EINVAL);
+		}
+		for (data = cursor->value.data, entries = cursor->value.size;
+		    entries > 0;
+		    entries -= page_entries, data += page_size) {
+			WT_RET(__rec_bulk_insert_split_check(cbulk));
+
+			page_entries =
+			    WT_MIN(entries, cbulk->nrecs - cbulk->entry);
+			page_size = __bitstr_size(page_entries * btree->bitcnt);
+			offset = __bitstr_size(cbulk->entry * btree->bitcnt);
+			memcpy(r->first_free + offset, data, page_size);
+			cbulk->entry += page_entries;
+			r->recno += page_entries;
+		}
+		return (0);
+	}
+
+	WT_RET(__rec_bulk_insert_split_check(cbulk));
 
 	__bit_setv(r->first_free,
 	    cbulk->entry, btree->bitcnt, ((uint8_t *)cursor->value.data)[0]);

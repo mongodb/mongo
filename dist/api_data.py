@@ -313,7 +313,9 @@ methods = {
 		resident bitmap to be loaded directly into a file by passing a
 		\c WT_ITEM to WT_CURSOR::set_value where the \c size field
 		indicates the number of records in the bitmap (as specified by
-		the file's \c value_format)''',
+		the file's \c value_format). Bulk load bitmap values must end
+		on a byte boundary relative to the bit count - except for the
+		last set of values loaded.''',
 		type='string'),
 	Config('checkpoint', '', r'''
 		the name of a checkpoint to open (the reserved name
