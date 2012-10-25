@@ -1597,6 +1597,8 @@ namespace mongo {
                 // this will prevent us from going into critical section until we're ready
                 Timer t;
                 while ( t.minutes() < 600 ) {
+                    log() << "Waiting for replication to catch up before entering critical section"
+                          << endl;
                     if ( flushPendingWrites( lastOpApplied ) )
                         break;
                     sleepsecs(1);
@@ -1786,7 +1788,8 @@ namespace mongo {
             
             Timer t;
             // we wait for the commit to succeed before giving up
-            while ( t.minutes() <= 5 ) {
+            while ( t.seconds() <= 30 ) {
+                log() << "Waiting for commit to finish" << endl;
                 sleepmillis(1);
                 if ( state == DONE )
                     return true;
