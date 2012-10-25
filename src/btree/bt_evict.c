@@ -21,6 +21,9 @@ static int  __evict_worker(WT_SESSION_IMPL *);
  * number of pages from each file's in-memory tree for each page we evict.
  */
 #define	WT_EVICT_GROUP		30	/* Consider N pages as LRU candidates */
+#define	WT_EVICT_INT_SKEW	(1<<20)	/* Prefer leaf pages over internal
+					   pages by this many increments of the
+					   read generation. */
 #define	WT_EVICT_WALK_PER_FILE	 5	/* Pages to visit per file */
 #define	WT_EVICT_WALK_BASE	50	/* Pages tracked across file visits */
 #define	WT_EVICT_WALK_INCR     100	/* Pages added each walk */
@@ -820,8 +823,8 @@ __evict_lru_cmp(const void *a, const void *b)
 	a_lru = a_page->read_gen;
 	b_lru = b_page->read_gen;
 	if (a_page->type == WT_PAGE_ROW_INT || a_page->type == WT_PAGE_COL_INT)
-		a_lru += WT_EVICT_GROUP;
+		a_lru += WT_EVICT_INT_SKEW;
 	if (b_page->type == WT_PAGE_ROW_INT || b_page->type == WT_PAGE_COL_INT)
-		b_lru += WT_EVICT_GROUP;
+		b_lru += WT_EVICT_INT_SKEW;
 	return (a_lru > b_lru ? 1 : (a_lru < b_lru ? -1 : 0));
 }
