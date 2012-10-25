@@ -183,6 +183,7 @@ track(const char *tag, uint64_t cnt, TINFO *tinfo)
 uint32_t
 wts_rand(void)
 {
+	struct timeval t;
 	char buf[64];
 	uint32_t r;
 
@@ -203,7 +204,9 @@ wts_rand(void)
 		    fopen("RUNDIR/rand", g.replay ? "r" : "w")) == NULL)
 			die(errno, "fopen: RUNDIR/rand");
 		if (!g.replay) {
-			srand((u_int)(0xdeadbeef ^ (u_int)time(NULL)));
+			if (gettimeofday(&t, NULL) != 0)
+				die(errno, "gettimeofday");
+			srand((u_int)(0xdeadbeef ^ (u_int)t.tv_usec));
 			(void)setvbuf(g.rand_log, NULL, _IOLBF, 0);
 		}
 	}
