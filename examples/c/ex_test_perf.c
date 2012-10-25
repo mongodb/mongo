@@ -57,9 +57,9 @@ typedef struct {
 	uint32_t stat_thread;	/* Whether to create a stat thread. */
 	WT_CONNECTION *conn;
 	FILE *logf;
-#define LSM_TEST_PERF_INIT	0x00
-#define LSM_TEST_PERF_POP	0x01
-#define LSM_TEST_PERF_READ	0x02
+#define	LSM_TEST_PERF_INIT	0x00
+#define	LSM_TEST_PERF_POP	0x01
+#define	LSM_TEST_PERF_READ	0x02
 	uint32_t phase;
 	struct timeval phase_start_time;
 } CONFIG;
