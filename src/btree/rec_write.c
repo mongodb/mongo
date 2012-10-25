@@ -1492,8 +1492,8 @@ __wt_rec_col_fix_bulk_insert(WT_CURSOR_BULK *cbulk)
 	WT_CURSOR *cursor;
 	WT_RECONCILE *r;
 	WT_SESSION_IMPL *session;
-	const uint8_t *data;
 	uint32_t entries, offset, page_entries, page_size;
+	const uint8_t *data;
 
 	session = (WT_SESSION_IMPL *)cbulk->cbt.iface.session;
 	r = cbulk->reconcile;
@@ -1501,11 +1501,9 @@ __wt_rec_col_fix_bulk_insert(WT_CURSOR_BULK *cbulk)
 	cursor = &cbulk->cbt.iface;
 
 	if (cbulk->bitmap) {
-		if (((r->recno - 1) * btree->bitcnt) & 0x7) {
+		if (((r->recno - 1) * btree->bitcnt) & 0x7)
 			WT_RET_MSG(session, EINVAL,
 			    "Bulk bitmap load not aligned on a byte boundary");
-			return (EINVAL);
-		}
 		for (data = cursor->value.data, entries = cursor->value.size;
 		    entries > 0;
 		    entries -= page_entries, data += page_size) {
