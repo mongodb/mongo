@@ -17,10 +17,10 @@ and \c /usr/local/lib, you should run configure as follows:
 
 @code
 cd build_posix
-../dist/configure --enable-bzip2 CPPFLAGS="-I/usr/local/include" LDFLAGS="-L/usr/local/include"
+../configure --enable-bzip2 CPPFLAGS="-I/usr/local/include" LDFLAGS="-L/usr/local/include"
 @endcode
 
-After building, you can confirm the compressor is working by running the
+If necessary, you can confirm the compressor is working by running the
 compression part of the test suite:
 
 @code
@@ -46,10 +46,10 @@ and \c /usr/local/lib, you should run configure as follows:
 
 @code
 cd build_posix
-../dist/configure --enable-snappy CPPFLAGS="-I/usr/local/include" LDFLAGS="-L/usr/local/include"
+../configure --enable-snappy CPPFLAGS="-I/usr/local/include" LDFLAGS="-L/usr/local/include"
 @endcode
 
-After building, you can confirm the compressor is working by running the
+If necessary, you can confirm the compressor is working by running the
 compression part of the test suite:
 
 @code
