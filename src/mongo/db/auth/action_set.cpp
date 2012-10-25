@@ -18,6 +18,7 @@
 
 #include "mongo/db/auth/action_set.h"
 
+#include <bitset>
 #include <string>
 
 #include "mongo/base/status.h"
@@ -28,11 +29,11 @@
 namespace mongo {
 
     void ActionSet::addAction(const ActionType& action) {
-        _actions |= (1ULL << action.getIdentifier());
+        _actions.set(action.getIdentifier(), true);
     }
 
     bool ActionSet::contains(const ActionType& action) const {
-        return _actions & (1ULL << action.getIdentifier());
+        return _actions[action.getIdentifier()];
     }
 
     bool ActionSet::isSupersetOf(const ActionSet& other) const {

@@ -16,9 +16,10 @@
 
 #pragma once
 
+#include <bitset>
+
 #include "mongo/base/status.h"
 #include "mongo/db/auth/action_type.h"
-#include "mongo/platform/cstdint.h"
 
 namespace mongo {
 
@@ -48,7 +49,7 @@ namespace mongo {
 
     private:
 
-        uint64_t _actions; // bitmask of actions this capability grants
+        std::bitset<128> _actions; // bitmask of actions this capability grants
     };
 
 } // namespace mongo
