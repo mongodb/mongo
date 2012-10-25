@@ -209,6 +209,7 @@ add_option( "use-system-boost", "use system version of boost libraries", 0, True
 add_option( "use-system-snappy", "use system version of snappy library", 0, True )
 
 add_option( "use-system-sm", "use system version of spidermonkey library", 0, True )
+add_option( "use-system-v8", "use system version of v8 library", 0, True )
 
 add_option( "use-system-all" , "use all system libraries", 0 , True )
 
@@ -734,10 +735,6 @@ if nix:
         print( "removing precompiled headers" )
         os.unlink( env.File("$BUILD_DIR/mongo/pch.h.$GCHSUFFIX").abspath ) # gcc uses the file if it exists
 
-if usev8:
-    env.Prepend( EXTRACPPPATH=["#/../v8/include/"] )
-    env.Prepend( EXTRALIBPATH=["#/../v8/"] )
-
 if usesm:
     env.Append( CPPDEFINES=["JS_C_STRINGS_ARE_UTF8"] )
 
@@ -814,7 +811,7 @@ def doConfigure(myenv):
     if solaris:
         conf.CheckLib( "nsl" )
 
-    if usev8:
+    if usev8 and use_system_version_of_library("v8"):
         if debugBuild:
             v8_lib_choices = ["v8_g", "v8"]
         else:
