@@ -263,10 +263,9 @@ namespace mongo {
 
     /** allocate space for a new record from deleted lists.
         @param lenToAlloc is WITH header
-        @param extentLoc OUT returns the extent location
         @return null diskloc if no room - allocate a new extent then
     */
-    DiskLoc NamespaceDetails::alloc(const char *ns, int lenToAlloc, DiskLoc& extentLoc) {
+    DiskLoc NamespaceDetails::alloc(const char* ns, int lenToAlloc) {
         {
             // align very slightly.  
             // note that if doing more coarse-grained quantization (really just if it isn't always
@@ -286,10 +285,9 @@ namespace mongo {
         /* note we want to grab from the front so our next pointers on disk tend
         to go in a forward direction which is important for performance. */
         int regionlen = r->lengthWithHeaders();
-        extentLoc.set(loc.a(), r->extentOfs());
         verify( r->extentOfs() < loc.getOfs() );
 
-        DEBUGGING out() << "TEMP: alloc() returns " << loc.toString() << ' ' << ns << " lentoalloc:" << lenToAlloc << " ext:" << extentLoc.toString() << endl;
+        DEBUGGING out() << "TEMP: alloc() returns " << loc.toString() << ' ' << ns << " lentoalloc:" << lenToAlloc << endl;
 
         int left = regionlen - lenToAlloc;
         if ( ! isCapped() ) {

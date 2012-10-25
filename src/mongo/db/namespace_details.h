@@ -362,7 +362,7 @@ namespace mongo {
         DiskLoc allocWillBeAt(const char *ns, int lenToAlloc);
 
         /* allocate a new record.  lenToAlloc includes headers. */
-        DiskLoc alloc(const char *ns, int lenToAlloc, DiskLoc& extentLoc);
+        DiskLoc alloc(const char* ns, int lenToAlloc);
 
         /* add a given record to the deleted chains for this NS */
         void addDeletedRec(DeletedRecord *d, DiskLoc dloc);

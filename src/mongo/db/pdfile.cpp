@@ -1317,18 +1317,18 @@ namespace mongo {
         }
     }
 
-    NOINLINE_DECL DiskLoc outOfSpace(const char *ns, NamespaceDetails *d, int lenWHdr, bool god, DiskLoc extentLoc) {
+    NOINLINE_DECL DiskLoc outOfSpace(const char* ns, NamespaceDetails* d, int lenWHdr, bool god) {
         DiskLoc loc;
         if ( ! d->isCapped() ) { // size capped doesn't grow
             LOG(1) << "allocating new extent for " << ns << " padding:" << d->paddingFactor() << " lenWHdr: " << lenWHdr << endl;
             cc().database()->allocExtent(ns, Extent::followupSize(lenWHdr, d->lastExtentSize), false, !god);
-            loc = d->alloc(ns, lenWHdr, extentLoc);
+            loc = d->alloc(ns, lenWHdr);
             if ( loc.isNull() ) {
                 log() << "warning: alloc() failed after allocating new extent. lenWHdr: " << lenWHdr << " last extent size:" << d->lastExtentSize << "; trying again\n";
                 for ( int z=0; z<10 && lenWHdr > d->lastExtentSize; z++ ) {
                     log() << "try #" << z << endl;
                     cc().database()->allocExtent(ns, Extent::followupSize(lenWHdr, d->lastExtentSize), false, !god);
-                    loc = d->alloc(ns, lenWHdr, extentLoc);
+                    loc = d->alloc(ns, lenWHdr);
                     if ( ! loc.isNull() )
                         break;
                 }
@@ -1340,11 +1340,10 @@ namespace mongo {
     /** used by insert and also compact
       * @return null loc if out of space 
       */
-    DiskLoc allocateSpaceForANewRecord(const char *ns, NamespaceDetails *d, int lenWHdr, bool god) {
-        DiskLoc extentLoc;
-        DiskLoc loc = d->alloc(ns, lenWHdr, extentLoc);
+    DiskLoc allocateSpaceForANewRecord(const char* ns, NamespaceDetails* d, int lenWHdr, bool god) {
+        DiskLoc loc = d->alloc(ns, lenWHdr);
         if ( loc.isNull() ) {
-            loc = outOfSpace(ns, d, lenWHdr, god, extentLoc);
+            loc = outOfSpace(ns, d, lenWHdr, god);
         }
         return loc;
     }
@@ -1625,9 +1624,8 @@ namespace mongo {
         RARELY verify( d == nsdetails(ns) );
         DEV verify( d == nsdetails(ns) );
 
-        DiskLoc extentLoc;
         int lenWHdr = len + Record::HeaderSize;
-        DiskLoc loc = d->alloc(ns, lenWHdr, extentLoc);
+        DiskLoc loc = d->alloc(ns, lenWHdr);
         verify( !loc.isNull() );
 
         Record *r = loc.rec();
