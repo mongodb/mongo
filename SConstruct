@@ -544,6 +544,8 @@ elif "sunos5" == os.sys.platform:
      solaris = True
      env.Append( CPPDEFINES=[ "__sunos__" ] )
      env.Append( LIBS=["socket","resolv"] )
+     # Use GNU tar instead of Solaris tar
+     env['TAR']="/opt/local/bin/tar"
 
 elif os.sys.platform.startswith( "freebsd" ):
     nix = True
