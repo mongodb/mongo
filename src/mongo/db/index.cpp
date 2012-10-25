@@ -16,17 +16,19 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include "mongo/pch.h"
+
+#include "mongo/db/index.h"
+
 #include <boost/checked_delete.hpp>
 
-#include "pch.h"
-#include "namespace-inl.h"
-#include "index.h"
-#include "btree.h"
-#include "background.h"
-#include "repl/rs.h"
-#include "ops/delete.h"
+#include "mongo/db/background.h"
+#include "mongo/db/btree.h"
+#include "mongo/db/index_update.h"
+#include "mongo/db/namespace-inl.h"
+#include "mongo/db/ops/delete.h"
+#include "mongo/db/repl/rs.h"
 #include "mongo/util/scopeguard.h"
-
 
 namespace mongo {
 
@@ -282,21 +284,12 @@ namespace mongo {
         return true;
     }
 
-    /* Prepare to build an index.  Does not actually build it (except for a special _id case).
-       - We validate that the params are good
-       - That the index does not already exist
-       - Creates the source collection if it DNE
-
-       example of 'io':
-         { ns : 'test.foo', name : 'z', key : { z : 1 } }
-
-       throws DBException
-
-       @param sourceNS - source NS we are indexing
-       @param sourceCollection - its details ptr
-       @return true if ok to continue.  when false we stop/fail silently (index already exists)
-    */
-    bool prepareToBuildIndex(const BSONObj& io, bool god, string& sourceNS, NamespaceDetails *&sourceCollection, BSONObj& fixedIndexObject ) {
+    bool prepareToBuildIndex(const BSONObj& io,
+                             bool mayInterrupt,
+                             bool god,
+                             string& sourceNS,
+                             NamespaceDetails*& sourceCollection,
+                             BSONObj& fixedIndexObject) {
         sourceCollection = 0;
 
         // logical name of the index.  todo: get rid of the name, we don't need it!
@@ -364,7 +357,7 @@ namespace mongo {
         */
         if ( IndexDetails::isIdIndexPattern(key) ) {
             if( !god ) {
-                ensureHaveIdIndex( sourceNS.c_str() );
+                ensureHaveIdIndex( sourceNS.c_str(), mayInterrupt );
                 return false;
             }
         }

@@ -1589,12 +1589,12 @@ namespace JsobjTests {
             void run() {
                 BSONObjExternalSorter sorter(indexInterfaceForTheseTests);
 
-                sorter.add( BSON( "x" << 10 ) , 5  , 1);
-                sorter.add( BSON( "x" << 2 ) , 3 , 1 );
-                sorter.add( BSON( "x" << 5 ) , 6 , 1 );
-                sorter.add( BSON( "x" << 5 ) , 7 , 1 );
+                sorter.add( BSON( "x" << 10 ), DiskLoc( 5, 1 ), false );
+                sorter.add( BSON( "x" << 2 ), DiskLoc( 3, 1 ), false );
+                sorter.add( BSON( "x" << 5 ), DiskLoc( 6, 1 ), false );
+                sorter.add( BSON( "x" << 5 ), DiskLoc( 7, 1 ), false );
 
-                sorter.sort();
+                sorter.sort( false );
 
                 auto_ptr<BSONObjExternalSorter::Iterator> i = sorter.iterator();
                 int num=0;
@@ -1621,12 +1621,12 @@ namespace JsobjTests {
         public:
             void run() {
                 BSONObjExternalSorter sorter( indexInterfaceForTheseTests, BSONObj() , 10 );
-                sorter.add( BSON( "x" << 10 ) , 5  , 11 );
-                sorter.add( BSON( "x" << 2 ) , 3 , 1 );
-                sorter.add( BSON( "x" << 5 ) , 6 , 1 );
-                sorter.add( BSON( "x" << 5 ) , 7 , 1 );
+                sorter.add( BSON( "x" << 10 ), DiskLoc( 5, 11 ), false );
+                sorter.add( BSON( "x" << 2 ), DiskLoc( 3, 1 ), false );
+                sorter.add( BSON( "x" << 5 ), DiskLoc( 6, 1 ), false );
+                sorter.add( BSON( "x" << 5 ), DiskLoc( 7, 1 ), false );
 
-                sorter.sort();
+                sorter.sort( false );
 
                 auto_ptr<BSONObjExternalSorter::Iterator> i = sorter.iterator();
                 int num=0;
@@ -1654,7 +1654,7 @@ namespace JsobjTests {
         public:
             void run() {
                 BSONObjExternalSorter sorter( indexInterfaceForTheseTests, BSONObj() , 10 );
-                sorter.sort();
+                sorter.sort( false );
 
                 auto_ptr<BSONObjExternalSorter::Iterator> i = sorter.iterator();
                 verify( ! i->more() );
@@ -1667,13 +1667,13 @@ namespace JsobjTests {
         public:
             void run() {
                 BSONObjExternalSorter sorter(indexInterfaceForTheseTests);
-                sorter.add( BSON( "x" << 10 ) , 5  , 4);
-                sorter.add( BSON( "x" << 2 ) , 3 , 0 );
-                sorter.add( BSON( "x" << 5 ) , 6 , 2 );
-                sorter.add( BSON( "x" << 5 ) , 7 , 3 );
-                sorter.add( BSON( "x" << 5 ) , 2 , 1 );
+                sorter.add( BSON( "x" << 10 ), DiskLoc( 5, 4 ), false );
+                sorter.add( BSON( "x" << 2 ), DiskLoc( 3, 0 ), false );
+                sorter.add( BSON( "x" << 5 ), DiskLoc( 6, 2 ), false );
+                sorter.add( BSON( "x" << 5 ), DiskLoc( 7, 3 ), false );
+                sorter.add( BSON( "x" << 5 ), DiskLoc( 2, 1 ), false );
 
-                sorter.sort();
+                sorter.sort( false );
 
                 auto_ptr<BSONObjExternalSorter::Iterator> i = sorter.iterator();
                 int num=0;
@@ -1702,10 +1702,10 @@ namespace JsobjTests {
             void run() {
                 BSONObjExternalSorter sorter( indexInterfaceForTheseTests, BSONObj() , 2000 );
                 for ( int i=0; i<10000; i++ ) {
-                    sorter.add( BSON( "x" << rand() % 10000 ) , 5  , i );
+                    sorter.add( BSON( "x" << rand() % 10000 ), DiskLoc( 5, i ), false );
                 }
 
-                sorter.sort();
+                sorter.sort( false );
 
                 auto_ptr<BSONObjExternalSorter::Iterator> i = sorter.iterator();
                 int num=0;
@@ -1727,10 +1727,10 @@ namespace JsobjTests {
                 const int total = 100000;
                 BSONObjExternalSorter sorter( indexInterfaceForTheseTests, BSONObj() , total * 2 );
                 for ( int i=0; i<total; i++ ) {
-                    sorter.add( BSON( "a" << "b" ) , 5  , i );
+                    sorter.add( BSON( "a" << "b" ), DiskLoc( 5, i ), false );
                 }
 
-                sorter.sort();
+                sorter.sort( false );
 
                 auto_ptr<BSONObjExternalSorter::Iterator> i = sorter.iterator();
                 int num=0;
@@ -1754,10 +1754,12 @@ namespace JsobjTests {
                 const int total = 1000 * 1000;
                 BSONObjExternalSorter sorter( indexInterfaceForTheseTests, BSONObj() , total * 2 );
                 for ( int i=0; i<total; i++ ) {
-                    sorter.add( BSON( "abcabcabcabd" << "basdasdasdasdasdasdadasdasd" << "x" << i ) , 5  , i );
+                    sorter.add( BSON( "abcabcabcabd" << "basdasdasdasdasdasdadasdasd" << "x" << i ),
+                                DiskLoc( 5, i ),
+                                false );
                 }
 
-                sorter.sort();
+                sorter.sort( false );
 
                 auto_ptr<BSONObjExternalSorter::Iterator> i = sorter.iterator();
                 int num=0;
@@ -1784,13 +1786,13 @@ namespace JsobjTests {
                 BSONObj x = b.obj();
 
                 BSONObjExternalSorter sorter(indexInterfaceForTheseTests);
-                sorter.add(x, DiskLoc(3,7));
-                sorter.add(x, DiskLoc(4,7));
-                sorter.add(x, DiskLoc(2,7));
-                sorter.add(x, DiskLoc(1,7));
-                sorter.add(x, DiskLoc(3,77));
+                sorter.add(x, DiskLoc(3,7), false);
+                sorter.add(x, DiskLoc(4,7), false);
+                sorter.add(x, DiskLoc(2,7), false);
+                sorter.add(x, DiskLoc(1,7), false);
+                sorter.add(x, DiskLoc(3,77), false);
 
-                sorter.sort();
+                sorter.sort( false );
 
                 auto_ptr<BSONObjExternalSorter::Iterator> i = sorter.iterator();
                 while( i->more() ) {

@@ -28,6 +28,7 @@
 #include "stats/counters.h"
 #include "dur_commitjob.h"
 #include "btreebuilder.h"
+#include "mongo/db/kill_current_op.h"
 
 namespace mongo {
 
@@ -92,7 +93,7 @@ namespace mongo {
     }
 
     template<class V>
-    void BtreeBuilder<V>::buildNextLevel(DiskLoc loc) {
+    void BtreeBuilder<V>::buildNextLevel(DiskLoc loc, bool mayInterrupt) {
         int levels = 1;
         while( 1 ) {
             if( loc.btree<V>()->tempNext().isNull() ) {
@@ -108,6 +109,8 @@ namespace mongo {
 
             DiskLoc xloc = loc;
             while( !xloc.isNull() ) {
+                killCurrentOp.checkForInterrupt( !mayInterrupt );
+
                 if ( getDur().commitIfNeeded() ) {
                     b = cur.btreemod<V>();
                     up = upLoc.btreemod<V>();
@@ -154,28 +157,9 @@ namespace mongo {
 
     /** when all addKeys are done, we then build the higher levels of the tree */
     template<class V>
-    void BtreeBuilder<V>::commit() {
-        buildNextLevel(first);
+    void BtreeBuilder<V>::commit(bool mayInterrupt) {
+        buildNextLevel(first, mayInterrupt);
         committed = true;
-    }
-
-    template<class V>
-    BtreeBuilder<V>::~BtreeBuilder() {
-        DESTRUCTOR_GUARD(
-            if( !committed ) {
-                LOG(2) << "Rolling back partially built index space" << endl;
-                DiskLoc x = first;
-                while( !x.isNull() ) {
-                    DiskLoc next = x.btree<V>()->tempNext();
-                    string ns = idx.indexNamespace();
-                    theDataFileMgr._deleteRecord(nsdetails(ns.c_str()), ns.c_str(), x.rec(), x);
-                    x = next;
-                    getDur().commitIfNeeded();
-                }
-                verify( idx.head.isNull() );
-                LOG(2) << "done rollback" << endl;
-            }
-        )
     }
 
     template class BtreeBuilder<V0>;
