@@ -532,7 +532,7 @@ struct __wt_session {
 	 * where the \c size field indicates the number of records in the bitmap
 	 * (as specified by the file's \c value_format). Bulk load bitmap values
 	 * must end on a byte boundary relative to the bit count - except for
-	 * the last set of values loaded..,a string; default \c false.}
+	 * the last set of values loaded.,a string; default \c false.}
 	 * @config{checkpoint, the name of a checkpoint to open (the reserved
 	 * name "WiredTigerCheckpoint" opens the most recent internal checkpoint
 	 * taken for the object).  The cursor does not support data

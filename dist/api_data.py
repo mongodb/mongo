@@ -315,7 +315,7 @@ methods = {
 		indicates the number of records in the bitmap (as specified by
 		the file's \c value_format). Bulk load bitmap values must end
 		on a byte boundary relative to the bit count - except for the
-		last set of values loaded.''',
+		last set of values loaded''',
 		type='string'),
 	Config('checkpoint', '', r'''
 		the name of a checkpoint to open (the reserved name

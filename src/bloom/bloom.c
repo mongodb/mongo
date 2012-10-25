@@ -183,7 +183,8 @@ __wt_bloom_finalize(WT_BLOOM *bloom)
 		values.data = bloom->bitstring + (i >> 3);
 		/*
 		 * Shave off some bytes for pure paranoia, in case WiredTiger
-		 * reserves some special sizes.
+		 * reserves some special sizes. Choose a value so that if
+		 * we do multiple inserts, it will be on an byte boundary.
 		 */
 		values.size = (uint32_t)WT_MIN(bloom->m - i, UINT32_MAX - 128);
 		c->set_value(c, &values);

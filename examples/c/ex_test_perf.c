@@ -57,6 +57,11 @@ typedef struct {
 	uint32_t stat_thread;	/* Whether to create a stat thread. */
 	WT_CONNECTION *conn;
 	FILE *logf;
+#define LSM_TEST_PERF_INIT	0x00
+#define LSM_TEST_PERF_POP	0x01
+#define LSM_TEST_PERF_READ	0x02
+	uint32_t phase;
+	struct timeval phase_start_time;
 } CONFIG;
 
 /* Forward function definitions. */
@@ -86,7 +91,9 @@ CONFIG default_cfg = {
 	0,		/* verbose */
 	0,		/* stat_thread */
 	NULL,		/* conn */
-	NULL		/* logf */
+	NULL,		/* logf */
+	LSM_TEST_PERF_INIT, /* phase */
+	{0, 0}		/* phase_start_time */
 };
 /* Small config values - these are small. */
 CONFIG small_cfg = {
@@ -107,7 +114,9 @@ CONFIG small_cfg = {
 	0,		/* verbose */
 	0,		/* stat_thread */
 	NULL,		/* conn */
-	NULL		/* logf */
+	NULL,		/* logf */
+	LSM_TEST_PERF_INIT, /* phase */
+	{0, 0}		/* phase_start_time */
 };
 /* Default values - these are small, we want the basic run to be fast. */
 CONFIG med_cfg = {
@@ -128,7 +137,9 @@ CONFIG med_cfg = {
 	0,		/* verbose */
 	0,		/* stat_thread */
 	NULL,		/* conn */
-	NULL		/* logf */
+	NULL,		/* logf */
+	LSM_TEST_PERF_INIT, /* phase */
+	{0, 0}		/* phase_start_time */
 };
 /* Default values - these are small, we want the basic run to be fast. */
 CONFIG large_cfg = {
@@ -149,7 +160,9 @@ CONFIG large_cfg = {
 	0,		/* verbose */
 	0,		/* stat_thread */
 	NULL,		/* conn */
-	NULL		/* logf */
+	NULL,		/* logf */
+	LSM_TEST_PERF_INIT, /* phase */
+	{0, 0}		/* phase_start_time */
 };
 
 const char *debug_cconfig = "verbose=[lsm]";
@@ -158,6 +171,7 @@ const char *debug_tconfig = "";
 /* Global values shared by threads. */
 uint64_t nops;
 int running;
+int stat_running;
 
 void *
 read_thread(void *arg)
@@ -207,7 +221,9 @@ stat_worker(void *arg)
 	WT_CURSOR *cursor;
 	const char *desc, *pvalue;
 	char *lsm_uri;
+	double secs;
 	int ret;
+	struct timeval e;
 	uint64_t value;
 
 	cfg = (CONFIG *)arg;
@@ -221,7 +237,8 @@ stat_worker(void *arg)
 	}
 
 	if (strncmp(cfg->uri, "lsm:", strlen("lsm:")) == 0) {
-		lsm_uri = calloc(strlen(cfg->uri) + strlen("statistics:"), 1);
+		lsm_uri = calloc(
+		    strlen(cfg->uri) + strlen("statistics:") + 1, 1);
 		if (lsm_uri == NULL) {
 			fprintf(stderr, "No memory in stat thread.\n");
 			goto err;
@@ -229,13 +246,20 @@ stat_worker(void *arg)
 		sprintf(lsm_uri, "statistics:%s", cfg->uri);
 	}
 
-	while (running) {
+	while (stat_running) {
 		sleep(cfg->report_interval);
 		/* Generic header. */
 		fprintf(cfg->logf, "=======================================\n");
+		gettimeofday(&e, NULL);
+		secs = e.tv_sec + e.tv_usec / 1000000.0;
+		secs -= (cfg->phase_start_time.tv_sec +
+		    cfg->phase_start_time.tv_usec / 1000000.0);
+		if (secs == 0)
+			++secs;
 		fprintf(cfg->logf,
-		    "reads completed: %" PRIu64", elapsed time: ~%d\n",
-		    nops, cfg->elapsed_time);
+		    "%s completed: %" PRIu64", elapsed time: %.2f\n",
+		    cfg->phase == LSM_TEST_PERF_READ ? "reads" : "inserts",
+		    nops, secs);
 		/* Report LSM tree stats, if using LSM. */
 		if (lsm_uri != NULL) {
 			if ((ret = session->open_cursor(session, lsm_uri,
@@ -284,10 +308,13 @@ int populate(CONFIG *cfg)
 	char *data_buf, *key_buf;
 	double secs;
 	int ret;
-	struct timeval e, s;
-	uint32_t i;
+	struct timeval e;
 
 	conn = cfg->conn;
+
+	cfg->phase = LSM_TEST_PERF_POP;
+	if (cfg->verbose > 0)
+		fprintf(cfg->logf, "Starting bulk load\n");
 
 	data_buf = calloc(cfg->data_sz, 1);
 	if (data_buf == NULL)
@@ -320,15 +347,15 @@ int populate(CONFIG *cfg)
 	memset(data_buf, 'a', cfg->data_sz - 1);
 	cursor->set_value(cursor, data_buf);
 	/* Populate the database. */
-	gettimeofday(&s, NULL);
-	for (i = 0; i < cfg->icount; i++) {
+	gettimeofday(&cfg->phase_start_time, NULL);
+	for (nops = 0; nops < cfg->icount; nops++) {
 		if (cfg->verbose > 0) {
-			if (i % 1000000 == 0)
+			if (nops % 1000000 == 0)
 				printf(".");
-			if (i % 50000000 == 0)
+			if (nops % 50000000 == 0)
 				printf("\n");
 		}
-		sprintf(key_buf, "%d", i);
+		sprintf(key_buf, "%"PRIu64, nops);
 		cursor->set_key(cursor, key_buf);
 		if ((ret = cursor->insert(cursor)) != 0) {
 			fprintf(stderr, "Failed inserting with: %d\n", ret);
@@ -342,7 +369,8 @@ int populate(CONFIG *cfg)
 		fprintf(cfg->logf,
 		    "Finished bulk load of %d items\n", cfg->icount);
 		secs = e.tv_sec + e.tv_usec / 1000000.0;
-		secs -= (s.tv_sec + s.tv_usec / 1000000.0);
+		secs -= (cfg->phase_start_time.tv_sec +
+		    cfg->phase_start_time.tv_usec / 1000000.0);
 		if (secs == 0)
 			++secs;
 		fprintf(cfg->logf,
@@ -534,10 +562,9 @@ int main(int argc, char **argv)
 	}
 
 	cfg.conn = conn;
-	if (cfg.create != 0 && (ret = populate(&cfg)) != 0)
-		goto err;
 
 	if (cfg.stat_thread) {
+		stat_running = 1;
 		if ((ret = pthread_create(
 		    &stat, NULL, stat_worker, &cfg)) != 0) {
 			fprintf(stderr, "Error creating statistics thread.\n");
@@ -545,6 +572,8 @@ int main(int argc, char **argv)
 		}
 		stat_created = 1;
 	}
+	if (cfg.create != 0 && (ret = populate(&cfg)) != 0)
+		goto err;
 
 	if (cfg.read_time != 0 && cfg.read_threads != 0)
 		if ((ret = execute_reads(&cfg)) != 0)
@@ -557,6 +586,9 @@ int main(int argc, char **argv)
 		fprintf(cfg.logf,
 		    "Executed %" PRIu64 " read operations\n", nops);
 	}
+
+	if (cfg.stat_thread)
+		stat_running = 0;
 
 	/* Cleanup. */
 err:	if (stat_created != 0 && (ret = pthread_join(stat, NULL)) != 0)
@@ -583,6 +615,7 @@ int execute_reads(CONFIG *cfg)
 	uint32_t i;
 	uint64_t last_ops;
 
+	cfg->phase = LSM_TEST_PERF_READ;
 	if (cfg->verbose > 0)
 		fprintf(cfg->logf, "Starting read threads\n");
 
@@ -604,6 +637,7 @@ int execute_reads(CONFIG *cfg)
 	if (cfg->report_interval > cfg->read_time)
 		cfg->report_interval = cfg->read_time;
 
+	gettimeofday(&cfg->phase_start_time, NULL);
 	for (cfg->elapsed_time = 0, last_ops = 0;
 	    cfg->elapsed_time < cfg->read_time;
 	    cfg->elapsed_time += cfg->report_interval) {
