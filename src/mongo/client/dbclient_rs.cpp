@@ -734,7 +734,7 @@ namespace mongo {
                 node.lastIsMaster = o.copy();
             }
 
-            LOG( ! verbose ) << "ReplicaSetMonitor::_checkConnection: " << conn->toString()
+            LOG( verbose ? 0 : 1 ) << "ReplicaSetMonitor::_checkConnection: " << conn->toString()
                              << ' ' << o << endl;
             
             // add other nodes
@@ -757,7 +757,7 @@ namespace mongo {
 
         }
         catch ( std::exception& e ) {
-            LOG( ! verbose ) << "ReplicaSetMonitor::_checkConnection: caught exception "
+            LOG( verbose ? 0 : 1 ) << "ReplicaSetMonitor::_checkConnection: caught exception "
                              << conn->toString() << ' ' << e.what() << endl;
 
             errorOccured = true;
