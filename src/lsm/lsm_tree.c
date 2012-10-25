@@ -370,6 +370,8 @@ __lsm_tree_open(
 	WT_DECL_RET;
 	WT_LSM_TREE *lsm_tree;
 
+	WT_ASSERT(session, F_ISSET(session, WT_SESSION_SCHEMA_LOCKED));
+
 	/* Make sure no one beat us to it. */
 	TAILQ_FOREACH(lsm_tree, &S2C(session)->lsmqh, q)
 		if (strcmp(uri, lsm_tree->name) == 0) {
@@ -419,7 +421,6 @@ int
 __wt_lsm_tree_get(
     WT_SESSION_IMPL *session, const char *uri, WT_LSM_TREE **treep)
 {
-	WT_DECL_RET;
 	WT_LSM_TREE *lsm_tree;
 
 	TAILQ_FOREACH(lsm_tree, &S2C(session)->lsmqh, q)
@@ -432,9 +433,7 @@ __wt_lsm_tree_get(
 	 * If we don't already hold the schema lock, get it now so that we
 	 * can find and/or open the handle.
 	 */
-	WT_WITH_SCHEMA_LOCK_OPT(session,
-	    ret = __lsm_tree_open(session, uri, treep));
-	return (ret);
+	return (__lsm_tree_open(session, uri, treep));
 }
 
 /*

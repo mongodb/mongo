@@ -345,9 +345,12 @@ static int
 __curstat_lsm_init(WT_SESSION_IMPL *session,
     const char *uri, WT_CURSOR_STAT *cst, uint32_t flags)
 {
+	WT_DECL_RET;
 	WT_LSM_TREE *lsm_tree;
 
-	WT_RET(__wt_lsm_tree_get(session, uri, &lsm_tree));
+	WT_WITH_SCHEMA_LOCK_OPT(session,
+	    ret = __wt_lsm_tree_get(session, uri, &lsm_tree));
+	WT_RET(ret);
 
 	WT_RET(__wt_lsm_stat_init(session, lsm_tree, flags));
 
