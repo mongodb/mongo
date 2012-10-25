@@ -68,7 +68,7 @@ __wt_lsm_checkpoint_worker(void *arg)
 	WT_LSM_TREE *lsm_tree;
 	WT_LSM_WORKER_COOKIE cookie;
 	WT_SESSION_IMPL *session;
-	const char *cfg[] = { "name=,drop=", NULL };
+	const char *cfg[] = API_CONF_DEFAULTS(session, checkpoint, NULL);
 	int i, j;
 
 	lsm_tree = arg;
@@ -217,7 +217,7 @@ __lsm_free_chunks(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 {
 	WT_DECL_RET;
 	WT_LSM_CHUNK *chunk;
-	const char *drop_cfg[] = { NULL };
+	const char *drop_cfg[] = API_CONF_DEFAULTS(session, drop, NULL);
 	int locked, progress, i;
 
 	locked = progress = 0;
