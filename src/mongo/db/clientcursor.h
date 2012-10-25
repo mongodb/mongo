@@ -32,6 +32,7 @@
 #include "jsobj.h"
 #include "../util/net/message.h"
 #include "../util/background.h"
+#include "cc_by_loc.h"
 #include "diskloc.h"
 #include "dbhelpers.h"
 #include "matcher.h"
@@ -43,36 +44,14 @@
 namespace mongo {
 
     typedef boost::recursive_mutex::scoped_lock recursive_scoped_lock;
-    typedef long long CursorId; /* passed to the client so it can send back on getMore */
-    static const CursorId INVALID_CURSOR_ID = -1; // But see SERVER-5726.
     class Cursor; /* internal server cursor base class */
     class ClientCursor;
     class ParsedQuery;
-
-    struct ByLocKey {
-
-        ByLocKey( const DiskLoc & l , const CursorId& i ) : loc(l), id(i) {}
-
-        static ByLocKey min( const DiskLoc& l ) { return ByLocKey( l , numeric_limits<long long>::min() ); }
-        static ByLocKey max( const DiskLoc& l ) { return ByLocKey( l , numeric_limits<long long>::max() ); }
-
-        bool operator<( const ByLocKey &other ) const {
-            int x = loc.compare( other.loc );
-            if ( x )
-                return x < 0;
-            return id < other.id;
-        }
-
-        DiskLoc loc;
-        CursorId id;
-
-    };
 
     /* todo: make this map be per connection.  this will prevent cursor hijacking security attacks perhaps.
      *       ERH: 9/2010 this may not work since some drivers send getMore over a different connection
     */
     typedef map<CursorId, ClientCursor*> CCById;
-    typedef map<ByLocKey, ClientCursor*> CCByLoc;
 
     extern BSONObj id_obj;
 
