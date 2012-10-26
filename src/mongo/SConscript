@@ -98,6 +98,7 @@ commonFiles = [ "pch.cpp",
                 "util/net/message_port.cpp",
                 "util/net/listen.cpp",
                 "util/startup_test.cpp",
+                "util/version.cpp",
                 "client/authentication_table.cpp",
                 "client/connpool.cpp",
                 "client/dbclient.cpp",
@@ -106,7 +107,23 @@ commonFiles = [ "pch.cpp",
                 "client/model.cpp",
                 "client/syncclusterconnection.cpp",
                 "client/distlock.cpp",
+                "db/dbmessage.cpp"
                 ]
+
+# handle processinfo*
+processInfoFiles = [ "util/processinfo.cpp" ]
+
+processInfoPlatformFile = env.File( "util/processinfo_${PYSYSPLATFORM}.cpp" )
+# NOTE( schwerin ): This is a very un-scons-y way to make this decision, and prevents one from using
+# code generation to produce util/processinfo_$PYSYSPLATFORM.cpp.
+if not os.path.exists( str( processInfoPlatformFile ) ):
+    processInfoPlatformFile = env.File( "util/processinfo_none.cpp" )
+
+processInfoFiles.append( processInfoPlatformFile )
+
+commonFiles += processInfoFiles
+
+
 
 env.StaticLibrary("fail_point",
                   ["util/fail_point.cpp",
@@ -175,10 +192,8 @@ env.StaticLibrary("coredb", [
         ],
                   LIBDEPS=['db/auth/serverauth'])
 
-coreServerFiles = [ "util/version.cpp",
-                    "db/common.cpp",
+coreServerFiles = [ "db/common.cpp",
                     "util/net/miniwebserver.cpp",
-                    "db/dbmessage.cpp",
                     "db/indexkey.cpp",
                     "db/stats/counters.cpp",
                     "db/stats/service_stats.cpp",
@@ -215,19 +230,6 @@ if has_option( "mm" ):
     mmapFiles += [ "util/mmap_mm.cpp" ]
 else:
     mmapFiles += [ "util/mmap_${OS_FAMILY}.cpp" ]
-
-# handle processinfo*
-processInfoFiles = [ "util/processinfo.cpp" ]
-
-processInfoPlatformFile = env.File( "util/processinfo_${PYSYSPLATFORM}.cpp" )
-# NOTE( schwerin ): This is a very un-scons-y way to make this decision, and prevents one from using
-# code generation to produce util/processinfo_$PYSYSPLATFORM.cpp.
-if not os.path.exists( str( processInfoPlatformFile ) ):
-    processInfoPlatformFile = env.File( "util/processinfo_none.cpp" )
-
-processInfoFiles.append( processInfoPlatformFile )
-
-coreServerFiles += processInfoFiles
 
 # handle systeminfo*
 systemInfoPlatformFile = env.File( "util/systeminfo_${PYSYSPLATFORM}.cpp" )
@@ -546,7 +548,7 @@ if shellEnv is not None:
     mongo_shell = shellEnv.Program(
         "mongo",
         coreShellFiles,
-        LIBDEPS=["coreserver", "clientandshell",
+        LIBDEPS=[ "clientandshell", "mongocommon", "scripting", 
                  "$BUILD_DIR/third_party/pcrecpp"] + env['MODULE_LIBDEPS_MONGOSHELL'] )
 
     shellEnv.Install( '#/', mongo_shell )
