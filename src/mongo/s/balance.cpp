@@ -1,5 +1,3 @@
-//@file balance.cpp
-
 /**
 *    Copyright (C) 2008 10gen Inc.
 *
@@ -18,18 +16,18 @@
 
 #include "pch.h"
 
-#include "../db/jsobj.h"
-#include "../db/cmdline.h"
+#include "mongo/s/balance.h"
 
-#include "../client/distlock.h"
+#include "mongo/client/distlock.h"
 #include "mongo/client/dbclientcursor.h"
-
-#include "balance.h"
-#include "server.h"
-#include "shard.h"
-#include "config.h"
-#include "chunk.h"
-#include "grid.h"
+#include "mongo/db/jsobj.h"
+#include "mongo/db/cmdline.h"
+#include "mongo/s/chunk.h"
+#include "mongo/s/cluster_constants.h"
+#include "mongo/s/config.h"
+#include "mongo/s/grid.h"
+#include "mongo/s/server.h"
+#include "mongo/s/shard.h"
 
 namespace mongo {
 
@@ -149,17 +147,19 @@ namespace mongo {
         // the ShardsNS::collections collection
         //
 
-        auto_ptr<DBClientCursor> cursor = conn.query( ShardNS::collection , BSONObj() );
+        auto_ptr<DBClientCursor> cursor = conn.query(ConfigNS::collection, BSONObj());
         vector< string > collections;
         while ( cursor->more() ) {
             BSONObj col = cursor->nextSafe();
 
             // sharded collections will have a shard "key".
-            if ( ! col["key"].eoo() && ! col["noBalance"].trueValue() ){
-                collections.push_back( col["_id"].String() );
+            if ( ! col[CollectionFields::key()].eoo() &&
+                 ! col[CollectionFields::noBalance()].trueValue() ){
+                collections.push_back( col[CollectionFields::name()].String() );
             }
-            else if( col["noBalance"].trueValue() ){
-                LOG(1) << "not balancing collection " << col["_id"].String() << ", explicitly disabled" << endl;
+            else if( col[CollectionFields::noBalance()].trueValue() ){
+                LOG(1) << "not balancing collection " << col[CollectionFields::name()].String()
+                       << ", explicitly disabled" << endl;
             }
 
         }
@@ -205,12 +205,14 @@ namespace mongo {
             const string& ns = *it;
 
             map< string,vector<BSONObj> > shardToChunksMap;
-            cursor = conn.query( ShardNS::chunk , QUERY( "ns" << ns ).sort( "min" ) );
+            cursor = conn.query(ConfigNS::chunk,
+                                QUERY(ChunkFields::ns(ns)).sort(ChunkFields::min()));
+
             while ( cursor->more() ) {
                 BSONObj chunk = cursor->nextSafe();
-                if ( chunk["jumbo"].trueValue() )
+                if (chunk[ChunkFields::jumbo()].trueValue())
                     continue;
-                vector<BSONObj>& chunks = shardToChunksMap[chunk["shard"].String()];
+                vector<BSONObj>& chunks = shardToChunksMap[chunk[ChunkFields::shard()].String()];
                 chunks.push_back( chunk.getOwned() );
             }
             cursor.reset();
@@ -227,17 +229,22 @@ namespace mongo {
             }
 
             DistributionStatus status( shardInfo, shardToChunksMap );
-            
+
             // load tags
-            conn.ensureIndex( ShardNS::tags, BSON( "ns" << 1 << "min" << 1 ), true );
-            cursor = conn.query( ShardNS::tags , QUERY( "ns" << ns ).sort( "min" ) );
+            conn.ensureIndex(ConfigNS::tag,
+                             BSON(TagFields::ns() << 1 << TagFields::min() << 1),
+                             true);
+
+            cursor = conn.query(ConfigNS::tag,
+                                QUERY(TagFields::ns(ns)).sort(TagFields::min()));
+
             while ( cursor->more() ) {
                 BSONObj tag = cursor->nextSafe();
-                uassert( 16356 , str::stream() << "tag ranges not valid for: " << ns ,
-                         status.addTagRange( TagRange( tag["min"].Obj().getOwned(), 
-                                                       tag["max"].Obj().getOwned(), 
-                                                       tag["tag"].String() ) ) );
-                    
+                uassert(16356 , str::stream() << "tag ranges not valid for: " << ns ,
+                        status.addTagRange(TagRange(tag[TagFields::min()].Obj().getOwned(),
+                                                    tag[TagFields::max()].Obj().getOwned(),
+                                                    tag[TagFields::tag()].String())));
+
             }
             cursor.reset();
             

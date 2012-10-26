@@ -172,7 +172,7 @@ namespace mongo {
         if ( _tagRanges.size() == 0 )
             return "";
 
-        BSONObj min = chunk["min"].Obj();
+        BSONObj min = chunk[ChunkFields::min()].Obj();
 
         map<BSONObj,TagRange>::const_iterator i = _tagRanges.upper_bound( min );
         if ( i == _tagRanges.end() )

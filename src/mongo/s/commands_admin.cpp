@@ -909,10 +909,11 @@ namespace mongo {
                     return false;
                 }
 
-                BSONObj primaryDoc = BSON( "_id" << NE << "local" << "primary" << s.getName() );
+                BSONObj primaryDoc = BSON(DatabaseFields::name.ne("local") <<
+                                          DatabaseFields::primary(s.getName()));
                 BSONObj dbInfo; // appended at end of result on success
                 {
-                    boost::scoped_ptr<DBClientCursor> cursor (conn->query("config.databases", primaryDoc));
+                    boost::scoped_ptr<DBClientCursor> cursor (conn->query(ConfigNS::database, primaryDoc));
                     if (cursor->more()) { // skip block and allocations if empty
                         BSONObjBuilder dbInfoBuilder;
                         dbInfoBuilder.append("note", "you need to drop or movePrimary these databases");
@@ -920,7 +921,7 @@ namespace mongo {
 
                         while (cursor->more()){
                             BSONObj db = cursor->nextSafe();
-                            dbs.append(db["_id"]);
+                            dbs.append(db[DatabaseFields::name()]);
                         }
                         dbs.doneFast();
 
@@ -929,9 +930,9 @@ namespace mongo {
                 }
 
                 // If the server is not yet draining chunks, put it in draining mode.
-                BSONObj searchDoc = BSON( ShardFields::name() << s.getName() );
-                BSONObj drainingDoc = BSON( ShardFields::name() << s.getName() << ShardFields::draining(true) );
-                BSONObj shardDoc = conn->findOne( ConfigNS::shard, drainingDoc );
+                BSONObj searchDoc = BSON(ShardFields::name() << s.getName());
+                BSONObj drainingDoc = BSON(ShardFields::name() << s.getName() << ShardFields::draining(true));
+                BSONObj shardDoc = conn->findOne(ConfigNS::shard, drainingDoc);
                 if ( shardDoc.isEmpty() ) {
 
                     // TODO prevent move chunks to this shard.
@@ -946,11 +947,12 @@ namespace mongo {
                         return false;
                     }
 
-                    BSONObj primaryLocalDoc = BSON("_id" << "local" <<  "primary" << s.getName() );
+                    BSONObj primaryLocalDoc = BSON(DatabaseFields::name("local") <<
+                                                   DatabaseFields::primary(s.getName()));
                     PRINT(primaryLocalDoc);
-                    if (conn->count("config.databases", primaryLocalDoc)) {
+                    if (conn->count(ConfigNS::database, primaryLocalDoc)) {
                         log() << "This shard is listed as primary of local db. Removing entry." << endl;
-                        conn->remove("config.databases", BSON("_id" << "local"));
+                        conn->remove(ConfigNS::database, BSON(DatabaseFields::name("local")));
                         errmsg = conn->getLastError();
                         if ( errmsg.size() ) {
                             log() << "error removing local db: " << errmsg << endl;
@@ -970,9 +972,9 @@ namespace mongo {
 
                 // If the server has been completely drained, remove it from the ConfigDB.
                 // Check not only for chunks but also databases.
-                BSONObj shardIDDoc = BSON( "shard" << shardDoc[ "_id" ].str() );
-                long long chunkCount = conn->count( "config.chunks" , shardIDDoc );
-                long long dbCount = conn->count( "config.databases" , primaryDoc );
+                BSONObj shardIDDoc = BSON(ChunkFields::shard(shardDoc[ShardFields::name()].str()));
+                long long chunkCount = conn->count(ConfigNS::chunk, shardIDDoc);
+                long long dbCount = conn->count( ConfigNS::database , primaryDoc );
                 if ( ( chunkCount == 0 ) && ( dbCount == 0 ) ) {
                     log() << "going to remove shard: " << s.getName() << endl;
                     conn->remove( ConfigNS::shard , searchDoc );

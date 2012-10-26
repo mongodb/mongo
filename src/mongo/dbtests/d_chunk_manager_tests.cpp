@@ -18,25 +18,26 @@
 
 #include "pch.h"
 
-#include "../s/d_chunk_manager.h"
 
-#include "dbtests.h"
+#include "mongo/dbtests/dbtests.h"
+#include "mongo/s/d_chunk_manager.h"
+#include "mongo/s/cluster_constants.h"
 
 namespace {
 
     class BasicTests {
     public:
         void run() {
-            BSONObj collection = BSON( "_id"     << "test.foo" <<
-                                       "dropped" << false <<
-                                       "key"     << BSON( "a" << 1 ) <<
-                                       "unique"  << false );
+            BSONObj collection = BSON(CollectionFields::name("test.foo") <<
+                                      CollectionFields::dropped(false) <<
+                                      CollectionFields::key(BSON("a" << 1)) <<
+                                      CollectionFields::unique(false));
 
             // single-chunk collection
-            BSONArray chunks = BSON_ARRAY( BSON( "_id" << "test.foo-a_MinKey" <<
-                                                 "ns"  << "test.foo" <<
-                                                 "min" << BSON( "a" << MINKEY ) <<
-                                                 "max" << BSON( "a" << MAXKEY ) ) );
+            BSONArray chunks = BSON_ARRAY(BSON(ChunkFields::name("test.foo-a_MinKey") <<
+                                               ChunkFields::ns("test.foo") <<
+                                               ChunkFields::min(BSON("a" << MINKEY)) <<
+                                               ChunkFields::max(BSON("a" << MAXKEY))));
 
             ShardChunkManager s ( collection , chunks );
 
@@ -52,16 +53,18 @@ namespace {
     class BasicCompoundTests {
     public:
         void run() {
-            BSONObj collection = BSON( "_id"     << "test.foo" <<
-                                       "dropped" << false <<
-                                       "key"     << BSON( "a" << 1 << "b" << 1) <<
-                                       "unique"  << false );
+            BSONObj collection = BSON(CollectionFields::name("test.foo") <<
+                                      CollectionFields::dropped(false) <<
+                                      CollectionFields::key(BSON("a" << 1 << "b" << 1)) <<
+                                      CollectionFields::unique(false));
 
             // single-chunk collection
-            BSONArray chunks = BSON_ARRAY( BSON( "_id" << "test.foo-a_MinKeyb_MinKey" <<
-                                                 "ns"  << "test.foo" <<
-                                                 "min" << BSON( "a" << MINKEY << "b" << MINKEY ) <<
-                                                 "max" << BSON( "a" << MAXKEY << "b" << MAXKEY ) ) );
+            BSONArray chunks = BSON_ARRAY(BSON(ChunkFields::name("test.foo-a_MinKeyb_MinKey") <<
+                                               ChunkFields::ns("test.foo") <<
+                                               ChunkFields::min(BSON("a" << MINKEY <<
+                                                                     "b" << MINKEY)) <<
+                                               ChunkFields::max(BSON("a" << MAXKEY <<
+                                                                     "b" << MINKEY))));
 
             ShardChunkManager s ( collection , chunks );
 
@@ -79,25 +82,27 @@ namespace {
     class RangeTests {
     public:
         void run() {
-            BSONObj collection = BSON( "_id"     << "x.y" <<
-                                       "dropped" << false <<
-                                       "key"     << BSON( "a" << 1 ) <<
-                                       "unique"  << false );
+            BSONObj collection = BSON(CollectionFields::name("x.y") <<
+                                      CollectionFields::dropped(false) <<
+                                      CollectionFields::key(BSON("a" << 1)) <<
+                                      CollectionFields::unique(false));
 
             // 3-chunk collection, 2 of them being contiguous
             // [min->10) , [10->20) , <gap> , [30->max)
-            BSONArray chunks = BSON_ARRAY( BSON( "_id" << "x.y-a_MinKey" <<
-                                                 "ns"  << "x.y" <<
-                                                 "min" << BSON( "a" << MINKEY ) <<
-                                                 "max" << BSON( "a" << 10 ) ) <<
-                                           BSON( "_id" << "x.y-a_10" <<
-                                                 "ns"  << "x.y" <<
-                                                 "min" << BSON( "a" << 10 ) <<
-                                                 "max" << BSON( "a" << 20 ) ) <<
-                                           BSON( "_id" << "x.y-a_30" <<
-                                                 "ns"  << "x.y" <<
-                                                 "min" << BSON( "a" << 30 ) <<
-                                                 "max" << BSON( "a" << MAXKEY ) ) );
+            BSONArray chunks = BSON_ARRAY(BSON(ChunkFields::name("x.y-a_MinKey") <<
+                                               ChunkFields::ns("x.y") <<
+                                               ChunkFields::min(BSON("a" << MINKEY)) <<
+                                               ChunkFields::max(BSON("a" << 10))) <<
+
+                                          BSON(ChunkFields::name("x.y-a_10") <<
+                                               ChunkFields::ns("x.y") <<
+                                               ChunkFields::min(BSON("a" << 10)) <<
+                                               ChunkFields::max(BSON("a" << 20))) <<
+
+                                          BSON(ChunkFields::name("x.y-a_30") <<
+                                               ChunkFields::ns("x.y") <<
+                                               ChunkFields::min(BSON("a" << 30)) <<
+                                               ChunkFields::max(BSON("a" << MAXKEY))));
 
             ShardChunkManager s ( collection , chunks );
 
@@ -117,11 +122,11 @@ namespace {
     class GetNextTests {
     public:
         void run() {
+            BSONObj collection = BSON(CollectionFields::name("x.y") <<
+                                      CollectionFields::dropped(false) <<
+                                      CollectionFields::key(BSON("a" << 1)) <<
+                                      CollectionFields::unique(false));
 
-            BSONObj collection = BSON( "_id"     << "x.y" <<
-                                       "dropped" << false <<
-                                       "key"     << BSON( "a" << 1 ) <<
-                                       "unique"  << false );
             // empty collection
             BSONArray chunks1 = BSONArray();
             ShardChunkManager s1( collection , chunks1 );
@@ -141,10 +146,10 @@ namespace {
             // [10->20]
             BSONObj key_a10 = BSON( "a" << 10 );
             BSONObj key_a20 = BSON( "a" << 20 );
-            BSONArray chunks2 = BSON_ARRAY( BSON( "_id" << "x.y-a_10" <<
-                                                  "ns"  << "x.y" <<
-                                                  "min" << key_a10 <<
-                                                  "max" << key_a20 ) );
+            BSONArray chunks2 = BSON_ARRAY(BSON(ChunkFields::name("x.y-a_10") <<
+                                                ChunkFields::ns("x.y") <<
+                                                ChunkFields::min(key_a10) <<
+                                                ChunkFields::max(key_a20)));
             ShardChunkManager s2( collection , chunks2 );
             ASSERT( s2.getNextChunk( empty , &foundMin , &foundMax ) );
             ASSERT( foundMin.woCompare( key_a10 ) == 0 );
@@ -155,18 +160,18 @@ namespace {
             BSONObj key_a30 = BSON( "a" << 30 );
             BSONObj key_min = BSON( "a" << MINKEY );
             BSONObj key_max = BSON( "a" << MAXKEY );
-            BSONArray chunks3 = BSON_ARRAY( BSON( "_id" << "x.y-a_MinKey" <<
-                                                  "ns"  << "x.y" <<
-                                                  "min" << key_min <<
-                                                  "max" << key_a10  ) <<
-                                            BSON( "_id" << "x.y-a_10" <<
-                                                  "ns"  << "x.y" <<
-                                                  "min" << key_a10  <<
-                                                  "max" << key_a20  ) <<
-                                            BSON( "_id" << "x.y-a_30" <<
-                                                  "ns"  << "x.y" <<
-                                                  "min" << key_a30  <<
-                                                  "max" << key_max  ) );
+            BSONArray chunks3 = BSON_ARRAY(BSON(ChunkFields::name("x.y-a_MinKey") <<
+                                                ChunkFields::ns("x.y") <<
+                                                ChunkFields::min(key_min) <<
+                                                ChunkFields::max(key_a10)) <<
+                                           BSON(ChunkFields::name("x.y-a_10") <<
+                                                ChunkFields::ns("x.y") <<
+                                                ChunkFields::min(key_a10)  <<
+                                                ChunkFields::max(key_a20)) <<
+                                           BSON(ChunkFields::name("x.y-a_30") <<
+                                                ChunkFields::ns("x.y") <<
+                                                ChunkFields::min(key_a30)  <<
+                                                ChunkFields::max(key_max)));
             ShardChunkManager s3( collection , chunks3 );
             ASSERT( ! s3.getNextChunk( empty , &foundMin , &foundMax ) ); // not eof
             ASSERT( foundMin.woCompare( key_min ) == 0 );
@@ -181,8 +186,8 @@ namespace {
     class DeletedTests {
     public:
         void run() {
-            BSONObj collection = BSON( "_id"     << "test.foo" <<
-                                       "dropped" << "true" );
+            BSONObj collection = BSON(CollectionFields::name("test.foo") <<
+                                      CollectionFields::dropped(true));
 
             BSONArray chunks = BSONArray();
 
@@ -193,16 +198,17 @@ namespace {
     class ClonePlusTests {
     public:
         void run() {
-            BSONObj collection = BSON( "_id"     << "test.foo" <<
-                                       "dropped" << false <<
-                                       "key"     << BSON( "a" << 1 << "b" << 1 ) <<
-                                       "unique"  << false );
+            BSONObj collection = BSON(CollectionFields::name("test.foo") <<
+                                      CollectionFields::dropped(false) <<
+                                      CollectionFields::key(BSON("a" << 1 << "b" << 1)) <<
+                                      CollectionFields::unique(false));
+
             // 1-chunk collection
             // [10,0-20,0)
-            BSONArray chunks = BSON_ARRAY( BSON( "_id" << "test.foo-a_MinKey" <<
-                                                 "ns"  << "test.foo" <<
-                                                 "min" << BSON( "a" << 10 << "b" << 0 ) <<
-                                                 "max" << BSON( "a" << 20 << "b" << 0 ) ) );
+            BSONArray chunks = BSON_ARRAY(BSON(ChunkFields::name("test.foo-a_MinKey") <<
+                                               ChunkFields::ns("test.foo") <<
+                                               ChunkFields::min(BSON("a" << 10 << "b" << 0)) <<
+                                               ChunkFields::max(BSON("a" << 20 << "b" << 0))));
 
             ShardChunkManager s ( collection , chunks );
 
@@ -225,16 +231,17 @@ namespace {
     class ClonePlusExceptionTests {
     public:
         void run() {
-            BSONObj collection = BSON( "_id"     << "test.foo" <<
-                                       "dropped" << false <<
-                                       "key"     << BSON( "a" << 1 << "b" << 1 ) <<
-                                       "unique"  << false );
+            BSONObj collection = BSON(CollectionFields::name("test.foo") <<
+                                      CollectionFields::dropped(false) <<
+                                      CollectionFields::key(BSON("a" << 1 << "b" << 1)) <<
+                                      CollectionFields::unique(false));
+
             // 1-chunk collection
             // [10,0-20,0)
-            BSONArray chunks = BSON_ARRAY( BSON( "_id" << "test.foo-a_MinKey" <<
-                                                 "ns"  << "test.foo" <<
-                                                 "min" << BSON( "a" << 10 << "b" << 0 ) <<
-                                                 "max" << BSON( "a" << 20 << "b" << 0 ) ) );
+            BSONArray chunks = BSON_ARRAY(BSON(ChunkFields::name("test.foo-a_MinKey") <<
+                                               ChunkFields::ns("test.foo") <<
+                                               ChunkFields::min(BSON("a" << 10 << "b" << 0)) <<
+                                               ChunkFields::max(BSON("a" << 20 << "b" << 0))));
 
             ShardChunkManager s ( collection , chunks );
 
@@ -248,21 +255,21 @@ namespace {
     class CloneMinusTests {
     public:
         void run() {
-            BSONObj collection = BSON( "_id"     << "x.y" <<
-                                       "dropped" << false <<
-                                       "key"     << BSON( "a" << 1 << "b" << 1 ) <<
-                                       "unique"  << false );
+            BSONObj collection = BSON(CollectionFields::name("x.y") <<
+                                      CollectionFields::dropped(false) <<
+                                      CollectionFields::key(BSON("a" << 1 << "b" << 1)) <<
+                                      CollectionFields::unique(false));
 
             // 2-chunk collection
             // [10,0->20,0) , <gap> , [30,0->40,0)
-            BSONArray chunks = BSON_ARRAY( BSON( "_id" << "x.y-a_10b_0" <<
-                                                 "ns"  << "x.y" <<
-                                                 "min" << BSON( "a" << 10 << "b" << 0 ) <<
-                                                 "max" << BSON( "a" << 20 << "b" << 0 ) ) <<
-                                           BSON( "_id" << "x.y-a_30b_0" <<
-                                                 "ns"  << "x.y" <<
-                                                 "min" << BSON( "a" << 30 << "b" << 0 ) <<
-                                                 "max" << BSON( "a" << 40 << "b" << 0 ) ) );
+            BSONArray chunks = BSON_ARRAY(BSON(ChunkFields::name("x.y-a_10b_0") <<
+                                               ChunkFields::ns("x.y") <<
+                                               ChunkFields::min(BSON("a" << 10 << "b" << 0)) <<
+                                               ChunkFields::max(BSON("a" << 20 << "b" << 0))) <<
+                                          BSON(ChunkFields::name("x.y-a_30b_0") <<
+                                               ChunkFields::ns("x.y") <<
+                                               ChunkFields::min(BSON("a" << 30 << "b" << 0)) <<
+                                               ChunkFields::max(BSON("a" << 40 << "b" << 0))));
 
             ShardChunkManager s ( collection , chunks );
 
@@ -287,21 +294,21 @@ namespace {
     class CloneMinusExceptionTests {
     public:
         void run() {
-            BSONObj collection = BSON( "_id"     << "x.y" <<
-                                       "dropped" << false <<
-                                       "key"     << BSON( "a" << 1 << "b" << 1 ) <<
-                                       "unique"  << false );
+            BSONObj collection = BSON(CollectionFields::name("x.y") <<
+                                      CollectionFields::dropped(false) <<
+                                      CollectionFields::key(BSON("a" << 1 << "b" << 1)) <<
+                                      CollectionFields::unique(false));
 
             // 2-chunk collection
             // [10,0->20,0) , <gap> , [30,0->40,0)
-            BSONArray chunks = BSON_ARRAY( BSON( "_id" << "x.y-a_10b_0" <<
-                                                 "ns"  << "x.y" <<
-                                                 "min" << BSON( "a" << 10 << "b" << 0 ) <<
-                                                 "max" << BSON( "a" << 20 << "b" << 0 ) ) <<
-                                           BSON( "_id" << "x.y-a_30b_0" <<
-                                                 "ns"  << "x.y" <<
-                                                 "min" << BSON( "a" << 30 << "b" << 0 ) <<
-                                                 "max" << BSON( "a" << 40 << "b" << 0 ) ) );
+            BSONArray chunks = BSON_ARRAY(BSON(ChunkFields::name("x.y-a_10b_0") <<
+                                               ChunkFields::ns("x.y") <<
+                                               ChunkFields::min(BSON("a" << 10 << "b" << 0)) <<
+                                               ChunkFields::max(BSON("a" << 20 << "b" << 0))) <<
+                                          BSON(ChunkFields::name("x.y-a_30b_0") <<
+                                               ChunkFields::ns("x.y") <<
+                                               ChunkFields::min(BSON("a" << 30 << "b" << 0)) <<
+                                               ChunkFields::max(BSON("a" << 40 << "b" << 0))));
 
             ShardChunkManager s ( collection , chunks );
 
@@ -321,18 +328,19 @@ namespace {
     class CloneSplitTests {
     public:
         void run() {
-            BSONObj collection = BSON( "_id"     << "test.foo" <<
-                                       "dropped" << false <<
-                                       "key"     << BSON( "a" << 1 << "b" << 1 ) <<
-                                       "unique"  << false );
+            BSONObj collection = BSON(CollectionFields::name("test.foo") <<
+                                      CollectionFields::dropped(false) <<
+                                      CollectionFields::key(BSON("a" << 1 << "b" << 1)) <<
+                                      CollectionFields::unique(false));
+
             // 1-chunk collection
             // [10,0-20,0)
             BSONObj min = BSON( "a" << 10 << "b" << 0 );
             BSONObj max = BSON( "a" << 20 << "b" << 0 );
-            BSONArray chunks = BSON_ARRAY( BSON( "_id" << "test.foo-a_MinKey"
-                                                 << "ns"  << "test.foo"
-                                                 << "min" << min
-                                                 << "max" << max ) );
+            BSONArray chunks = BSON_ARRAY(BSON(ChunkFields::name("test.foo-a_MinKey") <<
+                                               ChunkFields::ns("test.foo") <<
+                                               ChunkFields::min(min) <<
+                                               ChunkFields::max(max)));
 
             ShardChunkManager s ( collection , chunks );
 
@@ -359,18 +367,19 @@ namespace {
     class CloneSplitExceptionTests {
     public:
         void run() {
-            BSONObj collection = BSON( "_id"     << "test.foo" <<
-                                       "dropped" << false <<
-                                       "key"     << BSON( "a" << 1 << "b" << 1 ) <<
-                                       "unique"  << false );
+            BSONObj collection = BSON(CollectionFields::name("test.foo") <<
+                                      CollectionFields::dropped(false) <<
+                                      CollectionFields::key(BSON("a" << 1 << "b" << 1)) <<
+                                      CollectionFields::unique(false));
+
             // 1-chunk collection
             // [10,0-20,0)
             BSONObj min = BSON( "a" << 10 << "b" << 0 );
             BSONObj max = BSON( "a" << 20 << "b" << 0 );
-            BSONArray chunks = BSON_ARRAY( BSON( "_id" << "test.foo-a_MinKey"
-                                                 << "ns"  << "test.foo"
-                                                 << "min" << min
-                                                 << "max" << max ) );
+            BSONArray chunks = BSON_ARRAY(BSON(ChunkFields::name("test.foo-a_MinKey") <<
+                                               ChunkFields::ns("test.foo") <<
+                                               ChunkFields::min(min) <<
+                                               ChunkFields::max(max)));
 
             ShardChunkManager s ( collection , chunks );
 
@@ -390,10 +399,10 @@ namespace {
     class EmptyShardTests {
     public:
         void run() {
-            BSONObj collection = BSON( "_id"     << "test.foo" <<
-                                       "dropped" << false <<
-                                       "key"     << BSON( "a" << 1 ) <<
-                                       "unique"  << false );
+            BSONObj collection = BSON(CollectionFields::name("test.foo") <<
+                                      CollectionFields::dropped(false) <<
+                                      CollectionFields::key(BSON("a" << 1)) <<
+                                      CollectionFields::unique(false));
 
             // no chunks on this shard
             BSONArray chunks;
@@ -409,17 +418,17 @@ namespace {
     class LastChunkTests {
     public:
         void run() {
-            BSONObj collection = BSON( "_id"     << "test.foo" <<
-                                       "dropped" << false <<
-                                       "key"     << BSON( "a" << 1 ) <<
-                                       "unique"  << false  );
+            BSONObj collection = BSON(CollectionFields::name("test.foo") <<
+                                      CollectionFields::dropped(false) <<
+                                      CollectionFields::key(BSON("a" << 1)) <<
+                                      CollectionFields::unique(false));
 
             // 1-chunk collection
             // [10->20)
-            BSONArray chunks = BSON_ARRAY( BSON( "_id" << "test.foo-a_10" <<
-                                                 "ns"  << "test.foo" <<
-                                                 "min" << BSON( "a" << 10 ) <<
-                                                 "max" << BSON( "a" << 20 ) ) );
+            BSONArray chunks = BSON_ARRAY(BSON(ChunkFields::name("test.foo-a_10") <<
+                                               ChunkFields::ns("test.foo") <<
+                                               ChunkFields::min(BSON("a" << 10)) <<
+                                               ChunkFields::max(BSON("a" << 20))));
 
             ShardChunkManager s( collection , chunks );
             BSONObj min = BSON( "a" << 10 );

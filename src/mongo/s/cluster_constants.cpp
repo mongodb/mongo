@@ -24,39 +24,43 @@ namespace mongo {
     BSONField<bool> ShardFields::draining("draining");
     BSONField<long long> ShardFields::maxSize("maxSize");
 
-    // ============  below not yet hooked  ============
-
     const string ConfigNS::database = "config.databases";
-    BSONField<string> DatabaseFields::UNHOOKED_name("_id");
-    BSONField<string> DatabaseFields::UNHOOKED_shard("shard");
-    BSONField<bool> DatabaseFields::UNHOOKED_draining("draining");
-    BSONField<bool> DatabaseFields::UNHOOKED_scatterCollections("scatterCollections");
-    BSONField<bool> DatabaseFields::DEPRECATED_partitioned("partitioned");
-    BSONField<string> DatabaseFields::DEPRECATED_oldShard("primary");
+    BSONField<string> DatabaseFields::name("_id");
+    BSONField<bool> DatabaseFields::partitioned("partitioned");
+    BSONField<string> DatabaseFields::primary("primary");
+    BSONField<string> DatabaseFields::DEPRECATED_name("name");
+    BSONField<bool> DatabaseFields::DEPRECATED_sharded("sharded");
+    BSONField<string> DatabaseFields::NEW_shard("shard");
+    BSONField<bool> DatabaseFields::NEW_draining("draining");
+    BSONField<bool> DatabaseFields::NEW_scatterCollections("scatterCollections");
 
     const string ConfigNS::collection = "config.collections";
-    BSONField<string> CollectionFields::UNHOOKED_name("_id");
-    BSONField<string> CollectionFields::UNHOOKED_shard("shard");
-    BSONField<BSONObj> CollectionFields::UNHOOKED_shardKey("shardKey");
-    BSONField<string> CollectionFields::UNHOOKED_epoch("epoch");
-    BSONField<string> CollectionFields::DEPRECATED_oldEpoch("Epoch");
-    BSONField<bool> CollectionFields::DEPRECATED_dropped("dropped");
-    BSONField<bool> CollectionFields::DEPRECATED_unique("unique");
+    BSONField<string> CollectionFields::name("_id");
+    BSONField<string> CollectionFields::shard("shard");
+    BSONField<BSONObj> CollectionFields::key("key");
+    BSONField<bool> CollectionFields::unique("unique");
+    BSONField<Date_t> CollectionFields::lastmod("lastmod");
+    BSONField<bool> CollectionFields::dropped("dropped");
+    BSONField<bool> CollectionFields::noBalance("noBalance");
 
     const string ConfigNS::chunk = "config.chunks";
-    BSONField<string> ChunkFields::UNHOOKED_name("_id");
-    BSONField<BSONObj> ChunkFields::UNHOOKED_min("min");
-    BSONField<BSONObj> ChunkFields::UNHOOKED_max("max");
-    BSONField<string> ChunkFields::UNHOOKED_version("version");
-    BSONField<string> ChunkFields::UNHOOKED_shard("shard");
-    BSONField<bool> ChunkFields::UNHOOKED_jumbo("jumbo");
-    BSONField<string> ChunkFields::DEPRECATED_oldVersion("lastmod");
-    BSONField<string> ChunkFields::DEPRECATED_epoch("lastmodEpoch");
+    BSONField<string> ChunkFields::name("_id");
+    BSONField<string> ChunkFields::ns("ns");
+    BSONField<BSONObj> ChunkFields::min("min");
+    BSONField<BSONObj> ChunkFields::max("max");
+    BSONField<string> ChunkFields::lastmod("lastmod");
+    BSONField<string> ChunkFields::shard("shard");
+    BSONField<bool> ChunkFields::jumbo("jumbo");
+    BSONField<OID> ChunkFields::lastmodEpoch("lastmodEpoch");
+    BSONField<BSONArray> ChunkFields::NEW_lastmod("lastmod");
 
-    const string ConfigNS::tags = "config.tags";
-    BSONField<string> TagFields::UNHOOKED_tag("tag");
-    BSONField<BSONObj> TagFields::UNHOOKED_min("min");
-    BSONField<BSONObj> TagFields::UNHOOKED_max("max");
+    const string ConfigNS::tag = "config.tags";
+    BSONField<string> TagFields::ns("ns");
+    BSONField<string> TagFields::tag("tag");
+    BSONField<BSONObj> TagFields::min("min");
+    BSONField<BSONObj> TagFields::max("max");
+
+    // ============  below not yet hooked  ============
 
     const string ConfigNS::mongos = "config.mongos";
     BSONField<string> MongosFields::UNHOOKED_name("_id");

@@ -20,12 +20,12 @@
 
 #include "mongo/pch.h"
 
-#include "../bson/util/atomic_int.h"
-#include "../client/distlock.h"
-
-#include "shardkey.h"
-#include "shard.h"
-#include "util.h"
+#include "mongo/bson/util/atomic_int.h"
+#include "mongo/client/distlock.h"
+#include "mongo/s/cluster_constants.h"
+#include "mongo/s/shard.h"
+#include "mongo/s/shardkey.h"
+#include "mongo/s/util.h"
 #include "mongo/util/concurrency/ticketholder.h"
 
 namespace mongo {
@@ -179,7 +179,6 @@ namespace mongo {
         // public constants
         //
 
-        static string chunkMetadataNS;
         static int MaxChunkSize;
         static int MaxObjectPerChunk;
         static bool ShouldAutoSplit;
@@ -197,7 +196,6 @@ namespace mongo {
         bool operator!=(const Chunk& s) const { return ! ( *this == s ); }
 
         string getns() const;
-        const char * getNS() { return "config.chunks"; }
         Shard getShard() const { return _shard; }
         const ChunkManager* getManager() const { return _manager; }
         
@@ -414,9 +412,9 @@ namespace mongo {
         ShardChunkVersion getVersion() const;
 
         void getInfo( BSONObjBuilder& b ) const {
-            b.append( "key" , _key.key() );
-            b.appendBool( "unique" , _unique );
-            _version.addEpochToBSON( b, "lastmod" );
+            b.append(CollectionFields::key(), _key.key());
+            b.appendBool(CollectionFields::unique(), _unique);
+            _version.addEpochToBSON(b, CollectionFields::lastmod());
         }
 
         /**

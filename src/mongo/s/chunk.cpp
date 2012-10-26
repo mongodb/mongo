@@ -46,8 +46,6 @@ namespace mongo {
 
     // -------  Shard --------
 
-    string Chunk::chunkMetadataNS = "config.chunks";
-
     int Chunk::MaxChunkSize = 1024 * 1024 * 64;
     int Chunk::MaxObjectPerChunk = 250000;
 
@@ -57,16 +55,16 @@ namespace mongo {
     Chunk::Chunk(const ChunkManager * manager, BSONObj from)
         : _manager(manager), _lastmod(0, OID()), _dataWritten(mkDataWritten())
     {
-        string ns = from.getStringField( "ns" );
-        _shard.reset( from.getStringField( "shard" ) );
+        string ns = from.getStringField(ChunkFields::ns().c_str());
+        _shard.reset(from.getStringField(ChunkFields::shard().c_str()));
 
-        _lastmod = ShardChunkVersion::fromBSON( from["lastmod"] );
+        _lastmod = ShardChunkVersion::fromBSON(from[ChunkFields::lastmod()]);
         verify( _lastmod.isSet() );
 
-        _min = from.getObjectField( "min" ).getOwned();
-        _max = from.getObjectField( "max" ).getOwned();
+        _min = from.getObjectField(ChunkFields::min().c_str()).getOwned();
+        _max = from.getObjectField(ChunkFields::max().c_str()).getOwned();
         
-        _jumbo = from["jumbo"].trueValue();
+        _jumbo = from[ChunkFields::jumbo()].trueValue();
 
         uassert( 10170 ,  "Chunk needs a ns" , ! ns.empty() );
         uassert( 13327 ,  "Chunk ns must match server ns" , ns == _manager->getns() );
@@ -467,8 +465,8 @@ namespace mongo {
 
     void Chunk::appendShortVersion( const char * name , BSONObjBuilder& b ) const {
         BSONObjBuilder bb( b.subobjStart( name ) );
-        bb.append( "min" , _min );
-        bb.append( "max" , _max );
+        bb.append(ChunkFields::min(), _min);
+        bb.append(ChunkFields::max(), _max);
         bb.done();
     }
 
@@ -481,19 +479,19 @@ namespace mongo {
         to.append( "_id" , genID( _manager->getns() , _min ) );
 
         if ( myLastMod.isSet() ) {
-            myLastMod.addToBSON( to, "lastmod" );
+            myLastMod.addToBSON(to, ChunkFields::lastmod());
         }
         else if ( _lastmod.isSet() ) {
-            _lastmod.addToBSON( to, "lastmod" );
+            _lastmod.addToBSON(to, ChunkFields::lastmod());
         }
         else {
             verify(0);
         }
 
-        to << "ns" << _manager->getns();
-        to << "min" << _min;
-        to << "max" << _max;
-        to << "shard" << _shard.getName();
+        to << ChunkFields::ns(_manager->getns());
+        to << ChunkFields::min(_min);
+        to << ChunkFields::max(_max);
+        to << ChunkFields::shard(_shard.getName());
     }
 
     string Chunk::genID( const string& ns , const BSONObj& o ) {
@@ -511,7 +509,11 @@ namespace mongo {
 
     string Chunk::toString() const {
         stringstream ss;
-        ss << "ns:" << _manager->getns() << " at: " << _shard.toString() << " lastmod: " << _lastmod.toString() << " min: " << _min << " max: " << _max;
+        ss << ChunkFields::ns() << ":" << _manager->getns() <<
+            ChunkFields::shard()   << ": " << _shard.toString() <<
+            ChunkFields::lastmod() << ": " << _lastmod.toString() <<
+            ChunkFields::min()     << ": " << _min <<
+            ChunkFields::max()     << ": " << _max;
         return ss.str();
     }
 
@@ -529,9 +531,9 @@ namespace mongo {
             scoped_ptr<ScopedDbConnection> conn(
                     ScopedDbConnection::getInternalScopedDbConnection( configServer.modelServer() ) );
 
-            conn->get()->update( chunkMetadataNS,
-                                 BSON( "_id" << genID() ),
-                                 BSON( "$set" << BSON( "jumbo" << true ) ) );
+            conn->get()->update(ConfigNS::chunk,
+                                BSON(ChunkFields::name(genID())),
+                                BSON("$set" << BSON(ChunkFields::jumbo(true))));
             conn->done();
         }
         catch ( DBException& e ) {
@@ -585,9 +587,13 @@ namespace mongo {
     ChunkManager::ChunkManager( const BSONObj& collDoc ) :
         // Need the ns early, to construct the lock
         // TODO: Construct lock on demand?  Not sure why we need to keep it around
-        _ns( collDoc["_id"].type() == String ? collDoc["_id"].String() : "" ),
-        _key( collDoc["key"].type() == Object ? collDoc["key"].Obj().getOwned() : BSONObj() ),
-        _unique( collDoc["unique"].trueValue() ),
+        _ns(collDoc[CollectionFields::name()].type() == String ?
+                                                        collDoc[CollectionFields::name()].String() :
+                                                        ""),
+        _key(collDoc[CollectionFields::key()].type() == Object ?
+                                                        collDoc[CollectionFields::key()].Obj().getOwned() :
+                                                        BSONObj()),
+        _unique(collDoc[CollectionFields::unique()].trueValue()),
         _chunkRanges(),
         _mutex("ChunkManager"),
         // The shard versioning mechanism hinges on keeping track of the number of times we reloaded ChunkManager's.
@@ -990,7 +996,7 @@ namespace mongo {
 
         // Make sure we don't have any chunks that already exist here
         unsigned long long existingChunks =
-            conn->get()->count( Chunk::chunkMetadataNS, BSON( "ns" << _ns ) );
+            conn->get()->count(ConfigNS::chunk, BSON(ChunkFields::ns(_ns)));
 
         uassert( 13449 , str::stream() << "collection " << _ns << " already sharded with "
                                        << existingChunks << " chunks", existingChunks == 0 );
@@ -1004,12 +1010,12 @@ namespace mongo {
             BSONObjBuilder chunkBuilder;
             temp.serialize( chunkBuilder );
             BSONObj chunkObj = chunkBuilder.obj();
-        
-            conn->get()->update( Chunk::chunkMetadataNS,
-                                 QUERY( "_id" << temp.genID() ),
-                                 chunkObj,
-                                 true,
-                                 false );
+
+            conn->get()->update(ConfigNS::chunk,
+                                QUERY(ChunkFields::name(temp.genID())),
+                                chunkObj,
+                                true,
+                                false );
 
             version.incMinor();
         }
@@ -1240,7 +1246,7 @@ namespace mongo {
         // remove chunk data
         scoped_ptr<ScopedDbConnection> conn(
                 ScopedDbConnection::getInternalScopedDbConnection( configServer.modelServer() ) );
-        conn->get()->remove( Chunk::chunkMetadataNS , BSON( "ns" << _ns ) );
+        conn->get()->remove(ConfigNS::chunk, BSON(ChunkFields::ns(_ns)));
         conn->done();
         LOG(1) << "ChunkManager::drop : " << _ns << "\t removed chunk data" << endl;
 

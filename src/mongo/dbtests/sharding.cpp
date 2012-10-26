@@ -20,9 +20,10 @@
 
 #include "dbtests.h"
 
-#include "../client/parallel.h"
-#include "../client/dbclientmockcursor.h"
-#include "../s/chunk_diff.h"
+#include "mongo/client/dbclientmockcursor.h"
+#include "mongo/client/parallel.h"
+#include "mongo/s/chunk_diff.h"
+#include "mongo/s/cluster_constants.h"
 
 namespace ShardingTests {
 
@@ -202,12 +203,13 @@ namespace ShardingTests {
             ChunkManager manager( collName(), ShardKeyPattern( BSON( "_id" << 1 ) ), false );
             manager.createFirstChunks( shard().getConnString(), shard(), NULL, NULL );
 
-            BSONObj firstChunk = client().findOne( ShardNS::chunk, BSONObj() ).getOwned();
+            BSONObj firstChunk = client().findOne(ConfigNS::chunk, BSONObj()).getOwned();
 
-            ASSERT( firstChunk[ "min" ].Obj()[ "_id" ].type() == MinKey );
-            ASSERT( firstChunk[ "max" ].Obj()[ "_id" ].type() == MaxKey );
+            ASSERT(firstChunk[ChunkFields::min()].Obj()[ "_id" ].type() == MinKey );
+            ASSERT(firstChunk[ChunkFields::max()].Obj()[ "_id" ].type() == MaxKey );
 
-            ShardChunkVersion version = ShardChunkVersion::fromBSON( firstChunk, "lastmod" );
+            ShardChunkVersion version = ShardChunkVersion::fromBSON(firstChunk,
+                                                                    ChunkFields::lastmod());
 
             ASSERT( version.majorVersion() == 1 );
             ASSERT( version.minorVersion() == 0 );
@@ -259,7 +261,7 @@ namespace ShardingTests {
             createChunks( keyName );
 
             auto_ptr<DBClientCursor> cursor =
-                    client().query( ShardNS::chunk, QUERY( "ns" << collName() ) );
+                client().query(ConfigNS::chunk, QUERY(ChunkFields::ns(collName())));
 
             set<int> minorVersions;
             OID epoch;
@@ -269,7 +271,8 @@ namespace ShardingTests {
 
                 BSONObj chunk = cursor->next();
 
-                ShardChunkVersion version = ShardChunkVersion::fromBSON( chunk, "lastmod" );
+                ShardChunkVersion version = ShardChunkVersion::fromBSON(chunk,
+                                                                        ChunkFields::lastmod());
 
                 ASSERT( version.majorVersion() == 1 );
                 ASSERT( version.isEpochSet() );
@@ -280,7 +283,7 @@ namespace ShardingTests {
                 ASSERT( minorVersions.find( version.minorVersion() ) == minorVersions.end() );
                 minorVersions.insert( version.minorVersion() );
 
-                ASSERT( chunk[ "shard" ].String() == shard().getName() );
+                ASSERT(chunk[ChunkFields::shard()].String() == shard().getName());
             }
         }
 
@@ -297,10 +300,13 @@ namespace ShardingTests {
 
             string keyName = "_id";
             createChunks( keyName );
-            int numChunks = static_cast<int>( client().count( ShardNS::chunk, BSON( "ns" << collName() ) ) );
+            int numChunks = static_cast<int>(client().count(ConfigNS::chunk,
+                                                            BSON(ChunkFields::ns(collName()))));
 
-            BSONObj firstChunk = client().findOne( ShardNS::chunk, BSONObj() ).getOwned();
-            ShardChunkVersion version = ShardChunkVersion::fromBSON( firstChunk, "lastmod" );
+            BSONObj firstChunk = client().findOne(ConfigNS::chunk, BSONObj()).getOwned();
+
+            ShardChunkVersion version = ShardChunkVersion::fromBSON(firstChunk,
+                                                                    ChunkFields::lastmod());
 
             // Make manager load existing chunks
             ChunkManagerPtr manager( new ChunkManager( collName(), ShardKeyPattern( BSON( "_id" << 1 ) ), false ) );
@@ -313,9 +319,9 @@ namespace ShardingTests {
             // Modify chunks collection
             BSONObjBuilder b;
             ShardChunkVersion laterVersion = ShardChunkVersion( 2, 1, version.epoch() );
-            laterVersion.addToBSON( b, "lastmod" );
+            laterVersion.addToBSON(b, ChunkFields::lastmod());
 
-            client().update( ShardNS::chunk, BSONObj(), BSON( "$set" << b.obj() ) );
+            client().update(ConfigNS::chunk, BSONObj(), BSON( "$set" << b.obj()));
 
             // Make new manager load chunk diff
             ChunkManager newManager( manager );
@@ -410,12 +416,17 @@ namespace ShardingTests {
                     ASSERT( chunkRange->second.woCompare( _inverse ? chunkDoc["min"].Obj() : chunkDoc["max"].Obj() ) == 0 );
                 }
 
-                ShardChunkVersion version = ShardChunkVersion::fromBSON( chunkDoc["lastmod"] );
+                ShardChunkVersion version =
+                    ShardChunkVersion::fromBSON(chunkDoc[ChunkFields::lastmod()]);
                 if( version > foundMaxVersion ) foundMaxVersion = version;
 
-                ShardChunkVersion shardMaxVersion = foundMaxShardVersions[ chunkDoc["shard"].String() ];
-                if( version > shardMaxVersion ) foundMaxShardVersions[ chunkDoc["shard"].String() ] = version;
+                ShardChunkVersion shardMaxVersion =
+                    foundMaxShardVersions[chunkDoc[ChunkFields::shard()].String()];
+                if( version > shardMaxVersion ) {
+                    foundMaxShardVersions[chunkDoc[ChunkFields::shard()].String() ] = version;
+                }
             }
+
             // Make sure all chunks are accounted for
             if( ranges != NULL ) ASSERT( chunkCount == (int) ranges->size() );
 
@@ -470,14 +481,15 @@ namespace ShardingTests {
                 if( i >= 0 ){
                     BSONObjBuilder chunkB;
 
-                    chunkB.append( "min", lastSplitPt );
-                    chunkB.append( "max", splitPt );
+                    chunkB.append(ChunkFields::min(), lastSplitPt );
+                    chunkB.append(ChunkFields::max(), splitPt );
 
                     int shardNum = rand( numShards );
-                    chunkB.append( "shard", "shard" + string( 1, (char)('A' + shardNum) ) );
+                    chunkB.append(ChunkFields::shard(),
+                                  "shard" + string( 1, (char)('A' + shardNum) ) );
 
                     rand( 2 ) ? version.incMajor() : version.incMinor();
-                    version.addToBSON( chunkB, "lastmod" );
+                    version.addToBSON(chunkB, ChunkFields::lastmod());
 
                     chunksB.append( chunkB.obj() );
                 }
@@ -535,10 +547,12 @@ namespace ShardingTests {
                         for( int k = 0; k < keySize; k++ ){
                             string field = string( "k" ) + string( 1, (char)('0' + k) );
 
-                            BSONType maxType = chunk["max"].Obj()[field].type();
+                            BSONType maxType = chunk[ChunkFields::max()].Obj()[field].type();
                             double max = maxType == NumberDouble ? chunk["max"].Obj()[field].Number() : 0.0;
-                            BSONType minType = chunk["min"].Obj()[field].type();
-                            double min = minType == NumberDouble ? chunk["min"].Obj()[field].Number() : 0.0;
+                            BSONType minType = chunk[ChunkFields::min()].Obj()[field].type();
+                            double min = minType == NumberDouble ?
+                                                    chunk[ChunkFields::min()].Obj()[field].Number() :
+                                                    0.0;
 
                             if( minType == MinKey ){
                                 midB.append( field, max - 1.0 );
@@ -555,19 +569,19 @@ namespace ShardingTests {
                         // Only happens if we can't split the min chunk
                         if( midPt.isEmpty() ) continue;
 
-                        leftB.append( chunk["min"] );
-                        leftB.append( "max", midPt );
-                        rightB.append( "min", midPt );
-                        rightB.append( chunk["max"] );
+                        leftB.append( chunk[ChunkFields::min()] );
+                        leftB.append(ChunkFields::max(), midPt );
+                        rightB.append(ChunkFields::min(), midPt );
+                        rightB.append(chunk[ChunkFields::max()] );
 
-                        leftB.append( chunk["shard"] );
-                        rightB.append( chunk["shard"] );
+                        leftB.append(chunk[ChunkFields::shard()] );
+                        rightB.append(chunk[ChunkFields::shard()] );
 
                         version.incMajor();
                         version._minor = 0;
-                        version.addToBSON( leftB, "lastmod" );
+                        version.addToBSON(leftB, ChunkFields::lastmod());
                         version.incMinor();
-                        version.addToBSON( rightB, "lastmod" );
+                        version.addToBSON(rightB, ChunkFields::lastmod());
 
                         BSONObj left = leftB.obj();
                         BSONObj right = rightB.obj();
@@ -590,7 +604,8 @@ namespace ShardingTests {
                         BSONObj prevShardChunk;
                         while( chunksIt.more() ){
                             prevShardChunk = chunksIt.next().Obj();
-                            if( prevShardChunk["shard"].String() == chunk["shard"].String() ) break;
+                            if( prevShardChunk[ChunkFields::shard()].String() ==
+                                chunk[ChunkFields::shard()].String() ) break;
 
                             // log() << "... appending chunk from diff shard: " << prevShardChunk << endl;
                             newChunksB.append( prevShardChunk );
@@ -604,20 +619,21 @@ namespace ShardingTests {
                             BSONObjBuilder newShardB;
                             BSONObjBuilder prevShardB;
 
-                            newShardB.append( chunk["min"] );
-                            newShardB.append( chunk["max"] );
-                            prevShardB.append( prevShardChunk["min"] );
-                            prevShardB.append( prevShardChunk["max"] );
+                            newShardB.append(chunk[ChunkFields::min()]);
+                            newShardB.append(chunk[ChunkFields::max()]);
+                            prevShardB.append(prevShardChunk[ChunkFields::min()]);
+                            prevShardB.append(prevShardChunk[ChunkFields::max()]);
 
                             int shardNum = rand( numShards );
-                            newShardB.append( "shard", "shard" + string( 1, (char)('A' + shardNum) ) );
-                            prevShardB.append( prevShardChunk["shard"] );
+                            newShardB.append(ChunkFields::shard(),
+                                             "shard" + string( 1, (char)('A' + shardNum)));
+                            prevShardB.append(prevShardChunk[ChunkFields::shard()]);
 
                             version.incMajor();
                             version._minor = 0;
-                            version.addToBSON( newShardB, "lastmod" );
+                            version.addToBSON(newShardB, ChunkFields::lastmod());
                             version.incMinor();
-                            version.addToBSON( prevShardB, "lastmod" );
+                            version.addToBSON(prevShardB, ChunkFields::lastmod());
 
                             BSONObj newShard = newShardB.obj();
                             BSONObj prevShard = prevShardB.obj();

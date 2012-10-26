@@ -18,13 +18,14 @@
 
 #include "pch.h"
 
-#include "../client/connpool.h"
-#include "../client/dbclientmockcursor.h"
-#include "../db/instance.h"
-#include "../db/clientcursor.h"
+#include "mongo/s/d_chunk_manager.h"
 
-#include "d_chunk_manager.h"
-#include "../s/chunk_diff.h"
+#include "mongo/client/connpool.h"
+#include "mongo/client/dbclientmockcursor.h"
+#include "mongo/db/clientcursor.h"
+#include "mongo/db/instance.h"
+#include "mongo/s/chunk_diff.h"
+#include "mongo/s/cluster_constants.h"
 
 namespace mongo {
 
@@ -39,7 +40,8 @@ namespace mongo {
         SCMConfigDiffTracker( const string& currShard ) : _currShard( currShard ) {}
 
         virtual bool isTracked( const BSONObj& chunkDoc ) const {
-            return chunkDoc["shard"].type() == String && chunkDoc["shard"].String() == _currShard;
+            return chunkDoc[ChunkFields::shard()].type() == String &&
+                   chunkDoc[ChunkFields::shard()].String() == _currShard;
         }
 
         virtual BSONObj maxFrom( const BSONObj& val ) const {
@@ -86,14 +88,14 @@ namespace mongo {
         }
 
         // get this collection's sharding key
-        BSONObj collectionDoc = conn->findOne( "config.collections", BSON( "_id" << ns ) );
+        BSONObj collectionDoc = conn->findOne(ConfigNS::collection, BSON(CollectionFields::name(ns)));
 
         if( collectionDoc.isEmpty() ){
             warning() << ns << " does not exist as a sharded collection" << endl;
             return;
         }
 
-        if( collectionDoc["dropped"].Bool() ){
+        if( collectionDoc[CollectionFields::dropped()].Bool() ){
             warning() << ns << " was dropped.  Re-shard collection first." << endl;
             return;
         }
@@ -123,7 +125,7 @@ namespace mongo {
 
         // Need to do the query ourselves, since we may use direct conns to the db
         Query query = differ.configDiffQuery();
-        auto_ptr<DBClientCursor> cursor = conn->query( "config.chunks" , query );
+        auto_ptr<DBClientCursor> cursor = conn->query(ConfigNS::chunk, query);
 
         uassert( 16181, str::stream() << "could not initialize cursor to config server chunks collection for ns " << ns, cursor.get() );
 
@@ -191,9 +193,10 @@ namespace mongo {
         ShardChunkVersion version;
         while ( cursor->more() ) {
             BSONObj d = cursor->next();
-            _chunksMap.insert( make_pair( d["min"].Obj().getOwned() , d["max"].Obj().getOwned() ) );
+            _chunksMap.insert(make_pair(d[ChunkFields::min()].Obj().getOwned(),
+                                        d[ChunkFields::max()].Obj().getOwned()));
 
-            ShardChunkVersion currVersion = ShardChunkVersion::fromBSON( d["lastmod"] );
+            ShardChunkVersion currVersion = ShardChunkVersion::fromBSON(d[ChunkFields::lastmod()]);
             if ( currVersion > version ) {
                 version = currVersion;
             }

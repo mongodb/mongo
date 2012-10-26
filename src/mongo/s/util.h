@@ -1,5 +1,3 @@
-// util.h
-
 /**
 *    Copyright (C) 2008 10gen Inc.
 *
@@ -19,8 +17,10 @@
 #pragma once
 
 #include "mongo/pch.h"
+
 #include "mongo/db/jsobj.h"
 #include "mongo/util/mongoutils/str.h"
+
 /**
    some generic sharding utils that can be used in mongod or mongos
  */
@@ -232,10 +232,13 @@ namespace mongo {
             *canParse = true;
 
             string prefix = prefixIn;
+            // "version" doesn't have a "cluster constanst" because that field is never
+            // written to the config.
             if( prefixIn == "" && ! obj[ "version" ].eoo() ){
                 prefix = (string)"version";
             }
-            else if( prefixIn == "" && ! obj[ "lastmod" ].eoo() ){
+            /// TODO: use ChunkFields::lastmod()
+            else if( prefixIn == "" && ! obj["lastmod"].eoo() ){
                 prefix = (string)"lastmod";
             }
 

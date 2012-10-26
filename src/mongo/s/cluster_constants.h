@@ -18,7 +18,8 @@
 
 #include <string>
 
-#include "mongo/db/jsobj.h" // for BSONField
+#include "mongo/bson/util/misc.h"  // for Date_t
+#include "mongo/db/jsobj.h"        // for BSON_Field and dependencies
 
 namespace mongo {
 
@@ -32,7 +33,7 @@ namespace mongo {
         static const string database;
         static const string collection;
         static const string chunk;
-        static const string tags;
+        static const string tag;
         static const string mongos;
         static const string settings;
         static const string changelog;
@@ -52,58 +53,68 @@ namespace mongo {
         static BSONField<long long> maxSize; // max allowe disk space usage
     };
 
-    // ============  below not yet hooked  ============
-
     /**
      * DatabaseFields holds all the field names and types for the database collection.
      */
     struct DatabaseFields {
-        static BSONField<string> UNHOOKED_name;             // database's name
-        static BSONField<string> UNHOOKED_shard;            // primary shard for the database
-        static BSONField<bool> UNHOOKED_draining;           // is the database being removed?
-        static BSONField<bool> UNHOOKED_scatterCollections; // distribute collection among shards
+        static BSONField<string> name;                  // database's name
+        static BSONField<bool> partitioned;             // To be deprecated in 2.4
+        static BSONField<string> primary;               // To be deprecated in 2.4
 
-        static BSONField<bool> DEPRECATED_partitioned;      // last used in 2.2 series
-        static BSONField<string> DEPRECATED_oldShard;       // last used in 2.2 series
+        static BSONField<string> DEPRECATED_name;       // last used in 1.4 series (version 2)
+        static BSONField<bool> DEPRECATED_sharded;      // last used in 1.4 series
+
+        // Being added in 2.4
+        static BSONField<string> NEW_shard;             // primary shard for the database
+        static BSONField<bool> NEW_draining;            // is the database being removed?
+        static BSONField<bool> NEW_scatterCollections;  // distribute collection among shards
     };
 
     /**
      * CollectionFields holds all the field names and types for the collections collection.
      */
     struct CollectionFields {
-        static BSONField<string> UNHOOKED_name;       // collection's name
-        static BSONField<string> UNHOOKED_shard;      // primary, if not sharded
-        static BSONField<BSONObj> UNHOOKED_shardKey;  // shardkey, if sharded
-        static BSONField<string> UNHOOKED_epoch;      // collection's incarnation
-
-        static BSONField<string> DEPRECATED_oldEpoch; // last used in 2.2 series
-        static BSONField<bool> DEPRECATED_dropped;    // last used in 2.2 series
-        static BSONField<bool> DEPRECATED_unique;     // last used in 2.2 series
+        static BSONField<string> name;     // collection's name
+        static BSONField<string> shard;    // primary, if not sharded
+        static BSONField<BSONObj> key;     // sharding key, if sharded
+        static BSONField<bool> unique;     // sharding key unique?
+        static BSONField<Date_t> lastmod;  // when collecation was created
+        static BSONField<bool> dropped;    // logical deletion
+        static BSONField<bool> noBalance;  // true if balancing is disabled
     };
 
     /**
      * ChunkFields holds all the field names and types for the chunks collection.
      */
     struct ChunkFields {
-        static BSONField<string> UNHOOKED_name;          // chunk's id
-        static BSONField<BSONObj> UNHOOKED_min;          // first key of the chunk, including
-        static BSONField<BSONObj> UNHOOKED_max;          // last key of the chunk, non-including
-        static BSONField<string> UNHOOKED_version;       // major | minor
-        static BSONField<string> UNHOOKED_shard;         // home of this chunk
-        static BSONField<bool> UNHOOKED_jumbo;           // too big to move?
+        static BSONField<string> name;            // chunk's id
+        static BSONField<string> ns;              // namespace this collection is in
+        static BSONField<BSONObj> min;            // first key of the chunk, including
+        static BSONField<BSONObj> max;            // last key of the chunk, non-including
+        static BSONField<string> lastmod;         // major | minor versions
+        static BSONField<string> shard;           // home of this chunk
+        static BSONField<bool> jumbo;             // too big to move?
 
-        static BSONField<string> DEPRECATED_oldVersion;  // last used in 2.2 series
-        static BSONField<string> DEPRECATED_epoch;       // last used in 2.2 series
+        // Transition to new format, 2.2 -> 2.4
+        // 2.2 can read both lastmod + lastmodEpoch format and 2.4 [ lastmod, OID ] formats.
+        static BSONField<OID> lastmodEpoch;       // OID, to disambiguate collection incarnations
+
+        // Being added in 2.4
+        // This will deprecate lastmod + lastmodEpoch format.
+        static BSONField<BSONArray> NEW_lastmod;  // [Date_t, OID] format
     };
 
     /**
      * TagFields holds all the field names and types for the tags collection.
      */
     struct TagFields {
-        static BSONField<string> UNHOOKED_tag;   // tag name
-        static BSONField<BSONObj> UNHOOKED_min;  // first key of the tag, including
-        static BSONField<BSONObj> UNHOOKED_max;  // last key of the tag, non-including
+        static BSONField<string> ns;    // namespace this tag is for
+        static BSONField<string> tag;   // tag name
+        static BSONField<BSONObj> min;  // first key of the tag, including
+        static BSONField<BSONObj> max;  // last key of the tag, non-including
     };
+
+    // ============  below not yet hooked  ============
 
     /**
      * MongosFields holds all the field names and types for the mongos collection.

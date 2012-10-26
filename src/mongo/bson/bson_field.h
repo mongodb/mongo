@@ -101,6 +101,10 @@ namespace mongo {
             return query("$lt", t);
         }
 
+        BSONFieldValue<BSONObj> ne(const T& t) const {
+            return query("$ne", t);
+        }
+
     private:
         std::string _name;
         std::string _longName;

@@ -85,13 +85,13 @@ namespace mongo {
                             BSONObjBuilder b;
                             b.appendRegex( "_id" , (string)"^" +
                                            pcrecpp::RE::QuoteMeta( database ) + "$" , "i" );
-                            BSONObj d = conn->get()->findOne( ShardNS::database , b.obj() );
+                            BSONObj dbObj = conn->get()->findOne( ConfigNS::database , b.obj() );
                             conn->done();
 
-                            if ( ! d.isEmpty() ) {
+                            if ( ! dbObj.isEmpty() ) {
                                 uasserted( DatabaseDifferCaseCode, str::stream()
                                     <<  "can't have 2 databases that just differ on case "
-                                    << " have: " << d["_id"].String()
+                                    << " have: " << dbObj[DatabaseFields::name()].String()
                                     << " want to add: " << database );
                             }
                         }
@@ -452,8 +452,8 @@ namespace mongo {
         try {
             // look for the stop balancer marker
             balancerDoc = conn->get()->findOne( ShardNS::settings, BSON( "_id" << "balancer" ) );
-            if( ns.size() > 0 ) collDoc = conn->get()->findOne( ShardNS::collection,
-                                                                BSON( "_id" << ns ) );
+            if( ns.size() > 0 ) collDoc = conn->get()->findOne(ConfigNS::collection,
+                                                               BSON( CollectionFields::name(ns)));
             conn->done();
         }
         catch( DBException& e ){
