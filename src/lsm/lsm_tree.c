@@ -433,7 +433,7 @@ __wt_lsm_tree_get(WT_SESSION_IMPL *session,
 			if (exclusive && lsm_tree->refcnt)
 				return (EBUSY);
 
-			WT_ATOMIC_ADD(lsm_tree->refcnt, 1);
+			(void)WT_ATOMIC_ADD(lsm_tree->refcnt, 1);
 			*treep = lsm_tree;
 			return (0);
 		}
@@ -453,7 +453,7 @@ void
 __wt_lsm_tree_release(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 {
 	WT_ASSERT(session, lsm_tree->refcnt > 0);
-	WT_ATOMIC_SUB(lsm_tree->refcnt, 1);
+	(void)WT_ATOMIC_SUB(lsm_tree->refcnt, 1);
 }
 
 /*
