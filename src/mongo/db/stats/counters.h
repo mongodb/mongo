@@ -44,7 +44,7 @@ namespace mongo {
 
         void gotOp( int op , bool isCommand );
 
-        BSONObj getObj();
+        BSONObj getObj() const;
         
         // thse are used by snmp, and other things, do not remove
         const AtomicUInt * getInsert() const { return &_insert; }
@@ -56,7 +56,8 @@ namespace mongo {
 
 
     private:
-
+        void _checkWrap();
+        
         // todo: there will be a lot of cache line contention on these.  need to do something 
         //       else eventually.
         AtomicUInt _insert;
@@ -69,71 +70,6 @@ namespace mongo {
 
     extern OpCounters globalOpCounters;
     extern OpCounters replOpCounters;
-
-
-    class IndexCounters {
-    public:
-        IndexCounters();
-
-        // used without a mutex intentionally (can race)
-        void btree( char * node ) {
-            if ( ! _memSupported )
-                return;
-            btree( Record::likelyInPhysicalMemory( node ) );
-        }
-
-        void btree( bool memHit ) {
-            if ( memHit )
-                _btreeMemHits++;
-            else
-                _btreeMemMisses++;
-            _btreeAccesses++;
-        }
-        void btreeHit() { _btreeMemHits++; _btreeAccesses++; }
-        void btreeMiss() { _btreeMemMisses++; _btreeAccesses++; }
-
-        void append( BSONObjBuilder& b );
-
-    private:
-        bool _memSupported;
-
-        int _resets;
-        long long _maxAllowed;
-
-        long long _btreeMemMisses;
-        long long _btreeMemHits;
-        long long _btreeAccesses;
-    };
-
-    extern IndexCounters globalIndexCounters;
-
-    class FlushCounters {
-    public:
-        FlushCounters();
-
-        void flushed(int ms);
-
-        void append( BSONObjBuilder& b );
-
-    private:
-        long long _total_time;
-        long long _flushes;
-        int _last_time;
-        Date_t _last;
-    };
-
-    extern FlushCounters globalFlushCounters;
-
-
-    class GenericCounter {
-    public:
-        GenericCounter() : _mutex("GenericCounter") { }
-        void hit( const string& name , int count=0 );
-        BSONObj getObj();
-    private:
-        map<string,long long> _counts; // TODO: replace with thread safe map
-        mongo::mutex _mutex;
-    };
 
     class NetworkCounter {
     public:

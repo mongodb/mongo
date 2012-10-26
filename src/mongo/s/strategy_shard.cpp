@@ -87,9 +87,6 @@ namespace mongo {
                 if ( qSpec.isExplain() ) start_millis = curTimeMillis64();
                 cursor->init();
 
-                LOG(5) << "   cursor type: " << cursor->type() << endl;
-                shardedCursorTypes.hit( cursor->type() );
-
                 if ( qSpec.isExplain() ) {
                     // fetch elapsed time for the query
                     long long elapsed_millis = curTimeMillis64() - start_millis;

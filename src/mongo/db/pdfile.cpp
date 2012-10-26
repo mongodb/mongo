@@ -31,10 +31,12 @@ _ disallow system* manipulations from the database.
 #include <boost/filesystem/operations.hpp>
 #include <list>
 
+#include "mongo/base/counter.h"
 #include "mongo/db/pdfile_private.h"
 #include "mongo/db/background.h"
 #include "mongo/db/btree.h"
 #include "mongo/db/btreebuilder.h"
+#include "mongo/db/commands/server_status.h"
 #include "mongo/db/compact.h"
 #include "mongo/db/curop-inl.h"
 #include "mongo/db/db.h"
@@ -59,19 +61,6 @@ namespace mongo {
 
     BOOST_STATIC_ASSERT( sizeof(Extent)-4 == 48+128 );
     BOOST_STATIC_ASSERT( sizeof(DataFileHeader)-4 == 8192 );
-
-    void printMemInfo( const char * where ) {
-        cout << "mem info: ";
-        if ( where )
-            cout << where << " ";
-        ProcessInfo pi;
-        if ( ! pi.supported() ) {
-            cout << " not supported" << endl;
-            return;
-        }
-
-        cout << "vsize: " << pi.getVirtualMemorySize() << " resident: " << pi.getResidentSize() << " mapped: " << ( MemoryMappedFile::totalMappedLength() / ( 1024 * 1024 ) ) << endl;
-    }
 
     bool isValidNS( const StringData& ns ) {
         // TODO: should check for invalid characters
@@ -1096,6 +1085,8 @@ namespace mongo {
         }
     }
 
+    Counter64 moveCounter;
+    ServerStatusMetricField<Counter64> moveCounterDisplay( "record.moves", false, &moveCounter );
 
     /** Note: if the object shrinks a lot, we don't free up space, we leave extra at end of the record.
      */
@@ -1137,6 +1128,7 @@ namespace mongo {
 
         if ( toupdate->netLength() < objNew.objsize() ) {
             // doesn't fit.  reallocate -----------------------------------------------------
+            moveCounter.increment();
             uassert( 10003 , "failing update: objects in a capped ns cannot grow", !(d && d->isCapped()));
             d->paddingTooSmall();
             deleteRecord(ns, toupdate, dl);

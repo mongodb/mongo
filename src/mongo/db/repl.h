@@ -176,7 +176,6 @@ namespace mongo {
     };
 
     bool anyReplEnabled();
-    void appendReplicationInfo( BSONObjBuilder& result , bool authed , int level = 0 );
 
     /**
      * Helper class used to set and query an ignore state for a named database.

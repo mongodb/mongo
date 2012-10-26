@@ -47,6 +47,7 @@
 #include "repl/connections.h"
 #include "ops/update.h"
 #include "pcrecpp.h"
+#include "mongo/db/commands/server_status.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/queryutil.h"
 
@@ -145,21 +146,20 @@ namespace mongo {
 
     bool replAuthenticate(DBClientBase *conn);
 
-    void appendReplicationInfo( BSONObjBuilder& result , bool authed , int level ) {
-
+    void appendReplicationInfo( BSONObjBuilder& result , bool userIsAdmin , int level ) {
         if ( replSet ) {
             if( theReplSet == 0 || theReplSet->state().shunned() ) {
                 result.append("ismaster", false);
                 result.append("secondary", false);
                 result.append("info", ReplSet::startupStatusMsg.get());
                 result.append( "isreplicaset" , true );
-                return;
             }
-
-            theReplSet->fillIsMaster(result);
+            else {
+                theReplSet->fillIsMaster(result);
+            }
             return;
         }
-
+        
         if ( replAllDead ) {
             result.append("ismaster", 0);
             string s = string("dead: ") + replAllDead;
@@ -168,24 +168,24 @@ namespace mongo {
         else {
             result.appendBool("ismaster", _isMaster() );
         }
-
+        
         if ( level && replSet ) {
             result.append( "info" , "is replica set" );
         }
         else if ( level ) {
             BSONObjBuilder sources( result.subarrayStart( "sources" ) );
-
+            
             int n = 0;
             list<BSONObj> src;
             {
-                Client::ReadContext ctx( "local.sources", dbpath, authed );
+                Client::ReadContext ctx( "local.sources", dbpath, userIsAdmin );
                 shared_ptr<Cursor> c = findTableScan("local.sources", BSONObj());
                 while ( c->ok() ) {
                     src.push_back(c->current());
                     c->advance();
                 }
             }
-
+            
             for( list<BSONObj>::const_iterator i = src.begin(); i != src.end(); i++ ) {
                 BSONObj s = *i;
                 BSONObjBuilder bb;
@@ -200,13 +200,12 @@ namespace mongo {
                     t.append( "inc" , e.timestampInc() );
                     t.done();
                 }
-
+                
                 if ( level > 1 ) {
                     wassert( !Lock::isLocked() );
                     // note: there is no so-style timeout on this connection; perhaps we should have one.
-                    scoped_ptr<ScopedDbConnection> conn(
-                            ScopedDbConnection::getInternalScopedDbConnection(
-                                    s["host"].valuestr() ) );
+                    scoped_ptr<ScopedDbConnection> conn( ScopedDbConnection::getInternalScopedDbConnection( s["host"].valuestr() ) );
+                    
                     DBClientConnection *cliConn = dynamic_cast< DBClientConnection* >( &conn->conn() );
                     if ( cliConn && replAuthenticate( cliConn ) ) {
                         BSONObj first = conn->get()->findOne( (string)"local.oplog.$" + sourcename,
@@ -220,13 +219,32 @@ namespace mongo {
                     }
                     conn->done();
                 }
-
+                
                 sources.append( BSONObjBuilder::numStr( n++ ) , bb.obj() );
             }
-
+            
             sources.done();
         }
     }
+    
+    class ReplicationInfoServerStatus : public ServerStatusSection {
+    public:
+        ReplicationInfoServerStatus() : ServerStatusSection( "repl" ){}
+        bool includeByDefault() const { return true; }
+        bool adminOnly() const { return false; }
+        
+        BSONObj generateSection( const BSONElement& configElement, bool userIsAdmin ) const {
+            if ( ! anyReplEnabled() )
+                return BSONObj();
+            
+            int level = configElement.numberInt();
+            
+            BSONObjBuilder result;
+            appendReplicationInfo( result, userIsAdmin, level );
+            return result.obj();
+        }
+    } replicationInfoServerStatus;
+
 
     class CmdIsMaster : public Command {
     public:
@@ -247,7 +265,7 @@ namespace mongo {
                one is not authenticated for admin db to be safe.
             */
             bool authed = cc().getAuthenticationInfo()->isAuthorizedReads("admin");
-            appendReplicationInfo( result , authed );
+            appendReplicationInfo( result , authed , 0 );
 
             result.appendNumber("maxBsonObjectSize", BSONObjMaxUserSize);
             result.appendDate("localTime", jsTime());
@@ -1565,5 +1583,7 @@ namespace mongo {
                             replSettings.slave == SimpleSlave );
         }
     }
+
+    OpCounterServerStatusSection replOpCounterServerStatusSection( "opcountersRepl", &replOpCounters );
 
 } // namespace mongo

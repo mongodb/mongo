@@ -25,6 +25,4 @@ namespace mongo {
 
     extern OpCounters opsNonSharded;
     extern OpCounters opsSharded;
-
-    extern GenericCounter shardedCursorTypes;
 }

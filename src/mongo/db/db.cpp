@@ -26,6 +26,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/cmdline.h"
+#include "mongo/db/commands/server_status.h"
 #include "mongo/db/d_concurrency.h"
 #include "mongo/db/d_globals.h"
 #include "mongo/db/db.h"
@@ -400,9 +401,20 @@ namespace mongo {
     /**
      * does background async flushes of mmapped files
      */
-    class DataFileSync : public BackgroundJob {
+    class DataFileSync : public BackgroundJob , public ServerStatusSection {
     public:
+        DataFileSync() 
+            : ServerStatusSection( "backgroundFlushing" ),
+              _total_time( 0 ),
+              _flushes( 0 ),
+              _last() {
+        }
+
+        virtual bool includeByDefault() const { return true; }
+        virtual bool adminOnly() const { return false; }
+        
         string name() const { return "DataFileSync"; }
+
         void run() {
             Client::initThread( name().c_str() );
             if( cmdLine.syncdelay == 0 )
@@ -431,13 +443,38 @@ namespace mongo {
                 int numFiles = MemoryMappedFile::flushAll( true );
                 time_flushing = (int) (jsTime() - start);
 
-                globalFlushCounters.flushed(time_flushing);
+                _flushed(time_flushing);
 
                 if( logLevel >= 1 || time_flushing >= 10000 ) {
                     log() << "flushing mmaps took " << time_flushing << "ms " << " for " << numFiles << " files" << endl;
                 }
             }
         }
+
+        BSONObj generateSection( const BSONElement& configElement, bool userIsAdmin ) const {
+            BSONObjBuilder b;
+            b.appendNumber( "flushes" , _flushes );
+            b.appendNumber( "total_ms" , _total_time );
+            b.appendNumber( "average_ms" , (_flushes ? (_total_time / double(_flushes)) : 0.0) );
+            b.appendNumber( "last_ms" , _last_time );
+            b.append("last_finished", _last);
+            return b.obj();
+        }
+
+    private:
+
+        void _flushed(int ms) {
+            _flushes++;
+            _total_time += ms;
+            _last_time = ms;
+            _last = jsTime();
+        }
+        
+        long long _total_time;
+        long long _flushes;
+        int _last_time;
+        Date_t _last;
+
 
     } dataFileSync;
 

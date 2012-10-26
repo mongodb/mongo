@@ -23,6 +23,7 @@
 #include "../util/net/listen.h"
 #include "../db/curop.h"
 #include "../db/client.h"
+#include "mongo/db/commands/server_status.h"
 #include "mongo/util/stacktrace.h"
 
 #include "d_writeback.h"
@@ -200,5 +201,13 @@ namespace mongo {
         }
 
     } writeBacksQueuedCommand;
+
+    class WriteBacksQueuedSSM : public ServerStatusMetric {
+    public:
+        WriteBacksQueuedSSM() : ServerStatusMetric( ".writeBacksQueued", false ){}
+        virtual void appendAtLeaf( BSONObjBuilder& b ) const {
+            b.appendBool( _leafName, ! writeBackManager.queuesEmpty() );
+        }
+    } writeBacksQueuedSSM;
 
 }  // namespace mongo

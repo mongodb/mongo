@@ -19,7 +19,7 @@
 #include "mongo/pch.h"
 
 #include "mongo/db/btree.h"
-
+#include "mongo/db/btree_stats.h"
 #include "mongo/db/btreebuilder.h"
 #include "mongo/db/client.h"
 #include "mongo/db/clientcursor.h"

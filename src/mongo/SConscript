@@ -129,6 +129,7 @@ env.StaticLibrary("coredb", [
         "db/commands.cpp",
         "db/commands/hashcmd.cpp",
         "db/commands/isself.cpp",
+        "db/commands/server_status.cpp",
         "db/fail_point_service.cpp",
         "db/pipeline/pipeline.cpp",
         "db/dbcommands_generic.cpp",
@@ -208,7 +209,7 @@ else:
     env.StaticLibrary('scripting', scripting_common_files + ['scripting/engine_none.cpp'],
                       LIBDEPS=['bson_template_evaluator'])
 
-mmapFiles = [ "util/mmap.cpp", "util/touch_pages.cpp" ]
+mmapFiles = [ "util/mmap.cpp" ]
 
 if has_option( "mm" ):
     mmapFiles += [ "util/mmap_mm.cpp" ]
@@ -257,6 +258,7 @@ serverOnlyFiles = [ "db/curop.cpp",
                     "util/logfile.cpp",
                     "util/alignedbuilder.cpp",
                     "util/elapsed_tracker.cpp",
+                    "util/touch_pages.cpp",
                     "db/mongommf.cpp",
                     "db/dur.cpp",
                     "db/durop.cpp",
@@ -267,6 +269,7 @@ serverOnlyFiles = [ "db/curop.cpp",
                     "db/dur_journal.cpp",
                     "db/introspect.cpp",
                     "db/btree.cpp",
+                    "db/btree_stats.cpp",
                     "db/clientcursor.cpp",
                     "db/tests.cpp",
                     "db/repl.cpp",
@@ -338,7 +341,7 @@ env.Program('lame_stacktrace_test', 'util/lame_stacktrace_test.cpp',
             LIBDEPS=['stacktrace',
                      '$BUILD_DIR/mongo/base/base'])
 
-serverOnlyFiles += mmapFiles
+coreServerFiles += mmapFiles
 
 serverOnlyFiles += [ "db/stats/snapshots.cpp" ]
 

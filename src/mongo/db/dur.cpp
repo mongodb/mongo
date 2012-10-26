@@ -73,6 +73,7 @@
 #include "mongo/util/stacktrace.h"
 #include "../server.h"
 #include "mongo/db/commands/fsync.h"
+#include "mongo/db/commands/server_status.h"
 
 using namespace mongoutils;
 
@@ -887,6 +888,21 @@ namespace mongo {
 
             verify(!haveJournalFiles()); // Double check post-conditions
         }
+        
+        class DurSSS : public ServerStatusSection {
+        public:
+            DurSSS() : ServerStatusSection( "dur" ){}
+            virtual bool includeByDefault() const { return true; }
+            virtual bool adminOnly() const { return false; }
+            
+            BSONObj generateSection( const BSONElement& configElement, bool userIsAdmin ) const {
+                if ( ! cmdLine.dur )
+                    return BSONObj();
+                return dur::stats.asObj();
+            }
+                
+        } durSSS;
+
 
     } // namespace dur
 
