@@ -349,10 +349,12 @@ __curstat_lsm_init(WT_SESSION_IMPL *session,
 	WT_LSM_TREE *lsm_tree;
 
 	WT_WITH_SCHEMA_LOCK_OPT(session,
-	    ret = __wt_lsm_tree_get(session, uri, &lsm_tree));
+	    ret = __wt_lsm_tree_get(session, uri, 0, &lsm_tree));
 	WT_RET(ret);
 
-	WT_RET(__wt_lsm_stat_init(session, lsm_tree, flags));
+	ret = __wt_lsm_stat_init(session, lsm_tree, flags);
+	__wt_lsm_tree_release(session, lsm_tree);
+	WT_RET(ret);
 
 	cst->btree = NULL;
 	cst->notpositioned = 1;

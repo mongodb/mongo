@@ -59,6 +59,7 @@ struct __wt_lsm_tree {
 
 	WT_COLLATOR *collator;
 
+	int refcnt;			/* Number of users of the tree. */
 	WT_RWLOCK *rwlock;
 	TAILQ_ENTRY(__wt_lsm_tree) q;
 

@@ -243,8 +243,10 @@ __wt_lsm_tree_create(WT_SESSION_IMPL *session,
 	const char *cfg[] = API_CONF_DEFAULTS(session, create, config);
 
 	/* If the tree is open, it already exists. */
-	if ((ret = __wt_lsm_tree_get(session, uri, &lsm_tree)) == 0)
+	if ((ret = __wt_lsm_tree_get(session, uri, 0, &lsm_tree)) == 0) {
+		__wt_lsm_tree_release(session, lsm_tree);
 		return (exclusive ? EEXIST : 0);
+	}
 	WT_RET_NOTFOUND_OK(ret);
 
 	/* If the tree has metadata, it already exists. */
@@ -319,10 +321,12 @@ __wt_lsm_tree_create(WT_SESSION_IMPL *session,
 
 	/*
 	 * Open our new tree and add it to the handle cache. Don't discard on
-	 * error the returned handle is NULL on error, and the metadata tracking
-	 *  macros handle cleaning up on failure.
+	 * error: the returned handle is NULL on error, and the metadata
+	 * tracking macros handle cleaning up on failure.
 	 */
 	ret = __lsm_tree_open(session, uri, &lsm_tree);
+	if (ret == 0)
+		__wt_lsm_tree_release(session, lsm_tree);
 
 	if (0) {
 err:		__lsm_tree_discard(session, lsm_tree);
@@ -401,6 +405,7 @@ __lsm_tree_open(
 	lsm_tree->dsk_gen = 1;
 
 	/* Now the tree is setup, make it visible to others. */
+	lsm_tree->refcnt = 1;
 	TAILQ_INSERT_HEAD(&S2C(session)->lsmqh, lsm_tree, q);
 	F_SET(lsm_tree, WT_LSM_TREE_OPEN);
 
@@ -418,13 +423,17 @@ err:		__lsm_tree_discard(session, lsm_tree);
  *	get an LSM tree structure for the given name.
  */
 int
-__wt_lsm_tree_get(
-    WT_SESSION_IMPL *session, const char *uri, WT_LSM_TREE **treep)
+__wt_lsm_tree_get(WT_SESSION_IMPL *session,
+    const char *uri, int exclusive, WT_LSM_TREE **treep)
 {
 	WT_LSM_TREE *lsm_tree;
 
 	TAILQ_FOREACH(lsm_tree, &S2C(session)->lsmqh, q)
 		if (strcmp(uri, lsm_tree->name) == 0) {
+			if (exclusive && lsm_tree->refcnt)
+				return (EBUSY);
+
+			WT_ATOMIC_ADD(lsm_tree->refcnt, 1);
 			*treep = lsm_tree;
 			return (0);
 		}
@@ -434,6 +443,17 @@ __wt_lsm_tree_get(
 	 * can find and/or open the handle.
 	 */
 	return (__lsm_tree_open(session, uri, treep));
+}
+
+/*
+ * __wt_lsm_tree_get --
+ *	get an LSM tree structure for the given name.
+ */
+void
+__wt_lsm_tree_release(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
+{
+	WT_ASSERT(session, lsm_tree->refcnt > 0);
+	WT_ATOMIC_SUB(lsm_tree->refcnt, 1);
 }
 
 /*
@@ -492,7 +512,7 @@ __wt_lsm_tree_drop(
 	int i;
 
 	/* Get the LSM tree. */
-	WT_RET(__wt_lsm_tree_get(session, name, &lsm_tree));
+	WT_RET(__wt_lsm_tree_get(session, name, 1, &lsm_tree));
 
 	/* Shut down the LSM worker. */
 	WT_RET(__lsm_tree_close(session, lsm_tree));
@@ -546,7 +566,7 @@ __wt_lsm_tree_rename(WT_SESSION_IMPL *session,
 	old = NULL;
 
 	/* Get the LSM tree. */
-	WT_RET(__wt_lsm_tree_get(session, oldname, &lsm_tree));
+	WT_RET(__wt_lsm_tree_get(session, oldname, 1, &lsm_tree));
 
 	/* Shut down the LSM worker. */
 	WT_RET(__lsm_tree_close(session, lsm_tree));
@@ -612,7 +632,7 @@ __wt_lsm_tree_truncate(
 	WT_UNUSED(cfg);
 
 	/* Get the LSM tree. */
-	WT_RET(__wt_lsm_tree_get(session, name, &lsm_tree));
+	WT_RET(__wt_lsm_tree_get(session, name, 1, &lsm_tree));
 
 	/* Shut down the LSM worker. */
 	WT_RET(__lsm_tree_close(session, lsm_tree));
@@ -633,6 +653,7 @@ __wt_lsm_tree_truncate(
 
 	WT_ERR(__lsm_tree_start_worker(session, lsm_tree));
 	__wt_spin_unlock(session, &lsm_tree->lock);
+	__wt_lsm_tree_release(session, lsm_tree);
 
 	if (0) {
 err:		__wt_spin_unlock(session, &lsm_tree->lock);
@@ -651,18 +672,21 @@ __wt_lsm_tree_worker(WT_SESSION_IMPL *session,
    int (*func)(WT_SESSION_IMPL *, const char *[]),
    const char *cfg[], uint32_t open_flags)
 {
+	WT_DECL_RET;
 	WT_LSM_CHUNK *chunk;
 	WT_LSM_TREE *lsm_tree;
 	int i;
 
-	WT_RET(__wt_lsm_tree_get(session, uri, &lsm_tree));
+	WT_RET(__wt_lsm_tree_get(session, uri,
+	    FLD_ISSET(open_flags, WT_BTREE_EXCLUSIVE) ? 1 : 0, &lsm_tree));
 	for (i = 0; i < lsm_tree->nchunks; i++) {
 		chunk = lsm_tree->chunk[i];
 		if (func == __wt_checkpoint &&
 		    F_ISSET(chunk, WT_LSM_CHUNK_ONDISK))
 			continue;
-		WT_RET(__wt_schema_worker(
+		WT_ERR(__wt_schema_worker(
 		    session, chunk->uri, func, cfg, open_flags));
 	}
-	return (0);
+err:	__wt_lsm_tree_release(session, lsm_tree);
+	return (ret);
 }
