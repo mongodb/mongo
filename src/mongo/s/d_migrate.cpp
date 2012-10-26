@@ -913,6 +913,7 @@ namespace mongo {
             configServer.logChange( "moveChunk.start" , ns , chunkInfo );
 
             ShardChunkVersion maxVersion;
+            ShardChunkVersion startingVersion;
             string myOldShard;
             {
                 scoped_ptr<ScopedDbConnection> conn(
@@ -981,10 +982,10 @@ namespace mongo {
                 // it's possible this shard will be *at* zero version from a previous migrate and
                 // no refresh will be done
                 // TODO: Make this less fragile
-                ShardChunkVersion shardVersion = maxVersion;
-                shardingState.trySetVersion( ns , shardVersion /* will return updated */ );
+                startingVersion = maxVersion;
+                shardingState.trySetVersion( ns , startingVersion /* will return updated */ );
 
-                log() << "moveChunk request accepted at version " << shardVersion << migrateLog;
+                log() << "moveChunk request accepted at version " << startingVersion << migrateLog;
             }
 
             timing.done(2);
@@ -1099,8 +1100,7 @@ namespace mongo {
                 // 5.a
                 // we're under the collection lock here, so no other migrate can change maxVersion or ShardChunkManager state
                 migrateFromStatus.setInCriticalSection( true );
-                ShardChunkVersion currVersion = maxVersion;
-                ShardChunkVersion myVersion = currVersion;
+                ShardChunkVersion myVersion = maxVersion;
                 myVersion.incMajor();
 
                 {
@@ -1132,7 +1132,7 @@ namespace mongo {
                     catch( DBException& e ){
                         errmsg = str::stream() << "moveChunk could not contact to: shard " << toShard.getConnString() << " to commit transfer" << causedBy( e );
                         warning() << errmsg << endl;
-                        return false;
+                        ok = false;
                     }
 
                     connTo->done();
@@ -1142,11 +1142,11 @@ namespace mongo {
                             Lock::DBWrite lk( ns );
 
                             // revert the chunk manager back to the state before "forgetting" about the chunk
-                            shardingState.undoDonateChunk( ns , min , max , currVersion );
+                            shardingState.undoDonateChunk( ns , min , max , startingVersion );
                         }
 
                         log() << "moveChunk migrate commit not accepted by TO-shard: " << res
-                              << " resetting shard version to: " << currVersion << migrateLog;
+                              << " resetting shard version to: " << startingVersion << migrateLog;
 
                         errmsg = "_recvChunkCommit failed!";
                         result.append( "cause" , res );
