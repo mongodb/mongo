@@ -120,8 +120,11 @@ ops(void *arg)
 	memset(&value, 0, sizeof(value));
 	val_gen_setup(&valbuf);
 
-	/* Each thread does its share of the total operations. */
-	thread_ops = g.c_ops / g.c_threads;
+	/*
+	 * Each thread does its share of the total operations, and make sure
+	 * that it's not 0 (testing runs: threads might be larger than ops).
+	 */
+	thread_ops = g.c_threads + g.c_ops / g.c_threads;
 
 	/* Pick a period for re-opening the session and cursors. */
 	session = NULL;
