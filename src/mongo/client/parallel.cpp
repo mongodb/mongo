@@ -1127,9 +1127,26 @@ namespace mongo {
                 throw;
             }
             catch( DBException& e ){
-                warning() << "db exception when finishing on " << shard << ", current connection state is " << mdata.toBSON() << causedBy( e ) << endl;
-                mdata.errored = true;
-                throw;
+                // NOTE: RECV() WILL NOT THROW A SOCKET EXCEPTION - WE GET THIS AS ERROR 15988 FROM
+                // ABOVE
+                if (e.getCode() == 15988) {
+
+                    warning() << "exception when receiving data from " << shard
+                              << ", current connection state is " << mdata.toBSON()
+                              << causedBy( e ) << endl;
+
+                    mdata.errored = true;
+                    if (returnPartial) {
+                        mdata.cleanup();
+                        continue;
+                    }
+                    throw;
+                }
+                else {
+                    warning() << "db exception when finishing on " << shard << ", current connection state is " << mdata.toBSON() << causedBy( e ) << endl;
+                    mdata.errored = true;
+                    throw;
+                }
             }
             catch( std::exception& e){
                 warning() << "exception when finishing on " << shard << ", current connection state is " << mdata.toBSON() << causedBy( e ) << endl;
@@ -1228,6 +1245,7 @@ namespace mongo {
         if( ! isVersioned() ) return false;
 
         if( _cursorMap.size() > 1 ) return true;
+        if( _cursorMap.size() == 0 ) return true;
         if( _cursorMap.begin()->second.pcState->manager ) return true;
         return false;
     }
