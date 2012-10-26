@@ -333,7 +333,7 @@ namespace mongo {
     }
 
     v8::Handle<v8::Value> mongoInsert(V8Scope* scope, const v8::Arguments& args) {
-        jsassert( args.Length() == 2 , "insert needs 2 args" );
+        jsassert( args.Length() == 3 , "insert needs 3 args" );
         jsassert( args[1]->IsObject() , "have to insert an object" );
 
         if ( args.This()->Get( scope->getV8Str( "readOnly" ) )->BooleanValue() )
@@ -343,6 +343,7 @@ namespace mongo {
         GETNS;
 
         v8::Handle<v8::Object> in = args[1]->ToObject();
+        v8::Handle<v8::Integer> flags = args[2]->ToInteger();
 
         if( args[1]->IsArray() ){
 
@@ -366,7 +367,7 @@ namespace mongo {
             DDD( "want to save batch : " << bos.length );
             try {
                 //V8Unlock u;
-                conn->insert( ns , bos );
+                conn->insert( ns , bos, flags->Int32Value() );
             }
             catch ( ... ) {
                 return v8::ThrowException( v8::String::New( "socket error on bulk insert" ) );
