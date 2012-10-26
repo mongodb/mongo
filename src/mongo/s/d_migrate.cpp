@@ -294,7 +294,7 @@ namespace mongo {
         }
 
         void done() {
-            Lock::DBRead lk( _ns );
+            Lock::DBWrite lk( _ns );
 
             {
                 scoped_spinlock lk( _trackerLocks );
