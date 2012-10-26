@@ -296,7 +296,10 @@ namespace mongo_test {
             mongo::Timer timer;
             conn.query("x.x");
             const int nowInMilliSec = timer.millis();
-            ASSERT_GREATER_THAN_OR_EQUALS(nowInMilliSec, 149);
+            // Use a more lenient lower bound since some platforms like Windows
+            // don't guarantee that sleeps will not wake up earlier (unlike
+            // nanosleep we use for Linux)
+            ASSERT_GREATER_THAN_OR_EQUALS(nowInMilliSec, 130);
         }
 
         {
@@ -304,7 +307,7 @@ namespace mongo_test {
             BSONObj response;
             conn.runCommand("x.x", BSON("serverStatus" << 1), response);
             const int nowInMilliSec = timer.millis();
-            ASSERT_GREATER_THAN_OR_EQUALS(nowInMilliSec, 149);
+            ASSERT_GREATER_THAN_OR_EQUALS(nowInMilliSec, 130);
         }
 
         ASSERT_EQUALS(1U, server.getQueryCount());
