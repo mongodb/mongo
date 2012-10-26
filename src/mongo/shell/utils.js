@@ -1471,7 +1471,7 @@ shellHelper.show = function (what) {
         return "";
     }
 
-    if (what == "dbs") {
+    if (what == "dbs" || what == "databases") {
         var dbs = db.getMongo().getDBs();
         var size = {};
         dbs.databases.forEach(function (x) { size[x.name] = x.sizeOnDisk; });
