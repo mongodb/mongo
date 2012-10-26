@@ -45,44 +45,45 @@ wts_open(void)
 	WT_SESSION *session;
 	uint32_t maxintlpage, maxintlitem, maxleafpage, maxleafitem;
 	int ret;
-	const char *ext1, *ext2;
-	char config[512], *end, *p;
-
-	/* If the bzip2 compression module has been built, use it. */
-#define	EXTPATH	"../../ext"
-	ext1 = EXTPATH "compressors/bzip2_compress/.libs/bzip2_compress.so";
-	if (access(ext1, R_OK) != 0) {
-		ext1 = "";
-		g.c_bzip = 0;
-	}
-	ext2 = EXTPATH "/collators/reverse/.libs/reverse_collator.so";
+	char config[1024], *end, *p;
 
 	/*
-	 * Open configuration -- put command line configuration options at the
-	 * end so they can override "standard" configuration.
+	 * Open configuration.
+	 *
+	 * Put command line configuration options at the end so they override
+	 * the standard configuration.
 	 */
 	snprintf(config, sizeof(config),
 	    "create,error_prefix=\"%s\",cache_size=%" PRIu32 "MB,sync=false,"
-	    "extensions=[\"%s\",\"%s\"],%s",
-	    g.progname, g.c_cache, ext1, ext2,
+	    "extensions=[\"%s\",\"%s\", \"%s\"],%s",
+	    g.progname, g.c_cache,
+	    access(BZIP_PATH, R_OK) == 0 ? BZIP_PATH : "",
+	    access(SNAPPY_PATH, R_OK) == 0 ? SNAPPY_PATH : "",
+	    REVERSE_PATH,
 	    g.config_open == NULL ? "" : g.config_open);
 
 	if ((ret =
 	    wiredtiger_open("RUNDIR", &event_handler, config, &conn)) != 0)
 		die(ret, "wiredtiger_open");
+	g.wts_conn = conn;
 
 	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
 		die(ret, "connection.open_session");
 
+	/*
+	 * Create the object.
+	 *
+	 * Make sure at least 2 internal page per thread can fit in cache.
+	 */
 	maxintlpage = 1U << g.c_intl_page_max;
-	/* Make sure at least 2 internal page per thread can fit in cache. */
 	while (2 * g.c_threads * maxintlpage > g.c_cache << 20)
 		maxintlpage >>= 1;
 	maxintlitem = MMRAND(maxintlpage / 50, maxintlpage / 40);
 	if (maxintlitem < 40)
 		maxintlitem = 40;
-	maxleafpage = 1U << g.c_leaf_page_max;
+
 	/* Make sure at least one leaf page per thread can fit in cache. */
+	maxleafpage = 1U << g.c_leaf_page_max;
 	while (g.c_threads * (maxintlpage + maxleafpage) > g.c_cache << 20)
 		maxleafpage >>= 1;
 	maxleafitem = MMRAND(maxleafpage / 50, maxleafpage / 40);
@@ -97,10 +98,6 @@ wts_open(void)
 	    "leaf_page_max=%d,leaf_item_max=%d",
 	    (g.type == ROW) ? "u" : "r",
 	    maxintlpage, maxintlitem, maxleafpage, maxleafitem);
-
-	if (g.c_bzip)
-		p += snprintf(p, (size_t)(end - p),
-		    ",block_compressor=\"bzip2_compress\"");
 
 	switch (g.type) {
 	case FIX:
@@ -125,13 +122,26 @@ wts_open(void)
 		break;
 	}
 
+	/* Configure compression. */
+	switch (g.compression) {
+	case COMPRESS_NONE:
+	case COMPRESS_BZIP:
+		p += snprintf(p, (size_t)(end - p),
+		    ",block_compressor=\"bzip2_compress\"");
+		break;
+	case COMPRESS_EXT:
+		break;
+	case COMPRESS_SNAPPY:
+		p += snprintf(p, (size_t)(end - p),
+		    ",block_compressor=\"snappy_compress\"");
+		break;
+	}
+
 	if ((ret = session->create(session, g.uri, config)) != 0)
 		die(ret, "session.create: %s", g.uri);
 
 	if ((ret = session->close(session, NULL)) != 0)
 		die(ret, "session.close");
-
-	g.wts_conn = conn;
 }
 
 void

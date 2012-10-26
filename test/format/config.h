@@ -39,7 +39,7 @@ typedef struct {
 
 	uint32_t	min;			/* Minimum value */
 	uint32_t	max;			/* Maximum value */
-	uint32_t	*v;			/* Value for this run */
+	u_int		*v;			/* Value for this run */
 	char		**vstr;			/* Value for string options */
 } CONFIG;
 
@@ -54,13 +54,13 @@ static CONFIG c[] = {
 	  "number of bits for fixed-length column-store files",
 	  C_FIX, 0, 1, 8, &g.c_bitcnt, NULL },
 
-	{ "bzip",
-	  "if blocks are BZIP2 encoded",		/* 80% */
-	  0, C_BOOL, 80, 0, &g.c_bzip, NULL },
-
 	{ "cache",
 	  "size of the cache in MB",
 	  0, 0, 1, 100, &g.c_cache, NULL },
+
+	{ "compression",
+	  "type of compression (none | bzip | ext | snappy)",
+	  0, C_IGNORE|C_STRING, 1, 4, NULL, &g.c_compression },
 
 	{ "data_source",
 	  "type of data source to create (file | table | lsm)",

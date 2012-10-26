@@ -187,6 +187,13 @@ wts_rand(void)
 	char buf[64];
 	uint32_t r;
 
+	/* If it's not a replay, seed the random number generator. */
+	if (!g.replay) {
+		if (gettimeofday(&t, NULL) != 0)
+			die(errno, "gettimeofday");
+		srand((u_int)(0xdeadbeef ^ (u_int)t.tv_usec));
+	}
+
 	/* If we're threaded, it's not repeatable, ignore the log. */
 	if (!SINGLETHREADED)
 		return ((uint32_t)rand());
@@ -203,12 +210,8 @@ wts_rand(void)
 		if ((g.rand_log =
 		    fopen("RUNDIR/rand", g.replay ? "r" : "w")) == NULL)
 			die(errno, "fopen: RUNDIR/rand");
-		if (!g.replay) {
-			if (gettimeofday(&t, NULL) != 0)
-				die(errno, "gettimeofday");
-			srand((u_int)(0xdeadbeef ^ (u_int)t.tv_usec));
+		if (!g.replay)
 			(void)setvbuf(g.rand_log, NULL, _IOLBF, 0);
-		}
 	}
 	if (g.replay) {
 		if (fgets(buf, sizeof(buf), g.rand_log) == NULL) {
