@@ -127,13 +127,13 @@ wts_open(void)
 	case COMPRESS_NONE:
 	case COMPRESS_BZIP:
 		p += snprintf(p, (size_t)(end - p),
-		    ",block_compressor=\"bzip2_compress\"");
+		    ",block_compressor=\"bzip2\"");
 		break;
 	case COMPRESS_EXT:
 		break;
 	case COMPRESS_SNAPPY:
 		p += snprintf(p, (size_t)(end - p),
-		    ",block_compressor=\"snappy_compress\"");
+		    ",block_compressor=\"snappy\"");
 		break;
 	}
 

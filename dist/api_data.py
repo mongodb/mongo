@@ -462,13 +462,15 @@ methods = {
 		list, such as <code>"direct_io=[data]"</code>''',
 		type='list', choices=['data', 'log']),
 	Config('extensions', '', r'''
-		list of extensions to load.  Optional values are passed as the
-		\c config parameter to WT_CONNECTION::load_extension.  Complex
-		paths may need quoting, for example,
-		<code>extensions=("/path/to/ext.so"="entry=my_entry")</code>''',
+		list of shared library extensions to load (using dlopen).
+		Optional values are passed as the \c config parameter to
+		WT_CONNECTION::load_extension.  Complex paths may require
+		quoting, for example,
+		<code>extensions=("/path/ext.so"="entry=my_entry")</code>''',
 		type='list'),
 	Config('hazard_max', '1000', r'''
-		maximum number of simultaneous hazard references per session handle''',
+		maximum number of simultaneous hazard references per session
+		handle''',
 		min='15'),
 	Config('logging', 'false', r'''
 		enable logging''',

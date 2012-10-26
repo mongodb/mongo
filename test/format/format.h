@@ -27,12 +27,12 @@
 #endif
 
 #define	EXTPATH	"../../ext/"			/* Extensions path */
-#define	BZIP_PATH \
-	EXTPATH "compressors/bzip2_compress/.libs/bzip2_compress.so"
-#define	SNAPPY_PATH \
-	EXTPATH "compressors/snappy_compress/.libs/snappy_compress.so"
-#define	REVERSE_PATH \
-	EXTPATH "collators/reverse/.libs/reverse_collator.so"
+#define	BZIP_PATH							\
+	EXTPATH "compressors/bzip2/.libs/libwiredtiger_bzip2.so"
+#define	SNAPPY_PATH							\
+	EXTPATH "compressors/snappy/.libs/libwiredtiger_snappy.so"
+#define	REVERSE_PATH							\
+	EXTPATH "collators/reverse/.libs/libwiredtiger_reverse_collator.so"
 
 #define	M(v)		((v) * 1000000)		/* Million */
 #define	UNUSED(var)	(void)(var)		/* Quiet unused var warnings */

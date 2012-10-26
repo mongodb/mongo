@@ -72,8 +72,7 @@ wiredtiger_extension_init(
 	wt_api = api;
 	conn = session->connection;
 
-	return (conn->add_compressor(
-	    conn, "bzip2_compress", &bzip2_compressor, NULL));
+	return (conn->add_compressor(conn, "bzip2", &bzip2_compressor, NULL));
 }
 
 /* Bzip2 WT_COMPRESSOR implementation for WT_CONNECTION::add_compressor. */

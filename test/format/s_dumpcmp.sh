@@ -32,15 +32,14 @@ if test $# -ne 0; then
 	exit 1
 fi
 
-revext="$top/ext/collators/reverse/.libs/reverse_collator.so"
-ext="\"$revext\""
-bzext="$top/ext/compressors/bzip2/.libs/bzip2_compress.so"
-if test -e $bzext ; then
-        ext="$ext,\"$bzext\""
+ext="\"$top/ext/collators/reverse/.libs/libwiredtiger_reverse_collator.so\""
+bz_ext="$top/ext/compressors/bzip2/.libs/libwiredtiger_bzip2.so"
+if test -e $bz_ext ; then
+        ext="$ext,\"$bz_ext\""
 fi
-snext="$top/ext/compressors/snappy/.libs/snappy_compress.so"
-if test -e $snext ; then
-        ext="$ext,\"$snext\""
+sn_ext="$top/ext/compressors/snappy/.libs/libwiredtiger_snappy.so"
+if test -e $sn_ext ; then
+        ext="$ext,\"$sn_ext\""
 fi
 
 config='extensions=['$ext']'
