@@ -43,6 +43,9 @@ namespace mongo {
         void resetAuthenticationSession(AuthenticationSession* newSession) {
             _authenticationSession.reset(newSession);
         }
+        void swapAuthenticationSession(boost::scoped_ptr<AuthenticationSession>& other) {
+            _authenticationSession.swap(other);
+        }
 
         virtual bool hasRemote() const = 0;
         virtual HostAndPort getRemote() const = 0;
