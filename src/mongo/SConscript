@@ -343,7 +343,7 @@ env.Program('lame_stacktrace_test', 'util/lame_stacktrace_test.cpp',
             LIBDEPS=['stacktrace',
                      '$BUILD_DIR/mongo/base/base'])
 
-coreServerFiles += mmapFiles
+serverOnlyFiles += mmapFiles
 
 serverOnlyFiles += [ "db/stats/snapshots.cpp" ]
 

@@ -317,46 +317,28 @@ namespace mongo {
             }
                 
         } network;
-        
-        class MemSSS : public ServerStatusSection {
+
+        class MemBase : public ServerStatusMetric {
         public:
-            MemSSS() : ServerStatusSection( "mem" ){}
-            virtual bool includeByDefault() const { return true; }
-            virtual bool adminOnly() const { return false; }
-            
-            BSONObj generateSection( const BSONElement& configElement, bool userIsAdmin ) const {
-                BSONObjBuilder t;
-                
-                t.append("bits",  ( sizeof(int*) == 4 ? 32 : 64 ) );
-                
+            MemBase() : ServerStatusMetric( ".mem.bits", false ) {}
+            virtual void appendAtLeaf( BSONObjBuilder& b ) const {
+                b.append( "bits", sizeof(int*) == 4 ? 32 : 64 );
+
                 ProcessInfo p;
                 int v = 0;
                 if ( p.supported() ) {
-                    t.appendNumber( "resident" , p.getResidentSize() );
+                    b.appendNumber( "resident" , p.getResidentSize() );
                     v = p.getVirtualMemorySize();
-                    t.appendNumber( "virtual" , v );
-                    t.appendBool( "supported" , true );
+                    b.appendNumber( "virtual" , v );
+                    b.appendBool( "supported" , true );
                 }
                 else {
-                    t.append( "note" , "not all mem info support on this platform" );
-                    t.appendBool( "supported" , false );
+                    b.append( "note" , "not all mem info support on this platform" );
+                    b.appendBool( "supported" , false );
                 }
-                
-                if ( ! cmdLine.isMongos() ) {
-                    int m = static_cast<int>(MemoryMappedFile::totalMappedLength() / ( 1024 * 1024 ));
-                    t.appendNumber( "mapped" , m );
-                    
-                    if ( cmdLine.dur ) {
-                        m *= 2;
-                        t.appendNumber( "mappedWithJournal" , m );
-                    }
-                }
-                
-                return t.obj();
-            }
-            
-        } memsss;
 
+            }
+        } memBase;
     }
 
 }

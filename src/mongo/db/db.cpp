@@ -478,6 +478,24 @@ namespace mongo {
 
     } dataFileSync;
 
+    namespace {
+        class MemJournalServerStatusMetric : public ServerStatusMetric {
+        public:
+            MemJournalServerStatusMetric() : ServerStatusMetric( ".mem.mapped", false ) {}
+            virtual void appendAtLeaf( BSONObjBuilder& b ) const {
+                int m = static_cast<int>(MemoryMappedFile::totalMappedLength() / ( 1024 * 1024 ));
+                b.appendNumber( "mapped" , m );
+                
+                if ( cmdLine.dur ) {
+                    m *= 2;
+                    b.appendNumber( "mappedWithJournal" , m );
+                }
+           
+            }
+        } memJournalServerStatusMetric;
+    }
+                
+
     const char * jsInterruptCallback() {
         // should be safe to interrupt in js code, even if we have a write lock
         return killCurrentOp.checkForInterruptNoAssert();
