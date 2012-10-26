@@ -1,3 +1,61 @@
+WiredTiger release 1.3.5, 2012-10-26
+------------------------------------
+
+This is a bugfix and performance tuning release. The changes are as follows:
+
+[#370] Document that applications are responsible for figuring out their
+       upgrade path if they might swap out compression engines.
+
+[#371] When a single session was used to reconcile multiple btrees, one of
+       which had dictionaries configured and one of which didn't, we failed to
+       clear the dictionary when starting page reconciliation.   Be consistent,
+       never use anything other than the btree handle's configuration to decide
+       if we're using a dictionary in a reconcilation run.
+
+[#372] Fix several potential integer overflow bugs.
+
+[#373] Fix a bug where calls that performed an operation on multiple objects
+       (such as creating a table that implicitly creates a column group)
+       could leave the metadata incomplete if a process exited without
+       calling `WT_CONNECTION::close`.
+       Hold the schema lock while opening tables. Fixes the error "cannot be
+       opened until all column groups are created" message when create calls
+       race with open_cursor.
+
+[#374] Fix a race that caused crashes when using the Python API with
+       multi-threaded code.
+
+[#375] Fix a bug in __wt_cond_wait - so that it returns after timeout expires.
+
+* Protect the list of LSM trees with the schema lock to avoid races during
+  create.
+
+* Update ex_test_perf to output statistics during populate and improve timing
+  accuracy.
+
+* Skew eviction in favor of leaf pages - which improves read-only performance
+  for large LSM trees.
+
+* Hold the LSM tree lock while gathering statistics.
+
+* Fix a bug in bulk load of bitmap files.
+
+* Fix a related bug in the bloom code that uses bitmap stores.
+
+* Don't attempt to drop the first chunk of an LSM tree before creating it.
+
+* Instead of entering a fake key cell after the last cell on the page just
+  in case the page ends with a key cell which has no value, use the end of
+  the page to detect that case.
+
+* Cache cursor key/value formats in Python, to save a native call from every
+  get_key/value.
+
+* Don't sync the directory after open if the global "sync" flag is false.
+
+* Fix a race for LSM trees that could happen if two threads race to open a
+  cursor and drop the LSM tree.
+
 WiredTiger release 1.3.4, 2012-10-19
 ------------------------------------
 
