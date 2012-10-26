@@ -21,15 +21,16 @@
 #include "db/pipeline/value.h"
 
 namespace mongo {
-    intrusive_ptr<const Value> AccumulatorPush::evaluate(
-        const intrusive_ptr<Document> &pDocument) const {
+    Value AccumulatorPush::evaluate(const Document& pDocument) const {
         verify(vpOperand.size() == 1);
-        intrusive_ptr<const Value> prhs(vpOperand[0]->evaluate(pDocument));
+        Value prhs(vpOperand[0]->evaluate(pDocument));
 
-        if (prhs->getType() == Undefined)
-            ; /* nothing to add to the array */
-        else if (!pCtx->getDoingMerge())
+        if (prhs.getType() == Undefined) {
+            /* nothing to add to the array */
+        }
+        else if (!pCtx->getDoingMerge()) {
             vpValue.push_back(prhs);
+        }
         else {
             /*
               If we're in the router, we need to take apart the arrays we
@@ -37,19 +38,16 @@ namespace mongo {
               If we didn't, then we'd get an array of arrays, with one array
               from each shard that responds.
              */
-            verify(prhs->getType() == Array);
+            verify(prhs.getType() == Array);
             
-            intrusive_ptr<ValueIterator> pvi(prhs->getArray());
-            while(pvi->more()) {
-                intrusive_ptr<const Value> pElement(pvi->next());
-                vpValue.push_back(pElement);
-            }
+            const vector<Value>& vec = prhs.getArray();
+            vpValue.insert(vpValue.end(), vec.begin(), vec.end());
         }
 
-        return Value::getNull();
+        return Value();
     }
 
-    intrusive_ptr<const Value> AccumulatorPush::getValue() const {
+    Value AccumulatorPush::getValue() const {
         return Value::createArray(vpValue);
     }
 

@@ -40,8 +40,7 @@ namespace mongo {
         pBuilder->append(matchName, *pQuery);
     }
 
-    bool DocumentSourceMatch::accept(
-        const intrusive_ptr<Document> &pDocument) const {
+    bool DocumentSourceMatch::accept(const Document& pDocument) const {
 
         /*
           The matcher only takes BSON documents, so we have to make one.

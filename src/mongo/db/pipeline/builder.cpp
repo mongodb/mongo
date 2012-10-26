@@ -46,7 +46,7 @@ namespace mongo {
         pBuilder->append(fieldName, d);
     }
 
-    void BuilderObj::append(const std::string& s) {
+    void BuilderObj::append(StringData s) {
         pBuilder->append(fieldName, s);
     }
 
@@ -70,8 +70,7 @@ namespace mongo {
         pBuilder->appendTimestamp(fieldName, ot.getSecs(), ot.getInc());
     }
 
-    BuilderObj::BuilderObj(
-        BSONObjBuilder *pObjBuilder, const std::string& theFieldName):
+    BuilderObj::BuilderObj(BSONObjBuilder *pObjBuilder, StringData theFieldName):
         pBuilder(pObjBuilder),
         fieldName(theFieldName) {
     }
@@ -101,7 +100,7 @@ namespace mongo {
         pBuilder->append(d);
     }
 
-    void BuilderArray::append(const std::string& s) {
+    void BuilderArray::append(StringData s) {
         pBuilder->append(s);
     }
 

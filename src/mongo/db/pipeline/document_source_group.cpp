@@ -60,7 +60,7 @@ namespace mongo {
         return true;
     }
 
-    intrusive_ptr<Document> DocumentSourceGroup::getCurrent() {
+    Document DocumentSourceGroup::getCurrent() {
         if (!populated)
             populate();
 
@@ -72,7 +72,7 @@ namespace mongo {
         BSONObjBuilder insides;
 
         /* add the _id */
-        pIdExpression->addToBsonObj(&insides, Document::idName.c_str(), true);
+        pIdExpression->addToBsonObj(&insides, "_id", true);
 
         /* add the remaining fields */
         const size_t n = vFieldName.size();
@@ -173,7 +173,7 @@ namespace mongo {
             BSONElement groupField(groupIterator.next());
             const char *pFieldName = groupField.fieldName();
 
-            if (strcmp(pFieldName, Document::idName.c_str()) == 0) {
+            if (str::equals(pFieldName, "_id")) {
                 uassert(15948, "a group's _id may only be specified once",
                         !idSet);
 
@@ -221,7 +221,7 @@ namespace mongo {
                     case jstNULL:
                     StringConstantId: // from string case above
                     {
-                        intrusive_ptr<const Value> pValue(
+                        Value pValue(
                             Value::createFromBsonElement(&groupField));
                         intrusive_ptr<ExpressionConstant> pConstant(
                             ExpressionConstant::create(pValue));
@@ -313,14 +313,14 @@ namespace mongo {
     void DocumentSourceGroup::populate() {
         for(bool hasNext = !pSource->eof(); hasNext;
                 hasNext = pSource->advance()) {
-            intrusive_ptr<Document> pDocument(pSource->getCurrent());
+            Document pDocument(pSource->getCurrent());
 
             /* get the _id value */
-            intrusive_ptr<const Value> pId(pIdExpression->evaluate(pDocument));
+            Value pId(pIdExpression->evaluate(pDocument));
 
             /* treat Undefined the same as NULL SERVER-4674 */
-            if (pId->getType() == Undefined)
-                pId = Value::getNull();
+            if (pId.getType() == Undefined)
+                pId = Value(jstNULL);
 
             /*
               Look for the _id value in the map; if it's not there, add a
@@ -334,10 +334,7 @@ namespace mongo {
             }
             else {
                 /* insert a new group into the map */
-                groups.insert(it,
-                              pair<intrusive_ptr<const Value>,
-                              vector<intrusive_ptr<Accumulator> > >(
-                                  pId, vector<intrusive_ptr<Accumulator> >()));
+                groups[pId] = vector<intrusive_ptr<Accumulator> >();
 
                 /* find the accumulator vector (the map value) */
                 it = groups.find(pId);
@@ -370,23 +367,23 @@ namespace mongo {
         populated = true;
     }
 
-    intrusive_ptr<Document> DocumentSourceGroup::makeDocument(
+    Document DocumentSourceGroup::makeDocument(
         const GroupsType::iterator &rIter) {
         vector<intrusive_ptr<Accumulator> > *pGroup = &rIter->second;
         const size_t n = vFieldName.size();
-        intrusive_ptr<Document> pResult(Document::create(1 + n));
+        MutableDocument out (1 + n);
 
         /* add the _id field */
-        pResult->addField(Document::idName, rIter->first);
+        out.addField("_id", rIter->first);
 
         /* add the rest of the fields */
         for(size_t i = 0; i < n; ++i) {
-            intrusive_ptr<const Value> pValue((*pGroup)[i]->getValue());
-            if (pValue->getType() != Undefined)
-                pResult->addField(vFieldName[i], pValue);
+            Value pValue((*pGroup)[i]->getValue());
+            if (pValue.getType() != Undefined)
+                out.addField(vFieldName[i], pValue);
         }
 
-        return pResult;
+        return out.freeze();
     }
 
     intrusive_ptr<DocumentSource> DocumentSourceGroup::getShardSource() {
@@ -399,8 +396,7 @@ namespace mongo {
         intrusive_ptr<DocumentSourceGroup> pMerger(DocumentSourceGroup::create(pMergerExpCtx));
 
         /* the merger will use the same grouping key */
-        pMerger->setIdExpression(ExpressionFieldPath::create(
-                                     Document::idName.c_str()));
+        pMerger->setIdExpression(ExpressionFieldPath::create("_id"));
 
         const size_t n = vFieldName.size();
         for(size_t i = 0; i < n; ++i) {

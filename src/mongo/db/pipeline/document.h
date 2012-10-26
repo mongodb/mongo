@@ -16,234 +16,389 @@
 
 #pragma once
 
-#include "mongo/pch.h"
+#include "mongo/db/pipeline/document_internal.h"
 
-#include "util/intrusive_counter.h"
+#include <boost/functional/hash.hpp>
+#include "mongo/bson/util/builder.h"
 
 namespace mongo {
     class BSONObj;
     class FieldIterator;
+    class FieldPath;
     class Value;
+    class MutableDocument;
 
-    class Document :
-        public IntrusiveCounterUnsigned {
+    /** An internal class that represents the position of a field in a document.
+     *
+     *  This is a low-level class that you usually don't need to worry about.
+     *
+     *  The main use of this class for clients is to allow refetching or
+     *  setting a field without looking it up again. It has a default
+     *  constructor that represents a field not being in a document. It also
+     *  has a method 'bool found()' that tells you if a field was found.
+     *
+     *  For more details see document_internal.h
+     */
+    class Position;
+
+    /** A Document is similar to a BSONObj but with a different in-memory representation.
+     *
+     *  A Document can be treated as a const map<string, const Value> that is
+     *  very cheap to copy and is Assignable.  Therefore, it is acceptable to
+     *  pass and return by Value. Note that the data in a Document is
+     *  immutable, but you can replace a Document instance with assignment.
+     *
+     *  See Also: Value class in Value.h
+     */
+    class Document {
     public:
-        ~Document();
 
-        /*
-          Create a new Document from the given BSONObj.
+        /// Empty Document (does no allocation)
+        Document() {}
 
-          Document field values may be pointed to in the BSONObj, so it
-          must live at least as long as the resulting Document.
+        /// Create a new Document deep-converted from the given BSONObj.
+        explicit Document(const BSONObj& bson);
 
-          @returns shared pointer to the newly created Document
-        */
-        static intrusive_ptr<Document> createFromBsonObj(BSONObj* pBsonObj);
+        void swap(Document& rhs) { _storage.swap(rhs._storage); }
 
-        /*
-          Create a new empty Document.
+        /// Look up a field by key name. Returns Value() if no such field. O(1)
+        const Value operator[] (StringData key) const { return getField(key); }
+        const Value getField(StringData key) const { return storage().getField(key); }
 
-          @param sizeHint a hint at what the number of fields will be; if
-            known, this can be used to increase memory allocation efficiency
-          @returns shared pointer to the newly created Document
-        */
-        static intrusive_ptr<Document> create(size_t sizeHint = 0);
+        /// Look up a field by Position. See positionOf and getNestedField.
+        const Value operator[] (Position pos) const { return getField(pos); }
+        const Value getField(Position pos) const { return storage().getField(pos); }
 
-        /*
-          Clone a document.
-
-          The new document shares all the fields' values with the original.
-
-          This is not a deep copy.  Only the fields on the top-level document
-          are cloned.
-
-          @returns the shallow clone of the document
-        */
-        intrusive_ptr<Document> clone();
-
-        /*
-          Add this document to the BSONObj under construction with the
-          given BSONObjBuilder.
-        */
-        void toBson(BSONObjBuilder *pBsonObjBuilder) const;
-
-        /*
-          Create a new FieldIterator that can be used to examine the
-          Document's fields.
-        */
-        FieldIterator *createFieldIterator();
-
-        /*
-          Get the value of the specified field.
-
-          @param fieldName the name of the field
-          @return point to the requested field
-        */
-        intrusive_ptr<const Value> getValue(const string &fieldName);
-
-        /*
-          Add the given field to the Document.
-
-          BSON documents' fields are ordered; the new Field will be
-          appended to the current list of fields.
-
-          It is an error to add a field that has the same name as another
-          field.
-        */
-        void addField(const string &fieldName,
-                      const intrusive_ptr<const Value> &pValue);
-
-        /*
-          Set the given field to be at the specified position in the
-          Document.  This will replace any field that is currently in that
-          position.  The index must be within the current range of field
-          indices, otherwise behavior is undefined.
-
-          pValue.get() may be NULL, in which case the field will be
-          removed.  fieldName is ignored in this case.
-
-          @param index the field index in the list of fields
-          @param fieldName the new field name
-          @param pValue the new Value
-        */
-        void setField(size_t index,
-                      const string &fieldName,
-                      const intrusive_ptr<const Value> &pValue);
-
-        /*
-          Convenience type for dealing with fields.
+        /** Similar to BSONObj::getFieldDotted, but using FieldPath rather than a dotted string.
+         *  If you pass a non-NULL positions vector, you get back a path suitable
+         *  to pass to MutableDocument::setNestedField.
+         *
+         *  TODO a version that doesn't use FieldPath
          */
-        typedef pair<string, intrusive_ptr<const Value> > FieldPair;
+        const Value getNestedField(const FieldPath& fieldNames,
+                                   vector<Position>* positions=NULL) const;
 
-        /*
-          Get the indicated field.
+        /// Number of fields in this document. O(n)
+        size_t size() const { return storage().size(); }
 
-          @param index the field index in the list of fields
-          @returns the field name and value of the field
+        /// True if this document has no fields.
+        bool empty() const { return !_storage || storage().iterator().atEnd(); }
+
+        /// Create a new FieldIterator that can be used to examine the Document's fields in order.
+        FieldIterator fieldIterator() const;
+
+        /// Convenience type for dealing with fields. Used by FieldIterator.
+        typedef pair<StringData, Value> FieldPair;
+
+        /** Get the approximate storage size of the document and sub-values in bytes.
+         *  Note: Some memory may be shared with other Documents or between fields within
+         *        a single Document so this can overestimate usage.
          */
-        FieldPair getField(size_t index) const;
-
-        /*
-          Get the number of fields in the Document.
-
-          @returns the number of fields in the Document
-         */
-        size_t getFieldCount() const;
-
-        /*
-          Get the index of the given field.
-
-          @param fieldName the name of the field
-          @returns the index of the field, or if it does not exist, the number
-            of fields (getFieldCount())
-        */
-        size_t getFieldIndex(const string &fieldName) const;
-
-        /*
-          Get a field by name.
-
-          @param fieldName the name of the field
-          @returns the value of the field
-        */
-        intrusive_ptr<const Value> getField(const string &fieldName) const;
-
-        /*
-          Get the approximate storage size of the document, in bytes.
-
-          Under the assumption that field name strings are shared, they are
-          not included in the total.
-
-          @returns the approximate storage
-        */
         size_t getApproximateSize() const;
 
-        /*
-          Compare two documents.
+        /** Compare two documents.
+         *
+         *  BSON document field order is significant, so this just goes through
+         *  the fields in order.  The comparison is done in roughly the same way
+         *  as strings are compared, but comparing one field at a time instead
+         *  of one character at a time.
+         *
+         *  @returns an integer less than zero, zero, or an integer greater than
+         *           zero, depending on whether lhs < rhs, lhs == rhs, or lhs > rhs
+         *  Warning: may return values other than -1, 0, or 1
+         */
+        static int compare(const Document& lhs, const Document& rhs);
 
-          BSON document field order is significant, so this just goes through
-          the fields in order.  The comparison is done in roughly the same way
-          as strings are compared, but comparing one field at a time instead
-          of one character at a time.
-        */
-        static int compare(const intrusive_ptr<Document> &rL,
-                           const intrusive_ptr<Document> &rR);
+        string toString() const; // TODO support streams
 
-        static string idName; // shared "_id"
-
-        /*
-          Calculate a hash value.
-
-          Meant to be used to create composite hashes suitable for
-          boost classes such as unordered_map<>.
-
-          @param seed value to augment with this' hash
-        */
+        /** Calculate a hash value.
+         *
+         * Meant to be used to create composite hashes suitable for
+         * hashed container classes such as unordered_map.
+         */
         void hash_combine(size_t &seed) const;
 
-        // For debugging purposes only!
-        string toString() const;
+        /// Add this document to the BSONObj under construction with the given BSONObjBuilder.
+        void toBson(BSONObjBuilder *pBsonObjBuilder) const;
+
+        /** Return the abstract Position of a field, suitable to pass to operator[] or getField().
+         *  This can potentially save time if you need to refer to a field multiple times.
+         */
+        Position positionOf(StringData fieldName) const { return storage().findField(fieldName); }
+
+        /** Clone a document.
+         *
+         *  This should only be called by MutableDocument and tests
+         *
+         *  The new document shares all the fields' values with the original.
+         *  This is not a deep copy.  Only the fields on the top-level document
+         *  are cloned.
+         */
+        Document clone() const { return Document(storage().clone().get()); }
+
+        // TEMP for compatibility with legacy intrusive_ptr<Document>
+              Document& operator*()       { return *this; }
+        const Document& operator*() const { return *this; }
+              Document* operator->()       { return this; }
+        const Document* operator->() const { return this; }
+        const void* getPtr() const { return _storage.get(); }
+        void reset() { return _storage.reset(); }
+        static Document createFromBsonObj(BSONObj* pBsonObj) { return Document(*pBsonObj); }
+        size_t getFieldCount() const { return size(); }
+        Value getValue(StringData fieldName) const { return getField(fieldName); }
+
+        // TODO: replace with logical equality once all current usages are fixed
+        bool operator== (const Document& lhs) const { return _storage == lhs._storage; }
+
+        explicit Document(const DocumentStorage* ptr) : _storage(ptr) {};
 
     private:
         friend class FieldIterator;
+        friend class ValueStorage;
+        friend class MutableDocument;
 
-        Document(size_t sizeHint);
-        Document(BSONObj* pBsonObj);
-
-        /* these two vectors parallel each other */
-        vector<string> vFieldName;
-        vector<intrusive_ptr<const Value> > vpValue;
+        const DocumentStorage& storage() const {
+            return (_storage ? *_storage : DocumentStorage::emptyDoc());
+        }
+        intrusive_ptr<const DocumentStorage> _storage;
     };
 
-
-    class FieldIterator :
-            boost::noncopyable {
+    /** This class is returned by MutableDocument to allow you to modify its values.
+     *  You are not allowed to hold variables of this type (enforced by the type system).
+     */
+    class MutableValue {
     public:
-        /*
-          Ask if there are more fields to return.
+        void operator= (const Value& v) { _val = v; }
 
-          @return true if there are more fields, false otherwise
-        */
-        bool more() const;
+        /** These are designed to allow things like mutDoc["a"]["b"]["c"] = Value(10);
+         *  It is safe to use even on nonexistent fields.
+         */
+        MutableValue operator[] (StringData key) { return getField(key); }
+        MutableValue operator[] (Position pos)   { return getField(pos); }
 
-        /*
-          Move the iterator to point to the next field and return it.
-
-          @return the next field's <name, Value>
-        */
-        Document::FieldPair next();
-
-        /*
-          Constructor.
-
-          @param pDocument points to the document whose fields are being
-              iterated
-        */
-        FieldIterator(const intrusive_ptr<Document> &pDocument);
+        MutableValue getField(StringData key);
+        MutableValue getField(Position pos);
 
     private:
-        friend class Document;
+        friend class MutableDocument;
 
-        /*
-          We'll hang on to the original document to ensure we keep the
-          fieldPtr vector alive.
-        */
-        intrusive_ptr<Document> pDocument;
-        size_t index; // current field in iteration
+        /// can only be constructed or copied by self and friends
+        MutableValue(const MutableValue& other): _val(other._val) {}
+        explicit MutableValue(Value& val): _val(val) {}
+
+        /// Used by MutableDocument(MutableValue)
+        const RefCountable*& getDocPtr() {
+            if (_val.getType() != Object)
+                *this = Value(Document());
+
+            return _val._storage.genericRCPtr;
+        }
+
+        MutableValue& operator= (const MutableValue&); // not assignable with another MutableValue
+
+        Value& _val;
+    };
+
+    /** MutableDocument is a Document builder that supports both adding and updating fields.
+     *
+     *  This class fills a similar role to BSONObjBuilder, but allows you to
+     *  change existing fields and more easily write to sub-Documents.
+     *
+     *  To preserve the immutability of Documents, MutableDocument will
+     *  shallow-clone its storage on write (COW) if it is shared with any other
+     *  Documents.
+     */
+    class MutableDocument : boost::noncopyable {
+    public:
+
+        /** Create a new empty Document.
+         *
+         *  @param expectedFields a hint at what the number of fields will be, if known.
+         *         this can be used to increase memory allocation efficiency. There is
+         *         no impact on correctness if this field over or under estimates.
+         *
+         *  TODO: find some way to convey field-name sizes to make even more efficient
+         */
+        MutableDocument() :_storageHolder(NULL), _storage(_storageHolder) {}
+        explicit MutableDocument(size_t expectedFields);
+
+        /// No copy yet. Copy-on-write. See storage()
+        explicit MutableDocument(const Document& d) : _storageHolder(NULL)
+                                                    , _storage(_storageHolder) {
+            reset(d);
+        }
+
+        ~MutableDocument() {
+            if (_storageHolder)
+                intrusive_ptr_release(_storageHolder);
+        }
+
+        /** Replace the current base Document with the argument
+         *
+         *  All Positions from the passed in Document are valid and refer to the
+         *  same field in this MutableDocument.
+         */
+        void reset(const Document& d=Document()) { reset(d._storage.get()); }
+
+        /** Add the given field to the Document.
+         *
+         *  BSON documents' fields are ordered; the new Field will be
+         *  appended to the current list of fields.
+         *
+         *  Unlike getField/setField, addField does not look for a field with the
+         *  same name and therefore cannot be used to update fields.
+         *
+         *  It is an error to add a field that has the same name as another field.
+         *
+         *  TODO: This is currently allowed but getField only gets first field.
+         *        Decide what level of support is needed for duplicate fields.
+         *        If duplicates are not allowed, consider removing this method.
+         */
+        void addField(StringData fieldName, const Value& val) {
+            storage().appendField(fieldName) = val;
+        }
+
+        /** Update field by key. If there is no field with that key, add one.
+         *
+         *  If the new value is missing(), the field is logically removed.
+         */
+        MutableValue operator[] (StringData key) { return getField(key); }
+        void setField(StringData key, const Value& val) { getField(key) = val; }
+        MutableValue getField(StringData key) {
+            return MutableValue(storage().getField(key));
+        }
+
+        /// Update field by Position. Must already be a valid Position.
+        MutableValue operator[] (Position pos) { return getField(pos); }
+        void setField(Position pos, const Value& val) { getField(pos) = val; }
+        MutableValue getField(Position pos) {
+            return MutableValue(storage().getField(pos).val);
+        }
+
+        /// Logically remove a field. Note that memory usage does not decrease.
+        void remove(StringData key) { getField(key) = Value(); }
+
+        /// Takes positions vector from Document::getNestedField.
+        MutableValue getNestedField(const vector<Position>& positions);
+        void setNestedField(const vector<Position>& positions, const Value& val) {
+            getNestedField(positions) = val;
+        }
+
+        /** Convert to a read-only document and release reference.
+         *
+         *  Call this to indicate that you are done with this Document and will
+         *  not be making further changes from this MutableDocument.
+         *
+         *  TODO: there are some optimizations that may make sense at freeze time.
+         */
+        Document freeze() {
+            Document ret(storagePtr());
+            reset(NULL);
+            return ret;
+        }
+
+        /** Borrow a readable reference to this Document.
+         *
+         *  Note that unlike freeze(), this indicates intention to continue
+         *  modifying this document. The returned Document will not observe
+         *  future changes to this MutableDocument.
+         */
+        Document peek() {
+            return Document(storagePtr());
+        }
+
+    private:
+        friend class MutableValue; // for access to next constructor
+        explicit MutableDocument(MutableValue mv)
+            : _storageHolder(NULL)
+            , _storage(mv.getDocPtr())
+        {}
+
+        void reset(const DocumentStorage* ds) {
+            if (_storage) intrusive_ptr_release(_storage);
+            _storage = ds;
+            if (_storage) intrusive_ptr_add_ref(_storage);
+        }
+
+        // This is split into 3 functions to speed up the fast-path
+        DocumentStorage& storage() {
+            if (MONGO_unlikely( !_storage ))
+                return newStorage();
+
+            if (MONGO_unlikely( _storage->isShared() ))
+                return clonedStorage();
+
+            // This function exists to ensure this is safe
+            return const_cast<DocumentStorage&>(*storagePtr());
+        }
+        DocumentStorage& newStorage() {
+            reset(new DocumentStorage);
+            return const_cast<DocumentStorage&>(*storagePtr());
+        }
+        DocumentStorage& clonedStorage() {
+            reset(storagePtr()->clone().get());
+            return const_cast<DocumentStorage&>(*storagePtr());
+        }
+
+        MutableValue getNestedFieldHelper(MutableDocument& md,
+                                          const vector<Position>& positions,
+                                          size_t level);
+
+        // this should only be called by storage methods and peek/freeze
+        const DocumentStorage* storagePtr() const {
+            dassert(!_storage || typeid(*_storage) == typeid(const DocumentStorage));
+            return static_cast<const DocumentStorage*>(_storage);
+        }
+
+        // These are both const to prevent modifications bypassing storage() method.
+        // They always point to NULL or an object with dynamic type DocumentStorage.
+        const RefCountable* _storageHolder; // Only used in constructors and destructor
+        const RefCountable*& _storage; // references either above member or genericRCPtr in a Value
+    };
+
+    /// This is the public iterator over a document
+    class FieldIterator {
+    public:
+        explicit FieldIterator(const Document& doc)
+            : _doc(doc)
+            , _it(_doc.storage().iterator())
+        {}
+
+        /// Ask if there are more fields to return.
+        bool more() const { return !_it.atEnd(); }
+
+        /// Get next item and advance iterator
+        Document::FieldPair next() {
+            verify(more());
+
+            Document::FieldPair fp (_it->nameSD(), _it->val);
+            _it.advance();
+            return fp;
+        }
+
+    private:
+        // We'll hang on to the original document to ensure we keep its storage alive
+        Document _doc;
+        DocumentStorageIterator _it;
     };
 }
 
+namespace std {
+    template<>
+    inline void swap(mongo::Document& lhs, mongo::Document& rhs) { lhs.swap(rhs); }
+}
 
 /* ======================= INLINED IMPLEMENTATIONS ========================== */
 
 namespace mongo {
-
-    inline size_t Document::getFieldCount() const {
-        return vFieldName.size();
-    }
-    
-    inline Document::FieldPair Document::getField(size_t index) const {
-        verify( index < vFieldName.size() );
-        return FieldPair(vFieldName[index], vpValue[index]);
+    inline FieldIterator Document::fieldIterator() const {
+        return FieldIterator(*this);
     }
 
+    inline MutableValue MutableValue::getField(Position pos) {
+        return MutableDocument(*this).getField(pos);
+    }
+    inline MutableValue MutableValue::getField(StringData key) {
+        return MutableDocument(*this).getField(key);
+    }
 }

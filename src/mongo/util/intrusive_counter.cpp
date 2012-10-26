@@ -14,9 +14,28 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "util/intrusive_counter.h"
+#include "pch.h"
+#include "mongo/util/intrusive_counter.h"
+#include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
+    using namespace mongoutils;
+
+    intrusive_ptr<const RCString> RCString::create(StringData s) {
+        const size_t sizeWithNUL = s.size() + 1;
+        const size_t bytesNeeded = sizeof(RCString) + sizeWithNUL;
+        uassert(16493, str::stream() << "Tried to create string longer than "
+                                     << (BSONObjMaxUserSize/1024/1024) << "MB",
+                bytesNeeded < static_cast<size_t>(BSONObjMaxUserSize));
+
+        intrusive_ptr<RCString> ptr = new (bytesNeeded) RCString(); // uses custom operator new
+
+        ptr->_size = s.size();
+        char* stringStart = reinterpret_cast<char*>(ptr.get()) + sizeof(RCString);
+        memcpy(stringStart, s.data(), sizeWithNUL);
+
+        return ptr;
+    }
 
     void IntrusiveCounterUnsigned::addRef() const {
 	++counter;

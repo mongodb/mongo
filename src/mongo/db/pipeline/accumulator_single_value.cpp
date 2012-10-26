@@ -21,12 +21,12 @@
 
 namespace mongo {
 
-    intrusive_ptr<const Value> AccumulatorSingleValue::getValue() const {
+    Value AccumulatorSingleValue::getValue() const {
         return pValue;
     }
 
     AccumulatorSingleValue::AccumulatorSingleValue():
-        pValue(intrusive_ptr<const Value>()) {
+        pValue(Value()) {
     }
 
 }

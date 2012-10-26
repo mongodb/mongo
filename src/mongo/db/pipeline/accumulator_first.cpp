@@ -21,12 +21,11 @@
 
 namespace mongo {
 
-    intrusive_ptr<const Value> AccumulatorFirst::evaluate(
-        const intrusive_ptr<Document> &pDocument) const {
+    Value AccumulatorFirst::evaluate(const Document& pDocument) const {
         verify(vpOperand.size() == 1);
 
         /* only remember the first value seen */
-        if (!pValue.get())
+        if (pValue.missing())
             pValue = vpOperand[0]->evaluate(pDocument);
 
         return pValue;

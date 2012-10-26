@@ -99,6 +99,7 @@ namespace mongo {
         bool empty() const { return size() == 0; }
         string toString() const { return string(_data, _size); }
 
+        string toStdString() const { return string(data(), size()); }
     private:
         const char* const _data;  // is always null terminated, but see "notes" above
         mutable size_t _size;     // 'size' does not include the null terminator

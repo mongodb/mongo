@@ -15,159 +15,292 @@
  */
 
 #include "pch.h"
+
+#include "mongo/db/pipeline/document.h"
+
 #include <boost/functional/hash.hpp>
-#include "db/jsobj.h"
-#include "db/pipeline/document.h"
-#include "db/pipeline/value.h"
-#include "util/mongoutils/str.h"
+
+#include "mongo/db/jsobj.h"
+#include "mongo/db/pipeline/field_path.h"
+#include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
     using namespace mongoutils;
 
-    string Document::idName("_id");
+    Position DocumentStorage::findField(StringData requested) const {
+        if (_numFields >= HASH_TAB_MIN) { // hash lookup
+            const unsigned bucket = bucketForKey(requested);
 
-    intrusive_ptr<Document> Document::createFromBsonObj(BSONObj* pBsonObj) {
-        return new Document(pBsonObj);
+            Position pos = _hashTab[bucket];
+            while (pos.found()) {
+                const ValueElement& elem = getField(pos);
+                if (str::equals(requested.data(), elem.name))
+                    return pos;
+
+                // possible collision
+                pos = elem.nextCollision;
+            }
+        }
+        else if (_numFields) { // linear scan
+            for (DocumentStorageIterator it = iteratorAll(); !it.atEnd(); it.advance()) {
+                if (size_t(it->nameLen) == requested.size()
+                    && str::equals(it->name, requested.data())) {
+                    return it.position();
+                }
+            }
+        }
+
+        // if we got here, there's no such field
+        return Position();
     }
 
-    Document::Document(BSONObj* pBsonObj) {
-        const int fields = pBsonObj->nFields();
-        vFieldName.reserve(fields);
-        vpValue.reserve(fields);
-        BSONObjIterator bsonIterator(pBsonObj->begin());
-        while(bsonIterator.more()) {
-            BSONElement bsonElement(bsonIterator.next());
-            string fieldName(bsonElement.fieldName());
+    Value& DocumentStorage::appendField(StringData name) {
+        Position pos = getNextPosition();
+        const int nameSize = name.size();
 
-            // LATER grovel through structures???
-            intrusive_ptr<const Value> pValue(
-                Value::createFromBsonElement(&bsonElement));
+        // these are the same for everyone
+        const Position nextCollision;
+        const Value value;
 
-            vFieldName.push_back(fieldName);
-            vpValue.push_back(pValue);
+        // Make room for new field (and padding at end for alignment)
+        const unsigned newUsed = ValueElement::align(_usedBytes + sizeof(ValueElement) + nameSize);
+        if (_buffer + newUsed > _bufferEnd)
+            alloc(newUsed);
+        _usedBytes = newUsed;
+
+        // Append structure of a ValueElement
+        char* dest = _buffer + pos.index; // must be after alloc since it changes _buffer
+#define append(x) memcpy(dest, &(x), sizeof(x)); dest += sizeof(x)
+        append(value);
+        append(nextCollision);
+        append(nameSize);
+        memcpy(dest, name.data(), nameSize + 1/*NUL*/);
+        // Padding for alignment handled above
+#undef append
+
+        // Make sure next field starts where we expect it
+        fassert(16486, getField(pos).next()->ptr() == _buffer + _usedBytes);
+
+        _numFields++;
+
+        if (_numFields > HASH_TAB_MIN) {
+            addFieldToHashTable(pos);
         }
+        else if (_numFields == HASH_TAB_MIN) {
+            // adds all fields to hash table (including the one we just added)
+            rehash();
+        }
+
+        return getField(pos);
+    }
+
+    // Call after adding field to _fields and increasing _numFields
+    void DocumentStorage::addFieldToHashTable(Position pos) {
+        ValueElement& elem = getField(pos);
+        elem.nextCollision = Position();
+
+        const unsigned bucket = bucketForKey(elem.nameSD());
+
+        Position* posPtr = &_hashTab[bucket];
+        while (posPtr->found()) {
+            // collision: walk links and add new to end
+            posPtr = &getField(*posPtr).nextCollision;
+        }
+        *posPtr = Position(pos.index);
+    }
+
+    void DocumentStorage::alloc(unsigned newSize) {
+        const bool firstAlloc = !_buffer;
+        const bool doingRehash = needRehash();
+        const size_t oldCapacity = _bufferEnd - _buffer;
+
+        // make new bucket count big enough
+        while (needRehash() || hashTabBuckets() < HASH_TAB_INIT_SIZE)
+            _hashTabMask = hashTabBuckets()*2 - 1;
+
+        // only allocate power-of-two sized space > 128 bytes
+        size_t capacity = 128;
+        while (capacity < newSize + hashTabBytes())
+            capacity *= 2;
+
+        uassert(16490, "Tried to make oversized document",
+                capacity <= size_t(BufferMaxSize));
+
+        boost::scoped_array<char> oldBuf(_buffer);
+        _buffer = new char[capacity];
+        _bufferEnd = _buffer + capacity - hashTabBytes();
+
+        if (!firstAlloc) {
+            // This just copies the elements
+            memcpy(_buffer, oldBuf.get(), _usedBytes);
+
+            if (_numFields >= HASH_TAB_MIN) {
+                // if we were hashing, deal with the hash table
+                if (doingRehash) {
+                    rehash();
+                }
+                else {
+                    // no rehash needed so just slide table down to new position
+                    memcpy(_hashTab, oldBuf.get() + oldCapacity, hashTabBytes());
+                }
+            }
+        }
+    }
+
+    void DocumentStorage::reserveFields(size_t expectedFields) {
+        fassert(16487, !_buffer);
+
+        unsigned buckets = HASH_TAB_INIT_SIZE;
+        while (buckets < expectedFields)
+            buckets *= 2;
+        _hashTabMask = buckets - 1;
+
+        // Using expectedFields+1 to allow space for long field names
+        const size_t newSize = (expectedFields+1) * ValueElement::align(sizeof(ValueElement));
+
+        uassert(16491, "Tried to make oversized document",
+                newSize <= size_t(BufferMaxSize));
+
+        _buffer = new char[newSize + hashTabBytes()];
+        _bufferEnd = _buffer + newSize;
+    }
+
+    intrusive_ptr<DocumentStorage> DocumentStorage::clone() const {
+        intrusive_ptr<DocumentStorage> out (new DocumentStorage());
+
+        // Make a copy of the buffer.
+        // It is very important that the positions of each field are the same after cloning.
+        const size_t bufferBytes = (_bufferEnd + hashTabBytes()) - _buffer;
+        out->_buffer = new char[bufferBytes];
+        out->_bufferEnd = out->_buffer + (_bufferEnd - _buffer);
+        memcpy(out->_buffer, _buffer, bufferBytes);
+
+        // Copy remaining fields
+        out->_usedBytes = _usedBytes;
+        out->_numFields = _numFields;
+        out->_hashTabMask = _hashTabMask;
+
+        // Tell values that they have been memcpyed (updates ref counts)
+        for (DocumentStorageIterator it = out->iteratorAll(); !it.atEnd(); it.advance()) {
+            it->val.memcpyed();
+        }
+
+        return out;
+    }
+
+    DocumentStorage::~DocumentStorage() {
+        boost::scoped_array<char> deleteBufferAtScopeEnd (_buffer);
+
+        for (DocumentStorageIterator it = iteratorAll(); !it.atEnd(); it.advance()) {
+            it->val.~Value(); // explicit destructor call
+        }
+    }
+
+    Document::Document(const BSONObj& bson) {
+        MutableDocument md(bson.nFields());
+
+        BSONObjIterator it(bson);
+        while(it.more()) {
+            BSONElement bsonElement(it.next());
+            md.addField(bsonElement.fieldName(), Value(bsonElement));
+        }
+
+        *this = md.freeze();
     }
 
     void Document::toBson(BSONObjBuilder* pBuilder) const {
-        const size_t n = vFieldName.size();
-        for(size_t i = 0; i < n; ++i)
-            vpValue[i]->addToBsonObj(pBuilder, vFieldName[i]);
-    }
-
-    intrusive_ptr<Document> Document::create(size_t sizeHint) {
-        intrusive_ptr<Document> pDocument(new Document(sizeHint));
-        return pDocument;
-    }
-
-    Document::Document(size_t sizeHint):
-        vFieldName(),
-        vpValue() {
-        if (sizeHint) {
-            vFieldName.reserve(sizeHint);
-            vpValue.reserve(sizeHint);
+        for (DocumentStorageIterator it = storage().iterator(); !it.atEnd(); it.advance()) {
+            it->val.addToBsonObj(pBuilder, it->nameSD());
         }
     }
 
-    intrusive_ptr<Document> Document::clone() {
-        const size_t n = vFieldName.size();
-        intrusive_ptr<Document> pNew(Document::create(n));
-        for(size_t i = 0; i < n; ++i)
-            pNew->addField(vFieldName[i], vpValue[i]);
-
-        return pNew;
-    }
-
-    Document::~Document() {
-    }
-
-    FieldIterator *Document::createFieldIterator() {
-        return new FieldIterator(intrusive_ptr<Document>(this));
-    }
-
-    intrusive_ptr<const Value> Document::getValue(const string &fieldName) {
-        /*
-          For now, assume the number of fields is small enough that iteration
-          is ok.  Later, if this gets large, we can create a map into the
-          vector for these lookups.
-
-          Note that because of the schema-less nature of this data, we always
-          have to look, and can't assume that the requested field is always
-          in a particular place as we would with a statically compilable
-          reference.
-        */
-        const size_t n = vFieldName.size();
-        for(size_t i = 0; i < n; ++i) {
-            if (fieldName.compare(vFieldName[i]) == 0)
-                return vpValue[i];
+    MutableDocument::MutableDocument(size_t expectedFields)
+        : _storageHolder(NULL)
+        , _storage(_storageHolder)
+    {
+        if (expectedFields) {
+            storage().reserveFields(expectedFields);
         }
-
-        return(intrusive_ptr<const Value>());
     }
 
-    void Document::addField(const string &fieldName,
-                            const intrusive_ptr<const Value> &pValue) {
-        vFieldName.push_back(fieldName);
-        vpValue.push_back(pValue);
-    }
+    MutableValue MutableDocument::getNestedFieldHelper(MutableDocument& md,
+                                                       const vector<Position>& positions,
+                                                       size_t level) {
+        fassert(16488, !positions.empty());
 
-    void Document::setField(size_t index,
-                            const string &fieldName,
-                            const intrusive_ptr<const Value> &pValue) {
-        /* special case:  should this field be removed? */
-        if (!pValue.get()) {
-            vFieldName.erase(vFieldName.begin() + index);
-            vpValue.erase(vpValue.begin() + index);
-            return;
+        if (level == positions.size()-1) {
+            return md[positions[level]];
         }
-
-        /* set the indicated field */
-        vFieldName[index] = fieldName;
-        vpValue[index] = pValue;
+        else {
+            MutableDocument nested (md[positions[level]]);
+            return getNestedFieldHelper(nested, positions, level+1);
+        }
     }
 
-    intrusive_ptr<const Value> Document::getField(const string &fieldName) const {
-        const size_t n = vFieldName.size();
-        for(size_t i = 0; i < n; ++i) {
-            if (fieldName.compare(vFieldName[i]) == 0)
-                return vpValue[i];
-        }
+    MutableValue MutableDocument::getNestedField(const vector<Position>& positions) {
+        return getNestedFieldHelper(*this, positions, 0);
+    }
 
-        /* if we got here, there's no such field */
-        return intrusive_ptr<const Value>();
+    static Value getNestedFieldHelper(const Document& doc,
+                                      const FieldPath& fieldNames,
+                                      vector<Position>* positions,
+                                      size_t level) {
+
+        fassert(16489, fieldNames.getPathLength());
+
+        const string& fieldName = fieldNames.getFieldName(level);
+        const Position pos = doc.positionOf(fieldName);
+
+        if (!pos.found())
+            return Value();
+
+        if (positions)
+            positions->push_back(pos);
+
+        if (level == fieldNames.getPathLength()-1)
+            return doc.getField(pos);
+
+        Value val = doc.getField(pos);
+        if (val.getType() != Object)
+            return Value();
+
+        return getNestedFieldHelper(val.getDocument(), fieldNames, positions, level+1);
+    }
+
+    const Value Document::getNestedField(const FieldPath& fieldNames,
+                                         vector<Position>* positions) const {
+        return getNestedFieldHelper(*this, fieldNames, positions, 0);
     }
 
     size_t Document::getApproximateSize() const {
-        size_t size = sizeof(Document);
-        const size_t n = vpValue.size();
-        for(size_t i = 0; i < n; ++i)
-            size += vpValue[i]->getApproximateSize();
+        if (!_storage)
+            return 0; // we've allocated no memory
+
+        size_t size = sizeof(DocumentStorage);
+        size += storage().allocatedBytes();
+
+        for (DocumentStorageIterator it = storage().iterator(); !it.atEnd(); it.advance()) {
+            size += it->val.getApproximateSize();
+            size -= sizeof(Value); // already accounted for above
+        }
 
         return size;
     }
 
-    size_t Document::getFieldIndex(const string &fieldName) const {
-        const size_t n = vFieldName.size();
-        size_t i = 0;
-        for(; i < n; ++i) {
-            if (fieldName.compare(vFieldName[i]) == 0)
-                break;
-        }
-
-        return i;
-    }
-
     void Document::hash_combine(size_t &seed) const {
-        const size_t n = vFieldName.size();
-        for(size_t i = 0; i < n; ++i) {
-            boost::hash_combine(seed, vFieldName[i]);
-            vpValue[i]->hash_combine(seed);
+        for (DocumentStorageIterator it = storage().iterator(); !it.atEnd(); it.advance()) {
+            StringData name = it->nameSD();
+            boost::hash_range(seed, name.data(), name.data()+name.size());
+            it->val.hash_combine(seed);
         }
     }
 
-    int Document::compare(const intrusive_ptr<Document> &rL,
-                          const intrusive_ptr<Document> &rR) {
-        const size_t lSize = rL->vFieldName.size();
-        const size_t rSize = rR->vFieldName.size();
+    int Document::compare(const Document& rL, const Document& rR) {
+        const size_t lSize = rL->storage().size();
+        const size_t rSize = rR->storage().size();
+
+        DocumentStorageIterator lIt = rL.storage().iterator();
+        DocumentStorageIterator rIt = rR.storage().iterator();
 
         for(size_t i = 0; true; ++i) {
             if (i >= lSize) {
@@ -180,43 +313,35 @@ namespace mongo {
             if (i >= rSize)
                 return 1; // right document is shorter
 
-            const int nameCmp = rL->vFieldName[i].compare(rR->vFieldName[i]);
+            const ValueElement& rField = rIt.get();
+            const ValueElement& lField = lIt.get();
+
+            rIt.advance();
+            lIt.advance();
+
+            const int nameCmp = strcmp(lField.name, rField.name);
             if (nameCmp)
                 return nameCmp; // field names are unequal
 
-            const int valueCmp = Value::compare(rL->vpValue[i], rR->vpValue[i]);
+            const int valueCmp = Value::compare(lField.val, rField.val);
             if (valueCmp)
                 return valueCmp; // fields are unequal
         }
-
-        /* NOTREACHED */
-        verify(false);
-        return 0;
     }
 
     string Document::toString() const {
-        // this is a temporary hack and it should only be used for debugging
-        BSONObjBuilder bb;
-        toBson(&bb);
-        return bb.done().toString();
-    }
+        if (empty())
+            return "{}";
 
-    /* ----------------------- FieldIterator ------------------------------- */
+        StringBuilder out;
+        const char* prefix = "{";
 
-    FieldIterator::FieldIterator(const intrusive_ptr<Document> &pTheDocument):
-        pDocument(pTheDocument),
-        index(0) {
-    }
+        for (DocumentStorageIterator it = storage().iterator(); !it.atEnd(); it.advance()) {
+            out << prefix << it->name << ": " << it->val.toString();
+            prefix = ", ";
+        }
+        out << '}';
 
-    bool FieldIterator::more() const {
-        return (index < pDocument->vFieldName.size());
-    }
-
-    pair<string, intrusive_ptr<const Value> > FieldIterator::next() {
-        verify(more());
-        pair<string, intrusive_ptr<const Value> > result(
-            pDocument->vFieldName[index], pDocument->vpValue[index]);
-        ++index;
-        return result;
+        return out.str();
     }
 }

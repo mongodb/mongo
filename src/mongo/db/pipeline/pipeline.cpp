@@ -416,7 +416,7 @@ namespace mongo {
             // cant use subArrayStart() due to error handling
             BSONArrayBuilder resultArray;
             for(bool hasDoc = !pSource->eof(); hasDoc; hasDoc = pSource->advance()) {
-                intrusive_ptr<Document> pDocument(pSource->getCurrent());
+                Document pDocument(pSource->getCurrent());
 
                 /* add the document to the result set */
                 BSONObjBuilder documentBuilder (resultArray.subobjStart());
@@ -476,8 +476,7 @@ namespace mongo {
         BSONArrayBuilder shardOpArray; // where we'll put the pipeline ops
         for(bool hasDocument = !pSourceBsonArray->eof(); hasDocument;
             hasDocument = pSourceBsonArray->advance()) {
-            intrusive_ptr<Document> pDocument(
-                pSourceBsonArray->getCurrent());
+            Document pDocument = pSourceBsonArray->getCurrent();
             BSONObjBuilder opBuilder;
             pDocument->toBson(&opBuilder);
             shardOpArray.append(opBuilder.obj());

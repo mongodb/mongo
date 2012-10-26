@@ -64,20 +64,16 @@ namespace mongo {
 
         ++count;
         if (count >= limit) {
-
-            pCurrent.reset();
-
             // This is required for the DocumentSourceCursor to release its read lock, see
             // SERVER-6123.
             pSource->dispose();
 
             return false;
         }
-        pCurrent = pSource->getCurrent();
         return pSource->advance();
     }
 
-    intrusive_ptr<Document> DocumentSourceLimit::getCurrent() {
+    Document DocumentSourceLimit::getCurrent() {
         return pSource->getCurrent();
     }
 

@@ -362,6 +362,10 @@ namespace mongo {
         BSONObjBuilder& append(const StringData& fieldName, const std::string& str) {
             return append(fieldName, str.c_str(), (int) str.size()+1);
         }
+        /** Append a string element */
+        BSONObjBuilder& append(const StringData& fieldName, const StringData& str) {
+            return append(fieldName, str.data(), (int) str.size()+1);
+        }
 
         BSONObjBuilder& appendSymbol(const StringData& fieldName, const StringData& symbol) {
             _b.appendNum((char) Symbol);
@@ -771,6 +775,11 @@ namespace mongo {
 
         BSONArrayBuilder& appendTimestamp(unsigned int sec, unsigned int inc) {
             _b.appendTimestamp(num(), sec, inc);
+            return *this;
+        }
+
+        BSONArrayBuilder& append(const StringData& s) {
+            _b.append(num(), s);
             return *this;
         }
 

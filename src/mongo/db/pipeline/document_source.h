@@ -88,9 +88,14 @@ namespace mongo {
 
         /** @returns the current Document without advancing.
          *
-         *  some implementations do the equivalent of verify(!eof()) so check eof() first
+         *  It is illegal to call this without first checking eof() == false or advance() == true.
+         *
+         *  While it is legal to call getCurrent() multiple times between calls to advance, and
+         *  you will get the same Document returned, some DocumentSources do expensive work in
+         *  getCurrent(). You are advised to cache the result if you plan to access it more than
+         *  once.
          */
-        virtual intrusive_ptr<Document> getCurrent() = 0;
+        virtual Document getCurrent() = 0;
 
         /**
          * Inform the source that it is no longer needed and may release its resources.  After
@@ -258,7 +263,7 @@ namespace mongo {
         virtual ~DocumentSourceBsonArray();
         virtual bool eof();
         virtual bool advance();
-        virtual intrusive_ptr<Document> getCurrent();
+        virtual Document getCurrent();
         virtual void setSource(DocumentSource *pSource);
 
         /**
@@ -301,7 +306,7 @@ namespace mongo {
         virtual ~DocumentSourceCommandShards();
         virtual bool eof();
         virtual bool advance();
-        virtual intrusive_ptr<Document> getCurrent();
+        virtual Document getCurrent();
         virtual void setSource(DocumentSource *pSource);
 
         /* convenient shorthand for a commonly used type */
@@ -335,9 +340,11 @@ namespace mongo {
          */
         void getNextDocument();
 
+        bool unstarted;
+        bool hasCurrent;
         bool newSource; // set to true for the first item of a new source
         intrusive_ptr<DocumentSourceBsonArray> pBsonSource;
-        intrusive_ptr<Document> pCurrent;
+        Document pCurrent;
         ShardOutput::const_iterator iterator;
         ShardOutput::const_iterator listEnd;
     };
@@ -369,7 +376,7 @@ namespace mongo {
         virtual ~DocumentSourceCursor();
         virtual bool eof();
         virtual bool advance();
-        virtual intrusive_ptr<Document> getCurrent();
+        virtual Document getCurrent();
         virtual void setSource(DocumentSource *pSource);
 
         /**
@@ -437,7 +444,9 @@ namespace mongo {
 
         void findNext();
 
-        intrusive_ptr<Document> pCurrent;
+        bool unstarted;
+        bool hasCurrent;
+        Document pCurrent;
 
         string ns; // namespace
 
@@ -482,7 +491,7 @@ namespace mongo {
         virtual ~DocumentSourceFilterBase();
         virtual bool eof();
         virtual bool advance();
-        virtual intrusive_ptr<Document> getCurrent();
+        virtual Document getCurrent();
 
         /**
           Create a BSONObj suitable for Matcher construction.
@@ -508,15 +517,15 @@ namespace mongo {
           @param pDocument the document to test
           @returns true if the document matches the filter, false otherwise
          */
-        virtual bool accept(const intrusive_ptr<Document> &pDocument) const = 0;
+        virtual bool accept(const Document& pDocument) const = 0;
 
     private:
 
         void findNext();
 
         bool unstarted;
-        bool hasNext;
-        intrusive_ptr<Document> pCurrent;
+        bool hasCurrent;
+        Document pCurrent;
     };
 
 
@@ -571,7 +580,7 @@ namespace mongo {
         virtual void sourceToBson(BSONObjBuilder *pBuilder, bool explain) const;
 
         // virtuals from DocumentSourceFilterBase
-        virtual bool accept(const intrusive_ptr<Document> &pDocument) const;
+        virtual bool accept(const Document& pDocument) const;
 
     private:
         DocumentSourceFilter(const intrusive_ptr<Expression> &pFilter,
@@ -589,7 +598,7 @@ namespace mongo {
         virtual bool eof();
         virtual bool advance();
         virtual const char *getSourceName() const;
-        virtual intrusive_ptr<Document> getCurrent();
+        virtual Document getCurrent();
         virtual GetDepsReturn getDependencies(set<string>& deps) const;
 
         /**
@@ -668,7 +677,7 @@ namespace mongo {
 
         intrusive_ptr<Expression> pIdExpression;
 
-        typedef boost::unordered_map<intrusive_ptr<const Value>,
+        typedef boost::unordered_map<Value,
             vector<intrusive_ptr<Accumulator> >, Value::Hash> GroupsType;
         GroupsType groups;
 
@@ -690,11 +699,10 @@ namespace mongo {
         vector<intrusive_ptr<Expression> > vpExpression;
 
 
-        intrusive_ptr<Document> makeDocument(
-            const GroupsType::iterator &rIter);
+        Document makeDocument(const GroupsType::iterator &rIter);
 
         GroupsType::iterator groupsIterator;
-        intrusive_ptr<Document> pCurrent;
+        Document pCurrent;
     };
 
 
@@ -735,7 +743,7 @@ namespace mongo {
         virtual void sourceToBson(BSONObjBuilder *pBuilder, bool explain) const;
 
         // virtuals from DocumentSourceFilterBase
-        virtual bool accept(const intrusive_ptr<Document> &pDocument) const;
+        virtual bool accept(const Document& pDocument) const;
 
     private:
         DocumentSourceMatch(const BSONObj &query,
@@ -753,7 +761,7 @@ namespace mongo {
         virtual bool eof();
         virtual bool advance();
         virtual const char *getSourceName() const;
-        virtual intrusive_ptr<Document> getCurrent();
+        virtual Document getCurrent();
 
         /**
           Create a document source for output and pass-through.
@@ -789,7 +797,7 @@ namespace mongo {
         virtual bool eof();
         virtual bool advance();
         virtual const char *getSourceName() const;
-        virtual intrusive_ptr<Document> getCurrent();
+        virtual Document getCurrent();
         virtual void optimize();
 
         virtual GetDepsReturn getDependencies(set<string>& deps) const;
@@ -839,7 +847,7 @@ namespace mongo {
         virtual bool eof();
         virtual bool advance();
         virtual const char *getSourceName() const;
-        virtual intrusive_ptr<Document> getCurrent();
+        virtual Document getCurrent();
 
         virtual GetDepsReturn getDependencies(set<string>& deps) const;
 
@@ -932,8 +940,7 @@ namespace mongo {
           @returns a number less than, equal to, or greater than zero,
             indicating pL < pR, pL == pR, or pL > pR, respectively
          */
-        int compare(const intrusive_ptr<Document> &pL,
-                    const intrusive_ptr<Document> &pR);
+        int compare(const Document& pL, const Document& pR);
 
         /*
           This is a utility class just for the STL sort that is done
@@ -941,9 +948,7 @@ namespace mongo {
          */
         class Comparator {
         public:
-            bool operator()(
-                const intrusive_ptr<Document> &pL,
-                const intrusive_ptr<Document> &pR) {
+            bool operator()(const Document& pL, const Document& pR) {
                 return (pSort->compare(pL, pR) < 0);
             }
 
@@ -955,11 +960,11 @@ namespace mongo {
             DocumentSourceSort *pSort;
         };
 
-        typedef vector<intrusive_ptr<Document> > VectorType;
+        typedef vector<Document> VectorType;
         VectorType documents;
 
         VectorType::iterator docIterator;
-        intrusive_ptr<Document> pCurrent;
+        Document pCurrent;
     };
 
 
@@ -970,7 +975,7 @@ namespace mongo {
         virtual ~DocumentSourceLimit();
         virtual bool eof();
         virtual bool advance();
-        virtual intrusive_ptr<Document> getCurrent();
+        virtual Document getCurrent();
         virtual const char *getSourceName() const;
         virtual bool coalesce(const intrusive_ptr<DocumentSource> &pNextSource);
 
@@ -1022,7 +1027,6 @@ namespace mongo {
 
         long long limit;
         long long count;
-        intrusive_ptr<Document> pCurrent;
     };
 
     class DocumentSourceSkip :
@@ -1032,7 +1036,7 @@ namespace mongo {
         virtual ~DocumentSourceSkip();
         virtual bool eof();
         virtual bool advance();
-        virtual intrusive_ptr<Document> getCurrent();
+        virtual Document getCurrent();
         virtual const char *getSourceName() const;
         virtual bool coalesce(const intrusive_ptr<DocumentSource> &pNextSource);
 
@@ -1088,7 +1092,7 @@ namespace mongo {
 
         long long skip;
         long long count;
-        intrusive_ptr<Document> pCurrent;
+        Document pCurrent;
     };
 
 
@@ -1100,7 +1104,7 @@ namespace mongo {
         virtual bool eof();
         virtual bool advance();
         virtual const char *getSourceName() const;
-        virtual intrusive_ptr<Document> getCurrent();
+        virtual Document getCurrent();
 
         virtual GetDepsReturn getDependencies(set<string>& deps) const;
 

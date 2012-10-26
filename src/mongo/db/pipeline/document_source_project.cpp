@@ -48,13 +48,12 @@ namespace mongo {
         return pSource->advance();
     }
 
-    intrusive_ptr<Document> DocumentSourceProject::getCurrent() {
-        intrusive_ptr<Document> pInDocument(pSource->getCurrent());
-        verify(pInDocument);
+    Document DocumentSourceProject::getCurrent() {
+        Document pInDocument(pSource->getCurrent());
 
         /* create the result document */
         const size_t sizeHint = pEO->getSizeHint();
-        intrusive_ptr<Document> pResultDocument(Document::create(sizeHint));
+        MutableDocument out (sizeHint);
 
         /*
           Use the ExpressionObject to create the base result.
@@ -62,7 +61,7 @@ namespace mongo {
           If we're excluding fields at the top level, leave out the _id if
           it is found, because we took care of it above.
         */
-        pEO->addToDocument(pResultDocument, pInDocument, /*root=*/pInDocument);
+        pEO->addToDocument(out, pInDocument, /*root=*/pInDocument);
 
 #if defined(_DEBUG)
         if (!_simpleProjection.getSpec().isEmpty()) {
@@ -73,7 +72,7 @@ namespace mongo {
             BSONObj input = inputBuilder.done();
 
             BSONObjBuilder outputBuilder;
-            pResultDocument->toBson(&outputBuilder);
+            out.peek().toBson(&outputBuilder);
             BSONObj output = outputBuilder.done();
 
             BSONObj projected = _simpleProjection.transform(input);
@@ -88,7 +87,7 @@ namespace mongo {
         }
 #endif
 
-        return pResultDocument;
+        return out.freeze();
     }
 
     void DocumentSourceProject::optimize() {

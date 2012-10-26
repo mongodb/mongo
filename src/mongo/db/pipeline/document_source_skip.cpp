@@ -87,7 +87,7 @@ namespace mongo {
         return pSource->advance();
     }
 
-    intrusive_ptr<Document> DocumentSourceSkip::getCurrent() {
+    Document DocumentSourceSkip::getCurrent() {
         skipper();
         return pCurrent;
     }

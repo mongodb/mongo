@@ -21,27 +21,26 @@
 
 namespace mongo {
 
-    intrusive_ptr<const Value> AccumulatorSum::evaluate(
-        const intrusive_ptr<Document> &pDocument) const {
+    Value AccumulatorSum::evaluate(const Document& pDocument) const {
         verify(vpOperand.size() == 1);
-        intrusive_ptr<const Value> prhs(vpOperand[0]->evaluate(pDocument));
+        Value prhs(vpOperand[0]->evaluate(pDocument));
 
-        BSONType rhsType = prhs->getType();
+        BSONType rhsType = prhs.getType();
 
         // do nothing with non numeric types
         if (!(rhsType == NumberInt || rhsType == NumberLong || rhsType == NumberDouble))
-            return Value::getZero();
+            return Value(0);
 
         // upgrade to the widest type required to hold the result
         totalType = Value::getWidestNumeric(totalType, rhsType);
 
         if (totalType == NumberInt || totalType == NumberLong) {
-            long long v = prhs->coerceToLong();
+            long long v = prhs.coerceToLong();
             longTotal += v;
             doubleTotal += v;
         }
         else if (totalType == NumberDouble) {
-            double v = prhs->coerceToDouble();
+            double v = prhs.coerceToDouble();
             doubleTotal += v;
         }
         else {
@@ -51,7 +50,7 @@ namespace mongo {
 
         count++;
 
-        return Value::getZero();
+        return Value();
     }
 
     intrusive_ptr<Accumulator> AccumulatorSum::create(
@@ -60,7 +59,7 @@ namespace mongo {
         return pSummer;
     }
 
-    intrusive_ptr<const Value> AccumulatorSum::getValue() const {
+    Value AccumulatorSum::getValue() const {
         if (totalType == NumberLong) {
             return Value::createLong(longTotal);
         }

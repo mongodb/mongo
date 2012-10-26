@@ -61,7 +61,7 @@ namespace mongo {
         return true;
     }
 
-    intrusive_ptr<Document> DocumentSourceSort::getCurrent() {
+    Document DocumentSourceSort::getCurrent() {
         if (!populated)
             populate();
 
@@ -164,7 +164,7 @@ namespace mongo {
         /* pull everything from the underlying source */
         for(bool hasNext = !pSource->eof(); hasNext;
             hasNext = pSource->advance()) {
-            intrusive_ptr<Document> pDocument(pSource->getCurrent());
+            Document pDocument(pSource->getCurrent());
             documents.push_back(pDocument);
 
             dmm.addToTotal(pDocument->getApproximateSize());
@@ -182,8 +182,7 @@ namespace mongo {
         populated = true;
     }
 
-    int DocumentSourceSort::compare(
-        const intrusive_ptr<Document> &pL, const intrusive_ptr<Document> &pR) {
+    int DocumentSourceSort::compare(const Document& pL, const Document& pR) {
 
         /*
           populate() already checked that there is a non-empty sort key,
@@ -196,8 +195,8 @@ namespace mongo {
         for(size_t i = 0; i < n; ++i) {
             /* evaluate the sort keys */
             ExpressionFieldPath *pE = vSortKey[i].get();
-            intrusive_ptr<const Value> pLeft(pE->evaluate(pL));
-            intrusive_ptr<const Value> pRight(pE->evaluate(pR));
+            Value pLeft(pE->evaluate(pL));
+            Value pRight(pE->evaluate(pR));
 
             /*
               Compare the two values; if they differ, return.  If they are

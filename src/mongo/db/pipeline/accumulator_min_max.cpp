@@ -21,13 +21,12 @@
 
 namespace mongo {
 
-    intrusive_ptr<const Value> AccumulatorMinMax::evaluate(
-        const intrusive_ptr<Document> &pDocument) const {
+    Value AccumulatorMinMax::evaluate(const Document& pDocument) const {
         verify(vpOperand.size() == 1);
-        intrusive_ptr<const Value> prhs(vpOperand[0]->evaluate(pDocument));
+        Value prhs(vpOperand[0]->evaluate(pDocument));
 
         /* if this is the first value, just use it */
-        if (!pValue.get())
+        if (pValue.missing())
             pValue = prhs;
         else {
             /* compare with the current value; swap if appropriate */

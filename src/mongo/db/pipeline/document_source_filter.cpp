@@ -63,10 +63,9 @@ namespace mongo {
         pFilter->addToBsonObj(pBuilder, filterName, false);
     }
 
-    bool DocumentSourceFilter::accept(
-        const intrusive_ptr<Document> &pDocument) const {
-        intrusive_ptr<const Value> pValue(pFilter->evaluate(pDocument));
-        return pValue->coerceToBool();
+    bool DocumentSourceFilter::accept(const Document& pDocument) const {
+        Value pValue(pFilter->evaluate(pDocument));
+        return pValue.coerceToBool();
     }
 
     intrusive_ptr<DocumentSource> DocumentSourceFilter::createFromBson(
