@@ -7,7 +7,7 @@ var dbdir = "/data/db/" + name + "/"; // this will work under windows as well as
 var basedir = "/data/db/" + name + "files" + "/";
 var logdir = basedir + "logdir/";
 var testdir = basedir + "testdir/"
-var sfile = _isWindows() ? "NUL:" : "/dev/null";
+var sfile = _isWindows() ? "NUL" : "/dev/null";
 
 var logs = [token + "1", token + "2"];
 var port = allocatePorts(6);

@@ -6,13 +6,7 @@
 
 // NOTE: this test is skipped when running smoke.py with --auth or --keyFile to force authentication
 // in all tests.
-var bitbucket;
-if ( _isWindows() ) {
-    bitbucket = "NUL";
-}
-else {
-    bitbucket = "/dev/null";
-}
+var bitbucket = _isWindows() ? "NUL" : "/dev/null";
 test = new SyncCCTest( "sync6", { logpath : bitbucket , logappend : "" } )
 
 // Startup another process to handle our commands to the cluster, mostly so it's 
