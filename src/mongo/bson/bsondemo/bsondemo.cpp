@@ -6,7 +6,8 @@
     Works headers only (the parts actually exercised herein that is - some functions require .cpp files).
 
     To build and run:
-      g++ -o bsondemo bsondemo.cpp
+      # "../../.." is the directory mongo/src/
+      g++ -o bsondemo -I ../../.. bsondemo.cpp
       ./bsondemo
 
     Windows: project files are available in this directory for bsondemo.cpp for use with Visual Studio.
