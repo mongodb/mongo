@@ -116,6 +116,9 @@
     <Filter Include="bson\util">
       <UniqueIdentifier>{00c41b76-f23e-439a-bea5-4b2fd714ab70}</UniqueIdentifier>
     </Filter>
+    <Filter Include="db\auth">
+      <UniqueIdentifier>{f05caff2-28ae-48ec-87b2-ee00d8c9012d}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\client\connpool.h">
@@ -803,6 +806,21 @@
     </ClInclude>
     <ClInclude Include="..\util\elapsed_tracker.h">
       <Filter>util\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\base\counter.h">
+      <Filter>base</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\btree_stats.h">
+      <Filter>db\Header Files\a to d</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\commands\server_status.h">
+      <Filter>db\commands</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\auth\authentication_session.h">
+      <Filter>db\auth</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\auth\mongo_authentication_session.h">
+      <Filter>db\auth</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -1734,6 +1752,15 @@
     </ClCompile>
     <ClCompile Include="..\util\elapsed_tracker.cpp">
       <Filter>util\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\btree_stats.cpp">
+      <Filter>db\Source Files\a to d</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\commands\server_status.cpp">
+      <Filter>db\commands</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\auth\mongo_authentication_session.cpp">
+      <Filter>db\auth</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

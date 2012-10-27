@@ -994,8 +994,10 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClCompile Include="..\db\auth\action_type.cpp" />
     <ClCompile Include="..\db\auth\capability.cpp" />
     <ClCompile Include="..\db\auth\capability_set.cpp" />
+    <ClCompile Include="..\db\auth\mongo_authentication_session.cpp" />
     <ClCompile Include="..\db\auth\principal.cpp" />
     <ClCompile Include="..\db\auth\principal_set.cpp" />
+    <ClCompile Include="..\db\commands\server_status.cpp" />
     <ClCompile Include="..\db\fail_point_service.cpp" />
     <ClCompile Include="..\db\hasher.cpp" />
     <ClCompile Include="..\db\initialize_server_global_state.cpp" />
@@ -1217,6 +1219,7 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClInclude Include="..\..\third_party\js-1.7\prmjtime.h" />
     <ClInclude Include="..\..\third_party\js-1.7\resource.h" />
     <ClInclude Include="..\base\configuration_variable_manager.h" />
+    <ClInclude Include="..\base\counter.h" />
     <ClInclude Include="..\base\disallow_copying.h" />
     <ClInclude Include="..\base\error_codes.h" />
     <ClInclude Include="..\base\global_initializer.h" />
@@ -1252,10 +1255,13 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClInclude Include="..\client\authlevel.h" />
     <ClInclude Include="..\db\auth\action_set.h" />
     <ClInclude Include="..\db\auth\action_type.h" />
+    <ClInclude Include="..\db\auth\authentication_session.h" />
     <ClInclude Include="..\db\auth\capability.h" />
     <ClInclude Include="..\db\auth\capability_set.h" />
+    <ClInclude Include="..\db\auth\mongo_authentication_session.h" />
     <ClInclude Include="..\db\auth\principal.h" />
     <ClInclude Include="..\db\auth\principal_set.h" />
+    <ClInclude Include="..\db\commands\server_status.h" />
     <ClInclude Include="..\db\fail_point_service.h" />
     <ClInclude Include="..\db\hasher.h" />
     <ClInclude Include="..\db\initialize_server_global_state.h" />

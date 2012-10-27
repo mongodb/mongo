@@ -1001,6 +1001,15 @@
     <ClCompile Include="auth\action_type.cpp">
       <Filter>db\auth</Filter>
     </ClCompile>
+    <ClCompile Include="auth\mongo_authentication_session.cpp">
+      <Filter>db\auth</Filter>
+    </ClCompile>
+    <ClCompile Include="btree_stats.cpp">
+      <Filter>db\Source Files\a to d</Filter>
+    </ClCompile>
+    <ClCompile Include="commands\server_status.cpp">
+      <Filter>db\commands</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\targetver.h" />
@@ -1886,6 +1895,33 @@
     </ClInclude>
     <ClInclude Include="auth\action_type.h">
       <Filter>db\auth</Filter>
+    </ClInclude>
+    <ClInclude Include="..\base\counter.h">
+      <Filter>base</Filter>
+    </ClInclude>
+    <ClInclude Include="auth\authentication_session.h">
+      <Filter>db\auth</Filter>
+    </ClInclude>
+    <ClInclude Include="auth\mongo_authentication_session.h">
+      <Filter>db\auth</Filter>
+    </ClInclude>
+    <ClInclude Include="btree_stats.h">
+      <Filter>db\Header Files\a to d</Filter>
+    </ClInclude>
+    <ClInclude Include="commands\fsync.h">
+      <Filter>db\commands</Filter>
+    </ClInclude>
+    <ClInclude Include="commands\mr.h">
+      <Filter>db\commands</Filter>
+    </ClInclude>
+    <ClInclude Include="commands\server_status.h">
+      <Filter>db\commands</Filter>
+    </ClInclude>
+    <ClInclude Include="dur.h">
+      <Filter>db\Header Files\a to d</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\boost\boost\smart_ptr\scoped_ptr.hpp">
+      <Filter>Boost</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
