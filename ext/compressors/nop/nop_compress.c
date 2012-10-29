@@ -55,8 +55,7 @@ wiredtiger_extension_init(
 	wt_api = api;
 	conn = session->connection;
 
-	return (
-	    conn->add_compressor(conn, "nop_compress", &nop_compressor, NULL));
+	return (conn->add_compressor(conn, "nop", &nop_compressor, NULL));
 }
 
 /* Implementation of WT_COMPRESSOR for WT_CONNECTION::add_compressor. */

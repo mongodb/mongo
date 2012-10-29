@@ -903,6 +903,8 @@ __clsm_close(WT_CURSOR *cursor)
 	__wt_free(session, clsm->cursors);
 	/* The WT_LSM_TREE owns the URI. */
 	cursor->uri = NULL;
+	if (clsm->lsm_tree != NULL)
+		__wt_lsm_tree_release(session, clsm->lsm_tree);
 	WT_TRET(__wt_cursor_close(cursor));
 	API_END(session);
 
@@ -951,14 +953,17 @@ __wt_clsm_open(WT_SESSION_IMPL *session,
 	WT_LSM_TREE *lsm_tree;
 
 	clsm = NULL;
+	cursor = NULL;
 
 	if (!WT_PREFIX_MATCH(uri, "lsm:"))
 		return (EINVAL);
 
 	/* Get the LSM tree. */
-	WT_RET(__wt_lsm_tree_get(session, uri, &lsm_tree));
+	WT_WITH_SCHEMA_LOCK_OPT(session,
+	    ret = __wt_lsm_tree_get(session, uri, 0, &lsm_tree));
+	WT_RET(ret);
 
-	WT_RET(__wt_calloc_def(session, 1, &clsm));
+	WT_ERR(__wt_calloc_def(session, 1, &clsm));
 
 	cursor = &clsm->iface;
 	*cursor = iface;
@@ -987,7 +992,10 @@ __wt_clsm_open(WT_SESSION_IMPL *session,
 		F_SET(cursor, WT_CURSTD_OVERWRITE);
 
 	if (0) {
-err:		(void)__clsm_close(cursor);
+err:		if (lsm_tree != NULL)
+			__wt_lsm_tree_release(session, lsm_tree);
+		if (cursor != NULL)
+			(void)__clsm_close(cursor);
 	}
 
 	return (ret);

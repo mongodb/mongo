@@ -395,6 +395,25 @@ session_ops(WT_SESSION *session)
 	    "table:mytable", "key_format=S,value_format=S");
 	/*! [Create a table] */
 
+	/*
+	 * This example code gets run, and the compression libraries might not
+	 * be loaded, causing the create to fail.  The documentation requires
+	 * the code snippets, use #ifdef's to avoid running it.
+	 */
+#ifdef MIGHT_NOT_RUN
+	/*! [Create a bzip2 compressed table] */
+	ret = session->create(session,
+	    "table:mytable",
+	    "block_compressor=bzip2,key_format=S,value_format=S");
+	/*! [Create a bzip2 compressed table] */
+
+	/*! [Create a snappy compressed table] */
+	ret = session->create(session,
+	    "table:mytable",
+	    "block_compressor=snappy,key_format=S,value_format=S");
+	/*! [Create a snappy compressed table] */
+#endif
+
 	/*! [Create a cache-resident object] */
 	ret = session->create(session,
 	    "table:mytable", "key_format=r,value_format=S,cache_resident=true");
@@ -891,15 +910,43 @@ main(void)
 {
 	int ret;
 
+	system("rm -rf WiredTigerHome && mkdir WiredTigerHome");
+
 	{
 	/*! [Open a connection] */
 	WT_CONNECTION *conn;
-	const char *home = "WT_TEST";
-	ret = wiredtiger_open(home, NULL, "create,transactional", &conn);
-	/*! [Open a connection] */
 
-	(void)conn->close(conn, NULL);
+	ret = wiredtiger_open(
+	    "WiredTigerHome", NULL, "create,transactional", &conn);
+	/*! [Open a connection] */
 	}
+
+	/*
+	 * This example code gets run, and the compression libraries might not
+	 * be installed, causing the open to fail.  The documentation requires
+	 * the code snippets, use #ifdef's to avoid running it.
+	 */
+#ifdef MIGHT_NOT_RUN
+	{
+	/*! [Configure bzip2 extension] */
+	WT_CONNECTION *conn;
+
+	ret = wiredtiger_open("WiredTigerHome", NULL,
+	    "create,"
+	    "extensions=[\"/usr/local/lib/wiredtiger_bzip2.so\"]", &conn);
+	/*! [Configure bzip2 extension] */
+	}
+
+	{
+	/*! [Configure snappy extension] */
+	WT_CONNECTION *conn;
+
+	ret = wiredtiger_open("WiredTigerHome", NULL,
+	    "create,"
+	    "extensions=[\"/usr/local/lib/wiredtiger_snappy.so\"]", &conn);
+	/*! [Configure snappy extension] */
+	}
+#endif
 
 	/*! [Get the WiredTiger library version #1] */
 	printf("WiredTiger version %s\n", wiredtiger_version(NULL, NULL, NULL));

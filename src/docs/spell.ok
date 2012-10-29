@@ -13,8 +13,8 @@ DbMultiple
 EB
 EmpId
 FreeBSD
-Gawlick
 GCC
+Gawlick
 GitHub
 IEC
 LDFLAGS
@@ -28,6 +28,7 @@ Mewhort
 NoSQL
 RepMgr
 Rrx
+Seward's
 URIs
 Vv
 WiredTiger
@@ -193,6 +194,7 @@ mutexes
 mutexing
 mvcc
 mygcc
+namespace
 ndary
 ndbm
 newsite

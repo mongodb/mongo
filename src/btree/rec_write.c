@@ -1191,33 +1191,11 @@ static int
 __rec_split_write(WT_SESSION_IMPL *session,
     WT_RECONCILE *r, WT_BOUNDARY *bnd, WT_ITEM *buf, int checkpoint)
 {
-	WT_CELL *cell;
 	WT_PAGE_HEADER *dsk;
 	uint32_t size;
 	uint8_t addr[WT_BTREE_MAX_ADDR_COOKIE];
 
 	dsk = buf->mem;
-
-	/*
-	 * We always write an additional byte on row-store leaf pages after the
-	 * key value pairs.  The reason is that zero-length value items are not
-	 * written on the page and they're detected by finding two adjacent key
-	 * cells.  If the last value item on a page is zero length, we need a
-	 * key cell after it on the page to detect it.  The row-store leaf page
-	 * reconciliation code made sure we had a spare byte in the buffer, now
-	 * write a trailing zero-length key cell.  This isn't a valid key cell,
-	 * but since it's not referenced by the entries on the page, no code but
-	 * the code reading after the key cell, to find the key value, will ever
-	 * see it.
-	 */
-#define	WT_TRAILING_KEY_CELL	(sizeof(uint8_t))
-	if (dsk->type == WT_PAGE_ROW_LEAF) {
-		WT_ASSERT_RET(session, buf->size < buf->memsize);
-
-		cell = (WT_CELL *)&(((uint8_t *)buf->data)[buf->size]);
-		__wt_cell_pack_key_empty(cell);
-		++buf->size;
-	}
 
 	/*
 	 * Write the chunk and save the location information.  There is one big
@@ -1441,11 +1419,8 @@ __wt_rec_row_bulk_insert(WT_CURSOR_BULK *cbulk)
 
 	/*
 	 * Boundary, split or write the page.
-	 *
-	 * We write a trailing key cell on the page after the K/V pairs
-	 * (see WT_TRAILING_KEY_CELL for more information).
 	 */
-	while (key->len + val->len + WT_TRAILING_KEY_CELL > r->space_avail) {
+	while (key->len + val->len > r->space_avail) {
 		/* Split the page. */
 		WT_RET(__rec_split(session, r));
 
@@ -1477,45 +1452,16 @@ __wt_rec_row_bulk_insert(WT_CURSOR_BULK *cbulk)
 
 #define	WT_FIX_ENTRIES(btree, bytes)	(((bytes) * 8) / (btree)->bitcnt)
 
-/*
- * __wt_rec_col_fix_bulk_insert --
- *	Fixed-length column-store bulk insert.
- */
-int
-__wt_rec_col_fix_bulk_insert(WT_CURSOR_BULK *cbulk)
+static inline int
+__rec_bulk_insert_split_check(WT_CURSOR_BULK  *cbulk)
 {
 	WT_BTREE *btree;
-	WT_CURSOR *cursor;
 	WT_RECONCILE *r;
 	WT_SESSION_IMPL *session;
-	const uint8_t *data;
-	uint32_t entries, page_entries, page_size;
 
 	session = (WT_SESSION_IMPL *)cbulk->cbt.iface.session;
 	r = cbulk->reconcile;
 	btree = session->btree;
-	cursor = &cbulk->cbt.iface;
-
-	if (cbulk->bitmap) {
-		for (data = cursor->value.data, entries = cursor->value.size;
-		    entries > 0;
-		    entries -= page_entries, data += page_size) {
-			page_entries = WT_MIN(entries,
-			    WT_FIX_ENTRIES(btree, r->space_avail));
-			page_size = __bitstr_size(page_entries * btree->bitcnt);
-
-			memcpy(r->first_free, data, page_size);
-			r->recno += page_entries;
-
-			/* Leave the last page for wrapup. */
-			if (entries > page_entries) {
-				__rec_incr(session, r, page_entries, page_size);
-				WT_RET(__rec_split(session, r));
-			} else
-				cbulk->entry = page_entries;
-		}
-		return (0);
-	}
 
 	if (cbulk->entry == cbulk->nrecs) {
 		if (cbulk->entry != 0) {
@@ -1532,6 +1478,49 @@ __wt_rec_col_fix_bulk_insert(WT_CURSOR_BULK *cbulk)
 		cbulk->entry = 0;
 		cbulk->nrecs = WT_FIX_ENTRIES(btree, r->space_avail);
 	}
+	return (0);
+}
+
+/*
+ * __wt_rec_col_fix_bulk_insert --
+ *	Fixed-length column-store bulk insert.
+ */
+int
+__wt_rec_col_fix_bulk_insert(WT_CURSOR_BULK *cbulk)
+{
+	WT_BTREE *btree;
+	WT_CURSOR *cursor;
+	WT_RECONCILE *r;
+	WT_SESSION_IMPL *session;
+	uint32_t entries, offset, page_entries, page_size;
+	const uint8_t *data;
+
+	session = (WT_SESSION_IMPL *)cbulk->cbt.iface.session;
+	r = cbulk->reconcile;
+	btree = session->btree;
+	cursor = &cbulk->cbt.iface;
+
+	if (cbulk->bitmap) {
+		if (((r->recno - 1) * btree->bitcnt) & 0x7)
+			WT_RET_MSG(session, EINVAL,
+			    "Bulk bitmap load not aligned on a byte boundary");
+		for (data = cursor->value.data, entries = cursor->value.size;
+		    entries > 0;
+		    entries -= page_entries, data += page_size) {
+			WT_RET(__rec_bulk_insert_split_check(cbulk));
+
+			page_entries =
+			    WT_MIN(entries, cbulk->nrecs - cbulk->entry);
+			page_size = __bitstr_size(page_entries * btree->bitcnt);
+			offset = __bitstr_size(cbulk->entry * btree->bitcnt);
+			memcpy(r->first_free + offset, data, page_size);
+			cbulk->entry += page_entries;
+			r->recno += page_entries;
+		}
+		return (0);
+	}
+
+	WT_RET(__rec_bulk_insert_split_check(cbulk));
 
 	__bit_setv(r->first_free,
 	    cbulk->entry, btree->bitcnt, ((uint8_t *)cursor->value.data)[0]);
@@ -2999,12 +2988,8 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 
 		/*
 		 * Boundary, split or write the page.
-		 *
-		 * We write a trailing key cell on the page after the K/V pairs
-		 * (see WT_TRAILING_KEY_CELL for more information).
 		 */
-		while (key->len +
-		    val->len + WT_TRAILING_KEY_CELL > r->space_avail) {
+		while (key->len + val->len > r->space_avail) {
 			/*
 			 * In one path above, we copied the key from the page
 			 * rather than building the actual key.  In that case,
@@ -3086,12 +3071,8 @@ __rec_row_leaf_insert(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins)
 
 		/*
 		 * Boundary, split or write the page.
-		 *
-		 * We write a trailing key cell on the page after the K/V pairs
-		 * (see WT_TRAILING_KEY_CELL for more information).
 		 */
-		while (key->len +
-		    val->len + WT_TRAILING_KEY_CELL > r->space_avail) {
+		while (key->len + val->len > r->space_avail) {
 			WT_RET(__rec_split(session, r));
 
 			/*

@@ -1,8 +1,28 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
- *	All rights reserved.
+ * Public Domain 2008-2012 WiredTiger, Inc.
  *
- * See the file LICENSE for redistribution information.
+ * This is free and unencumbered software released into the public domain.
+ *
+ * Anyone is free to copy, modify, publish, use, compile, sell, or
+ * distribute this software, either in source code form or as a compiled
+ * binary, for any purpose, commercial or non-commercial, and by any
+ * means.
+ *
+ * In jurisdictions that recognize copyright laws, the author or authors
+ * of this software dedicate any and all copyright interest in the
+ * software to the public domain. We make this dedication for the benefit
+ * of the public at large and to the detriment of our heirs and
+ * successors. We intend this dedication to be an overt act of
+ * relinquishment in perpetuity of all present and future rights to this
+ * software under copyright law.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+ * IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+ * OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+ * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+ * OTHER DEALINGS IN THE SOFTWARE.
  */
 
 /*
@@ -39,7 +59,7 @@ typedef struct {
 
 	uint32_t	min;			/* Minimum value */
 	uint32_t	max;			/* Maximum value */
-	uint32_t	*v;			/* Value for this run */
+	u_int		*v;			/* Value for this run */
 	char		**vstr;			/* Value for string options */
 } CONFIG;
 
@@ -54,13 +74,13 @@ static CONFIG c[] = {
 	  "number of bits for fixed-length column-store files",
 	  C_FIX, 0, 1, 8, &g.c_bitcnt, NULL },
 
-	{ "bzip",
-	  "if blocks are BZIP2 encoded",		/* 80% */
-	  0, C_BOOL, 80, 0, &g.c_bzip, NULL },
-
 	{ "cache",
 	  "size of the cache in MB",
 	  0, 0, 1, 100, &g.c_cache, NULL },
+
+	{ "compression",
+	  "type of compression (none | bzip | ext | snappy)",
+	  0, C_IGNORE|C_STRING, 1, 4, NULL, &g.c_compression },
 
 	{ "data_source",
 	  "type of data source to create (file | table | lsm)",

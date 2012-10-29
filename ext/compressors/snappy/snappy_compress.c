@@ -59,8 +59,8 @@ wiredtiger_extension_init(
 	wt_api = api;
 	conn = session->connection;
 
-	return (conn->add_compressor(
-	    conn, "snappy_compress", &wt_snappy_compressor, NULL));
+	return (
+	    conn->add_compressor(conn, "snappy", &wt_snappy_compressor, NULL));
 }
 
 /* Snappy WT_COMPRESSOR for WT_CONNECTION::add_compressor. */

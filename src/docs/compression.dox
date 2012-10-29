@@ -5,22 +5,35 @@ the bzip2 and snappy compression engines.
 
 @section compression_bzip2 Using bzip2 compression
 
-To use the builtin support for <a href="http://www.bzip.org/">bzip2</a>
+To use the builtin support for
+<a href="http://www.bzip.org/">Julian Seward's bzip2</a>
 compression, first check that bzip2 is installed in include and library
 directories searched by the compiler.  Once bzip2 is installed, you can
 enable bzip2 using the \c --enable-bzip2 option to configure.
 
-If bzip2 is installed in a non-standard location, you'll need to modify
-the \c CPPFLAGS and \c LDFLAGS to indicate these locations.  For example,
-with the bzip2 includes and libraries installed in \c /usr/local/include
-and \c /usr/local/lib, you should run configure as follows:
+If bzip2 is installed in a location not normally searched by the
+compiler toolchain, you'll need to modify the \c CPPFLAGS and \c LDFLAGS
+to indicate these locations.  For example, with the bzip2 includes and
+libraries installed in \c /usr/local/include and \c /usr/local/lib, you
+should run configure as follows:
 
 @code
 cd build_posix
-../dist/configure --enable-bzip2 CPPFLAGS="-I/usr/local/include" LDFLAGS="-L/usr/local/include"
+../configure --enable-bzip2 CPPFLAGS="-I/usr/local/include" LDFLAGS="-L/usr/local/include"
 @endcode
 
-After building, you can confirm the compressor is working by running the
+When opening the WiredTiger database, load the bzip2 shared library as
+an extension.  For example, with the bzip2 library installed in
+\c /usr/local/lib, you would use the following extension:
+
+@snippet ex_all.c Configure bzip2 extension
+
+Finally, when creating the WiredTiger object, set \c block_compressor
+to \c bzip2:
+
+@snippet ex_all.c Create a bzip2 compressed table
+
+If necessary, you can confirm the compressor is working by running the
 compression part of the test suite:
 
 @code
@@ -33,23 +46,35 @@ was not skipped.
 
 @section compression_snappy Using snappy compression
 
-To use the builtin support for Google's
-<a href="http://code.google.com/p/snappy/">snappy</a> compression, first
-check that snappy is installed in include and library directories
-searched by the compiler.  Once snappy is installed, you can enable
-snappy using the \c --enable-snappy option to configure.
+To use the builtin support for
+<a href="http://code.google.com/p/snappy/">Google's snappy</a>
+compression, first check that snappy is installed in include and library
+directories searched by the compiler.  Once snappy is installed, you can
+enable snappy using the \c --enable-snappy option to configure.
 
-If snappy is installed in a non-standard location, you'll need to modify
-the \c CPPFLAGS and \c LDFLAGS to indicate these locations.  For example,
-with the snappy includes and libraries installed in \c /usr/local/include
-and \c /usr/local/lib, you should run configure as follows:
+If snappy is installed in a location not normally searched by the
+compiler toolchain, you'll need to modify the \c CPPFLAGS and \c LDFLAGS
+to indicate these locations.  For example, with the snappy includes and
+libraries installed in \c /usr/local/include and \c /usr/local/lib, you
+should run configure as follows:
 
 @code
 cd build_posix
-../dist/configure --enable-snappy CPPFLAGS="-I/usr/local/include" LDFLAGS="-L/usr/local/include"
+../configure --enable-snappy CPPFLAGS="-I/usr/local/include" LDFLAGS="-L/usr/local/include"
 @endcode
 
-After building, you can confirm the compressor is working by running the
+When opening the WiredTiger database, load the snappy shared library as
+an extension.  For example, with the snappy library installed in
+\c /usr/local/lib, you would use the following extension:
+
+@snippet ex_all.c Configure snappy extension
+
+Finally, when creating the WiredTiger object, set \c block_compressor
+to \c snappy:
+
+@snippet ex_all.c Create a snappy compressed table
+
+If necessary, you can confirm the compressor is working by running the
 compression part of the test suite:
 
 @code

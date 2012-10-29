@@ -329,7 +329,9 @@ methods = {
 		resident bitmap to be loaded directly into a file by passing a
 		\c WT_ITEM to WT_CURSOR::set_value where the \c size field
 		indicates the number of records in the bitmap (as specified by
-		the file's \c value_format)''',
+		the file's \c value_format). Bulk load bitmap values must end
+		on a byte boundary relative to the bit count - except for the
+		last set of values loaded''',
 		type='string'),
 	Config('checkpoint', '', r'''
 		the name of a checkpoint to open (the reserved name
@@ -476,13 +478,15 @@ methods = {
 		list, such as <code>"direct_io=[data]"</code>''',
 		type='list', choices=['data', 'log']),
 	Config('extensions', '', r'''
-		list of extensions to load.  Optional values are passed as the
-		\c config parameter to WT_CONNECTION::load_extension.  Complex
-		paths may need quoting, for example,
-		<code>extensions=("/path/to/ext.so"="entry=my_entry")</code>''',
+		list of shared library extensions to load (using dlopen).
+		Optional values are passed as the \c config parameter to
+		WT_CONNECTION::load_extension.  Complex paths may require
+		quoting, for example,
+		<code>extensions=("/path/ext.so"="entry=my_entry")</code>''',
 		type='list'),
 	Config('hazard_max', '1000', r'''
-		maximum number of simultaneous hazard references per session handle''',
+		maximum number of simultaneous hazard references per session
+		handle''',
 		min='15'),
 	Config('logging', 'false', r'''
 		enable logging''',

@@ -530,8 +530,9 @@ struct __wt_session {
 	 * stores\, and allows chunks of a memory resident bitmap to be loaded
 	 * directly into a file by passing a \c WT_ITEM to WT_CURSOR::set_value
 	 * where the \c size field indicates the number of records in the bitmap
-	 * (as specified by the file's \c value_format).,a string; default \c
-	 * false.}
+	 * (as specified by the file's \c value_format). Bulk load bitmap values
+	 * must end on a byte boundary relative to the bit count - except for
+	 * the last set of values loaded.,a string; default \c false.}
 	 * @config{checkpoint, the name of a checkpoint to open (the reserved
 	 * name "WiredTigerCheckpoint" opens the most recent internal checkpoint
 	 * taken for the object).  The cursor does not support data
@@ -1201,11 +1202,11 @@ struct __wt_connection {
  * integer between 10 and 99; default \c 80.}
  * @config{eviction_trigger, trigger eviction when the cache becomes this full
  * (as a percentage).,an integer between 10 and 99; default \c 95.}
- * @config{extensions, list of extensions to load.  Optional values are passed
- * as the \c config parameter to WT_CONNECTION::load_extension.  Complex paths
- * may need quoting\, for example\,
- * <code>extensions=("/path/to/ext.so"="entry=my_entry")</code>.,a list of
- * strings; default empty.}
+ * @config{extensions, list of shared library extensions to load (using dlopen).
+ * Optional values are passed as the \c config parameter to
+ * WT_CONNECTION::load_extension.  Complex paths may require quoting\, for
+ * example\, <code>extensions=("/path/ext.so"="entry=my_entry")</code>.,a list
+ * of strings; default empty.}
  * @config{hazard_max, maximum number of simultaneous hazard references per
  * session handle.,an integer greater than or equal to 15; default \c 1000.}
  * @config{logging, enable logging.,a boolean flag; default \c false.}

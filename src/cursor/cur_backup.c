@@ -155,6 +155,7 @@ __wt_curbackup_open(WT_SESSION_IMPL *session,
 	cursor->session = &session->iface;
 
 	cursor->key_format = "S";	/* Return the file names as the key. */
+	cursor->value_format = "";	/* No value. */
 
 	/*
 	 * Start the backup and fill in the cursor's list.  Acquire the API

@@ -97,7 +97,8 @@ class test_compress01_base(wttest.WiredTigerTestCase):
             testdir = os.path.dirname(__file__)
             import run
             extdir = os.path.join(run.wt_builddir, 'ext/compressors')
-            extfile = os.path.join(extdir, name, '.libs', name + '.so')
+            extfile = os.path.join(
+                extdir, name, '.libs', 'libwiredtiger_' + name + '.so')
             if not os.path.exists(extfile):
                 self.skipTest('Extension "' + extfile + '" not built')
             return 'extensions=["' + extfile + '"]'
@@ -130,15 +131,15 @@ class compress01_tests(object):
 
 class test_compress01_1_nop(test_compress01_base, compress01_tests):
     def __init__(self, testname):
-        test_compress01_base.__init__(self, testname, 'nop_compress', 'nop')
+        test_compress01_base.__init__(self, testname, 'nop', 'nop')
 
 class test_compress01_2_bz(test_compress01_base, compress01_tests):
     def __init__(self, testname):
-        test_compress01_base.__init__(self, testname, 'bzip2_compress', 'bz')
+        test_compress01_base.__init__(self, testname, 'bzip2', 'bz')
 
 class test_compress01_3_sn(test_compress01_base, compress01_tests):
     def __init__(self, testname):
-        test_compress01_base.__init__(self, testname, 'snappy_compress', 'sn')
+        test_compress01_base.__init__(self, testname, 'snappy', 'sn')
 
 
 if __name__ == '__main__':

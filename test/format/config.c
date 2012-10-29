@@ -1,16 +1,36 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
- *	All rights reserved.
+ * Public Domain 2008-2012 WiredTiger, Inc.
  *
- * See the file LICENSE for redistribution information.
+ * This is free and unencumbered software released into the public domain.
+ *
+ * Anyone is free to copy, modify, publish, use, compile, sell, or
+ * distribute this software, either in source code form or as a compiled
+ * binary, for any purpose, commercial or non-commercial, and by any
+ * means.
+ *
+ * In jurisdictions that recognize copyright laws, the author or authors
+ * of this software dedicate any and all copyright interest in the
+ * software to the public domain. We make this dedication for the benefit
+ * of the public at large and to the detriment of our heirs and
+ * successors. We intend this dedication to be an overt act of
+ * relinquishment in perpetuity of all present and future rights to this
+ * software under copyright law.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+ * IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+ * OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+ * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+ * OTHER DEALINGS IN THE SOFTWARE.
  */
 
 #include "format.h"
 #include "config.h"
 
-static const char *config_file_type(int);
+static const char *config_file_type(u_int);
 static CONFIG	  *config_find(const char *, size_t);
-static uint32_t	   config_translate(const char *);
+static u_int	   config_translate(const char *);
 
 /*
  * config_setup --
@@ -20,6 +40,7 @@ void
 config_setup(void)
 {
 	CONFIG *cp;
+	const char *cstr;
 
 	/* Clear any temporary values. */
 	config_clear();
@@ -30,7 +51,7 @@ config_setup(void)
 	 * them.
 	 */
 	cp = config_find("data_source", strlen("data_source"));
-	if (!(cp->flags & C_PERM)) {
+	if (!(cp->flags & C_PERM))
 		switch (MMRAND(0, 2)) {
 		case 0:
 			config_single("data_source=file", 0);
@@ -44,7 +65,6 @@ config_setup(void)
 			config_single("data_source=table", 0);
 			break;
 		}
-	}
 
 	cp = config_find("file_type", strlen("file_type"));
 	if (!(cp->flags & C_PERM)) {
@@ -62,8 +82,8 @@ config_setup(void)
 				config_single("file_type=row", 0);
 				break;
 			}
-		}
-	g.type = (int)config_translate(g.c_file_type);
+	}
+	g.type = config_translate(g.c_file_type);
 
 	/*
 	 * If data_source and file_type were both "permanent", we may still
@@ -74,6 +94,48 @@ config_setup(void)
 	    "%s: lsm data_source is only compatible with row file_type\n",
 		    g.progname);
 		exit(EXIT_FAILURE);
+	}
+
+	/*
+	 * Compression: choose something if compression wasn't specified,
+	 * otherwise confirm the appropriate shared library is available.
+	 */
+	cp = config_find("compression", strlen("compression"));
+	if (!(cp->flags & C_PERM)) {
+		cstr = "compression=none";
+		switch (MMRAND(0, 9)) {
+		case 0:					/* 10% */
+			break;
+		case 1: case 2: case 3: case 4:		/* 40% */
+			if (access(BZIP_PATH, R_OK) == 0)
+				cstr = "compression=bzip";
+			break;
+		case 5:					/* 10% */
+#if 0
+			cstr = "compression=ext";
+#endif
+			break;
+		case 6: case 7: case 8: case 9:		/* 40% */
+			if (access(SNAPPY_PATH, R_OK) == 0)
+				cstr = "compression=snappy";
+			break;
+		}
+		config_single(cstr, 0);
+	}
+	g.compression = config_translate(g.c_compression);
+	if (cp->flags & C_PERM) {
+		if (g.compression == COMPRESS_BZIP &&
+		    access(BZIP_PATH, R_OK) != 0) {
+			fprintf(stderr,
+			    "bzip library not found or not readable\n");
+			exit(EXIT_FAILURE);
+		}
+		if (g.compression == COMPRESS_SNAPPY &&
+		    access(SNAPPY_PATH, R_OK) != 0) {
+			fprintf(stderr,
+			    "snappy library not found or not readable\n");
+			exit(EXIT_FAILURE);
+		}
 	}
 
 	/* Build the object name. */
@@ -274,7 +336,9 @@ config_single(const char *s, int perm)
 		}
 		else if (strncmp(s, "file_type", strlen("file_type")) == 0)
 			*cp->vstr = strdup(
-			    config_file_type((int)config_translate(ep)));
+			    config_file_type(config_translate(ep)));
+		else if (strncmp(s, "compression", strlen("compression")) == 0)
+			*cp->vstr = strdup(ep);
 		if (*cp->vstr == NULL)
 			syserr("strdup");
 		return;
@@ -299,25 +363,35 @@ config_single(const char *s, int perm)
  * config_translate --
  *	Return an integer value representing the argument.
  */
-static uint32_t
+static u_int
 config_translate(const char *s)
 {
 	/* If it's already a integer value, we're done. */
 	if (isdigit(s[0]))
-		return (uint32_t)atoi(s);
+		return ((u_int)atoi(s));
 
-	/* Currently, all we translate are the file type names. */
+	/* File type names. */
 	if (strcmp(s, "fix") == 0 ||
 	    strcmp(s, "flcs") == 0 ||		/* Deprecated */
 	    strcmp(s, "fixed-length column-store") == 0)
-		return ((uint32_t)FIX);
+		return (FIX);
 	if (strcmp(s, "var") == 0 ||
 	    strcmp(s, "vlcs") == 0 ||		/* Deprecated */
 	    strcmp(s, "variable-length column-store") == 0)
-		return ((uint32_t)VAR);
+		return (VAR);
 	if (strcmp(s, "row") == 0 ||
 	    strcmp(s, "row-store") == 0)
-		return ((uint32_t)ROW);
+		return (ROW);
+
+	/* Compression type names. */
+	if (strcmp(s, "none") == 0)
+		return (COMPRESS_NONE);
+	if (strcmp(s, "bzip") == 0)
+		return (COMPRESS_BZIP);
+	if (strcmp(s, "ext") == 0)
+		return (COMPRESS_EXT);
+	if (strcmp(s, "snappy") == 0)
+		return (COMPRESS_SNAPPY);
 
 	fprintf(stderr, "%s: %s: unknown configuration value\n", g.progname, s);
 	exit(EXIT_FAILURE);
@@ -347,7 +421,7 @@ config_find(const char *s, size_t len)
  *	Return the file type as a string.
  */
 static const char *
-config_file_type(int type)
+config_file_type(u_int type)
 {
 	switch (type) {
 	case FIX:

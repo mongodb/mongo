@@ -330,21 +330,6 @@ __wt_cell_pack_key(WT_CELL *cell, uint8_t prefix, uint32_t size)
 }
 
 /*
- * __wt_cell_pack_key_empty --
- *	Write an empty key cell.
- */
-static inline void
-__wt_cell_pack_key_empty(WT_CELL *cell)
-{
-	/*
-	 * At the end of a row-store leaf page we have to write an empty key to
-	 * act as a marker in case the last value on the page is zero-length.
-	 * See the caller of this function for details.
-	 */
-	cell->__chunk[0] = WT_CELL_KEY;
-}
-
-/*
  * __wt_cell_pack_ovfl --
  *	Pack an overflow cell.
  */
@@ -626,19 +611,6 @@ static inline void
 __wt_cell_unpack(WT_CELL *cell, WT_CELL_UNPACK *unpack)
 {
 	(void)__wt_cell_unpack_safe(cell, unpack, NULL);
-}
-
-/*
- * __wt_cell_next --
- *	Return the next WT_CELL on the page.
- */
-static inline WT_CELL *
-__wt_cell_next(WT_CELL *cell)
-{
-	WT_CELL_UNPACK unpack;
-
-	__wt_cell_unpack(cell, &unpack);
-	return ((WT_CELL *)((uint8_t *)cell + unpack.__len));
 }
 
 /*

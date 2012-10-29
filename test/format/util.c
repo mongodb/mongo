@@ -1,8 +1,28 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
- *	All rights reserved.
+ * Public Domain 2008-2012 WiredTiger, Inc.
  *
- * See the file LICENSE for redistribution information.
+ * This is free and unencumbered software released into the public domain.
+ *
+ * Anyone is free to copy, modify, publish, use, compile, sell, or
+ * distribute this software, either in source code form or as a compiled
+ * binary, for any purpose, commercial or non-commercial, and by any
+ * means.
+ *
+ * In jurisdictions that recognize copyright laws, the author or authors
+ * of this software dedicate any and all copyright interest in the
+ * software to the public domain. We make this dedication for the benefit
+ * of the public at large and to the detriment of our heirs and
+ * successors. We intend this dedication to be an overt act of
+ * relinquishment in perpetuity of all present and future rights to this
+ * software under copyright law.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+ * IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+ * OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+ * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+ * OTHER DEALINGS IN THE SOFTWARE.
  */
 
 #include "format.h"
@@ -183,8 +203,16 @@ track(const char *tag, uint64_t cnt, TINFO *tinfo)
 uint32_t
 wts_rand(void)
 {
+	struct timeval t;
 	char buf[64];
 	uint32_t r;
+
+	/* If it's not a replay, seed the random number generator. */
+	if (!g.replay) {
+		if (gettimeofday(&t, NULL) != 0)
+			die(errno, "gettimeofday");
+		srand((u_int)(0xdeadbeef ^ (u_int)t.tv_usec));
+	}
 
 	/* If we're threaded, it's not repeatable, ignore the log. */
 	if (!SINGLETHREADED)
@@ -202,10 +230,8 @@ wts_rand(void)
 		if ((g.rand_log =
 		    fopen("RUNDIR/rand", g.replay ? "r" : "w")) == NULL)
 			die(errno, "fopen: RUNDIR/rand");
-		if (!g.replay) {
-			srand((u_int)(0xdeadbeef ^ (u_int)time(NULL)));
+		if (!g.replay)
 			(void)setvbuf(g.rand_log, NULL, _IOLBF, 0);
-		}
 	}
 	if (g.replay) {
 		if (fgets(buf, sizeof(buf), g.rand_log) == NULL) {
