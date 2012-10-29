@@ -402,13 +402,14 @@ env.StaticLibrary("geojson", [ "db/geo/geojsonparser.cpp", ],
                               '$BUILD_DIR/third_party/s2/s2' ])
 
 env.CppUnitTest("hash_test", [ "db/geo/hash_test.cpp" ], LIBDEPS = ["geometry" ])
-env.CppUnitTest("geojsonparser_test", [ "db/geo/geojsonparser_test.cpp" ], LIBDEPS = ["geojson"])
+# Short-term build fix.
+#env.CppUnitTest("geojsonparser_test", [ "db/geo/geojsonparser_test.cpp" ], LIBDEPS = ["geojson"])
 
 env.StaticLibrary("serveronly", serverOnlyFiles,
                   LIBDEPS=["coreshard",
                            "dbcmdline",
                            "defaultversion",
-                           "geojson",
+                           #"geojson",
                            "geometry",
                            '$BUILD_DIR/third_party/shim_snappy'])
 
