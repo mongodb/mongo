@@ -261,7 +261,7 @@ connection_runtime_config = [
 		list, such as <code>"verbose=[evictserver,read]"</code>''',
 		type='list', choices=[
 		    'block',
-			'cache_pool',
+		    'cache_pool',
 		    'ckpt',
 		    'evict',
 		    'evictserver',
@@ -515,7 +515,7 @@ methods = {
 		variables regardless of whether or not the process is running
 		with special privileges.  See @ref home for more information''',
 		type='boolean'),
-])
+]),
 }
 
 flags = {

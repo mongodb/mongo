@@ -22,7 +22,7 @@ __wt_cache_config(WT_CONNECTION_IMPL *conn, const char *cfg[])
 	session = conn->default_session;
 	cache = conn->cache;
 
-	/* If a shared cache is configured - ignore the cache size. */
+	/* Ignore the cache size if a shared cache is configured. */
 	if (!F_ISSET(conn, WT_CONN_CACHE_POOL) &&
 	    (ret = __wt_config_gets(session, cfg, "cache_size", &cval)) == 0)
 		conn->cache_size = (uint64_t)cval.val;
