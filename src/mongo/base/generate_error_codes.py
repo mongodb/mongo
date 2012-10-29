@@ -120,10 +120,19 @@ def generate_header(filename, error_codes, error_classes):
             error_code_class_predicate_declarations=predicate_declarations))
 
 def generate_source(filename, error_codes, error_classes):
-    symbol_to_string_cases = ';\n        '.join('case %s: return "%s"' % (ec[0], ec[0]) for ec in error_codes)
-    predicate_definitions = '\n    '.join(generate_error_class_predicate_definition(*ec) for ec in error_classes)
+    symbol_to_string_cases = ';\n        '.join(
+        'case %s: return "%s"' % (ec[0], ec[0]) for ec in error_codes)
+    string_to_symbol_cases = ';\n        '.join(
+        'if (!strncmp("%s", name.data(), name.size())) return %s' % (ec[0], ec[0])
+        for ec in error_codes)
+    int_to_symbol_cases = ';\n        '.join(
+        'case %s: return %s' % (ec[0], ec[0]) for ec in error_codes)
+    predicate_definitions = '\n    '.join(
+        generate_error_class_predicate_definition(*ec) for ec in error_classes)
     open(filename, 'w').write(source_template % dict(
             symbol_to_string_cases=symbol_to_string_cases,
+            string_to_symbol_cases=string_to_symbol_cases,
+            int_to_symbol_cases=int_to_symbol_cases,
             error_code_class_predicate_definitions=predicate_definitions))
 
 def generate_error_class_predicate_definition(class_name, code_names):
@@ -134,6 +143,8 @@ header_template = '''// AUTO-GENERATED FILE DO NOT EDIT
 // See src/mongo/base/generate_error_codes.py
 
 #pragma once
+
+#include "mongo/base/string_data.h"
 
 namespace mongo {
 
@@ -153,6 +164,20 @@ namespace mongo {
 
         static const char* errorString(Error err);
 
+        /**
+         * Parse an Error from its "name".  Returns UnknownError if "name" is unrecognized.
+         *
+         * NOTE: Also returns UnknownError for the string "UnknownError".
+         */
+        static Error fromString(const StringData& name);
+
+        /**
+         * Parse an Error from its "code".  Returns UnknownError if "code" is unrecognized.
+         *
+         * NOTE: Also returns UnknownError for the integer code for UnknownError.
+         */
+        static Error fromInt(int code);
+
         %(error_code_class_predicate_declarations)s;
     };
 
@@ -164,11 +189,26 @@ source_template = '''// AUTO-GENERATED FILE DO NOT EDIT
 
 #include "mongo/base/error_codes.h"
 
+#include <cstring>
+
 namespace mongo {
     const char *ErrorCodes::errorString(Error err) {
         switch (err) {
         %(symbol_to_string_cases)s;
         default: return "Unknown error code";
+        }
+    }
+
+    ErrorCodes::Error ErrorCodes::fromString(const StringData& name) {
+        %(string_to_symbol_cases)s;
+        return UnknownError;
+    }
+
+    ErrorCodes::Error ErrorCodes::fromInt(int code) {
+        switch (code) {
+        %(int_to_symbol_cases)s;
+        default:
+            return UnknownError;
         }
     }
 
