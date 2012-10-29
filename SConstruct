@@ -677,6 +677,9 @@ if nix:
     # env.Append( " -Wconversion" ) TODO: this doesn't really work yet
     if linux:
         env.Append( CCFLAGS=["-Werror", "-pipe"] )
+        # S2 uses hash_map and hash_set, and some versions of the C++
+        # includes don't provide a #define to prevent a #warning...sigh.
+        env.Append( CCFLAGS=["-Wno-deprecated"] )
         if not has_option('clang'):
             env.Append( CCFLAGS=["-fno-builtin-memcmp"] ) # glibc's memcmp is faster than gcc's
 
