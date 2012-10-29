@@ -923,13 +923,15 @@ namespace mongo {
             
             BSONObjIterator i( ops );
             BSONArrayBuilder ab;
+            const bool alwaysUpsert = cmdObj.hasField("alwaysUpsert") ?
+                    cmdObj["alwaysUpsert"].trueValue() : true;
             
             while ( i.more() ) {
                 BSONElement e = i.next();
                 const BSONObj& temp = e.Obj();
                 
                 Client::Context ctx( temp["ns"].String() ); // this handles security
-                bool failed = applyOperation_inlock( temp , false );
+                bool failed = applyOperation_inlock(temp, false, alwaysUpsert);
                 ab.append(!failed);
                 if ( failed )
                     errors++;
