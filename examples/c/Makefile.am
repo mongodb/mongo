@@ -3,7 +3,6 @@ LDADD = $(top_builddir)/libwiredtiger.la
 noinst_PROGRAMS = \
 	ex_access \
 	ex_all \
-	ex_cache_pool \
 	ex_call_center \
 	ex_config \
 	ex_cursor \

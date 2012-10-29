@@ -179,6 +179,11 @@ __wt_conn_cache_pool_destroy(WT_CONNECTION_IMPL *conn)
 			return (0);
 		}
 		WT_VERBOSE_VOID(session, cache_pool, "Destroying cache pool.");
+		/* Shut down the cache pool worker. */
+		__wt_cond_signal(
+		    conn->default_session, cp->cache_pool_cond);
+		WT_TRET(__wt_thread_join(cp->cache_pool_tid));
+
 		/*
 		 * Get the pool lock out of paranoia there should not be
 		 * any connections accessing the contents.
@@ -219,6 +224,12 @@ __wt_cache_pool_server(void *arg)
 	 */
 	while (F_SET(cp, WT_CACHE_POOL_RUN)) {
 		__wt_cond_wait(NULL, cp->cache_pool_cond, 1000000);
+		/*
+		 * Re-check pool run flag - since we want to avoid getting the
+		 * lock on shutdown.
+		 */
+		if (!F_ISSET(cp, WT_CACHE_POOL_RUN))
+			break;
 		__wt_spin_lock(NULL, &cp->cache_pool_lock);
 		entry = NULL;
 		if (!TAILQ_EMPTY(&cp->cache_pool_qh))
