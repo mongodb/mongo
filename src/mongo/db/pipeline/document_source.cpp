@@ -87,11 +87,16 @@ namespace mongo {
 
     BSONObj DocumentSource::depsToProjection(const set<string>& deps) {
         BSONObjBuilder bb;
-        if (deps.count("_id") == 0)
-            bb.append("_id", 0);
+
+        bool needId = false;
 
         string last;
         for (set<string>::const_iterator it(deps.begin()), end(deps.end()); it!=end; ++it) {
+            if (str::startsWith(*it, "_id") && (it->size() == 3 || (*it)[3] == '.')) {
+                // _id and subfields are handled specially due in part to SERVER-7502
+                needId = true;
+                continue;
+            }
             if (!last.empty() && str::startsWith(*it, last)) {
                 // we are including a parent of *it so we don't need to
                 // include this field explicitly. In fact, due to
@@ -102,6 +107,12 @@ namespace mongo {
             last = *it + '.';
             bb.append(*it, 1);
         }
+
+        if (needId) // we are explicit either way
+            bb.append("_id", 1);
+        else
+            bb.append("_id", 0);
+
         return bb.obj();
     }
 }
