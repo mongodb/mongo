@@ -145,6 +145,7 @@ wts_open(void)
 	/* Configure compression. */
 	switch (g.compression) {
 	case COMPRESS_NONE:
+		break;
 	case COMPRESS_BZIP:
 		p += snprintf(p, (size_t)(end - p),
 		    ",block_compressor=\"bzip2\"");
