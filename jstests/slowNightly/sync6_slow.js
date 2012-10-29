@@ -6,7 +6,7 @@
 // thread scheduling.
 
 var bitbucket = _isWindows() ? "NUL" : "/dev/null";
-test = new SyncCCTest("sync6", {logpath: bitbucket});
+test = new SyncCCTest("sync6", {logpath: bitbucket, logappend: ""});
 
 // Startup another process to handle our commands to the cluster, mostly so it's 
 // easier to read.
