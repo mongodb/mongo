@@ -44,6 +44,59 @@ namespace DocumentSourceTests {
         }
     };
 
+    namespace DocumentSourceClass {
+        using mongo::DocumentSource;
+
+        template<size_t ArrayLen>
+        set<string> arrayToSet(const char* (&array) [ArrayLen]) {
+            set<string> out;
+            for (size_t i = 0; i < ArrayLen; i++)
+                out.insert(array[i]);
+            return out;
+        }
+
+        class Deps {
+        public:
+            void run() {
+                {
+                    const char* array[] = {"a", "b"}; // basic
+                    BSONObj proj = DocumentSource::depsToProjection(arrayToSet(array));
+                    ASSERT_EQUALS(proj, BSON("a" << 1 << "b" << 1 << "_id" << 0));
+                }
+                {
+                    const char* array[] = {"a", "ab"}; // prefixed but not subfield
+                    BSONObj proj = DocumentSource::depsToProjection(arrayToSet(array));
+                    ASSERT_EQUALS(proj, BSON("a" << 1 << "ab" << 1 << "_id" << 0));
+                }
+                {
+                    const char* array[] = {"a", "b", "a.b"}; // a.b included by a
+                    BSONObj proj = DocumentSource::depsToProjection(arrayToSet(array));
+                    ASSERT_EQUALS(proj, BSON("a" << 1 << "b" << 1 << "_id" << 0));
+                }
+                {
+                    const char* array[] = {"a", "_id"}; // _id now included
+                    BSONObj proj = DocumentSource::depsToProjection(arrayToSet(array));
+                    ASSERT_EQUALS(proj, BSON("a" << 1 << "_id" << 1));
+                }
+                {
+                    const char* array[] = {"a", "_id.a"}; // still include whole _id (SERVER-7502)
+                    BSONObj proj = DocumentSource::depsToProjection(arrayToSet(array));
+                    ASSERT_EQUALS(proj, BSON("a" << 1 << "_id" << 1));
+                }
+                {
+                    const char* array[] = {"a", "_id", "_id.a"}; // handle both _id and subfield
+                    BSONObj proj = DocumentSource::depsToProjection(arrayToSet(array));
+                    ASSERT_EQUALS(proj, BSON("a" << 1 << "_id" << 1));
+                }
+                {
+                    const char* array[] = {"a", "_id", "_id_a"}; // _id prefixed but non-subfield
+                    BSONObj proj = DocumentSource::depsToProjection(arrayToSet(array));
+                    ASSERT_EQUALS(proj, BSON("_id_a" << 1 << "a" << 1 << "_id" << 1));
+                }
+            }
+        };
+    }
+
     namespace DocumentSourceCursor {
 
         using mongo::DocumentSourceCursor;
@@ -1690,6 +1743,8 @@ namespace DocumentSourceTests {
         All() : Suite( "documentsource" ) {
         }
         void setupTests() {
+            add<DocumentSourceClass::Deps>();
+
             add<DocumentSourceCursor::Create>();
             add<DocumentSourceCursor::Iterate>();
             add<DocumentSourceCursor::Dispose>();
