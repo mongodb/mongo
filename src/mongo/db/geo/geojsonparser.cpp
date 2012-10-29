@@ -140,7 +140,7 @@ namespace mongo {
 
     void fixOrientationTo(vector<S2Point>* points, const bool wantClockwise) {
         const vector<S2Point>& pointsRef = *points;
-        massert(0, "Don't have enough points in S2 orientation fixing to work with", 4 <= points->size());
+        massert(16463, "Don't have enough points in S2 orientation fixing to work with", 4 <= points->size());
         double sum = 0;
         // Sum the area under the curve...well really, it's twice the area.
         for (size_t i = 0; i < pointsRef.size(); ++i) {
@@ -155,7 +155,6 @@ namespace mongo {
             vector<S2Point> reversed(pointsRef.rbegin(), pointsRef.rend());
             *points = reversed;
         }
-        uassert(0, "Couldn't fix the orientation of a loop!", 0);
     }
 
     void GeoJSONParser::parsePolygon(const BSONObj& obj, S2Polygon* out) {
