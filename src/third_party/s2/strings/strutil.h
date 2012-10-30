@@ -13,24 +13,7 @@
 #define STRINGS_STRUTIL_H_
 
 #include "base/definer.h"
-#if defined OS_MACOSX
-#include <ext/hash_map>
-#else
-#include <hash_map>
-#endif
-#ifndef _WIN32
-using __gnu_cxx::hash_map;
-#endif
-
-#if defined OS_MACOSX
-#include <ext/hash_set>
-#else
-#include <hash_set>
-#endif
-#ifndef _WIN32
-using __gnu_cxx::hash_set;
-#endif
-
+#include "hash.h"
 
 #include <functional>
 using std::less;
@@ -60,9 +43,6 @@ using std::vector;
 #include <ctype.h>      // not needed, but removing it will break the build
 
 using namespace std;
-#ifndef _WIN32
-using namespace __gnu_cxx;
-#endif
 
 // A buffer size which is large enough for all the FastToBuffer functions, as
 // well as DoubleToBuffer and FloatToBuffer.  We define this here in case other
@@ -78,7 +58,6 @@ static const int kFastToBufferSize =       32;
 //#include "escaping.h"
 //#include "host_port.h"
 #include "stringprintf.h"
-#include "base/stl_decl.h"
 #include "base/port.h"
 #include "util/endian/endian.h"
 

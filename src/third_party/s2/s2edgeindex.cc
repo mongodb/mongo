@@ -68,7 +68,6 @@ using std::pair;
 using std::make_pair;
 
 
-#include "base/commandlineflags.h"
 #include "base/logging.h"
 #include "s2cell.h"
 #include "s2edgeutil.h"
@@ -76,11 +75,11 @@ using std::make_pair;
 #include "s2regioncoverer.h"
 
 
-DEFINE_bool(always_recurse_on_children, false,
-            "When we test a query edge against a cell, we don't "
-            "recurse if there are only a few test edges in it.  "
-            "For testing, it is useful to always recurse to the end.  "
-            "You don't want to use this flag anywhere but in tests.");
+//"When we test a query edge against a cell, we don't "
+//"recurse if there are only a few test edges in it.  "
+//"For testing, it is useful to always recurse to the end.  "
+//"You don't want to use this flag anywhere but in tests.";
+static bool FLAGS_always_recurse_on_children = false;
 
 void S2EdgeIndex::Reset() {
   minimum_s2_level_used_ = S2CellId::kMaxLevel;

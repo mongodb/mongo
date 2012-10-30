@@ -488,31 +488,12 @@ inline S2CellId S2CellId::End(int level) {
 
 ostream& operator<<(ostream& os, S2CellId const& id);
 
-#ifndef SWIG
-
-#if defined OS_MACOSX
-#include <ext/hash_set>
-#else
-#include <hash_set>
-#endif
-#ifndef OS_WINDOWS
-namespace __gnu_cxx {
-#endif
-
+HASH_NAMESPACE_START
 template<> struct hash<S2CellId> {
   size_t operator()(S2CellId const& id) const {
     return static_cast<size_t>(id.id() >> 32) + static_cast<size_t>(id.id());
   }
 };
-
-#ifdef OS_WINDOWS
-template<> size_t stdext::hash_value<S2CellId>(const S2CellId &id);
-#endif
-
-#ifndef OS_WINDOWS
-}  // namespace __gnu_cxx
-#endif
-
-#endif  // SWIG
+HASH_NAMESPACE_END
 
 #endif  // UTIL_GEOMETRY_S2CELLID_H_

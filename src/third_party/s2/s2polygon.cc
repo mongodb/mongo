@@ -8,14 +8,7 @@ using std::reverse;
 
 #include "base/definer.h"
 #include "s2.h"
-#if defined OS_MACOSX
-#include <ext/hash_map>
-#else
-#include <hash_map>
-#endif
-#ifndef _WIN32
-using __gnu_cxx::hash_map;
-#endif
+#include "hash.h"
 
 #include <set>
 using std::set;
@@ -24,8 +17,6 @@ using std::multiset;
 #include <vector>
 using std::vector;
 
-
-#include "base/commandlineflags.h"
 #include "s2polygon.h"
 
 #include "base/port.h"  // for HASH_NAMESPACE_DECLARATION_START
@@ -37,8 +28,6 @@ using std::vector;
 #include "s2latlngrect.h"
 #include "s2polygonbuilder.h"
 #include "s2polyline.h"
-
-DECLARE_bool(s2debug);  // defined in s2.cc
 
 static const unsigned char kCurrentEncodingVersionNumber = 1;
 
@@ -115,13 +104,7 @@ S2Polygon::~S2Polygon() {
 
 typedef pair<S2Point, S2Point> S2PointPair;
 
-#if defined OS_MACOSX
-#include <ext/hash_set>
-#else
-#include <hash_set>
-#endif
-namespace HASH_NAMESPACE {
-
+HASH_NAMESPACE_START
 template<> class hash<S2PointPair> {
 public:
   size_t operator()(S2PointPair const& p) const {
@@ -129,17 +112,7 @@ public:
     return h(p.first) + (h(p.second) << 1);
   }
 };
-
-}  // namespace __gnu_cxx
-
-#ifdef _WIN32
-template<> size_t stdext::hash_value<S2PointPair>(const S2PointPair &p) {
-    hash<S2Point> h;
-    return h(p.first) + (h(p.second)<<1);
-}
-// XXX: implement this
-#endif
-
+HASH_NAMESPACE_END
 
 bool S2Polygon::IsValid(const vector<S2Loop*>& loops) {
   // If a loop contains an edge AB, then no other loop may contain AB or BA.
@@ -248,7 +221,7 @@ bool S2Polygon::ContainsChild(S2Loop* a, S2Loop* b, LoopMap const& loop_map) {
 }
 
 void S2Polygon::Init(vector<S2Loop*>* loops) {
-  if (FLAGS_s2debug) {
+  if (S2::debug) {
       CHECK(IsValid(*loops));
   }
   DCHECK(loops_.empty());
@@ -267,7 +240,7 @@ void S2Polygon::Init(vector<S2Loop*>* loops) {
   loops_.clear();
   InitLoop(NULL, -1, &loop_map);
 
-  if (FLAGS_s2debug) {
+  if (S2::debug) {
     // Check that the LoopMap is correct (this is fairly cheap).
     for (int i = 0; i < num_loops(); ++i) {
       for (int j = 0; j < num_loops(); ++j) {

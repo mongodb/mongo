@@ -14,24 +14,14 @@ using std::multiset;
 using std::vector;
 
 #include "s2.h"
-
-#if defined OS_MACOSX
-#include <ext/hash_map>
-#else
-#include <hash_map>
-#endif
-#ifndef _WIN32
-using __gnu_cxx::hash_map;
-#endif
+#include "hash.h"
 
 #include <utility>
 using std::pair;
 using std::make_pair;
 
-
 #include "s2loop.h"
 
-#include "base/commandlineflags.h"
 #include "base/logging.h"
 #include "base/scoped_ptr.h"
 #include "util/coding/coder.h"
@@ -40,8 +30,6 @@ using std::make_pair;
 #include "s2edgeindex.h"
 
 static const unsigned char kCurrentEncodingVersionNumber = 1;
-
-DECLARE_bool(s2debug);  // defined in s2.cc
 
 S2Point const* S2LoopIndex::edge_from(int index) const {
   return &loop_->vertex(index);

@@ -16,27 +16,7 @@ using std::reverse;
 #include <cmath>
 #endif
 
-#ifndef _GLIBCXX_PERMIT_BACKWARD_HASH
-#define _GLIBCXX_PERMIT_BACKWARD_HASH
-#endif
-
-#if defined OS_MACOSX
-#include <ext/hash_map>
-#else
-#include <hash_map>
-#endif
-#ifndef OS_WINDOWS
-using __gnu_cxx::hash_map;
-#endif
-
-#if defined OS_MACOSX
-#include <ext/hash_set>
-#else
-#include <hash_set>
-#endif
-#ifndef OS_WINDOWS
-using __gnu_cxx::hash_set;
-#endif
+#include "hash.h"
 
 // To have template struct hash<T> defined
 #include "third_party/s2/base/basictypes.h"
@@ -55,15 +35,13 @@ using __gnu_cxx::hash_set;
 
 typedef Vector3_d S2Point;
 
-namespace HASH_NAMESPACE {
+HASH_NAMESPACE_START
+
 template<> class hash<S2Point> {
 public:
   size_t operator()(S2Point const& p) const;
 };
-}
-#ifdef _WIN32
-template<> size_t stdext::hash_value<S2Point>(const S2Point &p);
-#endif
+HASH_NAMESPACE_END
 
 // The S2 class is simply a namespace for constants and static utility
 // functions related to spherical geometry, such as area calculations and edge
@@ -91,6 +69,7 @@ template<> size_t stdext::hash_value<S2Point>(const S2Point &p);
 //
 class S2 {
  public:
+  static const bool debug;
   // Return a unique "origin" on the sphere for operations that need a fixed
   // reference point.  In particular, this is the "point at infinity" used for
   // point-in-polygon testing (by counting the number of edge crossings).

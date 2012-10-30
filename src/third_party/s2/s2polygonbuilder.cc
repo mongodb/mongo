@@ -9,23 +9,7 @@ using std::max;
 using std::swap;
 using std::reverse;
 
-#if defined OS_MACOSX
-#include <ext/hash_map>
-#else
-#include <hash_map>
-#endif
-#ifndef OS_WINDOWS
-using __gnu_cxx::hash_map;
-#endif
-
-#if defined OS_MACOSX
-#include <ext/hash_set>
-#else
-#include <hash_set>
-#endif
-#ifndef OS_WINDOWS
-using __gnu_cxx::hash_set;
-#endif
+#include "hash.h"
 
 #include <iomanip>
 using std::setprecision;

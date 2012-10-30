@@ -724,7 +724,6 @@ inline int isinf(double x) {
 #include <assert.h>
 #include <windows.h>
 #undef ERROR
-#include "base/stl_decl.h"
 
 #include <float.h>  // for nextafter functionality on windows
 #include <math.h>  // for HUGE_VAL

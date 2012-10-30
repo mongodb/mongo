@@ -63,9 +63,6 @@ class Encoder {
   // ZigZag coding is defined in utils/coding/transforms.h
   void put_varsigned32(int32 v);
 
-  // Support for a few special types we don't want to restrict size of
-  void put_docid(DocId d);
-
   // Return number of bytes encoded so far
   int length() const;
 
@@ -160,12 +157,6 @@ class Decoder {
   //   signed_value = ZigZagDecode(unsigned_temp);
   // ZigZag coding is defined in utils/coding/transforms.h
   bool get_varsigned32(int32* v);
-
-  // Support for a few special types we don't want to restrict size of
-  DocId get_docid();
-
-  // This is used for transitioning docids from 32bits to 64bits
-  DocId32Bit get_docid_32bit();
 
   int pos() const;
   // Return number of bytes decoded so far
@@ -365,10 +356,6 @@ inline void Encoder::putword(uword_t v) {
   buf_ += sizeof(v);
 }
 
-inline void Encoder::put_docid(DocId d) {
-  put64(DocIdAsNumber(d));
-}
-
 inline void Encoder::putfloat(float f) {
   uint32 v;
   typedef char VerifySizesAreEqual[sizeof(f) == sizeof(v) ? 1 : -1];
@@ -417,13 +404,6 @@ inline uword_t Decoder::getword() {
   return v;
 }
 
-inline DocId Decoder::get_docid() {
-  return DocId(get64());
-}
-
-inline DocId32Bit Decoder::get_docid_32bit() {
-  return DocId32Bit(get32());
-}
 
 inline float Decoder::getfloat() {
   uint32 v = get32();

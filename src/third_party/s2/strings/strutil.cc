@@ -20,23 +20,7 @@ using std::max;
 using std::swap;
 using std::reverse;
 
-#if defined OS_MACOSX
-#include <ext/hash_map>
-#else
-#include <hash_map>
-#endif
-#ifndef _WIN32
-using __gnu_cxx::hash_map;
-#endif
-
-#if defined OS_MACOSX
-#include <ext/hash_set>
-#else
-#include <hash_set>
-#endif
-#ifndef _WIN32
-using __gnu_cxx::hash_set;
-#endif
+#include "hash.h"
 
 #include <iterator>
 #include <limits>
@@ -55,10 +39,6 @@ using std::vector;
 
 #include "base/logging.h"
 #include "base/scoped_ptr.h"
-//#include "strutil-inl.h"
-//#include "third_party/utf/utf.h"  // for runetochar
-//#include "util/gtl/stl_util-inl.h"  // for string_as_array
-//#include "util/hash/hash.h"
 #include "split.h"
 
 #ifdef OS_WINDOWS

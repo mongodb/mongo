@@ -2,7 +2,6 @@
 
 #include "s2.h"
 
-#include "base/commandlineflags.h"
 #include "base/integral_types.h"
 #include "base/logging.h"
 #include "util/math/matrix3x3-inl.h"
@@ -15,16 +14,16 @@ int const S2::kSwapMask = 0x01;
 int const S2::kInvertMask = 0x02;
 int const S2::kMaxCellLevel = 30;
 double const S2::kMaxDetError = 0.8e-15;  // 14 * (2**-54)
+// Enable debugging checks in s2 code?
+bool const S2::debug = DEBUG_MODE;
 
 COMPILE_ASSERT(S2::kSwapMask == 0x01 && S2::kInvertMask == 0x02,
                masks_changed);
 
-DEFINE_bool(s2debug, DEBUG_MODE, "Enable debugging checks in s2 code");
-
 static const uint32 MIX32 = 0x12b9b0a1UL;
-//#include<hash_set>
-namespace HASH_NAMESPACE {
 
+
+HASH_NAMESPACE_START
 // The hash function due to Bob Jenkins (see
 // http://burtleburtle.net/bob/hash/index.html).
 static inline void mix(uint32& a, uint32& b, uint32& c) {     // 32bit version
@@ -64,7 +63,7 @@ inline uint32 CollapseZero(uint32 bits) {
   return bits & 0x7ffffffe;
 }
 
-size_t hash<S2Point>::operator()(S2Point const& p) const {
+size_t makeHash(S2Point const& p) {
   // This function is significantly faster than calling HashTo32().
   uint32 const* data = reinterpret_cast<uint32 const*>(p.Data());
   DCHECK_EQ((6 * sizeof(*data)), sizeof(p));
@@ -81,16 +80,14 @@ size_t hash<S2Point>::operator()(S2Point const& p) const {
   mix(a, b, c);
   return c;
 }
-}  // namespace __gnu_cxx
 
-#ifdef _WIN32
-template<> size_t stdext::hash_value<S2Point>(const S2Point &p) {
-	return hash<S2Point>()(p);
+size_t hash<S2Point>::operator()(S2Point const& p) const {
+  return makeHash(p);
 }
-#endif
+
+HASH_NAMESPACE_END
 
 bool S2::IsUnitLength(S2Point const& p) {
-
   return fabs(p.Norm2() - 1) <= 1e-15;
 }
 

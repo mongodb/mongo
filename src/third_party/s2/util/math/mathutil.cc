@@ -1,5 +1,12 @@
 // Copyright 2008 Google Inc. All Rights Reserved.
 
+#include "base/definer.h"
+
+#ifdef OS_WINDOWS
+#define _USE_MATH_DEFINES
+#include <cmath>
+#endif
+
 #include "util/math/mathlimits.h"
 #include "util/math/mathlimits.cc"
 #include "util/math/mathutil.h"

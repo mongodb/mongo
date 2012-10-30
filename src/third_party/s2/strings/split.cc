@@ -4,7 +4,6 @@
 using std::numeric_limits;
 
 
-#include "base/commandlineflags.h"
 #include "base/integral_types.h"
 #include "base/logging.h"
 #include "base/macros.h"
@@ -134,54 +133,6 @@ HASH_TO((intptr_t c),  static_cast<uint32>(Hash64NumWithSeed(c, MIX64) >> 32))
 #endif
 
 #undef HASH_TO        // clean up the macro space
-
-
-// HASH_NAMESPACE_DECLARATION_START
-namespace __gnu_cxx {
-
-#if defined(__GNUC__)
-// Use our nice hash function for strings
-template<class _CharT, class _Traits, class _Alloc>
-struct hash<basic_string<_CharT, _Traits, _Alloc> > {
-  size_t operator()(const basic_string<_CharT, _Traits, _Alloc>& k) const {
-    return HashTo32(k.data(), static_cast<uint32>(k.length()));
-  }
-};
-
-// they don't define a hash for const string at all
-template<> struct hash<const string> {
-  size_t operator()(const string& k) const {
-    return HashTo32(k.data(), static_cast<uint32>(k.length()));
-  }
-};
-#endif  // __GNUC__
-
-// MSVC's STL requires an ever-so slightly different decl
-#if defined STL_MSVC
-template<> struct hash<char const*> : PortableHashBase {
-  size_t operator()(char const* const k) const {
-    return HashTo32(k, strlen(k));
-  }
-  // Less than operator:
-  bool operator()(char const* const a, char const* const b) const {
-    return strcmp(a, b) < 0;
-  }
-};
-
-template<> struct hash<string> : PortableHashBase {
-  size_t operator()(const string& k) const {
-    return HashTo32(k.data(), k.length());
-  }
-  // Less than operator:
-  bool operator()(const string& a, const string& b) const {
-    return a < b;
-  }
-};
-
-#endif
-
-}  // hash namespace
-
 
 namespace {
 // NOTE(user): we have to implement our own interator because

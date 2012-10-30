@@ -21,27 +21,9 @@ using std::pair;
 using std::make_pair;
 
 #include "base/definer.h"
-#if defined OS_MACOSX
-#include <ext/hash_map>
-#else
-#include <hash_map>
-#endif
-#ifndef _WIN32
-using __gnu_cxx::hash_map;
-#endif
-
-#if defined OS_MACOSX
-#include <ext/hash_set>
-#else
-#include <hash_set>
-#endif
-#ifndef _WIN32
-using __gnu_cxx::hash_set;
-using namespace __gnu_cxx;
-#endif
+#include "hash.h"
 
 using namespace std;
-
 
 // ----------------------------------------------------------------------
 // SplitStringAllowEmpty()

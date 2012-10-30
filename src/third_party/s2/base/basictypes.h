@@ -64,10 +64,6 @@ const Hash16 kIllegalHash16 = static_cast<Hash16>(65535U);          // 2^16-1
 const Hash8  kIllegalHash8 = static_cast<Hash8>(255);               // 2^8-1
 
 
-// Include docid.h at end because it needs the trait stuff.
-#include "base/docid.h"
-
-
 // MetatagId refers to metatag-id that we assign to
 // each metatag <name, value> pair..
 typedef uint32 MetatagId;

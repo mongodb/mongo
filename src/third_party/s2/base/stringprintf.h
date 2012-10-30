@@ -17,7 +17,6 @@ using std::string;
 #include <vector>
 using std::vector;
 
-#include "stl_decl.h"
 #include "port.h"
 
 // Return a C++ string

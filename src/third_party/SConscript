@@ -4,7 +4,6 @@ Import("env use_system_version_of_library windows darwin usesm usev8")
 
 env.SConscript( [
         "murmurhash3/SConscript",
-        "gflags-2.0/SConscript",
         "s2/SConscript",
         ] )
 env.Append(CPPPATH='$BUILD_DIR/third_party/s2')

@@ -12,7 +12,6 @@ env.SConscript( [
         ] )
 
 env.Append(CCFLAGS=['-Isrc/third_party/s2'])
-env.Append(CCFLAGS=['-Isrc/third_party/gflags-2.0/src'])
 env.Append(CCFLAGS=['-DDEBUG_MODE=false'])
 
 env.StaticLibrary( "s2",
@@ -41,7 +40,6 @@ env.StaticLibrary( "s2",
     ], LIBDEPS=['$BUILD_DIR/third_party/s2/base/base',
 		'$BUILD_DIR/third_party/s2/strings/strings',
 		'$BUILD_DIR/third_party/s2/util/coding/coding',
-		'$BUILD_DIR/third_party/gflags-2.0/gflags',
 		'$BUILD_DIR/third_party/s2/util/math/math'])
 
 #env.Program('r1interval_test', ['r1interval_test.cc'],

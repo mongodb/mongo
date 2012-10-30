@@ -4,15 +4,7 @@
 #define UTIL_GEOMETRY_S2POLYGONBUILDER_H__
 
 #include "base/definer.h"
-
-#if defined OS_MACOSX
-#include <ext/hash_map>
-#else
-#include <hash_map>
-#endif
-#ifndef OS_WINDOWS
-using __gnu_cxx::hash_map;
-#endif
+#include "hash.h"
 
 #include <set>
 using std::set;

@@ -9,7 +9,10 @@ using std::cout;
 using std::endl;
 #include "base/definer.h"
 
-#include <math.h>
+#ifdef OS_WINDOWS
+#define _USE_MATH_DEFINES
+#endif
+#include <cmath>
 #include "base/basictypes.h"
 #include "base/logging.h"
 #include "util/math/vector2-inl.h"

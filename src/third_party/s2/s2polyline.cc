@@ -7,7 +7,7 @@ using std::multiset;
 #include <vector>
 using std::vector;
 
-#include "base/commandlineflags.h"
+#include "s2.h"
 #include "base/logging.h"
 #include "util/math/matrix3x3-inl.h"
 #include "s2polyline.h"
@@ -17,8 +17,6 @@ using std::vector;
 #include "s2cell.h"
 #include "s2latlng.h"
 #include "s2edgeutil.h"
-
-DECLARE_bool(s2debug);  // defined in s2.cc
 
 static const unsigned char kCurrentEncodingVersionNumber = 1;
 
@@ -44,7 +42,7 @@ S2Polyline::~S2Polyline() {
 }
 
 void S2Polyline::Init(vector<S2Point> const& vertices) {
-  if (FLAGS_s2debug) {
+  if (S2::debug) {
       CHECK(IsValid(vertices));
   }
 
@@ -64,7 +62,7 @@ void S2Polyline::Init(vector<S2LatLng> const& vertices) {
   for (int i = 0; i < num_vertices_; ++i) {
     vertices_[i] = vertices[i].ToPoint();
   }
-  if (FLAGS_s2debug) {
+  if (S2::debug) {
     vector<S2Point> vertex_vector(vertices_, vertices_ + num_vertices_);
     CHECK(IsValid(vertex_vector));
   }
@@ -323,7 +321,7 @@ bool S2Polyline::Decode(Decoder* const decoder) {
   vertices_ = new S2Point[num_vertices_];
   decoder->getn(vertices_, num_vertices_ * sizeof(*vertices_));
 
-  if (FLAGS_s2debug) {
+  if (S2::debug) {
     vector<S2Point> vertex_vector(vertices_, vertices_ + num_vertices_);
     CHECK(IsValid(vertex_vector));
   }
