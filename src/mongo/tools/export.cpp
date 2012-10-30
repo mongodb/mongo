@@ -139,7 +139,7 @@ public:
         ostream *outPtr = &cout;
         string outfile = getParam( "out" );
         auto_ptr<ofstream> fileStream;
-        if ( hasParam( "out" ) ) {
+        if ( hasParam( "out" ) && outfile != "-" ) {
             size_t idx = outfile.rfind( "/" );
             if ( idx != string::npos ) {
                 string dir = outfile.substr( 0 , idx + 1 );
