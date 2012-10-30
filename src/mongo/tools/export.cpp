@@ -50,11 +50,14 @@ public:
     }
 
     virtual void preSetup() {
-        string out = getParam("out");
-        if ( out == "-" ) {
-                // write output to standard error to avoid mangling output
-                // must happen early to avoid sending junk to stdout
-                useStandardOutput(false);
+        if ( hasParam("out") ) {
+            string out = getParam("out");
+            if ( out != "-" ) {
+                // we write output to standard error by default to avoid
+                // mangling output, but we don't need to do this if an output
+                // file was specified
+                useStandardOutput(true);
+            }
         }
     }
 
