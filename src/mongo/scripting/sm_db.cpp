@@ -15,10 +15,12 @@
  *    limitations under the License.
  */
 
-// hacked in right now from engine_spidermonkey.cpp
+#include <third_party/js-1.7/jsapi.h>
 
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/db/namespacestring.h"
+#include "mongo/scripting/engine_spidermonkey.h"
+#include "mongo/scripting/engine_spidermonkey_internal.h"
 #include "mongo/util/base64.h"
 #include "mongo/util/text.h"
 
@@ -30,12 +32,22 @@ namespace mongo {
 
     bool haveLocalShardingInfo( const string& ns );
 
+namespace spidermonkey {
+
+    JSFunctionSpec bson_functions[] = {
+        { 0 }
+    };
+
+    JSBool bson_cons( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval ) {
+        JS_ReportError( cx , "can't construct bson object" );
+        return JS_FALSE;
+    }
+
     // ------------    some defs needed ---------------
 
     JSObject * doCreateCollection( JSContext * cx , JSObject * db , const string& shortName );
 
     // ------------     utils          ------------------
-
 
     bool isSpecialName( const string& name ) {
         static set<string> names;
@@ -1715,4 +1727,5 @@ zzz
 #endif
     }
 
-}
+}  // namespace spidermonkey
+}  // namespace mongo

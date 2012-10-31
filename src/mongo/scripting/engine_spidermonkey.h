@@ -48,6 +48,7 @@
 #endif
 
 namespace mongo {
+namespace spidermonkey {
 
     class SMScope;
     class Convertor;
@@ -66,7 +67,7 @@ namespace mongo {
     extern JSClass maxkey_class;
 
     // internal things
-    void dontDeleteScope( SMScope * s ) {}
+    inline void dontDeleteScope( SMScope * s ) {}
     void errorReporter( JSContext *cx, const char *message, JSErrorReport *report );
     extern boost::thread_specific_ptr<SMScope> currentScope;
 
@@ -98,4 +99,6 @@ namespace mongo {
         char *c_;
         bool iFree_;
     };
-}
+
+}  // namespace spidermonkey
+}  // namespace mongo
