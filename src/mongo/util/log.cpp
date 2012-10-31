@@ -315,7 +315,9 @@ namespace mongo {
                 bufSize += 128;
 
             BufBuilder b(bufSize);
-            time_t_to_String( time(0) , b.grow(20) );
+            char* dateStr = b.grow(24);
+            curTimeString(dateStr);
+            dateStr[23] = ' '; // change null char to space
 
             if (!threadName.empty()) {
                 b.appendChar( '[' );
@@ -417,10 +419,9 @@ namespace mongo {
         if( s.empty() ) return;
 
         char buf[64];
-        time_t_to_String( time(0) , buf );
-        /* truncate / don't show the year: */
-        buf[19] = ' ';
-        buf[20] = 0;
+        curTimeString(buf);
+        buf[23] = ' ';
+        buf[24] = 0;
 
         Logstream::logLockless(buf);
         Logstream::logLockless(s);

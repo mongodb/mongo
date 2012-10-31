@@ -28,6 +28,16 @@ namespace mongo {
 
     void time_t_to_Struct(time_t t, struct tm * buf , bool local = false );
 
+    /**
+     * Gets the current time string (in fixed width) in UTC. Sample format:
+     *
+     * Wed Oct 31 13:34:47.996
+     *
+     * @param timeStr pointer to the buffer to set the string - should at least be
+     *     24 bytes big.
+     */
+    void curTimeString(char* timeStr);
+
     // uses ISO 8601 dates without trailing Z
     // colonsOk should be false when creating filenames
     std::string terseCurrentTime(bool colonsOk=true);

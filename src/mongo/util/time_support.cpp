@@ -14,7 +14,7 @@
  */
 
 #include "mongo/platform/basic.h"
-
+#include "mongo/platform/cstdint.h"
 #include "mongo/util/time_support.h"
 
 #include <cstdio>
@@ -48,6 +48,26 @@ namespace mongo {
             gmtime_r(&t, buf);
 #endif
     }
+
+#if defined(_WIN32)
+    void curTimeString(char* timeStr) {
+        boost::xtime xt;
+        boost::xtime_get(&xt, MONGO_BOOST_TIME_UTC);
+        time_t_to_String(xt.sec, timeStr);
+
+        char* milliSecStr = timeStr + 19;
+        _snprintf(milliSecStr, 5, ".%03d", static_cast<int32_t>(xt.nsec / 1000000));
+    }
+#else
+    void curTimeString(char* timeStr) {
+        struct timeval tv;
+        gettimeofday(&tv, NULL);
+        time_t_to_String(tv.tv_sec, timeStr);
+
+        char* milliSecStr = timeStr + 19;
+        snprintf(milliSecStr, 5, ".%03d", static_cast<int32_t>(tv.tv_usec / 1000));
+    }
+#endif
 
     // uses ISO 8601 dates without trailing Z
     // colonsOk should be false when creating filenames
