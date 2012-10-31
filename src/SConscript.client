@@ -5,7 +5,12 @@
 
 Import('env clientEnv')
 
+env.Command(['mongo/base/error_codes.h', 'mongo/base/error_codes.cpp',],
+            ['mongo/base/generate_error_codes.py', 'mongo/base/error_codes.err'],
+            '$PYTHON $SOURCES $TARGETS')
+
 clientSource = [
+    'mongo/base/error_codes.cpp',
     'mongo/bson/oid.cpp',
     'mongo/buildinfo.cpp',
     "mongo/client/authentication_table.cpp",
@@ -78,6 +83,7 @@ clientHeaderDirectories = [
     "bson/util/",
     "client/",
     "db/",
+    "db/auth/",
     "db/stats/",
     "db/repl/",
     "db/ops/",
@@ -120,6 +126,8 @@ env.Install(
                  '$CLIENT_SCONSTRUCT',
                  '$CLIENT_LICENSE',
                  'SConscript.client',
+                 'mongo/base/generate_error_codes.py',
+                 'mongo/base/error_codes.err',
                  '#buildscripts/make_archive.py',
                  clientSource,
                  clientHeaders,
