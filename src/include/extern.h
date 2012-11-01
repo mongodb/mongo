@@ -259,6 +259,8 @@ extern int __wt_bloom_open(WT_SESSION_IMPL *session,
     WT_BLOOM **bloomp);
 extern int __wt_bloom_insert(WT_BLOOM *bloom, WT_ITEM *key);
 extern int __wt_bloom_finalize(WT_BLOOM *bloom);
+extern int __wt_bloom_hash(WT_BLOOM *bloom, WT_ITEM *key, WT_BLOOM_HASH *bhash);
+extern int __wt_bloom_hash_get(WT_BLOOM *bloom, WT_BLOOM_HASH *bhash);
 extern int __wt_bloom_get(WT_BLOOM *bloom, WT_ITEM *key);
 extern int __wt_bloom_close(WT_BLOOM *bloom);
 extern int __wt_bloom_drop(WT_BLOOM *bloom, const char *config);

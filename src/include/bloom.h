@@ -22,3 +22,7 @@ struct __wt_bloom {
 	uint64_t m;		/* The number of slots in the bit string. */
 	uint64_t n;		/* The number of items to be inserted. */
 };
+
+struct __wt_bloom_hash {
+	uint64_t h1, h2;	/* The two hashes used to calculate bits. */
+};

@@ -59,6 +59,8 @@ struct __wt_block_header;
     typedef struct __wt_block_header WT_BLOCK_HEADER;
 struct __wt_bloom;
     typedef struct __wt_bloom WT_BLOOM;
+struct __wt_bloom_hash;
+    typedef struct __wt_bloom_hash WT_BLOOM_HASH;
 struct __wt_btree;
     typedef struct __wt_btree WT_BTREE;
 struct __wt_btree_session;
@@ -208,6 +210,7 @@ struct __wt_update;
 #include "stat.h"
 
 #include "api.h"
+#include "bloom.h"
 #include "cursor.h"
 #include "lsm.h"
 #include "meta.h"

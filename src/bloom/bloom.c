@@ -6,7 +6,6 @@
  */
 
 #include "wt_internal.h"
-#include "bloom.h"
 
 #define	WT_BLOOM_TABLE_CONFIG "key_format=r,value_format=1t,exclusive=true"
 
@@ -199,12 +198,27 @@ err:	WT_TRET(c->close(c));
 }
 
 /*
- * __wt_bloom_get --
- *	Tests whether the given key is in the Bloom filter.
- *	Returns zero if found, WT_NOTFOUND if not.
+ * __wt_bloom_hash --
+ *	Calculate the hash values for a given key.
  */
 int
-__wt_bloom_get(WT_BLOOM *bloom, WT_ITEM *key)
+__wt_bloom_hash(WT_BLOOM *bloom, WT_ITEM *key, WT_BLOOM_HASH *bhash)
+{
+	WT_UNUSED(bloom);
+
+	bhash->h1 = __wt_hash_fnv64(key->data, key->size);
+	bhash->h2 = __wt_hash_city64(key->data, key->size);
+
+	return (0);
+}
+
+/*
+ * __wt_bloom_hash_get --
+ *	Tests whether the key (as given by its hash signature) is in the Bloom
+ *	filter.  Returns zero if found, WT_NOTFOUND if not.
+ */
+int
+__wt_bloom_hash_get(WT_BLOOM *bloom, WT_BLOOM_HASH *bhash)
 {
 	WT_CURSOR *c;
 	WT_DECL_RET;
@@ -226,24 +240,15 @@ __wt_bloom_get(WT_BLOOM *bloom, WT_ITEM *key)
 	} else
 		c = bloom->c;
 
-	/*
-	 * This comparison code is complex to avoid calculating the second
-	 * hash if possible.
-	 */
-	h1 = __wt_hash_fnv64(key->data, key->size);
+	h1 = bhash->h1;
+	h2 = bhash->h2;
 
-	/*
-	 * Add 1 to the hash because Wired Tiger tables are 1 based, and the
-	 * original bitstring array was 0 based.
-	 */
-	c->set_key(c, (h1 % bloom->m) + 1);
-	WT_RET(c->search(c));
-	WT_RET(c->get_value(c, &bit));
-	if (bit == 0)
-		return (WT_NOTFOUND);
-	h2 = __wt_hash_city64(key->data, key->size);
 	result = 0;
-	for (i = 0, h1 += h2; i < bloom->k - 1; i++, h1 += h2) {
+	for (i = 0; i < bloom->k; i++, h1 += h2) {
+		/*
+		 * Add 1 to the hash because Wired Tiger tables are 1 based and
+		 * the original bitstring array was 0 based.
+		 */
 		c->set_key(c, (h1 % bloom->m) + 1);
 		WT_ERR(c->search(c));
 		WT_ERR(c->get_value(c, &bit));
@@ -261,6 +266,20 @@ err:	/* Don't return WT_NOTFOUND from a failed search. */
 		ret = WT_ERROR;
 	__wt_err(bloom->session, ret, "Failed lookup in bloom filter.");
 	return (ret);
+}
+
+/*
+ * __wt_bloom_get --
+ *	Tests whether the given key is in the Bloom filter.
+ *	Returns zero if found, WT_NOTFOUND if not.
+ */
+int
+__wt_bloom_get(WT_BLOOM *bloom, WT_ITEM *key)
+{
+	WT_BLOOM_HASH bhash;
+
+	WT_RET(__wt_bloom_hash(bloom, key, &bhash));
+	return (__wt_bloom_hash_get(bloom, &bhash));
 }
 
 /*

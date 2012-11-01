@@ -517,11 +517,14 @@ static int
 __clsm_search(WT_CURSOR *cursor)
 {
 	WT_BLOOM *bloom;
+	WT_BLOOM_HASH bhash;
 	WT_CURSOR *c;
 	WT_CURSOR_LSM *clsm;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
-	int i;
+	int have_hash, i;
+
+	have_hash = 0;
 
 	WT_LSM_ENTER(clsm, cursor, session, search);
 	WT_CURSOR_NEEDKEY(cursor);
@@ -541,7 +544,13 @@ __clsm_search(WT_CURSOR *cursor)
 	FORALL_CURSORS(clsm, c, i) {
 		/* If there is a Bloom filter, see if we can skip the read. */
 		if ((bloom = clsm->blooms[i]) != NULL) {
-			ret = __wt_bloom_get(bloom, &cursor->key);
+			if (!have_hash) {
+				WT_ERR(__wt_bloom_hash(
+				    bloom, &cursor->key, &bhash));
+				have_hash = 1;
+			}
+
+			ret = __wt_bloom_hash_get(bloom, &bhash);
 			if (ret == WT_NOTFOUND) {
 				WT_STAT_INCR(
 				    clsm->lsm_tree->stats, bloom_misses);
