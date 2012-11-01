@@ -93,7 +93,25 @@ st.rs0.nodes.forEach(function(node) {
     node.getDB('test').setProfilingLevel(2);
 });
 
-doTest(new Mongo(st.rs0.getURL()), st.rs0.nodes);
+var replConn = new Mongo(st.rs0.getURL());
+
+// TODO: use api in SERVER-7533 once available.
+// Make sure replica set connection is ready by repeatedly performing a dummy query
+// against the secondary until it succeeds. This hack is needed because awaitRSClientHosts
+// won't work on the shell's instance of the ReplicaSetMonitor.
+assert.soon(function() {
+    try {
+        replConn.getDB('test').user.find().readPref('secondary').hasNext();
+        return true;
+    }
+    catch (x) {
+        // Intentionally caused an error that forces the monitor to refresh.
+        print('Caught exception while doing dummy query: ' + tojson(x));
+        return false;
+    }
+});
+
+doTest(replConn, st.rs0.nodes);
 
 // TODO: uncomment once read preference command is properly implemented in mongos
 /*
