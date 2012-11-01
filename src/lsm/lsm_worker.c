@@ -17,14 +17,18 @@ static int __lsm_free_chunks(WT_SESSION_IMPL *, WT_LSM_TREE *);
  *	trees to disk and merging on-disk trees.
  */
 void *
-__wt_lsm_worker(void *arg)
+__wt_lsm_worker(void *vargs)
 {
+	WT_LSM_WORKER_ARGS *args;
 	WT_LSM_TREE *lsm_tree;
 	WT_SESSION_IMPL *session;
-	int progress, stalls;
+	int id, progress, stalls;
 
-	lsm_tree = arg;
-	session = lsm_tree->worker_session;
+	args = vargs;
+	lsm_tree = args->lsm_tree;
+	id = args->id;
+	session = lsm_tree->worker_sessions[id];
+	__wt_free(session, args);
 	stalls = 0;
 
 	while (F_ISSET(lsm_tree, WT_LSM_TREE_WORKING)) {
@@ -34,13 +38,18 @@ __wt_lsm_worker(void *arg)
 		session->btree = NULL;
 
 		/* Report stalls to merge in seconds. */
-		if (__wt_lsm_merge(session, lsm_tree, stalls / 1000) == 0)
+		if (__wt_lsm_merge(session, lsm_tree, id, stalls / 1000) == 0)
 			progress = 1;
 
 		/* Clear any state from previous worker thread iterations. */
 		session->btree = NULL;
 
-		if (lsm_tree->nold_chunks != lsm_tree->old_avail &&
+		/*
+		 * Only have one thread freeing old chunks, and only if there
+		 * are chunks to free.
+		 */
+		if (id == 0 &&
+		    lsm_tree->nold_chunks != lsm_tree->old_avail &&
 		    __lsm_free_chunks(session, lsm_tree) == 0)
 			progress = 1;
 
@@ -177,7 +186,7 @@ __lsm_bloom_create(WT_SESSION_IMPL *session,
 	WT_BLOOM *bloom;
 	WT_CURSOR *src;
 	WT_DECL_RET;
-	WT_ITEM key;
+	WT_ITEM buf, key;
 	const char *cur_cfg[] = API_CONF_DEFAULTS(session, open_cursor, "raw");
 	uint64_t insert_count;
 
@@ -185,11 +194,21 @@ __lsm_bloom_create(WT_SESSION_IMPL *session,
 	    chunk->count == 0)
 		return (0);
 
-	WT_ASSERT(session, chunk->bloom_uri != NULL);
+	/*
+	 * Normally, the Bloom URI is populated when the chunk struct is
+	 * allocated.  After an open, however, it may not have been.
+	 * Deal with that here.
+	 */
+	if (chunk->bloom_uri == NULL) {
+		WT_CLEAR(buf);
+		WT_RET(__wt_lsm_tree_bloom_name(
+		    session, lsm_tree, chunk->id, &buf));
+		chunk->bloom_uri = __wt_buf_steal(session, &buf, NULL);
+	}
 
 	bloom = NULL;
 
-	WT_ERR(__wt_bloom_create(session, chunk->bloom_uri,
+	WT_RET(__wt_bloom_create(session, chunk->bloom_uri,
 	    lsm_tree->bloom_config, chunk->count,
 	    lsm_tree->bloom_bit_count, lsm_tree->bloom_hash_count, &bloom));
 
@@ -262,7 +281,7 @@ __lsm_free_chunks(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 				    "LSM worker drop busy: %s.",
 				    chunk->uri);
 				continue;
-			} else 
+			} else
 				WT_ERR(ret);
 		}
 

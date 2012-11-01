@@ -33,7 +33,7 @@
 	CURSOR_UPDATE_API_CALL(cursor, session, n, NULL);		\
 	WT_ERR(__clsm_enter(clsm))
 
-static int __clsm_open_cursors(WT_CURSOR_LSM *, int);
+static int __clsm_open_cursors(WT_CURSOR_LSM *, int, uint32_t);
 static int __clsm_search(WT_CURSOR *);
 
 static inline int
@@ -41,7 +41,7 @@ __clsm_enter(WT_CURSOR_LSM *clsm)
 {
 	if (!F_ISSET(clsm, WT_CLSM_MERGE) &&
 	    clsm->dsk_gen != clsm->lsm_tree->dsk_gen)
-		WT_RET(__clsm_open_cursors(clsm, 0));
+		WT_RET(__clsm_open_cursors(clsm, 0, 0));
 
 	return (0);
 }
@@ -106,7 +106,7 @@ __clsm_close_cursors(WT_CURSOR_LSM *clsm)
  *	Open cursors for the current set of files.
  */
 static int
-__clsm_open_cursors(WT_CURSOR_LSM *clsm, int start_chunk)
+__clsm_open_cursors(WT_CURSOR_LSM *clsm, int start_chunk, uint32_t start_id)
 {
 	WT_CURSOR *c, **cp;
 	WT_DECL_RET;
@@ -135,10 +135,27 @@ __clsm_open_cursors(WT_CURSOR_LSM *clsm, int start_chunk)
 	WT_RET(__clsm_close_cursors(clsm));
 
 	__wt_spin_lock(session, &lsm_tree->lock);
+
 	/* Merge cursors have already figured out how many chunks they need. */
-	if (F_ISSET(clsm, WT_CLSM_MERGE))
+	if (F_ISSET(clsm, WT_CLSM_MERGE)) {
 		nchunks = clsm->nchunks;
-	else
+
+		/*
+		 * We may have raced with another merge completing.  Check that
+		 * we're starting at the right offset in the chunk array.
+		 */
+		if (start_chunk >= lsm_tree->nchunks ||
+		    lsm_tree->chunk[start_chunk]->id != start_id)
+			for (start_chunk = 0;
+			    start_chunk < lsm_tree->nchunks;
+			    start_chunk++) {
+				chunk = lsm_tree->chunk[start_chunk];
+				if (chunk->id == start_id)
+					break;
+			}
+
+		WT_ASSERT(session, start_chunk + nchunks <= lsm_tree->nchunks);
+	} else
 		nchunks = lsm_tree->nchunks;
 
 	if (clsm->cursors == NULL || nchunks > clsm->nchunks) {
@@ -201,7 +218,8 @@ err:	__wt_spin_unlock(session, &lsm_tree->lock);
  *	Initialize an LSM cursor for a merge.
  */
 int
-__wt_clsm_init_merge(WT_CURSOR *cursor, int start_chunk, int nchunks)
+__wt_clsm_init_merge(
+    WT_CURSOR *cursor, int start_chunk, uint32_t start_id, int nchunks)
 {
 	WT_CURSOR_LSM *clsm;
 
@@ -211,7 +229,7 @@ __wt_clsm_init_merge(WT_CURSOR *cursor, int start_chunk, int nchunks)
 		F_SET(clsm, WT_CLSM_MINOR_MERGE);
 	clsm->nchunks = nchunks;
 
-	return (__clsm_open_cursors(clsm, start_chunk));
+	return (__clsm_open_cursors(clsm, start_chunk, start_id));
 }
 
 /*
