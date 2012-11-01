@@ -82,14 +82,21 @@ __wt_lsm_checkpoint_worker(void *arg)
 		/* Write checkpoints in all completed files. */
 		for (i = 0, j = 0; i < cookie.nchunks; i++) {
 			chunk = cookie.chunk_array[i];
-			if (F_ISSET(chunk, WT_LSM_CHUNK_ONDISK))
-				continue;
 			/* Stop if a thread is still active in the chunk. */
-			if (chunk->ncursor != 0)
+			if (chunk->ncursor != 0 ||
+			    (i == cookie.nchunks - 1 &&
+			    !F_ISSET(chunk, WT_LSM_CHUNK_ONDISK)))
 				break;
+
+			if (F_ISSET(chunk, WT_LSM_CHUNK_BLOOM))
+				continue;
 
 			WT_ERR(__lsm_bloom_create(
 			    session, lsm_tree, chunk));
+
+			if (F_ISSET(chunk, WT_LSM_CHUNK_ONDISK))
+				continue;
+
 			/*
 			 * NOTE: we pass a non-NULL config, because otherwise
 			 * __wt_checkpoint thinks we're closing the file.
@@ -101,14 +108,14 @@ __wt_lsm_checkpoint_worker(void *arg)
 				++j;
 				__wt_spin_lock(session, &lsm_tree->lock);
 				F_SET(chunk, WT_LSM_CHUNK_ONDISK);
-				lsm_tree->dsk_gen++;
+				++lsm_tree->dsk_gen;
 				__wt_spin_unlock(session, &lsm_tree->lock);
 				WT_VERBOSE_ERR(session, lsm,
 				     "LSM worker checkpointed %d.", i);
 			}
 		}
 		if (j == 0)
-			__wt_sleep(0, 10);
+			__wt_sleep(0, 1000);
 	}
 err:	__wt_free(session, cookie.chunk_array);
 
@@ -136,12 +143,9 @@ __wt_lsm_copy_chunks(WT_SESSION_IMPL *session,
 		/* The actual error value is ignored. */
 		return (WT_ERROR);
 	}
-	/*
-	 * Take a copy of the current state of the LSM tree. Skip
-	 * the last chunk - since it is the active one and not relevant
-	 * to merge operations.
-	 */
-	nchunks = lsm_tree->nchunks - 1;
+
+	/* Take a copy of the current state of the LSM tree. */
+	nchunks = lsm_tree->nchunks;
 
 	/*
 	 * If the tree array of active chunks is larger than our current buffer,
