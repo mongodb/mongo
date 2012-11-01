@@ -149,6 +149,7 @@ __wt_lsm_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, int stalls)
 	}
 	__wt_spin_unlock(session, &lsm_tree->lock);
 
+	nchunks = end_chunk - start_chunk + 1;
 	WT_ASSERT(session, nchunks <= max_chunks);
 
 	/* Don't do small merges unless we have waited for 2s. */
@@ -170,7 +171,7 @@ __wt_lsm_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, int stalls)
 		create_bloom = 1;
 
 	/* Find the merge generation. */
-	for (generation = 0, i = start_chunk; i < end_chunk; i++)
+	for (generation = 0, i = start_chunk; i <= end_chunk; i++)
 		if (lsm_tree->chunk[i]->generation > generation)
 			generation = lsm_tree->chunk[i]->generation;
 

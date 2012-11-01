@@ -185,12 +185,12 @@ __clsm_open_cursors(WT_CURSOR_LSM *clsm, int start_chunk)
 	if (chunk != NULL && !F_ISSET(chunk, WT_LSM_CHUNK_ONDISK)) {
 		clsm->primary_chunk = chunk;
 		(void)WT_ATOMIC_ADD(clsm->primary_chunk->ncursor, 1);
-	}
 
-	/* Peek into the btree layer to track the in-memory size. */
-	if (lsm_tree->memsizep == NULL)
-		(void)__wt_btree_get_memsize(
-		    session, session->btree, &lsm_tree->memsizep);
+		/* Peek into the btree layer to track the in-memory size. */
+		if (lsm_tree->memsizep == NULL)
+			(void)__wt_btree_get_memsize(
+			    session, session->btree, &lsm_tree->memsizep);
+	}
 
 	clsm->dsk_gen = lsm_tree->dsk_gen;
 err:	__wt_spin_unlock(session, &lsm_tree->lock);
