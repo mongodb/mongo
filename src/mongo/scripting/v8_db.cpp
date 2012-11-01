@@ -25,6 +25,7 @@
 #include "../s/d_logic.h"
 #include "../db/namespacestring.h"
 #include <iostream>
+#include <boost/scoped_array.hpp>
 
 using namespace std;
 using namespace v8;
@@ -258,11 +259,7 @@ namespace mongo {
 
     // ---
 
-#ifdef _WIN32
-#define GETNS char * ns = new char[args[0]->ToString()->Utf8Length()];  args[0]->ToString()->WriteUtf8( ns );
-#else
-#define GETNS char ns[args[0]->ToString()->Utf8Length()];  args[0]->ToString()->WriteUtf8( ns );
-#endif
+#define GETNS boost::scoped_array<char> ns(new char[args[0]->ToString()->Utf8Length()+1]); args[0]->ToString()->WriteUtf8( ns.get() );
 
     DBClientBase * getConnection( const Arguments& args ) {
         Local<External> c = External::Cast( *(args.This()->GetInternalField( 0 )) );
@@ -312,7 +309,7 @@ namespace mongo {
             int options = (int)(args[6]->ToNumber()->Value());
             {
                 //V8Unlock u;
-                cursor = conn->query( ns, q ,  nToReturn , nToSkip , haveFields ? &fields : 0, options , batchSize );
+                cursor = conn->query( ns.get(), q ,  nToReturn , nToSkip , haveFields ? &fields : 0, options , batchSize );
                 if ( ! cursor.get() ) 
                     return v8::ThrowException( v8::String::New( "error doing query: failed" ) );
             }
@@ -367,7 +364,7 @@ namespace mongo {
             DDD( "want to save batch : " << bos.length );
             try {
                 //V8Unlock u;
-                conn->insert( ns , bos, flags->Int32Value() );
+                conn->insert( ns.get() , bos, flags->Int32Value() );
             }
             catch ( ... ) {
                 return v8::ThrowException( v8::String::New( "socket error on bulk insert" ) );
@@ -386,7 +383,7 @@ namespace mongo {
             DDD( "want to save : " << o.jsonString() );
             try {
                 //V8Unlock u;
-                conn->insert( ns , o );
+                conn->insert( ns.get() , o );
             }
             catch ( ... ) {
                 return v8::ThrowException( v8::String::New( "socket error on insert" ) );
@@ -418,7 +415,7 @@ namespace mongo {
         DDD( "want to remove : " << o.jsonString() );
         try {
             //V8Unlock u;
-            conn->remove( ns , o , justOne );
+            conn->remove( ns.get() , o , justOne );
         }
         catch ( ... ) {
             return v8::ThrowException( v8::String::New( "socket error on remove" ) );
@@ -448,7 +445,7 @@ namespace mongo {
             BSONObj q1 = scope->v8ToMongo( q );
             BSONObj o1 = scope->v8ToMongo( o );
             //V8Unlock u;
-            conn->update( ns , q1 , o1 , upsert, multi );
+            conn->update( ns.get() , q1 , o1 , upsert, multi );
         }
         catch ( ... ) {
             return v8::ThrowException( v8::String::New( "socket error on remove" ) );
