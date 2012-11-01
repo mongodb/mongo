@@ -33,6 +33,8 @@ namespace mongo {
         ActionSet() : _actions(0) {}
 
         void addAction(const ActionType& action);
+        void addAllActionsFromSet(const ActionSet& actionSet);
+        void addAllActions();
 
         bool contains(const ActionType& action) const;
 
@@ -49,7 +51,8 @@ namespace mongo {
 
     private:
 
-        std::bitset<128> _actions; // bitmask of actions this capability grants
+        // bitmask of actions this capability grants
+        std::bitset<ActionType::NUM_ACTION_TYPES> _actions;
     };
 
 } // namespace mongo

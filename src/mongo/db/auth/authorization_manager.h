@@ -55,6 +55,11 @@ namespace mongo {
         // Grant this connection the given capability.
         Status acquireCapability(const Capability& capability);
 
+        // This should be called when the connection gets authenticated as the internal user.
+        // This grants a capability on all the actions for the internal role, with the
+        // internalPrincipal as the principal.
+        void grantInternalAuthorization();
+
         // Checks if this connection has the capabilities required to perform the given action
         // on the given resource.  Contains all the authorization logic including handling things
         // like the localhost exception.  If it is authorized, returns the principal that granted
@@ -95,8 +100,6 @@ namespace mongo {
         CapabilitySet _aquiredCapabilities;
         // All principals who have been authenticated on this connection
         PrincipalSet _authenticatedPrincipals;
-
-        // TODO: handle temporary authorization from $auth table for commands
     };
 
 } // namespace mongo
