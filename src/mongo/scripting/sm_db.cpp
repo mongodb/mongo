@@ -17,6 +17,7 @@
 
 //#include <third_party/js-1.7/jsapi.h>
 
+#include "mongo/base/init.h"
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/db/namespacestring.h"
 #include "mongo/scripting/engine_spidermonkey.h"
@@ -288,7 +289,8 @@ namespace spidermonkey {
 
     DBClientWithCommands *getConnection( JSContext *cx, JSObject *obj ) {
         shared_ptr< DBClientWithCommands > * connHolder = (shared_ptr< DBClientWithCommands >*)JS_GetPrivate( cx , obj );
-        uassert( 10239 ,  "no connection!" , connHolder && connHolder->get() );
+        if (!connHolder)
+            return NULL;
         return connHolder->get();
     }
 
@@ -328,9 +330,8 @@ namespace spidermonkey {
     JSBool mongo_auth(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval) {
         try {
             smuassert( cx , "mongo_auth needs 3 args" , argc == 3 );
-            shared_ptr< DBClientWithCommands > * connHolder = (shared_ptr< DBClientWithCommands >*)JS_GetPrivate( cx , obj );
-            smuassert( cx ,  "no connection!" , connHolder && connHolder->get() );
-            DBClientWithCommands *conn = connHolder->get();
+            DBClientWithCommands *conn = getConnection(cx, obj);
+            smuassert(cx , "no connection!", conn);
 
             Convertor c( cx );
 
@@ -594,15 +595,44 @@ namespace spidermonkey {
         return JS_TRUE;
     }
 
-    JSFunctionSpec mongo_functions[] = {
-        { "auth" , mongo_auth , 0 , JSPROP_READONLY | JSPROP_PERMANENT, 0 } ,
-        { "logout", mongo_logout, 0, JSPROP_READONLY | JSPROP_PERMANENT, 0 },
-        { "find" , mongo_find , 0 , JSPROP_READONLY | JSPROP_PERMANENT, 0 } ,
-        { "update" , mongo_update , 0 , JSPROP_READONLY | JSPROP_PERMANENT, 0 } ,
-        { "insert" , mongo_insert , 0 , JSPROP_READONLY | JSPROP_PERMANENT, 0 } ,
-        { "remove" , mongo_remove , 0 , JSPROP_READONLY | JSPROP_PERMANENT, 0 } ,
-        { 0 }
-    };
+namespace {
+    std::vector<JSFunctionSpec>* mongoFunctionsVector;
+    JSFunctionSpec* mongo_functions;
+
+    MONGO_INITIALIZER(SmMongoFunctionsRegistry)(InitializerContext* context) {
+        static const JSFunctionSpec mongoFunctionsStandard[] = {
+            { "auth" , mongo_auth , 0 , JSPROP_READONLY | JSPROP_PERMANENT, 0 } ,
+            { "logout", mongo_logout, 0, JSPROP_READONLY | JSPROP_PERMANENT, 0 },
+            { "find" , mongo_find , 0 , JSPROP_READONLY | JSPROP_PERMANENT, 0 } ,
+            { "update" , mongo_update , 0 , JSPROP_READONLY | JSPROP_PERMANENT, 0 } ,
+            { "insert" , mongo_insert , 0 , JSPROP_READONLY | JSPROP_PERMANENT, 0 } ,
+            { "remove" , mongo_remove , 0 , JSPROP_READONLY | JSPROP_PERMANENT, 0 }
+        };
+        mongoFunctionsVector = new std::vector<JSFunctionSpec>;
+        std::copy(mongoFunctionsStandard,
+                  mongoFunctionsStandard + boost::size(mongoFunctionsStandard),
+                  std::back_inserter(*mongoFunctionsVector));
+        return Status::OK();
+    }
+
+    MONGO_INITIALIZER_WITH_PREREQUISITES(
+            SmMongoFunctionRegistrationDone, ("SmMongoFunctionsRegistry"))(InitializerContext* cx) {
+
+        static const JSFunctionSpec nullSpec = { 0 };
+        mongo_functions = new JSFunctionSpec[mongoFunctionsVector->size() + 1];
+        std::copy(mongoFunctionsVector->begin(), mongoFunctionsVector->end(), mongo_functions);
+        mongo_functions[mongoFunctionsVector->size()] = nullSpec;
+        delete mongoFunctionsVector;
+        mongoFunctionsVector = NULL;
+        return Status::OK();
+    }
+
+}  // namespace
+
+    void registerMongoFunction(const JSFunctionSpec& functionSpec) {
+        fassert(16466, mongoFunctionsVector != NULL);
+        mongoFunctionsVector->push_back(functionSpec);
+    }
 
     // -------------  db_collection -------------
 

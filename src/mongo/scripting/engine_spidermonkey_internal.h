@@ -21,6 +21,7 @@
 #include <third_party/js-1.7/jsapi.h>
 #include <third_party/js-1.7/jsdate.h>
 
+#include "mongo/client/dbclientinterface.h"
 #include "mongo/db/jsobj.h"
 
 #define smuassert( cx , msg , val ) \
@@ -308,6 +309,19 @@ namespace spidermonkey {
 
         set<string> _initFieldNames;
     };
+
+    /**
+     * Get the connection object associated with "cx" and "obj".
+     */
+    DBClientWithCommands *getConnection(JSContext *cx, JSObject *obj);
+
+    /**
+     * Register a function that should be part of the Mongo object in the javascript shell.
+     *
+     * This function may only be called from  MONGO_INITIALIZERs with SmMongoFunctionsRegistry as
+     * a prerequisite, and SmMongoFunctionRegistrationDone as a dependent.
+     */
+    void registerMongoFunction(const JSFunctionSpec& functionSpec);
 
 }  // namespace spidermonkey
 }  // namespace mongo
