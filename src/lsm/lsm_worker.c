@@ -240,17 +240,15 @@ __lsm_free_chunks(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 			 * An EBUSY return is acceptable - a cursor may still
 			 * be positioned on this old chunk.
 			 */
-			if (ret == 0) {
-				progress = 1;
-				F_CLR(chunk, WT_LSM_CHUNK_BLOOM);
-				__wt_free(session, chunk->bloom_uri);
-				chunk->bloom_uri = NULL;
-			} else if (ret != EBUSY)
-				goto err;
-			if (ret == EBUSY)
+			if (ret == EBUSY) {
 				WT_VERBOSE_ERR(session, lsm,
 				    "LSM worker bloom drop busy: %s.",
 				    chunk->bloom_uri);
+				continue;
+			} else
+				WT_ERR(ret);
+
+			F_CLR(chunk, WT_LSM_CHUNK_BLOOM);
 		}
 		if (chunk->uri != NULL) {
 			WT_WITH_SCHEMA_LOCK(session, ret =
@@ -259,19 +257,20 @@ __lsm_free_chunks(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 			 * An EBUSY return is acceptable - a cursor may still
 			 * be positioned on this old chunk.
 			 */
-			if (ret == 0) {
-				progress = 1;
-				__wt_free(session, chunk->uri);
-				chunk->uri = NULL;
-			} else if (ret != EBUSY)
-				goto err;
+			if (ret == EBUSY) {
+				WT_VERBOSE_ERR(session, lsm,
+				    "LSM worker drop busy: %s.",
+				    chunk->uri);
+				continue;
+			} else 
+				WT_ERR(ret);
 		}
 
-		if (chunk->uri == NULL &&
-		    !F_ISSET(chunk, WT_LSM_CHUNK_BLOOM)) {
-			__wt_free(session, lsm_tree->old_chunks[i]);
-			++lsm_tree->old_avail;
-		}
+		progress = 1;
+		__wt_free(session, chunk->bloom_uri);
+		__wt_free(session, chunk->uri);
+		__wt_free(session, lsm_tree->old_chunks[i]);
+		++lsm_tree->old_avail;
 	}
 	if (locked) {
 err:		WT_TRET(__wt_lsm_meta_write(session, lsm_tree));
