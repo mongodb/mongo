@@ -8,6 +8,20 @@
 #include "wt_internal.h"
 
 /*
+ * Tuning constants.
+ */
+/* Threshold when a connection is allocated more cache */
+#define	WT_CACHE_POOL_BUMP_THRESHOLD	6
+/* Threshold when a connection is allocated less cache */
+#define	WT_CACHE_POOL_REDUCE_THRESHOLD	2
+/* Balancing passes after a bump before a connection is a candidate. */
+#define	WT_CACHE_POOL_BUMP_SKIPS	10
+/* Balancing passes after a reduction before a connection is a candidate. */
+#define	WT_CACHE_POOL_REDUCE_SKIPS	5
+
+static int  __cache_pool_balance(void);
+
+/*
  * __wt_conn_cache_pool_config --
  *	Parse and setup and cache pool options.
  */
@@ -202,6 +216,114 @@ __wt_conn_cache_pool_destroy(WT_CONNECTION_IMPL *conn)
 
 	return (ret);
 }
+/*
+ * __cache_pool_balance --
+ *	Do a pass over the cache pool members and ensure the pool is being
+ *	effectively used.
+ */
+int
+__cache_pool_balance(void)
+{
+	WT_CACHE_POOL *cp;
+	WT_CACHE_POOL_ENTRY *entry;
+	WT_SESSION_IMPL *session;
+	uint64_t added, highest, new, read_pressure;
+	int entries;
+
+	cp = __wt_process.cache_pool;
+
+	__wt_spin_lock(NULL, &cp->cache_pool_lock);
+	entry = NULL;
+	if (!TAILQ_EMPTY(&cp->cache_pool_qh))
+		entry = TAILQ_FIRST(&cp->cache_pool_qh);
+	if (entry == NULL) {
+		__wt_spin_unlock(NULL, &cp->cache_pool_lock);
+		return (0);
+	}
+	/* HACK: Use the default session from the first entry. */
+	session = entry->conn->default_session;
+
+	/* Generate read pressure information. */
+	entries = 0;
+	highest = 0;
+	TAILQ_FOREACH(entry, &cp->cache_pool_qh, q) {
+		if (!entry->active ||
+		    entry->cache_size == 0 ||
+		    entry->conn->cache == NULL)
+			continue;
+		++entries;
+		new = entry->conn->cache->bytes_evict;
+		/* Handle wrapping of eviction requests. */
+		if (new >= entry->saved_evict)
+			entry->current_evict = new - entry->saved_evict;
+		else
+			entry->current_evict = new;
+		entry->saved_evict = new;
+		if (entry->current_evict > highest)
+			highest = entry->current_evict;
+	}
+	WT_VERBOSE_VOID(session, cache_pool,
+	    "Highest eviction count: %d, entries: %d",
+	    (int)highest, entries);
+	/* Normalize eviction information across connections. */
+	highest = highest / 10;
+	++highest; /* Avoid divide by zero. */
+
+	TAILQ_FOREACH(entry, &cp->cache_pool_qh, q) {
+		/* Allow to stabilize after changes. */
+		if (!entry->active || --entry->skip_count > 0)
+			continue;
+
+		read_pressure = entry->current_evict / highest;
+		/*
+		 * TODO: Use __wt_cache_bytes_inuse instead of
+		 * eviction_target - it doesn't do the right thing at
+		 * the moment.
+		 */
+		if (entry->cache_size == 0) {
+			entry->cache_size = cp->chunk;
+			cp->currently_used += cp->chunk;
+			entry->skip_count = WT_CACHE_POOL_BUMP_SKIPS;
+		} else if (highest > 1 &&
+		    entry->cache_size < cp->quota &&
+		     entry->conn->cache->bytes_inmem >=
+		     (entry->cache_size *
+		      entry->conn->cache->eviction_target) / 100 &&
+		     cp->currently_used < cp->size &&
+		     read_pressure > WT_CACHE_POOL_BUMP_THRESHOLD) {
+			added = WT_MIN(cp->chunk,
+			    cp->size - cp->currently_used);
+			entry->cache_size += added;
+			cp->currently_used += added;
+			entry->skip_count = WT_CACHE_POOL_BUMP_SKIPS;
+		} else if (read_pressure < WT_CACHE_POOL_REDUCE_THRESHOLD &&
+		    highest > 1 &&
+		    entry->cache_size > cp->chunk &&
+		    cp->currently_used >= cp->size) {
+			/*
+			 * If a connection isn't actively using
+			 * it's assigned cache and is assigned
+			 * a reasonable amount - reduce it.
+			 */
+			entry->cache_size -= cp->chunk;
+			cp->currently_used -= cp->chunk;
+			entry->skip_count = WT_CACHE_POOL_REDUCE_SKIPS;
+		}
+		if (entry->cache_size != entry->conn->cache_size) {
+			WT_VERBOSE_VOID(session, cache_pool,
+			    "Allocated %d to %s",
+			    (int)(entry->cache_size - entry->conn->cache_size),
+			    entry->conn->home);
+			entry->conn->cache_size = entry->cache_size;
+			/*
+			 * TODO: Add a loop waiting for connection to
+			 * give up cache.
+			 */
+		}
+	}
+	__wt_spin_unlock(NULL, &cp->cache_pool_lock);
+	return (0);
+}
 
 /*
  * __wt_cache_pool_server --
@@ -211,10 +333,7 @@ void *
 __wt_cache_pool_server(void *arg)
 {
 	WT_CACHE_POOL *cp;
-	WT_CACHE_POOL_ENTRY *entry;
-	WT_SESSION_IMPL *session;
-	uint64_t added, highest, new, read_pressure;
-	int entries;
+	WT_DECL_RET;
 
 	cp = __wt_process.cache_pool;
 
@@ -230,97 +349,7 @@ __wt_cache_pool_server(void *arg)
 		 */
 		if (!F_ISSET(cp, WT_CACHE_POOL_RUN))
 			break;
-		__wt_spin_lock(NULL, &cp->cache_pool_lock);
-		entry = NULL;
-		if (!TAILQ_EMPTY(&cp->cache_pool_qh))
-			entry = TAILQ_FIRST(&cp->cache_pool_qh);
-		if (entry == NULL) {
-			__wt_spin_unlock(NULL, &cp->cache_pool_lock);
-			continue;
-		}
-		/* HACK: Use the default session from the first entry. */
-		session = entry->conn->default_session;
-
-		/* Generate read pressure information. */
-		entries = 0;
-		highest = 0;
-		TAILQ_FOREACH(entry, &cp->cache_pool_qh, q) {
-			if (!entry->active ||
-			    entry->cache_size == 0 ||
-			    entry->conn->cache == NULL)
-				continue;
-			++entries;
-			new = entry->conn->cache->bytes_evict;
-			/* Handle wrapping of eviction requests. */
-			if (new >= entry->saved_evict)
-				entry->current_evict = new - entry->saved_evict;
-			else
-				entry->current_evict = new;
-			entry->saved_evict = new;
-			if (entry->current_evict > highest)
-				highest = entry->current_evict;
-		}
-		WT_VERBOSE_VOID(session, cache_pool,
-		    "Highest eviction count: %d, entries: %d",
-		    (int)highest, entries);
-		/* Normalize eviction information across connections. */
-		highest = highest / 10;
-		++highest; /* Avoid divide by zero. */
-
-		TAILQ_FOREACH(entry, &cp->cache_pool_qh, q) {
-			/* Allow to stabilize after changes. */
-			if (!entry->active || --entry->skip_count > 0)
-				continue;
-
-			read_pressure = entry->current_evict / highest;
-			/*
-			 * TODO: Use __wt_cache_bytes_inuse instead of
-			 * eviction_target - it doesn't do the right thing at
-			 * the moment.
-			 */
-			if (entry->cache_size == 0) {
-				entry->cache_size = cp->chunk;
-				cp->currently_used += cp->chunk;
-				entry->skip_count = 10;
-			} else if (highest > 1 &&
-			    entry->cache_size < cp->quota &&
-			     entry->conn->cache->bytes_inmem >=
-			     (entry->cache_size *
-			      entry->conn->cache->eviction_target) / 100 &&
-			     cp->currently_used < cp->size &&
-			     read_pressure > 6) {
-				added = WT_MIN(cp->chunk,
-				    cp->size - cp->currently_used);
-				entry->cache_size += added;
-				cp->currently_used += added;
-				entry->skip_count = 10;
-			} else if (read_pressure < 2 &&
-			    highest > 1 &&
-			    entry->cache_size > cp->chunk &&
-			    cp->currently_used >= cp->size) {
-				/*
-				 * If a connection isn't actively using
-				 * it's assigned cache and is assigned
-				 * a reasonable amount - reduce it.
-				 */
-				entry->cache_size -= cp->chunk;
-				cp->currently_used -= cp->chunk;
-				entry->skip_count = 5;
-			}
-			if (entry->cache_size != entry->conn->cache_size) {
-				WT_VERBOSE_VOID(session, cache_pool,
-				    "Allocated %d to %s",
-				    (int)(entry->cache_size -
-				    entry->conn->cache_size),
-				    entry->conn->home);
-				entry->conn->cache_size = entry->cache_size;
-				/*
-				 * TODO: Add a loop waiting for connection to
-				 * give up cache.
-				 */
-			}
-		}
-		__wt_spin_unlock(NULL, &cp->cache_pool_lock);
+		WT_ERR(__cache_pool_balance());
 	}
-	return (arg);
+err:	return (arg);
 }
