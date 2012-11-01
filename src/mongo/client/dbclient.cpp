@@ -108,7 +108,7 @@ namespace mongo {
             DBClientReplicaSet * set = new DBClientReplicaSet( _setName , _servers , socketTimeout );
             if( ! set->connect() ) {
                 delete set;
-                errmsg = "connect failed to set ";
+                errmsg = "connect failed to replica set ";
                 errmsg += toString();
                 return 0;
             }

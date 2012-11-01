@@ -174,6 +174,9 @@ namespace mongo {
      *    server:port
      *    foo/server:port,server:port   SET
      *    server,server,server          SYNC
+     *                                    Warning - you usually don't want "SYNC", it's used 
+     *                                    for some special things such as sharding config servers.
+     *                                    See syncclusterconnection.h for more info.
      *
      * tyipcal use
      * string errmsg,
