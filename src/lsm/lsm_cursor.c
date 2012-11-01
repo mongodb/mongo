@@ -182,11 +182,8 @@ __clsm_open_cursors(WT_CURSOR_LSM *clsm, int start_chunk)
 	}
 
 	/* The last chunk is our new primary. */
-	if ((clsm->primary_chunk = chunk) != NULL) {
-		WT_ASSERT(session,
-		    !F_ISSET(clsm, WT_CLSM_UPDATED) ||
-		    !F_ISSET(chunk, WT_LSM_CHUNK_ONDISK));
-
+	if (chunk != NULL && !F_ISSET(chunk, WT_LSM_CHUNK_ONDISK)) {
+		clsm->primary_chunk = chunk;
 		(void)WT_ATOMIC_ADD(clsm->primary_chunk->ncursor, 1);
 	}
 
