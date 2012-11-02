@@ -242,8 +242,10 @@ namespace mongo {
             BSONElement e = options.getField("size");
             if ( e.isNumber() ) {
                 size = e.numberLong();
-                size += 256;
+                size += 0xff;
                 size &= 0xffffffffffffff00LL;
+                if ( size < Extent::minSize() )
+                    size = Extent::minSize();
             }
         }
 
