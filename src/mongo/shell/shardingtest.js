@@ -274,6 +274,7 @@ ShardingTest = function( testName , numShards , verboseLevel , numMongos , other
         
         rs.getMaster().getDB( "admin" ).foo.save( { x : 1 } )
         rs.awaitReplication();
+        rs.awaitSecondaryNodes();
         
         var rsConn = new Mongo( rs.getURL() );
         rsConn.name = rs.getURL();
