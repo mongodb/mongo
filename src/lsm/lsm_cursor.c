@@ -772,17 +772,18 @@ __clsm_put(
 	 * If this is the first update in this cursor, check if a new in-memory
 	 * chunk is needed.
 	 */
-	if (!F_ISSET(clsm, WT_CLSM_UPDATED)) {
+	if (clsm->primary_chunk == NULL) {
 		__wt_spin_lock(session, &lsm_tree->lock);
 		if (clsm->dsk_gen == lsm_tree->dsk_gen)
 			WT_WITH_SCHEMA_LOCK(session,
 			    ret = __wt_lsm_tree_switch(session, lsm_tree));
 		__wt_spin_unlock(session, &lsm_tree->lock);
 		WT_RET(ret);
-		F_SET(clsm, WT_CLSM_UPDATED);
 
 		/* We changed the structure, or someone else did: update. */
 		WT_RET(__clsm_enter(clsm));
+
+		WT_ASSERT(session, clsm->primary_chunk != NULL);
 	}
 
 	primary = clsm->cursors[clsm->nchunks - 1];
