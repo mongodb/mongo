@@ -20,6 +20,8 @@
  * For examples of basic usage, see mongo/unittest/unittest_test.cpp.
  */
 
+#pragma once
+
 #include <sstream>
 #include <string>
 #include <vector>
@@ -41,8 +43,8 @@
 /**
  * Fails unless "EXPRESSION" is true.
  */
-#define ASSERT_TRUE(EXPRESSION) ::mongo::unittest::TestAssertion( __FILE__, __LINE__ ).failUnless( \
-            (EXPRESSION), "Expected: " #EXPRESSION )
+#define ASSERT_TRUE(EXPRESSION) ::mongo::unittest::TestAssertion( __FILE__, __LINE__ ).failIf( \
+            !(EXPRESSION), "Expected: " #EXPRESSION )
 #define ASSERT(EXPRESSION) ASSERT_TRUE(EXPRESSION)
 
 /**
@@ -335,9 +337,6 @@ namespace mongo {
             void failIf( bool flag, const std::string &message ) const {
                 if ( flag ) fail( message );
             }
-            void failUnless( bool flag, const std::string& message ) const {
-                failIf( !flag, message );
-            }
 
         private:
             const std::string _file;
@@ -354,32 +353,44 @@ namespace mongo {
 
             template<typename A,typename B>
             void assertEqual( const A& a , const B& b ) {
-                failUnless(a == b, getComparisonFailureMessage("==", a, b));
+                if ( a == b )
+                    return;
+                fail(getComparisonFailureMessage("==", a, b));
             }
 
             template<typename A,typename B>
             void assertNotEqual( const A& a , const B& b ) {
-                failUnless(a != b, getComparisonFailureMessage("!=", a, b));
+                if ( a != b )
+                    return;
+                fail(getComparisonFailureMessage("!=", a, b));
             }
 
             template<typename A,typename B>
             void assertLessThan( const A& a , const B& b ) {
-                failUnless(a < b, getComparisonFailureMessage("<", a, b));
+                if ( a < b )
+                    return;
+                fail(getComparisonFailureMessage("<", a, b));
             }
 
             template<typename A,typename B>
             void assertNotLessThan( const A& a , const B& b ) {
-                failUnless(a >= b, getComparisonFailureMessage(">=", a, b));
+                if ( a >= b )
+                    return;
+                fail(getComparisonFailureMessage(">=", a, b));
             }
 
             template<typename A,typename B>
             void assertGreaterThan( const A& a , const B& b ) {
-                failUnless(a > b, getComparisonFailureMessage(">", a, b));
+                if ( a > b )
+                    return;
+                fail(getComparisonFailureMessage(">", a, b));
             }
 
             template<typename A,typename B>
             void assertNotGreaterThan( const A& a , const B& b ) {
-                failUnless(a <= b, getComparisonFailureMessage("<=", a, b));
+                if ( a <= b )
+                    return;
+                fail(getComparisonFailureMessage("<=", a, b));
             }
 
         private:
