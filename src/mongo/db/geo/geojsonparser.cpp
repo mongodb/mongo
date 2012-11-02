@@ -19,6 +19,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/geo/geojsonparser.h"
 #include "third_party/s2/s2.h"
+#include "third_party/s2/s2cell.h"
 #include "third_party/s2/s2latlng.h"
 #include "third_party/s2/s2loop.h"
 #include "third_party/s2/s2polygon.h"
@@ -89,6 +90,13 @@ namespace mongo {
         const vector<BSONElement>& coordinates = coordElt.Array();
         if (coordinates.size() != 2) { return false; }
         return coordinates[0].isNumber() && coordinates[1].isNumber();
+    }
+
+    void GeoJSONParser::parsePoint(const BSONObj& obj, S2Cell* out) {
+        const vector<BSONElement>& coords = obj.getFieldDotted(GEOJSON_COORDINATES).Array();
+        S2LatLng ll = S2LatLng::FromDegrees(coords[1].Number(),
+                                            coords[0].Number()).Normalized();
+        *out = S2Cell(ll);
     }
 
     void GeoJSONParser::parsePoint(const BSONObj& obj, S2Point* out) {

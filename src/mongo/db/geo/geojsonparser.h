@@ -20,6 +20,7 @@
 #include <vector>
 #include "third_party/s2/s2.h"
 
+class S2Cell;
 class S2Polyline;
 class S2Polygon;
 
@@ -34,6 +35,7 @@ namespace mongo {
     public:
         static bool isPoint(const BSONObj &obj);
         static void parsePoint(const BSONObj &obj, S2Point *out);
+        static void parsePoint(const BSONObj &obj, S2Cell *out);
 
         static bool isLineString(const BSONObj &obj);
         static void parseLineString(const BSONObj &obj, S2Polyline *out);

@@ -449,6 +449,9 @@ namespace mongo {
         case BSONObj::opWITHIN:
             _special = "2d";
             break;
+        case BSONObj::opINTERSECT:
+            _special = "s2d";
+            break;
         case BSONObj::opEXISTS: {
             if ( !existsSpec ) {
                 lower = upper = staticNull.firstElement();
