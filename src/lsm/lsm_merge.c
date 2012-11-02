@@ -154,8 +154,10 @@ __wt_lsm_merge(
 		record_count += chunk->count;
 		--start_chunk;
 
-		if (nchunks == max_chunks)
+		if (nchunks == max_chunks) {
+			F_CLR(lsm_tree->chunk[end_chunk], WT_LSM_CHUNK_MERGING);
 			record_count -= lsm_tree->chunk[end_chunk--]->count;
+		}
 	}
 
 	nchunks = end_chunk - start_chunk + 1;
