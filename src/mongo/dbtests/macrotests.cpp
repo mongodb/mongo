@@ -39,6 +39,23 @@
 
 # undef malloc
 
+#ifndef MONGO_MALLOC
+#define MONGO_MALLOC 1
+#endif
+
+# define malloc 42
+
+# include "mongo/client/redef_macros.h"
+# include "mongo/client/undef_macros.h"
+
+# if malloc == 42
+# else
+#  error malloc macro molested
+# endif
+
+# undef malloc
+
+
 #endif // gcc 4.3
 
 #include "mongo/client/dbclient.h"
