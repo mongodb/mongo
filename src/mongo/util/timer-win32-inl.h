@@ -28,6 +28,7 @@
 
 #define MONGO_TIMER_IMPL_WIN32
 
+#include "mongo/platform/windows_basic.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
