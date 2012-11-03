@@ -51,88 +51,88 @@ namespace mongo {
     MONGO_INITIALIZER(AuthorizationSystemRoles)(InitializerContext* context) {
         // Read role
         // TODO: Remove OLD_READ once commands require the proper actions
-        readRoleActions.addAction(ActionType::OLD_READ);
-        readRoleActions.addAction(ActionType::COLL_STATS);
-        readRoleActions.addAction(ActionType::DB_STATS);
-        readRoleActions.addAction(ActionType::FIND);
+        readRoleActions.addAction(ActionType::oldRead);
+        readRoleActions.addAction(ActionType::collStats);
+        readRoleActions.addAction(ActionType::dbStats);
+        readRoleActions.addAction(ActionType::find);
 
         // Read-write role
         readWriteRoleActions.addAllActionsFromSet(readRoleActions);
         // TODO: Remove OLD_WRITE once commands require the proper actions
-        readWriteRoleActions.addAction(ActionType::OLD_WRITE);
-        readWriteRoleActions.addAction(ActionType::CONVERT_TO_CAPPED);
-        readWriteRoleActions.addAction(ActionType::CREATE_COLLECTION); // TODO: should db admin get this also?
-        readWriteRoleActions.addAction(ActionType::DELETE);
-        readWriteRoleActions.addAction(ActionType::DROP_COLLECTION);
-        readWriteRoleActions.addAction(ActionType::DROP_INDEXES);
-        readWriteRoleActions.addAction(ActionType::EMPTYCAPPED);
-        readWriteRoleActions.addAction(ActionType::ENSURE_INDEX);
-        readWriteRoleActions.addAction(ActionType::INSERT);
-        readWriteRoleActions.addAction(ActionType::UPDATE);
+        readWriteRoleActions.addAction(ActionType::oldWrite);
+        readWriteRoleActions.addAction(ActionType::convertToCapped);
+        readWriteRoleActions.addAction(ActionType::createCollection); // TODO: should db admin get this also?
+        readWriteRoleActions.addAction(ActionType::dropCollection);
+        readWriteRoleActions.addAction(ActionType::dropIndexes);
+        readWriteRoleActions.addAction(ActionType::emptycapped);
+        readWriteRoleActions.addAction(ActionType::ensureIndex);
+        readWriteRoleActions.addAction(ActionType::insert);
+        readWriteRoleActions.addAction(ActionType::remove);
+        readWriteRoleActions.addAction(ActionType::update);
 
         // User admin role
-        userAdminRoleActions.addAction(ActionType::USER_ADMIN);
+        userAdminRoleActions.addAction(ActionType::userAdmin);
 
         // DB admin role
-        dbAdminRoleActions.addAction(ActionType::CLEAN);
-        dbAdminRoleActions.addAction(ActionType::COLL_MOD);
-        dbAdminRoleActions.addAction(ActionType::COLL_STATS);
-        dbAdminRoleActions.addAction(ActionType::COMPACT);
-        dbAdminRoleActions.addAction(ActionType::CONVERT_TO_CAPPED);
-        dbAdminRoleActions.addAction(ActionType::DB_STATS);
-        dbAdminRoleActions.addAction(ActionType::DROP_COLLECTION);
-        dbAdminRoleActions.addAction(ActionType::RE_INDEX); // TODO: Should readWrite have this also? This isn't consistent with ENSURE_INDEX and DROP_INDEXES
-        dbAdminRoleActions.addAction(ActionType::RENAME_COLLECTION);
-        dbAdminRoleActions.addAction(ActionType::VALIDATE);
+        dbAdminRoleActions.addAction(ActionType::clean);
+        dbAdminRoleActions.addAction(ActionType::collMod);
+        dbAdminRoleActions.addAction(ActionType::collStats);
+        dbAdminRoleActions.addAction(ActionType::compact);
+        dbAdminRoleActions.addAction(ActionType::convertToCapped);
+        dbAdminRoleActions.addAction(ActionType::dbStats);
+        dbAdminRoleActions.addAction(ActionType::dropCollection);
+        dbAdminRoleActions.addAction(ActionType::reIndex); // TODO: Should readWrite have this also? This isn't consistent with ENSURE_INDEX and DROP_INDEXES
+        dbAdminRoleActions.addAction(ActionType::renameCollection);
+        dbAdminRoleActions.addAction(ActionType::validate);
 
         // Server admin role
-        serverAdminRoleActions.addAction(ActionType::CLOSE_ALL_DATABASES);
-        serverAdminRoleActions.addAction(ActionType::CONN_POOL_STATS);
-        serverAdminRoleActions.addAction(ActionType::CONN_POOL_SYNC);
-        serverAdminRoleActions.addAction(ActionType::CPU_PROFILER);
-        serverAdminRoleActions.addAction(ActionType::CURSOR_INFO);
-        serverAdminRoleActions.addAction(ActionType::DIAG_LOGGING);
-        serverAdminRoleActions.addAction(ActionType::FSYNC);
-        serverAdminRoleActions.addAction(ActionType::GET_CMD_LINE_OPTS);
-        serverAdminRoleActions.addAction(ActionType::GET_LOG);
-        serverAdminRoleActions.addAction(ActionType::GET_PARAMETER);
-        serverAdminRoleActions.addAction(ActionType::GET_SHARD_MAP);
-        serverAdminRoleActions.addAction(ActionType::GET_SHARD_VERSION);
-        serverAdminRoleActions.addAction(ActionType::HOST_INFO);
-        serverAdminRoleActions.addAction(ActionType::LIST_DATABASES);
-        serverAdminRoleActions.addAction(ActionType::LOG_ROTATE);
-        serverAdminRoleActions.addAction(ActionType::PROFILE);
-        serverAdminRoleActions.addAction(ActionType::REPAIR_DATABASE);
-        serverAdminRoleActions.addAction(ActionType::REPL_SET_FREEZE);
-        serverAdminRoleActions.addAction(ActionType::REPL_SET_GET_STATUS);
-        serverAdminRoleActions.addAction(ActionType::REPL_SET_INITIATE);
-        serverAdminRoleActions.addAction(ActionType::REPL_SET_MAINTENANCE);
-        serverAdminRoleActions.addAction(ActionType::REPL_SET_RECONFIG);
-        serverAdminRoleActions.addAction(ActionType::REPL_SET_STEP_DOWN);
-        serverAdminRoleActions.addAction(ActionType::REPL_SET_SYNC_FROM);
-        serverAdminRoleActions.addAction(ActionType::RESYNC);
-        serverAdminRoleActions.addAction(ActionType::SET_PARAMETER);
-        serverAdminRoleActions.addAction(ActionType::SHUTDOWN);
-        serverAdminRoleActions.addAction(ActionType::TOP);
-        serverAdminRoleActions.addAction(ActionType::TOUCH);
+        serverAdminRoleActions.addAction(ActionType::closeAllDatabases);
+        serverAdminRoleActions.addAction(ActionType::connPoolStats);
+        serverAdminRoleActions.addAction(ActionType::connPoolSync);
+        serverAdminRoleActions.addAction(ActionType::cpuProfiler);
+        serverAdminRoleActions.addAction(ActionType::cursorInfo);
+        serverAdminRoleActions.addAction(ActionType::diagLogging);
+        serverAdminRoleActions.addAction(ActionType::fsync);
+        serverAdminRoleActions.addAction(ActionType::getCmdLineOpts);
+        serverAdminRoleActions.addAction(ActionType::getLog);
+        serverAdminRoleActions.addAction(ActionType::getParameter);
+        serverAdminRoleActions.addAction(ActionType::getShardMap);
+        serverAdminRoleActions.addAction(ActionType::getShardVersion);
+        serverAdminRoleActions.addAction(ActionType::hostInfo);
+        serverAdminRoleActions.addAction(ActionType::listDatabases);
+        serverAdminRoleActions.addAction(ActionType::logRotate);
+        serverAdminRoleActions.addAction(ActionType::profile);
+        serverAdminRoleActions.addAction(ActionType::repairDatabase);
+        serverAdminRoleActions.addAction(ActionType::replSetFreeze);
+        serverAdminRoleActions.addAction(ActionType::replSetGetStatus);
+        serverAdminRoleActions.addAction(ActionType::replSetInitiate);
+        serverAdminRoleActions.addAction(ActionType::replSetMaintenance);
+        serverAdminRoleActions.addAction(ActionType::replSetReconfig);
+        serverAdminRoleActions.addAction(ActionType::replSetStepDown);
+        serverAdminRoleActions.addAction(ActionType::replSetSyncFrom);
+        serverAdminRoleActions.addAction(ActionType::resync);
+        serverAdminRoleActions.addAction(ActionType::setParameter);
+        serverAdminRoleActions.addAction(ActionType::shutdown);
+        serverAdminRoleActions.addAction(ActionType::top);
+        serverAdminRoleActions.addAction(ActionType::touch);
 
         // Cluster admin role
-        clusterAdminRoleActions.addAction(ActionType::ADD_SHARD);
-        clusterAdminRoleActions.addAction(ActionType::DROP_DATABASE); // TODO: Should there be a CREATE_DATABASE also?
-        clusterAdminRoleActions.addAction(ActionType::ENABLE_SHARDING);
-        clusterAdminRoleActions.addAction(ActionType::FLUSH_ROUTER_CONFIG);
-        clusterAdminRoleActions.addAction(ActionType::LIST_SHARDS);
-        clusterAdminRoleActions.addAction(ActionType::MOVE_CHUNK);
-        clusterAdminRoleActions.addAction(ActionType::MOVE_PRIMARY);
-        clusterAdminRoleActions.addAction(ActionType::NETSTAT);
-        clusterAdminRoleActions.addAction(ActionType::REMOVE_SHARD);
-        clusterAdminRoleActions.addAction(ActionType::SET_SHARD_VERSION); // TODO: should this be internal?
-        clusterAdminRoleActions.addAction(ActionType::SHARD_COLLECTION);
-        clusterAdminRoleActions.addAction(ActionType::SHARDING_STATE);
-        clusterAdminRoleActions.addAction(ActionType::SPLIT);
-        clusterAdminRoleActions.addAction(ActionType::SPLIT_CHUNK);
-        clusterAdminRoleActions.addAction(ActionType::SPLIT_VECTOR);
-        clusterAdminRoleActions.addAction(ActionType::UNSET_SHARDING);
+        clusterAdminRoleActions.addAction(ActionType::addShard);
+        clusterAdminRoleActions.addAction(ActionType::dropDatabase); // TODO: Should there be a CREATE_DATABASE also?
+        clusterAdminRoleActions.addAction(ActionType::enableSharding);
+        clusterAdminRoleActions.addAction(ActionType::flushRouterConfig);
+        clusterAdminRoleActions.addAction(ActionType::listShards);
+        clusterAdminRoleActions.addAction(ActionType::moveChunk);
+        clusterAdminRoleActions.addAction(ActionType::movePrimary);
+        clusterAdminRoleActions.addAction(ActionType::netstat);
+        clusterAdminRoleActions.addAction(ActionType::removeShard);
+        clusterAdminRoleActions.addAction(ActionType::setShardVersion); // TODO: should this be internal?
+        clusterAdminRoleActions.addAction(ActionType::shardCollection);
+        clusterAdminRoleActions.addAction(ActionType::shardingState);
+        clusterAdminRoleActions.addAction(ActionType::split);
+        clusterAdminRoleActions.addAction(ActionType::splitChunk);
+        clusterAdminRoleActions.addAction(ActionType::splitVector);
+        clusterAdminRoleActions.addAction(ActionType::unsetSharding);
 
         return Status::OK();
     }

@@ -70,7 +70,7 @@ namespace mongo {
     std::string ActionSet::toString() const {
         StringBuilder str;
         bool addedOne = false;
-        for (int i = 0; i < ActionType::ACTION_TYPE_END_VALUE; i++) {
+        for (int i = 0; i < ActionType::actionTypeEndValue; i++) {
             ActionType action(i);
             if (contains(action)) {
                 if (addedOne) {

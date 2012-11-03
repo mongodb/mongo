@@ -23,91 +23,89 @@ Usage:
 
 import sys
 
-# List of tuples describing the ActionTypes that should be created.
-# The first value in the tuple is the name of the enum, the second is the string
-# representation.
-actionTypes = [("ADD_SHARD", "addShard"),
-               ("APPLY_OPS", "applyOps"),
-               ("CAPTRUNC", "captrunc"),
-               ("CLEAN", "clean"),
-               ("CLOSE_ALL_DATABASES", "closeAllDatabases"),
-               ("COLL_MOD", "collMod"),
-               ("COLL_STATS", "collStats"),
-               ("COMPACT", "compact"),
-               ("CONN_POOL_STATS", "connPoolStats"),
-               ("CONN_POOL_SYNC", "connPoolSync"),
-               ("CONVERT_TO_CAPPED", "convertToCapped"),
-               ("CPU_PROFILER", "cpuProfiler"),
-               ("CREATE_COLLECTION", "createCollection"),
-               ("CURSOR_INFO", "cursorInfo"),
-               ("DB_HASH", "dbHash"),
-               ("DB_STATS", "dbStats"),
-               ("DELETE", "delete"),
-               ("DIAG_LOGGING", "diagLogging"),
-               ("DROP_COLLECTION", "dropCollection"),
-               ("DROP_DATABASE", "dropDatabase"),
-               ("DROP_INDEXES", "dropIndexes"),
-               ("EMPTYCAPPED", "emptycapped"),
-               ("ENABLE_SHARDING", "enableSharding"),
-               ("ENSURE_INDEX", "ensureIndex"),
-               ("FIND", "find"),
-               ("FLUSH_ROUTER_CONFIG", "flushRouterConfig"),
-               ("FSYNC", "fsync"),
-               ("GET_CMD_LINE_OPTS", "getCmdLineOpts"),
-               ("GET_LOG", "getLog"),
-               ("GET_PARAMETER", "getParameter"),
-               ("GET_SHARD_MAP", "getShardMap"),
-               ("GET_SHARD_VERSION", "getShardVersion"),
-               ("HANDSHAKE", "handshake"),
-               ("HOST_INFO", "hostInfo"),
-               ("INSERT", "insert"),
-               ("LIST_DATABASES", "listDatabases"),
-               ("LIST_SHARDS", "listShards"),
-               ("LOG_ROTATE", "logRotate"),
-               ("MOVE_CHUNK", "moveChunk"),
-               ("MOVE_PRIMARY", "movePrimary"),
-               ("NETSTAT", "netstat"),
-               ("PROFILE", "profile"),
-               ("RE_INDEX", "reIndex"),
-               ("REMOVE_SHARD", "removeShard"),
-               ("RENAME_COLLECTION", "renameCollection"),
-               ("REPAIR_DATABASE", "repairDatabase"),
-               ("REPL_SET_ELECT", "replSetElect"),
-               ("REPL_SET_FREEZE", "replSetFreeze"),
-               ("REPL_SET_FRESH", "replSetFresh"),
-               ("REPL_SET_GET_RBID", "replSetGetRBID"),
-               ("REPL_SET_GET_STATUS", "replSetGetStatus"),
-               ("REPL_SET_HEARTBEAT", "replSetHeartbeat"),
-               ("REPL_SET_INITIATE", "replSetInitiate"),
-               ("REPL_SET_MAINTENANCE", "replSetMaintenance"),
-               ("REPL_SET_RECONFIG", "replSetReconfig"),
-               ("REPL_SET_STEP_DOWN", "replSetStepDown"),
-               ("REPL_SET_SYNC_FROM", "replSetSyncFrom"),
-               ("RESYNC", "resync"),
-               ("SET_PARAMETER", "setParameter"),
-               ("SET_SHARD_VERSION", "setShardVersion"),
-               ("SHARD_COLLECTION", "shardCollection"),
-               ("SHARDING_STATE", "shardingState"),
-               ("SHUTDOWN", "shutdown"),
-               ("SPLIT", "split"),
-               ("SPLIT_CHUNK", "splitChunk"),
-               ("SPLIT_VECTOR", "splitVector"),
-               ("TOP", "top"),
-               ("TOUCH", "touch"),
-               ("UNSET_SHARDING", "unsetSharding"),
-               ("UPDATE", "update"),
-               ("USER_ADMIN", "userAdmin"),
-               ("VALIDATE", "validate"),
-               ("WRITEBACKLISTEN", "writebacklisten"),
-               ("WRITE_BACKS_QUEUED", "writeBacksQueued"),
-               ("_MIGRATE_CLONE", "_migrateClone"),
-               ("_RECV_CHUNK_ABORT", "_recvChunkAbort"),
-               ("_RECV_CHUNK_COMMIT", "_recvChunkCommit"),
-               ("_RECV_CHUNK_START", "_recvChunkStart"),
-               ("_RECV_CHUNK_STATUS", "_recvChunkStatus"),
-               ("_TRANSFER_MODS", "_transferMods"),
-               ("OLD_READ", "oldRead"), # Temporary. For easing AuthorizationManager integration
-               ("OLD_WRITE", "oldWrite")] # Temporary. For easing AuthorizationManager integration
+# List describing the ActionTypes that should be created.
+actionTypes = ["addShard",
+               "applyOps",
+               "captrunc",
+               "clean",
+               "closeAllDatabases",
+               "collMod",
+               "collStats",
+               "compact",
+               "connPoolStats",
+               "connPoolSync",
+               "convertToCapped",
+               "cpuProfiler",
+               "createCollection",
+               "cursorInfo",
+               "dbHash",
+               "dbStats",
+               "diagLogging",
+               "dropCollection",
+               "dropDatabase",
+               "dropIndexes",
+               "emptycapped",
+               "enableSharding",
+               "ensureIndex",
+               "find",
+               "flushRouterConfig",
+               "fsync",
+               "getCmdLineOpts",
+               "getLog",
+               "getParameter",
+               "getShardMap",
+               "getShardVersion",
+               "handshake",
+               "hostInfo",
+               "insert",
+               "listDatabases",
+               "listShards",
+               "logRotate",
+               "moveChunk",
+               "movePrimary",
+               "netstat",
+               "profile",
+               "reIndex",
+               "remove",
+               "removeShard",
+               "renameCollection",
+               "repairDatabase",
+               "replSetElect",
+               "replSetFreeze",
+               "replSetFresh",
+               "replSetGetRBID",
+               "replSetGetStatus",
+               "replSetHeartbeat",
+               "replSetInitiate",
+               "replSetMaintenance",
+               "replSetReconfig",
+               "replSetStepDown",
+               "replSetSyncFrom",
+               "resync",
+               "setParameter",
+               "setShardVersion",
+               "shardCollection",
+               "shardingState",
+               "shutdown",
+               "split",
+               "splitChunk",
+               "splitVector",
+               "top",
+               "touch",
+               "unsetSharding",
+               "update",
+               "userAdmin",
+               "validate",
+               "writebacklisten",
+               "writeBacksQueued",
+               "_migrateClone",
+               "_recvChunkAbort",
+               "_recvChunkCommit",
+               "_recvChunkStart",
+               "_recvChunkStatus",
+               "_transferMods",
+               "oldRead", # Temporary. For easing AuthorizationManager integration
+               "oldWrite"] # Temporary. For easing AuthorizationManager integration
 
 
 headerFileTemplate = """// AUTO-GENERATED FILE DO NOT EDIT
@@ -161,10 +159,10 @@ namespace mongo {
 %(actionTypeConstants)s
         enum ActionTypeIdentifier {
 %(actionTypeIdentifiers)s
-            ACTION_TYPE_END_VALUE, // Should always be last in this enum
+            actionTypeEndValue, // Should always be last in this enum
         };
 
-        static const int NUM_ACTION_TYPES = ACTION_TYPE_END_VALUE;
+        static const int NUM_ACTION_TYPES = actionTypeEndValue;
 
     private:
 
@@ -241,17 +239,16 @@ def writeSourceFile(sourceOutputFile):
     actionTypeConstants = ""
     fromStringIfStatements = ""
     toStringCaseStatements = ""
-    for (actionType, stringRepresentation) in actionTypes:
+    for actionType in actionTypes:
         actionTypeConstants += ("    const ActionType ActionType::%(actionType)s"
-                                "(%(actionType)s_VALUE);\n" %
+                                "(%(actionType)sValue);\n" %
                                 dict(actionType=actionType))
-        fromStringIfStatements += """        if (action == "%(stringRepresentation)s") {
+        fromStringIfStatements += """        if (action == "%(actionType)s") {
             *result = %(actionType)s;
             return Status::OK();
-        }\n""" % dict(stringRepresentation=stringRepresentation, actionType=actionType)
-        toStringCaseStatements += """        case %(actionType)s_VALUE:
-            return "%(stringRepresentation)s";\n""" % dict(actionType=actionType,
-                                                           stringRepresentation=stringRepresentation)
+        }\n""" % dict(actionType=actionType)
+        toStringCaseStatements += """        case %(actionType)sValue:
+            return "%(actionType)s";\n""" % dict(actionType=actionType)
     formattedSourceFile = sourceFileTemplate % dict(actionTypeConstants=actionTypeConstants,
                                                     fromStringIfStatements=fromStringIfStatements,
                                                     toStringCaseStatements=toStringCaseStatements)
@@ -262,31 +259,23 @@ def writeSourceFile(sourceOutputFile):
 def writeHeaderFile(headerOutputFile):
     actionTypeConstants = ""
     actionTypeIdentifiers = ""
-    for (actionType, unused) in actionTypes:
+    for actionType in actionTypes:
         actionTypeConstants += "        static const ActionType %s;\n" % (actionType)
-        actionTypeIdentifiers += "            %s_VALUE,\n" % (actionType)
+        actionTypeIdentifiers += "            %sValue,\n" % (actionType)
     formattedHeaderFile = headerFileTemplate % dict(actionTypeConstants=actionTypeConstants,
                                                     actionTypeIdentifiers=actionTypeIdentifiers)
     headerOutputFile.write(formattedHeaderFile)
 
 def hasDuplicateActionTypes():
-    sorted_by_name = sorted(actionTypes, key=lambda x: x[0])
-    sorted_by_string = sorted(actionTypes, key=lambda x: x[1])
+    sortedActionTypes = sorted(actionTypes)
 
     didFail = False
-    prev_name, prev_string = sorted_by_name[0]
-    for name, string in sorted_by_name[1:]:
-        if name == prev_name:
-            print 'Duplicate name %s with string descriptions %s and %s\n' % (name, string, prev_string)
+    prevActionType = sortedActionTypes[0]
+    for actionType in sortedActionTypes[1:]:
+        if actionType == prevActionType:
+            print 'Duplicate actionType %s\n' % actionType
             didFail = True
-        prev_name, prev_string = name, string
-
-    prev_name, prev_string = sorted_by_string[0]
-    for name, string in sorted_by_string[1:]:
-        if string == prev_string:
-            print 'Duplicate string description %s for actions %s and %s\n' % (string, name, prev_name)
-            didFail = True
-        prev_name, prev_string = name, string
+        prevActionType = actionType
 
     return didFail
 

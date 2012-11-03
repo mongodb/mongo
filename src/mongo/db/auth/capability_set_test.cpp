@@ -36,7 +36,7 @@ namespace {
         ASSERT_OK(ActionSet::parseActionSetFromString("find,update", &actions));
         Capability fooUser("foo", &user2, actions);
 
-        ASSERT_OK(ActionSet::parseActionSetFromString("find,update,userAdmin,delete", &actions));
+        ASSERT_OK(ActionSet::parseActionSetFromString("find,update,userAdmin,remove", &actions));
         Capability fooUser2("foo", &user1, actions);
 
         ASSERT_OK(ActionSet::parseActionSetFromString("find,update", &actions));
@@ -48,53 +48,53 @@ namespace {
 
         const Capability* capPtr;
         // No capabilities
-        ASSERT(!capSet.getCapabilityForAction("foo", ActionType::FIND));
+        ASSERT(!capSet.getCapabilityForAction("foo", ActionType::find));
 
         capSet.grantCapability(fooUser);
-        capPtr = capSet.getCapabilityForAction("foo", ActionType::FIND);
-        ASSERT_TRUE(capPtr->includesAction(ActionType::FIND));
-        ASSERT_FALSE(capPtr->includesAction(ActionType::DELETE));
+        capPtr = capSet.getCapabilityForAction("foo", ActionType::find);
+        ASSERT_TRUE(capPtr->includesAction(ActionType::find));
+        ASSERT_FALSE(capPtr->includesAction(ActionType::remove));
 
-        ASSERT(!capSet.getCapabilityForAction("foo", ActionType::DELETE));
+        ASSERT(!capSet.getCapabilityForAction("foo", ActionType::remove));
 
         capSet.grantCapability(fooUser2);
-        capPtr = capSet.getCapabilityForAction("foo", ActionType::USER_ADMIN);
-        ASSERT_TRUE(capPtr->includesAction(ActionType::FIND));
-        ASSERT_TRUE(capPtr->includesAction(ActionType::DELETE));
+        capPtr = capSet.getCapabilityForAction("foo", ActionType::userAdmin);
+        ASSERT_TRUE(capPtr->includesAction(ActionType::find));
+        ASSERT_TRUE(capPtr->includesAction(ActionType::remove));
 
         // No capabilities
-        ASSERT(!capSet.getCapabilityForAction("bar", ActionType::FIND));
+        ASSERT(!capSet.getCapabilityForAction("bar", ActionType::find));
 
         capSet.grantCapability(barReadOnly);
-        capPtr = capSet.getCapabilityForAction("bar", ActionType::FIND);
-        ASSERT_TRUE(capPtr->includesAction(ActionType::FIND));
-        ASSERT_FALSE(capPtr->includesAction(ActionType::UPDATE));
-        ASSERT_FALSE(capPtr->includesAction(ActionType::DELETE));
+        capPtr = capSet.getCapabilityForAction("bar", ActionType::find);
+        ASSERT_TRUE(capPtr->includesAction(ActionType::find));
+        ASSERT_FALSE(capPtr->includesAction(ActionType::update));
+        ASSERT_FALSE(capPtr->includesAction(ActionType::remove));
 
-        ASSERT(!capSet.getCapabilityForAction("bar", ActionType::UPDATE));
+        ASSERT(!capSet.getCapabilityForAction("bar", ActionType::update));
 
         capSet.grantCapability(barUser);
-        capPtr = capSet.getCapabilityForAction("bar", ActionType::UPDATE);
-        ASSERT_TRUE(capPtr->includesAction(ActionType::FIND));
-        ASSERT_TRUE(capPtr->includesAction(ActionType::UPDATE));
-        ASSERT_FALSE(capPtr->includesAction(ActionType::DELETE));
+        capPtr = capSet.getCapabilityForAction("bar", ActionType::update);
+        ASSERT_TRUE(capPtr->includesAction(ActionType::find));
+        ASSERT_TRUE(capPtr->includesAction(ActionType::update));
+        ASSERT_FALSE(capPtr->includesAction(ActionType::remove));
 
         // Now let's start revoking capabilities
         capSet.revokeCapabilitiesFromPrincipal(&user1);
 
-        capPtr = capSet.getCapabilityForAction("foo", ActionType::FIND);
-        ASSERT_TRUE(capPtr->includesAction(ActionType::FIND));
-        ASSERT_FALSE(capPtr->includesAction(ActionType::DELETE));
+        capPtr = capSet.getCapabilityForAction("foo", ActionType::find);
+        ASSERT_TRUE(capPtr->includesAction(ActionType::find));
+        ASSERT_FALSE(capPtr->includesAction(ActionType::remove));
 
-        capPtr = capSet.getCapabilityForAction("bar", ActionType::FIND);
-        ASSERT_TRUE(capPtr->includesAction(ActionType::FIND));
-        ASSERT_FALSE(capPtr->includesAction(ActionType::UPDATE));
-        ASSERT_FALSE(capPtr->includesAction(ActionType::DELETE));
+        capPtr = capSet.getCapabilityForAction("bar", ActionType::find);
+        ASSERT_TRUE(capPtr->includesAction(ActionType::find));
+        ASSERT_FALSE(capPtr->includesAction(ActionType::update));
+        ASSERT_FALSE(capPtr->includesAction(ActionType::remove));
 
 
         capSet.revokeCapabilitiesFromPrincipal(&user2);
-        ASSERT(!capSet.getCapabilityForAction("foo", ActionType::FIND));
-        ASSERT(!capSet.getCapabilityForAction("bar", ActionType::FIND));
+        ASSERT(!capSet.getCapabilityForAction("foo", ActionType::find));
+        ASSERT(!capSet.getCapabilityForAction("bar", ActionType::find));
     }
 
 }  // namespace
