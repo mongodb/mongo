@@ -18,94 +18,10 @@
 """Generate action_type.{h,cpp}
 
 Usage:
-    python generate_action_types.py <header file path> <source file path>
+    python generate_action_types.py <path to action_types.txt> <header file path> <source file path>
 """
 
 import sys
-
-# List describing the ActionTypes that should be created.
-actionTypes = ["addShard",
-               "applyOps",
-               "captrunc",
-               "clean",
-               "closeAllDatabases",
-               "collMod",
-               "collStats",
-               "compact",
-               "connPoolStats",
-               "connPoolSync",
-               "convertToCapped",
-               "cpuProfiler",
-               "createCollection",
-               "cursorInfo",
-               "dbHash",
-               "dbStats",
-               "diagLogging",
-               "dropCollection",
-               "dropDatabase",
-               "dropIndexes",
-               "emptycapped",
-               "enableSharding",
-               "ensureIndex",
-               "find",
-               "flushRouterConfig",
-               "fsync",
-               "getCmdLineOpts",
-               "getLog",
-               "getParameter",
-               "getShardMap",
-               "getShardVersion",
-               "handshake",
-               "hostInfo",
-               "insert",
-               "listDatabases",
-               "listShards",
-               "logRotate",
-               "moveChunk",
-               "movePrimary",
-               "netstat",
-               "profile",
-               "reIndex",
-               "remove",
-               "removeShard",
-               "renameCollection",
-               "repairDatabase",
-               "replSetElect",
-               "replSetFreeze",
-               "replSetFresh",
-               "replSetGetRBID",
-               "replSetGetStatus",
-               "replSetHeartbeat",
-               "replSetInitiate",
-               "replSetMaintenance",
-               "replSetReconfig",
-               "replSetStepDown",
-               "replSetSyncFrom",
-               "resync",
-               "setParameter",
-               "setShardVersion",
-               "shardCollection",
-               "shardingState",
-               "shutdown",
-               "split",
-               "splitChunk",
-               "splitVector",
-               "top",
-               "touch",
-               "unsetSharding",
-               "update",
-               "userAdmin",
-               "validate",
-               "writebacklisten",
-               "writeBacksQueued",
-               "_migrateClone",
-               "_recvChunkAbort",
-               "_recvChunkCommit",
-               "_recvChunkStart",
-               "_recvChunkStatus",
-               "_transferMods",
-               "oldRead", # Temporary. For easing AuthorizationManager integration
-               "oldWrite"] # Temporary. For easing AuthorizationManager integration
 
 
 headerFileTemplate = """// AUTO-GENERATED FILE DO NOT EDIT
@@ -235,7 +151,7 @@ namespace mongo {
 } // namespace mongo
 """
 
-def writeSourceFile(sourceOutputFile):
+def writeSourceFile(actionTypes, sourceOutputFile):
     actionTypeConstants = ""
     fromStringIfStatements = ""
     toStringCaseStatements = ""
@@ -256,7 +172,7 @@ def writeSourceFile(sourceOutputFile):
 
     pass
 
-def writeHeaderFile(headerOutputFile):
+def writeHeaderFile(actionTypes, headerOutputFile):
     actionTypeConstants = ""
     actionTypeIdentifiers = ""
     for actionType in actionTypes:
@@ -266,7 +182,7 @@ def writeHeaderFile(headerOutputFile):
                                                     actionTypeIdentifiers=actionTypeIdentifiers)
     headerOutputFile.write(formattedHeaderFile)
 
-def hasDuplicateActionTypes():
+def hasDuplicateActionTypes(actionTypes):
     sortedActionTypes = sorted(actionTypes)
 
     didFail = False
@@ -279,16 +195,22 @@ def hasDuplicateActionTypes():
 
     return didFail
 
+def parseActionTypesFromFile(actionTypesFilename):
+    actionTypesFile = open(actionTypesFilename, 'r')
+    actionTypes = eval(actionTypesFile.read())
+    return actionTypes
+
 if __name__ == "__main__":
-    if len(sys.argv) != 3:
-        print "Usage: generate_action_types.py <header file path> <source file path>"
+    if len(sys.argv) != 4:
+        print "Usage: generate_action_types.py <path to action_types.txt> <header file path> <source file path>"
         sys.exit(-1)
 
-    if hasDuplicateActionTypes():
+    actionTypes = parseActionTypesFromFile(sys.argv[1])
+    if hasDuplicateActionTypes(actionTypes):
         sys.exit(-1)
 
-    headerOutputFile = open(sys.argv[1], 'w')
-    sourceOutputFile = open(sys.argv[2], 'w')
+    headerOutputFile = open(sys.argv[2], 'w')
+    sourceOutputFile = open(sys.argv[3], 'w')
 
-    writeHeaderFile(headerOutputFile)
-    writeSourceFile(sourceOutputFile)
+    writeHeaderFile(actionTypes, headerOutputFile)
+    writeSourceFile(actionTypes, sourceOutputFile)

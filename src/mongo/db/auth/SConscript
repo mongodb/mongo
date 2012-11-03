@@ -4,7 +4,7 @@ Import("env")
 
 env.StaticLibrary('serverauth', ['mongo_authentication_session.cpp'])
 
-env.Command(['action_type.h', 'action_type.cpp'], ['generate_action_types.py'],
+env.Command(['action_type.h', 'action_type.cpp'], ['generate_action_types.py', 'action_types.txt'],
             '$PYTHON $SOURCES $TARGETS')
 
 # Just the data structures used
