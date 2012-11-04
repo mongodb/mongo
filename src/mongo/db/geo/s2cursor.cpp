@@ -14,11 +14,13 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "mongo/db/btree.h"
+#include "mongo/db/geo/s2cursor.h"
+
+#include "mongo/db/btreecursor.h"
 #include "mongo/db/index.h"
 #include "mongo/db/matcher.h"
+#include "mongo/db/pdfile.h"
 #include "mongo/db/geo/s2common.h"
-#include "mongo/db/geo/s2cursor.h"
 
 namespace mongo {
     // Does this GeoQueryField intersect the provided data?
@@ -126,7 +128,7 @@ namespace mongo {
             FieldRangeSet frs(_details->parentNS().c_str(), makeUnifiedFRS(), false, false);
             shared_ptr<FieldRangeVector> frv(new FieldRangeVector(frs, specForFRV, 1));
             _btreeCursor.reset(BtreeCursor::make(nsdetails(_details->parentNS().c_str()),
-                                                 *_details, frv, 1));
+                                                 *_details, frv, 0, 1));
             return advance();
         }
         return _btreeCursor->ok();

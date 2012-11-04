@@ -336,7 +336,12 @@
             start.appendMinKey( "a" );
             BSONObjBuilder end;
             end.appendMaxKey( "a" );
-            auto_ptr< BtreeCursor > c( BtreeCursor::make( nsdetails( ns() ), 1, id(), start.done(), end.done(), false, 1 ) );
+            auto_ptr< BtreeCursor > c( BtreeCursor::make( nsdetails( ns() ),
+                                                          id(),
+                                                          start.done(),
+                                                          end.done(),
+                                                          false,
+                                                          1 ) );
             while( c->ok() ) {
                 if ( c->curKeyHasChild() ) {
                     toDel.push_back( c->currKey().firstElement().valuestr() );
@@ -393,7 +398,12 @@
             end.appendMaxKey( "a" );
             BSONObj l = bt()->keyNode( 0 ).key.toBson();
             string toInsert;
-            auto_ptr< BtreeCursor > c( BtreeCursor::make( nsdetails( ns() ), 1, id(), start.done(), end.done(), false, 1 ) );
+            auto_ptr< BtreeCursor > c( BtreeCursor::make( nsdetails( ns() ),
+                                                          id(),
+                                                          start.done(),
+                                                          end.done(),
+                                                          false,
+                                                          1 ) );
             while( c->ok() ) {
                 if ( c->currKey().woCompare( l ) > 0 ) {
                     toInsert = c->currKey().firstElement().valuestr();

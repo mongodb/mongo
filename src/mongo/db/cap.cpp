@@ -23,7 +23,6 @@
 #include "../util/mmap.h"
 #include "../util/hashtab.h"
 #include "../scripting/engine.h"
-#include "btree.h"
 #include <algorithm>
 #include <list>
 #include "json.h"

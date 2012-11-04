@@ -19,6 +19,7 @@
 #include "mongo/db/index_update.h"
 
 #include "mongo/db/btree.h"
+#include "mongo/db/btreecursor.h"
 #include "mongo/db/compact.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/kill_current_op.h"

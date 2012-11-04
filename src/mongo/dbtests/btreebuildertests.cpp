@@ -18,6 +18,8 @@
 
 #include "mongo/db/btreebuilder.h"
 
+#include "mongo/db/btreecursor.h"
+#include "mongo/db/pdfile.h"
 #include "mongo/platform/cstdint.h"
 
 #include "mongo/dbtests/dbtests.h"

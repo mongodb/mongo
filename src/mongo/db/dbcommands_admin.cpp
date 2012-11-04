@@ -28,7 +28,6 @@
 #include <boost/filesystem/convenience.hpp>
 #include <boost/filesystem/operations.hpp>
 
-#include "mongo/db/btree.h"
 #include "mongo/db/cmdline.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/curop-inl.h"

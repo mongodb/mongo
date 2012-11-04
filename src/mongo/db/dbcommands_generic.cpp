@@ -22,7 +22,6 @@
 #include "../bson/util/builder.h"
 #include <time.h>
 #include "introspect.h"
-#include "btree.h"
 #include "../client/dbclient_rs.h"
 #include "../util/lruishmap.h"
 #include "../util/md5.hpp"

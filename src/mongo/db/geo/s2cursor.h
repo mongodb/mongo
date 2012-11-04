@@ -17,7 +17,6 @@
 #include <vector>
 #include "mongo/db/jsobj.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/btree.h"
 #include "mongo/db/cursor.h"
 #include "mongo/db/diskloc.h"
 #include "mongo/db/matcher.h"
@@ -25,6 +24,8 @@
 #include "mongo/db/geo/s2common.h"
 
 namespace mongo {
+    class BtreeCursor;
+
     class S2Cursor : public Cursor {
     public:
         S2Cursor(const BSONObj &keyPattern, const IndexDetails* details, const BSONObj &query,

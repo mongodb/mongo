@@ -27,7 +27,7 @@
 
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/background.h"
-#include "mongo/db/btree.h"
+#include "mongo/db/btreecursor.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/db.h"
 #include "mongo/db/dur_stats.h"
@@ -1039,7 +1039,7 @@ namespace mongo {
                 min = Helpers::modifiedRangeBound( min , idx->keyPattern() , -1 );
                 max = Helpers::modifiedRangeBound( max , idx->keyPattern() , -1 );
 
-                c.reset( BtreeCursor::make( d, d->idxNo(*idx), *idx, min, max, false, 1 ) );
+                c.reset( BtreeCursor::make( d, *idx, min, max, false, 1 ) );
             }
 
             long long avgObjSize = d->stats.datasize / d->stats.nrecords;
@@ -1519,7 +1519,12 @@ namespace mongo {
 
                 int idNum = nsd->findIdIndex();
                 if ( idNum >= 0 ) {
-                    cursor.reset( BtreeCursor::make( nsd , idNum , nsd->idx( idNum ) , BSONObj() , BSONObj() , false , 1 ) );
+                    cursor.reset( BtreeCursor::make( nsd,
+                                                     nsd->idx( idNum ),
+                                                     BSONObj(),
+                                                     BSONObj(),
+                                                     false,
+                                                     1 ) );
                 }
                 else if ( c.find( ".system." ) != string::npos ) {
                     continue;
