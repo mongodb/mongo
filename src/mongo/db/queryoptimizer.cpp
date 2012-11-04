@@ -16,14 +16,17 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "pch.h"
+#include "mongo/pch.h"
+
 #include "mongo/db/queryoptimizer.h"
-#include "db.h"
-#include "mongo/db/btreecursor.h"
-#include "cmdline.h"
-#include "../server.h"
-#include "pagefault.h"
+
 #include "mongo/client/dbclientinterface.h"
+#include "mongo/db/btreecursor.h"
+#include "mongo/db/cmdline.h"
+#include "mongo/db/db.h"
+#include "mongo/db/intervalbtreecursor.h"
+#include "mongo/db/pagefault.h"
+#include "mongo/server.h"
 
 //#define DEBUGQO(x) cout << x << endl;
 #define DEBUGQO(x)
@@ -258,7 +261,8 @@ doneCheckOrder:
         }
     }
 
-    shared_ptr<Cursor> QueryPlan::newCursor( const DiskLoc &startLoc ) const {
+    shared_ptr<Cursor> QueryPlan::newCursor( const DiskLoc& startLoc,
+                                             bool requestIntervalCursor ) const {
 
         if ( _type ) {
             // hopefully safe to use original query in these contexts - don't think we can mix type with $or clause separation yet
@@ -299,6 +303,27 @@ doneCheckOrder:
                                                           _frv->endKey(),
                                                           true,
                                                           _direction >= 0 ? 1 : -1 ) );
+        }
+
+        // An IntervalBtreeCursor is returned if explicitly requested AND _frv is exactly
+        // represented by a single interval within the btree.
+        if ( // If an interval cursor is requested and ...
+             requestIntervalCursor &&
+             // ... equalities come before ranges (a requirement of Optimal) and ...
+             _utility == Optimal &&
+             // ... the field range vector exactly represents a single interval ...
+             _frv->isSingleInterval() ) {
+            // ... and an interval cursor can be created ...
+            shared_ptr<Cursor> ret( IntervalBtreeCursor::make( _d,
+                                                               *_index,
+                                                               _frv->startKey(),
+                                                               _frv->startKeyInclusive(),
+                                                               _frv->endKey(),
+                                                               _frv->endKeyInclusive() ) );
+            if ( ret ) {
+                // ... then return the interval cursor.
+                return ret;
+            }
         }
 
         return shared_ptr<Cursor>( BtreeCursor::make( _d,

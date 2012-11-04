@@ -894,6 +894,11 @@ namespace mongo {
      * This function is only needed in cases where k has a left or right child;
      * in other cases a simpler key removal implementation is possible.
      *
+     * NOTE on noncompliant BtreeBuilder btrees:
+     * It is possible (though likely rare) for btrees created by BtreeBuilder to
+     * have k' that is not a leaf, see SERVER-2732.  These cases are handled in
+     * the same manner as described in the "legacy btree structures" note below.
+     *
      * NOTE on legacy btree structures:
      * In legacy btrees, k' can be a nonleaf.  In such a case we 'delete' k by
      * marking it as an unused node rather than replacing it with k'.  Also, k'

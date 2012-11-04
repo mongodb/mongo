@@ -678,8 +678,13 @@ namespace mongo {
         }
         else {
             cursor =
-                NamespaceDetailsTransient::getCursor( ns.c_str(), query, order, QueryPlanSelectionPolicy::any(),
-                                                      true, pq_shared, false, &queryPlan );
+                NamespaceDetailsTransient::getCursor( ns.c_str(),
+                                                      query,
+                                                      order,
+                                                      QueryPlanSelectionPolicy::any(),
+                                                      pq_shared,
+                                                      false,
+                                                      &queryPlan );
         }
         verify( cursor );
         

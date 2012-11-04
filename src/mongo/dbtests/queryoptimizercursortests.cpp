@@ -996,7 +996,7 @@ namespace QueryOptimizerCursorTests {
                                       BSON( "$query" << query << "$orderby" << order ),
                                       BSONObj() ) );
             return NamespaceDetailsTransient::getCursor( ns(), query, order,
-                                                        QueryPlanSelectionPolicy::any(), 0,
+                                                        QueryPlanSelectionPolicy::any(),
                                                         parsedQuery, false );
         }
     };
@@ -2844,7 +2844,7 @@ namespace QueryOptimizerCursorTests {
                                       BSONObj() ) );
             shared_ptr<Cursor> cursor =
             NamespaceDetailsTransient::getCursor( ns(), query, order,
-                                                  QueryPlanSelectionPolicy::any(), 0, parsedQuery,
+                                                  QueryPlanSelectionPolicy::any(), parsedQuery,
                                                   false );
             shared_ptr<QueryOptimizerCursor> ret =
             dynamic_pointer_cast<QueryOptimizerCursor>( cursor );
@@ -2897,7 +2897,7 @@ namespace QueryOptimizerCursorTests {
                                       BSON( "b" << 1 ) ) );
             shared_ptr<Cursor> cursor =
             NamespaceDetailsTransient::getCursor( ns(), BSON( "a" << 4 ), BSONObj(),
-                                                  QueryPlanSelectionPolicy::any(), 0, parsedQuery,
+                                                  QueryPlanSelectionPolicy::any(), parsedQuery,
                                                   false );
             while( cursor->advance() );
             // No plan recorded when a hint is used.
@@ -2911,7 +2911,7 @@ namespace QueryOptimizerCursorTests {
             shared_ptr<Cursor> cursor2 =
             NamespaceDetailsTransient::getCursor( ns(), BSON( "a" << 4 ),
                                                  BSON( "b" << 1 << "c" << 1 ),
-                                                 QueryPlanSelectionPolicy::any(), 0,
+                                                 QueryPlanSelectionPolicy::any(),
                                                  parsedQuery2, false );
             while( cursor2->advance() );
             // Plan recorded was for a different query pattern (different sort spec).
@@ -3513,7 +3513,7 @@ namespace QueryOptimizerCursorTests {
                 }
                 shared_ptr<Cursor> c =
                 NamespaceDetailsTransient::getCursor( ns(), extractedQuery, order(), planPolicy(),
-                                                      true, _parsedQuery, false );
+                                                      _parsedQuery, false );
                 string type = c->toString().substr( 0, expectedType().length() );
                 ASSERT_EQUALS( expectedType(), type );
                 check( c );
@@ -3651,7 +3651,7 @@ namespace QueryOptimizerCursorTests {
                                           BSONObj() ) );
                 shared_ptr<Cursor> c =
                 NamespaceDetailsTransient::getCursor( ns(), BSONObj(), BSON( "a" << 1 ),
-                                                     QueryPlanSelectionPolicy::any(), 0,
+                                                     QueryPlanSelectionPolicy::any(),
                                                      parsedQuery, false );
                 ASSERT( c );
             }
@@ -3990,6 +3990,11 @@ namespace QueryOptimizerCursorTests {
             }
         };
 
+        class RequestMatcherFalse : public QueryPlanSelectionPolicy {
+            virtual string name() const { return "RequestMatcherFalse"; }
+            virtual bool requestMatcher() const { return false; }
+        } _requestMatcherFalse;
+
         /**
          * A Cursor returned by NamespaceDetailsTransient::getCursor() may or may not have a
          * matcher().  A Matcher will generally exist if required to match the provided query or
@@ -4020,8 +4025,9 @@ namespace QueryOptimizerCursorTests {
                         NamespaceDetailsTransient::getCursor( ns(),
                                                               query,
                                                               BSONObj(),
-                                                              QueryPlanSelectionPolicy::any(),
-                                                              requestMatcher );
+                                                              requestMatcher ?
+                                                                  QueryPlanSelectionPolicy::any() :
+                                                                  _requestMatcherFalse );
                 return cursor->matcher();
             }
         };
@@ -4040,9 +4046,31 @@ namespace QueryOptimizerCursorTests {
                         ( NamespaceDetailsTransient::getCursor( ns(),
                                                                 fromjson( "{a:undefined}" ),
                                                                 BSONObj(),
-                                                                QueryPlanSelectionPolicy::any(),
-                                                                /* requestMatcher */ false ),
+                                                                _requestMatcherFalse ),
                           UserException );
+            }
+        };
+
+        class RequestIntervalCursorTrue : public QueryPlanSelectionPolicy {
+            virtual string name() const { return "RequestIntervalCursorTrue"; }
+            virtual bool requestIntervalCursor() const { return true; }
+        } _requestIntervalCursorTrue;
+
+        /** An IntervalBtreeCursor is selected when requested by a QueryPlanSelectionPolicy. */
+        class IntervalCursor : public Base {
+        public:
+            IntervalCursor() {
+                _cli.insert( ns(), BSON( "a" << 2 << "b" << 3 ) );
+                _cli.ensureIndex( ns(), BSON( "a" << 1 ) );
+            }
+            void run() {
+                Client::ReadContext ctx( ns() );
+                shared_ptr<Cursor> cursor =
+                        NamespaceDetailsTransient::getCursor( ns(),
+                                                              BSON( "a" << 1 ),
+                                                              BSONObj(),
+                                                              _requestIntervalCursorTrue );
+                ASSERT_EQUALS( "IntervalBtreeCursor", cursor->toString() );
             }
         };
         
@@ -4068,7 +4096,8 @@ namespace QueryOptimizerCursorTests {
                         ( new ParsedQuery( ns(), 0, 0, 0,
                                           BSON( "$query" << query << "$explain" << true ),
                                           BSONObj() ) );
-                c = NamespaceDetailsTransient::getCursor( ns(), query, BSONObj(), QueryPlanSelectionPolicy::any(), 0,
+                c = NamespaceDetailsTransient::getCursor( ns(), query, BSONObj(),
+                                                          QueryPlanSelectionPolicy::any(),
                                                           parsedQuery, false );
                 set<BSONObj> indexKeys;
                 while( c->ok() ) {
@@ -4093,7 +4122,8 @@ namespace QueryOptimizerCursorTests {
                                           fields() ) );
                 _cursor =
                 dynamic_pointer_cast<QueryOptimizerCursor>
-                ( NamespaceDetailsTransient::getCursor( ns(), query(), BSONObj(), QueryPlanSelectionPolicy::any(), 0,
+                ( NamespaceDetailsTransient::getCursor( ns(), query(), BSONObj(),
+                                                        QueryPlanSelectionPolicy::any(),
                                                         parsedQuery, false ) );
                 ASSERT( _cursor );
                 
@@ -4907,6 +4937,7 @@ namespace QueryOptimizerCursorTests {
             add<GetCursor::MatcherValidation>();
             add<GetCursor::MatcherSet>();
             add<GetCursor::MatcherValidate>();
+            add<GetCursor::IntervalCursor>();
             add<Explain::ClearRecordedIndex>();
             add<Explain::Initial>();
             add<Explain::Empty>();

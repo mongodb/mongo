@@ -351,6 +351,11 @@ namespace CursorTests {
             }
         };
 
+        class RequestMatcherFalse : public QueryPlanSelectionPolicy {
+            virtual string name() const { return "RequestMatcherFalse"; }
+            virtual bool requestMatcher() const { return false; }
+        } _requestMatcherFalse;
+
         /**
          * A BtreeCursor typically moves from one index match to another when its advance() method
          * is called.  However, to prevent excessive iteration advance() may bail out early before
@@ -381,8 +386,7 @@ namespace CursorTests {
                         NamespaceDetailsTransient::getCursor( ns(),
                                                               query,
                                                               BSONObj(),
-                                                              QueryPlanSelectionPolicy::any(),
-                                                              /* requestMatcher */ false );
+                                                              _requestMatcherFalse );
                 // The BtreeCursor attempts to find each of the values 0, 1, 2, ... etc in the
                 // btree.  Because the values 0.5, 1.5, etc are present in the btree, the
                 // BtreeCursor will explicitly look for all the values in the $in list during
@@ -425,8 +429,7 @@ namespace CursorTests {
                         NamespaceDetailsTransient::getCursor( ns(),
                                                               BSON( "a" << GT << 0 << LT << 5 ),
                                                               BSONObj(),
-                                                              QueryPlanSelectionPolicy::any(),
-                                                              /* requestMatcher */ false );
+                                                              _requestMatcherFalse );
                 while( c->ok() ) {
                     // A Matcher is provided even though 'requestMatcher' is false.
                     ASSERT( c->matcher() );
@@ -461,8 +464,7 @@ namespace CursorTests {
                         NamespaceDetailsTransient::getCursor( ns(),
                                                               BSON( "a.b" << 2 << "a.c" << 2 ),
                                                               BSONObj(),
-                                                              QueryPlanSelectionPolicy::any(),
-                                                              /* requestMatcher */ false );
+                                                              _requestMatcherFalse );
                 while( c->ok() ) {
                     // A Matcher is provided even though 'requestMatcher' is false.
                     ASSERT( c->matcher() );
@@ -491,8 +493,7 @@ namespace CursorTests {
                         NamespaceDetailsTransient::getCursor( ns(),
                                                               BSON( "a" << GTE << "" ),
                                                               BSONObj(),
-                                                              QueryPlanSelectionPolicy::any(),
-                                                              /* requestMatcher */ false );
+                                                              _requestMatcherFalse );
                 while( c->ok() ) {
                     ASSERT( !c->matcher() );
                     if ( c->currentMatches() ) {
@@ -520,8 +521,7 @@ namespace CursorTests {
                         NamespaceDetailsTransient::getCursor( ns(),
                                                               BSON( "a" << LTE << Date_t( 1 ) ),
                                                               BSONObj(),
-                                                              QueryPlanSelectionPolicy::any(),
-                                                              /* requestMatcher */ false );
+                                                              _requestMatcherFalse );
                 while( c->ok() ) {
                     ASSERT( !c->matcher() );
                     if ( c->currentMatches() ) {

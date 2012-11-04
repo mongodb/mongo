@@ -484,14 +484,6 @@ namespace mongo {
          *
          * @param planPolicy - A policy for selecting query plans - see queryoptimizercursor.h
          *
-         * @param requestMatcher - Set to true to request that the returned Cursor provide a
-         * matcher().  If false, the cursor's matcher() may return NULL if the Cursor can perform
-         * accurate query matching internally using a non Matcher mechanism.  One case where a
-         * Matcher might be requested even though not strictly necessary to select matching
-         * documents is if metadata about matches may be requested using MatchDetails.  NOTE This is
-         * a hint that the Cursor use a Matcher, but the hint may be ignored.  In some cases the
-         * returned cursor may not provide a matcher even if 'requestMatcher' is true.
-         *
          * @param parsedQuery - Additional query parameters, as from a client query request.
          *
          * @param requireOrder - If false, the resulting cursor may return results in an order
@@ -511,15 +503,15 @@ namespace mongo {
          * - covered indexes
          * - in memory sorting
          */
-        static shared_ptr<Cursor> getCursor( const char *ns, const BSONObj &query,
-                                            const BSONObj &order = BSONObj(),
-                                            const QueryPlanSelectionPolicy &planPolicy =
-                                            QueryPlanSelectionPolicy::any(),
-                                            bool requestMatcher = true,
-                                            const shared_ptr<const ParsedQuery> &parsedQuery =
-                                            shared_ptr<const ParsedQuery>(),
-                                            bool requireOrder = true,
-                                            QueryPlanSummary *singlePlanSummary = 0 );
+        static shared_ptr<Cursor> getCursor( const char* ns,
+                                             const BSONObj& query,
+                                             const BSONObj& order = BSONObj(),
+                                             const QueryPlanSelectionPolicy& planPolicy =
+                                                 QueryPlanSelectionPolicy::any(),
+                                             const shared_ptr<const ParsedQuery>& parsedQuery =
+                                                 shared_ptr<const ParsedQuery>(),
+                                             bool requireOrder = true,
+                                             QueryPlanSummary* singlePlanSummary = NULL );
 
         /**
          * @return a single cursor that may work well for the given query.  A $or style query will

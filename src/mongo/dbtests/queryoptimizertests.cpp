@@ -641,6 +641,219 @@ namespace {
                 ASSERT_EQUALS( QueryPlan::Disallowed, newPlan( query )->utility() );
             }
         };
+
+        /** Test conditions in which QueryPlan::newCursor() returns an IntervalBtreeCursor. */
+        class IntervalCursorCreate : public Base {
+        public:
+            void run() {
+                // An interval cursor will not be created if the query plan is not Optimal.  (See
+                // comments on Optimal value of QueryPlan::Utility enum.)
+                BSONObj query = fromjson( "{a:{$gt:4},b:{$gt:5}}" );
+                scoped_ptr<QueryPlan> plan( QueryPlan::make( nsd(),
+                                                             INDEXNO( "a" << 1 << "b" << 1 ),
+                                                             FRSP( query ),
+                                                             FRSP2( query ),
+                                                             query,
+                                                             BSONObj() ) );
+                shared_ptr<Cursor> cursor = plan->newCursor( DiskLoc(), true );
+                ASSERT_NOT_EQUALS( "IntervalBtreeCursor", cursor->toString() );
+
+                // An interval cursor will not be created if the query plan is Optimal but does not
+                // consist of a single interval.
+                query = fromjson( "{a:4,b:{$in:[5,6]}}" );
+                plan.reset( QueryPlan::make( nsd(),
+                                             INDEXNO( "a" << 1 << "b" << 1 ),
+                                             FRSP( query ),
+                                             FRSP2( query ),
+                                             query,
+                                             BSONObj() ) );
+                cursor = plan->newCursor( DiskLoc(), true );
+                ASSERT_NOT_EQUALS( "IntervalBtreeCursor", cursor->toString() );
+
+                // An interval cursor will be created if the field ranges consist of a single
+                // interval.
+                query = fromjson( "{a:4,b:{$gt:6,$lte:9}}" );
+                plan.reset( QueryPlan::make( nsd(),
+                                             INDEXNO( "a" << 1 << "b" << 1 ),
+                                             FRSP( query ),
+                                             FRSP2( query ),
+                                             query,
+                                             BSONObj() ) );
+                cursor = plan->newCursor( DiskLoc(), true );
+                ASSERT_EQUALS( "IntervalBtreeCursor", cursor->toString() );
+                ASSERT_EQUALS( BSON( "lower" << BSON( "a" << 4 << "b" << 6 ) <<
+                                     "upper" << BSON( "a" << 4 << "b" << 9 ) ),
+                               cursor->prettyIndexBounds() );
+
+                // But an interval cursor will not be created if it is not requested.
+                query = fromjson( "{a:4,b:{$gt:6,$lte:9}}" );
+                plan.reset( QueryPlan::make( nsd(),
+                                             INDEXNO( "a" << 1 << "b" << 1 ),
+                                             FRSP( query ),
+                                             FRSP2( query ),
+                                             query,
+                                             BSONObj() ) );
+                cursor = plan->newCursor( DiskLoc(), /* requestIntervalCursor */ false );
+                ASSERT_NOT_EQUALS( "IntervalBtreeCursor", cursor->toString() );
+
+                // An interval cursor will not be created for a v0 index (unsupported).
+                client().ensureIndex( ns(),
+                                      BSON( "x" << 1 << "y" << 1 ),
+                                      false,
+                                      "",
+                                      false,
+                                      false,
+                                      0 );
+                query = fromjson( "{x:2,y:3}" );
+                plan.reset( QueryPlan::make( nsd(),
+                                             indexno( BSON( "x" << 1 << "y" << 1 ) ),
+                                             FRSP( query ),
+                                             FRSP2( query ),
+                                             query,
+                                             BSONObj() ) );
+                cursor = plan->newCursor( DiskLoc(), true );
+                ASSERT_NOT_EQUALS( "IntervalBtreeCursor", cursor->toString() );
+            }
+        };
+
+        /**
+         * Test that interval cursors returned by newCursor iterate over matching documents only.
+         */
+        class IntervalCursorBounds : public Base {
+        public:
+            void run() {
+                client().insert( ns(), BSON( "_id" << 0 << "a" << 1 << "b" << 1 ) );
+                client().insert( ns(), BSON( "_id" << 1 << "a" << 1 << "b" << 2 ) );
+                client().insert( ns(), BSON( "_id" << 2 << "a" << 2 << "b" << 1 ) );
+                client().insert( ns(), BSON( "_id" << 3 << "a" << 2 << "b" << 2 ) );
+
+                BSONObj query = fromjson( "{a:2,b:{$lte:2}}" );
+                scoped_ptr<QueryPlan> plan( QueryPlan::make( nsd(),
+                                                             INDEXNO( "a" << 1 << "b" << 1 ),
+                                                             FRSP( query ),
+                                                             FRSP2( query ),
+                                                             query,
+                                                             BSONObj() ) );
+                shared_ptr<Cursor> cursor = plan->newCursor( DiskLoc(), true );
+                ASSERT_EQUALS( "IntervalBtreeCursor", cursor->toString() );
+                ASSERT_EQUALS( BSON( "_id" << 2 << "a" << 2 << "b" << 1 ), cursor->current() );
+                ASSERT( cursor->advance() );
+                ASSERT_EQUALS( BSON( "_id" << 3 << "a" << 2 << "b" << 2 ), cursor->current() );
+                ASSERT( !cursor->advance() );
+
+                query = fromjson( "{a:{$lt:2}}" );
+                plan.reset( QueryPlan::make( nsd(),
+                                             INDEXNO( "a" << 1 << "b" << 1 ),
+                                             FRSP( query ),
+                                             FRSP2( query ),
+                                             query,
+                                             BSONObj() ) );
+                cursor = plan->newCursor( DiskLoc(), true );
+                ASSERT_EQUALS( "IntervalBtreeCursor", cursor->toString() );
+                ASSERT_EQUALS( BSON( "_id" << 0 << "a" << 1 << "b" << 1 ), cursor->current() );
+                ASSERT( cursor->advance() );
+                ASSERT_EQUALS( BSON( "_id" << 1 << "a" << 1 << "b" << 2 ), cursor->current() );
+                ASSERT( !cursor->advance() );
+
+                query = fromjson( "{a:{$lt:2}}" );
+                plan.reset( QueryPlan::make( nsd(),
+                                             INDEXNO( "a" << 1 << "b" << -1 ), // note -1
+                                             FRSP( query ),
+                                             FRSP2( query ),
+                                             query,
+                                             BSONObj() ) );
+                cursor = plan->newCursor( DiskLoc(), true );
+                ASSERT_EQUALS( "IntervalBtreeCursor", cursor->toString() );
+                ASSERT_EQUALS( BSON( "_id" << 1 << "a" << 1 << "b" << 2 ), cursor->current() );
+                ASSERT( cursor->advance() );
+                ASSERT_EQUALS( BSON( "_id" << 0 << "a" << 1 << "b" << 1 ), cursor->current() );
+                ASSERT( !cursor->advance() );
+
+                query = fromjson( "{a:{$gt:1}}" );
+                plan.reset( QueryPlan::make( nsd(),
+                                             INDEXNO( "a" << 1 << "b" << 1 ),
+                                             FRSP( query ),
+                                             FRSP2( query ),
+                                             query,
+                                             BSONObj() ) );
+                cursor = plan->newCursor( DiskLoc(), true );
+                ASSERT_EQUALS( "IntervalBtreeCursor", cursor->toString() );
+                ASSERT_EQUALS( BSON( "_id" << 2 << "a" << 2 << "b" << 1 ), cursor->current() );
+                ASSERT( cursor->advance() );
+                ASSERT_EQUALS( BSON( "_id" << 3 << "a" << 2 << "b" << 2 ), cursor->current() );
+                ASSERT( !cursor->advance() );
+
+                query = fromjson( "{a:{$gt:1}}" );
+                plan.reset( QueryPlan::make( nsd(),
+                                             INDEXNO( "a" << 1 << "b" << -1 ), // note -1
+                                             FRSP( query ),
+                                             FRSP2( query ),
+                                             query,
+                                             BSONObj() ) );
+                cursor = plan->newCursor( DiskLoc(), true );
+                ASSERT_EQUALS( "IntervalBtreeCursor", cursor->toString() );
+                ASSERT_EQUALS( BSON( "_id" << 3 << "a" << 2 << "b" << 2 ), cursor->current() );
+                ASSERT( cursor->advance() );
+                ASSERT_EQUALS( BSON( "_id" << 2 << "a" << 2 << "b" << 1 ), cursor->current() );
+                ASSERT( !cursor->advance() );
+
+                query = fromjson( "{a:2,b:{$lte:2}}" );
+                plan.reset( QueryPlan::make( nsd(),
+                                             INDEXNO( "a" << 1 << "b" << -1 ), // note -1
+                                             FRSP( query ),
+                                             FRSP2( query ),
+                                             query,
+                                             BSONObj() ) );
+                cursor = plan->newCursor( DiskLoc(), true );
+                ASSERT_EQUALS( "IntervalBtreeCursor", cursor->toString() );
+                ASSERT_EQUALS( BSON( "_id" << 3 << "a" << 2 << "b" << 2 ), cursor->current() );
+                ASSERT( cursor->advance() );
+                ASSERT_EQUALS( BSON( "_id" << 2 << "a" << 2 << "b" << 1 ), cursor->current() );
+                ASSERT( !cursor->advance() );
+
+                query = fromjson( "{a:1,b:{$gte:1}}" );
+                plan.reset( QueryPlan::make( nsd(),
+                                             INDEXNO( "a" << -1 << "b" << -1 ), // note -1
+                                             FRSP( query ),
+                                             FRSP2( query ),
+                                             query,
+                                             BSONObj() ) );
+                cursor = plan->newCursor( DiskLoc(), true );
+                ASSERT_EQUALS( "IntervalBtreeCursor", cursor->toString() );
+                ASSERT_EQUALS( BSON( "_id" << 1 << "a" << 1 << "b" << 2 ), cursor->current() );
+                ASSERT( cursor->advance() );
+                ASSERT_EQUALS( BSON( "_id" << 0 << "a" << 1 << "b" << 1 ), cursor->current() );
+                ASSERT( !cursor->advance() );
+            }
+        };
+
+        /** IntervalBtreeCursor is used and a Matcher is necessary. */
+        class IntervalCursorWithMatcher : public Base {
+        public:
+            void run() {
+                client().insert( ns(), BSON( "_id" << 0 << "a" << 1 ) );
+                client().insert( ns(), BSON( "_id" << 1 << "a" << 1 << "b" << "exists" ) );
+                BSONObj query = BSON( "a" << 1 << "b" << BSON( "$exists" << true ) );
+                scoped_ptr<QueryPlan> plan( QueryPlan::make( nsd(),
+                                            INDEXNO( "a" << 1 ),
+                                            FRSP( query ),
+                                            FRSP2( query ),
+                                            query,
+                                            BSONObj() ) );
+                shared_ptr<Cursor> cursor = plan->newCursor( DiskLoc(), true );
+                ASSERT_EQUALS( "IntervalBtreeCursor", cursor->toString() );
+                ASSERT( plan->mayBeMatcherNecessary() );
+                cursor->setMatcher( plan->matcher() );
+
+                // Check the cursor's results, and whether they match.
+                ASSERT_EQUALS( 0, cursor->current()[ "_id" ].Int() );
+                ASSERT( !cursor->currentMatches() );
+                ASSERT( cursor->advance() );
+                ASSERT_EQUALS( 1, cursor->current()[ "_id" ].Int() );
+                ASSERT( cursor->currentMatches() );
+                ASSERT( !cursor->advance() );
+            }
+        };
         
         namespace QueryBoundsExactOrderSuffix {
             
@@ -861,6 +1074,9 @@ namespace {
             add<QueryPlanTests::Unhelpful>();
             add<QueryPlanTests::KeyFieldsOnly>();
             add<QueryPlanTests::SparseExistsFalse>();
+            add<QueryPlanTests::IntervalCursorCreate>();
+            add<QueryPlanTests::IntervalCursorBounds>();
+            add<QueryPlanTests::IntervalCursorWithMatcher>();
             add<QueryPlanTests::QueryBoundsExactOrderSuffix::Unindexed>();
             add<QueryPlanTests::QueryBoundsExactOrderSuffix::RangeSort>();
             add<QueryPlanTests::QueryBoundsExactOrderSuffix::RangeBeforeSort>();

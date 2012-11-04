@@ -22,7 +22,8 @@
 
 #pragma once
 
-#include "jsobj.h"
+#include "mongo/db/jsobj.h"
+#include "mongo/platform/cstdint.h"
 
 namespace mongo {
 
@@ -51,7 +52,7 @@ namespace mongo {
 
             // Caps the number of files that may be allocated in a database, allowing about 32TB of
             // data per db.  Note that the DiskLoc and DiskLoc56Bit types supports more files than
-            // this value, as does the storage format.
+            // this value, as does the data storage format.
             MaxFiles=16000
         };
 
@@ -130,6 +131,8 @@ namespace mongo {
             return compare(b) < 0;
         }
 
+        uint64_t asUint64() const { return *reinterpret_cast<const uint64_t*>( this ); }
+
         /**
          * Marks this disk loc for writing
          * @returns a non const reference to this disk loc
@@ -157,6 +160,10 @@ namespace mongo {
         /*MongoDataFile& pdf() const;*/
     };
 #pragma pack()
+
+    inline std::ostream& operator<<( std::ostream &stream, const DiskLoc &loc ) {
+        return stream << loc.toString();
+    }
 
     // Minimum allowed DiskLoc.  No Record may begin at this location because file and extent
     // headers must precede Records in a file.

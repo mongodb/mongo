@@ -619,12 +619,67 @@ namespace mongo {
          */
         FieldRangeVector( const FieldRangeSet &frs, const IndexSpec &indexSpec, int direction );
 
-        /** @return the number of index ranges represented by 'this' */
-        unsigned size();
-        /** @return starting point for an index traversal. */
+        /**
+         * Methods for identifying compound start and end btree bounds describing this field range
+         * vector.
+         *
+         * A FieldRangeVector contains the FieldRange bounds for every field of an index.  A
+         * FieldRangeVectorIterator may be used to efficiently search for btree keys within these
+         * bounds.  Alternatively, a single compound field interval of the btree may be scanned,
+         * between a compound field start point and end point.  If isSingleInterval() is true then
+         * the interval between the start and end points will be an exact description of this
+         * FieldRangeVector, otherwise the start/end interval will be a superset of this
+         * FieldRangeVector.  For example:
+         *
+         * index { a:1 }, query { a:{ $gt:2, $lte:4 } }
+         *     -> frv ( 2, 4 ]
+         *         -> start/end bounds ( { '':2 }, { '':4 } ]
+         *
+         * index { a:1, b:1 }, query { a:2, b:{ $gte:7, $lt:9 } }
+         *     -> frv [ 2, 2 ], [ 7, 9 )
+         *         -> start/end bounds [ { '':2, '':7 }, { '':2, '':9 } )
+         *
+         * index { a:1, b:-1 }, query { a:2, b:{ $gte:7, $lt:9 } }
+         *     -> frv [ 2, 2 ], ( 9, 7 ]
+         *         -> start/end bounds ( { '':2, '':9 }, { '':2, '':7 } ]
+         *
+         * index { a:1, b:1 }, query { a:{ $gte:7, $lt:9 } }
+         *     -> frv [ 7, 9 )
+         *         -> start/end bounds [ { '':7, '':MinKey }, { '':9, '':MinKey } )
+         *
+         * index { a:1, b:1 }, query { a:{ $gte:2, $lte:5 }, b:{ $gte:7, $lte:9 } }
+         *     -> frv [ 2, 5 ], [ 7, 9 ]
+         *         -> start/end bounds [ { '':2, '':7 }, { '':5, '':9 } ]
+         *            (isSingleInterval() == false)
+         */
+
+        /**
+         * @return true if this FieldRangeVector represents a single interval within a btree,
+         * comprised of all keys between a single start point and a single end point.
+         */
+        bool isSingleInterval() const;
+
+        /**
+         * @return a starting point for an index traversal, a lower bound on the ranges represented
+         * by this FieldRangeVector according to the btree's native ordering.
+         */
         BSONObj startKey() const;
-        /** @return end point for an index traversal. */
+
+        /** @return true if the startKey() bound is inclusive. */
+        bool startKeyInclusive() const;
+
+        /**
+         * @return an end point for an index traversal, an upper bound on the ranges represented
+         * by this FieldRangeVector according to the btree's native ordering.
+         */
         BSONObj endKey() const;
+
+        /** @return true if the endKey() bound is inclusive. */
+        bool endKeyInclusive() const;
+
+        /** @return the number of index ranges represented by 'this' */
+        unsigned size() const;
+
         /** @return a client readable representation of 'this' */
         BSONObj obj() const;
         

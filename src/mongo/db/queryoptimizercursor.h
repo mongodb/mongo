@@ -27,8 +27,8 @@ namespace mongo {
     class CandidatePlanCharacter;
     
     /**
-     * An interface for policies overriding the query optimizer's default query plan selection
-     * behavior.
+     * An interface for policies overriding the query optimizer's default behavior for selecting
+     * query plans and creating cursors.
      */
     class QueryPlanSelectionPolicy {
     public:
@@ -38,6 +38,26 @@ namespace mongo {
         virtual bool permitOptimalIdPlan() const { return true; }
         virtual bool permitPlan( const QueryPlan &plan ) const { return true; }
         virtual BSONObj planHint( const char *ns ) const { return BSONObj(); }
+
+        /**
+         * @return true to request that a created Cursor provide a matcher().  If false, the
+         * Cursor's matcher() may be NULL if the Cursor can perform accurate query matching
+         * internally using a non Matcher mechanism.  One case where a Matcher might be requested
+         * even though not strictly necessary to select matching documents is if metadata about
+         * matches may be requested using MatchDetails.  NOTE This is a hint that the Cursor use a
+         * Matcher, but the hint may be ignored.  In some cases the Cursor may not provide
+         * a Matcher even if 'requestMatcher' is true.
+         */
+        virtual bool requestMatcher() const { return true; }
+
+        /**
+         * @return true to request creating an IntervalBtreeCursor rather than a BtreeCursor when
+         * possible.  An IntervalBtreeCursor is optimized for counting the number of documents
+         * between two endpoints in a btree.  NOTE This is a hint to create an interval cursor, but
+         * the hint may be ignored.  In some cases a different cursor type may be created even if
+         * 'requestIntervalCursor' is true.
+         */
+        virtual bool requestIntervalCursor() const { return false; }
         
         /** Allow any query plan selection, permitting the query optimizer's default behavior. */
         static const QueryPlanSelectionPolicy &any();

@@ -1820,6 +1820,266 @@ namespace QueryUtilTests {
             }
         };
 
+        /** Detecting cases where a FieldRangeVector describes a single btree interval. */
+        class SingleInterval {
+        public:
+            void run() {
+                // Equality on a single field is a single interval.
+                FieldRangeVector frv1( FieldRangeSet( "dummy", BSON( "a" << 5 ), true, true ),
+                                       IndexSpec( BSON( "a" << 1 ) ),
+                                       1 );
+                ASSERT( frv1.isSingleInterval() );
+                // Single interval on a single field is a single interval.
+                FieldRangeVector frv2( FieldRangeSet( "dummy", BSON( "a" << GT << 5 ), true, true ),
+                                       IndexSpec( BSON( "a" << 1 ) ),
+                                       1 );
+                ASSERT( frv2.isSingleInterval() );
+                // Multiple intervals on a single field is not a single interval.
+                FieldRangeVector frv3( FieldRangeSet( "dummy",
+                                                      fromjson( "{a:{$in:[4,5]}}" ),
+                                                      true,
+                                                      true ),
+                                      IndexSpec( BSON( "a" << 1 ) ),
+                                      1 );
+                ASSERT( !frv3.isSingleInterval() );
+
+                // Equality on two fields is a compound single interval.
+                FieldRangeVector frv4( FieldRangeSet( "dummy",
+                                                      BSON( "a" << 5 << "b" << 6 ),
+                                                      true,
+                                                      true ),
+                                       IndexSpec( BSON( "a" << 1 << "b" << 1 ) ),
+                                       1 );
+                ASSERT( frv4.isSingleInterval() );
+                // Equality on first field and single interval on second field is a compound
+                // single interval.
+                FieldRangeVector frv5( FieldRangeSet( "dummy",
+                                                      BSON( "a" << 5 << "b" << GT << 6 ),
+                                                      true,
+                                                      true ),
+                                       IndexSpec( BSON( "a" << 1 << "b" << 1 ) ),
+                                       1 );
+                ASSERT( frv5.isSingleInterval() );
+                // Single interval on first field and single interval on second field is not a
+                // compound single interval.
+                FieldRangeVector frv6( FieldRangeSet( "dummy",
+                                                      BSON( "a" << LT << 5 << "b" << GT << 6 ),
+                                                      true,
+                                                      true ),
+                                       IndexSpec( BSON( "a" << 1 << "b" << 1 ) ),
+                                       1 );
+                ASSERT( !frv6.isSingleInterval() );
+                // Multiple intervals on two fields is not a compound single interval.
+                FieldRangeVector frv7( FieldRangeSet( "dummy",
+                                                      fromjson( "{a:{$in:[4,5]},b:{$in:[7,8]}}" ),
+                                                      true,
+                                                      true ),
+                                       IndexSpec( BSON( "a" << 1 << "b" << 1 ) ),
+                                       1 );
+                ASSERT( !frv7.isSingleInterval() );
+
+                // With missing second field is still a single compound interval.
+                FieldRangeVector frv8( FieldRangeSet( "dummy",
+                                                      BSON( "a" << 5 ),
+                                                      true,
+                                                      true ),
+                                       IndexSpec( BSON( "a" << 1 << "b" << 1 ) ),
+                                       1 );
+                ASSERT( frv8.isSingleInterval() );
+                // With missing second field is still a single compound interval.
+                FieldRangeVector frv9( FieldRangeSet( "dummy",
+                                                      BSON( "b" << 5 ),
+                                                      true,
+                                                      true ),
+                                       IndexSpec( BSON( "a" << 1 << "b" << 1 ) ),
+                                       1 );
+                ASSERT( !frv9.isSingleInterval() );
+
+                // Equality on first two fields and single interval on third field is a compound
+                // single interval.
+                FieldRangeVector frv10( FieldRangeSet( "dummy",
+                                                       fromjson( "{a:5,b:6,c:{$gt:7}}" ),
+                                                       true,
+                                                       true ),
+                                        IndexSpec( BSON( "a" << 1 << "b" << 1 << "c" << 1 ) ),
+                                        1 );
+                ASSERT( frv10.isSingleInterval() );
+
+                // Equality, then single interval, then missing is a compound single interval.
+                FieldRangeVector frv11( FieldRangeSet( "dummy",
+                                                       fromjson( "{a:5,b:{$gt:7}}" ),
+                                                       true,
+                                                       true ),
+                                        IndexSpec( BSON( "a" << 1 << "b" << 1 << "c" << 1 ) ),
+                                        1 );
+                ASSERT( frv11.isSingleInterval() );
+                // Equality, then single interval, then missing, then missing is a compound single
+                // interval.
+                FieldRangeVector frv12( FieldRangeSet( "dummy",
+                                                       fromjson( "{a:5,b:{$gt:7}}" ),
+                                                       true,
+                                                       true ),
+                                        IndexSpec( BSON( "a" << 1 <<
+                                                         "b" << 1 <<
+                                                         "c" << 1 <<
+                                                         "d" << 1 ) ),
+                                        1 );
+                ASSERT( frv12.isSingleInterval() );
+                // Equality, then single interval, then missing, then missing, with mixed order
+                // fields is a compound single interval.
+                FieldRangeVector frv13( FieldRangeSet( "dummy",
+                                                       fromjson( "{a:5,b:{$gt:7}}" ),
+                                                       true,
+                                                       true ),
+                                        IndexSpec( BSON( "a" << 1 <<
+                                                         "b" << 1 <<
+                                                         "c" << 1 <<
+                                                         "d" << -1 ) ),
+                                        1 );
+                ASSERT( frv13.isSingleInterval() );
+                // Equality, then single interval, then missing, then single interval is not a
+                // compound single interval.
+                FieldRangeVector frv14( FieldRangeSet( "dummy",
+                                                       fromjson( "{a:5,b:{$gt:7},d:{$gt:1}}" ),
+                                                       true,
+                                                       true ),
+                                        IndexSpec( BSON( "a" << 1 <<
+                                                         "b" << 1 <<
+                                                         "c" << 1 <<
+                                                         "d" << 1 ) ),
+                                        1 );
+                ASSERT( !frv14.isSingleInterval() );
+            }
+        };
+
+        /** Check start and end key values. */
+        class StartEndKey {
+        public:
+            void run() {
+                // Equality on a single field.
+                FieldRangeVector frv1( FieldRangeSet( "dummy", BSON( "a" << 5 ), true, true ),
+                                       IndexSpec( BSON( "a" << 1 ) ),
+                                       1 );
+                ASSERT_EQUALS( BSON( "" << 5 ), frv1.startKey() );
+                ASSERT( frv1.startKeyInclusive() );
+                ASSERT_EQUALS( BSON( "" << 5 ), frv1.endKey() );
+                ASSERT( frv1.endKeyInclusive() );
+                // Single interval on a single field.
+                FieldRangeVector frv2( FieldRangeSet( "dummy", BSON( "a" << GT << 5 ), true, true ),
+                                       IndexSpec( BSON( "a" << 1 ) ),
+                                       1 );
+                ASSERT_EQUALS( BSON( "" << 5 ), frv2.startKey() );
+                ASSERT( !frv2.startKeyInclusive() );
+                ASSERT_EQUALS( BSON( "" << numeric_limits<double>::max() ), frv2.endKey() );
+                ASSERT( frv2.endKeyInclusive() );
+
+                // Equality on two fields.
+                FieldRangeVector frv3( FieldRangeSet( "dummy",
+                                                      BSON( "a" << 5 << "b" << 6 ),
+                                                      true,
+                                                      true ),
+                                       IndexSpec( BSON( "a" << 1 << "b" << 1 ) ),
+                                       1 );
+                ASSERT_EQUALS( BSON( "" << 5 << "" << 6 ), frv3.startKey() );
+                ASSERT( frv3.startKeyInclusive() );
+                ASSERT_EQUALS( BSON( "" << 5 << "" << 6 ), frv3.endKey() );
+                ASSERT( frv3.endKeyInclusive() );
+                // Equality on first field and single interval on second field.
+                FieldRangeVector frv4( FieldRangeSet( "dummy",
+                                                      BSON( "a" << 5 << "b" << LT << 6 ),
+                                                      true,
+                                                      true ),
+                                       IndexSpec( BSON( "a" << 1 << "b" << 1 ) ),
+                                       1 );
+                ASSERT_EQUALS( BSON( "" << 5 << "" << -numeric_limits<double>::max() ),
+                               frv4.startKey() );
+                ASSERT( frv4.startKeyInclusive() );
+                ASSERT_EQUALS( BSON( "" << 5 << "" << 6 ),
+                               frv4.endKey() );
+                ASSERT( !frv4.endKeyInclusive() );
+
+                // With missing second field.
+                FieldRangeVector frv5( FieldRangeSet( "dummy",
+                                                      BSON( "a" << 5 ),
+                                                      true,
+                                                      true ),
+                                       IndexSpec( BSON( "a" << 1 << "b" << 1 ) ),
+                                       1 );
+                ASSERT_EQUALS( BSON( "" << 5 << "" << MINKEY ), frv5.startKey() );
+                ASSERT( frv5.startKeyInclusive() );
+                ASSERT_EQUALS( BSON( "" << 5 << "" << MAXKEY ), frv5.endKey() );
+                ASSERT( frv5.endKeyInclusive() );
+                // Equality, then single interval, then missing.
+                FieldRangeVector frv6( FieldRangeSet( "dummy",
+                                                      fromjson( "{a:5,b:{$gt:7}}" ),
+                                                      true,
+                                                      true ),
+                                       IndexSpec( BSON( "a" << 1 << "b" << 1 << "c" << 1 ) ),
+                                       1 );
+                ASSERT_EQUALS( BSON( "" << 5 << "" << 7 << "" << MAXKEY ), frv6.startKey() );
+                ASSERT( !frv6.startKeyInclusive() );
+                ASSERT_EQUALS( BSON( "" << 5 <<
+                                     "" << numeric_limits<double>::max() <<
+                                     "" << MAXKEY ),
+                               frv6.endKey() );
+                ASSERT( frv6.endKeyInclusive() );
+                // Equality, then single interval, then missing, then missing.
+                FieldRangeVector frv7( FieldRangeSet( "dummy",
+                                                      fromjson( "{a:5,b:{$gt:7}}" ),
+                                                      true,
+                                                      true ),
+                                       IndexSpec( BSON( "a" << 1 <<
+                                                        "b" << 1 <<
+                                                        "c" << 1 <<
+                                                        "d" << 1 ) ),
+                                       1 );
+                ASSERT_EQUALS( BSON( "" << 5 << "" << 7 << "" << MAXKEY << "" << MAXKEY ),
+                               frv7.startKey() );
+                ASSERT( !frv7.startKeyInclusive() );
+                ASSERT_EQUALS( BSON( "" << 5 <<
+                                     "" << numeric_limits<double>::max() <<
+                                     "" << MAXKEY <<
+                                     "" << MAXKEY ),
+                               frv7.endKey() );
+                ASSERT( frv7.endKeyInclusive() );
+
+                // Equality, then single exclusive interval on both ends, then missing, then
+                // missing with mixed direction index ordering.
+                FieldRangeVector frv8( FieldRangeSet( "dummy",
+                                                      fromjson( "{a:5,b:{$gt:7,$lt:10}}" ),
+                                                      true,
+                                                      true ),
+                                       IndexSpec( BSON( "a" << 1 <<
+                                                        "b" << 1 <<
+                                                        "c" << 1 <<
+                                                        "d" << -1 ) ),
+                                       1 );
+                ASSERT_EQUALS( BSON( "" << 5 << "" << 7 << "" << MAXKEY << "" << MINKEY ),
+                               frv8.startKey() );
+                ASSERT( !frv8.startKeyInclusive() );
+                ASSERT_EQUALS( BSON( "" << 5 << "" << 10 << "" << MINKEY << "" << MAXKEY ),
+                               frv8.endKey() );
+                ASSERT( !frv8.endKeyInclusive() );
+                // Equality, then single exclusive interval on both ends, then missing, then
+                // missing with mixed direction index ordering and reverse direction traversal.
+                FieldRangeVector frv9( FieldRangeSet( "dummy",
+                                                      fromjson( "{a:5,b:{$gt:7,$lt:10}}" ),
+                                                      true,
+                                                      true ),
+                                       IndexSpec( BSON( "a" << 1 <<
+                                                        "b" << 1 <<
+                                                        "c" << 1 <<
+                                                        "d" << -1 ) ),
+                                       -1 );
+                ASSERT_EQUALS( BSON( "" << 5 << "" << 10 << "" << MINKEY << "" << MAXKEY ),
+                               frv9.startKey() );
+                ASSERT( !frv9.startKeyInclusive() );
+                ASSERT_EQUALS( BSON( "" << 5 << "" << 7 << "" << MAXKEY << "" << MINKEY ),
+                               frv9.endKey() );
+                ASSERT( !frv9.endKeyInclusive() );
+            }
+        };
+
     } // namespace FieldRangeVectorTests
     
     // These are currently descriptive, not normative tests.  SERVER-5450
@@ -2795,6 +3055,8 @@ namespace QueryUtilTests {
             add<FieldRangeSetPairTests::BestIndexForPatterns>();
             add<FieldRangeVectorTests::ToString>();
             add<FieldRangeVectorTests::HasAllIndexedRanges>();
+            add<FieldRangeVectorTests::SingleInterval>();
+            add<FieldRangeVectorTests::StartEndKey>();
             add<FieldRangeVectorIteratorTests::AdvanceToNextIntervalEquality>();
             add<FieldRangeVectorIteratorTests::AdvanceToNextIntervalExclusiveInequality>();
             add<FieldRangeVectorIteratorTests::AdvanceToNextIntervalEqualityReverse>();
