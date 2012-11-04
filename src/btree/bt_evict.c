@@ -795,15 +795,19 @@ __wt_evict_lru_page(WT_SESSION_IMPL *session, int is_app)
 static int
 __evict_lru_cmp(const void *a, const void *b)
 {
+	WT_EVICT_ENTRY *a_evict, *b_evict;
 	WT_PAGE *a_page, *b_page;
 	uint64_t a_lru, b_lru;
+
+	a_evict = (WT_EVICT_ENTRY *)a;
+	b_evict = (WT_EVICT_ENTRY *)b;
 
 	/*
 	 * There may be NULL references in the array; sort them as greater than
 	 * anything else so they migrate to the end of the array.
 	 */
-	a_page = ((WT_EVICT_ENTRY *)a)->page;
-	b_page = ((WT_EVICT_ENTRY *)b)->page;
+	a_page = a_evict->page;
+	b_page = b_evict->page;
 	if (a_page == NULL)
 		return (b_page == NULL ? 0 : 1);
 	if (b_page == NULL)
@@ -820,8 +824,8 @@ __evict_lru_cmp(const void *a, const void *b)
 	 * if we have enough good leaf page candidates, we should evict them
 	 * first, but not completely ignore an old internal page.
 	 */
-	a_lru = a_page->read_gen;
-	b_lru = b_page->read_gen;
+	a_lru = a_page->read_gen + a_evict->btree->evict_priority;
+	b_lru = b_page->read_gen + b_evict->btree->evict_priority;
 	if (a_page->type == WT_PAGE_ROW_INT || a_page->type == WT_PAGE_COL_INT)
 		a_lru += WT_EVICT_INT_SKEW;
 	if (b_page->type == WT_PAGE_ROW_INT || b_page->type == WT_PAGE_COL_INT)
