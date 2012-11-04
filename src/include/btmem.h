@@ -271,7 +271,7 @@ struct __wt_page {
 	 * The read-generation is not declared volatile: read-generation is set
 	 * a lot (on every access), and we don't want to write it that much.
 	 */
-	 uint64_t read_gen;
+	uint64_t read_gen;
 
 	/*
 	 * In-memory pages optionally reference a number of entries originally
