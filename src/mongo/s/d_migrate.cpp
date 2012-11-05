@@ -294,7 +294,10 @@ namespace mongo {
         }
 
         void done() {
-            Lock::DBWrite lk( _ns );
+            log() << "MigrateFromStatus::done About to acquire global write lock to exit critical "
+                    "section" << endl;
+            Lock::GlobalWrite lk;
+            log() << "MigrateFromStatus::done Global lock acquired" << endl;
 
             {
                 scoped_spinlock lk( _trackerLocks );
@@ -1120,7 +1123,8 @@ namespace mongo {
                 {
                     BSONObj res;
                     scoped_ptr<ScopedDbConnection> connTo(
-                            ScopedDbConnection::getScopedDbConnection( toShard.getConnString() ) );
+                            ScopedDbConnection::getScopedDbConnection( toShard.getConnString(),
+                                                                       35.0 ) );
 
                     bool ok;
 
@@ -1138,15 +1142,18 @@ namespace mongo {
                     connTo->done();
 
                     if ( ! ok ) {
+                        log() << "moveChunk migrate commit not accepted by TO-shard: " << res
+                              << " resetting shard version to: " << startingVersion << migrateLog;
                         {
-                            Lock::DBWrite lk( ns );
+                            Lock::GlobalWrite lk;
+                            log() << "moveChunk global lock acquired to reset shard version from "
+                                    "failed migration" << endl;
 
                             // revert the chunk manager back to the state before "forgetting" about the chunk
                             shardingState.undoDonateChunk( ns , min , max , startingVersion );
                         }
-
-                        log() << "moveChunk migrate commit not accepted by TO-shard: " << res
-                              << " resetting shard version to: " << startingVersion << migrateLog;
+                        log() << "Shard version successfully reset to clean up failed migration"
+                                << endl;
 
                         errmsg = "_recvChunkCommit failed!";
                         result.append( "cause" , res );
