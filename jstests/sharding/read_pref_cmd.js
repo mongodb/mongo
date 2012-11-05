@@ -30,7 +30,7 @@ var doTest = function(conn, hostList) {
 
     // Test command that can't be sent to secondary
     var createResult = testDB.runCommand({ create: 'user' });
-    assert(createResult.ok);
+    assert(createResult.ok, 'create cmd failed: ' + tojson(createResult));
 
     testedAtLeastOnce = false;
     hostList.forEach(function(node) {
@@ -52,7 +52,7 @@ var doTest = function(conn, hostList) {
 
     var inlineMRResult = testDB.runCommand({ mapreduce: 'user', map: mapFunc,
         reduce: reduceFunc, out: { inline: 1 }});
-    assert(inlineMRResult.ok);
+    assert(inlineMRResult.ok, 'inline mr failed: ' + tojson(inlineMRResult));
 
     testedAtLeastOnce = false;
     hostList.forEach(function(node) {
@@ -70,7 +70,7 @@ var doTest = function(conn, hostList) {
     testDB.runCommand({ create: 'mrIn' });
     var outCollMRResult = testDB.runCommand({ mapreduce: 'mrIn', map: mapFunc,
         reduce: reduceFunc, out: { replace: 'mrOut' }});
-    assert(outCollMRResult.ok);
+    assert(outCollMRResult.ok, 'replace mr cmd failed: ' + tojson(outCollMRResult));
 
     testedAtLeastOnce = false;
     hostList.forEach(function(node) {
