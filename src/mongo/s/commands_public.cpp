@@ -536,6 +536,10 @@ namespace mongo {
                     countCmdBuilder.append( "limit", limit );
                 }
 
+                if (cmdObj.hasField("$queryOptions")) {
+                    countCmdBuilder.append(cmdObj["$queryOptions"]);
+                }
+
                 map<Shard, BSONObj> countResult;
 
                 SHARDED->commandOp( dbName, countCmdBuilder.done(),
@@ -1118,14 +1122,15 @@ namespace mongo {
                 while ( i.more() ) {
                     BSONElement e = i.next();
                     string fn = e.fieldName();
-                    if ( fn == "map" ||
+                    if (fn == "map" ||
                             fn == "mapreduce" ||
                             fn == "mapparams" ||
                             fn == "reduce" ||
                             fn == "query" ||
                             fn == "sort" ||
                             fn == "scope" ||
-                            fn == "verbose" ) {
+                            fn == "verbose" ||
+                            fn == "$queryOptions") {
                         b.append( e );
                     }
                     else if ( fn == "out" ||
@@ -1602,6 +1607,11 @@ namespace mongo {
             /* create the command for the shards */
             BSONObjBuilder commandBuilder;
             pShardPipeline->toBson(&commandBuilder);
+
+            if (cmdObj.hasField("$queryOptions")) {
+                commandBuilder.append(cmdObj["$queryOptions"]);
+            }
+
             BSONObj shardedCommand(commandBuilder.done());
 
             BSONObjBuilder shardQueryBuilder;

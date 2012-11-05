@@ -38,6 +38,13 @@ namespace mongo {
 
     AtomicInt64 DBClientBase::ConnectionIdSequence;
 
+    bool hasReadPreference(const BSONObj& queryObj) {
+        const bool isQueryEmbedded = strcmp(queryObj.firstElement().fieldName(), "query") == 0;
+        const bool hasReadPrefOption = queryObj["$queryOptions"].isABSONObj() &&
+                        queryObj["$queryOptions"].Obj().hasField("$readPreference");
+        return (isQueryEmbedded && queryObj.hasField("$readPreference")) || hasReadPrefOption;
+    }
+
     void ConnectionString::_fillServers( string s ) {
         
         //

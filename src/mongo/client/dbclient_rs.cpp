@@ -53,31 +53,50 @@ namespace mongo {
     }
 
     /**
-     * @param ns the namespace of the query
-     * @param queryObj the query object to check
+     * @param ns the namespace of the query.
+     * @param queryOptionFlags the flags for the query.
+     * @param queryObj the query object to check.
      *
-     * @return true if the given query can be sent to a secondary node.
+     * @return true if the given query can be sent to a secondary node without taking the
+     *     slaveOk flag into account.
      */
-    bool isQueryOkToSecondary(const string& ns, const BSONObj& queryObj) {
+    bool _isQueryOkToSecondary(const string& ns, int queryOptionFlags, const BSONObj& queryObj) {
+        if (queryOptionFlags & QueryOption_SlaveOk) {
+            return true;
+        }
+
         // _secOkCmdList was not initialized! mongo::runGlobalInitializersOrDie
         // probably was not called.
         fassert(16464, !_secOkCmdList.empty());
+
+        if (!hasReadPreference(queryObj)) {
+            return false;
+        }
 
         if (ns.find(".$cmd") == string::npos) {
             return true;
         }
 
-        const string cmdName = queryObj.firstElementFieldName();
+        BSONObj actualQueryObj;
+        if (strcmp(queryObj.firstElement().fieldName(), "query") == 0) {
+            actualQueryObj = queryObj["query"].embeddedObject();
+        }
+        else {
+            actualQueryObj = queryObj;
+        }
+
+        const string cmdName = actualQueryObj.firstElementFieldName();
         if (_secOkCmdList.count(cmdName) == 1) {
             return true;
         }
 
         if (cmdName == "mapReduce" || cmdName == "mapreduce") {
-            if (!queryObj.hasField("out")) {
+            if (!actualQueryObj.hasField("out")) {
                 return false;
             }
 
-            if (queryObj["out"]["inline"].trueValue()) {
+            BSONElement outElem(actualQueryObj["out"]);
+            if (outElem.isABSONObj() && outElem["inline"].trueValue()) {
                 return true;
             }
         }
@@ -162,7 +181,16 @@ namespace mongo {
     }
 
     /**
-     * Extracts the read preference settings from the query document.
+     * Extracts the read preference settings from the query document. Note that this method
+     * assumes that the query is ok for secondaries so it defaults to
+     * ReadPreference_SecondaryPreferred when nothing is specified. Supports the following
+     * format:
+     *
+     * Format A (official format):
+     * { query: <actual query>, $readPreference: <read pref obj> }
+     *
+     * Format B (unofficial internal format from mongos):
+     * { <actual query>, $queryOptions: { $readPreference: <read pref obj> }}
      *
      * @param query the raw query document
      * @param pref an out parameter and will contain the read preference mode extracted
@@ -175,13 +203,22 @@ namespace mongo {
      * @throws AssertionException if the read preference object is malformed
      */
     TagSet* _extractReadPref(const BSONObj& query, ReadPreference* pref) {
-        if (!query.hasField("$readPreference")) {
+        if (!hasReadPreference(query)) {
             *pref = mongo::ReadPreference_SecondaryPreferred;
         }
         else {
+            BSONElement readPrefElement;
+
+            if (query.hasField("$readPreference")) {
+                readPrefElement = query["$readPreference"];
+            }
+            else {
+                readPrefElement = query["$queryOptions"]["$readPreference"];
+            }
+
             uassert(16381, "$readPreference should be an object",
-                    query["$readPreference"].isABSONObj());
-            const BSONObj& prefDoc = query["$readPreference"].Obj();
+                    readPrefElement.isABSONObj());
+            const BSONObj& prefDoc = readPrefElement.Obj();
 
             uassert(16382, "mode not specified for read preference", prefDoc.hasField("mode"));
 
@@ -1502,9 +1539,7 @@ namespace mongo {
                                                        const BSONObj *fieldsToReturn,
                                                        int queryOptions,
                                                        int batchSize) {
-        if ((queryOptions & QueryOption_SlaveOk) ||
-                (query.obj.hasField("$readPreference") &&
-                        isQueryOkToSecondary(ns, query.obj["query"].Obj()))) {
+        if (_isQueryOkToSecondary(ns, queryOptions, query.obj)) {
             ReadPreference pref;
             scoped_ptr<TagSet> tags(_extractReadPref(query.obj, &pref));
 
@@ -1541,8 +1576,7 @@ namespace mongo {
                                         const Query& query,
                                         const BSONObj *fieldsToReturn,
                                         int queryOptions) {
-        if ((queryOptions & QueryOption_SlaveOk) ||
-                query.obj.hasField("$readPreference")) {
+        if (_isQueryOkToSecondary(ns, queryOptions, query.obj)) {
             ReadPreference pref;
             scoped_ptr<TagSet> tags(_extractReadPref(query.obj, &pref));
 
@@ -1662,7 +1696,7 @@ namespace mongo {
             QueryMessage qm(dm);
 
             const bool slaveOk = qm.queryOptions & QueryOption_SlaveOk;
-            if (slaveOk || qm.query.hasField("$readPreference")) {
+            if (_isQueryOkToSecondary(qm.ns, qm.queryOptions, qm.query)) {
                 ReadPreference pref;
                 scoped_ptr<TagSet> tags(_extractReadPref(qm.query, &pref));
 
@@ -1805,8 +1839,7 @@ namespace mongo {
             QueryMessage qm(dm);
             ns = qm.ns;
 
-            if ((qm.queryOptions & QueryOption_SlaveOk) ||
-                    qm.query.hasField("$readPreference")) {
+            if (_isQueryOkToSecondary(ns, qm.queryOptions, qm.query)) {
                 ReadPreference pref;
                 scoped_ptr<TagSet> tags(_extractReadPref(qm.query, &pref));
 

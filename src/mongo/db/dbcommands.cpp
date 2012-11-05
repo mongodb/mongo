@@ -1844,13 +1844,16 @@ namespace mongo {
                                          : str::equals("query", e.fieldName())))
             {
                 jsobj = e.embeddedObject();
-                if (_cmdobj.hasField("$readPreference")) {
-                    queryOptions |= QueryOption_SlaveOk;
-                }
             }
             else {
                 jsobj = _cmdobj;
             }
+        }
+
+        // Treat the command the same as if it has slaveOk bit on if it has a read
+        // preference setting. This is to allow these commands to run on a secondary.
+        if (hasReadPreference(_cmdobj)) {
+            queryOptions |= QueryOption_SlaveOk;
         }
 
         Client& client = cc();

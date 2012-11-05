@@ -136,6 +136,11 @@ namespace mongo {
                 continue;
             }
 
+            // Ignore $queryOptions (like read preference)
+            if (strcmp(pFieldName, "$queryOptions") == 0) {
+                continue;
+            }
+
             /* we didn't recognize a field in the command */
             ostringstream sb;
             sb <<
