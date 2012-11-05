@@ -197,6 +197,8 @@ struct __wt_connection_impl {
 
 					/* Connection queue */
 	TAILQ_ENTRY(__wt_connection_impl) q;
+					/* Cache pool queue */
+	TAILQ_ENTRY(__wt_connection_impl) cpq;
 
 	const char *home;		/* Database home */
 	int is_new;			/* Connection created database */

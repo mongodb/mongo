@@ -29,7 +29,6 @@ int
 __wt_conn_cache_pool_config(WT_SESSION_IMPL *session, const char **cfg)
 {
 	WT_CACHE_POOL *cp;
-	WT_CACHE_POOL_ENTRY *entry;
 	WT_CONFIG_ITEM cval;
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
@@ -62,6 +61,7 @@ __wt_conn_cache_pool_config(WT_SESSION_IMPL *session, const char **cfg)
 		created = 1;
 		cp->size = cval.val;
 		cp->name = pool_name;
+		pool_name = NULL; /* Belongs to the cache pool now. */
 		TAILQ_INIT(&cp->cache_pool_qh);
 		__wt_spin_init(conn->default_session, &cp->cache_pool_lock);
 		WT_ERR(__wt_cond_alloc(conn->default_session,
@@ -82,7 +82,6 @@ __wt_conn_cache_pool_config(WT_SESSION_IMPL *session, const char **cfg)
 			cp->quota = cp->size / 2;
 
 		__wt_process.cache_pool = cp;
-		pool_name = NULL; /* Belongs to the cache pool now. */
 		WT_VERBOSE_VOID(session, cache_pool,
 		    "Created cache pool %s. Size: %" PRIu64
 		    ", chunk size: %" PRIu64 ", quota: %" PRIu64,
@@ -90,8 +89,8 @@ __wt_conn_cache_pool_config(WT_SESSION_IMPL *session, const char **cfg)
 	} else if (!WT_STRING_MATCH(
 	    __wt_process.cache_pool->name, pool_name, strlen(pool_name)))
 		WT_ERR_MSG(session, WT_ERROR,
-		    "Attempting to join a cache pool that does not "
-		    "exist: %s", pool_name);
+		    "Attempting to join a cache pool that does not exist: %s",
+		    pool_name);
 	else
 		cp = __wt_process.cache_pool;
 
@@ -101,21 +100,19 @@ __wt_conn_cache_pool_config(WT_SESSION_IMPL *session, const char **cfg)
 	__wt_spin_unlock(conn->default_session, &__wt_process.spinlock);
 	process_locked = 0;
 	/* Add this connection into the cache pool connection queue. */
-	WT_ERR(__wt_calloc_def(conn->default_session, 1, &entry));
-	entry->conn = conn;
-	entry->active = 1;
+	WT_ERR(__wt_calloc_def(conn->default_session, 1, &conn->cache));
 
 	/*
 	 * Figure out if a manager thread is needed while holding the lock.
 	 * Don't start the thread until we have released the lock.
 	 */
 	create_server = TAILQ_EMPTY(&cp->cache_pool_qh);
-	TAILQ_INSERT_TAIL(&cp->cache_pool_qh, entry, q);
+	TAILQ_INSERT_TAIL(&cp->cache_pool_qh, conn, cpq);
 	F_SET(conn, WT_CONN_CACHE_POOL);
 	__wt_spin_unlock(conn->default_session, &cp->cache_pool_lock);
 	pool_locked = 0;
 	WT_VERBOSE_VOID(session, cache_pool,
-	    "Added %s to cache pool %s.", entry->conn->home, cp->name);
+	    "Added %s to cache pool %s.", conn->home, cp->name);
 
 	/* Start the cache pool server if required. */
 	if (create_server) {
@@ -146,7 +143,7 @@ int
 __wt_conn_cache_pool_destroy(WT_CONNECTION_IMPL *conn)
 {
 	WT_CACHE_POOL *cp;
-	WT_CACHE_POOL_ENTRY *entry;
+	WT_CONNECTION_IMPL *entry;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 	int found;
@@ -159,8 +156,8 @@ __wt_conn_cache_pool_destroy(WT_CONNECTION_IMPL *conn)
 
 	__wt_spin_lock(session, &__wt_process.cache_pool->cache_pool_lock);
 	cp = __wt_process.cache_pool;
-	TAILQ_FOREACH(entry, &cp->cache_pool_qh, q)
-		if (entry->conn == conn) {
+	TAILQ_FOREACH(entry, &cp->cache_pool_qh, cpq)
+		if (entry == conn) {
 			found = 1;
 			break;
 		}
@@ -173,13 +170,12 @@ __wt_conn_cache_pool_destroy(WT_CONNECTION_IMPL *conn)
 
 	/* Ignore any errors - it's possible the session isn't valid. */
 	WT_VERBOSE_VOID(session, cache_pool,
-	    "Removing %s from cache pool.", entry->conn->home);
-	TAILQ_REMOVE(&cp->cache_pool_qh, entry, q);
+	    "Removing %s from cache pool.", entry->home);
+	TAILQ_REMOVE(&cp->cache_pool_qh, entry, cpq);
 
 	/* Give the connections resources back to the pool. */
 	WT_ASSERT(session, cp->currently_used >= conn->cache_size);
 	cp->currently_used -= conn->cache_size;
-	__wt_free(session, entry);
 	if (TAILQ_EMPTY(&cp->cache_pool_qh))
 		F_CLR(cp, WT_CACHE_POOL_RUN);
 
@@ -226,9 +222,11 @@ int
 __cache_pool_balance(void)
 {
 	WT_CACHE_POOL *cp;
-	WT_CACHE_POOL_ENTRY *entry;
+	WT_CACHE *cache;
+	WT_CONNECTION_IMPL *entry;
 	WT_SESSION_IMPL *session;
-	uint64_t added, highest, new, read_pressure;
+	uint64_t highest, new, read_pressure;
+	int64_t added;
 	int entries;
 
 	cp = __wt_process.cache_pool;
@@ -240,26 +238,26 @@ __cache_pool_balance(void)
 	}
 
 	/* HACK: Use the default session from the first entry. */
-	session = entry->conn->default_session;
+	session = entry->default_session;
 
 	/* Generate read pressure information. */
 	entries = 0;
 	highest = 0;
-	TAILQ_FOREACH(entry, &cp->cache_pool_qh, q) {
-		if (!entry->active ||
-		    entry->cache_size == 0 ||
-		    entry->conn->cache == NULL)
+	TAILQ_FOREACH(entry, &cp->cache_pool_qh, cpq) {
+		if (entry->cache_size == 0 ||
+		    entry->cache == NULL)
 			continue;
+		cache = entry->cache;
 		++entries;
-		new = entry->conn->cache->bytes_evict;
+		new = cache->bytes_evict;
 		/* Handle wrapping of eviction requests. */
-		if (new >= entry->saved_evict)
-			entry->current_evict = new - entry->saved_evict;
+		if (new >= cache->cp_saved_evict)
+			cache->cp_current_evict = new - cache->cp_saved_evict;
 		else
-			entry->current_evict = new;
-		entry->saved_evict = new;
-		if (entry->current_evict > highest)
-			highest = entry->current_evict;
+			cache->cp_current_evict = new;
+		cache->cp_saved_evict = new;
+		if (cache->cp_current_evict > highest)
+			highest = cache->cp_current_evict;
 	}
 	WT_VERBOSE_VOID(session, cache_pool,
 	    "Highest eviction count: %d, entries: %d",
@@ -268,55 +266,55 @@ __cache_pool_balance(void)
 	highest = highest / 10;
 	++highest; /* Avoid divide by zero. */
 
-	TAILQ_FOREACH(entry, &cp->cache_pool_qh, q) {
+	TAILQ_FOREACH(entry, &cp->cache_pool_qh, cpq) {
+		cache = entry->cache;
+		added = 0;
 		/* Allow to stabilize after changes. */
-		if (!entry->active || --entry->skip_count > 0)
+		if (cache->cp_skip_count > 0 && --cache->cp_skip_count > 0)
 			continue;
 
-		read_pressure = entry->current_evict / highest;
+		read_pressure = cache->cp_current_evict / highest;
 		/*
-		 * TODO: Use __wt_cache_bytes_inuse instead of
-		 * eviction_target - it doesn't do the right thing at
-		 * the moment.
+		 * TODO: Use __wt_cache_bytes_inuse instead of eviction_target
+		 * which doesn't do the right thing at the moment.
 		 */
 		if (entry->cache_size == 0) {
+			added = cp->chunk;
 			entry->cache_size = cp->chunk;
 			cp->currently_used += cp->chunk;
-			entry->skip_count = WT_CACHE_POOL_BUMP_SKIPS;
+			cache->cp_skip_count = WT_CACHE_POOL_BUMP_SKIPS;
 		} else if (highest > 1 &&
 		    entry->cache_size < cp->quota &&
-		     entry->conn->cache->bytes_inmem >=
-		     (entry->cache_size *
-		      entry->conn->cache->eviction_target) / 100 &&
+		     cache->bytes_inmem >=
+		     (entry->cache_size * cache->eviction_target) / 100 &&
 		     cp->currently_used < cp->size &&
 		     read_pressure > WT_CACHE_POOL_BUMP_THRESHOLD) {
 			added = WT_MIN(cp->chunk,
 			    cp->size - cp->currently_used);
 			entry->cache_size += added;
 			cp->currently_used += added;
-			entry->skip_count = WT_CACHE_POOL_BUMP_SKIPS;
+			cache->cp_skip_count = WT_CACHE_POOL_BUMP_SKIPS;
 		} else if (read_pressure < WT_CACHE_POOL_REDUCE_THRESHOLD &&
 		    highest > 1 &&
 		    entry->cache_size > cp->chunk &&
 		    cp->currently_used >= cp->size) {
 			/*
-			 * If a connection isn't actively using
-			 * it's assigned cache and is assigned
-			 * a reasonable amount - reduce it.
+			 * If a connection isn't actively using it's assigned
+			 * cache and is assigned a reasonable amount - reduce
+			 * it.
 			 */
+			added = -cp->chunk;
 			entry->cache_size -= cp->chunk;
 			cp->currently_used -= cp->chunk;
-			entry->skip_count = WT_CACHE_POOL_REDUCE_SKIPS;
+			cache->cp_skip_count = WT_CACHE_POOL_REDUCE_SKIPS;
 		}
-		if (entry->cache_size != entry->conn->cache_size) {
+		if (added != 0) {
 			WT_VERBOSE_VOID(session, cache_pool,
-			    "Allocated %d to %s",
-			    (int)(entry->cache_size - entry->conn->cache_size),
-			    entry->conn->home);
-			entry->conn->cache_size = entry->cache_size;
+			    "Allocated %" PRId64 " to %s",
+			    added, entry->home);
 			/*
-			 * TODO: Add a loop waiting for connection to
-			 * give up cache.
+			 * TODO: Add a loop waiting for connection to give up
+			 * cache.
 			 */
 		}
 	}

@@ -69,8 +69,6 @@ struct __wt_cache;
     typedef struct __wt_cache WT_CACHE;
 struct __wt_cache_pool;
     typedef struct __wt_cache_pool WT_CACHE_POOL;
-struct __wt_cache_pool_entry;
-    typedef struct __wt_cache_pool_entry WT_CACHE_POOL_ENTRY;
 struct __wt_cell;
     typedef struct __wt_cell WT_CELL;
 struct __wt_cell_unpack;
@@ -207,7 +205,6 @@ struct __wt_update;
 #include "error.h"
 #include "log.h"
 #include "os.h"
-#include "cache_pool.h"
 #include "stat.h"
 
 #include "api.h"
