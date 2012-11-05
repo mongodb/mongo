@@ -127,7 +127,8 @@ commonFiles += processInfoFiles
 
 env.StaticLibrary("fail_point",
                   ["util/fail_point.cpp",
-                   "util/fail_point_registry.cpp"],
+                   "util/fail_point_registry.cpp",
+                   "util/fail_point_service.cpp"],
                   LIBDEPS=["foundation", "bson"])
 
 env.StaticLibrary('mongocommon', commonFiles,
@@ -144,10 +145,10 @@ env.StaticLibrary('mongocommon', commonFiles,
 env.StaticLibrary("coredb", [
         "client/parallel.cpp",
         "db/commands.cpp",
+        "db/commands/fail_point_cmd.cpp",
         "db/commands/hashcmd.cpp",
         "db/commands/isself.cpp",
         "db/commands/server_status.cpp",
-        "db/fail_point_service.cpp",
         "db/pipeline/pipeline.cpp",
         "db/dbcommands_generic.cpp",
         "db/dbwebserver.cpp",

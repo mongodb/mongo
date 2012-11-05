@@ -14,13 +14,12 @@
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "mongo/db/fail_point_service.h"
+#include "mongo/db/commands/fail_point_cmd.h"
 
 #include "mongo/db/commands.h"
+#include "mongo/util/fail_point_service.h"
 
 namespace mongo {
-    MONGO_FP_DECLARE(dummy); // used by jstests/libs/fail_point.js
-
     /**
      * Command for modifying installed fail points.
      *
@@ -142,21 +141,6 @@ namespace mongo {
     };
 
     scoped_ptr<FaultInjectCmd> _faultInjectCmd(NULL);
-    scoped_ptr<FailPointRegistry> _fpRegistry(NULL);
-
-    MONGO_INITIALIZER(FailPointRegistry)(InitializerContext* context) {
-        _fpRegistry.reset(new FailPointRegistry());
-        return Status::OK();
-    }
-
-    MONGO_INITIALIZER_GENERAL(AllFailPointsRegistered, (), ())(InitializerContext* context) {
-        _fpRegistry->freeze();
-        return Status::OK();
-    }
-
-    FailPointRegistry* getGlobalFailPointRegistry() {
-        return _fpRegistry.get();
-    }
 
     void enableFailPointCmd() {
         _faultInjectCmd.reset(new FaultInjectCmd);

@@ -30,13 +30,6 @@ namespace mongo {
     FailPointRegistry* getGlobalFailPointRegistry();
 
     /**
-     * Installs the injectFault command and freezes the fail point registry.
-     *
-     * Note: not thread-safe
-     */
-    void enableFailPointCmd();
-
-    /**
      * Convenience macro for declaring a fail point. Must be used in global scope and
      * never in a block with limited scope (ie, inside functions, loops, etc.)
      */
