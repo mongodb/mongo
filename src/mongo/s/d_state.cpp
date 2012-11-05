@@ -162,6 +162,7 @@ namespace mongo {
 
     void ShardingState::undoDonateChunk( const string& ns , const BSONObj& min , const BSONObj& max , ShardChunkVersion version ) {
         scoped_lock lk( _mutex );
+        log() << "ShardingState::undoDonateChunk acquired _mutex" << endl;
 
         ChunkManagersMap::const_iterator it = _chunks.find( ns );
         verify( it != _chunks.end() ) ;
@@ -634,7 +635,7 @@ namespace mongo {
             if ( version < globalVersion && version.hasCompatibleEpoch( globalVersion ) ) {
                 while ( shardingState.inCriticalMigrateSection() ) {
                     dbtemprelease r;
-                    sleepmillis(2);
+                    sleepmillis(20);
                     OCCASIONALLY log() << "waiting till out of critical section" << endl;
                 }
                 errmsg = "shard global version for collection is higher than trying to set to '" + ns + "'";
