@@ -19,7 +19,6 @@
 #include <sstream>
 #include <string.h>
 #include <stdlib.h>
-#include <sys/time.h>
 
 #include "mongo/bson/mutable/mutable_bson_heap.h"
 #include "mongo/bson/mutable/mutable_bson_internal.h"
@@ -35,16 +34,14 @@ namespace mutablebson {
 #define SHORT_LIMIT     16
 #define __TRACE__ __FILE__ << ":" << __FUNCTION__ << " [" << __LINE__ << "]"
 
-std::string indentv[] = {
- "    ",
- "        ",
- "            ",
- "                ",
- "                    ",
- "                        ",
- "                            ",
- "                                " };
-
+    static const std::string indentv[] = { "    ",
+                                           "        ",
+                                           "            ",
+                                           "                ",
+                                           "                    ",
+                                           "                        ",
+                                           "                            ",
+                                           "                                " };
 
     //
     // Element implementation
@@ -403,7 +400,7 @@ std::string indentv[] = {
             return Status(ErrorCodes::IllegalOperation, "get(index, e) out of bounds");
         }
 ElementRep& dstRep = _ctx->_elements->_vec[(*sibIt)._rep];
-        ElementRep& srcRep = _ctx->_elements->_vec[e._rep]; 
+        ElementRep& srcRep = _ctx->_elements->_vec[e._rep];
         dstRep._value = srcRep._value;
         return Status::OK();
     }
@@ -966,7 +963,7 @@ ElementRep& dstRep = _ctx->_elements->_vec[(*sibIt)._rep];
         uint32_t rep = _elements->size();
         uint32_t nameref = _heap->putString(fieldName);
         ValueType val;
-        val.tsVal = d;
+        val.doubleVal = d;
         _elements->push_back(ElementRep(mongo::NumberDouble, nameref, val));
         return Element(this, rep);
     }

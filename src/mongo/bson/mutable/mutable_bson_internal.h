@@ -95,8 +95,8 @@ namespace mutablebson {
  *
  */
 
-    const static uint32_t EMPTY_REP = (uint32_t)-1;
-    const static uint32_t NULL_REF  = (uint32_t)-1;
+    static const uint32_t EMPTY_REP = (uint32_t)-1;
+    static const uint32_t NULL_REF  = (uint32_t)-1;
 
     union ValueType {
         bool boolVal;
