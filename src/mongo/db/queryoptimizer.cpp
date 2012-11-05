@@ -1085,15 +1085,9 @@ doneCheckOrder:
             ( _qps.firstPlan()->utility() != QueryPlan::Impossible ) &&
             !_qps.firstPlan()->indexed() &&
             !_qps.firstPlan()->multikeyFrs().range( "_id" ).universal() ) {
-            if ( cc().isSyncThread() ||
-                str::contains( ns , ".system." ) ||
-                str::startsWith( ns , "local." ) ) {
-                // ok
-            }
-            else {
-                warning()
-                << "unindexed _id query on capped collection, "
-                << "performance will be poor collection: " << ns << endl;
+            if (!str::contains( ns , ".system." ) && !str::startsWith( ns , "local." )) {
+                warning() << "unindexed _id query on capped collection, "
+                          << "performance will be poor collection: " << ns << endl;
             }
         }
     }

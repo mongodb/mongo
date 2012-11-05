@@ -56,7 +56,6 @@ namespace mongo {
 
     /** the database's concept of an outside "client" */
     class Client : public ClientBasic {
-        static Client *syncThread;
     public:
         // always be in clientsMutex when manipulating this. killop stuff uses these.
         static set<Client*>& clients;
@@ -81,14 +80,6 @@ namespace mongo {
          *  @return true if anything was done
          */
         bool shutdown();
-
-        /** set so isSyncThread() works */
-        void iAmSyncThread() {
-            wassert( syncThread == 0 );
-            syncThread = this;
-        }
-        /** @return true if this client is the replication secondary pull thread.  not used much, is used in create index sync code. */
-        bool isSyncThread() const { return this == syncThread; }
 
         string clientAddress(bool includePort=false) const;
         const AuthenticationInfo * getAuthenticationInfo() const { return &_ai; }

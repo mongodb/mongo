@@ -712,7 +712,6 @@ namespace replset {
         n++;
 
         Client::initThread("rsSync");
-        cc().iAmSyncThread(); // for isSyncThread() (which is used not used much, is used in secondary create index code
         replLocalAuth();
         theReplSet->syncThread();
         cc().shutdown();

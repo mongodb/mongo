@@ -41,8 +41,7 @@
 #include "mongo/util/mongoutils/html.h"
 
 namespace mongo {
-  
-    Client* Client::syncThread;
+
     mongo::mutex& Client::clientsMutex = *(new mutex("clientsMutex"));
     set<Client*>& Client::clients = *(new set<Client*>); // always be in clientsMutex when manipulating this
 
@@ -170,9 +169,6 @@ namespace mongo {
         {
             scoped_lock bl(clientsMutex);
             clients.erase(this);
-            if ( isSyncThread() ) {
-                syncThread = 0;
-            }
         }
 
         return false;
