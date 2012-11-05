@@ -480,7 +480,6 @@ if "darwin" == os.sys.platform:
     platform = "osx" # prettier than darwin
 
     if env["CXX"] is None:
-        print( "YO" )
         if os.path.exists( "/usr/bin/g++-4.2" ):
             env["CXX"] = "g++-4.2"
 
