@@ -134,6 +134,11 @@ namespace mongo {
             if (_heartbeatTimeout != DEFAULT_HB_TIMEOUT) {
                 settings << "heartbeatTimeoutSecs" << _heartbeatTimeout;
             }
+
+            if (!_chainingAllowed) {
+                settings << "chainingAllowed" << _chainingAllowed;
+            }
+
             b << "settings" << settings.obj();
         }
 
@@ -566,10 +571,20 @@ namespace mongo {
                 uassert(16438, "Heartbeat timeout must be non-negative", timeout >= 0);
                 _heartbeatTimeout = timeout;
             }
+
+            // If the config explicitly sets chaining to false, turn it off.
+            if (settings.hasField("chainingAllowed") &&
+                !settings["chainingAllowed"].trueValue()) {
+                _chainingAllowed = false;
+            }
         }
 
         // figure out the majority for this config
         setMajority();
+    }
+
+    bool ReplSetConfig::chainingAllowed() const {
+        return _chainingAllowed;
     }
 
     int ReplSetConfig::getHeartbeatTimeout() const {
@@ -582,8 +597,9 @@ namespace mongo {
 
     ReplSetConfig::ReplSetConfig() :
         version(EMPTYCONFIG),
-        _ok(false),
+        _chainingAllowed(true),
         _majority(-1),
+        _ok(false),
         _heartbeatTimeout(DEFAULT_HB_TIMEOUT) {
     }
 
