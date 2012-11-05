@@ -101,7 +101,7 @@ __wt_conn_cache_pool_config(WT_SESSION_IMPL *session, const char **cfg)
 	__wt_spin_unlock(conn->default_session, &__wt_process.spinlock);
 	process_locked = 0;
 	/* Add this connection into the cache pool connection queue. */
-	WT_ERR(__wt_calloc_def(conn->default_session, &entry));
+	WT_ERR(__wt_calloc_def(conn->default_session, 1, &entry));
 	entry->conn = conn;
 	entry->active = 1;
 
