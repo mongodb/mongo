@@ -398,7 +398,7 @@ namespace replset {
     }
 
     void BackgroundSync::getOplogReader(OplogReader& r) {
-        Member *target = NULL, *stale = NULL;
+        const Member *target = NULL, *stale = NULL;
         BSONObj oldest;
 
         // then we're initial syncing and we're still waiting for this to be set
@@ -491,7 +491,7 @@ namespace replset {
         return false;
     }
 
-    Member* BackgroundSync::getSyncTarget() {
+    const Member* BackgroundSync::getSyncTarget() {
         boost::unique_lock<boost::mutex> lock(_mutex);
         return _currentSyncTarget;
     }

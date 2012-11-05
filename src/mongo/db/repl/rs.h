@@ -338,7 +338,7 @@ namespace mongo {
         /**
          * Find the closest member (using ping time) with a higher latest optime.
          */
-        Member* getMemberToSyncTo();
+        const Member* getMemberToSyncTo();
         void veto(const string& host, unsigned secs=10);
         bool gotForceSync();
         void goStale(const Member* m, const BSONObj& o);

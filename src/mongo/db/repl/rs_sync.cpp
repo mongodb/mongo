@@ -634,7 +634,7 @@ namespace replset {
         }
 
         // record the previous member we were syncing from
-        Member *prev = replset::BackgroundSync::get()->getSyncTarget();
+        const Member *prev = replset::BackgroundSync::get()->getSyncTarget();
         if (prev) {
             result.append("prevSyncTarget", prev->fullName());
         }

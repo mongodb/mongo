@@ -124,7 +124,7 @@ namespace mongo {
         d->emptyCappedCollection(rsoplog);
     }
 
-    Member* ReplSetImpl::getMemberToSyncTo() {
+    const Member* ReplSetImpl::getMemberToSyncTo() {
         lock lk(this);
 
         bool buildIndexes = true;
@@ -150,7 +150,7 @@ namespace mongo {
             buildIndexes = myConfig().buildIndexes;
         }
 
-        Member* primary = const_cast<Member*>(box.getPrimary());
+        const Member* primary = box.getPrimary();
 
         // If we are only allowed to sync from the primary, return that
         if (!config().chainingAllowed()) {
