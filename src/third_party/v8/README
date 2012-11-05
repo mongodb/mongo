@@ -24,13 +24,8 @@ and to satisfy space constraints:
 And these files have been added to complete the integration with the
 MongoDB build system:
 
-    experimental-libraries.cc [1]
-    libraries.cc [1]
     README
-    SConscript [2]
+    SConscript [1]
 
-[1] These files were generated using V8's JS2C utility, and need to
-    be updated upon changes to the underlying .js files in future
-    versions of V8.
-[2] The contents of this file are heavily borrowed from V8's
+[1] The contents of this file are heavily borrowed from V8's
     src/SConscript.
