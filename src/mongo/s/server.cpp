@@ -21,6 +21,7 @@
 #include <boost/thread/thread.hpp>
 
 #include "mongo/base/initializer.h"
+#include "mongo/db/commands/fail_point_cmd.h"
 #include "mongo/db/initialize_server_global_state.h"
 #include "../util/net/message.h"
 #include "../util/startup_test.h"
@@ -45,7 +46,6 @@
 #include "cursors.h"
 #include "shard_version.h"
 #include "../util/processinfo.h"
-#include "mongo/db/fail_point_service.h"
 #include "mongo/db/lasterror.h"
 #include "mongo/util/stacktrace.h"
 
