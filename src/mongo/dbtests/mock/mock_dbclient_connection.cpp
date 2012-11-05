@@ -16,6 +16,7 @@
 #include "mongo/dbtests/mock/mock_dbclient_connection.h"
 
 #include "mongo/util/net/sock.h"
+#include "mongo/util/time_support.h"
 
 using mongo::BSONObj;
 
@@ -26,7 +27,8 @@ namespace mongo_test {
     MockDBClientConnection::MockDBClientConnection(MockRemoteDBServer* remoteServer):
             _remoteServerInstanceID(remoteServer->getInstanceID()),
             _remoteServer(remoteServer),
-            _isFailed(false) {
+            _isFailed(false),
+            _sockCreationTime(mongo::curTimeMicros64()) {
     }
 
     MockDBClientConnection::~MockDBClientConnection() {
@@ -99,6 +101,10 @@ namespace mongo_test {
             int queryOptions) {
         verify(false);
         return 0;
+    }
+
+    uint64_t MockDBClientConnection::getSockCreationMicroSec() const {
+        return _sockCreationTime;
     }
 
     void MockDBClientConnection::killCursor(long long cursorID) {

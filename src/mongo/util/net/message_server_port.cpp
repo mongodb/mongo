@@ -121,6 +121,11 @@ namespace mongo {
             pms::handler = handler;
         }
 
+        ~PortMessageServer() {
+            delete pms::handler;
+            pms::handler = NULL;
+        }
+
         virtual void acceptedMP(MessagingPort * p) {
 
             if ( ! Listener::globalTicketHolder.tryAcquire() ) {

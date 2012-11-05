@@ -935,6 +935,8 @@ namespace mongo {
         long long _connectionId; // unique connection id for this connection
         WriteConcern _writeConcern;
     public:
+        static const uint64_t INVALID_SOCK_CREATION_TIME;
+
         DBClientBase() {
             _writeConcern = W_NORMAL;
             _connectionId = ConnectionIdSequence.fetchAndAdd(1);
@@ -1029,6 +1031,10 @@ namespace mongo {
         virtual ConnectionString::ConnectionType type() const = 0;
         
         virtual double getSoTimeout() const = 0;
+
+        virtual uint64_t getSockCreationMicroSec() const {
+            return INVALID_SOCK_CREATION_TIME;
+        }
 
     }; // DBClientBase
 
@@ -1162,6 +1168,8 @@ namespace mongo {
 
         static void setLazyKillCursor( bool lazy ) { _lazyKillCursor = lazy; }
         static bool getLazyKillCursor() { return _lazyKillCursor; }
+
+        uint64_t getSockCreationMicroSec() const;
 
     protected:
         friend class SyncClusterConnection;

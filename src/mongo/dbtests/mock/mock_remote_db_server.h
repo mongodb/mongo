@@ -36,8 +36,28 @@ namespace mongo_test {
     public:
         typedef size_t InstanceID;
 
+        /**
+         * Creates a new mock server. This also setups a hook to this server that can be used
+         * to allow clients using the ConnectionString::connect interface to create connections
+         * to this server. The requirements to make this hook fully functional are:
+         *
+         * 1. hostName of this server should start with $.
+         * 2. No other instance has the same hostName as this.
+         *
+         * To register the hook, simply call setConnectionHook:
+         *
+         * MockRemoteDBServer mockServer;
+         * ConnectionString::setConnectionHook(mockServer.getConnectionHook());
+         *
+         * @param hostName the host name for this server.
+         */
         MockRemoteDBServer(const std::string& hostName);
         virtual ~MockRemoteDBServer();
+
+        /**
+         * @return the hook that can be used with ConnectionString.
+         */
+        mongo::ConnectionString::ConnectionHook* getConnectionHook();
 
         //
         // Connectivity methods
@@ -143,6 +163,29 @@ namespace mongo_test {
         };
 
         /**
+         * Custom connection hook that can be used with ConnectionString.
+         */
+        class MockDBClientConnStrHook: public mongo::ConnectionString::ConnectionHook {
+        public:
+            /**
+             * Creates a new connection hook for the ConnectionString class that
+             * can create mock connections to this server.
+             *
+             * @param replSet the mock replica set. Caller is responsible for managing
+             *     mockServer and making sure that it lives longer than this object.
+             */
+            MockDBClientConnStrHook(MockRemoteDBServer* mockServer);
+            ~MockDBClientConnStrHook();
+
+            mongo::DBClientBase* connect(
+                    const mongo::ConnectionString& connString,
+                    std::string& errmsg, double socketTimeout);
+
+        private:
+            MockRemoteDBServer* _mockServer;
+        };
+
+        /**
          * Checks whether the instance of the server is still up.
          *
          * @throws mongo::SocketException if this server is down
@@ -170,5 +213,7 @@ namespace mongo_test {
 
         // protects this entire instance
         mutable mongo::SpinLock _lock;
+
+        MockDBClientConnStrHook _connStrHook;
     };
 }

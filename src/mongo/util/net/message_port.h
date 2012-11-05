@@ -111,6 +111,10 @@ namespace mongo {
         }
 #endif
 
+        uint64_t getSockCreationMicroSec() const {
+            return psock->getSockCreationMicroSec();
+        }
+
     private:
         
         PiggyBackData * piggyBackData;

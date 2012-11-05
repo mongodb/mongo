@@ -57,6 +57,8 @@ namespace mongo_test {
                 int queryOptions = 0,
                 int batchSize = 0);
 
+        uint64_t getSockCreationMicroSec() const;
+
         //
         // Getters
         //
@@ -95,5 +97,6 @@ namespace mongo_test {
         const MockRemoteDBServer::InstanceID _remoteServerInstanceID;
         MockRemoteDBServer* _remoteServer;
         bool _isFailed;
+        uint64_t _sockCreationTime;
     };
 }

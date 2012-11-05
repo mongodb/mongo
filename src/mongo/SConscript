@@ -429,6 +429,30 @@ env.CppUnitTest( "balancer_policy_test" , [ "s/balancer_policy_tests.cpp" ] ,
                  LIBDEPS=["mongoscore", "coreshard","mongocommon","coreserver","coredb","dbcmdline","mongodandmongos"] ,
                  NO_CRUTCH=True)
 
+env.CppUnitTest("scoped_db_conn_test", [ "client/scoped_db_conn_test.cpp" ],
+                 LIBDEPS=[
+                    "coredb",
+                    "coreserver",
+                    "coreshard",
+                    "dbcmdline",
+                    "mongocommon",
+                    "mongodandmongos",
+                    "mongoscore"],
+                 NO_CRUTCH=True)
+
+env.CppUnitTest("shard_conn_test", [ "s/shard_conn_test.cpp" ],
+                 LIBDEPS=[
+                    "mongoscore",
+                    "coreshard",
+                    "mongocommon",
+                    "coreserver",
+                    "coredb",
+                    "dbcmdline",
+                    "mongodandmongos",
+                    "mocklib"],
+                 NO_CRUTCH=True)
+
+
 # Should only need stuff from util, unittest and platform
 env.CppUnitTest("fail_point_test", [ "util/fail_point_test.cpp" ],
                 LIBDEPS=["fail_point"])
