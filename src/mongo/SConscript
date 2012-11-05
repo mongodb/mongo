@@ -46,6 +46,10 @@ env.StaticLibrary('md5', [
         ])
 
 env.StaticLibrary('bson', [
+        'bson/mutable/mutable_bson.cpp',
+        'bson/mutable/mutable_bson_builder.cpp',
+        'bson/mutable/mutable_bson_heap.cpp',
+        'bson/mutable/mutable_bson_internal.cpp',
         'util/safe_num.cpp',
         'bson/oid.cpp',
         'db/nonce.cpp',
@@ -55,6 +59,15 @@ env.StaticLibrary('bson', [
         'md5',
         'stringutils',
         ])
+
+env.CppUnitTest('mutable_bson_test', ['bson/mutable/mutable_bson_test.cpp'],
+                 LIBDEPS=['bson'])
+
+env.CppUnitTest('mutable_bson_heap_test', ['bson/mutable/mutable_bson_heap_test.cpp'],
+                 LIBDEPS=['bson'])
+
+env.CppUnitTest('mutable_bson_builder_test', ['bson/mutable/mutable_bson_builder_test.cpp'],
+                LIBDEPS=['bson'])
 
 env.CppUnitTest('safe_num_test', ['util/safe_num_test.cpp'],
                 LIBDEPS=['bson'])

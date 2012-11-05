@@ -16,5 +16,7 @@ error_code("UnsupportedFormat", 12)
 error_code("Unauthorized", 13)
 error_code("TypeMismatch", 14)
 error_code("Overflow", 15)
+error_code("IllegalOperation", 16)
+error_code("EmptyArrayOperation", 17)
 
 error_class("NetworkError", ["HostUnreachable", "HostNotFound"])
