@@ -549,11 +549,15 @@ __evict_lru(WT_SESSION_IMPL *session)
 	cutoff = (3 * __evict_read_gen(&cache->evict[0]) +
 	    __evict_read_gen(&cache->evict[candidates - 1])) / 4;
 
-	/* Don't take more than half, regardless. */
+	/*
+	 * Don't take more than half, regardless.  That said, if there is only
+	 * one candidate page, which is normal when populating an empty file,
+	 * don't exclude it.
+	 */
 	for (i = 0; i < candidates / 2; i++)
 		if (cache->evict[i].page->read_gen > cutoff)
 			break;
-	cache->evict_candidates = i;
+	cache->evict_candidates = i + 1;
 
 	__evict_list_clr_all(session, WT_EVICT_WALK_BASE);
 
