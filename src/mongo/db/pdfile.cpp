@@ -1399,7 +1399,7 @@ namespace mongo {
 
         BSONObj info = loc.obj();
         bool background = info["background"].trueValue();
-        if( background && cc().isSyncThread() ) {
+        if (background && !isMasterNs(tabletoidxns.c_str())) {
             /* don't do background indexing on slaves.  there are nuances.  this could be added later
                 but requires more code.
                 */
