@@ -671,7 +671,13 @@ namespace mongo {
             try {
                 vector<ReplSetConfig> configs;
                 try {
-                    configs.push_back( ReplSetConfig(HostAndPort::me()) );
+                    DBDirectClient cli;
+                    BSONObj config = cli.findOne(rsConfigNs, Query()).getOwned();
+
+                    // Add local config, if it exists
+                    if (!config.isEmpty()) {
+                        configs.push_back(ReplSetConfig(config, false));
+                    }
                 }
                 catch(DBException& e) {
                     log() << "replSet exception loading our local replset configuration object : " << e.toString() << rsLog;
