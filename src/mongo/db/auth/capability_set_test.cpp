@@ -17,8 +17,8 @@
  * Unit tests of the CapabilitySet type.
  */
 
+#include "mongo/db/auth/acquired_capability.h"
 #include "mongo/db/auth/action_set.h"
-#include "mongo/db/auth/capability.h"
 #include "mongo/db/auth/capability_set.h"
 #include "mongo/unittest/unittest.h"
 
@@ -32,19 +32,19 @@ namespace {
         Principal user2("user2");
 
         ASSERT_OK(ActionSet::parseActionSetFromString("find,update", &actions));
-        Capability fooUser("foo", &user2, actions);
+        AcquiredCapability fooUser("foo", &user2, actions);
 
         ASSERT_OK(ActionSet::parseActionSetFromString("find,update,userAdmin,remove", &actions));
-        Capability fooUser2("foo", &user1, actions);
+        AcquiredCapability fooUser2("foo", &user1, actions);
 
         ASSERT_OK(ActionSet::parseActionSetFromString("find,update", &actions));
-        Capability barUser("bar", &user1, actions);
+        AcquiredCapability barUser("bar", &user1, actions);
 
         ASSERT_OK(ActionSet::parseActionSetFromString("find", &actions));
-        Capability barReadOnly("bar", &user2, actions);
+        AcquiredCapability barReadOnly("bar", &user2, actions);
 
 
-        const Capability* capPtr;
+        const AcquiredCapability* capPtr;
         // No capabilities
         ASSERT(!capSet.getCapabilityForAction("foo", ActionType::find));
 

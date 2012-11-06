@@ -21,25 +21,25 @@
 #include <map>
 #include <string>
 
+#include "mongo/db/auth/acquired_capability.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
-#include "mongo/db/auth/capability.h"
 #include "mongo/db/auth/principal.h"
 
 namespace mongo {
 
-    void CapabilitySet::grantCapability(const Capability& capability) {
+    void CapabilitySet::grantCapability(const AcquiredCapability& capability) {
         _capabilities.insert(std::make_pair(capability.getResource(), capability));
     }
 
-    const Capability* CapabilitySet::getCapabilityForAction(const std::string& resource,
-                                                            const ActionType& action) const {
+    const AcquiredCapability* CapabilitySet::getCapabilityForAction(
+            const std::string& resource, const ActionType& action) const {
         CapabilitySetConstRange range;
         CapabilityRangeConstIterator it;
 
         range = _capabilities.equal_range(resource);
         for (it = range.first; it != range.second; ++it) {
-            const Capability& capability = it->second;
+            const AcquiredCapability& capability = it->second;
             if (capability.includesAction(action)) {
                 return &capability;
             }
@@ -53,7 +53,7 @@ namespace mongo {
         while (it != _capabilities.end()) {
             CapabilityRangeIterator current = it;
             ++it;  // Must advance now because erase will invalidate the iterator
-            Capability& capability = current->second;
+            AcquiredCapability& capability = current->second;
             if (capability.getPrincipal() == principal) {
                 _capabilities.erase(current);
             }

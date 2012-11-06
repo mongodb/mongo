@@ -8,7 +8,8 @@ env.Command(['action_type.h', 'action_type.cpp'], ['generate_action_types.py', '
             '$PYTHON $SOURCES $TARGETS')
 
 # Just the data structures used
-env.StaticLibrary('authcore', ['action_set.cpp',
+env.StaticLibrary('authcore', ['acquired_capability.cpp',
+                               'action_set.cpp',
                                'action_type.cpp',
                                'authorization_manager.cpp',
                                'capability.cpp',

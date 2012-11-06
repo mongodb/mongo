@@ -21,9 +21,9 @@
 #include "mongo/base/init.h"
 #include "mongo/base/status.h"
 #include "mongo/client/dbclientinterface.h"
+#include "mongo/db/auth/acquired_capability.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
-#include "mongo/db/auth/capability.h"
 #include "mongo/db/auth/capability_set.h"
 #include "mongo/db/auth/external_state_impl.h"
 #include "mongo/db/auth/principal.h"
@@ -151,7 +151,7 @@ namespace mongo {
         return _authenticatedPrincipals.removeByName(principal->getName());
     }
 
-    Status AuthorizationManager::acquireCapability(const Capability& capability) {
+    Status AuthorizationManager::acquireCapability(const AcquiredCapability& capability) {
         const std::string& userName = capability.getPrincipal()->getName();
         if (!_authenticatedPrincipals.lookup(userName)) {
             return Status(ErrorCodes::UserNotFound,
@@ -171,7 +171,7 @@ namespace mongo {
         _authenticatedPrincipals.add(internalPrincipal);
         ActionSet allActions;
         allActions.addAllActions();
-        Capability capability("*", internalPrincipal, allActions);
+        AcquiredCapability capability("*", internalPrincipal, allActions);
         Status status = acquireCapability(capability);
         verify (status == Status::OK());
     }
@@ -251,7 +251,7 @@ namespace mongo {
 
         if (dbname == "admin" || dbname == "local") {
             // Make all basic actions available on all databases
-            result->grantCapability(Capability("*", principal, actions));
+            result->grantCapability(AcquiredCapability("*", principal, actions));
             // Make server and cluster admin actions available on admin database.
             if (!readOnly) {
                 actions.addAllActionsFromSet(serverAdminRoleActions);
@@ -259,7 +259,7 @@ namespace mongo {
             }
         }
 
-        result->grantCapability(Capability(dbname, principal, actions));
+        result->grantCapability(AcquiredCapability(dbname, principal, actions));
 
         return Status::OK();
     }
@@ -270,7 +270,7 @@ namespace mongo {
             return &specialAdminPrincipal;
         }
 
-        const Capability* capability;
+        const AcquiredCapability* capability;
         capability = _aquiredCapabilities.getCapabilityForAction(resource, action);
         if (capability) {
             return capability->getPrincipal();

@@ -20,6 +20,7 @@
 #include <string>
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/db/auth/acquired_capability.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/capability.h"
@@ -41,7 +42,7 @@ namespace mongo {
         CapabilitySet(){}
         ~CapabilitySet(){}
 
-        void grantCapability(const Capability& capability);
+        void grantCapability(const AcquiredCapability& capability);
         void revokeCapabilitiesFromPrincipal(Principal* principal);
 
         // Returns the first capability found that grants the given action on the given resource.
@@ -49,13 +50,13 @@ namespace mongo {
         // Ownership of the returned Capability remains with the CapabilitySet.  The pointer
         // returned is only guaranteed to remain valid until the next non-const method is called
         // on the CapabilitySet.
-        const Capability* getCapabilityForAction(const std::string& resource,
-                                                 const ActionType& action) const;
+        const AcquiredCapability* getCapabilityForAction(const std::string& resource,
+                                                         const ActionType& action) const;
 
     private:
 
         // Key is the resource the capability is on.
-        typedef std::multimap<const std::string, Capability> CapabilityMap;
+        typedef std::multimap<const std::string, AcquiredCapability> CapabilityMap;
         typedef CapabilityMap::iterator CapabilityRangeIterator;
         typedef std::pair<CapabilityRangeIterator, CapabilityRangeIterator> CapabilitySetRange;
         typedef CapabilityMap::const_iterator CapabilityRangeConstIterator;

@@ -16,25 +16,25 @@
 
 #pragma once
 
-#include <string>
-
-#include "mongo/db/auth/action_set.h"
-#include "mongo/db/auth/action_type.h"
+#include "mongo/db/auth/capability.h"
 #include "mongo/db/auth/principal.h"
 
 namespace mongo {
 
     /**
-     * A representation of the permission to perform a set of actions on a specific resource.
+     * A representation that a given principal has the permission to perform a set of actions on a
+     * specific resource.
      * This class does not do any locking/synchronization, the consumer will be responsible for
      * synchronizing access.
      */
-    class Capability {
+    class AcquiredCapability {
     public:
 
-        Capability(const std::string& resource, ActionSet actions);
-        ~Capability() {}
+        AcquiredCapability(const Capability& capability, Principal* principal);
+        AcquiredCapability(const std::string& resource, Principal* principal, ActionSet actions);
+        ~AcquiredCapability() {}
 
+        const Principal* getPrincipal() const;
         const std::string& getResource() const;
         const ActionSet& getActions() const;
 
@@ -43,8 +43,8 @@ namespace mongo {
 
     private:
 
-        std::string _resource;
-        ActionSet _actions; // bitmask of actions this capability grants
+        Capability _capability;
+        Principal* _principal;
     };
 
 } // namespace mongo

@@ -17,26 +17,17 @@
 #include "mongo/db/auth/capability.h"
 
 #include <string>
-#include <vector>
 
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/principal.h"
-#include "mongo/platform/cstdint.h"
 
 namespace mongo {
 
-    Capability::Capability(const std::string& resource,
-                           Principal* principal,
-                           ActionSet actions) :
+    Capability::Capability(const std::string& resource, ActionSet actions) :
             _resource(resource),
-            _principal(principal),
             _actions(actions) {}
 
-
-    const Principal* Capability::getPrincipal() const {
-        return _principal;
-    }
 
     const std::string& Capability::getResource() const {
         return _resource;

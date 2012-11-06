@@ -21,9 +21,9 @@
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
 #include "mongo/client/dbclientinterface.h"
+#include "mongo/db/auth/acquired_capability.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
-#include "mongo/db/auth/capability.h"
 #include "mongo/db/auth/capability_set.h"
 #include "mongo/db/auth/external_state.h"
 #include "mongo/db/auth/principal.h"
@@ -53,7 +53,7 @@ namespace mongo {
         Status removeAuthorizedPrincipal(const Principal* principal);
 
         // Grant this connection the given capability.
-        Status acquireCapability(const Capability& capability);
+        Status acquireCapability(const AcquiredCapability& capability);
 
         // This should be called when the connection gets authenticated as the internal user.
         // This grants a capability on all the actions for the internal role, with the
