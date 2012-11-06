@@ -36,6 +36,7 @@ namespace mongo {
         // Protects _groups.
         static mongo::mutex groupMx;
     public:
+        ReplSetConfig();
         /**
          * This contacts the given host and tries to get a config from them.
          *

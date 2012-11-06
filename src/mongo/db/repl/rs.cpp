@@ -681,8 +681,11 @@ namespace mongo {
                     DBDirectClient cli;
                     BSONObj config = cli.findOne(rsConfigNs, Query()).getOwned();
 
-                    // Add local config, if it exists
-                    if (!config.isEmpty()) {
+                    // Add local config
+                    if (config.isEmpty()) {
+                        configs.push_back(ReplSetConfig());
+                    }
+                    else {
                         configs.push_back(ReplSetConfig(config, false));
                     }
                 }

@@ -581,6 +581,10 @@ namespace mongo {
         uassert(13122, "bad repl set config?", expr);
     }
 
+    ReplSetConfig::ReplSetConfig() :
+        version(EMPTYCONFIG),_ok(false),_majority(-1)
+    {}
+
     ReplSetConfig::ReplSetConfig(BSONObj cfg, bool force) :
         _ok(false),_chainingAllowed(true),_majority(-1)
     {
