@@ -23,6 +23,15 @@ def gettype(c):
 		ctype = 'int'
 	return ctype or 'string'
 
+def getsubconfigstr(c):
+	'''Return a string indicating if an item has sub configuration'''
+	ctype = gettype(c)
+	if ctype == 'category':
+		return '__wt_confchk_' + c.name + '_subconfigs'
+	else:
+		return 'NULL'
+
+
 def typedesc(c):
 	'''Descripe what type of value is expected for the given config item'''
 	checks = c.flags
@@ -51,6 +60,28 @@ def typedesc(c):
 	elif ctype == 'list':
 		desc += ' of strings'
 	return desc
+
+def categorydesc(c):
+	desc = 'a list of configuration settings'
+	desc += ' @subconfigstart{' + c.name + ', see dist/api_data.py}'
+	for subc in c.subconfig:
+		desc += ' ' + parseconfig(subc)
+	desc = desc.replace('@config', '@subconfig')
+	desc += ' @subconfigend'
+	return desc
+
+def parseconfig(c):
+		desc = textwrap.dedent(c.desc) + '.'
+		desc = desc.replace(',', '\\,')
+		default = '\\c ' + str(c.default) if c.default or gettype(c) == 'int' \
+				else 'empty'
+		if gettype(c) == 'category':
+			tdesc = categorydesc(c) + ';\n'
+		else:
+			tdesc = typedesc(c) + '; default ' + default + '.'
+			tdesc = tdesc.replace(',', '\\,')
+		output = '@config{' + ','.join((c.name, desc, tdesc)) + '}'
+		return output
 
 skip = False
 for line in open(f, 'r'):
@@ -96,14 +127,7 @@ for line in open(f, 'r'):
 		lastname = name
 		if 'undoc' in c.flags:
 			continue
-
-		desc = textwrap.dedent(c.desc) + '.'
-		desc = desc.replace(',', '\\,')
-		default = '\\c ' + str(c.default) if c.default or gettype(c) == 'int' \
-				else 'empty'
-		tdesc = typedesc(c) + '; default ' + default + '.'
-		tdesc = tdesc.replace(',', '\\,')
-		output = '@config{' + ','.join((name, desc, tdesc)) + '}'
+		output = parseconfig(c)
 		for l in w.wrap(output):
 			tfile.write(prefix + l + '\n')
 
@@ -134,11 +158,15 @@ def checkstr(c):
 	cmin = str(checks.get('min', ''))
 	cmax = str(checks.get('max', ''))
 	choices = checks.get('choices', [])
+	subconfig = checks.get('subconfig', [])
 	result = []
 	if cmin:
 		result.append('min=' + cmin)
 	if cmax:
 		result.append('max=' + cmax)
+	if subconfig:
+		result.append('subconfig=' + '[' +
+		    ','.join('\\"' + parseconfig(c) + '\\"' for c in subconfig) + ']')
 	if choices:
 		result.append('choices=' + '[' +
 		    ','.join('\\"' + s + '\\"' for s in choices) + ']')
@@ -156,6 +184,33 @@ def get_default(c):
 	else:
 		return ''
 
+created_subconfigs=set()
+
+def add_subconfig(c, tfile):
+	created_subconfigs.add(c.name)
+	subname = c.name.replace('.', '_')
+	tfile.write('''
+const char *
+__wt_confdfl_%(name)s_subconfigs =
+%(config)s;
+''' % {
+	'name' : subname,
+	'config' : '\n'.join('\t"%s"' % line
+		for line in w.wrap(','.join('%s=%s' % (subc.name, get_default(subc))
+			for subc in sorted(c.subconfig))) or [""]),
+})
+	tfile.write('''
+WT_CONFIG_CHECK
+__wt_confchk_%(name)s_subconfigs[] = {
+\t%(check)s
+\t{ NULL, NULL, NULL, NULL }
+};
+''' % {
+	'name' : c.name,
+	'check' : '\n\t'.join('"\n\t    "'.join(w.wrap('{ "%s", "%s", %s, NULL },' %
+		(subc.name, gettype(subc), checkstr(subc)))) for subc in sorted(c.subconfig)),
+})
+
 for name in sorted(api_data.methods.keys()):
 	ctype = api_data.methods[name].config
 	name = name.replace('.', '_')
@@ -169,13 +224,18 @@ __wt_confdfl_%(name)s =
 		for line in w.wrap(','.join('%s=%s' % (c.name, get_default(c))
 			for c in sorted(ctype))) or [""]),
 })
+	# Deal with subsets of configuration settings.
+	for c in sorted(ctype):
+		if gettype(c) == 'category' and c.name not in created_subconfigs:
+			add_subconfig(c, tfile)
+
 # Construct an array of allowable configuration options. Always append an empty
 # string as a terminator for iteration
 	if not ctype:
 		tfile.write('''
 WT_CONFIG_CHECK
 __wt_confchk_%(name)s[] = {
-\t{ NULL, NULL, NULL }
+\t{ NULL, NULL, NULL, NULL }
 };
 ''' % { 'name' : name })
 	else:
@@ -183,12 +243,12 @@ __wt_confchk_%(name)s[] = {
 WT_CONFIG_CHECK
 __wt_confchk_%(name)s[] = {
 \t%(check)s
-\t{ NULL, NULL, NULL }
+\t{ NULL, NULL, NULL, NULL }
 };
 ''' % {
 	'name' : name,
-	'check' : '\n\t'.join('"\n\t    "'.join(w.wrap('{ "%s", "%s", %s },' %
-		(c.name, gettype(c), checkstr(c)))) for c in sorted(ctype)),
+	'check' : '\n\t'.join('"\n\t    "'.join(w.wrap('{ "%s", "%s", %s, %s },' %
+		(c.name, gettype(c), checkstr(c), getsubconfigstr(c)))) for c in sorted(ctype)),
 })
 
 tfile.close()

@@ -992,20 +992,35 @@ struct __wt_connection {
 	 *
 	 * @param connection the connection handle
 	 * @configstart{connection.reconfigure, see dist/api_data.py}
-	 * @config{cache_pool, name of a cache pool that is shared between
-	 * databases.,a string; default empty.}
-	 * @config{cache_pool_chunk, the granularity that a cache pool is shared
-	 * out. Only valid if the cache_pool option is also specified..,an
-	 * integer between 1MB and 10TB; default \c .}
-	 * @config{cache_pool_quota, the maximum amount of the cache pool a
-	 * single database can use. Only valid if the cache_pool option is also
-	 * specified..,an integer between 1MB and 10TB; default \c .}
-	 * @config{cache_pool_size, size of a cache pool that is shared between
-	 * databases. Only valid if the cache_pool option is also specified.
-	 * Must be specified if this connection may create the cache pool.,an
-	 * integer between 1MB and 10TB; default \c .}
-	 * @config{cache_size, maximum heap memory to allocate for the cache.,an
-	 * integer between 1MB and 10TB; default \c 100MB.}
+	 * @config{cache, cache configuration setup.,a list of configuration
+	 * settings @subconfigstart{cache, see dist/api_data.py}
+	 * @subconfig{size, maximum heap memory to allocate for the cache.,an
+	 * integer between 1MB and 10TB; default \c 100MB.} @subconfig{pool,
+	 * name of a cache pool that is shared between databases.,a string;
+	 * default empty.} @subconfig{pool_min, minimum amount of cache a
+	 * connection in a cache pool can have.,an integer between 1MB and 10TB;
+	 * default \c .} @subconfig{pool_chunk, the granularity that a cache
+	 * pool is shared out. Only valid if the cache_pool option is also
+	 * specified.,an integer between 1MB and 10TB; default \c .}
+	 * @subconfigend; }
+	 * @config{error_prefix, prefix string for error messages.,a string;
+	 * default empty.}
+	 * @config{eviction_target, continue evicting until the cache becomes
+	 * less full than this (as a percentage).  Must be less than \c
+	 * eviction_trigger.,an integer between 10 and 99; default \c 80.}
+	 * @config{eviction_trigger, trigger eviction when the cache becomes
+	 * this full (as a percentage).,an integer between 10 and 99; default \c
+	 * 95.}
+	 * @config{verbose, enable messages for various events.  Options are
+	 * given as a list\, such as
+	 * <code>"verbose=[evictserver\,read]"</code>.,a list\, with values
+	 * chosen from the following options: \c "block"\, \c "cache_pool"\, \c
+	 * "ckpt"\, \c "evict"\, \c "evictserver"\, \c "fileops"\, \c "hazard"\,
+	 * \c "lsm"\, \c "mutex"\, \c "read"\, \c "readserver"\, \c
+	 * "reconcile"\, \c "salvage"\, \c "verify"\, \c "write"; default
+	 * empty.}
+	 * @configend
+	 * empty.}
 	 * @config{error_prefix, prefix string for error messages.,a string;
 	 * default empty.}
 	 * @config{eviction_target, continue evicting until the cache becomes
@@ -1176,20 +1191,58 @@ struct __wt_connection {
  * I/O.  By default\, a platform-specific alignment value is used (512 bytes on
  * Linux systems\, zero elsewhere).,an integer between -1 and 1MB; default \c
  * -1.}
- * @config{cache_pool, name of a cache pool that is shared between databases.,a
- * string; default empty.}
- * @config{cache_pool_chunk, the granularity that a cache pool is shared out.
- * Only valid if the cache_pool option is also specified..,an integer between
- * 1MB and 10TB; default \c .}
- * @config{cache_pool_quota, the maximum amount of the cache pool a single
- * database can use. Only valid if the cache_pool option is also specified..,an
- * integer between 1MB and 10TB; default \c .}
- * @config{cache_pool_size, size of a cache pool that is shared between
- * databases. Only valid if the cache_pool option is also specified. Must be
- * specified if this connection may create the cache pool.,an integer between
- * 1MB and 10TB; default \c .}
- * @config{cache_size, maximum heap memory to allocate for the cache.,an integer
- * between 1MB and 10TB; default \c 100MB.}
+ * @config{cache, cache configuration setup.,a list of configuration settings
+ * @subconfigstart{cache, see dist/api_data.py} @subconfig{size, maximum heap
+ * memory to allocate for the cache.,an integer between 1MB and 10TB; default \c
+ * 100MB.} @subconfig{pool, name of a cache pool that is shared between
+ * databases.,a string; default empty.} @subconfig{pool_min, minimum amount of
+ * cache a connection in a cache pool can have.,an integer between 1MB and 10TB;
+ * default \c .} @subconfig{pool_chunk, the granularity that a cache pool is
+ * shared out. Only valid if the cache_pool option is also specified.,an integer
+ * between 1MB and 10TB; default \c .} @subconfigend; }
+ * @config{create, create the database if it does not exist.,a boolean flag;
+ * default \c false.}
+ * @config{direct_io, Use \c O_DIRECT to access files.  Options are given as a
+ * list\, such as <code>"direct_io=[data]"</code>.,a list\, with values chosen
+ * from the following options: \c "data"\, \c "log"; default empty.}
+ * @config{error_prefix, prefix string for error messages.,a string; default
+ * empty.}
+ * @config{eviction_target, continue evicting until the cache becomes less full
+ * than this (as a percentage).  Must be less than \c eviction_trigger.,an
+ * integer between 10 and 99; default \c 80.}
+ * @config{eviction_trigger, trigger eviction when the cache becomes this full
+ * (as a percentage).,an integer between 10 and 99; default \c 95.}
+ * @config{extensions, list of shared library extensions to load (using dlopen).
+ * Optional values are passed as the \c config parameter to
+ * WT_CONNECTION::load_extension.  Complex paths may require quoting\, for
+ * example\, <code>extensions=("/path/ext.so"="entry=my_entry")</code>.,a list
+ * of strings; default empty.}
+ * @config{hazard_max, maximum number of simultaneous hazard references per
+ * session handle.,an integer greater than or equal to 15; default \c 1000.}
+ * @config{logging, enable logging.,a boolean flag; default \c false.}
+ * @config{lsm_merge, merge LSM chunks where possible.,a boolean flag; default
+ * \c true.}
+ * @config{multiprocess, permit sharing between processes (will automatically
+ * start an RPC server for primary processes and use RPC for secondary
+ * processes). <b>Not yet supported in WiredTiger</b>.,a boolean flag; default
+ * \c false.}
+ * @config{session_max, maximum expected number of sessions (including server
+ * threads).,an integer greater than or equal to 1; default \c 50.}
+ * @config{sync, flush files to stable storage when closing or writing
+ * checkpoints.,a boolean flag; default \c true.}
+ * @config{transactional, support transactional semantics.,a boolean flag;
+ * default \c true.}
+ * @config{use_environment_priv, use the \c WIREDTIGER_CONFIG and \c
+ * WIREDTIGER_HOME environment variables regardless of whether or not the
+ * process is running with special privileges.  See @ref home for more
+ * information.,a boolean flag; default \c false.}
+ * @config{verbose, enable messages for various events.  Options are given as a
+ * list\, such as <code>"verbose=[evictserver\,read]"</code>.,a list\, with
+ * values chosen from the following options: \c "block"\, \c "cache_pool"\, \c
+ * "ckpt"\, \c "evict"\, \c "evictserver"\, \c "fileops"\, \c "hazard"\, \c
+ * "lsm"\, \c "mutex"\, \c "read"\, \c "readserver"\, \c "reconcile"\, \c
+ * "salvage"\, \c "verify"\, \c "write"; default empty.}
+ * @configend
  * @config{create, create the database if it does not exist.,a boolean flag;
  * default \c false.}
  * @config{direct_io, Use \c O_DIRECT to access files.  Options are given as a
