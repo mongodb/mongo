@@ -138,6 +138,8 @@ namespace mongo {
             return target;
         }
 
+        Member* primary = const_cast<Member*>(box.getPrimary());
+
         // wait for 2N pings before choosing a sync target
         if (_cfg) {
             int needMorePings = config().members.size()*2 - HeartbeatInfo::numPings;
@@ -148,14 +150,12 @@ namespace mongo {
             }
 
             buildIndexes = myConfig().buildIndexes;
-        }
 
-        Member* primary = const_cast<Member*>(box.getPrimary());
-
-        // If we are only allowed to sync from the primary, return that
-        if (!config().chainingAllowed()) {
-            // Returns NULL if we cannot reach the primary
-            return primary;
+            // If we are only allowed to sync from the primary, return that
+            if (!_cfg->chainingAllowed()) {
+                // Returns NULL if we cannot reach the primary
+                return primary;
+            }
         }
 
         // find the member with the lowest ping time that has more data than me
