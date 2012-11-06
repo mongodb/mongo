@@ -15,9 +15,10 @@
  *    limitations under the License.
  */
 
-#include "pch.h"
-#include "processinfo.h"
-#include "mmap.h"
+#include "mongo/pch.h"
+
+#include "mongo/base/init.h"
+#include "mongo/util/processinfo.h"
 
 #include <iostream>
 #include <fstream>
@@ -47,7 +48,17 @@ namespace mongo {
         pidFileWiper.write( path );
     }
 
-    // static lock for sysinfo initialization
-    mongo::mutex ProcessInfo::_sysInfoLock( "hostInfo" );
+    ProcessInfo::SystemInfo* ProcessInfo::systemInfo = NULL;
+
+    void ProcessInfo::initializeSystemInfo() {
+        if (systemInfo == NULL) {
+            systemInfo = new SystemInfo();
+        }
+    }
+
+    MONGO_INITIALIZER(SystemInfo)(InitializerContext* context) {
+        ProcessInfo::initializeSystemInfo();
+        return Status::OK();
+    }
 
 }
