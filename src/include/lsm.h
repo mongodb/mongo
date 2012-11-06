@@ -28,6 +28,7 @@ struct __wt_cursor_lsm {
 #define	WT_CLSM_MINOR_MERGE	0x08    /* Minor merge, include tombstones */
 #define	WT_CLSM_MULTIPLE        0x10    /* Multiple cursors have values for the
 					   current key */
+#define	WT_CLSM_OPEN_READ	0x20    /* Open for reads */
 	uint32_t flags;
 };
 

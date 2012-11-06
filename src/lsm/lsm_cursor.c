@@ -26,22 +26,23 @@
 #define	WT_LSM_ENTER(clsm, cursor, session, n)				\
 	clsm = (WT_CURSOR_LSM *)cursor;					\
 	CURSOR_API_CALL(cursor, session, n, NULL);			\
-	WT_ERR(__clsm_enter(clsm))
+	WT_ERR(__clsm_enter(clsm, 0))
 
 #define	WT_LSM_UPDATE_ENTER(clsm, cursor, session, n)			\
 	clsm = (WT_CURSOR_LSM *)cursor;					\
 	CURSOR_UPDATE_API_CALL(cursor, session, n, NULL);		\
-	WT_ERR(__clsm_enter(clsm))
+	WT_ERR(__clsm_enter(clsm, 1))
 
-static int __clsm_open_cursors(WT_CURSOR_LSM *, int, uint32_t);
+static int __clsm_open_cursors(WT_CURSOR_LSM *, int, int, uint32_t);
 static int __clsm_search(WT_CURSOR *);
 
 static inline int
-__clsm_enter(WT_CURSOR_LSM *clsm)
+__clsm_enter(WT_CURSOR_LSM *clsm, int update)
 {
 	if (!F_ISSET(clsm, WT_CLSM_MERGE) &&
-	    clsm->dsk_gen != clsm->lsm_tree->dsk_gen)
-		WT_RET(__clsm_open_cursors(clsm, 0, 0));
+	    (clsm->dsk_gen != clsm->lsm_tree->dsk_gen ||
+	    (!update && !F_ISSET(clsm, WT_CLSM_OPEN_READ))))
+		WT_RET(__clsm_open_cursors(clsm, update, 0, 0));
 
 	return (0);
 }
@@ -106,7 +107,8 @@ __clsm_close_cursors(WT_CURSOR_LSM *clsm)
  *	Open cursors for the current set of files.
  */
 static int
-__clsm_open_cursors(WT_CURSOR_LSM *clsm, int start_chunk, uint32_t start_id)
+__clsm_open_cursors(
+    WT_CURSOR_LSM *clsm, int update, int start_chunk, uint32_t start_id)
 {
 	WT_CURSOR *c, **cp;
 	WT_DECL_RET;
@@ -123,6 +125,9 @@ __clsm_open_cursors(WT_CURSOR_LSM *clsm, int start_chunk, uint32_t start_id)
 	lsm_tree = clsm->lsm_tree;
 	c = &clsm->iface;
 	chunk = NULL;
+
+	if (!update)
+		F_SET(clsm, WT_CLSM_OPEN_READ);
 
 	/* Copy the key, so we don't lose the cursor position. */
 	if (F_ISSET(c, WT_CURSTD_KEY_SET)) {
@@ -167,6 +172,9 @@ __clsm_open_cursors(WT_CURSOR_LSM *clsm, int start_chunk, uint32_t start_id)
 	clsm->nchunks = nchunks;
 
 	for (i = 0, cp = clsm->cursors; i != clsm->nchunks; i++, cp++) {
+		if (!F_ISSET(clsm, WT_CLSM_OPEN_READ) && i < clsm->nchunks - 1)
+			continue;
+
 		/*
 		 * Read from the checkpoint if the file has been written.
 		 * Once all cursors switch, the in-memory tree can be evicted.
@@ -229,7 +237,7 @@ __wt_clsm_init_merge(
 		F_SET(clsm, WT_CLSM_MINOR_MERGE);
 	clsm->nchunks = nchunks;
 
-	return (__clsm_open_cursors(clsm, start_chunk, start_id));
+	return (__clsm_open_cursors(clsm, 0, start_chunk, start_id));
 }
 
 /*
@@ -781,7 +789,7 @@ __clsm_put(
 		WT_RET(ret);
 
 		/* We changed the structure, or someone else did: update. */
-		WT_RET(__clsm_enter(clsm));
+		WT_RET(__clsm_enter(clsm, 1));
 
 		WT_ASSERT(session, clsm->primary_chunk != NULL);
 	}
