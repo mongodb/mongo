@@ -29,7 +29,7 @@
 namespace mongo {
 
     void CapabilitySet::grantCapability(const AcquiredCapability& capability) {
-        _capabilities.insert(std::make_pair(capability.getResource(), capability));
+        _capabilities.insert(std::make_pair(capability.getCapability().getResource(), capability));
     }
 
     const AcquiredCapability* CapabilitySet::getCapabilityForAction(
@@ -40,7 +40,7 @@ namespace mongo {
         range = _capabilities.equal_range(resource);
         for (it = range.first; it != range.second; ++it) {
             const AcquiredCapability& capability = it->second;
-            if (capability.includesAction(action)) {
+            if (capability.getCapability().includesAction(action)) {
                 return &capability;
             }
         }

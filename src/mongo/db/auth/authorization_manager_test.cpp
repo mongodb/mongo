@@ -34,8 +34,8 @@ namespace {
         Principal* principal = new Principal("Spencer");
         ActionSet actions;
         actions.addAction(ActionType::insert);
-        AcquiredCapability writeCapability("test", principal, actions);
-        AcquiredCapability allDBsWriteCapability("*", principal, actions);
+        AcquiredCapability writeCapability("test", actions, principal);
+        AcquiredCapability allDBsWriteCapability("*", actions, principal);
         ExternalStateMock* externalState = new ExternalStateMock();
         AuthorizationManager authManager(externalState);
 

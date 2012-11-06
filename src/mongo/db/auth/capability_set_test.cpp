@@ -32,16 +32,16 @@ namespace {
         Principal user2("user2");
 
         ASSERT_OK(ActionSet::parseActionSetFromString("find,update", &actions));
-        AcquiredCapability fooUser("foo", &user2, actions);
+        AcquiredCapability fooUser("foo", actions, &user2);
 
         ASSERT_OK(ActionSet::parseActionSetFromString("find,update,userAdmin,remove", &actions));
-        AcquiredCapability fooUser2("foo", &user1, actions);
+        AcquiredCapability fooUser2("foo", actions, &user1);
 
         ASSERT_OK(ActionSet::parseActionSetFromString("find,update", &actions));
-        AcquiredCapability barUser("bar", &user1, actions);
+        AcquiredCapability barUser("bar", actions, &user1);
 
         ASSERT_OK(ActionSet::parseActionSetFromString("find", &actions));
-        AcquiredCapability barReadOnly("bar", &user2, actions);
+        AcquiredCapability barReadOnly("bar", actions, &user2);
 
 
         const AcquiredCapability* capPtr;
@@ -50,44 +50,44 @@ namespace {
 
         capSet.grantCapability(fooUser);
         capPtr = capSet.getCapabilityForAction("foo", ActionType::find);
-        ASSERT_TRUE(capPtr->includesAction(ActionType::find));
-        ASSERT_FALSE(capPtr->includesAction(ActionType::remove));
+        ASSERT_TRUE(capPtr->getCapability().includesAction(ActionType::find));
+        ASSERT_FALSE(capPtr->getCapability().includesAction(ActionType::remove));
 
         ASSERT(!capSet.getCapabilityForAction("foo", ActionType::remove));
 
         capSet.grantCapability(fooUser2);
         capPtr = capSet.getCapabilityForAction("foo", ActionType::userAdmin);
-        ASSERT_TRUE(capPtr->includesAction(ActionType::find));
-        ASSERT_TRUE(capPtr->includesAction(ActionType::remove));
+        ASSERT_TRUE(capPtr->getCapability().includesAction(ActionType::find));
+        ASSERT_TRUE(capPtr->getCapability().includesAction(ActionType::remove));
 
         // No capabilities
         ASSERT(!capSet.getCapabilityForAction("bar", ActionType::find));
 
         capSet.grantCapability(barReadOnly);
         capPtr = capSet.getCapabilityForAction("bar", ActionType::find);
-        ASSERT_TRUE(capPtr->includesAction(ActionType::find));
-        ASSERT_FALSE(capPtr->includesAction(ActionType::update));
-        ASSERT_FALSE(capPtr->includesAction(ActionType::remove));
+        ASSERT_TRUE(capPtr->getCapability().includesAction(ActionType::find));
+        ASSERT_FALSE(capPtr->getCapability().includesAction(ActionType::update));
+        ASSERT_FALSE(capPtr->getCapability().includesAction(ActionType::remove));
 
         ASSERT(!capSet.getCapabilityForAction("bar", ActionType::update));
 
         capSet.grantCapability(barUser);
         capPtr = capSet.getCapabilityForAction("bar", ActionType::update);
-        ASSERT_TRUE(capPtr->includesAction(ActionType::find));
-        ASSERT_TRUE(capPtr->includesAction(ActionType::update));
-        ASSERT_FALSE(capPtr->includesAction(ActionType::remove));
+        ASSERT_TRUE(capPtr->getCapability().includesAction(ActionType::find));
+        ASSERT_TRUE(capPtr->getCapability().includesAction(ActionType::update));
+        ASSERT_FALSE(capPtr->getCapability().includesAction(ActionType::remove));
 
         // Now let's start revoking capabilities
         capSet.revokeCapabilitiesFromPrincipal(&user1);
 
         capPtr = capSet.getCapabilityForAction("foo", ActionType::find);
-        ASSERT_TRUE(capPtr->includesAction(ActionType::find));
-        ASSERT_FALSE(capPtr->includesAction(ActionType::remove));
+        ASSERT_TRUE(capPtr->getCapability().includesAction(ActionType::find));
+        ASSERT_FALSE(capPtr->getCapability().includesAction(ActionType::remove));
 
         capPtr = capSet.getCapabilityForAction("bar", ActionType::find);
-        ASSERT_TRUE(capPtr->includesAction(ActionType::find));
-        ASSERT_FALSE(capPtr->includesAction(ActionType::update));
-        ASSERT_FALSE(capPtr->includesAction(ActionType::remove));
+        ASSERT_TRUE(capPtr->getCapability().includesAction(ActionType::find));
+        ASSERT_FALSE(capPtr->getCapability().includesAction(ActionType::update));
+        ASSERT_FALSE(capPtr->getCapability().includesAction(ActionType::remove));
 
 
         capSet.revokeCapabilitiesFromPrincipal(&user2);

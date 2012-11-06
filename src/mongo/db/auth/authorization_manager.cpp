@@ -171,7 +171,7 @@ namespace mongo {
         _authenticatedPrincipals.add(internalPrincipal);
         ActionSet allActions;
         allActions.addAllActions();
-        AcquiredCapability capability("*", internalPrincipal, allActions);
+        AcquiredCapability capability("*", allActions, internalPrincipal);
         Status status = acquireCapability(capability);
         verify (status == Status::OK());
     }
@@ -251,7 +251,7 @@ namespace mongo {
 
         if (dbname == "admin" || dbname == "local") {
             // Make all basic actions available on all databases
-            result->grantCapability(AcquiredCapability("*", principal, actions));
+            result->grantCapability(AcquiredCapability("*", actions, principal));
             // Make server and cluster admin actions available on admin database.
             if (!readOnly) {
                 actions.addAllActionsFromSet(serverAdminRoleActions);
@@ -259,7 +259,7 @@ namespace mongo {
             }
         }
 
-        result->grantCapability(AcquiredCapability(dbname, principal, actions));
+        result->grantCapability(AcquiredCapability(dbname, actions, principal));
 
         return Status::OK();
     }

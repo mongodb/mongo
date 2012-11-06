@@ -24,22 +24,23 @@ namespace mongo {
     /**
      * A representation that a given principal has the permission to perform a set of actions on a
      * specific resource.
-     * This class does not do any locking/synchronization, the consumer will be responsible for
-     * synchronizing access.
      */
     class AcquiredCapability {
     public:
 
-        AcquiredCapability(const Capability& capability, Principal* principal);
-        AcquiredCapability(const std::string& resource, Principal* principal, ActionSet actions);
+        AcquiredCapability(const Capability& capability, Principal* principal) :
+            _capability(capability), _principal(principal) {}
+        AcquiredCapability(const std::string& resource, ActionSet actions, Principal* principal) :
+            _capability(resource, actions), _principal(principal) {}
         ~AcquiredCapability() {}
 
-        const Principal* getPrincipal() const;
-        const std::string& getResource() const;
-        const ActionSet& getActions() const;
+        const Principal* getPrincipal() const {
+            return _principal;
+        }
 
-        // Checks if the given action is present in the Capability.
-        bool includesAction(const ActionType& action) const;
+        const Capability& getCapability() const {
+            return _capability;
+        }
 
     private:
 
