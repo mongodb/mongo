@@ -79,26 +79,32 @@ TEST(ExtractBSON, ExtractStringFieldWithDefault) {
 
 TEST(ExtractBSON, ExtractBooleanFieldWithDefault) {
     bool b;
+    b = false;
     ASSERT_OK(bsonExtractBooleanFieldWithDefault(BSON("a" << 1 << "b" << "hello"  << "c" << true),
                                                  "a", false, &b));
     ASSERT_EQUALS(true, b);
 
+    b = false;
     ASSERT_OK(bsonExtractBooleanFieldWithDefault(BSON("a" << 1 << "b" << "hello"  << "c" << true),
                                                  "c", false, &b));
     ASSERT_EQUALS(true, b);
 
+    b = true;
     ASSERT_OK(bsonExtractBooleanFieldWithDefault(BSON("a" << 0 << "b" << "hello"  << "c" << false),
                                                  "a", true, &b));
     ASSERT_EQUALS(false, b);
 
+    b = true;
     ASSERT_OK(bsonExtractBooleanFieldWithDefault(BSON("a" << 0 << "b" << "hello"  << "c" << false),
                                                  "c", true, &b));
     ASSERT_EQUALS(false, b);
 
+    b = false;
     ASSERT_OK(bsonExtractBooleanFieldWithDefault(BSON("a" << 0 << "b" << "hello"  << "c" << false),
                                                  "d", true, &b));
     ASSERT_EQUALS(true, b);
 
+    b = true;
     ASSERT_OK(bsonExtractBooleanFieldWithDefault(BSON("a" << 0 << "b" << "hello"  << "c" << false),
                                                  "d", false, &b));
     ASSERT_EQUALS(false, b);

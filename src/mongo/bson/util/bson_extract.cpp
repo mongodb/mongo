@@ -50,12 +50,18 @@ namespace mongo {
                                               bool* out) {
         BSONElement value;
         Status status = bsonExtractField(object, fieldName, &value);
-        if (!status.isOK())
+        if (status == ErrorCodes::NoSuchKey) {
+            *out = defaultValue;
+        }
+        else if (!status.isOK()) {
             return status;
-        if (!value.isNumber() && !value.isBoolean())
+        }
+        else if (!value.isNumber() && !value.isBoolean()) {
             return Status(ErrorCodes::TypeMismatch, "Expected boolean or number type");
-
-        *out = value.trueValue();
+        }
+        else {
+            *out = value.trueValue();
+        }
         return Status::OK();
     }
 
