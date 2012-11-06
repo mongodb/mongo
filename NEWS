@@ -1,3 +1,46 @@
+WiredTiger release 1.3.6, 2012-11-06
+------------------------------------
+
+This is a bugfix and performance tuning release. The changes are as follows:
+
+* Rename the WiredTiger installed modules to libwiredtiger_XXX.  Don't install
+  the nop and reverse collator modules.
+
+* Replace test/format's bzip configuration string with compression, which can
+  take one of four arguments (none, bzip, ext, snappy), change format to run
+  snappy compression if the library is available.
+
+* Rename the builtin block compressor names from "bzip2_compress" to "bzip2",
+  and from "snappy_compress" to "snappy".
+
+* Support multiple LSM merge threads with the "lsm_merge_threads" config key.
+  Use IDs rather than array index to mark the start chunk in a merge, in case
+  we race with another thread.
+
+* Cache the hash values used for Bloom filter lookups, rather than hashing for
+  each Bloom filter in an LSM tree.
+
+* Only switch trees in an LSM cursor if the primary chunk is on disk.
+
+* Add a per-btree cache priority, currently only used to make it more likely
+  for Bloom filter pages to stay in cache.
+
+* Only evict pages with read generations in the bottom quarter of the range we
+  see.  Fix a 32-bit wrapping bug in assigning read generations.
+
+* For update-only LSM cursors, only open a cursor in the primary chunk.
+
+* LSM: Report errors from the checkpoint thread.
+
+* LSM: only save a Bloom URI in the metadata after it is successfully created.
+
+* LSM: Create missing Bloom filters when reading from an LSM tree if
+  "lsm_bloom_newest"is set.
+
+* LSM: Include all of the chosen chunks in a merge.  Only pin the current chunk
+  in an LSM cursor if it is writeable.
+
+
 WiredTiger release 1.3.5, 2012-10-26
 ------------------------------------
 
