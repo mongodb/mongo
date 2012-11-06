@@ -549,6 +549,13 @@ namespace mongo {
                 additive = false;
         }
 
+        // If we are changing chaining rules, we don't want this to be an additive reconfig so that
+        // the primary can step down and the sync targets change.
+        // TODO: This can be removed once SERVER-5208 is fixed.
+        if (reconf && config().chainingAllowed() != c.chainingAllowed()) {
+            additive = false;
+        }
+
         _cfg = new ReplSetConfig(c);
         dassert( &config() == _cfg ); // config() is same thing but const, so we use that when we can for clarity below
         verify( config().ok() );

@@ -130,6 +130,11 @@ namespace mongo {
             }
             if( !getLastErrorDefaults.isEmpty() )
                 settings << "getLastErrorDefaults" << getLastErrorDefaults;
+
+            if (!_chainingAllowed) {
+                settings << "chainingAllowed" << _chainingAllowed;
+            }
+
             b << "settings" << settings.obj();
         }
 
@@ -556,10 +561,20 @@ namespace mongo {
             ho.check();
             try { getLastErrorDefaults = settings["getLastErrorDefaults"].Obj().copy(); }
             catch(...) { }
+
+            // If the config explicitly sets chaining to false, turn it off.
+            if (settings.hasField("chainingAllowed") &&
+                !settings["chainingAllowed"].trueValue()) {
+                _chainingAllowed = false;
+            }
         }
 
         // figure out the majority for this config
         setMajority();
+    }
+
+    bool ReplSetConfig::chainingAllowed() const {
+        return _chainingAllowed;
     }
 
     static inline void configAssert(bool expr) {
@@ -567,7 +582,7 @@ namespace mongo {
     }
 
     ReplSetConfig::ReplSetConfig(BSONObj cfg, bool force) :
-        _ok(false),_majority(-1)
+        _ok(false),_chainingAllowed(true),_majority(-1)
     {
         _constructed = false;
         clear();
@@ -583,7 +598,7 @@ namespace mongo {
     }
 
     ReplSetConfig::ReplSetConfig(const HostAndPort& h) :
-      _ok(false),_majority(-1)
+        _ok(false),_chainingAllowed(true),_majority(-1)
     {
         LOG(2) << "ReplSetConfig load " << h.toString() << rsLog;
 

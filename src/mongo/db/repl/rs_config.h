@@ -153,8 +153,20 @@ namespace mongo {
         int getMajority() const;
 
         bool _constructed;
+
+        /**
+         * Returns if replication chaining is allowed.
+         */
+        bool chainingAllowed() const;
+
     private:
         bool _ok;
+
+        /**
+         * If replication can be chained. If chaining is disallowed, it can still be explicitly
+         * enabled via the replSetSyncFrom command, but it will not happen automatically.
+         */
+        bool _chainingAllowed;
         int _majority;
 
         void from(BSONObj);
