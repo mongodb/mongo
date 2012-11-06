@@ -28,15 +28,6 @@ namespace mongo {
             _resource(resource),
             _actions(actions) {}
 
-
-    const std::string& Capability::getResource() const {
-        return _resource;
-    }
-
-    const ActionSet& Capability::getActions() const {
-        return _actions;
-    }
-
     bool Capability::includesAction(const ActionType& action) const {
         return _actions.contains(action);
     }

@@ -26,8 +26,6 @@ namespace mongo {
 
     /**
      * A representation of the permission to perform a set of actions on a specific resource.
-     * This class does not do any locking/synchronization, the consumer will be responsible for
-     * synchronizing access.
      */
     class Capability {
     public:
@@ -35,8 +33,13 @@ namespace mongo {
         Capability(const std::string& resource, ActionSet actions);
         ~Capability() {}
 
-        const std::string& getResource() const;
-        const ActionSet& getActions() const;
+        const std::string& getResource() const {
+            return _resource;
+        }
+
+        const ActionSet& getActions() const {
+            return _actions;
+        }
 
         // Checks if the given action is present in the Capability.
         bool includesAction(const ActionType& action) const;
