@@ -466,6 +466,18 @@ namespace ReplSetTests {
                     "timestamp" << 1334810820))), &id);
         }
 
+        void addConflictingUpdates() {
+            BSONObj first = BSON("_id" << "asdfasdfasdf");
+            addOp("i", first);
+
+            BSONObj filter = BSON("_id" << "asdfasdfasdf" << "sp" << BSON("$size" << 2));
+            // Test an op with no version, op is ignored and replication continues (code assumes 
+            // version 1)
+            addOp("u", BSON("$push" << BSON("sp" << 42)), &filter, NULL, NULL);
+            // The following line generates an fassert because it's version 2
+            //addOp("u", BSON("$push" << BSON("sp" << 42)), &filter, NULL, 2);
+        }
+
         void addUniqueIndex() {
             addOp("i", BSON("ns" << ns() << "key" << BSON("x" << 1) << "name" << "x1" << "unique" << true), 0, "unittests.system.indexes");
             addInserts(2);
@@ -501,6 +513,14 @@ namespace ReplSetTests {
             ASSERT_EQUALS(1334810820, obj["requests"]["100002_1"]["timestamp"].number());
 
             drop();
+            
+            // test converting updates to upserts but only for version 2.2.1 and greater,
+            // which means oplog version 2 and greater.
+            addConflictingUpdates();
+            applyOplog();
+
+            drop();
+
         }
     };
 

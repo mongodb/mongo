@@ -109,11 +109,16 @@ namespace replset {
     // This free function is used by the writer threads to apply each op
     void multiSyncApply(const std::vector<BSONObj>& ops, SyncTail* st) {
         initializeWriterThread();
+
+        // convert update operations only for 2.2.1 or greater, because we need guaranteed
+        // idempotent operations for this to work.  See SERVER-6825
+        bool convertUpdatesToUpserts = theReplSet->oplogVersion > 1 ? true : false;
+
         for (std::vector<BSONObj>::const_iterator it = ops.begin();
              it != ops.end();
              ++it) {
             try {
-                fassert(16359, st->syncApply(*it, true));
+                fassert(16359, st->syncApply(*it, convertUpdatesToUpserts));
             } catch (DBException& e) {
                 error() << "writer worker caught exception: " << e.what() 
                         << " on: " << it->toString() << endl;
@@ -420,7 +425,7 @@ namespace replset {
         if (!peek_success) {
             // if we don't have anything in the queue, wait a bit for something to appear
             if (ops->empty()) {
-                // block 1 second
+                // block up to 1 second
                 _networkQueue->waitForMore();
                 return false;
             }
