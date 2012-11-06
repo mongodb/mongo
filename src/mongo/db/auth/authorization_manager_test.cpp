@@ -24,7 +24,6 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/unittest/unittest.h"
 
-#define ASSERT_OK(EXPR) ASSERT_EQUALS(Status::OK(), (EXPR))
 #define ASSERT_NULL(EXPR) ASSERT_FALSE(EXPR)
 #define ASSERT_NON_NULL(EXPR) ASSERT_TRUE(EXPR)
 

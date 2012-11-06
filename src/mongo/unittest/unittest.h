@@ -48,6 +48,11 @@
 #define ASSERT(EXPRESSION) ASSERT_TRUE(EXPRESSION)
 
 /**
+ * Assert that a Status code is OK.
+ */
+#define ASSERT_OK(EXPRESSION) ASSERT_EQUALS(Status::OK(), (EXPRESSION))
+
+/**
  * Fails if "EXPRESSION" is true.
  */
 #define ASSERT_FALSE(EXPRESSION) ::mongo::unittest::TestAssertion( __FILE__, __LINE__ ).failIf( \

@@ -21,8 +21,6 @@
 #include "mongo/base/status.h"
 #include "mongo/unittest/unittest.h"
 
-#define ASSERT_OK(EXPR) ASSERT_EQUALS(Status::OK(), (EXPR))
-
 namespace mongo {
 namespace {
 
