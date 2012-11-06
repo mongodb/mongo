@@ -30,17 +30,11 @@ namespace mongo {
 
         AcquiredCapability(const Capability& capability, Principal* principal) :
             _capability(capability), _principal(principal) {}
-        AcquiredCapability(const std::string& resource, ActionSet actions, Principal* principal) :
-            _capability(resource, actions), _principal(principal) {}
         ~AcquiredCapability() {}
 
-        const Principal* getPrincipal() const {
-            return _principal;
-        }
+        const Principal* getPrincipal() const { return _principal; }
 
-        const Capability& getCapability() const {
-            return _capability;
-        }
+        const Capability& getCapability() const { return _capability; }
 
     private:
 

@@ -32,16 +32,16 @@ namespace {
         Principal user2("user2");
 
         ASSERT_OK(ActionSet::parseActionSetFromString("find,update", &actions));
-        AcquiredCapability fooUser("foo", actions, &user2);
+        AcquiredCapability fooUser(Capability("foo", actions), &user2);
 
         ASSERT_OK(ActionSet::parseActionSetFromString("find,update,userAdmin,remove", &actions));
-        AcquiredCapability fooUser2("foo", actions, &user1);
+        AcquiredCapability fooUser2(Capability("foo", actions), &user1);
 
         ASSERT_OK(ActionSet::parseActionSetFromString("find,update", &actions));
-        AcquiredCapability barUser("bar", actions, &user1);
+        AcquiredCapability barUser(Capability("bar", actions), &user1);
 
         ASSERT_OK(ActionSet::parseActionSetFromString("find", &actions));
-        AcquiredCapability barReadOnly("bar", actions, &user2);
+        AcquiredCapability barReadOnly(Capability("bar", actions), &user2);
 
 
         const AcquiredCapability* capPtr;

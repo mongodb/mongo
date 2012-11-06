@@ -33,13 +33,9 @@ namespace mongo {
         Capability(const std::string& resource, ActionSet actions);
         ~Capability() {}
 
-        const std::string& getResource() const {
-            return _resource;
-        }
+        const std::string& getResource() const { return _resource; }
 
-        const ActionSet& getActions() const {
-            return _actions;
-        }
+        const ActionSet& getActions() const { return _actions; }
 
         // Checks if the given action is present in the Capability.
         bool includesAction(const ActionType& action) const;
