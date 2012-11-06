@@ -70,11 +70,9 @@ namespace mongo {
             return *cell;
         } else if (NULL != line) {
             return *line;
-        } else if (NULL != polygon) {
-            return *polygon;
         } else {
-            // TODO: freak out here.
-            return S2Cell();
+            verify(NULL != polygon);
+            return *polygon;
         }
     }
 
@@ -83,7 +81,8 @@ namespace mongo {
             delete cell;
         } else if (NULL != line) {
             delete line;
-        } else if (NULL != polygon) {
+        } else {
+            verify(NULL != polygon);
             delete polygon;
         }
     }

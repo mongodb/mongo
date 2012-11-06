@@ -9,7 +9,6 @@ env.Append(CCFLAGS=['-Isrc/third_party/s2'])
 env.StaticLibrary(
     "strings",
     [ 
-	"ascii_ctype.cc",
 	"split.cc",
 	"stringprintf.cc",
 	"strutil.cc",
