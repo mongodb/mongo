@@ -20,7 +20,8 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
-#include <third_party/v8/include/v8.h>
+#include <v8.h>
+#include <boost/function.hpp>
 
 #include "mongo/scripting/engine_v8.h"
 
@@ -90,5 +91,8 @@ namespace mongo {
 
     v8::Handle<v8::Value> bsonsize( V8Scope* scope, const v8::Arguments& args );
 
+    typedef boost::function<void (V8Scope*, const v8::Handle<v8::FunctionTemplate>&)>
+        V8FunctionPrototypeManipulatorFn;
+    void v8RegisterMongoPrototypeManipulator(const V8FunctionPrototypeManipulatorFn& manipulator);
 }
 
