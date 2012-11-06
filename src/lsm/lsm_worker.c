@@ -97,11 +97,13 @@ __wt_lsm_checkpoint_worker(void *arg)
 			    !F_ISSET(chunk, WT_LSM_CHUNK_ONDISK)))
 				break;
 
-			if (F_ISSET(chunk, WT_LSM_CHUNK_BLOOM))
-				continue;
-
-			WT_ERR(__lsm_bloom_create(
-			    session, lsm_tree, chunk));
+			if (!F_ISSET(chunk, WT_LSM_CHUNK_BLOOM) &&
+			    (ret = __lsm_bloom_create(
+			    session, lsm_tree, chunk)) != 0) {
+				(void)__wt_err(
+				   session, ret, "bloom creation failed");
+				break;
+			}
 
 			if (F_ISSET(chunk, WT_LSM_CHUNK_ONDISK))
 				continue;
@@ -121,6 +123,10 @@ __wt_lsm_checkpoint_worker(void *arg)
 				__wt_spin_unlock(session, &lsm_tree->lock);
 				WT_VERBOSE_ERR(session, lsm,
 				     "LSM worker checkpointed %d.", i);
+			} else {
+				(void)__wt_err(
+				   session, ret, "LSM checkpoint failed");
+				break;
 			}
 		}
 		if (j == 0)
