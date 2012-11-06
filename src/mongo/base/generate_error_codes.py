@@ -115,7 +115,7 @@ def generate_header(filename, error_codes, error_classes):
     predicate_declarations = ';\n        '.join(
         'static bool is%s(Error err)' % ec[0] for ec in error_classes)
 
-    open(filename, 'w').write(header_template % dict(
+    open(filename, 'wb').write(header_template % dict(
             error_code_enum_declarations=enum_declarations,
             error_code_class_predicate_declarations=predicate_declarations))
 
@@ -129,7 +129,7 @@ def generate_source(filename, error_codes, error_classes):
         'case %s: return %s' % (ec[0], ec[0]) for ec in error_codes)
     predicate_definitions = '\n    '.join(
         generate_error_class_predicate_definition(*ec) for ec in error_classes)
-    open(filename, 'w').write(source_template % dict(
+    open(filename, 'wb').write(source_template % dict(
             symbol_to_string_cases=symbol_to_string_cases,
             string_to_symbol_cases=string_to_symbol_cases,
             int_to_symbol_cases=int_to_symbol_cases,
@@ -149,8 +149,8 @@ header_template = '''// AUTO-GENERATED FILE DO NOT EDIT
 namespace mongo {
 
     /**
-     * This is a generated class containg a table of error codes and their corresponding error
-     * strings. The class is derived from the definitions in src/mongno/base/error_codes.err file.
+     * This is a generated class containing a table of error codes and their corresponding error
+     * strings. The class is derived from the definitions in src/mongo/base/error_codes.err file.
      *
      * Do not update this file directly. Update src/mongo/base/error_codes.err instead.
      */
@@ -192,7 +192,7 @@ source_template = '''// AUTO-GENERATED FILE DO NOT EDIT
 #include <cstring>
 
 namespace mongo {
-    const char *ErrorCodes::errorString(Error err) {
+    const char* ErrorCodes::errorString(Error err) {
         switch (err) {
         %(symbol_to_string_cases)s;
         default: return "Unknown error code";
@@ -217,7 +217,7 @@ namespace mongo {
 '''
 
 error_class_predicate_template = '''bool ErrorCodes::is%(class_name)s(Error err) {
-        switch(err) {
+        switch (err) {
         %(cases)s
             return true;
         default:

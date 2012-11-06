@@ -1,3 +1,5 @@
+var NUM_NODES = 2;
+
 /**
  * Performs a series of test on commands with read preference
  *
@@ -31,6 +33,7 @@ var doTest = function(conn, hostList) {
     // Test command that can't be sent to secondary
     var createResult = testDB.runCommand({ create: 'user' });
     assert(createResult.ok, 'create cmd failed: ' + tojson(createResult));
+    testDB.runCommand({ getLastError: 1, w: NUM_NODES });
 
     testedAtLeastOnce = false;
     hostList.forEach(function(node) {
@@ -68,6 +71,7 @@ var doTest = function(conn, hostList) {
 
     // Test non-inline map reduce
     testDB.runCommand({ create: 'mrIn' });
+    testDB.runCommand({ getLastError: 1, w: NUM_NODES });
     var outCollMRResult = testDB.runCommand({ mapreduce: 'mrIn', map: mapFunc,
         reduce: reduceFunc, out: { replace: 'mrOut' }});
     assert(outCollMRResult.ok, 'replace mr cmd failed: ' + tojson(outCollMRResult));
@@ -85,7 +89,7 @@ var doTest = function(conn, hostList) {
     });
 };
 
-var st = new ShardingTest({ shards: { rs0: { nodes: 2 }}});
+var st = new ShardingTest({ shards: { rs0: { nodes: NUM_NODES }}});
 st.stopBalancer();
 ReplSetTest.awaitRSClientHosts(st.s, st.rs0.nodes);
 
