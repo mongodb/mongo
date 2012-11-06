@@ -1216,12 +1216,12 @@ namespace mongo {
         LOG(2) << "repl: " << ns << ".find(" << query.toString() << ')' << endl;
         cursor.reset( _conn->query( ns, query, 0, 0, fields, _tailingQueryOptions ).release() );
     }
-    
-    void OplogReader::tailingQueryGTE(const char *ns, OpTime t, const BSONObj* fields ) {
-        BSONObjBuilder q;
-        q.appendDate("$gte", t.asDate());
+
+    void OplogReader::tailingQueryGTE(const char *ns, OpTime optime, const BSONObj* fields ) {
+        BSONObjBuilder gte;
+        gte.appendTimestamp("$gte", optime.asDate());
         BSONObjBuilder query;
-        query.append("ts", q.done());
+        query.append("ts", gte.done());
         tailingQuery(ns, query.done(), fields);
     }
 
