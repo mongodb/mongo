@@ -98,7 +98,6 @@ public:
             queryOptions |= QueryOption_OplogReplay;
         else if ( _query.isEmpty() && !hasParam("dbpath") && !hasParam("forceTableScan") ) {
             q.snapshot();
-            log() << "doing snapshot query" << endl;
         }
         
         DBClientBase& connBase = conn(true);

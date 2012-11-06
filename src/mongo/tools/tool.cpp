@@ -308,6 +308,9 @@ namespace mongo {
 
         if ( useDirectClient )
             dbexit( EXIT_CLEAN );
+
+        fflush(stdout);
+        fflush(stderr);
         return ret;
     }
 
