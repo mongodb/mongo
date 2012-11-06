@@ -473,7 +473,7 @@ namespace ReplSetTests {
             BSONObj filter = BSON("_id" << "asdfasdfasdf" << "sp" << BSON("$size" << 2));
             // Test an op with no version, op is ignored and replication continues (code assumes 
             // version 1)
-            addOp("u", BSON("$push" << BSON("sp" << 42)), &filter, NULL, NULL);
+            addOp("u", BSON("$push" << BSON("sp" << 42)), &filter, NULL, 0);
             // The following line generates an fassert because it's version 2
             //addOp("u", BSON("$push" << BSON("sp" << 42)), &filter, NULL, 2);
         }
