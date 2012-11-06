@@ -149,8 +149,8 @@ header_template = '''// AUTO-GENERATED FILE DO NOT EDIT
 namespace mongo {
 
     /**
-     * This is a generated class containg a table of error codes and their corresponding error
-     * strings. The class is derived from the definitions in src/mongno/base/error_codes.err file.
+     * This is a generated class containing a table of error codes and their corresponding error
+     * strings. The class is derived from the definitions in src/mongo/base/error_codes.err file.
      *
      * Do not update this file directly. Update src/mongo/base/error_codes.err instead.
      */
@@ -192,7 +192,7 @@ source_template = '''// AUTO-GENERATED FILE DO NOT EDIT
 #include <cstring>
 
 namespace mongo {
-    const char *ErrorCodes::errorString(Error err) {
+    const char* ErrorCodes::errorString(Error err) {
         switch (err) {
         %(symbol_to_string_cases)s;
         default: return "Unknown error code";
@@ -217,7 +217,7 @@ namespace mongo {
 '''
 
 error_class_predicate_template = '''bool ErrorCodes::is%(class_name)s(Error err) {
-        switch(err) {
+        switch (err) {
         %(cases)s
             return true;
         default:
