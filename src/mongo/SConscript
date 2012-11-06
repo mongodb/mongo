@@ -212,7 +212,7 @@ env.StaticLibrary("coredb", [
         "db/stats/top.cpp",
         "s/shardconnection.cpp",
         ],
-                  LIBDEPS=['db/auth/serverauth'])
+                  LIBDEPS=['db/auth/auth', 'db/auth/serverauth'])
 
 coreServerFiles = [ "db/common.cpp",
                     "util/net/miniwebserver.cpp",
@@ -467,7 +467,6 @@ mongod = env.Install(
     '#/', env.Program( "mongod", mongodOnlyFiles,
                        LIBDEPS=["coredb",
                                 "coreserver",
-                                "db/auth/auth",
                                 "mongodandmongos",
                                 "ntservice",
                                 "serveronly",
@@ -501,7 +500,7 @@ env.Install( '#/', [
 mongos = env.Program(
     "mongos", [ "s/server.cpp"] ,
     LIBDEPS=["mongoscore", "coreserver", "coredb", "mongocommon", "coreshard", "dbcmdline", "ntservice",
-             "mongodandmongos", "db/auth/auth"] + env['MODULE_LIBDEPS_MONGOS'])
+             "mongodandmongos"] + env['MODULE_LIBDEPS_MONGOS'])
 env.Install( '#/', mongos )
 
 env.Library("clientandshell", ["client/clientAndShell.cpp"], LIBDEPS=["mongocommon", "defaultversion", "gridfs", "notmongodormongos"])
