@@ -135,7 +135,7 @@ namespace mongo {
     Status ActionType::parseActionFromString(const std::string& action, ActionType* result) {
 %(fromStringIfStatements)s
         return Status(ErrorCodes::FailedToParse,
-                      mongoutils::str::stream() << "Unrecognized action capability string: "
+                      mongoutils::str::stream() << "Unrecognized action privilege string: "
                                                 << action,
                       0);
     }

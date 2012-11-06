@@ -14,22 +14,32 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "mongo/db/auth/capability.h"
+#pragma once
 
-#include <string>
-
-#include "mongo/db/auth/action_set.h"
-#include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/principal.h"
+#include "mongo/db/auth/privilege.h"
 
 namespace mongo {
 
-    Capability::Capability(const std::string& resource, ActionSet actions) :
-            _resource(resource),
-            _actions(actions) {}
+    /**
+     * A representation that a given principal has the permission to perform a set of actions on a
+     * specific resource.
+     */
+    class AcquiredPrivilege {
+    public:
 
-    bool Capability::includesAction(const ActionType& action) const {
-        return _actions.contains(action);
-    }
+        AcquiredPrivilege(const Privilege& privilege, Principal* principal) :
+            _privilege(privilege), _principal(principal) {}
+        ~AcquiredPrivilege() {}
+
+        const Principal* getPrincipal() const { return _principal; }
+
+        const Privilege& getPrivilege() const { return _privilege; }
+
+    private:
+
+        Privilege _privilege;
+        Principal* _principal;
+    };
 
 } // namespace mongo

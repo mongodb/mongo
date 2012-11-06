@@ -25,7 +25,7 @@ namespace mongo {
 
     /*
      *  An ActionSet is a bitmask of ActionTypes that represents a set of actions.
-     *  These are the actions that a Capability can grant a principal to perform on a resource.
+     *  These are the actions that a Privilege can grant a principal to perform on a resource.
      */
     class ActionSet {
     public:
@@ -51,7 +51,7 @@ namespace mongo {
 
     private:
 
-        // bitmask of actions this capability grants
+        // bitmask of actions this privilege grants
         std::bitset<ActionType::NUM_ACTION_TYPES> _actions;
     };
 
