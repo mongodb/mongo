@@ -110,14 +110,24 @@ typedef uint16_t u_int16_t;
 #define bswap_16(x) _byteswap_ushort(x)
 #define bswap_32(x) _byteswap_ulong(x)
 #define bswap_64(x) _byteswap_uint64(x)
-
 #elif defined(OS_MACOSX)
 // Mac OS X / Darwin features
 #include <libkern/OSByteOrder.h>
 #define bswap_16(x) OSSwapInt16(x)
 #define bswap_32(x) OSSwapInt32(x)
 #define bswap_64(x) OSSwapInt64(x)
+#elif defined __sunos__
 
+#ifdef _LITTLE_ENDIAN
+#define IS_LITTLE_ENDIAN
+#elif defined _BIG_ENDIAN
+#define IS_BIG_ENDIAN
+#endif
+
+#include <sys/byteorder.h>
+#define bswap_16(x) BSWAP_16(x)
+#define bswap_32(x) BSWAP_32(x)
+#define bswap_64(x) BSWAP_64(x)
 #else
 #include <byteswap.h>
 #endif
@@ -664,16 +674,19 @@ extern inline void prefetch(const char *x) {}
 
 #endif  // !HAVE_ATTRIBUTE_SECTION
 
+#if defined _WIN32 || defined __sunos__
+inline double drem(double x, double y) {
+  int quot = (x / y) + 0.5;
+  return x - ((double)quot) * y;
+}
+#endif
+
 // HK's fun windows fixer-upper defines go here!  Woo.
 #ifdef _WIN32
 #define strtoll  _strtoi64
 #define strtoull _strtoui64
 #define safe_vsnprintf _vsnprintf
 #define snprintf _snprintf
-inline double drem(double x, double y) {
-  int quot = (x / y) + 0.5;
-  return x - ((double)quot) * y;
-}
 
 inline void va_copy(va_list& a, va_list& b) {
   a = b;
