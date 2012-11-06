@@ -76,6 +76,10 @@ clientSource = [
     'mongo/util/util.cpp',
     ]
 
+if env['MONGO_BUILD_SASL_CLIENT']:
+    clientSource.extend(['mongo/client/sasl_client_authenticate.cpp',
+                         'mongo/util/gsasl_session.cpp'])
+
 exampleSourceMap = [
         ('authTest', 'mongo/client/examples/authTest.cpp'),
         ('clientTest', 'mongo/client/examples/clientTest.cpp'),
