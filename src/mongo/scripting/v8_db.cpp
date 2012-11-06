@@ -15,17 +15,19 @@
  *    limitations under the License.
  */
 
-#include "v8_wrapper.h"
-#include "v8_utils.h"
-#include "engine_v8.h"
-#include "v8_db.h"
-#include "util/base64.h"
-#include "util/text.h"
-#include "../client/syncclusterconnection.h"
-#include "../s/d_logic.h"
-#include "../db/namespacestring.h"
+#include "mongo/scripting/v8_db.h"
+
 #include <iostream>
 #include <boost/scoped_array.hpp>
+
+#include "mongo/client/syncclusterconnection.h"
+#include "mongo/db/namespacestring.h"
+#include "mongo/s/d_logic.h"
+#include "mongo/scripting/engine_v8.h"
+#include "mongo/scripting/v8_utils.h"
+#include "mongo/scripting/v8_wrapper.h"
+#include "mongo/util/base64.h"
+#include "mongo/util/text.h"
 
 using namespace std;
 using namespace v8;
