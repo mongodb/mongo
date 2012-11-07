@@ -17,13 +17,11 @@
 
 #pragma once
 
-#include <v8.h>
-
-#include <cstring>
 #include <cstdio>
 #include <cstdlib>
-#include <assert.h>
 #include <iostream>
+#include <string>
+#include <third_party/v8/include/v8.h>
 
 namespace mongo {
 

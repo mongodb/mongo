@@ -18,8 +18,9 @@
 #pragma once
 
 #include <vector>
-#include "engine.h"
-#include <v8.h>
+#include <third_party/v8/include/v8.h>
+
+#include "mongo/scripting/engine.h"
 
 using namespace v8;
 

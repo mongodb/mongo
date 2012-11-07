@@ -17,12 +17,12 @@
 
 #pragma once
 
-#include <v8.h>
-#include <cstring>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
+#include <third_party/v8/include/v8.h>
 
-#include "engine_v8.h"
+#include "mongo/scripting/engine_v8.h"
 
 namespace mongo {
     class DBClientBase;
