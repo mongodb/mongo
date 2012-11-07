@@ -136,6 +136,8 @@ namespace mongo {
             log() << "Unable to collect Number of CPUs. (errno: "
                   << errno << " msg: " << strerror(errno) << ")" << endl;
 
+        pageSize = static_cast<unsigned long long>(sysconf(_SC_PAGESIZE));
+
         hasNuma = checkNumaEnabled();
     }
 

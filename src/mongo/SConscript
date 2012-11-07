@@ -137,9 +137,13 @@ if not os.path.exists( str( processInfoPlatformFile ) ):
 
 processInfoFiles.append( processInfoPlatformFile )
 
-commonFiles += processInfoFiles
+env.StaticLibrary("processinfo",
+                  processInfoFiles,
+                  LIBDEPS=["foundation", "bson"])
 
-
+env.CppUnitTest("processinfo_test",
+                ["util/processinfo_test.cpp"],
+                LIBDEPS=["processinfo"])
 
 env.StaticLibrary("fail_point",
                   ["util/fail_point.cpp",
@@ -151,6 +155,7 @@ env.StaticLibrary('mongocommon', commonFiles,
                   LIBDEPS=['bson',
                            'foundation',
                            'md5',
+                           'processinfo',
                            'stacktrace',
                            'stringutils',
                            'fail_point',
