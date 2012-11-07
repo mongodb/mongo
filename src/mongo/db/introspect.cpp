@@ -16,28 +16,24 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "pch.h"
-#include "introspect.h"
-#include "../bson/util/builder.h"
-#include "../util/goodies.h"
-#include "pdfile.h"
-#include "jsobj.h"
-#include "pdfile.h"
-#include "curop.h"
+#include "mongo/pch.h"
+
+#include "mongo/bson/util/builder.h"
+#include "mongo/db/curop.h"
+#include "mongo/db/databaseholder.h"
+#include "mongo/db/introspect.h"
+#include "mongo/db/jsobj.h"
+#include "mongo/db/pdfile.h"
+#include "mongo/util/goodies.h"
 
 namespace mongo {
 
-    BufBuilder profileBufBuilder; // reused, instead of allocated every time - avoids a malloc/free cycle
-
-    void profile( const Client& c , CurOp& currentOp ) {
-        verify( Lock::somethingWriteLocked() );
-
+    static void _profile(const Client& c, CurOp& currentOp, BufBuilder& profileBufBuilder) {
         Database *db = c.database();
         DEV verify( db );
         const char *ns = db->profileName.c_str();
         
         // build object
-        profileBufBuilder.reset();
         BSONObjBuilder b(profileBufBuilder);
         b.appendDate("ts", jsTime());
         currentOp.debug().append( currentOp , b );
@@ -76,6 +72,29 @@ namespace mongo {
             int len = p.objsize();
             Record *r = theDataFileMgr.fast_oplog_insert(details, ns, len);
             memcpy(getDur().writingPtr(r->data(), len), p.objdata(), len);
+        }
+    }
+
+    void profile(const Client& c, int op, CurOp& currentOp) {
+        // initialize with 1kb to start, to avoid realloc later
+        // doing this outside the dblock to improve performance
+        BufBuilder profileBufBuilder(1024);
+
+        try {
+            Lock::DBWrite lk( currentOp.getNS() );
+            if ( dbHolder()._isLoaded( nsToDatabase( currentOp.getNS() ) , dbpath ) ) {
+                Client::Context cx( currentOp.getNS(), dbpath, false );
+                _profile(c, currentOp, profileBufBuilder);
+            }
+            else {
+                mongo::log() << "note: not profiling because db went away - probably a close on: "
+                             << currentOp.getNS() << endl;
+            }
+        }
+        catch (const AssertionException& assertionEx) {
+            warning() << "Caught Assertion while trying to profile " << opToString(op)
+                      << " against " << currentOp.getNS()
+                      << ": " << assertionEx.toString() << endl;
         }
     }
 

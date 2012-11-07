@@ -476,14 +476,7 @@ namespace mongo {
                 mongo::log(1) << "note: not profiling because doing fsync+lock" << endl;
             }
             else {
-                Lock::DBWrite lk( currentOp.getNS() );
-                if ( dbHolder()._isLoaded( nsToDatabase( currentOp.getNS() ) , dbpath ) ) {
-                    Client::Context cx( currentOp.getNS(), dbpath, false );
-                    profile(c , currentOp );
-                }
-                else {
-                    mongo::log() << "note: not profiling because db went away - probably a close on: " << currentOp.getNS() << endl;
-                }
+                profile(c, op, currentOp);
             }
         }
         
