@@ -64,7 +64,7 @@ namespace mongo {
         void err(BOOL b=false) { /* false = error happened */
             if( !b && !_bad ) {
                 _bad = true;
-                log() << "File " << _name << "I/O error " << GetLastError() << '\n';
+                log() << "File " << _name << "I/O error " << GetLastError() << endl;
             }
         }
     public:
@@ -154,7 +154,7 @@ namespace mongo {
         void err(bool ok) {
             if( !ok && !_bad ) {
                 _bad = true;
-                log() << "File I/O " << errnoWithDescription() << '\n';
+                log() << "File I/O " << errnoWithDescription() << endl;
             }
         }
     public:

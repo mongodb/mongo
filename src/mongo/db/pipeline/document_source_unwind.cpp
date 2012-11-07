@@ -39,7 +39,7 @@ namespace mongo {
          */
         void advance();
         /**
-         * @return the current document unwound from the document provided to resetDocuemnt(), using
+         * @return the current document unwound from the document provided to resetDocument(), using
          * the current value in the array located at the provided unwindPath.  But @return
          * intrusive_ptr<Document>() if resetDocument() has not been called or the results to unwind
          * have been exhausted.

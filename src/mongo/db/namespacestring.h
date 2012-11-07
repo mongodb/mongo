@@ -159,5 +159,70 @@ namespace mongo {
         massert(10088, "nsToDatabase: ns too long", i < (size_t)MaxDatabaseNameLen);
         return ns.substr( 0 , i );
     }
+    
+    /**
+     * NamespaceDBHash and NamespaceDBEquals allow you to do something like
+     * unordered_map<string,int,NamespaceDBHash,NamespaceDBEquals>
+     * and use the full namespace for the string
+     * but comparisons are done only on the db piece
+     */
+    
+    /**
+     * this can change, do not store on disk
+     */
+    inline int nsDBHash( const string& ns ) {
+        int hash = 7;
+        for ( size_t i = 0; i < ns.size(); i++ ) {
+            if ( ns[i] == '.' )
+                break;
+            hash += 11 * ( ns[i] );
+            hash *= 3;
+        }
+        return hash;
+    }
 
+    inline bool nsDBEquals( const string& a, const string& b ) {
+        for ( size_t i = 0; i < a.size(); i++ ) {
+            
+            if ( a[i] == '.' ) {
+                // b has to either be done or a '.'
+                
+                if ( b.size() == i )
+                    return true;
+
+                if ( b[i] == '.' ) 
+                    return true;
+
+                return false;
+            }
+            
+            // a is another character
+            if ( b.size() == i )
+                return false;
+            
+            if ( b[i] != a[i] )
+                    return false;
+        }
+        
+        // a is done
+        // make sure b is done 
+        if ( b.size() == a.size() || 
+             b[a.size()] == '.' )
+            return true;
+
+        return false;
+    }
+    
+    struct NamespaceDBHash {
+        int operator()( const string& ns ) const {
+            return nsDBHash( ns );
+        }
+    };
+
+    struct NamespaceDBEquals {
+        bool operator()( const string& a, const string& b ) const {
+            return nsDBEquals( a, b );
+        }
+    };
+    
 }

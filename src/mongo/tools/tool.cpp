@@ -118,12 +118,6 @@ namespace mongo {
         // we want durability to be disabled.
         cmdLine.dur = false;
 
-#if( BOOST_VERSION >= 104500 )
-    boost::filesystem::path::default_name_check( boost::filesystem2::no_check );
-#else
-    boost::filesystem::path::default_name_check( boost::filesystem::no_check );
-#endif
-
         _name = argv[0];
 
         /* using the same style as db.cpp */
@@ -313,8 +307,10 @@ namespace mongo {
 
     DBClientBase& Tool::conn( bool slaveIfPaired ) {
         if ( slaveIfPaired && _conn->type() == ConnectionString::SET ) {
-            if (!_slaveConn)
-                _slaveConn = &((DBClientReplicaSet*)_conn)->slaveConn();
+            if (!_slaveConn) {
+                DBClientReplicaSet* rs = static_cast<DBClientReplicaSet*>(_conn);
+                _slaveConn = &rs->slaveConn();
+            }
             return *_slaveConn;
         }
         return *_conn;
@@ -477,7 +473,7 @@ namespace mongo {
         posix_fadvise(fileno(file), 0, fileLength, POSIX_FADV_SEQUENTIAL);
 #endif
 
-        log(1) << "\t file size: " << fileLength << endl;
+        LOG(1) << "\t file size: " << fileLength << endl;
 
         unsigned long long read = 0;
         unsigned long long num = 0;

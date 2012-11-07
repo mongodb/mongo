@@ -61,7 +61,7 @@ namespace mongo {
      * unique name across the system (e.g., "balancer"). A lock is taken by writing a document in the configdb's locks
      * collection with that name.
      *
-     * To be maintained, each taken lock needs to be revalidaded ("pinged") within a pre-established amount of time. This
+     * To be maintained, each taken lock needs to be revalidated ("pinged") within a pre-established amount of time. This
      * class does this maintenance automatically once a DistributedLock object was constructed.
      */
     class DistributedLock {

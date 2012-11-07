@@ -155,7 +155,7 @@ namespace mongo {
     void FileAllocator::ensureLength(int fd , long size) {
 #if !defined(_WIN32)
         if (useSparseFiles(fd)) {
-            log(1) << "using ftruncate to create a sparse file" << endl;
+            LOG(1) << "using ftruncate to create a sparse file" << endl;
             int ret = ftruncate(fd, size);
             uassert(16063, "ftruncate failed: " + errnoWithDescription(), ret == 0);
             return;

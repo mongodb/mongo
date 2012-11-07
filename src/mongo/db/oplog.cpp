@@ -30,6 +30,7 @@
 #include "ops/delete.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/repl/bgsync.h"
+#include "mongo/util/elapsed_tracker.h"
 
 namespace mongo {
 
@@ -148,7 +149,7 @@ namespace mongo {
     // the compiler would use if inside the function.  the reason this is static is to avoid a malloc/free for this
     // on every logop call.
     static BufBuilder logopbufbuilder(8*1024);
-    const static int OPLOG_VERSION = 2;
+    static const int OPLOG_VERSION = 2;
     static void _logOpRS(const char *opstr, const char *ns, const char *logNS, const BSONObj& obj, BSONObj *o2, bool *bb, bool fromMigrate ) {
         Lock::DBWrite lk1("local");
 
@@ -223,7 +224,7 @@ namespace mongo {
         append_O_Obj(r->data(), partial, obj);
 
         if ( logLevel >= 6 ) {
-            log( 6 ) << "logOp:" << BSONObj::make(r) << endl;
+            LOG( 6 ) << "logOp:" << BSONObj::make(r) << endl;
         }
     }
 
@@ -730,7 +731,7 @@ namespace mongo {
         @return true if was and update should have happened and the document DNE.  see replset initial sync code.
      */
     bool applyOperation_inlock(const BSONObj& op, bool fromRepl, bool convertUpdateToUpsert) {
-        LOG(6) << "applying op: " << op << endl;
+        LOG(3) << "applying op: " << op << endl;
         bool failedUpdate = false;
 
         OpCounters * opCounters = fromRepl ? &replOpCounters : &globalOpCounters;
@@ -768,8 +769,8 @@ namespace mongo {
                 if( !o.getObjectID(_id) ) {
                     /* No _id.  This will be very slow. */
                     Timer t;
-                    updateObjects(ns, o, o, true, false, false, debug, false,
-                                  QueryPlanSelectionPolicy::idElseNatural() );
+                    updateObjectsForReplication(ns, o, o, true, false, false, debug, false,
+                                                QueryPlanSelectionPolicy::idElseNatural() );
                     if( t.millis() >= 2 ) {
                         RARELY OCCASIONALLY log() << "warning, repl doing slow updates (no _id field) for " << ns << endl;
                     }
@@ -784,8 +785,8 @@ namespace mongo {
                               */
                     BSONObjBuilder b;
                     b.append(_id);
-                    updateObjects(ns, o, b.done(), true, false, false , debug, false,
-                                  QueryPlanSelectionPolicy::idElseNatural() );
+                    updateObjectsForReplication(ns, o, b.done(), true, false, false , debug, false,
+                                                QueryPlanSelectionPolicy::idElseNatural() );
                 }
             }
         }
@@ -799,10 +800,18 @@ namespace mongo {
             OpDebug debug;
             BSONObj updateCriteria = op.getObjectField("o2");
             bool upsert = fields[3].booleanSafe() || convertUpdateToUpsert;
-            UpdateResult ur = updateObjects(ns, o, updateCriteria, upsert, /*multi*/ false,
-                                            /*logop*/ false , debug, /*fromMigrate*/ false,
+            UpdateResult ur =
+                updateObjectsForReplication(ns,
+                                            o,
+                                            updateCriteria,
+                                            upsert,
+                                            /*multi*/ false,
+                                            /*logop*/ false,
+                                            debug,
+                                            /*fromMigrate*/ false,
                                             QueryPlanSelectionPolicy::idElseNatural() );
-            if( ur.num == 0 ) { 
+
+            if( ur.num == 0 ) {
                 if( ur.mod ) {
                     if( updateCriteria.nFields() == 1 ) {
                         // was a simple { _id : ... } update criteria
@@ -914,13 +923,15 @@ namespace mongo {
             
             BSONObjIterator i( ops );
             BSONArrayBuilder ab;
+            const bool alwaysUpsert = cmdObj.hasField("alwaysUpsert") ?
+                    cmdObj["alwaysUpsert"].trueValue() : true;
             
             while ( i.more() ) {
                 BSONElement e = i.next();
                 const BSONObj& temp = e.Obj();
                 
                 Client::Context ctx( temp["ns"].String() ); // this handles security
-                bool failed = applyOperation_inlock( temp , false );
+                bool failed = applyOperation_inlock(temp, false, alwaysUpsert);
                 ab.append(!failed);
                 if ( failed )
                     errors++;
@@ -937,7 +948,19 @@ namespace mongo {
 
                 string tempNS = str::stream() << dbname << ".$cmd";
 
-                logOp( "c" , tempNS.c_str() , cmdObj.firstElement().wrap() );
+                // TODO: possibly use mutable BSON to remove preCondition field
+                // once it is available
+                BSONObjIterator iter(cmdObj);
+                BSONObjBuilder cmdBuilder;
+
+                while (iter.more()) {
+                    BSONElement elem(iter.next());
+                    if (strcmp(elem.fieldName(), "preCondition") != 0) {
+                        cmdBuilder.append(elem);
+                    }
+                }
+
+                logOp("c", tempNS.c_str(), cmdBuilder.done());
             }
 
             return errors == 0;

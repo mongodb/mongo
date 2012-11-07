@@ -110,6 +110,17 @@ namespace mongo {
         int _level;
     };
 
+    inline bool operator<( const LabeledLevel& ll, const int i ) { return ll.getLevel() < i; }
+    inline bool operator<( const int i, const LabeledLevel& ll ) { return i < ll.getLevel(); }
+    inline bool operator>( const LabeledLevel& ll, const int i ) { return ll.getLevel() > i; }
+    inline bool operator>( const int i, const LabeledLevel& ll ) { return i > ll.getLevel(); }
+    inline bool operator<=( const LabeledLevel& ll, const int i ) { return ll.getLevel() <= i; }
+    inline bool operator<=( const int i, const LabeledLevel& ll ) { return i <= ll.getLevel(); }
+    inline bool operator>=( const LabeledLevel& ll, const int i ) { return ll.getLevel() >= i; }
+    inline bool operator>=( const int i, const LabeledLevel& ll ) { return i >= ll.getLevel(); }
+    inline bool operator==( const LabeledLevel& ll, const int i ) { return ll.getLevel() == i; }
+    inline bool operator==( const int i, const LabeledLevel& ll ) { return i == ll.getLevel(); }
+
     class LazyString {
     public:
         virtual ~LazyString() {}
@@ -376,36 +387,21 @@ namespace mongo {
         return nullstream;
     }
 
-    inline Nullstream& log( int level ) {
-        if ( level > logLevel )
-            return nullstream;
-        return Logstream::get().prolog();
-    }
-
-#define MONGO_LOG(level) if ( MONGO_likely(logLevel < (level)) ) { } else log( level )
+#define MONGO_LOG(requiredLevel) \
+    ( MONGO_likely( ::mongo::logLevel < (requiredLevel) ) ) \
+    ? ::mongo::log() : ::mongo::log()
 #define LOG MONGO_LOG
-
-    inline Nullstream& log( LogLevel l ) {
-        return Logstream::get().prolog().setLogLevel( l );
-    }
-
-    inline Nullstream& log( const LabeledLevel& ll ) {
-        Nullstream& stream = log( ll.getLevel() );
-        if( ll.getLabel() != "" )
-            stream << "[" << ll.getLabel() << "] ";
-        return stream;
-    }
 
     inline Nullstream& log() {
         return Logstream::get().prolog();
     }
 
     inline Nullstream& error() {
-        return log( LL_ERROR );
+        return MONGO_LOG( LL_ERROR );
     }
 
     inline Nullstream& warning() {
-        return log( LL_WARNING );
+        return MONGO_LOG( LL_WARNING );
     }
 
     /* default impl returns "" -- mongod overrides */
@@ -443,7 +439,7 @@ namespace mongo {
     };
 
     extern Tee* const warnings; // Things put here go in serverStatus
-    extern Tee* startupWarningsLog;
+    extern Tee* const startupWarningsLog; // Things put here get reported in MMS
 
     string errnoWithDescription(int errorcode = -1);
     void rawOut( const string &s );

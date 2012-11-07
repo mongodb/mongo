@@ -21,8 +21,6 @@
 #include "mongo/base/status.h"
 #include "mongo/unittest/unittest.h"
 
-#define ASSERT_OK(EXPR) ASSERT_EQUALS(Status::OK(), (EXPR))
-
 namespace mongo {
 namespace {
 
@@ -95,6 +93,19 @@ namespace {
     TEST(ConfigurationVariableManagerTest, SettingUnregisteredVariableFails) {
         ConfigurationVariableManager cvars;
         ASSERT_EQUALS(ErrorCodes::NoSuchKey, cvars.setVariable("v", "15"));
+    }
+
+    TEST(ConfigurationVariableManagerTest, ParseBool) {
+        ConfigurationVariableManager cvars;
+        bool a;
+        ASSERT_OK(cvars.registerVariable("a", &a));
+        ASSERT_OK(cvars.setVariable("a", "false"));
+        ASSERT_FALSE(a);
+        ASSERT_OK(cvars.setVariable("a", "true"));
+        ASSERT_TRUE(a);
+        ASSERT_OK(cvars.setVariable("a", "false"));
+        ASSERT_FALSE(a);
+        ASSERT_EQUALS(ErrorCodes::FailedToParse, cvars.setVariable("a", "False"));
     }
 
 }  // namespace

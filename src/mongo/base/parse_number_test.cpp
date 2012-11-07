@@ -23,8 +23,6 @@
 #include "mongo/util/mongoutils/str.h"  // for str::stream()!
 #include "mongo/unittest/unittest.h"
 
-#define ASSERT_OK(EXPR) ASSERT_EQUALS(::mongo::Status::OK(), (EXPR))
-
 #define ASSERT_PARSES(TYPE, INPUT_STRING, EXPECTED_VALUE) do {  \
         TYPE v;                                                 \
         ASSERT_OK(parseNumberFromString(INPUT_STRING, &v));     \

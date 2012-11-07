@@ -59,7 +59,7 @@ namespace mongo {
         void push(T const& t) {
             scoped_lock l( _lock );
             size_t tSize = _getSize(t);
-            while (_queue.size()+tSize >= _maxSize) {
+            while (_currentSize + tSize >= _maxSize) {
                 _cvNoLongerFull.wait( l.boost() );
             }
             _queue.push( t );

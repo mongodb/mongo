@@ -85,7 +85,7 @@ namespace mongo {
           Add the given field to the Document.
 
           BSON documents' fields are ordered; the new Field will be
-          appened to the current list of fields.
+          appended to the current list of fields.
 
           It is an error to add a field that has the same name as another
           field.

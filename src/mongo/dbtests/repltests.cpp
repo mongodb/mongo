@@ -815,6 +815,23 @@ namespace ReplTests {
             }
         };
 
+        class PushWithDollarSigns : public Base {
+            void doIt() const {
+                client()->update( ns(),
+                                  BSON( "_id" << 0),
+                                  BSON( "$push" << BSON( "a" << BSON( "$foo" << 1 ) ) ) );
+            }
+            using ReplTests::Base::check;
+            void check() const {
+                ASSERT_EQUALS( 1, count() );
+                check( fromjson( "{'_id':0, a:[0, {'$foo':1}]}"), one( fromjson( "{'_id':0}" ) ) );
+            }
+            void reset() const {
+                deleteAll( ns() );
+                insert( BSON( "_id" << 0 << "a" << BSON_ARRAY( 0 ) ) );
+            }
+        };
+
         class PushAllUpsert : public Base {
         public:
             void doIt() const {
@@ -1077,6 +1094,68 @@ namespace ReplTests {
             void reset() const {
                 deleteAll( ns() );
                 insert( fromjson( "{'_id':0}" ) );
+            }
+        };
+
+        class AddToSetWithDollarSigns : public Base {
+            void doIt() const {
+                client()->update( ns(),
+                                  BSON( "_id" << 0),
+                                  BSON( "$addToSet" << BSON( "a" << BSON( "$foo" << 1 ) ) ) );
+            }
+            using ReplTests::Base::check;
+            void check() const {
+                ASSERT_EQUALS( 1, count() );
+                check( fromjson( "{'_id':0, a:[0, {'$foo':1}]}"), one( fromjson( "{'_id':0}" ) ) );
+            }
+            void reset() const {
+                deleteAll( ns() );
+                insert( BSON( "_id" << 0 << "a" << BSON_ARRAY( 0 ) ) );
+            }
+        };
+
+        //
+        // replay cases
+        //
+
+        class ReplaySetPreexistingNoOpPull : public Base {
+        public:
+            void doIt() const {
+                client()->update( ns(), BSONObj(), fromjson( "{$unset:{z:1}}" ));
+
+                // This is logged as {$set:{'a.b':[]},$set:{z:1}}, which might not be
+                // replayable against future versions of a document (here {_id:0,a:1,z:1}) due
+                // to SERVER-4781. As a result the $set:{z:1} will not be replayed in such
+                // cases (and also an exception may abort replication). If this were instead
+                // logged as {$set:{z:1}}, SERVER-4781 would not be triggered.
+                client()->update( ns(), BSONObj(), fromjson( "{$pull:{'a.b':1}, $set:{z:1}}" ) );
+                client()->update( ns(), BSONObj(), fromjson( "{$set:{a:1}}" ) );
+            }
+            using ReplTests::Base::check;
+            void check() const {
+                ASSERT_EQUALS( 1, count() );
+                check( fromjson( "{_id:0,a:1,z:1}" ), one( fromjson("{'_id':0}") ) );
+            }
+            void reset() const {
+                deleteAll( ns() );
+                insert( fromjson( "{'_id':0,a:{b:[]},z:1}" ) );
+            }
+        };
+
+        class ReplayArrayFieldNotAppended : public Base {
+        public:
+            void doIt() const {
+                client()->update( ns(), BSONObj(), fromjson( "{$push:{'a.0.b':2}}" ) );
+                client()->update( ns(), BSONObj(), fromjson( "{$set:{'a.0':1}}") );
+            }
+            using ReplTests::Base::check;
+            void check() const {
+                ASSERT_EQUALS( 1, count() );
+                check( fromjson( "{_id:0,a:[1,{b:[1]}]}" ), one(fromjson("{'_id':0}") ) );
+            }
+            void reset() const {
+                deleteAll( ns() );
+                insert( fromjson( "{'_id':0,a:[{b:[0]},{b:[1]}]}" ) );
             }
         };
 
@@ -1482,6 +1561,7 @@ namespace ReplTests {
             add< Idempotence::EmptyPush >();
             add< Idempotence::EmptyPushSparseIndex >();
             add< Idempotence::PushAll >();
+            add< Idempotence::PushWithDollarSigns >();
             add< Idempotence::PushAllUpsert >();
             add< Idempotence::EmptyPushAll >();
             add< Idempotence::Pull >();
@@ -1498,6 +1578,9 @@ namespace ReplTests {
             add< Idempotence::SingletonNoRename >();
             add< Idempotence::IndexedSingletonNoRename >();
             add< Idempotence::AddToSetEmptyMissing >();
+            add< Idempotence::AddToSetWithDollarSigns >();
+            add< Idempotence::ReplaySetPreexistingNoOpPull >();
+            add< Idempotence::ReplayArrayFieldNotAppended >();
             add< DeleteOpIsIdBased >();
             add< DatabaseIgnorerBasic >();
             add< DatabaseIgnorerUpdate >();

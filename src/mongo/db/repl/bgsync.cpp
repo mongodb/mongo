@@ -18,6 +18,7 @@
 
 #include "mongo/db/client.h"
 #include "mongo/db/commands/fsync.h"
+#include "mongo/db/commands/server_status.h"
 #include "mongo/db/repl/bgsync.h"
 #include "mongo/db/repl/rs_sync.h"
 
@@ -397,7 +398,7 @@ namespace replset {
     }
 
     void BackgroundSync::getOplogReader(OplogReader& r) {
-        Member *target = NULL, *stale = NULL;
+        const Member *target = NULL, *stale = NULL;
         BSONObj oldest;
 
         // then we're initial syncing and we're still waiting for this to be set
@@ -415,7 +416,7 @@ namespace replset {
             string current = target->fullName();
 
             if (!r.connect(current)) {
-                log(2) << "replSet can't connect to " << current << " to read operations" << rsLog;
+                LOG(2) << "replSet can't connect to " << current << " to read operations" << rsLog;
                 r.resetConnection();
                 theReplSet->veto(current);
                 continue;
@@ -490,7 +491,7 @@ namespace replset {
         return false;
     }
 
-    Member* BackgroundSync::getSyncTarget() {
+    const Member* BackgroundSync::getSyncTarget() {
         boost::unique_lock<boost::mutex> lock(_mutex);
         return _currentSyncTarget;
     }
@@ -526,7 +527,22 @@ namespace replset {
         _lastH = theReplSet->lastH;
 
         LOG(1) << "replset bgsync fetch queue set to: " << _lastOpTimeFetched << " " << _lastH << rsLog;
-   }
+    }
+
+    class ReplNetworkQueueSSS : public ServerStatusSection {
+    public:
+        ReplNetworkQueueSSS() : ServerStatusSection( "replNetworkQueue" ){}
+        virtual bool includeByDefault() const { return true; }
+        virtual bool adminOnly() const { return false; }
+
+        BSONObj generateSection( const BSONElement& configElement, bool userIsAdmin ) const {
+            if ( ! theReplSet )
+                return BSONObj();
+            
+            return replset::BackgroundSync::get()->getCounters();
+        }
+
+    } replNetworkQueueSSS;
 
 } // namespace replset
 } // namespace mongo

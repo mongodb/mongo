@@ -25,6 +25,9 @@ namespace mongo {
     
     extern const int MaxBytesToReturnToClientAtOnce;
     
+    //maximum number of intervals produced by $in queries.
+    static const unsigned MAX_IN_COMBINATIONS = 4000000;
+
     /* This is for languages whose "objects" are not well ordered (JSON is well ordered).
      [ { a : ... } , { b : ... } ] -> { a : ..., b : ... }
      */
@@ -381,15 +384,6 @@ namespace mongo {
                                        // _elemMatchContext for the FieldRange on 'a.b' is the query
                                        // element having field name '$elemMatch'.
     };
-    
-    /**
-     * A BoundList contains intervals specified by inclusive start
-     * and end bounds.  The intervals should be nonoverlapping and occur in
-     * the specified direction of traversal.  For example, given a simple index {i:1}
-     * and direction +1, one valid BoundList is: (1, 2); (4, 6).  The same BoundList
-     * would be valid for index {i:-1} with direction -1.
-     */
-    typedef vector<pair<BSONObj,BSONObj> > BoundList;
 
     class QueryPattern;
     
@@ -477,18 +471,6 @@ namespace mongo {
         const FieldRangeSet &operator-=( const FieldRangeSet &other );
         /** @return intersection of 'this' with 'other'. */
         const FieldRangeSet &operator&=( const FieldRangeSet &other );
-        
-        /**
-         * @return an ordered list of bounds generated using an index key pattern
-         * and traversal direction.
-         *
-         * The value of matchPossible() should be true, otherwise this function
-         * may @throw.
-         *
-         * NOTE This function is deprecated in the query optimizer and only
-         * currently used by sharding code.
-         */
-        BoundList indexBounds( const BSONObj &keyPattern, int direction ) const;
 
         /**
          * @return - A new FieldRangeSet based on this FieldRangeSet, but with only
@@ -597,16 +579,15 @@ namespace mongo {
          * already been scanned.
          */
         FieldRangeSetPair &operator-=( const FieldRangeSet &scanned );
-
-        BoundList shardKeyIndexBounds( const BSONObj &keyPattern ) const {
-            return _singleKey.indexBounds( keyPattern, 1 );
-        }
         
-        bool matchPossibleForShardKey( const BSONObj &keyPattern ) const {
+        bool matchPossibleForSingleKeyFRS( const BSONObj &keyPattern ) const {
             return _singleKey.matchPossibleForIndex( keyPattern );
         }
         
         BSONObj originalQuery() const { return _singleKey.originalQuery(); }
+
+        const FieldRangeSet getSingleKeyFRS() const { return _singleKey; }
+        const FieldRangeSet getMultiKeyFRS() const { return _singleKey; }
 
         string toString() const;
     private:
@@ -656,23 +637,43 @@ namespace mongo {
          * FieldRangeVector.  This function is used for $or clause deduping.
          */
         bool matches( const BSONObj &obj ) const;
-        
+
+        /**
+         * @return true if all values in the provided index key are contained within the field
+         * ranges of their respective fields in this FieldRangeVector.
+         *
+         * For example, given a query { a:3, b:4 } and index { a:1, b:1 }, the FieldRangeVector is
+         * [ [[ 3, 3 ]], [[ 4, 4 ]] ], consisting of field range [[ 3, 3 ]] on field 'a' and
+         * [[ 4, 4 ]] on field 'b'.  The index key { '':3, '':4 } matches, but the index key
+         * { '':3, '':5 } does not match because the value 5 in the second field is not contained in
+         * the field range [[ 4, 4 ]] for field 'b'.
+         */
+        bool matchesKey( const BSONObj& key ) const;
+
         /**
          * @return first key of 'obj' that would be encountered by a forward
          * index scan using this FieldRangeVector, BSONObj() if no such key.
          */
         BSONObj firstMatch( const BSONObj &obj ) const;
-        
+
+        /**
+         * @return true if all ranges within the field range set on fields of this index are
+         * represented in this field range vector.  May be false in certain multikey index cases
+         * when intervals on two fields cannot both be used, see comments related to SERVER-958 in
+         * FieldRangeVector().
+         */
+        bool hasAllIndexedRanges() const { return _hasAllIndexedRanges; }
+
         string toString() const;
         
     private:
         int matchingLowElement( const BSONElement &e, int i, bool direction, bool &lowEquality ) const;
         bool matchesElement( const BSONElement &e, int i, bool direction ) const;
-        bool matchesKey( const BSONObj &key ) const;
         vector<FieldRange> _ranges;
         const IndexSpec _indexSpec;
         int _direction;
         vector<BSONObj> _queries; // make sure mem owned
+        bool _hasAllIndexedRanges;
         friend class FieldRangeVectorIterator;
     };
     

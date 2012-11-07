@@ -25,16 +25,17 @@
 #pragma once
 
 #include "mongo/pch.h"
-#include "security.h"
-#include "namespace-inl.h"
-#include "lasterror.h"
-#include "stats/top.h"
-#include "../db/client_common.h"
-#include "../util/concurrency/threadlocal.h"
-#include "../util/net/message_port.h"
-#include "../util/concurrency/rwlock.h"
-#include "d_concurrency.h"
+
+#include "mongo/db/client_common.h"
+#include "mongo/db/d_concurrency.h"
+#include "mongo/db/lasterror.h"
 #include "mongo/db/lockstate.h"
+#include "mongo/db/namespace-inl.h"
+#include "mongo/db/security.h"
+#include "mongo/db/stats/top.h"
+#include "mongo/util/concurrency/rwlock.h"
+#include "mongo/util/concurrency/threadlocal.h"
+#include "mongo/util/net/message_port.h"
 #include "mongo/util/paths.h"
 
 namespace mongo {
@@ -55,7 +56,6 @@ namespace mongo {
 
     /** the database's concept of an outside "client" */
     class Client : public ClientBasic {
-        static Client *syncThread;
     public:
         // always be in clientsMutex when manipulating this. killop stuff uses these.
         static set<Client*>& clients;
@@ -80,14 +80,6 @@ namespace mongo {
          *  @return true if anything was done
          */
         bool shutdown();
-
-        /** set so isSyncThread() works */
-        void iAmSyncThread() {
-            wassert( syncThread == 0 );
-            syncThread = this;
-        }
-        /** @return true if this client is the replication secondary pull thread.  not used much, is used in create index sync code. */
-        bool isSyncThread() const { return this == syncThread; }
 
         string clientAddress(bool includePort=false) const;
         const AuthenticationInfo * getAuthenticationInfo() const { return &_ai; }

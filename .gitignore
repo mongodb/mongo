@@ -1,4 +1,5 @@
 /build
+/src/mongo/db/modules
 /.jsdbshell
 /.dbshell
 /.sconsign.dblite

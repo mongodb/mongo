@@ -16,13 +16,30 @@
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "pch.h"
-#include "stats.h"
+#include "mongo/pch.h"
+#include "mongo/db/commands/server_status.h"
+#include "mongo/s/stats.h"
 
 namespace mongo {
 
     OpCounters opsNonSharded;
     OpCounters opsSharded;
 
-    GenericCounter shardedCursorTypes;
+    namespace {
+        class OpsSSS : public ServerStatusSection {
+        public:
+            OpsSSS() : ServerStatusSection( "ops" ){}
+            virtual bool includeByDefault() const { return true; }
+            virtual bool adminOnly() const { return false; }
+            
+            BSONObj generateSection( const BSONElement& configElement, bool userIsAdmin ) const {
+                BSONObjBuilder b;
+                b.append( "sharded" , opsSharded.getObj() );
+                b.append( "notSharded" , opsNonSharded.getObj() );
+                return b.obj();
+            }
+        } opssss;
+        
+    }
+
 }

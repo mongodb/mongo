@@ -1,5 +1,3 @@
-// ntservice.h
-
 /*    Copyright 2009 10gen Inc.
  *
  *    Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,58 +13,63 @@
  *    limitations under the License.
  */
 
+/**
+ * The ntservice namespace provides minimal support for running mongo servers as NT services.
+ *
+ * TODO: ntservice should only provide implementation for a more general server process
+ * startup/shutdown/management interface.
+ */
+
 #pragma once
 
-#if defined(_WIN32)
-#include <windows.h>
-#include "boost/program_options.hpp"
+#ifdef _WIN32
+
+#include <boost/program_options.hpp>
+#include <string>
+#include <vector>
+
+#include "mongo/platform/compiler.h"
 
 namespace mongo {
 
-    struct ntServiceDefaultStrings {
+namespace ntservice {
+    struct NtServiceDefaultStrings {
         const wchar_t* serviceName;
         const wchar_t* displayName;
         const wchar_t* serviceDescription;
     };
 
-    typedef bool ( *ServiceCallback )( void );
-    bool serviceParamsCheck(
-            boost::program_options::variables_map& params,
-            const std::string& dbpath,
-            const ntServiceDefaultStrings& defaultStrings,
-            const vector<string>& disallowedOptions,
-            int argc,
-            char* argv[]
-    );
+    typedef void (*ServiceCallback)(void);
 
-    class ServiceController {
-    public:
-        ServiceController();
-        virtual ~ServiceController() {}
+    /**
+     * Configure the service.
+     *
+     * Also performs service installation and removal.
+     *
+     * This function calls _exit() with an error if bad parameters are passed in.  If
+     * the parameters specify that the service should be installed, removed, etc, performs that
+     * operation and exits.
+     *
+     * If this function returns to the caller, the caller should either call startService, or run
+     * the service as a regular process, depending on the return value of shouldStartService().
+     */
+    void configureService(
+            ServiceCallback serviceCallback,
+            const boost::program_options::variables_map& params,
+            const NtServiceDefaultStrings& defaultStrings,
+            const std::vector<std::string>& disallowedOptions,
+            const std::vector<std::string>& argv);
 
-        static bool installService(
-                const std::wstring& serviceName,
-                const std::wstring& displayName,
-                const std::wstring& serviceDesc,
-                const std::wstring& serviceUser,
-                const std::wstring& servicePassword,
-                const std::string& dbpath,
-                int argc,
-                char* argv[]
-        );
-        static bool removeService( const std::wstring& serviceName );
-        static bool startService( const std::wstring& serviceName, ServiceCallback startService );
-        static bool reportStatus( DWORD reportState, DWORD waitHint = 0 );
+    bool shouldStartService();
 
-        static void WINAPI initService( DWORD argc, LPTSTR *argv );
-        static void WINAPI serviceCtrl( DWORD ctrlCode );
+    /**
+     * Start the service.  Never returns.
+     */
+    MONGO_COMPILER_NORETURN void startService();
 
-    protected:
-        static std::wstring _serviceName;
-        static SERVICE_STATUS_HANDLE _statusHandle;
-        static ServiceCallback _serviceCallback;
-    };
+    bool reportStatus(DWORD reportState, DWORD waitHint = 0);
 
-} // namespace mongo
+}  // namespace ntservice
+}  // namespace mongo
 
-#endif
+#endif  // defined(_WIN32)

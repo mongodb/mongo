@@ -15,51 +15,68 @@
  *    limitations under the License.
  */
 
-#include "pch.h"
-#include "ntservice.h"
-#include "../db/client.h"
-#include "../db/instance.h"
-#include "winutil.h"
-#include "text.h"
-
 #if defined(_WIN32)
+
+#include "mongo/pch.h"
+
+#include "mongo/util/ntservice.h"
+
+#include "mongo/db/client.h"
+#include "mongo/db/instance.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/text.h"
+#include "mongo/util/winutil.h"
 
 using std::wstring;
 
 namespace mongo {
 
-    SERVICE_STATUS_HANDLE ServiceController::_statusHandle = NULL;
-    wstring ServiceController::_serviceName;
-    ServiceCallback ServiceController::_serviceCallback = NULL;
+namespace ntservice {
+namespace {
+    bool _startService = false;
+    SERVICE_STATUS_HANDLE _statusHandle = NULL;
+    wstring _serviceName;
+    ServiceCallback _serviceCallback = NULL;
+}  // namespace
 
-    ServiceController::ServiceController() {}
+    static void installServiceOrDie(
+            const wstring& serviceName,
+            const wstring& displayName,
+            const wstring& serviceDesc,
+            const wstring& serviceUser,
+            const wstring& servicePassword,
+            const std::vector<std::string>& argv);
 
-    // defined in db/db.cpp for mongod.exe and in s/server.cpp for mongos.exe
-    extern bool initService();
+    static void removeServiceOrDie(const wstring& serviceName);
 
-    // returns true if the service is started.
-    bool serviceParamsCheck(
-            boost::program_options::variables_map& params,
-            const std::string& dbpath,
-            const ntServiceDefaultStrings& defaultStrings,
-            const vector<string>& disallowedOptions,
-            int argc,
-            char* argv[]
+    bool shouldStartService() {
+        return _startService;
+    }
+
+    static void WINAPI serviceCtrl(DWORD ctrlCode);
+
+    void configureService(
+            ServiceCallback serviceCallback,
+            const boost::program_options::variables_map& params,
+            const NtServiceDefaultStrings& defaultStrings,
+            const std::vector<std::string>& disallowedOptions,
+            const std::vector<std::string>& argv
     ) {
         bool installService = false;
         bool removeService = false;
         bool reinstallService = false;
-        bool startService = false;
+
+        _serviceCallback = serviceCallback;
 
         int badOption = -1;
-        for ( int i = 0, disallowedListLength = disallowedOptions.size(); i < disallowedListLength; ++i ) {
-            if ( params.count( disallowedOptions[i] ) > 0 ) {
+        for (size_t i = 0; i < disallowedOptions.size(); ++i) {
+            if (params.count(disallowedOptions[i]) > 0) {
                 badOption = i;
                 break;
             }
         }
 
-        wstring windowsServiceName( defaultStrings.serviceName );
+        _serviceName = defaultStrings.serviceName;
         wstring windowsServiceDisplayName( defaultStrings.displayName );
         wstring windowsServiceDescription( defaultStrings.serviceDescription );
         wstring windowsServiceUser;
@@ -99,7 +116,7 @@ namespace mongo {
                 log() << "--service cannot be used with --" << disallowedOptions[badOption] << endl;
                 ::_exit( EXIT_BADOPTIONS );
             }
-            startService = true;
+            _startService = true;
         }
 
         if (params.count("serviceName")) {
@@ -107,7 +124,7 @@ namespace mongo {
                 log() << "--serviceName cannot be used with --" << disallowedOptions[badOption] << endl;
                 ::_exit( EXIT_BADOPTIONS );
             }
-            windowsServiceName = toWideString( params[ "serviceName" ].as<string>().c_str() );
+            _serviceName = toWideString( params[ "serviceName" ].as<string>().c_str() );
         }
         if (params.count("serviceDisplayName")) {
             if ( badOption != -1 ) {
@@ -138,48 +155,32 @@ namespace mongo {
             windowsServicePassword = toWideString( params[ "servicePassword" ].as<string>().c_str() );
         }
 
-        if ( reinstallService ) {
-            ServiceController::removeService( windowsServiceName );
-        }
         if ( installService || reinstallService ) {
-            if ( !ServiceController::installService(
-                        windowsServiceName,
-                        windowsServiceDisplayName,
-                        windowsServiceDescription,
-                        windowsServiceUser,
-                        windowsServicePassword,
-                        dbpath,
-                        argc,
-                        argv )
-            ) {
-                ::_exit( EXIT_NTSERVICE_ERROR );
+            if ( reinstallService ) {
+                removeServiceOrDie(_serviceName);
             }
-            ::_exit( EXIT_CLEAN );
+            installServiceOrDie(
+                    _serviceName,
+                    windowsServiceDisplayName,
+                    windowsServiceDescription,
+                    windowsServiceUser,
+                    windowsServicePassword,
+                    argv);
+            ::_exit(EXIT_CLEAN);
         }
         else if ( removeService ) {
-            if ( !ServiceController::removeService( windowsServiceName ) ) {
-                ::_exit( EXIT_NTSERVICE_ERROR );
-            }
+            removeServiceOrDie(_serviceName);
             ::_exit( EXIT_CLEAN );
         }
-        else if ( startService ) {
-            if ( !ServiceController::startService( windowsServiceName , mongo::initService ) ) {
-                ::_exit( EXIT_NTSERVICE_ERROR );
-            }
-            return true;
-        }
-        return false;
     }
 
-    bool ServiceController::installService(
+    void installServiceOrDie(
             const wstring& serviceName,
             const wstring& displayName,
             const wstring& serviceDesc,
             const wstring& serviceUser,
             const wstring& servicePassword,
-            const std::string& dbpath,
-            int argc,
-            char* argv[]
+            const std::vector<std::string>& argv
     ) {
         log() << "Trying to install Windows service '" << toUtf8String(serviceName) << "'" << endl;
 
@@ -194,14 +195,15 @@ namespace mongo {
         // likewise for all options.  this means that when parsing option-by-option as
         // we do here, we need to handle both "-" and "--" prefixes.
 
-        for ( int i = 1; i < argc; i++ ) {
-            std::string arg( argv[ i ] );
+        const size_t argc = argv.size();
+        for ( size_t i = 1; i < argc; i++ ) {
+            std::string arg(argv[i]);
             // replace install command to indicate process is being started as a service
             if ( arg == "-install" || arg == "--install" || arg == "-reinstall" || arg == "--reinstall" ) {
                 arg = "--service";
             }
             else if ( (arg == "-dbpath" || arg == "--dbpath") && i + 1 < argc ) {
-                commandLine << arg << " \"" << dbpath << "\" ";
+                commandLine << arg << " \"" << argv[i+1] << "\" ";
                 i++;
                 continue;
             }
@@ -252,7 +254,7 @@ namespace mongo {
         if ( schSCManager == NULL ) {
             DWORD err = ::GetLastError();
             log() << "Error connecting to the Service Control Manager: " << GetWinErrMsg(err) << endl;
-            return false;
+            ::_exit(EXIT_NTSERVICE_ERROR);
         }
 
         // Make sure service doesn't already exist.
@@ -262,7 +264,7 @@ namespace mongo {
             log() << "There is already a service named '" << toUtf8String(serviceName) << "', aborting" << endl;
             ::CloseServiceHandle( schService );
             ::CloseServiceHandle( schSCManager );
-            return false;
+            ::_exit(EXIT_NTSERVICE_ERROR);
         }
         std::basic_ostringstream< TCHAR > commandLineWide;
         commandLineWide << commandLine.str().c_str();
@@ -286,7 +288,7 @@ namespace mongo {
             DWORD err = ::GetLastError();
             log() << "Error creating service: " << GetWinErrMsg(err) << endl;
             ::CloseServiceHandle( schSCManager );
-            return false;
+            ::_exit( EXIT_NTSERVICE_ERROR );
         }
 
         log() << "Service '" << toUtf8String(serviceName) << "' (" << toUtf8String(displayName) <<
@@ -363,24 +365,25 @@ namespace mongo {
         ::CloseServiceHandle( schService );
         ::CloseServiceHandle( schSCManager );
 
-        return serviceInstalled;
+        if (!serviceInstalled)
+            ::_exit( EXIT_NTSERVICE_ERROR );
     }
 
-    bool ServiceController::removeService( const wstring& serviceName ) {
+    void removeServiceOrDie(const wstring& serviceName) {
         log() << "Trying to remove Windows service '" << toUtf8String(serviceName) << "'" << endl;
 
         SC_HANDLE schSCManager = ::OpenSCManager( NULL, NULL, SC_MANAGER_ALL_ACCESS );
         if ( schSCManager == NULL ) {
             DWORD err = ::GetLastError();
             log() << "Error connecting to the Service Control Manager: " << GetWinErrMsg(err) << endl;
-            return false;
+            ::_exit(EXIT_NTSERVICE_ERROR);
         }
 
         SC_HANDLE schService = ::OpenService( schSCManager, serviceName.c_str(), SERVICE_ALL_ACCESS );
         if ( schService == NULL ) {
             log() << "Could not find a service named '" << toUtf8String(serviceName) << "' to remove" << endl;
             ::CloseServiceHandle( schSCManager );
-            return false;
+            ::_exit(EXIT_NTSERVICE_ERROR);
         }
 
         SERVICE_STATUS serviceStatus;
@@ -409,23 +412,11 @@ namespace mongo {
             log() << "Failed to remove service '" << toUtf8String(serviceName) << "'" << endl;
         }
 
-        return serviceRemoved;
+        if (!serviceRemoved)
+            ::_exit(EXIT_NTSERVICE_ERROR);
     }
 
-    bool ServiceController::startService( const wstring& serviceName, ServiceCallback startService ) {
-        _serviceName = serviceName;
-        _serviceCallback = startService;
-
-        SERVICE_TABLE_ENTRY dispTable[] = {
-            { (LPTSTR)serviceName.c_str(), (LPSERVICE_MAIN_FUNCTION)ServiceController::initService },
-            { NULL, NULL }
-        };
-
-        log() << "Trying to start Windows service '" << toUtf8String(serviceName) << "'" << endl;
-        return StartServiceCtrlDispatcher( dispTable );
-    }
-
-    bool ServiceController::reportStatus( DWORD reportState, DWORD waitHint ) {
+    bool reportStatus(DWORD reportState, DWORD waitHint) {
         if ( _statusHandle == NULL )
             return false;
 
@@ -456,7 +447,7 @@ namespace mongo {
         return SetServiceStatus( _statusHandle, &ssStatus );
     }
 
-    void WINAPI ServiceController::initService( DWORD argc, LPTSTR *argv ) {
+    static void WINAPI initService( DWORD argc, LPTSTR *argv ) {
         _statusHandle = RegisterServiceCtrlHandler( _serviceName.c_str(), serviceCtrl );
         if ( !_statusHandle )
             return;
@@ -472,16 +463,16 @@ namespace mongo {
         Client::initThread( "serviceShutdown" );
         log() << "got " << controlCodeName << " request from Windows Service Control Manager, " <<
             ( inShutdown() ? "already in shutdown" : "will terminate after current cmd ends" ) << endl;
-        ServiceController::reportStatus( SERVICE_STOP_PENDING );
+        reportStatus( SERVICE_STOP_PENDING );
         if ( ! inShutdown() ) {
             // TODO: SERVER-5703, separate the "cleanup for shutdown" functionality from
             // the "terminate process" functionality in exitCleanly.
             exitCleanly( EXIT_WINDOWS_SERVICE_STOP );
-            ServiceController::reportStatus( SERVICE_STOPPED );
+            reportStatus( SERVICE_STOPPED );
         }
     }
 
-    void WINAPI ServiceController::serviceCtrl( DWORD ctrlCode ) {
+    static void WINAPI serviceCtrl( DWORD ctrlCode ) {
         switch ( ctrlCode ) {
         case SERVICE_CONTROL_STOP:
             serviceShutdown( "SERVICE_CONTROL_STOP" );
@@ -492,6 +483,25 @@ namespace mongo {
         }
     }
 
+    void startService() {
+
+        fassert(16454, _startService);
+
+        SERVICE_TABLE_ENTRYW dispTable[] = {
+            { const_cast<LPWSTR>(_serviceName.c_str()), (LPSERVICE_MAIN_FUNCTION)initService },
+            { NULL, NULL }
+        };
+
+        log() << "Trying to start Windows service '" << toUtf8String(_serviceName) << "'" << endl;
+        if (StartServiceCtrlDispatcherW(dispTable)) {
+            ::_exit(EXIT_CLEAN);
+        }
+        else {
+            ::exit(EXIT_NTSERVICE_ERROR);
+        }
+    }
+
+}  // namspace ntservice
 } // namespace mongo
 
 #endif

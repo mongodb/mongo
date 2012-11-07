@@ -25,8 +25,6 @@
 
 namespace mongo {
 
-    static const unsigned maxCombinations = 4000000;
-
     ParsedQuery::ParsedQuery( QueryMessage& qm )
     : _ns( qm.ns ) , _ntoskip( qm.ntoskip ) , _ntoreturn( qm.ntoreturn ) , _options( qm.queryOptions ) {
         init( qm.query );
@@ -195,6 +193,12 @@ namespace mongo {
                         }                        
                         vals.insert( temp );
                     }
+                    if ( ie.isNull() ) {
+                        // A null index key will not always match a null query value (eg
+                        // SERVER-4529).  As a result, a field range containing null cannot be an
+                        // exact match representation.
+                        exactMatchesOnly = false;
+                    }
                 }
             }
 
@@ -286,14 +290,27 @@ namespace mongo {
             }
             return;
         }
-        
-        if ( optimize && !isNot && ( e.type() != Array ) ) {
+
+        // Identify simple cases where this FieldRange represents the exact set of BSONElement
+        // values matching the query expression element used to construct the FieldRange.
+
+        if ( // If type bracketing is enabled (see 'optimize' case at the end of this function) ...
+             optimize &&
+             // ... and the operator isn't within a $not clause ...
+             !isNot &&
+             // ... and the operand is of a type that implements exact type bracketing and will be
+             // exactly represented in an index key (eg is not null or an array) ...
+             e.isSimpleType() ) {
             switch( op ) {
+                // ... and the operator is one for which this constructor will determine exact
+                // bounds on the values that match ...
                 case BSONObj::Equality:
                 case BSONObj::LT:
                 case BSONObj::LTE:
                 case BSONObj::GT:
                 case BSONObj::GTE:
+                    // ... then this FieldRange exactly characterizes those documents that match the
+                    // operator.
                     _exactMatchRepresentation = true;
                 default:
                     break;
@@ -432,6 +449,9 @@ namespace mongo {
         case BSONObj::opWITHIN:
             _special = "2d";
             break;
+        case BSONObj::opINTERSECT:
+            _special = "s2d";
+            break;
         case BSONObj::opEXISTS: {
             if ( !existsSpec ) {
                 lower = upper = staticNull.firstElement();
@@ -443,18 +463,38 @@ namespace mongo {
             break;
         }
 
+        // If 'optimize' is set, then bracket the field range by bson type.  For example, if this
+        // FieldRange is constructed with the operator { $gt:5 }, then the lower bound will be 5
+        // at this point but the upper bound will be MaxKey.  If 'optimize' is true, the upper bound
+        // is bracketed to the highest possible bson numeric value.  This is consistent with the
+        // Matcher's $gt implementation.
+
         if ( optimize ) {
             if ( lower.type() != MinKey && upper.type() == MaxKey && lower.isSimpleType() ) { // TODO: get rid of isSimpleType
                 BSONObjBuilder b;
                 b.appendMaxForType( lower.fieldName() , lower.type() );
                 upper = addObj( b.obj() ).firstElement();
+                if ( upper.canonicalType() != lower.canonicalType() ) {
+                    // _exactMatchRepresentation will be set if lower.isSimpleType(), requiring that
+                    // this field range exactly describe the values matching its query operator.  If
+                    // lower's max for type is not of the same canonical type as lower, it is
+                    // assumed to be the lowest value of the next canonical type meaning the upper
+                    // bound should be exclusive.
+                    upperInclusive = false;
+                }
             }
             else if ( lower.type() == MinKey && upper.type() != MaxKey && upper.isSimpleType() ) { // TODO: get rid of isSimpleType
-                if( upper.type() == Date ) 
-                    lowerInclusive = false;
                 BSONObjBuilder b;
                 b.appendMinForType( upper.fieldName() , upper.type() );
                 lower = addObj( b.obj() ).firstElement();
+                if ( lower.canonicalType() != upper.canonicalType() ) {
+                    // _exactMatchRepresentation will be set if upper.isSimpleType(), requiring that
+                    // this field range exactly describe the values matching its query operator.  If
+                    // upper's min for type is not of the same canonical type as upper, it is
+                    // assumed to be the highest value of the previous canonical type meaning the
+                    // lower bound should be exclusive.
+                    lowerInclusive = false;
+                }
             }
         }
 
@@ -1105,8 +1145,10 @@ namespace mongo {
     }
 
     FieldRangeVector::FieldRangeVector( const FieldRangeSet &frs, const IndexSpec &indexSpec,
-                                       int direction )
-    :_indexSpec( indexSpec ), _direction( direction >= 0 ? 1 : -1 ) {
+                                        int direction ) :
+        _indexSpec( indexSpec ),
+        _direction( direction >= 0 ? 1 : -1 ),
+        _hasAllIndexedRanges( true ) {
         verify(  frs.matchPossibleForIndex( _indexSpec.keyPattern ) );
         _queries = frs._queries;
         BSONObjIterator i( _indexSpec.keyPattern );
@@ -1148,6 +1190,7 @@ namespace mongo {
                               topFieldElemMatchContexts[ topField ].rawdata() ) {
                     // ... this field's parsed range cannot be used.
                     range = &frs.universalRange();
+                    _hasAllIndexedRanges = false;
                 }
             }
 
@@ -1163,7 +1206,7 @@ namespace mongo {
             verify( !_ranges.back().empty() );
         }
         uassert( 13385, "combinatorial limit of $in partitioning of result set exceeded",
-                size() < maxCombinations );
+                size() < MAX_IN_COMBINATIONS );
     }    
 
     BSONObj FieldRangeVector::startKey() const {
@@ -1258,71 +1301,6 @@ namespace mongo {
 
     QueryPattern FieldRangeSet::pattern( const BSONObj &sort ) const {
         return QueryPattern( *this, sort );
-    }
-
-    // TODO get rid of this
-    BoundList FieldRangeSet::indexBounds( const BSONObj &keyPattern, int direction ) const {
-        typedef vector<pair<shared_ptr<BSONObjBuilder>, shared_ptr<BSONObjBuilder> > > BoundBuilders;
-        BoundBuilders builders;
-        builders.push_back( make_pair( shared_ptr<BSONObjBuilder>( new BSONObjBuilder() ), shared_ptr<BSONObjBuilder>( new BSONObjBuilder() ) ) );
-        BSONObjIterator i( keyPattern );
-        bool equalityOnly = true; // until equalityOnly is false, we are just dealing with equality (no range or $in querys).
-        while( i.more() ) {
-            BSONElement e = i.next();
-            const FieldRange &fr = range( e.fieldName() );
-            int number = (int) e.number(); // returns 0.0 if not numeric
-            bool forward = ( ( number >= 0 ? 1 : -1 ) * ( direction >= 0 ? 1 : -1 ) > 0 );
-            if ( equalityOnly ) {
-                if ( fr.equality() ) {
-                    for( BoundBuilders::const_iterator j = builders.begin(); j != builders.end(); ++j ) {
-                        j->first->appendAs( fr.min(), "" );
-                        j->second->appendAs( fr.min(), "" );
-                    }
-                }
-                else {
-                    equalityOnly = false;
-
-                    BoundBuilders newBuilders;
-                    const vector<FieldInterval> &intervals = fr.intervals();
-                    for( BoundBuilders::const_iterator i = builders.begin(); i != builders.end(); ++i ) {
-                        BSONObj first = i->first->obj();
-                        BSONObj second = i->second->obj();
-
-                        if ( forward ) {
-                            for( vector<FieldInterval>::const_iterator j = intervals.begin(); j != intervals.end(); ++j ) {
-                                uassert( 13303, "combinatorial limit of $in partitioning of result set exceeded", newBuilders.size() < maxCombinations );
-                                newBuilders.push_back( make_pair( shared_ptr<BSONObjBuilder>( new BSONObjBuilder() ), shared_ptr<BSONObjBuilder>( new BSONObjBuilder() ) ) );
-                                newBuilders.back().first->appendElements( first );
-                                newBuilders.back().second->appendElements( second );
-                                newBuilders.back().first->appendAs( j->_lower._bound, "" );
-                                newBuilders.back().second->appendAs( j->_upper._bound, "" );
-                            }
-                        }
-                        else {
-                            for( vector<FieldInterval>::const_reverse_iterator j = intervals.rbegin(); j != intervals.rend(); ++j ) {
-                                uassert( 13304, "combinatorial limit of $in partitioning of result set exceeded", newBuilders.size() < maxCombinations );
-                                newBuilders.push_back( make_pair( shared_ptr<BSONObjBuilder>( new BSONObjBuilder() ), shared_ptr<BSONObjBuilder>( new BSONObjBuilder() ) ) );
-                                newBuilders.back().first->appendElements( first );
-                                newBuilders.back().second->appendElements( second );
-                                newBuilders.back().first->appendAs( j->_upper._bound, "" );
-                                newBuilders.back().second->appendAs( j->_lower._bound, "" );
-                            }
-                        }
-                    }
-                    builders = newBuilders;
-                }
-            }
-            else {
-                for( BoundBuilders::const_iterator j = builders.begin(); j != builders.end(); ++j ) {
-                    j->first->appendAs( forward ? fr.min() : fr.max(), "" );
-                    j->second->appendAs( forward ? fr.max() : fr.min(), "" );
-                }
-            }
-        }
-        BoundList ret;
-        for( BoundBuilders::const_iterator i = builders.begin(); i != builders.end(); ++i )
-            ret.push_back( make_pair( i->first->obj(), i->second->obj() ) );
-        return ret;
     }
 
     int FieldRangeSet::numNonUniversalRanges() const {

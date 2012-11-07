@@ -19,15 +19,17 @@
 #include "pch.h"
 
 #include <iomanip>
-#include "../client/connpool.h"
-#include "../util/stringutils.h"
-#include "../util/startup_test.h"
-#include "../db/namespacestring.h"
-#include "mongo/db/json.h"
 
-#include "grid.h"
-#include "shard.h"
 #include "pcrecpp.h"
+
+#include "mongo/client/connpool.h"
+#include "mongo/db/namespacestring.h"
+#include "mongo/db/json.h"
+#include "mongo/s/grid.h"
+#include "mongo/s/shard.h"
+#include "mongo/s/cluster_constants.h"
+#include "mongo/util/stringutils.h"
+#include "mongo/util/startup_test.h"
 
 namespace mongo {
 
@@ -83,13 +85,13 @@ namespace mongo {
                             BSONObjBuilder b;
                             b.appendRegex( "_id" , (string)"^" +
                                            pcrecpp::RE::QuoteMeta( database ) + "$" , "i" );
-                            BSONObj d = conn->get()->findOne( ShardNS::database , b.obj() );
+                            BSONObj dbObj = conn->get()->findOne( ConfigNS::database , b.obj() );
                             conn->done();
 
-                            if ( ! d.isEmpty() ) {
+                            if ( ! dbObj.isEmpty() ) {
                                 uasserted( DatabaseDifferCaseCode, str::stream()
                                     <<  "can't have 2 databases that just differ on case "
-                                    << " have: " << d["_id"].String()
+                                    << " have: " << dbObj[DatabaseFields::name()].String()
                                     << " want to add: " << database );
                             }
                         }
@@ -352,10 +354,11 @@ namespace mongo {
 
         // build the ConfigDB shard document
         BSONObjBuilder b;
-        b.append( "_id" , *name );
-        b.append( "host" , rsMonitor ? rsMonitor->getServerAddress() : servers.toString() );
-        if ( maxSize > 0 ) {
-            b.append( ShardFields::maxSize.name() , maxSize );
+        b.append(ShardFields::name(), *name);
+        b.append(ShardFields::host(),
+                 rsMonitor ? rsMonitor->getServerAddress() : servers.toString());
+        if (maxSize > 0) {
+            b.append(ShardFields::maxSize(), maxSize);
         }
         BSONObj shardDoc = b.obj();
 
@@ -364,8 +367,9 @@ namespace mongo {
                     configServer.getPrimary().getConnString() ) );
 
             // check whether the set of hosts (or single host) is not an already a known shard
-            BSONObj old = conn->get()->findOne( ShardNS::shard ,
-                                                BSON( "host" << servers.toString() ) );
+            BSONObj old = conn->get()->findOne(ConfigNS::shard,
+                                               BSON(ShardFields::host(servers.toString())));
+
             if ( ! old.isEmpty() ) {
                 errMsg = "host already used";
                 conn->done();
@@ -374,7 +378,7 @@ namespace mongo {
 
             log() << "going to add shard: " << shardDoc << endl;
 
-            conn->get()->insert( ShardNS::shard , shardDoc );
+            conn->get()->insert(ConfigNS::shard , shardDoc);
             errMsg = conn->get()->getLastError();
             if ( ! errMsg.empty() ) {
                 log() << "error adding shard: " << shardDoc << " err: " << errMsg << endl;
@@ -401,7 +405,7 @@ namespace mongo {
     bool Grid::knowAboutShard( const string& name ) const {
         scoped_ptr<ScopedDbConnection> conn( ScopedDbConnection::getInternalScopedDbConnection(
                 configServer.getPrimary().getConnString() ) );
-        BSONObj shard = conn->get()->findOne( ShardNS::shard , BSON( "host" << name ) );
+        BSONObj shard = conn->get()->findOne(ConfigNS::shard, BSON(ShardFields::host(name)));
         conn->done();
         return ! shard.isEmpty();
     }
@@ -414,11 +418,11 @@ namespace mongo {
 
         scoped_ptr<ScopedDbConnection> conn( ScopedDbConnection::getInternalScopedDbConnection(
                 configServer.getPrimary().getConnString() ) );
-        BSONObj o = conn->get()->findOne( ShardNS::shard ,
-                                          Query( fromjson ( "{_id: /^shard/}" ) )
-                                              .sort(  BSON( "_id" << -1 ) ) );
+        BSONObj o = conn->get()->findOne(ConfigNS::shard,
+                                         Query(fromjson("{" + ShardFields::name() + ": /^shard/}"))
+                                         .sort(BSON(ShardFields::name() << -1 )));
         if ( ! o.isEmpty() ) {
-            string last = o["_id"].String();
+            string last = o[ShardFields::name()].String();
             istringstream is( last.substr( 5 ) );
             is >> count;
             count++;
@@ -448,8 +452,8 @@ namespace mongo {
         try {
             // look for the stop balancer marker
             balancerDoc = conn->get()->findOne( ShardNS::settings, BSON( "_id" << "balancer" ) );
-            if( ns.size() > 0 ) collDoc = conn->get()->findOne( ShardNS::collection,
-                                                                BSON( "_id" << ns ) );
+            if( ns.size() > 0 ) collDoc = conn->get()->findOne(ConfigNS::collection,
+                                                               BSON( CollectionFields::name(ns)));
             conn->done();
         }
         catch( DBException& e ){

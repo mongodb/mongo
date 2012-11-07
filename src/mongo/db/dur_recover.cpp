@@ -58,7 +58,7 @@ namespace mongo {
             // might be a pointer into mmaped Journal file
             const char *dbName;
 
-            // thse are pointers into the memory mapped journal file
+            // those are pointers into the memory mapped journal file
             const JEntry *e;  // local db sentinel is already parsed out here into dbName
 
             // if not one of the two simple JEntry's above, this is the operation:
@@ -75,7 +75,7 @@ namespace mongo {
                     i != boost::filesystem::directory_iterator();
                     ++i ) {
                 boost::filesystem::path filepath = *i;
-                string fileName = boost::filesystem::path(*i).leaf();
+                string fileName = boost::filesystem::path(*i).leaf().string();
                 if( str::startsWith(fileName, "j._") ) {
                     unsigned u = str::toUnsigned( str::after(fileName, '_') );
                     if( m.count(u) ) {
@@ -88,7 +88,7 @@ namespace mongo {
                 if( i != m.begin() && m.count(i->first - 1) == 0 ) {
                     uasserted(13532,
                     str::stream() << "unexpected file in journal directory " << dir.string()
-                      << " : " << boost::filesystem::path(i->second).leaf() << " : can't find its preceeding file");
+                      << " : " << boost::filesystem::path(i->second).leaf().string() << " : can't find its preceding file");
                 }
                 files.push_back(i->second);
             }
@@ -217,7 +217,7 @@ namespace mongo {
             _mmfs.clear();
         }
 
-        RecoveryJob::Last::Last() { 
+        RecoveryJob::Last::Last() : mmf(NULL), fileNo(-1) { 
             // we are keeping invariants so we need to be sure things aren't disappearing out from under us:
             LockMongoFilesShared::assertAtLeastReadLocked();
         }
@@ -513,7 +513,7 @@ namespace mongo {
             log() << "recover lsn: " << _lastDataSyncedFromLastRun << endl;
 
             for( unsigned i = 0; i != files.size(); ++i ) {
-	      bool abruptEnd = processFile(files[i]);
+                bool abruptEnd = processFile(files[i]);
                 if( abruptEnd && i+1 < files.size() ) {
                     log() << "recover error: abrupt end to file " << files[i].string() << ", yet it isn't the last journal file" << endl;
                     close();

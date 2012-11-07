@@ -146,7 +146,7 @@ namespace mongo {
             shared_ptr<Cursor> pSortedCursor(
                 pCursor = NamespaceDetailsTransient::getCursor(
                     fullName.c_str(), *pQueryObj, *pSortObj,
-                    QueryPlanSelectionPolicy::any(), NULL, pq));
+                    QueryPlanSelectionPolicy::any(), true, pq));
 
             if (pSortedCursor.get()) {
                 /* success:  remove the sort from the pipeline */
@@ -165,7 +165,7 @@ namespace mongo {
             shared_ptr<Cursor> pUnsortedCursor(
                 pCursor = NamespaceDetailsTransient::getCursor(
                     fullName.c_str(), *pQueryObj, BSONObj(),
-                    QueryPlanSelectionPolicy::any(), NULL, pq));
+                    QueryPlanSelectionPolicy::any(), true, pq));
 
             pCursor = pUnsortedCursor;
         }

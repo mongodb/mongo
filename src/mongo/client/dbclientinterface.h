@@ -56,7 +56,7 @@ namespace mongo {
         // an extended period of time.
         QueryOption_OplogReplay = 1 << 3,
 
-        /** The server normally times out idle cursors after an inactivy period to prevent excess memory uses
+        /** The server normally times out idle cursors after an inactivity period to prevent excess memory uses
             Set this option to prevent that.
         */
         QueryOption_NoCursorTimeout = 1 << 4,

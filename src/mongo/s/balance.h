@@ -19,8 +19,10 @@
 #pragma once
 
 #include "mongo/pch.h"
-#include "../util/background.h"
-#include "balancer_policy.h"
+
+#include "mongo/client/dbclientinterface.h"
+#include "mongo/s/balancer_policy.h"
+#include "mongo/util/background.h"
 
 namespace mongo {
 

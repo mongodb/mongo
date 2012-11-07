@@ -1,0 +1,15 @@
+# -*- mode: python -*-
+
+Import("env windows linux darwin solaris")
+
+env = env.Clone()
+
+env.Append(CCFLAGS=['-Isrc/third_party/s2'])
+
+env.StaticLibrary(
+    "strings",
+    [ 
+	"split.cc",
+	"stringprintf.cc",
+	"strutil.cc",
+    ])

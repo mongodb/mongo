@@ -1,5 +1,21 @@
 #include "pch.h"
 
+/**
+*    Copyright (C) 2012 10gen Inc.
+*
+*    This program is free software: you can redistribute it and/or  modify
+*    it under the terms of the GNU Affero General Public License, version 3,
+*    as published by the Free Software Foundation.
+*
+*    This program is distributed in the hope that it will be useful,
+*    but WITHOUT ANY WARRANTY; without even the implied warranty of
+*    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+*    GNU Affero General Public License for more details.
+*
+*    You should have received a copy of the GNU Affero General Public License
+*    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+*/
+
 #if 1
 
 #define DDD(x) 
@@ -86,13 +102,13 @@ namespace mongo {
 
 #if 0 && defined(_DEBUG)
         bool d = false;
-        void is(void *p, concept c, const std::string& description, unsigned len) {
-            DDD( log() << "is  " << p << ' ' << c.toString() << ' ' << description << ' ' << len << endl; )
+        void is(void *p, concept c, const StringData& description, unsigned len) {
+            DDD( log() << "is  " << p << ' ' << c.toString() << ' ' << description.data() << ' ' << len << endl; )
             C &node = map.find(p);
             node.p = p;
             node.c = c;
             node.len = len;
-            strncpy(node.desc, description.c_str(), 15);
+            strncpy(node.desc, description.data(), 15);
         }
 
         void invalidate(void *p, unsigned len) {
@@ -100,7 +116,7 @@ namespace mongo {
             C &node = map.find(p);
             node.p = p;
             node.c = concept::err;
-            // len is not used currenntly. hmmm.
+            // len is not used currently. hmmm.
         }
 #endif
 

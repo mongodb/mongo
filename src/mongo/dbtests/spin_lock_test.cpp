@@ -1,4 +1,4 @@
-// spin_lock_test.cpp : spin_lcok.{h, cpp} unit test
+// spin_lock_test.cpp : spin_lock.{h, cpp} unit test
 
 /**
  *    Copyright (C) 2010 10gen Inc.

@@ -41,6 +41,9 @@ namespace mongo {
     */
     class ScopedConn {
     public:
+        // A flag to keep ScopedConns open when all other sockets are disconnected
+        static const unsigned keepOpen;
+
         /** throws assertions if connect failure etc. */
         ScopedConn(const std::string& hostport);
         ~ScopedConn() {
@@ -90,6 +93,11 @@ namespace mongo {
                 cc->_logLevel = 2;
             }
 
+            void tagPort() {
+                MessagingPort& mp = cc->port();
+                mp.tag |= ScopedConn::keepOpen;
+            }
+
             void setTimeout(time_t timeout) {
                 _timeout = timeout;
                 cc->setSoTimeout(_timeout);
@@ -115,6 +123,7 @@ namespace mongo {
             return false;
           }
           connInfo->connected = true;
+          connInfo->tagPort();
 
           // if we cannot authenticate against a member, then either its key file
           // or our key file has to change.  if our key file has to change, we'll
@@ -163,5 +172,4 @@ namespace mongo {
         // Keep trying to connect if we're not yet connected
         connect();
     }
-
 }

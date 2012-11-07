@@ -1,5 +1,3 @@
-// s/commands_admin.cpp
-
 /**
 *    Copyright (C) 2008 10gen Inc.
 *
@@ -16,38 +14,29 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-/* TODO
-   _ concurrency control.
-   _ limit() works right?
-   _ KillCursors
-
-   later
-   _ secondary indexes
-*/
-
 #include "pch.h"
-#include "../util/net/message.h"
-#include "../util/net/listen.h"
-#include "../util/processinfo.h"
-#include "../util/stringutils.h"
-#include "../util/version.h"
-#include "../util/timer.h"
 
-#include "../client/connpool.h"
+#include "mongo/db/commands.h"
+
+#include "mongo/client/connpool.h"
 #include "mongo/client/dbclientcursor.h"
-
-#include "../db/dbmessage.h"
-#include "../db/commands.h"
-#include "../db/stats/counters.h"
-
-#include "config.h"
-#include "chunk.h"
-#include "grid.h"
-#include "strategy.h"
-#include "stats.h"
-#include "writeback_listener.h"
-#include "client_info.h"
-#include "../util/ramlog.h"
+#include "mongo/db/dbmessage.h"
+#include "mongo/db/stats/counters.h"
+#include "mongo/s/chunk.h"
+#include "mongo/s/client_info.h"
+#include "mongo/s/cluster_constants.h"
+#include "mongo/s/config.h"
+#include "mongo/s/grid.h"
+#include "mongo/s/stats.h"
+#include "mongo/s/strategy.h"
+#include "mongo/s/writeback_listener.h"
+#include "mongo/util/net/message.h"
+#include "mongo/util/net/listen.h"
+#include "mongo/util/processinfo.h"
+#include "mongo/util/ramlog.h"
+#include "mongo/util/stringutils.h"
+#include "mongo/util/version.h"
+#include "mongo/util/timer.h"
 
 namespace mongo {
 
@@ -109,103 +98,6 @@ namespace mongo {
                 return true;
             }
         } flushRouterConfigCmd;
-
-
-        class ServerStatusCmd : public Command {
-        public:
-            ServerStatusCmd() : Command( "serverStatus" , true ) {
-                _started = time(0);
-            }
-
-            virtual bool slaveOk() const { return true; }
-            virtual LockType locktype() const { return NONE; }
-
-            bool run(const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-                result.append( "host" , prettyHostName() );
-                result.append("version", versionString);
-                result.append("process","mongos");
-                result.append("uptime",(double) (time(0)-_started));
-                result.appendDate( "localTime" , jsTime() );
-
-                {
-                    BSONObjBuilder t( result.subobjStart( "mem" ) );
-
-                    ProcessInfo p;
-                    if ( p.supported() ) {
-                        t.appendNumber( "resident" , p.getResidentSize() );
-                        t.appendNumber( "virtual" , p.getVirtualMemorySize() );
-                        t.appendBool( "supported" , true );
-                    }
-                    else {
-                        result.append( "note" , "not all mem info support on this platform" );
-                        t.appendBool( "supported" , false );
-                    }
-
-                    t.done();
-                }
-
-                {
-                    BSONObjBuilder bb( result.subobjStart( "connections" ) );
-                    bb.append( "current" , Listener::globalTicketHolder.used() );
-                    bb.append( "available" , Listener::globalTicketHolder.available() );
-                    bb.append( "totalCreated" , Listener::globalConnectionNumber.load() );
-                    bb.done();
-                }
-
-                {
-                    BSONObjBuilder bb( result.subobjStart( "extra_info" ) );
-                    bb.append("note", "fields vary by platform");
-                    ProcessInfo p;
-                    p.getExtraInfo(bb);
-                    bb.done();
-                }
-
-                result.append( "opcounters" , globalOpCounters.getObj() );
-                {
-                    BSONObjBuilder bb( result.subobjStart( "ops" ) );
-                    bb.append( "sharded" , opsSharded.getObj() );
-                    bb.append( "notSharded" , opsNonSharded.getObj() );
-                    bb.done();
-                }
-
-                result.append( "shardCursorType" , shardedCursorTypes.getObj() );
-
-                {
-                    BSONObjBuilder asserts( result.subobjStart( "asserts" ) );
-                    asserts.append( "regular" , assertionCount.regular );
-                    asserts.append( "warning" , assertionCount.warning );
-                    asserts.append( "msg" , assertionCount.msg );
-                    asserts.append( "user" , assertionCount.user );
-                    asserts.append( "rollovers" , assertionCount.rollovers );
-                    asserts.done();
-                }
-
-                {
-                    BSONObjBuilder bb( result.subobjStart( "network" ) );
-                    networkCounter.append( bb );
-                    bb.done();
-                }
-
-                {
-                    RamLog* rl = RamLog::get( "warnings" );
-                    verify(rl);
-                    
-                    if (rl->lastWrite() >= time(0)-(10*60)){ // only show warnings from last 10 minutes
-                        vector<const char*> lines;
-                        rl->get( lines );
-                        
-                        BSONArrayBuilder arr( result.subarrayStart( "warnings" ) );
-                        for ( unsigned i=std::max(0,(int)lines.size()-10); i<lines.size(); i++ )
-                            arr.append( lines[i] );
-                        arr.done();
-                    }
-                }
-
-                return 1;
-            }
-
-            time_t _started;
-        } cmdServerStatus;
 
         class FsyncCommand : public GridAdminCmd {
         public:
@@ -898,7 +790,7 @@ namespace mongo {
                                                                            .getConnString() ) );
 
                 vector<BSONObj> all;
-                auto_ptr<DBClientCursor> cursor = conn->get()->query( "config.shards" , BSONObj() );
+                auto_ptr<DBClientCursor> cursor = conn->get()->query( ConfigNS::shard , BSONObj() );
                 while ( cursor->more() ) {
                     BSONObj o = cursor->next();
                     all.push_back( o );
@@ -961,8 +853,8 @@ namespace mongo {
 
                 // maxSize is the space usage cap in a shard in MBs
                 long long maxSize = 0;
-                if ( cmdObj[ ShardFields::maxSize.name() ].isNumber() ) {
-                    maxSize = cmdObj[ ShardFields::maxSize.name() ].numberLong();
+                if ( cmdObj[ ShardFields::maxSize() ].isNumber() ) {
+                    maxSize = cmdObj[ ShardFields::maxSize() ].numberLong();
                 }
 
                 if ( ! grid.addShard( &name , servers , maxSize , errmsg ) ) {
@@ -1003,22 +895,25 @@ namespace mongo {
                                                                            .getConnString() ) );
                 ScopedDbConnection& conn = *connPtr;
 
-                if (conn->count("config.shards", BSON("_id" << NE << s.getName() << ShardFields::draining(true)))){
+                if (conn->count(ConfigNS::shard,
+                                BSON(ShardFields::name() << NE << s.getName() <<
+                                     ShardFields::draining(true)))){
                     conn.done();
                     errmsg = "Can't have more than one draining shard at a time";
                     return false;
                 }
 
-                if (conn->count("config.shards", BSON("_id" << NE << s.getName())) == 0){
+                if (conn->count(ConfigNS::shard, BSON(ShardFields::name() << NE << s.getName())) == 0){
                     conn.done();
                     errmsg = "Can't remove last shard";
                     return false;
                 }
 
-                BSONObj primaryDoc = BSON( "_id" << NE << "local" << "primary" << s.getName() );
+                BSONObj primaryDoc = BSON(DatabaseFields::name.ne("local") <<
+                                          DatabaseFields::primary(s.getName()));
                 BSONObj dbInfo; // appended at end of result on success
                 {
-                    boost::scoped_ptr<DBClientCursor> cursor (conn->query("config.databases", primaryDoc));
+                    boost::scoped_ptr<DBClientCursor> cursor (conn->query(ConfigNS::database, primaryDoc));
                     if (cursor->more()) { // skip block and allocations if empty
                         BSONObjBuilder dbInfoBuilder;
                         dbInfoBuilder.append("note", "you need to drop or movePrimary these databases");
@@ -1026,7 +921,7 @@ namespace mongo {
 
                         while (cursor->more()){
                             BSONObj db = cursor->nextSafe();
-                            dbs.append(db["_id"]);
+                            dbs.append(db[DatabaseFields::name()]);
                         }
                         dbs.doneFast();
 
@@ -1035,16 +930,16 @@ namespace mongo {
                 }
 
                 // If the server is not yet draining chunks, put it in draining mode.
-                BSONObj searchDoc = BSON( "_id" << s.getName() );
-                BSONObj drainingDoc = BSON( "_id" << s.getName() << ShardFields::draining(true) );
-                BSONObj shardDoc = conn->findOne( "config.shards", drainingDoc );
+                BSONObj searchDoc = BSON(ShardFields::name() << s.getName());
+                BSONObj drainingDoc = BSON(ShardFields::name() << s.getName() << ShardFields::draining(true));
+                BSONObj shardDoc = conn->findOne(ConfigNS::shard, drainingDoc);
                 if ( shardDoc.isEmpty() ) {
 
                     // TODO prevent move chunks to this shard.
 
                     log() << "going to start draining shard: " << s.getName() << endl;
                     BSONObj newStatus = BSON( "$set" << BSON( ShardFields::draining(true) ) );
-                    conn->update( "config.shards" , searchDoc , newStatus, false /* do no upsert */);
+                    conn->update( ConfigNS::shard , searchDoc , newStatus, false /* do no upsert */);
 
                     errmsg = conn->getLastError();
                     if ( errmsg.size() ) {
@@ -1052,11 +947,12 @@ namespace mongo {
                         return false;
                     }
 
-                    BSONObj primaryLocalDoc = BSON("_id" << "local" <<  "primary" << s.getName() );
+                    BSONObj primaryLocalDoc = BSON(DatabaseFields::name("local") <<
+                                                   DatabaseFields::primary(s.getName()));
                     PRINT(primaryLocalDoc);
-                    if (conn->count("config.databases", primaryLocalDoc)) {
+                    if (conn->count(ConfigNS::database, primaryLocalDoc)) {
                         log() << "This shard is listed as primary of local db. Removing entry." << endl;
-                        conn->remove("config.databases", BSON("_id" << "local"));
+                        conn->remove(ConfigNS::database, BSON(DatabaseFields::name("local")));
                         errmsg = conn->getLastError();
                         if ( errmsg.size() ) {
                             log() << "error removing local db: " << errmsg << endl;
@@ -1076,12 +972,12 @@ namespace mongo {
 
                 // If the server has been completely drained, remove it from the ConfigDB.
                 // Check not only for chunks but also databases.
-                BSONObj shardIDDoc = BSON( "shard" << shardDoc[ "_id" ].str() );
-                long long chunkCount = conn->count( "config.chunks" , shardIDDoc );
-                long long dbCount = conn->count( "config.databases" , primaryDoc );
+                BSONObj shardIDDoc = BSON(ChunkFields::shard(shardDoc[ShardFields::name()].str()));
+                long long chunkCount = conn->count(ConfigNS::chunk, shardIDDoc);
+                long long dbCount = conn->count( ConfigNS::database , primaryDoc );
                 if ( ( chunkCount == 0 ) && ( dbCount == 0 ) ) {
                     log() << "going to remove shard: " << s.getName() << endl;
-                    conn->remove( "config.shards" , searchDoc );
+                    conn->remove( ConfigNS::shard , searchDoc );
 
                     errmsg = conn->getLastError();
                     if ( errmsg.size() ) {
@@ -1089,7 +985,7 @@ namespace mongo {
                         return false;
                     }
 
-                    string shardName = shardDoc[ "_id" ].str();
+                    string shardName = shardDoc[ ShardFields::name() ].str();
                     Shard::removeShard( shardName );
                     shardConnectionPool.removeHost( shardName );
                     ReplicaSetMonitor::remove( shardName, true );

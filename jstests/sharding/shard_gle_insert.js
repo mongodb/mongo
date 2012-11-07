@@ -25,19 +25,25 @@ coll.insert({ _id : -1 })
 print( "GLE start" )
 var gle_state = 0;
 try{
-    var myjson = coll.getDB().getLastErrorObj();
+    var err = coll.getDB().getLastError();
+    
     // for example -- err : "socket exception [SEND_ERROR] for 127.0.0.1:30001"
     //  or            err : "socket exception [CONNECT_ERROR] for localhost:30001"
-    var errorStringParts = myjson.err.split(" ");
-    if ( errorStringParts.length < 2 ||
-         errorStringParts[0] != "socket" ||
-         errorStringParts[1] != "exception" ) {
+    
+    if (err && !/socket exception/.test(err)) {
         gle_state = 1;
-        print( "Unit test failure -- received response from getLastError:" );
-        printjson( myjson );
+        print( "Test failure -- received response from getLastError:" + err );
+    }
+    else if(!err) {
+        gle_state = 1;
+        print("Test failure -- no response from getLastError.");
+    }
+    else {
+        print("Normal socket error detected: " + err);
     }
 }
 catch( e ){
+    print("Error detected when calling GLE, this is normal:")
     printjson( e )
 }
 assert( !gle_state );

@@ -15,7 +15,12 @@ import hashlib
 def getAllSourceFiles( arr=None , prefix="." ):
     if arr is None:
         arr = []
-
+    
+    if not os.path.isdir( prefix ):
+        # assume a file
+        arr.append( prefix )
+        return arr
+        
     for x in os.listdir( prefix ):
         if x.startswith( "." ) or x.startswith( "pcre-" ) or x.startswith( "32bit" ) or x.startswith( "mongodb-" ) or x.startswith("debian") or x.startswith( "mongo-cxx-driver" ):
             continue
@@ -24,6 +29,7 @@ def getAllSourceFiles( arr=None , prefix="." ):
             getAllSourceFiles( arr , full )
         else:
             if full.endswith( ".cpp" ) or full.endswith( ".h" ) or full.endswith( ".c" ):
+                full = full.replace( "//" , "/" )
                 arr.append( full )
 
     return arr

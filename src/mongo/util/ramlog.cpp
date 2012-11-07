@@ -139,7 +139,7 @@ namespace mongo {
             }
             else {
                 stringstream x;
-                x << string(v[i], 0, 20);
+                x << string(v[i], 0, 24);
                 int nr = (i-r);
                 int last = i+nr-1;
                 for( ; r < i ; r++ ) x << '.';

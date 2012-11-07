@@ -31,10 +31,12 @@ _ disallow system* manipulations from the database.
 #include <boost/filesystem/operations.hpp>
 #include <list>
 
+#include "mongo/base/counter.h"
 #include "mongo/db/pdfile_private.h"
 #include "mongo/db/background.h"
 #include "mongo/db/btree.h"
 #include "mongo/db/btreebuilder.h"
+#include "mongo/db/commands/server_status.h"
 #include "mongo/db/compact.h"
 #include "mongo/db/curop-inl.h"
 #include "mongo/db/db.h"
@@ -59,19 +61,6 @@ namespace mongo {
 
     BOOST_STATIC_ASSERT( sizeof(Extent)-4 == 48+128 );
     BOOST_STATIC_ASSERT( sizeof(DataFileHeader)-4 == 8192 );
-
-    void printMemInfo( const char * where ) {
-        cout << "mem info: ";
-        if ( where )
-            cout << where << " ";
-        ProcessInfo pi;
-        if ( ! pi.supported() ) {
-            cout << " not supported" << endl;
-            return;
-        }
-
-        cout << "vsize: " << pi.getVirtualMemorySize() << " resident: " << pi.getResidentSize() << " mapped: " << ( MemoryMappedFile::totalMappedLength() / ( 1024 * 1024 ) ) << endl;
-    }
 
     bool isValidNS( const StringData& ns ) {
         // TODO: should check for invalid characters
@@ -169,7 +158,7 @@ namespace mongo {
     void ensureIdIndexForNewNs(const char *ns) {
         if ( ( strstr( ns, ".system." ) == 0 || legalClientSystemNS( ns , false ) ) &&
                 strstr( ns, FREELIST_NS ) == 0 ) {
-            log( 1 ) << "adding _id index for collection " << ns << endl;
+            LOG( 1 ) << "adding _id index for collection " << ns << endl;
             ensureHaveIdIndex( ns );
         }
     }
@@ -239,7 +228,7 @@ namespace mongo {
     }
 
     bool _userCreateNS(const char *ns, const BSONObj& options, string& err, bool *deferIdIndex) {
-        log(1) << "create collection " << ns << ' ' << options << endl;
+        LOG(1) << "create collection " << ns << ' ' << options << endl;
 
         if ( nsdetails(ns) ) {
             err = "collection already exists";
@@ -253,12 +242,14 @@ namespace mongo {
             BSONElement e = options.getField("size");
             if ( e.isNumber() ) {
                 size = e.numberLong();
-                size += 256;
+                uassert( 10083 , "create collection invalid size spec", size > 0 );
+
+                size += 0xff;
                 size &= 0xffffffffffffff00LL;
+                if ( size < Extent::minSize() )
+                    size = Extent::minSize();
             }
         }
-
-        uassert( 10083 , "create collection invalid size spec", size > 0 );
 
         bool newCapped = false;
         long long mx = 0;
@@ -526,7 +517,7 @@ namespace mongo {
                 verify( loops < 10000 );
                 out() << "warning: loops=" << loops << " fileno:" << fileNo << ' ' << ns << '\n';
             }
-            log() << "newExtent: " << ns << " file " << fileNo << " full, adding a new file\n";
+            log() << "newExtent: " << ns << " file " << fileNo << " full, adding a new file" << endl;
             return cc().database()->addAFile( 0, true )->createExtent(ns, approxSize, newCapped, loops+1);
         }
         int offset = header()->unused.getOfs();
@@ -608,7 +599,7 @@ namespace mongo {
                 }
             }
 
-            if( n > 128 ) log( n < 512 ) << "warning: newExtent " << n << " scanned\n";
+            if( n > 128 ) LOG( n < 512 ? 1 : 0 ) << "warning: newExtent " << n << " scanned\n";
 
             if( best ) {
                 Extent *e = best;
@@ -623,7 +614,7 @@ namespace mongo {
                     f->lastExtent.writing() = e->xprev;
 
                 // use it
-                OCCASIONALLY if( n > 512 ) log() << "warning: newExtent " << n << " scanned\n";
+                OCCASIONALLY if( n > 512 ) log() << "warning: newExtent " << n << " scanned" << endl;
                 DiskLoc emptyLoc = e->reuse(ns, capped);
                 addNewExtentToNamespace(ns, e, e->myLoc, emptyLoc, capped);
                 return e;
@@ -662,8 +653,14 @@ namespace mongo {
     }
 
     DiskLoc Extent::_reuse(const char *nsname, bool capped) {
-        LOG(3) << "reset extent was:" << nsDiagnostic.toString() << " now:" << nsname << '\n';
-        massert( 10360 ,  "Extent::reset bad magic value", magic == 0x41424344 );
+        LOG(3) << "_reuse extent was:" << nsDiagnostic.toString() << " now:" << nsname << endl;
+        if (magic != extentSignature) {
+            StringBuilder sb;
+            sb << "bad extent signature " << toHex(&magic, 4)
+               << " for namespace '" << nsDiagnostic.toString()
+               << "' found in Extent::_reuse";
+            msgasserted(10360, sb.str());
+        }
         nsDiagnostic = nsname;
         markEmpty();
 
@@ -672,18 +669,16 @@ namespace mongo {
         getEmptyLoc(nsname, myLoc, length, capped, emptyLoc, delRecLength);
 
         // todo: some dup code here and below in Extent::init
-        DeletedRecord *empty = DataFileMgr::makeDeletedRecord(emptyLoc, delRecLength);
-        empty = getDur().writing(empty);
+        DeletedRecord* empty = getDur().writing(DataFileMgr::getDeletedRecord(emptyLoc));
         empty->lengthWithHeaders() = delRecLength;
         empty->extentOfs() = myLoc.getOfs();
         empty->nextDeleted().Null();
-
         return emptyLoc;
     }
 
     /* assumes already zeroed -- insufficient for block 'reuse' perhaps */
     DiskLoc Extent::init(const char *nsname, int _length, int _fileNo, int _offset, bool capped) {
-        magic = 0x41424344;
+        magic = extentSignature;
         myLoc.set(_fileNo, _offset);
         xnext.Null();
         xprev.Null();
@@ -696,97 +691,108 @@ namespace mongo {
         int delRecLength;
         getEmptyLoc(nsname, myLoc, _length, capped, emptyLoc, delRecLength);
 
-        DeletedRecord *empty = getDur().writing( DataFileMgr::makeDeletedRecord(emptyLoc, delRecLength) );
+        DeletedRecord* empty = getDur().writing(DataFileMgr::getDeletedRecord(emptyLoc));
         empty->lengthWithHeaders() = delRecLength;
         empty->extentOfs() = myLoc.getOfs();
-
+        empty->nextDeleted().Null();
         return emptyLoc;
     }
 
-        bool Extent::validates(const DiskLoc diskLoc, BSONArrayBuilder* errors) {
-            bool extentOk = true;
-            if (myLoc != diskLoc) {
-                if (errors) {
-                    StringBuilder sb;
-                    sb << "extent " << diskLoc.toString()
-                       << " self-pointer is " << myLoc.toString();
-                    *errors << sb.str();
-                }
-                extentOk = false;
+    bool Extent::validates(const DiskLoc diskLoc, BSONArrayBuilder* errors) {
+        bool extentOk = true;
+        if (magic != extentSignature) {
+            if (errors) {
+                StringBuilder sb;
+                sb << "bad extent signature " << toHex(&magic, 4)
+                    << " in extent " << diskLoc.toString();
+                *errors << sb.str();
             }
-            if (firstRecord.isNull() != lastRecord.isNull()) {
-                if (errors) {
-                    StringBuilder sb;
-                    if (firstRecord.isNull()) {
-                        sb << "in extent " << diskLoc.toString()
-                           << ", firstRecord is null but lastRecord is "
-                           << lastRecord.toString();
-                    }
-                    else {
-                        sb << "in extent " << diskLoc.toString()
-                           << ", firstRecord is " << firstRecord.toString()
-                           << " but lastRecord is null";
-                    }
-                    *errors << sb.str();
-                }
-                extentOk = false;
+            extentOk = false;
+        }
+        if (myLoc != diskLoc) {
+            if (errors) {
+                StringBuilder sb;
+                sb << "extent " << diskLoc.toString()
+                    << " self-pointer is " << myLoc.toString();
+                *errors << sb.str();
             }
-            if (length < 0) {
-                if (errors) {
-                    StringBuilder sb;
-                    sb << "negative length extent " << diskLoc.toString();
-                    *errors << sb.str();
+            extentOk = false;
+        }
+        if (firstRecord.isNull() != lastRecord.isNull()) {
+            if (errors) {
+                StringBuilder sb;
+                if (firstRecord.isNull()) {
+                    sb << "in extent " << diskLoc.toString()
+                        << ", firstRecord is null but lastRecord is "
+                        << lastRecord.toString();
                 }
-                extentOk = false;
+                else {
+                    sb << "in extent " << diskLoc.toString()
+                        << ", firstRecord is " << firstRecord.toString()
+                        << " but lastRecord is null";
+                }
+                *errors << sb.str();
             }
-            return extentOk;
+            extentOk = false;
+        }
+        if (length < minSize()) {
+            if (errors) {
+                StringBuilder sb;
+                sb << "length of extent " << diskLoc.toString()
+                    << " is " << length
+                    << ", which is less than minimum length of " << minSize();
+                *errors << sb.str();
+            }
+            extentOk = false;
+        }
+        return extentOk;
+    }
+
+/*
+    Record* Extent::newRecord(int len) {
+        if( firstEmptyRegion.isNull() )8
+            return 0;
+
+        verify(len > 0);
+        int newRecSize = len + Record::HeaderSize;
+        DiskLoc newRecordLoc = firstEmptyRegion;
+        Record *r = getRecord(newRecordLoc);
+        int left = r->netLength() - len;
+        if( left < 0 ) {
+            //
+            firstEmptyRegion.Null();
+            return 0;
         }
 
-    /*
-      Record* Extent::newRecord(int len) {
-      if( firstEmptyRegion.isNull() )8
-      return 0;
+        DiskLoc nextEmpty = r->next.getNextEmpty(firstEmptyRegion);
+        r->lengthWithHeaders = newRecSize;
+        r->next.markAsFirstOrLastInExtent(this); // we're now last in the extent
+        if( !lastRecord.isNull() ) {
+            verify(getRecord(lastRecord)->next.lastInExtent()); // it was the last one
+            getRecord(lastRecord)->next.set(newRecordLoc); // until now
+            r->prev.set(lastRecord);
+        }
+        else {
+            r->prev.markAsFirstOrLastInExtent(this); // we are the first in the extent
+            verify( firstRecord.isNull() );
+            firstRecord = newRecordLoc;
+        }
+        lastRecord = newRecordLoc;
 
-      verify(len > 0);
-      int newRecSize = len + Record::HeaderSize;
-      DiskLoc newRecordLoc = firstEmptyRegion;
-      Record *r = getRecord(newRecordLoc);
-      int left = r->netLength() - len;
-      if( left < 0 ) {
-      //
-      firstEmptyRegion.Null();
-      return 0;
-      }
+        if( left < Record::HeaderSize + 32 ) {
+            firstEmptyRegion.Null();
+        }
+        else {
+            firstEmptyRegion.inc(newRecSize);
+            Record *empty = getRecord(firstEmptyRegion);
+            empty->next.set(nextEmpty); // not for empty records, unless in-use records, next and prev can be null.
+            empty->prev.Null();
+            empty->lengthWithHeaders = left;
+        }
 
-      DiskLoc nextEmpty = r->next.getNextEmpty(firstEmptyRegion);
-      r->lengthWithHeaders = newRecSize;
-      r->next.markAsFirstOrLastInExtent(this); // we're now last in the extent
-      if( !lastRecord.isNull() ) {
-      verify(getRecord(lastRecord)->next.lastInExtent()); // it was the last one
-      getRecord(lastRecord)->next.set(newRecordLoc); // until now
-      r->prev.set(lastRecord);
-      }
-      else {
-      r->prev.markAsFirstOrLastInExtent(this); // we are the first in the extent
-      verify( firstRecord.isNull() );
-      firstRecord = newRecordLoc;
-      }
-      lastRecord = newRecordLoc;
-
-      if( left < Record::HeaderSize + 32 ) {
-      firstEmptyRegion.Null();
-      }
-      else {
-      firstEmptyRegion.inc(newRecSize);
-      Record *empty = getRecord(firstEmptyRegion);
-      empty->next.set(nextEmpty); // not for empty records, unless in-use records, next and prev can be null.
-      empty->prev.Null();
-      empty->lengthWithHeaders = left;
-      }
-
-      return r;
-      }
-    */
+        return r;
+    }
+*/
 
     int Extent::maxSize() {
         int maxExtentSize = 0x7ff00000;
@@ -964,7 +970,7 @@ namespace mongo {
     }
 
     void dropCollection( const string &name, string &errmsg, BSONObjBuilder &result ) {
-        log(1) << "dropCollection: " << name << endl;
+        LOG(1) << "dropCollection: " << name << endl;
         NamespaceDetails *d = nsdetails(name.c_str());
         if( d == 0 )
             return;
@@ -983,11 +989,11 @@ namespace mongo {
             }
             verify( d->nIndexes == 0 );
         }
-        log(1) << "\t dropIndexes done" << endl;
+        LOG(1) << "\t dropIndexes done" << endl;
         result.append("ns", name.c_str());
         ClientCursor::invalidate(name.c_str());
         Top::global.collectionDropped( name );
-        NamespaceDetailsTransient::eraseForPrefix( name.c_str() );
+        NamespaceDetailsTransient::eraseCollection( name );
         dropNS(name);
     }
 
@@ -1048,9 +1054,12 @@ namespace mongo {
     }
 
     void DataFileMgr::deleteRecord(const char *ns, Record *todelete, const DiskLoc& dl, bool cappedOK, bool noWarn, bool doLog ) {
+        deleteRecord( nsdetails(ns), ns, todelete, dl, cappedOK, noWarn, doLog );
+    }
+
+    void DataFileMgr::deleteRecord(NamespaceDetails* d, const char *ns, Record *todelete, const DiskLoc& dl, bool cappedOK, bool noWarn, bool doLog ) {
         dassert( todelete == dl.rec() );
 
-        NamespaceDetails* d = nsdetails(ns);
         if ( d->isCapped() && !cappedOK ) {
             out() << "failing remove on a capped ns " << ns << endl;
             uassert( 10089 ,  "can't remove from a capped collection" , 0 );
@@ -1066,7 +1075,7 @@ namespace mongo {
         }
 
         /* check if any cursors point to us.  if so, advance them. */
-        ClientCursor::aboutToDelete(dl);
+        ClientCursor::aboutToDelete(d, dl);
 
         unindexRecord(d, todelete, dl, noWarn);
 
@@ -1078,6 +1087,8 @@ namespace mongo {
         }
     }
 
+    Counter64 moveCounter;
+    ServerStatusMetricField<Counter64> moveCounterDisplay( "record.moves", false, &moveCounter );
 
     /** Note: if the object shrinks a lot, we don't free up space, we leave extra at end of the record.
      */
@@ -1119,6 +1130,7 @@ namespace mongo {
 
         if ( toupdate->netLength() < objNew.objsize() ) {
             // doesn't fit.  reallocate -----------------------------------------------------
+            moveCounter.increment();
             uassert( 10003 , "failing update: objects in a capped ns cannot grow", !(d && d->isCapped()));
             d->paddingTooSmall();
             deleteRecord(ns, toupdate, dl);
@@ -1307,18 +1319,18 @@ namespace mongo {
         }
     }
 
-    NOINLINE_DECL DiskLoc outOfSpace(const char *ns, NamespaceDetails *d, int lenWHdr, bool god, DiskLoc extentLoc) {
+    NOINLINE_DECL DiskLoc outOfSpace(const char* ns, NamespaceDetails* d, int lenWHdr, bool god) {
         DiskLoc loc;
         if ( ! d->isCapped() ) { // size capped doesn't grow
-            log(1) << "allocating new extent for " << ns << " padding:" << d->paddingFactor() << " lenWHdr: " << lenWHdr << endl;
+            LOG(1) << "allocating new extent for " << ns << " padding:" << d->paddingFactor() << " lenWHdr: " << lenWHdr << endl;
             cc().database()->allocExtent(ns, Extent::followupSize(lenWHdr, d->lastExtentSize), false, !god);
-            loc = d->alloc(ns, lenWHdr, extentLoc);
+            loc = d->alloc(ns, lenWHdr);
             if ( loc.isNull() ) {
-                log() << "warning: alloc() failed after allocating new extent. lenWHdr: " << lenWHdr << " last extent size:" << d->lastExtentSize << "; trying again\n";
+                log() << "warning: alloc() failed after allocating new extent. lenWHdr: " << lenWHdr << " last extent size:" << d->lastExtentSize << "; trying again" << endl;
                 for ( int z=0; z<10 && lenWHdr > d->lastExtentSize; z++ ) {
                     log() << "try #" << z << endl;
                     cc().database()->allocExtent(ns, Extent::followupSize(lenWHdr, d->lastExtentSize), false, !god);
-                    loc = d->alloc(ns, lenWHdr, extentLoc);
+                    loc = d->alloc(ns, lenWHdr);
                     if ( ! loc.isNull() )
                         break;
                 }
@@ -1330,11 +1342,10 @@ namespace mongo {
     /** used by insert and also compact
       * @return null loc if out of space 
       */
-    DiskLoc allocateSpaceForANewRecord(const char *ns, NamespaceDetails *d, int lenWHdr, bool god) {
-        DiskLoc extentLoc;
-        DiskLoc loc = d->alloc(ns, lenWHdr, extentLoc);
+    DiskLoc allocateSpaceForANewRecord(const char* ns, NamespaceDetails* d, int lenWHdr, bool god) {
+        DiskLoc loc = d->alloc(ns, lenWHdr);
         if ( loc.isNull() ) {
-            loc = outOfSpace(ns, d, lenWHdr, god, extentLoc);
+            loc = outOfSpace(ns, d, lenWHdr, god);
         }
         return loc;
     }
@@ -1355,9 +1366,8 @@ namespace mongo {
                 }
             }
             else if ( !god ) {
-                // todo this should probably uasseert rather than doing this:
-                log() << "ERROR: attempt to insert in system namespace " << ns << endl;
-                return false;
+                uasserted(16459, str::stream() << "attempt to insert in system namespace '"
+                                               << ns << "'");
             }
         }
         return true;
@@ -1385,7 +1395,7 @@ namespace mongo {
 
         BSONObj info = loc.obj();
         bool background = info["background"].trueValue();
-        if( background && cc().isSyncThread() ) {
+        if (background && !isMasterNs(tabletoidxns.c_str())) {
             /* don't do background indexing on slaves.  there are nuances.  this could be added later
                 but requires more code.
                 */
@@ -1616,9 +1626,8 @@ namespace mongo {
         RARELY verify( d == nsdetails(ns) );
         DEV verify( d == nsdetails(ns) );
 
-        DiskLoc extentLoc;
         int lenWHdr = len + Record::HeaderSize;
-        DiskLoc loc = d->alloc(ns, lenWHdr, extentLoc);
+        DiskLoc loc = d->alloc(ns, lenWHdr);
         verify( !loc.isNull() );
 
         Record *r = loc.rec();
@@ -1673,7 +1682,7 @@ namespace mongo {
     }
 
     void dropDatabase(const std::string& db) {
-        log(1) << "dropDatabase " << db << endl;
+        LOG(1) << "dropDatabase " << db << endl;
         Lock::assertWriteLocked(db);
         Database *d = cc().database();
         verify( d );
@@ -1722,7 +1731,7 @@ namespace mongo {
             virtual bool apply( const Path &p ) {
                 if ( !boost::filesystem::exists( p ) )
                     return false;
-                boostRenameWrapper( p, newPath_ / ( p.leaf() + ".bak" ) );
+                boostRenameWrapper( p, newPath_ / ( p.leaf().string() + ".bak" ) );
                 return true;
             }
             virtual const char * op() const {
@@ -1830,7 +1839,7 @@ namespace mongo {
             uniqueReservedPath( ( preserveClonedFilesOnFailure || backupOriginalFiles ) ?
                                 "backup" : "_tmp" );
         MONGO_ASSERT_ON_EXCEPTION( boost::filesystem::create_directory( reservedPath ) );
-        string reservedPathString = reservedPath.native_directory_string();
+        string reservedPathString = reservedPath.string();
 
         bool res;
         {
@@ -1889,7 +1898,7 @@ namespace mongo {
         bool ok = false;
         MONGO_ASSERT_ON_EXCEPTION( ok = fo.apply( q ) );
         if ( ok )
-            log(2) << fo.op() << " file " << q.string() << endl;
+            LOG(2) << fo.op() << " file " << q.string() << endl;
         int i = 0;
         int extra = 10; // should not be necessary, this is defensive in case there are missing files
         while ( 1 ) {
@@ -1900,7 +1909,7 @@ namespace mongo {
             MONGO_ASSERT_ON_EXCEPTION( ok = fo.apply(q) );
             if ( ok ) {
                 if ( extra != 10 ) {
-                    log(1) << fo.op() << " file " << q.string() << endl;
+                    LOG(1) << fo.op() << " file " << q.string() << endl;
                     log() << "  _applyOpToDataFiles() warning: extra == " << extra << endl;
                 }
             }
@@ -1933,7 +1942,7 @@ namespace mongo {
         int nNotClosed = 0;
         for( set< string >::iterator i = dbs.begin(); i != dbs.end(); ++i ) {
             string name = *i;
-            log(2) << "DatabaseHolder::closeAll path:" << path << " name:" << name << endl;
+            LOG(2) << "DatabaseHolder::closeAll path:" << path << " name:" << name << endl;
             Client::Context ctx( name , path );
             if( !force && BackgroundOperation::inProgForDb(name.c_str()) ) {
                 log() << "WARNING: can't close database " << name << " because a bg job is in progress - try killOp command" << endl;

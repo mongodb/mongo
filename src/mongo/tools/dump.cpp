@@ -202,7 +202,7 @@ public:
 
             // skip namespaces with $ in them only if we don't specify a collection to dump
             if ( _coll == "" && name.find( ".$" ) != string::npos ) {
-                log(1) << "\tskipping collection: " << name << endl;
+                LOG(1) << "\tskipping collection: " << name << endl;
                 continue;
             }
 
@@ -218,9 +218,12 @@ public:
               error() << "Cannot dump "  << name << ". Collection has '/' or null in the collection name." << endl;
               continue;
             }
-            
-            // Don't dump indexes
+
             if ( endsWith(name.c_str(), ".system.indexes") ) {
+              // Create system.indexes.bson for compatibility with pre 2.2 mongorestore
+              const string filename = name.substr( db.size() + 1 );
+              writeCollectionFile( name.c_str() , outdir / ( filename + ".bson" ) );
+              // Don't dump indexes as *.metadata.json
               continue;
             }
             
@@ -290,7 +293,7 @@ public:
                 error() << "offset is 0 for record which should be impossible" << endl;
                 break;
             }
-            log(1) << loc << endl;
+            LOG(1) << loc << endl;
             Record* rec = loc.rec();
             BSONObj obj;
             try {

@@ -38,7 +38,7 @@ namespace mongo {
      * manages state about a replica set for client
      * keeps tabs on whose master and what slaves are up
      * can hand a slave to someone for SLAVE_OK
-     * one instace per process per replica set
+     * one instance per process per replica set
      * TODO: we might be able to use a regular Node * to avoid _lock
      */
     class ReplicaSetMonitor {

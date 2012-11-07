@@ -23,6 +23,7 @@
 #include "../util/net/listen.h"
 #include "../db/curop.h"
 #include "../db/client.h"
+#include "mongo/db/commands/server_status.h"
 #include "mongo/util/stacktrace.h"
 
 #include "d_writeback.h"
@@ -42,21 +43,18 @@ namespace mongo {
     WriteBackManager::~WriteBackManager() {
     }
 
-    void WriteBackManager::queueWriteBack( const string& remote , const BSONObj& o ) {
-        static mongo::mutex xxx( "WriteBackManager::queueWriteBack tmp" );
-        static OID lastOID;
+    OID WriteBackManager::queueWriteBack( const string& remote , BSONObjBuilder& b ) {
+        static mongo::mutex writebackIDOrdering( "WriteBackManager::queueWriteBack id ordering" );
+        
+        scoped_lock lk( writebackIDOrdering );
 
-        scoped_lock lk( xxx );
-        const BSONElement& e = o["id"];
+        OID writebackID;
+        writebackID.initSequential();
+        b.append( "id", writebackID );
+        
+        getWritebackQueue( remote )->queue.push( b.obj() );
 
-        if ( lastOID.isSet() ) {
-            if ( e.OID() < lastOID ) {
-                log() << "this could fail" << endl;
-                printStackTrace();
-            }
-        }
-        lastOID = e.OID();
-        getWritebackQueue( remote )->queue.push( o );
+        return writebackID;
     }
 
     shared_ptr<WriteBackManager::QueueInfo> WriteBackManager::getWritebackQueue( const string& remote ) {
@@ -203,5 +201,13 @@ namespace mongo {
         }
 
     } writeBacksQueuedCommand;
+
+    class WriteBacksQueuedSSM : public ServerStatusMetric {
+    public:
+        WriteBacksQueuedSSM() : ServerStatusMetric( ".writeBacksQueued", false ){}
+        virtual void appendAtLeaf( BSONObjBuilder& b ) const {
+            b.appendBool( _leafName, ! writeBackManager.queuesEmpty() );
+        }
+    } writeBacksQueuedSSM;
 
 }  // namespace mongo

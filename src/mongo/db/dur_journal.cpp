@@ -176,7 +176,7 @@ namespace mongo {
                 for ( boost::filesystem::directory_iterator i( getJournalDir() );
                         i != boost::filesystem::directory_iterator();
                         ++i ) {
-                    string fileName = boost::filesystem::path(*i).leaf();
+                    string fileName = boost::filesystem::path(*i).leaf().string();
                     if( anyFiles || str::startsWith(fileName, "j._") )
                         return true;
                 }
@@ -194,7 +194,7 @@ namespace mongo {
                 for ( boost::filesystem::directory_iterator i( getJournalDir() );
                         i != boost::filesystem::directory_iterator();
                         ++i ) {
-                    string fileName = boost::filesystem::path(*i).leaf();
+                    string fileName = boost::filesystem::path(*i).leaf().string();
                     if( str::startsWith(fileName, "j._") ) {
                         try {
                             removeOldJournalFile(*i);
@@ -222,7 +222,7 @@ namespace mongo {
 
             flushMyDirectory(getJournalDir() / "file"); // flushes parent of argument (in this case journal dir)
 
-            log(1) << "removeJournalFiles end" << endl;
+            LOG(1) << "removeJournalFiles end" << endl;
         }
 
         /** at clean shutdown */
@@ -591,8 +591,8 @@ namespace mongo {
                 LSNFile lsnf;
                 lsnf.set(_lastFlushTime);
                 f.write(0, (char*)&lsnf, sizeof(lsnf));
-				// do we want to fsync here? if we do it probably needs to be async so the durthread
-				// is not delayed.
+                // do we want to fsync here? if we do it probably needs to be async so the durthread
+                // is not delayed.
             }
             catch(std::exception& e) {
                 log() << "warning: write to lsn file failed " << e.what() << endl;

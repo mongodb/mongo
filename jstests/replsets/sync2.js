@@ -19,6 +19,22 @@ catch(e) {
 master.getDB("foo").bar.insert({x:1});
 replTest.awaitReplication();
 
+// Check that currentOp for secondaries uses OpTime, not Date
+assert.soon(
+    function() {
+        var count = 0;
+        var currentOp = master.getDB("admin").currentOp({ns: 'local.oplog.rs'});
+        printjson(currentOp);
+        currentOp.inprog.forEach(
+            function(op) {
+                assert.eq(op.query.ts.$gte.constructor, Timestamp);
+                count++;
+            }
+        );
+        return count >= 4;
+    }
+);
+
 master = replTest.bridge();
 
 replTest.partition(0,4);

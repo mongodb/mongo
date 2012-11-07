@@ -46,7 +46,7 @@ namespace mongo {
     }
 
     void ReplSetImpl::syncDoInitialSync() {
-        const static int maxFailedAttempts = 10;
+        static const int maxFailedAttempts = 10;
         createOplog();
         int failedAttempts = 0;
         while ( failedAttempts < maxFailedAttempts ) {
@@ -124,7 +124,7 @@ namespace mongo {
         d->emptyCappedCollection(rsoplog);
     }
 
-    Member* ReplSetImpl::getMemberToSyncTo() {
+    const Member* ReplSetImpl::getMemberToSyncTo() {
         lock lk(this);
 
         bool buildIndexes = true;
@@ -138,6 +138,8 @@ namespace mongo {
             return target;
         }
 
+        const Member* primary = box.getPrimary();
+
         // wait for 2N pings before choosing a sync target
         if (_cfg) {
             int needMorePings = config().members.size()*2 - HeartbeatInfo::numPings;
@@ -148,6 +150,12 @@ namespace mongo {
             }
 
             buildIndexes = myConfig().buildIndexes;
+
+            // If we are only allowed to sync from the primary, return that
+            if (!_cfg->chainingAllowed()) {
+                // Returns NULL if we cannot reach the primary
+                return primary;
+            }
         }
 
         // find the member with the lowest ping time that has more data than me
@@ -156,8 +164,7 @@ namespace mongo {
         // MAX_SLACK_TIME seconds behind.
         OpTime primaryOpTime;
         static const unsigned maxSlackDurationSeconds = 10 * 60; // 10 minutes
-        const Member* primary = box.getPrimary();
-        if (primary) 
+        if (primary)
             primaryOpTime = primary->hbinfo().opTime;
         else
             // choose a time that will exclude no candidates, since we don't see a primary

@@ -965,7 +965,7 @@ namespace mongo {
 
 
     class DocumentSourceLimit :
-        public DocumentSource {
+        public SplittableDocumentSource {
     public:
         // virtuals from DocumentSource
         virtual ~DocumentSourceLimit();
@@ -987,6 +987,14 @@ namespace mongo {
          */
         static intrusive_ptr<DocumentSourceLimit> create(
             const intrusive_ptr<ExpressionContext> &pExpCtx);
+
+        // Virtuals for SplittableDocumentSource
+        // Need to run on rounter. Running on shard as well is an optimization.
+        virtual intrusive_ptr<DocumentSource> getShardSource() { return this; }
+        virtual intrusive_ptr<DocumentSource> getRouterSource() { return this; }
+
+        long long getLimit() const { return limit; }
+        void setLimit(long long newLimit) { limit = newLimit; }
 
         /**
           Create a limiting DocumentSource from BSON.
@@ -1019,7 +1027,7 @@ namespace mongo {
     };
 
     class DocumentSourceSkip :
-        public DocumentSource {
+        public SplittableDocumentSource {
     public:
         // virtuals from DocumentSource
         virtual ~DocumentSourceSkip();
@@ -1041,6 +1049,14 @@ namespace mongo {
          */
         static intrusive_ptr<DocumentSourceSkip> create(
             const intrusive_ptr<ExpressionContext> &pExpCtx);
+
+        // Virtuals for SplittableDocumentSource
+        // Need to run on rounter. Can't run on shards.
+        virtual intrusive_ptr<DocumentSource> getShardSource() { return NULL; }
+        virtual intrusive_ptr<DocumentSource> getRouterSource() { return this; }
+
+        long long getSkip() const { return skip; }
+        void setSkip(long long newSkip) { skip = newSkip; }
 
         /**
           Create a skipping DocumentSource from BSON.

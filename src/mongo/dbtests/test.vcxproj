@@ -473,6 +473,7 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClInclude Include="..\..\third_party\js-1.7\resource.h" />
     <ClInclude Include="..\..\third_party\murmurhash3\MurmurHash3.h" />
     <ClInclude Include="..\base\configuration_variable_manager.h" />
+    <ClInclude Include="..\base\counter.h" />
     <ClInclude Include="..\base\disallow_copying.h" />
     <ClInclude Include="..\base\error_codes.h" />
     <ClInclude Include="..\base\global_initializer.h" />
@@ -507,7 +508,11 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClInclude Include="..\client\authentication_table.h" />
     <ClInclude Include="..\client\authlevel.h" />
     <ClInclude Include="..\client\dbclientmockcursor.h" />
+    <ClInclude Include="..\db\auth\authentication_session.h" />
+    <ClInclude Include="..\db\auth\mongo_authentication_session.h" />
+    <ClInclude Include="..\db\btree_stats.h" />
     <ClInclude Include="..\db\collection.h" />
+    <ClInclude Include="..\db\commands\server_status.h" />
     <ClInclude Include="..\db\databaseholder.h" />
     <ClInclude Include="..\db\dur.h" />
     <ClInclude Include="..\db\durop.h" />
@@ -515,9 +520,14 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClInclude Include="..\db\d_concurrency.h" />
     <ClInclude Include="..\db\explain.h" />
     <ClInclude Include="..\db\fail_point_service.h" />
+    <ClInclude Include="..\db\geo\core.h" />
+    <ClInclude Include="..\db\geo\hash.h" />
+    <ClInclude Include="..\db\geo\shapes.h" />
     <ClInclude Include="..\db\hasher.h" />
     <ClInclude Include="..\db\index_update.h" />
     <ClInclude Include="..\db\jsobjmanipulator.h" />
+    <ClInclude Include="..\db\keypattern.h" />
+    <ClInclude Include="..\db\kill_current_op.h" />
     <ClInclude Include="..\db\lockstat.h" />
     <ClInclude Include="..\db\lockstate.h" />
     <ClInclude Include="..\db\mongommf.h" />
@@ -540,7 +550,9 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClInclude Include="..\platform\bits.h" />
     <ClInclude Include="..\platform\compiler.h" />
     <ClInclude Include="..\platform\compiler_msvc.h" />
+    <ClInclude Include="..\platform\cstdint.h" />
     <ClInclude Include="..\platform\float_utils.h" />
+    <ClInclude Include="..\platform\random.h" />
     <ClInclude Include="..\platform\strtoll.h" />
     <ClInclude Include="..\platform\unordered_map.h" />
     <ClInclude Include="..\platform\unordered_set.h" />
@@ -551,6 +563,7 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClInclude Include="..\scripting\engine_spidermonkey.h" />
     <ClInclude Include="..\server.h" />
     <ClInclude Include="..\s\chunk.h" />
+    <ClInclude Include="..\s\cluster_constants.h" />
     <ClInclude Include="..\s\config.h" />
     <ClInclude Include="..\s\d_chunk_manager.h" />
     <ClInclude Include="..\s\d_logic.h" />
@@ -607,6 +620,7 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClInclude Include="..\util\concurrency\qlock.h" />
     <ClInclude Include="..\util\concurrency\task.h" />
     <ClInclude Include="..\util\concurrency\value.h" />
+    <ClInclude Include="..\util\elapsed_tracker.h" />
     <ClInclude Include="..\util\fail_point.h" />
     <ClInclude Include="..\util\fail_point_registry.h" />
     <ClInclude Include="..\util\file.h" />
@@ -622,6 +636,13 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClInclude Include="..\util\miniwebserver.h" />
     <ClInclude Include="..\util\mmap.h" />
     <ClInclude Include="..\util\mongoutils\hash.h" />
+    <ClInclude Include="..\util\net\hostandport.h" />
+    <ClInclude Include="..\util\net\listen.h" />
+    <ClInclude Include="..\util\net\message.h" />
+    <ClInclude Include="..\util\net\message_port.h" />
+    <ClInclude Include="..\util\net\message_server.h" />
+    <ClInclude Include="..\util\net\sock.h" />
+    <ClInclude Include="..\util\net\ssl_manager.h" />
     <ClInclude Include="..\util\safe_num.h" />
     <ClInclude Include="..\util\signal_handlers.h" />
     <ClInclude Include="..\util\sock.h" />
@@ -1235,10 +1256,13 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClCompile Include="..\client\gridfs.cpp" />
     <ClCompile Include="..\client\model.cpp" />
     <ClCompile Include="..\client\parallel.cpp" />
+    <ClCompile Include="..\db\auth\mongo_authentication_session.cpp" />
     <ClCompile Include="..\db\btreebuilder.cpp" />
+    <ClCompile Include="..\db\btree_stats.cpp" />
     <ClCompile Include="..\db\cap.cpp" />
     <ClCompile Include="..\db\commands\fsync.cpp" />
     <ClCompile Include="..\db\commands\isself.cpp" />
+    <ClCompile Include="..\db\commands\server_status.cpp" />
     <ClCompile Include="..\db\compact.cpp" />
     <ClCompile Include="..\db\curop.cpp" />
     <ClCompile Include="..\db\dbcommands_admin.cpp" />
@@ -1255,10 +1279,14 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClCompile Include="..\db\explain.cpp" />
     <ClCompile Include="..\db\fail_point_service.cpp" />
     <ClCompile Include="..\db\geo\2d.cpp" />
+    <ClCompile Include="..\db\geo\hash.cpp" />
     <ClCompile Include="..\db\geo\haystack.cpp" />
+    <ClCompile Include="..\db\geo\shapes.cpp" />
     <ClCompile Include="..\db\hasher.cpp" />
     <ClCompile Include="..\db\index_update.cpp" />
     <ClCompile Include="..\db\key.cpp" />
+    <ClCompile Include="..\db\keypattern.cpp" />
+    <ClCompile Include="..\db\kill_current_op.cpp" />
     <ClCompile Include="..\db\lockstat.cpp" />
     <ClCompile Include="..\db\lockstate.cpp" />
     <ClCompile Include="..\db\mongommf.cpp" />
@@ -1287,6 +1315,7 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClCompile Include="..\db\restapi.cpp" />
     <ClCompile Include="..\db\scanandorder.cpp" />
     <ClCompile Include="..\db\security_common.cpp" />
+    <ClCompile Include="..\platform\random.cpp" />
     <ClCompile Include="..\scripting\bson_template_evaluator.cpp" />
     <ClCompile Include="..\scripting\sm_db.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
@@ -1298,6 +1327,7 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">true</ExcludedFromBuild>
     </ClCompile>
+    <ClCompile Include="..\s\cluster_constants.cpp" />
     <ClCompile Include="..\s\default_version.cpp" />
     <ClCompile Include="..\..\third_party\pcre-8.30\pcrecpp.cc" />
     <ClCompile Include="..\..\third_party\pcre-8.30\pcre_chartables.c" />
@@ -1372,6 +1402,7 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClCompile Include="..\util\concurrency\task.cpp" />
     <ClCompile Include="..\util\concurrency\thread_pool.cpp" />
     <ClCompile Include="..\util\debug_util.cpp" />
+    <ClCompile Include="..\util\elapsed_tracker.cpp" />
     <ClCompile Include="..\util\fail_point.cpp" />
     <ClCompile Include="..\util\fail_point_registry.cpp" />
     <ClCompile Include="..\util\file_allocator.cpp" />
@@ -1383,6 +1414,7 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClCompile Include="..\db\nonce.cpp" />
     <ClCompile Include="..\db\pdfile.cpp" />
     <ClCompile Include="..\db\queryoptimizer.cpp" />
+    <ClCompile Include="..\util\net\ssl_manager.cpp" />
     <ClCompile Include="..\util\processinfo.cpp" />
     <ClCompile Include="..\db\repl.cpp" />
     <ClCompile Include="..\db\security.cpp" />

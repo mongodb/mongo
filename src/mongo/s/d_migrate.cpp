@@ -31,6 +31,7 @@
 
 #include "mongo/db/dbhelpers.h"
 #include "../db/commands.h"
+#include "mongo/db/hasher.h"
 #include "../db/jsobj.h"
 #include "../db/cmdline.h"
 #include "../db/queryoptimizer.h"
@@ -50,6 +51,7 @@
 #include "../util/startup_test.h"
 #include "../util/processinfo.h"
 #include "../util/ramlog.h"
+#include "mongo/util/elapsed_tracker.h"
 
 #include "shard.h"
 #include "d_logic.h"
@@ -194,6 +196,9 @@ namespace mongo {
             ShardForceVersionOkModeBlock sf;
             {
                 RemoveSaver rs("moveChunk",ns,"post-cleanup");
+
+                log() << "moveChunk starting delete for: " << this->toString() << migrateLog;
+
                 long long numDeleted =
                         Helpers::removeRange( ns ,
                                               min ,
@@ -203,7 +208,9 @@ namespace mongo {
                                               secondaryThrottle ,
                                               cmdLine.moveParanoia ? &rs : 0 , /*callback*/
                                               true ); /*fromMigrate*/
-                log() << "moveChunk deleted: " << numDeleted << migrateLog;
+
+                log() << "moveChunk deleted " << numDeleted << " documents for "
+                      << this->toString() << migrateLog;
             }
             
             
@@ -241,9 +248,12 @@ namespace mongo {
 
     };
 
-    bool isInRange( const BSONObj& obj , const BSONObj& min , const BSONObj& max ) {
-        BSONObj k = obj.extractFields( min, true );
-
+    bool isInRange( const BSONObj& obj ,
+                    const BSONObj& min ,
+                    const BSONObj& max ,
+                    const BSONObj& shardKeyPattern ) {
+        ShardKeyPattern shardKey( shardKeyPattern );
+        BSONObj k = shardKey.extractKey( obj );
         return k.woCompare( min ) >= 0 && k.woCompare( max ) < 0;
     }
 
@@ -265,7 +275,13 @@ namespace mongo {
                     const BSONObj& min ,
                     const BSONObj& max ,
                     const BSONObj& shardKeyPattern ) {
-            scoped_lock ll(_workLock);
+
+            //
+            // Do not hold _workLock
+            //
+
+            //scoped_lock ll(_workLock);
+
             scoped_lock l(_m); // reads and writes _active
 
             if (_active) {
@@ -291,7 +307,7 @@ namespace mongo {
         }
 
         void done() {
-            Lock::DBRead lk( _ns );
+            Lock::DBWrite lk( _ns );
 
             {
                 scoped_spinlock lk( _trackerLocks );
@@ -337,7 +353,7 @@ namespace mongo {
 
             case 'd': {
 
-                if ( getThreadName() == cleanUpThreadName ) {
+                if (getThreadName().find(cleanUpThreadName) == 0) {
                     // we don't want to xfer things we're cleaning
                     // as then they'll be deleted on TO
                     // which is bad
@@ -363,7 +379,7 @@ namespace mongo {
 
             }
 
-            if ( ! isInRange( it , _min , _max ) )
+            if ( ! isInRange( it , _min , _max , _shardKeyPattern ) )
                 return;
 
             _reload.push_back( ide.wrap() );
@@ -572,7 +588,7 @@ namespace mongo {
                 }
                 
                 if ( recordToTouch ) {
-                    // its safe to touch here bceause we have a LockMongoFilesShared
+                    // its safe to touch here because we have a LockMongoFilesShared
                     // we can't do where we get the lock because we would have to unlock the main readlock and tne _trackerLocks
                     // simpler to handle this out there
                     recordToTouch->touch();
@@ -679,11 +695,16 @@ namespace mongo {
     };
 
     void _cleanupOldData( OldDataCleanup cleanup ) {
-        Client::initThread( cleanUpThreadName );
+
+        Client::initThread((string(cleanUpThreadName) + string("-") +
+                                                        OID::gen().toString()).c_str());
+
         if (!noauth) {
             cc().getAuthenticationInfo()->authorize("local", internalSecurity.user);
         }
-        log() << " (start) waiting to cleanup " << cleanup << "  # cursors:" << cleanup.initial.size() << migrateLog;
+
+        log() << " (start) waiting to cleanup " << cleanup
+              << ", # cursors remaining: " << cleanup.initial.size() << migrateLog;
 
         int loops = 0;
         Timer t;
@@ -738,7 +759,9 @@ namespace mongo {
         migrateFromStatus.logOp( opstr , ns , obj , patt );
     }
 
-    void aboutToDeleteForSharding( const Database* db , const DiskLoc& dl ) {
+    void aboutToDeleteForSharding( const Database* db, const NamespaceDetails* nsd, const DiskLoc& dl ) {
+        if ( nsd->isCapped() )
+            return;
         migrateFromStatus.aboutToDelete( db , dl );
     }
 
@@ -914,6 +937,7 @@ namespace mongo {
             configServer.logChange( "moveChunk.start" , ns , chunkInfo );
 
             ShardChunkVersion maxVersion;
+            ShardChunkVersion startingVersion;
             string myOldShard;
             {
                 scoped_ptr<ScopedDbConnection> conn(
@@ -923,10 +947,12 @@ namespace mongo {
                 BSONObj x;
                 BSONObj currChunk;
                 try{
-                    x = conn->get()->findOne( ShardNS::chunk,
-                                              Query( BSON( "ns" << ns ) )
-                                                  .sort( BSON( "lastmod" << -1 ) ) );
-                    currChunk = conn->get()->findOne( ShardNS::chunk , shardId.wrap( "_id" ) );
+                    x = conn->get()->findOne(ConfigNS::chunk,
+                                             Query(BSON(ChunkFields::ns(ns)))
+                                                  .sort(BSON(ChunkFields::lastmod() << -1)));
+
+                    currChunk = conn->get()->findOne(ConfigNS::chunk,
+                                                     shardId.wrap(ChunkFields::name().c_str()));
                 }
                 catch( DBException& e ){
                     errmsg = str::stream() << "aborted moveChunk because could not get chunk data from config server " << shardingState.getConfigServer() << causedBy( e );
@@ -934,15 +960,15 @@ namespace mongo {
                     return false;
                 }
 
-                maxVersion = ShardChunkVersion::fromBSON( x, "lastmod" );
-                verify( currChunk["shard"].type() );
-                verify( currChunk["min"].type() );
-                verify( currChunk["max"].type() );
-                myOldShard = currChunk["shard"].String();
+                maxVersion = ShardChunkVersion::fromBSON(x, ChunkFields::lastmod());
+                verify(currChunk[ChunkFields::shard()].type());
+                verify(currChunk[ChunkFields::min()].type());
+                verify(currChunk[ChunkFields::max()].type());
+                myOldShard = currChunk[ChunkFields::shard()].String();
                 conn->done();
 
-                BSONObj currMin = currChunk["min"].Obj();
-                BSONObj currMax = currChunk["max"].Obj();
+                BSONObj currMin = currChunk[ChunkFields::min()].Obj();
+                BSONObj currMax = currChunk[ChunkFields::max()].Obj();
                 if ( currMin.woCompare( min ) || currMax.woCompare( max ) ) {
                     errmsg = "boundaries are outdated (likely a split occurred)";
                     result.append( "currMin" , currMin );
@@ -982,10 +1008,10 @@ namespace mongo {
                 // it's possible this shard will be *at* zero version from a previous migrate and
                 // no refresh will be done
                 // TODO: Make this less fragile
-                ShardChunkVersion shardVersion = maxVersion;
-                shardingState.trySetVersion( ns , shardVersion /* will return updated */ );
+                startingVersion = maxVersion;
+                shardingState.trySetVersion( ns , startingVersion /* will return updated */ );
 
-                log() << "moveChunk request accepted at version " << shardVersion << migrateLog;
+                log() << "moveChunk request accepted at version " << startingVersion << migrateLog;
             }
 
             timing.done(2);
@@ -1028,7 +1054,8 @@ namespace mongo {
                                                     res );
                 }
                 catch( DBException& e ){
-                    errmsg = str::stream() << "moveChunk could not contact to: shard " << to << " to start transfer" << causedBy( e );
+                    errmsg = str::stream() << "moveChunk could not contact to: shard "
+                                           << to << " to start transfer" << causedBy( e );
                     warning() << errmsg << endl;
                     return false;
                 }
@@ -1040,6 +1067,7 @@ namespace mongo {
                     verify( res["errmsg"].type() );
                     errmsg += res["errmsg"].String();
                     result.append( "cause" , res );
+                    warning() << errmsg << endl;
                     return false;
                 }
 
@@ -1066,7 +1094,7 @@ namespace mongo {
 
                 conn->done();
 
-                log(0) << "moveChunk data transfer progress: " << res << " my mem used: " << migrateFromStatus.mbUsed() << migrateLog;
+                LOG(0) << "moveChunk data transfer progress: " << res << " my mem used: " << migrateFromStatus.mbUsed() << migrateLog;
 
                 if ( ! ok || res["state"].String() == "fail" ) {
                     warning() << "moveChunk error transferring data caused migration abort: " << res << migrateLog;
@@ -1103,8 +1131,7 @@ namespace mongo {
                 // 5.a
                 // we're under the collection lock here, so no other migrate can change maxVersion or ShardChunkManager state
                 migrateFromStatus.setInCriticalSection( true );
-                ShardChunkVersion currVersion = maxVersion;
-                ShardChunkVersion myVersion = currVersion;
+                ShardChunkVersion myVersion = maxVersion;
                 myVersion.incMajor();
 
                 {
@@ -1124,7 +1151,8 @@ namespace mongo {
                 {
                     BSONObj res;
                     scoped_ptr<ScopedDbConnection> connTo(
-                            ScopedDbConnection::getScopedDbConnection( toShard.getConnString() ) );
+                            ScopedDbConnection::getScopedDbConnection( toShard.getConnString(),
+                                                                       10.0 ) );
 
                     bool ok;
 
@@ -1136,7 +1164,7 @@ namespace mongo {
                     catch( DBException& e ){
                         errmsg = str::stream() << "moveChunk could not contact to: shard " << toShard.getConnString() << " to commit transfer" << causedBy( e );
                         warning() << errmsg << endl;
-                        return false;
+                        ok = false;
                     }
 
                     connTo->done();
@@ -1146,11 +1174,11 @@ namespace mongo {
                             Lock::DBWrite lk( ns );
 
                             // revert the chunk manager back to the state before "forgetting" about the chunk
-                            shardingState.undoDonateChunk( ns , min , max , currVersion );
+                            shardingState.undoDonateChunk( ns , min , max , startingVersion );
                         }
 
                         log() << "moveChunk migrate commit not accepted by TO-shard: " << res
-                              << " resetting shard version to: " << currVersion << migrateLog;
+                              << " resetting shard version to: " << startingVersion << migrateLog;
 
                         errmsg = "_recvChunkCommit failed!";
                         result.append( "cause" , res );
@@ -1180,19 +1208,19 @@ namespace mongo {
                     BSONObjBuilder op;
                     op.append( "op" , "u" );
                     op.appendBool( "b" , false /* no upserting */ );
-                    op.append( "ns" , ShardNS::chunk );
+                    op.append( "ns" , ConfigNS::chunk );
 
                     BSONObjBuilder n( op.subobjStart( "o" ) );
-                    n.append( "_id" , Chunk::genID( ns , min ) );
-                    myVersion.addToBSON( n, "lastmod" );
-                    n.append( "ns" , ns );
-                    n.append( "min" , min );
-                    n.append( "max" , max );
-                    n.append( "shard" , toShard.getName() );
+                    n.append(ChunkFields::name(), Chunk::genID(ns, min));
+                    myVersion.addToBSON(n, ChunkFields::lastmod());
+                    n.append(ChunkFields::ns(), ns);
+                    n.append(ChunkFields::min(), min);
+                    n.append(ChunkFields::max(), max);
+                    n.append(ChunkFields::shard(), toShard.getName());
                     n.done();
 
                     BSONObjBuilder q( op.subobjStart( "o2" ) );
-                    q.append( "_id" , Chunk::genID( ns , min ) );
+                    q.append(ChunkFields::name(), Chunk::genID(ns, min));
                     q.done();
 
                     updates.append( op.obj() );
@@ -1219,20 +1247,20 @@ namespace mongo {
                     BSONObjBuilder op;
                     op.append( "op" , "u" );
                     op.appendBool( "b" , false );
-                    op.append( "ns" , ShardNS::chunk );
+                    op.append( "ns" , ConfigNS::chunk );
 
                     nextVersion.incMinor();  // same as used on donateChunk
                     BSONObjBuilder n( op.subobjStart( "o" ) );
-                    n.append( "_id" , Chunk::genID( ns , bumpMin ) );
-                    nextVersion.addToBSON( n, "lastmod" );
-                    n.append( "ns" , ns );
-                    n.append( "min" , bumpMin );
-                    n.append( "max" , bumpMax );
-                    n.append( "shard" , fromShard.getName() );
+                    n.append(ChunkFields::name(), Chunk::genID(ns, bumpMin));
+                    nextVersion.addToBSON(n, ChunkFields::lastmod());
+                    n.append(ChunkFields::ns(), ns);
+                    n.append(ChunkFields::min(), bumpMin);
+                    n.append(ChunkFields::max(), bumpMax);
+                    n.append(ChunkFields::shard(), fromShard.getName());
                     n.done();
 
                     BSONObjBuilder q( op.subobjStart( "o2" ) );
-                    q.append( "_id" , Chunk::genID( ns , bumpMin  ) );
+                    q.append(ChunkFields::name(), Chunk::genID(ns, bumpMin));
                     q.done();
 
                     updates.append( op.obj() );
@@ -1251,12 +1279,13 @@ namespace mongo {
                 BSONArrayBuilder preCond( cmdBuilder.subarrayStart( "preCondition" ) );
                 {
                     BSONObjBuilder b;
-                    b.append( "ns" , ShardNS::chunk );
-                    b.append( "q" , BSON( "query" << BSON( "ns" << ns ) << "orderby" << BSON( "lastmod" << -1 ) ) );
+                    b.append("ns", ConfigNS::chunk);
+                    b.append("q", BSON("query" << BSON(ChunkFields::ns(ns)) <<
+                                       "orderby" << BSON(ChunkFields::lastmod() << -1)));
                     {
                         BSONObjBuilder bb( b.subobjStart( "res" ) );
                         // TODO: For backwards compatibility, we can't yet require an epoch here
-                        bb.appendTimestamp( "lastmod", maxVersion.toLong() );
+                        bb.appendTimestamp(ChunkFields::lastmod(), maxVersion.toLong());
                         bb.done();
                     }
                     preCond.append( b.obj() );
@@ -1272,7 +1301,8 @@ namespace mongo {
                 try {
                     scoped_ptr<ScopedDbConnection> conn(
                             ScopedDbConnection::getInternalScopedDbConnection(
-                                    shardingState.getConfigServer() ) );
+                                    shardingState.getConfigServer(),
+                                    10.0 ) );
                     ok = conn->get()->runCommand( "config" , cmd , cmdResult );
                     conn->done();
                 }
@@ -1299,14 +1329,17 @@ namespace mongo {
                     try {
                         scoped_ptr<ScopedDbConnection> conn(
                                 ScopedDbConnection::getInternalScopedDbConnection(
-                                        shardingState.getConfigServer() ) );
+                                        shardingState.getConfigServer(),
+                                        10.0 ) );
 
                         // look for the chunk in this shard whose version got bumped
                         // we assume that if that mod made it to the config, the applyOps was successful
-                        BSONObj doc = conn->get()->findOne( ShardNS::chunk,
-                                                            Query(BSON( "ns" << ns ))
-                                                                .sort( BSON("lastmod" << -1)));
-                        ShardChunkVersion checkVersion = ShardChunkVersion::fromBSON( doc["lastmod"] );
+                        BSONObj doc = conn->get()->findOne(ConfigNS::chunk,
+                                                           Query(BSON(ChunkFields::ns(ns)))
+                                                               .sort(BSON(ChunkFields::lastmod() << -1)));
+
+                        ShardChunkVersion checkVersion =
+                            ShardChunkVersion::fromBSON(doc[ChunkFields::lastmod()]);
 
                         if ( checkVersion.isEquivalentTo( nextVersion ) ) {
                             log() << "moveChunk commit confirmed" << migrateLog;
@@ -1693,7 +1726,7 @@ namespace mongo {
                     // do not apply deletes if they do not belong to the chunk being migrated
                     BSONObj fullObj;
                     if ( Helpers::findById( cc() , ns.c_str() , id, fullObj ) ) {
-                        if ( ! isInRange( fullObj , min , max ) ) {
+                        if ( ! isInRange( fullObj , min , max , shardKeyPattern ) ) {
                             log() << "not applying out of range deletion: " << fullObj << migrateLog;
 
                             continue;
@@ -1945,13 +1978,23 @@ namespace mongo {
         void run() {
             BSONObj min = BSON( "x" << 1 );
             BSONObj max = BSON( "x" << 5 );
+            BSONObj skey = BSON( "x" << 1 );
 
-            verify( ! isInRange( BSON( "x" << 0 ) , min , max ) );
-            verify( isInRange( BSON( "x" << 1 ) , min , max ) );
-            verify( isInRange( BSON( "x" << 3 ) , min , max ) );
-            verify( isInRange( BSON( "x" << 4 ) , min , max ) );
-            verify( ! isInRange( BSON( "x" << 5 ) , min , max ) );
-            verify( ! isInRange( BSON( "x" << 6 ) , min , max ) );
+            verify( ! isInRange( BSON( "x" << 0 ) , min , max , skey ) );
+            verify( isInRange( BSON( "x" << 1 ) , min , max , skey ) );
+            verify( isInRange( BSON( "x" << 3 ) , min , max , skey ) );
+            verify( isInRange( BSON( "x" << 4 ) , min , max , skey ) );
+            verify( ! isInRange( BSON( "x" << 5 ) , min , max , skey ) );
+            verify( ! isInRange( BSON( "x" << 6 ) , min , max , skey ) );
+
+            BSONObj obj = BSON( "n" << 3 );
+            BSONObj min2 = BSON( "x" << BSONElementHasher::hash64( obj.firstElement() , 0 ) - 2 );
+            BSONObj max2 = BSON( "x" << BSONElementHasher::hash64( obj.firstElement() , 0 ) + 2 );
+            BSONObj hashedKey =  BSON( "x" << "hashed" );
+
+            verify( isInRange( BSON( "x" << 3 ) , min2 , max2 , hashedKey ) );
+            verify( ! isInRange( BSON( "x" << 3 ) , min , max , hashedKey ) );
+            verify( ! isInRange( BSON( "x" << 4 ) , min2 , max2 , hashedKey ) );
 
             LOG(1) << "isInRangeTest passed" << migrateLog;
         }

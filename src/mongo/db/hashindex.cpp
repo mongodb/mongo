@@ -26,13 +26,11 @@ namespace mongo {
     const string HashedIndexType::HASHED_INDEX_TYPE_IDENTIFIER = "hashed";
 
     HashedIndexType::HashedIndexType( const IndexPlugin* plugin , const IndexSpec* spec ) :
-            IndexType( plugin , spec ) {
-
-        _keyPattern = spec->keyPattern;
+            IndexType( plugin , spec ) , _keyPattern( spec->keyPattern ) {
 
         //change these if single-field limitation lifted later
         uassert( 16241 , "Currently only single field hashed index supported." ,
-                _keyPattern.nFields() == 1 );
+                _keyPattern.toBSON().nFields() == 1 );
         uassert( 16242 , "Currently hashed indexes cannot guarantee uniqueness. Use a regular index." ,
                 ! (spec->info).getField("unique").booleanSafe() );
 
@@ -52,7 +50,7 @@ namespace mongo {
         _hashVersion = (spec->info).getField("hashVersion").numberInt();
 
         //Get the hashfield name
-        BSONElement firstElt = _keyPattern.firstElement();
+        BSONElement firstElt = spec->keyPattern.firstElement();
         massert( 16243 , "error: no hashed index field" ,
                 firstElt.str().compare( HASHED_INDEX_TYPE_IDENTIFIER ) == 0 );
         _hashedField = firstElt.fieldName();

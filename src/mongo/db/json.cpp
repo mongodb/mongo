@@ -482,7 +482,7 @@ namespace mongo {
         ObjectBuilder &b;
     };
 
-// One gotcha with this parsing library is probably best ilustrated with an
+// One gotcha with this parsing library is probably best illustrated with an
 // example.  Say we have a production like this:
 // z = ( ch_p( 'a' )[ foo ] >> ch_p( 'b' ) ) | ( ch_p( 'a' )[ foo ] >> ch_p( 'c' ) );
 // On input "ac", action foo() will be called twice -- once as the parser tries

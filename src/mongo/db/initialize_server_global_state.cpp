@@ -151,8 +151,8 @@ namespace mongo {
 #endif
         if (!cmdLine.logpath.empty() && !isMongodShutdownSpecialCase) {
             fassert(16448, !cmdLine.logWithSyslog);
-            string absoluteLogpath = boost::filesystem::complete(
-                    cmdLine.logpath, cmdLine.cwd).native_file_string();
+            string absoluteLogpath = boost::filesystem::absolute(
+                    cmdLine.logpath, cmdLine.cwd).string();
             if (!initLogging(absoluteLogpath, cmdLine.logAppend)) {
                 cout << "Bad logpath value: \"" << absoluteLogpath << "\"; terminating." << endl;
                 return false;

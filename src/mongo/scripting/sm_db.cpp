@@ -15,10 +15,12 @@
  *    limitations under the License.
  */
 
-// hacked in right now from engine_spidermonkey.cpp
+#include <third_party/js-1.7/jsapi.h>
 
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/db/namespacestring.h"
+#include "mongo/scripting/engine_spidermonkey.h"
+#include "mongo/scripting/engine_spidermonkey_internal.h"
 #include "mongo/util/base64.h"
 #include "mongo/util/text.h"
 
@@ -30,12 +32,22 @@ namespace mongo {
 
     bool haveLocalShardingInfo( const string& ns );
 
+namespace spidermonkey {
+
+    JSFunctionSpec bson_functions[] = {
+        { 0 }
+    };
+
+    JSBool bson_cons( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval ) {
+        JS_ReportError( cx , "can't construct bson object" );
+        return JS_FALSE;
+    }
+
     // ------------    some defs needed ---------------
 
     JSObject * doCreateCollection( JSContext * cx , JSObject * db , const string& shortName );
 
     // ------------     utils          ------------------
-
 
     bool isSpecialName( const string& name ) {
         static set<string> names;
@@ -479,7 +491,7 @@ namespace mongo {
 
     JSBool mongo_insert(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval) {
         try {
-            smuassert( cx ,  "mongo_insert needs 2 args" , argc == 2 );
+            smuassert( cx ,  "mongo_insert needs 3 args" , argc == 3 );
             smuassert( cx ,  "2nd param to insert has to be an object" , JSVAL_IS_OBJECT( argv[1] ) );
 
             Convertor c( cx );
@@ -494,6 +506,8 @@ namespace mongo {
             string ns = c.toString( argv[0] );
 
             JSObject * insertObj = JSVAL_TO_OBJECT( argv[1] );
+
+            int flags = static_cast<int>( c.toNumber( argv[2] ) );
 
             if( JS_IsArrayObject( cx, insertObj ) ){
                 vector<BSONObj> bos;
@@ -511,7 +525,7 @@ namespace mongo {
                     bos.push_back( c.toObject( el ) );
                 }
 
-                conn->insert( ns, bos );
+                conn->insert( ns, bos, flags );
             }
             else {
                 BSONObj o = c.toObject( argv[1] );
@@ -1713,4 +1727,5 @@ zzz
 #endif
     }
 
-}
+}  // namespace spidermonkey
+}  // namespace mongo

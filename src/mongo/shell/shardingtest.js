@@ -3,7 +3,7 @@
  * will be fully operational after the execution of this constructor function.
  * 
  * @param {Object} testName Contains the key value pair for the cluster
- *   configuration. Accpeted keys are:
+ *   configuration. Accepted keys are:
  * 
  *   {
  *     name {string}: name for this test
@@ -274,6 +274,7 @@ ShardingTest = function( testName , numShards , verboseLevel , numMongos , other
         
         rs.getMaster().getDB( "admin" ).foo.save( { x : 1 } )
         rs.awaitReplication();
+        rs.awaitSecondaryNodes();
         
         var rsConn = new Mongo( rs.getURL() );
         rsConn.name = rs.getURL();

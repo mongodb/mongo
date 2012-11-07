@@ -21,6 +21,7 @@
 #include "mongo/db/oplog.h"
 #include "mongo/db/jsobjmanipulator.h"
 #include "mongo/db/pdfile.h"
+#include "mongo/util/mongoutils/str.h"
 
 #include "update_internal.h"
 
@@ -124,9 +125,22 @@ namespace mongo {
             }
 
             bb.append( elt );
-            ms.fixedOpName = "$set";
-            ms.forceEmptyArray = true;
-            ms.fixedArray = BSONArray(bb.done().getOwned());
+
+            // We don't want to log a positional $set for which the '_checkForAppending' test
+            // won't pass. If we're in that case, fall back to non-optimized logging.
+            if ( (elt.type() == Object && elt.embeddedObject().okForStorage()) ||
+                 (elt.type() != Object) ) {
+                ms.fixedOpName = "$set";
+                ms.forcePositional = true;
+                ms.position = bb.arrSize() - 1;
+                bb.done();
+            }
+            else {
+                ms.fixedOpName = "$set";
+                ms.forceEmptyArray = true;
+                ms.fixedArray = BSONArray( bb.done().getOwned() );
+            }
+
             break;
         }
 
@@ -157,30 +171,47 @@ namespace mongo {
                     }
                 }
 
+                ms.fixedOpName = "$set";
+                ms.forceEmptyArray = true;
+                ms.fixedArray = BSONArray(bb.done().getOwned());
             }
             else {
 
                 bool found = false;
-
+                int pos = 0;
+                int count = 0;
                 while ( i.more() ) {
                     BSONElement cur = i.next();
                     bb.append( cur );
-                    if ( elt.woCompare( cur , false ) == 0 )
+                    if ( elt.woCompare( cur , false ) == 0 ) {
                         found = true;
+                        pos = count;
+                    }
+                    count++;
                 }
 
-                if ( ! found )
+                if ( !found ) {
                     bb.append( elt );
+                }
 
+                // We don't want to log a positional $set for which the '_checkForAppending'
+                // test won't pass. If we're in that case, fall back to non-optimized logging.
+                if ( (elt.type() == Object && elt.embeddedObject().okForStorage()) ||
+                     (elt.type() != Object) ) {
+                    ms.fixedOpName = "$set";
+                    ms.forcePositional = true;
+                    ms.position = found ? pos : bb.arrSize() - 1;
+                    bb.done();
+                }
+                else {
+                    ms.fixedOpName = "$set";
+                    ms.forceEmptyArray = true;
+                    ms.fixedArray = BSONArray(bb.done().getOwned());
+                }
             }
 
-            ms.fixedOpName = "$set";
-            ms.forceEmptyArray = true;
-            ms.fixedArray = BSONArray(bb.done().getOwned());
             break;
         }
-
-
 
         case PUSH_ALL: {
             uassert( 10132 ,  "$pushAll can only be applied to an array" , in.type() == Array );
@@ -568,6 +599,10 @@ namespace mongo {
         else if ( ! fixedArray.isEmpty() || forceEmptyArray ) {
             bb.append( m->fieldName, fixedArray );
         }
+        else if ( forcePositional ) {
+            string positionalField = str::stream() << m->fieldName << "." << position;
+            bb.appendAs( m->elt, positionalField.c_str() );
+        }
         else {
             bb.appendAs( m->elt , m->fieldName );
         }
@@ -771,9 +806,34 @@ namespace mongo {
             switch ( cmp ) {
 
             case LEFT_SUBFIELD: { // Mod is embedded under this element
-                uassert( 10145,
-                         str::stream() << "LEFT_SUBFIELD only supports Object: " << field
-                         << " not: " << e.type() , e.type() == Object || e.type() == Array );
+
+                // SERVER-4781
+                bool isObjOrArr = e.type() == Object || e.type() == Array;
+                if ( ! isObjOrArr ) {
+                    if (m->second->m->strictApply) {
+                        uasserted( 10145,
+                                   str::stream() << "LEFT_SUBFIELD only supports Object: " << field
+                                   << " not: " << e.type() );
+                    }
+                    else {
+                        // Since we're not applying the mod, we keep what was there before
+                        builder.append( e );
+
+                        // Skip both as we're not applying this mod. Note that we'll advance
+                        // the iterator on the mod side for all the mods that are under the
+                        // root we are now.
+                        e = es.next();
+                        m++;
+                        while ( m != mend &&
+                                ( compareDottedFieldNames( m->second->m->fieldName,
+                                                           field,
+                                                           lexNumCmp ) == LEFT_SUBFIELD ) ) {
+                            m++;
+                        }
+                        continue;
+                    }
+                }
+
                 if ( onedownseen.count( e.fieldName() ) == 0 ) {
                     onedownseen.insert( e.fieldName() );
                     if ( e.type() == Object ) {
@@ -791,6 +851,11 @@ namespace mongo {
                     // inc both as we handled both
                     e = es.next();
                     m++;
+                    while ( m != mend &&
+                            ( compareDottedFieldNames( m->second->m->fieldName , field , lexNumCmp ) ==
+                              LEFT_SUBFIELD ) ) {
+                        m++;
+                    }
                 }
                 else {
                     massert( 16069 , "ModSet::createNewFromMods - "
@@ -866,7 +931,7 @@ namespace mongo {
                     // we have something like { x : { $gt : 5 } }
                     // this can be a query piece
                     // or can be a dbref or something
-                    
+
                     int op = e.embeddedObject().firstElement().getGtLtOp( -1 );
                     if ( op >= 0 ) {
                         // this means this is a $gt type filter, so don't make part of the new object
@@ -902,7 +967,8 @@ namespace mongo {
     ModSet::ModSet(
         const BSONObj& from ,
         const set<string>& idxKeys,
-        const set<string>* backgroundKeys)
+        const set<string>* backgroundKeys,
+        bool forReplication)
         : _isIndexed(0) , _hasDynamicArray( false ) {
 
         BSONObjIterator it(from);
@@ -991,13 +1057,13 @@ namespace mongo {
                              strstr( target , ".$" ) == 0 );
 
                     Mod from;
-                    from.init( Mod::RENAME_FROM, f );
+                    from.init( Mod::RENAME_FROM, f , forReplication );
                     from.setFieldName( fieldName );
                     updateIsIndexed( from, idxKeys, backgroundKeys );
                     _mods[ from.fieldName ] = from;
 
                     Mod to;
-                    to.init( Mod::RENAME_TO, f );
+                    to.init( Mod::RENAME_TO, f , forReplication );
                     to.setFieldName( target );
                     updateIsIndexed( to, idxKeys, backgroundKeys );
                     _mods[ to.fieldName ] = to;
@@ -1009,7 +1075,7 @@ namespace mongo {
                 _hasDynamicArray = _hasDynamicArray || strstr( fieldName , ".$" ) > 0;
 
                 Mod m;
-                m.init( op , f );
+                m.init( op , f , forReplication );
                 m.setFieldName( f.fieldName() );
                 updateIsIndexed( m, idxKeys, backgroundKeys );
                 _mods[m.fieldName] = m;

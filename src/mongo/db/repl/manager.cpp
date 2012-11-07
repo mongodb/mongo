@@ -252,7 +252,7 @@ namespace mongo {
                 int ll = 0;
                 if( ++n > 5 ) ll++;
                 if( last + 60 > time(0 ) ) ll++;
-                log(ll) << "replSet can't see a majority, will not try to elect self" << rsLog;
+                LOG(ll) << "replSet can't see a majority, will not try to elect self" << rsLog;
                 last = time(0);
                 return;
             }

@@ -46,7 +46,11 @@ namespace mongo {
     bool replSet = false;
     ReplSet *theReplSet = 0;
 
-    bool isCurrentlyAReplSetPrimary() { 
+    // This is a bitmask with the first bit set. It's used to mark connections that should be kept
+    // open during stepdowns
+    const unsigned ScopedConn::keepOpen = 1;
+
+    bool isCurrentlyAReplSetPrimary() {
         return theReplSet && theReplSet->isPrimary();
     }
 
@@ -75,7 +79,7 @@ namespace mongo {
         }
         if( !s.empty() ) {
             lastLogged = _hbmsgTime;
-            log(logLevel) << "replSet " << s << rsLog;
+            LOG(logLevel) << "replSet " << s << rsLog;
         }
     }
 
@@ -164,7 +168,7 @@ namespace mongo {
                    with "not master" (of course client could check result code, but in case they are not)
                 */
                 log() << "replSet closing client sockets after relinquishing primary" << rsLog;
-                MessagingPort::closeAllSockets(1);
+                MessagingPort::closeAllSockets(ScopedConn::keepOpen);
             }
 
             // now that all connections were closed, strip this mongod from all sharding details
@@ -350,7 +354,7 @@ namespace mongo {
                 seedSet.insert(m);
                 //uassert(13101, "can't use localhost in replset host list", !m.isLocalHost());
                 if( m.isSelf() ) {
-                    log(1) << "replSet ignoring seed " << m.toString() << " (=self)" << rsLog;
+                    LOG(1) << "replSet ignoring seed " << m.toString() << " (=self)" << rsLog;
                 }
                 else
                     seeds.push_back(m);
@@ -551,6 +555,13 @@ namespace mongo {
                 additive = false;
         }
 
+        // If we are changing chaining rules, we don't want this to be an additive reconfig so that
+        // the primary can step down and the sync targets change.
+        // TODO: This can be removed once SERVER-5208 is fixed.
+        if (reconf && config().chainingAllowed() != c.chainingAllowed()) {
+            additive = false;
+        }
+
         _cfg = new ReplSetConfig(c);
         dassert( &config() == _cfg ); // config() is same thing but const, so we use that when we can for clarity below
         verify( config().ok() );
@@ -645,7 +656,7 @@ namespace mongo {
         int n = 0;
         for( vector<ReplSetConfig*>::iterator i = cfgs.begin(); i != cfgs.end(); i++ ) {
             ReplSetConfig* cfg = *i;
-            DEV log(1) << n+1 << " config shows version " << cfg->version << rsLog;
+            DEV LOG(1) << n+1 << " config shows version " << cfg->version << rsLog;
             if( ++n == 1 ) myVersion = cfg->version;
             if( cfg->ok() && cfg->version > v ) {
                 highest = cfg;
@@ -673,7 +684,7 @@ namespace mongo {
             try {
                 OwnedPointerVector<ReplSetConfig> configs;
                 try {
-                    configs.vector().push_back( ReplSetConfig::make(HostAndPort::me()) );
+                    configs.vector().push_back(ReplSetConfig::makeDirect());
                 }
                 catch(DBException& e) {
                     log() << "replSet exception loading our local replset configuration object : " << e.toString() << rsLog;
@@ -696,7 +707,7 @@ namespace mongo {
                                 configs.vector().push_back( ReplSetConfig::make(HostAndPort(*i)) );
                             }
                             catch( DBException& ) {
-                                log(1) << "replSet exception trying to load config from discovered seed " << *i << rsLog;
+                                LOG(1) << "replSet exception trying to load config from discovered seed " << *i << rsLog;
                                 replSettings.discoveredSeeds.erase(*i);
                             }
                         }

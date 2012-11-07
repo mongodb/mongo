@@ -17,7 +17,7 @@
 
 #pragma once
 
-#include <iostream>
+#include <iosfwd>
 
 namespace mongo {
 

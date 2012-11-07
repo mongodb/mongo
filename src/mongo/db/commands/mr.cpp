@@ -1,6 +1,7 @@
 // mr.cpp
 
 /**
+ *    Copyright (C) 2012 10gen Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -665,7 +666,7 @@ namespace mongo {
         }
 
         void State::bailFromJS() {
-            log(1) << "M/R: Switching from JS mode to mixed mode" << endl;
+            LOG(1) << "M/R: Switching from JS mode to mixed mode" << endl;
 
             // reduce and reemit into c++
             switchMode(false);
@@ -823,7 +824,7 @@ namespace mongo {
             {
                 dbtempreleasecond tl;
                 if ( ! tl.unlocked() )
-                    log( LL_WARNING ) << "map/reduce can't temp release" << endl;
+                    LOG( LL_WARNING ) << "map/reduce can't temp release" << endl;
                 // reduce and finalize last array
                 finalReduce( all );
             }
@@ -933,7 +934,7 @@ namespace mongo {
                     // reduce now to lower mem usage
                     Timer t;
                     _scope->invoke(_reduceAll, 0, 0, 0, true);
-                    log(1) << "  MR - did reduceAll: keys=" << keyCt << " dups=" << dupCt << " newKeys=" << _scope->getNumberInt("_keyCt") << " time=" << t.millis() << "ms" << endl;
+                    LOG(1) << "  MR - did reduceAll: keys=" << keyCt << " dups=" << dupCt << " newKeys=" << _scope->getNumberInt("_keyCt") << " time=" << t.millis() << "ms" << endl;
                     return;
                 }
             }
@@ -946,12 +947,12 @@ namespace mongo {
                 long oldSize = _size;
                 Timer t;
                 reduceInMemory();
-                log(1) << "  MR - did reduceInMemory: size=" << oldSize << " dups=" << _dupCount << " newSize=" << _size << " time=" << t.millis() << "ms" << endl;
+                LOG(1) << "  MR - did reduceInMemory: size=" << oldSize << " dups=" << _dupCount << " newSize=" << _size << " time=" << t.millis() << "ms" << endl;
 
                 // if size is still high, or values are not reducing well, dump
                 if ( _onDisk && (_size > _config.maxInMemSize || _size > oldSize / 2) ) {
                     dumpToInc();
-                    log(1) << "  MR - dumping to db" << endl;
+                    LOG(1) << "  MR - dumping to db" << endl;
                 }
             }
         }
@@ -1021,7 +1022,7 @@ namespace mongo {
 
                 Config config( dbname , cmd );
 
-                log(1) << "mr ns: " << config.ns << endl;
+                LOG(1) << "mr ns: " << config.ns << endl;
 
                 uassert( 16149 , "cannot run map reduce without the js engine", globalScriptEngine );
 

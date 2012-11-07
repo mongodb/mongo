@@ -45,7 +45,7 @@ namespace replset {
          * batching, this may end up applying ops beyond minValidObj's ts.
          *
          * @param applyGTEObj the op to start replicating at.  This is actually not used except in
-         *                    comparision to minValidObj: the background sync thread keeps its own
+         *                    comparison to minValidObj: the background sync thread keeps its own
          *                    record of where we're synced to and starts providing ops from that
          *                    point.
          * @param minValidObj the op to finish syncing at.  This function cannot return (other than

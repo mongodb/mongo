@@ -127,7 +127,7 @@ class Import : public Tool {
 
             uassert(16329, str::stream() << "read error, or input line too long (max length: "
                     << BUF_SIZE << ")", !(in->rdstate() & ios_base::failbit));
-            log(1) << "got line:" << buf << endl;
+            LOG(1) << "got line:" << buf << endl;
         }
         uassert( 10263 ,  "unknown error reading file" ,
                  (!(in->rdstate() & ios_base::badbit)) &&
@@ -291,9 +291,29 @@ public:
         _doimport = true;
         _jsonArray = false;
     }
-
+    ;
     virtual void printExtraHelp( ostream & out ) {
         out << "Import CSV, TSV or JSON data into MongoDB.\n" << endl;
+    }
+
+    unsigned long long lastErrorFailures;
+
+    /** @return true if ok */
+    bool checkLastError() { 
+        string s = conn().getLastError();
+        if( !s.empty() ) { 
+            if( str::contains(s,"uplicate") ) {
+                // we don't want to return an error from the mongoimport process for
+                // dup key errors
+                log() << s << endl;
+            }
+            else {
+                lastErrorFailures++;
+                log() << "error: " << s << endl;
+                return false;
+            }
+        }
+        return true;
     }
 
     int run() {
@@ -329,7 +349,7 @@ public:
             return -1;
         }
 
-        log(1) << "ns: " << ns << endl;
+        LOG(1) << "ns: " << ns << endl;
 
         auth();
 
@@ -391,10 +411,12 @@ public:
         }
 
         time_t start = time(0);
-        log(1) << "filesize: " << fileSize << endl;
+        LOG(1) << "filesize: " << fileSize << endl;
         ProgressMeter pm( fileSize );
         int num = 0;
+        int lastNumChecked = num;
         int errors = 0;
+        lastErrorFailures = 0;
         int len = 0;
         // buffer and line are only used when parsing a jsonArray
         boost::scoped_array<char> buffer(new char[BUF_SIZE+2]);
@@ -446,6 +468,13 @@ public:
                     else {
                         conn().insert( ns.c_str() , o );
                     }
+
+                    if( num < 10 ) { 
+                        // we absolutely want to check the first and last op of the batch. we do 
+                        // a few more as that won't be too time expensive.
+                        checkLastError();
+                        lastNumChecked = num;
+                    }
                 }
 
                 num++;
@@ -464,14 +493,23 @@ public:
             }
         }
 
-        log() << "imported " << ( num - headerRows ) << " objects" << endl;
+        // this is for two reasons: to wait for all operations to reach the server and be processed, and this will wait until all data reaches the server,
+        // and secondly to check if there were an error (on the last op)
+        if( lastNumChecked+1 != num ) { // avoid redundant log message if already reported above
+            log() << "check " << lastNumChecked << " " << num << endl;
+            checkLastError();
+        }
 
-        conn().getLastError();
+        bool hadErrors = lastErrorFailures || errors;
 
-        if ( errors == 0 )
+        // the message is vague on lastErrorFailures as we don't call it on every single operation. 
+        // so if we have a lastErrorFailure there might be more than just what has been counted.
+        log() << (lastErrorFailures ? "tried to import " : "imported ") << ( num - headerRows ) << " objects" << endl;
+
+        if ( !hadErrors )
             return 0;
 
-        error() << "encountered " << errors << " error" << ( errors == 1 ? "" : "s" ) << endl;
+        error() << "encountered " << (lastErrorFailures?"at least ":"") << lastErrorFailures+errors <<  " error(s)" << ( lastErrorFailures+errors == 1 ? "" : "s" ) << endl;
         return -1;
     }
 };

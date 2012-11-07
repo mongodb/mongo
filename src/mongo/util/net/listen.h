@@ -107,51 +107,6 @@ namespace mongo {
         static void checkTicketNumbers();
     };
 
-    /**
-     * keep track of elapsed time
-     * after a set amount of time, tells you to do something
-     * only in this file because depends on Listener
-     */
-    class ElapsedTracker {
-    public:
-        ElapsedTracker( int hitsBetweenMarks , int msBetweenMarks )
-            : _h( hitsBetweenMarks ) , _ms( msBetweenMarks ) , _pings(0) {
-            _last = Listener::getElapsedTimeMillis();
-        }
-
-        /**
-         * call this for every iteration
-         * returns true if one of the triggers has gone off
-         */
-        bool intervalHasElapsed() {
-            if ( ( ++_pings % _h ) == 0 ) {
-                _last = Listener::getElapsedTimeMillis();
-                return true;
-            }
-
-            long long now = Listener::getElapsedTimeMillis();
-            if ( now - _last > _ms ) {
-                _last = now;
-                return true;
-            }
-
-            return false;
-        }
-
-        void resetLastTime() {
-            _last = Listener::getElapsedTimeMillis();
-        }
-        
-    private:
-        const int _h;
-        const int _ms;
-
-        unsigned long long _pings;
-
-        long long _last;
-
-    };
-
     class ListeningSockets {
     public:
         ListeningSockets()

@@ -263,10 +263,9 @@ namespace mongo {
 
     /** allocate space for a new record from deleted lists.
         @param lenToAlloc is WITH header
-        @param extentLoc OUT returns the extent location
         @return null diskloc if no room - allocate a new extent then
     */
-    DiskLoc NamespaceDetails::alloc(const char *ns, int lenToAlloc, DiskLoc& extentLoc) {
+    DiskLoc NamespaceDetails::alloc(const char* ns, int lenToAlloc) {
         {
             // align very slightly.  
             // note that if doing more coarse-grained quantization (really just if it isn't always
@@ -286,10 +285,9 @@ namespace mongo {
         /* note we want to grab from the front so our next pointers on disk tend
         to go in a forward direction which is important for performance. */
         int regionlen = r->lengthWithHeaders();
-        extentLoc.set(loc.a(), r->extentOfs());
         verify( r->extentOfs() < loc.getOfs() );
 
-        DEBUGGING out() << "TEMP: alloc() returns " << loc.toString() << ' ' << ns << " lentoalloc:" << lenToAlloc << " ext:" << extentLoc.toString() << endl;
+        DEBUGGING out() << "TEMP: alloc() returns " << loc.toString() << ' ' << ns << " lentoalloc:" << lenToAlloc << endl;
 
         int left = regionlen - lenToAlloc;
         if ( ! isCapped() ) {
@@ -303,8 +301,8 @@ namespace mongo {
         getDur().writingInt(r->lengthWithHeaders()) = lenToAlloc;
         DiskLoc newDelLoc = loc;
         newDelLoc.inc(lenToAlloc);
-        DeletedRecord *newDel = DataFileMgr::makeDeletedRecord(newDelLoc, left);
-        DeletedRecord *newDelW = getDur().writing(newDel);
+        DeletedRecord* newDel = DataFileMgr::getDeletedRecord(newDelLoc);
+        DeletedRecord* newDelW = getDur().writing(newDel);
         newDelW->extentOfs() = r->extentOfs();
         newDelW->lengthWithHeaders() = left;
         newDelW->nextDeleted().Null();
@@ -617,8 +615,7 @@ namespace mongo {
 
     SimpleMutex NamespaceDetailsTransient::_qcMutex("qc");
     SimpleMutex NamespaceDetailsTransient::_isMutex("is");
-    map< string, shared_ptr< NamespaceDetailsTransient > > NamespaceDetailsTransient::_nsdMap;
-    typedef map< string, shared_ptr< NamespaceDetailsTransient > >::iterator ouriter;
+    NamespaceDetailsTransient::DMap NamespaceDetailsTransient::_nsdMap;
 
     void NamespaceDetailsTransient::reset() {
         Lock::assertWriteLocked(_ns); 
@@ -627,8 +624,15 @@ namespace mongo {
         _indexSpecs.clear();
     }
 
-    /*static*/ NOINLINE_DECL NamespaceDetailsTransient& NamespaceDetailsTransient::make_inlock(const char *ns) {
-        shared_ptr< NamespaceDetailsTransient > &t = _nsdMap[ ns ];
+    NamespaceDetailsTransient::CMap& NamespaceDetailsTransient::get_cmap_inlock(const string& ns) {
+        CMap*& m = _nsdMap[ns];
+        if ( ! m )
+            m = new CMap();
+        return *m;
+    }
+
+    /*static*/ NOINLINE_DECL NamespaceDetailsTransient& NamespaceDetailsTransient::make_inlock(const string& ns) {
+        shared_ptr< NamespaceDetailsTransient > &t = get_cmap_inlock(ns)[ ns ];
         verify( t.get() == 0 );
         Database *database = cc().database();
         verify( database );
@@ -644,7 +648,7 @@ namespace mongo {
     // note with repair there could be two databases with the same ns name.
     // that is NOT handled here yet!  TODO
     // repair may not use nsdt though not sure.  anyway, requires work.
-    NamespaceDetailsTransient::NamespaceDetailsTransient(Database *db, const char *ns) : 
+    NamespaceDetailsTransient::NamespaceDetailsTransient(Database *db, const string& ns) : 
         _ns(ns), _keysComputed(false), _qcWriteCount() 
     {
         dassert(db);
@@ -652,34 +656,30 @@ namespace mongo {
 
     NamespaceDetailsTransient::~NamespaceDetailsTransient() { 
     }
-
-    void NamespaceDetailsTransient::clearForPrefix(const char *prefix) {
+    
+    void NamespaceDetailsTransient::resetCollection(const string& ns ) {
         SimpleMutex::scoped_lock lk(_qcMutex);
-        vector< string > found;
-        for( ouriter i = _nsdMap.begin(); i != _nsdMap.end(); ++i ) {
-            if ( strncmp( i->first.c_str(), prefix, strlen( prefix ) ) == 0 ) {
-                found.push_back( i->first );
-                Lock::assertWriteLocked(i->first);
-            }
-        }
-        for( vector< string >::iterator i = found.begin(); i != found.end(); ++i ) {
-            _nsdMap[ *i ].reset();
+        Lock::assertWriteLocked(ns);
+        get_cmap_inlock(ns)[ns].reset();
+    }
+        
+    void NamespaceDetailsTransient::eraseDB(const string& db) {
+        SimpleMutex::scoped_lock lk(_qcMutex);
+        Lock::assertWriteLocked(db);
+        
+        DMap::iterator i = _nsdMap.find( db );
+        if ( i != _nsdMap.end() ) {
+            delete i->second;
+            _nsdMap.erase( i );
         }
     }
-
-    void NamespaceDetailsTransient::eraseForPrefix(const char *prefix) {
+    
+    void NamespaceDetailsTransient::eraseCollection(const string& ns) {
         SimpleMutex::scoped_lock lk(_qcMutex);
-        vector< string > found;
-        for( ouriter i = _nsdMap.begin(); i != _nsdMap.end(); ++i ) {
-            if ( strncmp( i->first.c_str(), prefix, strlen( prefix ) ) == 0 ) {
-                found.push_back( i->first );
-                Lock::assertWriteLocked(i->first);
-            }
-        }
-        for( vector< string >::iterator i = found.begin(); i != found.end(); ++i ) {
-            _nsdMap.erase(*i);
-        }
+        Lock::assertWriteLocked(ns);
+        get_cmap_inlock(ns).erase(ns);
     }
+
 
     void NamespaceDetailsTransient::computeIndexKeys() {
         _indexKeys.clear();
@@ -802,7 +802,7 @@ namespace mongo {
         // index details across commands are in cursors and nsd
         // transient (including query cache) so clear these.
         ClientCursor::invalidate( from );
-        NamespaceDetailsTransient::eraseForPrefix( from );
+        NamespaceDetailsTransient::eraseCollection( from );
 
         NamespaceDetails *details = ni->details( from );
         ni->add_ns( to, *details );

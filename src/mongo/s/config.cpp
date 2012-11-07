@@ -17,37 +17,29 @@
 */
 
 #include "pch.h"
-#include "../util/net/message.h"
-#include "../util/stringutils.h"
-#include "../client/connpool.h"
-#include "../client/model.h"
-#include "mongo/client/dbclientcursor.h"
-#include "../db/pdfile.h"
-#include "../db/cmdline.h"
 
-
-#include "chunk.h"
-#include "config.h"
-#include "grid.h"
-#include "server.h"
 #include "pcrecpp.h"
+
+#include "mongo/client/connpool.h"
+#include "mongo/client/dbclientcursor.h"
+#include "mongo/client/model.h"
+#include "mongo/db/pdfile.h"
+#include "mongo/db/cmdline.h"
+#include "mongo/s/chunk.h"
+#include "mongo/s/cluster_constants.h"
+#include "mongo/s/config.h"
+#include "mongo/s/grid.h"
+#include "mongo/s/server.h"
+#include "mongo/util/net/message.h"
+#include "mongo/util/stringutils.h"
 
 namespace mongo {
 
     int ConfigServer::VERSION = 3;
     Shard Shard::EMPTY;
 
-    string ShardNS::shard = "config.shards";
-    string ShardNS::database = "config.databases";
-    string ShardNS::collection = "config.collections";
-    string ShardNS::chunk = "config.chunks";
-    string ShardNS::tags = "config.tags";
-
     string ShardNS::mongos = "config.mongos";
     string ShardNS::settings = "config.settings";
-
-    BSONField<bool>      ShardFields::draining("draining");
-    BSONField<long long> ShardFields::maxSize ("maxSize");
 
     OID serverID;
 
@@ -55,9 +47,9 @@ namespace mongo {
 
     DBConfig::CollectionInfo::CollectionInfo( const BSONObj& in ) {
         _dirty = false;
-        _dropped = in["dropped"].trueValue();
+        _dropped = in[CollectionFields::dropped()].trueValue();
 
-        if ( in["key"].isABSONObj() ) {
+        if ( in[CollectionFields::key()].isABSONObj() ) {
             shard( new ChunkManager( in ) );
         }
 
@@ -99,13 +91,13 @@ namespace mongo {
         BSONObj key = BSON( "_id" << ns );
 
         BSONObjBuilder val;
-        val.append( "_id" , ns );
-        val.appendDate( "lastmod" , time(0) );
-        val.appendBool( "dropped" , _dropped );
+        val.append(CollectionFields::name(), ns);
+        val.appendDate(CollectionFields::lastmod(), time(0));
+        val.appendBool(CollectionFields::dropped(), _dropped);
         if ( _cm )
             _cm->getInfo( val );
 
-        conn->update( ShardNS::collection , key , val.obj() , true );
+        conn->update(ConfigNS::collection, key, val.obj(), true);
         string err = conn->getLastError();
         uassert( 13473 , (string)"failed to save collection (" + ns + "): " + err , err.size() == 0 );
 
@@ -329,12 +321,12 @@ namespace mongo {
         if ( oldVersion.isSet() && ! forceReload ) {
             scoped_ptr<ScopedDbConnection> conn( ScopedDbConnection::getInternalScopedDbConnection(
                     configServer.modelServer(), 30.0 ) );
-            newest = conn->get()->findOne( ShardNS::chunk ,
-                                           Query( BSON( "ns" << ns ) ).sort( "lastmod" , -1 ) );
+            newest = conn->get()->findOne(ConfigNS::chunk,
+                                          Query(BSON(ChunkFields::ns(ns))).sort(ChunkFields::lastmod(), -1));
             conn->done();
             
             if ( ! newest.isEmpty() ) {
-                ShardChunkVersion v = ShardChunkVersion::fromBSON( newest, "lastmod" );
+                ShardChunkVersion v = ShardChunkVersion::fromBSON(newest, ChunkFields::lastmod());
                 if ( v.isEquivalentTo( oldVersion ) ) {
                     scoped_lock lk( _lock );
                     CollectionInfo& ci = _collections[ns];
@@ -365,7 +357,7 @@ namespace mongo {
                 if ( ci.isSharded() && ci.getCM() ) {
 
                     ShardChunkVersion currentVersion =
-                            ShardChunkVersion::fromBSON( newest, "lastmod" );
+                        ShardChunkVersion::fromBSON(newest, ChunkFields::lastmod());
 
                     // Only reload if the version we found is newer than our own in the same
                     // epoch
@@ -435,21 +427,21 @@ namespace mongo {
 
     void DBConfig::serialize(BSONObjBuilder& to) {
         to.append("_id", _name);
-        to.appendBool("partitioned", _shardingEnabled );
-        to.append("primary", _primary.getName() );
+        to.appendBool(DatabaseFields::partitioned(), _shardingEnabled );
+        to.append(DatabaseFields::primary(), _primary.getName() );
     }
 
     void DBConfig::unserialize(const BSONObj& from) {
         LOG(1) << "DBConfig unserialize: " << _name << " " << from << endl;
-        verify( _name == from["_id"].String() );
+        verify( _name == from[DatabaseFields::name()].String() );
 
-        _shardingEnabled = from.getBoolField("partitioned");
-        _primary.reset( from.getStringField("primary") );
+        _shardingEnabled = from.getBoolField(DatabaseFields::partitioned().c_str());
+        _primary.reset( from.getStringField(DatabaseFields::primary().c_str()));
 
         // In the 1.5.x series, we used to have collection metadata nested in the database entry. The 1.6.x series
         // had migration code that ported that info to where it belongs now: the 'collections' collection. We now
         // just assert that we're not migrating from a 1.5.x directly into a 1.7.x without first converting.
-        BSONObj sharded = from.getObjectField( "sharded" );
+        BSONObj sharded = from.getObjectField(DatabaseFields::DEPRECATED_sharded().c_str());
         if ( ! sharded.isEmpty() )
             uasserted( 13509 , "can't migrate from 1.5.x release to the current one; need to upgrade to 1.6.x first");
     }
@@ -463,34 +455,36 @@ namespace mongo {
         scoped_ptr<ScopedDbConnection> conn( ScopedDbConnection::getInternalScopedDbConnection(
                 configServer.modelServer(), 30.0 ) );
 
-        BSONObj o = conn->get()->findOne( ShardNS::database , BSON( "_id" << _name ) );
+        BSONObj dbObj = conn->get()->findOne( ConfigNS::database,
+                                              BSON( DatabaseFields::name( _name ) ) );
 
-        if ( o.isEmpty() ) {
+        if ( dbObj.isEmpty() ) {
             conn->done();
             return false;
         }
 
-        unserialize( o );
+        unserialize( dbObj );
 
         BSONObjBuilder b;
-        b.appendRegex( "_id" , (string)"^" + pcrecpp::RE::QuoteMeta( _name ) + "\\." );
+        b.appendRegex(CollectionFields::name(),
+                      (string)"^" + pcrecpp::RE::QuoteMeta( _name ) + "\\." );
 
         int numCollsErased = 0;
         int numCollsSharded = 0;
 
-        auto_ptr<DBClientCursor> cursor = conn->get()->query( ShardNS::collection, b.obj() );
+        auto_ptr<DBClientCursor> cursor = conn->get()->query(ConfigNS::collection, b.obj());
         verify( cursor.get() );
         while ( cursor->more() ) {
 
-            BSONObj o = cursor->next();
-            string collName = o["_id"].String();
+            BSONObj collObj = cursor->next();
+            string collName = collObj[CollectionFields::name()].String();
 
-            if( o["dropped"].trueValue() ){
+            if( collObj[CollectionFields::dropped()].trueValue() ){
                 _collections.erase( collName );
                 numCollsErased++;
             }
             else{
-                _collections[ collName ] = CollectionInfo( o );
+                _collections[ collName ] = CollectionInfo( collObj );
                 if( _collections[ collName ].isSharded() ) numCollsSharded++;
             }
         }
@@ -516,7 +510,7 @@ namespace mongo {
                 n = b.obj();
             }
 
-            conn->get()->update( ShardNS::database , BSON( "_id" << _name ) , n , true );
+            conn->get()->update( ConfigNS::database , BSON( DatabaseFields::name( _name ) ) , n , true );
             string err = conn->get()->getLastError();
             uassert( 13396 , (string)"DBConfig save failed: " + err , err.size() == 0 );
 
@@ -581,7 +575,7 @@ namespace mongo {
         {
             scoped_ptr<ScopedDbConnection> conn( ScopedDbConnection::getInternalScopedDbConnection(
                     configServer.modelServer(), 30.0 ) );
-            conn->get()->remove( ShardNS::database , BSON( "_id" << _name ) );
+            conn->get()->remove( ConfigNS::database , BSON( DatabaseFields::name( _name ) ) );
             errmsg = conn->get()->getLastError();
             if ( ! errmsg.empty() ) {
                 log() << "could not drop '" << _name << "': " << errmsg << endl;
@@ -809,7 +803,7 @@ namespace mongo {
         }
 
         if ( up == 1 ) {
-            log( LL_WARNING ) << "only 1 config server reachable, continuing" << endl;
+            LOG( LL_WARNING ) << "only 1 config server reachable, continuing" << endl;
             return true;
         }
 
@@ -829,7 +823,7 @@ namespace mongo {
 
             stringstream ss;
             ss << "config servers " << _config[firstGood] << " and " << _config[i] << " differ";
-            log( LL_WARNING ) << ss.str() << endl;
+            LOG( LL_WARNING ) << ss.str() << endl;
             if ( tries <= 1 ) {
                 ss << "\n" << c1 << "\t" << c2 << "\n" << d1 << "\t" << d2;
                 errmsg = ss.str();
@@ -849,7 +843,7 @@ namespace mongo {
         if ( checkConsistency ) {
             string errmsg;
             if ( ! checkConfigServersConsistent( errmsg ) ) {
-                log( LL_ERROR ) << "config servers not in sync! " << errmsg << warnings;
+                LOG( LL_ERROR ) << "config servers not in sync! " << errmsg << warnings;
                 return false;
             }
         }
@@ -897,7 +891,7 @@ namespace mongo {
             uassert( 10189 ,  "should only have 1 thing in config.version" , ! c->more() );
         }
         else {
-            if ( conn.count( ShardNS::shard ) || conn.count( ShardNS::database ) ) {
+            if ( conn.count(ConfigNS::shard) || conn.count( ConfigNS::database ) ) {
                 version = 1;
             }
         }
@@ -949,12 +943,19 @@ namespace mongo {
             }
 
             // indexes
-            conn->get()->ensureIndex( ShardNS::chunk, BSON( "ns" << 1 << "min" << 1 ), true );
-            conn->get()->ensureIndex( ShardNS::chunk,
-                                      BSON( "ns" << 1 << "shard" << 1 << "min" << 1 ),
-                                      true );
-            conn->get()->ensureIndex( ShardNS::chunk, BSON( "ns" << 1 << "lastmod" << 1 ), true );
-            conn->get()->ensureIndex( ShardNS::shard, BSON( "host" << 1 ), true );
+            conn->get()->ensureIndex(ConfigNS::chunk,
+                                     BSON(ChunkFields::ns() << 1 << ChunkFields::min() << 1 ), true);
+
+            conn->get()->ensureIndex(ConfigNS::chunk,
+                                     BSON(ChunkFields::ns() << 1 <<
+                                          ChunkFields::shard() << 1 <<
+                                          ChunkFields::min() << 1 ), true);
+
+            conn->get()->ensureIndex(ConfigNS::chunk,
+                                     BSON(ChunkFields::ns() << 1 <<
+                                          ChunkFields::lastmod() << 1 ), true );
+
+            conn->get()->ensureIndex(ConfigNS::shard, BSON(ShardFields::host() << 1), true);
 
             conn->done();
         }
@@ -1030,14 +1031,15 @@ namespace mongo {
         try {
             Shard s = Shard::lookupRSName(monitor->getName());
             if (s == Shard::EMPTY) {
-                log(1) << "replicaSetChange: shard not found for set: " << monitor->getServerAddress() << endl;
+                LOG(1) << "replicaSetChange: shard not found for set: " << monitor->getServerAddress() << endl;
                 return;
             }
             scoped_ptr<ScopedDbConnection> conn( ScopedDbConnection::getScopedDbConnection(
                     configServer.getConnectionString().toString(), 30.0 ) );
-            conn->get()->update( ShardNS::shard,
-                                 BSON( "_id" << s.getName() ),
-                                 BSON( "$set" << BSON( "host" << monitor->getServerAddress() ) ) );
+            conn->get()->update(ConfigNS::shard,
+                                BSON(ShardFields::name(s.getName())),
+                                BSON("$set" <<
+                                     BSON(ShardFields::host(monitor->getServerAddress()))));
             conn->done();
         }
         catch ( DBException & ) {

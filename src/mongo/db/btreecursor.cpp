@@ -90,7 +90,7 @@ namespace mongo {
                 //++_nscanned;
             }
             if ( u > 10 )
-                OCCASIONALLY log() << "btree unused skipped:" << u << '\n';
+                OCCASIONALLY log() << "btree unused skipped:" << u << endl;
             return u;
         }
 
@@ -239,9 +239,13 @@ namespace mongo {
         return c.release();
     }
 
-    BtreeCursor::BtreeCursor( NamespaceDetails* nsd , int theIndexNo, const IndexDetails& id ) 
-        : d( nsd ) , idxNo( theIndexNo ) , indexDetails( id ) , _ordering(Ordering::make(BSONObj())){
-        _nscanned = 0;
+    BtreeCursor::BtreeCursor( NamespaceDetails* nsd, int theIndexNo, const IndexDetails& id ) :
+        d( nsd ),
+        idxNo( theIndexNo ),
+        indexDetails( id ),
+        _ordering( Ordering::make( BSONObj() ) ),
+        _boundsMustMatch( true ),
+        _nscanned() {
     }
 
     void BtreeCursor::_finishConstructorInit() {
@@ -304,8 +308,17 @@ namespace mongo {
                 break;
             }
             do {
+                // If nscanned is increased by more than 20 before a matching key is found, abort
+                // skipping through the btree to find a matching key.  This iteration cutoff
+                // prevents unbounded internal iteration within BtreeCursor::init() and
+                // BtreeCursor::advance() (the callers of skipAndCheck()).  See SERVER-3448.
                 if ( _nscanned > startNscanned + 20 ) {
                     skipUnusedKeys();
+                    // If iteration is aborted before a key matching _bounds is identified, the
+                    // cursor may be left pointing at a key that is not within bounds
+                    // (_bounds->matchesKey( currKey() ) may be false).  Set _boundsMustMatch to
+                    // false accordingly.
+                    _boundsMustMatch = false;
                     return;
                 }
             } while( skipOutOfRangeKeysAndCheckEnd() );
@@ -357,6 +370,9 @@ namespace mongo {
     }
 
     bool BtreeCursor::advance() {
+        // Reset this flag at the start of a new iteration.
+        _boundsMustMatch = true;
+
         killCurrentOp.checkForInterrupt();
         if ( bucket.isNull() )
             return false;
@@ -398,7 +414,17 @@ namespace mongo {
         else {
             return _bounds->obj();
         }
-    }    
+    }
+
+    bool BtreeCursor::currentMatches( MatchDetails* details ) {
+        // If currKey() might not match the specified _bounds, check whether or not it does.
+        if ( !_boundsMustMatch && _bounds && !_bounds->matchesKey( currKey() ) ) {
+            // If the key does not match _bounds, it does not match the query.
+            return false;
+        }
+        // Forward to the base class implementation, which may utilize a Matcher.
+        return Cursor::currentMatches( details );
+    }
 
     /* ----------------------------------------------------------------------------- */
 

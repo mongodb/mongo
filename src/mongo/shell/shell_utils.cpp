@@ -124,12 +124,18 @@ namespace mongo {
 #endif
         }
 
+        BSONObj interpreterVersion(const BSONObj& a, void* data) {
+            uassert( 16453, "interpreterVersion accepts no arguments", a.nFields() == 0 );
+            return BSON( "" << globalScriptEngine->getInterpreterVersionString() );
+        }
+
         void installShellUtils( Scope& scope ) {
             scope.injectNative( "quit", Quit );
             scope.injectNative( "getMemInfo" , JSGetMemInfo );
             scope.injectNative( "_srand" , JSSrand );
             scope.injectNative( "_rand" , JSRand );
             scope.injectNative( "_isWindows" , isWindows );
+            scope.injectNative( "interpreterVersion", interpreterVersion );
 
 #ifndef MONGO_SAFE_SHELL
             //can't launch programs

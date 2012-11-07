@@ -15,12 +15,9 @@
  *    limitations under the License.
  */
 
-#include "pch.h"
-#include "sock.h"
-#include "../background.h"
-#include "../concurrency/value.h"
-#include "../mongoutils/str.h"
-#include "../../db/cmdline.h"
+#include "mongo/pch.h"
+
+#include "mongo/util/net/sock.h"
 
 #if !defined(_WIN32)
 # include <sys/socket.h>
@@ -38,11 +35,13 @@
 #endif
 
 #ifdef MONGO_SSL
-#include <openssl/err.h>
-#include <openssl/ssl.h>
+#include "mongo/util/net/ssl_manager.h"
 #endif
 
-using namespace mongoutils;
+#include "mongo/util/background.h"
+#include "mongo/util/concurrency/value.h"
+#include "mongo/util/mongoutils/str.h"
+#include "mongo/db/cmdline.h"
 
 namespace mongo {
 
@@ -151,7 +150,7 @@ namespace mongo {
             target = "127.0.0.1";
         }
 
-        if( str::contains(target, '/') ) {
+        if( mongoutils::str::contains(target, '/') ) {
 #ifdef _WIN32
             uassert(13080, "no unix socket support on windows", false);
 #endif
@@ -234,14 +233,14 @@ namespace mongo {
         }
     }
     
-    string SockAddr::getAddr() const {
+    std::string SockAddr::getAddr() const {
         switch (getType()) {
         case AF_INET:
         case AF_INET6: {
             const int buflen=128;
             char buffer[buflen];
             int ret = getnameinfo(raw(), addressSize, buffer, buflen, NULL, 0, NI_NUMERICHOST);
-            massert(13082, str::stream() << "getnameinfo error " << getAddrInfoStrError(ret), ret == 0);
+            massert(13082, mongoutils::str::stream() << "getnameinfo error " << getAddrInfoStrError(ret), ret == 0);
             return buffer;
         }
             
@@ -365,137 +364,6 @@ namespace mongo {
         return ss.str();
     }
 
-
-    // ------------ SSLManager -----------------
-
-#ifdef MONGO_SSL
-
-    static unsigned long _ssl_id_callback();
-    static void _ssl_locking_callback(int mode, int type, const char *file, int line);
-
-    class SSLThreadInfo {
-    public:
-        
-        SSLThreadInfo() {
-            _id = ++_next;
-            CRYPTO_set_id_callback(_ssl_id_callback);
-            CRYPTO_set_locking_callback(_ssl_locking_callback);
-        }
-        
-        ~SSLThreadInfo() {
-            CRYPTO_set_id_callback(0);
-        }
-
-        unsigned long id() const { return _id; }
-        
-        void lock_callback( int mode, int type, const char *file, int line ) {
-            if ( mode & CRYPTO_LOCK ) {
-                _mutex[type]->lock();
-            }
-            else {
-                _mutex[type]->unlock();
-            }
-        }
-        
-        static void init() {
-            while ( (int)_mutex.size() < CRYPTO_num_locks() )
-                _mutex.push_back( new SimpleMutex("SSLThreadInfo") );
-        }
-
-        static SSLThreadInfo* get() {
-            SSLThreadInfo* me = _thread.get();
-            if ( ! me ) {
-                me = new SSLThreadInfo();
-                _thread.reset( me );
-            }
-            return me;
-        }
-
-    private:
-        unsigned _id;
-        
-        static AtomicUInt _next;
-        static vector<SimpleMutex*> _mutex;
-        static boost::thread_specific_ptr<SSLThreadInfo> _thread;
-    };
-
-    static unsigned long _ssl_id_callback() {
-        return SSLThreadInfo::get()->id();
-    }
-    static void _ssl_locking_callback(int mode, int type, const char *file, int line) {
-        SSLThreadInfo::get()->lock_callback( mode , type , file , line );
-    }
-
-    AtomicUInt SSLThreadInfo::_next;
-    vector<SimpleMutex*> SSLThreadInfo::_mutex;
-    boost::thread_specific_ptr<SSLThreadInfo> SSLThreadInfo::_thread;
-    
-
-    SSLManager::SSLManager( bool client ) {
-        _client = client;
-        SSL_library_init();
-        SSL_load_error_strings();
-        ERR_load_crypto_strings();
-        
-        _context = SSL_CTX_new( client ? SSLv23_client_method() : SSLv23_server_method() );
-        massert( 15864 , mongoutils::str::stream() << "can't create SSL Context: " << ERR_error_string(ERR_get_error(), NULL) , _context );
-        
-        SSL_CTX_set_options( _context, SSL_OP_ALL);   
-        SSLThreadInfo::init();
-        SSLThreadInfo::get();
-    }
-
-    void SSLManager::setupPubPriv( const string& privateKeyFile , const string& publicKeyFile ) {
-        massert( 15865 , 
-                 mongoutils::str::stream() << "Can't read SSL certificate from file " 
-                 << publicKeyFile << ":" <<  ERR_error_string(ERR_get_error(), NULL) ,
-                 SSL_CTX_use_certificate_file(_context, publicKeyFile.c_str(), SSL_FILETYPE_PEM) );
-  
-
-        massert( 15866 , 
-                 mongoutils::str::stream() << "Can't read SSL private key from file " 
-                 << privateKeyFile << " : " << ERR_error_string(ERR_get_error(), NULL) ,
-                 SSL_CTX_use_PrivateKey_file(_context, privateKeyFile.c_str(), SSL_FILETYPE_PEM) );
-    }
-    
-    
-    int SSLManager::password_cb(char *buf,int num, int rwflag,void *userdata){
-        SSLManager* sm = (SSLManager*)userdata;
-        string pass = sm->_password;
-        strcpy(buf,pass.c_str());
-        return(pass.size());
-    }
-
-    bool SSLManager::setupPEM( const string& keyFile , const string& password ) {
-        _password = password;
-        
-        if ( SSL_CTX_use_certificate_chain_file( _context , keyFile.c_str() ) != 1 ) {
-            log() << "Can't read certificate file: " << keyFile << endl;
-            return false;
-        }
-        
-        SSL_CTX_set_default_passwd_cb_userdata( _context , this );
-        SSL_CTX_set_default_passwd_cb( _context, &SSLManager::password_cb );
-        
-        if ( SSL_CTX_use_PrivateKey_file( _context , keyFile.c_str() , SSL_FILETYPE_PEM ) != 1 ) {
-            log() << "Can't read key file: " << keyFile << endl;
-            return false;
-        }
-        
-        return true;
-    }
-        
-    SSL * SSLManager::secure( int fd ) {
-        SSLThreadInfo::get();
-        SSL * ssl = SSL_new( _context );
-        massert( 15861 , "can't create SSL" , ssl );
-        SSL_set_fd( ssl , fd );
-        return ssl;
-    }
-
-
-#endif
-
     // ------------ Socket -----------------
     
     Socket::Socket(int fd , const SockAddr& remote) : 
@@ -578,7 +446,7 @@ namespace mongo {
 
         _fd = socket(remote.getType(), SOCK_STREAM, 0);
         if ( _fd == INVALID_SOCKET ) {
-            log(_logLevel) << "ERROR: connect invalid socket " << errnoWithDescription() << endl;
+            LOG(_logLevel) << "ERROR: connect invalid socket " << errnoWithDescription() << endl;
             return false;
         }
 
@@ -643,12 +511,12 @@ namespace mongo {
                 const int mongo_errno = errno;
                 if ( ( mongo_errno == EAGAIN || mongo_errno == EWOULDBLOCK ) && _timeout != 0 ) {
 #endif
-                    log(_logLevel) << "Socket " << context << " send() timed out " << _remote.toString() << endl;
+                    LOG(_logLevel) << "Socket " << context << " send() timed out " << _remote.toString() << endl;
                     throw SocketException( SocketException::SEND_TIMEOUT , remoteString() );
                 }
                 else {
                     SocketException::Type t = SocketException::SEND_ERROR;
-                    log(_logLevel) << "Socket " << context << " send() " 
+                    LOG(_logLevel) << "Socket " << context << " send() "
                                    << errnoWithDescription(mongo_errno) << ' ' << remoteString() << endl;
                     throw SocketException( t , remoteString() );
                 }
@@ -706,11 +574,11 @@ namespace mongo {
             int ret = ::sendmsg( _fd , &meta , portSendFlags );
             if ( ret == -1 ) {
                 if ( errno != EAGAIN || _timeout == 0 ) {
-                    log(_logLevel) << "Socket " << context << " send() " << errnoWithDescription() << ' ' << remoteString() << endl;
+                    LOG(_logLevel) << "Socket " << context << " send() " << errnoWithDescription() << ' ' << remoteString() << endl;
                     throw SocketException( SocketException::SEND_ERROR , remoteString() );
                 }
                 else {
-                    log(_logLevel) << "Socket " << context << " send() remote timeout " << remoteString() << endl;
+                    LOG(_logLevel) << "Socket " << context << " send() remote timeout " << remoteString() << endl;
                     throw SocketException( SocketException::SEND_TIMEOUT , remoteString() );
                 }
             }
@@ -739,13 +607,13 @@ namespace mongo {
             int ret = unsafe_recv( buf , len );
             if ( ret > 0 ) {
                 if ( len <= 4 && ret != len )
-                    log(_logLevel) << "Socket recv() got " << ret << " bytes wanted len=" << len << endl;
+                    LOG(_logLevel) << "Socket recv() got " << ret << " bytes wanted len=" << len << endl;
                 verify( ret <= len );
                 len -= ret;
                 buf += ret;
             }
             else if ( ret == 0 ) {
-                log(3) << "Socket recv() conn closed? " << remoteString() << endl;
+                LOG(3) << "Socket recv() conn closed? " << remoteString() << endl;
                 throw SocketException( SocketException::CLOSED , remoteString() );
             }
             else { /* ret < 0  */                
@@ -767,11 +635,11 @@ namespace mongo {
                        ) && _timeout > 0 ) 
                 {
                     // this is a timeout
-                    log(_logLevel) << "Socket recv() timeout  " << remoteString() <<endl;
+                    LOG(_logLevel) << "Socket recv() timeout  " << remoteString() <<endl;
                     throw SocketException( SocketException::RECV_TIMEOUT, remoteString() );                    
                 }
 
-                log(_logLevel) << "Socket recv() " << errnoWithDescription(e) << " " << remoteString() <<endl;
+                LOG(_logLevel) << "Socket recv() " << errnoWithDescription(e) << " " << remoteString() <<endl;
                 throw SocketException( SocketException::RECV_ERROR , remoteString() );
             }
         }
@@ -804,7 +672,7 @@ namespace mongo {
             if ( WSAStartup(MAKEWORD(2,2), &d) != 0 ) {
                 out() << "ERROR: wsastartup failed " << errnoWithDescription() << endl;
                 problem() << "ERROR: wsastartup failed " << errnoWithDescription() << endl;
-                dbexit( EXIT_NTSERVICE_ERROR );
+                _exit(EXIT_NTSERVICE_ERROR);
             }
         }
     } winsock_init;

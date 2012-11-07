@@ -1,6 +1,7 @@
 /** @file dbcommands_generic.cpp commands suited for any mongo server (both mongod, mongos) */
 
 /**
+*    Copyright (C) 2012 10gen Inc.
 *
 *    This program is free software: you can redistribute it and/or  modify
 *    it under the terms of the GNU Affero General Public License, version 3,
@@ -109,10 +110,18 @@ namespace mongo {
             help << "get version #, etc.\n";
             help << "{ buildinfo:1 }";
         }
-        bool run(const string& dbname, BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
-            result << "version" << versionString << "gitVersion" << gitVersion() << "sysInfo" << sysInfo();
-            result << "versionArray" << versionArray;
-            result << "bits" << ( sizeof( int* ) == 4 ? 32 : 64 );
+        bool run(const std::string& dbname,
+                 BSONObj& jsobj,
+                 int, // options
+                 std::string& errmsg,
+                 BSONObjBuilder& result,
+                 bool fromRepl) {
+            result << "version" << versionString
+                   << "gitVersion" << gitVersion()
+                   << "sysInfo" << sysInfo()
+                   << "versionArray" << versionArray
+                   << "interpreterVersion" << globalScriptEngine->getInterpreterVersionString()
+                   << "bits" << ( sizeof( int* ) == 4 ? 32 : 64 );
             result.appendBool( "debug" , debug );
             result.appendNumber("maxBsonObjectSize", BSONObjMaxUserSize);
             return true;
@@ -475,5 +484,21 @@ namespace mongo {
         }
 
     } getLogCmd;
+
+    class CmdGetCmdLineOpts : Command {
+    public:
+        CmdGetCmdLineOpts(): Command("getCmdLineOpts") {}
+        void help(stringstream& h) const { h << "get argv"; }
+        virtual LockType locktype() const { return NONE; }
+        virtual bool adminOnly() const { return true; }
+        virtual bool slaveOk() const { return true; }
+
+        virtual bool run(const string&, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+            result.append("argv", CmdLine::getArgvArray());
+            result.append("parsed", CmdLine::getParsedOpts());
+            return true;
+        }
+
+    } cmdGetCmdLineOpts;
 
 }

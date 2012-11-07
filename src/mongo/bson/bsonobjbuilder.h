@@ -404,6 +404,13 @@ namespace mongo {
             return *this;
         }
 
+        /**
+         * To store an OpTime in BSON, use this function. Pass the OpTime as a Date, as follows:
+         *
+         *     builder.appendTimestamp("field", optime.asDate());
+         *
+         * This captures both the secs and inc fields.
+         */
         BSONObjBuilder& appendTimestamp( const StringData& fieldName , unsigned long long val ) {
             _b.appendNum( (char) Timestamp );
             _b.appendStr( fieldName );

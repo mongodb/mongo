@@ -87,9 +87,6 @@ namespace mongo {
                 if ( qSpec.isExplain() ) start_millis = curTimeMillis64();
                 cursor->init();
 
-                LOG(5) << "   cursor type: " << cursor->type() << endl;
-                shardedCursorTypes.hit( cursor->type() );
-
                 if ( qSpec.isExplain() ) {
                     // fetch elapsed time for the query
                     long long elapsed_millis = curTimeMillis64() - start_millis;
@@ -262,24 +259,27 @@ namespace mongo {
          * Each thread gets its own backoff wait sequence, to avoid interfering with other valid
          * operations.
          */
-        void _sleepForVerifiedLocalError(){
+        void _sleepForVerifiedLocalError() {
 
-            if( ! perThreadBackoff.get() )
-                perThreadBackoff.reset( new Backoff( maxWaitMillis, maxWaitMillis * 2 ) );
+            if (!perThreadBackoff.get()) perThreadBackoff.reset(new Backoff(maxWaitMillis,
+                                                                            maxWaitMillis * 2));
 
             perThreadBackoff.get()->nextSleepMillis();
         }
 
-        void _handleRetries( const string& op,
-                             int retries,
-                             const string& ns,
-                             const BSONObj& query,
-                             StaleConfigException& e,
-                             Request& r ) // TODO: remove
+        void _handleRetries(const string& op,
+                            int retries,
+                            const string& ns,
+                            const BSONObj& query,
+                            StaleConfigException& e,
+                            Request& r) // TODO: remove
         {
-
             static const int MAX_RETRIES = 5;
-            if( retries >= MAX_RETRIES ) throw e;
+            if (retries >= MAX_RETRIES) {
+                // If we rethrow b/c too many retries, make sure we add as much data as possible
+                e.addContext(query.toString());
+                throw e;
+            }
 
             //
             // On a stale config exception, we have to assume that the entire collection could have
@@ -287,66 +287,93 @@ namespace mongo {
             // targeting we've done earlier
             //
 
-            log( retries == 0 ) << op << " will be retried b/c sharding config info is stale, "
-                                << " retries: " << retries
-                                << " ns: " << ns
-                                << " data: " << query << endl;
+            LOG( retries == 0 ? 1 : 0 ) << op << " will be retried b/c sharding config info is stale, "
+                              << " retries: " << retries
+                              << " ns: " << ns
+                              << " data: " << query << endl;
 
-            if( retries > 2 ){
-                versionManager.forceRemoteCheckShardVersionCB( ns );
+            if (retries > 2) {
+                versionManager.forceRemoteCheckShardVersionCB(ns);
             }
 
             r.reset();
         }
 
-        void _groupInserts( const string& ns,
-                            vector<BSONObj>& inserts,
-                            map<ChunkPtr,vector<BSONObj> >& insertsForChunks,
-                            ChunkManagerPtr& manager,
-                            ShardPtr& primary,
-                            bool reloadedConfigData = false )
-        {
+        struct InsertGroup {
 
-            grid.getDBConfig( ns )->getChunkManagerOrPrimary( ns, manager, primary );
-
-            // Redo all inserts for chunks which have changed
-            map<ChunkPtr,vector<BSONObj> >::iterator i = insertsForChunks.begin();
-            while( ! insertsForChunks.empty() && i != insertsForChunks.end() ){
-
-                // If we don't have a manger, our chunk is empty, or our manager is incompatible with the chunk
-                // we assigned inserts to, re-map the inserts to new chunks
-                if( ! manager || ! ( i->first.get() ) || ( manager && ! manager->compatibleWith( i->first ) ) ){
-                    inserts.insert( inserts.end(), i->second.begin(), i->second.end() );
-                    insertsForChunks.erase( i++ );
-                }
-                else ++i;
-
+            InsertGroup() :
+                    reloadedConfig(false)
+            {
             }
 
-            // Used for storing non-sharded insert data
-            ChunkPtr empty;
+            // Does NOT reset our config reload flag
+            void resetInsertData() {
+                shard.reset();
+                manager.reset();
+                inserts.clear();
+                chunkData.clear();
+                errMsg.clear();
+            }
 
-            // Figure out inserts we haven't chunked yet
-            for( vector<BSONObj>::iterator i = inserts.begin(); i != inserts.end(); ++i ){
+            bool hasException() {
+                return errMsg != "";
+            }
 
-                BSONObj o = *i;
+            void setException(int code, const string& errMsg) {
+                this->errCode = code;
+                this->errMsg = errMsg;
+            }
 
-                if ( manager && ! manager->hasShardKey( o ) ) {
+            ShardPtr shard;
+            ChunkManagerPtr manager;
+            vector<BSONObj> inserts;
+            map<ChunkPtr, int> chunkData;
+            bool reloadedConfig;
+
+            string errMsg;
+            int errCode;
+
+        };
+
+        /**
+         * Given a ns and insert message (with flags), returns the shard (and chunkmanager if
+         * needed) required to do a bulk insert of the next N inserts until the shard changes.
+         *
+         * Also tracks the data inserted per chunk on the current shard.
+         *
+         * Returns whether or not the config data was reloaded
+         */
+        void _getNextInsertGroup(const string& ns, DbMessage& d, int flags, InsertGroup* group) {
+            grid.getDBConfig(ns)->getChunkManagerOrPrimary(ns, group->manager, group->shard);
+            // shard is either primary or nothing, if there's a chunk manager
+
+            // Set our current position, so we can jump back if we have a stale config error for
+            // this group
+            d.markSet();
+
+            int totalInsertSize = 0;
+
+            while (d.moreJSObjs()) {
+
+                const char* prevObjMark = d.markGet();
+                BSONObj o = d.nextJsObj();
+
+                if (group->manager && !group->manager->hasShardKey(o)) {
 
                     bool bad = true;
 
                     // Add autogenerated _id to item and see if we now have a shard key
-                    if ( manager->getShardKey().partOfShardKey( "_id" ) ) {
+                    if (group->manager->getShardKey().partOfShardKey("_id")) {
 
                         BSONObjBuilder b;
-                        b.appendOID( "_id" , 0 , true );
-                        b.appendElements( o );
+                        b.appendOID("_id", 0, true);
+                        b.appendElements(o);
                         o = b.obj();
-                        bad = ! manager->hasShardKey( o );
+                        bad = !group->manager->hasShardKey(o);
 
                     }
 
-                    if( bad && ! reloadedConfigData ){
+                    if (bad && !group->reloadedConfig) {
 
                         //
                         // The shard key may not match because it has changed on us (new collection), and we are now
@@ -367,45 +394,101 @@ namespace mongo {
                         //
 
                         warning() << "shard key mismatch for insert " << o
-                                  << ", expected values for " << manager->getShardKey()
+                                  << ", expected values for " << group->manager->getShardKey()
                                   << ", reloading config data to ensure not stale" << endl;
 
+                        // Reset the selected shard and manager
+                        group->shard.reset();
+                        group->manager.reset();
                         // Remove all the previously grouped inserts...
-                        inserts.erase( inserts.begin(), i );
+                        group->inserts.clear();
+                        // Reset the chunk data...
+                        group->chunkData.clear();
 
                         // If this is our retry, force talking to the config server
-                        grid.getDBConfig( ns )->getChunkManagerIfExists( ns, true );
-                        _groupInserts( ns, inserts, insertsForChunks, manager, primary, true );
+                        grid.getDBConfig(ns)->getChunkManagerIfExists(ns, true);
+
+                        // Now we've reloaded the config once
+                        group->reloadedConfig = true;
+
+                        // Reset our current position to the start of the last group of inserts
+                        d.markReset();
+
+                        _getNextInsertGroup(ns, d, flags, group);
                         return;
                     }
 
-                    if( bad ){
+                    if (bad) {
 
                         // Sleep to avoid DOS'ing config server when we have invalid inserts
                         _sleepForVerifiedLocalError();
 
                         // TODO: Matching old behavior, but do we need this log line?
                         log() << "tried to insert object with no valid shard key for "
-                              << manager->getShardKey() << " : " << o << endl;
+                              << group->manager->getShardKey() << " : " << o << endl;
 
-                        uasserted( 8011,
-                              str::stream() << "tried to insert object with no valid shard key for "
-                                            << manager->getShardKey().toString() << " : " << o.toString() );
+                        group->setException(8011,
+                                            str::stream()
+                                                    << "tried to insert object with no valid shard key for "
+                                                    << group->manager->getShardKey().toString()
+                                                    << " : " << o.toString());
+                        return;
                     }
                 }
 
-                // Many operations benefit from having the shard key early in the object
-                if( manager ){
-                    o = manager->getShardKey().moveToFront(o);
-                    insertsForChunks[manager->findChunkForDoc(o)].push_back(o);
+                int objSize = o.objsize();
+                totalInsertSize += objSize;
+
+                // Insert at least one document, but otherwise no more than 8MB of data, otherwise
+                // the WBL will not work
+                if (group->inserts.size() > 0 && totalInsertSize > BSONObjMaxUserSize / 2) {
+                    // Reset to after the previous insert
+                    d.markReset(prevObjMark);
+
+                    LOG(3) << "breaking up bulk insert group to " << ns << " at size "
+                               << (totalInsertSize - objSize) << " (" << group->inserts.size()
+                               << " documents)" << endl;
+
+                    // Too much data would be inserted, break out of our bulk insert loop
+                    break;
                 }
-                else{
-                    insertsForChunks[ empty ].push_back(o);
+
+                // Make sure our objSize is not greater than maximum, otherwise WBL won't work
+                verify( objSize <= BSONObjMaxUserSize );
+
+                // Many operations benefit from having the shard key early in the object
+                if (group->manager) {
+
+                    //
+                    // Sharded insert
+                    //
+
+                    ChunkPtr chunk = group->manager->findChunkForDoc(o);
+
+                    if (!group->shard) {
+                        group->shard.reset(new Shard(chunk->getShard()));
+                    }
+                    else if (group->shard->getName() != chunk->getShard().getName()) {
+
+                        // Reset to after the previous insert
+                        d.markReset(prevObjMark);
+                        // Our shard has changed, break out of bulk insert loop
+                        break;
+                    }
+
+                    o = group->manager->getShardKey().moveToFront(o);
+                    group->inserts.push_back(o);
+                    group->chunkData[chunk] += objSize;
+                }
+                else {
+
+                    //
+                    // Unsharded insert
+                    //
+
+                    group->inserts.push_back(o);
                 }
             }
-
-            inserts.clear();
-            return;
         }
 
         /**
@@ -415,125 +498,258 @@ namespace mongo {
          * 1) Error is thrown immediately for corrupt objects
          * 2) Error is thrown only for UserExceptions during the insert process, if last obj had error that's thrown
          */
-        void _insert( Request& r , DbMessage& d ){
+        void _insert(Request& r, DbMessage& d) {
 
             const string& ns = r.getns();
 
-            vector<BSONObj> insertsRemaining;
-            while ( d.moreJSObjs() ){
-                insertsRemaining.push_back( d.nextJsObj() );
-            }
-
             int flags = 0;
 
-            if( d.reservedField() & Reserved_InsertOption_ContinueOnError )
-                flags |= InsertOption_ContinueOnError;
+            if (d.reservedField() & Reserved_InsertOption_ContinueOnError) flags |=
+                    InsertOption_ContinueOnError;
 
-            if( d.reservedField() & Reserved_FromWriteback )
-                flags |= WriteOption_FromWriteback;
+            if (d.reservedField() & Reserved_FromWriteback) flags |= WriteOption_FromWriteback;
 
-            _insert( ns, insertsRemaining, flags, r, d );
+            if (!d.moreJSObjs()) return;
+
+            _insert(ns, d, flags, r);
         }
 
-        void _insert( const string& ns,
-                      vector<BSONObj>& inserts,
-                      int flags,
-                      Request& r , DbMessage& d ) // TODO: remove
+        void _insert(const string& ns, DbMessage& d, int flags, Request& r) // TODO: remove
         {
-            map<ChunkPtr, vector<BSONObj> > insertsForChunks; // Map for bulk inserts to diff chunks
-            _insert( ns, inserts, insertsForChunks, flags, r, d );
-        }
+            uassert( 16056, str::stream() << "shutting down server during insert", ! inShutdown() );
 
-        void _insert( const string& ns,
-                      vector<BSONObj>& insertsRemaining,
-                      map<ChunkPtr, vector<BSONObj> >& insertsForChunks,
-                      int flags,
-                      Request& r, DbMessage& d, // TODO: remove
-                      int retries = 0 )
-        {
-            // TODO: Replace this with a better check to see if we're making progress
-            uassert( 16055, str::stream() << "too many retries during bulk insert, " << insertsRemaining.size() << " inserts remaining", retries < 30 );
-            uassert( 16056, str::stream() << "shutting down server during bulk insert, " << insertsRemaining.size() << " inserts remaining", ! inShutdown() );
+            bool continueOnError = flags & InsertOption_ContinueOnError;
 
-            ChunkManagerPtr manager;
-            ShardPtr primary;
+            // Sanity check, probably not needed but for safety
+            int retries = 0;
 
-            // This function handles grouping the inserts per-shard whether the collection is sharded or not.
-            _groupInserts( ns, insertsRemaining, insertsForChunks, manager, primary );
+            InsertGroup group;
 
-            // ContinueOnError is always on when using sharding.
-            flags |= manager ? InsertOption_ContinueOnError : 0;
+            bool prevInsertException = false;
 
-            while( ! insertsForChunks.empty() ){
+            while (d.moreJSObjs()) {
 
-                ChunkPtr c = insertsForChunks.begin()->first;
-                vector<BSONObj>& objs = insertsForChunks.begin()->second;
+                // TODO: Replace this with a better check to see if we're making progress
+                uassert( 16055, str::stream() << "too many retries during insert", retries < 30 );
 
                 //
-                // Careful - if primary exists, c will be empty
+                // PREPARE INSERT
                 //
 
-                const Shard& shard = c ? c->getShard() : primary.get();
+                group.resetInsertData();
 
-                ShardConnection dbcon( shard, ns, manager );
+                // This function handles grouping the inserts per-shard whether the collection
+                // is sharded or not.
+                //
+                // Can record errors on bad insert object format (i.e. doesn't have the shard
+                // key), which should be handled in-order with mongod errors.
+                //
+                _getNextInsertGroup(ns, d, flags, &group);
+
+                // We should always have a shard if we have any inserts
+                verify(group.inserts.size() == 0 || group.shard.get());
+
+                if (group.inserts.size() > 0 && group.hasException()) {
+                    warning() << "problem preparing batch insert detected, first inserting "
+                              << group.inserts.size() << " intermediate documents" << endl;
+                }
+
+                scoped_ptr<ShardConnection> dbconPtr;
 
                 try {
 
-                    LOG(4) << "inserting " << objs.size() << " documents to shard " << shard
-                           << " at version "
-                           << ( manager.get() ? manager->getVersion().toString() :
-                                                ShardChunkVersion( 0, OID() ).toString() ) << endl;
+                    //
+                    // DO ALL VALID INSERTS
+                    //
 
-                    // Taken from single-shard bulk insert, should not need multiple methods in future
-                    // insert( c->getShard() , r.getns() , objs , flags);
+                    if (group.inserts.size() > 0) {
 
-                    // It's okay if the version is set here, an exception will be thrown if the version is incompatible
-                    try{
+                        dbconPtr.reset(new ShardConnection(*(group.shard), ns, group.manager));
+                        ShardConnection& dbcon = *dbconPtr;
+
+                        LOG(5)
+                                << "inserting "
+                                << group.inserts.size()
+                                << " documents to shard "
+                                << group.shard
+                                << " at version "
+                                << (group.manager.get() ?
+                                        group.manager->getVersion().toString() :
+                                        ShardChunkVersion(0, OID()).toString())
+                                << endl;
+
+                        //
+                        // CHECK VERSION
+                        //
+
+                        // Will throw SCE if we need to reset our version before sending.
                         dbcon.setVersion();
+
+                        // Reset our retries to zero since this batch's version went through
+                        retries = 0;
+
+                        //
+                        // SEND INSERT
+                        //
+
+                        string insertErr = "";
+
+                        try {
+
+                            dbcon->insert(ns, group.inserts, flags);
+
+                            //
+                            // WARNING: We *have* to return the connection here, otherwise the
+                            // error gets checked on a different connection!
+                            //
+                            dbcon.done();
+
+                            //
+                            // CHECK INTERMEDIATE ERROR
+                            //
+
+                            // We need to check the mongod error if we're inserting more documents,
+                            // or if a later mongos error might mask an insert error,
+                            // or if an earlier error might mask this error from GLE
+                            if (d.moreJSObjs() || group.hasException() || prevInsertException) {
+
+                                LOG(3) << "running intermediate GLE to "
+                                       << group.shard->toString() << " during bulk insert "
+                                       << "because "
+                                       << (d.moreJSObjs() ? "we have more documents to insert" : 
+                                          (group.hasException() ? "exception detected while preparing group" :
+                                                                      "a previous error exists"))
+                                       << endl;
+
+                                ClientInfo* ci = r.getClientInfo();
+
+                                //
+                                // WARNING: Without this, we will use the *previous* shard for GLE
+                                //
+                                ci->newRequest();
+
+                                BSONObjBuilder gleB;
+                                string errMsg;
+
+                                // TODO: Can't actually pass GLE parameters here,
+                                // so we use defaults?
+                                ci->getLastError("admin",
+                                                 BSON( "getLastError" << 1 ),
+                                                 gleB,
+                                                 errMsg,
+                                                 false);
+
+                                insertErr = errMsg;
+                                BSONObj gle = gleB.obj();
+                                if (gle["err"].type() == String)
+                                    insertErr = gle["err"].String();
+
+                                LOG(3) << "intermediate GLE result was " << gle
+                                       << " errmsg: " << errMsg << endl;
+
+                                //
+                                // Clear out the shards we've checked so far, if we're successful
+                                //
+                                ci->clearSinceLastGetError();
+                            }
+                        }
+                        catch (DBException& e) {
+                            // Network error on send or GLE
+                            insertErr = e.what();
+                            dbcon.kill();
+                        }
+
+                        //
+                        // If the insert had an error, figure out if we should throw right now.
+                        //
+
+                        if (insertErr.size() > 0) {
+
+                            string errMsg = str::stream()
+                                    << "error inserting "
+                                    << group.inserts.size()
+                                    << " documents to shard "
+                                    << group.shard->toString()
+                                    << " at version "
+                                    << (group.manager.get() ?
+                                            group.manager->getVersion().toString() :
+                                            ShardChunkVersion(0, OID()).toString())
+                                    << causedBy(insertErr);
+
+                            // If we're continuing-on-error and the insert error is superseded by
+                            // a later error from mongos, we shouldn't throw this error but the
+                            // later one.
+                            if (group.hasException() && continueOnError) warning() << errMsg;
+                            else uasserted(16460, errMsg);
+                        }
+
+                        //
+                        // SPLIT CHUNKS IF NEEDED
+                        //
+
+                        // Should never throw errors!
+                        if (!group.chunkData.empty() && r.getClientInfo()->autoSplitOk()) {
+
+                            for (map<ChunkPtr, int>::iterator it = group.chunkData.begin();
+                                    it != group.chunkData.end(); ++it)
+                            {
+                                ChunkPtr c = it->first;
+                                int bytesWritten = it->second;
+
+                                c->splitIfShould(bytesWritten);
+                            }
+                        }
                     }
-                    catch ( StaleConfigException& e ) {
-                        // External try block is still needed to match bulk insert mongod
-                        // behavior
-                        dbcon.done();
-                        _handleRetries( "insert", retries, ns, objs[0], e, r );
-                        _insert( ns, insertsRemaining, insertsForChunks, flags, r, d, retries + 1 );
-                        return;
+
+                    //
+                    // CHECK AND RE-THROW MONGOS ERROR
+                    //
+
+                    if (group.hasException()) {
+
+                        string errMsg = str::stream() << "error preparing documents for insert"
+                                                      << causedBy(group.errMsg);
+
+                        uasserted(group.errCode, errMsg);
                     }
-
-                    // Certain conn types can't handle bulk inserts, so don't use unless we need to
-                    if( objs.size() == 1 ){
-                        dbcon->insert( ns, objs[0], flags );
-                    }
-                    else{
-                        dbcon->insert( ns , objs , flags);
-                    }
-
-                    // TODO: Option for safe inserts here - can then use this for all inserts
-                    // Not sure what this means?
-
-                    dbcon.done();
-
-                    int bytesWritten = 0;
-                    for (vector<BSONObj>::iterator vecIt = objs.begin(); vecIt != objs.end(); ++vecIt) {
-                        r.gotInsert(); // Record the correct number of individual inserts
-                        bytesWritten += (*vecIt).objsize();
-                    }
-
-                    // TODO: The only reason we're grouping by chunks here is for auto-split, more efficient
-                    // to track this separately and bulk insert to shards
-                    if ( c && r.getClientInfo()->autoSplitOk() )
-                        c->splitIfShould( bytesWritten );
-
                 }
-                catch( UserException& e ){
-                    // Unexpected exception, so don't clean up the conn
-                    dbcon.kill();
+                catch (StaleConfigException& e) {
 
-                    // These inserts won't be retried, as something weird happened here
-                    insertsForChunks.erase( insertsForChunks.begin() );
+                    // Clean up the conn if needed
+                    if (dbconPtr) dbconPtr->done();
 
-                    // Throw if this is the last chunk bulk-inserted to
-                    if( insertsForChunks.empty() ){
+                    // Note - this can throw a SCE which will abort *all* the rest of the inserts
+                    // if we retry too many times.  We assume that this cannot happen.  In any
+                    // case, the user gets an error.
+                    _handleRetries("insert", retries, ns, group.inserts[0], e, r);
+                    retries++;
+
+                    // Go back to the start of the inserts
+                    d.markReset();
+
+                    verify( d.moreJSObjs() );
+                }
+                catch (UserException& e) {
+
+                    // Unexpected exception, cleans up the conn if not already done()
+                    if (dbconPtr) dbconPtr->kill();
+
+                    warning() << "exception during insert"
+                              << (continueOnError ? " (continue on error set)" : "") << causedBy(e)
+                              << endl;
+
+                    prevInsertException = true;
+
+                    //
+                    // Throw if this is the last chunk bulk-inserted to, or if continue-on-error is
+                    // not set.
+                    //
+                    // If this is the last chunk bulk-inserted to, then if continue-on-error is
+                    // true, we'll have the final error, and if continue-on-error is false, we
+                    // should abort anyway.
+                    //
+
+                    if (!d.moreJSObjs() || !continueOnError) {
                         throw;
                     }
 
@@ -544,25 +760,26 @@ namespace mongo {
                     // TODO: Make better semantics
                     //
 
-                    warning() << "swallowing exception during batch insert"
-                              << causedBy( e ) << endl;
+                    warning() << "swallowing exception during insert" << causedBy(e) << endl;
                 }
 
-                insertsForChunks.erase( insertsForChunks.begin() );
+                // Reset our list of last shards we talked to, since we already got writebacks
+                // earlier.
+                if (d.moreJSObjs()) r.getClientInfo()->clearSinceLastGetError();
             }
         }
 
-        void _prepareUpdate( const string& ns,
-                             const BSONObj& query,
-                             const BSONObj& toUpdate,
-                             int flags,
-                             // Output
-                             ChunkPtr& chunk,
-                             ShardPtr& shard,
-                             ChunkManagerPtr& manager,
-                             ShardPtr& primary,
-                             // Input
-                             bool reloadConfigData = false )
+        void _prepareUpdate(const string& ns,
+                            const BSONObj& query,
+                            const BSONObj& toUpdate,
+                            int flags,
+                            // Output
+                            ChunkPtr& chunk,
+                            ShardPtr& shard,
+                            ChunkManagerPtr& manager,
+                            ShardPtr& primary,
+                            // Input
+                            bool reloadConfigData = false)
         {
             //
             // Updates have three basic targeting options :

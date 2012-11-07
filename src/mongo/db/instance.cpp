@@ -471,10 +471,10 @@ namespace mongo {
         if ( currentOp.shouldDBProfile( debug.executionTime ) ) {
             // performance profiling is on
             if ( Lock::isReadLocked() ) {
-                mongo::log(1) << "note: not profiling because recursive read lock" << endl;
+                LOG(1) << "note: not profiling because recursive read lock" << endl;
             }
             else if ( lockedForWriting() ) {
-                mongo::log(1) << "note: not profiling because doing fsync+lock" << endl;
+                LOG(1) << "note: not profiling because doing fsync+lock" << endl;
             }
             else {
                 try {
@@ -509,14 +509,14 @@ namespace mongo {
         uassert( 13004 , str::stream() << "sent negative cursors to kill: " << n  , n >= 1 );
 
         if ( n > 2000 ) {
-            log( n < 30000 ? LL_WARNING : LL_ERROR ) << "receivedKillCursors, n=" << n << endl;
+            LOG( n < 30000 ? LL_WARNING : LL_ERROR ) << "receivedKillCursors, n=" << n << endl;
             verify( n < 30000 );
         }
 
         int found = ClientCursor::erase(n, (long long *) x);
 
         if ( logLevel > 0 || found != n ) {
-            log( found == n ) << "killcursors: found " << found << " of " << n << endl;
+            LOG( found == n ? 1 : 0 ) << "killcursors: found " << found << " of " << n << endl;
         }
 
     }
@@ -544,7 +544,7 @@ namespace mongo {
         prefix += '.';
         ClientCursor::invalidate(prefix.c_str());
 
-        NamespaceDetailsTransient::clearForPrefix( prefix.c_str() );
+        NamespaceDetailsTransient::eraseDB( prefix );
 
         dbHolderW().erase( db, path );
         ctx->_clear();
@@ -678,10 +678,6 @@ namespace mongo {
                     }
                 }
 
-                Client::ReadContext ctx(ns);
-
-                // call this readlocked so state can't change
-                replVerifyReadsOk();
                 msgdata = processGetMore(ns, ntoreturn, cursorid, curop, pass, exhaust);
             }
             catch ( AssertionException& e ) {
@@ -842,13 +838,13 @@ namespace mongo {
                 i != boost::filesystem::directory_iterator(); ++i ) {
             if ( directoryperdb ) {
                 boost::filesystem::path p = *i;
-                string dbName = p.leaf();
+                string dbName = p.leaf().string();
                 p /= ( dbName + ".ns" );
                 if ( exists( p ) )
                     names.push_back( dbName );
             }
             else {
-                string fileName = boost::filesystem::path(*i).leaf();
+                string fileName = boost::filesystem::path(*i).leaf().string();
                 if ( fileName.length() > 3 && fileName.substr( fileName.length() - 3, 3 ) == ".ns" )
                     names.push_back( fileName.substr( 0, fileName.length() - 3 ) );
             }
@@ -1085,7 +1081,7 @@ namespace mongo {
 #endif
 
         // block the dur thread from doing any work for the rest of the run
-        log(2) << "shutdown: groupCommitMutex" << endl;
+        LOG(2) << "shutdown: groupCommitMutex" << endl;
         SimpleMutex::scoped_lock lk(dur::commitJob.groupCommitMutex);
 
 #ifdef _WIN32
@@ -1116,7 +1112,7 @@ namespace mongo {
     }
 
     void acquirePathLock(bool doingRepair) {
-        string name = ( boost::filesystem::path( dbpath ) / "mongod.lock" ).native_file_string();
+        string name = ( boost::filesystem::path( dbpath ) / "mongod.lock" ).string();
 
         bool oldFile = false;
 

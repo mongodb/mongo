@@ -18,59 +18,85 @@
  */
 
 #include "mongo/db/auth/action_set.h"
+#include "mongo/db/auth/action_type.h"
 #include "mongo/unittest/unittest.h"
-
-#define ASSERT_OK(EXPR) ASSERT_EQUALS(Status::OK(), (EXPR))
 
 namespace mongo {
 namespace {
 
-    TEST(ActionSetTest, ActionStringToAction) {
-        ActionSet::ActionType result;
-        ASSERT_OK(ActionSet::parseActionFromString("r", &result));
-        ASSERT_EQUALS(ActionSet::READ, result);
-        ASSERT_OK(ActionSet::parseActionFromString("w", &result));
-        ASSERT_EQUALS(ActionSet::WRITE, result);
-        ASSERT_OK(ActionSet::parseActionFromString("u", &result));
-        ASSERT_EQUALS(ActionSet::USER_ADMIN, result);
-        ASSERT_OK(ActionSet::parseActionFromString("p", &result));
-        ASSERT_EQUALS(ActionSet::PRODUCTION_ADMIN, result);
-        ASSERT_OK(ActionSet::parseActionFromString("a", &result));
-        ASSERT_EQUALS(ActionSet::SUPER_ADMIN, result);
-
-        ASSERT_EQUALS(ErrorCodes::FailedToParse,
-                      ActionSet::parseActionFromString("INVALID INPUT", &result).code());
-        ASSERT_EQUALS(ErrorCodes::FailedToParse,
-                      ActionSet::parseActionFromString("", &result).code());
-    }
-
-    TEST(ActionSetTest, ActionsStringToInt) {
+    TEST(ActionSetTest, ParseActionSetFromString) {
         ActionSet result;
-        ASSERT_OK(ActionSet::parseActionSetFromString("r,w,u,p,a", &result));
-        ASSERT_TRUE(result.contains(ActionSet::READ));
-        ASSERT_TRUE(result.contains(ActionSet::WRITE));
-        ASSERT_TRUE(result.contains(ActionSet::USER_ADMIN));
-        ASSERT_TRUE(result.contains(ActionSet::PRODUCTION_ADMIN));
-        ASSERT_TRUE(result.contains(ActionSet::SUPER_ADMIN));
+        ASSERT_OK(ActionSet::parseActionSetFromString("find,insert,update,remove", &result));
+        ASSERT_TRUE(result.contains(ActionType::find));
+        ASSERT_TRUE(result.contains(ActionType::insert));
+        ASSERT_TRUE(result.contains(ActionType::update));
+        ASSERT_TRUE(result.contains(ActionType::remove));
 
-        // Order of the letters doesn't matter
-        ASSERT_OK(ActionSet::parseActionSetFromString("a,u,w,p,r", &result));
-        ASSERT_TRUE(result.contains(ActionSet::READ));
-        ASSERT_TRUE(result.contains(ActionSet::WRITE));
-        ASSERT_TRUE(result.contains(ActionSet::USER_ADMIN));
-        ASSERT_TRUE(result.contains(ActionSet::PRODUCTION_ADMIN));
-        ASSERT_TRUE(result.contains(ActionSet::SUPER_ADMIN));
+        // Order of the strings doesn't matter
+        ASSERT_OK(ActionSet::parseActionSetFromString("update,find,remove,insert", &result));
+        ASSERT_TRUE(result.contains(ActionType::find));
+        ASSERT_TRUE(result.contains(ActionType::insert));
+        ASSERT_TRUE(result.contains(ActionType::update));
+        ASSERT_TRUE(result.contains(ActionType::remove));
 
-        ASSERT_OK(ActionSet::parseActionSetFromString("r", &result));
+        ASSERT_OK(ActionSet::parseActionSetFromString("find", &result));
 
-        ASSERT_TRUE(result.contains(ActionSet::READ));
-        ASSERT_FALSE(result.contains(ActionSet::WRITE));
-        ASSERT_FALSE(result.contains(ActionSet::USER_ADMIN));
-        ASSERT_FALSE(result.contains(ActionSet::PRODUCTION_ADMIN));
-        ASSERT_FALSE(result.contains(ActionSet::SUPER_ADMIN));
+        ASSERT_TRUE(result.contains(ActionType::find));
+        ASSERT_FALSE(result.contains(ActionType::insert));
+        ASSERT_FALSE(result.contains(ActionType::update));
+        ASSERT_FALSE(result.contains(ActionType::remove));
+
+        ASSERT_OK(ActionSet::parseActionSetFromString("", &result));
+
+        ASSERT_FALSE(result.contains(ActionType::find));
+        ASSERT_FALSE(result.contains(ActionType::insert));
+        ASSERT_FALSE(result.contains(ActionType::update));
+        ASSERT_FALSE(result.contains(ActionType::remove));
 
         ASSERT_EQUALS(ErrorCodes::FailedToParse,
                       ActionSet::parseActionSetFromString("INVALID INPUT", &result).code());
+    }
+
+    TEST(ActionSetTest, ToString) {
+        ActionSet actionSet;
+
+        ASSERT_EQUALS("", actionSet.toString());
+        actionSet.addAction(ActionType::find);
+        ASSERT_EQUALS("find", actionSet.toString());
+        actionSet.addAction(ActionType::insert);
+        ASSERT_EQUALS("find,insert", actionSet.toString());
+        actionSet.addAction(ActionType::update);
+        ASSERT_EQUALS("find,insert,update", actionSet.toString());
+        actionSet.addAction(ActionType::remove);
+        ASSERT_EQUALS("find,insert,remove,update", actionSet.toString());
+
+        // Now make sure adding actions in a different order doesn't change anything.
+        ActionSet actionSet2;
+        ASSERT_EQUALS("", actionSet2.toString());
+        actionSet2.addAction(ActionType::insert);
+        ASSERT_EQUALS("insert", actionSet2.toString());
+        actionSet2.addAction(ActionType::remove);
+        ASSERT_EQUALS("insert,remove", actionSet2.toString());
+        actionSet2.addAction(ActionType::find);
+        ASSERT_EQUALS("find,insert,remove", actionSet2.toString());
+        actionSet2.addAction(ActionType::update);
+        ASSERT_EQUALS("find,insert,remove,update", actionSet2.toString());
+    }
+
+    TEST(ActionSetTest, IsSupersetOf) {
+        ActionSet set1, set2, set3;
+        ASSERT_OK(ActionSet::parseActionSetFromString("find,update,insert", &set1));
+        ASSERT_OK(ActionSet::parseActionSetFromString("find,update,remove", &set2));
+        ASSERT_OK(ActionSet::parseActionSetFromString("find,update", &set3));
+
+        ASSERT_FALSE(set1.isSupersetOf(set2));
+        ASSERT_TRUE(set1.isSupersetOf(set3));
+
+        ASSERT_FALSE(set2.isSupersetOf(set1));
+        ASSERT_TRUE(set2.isSupersetOf(set3));
+
+        ASSERT_FALSE(set3.isSupersetOf(set1));
+        ASSERT_FALSE(set3.isSupersetOf(set2));
     }
 
 }  // namespace

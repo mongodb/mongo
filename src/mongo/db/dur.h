@@ -1,5 +1,21 @@
 // @file dur.h durability support
 
+/**
+*    Copyright (C) 2009 10gen Inc.
+*
+*    This program is free software: you can redistribute it and/or  modify
+*    it under the terms of the GNU Affero General Public License, version 3,
+*    as published by the Free Software Foundation.
+*
+*    This program is distributed in the hope that it will be useful,
+*    but WITHOUT ANY WARRANTY; without even the implied warranty of
+*    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+*    GNU Affero General Public License for more details.
+*
+*    You should have received a copy of the GNU Affero General Public License
+*    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+*/
+
 #pragma once
 
 #include "diskloc.h"
@@ -95,7 +111,7 @@ namespace mongo {
 
             /** Commit if enough bytes have been modified. Current threshold is 50MB
 
-                The idea is that long running write operations that dont yield
+                The idea is that long running write operations that don't yield
                 (like creating an index or update with $atomic) can call this
                 whenever the db is in a sane state and it will prevent commits
                 from growing too large.

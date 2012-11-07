@@ -20,7 +20,6 @@
 #include "mongo/db/auth/principal_set.h"
 #include "mongo/unittest/unittest.h"
 
-#define ASSERT_OK(EXPR) ASSERT_EQUALS(Status::OK(), (EXPR))
 #define ASSERT_NULL(EXPR) ASSERT_FALSE((EXPR))
 
 namespace mongo {

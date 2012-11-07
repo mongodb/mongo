@@ -15,6 +15,7 @@
 
 #include "mongo/base/initializer.h"
 
+#include <iostream>
 #include "mongo/base/global_initializer.h"
 
 namespace mongo {

@@ -22,7 +22,7 @@ function testWithCollectionIndexIds( capped, sparse, useIds ) {
         mc.insert( toInsert );
     }
     else { // Otherwise avoid the auto generated _id.
-        mc._mongo.insert( mc._fullName, toInsert );
+        mc._mongo.insert( mc._fullName, toInsert, 0 );
     }
     
     s = rt.start( false ); // slave

@@ -82,6 +82,7 @@ namespace mongo {
         // accessors
         //
 
+        bool isOK() const { return code() == ErrorCodes::OK; }
         ErrorCodes::Error code() const { return _error->code; }
         const char* codeString() const { return ErrorCodes::errorString(_error->code); }
         const std::string& reason() const { return _error->reason; }

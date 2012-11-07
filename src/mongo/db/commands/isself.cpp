@@ -1,5 +1,21 @@
 // isself.cpp
 
+/**
+*    Copyright (C) 2012 10gen Inc.
+*
+*    This program is free software: you can redistribute it and/or  modify
+*    it under the terms of the GNU Affero General Public License, version 3,
+*    as published by the Free Software Foundation.
+*
+*    This program is distributed in the hope that it will be useful,
+*    but WITHOUT ANY WARRANTY; without even the implied warranty of
+*    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+*    GNU Affero General Public License for more details.
+*
+*    You should have received a copy of the GNU Affero General Public License
+*    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+*/
+
 #include "pch.h"
 #include "../../util/net/listen.h"
 #include "../commands.h"
@@ -73,11 +89,11 @@ namespace mongo {
         addrs = NULL;
 
         if (logLevel >= 1) {
-            log(1) << "getMyAddrs():";
+            LOG(1) << "getMyAddrs():";
             for (vector<string>::const_iterator it=out.begin(), end=out.end(); it!=end; ++it) {
-                log(1) << " [" << *it << ']';
+                LOG(1) << " [" << *it << ']';
             }
-            log(1) << endl;
+            LOG(1) << endl;
         }
 
         return out;
@@ -117,11 +133,11 @@ namespace mongo {
         freeaddrinfo(addrs);
 
         if (logLevel >= 1) {
-            log(1) << "getallIPs(\"" << iporhost << "\"):";
+            LOG(1) << "getallIPs(\"" << iporhost << "\"):";
             for (vector<string>::const_iterator it=out.begin(), end=out.end(); it!=end; ++it) {
-                log(1) << " [" << *it << ']';
+                LOG(1) << " [" << *it << ']';
             }
-            log(1) << endl;
+            LOG(1) << endl;
         }
 
         return out;

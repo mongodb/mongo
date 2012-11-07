@@ -27,9 +27,8 @@
 namespace mongo {
     const char DocumentSourceLimit::limitName[] = "$limit";
 
-    DocumentSourceLimit::DocumentSourceLimit(
-        const intrusive_ptr<ExpressionContext> &pExpCtx):
-        DocumentSource(pExpCtx),
+    DocumentSourceLimit::DocumentSourceLimit(const intrusive_ptr<ExpressionContext> &pExpCtx):
+        SplittableDocumentSource(pExpCtx),
         limit(0),
         count(0) {
     }
@@ -68,7 +67,7 @@ namespace mongo {
 
             pCurrent.reset();
 
-            // This is requried for the DocumentSourceCursor to release its read lock, see
+            // This is required for the DocumentSourceCursor to release its read lock, see
             // SERVER-6123.
             pSource->dispose();
 

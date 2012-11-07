@@ -176,8 +176,8 @@ namespace mongo {
     inline std::string causedBy( const std::exception& e ){ return causedBy( e.what() ); }
     inline std::string causedBy( const std::string& e ){ return causedBy( e.c_str() ); }
 
-    /** abends on condition failure */
-    inline void fassert( int msgid , bool testOK ) { if ( ! testOK ) fassertFailed( msgid ); }
+    /** aborts on condition failure */
+    inline void fassert(int msgid, bool testOK) {if (MONGO_unlikely(!testOK)) fassertFailed(msgid);}
 
 
     /* "user assert".  if asserts, user did something wrong, not our code */

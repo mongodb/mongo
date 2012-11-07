@@ -66,7 +66,7 @@ namespace mongo {
 
     /**
      * this is a cursor that works over a set of servers
-     * can be used in serial/paralellel as controlled by sub classes
+     * can be used in serial/parallel as controlled by sub classes
      */
     class ClusteredCursor {
     public:

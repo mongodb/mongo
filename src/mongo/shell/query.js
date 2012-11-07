@@ -243,6 +243,7 @@ DBQuery.prototype.showDiskLoc = function() {
  * 
  * @param mode {string} read prefrence mode to use.
  * @param tagSet {Array.<Object>} optional. The list of tags to use, order matters.
+ *     Note that this object only keeps a shallow copy of this array.
  * 
  * @return this cursor
  */

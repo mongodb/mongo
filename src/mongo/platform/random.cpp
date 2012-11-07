@@ -16,7 +16,10 @@
  */
 
 #include "mongo/platform/basic.h"
+
 #include "mongo/platform/random.h"
+
+#include <cstdlib>
 
 namespace mongo {
 

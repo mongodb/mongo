@@ -45,7 +45,7 @@ namespace mongo {
         _principals[principal->getName()] = principal;
     }
 
-    Status PrincipalSet::removeByName(const std::string& name) {\
+    Status PrincipalSet::removeByName(const std::string& name) {
         unordered_map<std::string, Principal*>::iterator it = _principals.find(name);
         if (it == _principals.end()) {
             return Status(ErrorCodes::NoSuchKey,
@@ -58,7 +58,7 @@ namespace mongo {
         return Status::OK();
     }
 
-    const Principal* PrincipalSet::lookup(const std::string& name) const {
+    Principal* PrincipalSet::lookup(const std::string& name) const {
         unordered_map<std::string, Principal*>::const_iterator it = _principals.find(name);
         if (it == _principals.end()) {
             return NULL;

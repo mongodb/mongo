@@ -398,7 +398,7 @@ namespace mongo {
           Provide for conformance with the uniform function pointer signature
           required for parsing.
 
-          These create a particular comparision operand, without any
+          These create a particular comparison operand, without any
           operands.  Those must be added via ExpressionNary::addOperand().
         */
         static intrusive_ptr<ExpressionNary> createCmp();

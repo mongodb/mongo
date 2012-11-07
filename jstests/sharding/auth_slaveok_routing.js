@@ -84,6 +84,12 @@ coll.setSlaveOk( true );
  */
 ReplSetTest.awaitRSClientHosts( mongos, replTest.getSecondaries(),
     { ok : true, secondary : true });
+//
+// We also need to wait for the primary, it's possible that the mongos may think a node is a 
+// secondary but it actually changed to a primary before we send our final query.
+//
+ReplSetTest.awaitRSClientHosts( mongos, replTest.getPrimary(),
+    { ok : true, ismaster : true });
 
 // Recheck if we can still query secondaries after refreshing connections.
 jsTest.log( 'Final query to SEC' );

@@ -100,8 +100,7 @@ namespace mongo {
 
         Extent* getExtent(DiskLoc loc) const;
         Extent* _getExtent(DiskLoc loc) const;
-        Record* recordAt(DiskLoc dl);
-        Record* makeRecord(DiskLoc dl, int size);
+        Record* recordAt(DiskLoc dl) const;
         void grow(DiskLoc dl, int size);
 
         char* p() const { return (char *) _mb; }
@@ -152,9 +151,11 @@ namespace mongo {
 
         static Extent* getExtent(const DiskLoc& dl);
         static Record* getRecord(const DiskLoc& dl);
-        static DeletedRecord* makeDeletedRecord(const DiskLoc& dl, int len);
+        static DeletedRecord* getDeletedRecord(const DiskLoc& dl);
 
         void deleteRecord(const char *ns, Record *todelete, const DiskLoc& dl, bool cappedOK = false, bool noWarn = false, bool logOp=false);
+
+        void deleteRecord(NamespaceDetails* d, const char *ns, Record *todelete, const DiskLoc& dl, bool cappedOK = false, bool noWarn = false, bool logOp=false);
 
         /* does not clean up indexes, etc. : just deletes the record in the pdfile. use deleteRecord() to unindex */
         void _deleteRecord(NamespaceDetails *d, const char *ns, Record *todelete, const DiskLoc& dl);
@@ -284,6 +285,8 @@ namespace mongo {
          * and how many times we throw a PageFaultException
          */
         static void appendStats( BSONObjBuilder& b );
+
+        static void appendWorkingSetInfo( BSONObjBuilder& b );
     private:
         
         int _netLength() const { return _lengthWithHeaders - HeaderSize; }
@@ -314,6 +317,7 @@ namespace mongo {
     */
     class Extent {
     public:
+        enum { extentSignature = 0x41424344 };
         unsigned magic;
         DiskLoc myLoc;
         DiskLoc xnext, xprev; /* next/prev extent for this namespace */
@@ -353,7 +357,7 @@ namespace mongo {
         /* like init(), but for a reuse case */
         DiskLoc reuse(const char *nsname, bool newUseIsAsCapped);
 
-        bool isOk() const { return magic == 0x41424344; }
+        bool isOk() const { return magic == extentSignature; }
         void assertOk() const { verify(isOk()); }
 
         Record* newRecord(int len);
@@ -487,16 +491,12 @@ namespace mongo {
 
 namespace mongo {
 
-    inline Record* MongoDataFile::recordAt(DiskLoc dl) {
+    inline Record* MongoDataFile::recordAt(DiskLoc dl) const {
         int ofs = dl.getOfs();
-        if( ofs < DataFileHeader::HeaderSize ) badOfs(ofs); // will uassert - external call to keep out of the normal code path
-        return (Record*) (p()+ofs);
-    }
-
-    inline Record* MongoDataFile::makeRecord(DiskLoc dl, int size) {
-        int ofs = dl.getOfs();
-        if( ofs < DataFileHeader::HeaderSize ) badOfs(ofs); // will uassert - external call to keep out of the normal code path
-        return (Record*) (p()+ofs);
+        if (ofs < DataFileHeader::HeaderSize) {
+            badOfs(ofs); // will uassert - external call to keep out of the normal code path
+        }
+        return reinterpret_cast<Record*>(p() + ofs);
     }
 
     inline DiskLoc Record::getNext(const DiskLoc& myLoc) {
@@ -594,16 +594,14 @@ namespace mongo {
     }
 
     inline Record* DataFileMgr::getRecord(const DiskLoc& dl) {
-        verify( dl.a() != -1 );
-        Record* r = cc().database()->getFile(dl.a())->recordAt(dl);
-        return r;
+        verify(dl.a() != -1);
+        return cc().database()->getFile(dl.a())->recordAt(dl);
     }
 
     BOOST_STATIC_ASSERT( 16 == sizeof(DeletedRecord) );
 
-    inline DeletedRecord* DataFileMgr::makeDeletedRecord(const DiskLoc& dl, int len) {
-        verify( dl.a() != -1 );
-        return (DeletedRecord*) cc().database()->getFile(dl.a())->makeRecord(dl, sizeof(DeletedRecord));
+    inline DeletedRecord* DataFileMgr::getDeletedRecord(const DiskLoc& dl) {
+        return reinterpret_cast<DeletedRecord*>(getRecord(dl));
     }
 
     void ensureHaveIdIndex(const char *ns);

@@ -42,7 +42,7 @@ namespace replset {
         virtual void consume() = 0;
 
         // Returns the member we're currently syncing from (or NULL)
-        virtual Member* getSyncTarget() = 0;
+        virtual const Member* getSyncTarget() = 0;
 
         // wait up to 1 second for more ops to appear
         virtual void waitForMore() = 0;
@@ -74,7 +74,7 @@ namespace replset {
         // if produce thread should be running
         bool _pause;
 
-        Member* _currentSyncTarget;
+        const Member* _currentSyncTarget;
 
         // Notifier thread
 
@@ -82,7 +82,7 @@ namespace replset {
         boost::condition_variable _lastOpCond;
         boost::mutex _lastOpMutex;
 
-        Member* _oplogMarkerTarget;
+        const Member* _oplogMarkerTarget;
         OplogReader _oplogMarker; // not locked, only used by notifier thread
         OpTime _consumedOpTime; // not locked, only used by notifier thread
 
@@ -131,7 +131,7 @@ namespace replset {
 
         virtual bool peek(BSONObj* op);
         virtual void consume();
-        virtual Member* getSyncTarget();
+        virtual const Member* getSyncTarget();
         virtual void waitForMore();
 
         // For monitoring

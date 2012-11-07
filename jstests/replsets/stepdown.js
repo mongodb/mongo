@@ -75,6 +75,8 @@ catch (e) {
 print("\nawait");
 replTest.awaitReplication();
 
+// 31000 may have just voted for 31001, preventing it from becoming primary for the first 30 seconds
+// of this assert.soon
 assert.soon(function() {
     try {
         var result = master.getDB("admin").runCommand({isMaster: 1});
@@ -82,7 +84,7 @@ assert.soon(function() {
     } catch (x) {
         return false;
     }
-});
+}, 'wait for 31000 to be primary', 60000);
 
 master = replTest.getMaster();
 var firstMaster = master;

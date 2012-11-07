@@ -55,6 +55,13 @@ assert.eq( 2, coll.getIndexes().length );
 
 // make sure balancing happens
 s.awaitBalance( coll.getName(), db.getName() );
+
+// Make sure our initial balance cleanup doesn't interfere with later migrations.
+assert.soon( function(){
+    print( "Waiting for migration cleanup to occur..." );
+    return coll.count() == coll.find().itcount();
+})
+
 s.stopBalancer();
 
 //test splitting
@@ -91,6 +98,12 @@ db.getLastError();
 var result4 = admin.runCommand( { movechunk : coll.getFullName() , find : { num : 70 } , to : s.getOther( s.getServer( "test" ) ).name } );
 printjson( result4 );
 assert.eq( 1, result4.ok , "moveChunk failed after rebuilding index");
+
+// Make sure the previous migrates cleanup doesn't interfere with later tests
+assert.soon( function(){
+    print( "Waiting for migration cleanup to occur..." );
+    return coll.count() == coll.find().itcount();
+})
 
 //******************Part 3********************
 
@@ -138,6 +151,12 @@ for( i=0; i < 3; i++ ){
     var moveRes = admin.runCommand( { moveChunk : coll2 + "", find : { skey : 0 }, to : shards[1]._id } );
     assert.eq( moveRes.ok , 1 , "movechunk didn't work" );
 
+    // Make sure our migration eventually goes through before testing individual shards
+    assert.soon( function(){
+        print( "Waiting for migration cleanup to occur..." );
+        return coll2.count() == coll2.find().itcount();
+    })
+    
     // check no orphaned docs on the shards
     assert.eq( 0 , shard0.getCollection( coll2 + "" ).find().itcount() );
     assert.eq( 25 , shard1.getCollection( coll2 + "" ).find().itcount() );

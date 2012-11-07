@@ -1,5 +1,3 @@
-// stat.cpp
-
 /**
 *    Copyright (C) 2008 10gen Inc.
 *
@@ -18,19 +16,21 @@
 
 #include "pch.h"
 
-#include <boost/thread/thread.hpp>
+#include "mongo/tools/tool.h"
 
-#include "mongo/base/initializer.h"
-#include "db/json.h"
-#include "../util/net/httpclient.h"
-#include "../util/text.h"
-#include "mongo/client/dbclientcursor.h"
-#include "mongo/db/jsobjmanipulator.h"
-#include "tool.h"
-#include "stat_util.h"
 #include <fstream>
 #include <iostream>
 #include <boost/program_options.hpp>
+#include <boost/thread/thread.hpp>
+
+#include "mongo/base/initializer.h"
+#include "mongo/client/dbclientcursor.h"
+#include "mongo/db/json.h"
+#include "mongo/db/jsobjmanipulator.h"
+#include "mongo/s/cluster_constants.h"
+#include "mongo/tools/stat_util.h"
+#include "mongo/util/net/httpclient.h"
+#include "mongo/util/text.h"
 
 namespace po = boost::program_options;
 
@@ -319,7 +319,7 @@ namespace mongo {
                         if ( out["shardCursorType"].type() == Object ) {
                             state->mongos = true;
                             if ( cycleNumber % 10 == 1 ) {
-                                auto_ptr<DBClientCursor> c = conn.query( "config.shards" , BSONObj() );
+                                auto_ptr<DBClientCursor> c = conn.query( ConfigNS::shard , BSONObj() );
                                 vector<BSONObj> shards;
                                 while ( c->more() ) {
                                     shards.push_back( c->next().getOwned() );

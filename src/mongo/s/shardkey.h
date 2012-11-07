@@ -18,9 +18,12 @@
 
 #pragma once
 
+#include "mongo/db/keypattern.h"
+
 namespace mongo {
 
     class Chunk;
+    class FieldRangeSet;
 
     /* A ShardKeyPattern is a pattern indicating what data to extract from the object to make the shard key from.
        Analogous to an index key pattern.
@@ -66,7 +69,7 @@ namespace mongo {
          */
         bool hasShardKey( const BSONObj& obj ) const;
 
-        BSONObj key() const { return pattern; }
+        BSONObj key() const { return pattern.toBSON(); }
 
         string toString() const;
 
@@ -83,7 +86,7 @@ namespace mongo {
          * @return
          * true if 'this' is a prefix (not necessarily contained) of 'otherPattern'.
          */
-        bool isPrefixOf( const BSONObj& otherPattern ) const;
+        bool isPrefixOf( const KeyPattern& otherPattern ) const;
 
         /**
          * @return
@@ -106,7 +109,7 @@ namespace mongo {
          *        is never capable of being a unique index, and thus is an invalid setting
          *        for the 'uniqueIndexPattern' argument.
          */
-        bool isUniqueIndexCompatible( const BSONObj& uniqueIndexPattern ) const;
+        bool isUniqueIndexCompatible( const KeyPattern& uniqueIndexPattern ) const;
 
         /**
          * @return
@@ -115,15 +118,27 @@ namespace mongo {
          *       With our current index expression language, "special" shard keys are any keys
          *       that are not a simple list of field names and 1/-1 values.
          */
-        bool isSpecial() const;
+        bool isSpecial() const { return pattern.isSpecial(); }
 
         /**
          * @return BSONObj with _id and shardkey at front. May return original object.
          */
         BSONObj moveToFront(const BSONObj& obj) const;
 
+        /**@param queryConstraints a FieldRangeSet formed from parsing a query
+         * @return an ordered list of bounds generated using this KeyPattern
+         * and the constraints from the FieldRangeSet
+         *
+         * The value of frsp->matchPossibleForSingleKeyFRS(fromQuery) should be true,
+         * otherwise this function could throw.
+         *
+         */
+        BoundList keyBounds( const FieldRangeSet& queryConstraints ) const{
+            return pattern.keyBounds( queryConstraints );
+        }
+
     private:
-        BSONObj pattern;
+        KeyPattern pattern;
         BSONObj gMin;
         BSONObj gMax;
 
@@ -132,21 +147,7 @@ namespace mongo {
     };
 
     inline BSONObj ShardKeyPattern::extractKey(const BSONObj& from) const {
-        BSONObj k = from;
-        bool needExtraction = false;
-
-        BSONObjIterator a(from);
-        BSONObjIterator b(pattern);
-        while (a.more() && b.more()){
-            if (strcmp(a.next().fieldName(), b.next().fieldName()) != 0){
-                needExtraction = true;
-                break;
-            }
-        }
-
-        if (needExtraction || a.more() != b.more())
-            k = from.extractFields(pattern);
-
+        BSONObj k = pattern.extractSingleKey( from );
         uassert(13334, "Shard Key must be less than 512 bytes", k.objsize() < 512);
         return k;
     }

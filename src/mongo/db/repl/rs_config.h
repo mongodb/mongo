@@ -51,6 +51,12 @@ namespace mongo {
 
         static ReplSetConfig* make(BSONObj cfg, bool force=false);
 
+        /**
+         * This uses DBDirectClient to check itself for a config.  This way we don't need to connect
+         * to ourselves over the network to fetch our own config.
+         */
+        static ReplSetConfig* makeDirect();
+
         bool ok() const { return _ok; }
 
         struct TagRule;
@@ -164,13 +170,23 @@ namespace mongo {
          */
         static const int DEFAULT_HB_TIMEOUT;
 
+        /**
+         * Returns if replication chaining is allowed.
+         */
+        bool chainingAllowed() const;
+
     private:
         ReplSetConfig();
         void init(const HostAndPort& h);
         void init(BSONObj cfg, bool force);
 
-        bool _ok;
+        /**
+         * If replication can be chained. If chaining is disallowed, it can still be explicitly
+         * enabled via the replSetSyncFrom command, but it will not happen automatically.
+         */
+        bool _chainingAllowed;
         int _majority;
+        bool _ok;
 
         void from(BSONObj);
         void clear();

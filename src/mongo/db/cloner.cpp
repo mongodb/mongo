@@ -381,7 +381,7 @@ namespace mongo {
             while ( c->more() ) {
                 BSONObj collection = c->next();
 
-                log(2) << "\t cloner got " << collection << endl;
+                LOG(2) << "\t cloner got " << collection << endl;
 
                 BSONElement e = collection.getField("name");
                 if ( e.eoo() ) {
@@ -396,7 +396,7 @@ namespace mongo {
                     /* system.users and s.js is cloned -- but nothing else from system.
                      * system.indexes is handled specially at the end*/
                     if( legalClientSystemNS( from_name , true ) == 0 ) {
-                        log(2) << "\t\t not cloning because system collection" << endl;
+                        LOG(2) << "\t\t not cloning because system collection" << endl;
                         continue;
                     }
                 }
@@ -424,7 +424,7 @@ namespace mongo {
                 dbtempreleaseif r( opts.mayYield );
             }
             BSONObj collection = *i;
-            log(2) << "  really will clone: " << collection << endl;
+            LOG(2) << "  really will clone: " << collection << endl;
             const char * from_name = collection["name"].valuestr();
             BSONObj options = collection.getObjectField("options");
 
@@ -440,7 +440,7 @@ namespace mongo {
                 /* we defer building id index for performance - building it in batch is much faster */
                 userCreateNS(toname, options, err, opts.logForRepl, &wantIdIndex);
             }
-            log(1) << "\t\t cloning " << from_name << " -> " << to_name << endl;
+            LOG(1) << "\t\t cloning " << from_name << " -> " << to_name << endl;
             Query q;
             if( opts.snapshot )
                 q.snapshot();
@@ -721,6 +721,9 @@ namespace mongo {
 
     class CmdRenameCollection : public Command {
     public:
+        // Absolute maximum Namespace is 128 incl NUL
+        // Namespace is 128 minus .$ and $extra so 120 before additions
+        static const int maxNamespaceLen = 120;
         CmdRenameCollection() : Command( "renameCollection" ) {}
         virtual bool adminOnly() const {
             return true;
@@ -744,6 +747,28 @@ namespace mongo {
             if ( source.empty() || target.empty() ) {
                 errmsg = "invalid command syntax";
                 return false;
+            }
+
+            string sourceDB = nsToDatabase(source);
+            string targetDB = nsToDatabase(target);
+            string databaseName = sourceDB;
+            databaseName += ".system.indexes";
+
+            int longestIndexNameLength = 0;
+            vector<BSONObj> oldIndSpec = Helpers::findAll(databaseName, BSON("ns" << source));
+            for (size_t i = 0; i < oldIndSpec.size(); ++i) {
+                int thisLength = oldIndSpec[i].getField("name").valuesize();
+                if (thisLength > longestIndexNameLength) {
+                     longestIndexNameLength = thisLength;
+                }
+            }
+            unsigned int longestAllowed = maxNamespaceLen - longestIndexNameLength - 1;
+            if (target.size() > longestAllowed) {
+                StringBuilder sb;
+                sb << "collection name length of " << target.size()
+                << " exceeds maximum length of " << longestAllowed
+                << ", allowing for index names";
+                uasserted(16451, sb.str());
             }
 
             bool capped = false;
@@ -773,11 +798,7 @@ namespace mongo {
             // if we are renaming in the same database, just
             // rename the namespace and we're done.
             {
-                char from[256];
-                nsToDatabase( source.c_str(), from );
-                char to[256];
-                nsToDatabase( target.c_str(), to );
-                if ( strcmp( from, to ) == 0 ) {
+                if ( sourceDB == targetDB ) {
                     renameNamespace( source.c_str(), target.c_str(), cmdObj["stayTemp"].trueValue() );
                     // make sure we drop counters etc
                     Top::global.collectionDropped( source );

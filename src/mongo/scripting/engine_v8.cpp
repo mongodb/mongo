@@ -310,7 +310,7 @@ namespace mongo {
     void gcCallback(GCType type, GCCallbackFlags flags) {
         HeapStatistics stats;
         V8::GetHeapStatistics( &stats );
-        log(1) << "V8 GC heap stats - "
+        LOG(1) << "V8 GC heap stats - "
                 << " total: " << stats.total_heap_size()
                 << " exec: " << stats.total_heap_size_executable()
                 << " used: " << stats.used_heap_size()<< " limit: "
@@ -343,6 +343,10 @@ namespace mongo {
         if ( !globalScriptEngine ) {
             globalScriptEngine = new V8ScriptEngine();
         }
+    }
+
+    std::string ScriptEngine::getInterpreterVersionString() {
+        return "V8 3.12.19";
     }
 
     void V8ScriptEngine::interrupt( unsigned opSpec ) {

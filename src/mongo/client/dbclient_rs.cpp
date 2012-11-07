@@ -21,6 +21,7 @@
 
 #include <fstream>
 
+#include "mongo/base/init.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/client/connpool.h"
 #include "mongo/client/dbclientcursor.h"
@@ -32,6 +33,58 @@
 #include "mongo/util/timer.h"
 
 namespace mongo {
+    /*
+     * Set of commands that can be used with $readPreference
+     */
+    set<string> _secOkCmdList;
+
+    MONGO_INITIALIZER(PopulateReadPrefSecOkCmdList)(::mongo::InitializerContext* context) {
+        _secOkCmdList.insert("aggregate");
+        _secOkCmdList.insert("collStats");
+        _secOkCmdList.insert("count");
+        _secOkCmdList.insert("distinct");
+        _secOkCmdList.insert("dbStats");
+        _secOkCmdList.insert("geoNear");
+        _secOkCmdList.insert("geoSearch");
+        _secOkCmdList.insert("geoWalk");
+        _secOkCmdList.insert("group");
+
+        return Status::OK();
+    }
+
+    /**
+     * @param ns the namespace of the query
+     * @param queryObj the query object to check
+     *
+     * @return true if the given query can be sent to a secondary node.
+     */
+    bool isQueryOkToSecondary(const string& ns, const BSONObj& queryObj) {
+        // _secOkCmdList was not initialized! mongo::runGlobalInitializersOrDie
+        // probably was not called.
+        fassert(16464, !_secOkCmdList.empty());
+
+        if (ns.find(".$cmd") == string::npos) {
+            return true;
+        }
+
+        const string cmdName = queryObj.firstElementFieldName();
+        if (_secOkCmdList.count(cmdName) == 1) {
+            return true;
+        }
+
+        if (cmdName == "mapReduce" || cmdName == "mapreduce") {
+            if (!queryObj.hasField("out")) {
+                return false;
+            }
+
+            if (queryObj["out"]["inline"].trueValue()) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     /**
      * Selects the right node given the nodes to pick from and the preference.
      * This method does strict tag matching, and will not implicitly fallback
@@ -74,7 +127,7 @@ namespace mongo {
             const ReplicaSetMonitor::Node& node = nodes[nextNodeIndex];
 
             if (!node.ok) {
-                log(2) << "dbclient_rs not selecting " << node << ", not currently ok" << endl;
+                LOG(2) << "dbclient_rs not selecting " << node << ", not currently ok" << endl;
                 continue;
             }
 
@@ -88,7 +141,7 @@ namespace mongo {
 
                 if (node.isLocalSecondary(localThresholdMillis)) {
                     // found a local node.  return early.
-                    log(2) << "dbclient_rs getSlave found local secondary for queries: "
+                    LOG(2) << "dbclient_rs _selectNode found local secondary for queries: "
                            << nextNodeIndex << ", ping time: " << node.pingTimeMillis << endl;
                     *lastHost = fallbackHost;
                     return fallbackHost;
@@ -282,7 +335,7 @@ namespace mongo {
         if ( createFromSeed ) {
             map<string,vector<HostAndPort> >::const_iterator j = _seedServers.find( name );
             if ( j != _seedServers.end() ) {
-                log(4) << "Creating ReplicaSetMonitor from cached address" << endl;
+                LOG(4) << "Creating ReplicaSetMonitor from cached address" << endl;
                 ReplicaSetMonitorPtr& m = _sets[name];
                 verify( !m );
                 m.reset( new ReplicaSetMonitor( name, j->second ) );
@@ -334,7 +387,7 @@ namespace mongo {
     }
 
     void ReplicaSetMonitor::_remove_inlock( const string& name, bool clearSeedCache ) {
-        log(2) << "Removing ReplicaSetMonitor for " << name << " from replica set table" << endl;
+        LOG(2) << "Removing ReplicaSetMonitor for " << name << " from replica set table" << endl;
         _sets.erase( name );
         if ( clearSeedCache ) {
             _seedServers.erase( name );
@@ -459,21 +512,21 @@ namespace mongo {
                         return fallbackNode;
                     else if ( _nodes[ _nextSlave ].isLocalSecondary( _localThresholdMillis ) ) {
                         // found a local slave.  return early.
-                        log(2) << "dbclient_rs getSlave found local secondary for queries: "
+                        LOG(2) << "dbclient_rs getSlave found local secondary for queries: "
                                << _nextSlave << ", ping time: "
                                << _nodes[ _nextSlave ].pingTimeMillis << endl;
                         return fallbackNode;
                     }
                 }
                 else
-                    log(2) << "dbclient_rs getSlave not selecting " << _nodes[_nextSlave]
+                    LOG(2) << "dbclient_rs getSlave not selecting " << _nodes[_nextSlave]
                            << ", not currently okForSecondaryQueries" << endl;
             }
         }
 
         if ( ! fallbackNode.empty() ) {
             // use a non-local secondary, even if local was preferred
-            log(1) << "dbclient_rs getSlave falling back to a non-local secondary node" << endl;
+            LOG(1) << "dbclient_rs getSlave falling back to a non-local secondary node" << endl;
             return fallbackNode;
         }
 
@@ -482,7 +535,7 @@ namespace mongo {
                 _master < static_cast<int>(_nodes.size()) && _nodes[_master].ok);
 
         // Fall back to primary
-        log(1) << "dbclient_rs getSlave no member in secondary state found, "
+        LOG(1) << "dbclient_rs getSlave no member in secondary state found, "
                   "returning primary " << _nodes[ _master ] << endl;
         return _nodes[_master].addr;
     }
@@ -734,7 +787,7 @@ namespace mongo {
                 node.lastIsMaster = o.copy();
             }
 
-            log( ! verbose ) << "ReplicaSetMonitor::_checkConnection: " << conn->toString()
+            LOG( verbose ? 0 : 1 ) << "ReplicaSetMonitor::_checkConnection: " << conn->toString()
                              << ' ' << o << endl;
             
             // add other nodes
@@ -757,7 +810,7 @@ namespace mongo {
 
         }
         catch ( std::exception& e ) {
-            log( ! verbose ) << "ReplicaSetMonitor::_checkConnection: caught exception "
+            LOG( verbose ? 0 : 1 ) << "ReplicaSetMonitor::_checkConnection: caught exception "
                              << conn->toString() << ' ' << e.what() << endl;
 
             errorOccured = true;
@@ -1440,7 +1493,8 @@ namespace mongo {
                                                        int queryOptions,
                                                        int batchSize) {
         if ((queryOptions & QueryOption_SlaveOk) ||
-                query.obj.hasField("$readPreference")) {
+                (query.obj.hasField("$readPreference") &&
+                        isQueryOkToSecondary(ns, query.obj["query"].Obj()))) {
             ReadPreference pref;
             scoped_ptr<TagSet> tags(_extractReadPref(query.obj, &pref));
 
@@ -1507,7 +1561,7 @@ namespace mongo {
     }
 
     void DBClientReplicaSet::killCursor( long long cursorID ) {
-        // we should neve call killCursor on a replica set conncetion
+        // we should never call killCursor on a replica set connection
         // since we don't know which server it belongs to
         // can't assume master because of slave ok
         // and can have a cursor survive a master change
@@ -1584,6 +1638,7 @@ namespace mongo {
             // TODO: might be possible to do this faster by changing api
             DbMessage dm(toSend);
             QueryMessage qm(dm);
+
             const bool slaveOk = qm.queryOptions & QueryOption_SlaveOk;
             if (slaveOk || qm.query.hasField("$readPreference")) {
                 ReadPreference pref;

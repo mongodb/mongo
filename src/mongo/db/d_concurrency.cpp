@@ -31,6 +31,7 @@
 #include "server.h"
 #include "dur.h"
 #include "lockstat.h"
+#include "mongo/db/commands/server_status.h"
 
 // oplog locking
 // no top level read locks
@@ -200,20 +201,6 @@ namespace mongo {
         return &qlk.stats;
     }
     
-    void reportLockStats(BSONObjBuilder& result) {
-        BSONObjBuilder b;
-        b.append(".", qlk.stats.report());
-        b.append("admin", nestableLocks[Lock::admin]->stats.report());
-        b.append("local", nestableLocks[Lock::local]->stats.report());
-        {
-            mapsf<string,WrapperForRWLock*>::ref r(dblocks);
-            for( unordered_map<string,WrapperForRWLock*>::const_iterator i = r.r.begin(); i != r.r.end(); i++ ) {
-                b.append(i->first, i->second->stats.report());
-            }
-        }
-        result.append("locks", b.obj());
-    }
-
     int Lock::isLocked() {
         return threadState();
     }
@@ -812,5 +799,71 @@ namespace mongo {
     void unlocking_W() {
         dur::releasingWriteLock();
     }
+
+ 
+    class GlobalLockServerStatusSection : public ServerStatusSection {
+    public:
+        GlobalLockServerStatusSection() : ServerStatusSection( "globalLock" ){
+            _started = curTimeMillis64();
+        }
+
+        virtual bool includeByDefault() const { return true; }
+        virtual bool adminOnly() const { return false; }
+
+        virtual BSONObj generateSection( const BSONElement& configElement, bool userIsAdmin ) const {
+            BSONObjBuilder t;
+            
+            t.append( "totalTime" , (long long)(1000 * ( curTimeMillis64() - _started ) ) );
+            t.append( "lockTime" , Lock::globalLockStat()->getTimeLocked( 'W' ) );
+            
+            {
+                BSONObjBuilder ttt( t.subobjStart( "currentQueue" ) );
+                int w=0, r=0;
+                Client::recommendedYieldMicros( &w , &r, true );
+                ttt.append( "total" , w + r );
+                ttt.append( "readers" , r );
+                ttt.append( "writers" , w );
+                ttt.done();
+            }
+            
+            {
+                BSONObjBuilder ttt( t.subobjStart( "activeClients" ) );
+                int w=0, r=0;
+                Client::getActiveClientCount( w , r );
+                ttt.append( "total" , w + r );
+                ttt.append( "readers" , r );
+                ttt.append( "writers" , w );
+                ttt.done();
+            }
+            
+            return t.obj();
+        }
+        
+    private:
+        unsigned long long _started;        
+        
+    } globalLockServerStatusSection;
+
+    class LockStatsServerStatusSection : public ServerStatusSection {
+    public:
+        LockStatsServerStatusSection() : ServerStatusSection( "locks" ){}
+        virtual bool includeByDefault() const { return true; }
+        virtual bool adminOnly() const { return false; }
+        
+        BSONObj generateSection( const BSONElement& configElement, bool userIsAdmin ) const {
+            BSONObjBuilder b;
+            b.append(".", qlk.stats.report());
+            b.append("admin", nestableLocks[Lock::admin]->stats.report());
+            b.append("local", nestableLocks[Lock::local]->stats.report());
+            {
+                mapsf<string,WrapperForRWLock*>::ref r(dblocks);
+                for( unordered_map<string,WrapperForRWLock*>::const_iterator i = r.r.begin(); i != r.r.end(); i++ ) {
+                    b.append(i->first, i->second->stats.report());
+                }
+            }
+            return b.obj();
+        }
+
+    } lockStatsServerStatusSection;
 
 }

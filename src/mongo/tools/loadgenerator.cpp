@@ -228,14 +228,12 @@ void collectAllStats( const BenchRunStats& stats, OpStatsMap& allStats ) {
     allStats.insert( std::make_pair("findOne",
                                     OperationStats(stats.findOneCounter.getNumEvents(),
                                                    stats.findOneCounter.getTotalTimeMicros(),
-                                                   mapFindWithDefault<std::string, long long>
-                                                   (stats.opcounters, "query", 0)
+                                                   mapFindWithDefault(stats.opcounters, "query", 0)
                                                    )) );
     allStats.insert( std::make_pair("insert",
                                     OperationStats(stats.insertCounter.getNumEvents(),
                                                    stats.insertCounter.getTotalTimeMicros(),
-                                                   mapFindWithDefault<std::string, long long>
-                                                   (stats.opcounters, "insert", 0)
+                                                   mapFindWithDefault(stats.opcounters, "insert", 0)
                                                    )) );
 
 }

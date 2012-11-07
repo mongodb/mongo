@@ -357,6 +357,11 @@ namespace mongo {
     }
 
     void SyncClusterConnection::insert( const string &ns, const vector< BSONObj >& v , int flags) {
+        if (v.size() == 1){
+            insert(ns, v[0], flags);
+            return;
+        }
+
         uassert( 10023 , "SyncClusterConnection bulk insert not implemented" , 0);
     }
 

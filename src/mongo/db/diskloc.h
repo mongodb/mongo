@@ -40,7 +40,7 @@ namespace mongo {
         (such as adding a virtual function)
      */
     class DiskLoc {
-        int _a;     // this will be volume, file #, etsc. but is a logical value could be anything depending on storage engine
+        int _a;     // this will be volume, file #, etc. but is a logical value could be anything depending on storage engine
         int ofs;
 
     public:
@@ -80,7 +80,7 @@ namespace mongo {
             if ( isNull() )
                 return "null";
             stringstream ss;
-            ss << hex << _a << ':' << ofs;
+            ss << _a << ':' << hex << ofs;
             return ss.str();
         }
 

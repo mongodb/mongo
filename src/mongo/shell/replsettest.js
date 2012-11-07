@@ -460,11 +460,9 @@ ReplSetTest.prototype.initiate = function( cfg , initCmd , timeout ) {
 
     // Setup authentication if running test with authentication
     if (jsTestOptions().keyFile && !this.keyFile) {
-        if (!this.shardSvr) {
-            master = this.getMaster();
-            jsTest.addAuth(master);
-            jsTest.authenticateNodes(this.nodes);
-        }
+        master = this.getMaster();
+        jsTest.addAuth(master);
+        jsTest.authenticateNodes(this.nodes);
     }
 }
 

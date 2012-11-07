@@ -18,14 +18,19 @@
 
 #pragma once
 
-#include "cursor.h"
-#include "queryutil.h"
-#include "matcher.h"
-#include "explain.h"
-#include "../util/net/listen.h"
+#include "mongo/base/disallow_copying.h"
+#include "mongo/db/clientcursor.h"
+#include "mongo/db/cursor.h"
+#include "mongo/db/explain.h"
+#include "mongo/db/matcher.h"
+#include "mongo/db/queryoptimizercursor.h"
 #include "mongo/db/querypattern.h"
+#include "mongo/db/queryutil.h"
+#include "mongo/util/elapsed_tracker.h"
 
 namespace mongo {
+
+    static const int OutOfOrderDocumentsAssertionCode = 14810;
 
     class IndexDetails;
     class IndexType;
@@ -70,10 +75,13 @@ namespace mongo {
         /** @return true if ScanAndOrder processing will be required for result set. */
         bool scanAndOrderRequired() const { return _scanAndOrderRequired; }
         /**
-         * @return true if the index we are using has keys such that it can completely resolve the
-         * query expression to match by itself without ever checking the main object.
+         * @return false if document matching can be determined entirely using index keys and the
+         * FieldRangeSetPair generated for the query, without using a Matcher.  This function may
+         * return false positives but not false negatives.  For example, if the field range set's
+         * mustBeExactMatchRepresentation() returns a false negative, this function will return a
+         * false positive.
          */
-        bool exactKeyMatch() const { return _exactKeyMatch; }
+        bool mayBeMatcherNecessary() const { return _matcherNecessary; }
         /** @return true if this QueryPlan would perform an unindexed scan. */
         bool willScanTable() const { return _idxNo < 0 && ( _utility != Impossible ); }
         /** @return 'special' attribute of the plan, which was either set explicitly or generated from the index. */
@@ -140,7 +148,7 @@ namespace mongo {
         shared_ptr<const ParsedQuery> _parsedQuery;
         const IndexDetails * _index;
         bool _scanAndOrderRequired;
-        bool _exactKeyMatch;
+        bool _matcherNecessary;
         int _direction;
         shared_ptr<FieldRangeVector> _frv;
         shared_ptr<FieldRangeVector> _originalFrv;
@@ -178,120 +186,235 @@ namespace mongo {
     };
 
     /**
-     * NOTE This interface is deprecated and will be replaced by a special purpose delegation class
-     * for the query optimizer cursor (QueryOptimizerCursorOp).
+     * Helper class for a QueryPlanRunner to cache and count matches.  One object of this type is
+     * used per candidate QueryPlan (as there is one QueryPlanRunner per QueryPlan).
      *
-     * Inherit from this interface to implement a new query operation.
-     * The query optimizer will clone the QueryOp that is provided, giving
-     * each clone its own query plan.
-     *
-     * Normal sequence of events:
-     * 1) A new QueryOp is generated using createChild().
-     * 2) A QueryPlan is assigned to this QueryOp with setQueryPlan().
-     * 3) _init() is called on the QueryPlan.
-     * 4) next() is called repeatedly, with nscanned() checked after each call.
-     * 5) In one of these calls to next(), setComplete() is called.
-     * 6) The QueryPattern for the QueryPlan may be recorded as a winner.
+     * Typical usage:
+     * 1) resetMatch() - reset stored match value to Unkonwn.
+     * 2) setMatch() - set match value to a definite true/false value.
+     * 3) knowMatch() - check if setMatch() has been called.
+     * 4) incMatch() - increment count if match is true.
      */
-    class QueryOp : private boost::noncopyable {
+    class CachedMatchCounter {
     public:
-        QueryOp() : _complete(), _stopRequested(), _queryPlan(), _error() {}
-
-        virtual ~QueryOp() {}
-
-        /** @return QueryPlan assigned to this QueryOp by the query optimizer. */
-        const QueryPlan &queryPlan() const { return *_queryPlan; }
-                
-        /** Advance to next potential matching document (eg using a cursor). */
-        virtual void next() = 0;
         /**
-         * @return current 'nscanned' metric for this QueryOp.  Used to compare
-         * cost to other QueryOps.
+         * @param aggregateNscanned - shared count of nscanned for this and other plans.
+         * @param cumulativeCount - starting point for accumulated count over a series of plans.
          */
-        virtual long long nscanned() = 0;
+        CachedMatchCounter( long long& aggregateNscanned, int cumulativeCount );
+        
+        /** Set whether dup checking is enabled when counting. */
+        void setCheckDups( bool checkDups ) { _checkDups = checkDups; }
+        
+        void resetMatch();
+
+        /** @return true if the match was not previously recorded. */
+        bool setMatch( bool match );
+        
+        bool knowMatch() const { return _match != Unknown; }
+
+        void incMatch( const DiskLoc& loc );
+
+        bool wouldIncMatch( const DiskLoc& loc ) const;
+        
+        bool enoughCumulativeMatchesToChooseAPlan() const;
+        
+        bool enoughMatchesToRecordPlan() const;
+        
+        int cumulativeCount() const { return _cumulativeCount; }
+        int count() const { return _count; }
+        
+        /** Update local and aggregate nscanned counts. */
+        void updateNscanned( long long nscanned );
+
+        long long nscanned() const { return _nscanned; }
+        long long& aggregateNscanned() const { return _aggregateNscanned; }
+
+    private:
+        bool getsetdup( const DiskLoc& loc );
+        bool getdup( const DiskLoc& loc ) const;
+
+        long long& _aggregateNscanned;
+        long long _nscanned;
+        int _cumulativeCount;
+        int _count;
+        bool _checkDups;
+        enum MatchState { Unknown, False, True };
+        MatchState _match;
+        bool _counted;
+        set<DiskLoc> _dups;
+    };
+
+    /**
+     * Iterates through a QueryPlan's candidate matches, keeping track of accumulated nscanned.
+     * Generally used along with runners for other QueryPlans in a QueryPlanRunnerQueue priority
+     * queue.  Eg if there are three candidate QueryPlans evaluated in parallel, there are three
+     * QueryPlanRunners, one checking for matches on each query.
+     *
+     * Typical usage:
+     * 1) A new QueryPlanRunner is generated using createChild().
+     * 2) A QueryPlan is assigned using setQueryPlan().
+     * 3) init() is called to initialize the runner.
+     * 4) next() is called repeatedly, with nscanned() checked after each call.
+     * 5) In one of these calls to next(), setComplete() is called internally.
+     * 6) The QueryPattern for the QueryPlan may be recorded as a winning plan.
+     */
+    class QueryPlanRunner {
+        MONGO_DISALLOW_COPYING( QueryPlanRunner );
+    public:
+        /**
+         * @param aggregateNscanned Shared long long counting total nscanned for runners for all
+         *     cursors.
+         * @param selectionPolicy Characterizes the set of QueryPlans allowed for this operation.
+         *     See queryoptimizercursor.h for more information.
+         * @param requireOrder Whether only ordered plans are allowed.
+         * @param alwaysCountMatches Whether matches are to be counted regardless of ordering.
+         * @param cumulativeCount Total count.
+         */
+        QueryPlanRunner( long long& aggregateNscanned,
+                         const QueryPlanSelectionPolicy& selectionPolicy,
+                         const bool& requireOrder,
+                         bool alwaysCountMatches,
+                         int cumulativeCount = 0 );
+
+        /** @return QueryPlan assigned to this runner by the query optimizer. */
+        const QueryPlan& queryPlan() const { return *_queryPlan; }
+                
+        /** Advance to the next potential matching document (eg using a cursor). */
+        void next();
+
+        /**
+         * @return current 'nscanned' metric for this runner.  Used to compare cost to other
+         * runners.
+         */
+        long long nscanned() const;
+
         /** Take any steps necessary before the db mutex is yielded. */
-        virtual void prepareToYield() = 0;
+        void prepareToYield();
+
         /** Recover once the db mutex is regained. */
-        virtual void recoverFromYield() = 0;
+        void recoverFromYield();
+
+        /** Take any steps necessary before an earlier iterate of the cursor is modified. */
+        void prepareToTouchEarlierIterate();
+
+        /** Recover after the earlier iterate is modified. */
+        void recoverFromTouchingEarlierIterate();
+
+        DiskLoc currLoc() const { return _c ? _c->currLoc() : DiskLoc(); }
+        BSONObj currKey() const { return _c ? _c->currKey() : BSONObj(); }
+        bool currentMatches( MatchDetails* details );
         
         /**
-         * @return true iff the QueryPlan for this QueryOp may be registered
+         * @return true iff the QueryPlan for this runner may be registered
          * as a winning plan.
          */
-        virtual bool mayRecordPlan() const = 0;
+        bool mayRecordPlan() const;
+
+        shared_ptr<Cursor> cursor() const { return _c; }
 
         /** @return true iff the implementation called setComplete() or setStop(). */
         bool complete() const { return _complete; }
-        /** @return true iff the implementation called steStop(). */
+        /** @return true iff the implementation called setStop(). */
         bool stopRequested() const { return _stopRequested; }
         bool completeWithoutStop() const { return complete() && !stopRequested(); }
-        /** @return true iff the implementation threw an exception. */
+        /** @return true iff the implementation errored out. */
         bool error() const { return _error; }
-        /** @return the exception thrown by implementation if one was thrown. */
+        /** @return the error information. */
         ExceptionInfo exception() const { return _exception; }
         
         /** To be called by QueryPlanSet::Runner only. */
         
         /**
          * @return a copy of the inheriting class, which will be run with its own query plan.  The
-         * child QueryOp will assume its parent QueryOp has completed execution.
+         * child runner will assume its parent runner has completed execution.
          */
-        virtual QueryOp *createChild() const = 0;
-        void setQueryPlan( const QueryPlan *queryPlan ) {
-            _queryPlan = queryPlan;
-            verify( _queryPlan != NULL );
-        }
+        QueryPlanRunner* createChild() const;
+
+        void setQueryPlan( const QueryPlan* queryPlan );
+
         /** Handle initialization after a QueryPlan has been set. */
-        virtual void init() = 0;
-        void setException( const DBException &e ) {
-            _error = true;
-            _exception = e.getInfo();
-        }
+        void init();
+
+        void setException( const DBException& e );
 
         /** @return an ExplainPlanInfo object that will be updated as the query runs. */
-        virtual shared_ptr<ExplainPlanInfo> generateExplainInfo() {
-            return shared_ptr<ExplainPlanInfo>( new ExplainPlanInfo() );
+        shared_ptr<ExplainPlanInfo> generateExplainInfo();
+        shared_ptr<ExplainPlanInfo> explainInfo() const { return _explainPlanInfo; }
+
+        const Projection::KeyOnly* keyFieldsOnly() const {
+            return queryPlan().keyFieldsOnly().get();
         }
         
-    protected:
+    private:
         /** Call if all results have been found. */
         void setComplete() { _complete = true; }
         /** Call if the scan is complete even if not all results have been found. */
         void setStop() { setComplete(); _stopRequested = true; }
 
-    private:
+        void mayAdvance();
+        bool countingMatches();
+        bool countMatches() const;
+        /**
+         * @return true if the results generated by this query plan will be loaded from the record
+         *     store (not built from an index entry).
+         */
+        bool hasDocumentLoadingQueryPlan() const;
+
+        void recordCursorLocation();
+        void checkCursorAdvanced();
+        void handleCursorAdvanced();
+        void checkCursorOrdering();
+
         bool _complete;
         bool _stopRequested;
         ExceptionInfo _exception;
-        const QueryPlan *_queryPlan;
+        const QueryPlan* _queryPlan;
         bool _error;
+        CachedMatchCounter _matchCounter;
+        bool _countingMatches;
+        bool _mustAdvance;
+        bool _capped;
+        shared_ptr<Cursor> _c;
+        ClientCursor::Holder _cc;
+        DiskLoc _posBeforeYield;
+        ClientCursor::YieldData _yieldData;
+        const QueryPlanSelectionPolicy& _selectionPolicy;
+        const bool& _requireOrder; // TODO don't use a ref for this, but signal change explicitly
+        shared_ptr<ExplainPlanInfo> _explainPlanInfo;
+        bool _alwaysCountMatches;
     };
 
-    // temp.  this class works if T::operator< is variant unlike a regular stl priority queue.
-    // but it's very slow.  however if v.size() is always very small, it would be fine, 
-    // maybe even faster than a smart impl that does more memory allocations.
+    /**
+     * This class works if T::operator< is variant unlike a regular stl priority queue, but it's
+     * very slow.  However if _vec.size() is always very small, it would be fine, maybe even faster
+     * than a smart impl that does more memory allocations.
+     * TODO Clean up this temporary code.
+     */
     template<class T>
-    class our_priority_queue : boost::noncopyable { 
-        vector<T> v;
+    class PriorityQueue {
+        MONGO_DISALLOW_COPYING( PriorityQueue );
     public:
-        our_priority_queue() { 
-            v.reserve(4);
+        PriorityQueue() {
+            _vec.reserve(4);
         }
-        int size() const { return v.size(); }
-        bool empty() const { return v.empty(); }
+        int size() const { return _vec.size(); }
+        bool empty() const { return _vec.empty(); }
         void push(const T & x) { 
-            v.push_back(x); 
+            _vec.push_back(x);
         }
         T pop() { 
             size_t t = 0;
-            for( size_t i = 1; i < v.size(); i++ ) { 
-                if( v[t] < v[i] )
+            for( size_t i = 1; i < _vec.size(); i++ ) {
+                if( _vec[t] < _vec[i] )
                     t = i;
             }
-            T ret = v[t];
-            v.erase(v.begin()+t);
+            T ret = _vec[t];
+            _vec.erase(_vec.begin()+t);
             return ret;
         }
+    private:
+        vector<T> _vec;
     };
 
     class QueryPlanSet;
@@ -348,14 +471,11 @@ namespace mongo {
         bool _allowSpecial;
     };
 
-    /**
-     * A set of candidate query plans for a query.  This class can return a best guess plan or run a
-     * QueryOp on all the plans.
-     */
+    /** A set of candidate query plans for a query. */
     class QueryPlanSet {
     public:
         typedef boost::shared_ptr<QueryPlan> QueryPlanPtr;
-        typedef vector<QueryPlanPtr> PlanSet;
+        typedef vector<QueryPlanPtr> PlanVector;
 
         /**
          * @param originalFrsp - original constraints for this query clause; if null, frsp will be
@@ -408,59 +528,16 @@ namespace mongo {
         void setCachedPlan( const QueryPlanPtr &plan, const CachedQueryPlan &cachedPlan );
         /** Add a candidate query plan, potentially one of many. */
         void addCandidatePlan( const QueryPlanPtr &plan );
+
+        const PlanVector& plans() const { return _plans; }
+        bool mayRecordPlan() const { return _mayRecordPlan; }
+        int oldNScanned() const { return _oldNScanned; }
+        void addFallbackPlans();
+        void setUsingCachedPlan( bool usingCachedPlan ) { _usingCachedPlan = usingCachedPlan; }
         
         //for testing
         bool modifiedKeys() const;
         bool hasMultiKey() const;
-
-        class Runner {
-        public:
-            Runner( QueryPlanSet &plans, QueryOp &op );
-            
-            /**
-             * Advance the runner, if it is not done().
-             * @return the next non error op if there is one, otherwise an error op.
-             * If the returned op is complete() or error(), the Runner becomes done().
-             */
-            shared_ptr<QueryOp> next();
-            /** @return true if done iterating. */
-            bool done() const { return _done; }
-            
-            void prepareToYield();
-            void recoverFromYield();
-            
-            /** @return an ExplainClauseInfo object that will be updated as the query runs. */
-            shared_ptr<ExplainClauseInfo> generateExplainInfo() {
-                _explainClauseInfo.reset( new ExplainClauseInfo() );
-                return _explainClauseInfo;
-            }
-
-        private:
-            QueryOp &_op;
-            QueryPlanSet &_plans;
-            static void initOp( QueryOp &op );
-            static void nextOp( QueryOp &op );
-            static void prepareToYieldOp( QueryOp &op );
-            static void recoverFromYieldOp( QueryOp &op );
-            
-            /** Initialize the Runner. */
-            shared_ptr<QueryOp> init();
-            /** Move the Runner forward one iteration, and @return the plan for the iteration. */
-            shared_ptr<QueryOp> _next();
-
-            vector<shared_ptr<QueryOp> > _ops;
-            struct OpHolder {
-                OpHolder( const shared_ptr<QueryOp> &op ) : _op( op ), _offset() {}
-                shared_ptr<QueryOp> _op;
-                long long _offset;
-                bool operator<( const OpHolder &other ) const {
-                    return _op->nscanned() + _offset > other._op->nscanned() + other._offset;
-                }
-            };
-            our_priority_queue<OpHolder> _queue;
-            shared_ptr<ExplainClauseInfo> _explainClauseInfo;
-            bool _done;
-        };
 
     private:
 
@@ -477,13 +554,12 @@ namespace mongo {
                      bool allowSpecial );
         void init();
 
-        void addFallbackPlans();
         void pushPlan( const QueryPlanPtr& plan );
 
         QueryPlanGenerator _generator;
         BSONObj _originalQuery;
         auto_ptr<FieldRangeSetPair> _frsp;
-        PlanSet _plans;
+        PlanVector _plans;
         bool _mayRecordPlan;
         bool _usingCachedPlan;
         CandidatePlanCharacter _cachedPlanCharacter;
@@ -491,6 +567,67 @@ namespace mongo {
         long long _oldNScanned;
         ElapsedTracker _yieldSometimesTracker;
         bool _allowSpecial;
+    };
+
+    /**
+     * A priority queue of QueryPlanRunners ordered by their nscanned values.  The QueryPlanRunners
+     * are iterated sequentially and reinserted into the queue until one runner completes or all
+     * runners error out.
+     */
+    class QueryPlanRunnerQueue {
+    public:
+        QueryPlanRunnerQueue( QueryPlanSet& plans, const QueryPlanRunner& prototypeRunner );
+        
+        /**
+         * Pull a runner from the priority queue, advance it if possible, re-insert it into the
+         * queue if it is not done, and return it.  But if this runner errors out, retry with
+         * another runner until a non error runner is found or all runners have errored out.
+         * @return the next non error runner if there is one, otherwise an error runner.
+         * If the returned runner is complete() or error(), this queue becomes done().
+         */
+        shared_ptr<QueryPlanRunner> next();
+        /** @return true if done iterating. */
+        bool done() const { return _done; }
+
+        /** Prepare all runners for a database mutex yield. */
+        void prepareToYield();
+        /** Restore all runners after a database mutex yield. */
+        void recoverFromYield();
+        
+        /** @return an ExplainClauseInfo object that will be updated as the query runs. */
+        shared_ptr<ExplainClauseInfo> generateExplainInfo() {
+            _explainClauseInfo.reset( new ExplainClauseInfo() );
+            return _explainClauseInfo;
+        }
+
+    private:
+        const QueryPlanRunner& _prototypeRunner;
+        QueryPlanSet& _plans;
+        static void initRunner( QueryPlanRunner& runner );
+        static void nextRunner( QueryPlanRunner& runner );
+        static void prepareToYieldRunner( QueryPlanRunner& runner );
+        static void recoverFromYieldRunner( QueryPlanRunner& runner );
+        
+        /** Initialize the Runner. */
+        shared_ptr<QueryPlanRunner> init();
+        /** Move the Runner forward one iteration, and @return the plan for the iteration. */
+        shared_ptr<QueryPlanRunner> _next();
+
+        vector<shared_ptr<QueryPlanRunner> > _runners;
+        struct RunnerHolder {
+            RunnerHolder( const shared_ptr<QueryPlanRunner>& runner ) :
+                _runner( runner ),
+                _offset() {
+            }
+            shared_ptr<QueryPlanRunner> _runner;
+            long long _offset;
+            bool operator<( const RunnerHolder& other ) const {
+                return _runner->nscanned() + _offset > other._runner->nscanned() + other._offset;
+            }
+        };
+        PriorityQueue<RunnerHolder> _queue;
+        shared_ptr<ExplainClauseInfo> _explainClauseInfo;
+        bool _done;
     };
 
     /** Handles $or type queries by generating a QueryPlanSet for each $or clause. */
@@ -508,17 +645,19 @@ namespace mongo {
                                       const BSONObj &min = BSONObj(),
                                       const BSONObj &max = BSONObj() );
 
-        /** Set the initial QueryOp for QueryPlanSet iteration. */
-        void initialOp( const shared_ptr<QueryOp> &originalOp ) { _baseOp = originalOp; }
+        /** Set the originalRunner for QueryPlanSet iteration. */
+        void initialRunner( const shared_ptr<QueryPlanRunner>& originalRunner ) {
+            _baseRunner = originalRunner;
+        }
         /**
-         * Advance to the next QueryOp, if not doneOps().
-         * @return the next non error op if there is one, otherwise an error op.
-         * If the returned op is complete() or error(), the MultiPlanScanner becomes doneOps() and
-         * no further QueryOp iteration is possible.
+         * Advance to the next runner, if not doneRunners().
+         * @return the next non error runner if there is one, otherwise an error runner.
+         * If the returned runner is complete() or error(), the MultiPlanScanner becomes
+         * doneRunners() and no further runner iteration is possible.
          */
-        shared_ptr<QueryOp> nextOp();
-        /** @return true if done with QueryOp iteration. */
-        bool doneOps() const { return _doneOps; }
+        shared_ptr<QueryPlanRunner> nextRunner();
+        /** @return true if done with runner iteration. */
+        bool doneRunners() const { return _doneRunners; }
 
         /**
          * Advance to the next $or clause; hasMoreClauses() must be true.
@@ -545,7 +684,7 @@ namespace mongo {
         void recoverFromYield();
         
         /** Clear the runner member. */
-        void clearRunner();
+        void clearRunnerQueue();
         
         void setRecordedPlanPolicy( QueryPlanGenerator::RecordedPlanPolicy recordedPlanPolicy ) {
             _recordedPlanPolicy = recordedPlanPolicy;
@@ -604,10 +743,11 @@ namespace mongo {
                   const BSONObj &max );
 
         /** Initialize or iterate a runner generated from @param originalOp. */
-        shared_ptr<QueryOp> iterateRunner( QueryOp &originalOp, bool retried = false );
+        shared_ptr<QueryPlanRunner> iterateRunnerQueue( QueryPlanRunner& originalRunner,
+                                                        bool retried = false );
 
-        shared_ptr<QueryOp> nextOpSimple();
-        shared_ptr<QueryOp> nextOpOr();
+        shared_ptr<QueryPlanRunner> nextRunnerSimple();
+        shared_ptr<QueryPlanRunner> nextRunnerOr();
         
         void updateCurrentQps( QueryPlanSet *qps );
         
@@ -634,10 +774,10 @@ namespace mongo {
         QueryPlanGenerator::RecordedPlanPolicy _recordedPlanPolicy;
         BSONObj _hint;
         bool _tableScanned;
-        shared_ptr<QueryOp> _baseOp;
-        scoped_ptr<QueryPlanSet::Runner> _runner;
+        shared_ptr<QueryPlanRunner> _baseRunner;
+        scoped_ptr<QueryPlanRunnerQueue> _runnerQueue;
         shared_ptr<ExplainQueryInfo> _explainQueryInfo;
-        bool _doneOps;
+        bool _doneRunners;
     };
 
     /**
@@ -653,7 +793,7 @@ namespace mongo {
         MultiCursor( auto_ptr<MultiPlanScanner> mps, const shared_ptr<Cursor> &c,
                     const shared_ptr<CoveredIndexMatcher> &matcher,
                     const shared_ptr<ExplainPlanInfo> &explainPlanInfo,
-                    const QueryOp &op, long long nscanned );
+                    const QueryPlanRunner& runner, long long nscanned );
 
         virtual bool ok() { return _c->ok(); }
         virtual Record* _current() { return _c->_current(); }

@@ -68,4 +68,19 @@ namespace mongo {
     template class ConfigurationVariableManager::SetFromStringImpl<unsigned int>;
     template class ConfigurationVariableManager::SetFromStringImpl<unsigned long>;
 
+    template <>
+    Status ConfigurationVariableManager::SetFromStringImpl<bool>::operator()(
+            const std::string& stringValue) const {
+        if (stringValue == "true") {
+            *_storage = true;
+            return Status::OK();
+        }
+        if (stringValue == "false") {
+            *_storage = false;
+            return Status::OK();
+        }
+        return Status(ErrorCodes::FailedToParse,
+                      "Could not parse boolean value out of \"" + stringValue + "\"");
+    }
+
 }  // namespace mongo
