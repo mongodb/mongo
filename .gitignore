@@ -97,7 +97,6 @@ scratch
 /libmongotestfiles.*
 /libmongoshellfiles.*
 
-
 /emr.jar
 *.class
 
@@ -135,15 +134,20 @@ debian/mongodb
 *.includes
 *.orig
 
+#built by Visual Studio
+src/mongo/base/error_codes.cpp
+src/mongo/base/error_codes.h
+src/mongo/db/auth/action_type.cpp
+src/mongo/db/auth/action_type.h
+src/mongo/shell/mongo-server.cpp
+src/mongo/shell/mongo.cpp
+src/third_party/js-1.7/jsautocfg.h
+src/third_party/js-1.7/jsautokw.h
 
 # old things that should be removed
 # maybe remove this mid 2012
 src/third_party/js-1.7/jscpucfg
 src/third_party/js-1.7/jskwgen
 src/mongo/buildinfo.cpp
-src/mongo/shell/mongo-server.cpp
-src/mongo/shell/mongo.cpp
-src/third_party/js-1.7/jsautocfg.h
-src/third_party/js-1.7/jsautokw.h
 buildinfo.cpp
 /.settings/

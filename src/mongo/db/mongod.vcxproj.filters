@@ -1043,6 +1043,9 @@
     <ClCompile Include="..\base\error_codes.cpp">
       <Filter>base</Filter>
     </ClCompile>
+    <ClCompile Include="..\bson\util\bson_extract.cpp">
+      <Filter>bson\util</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\targetver.h" />
@@ -1989,6 +1992,12 @@
     <ClInclude Include="..\util\fail_point_service.h">
       <Filter>util\Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\bson\util\bson_extract.h">
+      <Filter>bson\util</Filter>
+    </ClInclude>
+    <ClInclude Include="auth\acquired_capability.h">
+      <Filter>db\auth</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="mongo.ico">
@@ -2014,6 +2023,9 @@
     </None>
     <None Include="..\base\error_codes.err">
       <Filter>base</Filter>
+    </None>
+    <None Include="..\..\third_party\run_if_newer.js">
+      <Filter>third_party</Filter>
     </None>
   </ItemGroup>
   <ItemGroup>

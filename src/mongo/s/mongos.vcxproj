@@ -189,7 +189,9 @@
     </Link>
     <PreBuildEvent>
       <Command>cscript //Nologo "$(ProjectDir)..\..\third_party\run_if_newer.js" /path:"$(ProjectDir)..\..\third_party\js-1.7" /input:"jskwgen.exe" /output:"jsautokw.h" /command:"jskwgen jsautokw.h"
-cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
+cscript //Nologo "$(ProjectDir)..\..\third_party\run_if_newer.js" /path:"$(ProjectDir)..\base" /input:"generate_error_codes.py,error_codes.err" /output:"error_codes.h,error_codes.cpp" /command:"python generate_error_codes.py error_codes.err error_codes.h error_codes.cpp"
+cscript //Nologo "$(ProjectDir)..\..\third_party\run_if_newer.js" /path:"$(ProjectDir)..\db\auth" /input:"generate_action_types.py,action_types.txt" /output:"action_type.h,action_type.cpp" /command:"python generate_action_types.py action_types.txt action_type.h action_type.cpp"
+cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(ProjectDir).."
 </Command>
       <Message>Build jsautokw.h for SpiderMonkey, create mongo.cpp and mongo-server.cpp from JavaScript source files</Message>
     </PreBuildEvent>
@@ -218,7 +220,9 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     </Link>
     <PreBuildEvent>
       <Command>cscript //Nologo "$(ProjectDir)..\..\third_party\run_if_newer.js" /path:"$(ProjectDir)..\..\third_party\js-1.7" /input:"jskwgen.exe" /output:"jsautokw.h" /command:"jskwgen jsautokw.h"
-cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
+cscript //Nologo "$(ProjectDir)..\..\third_party\run_if_newer.js" /path:"$(ProjectDir)..\base" /input:"generate_error_codes.py,error_codes.err" /output:"error_codes.h,error_codes.cpp" /command:"python generate_error_codes.py error_codes.err error_codes.h error_codes.cpp"
+cscript //Nologo "$(ProjectDir)..\..\third_party\run_if_newer.js" /path:"$(ProjectDir)..\db\auth" /input:"generate_action_types.py,action_types.txt" /output:"action_type.h,action_type.cpp" /command:"python generate_action_types.py action_types.txt action_type.h action_type.cpp"
+cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(ProjectDir).."
 </Command>
       <Message>Build jsautokw.h for SpiderMonkey, create mongo.cpp and mongo-server.cpp from JavaScript source files</Message>
     </PreBuildEvent>
@@ -245,7 +249,9 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     </Link>
     <PreBuildEvent>
       <Command>cscript //Nologo "$(ProjectDir)..\..\third_party\run_if_newer.js" /path:"$(ProjectDir)..\..\third_party\js-1.7" /input:"jskwgen.exe" /output:"jsautokw.h" /command:"jskwgen jsautokw.h"
-cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
+cscript //Nologo "$(ProjectDir)..\..\third_party\run_if_newer.js" /path:"$(ProjectDir)..\base" /input:"generate_error_codes.py,error_codes.err" /output:"error_codes.h,error_codes.cpp" /command:"python generate_error_codes.py error_codes.err error_codes.h error_codes.cpp"
+cscript //Nologo "$(ProjectDir)..\..\third_party\run_if_newer.js" /path:"$(ProjectDir)..\db\auth" /input:"generate_action_types.py,action_types.txt" /output:"action_type.h,action_type.cpp" /command:"python generate_action_types.py action_types.txt action_type.h action_type.cpp"
+cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(ProjectDir).."
 </Command>
       <Message>Build jsautokw.h for SpiderMonkey, create mongo.cpp and mongo-server.cpp from JavaScript source files</Message>
     </PreBuildEvent>
@@ -272,7 +278,9 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     </Link>
     <PreBuildEvent>
       <Command>cscript //Nologo "$(ProjectDir)..\..\third_party\run_if_newer.js" /path:"$(ProjectDir)..\..\third_party\js-1.7" /input:"jskwgen.exe" /output:"jsautokw.h" /command:"jskwgen jsautokw.h"
-cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
+cscript //Nologo "$(ProjectDir)..\..\third_party\run_if_newer.js" /path:"$(ProjectDir)..\base" /input:"generate_error_codes.py,error_codes.err" /output:"error_codes.h,error_codes.cpp" /command:"python generate_error_codes.py error_codes.err error_codes.h error_codes.cpp"
+cscript //Nologo "$(ProjectDir)..\..\third_party\run_if_newer.js" /path:"$(ProjectDir)..\db\auth" /input:"generate_action_types.py,action_types.txt" /output:"action_type.h,action_type.cpp" /command:"python generate_action_types.py action_types.txt action_type.h action_type.cpp"
+cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(ProjectDir).."
 </Command>
       <Message>Build jsautokw.h for SpiderMonkey, create mongo.cpp and mongo-server.cpp from JavaScript source files</Message>
     </PreBuildEvent>
@@ -304,7 +312,9 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     </Link>
     <PreBuildEvent>
       <Command>cscript //Nologo "$(ProjectDir)..\..\third_party\run_if_newer.js" /path:"$(ProjectDir)..\..\third_party\js-1.7" /input:"jskwgen.exe" /output:"jsautokw.h" /command:"jskwgen jsautokw.h"
-cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
+cscript //Nologo "$(ProjectDir)..\..\third_party\run_if_newer.js" /path:"$(ProjectDir)..\base" /input:"generate_error_codes.py,error_codes.err" /output:"error_codes.h,error_codes.cpp" /command:"python generate_error_codes.py error_codes.err error_codes.h error_codes.cpp"
+cscript //Nologo "$(ProjectDir)..\..\third_party\run_if_newer.js" /path:"$(ProjectDir)..\db\auth" /input:"generate_action_types.py,action_types.txt" /output:"action_type.h,action_type.cpp" /command:"python generate_action_types.py action_types.txt action_type.h action_type.cpp"
+cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(ProjectDir).."
 </Command>
       <Message>Build jsautokw.h for SpiderMonkey, create mongo.cpp and mongo-server.cpp from JavaScript source files</Message>
     </PreBuildEvent>
@@ -336,7 +346,9 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     </Link>
     <PreBuildEvent>
       <Command>cscript //Nologo "$(ProjectDir)..\..\third_party\run_if_newer.js" /path:"$(ProjectDir)..\..\third_party\js-1.7" /input:"jskwgen.exe" /output:"jsautokw.h" /command:"jskwgen jsautokw.h"
-cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
+cscript //Nologo "$(ProjectDir)..\..\third_party\run_if_newer.js" /path:"$(ProjectDir)..\base" /input:"generate_error_codes.py,error_codes.err" /output:"error_codes.h,error_codes.cpp" /command:"python generate_error_codes.py error_codes.err error_codes.h error_codes.cpp"
+cscript //Nologo "$(ProjectDir)..\..\third_party\run_if_newer.js" /path:"$(ProjectDir)..\db\auth" /input:"generate_action_types.py,action_types.txt" /output:"action_type.h,action_type.cpp" /command:"python generate_action_types.py action_types.txt action_type.h action_type.cpp"
+cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(ProjectDir).."
 </Command>
       <Message>Build jsautokw.h for SpiderMonkey, create mongo.cpp and mongo-server.cpp from JavaScript source files</Message>
     </PreBuildEvent>
@@ -366,7 +378,9 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     </Link>
     <PreBuildEvent>
       <Command>cscript //Nologo "$(ProjectDir)..\..\third_party\run_if_newer.js" /path:"$(ProjectDir)..\..\third_party\js-1.7" /input:"jskwgen.exe" /output:"jsautokw.h" /command:"jskwgen jsautokw.h"
-cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
+cscript //Nologo "$(ProjectDir)..\..\third_party\run_if_newer.js" /path:"$(ProjectDir)..\base" /input:"generate_error_codes.py,error_codes.err" /output:"error_codes.h,error_codes.cpp" /command:"python generate_error_codes.py error_codes.err error_codes.h error_codes.cpp"
+cscript //Nologo "$(ProjectDir)..\..\third_party\run_if_newer.js" /path:"$(ProjectDir)..\db\auth" /input:"generate_action_types.py,action_types.txt" /output:"action_type.h,action_type.cpp" /command:"python generate_action_types.py action_types.txt action_type.h action_type.cpp"
+cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(ProjectDir).."
 </Command>
       <Message>Build jsautokw.h for SpiderMonkey, create mongo.cpp and mongo-server.cpp from JavaScript source files</Message>
     </PreBuildEvent>
@@ -396,7 +410,9 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     </Link>
     <PreBuildEvent>
       <Command>cscript //Nologo "$(ProjectDir)..\..\third_party\run_if_newer.js" /path:"$(ProjectDir)..\..\third_party\js-1.7" /input:"jskwgen.exe" /output:"jsautokw.h" /command:"jskwgen jsautokw.h"
-cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
+cscript //Nologo "$(ProjectDir)..\..\third_party\run_if_newer.js" /path:"$(ProjectDir)..\base" /input:"generate_error_codes.py,error_codes.err" /output:"error_codes.h,error_codes.cpp" /command:"python generate_error_codes.py error_codes.err error_codes.h error_codes.cpp"
+cscript //Nologo "$(ProjectDir)..\..\third_party\run_if_newer.js" /path:"$(ProjectDir)..\db\auth" /input:"generate_action_types.py,action_types.txt" /output:"action_type.h,action_type.cpp" /command:"python generate_action_types.py action_types.txt action_type.h action_type.cpp"
+cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(ProjectDir).."
 </Command>
       <Message>Build jsautokw.h for SpiderMonkey, create mongo.cpp and mongo-server.cpp from JavaScript source files</Message>
     </PreBuildEvent>
@@ -975,6 +991,7 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
       <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">4355;4800;4267;4244;4334</DisableSpecificWarnings>
     </ClCompile>
     <ClCompile Include="..\base\configuration_variable_manager.cpp" />
+    <ClCompile Include="..\base\error_codes.cpp" />
     <ClCompile Include="..\base\global_initializer.cpp" />
     <ClCompile Include="..\base\global_initializer_registerer.cpp" />
     <ClCompile Include="..\base\init.cpp" />
@@ -984,7 +1001,12 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClCompile Include="..\base\make_string_vector.cpp" />
     <ClCompile Include="..\base\parse_number.cpp" />
     <ClCompile Include="..\base\status.cpp" />
+    <ClCompile Include="..\bson\mutable\mutable_bson.cpp" />
+    <ClCompile Include="..\bson\mutable\mutable_bson_builder.cpp" />
+    <ClCompile Include="..\bson\mutable\mutable_bson_heap.cpp" />
+    <ClCompile Include="..\bson\mutable\mutable_bson_internal.cpp" />
     <ClCompile Include="..\bson\oid.cpp" />
+    <ClCompile Include="..\bson\util\bson_extract.cpp" />
     <ClCompile Include="..\client\authentication_table.cpp" />
     <ClCompile Include="..\client\connection_factory.cpp" />
     <ClCompile Include="..\client\dbclientcursor.cpp" />
@@ -992,13 +1014,15 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClCompile Include="..\client\distlock.cpp" />
     <ClCompile Include="..\db\auth\action_set.cpp" />
     <ClCompile Include="..\db\auth\action_type.cpp" />
+    <ClCompile Include="..\db\auth\authorization_manager.cpp" />
     <ClCompile Include="..\db\auth\capability.cpp" />
     <ClCompile Include="..\db\auth\capability_set.cpp" />
+    <ClCompile Include="..\db\auth\external_state.cpp" />
     <ClCompile Include="..\db\auth\mongo_authentication_session.cpp" />
     <ClCompile Include="..\db\auth\principal.cpp" />
     <ClCompile Include="..\db\auth\principal_set.cpp" />
+    <ClCompile Include="..\db\commands\fail_point_cmd.cpp" />
     <ClCompile Include="..\db\commands\server_status.cpp" />
-    <ClCompile Include="..\db\fail_point_service.cpp" />
     <ClCompile Include="..\db\hasher.cpp" />
     <ClCompile Include="..\db\initialize_server_global_state.cpp" />
     <ClCompile Include="..\db\keypattern.cpp" />
@@ -1044,16 +1068,7 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClCompile Include="..\platform\random.cpp" />
     <ClCompile Include="..\scripting\bench.cpp" />
     <ClCompile Include="..\scripting\bson_template_evaluator.cpp" />
-    <ClCompile Include="..\scripting\sm_db.cpp">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">true</ExcludedFromBuild>
-    </ClCompile>
+    <ClCompile Include="..\scripting\sm_db.cpp" />
     <ClCompile Include="..\util\alignedbuilder.cpp" />
     <ClCompile Include="..\util\concurrency\mutexdebugger.cpp" />
     <ClCompile Include="..\util\concurrency\rwlockimpl.cpp" />
@@ -1062,6 +1077,7 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClCompile Include="..\util\concurrency\thread_pool.cpp" />
     <ClCompile Include="..\util\fail_point.cpp" />
     <ClCompile Include="..\util\fail_point_registry.cpp" />
+    <ClCompile Include="..\util\fail_point_service.cpp" />
     <ClCompile Include="..\util\intrusive_counter.cpp" />
     <ClCompile Include="..\util\log.cpp" />
     <ClCompile Include="..\util\net\miniwebserver.cpp" />
@@ -1245,24 +1261,33 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClInclude Include="..\bson\bson_db.h" />
     <ClInclude Include="..\bson\bson_field.h" />
     <ClInclude Include="..\bson\inline_decls.h" />
+    <ClInclude Include="..\bson\mutable\mutable_bson.h" />
+    <ClInclude Include="..\bson\mutable\mutable_bson_builder.h" />
+    <ClInclude Include="..\bson\mutable\mutable_bson_heap.h" />
+    <ClInclude Include="..\bson\mutable\mutable_bson_internal.h" />
     <ClInclude Include="..\bson\oid.h" />
     <ClInclude Include="..\bson\ordering.h" />
     <ClInclude Include="..\base\string_data.h" />
     <ClInclude Include="..\bson\util\atomic_int.h" />
+    <ClInclude Include="..\bson\util\bson_extract.h" />
     <ClInclude Include="..\bson\util\builder.h" />
     <ClInclude Include="..\bson\util\misc.h" />
     <ClInclude Include="..\client\authentication_table.h" />
     <ClInclude Include="..\client\authlevel.h" />
+    <ClInclude Include="..\db\auth\acquired_capability.h" />
     <ClInclude Include="..\db\auth\action_set.h" />
     <ClInclude Include="..\db\auth\action_type.h" />
     <ClInclude Include="..\db\auth\authentication_session.h" />
+    <ClInclude Include="..\db\auth\authorization_manager.h" />
     <ClInclude Include="..\db\auth\capability.h" />
     <ClInclude Include="..\db\auth\capability_set.h" />
+    <ClInclude Include="..\db\auth\external_state.h" />
+    <ClInclude Include="..\db\auth\external_state_impl.h" />
     <ClInclude Include="..\db\auth\mongo_authentication_session.h" />
     <ClInclude Include="..\db\auth\principal.h" />
     <ClInclude Include="..\db\auth\principal_set.h" />
+    <ClInclude Include="..\db\commands\fail_point_cmd.h" />
     <ClInclude Include="..\db\commands\server_status.h" />
-    <ClInclude Include="..\db\fail_point_service.h" />
     <ClInclude Include="..\db\hasher.h" />
     <ClInclude Include="..\db\initialize_server_global_state.h" />
     <ClInclude Include="..\db\keypattern.h" />
@@ -1299,6 +1324,7 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClInclude Include="..\util\concurrency\simplerwlock.h" />
     <ClInclude Include="..\util\fail_point.h" />
     <ClInclude Include="..\util\fail_point_registry.h" />
+    <ClInclude Include="..\util\fail_point_service.h" />
     <ClInclude Include="..\util\intrusive_counter.h" />
     <ClInclude Include="..\util\net\hostandport.h" />
     <ClInclude Include="..\util\net\listen.h" />
@@ -1359,6 +1385,10 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
   <ItemGroup>
     <None Include="..\..\third_party\js-1.7\jskeyword.tbl" />
     <None Include="..\..\third_party\js-1.7\jsopcode.tbl" />
+    <None Include="..\base\error_codes.err" />
+    <None Include="..\base\generate_error_codes.py" />
+    <None Include="..\db\auth\action_types.txt" />
+    <None Include="..\db\auth\generate_action_types.py" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
