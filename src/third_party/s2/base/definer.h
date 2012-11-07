@@ -7,6 +7,8 @@
 #  define OS_LINUX
 #elif defined _WIN32
 #  define OS_WINDOWS
+#elif defined __freebsd__
+#  define OS_FREEBSD
 #endif
 
 #endif  // BASE_DEFINER_H
