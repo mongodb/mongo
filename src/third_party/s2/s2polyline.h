@@ -44,7 +44,6 @@ class S2Polyline : public S2Region {
   int num_vertices() const { return num_vertices_; }
   S2Point const& vertex(int k) const {
     DCHECK_GE(k, 0);
-    DCHECK_LT(k, num_vertices_);
     return vertices_[k];
   }
 
