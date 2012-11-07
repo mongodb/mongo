@@ -1696,6 +1696,7 @@ rs.help = function () {
     print("\trs.slaveOk()                    shorthand for db.getMongo().setSlaveOk()");
     print();
     print("\tdb.isMaster()                   check who is primary");
+    print("\tdb.printReplicationInfo()       check oplog size and time range");
     print();
     print("\treconfiguration helpers disconnect from the database so the shell will display");
     print("\tan error, even if the command succeeds.");
