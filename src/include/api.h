@@ -289,7 +289,7 @@ struct __wt_connection_impl {
 	const char *cfgvar[] = API_CONF_DEFAULTS(h, n, cfg);		\
 	API_SESSION_INIT(s, h, n, cur, bt);				\
 	WT_ERR(((cfg) != NULL) ?					\
-	    __wt_config_check((s), __wt_confchk_##h##_##n, (cfg)) : 0)
+	    __wt_config_check((s), __wt_confchk_##h##_##n, (cfg), 0) : 0)
 
 #define	API_END(s)							\
 	if ((s) != NULL) {						\

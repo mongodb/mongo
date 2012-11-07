@@ -80,7 +80,7 @@ class test_config04(wttest.WiredTigerTestCase):
         self.populate_and_check()
 
     def common_cache_size_test(self, sizestr, size):
-        self.common_test('cache_size=' + sizestr)
+        self.common_test('cache.size=' + sizestr)
         cursor = self.session.open_cursor('statistics:', None, None)
         cursor.set_key(wiredtiger.stat.cache_bytes_max)
         self.assertEqual(cursor.search(), 0)
@@ -124,12 +124,12 @@ class test_config04(wttest.WiredTigerTestCase):
 
     def test_cache_too_small(self):
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
-            lambda: wiredtiger.wiredtiger_open('.', 'create,cache_size=900000'),
+            lambda: wiredtiger.wiredtiger_open('.', 'create,cache.size=900000'),
             "/Value too small for key 'cache_size' the minimum is/")
 
     def test_cache_too_large(self):
         T11 = 11 * self.T  # 11 Terabytes
-        configstr = 'create,cache_size=' + str(T11)
+		configstr = 'create,cache.size=' + str(T11)
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: wiredtiger.wiredtiger_open('.', configstr),
             "/Value too large for key 'cache_size' the maximum is/")

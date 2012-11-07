@@ -35,6 +35,7 @@ def typedesc(c):
 		'format'  : 'a format string',
 		'int'     : 'an integer',
 		'list'    : 'a list',
+		'category': 'a set of related configuration options defined below',
 		'string'  : 'a string'}[ctype]
 	if cmin and cmax:
 		desc += ' between ' + cmin + ' and ' + cmax
@@ -52,27 +53,26 @@ def typedesc(c):
 		desc += ' of strings'
 	return desc
 
-def categorydesc(c):
-	desc = 'a list of configuration settings'
-	desc += ' @subconfigstart{' + c.name + ', see dist/api_data.py}'
-	for subc in c.subconfig:
-		desc += ' ' + parseconfig(subc)
-	desc = desc.replace('@config', '@subconfig')
-	desc += ' @subconfigend'
-	return desc
+def parseconfig(c, parent_name=None):
+	ctype = gettype(c)
+	desc = textwrap.dedent(c.desc) + '.'
+	desc = desc.replace(',', '\\,')
+	default = '\\c ' + str(c.default) if c.default or ctype == 'int' \
+			else 'empty'
+	name = c.name
+	if parent_name:
+		name = parent_name + '.' + name
 
-def parseconfig(c):
-		desc = textwrap.dedent(c.desc) + '.'
-		desc = desc.replace(',', '\\,')
-		default = '\\c ' + str(c.default) if c.default or gettype(c) == 'int' \
-				else 'empty'
-		if gettype(c) == 'category':
-			tdesc = categorydesc(c) + ';\n'
-		else:
-			tdesc = typedesc(c) + '; default ' + default + '.'
-			tdesc = tdesc.replace(',', '\\,')
-		output = '@config{' + ','.join((c.name, desc, tdesc)) + '}'
-		return output
+	tdesc = typedesc(c)
+	if ctype != 'category':
+		tdesc += '; default ' + default
+	tdesc += '.'
+	tdesc = tdesc.replace(',', '\\,')
+	output = '@config{' + ','.join((name, desc, tdesc)) + '}'
+	if ctype == 'category':
+		for subc in c.subconfig:
+			output += parseconfig(subc, c.name)
+	return output
 
 skip = False
 for line in open(f, 'r'):

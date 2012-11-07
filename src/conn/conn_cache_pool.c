@@ -50,7 +50,7 @@ __wt_conn_cache_pool_config(WT_SESSION_IMPL *session, const char **cfg)
 	if (__wt_process.cache_pool == NULL) {
 		/* Create a cache pool. */
 		WT_ERR(__wt_config_gets(
-		    session, cfg, "cache.pool_size", &cval));
+		    session, cfg, "cache.size", &cval));
 		if (cval.len <= 0) {
 			WT_ERR_MSG(session, WT_ERROR,
 			    "Attempting to join a cache pool that does not "
@@ -75,17 +75,17 @@ __wt_conn_cache_pool_config(WT_SESSION_IMPL *session, const char **cfg)
 			cp->chunk = WT_MAX(
 			    50 * WT_MEGABYTE, cp->size / 20);
 		WT_ERR(__wt_config_gets(
-		    session, cfg, "cache.pool_quota", &cval));
+		    session, cfg, "cache.pool_min", &cval));
 		if (cval.len > 0)
-			cp->quota = cval.val;
+			cp->min = cval.val;
 		else
-			cp->quota = cp->size / 2;
+			cp->min = cp->size / 2;
 
 		__wt_process.cache_pool = cp;
 		WT_VERBOSE_VOID(session, cache_pool,
 		    "Created cache pool %s. Size: %" PRIu64
-		    ", chunk size: %" PRIu64 ", quota: %" PRIu64,
-		    cp->name, cp->size, cp->chunk, cp->quota);
+		    ", chunk size: %" PRIu64 ", min: %" PRIu64,
+		    cp->name, cp->size, cp->chunk, cp->min);
 	} else if (!WT_STRING_MATCH(
 	    __wt_process.cache_pool->name, pool_name, strlen(pool_name)))
 		WT_ERR_MSG(session, WT_ERROR,
@@ -279,12 +279,12 @@ __cache_pool_balance(void)
 		 * which doesn't do the right thing at the moment.
 		 */
 		if (entry->cache_size == 0) {
-			added = cp->chunk;
-			entry->cache_size = cp->chunk;
-			cp->currently_used += cp->chunk;
+			added = cp->min;
+			entry->cache_size = cp->min;
+			cp->currently_used += cp->min;
 			cache->cp_skip_count = WT_CACHE_POOL_BUMP_SKIPS;
 		} else if (highest > 1 &&
-		    entry->cache_size < cp->quota &&
+		    entry->cache_size < cp->size &&
 		     cache->bytes_inmem >=
 		     (entry->cache_size * cache->eviction_target) / 100 &&
 		     cp->currently_used < cp->size &&
@@ -296,14 +296,14 @@ __cache_pool_balance(void)
 			cache->cp_skip_count = WT_CACHE_POOL_BUMP_SKIPS;
 		} else if (read_pressure < WT_CACHE_POOL_REDUCE_THRESHOLD &&
 		    highest > 1 &&
-		    entry->cache_size > cp->chunk &&
+		    entry->cache_size > cp->min &&
 		    cp->currently_used >= cp->size) {
 			/*
 			 * If a connection isn't actively using it's assigned
 			 * cache and is assigned a reasonable amount - reduce
 			 * it.
 			 */
-			added = -cp->chunk;
+			added = -WT_MIN(cp->chunk, entry->cache_size - cp->min);
 			entry->cache_size -= cp->chunk;
 			cp->currently_used -= cp->chunk;
 			cache->cp_skip_count = WT_CACHE_POOL_REDUCE_SKIPS;

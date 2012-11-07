@@ -992,17 +992,16 @@ struct __wt_connection {
 	 *
 	 * @param connection the connection handle
 	 * @configstart{connection.reconfigure, see dist/api_data.py}
-	 * @config{cache, cache configuration setup.,a list of configuration
-	 * settings @subconfigstart{cache, see dist/api_data.py}
-	 * @subconfig{size, maximum heap memory to allocate for the cache.,an
-	 * integer between 1MB and 10TB; default \c 100MB.} @subconfig{pool,
-	 * name of a cache pool that is shared between databases.,a string;
-	 * default empty.} @subconfig{pool_min, minimum amount of cache a
-	 * connection in a cache pool can have.,an integer between 1MB and 10TB;
-	 * default \c .} @subconfig{pool_chunk, the granularity that a cache
-	 * pool is shared out. Only valid if the cache_pool option is also
-	 * specified.,an integer between 1MB and 10TB; default \c .}
-	 * @subconfigend; }
+	 * @config{cache, cache configuration setup.,a set of related
+	 * configuration options defined below.}@config{cache.size, maximum heap
+	 * memory to allocate for the cache.,an integer between 1MB and 10TB;
+	 * default \c 100MB.}@config{cache.pool, name of a cache pool that is
+	 * shared between databases.,a string; default
+	 * empty.}@config{cache.pool_min, minimum amount of cache a connection
+	 * in a cache pool can have.,an integer between 1MB and 10TB; default \c
+	 * .}@config{cache.pool_chunk, the granularity that a cache pool is
+	 * shared out. Only valid if the cache_pool option is also specified.,an
+	 * integer between 1MB and 10TB; default \c .}
 	 * @config{error_prefix, prefix string for error messages.,a string;
 	 * default empty.}
 	 * @config{eviction_target, continue evicting until the cache becomes
@@ -1191,15 +1190,15 @@ struct __wt_connection {
  * I/O.  By default\, a platform-specific alignment value is used (512 bytes on
  * Linux systems\, zero elsewhere).,an integer between -1 and 1MB; default \c
  * -1.}
- * @config{cache, cache configuration setup.,a list of configuration settings
- * @subconfigstart{cache, see dist/api_data.py} @subconfig{size, maximum heap
- * memory to allocate for the cache.,an integer between 1MB and 10TB; default \c
- * 100MB.} @subconfig{pool, name of a cache pool that is shared between
- * databases.,a string; default empty.} @subconfig{pool_min, minimum amount of
+ * @config{cache, cache configuration setup.,a set of related configuration
+ * options defined below.}@config{cache.size, maximum heap memory to allocate
+ * for the cache.,an integer between 1MB and 10TB; default \c
+ * 100MB.}@config{cache.pool, name of a cache pool that is shared between
+ * databases.,a string; default empty.}@config{cache.pool_min, minimum amount of
  * cache a connection in a cache pool can have.,an integer between 1MB and 10TB;
- * default \c .} @subconfig{pool_chunk, the granularity that a cache pool is
+ * default \c .}@config{cache.pool_chunk, the granularity that a cache pool is
  * shared out. Only valid if the cache_pool option is also specified.,an integer
- * between 1MB and 10TB; default \c .} @subconfigend; }
+ * between 1MB and 10TB; default \c .}
  * @config{create, create the database if it does not exist.,a boolean flag;
  * default \c false.}
  * @config{direct_io, Use \c O_DIRECT to access files.  Options are given as a

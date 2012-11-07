@@ -78,7 +78,7 @@ struct __wt_cache_pool {
 	WT_CONDVAR *cache_pool_cond;
 	const char *name;
 	uint64_t size;
-	uint64_t quota;
+	uint64_t min;		/* The minimum size per connection. */
 	uint64_t chunk;
 	uint64_t currently_used;
 	uint32_t flags;

@@ -66,7 +66,7 @@ class test_cache_pool(wttest.WiredTigerTestCase):
     def openConnections(
             self,
             connections,
-            pool_opts = ',cache_pool=pool,cache_pool_size=200M,cache_pool_chunk=20M,cache_pool_quota=100M,',
+            pool_opts = ',cache=(pool=pool,size=200M,pool_chunk=20M,pool_min=60M),',
             extra_opts = '',
             add=0):
         if add == 0:
@@ -180,7 +180,7 @@ class test_cache_pool(wttest.WiredTigerTestCase):
         nops = 1000
         self.openConnections(['WT_TEST1', 'WT_TEST2'])
 
-        self.openConnections(['WT_TEST3'], add=1, pool_opts=',cache_size=50M')
+        self.openConnections(['WT_TEST3'], add=1, pool_opts=',cache=(size=50M)')
         for sess in self.sessions:
             sess.create(self.uri, "key_format=S,value_format=S")
             self.add_records(sess, 0, nops)
@@ -189,7 +189,7 @@ class test_cache_pool(wttest.WiredTigerTestCase):
     # Test default config values
     def test_cache_pool9(self):
         nops = 1000
-        self.openConnections(['WT_TEST1', 'WT_TEST2'], pool_opts=',cache_pool=pool,cache_pool_size=200M')
+        self.openConnections(['WT_TEST1', 'WT_TEST2'], pool_opts=',cache=(pool=pool,size=200M)')
 
         for sess in self.sessions:
             sess.create(self.uri, "key_format=S,value_format=S")
