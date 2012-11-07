@@ -568,17 +568,29 @@ int
 __wt_config_getraw(
     WT_CONFIG *cparser, WT_CONFIG_ITEM *key, WT_CONFIG_ITEM *value)
 {
-	WT_CONFIG_ITEM k, v;
+	WT_CONFIG sparser;
+	WT_CONFIG_ITEM k, v, subk;
 	WT_DECL_RET;
 	int found;
 
 	found = 0;
 	while ((ret = __config_next(cparser, &k, &v)) == 0) {
-		if ((k.type == ITEM_STRING || k.type == ITEM_ID) &&
-		    key->len == k.len &&
+		if (k.type != ITEM_STRING && k.type != ITEM_ID)
+			continue;
+		if (k.len == key->len &&
 		    strncasecmp(key->str, k.str, k.len) == 0) {
 			*value = v;
 			found = 1;
+		} else if (k.len < key->len && key->str[k.len] == '.' &&
+		    strncasecmp(key->str, k.str, k.len) == 0) {
+			subk.str = key->str + k.len + 1;
+			subk.len = key->len - k.len - 1;
+			WT_RET(__wt_config_initn(
+			    cparser->session, &sparser, v.str, v.len));
+			if ((ret =
+			    __wt_config_getraw(&sparser, &subk, value)) == 0)
+				found = 1;
+			WT_RET_NOTFOUND_OK(ret);
 		}
 	}
 

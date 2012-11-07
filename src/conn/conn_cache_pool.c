@@ -40,7 +40,7 @@ __wt_conn_cache_pool_config(WT_SESSION_IMPL *session, const char **cfg)
 	pool_name = NULL;
 	cp = NULL;
 
-	WT_RET(__wt_config_gets(session, cfg, "cache_pool", &cval));
+	WT_RET(__wt_config_gets(session, cfg, "cache.pool", &cval));
 	if (cval.len <= 0)
 		return (0);
 
@@ -50,7 +50,7 @@ __wt_conn_cache_pool_config(WT_SESSION_IMPL *session, const char **cfg)
 	if (__wt_process.cache_pool == NULL) {
 		/* Create a cache pool. */
 		WT_ERR(__wt_config_gets(
-		    session, cfg, "cache_pool_size", &cval));
+		    session, cfg, "cache.pool_size", &cval));
 		if (cval.len <= 0) {
 			WT_ERR_MSG(session, WT_ERROR,
 			    "Attempting to join a cache pool that does not "
@@ -68,14 +68,14 @@ __wt_conn_cache_pool_config(WT_SESSION_IMPL *session, const char **cfg)
 		    "cache pool server", 0, &cp->cache_pool_cond));
 
 		WT_ERR(__wt_config_gets(
-		    session, cfg, "cache_pool_chunk", &cval));
+		    session, cfg, "cache.pool_chunk", &cval));
 		if (cval.len > 0)
 			cp->chunk = cval.val;
 		else
 			cp->chunk = WT_MAX(
 			    50 * WT_MEGABYTE, cp->size / 20);
 		WT_ERR(__wt_config_gets(
-		    session, cfg, "cache_pool_quota", &cval));
+		    session, cfg, "cache.pool_quota", &cval));
 		if (cval.len > 0)
 			cp->quota = cval.val;
 		else

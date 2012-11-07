@@ -83,11 +83,8 @@ __wt_confchk_connection_open_session[] = {
 
 const char *
 __wt_confdfl_connection_reconfigure =
-	"cache=,error_prefix=,eviction_target=80,eviction_trigger=95,verbose=";
-
-const char *
-__wt_confdfl_cache_subconfigs =
-	"pool=,pool_chunk=,pool_min=,size=100MB";
+	"cache=(pool=,pool_chunk=,pool_min=,size=100MB),error_prefix=,"
+	"eviction_target=80,eviction_trigger=95,verbose=";
 
 WT_CONFIG_CHECK
 __wt_confchk_cache_subconfigs[] = {
@@ -414,10 +411,11 @@ __wt_confchk_table_meta[] = {
 
 const char *
 __wt_confdfl_wiredtiger_open =
-	"buffer_alignment=-1,cache=,create=0,direct_io=,error_prefix=,"
-	"eviction_target=80,eviction_trigger=95,extensions=,hazard_max=1000,"
-	"logging=0,lsm_merge=,multiprocess=0,session_max=50,sync=,"
-	"transactional=,use_environment_priv=0,verbose=";
+	"buffer_alignment=-1,cache=(pool=,pool_chunk=,pool_min=,size=100MB),"
+	"create=0,direct_io=,error_prefix=,eviction_target=80,"
+	"eviction_trigger=95,extensions=,hazard_max=1000,logging=0,lsm_merge="
+	",multiprocess=0,session_max=50,sync=,transactional=,"
+	"use_environment_priv=0,verbose=";
 
 WT_CONFIG_CHECK
 __wt_confchk_wiredtiger_open[] = {

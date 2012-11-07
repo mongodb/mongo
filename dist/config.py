@@ -23,15 +23,6 @@ def gettype(c):
 		ctype = 'int'
 	return ctype or 'string'
 
-def getsubconfigstr(c):
-	'''Return a string indicating if an item has sub configuration'''
-	ctype = gettype(c)
-	if ctype == 'category':
-		return '__wt_confchk_' + c.name + '_subconfigs'
-	else:
-		return 'NULL'
-
-
 def typedesc(c):
 	'''Descripe what type of value is expected for the given config item'''
 	checks = c.flags
@@ -179,26 +170,19 @@ def get_default(c):
 	t = gettype(c)
 	if c.default == 'false':
 		return '0'
+	elif t == 'category':
+		return '(%s)' % (','.join('%s=%s' % (subc.name, get_default(subc))
+			for subc in sorted(c.subconfig)))
 	elif (c.default or t == 'int') and c.default != 'true':
 		return str(c.default)
 	else:
 		return ''
 
 created_subconfigs=set()
-
-def add_subconfig(c, tfile):
+def add_subconfig(c):
+	if c.name in created_subconfigs:
+		return
 	created_subconfigs.add(c.name)
-	subname = c.name.replace('.', '_')
-	tfile.write('''
-const char *
-__wt_confdfl_%(name)s_subconfigs =
-%(config)s;
-''' % {
-	'name' : subname,
-	'config' : '\n'.join('\t"%s"' % line
-		for line in w.wrap(','.join('%s=%s' % (subc.name, get_default(subc))
-			for subc in sorted(c.subconfig))) or [""]),
-})
 	tfile.write('''
 WT_CONFIG_CHECK
 __wt_confchk_%(name)s_subconfigs[] = {
@@ -210,6 +194,15 @@ __wt_confchk_%(name)s_subconfigs[] = {
 	'check' : '\n\t'.join('"\n\t    "'.join(w.wrap('{ "%s", "%s", %s, NULL },' %
 		(subc.name, gettype(subc), checkstr(subc)))) for subc in sorted(c.subconfig)),
 })
+
+def getsubconfigstr(c):
+	'''Return a string indicating if an item has sub configuration'''
+	ctype = gettype(c)
+	if ctype == 'category':
+		add_subconfig(c)
+		return '__wt_confchk_' + c.name + '_subconfigs'
+	else:
+		return 'NULL'
 
 for name in sorted(api_data.methods.keys()):
 	ctype = api_data.methods[name].config
@@ -224,10 +217,6 @@ __wt_confdfl_%(name)s =
 		for line in w.wrap(','.join('%s=%s' % (c.name, get_default(c))
 			for c in sorted(ctype))) or [""]),
 })
-	# Deal with subsets of configuration settings.
-	for c in sorted(ctype):
-		if gettype(c) == 'category' and c.name not in created_subconfigs:
-			add_subconfig(c, tfile)
 
 # Construct an array of allowable configuration options. Always append an empty
 # string as a terminator for iteration
