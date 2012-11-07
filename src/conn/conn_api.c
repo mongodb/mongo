@@ -526,7 +526,7 @@ __conn_config_file(WT_SESSION_IMPL *session, const char **cfg, WT_ITEM **cbufp)
 
 	/* Check the configuration string. */
 	WT_ERR(__wt_config_check(
-	    session, __wt_confchk_wiredtiger_open, cbuf->data));
+	    session, __wt_confchk_wiredtiger_open, cbuf->data, 0));
 
 	/*
 	 * The configuration file falls between the default configuration and
@@ -577,7 +577,7 @@ __conn_config_env(WT_SESSION_IMPL *session, const char **cfg)
 
 	/* Check the configuration string. */
 	WT_RET(__wt_config_check(
-	    session, __wt_confchk_wiredtiger_open, env_config));
+	    session, __wt_confchk_wiredtiger_open, env_config, 0));
 
 	/*
 	 * The environment setting comes second-to-last: it overrides the
@@ -830,8 +830,8 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	WT_ERR(__wt_connection_init(conn));
 
 	/* Check the configuration strings. */
-	WT_ERR(
-	    __wt_config_check(session, __wt_confchk_wiredtiger_open, config));
+	WT_ERR(__wt_config_check(
+	    session, __wt_confchk_wiredtiger_open, config, 0));
 
 	/* Get the database home. */
 	WT_ERR(__conn_home(session, home, cfg));

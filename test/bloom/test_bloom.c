@@ -138,7 +138,7 @@ int setup(void)
 	 * end so they can override "standard" configuration.
 	 */
 	snprintf(config, sizeof(config),
-	    "create,error_prefix=\"%s\",cache_size=%" PRIu32 "MB,%s",
+	    "create,error_prefix=\"%s\",cache.size=%" PRIu32 "MB,%s",
 	    g.progname, g.c_cache, g.config_open == NULL ? "" : g.config_open);
 
 	if ((ret = wiredtiger_open(NULL, &event_handler, config, &conn)) != 0)

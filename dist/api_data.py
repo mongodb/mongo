@@ -35,10 +35,11 @@ class Method:
 		self.flags = flags
 
 class Config:
-	def __init__(self, name, default, desc, **flags):
+	def __init__(self, name, default, desc, subconfig=None, **flags):
 		self.name = name
 		self.default = default
 		self.desc = desc
+		self.subconfig = subconfig
 		self.flags = flags
 
 	def __cmp__(self, other):
@@ -228,24 +229,20 @@ table_meta = format_meta + table_only_meta
 
 # Connection runtime config, shared by conn.reconfigure and wiredtiger_open
 connection_runtime_config = [
-	Config('cache_pool', '', r'''
-		name of a cache pool that is shared between databases'''),
-	Config('cache_pool_size', '', r'''
-		size of a cache pool that is shared between databases. Only valid if
-		the cache_pool option is also specified. Must be specified if this
-		connection may create the cache pool''',
-		min='1MB', max='10TB'),
-	Config('cache_pool_chunk', '', r'''
-		the granularity that a cache pool is shared out. Only valid if the
-		cache_pool option is also specified.''',
-		min='1MB', max='10TB'),
-	Config('cache_pool_quota', '', r'''
-		the maximum amount of the cache pool a single database can use. Only
-		valid if the cache_pool option is also specified.''',
-		min='1MB', max='10TB'),
-	Config('cache_size', '100MB', r'''
+	Config('cache', '', r'''
+		cache configuration setup''', type='category', subconfig=[
+		Config('size', '100MB', r'''
 		maximum heap memory to allocate for the cache''',
 		min='1MB', max='10TB'),
+		Config('pool', '', r'''
+		name of a cache pool that is shared between databases'''),
+		Config('pool_min', '', r'''
+		minimum amount of cache a connection in a cache pool can have''',
+		min='1MB', max='10TB'),
+		Config('pool_chunk', '', r'''
+		the granularity that a cache pool is shared out. Only valid if the
+		cache_pool option is also specified''',
+		min='1MB', max='10TB')]),
 	Config('error_prefix', '', r'''
 		prefix string for error messages'''),
 	Config('eviction_target', '80', r'''

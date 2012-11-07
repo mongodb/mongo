@@ -286,7 +286,7 @@ class test_schema03(wttest.WiredTigerTestCase):
 
     def setUpConnectionOpen(self, dir):
         conn = wiredtiger.wiredtiger_open(dir,
-            'create,cache_size=100m,session_max=1000')
+            'create,cache.size=100m,session_max=1000')
         self.pr(`conn`)
         return conn
         

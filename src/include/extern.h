@@ -536,7 +536,8 @@ extern  int __wt_config_subgets(WT_SESSION_IMPL *session,
     WT_CONFIG_ITEM *value);
 extern int __wt_config_check(WT_SESSION_IMPL *session,
     WT_CONFIG_CHECK checks[],
-    const char *config);
+    const char *config,
+    size_t config_len);
 extern int __wt_config_collapse( WT_SESSION_IMPL *session,
     const char **cfg,
     const char **config_ret);
@@ -560,6 +561,7 @@ extern WT_CONFIG_CHECK __wt_confchk_connection_load_extension[];
 extern const char *__wt_confdfl_connection_open_session;
 extern WT_CONFIG_CHECK __wt_confchk_connection_open_session[];
 extern const char *__wt_confdfl_connection_reconfigure;
+extern WT_CONFIG_CHECK __wt_confchk_cache_subconfigs[];
 extern WT_CONFIG_CHECK __wt_confchk_connection_reconfigure[];
 extern const char *__wt_confdfl_cursor_close;
 extern WT_CONFIG_CHECK __wt_confchk_cursor_close[];

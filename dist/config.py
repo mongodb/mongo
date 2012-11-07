@@ -35,6 +35,7 @@ def typedesc(c):
 		'format'  : 'a format string',
 		'int'     : 'an integer',
 		'list'    : 'a list',
+		'category': 'a set of related configuration options defined below',
 		'string'  : 'a string'}[ctype]
 	if cmin and cmax:
 		desc += ' between ' + cmin + ' and ' + cmax
@@ -51,6 +52,27 @@ def typedesc(c):
 	elif ctype == 'list':
 		desc += ' of strings'
 	return desc
+
+def parseconfig(c, parent_name=None):
+	ctype = gettype(c)
+	desc = textwrap.dedent(c.desc) + '.'
+	desc = desc.replace(',', '\\,')
+	default = '\\c ' + str(c.default) if c.default or ctype == 'int' \
+			else 'empty'
+	name = c.name
+	if parent_name:
+		name = parent_name + '.' + name
+
+	tdesc = typedesc(c)
+	if ctype != 'category':
+		tdesc += '; default ' + default
+	tdesc += '.'
+	tdesc = tdesc.replace(',', '\\,')
+	output = '@config{' + ','.join((name, desc, tdesc)) + '}'
+	if ctype == 'category':
+		for subc in c.subconfig:
+			output += parseconfig(subc, c.name)
+	return output
 
 skip = False
 for line in open(f, 'r'):
@@ -96,14 +118,7 @@ for line in open(f, 'r'):
 		lastname = name
 		if 'undoc' in c.flags:
 			continue
-
-		desc = textwrap.dedent(c.desc) + '.'
-		desc = desc.replace(',', '\\,')
-		default = '\\c ' + str(c.default) if c.default or gettype(c) == 'int' \
-				else 'empty'
-		tdesc = typedesc(c) + '; default ' + default + '.'
-		tdesc = tdesc.replace(',', '\\,')
-		output = '@config{' + ','.join((name, desc, tdesc)) + '}'
+		output = parseconfig(c)
 		for l in w.wrap(output):
 			tfile.write(prefix + l + '\n')
 
@@ -134,11 +149,15 @@ def checkstr(c):
 	cmin = str(checks.get('min', ''))
 	cmax = str(checks.get('max', ''))
 	choices = checks.get('choices', [])
+	subconfig = checks.get('subconfig', [])
 	result = []
 	if cmin:
 		result.append('min=' + cmin)
 	if cmax:
 		result.append('max=' + cmax)
+	if subconfig:
+		result.append('subconfig=' + '[' +
+		    ','.join('\\"' + parseconfig(c) + '\\"' for c in subconfig) + ']')
 	if choices:
 		result.append('choices=' + '[' +
 		    ','.join('\\"' + s + '\\"' for s in choices) + ']')
@@ -151,10 +170,39 @@ def get_default(c):
 	t = gettype(c)
 	if c.default == 'false':
 		return '0'
+	elif t == 'category':
+		return '(%s)' % (','.join('%s=%s' % (subc.name, get_default(subc))
+			for subc in sorted(c.subconfig)))
 	elif (c.default or t == 'int') and c.default != 'true':
 		return str(c.default)
 	else:
 		return ''
+
+created_subconfigs=set()
+def add_subconfig(c):
+	if c.name in created_subconfigs:
+		return
+	created_subconfigs.add(c.name)
+	tfile.write('''
+WT_CONFIG_CHECK
+__wt_confchk_%(name)s_subconfigs[] = {
+\t%(check)s
+\t{ NULL, NULL, NULL, NULL }
+};
+''' % {
+	'name' : c.name,
+	'check' : '\n\t'.join('"\n\t    "'.join(w.wrap('{ "%s", "%s", %s, NULL },' %
+		(subc.name, gettype(subc), checkstr(subc)))) for subc in sorted(c.subconfig)),
+})
+
+def getsubconfigstr(c):
+	'''Return a string indicating if an item has sub configuration'''
+	ctype = gettype(c)
+	if ctype == 'category':
+		add_subconfig(c)
+		return '__wt_confchk_' + c.name + '_subconfigs'
+	else:
+		return 'NULL'
 
 for name in sorted(api_data.methods.keys()):
 	ctype = api_data.methods[name].config
@@ -169,13 +217,14 @@ __wt_confdfl_%(name)s =
 		for line in w.wrap(','.join('%s=%s' % (c.name, get_default(c))
 			for c in sorted(ctype))) or [""]),
 })
+
 # Construct an array of allowable configuration options. Always append an empty
 # string as a terminator for iteration
 	if not ctype:
 		tfile.write('''
 WT_CONFIG_CHECK
 __wt_confchk_%(name)s[] = {
-\t{ NULL, NULL, NULL }
+\t{ NULL, NULL, NULL, NULL }
 };
 ''' % { 'name' : name })
 	else:
@@ -183,12 +232,12 @@ __wt_confchk_%(name)s[] = {
 WT_CONFIG_CHECK
 __wt_confchk_%(name)s[] = {
 \t%(check)s
-\t{ NULL, NULL, NULL }
+\t{ NULL, NULL, NULL, NULL }
 };
 ''' % {
 	'name' : name,
-	'check' : '\n\t'.join('"\n\t    "'.join(w.wrap('{ "%s", "%s", %s },' %
-		(c.name, gettype(c), checkstr(c)))) for c in sorted(ctype)),
+	'check' : '\n\t'.join('"\n\t    "'.join(w.wrap('{ "%s", "%s", %s, %s },' %
+		(c.name, gettype(c), checkstr(c), getsubconfigstr(c)))) for c in sorted(ctype)),
 })
 
 tfile.close()
