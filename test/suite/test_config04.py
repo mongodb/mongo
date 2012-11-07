@@ -125,14 +125,14 @@ class test_config04(wttest.WiredTigerTestCase):
     def test_cache_too_small(self):
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: wiredtiger.wiredtiger_open('.', 'create,cache.size=900000'),
-            "/Value too small for key 'cache_size' the minimum is/")
+            "/Value too small for key 'size' the minimum is/")
 
     def test_cache_too_large(self):
         T11 = 11 * self.T  # 11 Terabytes
-		configstr = 'create,cache.size=' + str(T11)
+        configstr = 'create,cache.size=' + str(T11)
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: wiredtiger.wiredtiger_open('.', configstr),
-            "/Value too large for key 'cache_size' the maximum is/")
+            "/Value too large for key 'size' the maximum is/")
 
     def test_eviction(self):
         self.common_test('eviction_target=84,eviction_trigger=94')

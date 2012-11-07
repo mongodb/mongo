@@ -97,6 +97,7 @@ class test_config03(test_base03.test_base03):
                 if value == False:
                     value = 'false'
                 args += ',' + var + '=' + str(value)
+        args = args.replace('cache_size', 'cache.size')
         args += ','
         self.pr('wiredtiger_open with args: ' + args)
 
