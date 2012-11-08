@@ -609,6 +609,7 @@ extern const char *__wt_confdfl_wiredtiger_open;
 extern WT_CONFIG_CHECK __wt_confchk_wiredtiger_open[];
 extern int __wt_conn_cache_pool_config(WT_SESSION_IMPL *session,
     const char **cfg);
+extern int __wt_conn_cache_pool_open(WT_SESSION_IMPL *session);
 extern int __wt_conn_cache_pool_destroy(WT_CONNECTION_IMPL *conn);
 extern void *__wt_cache_pool_server(void *arg);
 extern int __wt_conn_btree_sync_and_close(WT_SESSION_IMPL *session);
