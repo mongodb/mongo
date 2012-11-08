@@ -36,7 +36,7 @@ namespace {
         actions.addAction(ActionType::insert);
         AcquiredPrivilege writePrivilege(Privilege("test", actions), principal);
         AcquiredPrivilege allDBsWritePrivilege(Privilege("*", actions), principal);
-        ExternalStateMock* externalState = new ExternalStateMock();
+        AuthExternalStateMock* externalState = new AuthExternalStateMock();
         AuthorizationManager authManager(externalState);
 
         ASSERT_NULL(authManager.checkAuthorization("test", ActionType::insert));
@@ -58,7 +58,7 @@ namespace {
     }
 
     TEST(AuthorizationManagerTest, GrantInternalAuthorization) {
-        ExternalStateMock* externalState = new ExternalStateMock();
+        AuthExternalStateMock* externalState = new AuthExternalStateMock();
         AuthorizationManager authManager(externalState);
 
         ASSERT_NULL(authManager.checkAuthorization("test", ActionType::insert));

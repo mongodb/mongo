@@ -23,10 +23,10 @@
 namespace mongo {
 
     /**
-     * The actual implementation of ExternalState
+     * The actual implementation of AuthExternalState
      */
-    class ExternalStateImpl : public ExternalState {
-        MONGO_DISALLOW_COPYING(ExternalStateImpl);
+    class AuthExternalStateImpl : public AuthExternalState {
+        MONGO_DISALLOW_COPYING(AuthExternalStateImpl);
 
     public:
 
@@ -35,8 +35,8 @@ namespace mongo {
         // localhost connections should be given special admin access.
         // adminDBConnection is used only in the constructor, no pointer to it is stored, so it
         // can be deleted as soon as the constructor returns.
-        ExternalStateImpl(DBClientBase* adminDBConnection);
-        virtual ~ExternalStateImpl();
+        AuthExternalStateImpl(DBClientBase* adminDBConnection);
+        virtual ~AuthExternalStateImpl();
 
         // Returns true if this connection should be treated as if it has full access to do
         // anything, regardless of the current auth state.  Currently the reasons why this could be

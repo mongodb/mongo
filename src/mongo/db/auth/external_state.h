@@ -24,15 +24,15 @@ namespace mongo {
     /**
      * Public interface for a class that encapsulates all the information related to system state
      * not stored in AuthorizationManager.  This is primarily to make AuthorizationManager easier
-     * to test.  There are two classes that implement this interface, ExternalStateImpl, which is
-     * what's used for the actual system, and ExternalStateMock, which is used in the tests.
+     * to test.  There are two classes that implement this interface, AuthExternalStateImpl, which
+     * is what's used for the actual system, and AuthExternalStateMock, which is used in the tests.
      */
-    class ExternalState {
-        MONGO_DISALLOW_COPYING(ExternalState);
+    class AuthExternalState {
+        MONGO_DISALLOW_COPYING(AuthExternalState);
 
     public:
 
-        virtual ~ExternalState() {};
+        virtual ~AuthExternalState() {};
 
         // Returns true if this connection should be treated as if it has full access to do
         // anything, regardless of the current auth state.  Currently the reasons why this could be
@@ -41,7 +41,7 @@ namespace mongo {
         virtual bool shouldIgnoreAuthChecks() const = 0;
 
     protected:
-        ExternalState() {}; // This class should never be instantiated directly.
+        AuthExternalState() {}; // This class should never be instantiated directly.
     };
 
 } // namespace mongo

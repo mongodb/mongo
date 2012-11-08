@@ -22,13 +22,13 @@
 namespace mongo {
 
     /**
-     * Mock of the ExternalState class used only for testing.
+     * Mock of the AuthExternalState class used only for testing.
      */
-    class ExternalStateMock : public ExternalState {
-        MONGO_DISALLOW_COPYING(ExternalStateMock);
+    class AuthExternalStateMock : public AuthExternalState {
+        MONGO_DISALLOW_COPYING(AuthExternalStateMock);
 
     public:
-        ExternalStateMock() : _returnValue(false) {}
+        AuthExternalStateMock() : _returnValue(false) {}
 
         virtual bool shouldIgnoreAuthChecks() const {
             return _returnValue;

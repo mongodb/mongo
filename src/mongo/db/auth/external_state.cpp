@@ -21,16 +21,16 @@
 
 namespace mongo {
 
-    ExternalStateImpl::ExternalStateImpl(DBClientBase* adminDBConnection) {
+    AuthExternalStateImpl::AuthExternalStateImpl(DBClientBase* adminDBConnection) {
         _adminUserExists = AuthorizationManager::hasPrivilegeDocument(adminDBConnection, "admin");
         if (!_adminUserExists) {
             log() << "note: no users configured in admin.system.users, allowing localhost access"
                   << endl;
         }
     }
-    ExternalStateImpl::~ExternalStateImpl() {}
+    AuthExternalStateImpl::~AuthExternalStateImpl() {}
 
-    bool ExternalStateImpl::shouldIgnoreAuthChecks() const {
+    bool AuthExternalStateImpl::shouldIgnoreAuthChecks() const {
         // TODO: uncomment part that checks if connection is localhost by looking in cc()
         return noauth || (!_adminUserExists /*&& cc().isLocalhost*/) || cc().isGod();
     }

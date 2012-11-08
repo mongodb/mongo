@@ -42,7 +42,7 @@ namespace mongo {
         MONGO_DISALLOW_COPYING(AuthorizationManager);
     public:
         // Takes ownership of the externalState.
-        explicit AuthorizationManager(ExternalState* externalState);
+        explicit AuthorizationManager(AuthExternalState* externalState);
         ~AuthorizationManager();
 
         // Takes ownership of the principal (by putting into _authenticatedPrincipals).
@@ -95,7 +95,7 @@ namespace mongo {
                 const BSONObj& privilegeDocument,
                 PrivilegeSet* result);
 
-        scoped_ptr<ExternalState> _externalState;
+        scoped_ptr<AuthExternalState> _externalState;
 
         // All the privileges that have been acquired by the authenticated principals.
         PrivilegeSet _acquiredPrivileges;

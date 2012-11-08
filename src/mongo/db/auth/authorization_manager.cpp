@@ -137,7 +137,7 @@ namespace mongo {
         return Status::OK();
     }
 
-    AuthorizationManager::AuthorizationManager(ExternalState* externalState) {
+    AuthorizationManager::AuthorizationManager(AuthExternalState* externalState) {
         _externalState.reset(externalState);
     }
 
