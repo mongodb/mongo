@@ -921,12 +921,16 @@ namespace mongo {
      */
     class DBClientBase : public DBClientWithCommands, public DBConnector {
     protected:
+        static AtomicInt64 ConnectionIdSequence;
+        long long _connectionId; // unique connection id for this connection
         WriteConcern _writeConcern;
-
     public:
         DBClientBase() {
             _writeConcern = W_NORMAL;
+            _connectionId = ConnectionIdSequence.fetchAndAdd(1);
         }
+
+        long long getConnectionId() const { return _connectionId; }
 
         WriteConcern getWriteConcern() const { return _writeConcern; }
         void setWriteConcern( WriteConcern w ) { _writeConcern = w; }

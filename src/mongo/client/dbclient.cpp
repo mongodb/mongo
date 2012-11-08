@@ -36,6 +36,8 @@
 
 namespace mongo {
 
+    AtomicInt64 DBClientBase::ConnectionIdSequence;
+
     void ConnectionString::_fillServers( string s ) {
         
         //
