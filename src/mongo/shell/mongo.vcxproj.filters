@@ -233,9 +233,6 @@
     <ClCompile Include="..\..\third_party\boost\libs\program_options\src\winmain.cpp">
       <Filter>Boost</Filter>
     </ClCompile>
-    <ClCompile Include="..\db\commands.cpp">
-      <Filter>db\Source FIles</Filter>
-    </ClCompile>
     <ClCompile Include="..\db\jsobj.cpp">
       <Filter>db\Source FIles</Filter>
     </ClCompile>

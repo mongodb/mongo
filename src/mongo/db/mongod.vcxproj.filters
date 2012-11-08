@@ -956,12 +956,6 @@
     <ClCompile Include="auth\action_set.cpp">
       <Filter>db\auth</Filter>
     </ClCompile>
-    <ClCompile Include="auth\capability.cpp">
-      <Filter>db\auth</Filter>
-    </ClCompile>
-    <ClCompile Include="auth\capability_set.cpp">
-      <Filter>db\auth</Filter>
-    </ClCompile>
     <ClCompile Include="auth\principal.cpp">
       <Filter>db\auth</Filter>
     </ClCompile>
@@ -1045,6 +1039,12 @@
     </ClCompile>
     <ClCompile Include="..\bson\util\bson_extract.cpp">
       <Filter>bson\util</Filter>
+    </ClCompile>
+    <ClCompile Include="auth\privilege.cpp">
+      <Filter>db\auth</Filter>
+    </ClCompile>
+    <ClCompile Include="auth\privilege_set.cpp">
+      <Filter>db\auth</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -1872,12 +1872,6 @@
     <ClInclude Include="auth\action_set.h">
       <Filter>db\auth</Filter>
     </ClInclude>
-    <ClInclude Include="auth\capability.h">
-      <Filter>db\auth</Filter>
-    </ClInclude>
-    <ClInclude Include="auth\capability_set.h">
-      <Filter>db\auth</Filter>
-    </ClInclude>
     <ClInclude Include="auth\principal.h">
       <Filter>db\auth</Filter>
     </ClInclude>
@@ -1995,7 +1989,13 @@
     <ClInclude Include="..\bson\util\bson_extract.h">
       <Filter>bson\util</Filter>
     </ClInclude>
-    <ClInclude Include="auth\acquired_capability.h">
+    <ClInclude Include="auth\acquired_privilege.h">
+      <Filter>db\auth</Filter>
+    </ClInclude>
+    <ClInclude Include="auth\privilege.h">
+      <Filter>db\auth</Filter>
+    </ClInclude>
+    <ClInclude Include="auth\privilege_set.h">
       <Filter>db\auth</Filter>
     </ClInclude>
   </ItemGroup>
