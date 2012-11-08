@@ -936,7 +936,7 @@ ElementRep& dstRep = _ctx->_elements->_vec[(*sibIt)._rep];
         uint32_t rep = _elements->size();
         uint32_t nameref = _heap->putString(fieldName);
         ValueType val;
-        val.intVal = j;
+        val.longVal = j;
         _elements->push_back(ElementRep(mongo::NumberLong, nameref, val));
         return Element(this, rep);
     }
