@@ -592,6 +592,40 @@ namespace {
         ASSERT_EQUALS((++it).done(), true);
     }
 
+    TEST(Element, setters) {
+        mongo::mutablebson::BasicHeap myHeap;
+        mongo::mutablebson::Context ctx(&myHeap);
+
+        mongo::mutablebson::Element t0 = ctx.makeNullElement("t0");
+
+        t0.setBoolValue(true);
+        ASSERT_EQUALS(mongo::Bool, t0.type());
+
+        t0.setIntValue(12345);
+        ASSERT_EQUALS(mongo::NumberInt, t0.type());
+
+        t0.setLongValue(12345LL);
+        ASSERT_EQUALS(mongo::NumberLong, t0.type());
+
+        t0.setTSValue(mongo::OpTime());
+        ASSERT_EQUALS(mongo::Timestamp, t0.type());
+
+        t0.setDateValue(12345LL);
+        ASSERT_EQUALS(mongo::Date, t0.type());
+
+        t0.setDoubleValue(123.45);
+        ASSERT_EQUALS(mongo::NumberDouble, t0.type());
+
+        t0.setOIDValue("012345678901");
+        ASSERT_EQUALS(mongo::jstOID, t0.type());
+
+        t0.setRegexValue("[a-zA-Z]?");
+        ASSERT_EQUALS(mongo::RegEx, t0.type());
+
+        t0.setStringValue("foo bar baz");
+        ASSERT_EQUALS(mongo::String, t0.type());
+    }
+
     TEST(TimestampType, createElement) {
         mongo::mutablebson::BasicHeap myHeap;
         mongo::mutablebson::Context ctx(&myHeap);
