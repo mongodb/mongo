@@ -30,6 +30,9 @@ Import("env windows linux darwin solaris freebsd debugBuild")
 # pared-down copies of the equivalent structures in v8's SConstruct/SConscript:
 LIBRARY_FLAGS = {
   'all': {
+    'all': {
+      'CPPDEFINES':   ['ENABLE_DEBUGGER_SUPPORT'],
+    },
     'mode:debug': {
       'CPPDEFINES':   ['V8_ENABLE_CHECKS', 'OBJECT_PRINT']
     },

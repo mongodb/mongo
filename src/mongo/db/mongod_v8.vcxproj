@@ -163,7 +163,7 @@
     <ClCompile>
       <Optimization>Disabled</Optimization>
       <AdditionalIncludeDirectories>..;..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>WIN32;V8_TARGET_ARCH_IA32;BOOST_ALL_NO_LIB;MONGO_EXPOSE_MACROS;XP_WIN;_DEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;HAVE_CONFIG_H;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>ENABLE_DEBUGGER_SUPPORT;WIN32;V8_TARGET_ARCH_IA32;BOOST_ALL_NO_LIB;MONGO_EXPOSE_MACROS;XP_WIN;_DEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;HAVE_CONFIG_H;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <MinimalRebuild>No</MinimalRebuild>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
@@ -196,7 +196,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile>
       <Optimization>Disabled</Optimization>
       <AdditionalIncludeDirectories>..;..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>WIN32;V8_TARGET_ARCH_IA32;BOOST_ALL_NO_LIB;MONGO_EXPOSE_MACROS;XP_WIN;_DEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;HAVE_CONFIG_H;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>ENABLE_DEBUGGER_SUPPORT;WIN32;V8_TARGET_ARCH_IA32;BOOST_ALL_NO_LIB;MONGO_EXPOSE_MACROS;XP_WIN;_DEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;HAVE_CONFIG_H;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <MinimalRebuild>No</MinimalRebuild>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
@@ -229,7 +229,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile>
       <Optimization>Disabled</Optimization>
       <AdditionalIncludeDirectories>..;..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>WIN32;V8_TARGET_ARCH_X64;BOOST_ALL_NO_LIB;MONGO_EXPOSE_MACROS;XP_WIN;_DEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;HAVE_CONFIG_H;;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>ENABLE_DEBUGGER_SUPPORT;WIN32;V8_TARGET_ARCH_X64;BOOST_ALL_NO_LIB;MONGO_EXPOSE_MACROS;XP_WIN;_DEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;HAVE_CONFIG_H;;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
@@ -260,7 +260,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile>
       <Optimization>Disabled</Optimization>
       <AdditionalIncludeDirectories>..;..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>WIN32;V8_TARGET_ARCH_X64;BOOST_ALL_NO_LIB;MONGO_EXPOSE_MACROS;XP_WIN;_DEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;HAVE_CONFIG_H;;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>ENABLE_DEBUGGER_SUPPORT;WIN32;V8_TARGET_ARCH_X64;BOOST_ALL_NO_LIB;MONGO_EXPOSE_MACROS;XP_WIN;_DEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;HAVE_CONFIG_H;;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
@@ -292,7 +292,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
       <Optimization>MaxSpeed</Optimization>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <AdditionalIncludeDirectories>..;..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>WIN32;V8_TARGET_ARCH_IA32;BOOST_ALL_NO_LIB;MONGO_EXPOSE_MACROS;XP_WIN;NDEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;HAVE_CONFIG_H;;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>ENABLE_DEBUGGER_SUPPORT;WIN32;V8_TARGET_ARCH_IA32;BOOST_ALL_NO_LIB;MONGO_EXPOSE_MACROS;XP_WIN;NDEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;HAVE_CONFIG_H;;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
@@ -327,7 +327,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
       <Optimization>MaxSpeed</Optimization>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <AdditionalIncludeDirectories>..;..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>WIN32;V8_TARGET_ARCH_IA32;BOOST_ALL_NO_LIB;MONGO_EXPOSE_MACROS;XP_WIN;NDEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;HAVE_CONFIG_H;;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>ENABLE_DEBUGGER_SUPPORT;WIN32;V8_TARGET_ARCH_IA32;BOOST_ALL_NO_LIB;MONGO_EXPOSE_MACROS;XP_WIN;NDEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;HAVE_CONFIG_H;;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
@@ -362,7 +362,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
       <Optimization>MaxSpeed</Optimization>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <AdditionalIncludeDirectories>..;..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>WIN32;V8_TARGET_ARCH_X64;BOOST_ALL_NO_LIB;MONGO_EXPOSE_MACROS;XP_WIN;NDEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;HAVE_CONFIG_H;;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>ENABLE_DEBUGGER_SUPPORT;WIN32;V8_TARGET_ARCH_X64;BOOST_ALL_NO_LIB;MONGO_EXPOSE_MACROS;XP_WIN;NDEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;HAVE_CONFIG_H;;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
@@ -394,7 +394,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
       <Optimization>MaxSpeed</Optimization>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <AdditionalIncludeDirectories>..;..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>WIN32;V8_TARGET_ARCH_X64;BOOST_ALL_NO_LIB;MONGO_EXPOSE_MACROS;XP_WIN;NDEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;HAVE_CONFIG_H;;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>ENABLE_DEBUGGER_SUPPORT;WIN32;V8_TARGET_ARCH_X64;BOOST_ALL_NO_LIB;MONGO_EXPOSE_MACROS;XP_WIN;NDEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;HAVE_CONFIG_H;;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
