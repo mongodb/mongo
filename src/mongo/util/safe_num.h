@@ -23,6 +23,11 @@
 
 namespace mongo {
 
+namespace mutablebson {
+    class Element;
+    class Context;
+}
+
     /**
      * SafeNum holds and does arithmetic on a number in a safe way, handling overflow
      * and casting for the user. 32-bit integers will overflow into 64-bit integers. But
@@ -104,8 +109,10 @@ namespace mongo {
         // output support
         //
 
+        friend class mutablebson::Element;
+        friend class mutablebson::Context;
+
         // TODO: output to builder
-        // TODO: output to Paul's class Element
 
         //
         // accessors

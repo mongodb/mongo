@@ -22,6 +22,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/util/safe_num.h"
 
 namespace mongo {
 namespace mutablebson {
@@ -135,6 +136,8 @@ namespace mutablebson {
         const char* getStringValue() const;
         const char* getRegexValue() const;
 
+        SafeNum getSafeNumValue() const;
+
         void setBoolValue(bool boolVal);
         void setIntValue(int32_t intVal);
         void setLongValue(int64_t longVal);
@@ -144,6 +147,7 @@ namespace mutablebson {
         void setOIDValue(const StringData& oid);
         void setStringValue(const StringData& stringVal);
         void setRegexValue(const StringData& re);
+        void setSafeNumValue(const SafeNum& safeNum);
 
         //
         // BSONElement compatibility
@@ -203,6 +207,8 @@ namespace mutablebson {
             const StringData& fieldName, const StringData& code, const StringData& scope);
         void appendBinary(
             const StringData& fieldName, uint32_t len, BinDataType t, const void* bin);
+
+        void appendSafeNum(const StringData& fieldName, const SafeNum num);
 
         //
         // operator overloading
@@ -291,6 +297,7 @@ namespace mutablebson {
         Element makeStringElement(const StringData& fieldName, const StringData& stringVal);
         Element makeCodeElement(const StringData& fieldName, const StringData& code);
         Element makeSymbolElement(const StringData& fieldName, const StringData& symbol);
+        Element makeSafeNumElement(const StringData& fieldName, const SafeNum& safeNum);
 
         Element makeRegexElement(
             const StringData& fieldName, const StringData& regex, const StringData& flags);
