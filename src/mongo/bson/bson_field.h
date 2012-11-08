@@ -17,6 +17,8 @@
 
 #include <string>
 
+#include "mongo/bson/bsonobj.h"
+
 namespace mongo {
 
     /**
@@ -87,7 +89,7 @@ namespace mongo {
             return _name;
         }
 
-        string operator()() const {
+        std::string operator()() const {
             return _name;
         }
 

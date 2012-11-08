@@ -1,0 +1,12 @@
+# -*- mode: python -*-
+
+Import("env")
+
+env.StaticLibrary('config', ['field_parser.cpp',
+                             'type_collection.cpp'],
+                  LIBDEPS=['$BUILD_DIR/mongo/base/base',
+                           '$BUILD_DIR/mongo/bson'])
+
+env.CppUnitTest('field_parser_test', 'field_parser_test.cpp', LIBDEPS=['config'])
+
+env.CppUnitTest('type_collection_test', 'type_collection_test.cpp', LIBDEPS=['config'])
