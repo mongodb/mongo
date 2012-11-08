@@ -55,6 +55,8 @@ namespace mongo {
     bool Client::shutdown() { return true; }
 
     Client& Client::initThread(const char *desc, AbstractMessagingPort *mp) {
+        // mp is non-null only for client connections, and mongos uses ClientInfo for those
+        massert(16478, "Mongos Client being used for incoming connection thread", mp == NULL);
         setThreadName(desc);
         verify( currentClient.get() == 0 );
         Client *c = new Client(desc, mp);

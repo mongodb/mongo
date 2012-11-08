@@ -118,6 +118,10 @@ namespace mongo {
             OID id;
         };
 
+        // Used to set up this thread's AuthorizationManager.  Should be called during the
+        // initialization of this ClientInfo.
+        void _setupAuth();
+
         // for getLastError
         void _addWriteBack( vector<WBInfo>& all , const BSONObj& o );
         vector<BSONObj> _handleWriteBacks( vector<WBInfo>& all , bool fromWriteBackListener );

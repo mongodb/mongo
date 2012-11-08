@@ -21,6 +21,7 @@
 #include <boost/scoped_ptr.hpp>
 
 #include "mongo/db/auth/authentication_session.h"
+#include "mongo/db/auth/authorization_manager.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/net/message_port.h"
 
@@ -47,6 +48,20 @@ namespace mongo {
         void swapAuthenticationSession(boost::scoped_ptr<AuthenticationSession>& other) {
             _authenticationSession.swap(other);
         }
+        AuthorizationManager* getAuthorizationManager() {
+            massert(16481,
+                    "No AuthorizationManager has been set up for this connection",
+                    _authorizationManager != NULL);
+            return _authorizationManager.get();
+        }
+        // setAuthorizationManager must be called in the initialization of any ClientBasic that
+        // corresponds to an incoming client connection.
+        void setAuthorizationManager(AuthorizationManager* authorizationManager) {
+            massert(16477,
+                    "An AuthorizationManager has already been set up for this connection",
+                    _authorizationManager == NULL);
+            _authorizationManager.reset(authorizationManager);
+        }
         bool getIsLocalHostConnection() { return getRemote().isLocalHost(); }
 
         virtual bool hasRemote() const { return _messagingPort; }
@@ -63,6 +78,7 @@ namespace mongo {
 
     private:
         boost::scoped_ptr<AuthenticationSession> _authenticationSession;
+        boost::scoped_ptr<AuthorizationManager> _authorizationManager;
         AbstractMessagingPort* const _messagingPort;
     };
 }
