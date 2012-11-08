@@ -43,24 +43,24 @@ namespace mongo {
 
         S getSequence( DBClientBase * conn , const string& ns ) {
             scoped_lock lk( _mutex );
-            return _map[conn][ns];
+            return _map[conn->getConnectionId()][ns];
         }
 
         void setSequence( DBClientBase * conn , const string& ns , const S& s ) {
             scoped_lock lk( _mutex );
-            _map[conn][ns] = s;
+            _map[conn->getConnectionId()][ns] = s;
         }
 
         void reset( DBClientBase * conn ) {
             scoped_lock lk( _mutex );
-            _map.erase( conn );
+            _map.erase( conn->getConnectionId() );
         }
 
         // protects _map
         mongo::mutex _mutex;
 
         // a map from a connection into ChunkManager's sequence number for each namespace
-        map<DBClientBase*, map<string,unsigned long long> > _map;
+        unordered_map<unsigned long long, map<string,unsigned long long> > _map;
 
     } connectionShardStatus;
 
