@@ -22,8 +22,8 @@ and the granularity at which the cache pool is redistributed among
 connections - called the chunk size.
 
 WiredTiger cache pool tuning options can be configured when first opening a
-database via @ref wiredtiger_open or changed after open using the
-WT_CONNECTION::reconfigure method.
+database via @ref wiredtiger_open. Cache pool configuration cannot be
+changed once the cache pool has been created.
 
 @section cache_eviction Overview of WiredTiger eviction configuration.
 
