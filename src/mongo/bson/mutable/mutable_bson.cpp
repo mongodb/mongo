@@ -89,7 +89,7 @@ namespace mutablebson {
         return SiblingIterator(leftChild());
     }
 
-    FilterIterator Element::find(const std::string& fieldName) {
+    FilterIterator Element::find(const std::string& fieldName) const {
         FieldNameFilter* filter = new FieldNameFilter(fieldName);
         return FilterIterator(*this, filter);
     }

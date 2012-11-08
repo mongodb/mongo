@@ -78,7 +78,7 @@ namespace mutablebson {
         Element parent() const;
 
         /** Find subtree nodes with a given name */
-        FilterIterator find(const std::string& fieldName);
+        FilterIterator find(const std::string& fieldName) const;
 
         /** Iterate children of this node */
         SiblingIterator children();
