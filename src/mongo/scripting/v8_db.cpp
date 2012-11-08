@@ -57,7 +57,7 @@ namespace {
 }  // namespace
 
     void v8RegisterMongoPrototypeManipulator(const V8FunctionPrototypeManipulatorFn& manipulator) {
-        fassert(0, !_mongoPrototypeManipulatorsFrozen);
+        fassert(16467, !_mongoPrototypeManipulatorsFrozen);
         _mongoPrototypeManipulators.push_back(manipulator);
     }
 
@@ -88,7 +88,7 @@ namespace {
         scope->injectV8Function("auth", mongoAuth, proto);
         scope->injectV8Function("logout", mongoLogout, proto);
 
-        fassert(0, _mongoPrototypeManipulatorsFrozen);
+        fassert(16468, _mongoPrototypeManipulatorsFrozen);
         for (size_t i = 0; i < _mongoPrototypeManipulators.size(); ++i)
             _mongoPrototypeManipulators[i](scope, mongo);
 
