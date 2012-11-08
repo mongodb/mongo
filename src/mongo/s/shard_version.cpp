@@ -60,7 +60,7 @@ namespace mongo {
         mongo::mutex _mutex;
 
         // a map from a connection into ChunkManager's sequence number for each namespace
-        unordered_map<unsigned long long, map<string,unsigned long long> > _map;
+        map<unsigned long long, map<string,unsigned long long> > _map;
 
     } connectionShardStatus;
 
