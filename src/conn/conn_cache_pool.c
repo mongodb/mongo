@@ -142,7 +142,7 @@ __wt_conn_cache_pool_open(WT_SESSION_IMPL *session)
 	TAILQ_INSERT_TAIL(&cp->cache_pool_qh, conn, cpq);
 	__wt_spin_unlock(session, &cp->cache_pool_lock);
 	locked = 0;
-	WT_VERBOSE_VOID(session, cache_pool,
+	WT_VERBOSE_ERR(session, cache_pool,
 	    "Added %s to cache pool %s.", conn->home, cp->name);
 
 	/* Start the cache pool server if required. */
@@ -194,7 +194,7 @@ __wt_conn_cache_pool_destroy(WT_CONNECTION_IMPL *conn)
 		    "Failed to find connection in shared cache pool.");
 	}
 
-	/* Ignore any errors - it's possible the session isn't valid. */
+	/* Ignore any errors - we want to continue closing things down. */
 	WT_VERBOSE_VOID(session, cache_pool,
 	    "Removing %s from cache pool.", entry->home);
 	TAILQ_REMOVE(&cp->cache_pool_qh, entry, cpq);
