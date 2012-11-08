@@ -137,11 +137,26 @@ namespace mongo {
         return Status::OK();
     }
 
-    AuthorizationManager::AuthorizationManager(AuthExternalState* externalState) {
+    AuthorizationManager::AuthorizationManager(AuthExternalState* externalState) :
+            _initialized(false) {
         _externalState.reset(externalState);
     }
 
     AuthorizationManager::~AuthorizationManager(){}
+
+    Status AuthorizationManager::initialize(DBClientBase* adminDBConnection) {
+        if (_initialized) {
+            // This should never happen.
+            return Status(ErrorCodes::InternalError,
+                          "AuthorizationManager already initialized!",
+                          0);
+        }
+        Status status = _externalState->initialize(adminDBConnection);
+        if (status == Status::OK()) {
+            _initialized = true;
+        }
+        return status;
+    }
 
     void AuthorizationManager::addAuthorizedPrincipal(Principal* principal) {
         _authenticatedPrincipals.add(principal);
@@ -266,6 +281,8 @@ namespace mongo {
 
     const Principal* AuthorizationManager::checkAuthorization(const std::string& resource,
                                                               ActionType action) const {
+        massert(16470, "AuthorizationManager has not been initialized!", _initialized);
+
         if (_externalState->shouldIgnoreAuthChecks()) {
             return &specialAdminPrincipal;
         }

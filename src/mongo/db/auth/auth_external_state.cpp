@@ -16,19 +16,32 @@
 
 #include "mongo/db/auth/auth_external_state_impl.h"
 
+#include "mongo/base/status.h"
+#include "mongo/client/dbclientinterface.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/client.h"
+#include "mongo/util/debug_util.h"
 
 namespace mongo {
 
-    AuthExternalStateImpl::AuthExternalStateImpl(DBClientBase* adminDBConnection) {
-        _adminUserExists = AuthorizationManager::hasPrivilegeDocument(adminDBConnection, "admin");
-        if (!_adminUserExists) {
-            log() << "note: no users configured in admin.system.users, allowing localhost access"
-                  << endl;
+    Status AuthExternalStateImpl::initialize(DBClientBase* adminDBConnection) {
+        try {
+            _adminUserExists = AuthorizationManager::hasPrivilegeDocument(adminDBConnection,
+                                                                          "admin");
+        } catch (DBException& e) {
+            return Status(ErrorCodes::InternalError,
+                          mongoutils::str::stream() << "An error occurred while checking for the "
+                                  "existence of an admin user: " << e.what(),
+                          0);
         }
+        ONCE {
+            if (!_adminUserExists) {
+                log() << "note: no users configured in admin.system.users, allowing localhost access"
+                      << endl;
+            }
+        }
+        return Status::OK();
     }
-    AuthExternalStateImpl::~AuthExternalStateImpl() {}
 
     bool AuthExternalStateImpl::shouldIgnoreAuthChecks() const {
         // TODO: uncomment part that checks if connection is localhost by looking in cc()

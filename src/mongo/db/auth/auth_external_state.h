@@ -17,6 +17,7 @@
 #pragma once
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/base/status.h"
 #include "mongo/client/dbclientinterface.h"
 
 namespace mongo {
@@ -39,6 +40,13 @@ namespace mongo {
         // are that auth isn't enabled, the connection is from localhost and there are admin users,
         // or the connection is a "god" connection.
         virtual bool shouldIgnoreAuthChecks() const = 0;
+
+        // adminDBConnection is a connection that can be used to access the admin database.  It is
+        // used to determine if there are any admin users configured for the cluster, and thus if
+        // localhost connections should be given special admin access.
+        // This function *must* be called on any new AuthExternalState, after the constructor but
+        // before any other methods are called on the AuthExternalState.
+        virtual Status initialize(DBClientBase* adminDBConnection) = 0;
 
     protected:
         AuthExternalState() {}; // This class should never be instantiated directly.

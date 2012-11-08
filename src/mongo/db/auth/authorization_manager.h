@@ -45,6 +45,13 @@ namespace mongo {
         explicit AuthorizationManager(AuthExternalState* externalState);
         ~AuthorizationManager();
 
+        // adminDBConnection is a connection that can be used to access the admin database.  It is
+        // used to determine if there are any admin users configured for the cluster, and thus if
+        // localhost connections should be given special admin access.
+        // This function *must* be called on any new AuthorizationManager, after the constructor but
+        // before any other methods are called on the AuthorizationManager.
+        Status initialize(DBClientBase* adminDBConnection);
+
         // Takes ownership of the principal (by putting into _authenticatedPrincipals).
         void addAuthorizedPrincipal(Principal* principal);
         // Removes and deletes the given principal from the set of authenticated principals.
@@ -101,6 +108,7 @@ namespace mongo {
         PrivilegeSet _acquiredPrivileges;
         // All principals who have been authenticated on this connection
         PrincipalSet _authenticatedPrincipals;
+        bool _initialized;
     };
 
 } // namespace mongo

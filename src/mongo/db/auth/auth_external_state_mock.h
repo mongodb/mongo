@@ -17,6 +17,8 @@
 #pragma once
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/base/status.h"
+#include "mongo/client/dbclientinterface.h"
 #include "mongo/db/auth/auth_external_state.h"
 
 namespace mongo {
@@ -37,6 +39,9 @@ namespace mongo {
         void setReturnValueForShouldIgnoreAuthChecks(bool returnValue) {
             _returnValue = returnValue;
         }
+
+        // This is a no-op for the mock
+        virtual Status initialize(DBClientBase* adminDBConnection) { return Status::OK(); }
 
     private:
         bool _returnValue;
