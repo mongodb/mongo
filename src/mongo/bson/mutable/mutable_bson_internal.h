@@ -102,7 +102,7 @@ namespace mutablebson {
         bool boolVal;
         int32_t intVal;
         int64_t longVal;
-        int32_t tsVal;
+        int64_t tsVal;
         int64_t dateVal;
         double doubleVal;
         char shortStr[16];  /* OID and short strings */

@@ -592,4 +592,47 @@ namespace {
         ASSERT_EQUALS((++it).done(), true);
     }
 
+    TEST(TimestampType, createElement) {
+        mongo::mutablebson::BasicHeap myHeap;
+        mongo::mutablebson::Context ctx(&myHeap);
+
+        mongo::mutablebson::Element t0 = ctx.makeTSElement("t0", mongo::OpTime());
+        ASSERT(mongo::OpTime() == t0.getTSValue());
+
+        mongo::mutablebson::Element t1 = ctx.makeTSElement("t1", mongo::OpTime(123, 456));
+        ASSERT(mongo::OpTime(123, 456) == t1.getTSValue());
+    }
+
+    TEST(TimestampType, setElement) {
+        mongo::mutablebson::BasicHeap myHeap;
+        mongo::mutablebson::Context ctx(&myHeap);
+
+        mongo::mutablebson::Element t0 = ctx.makeTSElement("t0", mongo::OpTime());
+        t0.setTSValue(mongo::OpTime(123, 456));
+        ASSERT(mongo::OpTime(123, 456) == t0.getTSValue());
+
+        // Try setting to other types and back to OpTime
+        t0.setLongValue(1234567890);
+        ASSERT_EQUALS(1234567890LL, t0.getLongValue());
+        t0.setTSValue(mongo::OpTime(789, 321));
+        ASSERT(mongo::OpTime(789, 321) == t0.getTSValue());
+
+        t0.setStringValue("foo bar baz");
+        ASSERT_EQUALS(0, strcmp("foo bar baz", t0.getStringValue()));
+        t0.setTSValue(mongo::OpTime(9876, 5432));
+        ASSERT(mongo::OpTime(9876, 5432) == t0.getTSValue());
+    }
+
+    TEST(TimestampType, appendElement) {
+        mongo::mutablebson::BasicHeap myHeap;
+        mongo::mutablebson::Context ctx(&myHeap);
+
+        mongo::mutablebson::Element t0 = ctx.makeObjElement("e0");
+        t0.appendTS("a timestamp field", mongo::OpTime(1352151971, 471));
+
+        mongo::mutablebson::FilterIterator it = t0.find("a timestamp field");
+        ASSERT_EQUALS(it.done(), false);
+        ASSERT(mongo::OpTime(1352151971, 471) ==
+            mongo::mutablebson::Element(&ctx, it.getRep()).getTSValue());
+    }
 } // unnamed namespace

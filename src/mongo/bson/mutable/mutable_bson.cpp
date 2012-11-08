@@ -418,8 +418,8 @@ ElementRep& dstRep = _ctx->_elements->_vec[(*sibIt)._rep];
     int64_t Element::getLongValue() const {
         return _ctx->_elements->_vec[_rep]._value.longVal;
     }
-    int32_t Element::getTSValue() const {
-        return _ctx->_elements->_vec[_rep]._value.tsVal;
+    OpTime Element::getTSValue() const {
+        return OpTime(_ctx->_elements->_vec[_rep]._value.tsVal);
     }
     double Element::getDoubleValue() const {
         return _ctx->_elements->_vec[_rep]._value.doubleVal;
@@ -452,8 +452,8 @@ ElementRep& dstRep = _ctx->_elements->_vec[(*sibIt)._rep];
         _ctx->_elements->_vec[_rep]._value.longVal = longVal;
     }
 
-    void Element::setTSValue(int32_t tsVal) {
-        _ctx->_elements->_vec[_rep]._value.tsVal = tsVal;
+    void Element::setTSValue(OpTime tsVal) {
+        _ctx->_elements->_vec[_rep]._value.tsVal = tsVal.asDate();
     }
 
     void Element::setDateValue(int64_t dateVal) {
@@ -670,7 +670,7 @@ ElementRep& dstRep = _ctx->_elements->_vec[(*sibIt)._rep];
         addChild(_ctx->makeLongElement(fieldName, longVal));
     }
 
-    void Element::appendTS(const StringData& fieldName, int32_t tsVal) {
+    void Element::appendTS(const StringData& fieldName, OpTime tsVal) {
         addChild(_ctx->makeTSElement(fieldName, tsVal));
     }
 
@@ -941,11 +941,11 @@ ElementRep& dstRep = _ctx->_elements->_vec[(*sibIt)._rep];
         return Element(this, rep);
     }
 
-    Element Context::makeTSElement(const StringData& fieldName, int32_t ts) {
+    Element Context::makeTSElement(const StringData& fieldName, OpTime ts) {
         uint32_t rep = _elements->size();
         uint32_t nameref = _heap->putString(fieldName);
         ValueType val;
-        val.tsVal = ts;
+        val.tsVal = ts.asDate();
         _elements->push_back(ElementRep(mongo::Timestamp, nameref, val));
         return Element(this, rep);
     }
