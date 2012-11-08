@@ -350,7 +350,8 @@ stat_worker(void *arg)
 		lsm_uri = calloc(
 		    strlen(cfg->uri) + strlen("statistics:") + 1, 1);
 		if (lsm_uri == NULL) {
-			lprintf(cfg, ENOMEM, 0, "Statistics thread uri create.");
+			lprintf(cfg, ENOMEM, 0,
+			    "Statistics thread uri create.");
 			goto err;
 		}
 		sprintf(lsm_uri, "statistics:%s", cfg->uri);

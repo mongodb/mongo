@@ -139,7 +139,8 @@ tfile.write('''/* DO NOT EDIT: automatically built by dist/config.py. */
 ''')
 
 # Make a TextWrapper that can wrap at commas.
-w = textwrap.TextWrapper(width=68, break_on_hyphens=False)
+# Choose 66 because there are up to 14 characters of indent and escape chars
+w = textwrap.TextWrapper(width=66, break_on_hyphens=False)
 w.wordsep_re = w.wordsep_simple_re = re.compile(r'(,)')
 
 def checkstr(c):

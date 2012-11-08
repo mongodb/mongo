@@ -58,7 +58,7 @@ __wt_cache_create(WT_CONNECTION_IMPL *conn, const char *cfg[])
 	    (F_ISSET(conn, WT_CONN_CACHE_POOL) && conn->cache != NULL));
 
 	if (F_ISSET(conn, WT_CONN_CACHE_POOL))
-		WT_ERR(__wt_conn_cache_pool_open(session));
+		WT_RET(__wt_conn_cache_pool_open(session));
 	else
 		WT_RET(__wt_calloc_def(session, 1, &conn->cache));
 

@@ -102,8 +102,8 @@ __wt_confchk_connection_reconfigure[] = {
 	{ "eviction_target", "int", "min=10,max=99", NULL },
 	{ "eviction_trigger", "int", "min=10,max=99", NULL },
 	{ "verbose", "list", "choices=[\"block\",\"cache_pool\",\"ckpt\","
-	    "\"evict\",\"evictserver\",\"fileops\",\"hazard\",\"lsm\",\"mutex\","
-	    "\"read\",\"readserver\",\"reconcile\",\"salvage\",\"verify\","
+	    "\"evict\",\"evictserver\",\"fileops\",\"hazard\",\"lsm\",\"mutex\""
+	    ",\"read\",\"readserver\",\"reconcile\",\"salvage\",\"verify\","
 	    "\"write\"]", NULL },
 	{ NULL, NULL, NULL, NULL }
 };
@@ -119,15 +119,15 @@ __wt_confchk_cursor_close[] = {
 
 const char *
 __wt_confdfl_file_meta =
-	"allocation_size=512B,block_compressor=,cache_resident=0,checkpoint=,"
-	"checksum=,collator=,columns=,dictionary=0,format=btree,huffman_key=,"
-	"huffman_value=,internal_item_max=0,internal_key_truncate=,"
-	"internal_page_max=2KB,key_format=u,key_gap=10,leaf_item_max=0,"
-	"leaf_page_max=1MB,lsm_bloom=,lsm_bloom_bit_count=8,lsm_bloom_config="
-	",lsm_bloom_hash_count=4,lsm_bloom_newest=0,lsm_bloom_oldest=0,"
-	"lsm_chunk_size=2MB,lsm_merge_max=15,lsm_merge_threads=1,"
-	"prefix_compression=,split_pct=75,value_format=u,version=(major=0,"
-	"minor=0)";
+	"allocation_size=512B,block_compressor=,cache_resident=0,"
+	"checkpoint=,checksum=,collator=,columns=,dictionary=0,format=btree"
+	",huffman_key=,huffman_value=,internal_item_max=0,"
+	"internal_key_truncate=,internal_page_max=2KB,key_format=u,"
+	"key_gap=10,leaf_item_max=0,leaf_page_max=1MB,lsm_bloom=,"
+	"lsm_bloom_bit_count=8,lsm_bloom_config=,lsm_bloom_hash_count=4,"
+	"lsm_bloom_newest=0,lsm_bloom_oldest=0,lsm_chunk_size=2MB,"
+	"lsm_merge_max=15,lsm_merge_threads=1,prefix_compression=,"
+	"split_pct=75,value_format=u,version=(major=0,minor=0)";
 
 WT_CONFIG_CHECK
 __wt_confchk_file_meta[] = {
@@ -241,11 +241,12 @@ __wt_confdfl_session_create =
 	"colgroups=,collator=,columns=,columns=,dictionary=0,exclusive=0,"
 	"format=btree,huffman_key=,huffman_value=,internal_item_max=0,"
 	"internal_key_truncate=,internal_page_max=2KB,key_format=u,"
-	"key_format=u,key_gap=10,leaf_item_max=0,leaf_page_max=1MB,lsm_bloom="
-	",lsm_bloom_bit_count=8,lsm_bloom_config=,lsm_bloom_hash_count=4,"
-	"lsm_bloom_newest=0,lsm_bloom_oldest=0,lsm_chunk_size=2MB,"
-	"lsm_merge_max=15,lsm_merge_threads=1,prefix_compression=,source=,"
-	"split_pct=75,type=file,value_format=u,value_format=u";
+	"key_format=u,key_gap=10,leaf_item_max=0,leaf_page_max=1MB,"
+	"lsm_bloom=,lsm_bloom_bit_count=8,lsm_bloom_config=,"
+	"lsm_bloom_hash_count=4,lsm_bloom_newest=0,lsm_bloom_oldest=0,"
+	"lsm_chunk_size=2MB,lsm_merge_max=15,lsm_merge_threads=1,"
+	"prefix_compression=,source=,split_pct=75,type=file,value_format=u,"
+	"value_format=u";
 
 WT_CONFIG_CHECK
 __wt_confchk_session_create[] = {
@@ -310,8 +311,8 @@ __wt_confchk_session_log_printf[] = {
 const char *
 __wt_confdfl_session_open_cursor =
 	"append=0,bulk=0,checkpoint=,dump=,next_random=0,no_cache=0,"
-	"overwrite=0,raw=0,statistics=0,statistics_clear=0,statistics_fast=0,"
-	"target=";
+	"overwrite=0,raw=0,statistics=0,statistics_clear=0,"
+	"statistics_fast=0,target=";
 
 WT_CONFIG_CHECK
 __wt_confchk_session_open_cursor[] = {
@@ -414,10 +415,10 @@ __wt_confchk_table_meta[] = {
 
 const char *
 __wt_confdfl_wiredtiger_open =
-	"buffer_alignment=-1,cache=(pool=,pool_chunk=,pool_min=,size=100MB),"
-	"create=0,direct_io=,error_prefix=,eviction_target=80,"
-	"eviction_trigger=95,extensions=,hazard_max=1000,logging=0,lsm_merge="
-	",multiprocess=0,session_max=50,sync=,transactional=,"
+	"buffer_alignment=-1,cache=(pool=,pool_chunk=,pool_min=,size=100MB)"
+	",create=0,direct_io=,error_prefix=,eviction_target=80,"
+	"eviction_trigger=95,extensions=,hazard_max=1000,logging=0,"
+	"lsm_merge=,multiprocess=0,session_max=50,sync=,transactional=,"
 	"use_environment_priv=0,verbose=";
 
 WT_CONFIG_CHECK
@@ -439,8 +440,8 @@ __wt_confchk_wiredtiger_open[] = {
 	{ "transactional", "boolean", NULL, NULL },
 	{ "use_environment_priv", "boolean", NULL, NULL },
 	{ "verbose", "list", "choices=[\"block\",\"cache_pool\",\"ckpt\","
-	    "\"evict\",\"evictserver\",\"fileops\",\"hazard\",\"lsm\",\"mutex\","
-	    "\"read\",\"readserver\",\"reconcile\",\"salvage\",\"verify\","
+	    "\"evict\",\"evictserver\",\"fileops\",\"hazard\",\"lsm\",\"mutex\""
+	    ",\"read\",\"readserver\",\"reconcile\",\"salvage\",\"verify\","
 	    "\"write\"]", NULL },
 	{ NULL, NULL, NULL, NULL }
 };
