@@ -44,8 +44,7 @@ namespace mongo {
     }
 
     bool AuthExternalStateImpl::shouldIgnoreAuthChecks() const {
-        // TODO: uncomment part that checks if connection is localhost by looking in cc()
-        return noauth || (!_adminUserExists /*&& cc().isLocalhost*/) || cc().isGod();
+        return noauth || (!_adminUserExists && cc().getIsLocalHostConnection()) || cc().isGod();
     }
 
 } // namespace mongo

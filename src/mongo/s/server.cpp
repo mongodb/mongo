@@ -94,8 +94,7 @@ namespace mongo {
         virtual ~ShardedMessageHandler() {}
 
         virtual void connected( AbstractMessagingPort* p ) {
-            ClientInfo *c = ClientInfo::get();
-            massert(15849, "client info not defined", c);
+            ClientInfo *c = ClientInfo::create(p);
             if( p->remote().isLocalHost() )
                 c->getAuthenticationInfo()->setIsALocalHostConnectionWithSpecialAuthPowers();
         }

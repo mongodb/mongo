@@ -22,6 +22,7 @@
 
 #include "mongo/db/auth/authentication_session.h"
 #include "mongo/util/net/hostandport.h"
+#include "mongo/util/net/message_port.h"
 
 namespace mongo {
 
@@ -46,13 +47,22 @@ namespace mongo {
         void swapAuthenticationSession(boost::scoped_ptr<AuthenticationSession>& other) {
             _authenticationSession.swap(other);
         }
+        bool getIsLocalHostConnection() { return getRemote().isLocalHost(); }
 
-        virtual bool hasRemote() const = 0;
-        virtual HostAndPort getRemote() const = 0;
+        virtual bool hasRemote() const { return _messagingPort; }
+        virtual HostAndPort getRemote() const {
+            verify( _messagingPort );
+            return _messagingPort->remote();
+        }
+        AbstractMessagingPort * port() const { return _messagingPort; }
 
         static ClientBasic* getCurrent();
 
+    protected:
+        ClientBasic(AbstractMessagingPort* messagingPort) : _messagingPort(messagingPort) {}
+
     private:
         boost::scoped_ptr<AuthenticationSession> _authenticationSession;
+        AbstractMessagingPort* const _messagingPort;
     };
 }
