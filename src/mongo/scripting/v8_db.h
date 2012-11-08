@@ -17,11 +17,11 @@
 
 #pragma once
 
+#include <boost/function.hpp>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
-#include <v8.h>
-#include <boost/function.hpp>
+#include <third_party/v8/include/v8.h>
 
 #include "mongo/scripting/engine_v8.h"
 
