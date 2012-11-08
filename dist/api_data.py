@@ -114,6 +114,9 @@ lsm_config = [
 	Config('lsm_merge_max', '15', r'''
 		the maximum number of chunks to include in a merge operation''',
 		min='2', max='100'),
+	Config('lsm_merge_threads', '1', r'''
+		the number of thread to perform merge operations''',
+		min='1', max='10'), # !!! max must match WT_LSM_MAX_WORKERS
 ]
 
 # Per-file configuration

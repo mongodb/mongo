@@ -259,6 +259,8 @@ extern int __wt_bloom_open(WT_SESSION_IMPL *session,
     WT_BLOOM **bloomp);
 extern int __wt_bloom_insert(WT_BLOOM *bloom, WT_ITEM *key);
 extern int __wt_bloom_finalize(WT_BLOOM *bloom);
+extern int __wt_bloom_hash(WT_BLOOM *bloom, WT_ITEM *key, WT_BLOOM_HASH *bhash);
+extern int __wt_bloom_hash_get(WT_BLOOM *bloom, WT_BLOOM_HASH *bhash);
 extern int __wt_bloom_get(WT_BLOOM *bloom, WT_ITEM *key);
 extern int __wt_bloom_close(WT_BLOOM *bloom);
 extern int __wt_bloom_drop(WT_BLOOM *bloom, const char *config);
@@ -710,8 +712,9 @@ extern int __wt_log_printf(WT_SESSION_IMPL *session,
     2,
     3)));
 extern WT_LOGREC_DESC __wt_logdesc_debug;
-extern int __wt_clsm_init_merge(WT_CURSOR *cursor,
+extern int __wt_clsm_init_merge( WT_CURSOR *cursor,
     int start_chunk,
+    uint32_t start_id,
     int nchunks);
 extern int __wt_clsm_open(WT_SESSION_IMPL *session,
     const char *uri,
@@ -725,8 +728,9 @@ extern int __wt_lsm_merge_update_tree(WT_SESSION_IMPL *session,
     int start_chunk,
     int nchunks,
     WT_LSM_CHUNK *chunk);
-extern int __wt_lsm_merge(WT_SESSION_IMPL *session,
+extern int __wt_lsm_merge( WT_SESSION_IMPL *session,
     WT_LSM_TREE *lsm_tree,
+    uint32_t id,
     int stalls);
 extern int __wt_lsm_meta_read(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree);
 extern int __wt_lsm_meta_write(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree);
@@ -736,15 +740,14 @@ extern int __wt_lsm_stat_init( WT_SESSION_IMPL *session,
 extern int __wt_lsm_tree_close_all(WT_SESSION_IMPL *session);
 extern int __wt_lsm_tree_bloom_name( WT_SESSION_IMPL *session,
     WT_LSM_TREE *lsm_tree,
-    int i,
+    uint32_t id,
     WT_ITEM *buf);
 extern int __wt_lsm_tree_chunk_name( WT_SESSION_IMPL *session,
     WT_LSM_TREE *lsm_tree,
-    int i,
+    uint32_t id,
     WT_ITEM *buf);
 extern int __wt_lsm_tree_setup_chunk(WT_SESSION_IMPL *session,
     WT_LSM_TREE *lsm_tree,
-    int i,
     WT_LSM_CHUNK *chunk,
     int create_bloom);
 extern int __wt_lsm_tree_create(WT_SESSION_IMPL *session,
@@ -775,7 +778,7 @@ extern int __wt_lsm_tree_worker(WT_SESSION_IMPL *session,
     const char *[]),
     const char *cfg[],
     uint32_t open_flags);
-extern void *__wt_lsm_worker(void *arg);
+extern void *__wt_lsm_worker(void *vargs);
 extern void *__wt_lsm_checkpoint_worker(void *arg);
 extern int __wt_lsm_copy_chunks(WT_SESSION_IMPL *session,
     WT_LSM_TREE *lsm_tree,

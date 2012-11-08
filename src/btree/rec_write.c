@@ -1247,12 +1247,13 @@ __rec_split_row_promote(WT_SESSION_IMPL *session, WT_RECONCILE *r, uint8_t type)
 	 * a copy.  For a row-store, it's the first key on the page, a variable-
 	 * length byte string, get a copy.
 	 *
-	 * This function is called from __rec_split at each split boundary, but
-	 * that means we're not called before the first boundary.  It's painful,
-	 * but we need to detect that case and copy the key from the page we're
-	 * building.  We could simplify this by grabbing a copy of the first key
-	 * we put on a page, perhaps in the function building keys for a page,
-	 * but that's going to be uglier than this.
+	 * This function is called from the split code at each split boundary,
+	 * but that means we're not called before the first boundary.  When we
+	 * do the split work at the second boundary, we need to copy the key
+	 * for the first boundary from the page we're building.  Alternatively,
+	 * we could store a copy of the first key we put on a page somewhere,
+	 * perhaps while building the keys for a page, but that's likely to be
+	 * even uglier.
 	 */
 	if (r->bnd_next == 1) {
 		/*
@@ -1270,7 +1271,11 @@ __rec_split_row_promote(WT_SESSION_IMPL *session, WT_RECONCILE *r, uint8_t type)
 
 	/*
 	 * For the current slot, take the last key we built, after doing suffix
-	 * compression.
+	 * compression.  The "last key we built" describes some process: before
+	 * calling the split code, we must place the last key on the page before
+	 * the boundary into the "last" key structure, and the first key on the
+	 * page after the boundary into the "current" key structure, we're going
+	 * to compare them for suffix compression.
 	 *
 	 * Suffix compression is a hack to shorten keys on internal pages.  We
 	 * only need enough bytes in the promoted key to ensure searches go to

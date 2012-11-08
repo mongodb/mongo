@@ -12,7 +12,7 @@ static int  __evict_file_request(WT_SESSION_IMPL *, int);
 static int  __evict_file_request_walk(WT_SESSION_IMPL *);
 static int  __evict_lru(WT_SESSION_IMPL *);
 static int  __evict_lru_cmp(const void *, const void *);
-static int  __evict_walk(WT_SESSION_IMPL *);
+static int  __evict_walk(WT_SESSION_IMPL *, uint32_t *);
 static int  __evict_walk_file(WT_SESSION_IMPL *, u_int *);
 static int  __evict_worker(WT_SESSION_IMPL *);
 
@@ -20,13 +20,47 @@ static int  __evict_worker(WT_SESSION_IMPL *);
  * Tuning constants: I hesitate to call this tuning, but we want to review some
  * number of pages from each file's in-memory tree for each page we evict.
  */
-#define	WT_EVICT_GROUP		30	/* Consider N pages as LRU candidates */
-#define	WT_EVICT_INT_SKEW	(1<<20)	/* Prefer leaf pages over internal
+#define	WT_EVICT_INT_SKEW  (1<<20)	/* Prefer leaf pages over internal
 					   pages by this many increments of the
 					   read generation. */
 #define	WT_EVICT_WALK_PER_FILE	 5	/* Pages to visit per file */
-#define	WT_EVICT_WALK_BASE	50	/* Pages tracked across file visits */
+#define	WT_EVICT_WALK_BASE     100	/* Pages tracked across file visits */
 #define	WT_EVICT_WALK_INCR     100	/* Pages added each walk */
+
+/*
+ * __evict_read_gen --
+ *	Get the adjusted read generation for an eviction entry.
+ */
+static inline uint64_t
+__evict_read_gen(const WT_EVICT_ENTRY *entry)
+{
+	uint64_t read_gen;
+
+	if (entry->page == NULL)
+		return (UINT64_MAX);
+
+	read_gen = entry->page->read_gen + entry->btree->evict_priority;
+	if (entry->page->type == WT_PAGE_ROW_INT ||
+	    entry->page->type == WT_PAGE_COL_INT)
+		read_gen += WT_EVICT_INT_SKEW;
+
+	return (read_gen);
+}
+
+/*
+ * __evict_lru_cmp --
+ *	Qsort function: sort the eviction array.
+ */
+static int
+__evict_lru_cmp(const void *a, const void *b)
+{
+	uint64_t a_lru, b_lru;
+
+	a_lru = __evict_read_gen(a);
+	b_lru = __evict_read_gen(b);
+
+	return ((a_lru < b_lru) ? -1 : (a_lru == b_lru) ? 0 : 1);
+}
 
 /*
  * __evict_list_clr --
@@ -488,16 +522,43 @@ static int
 __evict_lru(WT_SESSION_IMPL *session)
 {
 	WT_CACHE *cache;
+	uint64_t cutoff;
+	uint32_t i, candidates;
 
 	cache = S2C(session)->cache;
 
 	/* Get some more pages to consider for eviction. */
-	WT_RET(__evict_walk(session));
+	WT_RET(__evict_walk(session, &candidates));
 
 	/* Sort the list into LRU order and restart. */
 	__wt_spin_lock(session, &cache->evict_lock);
+	while (candidates > 0 && cache->evict[candidates - 1].page == NULL)
+		--candidates;
+	if (candidates == 0) {
+		__wt_spin_unlock(session, &cache->evict_lock);
+		return (0);
+	}
+
 	qsort(cache->evict,
-	    cache->evict_entries, sizeof(WT_EVICT_ENTRY), __evict_lru_cmp);
+	    candidates, sizeof(WT_EVICT_ENTRY), __evict_lru_cmp);
+
+	/* Find the bottom 25% */
+	while (candidates > 0 && cache->evict[candidates - 1].page == NULL)
+		--candidates;
+
+	cutoff = (3 * __evict_read_gen(&cache->evict[0]) +
+	    __evict_read_gen(&cache->evict[candidates - 1])) / 4;
+
+	/*
+	 * Don't take more than half, regardless.  That said, if there is only
+	 * one candidate page, which is normal when populating an empty file,
+	 * don't exclude it.
+	 */
+	for (i = 0; i < candidates / 2; i++)
+		if (cache->evict[i].page->read_gen > cutoff)
+			break;
+	cache->evict_candidates = i + 1;
+
 	__evict_list_clr_all(session, WT_EVICT_WALK_BASE);
 
 	cache->evict_current = cache->evict;
@@ -515,7 +576,7 @@ __evict_lru(WT_SESSION_IMPL *session)
  *	Fill in the array by walking the next set of pages.
  */
 static int
-__evict_walk(WT_SESSION_IMPL *session)
+__evict_walk(WT_SESSION_IMPL *session, u_int *entriesp)
 {
 	WT_BTREE *btree;
 	WT_CACHE *cache;
@@ -586,6 +647,7 @@ retry:	file_count = 0;
 	    retries++ < WT_EVICT_WALK_INCR / WT_EVICT_WALK_PER_FILE)
 		goto retry;
 
+	*entriesp = i;
 	if (0) {
 err:		__wt_spin_unlock(session, &cache->evict_lock);
 	}
@@ -683,7 +745,10 @@ __evict_get_page(
 	*btreep = NULL;
 	*pagep = NULL;
 
-	candidates = (is_app ? WT_EVICT_GROUP : WT_EVICT_GROUP / 2);
+	candidates = cache->evict_candidates;
+	/* The eviction server only considers half of the entries. */
+	if (!is_app)
+		candidates /= 2;
 
 	/*
 	 * Avoid the LRU lock if no pages are available.  If there are pages
@@ -786,45 +851,4 @@ __wt_evict_lru_page(WT_SESSION_IMPL *session, int is_app)
 	session->btree = saved_btree;
 
 	return (ret);
-}
-
-/*
- * __evict_lru_cmp --
- *	Qsort function: sort the eviction array.
- */
-static int
-__evict_lru_cmp(const void *a, const void *b)
-{
-	WT_PAGE *a_page, *b_page;
-	uint64_t a_lru, b_lru;
-
-	/*
-	 * There may be NULL references in the array; sort them as greater than
-	 * anything else so they migrate to the end of the array.
-	 */
-	a_page = ((WT_EVICT_ENTRY *)a)->page;
-	b_page = ((WT_EVICT_ENTRY *)b)->page;
-	if (a_page == NULL)
-		return (b_page == NULL ? 0 : 1);
-	if (b_page == NULL)
-		return (-1);
-
-	/*
-	 * Sort by the LRU in ascending order.
-	 *
-	 * Bias in favor of leaf pages.  Otherwise, we can waste time
-	 * considering parent pages for eviction while their child pages are
-	 * still in memory.
-	 *
-	 * Bump the LRU generation by a small fixed amount: the idea being that
-	 * if we have enough good leaf page candidates, we should evict them
-	 * first, but not completely ignore an old internal page.
-	 */
-	a_lru = a_page->read_gen;
-	b_lru = b_page->read_gen;
-	if (a_page->type == WT_PAGE_ROW_INT || a_page->type == WT_PAGE_COL_INT)
-		a_lru += WT_EVICT_INT_SKEW;
-	if (b_page->type == WT_PAGE_ROW_INT || b_page->type == WT_PAGE_COL_INT)
-		b_lru += WT_EVICT_INT_SKEW;
-	return (a_lru > b_lru ? 1 : (a_lru < b_lru ? -1 : 0));
 }
