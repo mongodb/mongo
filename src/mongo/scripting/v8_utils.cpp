@@ -23,16 +23,18 @@ using namespace boost;
 #define V8STDINT_H_
 #endif
 
-#include "v8_utils.h"
-#include "v8_db.h"
+#include "mongo/scripting/v8_utils.h"
+
+#include <boost/smart_ptr.hpp>
+#include <boost/thread/thread.hpp>
+#include <boost/thread/xtime.hpp>
 #include <iostream>
 #include <map>
 #include <sstream>
 #include <vector>
-#include <boost/smart_ptr.hpp>
-#include <boost/thread/thread.hpp>
-#include <boost/thread/xtime.hpp>
-#include "engine_v8.h"
+
+#include "mongo/scripting/engine_v8.h"
+#include "mongo/scripting/v8_db.h"
 
 using namespace std;
 using namespace v8;

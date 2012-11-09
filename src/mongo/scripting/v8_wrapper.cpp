@@ -15,12 +15,13 @@
  *    limitations under the License.
  */
 
-#include "v8_wrapper.h"
-#include "v8_utils.h"
-#include "v8_db.h"
-#include "engine_v8.h"
+#include "mongo/scripting/v8_wrapper.h"
 
 #include <iostream>
+
+#include "mongo/scripting/engine_v8.h"
+#include "mongo/scripting/v8_db.h"
+#include "mongo/scripting/v8_utils.h"
 
 using namespace std;
 using namespace v8;
