@@ -9,6 +9,10 @@ env.Command(['mongo/base/error_codes.h', 'mongo/base/error_codes.cpp',],
             ['mongo/base/generate_error_codes.py', 'mongo/base/error_codes.err'],
             '$PYTHON $SOURCES $TARGETS')
 
+env.Command(['mongo/db/auth/action_type.h', 'mongo/db/auth/action_type.cpp'], 
+            ['mongo/db/auth/generate_action_types.py', 'mongo/db/auth/action_types.txt'],
+            '$PYTHON $SOURCES $TARGETS')
+
 clientSource = [
     'mongo/base/configuration_variable_manager.cpp',
     'mongo/base/error_codes.cpp',
@@ -142,6 +146,8 @@ env.Install(
                  'SConscript.client',
                  'mongo/base/generate_error_codes.py',
                  'mongo/base/error_codes.err',
+                 'mongo/db/auth/generate_action_types.py',
+                 'mongo/db/auth/action_types.txt',
                  '#buildscripts/make_archive.py',
                  clientSource,
                  clientHeaders,
