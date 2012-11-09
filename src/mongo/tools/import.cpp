@@ -18,14 +18,11 @@
 
 #include "pch.h"
 #include "db/json.h"
-
 #include "tool.h"
 #include "../util/text.h"
 #include "mongo/base/initializer.h"
-
 #include <fstream>
 #include <iostream>
-
 #include <boost/program_options.hpp>
 #include <boost/algorithm/string.hpp>
 #include <boost/filesystem/operations.hpp>
@@ -274,7 +271,7 @@ public:
         ("type",po::value<string>() , "type of file to import.  default: json (json,csv,tsv)")
         ("file",po::value<string>() , "file to import from; if not specified stdin is used" )
         ("drop", "drop collection first " )
-        ("headerline","CSV,TSV only - use first line as headers")
+        ("headerline","first line in input file is a header (CSV and TSV only)")
         ("upsert", "insert or update objects that already exist" )
         ("upsertFields", po::value<string>(), "comma-separated fields for the query part of the upsert. You should make sure this is indexed" )
         ("stopOnError", "stop importing at first error rather than continuing" )
@@ -294,6 +291,9 @@ public:
     ;
     virtual void printExtraHelp( ostream & out ) {
         out << "Import CSV, TSV or JSON data into MongoDB.\n" << endl;
+        out << "When importing JSON documents, each document must be a separate line of the input file.\n";
+        out << "\nExample:\n";
+        out << "  mongoimport --host myhost --db my_cms --collection docs < mydocfile.json\n" << endl;
     }
 
     unsigned long long lastErrorFailures;
@@ -519,4 +519,5 @@ int main( int argc , char ** argv, char** envp ) {
     Import import;
     return import.main( argc , argv );
 }
+
 const int Import::BUF_SIZE(1024 * 1024 * 16);
