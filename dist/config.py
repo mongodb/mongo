@@ -76,19 +76,19 @@ def parseconfig(c, name_indent=''):
     return output
 
 def getconfcheck(c):
-    check = '{ "' + c.name + '", "' + gettype(c) + '", '
+    check = '{ "' + c.name + '", "' + gettype(c) + '",'
     cstr = checkstr(c)
     sstr = getsubconfigstr(c)
     if cstr != 'NULL':
         cstr = '"\n\t    "'.join(w.wrap(cstr))
         # Manually re-wrap when there is a check string to avoid ugliness
         # between string and non-string wrapping
-        if len(check + cstr + ',\n\t    ' + sstr + '},') >= 68:
+        if len(check + ' ' + cstr + ',\n\t    ' + sstr + '},') >= 68:
             check = check + '\n\t    ' + cstr + ',\n\t    ' + sstr + '},'
         else:
-            check = check + cstr + ', ' + sstr + '},'
+            check = check + ' ' + cstr + ', ' + sstr + '},'
     else:
-        check = '\n\t    '.join(w.wrap(check + cstr + ', ' + sstr + '},'))
+        check = '\n\t    '.join(w.wrap(check + ' ' + cstr + ', ' + sstr + '},'))
     return check
 
 skip = False
