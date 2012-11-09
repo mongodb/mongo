@@ -23,7 +23,6 @@
 #include "../db/jsobjmanipulator.h"
 #include "../db/json.h"
 #include "../db/repl.h"
-#include "../db/extsort.h"
 #include "dbtests.h"
 #include "../util/stringutils.h"
 #include "../util/mongoutils/checksum.h"
@@ -32,8 +31,6 @@
 #include "mongo/platform/float_utils.h"
 
 namespace JsobjTests {
-
-    IndexInterface& indexInterfaceForTheseTests = (time(0)%2) ? *IndexDetails::iis[0] : *IndexDetails::iis[1];
 
     void keyTest(const BSONObj& o, bool mustBeCompact = false) {
         static KeyV1Owned *kLast;
@@ -1583,228 +1580,6 @@ namespace JsobjTests {
         }
     };
 
-    namespace external_sort {
-        class Basic1 {
-        public:
-            void run() {
-                BSONObjExternalSorter sorter(indexInterfaceForTheseTests);
-
-                sorter.add( BSON( "x" << 10 ), DiskLoc( 5, 1 ), false );
-                sorter.add( BSON( "x" << 2 ), DiskLoc( 3, 1 ), false );
-                sorter.add( BSON( "x" << 5 ), DiskLoc( 6, 1 ), false );
-                sorter.add( BSON( "x" << 5 ), DiskLoc( 7, 1 ), false );
-
-                sorter.sort( false );
-
-                auto_ptr<BSONObjExternalSorter::Iterator> i = sorter.iterator();
-                int num=0;
-                while ( i->more() ) {
-                    pair<BSONObj,DiskLoc> p = i->next();
-                    if ( num == 0 )
-                        verify( p.first["x"].number() == 2 );
-                    else if ( num <= 2 ) {
-                        verify( p.first["x"].number() == 5 );
-                    }
-                    else if ( num == 3 )
-                        verify( p.first["x"].number() == 10 );
-                    else
-                        ASSERT( 0 );
-                    num++;
-                }
-
-
-                ASSERT_EQUALS( 0 , sorter.numFiles() );
-            }
-        };
-
-        class Basic2 {
-        public:
-            void run() {
-                BSONObjExternalSorter sorter( indexInterfaceForTheseTests, BSONObj() , 10 );
-                sorter.add( BSON( "x" << 10 ), DiskLoc( 5, 11 ), false );
-                sorter.add( BSON( "x" << 2 ), DiskLoc( 3, 1 ), false );
-                sorter.add( BSON( "x" << 5 ), DiskLoc( 6, 1 ), false );
-                sorter.add( BSON( "x" << 5 ), DiskLoc( 7, 1 ), false );
-
-                sorter.sort( false );
-
-                auto_ptr<BSONObjExternalSorter::Iterator> i = sorter.iterator();
-                int num=0;
-                while ( i->more() ) {
-                    pair<BSONObj,DiskLoc> p = i->next();
-                    if ( num == 0 ) {
-                        verify( p.first["x"].number() == 2 );
-                        ASSERT_EQUALS( p.second.toString() , "3:1" );
-                    }
-                    else if ( num <= 2 )
-                        verify( p.first["x"].number() == 5 );
-                    else if ( num == 3 ) {
-                        verify( p.first["x"].number() == 10 );
-                        ASSERT_EQUALS( p.second.toString() , "5:b" );
-                    }
-                    else
-                        ASSERT( 0 );
-                    num++;
-                }
-
-            }
-        };
-
-        class Basic3 {
-        public:
-            void run() {
-                BSONObjExternalSorter sorter( indexInterfaceForTheseTests, BSONObj() , 10 );
-                sorter.sort( false );
-
-                auto_ptr<BSONObjExternalSorter::Iterator> i = sorter.iterator();
-                verify( ! i->more() );
-
-            }
-        };
-
-
-        class ByDiskLock {
-        public:
-            void run() {
-                BSONObjExternalSorter sorter(indexInterfaceForTheseTests);
-                sorter.add( BSON( "x" << 10 ), DiskLoc( 5, 4 ), false );
-                sorter.add( BSON( "x" << 2 ), DiskLoc( 3, 0 ), false );
-                sorter.add( BSON( "x" << 5 ), DiskLoc( 6, 2 ), false );
-                sorter.add( BSON( "x" << 5 ), DiskLoc( 7, 3 ), false );
-                sorter.add( BSON( "x" << 5 ), DiskLoc( 2, 1 ), false );
-
-                sorter.sort( false );
-
-                auto_ptr<BSONObjExternalSorter::Iterator> i = sorter.iterator();
-                int num=0;
-                while ( i->more() ) {
-                    pair<BSONObj,DiskLoc> p = i->next();
-                    if ( num == 0 )
-                        verify( p.first["x"].number() == 2 );
-                    else if ( num <= 3 ) {
-                        verify( p.first["x"].number() == 5 );
-                    }
-                    else if ( num == 4 )
-                        verify( p.first["x"].number() == 10 );
-                    else
-                        ASSERT( 0 );
-                    ASSERT_EQUALS( num , p.second.getOfs() );
-                    num++;
-                }
-
-
-            }
-        };
-
-
-        class Big1 {
-        public:
-            void run() {
-                BSONObjExternalSorter sorter( indexInterfaceForTheseTests, BSONObj() , 2000 );
-                for ( int i=0; i<10000; i++ ) {
-                    sorter.add( BSON( "x" << rand() % 10000 ), DiskLoc( 5, i ), false );
-                }
-
-                sorter.sort( false );
-
-                auto_ptr<BSONObjExternalSorter::Iterator> i = sorter.iterator();
-                int num=0;
-                double prev = 0;
-                while ( i->more() ) {
-                    pair<BSONObj,DiskLoc> p = i->next();
-                    num++;
-                    double cur = p.first["x"].number();
-                    verify( cur >= prev );
-                    prev = cur;
-                }
-                verify( num == 10000 );
-            }
-        };
-
-        class Big2 {
-        public:
-            void run() {
-                const int total = 100000;
-                BSONObjExternalSorter sorter( indexInterfaceForTheseTests, BSONObj() , total * 2 );
-                for ( int i=0; i<total; i++ ) {
-                    sorter.add( BSON( "a" << "b" ), DiskLoc( 5, i ), false );
-                }
-
-                sorter.sort( false );
-
-                auto_ptr<BSONObjExternalSorter::Iterator> i = sorter.iterator();
-                int num=0;
-                double prev = 0;
-                while ( i->more() ) {
-                    pair<BSONObj,DiskLoc> p = i->next();
-                    num++;
-                    double cur = p.first["x"].number();
-                    verify( cur >= prev );
-                    prev = cur;
-                }
-                verify( num == total );
-                ASSERT( sorter.numFiles() > 2 );
-            }
-        };
-
-
-        class Big3 {
-        public:
-            void run() {
-                const int total = 1000 * 1000;
-                BSONObjExternalSorter sorter( indexInterfaceForTheseTests, BSONObj() , total * 2 );
-                for ( int i=0; i<total; i++ ) {
-                    sorter.add( BSON( "abcabcabcabd" << "basdasdasdasdasdasdadasdasd" << "x" << i ),
-                                DiskLoc( 5, i ),
-                                false );
-                }
-
-                sorter.sort( false );
-
-                auto_ptr<BSONObjExternalSorter::Iterator> i = sorter.iterator();
-                int num=0;
-                double prev = 0;
-                while ( i->more() ) {
-                    pair<BSONObj,DiskLoc> p = i->next();
-                    num++;
-                    double cur = p.first["x"].number();
-                    verify( cur >= prev );
-                    prev = cur;
-                }
-                verify( num == total );
-                ASSERT( sorter.numFiles() > 2 );
-            }
-        };
-
-
-        class D1 {
-        public:
-            void run() {
-
-                BSONObjBuilder b;
-                b.appendNull("");
-                BSONObj x = b.obj();
-
-                BSONObjExternalSorter sorter(indexInterfaceForTheseTests);
-                sorter.add(x, DiskLoc(3,7), false);
-                sorter.add(x, DiskLoc(4,7), false);
-                sorter.add(x, DiskLoc(2,7), false);
-                sorter.add(x, DiskLoc(1,7), false);
-                sorter.add(x, DiskLoc(3,77), false);
-
-                sorter.sort( false );
-
-                auto_ptr<BSONObjExternalSorter::Iterator> i = sorter.iterator();
-                while( i->more() ) {
-                    BSONObjExternalSorter::Data d = i->next();
-                    /*cout << d.second.toString() << endl;
-                    cout << d.first.objsize() << endl;
-                    cout<<"SORTER next:" << d.first.toString() << endl;*/
-                }
-            }
-        };
-    }
-
     class CompatBSON {
     public:
 
@@ -2357,14 +2132,6 @@ namespace JsobjTests {
             add< MinMaxElementTest >();
             add< ComparatorTest >();
             add< ExtractFieldsTest >();
-            add< external_sort::Basic1 >();
-            add< external_sort::Basic2 >();
-            add< external_sort::Basic3 >();
-            add< external_sort::ByDiskLock >();
-            add< external_sort::Big1 >();
-            add< external_sort::Big2 >();
-            add< external_sort::Big3 >();
-            add< external_sort::D1 >();
             add< CompatBSON >();
             add< CompareDottedFieldNamesTest >();
             add< CompareDottedArrayFieldNamesTest >();
