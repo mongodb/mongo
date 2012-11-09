@@ -16,21 +16,24 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "pch.h"
-#include "oplog.h"
-#include "repl_block.h"
-#include "repl.h"
-#include "commands.h"
-#include "repl/rs.h"
-#include "stats/counters.h"
-#include "../util/file.h"
-#include "../util/startup_test.h"
-#include "queryoptimizer.h"
-#include "ops/update.h"
-#include "ops/delete.h"
+#include "mongo/pch.h"
+
+#include "mongo/db/oplog.h"
+
+#include "mongo/db/commands.h"
+#include "mongo/db/index_update.h"
 #include "mongo/db/instance.h"
+#include "mongo/db/ops/update.h"
+#include "mongo/db/ops/delete.h"
+#include "mongo/db/queryoptimizer.h"
+#include "mongo/db/repl.h"
+#include "mongo/db/repl_block.h"
 #include "mongo/db/repl/bgsync.h"
+#include "mongo/db/repl/rs.h"
+#include "mongo/db/stats/counters.h"
 #include "mongo/util/elapsed_tracker.h"
+#include "mongo/util/file.h"
+#include "mongo/util/startup_test.h"
 
 namespace mongo {
 
@@ -778,7 +781,7 @@ namespace mongo {
                 else {
                     // probably don't need this since all replicated colls have _id indexes now
                     // but keep it just in case
-                    RARELY if ( nsd && !nsd->isCapped() ) { ensureHaveIdIndex(ns); }
+                    RARELY if ( nsd && !nsd->isCapped() ) { ensureHaveIdIndex(ns, false); }
 
                     /* todo : it may be better to do an insert here, and then catch the dup key exception and do update
                               then.  very few upserts will not be inserts...
@@ -795,7 +798,7 @@ namespace mongo {
 
             // probably don't need this since all replicated colls have _id indexes now
             // but keep it just in case
-            RARELY if ( nsd && !nsd->isCapped() ) { ensureHaveIdIndex(ns); }
+            RARELY if ( nsd && !nsd->isCapped() ) { ensureHaveIdIndex(ns, false); }
 
             OpDebug debug;
             BSONObj updateCriteria = op.getObjectField("o2");

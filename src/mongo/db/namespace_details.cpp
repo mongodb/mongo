@@ -715,7 +715,11 @@ namespace mongo {
         BSONObj newEntry = applyUpdateOperators( oldEntry , BSON( "$set" << BSON( "options.flags" << userFlags() ) ) );
         
         verify( 1 == deleteObjects( system_namespaces.c_str() , oldEntry , true , false , true ) );
-        theDataFileMgr.insert( system_namespaces.c_str() , newEntry.objdata() , newEntry.objsize() , true );
+        theDataFileMgr.insert( system_namespaces.c_str(),
+                               newEntry.objdata(),
+                               newEntry.objsize(),
+                               false,
+                               true );
     }
 
     bool NamespaceDetails::setUserFlag( int flags ) {
@@ -788,7 +792,7 @@ namespace mongo {
         char database[256];
         nsToDatabase(ns, database);
         string s = string(database) + ".system.namespaces";
-        theDataFileMgr.insert(s.c_str(), j.objdata(), j.objsize(), true);
+        theDataFileMgr.insert(s.c_str(), j.objdata(), j.objsize(), false, true);
     }
 
     void renameNamespace( const char *from, const char *to, bool stayTemp) {
@@ -857,7 +861,12 @@ namespace mongo {
                     newIndexSpecB << "ns" << to;
             }
             BSONObj newIndexSpec = newIndexSpecB.done();
-            DiskLoc newIndexSpecLoc = theDataFileMgr.insert( s.c_str(), newIndexSpec.objdata(), newIndexSpec.objsize(), true, false );
+            DiskLoc newIndexSpecLoc = theDataFileMgr.insert( s.c_str(),
+                                                             newIndexSpec.objdata(),
+                                                             newIndexSpec.objsize(),
+                                                             false,
+                                                             true,
+                                                             false );
             int indexI = details->findIndexByName( oldIndexSpec.getStringField( "name" ) );
             IndexDetails &indexDetails = details->idx(indexI);
             string oldIndexNs = indexDetails.indexNamespace();

@@ -747,7 +747,15 @@ namespace mongo {
                 uassert( 13511 , "document to insert can't have $ fields" , e.fieldName()[0] != '$' );
             }
         }
-        theDataFileMgr.insertWithObjMod(ns, js, false); // js may be modified in the call to add an _id field.
+        theDataFileMgr.insertWithObjMod(ns,
+                                        // May be modified in the call to add an _id field.
+                                        js,
+                                        // Only permit interrupting an (index build) insert if the
+                                        // insert comes from a socket client request rather than a
+                                        // parent operation using the client interface.  The parent
+                                        // operation might not support interrupts.
+                                        cc().curop()->parent() == NULL,
+                                        false);
         logOp("i", ns, js);
     }
 

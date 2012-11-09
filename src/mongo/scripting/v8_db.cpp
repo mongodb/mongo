@@ -15,17 +15,21 @@
  *    limitations under the License.
  */
 
-#include "v8_wrapper.h"
-#include "v8_utils.h"
-#include "engine_v8.h"
-#include "v8_db.h"
-#include "util/base64.h"
-#include "util/text.h"
-#include "../client/syncclusterconnection.h"
-#include "../s/d_logic.h"
-#include "../db/namespacestring.h"
+#include "mongo/scripting/v8_db.h"
+
 #include <iostream>
 #include <boost/scoped_array.hpp>
+
+#include "mongo/base/init.h"
+#include "mongo/client/syncclusterconnection.h"
+#include "mongo/db/namespacestring.h"
+#include "mongo/s/d_logic.h"
+#include "mongo/scripting/engine_v8.h"
+#include "mongo/scripting/v8_utils.h"
+#include "mongo/scripting/v8_wrapper.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/base64.h"
+#include "mongo/util/text.h"
 
 using namespace std;
 using namespace v8;
@@ -33,6 +37,29 @@ using namespace v8;
 namespace mongo {
 
 #define DDD(x)
+
+namespace {
+    std::vector<V8FunctionPrototypeManipulatorFn> _mongoPrototypeManipulators;
+    bool _mongoPrototypeManipulatorsFrozen = false;
+
+    MONGO_INITIALIZER(V8MongoPrototypeManipulatorRegistry)(InitializerContext* context) {
+        return Status::OK();
+    }
+
+    MONGO_INITIALIZER_WITH_PREREQUISITES(V8MongoPrototypeManipulatorRegistrationDone,
+                                         ("V8MongoPrototypeManipulatorRegistry"))
+        (InitializerContext* context) {
+
+        _mongoPrototypeManipulatorsFrozen = true;
+        return Status::OK();
+    }
+
+}  // namespace
+
+    void v8RegisterMongoPrototypeManipulator(const V8FunctionPrototypeManipulatorFn& manipulator) {
+        fassert(16467, !_mongoPrototypeManipulatorsFrozen);
+        _mongoPrototypeManipulators.push_back(manipulator);
+    }
 
     static v8::Handle<v8::Value> newInstance( v8::Function* f, const v8::Arguments& args ) {
         // need to translate arguments into an array
@@ -60,6 +87,10 @@ namespace mongo {
         scope->injectV8Function("update", mongoUpdate, proto);
         scope->injectV8Function("auth", mongoAuth, proto);
         scope->injectV8Function("logout", mongoLogout, proto);
+
+        fassert(16468, _mongoPrototypeManipulatorsFrozen);
+        for (size_t i = 0; i < _mongoPrototypeManipulators.size(); ++i)
+            _mongoPrototypeManipulators[i](scope, mongo);
 
         v8::Handle<FunctionTemplate> ic = scope->createV8Function(internalCursorCons);
         ic->InstanceTemplate()->SetInternalFieldCount( 1 );

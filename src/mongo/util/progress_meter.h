@@ -93,6 +93,8 @@ namespace mongo {
         }
 
         ProgressMeter* operator->() { return &_pm; }
+
+        ProgressMeter* get() { return &_pm; }
         
         bool hit( int n = 1 ) { return _pm.hit( n ); }
 

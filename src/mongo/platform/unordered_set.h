@@ -15,7 +15,20 @@
 
 #pragma once
 
-#if defined(_MSC_VER) && _MSC_VER >= 1500
+// NOTE(acm): Before gcc-4.7, __cplusplus is always defined to be 1,
+// so we can't reliably detect C++11 support by exclusively checking
+// the value of __cplusplus.
+#if __cplusplus >= 201103L || defined(__GXX_EXPERIMENTAL_CXX0X__)
+
+#include <unordered_set>
+
+namespace mongo {
+
+    using std::unordered_set;
+
+}  // namespace mongo
+
+#elif defined(_MSC_VER) && _MSC_VER >= 1500
 
 #include <unordered_set>
 

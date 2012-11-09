@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include "mongo/db/cc_by_loc.h"
 #include "mongo/db/cmdline.h"
 #include "mongo/db/namespace_details.h"
 #include "mongo/db/record.h"
@@ -26,9 +27,6 @@ namespace mongo {
 
     class Extent;
     class MongoDataFile;
-    class ClientCursor;
-    struct ByLocKey;
-    typedef map<ByLocKey, ClientCursor*> CCByLoc;
 
     /**
      * Database represents a database database

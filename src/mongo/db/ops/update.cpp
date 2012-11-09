@@ -199,7 +199,7 @@ namespace mongo {
                     checkNoMods( updateobj );
                     debug.upsert = true;
                     BSONObj no = updateobj;
-                    theDataFileMgr.insertWithObjMod(ns, no, su);
+                    theDataFileMgr.insertWithObjMod(ns, no, false, su);
                     return UpdateResult( 0 , 0 , 1 , no );
                 }
             }
@@ -433,7 +433,7 @@ namespace mongo {
                 BSONObj newObj = mods->createNewFromQuery( patternOrig );
                 checkNoMods( newObj );
                 debug.fastmodinsert = true;
-                theDataFileMgr.insertWithObjMod(ns, newObj, su);
+                theDataFileMgr.insertWithObjMod(ns, newObj, false, su);
                 if ( logop )
                     logOp( "i", ns, newObj, 0, 0, fromMigrate );
 
@@ -443,7 +443,7 @@ namespace mongo {
             checkNoMods( updateobj );
             debug.upsert = true;
             BSONObj no = updateobj;
-            theDataFileMgr.insertWithObjMod(ns, no, su);
+            theDataFileMgr.insertWithObjMod(ns, no, false, su);
             if ( logop )
                 logOp( "i", ns, no, 0, 0, fromMigrate );
             return UpdateResult( 0 , 0 , 1 , no );

@@ -43,12 +43,10 @@ namespace mongo {
         BtreeBucket<V> *b;
 
         void newBucket();
-        void buildNextLevel(DiskLoc);
+        void buildNextLevel(DiskLoc loc, bool mayInterrupt);
         void mayCommitProgressDurably();
 
     public:
-        ~BtreeBuilder();
-
         BtreeBuilder(bool _dupsAllowed, IndexDetails& _idx);
 
         /**
@@ -61,7 +59,7 @@ namespace mongo {
          * commit work.  if not called, destructor will clean up partially completed work
          *  (in case exception has happened).
          */
-        void commit();
+        void commit(bool mayInterrupt);
 
         unsigned long long getn() { return n; }
     };
