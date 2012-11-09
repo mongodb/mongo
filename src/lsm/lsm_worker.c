@@ -85,11 +85,14 @@ __wt_lsm_checkpoint_worker(void *arg)
 
 	WT_CLEAR(cookie);
 
-	while (F_ISSET(lsm_tree, WT_LSM_TREE_WORKING)) {
+	for (;;) {
 		WT_ERR(__wt_lsm_copy_chunks(session, lsm_tree, &cookie));
 
 		/* Write checkpoints in all completed files. */
 		for (i = 0, j = 0; i < cookie.nchunks; i++) {
+			if (!F_ISSET(lsm_tree, WT_LSM_TREE_WORKING))
+				goto err;
+
 			chunk = cookie.chunk_array[i];
 			/* Stop if a thread is still active in the chunk. */
 			if (chunk->ncursor != 0 ||
@@ -97,7 +100,15 @@ __wt_lsm_checkpoint_worker(void *arg)
 			    !F_ISSET(chunk, WT_LSM_CHUNK_ONDISK)))
 				break;
 
-			if (!F_ISSET(chunk, WT_LSM_CHUNK_BLOOM) &&
+			if (F_ISSET(chunk, WT_LSM_CHUNK_ONDISK) &&
+			    (!FLD_ISSET(lsm_tree->bloom, WT_LSM_BLOOM_NEWEST) ||
+			    F_ISSET(chunk, WT_LSM_CHUNK_BLOOM) ||
+			    chunk->count == 0))
+				continue;
+
+			if (FLD_ISSET(lsm_tree->bloom, WT_LSM_BLOOM_NEWEST) &&
+			    !F_ISSET(chunk, WT_LSM_CHUNK_BLOOM) &&
+			    chunk->count != 0 &&
 			    (ret = __lsm_bloom_create(
 			    session, lsm_tree, chunk)) != 0) {
 				(void)__wt_err(
@@ -105,35 +116,43 @@ __wt_lsm_checkpoint_worker(void *arg)
 				break;
 			}
 
-			if (F_ISSET(chunk, WT_LSM_CHUNK_ONDISK))
-				continue;
-
 			/*
 			 * NOTE: we pass a non-NULL config, because otherwise
 			 * __wt_checkpoint thinks we're closing the file.
 			 */
-			WT_WITH_SCHEMA_LOCK(session,
-			    ret = __wt_schema_worker(session, chunk->uri,
-			    __wt_checkpoint, cfg, 0));
-			if (ret == 0) {
-				++j;
-				__wt_spin_lock(session, &lsm_tree->lock);
-				F_SET(chunk, WT_LSM_CHUNK_ONDISK);
-				++lsm_tree->dsk_gen;
-				__wt_spin_unlock(session, &lsm_tree->lock);
-				WT_VERBOSE_ERR(session, lsm,
-				     "LSM worker checkpointed %d.", i);
-			} else {
-				(void)__wt_err(
-				   session, ret, "LSM checkpoint failed");
+			if (!F_ISSET(chunk, WT_LSM_CHUNK_ONDISK)) {
+				WT_WITH_SCHEMA_LOCK(session,
+				    ret = __wt_schema_worker(session,
+				    chunk->uri, __wt_checkpoint, cfg, 0));
+
+				if (ret != 0) {
+					(void)__wt_err(session, ret,
+					    "LSM checkpoint failed");
+					break;
+				}
+			}
+
+			++j;
+			__wt_spin_lock(session, &lsm_tree->lock);
+			F_SET(chunk, WT_LSM_CHUNK_ONDISK);
+			++lsm_tree->dsk_gen;
+			ret = __wt_lsm_meta_write(session, lsm_tree);
+			__wt_spin_unlock(session, &lsm_tree->lock);
+
+			if (ret != 0) {
+				(void)__wt_err(session, ret,
+				    "LSM metadata write failed");
 				break;
 			}
+
+			WT_VERBOSE_ERR(session, lsm,
+			     "LSM worker checkpointed %d.", i);
 		}
 		if (j == 0)
 			__wt_sleep(0, 1000);
 	}
-err:	__wt_free(session, cookie.chunk_array);
 
+err:	__wt_free(session, cookie.chunk_array);
 	return (NULL);
 }
 
@@ -196,10 +215,6 @@ __lsm_bloom_create(WT_SESSION_IMPL *session,
 	WT_SESSION *wt_session;
 	const char *cur_cfg[] = API_CONF_DEFAULTS(session, open_cursor, "raw");
 	uint64_t insert_count;
-
-	if (!FLD_ISSET(lsm_tree->bloom, WT_LSM_BLOOM_NEWEST) ||
-	    chunk->count == 0)
-		return (0);
 
 	/*
 	 * Normally, the Bloom URI is populated when the chunk struct is
