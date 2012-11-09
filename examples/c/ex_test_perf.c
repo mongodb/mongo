@@ -446,7 +446,7 @@ int execute_populate(CONFIG *cfg)
 		return (ret);
 
 	gettimeofday(&cfg->phase_start_time, NULL);
-	for (cfg->elapsed_time = 0, last_ops = 0;
+	for (cfg->elapsed_time = 0, elapsed = last_ops = 0;
 	    g_nops < cfg->icount && g_threads_quit < cfg->populate_threads;) {
 		/*
 		 * Sleep for 100th of a second, report_interval is in second
