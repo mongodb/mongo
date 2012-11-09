@@ -20,7 +20,7 @@
 #include "mongo/db/auth/authorization_manager.h"
 
 #include "mongo/base/status.h"
-#include "mongo/db/auth/external_state_mock.h"
+#include "mongo/db/auth/auth_external_state_mock.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/unittest/unittest.h"
 

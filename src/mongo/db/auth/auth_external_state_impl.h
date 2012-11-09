@@ -18,7 +18,7 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/client/dbclientinterface.h"
-#include "mongo/db/auth/external_state.h"
+#include "mongo/db/auth/auth_external_state.h"
 
 namespace mongo {
 

@@ -14,7 +14,7 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "mongo/db/auth/external_state_impl.h"
+#include "mongo/db/auth/auth_external_state_impl.h"
 
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/client.h"

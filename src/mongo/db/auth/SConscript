@@ -17,7 +17,7 @@ env.StaticLibrary('authcore', ['action_set.cpp',
                                'privilege_set.cpp'],
                   LIBDEPS=['$BUILD_DIR/mongo/base/base', '$BUILD_DIR/mongo/stringutils'])
 
-env.StaticLibrary('auth', ['external_state.cpp'], LIBDEPS=['authcore'])
+env.StaticLibrary('auth', ['auth_external_state.cpp'], LIBDEPS=['authcore'])
 
 env.CppUnitTest('action_set_test', 'action_set_test.cpp', LIBDEPS=['authcore'])
 env.CppUnitTest('principal_set_test', 'principal_set_test.cpp', LIBDEPS=['authcore'])

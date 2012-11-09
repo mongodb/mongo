@@ -24,7 +24,7 @@
 #include "mongo/db/auth/acquired_privilege.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
-#include "mongo/db/auth/external_state.h"
+#include "mongo/db/auth/auth_external_state.h"
 #include "mongo/db/auth/principal.h"
 #include "mongo/db/auth/principal_set.h"
 #include "mongo/db/auth/privilege_set.h"
