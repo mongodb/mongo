@@ -280,7 +280,7 @@ namespace IndexUpdateTests {
             // Find the documents that are dups.
             set<DiskLoc> dups;
             int32_t last = -1;
-            for( shared_ptr<Cursor> cursor = theDataFileMgr.findAll( _ns );
+            for( boost::shared_ptr<Cursor> cursor = theDataFileMgr.findAll( _ns );
                  cursor->ok();
                  cursor->advance() ) {
                 int32_t currA = cursor->current()[ "a" ].Int();
@@ -313,7 +313,7 @@ namespace IndexUpdateTests {
             // Find the documents that are dups.
             set<DiskLoc> dups;
             int32_t last = -1;
-            for( shared_ptr<Cursor> cursor = theDataFileMgr.findAll( _ns );
+            for( boost::shared_ptr<Cursor> cursor = theDataFileMgr.findAll( _ns );
                  cursor->ok();
                  cursor->advance() ) {
                 int32_t currA = cursor->current()[ "a" ].Int();
