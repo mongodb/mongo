@@ -1148,7 +1148,7 @@ jsTest.authenticate = function(conn) {
     }
 
     try {
-        jsTest.attempt({},
+        jsTest.attempt({timeout:5000, sleepTime:1000},
                        function() {
                            // Set authenticated to stop an infinite recursion from getDB calling
                            // back into authenticate.
@@ -1191,7 +1191,7 @@ jsTest.isMongos = function(conn) {
 jsTest.attempt = function( opts, func ) {
     var timeout = opts.timeout || 1000;
     var tries   = 0;
-    var sleepTime = 2000;
+    var sleepTime = opts.sleepTime || 2000;
     var result = null;
     var context = opts.context || this;
 
