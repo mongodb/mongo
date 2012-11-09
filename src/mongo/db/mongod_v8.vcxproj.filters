@@ -893,9 +893,6 @@
     <ClCompile Include="auth\authorization_manager.cpp">
       <Filter>db\auth</Filter>
     </ClCompile>
-    <ClCompile Include="auth\external_state.cpp">
-      <Filter>db\auth</Filter>
-    </ClCompile>
     <ClCompile Include="..\bson\mutable\mutable_bson.cpp">
       <Filter>bson\mutable</Filter>
     </ClCompile>
@@ -941,10 +938,10 @@
     <ClCompile Include="..\scripting\v8_wrapper.cpp">
       <Filter>scripting</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\third_party\v8\experimental-libraries.cc">
+    <ClCompile Include="..\..\third_party\v8\src\experimental-libraries.cc">
       <Filter>third_party\v8\Generated from JavaScript source</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\third_party\v8\libraries.cc">
+    <ClCompile Include="..\..\third_party\v8\src\libraries.cc">
       <Filter>third_party\v8\Generated from JavaScript source</Filter>
     </ClCompile>
     <ClCompile Include="..\..\third_party\v8\src\extensions\externalize-string-extension.cc">
@@ -1390,6 +1387,15 @@
     </ClCompile>
     <ClCompile Include="auth\privilege_set.cpp">
       <Filter>db\auth</Filter>
+    </ClCompile>
+    <ClCompile Include="auth\auth_external_state.cpp">
+      <Filter>db\auth</Filter>
+    </ClCompile>
+    <ClCompile Include="..\s\field_parser.cpp">
+      <Filter>s</Filter>
+    </ClCompile>
+    <ClCompile Include="..\s\type_collection.cpp">
+      <Filter>s</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -2154,12 +2160,6 @@
     <ClInclude Include="auth\authorization_manager.h">
       <Filter>db\auth</Filter>
     </ClInclude>
-    <ClInclude Include="auth\external_state.h">
-      <Filter>db\auth</Filter>
-    </ClInclude>
-    <ClInclude Include="auth\external_state_impl.h">
-      <Filter>db\auth</Filter>
-    </ClInclude>
     <ClInclude Include="..\bson\mutable\mutable_bson.h">
       <Filter>bson\mutable</Filter>
     </ClInclude>
@@ -2795,6 +2795,18 @@
     </ClInclude>
     <ClInclude Include="auth\privilege_set.h">
       <Filter>db\auth</Filter>
+    </ClInclude>
+    <ClInclude Include="auth\auth_external_state.h">
+      <Filter>db\auth</Filter>
+    </ClInclude>
+    <ClInclude Include="auth\auth_external_state_impl.h">
+      <Filter>db\auth</Filter>
+    </ClInclude>
+    <ClInclude Include="..\s\field_parser.h">
+      <Filter>s</Filter>
+    </ClInclude>
+    <ClInclude Include="..\s\type_collection.h">
+      <Filter>s</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

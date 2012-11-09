@@ -143,6 +143,8 @@ src/mongo/shell/mongo-server.cpp
 src/mongo/shell/mongo.cpp
 src/third_party/js-1.7/jsautocfg.h
 src/third_party/js-1.7/jsautokw.h
+src/third_party/v8/src/experimental-libraries.cc
+src/third_party/v8/src/libraries.cc
 
 # old things that should be removed
 # maybe remove this mid 2012

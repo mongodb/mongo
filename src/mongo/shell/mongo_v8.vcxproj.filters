@@ -974,10 +974,10 @@
     <ClCompile Include="..\..\third_party\v8\src\win32-math.cc">
       <Filter>third_party\v8\src\Source Files\o to z</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\third_party\v8\experimental-libraries.cc">
+    <ClCompile Include="..\..\third_party\v8\src\experimental-libraries.cc">
       <Filter>third_party\v8\Generated from JavaScript source</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\third_party\v8\libraries.cc">
+    <ClCompile Include="..\..\third_party\v8\src\libraries.cc">
       <Filter>third_party\v8\Generated from JavaScript source</Filter>
     </ClCompile>
   </ItemGroup>
