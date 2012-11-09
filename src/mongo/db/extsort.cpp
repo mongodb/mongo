@@ -59,7 +59,10 @@ namespace mongo {
         DEV RARELY {
             _extSortMutex.dassertLocked(); // must be as we use a global var
         }
+#ifndef __sunos__
+        // Some solaris gnu qsort implementations do not support callback exceptions.
         RARELY killCurrentOp.checkForInterrupt(!extSortMayInterrupt);
+#endif
         Data * l = (Data*)lv;
         Data * r = (Data*)rv;
         return _compare(*extSortIdxInterface, *l, *r, extSortOrder);

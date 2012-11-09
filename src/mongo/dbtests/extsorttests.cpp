@@ -25,6 +25,14 @@
 
 namespace ExtSortTests {
 
+    bool isSolaris() {
+#ifdef __sunos__
+        return true;
+#else
+        return false;
+#endif
+    }
+
     static const char* const _ns = "unittests.extsort";
     DBDirectClient _client;
     IndexInterface& _arbitraryIndexInterface = *IndexDetails::iis[ time( 0 ) % 2 ];
@@ -295,7 +303,7 @@ namespace ExtSortTests {
                                           10 * 1024 );
             // Register a request to kill the current operation.
             cc().curop()->kill();
-            if ( _mayInterrupt ) {
+            if ( _mayInterrupt && !isSolaris() ) { // This interrupt is unsupported on solaris.
                 // When enough keys are added to fill the first file, an interruption will be
                 // triggered as the records are sorted for the file.
                 ASSERT_THROWS( addKeysUntilFileFlushed( &sorter, _mayInterrupt ), UserException );
@@ -342,7 +350,7 @@ namespace ExtSortTests {
             ASSERT( sorter.getCurSizeSoFar() > 0 );
             // Register a request to kill the current operation.
             cc().curop()->kill();
-            if ( _mayInterrupt ) {
+            if ( _mayInterrupt && !isSolaris() ) { // This interrupt is unsupported on solaris.
                 // The sort is aborted due to the kill request.
                 ASSERT_THROWS( sorter.sort( _mayInterrupt ), UserException );
                 // TODO Check that an iterator cannot be retrieved because the keys are unsorted (Not
