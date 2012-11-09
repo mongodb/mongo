@@ -994,8 +994,16 @@ struct __wt_connection {
 	 *
 	 * @param connection the connection handle
 	 * @configstart{connection.reconfigure, see dist/api_data.py}
-	 * @config{cache_size, maximum heap memory to allocate for the cache.,an
-	 * integer between 1MB and 10TB; default \c 100MB.}
+	 * @config{cache, cache configuration setup.,a set of related
+	 * configuration options defined below.}@config{cache.size, maximum heap
+	 * memory to allocate for the cache.,an integer between 1MB and 10TB;
+	 * default \c 100MB.}@config{cache.pool, name of a cache pool that is
+	 * shared between databases.,a string; default
+	 * empty.}@config{cache.pool_min, minimum amount of cache a connection
+	 * in a cache pool can have.,an integer between 1MB and 10TB; default \c
+	 * .}@config{cache.pool_chunk, the granularity that a cache pool is
+	 * shared out. Only valid if the cache_pool option is also specified.,an
+	 * integer between 1MB and 10TB; default \c .}
 	 * @config{error_prefix, prefix string for error messages.,a string;
 	 * default empty.}
 	 * @config{eviction_target, continue evicting until the cache becomes
@@ -1007,10 +1015,11 @@ struct __wt_connection {
 	 * @config{verbose, enable messages for various events.  Options are
 	 * given as a list\, such as
 	 * <code>"verbose=[evictserver\,read]"</code>.,a list\, with values
-	 * chosen from the following options: \c "block"\, \c "ckpt"\, \c
-	 * "evict"\, \c "evictserver"\, \c "fileops"\, \c "hazard"\, \c "lsm"\,
-	 * \c "mutex"\, \c "read"\, \c "readserver"\, \c "reconcile"\, \c
-	 * "salvage"\, \c "verify"\, \c "write"; default empty.}
+	 * chosen from the following options: \c "block"\, \c "cache_pool"\, \c
+	 * "ckpt"\, \c "evict"\, \c "evictserver"\, \c "fileops"\, \c "hazard"\,
+	 * \c "lsm"\, \c "mutex"\, \c "read"\, \c "readserver"\, \c
+	 * "reconcile"\, \c "salvage"\, \c "verify"\, \c "write"; default
+	 * empty.}
 	 * @configend
 	 * @errors
 	 */
@@ -1165,8 +1174,15 @@ struct __wt_connection {
  * I/O.  By default\, a platform-specific alignment value is used (512 bytes on
  * Linux systems\, zero elsewhere).,an integer between -1 and 1MB; default \c
  * -1.}
- * @config{cache_size, maximum heap memory to allocate for the cache.,an integer
- * between 1MB and 10TB; default \c 100MB.}
+ * @config{cache, cache configuration setup.,a set of related configuration
+ * options defined below.}@config{cache.size, maximum heap memory to allocate
+ * for the cache.,an integer between 1MB and 10TB; default \c
+ * 100MB.}@config{cache.pool, name of a cache pool that is shared between
+ * databases.,a string; default empty.}@config{cache.pool_min, minimum amount of
+ * cache a connection in a cache pool can have.,an integer between 1MB and 10TB;
+ * default \c .}@config{cache.pool_chunk, the granularity that a cache pool is
+ * shared out. Only valid if the cache_pool option is also specified.,an integer
+ * between 1MB and 10TB; default \c .}
  * @config{create, create the database if it does not exist.,a boolean flag;
  * default \c false.}
  * @config{direct_io, Use \c O_DIRECT to access files.  Options are given as a
@@ -1205,10 +1221,10 @@ struct __wt_connection {
  * information.,a boolean flag; default \c false.}
  * @config{verbose, enable messages for various events.  Options are given as a
  * list\, such as <code>"verbose=[evictserver\,read]"</code>.,a list\, with
- * values chosen from the following options: \c "block"\, \c "ckpt"\, \c
- * "evict"\, \c "evictserver"\, \c "fileops"\, \c "hazard"\, \c "lsm"\, \c
- * "mutex"\, \c "read"\, \c "readserver"\, \c "reconcile"\, \c "salvage"\, \c
- * "verify"\, \c "write"; default empty.}
+ * values chosen from the following options: \c "block"\, \c "cache_pool"\, \c
+ * "ckpt"\, \c "evict"\, \c "evictserver"\, \c "fileops"\, \c "hazard"\, \c
+ * "lsm"\, \c "mutex"\, \c "read"\, \c "readserver"\, \c "reconcile"\, \c
+ * "salvage"\, \c "verify"\, \c "write"; default empty.}
  * @configend
  * Additionally, if a file named \c WiredTiger.config appears in the WiredTiger
  * home directory, it is read for configuration values (see @ref config_file
