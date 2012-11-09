@@ -193,6 +193,7 @@ __lsm_bloom_create(WT_SESSION_IMPL *session,
 	WT_CURSOR *src;
 	WT_DECL_RET;
 	WT_ITEM buf, key;
+	WT_SESSION *wt_session;
 	const char *cur_cfg[] = API_CONF_DEFAULTS(session, open_cursor, "raw");
 	uint64_t insert_count;
 
@@ -211,6 +212,13 @@ __lsm_bloom_create(WT_SESSION_IMPL *session,
 		    session, lsm_tree, chunk->id, &buf));
 		chunk->bloom_uri = __wt_buf_steal(session, &buf, NULL);
 	}
+
+	/*
+	 * Drop the bloom filter first - there may be some content hanging over
+	 * from an aborted merge or checkpoint.
+	 */
+	wt_session = &session->iface;
+	WT_RET(wt_session->drop(wt_session, chunk->bloom_uri, "force"));
 
 	bloom = NULL;
 

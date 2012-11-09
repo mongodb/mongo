@@ -180,7 +180,7 @@ __wt_lsm_tree_setup_chunk(WT_SESSION_IMPL *session,
 
 	/*
 	 * Drop the chunk first - there may be some content hanging over from
-	 * an aborted merge.
+	 * an aborted merge or checkpoint.
 	 *
 	 * Don't do this for the very first chunk: we are called during
 	 * WT_SESSION::create, and doing a drop inside there does interesting
