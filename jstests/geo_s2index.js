@@ -16,6 +16,11 @@ t.insert( {geo : pointB , nonGeo: ["pointB"]})
 pointC = { "type" : "Point", "coordinates": [ 41, 6 ] }
 t.insert( {geo : pointC} )
 
+// Add a point within the polygon but not on the border.  Don't want to be on
+// the path of the polyline.
+pointE = { "type" : "Point", "coordinates": [ 40.6, 5.4 ] }
+t.insert( {geo : pointE} )
+
 somepoly = { "type" : "Polygon",
              "coordinates" : [ [ [40,5], [40,6], [41,6], [41,5], [40,5]]]}
 t.insert( {geo : somepoly, nonGeo: ["somepoly"] })
@@ -34,7 +39,7 @@ res = t.find({ "geo" : { "$intersect" : { "$geometry" : someline} } })
 assert.eq(res.count(), 5);
 
 res = t.find({ "geo" : { "$intersect" : { "$geometry" : somepoly} } })
-assert.eq(res.count(), 5);
+assert.eq(res.count(), 6);
 
 res = t.find({ "geo" : { "$intersect" : { "$geometry" : somepoly} } }).limit(1)
 assert.eq(res.itcount(), 1);

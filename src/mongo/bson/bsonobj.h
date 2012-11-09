@@ -421,7 +421,8 @@ namespace mongo {
             opNEAR = 0x13,
             opWITHIN = 0x14,
             opMAX_DISTANCE = 0x15,
-            opINTERSECT = 0x16
+            opINTERSECT = 0x16,
+            opNEWNEAR = 0x17
         };
 
         /** add all elements of the object to the specified vector */

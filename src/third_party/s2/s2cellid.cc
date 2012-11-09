@@ -520,7 +520,7 @@ string S2CellId::ToString() const {
   if (!is_valid()) {
     return StringPrintf("Invalid: %016llx", id());
   }
-  string out = IntToString(face(), "%d/");
+  string out = IntToString(face(), "%df");
   for (int current_level = 1; current_level <= level(); ++current_level) {
     out += IntToString(child_position(current_level), "%d");
   }

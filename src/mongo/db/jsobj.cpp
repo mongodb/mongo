@@ -282,6 +282,9 @@ namespace mongo {
                     return BSONObj::NE;
                 if ( fn[3] == 'a' && fn[4] == 'r') // matches anything with $near prefix
                     return BSONObj::opNEAR;
+                if (mongoutils::str::equals(fn + 3, "wnear")) {
+                    return BSONObj::opNEWNEAR;
+                }
             }
             else if ( fn[1] == 'm' ) {
                 if ( fn[2] == 'o' && fn[3] == 'd' && fn[4] == 0 )

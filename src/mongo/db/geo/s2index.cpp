@@ -21,6 +21,7 @@
 #include "mongo/db/geo/geojsonparser.h"
 #include "mongo/db/geo/s2common.h"
 #include "mongo/db/geo/s2cursor.h"
+#include "mongo/db/geo/s2nearcursor.h"
 #include "third_party/s2/s2.h"
 #include "third_party/s2/s2cell.h"
 #include "third_party/s2/s2polygon.h"
@@ -135,8 +136,8 @@ namespace mongo {
             }
 
             if (keysToAdd.size() > _params.maxKeysPerInsert) {
-                warning() << "insert of geo object generated lots of keys.\n"
-                          << "consider creating larger buckets. obj="
+                warning() << "insert of geo object generated lots of keys (" << keysToAdd.size()
+                          << ") consider creating larger buckets. obj="
                           << obj;
             }
 
@@ -150,9 +151,11 @@ namespace mongo {
                                              int numWanted) const {
             // I copied this from 2d.cpp.  Guard against perversion.
             if (numWanted < 0) numWanted *= -1;
-            if (0 == numWanted) numWanted = INT_MAX;
 
             vector<GeoQueryField> regions;
+            double maxDistanceForNear = -1;
+            bool nearQuery = false;
+            bool intersectQuery = false;
 
             // Go through the fields that we index, and for each geo one, make a GeoQueryField
             // object for the S2Cursor class to do intersection testing/cover generating with.
@@ -162,7 +165,8 @@ namespace mongo {
 
                 // Example of what we're trying to parse:
                 // pointA = { "type" : "Point", "coordinates": [ 40, 5 ] }
-                // t.find({ "geo" : { "$intersect" : { "$point" : pointA} } })
+                // t.find({ "geo" : { "$intersect" : { "$geometry" : pointA} } })
+                // t.find({ "geo" : { "$newnear" : { "$geometry" : pointA, $maxDistance : 20 }}})
                 // where field.name is "geo"
                 BSONElement e = query.getFieldDotted(field.name);
                 if (e.eoo()) { continue; }
@@ -173,41 +177,58 @@ namespace mongo {
                 if (!e.isABSONObj()) { continue; }
 
                 BSONObj::MatchType matchType = static_cast<BSONObj::MatchType>(e.getGtLtOp());
-                if (BSONObj::opINTERSECT != matchType && BSONObj::opWITHIN != matchType) {
-                    continue;
-                }
-
-                e = e.embeddedObject().firstElement();
-                if (!e.isABSONObj()) { continue; }
-
-                BSONObj shapeObj = e.embeddedObject();
-                if (2 != shapeObj.nFields()) { continue; }
-
-                GeoQueryField geoQueryField(field.name);
-
-                if (strcmp(e.fieldName(), "$geometry")) { continue; }
-                if (GeoJSONParser::isPolygon(shapeObj)) {
-                    // We can't really pass these things around willy-nilly except by ptr.
-                    // The cursor owns them.
-                    geoQueryField.polygon = new S2Polygon();
-                    GeoJSONParser::parsePolygon(shapeObj, geoQueryField.polygon);
-                } else if (GeoJSONParser::isPoint(shapeObj)) { 
-                    geoQueryField.cell = new S2Cell();
-                    GeoJSONParser::parsePoint(shapeObj, geoQueryField.cell);
-                } else if (GeoJSONParser::isLineString(shapeObj)) {
-                    geoQueryField.line = new S2Polyline();
-                    GeoJSONParser::parseLineString(shapeObj, geoQueryField.line);
+                if (BSONObj::opINTERSECT == matchType) {
+                    intersectQuery = true;
+                } else if (BSONObj::opNEWNEAR == matchType) {
+                    nearQuery = true;
                 } else {
-                    // Maybe it's unknown geometry, maybe it's garbage.
-                    // TODO: alert the user?
                     continue;
                 }
-                regions.push_back(geoQueryField);
+
+                if (nearQuery && intersectQuery) {
+                    // Sigh.  This can be handled better.  TODO.
+                    for (size_t j = 0; j < regions.size(); ++j) { regions[j].free(); }
+                    throw new UserException(16474, "Can't do both near and intersect, query: "
+                                               +  query.toString());
+                }
+
+                BSONObjIterator argIt(e.embeddedObject());
+                while (argIt.more()) {
+                    BSONElement e = argIt.next();
+                    if (mongoutils::str::equals(e.fieldName(), "$geometry")) {
+                        if (!e.isABSONObj()) { continue; }
+                        BSONObj shapeObj = e.embeddedObject();
+                        if (2 != shapeObj.nFields()) { continue; }
+
+                        GeoQueryField geoQueryField(field.name);
+                        if (!geoQueryField.parseFrom(shapeObj)) {
+                            // Maybe it's unknown geometry, maybe it's garbage.
+                            warning() << "unknown shape: " << shapeObj.toString();
+                            continue;
+                        }
+                        regions.push_back(geoQueryField);
+                    } else if (mongoutils::str::equals(e.fieldName(), "$maxDistance")) {
+                        if (!e.isNumber()) { continue; }
+                        maxDistanceForNear = e.Number();
+                    }
+                }
             }
 
-            S2Cursor *cursor = new S2Cursor(keyPattern(), getDetails(), query, regions, _params,
-                                            numWanted);
-            return shared_ptr<Cursor>(cursor);
+            if (0 == numWanted) numWanted = INT_MAX;
+
+            if (nearQuery) {
+                // Can't search no further than this.
+                if (maxDistanceForNear < 0) maxDistanceForNear = M_PI * _params.radius;
+                S2NearCursor *cursor = new S2NearCursor(keyPattern(), getDetails(), query, regions,
+                                                        _params, numWanted, maxDistanceForNear);
+                return shared_ptr<Cursor>(cursor);
+            } else if (intersectQuery) {
+                S2Cursor *cursor = new S2Cursor(keyPattern(), getDetails(), query, regions, _params,
+                                                numWanted);
+                return shared_ptr<Cursor>(cursor);
+            } else {
+                throw new UserException(16475, "Asking for s2 cursor w/bad query: " + query.toString());
+            }
         }
 
         virtual IndexSuitability suitability(const BSONObj& query, const BSONObj& order) const {
@@ -217,10 +238,10 @@ namespace mongo {
 
                 BSONElement e = query.getFieldDotted(field.name);
                 if (Object != e.type()) { continue; }
-                // we only support opWITHIN and opINTERSECT 
                 // getGtLtOp is horribly misnamed and really means get the operation.
                 switch (e.embeddedObject().firstElement().getGtLtOp()) {
                     case BSONObj::opWITHIN:
+                    case BSONObj::opNEWNEAR:
                     case BSONObj::opINTERSECT:
                         return OPTIMAL;
                     default:
@@ -257,7 +278,7 @@ namespace mongo {
                     GeoJSONParser::parsePoint(obj, &point);
                     keysFromRegion(&coverer, point, &cells);
                 } else {
-                    // TODO(hk): report an error?
+                    warning() << "unknown geometry: " << obj;
                 }
 
                 for (vector<string>::const_iterator it = cells.begin(); it != cells.end(); ++it) {
@@ -296,15 +317,17 @@ namespace mongo {
 
         virtual IndexType* generate(const IndexSpec* spec) const {
             S2IndexingParams params;
-            // TODO: parse params optionally from spec?
-            params.maxKeysPerInsert = 100;
+            params.maxKeysPerInsert = 200;
             // This is advisory.
-            params.maxCellsInCovering = 5;
+            params.maxCellsInCovering = 50;
+            // Thanks, Wikipedia.
             const double radiusOfEarthInMeters = 6378.1 * 1000.0;
+            // We need this to do distance-related things (near queries).
+            params.radius = radiusOfEarthInMeters;
             // These are not advisory.
-            params.finestIndexedLevel = S2::kAvgEdge.GetClosestLevel(10.0 / radiusOfEarthInMeters);
-            params.coarsestIndexedLevel =
-                S2::kAvgEdge.GetClosestLevel(1000000.0 / radiusOfEarthInMeters);
+            params.finestIndexedLevel = S2::kAvgEdge.GetClosestLevel(100.0 / radiusOfEarthInMeters);
+            params.coarsestIndexedLevel = 
+                S2::kAvgEdge.GetClosestLevel(100 * 1000.0 / radiusOfEarthInMeters);
             return new GeoSphere2DType(this, spec, params);
         }
     } geoSphere2DIndexPlugin;

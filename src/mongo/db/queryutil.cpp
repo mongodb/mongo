@@ -450,6 +450,7 @@ namespace mongo {
             _special = "2d";
             break;
         case BSONObj::opINTERSECT:
+        case BSONObj::opNEWNEAR:
             _special = "s2d";
             break;
         case BSONObj::opEXISTS: {

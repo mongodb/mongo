@@ -17,6 +17,7 @@
 #include <vector>
 #include "mongo/db/jsobj.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/btreecursor.h"
 #include "mongo/db/cursor.h"
 #include "mongo/db/diskloc.h"
 #include "mongo/db/matcher.h"
@@ -24,14 +25,12 @@
 #include "mongo/db/geo/s2common.h"
 
 namespace mongo {
-    class BtreeCursor;
-
-    class S2Cursor : public Cursor {
+    class S2NearCursor : public Cursor {
     public:
-        S2Cursor(const BSONObj &keyPattern, const IndexDetails* details, const BSONObj &query,
-                 const vector<GeoQueryField> &regions, const S2IndexingParams &params,
-                 int numWanted);
-        virtual ~S2Cursor(); 
+        S2NearCursor(const BSONObj &keyPattern, const IndexDetails* details, const BSONObj &query,
+                     const vector<GeoQueryField> &regions, const S2IndexingParams &params,
+                     int numWanted, double maxDistance);
+        virtual ~S2NearCursor(); 
         virtual CoveredIndexMatcher *matcher() const;
 
         virtual bool supportYields()  { return true; }
@@ -40,7 +39,7 @@ namespace mongo {
         virtual bool autoDedup() const { return false; }
         virtual bool modifiedKeys() const { return true; }
         virtual bool getsetdup(DiskLoc loc) { return false; }
-        virtual string toString() { return "S2Cursor"; }
+        virtual string toString() { return "S2NearCursor"; }
         BSONObj indexKeyPattern() { return _keyPattern; }
         virtual bool ok();
         virtual Record* _current();
@@ -54,10 +53,32 @@ namespace mongo {
         virtual long long nscanned();
         virtual void explainDetails(BSONObjBuilder& b);
     private:
-        // Make an object that describes the restrictions on all possible valid keys.
-        // It's kind of a monstrous object.  Thanks, FieldRangeSet, for doing all the work
-        // for us.
+        // We use this to cache results of the search.  Results are sorted to have decreasing
+        // distance, and callers are interested in loc and key.
+        struct Result {
+            Result(BtreeCursor *cursor, double dist) {
+                loc = cursor->currLoc();
+                key = cursor->currKey();
+                distance = dist;
+            }
+            bool operator<(const Result& other) const {
+                // We want increasing distance, not decreasing, so we reverse the <.
+                return distance > other.distance;
+            }
+            DiskLoc loc;
+            BSONObj key;
+            double distance;
+        };
+
+        // Make the object that describes all keys that are within our current search annulus.
         BSONObj makeFRSObject();
+        // Fill _results with all of the results in the annulus defined by _innerRadius and
+        // _outerRadius.  If no results are found, grow the annulus and repeat until success (or
+        // until the edge of the world).
+        void fillResults();
+        // Grow _innerRadius and _outerRadius by _radiusIncrement, capping _outerRadius at halfway
+        // around the world (pi * _params.radius).
+        void nextAnnulus();
 
         // Need this to make a FieldRangeSet.
         const IndexDetails *_details;
@@ -73,13 +94,21 @@ namespace mongo {
         long long _nscanned;
         // We have to pass this to the FieldRangeVector ctor (in modified form).
         BSONObj _keyPattern;
-        // How many docs do we want to return?  Starts with the # the user requests
-        // and goes down.
+        // We also pass this to the FieldRangeVector ctor.
+        IndexSpec _specForFRV;
+        // How many docs do we want to return?  Starts with the # the user requests and goes down.
         int _numToReturn;
 
-        // What have we checked so we don't repeat it and waste time?
-        set<DiskLoc> _seen;
-        // This really does all the work/points into the btree.
-        scoped_ptr<BtreeCursor> _btreeCursor;
+        // Geo-related variables.
+        // What's the max distance (arc length) we're willing to look for results?
+        double _maxDistance;
+        // We compute an annulus of results and cache it here.
+        priority_queue<Result> _results;
+        // These radii define the annulus.
+        double _innerRadius;
+        double _outerRadius;
+        // When we search the next annulus, what to adjust our radius by?  Grows when we search an
+        // annulus and find no results.
+        double _radiusIncrement;
     };
 }  // namespace mongo

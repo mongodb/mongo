@@ -25,6 +25,15 @@
 #pragma once
 
 namespace mongo {
+    // This is used by both s2cursor and s2nearcursor.
+    class S2SearchUtil {
+    public:
+        // Given a coverer, region, and field name, generate a BSONObj that we can pass to a
+        // FieldRangeSet so that we only examine the keys that the provided region may intersect.
+        static BSONObj coverAsBSON(S2RegionCoverer *coverer, const S2Region &region,
+                                   const string& field);
+    };
+
     // Used for passing geo data from the newCursor entry point to the S2Cursor class.
     struct GeoQueryField {
         GeoQueryField(const string& f) : field(f), cell(NULL), line(NULL), polygon(NULL) { }
@@ -38,17 +47,19 @@ namespace mongo {
         S2Polyline *line;
         S2Polygon *polygon;
         
-        // The functions below are defined in s2cursor.cpp.
-
         // Does this GeoQueryField intersect the provided data?  Sadly there is no common good way
         // to check this, so we do different things for all query/data pairs.
-        bool intersectsPoint(const S2Cell &otherPoint);
+        bool intersectsPoint(const S2Cell& otherPoint);
         bool intersectsLine(const S2Polyline& otherLine);
         bool intersectsPolygon(const S2Polygon& otherPolygon);
         // One region is not NULL and this returns it.
         const S2Region& getRegion() const;
         // Delete the not NULL region.
         void free();
+        // Get the centroid, boring if we're a point, interesting if we're not.
+        S2Point getCentroid() const;
+        // Try to parse the provided object into the right place.
+        bool parseFrom(BSONObj& obj);
     };
 
     struct S2IndexingParams {
@@ -64,6 +75,9 @@ namespace mongo {
         // And, what's the coarsest?  When we search in larger coverings we know we
         // can stop here -- we index nothing coarser than this.
         int coarsestIndexedLevel;
+        // What is the radius of the sphere/earth we're using?  Not everybody likes giving 
+        // radians or degrees all the time.  In meters.
+        double radius;
 
         string toString() const {
             stringstream ss;
@@ -71,6 +85,7 @@ namespace mongo {
             ss << "maxCellsInCovering: " << maxCellsInCovering << endl;
             ss << "finestIndexedLevel: " << finestIndexedLevel << endl;
             ss << "coarsestIndexedLevel: " << coarsestIndexedLevel << endl;
+            ss << "radius: " << radius << endl;
             return ss.str();
         }
 

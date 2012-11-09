@@ -23,72 +23,6 @@
 #include "mongo/db/geo/s2common.h"
 
 namespace mongo {
-    // Does this GeoQueryField intersect the provided data?
-    bool GeoQueryField::intersectsPoint(const S2Cell &otherPoint) {
-        if (NULL != cell) {
-            return cell->MayIntersect(otherPoint);
-        } else if (NULL != line) {
-            return line->MayIntersect(otherPoint);
-        } else {
-            return polygon->MayIntersect(otherPoint);
-        }
-    }
-
-    bool GeoQueryField::intersectsLine(const S2Polyline& otherLine) {
-        if (NULL != cell) {
-            return otherLine.MayIntersect(*cell);
-        } else if (NULL != line) {
-            return otherLine.Intersects(line);
-        } else {
-            // TODO(hk): modify s2 library to just let us know if it intersected
-            // rather than returning all this.
-            vector<S2Polyline*> clipped;
-            polygon->IntersectWithPolyline(&otherLine, &clipped);
-            bool ret = clipped.size() > 0;
-            for (size_t i = 0; i < clipped.size(); ++i) delete clipped[i];
-            return ret;
-        }
-        return false;
-    }
-
-    bool GeoQueryField::intersectsPolygon(const S2Polygon& otherPolygon) {
-        if (NULL != cell) {
-            return otherPolygon.MayIntersect(*cell);
-        } else if (NULL != line) {
-            // TODO(hk): modify s2 library to just let us know if it intersected
-            // rather than returning all this.
-            vector<S2Polyline*> clipped;
-            otherPolygon.IntersectWithPolyline(line, &clipped);
-            bool ret = clipped.size() > 0;
-            for (size_t i = 0; i < clipped.size(); ++i) delete clipped[i];
-            return ret;
-        } else {
-            return otherPolygon.Intersects(polygon);
-        }
-    }
-
-    const S2Region& GeoQueryField::getRegion() const {
-        if (NULL != cell) {
-            return *cell;
-        } else if (NULL != line) {
-            return *line;
-        } else {
-            verify(NULL != polygon);
-            return *polygon;
-        }
-    }
-
-    void GeoQueryField::free() {
-        if (NULL != cell) {
-            delete cell;
-        } else if (NULL != line) {
-            delete line;
-        } else {
-            verify(NULL != polygon);
-            delete polygon;
-        }
-    }
-
     S2Cursor::S2Cursor(const BSONObj &keyPattern, const IndexDetails *details,
                        const BSONObj &query, const vector<GeoQueryField> &fields,
                        const S2IndexingParams &params, int numWanted)
@@ -125,7 +59,7 @@ namespace mongo {
             IndexSpec specForFRV(spec);
             // All the magic is in makeUnifiedFRS.  See below.
             // A lot of these arguments are opaque.
-            FieldRangeSet frs(_details->parentNS().c_str(), makeUnifiedFRS(), false, false);
+            FieldRangeSet frs(_details->parentNS().c_str(), makeFRSObject(), false, false);
             shared_ptr<FieldRangeVector> frv(new FieldRangeVector(frs, specForFRV, 1));
             _btreeCursor.reset(BtreeCursor::make(nsdetails(_details->parentNS().c_str()),
                                                  *_details, frv, 0, 1));
@@ -134,67 +68,19 @@ namespace mongo {
         return _btreeCursor->ok();
     }
 
-    // Make the FieldRangeSet of keys we look for.  Here is an example:
-    // regularfield1: regularvalue1, $or [ { geo1 : {$in [parentcover1, ... ]}},
-    //                                     { geo1 : {regex: ^cover1 } },
-    //                                     { geo1 : {regex: ^cover2 } },
-    // As for what we put into the geo field, see lengthy comments below.
-    BSONObj S2Cursor::makeUnifiedFRS() {
+    // Make the FieldRangeSet of keys we look for.  Uses coverAsBSON to go from
+    // a region to a covering to a set of keys for that covering.
+    BSONObj S2Cursor::makeFRSObject() {
         BSONObjBuilder frsObjBuilder;
         frsObjBuilder.appendElements(_filteredQuery);
 
         S2RegionCoverer coverer;
-        _params.configureCoverer(&coverer);
 
         for (size_t i = 0; i < _fields.size(); ++i) {
-            // Get a set of coverings.  We look for keys that have this covering as a prefix
-            // (meaning the key is contained within the covering).
-            vector<S2CellId> cover;
-            coverer.GetCovering(_fields[i].getRegion(), &cover);
-
-            BSONArrayBuilder orBuilder;
-
-            // Look at the cells we cover (and any cells they cover via prefix).  Examine
-            // everything which has our cover as a strict prefix of its key.  Anything with our
-            // cover as a strict prefix is contained within the cover and should be intersection
-            // tested.
-            for (size_t j = 0; j < cover.size(); ++j) {
-                string regex = "^" + cover[j].toString();
-                orBuilder.append(BSON(_fields[i].field << BSON("$regex" << regex)));
-            }
-
-            // Look at the cells that cover us.  We want to look at every cell that contains the
-            // covering we would index on.  We generate the would-index-with-this-covering and
-            // find all the cells strictly containing the cells in that set, until we hit the
-            // coarsest indexed cell.  We use $in, not a prefix match.  Why not prefix?  Because
-            // we've already looked at everything finer or as fine as our initial covering.
-            //
-            // Say we have a fine point with cell id 212121, we go up one, get 21212, we don't
-            // want to look at cells 21212[not-1] because we know they're not going to intersect
-            // with 212121, but entries inserted with cell value 21212 (no trailing digits) may.
-            // And we've already looked at points with the cell id 211111 from the regex search
-            // created above, so we only want things where the value of the last digit is not
-            // stored (and therefore could be 1).
-            set<S2CellId> parentCells;
-            for (size_t j = 0; j < cover.size(); ++j) {
-                for (S2CellId id = cover[j].parent();
-                     id.level() >= _params.coarsestIndexedLevel; id = id.parent()) {
-                    parentCells.insert(id);
-                }
-            }
-
-            // Create the actual $in statement.
-            BSONArrayBuilder inBuilder;
-            for (set<S2CellId>::const_iterator it = parentCells.begin();
-                 it != parentCells.end(); ++it) {
-                inBuilder.append(it->toString());
-            }
-            orBuilder.append(BSON(_fields[i].field << BSON("$in" << inBuilder.arr())));
-
-            // Join the regexes with the in statement via an or.
-            // TODO(hk): see if this actually works with two geo fields or if they have
-            // to be joined with an and or what.
-            frsObjBuilder.append("$or", orBuilder.arr());
+            _params.configureCoverer(&coverer);
+            BSONObj fieldRange = S2SearchUtil::coverAsBSON(&coverer, _fields[i].getRegion(),
+                                                           _fields[i].field);
+            frsObjBuilder.appendElements(fieldRange);
         }
         return frsObjBuilder.obj();
     }
@@ -278,7 +164,6 @@ namespace mongo {
         // (yield), then checkLocation (unyield), when we call advance, we don't go past the object
         // that we were/are pointing at since we only do that if we've seen it before (that is, it's
         // in _seen, which we clear when we yield).
-
         advance();
     }
 

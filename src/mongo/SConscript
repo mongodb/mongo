@@ -353,8 +353,10 @@ serverOnlyFiles = [ "db/curop.cpp",
                     "db/explain.cpp",
                     "db/geo/2d.cpp",
                     "db/geo/haystack.cpp",
+                    "db/geo/s2common.cpp",
                     "db/geo/s2cursor.cpp",
                     "db/geo/s2index.cpp",
+                    "db/geo/s2nearcursor.cpp",
                     "db/hashindex.cpp",
                     "db/ops/count.cpp",
                     "db/ops/delete.cpp",
@@ -443,6 +445,7 @@ env.StaticLibrary("geojson", [ "db/geo/geojsonparser.cpp", ],
 
 env.CppUnitTest("hash_test", [ "db/geo/hash_test.cpp" ], LIBDEPS = ["geometry" ])
 env.CppUnitTest("geojsonparser_test", [ "db/geo/geojsonparser_test.cpp" ], LIBDEPS = ["geojson"])
+env.CppUnitTest("s2r2_test", [ "db/geo/s2r2_test.cpp" ], LIBDEPS = ["geojson"])
 
 env.StaticLibrary("serveronly", serverOnlyFiles,
                   LIBDEPS=["coreshard",
