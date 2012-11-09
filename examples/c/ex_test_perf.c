@@ -86,12 +86,16 @@ void *stat_worker(void *);
 int stop_threads(CONFIG *, int, pthread_t *);
 void usage(void);
 
+#define	DEFAULT_LSM_CONFIG						\
+	"key_format=S,value_format=S,exclusive,"			\
+	"leaf_page_max=4kb,internal_page_max=64kb,allocation_size=4kb,"
+
 /* Default values - these are tiny, we want the basic run to be fast. */
 CONFIG default_cfg = {
 	"WT_TEST",	/* home */
 	"lsm:test",	/* uri */
 	"create,cache_size=200MB", /* conn_config */
-	"key_format=S,value_format=S,exclusive=true",	/* table_config */
+	DEFAULT_LSM_CONFIG, /* table_config */
 	1,		/* create */
 	14023954,	/* rand_seed */
 	5000,		/* icount */
@@ -114,8 +118,8 @@ CONFIG small_cfg = {
 	"WT_TEST",	/* home */
 	"lsm:test",	/* uri */
 	"create,cache_size=500MB", /* conn_config */
-	"key_format=S,value_format=S,exclusive=true,lsm_chunk_size=5MB,"
-	    "leaf_page_max=16k,internal_page_max=16kb", /* table_config */
+	DEFAULT_LSM_CONFIG /* table_config */
+	    "lsm_chunk_size=5MB,",
 	1,		/* create */
 	14023954,	/* rand_seed */
 	500000,		/* icount 0.5 million */
@@ -138,8 +142,8 @@ CONFIG med_cfg = {
 	"WT_TEST",	/* home */
 	"lsm:test",	/* uri */
 	"create,cache_size=1GB", /* conn_config */
-	"key_format=S,value_format=S,exclusive=true,lsm_chunk_size=20MB,"
-	    "leaf_page_max=16k,internal_page_max=16kb", /* table_config */
+	DEFAULT_LSM_CONFIG /* table_config */
+	    "lsm_chunk_size=20MB,",
 	1,		/* create */
 	14023954,	/* rand_seed */
 	50000000,	/* icount 50 million */
@@ -162,8 +166,8 @@ CONFIG large_cfg = {
 	"WT_TEST",	/* home */
 	"lsm:test",	/* uri */
 	"create,cache_size=2GB", /* conn_config */
-	"key_format=S,value_format=S,exclusive=true,lsm_chunk_size=50MB,"
-	    "leaf_page_max=16k,internal_page_max=16kb", /* table_config */
+	DEFAULT_LSM_CONFIG /* table_config */
+	    "lsm_chunk_size=50MB,",
 	1,		/* create */
 	14023954,	/* rand_seed */
 	500000000,	/* icount 500 million */
