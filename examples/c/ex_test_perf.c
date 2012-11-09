@@ -90,7 +90,7 @@ void usage(void);
 CONFIG default_cfg = {
 	"WT_TEST",	/* home */
 	"lsm:test",	/* uri */
-	"create,cache.size=200MB", /* conn_config */
+	"create,cache_size=200MB", /* conn_config */
 	"key_format=S,value_format=S,exclusive=true",	/* table_config */
 	1,		/* create */
 	14023954,	/* rand_seed */
@@ -113,7 +113,7 @@ CONFIG default_cfg = {
 CONFIG small_cfg = {
 	"WT_TEST",	/* home */
 	"lsm:test",	/* uri */
-	"create,cache.size=500MB", /* conn_config */
+	"create,cache_size=500MB", /* conn_config */
 	"key_format=S,value_format=S,exclusive=true,lsm_chunk_size=5MB,"
 	    "leaf_page_max=16k,internal_page_max=16kb", /* table_config */
 	1,		/* create */
@@ -137,7 +137,7 @@ CONFIG small_cfg = {
 CONFIG med_cfg = {
 	"WT_TEST",	/* home */
 	"lsm:test",	/* uri */
-	"create,cache.size=1GB", /* conn_config */
+	"create,cache_size=1GB", /* conn_config */
 	"key_format=S,value_format=S,exclusive=true,lsm_chunk_size=20MB,"
 	    "leaf_page_max=16k,internal_page_max=16kb", /* table_config */
 	1,		/* create */
@@ -161,7 +161,7 @@ CONFIG med_cfg = {
 CONFIG large_cfg = {
 	"WT_TEST",	/* home */
 	"lsm:test",	/* uri */
-	"create,cache.size=2GB", /* conn_config */
+	"create,cache_size=2GB", /* conn_config */
 	"key_format=S,value_format=S,exclusive=true,lsm_chunk_size=50MB,"
 	    "leaf_page_max=16k,internal_page_max=16kb", /* table_config */
 	1,		/* create */

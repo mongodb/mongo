@@ -563,7 +563,7 @@ extern WT_CONFIG_CHECK __wt_confchk_connection_load_extension[];
 extern const char *__wt_confdfl_connection_open_session;
 extern WT_CONFIG_CHECK __wt_confchk_connection_open_session[];
 extern const char *__wt_confdfl_connection_reconfigure;
-extern WT_CONFIG_CHECK __wt_confchk_cache_subconfigs[];
+extern WT_CONFIG_CHECK __wt_confchk_shared_cache_subconfigs[];
 extern WT_CONFIG_CHECK __wt_confchk_connection_reconfigure[];
 extern const char *__wt_confdfl_cursor_close;
 extern WT_CONFIG_CHECK __wt_confchk_cursor_close[];

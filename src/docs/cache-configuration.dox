@@ -4,35 +4,36 @@
 
 The WiredTiger cache implements an approximation of a least recently used
 algorithm. Ideally the cache should be configured to be large enough to
-hold an applications working set.
+hold an application's working set.
 
 The WiredTiger cache size can be configured when first opening a database via 
 @ref wiredtiger_open or changed after open using the
 WT_CONNECTION::reconfigure method.
 
-@section cache_pool Overview of WiredTiger cache pool configuration.
+@section shared_cache Overview of WiredTiger shared cache configuration.
 
 WiredTiger supports sharing a single cache among multiple databases within
-a process. This functionality is called a cache pool.
+a process.
 
-An application configures a cache pool by specifying a pool name and size
+An application configures a shared cache by specifying a shared_cache name
 to the @ref wiredtiger_open function. Applications can optionally
 set a minimum amount of cache any connection in the pool will be assigned
 and the granularity at which the cache pool is redistributed among
-connections - called the chunk size.
+connections - called the chunk size. Both of these options are specified as
+a percentage of the total cache size.
 
-WiredTiger cache pool tuning options can be configured when first opening a
-database via @ref wiredtiger_open. Cache pool configuration cannot be
-changed once the cache pool has been created.
+WiredTiger shared cache tuning options can be configured when first opening a
+database via @ref wiredtiger_open or changed after open using the
+WT_CONNECTION::reconfigure method.
 
 @section cache_eviction Overview of WiredTiger eviction configuration.
 
 WiredTiger provides several configuration options for tuning how aggressively
 pages are evicted from the cache. Different values will result in better
-performance depending on an applications particular workload.
+performance depending on an application's particular workload.
 
 In WiredTiger cache eviction is handled by a separate thread. It is possible
-configure the percentage of cache that needs to be used before the eviction
+to configure the percentage of cache that needs to be used before the eviction
 thread will attempt to find pages to free. It is also possible to configure
 a target percentage which is the percentage of the cache that needs to be
 free before the eviction server sleeps.

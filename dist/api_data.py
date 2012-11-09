@@ -232,20 +232,28 @@ table_meta = format_meta + table_only_meta
 
 # Connection runtime config, shared by conn.reconfigure and wiredtiger_open
 connection_runtime_config = [
-	Config('cache', '', r'''
-		cache configuration setup''', type='category', subconfig=[
-		Config('size', '100MB', r'''
-		maximum heap memory to allocate for the cache''',
+	Config('shared_cache', '', r'''
+		shared cache configuration options. A database should configure either
+		a cache_size or a shared_cache not both''',
+		type='category', subconfig=[
+		Config('chunk', '5', r'''
+			the granularity that a shared cache is redistributed as a
+			percentage''',
+			min='1', max='100'),
+		Config('min', '10', r'''
+			minimum amount of cache a database in a shared cache can have
+			as a percentage''',
+			min='1', max='100'),
+		Config('name', '', r'''
+			name of a cache that is shared between databases'''),
+		Config('size', '500MB', r'''
+			maximum memory to allocate for the shared cache''',
+			min='1MB', max='10TB')
+		]),
+	Config('cache_size', '100MB', r'''
+		maximum heap memory to allocate for the cache. A database should
+		configure either a cache_size or a shared_cache not both''',
 		min='1MB', max='10TB'),
-		Config('pool', '', r'''
-		name of a cache pool that is shared between databases'''),
-		Config('pool_min', '', r'''
-		minimum amount of cache a connection in a cache pool can have''',
-		min='1MB', max='10TB'),
-		Config('pool_chunk', '', r'''
-		the granularity that a cache pool is shared out. Only valid if the
-		cache_pool option is also specified''',
-		min='1MB', max='10TB')]),
 	Config('error_prefix', '', r'''
 		prefix string for error messages'''),
 	Config('eviction_target', '80', r'''
@@ -261,7 +269,7 @@ connection_runtime_config = [
 		list, such as <code>"verbose=[evictserver,read]"</code>''',
 		type='list', choices=[
 		    'block',
-		    'cache_pool',
+		    'shared_cache',
 		    'ckpt',
 		    'evict',
 		    'evictserver',
@@ -522,13 +530,13 @@ flags = {
 ###################################################
 # Internal routine flag declarations
 ###################################################
-	'cache_pool' : [ 'CACHE_POOL_RUN' ],
+	'shared_cache' : [ 'CACHE_POOL_RUN' ],
 	'direct_io' : [ 'DIRECTIO_DATA', 'DIRECTIO_LOG' ],
 	'page_free' : [ 'PAGE_FREE_IGNORE_DISK' ],
 	'rec_evict' : [ 'REC_SINGLE' ],
 	'verbose' : [
 		'VERB_block',
-		'VERB_cache_pool',
+		'VERB_shared_cache',
 		'VERB_ckpt',
 		'VERB_evict',
 		'VERB_evictserver',

@@ -40,8 +40,8 @@ __wt_conn_cache_pool_config(WT_SESSION_IMPL *session, const char **cfg)
 	pool_name = NULL;
 	cp = NULL;
 
-	WT_RET(__wt_config_gets(session, cfg, "cache.pool", &cval));
-	if (cval.len <= 0)
+	WT_RET(__wt_config_gets(session, cfg, "shared_cache.name", &cval));
+	if (cval.len == 0)
 		return (0);
 
 	/*
@@ -56,17 +56,8 @@ __wt_conn_cache_pool_config(WT_SESSION_IMPL *session, const char **cfg)
 	process_locked = 1;
 	if (__wt_process.cache_pool == NULL) {
 		/* Create a cache pool. */
-		WT_ERR(__wt_config_gets(
-		    session, cfg, "cache.size", &cval));
-		if (cval.len <= 0) {
-			WT_ERR_MSG(session, WT_ERROR,
-			    "Attempting to join a cache pool that does not "
-			    "exist: %s. Must specify a pool size if creating.",
-			    pool_name);
-		}
 		WT_ERR(__wt_calloc_def(conn->default_session, 1, &cp));
 		created = 1;
-		cp->size = cval.val;
 		cp->name = pool_name;
 		pool_name = NULL; /* Belongs to the cache pool now. */
 		TAILQ_INIT(&cp->cache_pool_qh);
@@ -74,33 +65,29 @@ __wt_conn_cache_pool_config(WT_SESSION_IMPL *session, const char **cfg)
 		WT_ERR(__wt_cond_alloc(conn->default_session,
 		    "cache pool server", 0, &cp->cache_pool_cond));
 
-		WT_ERR(__wt_config_gets(
-		    session, cfg, "cache.pool_chunk", &cval));
-		if (cval.len > 0)
-			cp->chunk = cval.val;
-		else
-			cp->chunk = WT_MAX(
-			    50 * WT_MEGABYTE, cp->size / 20);
-		WT_ERR(__wt_config_gets(
-		    session, cfg, "cache.pool_min", &cval));
-		if (cval.len > 0)
-			cp->min = cval.val;
-		else
-			cp->min = cp->size / 2;
-
 		__wt_process.cache_pool = cp;
-		WT_VERBOSE_ERR(session, cache_pool,
-		    "Created cache pool %s. Size: %" PRIu64
-		    ", chunk size: %" PRIu64 ", min: %" PRIu64,
-		    cp->name, cp->size, cp->chunk, cp->min);
+		WT_VERBOSE_ERR(session, shared_cache,
+		    "Created cache pool %s.", cp->name);
 	} else if (!WT_STRING_MATCH(
 	    __wt_process.cache_pool->name, pool_name, strlen(pool_name)))
 		/* Only a single cache pool is supported. */
 		WT_ERR_MSG(session, WT_ERROR,
 		    "Attempting to join a cache pool that does not exist: %s",
 		    pool_name);
-	else
-		cp = __wt_process.cache_pool;
+
+	cp = __wt_process.cache_pool;
+	/* Configure the pool. */
+	WT_ERR(__wt_config_gets(session, cfg, "shared_cache.size", &cval));
+	cp->size = cval.val;
+	WT_ERR(__wt_config_gets(session, cfg, "shared_cache.chunk", &cval));
+	cp->chunk = cp->size * ((double)cval.val / 100);
+	WT_ERR(__wt_config_gets(session, cfg, "shared_cache.min", &cval));
+	cp->min = cp->size * ((double)cval.val / 100);
+	WT_VERBOSE_ERR(session, shared_cache,
+	    "Configured cache pool %s. Size: %" PRIu64
+	    ", chunk size: %" PRIu64 ", min: %" PRIu64,
+	    cp->name, cp->size, cp->chunk, cp->min);
+
 	F_SET(conn, WT_CONN_CACHE_POOL);
 	__wt_spin_unlock(session, &__wt_process.spinlock);
 err:	if (process_locked)
@@ -142,7 +129,7 @@ __wt_conn_cache_pool_open(WT_SESSION_IMPL *session)
 	TAILQ_INSERT_TAIL(&cp->cache_pool_qh, conn, cpq);
 	__wt_spin_unlock(session, &cp->cache_pool_lock);
 	locked = 0;
-	WT_VERBOSE_ERR(session, cache_pool,
+	WT_VERBOSE_ERR(session, shared_cache,
 	    "Added %s to cache pool %s.", conn->home, cp->name);
 
 	/* Start the cache pool server if required. */
@@ -195,7 +182,7 @@ __wt_conn_cache_pool_destroy(WT_CONNECTION_IMPL *conn)
 	}
 
 	/* Ignore any errors - we want to continue closing things down. */
-	WT_VERBOSE_VOID(session, cache_pool,
+	WT_VERBOSE_VOID(session, shared_cache,
 	    "Removing %s from cache pool.", entry->home);
 	TAILQ_REMOVE(&cp->cache_pool_qh, entry, cpq);
 
@@ -210,7 +197,7 @@ __wt_conn_cache_pool_destroy(WT_CONNECTION_IMPL *conn)
 	 * connection. A new one will be created by the next balance pass.
 	 */
 	if (cp->session != NULL && entry == S2C(cp->session)) {
-		WT_VERBOSE_VOID(cp->session, cache_pool,
+		WT_VERBOSE_VOID(cp->session, shared_cache,
 		    "Freeing a cache pool session due to connection close.");
 		wt_session = &cp->session->iface;
 		WT_TRET(wt_session->close(wt_session, NULL));
@@ -233,7 +220,8 @@ __wt_conn_cache_pool_destroy(WT_CONNECTION_IMPL *conn)
 		}
 		__wt_process.cache_pool = NULL;
 		__wt_spin_unlock(session, &__wt_process.spinlock);
-		WT_VERBOSE_VOID(session, cache_pool, "Destroying cache pool.");
+		WT_VERBOSE_VOID(session, shared_cache,
+		    "Destroying cache pool.");
 		/* Shut down the cache pool worker. */
 		__wt_cond_signal(
 		    conn->default_session, cp->cache_pool_cond);
@@ -310,7 +298,7 @@ __cache_pool_balance(void)
 		if (cache->cp_current_evict > highest)
 			highest = cache->cp_current_evict;
 	}
-	WT_VERBOSE_ERR(session, cache_pool,
+	WT_VERBOSE_ERR(session, shared_cache,
 	    "Highest eviction count: %d, entries: %d",
 	    (int)highest, entries);
 	/* Normalize eviction information across connections. */
@@ -360,7 +348,7 @@ __cache_pool_balance(void)
 			cache->cp_skip_count = WT_CACHE_POOL_REDUCE_SKIPS;
 		}
 		if (added != 0) {
-			WT_VERBOSE_ERR(session, cache_pool,
+			WT_VERBOSE_ERR(session, shared_cache,
 			    "Allocated %" PRId64 " to %s",
 			    added, entry->home);
 			/*

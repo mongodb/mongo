@@ -69,7 +69,7 @@ class test_cursor03(TestCursorTracker):
         return self.session.open_cursor(tablearg, None, 'append')
 
     def setUpConnectionOpen(self, dir):
-        wtopen_args = 'create,cache.size=' + str(self.cache_size)
+        wtopen_args = 'create,cache_size=' + str(self.cache_size)
         conn = wiredtiger.wiredtiger_open(dir, wtopen_args)
         self.pr(`conn`)
         return conn

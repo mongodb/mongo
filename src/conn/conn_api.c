@@ -728,7 +728,7 @@ __conn_verbose_config(WT_SESSION_IMPL *session, const char *cfg[])
 		uint32_t flag;
 	} *ft, verbtypes[] = {
 		{ "block",	WT_VERB_block },
-		{ "cache_pool",	WT_VERB_cache_pool },
+		{ "shared_cache",WT_VERB_shared_cache },
 		{ "ckpt",	WT_VERB_ckpt },
 		{ "evict",	WT_VERB_evict },
 		{ "evictserver",WT_VERB_evictserver },

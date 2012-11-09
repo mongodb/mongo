@@ -144,7 +144,7 @@ wt_startup(char *config_open)
 	char config_buf[128];
 
 	snprintf(config_buf, sizeof(config_buf),
-	    "create,error_prefix=\"%s\",cache.size=5MB%s%s",
+	    "create,error_prefix=\"%s\",cache_size=5MB%s%s",
 	    progname,
 	    config_open == NULL ? "" : ",",
 	    config_open == NULL ? "" : config_open);
