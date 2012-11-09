@@ -1015,7 +1015,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="..\db\auth\action_set.cpp" />
     <ClCompile Include="..\db\auth\action_type.cpp" />
     <ClCompile Include="..\db\auth\authorization_manager.cpp" />
-    <ClCompile Include="..\db\auth\external_state.cpp" />
+    <ClCompile Include="..\db\auth\auth_external_state.cpp" />
     <ClCompile Include="..\db\auth\mongo_authentication_session.cpp" />
     <ClCompile Include="..\db\auth\principal.cpp" />
     <ClCompile Include="..\db\auth\principal_set.cpp" />
@@ -1109,6 +1109,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="cursors.cpp" />
     <ClCompile Include="..\pch.cpp" />
     <ClCompile Include="..\db\queryutil.cpp" />
+    <ClCompile Include="field_parser.cpp" />
     <ClCompile Include="grid.cpp" />
     <ClCompile Include="interrupt_status_mongos.cpp" />
     <ClCompile Include="request.cpp" />
@@ -1184,6 +1185,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="..\util\net\sock.cpp" />
     <ClCompile Include="..\client\syncclusterconnection.cpp" />
     <ClCompile Include="..\util\util.cpp" />
+    <ClCompile Include="type_collection.cpp" />
     <ClCompile Include="writeback_listener.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -1279,8 +1281,8 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="..\db\auth\action_type.h" />
     <ClInclude Include="..\db\auth\authentication_session.h" />
     <ClInclude Include="..\db\auth\authorization_manager.h" />
-    <ClInclude Include="..\db\auth\external_state.h" />
-    <ClInclude Include="..\db\auth\external_state_impl.h" />
+    <ClInclude Include="..\db\auth\auth_external_state.h" />
+    <ClInclude Include="..\db\auth\auth_external_state_impl.h" />
     <ClInclude Include="..\db\auth\mongo_authentication_session.h" />
     <ClInclude Include="..\db\auth\principal.h" />
     <ClInclude Include="..\db\auth\principal_set.h" />
@@ -1356,6 +1358,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="d_chunk_manager.h" />
     <ClInclude Include="d_logic.h" />
     <ClInclude Include="d_writeback.h" />
+    <ClInclude Include="field_parser.h" />
     <ClInclude Include="grid.h" />
     <ClInclude Include="gridconfig.h" />
     <ClInclude Include="griddatabase.h" />
@@ -1379,6 +1382,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="..\client\connpool.h" />
     <ClInclude Include="..\client\dbclient.h" />
     <ClInclude Include="..\client\model.h" />
+    <ClInclude Include="type_collection.h" />
     <ClInclude Include="util.h" />
     <ClInclude Include="writeback_listener.h" />
   </ItemGroup>

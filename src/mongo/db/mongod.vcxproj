@@ -1088,12 +1088,14 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="..\s\d_split.cpp" />
     <ClCompile Include="..\s\d_state.cpp" />
     <ClCompile Include="..\s\d_writeback.cpp" />
+    <ClCompile Include="..\s\field_parser.cpp" />
     <ClCompile Include="..\s\grid.cpp" />
     <ClCompile Include="..\s\shard.cpp" />
     <ClCompile Include="..\s\shardconnection.cpp" />
     <ClCompile Include="..\s\shardkey.cpp" />
     <ClCompile Include="..\..\third_party\snappy\snappy-sinksource.cc" />
     <ClCompile Include="..\..\third_party\snappy\snappy.cc" />
+    <ClCompile Include="..\s\type_collection.cpp" />
     <ClCompile Include="..\util\alignedbuilder.cpp" />
     <ClCompile Include="..\util\compress.cpp" />
     <ClCompile Include="..\util\concurrency\mutexdebugger.cpp" />
@@ -1134,7 +1136,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="auth\action_set.cpp" />
     <ClCompile Include="auth\action_type.cpp" />
     <ClCompile Include="auth\authorization_manager.cpp" />
-    <ClCompile Include="auth\external_state.cpp" />
+    <ClCompile Include="auth\auth_external_state.cpp" />
     <ClCompile Include="auth\mongo_authentication_session.cpp" />
     <ClCompile Include="auth\principal.cpp" />
     <ClCompile Include="auth\principal_set.cpp" />
@@ -1352,7 +1354,9 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="..\s\config.h" />
     <ClInclude Include="..\s\d_chunk_manager.h" />
     <ClInclude Include="..\s\d_writeback.h" />
+    <ClInclude Include="..\s\field_parser.h" />
     <ClInclude Include="..\s\grid.h" />
+    <ClInclude Include="..\s\type_collection.h" />
     <ClInclude Include="..\util\concurrency\mutexdebugger.h" />
     <ClInclude Include="..\util\concurrency\simplerwlock.h" />
     <ClInclude Include="..\util\elapsed_tracker.h" />
@@ -1374,8 +1378,8 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="auth\action_type.h" />
     <ClInclude Include="auth\authentication_session.h" />
     <ClInclude Include="auth\authorization_manager.h" />
-    <ClInclude Include="auth\external_state.h" />
-    <ClInclude Include="auth\external_state_impl.h" />
+    <ClInclude Include="auth\auth_external_state.h" />
+    <ClInclude Include="auth\auth_external_state_impl.h" />
     <ClInclude Include="auth\mongo_authentication_session.h" />
     <ClInclude Include="auth\principal.h" />
     <ClInclude Include="auth\principal_set.h" />
