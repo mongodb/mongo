@@ -92,6 +92,9 @@ struct __wt_lsm_tree {
 	WT_SESSION_IMPL *ckpt_session;	/* For checkpoint worker */
 	pthread_t ckpt_tid;		/* LSM checkpoint worker thread */
 
+	WT_SESSION_IMPL *bloom_session;	/* For bloom worker */
+	pthread_t bloom_tid;		/* LSM bloom worker thread */
+
 	WT_LSM_CHUNK **chunk;		/* Array of active LSM chunks */
 	size_t chunk_alloc;		/* Space allocated for chunks */
 	int nchunks;			/* Number of active chunks */

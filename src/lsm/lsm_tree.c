@@ -78,6 +78,8 @@ __lsm_tree_close(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 				WT_TRET(__wt_thread_join(
 				    lsm_tree->worker_tids[i]));
 		WT_TRET(__wt_thread_join(lsm_tree->ckpt_tid));
+		if (FLD_ISSET(lsm_tree->bloom, WT_LSM_BLOOM_NEWEST))
+			WT_TRET(__wt_thread_join(lsm_tree->bloom_tid));
 	}
 
 	/*
@@ -101,6 +103,21 @@ __lsm_tree_close(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 		 */
 		__wt_free(NULL, s->hazard);
 	}
+
+	if (lsm_tree->bloom_session != NULL) {
+		F_SET(lsm_tree->bloom_session,
+		    F_ISSET(session, WT_SESSION_SCHEMA_LOCKED));
+
+		wt_session = &lsm_tree->bloom_session->iface;
+		WT_TRET(wt_session->close(wt_session, NULL));
+
+		/*
+		 * This is safe after the close because session handles are
+		 * not freed, but are managed by the connection.
+		 */
+		__wt_free(NULL, lsm_tree->bloom_session->hazard);
+	}
+
 	if (lsm_tree->ckpt_session != NULL) {
 		F_SET(lsm_tree->ckpt_session,
 		    F_ISSET(session, WT_SESSION_SCHEMA_LOCKED));
@@ -167,8 +184,8 @@ __wt_lsm_tree_chunk_name(
  *	Initialize a chunk of an LSM tree.
  */
 int
-__wt_lsm_tree_setup_chunk(WT_SESSION_IMPL *session,
-    WT_LSM_TREE *lsm_tree, WT_LSM_CHUNK *chunk, int create_bloom)
+__wt_lsm_tree_setup_chunk(
+    WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, WT_LSM_CHUNK *chunk)
 {
 	WT_DECL_RET;
 	WT_ITEM buf;
@@ -190,11 +207,6 @@ __wt_lsm_tree_setup_chunk(WT_SESSION_IMPL *session,
 	if (chunk->id > 1)
 		WT_ERR(__wt_schema_drop(session, chunk->uri, cfg));
 	WT_ERR(__wt_schema_create(session, chunk->uri, lsm_tree->file_config));
-	if (create_bloom) {
-		WT_ERR(__wt_lsm_tree_bloom_name(
-		    session, lsm_tree, chunk->id, &buf));
-		chunk->bloom_uri = __wt_buf_steal(session, &buf, NULL);
-	}
 
 err:	return (ret);
 }
@@ -232,9 +244,17 @@ __lsm_tree_start_worker(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 			WT_RET(__wt_calloc_def(session, 1, &wargs));
 			wargs->lsm_tree = lsm_tree;
 			wargs->id = i;
-			WT_RET(__wt_thread_create(
-			    &lsm_tree->worker_tids[i], __wt_lsm_worker, wargs));
+			WT_RET(__wt_thread_create(&lsm_tree->worker_tids[i],
+			    __wt_lsm_merge_worker, wargs));
 		}
+	if (FLD_ISSET(lsm_tree->bloom, WT_LSM_BLOOM_NEWEST)) {
+		WT_RET(wt_conn->open_session(wt_conn, NULL, NULL, &wt_session));
+		lsm_tree->bloom_session = (WT_SESSION_IMPL *)wt_session;
+		F_SET(lsm_tree->bloom_session, WT_SESSION_INTERNAL);
+
+		WT_RET(__wt_thread_create(
+		    &lsm_tree->bloom_tid, __wt_lsm_bloom_worker, lsm_tree));
+	}
 	WT_RET(__wt_thread_create(
 	    &lsm_tree->ckpt_tid, __wt_lsm_checkpoint_worker, lsm_tree));
 
@@ -506,8 +526,7 @@ __wt_lsm_tree_switch(
 	WT_ERR(__wt_calloc_def(session, 1, &chunk));
 	chunk->id = new_id;
 	lsm_tree->chunk[lsm_tree->nchunks++] = chunk;
-	WT_ERR(__wt_lsm_tree_setup_chunk(session, lsm_tree, chunk,
-	    FLD_ISSET(lsm_tree->bloom, WT_LSM_BLOOM_NEWEST) ? 1 : 0));
+	WT_ERR(__wt_lsm_tree_setup_chunk(session, lsm_tree, chunk));
 
 	++lsm_tree->dsk_gen;
 	WT_ERR(__wt_lsm_meta_write(session, lsm_tree));
@@ -661,7 +680,7 @@ __wt_lsm_tree_truncate(
 	/* Create the new chunk. */
 	WT_ERR(__wt_calloc_def(session, 1, &chunk));
 	chunk->id = WT_ATOMIC_ADD(lsm_tree->last, 1);
-	WT_ERR(__wt_lsm_tree_setup_chunk(session, lsm_tree, chunk, 0));
+	WT_ERR(__wt_lsm_tree_setup_chunk(session, lsm_tree, chunk));
 
 	/* Mark all chunks old. */
 	WT_ERR(__wt_lsm_merge_update_tree(

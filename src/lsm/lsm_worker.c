@@ -12,12 +12,12 @@ static int __lsm_bloom_create(
 static int __lsm_free_chunks(WT_SESSION_IMPL *, WT_LSM_TREE *);
 
 /*
- * __wt_lsm_worker --
- *	The worker thread for an LSM tree, responsible for writing in-memory
- *	trees to disk and merging on-disk trees.
+ * __wt_lsm_merge_worker --
+ *	The merge worker thread for an LSM tree, responsible for merging
+ *	on-disk trees.
  */
 void *
-__wt_lsm_worker(void *vargs)
+__wt_lsm_merge_worker(void *vargs)
 {
 	WT_LSM_WORKER_ARGS *args;
 	WT_LSM_TREE *lsm_tree;
@@ -65,9 +65,79 @@ __wt_lsm_worker(void *vargs)
 }
 
 /*
+ * __wt_lsm_bloom_worker --
+ *	A worker thread for an LSM tree, responsible for creating Bloom filters
+ *	for the newest on-disk chunks.
+ */
+void *
+__wt_lsm_bloom_worker(void *arg)
+{
+	WT_DECL_RET;
+	WT_LSM_CHUNK *chunk;
+	WT_LSM_TREE *lsm_tree;
+	WT_LSM_WORKER_COOKIE cookie;
+	WT_SESSION_IMPL *session;
+	int i, j;
+
+	lsm_tree = arg;
+	session = lsm_tree->bloom_session;
+
+	WT_CLEAR(cookie);
+
+	for (;;) {
+		WT_ERR(__wt_lsm_copy_chunks(session, lsm_tree, &cookie));
+
+		/* Write checkpoints in all completed files. */
+		for (i = 0, j = 0; i < cookie.nchunks; i++) {
+			if (!F_ISSET(lsm_tree, WT_LSM_TREE_WORKING))
+				goto err;
+
+			chunk = cookie.chunk_array[i];
+			/* Stop if a thread is still active in the chunk. */
+			if (chunk->ncursor != 0 ||
+			    !F_ISSET(chunk, WT_LSM_CHUNK_ONDISK))
+				break;
+
+			if (F_ISSET(chunk, WT_LSM_CHUNK_BLOOM) ||
+			    F_ISSET(chunk, WT_LSM_CHUNK_MERGING) ||
+			    chunk->generation > 0 ||
+			    chunk->count == 0)
+				continue;
+
+			if ((ret = __lsm_bloom_create(
+			    session, lsm_tree, chunk)) != 0) {
+				(void)__wt_err(
+				   session, ret, "bloom creation failed");
+				break;
+			}
+
+			++j;
+			__wt_spin_lock(session, &lsm_tree->lock);
+			++lsm_tree->dsk_gen;
+			ret = __wt_lsm_meta_write(session, lsm_tree);
+			__wt_spin_unlock(session, &lsm_tree->lock);
+
+			if (ret != 0) {
+				(void)__wt_err(session, ret,
+				    "LSM bloom worker metadata write failed");
+				break;
+			}
+
+			WT_VERBOSE_ERR(session, lsm,
+			     "LSM worker created bloom filter for %d.", i);
+		}
+		if (j == 0)
+			__wt_sleep(0, 100000);
+	}
+
+err:	__wt_free(session, cookie.chunk_array);
+	return (NULL);
+}
+
+/*
  * __wt_lsm_checkpoint_worker --
- *	A worker thread for an LSM tree, responsible for checkpointing chunks
- *	once they become read only.
+ *	A worker thread for an LSM tree, responsible for flushing new chunks to
+ *	disk.
  */
 void *
 __wt_lsm_checkpoint_worker(void *arg)
@@ -89,47 +159,30 @@ __wt_lsm_checkpoint_worker(void *arg)
 		WT_ERR(__wt_lsm_copy_chunks(session, lsm_tree, &cookie));
 
 		/* Write checkpoints in all completed files. */
-		for (i = 0, j = 0; i < cookie.nchunks; i++) {
+		for (i = 0, j = 0; i < cookie.nchunks - 1; i++) {
 			if (!F_ISSET(lsm_tree, WT_LSM_TREE_WORKING))
 				goto err;
 
 			chunk = cookie.chunk_array[i];
 			/* Stop if a thread is still active in the chunk. */
-			if (chunk->ncursor != 0 ||
-			    (i == cookie.nchunks - 1 &&
-			    !F_ISSET(chunk, WT_LSM_CHUNK_ONDISK)))
+			if (chunk->ncursor != 0)
 				break;
 
-			if (F_ISSET(chunk, WT_LSM_CHUNK_ONDISK) &&
-			    (!FLD_ISSET(lsm_tree->bloom, WT_LSM_BLOOM_NEWEST) ||
-			    F_ISSET(chunk, WT_LSM_CHUNK_BLOOM) ||
-			    chunk->count == 0))
+			if (F_ISSET(chunk, WT_LSM_CHUNK_ONDISK))
 				continue;
-
-			if (FLD_ISSET(lsm_tree->bloom, WT_LSM_BLOOM_NEWEST) &&
-			    !F_ISSET(chunk, WT_LSM_CHUNK_BLOOM) &&
-			    chunk->count != 0 &&
-			    (ret = __lsm_bloom_create(
-			    session, lsm_tree, chunk)) != 0) {
-				(void)__wt_err(
-				   session, ret, "bloom creation failed");
-				break;
-			}
 
 			/*
 			 * NOTE: we pass a non-NULL config, because otherwise
 			 * __wt_checkpoint thinks we're closing the file.
 			 */
-			if (!F_ISSET(chunk, WT_LSM_CHUNK_ONDISK)) {
-				WT_WITH_SCHEMA_LOCK(session,
-				    ret = __wt_schema_worker(session,
-				    chunk->uri, __wt_checkpoint, cfg, 0));
+			WT_WITH_SCHEMA_LOCK(session,
+			    ret = __wt_schema_worker(session,
+			    chunk->uri, __wt_checkpoint, cfg, 0));
 
-				if (ret != 0) {
-					(void)__wt_err(session, ret,
-					    "LSM checkpoint failed");
-					break;
-				}
+			if (ret != 0) {
+				(void)__wt_err(session, ret,
+				    "LSM checkpoint failed");
+				break;
 			}
 
 			++j;
@@ -141,7 +194,7 @@ __wt_lsm_checkpoint_worker(void *arg)
 
 			if (ret != 0) {
 				(void)__wt_err(session, ret,
-				    "LSM metadata write failed");
+				    "LSM checkpoint metadata write failed");
 				break;
 			}
 
@@ -149,7 +202,7 @@ __wt_lsm_checkpoint_worker(void *arg)
 			     "LSM worker checkpointed %d.", i);
 		}
 		if (j == 0)
-			__wt_sleep(0, 1000);
+			__wt_sleep(0, 10000);
 	}
 
 err:	__wt_free(session, cookie.chunk_array);

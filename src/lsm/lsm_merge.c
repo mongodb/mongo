@@ -70,7 +70,7 @@ __wt_lsm_merge(
 	WT_CURSOR *src, *dest;
 	WT_DECL_ITEM(bbuf);
 	WT_DECL_RET;
-	WT_ITEM key, value;
+	WT_ITEM buf, key, value;
 	WT_LSM_CHUNK *chunk;
 	const char *cur_cfg[] =
 	    API_CONF_DEFAULTS(session, open_cursor, "bulk,raw");
@@ -208,13 +208,19 @@ __wt_lsm_merge(
 	WT_ERR(__wt_clsm_init_merge(src, start_chunk, start_id, nchunks));
 
 	WT_WITH_SCHEMA_LOCK(session, ret = __wt_lsm_tree_setup_chunk(
-	    session, lsm_tree, chunk, create_bloom));
+	    session, lsm_tree, chunk));
 	WT_ERR(ret);
-	if (create_bloom)
+	if (create_bloom) {
+		WT_CLEAR(buf);
+		WT_ERR(__wt_lsm_tree_bloom_name(
+		    session, lsm_tree, chunk->id, &buf));
+		chunk->bloom_uri = __wt_buf_steal(session, &buf, NULL);
+
 		WT_ERR(__wt_bloom_create(session, chunk->bloom_uri,
 		    lsm_tree->bloom_config,
 		    record_count, lsm_tree->bloom_bit_count,
 		    lsm_tree->bloom_hash_count, &bloom));
+	}
 
 	WT_ERR(__wt_open_cursor(session, chunk->uri, NULL, cur_cfg, &dest));
 

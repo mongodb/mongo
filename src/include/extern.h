@@ -740,10 +740,9 @@ extern int __wt_lsm_tree_chunk_name( WT_SESSION_IMPL *session,
     WT_LSM_TREE *lsm_tree,
     uint32_t id,
     WT_ITEM *buf);
-extern int __wt_lsm_tree_setup_chunk(WT_SESSION_IMPL *session,
+extern int __wt_lsm_tree_setup_chunk( WT_SESSION_IMPL *session,
     WT_LSM_TREE *lsm_tree,
-    WT_LSM_CHUNK *chunk,
-    int create_bloom);
+    WT_LSM_CHUNK *chunk);
 extern int __wt_lsm_tree_create(WT_SESSION_IMPL *session,
     const char *uri,
     int exclusive,
@@ -772,7 +771,8 @@ extern int __wt_lsm_tree_worker(WT_SESSION_IMPL *session,
     const char *[]),
     const char *cfg[],
     uint32_t open_flags);
-extern void *__wt_lsm_worker(void *vargs);
+extern void *__wt_lsm_merge_worker(void *vargs);
+extern void *__wt_lsm_bloom_worker(void *arg);
 extern void *__wt_lsm_checkpoint_worker(void *arg);
 extern int __wt_lsm_copy_chunks(WT_SESSION_IMPL *session,
     WT_LSM_TREE *lsm_tree,
