@@ -283,7 +283,7 @@ namespace IndexUpdateTests {
             for( shared_ptr<Cursor> cursor = theDataFileMgr.findAll( _ns );
                  cursor->ok();
                  cursor->advance() ) {
-                int32_t currA = cursor->current()[ "a" ].number();
+                int32_t currA = cursor->current()[ "a" ].Int();
                 if ( currA == last ) {
                     dups.insert( cursor->currLoc() );
                 }
@@ -316,7 +316,7 @@ namespace IndexUpdateTests {
             for( shared_ptr<Cursor> cursor = theDataFileMgr.findAll( _ns );
                  cursor->ok();
                  cursor->advance() ) {
-                int32_t currA = cursor->current()[ "a" ].number();
+                int32_t currA = cursor->current()[ "a" ].Int();
                 if ( currA == last ) {
                     dups.insert( cursor->currLoc() );
                 }
