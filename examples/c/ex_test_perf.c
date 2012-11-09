@@ -777,6 +777,13 @@ int lprintf(CONFIG *cfg, int err, uint32_t level, const char *fmt, ...)
 		vfprintf(cfg->logf, fmt, ap);
 		va_end(ap);
 		fprintf(cfg->logf, "\n");
+
+		if (level < cfg->verbose) {
+			va_start(ap, fmt);
+			vprintf(fmt, ap);
+			va_end(ap);
+			printf("\n");
+		}
 	}
 	if (err == 0)
 		return (0);
