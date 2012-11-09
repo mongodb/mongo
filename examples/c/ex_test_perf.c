@@ -350,7 +350,8 @@ stat_worker(void *arg)
 		lsm_uri = calloc(
 		    strlen(cfg->uri) + strlen("statistics:") + 1, 1);
 		if (lsm_uri == NULL) {
-			lprintf(cfg, ENOMEM, 0, "Statistics thread uri create.");
+			lprintf(
+			    cfg, ENOMEM, 0, "Statistics thread uri create.");
 			goto err;
 		}
 		sprintf(lsm_uri, "statistics:%s", cfg->uri);
@@ -847,7 +848,7 @@ void print_config(CONFIG *cfg)
 
 void usage(void)
 {
-	printf("ex_perf_test [-CDLMPRSTdehikrsuv]\n");
+	printf("ex_perf_test [-CLMPRSTdehikrsuv]\n");
 	printf("\t-S Use a small default configuration\n");
 	printf("\t-M Use a medium default configuration\n");
 	printf("\t-L Use a large default configuration\n");
