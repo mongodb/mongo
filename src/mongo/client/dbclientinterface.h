@@ -25,6 +25,7 @@
 #include "mongo/client/authlevel.h"
 #include "mongo/client/authentication_table.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/util/net/message.h"
 #include "mongo/util/net/message_port.h"
 
