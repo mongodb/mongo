@@ -24,10 +24,7 @@ __wt_config_check(WT_SESSION_IMPL *session,
 	WT_CONFIG parser, cparser, sparser;
 	WT_CONFIG_ITEM k, v, ck, cv, dummy;
 	WT_DECL_RET;
-	const char *cn;
 	int badtype, found, i;
-	size_t len;
-	uint64_t cl;
 
 	/* It is always okay to pass NULL. */
 	if (config == NULL)
@@ -45,15 +42,9 @@ __wt_config_check(WT_SESSION_IMPL *session,
 
 		/* The config check array is sorted, so exit on first found */
 		for (i = 0, found = 0; checks[i].name != NULL; i++) {
-			cn = checks[i].name;
-			if (WT_STRING_CASE_MATCH(cn, k.str, k.len)) {
+			if (WT_STRING_CASE_MATCH(
+			    checks[i].name, k.str, k.len)) {
 				found = 1;
-				break;
-			}
-			cl = strlen(cn);
-			if (k.len > cl && k.str[cl] == '.' &&
-			    WT_STRING_CASE_MATCH(cn, k.str, cl)) {
-				found = 2;
 				break;
 			}
 		}
@@ -72,15 +63,12 @@ __wt_config_check(WT_SESSION_IMPL *session,
 			badtype = (v.len > 0 && v.type != ITEM_STRUCT);
 		else if (strcmp(checks[i].type, "category") == 0) {
 			/*
-			 * Deal with categories that could either be of the
-			 * form:
-			 * XXX.XXX=blah (found will be 2) OR
-			 * XXX=(XXX=blah) (found will be 1)
+			 * Deal with categories that could are of the form:
+			 * XXX=(XXX=blah)
 			 */
-			len = (found == 1) ? v.len : k.len + v.len - cl;
 			ret = __wt_config_check(session,
 			    checks[i].subconfigs,
-			    k.str + strlen(cn) + 1, len);
+			    k.str + strlen(checks[i].name) + 1, v.len);
 			if (ret != EINVAL)
 				badtype = 0;
 			else

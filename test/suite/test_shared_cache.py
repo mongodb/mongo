@@ -196,5 +196,18 @@ class test_shared_cache(wttest.WiredTigerTestCase):
             self.add_records(sess, 0, nops)
         self.closeConnections()
 
+    # Test reconfigure API
+    def test_shared_cache10(self):
+        nops = 1000
+        self.openConnections(['WT_TEST1', 'WT_TEST2'])
+
+        for sess in self.sessions:
+            sess.create(self.uri, "key_format=S,value_format=S")
+            self.add_records(sess, 0, nops)
+
+        connection = self.conns[0]
+        connection.reconfigure("shared_cache=(size=300M)")
+        self.closeConnections()
+
 if __name__ == '__main__':
     wttest.run()

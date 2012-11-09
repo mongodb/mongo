@@ -584,7 +584,7 @@ __wt_config_getraw(
 		} else if (k.len < key->len && key->str[k.len] == '.' &&
 		    strncasecmp(key->str, k.str, k.len) == 0) {
 			subk.str = key->str + k.len + 1;
-			subk.len = key->len - k.len - 1;
+			subk.len = (key->len - k.len) - 1;
 			WT_RET(__wt_config_initn(
 			    cparser->session, &sparser, v.str, v.len));
 			if ((ret =

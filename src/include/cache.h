@@ -84,6 +84,7 @@ struct __wt_cache_pool {
 	uint64_t chunk;
 	uint64_t currently_used;
 	uint32_t flags;
+	uint32_t refs;		/* Reference count for structure. */
 	/* Locked: List of connections participating in the cache pool. */
 	TAILQ_HEAD(__wt_cache_pool_qh, __wt_connection_impl) cache_pool_qh;
 };

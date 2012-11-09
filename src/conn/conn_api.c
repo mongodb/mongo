@@ -365,8 +365,9 @@ __conn_reconfigure(WT_CONNECTION *wt_conn, const char *config)
 	 * Don't include the default config: only override values the
 	 * application sets explicitly.
 	 */
+	WT_ERR(__wt_conn_cache_pool_config(session, cfg));
 	WT_ERR(__wt_cache_config(conn, raw_cfg));
-	WT_ERR(__conn_verbose_config(session, raw_cfg));
+	WT_ERR(__conn_verbose_config(session, cfg));
 
 err:	API_END(session);
 	return (ret);
