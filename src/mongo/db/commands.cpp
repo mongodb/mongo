@@ -164,7 +164,8 @@ namespace mongo {
         return c->locktype();
     }
 
-
+    // TODO: remove this default implementation so that all Command subclasses have to explicitly
+    // declare their own.
     void Command::addRequiredPrivileges(const std::string& dbname,
                                         const BSONObj& cmdObj,
                                         std::vector<Privilege>* out) {

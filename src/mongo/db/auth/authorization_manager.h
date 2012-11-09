@@ -41,6 +41,10 @@ namespace mongo {
     class AuthorizationManager {
         MONGO_DISALLOW_COPYING(AuthorizationManager);
     public:
+
+        static const std::string SERVER_RESOURCE_NAME;
+        static const std::string CLUSTER_RESOURCE_NAME;
+
         // Takes ownership of the externalState.
         explicit AuthorizationManager(AuthExternalState* externalState);
         ~AuthorizationManager();

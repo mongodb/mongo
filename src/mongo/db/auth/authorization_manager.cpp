@@ -34,6 +34,9 @@
 
 namespace mongo {
 
+    const std::string AuthorizationManager::SERVER_RESOURCE_NAME = "$SERVER";
+    const std::string AuthorizationManager::CLUSTER_RESOURCE_NAME = "$CLUSTER";
+
     namespace {
         Principal specialAdminPrincipal("special");
         const std::string ADMIN_DBNAME = "admin";
@@ -59,6 +62,7 @@ namespace mongo {
         readRoleActions.addAction(ActionType::collStats);
         readRoleActions.addAction(ActionType::dbStats);
         readRoleActions.addAction(ActionType::find);
+        //TODO: should dbHash go here?
 
         // Read-write role
         readWriteRoleActions.addAllActionsFromSet(readRoleActions);
@@ -105,7 +109,7 @@ namespace mongo {
         serverAdminRoleActions.addAction(ActionType::hostInfo);
         serverAdminRoleActions.addAction(ActionType::listDatabases);
         serverAdminRoleActions.addAction(ActionType::logRotate);
-        serverAdminRoleActions.addAction(ActionType::profile);
+        serverAdminRoleActions.addAction(ActionType::profile); // TODO: should this be dbAdmin?
         serverAdminRoleActions.addAction(ActionType::repairDatabase);
         serverAdminRoleActions.addAction(ActionType::replSetFreeze);
         serverAdminRoleActions.addAction(ActionType::replSetGetStatus);
@@ -314,6 +318,8 @@ namespace mongo {
         if (_externalState->shouldIgnoreAuthChecks()) {
             return &specialAdminPrincipal;
         }
+
+        // TODO: If resource is a ns, check against the dbname portion only.
 
         const AcquiredPrivilege* privilege;
         privilege = _acquiredPrivileges.getPrivilegeForAction(resource, action);

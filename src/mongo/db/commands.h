@@ -19,6 +19,9 @@
 
 #include <vector>
 
+#include "mongo/db/auth/action_set.h"
+#include "mongo/db/auth/action_type.h"
+#include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/util/mongoutils/str.h"
@@ -168,6 +171,13 @@ namespace mongo {
         }
         virtual bool slaveOk() const {
             return true;
+        }
+        virtual void addRequiredPrivileges(const std::string& dbname,
+                                           const BSONObj& cmdObj,
+                                           std::vector<Privilege>* out) {
+            ActionSet actions;
+            actions.addAction(ActionType::shutdown);
+            out->push_back(Privilege(AuthorizationManager::SERVER_RESOURCE_NAME, actions));
         }
         virtual LockType locktype() const { return NONE; }
         virtual void help( stringstream& help ) const;
