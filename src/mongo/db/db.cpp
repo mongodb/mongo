@@ -730,9 +730,9 @@ static void buildOptionsDescriptions(po::options_description *pVisible,
 #if defined(_WIN32)
     po::options_description windows_scm_options("Windows Service Control Manager options");
 #endif
-    po::options_description replication_options("Replication options");
-    po::options_description ms_options("Master/slave options");
+    po::options_description ms_options("Master/slave options (old; use replica sets instead)");
     po::options_description rs_options("Replica set options");
+    po::options_description replication_options("Replication options");
     po::options_description sharding_options("Sharding options");
     po::options_description ssl_options("SSL options");
 
