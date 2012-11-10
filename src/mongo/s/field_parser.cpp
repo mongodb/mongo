@@ -47,7 +47,7 @@ namespace mongo {
         }
 
         if (elem.type() == Object) {
-            *out = elem.embeddedObject();
+            *out = elem.Obj().getOwned();
             return true;
         }
 
