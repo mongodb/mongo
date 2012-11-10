@@ -15,7 +15,6 @@
  */
 
 #include "mongo/s/field_parser.h"
-#include "mongo/bson/bsontypes.h"
 
 namespace mongo {
 
