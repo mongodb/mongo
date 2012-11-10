@@ -19,6 +19,7 @@
 #include "mongo/db/diskloc.h"
 #include "mongo/db/index.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/platform/cstdint.h"
 
 namespace mongo {
     class NamespaceDetails;
@@ -33,8 +34,9 @@ namespace mongo {
     void buildAnIndex(const std::string& ns,
                       NamespaceDetails *d,
                       IndexDetails& idx,
-                      int idxNo,
-                      bool background);
+                      int32_t idxNo,
+                      bool background,
+                      bool mayInterrupt);
 
     // add index keys for a newly inserted record 
     // done in two steps/phases to allow potential deferal of write lock portion in the future
@@ -52,4 +54,47 @@ namespace mongo {
 
     bool dropIndexes( NamespaceDetails *d, const char *ns, const char *name, string &errmsg, BSONObjBuilder &anObjBuilder, bool maydeleteIdIndex );
 
-}
+    /**
+     * Add an _id index to namespace @param 'ns' if not already present.
+     * @param mayInterrupt When true, killop may interrupt the function call.
+     */
+    void ensureHaveIdIndex(const char* ns, bool mayInterrupt);
+
+    ////// The remaining functions are only included in this header file for unit testing.
+
+    class BSONObjExternalSorter;
+    class CurOp;
+    class ProgressMeter;
+    class ProgressMeterHolder;
+    struct SortPhaseOne;
+    class Timer;
+
+    /** Extract index keys from the @param 'ns' to the external sorter in @param 'phaseOne'. */
+    void addKeysToPhaseOne( const char* ns,
+                            const IndexDetails& idx,
+                            const BSONObj& order,
+                            SortPhaseOne* phaseOne,
+                            int64_t nrecords,
+                            ProgressMeter* progressMeter,
+                            bool mayInterrupt );
+
+    /** Popuate the index @param 'idx' using the keys contained in @param 'sorter'. */
+    template< class V >
+    void buildBottomUpPhases2And3( bool dupsAllowed,
+                                   IndexDetails& idx,
+                                   BSONObjExternalSorter& sorter,
+                                   bool dropDups,
+                                   set<DiskLoc>& dupsToDrop,
+                                   CurOp* op,
+                                   SortPhaseOne* phase1,
+                                   ProgressMeterHolder& pm,
+                                   Timer& t,
+                                   bool mayInterrupt );
+
+    /** Drop duplicate documents from the set @param 'dupsToDrop'. */
+    void doDropDups( const char* ns,
+                     NamespaceDetails* d,
+                     const set<DiskLoc>& dupsToDrop,
+                     bool mayInterrupt );
+
+} // namespace mongo

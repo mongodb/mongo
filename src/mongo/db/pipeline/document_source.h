@@ -28,6 +28,7 @@
 #include "db/pipeline/value.h"
 #include "util/string_writer.h"
 #include "mongo/db/projection.h"
+#include "mongo/s/shard.h"
 
 namespace mongo {
     class Accumulator;
@@ -38,8 +39,6 @@ namespace mongo {
     class ExpressionFieldPath;
     class ExpressionObject;
     class Matcher;
-    class Shard;
-    class ShardChunkManager;
 
     class DocumentSource :
         public IntrusiveCounterUnsigned,

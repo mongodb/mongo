@@ -406,6 +406,7 @@ namespace mongo {
         memSize = LinuxSysHelper::getSystemMemorySize();
         addrSize = (string( unameData.machine ).find( "x86_64" ) != string::npos ? 64 : 32);
         numCores = cpuCount;
+        pageSize = static_cast<unsigned long long>(sysconf( _SC_PAGESIZE ));
         cpuArch = unameData.machine;
         hasNuma = checkNumaEnabled();
         
@@ -419,7 +420,7 @@ namespace mongo {
         bExtra.append( "kernelVersion", unameData.release );
         bExtra.append( "cpuFrequencyMHz", cpuFreq);
         bExtra.append( "cpuFeatures", cpuFeatures);
-        bExtra.append( "pageSize", static_cast< int >(sysconf( _SC_PAGESIZE ) ) );
+        bExtra.append( "pageSize", static_cast<long long>(pageSize) );
         bExtra.append( "numPages", static_cast< int >(sysconf( _SC_PHYS_PAGES ) ) );
         bExtra.append( "maxOpenFiles", static_cast< int >(sysconf( _SC_OPEN_MAX ) ) );
 

@@ -106,7 +106,8 @@ namespace mongo {
         GetNativeSystemInfo( &ntsysinfo );
         addrSize = (ntsysinfo.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_AMD64 ? 64 : 32);
         numCores = ntsysinfo.dwNumberOfProcessors;
-        bExtra.append( "pageSize", static_cast< int >(ntsysinfo.dwPageSize) );
+        pageSize = static_cast<unsigned long long>(ntsysinfo.dwPageSize);
+        bExtra.append("pageSize", static_cast<long long>(pageSize));
 
         // get memory info
         mse.dwLength = sizeof( mse );

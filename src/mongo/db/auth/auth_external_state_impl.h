@@ -17,32 +17,35 @@
 #pragma once
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/base/status.h"
 #include "mongo/client/dbclientinterface.h"
-#include "mongo/db/auth/external_state.h"
+#include "mongo/db/auth/auth_external_state.h"
 
 namespace mongo {
 
     /**
-     * The actual implementation of ExternalState
+     * The actual implementation of AuthExternalState
      */
-    class ExternalStateImpl : public ExternalState {
-        MONGO_DISALLOW_COPYING(ExternalStateImpl);
+    class AuthExternalStateImpl : public AuthExternalState {
+        MONGO_DISALLOW_COPYING(AuthExternalStateImpl);
 
     public:
 
-        // adminDBConnection is a connection that can be used to access the admin database.  It is
-        // used to determine if there are any admin users configured for the cluster, and thus if
-        // localhost connections should be given special admin access.
-        // adminDBConnection is used only in the constructor, no pointer to it is stored, so it
-        // can be deleted as soon as the constructor returns.
-        ExternalStateImpl(DBClientBase* adminDBConnection);
-        virtual ~ExternalStateImpl();
+        AuthExternalStateImpl() {};
+        virtual ~AuthExternalStateImpl() {};
 
         // Returns true if this connection should be treated as if it has full access to do
         // anything, regardless of the current auth state.  Currently the reasons why this could be
         // are that auth isn't enabled, the connection is from localhost and there are admin users,
         // or the connection is a "god" connection.
         virtual bool shouldIgnoreAuthChecks() const;
+
+        // adminDBConnection is a connection that can be used to access the admin database.  It is
+        // used to determine if there are any admin users configured for the cluster, and thus if
+        // localhost connections should be given special admin access.
+        // This function *must* be called on any new AuthExternalState, after the constructor but
+        // before any other methods are called on the AuthExternalState.
+        virtual Status initialize(DBClientBase* adminDBConnection);
 
     private:
 

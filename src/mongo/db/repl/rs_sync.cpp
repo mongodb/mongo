@@ -259,6 +259,8 @@ namespace replset {
         OpTime ts = applyGTE;
 
         time_t start = time(0);
+        time_t now = start;
+
         unsigned long long n = 0, lastN = 0;
 
         while( ts < minValid ) {
@@ -268,6 +270,15 @@ namespace replset {
                 if (tryPopAndWaitForMore(&ops)) {
                     break;
                 }
+
+                // apply replication batch limits
+                now = time(0);
+                if (!ops.empty()) {
+                    if (now > replBatchLimitSeconds)
+                        break;
+                    if (ops.getDeque().size() > replBatchLimitOperations)
+                        break;
+                }
             }
             setOplogVersion(ops.getDeque().front());
             
@@ -276,7 +287,6 @@ namespace replset {
             n += ops.getDeque().size();
 
             if ( n > lastN + 1000 ) {
-                time_t now = time(0);
                 if (now - start > 10) {
                     // simple progress metering
                     log() << "replSet initialSyncOplogApplication applied " << n << " operations, synced to "

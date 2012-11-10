@@ -15,11 +15,11 @@
  *    limitations under the License.
  */
 
-#include "engine_v8.h"
+#include "mongo/scripting/engine_v8.h"
 
-#include "v8_wrapper.h"
-#include "v8_utils.h"
-#include "v8_db.h"
+#include "mongo/scripting/v8_db.h"
+#include "mongo/scripting/v8_utils.h"
+#include "mongo/scripting/v8_wrapper.h"
 
 #define V8_SIMPLE_HEADER v8::Locker l(_isolate); v8::Isolate::Scope iscope(_isolate); HandleScope handle_scope; Context::Scope context_scope( _context );
 

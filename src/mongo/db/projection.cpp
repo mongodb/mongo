@@ -75,8 +75,9 @@ namespace mongo {
 
                     // initialize new Matcher object(s)
 
-                    _matchers.insert( make_pair( mongoutils::str::before( e.fieldName(), '.' ),
-                                                 new Matcher( e.wrap(), true ) ) );
+                    _matchers.insert( make_pair(
+                                          mongoutils::str::before( e.fieldName(), '.' ),
+                                          shared_ptr<Matcher>( new Matcher( e.wrap(), true ) ) ) );
                     add( e.fieldName(), true );
                 }
                 else {

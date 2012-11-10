@@ -1433,7 +1433,7 @@ namespace mongo {
     template< class V >
     DiskLoc BtreeBucket<V>::addBucket(const IndexDetails& id) {
         string ns = id.indexNamespace();
-        DiskLoc loc = theDataFileMgr.insert(ns.c_str(), 0, V::BucketSize, true);
+        DiskLoc loc = theDataFileMgr.insert(ns.c_str(), 0, V::BucketSize, false, true);
         BtreeBucket *b = BTREEMOD(loc);
         b->init();
         return loc;

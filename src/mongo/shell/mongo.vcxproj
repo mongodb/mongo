@@ -164,7 +164,7 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <PreprocessorDefinitions>BOOST_ALL_NO_LIB;XP_WIN;HAVE_CONFIG_H;OLDJS;MONGO_EXPOSE_MACROS;_DEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>BOOST_ALL_NO_LIB;XP_WIN;HAVE_CONFIG_H;OLDJS;MONGO_EXPOSE_MACROS;_DEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;_SCL_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>..;..\..;..\..\third_party\boost</AdditionalIncludeDirectories>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <DisableSpecificWarnings>4355;4800;4267;4244</DisableSpecificWarnings>
@@ -178,7 +178,8 @@
     </Link>
     <PreBuildEvent>
       <Command>cscript //Nologo "$(ProjectDir)..\..\third_party\run_if_newer.js" /path:"$(ProjectDir)..\..\third_party\js-1.7" /input:"jskwgen.exe" /output:"jsautokw.h" /command:"jskwgen jsautokw.h"
-cscript //Nologo createCPPfromJavaScriptFiles.js "$(ProjectDir).."
+cscript //Nologo "$(ProjectDir)..\..\third_party\run_if_newer.js" /path:"$(ProjectDir)..\base" /input:"generate_error_codes.py,error_codes.err" /output:"error_codes.h,error_codes.cpp" /command:"python generate_error_codes.py error_codes.err error_codes.h error_codes.cpp"
+cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(ProjectDir).."
 </Command>
       <Message>Build jsautokw.h for SpiderMonkey, create mongo.cpp and mongo-server.cpp from JavaScript source files</Message>
     </PreBuildEvent>
@@ -187,7 +188,7 @@ cscript //Nologo createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <PreprocessorDefinitions>BOOST_ALL_NO_LIB;XP_WIN;HAVE_CONFIG_H;OLDJS;MONGO_EXPOSE_MACROS;_DEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>BOOST_ALL_NO_LIB;XP_WIN;HAVE_CONFIG_H;OLDJS;MONGO_EXPOSE_MACROS;_DEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;_SCL_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>..;..\..;..\..\third_party\boost</AdditionalIncludeDirectories>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <DisableSpecificWarnings>4355;4800;4267;4244</DisableSpecificWarnings>
@@ -200,7 +201,8 @@ cscript //Nologo createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     </Link>
     <PreBuildEvent>
       <Command>cscript //Nologo "$(ProjectDir)..\..\third_party\run_if_newer.js" /path:"$(ProjectDir)..\..\third_party\js-1.7" /input:"jskwgen.exe" /output:"jsautokw.h" /command:"jskwgen jsautokw.h"
-cscript //Nologo createCPPfromJavaScriptFiles.js "$(ProjectDir).."
+cscript //Nologo "$(ProjectDir)..\..\third_party\run_if_newer.js" /path:"$(ProjectDir)..\base" /input:"generate_error_codes.py,error_codes.err" /output:"error_codes.h,error_codes.cpp" /command:"python generate_error_codes.py error_codes.err error_codes.h error_codes.cpp"
+cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(ProjectDir).."
 </Command>
       <Message>Build jsautokw.h for SpiderMonkey, create mongo.cpp and mongo-server.cpp from JavaScript source files</Message>
     </PreBuildEvent>
@@ -209,7 +211,7 @@ cscript //Nologo createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <PreprocessorDefinitions>BOOST_ALL_NO_LIB;XP_WIN;HAVE_CONFIG_H;OLDJS;MONGO_EXPOSE_MACROS;_DEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>BOOST_ALL_NO_LIB;XP_WIN;HAVE_CONFIG_H;OLDJS;MONGO_EXPOSE_MACROS;_DEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;_SCL_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>..;..\..;..\..\third_party\boost</AdditionalIncludeDirectories>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <DisableSpecificWarnings>4355;4800;4267;4244</DisableSpecificWarnings>
@@ -223,7 +225,8 @@ cscript //Nologo createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     </Link>
     <PreBuildEvent>
       <Command>cscript //Nologo "$(ProjectDir)..\..\third_party\run_if_newer.js" /path:"$(ProjectDir)..\..\third_party\js-1.7" /input:"jskwgen.exe" /output:"jsautokw.h" /command:"jskwgen jsautokw.h"
-cscript //Nologo createCPPfromJavaScriptFiles.js "$(ProjectDir).."
+cscript //Nologo "$(ProjectDir)..\..\third_party\run_if_newer.js" /path:"$(ProjectDir)..\base" /input:"generate_error_codes.py,error_codes.err" /output:"error_codes.h,error_codes.cpp" /command:"python generate_error_codes.py error_codes.err error_codes.h error_codes.cpp"
+cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(ProjectDir).."
 </Command>
       <Message>Build jsautokw.h for SpiderMonkey, create mongo.cpp and mongo-server.cpp from JavaScript source files</Message>
     </PreBuildEvent>
@@ -232,7 +235,7 @@ cscript //Nologo createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <PreprocessorDefinitions>BOOST_ALL_NO_LIB;XP_WIN;HAVE_CONFIG_H;OLDJS;MONGO_EXPOSE_MACROS;_DEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>BOOST_ALL_NO_LIB;XP_WIN;HAVE_CONFIG_H;OLDJS;MONGO_EXPOSE_MACROS;_DEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;_SCL_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>..;..\..;..\..\third_party\boost</AdditionalIncludeDirectories>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <DisableSpecificWarnings>4355;4800;4267;4244</DisableSpecificWarnings>
@@ -245,7 +248,8 @@ cscript //Nologo createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     </Link>
     <PreBuildEvent>
       <Command>cscript //Nologo "$(ProjectDir)..\..\third_party\run_if_newer.js" /path:"$(ProjectDir)..\..\third_party\js-1.7" /input:"jskwgen.exe" /output:"jsautokw.h" /command:"jskwgen jsautokw.h"
-cscript //Nologo createCPPfromJavaScriptFiles.js "$(ProjectDir).."
+cscript //Nologo "$(ProjectDir)..\..\third_party\run_if_newer.js" /path:"$(ProjectDir)..\base" /input:"generate_error_codes.py,error_codes.err" /output:"error_codes.h,error_codes.cpp" /command:"python generate_error_codes.py error_codes.err error_codes.h error_codes.cpp"
+cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(ProjectDir).."
 </Command>
       <Message>Build jsautokw.h for SpiderMonkey, create mongo.cpp and mongo-server.cpp from JavaScript source files</Message>
     </PreBuildEvent>
@@ -256,7 +260,7 @@ cscript //Nologo createCPPfromJavaScriptFiles.js "$(ProjectDir).."
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <PreprocessorDefinitions>BOOST_ALL_NO_LIB;XP_WIN;HAVE_CONFIG_H;OLDJS;MONGO_EXPOSE_MACROS;NDEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>BOOST_ALL_NO_LIB;XP_WIN;HAVE_CONFIG_H;OLDJS;MONGO_EXPOSE_MACROS;NDEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;_SCL_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>..;..\..;..\..\third_party\boost</AdditionalIncludeDirectories>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
@@ -273,7 +277,8 @@ cscript //Nologo createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     </Link>
     <PreBuildEvent>
       <Command>cscript //Nologo "$(ProjectDir)..\..\third_party\run_if_newer.js" /path:"$(ProjectDir)..\..\third_party\js-1.7" /input:"jskwgen.exe" /output:"jsautokw.h" /command:"jskwgen jsautokw.h"
-cscript //Nologo createCPPfromJavaScriptFiles.js "$(ProjectDir).."
+cscript //Nologo "$(ProjectDir)..\..\third_party\run_if_newer.js" /path:"$(ProjectDir)..\base" /input:"generate_error_codes.py,error_codes.err" /output:"error_codes.h,error_codes.cpp" /command:"python generate_error_codes.py error_codes.err error_codes.h error_codes.cpp"
+cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(ProjectDir).."
 </Command>
       <Message>Build jsautokw.h for SpiderMonkey, create mongo.cpp and mongo-server.cpp from JavaScript source files</Message>
     </PreBuildEvent>
@@ -284,7 +289,7 @@ cscript //Nologo createCPPfromJavaScriptFiles.js "$(ProjectDir).."
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <PreprocessorDefinitions>BOOST_ALL_NO_LIB;XP_WIN;HAVE_CONFIG_H;OLDJS;MONGO_EXPOSE_MACROS;NDEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>BOOST_ALL_NO_LIB;XP_WIN;HAVE_CONFIG_H;OLDJS;MONGO_EXPOSE_MACROS;NDEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;_SCL_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>..;..\..;..\..\third_party\boost</AdditionalIncludeDirectories>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
@@ -300,7 +305,8 @@ cscript //Nologo createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     </Link>
     <PreBuildEvent>
       <Command>cscript //Nologo "$(ProjectDir)..\..\third_party\run_if_newer.js" /path:"$(ProjectDir)..\..\third_party\js-1.7" /input:"jskwgen.exe" /output:"jsautokw.h" /command:"jskwgen jsautokw.h"
-cscript //Nologo createCPPfromJavaScriptFiles.js "$(ProjectDir).."
+cscript //Nologo "$(ProjectDir)..\..\third_party\run_if_newer.js" /path:"$(ProjectDir)..\base" /input:"generate_error_codes.py,error_codes.err" /output:"error_codes.h,error_codes.cpp" /command:"python generate_error_codes.py error_codes.err error_codes.h error_codes.cpp"
+cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(ProjectDir).."
 </Command>
       <Message>Build jsautokw.h for SpiderMonkey, create mongo.cpp and mongo-server.cpp from JavaScript source files</Message>
     </PreBuildEvent>
@@ -311,7 +317,7 @@ cscript //Nologo createCPPfromJavaScriptFiles.js "$(ProjectDir).."
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <PreprocessorDefinitions>BOOST_ALL_NO_LIB;XP_WIN;HAVE_CONFIG_H;OLDJS;MONGO_EXPOSE_MACROS;NDEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>BOOST_ALL_NO_LIB;XP_WIN;HAVE_CONFIG_H;OLDJS;MONGO_EXPOSE_MACROS;NDEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;_SCL_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>..;..\..;..\..\third_party\boost</AdditionalIncludeDirectories>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
@@ -328,7 +334,8 @@ cscript //Nologo createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     </Link>
     <PreBuildEvent>
       <Command>cscript //Nologo "$(ProjectDir)..\..\third_party\run_if_newer.js" /path:"$(ProjectDir)..\..\third_party\js-1.7" /input:"jskwgen.exe" /output:"jsautokw.h" /command:"jskwgen jsautokw.h"
-cscript //Nologo createCPPfromJavaScriptFiles.js "$(ProjectDir).."
+cscript //Nologo "$(ProjectDir)..\..\third_party\run_if_newer.js" /path:"$(ProjectDir)..\base" /input:"generate_error_codes.py,error_codes.err" /output:"error_codes.h,error_codes.cpp" /command:"python generate_error_codes.py error_codes.err error_codes.h error_codes.cpp"
+cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(ProjectDir).."
 </Command>
       <Message>Build jsautokw.h for SpiderMonkey, create mongo.cpp and mongo-server.cpp from JavaScript source files</Message>
     </PreBuildEvent>
@@ -339,7 +346,7 @@ cscript //Nologo createCPPfromJavaScriptFiles.js "$(ProjectDir).."
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <PreprocessorDefinitions>BOOST_ALL_NO_LIB;XP_WIN;HAVE_CONFIG_H;OLDJS;MONGO_EXPOSE_MACROS;NDEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>BOOST_ALL_NO_LIB;XP_WIN;HAVE_CONFIG_H;OLDJS;MONGO_EXPOSE_MACROS;NDEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;_SCL_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>..;..\..;..\..\third_party\boost</AdditionalIncludeDirectories>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
@@ -355,7 +362,8 @@ cscript //Nologo createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     </Link>
     <PreBuildEvent>
       <Command>cscript //Nologo "$(ProjectDir)..\..\third_party\run_if_newer.js" /path:"$(ProjectDir)..\..\third_party\js-1.7" /input:"jskwgen.exe" /output:"jsautokw.h" /command:"jskwgen jsautokw.h"
-cscript //Nologo createCPPfromJavaScriptFiles.js "$(ProjectDir).."
+cscript //Nologo "$(ProjectDir)..\..\third_party\run_if_newer.js" /path:"$(ProjectDir)..\base" /input:"generate_error_codes.py,error_codes.err" /output:"error_codes.h,error_codes.cpp" /command:"python generate_error_codes.py error_codes.err error_codes.h error_codes.cpp"
+cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(ProjectDir).."
 </Command>
       <Message>Build jsautokw.h for SpiderMonkey, create mongo.cpp and mongo-server.cpp from JavaScript source files</Message>
     </PreBuildEvent>
@@ -872,6 +880,7 @@ cscript //Nologo createCPPfromJavaScriptFiles.js "$(ProjectDir).."
       <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">4355;4800;4267;4244;4334</DisableSpecificWarnings>
     </ClCompile>
     <ClCompile Include="..\base\configuration_variable_manager.cpp" />
+    <ClCompile Include="..\base\error_codes.cpp" />
     <ClCompile Include="..\base\global_initializer.cpp" />
     <ClCompile Include="..\base\global_initializer_registerer.cpp" />
     <ClCompile Include="..\base\init.cpp" />
@@ -881,10 +890,14 @@ cscript //Nologo createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClCompile Include="..\base\make_string_vector.cpp" />
     <ClCompile Include="..\base\parse_number.cpp" />
     <ClCompile Include="..\base\status.cpp" />
+    <ClCompile Include="..\bson\mutable\mutable_bson.cpp" />
+    <ClCompile Include="..\bson\mutable\mutable_bson_builder.cpp" />
+    <ClCompile Include="..\bson\mutable\mutable_bson_heap.cpp" />
+    <ClCompile Include="..\bson\mutable\mutable_bson_internal.cpp" />
+    <ClCompile Include="..\bson\util\bson_extract.cpp" />
     <ClCompile Include="..\client\authentication_table.cpp" />
     <ClCompile Include="..\client\connection_factory.cpp" />
     <ClCompile Include="..\db\dbmessage.cpp" />
-    <ClCompile Include="..\db\fail_point_service.cpp" />
     <ClCompile Include="..\platform\random.cpp" />
     <ClCompile Include="..\scripting\bson_template_evaluator.cpp" />
     <ClCompile Include="..\util\concurrency\mutexdebugger.cpp" />
@@ -962,7 +975,6 @@ cscript //Nologo createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClCompile Include="..\client\connpool.cpp" />
     <ClCompile Include="..\client\dbclient_rs.cpp" />
     <ClCompile Include="..\client\syncclusterconnection.cpp" />
-    <ClCompile Include="..\db\commands.cpp" />
     <ClCompile Include="..\db\lasterror.cpp" />
     <ClCompile Include="..\db\nonce.cpp" />
     <ClCompile Include="..\..\third_party\pcre-8.30\pcrecpp.cc" />
@@ -989,16 +1001,7 @@ cscript //Nologo createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClCompile Include="..\..\third_party\pcre-8.30\pcreposix.c" />
     <ClCompile Include="..\scripting\bench.cpp" />
     <ClCompile Include="..\scripting\engine_spidermonkey.cpp" />
-    <ClCompile Include="..\scripting\sm_db.cpp">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">true</ExcludedFromBuild>
-    </ClCompile>
+    <ClCompile Include="..\scripting\sm_db.cpp" />
     <ClCompile Include="..\scripting\utils.cpp" />
     <ClCompile Include="linenoise.cpp" />
     <ClCompile Include="..\util\background.cpp" />
@@ -1039,6 +1042,8 @@ cscript //Nologo createCPPfromJavaScriptFiles.js "$(ProjectDir).."
   <ItemGroup>
     <None Include="..\..\third_party\js-1.7\jskeyword.tbl" />
     <None Include="..\..\third_party\js-1.7\jsopcode.tbl" />
+    <None Include="..\base\error_codes.err" />
+    <None Include="..\base\generate_error_codes.py" />
     <None Include="collection.js" />
     <None Include="db.js" />
     <None Include="mongo.js" />
@@ -1102,6 +1107,7 @@ cscript //Nologo createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClInclude Include="..\..\third_party\js-1.7\prmjtime.h" />
     <ClInclude Include="..\..\third_party\js-1.7\resource.h" />
     <ClInclude Include="..\base\configuration_variable_manager.h" />
+    <ClInclude Include="..\base\counter.h" />
     <ClInclude Include="..\base\disallow_copying.h" />
     <ClInclude Include="..\base\error_codes.h" />
     <ClInclude Include="..\base\global_initializer.h" />
@@ -1118,9 +1124,13 @@ cscript //Nologo createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClInclude Include="..\bson\bson.h" />
     <ClInclude Include="..\bson\bson_builder_base.h" />
     <ClInclude Include="..\bson\bson_field.h" />
+    <ClInclude Include="..\bson\mutable\mutable_bson.h" />
+    <ClInclude Include="..\bson\mutable\mutable_bson_builder.h" />
+    <ClInclude Include="..\bson\mutable\mutable_bson_heap.h" />
+    <ClInclude Include="..\bson\mutable\mutable_bson_internal.h" />
+    <ClInclude Include="..\bson\util\bson_extract.h" />
     <ClInclude Include="..\client\authentication_table.h" />
     <ClInclude Include="..\client\dbclientinterface.h" />
-    <ClInclude Include="..\db\fail_point_service.h" />
     <ClInclude Include="..\platform\atomic_intrinsics.h" />
     <ClInclude Include="..\platform\atomic_intrinsics_win32.h" />
     <ClInclude Include="..\platform\atomic_word.h" />

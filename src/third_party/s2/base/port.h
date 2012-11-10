@@ -102,6 +102,14 @@ typedef uint16_t u_int16_t;
 
 #endif
 
+#if defined __sunos__ || defined __freebsd__
+#ifdef _LITTLE_ENDIAN
+#define IS_LITTLE_ENDIAN
+#elif defined _BIG_ENDIAN
+#define IS_BIG_ENDIAN
+#endif
+#endif
+
 // The following guarenty declaration of the byte swap functions, and
 // define __BYTE_ORDER for MSVC
 #ifdef OS_WINDOWS
@@ -117,17 +125,15 @@ typedef uint16_t u_int16_t;
 #define bswap_32(x) OSSwapInt32(x)
 #define bswap_64(x) OSSwapInt64(x)
 #elif defined __sunos__
-
-#ifdef _LITTLE_ENDIAN
-#define IS_LITTLE_ENDIAN
-#elif defined _BIG_ENDIAN
-#define IS_BIG_ENDIAN
-#endif
-
 #include <sys/byteorder.h>
 #define bswap_16(x) BSWAP_16(x)
 #define bswap_32(x) BSWAP_32(x)
 #define bswap_64(x) BSWAP_64(x)
+#elif defined __freebsd__
+#include <sys/endian.h>
+#define bswap_16(x) bswap16(x)
+#define bswap_32(x) bswap32(x)
+#define bswap_64(x) bswap64(x)
 #else
 #include <byteswap.h>
 #endif

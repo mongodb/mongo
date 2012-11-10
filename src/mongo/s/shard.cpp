@@ -31,8 +31,6 @@
 
 namespace mongo {
 
-    typedef shared_ptr<Shard> ShardPtr;
-
     class StaticShardInfo {
     public:
         StaticShardInfo() : _mutex("StaticShardInfo"), _rsMutex("RSNameMap") { }

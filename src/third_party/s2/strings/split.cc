@@ -128,9 +128,6 @@ HASH_TO((uint32 c), Hash32NumWithSeed(static_cast<uint32>(c), MIX32))
 HASH_TO((int32 c),  Hash32NumWithSeed(static_cast<uint32>(c), MIX32))
 HASH_TO((uint64 c), static_cast<uint32>(Hash64NumWithSeed(c, MIX64) >> 32))
 HASH_TO((int64 c),  static_cast<uint32>(Hash64NumWithSeed(c, MIX64) >> 32))
-#ifdef _LP64
-HASH_TO((intptr_t c),  static_cast<uint32>(Hash64NumWithSeed(c, MIX64) >> 32))
-#endif
 
 #undef HASH_TO        // clean up the macro space
 

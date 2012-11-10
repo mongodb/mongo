@@ -90,6 +90,9 @@
     <Filter Include="db\auth">
       <UniqueIdentifier>{a8303268-06c5-45c6-9f68-93ea9e6e1348}</UniqueIdentifier>
     </Filter>
+    <Filter Include="bson\mutable">
+      <UniqueIdentifier>{785e9dc0-570b-43f5-902f-61ae605b81a8}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="balance.cpp">
@@ -777,9 +780,6 @@
     <ClCompile Include="..\base\status.cpp">
       <Filter>base</Filter>
     </ClCompile>
-    <ClCompile Include="..\db\fail_point_service.cpp">
-      <Filter>db\Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="..\util\fail_point.cpp">
       <Filter>util\Source Files</Filter>
     </ClCompile>
@@ -793,12 +793,6 @@
       <Filter>db\Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\db\auth\action_set.cpp">
-      <Filter>db\auth</Filter>
-    </ClCompile>
-    <ClCompile Include="..\db\auth\capability.cpp">
-      <Filter>db\auth</Filter>
-    </ClCompile>
-    <ClCompile Include="..\db\auth\capability_set.cpp">
       <Filter>db\auth</Filter>
     </ClCompile>
     <ClCompile Include="..\db\auth\principal.cpp">
@@ -827,6 +821,48 @@
     </ClCompile>
     <ClCompile Include="..\db\auth\mongo_authentication_session.cpp">
       <Filter>db\auth</Filter>
+    </ClCompile>
+    <ClCompile Include="..\base\error_codes.cpp">
+      <Filter>base</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\auth\authorization_manager.cpp">
+      <Filter>db\auth</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\commands\fail_point_cmd.cpp">
+      <Filter>db\commands</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\fail_point_service.cpp">
+      <Filter>util\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\bson\util\bson_extract.cpp">
+      <Filter>bson\util</Filter>
+    </ClCompile>
+    <ClCompile Include="..\bson\mutable\mutable_bson.cpp">
+      <Filter>bson\mutable</Filter>
+    </ClCompile>
+    <ClCompile Include="..\bson\mutable\mutable_bson_builder.cpp">
+      <Filter>bson\mutable</Filter>
+    </ClCompile>
+    <ClCompile Include="..\bson\mutable\mutable_bson_heap.cpp">
+      <Filter>bson\mutable</Filter>
+    </ClCompile>
+    <ClCompile Include="..\bson\mutable\mutable_bson_internal.cpp">
+      <Filter>bson\mutable</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\auth\privilege.cpp">
+      <Filter>db\auth</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\auth\privilege_set.cpp">
+      <Filter>db\auth</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\auth\auth_external_state.cpp">
+      <Filter>db\auth</Filter>
+    </ClCompile>
+    <ClCompile Include="field_parser.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="type_collection.cpp">
+      <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -1272,9 +1308,6 @@
     <ClInclude Include="..\base\status.h">
       <Filter>base</Filter>
     </ClInclude>
-    <ClInclude Include="..\db\fail_point_service.h">
-      <Filter>db\Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="..\util\fail_point.h">
       <Filter>util\Header Files</Filter>
     </ClInclude>
@@ -1288,12 +1321,6 @@
       <Filter>db\Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\db\auth\action_set.h">
-      <Filter>db\auth</Filter>
-    </ClInclude>
-    <ClInclude Include="..\db\auth\capability.h">
-      <Filter>db\auth</Filter>
-    </ClInclude>
-    <ClInclude Include="..\db\auth\capability_set.h">
       <Filter>db\auth</Filter>
     </ClInclude>
     <ClInclude Include="..\db\auth\principal.h">
@@ -1356,6 +1383,51 @@
     <ClInclude Include="..\db\auth\mongo_authentication_session.h">
       <Filter>db\auth</Filter>
     </ClInclude>
+    <ClInclude Include="..\db\auth\authorization_manager.h">
+      <Filter>db\auth</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\commands\fail_point_cmd.h">
+      <Filter>db\commands</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\fail_point_service.h">
+      <Filter>util\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\bson\util\bson_extract.h">
+      <Filter>bson\util</Filter>
+    </ClInclude>
+    <ClInclude Include="..\bson\mutable\mutable_bson.h">
+      <Filter>bson\mutable</Filter>
+    </ClInclude>
+    <ClInclude Include="..\bson\mutable\mutable_bson_builder.h">
+      <Filter>bson\mutable</Filter>
+    </ClInclude>
+    <ClInclude Include="..\bson\mutable\mutable_bson_heap.h">
+      <Filter>bson\mutable</Filter>
+    </ClInclude>
+    <ClInclude Include="..\bson\mutable\mutable_bson_internal.h">
+      <Filter>bson\mutable</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\auth\acquired_privilege.h">
+      <Filter>db\auth</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\auth\privilege.h">
+      <Filter>db\auth</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\auth\privilege_set.h">
+      <Filter>db\auth</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\auth\auth_external_state.h">
+      <Filter>db\auth</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\auth\auth_external_state_impl.h">
+      <Filter>db\auth</Filter>
+    </ClInclude>
+    <ClInclude Include="field_parser.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="type_collection.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\third_party\js-1.7\jskeyword.tbl">
@@ -1363,6 +1435,18 @@
     </None>
     <None Include="..\..\third_party\js-1.7\jsopcode.tbl">
       <Filter>third_party\SpiderMonkey\Header Files</Filter>
+    </None>
+    <None Include="..\base\error_codes.err">
+      <Filter>base</Filter>
+    </None>
+    <None Include="..\base\generate_error_codes.py">
+      <Filter>base</Filter>
+    </None>
+    <None Include="..\db\auth\action_types.txt">
+      <Filter>db\auth</Filter>
+    </None>
+    <None Include="..\db\auth\generate_action_types.py">
+      <Filter>db\auth</Filter>
     </None>
   </ItemGroup>
 </Project>

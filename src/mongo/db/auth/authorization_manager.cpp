@@ -21,13 +21,13 @@
 #include "mongo/base/init.h"
 #include "mongo/base/status.h"
 #include "mongo/client/dbclientinterface.h"
-#include "mongo/db/auth/acquired_capability.h"
+#include "mongo/db/auth/acquired_privilege.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
-#include "mongo/db/auth/capability_set.h"
-#include "mongo/db/auth/external_state_impl.h"
+#include "mongo/db/auth/auth_external_state_impl.h"
 #include "mongo/db/auth/principal.h"
 #include "mongo/db/auth/principal_set.h"
+#include "mongo/db/auth/privilege_set.h"
 #include "mongo/db/client.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -137,11 +137,26 @@ namespace mongo {
         return Status::OK();
     }
 
-    AuthorizationManager::AuthorizationManager(ExternalState* externalState) {
+    AuthorizationManager::AuthorizationManager(AuthExternalState* externalState) :
+            _initialized(false) {
         _externalState.reset(externalState);
     }
 
     AuthorizationManager::~AuthorizationManager(){}
+
+    Status AuthorizationManager::initialize(DBClientBase* adminDBConnection) {
+        if (_initialized) {
+            // This should never happen.
+            return Status(ErrorCodes::InternalError,
+                          "AuthorizationManager already initialized!",
+                          0);
+        }
+        Status status = _externalState->initialize(adminDBConnection);
+        if (status == Status::OK()) {
+            _initialized = true;
+        }
+        return status;
+    }
 
     void AuthorizationManager::addAuthorizedPrincipal(Principal* principal) {
         _authenticatedPrincipals.add(principal);
@@ -151,8 +166,8 @@ namespace mongo {
         return _authenticatedPrincipals.removeByName(principal->getName());
     }
 
-    Status AuthorizationManager::acquireCapability(const AcquiredCapability& capability) {
-        const std::string& userName = capability.getPrincipal()->getName();
+    Status AuthorizationManager::acquirePrivilege(const AcquiredPrivilege& privilege) {
+        const std::string& userName = privilege.getPrincipal()->getName();
         if (!_authenticatedPrincipals.lookup(userName)) {
             return Status(ErrorCodes::UserNotFound,
                           mongoutils::str::stream()
@@ -161,7 +176,7 @@ namespace mongo {
                           0);
         }
 
-        _aquiredCapabilities.grantCapability(capability);
+        _acquiredPrivileges.grantPrivilege(privilege);
 
         return Status::OK();
     }
@@ -171,8 +186,8 @@ namespace mongo {
         _authenticatedPrincipals.add(internalPrincipal);
         ActionSet allActions;
         allActions.addAllActions();
-        AcquiredCapability capability(Capability("*", allActions), internalPrincipal);
-        Status status = acquireCapability(capability);
+        AcquiredPrivilege privilege(Privilege("*", allActions), internalPrincipal);
+        Status status = acquirePrivilege(privilege);
         verify (status == Status::OK());
     }
 
@@ -205,34 +220,34 @@ namespace mongo {
         return !result.isEmpty();
     }
 
-    Status AuthorizationManager::buildCapabilitySet(const std::string& dbname,
-                                                    Principal* principal,
-                                                    const BSONObj& privilegeDocument,
-                                                    CapabilitySet* result) {
+    Status AuthorizationManager::buildPrivilegeSet(const std::string& dbname,
+                                                   Principal* principal,
+                                                   const BSONObj& privilegeDocument,
+                                                   PrivilegeSet* result) {
         if (!privilegeDocument.hasField("privileges")) {
             // Old-style (v2.2 and prior) privilege document
-            return _buildCapabilitySetFromOldStylePrivilegeDocument(dbname,
-                                                                    principal,
-                                                                    privilegeDocument,
-                                                                    result);
+            return _buildPrivilegeSetFromOldStylePrivilegeDocument(dbname,
+                                                                   principal,
+                                                                   privilegeDocument,
+                                                                   result);
         }
         else {
             return Status(ErrorCodes::UnsupportedFormat,
                           mongoutils::str::stream() << "Invalid privilege document received when"
-                                  "trying to extract capabilities: " << privilegeDocument,
+                                  "trying to extract privileges: " << privilegeDocument,
                           0);
         }
     }
 
-    Status AuthorizationManager::_buildCapabilitySetFromOldStylePrivilegeDocument(
+    Status AuthorizationManager::_buildPrivilegeSetFromOldStylePrivilegeDocument(
             const std::string& dbname,
             Principal* principal,
             const BSONObj& privilegeDocument,
-            CapabilitySet* result) {
+            PrivilegeSet* result) {
         if (!(privilegeDocument.hasField("user") && privilegeDocument.hasField("pwd"))) {
             return Status(ErrorCodes::UnsupportedFormat,
                           mongoutils::str::stream() << "Invalid old-style privilege document "
-                                  "received when trying to extract capabilities: "
+                                  "received when trying to extract privileges: "
                                    << privilegeDocument,
                           0);
         }
@@ -251,7 +266,7 @@ namespace mongo {
 
         if (dbname == "admin" || dbname == "local") {
             // Make all basic actions available on all databases
-            result->grantCapability(AcquiredCapability(Capability("*", actions), principal));
+            result->grantPrivilege(AcquiredPrivilege(Privilege("*", actions), principal));
             // Make server and cluster admin actions available on admin database.
             if (!readOnly) {
                 actions.addAllActionsFromSet(serverAdminRoleActions);
@@ -259,25 +274,27 @@ namespace mongo {
             }
         }
 
-        result->grantCapability(AcquiredCapability(Capability(dbname, actions), principal));
+        result->grantPrivilege(AcquiredPrivilege(Privilege(dbname, actions), principal));
 
         return Status::OK();
     }
 
     const Principal* AuthorizationManager::checkAuthorization(const std::string& resource,
                                                               ActionType action) const {
+        massert(16470, "AuthorizationManager has not been initialized!", _initialized);
+
         if (_externalState->shouldIgnoreAuthChecks()) {
             return &specialAdminPrincipal;
         }
 
-        const AcquiredCapability* capability;
-        capability = _aquiredCapabilities.getCapabilityForAction(resource, action);
-        if (capability) {
-            return capability->getPrincipal();
+        const AcquiredPrivilege* privilege;
+        privilege = _acquiredPrivileges.getPrivilegeForAction(resource, action);
+        if (privilege) {
+            return privilege->getPrincipal();
         }
-        capability = _aquiredCapabilities.getCapabilityForAction("*", action);
-        if (capability) {
-            return capability->getPrincipal();
+        privilege = _acquiredPrivileges.getPrivilegeForAction("*", action);
+        if (privilege) {
+            return privilege->getPrincipal();
         }
 
         return NULL; // Not authorized

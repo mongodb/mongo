@@ -16,6 +16,7 @@ Import("darwin windows solaris linux nix")
 env.SConscript(['base/SConscript',
                 'db/auth/SConscript',
                 'platform/SConscript',
+                's/SConscript',
                 'unittest/SConscript'])
 
 def add_exe( v ):
@@ -126,6 +127,13 @@ commonFiles = [ "pch.cpp",
                 "db/dbmessage.cpp"
                 ]
 
+commonSysLibdeps = []
+
+if env['MONGO_BUILD_SASL_CLIENT']:
+    commonFiles.extend(['client/sasl_client_authenticate.cpp',
+                        'util/gsasl_session.cpp'])
+    commonSysLibdeps.append('gsasl')
+
 # handle processinfo*
 processInfoFiles = [ "util/processinfo.cpp" ]
 
@@ -137,9 +145,13 @@ if not os.path.exists( str( processInfoPlatformFile ) ):
 
 processInfoFiles.append( processInfoPlatformFile )
 
-commonFiles += processInfoFiles
+env.StaticLibrary("processinfo",
+                  processInfoFiles,
+                  LIBDEPS=["foundation", "bson"])
 
-
+env.CppUnitTest("processinfo_test",
+                ["util/processinfo_test.cpp"],
+                LIBDEPS=["processinfo"])
 
 env.StaticLibrary("fail_point",
                   ["util/fail_point.cpp",
@@ -151,12 +163,14 @@ env.StaticLibrary('mongocommon', commonFiles,
                   LIBDEPS=['bson',
                            'foundation',
                            'md5',
+                           'processinfo',
                            'stacktrace',
                            'stringutils',
                            'fail_point',
                            '$BUILD_DIR/third_party/pcrecpp',
                            '$BUILD_DIR/third_party/murmurhash3/murmurhash3',
-                           '$BUILD_DIR/third_party/shim_boost'],)
+                           '$BUILD_DIR/third_party/shim_boost'],
+                  SYSLIBDEPS=commonSysLibdeps)
 
 env.StaticLibrary("coredb", [
         "client/parallel.cpp",
@@ -207,7 +221,7 @@ env.StaticLibrary("coredb", [
         "db/stats/top.cpp",
         "s/shardconnection.cpp",
         ],
-                  LIBDEPS=['db/auth/serverauth'])
+                  LIBDEPS=['db/auth/auth', 'db/auth/serverauth'])
 
 coreServerFiles = [ "db/common.cpp",
                     "util/net/miniwebserver.cpp",
@@ -462,7 +476,6 @@ mongod = env.Install(
     '#/', env.Program( "mongod", mongodOnlyFiles,
                        LIBDEPS=["coredb",
                                 "coreserver",
-                                "db/auth/auth",
                                 "mongodandmongos",
                                 "ntservice",
                                 "serveronly",
@@ -496,7 +509,7 @@ env.Install( '#/', [
 mongos = env.Program(
     "mongos", [ "s/server.cpp"] ,
     LIBDEPS=["mongoscore", "coreserver", "coredb", "mongocommon", "coreshard", "dbcmdline", "ntservice",
-             "mongodandmongos", "db/auth/auth"] + env['MODULE_LIBDEPS_MONGOS'])
+             "mongodandmongos"] + env['MODULE_LIBDEPS_MONGOS'])
 env.Install( '#/', mongos )
 
 env.Library("clientandshell", ["client/clientAndShell.cpp"], LIBDEPS=["mongocommon", "defaultversion", "gridfs", "notmongodormongos"])

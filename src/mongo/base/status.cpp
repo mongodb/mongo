@@ -15,6 +15,8 @@
 
 #include "mongo/base/status.h"
 
+#include <ostream>
+
 namespace mongo {
 
     Status::ErrorInfo* Status::getOKInfo() {

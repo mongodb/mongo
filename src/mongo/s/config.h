@@ -42,7 +42,6 @@ namespace mongo {
 
     class DBConfig;
     typedef boost::shared_ptr<DBConfig> DBConfigPtr;
-    typedef shared_ptr<Shard> ShardPtr;
 
     extern DBConfigPtr configServerPtr;
     extern ConfigServer& configServer;

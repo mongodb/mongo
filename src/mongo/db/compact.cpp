@@ -37,8 +37,6 @@
 
 namespace mongo {
 
-    void addRecordToRecListInExtent(Record *r, DiskLoc loc);
-    DiskLoc allocateSpaceForANewRecord(const char *ns, NamespaceDetails *d, int lenWHdr, bool god);
     void freeExtents(DiskLoc firstExt, DiskLoc lastExt);
 
     /* this should be done in alloc record not here, but doing here for now. 
@@ -123,7 +121,7 @@ namespace mongo {
                         {
                             // extract keys for all indexes we will be rebuilding
                             for( int x = 0; x < nidx; x++ ) { 
-                                phase1[x].addKeys(indexSpecs[x], objOld, loc);
+                                phase1[x].addKeys(indexSpecs[x], objOld, loc, false);
                             }
                         }
                     }

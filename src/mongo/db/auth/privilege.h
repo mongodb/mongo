@@ -16,30 +16,34 @@
 
 #pragma once
 
-#include "mongo/db/auth/capability.h"
+#include <string>
+
+#include "mongo/db/auth/action_set.h"
+#include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/principal.h"
 
 namespace mongo {
 
     /**
-     * A representation that a given principal has the permission to perform a set of actions on a
-     * specific resource.
+     * A representation of the permission to perform a set of actions on a specific resource.
      */
-    class AcquiredCapability {
+    class Privilege {
     public:
 
-        AcquiredCapability(const Capability& capability, Principal* principal) :
-            _capability(capability), _principal(principal) {}
-        ~AcquiredCapability() {}
+        Privilege(const std::string& resource, ActionSet actions);
+        ~Privilege() {}
 
-        const Principal* getPrincipal() const { return _principal; }
+        const std::string& getResource() const { return _resource; }
 
-        const Capability& getCapability() const { return _capability; }
+        const ActionSet& getActions() const { return _actions; }
+
+        // Checks if the given action is present in the Privilege.
+        bool includesAction(const ActionType& action) const;
 
     private:
 
-        Capability _capability;
-        Principal* _principal;
+        std::string _resource;
+        ActionSet _actions; // bitmask of actions this privilege grants
     };
 
 } // namespace mongo

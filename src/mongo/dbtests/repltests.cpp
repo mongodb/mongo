@@ -17,18 +17,19 @@
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "pch.h"
-#include "../db/repl.h"
+#include "mongo/pch.h"
 
-#include "../db/db.h"
-#include "../db/instance.h"
-#include "../db/json.h"
+#include "mongo/db/repl.h"
 
-#include "dbtests.h"
-#include "../db/oplog.h"
-#include "../db/queryoptimizer.h"
+#include "mongo/db/db.h"
+#include "mongo/db/index_update.h"
+#include "mongo/db/instance.h"
+#include "mongo/db/json.h"
+#include "mongo/db/oplog.h"
+#include "mongo/db/queryoptimizer.h"
+#include "mongo/db/repl/rs.h"
 
-#include "../db/repl/rs.h"
+#include "mongo/dbtests/dbtests.h"
 
 namespace mongo {
     void createOplog();
@@ -47,7 +48,7 @@ namespace ReplTests {
         Base() : _context( ns() ) {
             replSettings.master = true;
             createOplog();
-            ensureHaveIdIndex( ns() );
+            ensureHaveIdIndex( ns(), false );
         }
         ~Base() {
             try {
@@ -156,7 +157,7 @@ namespace ReplTests {
         static void insert( const BSONObj &o, bool god = false ) {
             Lock::GlobalWrite lk;
             Client::Context ctx( ns() );
-            theDataFileMgr.insert( ns(), o.objdata(), o.objsize(), god );
+            theDataFileMgr.insert( ns(), o.objdata(), o.objsize(), false, god );
         }
         static BSONObj wid( const char *json ) {
             class BSONObjBuilder b;

@@ -113,4 +113,8 @@ namespace mongo {
             return "interrupted";
         return "";
     }
+
+    void KillCurrentOp::reset() {
+        _globalKill = false;
+    }
 }

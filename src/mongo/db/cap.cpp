@@ -484,7 +484,10 @@ namespace mongo {
         }
 
         for ( unsigned i=0; i<indexes.size(); i++ ) {
-            theDataFileMgr.insertWithObjMod( Namespace( ns ).getSisterNS( "system.indexes" ).c_str() , indexes[i] , true );
+            theDataFileMgr.insertWithObjMod(Namespace( ns ).getSisterNS( "system.indexes" ).c_str(),
+                                            indexes[i],
+                                            false,
+                                            true);
         }
         
     }

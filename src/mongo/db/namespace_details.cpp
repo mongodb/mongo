@@ -328,14 +328,16 @@ namespace mongo {
         int chain = 0;
         while ( 1 ) {
             {
-                int a = cur.a();
-                if ( a < -1 || a >= 100000 ) {
-                    problem() << "~~ Assertion - cur out of range in _alloc() " << cur.toString() <<
-                              " a:" << a << " b:" << b << " chain:" << chain << '\n';
-                    logContext();
-                    if ( cur == *prev )
-                        prev->Null();
-                    cur.Null();
+                int fileNumber = cur.a();
+                int fileOffset = cur.getOfs();
+                if (fileNumber < -1 || fileNumber >= 100000 || fileOffset < 0) {
+                    StringBuilder sb;
+                    sb << "Deleted record list corrupted in bucket " << b
+                       << ", link number " << chain
+                       << ", invalid link is " << cur.toString()
+                       << ", throwing Fatal Assertion";
+                    problem() << sb.str() << endl;
+                    fassertFailed(16469);
                 }
             }
             if ( cur.isNull() ) {
@@ -715,7 +717,11 @@ namespace mongo {
         BSONObj newEntry = applyUpdateOperators( oldEntry , BSON( "$set" << BSON( "options.flags" << userFlags() ) ) );
         
         verify( 1 == deleteObjects( system_namespaces.c_str() , oldEntry , true , false , true ) );
-        theDataFileMgr.insert( system_namespaces.c_str() , newEntry.objdata() , newEntry.objsize() , true );
+        theDataFileMgr.insert( system_namespaces.c_str(),
+                               newEntry.objdata(),
+                               newEntry.objsize(),
+                               false,
+                               true );
     }
 
     bool NamespaceDetails::setUserFlag( int flags ) {
@@ -788,7 +794,7 @@ namespace mongo {
         char database[256];
         nsToDatabase(ns, database);
         string s = string(database) + ".system.namespaces";
-        theDataFileMgr.insert(s.c_str(), j.objdata(), j.objsize(), true);
+        theDataFileMgr.insert(s.c_str(), j.objdata(), j.objsize(), false, true);
     }
 
     void renameNamespace( const char *from, const char *to, bool stayTemp) {
@@ -857,7 +863,12 @@ namespace mongo {
                     newIndexSpecB << "ns" << to;
             }
             BSONObj newIndexSpec = newIndexSpecB.done();
-            DiskLoc newIndexSpecLoc = theDataFileMgr.insert( s.c_str(), newIndexSpec.objdata(), newIndexSpec.objsize(), true, false );
+            DiskLoc newIndexSpecLoc = theDataFileMgr.insert( s.c_str(),
+                                                             newIndexSpec.objdata(),
+                                                             newIndexSpec.objsize(),
+                                                             false,
+                                                             true,
+                                                             false );
             int indexI = details->findIndexByName( oldIndexSpec.getStringField( "name" ) );
             IndexDetails &indexDetails = details->idx(indexI);
             string oldIndexNs = indexDetails.indexNamespace();

@@ -32,8 +32,6 @@ namespace mongo {
 
     BSONElement getErrField(const BSONObj& o);
 
-    void ensureHaveIdIndex(const char *ns);
-
     bool replAuthenticate(DBClientBase *);
 
     /** Selectively release the mutex based on a parameter. */

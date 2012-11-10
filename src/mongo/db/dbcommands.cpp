@@ -722,7 +722,9 @@ namespace mongo {
             for ( list<BSONObj>::iterator i=all.begin(); i!=all.end(); i++ ) {
                 BSONObj o = *i;
                 LOG(1) << "reIndex ns: " << toDeleteNs << " index: " << o << endl;
-                theDataFileMgr.insertWithObjMod( Namespace( toDeleteNs.c_str() ).getSisterNS( "system.indexes" ).c_str() , o , true );
+                string systemIndexesNs =
+                        Namespace( toDeleteNs.c_str() ).getSisterNS( "system.indexes" );
+                theDataFileMgr.insertWithObjMod( systemIndexesNs.c_str(), o, false, true );
             }
 
             result.append( "nIndexes" , (int)all.size() );
@@ -1469,7 +1471,7 @@ namespace mongo {
             {
                 Lock::DBWrite lk(ns);
                 Client::Context ctx( ns );
-                theDataFileMgr.insertWithObjMod( ns.c_str(), obj, true );
+                theDataFileMgr.insertWithObjMod( ns.c_str(), obj, false, true );
             }
             return true;
         }

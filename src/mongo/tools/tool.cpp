@@ -72,8 +72,8 @@ namespace mongo {
              "files in the given path, instead of connecting to a mongod  "
              "server - needs to lock the data directory, so cannot be "
              "used if a mongod is currently accessing the same path" )
-            ("directoryperdb", "if dbpath specified, each db is in a separate directory" )
-            ("journal", "enable journaling" )
+            ("directoryperdb", "each db is in a separate directly (relevant only if dbpath specified)" )
+            ("journal", "enable journaling (relevant only if dbpath specified)" )
             ;
 
         if ( access & SPECIFY_DBCOL )
@@ -302,6 +302,9 @@ namespace mongo {
 
         if ( useDirectClient )
             dbexit( EXIT_CLEAN );
+
+        fflush(stdout);
+        fflush(stderr);
         ::_exit(ret);
     }
 

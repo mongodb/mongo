@@ -140,7 +140,7 @@ namespace ReplSetTests {
         static void insert( const BSONObj &o, bool god = false ) {
             Lock::DBWrite lk(ns());
             Client::Context ctx( ns() );
-            theDataFileMgr.insert( ns(), o.objdata(), o.objsize(), god );
+            theDataFileMgr.insert( ns(), o.objdata(), o.objsize(), false, god );
         }
 
         BSONObj findOne( const BSONObj &query = BSONObj() ) const {
@@ -363,7 +363,11 @@ namespace ReplSetTests {
         void insert() {
             Client::Context ctx( cappedNs() );
             BSONObj o = BSON(GENOID << "x" << 456);
-            DiskLoc loc = theDataFileMgr.insert( cappedNs().c_str(), o.objdata(), o.objsize(), false );
+            DiskLoc loc = theDataFileMgr.insert( cappedNs().c_str(),
+                                                 o.objdata(),
+                                                 o.objsize(),
+                                                 false,
+                                                 false );
             verify(!loc.isNull());
         }
     public:

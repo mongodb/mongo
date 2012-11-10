@@ -32,7 +32,7 @@ namespace mongo {
         unsigned long long nkeys;
         bool multi; // multikey index
 
-        void addKeys(const IndexSpec& spec, const BSONObj& o, DiskLoc loc) { 
+        void addKeys(const IndexSpec& spec, const BSONObj& o, DiskLoc loc, bool mayInterrupt) {
             BSONObjSet keys;
             spec.getKeys(o, keys);
             int k = 0;
@@ -40,7 +40,7 @@ namespace mongo {
                 if( ++k == 2 ) {
                     multi = true;
                 }
-                sorter->add(*i, loc);
+                sorter->add(*i, loc, mayInterrupt);
                 nkeys++;
             }
             n++;

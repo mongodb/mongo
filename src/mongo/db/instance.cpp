@@ -477,22 +477,7 @@ namespace mongo {
                 LOG(1) << "note: not profiling because doing fsync+lock" << endl;
             }
             else {
-                try {
-                    Lock::DBWrite lk( currentOp.getNS() );
-                    if ( dbHolder()._isLoaded( nsToDatabase( currentOp.getNS() ) , dbpath ) ) {
-                        Client::Context cx( currentOp.getNS(), dbpath, false );
-                        profile(c , currentOp );
-                    }
-                    else {
-                        mongo::log() << "note: not profiling because db went away - probably a close on: "
-                                << currentOp.getNS() << endl;
-                    }
-                }
-                catch (const AssertionException& assertionEx) {
-                    warning() << "Caught Assertion while trying to profile " << opToString(op)
-                            << " against " << currentOp.getNS()
-                            << ": " << assertionEx.toString() << endl;
-                }
+                profile(c, op, currentOp);
             }
         }
         
@@ -762,7 +747,15 @@ namespace mongo {
                 uassert( 13511 , "document to insert can't have $ fields" , e.fieldName()[0] != '$' );
             }
         }
-        theDataFileMgr.insertWithObjMod(ns, js, false); // js may be modified in the call to add an _id field.
+        theDataFileMgr.insertWithObjMod(ns,
+                                        // May be modified in the call to add an _id field.
+                                        js,
+                                        // Only permit interrupting an (index build) insert if the
+                                        // insert comes from a socket client request rather than a
+                                        // parent operation using the client interface.  The parent
+                                        // operation might not support interrupts.
+                                        cc().curop()->parent() == NULL,
+                                        false);
         logOp("i", ns, js);
     }
 

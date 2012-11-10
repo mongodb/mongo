@@ -17,18 +17,20 @@
 #pragma once
 
 #include "mongo/base/disallow_copying.h"
-#include "mongo/db/auth/external_state.h"
+#include "mongo/base/status.h"
+#include "mongo/client/dbclientinterface.h"
+#include "mongo/db/auth/auth_external_state.h"
 
 namespace mongo {
 
     /**
-     * Mock of the ExternalState class used only for testing.
+     * Mock of the AuthExternalState class used only for testing.
      */
-    class ExternalStateMock : public ExternalState {
-        MONGO_DISALLOW_COPYING(ExternalStateMock);
+    class AuthExternalStateMock : public AuthExternalState {
+        MONGO_DISALLOW_COPYING(AuthExternalStateMock);
 
     public:
-        ExternalStateMock() : _returnValue(false) {}
+        AuthExternalStateMock() : _returnValue(false) {}
 
         virtual bool shouldIgnoreAuthChecks() const {
             return _returnValue;
@@ -37,6 +39,9 @@ namespace mongo {
         void setReturnValueForShouldIgnoreAuthChecks(bool returnValue) {
             _returnValue = returnValue;
         }
+
+        // This is a no-op for the mock
+        virtual Status initialize(DBClientBase* adminDBConnection) { return Status::OK(); }
 
     private:
         bool _returnValue;

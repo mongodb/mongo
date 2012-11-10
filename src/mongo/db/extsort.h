@@ -58,6 +58,7 @@ namespace mongo {
 
         static IndexInterface *extSortIdxInterface;
         static Ordering extSortOrder;
+        static bool extSortMayInterrupt;
         static int extSortComp( const void *lv, const void *rv );
 
         class FileIterator : boost::noncopyable {
@@ -96,13 +97,10 @@ namespace mongo {
 
         };
 
-        void add( const BSONObj& o , const DiskLoc & loc );
-        void add( const BSONObj& o , int a , int b ) {
-            add( o , DiskLoc( a , b ) );
-        }
+        void add( const BSONObj& o, const DiskLoc& loc, bool mayInterrupt );
 
         /* call after adding values, and before fetching the iterator */
-        void sort();
+        void sort( bool mayInterrupt );
 
         auto_ptr<Iterator> iterator() {
             uassert( 10052 ,  "not sorted" , _sorted );
@@ -122,10 +120,10 @@ namespace mongo {
 
     private:
 
-        void _sortInMem();
+        void _sortInMem( bool mayInterrupt );
 
         void sort( const std::string& file );
-        void finishMap();
+        void finishMap( bool mayInterrupt );
 
         BSONObj _order;
         long _maxFilesize;

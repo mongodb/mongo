@@ -956,12 +956,6 @@
     <ClCompile Include="auth\action_set.cpp">
       <Filter>db\auth</Filter>
     </ClCompile>
-    <ClCompile Include="auth\capability.cpp">
-      <Filter>db\auth</Filter>
-    </ClCompile>
-    <ClCompile Include="auth\capability_set.cpp">
-      <Filter>db\auth</Filter>
-    </ClCompile>
     <ClCompile Include="auth\principal.cpp">
       <Filter>db\auth</Filter>
     </ClCompile>
@@ -1010,9 +1004,6 @@
     <ClCompile Include="auth\authorization_manager.cpp">
       <Filter>db\auth</Filter>
     </ClCompile>
-    <ClCompile Include="auth\external_state.cpp">
-      <Filter>db\auth</Filter>
-    </ClCompile>
     <ClCompile Include="..\bson\mutable\mutable_bson.cpp">
       <Filter>bson\mutable</Filter>
     </ClCompile>
@@ -1042,6 +1033,24 @@
     </ClCompile>
     <ClCompile Include="..\base\error_codes.cpp">
       <Filter>base</Filter>
+    </ClCompile>
+    <ClCompile Include="..\bson\util\bson_extract.cpp">
+      <Filter>bson\util</Filter>
+    </ClCompile>
+    <ClCompile Include="auth\privilege.cpp">
+      <Filter>db\auth</Filter>
+    </ClCompile>
+    <ClCompile Include="auth\privilege_set.cpp">
+      <Filter>db\auth</Filter>
+    </ClCompile>
+    <ClCompile Include="auth\auth_external_state.cpp">
+      <Filter>db\auth</Filter>
+    </ClCompile>
+    <ClCompile Include="..\s\field_parser.cpp">
+      <Filter>s</Filter>
+    </ClCompile>
+    <ClCompile Include="..\s\type_collection.cpp">
+      <Filter>s</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -1869,12 +1878,6 @@
     <ClInclude Include="auth\action_set.h">
       <Filter>db\auth</Filter>
     </ClInclude>
-    <ClInclude Include="auth\capability.h">
-      <Filter>db\auth</Filter>
-    </ClInclude>
-    <ClInclude Include="auth\capability_set.h">
-      <Filter>db\auth</Filter>
-    </ClInclude>
     <ClInclude Include="auth\principal.h">
       <Filter>db\auth</Filter>
     </ClInclude>
@@ -1956,12 +1959,6 @@
     <ClInclude Include="auth\authorization_manager.h">
       <Filter>db\auth</Filter>
     </ClInclude>
-    <ClInclude Include="auth\external_state.h">
-      <Filter>db\auth</Filter>
-    </ClInclude>
-    <ClInclude Include="auth\external_state_impl.h">
-      <Filter>db\auth</Filter>
-    </ClInclude>
     <ClInclude Include="..\bson\mutable\mutable_bson.h">
       <Filter>bson\mutable</Filter>
     </ClInclude>
@@ -1989,6 +1986,30 @@
     <ClInclude Include="..\util\fail_point_service.h">
       <Filter>util\Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\bson\util\bson_extract.h">
+      <Filter>bson\util</Filter>
+    </ClInclude>
+    <ClInclude Include="auth\acquired_privilege.h">
+      <Filter>db\auth</Filter>
+    </ClInclude>
+    <ClInclude Include="auth\privilege.h">
+      <Filter>db\auth</Filter>
+    </ClInclude>
+    <ClInclude Include="auth\privilege_set.h">
+      <Filter>db\auth</Filter>
+    </ClInclude>
+    <ClInclude Include="auth\auth_external_state.h">
+      <Filter>db\auth</Filter>
+    </ClInclude>
+    <ClInclude Include="auth\auth_external_state_impl.h">
+      <Filter>db\auth</Filter>
+    </ClInclude>
+    <ClInclude Include="..\s\field_parser.h">
+      <Filter>s</Filter>
+    </ClInclude>
+    <ClInclude Include="..\s\type_collection.h">
+      <Filter>s</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="mongo.ico">
@@ -2014,6 +2035,9 @@
     </None>
     <None Include="..\base\error_codes.err">
       <Filter>base</Filter>
+    </None>
+    <None Include="..\..\third_party\run_if_newer.js">
+      <Filter>third_party</Filter>
     </None>
   </ItemGroup>
   <ItemGroup>

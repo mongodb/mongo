@@ -25,11 +25,21 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+# set up path for js2c import
+import sys
+from os.path import join, dirname, abspath
+root_dir = dirname(File('SConscript').rfile().abspath)
+sys.path.append(join(root_dir, 'tools'))
+import js2c
+
 Import("env windows linux darwin solaris freebsd debugBuild")
 
 # pared-down copies of the equivalent structures in v8's SConstruct/SConscript:
 LIBRARY_FLAGS = {
   'all': {
+    'all': {
+      'CPPDEFINES':   ['ENABLE_DEBUGGER_SUPPORT'],
+    },
     'mode:debug': {
       'CPPDEFINES':   ['V8_ENABLE_CHECKS', 'OBJECT_PRINT']
     },
@@ -245,6 +255,28 @@ SOURCES = {
   ]
 }
 
+EXPERIMENTAL_LIBRARY_FILES = '''
+proxy.js
+collection.js
+'''.split()
+
+LIBRARY_FILES = '''
+runtime.js
+v8natives.js
+array.js
+string.js
+uri.js
+math.js
+messages.js
+apinatives.js
+date.js
+regexp.js
+json.js
+liveedit-debugger.js
+mirror-debugger.js
+debug-debugger.js
+'''.split()
+
 def get_flags(flag, toolchain, options):
     ret = []
     for t in (toolchain, 'all'):
@@ -288,10 +320,9 @@ def get_sources(options):
     for i in keys:
         sources.extend(('src/'+s) for s in SOURCES[i])
 
-    # v8 generates the following from .js files, but we've pregenerated
-    # them:
-    sources.append('libraries.cc')
-    sources.append('experimental-libraries.cc')
+    # sources generated from .js files:
+    sources.append('src/libraries.cc')
+    sources.append('src/experimental-libraries.cc')
 
     # we're building with v8 "snapshot=off", which requires this file:
     sources.append('src/snapshot-empty.cc')
@@ -332,5 +363,17 @@ env.Append(CCFLAGS=ccflags)
 cppdefines = get_flags('CPPDEFINES', toolchain, options)
 cppdefines = filter(lambda f : f not in env['CPPDEFINES'], cppdefines)
 env.Append(CPPDEFINES=cppdefines)
+
+# specify rules for building libraries.cc and experimental-libraries.cc
+env['BUILDERS']['JS2C'] = Builder(action=js2c.JS2C)
+experimental_library_files = [('src/'+s) for s in EXPERIMENTAL_LIBRARY_FILES]
+experimental_library_files.append('src/macros.py')
+env.JS2C(['src/experimental-libraries.cc'],
+         experimental_library_files,
+         TYPE='EXPERIMENTAL',
+         COMPRESSION='off')
+library_files = [('src/'+s) for s in LIBRARY_FILES]
+library_files.append('src/macros.py')
+env.JS2C(['src/libraries.cc'], library_files, TYPE='CORE', COMPRESSION='off')
 
 env.StaticLibrary("v8", sources)

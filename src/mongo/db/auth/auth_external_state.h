@@ -17,6 +17,7 @@
 #pragma once
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/base/status.h"
 #include "mongo/client/dbclientinterface.h"
 
 namespace mongo {
@@ -24,15 +25,15 @@ namespace mongo {
     /**
      * Public interface for a class that encapsulates all the information related to system state
      * not stored in AuthorizationManager.  This is primarily to make AuthorizationManager easier
-     * to test.  There are two classes that implement this interface, ExternalStateImpl, which is
-     * what's used for the actual system, and ExternalStateMock, which is used in the tests.
+     * to test.  There are two classes that implement this interface, AuthExternalStateImpl, which
+     * is what's used for the actual system, and AuthExternalStateMock, which is used in the tests.
      */
-    class ExternalState {
-        MONGO_DISALLOW_COPYING(ExternalState);
+    class AuthExternalState {
+        MONGO_DISALLOW_COPYING(AuthExternalState);
 
     public:
 
-        virtual ~ExternalState() {};
+        virtual ~AuthExternalState() {};
 
         // Returns true if this connection should be treated as if it has full access to do
         // anything, regardless of the current auth state.  Currently the reasons why this could be
@@ -40,8 +41,15 @@ namespace mongo {
         // or the connection is a "god" connection.
         virtual bool shouldIgnoreAuthChecks() const = 0;
 
+        // adminDBConnection is a connection that can be used to access the admin database.  It is
+        // used to determine if there are any admin users configured for the cluster, and thus if
+        // localhost connections should be given special admin access.
+        // This function *must* be called on any new AuthExternalState, after the constructor but
+        // before any other methods are called on the AuthExternalState.
+        virtual Status initialize(DBClientBase* adminDBConnection) = 0;
+
     protected:
-        ExternalState() {}; // This class should never be instantiated directly.
+        AuthExternalState() {}; // This class should never be instantiated directly.
     };
 
 } // namespace mongo

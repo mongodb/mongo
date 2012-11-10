@@ -65,6 +65,9 @@ namespace mongo {
         **/
         void notifyAllWaiters();
 
+        /** Reset the object to its initial state.  Only for testing. */
+        void reset();
+
     private:
         void interruptJs( AtomicUInt *op );
         volatile bool _globalKill;

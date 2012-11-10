@@ -372,8 +372,8 @@ ReplSetTest.prototype.awaitSecondaryNodes = function( timeout ) {
   var master = this.getMaster();
   var slaves = this.liveNodes.slaves;
   var len = slaves.length;
-
-  jsTest.attempt({context: this, timeout: 60000, desc: "Awaiting secondaries"}, function() {
+  var tmo = timeout || 60000;
+  jsTest.attempt({context: this, timeout: tmo, desc: "Awaiting secondaries"}, function() {
      var ready = true;
      for(var i=0; i<len; i++) {
        var isMaster = slaves[i].getDB("admin").runCommand({ismaster: 1});
@@ -387,10 +387,10 @@ ReplSetTest.prototype.awaitSecondaryNodes = function( timeout ) {
 ReplSetTest.prototype.getMaster = function( timeout ) {
   var tries = 0;
   var sleepTime = 500;
-  var t = timeout || 000;
+  var tmo = timeout || 60000;
   var master = null;
 
-  master = jsTest.attempt({context: this, timeout: 60000, desc: "Finding master"}, this.callIsMaster);
+  master = jsTest.attempt({context: this, timeout: tmo, desc: "Finding master"}, this.callIsMaster);
   return master;
 }
 
