@@ -288,6 +288,8 @@ def get_options():
     processor = env['PROCESSOR_ARCHITECTURE']
     if processor == 'i386':
         arch_string = 'arch:ia32'
+    elif processor == 'i686':
+        arch_string = 'arch:ia32'
     elif processor == 'x86_64':
         arch_string = 'arch:x64'
     else:
