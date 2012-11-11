@@ -31,15 +31,19 @@ namespace mongo {
      *
      * Usage Example:
      *
-     *     BSONObj query = QUERY(CollectionInfo::ns("mynamspace") <<
-     *                           CollectionInfo::unique(true));
-     *     collDoc = conn->findOne(query);
+     *     // Contact the config. 'conn' has been obtained before.
+     *     DBClientBase* conn;
+     *     BSONObj query = QUERY(CollectionType::ns("db.coll") <<
+     *                           CollectionType::unique(true));
+     *     collDoc = conn->findOne(CollectionType::ConfigNS, query);
+     *
+     *     // Process the response.
      *     CollectionType coll;
      *     coll.fromBSON(collDoc);
      *     if (! coll.isValid()) {
-     *         /// take action
+     *         // Can't use 'coll'. Take action.
      *     }
-     *     // use coll
+     *     // use 'coll'
      *
      */
     class CollectionType {
@@ -51,16 +55,16 @@ namespace mongo {
         //
 
         // Name of the collection in the config server.
-        static const string ConfigNS;
+        static const std::string ConfigNS;
 
         // Field names and types in the collection type.
-        static BSONField<string> ns;          // collection's namespace
-        static BSONField<string> primary;     // primary db when not sharded
-        static BSONField<BSONObj> keyPattern; // sharding key, if sharded
-        static BSONField<bool> unique;        // sharding key unique?
-        static BSONField<Date_t> createdAt;   // when collecation was created
-        static BSONField<bool> noBalance;     // true if balancing is disabled
-        static BSONField<OID> epoch;          // disambiguate ns (drop/recreate)
+        static BSONField<std::string> ns;      // collection's namespace
+        static BSONField<std::string> primary; // primary db when not sharded
+        static BSONField<BSONObj> keyPattern;  // sharding key, if sharded
+        static BSONField<bool> unique;         // sharding key unique?
+        static BSONField<Date_t> createdAt;    // when collection was created
+        static BSONField<bool> noBalance;      // true if balancing is disabled
+        static BSONField<OID> epoch;           // disambiguate ns (drop/recreate)
 
         // Deprecated fields should only be used in parseBSON calls. Exposed here for testing only.
         static BSONField<OID> DEPRECATED_lastmodEpoch;
@@ -76,9 +80,9 @@ namespace mongo {
 
         /**
          * Returns true if all the mandatory fields are present and have valid
-         * representations. Otherwise returs false and fills in the optional 'errMsg' string.
+         * representations. Otherwise returns false and fills in the optional 'errMsg' string.
          */
-        bool isValid(string* errMsg) const;
+        bool isValid(std::string* errMsg) const;
 
         /**
          * Returns the BSON representation of the entry.
@@ -104,35 +108,42 @@ namespace mongo {
         /**
          * Returns a string representation of the current internal state.
          */
-        string toString() const;
+        std::string toString() const;
 
         //
         // individual field accessors
         //
 
-        void setNS(const StringData& ns) { _ns = string(ns.data(), ns.size()); }
-        const string& getNS() const { return _ns; }
-        void setPrimary(const StringData& name) { _primary = string(name.data(), name.size()); }
-        const string& getPrimary() const { return _primary; }
+        void setNS(const StringData& ns) { _ns = std::string(ns.data(), ns.size()); }
+        const std::string& getNS() const { return _ns; }
+
+        void setPrimary(const StringData& name) { _primary=std::string(name.data(), name.size()); }
+        const std::string& getPrimary() const { return _primary; }
+
         void setKeyPattern(const BSONObj keyPattern) { _keyPattern = keyPattern.getOwned(); }
         BSONObj getKeyPattern() const { return _keyPattern; }
+
         void setUnique(bool unique) { _unique = unique; }
         bool getUnique() const { return _unique; }
+
         void setCreatedAt(const Date_t& time) { _createdAt = time; }
         Date_t getCreatedAt() const { return _createdAt; }
+
         void setNoBalance(bool noBalance) { _noBalance = noBalance; }
         bool getNoBalance() const { return _noBalance; }
+
         void setEpoch(OID oid) { _epoch = oid; }
         OID getEpoch() const { return _epoch; }
 
     private:
-        string _ns;            // mandatory namespace
-        string _primary;       // either or with _keyPattern
-        BSONObj _keyPattern;   // sharding parttern if sharded
-        bool _unique;          // not optional if sharded, index is unique
-        Date_t _createdAt;     // mandatory creation time
-        bool _noBalance;       // optional, if sharded, disable balancing
-        OID _epoch;            // mandatory, to disambiguate collection incarnations
+        // Convention: (M)andatory, (O)ptional, (S)pecial rule.
+        std::string _ns;       // (M) namespace
+        std::string _primary;  // (S) either/or with _keyPattern
+        BSONObj _keyPattern;   // (S) sharding pattern if sharded
+        bool _unique;          // (S) mandatory if sharded, index is unique
+        Date_t _createdAt;     // (M) creation time
+        bool _noBalance;       // (S) optional if sharded, disable balancing
+        OID _epoch;            // (M) disambiguates collection incarnations
 
     };
 

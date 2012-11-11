@@ -23,87 +23,100 @@
 
 namespace {
 
+    using mongo::CollectionType;
+    using mongo::BSONObj;
+    using mongo::OID;
+    using mongo::Date_t;
+
     TEST(Validity, Empty) {
-        mongo::CollectionType coll;
-        coll.parseBSON(mongo::BSONObj());
+        CollectionType coll;
+        BSONObj emptyObj = BSONObj();
+        coll.parseBSON(emptyObj);
         ASSERT_FALSE(coll.isValid(NULL));
     }
 
     TEST(Validity, ShardedCollection) {
-        mongo::CollectionType coll;
-        coll.parseBSON(BSON(mongo::CollectionType::ns("db.coll") <<
-                            mongo::CollectionType::keyPattern(BSON("a" << 1)) <<
-                            mongo::CollectionType::createdAt(1ULL) <<
-                            mongo::CollectionType::epoch(mongo::OID::gen())));
+        CollectionType coll;
+        BSONObj obj = BSON(CollectionType::ns("db.coll") <<
+                           CollectionType::keyPattern(BSON("a" << 1)) <<
+                           CollectionType::createdAt(1ULL) <<
+                           CollectionType::epoch(OID::gen()));
+        coll.parseBSON(obj);
         ASSERT_TRUE(coll.isValid(NULL));
     }
 
     TEST(Validity, UnshardedCollection) {
-        mongo::CollectionType coll;
-        coll.parseBSON(BSON(mongo::CollectionType::ns("db.coll") <<
-                            mongo::CollectionType::primary("my_primary_shard") <<
-                            mongo::CollectionType::createdAt(1ULL) <<
-                            mongo::CollectionType::epoch(mongo::OID::gen())));
+        CollectionType coll;
+        BSONObj obj = BSON(CollectionType::ns("db.coll") <<
+                           CollectionType::primary("my_primary_shard") <<
+                           CollectionType::createdAt(1ULL) <<
+                           CollectionType::epoch(OID::gen()));
+        coll.parseBSON(obj);
         ASSERT_TRUE(coll.isValid(NULL));
     }
 
     TEST(Validity, MixingOptionals) {
-        mongo::CollectionType coll;
-        coll.parseBSON(BSON(mongo::CollectionType::ns("db.coll") <<
-                            mongo::CollectionType::createdAt(time(0)) <<
-                            mongo::CollectionType::unique(true)));
+        CollectionType coll;
+        BSONObj obj = BSON(CollectionType::ns("db.coll") <<
+                           CollectionType::createdAt(time(0)) <<
+                           CollectionType::unique(true));
+        coll.parseBSON(obj);
         ASSERT_FALSE(coll.isValid(NULL));
     }
 
     TEST(Compatibility, OldLastmod ) {
-        mongo::CollectionType coll;
-        mongo::Date_t creation(time(0));
-        coll.parseBSON(BSON(mongo::CollectionType::ns("db.coll") <<
-                            mongo::CollectionType::primary("my_primary_shard") <<
-                            mongo::CollectionType::DEPRECATED_lastmod(creation) <<
-                            mongo::CollectionType::epoch(mongo::OID::gen())));
+        CollectionType coll;
+        Date_t creation(time(0));
+        BSONObj obj = BSON(CollectionType::ns("db.coll") <<
+                           CollectionType::primary("my_primary_shard") <<
+                           CollectionType::DEPRECATED_lastmod(creation) <<
+                           CollectionType::epoch(OID::gen()));
+        coll.parseBSON(obj);
         ASSERT_TRUE(coll.isValid(NULL));
         ASSERT_EQUALS(coll.getCreatedAt(), creation);
     }
 
     TEST(Compatibility, OldEpoch) {
-        mongo::CollectionType coll;
-        mongo::OID epoch = mongo::OID::gen();
-        coll.parseBSON(BSON(mongo::CollectionType::ns("db.coll") <<
-                            mongo::CollectionType::primary("my_primary_shard") <<
-                            mongo::CollectionType::createdAt(1ULL) <<
-                            mongo::CollectionType::DEPRECATED_lastmodEpoch(epoch)));
+        CollectionType coll;
+        OID epoch = OID::gen();
+        BSONObj obj = BSON(CollectionType::ns("db.coll") <<
+                           CollectionType::primary("my_primary_shard") <<
+                           CollectionType::createdAt(1ULL) <<
+                           CollectionType::DEPRECATED_lastmodEpoch(epoch));
+        coll.parseBSON(obj);
         ASSERT_TRUE(coll.isValid(NULL));
         ASSERT_EQUALS(coll.getEpoch(), epoch);
     }
 
     TEST(Compatibility, OldDroppedTrue) {
         // The 'dropped' field creates a special case. We'd parse the doc containing it but
-        // would generate and empty CollectionType, which is not valid.
-        mongo::CollectionType coll;
-        coll.parseBSON(BSON(mongo::CollectionType::ns("db.coll") <<
-                            mongo::CollectionType::keyPattern(BSON("a" << 1)) <<
-                            mongo::CollectionType::unique(false) <<
-                            mongo::CollectionType::DEPRECATED_lastmod(1ULL) <<
-                            mongo::CollectionType::DEPRECATED_lastmodEpoch(mongo::OID::gen()) <<
-                            mongo::CollectionType::DEPRECATED_dropped(true)));
+        // would generate an empty CollectionType, which is not valid.
+        CollectionType coll;
+        BSONObj obj = BSON(CollectionType::ns("db.coll") <<
+                           CollectionType::keyPattern(BSON("a" << 1)) <<
+                           CollectionType::unique(false) <<
+                           CollectionType::DEPRECATED_lastmod(1ULL) <<
+                           CollectionType::DEPRECATED_lastmodEpoch(OID::gen()) <<
+                           CollectionType::DEPRECATED_dropped(true));
+        coll.parseBSON(obj);
         ASSERT_EQUALS(coll.getNS(), "");
-        ASSERT_EQUALS(coll.getKeyPattern(), mongo::BSONObj());
+        ASSERT_EQUALS(coll.getKeyPattern(), BSONObj());
         ASSERT_EQUALS(coll.getUnique(), false);
         ASSERT_EQUALS(coll.getCreatedAt(), 0ULL);
-        ASSERT_EQUALS(coll.getEpoch(), mongo::OID());
+        ASSERT_EQUALS(coll.getEpoch(), OID());
         ASSERT_FALSE(coll.isValid(NULL));
     }
 
     TEST(Compatibility, OldDroppedFalse) {
-        mongo::CollectionType coll;
-        mongo::OID epoch = mongo::OID::gen();
-        coll.parseBSON(BSON(mongo::CollectionType::ns("db.coll") <<
-                            mongo::CollectionType::keyPattern(BSON("a" << 1)) <<
-                            mongo::CollectionType::unique(true) <<
-                            mongo::CollectionType::DEPRECATED_lastmod(1ULL) <<
-                            mongo::CollectionType::DEPRECATED_lastmodEpoch(epoch) <<
-                            mongo::CollectionType::DEPRECATED_dropped(false)));
+        CollectionType coll;
+        OID epoch = OID::gen();
+        BSONObj obj = BSON(CollectionType::ns("db.coll") <<
+                           CollectionType::keyPattern(BSON("a" << 1)) <<
+                           CollectionType::unique(true) <<
+                           CollectionType::DEPRECATED_lastmod(1ULL) <<
+                           CollectionType::DEPRECATED_lastmodEpoch(epoch) <<
+                           CollectionType::DEPRECATED_dropped(false));
+        coll.parseBSON(obj);
         ASSERT_EQUALS(coll.getNS(), "db.coll");
         ASSERT_EQUALS(coll.getKeyPattern(), BSON("a" << 1));
         ASSERT_EQUALS(coll.getUnique(), true);
