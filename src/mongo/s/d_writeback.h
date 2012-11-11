@@ -20,8 +20,9 @@
 
 #include "mongo/pch.h"
 
-#include "../util/queue.h"
-#include "../util/background.h"
+#include "mongo/db/jsobj.h"
+#include "mongo/util/queue.h"
+#include "mongo/util/background.h"
 
 namespace mongo {
 
