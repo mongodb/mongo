@@ -1052,6 +1052,9 @@
     <ClCompile Include="..\s\type_collection.cpp">
       <Filter>s</Filter>
     </ClCompile>
+    <ClCompile Include="index_rebuilder.cpp">
+      <Filter>db\Source Files\e to n</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\targetver.h" />
@@ -2009,6 +2012,18 @@
     </ClInclude>
     <ClInclude Include="..\s\type_collection.h">
       <Filter>s</Filter>
+    </ClInclude>
+    <ClInclude Include="btreebuilder.h">
+      <Filter>db\Header Files\a to d</Filter>
+    </ClInclude>
+    <ClInclude Include="btreecursor.h">
+      <Filter>db\Header Files\a to d</Filter>
+    </ClInclude>
+    <ClInclude Include="cc_by_loc.h">
+      <Filter>db\Header Files\a to d</Filter>
+    </ClInclude>
+    <ClInclude Include="index_rebuilder.h">
+      <Filter>db\Header Files\e to n</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
