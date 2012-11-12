@@ -65,7 +65,8 @@ namespace IndexUpdateTests {
                                                                                  lenWHdr ) );
             memcpy( infoRecord->data(), indexInfo.objdata(), indexInfo.objsize() );
             addRecordToRecListInExtent( infoRecord, infoLoc );
-            IndexDetails& id = nsdetails( _ns )->addIndex( _ns );
+            IndexDetails& id = nsdetails( _ns )->getNextIndexDetails( _ns );
+            nsdetails( _ns )->addIndex( _ns );
             id.info.writing() = infoLoc;
             return id;
         }
