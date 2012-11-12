@@ -83,17 +83,29 @@ namespace mongo {
             // facilitate clean exit when child starts successfully
             setupLaunchSignals();
 
-            pid_t c = fork();
-            if ( c ) {
-                int pstat;
-                waitpid(c, &pstat, 0);
+            cout << "about to fork child process, waiting until server is ready for connections."
+                 << endl;
 
-                if ( WIFEXITED(pstat) ) {
-                    if ( ! WEXITSTATUS(pstat) ) {
+            pid_t child1 = fork();
+            if (child1 == -1) {
+                cout << "ERROR: stage 1 fork() failed: " << errnoWithDescription();
+                _exit(EXIT_ABRUPT);
+            }
+            else if (child1) {
+                // this is run in the original parent process
+                int pstat;
+                waitpid(child1, &pstat, 0);
+
+                if (WIFEXITED(pstat)) {
+                    if (WEXITSTATUS(pstat)) {
+                        cout << "ERROR: child process failed, exited with error number "
+                             << WEXITSTATUS(pstat) << endl;
+                    }
+                    else {
                         cout << "child process started successfully, parent exiting" << endl;
                     }
 
-                    _exit( WEXITSTATUS(pstat) );
+                    _exit(WEXITSTATUS(pstat));
                 }
 
                 _exit(50);
@@ -107,11 +119,16 @@ namespace mongo {
 
             cmdLine.leaderProc = getpid();
 
-            pid_t c2 = fork();
-            if ( c2 ) {
+            pid_t child2 = fork();
+            if (child2 == -1) {
+                cout << "ERROR: stage 2 fork() failed: " << errnoWithDescription();
+                _exit(EXIT_ABRUPT);
+            }
+            else if (child2) {
+                // this is run in the middle process
                 int pstat;
-                cout << "forked process: " << c2 << endl;
-                waitpid(c2, &pstat, 0);
+                cout << "forked process: " << child2 << endl;
+                waitpid(child2, &pstat, 0);
 
                 if ( WIFEXITED(pstat) ) {
                     _exit( WEXITSTATUS(pstat) );
@@ -119,6 +136,8 @@ namespace mongo {
 
                 _exit(51);
             }
+
+            // this is run in the final child process (the server)
 
             // stdout handled in initLogging
             //fclose(stdout);
