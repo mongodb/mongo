@@ -1,8 +1,9 @@
 t = db.jstests_drop2;
 t.drop();
+db.adminCommand({setParameter:1, logLevel:2});
 
 function debug( x ) {
-    //printjson( x );
+    printjson( x );
 }
 
 t.save( {} );
