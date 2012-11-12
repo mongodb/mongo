@@ -138,6 +138,9 @@ namespace mongo {
         Extra* allocExtra(const char *ns, int nindexessofar);
         void copyingFrom(const char *thisns, NamespaceDetails *src); // must be called when renaming a NS to fix up extra
 
+        /* called when loaded from disk */
+        void onLoad(const Namespace& k);
+
         /* dump info on this namespace.  for debugging. */
         void dump(const Namespace& k);
 
@@ -223,17 +226,10 @@ namespace mongo {
         bool isMultikey(int i) const { return (multiKeyIndexBits & (((unsigned long long) 1) << i)) != 0; }
         void setIndexIsMultikey(const char *thisns, int i);
 
-        /**
-         * This fetches the IndexDetails for the next empty index slot. The caller must populate
-         * returned object.  This handles allocating extra index space, if necessary.
+        /* add a new index.  does not add to system.indexes etc. - just to NamespaceDetails.
+           caller must populate returned object.
          */
-        IndexDetails& getNextIndexDetails(const char* thisns);
-
-        /**
-         * Add a new index.  This does not add it to system.indexes etc. - just to NamespaceDetails.
-         * This resets the transient namespace details.
-         */
-        void addIndex(const char* thisns);
+        IndexDetails& addIndex(const char *thisns, bool resetTransient=true);
 
         void aboutToDeleteAnIndex() { 
             clearSystemFlag( Flag_HaveIdIndex );

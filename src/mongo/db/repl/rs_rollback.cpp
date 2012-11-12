@@ -16,14 +16,12 @@
 */
 
 #include "pch.h"
-
-#include "mongo/db/client.h"
-#include "mongo/db/cloner.h"
-#include "mongo/db/index_rebuilder.h"
-#include "mongo/db/ops/update.h"
-#include "mongo/db/ops/delete.h"
-#include "mongo/db/repl/rs.h"
-#include "mongo/db/repl.h"
+#include "../client.h"
+#include "rs.h"
+#include "../repl.h"
+#include "../cloner.h"
+#include "../ops/update.h"
+#include "../ops/delete.h"
 
 /* Scenarios
 
@@ -575,12 +573,6 @@ namespace mongo {
     }
 
     void ReplSetImpl::syncRollback(OplogReader&r) {
-        // If this is startup, wait for any index build retries to finish first
-        while (indexRebuilder.getState() != BackgroundJob::Done) {
-            OCCASIONALLY LOG(0) << "replSet rollback waiting for index rebuild to finish" << endl;
-            indexRebuilder.wait(1000);
-        }
-
         // check that we are at minvalid, otherwise we cannot rollback as we may be in an
         // inconsistent state
         {

@@ -17,11 +17,9 @@
 // client.cpp
 
 #include "pch.h"
-
 #include "dbtests.h"
+#include "../db/d_concurrency.h"
 #include "mongo/client/dbclientcursor.h"
-#include "mongo/db/d_concurrency.h"
-#include "mongo/db/pdfile.h"
 
 namespace ClientTests {
 
@@ -29,7 +27,6 @@ namespace ClientTests {
     public:
 
         Base( string coll ) {
-            db.dropDatabase("test");
             _ns = (string)"test." + coll;
         }
 
@@ -99,43 +96,6 @@ namespace ClientTests {
             ASSERT_EQUALS( 2 , db.getIndexes( ns() )->itcount() );
         }
 
-    };
-
-    /**
-     * Check that nIndexes is incremented correctly when an index builds (and that it is not
-     * incremented when an index fails to build), system.indexes has an entry added (or not), and
-     * system.namespaces has a doc added (or not).
-     */
-    class BuildIndex : public Base {
-    public:
-        BuildIndex() : Base("buildIndex") {}
-        void run() {
-            Lock::DBWrite lock(ns());
-            Client::WriteContext ctx(ns());
-
-            db.insert(ns(), BSON("x" << 1 << "y" << 2));
-            db.insert(ns(), BSON("x" << 2 << "y" << 2));
-
-            ASSERT_EQUALS(1, nsdetails(ns())->nIndexes);
-            // _id index
-            ASSERT_EQUALS(1U, db.count("test.system.indexes"));
-            // test.buildindex
-            // test.buildindex_$id
-            // test.system.indexes
-            ASSERT_EQUALS(3U, db.count("test.system.namespaces"));
-
-            db.ensureIndex(ns(), BSON("y" << 1), true);
-
-            ASSERT_EQUALS(1, nsdetails(ns())->nIndexes);
-            ASSERT_EQUALS(1U, db.count("test.system.indexes"));
-            ASSERT_EQUALS(3U, db.count("test.system.namespaces"));
-
-            db.ensureIndex(ns(), BSON("x" << 1), true);
-
-            ASSERT_EQUALS(2, nsdetails(ns())->nIndexes);
-            ASSERT_EQUALS(2U, db.count("test.system.indexes"));
-            ASSERT_EQUALS(4U, db.count("test.system.namespaces"));
-        }
     };
 
     class CS_10 : public Base {
@@ -227,7 +187,6 @@ namespace ClientTests {
             add<DropIndex>();
             add<ReIndex>();
             add<ReIndex2>();
-            add<BuildIndex>();
             add<CS_10>();
             add<PushBack>();
             add<Create>();
