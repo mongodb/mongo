@@ -42,9 +42,11 @@ env.StaticLibrary('foundation',
 env.StaticLibrary('stringutils', ['util/stringutils.cpp', 'util/base64.cpp',])
 
 env.StaticLibrary('md5', [
-        'util/md5.cpp',
-        'util/md5main.cpp',
+        'util/md5.cpp'
         ])
+
+env.CppUnitTest( "md5_test", ["util/md5_test.cpp", "util/md5main.cpp" ],
+                 LIBDEPS=["md5"] )
 
 env.StaticLibrary('bson', [
         'bson/mutable/mutable_bson.cpp',
