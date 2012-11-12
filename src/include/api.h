@@ -14,6 +14,7 @@ struct __wt_process {
 
 					/* Locked: connection queue */
 	TAILQ_HEAD(__wt_connection_impl_qh, __wt_connection_impl) connqh;
+	WT_CACHE_POOL *cache_pool;
 };
 
 /*******************************************
@@ -196,6 +197,8 @@ struct __wt_connection_impl {
 
 					/* Connection queue */
 	TAILQ_ENTRY(__wt_connection_impl) q;
+					/* Cache pool queue */
+	TAILQ_ENTRY(__wt_connection_impl) cpq;
 
 	const char *home;		/* Database home */
 	int is_new;			/* Connection created database */
@@ -286,7 +289,7 @@ struct __wt_connection_impl {
 	const char *cfgvar[] = API_CONF_DEFAULTS(h, n, cfg);		\
 	API_SESSION_INIT(s, h, n, cur, bt);				\
 	WT_ERR(((cfg) != NULL) ?					\
-	    __wt_config_check((s), __wt_confchk_##h##_##n, (cfg)) : 0)
+	    __wt_config_check((s), __wt_confchk_##h##_##n, (cfg), 0) : 0)
 
 #define	API_END(s)							\
 	if ((s) != NULL) {						\
@@ -385,6 +388,8 @@ extern WT_PROCESS __wt_process;
  * DO NOT EDIT: automatically built by dist/api_flags.py.
  * API flags section: BEGIN
  */
+#define	WT_CACHE_POOL_RUN				0x00000001
+#define	WT_CONN_CACHE_POOL				0x00000010
 #define	WT_CONN_LSM_MERGE				0x00000008
 #define	WT_CONN_SYNC					0x00000004
 #define	WT_CONN_TRANSACTIONAL				0x00000002
@@ -396,18 +401,19 @@ extern WT_PROCESS __wt_process;
 #define	WT_SESSION_INTERNAL				0x00000004
 #define	WT_SESSION_SALVAGE_QUIET_ERR			0x00000002
 #define	WT_SESSION_SCHEMA_LOCKED			0x00000001
-#define	WT_VERB_block					0x00002000
-#define	WT_VERB_ckpt					0x00001000
-#define	WT_VERB_evict					0x00000800
-#define	WT_VERB_evictserver				0x00000400
-#define	WT_VERB_fileops					0x00000200
-#define	WT_VERB_hazard					0x00000100
-#define	WT_VERB_lsm					0x00000080
-#define	WT_VERB_mutex					0x00000040
-#define	WT_VERB_read					0x00000020
-#define	WT_VERB_readserver				0x00000010
-#define	WT_VERB_reconcile				0x00000008
-#define	WT_VERB_salvage					0x00000004
+#define	WT_VERB_block					0x00004000
+#define	WT_VERB_ckpt					0x00002000
+#define	WT_VERB_evict					0x00001000
+#define	WT_VERB_evictserver				0x00000800
+#define	WT_VERB_fileops					0x00000400
+#define	WT_VERB_hazard					0x00000200
+#define	WT_VERB_lsm					0x00000100
+#define	WT_VERB_mutex					0x00000080
+#define	WT_VERB_read					0x00000040
+#define	WT_VERB_readserver				0x00000020
+#define	WT_VERB_reconcile				0x00000010
+#define	WT_VERB_salvage					0x00000008
+#define	WT_VERB_shared_cache				0x00000004
 #define	WT_VERB_verify					0x00000002
 #define	WT_VERB_write					0x00000001
 /*

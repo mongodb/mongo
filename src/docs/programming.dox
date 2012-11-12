@@ -14,6 +14,7 @@ WiredTiger applications:
 - @subpage lsm
 
 - @subpage transactions
+- @subpage cache_configuration
 - @subpage checkpoints
 - @subpage hot_backup
 

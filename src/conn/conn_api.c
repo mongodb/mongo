@@ -365,8 +365,9 @@ __conn_reconfigure(WT_CONNECTION *wt_conn, const char *config)
 	 * Don't include the default config: only override values the
 	 * application sets explicitly.
 	 */
+	WT_ERR(__wt_conn_cache_pool_config(session, cfg));
 	WT_ERR(__wt_cache_config(conn, raw_cfg));
-	WT_ERR(__conn_verbose_config(session, raw_cfg));
+	WT_ERR(__conn_verbose_config(session, cfg));
 
 err:	API_END(session);
 	return (ret);
@@ -526,7 +527,7 @@ __conn_config_file(WT_SESSION_IMPL *session, const char **cfg, WT_ITEM **cbufp)
 
 	/* Check the configuration string. */
 	WT_ERR(__wt_config_check(
-	    session, __wt_confchk_wiredtiger_open, cbuf->data));
+	    session, __wt_confchk_wiredtiger_open, cbuf->data, 0));
 
 	/*
 	 * The configuration file falls between the default configuration and
@@ -577,7 +578,7 @@ __conn_config_env(WT_SESSION_IMPL *session, const char **cfg)
 
 	/* Check the configuration string. */
 	WT_RET(__wt_config_check(
-	    session, __wt_confchk_wiredtiger_open, env_config));
+	    session, __wt_confchk_wiredtiger_open, env_config, 0));
 
 	/*
 	 * The environment setting comes second-to-last: it overrides the
@@ -728,6 +729,7 @@ __conn_verbose_config(WT_SESSION_IMPL *session, const char *cfg[])
 		uint32_t flag;
 	} *ft, verbtypes[] = {
 		{ "block",	WT_VERB_block },
+		{ "shared_cache",WT_VERB_shared_cache },
 		{ "ckpt",	WT_VERB_ckpt },
 		{ "evict",	WT_VERB_evict },
 		{ "evictserver",WT_VERB_evictserver },
@@ -829,8 +831,8 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	WT_ERR(__wt_connection_init(conn));
 
 	/* Check the configuration strings. */
-	WT_ERR(
-	    __wt_config_check(session, __wt_confchk_wiredtiger_open, config));
+	WT_ERR(__wt_config_check(
+	    session, __wt_confchk_wiredtiger_open, config, 0));
 
 	/* Get the database home. */
 	WT_ERR(__conn_home(session, home, cfg));
@@ -860,6 +862,8 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 
 	/* Configure verbose flags. */
 	WT_ERR(__conn_verbose_config(session, cfg));
+
+	WT_ERR(__wt_conn_cache_pool_config(session, cfg));
 
 	WT_ERR(__wt_config_gets(session, cfg, "logging", &cval));
 	if (cval.val != 0)

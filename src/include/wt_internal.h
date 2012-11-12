@@ -69,6 +69,8 @@ struct __wt_btree_stats;
     typedef struct __wt_btree_stats WT_BTREE_STATS;
 struct __wt_cache;
     typedef struct __wt_cache WT_CACHE;
+struct __wt_cache_pool;
+    typedef struct __wt_cache_pool WT_CACHE_POOL;
 struct __wt_cell;
     typedef struct __wt_cell WT_CELL;
 struct __wt_cell_unpack;
