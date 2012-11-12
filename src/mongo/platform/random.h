@@ -38,4 +38,18 @@ namespace mongo {
         unsigned _seed;
     };
 
+    /**
+     * More secure random numbers
+     * Suitable for nonce/crypto
+     * Slower than PseudoRandom, so only use when really need
+     */
+    class SecureRandom {
+    public:
+        virtual ~SecureRandom();
+
+        virtual int64_t nextInt64() = 0;
+
+        static SecureRandom* create();
+    };
+
 }
