@@ -34,6 +34,7 @@
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/dbwebserver.h"
 #include "mongo/db/dur.h"
+#include "mongo/db/index_rebuilder.h"
 #include "mongo/db/initialize_server_global_state.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/introspect.h"
@@ -78,7 +79,6 @@ namespace mongo {
     extern int diagLogging;
     extern unsigned lenForNewNsFiles;
     extern int lockFile;
-    extern bool checkNsFilesOnLoad;
     extern string repairpath;
 
     void setupSignals( bool inFork );
@@ -294,9 +294,6 @@ namespace mongo {
         Client::GodScope gs;
         LOG(1) << "enter repairDatabases (to check pdfile version #)" << endl;
 
-        //verify(checkNsFilesOnLoad);
-        checkNsFilesOnLoad = false; // we are mainly just checking the header - don't scan the whole .ns file for every db here.
-
         Lock::GlobalWrite lk;
         vector< string > dbNames;
         getDatabaseNames( dbNames );
@@ -345,8 +342,6 @@ namespace mongo {
             cc().shutdown();
             dbexit( EXIT_CLEAN );
         }
-
-        checkNsFilesOnLoad = true;
     }
 
     void clearTmpFiles() {
@@ -403,7 +398,7 @@ namespace mongo {
      */
     class DataFileSync : public BackgroundJob , public ServerStatusSection {
     public:
-        DataFileSync() 
+        DataFileSync()
             : ServerStatusSection( "backgroundFlushing" ),
               _total_time( 0 ),
               _flushes( 0 ),
@@ -412,7 +407,7 @@ namespace mongo {
 
         virtual bool includeByDefault() const { return true; }
         virtual bool adminOnly() const { return false; }
-        
+
         string name() const { return "DataFileSync"; }
 
         void run() {
@@ -469,7 +464,7 @@ namespace mongo {
             _last_time = ms;
             _last = jsTime();
         }
-        
+
         long long _total_time;
         long long _flushes;
         int _last_time;
@@ -485,16 +480,16 @@ namespace mongo {
             virtual void appendAtLeaf( BSONObjBuilder& b ) const {
                 int m = static_cast<int>(MemoryMappedFile::totalMappedLength() / ( 1024 * 1024 ));
                 b.appendNumber( "mapped" , m );
-                
+
                 if ( cmdLine.dur ) {
                     m *= 2;
                     b.appendNumber( "mappedWithJournal" , m );
                 }
-           
+
             }
         } memJournalServerStatusMetric;
     }
-                
+
 
     const char * jsInterruptCallback() {
         // should be safe to interrupt in js code, even if we have a write lock
@@ -640,6 +635,8 @@ namespace mongo {
         /* this is for security on certain platforms (nonce generation) */
         srand((unsigned) (curTimeMicros() ^ startupSrandTimer.micros()));
 
+        indexRebuilder.go();
+
         snapshotThread.go();
         d.clientCursorMonitor.go();
         PeriodicTask::theRunner->go();
@@ -754,6 +751,8 @@ static void buildOptionsDescriptions(po::options_description *pVisible,
     ("jsonp","allow JSONP access via http (has security implications)")
     ("noauth", "run without security")
     ("nohttpinterface", "disable http interface")
+    ("noIndexBuildRetry", po::value<int>(),
+        "don't retry any index builds that were interrupted by shutdown")
     ("nojournal", "disable journaling (journaling is on by default for 64 bit)")
     ("noprealloc", "disable data file preallocation - will often hurt performance")
     ("noscripting", "disable scripting engine")
@@ -1036,6 +1035,9 @@ static void processCommandLineOptions(const std::vector<std::string>& argv) {
         }
         if (params.count("replIndexPrefetch")) {
             cmdLine.rsIndexPrefetch = params["replIndexPrefetch"].as<std::string>();
+        }
+        if (params.count("noIndexBuildRetry")) {
+            cmdLine.indexBuildRetry = false;
         }
         if (params.count("only")) {
             cmdLine.only = params["only"].as<string>().c_str();
