@@ -46,15 +46,19 @@ namespace mongo {
      * @param lastHost the last host returned (mainly used for doing round-robin).
      *     Will be overwritten with the newly returned host if not empty. Should
      *     never be NULL.
+     * @param isPrimarySelected out parameter that is set to true if the returned host
+     *     is a primary.
      *
      * @return the host object of the node selected. If none of the nodes are
-     *     eligible, returns an empty host.
+     *     eligible, returns an empty host. Cannot be NULL and valid only if returned
+     *     host is not empty.
      */
     HostAndPort _selectNode(const vector<ReplicaSetMonitor::Node>& nodes,
                             const BSONObj& readPreferenceTag,
                             bool secOnly,
                             int localThresholdMillis,
-                            HostAndPort* lastHost /* in/out */) {
+                            HostAndPort* lastHost /* in/out */,
+                            bool* isPrimarySelected) {
         HostAndPort fallbackHost;
 
         // Implicit: start from index 0 if lastHost doesn't exist anymore
@@ -85,6 +89,7 @@ namespace mongo {
             if (node.matchesTag(readPreferenceTag)) {
                 // found an ok candidate; may not be local.
                 fallbackHost = node.addr;
+                *isPrimarySelected = node.ismaster;
 
                 if (node.isLocalSecondary(localThresholdMillis)) {
                     // found a local node.  return early.
@@ -1006,14 +1011,15 @@ namespace mongo {
     }
 
     HostAndPort ReplicaSetMonitor::selectAndCheckNode(ReadPreference preference,
-                                                      TagSet* tags) {
+                                                      TagSet* tags,
+                                                      bool* isPrimarySelected) {
 
         HostAndPort candidate;
 
         {
             scoped_lock lk(_lock);
             candidate = ReplicaSetMonitor::selectNode(_nodes, preference, tags,
-                    _localThresholdMillis, &_lastReadPrefHost);
+                    _localThresholdMillis, &_lastReadPrefHost, isPrimarySelected);
         }
 
         if (candidate.empty()) {
@@ -1022,7 +1028,7 @@ namespace mongo {
 
             scoped_lock lk(_lock);
             return ReplicaSetMonitor::selectNode(_nodes, preference, tags, _localThresholdMillis,
-                    &_lastReadPrefHost);
+                    &_lastReadPrefHost, isPrimarySelected);
         }
 
         return candidate;
@@ -1033,11 +1039,15 @@ namespace mongo {
                                               ReadPreference preference,
                                               TagSet* tags,
                                               int localThresholdMillis,
-                                              HostAndPort* lastHost) {
+                                              HostAndPort* lastHost,
+                                              bool* isPrimarySelected) {
+        *isPrimarySelected = false;
+
         switch (preference) {
         case ReadPreference_PrimaryOnly:
             for (vector<Node>::const_iterator iter = nodes.begin(); iter != nodes.end(); ++iter) {
                 if (iter->ismaster && iter->ok) {
+                    *isPrimarySelected = true;
                     return iter->addr;
                 }
             }
@@ -1047,14 +1057,14 @@ namespace mongo {
         case ReadPreference_PrimaryPreferred:
         {
             HostAndPort candidatePri = selectNode(nodes, ReadPreference_PrimaryOnly, tags,
-                                                  localThresholdMillis, lastHost);
+                    localThresholdMillis, lastHost, isPrimarySelected);
 
             if (!candidatePri.empty()) {
                 return candidatePri;
             }
 
             return selectNode(nodes, ReadPreference_SecondaryOnly, tags,
-                              localThresholdMillis, lastHost);
+                              localThresholdMillis, lastHost, isPrimarySelected);
         }
 
         case ReadPreference_SecondaryOnly:
@@ -1063,7 +1073,7 @@ namespace mongo {
 
             while (!tags->isExhausted()) {
                 candidate = _selectNode(nodes, tags->getCurrentTag(), true, localThresholdMillis,
-                        lastHost);
+                        lastHost, isPrimarySelected);
 
                 if (candidate.empty()) {
                     tags->next();
@@ -1079,14 +1089,14 @@ namespace mongo {
         case ReadPreference_SecondaryPreferred:
         {
             HostAndPort candidateSec = selectNode(nodes, ReadPreference_SecondaryOnly, tags,
-                                                  localThresholdMillis, lastHost);
+                    localThresholdMillis, lastHost, isPrimarySelected);
 
             if (!candidateSec.empty()) {
                 return candidateSec;
             }
 
             return selectNode(nodes, ReadPreference_PrimaryOnly, tags,
-                              localThresholdMillis, lastHost);
+                    localThresholdMillis, lastHost, isPrimarySelected);
         }
 
         case ReadPreference_Nearest:
@@ -1095,7 +1105,7 @@ namespace mongo {
 
             while (!tags->isExhausted()) {
                 candidate = _selectNode(nodes, tags->getCurrentTag(), false, localThresholdMillis,
-                        lastHost);
+                        lastHost, isPrimarySelected);
 
                 if (candidate.empty()) {
                     tags->next();
@@ -1559,10 +1569,22 @@ namespace mongo {
         }
 
         ReplicaSetMonitorPtr monitor = _getMonitor();
-        _lastSlaveOkHost = monitor->selectAndCheckNode(preference, tags);
+        bool isPrimarySelected = false;
+        _lastSlaveOkHost = monitor->selectAndCheckNode(preference, tags, &isPrimarySelected);
 
         if ( _lastSlaveOkHost.empty() ){
             return NULL;
+        }
+
+        // Primary connection is special because it is the only connection that is
+        // versioned in mongos. Therefore, we have to make sure that this object
+        // maintains only one connection to the primary and use that connection
+        // every time we need to talk to the primary.
+        if (isPrimarySelected) {
+            checkMaster();
+            _lastSlaveOkConn = _master;
+            _lastSlaveOkHost = _masterHost; // implied, but still assign just to be safe
+            return _master.get();
         }
 
         _lastSlaveOkConn.reset(new DBClientConnection(true , this , _so_timeout));

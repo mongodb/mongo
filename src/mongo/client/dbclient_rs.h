@@ -147,6 +147,8 @@ namespace mongo {
          *     robin, starting from the node next to this lastHost. This will be overwritten
          *     with the newly chosen host if not empty, not primary and when preference
          *     is not Nearest.
+         * @param isPrimarySelected out parameter that is set to true if the returned host
+         *     is a primary. Cannot be NULL and valid only if returned host is not empty.
          *
          * @return the host object of the node selected. If none of the nodes are
          *     eligible, returns an empty host.
@@ -155,7 +157,8 @@ namespace mongo {
                                       ReadPreference preference,
                                       TagSet* tags,
                                       int localThresholdMillis,
-                                      HostAndPort* lastHost);
+                                      HostAndPort* lastHost,
+                                      bool* isPrimarySelected);
 
         /**
          * Selects the right node given the nodes to pick from and the preference. This
@@ -163,14 +166,17 @@ namespace mongo {
          * if the primary node needs to be returned but is not currently available (except
          * for ReadPrefrence_Nearest).
          *
-         * @param preference the read mode to use
-         * @param tags the tags used for filtering nodes
+         * @param preference the read mode to use.
+         * @param tags the tags used for filtering nodes.
+         * @param isPrimarySelected out parameter that is set to true if the returned host
+         *     is a primary. Cannot be NULL and valid only if returned host is not empty.
          *
          * @return the host object of the node selected. If none of the nodes are
          *     eligible, returns an empty host.
          */
         HostAndPort selectAndCheckNode(ReadPreference preference,
-                                       TagSet* tags);
+                                       TagSet* tags,
+                                       bool* isPrimarySelected);
 
         /**
          * Creates a new ReplicaSetMonitor, if it doesn't already exist.
@@ -269,6 +275,8 @@ namespace mongo {
          * @return true if any node is ok
          */
         bool isAnyNodeOk() const;
+
+        bool isHostPrimary(const std::string& hostName) const;
 
     private:
         /**
@@ -556,12 +564,18 @@ namespace mongo {
         string _setName;
 
         HostAndPort _masterHost;
-        scoped_ptr<DBClientConnection> _master;
+        // Note: reason why this is a shared_ptr is because we want _lastSlaveOkConn to
+        // keep a reference of the _master connection when it selected a primary node.
+        // This is because the primary connection is special in mongos - it is the only
+        // connection that is versioned.
+        // WARNING: do not assign this variable (which will increment the internal ref
+        // counter) to any other variable other than _lastSlaveOkConn.
+        boost::shared_ptr<DBClientConnection> _master;
 
         // Last used host in a slaveOk query (can be a primary)
         HostAndPort _lastSlaveOkHost;
         // Last used connection in a slaveOk query (can be a primary)
-        scoped_ptr<DBClientConnection> _lastSlaveOkConn;
+        boost::shared_ptr<DBClientConnection> _lastSlaveOkConn;
         
         double _so_timeout;
 
