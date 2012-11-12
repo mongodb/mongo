@@ -1,11 +1,11 @@
 
 
-var rt = new ReplSetTest( { name : "replset9tests" , nodes: 1, oplogSize: 400 } );
+var rt = new ReplSetTest( { name : "replset9tests" , nodes: 1, oplogSize: 100 } );
 
 var nodes = rt.startSet();
 rt.initiate();
 var master = rt.getMaster();
-var bigstring = "a";
+var bigstring = Array(1000).toString();
 var md = master.getDB( 'd' );
 var mdc = md[ 'c' ];
 
@@ -20,7 +20,6 @@ mdc.insert( { _id:-1, x:"dummy" } );
 print ("inserting bigstrings");
 for( i = 0; i < doccount; ++i ) {
     mdc.insert( { _id:i, x:bigstring } );
-    bigstring += "a";
 }
 md.getLastError();
 
@@ -39,7 +38,7 @@ var sc = slave.getDB( 'd' )[ 'c' ];
 slave.setSlaveOk();
 
 print ("updating and deleting documents");
-for (i = doccount*2; i > doccount; --i) {
+for (i = doccount*4; i > doccount; --i) {
     mdc.update( { _id:i }, { $inc: { x : 1 } } );
     md.getLastError();
     mdc.remove( { _id:i } );
