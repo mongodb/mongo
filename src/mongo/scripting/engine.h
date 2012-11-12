@@ -34,6 +34,8 @@ namespace mongo {
         Scope();
         virtual ~Scope();
 
+        virtual void enter() {}
+        virtual void exit() {}
         virtual void reset() = 0;
         virtual void init( const BSONObj * data ) = 0;
         void init( const char * data ) {

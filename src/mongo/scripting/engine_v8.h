@@ -97,6 +97,8 @@ namespace mongo {
         V8Scope( V8ScriptEngine * engine );
         ~V8Scope();
 
+        virtual void enter();
+        virtual void exit();
         virtual void reset();
         virtual void init( const BSONObj * data );
 
