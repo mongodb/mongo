@@ -336,20 +336,12 @@ DBCollection.prototype.createIndex = function( keys , options ){
 }
 
 DBCollection.prototype.ensureIndex = function( keys , options ){
-    var name = this._indexSpec( keys, options ).name;
-    this._indexCache = this._indexCache || {};
-    if ( this._indexCache[ name ] ){
-        return;
+    this.createIndex(keys, options);
+    err = this.getDB().getLastErrorObj();
+    if (err.err) {
+        return err;
     }
-
-    this.createIndex( keys , options );
-    if ( this.getDB().getLastError() == "" ) {
-	this._indexCache[name] = true;
-    }
-}
-
-DBCollection.prototype.resetIndexCache = function(){
-    this._indexCache = {};
+    // nothing returned on success
 }
 
 DBCollection.prototype.reIndex = function() {
@@ -357,8 +349,6 @@ DBCollection.prototype.reIndex = function() {
 }
 
 DBCollection.prototype.dropIndexes = function(){
-    this.resetIndexCache();
-
     var res = this._db.runCommand( { deleteIndexes: this.getName(), index: "*" } );
     assert( res , "no result from dropIndex result" );
     if ( res.ok )
@@ -374,7 +364,6 @@ DBCollection.prototype.dropIndexes = function(){
 DBCollection.prototype.drop = function(){
     if ( arguments.length > 0 )
         throw "drop takes no argument";
-    this.resetIndexCache();
     var ret = this._db.runCommand( { drop: this.getName() } );
     if ( ! ret.ok ){
         if ( ret.errmsg == "ns not found" )
@@ -489,7 +478,6 @@ DBCollection.prototype.clean = function() {
 DBCollection.prototype.dropIndex =  function(index) {
     assert(index, "need to specify index to dropIndex" );
     var res = this._dbCommand( "deleteIndexes", { index: index } );
-    this.resetIndexCache();
     return res;
 }
 

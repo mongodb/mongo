@@ -14,3 +14,7 @@ assert.eq( 2 , t.getIndexes().length , "B1" );
 
 x = db._dbCommand( { dropIndexes: t.getName() , index : { b : 1 } } )
 assert.eq( 1 , t.getIndexes().length , "B2" );
+
+// ensure you can recreate indexes, even if you don't use dropIndex method
+t.ensureIndex({a:1});
+assert.eq(2 , t.getIndexes().length);
