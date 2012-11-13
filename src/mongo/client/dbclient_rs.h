@@ -276,8 +276,6 @@ namespace mongo {
          */
         bool isAnyNodeOk() const;
 
-        bool isHostPrimary(const std::string& hostName) const;
-
     private:
         /**
          * This populates a list of hosts from the list of seeds (discarding the
