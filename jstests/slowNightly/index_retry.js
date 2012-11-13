@@ -37,6 +37,11 @@ function indexBuildInProgress() {
             // namespace.  It is assumed that no other clients are concurrently
             // accessing the 'test' database.
             if ( op.op == 'insert' && op.ns == 'test.system.indexes' ) {
+                // SERVER-4295 Make sure the index details are there
+                assert.eq("a_1", op.query.name);
+                assert.eq(1, op.query.key.a);
+                assert.eq(true, op.query.background);
+
                 debug(op.opid);
                 indexBuildOpId = op.opid;
             }
