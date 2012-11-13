@@ -20,11 +20,11 @@
 
 #include "mongo/pch.h"
 
-#include "../db/jsobj.h"
-#include "../db/dbmessage.h"
-#include "../client/parallel.h"
-
-#include "request.h"
+#include "mongo/client/parallel.h"
+#include "mongo/db/dbmessage.h"
+#include "mongo/db/jsobj.h"
+#include "mongo/platform/random.h"
+#include "mongo/s/request.h"
 
 namespace mongo {
 
@@ -116,9 +116,11 @@ namespace mongo {
     private:
         mutable mongo::mutex _mutex;
 
+        PseudoRandom _random;
+
         MapSharded _cursors;
         MapNormal _refs;
-
+        
         long long _shardedTotal;
 
         static const int _myLogLevel;

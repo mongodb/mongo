@@ -38,6 +38,7 @@
 #include "mongo/db/repl/rs.h"
 #include "mongo/db/repl_block.h"
 #include "mongo/db/scanandorder.h"
+#include "mongo/platform/random.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/timer.h"
 
@@ -650,19 +651,39 @@ namespace mongo {
         return ClientCursor::recoverFromYield( data );
     }
 
-    // See SERVER-5726.
-    long long ctmLast = 0; // so we don't have to do find() which is a little slow very often.
+    namespace {
+        // so we don't have to do find() which is a little slow very often.
+        long long cursorGenTSLast = 0;
+        PseudoRandom* cursorGenRandom = NULL;
+    }
+
     long long ClientCursor::allocCursorId_inlock() {
-        long long ctm = curTimeMillis64();
-        dassert( ctm );
+
+        if ( ! cursorGenRandom ) {
+            scoped_ptr<SecureRandom> sr( SecureRandom::create() );
+            cursorGenRandom = new PseudoRandom( sr->nextInt64() );
+        }
+
+        const long long ts = Listener::getElapsedTimeMillis();
+
         long long x;
+
         while ( 1 ) {
-            x = (((long long)rand()) << 32);
-            x = x ^ ctm;
-            if ( ctm != ctmLast || ClientCursor::find_inlock(x, false) == 0 )
+            x = ts << 32;
+            x |= cursorGenRandom->nextInt32();
+
+            if ( x == 0 )
+                continue;
+
+            if ( x < 0 )
+                x *= -1;
+
+            if ( ts != cursorGenTSLast || ClientCursor::find_inlock(x, false) == 0 )
                 break;
         }
-        ctmLast = ctm;
+
+        cursorGenTSLast = ts;
+
         return x;
     }
 
