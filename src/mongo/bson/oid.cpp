@@ -20,10 +20,10 @@
 #include <boost/functional/hash.hpp>
 
 #include "mongo/platform/atomic_word.h"
+#include "mongo/platform/random.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/oid.h"
 #include "mongo/bson/util/atomic_int.h"
-#include "mongo/db/nonce.h"
 
 #define verify MONGO_verify
 
@@ -31,6 +31,16 @@ BOOST_STATIC_ASSERT( sizeof(mongo::OID) == 12 );
 
 namespace mongo {
 
+    namespace {
+        SecureRandom* mySecureRandom = NULL;
+        SecureRandom* getMySecureRandom() {
+            if ( mySecureRandom == NULL ) {
+                mySecureRandom = SecureRandom::create();
+            }
+            return mySecureRandom;
+        }
+    }
+    
     void OID::hash_combine(size_t &seed) const {
         boost::hash_combine(seed, x);
         boost::hash_combine(seed, y);
@@ -46,15 +56,11 @@ namespace mongo {
     }
 
     unsigned OID::ourPid() {
-        unsigned pid;
-#if defined(_WIN32)
-        pid = (unsigned short) GetCurrentProcessId();
-#elif defined(__linux__) || defined(__APPLE__) || defined(__sunos__)
-        pid = (unsigned short) getpid();
+#ifdef _WIN32
+        return static_cast<unsigned>( GetCurrentProcessId() );
 #else
-        pid = (unsigned short) Security::getNonce();
+        return static_cast<unsigned>( getpid() );
 #endif
-        return pid;
     }
 
     void OID::foldInPid(OID::MachineAndPid& x) {
@@ -68,17 +74,8 @@ namespace mongo {
     OID::MachineAndPid OID::genMachineAndPid() {
         BOOST_STATIC_ASSERT( sizeof(mongo::OID::MachineAndPid) == 5 );
 
-        // this is not called often, so the following is not expensive, and gives us some
-        // testing that nonce generation is working right and that our OIDs are (perhaps) ok.
-        {
-            nonce64 a = Security::getNonceDuringInit();
-            nonce64 b = Security::getNonceDuringInit();
-            nonce64 c = Security::getNonceDuringInit();
-            verify( !(a==b && b==c) );
-        }
-
-        unsigned long long n = Security::getNonceDuringInit();
-        OID::MachineAndPid x = ourMachine = (OID::MachineAndPid&) n;
+        int64_t n = getMySecureRandom()->nextInt64();
+        OID::MachineAndPid x = ourMachine = reinterpret_cast<OID::MachineAndPid&>(n);
         foldInPid(x);
         return x;
     }
@@ -114,7 +111,7 @@ namespace mongo {
     }
 
     void OID::init() {
-        static AtomicUInt inc = (unsigned) Security::getNonce();
+        static AtomicUInt inc = static_cast<unsigned>( getMySecureRandom()->nextInt64() );
 
         {
             unsigned t = (unsigned) time(0);
