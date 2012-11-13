@@ -373,8 +373,8 @@ namespace {
         HostAndPort host = ReplicaSetMonitor::selectNode(nodes,
             mongo::ReadPreference_PrimaryOnly, &tags, 3, &lastHost,
             &isPrimarySelected);
-        ASSERT(isPrimarySelected);
 
+        ASSERT(isPrimarySelected);
         ASSERT_EQUALS("b", host.host());
     }
 
@@ -391,7 +391,6 @@ namespace {
             mongo::ReadPreference_PrimaryOnly, &tags, 3,  &lastHost,
             &isPrimarySelected);
 
-        ASSERT(!isPrimarySelected);
         ASSERT(host.empty());
     }
 
@@ -602,6 +601,7 @@ namespace {
             mongo::ReadPreference_PrimaryPreferred, &tags, 3, &lastHost,
             &isPrimarySelected);
 
+        ASSERT(!isPrimarySelected);
         ASSERT_EQUALS("c", host.host());
         ASSERT_EQUALS("c", lastHost.host());
     }
@@ -617,6 +617,7 @@ namespace {
             mongo::ReadPreference_PrimaryPreferred, &tags, 3, &lastHost,
             &isPrimarySelected);
 
+        ASSERT(isPrimarySelected);
         ASSERT_EQUALS("b", host.host());
     }
 
@@ -680,6 +681,7 @@ namespace {
             mongo::ReadPreference_SecondaryPreferred, &tags, 3, &lastHost,
             &isPrimarySelected);
 
+        ASSERT(!isPrimarySelected);
         ASSERT_EQUALS("c", host.host());
         ASSERT_EQUALS("c", lastHost.host());
     }
@@ -1089,7 +1091,7 @@ namespace {
             mongo::ReadPreference_SecondaryOnly, getMatchesSecondTagSet(),
             3, &lastHost, &isPrimarySelected);
 
-        ASSERT(isPrimarySelected);
+        ASSERT(!isPrimarySelected);
         ASSERT_EQUALS("a", host.host());
         ASSERT_EQUALS("a", lastHost.host());
     }
@@ -1160,7 +1162,7 @@ namespace {
             mongo::ReadPreference_SecondaryPreferred, getMatchesFirstTagSet(),
             3, &lastHost, &isPrimarySelected);
 
-        ASSERT(isPrimarySelected);
+        ASSERT(!isPrimarySelected);
         ASSERT_EQUALS("a", host.host());
         ASSERT_EQUALS("a", lastHost.host());
     }
@@ -1176,7 +1178,7 @@ namespace {
             mongo::ReadPreference_SecondaryPreferred, getMatchesFirstTagSet(),
             3, &lastHost, &isPrimarySelected);
 
-        ASSERT(isPrimarySelected);
+        ASSERT(!isPrimarySelected);
         ASSERT_EQUALS("c", host.host());
         ASSERT_EQUALS("c", lastHost.host());
     }
