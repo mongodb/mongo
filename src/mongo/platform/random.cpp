@@ -23,6 +23,7 @@
 #include <iostream>
 #include <fstream>
 #include <stdio.h>
+#include <string.h>
 
 #ifndef _WIN32
 #include <errno.h>
