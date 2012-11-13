@@ -11,6 +11,7 @@
 #ifdef _WIN32
 #include <sstream>
 #include <stdio.h>
+#include <boost/filesystem/operations.hpp>
 #include <boost/smart_ptr/scoped_array.hpp>
 #include "mongo/platform/windows_basic.h"
 #include <DbgHelp.h>
@@ -52,6 +53,26 @@ namespace mongo {
 #elif defined(_WIN32)
 
 namespace mongo {
+
+    /**
+     * Get the path string to be used when searching for PDB files.
+     * 
+     * @param process        Process handle
+     * @return searchPath    Returned search path string
+     */
+    static const char* getSymbolSearchPath(HANDLE process) {
+        static std::string symbolSearchPath;
+
+        if (symbolSearchPath.empty()) {
+            static const size_t bufferSize = 1024;
+            boost::scoped_array<char> pathBuffer(new char[bufferSize]);
+            GetModuleFileNameA(NULL, pathBuffer.get(), bufferSize);
+            boost::filesystem::path exePath(pathBuffer.get());
+            symbolSearchPath = exePath.parent_path().string();
+            symbolSearchPath += ";C:\\Windows\\System32;C:\\Windows";
+        }
+        return symbolSearchPath.c_str();
+    }
 
     /**
      * Get the display name of the executable module containing the specified address.
@@ -172,7 +193,7 @@ namespace mongo {
     void printWindowsStackTrace( CONTEXT& context, std::ostream& os ) {
         SimpleMutex::scoped_lock lk(_stackTraceMutex);
         HANDLE process = GetCurrentProcess();
-        BOOL ret = SymInitialize( process, NULL, TRUE );
+        BOOL ret = SymInitialize(process, getSymbolSearchPath(process), TRUE);
         if ( ret == FALSE ) {
             DWORD dosError = GetLastError();
             log() << "Stack trace failed, SymInitialize failed with error " <<
