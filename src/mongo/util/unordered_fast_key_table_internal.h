@@ -33,7 +33,7 @@ namespace mongo {
             *firstEmpty = -1;
 
         for ( unsigned probe = 0; probe < _maxProbe; probe++ ) {
-            unsigned pos = abs( hash + probe ) % _capacity;
+            unsigned pos = (hash + probe) % _capacity;
 
             if ( ! _entries[pos].used ) {
                 // space is empty
