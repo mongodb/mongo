@@ -37,6 +37,7 @@
 #include "../util/progress_meter.h"
 #include "../server.h"
 #include "../util/mmap.h"
+#include "mongo/platform/random.h"
 
 using namespace mongoutils;
 
@@ -46,7 +47,6 @@ namespace mongo {
 
     class AlignedBuilder;
 
-    unsigned goodRandomNumberSlow();
 
     namespace dur {
         // Rotate after reaching this data size in a journal (j._<n>) file
@@ -126,6 +126,17 @@ namespace mongo {
             return false;
         }
 
+        namespace {
+            SecureRandom* mySecureRandom = NULL;
+            mongo::mutex mySecureRandomMutex( "JHeader-SecureRandom" );
+            int64_t getMySecureRandomNumber() {
+                scoped_lock lk( mySecureRandomMutex );
+                if ( ! mySecureRandom )
+                    mySecureRandom = SecureRandom::create();
+                return mySecureRandom->nextInt64();
+            }
+        }
+
         JHeader::JHeader(string fname) {
             magic[0] = 'j'; magic[1] = '\n';
             _version = CurrentVersion;
@@ -136,7 +147,7 @@ namespace mongo {
             strncpy(dbpath, fname.c_str(), sizeof(dbpath)-1);
             {
                 fileId = t&0xffffffff;
-                fileId |= ((unsigned long long)goodRandomNumberSlow()) << 32;
+                fileId |= static_cast<unsigned long long>( getMySecureRandomNumber() ) << 32;
             }
             memset(reserved3, 0, sizeof(reserved3));
             txt2[0] = txt2[1] = '\n';
