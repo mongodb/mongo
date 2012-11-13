@@ -22,6 +22,7 @@
 #include <cstdlib>
 #include <iostream>
 #include <fstream>
+#include <stdio.h>
 
 #ifndef _WIN32
 #include <errno.h>
