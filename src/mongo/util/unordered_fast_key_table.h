@@ -68,10 +68,15 @@ namespace mongo {
 
     public:
         static const unsigned DEFAULT_STARTING_CAPACITY = 20;
-        static const double DEFAULT_MAX_PROBE_RATIO = 0.05;
 
+        /**
+         * @param startingCapacity how many buckets should exist on initial creation
+         *                         DEFAULT_STARTING_CAPACITY
+         * @param maxProbeRatio the percentage of buckets we're willing to probe
+         *                      no defined default as you can't have a static const double on windows
+         */
         UnorderedFastKeyTable( unsigned startingCapacity = DEFAULT_STARTING_CAPACITY,
-                               double maxProbeRatio = DEFAULT_MAX_PROBE_RATIO );
+                               double maxProbeRatio = 0.05 );
 
         /**
          * @return number of elements in map
