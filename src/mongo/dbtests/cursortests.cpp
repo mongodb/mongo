@@ -532,6 +532,31 @@ namespace CursorTests {
                 }                
             }
         };
+
+        /** Test iteration of a reverse direction btree cursor between start and end keys. */
+        class ReverseDirectionStartEndKeys : public Base {
+        public:
+            void run() {
+                _c.dropCollection( ns() );
+                _c.ensureIndex( ns(), BSON( "a" << 1 ) );
+                // Add documents a:4 and a:5
+                _c.insert( ns(), BSON( "a" << 4 ) );
+                _c.insert( ns(), BSON( "a" << 5 ) );
+                Client::ReadContext ctx( ns() );
+                scoped_ptr<Cursor> cursor( BtreeCursor::make( nsdetails( ns() ),
+                                                              nsdetails( ns() )->idx( 1 ),
+                                                              /* startKey */ BSON( "" << 5 ),
+                                                              /* endKey */ BSON( "" << 4 ),
+                                                              /* endKeyInclusive */ true,
+                                                              /* direction */ -1 ) );
+                // Check that the iterator produces the expected results, in the expected order.
+                ASSERT( cursor->ok() );
+                ASSERT_EQUALS( 5, cursor->current()[ "a" ].Int() );
+                ASSERT( cursor->advance() );
+                ASSERT_EQUALS( 4, cursor->current()[ "a" ].Int() );
+                ASSERT( !cursor->advance() );
+            }
+        };
         
     } // namespace BtreeCursor
     
@@ -769,6 +794,7 @@ namespace CursorTests {
             add<BtreeCursor::MatcherRequiredTwoConstraintsDifferentFields>();
             add<BtreeCursor::TypeBracketedUpperBoundWithoutMatcher>();
             add<BtreeCursor::TypeBracketedLowerBoundWithoutMatcher>();
+            add<BtreeCursor::ReverseDirectionStartEndKeys>();
             add<ClientCursor::HandleDelete>();
             add<ClientCursor::AboutToDelete>();
             add<ClientCursor::AboutToDeleteDuplicate>();

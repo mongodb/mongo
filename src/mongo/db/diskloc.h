@@ -48,7 +48,11 @@ namespace mongo {
         enum SentinelValues {
             /* note NullOfs is different. todo clean up.  see refs to NullOfs in code - use is valid but outside DiskLoc context so confusing as-is. */
             NullOfs = -1,
-            MaxFiles=16000 // thus a limit of about 32TB of data per db
+
+            // Caps the number of files that may be allocated in a database, allowing about 32TB of
+            // data per db.  Note that the DiskLoc and DiskLoc56Bit types supports more files than
+            // this value, as does the storage format.
+            MaxFiles=16000
         };
 
         DiskLoc(int a, int Ofs) : _a(a), ofs(Ofs) { }
@@ -154,7 +158,14 @@ namespace mongo {
     };
 #pragma pack()
 
-    const DiskLoc minDiskLoc(0, 1);
-    const DiskLoc maxDiskLoc(0x7fffffff, 0x7fffffff);
+    // Minimum allowed DiskLoc.  No Record may begin at this location because file and extent
+    // headers must precede Records in a file.
+    const DiskLoc minDiskLoc(0, 0);
+
+    // Maximum allowed DiskLoc.  Note that only three bytes are used to represent the file number
+    // for consistency with the v1 index DiskLoc storage format, which uses only 7 bytes total.
+    // No Record may begin at this location because the minimum size of a Record is larger than one
+    // byte.
+    const DiskLoc maxDiskLoc(0x00ffffff, 0x7fffffff);
 
 } // namespace mongo
