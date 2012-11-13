@@ -57,12 +57,12 @@ env.StaticLibrary('bson', [
         'bson/util/bson_extract.cpp',
         'util/safe_num.cpp',
         'bson/oid.cpp',
-        'db/nonce.cpp',
         'db/jsobj.cpp',
-        'db/json.cpp',
+        'db/json.cpp'
         ], LIBDEPS=[
         'md5',
         'stringutils',
+        '$BUILD_DIR/mongo/platform/platform',
         ])
 
 env.CppUnitTest('mutable_bson_test', ['bson/mutable/mutable_bson_test.cpp'],

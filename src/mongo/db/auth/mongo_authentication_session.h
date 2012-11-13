@@ -17,9 +17,10 @@
 #pragma once
 
 #include "mongo/db/auth/authentication_session.h"
-#include "mongo/db/nonce.h"
 
 namespace mongo {
+
+    typedef unsigned long long nonce64;
 
     /**
      * Authentication session data for a nonce-challenge-response authentication of the

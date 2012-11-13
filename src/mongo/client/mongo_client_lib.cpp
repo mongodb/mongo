@@ -79,7 +79,6 @@
 #include "../db/lasterror.cpp"
 #include "../db/json.cpp"
 #include "../db/jsobj.cpp"
-#include "../db/nonce.cpp"
 #include "../db/dbmessage.cpp"
 
 #include "../pch.cpp"

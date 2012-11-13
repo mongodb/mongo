@@ -20,7 +20,6 @@
 
 #include <string>
 
-#include "mongo/db/nonce.h"
 #include "mongo/db/security_common.h"
 #include "mongo/client/authentication_table.h"
 #include "mongo/client/authlevel.h"
