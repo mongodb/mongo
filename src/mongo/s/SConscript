@@ -2,7 +2,8 @@
 
 Import("env")
 
-env.StaticLibrary('config', ['field_parser.cpp',
+env.StaticLibrary('config', ['cluster_constants.cpp',
+                             'field_parser.cpp',
                              'type_collection.cpp'],
                   LIBDEPS=['$BUILD_DIR/mongo/base/base',
                            '$BUILD_DIR/mongo/bson'])

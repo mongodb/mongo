@@ -133,7 +133,6 @@ commonFiles = [ "pch.cpp",
                 "client/dbclientcursor.cpp",
                 "client/model.cpp",
                 "client/syncclusterconnection.cpp",
-                "client/distlock.cpp",
                 "db/dbmessage.cpp"
                 ]
 
@@ -396,12 +395,13 @@ serverOnlyFiles += mmapFiles
 
 serverOnlyFiles += [ "db/stats/snapshots.cpp" ]
 
-env.Library( "coreshard", [ "s/cluster_constants.cpp",
+env.Library( "coreshard", [ "client/distlock.cpp",
                             "s/config.cpp",
                             "s/grid.cpp",
                             "s/chunk.cpp",
                             "s/shard.cpp",
-                            "s/shardkey.cpp"] )
+                            "s/shardkey.cpp"],
+                            LIBDEPS=['s/config'] )
 
 mongosLibraryFiles = [
     "s/interrupt_status_mongos.cpp",

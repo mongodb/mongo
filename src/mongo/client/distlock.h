@@ -162,7 +162,6 @@ namespace mongo {
 
         const ConnectionString _conn;
         const string _name;
-        const BSONObj _id;
         const string _processId;
 
         // Timeout for lock, usually LOCK_TIMEOUT

@@ -81,11 +81,17 @@ namespace mongo {
     BSONField<string> ChangelogFields::UNHOOKED_ns("ns");
     BSONField<string> ChangelogFields::UNHOOKED_details("details");
 
+    // ============  below hooked  ============
+
     const string ConfigNS::locks = "config.locks";
-    BSONField<string> LockFields::UNHOOKED_name("_id");
-    BSONField<int> LockFields::UNHOOKED_state("state");
-    BSONField<Date_t> LockFields::UNHOOKED_ts("ts");
-    BSONField<string> LockFields::UNHOOKED_who("who");
+    BSONField<string> LockFields::name("_id");
+    BSONField<int> LockFields::state("state");
+    BSONField<string> LockFields::process("process");
+    BSONField<OID> LockFields::lockID("ts");
+    BSONField<string> LockFields::who("who");
+    BSONField<string> LockFields::why("why");
+
+    // ============  below not yet hooked  ============
 
     const string ConfigNS::lockpings = "config.lockpings";
     BSONField<string> LockPingFields::UNHOOKED_name("_id");

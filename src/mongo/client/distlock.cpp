@@ -22,7 +22,7 @@
 #include <boost/thread/thread.hpp>
 
 #include "mongo/client/dbclientcursor.h"
-
+#include "mongo/s/cluster_constants.h"
 
 namespace mongo {
 
@@ -127,15 +127,15 @@ namespace mongo {
                     // (this may happen if an instance of a process was taken down and no new instance came up to
                     // replace it for a quite a while)
                     // if the lock is taken, the take-over mechanism should handle the situation
-                    auto_ptr<DBClientCursor> c = conn->query( DistributedLock::locksNS , BSONObj() );
+                    auto_ptr<DBClientCursor> c = conn->query( ConfigNS::locks , BSONObj() );
                     // TODO:  Would be good to make clear whether query throws or returns empty on errors
                     uassert( 16060, str::stream() << "cannot query locks collection on config server " << conn.getHost(), c.get() );
 
                     set<string> pids;
                     while ( c->more() ) {
                         BSONObj lock = c->next();
-                        if ( ! lock["process"].eoo() ) {
-                            pids.insert( lock["process"].valuestrsafe() );
+                        if ( ! lock[LockFields::process()].eoo() ) {
+                            pids.insert( lock[LockFields::process()].valuestrsafe() );
                         }
                     }
 
@@ -175,9 +175,9 @@ namespace mongo {
                         removed = false;
                         try {
                             // Got OID from lock with id, so we don't need to specify id again
-                            conn->update( DistributedLock::locksNS ,
-                                          BSON( "ts" << *i ),
-                                          BSON( "$set" << BSON( "state" << 0 ) ) );
+                            conn->update( ConfigNS::locks ,
+                                          BSON( LockFields::lockID(*i) ),
+                                          BSON( "$set" << BSON( LockFields::state(0) ) ) );
 
                             // Either the update went through or it didn't, either way we're done trying to
                             // unlock
@@ -313,16 +313,17 @@ namespace mongo {
 
 
     const string DistributedLock::lockPingNS = "config.lockpings";
-    const string DistributedLock::locksNS = "config.locks";
 
     /**
      * Create a new distributed lock, potentially with a custom sleep and takeover time.  If a custom sleep time is
      * specified (time between pings)
      */
     DistributedLock::DistributedLock( const ConnectionString& conn , const string& name , unsigned long long lockTimeout, bool asProcess )
-        : _conn(conn) , _name(name) , _id( BSON( "_id" << name ) ), _processId( asProcess ? getDistLockId() : getDistLockProcess() ),
-          _lockTimeout( lockTimeout == 0 ? LOCK_TIMEOUT : lockTimeout ), _maxClockSkew( _lockTimeout / LOCK_SKEW_FACTOR ), _maxNetSkew( _maxClockSkew ), _lockPing( _maxClockSkew ),
-          _mutex( "DistributedLock" )
+        : _conn(conn), _name(name),
+          _processId( asProcess ? getDistLockId() : getDistLockProcess() ),
+          _lockTimeout( lockTimeout == 0 ? LOCK_TIMEOUT : lockTimeout ),
+          _maxClockSkew( _lockTimeout / LOCK_SKEW_FACTOR ), _maxNetSkew( _maxClockSkew ),
+          _lockPing( _maxClockSkew ), _mutex( "DistributedLock" )
     {
         LOG( logLvl - 1 ) << "created new distributed lock for " << name << " on " << conn
                           << " ( lock timeout : " << _lockTimeout
@@ -507,18 +508,18 @@ namespace mongo {
         ScopedDbConnection& conn = *connPtr;
 
         BSONObjBuilder queryBuilder;
-        queryBuilder.appendElements( _id );
-        queryBuilder.append( "state" , 0 );
+        queryBuilder.append( LockFields::name() , _name );
+        queryBuilder.append( LockFields::state() , 0 );
 
         {
             // make sure its there so we can use simple update logic below
-            BSONObj o = conn->findOne( locksNS , _id ).getOwned();
+            BSONObj o = conn->findOne( ConfigNS::locks , BSON( LockFields::name(_name) ) ).getOwned();
 
             // Case 1: No locks
             if ( o.isEmpty() ) {
                 try {
-                    LOG( logLvl ) << "inserting initial doc in " << locksNS << " for lock " << _name << endl;
-                    conn->insert( locksNS , BSON( "_id" << _name << "state" << 0 << "who" << "" ) );
+                    LOG( logLvl ) << "inserting initial doc in " << ConfigNS::locks << " for lock " << _name << endl;
+                    conn->insert( ConfigNS::locks , BSON( LockFields::name(_name) << LockFields::state(0) << LockFields::who("") ) );
                 }
                 catch ( UserException& e ) {
                     warning() << "could not insert initial doc for distributed lock " << _name << causedBy( e ) << endl;
@@ -526,16 +527,26 @@ namespace mongo {
             }
 
             // Case 2: A set lock that we might be able to force
-            else if ( o["state"].numberInt() > 0 ) {
+            else if ( o[LockFields::state()].numberInt() > 0 ) {
 
-                string lockName = o["_id"].String() + string("/") + o["process"].String();
+                string lockName = o[LockFields::name()].String() + string("/") + o[LockFields::process()].String();
 
-                bool canReenter = reenter && o["process"].String() == _processId && ! distLockPinger.willUnlockOID( o["ts"].OID() ) && o["state"].numberInt() == 2;
+                bool canReenter = reenter &&
+                                  o[LockFields::process()].String() == _processId &&
+                                  !distLockPinger.willUnlockOID( o[LockFields::lockID()].OID() ) &&
+                                  o[LockFields::state()].numberInt() == 2;
                 if( reenter && ! canReenter ) {
+
                     LOG( logLvl - 1 ) << "not re-entering distributed lock " << lockName;
-                    if( o["process"].String() != _processId ) LOG( logLvl - 1 ) << ", different process " << _processId << endl;
-                    else if( o["state"].numberInt() == 2 ) LOG( logLvl - 1 ) << ", state not finalized" << endl;
-                    else LOG( logLvl - 1 ) << ", ts " << o["ts"].OID() << " scheduled for late unlock" << endl;
+                    if ( o[LockFields::process()].String() != _processId ) {
+                        LOG( logLvl - 1 ) << ", different process " << _processId << endl;
+                    }
+                    else if ( o[LockFields::state()].numberInt() == 2 ) {
+                        LOG( logLvl - 1 ) << ", state not finalized" << endl;
+                    }
+                    else {
+                        LOG( logLvl - 1 ) << ", ts " << o[LockFields::lockID()].OID() << " scheduled for late unlock" << endl;
+                    }
 
                     // reset since we've been bounced by a previous lock not being where we thought it was,
                     // and should go through full forcing process if required.
@@ -544,11 +555,11 @@ namespace mongo {
                     return false;
                 }
 
-                BSONObj lastPing = conn->findOne( lockPingNS , o["process"].wrap( "_id" ) );
+                BSONObj lastPing = conn->findOne( lockPingNS , o[LockFields::process()].wrap( "_id" ) );
                 if ( lastPing.isEmpty() ) {
                     LOG( logLvl ) << "empty ping found for process in lock '" << lockName << "'" << endl;
                     // TODO:  Using 0 as a "no time found" value Will fail if dates roll over, but then, so will a lot.
-                    lastPing = BSON( "_id" << o["process"].String() << "ping" << (Date_t) 0 );
+                    lastPing = BSON( "_id" << o[LockFields::process()].String() << "ping" << (Date_t) 0 );
                 }
 
                 unsigned long long elapsed = 0;
@@ -564,12 +575,16 @@ namespace mongo {
                     // Timeout the elapsed time using comparisons of remote clock
                     // For non-finalized locks, timeout 15 minutes since last seen (ts)
                     // For finalized locks, timeout 15 minutes since last ping
-                    bool recPingChange = o["state"].numberInt() == 2 && ( _lastPingCheck.id != lastPing["_id"].String() || _lastPingCheck.lastPing != lastPing["ping"].Date() );
-                    bool recTSChange = _lastPingCheck.ts != o["ts"].OID();
+                    bool recPingChange = o[LockFields::state()].numberInt() == 2 &&
+                                         ( _lastPingCheck.id != lastPing["_id"].String() ||
+                                           _lastPingCheck.lastPing != lastPing["ping"].Date() );
+                    bool recTSChange = _lastPingCheck.ts != o[LockFields::lockID()].OID();
 
                     if( recPingChange || recTSChange ) {
                         // If the ping has changed since we last checked, mark the current date and time
-                        setLastPing( PingData( lastPing["_id"].String().c_str(), lastPing["ping"].Date(), remote, o["ts"].OID() ) );
+                        setLastPing( PingData( lastPing["_id"].String().c_str(),
+                                    lastPing["ping"].Date(),
+                                    remote, o[LockFields::lockID()].OID() ) );
                     }
                     else {
 
@@ -623,8 +638,11 @@ namespace mongo {
 
                         // Make sure we break the lock with the correct "ts" (OID) value, otherwise
                         // we can overwrite a new lock inserted in the meantime.
-                        conn->update( locksNS , BSON( "_id" << _id["_id"].String() << "state" << o["state"].numberInt() << "ts" << o["ts"] ),
-                                      BSON( "$set" << BSON( "state" << 0 ) ) );
+                        conn->update( ConfigNS::locks,
+                                      BSON( LockFields::name(_name) <<
+                                            LockFields::state(o[LockFields::state()].numberInt()) <<
+                                            LockFields::lockID(o[LockFields::lockID()].OID()) ),
+                                      BSON( "$set" << BSON( LockFields::state(0) ) ) );
 
                         BSONObj err = conn->getLastErrorDetailed();
                         string errMsg = DBClientWithCommands::getLastErrorString(err);
@@ -665,8 +683,10 @@ namespace mongo {
                     try {
 
                         // Test the lock with the correct "ts" (OID) value
-                        conn->update( locksNS , BSON( "_id" << _id["_id"].String() << "state" << 2 << "ts" << o["ts"] ),
-                                      BSON( "$set" << BSON( "state" << 2 ) ) );
+                        conn->update( ConfigNS::locks , BSON( LockFields::name(_name)
+                                    << LockFields::state(2)
+                                    << LockFields::lockID(o[LockFields::lockID()].OID()) ),
+                                      BSON( "$set" << BSON( LockFields::state(2) ) ) );
 
                         BSONObj err = conn->getLastErrorDetailed();
                         string errMsg = DBClientWithCommands::getLastErrorString(err);
@@ -706,8 +726,8 @@ namespace mongo {
                 // We don't need the ts value in the query, since we will only ever replace locks with state=0.
             }
             // Case 3: We have an expired lock
-            else if ( o["ts"].type() ) {
-                queryBuilder.append( o["ts"] );
+            else if ( o[LockFields::lockID()].type() ) {
+                queryBuilder.append( o[LockFields::lockID()] );
             }
         }
 
@@ -718,8 +738,12 @@ namespace mongo {
         bool gotLock = false;
         BSONObj currLock;
 
-        BSONObj lockDetails = BSON( "state" << 1 << "who" << getDistLockId() << "process" << _processId <<
-                                    "when" << jsTime() << "why" << why << "ts" << OID::gen() );
+        BSONObj lockDetails = BSON( LockFields::state(1)
+                << LockFields::who(getDistLockId())
+                << LockFields::process(_processId)
+                << "when" << jsTime()
+                << LockFields::why(why)
+                << LockFields::lockID(OID::gen()) );
         BSONObj whatIWant = BSON( "$set" << lockDetails );
 
         BSONObj query = queryBuilder.obj();
@@ -734,12 +758,12 @@ namespace mongo {
                           <<  lockDetails.jsonString(Strict, true) << "\n"
                           << query.jsonString(Strict, true) << endl;
 
-            conn->update( locksNS , query , whatIWant );
+            conn->update( ConfigNS::locks , query , whatIWant );
 
             BSONObj err = conn->getLastErrorDetailed();
             string errMsg = DBClientWithCommands::getLastErrorString(err);
 
-            currLock = conn->findOne( locksNS , _id );
+            currLock = conn->findOne( ConfigNS::locks , BSON( LockFields::name(_name) ) );
 
             if ( !errMsg.empty() || !err["n"].type() || err["n"].numberInt() < 1 ) {
                 ( errMsg.empty() ? LOG( logLvl - 1 ) : warning() ) << "could not acquire lock '" << lockName << "' "
@@ -771,29 +795,31 @@ namespace mongo {
 
                 try {
 
-                    indUpdate = indDB->findOne( locksNS , _id );
+                    indUpdate = indDB->findOne( ConfigNS::locks , BSON( LockFields::name(_name) ) );
 
                     // If we override this lock in any way, grab and protect it.
                     // We assume/ensure that if a process does not have all lock documents, it is no longer
                     // holding the lock.
                     // Note - finalized locks may compete too, but we know they've won already if competing
                     // in this round.  Cleanup of crashes during finalizing may take a few tries.
-                    if( indUpdate["ts"] < lockDetails["ts"] || indUpdate["state"].numberInt() == 0 ) {
+                    if( indUpdate[LockFields::lockID()] < lockDetails[LockFields::lockID()] || indUpdate[LockFields::state()].numberInt() == 0 ) {
 
-                        BSONObj grabQuery = BSON( "_id" << _id["_id"].String() << "ts" << indUpdate["ts"].OID() );
+                        BSONObj grabQuery = BSON( LockFields::name(_name)
+                                << LockFields::lockID(indUpdate[LockFields::lockID()].OID()) );
 
                         // Change ts so we won't be forced, state so we won't be relocked
-                        BSONObj grabChanges = BSON( "ts" << lockDetails["ts"].OID() << "state" << 1 );
+                        BSONObj grabChanges = BSON( LockFields::lockID(lockDetails[LockFields::lockID()].OID())
+                                << LockFields::state(1) );
 
                         // Either our update will succeed, and we'll grab the lock, or it will fail b/c some other
                         // process grabbed the lock (which will change the ts), but the lock will be set until forcing
-                        indDB->update( locksNS, grabQuery, BSON( "$set" << grabChanges ) );
+                        indDB->update( ConfigNS::locks, grabQuery, BSON( "$set" << grabChanges ) );
 
-                        indUpdate = indDB->findOne( locksNS, _id );
+                        indUpdate = indDB->findOne( ConfigNS::locks, BSON( LockFields::name(_name) ) );
 
                         // Our lock should now be set until forcing.
                         // It's possible another lock has won entirely by now, so state could be 1 or 2 here
-                        verify( indUpdate["state"].numberInt() > 0 );
+                        verify( indUpdate[LockFields::state()].numberInt() > 0 );
 
                     }
                     // else our lock is the same, in which case we're safe, or it's a bigger lock,
@@ -810,7 +836,7 @@ namespace mongo {
                 verify( !indUpdate.isEmpty() );
 
                 // Find max TS value
-                if ( currLock.isEmpty() || currLock["ts"] < indUpdate["ts"] ) {
+                if ( currLock.isEmpty() || currLock[LockFields::lockID()] < indUpdate[LockFields::lockID()] ) {
                     currLock = indUpdate.getOwned();
                 }
 
@@ -820,7 +846,7 @@ namespace mongo {
 
             // Locks on all servers are now set and safe until forcing
 
-            if ( currLock["ts"] == lockDetails["ts"] ) {
+            if ( currLock[LockFields::lockID()] == lockDetails[LockFields::lockID()] ) {
                 LOG( logLvl - 1 ) << "lock update won, completing lock propagation for '" << lockName << "'" << endl;
                 gotLock = true;
             }
@@ -829,7 +855,7 @@ namespace mongo {
 
                 // Register the lock for deletion, to speed up failover
                 // Not strictly necessary, but helpful
-                distLockPinger.addUnlockOID( lockDetails["ts"].OID() );
+                distLockPinger.addUnlockOID( lockDetails[LockFields::lockID()].OID() );
 
                 gotLock = false;
             }
@@ -854,17 +880,17 @@ namespace mongo {
                 BSONObjIterator bi( lockDetails );
                 while( bi.more() ) {
                     BSONElement el = bi.next();
-                    if( (string) ( el.fieldName() ) == "state" )
-                        finalLockDetails.append( "state", 2 );
+                    if( (string) ( el.fieldName() ) == LockFields::state() )
+                        finalLockDetails.append( LockFields::state(), 2 );
                     else finalLockDetails.append( el );
                 }
 
-                conn->update( locksNS , _id , BSON( "$set" << finalLockDetails.obj() ) );
+                conn->update( ConfigNS::locks , BSON( LockFields::name(_name) ) , BSON( "$set" << finalLockDetails.obj() ) );
 
                 BSONObj err = conn->getLastErrorDetailed();
                 string errMsg = DBClientWithCommands::getLastErrorString(err);
 
-                currLock = conn->findOne( locksNS , _id );
+                currLock = conn->findOne( ConfigNS::locks , BSON( LockFields::name(_name) ) );
 
                 if ( !errMsg.empty() || !err["n"].type() || err["n"].numberInt() < 1 ) {
                     warning() << "could not finalize winning lock " << lockName
@@ -881,7 +907,7 @@ namespace mongo {
                 conn.done();
 
                 // Register the bad final lock for deletion, in case it exists
-                distLockPinger.addUnlockOID( lockDetails["ts"].OID() );
+                distLockPinger.addUnlockOID( lockDetails[LockFields::lockID()].OID() );
 
                 throw LockException( str::stream() << "exception finalizing winning lock"
                                      << causedBy( e ), 13662 );
@@ -894,7 +920,8 @@ namespace mongo {
 
         // Log our lock results
         if(gotLock)
-            LOG( logLvl - 1 ) << "distributed lock '" << lockName << "' acquired, ts : " << currLock["ts"].OID() << endl;
+            LOG( logLvl - 1 ) << "distributed lock '" << lockName <<
+                "' acquired, ts : " << currLock[LockFields::lockID()].OID() << endl;
         else
             LOG( logLvl - 1 ) << "distributed lock '" << lockName << "' was not acquired." << endl;
 
@@ -927,18 +954,21 @@ namespace mongo {
             try {
 
                 if( oldLock.isEmpty() )
-                    oldLock = conn->findOne( locksNS, _id );
+                    oldLock = conn->findOne( ConfigNS::locks, BSON( LockFields::name(_name) ) );
 
-                if( oldLock["state"].eoo() || oldLock["state"].numberInt() != 2 || oldLock["ts"].eoo() ) {
+                if( oldLock[LockFields::state()].eoo() ||
+                    oldLock[LockFields::state()].numberInt() != 2 ||
+                    oldLock[LockFields::lockID()].eoo() ) {
                     warning() << "cannot unlock invalid distributed lock " << oldLock << endl;
                     conn.done();
                     break;
                 }
 
                 // Use ts when updating lock, so that new locks can be sure they won't get trampled.
-                conn->update( locksNS ,
-                              BSON( "_id" << _id["_id"].String() << "ts" << oldLock["ts"].OID() ),
-                              BSON( "$set" << BSON( "state" << 0 ) ) );
+                conn->update( ConfigNS::locks ,
+                              BSON( LockFields::name(_name)
+                                  << LockFields::lockID(oldLock[LockFields::lockID()].OID()) ),
+                              BSON( "$set" << BSON( LockFields::state(0) ) ) );
 
                 // Check that the lock was actually unlocked... if not, try again
                 BSONObj err = conn->getLastErrorDetailed();
@@ -970,13 +1000,13 @@ namespace mongo {
             }
         }
 
-        if( attempted > maxAttempts && ! oldLock.isEmpty() && ! oldLock["ts"].eoo() ) {
+        if( attempted > maxAttempts && ! oldLock.isEmpty() && ! oldLock[LockFields::lockID()].eoo() ) {
 
-            LOG( logLvl - 1 ) << "could not unlock distributed lock with ts " << oldLock["ts"].OID()
-                              << ", will attempt again later" << endl;
+            LOG( logLvl - 1 ) << "could not unlock distributed lock with ts " <<
+                oldLock[LockFields::lockID()].OID() << ", will attempt again later" << endl;
 
             // We couldn't unlock the lock at all, so try again later in the pinging thread...
-            distLockPinger.addUnlockOID( oldLock["ts"].OID() );
+            distLockPinger.addUnlockOID( oldLock[LockFields::lockID()].OID() );
         }
         else if( attempted > maxAttempts ) {
             warning() << "could not unlock untracked distributed lock, a manual force may be required" << endl;
