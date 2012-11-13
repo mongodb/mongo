@@ -30,17 +30,6 @@
 BOOST_STATIC_ASSERT( sizeof(mongo::OID) == 12 );
 
 namespace mongo {
-
-    namespace {
-        SecureRandom* mySecureRandom = NULL;
-        SecureRandom* getMySecureRandom() {
-            if ( mySecureRandom == NULL ) {
-                mySecureRandom = SecureRandom::create();
-            }
-            return mySecureRandom;
-        }
-    }
-    
     void OID::hash_combine(size_t &seed) const {
         boost::hash_combine(seed, x);
         boost::hash_combine(seed, y);
@@ -74,7 +63,9 @@ namespace mongo {
     OID::MachineAndPid OID::genMachineAndPid() {
         BOOST_STATIC_ASSERT( sizeof(mongo::OID::MachineAndPid) == 5 );
 
-        int64_t n = getMySecureRandom()->nextInt64();
+        // we only call this once per process
+        scoped_ptr<SecureRandom> sr( SecureRandom::create() );
+        int64_t n = sr->nextInt64();
         OID::MachineAndPid x = ourMachine = reinterpret_cast<OID::MachineAndPid&>(n);
         foldInPid(x);
         return x;
@@ -111,7 +102,8 @@ namespace mongo {
     }
 
     void OID::init() {
-        static AtomicUInt inc = static_cast<unsigned>( getMySecureRandom()->nextInt64() );
+        scoped_ptr<SecureRandom> sr( SecureRandom::create() );
+        static AtomicUInt inc = static_cast<unsigned>( sr->nextInt64() );
 
         {
             unsigned t = (unsigned) time(0);
