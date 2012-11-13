@@ -1507,7 +1507,7 @@ namespace mongo {
         virtual void addRequiredPrivileges(const std::string& dbname,
                                            const BSONObj& cmdObj,
                                            std::vector<Privilege>* out) {
-            // TODO: Should this have no auth since it's not supported in mongos anyway?
+            // TODO: Should this require no auth since it's not supported in mongos anyway?
             ActionSet actions;
             actions.addAction(ActionType::replSetGetStatus);
             out->push_back(Privilege(AuthorizationManager::SERVER_RESOURCE_NAME, actions));

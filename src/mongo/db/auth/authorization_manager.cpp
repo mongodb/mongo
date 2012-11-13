@@ -94,6 +94,7 @@ namespace mongo {
         dbAdminRoleActions.addAction(ActionType::validate);
 
         // Server admin role
+        // TODO: should applyOps go here?
         serverAdminRoleActions.addAction(ActionType::closeAllDatabases);
         serverAdminRoleActions.addAction(ActionType::connPoolStats);
         serverAdminRoleActions.addAction(ActionType::connPoolSync);
