@@ -16,11 +16,14 @@
  *    limitations under the License.
  */
 
+#include <set>
+
 #include "mongo/platform/random.h"
 
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
+
     TEST( RandomTest, Seed1 ) {
 #ifndef _WIN32
         PseudoRandom a( 12 );
@@ -31,6 +34,34 @@ namespace mongo {
         }
 #endif
     }
+
+    TEST( RandomTest, Seed2 ) {
+        PseudoRandom a( 12 );
+        PseudoRandom b( 12 );
+
+        for ( int i = 0; i < 100; i++ ) {
+            ASSERT_EQUALS( a.nextInt64(), b.nextInt64() );
+        }
+    }
+
+    TEST( RandomTest, R1 ) {
+        PseudoRandom a( 11 );
+        std::set<int32_t> s;
+        for ( int i = 0; i < 100; i++ ) {
+            s.insert( a.nextInt32() );
+        }
+        ASSERT_EQUALS( 100U, s.size() );
+    }
+
+    TEST( RandomTest, R2 ) {
+        PseudoRandom a( 11 );
+        std::set<int64_t> s;
+        for ( int i = 0; i < 100; i++ ) {
+            s.insert( a.nextInt64() );
+        }
+        ASSERT_EQUALS( 100U, s.size() );
+    }
+
 
     TEST( RandomTest, Secure1 ) {
         SecureRandom* a = SecureRandom::create();

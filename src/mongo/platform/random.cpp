@@ -48,6 +48,15 @@ namespace mongo {
         return rand_r( &_seed );
     }
 #endif
+    PseudoRandom::PseudoRandom( int64_t seed ) {
+        _seed = static_cast<uint32_t>( seed );
+    }
+
+    int64_t PseudoRandom::nextInt64() {
+        int64_t a = nextInt32();
+        int64_t b = nextInt32();
+        return ( a << 32 ) | b;
+    }
 
     // --- SecureRandom ----
 
