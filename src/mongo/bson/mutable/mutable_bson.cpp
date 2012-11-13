@@ -440,36 +440,66 @@ ElementRep& dstRep = _ctx->_elements->_vec[(*sibIt)._rep];
         }
     }
 
+    SafeNum Element::getSafeNumValue() const {
+        switch (_ctx->_elements->_vec[_rep]._type) {
+        case mongo::NumberInt:
+            return SafeNum(_ctx->_elements->_vec[_rep]._value.intVal);
+        case mongo::NumberLong:
+            return SafeNum(static_cast<long long int>(_ctx->_elements->_vec[_rep]._value.longVal));
+        case mongo::NumberDouble:
+            return SafeNum(_ctx->_elements->_vec[_rep]._value.doubleVal);
+        default:
+            return SafeNum();
+        }
+    }
+
+
     void Element::setBoolValue(bool boolVal) {
-        _ctx->_elements->_vec[_rep]._value.boolVal = boolVal;
+        ElementRep& e = _ctx->_elements->_vec[_rep];
+        e._type = mongo::Bool;
+        e._value.boolVal = boolVal;
     }
 
     void Element::setIntValue(int32_t intVal) {
-        _ctx->_elements->_vec[_rep]._value.intVal = intVal;
+        ElementRep& e = _ctx->_elements->_vec[_rep];
+        e._type = mongo::NumberInt;
+        e._value.intVal = intVal;
     }
 
     void Element::setLongValue(int64_t longVal) {
-        _ctx->_elements->_vec[_rep]._value.longVal = longVal;
+        ElementRep& e = _ctx->_elements->_vec[_rep];
+        e._type = mongo::NumberLong;
+        e._value.longVal = longVal;
     }
 
     void Element::setTSValue(OpTime tsVal) {
-        _ctx->_elements->_vec[_rep]._value.tsVal = tsVal.asDate();
+        ElementRep& e = _ctx->_elements->_vec[_rep];
+        e._type = mongo::Timestamp;
+        e._value.tsVal = tsVal.asDate();
     }
 
     void Element::setDateValue(int64_t dateVal) {
-        _ctx->_elements->_vec[_rep]._value.dateVal = dateVal;
+        ElementRep& e = _ctx->_elements->_vec[_rep];
+        e._type = mongo::Date;
+        e._value.dateVal = dateVal;
     }
 
     void Element::setDoubleValue(double doubleVal) {
-        _ctx->_elements->_vec[_rep]._value.doubleVal = doubleVal;
+        ElementRep& e = _ctx->_elements->_vec[_rep];
+        e._type = mongo::NumberDouble;
+        e._value.doubleVal = doubleVal;
     }
 
     void Element::setOIDValue(const StringData& oid) {
-        strncpy(_ctx->_elements->_vec[_rep]._value.shortStr, oid.data(), 12);
+        ElementRep& e = _ctx->_elements->_vec[_rep];
+        e._type = mongo::jstOID;
+        strncpy(e._value.shortStr, oid.data(), 12);
     }
 
     void Element::setRegexValue(const StringData& re) {
+        // type is set to "string" in setStringValue
         setStringValue(re);
+        _ctx->_elements->_vec[_rep]._type = mongo::RegEx;
     }
 
     void Element::setStringValue(const StringData& stringVal) {
@@ -481,6 +511,25 @@ ElementRep& dstRep = _ctx->_elements->_vec[(*sibIt)._rep];
         }
         else {
             e._value.valueRef = _ctx->_heap->putString(stringVal);
+        }
+    }
+
+    void Element::setSafeNumValue(const SafeNum& safeNumVal) {
+        ElementRep& e = _ctx->_elements->_vec[_rep];
+        e._type = safeNumVal.type();
+        switch (e._type) {
+        case mongo::NumberInt:
+            e._value.intVal = safeNumVal._value.int32Val;
+            break;
+        case mongo::NumberLong:
+            e._value.longVal = safeNumVal._value.int64Val;
+            break;
+        case mongo::NumberDouble:
+            e._value.doubleVal = safeNumVal._value.doubleVal;
+            break;
+        default:
+            // Invalid type - e._type was set to EOO above, so we're done
+            break;
         }
     }
 
@@ -728,6 +777,10 @@ ElementRep& dstRep = _ctx->_elements->_vec[(*sibIt)._rep];
     void Element::appendBinary( const StringData& fieldName,
         uint32_t len, mongo::BinDataType binType, const void* data) {
         addChild(_ctx->makeBinaryElement(fieldName, len, binType, data));
+    }
+
+    void Element::appendSafeNum(const StringData& fieldName, const SafeNum num) {
+        addChild(_ctx->makeSafeNumElement(fieldName, num));
     }
 
     void Element::appendElement(const StringData& fieldName, Element e) {
@@ -1040,6 +1093,29 @@ ElementRep& dstRep = _ctx->_elements->_vec[(*sibIt)._rep];
         return Element(this,EMPTY_REP);
     }
 
+    Element Context::makeSafeNumElement(const StringData& fieldName, const SafeNum& safeNum) {
+        uint32_t rep = _elements->size();
+        uint32_t nameref = _heap->putString(fieldName);
+        ValueType val;
+
+        switch (safeNum.type()) {
+        case mongo::NumberInt:
+            val.intVal = safeNum._value.int32Val;
+            break;
+        case mongo::NumberLong:
+            val.longVal = safeNum._value.int64Val;
+            break;
+        case mongo::NumberDouble:
+            val.doubleVal = safeNum._value.doubleVal;
+            break;
+        default:
+            // Invalid SafeNum - type is set to EOO below
+            break;
+        }
+
+        _elements->push_back(ElementRep(safeNum.type(), nameref, val));
+        return Element(this, rep);
+    }
 
     //
     // Iterator base class

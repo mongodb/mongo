@@ -18,6 +18,8 @@
 
 #include "mongo/db/btreebuilder.h"
 
+#include "mongo/db/btreecursor.h"
+#include "mongo/db/pdfile.h"
 #include "mongo/platform/cstdint.h"
 
 #include "mongo/dbtests/dbtests.h"
@@ -58,7 +60,8 @@ namespace BtreeBuilderTests {
                                                                                  lenWHdr ) );
             memcpy( infoRecord->data(), indexInfo.objdata(), indexInfo.objsize() );
             addRecordToRecListInExtent( infoRecord, infoLoc );
-            IndexDetails& id = nsdetails( _ns )->addIndex( _ns );
+            IndexDetails& id = nsdetails( _ns )->getNextIndexDetails( _ns );
+            nsdetails( _ns )->addIndex( _ns );
             id.info.writing() = infoLoc;
             return id;
         }

@@ -20,8 +20,16 @@
 #include "mongo/platform/random.h"
 
 #include <cstdlib>
+#include <iostream>
+#include <fstream>
+
+#ifndef _WIN32
+#include <errno.h>
+#endif
 
 namespace mongo {
+
+    // ---- PseudoRandom  -----
 
 #ifdef _WIN32
 #pragma warning( disable : 4715 ) // not all control paths return a value
@@ -37,6 +45,85 @@ namespace mongo {
     int32_t PseudoRandom::nextInt32() {
         return rand_r( &_seed );
     }
+#endif
+
+    // --- SecureRandom ----
+
+    SecureRandom::~SecureRandom() {
+    }
+
+#ifdef _WIN32
+    class WinSecureRandom : public SecureRandom {
+        virtual ~WinSecureRandom(){}
+        int64_t nextInt64() {
+            uint32_t a, b;
+            if ( rand_s(&a) ) {
+                abort();
+            }
+            if ( rand_s(&b) ) {
+                abort();
+            }
+            return ( static_cast<int64_t>(a) << 32 ) | b;
+        }
+    };
+
+    SecureRandom* SecureRandom::create() {
+        return new WinSecureRandom();
+    }
+
+#elif defined(__linux__) || defined(__sunos__) || defined(__APPLE__)
+
+    class InputStreamSecureRandom : public SecureRandom {
+    public:
+        InputStreamSecureRandom( const char* fn ) {
+            _in = new std::ifstream( fn, std::ios::binary | std::ios::in );
+            if ( ! _in->is_open() ) {
+                std::cerr << "can't open " << fn << " " << strerror(errno) << std::endl;
+                abort();
+            }
+        }
+
+        ~InputStreamSecureRandom() {
+            delete _in;
+        }
+
+        int64_t nextInt64() {
+            int64_t r;
+            _in->read( reinterpret_cast<char*>( &r ), sizeof(r) );
+            if ( _in->fail() ) {
+                abort();
+            }
+            return r;
+        }
+
+    private:
+        std::ifstream* _in;
+    };
+
+    SecureRandom* SecureRandom::create() {
+        return new InputStreamSecureRandom( "/dev/urandom" );
+    }
+
+#else
+    class SRandSecureRandom : public SecureRandom {
+    public:
+        SRandSecureRandom() {
+            srandomdev();
+        }
+
+        int64_t nextInt64() {
+            long a, b;
+            a = random();
+            b = random();
+            return ( static_cast<int64_t>(a) << 32 ) | b;
+        }
+    };
+
+    SecureRandom* SecureRandom::create() {
+        return new SRandSecureRandom();
+    }
+
+
 #endif
 
 }

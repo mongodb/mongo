@@ -18,15 +18,16 @@
 
 #include "pch.h"
 
-#include "../db/commands.h"
-#include "../util/queue.h"
-#include "../util/net/listen.h"
-#include "../db/curop.h"
-#include "../db/client.h"
-#include "mongo/db/commands/server_status.h"
-#include "mongo/util/stacktrace.h"
+#include "mongo/s/d_writeback.h"
 
-#include "d_writeback.h"
+#include "mongo/db/client.h"
+#include "mongo/db/commands.h"
+#include "mongo/db/commands/server_status.h"
+#include "mongo/db/curop.h"
+#include "mongo/platform/random.h"
+#include "mongo/util/net/listen.h"
+#include "mongo/util/queue.h"
+#include "mongo/util/stacktrace.h"
 
 using namespace std;
 
@@ -169,12 +170,13 @@ namespace mongo {
             }
 
 #ifdef _DEBUG
+            PseudoRandom r( time(0) );
             // Sleep a short amount of time usually
-            int sleepFor = rand() % 10;
+            int sleepFor = r.nextInt32( 10 );
             sleepmillis( sleepFor );
 
             // Sleep a longer amount of time every once and awhile
-            int sleepLong = rand() % 50;
+            int sleepLong = r.nextInt32( 50 );
             if( sleepLong == 0 ) sleepsecs( 2 );
 #endif
 

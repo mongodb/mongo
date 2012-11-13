@@ -57,14 +57,21 @@ def push_tag( bucket , tag , extension , gzip=False ):
     os.remove( localName )
 
 
-def push_all():
+def push_all( filter=None):
     tags = run_git("tag -l").strip().split( "\n" )
 
     bucket = simples3.S3Bucket( settings.bucket , settings.id , settings.key )
 
     for tag in tags:
+        if filter and tag.find( filter ) < 0:
+            print( "skipping %s because it doesn't match filter %s" % ( tag, filter ) )
+            continue
         push_tag( bucket , tag , "tar" , True )
         push_tag( bucket , tag , "zip" )
 
 if __name__ == "__main__":
-    push_all()
+    filter = None
+    if len(sys.argv) > 1:
+        filter = sys.argv[1]
+    print( "filter: %s" % filter )
+    push_all(filter)

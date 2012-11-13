@@ -23,7 +23,7 @@
 #include "mongo/util/startup_test.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/pdfile.h"
-#include "mongo/db/btree.h"
+#include "mongo/db/btreecursor.h"
 #include "mongo/db/curop-inl.h"
 #include "mongo/db/matcher.h"
 #include "mongo/db/queryutil.h"
@@ -689,13 +689,19 @@ namespace mongo {
             shared_ptr<FieldRangeVector> frvMax(new FieldRangeVector(*(max._frs), *(max._spec), 1));
 
             min._cursor.reset(
-                            BtreeCursor::make(nsdetails(spec->getDetails()->parentNS().c_str()), *(spec->getDetails()),
-                                               frvMin, -1)
+                            BtreeCursor::make(nsdetails(spec->getDetails()->parentNS().c_str()),
+                                              *(spec->getDetails()),
+                                              frvMin,
+                                              0,
+                                              -1)
                    );
 
             max._cursor.reset(
-                           BtreeCursor::make(nsdetails(spec->getDetails()->parentNS().c_str()), *(spec->getDetails()),
-                                              frvMax, 1)
+                           BtreeCursor::make(nsdetails(spec->getDetails()->parentNS().c_str()),
+                                             *(spec->getDetails()),
+                                             frvMax,
+                                             0,
+                                             1)
                   );
 
             // if(hopper) min.checkCur(found, hopper);
@@ -2520,7 +2526,7 @@ namespace mongo {
 
             int max = 100000;
 
-            auto_ptr<BtreeCursor> bc(BtreeCursor::make(d, geoIdx, id, BSONObj(), BSONObj(), true, 1));
+            auto_ptr<BtreeCursor> bc(BtreeCursor::make(d, id, BSONObj(), BSONObj(), true, 1));
             BtreeCursor &c = *bc;
             while (c.ok() && max--) {
                 GeoHash h(c.currKey().firstElement());

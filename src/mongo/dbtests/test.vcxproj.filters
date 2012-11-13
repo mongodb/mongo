@@ -876,6 +876,87 @@
     <ClInclude Include="..\s\type_collection.h">
       <Filter>s</Filter>
     </ClInclude>
+    <ClInclude Include="..\db\background.h">
+      <Filter>db\Header Files\a to d</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\btreebuilder.h">
+      <Filter>db\Header Files\a to d</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\btreecursor.h">
+      <Filter>db\Header Files\a to d</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\cc_by_loc.h">
+      <Filter>db\Header Files\a to d</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\client.h">
+      <Filter>db\Header Files\a to d</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\client_common.h">
+      <Filter>db\Header Files\a to d</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\cloner.h">
+      <Filter>db\Header Files\a to d</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\compact.h">
+      <Filter>db\Header Files\a to d</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\curop-inl.h">
+      <Filter>db\Header Files\a to d</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\d_globals.h">
+      <Filter>db\Header Files\a to d</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\dur_commitjob.h">
+      <Filter>db\Header Files\a to d</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\dur_journalformat.h">
+      <Filter>db\Header Files\a to d</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\dur_journalimpl.h">
+      <Filter>db\Header Files\a to d</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\dur_recover.h">
+      <Filter>db\Header Files\a to d</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\dur_stats.h">
+      <Filter>db\Header Files\a to d</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\filever.h">
+      <Filter>db\Header Files\e to n</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\hashindex.h">
+      <Filter>db\Header Files\e to n</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\index.h">
+      <Filter>db\Header Files\e to n</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\index_insertion_continuation.h">
+      <Filter>db\Header Files\e to n</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\index_rebuilder.h">
+      <Filter>db\Header Files\e to n</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\indexkey.h">
+      <Filter>db\Header Files\e to n</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\initialize_server_global_state.h">
+      <Filter>db\Header Files\e to n</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\instance.h">
+      <Filter>db\Header Files\e to n</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\interrupt_status.h">
+      <Filter>db\Header Files\e to n</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\key.h">
+      <Filter>db\Header Files\e to n</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\memconcept.h">
+      <Filter>db\Header Files\e to n</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\module.h">
+      <Filter>db\Header Files\e to n</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\client\connpool.cpp">
@@ -1863,6 +1944,9 @@
     </ClCompile>
     <ClCompile Include="..\s\type_collection.cpp">
       <Filter>s</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\index_rebuilder.cpp">
+      <Filter>db\Source Files\e to n</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

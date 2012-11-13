@@ -515,29 +515,6 @@ namespace mongo {
         }
     };
 
-    /**
-     * For the lifetime of this object, an index build is indicated on the specified
-     * namespace and the newest index is marked as absent.  This simplifies
-     * the cleanup required on recovery.
-     */
-    class RecoverableIndexState {
-    public:
-        RecoverableIndexState( NamespaceDetails *d ) : _d( d ) {
-            indexBuildInProgress() = 1;
-            nIndexes()--;
-        }
-        ~RecoverableIndexState() {
-            DESTRUCTOR_GUARD (
-                nIndexes()++;
-                indexBuildInProgress() = 0;
-            )
-        }
-    private:
-        int &nIndexes() { return getDur().writingInt( _d->nIndexes ); }
-        int &indexBuildInProgress() { return getDur().writingInt( _d->indexBuildInProgress ); }
-        NamespaceDetails *_d;
-    };
-
     // throws DBException
     void buildAnIndex(const std::string& ns,
                       NamespaceDetails* d,
@@ -550,9 +527,7 @@ namespace mongo {
         unsigned long long n;
 
         verify( !BackgroundOperation::inProgForNs(ns.c_str()) ); // should have been checked earlier, better not be...
-        verify( d->indexBuildInProgress == 0 );
         verify( Lock::isWriteLocked(ns) );
-        RecoverableIndexState recoverable( d );
 
         // Build index spec here in case the collection is empty and the index details are invalid
         idx.getSpec();
@@ -676,7 +651,8 @@ namespace mongo {
                 d->nIndexes = 0;
             }
             if ( idIndex ) {
-                d->addIndex(ns) = *idIndex;
+                d->getNextIndexDetails(ns) = *idIndex;
+                d->addIndex(ns);
                 wassert( d->nIndexes == 1 );
             }
             /* assuming here that id index is not multikey: */

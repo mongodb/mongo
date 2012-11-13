@@ -230,7 +230,7 @@ namespace mongo {
         BSONObj _getExtremeKey( int sort ) const;
 
         /** initializes _dataWritten with a random value so that a mongos restart wouldn't cause delay in splitting */
-        static long mkDataWritten();
+        static int mkDataWritten();
 
         ShardKeyPattern skey() const;
     };

@@ -1,8 +1,9 @@
 t = db.jstests_drop2;
 t.drop();
+db.adminCommand({setParameter:1, logLevel:2});
 
 function debug( x ) {
-    //printjson( x );
+    printjson( x );
 }
 
 t.save( {} );
@@ -39,5 +40,7 @@ db.killOp( countOp );
 
 s1();
 s2();
+
+db.adminCommand({setParameter:1, logLevel:0});
 
 t.drop(); // in SERVER-1818, this fails

@@ -23,7 +23,6 @@
 
 #include <boost/filesystem/operations.hpp>
 
-#include "mongo/db/btree.h"
 #include "mongo/db/db.h"
 #include "mongo/db/json.h"
 #include "mongo/db/mongommf.h"
@@ -121,28 +120,6 @@ namespace mongo {
     }
 #endif
 
-    void NamespaceDetails::onLoad(const Namespace& k) {
-
-        if( k.isExtra() ) {
-            /* overflow storage for indexes - so don't treat as a NamespaceDetails object. */
-            return;
-        }
-
-        if( indexBuildInProgress ) {
-            verify( Lock::isW() ); // TODO(erh) should this be per db?
-            if( indexBuildInProgress ) {
-                log() << "indexBuildInProgress was " << indexBuildInProgress << " for " << k << ", indicating an abnormal db shutdown" << endl;
-                getDur().writingInt( indexBuildInProgress ) = 0;
-            }
-        }
-    }
-
-    static void namespaceOnLoadCallback(const Namespace& k, NamespaceDetails& v) {
-        v.onLoad(k);
-    }
-
-    bool checkNsFilesOnLoad = true;
-
     NOINLINE_DECL void NamespaceIndex::_init() {
         verify( !ht );
 
@@ -195,8 +172,6 @@ namespace mongo {
 
         verify( len <= 0x7fffffff );
         ht = new HashTable<Namespace,NamespaceDetails>(p, (int) len, "namespace index");
-        if( checkNsFilesOnLoad )
-            ht->iterAll(namespaceOnLoadCallback);
     }
 
     static void namespaceGetNamespacesCallback( const Namespace& k , NamespaceDetails& v , void * extra ) {
@@ -524,8 +499,7 @@ namespace mongo {
         NamespaceDetailsTransient::get(thisns).clearQueryCache();
     }
 
-    /* you MUST call when adding an index.  see pdfile.cpp */
-    IndexDetails& NamespaceDetails::addIndex(const char *thisns, bool resetTransient) {
+    IndexDetails& NamespaceDetails::getNextIndexDetails(const char* thisns) {
         IndexDetails *id;
         try {
             id = &idx(nIndexes,true);
@@ -534,11 +508,13 @@ namespace mongo {
             allocExtra(thisns, nIndexes);
             id = &idx(nIndexes,false);
         }
-
-        (*getDur().writing(&nIndexes))++;
-        if ( resetTransient )
-            NamespaceDetailsTransient::get(thisns).addedIndex();
         return *id;
+    }
+
+    /* you MUST call when adding an index.  see pdfile.cpp */
+    void NamespaceDetails::addIndex(const char* thisns) {
+        (*getDur().writing(&nIndexes))++;
+        NamespaceDetailsTransient::get(thisns).addedIndex();
     }
 
     // must be called when renaming a NS to fix up extra

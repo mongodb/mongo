@@ -18,6 +18,7 @@
 
 #include "mongo/db/hashindex.h"
 
+#include "mongo/db/btreecursor.h"
 #include "mongo/db/json.h"
 #include "mongo/db/queryutil.h"
 
@@ -131,7 +132,7 @@ namespace mongo {
 
         const shared_ptr< BtreeCursor > cursor(
                 BtreeCursor::make( nsdetails( _spec->getDetails()->parentNS().c_str()),
-                        *( _spec->getDetails() ),  newVector , 1 ) );
+                        *( _spec->getDetails() ), newVector, 0, 1 ) );
         cursor->setMatcher( forceDocMatcher );
         return cursor;
     }

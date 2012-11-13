@@ -396,8 +396,8 @@ else:
     boostVersion = "-" + boostVersion
 
 if ( not ( usesm or usev8 or justClientLib) ):
-    usesm = True
-    options_topass["usesm"] = True
+    usev8 = True
+    options_topass["usev8"] = True
 
 extraLibPlaces = []
 

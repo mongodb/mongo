@@ -22,9 +22,9 @@ namespace mongo {
 
     using mongoutils::str::stream;
 
-    const string CollectionType::ConfigNS = "config.collections";
-    BSONField<string> CollectionType::ns("_id");
-    BSONField<string> CollectionType::primary("primary");
+    const std::string CollectionType::ConfigNS = "config.collections";
+    BSONField<std::string> CollectionType::ns("_id");
+    BSONField<std::string> CollectionType::primary("primary");
     BSONField<BSONObj> CollectionType::keyPattern("key");
     BSONField<bool> CollectionType::unique("unique");
     BSONField<Date_t> CollectionType::createdAt("createdAt");
@@ -42,8 +42,8 @@ namespace mongo {
     CollectionType::~CollectionType() {
     }
 
-    bool CollectionType::isValid(string* errMsg) const {
-        string dummy;
+    bool CollectionType::isValid(std::string* errMsg) const {
+        std::string dummy;
         if (errMsg == NULL) {
             errMsg = &dummy;
         }
@@ -160,7 +160,7 @@ namespace mongo {
         other->_epoch = _epoch;
     }
 
-    string CollectionType::toString() const {
+    std::string CollectionType::toString() const {
         return toBSON().toString();
     }
 

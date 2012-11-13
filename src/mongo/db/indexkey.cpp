@@ -19,9 +19,9 @@
 #include "pch.h"
 #include "namespace-inl.h"
 #include "index.h"
-#include "btree.h"
 #include "background.h"
 #include "../util/stringutils.h"
+#include "mongo/util/mongoutils/str.h"
 #include "../util/text.h"
 
 namespace mongo {
@@ -296,7 +296,12 @@ namespace mongo {
             bool haveArrField = !arrField.eoo();
 
             // An index component field name cannot exist in both a document array and one of that array's children.
-            uassert( 15855 ,  str::stream() << "Ambiguous field name found in array (do not use numeric field names in embedded elements in an array), field: '" << arrField.fieldName() << "' for array: " << arr, !haveObjField || !haveArrField );
+            uassert( 15855,
+                     mongoutils::str::stream() <<
+                         "Ambiguous field name found in array (do not use numeric field names in "
+                         "embedded elements in an array), field: '" << arrField.fieldName() <<
+                         "' for array: " << arr,
+                     !haveObjField || !haveArrField );
 
             arrayNestedArray = false;
 			if ( haveObjField ) {

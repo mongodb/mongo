@@ -1,7 +1,7 @@
 // @file chunk.cpp
 
 /**
- *    Copyright (C) 2008 10gen Inc.
+ *    Copyright (C) 2008-2012 10gen Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -18,20 +18,20 @@
 
 #include "pch.h"
 
-#include "../client/connpool.h"
-#include "../db/queryutil.h"
-#include "../util/startup_test.h"
-#include "../util/timer.h"
+#include "mongo/client/connpool.h"
 #include "mongo/client/dbclientcursor.h"
-
-#include "chunk.h"
-#include "chunk_diff.h"
-#include "config.h"
-#include "cursors.h"
-#include "grid.h"
-#include "strategy.h"
-#include "client_info.h"
+#include "mongo/db/queryutil.h"
+#include "mongo/platform/random.h"
+#include "mongo/s/chunk.h"
+#include "mongo/s/chunk_diff.h"
+#include "mongo/s/client_info.h"
+#include "mongo/s/config.h"
+#include "mongo/s/cursors.h"
+#include "mongo/s/grid.h"
 #include "mongo/util/concurrency/ticketholder.h"
+#include "mongo/s/strategy.h"
+#include "mongo/util/startup_test.h"
+#include "mongo/util/timer.h"
 
 namespace mongo {
 
@@ -79,8 +79,9 @@ namespace mongo {
         : _manager(info), _min(min), _max(max), _shard(shard), _lastmod(lastmod), _jumbo(false), _dataWritten(mkDataWritten())
     {}
 
-    long Chunk::mkDataWritten() {
-        return rand() % ( MaxChunkSize / ChunkManager::SplitHeuristics::splitTestFactor );
+    int Chunk::mkDataWritten() {
+        PseudoRandom r( time(0) );
+        return r.nextInt32( MaxChunkSize / ChunkManager::SplitHeuristics::splitTestFactor );
     }
 
     string Chunk::getns() const {

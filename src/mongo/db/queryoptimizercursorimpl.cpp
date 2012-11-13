@@ -21,7 +21,7 @@
 
 #include "mongo/db/queryoptimizercursorimpl.h"
 
-#include "mongo/db/btree.h"
+#include "mongo/db/btreecursor.h"
 #include "mongo/db/queryoptimizer.h"
 
 namespace mongo {
@@ -459,8 +459,7 @@ namespace mongo {
                 if ( idxNo >= 0 ) {
                     IndexDetails& i = d->idx( idxNo );
                     BSONObj key = i.getKeyFromQuery( _query );
-                    return shared_ptr<Cursor>( BtreeCursor::make( d, idxNo, i, key, key, true,
-                                                                 1 ) );
+                    return shared_ptr<Cursor>( BtreeCursor::make( d, i, key, key, true, 1 ) );
                 }
             }
         }

@@ -16,7 +16,6 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "mongo/db/btree.h"
 #include "mongo/db/hasher.h"
 #include "mongo/db/index.h"
 #include "mongo/db/keypattern.h"

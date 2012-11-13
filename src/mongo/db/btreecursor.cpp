@@ -1,5 +1,3 @@
-// btreecursor.cpp
-
 /**
 *    Copyright (C) 2008 10gen Inc.
 *
@@ -18,9 +16,10 @@
 
 #include "mongo/pch.h"
 
+#include "mongo/db/btreecursor.h"
+
 #include "mongo/db/btree.h"
 #include "mongo/db/curop-inl.h"
-#include "mongo/db/jsobj.h"
 #include "mongo/db/kill_current_op.h"
 #include "mongo/db/pdfile.h"
 #include "mongo/db/queryutil.h"
@@ -190,21 +189,6 @@ namespace mongo {
     template class BtreeCursorImpl<V0>;
     template class BtreeCursorImpl<V1>;
 
-    BtreeCursor* BtreeCursor::make(
-        NamespaceDetails *_d, const IndexDetails& _id,
-        const shared_ptr< FieldRangeVector > &_bounds, int _direction )
-    {
-        return make( _d, _d->idxNo( (IndexDetails&) _id), _id, _bounds, 0, _direction );
-    }
-
-    BtreeCursor* BtreeCursor::make(
-        NamespaceDetails *_d, const IndexDetails& _id,
-        const BSONObj &startKey, const BSONObj &endKey, bool endKeyInclusive, int direction)
-    {
-        return make( _d, _d->idxNo( (IndexDetails&) _id), _id, startKey, endKey, endKeyInclusive, direction );
-    }
-
-
     BtreeCursor* BtreeCursor::make( NamespaceDetails * nsd , int idxNo , const IndexDetails& indexDetails ) {
         int v = indexDetails.version();
         
@@ -219,22 +203,26 @@ namespace mongo {
         return 0; // not reachable
     }
     
-    BtreeCursor* BtreeCursor::make(
-        NamespaceDetails *d, int idxNo, const IndexDetails& id, 
-        const BSONObj &startKey, const BSONObj &endKey, bool endKeyInclusive, int direction) 
-    { 
-        auto_ptr<BtreeCursor> c( make( d , idxNo , id ) );
+    BtreeCursor* BtreeCursor::make( NamespaceDetails* namespaceDetails,
+                                    const IndexDetails& id,
+                                    const BSONObj& startKey,
+                                    const BSONObj& endKey,
+                                    bool endKeyInclusive,
+                                    int direction ) {
+        auto_ptr<BtreeCursor> c( make( namespaceDetails, namespaceDetails->idxNo( id ), id ) );
         c->init(startKey,endKey,endKeyInclusive,direction);
         c->initWithoutIndependentFieldRanges();
         dassert( c->_dups.size() == 0 );
         return c.release();
     }
 
-    BtreeCursor* BtreeCursor::make(
-        NamespaceDetails *d, int idxNo, const IndexDetails& id, 
-        const shared_ptr< FieldRangeVector > &bounds, int singleIntervalLimit, int direction )
+    BtreeCursor* BtreeCursor::make( NamespaceDetails* namespaceDetails,
+                                    const IndexDetails& id,
+                                    const shared_ptr<FieldRangeVector>& bounds,
+                                    int singleIntervalLimit,
+                                    int direction )
     {
-        auto_ptr<BtreeCursor> c( make( d , idxNo , id ) );
+        auto_ptr<BtreeCursor> c( make( namespaceDetails, namespaceDetails->idxNo( id ), id ) );
         c->init(bounds,singleIntervalLimit,direction);
         return c.release();
     }

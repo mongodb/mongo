@@ -19,6 +19,7 @@
 #include "mongo/db/index_update.h"
 
 #include "mongo/db/btree.h"
+#include "mongo/db/btreecursor.h"
 #include "mongo/db/compact.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/kill_current_op.h"
@@ -64,7 +65,8 @@ namespace IndexUpdateTests {
                                                                                  lenWHdr ) );
             memcpy( infoRecord->data(), indexInfo.objdata(), indexInfo.objsize() );
             addRecordToRecListInExtent( infoRecord, infoLoc );
-            IndexDetails& id = nsdetails( _ns )->addIndex( _ns );
+            IndexDetails& id = nsdetails( _ns )->getNextIndexDetails( _ns );
+            nsdetails( _ns )->addIndex( _ns );
             id.info.writing() = infoLoc;
             return id;
         }

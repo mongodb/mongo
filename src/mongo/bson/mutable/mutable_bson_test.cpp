@@ -592,6 +592,40 @@ namespace {
         ASSERT_EQUALS((++it).done(), true);
     }
 
+    TEST(Element, setters) {
+        mongo::mutablebson::BasicHeap myHeap;
+        mongo::mutablebson::Context ctx(&myHeap);
+
+        mongo::mutablebson::Element t0 = ctx.makeNullElement("t0");
+
+        t0.setBoolValue(true);
+        ASSERT_EQUALS(mongo::Bool, t0.type());
+
+        t0.setIntValue(12345);
+        ASSERT_EQUALS(mongo::NumberInt, t0.type());
+
+        t0.setLongValue(12345LL);
+        ASSERT_EQUALS(mongo::NumberLong, t0.type());
+
+        t0.setTSValue(mongo::OpTime());
+        ASSERT_EQUALS(mongo::Timestamp, t0.type());
+
+        t0.setDateValue(12345LL);
+        ASSERT_EQUALS(mongo::Date, t0.type());
+
+        t0.setDoubleValue(123.45);
+        ASSERT_EQUALS(mongo::NumberDouble, t0.type());
+
+        t0.setOIDValue("012345678901");
+        ASSERT_EQUALS(mongo::jstOID, t0.type());
+
+        t0.setRegexValue("[a-zA-Z]?");
+        ASSERT_EQUALS(mongo::RegEx, t0.type());
+
+        t0.setStringValue("foo bar baz");
+        ASSERT_EQUALS(mongo::String, t0.type());
+    }
+
     TEST(TimestampType, createElement) {
         mongo::mutablebson::BasicHeap myHeap;
         mongo::mutablebson::Context ctx(&myHeap);
@@ -634,5 +668,67 @@ namespace {
         ASSERT_EQUALS(it.done(), false);
         ASSERT(mongo::OpTime(1352151971, 471) ==
             mongo::mutablebson::Element(&ctx, it.getRep()).getTSValue());
+    }
+
+    TEST(SafeNumType, createElement) {
+        mongo::mutablebson::BasicHeap myHeap;
+        mongo::mutablebson::Context ctx(&myHeap);
+
+        mongo::mutablebson::Element t0 = ctx.makeSafeNumElement("t0", mongo::SafeNum(123.456));
+        ASSERT_EQUALS(mongo::SafeNum(123.456), t0.getSafeNumValue());
+    }
+
+    // Try getting SafeNums from different types.
+    TEST(SafeNumType, getSafeNum) {
+        mongo::mutablebson::BasicHeap myHeap;
+        mongo::mutablebson::Context ctx(&myHeap);
+
+        mongo::mutablebson::Element t0 = ctx.makeIntElement("t0", 1234567890);
+        ASSERT_EQUALS(1234567890, t0.getIntValue());
+        mongo::SafeNum num = t0.getSafeNumValue();
+        ASSERT_EQUALS(num, 1234567890);
+
+        t0.setLongValue(1234567890LL);
+        ASSERT_EQUALS(1234567890LL, t0.getLongValue());
+        num = t0.getSafeNumValue();
+        ASSERT_EQUALS(num, 1234567890LL);
+
+        t0.setDoubleValue(123.456789);
+        ASSERT_EQUALS(123.456789, t0.getDoubleValue());
+        num = t0.getSafeNumValue();
+        ASSERT_EQUALS(num, 123.456789);
+    }
+
+    TEST(SafeNumType, setSafeNum) {
+        mongo::mutablebson::BasicHeap myHeap;
+        mongo::mutablebson::Context ctx(&myHeap);
+
+        mongo::mutablebson::Element t0 = ctx.makeSafeNumElement("t0", mongo::SafeNum(123456));
+        t0.setSafeNumValue(mongo::SafeNum(654321));
+        ASSERT_EQUALS(mongo::SafeNum(654321), t0.getSafeNumValue());
+
+        // Try setting to other types and back to SafeNum
+        t0.setLongValue(1234567890);
+        ASSERT_EQUALS(1234567890LL, t0.getLongValue());
+        t0.setSafeNumValue(mongo::SafeNum(1234567890));
+        ASSERT_EQUALS(mongo::SafeNum(1234567890), t0.getSafeNumValue());
+
+        t0.setStringValue("foo bar baz");
+        ASSERT_EQUALS("foo bar baz", std::string(t0.getStringValue()));
+        t0.setSafeNumValue(mongo::SafeNum(12345));
+        ASSERT_EQUALS(mongo::SafeNum(12345), t0.getSafeNumValue());
+    }
+
+    TEST(SafeNumType, appendElement) {
+        mongo::mutablebson::BasicHeap myHeap;
+        mongo::mutablebson::Context ctx(&myHeap);
+
+        mongo::mutablebson::Element t0 = ctx.makeObjElement("e0");
+        t0.appendSafeNum("a timestamp field", mongo::SafeNum(1352151971LL));
+
+        mongo::mutablebson::FilterIterator it = t0.find("a timestamp field");
+        ASSERT_EQUALS(it.done(), false);
+        ASSERT_EQUALS(mongo::SafeNum(1352151971LL),
+            mongo::mutablebson::Element(&ctx, it.getRep()).getSafeNumValue());
     }
 } // unnamed namespace

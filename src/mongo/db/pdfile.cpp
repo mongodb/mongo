@@ -1404,36 +1404,58 @@ namespace mongo {
         }
 
         int idxNo = tableToIndex->nIndexes;
-        IndexDetails& idx = tableToIndex->addIndex(tabletoidxns.c_str(), !background); // clear transient info caches so they refresh; increments nIndexes
-        getDur().writingDiskLoc(idx.info) = loc;
+
         try {
-            buildAnIndex(tabletoidxns, tableToIndex, idx, idxNo, background, mayInterrupt);
+            IndexDetails& idx = tableToIndex->getNextIndexDetails(tabletoidxns.c_str());
+            // It's important that this is outside the inner try/catch so that we never try to call
+            // kill_idx on a half-formed disk loc (if this asserts).
+            getDur().writingDiskLoc(idx.info) = loc;
+
+            try {
+                getDur().writingInt(tableToIndex->indexBuildInProgress) = 1;
+                buildAnIndex(tabletoidxns, tableToIndex, idx, idxNo, background, mayInterrupt);
+            }
+            catch (DBException& e) {
+                // save our error msg string as an exception or dropIndexes will overwrite our message
+                LastError *le = lastError.get();
+                int savecode = 0;
+                string saveerrmsg;
+                if ( le ) {
+                    savecode = le->code;
+                    saveerrmsg = le->msg;
+                }
+                else {
+                    savecode = e.getCode();
+                    saveerrmsg = e.what();
+                }
+
+                // roll back this index
+                idx.kill_idx();
+
+                verify(le && !saveerrmsg.empty());
+                setLastError(savecode,saveerrmsg.c_str());
+                throw;
+            }
+
+            // clear transient info caches so they refresh; increments nIndexes
+            tableToIndex->addIndex(tabletoidxns.c_str());
+            getDur().writingInt(tableToIndex->indexBuildInProgress) = 0;
         }
-        catch( DBException& e ) {
-            // save our error msg string as an exception or dropIndexes will overwrite our message
-            LastError *le = lastError.get();
-            int savecode = 0;
-            string saveerrmsg;
-            if ( le ) {
-                savecode = le->code;
-                saveerrmsg = le->msg;
-            }
-            else {
-                savecode = e.getCode();
-                saveerrmsg = e.what();
+        catch (...) {
+            // Generally, this will be called as an exception from building the index bubbles up.
+            // Thus, the index will have already been cleaned up.  This catch just ensures that the
+            // metadata is consistent on any exception. It may leak like a sieve if the index
+            // successfully finished building and addIndex or kill_idx threw.
+
+            // Check if nIndexes was incremented
+            if (idxNo < tableToIndex->nIndexes) {
+                // TODO: this will have to change when we can have multiple simultanious index
+                // builds
+                getDur().writingInt(tableToIndex->nIndexes) -= 1;
             }
 
-            // roll back this index
-            string name = idx.indexName();
-            BSONObjBuilder b;
-            string errmsg;
-            bool ok = dropIndexes(tableToIndex, tabletoidxns.c_str(), name.c_str(), errmsg, b, true);
-            if( !ok ) {
-                log() << "failed to drop index after a unique key error building it: " << errmsg << ' ' << tabletoidxns << ' ' << name << endl;
-            }
+            getDur().writingInt(tableToIndex->indexBuildInProgress) = 0;
 
-            verify( le && !saveerrmsg.empty() );
-            setLastError(savecode,saveerrmsg.c_str());
             throw;
         }
     }

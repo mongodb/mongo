@@ -22,7 +22,7 @@
 #include "mongo/db/index.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/pdfile.h"
-#include "mongo/db/btree.h"
+#include "mongo/db/btreecursor.h"
 #include "mongo/db/curop-inl.h"
 #include "mongo/db/matcher.h"
 #include "mongo/db/geo/core.h"
@@ -173,7 +173,7 @@ namespace mongo {
             return c;
         }
 
-        void searchCommand(NamespaceDetails* nsd, int idxNo,
+        void searchCommand(NamespaceDetails* nsd,
                             const BSONObj& n /*near*/, double maxDistance, const BSONObj& search,
                             BSONObjBuilder& result, unsigned limit) {
             Timer t;
@@ -219,8 +219,12 @@ namespace mongo {
                     set<DiskLoc> thisPass;
 
                     // Lookup from key to key, inclusive.
-                    scoped_ptr<BtreeCursor> cursor(BtreeCursor::make(nsd, idxNo, *getDetails(),
-                                                   key, key, true, 1));
+                    scoped_ptr<BtreeCursor> cursor(BtreeCursor::make(nsd,
+                                                                     *getDetails(),
+                                                                     key,
+                                                                     key,
+                                                                     true,
+                                                                     1));
                     while (cursor->ok() && !hopper.limitReached()) {
                         pair<set<DiskLoc>::iterator, bool> p = thisPass.insert(cursor->currLoc());
                         // If a new element was inserted (haven't seen the DiskLoc before), p.second
@@ -346,7 +350,7 @@ namespace mongo {
             if (cmdObj["limit"].isNumber())
                 limit = static_cast<unsigned>(cmdObj["limit"].numberInt());
 
-            si->searchCommand(nsd, idxNum, nearElt.Obj(), maxDistance.numberDouble(), search.Obj(),
+            si->searchCommand(nsd, nearElt.Obj(), maxDistance.numberDouble(), search.Obj(),
                               result, limit);
             return 1;
         }

@@ -20,8 +20,6 @@
 #include "../util/time_support.h"
 #include <fstream>
 
-extern int do_md5_test(void);
-
 namespace mongo {
 
     BOOST_STATIC_ASSERT( sizeof(nonce64) == 8 );
@@ -48,10 +46,6 @@ namespace mongo {
         srandomdev();
 #endif
 
-#ifndef NDEBUG
-        if ( do_md5_test() )
-            massert( 10354 , "md5 unit test fails", false);
-#endif
     }
 
     nonce64 Security::__getNonce() { 

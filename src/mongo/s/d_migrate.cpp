@@ -35,7 +35,7 @@
 #include "../db/jsobj.h"
 #include "../db/cmdline.h"
 #include "../db/queryoptimizer.h"
-#include "../db/btree.h"
+#include "mongo/db/btreecursor.h"
 #include "../db/repl_block.h"
 #include "../db/dur.h"
 #include "../db/clientcursor.h"
