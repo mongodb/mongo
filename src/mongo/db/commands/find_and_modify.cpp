@@ -270,7 +270,7 @@ namespace mongo {
                 uassert(13330, "upsert mode requires query field", !origQuery.isEmpty());
                 db.update(ns, origQuery, update.embeddedObjectUserCheck(), true);
 
-                BSONObj gle = db.getLastErrorDetailed();
+                BSONObj gle = db.getLastErrorDetailed(dbname);
                 result.append("lastErrorObject", gle);
                 if (gle["err"].type() == String) {
                     errmsg = gle["err"].String();
@@ -292,7 +292,7 @@ namespace mongo {
                     uassert(12515, "can't remove and update", cmdObj["update"].eoo());
                     db.remove(ns, QUERY("_id" << out["_id"]), 1);
 
-                    BSONObj gle = db.getLastErrorDetailed();
+                    BSONObj gle = db.getLastErrorDetailed(dbname);
                     result.append("lastErrorObject", gle);
                     if (gle["err"].type() == String) {
                         errmsg = gle["err"].String();
@@ -324,7 +324,7 @@ namespace mongo {
                     uassert(12516, "must specify remove or update", !update.eoo());
                     db.update(ns, q, update.embeddedObjectUserCheck());
 
-                    BSONObj gle = db.getLastErrorDetailed();
+                    BSONObj gle = db.getLastErrorDetailed(dbname);
                     result.append("lastErrorObject", gle);
                     if (gle["err"].type() == String) {
                         errmsg = gle["err"].String();
