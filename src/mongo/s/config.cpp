@@ -1034,7 +1034,7 @@ namespace mongo {
                 LOG(1) << "replicaSetChange: shard not found for set: " << monitor->getServerAddress() << endl;
                 return;
             }
-            scoped_ptr<ScopedDbConnection> conn( ScopedDbConnection::getScopedDbConnection(
+            scoped_ptr<ScopedDbConnection> conn( ScopedDbConnection::getInternalScopedDbConnection(
                     configServer.getConnectionString().toString(), 30.0 ) );
             conn->get()->update(ConfigNS::shard,
                                 BSON(ShardFields::name(s.getName())),
@@ -1042,9 +1042,9 @@ namespace mongo {
                                      BSON(ShardFields::host(monitor->getServerAddress()))));
             conn->done();
         }
-        catch ( DBException& e ) {
-            error() << "RSChangeWatcher: could not update config db for set: " << monitor->getName() << " to: " << monitor->getServerAddress()
-            << causedBy( e ) << endl;
+        catch (DBException& e) {
+            error() << "RSChangeWatcher: could not update config db for set: " << monitor->getName()
+                    << " to: " << monitor->getServerAddress() << causedBy(e) << endl;
         }
     }
 
