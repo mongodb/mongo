@@ -1042,8 +1042,9 @@ namespace mongo {
                                      BSON(ShardFields::host(monitor->getServerAddress()))));
             conn->done();
         }
-        catch ( DBException & ) {
-            error() << "RSChangeWatcher: could not update config db for set: " << monitor->getName() << " to: " << monitor->getServerAddress() << endl;
+        catch ( DBException& e ) {
+            error() << "RSChangeWatcher: could not update config db for set: " << monitor->getName() << " to: " << monitor->getServerAddress()
+            << causedBy( e ) << endl;
         }
     }
 
