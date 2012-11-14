@@ -461,7 +461,7 @@ namespace mongo {
         if (seen || ps::rolling[ps::bigHash(region)].access( region , offset , false ) ) {
         
 #ifdef _DEBUG
-            if ( blockSupported && ! ProcessInfo::blockInMemory( const_cast<char*>(data) ) ) {
+            if ( blockSupported && ! ProcessInfo::blockInMemory(data) ) {
                 warning() << "we think data is in ram but system says no"  << endl;
             }
 #endif
