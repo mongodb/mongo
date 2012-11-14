@@ -418,9 +418,9 @@ namespace mongo {
         /**
          * Helper for ASSERT_APPROX_EQUAL to ensure that the arguments are evaluated only once.
          */
-        template < typename A, typename B, typename ERR >
+        template < typename A, typename B, typename ABSOLUTE_ERR >
         inline void assertApproxEqual(const std::string& aexp, const std::string& bexp,
-                                      const A& a, const B& b, const ERR& absoluteErr,
+                                      const A& a, const B& b, const ABSOLUTE_ERR& absoluteErr,
                                       const std::string& file , unsigned line) {
             if (std::abs(a - b) <= absoluteErr)
                 return;
