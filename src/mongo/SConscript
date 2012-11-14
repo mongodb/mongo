@@ -92,6 +92,10 @@ env.CppUnitTest('namespacestring_test', ['db/namespacestring_test.cpp'],
 
 env.CppUnitTest('bson_extract_test', ['bson/util/bson_extract_test.cpp'], LIBDEPS=['bson'])
 
+env.CppUnitTest('descriptive_stats_test',
+                ['util/descriptive_stats_test.cpp'],
+                LIBDEPS=['foundation', 'bson']);
+
 commonFiles = [ "pch.cpp",
                 "buildinfo.cpp",
                 "db/hasher.cpp",
