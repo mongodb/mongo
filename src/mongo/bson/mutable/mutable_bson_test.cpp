@@ -449,17 +449,17 @@ namespace {
 
         mongo::mutablebson::Element e1 = ctx.makeArrayElement("a");
         mongo::mutablebson::Element e2 = ctx.makeIntElement("", 10);
-        ASSERT_EQUALS(10, e2.Int());
+        ASSERT_EQUALS(10, e2.getIntValue());
         mongo::mutablebson::Element e3 = ctx.makeIntElement("", 20);
-        ASSERT_EQUALS(20, e3.Int());
+        ASSERT_EQUALS(20, e3.getIntValue());
         mongo::mutablebson::Element e4 = ctx.makeIntElement("", 30);
-        ASSERT_EQUALS(30, e4.Int());
+        ASSERT_EQUALS(30, e4.getIntValue());
         mongo::mutablebson::Element e5 = ctx.makeIntElement("", 40);
-        ASSERT_EQUALS(40, e5.Int());
+        ASSERT_EQUALS(40, e5.getIntValue());
         mongo::mutablebson::Element e6 = ctx.makeIntElement("", 5);
-        ASSERT_EQUALS(5, e6.Int());
+        ASSERT_EQUALS(5, e6.getIntValue());
         mongo::mutablebson::Element e7 = ctx.makeIntElement("", 0);
-        ASSERT_EQUALS(0, e7.Int());
+        ASSERT_EQUALS(0, e7.getIntValue());
     
         ASSERT_EQUALS(e1.pushBack(e2), mongo::Status::OK());
         ASSERT_EQUALS(e1.pushBack(e3), mongo::Status::OK());
@@ -474,83 +474,83 @@ namespace {
 
         mongo::mutablebson::Element e(&ctx, EMPTY_REP);
         ASSERT_EQUALS(e1.get(0, &e), mongo::Status::OK());
-        ASSERT_EQUALS(0, e.Int());
+        ASSERT_EQUALS(0, e.getIntValue());
         ASSERT_EQUALS(e1.get(1, &e), mongo::Status::OK());
-        ASSERT_EQUALS(5, e.Int());
+        ASSERT_EQUALS(5, e.getIntValue());
         ASSERT_EQUALS(e1.get(2, &e), mongo::Status::OK());
-        ASSERT_EQUALS(10, e.Int());
+        ASSERT_EQUALS(10, e.getIntValue());
         ASSERT_EQUALS(e1.get(3, &e), mongo::Status::OK());
-        ASSERT_EQUALS(20, e.Int());
+        ASSERT_EQUALS(20, e.getIntValue());
         ASSERT_EQUALS(e1.get(4, &e), mongo::Status::OK());
-        ASSERT_EQUALS(30, e.Int());
+        ASSERT_EQUALS(30, e.getIntValue());
         ASSERT_EQUALS(e1.get(5, &e), mongo::Status::OK());
-        ASSERT_EQUALS(40, e.Int());
+        ASSERT_EQUALS(40, e.getIntValue());
 
         ASSERT_EQUALS(e1.peekBack(&e), mongo::Status::OK());
-        ASSERT_EQUALS(40, e.Int());
+        ASSERT_EQUALS(40, e.getIntValue());
         ASSERT_EQUALS(e1.popBack(), mongo::Status::OK());
         ASSERT_EQUALS(e1.arraySize(&n), mongo::Status::OK());
         ASSERT_EQUALS(5, (int)n);
         ASSERT_EQUALS(e1.get(0, &e), mongo::Status::OK());
-        ASSERT_EQUALS(0, e.Int());
+        ASSERT_EQUALS(0, e.getIntValue());
         ASSERT_EQUALS(e1.get(1, &e), mongo::Status::OK());
-        ASSERT_EQUALS(5, e.Int());
+        ASSERT_EQUALS(5, e.getIntValue());
         ASSERT_EQUALS(e1.get(2, &e), mongo::Status::OK());
-        ASSERT_EQUALS(10, e.Int());
+        ASSERT_EQUALS(10, e.getIntValue());
         ASSERT_EQUALS(e1.get(3, &e), mongo::Status::OK());
-        ASSERT_EQUALS(20, e.Int());
+        ASSERT_EQUALS(20, e.getIntValue());
         ASSERT_EQUALS(e1.get(4, &e), mongo::Status::OK());
-        ASSERT_EQUALS(30, e.Int());
+        ASSERT_EQUALS(30, e.getIntValue());
 
         ASSERT_EQUALS(e1.peekFront(&e), mongo::Status::OK());
-        ASSERT_EQUALS(0, e.Int());
+        ASSERT_EQUALS(0, e.getIntValue());
         ASSERT_EQUALS(e1.popFront(), mongo::Status::OK());
         ASSERT_EQUALS(e1.arraySize(&n), mongo::Status::OK());
         ASSERT_EQUALS(4, (int)n);
         ASSERT_EQUALS(e1.get(0, &e), mongo::Status::OK());
-        ASSERT_EQUALS(5, e.Int());
+        ASSERT_EQUALS(5, e.getIntValue());
         ASSERT_EQUALS(e1.get(1, &e), mongo::Status::OK());
-        ASSERT_EQUALS(10, e.Int());
+        ASSERT_EQUALS(10, e.getIntValue());
         ASSERT_EQUALS(e1.get(2, &e), mongo::Status::OK());
-        ASSERT_EQUALS(20, e.Int());
+        ASSERT_EQUALS(20, e.getIntValue());
         ASSERT_EQUALS(e1.get(3, &e), mongo::Status::OK());
-        ASSERT_EQUALS(30, e.Int());
+        ASSERT_EQUALS(30, e.getIntValue());
 
         ASSERT_EQUALS(e1.peekFront(&e), mongo::Status::OK());
-        ASSERT_EQUALS(5, e.Int());
+        ASSERT_EQUALS(5, e.getIntValue());
         ASSERT_EQUALS(e1.popFront(), mongo::Status::OK());
         ASSERT_EQUALS(e1.arraySize(&n), mongo::Status::OK());
         ASSERT_EQUALS(3, (int)n);
         ASSERT_EQUALS(e1.get(0, &e), mongo::Status::OK());
-        ASSERT_EQUALS(10, e.Int());
+        ASSERT_EQUALS(10, e.getIntValue());
         ASSERT_EQUALS(e1.get(1, &e), mongo::Status::OK());
-        ASSERT_EQUALS(20, e.Int());
+        ASSERT_EQUALS(20, e.getIntValue());
         ASSERT_EQUALS(e1.get(2, &e), mongo::Status::OK());
-        ASSERT_EQUALS(30, e.Int());
+        ASSERT_EQUALS(30, e.getIntValue());
 
         ASSERT_EQUALS(e1.peekBack(&e), mongo::Status::OK());
-        ASSERT_EQUALS(30, e.Int());
+        ASSERT_EQUALS(30, e.getIntValue());
         ASSERT_EQUALS(e1.popBack(), mongo::Status::OK());
         ASSERT_EQUALS(e1.arraySize(&n), mongo::Status::OK());
         ASSERT_EQUALS(2, (int)n);
         ASSERT_EQUALS(e1.get(0, &e), mongo::Status::OK());
-        ASSERT_EQUALS(10, e.Int());
+        ASSERT_EQUALS(10, e.getIntValue());
         ASSERT_EQUALS(e1.get(1, &e), mongo::Status::OK());
-        ASSERT_EQUALS(20, e.Int());
+        ASSERT_EQUALS(20, e.getIntValue());
 
         ASSERT_EQUALS(e1.peekFront(&e), mongo::Status::OK());
-        ASSERT_EQUALS(10, e.Int());
+        ASSERT_EQUALS(10, e.getIntValue());
         ASSERT_EQUALS(e1.popFront(), mongo::Status::OK());
         ASSERT_EQUALS(e1.arraySize(&n), mongo::Status::OK());
         ASSERT_EQUALS(1, (int)n);
         ASSERT_EQUALS(e1.get(0, &e), mongo::Status::OK());
-        ASSERT_EQUALS(20, e.Int());
+        ASSERT_EQUALS(20, e.getIntValue());
         
         mongo::mutablebson::Element e8 = ctx.makeIntElement("", 100);
-        ASSERT_EQUALS(100, e8.Int());
+        ASSERT_EQUALS(100, e8.getIntValue());
         ASSERT_EQUALS(e1.set(0, e8), mongo::Status::OK());
         ASSERT_EQUALS(e1.peekFront(&e), mongo::Status::OK());
-        ASSERT_EQUALS(100, e.Int());
+        ASSERT_EQUALS(100, e.getIntValue());
     }
 
 

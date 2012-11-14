@@ -421,6 +421,9 @@ ElementRep& dstRep = _ctx->_elements->_vec[(*sibIt)._rep];
     OpTime Element::getTSValue() const {
         return OpTime(_ctx->_elements->_vec[_rep]._value.tsVal);
     }
+    int64_t Element::getDateValue() const {
+        return _ctx->_elements->_vec[_rep]._value.dateVal;
+    }
     double Element::getDoubleValue() const {
         return _ctx->_elements->_vec[_rep]._value.doubleVal;
     }
@@ -534,67 +537,11 @@ ElementRep& dstRep = _ctx->_elements->_vec[(*sibIt)._rep];
     }
 
     //
-    // Element BSONElement compatibility
-    //
-
-    std::string Element::String() const {
-        ElementRep& e = _ctx->_elements->_vec[_rep];
-        if (isInlineType()) return e._value.shortStr;
-        return _ctx->getHeap()->getString(e._value.valueRef);
-    }
-
-    Date_t Element::Date() const {
-        return Date_t();
-    }
-
-    double Element::Number() const {
-        ElementRep& e = _ctx->_elements->_vec[_rep];
-        switch (type()) {
-        case mongo::NumberDouble: return e._value.doubleVal; break;
-        case mongo::Bool: return e._value.boolVal; break;
-        case mongo::NumberInt: return e._value.intVal; break;
-        case mongo::NumberLong : return e._value.longVal; break;
-
-        case mongo::String: case mongo::Object: case mongo::Array: case mongo::BinData:
-        case mongo::Undefined: case mongo::jstOID: case mongo::Date: case mongo::jstNULL:
-        case mongo::RegEx: case mongo::Symbol: case mongo::CodeWScope: case mongo::Timestamp :
-        case mongo::MaxKey: case mongo::MinKey: case mongo::EOO:
-        default: return 0.0;
-        }
-    }
-
-    double Element::Double() const {
-        return _ctx->_elements->_vec[_rep]._value.doubleVal;
-    }
-
-    long long Element::Long() const {
-        return _ctx->_elements->_vec[_rep]._value.longVal;
-    }
-
-    int Element::Int() const {
-        return _ctx->_elements->_vec[_rep]._value.intVal;
-    }
-
-    bool Element::Bool() const {
-        return _ctx->_elements->_vec[_rep]._value.boolVal;
-    }
-
-    mongo::OID Element::OID() const {
-        return mongo::OID(&_ctx->_elements->_vec[_rep]._value.shortStr[0]);
-    }
-
-    /* stub */
-    const void* Element::BinData() const {
-        return NULL;
-    }
-
-
-    //
     // decoders
     //
 
     Status Element::prefix(std::string* result, char delim) const {
-        std::string s = String();
+        std::string s = getStringValue();
         size_t n = s.find(delim);
         if (n == std::string::npos) {
             return Status(ErrorCodes::IllegalOperation, "expecting regex format /PAT/flags");
@@ -608,7 +555,7 @@ ElementRep& dstRep = _ctx->_elements->_vec[(*sibIt)._rep];
     }
 
     Status Element::suffix(std::string* result, char delim) const {
-        std::string s = String();
+        std::string s = getStringValue();
         size_t n = s.find(delim);
         if (n == std::string::npos) {
             return Status(ErrorCodes::IllegalOperation, "expecting regex format ./.pat/flags");
@@ -796,22 +743,22 @@ ElementRep& dstRep = _ctx->_elements->_vec[(*sibIt)._rep];
         switch (type()) {
         case mongo::MinKey: os << "MinKey"; break;
         case mongo::EOO: os << "EOO"; break;
-        case mongo::NumberDouble: os << Double(); break;
-        case mongo::String: os << "\"" << String() << "\""; break;
+        case mongo::NumberDouble: os << getDoubleValue(); break;
+        case mongo::String: os << "\"" << getStringValue() << "\""; break;
         case mongo::Object: break;
         case mongo::Array: break;
-        case mongo::BinData: os << "|" << String() << "|"; break;
+        case mongo::BinData: os << "|" << getStringValue() << "|"; break;
         case mongo::Undefined: os << "Undefined"; break;
         case mongo::jstOID: os << OID(); break;
-        case mongo::Bool: os << Bool(); break;
-        case mongo::Date: os << Date(); break;
+        case mongo::Bool: os << getBoolValue(); break;
+        case mongo::Date: os << getDateValue(); break;
         case mongo::jstNULL: os << "jstNULL"; break;
-        case mongo::RegEx: os << "Regex(\"" << String() << "\")"; break;
-        case mongo::Symbol: os << "Symbol(\"" << String() << "\")"; break;
-        case mongo::CodeWScope: os << "CodeWithScope(\"" << String() << "\")"; break;
-        case mongo::NumberInt: os << Int(); break;
-        case mongo::Timestamp : os << Date(); break;
-        case mongo::NumberLong : os << Long(); break;
+        case mongo::RegEx: os << "Regex(\"" << getStringValue() << "\")"; break;
+        case mongo::Symbol: os << "Symbol(\"" << getStringValue() << "\")"; break;
+        case mongo::CodeWScope: os << "CodeWithScope(\"" << getStringValue() << "\")"; break;
+        case mongo::NumberInt: os << getIntValue(); break;
+        case mongo::Timestamp : os << getDateValue(); break;
+        case mongo::NumberLong : os << getLongValue(); break;
         case mongo::MaxKey: os << "MaxKey"; break;
         default:;
         }

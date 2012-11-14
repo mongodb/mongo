@@ -148,11 +148,11 @@ namespace mutablebson {
             break;
         }
         case NumberDouble: {
-            dst->appendNumber(src.fieldName(), src.Double());
+            dst->appendNumber(src.fieldName(), src.getDoubleValue());
             break;
         }
         case String: {
-            dst->append(src.fieldName(), src.String());
+            dst->append(src.fieldName(), src.getStringValue());
             break;
         }
         case Object: {
@@ -174,7 +174,7 @@ namespace mutablebson {
         case BinData: {
             uint32_t len(0);
             BinDataType subType(mongo::BinDataGeneral);
-            dst->appendBinData(src.fieldName(), len, subType, src.BinData());
+            dst->appendBinData(src.fieldName(), len, subType, src.getStringValue());
             break;
         }
         case Undefined: {
@@ -182,16 +182,16 @@ namespace mutablebson {
             break;
         }
         case jstOID: {
-            mongo::OID oid(src.OID());
+            mongo::OID oid(src.getOIDValue());
             dst->appendOID(src.fieldName(), &oid);
             break;
         }
         case Bool: {
-            dst->appendBool(src.fieldName(), src.Bool());
+            dst->appendBool(src.fieldName(), src.getBoolValue());
             break;
         }
         case Date: {
-            dst->appendDate(src.fieldName(), src.Date());
+            dst->appendDate(src.fieldName(), src.getDateValue());
             break;
         }
         case jstNULL: {
@@ -233,11 +233,11 @@ namespace mutablebson {
         }
 
         case Code: {
-            dst->appendCode(src.fieldName(), src.String().c_str());
+            dst->appendCode(src.fieldName(), src.getStringValue());
             break;
         }
         case Symbol: {
-            dst->appendSymbol(src.fieldName(), src.String().c_str());
+            dst->appendSymbol(src.fieldName(), src.getStringValue());
             break;
         }
         case CodeWScope: {
@@ -258,15 +258,15 @@ namespace mutablebson {
         }
 
         case NumberInt: {
-            dst->appendNumber(src.fieldName(), src.Int());
+            dst->appendNumber(src.fieldName(), src.getIntValue());
             break;
         }
         case Timestamp: {
-            dst->appendTimeT(src.fieldName(), src.Long());
+            dst->appendTimeT(src.fieldName(), src.getLongValue());
             break;
         }
         case NumberLong: {
-            dst->appendNumber(src.fieldName(), src.Long());
+            dst->appendNumber(src.fieldName(), src.getLongValue());
             break;
         }
         case MaxKey: {

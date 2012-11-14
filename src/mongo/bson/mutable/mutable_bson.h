@@ -149,20 +149,6 @@ namespace mutablebson {
         void setRegexValue(const StringData& re);
         void setSafeNumValue(const SafeNum& safeNum);
 
-        //
-        // BSONElement compatibility
-        //
-
-        bool Bool() const;
-        int Int() const;
-        long long Long() const;
-        Date_t Date() const;
-        double Double() const;
-        double Number() const;
-        mongo::OID OID() const;
-        std::string String() const;
-        const void* BinData() const;
-
         // additional methods needed for BSON decoding
         Status prefix(std::string* result, char delim) const;
         Status suffix(std::string* result, char delim) const;
