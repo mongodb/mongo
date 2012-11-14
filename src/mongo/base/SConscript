@@ -17,21 +17,30 @@ env.StaticLibrary('base', ['configuration_variable_manager.cpp',
                            'parse_number.cpp',
                            'status.cpp'])
 
-env.CppUnitTest('status_test', 'status_test.cpp', LIBDEPS=['base'])
+env.CppUnitTest('configuration_variable_manager_test',
+                ['configuration_variable_manager_test.cpp'],
+                LIBDEPS=['base'])
 
 env.CppUnitTest('initializer_dependency_graph_test',
                 ['initializer_dependency_graph_test.cpp'],
+                LIBDEPS=['base'])
+
+env.CppUnitTest('initializer_test',
+                ['initializer_test.cpp'],
                 LIBDEPS=['base'])
 
 env.CppUnitTest('owned_pointer_vector_test',
                 ['owned_pointer_vector_test.cpp'],
                 LIBDEPS=['base'])
 
-env.CppUnitTest('configuration_variable_manager_test',
-                ['configuration_variable_manager_test.cpp'],
+env.CppUnitTest('parse_number_test',
+                ['parse_number_test.cpp'],
                 LIBDEPS=['base'])
 
-env.CppUnitTest('parse_number_test', ['parse_number_test.cpp'], LIBDEPS=['base'])
+env.CppUnitTest('status_test',
+                'status_test.cpp',
+                LIBDEPS=['base'])
 
-env.CppUnitTest('initializer_test', ['initializer_test.cpp'], LIBDEPS=['base'])
-
+env.CppUnitTest('string_data_test',
+                'string_data_test.cpp',
+                LIBDEPS=['$BUILD_DIR/mongo/unittest/unittest'])
