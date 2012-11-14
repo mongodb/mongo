@@ -27,7 +27,13 @@
 
 #include <boost/filesystem/convenience.hpp>
 #include <boost/filesystem/operations.hpp>
+#include <string>
+#include <vector>
 
+#include "mongo/db/auth/action_set.h"
+#include "mongo/db/auth/action_type.h"
+#include "mongo/db/auth/authorization_manager.h"
+#include "mongo/db/auth/privilege.h"
 #include "mongo/db/cmdline.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/curop-inl.h"
@@ -52,7 +58,13 @@ namespace mongo {
         virtual LockType locktype() const { return WRITE; }
 
         virtual void help(stringstream& h) const { h << "internal"; }
-
+        virtual void addRequiredPrivileges(const std::string& dbname,
+                                           const BSONObj& cmdObj,
+                                           std::vector<Privilege>* out) {
+            ActionSet actions;
+            actions.addAction(ActionType::clean);
+            out->push_back(Privilege(parseNs(dbname, cmdObj), actions));
+        }
         bool run(const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
             string dropns = dbname + "." + cmdObj.firstElement().valuestrsafe();
 
@@ -161,6 +173,13 @@ namespace mongo {
                                                         "Add full:true option to do a more thorough check"; }
 
         virtual LockType locktype() const { return READ; }
+        virtual void addRequiredPrivileges(const std::string& dbname,
+                                           const BSONObj& cmdObj,
+                                           std::vector<Privilege>* out) {
+            ActionSet actions;
+            actions.addAction(ActionType::validate);
+            out->push_back(Privilege(parseNs(dbname, cmdObj), actions));
+        }
         //{ validate: "collectionnamewithoutthedbpart" [, scandata: <bool>] [, full: <bool> } */
 
         bool run(const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {

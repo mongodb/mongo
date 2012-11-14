@@ -24,9 +24,15 @@
 
 #include "mongo/db/client.h"
 
+#include <string>
+#include <vector>
+
 #include "mongo/base/status.h"
+#include "mongo/db/auth/action_set.h"
+#include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/auth_external_state_d.h"
+#include "mongo/db/auth/privilege.h"
 #include "mongo/db/db.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/curop-inl.h"
@@ -34,6 +40,7 @@
 #include "mongo/db/dbwebserver.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/json.h"
+#include "mongo/db/jsobj.h"
 #include "mongo/db/pagefault.h"
 #include "mongo/db/repl/rs.h"
 #include "mongo/s/d_logic.h"
@@ -439,6 +446,13 @@ namespace mongo {
         virtual LockType locktype() const { return NONE; }
         virtual bool slaveOk() const { return true; }
         virtual bool adminOnly() const { return false; }
+        virtual void addRequiredPrivileges(const std::string& dbname,
+                                           const BSONObj& cmdObj,
+                                           std::vector<Privilege>* out) {
+            ActionSet actions;
+            actions.addAction(ActionType::handshake);
+            out->push_back(Privilege(AuthorizationManager::SERVER_RESOURCE_NAME, actions));
+        }
         virtual bool run(const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             Client& c = cc();
             c.gotHandshake( cmdObj );
