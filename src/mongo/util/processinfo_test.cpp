@@ -16,10 +16,8 @@
 
 #include <vector>
 
-#include "boost/scoped_array.hpp"
-
-#include "mongo/unittest/unittest.h"
 #include "mongo/util/processinfo.h"
+#include "mongo/unittest/unittest.h"
 
 using mongo::ProcessInfo;
 
@@ -41,27 +39,20 @@ namespace mongo_test {
 
     TEST(ProcessInfo, BlockInMemoryDoesNotThrowIfSupported) {
         if (ProcessInfo::blockCheckSupported()) {
-            boost::scoped_array<char> ptr(new char[ProcessInfo::getPageSize() * PAGES]);
-            ProcessInfo::blockInMemory(ptr.get() + ProcessInfo::getPageSize() * 2);
+            static char ptr[4096 * PAGES] = "This needs data to not be in .bss";
+            ProcessInfo::blockInMemory(ptr + ProcessInfo::getPageSize() * 2);
         }
     }
 
     TEST(ProcessInfo, PagesInMemoryIsSensible) {
         if (ProcessInfo::blockCheckSupported()) {
-            static volatile char ptr[4096 * PAGES];
-            ptr[1] = 'a';
+            static char ptr[4096 * PAGES] = "This needs data to not be in .bss";
+            ptr[(ProcessInfo::getPageSize() * 0) + 1] = 'a';
+            ptr[(ProcessInfo::getPageSize() * 8) + 1] = 'a';
             std::vector<char> result;
             ASSERT_TRUE(ProcessInfo::pagesInMemory(const_cast<char*>(ptr), PAGES, &result));
             ASSERT_TRUE(result[0]);
-            ASSERT_FALSE(result[1]);
-            ASSERT_FALSE(result[2]);
-            ASSERT_FALSE(result[3]);
-            ASSERT_FALSE(result[4]);
-            ASSERT_FALSE(result[5]);
-            ASSERT_FALSE(result[6]);
-            ASSERT_FALSE(result[7]);
-            ASSERT_FALSE(result[8]);
-            ASSERT_FALSE(result[9]);
+            ASSERT_TRUE(result[8]);
         }
     }
 }
