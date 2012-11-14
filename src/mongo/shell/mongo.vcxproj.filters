@@ -242,9 +242,6 @@
     <ClCompile Include="..\db\lasterror.cpp">
       <Filter>db\Source FIles</Filter>
     </ClCompile>
-    <ClCompile Include="..\db\nonce.cpp">
-      <Filter>db\Source FIles</Filter>
-    </ClCompile>
     <ClCompile Include="..\util\debug_util.cpp">
       <Filter>util\Source Files</Filter>
     </ClCompile>
@@ -580,6 +577,9 @@
     </ClCompile>
     <ClCompile Include="..\bson\mutable\mutable_bson_internal.cpp">
       <Filter>bson\mutable</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\processinfo.cpp">
+      <Filter>util\Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -1375,6 +1375,27 @@
     </ClInclude>
     <ClInclude Include="..\bson\mutable\mutable_bson_internal.h">
       <Filter>bson\mutable</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\fail_point_service.h">
+      <Filter>util\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\moveablebuffer.h">
+      <Filter>util\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\string_map.h">
+      <Filter>util\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\string_map_internal.h">
+      <Filter>util\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\string_writer.h">
+      <Filter>util\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\unordered_fast_key_table.h">
+      <Filter>util\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\unordered_fast_key_table_internal.h">
+      <Filter>util\Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

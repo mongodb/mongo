@@ -904,6 +904,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="..\util\fail_point.cpp" />
     <ClCompile Include="..\util\fail_point_registry.cpp" />
     <ClCompile Include="..\util\net\ssl_manager.cpp" />
+    <ClCompile Include="..\util\processinfo.cpp" />
     <ClCompile Include="..\util\safe_num.cpp" />
     <ClCompile Include="..\util\time_support.cpp" />
     <ClCompile Include="linenoise_utf8.cpp" />
@@ -976,7 +977,6 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="..\client\dbclient_rs.cpp" />
     <ClCompile Include="..\client\syncclusterconnection.cpp" />
     <ClCompile Include="..\db\lasterror.cpp" />
-    <ClCompile Include="..\db\nonce.cpp" />
     <ClCompile Include="..\..\third_party\pcre-8.30\pcrecpp.cc" />
     <ClCompile Include="..\..\third_party\pcre-8.30\pcre_chartables.c" />
     <ClCompile Include="..\..\third_party\pcre-8.30\pcre_compile.c" />
@@ -1148,8 +1148,15 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="..\scripting\bson_template_evaluator.h" />
     <ClInclude Include="..\util\fail_point.h" />
     <ClInclude Include="..\util\fail_point_registry.h" />
+    <ClInclude Include="..\util\fail_point_service.h" />
+    <ClInclude Include="..\util\moveablebuffer.h" />
     <ClInclude Include="..\util\net\ssl_manager.h" />
     <ClInclude Include="..\util\safe_num.h" />
+    <ClInclude Include="..\util\string_map.h" />
+    <ClInclude Include="..\util\string_map_internal.h" />
+    <ClInclude Include="..\util\string_writer.h" />
+    <ClInclude Include="..\util\unordered_fast_key_table.h" />
+    <ClInclude Include="..\util\unordered_fast_key_table_internal.h" />
     <ClInclude Include="linenoise_utf8.h" />
     <ClInclude Include="mk_wcwidth.h" />
     <ClInclude Include="..\..\third_party\pcre-8.30\config.h" />
