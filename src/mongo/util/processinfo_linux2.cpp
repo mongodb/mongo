@@ -451,19 +451,26 @@ namespace mongo {
         return true;
     }
 
-    bool ProcessInfo::blockInMemory( char * start ) {
-        static long pageSize = 0;
-        if ( pageSize == 0 ) {
-            pageSize = sysconf( _SC_PAGESIZE );
-        }
-        start = start - ( (unsigned long long)start % pageSize );
+    bool ProcessInfo::blockInMemory(const void* start) {
         unsigned char x = 0;
-        if ( mincore( start , 128 , &x ) ) {
+        if (mincore(const_cast<void*>(alignToStartOfPage(start)), getPageSize(), &x)) {
             log() << "mincore failed: " << errnoWithDescription() << endl;
             return 1;
         }
         return x & 0x1;
     }
 
+    bool ProcessInfo::pagesInMemory(const void* start, size_t numPages, vector<char>* out) {
+        out->resize(numPages);
+        if (mincore(const_cast<void*>(alignToStartOfPage(start)), numPages * getPageSize(),
+                    reinterpret_cast<unsigned char*>(&out->front()))) {
+            log() << "mincore failed: " << errnoWithDescription() << endl;
+            return false;
+        }
+        for (size_t i = 0; i < numPages; ++i) {
+            (*out)[i] &= 0x1; 
+        }
+        return true;
+    }
 
 }

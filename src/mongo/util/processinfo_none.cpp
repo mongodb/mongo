@@ -57,9 +57,12 @@ namespace mongo {
         
     }
 
-    bool ProcessInfo::blockInMemory( char * start ) {
+    bool ProcessInfo::blockInMemory(const void* start) {
         verify(0);
-        return true;
+    }
+
+    bool ProcessInfo::pagesInMemory(const void* start, size_t numPages, vector<bool>* out) {
+        verify(0);
     }
 
 }
