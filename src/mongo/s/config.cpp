@@ -1033,15 +1033,16 @@ namespace mongo {
                 log(1) << "replicaSetChange: shard not found for set: " << monitor->getServerAddress() << endl;
                 return;
             }
-            scoped_ptr<ScopedDbConnection> conn( ScopedDbConnection::getScopedDbConnection(
+            scoped_ptr<ScopedDbConnection> conn( ScopedDbConnection::getInternalScopedDbConnection(
                     configServer.getConnectionString().toString(), 30.0 ) );
             conn->get()->update( ShardNS::shard,
                                  BSON( "_id" << s.getName() ),
                                  BSON( "$set" << BSON( "host" << monitor->getServerAddress() ) ) );
             conn->done();
         }
-        catch ( DBException & ) {
-            error() << "RSChangeWatcher: could not update config db for set: " << monitor->getName() << " to: " << monitor->getServerAddress() << endl;
+        catch (DBException& e) {
+            error() << "RSChangeWatcher: could not update config db for set: " << monitor->getName()
+                    << " to: " << monitor->getServerAddress() << causedBy(e) << endl;
         }
     }
 
