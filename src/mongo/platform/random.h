@@ -21,7 +21,7 @@
 
 namespace mongo {
 
-    // TODO, make this is generate 64-bit numbers
+    // TODO(erh) make this is generate 64-bit numbers
     class PseudoRandom {
     public:
         PseudoRandom( int64_t seed );
