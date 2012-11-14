@@ -65,6 +65,8 @@ namespace mongo {
 
         bool operator==(const ActionType& rhs) const;
 
+        std::string toString() const;
+
         // Takes the string representation of a single action type and returns the corresponding
         // ActionType enum.
         static Status parseActionFromString(const std::string& actionString, ActionType* result);
@@ -130,6 +132,10 @@ namespace mongo {
     std::ostream& operator<<(std::ostream& os, const ActionType& at) {
         os << ActionType::actionToString(at);
         return os;
+    }
+
+    std::string ActionType::toString() const {
+        return actionToString(*this);
     }
 
     Status ActionType::parseActionFromString(const std::string& action, ActionType* result) {
