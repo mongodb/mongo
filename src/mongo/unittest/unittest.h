@@ -22,6 +22,7 @@
 
 #pragma once
 
+#include <cmath>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -75,6 +76,13 @@
  */
 #define _ASSERT_COMPARISON(COMPARISON, a, b) mongo::unittest::ComparisonAssertion( \
             #a, #b , __FILE__ , __LINE__ ).assert##COMPARISON( (a), (b) )
+
+/**
+ * Approximate equality assertion. Useful for comparisons on limited precision floating point
+ * values.
+ */
+#define ASSERT_APPROX_EQUAL(a,b,ABSOLUTE_ERR) ::mongo::unittest::assertApproxEqual( \
+            #a, #b, a, b, ABSOLUTE_ERR, __FILE__, __LINE__)
 
 /**
  * Verify that the evaluation of "EXPRESSION" throws an exception of type EXCEPTION_TYPE.
@@ -406,6 +414,20 @@ namespace mongo {
             std::string _aexp;
             std::string _bexp;
         };
+
+        /**
+         * Helper for ASSERT_APPROX_EQUAL to ensure that the arguments are evaluated only once.
+         */
+        template < typename A, typename B, typename ERR >
+        inline void assertApproxEqual(const std::string& aexp, const std::string& bexp,
+                                      const A& a, const B& b, const ERR& absoluteErr,
+                                      const std::string& file , unsigned line) {
+            if (std::abs(a - b) <= absoluteErr)
+                return;
+            TestAssertion(file, line).fail(mongoutils::str::stream()
+                    << "Expected " << aexp << " and " << bexp << " to be within " << absoluteErr
+                    << " of each other ((" << a << ") - (" << b << ") = " << (a - b) << ")");
+        }
 
         /**
          * Hack to support the runaway test observer in dbtests.  This is a hook that
