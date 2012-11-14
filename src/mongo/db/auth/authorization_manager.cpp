@@ -29,12 +29,16 @@
 #include "mongo/db/auth/principal_set.h"
 #include "mongo/db/auth/privilege_set.h"
 #include "mongo/db/client.h"
+#include "mongo/db/security_common.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 
     namespace {
         Principal specialAdminPrincipal("special");
+        const std::string ADMIN_DBNAME = "admin";
+        const std::string LOCAL_DBNAME = "local";
+        const std::string WILDCARD_DBNAME = "*";
     }
 
     // ActionSets for the various system roles.  These ActionSets contain all the actions that
@@ -185,16 +189,6 @@ namespace mongo {
         return Status::OK();
     }
 
-    void AuthorizationManager::grantInternalAuthorization() {
-        Principal* internalPrincipal = new Principal("__system");
-        _authenticatedPrincipals.add(internalPrincipal);
-        ActionSet allActions;
-        allActions.addAllActions();
-        AcquiredPrivilege privilege(Privilege("*", allActions), internalPrincipal);
-        Status status = acquirePrivilege(privilege);
-        verify (status == Status::OK());
-    }
-
     Status AuthorizationManager::getPrivilegeDocument(DBClientBase* conn,
                                                       const std::string& dbname,
                                                       const std::string& userName,
@@ -224,6 +218,44 @@ namespace mongo {
         return !result.isEmpty();
     }
 
+    ActionSet AuthorizationManager::getActionsForOldStyleUser(const std::string& dbname,
+                                                              bool readOnly) {
+        ActionSet actions;
+        if (readOnly) {
+            actions.addAllActionsFromSet(readRoleActions);
+        }
+        else {
+            actions.addAllActionsFromSet(readWriteRoleActions);
+            actions.addAllActionsFromSet(dbAdminRoleActions);
+            actions.addAllActionsFromSet(userAdminRoleActions);
+
+            if (dbname == ADMIN_DBNAME || dbname == LOCAL_DBNAME) {
+                actions.addAllActionsFromSet(serverAdminRoleActions);
+                actions.addAllActionsFromSet(clusterAdminRoleActions);
+            }
+        }
+        return actions;
+    }
+
+    Status AuthorizationManager::acquirePrivilegesFromPrivilegeDocument(
+            const std::string& dbname, Principal* principal, const BSONObj& privilegeDocument) {
+        if (!_authenticatedPrincipals.lookup(principal->getName())) {
+            return Status(ErrorCodes::UserNotFound,
+                          mongoutils::str::stream()
+                                  << "No authenticated principle found with name: "
+                                  << principal->getName(),
+                          0);
+        }
+        if (principal->getName() == internalSecurity.user) {
+            // Grant full access to internal user
+            ActionSet allActions;
+            allActions.addAllActions();
+            AcquiredPrivilege privilege(Privilege(WILDCARD_DBNAME, allActions), principal);
+            return acquirePrivilege(privilege);
+        }
+        return buildPrivilegeSet(dbname, principal, privilegeDocument, &_acquiredPrivileges);
+    }
+
     Status AuthorizationManager::buildPrivilegeSet(const std::string& dbname,
                                                    Principal* principal,
                                                    const BSONObj& privilegeDocument,
@@ -237,7 +269,7 @@ namespace mongo {
         }
         else {
             return Status(ErrorCodes::UnsupportedFormat,
-                          mongoutils::str::stream() << "Invalid privilege document received when"
+                          mongoutils::str::stream() << "Invalid privilege document received when "
                                   "trying to extract privileges: " << privilegeDocument,
                           0);
         }
@@ -255,30 +287,22 @@ namespace mongo {
                                    << privilegeDocument,
                           0);
         }
-
-        bool readOnly = false;
-        ActionSet actions;
-        if (privilegeDocument.hasField("readOnly") && privilegeDocument["readOnly"].trueValue()) {
-            actions.addAllActionsFromSet(readRoleActions);
-            readOnly = true;
-        }
-        else {
-            actions.addAllActionsFromSet(readWriteRoleActions);
-            actions.addAllActionsFromSet(dbAdminRoleActions);
-            actions.addAllActionsFromSet(userAdminRoleActions);
+        if (privilegeDocument["user"].str() != principal->getName()) {
+            return Status(ErrorCodes::BadValue,
+                          mongoutils::str::stream() << "Principal name from privilege document \""
+                                  << privilegeDocument["user"].str()
+                                  << "\" doesn't match name of provided Principal \""
+                                  << principal->getName()
+                                  << "\"",
+                          0);
         }
 
-        if (dbname == "admin" || dbname == "local") {
-            // Make all basic actions available on all databases
-            result->grantPrivilege(AcquiredPrivilege(Privilege("*", actions), principal));
-            // Make server and cluster admin actions available on admin database.
-            if (!readOnly) {
-                actions.addAllActionsFromSet(serverAdminRoleActions);
-                actions.addAllActionsFromSet(clusterAdminRoleActions);
-            }
-        }
-
-        result->grantPrivilege(AcquiredPrivilege(Privilege(dbname, actions), principal));
+        bool readOnly = privilegeDocument.hasField("readOnly") &&
+                privilegeDocument["readOnly"].trueValue();
+        ActionSet actions = getActionsForOldStyleUser(dbname, readOnly);
+        std::string resourceName = (dbname == ADMIN_DBNAME || dbname == LOCAL_DBNAME) ?
+                WILDCARD_DBNAME : dbname;
+        result->grantPrivilege(AcquiredPrivilege(Privilege(resourceName, actions), principal));
 
         return Status::OK();
     }
@@ -296,7 +320,7 @@ namespace mongo {
         if (privilege) {
             return privilege->getPrincipal();
         }
-        privilege = _acquiredPrivileges.getPrivilegeForAction("*", action);
+        privilege = _acquiredPrivileges.getPrivilegeForAction(WILDCARD_DBNAME, action);
         if (privilege) {
             return privilege->getPrincipal();
         }

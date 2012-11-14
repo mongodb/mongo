@@ -67,11 +67,6 @@ namespace mongo {
         // Grant this connection the given privilege.
         Status acquirePrivilege(const AcquiredPrivilege& privilege);
 
-        // This should be called when the connection gets authenticated as the internal user.
-        // This grants a privilege on all the actions for the internal role, with the
-        // internalPrincipal as the principal.
-        void grantInternalAuthorization();
-
         // Checks if this connection has the privileges required to perform the given action
         // on the given resource.  Contains all the authorization logic including handling things
         // like the localhost exception.  If it is authorized, returns the principal that granted
@@ -79,6 +74,12 @@ namespace mongo {
         // not because of a standard user Principal but for a special reason such as the localhost
         // exception, it returns a pointer to specialAdminPrincipal.
         const Principal* checkAuthorization(const std::string& resource, ActionType action) const;
+
+        // Parses the privilege documents and acquires all privileges that the privilege document
+        // grants
+        Status acquirePrivilegesFromPrivilegeDocument(const std::string& dbname,
+                                                      Principal* principal,
+                                                      const BSONObj& privilegeDocument);
 
         // Returns the privilege document with the given user name in the given database. Currently
         // this information comes from the system.users collection in that database.
@@ -89,6 +90,10 @@ namespace mongo {
 
         // Returns true if there exists at least one privilege document in the given database.
         static bool hasPrivilegeDocument(DBClientBase* conn, const std::string& dbname);
+
+        // Given a database name and a readOnly flag return an ActionSet describing all the actions
+        // that an old-style user with those attributes should be given.
+        static ActionSet getActionsForOldStyleUser(const std::string& dbname, bool readOnly);
 
         // Parses the privilege document and returns a PrivilegeSet of all the Capabilities that
         // the privilege document grants.

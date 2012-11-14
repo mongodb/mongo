@@ -16,8 +16,12 @@
 
 #include "mongo/pch.h"
 
+#include "mongo/base/status.h"
+#include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authentication_session.h"
 #include "mongo/db/auth/mongo_authentication_session.h"
+#include "mongo/db/auth/principal.h"
+#include "mongo/db/auth/privilege_set.h"
 #include "mongo/db/client_common.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/db.h"
@@ -27,6 +31,7 @@
 #include "mongo/db/pdfile.h"
 #include "mongo/platform/random.h"
 #include "mongo/util/md5.hpp"
+#include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 
@@ -69,6 +74,18 @@ namespace mongo {
     } cmdGetNonce;
 
     CmdLogout cmdLogout;
+
+    Status authenticateAndAuthorizePrincipal(const std::string& principalName,
+                                             const std::string& dbname,
+                                             const BSONObj& userObj) {
+        AuthorizationManager* authorizationManager =
+                ClientBasic::getCurrent()->getAuthorizationManager();
+        Principal* principal = new Principal(principalName);
+        authorizationManager->addAuthorizedPrincipal(principal);
+        return authorizationManager->acquirePrivilegesFromPrivilegeDocument(dbname,
+                                                                            principal,
+                                                                            userObj);
+    }
 
     bool CmdAuthenticate::run(const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
         log() << " authenticate db: " << dbname << " " << cmdObj << endl;
@@ -140,7 +157,15 @@ namespace mongo {
             return false;
         }
 
+        Status status = authenticateAndAuthorizePrincipal(user, dbname, userObj);
+        uassert(16500,
+                mongoutils::str::stream() << "Problem acquiring privileges for principal \""
+                        << user << "\": " << status.reason(),
+                status == Status::OK());
+
         bool readOnly = userObj["readOnly"].trueValue();
+        // TODO: remove this once all auth checking goes through AuthorizationManager instead of
+        // AuthenticationInfo
         authenticate(dbname, user, readOnly );
         
         
