@@ -22,6 +22,7 @@
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/privilege.h"
+#include "mongo/db/commands/find_and_modify.h"
 #include "../util/net/message.h"
 #include "../db/dbmessage.h"
 #include "../client/connpool.h"
@@ -803,7 +804,11 @@ namespace mongo {
         class FindAndModifyCmd : public PublicGridCommand {
         public:
             FindAndModifyCmd() : PublicGridCommand("findAndModify", "findandmodify") { }
-            // TODO: implement addRequiredPrivileges
+            virtual void addRequiredPrivileges(const std::string& dbname,
+                                               const BSONObj& cmdObj,
+                                               std::vector<Privilege>* out) {
+                find_and_modify::addPrivilegesRequiredForFindAndModify(dbname, cmdObj, out);
+            }
             bool run(const string& dbName, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
                 string collection = cmdObj.firstElement().valuestrsafe();
                 string fullns = dbName + "." + collection;
