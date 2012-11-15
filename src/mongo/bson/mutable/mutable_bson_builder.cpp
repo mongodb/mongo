@@ -31,7 +31,7 @@ namespace mutablebson {
     // ElementBuilder
     //
 
-    Status ElementBuilder::parse(Element* dst, const BSONObj& src) {
+    Status ElementBuilder::parse(const BSONObj& src, Element* dst) {
         Status result(Status::OK());
         Document& doc = *dst->getDocument();
 
@@ -57,14 +57,14 @@ namespace mutablebson {
             }
             case Object: {
                 Element e0 = doc.makeObjElement(fieldName);
-                result = ElementBuilder::parse(&e0, bsonElem.Obj());
+                result = ElementBuilder::parse(bsonElem.Obj(), &e0);
                 if (result.isOK())
                     result = dst->addChild(e0);
                 break;
             }
             case Array: {
                 Element e0 = doc.makeArrayElement(fieldName);
-                result = ElementBuilder::parse(&e0, bsonElem.Obj());
+                result = ElementBuilder::parse(bsonElem.Obj(), &e0);
                 if (result.isOK())
                     result = dst->addChild(e0);
                 break;
@@ -167,6 +167,7 @@ namespace mutablebson {
         case Object: {
             BSONObjBuilder subBuilder(dst->subobjStart(src.fieldName()));
             BSONBuilder::build(src, &subBuilder);
+            subBuilder.doneFast();
             break;
         }
         case Array: {
@@ -178,6 +179,7 @@ namespace mutablebson {
                 e0.rename(oss.str());
                 BSONBuilder::buildFromElement(e0, &subBuilder);
             }
+            subBuilder.doneFast();
             break;
         }
         case BinData: {
@@ -289,7 +291,7 @@ namespace mutablebson {
 
     void BSONBuilder::build(Element src, BSONObjBuilder* dst) {
 
-        SiblingIterator it(src);
+        SiblingIterator it = src.children();
 
         for (; !it.done(); ++it) {
             Element elem = *it;

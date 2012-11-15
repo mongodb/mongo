@@ -24,7 +24,11 @@ namespace mutablebson {
     /** static method for creating a MutableBSON tree from a BSONObj. */
     class ElementBuilder {
     public:
-        static Status parse(Element* dst, const BSONObj& src);
+        static Status parse(const BSONObj& src, Element* dst);
+
+        static Status parse(const BSONObj& src, Document* dst) {
+            return parse(src, &dst->root());
+        }
     };
 
     /** static method for creating BSONObj from MutableBSON */
@@ -32,6 +36,11 @@ namespace mutablebson {
     public:
         static void buildFromElement(Element src, BSONObjBuilder* dst);
         static void build(Element src, BSONObjBuilder* dst);
+
+        static void build(const Document& src, BSONObjBuilder* dst) {
+            return build(src.root(), dst);
+        }
+
     };
 
 } // namespace mutablebson

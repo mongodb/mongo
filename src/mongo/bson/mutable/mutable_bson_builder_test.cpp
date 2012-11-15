@@ -48,12 +48,9 @@ namespace {
 
         int len;
         mongo::BSONObj obj = mongo::fromjson(jsonSample, &len);
-        mongo::mutablebson::Element e = doc.makeObjElement("root");
-        mongo::mutablebson::ElementBuilder::parse(&e, obj); 
-        mongo::mutablebson::SubtreeIterator it(e);
+        mongo::mutablebson::ElementBuilder::parse(obj, &doc);
+        mongo::mutablebson::SubtreeIterator it(doc.root());
 
-        ASSERT_EQUALS(it.done(), false);
-        ASSERT_EQUALS("root", mongo::mutablebson::Element(&doc, it.getRep()).fieldName());
         ASSERT_EQUALS((++it).done(), false);
         ASSERT_EQUALS("_id", mongo::mutablebson::Element(&doc, it.getRep()).fieldName());
         ASSERT_EQUALS((++it).done(), false);
@@ -102,6 +99,13 @@ namespace {
         ASSERT_EQUALS("lastfield", mongo::mutablebson::Element(&doc, it.getRep()).fieldName());
 
         ASSERT_EQUALS((++it).done(), true);
+
+        mongo::BSONObjBuilder builder;
+        mongo::mutablebson::BSONBuilder::build(doc.root(), &builder);
+        mongo::BSONObj built = builder.done();
+
+        // TODO: When both builders are feature complete, add a an assert
+        // that the round tripped objects are equivalent.
     }
 
 } // unnamed namespace
