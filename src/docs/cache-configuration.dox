@@ -22,7 +22,7 @@ and the granularity at which the cache pool is redistributed among
 connections - called the chunk size.
 
 The shared cache implementation assigns a certain amount of cache to each
-participating database. Each database manages its allocated cache 
+participating database. Each database manages its allocated cache
 as it would when not using a shared cache - thus databases using a shared
 cache can have different eviction policies. There is a thread that monitors
 the cache usage of each database and redistributes the cache among
@@ -30,7 +30,7 @@ participants according to where it is most likely to improve performance.
 The cache is redistributed in chunks which are of a configurable size. Once
 a database has had a chunk of cache added or removed it will be given
 time to start effectively using that cache before it is considered for further
-adjustment. If a small chunk size is configured it will take longer for the 
+adjustment. If a small chunk size is configured it will take longer for the
 shared cache to adjust to changes in participants. Reallocation of resources
 happens periodically and whenever a database joins the shared cache.
 
