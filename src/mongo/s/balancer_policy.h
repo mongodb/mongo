@@ -80,6 +80,10 @@ namespace mongo {
          */
         bool hasOpsQueued() const { return _hasOpsQueued; }
         
+        long long getMaxSize() const { return _maxSize; }
+
+        long long getCurrSize() const { return _currSize; }
+
         string toString() const;
         
     private:

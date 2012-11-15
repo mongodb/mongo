@@ -291,5 +291,221 @@ namespace mongo {
         }
 
 
+        /**
+         * Idea for this test is to set up three shards, one of which is overloaded (too much data).
+         *
+         * Even though the overloaded shard has less chunks, we shouldn't move chunks to that shard.
+         */
+        TEST( BalancerPolicyTests, MaxSizeRespect ) {
+
+            ShardToChunksMap chunks;
+            addShard( chunks, 3 , false );
+            addShard( chunks, 4 , false );
+            addShard( chunks, 6 , true );
+
+            // Note that maxSize of shard0 is 1, and it is therefore overloaded with currSize = 3.
+            // Other shards have maxSize = 0 = unset.
+
+            ShardInfoMap shards;
+            // ShardInfo(maxSize, currSize, draining, opsQueued)
+            shards["shard0"] = ShardInfo( 1, 3, false, false );
+            shards["shard1"] = ShardInfo( 0, 4, false, false );
+            shards["shard2"] = ShardInfo( 0, 6, false, false );
+
+            DistributionStatus d( shards, chunks );
+            MigrateInfo* m = BalancerPolicy::balance( "ns", d, 0 );
+            ASSERT( m );
+            ASSERT_EQUALS( "shard2" , m->from );
+            ASSERT_EQUALS( "shard1" , m->to );
+
+        }
+
+        /**
+         * Here we check that being over the maxSize is *not* equivalent to draining, we don't want
+         * to empty shards for no other reason than they are over this limit.
+         */
+        TEST( BalancerPolicyTests, MaxSizeNoDrain ) {
+
+            ShardToChunksMap chunks;
+            // Shard0 will be overloaded
+            addShard( chunks, 4 , false );
+            addShard( chunks, 4 , false );
+            addShard( chunks, 4 , true );
+
+            // Note that maxSize of shard0 is 1, and it is therefore overloaded with currSize = 4.
+            // Other shards have maxSize = 0 = unset.
+
+            ShardInfoMap shards;
+            // ShardInfo(maxSize, currSize, draining, opsQueued)
+            shards["shard0"] = ShardInfo( 1, 4, false, false );
+            shards["shard1"] = ShardInfo( 0, 4, false, false );
+            shards["shard2"] = ShardInfo( 0, 4, false, false );
+
+            DistributionStatus d( shards, chunks );
+            MigrateInfo* m = BalancerPolicy::balance( "ns", d, 0 );
+            ASSERT( !m );
+        }
+
+        // Note: Only in 2.2, 2.4 has utility class
+        class PseudoRandom {
+        public:
+
+            PseudoRandom(unsigned int seed) {
+                _seed = seed;
+            }
+
+            int nextInt32( int max = -1 ){
+
+#if !defined(_WIN32)
+                int r = rand_r( &_seed ) ;
+#else
+                int r = ::rand(); // seed not used in this case
+#endif
+                return max > 0 ? r % max : r;
+            }
+
+        private:
+            unsigned int _seed;
+        };
+
+        /**
+         * Idea behind this test is that we set up several shards, the first two of which are
+         * draining and the second two of which have a data size limit.  We also simulate a random
+         * number of chunks on each shard.
+         *
+         * Once the shards are setup, we virtually migrate numChunks times, or until there are no
+         * more migrations to run.  Each chunk is assumed to have a size of 1 unit, and we increment
+         * our currSize for each shard as the chunks move.
+         *
+         * Finally, we ensure that the drained shards are drained, the data-limited shards aren't
+         * overloaded, and that all shards (including the data limited shard if the baseline isn't
+         * over the limit are balanced to within 1 unit of some baseline.
+         *
+         */
+        TEST( BalancerPolicyTests, Simulation ) {
+
+            // Hardcode seed here, make test deterministic.
+            int64_t seed = 1337;
+            PseudoRandom rng(seed);
+
+            // Run test 10 times
+            for (int test = 0; test < 10; test++) {
+
+                //
+                // Setup our shards as draining, with maxSize, and normal
+                //
+
+                int numShards = 7;
+                int numChunks = 0;
+
+                ShardToChunksMap chunks;
+                ShardInfoMap shards;
+
+                map<string,int> expected;
+
+                for (int i = 0; i < numShards; i++) {
+
+                    int numShardChunks = rng.nextInt32(100);
+                    bool draining = i < 2;
+                    bool maxed = i >= 2 && i < 4;
+
+                    if (draining) expected[str::stream() << "shard" << i] = 0;
+                    if (maxed) expected[str::stream() << "shard" << i] = numShardChunks + 1;
+
+                    addShard(chunks, numShardChunks, false);
+                    numChunks += numShardChunks;
+
+                    shards[str::stream() << "shard" << i] =
+                            ShardInfo(maxed ? numShardChunks + 1 : 0,
+                                              numShardChunks, draining, false);
+                }
+
+                for (ShardInfoMap::iterator it = shards.begin(); it != shards.end(); ++it) {
+                    log() << it->first << " : " << it->second.toString() << endl;
+                }
+
+                //
+                // Perform migrations and increment data size as chunks move
+                //
+
+                for (int i = 0; i < numChunks; i++) {
+
+                    DistributionStatus d( shards, chunks );
+                    MigrateInfo* m = BalancerPolicy::balance( "ns", d, i != 0 );
+
+                    if (!m) {
+                        log() << "Finished with test moves." << endl;
+                        break;
+                    }
+
+                    moveChunk(chunks, m);
+
+                    {
+                        ShardInfo& info = shards[m->from];
+                        shards[m->from] = ShardInfo(info.getMaxSize(),
+                                                    info.getCurrSize() - 1,
+                                                    info.isDraining(),
+                                                    info.hasOpsQueued());
+                    }
+
+                    {
+                        ShardInfo& info = shards[m->to];
+                        shards[m->to] = ShardInfo(info.getMaxSize(),
+                                                  info.getCurrSize() + 1,
+                                                  info.isDraining(),
+                                                  info.hasOpsQueued());
+                    }
+                }
+
+                //
+                // Make sure our balance is correct and our data size is low.
+                //
+
+                // The balanced value is the count on the last shard, since it's not draining or
+                // limited
+                int balancedSize = (--shards.end())->second.getCurrSize();
+
+                for (ShardInfoMap::iterator it = shards.begin(); it != shards.end(); ++it) {
+                    log() << it->first << " : " << it->second.toString() << endl;
+                }
+
+                for (ShardInfoMap::iterator it = shards.begin(); it != shards.end(); ++it) {
+
+                    log() << it->first << " : " << it->second.toString() << endl;
+
+                    map<string,int>::iterator expectedIt = expected.find(it->first);
+
+                    if (expectedIt == expected.end()) {
+                        bool isInRange = it->second.getCurrSize() >= balancedSize - 1 &&
+                                         it->second.getCurrSize() <= balancedSize + 1;
+
+                        if (!isInRange) {
+                            warning() << "non-limited and non-draining shard had "
+                                      << it->second.getCurrSize() << " chunks, expected near "
+                                      << balancedSize << endl;
+                        }
+
+                        ASSERT(isInRange);
+                    }
+                    else {
+                        int expectedSize = expectedIt->second;
+                        bool isInRange = it->second.getCurrSize() <= expectedSize;
+                        if (isInRange && expectedSize >= balancedSize) {
+                            isInRange = it->second.getCurrSize() >= balancedSize - 1 &&
+                                        it->second.getCurrSize() <= balancedSize + 1;
+                        }
+
+                        if (!isInRange) {
+                            warning() << "limited or draining shard had "
+                                      << it->second.getCurrSize() << " chunks, expected less than "
+                                      << expectedSize << " and (if less than expected) near "
+                                      << balancedSize << endl;
+                        }
+
+                        ASSERT(isInRange);
+                    }
+                }
+            }
+        }
     }
 }

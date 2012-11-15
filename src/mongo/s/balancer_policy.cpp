@@ -212,8 +212,8 @@ namespace mongo {
                                           int balancedLastTime ) {
 
 
-        // 1) check for shards that policy require to us to move off of
-        //    draining, maxSize
+        // 1) check for shards that policy require to us to move off of:
+        //    draining only
         // 2) check tag policy violations
         // 3) then we make sure chunks are balanced for each tag
         
@@ -226,7 +226,7 @@ namespace mongo {
                 string shard = *z;
                 const ShardInfo& info = distribution.shardInfo( shard );
                 
-                if ( ! info.isSizeMaxed() && ! info.isDraining() )
+                if ( ! info.isDraining() )
                     continue;
                 
                 if ( distribution.numberOfChunksInShard( shard ) == 0 )
