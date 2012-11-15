@@ -38,9 +38,9 @@ function indexBuildInProgress() {
             // accessing the 'test' database.
             if ( op.op == 'insert' && op.ns == 'test.system.indexes' ) {
                 // SERVER-4295 Make sure the index details are there
-                assert.eq("a_1", op.query.name);
-                assert.eq(1, op.query.key.a);
-                assert.eq(true, op.query.background);
+                assert.eq("a_1", op.insert.name);
+                assert.eq(1, op.insert.key.a);
+                assert.eq(true, op.insert.background);
 
                 debug(op.opid);
                 indexBuildOpId = op.opid;
