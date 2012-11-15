@@ -427,8 +427,10 @@ ElementRep& dstRep = _doc->_elements->_vec[(*sibIt)._rep];
     double Element::getDoubleValue() const {
         return _doc->_elements->_vec[_rep]._value.doubleVal;
     }
-    const char* Element::getOIDValue() const {
-        return getStringValue();
+    OID Element::getOIDValue() const {
+        return OID(
+            reinterpret_cast<const unsigned char (&)[12]>(
+                _doc->_elements->_vec[_rep]._value.shortStr));
     }
     const char* Element::getRegexValue() const {
         return getStringValue();
@@ -745,7 +747,7 @@ ElementRep& dstRep = _doc->_elements->_vec[(*sibIt)._rep];
         case mongo::Array: break;
         case mongo::BinData: os << "|" << getStringValue() << "|"; break;
         case mongo::Undefined: os << "Undefined"; break;
-        case mongo::jstOID: os << OID(); break;
+        case mongo::jstOID: os << getOIDValue(); break;
         case mongo::Bool: os << getBoolValue(); break;
         case mongo::Date: os << getDateValue(); break;
         case mongo::jstNULL: os << "jstNULL"; break;

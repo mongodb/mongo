@@ -189,7 +189,7 @@ namespace mutablebson {
             break;
         }
         case jstOID: {
-            mongo::OID oid(src.getOIDValue());
+            OID oid = src.getOIDValue();
             dst->appendOID(src.fieldName(), &oid);
             break;
         }

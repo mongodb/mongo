@@ -731,4 +731,16 @@ namespace {
         ASSERT_EQUALS(mongo::SafeNum(1352151971LL),
             mongo::mutablebson::Element(&doc, it.getRep()).getSafeNumValue());
     }
+
+    TEST(OIDType, getOidValue) {
+        mongo::mutablebson::BasicHeap myHeap;
+        mongo::mutablebson::Document doc(&myHeap);
+        mongo::mutablebson::Element t0 = doc.makeObjElement("e0");
+        const mongo::OID generated = mongo::OID::gen();
+        t0.appendOID("myOid", generated);
+        mongo::mutablebson::FilterIterator it = t0.find("myOid");
+        const mongo::OID recovered = mongo::OID((*it).getOIDValue());
+        ASSERT_EQUALS(generated, recovered);
+    }
+
 } // unnamed namespace

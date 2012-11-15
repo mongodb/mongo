@@ -125,14 +125,14 @@ namespace mutablebson {
         OpTime getTSValue() const;
         int64_t getDateValue() const;
         double getDoubleValue() const;
-       
+        OID getOIDValue() const;
+
         /**
             The methods returning const char* all have the property that the returned value is
             only valid until the next non-const method is called on the underlying heap, because
             those operations might invalidate the iterators from which these values are implicitly
             derived. This happens in practice if the heap's underlying vector grows.  (andy)
         */
-        const char* getOIDValue() const;
         const char* getStringValue() const;
         const char* getRegexValue() const;
 
