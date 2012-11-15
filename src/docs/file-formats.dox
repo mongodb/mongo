@@ -38,13 +38,15 @@ maximum file allocation unit is 512MB.  File block offsets are 64-bit
 
 @section file_formats_compression File formats and compression
 
-Row-stores support four types of compression: prefix compression,
+Row-stores support four types of compression: key prefix compression,
 dictionary compression, Huffman encoding and block compression.
 
-- Prefix compression reduces the size requirement of both in-memory and
-on-disk objects by storing any identical key prefix only once per page.
-The cost is minor additional CPU memory use when searching the in-memory
-tree and when writing pages to disk.
+- Key prefix compression reduces the size requirement of both in-memory
+and on-disk objects by storing any identical key prefix only once per
+page.  The cost is minor additional CPU and memory use when reading
+pages into memory, when searching the in-memory tree and when writing
+pages to disk.  Applications with poor cache locality of reference may
+choose to turn off key prefix compression to avoid this additional cost.
 
 - Dictionary compression reduces the size requirement of both the
 in-memory and on-disk objects by storing any identical value only once
