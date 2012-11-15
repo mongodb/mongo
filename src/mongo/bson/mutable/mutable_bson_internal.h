@@ -51,13 +51,13 @@ namespace mutablebson {
  *
  *
  * ElementRep contains node data
- * Element wraps ElementRep by adding context, (.g) heap
+ * Element wraps ElementRep by adding document, (.g) heap
  *
  * Element::find returns an Iterator
  * Iterators have undefined behavior after move or removal of current node or
  *   any ancestor of current node.
  *
- * Context includes the heap and element vector
+ * Document includes the heap and element vector
  *
  * BasicHeap implements Heap interface using vector<uint8_t>
  * BSONObjHeap implements Heap interface using BSON _objdata buffer + vector<uint8_t>
@@ -110,7 +110,7 @@ namespace mutablebson {
     };
 
     /**
-        fixed-width node - stored in Context ElementVector 
+        fixed-width node - stored in Document ElementVector 
 
 	"rep" is a name coined by Stroustrup in his original
 	std::string implementation. It means "representative".

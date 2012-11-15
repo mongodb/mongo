@@ -44,14 +44,14 @@ namespace {
         */
 
         mongo::mutablebson::BasicHeap myHeap;
-        mongo::mutablebson::Context ctx(&myHeap);
+        mongo::mutablebson::Document doc(&myHeap);
 
-        mongo::mutablebson::Element e0 = ctx.makeObjElement("e0");
-        mongo::mutablebson::Element e1 = ctx.makeObjElement("e1");
-        mongo::mutablebson::Element e2 = ctx.makeObjElement("e2");
-        mongo::mutablebson::Element e3 = ctx.makeObjElement("e3");
-        mongo::mutablebson::Element e4 = ctx.makeObjElement("e4");
-        mongo::mutablebson::Element e5 = ctx.makeObjElement("e5");
+        mongo::mutablebson::Element e0 = doc.makeObjElement("e0");
+        mongo::mutablebson::Element e1 = doc.makeObjElement("e1");
+        mongo::mutablebson::Element e2 = doc.makeObjElement("e2");
+        mongo::mutablebson::Element e3 = doc.makeObjElement("e3");
+        mongo::mutablebson::Element e4 = doc.makeObjElement("e4");
+        mongo::mutablebson::Element e5 = doc.makeObjElement("e5");
 
         ASSERT_EQUALS(e0.addChild(e1), mongo::Status::OK());
         ASSERT_EQUALS(e0.addChild(e2), mongo::Status::OK());
@@ -90,13 +90,13 @@ namespace {
         */
 
         mongo::mutablebson::BasicHeap myHeap;
-        mongo::mutablebson::Context ctx(&myHeap);
+        mongo::mutablebson::Document doc(&myHeap);
 
-        mongo::mutablebson::Element e0 = ctx.makeObjElement("e0");
-        mongo::mutablebson::Element e1 = ctx.makeObjElement("e1");
-        mongo::mutablebson::Element e2 = ctx.makeObjElement("e2");
-        mongo::mutablebson::Element e3 = ctx.makeObjElement("e3");
-        mongo::mutablebson::Element e4 = ctx.makeObjElement("e4");
+        mongo::mutablebson::Element e0 = doc.makeObjElement("e0");
+        mongo::mutablebson::Element e1 = doc.makeObjElement("e1");
+        mongo::mutablebson::Element e2 = doc.makeObjElement("e2");
+        mongo::mutablebson::Element e3 = doc.makeObjElement("e3");
+        mongo::mutablebson::Element e4 = doc.makeObjElement("e4");
 
         ASSERT_EQUALS(e0.addChild(e1), mongo::Status::OK());
         ASSERT_EQUALS(e0.addChild(e2), mongo::Status::OK());
@@ -122,14 +122,14 @@ namespace {
         */
 
         mongo::mutablebson::BasicHeap myHeap;
-        mongo::mutablebson::Context ctx(&myHeap);
+        mongo::mutablebson::Document doc(&myHeap);
 
-        mongo::mutablebson::Element e2 = ctx.makeObjElement("e2");
-        mongo::mutablebson::Element e3 = ctx.makeObjElement("e3");
-        mongo::mutablebson::Element e4 = ctx.makeObjElement("e4");
-        mongo::mutablebson::Element e5 = ctx.makeObjElement("e5");
-        mongo::mutablebson::Element e6 = ctx.makeObjElement("e6");
-        mongo::mutablebson::Element e7 = ctx.makeObjElement("e7");
+        mongo::mutablebson::Element e2 = doc.makeObjElement("e2");
+        mongo::mutablebson::Element e3 = doc.makeObjElement("e3");
+        mongo::mutablebson::Element e4 = doc.makeObjElement("e4");
+        mongo::mutablebson::Element e5 = doc.makeObjElement("e5");
+        mongo::mutablebson::Element e6 = doc.makeObjElement("e6");
+        mongo::mutablebson::Element e7 = doc.makeObjElement("e7");
 
         ASSERT_EQUALS(e2.addChild(e3), mongo::Status::OK());
         ASSERT_EQUALS(e2.addChild(e4), mongo::Status::OK());
@@ -163,15 +163,15 @@ namespace {
                    [ e9 ]..[ e10]
         */
         mongo::mutablebson::BasicHeap myHeap;
-        mongo::mutablebson::Context ctx(&myHeap);
+        mongo::mutablebson::Document doc(&myHeap);
 
-        mongo::mutablebson::Element e3 = ctx.makeObjElement("e3");
-        mongo::mutablebson::Element e4 = ctx.makeObjElement("e4");
-        mongo::mutablebson::Element e5 = ctx.makeObjElement("e5");
-        mongo::mutablebson::Element e6 = ctx.makeObjElement("e6");
-        mongo::mutablebson::Element e8 = ctx.makeObjElement("e8");
-        mongo::mutablebson::Element e9 = ctx.makeObjElement("e9");
-        mongo::mutablebson::Element e10 = ctx.makeObjElement("e10");
+        mongo::mutablebson::Element e3 = doc.makeObjElement("e3");
+        mongo::mutablebson::Element e4 = doc.makeObjElement("e4");
+        mongo::mutablebson::Element e5 = doc.makeObjElement("e5");
+        mongo::mutablebson::Element e6 = doc.makeObjElement("e6");
+        mongo::mutablebson::Element e8 = doc.makeObjElement("e8");
+        mongo::mutablebson::Element e9 = doc.makeObjElement("e9");
+        mongo::mutablebson::Element e10 = doc.makeObjElement("e10");
 
         ASSERT_EQUALS(e3.addChild(e4), mongo::Status::OK());
         ASSERT_EQUALS(e3.addChild(e5), mongo::Status::OK());
@@ -199,11 +199,11 @@ namespace {
                    [ e1 ]   [ e2 ]              [ e2 ]
         */
         mongo::mutablebson::BasicHeap myHeap;
-        mongo::mutablebson::Context ctx(&myHeap);
+        mongo::mutablebson::Document doc(&myHeap);
 
-        mongo::mutablebson::Element e0 = ctx.makeObjElement("e0");
-        mongo::mutablebson::Element e1 = ctx.makeObjElement("e1");
-        mongo::mutablebson::Element e2 = ctx.makeObjElement("e2");
+        mongo::mutablebson::Element e0 = doc.makeObjElement("e0");
+        mongo::mutablebson::Element e1 = doc.makeObjElement("e1");
+        mongo::mutablebson::Element e2 = doc.makeObjElement("e2");
 
         ASSERT_EQUALS(e0.addChild(e1), mongo::Status::OK());
         ASSERT_EQUALS(e0.addChild(e2), mongo::Status::OK());
@@ -227,15 +227,15 @@ namespace {
                    [ e9 ]..[ e10]
         */
         mongo::mutablebson::BasicHeap myHeap;
-        mongo::mutablebson::Context ctx(&myHeap);
+        mongo::mutablebson::Document doc(&myHeap);
 
-        mongo::mutablebson::Element e3 = ctx.makeObjElement("e3");
-        mongo::mutablebson::Element e4 = ctx.makeObjElement("e4");
-        mongo::mutablebson::Element e5 = ctx.makeObjElement("e5");
-        mongo::mutablebson::Element e6 = ctx.makeObjElement("e6");
-        mongo::mutablebson::Element e8 = ctx.makeObjElement("e8");
-        mongo::mutablebson::Element e9 = ctx.makeObjElement("e9");
-        mongo::mutablebson::Element e10 = ctx.makeObjElement("e10");
+        mongo::mutablebson::Element e3 = doc.makeObjElement("e3");
+        mongo::mutablebson::Element e4 = doc.makeObjElement("e4");
+        mongo::mutablebson::Element e5 = doc.makeObjElement("e5");
+        mongo::mutablebson::Element e6 = doc.makeObjElement("e6");
+        mongo::mutablebson::Element e8 = doc.makeObjElement("e8");
+        mongo::mutablebson::Element e9 = doc.makeObjElement("e9");
+        mongo::mutablebson::Element e10 = doc.makeObjElement("e10");
 
         ASSERT_EQUALS(e3.addChild(e4), mongo::Status::OK());
         ASSERT_EQUALS(e3.addChild(e5), mongo::Status::OK());
@@ -262,11 +262,11 @@ namespace {
         */
 
         mongo::mutablebson::BasicHeap myHeap;
-        mongo::mutablebson::Context ctx(&myHeap);
+        mongo::mutablebson::Document doc(&myHeap);
 
-        mongo::mutablebson::Element e0 = ctx.makeObjElement("e0");
-        mongo::mutablebson::Element e1 = ctx.makeObjElement("e1");
-        mongo::mutablebson::Element e2 = ctx.makeObjElement("e2");
+        mongo::mutablebson::Element e0 = doc.makeObjElement("e0");
+        mongo::mutablebson::Element e1 = doc.makeObjElement("e1");
+        mongo::mutablebson::Element e2 = doc.makeObjElement("e2");
 
         ASSERT_EQUALS(e0.addChild(e1), mongo::Status::OK());
         ASSERT_EQUALS(e0.addChild(e2), mongo::Status::OK());
@@ -290,14 +290,14 @@ namespace {
         */
 
         mongo::mutablebson::BasicHeap myHeap;
-        mongo::mutablebson::Context ctx(&myHeap);
+        mongo::mutablebson::Document doc(&myHeap);
 
-        mongo::mutablebson::Element e0 = ctx.makeObjElement("e0");
-        mongo::mutablebson::Element e1 = ctx.makeObjElement("e1");
-        mongo::mutablebson::Element e2 = ctx.makeObjElement("e2");
-        mongo::mutablebson::Element e3 = ctx.makeObjElement("e3");
-        mongo::mutablebson::Element e4 = ctx.makeObjElement("e4");
-        mongo::mutablebson::Element e5 = ctx.makeObjElement("e5");
+        mongo::mutablebson::Element e0 = doc.makeObjElement("e0");
+        mongo::mutablebson::Element e1 = doc.makeObjElement("e1");
+        mongo::mutablebson::Element e2 = doc.makeObjElement("e2");
+        mongo::mutablebson::Element e3 = doc.makeObjElement("e3");
+        mongo::mutablebson::Element e4 = doc.makeObjElement("e4");
+        mongo::mutablebson::Element e5 = doc.makeObjElement("e5");
 
         ASSERT_EQUALS(e0.addChild(e1), mongo::Status::OK());
         ASSERT_EQUALS(e0.addChild(e2), mongo::Status::OK());
@@ -345,14 +345,14 @@ namespace {
         */
 
         mongo::mutablebson::BasicHeap myHeap;
-        mongo::mutablebson::Context ctx(&myHeap);
+        mongo::mutablebson::Document doc(&myHeap);
 
-        mongo::mutablebson::Element e0 = ctx.makeObjElement("e0");
-        mongo::mutablebson::Element e1 = ctx.makeObjElement("e1");
-        mongo::mutablebson::Element e2 = ctx.makeObjElement("e2");
-        mongo::mutablebson::Element e3 = ctx.makeObjElement("e3");
-        mongo::mutablebson::Element e4 = ctx.makeObjElement("e4");
-        mongo::mutablebson::Element e5 = ctx.makeObjElement("e5");
+        mongo::mutablebson::Element e0 = doc.makeObjElement("e0");
+        mongo::mutablebson::Element e1 = doc.makeObjElement("e1");
+        mongo::mutablebson::Element e2 = doc.makeObjElement("e2");
+        mongo::mutablebson::Element e3 = doc.makeObjElement("e3");
+        mongo::mutablebson::Element e4 = doc.makeObjElement("e4");
+        mongo::mutablebson::Element e5 = doc.makeObjElement("e5");
 
         ASSERT_EQUALS(e0.addChild(e1), mongo::Status::OK());
         ASSERT_EQUALS(e0.addChild(e2), mongo::Status::OK());
@@ -363,17 +363,17 @@ namespace {
         mongo::mutablebson::SubtreeIterator it(e0);
 
         ASSERT_EQUALS(it.done(), false);
-        ASSERT_EQUALS("e0", mongo::mutablebson::Element(&ctx, it.getRep()).fieldName());
+        ASSERT_EQUALS("e0", mongo::mutablebson::Element(&doc, it.getRep()).fieldName());
         ASSERT_EQUALS((++it).done(), false);
-        ASSERT_EQUALS("e1", mongo::mutablebson::Element(&ctx, it.getRep()).fieldName());
+        ASSERT_EQUALS("e1", mongo::mutablebson::Element(&doc, it.getRep()).fieldName());
         ASSERT_EQUALS((++it).done(), false);
-        ASSERT_EQUALS("e2", mongo::mutablebson::Element(&ctx, it.getRep()).fieldName());
+        ASSERT_EQUALS("e2", mongo::mutablebson::Element(&doc, it.getRep()).fieldName());
         ASSERT_EQUALS((++it).done(), false);
-        ASSERT_EQUALS("e3", mongo::mutablebson::Element(&ctx, it.getRep()).fieldName());
+        ASSERT_EQUALS("e3", mongo::mutablebson::Element(&doc, it.getRep()).fieldName());
         ASSERT_EQUALS((++it).done(), false);
-        ASSERT_EQUALS("e4", mongo::mutablebson::Element(&ctx, it.getRep()).fieldName());
+        ASSERT_EQUALS("e4", mongo::mutablebson::Element(&doc, it.getRep()).fieldName());
         ASSERT_EQUALS((++it).done(), false);
-        ASSERT_EQUALS("e5", mongo::mutablebson::Element(&ctx, it.getRep()).fieldName());
+        ASSERT_EQUALS("e5", mongo::mutablebson::Element(&doc, it.getRep()).fieldName());
         ASSERT_EQUALS((++it).done(), true);
     }
 
@@ -392,15 +392,15 @@ namespace {
         */
 
         mongo::mutablebson::BasicHeap myHeap;
-        mongo::mutablebson::Context ctx(&myHeap);
+        mongo::mutablebson::Document doc(&myHeap);
 
-        mongo::mutablebson::Element e0 = ctx.makeObjElement("e0");
-        mongo::mutablebson::Element e1 = ctx.makeObjElement("e1");
-        mongo::mutablebson::Element e2 = ctx.makeObjElement("e2");
-        mongo::mutablebson::Element e3 = ctx.makeObjElement("e3");
-        mongo::mutablebson::Element e4 = ctx.makeObjElement("e4");
-        mongo::mutablebson::Element e5 = ctx.makeObjElement("e5");
-        mongo::mutablebson::Element e6 = ctx.makeObjElement("e3");
+        mongo::mutablebson::Element e0 = doc.makeObjElement("e0");
+        mongo::mutablebson::Element e1 = doc.makeObjElement("e1");
+        mongo::mutablebson::Element e2 = doc.makeObjElement("e2");
+        mongo::mutablebson::Element e3 = doc.makeObjElement("e3");
+        mongo::mutablebson::Element e4 = doc.makeObjElement("e4");
+        mongo::mutablebson::Element e5 = doc.makeObjElement("e5");
+        mongo::mutablebson::Element e6 = doc.makeObjElement("e3");
 
         ASSERT_EQUALS(e0.addChild(e1), mongo::Status::OK());
         ASSERT_EQUALS(e0.addChild(e2), mongo::Status::OK());
@@ -422,9 +422,9 @@ namespace {
         mongo::mutablebson::FilterIterator it(e0, &filter);
 
         ASSERT_EQUALS(it.done(), false);
-        ASSERT_EQUALS("e3", mongo::mutablebson::Element(&ctx, it.getRep()).fieldName());
+        ASSERT_EQUALS("e3", mongo::mutablebson::Element(&doc, it.getRep()).fieldName());
         ASSERT_EQUALS((++it).done(), false);
-        ASSERT_EQUALS("e3", mongo::mutablebson::Element(&ctx, it.getRep()).fieldName());
+        ASSERT_EQUALS("e3", mongo::mutablebson::Element(&doc, it.getRep()).fieldName());
         ASSERT_EQUALS((++it).done(), true);
     }
 
@@ -445,20 +445,20 @@ namespace {
         */
   
         mongo::mutablebson::BasicHeap myHeap;
-        mongo::mutablebson::Context ctx(&myHeap);
+        mongo::mutablebson::Document doc(&myHeap);
 
-        mongo::mutablebson::Element e1 = ctx.makeArrayElement("a");
-        mongo::mutablebson::Element e2 = ctx.makeIntElement("", 10);
+        mongo::mutablebson::Element e1 = doc.makeArrayElement("a");
+        mongo::mutablebson::Element e2 = doc.makeIntElement("", 10);
         ASSERT_EQUALS(10, e2.getIntValue());
-        mongo::mutablebson::Element e3 = ctx.makeIntElement("", 20);
+        mongo::mutablebson::Element e3 = doc.makeIntElement("", 20);
         ASSERT_EQUALS(20, e3.getIntValue());
-        mongo::mutablebson::Element e4 = ctx.makeIntElement("", 30);
+        mongo::mutablebson::Element e4 = doc.makeIntElement("", 30);
         ASSERT_EQUALS(30, e4.getIntValue());
-        mongo::mutablebson::Element e5 = ctx.makeIntElement("", 40);
+        mongo::mutablebson::Element e5 = doc.makeIntElement("", 40);
         ASSERT_EQUALS(40, e5.getIntValue());
-        mongo::mutablebson::Element e6 = ctx.makeIntElement("", 5);
+        mongo::mutablebson::Element e6 = doc.makeIntElement("", 5);
         ASSERT_EQUALS(5, e6.getIntValue());
-        mongo::mutablebson::Element e7 = ctx.makeIntElement("", 0);
+        mongo::mutablebson::Element e7 = doc.makeIntElement("", 0);
         ASSERT_EQUALS(0, e7.getIntValue());
     
         ASSERT_EQUALS(e1.pushBack(e2), mongo::Status::OK());
@@ -472,7 +472,7 @@ namespace {
         ASSERT_EQUALS(e1.arraySize(&n), mongo::Status::OK());
         ASSERT_EQUALS(6, (int)n);
 
-        mongo::mutablebson::Element e(&ctx, EMPTY_REP);
+        mongo::mutablebson::Element e(&doc, EMPTY_REP);
         ASSERT_EQUALS(e1.get(0, &e), mongo::Status::OK());
         ASSERT_EQUALS(0, e.getIntValue());
         ASSERT_EQUALS(e1.get(1, &e), mongo::Status::OK());
@@ -546,7 +546,7 @@ namespace {
         ASSERT_EQUALS(e1.get(0, &e), mongo::Status::OK());
         ASSERT_EQUALS(20, e.getIntValue());
         
-        mongo::mutablebson::Element e8 = ctx.makeIntElement("", 100);
+        mongo::mutablebson::Element e8 = doc.makeIntElement("", 100);
         ASSERT_EQUALS(100, e8.getIntValue());
         ASSERT_EQUALS(e1.set(0, e8), mongo::Status::OK());
         ASSERT_EQUALS(e1.peekFront(&e), mongo::Status::OK());
@@ -566,12 +566,12 @@ namespace {
         */
 
         mongo::mutablebson::BasicHeap myHeap;
-        mongo::mutablebson::Context ctx(&myHeap);
+        mongo::mutablebson::Document doc(&myHeap);
 
-        mongo::mutablebson::Element e0 = ctx.makeObjElement("e0");
-        mongo::mutablebson::Element e1 = ctx.makeObjElement("e1");
-        mongo::mutablebson::Element e0e2 = ctx.makeObjElement("e2");
-        mongo::mutablebson::Element e1e2 = ctx.makeObjElement("e2");
+        mongo::mutablebson::Element e0 = doc.makeObjElement("e0");
+        mongo::mutablebson::Element e1 = doc.makeObjElement("e1");
+        mongo::mutablebson::Element e0e2 = doc.makeObjElement("e2");
+        mongo::mutablebson::Element e1e2 = doc.makeObjElement("e2");
 
         ASSERT_EQUALS(e0.addChild(e1), mongo::Status::OK());
         ASSERT_EQUALS(e0.addChild(e0e2), mongo::Status::OK());
@@ -582,21 +582,21 @@ namespace {
 
         mongo::mutablebson::FilterIterator it = e0.find("e2");
         ASSERT_EQUALS(it.done(), false);
-        ASSERT_EQUALS("e2", mongo::mutablebson::Element(&ctx, it.getRep()).fieldName());
-        ASSERT_EQUALS("e1", mongo::mutablebson::Element(&ctx, it.getRep()).parent().fieldName());
+        ASSERT_EQUALS("e2", mongo::mutablebson::Element(&doc, it.getRep()).fieldName());
+        ASSERT_EQUALS("e1", mongo::mutablebson::Element(&doc, it.getRep()).parent().fieldName());
 
         ASSERT_EQUALS((++it).done(), false);
-        ASSERT_EQUALS("e2", mongo::mutablebson::Element(&ctx, it.getRep()).fieldName());
-        ASSERT_EQUALS("e0", mongo::mutablebson::Element(&ctx, it.getRep()).parent().fieldName());
+        ASSERT_EQUALS("e2", mongo::mutablebson::Element(&doc, it.getRep()).fieldName());
+        ASSERT_EQUALS("e0", mongo::mutablebson::Element(&doc, it.getRep()).parent().fieldName());
 
         ASSERT_EQUALS((++it).done(), true);
     }
 
     TEST(Element, setters) {
         mongo::mutablebson::BasicHeap myHeap;
-        mongo::mutablebson::Context ctx(&myHeap);
+        mongo::mutablebson::Document doc(&myHeap);
 
-        mongo::mutablebson::Element t0 = ctx.makeNullElement("t0");
+        mongo::mutablebson::Element t0 = doc.makeNullElement("t0");
 
         t0.setBoolValue(true);
         ASSERT_EQUALS(mongo::Bool, t0.type());
@@ -628,20 +628,20 @@ namespace {
 
     TEST(TimestampType, createElement) {
         mongo::mutablebson::BasicHeap myHeap;
-        mongo::mutablebson::Context ctx(&myHeap);
+        mongo::mutablebson::Document doc(&myHeap);
 
-        mongo::mutablebson::Element t0 = ctx.makeTSElement("t0", mongo::OpTime());
+        mongo::mutablebson::Element t0 = doc.makeTSElement("t0", mongo::OpTime());
         ASSERT(mongo::OpTime() == t0.getTSValue());
 
-        mongo::mutablebson::Element t1 = ctx.makeTSElement("t1", mongo::OpTime(123, 456));
+        mongo::mutablebson::Element t1 = doc.makeTSElement("t1", mongo::OpTime(123, 456));
         ASSERT(mongo::OpTime(123, 456) == t1.getTSValue());
     }
 
     TEST(TimestampType, setElement) {
         mongo::mutablebson::BasicHeap myHeap;
-        mongo::mutablebson::Context ctx(&myHeap);
+        mongo::mutablebson::Document doc(&myHeap);
 
-        mongo::mutablebson::Element t0 = ctx.makeTSElement("t0", mongo::OpTime());
+        mongo::mutablebson::Element t0 = doc.makeTSElement("t0", mongo::OpTime());
         t0.setTSValue(mongo::OpTime(123, 456));
         ASSERT(mongo::OpTime(123, 456) == t0.getTSValue());
 
@@ -659,31 +659,31 @@ namespace {
 
     TEST(TimestampType, appendElement) {
         mongo::mutablebson::BasicHeap myHeap;
-        mongo::mutablebson::Context ctx(&myHeap);
+        mongo::mutablebson::Document doc(&myHeap);
 
-        mongo::mutablebson::Element t0 = ctx.makeObjElement("e0");
+        mongo::mutablebson::Element t0 = doc.makeObjElement("e0");
         t0.appendTS("a timestamp field", mongo::OpTime(1352151971, 471));
 
         mongo::mutablebson::FilterIterator it = t0.find("a timestamp field");
         ASSERT_EQUALS(it.done(), false);
         ASSERT(mongo::OpTime(1352151971, 471) ==
-            mongo::mutablebson::Element(&ctx, it.getRep()).getTSValue());
+            mongo::mutablebson::Element(&doc, it.getRep()).getTSValue());
     }
 
     TEST(SafeNumType, createElement) {
         mongo::mutablebson::BasicHeap myHeap;
-        mongo::mutablebson::Context ctx(&myHeap);
+        mongo::mutablebson::Document doc(&myHeap);
 
-        mongo::mutablebson::Element t0 = ctx.makeSafeNumElement("t0", mongo::SafeNum(123.456));
+        mongo::mutablebson::Element t0 = doc.makeSafeNumElement("t0", mongo::SafeNum(123.456));
         ASSERT_EQUALS(mongo::SafeNum(123.456), t0.getSafeNumValue());
     }
 
     // Try getting SafeNums from different types.
     TEST(SafeNumType, getSafeNum) {
         mongo::mutablebson::BasicHeap myHeap;
-        mongo::mutablebson::Context ctx(&myHeap);
+        mongo::mutablebson::Document doc(&myHeap);
 
-        mongo::mutablebson::Element t0 = ctx.makeIntElement("t0", 1234567890);
+        mongo::mutablebson::Element t0 = doc.makeIntElement("t0", 1234567890);
         ASSERT_EQUALS(1234567890, t0.getIntValue());
         mongo::SafeNum num = t0.getSafeNumValue();
         ASSERT_EQUALS(num, 1234567890);
@@ -701,9 +701,9 @@ namespace {
 
     TEST(SafeNumType, setSafeNum) {
         mongo::mutablebson::BasicHeap myHeap;
-        mongo::mutablebson::Context ctx(&myHeap);
+        mongo::mutablebson::Document doc(&myHeap);
 
-        mongo::mutablebson::Element t0 = ctx.makeSafeNumElement("t0", mongo::SafeNum(123456));
+        mongo::mutablebson::Element t0 = doc.makeSafeNumElement("t0", mongo::SafeNum(123456));
         t0.setSafeNumValue(mongo::SafeNum(654321));
         ASSERT_EQUALS(mongo::SafeNum(654321), t0.getSafeNumValue());
 
@@ -721,14 +721,14 @@ namespace {
 
     TEST(SafeNumType, appendElement) {
         mongo::mutablebson::BasicHeap myHeap;
-        mongo::mutablebson::Context ctx(&myHeap);
+        mongo::mutablebson::Document doc(&myHeap);
 
-        mongo::mutablebson::Element t0 = ctx.makeObjElement("e0");
+        mongo::mutablebson::Element t0 = doc.makeObjElement("e0");
         t0.appendSafeNum("a timestamp field", mongo::SafeNum(1352151971LL));
 
         mongo::mutablebson::FilterIterator it = t0.find("a timestamp field");
         ASSERT_EQUALS(it.done(), false);
         ASSERT_EQUALS(mongo::SafeNum(1352151971LL),
-            mongo::mutablebson::Element(&ctx, it.getRep()).getSafeNumValue());
+            mongo::mutablebson::Element(&doc, it.getRep()).getSafeNumValue());
     }
 } // unnamed namespace

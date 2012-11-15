@@ -27,7 +27,7 @@
 namespace mongo {
 namespace mutablebson {
 
-    class Context;
+    class Document;
     class ElementVector;
     class FilterIterator;
     class Heap;
@@ -38,7 +38,7 @@ namespace mutablebson {
      * The Element class represents one node in the document tree. A document is
      * identified with its root node.
      *
-     * Elements are created with the help of the Context class. Once created, an
+     * Elements are created with the help of the Document class. Once created, an
      * element can be introduced in any position in a document tree with methods
      * provided here.
      *
@@ -46,26 +46,26 @@ namespace mutablebson {
      *
      *     // creation
      *     mutablebson::BasicHeap myHeap;
-     *     mutablebson::Context ctx(&myHeap);
-     *     mutablebson::Element e0 = ctx.makeObjElement("e0");
-     *     mutablebson::Element e1 = ctx.makeObjElement("e1");
+     *     mutablebson::Document doc(&myHeap);
+     *     mutablebson::Element e0 = doc.makeObjElement("e0");
+     *     mutablebson::Element e1 = doc.makeObjElement("e1");
      *     e0.addChild(e1);
      *
      *     // traversal
-     *     mutablebson::SubtreeIterator it(&ctx, e0);
+     *     mutablebson::SubtreeIterator it(&doc, e0);
      *     while (!it.done()) {
-     *         cout << mutablebson::Element(&ctx, it.getRep()).fieldName()) << endl;
+     *         cout << mutablebson::Element(&doc, it.getRep()).fieldName()) << endl;
      *     }
      *
      *     // look up
      *     mutablebson::FilterIterator it = e0.find("e1");
      *     if (!it.done()) {
-     *         cout << mongo::mutablebson::Element(&ctx, it.getRep()).fieldName( ) << endl;
+     *         cout << mongo::mutablebson::Element(&doc, it.getRep()).fieldName( ) << endl;
      *     }
      */
     class Element {
     public:
-        Element(Context* ctx, uint32_t rep);
+        Element(Document* doc, uint32_t rep);
         ~Element();
 
         //
@@ -209,8 +209,8 @@ namespace mutablebson {
         uint32_t getRep() const;
         void setRep(uint32_t rep);
 
-        Context* getContext() const;
-        void setContext(Context* ctx);
+        Document* getDocument() const;
+        void setDocument(Document* doc);
 
         std::string fieldName() const;
         int fieldNameSize() const;
@@ -236,23 +236,24 @@ namespace mutablebson {
         Status checkSubtreeIsClean(Element e);
 
     private:
-        // We carry the context in every element.  The context determines the element:
-        // '_rep' is resolved through the context ElementVector and Heap
+        // We carry the document in every element. The document determines the element:
+        // '_rep' is resolved through the document ElementVector and Heap
         uint32_t _rep;
-        Context* _ctx;
+        Document* _doc;
     };
 
     /**
-     * Context contains the factory methods for creating new nodes.  Storage is allocated for
-     * the nodes within the Content heap, and the document tree structure is stored in the
-     * context ElementVector.
-     *  
+     * Document contains the root node, and factory methods for
+     * creating new nodes.  Storage is allocated for the nodes within
+     * the Content heap, and the document tree structure is stored in
+     * the document ElementVector.
+     *
      * For example usage, see class Element.
      */
-    class Context {
+    class Document {
     public:
-        explicit Context(Heap* heap);
-        ~Context();
+        explicit Document(Heap* heap);
+        ~Document();
 
         //
         // getters, (setters?)
@@ -321,11 +322,11 @@ namespace mutablebson {
         Element operator->();
 
         // acessors
-        Context* getContext() const;
+        Document* getDocument() const;
         uint32_t getRep() const;
 
     protected:
-        Context* _ctx;
+        Document* _doc;
         uint32_t _theRep;
     };
 

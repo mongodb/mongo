@@ -31,7 +31,7 @@ namespace mutablebson {
 
     Status ElementBuilder::parse(Element* dst, const BSONObj& src) {
         Status result(Status::OK());
-        Context& context = *dst->getContext();
+        Document& doc = *dst->getDocument();
 
         BSONObjIterator it(src);
         for (; it.more(); ++it) {
@@ -54,14 +54,14 @@ namespace mutablebson {
                 break;
             }
             case Object: {
-                Element e0 = context.makeObjElement(fieldName);
+                Element e0 = doc.makeObjElement(fieldName);
                 result = ElementBuilder::parse(&e0, bsonElem.Obj());
                 if (result.isOK())
                     result = dst->appendElement(fieldName, e0);
                 break;
             }
             case Array: {
-                Element e0 = context.makeArrayElement(fieldName);
+                Element e0 = doc.makeArrayElement(fieldName);
                 result = ElementBuilder::parse(&e0, bsonElem.Obj());
                 if (result.isOK())
                     result = dst->appendElement(fieldName, e0);
