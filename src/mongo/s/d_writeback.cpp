@@ -20,10 +20,18 @@
 
 #include "mongo/s/d_writeback.h"
 
+#include <string>
+#include <vector>
+
+#include "mongo/db/auth/action_set.h"
+#include "mongo/db/auth/action_type.h"
+#include "mongo/db/auth/authorization_manager.h"
+#include "mongo/db/auth/privilege.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/jsobj.h"
 #include "mongo/platform/random.h"
 #include "mongo/util/net/listen.h"
 #include "mongo/util/queue.h"
@@ -143,7 +151,13 @@ namespace mongo {
         WriteBackCommand() : Command( "writebacklisten" ) {}
 
         void help(stringstream& h) const { h<<"internal"; }
-
+        virtual void addRequiredPrivileges(const std::string& dbname,
+                                           const BSONObj& cmdObj,
+                                           std::vector<Privilege>* out) {
+            ActionSet actions;
+            actions.addAction(ActionType::writebacklisten);
+            out->push_back(Privilege(AuthorizationManager::CLUSTER_RESOURCE_NAME, actions));
+        }
         bool run(const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
 
             cc().curop()->suppressFromCurop();
@@ -189,7 +203,13 @@ namespace mongo {
         virtual LockType locktype() const { return NONE; }
         virtual bool slaveOk() const { return true; }
         virtual bool adminOnly() const { return true; }
-
+        virtual void addRequiredPrivileges(const std::string& dbname,
+                                           const BSONObj& cmdObj,
+                                           std::vector<Privilege>* out) {
+            ActionSet actions;
+            actions.addAction(ActionType::writeBacksQueued);
+            out->push_back(Privilege(AuthorizationManager::CLUSTER_RESOURCE_NAME, actions));
+        }
         WriteBacksQueuedCommand() : Command( "writeBacksQueued" ) {}
 
         void help(stringstream& help) const {

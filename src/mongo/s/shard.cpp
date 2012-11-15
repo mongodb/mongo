@@ -19,11 +19,17 @@
 #include "pch.h"
 
 #include <set>
+#include <string>
+#include <vector>
 
 #include "mongo/client/dbclient_rs.h"
 #include "mongo/client/dbclientcursor.h"
+#include "mongo/db/auth/action_set.h"
+#include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_manager.h"
+#include "mongo/db/auth/privilege.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/jsobj.h"
 #include "mongo/s/config.h"
 #include "mongo/s/client_info.h"
 #include "mongo/s/cluster_constants.h"
@@ -264,7 +270,13 @@ namespace mongo {
         virtual LockType locktype() const { return NONE; }
         virtual bool slaveOk() const { return true; }
         virtual bool adminOnly() const { return true; }
-
+        virtual void addRequiredPrivileges(const std::string& dbname,
+                                           const BSONObj& cmdObj,
+                                           std::vector<Privilege>* out) {
+            ActionSet actions;
+            actions.addAction(ActionType::getShardMap);
+            out->push_back(Privilege(AuthorizationManager::CLUSTER_RESOURCE_NAME, actions));
+        }
         virtual bool run(const string&, mongo::BSONObj&, int, std::string& errmsg , mongo::BSONObjBuilder& result, bool) {
             return staticShardInfo.getShardMap( result , errmsg );
         }

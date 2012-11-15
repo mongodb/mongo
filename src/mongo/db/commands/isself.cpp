@@ -18,7 +18,14 @@
 
 #include "pch.h"
 
+#include <string>
+#include <vector>
+
+#include "mongo/db/auth/action_set.h"
+#include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_manager.h"
+#include "mongo/db/auth/privilege.h"
+#include "mongo/db/jsobj.h"
 #include "../../util/net/listen.h"
 #include "../commands.h"
 #include "../security.h"
@@ -155,7 +162,9 @@ namespace mongo {
         virtual void help( stringstream &help ) const {
             help << "{ _isSelf : 1 } INTERNAL ONLY";
         }
-
+        virtual void addRequiredPrivileges(const std::string& dbname,
+                                           const BSONObj& cmdObj,
+                                           std::vector<Privilege>* out) {} // No auth required
         bool run(const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
             init();
             result.append( "id" , _id );

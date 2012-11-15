@@ -45,6 +45,9 @@ namespace mongo {
         }
         virtual LockType locktype() const { return NONE; }
         virtual void help(stringstream& ss) const { ss << "internal"; }
+        virtual void addRequiredPrivileges(const std::string& dbname,
+                                           const BSONObj& cmdObj,
+                                           std::vector<Privilege>* out) {} // No auth required
         CmdAuthenticate() : Command("authenticate") {}
         bool run(const string& dbname , BSONObj& cmdObj, int options, string& errmsg, BSONObjBuilder& result, bool fromRepl);
         void authenticate(const string& dbname, const string& user, const bool readOnly);
@@ -60,6 +63,9 @@ namespace mongo {
         virtual bool slaveOk() const {
             return true;
         }
+        virtual void addRequiredPrivileges(const std::string& dbname,
+                                           const BSONObj& cmdObj,
+                                           std::vector<Privilege>* out) {} // No auth required
         void help(stringstream& h) const { h << "de-authenticate"; }
         virtual LockType locktype() const { return NONE; }
         CmdLogout() : Command("logout") {}

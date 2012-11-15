@@ -29,8 +29,13 @@
 #include "pch.h"
 
 #include <boost/thread/thread.hpp>
+#include <string>
+#include <vector>
 
+#include "mongo/db/auth/action_set.h"
+#include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_manager.h"
+#include "mongo/db/auth/privilege.h"
 #include "jsobj.h"
 #include "../util/goodies.h"
 #include "repl.h"
@@ -96,6 +101,13 @@ namespace mongo {
         virtual bool logTheOp() { return false; }
         virtual bool lockGlobally() const { return true; }
         virtual LockType locktype() const { return WRITE; }
+        virtual void addRequiredPrivileges(const std::string& dbname,
+                                           const BSONObj& cmdObj,
+                                           std::vector<Privilege>* out) {
+            ActionSet actions;
+            actions.addAction(ActionType::resync);
+            out->push_back(Privilege(AuthorizationManager::SERVER_RESOURCE_NAME, actions));
+        }
         void help(stringstream&h) const { h << "resync (from scratch) an out of date replica slave.\nhttp://dochub.mongodb.org/core/masterslave"; }
         CmdResync() : Command("resync") { }
         virtual bool run(const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
@@ -259,6 +271,9 @@ namespace mongo {
             help << "{ isMaster : 1 }";
         }
         virtual LockType locktype() const { return NONE; }
+        virtual void addRequiredPrivileges(const std::string& dbname,
+                                           const BSONObj& cmdObj,
+                                           std::vector<Privilege>* out) {} // No auth required
         CmdIsMaster() : Command("isMaster", true, "ismaster") { }
         virtual bool run(const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool /*fromRepl*/) {
             /* currently request to arbiter is (somewhat arbitrarily) an ismaster request that is not

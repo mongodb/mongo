@@ -16,11 +16,17 @@
 
 #include "mongo/pch.h"
 
+#include <string>
+#include <vector>
+
 #include "mongo/base/status.h"
+#include "mongo/db/auth/action_set.h"
+#include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authentication_session.h"
 #include "mongo/db/auth/mongo_authentication_session.h"
 #include "mongo/db/auth/principal.h"
+#include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/privilege_set.h"
 #include "mongo/db/client_common.h"
 #include "mongo/db/commands.h"
@@ -60,6 +66,9 @@ namespace mongo {
         }
         void help(stringstream& h) const { h << "internal"; }
         virtual LockType locktype() const { return NONE; }
+        virtual void addRequiredPrivileges(const std::string& dbname,
+                                           const BSONObj& cmdObj,
+                                           std::vector<Privilege>* out) {} // No auth required
         bool run(const string&, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             nonce64 n = _random->nextInt64();
             stringstream ss;

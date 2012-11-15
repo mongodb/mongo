@@ -20,10 +20,18 @@
 
 #include "mongo/db/commands/fsync.h"
 
+#include <string>
+#include <vector>
+
+#include "mongo/db/auth/action_set.h"
+#include "mongo/db/auth/action_type.h"
+#include "mongo/db/auth/authorization_manager.h"
+#include "mongo/db/auth/privilege.h"
 #include "mongo/db/d_concurrency.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/dur.h"
 #include "mongo/db/client.h"
+#include "mongo/db/jsobj.h"
 #include "mongo/util/background.h"
 
 namespace mongo {
@@ -65,6 +73,13 @@ namespace mongo {
         virtual bool slaveOk() const { return true; }
         virtual bool adminOnly() const { return true; }
         virtual void help(stringstream& h) const { h << url(); }
+        virtual void addRequiredPrivileges(const std::string& dbname,
+                                           const BSONObj& cmdObj,
+                                           std::vector<Privilege>* out) {
+            ActionSet actions;
+            actions.addAction(ActionType::fsync);
+            out->push_back(Privilege(AuthorizationManager::SERVER_RESOURCE_NAME, actions));
+        }
         virtual bool run(const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
 
             if (Lock::isLocked()) {

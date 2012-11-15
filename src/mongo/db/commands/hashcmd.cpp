@@ -20,9 +20,16 @@
  * Defines a shell command for hashing a BSONElement value
  */
 
+#include <string>
+#include <vector>
 
+#include "mongo/db/auth/action_set.h"
+#include "mongo/db/auth/action_type.h"
+#include "mongo/db/auth/authorization_manager.h"
+#include "mongo/db/auth/privilege.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/hasher.h"
+#include "mongo/db/jsobj.h"
 
 namespace mongo {
 
@@ -31,6 +38,9 @@ namespace mongo {
         CmdHashElt() : Command("_hashBSONElement") {};
         virtual LockType locktype() const { return NONE; }
         virtual bool slaveOk() const { return true; }
+        virtual void addRequiredPrivileges(const std::string& dbname,
+                                           const BSONObj& cmdObj,
+                                           std::vector<Privilege>* out) {} // No auth required
         virtual void help( stringstream& help ) const {
             help << "returns the hash of the first BSONElement val in a BSONObj";
         }

@@ -38,7 +38,16 @@
  */
 
 #include "third_party/gperftools-2.0/src/gperftools/profiler.h"
+#include <string>
+#include <vector>
+
+#include "google/profiler.h"
+#include "mongo/db/auth/action_set.h"
+#include "mongo/db/auth/action_type.h"
+#include "mongo/db/auth/authorization_manager.h"
+#include "mongo/db/auth/privilege.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/jsobj.h"
 
 namespace mongo {
 
@@ -53,6 +62,13 @@ namespace mongo {
             virtual bool slaveOk() const { return true; }
             virtual bool adminOnly() const { return true; }
             virtual bool localHostOnlyIfNoAuth( const BSONObj& cmdObj ) { return true; }
+            virtual void addRequiredPrivileges(const std::string& dbname,
+                                               const BSONObj& cmdObj,
+                                               std::vector<Privilege>* out) {
+                ActionSet actions;
+                actions.addAction(ActionType::cpuProfiler);
+                out->push_back(Privilege(AuthorizationManager::SERVER_RESOURCE_NAME, actions));
+            }
 
             // This is an abuse of the global dbmutex.  We only really need to
             // ensure that only one cpuprofiler command runs at once; it would

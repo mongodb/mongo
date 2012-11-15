@@ -20,10 +20,18 @@
 
 #include "pch.h"
 
+#include <string>
+#include <vector>
+
+#include "mongo/db/auth/action_set.h"
+#include "mongo/db/auth/action_type.h"
+#include "mongo/db/auth/authorization_manager.h"
+#include "mongo/db/auth/privilege.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/d_concurrency.h"
 #include "mongo/db/curop-inl.h"
 #include "mongo/db/index.h"
+#include "mongo/db/jsobj.h"
 #include "mongo/db/pdfile.h"
 #include "mongo/util/timer.h"
 #include "mongo/util/touch_pages.h"
@@ -44,6 +52,13 @@ namespace mongo {
                 " at least one of data or index must be true; default is both are false\n";
         }
         virtual bool requiresAuth() { return true; }
+        virtual void addRequiredPrivileges(const std::string& dbname,
+                                           const BSONObj& cmdObj,
+                                           std::vector<Privilege>* out) {
+            ActionSet actions;
+            actions.addAction(ActionType::touch);
+            out->push_back(Privilege(AuthorizationManager::SERVER_RESOURCE_NAME, actions));
+        }
         TouchCmd() : Command("touch") { }
 
         virtual bool run(const string& db, 
