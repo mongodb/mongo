@@ -43,15 +43,6 @@ namespace mutablebson {
                                            "                            ",
                                            "                                " };
 
-    //
-    // Element implementation
-    //
-
-    Element::~Element() {
-    }
-
-    Element::Element(Document* doc, uint32_t rep) : _rep(rep), _doc(doc) {}
-
     // for debugging only:
     //ElementRep& Element::getElementRep() { return _doc->_elements->_vec[_rep]; }
     //ElementRep& Element::getElementRep() const { return _doc->_elements->_vec[_rep]; }

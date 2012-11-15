@@ -73,8 +73,11 @@ namespace mutablebson {
      */
     class Element {
     public:
-        Element(Document* doc, uint32_t rep);
-        ~Element();
+        Element(Document* doc, uint32_t rep)
+            : _doc(doc)
+            , _rep(rep) {}
+
+        ~Element() {}
 
         //
         // navigation API
@@ -245,8 +248,8 @@ namespace mutablebson {
     private:
         // We carry the document in every element. The document determines the element:
         // '_rep' is resolved through the document ElementVector and Heap
-        uint32_t _rep;
         Document* _doc;
+        uint32_t _rep;
     };
 
     /**
