@@ -20,6 +20,8 @@
 #include <string>
 #include <stdint.h>
 
+#include <boost/scoped_ptr.hpp>
+#include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/util/safe_num.h"
@@ -257,6 +259,8 @@ namespace mutablebson {
      * For example usage, see class Element.
      */
     class Document {
+        MONGO_DISALLOW_COPYING(Document);
+
     public:
         explicit Document(Heap* heap);
         ~Document();
@@ -314,8 +318,8 @@ namespace mutablebson {
         friend class SubtreeIterator;
         friend class SiblingIterator;
 
-        Heap* _heap;
-        ElementVector* _elements;
+        Heap* const _heap;
+        boost::scoped_ptr<ElementVector> _elements;
         Element _root;
     };
 

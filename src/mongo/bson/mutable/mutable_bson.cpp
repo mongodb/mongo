@@ -855,13 +855,11 @@ ElementRep& dstRep = _doc->_elements->_vec[(*sibIt)._rep];
 
     Document::Document(Heap* heap) :
         _heap(heap),
-        _elements(new ElementVector()),
+        _elements(new ElementVector),
         _root(makeObjElement(StringData("", StringData::LiteralTag()))) {
     }
 
-    Document::~Document() {
-        delete _elements;
-    }
+    Document::~Document() {}
 
     std::string Document::getString(uint32_t offset) const {
         return _heap->getString(offset);
