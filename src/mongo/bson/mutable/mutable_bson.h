@@ -47,9 +47,15 @@ namespace mutablebson {
      *     // creation
      *     mutablebson::BasicHeap myHeap;
      *     mutablebson::Document doc(&myHeap);
+     *     // Document is: {}
+     *
      *     mutablebson::Element e0 = doc.makeObjElement("e0");
+     *     doc.root().addChild(e0);
+     *     // Document is: { e0 : {} }
+     *
      *     mutablebson::Element e1 = doc.makeObjElement("e1");
      *     e0.addChild(e1);
+     *     // Document is: { e0 : { e1 : {} } }
      *
      *     // traversal
      *     mutablebson::SubtreeIterator it(&doc, e0);
@@ -265,6 +271,14 @@ namespace mutablebson {
         char* getStringBuffer(uint32_t offset) const;
         uint32_t elementVectorSize() const;
 
+
+        //
+        // The distinguished root Element of the document, which is
+        // always an Object element.
+        //
+        Element& root() { return _root; }
+        const Element& root() const { return _root; }
+
         //
         // factory methods
         //
@@ -302,6 +316,7 @@ namespace mutablebson {
 
         Heap* _heap;
         ElementVector* _elements;
+        Element _root;
     };
 
     //
