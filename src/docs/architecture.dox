@@ -59,8 +59,8 @@ same file.  Applications can maximize the amount of data transferred in
 each I/O by configuring large leaf pages, and still minimize CPU cache
 misses when searching the tree.
 
-WiredTiger supports key prefix encoding and value dictionaries, reducing
-the amount of memory keys and values require.
+WiredTiger supports key prefix compression and value dictionaries,
+reducing the amount of memory keys and values require.
 
 WiredTiger supports static encoding with a configurable Huffman engine,
 which typically reduces the amount of information maintained in memory
