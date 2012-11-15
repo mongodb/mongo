@@ -103,7 +103,10 @@ namespace {
         
         // Extra hidden options
         hidden.add_options()
-        ("traceExceptions", "log stack traces for every exception");
+        ("traceExceptions", "log stack traces for every exception")
+        ("enableExperimentalStorageDetailsCmd", po::bool_switch(&cmdLine.experimental.storageDetailsCmdEnabled),
+                "EXPERIMENTAL (UNSUPPORTED). Enable command computing aggregate statistics on storage.")
+        ;
     }
 
 #if defined(_WIN32)

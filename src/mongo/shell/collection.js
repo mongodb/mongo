@@ -59,6 +59,8 @@ DBCollection.prototype.help = function () {
     print("\tdb." + shortName + ".runCommand( name , <options> ) runs a db command with the given name where the first param is the collection name");
     print("\tdb." + shortName + ".save(obj)");
     print("\tdb." + shortName + ".stats()");
+    // print("\tdb." + shortName + ".diskStorageStats({[extent: <num>,] [granularity: <bytes>,] ...}) - analyze record layout on disk");
+    // print("\tdb." + shortName + ".pagesInRAM({[extent: <num>,] [granularity: <bytes>,] ...}) - analyze resident memory pages");
     print("\tdb." + shortName + ".storageSize() - includes free space allocated to this collection");
     print("\tdb." + shortName + ".totalIndexSize() - size in bytes of all the indexes");
     print("\tdb." + shortName + ".totalSize() - storage allocated for all data and indexes");
@@ -67,6 +69,8 @@ DBCollection.prototype.help = function () {
     print("\tdb." + shortName + ".getShardVersion() - only for use with sharding");
     print("\tdb." + shortName + ".getShardDistribution() - prints statistics about data distribution in the cluster");
     print("\tdb." + shortName + ".getSplitKeysForChunks( <maxChunkSize> ) - calculates split points over all chunks and returns splitter function");
+    // print("\tdb." + shortName + ".getDiskStorageStats({...}) - prints a summary of disk usage statistics");
+    // print("\tdb." + shortName + ".getPagesInRAM({...}) - prints a summary of storage pages currently in physical memory");
     return __magicNoPrint;
 }
 
@@ -425,6 +429,152 @@ DBCollection.prototype.validate = function(full) {
     }
 
     return res;
+}
+
+/**
+ * Invokes the storageDetails command to provide aggregate and (if requested) detailed information
+ * regarding the layout of records and deleted records in the collection extents.
+ * getDiskStorageStats provides a human-readable summary of the command output
+ */
+DBCollection.prototype.diskStorageStats = function(opt) {
+    var cmd = { storageDetails: this.getName(), analyze: 'diskStorage' };
+    if (typeof(opt) == 'object') Object.extend(cmd, opt);
+    return this._db.runCommand(cmd);
+}
+
+// Refer to diskStorageStats
+DBCollection.prototype.getDiskStorageStats = function(params) {
+    var stats = this.diskStorageStats(params);
+    if (!stats.ok) {
+        print("error executing storageDetails command: " + stats.errmsg);
+        return;
+    }
+
+    print("\n    " + "size".pad(9) + " " + "# recs".pad(10) + " " +
+          "[===occupied by BSON=== ---occupied by padding---       free           ]" + "  " +
+          "bson".pad(8) + " " + "rec".pad(8) + " " + "padding".pad(8));
+    print();
+
+    var BAR_WIDTH = 70;
+
+    var formatSliceData = function(data) {
+        var bar = _barFormat([
+            [data.bsonBytes / data.onDiskBytes, "="],
+            [(data.recBytes - data.bsonBytes) / data.onDiskBytes, "-"]
+        ], BAR_WIDTH);
+
+        return sh._dataFormat(data.onDiskBytes).pad(9) + " " +
+               data.numEntries.toFixed(0).pad(10) + " " +
+               bar + "  " +
+               (data.bsonBytes / data.onDiskBytes).toPercentStr().pad(8) + " " +
+               (data.recBytes / data.onDiskBytes).toPercentStr().pad(8) + " " +
+               (data.recBytes / data.bsonBytes).toFixed(4).pad(8);
+    };
+
+    var printExtent = function(ex, rng) {
+        print("--- extent " + rng + " ---");
+        print("tot " + formatSliceData(ex));
+        print();
+        if (ex.slices) {
+            for (var c = 0; c < ex.slices.length; c++) {
+                var slice = ex.slices[c];
+                print(("" + c).pad(3) + " " + formatSliceData(slice));
+            }
+            print();
+        }
+    };
+
+    if (stats.extents) {
+        print("--- extent overview ---\n");
+        for (var i = 0; i < stats.extents.length; i++) {
+            var ex = stats.extents[i];
+            print(("" + i).pad(3) + " " + formatSliceData(ex));
+        }
+        print();
+        if (params && (params.granularity || params.numberOfSlices)) {
+            for (var i = 0; i < stats.extents.length; i++) {
+                printExtent(stats.extents[i], i);
+            }
+        }
+    } else {
+        printExtent(stats, "range " + stats.range);
+    }
+
+}
+
+/**
+ * Invokes the storageDetails command to report the percentage of virtual memory pages of the
+ * collection storage currently in physical memory (RAM).
+ * getPagesInRAM provides a human-readable summary of the command output
+ */
+DBCollection.prototype.pagesInRAM = function(opt) {
+    var cmd = { storageDetails: this.getName(), analyze: 'pagesInRAM' };
+    if (typeof(opt) == 'object') Object.extend(cmd, opt);
+    return this._db.runCommand(cmd);
+}
+
+// Refer to pagesInRAM
+DBCollection.prototype.getPagesInRAM = function(params) {
+    var stats = this.pagesInRAM(params);
+    if (!stats.ok) {
+        print("error executing storageDetails command: " + stats.errmsg);
+        return;
+    }
+
+    var BAR_WIDTH = 70;
+    var formatExtentData = function(data) {
+        return "size".pad(8) + " " +
+               _barFormat([ [data.inMem, '='] ], BAR_WIDTH) + "  " +
+               data.inMem.toPercentStr().pad(7);
+    }
+
+    var printExtent = function(ex, rng) {
+        print("--- extent " + rng + " ---");
+        print("tot " + formatExtentData(ex));
+        print();
+        if (ex.slices) {
+            print("\tslices, percentage of pages in memory (< .1% : ' ', <25% : '.', " +
+                  "<50% : '_', <75% : '=', >75% : '#')");
+            print();
+            print("\t" + "offset".pad(8) + "  [slices...] (each slice is " +
+                  sh._dataFormat(ex.sliceBytes) + ")");
+            line = "\t" + ("" + 0).pad(8) + "  [";
+            for (var c = 0; c < ex.slices.length; c++) {
+                if (c % 80 == 0 && c != 0) {
+                    print(line + "]");
+                    line = "\t" + sh._dataFormat(ex.sliceBytes * c).pad(8) + "  [";
+                }
+                var inMem = ex.slices[c];
+                if (inMem <= .001) line += " ";
+                else if (inMem <= .25) line += ".";
+                else if (inMem <= .5) line += "_";
+                else if (inMem <= .75) line += "=";
+                else line += "#";
+            }
+            print(line + "]");
+            print();
+        }
+    }
+
+    if (stats.extents) {
+        print("--- extent overview ---\n");
+        for (var i = 0; i < stats.extents.length; i++) {
+            var ex = stats.extents[i];
+            print(("" + i).pad(3) + " " + formatExtentData(ex));
+        }
+        print();
+        if (params && (params.granularity || params.numberOfSlices)) {
+            for (var i = 0; i < stats.extents.length; i++) {
+                printExtent(stats.extents[i], i);
+            }
+        } else {
+            print("use getPagesInRAM({granularity: _bytes_}) or " +
+                  "getPagesInRAM({numberOfSlices: _num_} for details");
+            print("use pagesInRAM(...) for json output, same parameters apply");
+        }
+    } else {
+        printExtent(stats, "range " + stats.range);
+    }
 }
 
 DBCollection.prototype.getShardVersion = function(){

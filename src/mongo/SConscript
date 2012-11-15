@@ -377,6 +377,7 @@ serverOnlyFiles = [ "db/curop.cpp",
                     "db/commands/group.cpp",
                     "db/commands/mr.cpp",
                     "db/commands/pipeline_command.cpp",
+                    "db/commands/storage_details.cpp",
                     "db/pipeline/pipeline_d.cpp",
                     "db/pipeline/document_source_cursor.cpp",
                     "db/driverHelpers.cpp" ]
