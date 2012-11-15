@@ -91,9 +91,9 @@ __wt_conn_cache_pool_config(WT_SESSION_IMPL *session, const char **cfg)
 	WT_ERR(__wt_config_gets(session, cfg, "shared_cache.size", &cval));
 	cp->size = cval.val;
 	WT_ERR(__wt_config_gets(session, cfg, "shared_cache.chunk", &cval));
-	cp->chunk = cp->size * ((double)cval.val / 100);
+	cp->chunk = cval.val;
 	WT_ERR(__wt_config_gets(session, cfg, "shared_cache.min", &cval));
-	cp->min = cp->size * ((double)cval.val / 100);
+	cp->min = cval.val;
 	WT_VERBOSE_ERR(session, shared_cache,
 	    "Configured cache pool %s. Size: %" PRIu64
 	    ", chunk size: %" PRIu64 ", min: %" PRIu64,

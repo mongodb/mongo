@@ -1009,12 +1009,11 @@ struct __wt_connection {
 	 * database should configure either a cache_size or a shared_cache not
 	 * both.,a set of related configuration options defined
 	 * below.}@config{&nbsp;&nbsp;&nbsp;&nbsp;chunk, the granularity that a
-	 * shared cache is redistributed as a percentage.,an integer between 1
-	 * and 100; default \c 5.}@config{&nbsp;&nbsp;&nbsp;&nbsp;min, minimum
-	 * amount of cache a database in a shared cache can have as a
-	 * percentage.,an integer between 1 and 100; default \c
-	 * 10.}@config{&nbsp;&nbsp;&nbsp;&nbsp;name, name of a cache that is
-	 * shared between databases.,a string; default
+	 * shared cache is redistributed.,an integer between 1MB and 10TB;
+	 * default \c 10MB.}@config{&nbsp;&nbsp;&nbsp;&nbsp;min, minimum amount
+	 * of cache a database in a shared cache can have.,an integer between
+	 * 10MB and 10TB; default \c 50MB.}@config{&nbsp;&nbsp;&nbsp;&nbsp;name,
+	 * name of a cache that is shared between databases.,a string; default
 	 * empty.}@config{&nbsp;&nbsp;&nbsp;&nbsp;size, maximum memory to
 	 * allocate for the shared cache.,an integer between 1MB and 10TB;
 	 * default \c 500MB.}@config{ ),,}
@@ -1215,11 +1214,11 @@ struct __wt_connection {
  * should configure either a cache_size or a shared_cache not both.,a set of
  * related configuration options defined
  * below.}@config{&nbsp;&nbsp;&nbsp;&nbsp;chunk, the granularity that a shared
- * cache is redistributed as a percentage.,an integer between 1 and 100; default
- * \c 5.}@config{&nbsp;&nbsp;&nbsp;&nbsp;min, minimum amount of cache a database
- * in a shared cache can have as a percentage.,an integer between 1 and 100;
- * default \c 10.}@config{&nbsp;&nbsp;&nbsp;&nbsp;name, name of a cache that is
- * shared between databases.,a string; default
+ * cache is redistributed.,an integer between 1MB and 10TB; default \c
+ * 10MB.}@config{&nbsp;&nbsp;&nbsp;&nbsp;min, minimum amount of cache a database
+ * in a shared cache can have.,an integer between 10MB and 10TB; default \c
+ * 50MB.}@config{&nbsp;&nbsp;&nbsp;&nbsp;name, name of a cache that is shared
+ * between databases.,a string; default
  * empty.}@config{&nbsp;&nbsp;&nbsp;&nbsp;size, maximum memory to allocate for
  * the shared cache.,an integer between 1MB and 10TB; default \c 500MB.}@config{
  * ),,}

@@ -236,14 +236,12 @@ connection_runtime_config = [
 		shared cache configuration options. A database should configure either
 		a cache_size or a shared_cache not both''',
 		type='category', subconfig=[
-		Config('chunk', '5', r'''
-			the granularity that a shared cache is redistributed as a
-			percentage''',
-			min='1', max='100'),
-		Config('min', '10', r'''
-			minimum amount of cache a database in a shared cache can have
-			as a percentage''',
-			min='1', max='100'),
+		Config('chunk', '10MB', r'''
+			the granularity that a shared cache is redistributed''',
+			min='1MB', max='10TB'),
+		Config('min', '50MB', r'''
+			minimum amount of cache a database in a shared cache can have''',
+			min='10MB', max='10TB'),
 		Config('name', '', r'''
 			name of a cache that is shared between databases'''),
 		Config('size', '500MB', r'''

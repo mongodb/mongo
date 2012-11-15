@@ -66,7 +66,7 @@ class test_shared_cache(wttest.WiredTigerTestCase):
     def openConnections(
             self,
             connections,
-            pool_opts = ',shared_cache=(name=pool,size=200M,chunk=10,min=30),',
+            pool_opts = ',shared_cache=(name=pool,size=200M,chunk=10M,min=30M),',
             extra_opts = '',
             add=0):
         if add == 0:
