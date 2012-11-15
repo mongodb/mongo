@@ -167,34 +167,34 @@ namespace mutablebson {
         bool isNonAtomic() const;
 
         //
-        // stream API - BSONObjBuilder compatibility
+        // stream API - BSONObjBuilder like API, but methods return a Status.
         //
 
-        void appendBool(const StringData& fieldName, bool boolVal);
-        void appendInt(const StringData& fieldName, int32_t intVal);
-        void appendLong(const StringData& fieldName, int64_t longVal);
-        void appendTS(const StringData& fieldName, OpTime tsVal);
-        void appendDate(const StringData& fieldName, int64_t millis);
-        void appendDouble(const StringData& fieldName, double doubleVal);
-        void appendOID(const StringData& fieldName, const mongo::OID& oid);
-        void appendString(const StringData& fieldName, const StringData& stringVal);
-        void appendCode(const StringData& fieldName, const StringData& code);
-        void appendSymbol(const StringData& fieldName, const StringData& symbol);
-        void appendNull(const StringData& fieldName);
-        void appendMinKey(const StringData& fieldName);
-        void appendMaxKey(const StringData& fieldName);
-        void appendElement(const StringData& fieldName, Element e);
+        Status appendBool(const StringData& fieldName, bool boolVal);
+        Status appendInt(const StringData& fieldName, int32_t intVal);
+        Status appendLong(const StringData& fieldName, int64_t longVal);
+        Status appendTS(const StringData& fieldName, OpTime tsVal);
+        Status appendDate(const StringData& fieldName, int64_t millis);
+        Status appendDouble(const StringData& fieldName, double doubleVal);
+        Status appendOID(const StringData& fieldName, const mongo::OID& oid);
+        Status appendString(const StringData& fieldName, const StringData& stringVal);
+        Status appendCode(const StringData& fieldName, const StringData& code);
+        Status appendSymbol(const StringData& fieldName, const StringData& symbol);
+        Status appendNull(const StringData& fieldName);
+        Status appendMinKey(const StringData& fieldName);
+        Status appendMaxKey(const StringData& fieldName);
+        Status appendElement(const StringData& fieldName, Element e);
 
-        void appendDBRef(
+        Status appendDBRef(
             const StringData& fieldName, const StringData& ns, const mongo::OID& oid);
-        void appendRegex(
+        Status appendRegex(
             const StringData& fieldName, const StringData& re, const StringData& flags);
-        void appendCodeWScope(
+        Status appendCodeWScope(
             const StringData& fieldName, const StringData& code, const StringData& scope);
-        void appendBinary(
+        Status appendBinary(
             const StringData& fieldName, uint32_t len, BinDataType t, const void* bin);
 
-        void appendSafeNum(const StringData& fieldName, const SafeNum num);
+        Status appendSafeNum(const StringData& fieldName, const SafeNum num);
 
         //
         // operator overloading

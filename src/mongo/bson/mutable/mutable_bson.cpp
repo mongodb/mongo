@@ -649,89 +649,85 @@ ElementRep& dstRep = _ctx->_elements->_vec[(*sibIt)._rep];
         return false;
     }
 
-
-    //
-    // Element stream API - BSONObjBuilder compatibility
-    //
-
-    void Element::appendBool(const StringData& fieldName, bool boolVal) {
-        addChild(_ctx->makeBoolElement(fieldName, boolVal));
+    // TODO: These should be probably be made inline.
+    Status Element::appendBool(const StringData& fieldName, bool boolVal) {
+        return addChild(_ctx->makeBoolElement(fieldName, boolVal));
     }
 
-    void Element::appendInt(const StringData& fieldName, int32_t intVal) {
-        addChild(_ctx->makeIntElement(fieldName, intVal));
+    Status Element::appendInt(const StringData& fieldName, int32_t intVal) {
+        return addChild(_ctx->makeIntElement(fieldName, intVal));
     }
 
-    void Element::appendLong(const StringData& fieldName, int64_t longVal) {
-        addChild(_ctx->makeLongElement(fieldName, longVal));
+    Status Element::appendLong(const StringData& fieldName, int64_t longVal) {
+        return addChild(_ctx->makeLongElement(fieldName, longVal));
     }
 
-    void Element::appendTS(const StringData& fieldName, OpTime tsVal) {
-        addChild(_ctx->makeTSElement(fieldName, tsVal));
+    Status Element::appendTS(const StringData& fieldName, OpTime tsVal) {
+        return addChild(_ctx->makeTSElement(fieldName, tsVal));
     }
 
-    void Element::appendDate(const StringData& fieldName, int64_t millis) {
-        addChild(_ctx->makeDateElement(fieldName, millis));
+    Status Element::appendDate(const StringData& fieldName, int64_t millis) {
+        return addChild(_ctx->makeDateElement(fieldName, millis));
     }
 
-    void Element::appendDouble(const StringData& fieldName, double doubleVal) {
-        addChild(_ctx->makeDoubleElement(fieldName, doubleVal));
+    Status Element::appendDouble(const StringData& fieldName, double doubleVal) {
+        return addChild(_ctx->makeDoubleElement(fieldName, doubleVal));
     }
 
-    void Element::appendOID(const StringData& fieldName, const mongo::OID& oid) {
-        addChild(_ctx->makeOIDElement(fieldName, oid));
+    Status Element::appendOID(const StringData& fieldName, const mongo::OID& oid) {
+        return addChild(_ctx->makeOIDElement(fieldName, oid));
     }
 
-    void Element::appendString(const StringData& fieldName, const StringData& stringVal) {
-        addChild(_ctx->makeStringElement(fieldName, stringVal));
+    Status Element::appendString(const StringData& fieldName, const StringData& stringVal) {
+        return addChild(_ctx->makeStringElement(fieldName, stringVal));
     }
 
-    void Element::appendCode(const StringData& fieldName, const StringData& code) {
-        addChild(_ctx->makeCodeElement(fieldName, code));
+    Status Element::appendCode(const StringData& fieldName, const StringData& code) {
+        return addChild(_ctx->makeCodeElement(fieldName, code));
     }
 
-    void Element::appendSymbol(const StringData& fieldName, const StringData& symbol) {
-        addChild(_ctx->makeSymbolElement(fieldName, symbol));
+    Status Element::appendSymbol(const StringData& fieldName, const StringData& symbol) {
+        return addChild(_ctx->makeSymbolElement(fieldName, symbol));
     }
 
-    void Element::appendNull(const StringData& fieldName) {
-        addChild(_ctx->makeNullElement(fieldName));
+    Status Element::appendNull(const StringData& fieldName) {
+        return addChild(_ctx->makeNullElement(fieldName));
     }
 
-    void Element::appendMinKey(const StringData& fieldName) {
-        addChild(_ctx->makeMinKeyElement(fieldName));
+    Status Element::appendMinKey(const StringData& fieldName) {
+        return addChild(_ctx->makeMinKeyElement(fieldName));
     }
 
-    void Element::appendMaxKey(const StringData& fieldName) {
-        addChild(_ctx->makeMaxKeyElement(fieldName));
+    Status Element::appendMaxKey(const StringData& fieldName) {
+        return addChild(_ctx->makeMaxKeyElement(fieldName));
     }
 
-    void Element::appendRegex( const StringData& fieldName,
+    Status Element::appendRegex( const StringData& fieldName,
         const StringData& re, const StringData& flags) {
-        addChild(_ctx->makeRegexElement(fieldName, re, flags));
+        return addChild(_ctx->makeRegexElement(fieldName, re, flags));
     }
 
-    void Element::appendCodeWScope( const StringData& fieldName,
+    Status Element::appendCodeWScope( const StringData& fieldName,
         const StringData& code, const StringData& scope) {
-        addChild(_ctx->makeCodeWScopeElement(fieldName, code, scope));
+        return addChild(_ctx->makeCodeWScopeElement(fieldName, code, scope));
     }
 
-    void Element::appendDBRef( const StringData& fieldName,
+    Status Element::appendDBRef( const StringData& fieldName,
         const StringData& ns, const mongo::OID& oid) {
-        addChild(_ctx->makeDBRefElement(fieldName, ns, oid));
+        return addChild(_ctx->makeDBRefElement(fieldName, ns, oid));
     }
 
-    void Element::appendBinary( const StringData& fieldName,
+    Status Element::appendBinary( const StringData& fieldName,
         uint32_t len, mongo::BinDataType binType, const void* data) {
-        addChild(_ctx->makeBinaryElement(fieldName, len, binType, data));
+        return addChild(_ctx->makeBinaryElement(fieldName, len, binType, data));
     }
 
-    void Element::appendSafeNum(const StringData& fieldName, const SafeNum num) {
-        addChild(_ctx->makeSafeNumElement(fieldName, num));
+    Status Element::appendSafeNum(const StringData& fieldName, const SafeNum num) {
+        return addChild(_ctx->makeSafeNumElement(fieldName, num));
     }
 
-    void Element::appendElement(const StringData& fieldName, Element e) {
-        addChild(e);
+    Status Element::appendElement(const StringData& fieldName, Element e) {
+        return addChild(e);
     }
 
 

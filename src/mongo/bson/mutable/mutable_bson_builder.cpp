@@ -30,40 +30,41 @@ namespace mutablebson {
     //
 
     Status ElementBuilder::parse(Element* dst, const BSONObj& src) {
+        Status result(Status::OK());
+        Context& context = *dst->getContext();
+
         BSONObjIterator it(src);
         for (; it.more(); ++it) {
             BSONElement bsonElem = *it;
 
+            // TODO: We should have a way to get the fieldName as a StringData.
+            const char* fieldName = bsonElem.fieldName();
+
             switch (bsonElem.type()) {
             case MinKey: {
-                dst->appendMinKey(bsonElem.fieldName());
-                break;
-            }
-            case EOO: {
+                result = dst->appendMinKey(fieldName);
                 break;
             }
             case NumberDouble: {
-                dst->appendDouble(bsonElem.fieldName(), bsonElem.Double());
+                result = dst->appendDouble(fieldName, bsonElem.Double());
                 break;
             }
             case String: {
-                dst->appendString(bsonElem.fieldName(), bsonElem.String().c_str());
+                result = dst->appendString(fieldName, bsonElem.String().c_str());
                 break;
             }
             case Object: {
-                const BSONObj& obj0(bsonElem.Obj());
-                Element e0 = dst->getContext()->makeObjElement(bsonElem.fieldName());
-                Status s = ElementBuilder::parse(&e0, obj0);
-                if (s.code() != Status::OK()) return s;
-                dst->appendElement(bsonElem.fieldName(), e0);
+                Element e0 = context.makeObjElement(fieldName);
+                result = ElementBuilder::parse(&e0, bsonElem.Obj());
+                if (result.isOK())
+                    result = dst->appendElement(fieldName, e0);
                 break;
             }
             case Array: {
-                const BSONObj& obj0(bsonElem.Obj());
-                Element e0 = dst->getContext()->makeArrayElement(bsonElem.fieldName());
-                Status s = ElementBuilder::parse(&e0, obj0);
-                if (s.code() != Status::OK()) return s;
-                dst->appendElement(bsonElem.fieldName(), e0);
+                Element e0 = context.makeArrayElement(fieldName);
+                result = ElementBuilder::parse(&e0, bsonElem.Obj());
+                if (result.isOK())
+                    result = dst->appendElement(fieldName, e0);
                 break;
             }
             case BinData: {  // a stub
@@ -73,64 +74,70 @@ namespace mutablebson {
                 break;
             }
             case jstOID: {
-                dst->appendOID(bsonElem.fieldName(), bsonElem.OID());
+                result = dst->appendOID(fieldName, bsonElem.OID());
                 break;
             }
             case Bool: {
-                dst->appendBool(bsonElem.fieldName(), bsonElem.Bool());
+                result = dst->appendBool(fieldName, bsonElem.Bool());
                 break;
             }
             case Date: {
-                dst->appendDate(bsonElem.fieldName(), bsonElem.Date().millis);
+                result = dst->appendDate(fieldName, bsonElem.Date().millis);
                 break;
             }
             case jstNULL: {
-                dst->appendNull(bsonElem.fieldName());
+                result = dst->appendNull(fieldName);
                 break;
             }
             case RegEx: {
-                dst->appendRegex(bsonElem.fieldName(), bsonElem.regex(), bsonElem.regexFlags());
+                result = dst->appendRegex(fieldName, bsonElem.regex(), bsonElem.regexFlags());
                 break;
             }
             case DBRef: {
-                dst->appendDBRef(bsonElem.fieldName(), bsonElem.dbrefNS(), bsonElem.dbrefOID());
+                result = dst->appendDBRef(fieldName, bsonElem.dbrefNS(), bsonElem.dbrefOID());
                 break;
             }
             /** Note: The following three cases seem fishy. They need better understanding. */
             case Code: {
-                dst->appendCode(bsonElem.fieldName(), bsonElem.str().c_str());
+                result = dst->appendCode(fieldName, bsonElem.str().c_str());
                 break;
             }
             case Symbol: {
-                dst->appendSymbol(bsonElem.fieldName(), bsonElem.str().c_str());
+                result = dst->appendSymbol(fieldName, bsonElem.str().c_str());
                 break;
             }
             case CodeWScope: {
-                dst->appendCodeWScope(bsonElem.fieldName(),
-                                    bsonElem.codeWScopeCode(), bsonElem.codeWScopeScopeData());
+                result = dst->appendCodeWScope(
+                    fieldName,
+                    bsonElem.codeWScopeCode(),
+                    bsonElem.codeWScopeScopeData());
                 break;
             }
             case NumberInt: {
-                dst->appendInt(bsonElem.fieldName(), bsonElem.Int());
+                result = dst->appendInt(fieldName, bsonElem.Int());
                 break;
             }
             case Timestamp: {
-                dst->appendTS(bsonElem.fieldName(), bsonElem.timestampTime().millis);
+                result = dst->appendTS(fieldName, bsonElem.timestampTime().millis);
                 break;
             }
             case NumberLong: {
-                dst->appendLong(bsonElem.fieldName(), bsonElem.Long());
+                result = dst->appendLong(fieldName, bsonElem.Long());
                 break;
             }
             case MaxKey: {
-                dst->appendMaxKey(bsonElem.fieldName());
+                result = dst->appendMaxKey(fieldName);
                 break;
             }
             default: {
             }
             }
+
+            if (!result.isOK())
+                break;
         }
-        return Status::OK();
+
+        return result;
     }
 
 
