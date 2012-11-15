@@ -18,17 +18,19 @@
 
 namespace mongo {
     template< typename K_L, typename K_S, typename V, typename H, typename E, typename C >
-    UnorderedFastKeyTable<K_L, K_S, V, H, E, C>::Area::Area( unsigned capacity, double maxProbeRatio )
+    inline UnorderedFastKeyTable<K_L, K_S, V, H, E, C>::Area::Area(unsigned capacity,
+                                                                   double maxProbeRatio)
         : _capacity( capacity ),
           _maxProbe( static_cast<unsigned>( capacity * maxProbeRatio ) ),
           _entries( new Entry[_capacity] ) {
     }
 
     template< typename K_L, typename K_S, typename V, typename H, typename E, typename C >
-    int UnorderedFastKeyTable<K_L, K_S, V, H, E, C>::Area::find( const K_L& key,
-                                                                 size_t hash,
-                                                                 int* firstEmpty,
-                                                                 const UnorderedFastKeyTable& sm ) const {
+    inline int UnorderedFastKeyTable<K_L, K_S, V, H, E, C>::Area::find(
+            const K_L& key,
+            size_t hash,
+            int* firstEmpty,
+            const UnorderedFastKeyTable& sm ) const {
         if ( firstEmpty )
             *firstEmpty = -1;
 
@@ -63,8 +65,9 @@ namespace mongo {
     }
 
     template< typename K_L, typename K_S, typename V, typename H, typename E, typename C >
-    void UnorderedFastKeyTable<K_L, K_S, V, H, E, C>::Area::transfer( Area* newArea,
-                                                                      const UnorderedFastKeyTable& sm ) const {
+    inline void UnorderedFastKeyTable<K_L, K_S, V, H, E, C>::Area::transfer(
+            Area* newArea,
+            const UnorderedFastKeyTable& sm) const {
         for ( unsigned i = 0; i < _capacity; i++ ) {
             if ( ! _entries[i].used )
                 continue;
@@ -83,14 +86,15 @@ namespace mongo {
     }
 
     template< typename K_L, typename K_S, typename V, typename H, typename E, typename C >
-    UnorderedFastKeyTable<K_L, K_S, V, H, E, C>::UnorderedFastKeyTable( unsigned startingCapacity,
-                                                                        double maxProbeRatio )
+    inline UnorderedFastKeyTable<K_L, K_S, V, H, E, C>::UnorderedFastKeyTable(
+            unsigned startingCapacity,
+            double maxProbeRatio)
         : _maxProbeRatio( maxProbeRatio ), _area( startingCapacity, maxProbeRatio ) {
         _size = 0;
     }
 
     template< typename K_L, typename K_S, typename V, typename H, typename E, typename C >
-    V& UnorderedFastKeyTable<K_L, K_S, V, H, E, C>::get( const K_L& key ) {
+    inline V& UnorderedFastKeyTable<K_L, K_S, V, H, E, C>::get( const K_L& key ) {
 
         const size_t hash = _hash( key );
 
@@ -118,7 +122,7 @@ namespace mongo {
     }
 
     template< typename K_L, typename K_S, typename V, typename H, typename E, typename C >
-    void UnorderedFastKeyTable<K_L, K_S, V, H, E, C>::_grow() {
+    inline void UnorderedFastKeyTable<K_L, K_S, V, H, E, C>::_grow() {
         Area newArea( _area._capacity * 2, _maxProbeRatio );
         _area.transfer( &newArea, *this );
         _area.swap( &newArea );

@@ -18,7 +18,7 @@
 
 namespace mongo {
 
-    size_t StringMapDefaultHash::operator()( const char* origKey ) const {
+    inline size_t StringMapDefaultHash::operator()( const char* origKey ) const {
         const char* key = origKey;
         size_t hash = 7;
         while ( *key ) {
@@ -32,7 +32,8 @@ namespace mongo {
     }
 
     template< typename K_L, typename K_S, typename V, typename H, typename E, typename C >
-    typename UnorderedFastKeyTable<K_L, K_S, V, H, E, C>::const_iterator UnorderedFastKeyTable<K_L, K_S, V, H, E, C>::find( const K_L& key ) const {
+    inline typename UnorderedFastKeyTable<K_L, K_S, V, H, E, C>::const_iterator
+    UnorderedFastKeyTable<K_L, K_S, V, H, E, C>::find( const K_L& key ) const {
         if ( _size == 0 )
             return const_iterator();
         int pos = _area.find( key, _hash(key), 0, *this );
@@ -42,7 +43,8 @@ namespace mongo {
     }
 
     template< typename K_L, typename K_S, typename V, typename H, typename E, typename C >
-    typename UnorderedFastKeyTable<K_L, K_S, V, H, E, C>::const_iterator UnorderedFastKeyTable<K_L, K_S, V, H, E, C>::end() const {
+    inline typename UnorderedFastKeyTable<K_L, K_S, V, H, E, C>::const_iterator
+    UnorderedFastKeyTable<K_L, K_S, V, H, E, C>::end() const {
         return const_iterator();
     }
 
