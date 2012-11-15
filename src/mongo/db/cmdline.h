@@ -148,8 +148,10 @@ namespace mongo {
          */
         struct ExperimentalFeatures {
             ExperimentalFeatures()
-                : storageDetailsCmdEnabled(false)
+                : indexStatsCmdEnabled(false)
+                , storageDetailsCmdEnabled(false)
             {}
+            bool indexStatsCmdEnabled; // -- enableExperimentalIndexStatsCmd
             bool storageDetailsCmdEnabled; // -- enableExperimentalStorageDetailsCmd
         } experimental;
 

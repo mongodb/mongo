@@ -104,6 +104,8 @@ namespace {
         // Extra hidden options
         hidden.add_options()
         ("traceExceptions", "log stack traces for every exception")
+        ("enableExperimentalIndexStatsCmd", po::bool_switch(&cmdLine.experimental.indexStatsCmdEnabled),
+                "EXPERIMENTAL (UNSUPPORTED). Enable command computing aggregate statistics on indexes.")
         ("enableExperimentalStorageDetailsCmd", po::bool_switch(&cmdLine.experimental.storageDetailsCmdEnabled),
                 "EXPERIMENTAL (UNSUPPORTED). Enable command computing aggregate statistics on storage.")
         ;
