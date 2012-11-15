@@ -728,11 +728,6 @@ ElementRep& dstRep = _doc->_elements->_vec[(*sibIt)._rep];
         return addChild(_doc->makeSafeNumElement(fieldName, num));
     }
 
-    Status Element::appendElement(const StringData& fieldName, Element e) {
-        return addChild(e);
-    }
-
-
     //
     // Element output methods - mainly for debugging
     //

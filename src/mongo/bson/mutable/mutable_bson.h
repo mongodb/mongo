@@ -191,7 +191,6 @@ namespace mutablebson {
         Status appendNull(const StringData& fieldName);
         Status appendMinKey(const StringData& fieldName);
         Status appendMaxKey(const StringData& fieldName);
-        Status appendElement(const StringData& fieldName, Element e);
 
         Status appendDBRef(
             const StringData& fieldName, const StringData& ns, const mongo::OID& oid);

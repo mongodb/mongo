@@ -57,14 +57,14 @@ namespace mutablebson {
                 Element e0 = doc.makeObjElement(fieldName);
                 result = ElementBuilder::parse(&e0, bsonElem.Obj());
                 if (result.isOK())
-                    result = dst->appendElement(fieldName, e0);
+                    result = dst->addChild(e0);
                 break;
             }
             case Array: {
                 Element e0 = doc.makeArrayElement(fieldName);
                 result = ElementBuilder::parse(&e0, bsonElem.Obj());
                 if (result.isOK())
-                    result = dst->appendElement(fieldName, e0);
+                    result = dst->addChild(e0);
                 break;
             }
             case BinData: {  // a stub
