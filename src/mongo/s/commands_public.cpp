@@ -23,6 +23,7 @@
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/commands/find_and_modify.h"
+#include "mongo/db/commands/mr.h"
 #include "../util/net/message.h"
 #include "../db/dbmessage.h"
 #include "../client/connpool.h"
@@ -1262,6 +1263,12 @@ namespace mongo {
             AtomicUInt JOB_NUMBER;
 
             MRCmd() : PublicGridCommand( "mapreduce" ) {}
+
+            virtual void addRequiredPrivileges(const std::string& dbname,
+                                               const BSONObj& cmdObj,
+                                               std::vector<Privilege>* out) {
+                mr::addPrivilegesRequiredForMapReduce(dbname, cmdObj, out);
+            }
 
             string getTmpName( const string& coll ) {
                 stringstream ss;

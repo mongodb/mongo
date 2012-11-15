@@ -17,7 +17,11 @@
 #include "mongo/db/commands/mr.h"
 
 #include <string>
+#include <vector>
 
+#include "mongo/db/auth/action_set.h"
+#include "mongo/db/auth/action_type.h"
+#include "mongo/db/auth/privilege.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -83,6 +87,31 @@ namespace mongo {
             }
 
             return outputOptions;
+        }
+
+        void addPrivilegesRequiredForMapReduce(const std::string& dbname,
+                                               const BSONObj& cmdObj,
+                                               std::vector<Privilege>* out) {
+            Config::OutputOptions outputOptions = Config::parseOutputOptions(dbname, cmdObj);
+            ActionSet inputActions, outputActions;
+
+            inputActions.addAction(ActionType::find);
+            std::string inputNs = dbname + '.' + cmdObj.firstElement().valuestr();
+            out->push_back(Privilege(inputNs, inputActions));
+
+            if (outputOptions.outType != Config::INMEMORY) {
+                outputActions.addAction(ActionType::insert);
+                if (outputOptions.outType == Config::REPLACE) {
+                    outputActions.addAction(ActionType::remove);
+                }
+                else {
+                    outputActions.addAction(ActionType::update);
+                }
+
+                std::string outputNs = outputOptions.finalNamespace;
+                // TODO: check if outputNs exists and add createCollection privilege if not
+                out->push_back(Privilege(outputNs, outputActions));
+            }
         }
     }
 

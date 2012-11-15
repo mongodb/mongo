@@ -990,6 +990,12 @@ namespace mongo {
 
             virtual LockType locktype() const { return NONE; }
 
+            virtual void addRequiredPrivileges(const std::string& dbname,
+                                               const BSONObj& cmdObj,
+                                               std::vector<Privilege>* out) {
+                addPrivilegesRequiredForMapReduce(dbname, cmdObj, out);
+            }
+
             bool run(const string& dbname , BSONObj& cmd, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
                 Timer t;
                 Client& client = cc();
