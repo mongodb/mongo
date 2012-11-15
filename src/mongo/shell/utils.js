@@ -348,11 +348,55 @@ String.prototype.endsWith = function (str){
     return new RegExp( RegExp.escape(str) + "$" ).test( this )
 }
 
-Number.prototype.zeroPad = function(width) {
-    var str = this + '';
-    while (str.length < width)
-        str = '0' + str;
+// Returns a copy padded with the provided character _chr_ so it becomes (at least) _length_
+// characters long.
+// No truncation is performed if the string is already longer than _length_.
+// @param length minimum length of the returned string
+// @param right if falsy add leading whitespace, otherwise add trailing whitespace
+// @param chr character to be used for padding, defaults to whitespace
+// @return the padded string
+String.prototype.pad = function(length, right, chr) {
+    if (typeof chr == 'undefined') chr = ' ';
+    var str = this;
+    for (var i = length - str.length; i > 0; i--) {
+        if (right) {
+            str = str + chr;
+        } else {
+            str = chr + str;
+        }
+    }
     return str;
+}
+
+Number.prototype.toPercentStr = function() {
+    return (this * 100).toFixed(2) + "%";
+}
+
+Number.prototype.zeroPad = function(width) {
+    return ('' + this).pad(width, false, '0');
+}
+
+// Formats a simple stacked horizontal histogram bar in the shell.
+// @param data array of the form [[ratio, symbol], ...] where ratio is between 0 and 1 and
+//             symbol is a string of length 1
+// @param width width of the bar (excluding the left and right delimiters [ ] )
+// e.g. _barFormat([[.3, "="], [.5, '-']], 80) returns
+//      "[========================----------------------------------------                ]"
+_barFormat = function(data, width) {
+    var remaining = width;
+    var res = "[";
+    for (var i = 0; i < data.length; i++) {
+        for (var x = 0; x < data[i][0] * width; x++) {
+            if (remaining-- > 0) {
+                res += data[i][1];
+            }
+        }
+    }
+    while (remaining-- > 0) {
+        res += " ";
+    }
+    res += "]";
+    return res;
 }
 
 Date.timeFunc = function( theFunc , numTimes ){

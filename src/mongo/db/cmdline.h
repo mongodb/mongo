@@ -143,6 +143,18 @@ namespace mongo {
         SSLManager* sslServerManager; // currently leaks on close
 #endif
 
+        /**
+         * Switches to enable experimental (unsupported) features.
+         */
+        struct ExperimentalFeatures {
+            ExperimentalFeatures()
+                : indexStatsCmdEnabled(false)
+                , storageDetailsCmdEnabled(false)
+            {}
+            bool indexStatsCmdEnabled; // -- enableExperimentalIndexStatsCmd
+            bool storageDetailsCmdEnabled; // -- enableExperimentalStorageDetailsCmd
+        } experimental;
+
         static void launchOk();
 
         static void addGlobalOptions( boost::program_options::options_description& general ,
