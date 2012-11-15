@@ -90,7 +90,7 @@ namespace {
             this->characteristicSum += rhs.characteristicSum;
             this->characteristicCount += rhs.characteristicCount;
             this->outOfOrderRecs += rhs.outOfOrderRecs;
-            for (size_t i = 0; i < mongo::Buckets; i++) {
+            for (int i = 0; i < mongo::Buckets; i++) {
                 this->freeRecords[i] += rhs.freeRecords[i];
             }
             return *this;
@@ -108,7 +108,7 @@ namespace {
             }
             if (includeFreeRecords) {
                 BSONArrayBuilder freeRecsPerBucketArrBuilder(b.subarrayStart("freeRecsPerBucket"));
-                for (size_t i = 0; i < mongo::Buckets; i++) {
+                for (int i = 0; i < mongo::Buckets; i++) {
                     freeRecsPerBucketArrBuilder.append(freeRecords[i]);
                 }
                 freeRecsPerBucketArrBuilder.doneFast();
