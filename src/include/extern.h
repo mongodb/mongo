@@ -272,10 +272,6 @@ extern int __wt_bloom_drop(WT_BLOOM *bloom, const char *config);
 extern int __wt_bulk_init(WT_CURSOR_BULK *cbulk);
 extern int __wt_bulk_insert(WT_CURSOR_BULK *cbulk);
 extern int __wt_bulk_end(WT_CURSOR_BULK *cbulk);
-extern int __wt_cache_config(WT_CONNECTION_IMPL *conn, const char *cfg[]);
-extern int __wt_cache_create(WT_CONNECTION_IMPL *conn, const char *cfg[]);
-extern void __wt_cache_stats_update(WT_CONNECTION_IMPL *conn);
-extern void __wt_cache_destroy(WT_CONNECTION_IMPL *conn);
 extern int __wt_compact(WT_SESSION_IMPL *session, const char *cfg[]);
 extern int __wt_compact_page_skip( WT_SESSION_IMPL *session,
     WT_PAGE *parent,
@@ -543,7 +539,8 @@ extern  int __wt_config_subgets(WT_SESSION_IMPL *session,
     WT_CONFIG_ITEM *value);
 extern int __wt_config_check(WT_SESSION_IMPL *session,
     WT_CONFIG_CHECK checks[],
-    const char *config);
+    const char *config,
+    size_t config_len);
 extern int __wt_config_collapse( WT_SESSION_IMPL *session,
     const char **cfg,
     const char **config_ret);
@@ -567,6 +564,7 @@ extern WT_CONFIG_CHECK __wt_confchk_connection_load_extension[];
 extern const char *__wt_confdfl_connection_open_session;
 extern WT_CONFIG_CHECK __wt_confchk_connection_open_session[];
 extern const char *__wt_confdfl_connection_reconfigure;
+extern WT_CONFIG_CHECK __wt_confchk_shared_cache_subconfigs[];
 extern WT_CONFIG_CHECK __wt_confchk_connection_reconfigure[];
 extern const char *__wt_confdfl_cursor_close;
 extern WT_CONFIG_CHECK __wt_confchk_cursor_close[];
@@ -610,6 +608,15 @@ extern const char *__wt_confdfl_table_meta;
 extern WT_CONFIG_CHECK __wt_confchk_table_meta[];
 extern const char *__wt_confdfl_wiredtiger_open;
 extern WT_CONFIG_CHECK __wt_confchk_wiredtiger_open[];
+extern int __wt_cache_config(WT_CONNECTION_IMPL *conn, const char *cfg[]);
+extern int __wt_cache_create(WT_CONNECTION_IMPL *conn, const char *cfg[]);
+extern void __wt_cache_stats_update(WT_CONNECTION_IMPL *conn);
+extern void __wt_cache_destroy(WT_CONNECTION_IMPL *conn);
+extern int __wt_conn_cache_pool_config(WT_SESSION_IMPL *session,
+    const char **cfg);
+extern int __wt_conn_cache_pool_open(WT_SESSION_IMPL *session);
+extern int __wt_conn_cache_pool_destroy(WT_CONNECTION_IMPL *conn);
+extern void *__wt_cache_pool_server(void *arg);
 extern int __wt_conn_btree_sync_and_close(WT_SESSION_IMPL *session);
 extern int __wt_conn_btree_get(WT_SESSION_IMPL *session,
     const char *name,
@@ -745,10 +752,9 @@ extern int __wt_lsm_tree_chunk_name( WT_SESSION_IMPL *session,
     WT_LSM_TREE *lsm_tree,
     uint32_t id,
     WT_ITEM *buf);
-extern int __wt_lsm_tree_setup_chunk(WT_SESSION_IMPL *session,
+extern int __wt_lsm_tree_setup_chunk( WT_SESSION_IMPL *session,
     WT_LSM_TREE *lsm_tree,
-    WT_LSM_CHUNK *chunk,
-    int create_bloom);
+    WT_LSM_CHUNK *chunk);
 extern int __wt_lsm_tree_create(WT_SESSION_IMPL *session,
     const char *uri,
     int exclusive,
@@ -777,7 +783,8 @@ extern int __wt_lsm_tree_worker(WT_SESSION_IMPL *session,
     const char *[]),
     const char *cfg[],
     uint32_t open_flags);
-extern void *__wt_lsm_worker(void *vargs);
+extern void *__wt_lsm_merge_worker(void *vargs);
+extern void *__wt_lsm_bloom_worker(void *arg);
 extern void *__wt_lsm_checkpoint_worker(void *arg);
 extern int __wt_lsm_copy_chunks(WT_SESSION_IMPL *session,
     WT_LSM_TREE *lsm_tree,

@@ -22,7 +22,9 @@ __wt_cache_config(WT_CONNECTION_IMPL *conn, const char *cfg[])
 	session = conn->default_session;
 	cache = conn->cache;
 
-	if ((ret = __wt_config_gets(session, cfg, "cache_size", &cval)) == 0)
+	/* Ignore the cache size if a shared cache is configured. */
+	if (!F_ISSET(conn, WT_CONN_CACHE_POOL) &&
+	    (ret = __wt_config_gets(session, cfg, "cache_size", &cval)) == 0)
 		conn->cache_size = (uint64_t)cval.val;
 	WT_RET_NOTFOUND_OK(ret);
 
@@ -52,7 +54,14 @@ __wt_cache_create(WT_CONNECTION_IMPL *conn, const char *cfg[])
 
 	session = conn->default_session;
 
-	WT_RET(__wt_calloc_def(session, 1, &conn->cache));
+	WT_ASSERT(session, conn->cache == NULL ||
+	    (F_ISSET(conn, WT_CONN_CACHE_POOL) && conn->cache != NULL));
+
+	if (F_ISSET(conn, WT_CONN_CACHE_POOL))
+		WT_RET(__wt_conn_cache_pool_open(session));
+	else
+		WT_RET(__wt_calloc_def(session, 1, &conn->cache));
+
 	cache = conn->cache;
 
 	/* Use a common routine for run-time configuration options. */

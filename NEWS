@@ -1,3 +1,23 @@
+WiredTiger release 1.3.7, 2012-11-09
+------------------------------------
+
+This release fixes a bug and improves performance with Bloom filters:
+
+* Drop any old Bloom filter before creating a new one -- we may have been
+  interrupted in between creating it and updating the metadata.  Write the
+  metadata after creating missing Bloom filters.
+
+* Use a separate thread for creation of Bloom filters for the newest,
+  unmerged LSM chunks.
+
+* Changes to the ex_test_perf example: change the default configuration to
+  4KB pages and disable prefix compression.  Change the "-i" command line
+  option to be a simple count of records to insert.  Clean up error
+  handling and add option to populate using multiple threads.
+
+* Clarify the docs for the default buffer_alignment setting.
+
+
 WiredTiger release 1.3.6, 2012-11-06
 ------------------------------------
 

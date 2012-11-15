@@ -35,10 +35,11 @@ class Method:
 		self.flags = flags
 
 class Config:
-	def __init__(self, name, default, desc, **flags):
+	def __init__(self, name, default, desc, subconfig=None, **flags):
 		self.name = name
 		self.default = default
 		self.desc = desc
+		self.subconfig = subconfig
 		self.flags = flags
 
 	def __cmp__(self, other):
@@ -235,8 +236,25 @@ table_meta = format_meta + table_only_meta
 
 # Connection runtime config, shared by conn.reconfigure and wiredtiger_open
 connection_runtime_config = [
+	Config('shared_cache', '', r'''
+		shared cache configuration options. A database should configure either
+		a cache_size or a shared_cache not both''',
+		type='category', subconfig=[
+		Config('chunk', '10MB', r'''
+			the granularity that a shared cache is redistributed''',
+			min='1MB', max='10TB'),
+		Config('min', '50MB', r'''
+			minimum amount of cache a database in a shared cache can have''',
+			min='10MB', max='10TB'),
+		Config('name', '', r'''
+			name of a cache that is shared between databases'''),
+		Config('size', '500MB', r'''
+			maximum memory to allocate for the shared cache''',
+			min='1MB', max='10TB')
+		]),
 	Config('cache_size', '100MB', r'''
-		maximum heap memory to allocate for the cache''',
+		maximum heap memory to allocate for the cache. A database should
+		configure either a cache_size or a shared_cache not both''',
 		min='1MB', max='10TB'),
 	Config('error_prefix', '', r'''
 		prefix string for error messages'''),
@@ -253,6 +271,7 @@ connection_runtime_config = [
 		list, such as <code>"verbose=[evictserver,read]"</code>''',
 		type='list', choices=[
 		    'block',
+		    'shared_cache',
 		    'ckpt',
 		    'evict',
 		    'evictserver',
@@ -457,9 +476,9 @@ methods = {
 
 'wiredtiger_open' : Method(connection_runtime_config + [
 	Config('buffer_alignment', '-1', r'''
-		in-memory alignment (in bytes) for buffers used for I/O.  By
-		default, a platform-specific alignment value is used (512 bytes
-		on Linux systems, zero elsewhere)''',
+		in-memory alignment (in bytes) for buffers used for I/O.  The default
+		value of -1 indicates that a platform-specific alignment value should
+		be used (512 bytes on Linux systems, zero elsewhere)''',
 		min='-1', max='1MB'),
 	Config('create', 'false', r'''
 		create the database if it does not exist''',
@@ -513,11 +532,13 @@ flags = {
 ###################################################
 # Internal routine flag declarations
 ###################################################
+	'shared_cache' : [ 'CACHE_POOL_RUN' ],
 	'direct_io' : [ 'DIRECTIO_DATA', 'DIRECTIO_LOG' ],
 	'page_free' : [ 'PAGE_FREE_IGNORE_DISK' ],
 	'rec_evict' : [ 'REC_SINGLE' ],
 	'verbose' : [
 		'VERB_block',
+		'VERB_shared_cache',
 		'VERB_ckpt',
 		'VERB_evict',
 		'VERB_evictserver',
@@ -537,6 +558,7 @@ flags = {
 # Structure flag declarations
 ###################################################
 	'conn' : [
+		'CONN_CACHE_POOL',
 		'CONN_LSM_MERGE',
 		'CONN_SYNC',
 		'CONN_TRANSACTIONAL',
