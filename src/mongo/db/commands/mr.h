@@ -18,7 +18,14 @@
 
 #pragma once
 
-#include "mongo/pch.h"
+#include <boost/scoped_ptr.hpp>
+#include <string>
+#include <vector>
+
+#include "mongo/db/curop.h"
+#include "mongo/db/instance.h"
+#include "mongo/db/jsobj.h"
+#include "mongo/scripting/engine.h"
 
 namespace mongo {
 

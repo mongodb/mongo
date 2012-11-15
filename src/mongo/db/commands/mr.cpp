@@ -216,66 +216,6 @@ namespace mongo {
             _reduce( x , key , endSizeEstimate );
         }
 
-        Config::OutputOptions Config::parseOutputOptions(const string& dbname,
-                                                         const BSONObj& cmdObj) {
-            Config::OutputOptions outputOptions;
-
-            outputOptions.outNonAtomic = false;
-            if ( cmdObj["out"].type() == String ) {
-                outputOptions.collectionName = cmdObj["out"].String();
-                outputOptions.outType = REPLACE;
-            }
-            else if ( cmdObj["out"].type() == Object ) {
-                BSONObj o = cmdObj["out"].embeddedObject();
-
-                BSONElement e = o.firstElement();
-                string t = e.fieldName();
-
-                if ( t == "normal" || t == "replace" ) {
-                    outputOptions.outType = REPLACE;
-                    outputOptions.collectionName = e.String();
-                }
-                else if ( t == "merge" ) {
-                    outputOptions.outType = MERGE;
-                    outputOptions.collectionName = e.String();
-                }
-                else if ( t == "reduce" ) {
-                    outputOptions.outType = REDUCE;
-                    outputOptions.collectionName = e.String();
-                }
-                else if ( t == "inline" ) {
-                    outputOptions.outType = INMEMORY;
-                }
-                else {
-                    uasserted( 13522 , str::stream() << "unknown out specifier [" << t << "]" );
-                }
-
-                if (o.hasElement("db")) {
-                    outputOptions.outDB = o["db"].String();
-                }
-
-                if (o.hasElement("nonAtomic")) {
-                    outputOptions.outNonAtomic = o["nonAtomic"].Bool();
-                    if (outputOptions.outNonAtomic)
-                        uassert(15895,
-                                "nonAtomic option cannot be used with this output type",
-                                (outputOptions.outType == REDUCE ||
-                                        outputOptions.outType == MERGE));
-                }
-            }
-            else {
-                uasserted( 13606 , "'out' has to be a string or an object" );
-            }
-
-            if ( outputOptions.outType != INMEMORY ) {
-                outputOptions.finalNamespace = str::stream() <<
-                        (outputOptions.outDB.empty() ? dbname : outputOptions.outDB) <<
-                        "." << outputOptions.collectionName;
-            }
-
-            return outputOptions;
-        }
-
         Config::Config( const string& _dbname , const BSONObj& cmdObj )
         {
             dbname = _dbname;
