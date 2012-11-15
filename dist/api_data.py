@@ -170,7 +170,9 @@ file_config = format_meta + lsm_config + [
 		the maximum page size for internal nodes, in bytes; the size
 		must be a multiple of the allocation size and is significant
 		for applications wanting to avoid excessive L2 cache misses
-		while searching the tree''',
+		while searching the tree.  The page maximum is the bytes of
+		uncompressed data, that is, the limit is applied before any
+		block compression is done''',
 		min='512B', max='512MB'),
 	Config('internal_item_max', '0', r'''
 		the maximum key size stored on internal nodes, in bytes.  If
@@ -186,7 +188,9 @@ file_config = format_meta + lsm_config + [
 		the maximum page size for leaf nodes, in bytes; the size must
 		be a multiple of the allocation size, and is significant for
 		applications wanting to maximize sequential data transfer from
-		a storage device''',
+		a storage device.  The page maximum is the bytes of uncompressed
+		data, that is, the limit is applied before any block compression
+		is done''',
 		min='512B', max='512MB'),
 	Config('leaf_item_max', '0', r'''
 		the maximum key or value size stored on leaf nodes, in bytes.

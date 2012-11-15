@@ -1067,7 +1067,8 @@ __wt_block_extlist_write(WT_SESSION_IMPL *session,
 	memset(dsk, 0, WT_BLOCK_HEADER_BYTE_SIZE);
 	dsk->u.datalen = WT_STORE_SIZE(datasize);
 	dsk->type = WT_PAGE_BLOCK_MANAGER;
-	tmp->size = WT_STORE_SIZE(WT_BLOCK_HEADER_BYTE_SIZE + datasize);
+	dsk->mem_size =
+	    tmp->size = WT_STORE_SIZE(WT_BLOCK_HEADER_BYTE_SIZE + datasize);
 
 #define	WT_EXTLIST_WRITE(p, v) do {					\
 	*(off_t *)(p) = (v);						\
@@ -1092,7 +1093,7 @@ __wt_block_extlist_write(WT_SESSION_IMPL *session,
 
 	/* Write the extent list to disk. */
 	WT_ERR(__wt_block_write_off(
-	    session, block, tmp, &el->offset, &el->size, &el->cksum, 1));
+	    session, block, tmp, &el->offset, &el->size, &el->cksum, 1, 0));
 
 	WT_VERBOSE_ERR(session, block,
 	    "%s written %" PRIdMAX "/%" PRIu32,

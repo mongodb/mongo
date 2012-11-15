@@ -38,8 +38,8 @@ __wt_block_write_size(
  *	Write a buffer into a block, returning the block's address cookie.
  */
 int
-__wt_block_write(WT_SESSION_IMPL *session,
-    WT_BLOCK *block, WT_ITEM *buf, uint8_t *addr, uint32_t *addr_size)
+__wt_block_write(WT_SESSION_IMPL *session, WT_BLOCK *block,
+    WT_ITEM *buf, uint8_t *addr, uint32_t *addr_size, int compressed)
 {
 	off_t offset;
 	uint32_t size, cksum;
@@ -48,7 +48,7 @@ __wt_block_write(WT_SESSION_IMPL *session,
 	WT_UNUSED(addr_size);
 
 	WT_RET(__wt_block_write_off(
-	    session, block, buf, &offset, &size, &cksum, 0));
+	    session, block, buf, &offset, &size, &cksum, 0, compressed));
 
 	endp = addr;
 	WT_RET(__wt_block_addr_to_buffer(block, &endp, offset, size, cksum));
@@ -64,7 +64,8 @@ __wt_block_write(WT_SESSION_IMPL *session,
  */
 int
 __wt_block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
-    WT_ITEM *buf, off_t *offsetp, uint32_t *sizep, uint32_t *cksump, int locked)
+    WT_ITEM *buf, off_t *offsetp, uint32_t *sizep, uint32_t *cksump,
+    int locked, int compressed)
 {
 	WT_BLOCK_HEADER *blk;
 	WT_DECL_ITEM(tmp);
@@ -76,27 +77,40 @@ __wt_block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	uint8_t *src, *dst;
 	size_t len, src_len, dst_len, result_len;
 
-	/*
-	 * Set the block's in-memory size.
-	 *
-	 * XXX
-	 * Should be set by our caller, it's part of the WT_PAGE_HEADER?
-	 */
 	dsk = buf->mem;
-	dsk->size = buf->size;
 
+#ifdef HAVE_DIAGNOSTIC
 	/*
-	 * We're passed a table's page image: WT_ITEM->{mem,size} are the image
-	 * and byte count.
+	 * We're passed a table's page image.
 	 *
 	 * Diagnostics: verify the disk page: this violates layering, but it's
 	 * the place we can ensure we never write a corrupted page.  Note that
 	 * we are verifying the extent list pages, too.  (We created a "page"
 	 * type for the extent lists, it was simpler than creating another type
 	 * of object in the file.)
+	 *
+	 * Decompress the page as necessary, in all cases check the in-memory
+	 * length for accuracy.
 	 */
-#ifdef HAVE_DIAGNOSTIC
-	WT_RET(__wt_verify_dsk(session, "[write-check]", buf));
+	if (compressed) {
+		WT_ERR(__wt_scr_alloc(session, dsk->mem_size, &tmp));
+
+		memcpy(tmp->mem, buf->data, WT_BLOCK_COMPRESS_SKIP);
+		WT_ERR(block->compressor->decompress(
+		    block->compressor, &session->iface,
+		    (uint8_t *)buf->data + WT_BLOCK_COMPRESS_SKIP,
+		    buf->size - WT_BLOCK_COMPRESS_SKIP,
+		    (uint8_t *)tmp->data + WT_BLOCK_COMPRESS_SKIP,
+		    tmp->memsize - WT_BLOCK_COMPRESS_SKIP,
+		    &result_len));
+		WT_ASSERT(session,
+		    dsk->mem_size == result_len + WT_BLOCK_COMPRESS_SKIP);
+		tmp->size = (uint32_t)result_len + WT_BLOCK_COMPRESS_SKIP;
+	} else
+		WT_ASSERT(session, dsk->mem_size == buf->size);
+	WT_ERR(
+	    __wt_verify_dsk(session, "[write-check]", compressed ? tmp : buf));
+	__wt_scr_free(&tmp);
 #endif
 
 	/*
@@ -108,28 +122,32 @@ __wt_block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	 */
 	align_size = WT_ALIGN(buf->size, block->allocsize);
 	if (align_size > buf->memsize)
-		WT_RET_MSG(session, EINVAL,
+		WT_ERR_MSG(session, EINVAL,
 		    "write buffer was incorrectly allocated");
 
 	/*
 	 * Optionally stream-compress the data, but don't compress blocks that
-	 * are already as small as they're going to get.
+	 * are already compressed or as small as they're going to get.
 	 */
-	if (block->compressor == NULL || align_size == block->allocsize) {
+	if (block->compressor == NULL ||
+	    align_size == block->allocsize || compressed) {
 not_compressed:	/*
-		 * If not compressing the buffer, we need to zero out any unused
-		 * bytes at the end.
+		 * Zero out any unused bytes at the end of the buffer, update
+		 * the buffer's size.
 		 */
 		memset(
 		    (uint8_t *)buf->mem + buf->size, 0, align_size - buf->size);
 		buf->size = align_size;
 
 		/*
-		 * Set the in-memory size to the on-page size (we check the size
-		 * to decide if a block is compressed: if the sizes match, the
-		 * block is NOT compressed).
+		 * If the buffer is compressed, set the flag.
+		 *
+		 * XXX
+		 * The block manager should not be setting page header flags.
 		 */
 		dsk = buf->mem;
+		if (compressed)
+			F_SET(dsk, WT_PAGE_COMPRESSED);
 	} else {
 		/* Skip the header bytes of the source data. */
 		src = (uint8_t *)buf->mem + WT_BLOCK_COMPRESS_SKIP;
@@ -146,9 +164,9 @@ not_compressed:	/*
 		if (block->compressor->pre_size == NULL)
 			len = src_len;
 		else
-			WT_RET(block->compressor->pre_size(block->compressor,
+			WT_ERR(block->compressor->pre_size(block->compressor,
 			    &session->iface, src, src_len, &len));
-		WT_RET(__wt_scr_alloc(
+		WT_ERR(__wt_scr_alloc(
 		    session, (uint32_t)len + WT_BLOCK_COMPRESS_SKIP, &tmp));
 
 		/* Skip the header bytes of the destination data. */
@@ -190,6 +208,7 @@ not_compressed:	/*
 		    (uint8_t *)tmp->mem + tmp->size, 0, align_size - tmp->size);
 
 		dsk = tmp->mem;
+		F_SET(dsk, WT_PAGE_COMPRESSED);
 	}
 
 	blk = WT_BLOCK_HEADER_REF(dsk);

@@ -106,8 +106,8 @@ struct __wt_btree {
 	int   internal_key_truncate;	/* Reconcile: internal key truncate */
 	int   prefix_compression;	/* Reconcile: key prefix compression */
 	u_int split_pct;		/* Reconcile: split page percent */
-
-	WT_RWLOCK *val_ovfl_lock;	/* Overflow value lock */
+	WT_COMPRESSOR *compressor;	/* Reconcile: page compressor */
+	WT_RWLOCK *val_ovfl_lock;	/* Reconcile: overflow value lock */
 
 	uint64_t last_recno;		/* Column-store last record number */
 

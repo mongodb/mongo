@@ -164,6 +164,7 @@ __btree_conf(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_NAMED_COLLATOR *ncoll;
+	WT_NAMED_COMPRESSOR *ncomp;
 	uint32_t bitcnt;
 	int fixed;
 	const char *config;
@@ -245,7 +246,13 @@ __btree_conf(WT_SESSION_IMPL *session, const char *cfg[])
 	/* Huffman encoding */
 	WT_RET(__wt_btree_huffman_open(session, config));
 
-	/* Reconciliation configuration. */
+	/*
+	 * Reconciliation configuration:
+	 *	Dictionary
+	 *	Prefix compression
+	 *	Block compression
+	 *	Overflow lock
+	 */
 	WT_RET(__wt_config_getones(session, config, "dictionary", &cval));
 	btree->dictionary = (u_int)cval.val;
 	WT_RET(__wt_config_getones(
@@ -256,6 +263,34 @@ __btree_conf(WT_SESSION_IMPL *session, const char *cfg[])
 	btree->prefix_compression = cval.val == 0 ? 0 : 1;
 	WT_RET(__wt_config_getones(session, config, "split_pct", &cval));
 	btree->split_pct = (u_int)cval.val;
+
+	WT_RET(__wt_config_getones(session, config, "block_compressor", &cval));
+	if (cval.len > 0) {
+		TAILQ_FOREACH(ncomp, &conn->compqh, q)
+			if (WT_STRING_MATCH(ncomp->name, cval.str, cval.len)) {
+				btree->compressor = ncomp->compressor;
+				break;
+			}
+		if (btree->compressor == NULL)
+			WT_RET_MSG(session, EINVAL,
+			    "unknown block compressor '%.*s'",
+			    (int)cval.len, cval.str);
+	}
+	if (btree->compressor != NULL &&
+	    btree->compressor->compress_raw != NULL) {
+		if (btree->type == BTREE_COL_FIX)
+			WT_RET_MSG(session, EINVAL,
+			    "WT_COMPRESSOR::compress_raw is not applicable to "
+			    "fixed-size column-store objects");
+		if (btree->dictionary)
+			WT_RET_MSG(session, EINVAL,
+			    "WT_COMPRESSOR::compress_raw may not be combined "
+			    "with dictionary compression");
+		if (btree->prefix_compression)
+			WT_RET_MSG(session, EINVAL,
+			    "WT_COMPRESSOR::compress_raw may not be combined "
+			    "with prefix compression");
+	}
 
 	WT_RET(__wt_rwlock_alloc(
 	    session, "btree overflow lock", &btree->val_ovfl_lock));

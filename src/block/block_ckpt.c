@@ -193,7 +193,7 @@ __wt_block_ckpt_destroy(WT_SESSION_IMPL *session, WT_BLOCK_CKPT *ci)
  */
 int
 __wt_block_checkpoint(WT_SESSION_IMPL *session,
-    WT_BLOCK *block, WT_ITEM *buf, WT_CKPT *ckptbase)
+    WT_BLOCK *block, WT_ITEM *buf, WT_CKPT *ckptbase, int compressed)
 {
 	WT_BLOCK_CKPT *ci;
 
@@ -214,7 +214,8 @@ __wt_block_checkpoint(WT_SESSION_IMPL *session,
 		ci->root_size = ci->root_cksum = 0;
 	} else
 		WT_RET(__wt_block_write_off(session, block, buf,
-		    &ci->root_offset, &ci->root_size, &ci->root_cksum, 0));
+		    &ci->root_offset, &ci->root_size, &ci->root_cksum,
+		    0, compressed));
 
 	/* Process the checkpoint list, deleting and updating as required. */
 	WT_RET(__ckpt_process(session, block, ckptbase));

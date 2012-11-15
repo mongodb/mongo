@@ -105,19 +105,17 @@ __wt_block_read_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	}
 
 	/*
-	 * If the in-memory block size is larger than the on-disk block size,
-	 * the block is compressed.   Size the user's buffer, copy the skipped
+	 * If the block is compressed, size the user's buffer, copy the skipped
 	 * bytes of the original image into place, then decompress.
-	 *
-	 * If the in-memory block size is less than or equal to the on-disk
-	 * block size, the block is not compressed.
 	 */
-	if (blk->disk_size < dsk->size) {
+	if (F_ISSET(dsk, WT_PAGE_COMPRESSED)) {
 		if (block->compressor == NULL)
-			WT_ERR(__wt_illegal_value(session, block->name));
+			WT_ERR_MSG(session, WT_ERROR,
+			    "read compressed blocks with no compression engine "
+			    "configured");
 
-		WT_ERR(__wt_buf_init(session, buf, dsk->size));
-		buf->size = dsk->size;
+		WT_ERR(__wt_buf_init(session, buf, dsk->mem_size));
+		buf->size = dsk->mem_size;
 
 		/*
 		 * Note the source length is NOT the number of compressed bytes,
@@ -135,13 +133,13 @@ __wt_block_read_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
 		    (uint8_t *)tmp->mem + WT_BLOCK_COMPRESS_SKIP,
 		    tmp->size - WT_BLOCK_COMPRESS_SKIP,
 		    (uint8_t *)buf->mem + WT_BLOCK_COMPRESS_SKIP,
-		    dsk->size - WT_BLOCK_COMPRESS_SKIP,
+		    dsk->mem_size - WT_BLOCK_COMPRESS_SKIP,
 		    &result_len));
-		if (result_len != dsk->size - WT_BLOCK_COMPRESS_SKIP)
+		if (result_len != dsk->mem_size - WT_BLOCK_COMPRESS_SKIP)
 			WT_ERR(__wt_illegal_value(session, block->name));
 	} else
 		if (block->compressor == NULL)
-			buf->size = dsk->size;
+			buf->size = dsk->mem_size;
 		else
 			/*
 			 * We guessed wrong: there was a compressor, but this
@@ -152,8 +150,8 @@ __wt_block_read_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
 			 * (we used a scratch buffer which might be large), and
 			 * copy the data into place.
 			 */
-			WT_ERR(
-			    __wt_buf_set(session, buf, tmp->data, dsk->size));
+			WT_ERR(__wt_buf_set(
+			    session, buf, tmp->data, dsk->mem_size));
 
 	WT_BSTAT_INCR(session, page_read);
 	WT_CSTAT_INCR(session, block_read);

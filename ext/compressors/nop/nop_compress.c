@@ -40,7 +40,8 @@ static int
 nop_decompress(WT_COMPRESSOR *, WT_SESSION *,
     uint8_t *, size_t, uint8_t *, size_t, size_t *);
 
-static WT_COMPRESSOR nop_compressor = { nop_compress, nop_decompress, NULL };
+static WT_COMPRESSOR nop_compressor = {
+    nop_compress, NULL, nop_decompress, NULL };
 
 #define	__UNUSED(v)	((void)(v))
 

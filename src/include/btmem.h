@@ -18,7 +18,11 @@ struct __wt_page_header {
 	 */
 	uint64_t recno;			/* 00-07: column-store starting recno */
 
-	uint32_t size;			/* 08-11: page size */
+	/*
+	 * The page's in-memory size isn't rounded or aligned, it's the actual
+	 * number of bytes the disk-image consumes when instantiated in memory.
+	 */
+	uint32_t mem_size;		/* 08-11: in-memory page size */
 
 	union {
 		uint32_t entries;	/* 12-15: number of cells on page */
@@ -28,11 +32,23 @@ struct __wt_page_header {
 	uint8_t type;			/* 16: page type */
 
 	/*
-	 * End the WT_PAGE_HEADER structure with 3 bytes of padding: it wastes
+	 * XXX
+	 * The page compression flag is shared between reconciliation (the btree
+	 * layer) and the block manager, which isn't good.  The cleaner approach
+	 * would be to move this flag into the WT_BLOCK_HEADER structure and to
+	 * quit setting it in the reconciliation level at all (the block manager
+	 * would then have to take a flag when being passed already compressed
+	 * blocks ), but I don't want to increase the size of the block header.
+	 */
+#define	WT_PAGE_COMPRESSED	0x01	/* Page is compressed on disk */
+	uint8_t flags;			/* 17: flags */
+
+	/*
+	 * End the WT_PAGE_HEADER structure with 2 bytes of padding: it wastes
 	 * space, but it leaves the WT_PAGE_HEADER structure 32-bit aligned and
 	 * having a small amount of space to play with in the future can't hurt.
 	 */
-	uint8_t unused[3];		/* 17-19: unused padding */
+	uint8_t unused[2];		/* 18-19: unused padding */
 };
 /*
  * WT_PAGE_HEADER_SIZE is the number of bytes we allocate for the structure: if

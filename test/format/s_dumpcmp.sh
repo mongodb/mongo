@@ -33,13 +33,17 @@ if test $# -ne 0; then
 fi
 
 ext="\"$top/ext/collators/reverse/.libs/libwiredtiger_reverse_collator.so\""
-bz_ext="$top/ext/compressors/bzip2/.libs/libwiredtiger_bzip2.so"
-if test -e $bz_ext ; then
-        ext="$ext,\"$bz_ext\""
+bzip2_ext="$top/ext/compressors/bzip2/.libs/libwiredtiger_bzip2.so"
+if test -e $bzip2_ext ; then
+        ext="$ext,\"$bzip2_ext\""
 fi
-sn_ext="$top/ext/compressors/snappy/.libs/libwiredtiger_snappy.so"
-if test -e $sn_ext ; then
-        ext="$ext,\"$sn_ext\""
+raw_ext=".libs/raw_compress.so"
+if test -e $raw_ext ; then
+        ext="$ext,\"$raw_ext\""
+fi
+snappy_ext="$top/ext/compressors/snappy/.libs/libwiredtiger_snappy.so"
+if test -e $snappy_ext ; then
+        ext="$ext,\"$snappy_ext\""
 fi
 
 config='extensions=['$ext']'
