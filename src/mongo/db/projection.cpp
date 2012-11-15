@@ -75,9 +75,8 @@ namespace mongo {
 
                     // initialize new Matcher object(s)
 
-                    _matchers.insert( make_pair(
-                                          mongoutils::str::before( e.fieldName(), '.' ),
-                                          shared_ptr<Matcher>( new Matcher( e.wrap(), true ) ) ) );
+                    _matchers[mongoutils::str::before(e.fieldName(), '.').c_str()]
+                            = boost::make_shared<Matcher>(e.wrap(), true);
                     add( e.fieldName(), true );
                 }
                 else {
@@ -127,9 +126,9 @@ namespace mongo {
             const string subfield = field.substr(0,dot);
             const string rest = (dot == string::npos ? "" : field.substr(dot+1,string::npos));
 
-            boost::shared_ptr<Projection>& fm = _fields[subfield];
+            boost::shared_ptr<Projection>& fm = _fields[subfield.c_str()];
             if (!fm)
-                fm.reset(new Projection());
+                fm = boost::make_shared<Projection>();
 
             fm->add(rest, include);
         }
@@ -147,9 +146,9 @@ namespace mongo {
             const string subfield = field.substr(0,dot);
             const string rest = (dot == string::npos ? "" : field.substr(dot+1,string::npos));
 
-            boost::shared_ptr<Projection>& fm = _fields[subfield];
+            boost::shared_ptr<Projection>& fm = _fields[subfield.c_str()];
             if (!fm)
-                fm.reset(new Projection());
+                fm = boost::make_shared<Projection>();
 
             fm->add(rest, skip, limit);
         }
