@@ -248,19 +248,31 @@ __btree_conf(WT_SESSION_IMPL *session, const char *cfg[])
 
 	/*
 	 * Reconciliation configuration:
-	 *	Dictionary
-	 *	Prefix compression
-	 *	Block compression
-	 *	Overflow lock
+	 *	Block compression (all)
+	 *	Dictionary compression (variable-length column-store, row-store)
+	 *	Page-split percentage
+	 *	Prefix compression (row-store)
+	 *	Suffix compression (row-store)
 	 */
-	WT_RET(__wt_config_getones(session, config, "dictionary", &cval));
-	btree->dictionary = (u_int)cval.val;
-	WT_RET(__wt_config_getones(
-	    session, config, "internal_key_truncate", &cval));
-	btree->internal_key_truncate = cval.val == 0 ? 0 : 1;
-	WT_RET(
-	    __wt_config_getones(session, config, "prefix_compression", &cval));
-	btree->prefix_compression = cval.val == 0 ? 0 : 1;
+	switch (btree->type) {
+	case BTREE_COL_FIX:
+		break;
+	case BTREE_ROW:
+		WT_RET(__wt_config_getones(
+		    session, config, "internal_key_truncate", &cval));
+		btree->internal_key_truncate = cval.val == 0 ? 0 : 1;
+
+		WT_RET(__wt_config_getones(
+		    session, config, "prefix_compression", &cval));
+		btree->prefix_compression = cval.val == 0 ? 0 : 1;
+		/* FALLTHROUGH */
+	case BTREE_COL_VAR:
+		WT_RET(
+		    __wt_config_getones(session, config, "dictionary", &cval));
+		btree->dictionary = (u_int)cval.val;
+		break;
+	}
+
 	WT_RET(__wt_config_getones(session, config, "split_pct", &cval));
 	btree->split_pct = (u_int)cval.val;
 
@@ -277,21 +289,27 @@ __btree_conf(WT_SESSION_IMPL *session, const char *cfg[])
 			    (int)cval.len, cval.str);
 	}
 	if (btree->compressor != NULL &&
-	    btree->compressor->compress_raw != NULL) {
-		if (btree->type == BTREE_COL_FIX)
+	    btree->compressor->compress_raw != NULL)
+		switch (btree->type) {
+		case BTREE_COL_FIX:
 			WT_RET_MSG(session, EINVAL,
 			    "WT_COMPRESSOR::compress_raw is not applicable to "
 			    "fixed-size column-store objects");
-		if (btree->dictionary)
-			WT_RET_MSG(session, EINVAL,
-			    "WT_COMPRESSOR::compress_raw may not be combined "
-			    "with dictionary compression");
-		if (btree->prefix_compression)
-			WT_RET_MSG(session, EINVAL,
-			    "WT_COMPRESSOR::compress_raw may not be combined "
-			    "with prefix compression");
-	}
+		case BTREE_ROW:
+			if (btree->prefix_compression)
+				WT_RET_MSG(session, EINVAL,
+				    "WT_COMPRESSOR::compress_raw may not be "
+				    "combined with prefix compression");
+			/* FALLTHROUGH */
+		case BTREE_COL_VAR:
+			if (btree->dictionary)
+				WT_RET_MSG(session, EINVAL,
+				    "WT_COMPRESSOR::compress_raw may not be "
+				    "combined with dictionary compression");
+			break;
+		}
 
+	/* Overflow lock. */
 	WT_RET(__wt_rwlock_alloc(
 	    session, "btree overflow lock", &btree->val_ovfl_lock));
 
