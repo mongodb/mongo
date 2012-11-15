@@ -52,6 +52,7 @@ DBCollection.prototype.help = function () {
     print("\tdb." + shortName + ".getDB() get DB object associated with collection");
     print("\tdb." + shortName + ".getIndexes()");
     print("\tdb." + shortName + ".group( { key : ..., initial: ..., reduce : ...[, cond: ...] } )");
+    // print("\tdb." + shortName + ".indexStats({expandNodes: [<expanded child numbers>}, <detailed: t/f>) - output aggregate/per-depth btree bucket stats");
     print("\tdb." + shortName + ".insert(obj)");
     print("\tdb." + shortName + ".mapReduce( mapFunction , reduceFunction , <optional params> )");
     print("\tdb." + shortName + ".remove(query)");
@@ -59,14 +60,19 @@ DBCollection.prototype.help = function () {
     print("\tdb." + shortName + ".runCommand( name , <options> ) runs a db command with the given name where the first param is the collection name");
     print("\tdb." + shortName + ".save(obj)");
     print("\tdb." + shortName + ".stats()");
+    // print("\tdb." + shortName + ".diskStorageStats({[extent: <num>,] [granularity: <bytes>,] ...}) - analyze record layout on disk");
+    // print("\tdb." + shortName + ".pagesInRAM({[extent: <num>,] [granularity: <bytes>,] ...}) - analyze resident memory pages");
     print("\tdb." + shortName + ".storageSize() - includes free space allocated to this collection");
     print("\tdb." + shortName + ".totalIndexSize() - size in bytes of all the indexes");
     print("\tdb." + shortName + ".totalSize() - storage allocated for all data and indexes");
     print("\tdb." + shortName + ".update(query, object[, upsert_bool, multi_bool]) - instead of two flags, you can pass an object with fields: upsert, multi");
     print("\tdb." + shortName + ".validate( <full> ) - SLOW");;
+    // print("\tdb." + shortName + ".getIndexStats({expandNodes: [<expanded child numbers>}, <detailed: t/f>) - same as .indexStats but prints a human readable summary of the output");
     print("\tdb." + shortName + ".getShardVersion() - only for use with sharding");
     print("\tdb." + shortName + ".getShardDistribution() - prints statistics about data distribution in the cluster");
     print("\tdb." + shortName + ".getSplitKeysForChunks( <maxChunkSize> ) - calculates split points over all chunks and returns splitter function");
+    // print("\tdb." + shortName + ".getDiskStorageStats({...}) - prints a summary of disk usage statistics");
+    // print("\tdb." + shortName + ".getPagesInRAM({...}) - prints a summary of storage pages currently in physical memory");
     return __magicNoPrint;
 }
 
@@ -425,6 +431,273 @@ DBCollection.prototype.validate = function(full) {
     }
 
     return res;
+}
+
+/**
+ * Invokes the storageDetails command to provide aggregate and (if requested) detailed information
+ * regarding the layout of records and deleted records in the collection extents.
+ * getDiskStorageStats provides a human-readable summary of the command output
+ */
+DBCollection.prototype.diskStorageStats = function(opt) {
+    var cmd = { storageDetails: this.getName(), analyze: 'diskStorage' };
+    if (typeof(opt) == 'object') Object.extend(cmd, opt);
+    return this._db.runCommand(cmd);
+}
+
+// Refer to diskStorageStats
+DBCollection.prototype.getDiskStorageStats = function(params) {
+    var stats = this.diskStorageStats(params);
+    if (!stats.ok) {
+        print("error executing storageDetails command: " + stats.errmsg);
+        return;
+    }
+
+    print("\n    " + "size".pad(9) + " " + "# recs".pad(10) + " " +
+          "[===occupied by BSON=== ---occupied by padding---       free           ]" + "  " +
+          "bson".pad(8) + " " + "rec".pad(8) + " " + "padding".pad(8));
+    print();
+
+    var BAR_WIDTH = 70;
+
+    var formatSliceData = function(data) {
+        var bar = _barFormat([
+            [data.bsonBytes / data.onDiskBytes, "="],
+            [(data.recBytes - data.bsonBytes) / data.onDiskBytes, "-"]
+        ], BAR_WIDTH);
+
+        return sh._dataFormat(data.onDiskBytes).pad(9) + " " +
+               data.numEntries.toFixed(0).pad(10) + " " +
+               bar + "  " +
+               (data.bsonBytes / data.onDiskBytes).toPercentStr().pad(8) + " " +
+               (data.recBytes / data.onDiskBytes).toPercentStr().pad(8) + " " +
+               (data.recBytes / data.bsonBytes).toFixed(4).pad(8);
+    };
+
+    var printExtent = function(ex, rng) {
+        print("--- extent " + rng + " ---");
+        print("tot " + formatSliceData(ex));
+        print();
+        if (ex.slices) {
+            for (var c = 0; c < ex.slices.length; c++) {
+                var slice = ex.slices[c];
+                print(("" + c).pad(3) + " " + formatSliceData(slice));
+            }
+            print();
+        }
+    };
+
+    if (stats.extents) {
+        print("--- extent overview ---\n");
+        for (var i = 0; i < stats.extents.length; i++) {
+            var ex = stats.extents[i];
+            print(("" + i).pad(3) + " " + formatSliceData(ex));
+        }
+        print();
+        if (params && (params.granularity || params.numberOfSlices)) {
+            for (var i = 0; i < stats.extents.length; i++) {
+                printExtent(stats.extents[i], i);
+            }
+        }
+    } else {
+        printExtent(stats, "range " + stats.range);
+    }
+
+}
+
+/**
+ * Invokes the storageDetails command to report the percentage of virtual memory pages of the
+ * collection storage currently in physical memory (RAM).
+ * getPagesInRAM provides a human-readable summary of the command output
+ */
+DBCollection.prototype.pagesInRAM = function(opt) {
+    var cmd = { storageDetails: this.getName(), analyze: 'pagesInRAM' };
+    if (typeof(opt) == 'object') Object.extend(cmd, opt);
+    return this._db.runCommand(cmd);
+}
+
+// Refer to pagesInRAM
+DBCollection.prototype.getPagesInRAM = function(params) {
+    var stats = this.pagesInRAM(params);
+    if (!stats.ok) {
+        print("error executing storageDetails command: " + stats.errmsg);
+        return;
+    }
+
+    var BAR_WIDTH = 70;
+    var formatExtentData = function(data) {
+        return "size".pad(8) + " " +
+               _barFormat([ [data.inMem, '='] ], BAR_WIDTH) + "  " +
+               data.inMem.toPercentStr().pad(7);
+    }
+
+    var printExtent = function(ex, rng) {
+        print("--- extent " + rng + " ---");
+        print("tot " + formatExtentData(ex));
+        print();
+        if (ex.slices) {
+            print("\tslices, percentage of pages in memory (< .1% : ' ', <25% : '.', " +
+                  "<50% : '_', <75% : '=', >75% : '#')");
+            print();
+            print("\t" + "offset".pad(8) + "  [slices...] (each slice is " +
+                  sh._dataFormat(ex.sliceBytes) + ")");
+            line = "\t" + ("" + 0).pad(8) + "  [";
+            for (var c = 0; c < ex.slices.length; c++) {
+                if (c % 80 == 0 && c != 0) {
+                    print(line + "]");
+                    line = "\t" + sh._dataFormat(ex.sliceBytes * c).pad(8) + "  [";
+                }
+                var inMem = ex.slices[c];
+                if (inMem <= .001) line += " ";
+                else if (inMem <= .25) line += ".";
+                else if (inMem <= .5) line += "_";
+                else if (inMem <= .75) line += "=";
+                else line += "#";
+            }
+            print(line + "]");
+            print();
+        }
+    }
+
+    if (stats.extents) {
+        print("--- extent overview ---\n");
+        for (var i = 0; i < stats.extents.length; i++) {
+            var ex = stats.extents[i];
+            print(("" + i).pad(3) + " " + formatExtentData(ex));
+        }
+        print();
+        if (params && (params.granularity || params.numberOfSlices)) {
+            for (var i = 0; i < stats.extents.length; i++) {
+                printExtent(stats.extents[i], i);
+            }
+        } else {
+            print("use getPagesInRAM({granularity: _bytes_}) or " +
+                  "getPagesInRAM({numberOfSlices: _num_} for details");
+            print("use pagesInRAM(...) for json output, same parameters apply");
+        }
+    } else {
+        printExtent(stats, "range " + stats.range);
+    }
+}
+
+DBCollection.prototype.indexStats = function(params) {
+    var cmd = { indexStats: this.getName() };
+
+    if (typeof(params) == 'object') // support arbitrary options here
+        Object.extend(cmd, params);
+
+    return this._db.runCommand( cmd );
+}
+
+DBCollection.prototype.getIndexStats = function(params, detailed) {
+    var stats = this.indexStats(params);
+    if (!stats.ok) {
+        print("error executing indexStats command: " + tojson(stats));
+        return;
+    }
+
+    print("-- index \"" + stats.name + "\" --");
+    print("  version " + stats.version + " | key pattern " +
+          tojsononeline(stats.keyPattern) + (stats.isIdIndex ? " [id index]" : "") +
+          " | storage namespace \"" + stats.storageNs + "\"");
+    print("  " + stats.depth + " deep, bucket body is " + stats.bucketBodyBytes + " bytes");
+    print();
+    if (detailed) {
+        print("  **  min |-- .02 quant --- 1st quartile [=== median ===] 3rd quartile --- " +
+              ".98 quant --| max  **  ");
+        print();
+    }
+
+    // format a number rounding to three decimal figures
+    var fnum = function(n) {
+        return n.toFixed(3);
+    }
+
+    var formatBoxPlot = function(st) {
+        var out = "";
+        if (st.count == 0) return "no samples";
+        out += "avg. " + fnum(st.mean);
+        if (st.count == 1) return out;
+        out += " | stdev. " + fnum(st.stddev);
+
+        var quant = function(st, prob) {
+            return st.quantiles["" + prob].toFixed(3);
+        }
+        if (st.quantiles) {
+            out += "\t" + fnum(st.min) + " |-- " + quant(st, 0.02) + " --- " + quant(st, 0.25) +
+                   " [=== " + quant(st, 0.5) + " ===] " + quant(st, 0.75) + " --- " +
+                   quant(st, 0.98) + " --| " + fnum(st.max) + " ";
+        }
+        return out;
+    }
+
+    var formatStats = function(indent, nd) {
+        var out = "";
+        out += indent + "bucket count\t" + nd.numBuckets
+                      + "\ton average " + fnum(nd.fillRatio.mean * 100) + " %"
+                      + " (±" + fnum((nd.fillRatio.stddev) * 100) + " %) full"
+                      + "\t" + fnum(nd.bsonRatio.mean * 100) + " %"
+                      + " (±" + fnum((nd.bsonRatio.stddev) * 100) + " %) bson keys, "
+                      + fnum(nd.keyNodeRatio.mean * 100) + " %"
+                      + " (±" + fnum((nd.keyNodeRatio.stddev) * 100) + " %) key nodes\n";
+        if (detailed) {
+            out += indent + "\n";
+            out += indent + "key count\t" + formatBoxPlot(nd.keyCount) + "\n";
+            out += indent + "used keys\t" + formatBoxPlot(nd.usedKeyCount) + "\n";
+            out += indent + "space occupied by (ratio of bucket)\n";
+            out += indent + "  key nodes\t" + formatBoxPlot(nd.keyNodeRatio) + "\n";
+            out += indent + "  key objs \t" + formatBoxPlot(nd.bsonRatio) + "\n";
+            out += indent + "  used     \t" + formatBoxPlot(nd.fillRatio) + "\n";
+        }
+        return out;
+    }
+
+    print(formatStats("  ", stats.overall));
+    print();
+
+    for (var d = 0; d <= stats.depth; ++d) {
+        print("  -- depth " + d + " --");
+        print(formatStats("    ", stats.perLevel[d]));
+    }
+
+    if (stats.expandedNodes) {
+        print("\n-- expanded nodes --\n");
+        for (var d = 0; d < stats.expandedNodes.length - 1; ++d) {
+            var node;
+            if (d == 0) {
+                node = stats.expandedNodes[0][0];
+                print("  -- root -- ");
+            } else {
+                node = stats.expandedNodes[d][params.expandNodes[d]];
+                print("  -- node # " + params.expandNodes[d] + " at depth " +
+                      node.nodeInfo.depth + " -- ");
+            }
+            print("    " + (node.nodeInfo.firstKey ? tojsononeline(node.nodeInfo.firstKey) : "") + " -> " +
+                  (node.nodeInfo.lastKey ? tojsononeline(node.nodeInfo.lastKey) : ""));
+            print("    " + node.nodeInfo.keyCount + " keys (" + node.nodeInfo.keyCount + " used)" +
+                  "\tat diskloc " + tojsononeline(node.nodeInfo.diskLoc));
+            print("    ");
+            print("    subtree stats, excluding node");
+            print(formatStats("      ", node));
+
+            if (detailed) {
+                print("    children (: % full, subtree % full)");
+                var children = "      ";
+                for (var k = 0; k < stats.expandedNodes[d + 1].length; ++k) {
+                    var node = stats.expandedNodes[d + 1][k];
+                    if (node.nodeInfo != undefined) {
+                        children += node.nodeInfo.childNum + ": " +
+                                    (node.nodeInfo.fillRatio * 100).toFixed(1) + ", " +
+                                    (node.fillRatio.mean * 100).toFixed(1) + " | ";
+                    } else {
+                        children += k + ": - | ";
+                    }
+                    if (k != 0 && k % 5 == 0) children += "\n      ";
+                }
+                print(children);
+                print(" ");
+            }
+        }
+    }
 }
 
 DBCollection.prototype.getShardVersion = function(){
