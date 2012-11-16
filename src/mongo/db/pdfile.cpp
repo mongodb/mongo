@@ -1404,6 +1404,12 @@ namespace mongo {
         }
 
         int idxNo = tableToIndex->nIndexes;
+        // Set curop description before setting indexBuildInProg, so that there's something
+        // commands can find and kill as soon as indexBuildInProg is set. Only set this if it's a
+        // killable index, so we don't overwrite commands in currentOp.
+        if (mayInterrupt) {
+            cc().curop()->setQuery(info);
+        }
 
         try {
             IndexDetails& idx = tableToIndex->getNextIndexDetails(tabletoidxns.c_str());
