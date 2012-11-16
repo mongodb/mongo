@@ -54,8 +54,8 @@ __wt_cache_full_check(WT_SESSION_IMPL *session)
 	 */
 	for (wake = 0;; wake = (wake + 1) % 100) {
 		__wt_eviction_check(session, &lockout, wake == 0);
-		if (!lockout ||
-		    F_ISSET(session, WT_SESSION_SCHEMA_LOCKED))
+		if (!lockout || F_ISSET(session,
+		    WT_SESSION_NO_CACHE_CHECK | WT_SESSION_SCHEMA_LOCKED))
 			return (0);
 		if ((btree = session->btree) != NULL && F_ISSET(btree,
 		    WT_BTREE_BULK | WT_BTREE_NO_CACHE | WT_BTREE_NO_EVICTION))

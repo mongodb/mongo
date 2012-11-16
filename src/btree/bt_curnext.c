@@ -100,7 +100,7 @@ __cursor_fix_next(WT_CURSOR_BTREE *cbt, int newpage)
 new_page:	/* Check any insert list for a matching record. */
 		cbt->ins_head = WT_COL_UPDATE_SINGLE(cbt->page);
 		cbt->ins = __col_insert_search(
-		    cbt->ins_head, cbt->ins_stack, cbt->recno);
+		    cbt->ins_head, cbt->ins_stack, cbt->next_stack, cbt->recno);
 		if (cbt->ins != NULL &&
 		    cbt->recno != WT_INSERT_RECNO(cbt->ins))
 			cbt->ins = NULL;

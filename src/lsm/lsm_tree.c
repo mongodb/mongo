@@ -35,7 +35,6 @@ __lsm_tree_discard(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 		__wt_rwlock_destroy(session, &lsm_tree->rwlock);
 
 	__wt_free(session, lsm_tree->stats);
-	__wt_spin_destroy(session, &lsm_tree->lock);
 
 	for (i = 0; i < lsm_tree->nchunks; i++) {
 		if ((chunk = lsm_tree->chunk[i]) == NULL)
@@ -423,10 +422,10 @@ __lsm_tree_open(
 
 	/* Try to open the tree. */
 	WT_RET(__wt_calloc_def(session, 1, &lsm_tree));
-	__wt_spin_init(session, &lsm_tree->lock);
+	WT_ERR(__wt_rwlock_alloc(session, "lsm tree", &lsm_tree->rwlock));
 	WT_ERR(__wt_strdup(session, uri, &lsm_tree->name));
 	lsm_tree->filename = lsm_tree->name + strlen("lsm:");
-	WT_ERR(__wt_stat_alloc_lsm_stats(session, &lsm_tree->stats));
+	WT_ERR(__wt_stat_alloc_dsrc_stats(session, &lsm_tree->stats));
 
 	WT_ERR(__wt_lsm_meta_read(session, lsm_tree));
 
@@ -555,7 +554,7 @@ __wt_lsm_tree_drop(
 	WT_RET(__lsm_tree_close(session, lsm_tree));
 
 	/* Prevent any new opens. */
-	WT_RET(__wt_spin_trylock(session, &lsm_tree->lock));
+	WT_RET(__wt_try_writelock(session, lsm_tree->rwlock));
 
 	/* Drop the chunks. */
 	for (i = 0; i < lsm_tree->nchunks; i++) {
@@ -575,11 +574,11 @@ __wt_lsm_tree_drop(
 			    __wt_schema_drop(session, chunk->bloom_uri, cfg));
 	}
 
-	__wt_spin_unlock(session, &lsm_tree->lock);
+	__wt_rwunlock(session, lsm_tree->rwlock);
 	WT_ERR(__wt_metadata_remove(session, name));
 
 	if (0) {
-err:		__wt_spin_unlock(session, &lsm_tree->lock);
+err:		__wt_rwunlock(session, lsm_tree->rwlock);
 	}
 	__lsm_tree_discard(session, lsm_tree);
 	return (ret);
@@ -610,7 +609,7 @@ __wt_lsm_tree_rename(WT_SESSION_IMPL *session,
 	WT_RET(__lsm_tree_close(session, lsm_tree));
 
 	/* Prevent any new opens. */
-	WT_RET(__wt_spin_trylock(session, &lsm_tree->lock));
+	WT_RET(__wt_try_writelock(session, lsm_tree->rwlock));
 
 	/* Set the new name. */
 	__wt_free(session, lsm_tree->name);
@@ -641,12 +640,12 @@ __wt_lsm_tree_rename(WT_SESSION_IMPL *session,
 		}
 	}
 
-	__wt_spin_unlock(session, &lsm_tree->lock);
+	__wt_rwunlock(session, lsm_tree->rwlock);
 	WT_ERR(__wt_lsm_meta_write(session, lsm_tree));
 	WT_ERR(__wt_metadata_remove(session, oldname));
 
 	if (0) {
-err:		__wt_spin_unlock(session, &lsm_tree->lock);
+err:		__wt_rwunlock(session, lsm_tree->rwlock);
 	}
 	if (old != NULL)
 		__wt_free(session, old);
@@ -675,7 +674,7 @@ __wt_lsm_tree_truncate(
 	WT_RET(__lsm_tree_close(session, lsm_tree));
 
 	/* Prevent any new opens. */
-	WT_RET(__wt_spin_trylock(session, &lsm_tree->lock));
+	WT_RET(__wt_try_writelock(session, lsm_tree->rwlock));
 
 	/* Create the new chunk. */
 	WT_ERR(__wt_calloc_def(session, 1, &chunk));
@@ -689,11 +688,11 @@ __wt_lsm_tree_truncate(
 	WT_ERR(__wt_lsm_meta_write(session, lsm_tree));
 
 	WT_ERR(__lsm_tree_start_worker(session, lsm_tree));
-	__wt_spin_unlock(session, &lsm_tree->lock);
+	__wt_rwunlock(session, lsm_tree->rwlock);
 	__wt_lsm_tree_release(session, lsm_tree);
 
 	if (0) {
-err:		__wt_spin_unlock(session, &lsm_tree->lock);
+err:		__wt_rwunlock(session, lsm_tree->rwlock);
 		__lsm_tree_discard(session, lsm_tree);
 	}
 	return (ret);

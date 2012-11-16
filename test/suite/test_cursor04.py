@@ -128,14 +128,10 @@ class test_cursor04(wttest.WiredTigerTestCase):
             cursor.insert()
 
         # 1. Calling search for a value that exists
-        cursor.set_key(self.genkey(5))
-        self.assertEqual(cursor.search(), 0)
-        self.assertEqual(cursor.get_key(), self.genkey(5))
-        self.assertEqual(cursor.get_value(), self.genvalue(5))
+        self.assertEqual(cursor[self.genkey(5)], self.genvalue(5))
 
         # 2. Calling search for a value that does not exist
-        cursor.set_key(self.genkey(self.nentries))
-        self.assertEqual(cursor.search(), wiredtiger.WT_NOTFOUND)
+        self.assertRaises(KeyError, lambda: cursor[self.genkey(self.nentries)])
 
         # 2. Calling search_near for a value beyond the end
         cursor.set_key(self.genkey(self.nentries))

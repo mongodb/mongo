@@ -112,10 +112,10 @@ __wt_lsm_bloom_worker(void *arg)
 			}
 
 			++j;
-			__wt_spin_lock(session, &lsm_tree->lock);
+			__wt_writelock(session, lsm_tree->rwlock);
 			++lsm_tree->dsk_gen;
 			ret = __wt_lsm_meta_write(session, lsm_tree);
-			__wt_spin_unlock(session, &lsm_tree->lock);
+			__wt_rwunlock(session, lsm_tree->rwlock);
 
 			if (ret != 0) {
 				(void)__wt_err(session, ret,
@@ -186,11 +186,11 @@ __wt_lsm_checkpoint_worker(void *arg)
 			}
 
 			++j;
-			__wt_spin_lock(session, &lsm_tree->lock);
+			__wt_writelock(session, lsm_tree->rwlock);
 			F_SET(chunk, WT_LSM_CHUNK_ONDISK);
 			++lsm_tree->dsk_gen;
 			ret = __wt_lsm_meta_write(session, lsm_tree);
-			__wt_spin_unlock(session, &lsm_tree->lock);
+			__wt_rwunlock(session, lsm_tree->rwlock);
 
 			if (ret != 0) {
 				(void)__wt_err(session, ret,
@@ -224,9 +224,9 @@ __wt_lsm_copy_chunks(WT_SESSION_IMPL *session,
 	/* Always return zero chunks on error. */
 	cookie->nchunks = 0;
 
-	__wt_spin_lock(session, &lsm_tree->lock);
+	__wt_readlock(session, lsm_tree->rwlock);
 	if (!F_ISSET(lsm_tree, WT_LSM_TREE_WORKING)) {
-		__wt_spin_unlock(session, &lsm_tree->lock);
+		__wt_rwunlock(session, lsm_tree->rwlock);
 		/* The actual error value is ignored. */
 		return (WT_ERROR);
 	}
@@ -245,7 +245,7 @@ __wt_lsm_copy_chunks(WT_SESSION_IMPL *session,
 	if (ret == 0 && nchunks > 0)
 		memcpy(cookie->chunk_array, lsm_tree->chunk,
 		    nchunks * sizeof(*lsm_tree->chunk));
-	__wt_spin_unlock(session, &lsm_tree->lock);
+	__wt_rwunlock(session, lsm_tree->rwlock);
 
 	if (ret == 0)
 		cookie->nchunks = nchunks;
@@ -332,7 +332,7 @@ __lsm_free_chunks(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 		if (!locked) {
 			locked = 1;
 			/* TODO: Do we need the lsm_tree lock for all drops? */
-			__wt_spin_lock(session, &lsm_tree->lock);
+			__wt_writelock(session, lsm_tree->rwlock);
 		}
 		if (F_ISSET(chunk, WT_LSM_CHUNK_BLOOM)) {
 			WT_WITH_SCHEMA_LOCK(session, ret = __wt_schema_drop(
@@ -375,7 +375,7 @@ __lsm_free_chunks(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	}
 	if (locked) {
 err:		WT_TRET(__wt_lsm_meta_write(session, lsm_tree));
-		__wt_spin_unlock(session, &lsm_tree->lock);
+		__wt_rwunlock(session, lsm_tree->rwlock);
 	}
 
 	/* Returning non-zero means there is no work to do. */

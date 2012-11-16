@@ -121,8 +121,10 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 		if (*inshead == NULL) {
 			new_inshead_size = sizeof(WT_INSERT_HEAD);
 			WT_ERR(__wt_calloc_def(session, 1, &new_inshead));
-			for (i = 0; i < WT_SKIP_MAXDEPTH; i++)
+			for (i = 0; i < WT_SKIP_MAXDEPTH; i++) {
 				cbt->ins_stack[i] = &new_inshead->head[i];
+				cbt->next_stack[i] = NULL;
+			}
 			cbt->ins_head = new_inshead;
 		}
 
@@ -144,7 +146,7 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 
 		/* Insert the WT_INSERT structure. */
 		WT_ERR(__wt_insert_serial(session, page, cbt->write_gen,
-		    inshead, cbt->ins_stack,
+		    inshead, cbt->ins_stack, cbt->next_stack,
 		    &new_inslist, new_inslist_size,
 		    &new_inshead, new_inshead_size,
 		    &ins, ins_size, skipdepth));
@@ -205,17 +207,38 @@ __wt_row_insert_alloc(WT_SESSION_IMPL *session,
 int
 __wt_insert_serial_func(WT_SESSION_IMPL *session, void *args)
 {
-	WT_INSERT *new_ins, ***ins_stack;
+	WT_INSERT *new_ins, ***ins_stack, **next_stack;
 	WT_INSERT_HEAD *inshead, **insheadp, **new_inslist, *new_inshead;
 	WT_PAGE *page;
 	uint32_t write_gen;
 	u_int i, skipdepth;
 
 	__wt_insert_unpack(args, &page, &write_gen, &insheadp,
-	    &ins_stack, &new_inslist, &new_inshead, &new_ins, &skipdepth);
+	    &ins_stack, &next_stack,
+	    &new_inslist, &new_inshead, &new_ins, &skipdepth);
 
-	/* Check the page's write-generation. */
-	WT_RET(__wt_page_write_gen_check(session, page, write_gen));
+	if ((inshead = *insheadp) == NULL)
+		inshead = new_inshead;
+
+	/*
+	 * Check the page's write-generation: if that fails, check whether we
+	 * are still in the expected position, and no item has been added where
+	 * our insert belongs.
+	 */
+	if (page->modify->write_gen + 1 == page->modify->disk_gen)
+		return (WT_RESTART);
+
+	if (page->modify->write_gen != write_gen) {
+		for (i = 0; i < skipdepth; i++) {
+			if (ins_stack[i] == NULL ||
+			    *ins_stack[i] != next_stack[i])
+				return (WT_RESTART);
+			if (next_stack[i] == NULL &&
+			    inshead->tail[i] != NULL &&
+			    ins_stack[i] != &inshead->tail[i]->next[i])
+				return (WT_RESTART);
+		}
+	}
 
 	/*
 	 * Publish: First, point the new WT_INSERT item's skiplist references
@@ -223,10 +246,9 @@ __wt_insert_serial_func(WT_SESSION_IMPL *session, void *args)
 	 * update the skiplist elements that reference the new WT_INSERT item,
 	 * this ensures the list is never inconsistent.
 	 */
-	if ((inshead = *insheadp) == NULL)
-		inshead = new_inshead;
 	for (i = 0; i < skipdepth; i++)
 		new_ins->next[i] = *ins_stack[i];
+
 	WT_WRITE_BARRIER();
 	for (i = 0; i < skipdepth; i++) {
 		if (inshead->tail[i] == NULL ||
