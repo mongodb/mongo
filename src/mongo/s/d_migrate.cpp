@@ -1077,7 +1077,9 @@ namespace mongo {
             // 4.
             for ( int i=0; i<86400; i++ ) { // don't want a single chunk move to take more than a day
                 verify( !Lock::isLocked() );
-                sleepsecs( 1 );
+                // Exponential sleep backoff, up to 1 sec. Don't sleep much on the first few
+                // iterations, since we want empty chunk migrations to be fast.
+                i < 10 ? sleepmillis( 1 << i ) : sleepsecs( 1 );
                 scoped_ptr<ScopedDbConnection> conn(
                         ScopedDbConnection::getScopedDbConnection( toShard.getConnString() ) );
                 BSONObj res;
