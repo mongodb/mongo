@@ -227,6 +227,27 @@ namespace mongo {
         }
     }
 
+    /* @return the size for an allocated record quantized to 1/16th of the BucketSize
+       @param allocSize    requested size to allocate
+    */
+    int NamespaceDetails::quantizeAllocationSpace(int allocSize) {
+        const int bucketIdx = bucket(allocSize);
+        int bucketSize = bucketSizes[bucketIdx];
+        int quantizeUnit = bucketSize / 16;
+        if (allocSize % quantizeUnit == 0)
+            // size is already quantized
+            return allocSize;
+        if (allocSize >= (1 << 22)) // 4mb
+            // all allocatons > 4mb result in 4mb/16 quantization units, even if allocated in
+            // the 8mb+ bucket.  idea is to reduce quantization overhead of large records at
+            // the cost of increasing the DeletedRecord size distribution in the largest bucket
+            // by factor of 4.
+            quantizeUnit = (1 << 18); // 256k
+        const int quantizedSpace = (allocSize | (quantizeUnit - 1)) + 1;
+        fassert(0, quantizedSpace >= allocSize);
+        return quantizedSpace;
+    }
+
     /* predetermine location of the next alloc without actually doing it. 
         if cannot predetermine returns null (so still call alloc() then)
     */
@@ -247,8 +268,8 @@ namespace mongo {
             // align very slightly.  
             // note that if doing more coarse-grained quantization (really just if it isn't always
             //   a constant amount but if it varied by record size) then that quantization should 
-            //   NOT be done here but rather in __stdAlloc so that we can grab a deletedrecord that 
-            //   is just big enough if we happen to run into one.
+            //   NOT be done here but rather in getRecordAllocationSize() so that we can grab a
+            //   deletedrecord that is just big enough if we happen to run into one.
             lenToAlloc = (lenToAlloc + 3) & 0xfffffffc;
         }
 
@@ -748,7 +769,11 @@ namespace mongo {
             return allocationSize;
         }
 
-        return static_cast<int>(minRecordSize * _paddingFactor);
+        // adjust for padding factor
+        int allocationSize = static_cast<int>(minRecordSize * _paddingFactor);
+
+        // quantize to the nearest 1/16th bucketSize
+        return quantizeAllocationSpace(allocationSize);
     }
 
     /* ------------------------------------------------------------------------- */

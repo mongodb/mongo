@@ -360,6 +360,11 @@ namespace mongo {
             return Buckets-1;
         }
 
+        /* @return the size for an allocated record quantized to 1/16th of the BucketSize
+           @param allocSize    requested size to allocate
+        */
+        static int quantizeAllocationSpace(int allocSize);
+
         /* predetermine location of the next alloc without actually doing it. 
            if cannot predetermine returns null (so still call alloc() then)
         */
