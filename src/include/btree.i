@@ -207,7 +207,7 @@ __wt_page_write_gen_check(
 	if (mod->write_gen == write_gen && mod->write_gen + 1 != mod->disk_gen)
 		return (0);
 
-	WT_BSTAT_INCR(session, file_write_conflicts);
+	WT_BSTAT_INCR(session, txn_write_conflict);
 	return (WT_RESTART);
 }
 

@@ -108,7 +108,7 @@ __wt_btcur_reset(WT_CURSOR_BTREE *cbt)
 	WT_SESSION_IMPL *session;
 
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
-	WT_BSTAT_INCR(session, cursor_resets);
+	WT_BSTAT_INCR(session, cursor_reset);
 
 	__cursor_leave(cbt);
 	__cursor_search_clear(cbt);
@@ -246,7 +246,7 @@ __wt_btcur_insert(WT_CURSOR_BTREE *cbt)
 	btree = cbt->btree;
 	cursor = &cbt->iface;
 	session = (WT_SESSION_IMPL *)cursor->session;
-	WT_BSTAT_INCR(session, cursor_inserts);
+	WT_BSTAT_INCR(session, cursor_insert);
 
 	if (btree->type == BTREE_ROW)
 		WT_RET(__cursor_size_chk(session, &cursor->key));
@@ -336,7 +336,7 @@ __wt_btcur_remove(WT_CURSOR_BTREE *cbt)
 	btree = cbt->btree;
 	cursor = &cbt->iface;
 	session = (WT_SESSION_IMPL *)cursor->session;
-	WT_BSTAT_INCR(session, cursor_removes);
+	WT_BSTAT_INCR(session, cursor_remove);
 
 	if (btree->type == BTREE_ROW)
 		WT_RET(__cursor_size_chk(session, &cursor->key));
@@ -398,7 +398,7 @@ __wt_btcur_update(WT_CURSOR_BTREE *cbt)
 	btree = cbt->btree;
 	cursor = &cbt->iface;
 	session = (WT_SESSION_IMPL *)cursor->session;
-	WT_BSTAT_INCR(session, cursor_updates);
+	WT_BSTAT_INCR(session, cursor_update);
 
 	if (btree->type == BTREE_ROW)
 		WT_RET(__cursor_size_chk(session, &cursor->key));

@@ -1239,15 +1239,12 @@ extern void *__wt_scr_alloc_ext(WT_SESSION *wt_session, size_t size);
 extern void __wt_scr_free_ext(WT_SESSION *wt_session, void *p);
 extern void __wt_session_dump_all(WT_SESSION_IMPL *session);
 extern void __wt_session_dump(WT_SESSION_IMPL *session);
-extern int __wt_stat_alloc_btree_stats(WT_SESSION_IMPL *session,
-    WT_BTREE_STATS **statsp);
-extern void __wt_stat_clear_btree_stats(WT_STATS *stats_arg);
+extern int __wt_stat_alloc_dsrc_stats(WT_SESSION_IMPL *session,
+    WT_DSRC_STATS **statsp);
+extern void __wt_stat_clear_dsrc_stats(WT_STATS *stats_arg);
 extern int __wt_stat_alloc_connection_stats(WT_SESSION_IMPL *session,
     WT_CONNECTION_STATS **statsp);
 extern void __wt_stat_clear_connection_stats(WT_STATS *stats_arg);
-extern int __wt_stat_alloc_lsm_stats(WT_SESSION_IMPL *session,
-    WT_LSM_STATS **statsp);
-extern void __wt_stat_clear_lsm_stats(WT_STATS *stats_arg);
 extern int __wt_txnid_cmp(const void *v1, const void *v2);
 extern void __wt_txn_release_snapshot(WT_SESSION_IMPL *session);
 extern void __wt_txn_get_oldest(WT_SESSION_IMPL *session);

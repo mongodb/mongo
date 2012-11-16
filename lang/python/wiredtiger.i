@@ -89,6 +89,7 @@ DESTRUCTOR(__wt_session, close)
 
 /* Don't require empty config strings. */
 %typemap(default) const char *config { $1 = NULL; }
+%typemap(default) WT_CURSOR *to_dup { $1 = NULL; }
 
 /* 
  * Error returns other than WT_NOTFOUND generate an exception.
@@ -334,7 +335,10 @@ typedef int int_void;
 		
 		@copydoc WT_CURSOR::get_key
 		Returns only the first column.'''
-		return self.get_keys()[0]
+		k = self.get_keys()
+		if len(k) == 1:
+			return k[0]
+		return k
 
 	def get_keys(self):
 		'''get_keys(self) -> (object, ...)
@@ -350,7 +354,10 @@ typedef int int_void;
 		
 		@copydoc WT_CURSOR::get_value
 		Returns only the first column.'''
-		return self.get_values()[0]
+		v = self.get_values()
+		if len(v) == 1:
+			return v[0]
+		return v
 
 	def get_values(self):
 		'''get_values(self) -> (object, ...)
@@ -362,6 +369,8 @@ typedef int int_void;
 		'''set_key(self) -> None
 		
 		@copydoc WT_CURSOR::set_key'''
+		if len(args) == 1 and type(args[0]) == tuple:
+			args = args[0]
 		if self.is_column:
 			self._set_recno(long(args[0]))
 		else:
@@ -373,6 +382,8 @@ typedef int int_void;
 		'''set_value(self) -> None
 		
 		@copydoc WT_CURSOR::set_value'''
+		if len(args) == 1 and type(args[0]) == tuple:
+			args = args[0]
 		# Keep the Python string pinned
 		self._value = pack(self.value_format, *args)
 		self._set_value(self._value)
@@ -383,6 +394,13 @@ typedef int int_void;
 		if not hasattr(self, '_iterable'):
 			self._iterable = IterableCursor(self)
 		return self._iterable
+
+	def __getitem__(self, key):
+		'''Python convenience for searching'''
+		self.set_key(key)
+		if self.search() != 0:
+			raise KeyError
+		return self.get_value()
 %}
 };
 
@@ -427,27 +445,30 @@ typedef int int_void;
 ## @}
 
 class stat:
-	""" a set of static defines used by statistics cursor """
-	pass
+	'''keys for statistics cursors'''
 
-class filestat:
-	""" a set of static defines used by statistics cursor """
-	pass
+	class conn:
+		'''keys for cursors on connection statistics'''
+		pass
+
+	class dsrc:
+		'''keys for cursors on data source statistics'''
+		pass
 
 import sys
-# All names starting with 'WT_STAT_file_' are renamed to
-# the wiredtiger.filestat class, those starting with 'WT_STAT_' are
-# renamed to wiredtiger.stat .
+# All names starting with 'WT_STAT_DSRC_' are renamed to
+# the wiredtiger.stat.dsrc class, those starting with 'WT_STAT_CONN' are
+# renamed to wiredtiger.stat.conn class.
 def _rename_with_prefix(prefix, toclass):
 	curmodule = sys.modules[__name__]
 	for name in dir(curmodule):
 		if name.startswith(prefix):
-			shortname = name[len(prefix):]
+			shortname = name[len(prefix):].lower()
 			setattr(toclass, shortname, getattr(curmodule, name))
 			delattr(curmodule, name)
 
-_rename_with_prefix('WT_STAT_file_', filestat)
-_rename_with_prefix('WT_STAT_', stat)
+_rename_with_prefix('WT_STAT_CONN_', stat.conn)
+_rename_with_prefix('WT_STAT_DSRC_', stat.dsrc)
 del _rename_with_prefix
 %}
 
