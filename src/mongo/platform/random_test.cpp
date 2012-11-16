@@ -25,25 +25,47 @@
 namespace mongo {
 
     TEST( RandomTest, Seed1 ) {
-#ifndef _WIN32
         PseudoRandom a( 12 );
         PseudoRandom b( 12 );
 
         for ( int i = 0; i < 100; i++ ) {
             ASSERT_EQUALS( a.nextInt32(), b.nextInt32() );
         }
-#endif
     }
 
     TEST( RandomTest, Seed2 ) {
-#ifndef _WIN32
         PseudoRandom a( 12 );
         PseudoRandom b( 12 );
 
         for ( int i = 0; i < 100; i++ ) {
             ASSERT_EQUALS( a.nextInt64(), b.nextInt64() );
         }
-#endif
+    }
+
+    TEST( RandomTest, Seed3 ) {
+        PseudoRandom a( 11 );
+        PseudoRandom b( 12 );
+
+        ASSERT_NOT_EQUALS( a.nextInt32(), b.nextInt32() );
+    }
+
+    TEST( RandomTest, Seed4 ) {
+        PseudoRandom a( 11 );
+        std::set<int32_t> s;
+        for ( int i = 0; i < 100; i++ ) {
+            s.insert( a.nextInt32() );
+        }
+        ASSERT_EQUALS( 100U, s.size() );
+    }
+
+    TEST( RandomTest, Seed5 ) {
+        const int64_t seed = 0xCC453456FA345FABLL;
+        PseudoRandom a(seed);
+        std::set<int32_t> s;
+        for ( int i = 0; i < 100; i++ ) {
+            s.insert( a.nextInt32() );
+        }
+        ASSERT_EQUALS( 100U, s.size() );
     }
 
     TEST( RandomTest, R1 ) {

@@ -15,13 +15,8 @@
  *    limitations under the License.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/platform/random.h"
 
-#include <cstdlib>
-#include <iostream>
-#include <fstream>
 #include <stdio.h>
 #include <string.h>
 
@@ -29,27 +24,54 @@
 #include <errno.h>
 #endif
 
+#include <cstdlib>
+#include <iostream>
+#include <fstream>
+
+#include "mongo/platform/basic.h"
+
 namespace mongo {
 
     // ---- PseudoRandom  -----
 
-#ifdef _WIN32
-#pragma warning( disable : 4715 ) // not all control paths return a value
     int32_t PseudoRandom::nextInt32() {
-        if ( rand_s(&_seed) == 0 ) {
-            // SUCCESS
-            return _seed;
-        }
-        abort();
+        int32_t t = _x ^ (_x << 11);
+        _x = _y;
+        _y = _z;
+        _z = _w;
+        return _w = _w ^ (_w >> 19) ^ (t ^ (t >> 8));
     }
 
-#else
-    int32_t PseudoRandom::nextInt32() {
-        return rand_r( &_seed );
+    namespace {
+        const int32_t default_y = 362436069;
+        const int32_t default_z = 521288629;
+        const int32_t default_w = 88675123;
     }
-#endif
+
+    PseudoRandom::PseudoRandom( int32_t seed ) {
+        _x = seed;
+        _y = default_y;
+        _z = default_z;
+        _w = default_w;
+    }
+
+
+    PseudoRandom::PseudoRandom( uint32_t seed ) {
+        _x = static_cast<int32_t>(seed);
+        _y = default_y;
+        _z = default_z;
+        _w = default_w;
+    }
+
+
     PseudoRandom::PseudoRandom( int64_t seed ) {
-        _seed = static_cast<uint32_t>( seed );
+        int32_t high = seed >> 32;
+        int32_t low = seed & 0xFFFFFFFF;
+
+        _x = high ^ low;
+        _y = default_y;
+        _z = default_z;
+        _w = default_w;
     }
 
     int64_t PseudoRandom::nextInt64() {
@@ -88,7 +110,7 @@ namespace mongo {
     public:
         InputStreamSecureRandom( const char* fn ) {
             _in = new std::ifstream( fn, std::ios::binary | std::ios::in );
-            if ( ! _in->is_open() ) {
+            if ( !_in->is_open() ) {
                 std::cerr << "can't open " << fn << " " << strerror(errno) << std::endl;
                 abort();
             }

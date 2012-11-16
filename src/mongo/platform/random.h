@@ -21,9 +21,15 @@
 
 namespace mongo {
 
-    // TODO(erh) make this is generate 64-bit numbers
+    /**
+     * Uses http://en.wikipedia.org/wiki/Xorshift
+     */
     class PseudoRandom {
     public:
+        PseudoRandom( int32_t seed );
+
+        PseudoRandom( uint32_t seed );
+
         PseudoRandom( int64_t seed );
 
         int32_t nextInt32();
@@ -36,7 +42,10 @@ namespace mongo {
         int32_t nextInt32( int32_t max ) { return nextInt32() % max; }
 
     private:
-        uint32_t _seed;
+        int32_t _x;
+        int32_t _y;
+        int32_t _z;
+        int32_t _w;
     };
 
     /**
