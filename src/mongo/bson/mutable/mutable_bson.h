@@ -15,15 +15,13 @@
 
 #pragma once
 
-#include "mongo/pch.h"
-
-#include <string>
-#include <stdint.h>
-
 #include <boost/scoped_ptr.hpp>
+#include <string>
+
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/platform/cstdint.h"
 #include "mongo/util/safe_num.h"
 
 namespace mongo {

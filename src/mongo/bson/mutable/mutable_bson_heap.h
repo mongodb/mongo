@@ -15,15 +15,14 @@
 
 #pragma once
 
-#include "mongo/pch.h"
 
-#include <stdint.h>
 #include <string>
 #include <vector>
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/oid.h"
+#include "mongo/platform/cstdint.h"
 
 namespace mongo {
 namespace mutablebson {

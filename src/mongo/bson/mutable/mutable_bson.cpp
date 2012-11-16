@@ -13,12 +13,14 @@
  * limitations under the License.
  */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/bson/mutable/mutable_bson.h"
 
 #include <algorithm>
+#include <cstdlib>
+#include <cstring>
 #include <sstream>
-#include <string.h>
-#include <stdlib.h>
 
 #include "mongo/bson/mutable/mutable_bson_heap.h"
 #include "mongo/bson/mutable/mutable_bson_internal.h"

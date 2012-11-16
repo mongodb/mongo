@@ -13,10 +13,13 @@
  * limitations under the License.
  */
 
+#include "mongo/platform/basic.h"
+
+#include "mongo/bson/mutable/mutable_bson_heap.h"
+
 #include <string>
 
 #include "mongo/unittest/unittest.h"
-#include "mongo/bson/mutable/mutable_bson_heap.h"
 
 namespace {
 

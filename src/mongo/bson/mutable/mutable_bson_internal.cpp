@@ -13,6 +13,8 @@
  * limitations under the License.
  */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/bson/mutable/mutable_bson_internal.h"
 
 #define __TRACE__ __FILE__ << ":" << __FUNCTION__ << " [" << __LINE__ << "]"

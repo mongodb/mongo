@@ -15,8 +15,8 @@
 
 #pragma once
 
-#include "mongo/db/jsobj.h"
 #include "mongo/bson/mutable/mutable_bson.h"
+#include "mongo/db/jsobj.h"
 
 namespace mongo {
 namespace mutablebson {

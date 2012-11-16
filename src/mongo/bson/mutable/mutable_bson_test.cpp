@@ -13,16 +13,17 @@
  * limitations under the License.
  */
 
-#include <iostream>
+#include "mongo/platform/basic.h"
+
+#include "mongo/bson/mutable/mutable_bson.h"
 
 #include "mongo/base/status.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/bson/mutable/mutable_bson.h"
-#include "mongo/bson/mutable/mutable_bson_internal.h"
-#include "mongo/bson/mutable/mutable_bson_heap.h"
-#include "mongo/bson/mutable/mutable_bson_builder.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/mutable/mutable_bson_builder.h"
+#include "mongo/bson/mutable/mutable_bson_heap.h"
+#include "mongo/bson/mutable/mutable_bson_internal.h"
 #include "mongo/db/json.h"
+#include "mongo/unittest/unittest.h"
 
 namespace {
 

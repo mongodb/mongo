@@ -15,10 +15,10 @@
 
 #pragma once
 
-#include <stdint.h>
 #include <vector>
 
 #include "mongo/bson/mutable/mutable_bson.h"
+#include "mongo/platform/cstdint.h"
 
 namespace mongo {
 namespace mutablebson {
