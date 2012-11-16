@@ -881,7 +881,7 @@ __rec_split_init(WT_SESSION_IMPL *session,
 	 * as corrected by the underlying block manager.
 	 */
 	WT_RET(__wt_bm_write_size(session, &max));
-	WT_RET(__wt_buf_initsize(session, &r->dsk, (size_t)max));
+	WT_RET(__wt_buf_init(session, &r->dsk, (size_t)max));
 
 	/*
 	 * Clear the header and set the page type (the type doesn't change, and
