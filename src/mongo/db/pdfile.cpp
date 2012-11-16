@@ -1410,9 +1410,6 @@ namespace mongo {
             // It's important that this is outside the inner try/catch so that we never try to call
             // kill_idx on a half-formed disk loc (if this asserts).
             getDur().writingDiskLoc(idx.info) = loc;
-            // Set curop description before setting indexBuildInProg, so that there's something
-            // commands can find and kill as soon as indexBuildInProg is set.
-            cc().curop()->setQuery(info);
 
             try {
                 getDur().writingInt(tableToIndex->indexBuildInProgress) = 1;
