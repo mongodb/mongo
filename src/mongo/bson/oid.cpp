@@ -27,9 +27,13 @@
 
 #define verify MONGO_verify
 
+BOOST_STATIC_ASSERT( sizeof(mongo::OID) == mongo::OID::kOIDSize );
 BOOST_STATIC_ASSERT( sizeof(mongo::OID) == 12 );
 
 namespace mongo {
+
+    const size_t OID::kOIDSize;
+
     void OID::hash_combine(size_t &seed) const {
         boost::hash_combine(seed, x);
         boost::hash_combine(seed, y);
@@ -149,7 +153,7 @@ namespace mongo {
     void OID::init( const std::string& s ) {
         verify( s.size() == 24 );
         const char *p = s.c_str();
-        for( int i = 0; i < 12; i++ ) {
+        for( size_t i = 0; i < kOIDSize; i++ ) {
             data[i] = fromHex(p);
             p += 2;
         }
