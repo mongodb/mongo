@@ -186,11 +186,11 @@ __wt_lsm_checkpoint_worker(void *arg)
 			}
 
 			++j;
-			__wt_spin_lock(session, &lsm_tree->lock);
+			__wt_writelock(session, lsm_tree->rwlock);
 			F_SET(chunk, WT_LSM_CHUNK_ONDISK);
 			++lsm_tree->dsk_gen;
 			ret = __wt_lsm_meta_write(session, lsm_tree);
-			__wt_spin_unlock(session, &lsm_tree->lock);
+			__wt_rwunlock(session, lsm_tree->rwlock);
 
 			if (ret != 0) {
 				(void)__wt_err(session, ret,

@@ -54,7 +54,8 @@ restart:
 			    session, cbt, cbt->ins_head, &key));
 		} else
 			cbt->ins = __col_insert_search(cbt->ins_head,
-			    cbt->ins_stack, WT_INSERT_RECNO(current));
+			    cbt->ins_stack, cbt->next_stack,
+			    WT_INSERT_RECNO(current));
 	}
 
 	/*
@@ -83,6 +84,7 @@ restart:
 	if (ins == NULL || ins == current)
 		for (; i >= 0; i--) {
 			cbt->ins_stack[i] = NULL;
+			cbt->next_stack[i] = NULL;
 			ins = cbt->ins_head->head[i];
 			if (ins != NULL && ins != current)
 				break;
@@ -96,12 +98,14 @@ restart:
 		 */
 		if (ins == NULL) {
 			cbt->ins_stack[0] = NULL;
+			cbt->next_stack[0] = NULL;
 			goto restart;
 		}
 		if (ins->next[i] != current)		/* Stay at this level */
 			ins = ins->next[i];
 		else {					/* Drop down a level */
 			cbt->ins_stack[i] = &ins->next[i];
+			cbt->next_stack[i] = ins->next[i];
 			--i;
 		}
 	}
@@ -231,7 +235,7 @@ __cursor_fix_prev(WT_CURSOR_BTREE *cbt, int newpage)
 new_page:	/* Check any insert list for a matching record. */
 		cbt->ins_head = WT_COL_UPDATE_SINGLE(cbt->page);
 		cbt->ins = __col_insert_search(
-		    cbt->ins_head, cbt->ins_stack, cbt->recno);
+		    cbt->ins_head, cbt->ins_stack, cbt->next_stack, cbt->recno);
 		if (cbt->ins != NULL &&
 		    cbt->recno != WT_INSERT_RECNO(cbt->ins))
 			cbt->ins = NULL;

@@ -16,27 +16,39 @@ __wt_search_insert(WT_SESSION_IMPL *session,
     WT_CURSOR_BTREE *cbt, WT_INSERT_HEAD *inshead, WT_ITEM *srch_key)
 {
 	WT_BTREE *btree;
-	WT_INSERT **insp, *ret_ins;
+	WT_INSERT **insp, *last_ins, *ret_ins;
 	WT_ITEM insert_key;
 	int cmp, i;
+
+	btree = session->btree;
 
 	/* If there's no insert chain to search, we're done. */
 	if ((ret_ins = WT_SKIP_LAST(inshead)) == NULL) {
 		cbt->ins = NULL;
+		cbt->next_stack[0] = NULL;
 		return (0);
 	}
-
-	btree = session->btree;
 
 	/* Fast-path appends. */
 	insert_key.data = WT_INSERT_KEY(ret_ins);
 	insert_key.size = WT_INSERT_KEY_SIZE(ret_ins);
 	(void)WT_BTREE_CMP(session, btree, srch_key, &insert_key, cmp);
 	if (cmp >= 0) {
-		for (i = WT_SKIP_MAXDEPTH - 1; i >= 0; i--)
-			cbt->ins_stack[i] = (inshead->tail[i] != NULL) ?
-			    &inshead->tail[i]->next[i] :
-			    &inshead->head[i];
+		/*
+		 * XXX We may race with another appending thread.
+		 *
+		 * To catch that case, rely on the atomic pointer read above
+		 * and set the next stack to NULL here.  If we have raced with
+		 * another thread, one of the next pointers will not be NULL by
+		 * the time they are checked against the next stack inside the
+		 * serialized insert function.
+		 */
+		for (i = WT_SKIP_MAXDEPTH - 1; i >= 0; i--) {
+			cbt->ins_stack[i] = (i == 0) ? &ret_ins->next[0] :
+			    (inshead->tail[i] != NULL) ?
+			    &inshead->tail[i]->next[i] : &inshead->head[i];
+			cbt->next_stack[i] = NULL;
+		}
 		cbt->compare = -cmp;
 		cbt->ins = ret_ins;
 		return (0);
@@ -46,9 +58,10 @@ __wt_search_insert(WT_SESSION_IMPL *session,
 	 * The insert list is a skip list: start at the highest skip level, then
 	 * go as far as possible at each level before stepping down to the next.
 	 */
-	ret_ins = NULL;
+	last_ins = ret_ins = NULL;
 	for (i = WT_SKIP_MAXDEPTH - 1, insp = &inshead->head[i]; i >= 0;) {
-		if (*insp == NULL) {
+		if ((ret_ins = *insp) == NULL) {
+			cbt->next_stack[i] = NULL;
 			cbt->ins_stack[i--] = insp--;
 			continue;
 		}
@@ -57,8 +70,8 @@ __wt_search_insert(WT_SESSION_IMPL *session,
 		 * Comparisons may be repeated as we drop down skiplist levels;
 		 * don't repeat comparisons, they might be expensive.
 		 */
-		if (ret_ins != *insp) {
-			ret_ins = *insp;
+		if (ret_ins != last_ins) {
+			last_ins = ret_ins;
 			insert_key.data = WT_INSERT_KEY(ret_ins);
 			insert_key.size = WT_INSERT_KEY_SIZE(ret_ins);
 			WT_RET(WT_BTREE_CMP(
@@ -68,10 +81,14 @@ __wt_search_insert(WT_SESSION_IMPL *session,
 		if (cmp > 0)		/* Keep going at this level */
 			insp = &ret_ins->next[i];
 		else if (cmp == 0)
-			for (; i >= 0; i--)
+			for (; i >= 0; i--) {
+				cbt->next_stack[i] = ret_ins->next[i];
 				cbt->ins_stack[i] = &ret_ins->next[i];
-		else			/* Drop down a level */
+			}
+		else {			/* Drop down a level */
+			cbt->next_stack[i] = ret_ins;
 			cbt->ins_stack[i--] = insp--;
+		}
 	}
 
 	/*
