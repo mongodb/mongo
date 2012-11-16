@@ -54,10 +54,15 @@ namespace mongo {
 
         // Takes ownership of the principal (by putting into _authenticatedPrincipals).
         void addAuthorizedPrincipal(Principal* principal);
+
         // Removes and deletes the given principal from the set of authenticated principals.
         // Return an error Status if the given principal isn't a member of the
         // _authenticatedPrincipals set.
         Status removeAuthorizedPrincipal(const Principal* principal);
+
+        // Returns NULL if not found
+        // Ownership of the returned Principal remains with _authenticatedPrincipals
+        Principal* lookupPrincipal(const std::string& name) const;
 
         // Grant this connection the given privilege.
         Status acquirePrivilege(const AcquiredPrivilege& privilege);

@@ -166,6 +166,10 @@ namespace mongo {
         return _authenticatedPrincipals.removeByName(principal->getName());
     }
 
+    Principal* AuthorizationManager::lookupPrincipal(const std::string& name) const {
+        return _authenticatedPrincipals.lookup(name);
+    }
+
     Status AuthorizationManager::acquirePrivilege(const AcquiredPrivilege& privilege) {
         const std::string& userName = privilege.getPrincipal()->getName();
         if (!_authenticatedPrincipals.lookup(userName)) {
