@@ -36,14 +36,16 @@ namespace mongo {
 
     BSONObj idKeyPattern = fromjson("{\"_id\":1}");
 
-    /* deleted lists -- linked lists of deleted records -- are placed in 'buckets' of various sizes
-       so you can look for a deleterecord about the right size.
+    /* Deleted list buckets are used to quickly locate free space based on size.  Each bucket
+       contains records up to that size.  All records > 4mb are placed into the 16mb bucket.
     */
     int bucketSizes[] = {
-        32, 64, 128, 256, 0x200, 0x400, 0x800, 0x1000, 0x2000, 0x4000,
-        0x8000, 0x10000, 0x20000, 0x40000, 0x80000, 0x100000, 0x200000,
-        0x400000, 0x800000
-    };
+        0x20,     0x40,     0x80,     0x100,
+        0x200,    0x400,    0x800,    0x1000,
+        0x2000,   0x4000,   0x8000,   0x10000,
+        0x20000,  0x40000,  0x80000,  0x100000,
+        0x200000, 0x400000, 0x1000000,
+     };
 
     NamespaceDetails::NamespaceDetails( const DiskLoc &loc, bool capped ) {
         /* be sure to initialize new fields here -- doesn't default to zeroes the way we use it */
