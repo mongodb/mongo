@@ -110,16 +110,21 @@ var joinShardedFindInsert =
 
 jsTest.log( "Upgrading cluster..." )
 
+var startTime = new Date();
+
 st.upgradeCluster( newVersion )
+
+var endTime = new Date();
 
 jsTest.log( "Cluster upgraded." )
 
 st.printShardingStatus()
 
+jsTest.log( "Cluster upgrade took " + ((endTime - startTime) / 1000) + 
+            " secs, sleeping for valid inserts" )
 
-// Allow more valid writes to go through
-sleep( 10 * 1000 )
-
+// Allow enough time for more valid writes to go through.
+sleep((endTime - startTime) * 3)
 
 joinFindInsert()
 joinShardedFindInsert()
