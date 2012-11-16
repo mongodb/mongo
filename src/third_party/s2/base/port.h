@@ -686,10 +686,15 @@ extern inline void prefetch(const char *x) {}
 
 // HK's fun windows fixer-upper defines go here!  Woo.
 #ifdef _WIN32
-// TODO: drem as below is broken.
 inline double drem(double x, double y) {
-  int quot = (x / y) + 0.5;
-  return x - ((double)quot) * y;
+    double quot = x/y;
+    if (quot > 0) {
+        quot = quot + 0.5;
+    } else {
+        quot = quot - 0.5;
+    }
+    int iquot = quot;
+    return x - iquot * y;
 }
 #define strtoll  _strtoi64
 #define strtoull _strtoui64
