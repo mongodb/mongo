@@ -244,7 +244,7 @@ namespace mongo {
             // by factor of 4.
             quantizeUnit = (1 << 18); // 256k
         const int quantizedSpace = (allocSize | (quantizeUnit - 1)) + 1;
-        fassert(0, quantizedSpace >= allocSize);
+        fassert(16484, quantizedSpace >= allocSize);
         return quantizedSpace;
     }
 
