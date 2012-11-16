@@ -617,7 +617,7 @@ namespace {
         t0.setDoubleValue(123.45);
         ASSERT_EQUALS(mongo::NumberDouble, t0.type());
 
-        t0.setOIDValue("012345678901");
+        t0.setOIDValue(mongo::OID("47cc67093475061e3d95369d"));
         ASSERT_EQUALS(mongo::jstOID, t0.type());
 
         t0.setRegexValue("[a-zA-Z]?");

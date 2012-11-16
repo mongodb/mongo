@@ -153,7 +153,7 @@ namespace mutablebson {
         void setTSValue(OpTime tsVal);
         void setDateValue(int64_t millis);
         void setDoubleValue(double doubleVal);
-        void setOIDValue(const StringData& oid);
+        void setOIDValue(const OID& oid);
         void setStringValue(const StringData& stringVal);
         void setRegexValue(const StringData& re);
         void setSafeNumValue(const SafeNum& safeNum);

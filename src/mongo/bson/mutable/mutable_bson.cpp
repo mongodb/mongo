@@ -422,7 +422,7 @@ ElementRep& dstRep = _doc->_elements->_vec[(*sibIt)._rep];
     }
     OID Element::getOIDValue() const {
         return OID(
-            reinterpret_cast<const unsigned char (&)[12]>(
+            reinterpret_cast<const unsigned char (&)[OID::kOIDSize]>(
                 _doc->_elements->_vec[_rep]._value.shortStr));
     }
     const char* Element::getRegexValue() const {
@@ -488,10 +488,11 @@ ElementRep& dstRep = _doc->_elements->_vec[(*sibIt)._rep];
         e._value.doubleVal = doubleVal;
     }
 
-    void Element::setOIDValue(const StringData& oid) {
+    void Element::setOIDValue(const OID& oid) {
         ElementRep& e = _doc->_elements->_vec[_rep];
         e._type = mongo::jstOID;
-        strncpy(e._value.shortStr, oid.data(), 12);
+        BOOST_STATIC_ASSERT(mongo::OID::kOIDSize <= sizeof(e._value.shortStr));
+        std::memcpy(e._value.shortStr, reinterpret_cast<const char*>(oid.getData()), OID::kOIDSize);
     }
 
     void Element::setRegexValue(const StringData& re) {
