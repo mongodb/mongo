@@ -180,11 +180,12 @@ config_compression(void)
 			break;
 		case 5:					/* 10% */
 			/*
-			 * Dictionary and prefix compression not compatible with
-			 * raw compression.  If one of them is set, don't config
+			 * Fixed-length column store files, and both dictionary
+			 * and prefix compression are not compatible with raw
+			 * compression.  If any of them are set, don't config
 			 * raw compression.
 			 */
-			if (g.c_dictionary || g.c_prefix)
+			if (g.type == FIX || g.c_dictionary || g.c_prefix)
 				break;
 			if (access(BZIP_PATH, R_OK) == 0)
 				cstr = "compression=raw";
@@ -215,28 +216,6 @@ config_compression(void)
 			    "snappy library not found or not readable\n");
 			exit(EXIT_FAILURE);
 		}
-	}
-
-	/*
-	 * If both dictionary or prefix, and raw compression were permanently
-	 * configured, that's a problem.
-	 */
-	if (g.compression == COMPRESS_RAW && g.c_dictionary) {
-		if (config_find_is_perm("dictionary", strlen("dictionary"))) {
-			fprintf(stderr,
-			    "dictionary and raw compression not compatible\n");
-			exit(EXIT_FAILURE);
-		}
-		g.c_dictionary = 0;
-	}
-
-	if (g.compression == COMPRESS_RAW && g.c_prefix) {
-		if (config_find_is_perm("prefix", strlen("prefix"))) {
-			fprintf(stderr,
-			    "prefix and raw compression not compatible\n");
-			exit(EXIT_FAILURE);
-		}
-		g.c_prefix = 0;
 	}
 }
 
