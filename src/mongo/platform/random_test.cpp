@@ -36,12 +36,14 @@ namespace mongo {
     }
 
     TEST( RandomTest, Seed2 ) {
+#ifndef _WIN32
         PseudoRandom a( 12 );
         PseudoRandom b( 12 );
 
         for ( int i = 0; i < 100; i++ ) {
             ASSERT_EQUALS( a.nextInt64(), b.nextInt64() );
         }
+#endif
     }
 
     TEST( RandomTest, R1 ) {
