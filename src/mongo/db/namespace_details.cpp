@@ -357,6 +357,9 @@ namespace mongo {
                 bestmatchlen = r->lengthWithHeaders();
                 bestmatch = cur;
                 bestprev = prev;
+                if (r->lengthWithHeaders() == len)
+                    // exact match, stop searching
+                    break;
             }
             if ( bestmatchlen < 0x7fffffff && --extra <= 0 )
                 break;
