@@ -57,6 +57,7 @@ typedef struct {
 	uint32_t  raw_max_slots;	/* Raw compression array sizes */
 	uint32_t *raw_entries;		/* Raw compression slot entries */
 	uint32_t *raw_offsets;		/* Raw compression slot offsets */
+	uint64_t *raw_recnos;		/* Raw compression recno count */
 
 	/*
 	 * Reconciliation gets tricky if we have to split a page, that is, if
@@ -638,13 +639,9 @@ __rec_write_init(
 	 * to row-and variable-length column-store objects, both dictionary and
 	 * prefix compression must be turned off at the API level.
 	 */
-	r->raw_compression = 0;
-	if (btree->compressor != NULL &&
-	    btree->compressor->compress_raw != NULL) {
-		WT_ASSERT(session, btree->dictionary == 0);
-		WT_ASSERT(session, btree->prefix_compression == 0);
-		r->raw_compression = 1;
-	}
+	r->raw_compression =
+	    btree->compressor != NULL &&
+	    btree->compressor->compress_raw != NULL;
 
 	/* Per-page reconciliation: track skipped updates. */
 	r->upd_skipped = 0;
@@ -678,6 +675,7 @@ __wt_rec_destroy(WT_SESSION_IMPL *session, void *retp)
 
 	__wt_free(session, r->raw_entries);
 	__wt_free(session, r->raw_offsets);
+	__wt_free(session, r->raw_recnos);
 
 	if (r->bnd != NULL) {
 		for (bnd = r->bnd, i = 0; i < r->bnd_entries; ++bnd, ++i) {
@@ -1257,58 +1255,74 @@ __rec_split_raw_worker(WT_SESSION_IMPL *session, WT_RECONCILE *r, int final)
 	WT_PAGE_HEADER *dsk, *dsk_dst;
 	WT_SESSION *wt_session;
 	size_t result_len;
+	uint64_t recno;
 	uint32_t entry, i, len, max, result_slots, slots;
 	uint8_t *dsk_start;
-	int split_on_value;
 
 	wt_session = (WT_SESSION *)session;
 	btree = session->btree;
 	compressor = btree->compressor;
 	unpack = &_unpack;
-
-	/*
-	 * We're going to walk the built page, which requires setting the
-	 * number of entries.
-	 */
 	dsk = r->dsk.mem;
-	dsk->u.entries = r->entries;
 
-	/*
-	 * Set the starting record number and promotion key for the chunk.
-	 * Repeated each time we try and split, which might be wasted work,
-	 * but detecting repeated key-building is probably more complicated
-	 * than it's worth.
-	 */
-	WT_ERR(__rec_split_bnd_grow(session, r));
 	bnd = &r->bnd[r->bnd_next];
-	if (dsk->type == WT_PAGE_ROW_INT || dsk->type == WT_PAGE_ROW_LEAF)
-		WT_ERR(__rec_split_row_promote_cell(session, dsk, &bnd->key));
+	switch (dsk->type) {
+	case WT_PAGE_COL_INT:
+	case WT_PAGE_COL_VAR:
+		recno = bnd->recno;
+		break;
+	case WT_PAGE_ROW_INT:
+	case WT_PAGE_ROW_LEAF:
+		recno = 0;
 
-	/*
-	 * Build paired arrays of offsets and cumulative counts for cells in
-	 * the page: the offset is the byte offset to the possible split-point
-	 * (adjusted for the initial chunk that cannot be compressed), the
-	 * entries is the cumulative page entries covered by the byte offset.
-	 */
-	if (r->entries > r->raw_max_slots) {
-		__wt_free(session, r->raw_entries);
-		WT_ERR(__wt_calloc_def(session, r->entries, &r->raw_entries));
-		__wt_free(session, r->raw_offsets);
-		WT_ERR(__wt_calloc_def(session, r->entries, &r->raw_offsets));
+		/*
+		 * Set the promotion key for the chunk.  Repeated each time we
+		 * try and split, which might be wasted work, but detecting
+		 * repeated key-building is probably more complicated than it's
+		 * worth.
+		 */
+		WT_RET(__rec_split_row_promote_cell(session, dsk, &bnd->key));
+		break;
+	WT_ILLEGAL_VALUE(session);
 	}
 
 	/*
-	 * Row-store pages can split at keys, but not at values, column-store
-	 * pages can split at values.
+	 * Build arrays of offsets and cumulative counts of cells and rows in
+	 * the page: the offset is the byte offset to the possible split-point
+	 * (adjusted for an initial chunk that cannot be compressed), entries
+	 * is the cumulative page entries covered by the byte offset, recnos is
+	 * the cumulative rows covered by the byte offset.
 	 */
-	split_on_value =
-	    dsk->type == WT_PAGE_COL_INT || dsk->type == WT_PAGE_COL_VAR;
+	if (r->entries >= r->raw_max_slots) {
+		__wt_free(session, r->raw_entries);
+		__wt_free(session, r->raw_offsets);
+		__wt_free(session, r->raw_recnos);
+		r->raw_max_slots = 0;
+
+		i = r->entries + 100;
+		WT_RET(__wt_calloc_def(session, i, &r->raw_entries));
+		WT_RET(__wt_calloc_def(session, i, &r->raw_offsets));
+		if (dsk->type == WT_PAGE_COL_INT ||
+		    dsk->type == WT_PAGE_COL_VAR)
+			WT_RET(__wt_calloc_def(session, i, &r->raw_recnos));
+		r->raw_max_slots = i;
+	}
+
+	/*
+	 * We're going to walk the disk image, which requires setting the
+	 * number of entries.
+	 */
+	dsk->u.entries = r->entries;
 
 	slots = 0;
 	entry = 0;
 	WT_CELL_FOREACH(btree, dsk, cell, unpack, i) {
 		++entry;
 
+		/*
+		 * Row-store pages can split at keys, but not at values,
+		 * column-store pages can split at values.
+		 */
 		__wt_cell_unpack(cell, unpack);
 		switch (unpack->type) {
 		case WT_CELL_KEY:
@@ -1316,14 +1330,21 @@ __rec_split_raw_worker(WT_SESSION_IMPL *session, WT_RECONCILE *r, int final)
 		case WT_CELL_KEY_SHORT:
 			break;
 		case WT_CELL_ADDR:
+		case WT_CELL_DEL:
 		case WT_CELL_VALUE:
 		case WT_CELL_VALUE_OVFL:
 		case WT_CELL_VALUE_SHORT:
-			if (split_on_value)
+			if (dsk->type == WT_PAGE_COL_INT) {
+				recno = unpack->v;
 				break;
+			}
+			if (dsk->type == WT_PAGE_COL_VAR) {
+				recno += __wt_cell_rle(unpack);
+				break;
+			}
 			r->raw_entries[slots] = entry;
 			continue;
-		WT_ILLEGAL_VALUE_ERR(session);
+		WT_ILLEGAL_VALUE(session);
 		}
 
 		/*
@@ -1335,6 +1356,10 @@ __rec_split_raw_worker(WT_SESSION_IMPL *session, WT_RECONCILE *r, int final)
 		 */
 		if ((len = WT_PTRDIFF32(cell, dsk)) > 1024)
 			r->raw_offsets[++slots] = len - WT_BLOCK_COMPRESS_SKIP;
+
+		if (dsk->type == WT_PAGE_COL_INT ||
+		    dsk->type == WT_PAGE_COL_VAR)
+			r->raw_recnos[slots] = recno;
 		r->raw_entries[slots] = entry;
 	}
 
@@ -1345,7 +1370,7 @@ __rec_split_raw_worker(WT_SESSION_IMPL *session, WT_RECONCILE *r, int final)
 	if (slots == 0 && final)
 		goto too_small;
 	if (slots == 0)
-		goto get_more;
+		goto more_rows;
 
 	/* The slot at array's end is the total length of the data. */
 	r->raw_offsets[++slots] =
@@ -1360,7 +1385,7 @@ __rec_split_raw_worker(WT_SESSION_IMPL *session, WT_RECONCILE *r, int final)
 	 * buffer to be the maximum object size (for a row-store leaf page, that
 	 * would be the maximum leaf page size), this shouldn't surprise anyone.
 	 */
-	WT_ERR(__wt_scr_alloc(session, r->dsk.memsize, &dst));
+	WT_RET(__wt_scr_alloc(session, r->dsk.memsize, &dst));
 	memcpy(dst->mem, dsk, WT_BLOCK_COMPRESS_SKIP);
 	WT_ERR(compressor->compress_raw(compressor, wt_session,
 	    (uint8_t *)dsk + WT_BLOCK_COMPRESS_SKIP,
@@ -1377,7 +1402,7 @@ __rec_split_raw_worker(WT_SESSION_IMPL *session, WT_RECONCILE *r, int final)
 		dsk_dst->recno = bnd->recno;
 		dsk_dst->mem_size =
 		    r->raw_offsets[result_slots] + WT_BLOCK_COMPRESS_SKIP;
-		dsk_dst->u.entries = r->raw_entries[result_slots -1];
+		dsk_dst->u.entries = r->raw_entries[result_slots - 1];
 
 		/*
 		 * There may be a remnant in the working buffer that didn't get
@@ -1390,10 +1415,23 @@ __rec_split_raw_worker(WT_SESSION_IMPL *session, WT_RECONCILE *r, int final)
 		dsk_start = WT_PAGE_HEADER_BYTE(btree, dsk);
 		(void)memcpy(dsk_start, (uint8_t *)r->first_free - len, len);
 
-		r->entries -= r->raw_entries[result_slots -1];
+		r->entries -= r->raw_entries[result_slots - 1];
 		r->first_free = dsk_start + len;
 		r->space_avail =
 		    r->page_size - (WT_PAGE_HEADER_BYTE_SIZE(btree) + len);
+
+		switch (dsk->type) {
+		case WT_PAGE_COL_INT:
+			recno = r->raw_recnos[result_slots];
+			break;
+		case WT_PAGE_COL_VAR:
+			recno = r->raw_recnos[result_slots - 1];
+			break;
+		case WT_PAGE_ROW_INT:
+		case WT_PAGE_ROW_LEAF:
+			recno = 0;
+			break;
+		}
 
 		bnd->already_compressed = 1;
 	} else if (final) {
@@ -1409,9 +1447,20 @@ too_small:	/*
 		r->first_free = WT_PAGE_HEADER_BYTE(btree, dsk);
 		r->space_avail = r->page_size - WT_PAGE_HEADER_BYTE_SIZE(btree);
 
+		switch (dsk->type) {
+		case WT_PAGE_COL_INT:
+		case WT_PAGE_COL_VAR:
+			recno = r->recno;
+			break;
+		case WT_PAGE_ROW_INT:
+		case WT_PAGE_ROW_LEAF:
+			recno = 0;
+			break;
+		}
+
 		bnd->already_compressed = 0;
 	} else {
-get_more:	/*
+more_rows:	/*
 		 * Compression failed, increase the size of the "page" and try
 		 * again after we accumulate some more rows.
 		 */
@@ -1444,8 +1493,9 @@ get_more:	/*
 		    session, r, bnd, bnd->already_compressed ? dst : &r->dsk));
 
 	/* We wrote something, move to the next boundary. */
+	WT_ERR(__rec_split_bnd_grow(session, r));
 	bnd = &r->bnd[++r->bnd_next];
-	bnd->recno = 0;				/* XXX wrong wrong wrong */
+	bnd->recno = recno;
 
 done:
 err:	__wt_scr_free(&dst);
@@ -1804,7 +1854,7 @@ __wt_rec_row_bulk_insert(WT_CURSOR_BULK *cbulk)
 #define	WT_FIX_ENTRIES(btree, bytes)	(((bytes) * 8) / (btree)->bitcnt)
 
 static inline int
-__rec_bulk_insert_split_check(WT_CURSOR_BULK  *cbulk)
+__rec_col_fix_bulk_insert_split_check(WT_CURSOR_BULK  *cbulk)
 {
 	WT_BTREE *btree;
 	WT_RECONCILE *r;
@@ -1858,7 +1908,7 @@ __wt_rec_col_fix_bulk_insert(WT_CURSOR_BULK *cbulk)
 		for (data = cursor->value.data, entries = cursor->value.size;
 		    entries > 0;
 		    entries -= page_entries, data += page_size) {
-			WT_RET(__rec_bulk_insert_split_check(cbulk));
+			WT_RET(__rec_col_fix_bulk_insert_split_check(cbulk));
 
 			page_entries =
 			    WT_MIN(entries, cbulk->nrecs - cbulk->entry);
@@ -1871,7 +1921,7 @@ __wt_rec_col_fix_bulk_insert(WT_CURSOR_BULK *cbulk)
 		return (0);
 	}
 
-	WT_RET(__rec_bulk_insert_split_check(cbulk));
+	WT_RET(__rec_col_fix_bulk_insert_split_check(cbulk));
 
 	__bit_setv(r->first_free,
 	    cbulk->entry, btree->bitcnt, ((uint8_t *)cursor->value.data)[0]);
@@ -1903,7 +1953,10 @@ __wt_rec_col_var_bulk_insert(WT_CURSOR_BULK *cbulk)
 
 	/* Boundary: split or write the page. */
 	while (val->len > r->space_avail)
-		WT_RET(__rec_split(session, r));
+		if (r->raw_compression)
+			WT_RET(__rec_split_raw(session, r));
+		else
+			WT_RET(__rec_split(session, r));
 
 	/* Copy the value onto the page. */
 	if (btree->dictionary)
@@ -2027,7 +2080,10 @@ __rec_col_merge(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 
 		/* Boundary: split or write the page. */
 		while (val->len > r->space_avail)
-			WT_RET(__rec_split(session, r));
+			if (r->raw_compression)
+				WT_RET(__rec_split_raw(session, r));
+			else
+				WT_RET(__rec_split(session, r));
 
 		/* Copy the value onto the page. */
 		__rec_copy_incr(session, r, val);
@@ -2254,7 +2310,10 @@ __rec_col_var_helper(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 
 	/* Boundary: split or write the page. */
 	while (val->len > r->space_avail)
-		WT_RET(__rec_split(session, r));
+		if (r->raw_compression)
+			WT_RET(__rec_split_raw(session, r));
+		else
+			WT_RET(__rec_split(session, r));
 
 	/* Copy the value onto the page. */
 	if (!deleted && !ovfl && btree->dictionary)

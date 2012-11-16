@@ -576,6 +576,7 @@ readprev
 readserver
 realloc
 recno
+recnos
 req
 rescan
 resizing
