@@ -25,6 +25,10 @@
 namespace mongo {
 
     Status AuthExternalStateImpl::initialize(DBClientBase* adminDBConnection) {
+        if (noauth) {
+            return Status::OK();
+        }
+
         try {
             _adminUserExists = AuthorizationManager::hasPrivilegeDocument(adminDBConnection,
                                                                           "admin");
