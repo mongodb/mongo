@@ -90,6 +90,13 @@ namespace mongo {
         void setProperty(Gsasl_property property, const StringData& value);
 
         /**
+         * Gets a property on this session.  Return an empty string if the property isn't set.
+         *
+         * Not valid before initializeServerSession() or initializeClientSession().
+         */
+        const std::string getProperty(Gsasl_property property) const;
+
+        /**
          * Performs one more step on this session.
          *
          * Receives "inputData" from the other side and produces "*outputData" to send.

@@ -37,6 +37,14 @@ namespace mongo {
         gsasl_property_set_raw(_gsaslSession, property, value.data(), value.size());
     }
 
+    const std::string GsaslSession::getProperty(Gsasl_property property) const {
+        const char* prop = gsasl_property_fast(_gsaslSession, property);
+        if (prop == NULL) {
+            return "";
+        }
+        return prop;
+    }
+
     Status GsaslSession::initializeClientSession(Gsasl* gsasl,
                                                  const StringData& mechanism,
                                                  void* sessionHook) {
