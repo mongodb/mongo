@@ -139,7 +139,7 @@ __clsm_open_cursors(
 
 	WT_RET(__clsm_close_cursors(clsm));
 
-	__wt_spin_lock(session, &lsm_tree->lock);
+	__wt_readlock(session, lsm_tree->rwlock);
 
 	/* Merge cursors have already figured out how many chunks they need. */
 	if (F_ISSET(clsm, WT_CLSM_MERGE)) {
@@ -218,7 +218,7 @@ __clsm_open_cursors(
 	}
 
 	clsm->dsk_gen = lsm_tree->dsk_gen;
-err:	__wt_spin_unlock(session, &lsm_tree->lock);
+err:	__wt_rwunlock(session, lsm_tree->rwlock);
 	return (ret);
 }
 
@@ -781,11 +781,11 @@ __clsm_put(
 	 * chunk is needed.
 	 */
 	if (clsm->primary_chunk == NULL) {
-		__wt_spin_lock(session, &lsm_tree->lock);
+		__wt_writelock(session, lsm_tree->rwlock);
 		if (clsm->dsk_gen == lsm_tree->dsk_gen)
 			WT_WITH_SCHEMA_LOCK(session,
 			    ret = __wt_lsm_tree_switch(session, lsm_tree));
-		__wt_spin_unlock(session, &lsm_tree->lock);
+		__wt_rwunlock(session, lsm_tree->rwlock);
 		WT_RET(ret);
 
 		/* We changed the structure, or someone else did: update. */
@@ -830,12 +830,12 @@ __clsm_put(
 		 * Take the LSM lock first: we can't acquire it while
 		 * holding the schema lock, or we will deadlock.
 		 */
-		__wt_spin_lock(session, &lsm_tree->lock);
+		__wt_writelock(session, lsm_tree->rwlock);
 		/* Make sure we don't race. */
 		if (clsm->dsk_gen == lsm_tree->dsk_gen)
 			WT_WITH_SCHEMA_LOCK(session,
 			    ret = __wt_lsm_tree_switch(session, lsm_tree));
-		__wt_spin_unlock(session, &lsm_tree->lock);
+		__wt_rwunlock(session, lsm_tree->rwlock);
 	}
 
 	return (ret);
