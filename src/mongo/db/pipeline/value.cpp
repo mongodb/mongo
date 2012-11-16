@@ -387,13 +387,13 @@ namespace mongo {
     int Value::coerceToInt() const {
         switch(getType()) {
         case NumberDouble:
-            return _storage.doubleValue;
+            return static_cast<int>(_storage.doubleValue);
 
         case NumberInt:
             return _storage.intValue;
 
         case NumberLong:
-            return _storage.longValue;
+            return static_cast<int>(_storage.longValue);
 
         case jstNULL:
         case Undefined:
@@ -411,10 +411,10 @@ namespace mongo {
     long long Value::coerceToLong() const {
         switch(getType()) {
         case NumberDouble:
-            return _storage.doubleValue;
+            return static_cast<long long>(_storage.doubleValue);
 
         case NumberInt:
-            return _storage.intValue;
+            return static_cast<long long>(_storage.intValue);
 
         case NumberLong:
             return _storage.longValue;
@@ -438,10 +438,10 @@ namespace mongo {
             return _storage.doubleValue;
 
         case NumberInt:
-            return _storage.intValue;
+            return static_cast<double>(_storage.intValue);
 
         case NumberLong:
-            return _storage.longValue;
+            return static_cast<double>(_storage.longValue);
 
         case jstNULL:
         case Undefined:
