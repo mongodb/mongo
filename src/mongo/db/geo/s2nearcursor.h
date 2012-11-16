@@ -36,7 +36,7 @@ namespace mongo {
         virtual bool supportYields()  { return true; }
         virtual bool supportGetMore() { return true; }
         virtual bool isMultiKey() const { return true; }
-        virtual bool autoDedup() const { return false; }
+        virtual bool autoDedup() const { return true; }
         virtual bool modifiedKeys() const { return true; }
         virtual bool getsetdup(DiskLoc loc) { return false; }
         virtual string toString() { return "S2NearCursor"; }
