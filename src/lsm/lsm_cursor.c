@@ -140,6 +140,7 @@ __clsm_open_cursors(
 	WT_RET(__clsm_close_cursors(clsm));
 
 	__wt_readlock(session, lsm_tree->rwlock);
+	F_SET(session, WT_SESSION_NO_CACHE_CHECK);
 
 	/* Merge cursors have already figured out how many chunks they need. */
 	if (F_ISSET(clsm, WT_CLSM_MERGE)) {
@@ -218,7 +219,8 @@ __clsm_open_cursors(
 	}
 
 	clsm->dsk_gen = lsm_tree->dsk_gen;
-err:	__wt_rwunlock(session, lsm_tree->rwlock);
+err:	F_CLR(session, WT_SESSION_NO_CACHE_CHECK);
+	__wt_rwunlock(session, lsm_tree->rwlock);
 	return (ret);
 }
 
