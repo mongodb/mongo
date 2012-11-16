@@ -80,7 +80,7 @@ namespace mongo {
     {}
 
     int Chunk::mkDataWritten() {
-        PseudoRandom r( time(0) );
+        PseudoRandom r(static_cast<int64_t>(time(0)));
         return r.nextInt32( MaxChunkSize / ChunkManager::SplitHeuristics::splitTestFactor );
     }
 
