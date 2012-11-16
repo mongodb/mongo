@@ -424,7 +424,7 @@ namespace {
             DiskStorageData& slice = sliceData[it->sliceNum];
             slice.numEntries += it->ratioHere;
             slice.recBytes += it->sizeHere;
-            slice.bsonBytes += it->ratioHere * obj.objsize();
+            slice.bsonBytes += static_cast<long long>(it->ratioHere * obj.objsize());
             if (hasCharacteristicField) {
                 slice.characteristicCount += it->ratioHere;
                 slice.characteristicSum += it->ratioHere * characteristicFieldValue;
@@ -782,7 +782,7 @@ namespace {
                 errmsg = "extent number must be a number, e.g. {..., extent: 3, ...}";
                 return false;
             }
-            int extentNum = extentElm.Number();
+            int extentNum = extentElm.numberInt();
             extent = getNthExtent(extentNum, nsd);
             if (extent == NULL) {
                 errmsg = str::stream() << "extent " << extentNum << " does not exist";
@@ -807,8 +807,8 @@ namespace {
                 errmsg = "range must be an array with exactly two numeric elements";
                 return false;
             }
-            params.startOfs = rangeElm["0"].Number();
-            params.endOfs = rangeElm["1"].Number();
+            params.startOfs = rangeElm["0"].numberInt();
+            params.endOfs = rangeElm["1"].numberInt();
         }
 
         // { granularity: bytes }
@@ -817,7 +817,7 @@ namespace {
             errmsg = "granularity must be a number";
             return false;
         }
-        params.granularity = granularityElm.number();
+        params.granularity = granularityElm.numberInt();
 
         // { numberOfSlices: num }
         BSONElement numberOfSlicesElm = cmdObj["numberOfSlices"];
@@ -825,7 +825,7 @@ namespace {
             errmsg = "numberOfSlices must be a number";
             return false;
         }
-        params.numberOfSlices = numberOfSlicesElm.number();
+        params.numberOfSlices = numberOfSlicesElm.numberInt();
 
         BSONElement characteristicFieldElm = cmdObj["characteristicField"];
         if (characteristicFieldElm.ok()) {
