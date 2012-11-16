@@ -170,7 +170,7 @@ namespace mongo {
             }
 
 #ifdef _DEBUG
-            PseudoRandom r( time(0) );
+            PseudoRandom r(static_cast<int64_t>(time(0)));
             // Sleep a short amount of time usually
             int sleepFor = r.nextInt32( 10 );
             sleepmillis( sleepFor );
