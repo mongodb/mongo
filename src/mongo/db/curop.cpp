@@ -147,12 +147,7 @@ namespace mongo {
 
         b.append("ns", _ns);
 
-        if (_op == dbInsert) {
-            _query.append(b, "insert");
-        }
-        else {
-            _query.append( b , "query" );
-        }
+        _query.append( b , "query" );
 
         if( !_remote.empty() ) {
             b.append("client", _remote.toString());
