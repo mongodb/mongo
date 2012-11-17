@@ -43,7 +43,7 @@ namespace mongo {
         // This is a "missing" Value
         ValueStorage() { zero(); type = EOO; }
 
-        ValueStorage(BSONType t)                    { zero(); type = t;}
+        explicit ValueStorage(BSONType t)           { zero(); type = t;}
         ValueStorage(BSONType t, int i)             { zero(); type = t; intValue = i; }
         ValueStorage(BSONType t, long long l)       { zero(); type = t; longValue = l; }
         ValueStorage(BSONType t, double d)          { zero(); type = t; doubleValue = d; }
@@ -117,7 +117,7 @@ namespace mongo {
 
         BSONType bsonType() const {
             verify(type != EOO);
-            return type;
+            return BSONType(type);
         }
 
         void zero() {
@@ -134,26 +134,31 @@ namespace mongo {
         // This data is public because this should only be used by Value which would be a friend
         union {
             struct {
-                BSONType type : 8; // one byte (offset 0)
-                union { // one byte (offset 1)
-                    unsigned int flags : 8;
-                    struct {
-                        bool refCounter : 1; // true if we need to refCount
-                        bool shortStr : 1; // true if we are using short strings
-                    };
+                // byte 1
+                signed char type;
+
+                // byte 2
+                struct {
+                    bool refCounter : 1; // true if we need to refCount
+                    bool shortStr : 1; // true if we are using short strings
+                    // reservedFlags: 6;
                 };
-                union { // 14 bytes (offset 2)
+
+                // bytes 3-16;
+                union {
                     unsigned char oid[12];
+
                     struct {
-                        int shortStrSize : 8; // TODO Consider moving into flags union (4 bits)
+                        char shortStrSize; // TODO Consider moving into flags union (4 bits)
                         char shortStrStorage[16 - 3]; // ValueStorage is 16 bytes, 3 byte offset
                     };
+
                     struct {
-                        union { // 6 bytes (offset 2)
+                        union {
                             char pad[6];
                             char stringCache[6]; // TODO copy first few bytes of strings in here
                         };
-                        union { // 8 bytes  (offset 8 and aligned)
+                        union { // 8 bytes long and 8-byte aligned
                             // There should be no pointers to non-const data
                             const RefCountable* genericRCPtr;
 
@@ -167,13 +172,9 @@ namespace mongo {
                     };
                 };
             };
-            long long i64[2];
 
-            // Note the following are currently unused, but may be useful later
-            int i32[4];
-            unsigned long long u64[2];
-            unsigned int u32[4];
-            char raw[16];
+            // covers the whole ValueStorage
+            long long i64[2];
         };
     };
     BOOST_STATIC_ASSERT(sizeof(ValueStorage) == 16);

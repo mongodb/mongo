@@ -57,10 +57,6 @@ namespace mongo {
         const int nameLen; // doesn't include '\0'
         const char name[1]; // pointer to start of name
 
-        // implicit conversions to Value
-        operator Value&() { return val; }
-        operator const Value&() const  { return val; }
-
         ValueElement* next() {
             return align(plusBytes(sizeof(ValueElement) + nameLen));
         }
@@ -189,7 +185,7 @@ namespace mongo {
             Position pos = findField(name);
             if (!pos.found())
                 return Value();
-            return getField(pos);
+            return getField(pos).val;
         }
 
         // MutableDocument uses these
@@ -201,7 +197,7 @@ namespace mongo {
             Position pos = findField(name);
             if (!pos.found())
                 return appendField(name); // TODO: find a way to avoid hashing name twice
-            return getField(pos);
+            return getField(pos).val;
         }
 
         /// Adds a new field with missing Value at the end of the document

@@ -210,7 +210,8 @@ namespace mongo {
          *
          *  Template argument name was chosen to make produced error easier to read.
          */
-        template <typename InvalidArgumentType> Value(const InvalidArgumentType& invalidArgument);
+        template <typename InvalidArgumentType>
+        explicit Value(const InvalidArgumentType& invalidArgument);
 
         void addToBson(Builder* pBuilder) const;
 

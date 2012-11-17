@@ -67,7 +67,7 @@ namespace mongo {
 
         /// Look up a field by Position. See positionOf and getNestedField.
         const Value operator[] (Position pos) const { return getField(pos); }
-        const Value getField(Position pos) const { return storage().getField(pos); }
+        const Value getField(Position pos) const { return storage().getField(pos).val; }
 
         /** Similar to BSONObj::getFieldDotted, but using FieldPath rather than a dotted string.
          *  If you pass a non-NULL positions vector, you get back a path suitable
