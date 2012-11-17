@@ -2901,6 +2901,12 @@
     <ClInclude Include="geo\s2nearcursor.h">
       <Filter>db\geo</Filter>
     </ClInclude>
+    <ClInclude Include="pipeline\document_internal.h">
+      <Filter>db\pipeline\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="pipeline\value_internal.h">
+      <Filter>db\pipeline\Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="mongo.ico">

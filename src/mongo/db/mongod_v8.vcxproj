@@ -1868,6 +1868,8 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="namespace_details.h" />
     <ClInclude Include="ops\query.h" />
     <ClInclude Include="ops\update_internal.h" />
+    <ClInclude Include="pipeline\document_internal.h" />
+    <ClInclude Include="pipeline\value_internal.h" />
     <ClInclude Include="prefetch.h" />
     <ClInclude Include="queryoptimizercursorimpl.h" />
     <ClCompile Include="queryoptimizercursorimpl.cpp" />

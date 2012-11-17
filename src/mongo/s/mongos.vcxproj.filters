@@ -1548,6 +1548,15 @@
     <ClInclude Include="..\util\winutil.h">
       <Filter>util\Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\db\pipeline\document_internal.h">
+      <Filter>db\pipeline\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\pipeline\pipeline_d.h">
+      <Filter>db\pipeline\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\pipeline\value_internal.h">
+      <Filter>db\pipeline\Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\third_party\js-1.7\jskeyword.tbl">

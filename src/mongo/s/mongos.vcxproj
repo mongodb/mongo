@@ -1292,6 +1292,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="..\db\hasher.h" />
     <ClInclude Include="..\db\initialize_server_global_state.h" />
     <ClInclude Include="..\db\keypattern.h" />
+    <ClInclude Include="..\db\pipeline\document_internal.h" />
     <ClInclude Include="..\db\pipeline\pipeline.h" />
     <ClInclude Include="..\db\interrupt_status.h" />
     <ClInclude Include="..\db\pipeline\accumulator.h" />
@@ -1302,7 +1303,9 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="..\db\pipeline\expression.h" />
     <ClInclude Include="..\db\pipeline\expression_context.h" />
     <ClInclude Include="..\db\pipeline\field_path.h" />
+    <ClInclude Include="..\db\pipeline\pipeline_d.h" />
     <ClInclude Include="..\db\pipeline\value.h" />
+    <ClInclude Include="..\db\pipeline\value_internal.h" />
     <ClInclude Include="..\db\projection.h" />
     <ClInclude Include="..\platform\atomic_intrinsics.h" />
     <ClInclude Include="..\platform\atomic_intrinsics_win32.h" />
