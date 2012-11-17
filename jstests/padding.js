@@ -48,7 +48,7 @@ for (var i = 0; i < 1000; i++) {
     }
     else {
         var x = p.findOne();
-        x.y = x.y + "aaaaaaaaaaaaaaaa";
+        x.y = x.y + "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
         p.update({}, x);
     }
     if (i % 100 == 0)
