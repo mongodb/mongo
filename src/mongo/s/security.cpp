@@ -64,14 +64,28 @@ namespace mongo {
         return true;
     }
 
+    void AuthenticationInfo::startRequest() {
+        _checkLocalHostSpecialAdmin();
+    }
+
     void AuthenticationInfo::setIsALocalHostConnectionWithSpecialAuthPowers() {
         verify(!_isLocalHost);
         _isLocalHost = true;
+        _isLocalHostAndLocalHostIsAuthorizedForAll = true;
+        _checkLocalHostSpecialAdmin();
     }
 
     bool AuthenticationInfo::_isAuthorizedSpecialChecks( const string& dbname ) const {
-        if ( !_isLocalHost ) {
-            return false;
+        return isSpecialLocalhostAdmin();
+    }
+
+    bool AuthenticationInfo::isSpecialLocalhostAdmin() const {
+        return _isLocalHostAndLocalHostIsAuthorizedForAll;
+    }
+
+    void AuthenticationInfo::_checkLocalHostSpecialAdmin() {
+        if (!_isLocalHost || !_isLocalHostAndLocalHostIsAuthorizedForAll) {
+            return;
         }
 
         string adminNs = "admin.system.users";
@@ -93,12 +107,13 @@ namespace mongo {
             // Must return conn to pool
             // TODO: Check for errors during findOne(), or just let the conn die?
             conn.done();
-            return true;
+            _isLocalHostAndLocalHostIsAuthorizedForAll = true;
+            return;
         }
 
         // Must return conn to pool
         conn.done();
-        return false;
+        _isLocalHostAndLocalHostIsAuthorizedForAll = false;
     }
 
     bool CmdLogout::run(const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {

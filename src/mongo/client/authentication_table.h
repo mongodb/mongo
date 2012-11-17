@@ -59,6 +59,9 @@ namespace mongo {
 
         static const string fieldName;
     private:
+
+        bool _shouldSendInternalSecurityTable() const;
+
         typedef map<std::string,Auth> DBAuthMap;
         DBAuthMap _dbs; // dbname -> auth
     };

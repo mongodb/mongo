@@ -44,6 +44,7 @@ namespace mongo {
         }
         ~AuthenticationInfo() {}
         bool isLocalHost() const { return _isLocalHost; } // why are you calling this? makes no sense to be externalized
+        bool isSpecialLocalhostAdmin() const;
 
         // -- modifiers ----
         

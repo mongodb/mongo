@@ -81,7 +81,7 @@ commonFiles = [ "pch.cpp",
                 "util/net/message_port.cpp",
                 "util/net/listen.cpp",
                 "util/startup_test.cpp",
-                "client/authentication_table.cpp",
+                "client/authentication_table_common.cpp",
                 "client/connpool.cpp",
                 "client/dbclient.cpp",
                 "client/dbclient_rs.cpp",
@@ -102,6 +102,7 @@ env.StaticLibrary('mongocommon', commonFiles,
                            '$BUILD_DIR/third_party/shim_boost'],)
 
 env.StaticLibrary("coredb", [
+        "client/authentication_table_server.cpp",
         "client/parallel.cpp",
         "db/commands.cpp",
         "db/commands/hashcmd.cpp",
@@ -443,7 +444,12 @@ mongos = env.Program(
              "mongodandmongos"])
 env.Install( '#/', mongos )
 
-env.Library("clientandshell", ["client/clientAndShell.cpp"], LIBDEPS=["mongocommon", "defaultversion", "gridfs", "notmongodormongos"])
+env.Library("clientandshell", ["client/authentication_table_client.cpp",
+                               "client/clientAndShell.cpp"],
+                              LIBDEPS=["mongocommon",
+                                       "defaultversion",
+                                       "gridfs",
+                                       "notmongodormongos"])
 env.Library("allclient", "client/clientOnly.cpp", LIBDEPS=["clientandshell"])
 
 if has_option( "sharedclient" ):

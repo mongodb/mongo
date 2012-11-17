@@ -100,6 +100,11 @@ namespace mongo {
         void noAutoSplit() { _autoSplitOk = false; }
 
         static ClientInfo * get();
+
+        // Returns whether or not a ClientInfo for this thread has already been created and stored
+        // in _tlInfo.
+        static bool exists();
+
         const AuthenticationInfo* getAuthenticationInfo() const { return (AuthenticationInfo*)&_ai; }
         AuthenticationInfo* getAuthenticationInfo() { return (AuthenticationInfo*)&_ai; }
         bool isAdmin() { return _ai.isAuthorized( "admin" ); }

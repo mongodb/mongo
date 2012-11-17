@@ -73,6 +73,10 @@ namespace mongo {
         _checkLocalHostSpecialAdmin();
     }
 
+    bool AuthenticationInfo::isSpecialLocalhostAdmin() const {
+        return _isLocalHostAndLocalHostIsAuthorizedForAll;
+    }
+
     void AuthenticationInfo::_checkLocalHostSpecialAdmin() {
         if ( ! _isLocalHost )
             return;
