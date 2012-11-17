@@ -72,6 +72,7 @@ namespace mongo {
         AbstractMessagingPort * port() const { return _messagingPort; }
 
         static ClientBasic* getCurrent();
+        static bool hasCurrent();
 
     protected:
         ClientBasic(AbstractMessagingPort* messagingPort) : _messagingPort(messagingPort) {}

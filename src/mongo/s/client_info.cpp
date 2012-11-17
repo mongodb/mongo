@@ -74,6 +74,7 @@ namespace mongo {
         _cur = _prev;
         _prev = temp;
         _cur->clear();
+        _ai.startRequest();
     }
 
     void ClientInfo::_setupAuth() {
@@ -122,6 +123,14 @@ namespace mongo {
                         << " NULL",
                 messagingPort == NULL || messagingPort == info->port());
         return info;
+    }
+
+    bool ClientInfo::exists() {
+        return _tlInfo.get();
+    }
+
+    bool ClientBasic::hasCurrent() {
+        return ClientInfo::exists();
     }
 
     ClientBasic* ClientBasic::getCurrent() {
