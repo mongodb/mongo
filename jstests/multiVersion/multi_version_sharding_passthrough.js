@@ -22,6 +22,8 @@ var testsToIgnore = [ /dbadmin/,
                       /mr_auth/,
                       /queryoptimizera/,
                       /regex_limit/, // Not compatible with mongod before 2.3
+                      /indexStatsCommand/, // New in 2.3.1
+                      /storageDetailsCommand/, // New in 2.3.1
                       /features2/ ]
 
 var testsThatAreBuggy = [ /apply_ops1/,
