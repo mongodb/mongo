@@ -49,7 +49,7 @@ namespace mongo {
         int numAvailable() const { return (int)_pool.size(); }
 
         void createdOne( DBClientBase * base );
-        int64_t numCreated() const { return _created; }
+        long long numCreated() const { return _created; }
 
         ConnectionString::ConnectionType type() const { verify(_created); return _type; }
 
