@@ -235,7 +235,7 @@ namespace mongo_test {
                 newConnList.push_back(newConn);
             }
 
-            const uint64_t oldCreationTime = mongo::curTimeMicros64();
+            const uint64_t oldCreationTime = mongo::getProgramUptimeMicros();
 
             for (vector<ScopedDbConnection*>::iterator iter = newConnList.begin();
                     iter != newConnList.end(); ++iter) {
@@ -297,7 +297,7 @@ namespace mongo_test {
         conn1->done();
         conn3->done();
 
-        const uint64_t badCreationTime = mongo::curTimeMicros64();
+        const uint64_t badCreationTime = mongo::getProgramUptimeMicros();
 
         mongo::getGlobalFailPointRegistry()->getFailPoint("throwSockExcep")->
                 setMode(FailPoint::alwaysOn);
@@ -358,7 +358,7 @@ namespace mongo_test {
         conn1->done();
         conn3->done();
 
-        const uint64_t badCreationTime = mongo::curTimeMicros64();
+        const uint64_t badCreationTime = mongo::getProgramUptimeMicros();
 
         mongo::getGlobalFailPointRegistry()->getFailPoint("throwSockExcep")->
                 setMode(FailPoint::alwaysOn);
