@@ -43,7 +43,9 @@ namespace mongo {
     public:
         OID() : a(0), b(0) { }
 
-        static const size_t kOIDSize = 12;
+        enum {
+            kOIDSize = 12
+        };
 
         /** init from a 24 char hex string */
         explicit OID(const std::string &s) { init(s); }

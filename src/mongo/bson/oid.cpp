@@ -32,8 +32,6 @@ BOOST_STATIC_ASSERT( sizeof(mongo::OID) == 12 );
 
 namespace mongo {
 
-    const size_t OID::kOIDSize;
-
     void OID::hash_combine(size_t &seed) const {
         boost::hash_combine(seed, x);
         boost::hash_combine(seed, y);
