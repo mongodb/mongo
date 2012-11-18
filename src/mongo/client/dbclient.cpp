@@ -806,7 +806,8 @@ namespace mongo {
         }
     }
 
-    const uint64_t DBClientBase::INVALID_SOCK_CREATION_TIME = UINT64_C(0xFFFFFFFFFFFFFFFF);
+    const uint64_t DBClientBase::INVALID_SOCK_CREATION_TIME =
+            static_cast<uint64_t>(0xFFFFFFFFFFFFFFFF);
 
     auto_ptr<DBClientCursor> DBClientBase::query(const string &ns, Query query, int nToReturn,
             int nToSkip, const BSONObj *fieldsToReturn, int queryOptions , int batchSize ) {
