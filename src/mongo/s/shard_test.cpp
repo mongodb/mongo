@@ -42,7 +42,7 @@ namespace mongo {
 
     // -----------------------------------
 
-    TEST( Shard, Simple1 ) {
+    TEST( Shard, EqualityRs ) {
         Shard a( "foo", "bar/a,b" );
         Shard b( "foo", "bar/a,b" );
         ASSERT_EQUALS( a, b );
@@ -51,10 +51,19 @@ namespace mongo {
         ASSERT_EQUALS( a, b );
     }
 
-    TEST( Shard, Simple2 ) {
+    TEST( Shard, EqualitySingle ) {
         ASSERT_EQUALS( Shard( "foo", "b.foo.com:123"), Shard( "foo", "b.foo.com:123") );
         ASSERT_NOT_EQUALS( Shard( "foo", "b.foo.com:123"), Shard( "foo", "a.foo.com:123") );
         ASSERT_NOT_EQUALS( Shard( "foo", "b.foo.com:123"), Shard( "foo", "b.foo.com:124") );
         ASSERT_NOT_EQUALS( Shard( "foo", "b.foo.com:123"), Shard( "foa", "b.foo.com:123") );
+    }
+
+    TEST( Shard, EqualitySync ) {
+        ConnectionString cs( ConnectionString::SYNC, "a,b,c" );
+        ASSERT( cs.sameLogicalEndpoint( ConnectionString( ConnectionString::SYNC, "a,b,c" ) ) );
+        ASSERT( cs.sameLogicalEndpoint( ConnectionString( ConnectionString::SYNC, "c,b,a" ) ) );
+        ASSERT( cs.sameLogicalEndpoint( ConnectionString( ConnectionString::SYNC, "c,a,b" ) ) );
+
+        ASSERT( ! cs.sameLogicalEndpoint( ConnectionString( ConnectionString::SYNC, "d,a,b" ) ) );
     }
 }

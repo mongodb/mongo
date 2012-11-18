@@ -160,8 +160,6 @@ namespace mongo {
 
         switch ( _type ) {
         case INVALID:
-            // both are invalid
-            // I think that should be ==
             return true;
         case MASTER:
             return _servers[0] == other._servers[0];
@@ -172,11 +170,23 @@ namespace mongo {
                 ( _servers[0] == other._servers[1] ) &&
                 ( _servers[1] == other._servers[0] );
         case SET:
-            // should this also make sure at least one host overlaps?
             return _setName == other._setName;
         case SYNC:
-            // should this check the _servers array instead?
-            return _string == other._string;
+            // The servers all have to be the same in each, but not in the same order.
+            if ( _servers.size() != other._servers.size() )
+                return false;
+            for ( unsigned i = 0; i < _servers.size(); i++ ) {
+                bool found = false;
+                for ( unsigned j = 0; j < other._servers.size(); j++ ) {
+                    if ( _servers[i] == other._servers[j] ) {
+                        found = true;
+                        break;
+                    }
+                }
+                if ( ! found )
+                    return false;
+            }
+            return true;
         case CUSTOM:
             return _string == other._string;
         }

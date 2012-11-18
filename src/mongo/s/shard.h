@@ -99,8 +99,9 @@ namespace mongo {
         }
 
         bool operator==( const Shard& s ) const {
-            bool n = _name == s._name;
-            return n && _cs.sameLogicalEndpoint( s._cs );
+            if ( _name != s._name )
+                return false;
+            return _cs.sameLogicalEndpoint( s._cs );
         }
 
         bool operator!=( const Shard& s ) const {
