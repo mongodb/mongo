@@ -154,6 +154,34 @@ namespace mongo {
         return 0;
     }
 
+    bool ConnectionString::sameLogicalEndpoint( const ConnectionString& other ) const {
+        if ( _type != other._type )
+            return false;
+
+        switch ( _type ) {
+        case INVALID:
+            // both are invalid
+            // I think that should be ==
+            return true;
+        case MASTER:
+            return _servers[0] == other._servers[0];
+        case PAIR:
+            if ( _servers[0] == other._servers[0] )
+                return _servers[1] == other._servers[1];
+            return
+                ( _servers[0] == other._servers[1] ) &&
+                ( _servers[1] == other._servers[0] );
+        case SET:
+            // should this also make sure at least one host overlaps?
+            return _setName == other._setName;
+        case SYNC:
+            // should this check the _servers array instead?
+            return _string == other._string;
+        case CUSTOM:
+            return _string == other._string;
+        }
+    }
+
     ConnectionString ConnectionString::parse( const string& host , string& errmsg ) {
 
         string::size_type i = host.find( '/' );
