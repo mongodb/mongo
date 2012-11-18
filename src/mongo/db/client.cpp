@@ -59,7 +59,7 @@ namespace mongo {
 #if defined(_WIN32)
         enum { SZ = 322 * 1024 };
 #else
-        enum { SZ = 210 * 1024 };
+        enum { SZ = 218 * 1024 };
 #endif
         char buf[SZ];
         StackChecker() { 
