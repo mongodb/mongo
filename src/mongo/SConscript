@@ -344,6 +344,16 @@ env.CppUnitTest( "balancer_policy_test" , [ "s/balancer_policy_tests.cpp" ] ,
                  LIBDEPS=["mongoscore", "coreshard","mongocommon","coreserver","coredb","dbcmdline","mongodandmongos"] ,
                  NO_CRUTCH=True)
 
+env.CppUnitTest("shard_test", [ "s/shard_test.cpp" ],
+                LIBDEPS=[ "mongoscore",
+                          "coreshard",
+                          "mongocommon",
+                          "coreserver",
+                          "coredb",
+                          "dbcmdline",
+                          "mongodandmongos"],
+                NO_CRUTCH=True)
+
 serverOnlyFiles += [ "s/d_logic.cpp",
                      "s/d_writeback.cpp",
                      "s/d_migrate.cpp",

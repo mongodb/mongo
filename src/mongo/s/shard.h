@@ -100,18 +100,12 @@ namespace mongo {
 
         bool operator==( const Shard& s ) const {
             bool n = _name == s._name;
-            bool a = _addr == s._addr;
-
-            verify( n == a ); // names and address are 1 to 1
-            return n;
+            return n && _cs.sameLogicalEndpoint( s._cs );
         }
 
         bool operator!=( const Shard& s ) const {
-            bool n = _name == s._name;
-            bool a = _addr == s._addr;
-            return ! ( n && a );
+            return ! ( *this == s );
         }
-
 
         bool operator==( const string& s ) const {
             return _name == s || _addr == s;

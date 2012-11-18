@@ -248,6 +248,13 @@ namespace mongo {
         
         ConnectionType type() const { return _type; }
 
+        /**
+         * this returns true if this and other point to the same logical entity
+         * for single nodes, thats the same address
+         * for replica sets, thats the same name
+         */
+        bool sameLogicalEndpoint( const ConnectionString& other ) const;
+
         static ConnectionString parse( const string& url , string& errmsg );
 
         static string typeToString( ConnectionType type );
