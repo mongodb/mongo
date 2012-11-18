@@ -407,11 +407,11 @@ namespace mongo {
                 
                 // Warning: we are sending back an array of keys but are currently limited to
                 // 4MB work of 'result' size. This should be okay for now.
-                
+
+                result.append( "timeMillis", timer.millis() );
             }
 
             result.append( "splitKeys" , splitKeys );
-
             return true;
 
         }
