@@ -93,6 +93,9 @@
     <Filter Include="bson\mutable">
       <UniqueIdentifier>{785e9dc0-570b-43f5-902f-61ae605b81a8}</UniqueIdentifier>
     </Filter>
+    <Filter Include="third_party\MurmurHash3">
+      <UniqueIdentifier>{9225469c-f0a7-45fb-b0c2-afb44d347ce2}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="balance.cpp">
@@ -861,6 +864,9 @@
     <ClCompile Include="type_collection.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\third_party\murmurhash3\MurmurHash3.cpp">
+      <Filter>third_party\MurmurHash3</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\pch.h" />
@@ -1556,6 +1562,9 @@
     </ClInclude>
     <ClInclude Include="..\db\pipeline\value_internal.h">
       <Filter>db\pipeline\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\murmurhash3\MurmurHash3.h">
+      <Filter>third_party\MurmurHash3</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
