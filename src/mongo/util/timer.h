@@ -75,12 +75,6 @@ namespace mongo {
 
         unsigned long long _old;
     };
-
-    /** Get this program's approximate uptime in microseconds.
-     *  @return uptime in microseconds.
-     */
-    extern unsigned long long getProgramUptimeMicros();
-
 }  // namespace mongo
 
 #include "mongo/util/timer-inl.h"
