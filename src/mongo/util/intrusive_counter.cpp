@@ -38,12 +38,12 @@ namespace mongo {
     }
 
     void IntrusiveCounterUnsigned::addRef() const {
-	++counter;
+        ++counter;
     }
 
     void IntrusiveCounterUnsigned::release() const {
-	if (!--counter)
-	    delete this;
+        if (!--counter)
+            delete this;
     }
 
 }

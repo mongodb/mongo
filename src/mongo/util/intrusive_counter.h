@@ -43,29 +43,29 @@ namespace mongo {
     class IntrusiveCounter :
         boost::noncopyable {
     public:
-	virtual ~IntrusiveCounter() {};
+        virtual ~IntrusiveCounter() {};
 
-	// these are here for the boost intrusive_ptr<> class
-	friend inline void intrusive_ptr_add_ref(const IntrusiveCounter *pIC) {
-	    pIC->addRef(); };
-	friend inline void intrusive_ptr_release(const IntrusiveCounter *pIC) {
-	    pIC->release(); };
+        // these are here for the boost intrusive_ptr<> class
+        friend inline void intrusive_ptr_add_ref(const IntrusiveCounter *pIC) {
+            pIC->addRef(); };
+        friend inline void intrusive_ptr_release(const IntrusiveCounter *pIC) {
+            pIC->release(); };
 
-	virtual void addRef() const = 0;
-	virtual void release() const = 0;
+        virtual void addRef() const = 0;
+        virtual void release() const = 0;
     };
 
     class IntrusiveCounterUnsigned :
         public IntrusiveCounter {
     public:
-	// virtuals from IntrusiveCounter
-	virtual void addRef() const;
-	virtual void release() const;
+        // virtuals from IntrusiveCounter
+        virtual void addRef() const;
+        virtual void release() const;
 
-	IntrusiveCounterUnsigned();
+        IntrusiveCounterUnsigned();
 
     private:
-	mutable unsigned counter;
+        mutable unsigned counter;
     };
 
     /// This is an alternative base class to the above ones (will replace them eventually)
@@ -121,7 +121,7 @@ namespace mongo {
 namespace mongo {
 
     inline IntrusiveCounterUnsigned::IntrusiveCounterUnsigned():
-	counter(0) {
+        counter(0) {
     }
 
 };
