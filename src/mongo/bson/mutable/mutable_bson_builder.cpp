@@ -275,7 +275,7 @@ namespace mutablebson {
             break;
         }
         case NumberLong: {
-            dst->appendNumber(src.fieldName(), src.getLongValue());
+            dst->appendNumber(src.fieldName(), static_cast<long long>(src.getLongValue()));
             break;
         }
         case MaxKey: {
