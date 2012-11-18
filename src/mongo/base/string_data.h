@@ -97,7 +97,7 @@ namespace mongo {
         const char* data() const { return _data; }
         size_t size() const { fillSize(); return _size; }
         bool empty() const { return size() == 0; }
-        string toString() const { return string(_data, _size); }
+        string toString() const { return string(data(), size()); }
 
     private:
         const char* const _data;  // is always null terminated, but see "notes" above
