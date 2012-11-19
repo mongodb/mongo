@@ -224,7 +224,8 @@ namespace mongo {
         ProgressMeter& getProgressMeter() { return _progressMeter; }
         CurOp *parent() const { return _wrapped; }
         void kill(bool* pNotifyFlag = NULL); 
-        bool killPending() const { return _killPending; }
+        bool killPendingStrict() const { return _killPending.load(); }
+        bool killPending() const { return _killPending.loadRelaxed(); }
         void yielded() { _numYields++; }
         int numYields() const { return _numYields; }
         void suppressFromCurop() { _suppressFromCurop = true; }
@@ -259,7 +260,7 @@ namespace mongo {
         OpDebug _debug;
         ThreadSafeString _message;
         ProgressMeter _progressMeter;
-        volatile bool _killPending;
+        AtomicInt32 _killPending;
         int _numYields;
         LockStat _lockStat;
         // _notifyList is protected by the global killCurrentOp's mtx.

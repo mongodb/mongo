@@ -47,7 +47,7 @@ namespace mongo {
         _end = 0;
         _message = "";
         _progressMeter.finished();
-        _killPending = false;
+        _killPending.store(0);
         killCurrentOp.notifyAllWaiters();
         _numYields = 0;
         _expectedLatencyMs = 0;
@@ -193,7 +193,7 @@ namespace mongo {
     }
 
     void CurOp::kill(bool* pNotifyFlag /* = NULL */) { 
-        _killPending = true;
+        _killPending.store(1);
         if (pNotifyFlag) {
             _notifyList.push_back(pNotifyFlag);
         }
