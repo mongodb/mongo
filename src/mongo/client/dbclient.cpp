@@ -190,6 +190,7 @@ namespace mongo {
         case CUSTOM:
             return _string == other._string;
         }
+        verify( false );
     }
 
     ConnectionString ConnectionString::parse( const string& host , string& errmsg ) {
