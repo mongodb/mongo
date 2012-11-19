@@ -133,14 +133,9 @@ namespace mongo {
         }
 
         case Array: {
-            vector<BSONElement> vElement(elem.Array());
-            const size_t n = vElement.size();
-
             intrusive_ptr<RCVector> vec (new RCVector);
-            vec->vec.reserve(n); // save on realloc()ing
-
-            for(size_t i = 0; i < n; ++i) {
-                vec->vec.push_back(Value::createFromBsonElement(&vElement[i]));
+            BSONForEach(sub, elem.embeddedObject()) {
+                vec->vec.push_back(Value(sub));
             }
             _storage.putVector(vec.get());
             break;
