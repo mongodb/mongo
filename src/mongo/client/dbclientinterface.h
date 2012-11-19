@@ -252,6 +252,7 @@ namespace mongo {
          * This returns true if this and other point to the same logical entity.
          * For single nodes, thats the same address.
          * For replica sets, thats just the same replica set name.
+         * For pair (deprecated) or sync cluster connections, that's the same hosts in any ordering.
          */
         bool sameLogicalEndpoint( const ConnectionString& other ) const;
 
