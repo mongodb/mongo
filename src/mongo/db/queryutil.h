@@ -357,7 +357,7 @@ namespace mongo {
         /** Empty the range so it includes no BSONElements. */
         void makeEmpty() { _intervals.clear(); }
         const vector<FieldInterval> &intervals() const { return _intervals; }
-        string getSpecial() const { return _special; }
+        const set<string>& getSpecial() const { return _special; }
         /** Make component intervals noninclusive. */
         void setExclusiveBounds();
         /**
@@ -375,8 +375,8 @@ namespace mongo {
         vector<FieldInterval> _intervals;
         // Owns memory for our BSONElements.
         vector<BSONObj> _objData;
-        string _special; // Index type name of a non standard (eg '2d') index required by a parsed
-                         // query operator (eg '$near').
+        set<string> _special; // Index type name of a non standard (eg '2d') index required by a
+                              // parsed query operator (eg '$near').  Could be >1.
         bool _exactMatchRepresentation;
         BSONElement _elemMatchContext; // Parent $elemMatch object of the field constraint that
                                        // generated this FieldRange.  For example if the query is
@@ -461,7 +461,7 @@ namespace mongo {
         BSONObj simplifiedQuery( const BSONObj &fields = BSONObj() ) const;
         
         QueryPattern pattern( const BSONObj &sort = BSONObj() ) const;
-        string getSpecial() const;
+        set<string> getSpecial() const;
 
         /**
          * @return a FieldRangeSet approximation of the documents in 'this' but
@@ -570,7 +570,7 @@ namespace mongo {
         
         const char *ns() const { return _singleKey.ns(); }
 
-        string getSpecial() const { return _singleKey.getSpecial(); }
+        set<string> getSpecial() const { return _singleKey.getSpecial(); }
 
         /** Intersect with another FieldRangeSetPair. */
         FieldRangeSetPair &operator&=( const FieldRangeSetPair &other );
@@ -837,7 +837,7 @@ namespace mongo {
          */
         FieldRangeSetPair *topFrspOriginal() const;
         
-        string getSpecial() const { return _baseSet.getSpecial(); }
+        set<string> getSpecial() const { return _baseSet.getSpecial(); }
     private:
         void assertMayPopOrClause();
         void _popOrClause( const FieldRangeSet *toDiff, NamespaceDetails *d, int idxNo, const BSONObj &keyPattern );

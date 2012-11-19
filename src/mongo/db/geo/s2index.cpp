@@ -179,7 +179,7 @@ namespace mongo {
                 BSONObj::MatchType matchType = static_cast<BSONObj::MatchType>(e.getGtLtOp());
                 if (BSONObj::opINTERSECT == matchType) {
                     intersectQuery = true;
-                } else if (BSONObj::opNEWNEAR == matchType) {
+                } else if (BSONObj::opNEAR == matchType) {
                     nearQuery = true;
                 } else {
                     continue;
@@ -240,8 +240,7 @@ namespace mongo {
                 if (Object != e.type()) { continue; }
                 // getGtLtOp is horribly misnamed and really means get the operation.
                 switch (e.embeddedObject().firstElement().getGtLtOp()) {
-                    case BSONObj::opWITHIN:
-                    case BSONObj::opNEWNEAR:
+                    case BSONObj::opNEAR:
                     case BSONObj::opINTERSECT:
                         return OPTIMAL;
                     default:

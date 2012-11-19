@@ -17,14 +17,14 @@ origin = { "type" : "Point", "coordinates": [ lng, lat ] }
 
 t.ensureIndex({ geo : "s2d" })
 
-res = t.find({ "geo" : { "$newnear" : { "$geometry" : origin, $maxDistance: 2000} } }).limit(10)
+res = t.find({ "geo" : { "$near" : { "$geometry" : origin, $maxDistance: 2000} } }).limit(10)
 assert.eq(res.itcount(), 10)
 
-res = t.find({ "geo" : { "$newnear" : { "$geometry" : origin } } }).limit(10)
+res = t.find({ "geo" : { "$near" : { "$geometry" : origin } } }).limit(10)
 assert.eq(res.itcount(), 10)
 
 // Find all the points!
-res = t.find({ "geo" : { "$newnear" : { "$geometry" : origin } } }).limit(10000)
+res = t.find({ "geo" : { "$near" : { "$geometry" : origin } } }).limit(10000)
 assert.eq(res.itcount(), (2 * points) * (2 * points))
 
 // longitude goes -180 to 180
@@ -35,5 +35,5 @@ t.insert({geo: { "type" : "Point", "coordinates" : [-180, -90]}})
 t.insert({geo: { "type" : "Point", "coordinates" : [180, -90]}})
 t.insert({geo: { "type" : "Point", "coordinates" : [180, 90]}})
 t.insert({geo: { "type" : "Point", "coordinates" : [-180, 90]}})
-res = t.find({ "geo" : { "$newnear" : { "$geometry" : origin } } }).limit(10000)
+res = t.find({ "geo" : { "$near" : { "$geometry" : origin } } }).limit(10000)
 assert.eq(res.itcount(), (2 * points) * (2 * points) + 4)

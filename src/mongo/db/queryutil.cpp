@@ -445,13 +445,15 @@ namespace mongo {
             log() << "warning: shouldn't get here?" << endl;
             break;
         }
-        case BSONObj::opNEAR:
         case BSONObj::opWITHIN:
-            _special = "2d";
+            _special.insert("2d");
+            break;
+        case BSONObj::opNEAR:
+            _special.insert("2d");
+            _special.insert("s2d");
             break;
         case BSONObj::opINTERSECT:
-        case BSONObj::opNEWNEAR:
-            _special = "s2d";
+            _special.insert("s2d");
             break;
         case BSONObj::opEXISTS: {
             if ( !existsSpec ) {
@@ -544,14 +546,14 @@ namespace mongo {
     const FieldRange &FieldRange::intersect( const FieldRange &other, bool singleKey ) {
         // If 'this' FieldRange is universal(), intersect by copying the 'other' range into 'this'.
         if ( universal() ) {
-            string intersectSpecial = !_special.empty() ? _special : other._special;
+            set<string> intersectSpecial = !_special.empty() ? _special : other._special;
             *this = other;
             _special = intersectSpecial;
             return *this;
         }
         // Range intersections are not taken for multikey indexes.  See SERVER-958.
         if ( !singleKey && !universal() ) {
-            string intersectSpecial = !_special.empty() ? _special : other._special;
+            set<string> intersectSpecial = !_special.empty() ? _special : other._special;
             // Pick 'other' range if it is smaller than or equal to 'this'.
             if ( other <= *this ) {
              	*this = other;
@@ -798,25 +800,31 @@ namespace mongo {
         return buf.str();
     }
 
+    static string setToString(const set<string>& s) {
+        stringstream ss;
+        for (set<string>::const_iterator it = s.begin(); it != s.end(); ++it) {
+            ss << *it << ", ";
+        }
+        return ss.str();
+    }
+
     string FieldRange::toString() const {
         StringBuilder buf;
-        buf << "(FieldRange special: " << _special << " intervals: ";
-        for( vector<FieldInterval>::const_iterator i = _intervals.begin(); i != _intervals.end(); ++i ) {
+        buf << "(FieldRange special: { " << setToString(_special) << "} intervals: ";
+        for (vector<FieldInterval>::const_iterator i = _intervals.begin(); i != _intervals.end(); ++i) {
             buf << i->toString() << " ";
         }
         buf << ")";
         return buf.str();
     }
 
-    string FieldRangeSet::getSpecial() const {
-        string s = "";
-        for ( map<string,FieldRange>::const_iterator i=_ranges.begin(); i!=_ranges.end(); i++ ) {
-            if ( i->second.getSpecial().size() == 0 )
-                continue;
-            uassert( 13033 , "can't have 2 special fields" , s.size() == 0 );
-            s = i->second.getSpecial();
+    set<string> FieldRangeSet::getSpecial() const {
+        for (map<string, FieldRange>::const_iterator i = _ranges.begin(); i != _ranges.end(); i++) {
+            if (i->second.getSpecial().size() > 0) {
+                return i->second.getSpecial();
+            }
         }
-        return s;
+        return set<string>();
     }
 
     /**
@@ -1730,14 +1738,13 @@ namespace mongo {
         return _upperCmp._cmp;
     }
 
-    OrRangeGenerator::OrRangeGenerator( const char *ns, const BSONObj &query , bool optimize )
-    : _baseSet( ns, query, optimize ), _orFound() {
-        
+    OrRangeGenerator::OrRangeGenerator(const char *ns, const BSONObj &query, bool optimize)
+                                      : _baseSet(ns, query, optimize), _orFound() {
         BSONObjIterator i( _baseSet.originalQuery() );
         
-        while( i.more() ) {
+        while (i.more()) {
             BSONElement e = i.next();
-            if ( strcmp( e.fieldName(), "$or" ) == 0 ) {
+            if (strcmp(e.fieldName(), "$or") == 0) {
                 uassert( 13262, "$or requires nonempty array", e.type() == Array && e.embeddedObject().nFields() > 0 );
                 BSONObjIterator j( e.embeddedObject() );
                 while( j.more() ) {
