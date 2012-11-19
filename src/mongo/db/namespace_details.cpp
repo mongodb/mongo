@@ -762,11 +762,9 @@ namespace mongo {
         
         if ( isUserFlagSet( Flag_UsePowerOf2Sizes ) ) {
             int allocationSize = bucketSizes[ bucket( minRecordSize ) ];
-            if ( allocationSize < minRecordSize ) {
-                // if we get here, it means we're allocating more than 8mb
-                // the highest bucket is 8mb, so the above code will never return more than 8mb for allocationSize
-                // if this happens, we are going to round up to the nearest megabyte
-                fassert( 16439, bucket( minRecordSize ) == MaxBucket );
+            if ( allocationSize == bucketSizes[MaxBucket] ) {
+                // if we get here, it means we're allocating more than 4mb, so round
+                // to the nearest megabyte
                 allocationSize = 1 + ( minRecordSize | ( ( 1 << 20 ) - 1 ) );
             }
             return allocationSize;
