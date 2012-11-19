@@ -958,7 +958,7 @@ ElementRep& dstRep = _doc->_elements->_vec[(*sibIt)._rep];
         uint32_t rep = _elements->size();
         uint32_t nameref = _heap->putString(fieldName);
         ValueType val;
-        strncpy(val.shortStr, (char*)oid.getData(), 12);
+        memcpy(val.shortStr, (char*)oid.getData(), 12);
         _elements->push_back(ElementRep(mongo::jstOID, nameref, val));
         return Element(this, rep);
     }

@@ -744,4 +744,15 @@ namespace {
         ASSERT_EQUALS(generated, recovered);
     }
 
+    TEST(OIDType, nullOID) {
+        mongo::mutablebson::BasicHeap myHeap;
+        mongo::mutablebson::Document doc(&myHeap);
+        mongo::mutablebson::Element t0 = doc.makeObjElement("e0");
+        const mongo::OID withNull("50a9c82263e413ad0028faad");
+        t0.appendOID("myOid", withNull);
+        mongo::mutablebson::FilterIterator it = t0.find("myOid");
+        const mongo::OID recovered = mongo::OID((*it).getOIDValue());
+        ASSERT_EQUALS(withNull, recovered);
+    }
+
 } // unnamed namespace
