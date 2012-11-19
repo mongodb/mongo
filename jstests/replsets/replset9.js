@@ -40,12 +40,10 @@ slave.setSlaveOk();
 print ("updating and deleting documents");
 for (i = doccount*4; i > doccount; --i) {
     mdc.update( { _id:i }, { $inc: { x : 1 } } );
-    md.getLastError();
     mdc.remove( { _id:i } );
-    md.getLastError();
     mdc.insert( { bs:bigstring } );
-    md.getLastError();
 }
+md.getLastError();
 print ("finished");
 // Wait for replication to catch up.
 rt.awaitReplication(640000);
