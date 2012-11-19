@@ -242,8 +242,8 @@ dodouble:
         return b.obj();
     }
 
-    inline BSONObj BSONElement::wrap( const char * newName ) const {
-        BSONObjBuilder b(size()+6+(int)strlen(newName));
+    inline BSONObj BSONElement::wrap( const StringData& newName ) const {
+        BSONObjBuilder b(size() + 6 + newName.size());
         b.appendAs(*this,newName);
         return b.obj();
     }

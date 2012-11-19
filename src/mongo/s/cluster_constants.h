@@ -177,8 +177,12 @@ namespace mongo {
      * LockPingFields holds all the field names and types for the lockpings collection.
      */
     struct LockPingFields {
-        static BSONField<string> UNHOOKED_name; // process id holding the lock
-        static BSONField<Date_t> UNHOOKED_ping; // last time it pinged
+
+        // string describing the process holding the lock
+        static BSONField<string> process;
+
+        // last time the holding process updated this document
+        static BSONField<Date_t> ping;
     };
 
 } // namespace mongo

@@ -94,7 +94,7 @@ namespace mongo {
     // ============  below not yet hooked  ============
 
     const string ConfigNS::lockpings = "config.lockpings";
-    BSONField<string> LockPingFields::UNHOOKED_name("_id");
-    BSONField<Date_t> LockPingFields::UNHOOKED_ping("ping");
+    BSONField<string> LockPingFields::process("_id");
+    BSONField<Date_t> LockPingFields::ping("ping");
 
 } // namespace mongo

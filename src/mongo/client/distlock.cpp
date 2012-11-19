@@ -107,9 +107,9 @@ namespace mongo {
                     pingTime = jsTime();
 
                     // refresh the entry corresponding to this process in the lockpings collection
-                    conn->update( DistributedLock::lockPingNS ,
-                                  BSON( "_id" << process ) ,
-                                  BSON( "$set" << BSON( "ping" << pingTime ) ) ,
+                    conn->update( ConfigNS::lockpings,
+                                  BSON( LockPingFields::process(process) ),
+                                  BSON( "$set" << BSON( LockPingFields::ping(pingTime) ) ),
                                   true );
 
                     string err = conn->getLastError();
@@ -140,7 +140,9 @@ namespace mongo {
                     }
 
                     Date_t fourDays = pingTime - ( 4 * 86400 * 1000 ); // 4 days
-                    conn->remove( DistributedLock::lockPingNS , BSON( "_id" << BSON( "$nin" << pids ) << "ping" << LT << fourDays ) );
+                    conn->remove( ConfigNS::lockpings,
+                                  BSON( LockPingFields::process() << BSON( "$nin" << pids ) <<
+                                        LockPingFields::ping() << LT << fourDays ) );
                     err = conn->getLastError();
                     if ( ! err.empty() ) {
                         warning() << "ping cleanup for distributed lock pinger '" << pingId << " failed."
@@ -154,7 +156,7 @@ namespace mongo {
 
                     // create index so remove is fast even with a lot of servers
                     if ( loops++ == 0 ) {
-                        conn->ensureIndex( DistributedLock::lockPingNS , BSON( "ping" << 1 ) );
+                        conn->ensureIndex( ConfigNS::lockpings, BSON( LockPingFields::ping(1) ) );
                     }
 
                     LOG( DistributedLock::logLvl - ( loops % 10 == 0 ? 1 : 0 ) ) << "cluster " << addr << " pinged successfully at " << pingTime
@@ -310,9 +312,6 @@ namespace mongo {
         list<OID> _oldLockOIDs;
 
     } distLockPinger;
-
-
-    const string DistributedLock::lockPingNS = "config.lockpings";
 
     /**
      * Create a new distributed lock, potentially with a custom sleep and takeover time.  If a custom sleep time is
@@ -555,11 +554,12 @@ namespace mongo {
                     return false;
                 }
 
-                BSONObj lastPing = conn->findOne( lockPingNS , o[LockFields::process()].wrap( "_id" ) );
+                BSONObj lastPing = conn->findOne( ConfigNS::lockpings, o[LockFields::process()].wrap( LockPingFields::process() ) );
                 if ( lastPing.isEmpty() ) {
                     LOG( logLvl ) << "empty ping found for process in lock '" << lockName << "'" << endl;
                     // TODO:  Using 0 as a "no time found" value Will fail if dates roll over, but then, so will a lot.
-                    lastPing = BSON( "_id" << o[LockFields::process()].String() << "ping" << (Date_t) 0 );
+                    lastPing = BSON( LockPingFields::process(o[LockFields::process()].String()) <<
+                                     LockPingFields::ping((Date_t) 0) );
                 }
 
                 unsigned long long elapsed = 0;
@@ -576,15 +576,15 @@ namespace mongo {
                     // For non-finalized locks, timeout 15 minutes since last seen (ts)
                     // For finalized locks, timeout 15 minutes since last ping
                     bool recPingChange = o[LockFields::state()].numberInt() == 2 &&
-                                         ( _lastPingCheck.id != lastPing["_id"].String() ||
-                                           _lastPingCheck.lastPing != lastPing["ping"].Date() );
+                                         ( _lastPingCheck.id != lastPing[LockPingFields::process()].String() ||
+                                           _lastPingCheck.lastPing != lastPing[LockPingFields::ping()].Date() );
                     bool recTSChange = _lastPingCheck.ts != o[LockFields::lockID()].OID();
 
                     if( recPingChange || recTSChange ) {
                         // If the ping has changed since we last checked, mark the current date and time
-                        setLastPing( PingData( lastPing["_id"].String().c_str(),
-                                    lastPing["ping"].Date(),
-                                    remote, o[LockFields::lockID()].OID() ) );
+                        setLastPing( PingData( lastPing[LockPingFields::process()].String().c_str(),
+                                               lastPing[LockPingFields::ping()].Date(),
+                                               remote, o[LockFields::lockID()].OID() ) );
                     }
                     else {
 
@@ -683,9 +683,10 @@ namespace mongo {
                     try {
 
                         // Test the lock with the correct "ts" (OID) value
-                        conn->update( ConfigNS::locks , BSON( LockFields::name(_name)
-                                    << LockFields::state(2)
-                                    << LockFields::lockID(o[LockFields::lockID()].OID()) ),
+                        conn->update( ConfigNS::locks,
+                                      BSON( LockFields::name(_name) <<
+                                            LockFields::state(2) <<
+                                            LockFields::lockID(o[LockFields::lockID()].OID()) ),
                                       BSON( "$set" << BSON( LockFields::state(2) ) ) );
 
                         BSONObj err = conn->getLastErrorDetailed();
