@@ -152,8 +152,8 @@ login(adminUser);
 print("logged in");
 result = s.getDB("admin").runCommand({addShard : shardName})
 
-ReplSetTest.awaitRSClientHosts(s.mongos, d1.nodes, {ok: true });
-ReplSetTest.awaitRSClientHosts(s.mongos, d2.nodes, {ok: true });
+ReplSetTest.awaitRSClientHosts(s.s, d1.nodes, {ok: true });
+ReplSetTest.awaitRSClientHosts(s.s, d2.nodes, {ok: true });
 
 s.getDB("test").foo.remove({})
 
