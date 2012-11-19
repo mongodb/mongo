@@ -24,30 +24,42 @@
 
 namespace {
 
+    using mongo::BSONArray;
+    using mongo::BSONField;
+    using mongo::BSONObj;
+    using mongo::Date_t;
+    using mongo::FieldParser;
+    using mongo::OID;
+    using std::string;
+
     class ExtractionFixture : public mongo::unittest::Test {
     protected:
-        mongo::BSONObj doc;
+        BSONObj doc;
 
         bool valBool;
-        mongo::BSONObj valObj;
-        mongo::Date_t valDate;
-        std::string valString;
-        mongo::OID valOID;
+        BSONArray valArray;
+        BSONObj valObj;
+        Date_t valDate;
+        string valString;
+        OID valOID;
 
-        static mongo::BSONField<bool> aBool;
-        static mongo::BSONField<mongo::BSONObj> anObj;
-        static mongo::BSONField<mongo::Date_t> aDate;
-        static mongo::BSONField<std::string> aString;
-        static mongo::BSONField<mongo::OID> anOID;
+        static BSONField<bool> aBool;
+        static BSONField<BSONArray> anArray;
+        static BSONField<BSONObj> anObj;
+        static BSONField<Date_t> aDate;
+        static BSONField<string> aString;
+        static BSONField<OID> anOID;
 
         void setUp() {
             valBool = true;
+            valArray = BSON_ARRAY(1 << 2 << 3);
             valObj = BSON("a" << 1);
             valDate = 1ULL;
             valString = "a string";
-            valOID = mongo::OID::gen();
+            valOID = OID::gen();
 
             doc = BSON(aBool(valBool) <<
+                       anArray(valArray) <<
                        anObj(valObj) <<
                        aDate(valDate) <<
                        aString(valString) <<
@@ -58,66 +70,78 @@ namespace {
         }
     };
 
-    mongo::BSONField<bool> ExtractionFixture::aBool("aBool");
-    mongo::BSONField<mongo::BSONObj> ExtractionFixture::anObj("anObj");
-    mongo::BSONField<mongo::Date_t> ExtractionFixture::aDate("aDate");
-    mongo::BSONField<std::string> ExtractionFixture::aString("aString");
-    mongo::BSONField<mongo::OID> ExtractionFixture::anOID("anOID");
+    BSONField<bool> ExtractionFixture::aBool("aBool");
+    BSONField<BSONArray> ExtractionFixture::anArray("anArray");
+    BSONField<BSONObj> ExtractionFixture::anObj("anObj");
+    BSONField<Date_t> ExtractionFixture::aDate("aDate");
+    BSONField<string> ExtractionFixture::aString("aString");
+    BSONField<OID> ExtractionFixture::anOID("anOID");
 
     TEST_F(ExtractionFixture, GetBool) {
-        mongo::BSONField<bool> notThere("otherBool");
-        mongo::BSONField<bool> wrongType(aString.name());
+        BSONField<bool> notThere("otherBool");
+        BSONField<bool> wrongType(anObj.name());
         bool val;
-        ASSERT_TRUE(mongo::FieldParser::extract(doc, aBool, false, &val));
+        ASSERT_TRUE(FieldParser::extract(doc, aBool, false, &val));
         ASSERT_EQUALS(val, valBool);
-        ASSERT_TRUE(mongo::FieldParser::extract(doc, notThere, true, &val));
+        ASSERT_TRUE(FieldParser::extract(doc, notThere, true, &val));
         ASSERT_EQUALS(val, true);
-        ASSERT_FALSE(mongo::FieldParser::extract(doc, wrongType, true, &val));
+        ASSERT_FALSE(FieldParser::extract(doc, wrongType, true, &val));
+    }
+
+    TEST_F(ExtractionFixture, GetBSONArray) {
+        BSONField<BSONArray> notThere("otherArray");
+        BSONField<BSONArray> wrongType(aString.name());
+        BSONArray val;
+        ASSERT_TRUE(FieldParser::extract(doc, anArray, BSONArray(), &val));
+        ASSERT_EQUALS(val, valArray);
+        ASSERT_TRUE(FieldParser::extract(doc, notThere, BSON_ARRAY("a" << "b"), &val));
+        ASSERT_EQUALS(val, BSON_ARRAY("a" << "b"));
+        ASSERT_FALSE(FieldParser::extract(doc, wrongType, BSON_ARRAY("a" << "b"), &val));
     }
 
     TEST_F(ExtractionFixture, GetBSONObj) {
-        mongo::BSONField<mongo::BSONObj> notThere("otherObj");
-        mongo::BSONField<mongo::BSONObj> wrongType(aString.name());
-        mongo::BSONObj val;
-        ASSERT_TRUE(mongo::FieldParser::extract(doc, anObj, mongo::BSONObj(), &val));
+        BSONField<BSONObj> notThere("otherObj");
+        BSONField<BSONObj> wrongType(aString.name());
+        BSONObj val;
+        ASSERT_TRUE(FieldParser::extract(doc, anObj, BSONObj(), &val));
         ASSERT_EQUALS(val, valObj);
-        ASSERT_TRUE(mongo::FieldParser::extract(doc, notThere, BSON("b" << 1), &val));
+        ASSERT_TRUE(FieldParser::extract(doc, notThere, BSON("b" << 1), &val));
         ASSERT_EQUALS(val, BSON("b" << 1));
-        ASSERT_FALSE(mongo::FieldParser::extract(doc, wrongType, BSON("b" << 1), &val));
+        ASSERT_FALSE(FieldParser::extract(doc, wrongType, BSON("b" << 1), &val));
     }
 
     TEST_F(ExtractionFixture, GetDate) {
-        mongo::BSONField<mongo::Date_t> notThere("otherDate");
-        mongo::BSONField<mongo::Date_t> wrongType(aString.name());
-        mongo::Date_t val;
-        ASSERT_TRUE(mongo::FieldParser::extract(doc, aDate, time(0), &val));
+        BSONField<Date_t> notThere("otherDate");
+        BSONField<Date_t> wrongType(aString.name());
+        Date_t val;
+        ASSERT_TRUE(FieldParser::extract(doc, aDate, time(0), &val));
         ASSERT_EQUALS(val, valDate);
-        ASSERT_TRUE(mongo::FieldParser::extract(doc, notThere, 99ULL, &val));
+        ASSERT_TRUE(FieldParser::extract(doc, notThere, 99ULL, &val));
         ASSERT_EQUALS(val, 99ULL);
-        ASSERT_FALSE(mongo::FieldParser::extract(doc, wrongType, 99ULL, &val));
+        ASSERT_FALSE(FieldParser::extract(doc, wrongType, 99ULL, &val));
     }
 
     TEST_F(ExtractionFixture, GetString) {
-        mongo::BSONField<std::string> notThere("otherString");
-        mongo::BSONField<std::string> wrongType(aBool.name());
-        std::string val;
-        ASSERT_TRUE(mongo::FieldParser::extract(doc, aString, "", &val));
+        BSONField<string> notThere("otherString");
+        BSONField<string> wrongType(aBool.name());
+        string val;
+        ASSERT_TRUE(FieldParser::extract(doc, aString, "", &val));
         ASSERT_EQUALS(val, valString);
-        ASSERT_TRUE(mongo::FieldParser::extract(doc, notThere, "abc", &val));
+        ASSERT_TRUE(FieldParser::extract(doc, notThere, "abc", &val));
         ASSERT_EQUALS(val, "abc");
-        ASSERT_FALSE(mongo::FieldParser::extract(doc, wrongType, "abc", &val));
+        ASSERT_FALSE(FieldParser::extract(doc, wrongType, "abc", &val));
     }
 
     TEST_F(ExtractionFixture, GetOID) {
-        mongo::BSONField<mongo::OID> notThere("otherOID");
-        mongo::BSONField<mongo::OID> wrongType(aString.name());
-        mongo::OID defOID = mongo::OID::gen();
-        mongo::OID val;
-        ASSERT_TRUE(mongo::FieldParser::extract(doc, anOID, mongo::OID(), &val));
+        BSONField<OID> notThere("otherOID");
+        BSONField<OID> wrongType(aString.name());
+        OID defOID = OID::gen();
+        OID val;
+        ASSERT_TRUE(FieldParser::extract(doc, anOID, OID(), &val));
         ASSERT_EQUALS(val, valOID);
-        ASSERT_TRUE(mongo::FieldParser::extract(doc, notThere, defOID, &val));
+        ASSERT_TRUE(FieldParser::extract(doc, notThere, defOID, &val));
         ASSERT_EQUALS(val, defOID);
-        ASSERT_FALSE(mongo::FieldParser::extract(doc, wrongType, defOID, &val));
+        ASSERT_FALSE(FieldParser::extract(doc, wrongType, defOID, &val));
     }
 
 } // unnamed namespace

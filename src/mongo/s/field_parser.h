@@ -44,6 +44,11 @@ namespace mongo {
                             bool* out);
 
         static bool extract(BSONObj doc,
+                            const BSONField<BSONArray>& field,
+                            const BSONArray& def,
+                            BSONArray* out);
+
+        static bool extract(BSONObj doc,
                             const BSONField<BSONObj>& field,
                             const BSONObj& def,
                             BSONObj* out);

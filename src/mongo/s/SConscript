@@ -4,10 +4,16 @@ Import("env")
 
 env.StaticLibrary('config', ['cluster_constants.cpp',
                              'field_parser.cpp',
-                             'type_collection.cpp'],
+                             'type_chunk.cpp',
+                             'type_collection.cpp',
+                             'type_database.cpp'],
                   LIBDEPS=['$BUILD_DIR/mongo/base/base',
                            '$BUILD_DIR/mongo/bson'])
 
 env.CppUnitTest('field_parser_test', 'field_parser_test.cpp', LIBDEPS=['config'])
 
+env.CppUnitTest('type_chunk_test', 'type_chunk_test.cpp', LIBDEPS=['config'])
+
 env.CppUnitTest('type_collection_test', 'type_collection_test.cpp', LIBDEPS=['config'])
+
+env.CppUnitTest('type_database_test', 'type_database_test.cpp', LIBDEPS=['config'])

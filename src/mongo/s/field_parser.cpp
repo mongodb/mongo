@@ -37,6 +37,24 @@ namespace mongo {
     }
 
     bool FieldParser::extract(BSONObj doc,
+                              const BSONField<BSONArray>& field,
+                              const BSONArray& def,
+                              BSONArray* out) {
+        BSONElement elem = doc[field.name()];
+        if (elem.eoo()) {
+            *out = def;
+            return true;
+        }
+
+        if (elem.type() == Array) {
+            *out = BSONArray(elem.embeddedObject());
+            return true;
+        }
+
+        return false;
+    }
+
+    bool FieldParser::extract(BSONObj doc,
                               const BSONField<BSONObj>& field,
                               const BSONObj& def,
                               BSONObj* out) {
