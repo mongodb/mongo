@@ -104,6 +104,7 @@ namespace mongo {
         if (_innerRadius > _maxDistance) { return false; }
 
         if (!_results.empty()) {
+            _returned.insert(_results.top().loc);
             _results.pop();
             --_numToReturn;
             // Safe to grow the radius as we've returned everything in our shell.  We don't do this
@@ -216,7 +217,9 @@ namespace mongo {
                     }
                 }
                 if (_fields.size() == geoFieldsInRange) {
-                    _results.push(Result(cursor.get(), minMatchingDistance));
+                    if (_returned.end() == _returned.find(cursor->currLoc())) {
+                        _results.push(Result(cursor->currLoc(), cursor->currKey(), minMatchingDistance));
+                    }
                 }
             }
             if (_results.empty()) {

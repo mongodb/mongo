@@ -56,11 +56,8 @@ namespace mongo {
         // We use this to cache results of the search.  Results are sorted to have decreasing
         // distance, and callers are interested in loc and key.
         struct Result {
-            Result(BtreeCursor *cursor, double dist) {
-                loc = cursor->currLoc();
-                key = cursor->currKey();
-                distance = dist;
-            }
+            Result(const DiskLoc &dl, const BSONObj &ck, double dist) : loc(dl), key(ck),
+                                                                        distance(dist) { }
             bool operator<(const Result& other) const {
                 // We want increasing distance, not decreasing, so we reverse the <.
                 return distance > other.distance;
@@ -110,5 +107,6 @@ namespace mongo {
         // When we search the next annulus, what to adjust our radius by?  Grows when we search an
         // annulus and find no results.
         double _radiusIncrement;
+        set<DiskLoc> _returned;
     };
 }  // namespace mongo
