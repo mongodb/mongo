@@ -773,7 +773,7 @@ namespace mongo {
         // adjust for padding factor
         int allocationSize = static_cast<int>(minRecordSize * _paddingFactor);
 
-        if (_isCapped)
+        if (isCapped())
             // pad record size for capped collections, but do not quantize
             return allocationSize;
 
