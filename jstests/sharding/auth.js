@@ -143,6 +143,7 @@ logout(testUser);
 d2 = new ReplSetTest({name : "d2", nodes : 3, startPort : 31200, useHostName : true });
 d2.startSet({keyFile : "jstests/libs/key1", verbose : 2});
 d2.initiate();
+d2.awaitSecondaryNodes();
 
 shardName = getShardName(d2);
 
@@ -150,6 +151,9 @@ print("adding shard "+shardName);
 login(adminUser);
 print("logged in");
 result = s.getDB("admin").runCommand({addShard : shardName})
+
+ReplSetTest.awaitRSClientHosts(s.mongos, d1.nodes, {ok: true });
+ReplSetTest.awaitRSClientHosts(s.mongos, d2.nodes, {ok: true });
 
 s.getDB("test").foo.remove({})
 
