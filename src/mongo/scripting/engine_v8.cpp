@@ -1430,7 +1430,137 @@ namespace mongo {
         v8ToMongoElement(builder, fieldName, value);
     }
 
-    void V8Scope::v8ToMongoElement( BSONObjBuilder & b , const string sname , v8::Handle<v8::Value> value , int depth, BSONObj* originalParent ) {
+    void V8Scope::v8ToMongoNumber(BSONObjBuilder& b,
+                                  const string& elementName,
+                                  v8::Handle<v8::Value> value,
+                                  BSONObj* originalParent) {
+        double val = value->ToNumber()->Value();
+        // if previous type was integer, keep it
+        int intval = static_cast<int>(val);
+        if (val == intval && originalParent) {
+            BSONElement elmt = originalParent->getField(elementName);
+            if (elmt.type() == mongo::NumberInt) {
+                b.append(elementName, intval);
+                return;
+            }
+        }
+        b.append(elementName , val);
+    }
+
+    void V8Scope::v8ToMongoNumberLong(BSONObjBuilder& b,
+                                      const string& elementName,
+                                      v8::Handle<v8::Object> obj) {
+        // TODO might be nice to potentially speed this up with an indexed internal
+        // field, but I don't yet know how to use an ObjectTemplate with a
+        // constructor.
+        long long val;
+        if (!obj->Has(getV8Str("top"))) {
+            val = static_cast<int64_t>(obj->Get(getV8Str("floatApprox"))->NumberValue());
+        }
+        else {
+            val = static_cast<int64_t>((
+                    static_cast<uint64_t>(obj->Get(getV8Str("top"))->ToInt32()->Value()) << 32) +
+                    static_cast<int32_t>(obj->Get(getV8Str("bottom"))->ToInt32()->Value()));
+        }
+        b.append(elementName, val);
+    }
+
+    void V8Scope::v8ToMongoInternal(BSONObjBuilder& b,
+                                    const string& elementName,
+                                    v8::Handle<v8::Object> obj) {
+        uint32_t bsonType = obj->GetInternalField( 0 )->ToUint32()->Value();
+        switch(bsonType) {
+        case Timestamp:
+            b.appendTimestamp(elementName,
+                              Date_t(static_cast<uint64_t>(obj->Get(V8STR_T)->ToNumber()->Value())),
+                              obj->Get(V8STR_I)->ToInt32()->Value());
+            return;
+        case MinKey:
+            b.appendMinKey(elementName);
+            return;
+        case MaxKey:
+            b.appendMaxKey(elementName);
+            return;
+        default:
+            verify( "invalid internal field" == 0 );
+        }
+    }
+
+    void V8Scope::v8ToMongoRegex(BSONObjBuilder& b,
+                                 const string& elementName,
+                                 string& regex) {
+        regex = regex.substr(1);
+        string r = regex.substr(0 ,regex.rfind("/"));
+        string o = regex.substr(regex.rfind("/") + 1);
+        b.appendRegex(elementName, r, o);
+    }
+
+    void V8Scope::v8ToMongoDBRef(BSONObjBuilder& b,
+                                 const string& elementName,
+                                 v8::Handle<v8::Object> obj) {
+        OID oid;
+        Local<Value> theid = obj->Get(getV8Str("id"));
+        oid.init(toSTLString(theid->ToObject()->Get(getV8Str("str"))));
+        string ns = toSTLString(obj->Get(getV8Str("ns")));
+        b.appendDBRef(elementName, ns, oid);
+    }
+
+    void V8Scope::v8ToMongoBinData(BSONObjBuilder& b,
+                                   const string& elementName,
+                                   v8::Handle<v8::Object> obj) {
+        int len = obj->Get(getV8Str("len"))->ToInt32()->Value();
+        Local<External> c = External::Cast(*(obj->GetInternalField(0)));
+        const char* dataArray = static_cast <const char*>(c->Value());
+        b.appendBinData(elementName,
+                        len,
+                        mongo::BinDataType(obj->Get(getV8Str("type"))->ToInt32()->Value()),
+                        dataArray);
+    }
+
+    void V8Scope::v8ToMongoObjectID(BSONObjBuilder& b,
+                                    const string& elementName,
+                                    v8::Handle<v8::Object> obj) {
+        OID oid;
+        oid.init(toSTLString(obj->Get(getV8Str("str"))));
+        b.appendOID(elementName, &oid);
+    }
+
+    void V8Scope::v8ToMongoObject(BSONObjBuilder& b,
+                                  const string& elementName,
+                                  v8::Handle<v8::Value> value,
+                                  int depth,
+                                  BSONObj* originalParent) {
+        // The user could potentially modify the fields of these special objects,
+        // wreaking havoc when we attempt to reinterpret them.  Not doing any validation
+        // for now...
+        Local<v8::Object> obj = value->ToObject();
+        Local<v8::Value> proto = obj->GetPrototype();
+
+        if (obj->InternalFieldCount() && obj->GetInternalField(0)->IsNumber())
+            v8ToMongoInternal(b, elementName, obj);
+
+        string s = toSTLString(value);
+        if (s.size() && s[0] == '/')
+            v8ToMongoRegex(b, elementName, s);
+        else if (proto->IsObject() &&
+                 proto->ToObject()->HasRealNamedProperty(V8STR_ISOBJECTID))
+            v8ToMongoObjectID(b, elementName, obj);
+        else if (!obj->GetHiddenValue(V8STR_NUMBERLONG).IsEmpty())
+            v8ToMongoNumberLong(b, elementName, obj);
+        else if (!obj->GetHiddenValue(V8STR_NUMBERINT).IsEmpty())
+            b.append(elementName, obj->GetHiddenValue(V8STR_NUMBERINT)->Int32Value());
+        else if (!value->ToObject()->GetHiddenValue(V8STR_DBPTR).IsEmpty())
+            v8ToMongoDBRef(b, elementName, obj);
+        else if (!value->ToObject()->GetHiddenValue(V8STR_BINDATA).IsEmpty())
+            v8ToMongoBinData(b, elementName, obj);
+        else {
+            // nested object or array
+            BSONObj sub = v8ToMongo(obj, depth);
+            b.append(elementName, sub);
+        }
+    }
+
+    void V8Scope::v8ToMongoElement( BSONObjBuilder & b , const string& sname , v8::Handle<v8::Value> value , int depth, BSONObj* originalParent ) {
 
         if ( value->IsString() ) {
 //            Handle<v8::String> str = Handle<v8::String>::Cast(value);
@@ -1446,18 +1576,7 @@ namespace mongo {
         }
 
         if ( value->IsNumber() ) {
-            double val = value->ToNumber()->Value();
-            // if previous type was integer, keep it
-            int intval = (int)val;
-            if (val == intval && originalParent) {
-                BSONElement elmt = originalParent->getField(sname);
-                if (elmt.type() == mongo::NumberInt) {
-                    b.append( sname , intval );
-                    return;
-                }
-            }
-
-            b.append( sname , val );
+            v8ToMongoNumber(b, sname, value, originalParent);
             return;
         }
 
@@ -1477,81 +1596,7 @@ namespace mongo {
             return;
 
         if ( value->IsObject() ) {
-            // The user could potentially modify the fields of these special objects,
-            // wreaking havoc when we attempt to reinterpret them.  Not doing any validation
-            // for now...
-            Local< v8::Object > obj = value->ToObject();
-            if ( obj->InternalFieldCount() && obj->GetInternalField( 0 )->IsNumber() ) {
-                switch( obj->GetInternalField( 0 )->ToInt32()->Value() ) { // NOTE Uint32's Value() gave me a linking error, so going with this instead
-                case Timestamp:
-                    b.appendTimestamp( sname,
-                                       Date_t( (unsigned long long)(obj->Get( V8STR_T )->ToNumber()->Value() )),
-                                       obj->Get( V8STR_I )->ToInt32()->Value() );
-                    return;
-                case MinKey:
-                    b.appendMinKey( sname );
-                    return;
-                case MaxKey:
-                    b.appendMaxKey( sname );
-                    return;
-                default:
-                    verify( "invalid internal field" == 0 );
-                }
-            }
-            string s = toSTLString( value );
-            if ( s.size() && s[0] == '/' ) {
-                s = s.substr( 1 );
-                string r = s.substr( 0 , s.rfind( "/" ) );
-                string o = s.substr( s.rfind( "/" ) + 1 );
-                b.appendRegex( sname , r , o );
-            }
-            else if ( value->ToObject()->GetPrototype()->IsObject() &&
-                      value->ToObject()->GetPrototype()->ToObject()->HasRealNamedProperty( V8STR_ISOBJECTID ) ) {
-                OID oid;
-                oid.init( toSTLString( value->ToObject()->Get(getV8Str("str")) ) );
-                b.appendOID( sname , &oid );
-            }
-            else if ( !value->ToObject()->GetHiddenValue( V8STR_NUMBERLONG ).IsEmpty() ) {
-                // TODO might be nice to potentially speed this up with an indexed internal
-                // field, but I don't yet know how to use an ObjectTemplate with a
-                // constructor.
-                v8::Handle< v8::Object > it = value->ToObject();
-                long long val;
-                if ( !it->Has( getV8Str( "top" ) ) ) {
-                    val = (long long)( it->Get( getV8Str( "floatApprox" ) )->NumberValue() );
-                }
-                else {
-                    val = (long long)
-                          ( (unsigned long long)( it->Get( getV8Str( "top" ) )->ToInt32()->Value() ) << 32 ) +
-                          (unsigned)( it->Get( getV8Str( "bottom" ) )->ToInt32()->Value() );
-                }
-
-                b.append( sname, val );
-            }
-            else if ( !value->ToObject()->GetHiddenValue( V8STR_NUMBERINT ).IsEmpty() ) {
-                v8::Handle< v8::Object > it = value->ToObject();
-                b.append(sname, it->GetHiddenValue(V8STR_NUMBERINT)->Int32Value());
-            }
-            else if ( !value->ToObject()->GetHiddenValue( V8STR_DBPTR ).IsEmpty() ) {
-                OID oid;
-                Local<Value> theid = value->ToObject()->Get( getV8Str( "id" ) );
-                oid.init( toSTLString( theid->ToObject()->Get(getV8Str("str")) ) );
-                string ns = toSTLString( value->ToObject()->Get( getV8Str( "ns" ) ) );
-                b.appendDBRef( sname, ns, oid );
-            }
-            else if ( !value->ToObject()->GetHiddenValue( V8STR_BINDATA ).IsEmpty() ) {
-                int len = obj->Get( getV8Str( "len" ) )->ToInt32()->Value();
-                Local<External> c = External::Cast( *(obj->GetInternalField( 0 )) );
-                const char* dataArray = (char*)(c->Value());;
-                b.appendBinData( sname,
-                                 len,
-                                 mongo::BinDataType( obj->Get( getV8Str( "type" ) )->ToInt32()->Value() ),
-                                 dataArray );
-            }
-            else {
-                BSONObj sub = v8ToMongo( value->ToObject() , depth );
-                b.append( sname , sub );
-            }
+            v8ToMongoObject(b, sname, value, depth, originalParent);
             return;
         }
 
@@ -1559,12 +1604,10 @@ namespace mongo {
             b.appendBool( sname , value->ToBoolean()->Value() );
             return;
         }
-
         else if ( value->IsUndefined() ) {
             b.appendUndefined( sname );
             return;
         }
-
         else if ( value->IsNull() ) {
             b.appendNull( sname );
             return;

@@ -146,7 +146,40 @@ namespace mongo {
         v8::Handle<v8::Object> mongoToLZV8( const mongo::BSONObj & m , bool array = 0 , bool readOnly = false );
         mongo::BSONObj v8ToMongo( v8::Handle<v8::Object> o , int depth = 0 );
 
-        void v8ToMongoElement( BSONObjBuilder & b , const string sname , v8::Handle<v8::Value> value , int depth = 0, BSONObj* originalParent=0 );
+        // v8 to mongo/BSON conversion functions
+        void v8ToMongoElement(BSONObjBuilder& b,
+                              const string& sname,
+                              v8::Handle<v8::Value> value,
+                              int depth = 0,
+                              BSONObj* originalParent = 0);
+        void v8ToMongoObject(BSONObjBuilder& b,
+                             const string& sname,
+                             v8::Handle<v8::Value> value,
+                             int depth,
+                             BSONObj* originalParent);
+        void v8ToMongoNumber(BSONObjBuilder& b,
+                             const string& elementName,
+                             v8::Handle<v8::Value> value,
+                             BSONObj* originalParent);
+        void v8ToMongoNumberLong(BSONObjBuilder& b,
+                                 const string& elementName,
+                                 v8::Handle<v8::Object> obj);
+        void v8ToMongoInternal(BSONObjBuilder& b,
+                               const string& elementName,
+                               v8::Handle<v8::Object> obj);
+        void v8ToMongoRegex(BSONObjBuilder& b,
+                            const string& elementName,
+                            string& regex);
+        void v8ToMongoDBRef(BSONObjBuilder& b,
+                            const string& elementName,
+                            v8::Handle<v8::Object> obj);
+        void v8ToMongoBinData(BSONObjBuilder& b,
+                              const string& elementName,
+                              v8::Handle<v8::Object> obj);
+        void v8ToMongoObjectID(BSONObjBuilder& b,
+                               const string& elementName,
+                               v8::Handle<v8::Object> obj);
+
         v8::Handle<v8::Value> mongoToV8Element( const BSONElement &f, bool readOnly = false );
         virtual void append( BSONObjBuilder & builder , const char * fieldName , const char * scopeName );
 
