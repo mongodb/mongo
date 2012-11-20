@@ -1460,7 +1460,7 @@ namespace mongo {
         else {
             val = static_cast<int64_t>((
                     static_cast<uint64_t>(obj->Get(getV8Str("top"))->ToInt32()->Value()) << 32) +
-                    static_cast<int32_t>(obj->Get(getV8Str("bottom"))->ToInt32()->Value()));
+                    static_cast<uint32_t>(obj->Get(getV8Str("bottom"))->ToInt32()->Value()));
         }
         b.append(elementName, val);
     }
