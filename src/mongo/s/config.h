@@ -123,10 +123,8 @@ namespace mongo {
          * distributed in a round-robin fashion onto a set of initial shards.  If no initial shards
          * are specified, only the primary will be used.
          *
-         * WARNING: It's not safe to place initial chunks onto non-primary shards using this nethod,
-         * unless the caller can guarantee that there there won't be simultaneous inserts into the
-         * collection while setup is still happening.  If uncertain, initShards should be left
-         * unspecified.
+         * WARNING: It's not safe to place initial chunks onto non-primary shards using this method.
+         * The initShards parameter allows legacy behavior expected by map-reduce.
          */
         ChunkManagerPtr shardCollection( const string& ns ,
                                          ShardKeyPattern fieldsAndOrder ,

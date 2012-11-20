@@ -1397,9 +1397,10 @@ namespace mongo {
                             sortedSplitPts.push_back( *it );
 
                         // pre-split the collection onto all the shards for this database.
-                        // Note that in this case it's safe to pre-split by calling shardCollection
-                        // with non-primary shards, because here we're writing to the collection
-                        // from a single mongos.
+                        // Note that it's not completely safe to pre-split onto non-primary shards
+                        // using the shardcollection method (a conflict may result if multiple
+                        // map-reduces are writing to the same output collection, for instance).
+                        // TODO: pre-split mapReduce output in a safer way.
                         set<Shard> shardSet;
                         confOut->getAllShards( shardSet );
                         vector<Shard> outShards( shardSet.begin() , shardSet.end() );
