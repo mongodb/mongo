@@ -49,6 +49,7 @@ __wt_buf_grow(WT_SESSION_IMPL *session, WT_ITEM *buf, size_t size)
 		} else if (buf->data >= buf->mem &&
 		    (uint8_t *)buf->data < (uint8_t *)buf->mem + buf->memsize) {
 			offset = WT_PTRDIFF(buf->data, buf->mem);
+			WT_ASSERT(session, offset == 0);
 			set_data = 1;
 		} else {
 			offset = 0;
@@ -75,8 +76,8 @@ __wt_buf_grow(WT_SESSION_IMPL *session, WT_ITEM *buf, size_t size)
 int
 __wt_buf_init(WT_SESSION_IMPL *session, WT_ITEM *buf, size_t size)
 {
-	WT_RET(__wt_buf_grow(session, buf, size));
 	buf->data = buf->mem;
+	WT_RET(__wt_buf_grow(session, buf, size));
 	buf->size = 0;
 
 	return (0);

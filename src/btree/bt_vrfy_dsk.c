@@ -239,7 +239,7 @@ __verify_dsk_row(
 		case WT_CELL_KEY:
 			break;
 		case WT_CELL_KEY_OVFL:
-			WT_ERR(__wt_cell_unpack_copy(session, unpack, current));
+			WT_ERR(__wt_cell_unpack_ref(session, unpack, current));
 			goto key_compare;
 		default:
 			/* Not a key -- continue with the next cell. */
@@ -270,43 +270,43 @@ __verify_dsk_row(
 			    cell_num, addr, prefix, last->size);
 
 		/*
-		 * If Huffman decoding required, use the heavy-weight call to
-		 * __wt_cell_unpack_copy() to build the key, up to the prefix.
-		 * Else, we can do it faster internally because we don't have
-		 * to shuffle memory around as much.
+		 * If Huffman decoding required, unpack the cell to build the
+		 * key, then resolve the prefix.  Else, we can do it faster
+		 * internally because we don't have to shuffle memory around as
+		 * much.
 		 */
-		if (huffman == NULL) {
-			/*
-			 * Get the cell's data/length and make sure we have
-			 * enough buffer space.
-			 */
-			WT_ERR(__wt_buf_grow(
-			    session, current, prefix + unpack->size));
-
-			/* Copy the prefix then the data into place. */
-			if (prefix != 0)
-				memcpy((void *)
-				    current->data, last->data, prefix);
-			memcpy((uint8_t *)
-			    current->data + prefix, unpack->data, unpack->size);
-			current->size = prefix + unpack->size;
-		} else {
-			WT_ERR(__wt_cell_unpack_copy(session, unpack, current));
+		if (huffman != NULL) {
+			WT_ERR(__wt_cell_unpack_ref(session, unpack, current));
 
 			/*
 			 * If there's a prefix, make sure there's enough buffer
 			 * space, then shift the decoded data past the prefix
-			 * and copy the prefix into place.
+			 * and copy the prefix into place.  Take care with the
+			 * pointers: current->data may be pointing inside the
 			 */
 			if (prefix != 0) {
 				WT_ERR(__wt_buf_grow(
 				    session, current, prefix + current->size));
-				memmove((uint8_t *)current->data +
-				    prefix, current->data, current->size);
-				memcpy(
-				    (void *)current->data, last->data, prefix);
+				memmove((uint8_t *)current->mem + prefix,
+				    current->data, current->size);
+				memcpy(current->mem, last->data, prefix);
+				current->data = current->mem;
 				current->size += prefix;
 			}
+		} else {
+			/*
+			 * Get the cell's data/length and make sure we have
+			 * enough buffer space.
+			 */
+			WT_ERR(__wt_buf_init(
+			    session, current, prefix + unpack->size));
+
+			/* Copy the prefix then the data into place. */
+			if (prefix != 0)
+				memcpy(current->mem, last->data, prefix);
+			memcpy((uint8_t *)current->mem + prefix, unpack->data,
+			    unpack->size);
+			current->size = prefix + unpack->size;
 		}
 
 key_compare:	/*
