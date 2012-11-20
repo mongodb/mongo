@@ -251,7 +251,6 @@ namespace mongo {
                 ofs = OurNullOfs;
             }
             memcpy(_a, &la, 3); // endian
-            dassert( ofs != 0 );
         }
         DiskLoc56Bit& writing() const { 
             return *((DiskLoc56Bit*) getDur().writingPtr((void*)this, 7));
