@@ -60,13 +60,13 @@ namespace mongo {
     BSONField<BSONObj> TagFields::min("min");
     BSONField<BSONObj> TagFields::max("max");
 
-    // ============  below not yet hooked  ============
-
     const string ConfigNS::mongos = "config.mongos";
-    BSONField<string> MongosFields::UNHOOKED_name("_id");
-    BSONField<Date_t> MongosFields::UNHOOKED_ping("ping");
-    BSONField<int> MongosFields::UNHOOKED_up("up");
-    BSONField<bool> MongosFields::UNHOOKED_waiting("waiting");
+    BSONField<string> MongosFields::name("_id");
+    BSONField<Date_t> MongosFields::ping("ping");
+    BSONField<int> MongosFields::up("up");
+    BSONField<bool> MongosFields::waiting("waiting");
+
+    // ============  below not yet hooked  ============
 
     const string ConfigNS::settings = "config.settings";
     BSONField<int> SettingFields::UNHOOKED_name("_id");
@@ -90,8 +90,6 @@ namespace mongo {
     BSONField<OID> LockFields::lockID("ts");
     BSONField<string> LockFields::who("who");
     BSONField<string> LockFields::why("why");
-
-    // ============  below not yet hooked  ============
 
     const string ConfigNS::lockpings = "config.lockpings";
     BSONField<string> LockPingFields::process("_id");

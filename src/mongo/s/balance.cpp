@@ -102,10 +102,11 @@ namespace mongo {
         WriteConcern w = conn.getWriteConcern();
         conn.setWriteConcern( W_NONE );
 
-        conn.update( ShardNS::mongos ,
-                     BSON( "_id" << _myid ) ,
-                     BSON( "$set" << BSON( "ping" << DATENOW << "up" << (int)(time(0)-_started)
-                                        << "waiting" << waiting ) ) ,
+        conn.update( ConfigNS::mongos ,
+                     BSON( MongosFields::name(_myid) ) ,
+                     BSON( "$set" << BSON( MongosFields::ping(jsTime()) <<
+                                           MongosFields::up((int)(time(0)-_started)) <<
+                                           MongosFields::waiting(waiting) ) ) ,
                      true );
 
         conn.setWriteConcern( w);

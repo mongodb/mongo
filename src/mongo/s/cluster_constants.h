@@ -114,17 +114,25 @@ namespace mongo {
         static BSONField<BSONObj> max;  // last key of the tag, non-including
     };
 
-    // ============  below not yet hooked  ============
-
     /**
      * MongosFields holds all the field names and types for the mongos collection.
      */
     struct MongosFields {
-        static BSONField<string> UNHOOKED_name;  // process id string
-        static BSONField<Date_t> UNHOOKED_ping;  // last time it was seen alive
-        static BSONField<int> UNHOOKED_up;       // uptime at the last ping
-        static BSONField<bool> UNHOOKED_waiting; // for testing purposes
+
+        // "host:port" for this mongos
+        static BSONField<string> name;
+
+        // last time it was seen alive
+        static BSONField<Date_t> ping;
+
+        // uptime at the last ping
+        static BSONField<int> up;
+
+        // for testing purposes
+        static BSONField<bool> waiting;
     };
+
+    // ============  below not yet hooked  ============
 
     /**
      * SettingFields holds all the field names and types for the settings collection.
