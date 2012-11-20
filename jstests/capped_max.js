@@ -4,11 +4,16 @@ sz = 1024 * 16;
 
 t.drop();
 db.createCollection( t.getName() , {capped: true, size: sz } );
-assert.eq( Math.pow(2,63), t.stats().max );
+assert.lt( Math.pow( 2, 62 ), t.stats().max.floatApprox )
 
 t.drop();
 db.createCollection( t.getName() , {capped: true, size: sz, max: 123456 } );
 assert.eq( 123456, t.stats().max );
+
+t.drop();
+mm = Math.pow(2, 31) - 1;
+db.createCollection( t.getName() , {capped: true, size: sz, max: mm } );
+assert.eq( mm, t.stats().max );
 
 t.drop();
 res = db.createCollection( t.getName() , {capped: true, size: sz, max: Math.pow(2, 31) } );

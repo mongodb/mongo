@@ -612,7 +612,7 @@ namespace mongo {
 
     void NamespaceDetails::setMaxCappedDocs( long long max ) {
         massert( 16496,
-                 "max in a capped collection has to be < 2^30 or inf",
+                 "max in a capped collection has to be < 2^31 or -1",
                  validMaxCappedDocs( &max ) );
         _maxDocsInCapped = max;
     }
