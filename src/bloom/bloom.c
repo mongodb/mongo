@@ -250,7 +250,7 @@ __wt_bloom_hash_get(WT_BLOOM *bloom, WT_BLOOM_HASH *bhash)
 	result = 0;
 	for (i = 0; i < bloom->k; i++, h1 += h2) {
 		/*
-		 * Add 1 to the hash because Wired Tiger tables are 1 based and
+		 * Add 1 to the hash because WiredTiger tables are 1 based and
 		 * the original bitstring array was 0 based.
 		 */
 		c->set_key(c, (h1 % bloom->m) + 1);
