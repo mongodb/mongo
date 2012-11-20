@@ -38,26 +38,6 @@ rsB.getMaster().getDB( "test_b" ).dummy.insert( { x : 1 } )
 rsA.awaitReplication()
 rsB.awaitReplication()
 
-// TEMPORARY
-
-// SERVER-7699
-
-// We need to do something with with both shards using a non-ShardConnection in order for our
-// connPoolStats to report our replica set status, so we just movePrimary some database back
-// and forth using the conn of collSOk
-
-prt("0: fix bug")
-
-var shards = collSOk.getMongo().getDB("config").shards.find().toArray();
-
-assert.eq(null, collSOk.getMongo().getDB("touchBothShards").coll.findOne());
-printjson(collSOk.getMongo().getDB("admin").runCommand({ movePrimary : "touchBothShards", to : shards[1]._id }))
-printjson(collSOk.getMongo().getDB("admin").runCommand({ movePrimary : "touchBothShards", to : shards[0]._id }))
-jsTest.log("Conn pool stats:")
-printjson(collSOk.getMongo().getDB( "admin" ).runCommand( "connPoolStats" ));
-
-// END TEMPORARY
-
 prt("1: initial insert")
 
 coll.save({ _id : -1, a : "a", date : new Date() })

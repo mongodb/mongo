@@ -350,18 +350,12 @@ namespace mongo {
 
                 long long& x = createdByType[i->second.type()];
                 x += i->second.numCreated();
-
-                {
-                    string setName = i->first.ident;
-                    if ( setName.find( "/" ) != string::npos ) {
-                        setName = setName.substr( 0 , setName.find( "/" ) );
-                        replicaSets.insert( setName );
-                    }
-                }
             }
         }
         bb.done();
         
+        // Always report all replica sets being tracked
+        ReplicaSetMonitor::getAllTrackedSets(&replicaSets);
         
         BSONObjBuilder setBuilder( b.subobjStart( "replicaSets" ) );
         for ( set<string>::iterator i=replicaSets.begin(); i!=replicaSets.end(); ++i ) {

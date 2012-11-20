@@ -190,6 +190,10 @@ namespace mongo {
          */
         static ReplicaSetMonitorPtr get( const string& name, const bool createFromSeed = false );
 
+        /**
+         * Populates activeSets with all the currently tracked replica set names.
+         */
+        static void getAllTrackedSets(set<string>* activeSets);
 
         /**
          * checks all sets for current master and new secondaries

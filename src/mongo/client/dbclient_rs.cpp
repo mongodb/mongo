@@ -388,6 +388,15 @@ namespace mongo {
         return ReplicaSetMonitorPtr();
     }
 
+    void ReplicaSetMonitor::getAllTrackedSets(set<string>* activeSets) {
+        scoped_lock lk( _setsLock );
+        for (map<string,ReplicaSetMonitorPtr>::const_iterator it = _sets.begin();
+             it != _sets.end(); ++it)
+        {
+            activeSets->insert(it->first);
+        }
+    }
+
     void ReplicaSetMonitor::checkAll( bool checkAllSecondaries ) {
         set<string> seen;
 
