@@ -1099,6 +1099,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="..\s\type_chunk.cpp" />
     <ClCompile Include="..\s\type_collection.cpp" />
     <ClCompile Include="..\s\type_database.cpp" />
+    <ClCompile Include="..\s\type_shard.cpp" />
     <ClCompile Include="..\util\alignedbuilder.cpp" />
     <ClCompile Include="..\util\compress.cpp" />
     <ClCompile Include="..\util\concurrency\mutexdebugger.cpp" />
@@ -1155,6 +1156,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="auth\privilege.cpp" />
     <ClCompile Include="auth\privilege_set.cpp" />
     <ClCompile Include="btreebuilder.cpp" />
+    <ClCompile Include="btreeposition.cpp" />
     <ClCompile Include="btree_stats.cpp" />
     <ClCompile Include="cap.cpp" />
     <ClCompile Include="commands\distinct.cpp" />
@@ -1214,6 +1216,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="geo\shapes.cpp" />
     <ClCompile Include="index_rebuilder.cpp" />
     <ClCompile Include="initialize_server_global_state.cpp" />
+    <ClCompile Include="intervalbtreecursor.cpp" />
     <ClCompile Include="keypattern.cpp" />
     <ClCompile Include="kill_current_op.cpp" />
     <ClCompile Include="pipeline\document_source_cursor.cpp" />
@@ -1393,6 +1396,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="..\s\type_chunk.h" />
     <ClInclude Include="..\s\type_collection.h" />
     <ClInclude Include="..\s\type_database.h" />
+    <ClInclude Include="..\s\type_shard.h" />
     <ClInclude Include="..\util\admin_access.h" />
     <ClInclude Include="..\util\bson_util.h" />
     <ClInclude Include="..\util\bufreader.h" />
@@ -1446,6 +1450,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="auth\privilege_set.h" />
     <ClInclude Include="btreebuilder.h" />
     <ClInclude Include="btreecursor.h" />
+    <ClInclude Include="btreeposition.h" />
     <ClInclude Include="btree_stats.h" />
     <ClInclude Include="cc_by_loc.h" />
     <ClInclude Include="commands\fail_point_cmd.h" />
@@ -1466,6 +1471,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="index_rebuilder.h" />
     <ClInclude Include="index_update.h" />
     <ClInclude Include="initialize_server_global_state.h" />
+    <ClInclude Include="intervalbtreecursor.h" />
     <ClInclude Include="keypattern.h" />
     <ClInclude Include="kill_current_op.h" />
     <ClInclude Include="lockstat.h" />

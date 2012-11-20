@@ -1207,6 +1207,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="type_chunk.cpp" />
     <ClCompile Include="type_collection.cpp" />
     <ClCompile Include="type_database.cpp" />
+    <ClCompile Include="type_shard.cpp" />
     <ClCompile Include="writeback_listener.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -1455,6 +1456,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="type_chunk.h" />
     <ClInclude Include="type_collection.h" />
     <ClInclude Include="type_database.h" />
+    <ClInclude Include="type_shard.h" />
     <ClInclude Include="util.h" />
     <ClInclude Include="writeback_listener.h" />
   </ItemGroup>

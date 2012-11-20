@@ -1412,6 +1412,15 @@
     <ClCompile Include="..\s\type_database.cpp">
       <Filter>s</Filter>
     </ClCompile>
+    <ClCompile Include="btreeposition.cpp">
+      <Filter>db\Source Files\a to d</Filter>
+    </ClCompile>
+    <ClCompile Include="intervalbtreecursor.cpp">
+      <Filter>db\Source Files\e to n</Filter>
+    </ClCompile>
+    <ClCompile Include="..\s\type_shard.cpp">
+      <Filter>s</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\targetver.h" />
@@ -2920,6 +2929,15 @@
       <Filter>s</Filter>
     </ClInclude>
     <ClInclude Include="..\s\type_database.h">
+      <Filter>s</Filter>
+    </ClInclude>
+    <ClInclude Include="btreeposition.h">
+      <Filter>db\Header Files\a to d</Filter>
+    </ClInclude>
+    <ClInclude Include="intervalbtreecursor.h">
+      <Filter>db\Header Files\e to n</Filter>
+    </ClInclude>
+    <ClInclude Include="..\s\type_shard.h">
       <Filter>s</Filter>
     </ClInclude>
   </ItemGroup>

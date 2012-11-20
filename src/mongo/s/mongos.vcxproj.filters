@@ -873,6 +873,9 @@
     <ClCompile Include="type_database.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="type_shard.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\pch.h" />
@@ -1591,6 +1594,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="type_database.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="type_shard.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

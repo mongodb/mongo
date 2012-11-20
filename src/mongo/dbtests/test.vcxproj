@@ -551,6 +551,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="..\db\background.h" />
     <ClInclude Include="..\db\btreebuilder.h" />
     <ClInclude Include="..\db\btreecursor.h" />
+    <ClInclude Include="..\db\btreeposition.h" />
     <ClInclude Include="..\db\btree_stats.h" />
     <ClInclude Include="..\db\cc_by_loc.h" />
     <ClInclude Include="..\db\client.h" />
@@ -586,6 +587,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="..\db\initialize_server_global_state.h" />
     <ClInclude Include="..\db\instance.h" />
     <ClInclude Include="..\db\interrupt_status.h" />
+    <ClInclude Include="..\db\intervalbtreecursor.h" />
     <ClInclude Include="..\db\jsobjmanipulator.h" />
     <ClInclude Include="..\db\key.h" />
     <ClInclude Include="..\db\keypattern.h" />
@@ -639,6 +641,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="..\s\type_chunk.h" />
     <ClInclude Include="..\s\type_collection.h" />
     <ClInclude Include="..\s\type_database.h" />
+    <ClInclude Include="..\s\type_shard.h" />
     <ClInclude Include="..\s\util.h" />
     <ClInclude Include="..\targetver.h" />
     <ClInclude Include="..\..\third_party\pcre-8.30\config.h" />
@@ -1383,6 +1386,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="..\db\auth\privilege.cpp" />
     <ClCompile Include="..\db\auth\privilege_set.cpp" />
     <ClCompile Include="..\db\btreebuilder.cpp" />
+    <ClCompile Include="..\db\btreeposition.cpp" />
     <ClCompile Include="..\db\btree_stats.cpp" />
     <ClCompile Include="..\db\cap.cpp" />
     <ClCompile Include="..\db\commands\fsync.cpp" />
@@ -1409,6 +1413,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="..\db\hasher.cpp" />
     <ClCompile Include="..\db\index_rebuilder.cpp" />
     <ClCompile Include="..\db\index_update.cpp" />
+    <ClCompile Include="..\db\intervalbtreecursor.cpp" />
     <ClCompile Include="..\db\key.cpp" />
     <ClCompile Include="..\db\keypattern.cpp" />
     <ClCompile Include="..\db\kill_current_op.cpp" />
@@ -1512,6 +1517,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="..\s\type_chunk.cpp" />
     <ClCompile Include="..\s\type_collection.cpp" />
     <ClCompile Include="..\s\type_database.cpp" />
+    <ClCompile Include="..\s\type_shard.cpp" />
     <ClCompile Include="..\unittest\unittest.cpp" />
     <ClCompile Include="..\util\alignedbuilder.cpp" />
     <ClCompile Include="..\util\compress.cpp" />
