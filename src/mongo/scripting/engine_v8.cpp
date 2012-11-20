@@ -1536,8 +1536,10 @@ namespace mongo {
         Local<v8::Object> obj = value->ToObject();
         Local<v8::Value> proto = obj->GetPrototype();
 
-        if (obj->InternalFieldCount() && obj->GetInternalField(0)->IsNumber())
+        if (obj->InternalFieldCount() && obj->GetInternalField(0)->IsNumber()) {
             v8ToMongoInternal(b, elementName, obj);
+            return;
+        }
 
         string s = toSTLString(value);
         if (s.size() && s[0] == '/')
