@@ -19,6 +19,7 @@
 #include "mongo/db/btree.h"
 #include "mongo/db/kill_current_op.h"
 #include "mongo/db/namespace_details-inl.h"
+#include "mongo/db/pdfile.h"
 
 namespace mongo {
 
