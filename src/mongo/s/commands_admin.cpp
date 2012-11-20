@@ -639,10 +639,12 @@ namespace mongo {
                 int i = 0;
                 for ( ChunkMap::const_iterator c = chunkMap.begin(); c != chunkMap.end(); ++c,++i ){
                     Shard to = shards[ i % numShards ];
-                    if ( to == primary )
+                    ChunkPtr chunk = c->second;
+
+                    // can't move chunk to shard it's already on
+                    if ( to == chunk->getShard() )
                         continue;
 
-                    ChunkPtr chunk = c->second;
                     BSONObj moveResult;
                     if ( ! chunk->moveAndCommit( to , Chunk::MaxChunkSize , false , moveResult ) ) {
                         warning() << "Couldn't move chunk " << chunk << " to shard "  << to
