@@ -140,6 +140,11 @@ namespace mongo {
 
         bool inCriticalMigrateSection();
 
+        /**
+         * @return true if we are NOT in the critical section
+         */
+        bool waitTillNotInCriticalSection( int maxSecondsToWait );
+
     private:
         bool _enabled;
 

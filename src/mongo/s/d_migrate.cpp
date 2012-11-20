@@ -261,7 +261,7 @@ namespace mongo {
     class MigrateFromStatus {
     public:
 
-        MigrateFromStatus() : _m("MigrateFromStatus") , _workLock("MigrateFromStatus::workLock") {
+        MigrateFromStatus() : _mutex("MigrateFromStatus") , _workLock("MigrateFromStatus::workLock") {
             _active = false;
             _inCriticalSection = false;
             _memoryUsed = 0;
@@ -282,7 +282,7 @@ namespace mongo {
 
             //scoped_lock ll(_workLock);
 
-            scoped_lock l(_m); // reads and writes _active
+            scoped_lock l(_mutex); // reads and writes _active
 
             if (_active) {
                 return false;
@@ -320,9 +320,10 @@ namespace mongo {
             }
             _memoryUsed = 0;
 
-            scoped_lock l(_m);
+            scoped_lock l(_mutex);
             _active = false;
             _inCriticalSection = false;
+            _inCriticalSectionCV.notify_all();
         }
 
         void logOp( const char * opstr , const char * ns , const BSONObj& obj , BSONObj * patt ) {
@@ -624,8 +625,35 @@ namespace mongo {
 
         long long mbUsed() const { return _memoryUsed / ( 1024 * 1024 ); }
 
-        bool getInCriticalSection() const { scoped_lock l(_m); return _inCriticalSection; }
-        void setInCriticalSection( bool b ) { scoped_lock l(_m); _inCriticalSection = b; }
+        bool getInCriticalSection() const {
+            scoped_lock l(_mutex);
+            return _inCriticalSection;
+        }
+
+        void setInCriticalSection( bool b ) {
+            scoped_lock l(_mutex);
+            _inCriticalSection = b;
+            _inCriticalSectionCV.notify_all();
+        }
+
+        /**
+         * @return true if we are NOT in the critical section
+         */
+        bool waitTillNotInCriticalSection( int maxSecondsToWait ) {
+            verify( !Lock::isLocked() );
+
+            boost::xtime xt;
+            boost::xtime_get(&xt, MONGO_BOOST_TIME_UTC);
+            xt.sec += maxSecondsToWait;
+
+            scoped_lock l(_mutex);
+            while ( _inCriticalSection ) {
+                if ( ! _inCriticalSectionCV.timed_wait( l.boost(), xt ) )
+                    return false;
+            }
+
+            return true;
+        }
 
         bool isActive() const { return _getActive(); }
         
@@ -645,7 +673,9 @@ namespace mongo {
         }
 
     private:
-        mutable mongo::mutex _m; // protect _inCriticalSection and _active
+        mutable mongo::mutex _mutex; // protect _inCriticalSection and _active
+        boost::condition _inCriticalSectionCV;
+
         bool _inCriticalSection;
         bool _active;
 
@@ -671,8 +701,8 @@ namespace mongo {
         mutable mongo::mutex _workLock; // this is used to make sure only 1 thread is doing serious work
                                         // for now, this means migrate or removing old chunk data
 
-        bool _getActive() const { scoped_lock l(_m); return _active; }
-        void _setActive( bool b ) { scoped_lock l(_m); _active = b; }
+        bool _getActive() const { scoped_lock l(_mutex); return _active; }
+        void _setActive( bool b ) { scoped_lock l(_mutex); _active = b; }
 
     } migrateFromStatus;
 
@@ -1410,6 +1440,10 @@ namespace mongo {
 
     bool ShardingState::inCriticalMigrateSection() {
         return migrateFromStatus.getInCriticalSection();
+    }
+
+    bool ShardingState::waitTillNotInCriticalSection( int maxSecondsToWait ) {
+        return migrateFromStatus.waitTillNotInCriticalSection( maxSecondsToWait );
     }
 
     /* -----
