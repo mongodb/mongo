@@ -79,6 +79,7 @@ namespace mongo {
 
         case Array: // empty
             _storage.putVector(new RCVector());
+            break;
 
         case Bool:
             _storage.boolValue = false;
