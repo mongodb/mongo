@@ -154,7 +154,8 @@ __bulk_row_keycmp_err(WT_CURSOR_BULK *cbulk)
 	WT_ERR_MSG(session, EINVAL,
 	    "bulk-load presented with out-of-order keys: %.*s compares smaller "
 	    "than previously inserted key %.*s",
-	    (int)a->size, (char *)a->data, (int)b->size, (char *)b->data);
+	    (int)a->size, (const char *)a->data,
+	    (int)b->size, (const char *)b->data);
 
 err:	__wt_scr_free(&a);
 	__wt_scr_free(&b);

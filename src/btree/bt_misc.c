@@ -111,5 +111,5 @@ __wt_addr_string(
 		buf->data = "[Error]";
 		buf->size = WT_STORE_SIZE(strlen("[Error]"));
 	}
-	return ((char *)buf->data);
+	return (buf->data);
 }

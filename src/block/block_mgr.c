@@ -48,7 +48,7 @@ __wt_bm_addr_stderr(
 	WT_RET(__wt_scr_alloc(session, 0, &buf));
 	ret = __wt_block_addr_string(session, block, buf, addr, addr_size);
 	if (ret == 0)
-		fprintf(stderr, "%s\n", (char *)buf->data);
+		fprintf(stderr, "%s\n", (const char *)buf->data);
 	__wt_scr_free(&buf);
 	return (ret);
 }

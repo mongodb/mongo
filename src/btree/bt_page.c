@@ -399,13 +399,13 @@ __inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *inmem_sizep)
 
 		/*
 		 * If Huffman decoding is required or it's an overflow record,
-		 * use the heavy-weight __wt_cell_unpack_copy() call to build
-		 * the key.  Else, we can do it faster internally as we don't
-		 * have to shuffle memory around as much.
+		 * unpack the cell to build the key, then resolve the prefix.
+		 * Else, we can do it faster internally as we don't have to
+		 * shuffle memory around as much.
 		 */
 		prefix = unpack->prefix;
 		if (huffman != NULL || unpack->ovfl) {
-			WT_ERR(__wt_cell_unpack_copy(session, unpack, current));
+			WT_ERR(__wt_cell_unpack_ref(session, unpack, current));
 
 			/*
 			 * If there's a prefix, make sure there's enough buffer
@@ -415,10 +415,10 @@ __inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *inmem_sizep)
 			if (prefix != 0) {
 				WT_ERR(__wt_buf_grow(
 				    session, current, prefix + current->size));
-				memmove((uint8_t *)current->data +
-				    prefix, current->data, current->size);
-				memcpy(
-				    (void *)current->data, last->data, prefix);
+				memmove((uint8_t *)current->mem + prefix,
+				    current->data, current->size);
+				memcpy(current->mem, last->data, prefix);
+				current->data = current->mem;
 				current->size += prefix;
 			}
 		} else {
@@ -426,15 +426,14 @@ __inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *inmem_sizep)
 			 * Get the cell's data/length and make sure we have
 			 * enough buffer space.
 			 */
-			WT_ERR(__wt_buf_grow(
+			WT_ERR(__wt_buf_init(
 			    session, current, prefix + unpack->size));
 
 			/* Copy the prefix then the data into place. */
 			if (prefix != 0)
-				memcpy((void *)
-				    current->data, last->data, prefix);
-			memcpy((uint8_t *)
-			    current->data + prefix, unpack->data, unpack->size);
+				memcpy(current->mem, last->data, prefix);
+			memcpy((uint8_t *)current->mem + prefix, unpack->data,
+			    unpack->size);
 			current->size = prefix + unpack->size;
 		}
 

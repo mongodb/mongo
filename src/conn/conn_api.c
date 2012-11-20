@@ -521,7 +521,7 @@ __conn_config_file(WT_SESSION_IMPL *session, const char **cfg, WT_ITEM **cbufp)
 	*t = '\0';
 
 #if 0
-	fprintf(stderr, "file config: {%s}\n", (char *)cbuf->data);
+	fprintf(stderr, "file config: {%s}\n", (const char *)cbuf->data);
 	exit(0);
 #endif
 
