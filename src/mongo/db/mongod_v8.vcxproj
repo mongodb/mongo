@@ -1198,7 +1198,8 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="..\bson\mutable\mutable_bson_internal.cpp" />
     <ClCompile Include="..\bson\oid.cpp" />
     <ClCompile Include="..\bson\util\bson_extract.cpp" />
-    <ClCompile Include="..\client\authentication_table.cpp" />
+    <ClCompile Include="..\client\authentication_table_common.cpp" />
+    <ClCompile Include="..\client\authentication_table_server.cpp" />
     <ClCompile Include="..\client\dbclientcursor.cpp" />
     <ClCompile Include="..\client\dbclient_rs.cpp" />
     <ClCompile Include="..\client\distlock.cpp" />
@@ -1250,7 +1251,9 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="..\s\shardkey.cpp" />
     <ClCompile Include="..\..\third_party\snappy\snappy-sinksource.cc" />
     <ClCompile Include="..\..\third_party\snappy\snappy.cc" />
+    <ClCompile Include="..\s\type_chunk.cpp" />
     <ClCompile Include="..\s\type_collection.cpp" />
+    <ClCompile Include="..\s\type_database.cpp" />
     <ClCompile Include="..\util\alignedbuilder.cpp" />
     <ClCompile Include="..\util\compress.cpp" />
     <ClCompile Include="..\util\concurrency\mutexdebugger.cpp" />
@@ -1793,7 +1796,9 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="..\s\d_writeback.h" />
     <ClInclude Include="..\s\field_parser.h" />
     <ClInclude Include="..\s\grid.h" />
+    <ClInclude Include="..\s\type_chunk.h" />
     <ClInclude Include="..\s\type_collection.h" />
+    <ClInclude Include="..\s\type_database.h" />
     <ClInclude Include="..\util\admin_access.h" />
     <ClInclude Include="..\util\bson_util.h" />
     <ClInclude Include="..\util\bufreader.h" />

@@ -509,9 +509,6 @@
     <ClCompile Include="..\util\concurrency\mutexdebugger.cpp">
       <Filter>util\concurrency</Filter>
     </ClCompile>
-    <ClCompile Include="..\client\authentication_table.cpp">
-      <Filter>client</Filter>
-    </ClCompile>
     <ClCompile Include="..\scripting\bson_template_evaluator.cpp">
       <Filter>scripting</Filter>
     </ClCompile>
@@ -583,6 +580,12 @@
     </ClCompile>
     <ClCompile Include="..\util\fail_point_service.cpp">
       <Filter>util\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\client\authentication_table_common.cpp">
+      <Filter>client</Filter>
+    </ClCompile>
+    <ClCompile Include="..\client\authentication_table_client.cpp">
+      <Filter>client</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -786,9 +789,6 @@
     </ClInclude>
     <ClInclude Include="..\client\undef_macros.h">
       <Filter>client</Filter>
-    </ClInclude>
-    <ClInclude Include="..\s\util.h">
-      <Filter>s</Filter>
     </ClInclude>
     <ClInclude Include="..\util\concurrency\value.h">
       <Filter>util\concurrency</Filter>

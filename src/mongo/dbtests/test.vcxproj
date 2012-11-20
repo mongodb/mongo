@@ -528,7 +528,14 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="..\bson\util\misc.h" />
     <ClInclude Include="..\client\authentication_table.h" />
     <ClInclude Include="..\client\authlevel.h" />
+    <ClInclude Include="..\client\dbclientcursor.h" />
+    <ClInclude Include="..\client\dbclientinterface.h" />
     <ClInclude Include="..\client\dbclientmockcursor.h" />
+    <ClInclude Include="..\client\distlock.h" />
+    <ClInclude Include="..\client\parallel.h" />
+    <ClInclude Include="..\client\redef_macros.h" />
+    <ClInclude Include="..\client\syncclusterconnection.h" />
+    <ClInclude Include="..\client\undef_macros.h" />
     <ClInclude Include="..\db\auth\acquired_privilege.h" />
     <ClInclude Include="..\db\auth\action_set.h" />
     <ClInclude Include="..\db\auth\action_type.h" />
@@ -629,7 +636,10 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="..\s\grid.h" />
     <ClInclude Include="..\s\shard.h" />
     <ClInclude Include="..\s\shardkey.h" />
+    <ClInclude Include="..\s\type_chunk.h" />
     <ClInclude Include="..\s\type_collection.h" />
+    <ClInclude Include="..\s\type_database.h" />
+    <ClInclude Include="..\s\util.h" />
     <ClInclude Include="..\targetver.h" />
     <ClInclude Include="..\..\third_party\pcre-8.30\config.h" />
     <ClInclude Include="..\..\third_party\pcre-8.30\pcre.h" />
@@ -1354,7 +1364,8 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="..\bson\mutable\mutable_bson_internal.cpp" />
     <ClCompile Include="..\bson\oid.cpp" />
     <ClCompile Include="..\bson\util\bson_extract.cpp" />
-    <ClCompile Include="..\client\authentication_table.cpp" />
+    <ClCompile Include="..\client\authentication_table_common.cpp" />
+    <ClCompile Include="..\client\authentication_table_server.cpp" />
     <ClCompile Include="..\client\connection_factory.cpp" />
     <ClCompile Include="..\client\dbclientcursor.cpp" />
     <ClCompile Include="..\client\dbclient_rs.cpp" />
@@ -1498,7 +1509,9 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="..\s\shardkey.cpp" />
     <ClCompile Include="..\..\third_party\snappy\snappy-sinksource.cc" />
     <ClCompile Include="..\..\third_party\snappy\snappy.cc" />
+    <ClCompile Include="..\s\type_chunk.cpp" />
     <ClCompile Include="..\s\type_collection.cpp" />
+    <ClCompile Include="..\s\type_database.cpp" />
     <ClCompile Include="..\unittest\unittest.cpp" />
     <ClCompile Include="..\util\alignedbuilder.cpp" />
     <ClCompile Include="..\util\compress.cpp" />

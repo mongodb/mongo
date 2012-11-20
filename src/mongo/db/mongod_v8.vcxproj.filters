@@ -761,9 +761,6 @@
     <ClCompile Include="..\util\touch_pages.cpp">
       <Filter>util\Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\client\authentication_table.cpp">
-      <Filter>client\Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="hashindex.cpp">
       <Filter>db\Source Files\e to n</Filter>
     </ClCompile>
@@ -1402,6 +1399,18 @@
     </ClCompile>
     <ClCompile Include="geo\s2nearcursor.cpp">
       <Filter>db\geo</Filter>
+    </ClCompile>
+    <ClCompile Include="..\client\authentication_table_common.cpp">
+      <Filter>client\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\client\authentication_table_server.cpp">
+      <Filter>client\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\s\type_chunk.cpp">
+      <Filter>s</Filter>
+    </ClCompile>
+    <ClCompile Include="..\s\type_database.cpp">
+      <Filter>s</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -2906,6 +2915,12 @@
     </ClInclude>
     <ClInclude Include="pipeline\value_internal.h">
       <Filter>db\pipeline\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\s\type_chunk.h">
+      <Filter>s</Filter>
+    </ClInclude>
+    <ClInclude Include="..\s\type_database.h">
+      <Filter>s</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
