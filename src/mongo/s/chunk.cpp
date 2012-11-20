@@ -960,6 +960,8 @@ namespace mongo {
                 // If not specified, only use the primary shard (note that it's not safe for mongos
                 // to put initial chunks on other shards without the primary mongod knowing).
                 shards->push_back( primary );
+            } else {
+                std::copy( initShards->begin() , initShards->end() , std::back_inserter(*shards) );
             }
         }
     }

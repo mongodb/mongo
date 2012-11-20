@@ -1395,7 +1395,21 @@ namespace mongo {
                         // points will be properly sorted using the set
                         for ( set<BSONObj>::iterator it = splitPts.begin() ; it != splitPts.end() ; ++it )
                             sortedSplitPts.push_back( *it );
-                        confOut->shardCollection( finalColLong, sortKey, true, &sortedSplitPts );
+
+                        // pre-split the collection onto all the shards for this database.
+                        // Note that in this case it's safe to pre-split by calling shardCollection
+                        // with non-primary shards, because here we're writing to the collection
+                        // from a single mongos.
+                        set<Shard> shardSet;
+                        confOut->getAllShards( shardSet );
+                        vector<Shard> outShards( shardSet.begin() , shardSet.end() );
+
+                        confOut->shardCollection( finalColLong ,
+                                                  sortKey ,
+                                                  true ,
+                                                  &sortedSplitPts ,
+                                                  &outShards );
+
                     }
 
                     map<BSONObj, int> chunkSizes;

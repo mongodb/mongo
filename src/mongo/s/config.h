@@ -117,7 +117,22 @@ namespace mongo {
         }
 
         void enableSharding( bool save = true );
-        ChunkManagerPtr shardCollection( const string& ns , ShardKeyPattern fieldsAndOrder , bool unique , vector<BSONObj>* initPoints=0, vector<Shard>* initShards=0 );
+
+        /* Makes all the configuration changes necessary to shard a new collection.
+         * Optionally, chunks will be created based on a set of specified initial split points, and
+         * distributed in a round-robin fashion onto a set of initial shards.  If no initial shards
+         * are specified, only the primary will be used.
+         *
+         * WARNING: It's not safe to place initial chunks onto non-primary shards using this nethod,
+         * unless the caller can guarantee that there there won't be simultaneous inserts into the
+         * collection while setup is still happening.  If uncertain, initShards should be left
+         * unspecified.
+         */
+        ChunkManagerPtr shardCollection( const string& ns ,
+                                         ShardKeyPattern fieldsAndOrder ,
+                                         bool unique ,
+                                         vector<BSONObj>* initPoints = 0,
+                                         vector<Shard>* initShards = 0 );
 
         /**
            @return true if there was sharding info to remove
