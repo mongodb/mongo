@@ -155,6 +155,7 @@ assert.soon(function() {
 doTest(new Mongo(st.rs0.getURL()), st.rs0.nodes, false);
 
 st.s.getDB('test').dropDatabase();
+st.s.getDB('test').runCommand({ getLastError: 1, w: NODE_COUNT });
 
 configDB.adminCommand({ enableSharding: 'test' });
 configDB.adminCommand({ shardCollection: 'test.user', key: { x: 1 }});
