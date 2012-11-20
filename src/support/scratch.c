@@ -47,9 +47,8 @@ __wt_buf_grow(WT_SESSION_IMPL *session, WT_ITEM *buf, size_t size)
 			offset = 0;
 			set_data = 1;
 		} else if (buf->data >= buf->mem &&
-		    (uint8_t *)buf->data < (uint8_t *)buf->mem + buf->memsize) {
+		    WT_PTRDIFF(buf->data, buf->mem) < buf->memsize) {
 			offset = WT_PTRDIFF(buf->data, buf->mem);
-			WT_ASSERT(session, offset == 0);
 			set_data = 1;
 		} else {
 			offset = 0;
@@ -146,12 +145,9 @@ __wt_buf_steal(WT_SESSION_IMPL *session, WT_ITEM *buf, uint32_t *sizep)
 	 * the page header, so buf->data references a location past buf->mem.
 	 */
 	if (buf->data != buf->mem) {
-		WT_ASSERT(session,
-		    buf->data > buf->mem &&
-		    (uint8_t *)buf->data <
-		    (uint8_t *)buf->mem + buf->memsize &&
-		    (uint8_t *)buf->data + buf->size <=
-		    (uint8_t *)buf->mem + buf->memsize);
+		WT_ASSERT(session, buf->data > buf->mem &&
+		    WT_PTRDIFF(buf->data, buf->mem) + buf->size <=
+		    buf->memsize);
 		memmove(buf->mem, buf->data, buf->size);
 	}
 

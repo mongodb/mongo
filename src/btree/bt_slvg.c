@@ -350,7 +350,8 @@ __slvg_read(WT_SESSION_IMPL *session, WT_STUFF *ss)
 		case WT_PAGE_ROW_INT:
 			WT_VERBOSE_ERR(session, salvage,
 			    "%s page ignored %s",
-			    __wt_page_type_string(dsk->type), (char *)as->data);
+			    __wt_page_type_string(dsk->type),
+			    (const char *)as->data);
 			WT_ERR(__wt_bm_free(session, addrbuf, addrbuf_size));
 			continue;
 		}
@@ -364,17 +365,19 @@ __slvg_read(WT_SESSION_IMPL *session, WT_STUFF *ss)
 		 * overflow references to non-existent pages, might as well
 		 * discard these pages now.
 		 */
-		if (__wt_verify_dsk(session, (char *)as->data, buf) != 0) {
+		if (__wt_verify_dsk(session, as->data, buf) != 0) {
 			WT_VERBOSE_ERR(session, salvage,
 			    "%s page failed verify %s",
-			    __wt_page_type_string(dsk->type), (char *)as->data);
+			    __wt_page_type_string(dsk->type),
+			    (const char *)as->data);
 			WT_ERR(__wt_bm_free(session, addrbuf, addrbuf_size));
 			continue;
 		}
 
 		WT_VERBOSE_ERR(session, salvage,
 		    "tracking %s page, generation %" PRIu64 " %s",
-		    __wt_page_type_string(dsk->type), gen, (char *)as->data);
+		    __wt_page_type_string(dsk->type), gen,
+		    (const char *)as->data);
 
 		switch (dsk->type) {
 		case WT_PAGE_COL_FIX:
