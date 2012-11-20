@@ -65,28 +65,14 @@ namespace mongo {
         return true;
     }
 
-    void AuthenticationInfo::startRequest() {
-        _checkLocalHostSpecialAdmin();
-    }
-
     void AuthenticationInfo::setIsALocalHostConnectionWithSpecialAuthPowers() {
         verify(!_isLocalHost);
         _isLocalHost = true;
-        _isLocalHostAndLocalHostIsAuthorizedForAll = true;
-        _checkLocalHostSpecialAdmin();
     }
 
     bool AuthenticationInfo::_isAuthorizedSpecialChecks( const string& dbname ) const {
-        return isSpecialLocalhostAdmin();
-    }
-
-    bool AuthenticationInfo::isSpecialLocalhostAdmin() const {
-        return _isLocalHostAndLocalHostIsAuthorizedForAll;
-    }
-
-    void AuthenticationInfo::_checkLocalHostSpecialAdmin() {
-        if (!_isLocalHost || !_isLocalHostAndLocalHostIsAuthorizedForAll) {
-            return;
+        if ( !_isLocalHost ) {
+            return false;
         }
 
         string adminNs = "admin.system.users";
@@ -94,15 +80,8 @@ namespace mongo {
         DBConfigPtr config = grid.getDBConfig( adminNs );
         Shard s = config->getShard( adminNs );
 
-        //
-        // Note: The connection mechanism here is *not* ideal, and should not be used elsewhere.
-        // It is safe in this particular case because the admin database is always on the config
-        // server and does not move.
-        //
-        scoped_ptr<ScopedDbConnection> conn(
-                ScopedDbConnection::getInternalScopedDbConnection(s.getConnString(), 30.0));
-
-        BSONObj result = (*conn)->findOne("admin.system.users", Query());
+        ShardConnection conn( s, adminNs );
+        BSONObj result = conn->findOne("admin.system.users", Query());
         if( result.isEmpty() ) {
             if( ! _warned ) {
                 // you could get a few of these in a race, but that's ok
@@ -112,14 +91,13 @@ namespace mongo {
 
             // Must return conn to pool
             // TODO: Check for errors during findOne(), or just let the conn die?
-            conn->done();
-            _isLocalHostAndLocalHostIsAuthorizedForAll = true;
-            return;
+            conn.done();
+            return true;
         }
 
         // Must return conn to pool
-        conn->done();
-        _isLocalHostAndLocalHostIsAuthorizedForAll = false;
+        conn.done();
+        return false;
     }
 
     bool CmdLogout::run(const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {

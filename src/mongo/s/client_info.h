@@ -101,9 +101,6 @@ namespace mongo {
 
         void noAutoSplit() { _autoSplitOk = false; }
 
-        // Returns whether or not a ClientInfo for this thread has already been created and stored
-        // in _tlInfo.
-        static bool exists();
         // Gets the ClientInfo object for this thread from _tlInfo. If no ClientInfo object exists
         // yet for this thread, it creates one.
         static ClientInfo * get(AbstractMessagingPort* messagingPort = NULL);

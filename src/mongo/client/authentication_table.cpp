@@ -93,12 +93,7 @@ namespace mongo {
             cmdWithAuth.append(e);
         }
 
-        if (_shouldSendInternalSecurityTable()) {
-            cmdWithAuth.append(fieldName, internalSecurityAuthenticationTable.toBSON());
-        }
-        else {
-            cmdWithAuth.append(fieldName, toBSON());
-        }
+        cmdWithAuth.append( fieldName, toBSON() );
         return cmdWithAuth.obj();
     }
 
