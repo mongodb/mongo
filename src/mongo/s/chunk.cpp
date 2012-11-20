@@ -957,14 +957,9 @@ namespace mongo {
             }
 
             if ( !initShards || !initShards->size() ) {
-                // use all shards, starting with primary
+                // If not specified, only use the primary shard (note that it's not safe for mongos
+                // to put initial chunks on other shards without the primary mongod knowing).
                 shards->push_back( primary );
-                vector<Shard> tmp;
-                primary.getAllShards( tmp );
-                for ( unsigned i = 0; i < tmp.size(); ++i ) {
-                    if ( tmp[i] != primary )
-                        shards->push_back( tmp[i] );
-                }
             }
         }
     }
