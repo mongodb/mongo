@@ -586,8 +586,11 @@ namespace mongo {
                 vector<BSONObj> initSplits;  // there will be at most numShards-1 of these
                 vector<BSONObj> allSplits;   // all of the initial desired split points
 
+                bool isHashedShardKey =
+                        str::equals(proposedKey.firstElement().valuestrsafe(), "hashed");
+
                 // only pre-split when using a hashed shard key and collection is still empty
-                if ( str::equals(proposedKey.firstElement().valuestrsafe(), "hashed") && isEmpty ){
+                if ( isHashedShardKey && isEmpty ){
 
                     int numChunks = cmdObj["numInitialChunks"].numberInt();
                     if ( numChunks <= 0 )
@@ -628,58 +631,63 @@ namespace mongo {
 
                 result << "collectionsharded" << ns;
 
-                // Reload the new config info.  If we created more than one initial chunk, then
-                // we need to move them around to balance.
-                ChunkManagerPtr chunkManager = config->getChunkManager( ns , true );
-                ChunkMap chunkMap = chunkManager->getChunkMap();
-                if ( chunkMap.size() == 1 )
-                    return true;
+                // only initially move chunks when using a hashed shard key
+                if (isHashedShardKey) {
 
-                // 2. Move and commit each "big chunk" to a different shard.
-                int i = 0;
-                for ( ChunkMap::const_iterator c = chunkMap.begin(); c != chunkMap.end(); ++c,++i ){
-                    Shard to = shards[ i % numShards ];
-                    ChunkPtr chunk = c->second;
+                    // Reload the new config info.  If we created more than one initial chunk, then
+                    // we need to move them around to balance.
+                    ChunkManagerPtr chunkManager = config->getChunkManager( ns , true );
+                    ChunkMap chunkMap = chunkManager->getChunkMap();
+                    if ( chunkMap.size() == 1 )
+                        return true;
 
-                    // can't move chunk to shard it's already on
-                    if ( to == chunk->getShard() )
-                        continue;
+                    // 2. Move and commit each "big chunk" to a different shard.
+                    int i = 0;
+                    for ( ChunkMap::const_iterator c = chunkMap.begin(); c != chunkMap.end(); ++c,++i ){
+                        Shard to = shards[ i % numShards ];
+                        ChunkPtr chunk = c->second;
 
-                    BSONObj moveResult;
-                    if ( ! chunk->moveAndCommit( to , Chunk::MaxChunkSize , false , moveResult ) ) {
-                        warning() << "Couldn't move chunk " << chunk << " to shard "  << to
-                                  << " while sharding collection " << ns << ". Reason: "
-                                  <<  moveResult << endl;
-                    }
-                }
+                        // can't move chunk to shard it's already on
+                        if ( to == chunk->getShard() )
+                            continue;
 
-                // Reload the config info, after all the migrations
-                chunkManager = config->getChunkManager( ns , true );
-
-                // 3. Subdivide the big chunks by splitting at each of the points in "allSplits"
-                //    that we haven't already split by.
-                ChunkPtr currentChunk = chunkManager->findIntersectingChunk( allSplits[0] );
-                vector<BSONObj> subSplits;
-                for ( unsigned i = 0 ; i <= allSplits.size(); i++){
-                    if ( i == allSplits.size() || ! currentChunk->containsPoint( allSplits[i] ) ) {
-                        if ( ! subSplits.empty() ){
-                            BSONObj splitResult;
-                            if ( ! currentChunk->multiSplit( subSplits , splitResult ) ){
-                                warning() << "Couldn't split chunk " << currentChunk
-                                          << " while sharding collection " << ns << ". Reason: "
-                                          << splitResult << endl;
-                            }
-                            subSplits.clear();
+                        BSONObj moveResult;
+                        if ( ! chunk->moveAndCommit( to , Chunk::MaxChunkSize , false , moveResult ) ) {
+                            warning() << "Couldn't move chunk " << chunk << " to shard "  << to
+                                      << " while sharding collection " << ns << ". Reason: "
+                                      <<  moveResult << endl;
                         }
-                        if ( i < allSplits.size() )
-                            currentChunk = chunkManager->findIntersectingChunk( allSplits[i] );
-                    } else {
-                        subSplits.push_back( allSplits[i] );
                     }
+
+                    // Reload the config info, after all the migrations
+                    chunkManager = config->getChunkManager( ns , true );
+
+                    // 3. Subdivide the big chunks by splitting at each of the points in "allSplits"
+                    //    that we haven't already split by.
+                    ChunkPtr currentChunk = chunkManager->findIntersectingChunk( allSplits[0] );
+                    vector<BSONObj> subSplits;
+                    for ( unsigned i = 0 ; i <= allSplits.size(); i++){
+                        if ( i == allSplits.size() || ! currentChunk->containsPoint( allSplits[i] ) ) {
+                            if ( ! subSplits.empty() ){
+                                BSONObj splitResult;
+                                if ( ! currentChunk->multiSplit( subSplits , splitResult ) ){
+                                    warning() << "Couldn't split chunk " << currentChunk
+                                              << " while sharding collection " << ns << ". Reason: "
+                                              << splitResult << endl;
+                                }
+                                subSplits.clear();
+                            }
+                            if ( i < allSplits.size() )
+                                currentChunk = chunkManager->findIntersectingChunk( allSplits[i] );
+                        } else {
+                            subSplits.push_back( allSplits[i] );
+                        }
+                    }
+
+                    // Proactively refresh the chunk manager. Not really necessary, but this way it's
+                    // immediately up-to-date the next time it's used.
+                    config->getChunkManager( ns , true );
                 }
-                // Proactively refresh the chunk manager. Not really necessary, but this way it's
-                // immediately up-to-date the next time it's used.
-                config->getChunkManager( ns , true );
 
                 return true;
             }
