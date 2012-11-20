@@ -54,7 +54,7 @@ namespace mongo {
         lastExtentSize = 0;
         nIndexes = 0;
         _isCapped = capped;
-        _maxDocsInCapped = 0x7fffffff;
+        _maxDocsInCapped = -1; // no limit
         _paddingFactor = 1.0;
         _systemFlags = 0;
         _userFlags = 0;
@@ -611,8 +611,31 @@ namespace mongo {
     }
 
     void NamespaceDetails::setMaxCappedDocs( long long max ) {
-        verify( max <= 0x7fffffffLL ); // TODO: this is temp
-        _maxDocsInCapped = static_cast<int>(max);
+        massert( 16496,
+                 "max in a capped collection has to be < 2^30 or inf",
+                 validMaxCappedDocs( &max ) );
+        _maxDocsInCapped = max;
+    }
+
+    bool NamespaceDetails::validMaxCappedDocs( long long* max ) {
+        if ( *max <= 0 ||
+             *max == numeric_limits<long long>::max() ) {
+            *max = -1;
+            return true;
+        }
+
+        if ( *max < ( 0x1LL << 31 ) ) {
+            return true;
+        }
+
+        return false;
+    }
+
+    long long NamespaceDetails::maxCappedDocs() const {
+        verify( isCapped() );
+        if ( _maxDocsInCapped == -1 )
+            return numeric_limits<long long>::max();
+        return _maxDocsInCapped;
     }
 
     /* ------------------------------------------------------------------------- */

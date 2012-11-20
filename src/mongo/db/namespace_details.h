@@ -81,7 +81,7 @@ namespace mongo {
 
         // ofs 352 (16 byte aligned)
         int _isCapped;                         // there is wasted space here if I'm right (ERH)
-        int _maxDocsInCapped;                  // max # of objects for a capped table.  TODO: should this be 64 bit?
+        int _maxDocsInCapped;                  // max # of objects for a capped table, -1 for inf.
 
         double _paddingFactor;                 // 1.0 = no padding.
         // ofs 386 (16)
@@ -155,9 +155,13 @@ namespace mongo {
     public:
 
         bool isCapped() const { return _isCapped; }
-        long long maxCappedDocs() const { verify( isCapped() ); return _maxDocsInCapped; }
+        long long maxCappedDocs() const;
         void setMaxCappedDocs( long long max );
-
+        /**
+         * @param max in and out, will be adjusted
+         * @return if the value is valid at all
+         */
+        static bool validMaxCappedDocs( long long* max );
 
         DiskLoc& cappedListOfAllDeletedRecords() { return deletedList[0]; }
         DiskLoc& cappedLastDelRecLastExtent()    { return deletedList[1]; }
