@@ -1300,9 +1300,8 @@ namespace mongo {
     Value ExpressionFieldPath::evaluatePath(size_t index,
                                             size_t pathLength,
                                             Document pDocument) const {
-        Value pValue; /* the return value */
-
-        pValue = pDocument->getValue(fieldPath.getFieldName(index));
+        // return value
+        Value pValue = pDocument->getValue(fieldPath.getFieldName(index));
 
         /* if the field doesn't exist, quit with an undefined value */
         if (pValue.missing())
