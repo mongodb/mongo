@@ -84,7 +84,7 @@ namespace mongo {
     }
 
     void AuthenticationInfo::_checkLocalHostSpecialAdmin() {
-        if (!_isLocalHost || !_isLocalHostAndLocalHostIsAuthorizedForAll) {
+        if (noauth || !_isLocalHost || !_isLocalHostAndLocalHostIsAuthorizedForAll) {
             return;
         }
 
