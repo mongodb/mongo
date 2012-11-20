@@ -126,4 +126,22 @@ namespace mongo {
         return false;
     }
 
+    bool FieldParser::extract(BSONObj doc,
+                              const BSONField<long long>& field,
+                              const long long& def,
+                              long long* out) {
+        BSONElement elem = doc[field.name()];
+        if (elem.eoo()) {
+            *out = def;
+            return true;
+        }
+
+        if (elem.type() == NumberLong) {
+            *out = elem.numberLong();
+            return true;
+        }
+
+        return false;
+    }
+
 } // namespace mongo

@@ -67,6 +67,11 @@ namespace mongo {
                             const BSONField<OID>& field,
                             const OID& def,
                             OID* out);
+
+        static bool extract(BSONObj doc,
+                            const BSONField<long long>& field,
+                            const long long& def,
+                            long long* out);
     };
 
 } // namespace mongo

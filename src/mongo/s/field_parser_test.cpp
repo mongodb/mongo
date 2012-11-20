@@ -42,6 +42,7 @@ namespace {
         Date_t valDate;
         string valString;
         OID valOID;
+        long long valLong;
 
         static BSONField<bool> aBool;
         static BSONField<BSONArray> anArray;
@@ -49,6 +50,7 @@ namespace {
         static BSONField<Date_t> aDate;
         static BSONField<string> aString;
         static BSONField<OID> anOID;
+        static BSONField<long long> aLong;
 
         void setUp() {
             valBool = true;
@@ -57,13 +59,15 @@ namespace {
             valDate = 1ULL;
             valString = "a string";
             valOID = OID::gen();
+            valLong = 1LL;
 
             doc = BSON(aBool(valBool) <<
                        anArray(valArray) <<
                        anObj(valObj) <<
                        aDate(valDate) <<
                        aString(valString) <<
-                       anOID(valOID));
+                       anOID(valOID) <<
+                       aLong(valLong));
         }
 
         void tearDown() {
@@ -76,6 +80,7 @@ namespace {
     BSONField<Date_t> ExtractionFixture::aDate("aDate");
     BSONField<string> ExtractionFixture::aString("aString");
     BSONField<OID> ExtractionFixture::anOID("anOID");
+    BSONField<long long> ExtractionFixture::aLong("aLong");
 
     TEST_F(ExtractionFixture, GetBool) {
         BSONField<bool> notThere("otherBool");
@@ -142,6 +147,17 @@ namespace {
         ASSERT_TRUE(FieldParser::extract(doc, notThere, defOID, &val));
         ASSERT_EQUALS(val, defOID);
         ASSERT_FALSE(FieldParser::extract(doc, wrongType, defOID, &val));
+    }
+
+    TEST_F(ExtractionFixture, GetLong) {
+        BSONField<long long> notThere("otherLong");
+        BSONField<long long> wrongType(aString.name());
+        long long val;
+        ASSERT_TRUE(FieldParser::extract(doc, aLong, 0, &val));
+        ASSERT_EQUALS(val, valLong);
+        ASSERT_TRUE(FieldParser::extract(doc, notThere, 0, &val));
+        ASSERT_EQUALS(val, 0);
+        ASSERT_FALSE(FieldParser::extract(doc, wrongType, 0, &val));
     }
 
 } // unnamed namespace
