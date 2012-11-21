@@ -91,6 +91,8 @@ namespace mongo {
 }
 
 namespace mongo_test {
+    mongo::DummyMessageHandler dummyHandler;
+
     // TODO: Take this out and make it as a reusable class in a header file. The only
     // thing that is preventing this from happening is the dependency on the inShutdown
     // method to terminate the socket listener thread.
@@ -183,7 +185,7 @@ namespace mongo_test {
             _maxPoolSizePerHost = mongo::PoolForHost::getMaxPerHost();
             _dummyServer = new DummyServer(TARGET_PORT);
 
-            _dummyServer->run(new mongo::DummyMessageHandler);
+            _dummyServer->run(&dummyHandler);
             mongo::DBClientConnection conn;
             mongo::Timer timer;
 
