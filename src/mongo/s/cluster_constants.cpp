@@ -72,16 +72,16 @@ namespace mongo {
     BSONField<int> SettingFields::UNHOOKED_name("_id");
     BSONField<string> SettingFields::UNHOOKED_value("value");
 
-    const string ConfigNS::changelog = "config.changelog";
-    BSONField<string> ChangelogFields::UNHOOKED_name("_id");
-    BSONField<string> ChangelogFields::UNHOOKED_server("server");
-    BSONField<string> ChangelogFields::UNHOOKED_clientAddr("clientAddr");
-    BSONField<Date_t> ChangelogFields::UNHOOKED_time("time");
-    BSONField<string> ChangelogFields::UNHOOKED_what("what");
-    BSONField<string> ChangelogFields::UNHOOKED_ns("ns");
-    BSONField<string> ChangelogFields::UNHOOKED_details("details");
-
     // ============  below hooked  ============
+
+    const string ConfigNS::changelog = "config.changelog";
+    BSONField<string> ChangelogFields::changeID("_id");
+    BSONField<string> ChangelogFields::server("server");
+    BSONField<string> ChangelogFields::clientAddr("clientAddr");
+    BSONField<Date_t> ChangelogFields::time("time");
+    BSONField<string> ChangelogFields::what("what");
+    BSONField<string> ChangelogFields::ns("ns");
+    BSONField<BSONObj> ChangelogFields::details("details");
 
     const string ConfigNS::locks = "config.locks";
     BSONField<string> LockFields::name("_id");

@@ -146,13 +146,27 @@ namespace mongo {
      * ChangelogFields holds all the field names and types for the changelog collection.
      */
     struct ChangelogFields {
-        static BSONField<string> UNHOOKED_name;
-        static BSONField<string> UNHOOKED_server;
-        static BSONField<string> UNHOOKED_clientAddr;
-        static BSONField<Date_t> UNHOOKED_time;
-        static BSONField<string> UNHOOKED_what;
-        static BSONField<string> UNHOOKED_ns;
-        static BSONField<string> UNHOOKED_details;
+
+        // id for this change "<hostname>-<current_time>-<increment>"
+        static BSONField<string> changeID;
+
+        // hostname of server that we are making the change on.  Does not include port.
+        static BSONField<string> server;
+
+        // hostname:port of the client that made this change
+        static BSONField<string> clientAddr;
+
+        // time this change was made
+        static BSONField<Date_t> time;
+
+        // description of the change
+        static BSONField<string> what;
+
+        // database or collection this change applies to
+        static BSONField<string> ns;
+
+        // A BSONObj containing extra information about some operations
+        static BSONField<BSONObj> details;
     };
 
     /**
