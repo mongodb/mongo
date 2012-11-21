@@ -34,7 +34,7 @@ int main() {
     try {
         cout << "connecting to localhost..." << endl;
         DBClientConnection c;
-        c.connect("localhost");
+        c.connect();
         cout << "connected ok" << endl;
 
         bo o = BSON( "hello" << "world" );

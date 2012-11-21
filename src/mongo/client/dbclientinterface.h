@@ -1116,8 +1116,9 @@ namespace mongo {
            false was returned -- it will try to connect again.
 
            @param serverHostname host to connect to.  can include port number ( 127.0.0.1 , 127.0.0.1:5555 )
+	   default to localhost.
         */
-        void connect(const string& serverHostname) {
+        void connect(const string& serverHostname = "localhost") {
             string errmsg;
             if( !connect(HostAndPort(serverHostname), errmsg) )
                 throw ConnectException(string("can't connect ") + errmsg);
