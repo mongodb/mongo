@@ -10,10 +10,20 @@ s.adminCommand( { shardcollection : "test.foo", key : { "_id" : 1 } } )
 jsTest.log( "Inserting a lot of documents into test.foo" )
 
 db = s.getDB( "test" );
+
 var idInc = 0;
 var valInc = 0;
 var str=""
-for (i=0;i<4*1024;i++) { str=str+"a"; }
+
+if (db.serverBuildInfo().bits == 32) {
+    // Make data ~0.5MB for 32 bit builds
+    for (var i = 0; i < 512; i++) str += "a";
+}
+else {
+    // Make data ~4MB
+    for (var i = 0; i < 4*1024; i++) str += "a";
+}
+
 for (j=0; j<100; j++) for (i=0; i<512; i++){ db.foo.save({ i : idInc++, val: valInc++, y:str})}
 
 jsTest.log( "Documents inserted, waiting for error..." )
