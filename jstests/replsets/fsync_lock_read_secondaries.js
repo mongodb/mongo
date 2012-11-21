@@ -36,6 +36,7 @@ for(var i=0; i<docNum; i++) {
     master.getDB("foo").bar.save({a: i});
 }
 waitForAllMembers(master.getDB("foo"));
+replTest.awaitReplication();
 
 // Calling getMaster also makes available the liveNodes structure, which looks like this:
 // liveNodes = {master: masterNode, slaves: [slave1, slave2] }
