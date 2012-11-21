@@ -136,10 +136,18 @@ __wt_lsm_merge(
 			break;
 
 		/*
+		 * Only merge across more than 2 generations if there are no
+		 * new chunks being created.
+		 */
+		if (stalls < 50 && chunk->generation >=
+		    lsm_tree->chunk[end_chunk]->generation + 2)
+			break;
+
+		/*
 		 * If the next chunk is more than double the average size of
 		 * the chunks we have so far, stop.
 		 */
-		if (nchunks > 2 && chunk->count > 2 * record_count / nchunks)
+		if (nchunks > 1 && chunk->count > 2 * record_count / nchunks)
 			break;
 
 		/*
@@ -188,8 +196,9 @@ __wt_lsm_merge(
 	dest_id = WT_ATOMIC_ADD(lsm_tree->last, 1);
 
 	WT_VERBOSE_RET(session, lsm,
-	    "Merging chunks %d-%d into %d (%" PRIu64 " records)\n",
-	    start_chunk, end_chunk, dest_id, record_count);
+	    "Merging chunks %d-%d into %d (%" PRIu64 " records)"
+	    ", generation %d\n",
+	    start_chunk, end_chunk, dest_id, record_count, generation);
 
 	WT_RET(__wt_calloc_def(session, 1, &chunk));
 	chunk->id = dest_id;
