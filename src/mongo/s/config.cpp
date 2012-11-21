@@ -618,6 +618,20 @@ namespace mongo {
 
         // 5
         for ( set<Shard>::iterator i=allServers.begin(); i!=allServers.end(); i++ ) {
+
+            // This block notifies GLE that we should check dropDatabase status on this shard
+            {
+                // Very very ugly, but mongod also pulls in this code and knows nothing of
+                // client_info.  The real fix here is to A) consolidate mongos and mongod
+                // client information and B) move this to mongod with collection lifecycle
+                // changes.
+
+                // Pulls a connection from the sharded pool with no namespace, no version checking
+                // is used.  Do this *before* any problems, so we're sure we'll check for them.
+                ShardConnection conn(i->getConnString(), "");
+                conn.done();
+            }
+
             scoped_ptr<ScopedDbConnection> conn(
                     ScopedDbConnection::getScopedDbConnection( i->getConnString(), 30.0 ) );
             BSONObj res;
