@@ -121,7 +121,7 @@ var doTest = function(conn, hostList, isMongos) {
         formatProfileQuery({ aggregate: 'mrIn' }, !isMongos));
 };
 
-var st = new ShardingTest({ verbose : 5, shards: { rs0: { nodes: NODE_COUNT }}});
+var st = new ShardingTest({ shards: { rs0: { nodes: NODE_COUNT }}});
 st.stopBalancer();
 
 var configDB = st.s.getDB('config');
