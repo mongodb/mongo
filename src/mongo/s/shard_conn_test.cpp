@@ -171,7 +171,7 @@ namespace mongo_test {
         try {
             conn2.get()->query("test.user", mongo::Query());
         }
-        catch (const mongo::SocketException& sockExcep) {
+        catch (const mongo::SocketException&) {
         }
 
         conn2.done();
@@ -191,7 +191,7 @@ namespace mongo_test {
         try {
             conn3.get()->query("test.user", mongo::Query());
         }
-        catch (const mongo::SocketException& sockExcep) {
+        catch (const mongo::SocketException&) {
         }
 
         restartServer();
@@ -220,7 +220,7 @@ namespace mongo_test {
         try {
             conn2.get()->query("test.user", mongo::Query());
         }
-        catch (const mongo::SocketException& sockExcep) {
+        catch (const mongo::SocketException&) {
         }
 
         conn2.done();

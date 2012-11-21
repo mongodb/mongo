@@ -194,7 +194,7 @@ namespace mongo_test {
                 try {
                     conn.connect(TARGET_HOST);
                     break;
-                } catch (const mongo::ConnectException& e) {
+                } catch (const mongo::ConnectException&) {
                     if (timer.seconds() > 20) {
                         FAIL("Timed out connecting to dummy server");
                     }
@@ -307,7 +307,7 @@ namespace mongo_test {
         try {
             conn2->get()->query("test.user", mongo::Query());
         }
-        catch (const mongo::SocketException& sockExcep) {
+        catch (const mongo::SocketException&) {
         }
 
         mongo::getGlobalFailPointRegistry()->getFailPoint("throwSockExcep")->
@@ -333,7 +333,7 @@ namespace mongo_test {
         try {
             conn3->get()->query("test.user", mongo::Query());
         }
-        catch (const mongo::SocketException& sockExcep) {
+        catch (const mongo::SocketException&) {
         }
 
         mongo::getGlobalFailPointRegistry()->getFailPoint("throwSockExcep")->
@@ -368,7 +368,7 @@ namespace mongo_test {
         try {
             conn2->get()->query("test.user", mongo::Query());
         }
-        catch (const mongo::SocketException& sockExcep) {
+        catch (const mongo::SocketException&) {
         }
 
         mongo::getGlobalFailPointRegistry()->getFailPoint("throwSockExcep")->
