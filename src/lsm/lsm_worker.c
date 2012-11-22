@@ -87,7 +87,7 @@ __wt_lsm_bloom_worker(void *arg)
 	for (;;) {
 		WT_ERR(__wt_lsm_copy_chunks(session, lsm_tree, &cookie));
 
-		/* Write checkpoints in all completed files. */
+		/* Create bloom filters in all checkpointed chunks. */
 		for (i = 0, j = 0; i < cookie.nchunks; i++) {
 			if (!F_ISSET(lsm_tree, WT_LSM_TREE_WORKING))
 				goto err;
@@ -104,27 +104,13 @@ __wt_lsm_bloom_worker(void *arg)
 			    chunk->count == 0)
 				continue;
 
-			if ((ret = __lsm_bloom_create(
-			    session, lsm_tree, chunk)) != 0) {
-				(void)__wt_err(
-				   session, ret, "bloom creation failed");
+			/*
+			 * If a bloom filter create fails restart at the
+			 * beginning of the chunk array. Don't exit the thread.
+			 */
+			if (__lsm_bloom_create(session, lsm_tree, chunk) != 0)
 				break;
-			}
-
 			++j;
-			__wt_writelock(session, lsm_tree->rwlock);
-			++lsm_tree->dsk_gen;
-			ret = __wt_lsm_meta_write(session, lsm_tree);
-			__wt_rwunlock(session, lsm_tree->rwlock);
-
-			if (ret != 0) {
-				(void)__wt_err(session, ret,
-				    "LSM bloom worker metadata write failed");
-				break;
-			}
-
-			WT_VERBOSE_ERR(session, lsm,
-			     "LSM worker created bloom filter for %d.", i);
 		}
 		if (j == 0)
 			__wt_sleep(0, 100000);
@@ -307,11 +293,22 @@ __lsm_bloom_create(WT_SESSION_IMPL *session,
 	WT_ERR(ret);
 
 	WT_VERBOSE_ERR(session, lsm,
-	    "LSM checkpoint worker created bloom filter. "
+	    "LSM worker created bloom filter %s. "
 	    "Expected %" PRIu64 " items, got %" PRIu64,
-	    chunk->count, insert_count);
+	    chunk->bloom_uri, chunk->count, insert_count);
 
 	F_SET(chunk, WT_LSM_CHUNK_BLOOM);
+
+	/* Ensure the bloom filter is in the metadata. */
+	__wt_writelock(session, lsm_tree->rwlock);
+	++lsm_tree->dsk_gen;
+	ret = __wt_lsm_meta_write(session, lsm_tree);
+	__wt_rwunlock(session, lsm_tree->rwlock);
+
+	if (ret != 0)
+		WT_ERR_MSG(session, ret,
+		    "LSM bloom worker metadata write failed");
+
 err:	if (bloom != NULL)
 		WT_TRET(__wt_bloom_close(bloom));
 	return (ret);
