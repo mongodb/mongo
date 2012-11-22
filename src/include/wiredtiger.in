@@ -1779,7 +1779,7 @@ extern int wiredtiger_extension_init(WT_SESSION *session,
  * @anchor statistics_conn
  * Statistics are accessed through cursors with \c "statistics:" URIs.
  * Individual statistics can be queried through the cursor using the following
- * keys.
+ * keys.  See @ref data_statistics for more information.
  * @{
  */
 /*! blocks read from a file */

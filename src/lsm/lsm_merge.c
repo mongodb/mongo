@@ -72,10 +72,12 @@ __wt_lsm_merge(
 	WT_DECL_RET;
 	WT_ITEM buf, key, value;
 	WT_LSM_CHUNK *chunk;
-	const char *cur_cfg[] =
-	    API_CONF_DEFAULTS(session, open_cursor, "bulk,raw");
+	const char *cur_cfg[] = API_CONF_DEFAULTS(session, open_cursor,
+	    "bulk,raw");
+	const char *rand_cfg[] = API_CONF_DEFAULTS(session, open_cursor,
+	    "checkpoint=WiredTigerCheckpoint,next_random");
 	uint32_t generation, start_id;
-	uint64_t insert_count, record_count;
+	uint64_t insert_count, record_count, r;
 	int create_bloom, dest_id, end_chunk, i;
 	int max_chunks, nchunks, start_chunk;
 
@@ -134,10 +136,18 @@ __wt_lsm_merge(
 			break;
 
 		/*
+		 * Only merge across more than 2 generations if there are no
+		 * new chunks being created.
+		 */
+		if (stalls < 50 && chunk->generation >=
+		    lsm_tree->chunk[end_chunk]->generation + 2)
+			break;
+
+		/*
 		 * If the next chunk is more than double the average size of
 		 * the chunks we have so far, stop.
 		 */
-		if (nchunks > 2 && chunk->count > 2 * record_count / nchunks)
+		if (nchunks > 1 && chunk->count > 2 * record_count / nchunks)
 			break;
 
 		/*
@@ -186,8 +196,9 @@ __wt_lsm_merge(
 	dest_id = WT_ATOMIC_ADD(lsm_tree->last, 1);
 
 	WT_VERBOSE_RET(session, lsm,
-	    "Merging chunks %d-%d into %d (%" PRIu64 " records)\n",
-	    start_chunk, end_chunk, dest_id, record_count);
+	    "Merging chunks %d-%d into %d (%" PRIu64 " records)"
+	    ", generation %d\n",
+	    start_chunk, end_chunk, dest_id, record_count, generation);
 
 	WT_RET(__wt_calloc_def(session, 1, &chunk));
 	chunk->id = dest_id;
@@ -249,10 +260,33 @@ __wt_lsm_merge(
 	src = dest = NULL;
 	if (create_bloom) {
 		WT_TRET(__wt_bloom_finalize(bloom));
+
+		/*
+		 * Read in a key to make sure the Bloom filters btree handle is
+		 * open before it becomes visible to application threads.
+		 * Otherwise application threads will stall while it is opened
+		 * and internal pages are read into cache.
+		 */
+		WT_CLEAR(key);
+		WT_TRET_NOTFOUND_OK(__wt_bloom_get(bloom, &key));
+
 		WT_TRET(__wt_bloom_close(bloom));
 		bloom = NULL;
 	}
 	WT_ERR(ret);
+
+	/*
+	 * Fault in some pages.  We use a random cursor to jump around in the
+	 * tree.  The count here is fairly arbitrary: what we want is to have
+	 * enough internal pages in cache so that application threads don't
+	 * stall and block each other reading them in.
+	 */
+	WT_ERR(__wt_open_cursor(session, chunk->uri, NULL, rand_cfg, &dest));
+	for (r = 0; ret == 0 && r < 1 + (insert_count >> 20); r++)
+		WT_TRET(dest->next(dest));
+	WT_TRET(dest->close(dest));
+	dest = NULL;
+	WT_ERR_NOTFOUND_OK(ret);
 
 	__wt_writelock(session, lsm_tree->rwlock);
 
