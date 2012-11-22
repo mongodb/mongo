@@ -2,6 +2,16 @@
 // Tests whether sharded GLE fails sanely and correctly reports failures.  
 //
 
+function waitForWrite(shardIndex, query, count) {
+    var searchText = tojson(query) + " on shard " + shardIndex;
+    jsTest.log( "Waiting for " + count + " document(s) with " + searchText );
+    var shardDB = connect(shards[shardIndex].host + "/" + jsTestName());
+    assert.soon( function() { return shardDB.coll.find( query ).count() == count; },
+                 "Failed to find document with " + searchText,
+                 /* timeout */ 10 * 1000,
+                 /*interval*/ 10 );
+}
+
 jsTest.log( "Starting sharded cluster..." )
 
 var st = new ShardingTest({ shards : 3,
@@ -35,6 +45,9 @@ jsTest.log( "Testing GLE...")
 coll.insert({ _id : -1, hello : "world" })
 coll.insert({ _id : 1, hello : "world" })
 
+waitForWrite(0, {_id: -1}, 1);
+waitForWrite(1, {_id:  1}, 1);
+
 jsTest.log( "GLE : " + tojson( coll.getDB().getLastErrorObj() ) )
 
 
@@ -45,8 +58,8 @@ jsTest.log( "Testing GLE when writeback host goes down..." )
 coll.insert({ _id : -2, hello : "world" })
 coll.insert({ _id : 2, hello : "world" })
 
-// pause to give writes time to happen
-sleep(10);
+waitForWrite(0, {_id: -2}, 1);
+waitForWrite(1, {_id:  2}, 1);
 
 MongoRunner.stopMongod( st.shard0 )
 
@@ -62,8 +75,8 @@ jsTest.log( "Testing GLE when main host goes down..." )
 coll.insert({ _id : -3, hello : "world" })
 coll.insert({ _id : 3, hello : "world" })
 
-// pause to give writes time to happen
-sleep(10);
+waitForWrite(0, {_id: -3}, 1);
+waitForWrite(1, {_id:  3}, 1);
 
 MongoRunner.stopMongod( st.shard1 )
 
@@ -87,15 +100,18 @@ jsTest.log( "Testing multi GLE for multi-host writes..." )
 
 coll.update({ hello : "world" }, { $set : { goodbye : "world" } }, false, true)
 
+waitForWrite(0, {goodbye: "world"}, 3);
+waitForWrite(1, {goodbye: "world"}, 3);
+
 jsTest.log( "GLE : " + tojson( coll.getDB().getLastErrorObj() ) )
 
 jsTest.log( "Testing multi GLE when host goes down..." )
 
 // insert to two diff shards
-coll.update({ hello : "world" }, { $set : { goodbye : "world" } }, false, true)
+coll.update({ hello : "world" }, { $set : { goodnight : "moon" } }, false, true)
 
-// pause to give writes time to happen
-sleep(10);
+waitForWrite(0, {goodnight: "moon"}, 3);
+waitForWrite(1, {goodnight: "moon"}, 3);
 
 MongoRunner.stopMongod( st.shard0 )
 
@@ -122,8 +138,7 @@ staleColl.findOne()
 
 printjson( admin.runCommand({ moveChunk : "" + coll, find : { _id : 0 }, to : shards[2]._id }) )
 
-// pause to give writes time to happen
-sleep(10);
+waitForWrite(2, {goodnight: "moon"}, 3);
 
 MongoRunner.stopMongod( st.shard2 )
 
