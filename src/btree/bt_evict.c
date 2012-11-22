@@ -243,7 +243,7 @@ __evict_worker(WT_SESSION_IMPL *session)
 {
 	WT_CACHE *cache;
 	WT_CONNECTION_IMPL *conn;
-	uint64_t bytes_inuse, bytes_max;
+	uint64_t bytes_inuse, bytes_max, dirty_inuse;
 	int loop;
 
 	conn = S2C(session);
@@ -263,13 +263,21 @@ __evict_worker(WT_SESSION_IMPL *session)
 		__wt_spin_unlock(session, &cache->evict_lock);
 
 		/*
-		 * Keep evicting until we hit the target cache usage.
+		 * Keep evicting until we hit the target cache usage and the
+		 * target dirty percentage.
 		 */
 		bytes_inuse = __wt_cache_bytes_inuse(cache);
+		dirty_inuse = __wt_cache_dirty_bytes(cache);
 		bytes_max = conn->cache_size;
-		if (bytes_inuse < (cache->eviction_target * bytes_max) / 100)
+		if (bytes_inuse < (cache->eviction_target * bytes_max) / 100 &&
+		    dirty_inuse <
+		    (cache->eviction_dirty_target * bytes_max) / 100)
 			break;
 
+		WT_VERBOSE_RET(session, evictserver,
+		    "Eviction pass with: Max: %" PRIu64
+		    " In use: %" PRIu64 " Dirty: %" PRIu64,
+		    bytes_max, bytes_inuse, dirty_inuse);
 		WT_RET(__evict_lru(session));
 
 		/*

@@ -70,16 +70,18 @@ wts_open(void)
 	/*
 	 * Open configuration.
 	 *
-	 * Put command line configuration options at the end so they override
-	 * the standard configuration.
+	 * Put configuration file configuration options second to last. Put
+	 * command line configuration options at the end. Do this so they
+	 * override the standard configuration.
 	 */
 	snprintf(config, sizeof(config),
 	    "create,error_prefix=\"%s\",cache_size=%" PRIu32 "MB,sync=false,"
-	    "extensions=[\"%s\",\"%s\", \"%s\"],%s",
+	    "extensions=[\"%s\",\"%s\", \"%s\"],%s,%s",
 	    g.progname, g.c_cache,
 	    access(BZIP_PATH, R_OK) == 0 ? BZIP_PATH : "",
 	    access(SNAPPY_PATH, R_OK) == 0 ? SNAPPY_PATH : "",
 	    REVERSE_PATH,
+	    g.c_config_open == NULL ? "" : g.c_config_open,
 	    g.config_open == NULL ? "" : g.config_open);
 
 	if ((ret =

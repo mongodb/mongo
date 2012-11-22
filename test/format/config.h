@@ -76,7 +76,7 @@ static CONFIG c[] = {
 
 	{ "cache",
 	  "size of the cache in MB",
-	  0, 0, 1, 100, &g.c_cache, NULL },
+	  0, 0, 1, 500, &g.c_cache, NULL },
 
 	{ "compression",
 	  "type of compression (none | bzip | ext | snappy)",
@@ -157,6 +157,10 @@ static CONFIG c[] = {
 	{ "value_min",
 	  "minimum size of values",
 	  C_ROW|C_VAR, 0, 1, 20, &g.c_value_min, NULL },
+
+	{ "wiredtiger_config",
+	  "configuration string used to wiredtiger_open",
+	  0, C_IGNORE|C_STRING, 0, 0, NULL, &g.c_config_open },
 
 	{ "write_pct",
 	  "percent operations that are writes",

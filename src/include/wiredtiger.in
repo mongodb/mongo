@@ -999,6 +999,9 @@ struct __wt_connection {
 	 * both.,an integer between 1MB and 10TB; default \c 100MB.}
 	 * @config{error_prefix, prefix string for error messages.,a string;
 	 * default empty.}
+	 * @config{eviction_dirty_target, continue evicting until the cache has
+	 * less dirty pages than this (as a percentage).,an integer between 10
+	 * and 99; default \c 80.}
 	 * @config{eviction_target, continue evicting until the cache becomes
 	 * less full than this (as a percentage).  Must be less than \c
 	 * eviction_trigger.,an integer between 10 and 99; default \c 80.}
@@ -1189,6 +1192,9 @@ struct __wt_connection {
  * from the following options: \c "data"\, \c "log"; default empty.}
  * @config{error_prefix, prefix string for error messages.,a string; default
  * empty.}
+ * @config{eviction_dirty_target, continue evicting until the cache has less
+ * dirty pages than this (as a percentage).,an integer between 10 and 99;
+ * default \c 80.}
  * @config{eviction_target, continue evicting until the cache becomes less full
  * than this (as a percentage).  Must be less than \c eviction_trigger.,an
  * integer between 10 and 99; default \c 80.}

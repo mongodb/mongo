@@ -3374,8 +3374,10 @@ err:			__wt_scr_free(&tkey);
 	 * the disk generation to the write generation as of when reconciliation
 	 * started.
 	 */
-	if (!r->upd_skipped)
+	if (!r->upd_skipped) {
+		__wt_cache_dirty_decr(session, page->memory_footprint);
 		mod->disk_gen = r->orig_write_gen;
+	}
 
 	return (0);
 }

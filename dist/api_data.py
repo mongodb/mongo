@@ -254,6 +254,10 @@ connection_runtime_config = [
 		min='1MB', max='10TB'),
 	Config('error_prefix', '', r'''
 		prefix string for error messages'''),
+	Config('eviction_dirty_target', '80', r'''
+		continue evicting until the cache has less dirty pages than this
+		(as a percentage)''',
+		min=10, max=99),
 	Config('eviction_target', '80', r'''
 		continue evicting until the cache becomes less full than this
 		(as a percentage).  Must be less than \c eviction_trigger''',

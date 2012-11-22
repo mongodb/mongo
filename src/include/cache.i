@@ -14,7 +14,7 @@ __wt_eviction_check(WT_SESSION_IMPL *session, int *read_lockoutp, int wake)
 {
 	WT_CACHE *cache;
 	WT_CONNECTION_IMPL *conn;
-	uint64_t bytes_inuse, bytes_max;
+	uint64_t bytes_inuse, bytes_max, dirty_inuse;
 
 	conn = S2C(session);
 	cache = conn->cache;
@@ -26,12 +26,15 @@ __wt_eviction_check(WT_SESSION_IMPL *session, int *read_lockoutp, int wake)
 	 * don't run on the edge all the time.
 	 */
 	bytes_inuse = __wt_cache_bytes_inuse(cache);
+	dirty_inuse = __wt_cache_dirty_bytes(cache);
 	bytes_max = conn->cache_size;
 	if (read_lockoutp != NULL)
 		*read_lockoutp = (bytes_inuse > bytes_max);
 
 	/* Wake eviction when we're over the trigger cache size. */
-	if (wake && bytes_inuse >= (cache->eviction_trigger * bytes_max) / 100)
+	if (wake && (
+	    bytes_inuse >= (cache->eviction_trigger * bytes_max) / 100 ||
+	    dirty_inuse >= (cache->eviction_dirty_target * bytes_max) / 100))
 		__wt_evict_server_wake(session);
 }
 

@@ -30,6 +30,8 @@ struct __wt_cache {
 	uint64_t bytes_inmem;		/* Bytes/pages created in memory */
 	uint64_t bytes_evict;		/* Bytes/pages discarded by eviction */
 	uint64_t pages_evict;
+	uint64_t bytes_dirty;		/* Bytes/pages currently dirty */
+	uint64_t pages_dirty;
 
 	/*
 	 * Read information.
@@ -42,8 +44,9 @@ struct __wt_cache {
 	WT_CONDVAR *evict_cond;		/* Cache eviction server mutex */
 	WT_SPINLOCK evict_lock;		/* Eviction serialization */
 
-	u_int eviction_trigger;		/* Percent to trigger eviction. */
+	u_int eviction_trigger;		/* Percent to trigger eviction */
 	u_int eviction_target;		/* Percent to end eviction */
+	u_int eviction_dirty_target;    /* Percent to allow dirty */
 
 	/*
 	 * LRU eviction list information.
