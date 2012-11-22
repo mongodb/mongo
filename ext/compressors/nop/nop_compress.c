@@ -25,7 +25,6 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include <errno.h>
 #include <string.h>
 
 #include <wiredtiger.h>
@@ -89,6 +88,7 @@ nop_decompress(WT_COMPRESSOR *compressor, WT_SESSION *session,
 {
 	__UNUSED(compressor);
 	__UNUSED(session);
+	__UNUSED(src_len);
 
 	/*
 	 * The destination length is the number of uncompressed bytes we're
