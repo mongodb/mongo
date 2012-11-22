@@ -106,6 +106,7 @@ typedef struct {
 
 	u_int c_bitcnt;				/* Config values */
 	u_int c_cache;
+	u_int c_checksum;
 	char *c_compression;
 	char *c_data_source;
 	u_int c_delete_pct;

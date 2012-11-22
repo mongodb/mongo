@@ -145,6 +145,8 @@ wts_open(void)
 			    ",dictionary=%d", MMRAND(123, 517));
 		break;
 	}
+	p += snprintf(p, (size_t)(end - p),
+	    ",checksum=%s", g.c_checksum ? "true" : "false");
 
 	/* Configure compression. */
 	switch (g.compression) {
