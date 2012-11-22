@@ -45,6 +45,9 @@ jsTest.log( "Testing GLE when writeback host goes down..." )
 coll.insert({ _id : -2, hello : "world" })
 coll.insert({ _id : 2, hello : "world" })
 
+// pause to give writes time to happen
+sleep(10);
+
 MongoRunner.stopMongod( st.shard0 )
 
 jsTest.log( "GLE : " + tojson( coll.getDB().getLastErrorObj() ) )
@@ -58,6 +61,9 @@ jsTest.log( "Testing GLE when main host goes down..." )
 // insert to two diff shards
 coll.insert({ _id : -3, hello : "world" })
 coll.insert({ _id : 3, hello : "world" })
+
+// pause to give writes time to happen
+sleep(10);
 
 MongoRunner.stopMongod( st.shard1 )
 
@@ -88,6 +94,9 @@ jsTest.log( "Testing multi GLE when host goes down..." )
 // insert to two diff shards
 coll.update({ hello : "world" }, { $set : { goodbye : "world" } }, false, true)
 
+// pause to give writes time to happen
+sleep(10);
+
 MongoRunner.stopMongod( st.shard0 )
 
 try{ 
@@ -112,6 +121,9 @@ var staleColl = st.s1.getCollection( coll + "" )
 staleColl.findOne()
 
 printjson( admin.runCommand({ moveChunk : "" + coll, find : { _id : 0 }, to : shards[2]._id }) )
+
+// pause to give writes time to happen
+sleep(10);
 
 MongoRunner.stopMongod( st.shard2 )
 
