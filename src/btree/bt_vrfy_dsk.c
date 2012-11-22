@@ -43,7 +43,7 @@ __wt_verify_dsk(WT_SESSION_IMPL *session, const char *addr, WT_ITEM *buf)
 {
 	WT_PAGE_HEADER *dsk;
 	uint32_t size;
-	uint8_t *p;
+	uint8_t *p, *end;
 	u_int i;
 
 	dsk = buf->mem;
@@ -87,20 +87,21 @@ __wt_verify_dsk(WT_SESSION_IMPL *session, const char *addr, WT_ITEM *buf)
 		    __wt_page_type_string(dsk->type), addr);
 	}
 
-	/* Check the in-memory size. */
-	if (dsk->mem_size != size)
-		WT_RET_VRFY(session,
-		    "%s page at %s has an incorrect size (%" PRIu32 " != %"
-		    PRIu32 ")",
-		    __wt_page_type_string(dsk->type),
-		    addr, dsk->mem_size, size);
-
 	/* Unused bytes */
 	for (p = dsk->unused, i = sizeof(dsk->unused); i > 0; --i)
 		if (*p != '\0')
 			WT_RET_VRFY(session,
 			    "page at %s has non-zero unused page header bytes",
 			    addr);
+
+	/* Any bytes after the data chunk should be nul bytes. */
+	p = (uint8_t *)dsk + dsk->mem_size;
+	end = (uint8_t *)dsk + size;
+	for (; p < end; ++p)
+		if (*p != '\0')
+			WT_RET_VRFY(session,
+			    "%s page at %s has non-zero trailing bytes",
+			    __wt_page_type_string(dsk->type), addr);
 
 	/* Verify the items on the page. */
 	switch (dsk->type) {

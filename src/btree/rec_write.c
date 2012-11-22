@@ -873,6 +873,7 @@ __rec_split_init(WT_SESSION_IMPL *session,
 {
 	WT_BTREE *btree;
 	WT_PAGE_HEADER *dsk;
+	uint32_t corrected_max;
 
 	btree = session->btree;
 
@@ -880,8 +881,9 @@ __rec_split_init(WT_SESSION_IMPL *session,
 	 * Ensure the disk image buffer is large enough for the max object,
 	 * as corrected by the underlying block manager.
 	 */
-	WT_RET(__wt_bm_write_size(session, &max));
-	WT_RET(__wt_buf_init(session, &r->dsk, (size_t)max));
+	corrected_max = max;
+	WT_RET(__wt_bm_write_size(session, &corrected_max));
+	WT_RET(__wt_buf_init(session, &r->dsk, (size_t)corrected_max));
 
 	/*
 	 * Clear the header and set the page type (the type doesn't change, and
@@ -1686,16 +1688,16 @@ __rec_split_write(WT_SESSION_IMPL *session,
     WT_RECONCILE *r, WT_BOUNDARY *bnd, WT_ITEM *buf)
 {
 	WT_PAGE_HEADER *dsk;
-	uint32_t size;
+	uint32_t addr_size;
 	uint8_t addr[WT_BTREE_MAX_ADDR_COOKIE];
 
 	/* Write the chunk and save the location information. */
-	WT_RET(
-	    __wt_bm_write(session, buf, addr, &size, bnd->already_compressed));
-	WT_RET(__wt_strndup(session, (char *)addr, size, &bnd->addr.addr));
+	WT_RET(__wt_bt_write(
+	    session, buf, addr, &addr_size, 0, bnd->already_compressed));
+	WT_RET(__wt_strndup(session, (char *)addr, addr_size, &bnd->addr.addr));
 
 	dsk = buf->mem;
-	bnd->addr.size = size;
+	bnd->addr.size = addr_size;
 	bnd->addr.leaf_no_overflow =
 	    (dsk->type == WT_PAGE_COL_FIX ||
 	    dsk->type == WT_PAGE_COL_VAR ||
@@ -3685,8 +3687,7 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 
 		/* If this is the root page, we need to create a sync point. */
 		if (WT_PAGE_IS_ROOT(page))
-			WT_RET(
-			    __wt_bm_checkpoint(session, NULL, btree->ckpt, 0));
+			WT_RET(__wt_bm_checkpoint(session, NULL, btree->ckpt));
 
 		/*
 		 * If the page was empty, we want to discard it from the tree
@@ -3709,8 +3710,8 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		 */
 		bnd = &r->bnd[0];
 		if (bnd->addr.addr == NULL)
-			WT_RET(__wt_bm_checkpoint(session,
-			    &r->dsk, btree->ckpt, bnd->already_compressed));
+			WT_RET(__wt_bt_write(session,
+			    &r->dsk, NULL, NULL, 1, bnd->already_compressed));
 		else {
 			mod->u.replace = bnd->addr;
 			bnd->addr.addr = NULL;
@@ -4171,7 +4172,7 @@ __rec_cell_build_ovfl(WT_SESSION_IMPL *session,
 
 		/* Write the buffer. */
 		addr = buf;
-		WT_ERR(__wt_bm_write(session, tmp, addr, &size, 0));
+		WT_ERR(__wt_bt_write(session, tmp, addr, &size, 0, 0));
 
 		/* Track the overflow record. */
 		WT_ERR(__wt_rec_track(session, page,

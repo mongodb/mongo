@@ -31,15 +31,6 @@ struct __wt_page_header {
 
 	uint8_t type;			/* 16: page type */
 
-	/*
-	 * XXX
-	 * The page compression flag is shared between reconciliation (the btree
-	 * layer) and the block manager, which isn't good.  The cleaner approach
-	 * would be to move this flag into the WT_BLOCK_HEADER structure and to
-	 * quit setting it in the reconciliation level at all (the block manager
-	 * would then have to take a flag when being passed already compressed
-	 * blocks ), but I don't want to increase the size of the block header.
-	 */
 #define	WT_PAGE_COMPRESSED	0x01	/* Page is compressed on disk */
 	uint8_t flags;			/* 17: flags */
 

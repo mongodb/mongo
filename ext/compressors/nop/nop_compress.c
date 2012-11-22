@@ -90,11 +90,12 @@ nop_decompress(WT_COMPRESSOR *compressor, WT_SESSION *session,
 	__UNUSED(compressor);
 	__UNUSED(session);
 
-	if (dst_len < src_len)
-		return (ENOMEM);
-
-	memcpy(dst, src, src_len);
-	*result_lenp = src_len;
+	/*
+	 * The destination length is the number of uncompressed bytes we're
+	 * expected to return.
+	 */
+	memcpy(dst, src, dst_len);
+	*result_lenp = dst_len;
 	return (0);
 }
 /* End implementation of WT_COMPRESSOR. */

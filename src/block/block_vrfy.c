@@ -255,51 +255,6 @@ __wt_verify_ckpt_unload(
 }
 
 /*
- * __wt_block_verify --
- *	Physically verify a disk block, if we haven't already verified it.
- */
-int
-__wt_block_verify(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_ITEM *buf,
-    const uint8_t *addr, uint32_t addr_size, off_t offset, uint32_t size)
-{
-	WT_DECL_ITEM(tmp);
-	WT_DECL_RET;
-	uint64_t frag, frags, i, match;
-
-	/*
-	 * If we've already verify this block's physical image, we know it's
-	 * good, we don't have to verify it again.
-	 */
-	frag = (uint64_t)WT_OFF_TO_FRAG(block, offset);
-	frags = (uint64_t)(size / block->allocsize);
-	for (match = i = 0; i < frags; ++i)
-		if (__bit_test(block->fragfile, frag++))
-			++match;
-	if (match == frags) {
-		WT_VERBOSE_RET(session, verify,
-		    "skipping block at %" PRIuMAX "-%" PRIuMAX ", already "
-		    "verified",
-		    (uintmax_t)offset, (uintmax_t)(offset + size));
-		return (0);
-	}
-	if (match != 0)
-		WT_RET_MSG(session, WT_ERROR,
-		    "block at %" PRIuMAX "-%" PRIuMAX " partially verified",
-		    (uintmax_t)offset, (uintmax_t)(offset + size));
-
-	/*
-	 * Create a string representation of the address cookie and verify the
-	 * block.
-	 */
-	WT_RET(__wt_scr_alloc(session, 0, &tmp));
-	WT_ERR(__wt_block_addr_string(session, block, tmp, addr, addr_size));
-	WT_ERR(__wt_verify_dsk(session, (const char *)tmp->data, buf));
-
-err:	__wt_scr_free(&tmp);
-	return (ret);
-}
-
-/*
  * __wt_block_verify_addr --
  *	Update an address in a checkpoint as verified.
  */

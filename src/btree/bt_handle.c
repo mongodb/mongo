@@ -46,12 +46,12 @@ __wt_btree_open(WT_SESSION_IMPL *session,
 	WT_BTREE *btree;
 	WT_CONFIG_ITEM cval;
 	WT_DECL_RET;
-	WT_ITEM dsk;
-	const char *filename;
+	uint32_t root_addr_size;
 	int created, forced_salvage;
+	const char *filename;
+	uint8_t root_addr[WT_BTREE_MAX_ADDR_COOKIE];
 
 	btree = session->btree;
-	WT_CLEAR(dsk);
 
 	/* Initialize and configure the WT_BTREE structure. */
 	WT_ERR(__btree_conf(session, cfg));
@@ -96,12 +96,13 @@ __wt_btree_open(WT_SESSION_IMPL *session,
 	 * either there is no checkpoint (the file is being created), or the
 	 * load call returns no root page (the checkpoint is for an empty file).
 	 */
-	WT_ERR(
-	    __wt_bm_checkpoint_load(session, &dsk, addr, addr_size, readonly));
-	if (created || dsk.size == 0)
+	WT_ERR(__wt_bm_checkpoint_load(
+	    session, addr, addr_size, root_addr, &root_addr_size, readonly));
+	if (created || root_addr_size == 0)
 		WT_ERR(__btree_tree_open_empty(session, created));
 	else {
-		WT_ERR(__wt_btree_tree_open(session, &dsk));
+		WT_ERR(
+		    __wt_btree_tree_open(session, root_addr, root_addr_size));
 
 		/* Get the last record number in a column-store file. */
 		if (btree->type != BTREE_ROW)
@@ -109,8 +110,7 @@ __wt_btree_open(WT_SESSION_IMPL *session,
 	}
 
 	if (0) {
-err:		__wt_buf_free(session, &dsk);
-		(void)__wt_btree_close(session);
+err:		(void)__wt_btree_close(session);
 	}
 
 	return (ret);
@@ -326,18 +326,31 @@ __btree_conf(WT_SESSION_IMPL *session, const char *cfg[])
  *	Read in a tree from disk.
  */
 int
-__wt_btree_tree_open(WT_SESSION_IMPL *session, WT_ITEM *dsk)
+__wt_btree_tree_open(
+    WT_SESSION_IMPL *session, const uint8_t *addr, uint32_t addr_size)
 {
 	WT_BTREE *btree;
+	WT_DECL_RET;
+	WT_ITEM dsk;
 	WT_PAGE *page;
 
 	btree = session->btree;
 
-	/* Build the in-memory version of the page. */
-	WT_RET(__wt_page_inmem(session, NULL, NULL, dsk->mem, &page));
+	/*
+	 * A buffer into which we read a root page; don't use a scratch buffer,
+	 * the buffer's allocated memory becomes the persistent in-memory page.
+	 */
+	WT_CLEAR(dsk);
+
+	/* Read the page, then build the in-memory version of the page. */
+	WT_ERR(__wt_bt_read(session, &dsk, addr, addr_size));
+	WT_ERR(__wt_page_inmem(session, NULL, NULL, dsk.mem, &page));
 	btree->root_page = page;
 
-	return (0);
+	if (0) {
+err:		__wt_buf_free(session, &dsk);
+	}
+	return (ret);
 }
 
 /*

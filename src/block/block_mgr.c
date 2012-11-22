@@ -136,16 +136,14 @@ __wt_bm_close(WT_SESSION_IMPL *session)
  *	Write a buffer into a block, creating a checkpoint.
  */
 int
-__wt_bm_checkpoint(
-    WT_SESSION_IMPL *session, WT_ITEM *buf, WT_CKPT *ckptbase, int compressed)
+__wt_bm_checkpoint(WT_SESSION_IMPL *session, WT_ITEM *buf, WT_CKPT *ckptbase)
 {
 	WT_BLOCK *block;
 
 	if ((block = session->btree->block) == NULL)
 		return (__bm_invalid(session));
 
-	return (
-	    __wt_block_checkpoint(session, block, buf, ckptbase, compressed));
+	return (__wt_block_checkpoint(session, block, buf, ckptbase));
 }
 
 /*
@@ -169,15 +167,16 @@ __wt_bm_checkpoint_resolve(WT_SESSION_IMPL *session)
  */
 int
 __wt_bm_checkpoint_load(WT_SESSION_IMPL *session,
-    WT_ITEM *buf, const uint8_t *addr, uint32_t addr_size, int readonly)
+    const uint8_t *addr, uint32_t addr_size,
+    uint8_t *root_addr, uint32_t *root_addr_size, int readonly)
 {
 	WT_BLOCK *block;
 
 	if ((block = session->btree->block) == NULL)
 		return (__bm_invalid(session));
 
-	return (__wt_block_checkpoint_load(
-	    session, block, buf, addr, addr_size, readonly));
+	return (__wt_block_checkpoint_load(session,
+	    block, addr, addr_size, root_addr, root_addr_size, readonly));
 }
 
 /*
@@ -288,16 +287,15 @@ __wt_bm_write_size(WT_SESSION_IMPL *session, uint32_t *sizep)
  *	Write a buffer into a block, returning the block's address cookie.
  */
 int
-__wt_bm_write(WT_SESSION_IMPL *session,
-    WT_ITEM *buf, uint8_t *addr, uint32_t *addr_size, int compressed)
+__wt_bm_write(
+    WT_SESSION_IMPL *session, WT_ITEM *buf, uint8_t *addr, uint32_t *addr_size)
 {
 	WT_BLOCK *block;
 
 	if ((block = session->btree->block) == NULL)
 		return (__bm_invalid(session));
 
-	return (
-	    __wt_block_write(session, block, buf, addr, addr_size, compressed));
+	return (__wt_block_write(session, block, buf, addr, addr_size));
 }
 
 /*
@@ -336,7 +334,7 @@ __wt_bm_salvage_start(WT_SESSION_IMPL *session)
  *	Return the next block from the file.
  */
 int
-__wt_bm_salvage_next(WT_SESSION_IMPL *session, WT_ITEM *buf,
+__wt_bm_salvage_next(WT_SESSION_IMPL *session,
     uint8_t *addr, uint32_t *addr_sizep, uint64_t *write_genp, int *eofp)
 {
 	WT_BLOCK *block;
@@ -345,7 +343,23 @@ __wt_bm_salvage_next(WT_SESSION_IMPL *session, WT_ITEM *buf,
 		return (__bm_invalid(session));
 
 	return (__wt_block_salvage_next(
-	    session, block, buf, addr, addr_sizep, write_genp, eofp));
+	    session, block, addr, addr_sizep, write_genp, eofp));
+}
+
+/*
+ * __wt_bm_salvage_valid --
+ *	Inform salvage a block is valid.
+ */
+int
+__wt_bm_salvage_valid(
+    WT_SESSION_IMPL *session, uint8_t *addr, uint32_t addr_size)
+{
+	WT_BLOCK *block;
+
+	if ((block = session->btree->block) == NULL)
+		return (__bm_invalid(session));
+
+	return (__wt_block_salvage_valid(session, block, addr, addr_size));
 }
 
 /*
