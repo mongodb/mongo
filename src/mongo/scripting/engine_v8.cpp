@@ -20,6 +20,7 @@
 #include "mongo/scripting/v8_db.h"
 #include "mongo/scripting/v8_utils.h"
 #include "mongo/scripting/v8_wrapper.h"
+#include "mongo/util/mongoutils/str.h"
 
 #define V8_SIMPLE_HEADER v8::Locker l(_isolate); v8::Isolate::Scope iscope(_isolate); HandleScope handle_scope; Context::Scope context_scope( _context );
 
@@ -1250,14 +1251,28 @@ namespace mongo {
 
         if ( readOnly ) {
             o = roObjectTemplate->NewInstance();
+            massert(16497, mongoutils::str::stream() << "V8: NULL RO Object template instantiated. "
+                                     << (v8::V8::IsExecutionTerminating() ?
+                                            "v8 execution is terminating." :
+                                            "v8 still executing."),
+                           *o != NULL);
         } else {
             if (array) {
                 o = lzArrayTemplate->NewInstance();
+                massert(16498, mongoutils::str::stream() << "V8: NULL Array template instantiated. "
+                                         << (v8::V8::IsExecutionTerminating() ?
+                                                "v8 execution is terminating." :
+                                                "v8 still executing."),
+                               *o != NULL);
                 o->SetPrototype(v8::Array::New(1)->GetPrototype());
                 o->Set(V8STR_LENGTH, v8::Integer::New(m.nFields()), DontEnum);
             } else {
                 o = lzObjectTemplate->NewInstance();
-
+                massert(16496, mongoutils::str::stream() << "V8: NULL Object template instantiated. "
+                                         << (v8::V8::IsExecutionTerminating() ?
+                                                "v8 execution is terminating." :
+                                                "v8 still executing."),
+                               *o != NULL);
                 static string ref = "$ref";
                 if ( ref == m.firstElement().fieldName() ) {
                   const BSONElement& id = m["$id"];
