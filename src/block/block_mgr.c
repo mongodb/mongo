@@ -212,7 +212,7 @@ __wt_bm_compact_skip(WT_SESSION_IMPL *session, int *skipp)
 }
 
 /*
- * __wt_bm_compact_skip --
+ * __wt_bm_compact_page_skip --
  *	Return if a page is useful for compaction.
  */
 int
