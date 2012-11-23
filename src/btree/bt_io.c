@@ -243,7 +243,18 @@ __wt_bt_write(WT_SESSION_IMPL *session, WT_ITEM *buf,
 	 * Checksum the data if the buffer isn't compressed or checksums are
 	 * configured.
 	 */
-	data_cksum = !compressed || btree->checksum;
+	switch (btree->checksum) {
+	case CKSUM_ON:
+		data_cksum = 1;
+		break;
+	case CKSUM_OFF:
+		data_cksum = 0;
+		break;
+	case CKSUM_UNCOMPRESSED:
+	default:
+		data_cksum = !compressed;
+		break;
+	}
 
 	/* Call the block manager to write the block. */
 	WT_ERR(checkpoint ?

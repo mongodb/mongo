@@ -245,7 +245,12 @@ __btree_conf(WT_SESSION_IMPL *session, const char *cfg[])
 
 	/* Checksums */
 	WT_RET(__wt_config_getones(session, config, "checksum", &cval));
-	btree->checksum = cval.val ? 1 : 0;
+	if (WT_STRING_MATCH("on", cval.str, cval.len))
+		btree->checksum = CKSUM_ON;
+	else if (WT_STRING_MATCH("off", cval.str, cval.len))
+		btree->checksum = CKSUM_OFF;
+	else
+		btree->checksum = CKSUM_UNCOMPRESSED;
 
 	/* Huffman encoding */
 	WT_RET(__wt_btree_huffman_open(session, config));

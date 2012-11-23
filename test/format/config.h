@@ -78,10 +78,6 @@ static CONFIG c[] = {
 	  "size of the cache in MB",
 	  0, 0, 1, 100, &g.c_cache, NULL },
 
-	{ "checksum",
-	  "if there is a block checksum",		/* 20% */
-	  0, C_BOOL, 20, 0, &g.c_checksum, NULL },
-
 	{ "compression",
 	  "type of compression (none | bzip | raw | snappy)",
 	  0, C_IGNORE|C_STRING, 1, 4, NULL, &g.c_compression },

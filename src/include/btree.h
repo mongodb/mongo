@@ -102,7 +102,10 @@ struct __wt_btree {
 	void *huffman_key;		/* Key huffman encoding */
 	void *huffman_value;		/* Value huffman encoding */
 
-	int checksum;			/* If checksums configured */
+	enum {	CKSUM_ON=1,		/* On */
+		CKSUM_OFF=2,		/* Off */
+		CKSUM_UNCOMPRESSED=3	/* Uncompressed blocks only */
+	} checksum;			/* Checksum configuration */
 
 	u_int dictionary;		/* Reconcile: dictionary slots */
 	int   internal_key_truncate;	/* Reconcile: internal key truncate */

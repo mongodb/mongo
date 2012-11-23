@@ -145,8 +145,20 @@ wts_open(void)
 			    ",dictionary=%d", MMRAND(123, 517));
 		break;
 	}
-	p += snprintf(p, (size_t)(end - p),
-	    ",checksum=%s", g.c_checksum ? "true" : "false");
+
+	/* Configure checksums. */
+	switch MMRAND(1, 10) {
+	case 1:						/* 10% */
+		p += snprintf(p, (size_t)(end - p), ",checksum=\"on\"");
+		break;
+	case 2:						/* 10% */
+		p += snprintf(p, (size_t)(end - p), ",checksum=\"off\"");
+		break;
+	default:					/* 80% */
+		p += snprintf(
+		    p, (size_t)(end - p), ",checksum=\"uncompressed\"");
+		break;
+	}
 
 	/* Configure compression. */
 	switch (g.compression) {
