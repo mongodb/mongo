@@ -49,7 +49,6 @@ extern int __wt_block_checkpoint( WT_SESSION_IMPL *session,
     WT_CKPT *ckptbase);
 extern int __wt_block_checkpoint_resolve(WT_SESSION_IMPL *session,
     WT_BLOCK *block);
-extern uint32_t __wt_cksum(const void *chunk, size_t len);
 extern int __wt_block_compact_skip( WT_SESSION_IMPL *session,
     WT_BLOCK *block,
     int *skipp);
@@ -1114,6 +1113,7 @@ extern int __wt_session_lock_checkpoint(WT_SESSION_IMPL *session,
 extern int __wt_session_discard_btree( WT_SESSION_IMPL *session,
     WT_BTREE_SESSION *btree_session);
 extern int __wt_salvage(WT_SESSION_IMPL *session, const char *cfg[]);
+extern uint32_t __wt_cksum(const void *chunk, size_t len);
 extern void __wt_event_handler_set(WT_SESSION_IMPL *session,
     WT_EVENT_HANDLER *handler);
 extern void __wt_err(WT_SESSION_IMPL *session,

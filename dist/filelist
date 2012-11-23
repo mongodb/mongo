@@ -5,7 +5,6 @@ src/api/api_strerror.c
 src/api/api_version.c
 src/block/block_addr.c
 src/block/block_ckpt.c
-src/block/block_cksum.c
 src/block/block_compact.c
 src/block/block_ext.c
 src/block/block_mgr.c
@@ -117,6 +116,7 @@ src/schema/schema_worker.c
 src/session/session_api.c
 src/session/session_btree.c
 src/session/session_salvage.c
+src/support/cksum.c
 src/support/err.c
 src/support/filename.c
 src/support/global.c
