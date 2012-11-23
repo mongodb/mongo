@@ -87,6 +87,17 @@ __wt_verify_dsk(WT_SESSION_IMPL *session, const char *addr, WT_ITEM *buf)
 		    __wt_page_type_string(dsk->type), addr);
 	}
 
+	/* Check the page flags. */
+	switch (dsk->flags) {
+	case 0:
+	case WT_PAGE_COMPRESSED:
+		break;
+	default:
+		WT_RET_VRFY(session,
+		    "page at %s has an invalid flags value of 0x%" PRIx32,
+		    addr, (uint32_t)dsk->flags);
+	}
+
 	/* Unused bytes */
 	for (p = dsk->unused, i = sizeof(dsk->unused); i > 0; --i)
 		if (*p != '\0')
