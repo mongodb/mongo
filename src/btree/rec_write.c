@@ -573,9 +573,8 @@ __rec_write_init(
 		r->cur = &r->_cur;
 		r->last = &r->_last;
 
-		/* Disk buffers may need to be aligned. */
+		/* Disk buffers need to be aligned for writing. */
 		F_SET(&r->dsk, WT_ITEM_ALIGNED);
-
 	}
 
 	/*
