@@ -73,8 +73,18 @@ __wt_bt_read(WT_SESSION_IMPL *session,
 		    (uint8_t *)buf->mem + WT_BLOCK_COMPRESS_SKIP,
 		    dsk->mem_size - WT_BLOCK_COMPRESS_SKIP,
 		    &result_len));
+
+		/*
+		 * If checksums were turned off because we're depending on the
+		 * decompression to fail on any corrupted data, we'll end up
+		 * here after corruption happens.  If we're salvaging the file,
+		 * it's OK, otherwise it's really, really bad.
+		 */
 		if (result_len != dsk->mem_size - WT_BLOCK_COMPRESS_SKIP)
-			WT_ERR(__wt_illegal_value(session, btree->name));
+			WT_ERR(
+			    F_ISSET(session, WT_SESSION_SALVAGE_QUIET_ERR) ?
+			    WT_ERROR :
+			    __wt_illegal_value(session, btree->name));
 	} else
 		if (btree->compressor == NULL)
 			buf->size = dsk->mem_size;
