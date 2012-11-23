@@ -136,14 +136,16 @@ __wt_bm_close(WT_SESSION_IMPL *session)
  *	Write a buffer into a block, creating a checkpoint.
  */
 int
-__wt_bm_checkpoint(WT_SESSION_IMPL *session, WT_ITEM *buf, WT_CKPT *ckptbase)
+__wt_bm_checkpoint(
+    WT_SESSION_IMPL *session, WT_ITEM *buf, WT_CKPT *ckptbase, int data_cksum)
 {
 	WT_BLOCK *block;
 
 	if ((block = session->btree->block) == NULL)
 		return (__bm_invalid(session));
 
-	return (__wt_block_checkpoint(session, block, buf, ckptbase));
+	return (
+	    __wt_block_checkpoint(session, block, buf, ckptbase, data_cksum));
 }
 
 /*
@@ -287,15 +289,16 @@ __wt_bm_write_size(WT_SESSION_IMPL *session, uint32_t *sizep)
  *	Write a buffer into a block, returning the block's address cookie.
  */
 int
-__wt_bm_write(
-    WT_SESSION_IMPL *session, WT_ITEM *buf, uint8_t *addr, uint32_t *addr_size)
+__wt_bm_write(WT_SESSION_IMPL *session,
+    WT_ITEM *buf, uint8_t *addr, uint32_t *addr_size, int data_cksum)
 {
 	WT_BLOCK *block;
 
 	if ((block = session->btree->block) == NULL)
 		return (__bm_invalid(session));
 
-	return (__wt_block_write(session, block, buf, addr, addr_size));
+	return (
+	    __wt_block_write(session, block, buf, addr, addr_size, data_cksum));
 }
 
 /*

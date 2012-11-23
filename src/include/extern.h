@@ -43,10 +43,11 @@ extern int __wt_block_checkpoint_unload(WT_SESSION_IMPL *session,
     WT_BLOCK *block);
 extern void __wt_block_ckpt_destroy(WT_SESSION_IMPL *session,
     WT_BLOCK_CKPT *ci);
-extern int __wt_block_checkpoint( WT_SESSION_IMPL *session,
+extern int __wt_block_checkpoint(WT_SESSION_IMPL *session,
     WT_BLOCK *block,
     WT_ITEM *buf,
-    WT_CKPT *ckptbase);
+    WT_CKPT *ckptbase,
+    int data_cksum);
 extern int __wt_block_checkpoint_resolve(WT_SESSION_IMPL *session,
     WT_BLOCK *block);
 extern int __wt_block_compact_skip( WT_SESSION_IMPL *session,
@@ -134,9 +135,10 @@ extern int __wt_bm_open(WT_SESSION_IMPL *session,
     const char *cfg[],
     int forced_salvage);
 extern int __wt_bm_close(WT_SESSION_IMPL *session);
-extern int __wt_bm_checkpoint(WT_SESSION_IMPL *session,
+extern int __wt_bm_checkpoint( WT_SESSION_IMPL *session,
     WT_ITEM *buf,
-    WT_CKPT *ckptbase);
+    WT_CKPT *ckptbase,
+    int data_cksum);
 extern int __wt_bm_checkpoint_resolve(WT_SESSION_IMPL *session);
 extern int __wt_bm_checkpoint_load(WT_SESSION_IMPL *session,
     const uint8_t *addr,
@@ -159,10 +161,11 @@ extern int __wt_bm_read(WT_SESSION_IMPL *session,
     const uint8_t *addr,
     uint32_t addr_size);
 extern int __wt_bm_write_size(WT_SESSION_IMPL *session, uint32_t *sizep);
-extern int __wt_bm_write( WT_SESSION_IMPL *session,
+extern int __wt_bm_write(WT_SESSION_IMPL *session,
     WT_ITEM *buf,
     uint8_t *addr,
-    uint32_t *addr_size);
+    uint32_t *addr_size,
+    int data_cksum);
 extern int __wt_bm_stat(WT_SESSION_IMPL *session);
 extern int __wt_bm_salvage_start(WT_SESSION_IMPL *session);
 extern int __wt_bm_salvage_next(WT_SESSION_IMPL *session,
@@ -235,13 +238,15 @@ extern int __wt_block_write(WT_SESSION_IMPL *session,
     WT_BLOCK *block,
     WT_ITEM *buf,
     uint8_t *addr,
-    uint32_t *addr_size);
+    uint32_t *addr_size,
+    int data_cksum);
 extern int __wt_block_write_off(WT_SESSION_IMPL *session,
     WT_BLOCK *block,
     WT_ITEM *buf,
     off_t *offsetp,
     uint32_t *sizep,
     uint32_t *cksump,
+    int data_cksum,
     int locked);
 extern int __wt_bloom_create( WT_SESSION_IMPL *session,
     const char *uri,

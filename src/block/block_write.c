@@ -38,8 +38,8 @@ __wt_block_write_size(
  *	Write a buffer into a block, returning the block's address cookie.
  */
 int
-__wt_block_write(WT_SESSION_IMPL *session,
-    WT_BLOCK *block, WT_ITEM *buf, uint8_t *addr, uint32_t *addr_size)
+__wt_block_write(WT_SESSION_IMPL *session, WT_BLOCK *block,
+    WT_ITEM *buf, uint8_t *addr, uint32_t *addr_size, int data_cksum)
 {
 	off_t offset;
 	uint32_t size, cksum;
@@ -48,7 +48,7 @@ __wt_block_write(WT_SESSION_IMPL *session,
 	WT_UNUSED(addr_size);
 
 	WT_RET(__wt_block_write_off(
-	    session, block, buf, &offset, &size, &cksum, 0));
+	    session, block, buf, &offset, &size, &cksum, data_cksum, 0));
 
 	endp = addr;
 	WT_RET(__wt_block_addr_to_buffer(block, &endp, offset, size, cksum));
@@ -64,7 +64,8 @@ __wt_block_write(WT_SESSION_IMPL *session,
  */
 int
 __wt_block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
-    WT_ITEM *buf, off_t *offsetp, uint32_t *sizep, uint32_t *cksump, int locked)
+    WT_ITEM *buf, off_t *offsetp, uint32_t *sizep, uint32_t *cksump,
+    int data_cksum, int locked)
 {
 	WT_BLOCK_HEADER *blk;
 	WT_DECL_RET;
@@ -112,19 +113,24 @@ __wt_block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	blk->disk_size = align_size;
 
 	/*
-	 * Update the block's checksum: if checksums are configured, checksum
-	 * the complete data, otherwise checksum just the not-compressed bytes.
-	 *
-	 * The assumption is applications with strong compression support turn
-	 * off checksums and assume corrupted blocks won't decompress correctly.
-	 * However, the first WT_BLOCK_COMPRESS_SKIP bytes are not compressed,
-	 * so we checksum them, both to give salvage a quick test of whether a
-	 * block is useful, and to hopefully give us a test so we don't lose the
-	 * first WT_BLOCK_COMPRESS_SKIP bytes without noticing.
+	 * Update the block's checksum: if our caller specifies, checksum the
+	 * complete data, otherwise checksum the leading WT_BLOCK_COMPRESS_SKIP
+	 * bytes.  The assumption is applications with good compression support
+	 * turn off checksums and assume corrupted blocks won't decompress
+	 * correctly.  However, if compression failed to shrink the block, the
+	 * block wasn't compressed, in which case our caller will tell us to
+	 * checksum the data to detect corruption.   If compression succeeded,
+	 * we still need to checksum the first WT_BLOCK_COMPRESS_SKIP bytes
+	 * because they're not compressed, both to give salvage a quick test
+	 * of whether a block is useful and to give us a test so we don't lose
+	 * the first WT_BLOCK_COMPRESS_SKIP bytes without noticing.
 	 */
+	blk->flags = 0;
+	if (data_cksum)
+		F_SET(blk, WT_BLOCK_DATA_CKSUM);
 	blk->cksum = 0;
 	blk->cksum = __wt_cksum(
-	    buf->mem, block->checksum ? align_size : WT_BLOCK_COMPRESS_SKIP);
+	    buf->mem, data_cksum ? align_size : WT_BLOCK_COMPRESS_SKIP);
 
 	if (!locked)
 		__wt_spin_lock(session, &block->live_lock);

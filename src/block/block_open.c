@@ -86,10 +86,6 @@ __wt_block_open(WT_SESSION_IMPL *session, const char *filename,
 	WT_ERR(__wt_config_getones(session, config, "allocation_size", &cval));
 	block->allocsize = (uint32_t)cval.val;
 
-	/* Check if configured for checksums. */
-	WT_ERR(__wt_config_getones(session, config, "checksum", &cval));
-	block->checksum = cval.val == 0 ? 0 : 1;
-
 	/* Open the underlying file handle. */
 	WT_ERR(__wt_open(session, filename, 0, 0, 1, &block->fh));
 

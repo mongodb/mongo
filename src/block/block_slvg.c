@@ -122,11 +122,10 @@ __wt_block_salvage_next(
 			goto skip;
 
 		/*
-		 * The page size isn't insane, read the entire page: reading the
-		 * page validates the checksum, if checksums are configured.  If
-		 * reading the page fails, it's probably corruption, ignore the
-		 * block.  If reading the page succeeds, return its address as a
-		 * possible block.
+		 * The block size isn't insane, read the entire block.  Reading
+		 * the block validates the checksum; if reading the block fails,
+		 * ignore it.  If reading the block succeeds, return its address
+		 * as a possible page.
 		 */
 		if (__wt_block_read_off(
 		    session, block, tmp, offset, size, cksum) == 0)

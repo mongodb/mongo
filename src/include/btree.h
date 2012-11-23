@@ -102,6 +102,8 @@ struct __wt_btree {
 	void *huffman_key;		/* Key huffman encoding */
 	void *huffman_value;		/* Value huffman encoding */
 
+	int checksum;			/* If checksums configured */
+
 	u_int dictionary;		/* Reconcile: dictionary slots */
 	int   internal_key_truncate;	/* Reconcile: internal key truncate */
 	int   prefix_compression;	/* Reconcile: key prefix compression */

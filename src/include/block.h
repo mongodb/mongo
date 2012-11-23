@@ -142,7 +142,6 @@ struct __wt_block {
 	WT_FH	*fh;			/* Backing file handle */
 
 	uint32_t allocsize;		/* Allocation size */
-	int	 checksum;		/* If checksums configured */
 
 	WT_SPINLOCK	live_lock;	/* Live checkpoint lock */
 	WT_BLOCK_CKPT	live;		/* Live checkpoint */
@@ -222,12 +221,22 @@ struct __wt_block_header {
 	 * has found a page that may be useful.
 	 */
 	uint32_t cksum;			/* 12-15: checksum */
+
+#define	WT_BLOCK_DATA_CKSUM	0x01	/* Block data is part of the checksum */
+	uint8_t flags;			/* 16: flags */
+
+	/*
+	 * End the structure with 3 bytes of padding: it wastes space, but it
+	 * leaves the structure 32-bit aligned and having a few bytes to play
+	 * with in the future can't hurt.
+	 */
+	uint8_t unused[3];		/* 17-19: unused padding */
 };
 /*
  * WT_BLOCK_HEADER_SIZE is the number of bytes we allocate for the structure: if
  * the compiler inserts padding it will break the world.
  */
-#define	WT_BLOCK_HEADER_SIZE		16
+#define	WT_BLOCK_HEADER_SIZE		20
 
 /*
  * WT_BLOCK_HEADER_BYTE

@@ -35,9 +35,9 @@ struct __wt_page_header {
 	uint8_t flags;			/* 17: flags */
 
 	/*
-	 * End the WT_PAGE_HEADER structure with 2 bytes of padding: it wastes
-	 * space, but it leaves the WT_PAGE_HEADER structure 32-bit aligned and
-	 * having a small amount of space to play with in the future can't hurt.
+	 * End the structure with 2 bytes of padding: it wastes space, but it
+	 * leaves the structure 32-bit aligned and having a few bytes to play
+	 * with in the future can't hurt.
 	 */
 	uint8_t unused[2];		/* 18-19: unused padding */
 };

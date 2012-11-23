@@ -79,8 +79,8 @@ __wt_block_read_off(WT_SESSION_IMPL *session,
 	/* Validate the checksum. */
 	blk = WT_BLOCK_HEADER_REF(buf->mem);
 	blk->cksum = 0;
-	page_cksum = __wt_cksum(
-	    buf->mem, block->checksum ? size : WT_BLOCK_COMPRESS_SKIP);
+	page_cksum = __wt_cksum(buf->mem,
+	    F_ISSET(blk, WT_BLOCK_DATA_CKSUM) ? size : WT_BLOCK_COMPRESS_SKIP);
 	if (cksum != page_cksum) {
 		if (!F_ISSET(session, WT_SESSION_SALVAGE_QUIET_ERR))
 			__wt_errx(session,

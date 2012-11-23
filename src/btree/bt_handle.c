@@ -243,6 +243,10 @@ __btree_conf(WT_SESSION_IMPL *session, const char *cfg[])
 			    WT_BTREE_NO_EVICTION | WT_BTREE_NO_HAZARD);
 	}
 
+	/* Checksums */
+	WT_RET(__wt_config_getones(session, config, "checksum", &cval));
+	btree->checksum = cval.val ? 1 : 0;
+
 	/* Huffman encoding */
 	WT_RET(__wt_btree_huffman_open(session, config));
 

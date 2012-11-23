@@ -119,7 +119,7 @@ __wt_bt_write(WT_SESSION_IMPL *session, WT_ITEM *buf,
 	WT_PAGE_HEADER *dsk;
 	size_t len, src_len, dst_len, result_len;
 	uint32_t size;
-	int compression_failed;
+	int data_cksum, compression_failed;
 	uint8_t *src, *dst;
 
 	btree = session->btree;
@@ -229,10 +229,16 @@ __wt_bt_write(WT_SESSION_IMPL *session, WT_ITEM *buf,
 		F_SET(dsk, WT_PAGE_COMPRESSED);
 	}
 
+	/*
+	 * Checksum the data if the buffer isn't compressed or checksums are
+	 * configured.
+	 */
+	data_cksum = !compressed || btree->checksum;
+
 	/* Call the block manager to write the block. */
 	WT_ERR(checkpoint ?
-	    __wt_bm_checkpoint(session, ip, btree->ckpt) :
-	    __wt_bm_write(session, ip, addr, addr_size));
+	    __wt_bm_checkpoint(session, ip, btree->ckpt, data_cksum) :
+	    __wt_bm_write(session, ip, addr, addr_size, data_cksum));
 
 	WT_BSTAT_INCR(session, page_write);
 
