@@ -1,3 +1,40 @@
+WiredTiger release 1.3.8, 2012-11-22
+------------------------------------
+
+This release improves the performance of LSM trees, changes how statistics are
+reported and adds a shared cache implementation:
+
+New features and API changes:
+
+[232] Add a "size of checkpoint" statistic.
+
+* Add a shared cache pool implemention.  Manages a single cache among
+  multiple databases within a process.
+
+* Merge statistics from file and LSM sources into a "data source" statistic
+  structure.  Rename and regroup some shared stastistics.  Add a helper to
+  the Python API to lookup in a cursor in a simple expression.
+
+* Add support for sub groups of options in configuration strings.
+
+Performance tuning for LSM trees:
+
+* Don't try to merge with a chunk that is much larger than a small chunk.
+
+* After an LSM merge, fault in some pages before the new tree goes live to
+  avoid stalling application threads.
+
+* Don't automatically fail inserts if the write generation check fails:
+  compare keys instead.
+
+* Switch the LSM tree lock to a read/write lock, so cursors can read the
+  state of the tree in parallel.
+
+Bug fixes:
+
+* Fix a bug where we could write past the end of a buffer after it was grown.
+
+
 WiredTiger release 1.3.7, 2012-11-09
 ------------------------------------
 
