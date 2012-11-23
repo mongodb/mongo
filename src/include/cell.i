@@ -674,7 +674,7 @@ __wt_cell_unpack_copy(
 	WT_RET(__wt_cell_unpack_ref(session, unpack, store));
 	if (store->mem != NULL &&
 	    store->data >= store->mem &&
-	    (uint8_t *)store->data < (uint8_t *)store->mem + store->memsize)
+	    WT_PTRDIFF(store->data, store->mem) < store->memsize)
 		return (0);
 	return (__wt_buf_set(session, store, store->data, store->size));
 }

@@ -2980,7 +2980,7 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 					    unpack->prefix);
 					tmpkey->data = tmpkey->mem;
 				}
-				memcpy((uint8_t *)tmpkey->data + unpack->prefix,
+				memcpy((uint8_t *)tmpkey->mem + unpack->prefix,
 				    unpack->data, unpack->size);
 				tmpkey->size = unpack->prefix + unpack->size;
 			} else
@@ -3321,7 +3321,7 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 					    "split: starting key "
 					    "%.*s",
 					    (int)tkey->size,
-					    (char *)tkey->data);
+					    (const char *)tkey->data);
 					break;
 				case WT_PAGE_COL_FIX:
 				case WT_PAGE_COL_INT:

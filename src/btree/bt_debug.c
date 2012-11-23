@@ -893,7 +893,7 @@ __debug_cell(WT_DBG *ds, WT_PAGE_HEADER *dsk, WT_CELL_UNPACK *unpack)
 addr:		WT_RET(__wt_scr_alloc(session, 128, &buf));
 		if ((ret = __wt_bm_addr_string(
 		    session, buf, unpack->data, unpack->size)) == 0)
-			__dmsg(ds, ", %s %s", type, (char *)buf->data);
+			__dmsg(ds, ", %s %s", type, (const char *)buf->data);
 		__wt_scr_free(&buf);
 		WT_RET(ret);
 		break;

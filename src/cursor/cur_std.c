@@ -214,7 +214,7 @@ __wt_cursor_set_keyv(WT_CURSOR *cursor, uint32_t flags, va_list ap)
 		if (LF_ISSET(WT_CURSOR_RAW_OK) || strcmp(fmt, "u") == 0) {
 			item = va_arg(ap, WT_ITEM *);
 			sz = item->size;
-			cursor->key.data = (void *)item->data;
+			cursor->key.data = item->data;
 		} else if (strcmp(fmt, "S") == 0) {
 			str = va_arg(ap, const char *);
 			sz = strlen(str) + 1;

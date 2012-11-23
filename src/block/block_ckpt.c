@@ -87,7 +87,7 @@ __wt_block_checkpoint_load(WT_SESSION_IMPL *session,
 		}
 		WT_VERBOSE_ERR(session, ckpt,
 		    "%s: load-checkpoint: %s", block->name,
-		    addr == NULL ? "[Empty]" : (char *)tmp->data);
+		    addr == NULL ? "[Empty]" : (const char *)tmp->data);
 	}
 
 	/* If not loading a checkpoint from disk, we're done. */
@@ -112,8 +112,7 @@ __wt_block_checkpoint_load(WT_SESSION_IMPL *session,
 				WT_ERR(__ckpt_string(
 				    session, block, addr, tmp));
 			}
-			WT_ERR(
-			    __wt_verify_dsk(session, (char *)tmp->data, dsk));
+			WT_ERR(__wt_verify_dsk(session, tmp->data, dsk));
 		}
 	}
 
@@ -393,7 +392,7 @@ __ckpt_process(
 			    session, block, ckpt->raw.data, tmp));
 			WT_VERBOSE_ERR(session, ckpt,
 			    "%s: delete-checkpoint: %s: %s",
-			    block->name, ckpt->name, (char *)tmp->data);
+			    block->name, ckpt->name, (const char *)tmp->data);
 		}
 
 		/*
@@ -648,7 +647,7 @@ __ckpt_update(
 		WT_ERR(__ckpt_string(session, block, ckpt->raw.data, tmp));
 		WT_VERBOSE_ERR(session, ckpt,
 		    "%s: create-checkpoint: %s: %s",
-		    block->name, ckpt->name, (char *)tmp->data);
+		    block->name, ckpt->name, (const char *)tmp->data);
 	}
 
 err:	__wt_scr_free(&tmp);

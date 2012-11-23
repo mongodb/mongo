@@ -81,8 +81,7 @@ __wt_metadata_load_backup(WT_SESSION_IMPL *session)
 		WT_ERR(__wt_getline(session, value, fp));
 		if (value->size == 0)
 			WT_ERR(__wt_illegal_value(session, WT_METADATA_BACKUP));
-		WT_ERR(__wt_metadata_update(
-		    session, (char *)key->data, (char *)value->data));
+		WT_ERR(__wt_metadata_update(session, key->data, value->data));
 	}
 
 	/* Remove the hot backup file, it's only read (successfully) once. */

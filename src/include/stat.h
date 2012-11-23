@@ -68,32 +68,32 @@ struct __wt_stats {
 /* Statistics section: BEGIN */
 
 /*
- * Statistics entries for BTREE handle.
+ * Statistics entries for data sources.
  */
-struct __wt_btree_stats {
-	WT_STATS file_bulk_loaded;
-	WT_STATS file_col_deleted;
-	WT_STATS file_col_fix_pages;
-	WT_STATS file_col_int_pages;
-	WT_STATS file_col_var_pages;
-	WT_STATS cursor_inserts;
+struct __wt_dsrc_stats {
+	WT_STATS block_alloc;
+	WT_STATS block_extend;
+	WT_STATS block_free;
+	WT_STATS bloom_count;
+	WT_STATS bloom_false_positive;
+	WT_STATS bloom_hit;
+	WT_STATS bloom_miss;
+	WT_STATS bloom_page_evict;
+	WT_STATS bloom_page_read;
+	WT_STATS bloom_size;
+	WT_STATS ckpt_size;
+	WT_STATS cursor_insert;
 	WT_STATS cursor_read;
 	WT_STATS cursor_read_near;
 	WT_STATS cursor_read_next;
 	WT_STATS cursor_read_prev;
-	WT_STATS cursor_removes;
-	WT_STATS cursor_resets;
-	WT_STATS cursor_updates;
-	WT_STATS alloc;
-	WT_STATS extend;
-	WT_STATS free;
-	WT_STATS overflow_read;
-	WT_STATS overflow_value_cache;
-	WT_STATS page_evict;
-	WT_STATS page_read;
-	WT_STATS page_evict_fail;
-	WT_STATS page_write;
-	WT_STATS file_size;
+	WT_STATS cursor_remove;
+	WT_STATS cursor_reset;
+	WT_STATS cursor_update;
+	WT_STATS entries;
+	WT_STATS file_allocsize;
+	WT_STATS file_bulk_loaded;
+	WT_STATS file_compact_rewrite;
 	WT_STATS file_fixed_len;
 	WT_STATS file_magic;
 	WT_STATS file_major;
@@ -102,75 +102,64 @@ struct __wt_btree_stats {
 	WT_STATS file_maxleafitem;
 	WT_STATS file_maxleafpage;
 	WT_STATS file_minor;
-	WT_STATS file_overflow;
-	WT_STATS file_allocsize;
-	WT_STATS file_compact_rewrite;
-	WT_STATS rec_page_merge;
+	WT_STATS file_size;
+	WT_STATS lsm_chunk_count;
+	WT_STATS lsm_generation_max;
+	WT_STATS lsm_lookup_no_bloom;
+	WT_STATS overflow_page;
+	WT_STATS overflow_read;
+	WT_STATS overflow_value_cache;
+	WT_STATS page_col_deleted;
+	WT_STATS page_col_fix;
+	WT_STATS page_col_int;
+	WT_STATS page_col_var;
+	WT_STATS page_evict;
+	WT_STATS page_evict_fail;
+	WT_STATS page_read;
+	WT_STATS page_row_int;
+	WT_STATS page_row_leaf;
+	WT_STATS page_write;
 	WT_STATS rec_dictionary;
-	WT_STATS rec_split_intl;
-	WT_STATS rec_split_leaf;
+	WT_STATS rec_hazard;
 	WT_STATS rec_ovfl_key;
 	WT_STATS rec_ovfl_value;
 	WT_STATS rec_page_delete;
+	WT_STATS rec_page_merge;
+	WT_STATS rec_split_intl;
+	WT_STATS rec_split_leaf;
 	WT_STATS rec_written;
-	WT_STATS rec_hazard;
-	WT_STATS file_row_int_pages;
-	WT_STATS file_row_leaf_pages;
-	WT_STATS file_entries;
-	WT_STATS update_conflict;
-	WT_STATS file_write_conflicts;
+	WT_STATS txn_update_conflict;
+	WT_STATS txn_write_conflict;
 };
 
 /*
- * Statistics entries for CONNECTION handle.
+ * Statistics entries for connections.
  */
 struct __wt_connection_stats {
-	WT_STATS txn_ancient;
 	WT_STATS block_read;
 	WT_STATS block_write;
 	WT_STATS cache_bytes_inuse;
-	WT_STATS cache_evict_slow;
-	WT_STATS cache_evict_internal;
 	WT_STATS cache_bytes_max;
-	WT_STATS cache_evict_modified;
-	WT_STATS cache_pages_inuse;
 	WT_STATS cache_evict_hazard;
+	WT_STATS cache_evict_internal;
+	WT_STATS cache_evict_modified;
+	WT_STATS cache_evict_slow;
 	WT_STATS cache_evict_unmodified;
+	WT_STATS cache_pages_inuse;
 	WT_STATS checkpoint;
 	WT_STATS cond_wait;
 	WT_STATS file_open;
-	WT_STATS rwlock_rdlock;
-	WT_STATS rwlock_wrlock;
 	WT_STATS memalloc;
 	WT_STATS memfree;
+	WT_STATS rwlock_rdlock;
+	WT_STATS rwlock_wrlock;
 	WT_STATS total_read_io;
 	WT_STATS total_write_io;
-	WT_STATS txn_fail_cache;
+	WT_STATS txn_ancient;
 	WT_STATS txn_begin;
 	WT_STATS txn_commit;
+	WT_STATS txn_fail_cache;
 	WT_STATS txn_rollback;
-};
-
-/*
- * Statistics entries for LSM handle.
- */
-struct __wt_lsm_stats {
-	WT_STATS generation_max;
-	WT_STATS bloom_false_positives;
-	WT_STATS bloom_hits;
-	WT_STATS bloom_misses;
-	WT_STATS bloom_count;
-	WT_STATS bloom_cache_evict;
-	WT_STATS bloom_cache_read;
-	WT_STATS chunk_count;
-	WT_STATS chunk_cache_evict;
-	WT_STATS cache_evict;
-	WT_STATS chunk_cache_read;
-	WT_STATS cache_read;
-	WT_STATS cache_evict_fail;
-	WT_STATS cache_write;
-	WT_STATS search_miss_no_bloom;
-	WT_STATS bloom_space;
 };
 
 /* Statistics section: END */

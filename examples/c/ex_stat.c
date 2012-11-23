@@ -122,7 +122,7 @@ print_overflow_pages(WT_SESSION *session)
 	    "statistics:file:access.wt", NULL, NULL, &cursor)) != 0)
 		return (ret);
 
-	cursor->set_key(cursor, WT_STAT_file_overflow);
+	cursor->set_key(cursor, WT_STAT_DSRC_OVERFLOW_PAGE);
 	ret = cursor->search(cursor);
 	ret = cursor->get_value(cursor, &desc, &pvalue, &value);
 	printf("%s=%s\n", desc, pvalue);

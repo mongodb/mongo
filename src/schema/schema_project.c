@@ -56,7 +56,7 @@ __wt_schema_project_in(WT_SESSION_IMPL *session,
 				WT_RET(__pack_init(
 				    session, &pack, c->key_format));
 			buf = &c->key;
-			p = (uint8_t *)buf->data;
+			p = (uint8_t *)buf->mem;
 			end = p + buf->size;
 			continue;
 
@@ -64,7 +64,7 @@ __wt_schema_project_in(WT_SESSION_IMPL *session,
 			c = cp[arg];
 			WT_RET(__pack_init(session, &pack, c->value_format));
 			buf = &c->value;
-			p = (uint8_t *)buf->data;
+			p = (uint8_t *)buf->mem;
 			end = p + buf->size;
 			continue;
 		}
@@ -96,12 +96,12 @@ __wt_schema_project_in(WT_SESSION_IMPL *session,
 						len = __pack_size(session, &pv);
 						WT_RET(__wt_buf_grow(session,
 						    buf, buf->size + len));
-						p = (uint8_t *)buf->data +
+						p = (uint8_t *)buf->mem +
 						    buf->size;
 						WT_RET(__pack_write(
 						    session, &pv, &p, len));
 						buf->size += WT_STORE_SIZE(len);
-						end = (uint8_t *)buf->data +
+						end = (uint8_t *)buf->mem +
 						    buf->size;
 					} else if (*proj == WT_PROJ_SKIP)
 						WT_RET(__unpack_read(session,
@@ -122,11 +122,11 @@ __wt_schema_project_in(WT_SESSION_IMPL *session,
 				old_len = (size_t)(next - p);
 
 				len = __pack_size(session, &pv);
-				offset = WT_PTRDIFF(p, buf->data);
+				offset = WT_PTRDIFF(p, buf->mem);
 				WT_RET(__wt_buf_grow(session,
 				    buf, buf->size + len));
-				p = (uint8_t *)buf->data + offset;
-				end = (uint8_t *)buf->data + buf->size + len;
+				p = (uint8_t *)buf->mem + offset;
+				end = (uint8_t *)buf->mem + buf->size + len;
 				/* Make room if we're inserting out-of-order. */
 				if (offset + old_len < buf->size)
 					memmove(p + len, p + old_len,
@@ -243,7 +243,7 @@ __wt_schema_project_slice(WT_SESSION_IMPL *session, WT_CURSOR **cp,
 	p = end = NULL;		/* -Wuninitialized */
 
 	WT_RET(__pack_init(session, &vpack, vformat));
-	vp = (uint8_t *)value->data;
+	vp = value->data;
 	vend = vp + value->size;
 
 	/* Reset any of the buffers we will be setting. */
@@ -392,7 +392,8 @@ __wt_schema_project_merge(WT_SESSION_IMPL *session,
 	WT_PACK pack, vpack;
 	WT_PACK_VALUE pv, vpv;
 	char *proj;
-	uint8_t *p, *end, *vp;
+	const uint8_t *p, *end;
+	uint8_t *vp;
 	size_t len;
 	uint32_t arg;
 
@@ -418,7 +419,7 @@ __wt_schema_project_merge(WT_SESSION_IMPL *session,
 				WT_RET(__pack_init(
 				    session, &pack, c->key_format));
 			buf = &c->key;
-			p = (uint8_t *)buf->data;
+			p = buf->data;
 			end = p + buf->size;
 			continue;
 
@@ -426,7 +427,7 @@ __wt_schema_project_merge(WT_SESSION_IMPL *session,
 			c = cp[arg];
 			WT_RET(__pack_init(session, &pack, c->value_format));
 			buf = &c->value;
-			p = (uint8_t *)buf->data;
+			p = buf->data;
 			end = p + buf->size;
 			continue;
 		}
@@ -441,8 +442,7 @@ __wt_schema_project_merge(WT_SESSION_IMPL *session,
 			case WT_PROJ_SKIP:
 				WT_RET(__pack_next(&pack, &pv));
 				WT_RET(__unpack_read(session, &pv,
-				    (const uint8_t **)&p,
-				    (size_t)(end - p)));
+				    &p, (size_t)(end - p)));
 				if (*proj == WT_PROJ_SKIP)
 					break;
 
@@ -451,7 +451,7 @@ __wt_schema_project_merge(WT_SESSION_IMPL *session,
 				len = __pack_size(session, &vpv);
 				WT_RET(__wt_buf_grow(session,
 				    value, value->size + len));
-				vp = (uint8_t *)value->data + value->size;
+				vp = (uint8_t *)value->mem + value->size;
 				WT_RET(__pack_write(session, &vpv, &vp, len));
 				value->size += WT_STORE_SIZE(len);
 				/* FALLTHROUGH */

@@ -69,6 +69,11 @@
 	if ((__ret = (a)) != 0 && ret == 0)				\
 		ret = __ret;						\
 } while (0)
+#define	WT_TRET_NOTFOUND_OK(a) do {					\
+	int __ret;							\
+	if ((__ret = (a)) != 0 && __ret != WT_NOTFOUND && ret == 0)	\
+		ret = __ret;						\
+} while (0)
 
 /*
  * WT_ASSERT, WT_ASSERT_ERR, WT_ASSERT_RET --

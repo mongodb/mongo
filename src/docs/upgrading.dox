@@ -1,5 +1,15 @@
 /*! @page upgrading Upgrading WiredTiger applications
 
+@section version_138 Upgrading to Version 1.3.8
+
+<dl>
+<dt>Statistics keys</dt>
+<dd>
+The @ref statistics_keys "statistics key constants" have been renamed to use
+all capitals, and use consistent prefixes to distinguish between connection
+statistics and statistics for data sources.
+</dd>
+
 @section version_136 Upgrading to Version 1.3.6
 <dl>
 

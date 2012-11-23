@@ -248,6 +248,7 @@ err:	__wt_scr_free(&buf);
 void
 __wt_block_stat(WT_SESSION_IMPL *session, WT_BLOCK *block)
 {
+	WT_BSTAT_SET(session, ckpt_size, block->live.ckpt_size);
 	WT_BSTAT_SET(session, file_size, block->fh->file_size);
 	WT_BSTAT_SET(session, file_magic, WT_BLOCK_MAGIC);
 	WT_BSTAT_SET(session, file_major, WT_BLOCK_MAJOR_VERSION);

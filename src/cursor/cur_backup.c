@@ -479,11 +479,11 @@ __backup_table_element(WT_SESSION_IMPL *session, WT_CURSOR_BACKUP *cb,
 			    (int)(cval.len - strlen("file:")),
 			    cval.str + strlen("file:")));
 			WT_ERR(__backup_list_append(
-			    session, cb, (char *)tmp->data));
+			    session, cb, (const char *)tmp->data));
 		} else
 			WT_ERR_MSG(session, EINVAL,
 			    "%s: unknown data source '%.*s'",
-			    (char *)tmp->data, (int)cval.len, cval.str);
+			    (const char *)tmp->data, (int)cval.len, cval.str);
 	}
 
 err:	__wt_scr_free(&tmp);
