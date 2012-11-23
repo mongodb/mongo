@@ -108,6 +108,7 @@ __wt_bt_read(WT_SESSION_IMPL *session,
 	}
 
 	WT_BSTAT_INCR(session, page_read);
+	WT_BSTAT_INCRV(session, byte_read, addr_size);
 
 err:	__wt_scr_free(&tmp);
 	return (ret);
@@ -262,6 +263,7 @@ __wt_bt_write(WT_SESSION_IMPL *session, WT_ITEM *buf,
 	    __wt_bm_write(session, ip, addr, addr_size, data_cksum));
 
 	WT_BSTAT_INCR(session, page_write);
+	WT_BSTAT_INCRV(session, byte_write, ip->size);
 
 err:	__wt_scr_free(&tmp);
 	return (ret);

@@ -155,6 +155,7 @@ __wt_block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	}
 
 	WT_CSTAT_INCR(session, block_write);
+	WT_CSTAT_INCRV(session, byte_write, align_size);
 
 	WT_VERBOSE_RET(session, write,
 	    "off %" PRIuMAX ", size %" PRIu32 ", cksum %" PRIu32,
