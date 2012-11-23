@@ -826,12 +826,10 @@ namespace mongo {
 
         if ( result.IsEmpty() ) {
             stringstream ss;
-            if ( try_catch.HasCaught() && !try_catch.CanContinue() ) {
-                ss << "error in invoke: " << globalScriptEngine->checkInterrupt();
-            }
-            else {
-                ss << "error in invoke: " << toSTLString( &try_catch );
-            }
+            ss << "error in invoke: "
+               << ( (try_catch.HasCaught() && try_catch.CanContinue()) ?
+                        toSTLString(&try_catch) :
+                        globalScriptEngine->checkInterrupt() );
             _error = ss.str();
             log() << _error << endl;
             return 1;
@@ -884,12 +882,12 @@ namespace mongo {
         Handle<v8::Value> result = script->Run();
         disableV8Interrupt();
         if ( result.IsEmpty() ) {
-            if ( try_catch.HasCaught() && !try_catch.CanContinue() ) {
-                _error = (string)"exec error: " + globalScriptEngine->checkInterrupt();
-            }
-            else {
-                _error = (string)"exec error: " + toSTLString( &try_catch );
-            }
+            stringstream ss;
+            ss << "exec error: "
+               << ( (try_catch.HasCaught() && try_catch.CanContinue()) ?
+                        toSTLString(&try_catch) :
+                        globalScriptEngine->checkInterrupt() );
+            _error = ss.str();
             if ( reportError )
                 log() << _error << endl;
             if ( assertOnError )
