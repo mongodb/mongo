@@ -96,8 +96,7 @@ __wt_block_checkpoint_load(WT_SESSION_IMPL *session, WT_BLOCK *block,
 		return (0);
 
 	/* Crack the checkpoint cookie. */
-	if (addr != NULL)
-		WT_ERR(__wt_block_buffer_to_ckpt(session, block, addr, ci));
+	WT_ERR(__wt_block_buffer_to_ckpt(session, block, addr, ci));
 
 	/* Verify sets up next. */
 	if (block->verify)
