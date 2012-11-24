@@ -116,8 +116,8 @@ __wt_block_checkpoint_load(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	 * which we can allocate.
 	 */
 	if (!readonly)
-		WT_ERR(
-		    __wt_block_extlist_read_avail(session, block, &ci->avail));
+		WT_ERR(__wt_block_extlist_read_avail(
+		    session, block, &ci->avail, ci->file_size));
 
 	/*
 	 * If the checkpoint can be written, that means anything written after
@@ -251,8 +251,10 @@ __ckpt_extlist_read(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_CKPT *ckpt)
 	ci = ckpt->bpriv;
 	WT_RET(__wt_block_ckpt_init(session, block, ci, ckpt->name, 0));
 	WT_RET(__wt_block_buffer_to_ckpt(session, block, ckpt->raw.data, ci));
-	WT_RET(__wt_block_extlist_read(session, block, &ci->alloc));
-	WT_RET(__wt_block_extlist_read(session, block, &ci->discard));
+	WT_RET(__wt_block_extlist_read(
+	    session, block, &ci->alloc, ci->file_size));
+	WT_RET(__wt_block_extlist_read(
+	    session, block, &ci->discard, ci->file_size));
 
 	return (0);
 }

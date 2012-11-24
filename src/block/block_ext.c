@@ -931,13 +931,13 @@ __block_merge(WT_SESSION_IMPL *session, WT_EXTLIST *el, off_t off, off_t size)
  */
 int
 __wt_block_extlist_read_avail(
-    WT_SESSION_IMPL *session, WT_BLOCK *block, WT_EXTLIST *el)
+    WT_SESSION_IMPL *session, WT_BLOCK *block, WT_EXTLIST *el, off_t ckpt_size)
 {
 	/* If there isn't a list, we're done. */
 	if (el->offset == WT_BLOCK_INVALID_OFFSET)
 		return (0);
 
-	WT_RET(__wt_block_extlist_read(session, block, el));
+	WT_RET(__wt_block_extlist_read(session, block, el, ckpt_size));
 
 	/*
 	 * Extent blocks are allocated from the available list: if reading the
@@ -955,7 +955,7 @@ __wt_block_extlist_read_avail(
  */
 int
 __wt_block_extlist_read(
-    WT_SESSION_IMPL *session, WT_BLOCK *block, WT_EXTLIST *el)
+    WT_SESSION_IMPL *session, WT_BLOCK *block, WT_EXTLIST *el, off_t ckpt_size)
 {
 	WT_DECL_ITEM(tmp);
 	WT_DECL_RET;
@@ -990,14 +990,14 @@ __wt_block_extlist_read(
 		/*
 		 * We check the offset/size pairs represent valid file ranges,
 		 * then insert them into the list.  We don't necessarily have
-		 * to check for offsets past the end-of-file, but it's a cheap
-		 * and easy test to do here and we'd have to do the check as
-		 * part of file verification, regardless.
+		 * to check for offsets past the end of the checkpoint, but it's
+		 * a cheap test to do here and we'd have to do the check as part
+		 * of file verification, regardless.
 		 */
 		if (off < WT_BLOCK_DESC_SECTOR ||
 		    (off - WT_BLOCK_DESC_SECTOR) % block->allocsize != 0 ||
 		    size % block->allocsize != 0 ||
-		    off + size > block->fh->file_size)
+		    off + size > ckpt_size)
 corrupted:		WT_ERR_MSG(session, WT_ERROR,
 			    "file contains a corrupted %s extent list, range %"
 			    PRIdMAX "-%" PRIdMAX " past end-of-file",

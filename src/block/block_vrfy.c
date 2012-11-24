@@ -115,7 +115,8 @@ __verify_start_avail(
 
 	el = &ci->avail;
 	if (el->offset != WT_BLOCK_INVALID_OFFSET) {
-		WT_ERR(__wt_block_extlist_read_avail(session, block, el));
+		WT_ERR(__wt_block_extlist_read_avail(
+		    session, block, el, ci->file_size));
 		WT_EXT_FOREACH(ext, el->off)
 			if ((ret = __verify_filefrag_add(
 			    session, block, ext->off, ext->size, 1)) != 0)
@@ -190,14 +191,16 @@ __wt_verify_ckpt_load(
 	 */
 	el = &ci->alloc;
 	if (el->offset != WT_BLOCK_INVALID_OFFSET) {
-		WT_RET(__wt_block_extlist_read(session, block, el));
+		WT_RET(__wt_block_extlist_read(
+		    session, block, el, ci->file_size));
 		WT_RET(__wt_block_extlist_merge(
 		    session, el, &block->verify_alloc));
 		__wt_block_extlist_free(session, el);
 	}
 	el = &ci->discard;
 	if (el->offset != WT_BLOCK_INVALID_OFFSET) {
-		WT_RET(__wt_block_extlist_read(session, block, el));
+		WT_RET(__wt_block_extlist_read(
+		    session, block, el, ci->file_size));
 		WT_EXT_FOREACH(ext, el->off)
 			WT_RET(__wt_block_off_remove_overlap(session,
 			    &block->verify_alloc, ext->off, ext->size));
