@@ -531,7 +531,6 @@ flags = {
 	'shared_cache' : [ 'CACHE_POOL_RUN' ],
 	'direct_io' : [ 'DIRECTIO_DATA', 'DIRECTIO_LOG' ],
 	'page_free' : [ 'PAGE_FREE_IGNORE_DISK' ],
-	'rec_evict' : [ 'REC_SINGLE' ],
 	'verbose' : [
 		'VERB_block',
 		'VERB_shared_cache',

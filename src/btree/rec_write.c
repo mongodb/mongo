@@ -222,7 +222,7 @@ static int  __rec_split_row_promote(
 		WT_SESSION_IMPL *, WT_RECONCILE *, uint8_t);
 static int  __rec_split_write(WT_SESSION_IMPL *,
 		WT_RECONCILE *, WT_BOUNDARY *, WT_ITEM *, int);
-static int  __rec_write_init(WT_SESSION_IMPL *, WT_PAGE *, uint32_t, void *);
+static int  __rec_write_init(WT_SESSION_IMPL *, WT_PAGE *, int, void *);
 static int  __rec_write_wrapup(WT_SESSION_IMPL *, WT_RECONCILE *, WT_PAGE *);
 static int  __rec_write_wrapup_err(
 		WT_SESSION_IMPL *, WT_RECONCILE *, WT_PAGE *);
@@ -399,7 +399,7 @@ __rec_txn_read(
  */
 int
 __wt_rec_write(WT_SESSION_IMPL *session,
-    WT_PAGE *page, WT_SALVAGE_COOKIE *salvage, uint32_t flags)
+    WT_PAGE *page, WT_SALVAGE_COOKIE *salvage, int eviction)
 {
 	WT_RECONCILE *r;
 	WT_DECL_RET;
@@ -420,7 +420,7 @@ __wt_rec_write(WT_SESSION_IMPL *session,
 		return (0);
 
 	/* Initialize the reconciliation structure for each new run. */
-	WT_RET(__rec_write_init(session, page, flags, &session->reconcile));
+	WT_RET(__rec_write_init(session, page, eviction, &session->reconcile));
 	r = session->reconcile;
 
 	/* Initialize the tracking subsystem for each new run. */
@@ -527,7 +527,7 @@ __wt_rec_write(WT_SESSION_IMPL *session,
 	__wt_page_modify_set(page);
 	F_CLR(page->modify, WT_PM_REC_SPLIT_MERGE);
 
-	WT_RET(__wt_rec_write(session, page, NULL, flags));
+	WT_RET(__wt_rec_write(session, page, NULL, eviction));
 
 	return (0);
 }
@@ -538,7 +538,7 @@ __wt_rec_write(WT_SESSION_IMPL *session,
  */
 static int
 __rec_write_init(
-    WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags, void *retp)
+    WT_SESSION_IMPL *session, WT_PAGE *page, int eviction, void *retp)
 {
 	WT_BTREE *btree;
 	WT_RECONCILE *r;
@@ -597,7 +597,7 @@ __rec_write_init(
 
 	/* Per-page reconciliation: track skipped updates. */
 	r->upd_skipped = 0;
-	r->upd_skip_fail = LF_ISSET(WT_REC_SINGLE) ? 0 : 1;
+	r->upd_skip_fail = eviction ? 0 : 1;
 
 	/* Per-page reconciliation: track overflow items. */
 	r->ovfl_items = 0;
