@@ -309,7 +309,13 @@ methods = {
 
 'session.close' : Method([]),
 
-'session.compact' : Method([]),
+'session.compact' : Method([
+	Config('trigger', '30', r'''
+		Compaction will not be attempted unless the specified
+		percentage of the underlying objects is expected to be
+		recovered by compaction''',
+		min='10', max='50'),
+]),
 
 'session.create' : Method(table_meta + file_config + source_meta + [
 	Config('exclusive', 'false', r'''

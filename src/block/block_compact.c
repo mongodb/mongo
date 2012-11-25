@@ -13,7 +13,7 @@
  */
 int
 __wt_block_compact_skip(
-    WT_SESSION_IMPL *session, WT_BLOCK *block, int *skipp)
+    WT_SESSION_IMPL *session, WT_BLOCK *block, int trigger, int *skipp)
 {
 	WT_EXT *ext;
 	WT_EXTLIST *el;
@@ -27,13 +27,13 @@ __wt_block_compact_skip(
 	/*
 	 * We do compaction by copying blocks from the end of the file to the
 	 * beginning of the file, and we need some metrics to decide if it's
-	 * worth doing.  Ignore small files, and files where less than 30% of
-	 * the file appears in the available list, and in the first half of
-	 * the file.  In other words, don't bother with compaction unless we
-	 * have a reasonable expectation of moving 30% of the file from the
-	 * last half of the file to the first half of the file.
+	 * worth doing.  Ignore small files, and files where we are unlikely
+	 * to recover the specified percentage of the file.  (The calculation
+	 * is if at least N % of the file appears in the available list, and
+	 * in the first half of the file.  In other words, don't bother with
+	 * compaction unless we have an expectation of moving N % of the file
+	 * from the last half of the file to the first half of the file.)
 	 */
-#define	WT_COMPACT_TRIGGER	30
 	if (fh->file_size <= 10 * 1024)
 		return (0);
 
@@ -50,13 +50,13 @@ __wt_block_compact_skip(
 
 	__wt_spin_unlock(session, &block->live_lock);
 
-	if (pct >= WT_COMPACT_TRIGGER)
+	if (pct >= trigger)
 		*skipp = 0;
 
 	WT_VERBOSE_RET(session, block,
-	    "compaction %s" "useful, %d%% of the free space in the available "
+	    "%s: compaction %s, %d%% of the free space in the available "
 	    "list appears in the first half of the file",
-	    pct < WT_COMPACT_TRIGGER ? "not " : "", pct);
+	    block->name, pct < trigger ? "skipped" : "proceeding", pct);
 
 	return (0);
 }

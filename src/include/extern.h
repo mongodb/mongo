@@ -52,6 +52,7 @@ extern int __wt_block_checkpoint_resolve(WT_SESSION_IMPL *session,
     WT_BLOCK *block);
 extern int __wt_block_compact_skip( WT_SESSION_IMPL *session,
     WT_BLOCK *block,
+    int trigger,
     int *skipp);
 extern int __wt_block_compact_page_skip(WT_SESSION_IMPL *session,
     WT_BLOCK *block,
@@ -149,7 +150,9 @@ extern int __wt_bm_checkpoint_load(WT_SESSION_IMPL *session,
     uint32_t *root_addr_size,
     int readonly);
 extern int __wt_bm_checkpoint_unload(WT_SESSION_IMPL *session);
-extern int __wt_bm_compact_skip(WT_SESSION_IMPL *session, int *skipp);
+extern int __wt_bm_compact_skip(WT_SESSION_IMPL *session,
+    int trigger,
+    int *skipp);
 extern int __wt_bm_compact_page_skip(WT_SESSION_IMPL *session,
     const uint8_t *addr,
     uint32_t addr_size,

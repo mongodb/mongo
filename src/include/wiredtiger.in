@@ -725,7 +725,12 @@ struct __wt_session {
 	 *
 	 * @param session the session handle
 	 * @param name the URI of the object to drop, such as \c "table:stock"
-	 * @configempty{session.compact, see dist/api_data.py}
+	 * @configstart{session.compact, see dist/api_data.py}
+	 * @config{trigger, Compaction will not be attempted unless the
+	 * specified percentage of the underlying objects is expected to be
+	 * recovered by compaction.,an integer between 10 and 50; default \c
+	 * 30.}
+	 * @configend
 	 * @errors
 	 */
 	int __F(compact)(WT_SESSION *session,

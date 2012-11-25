@@ -237,10 +237,11 @@ __wt_confchk_session_commit_transaction[] = {
 
 const char *
 __wt_confdfl_session_compact =
-	"";
+	"trigger=30";
 
 WT_CONFIG_CHECK
 __wt_confchk_session_compact[] = {
+	{ "trigger", "int", "min=10,max=50", NULL},
 	{ NULL, NULL, NULL, NULL }
 };
 
