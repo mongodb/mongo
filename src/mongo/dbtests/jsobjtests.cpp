@@ -1820,6 +1820,9 @@ namespace JsobjTests {
 
             good( "{x:{a:2}}" );
             bad( "{x:{'$a':2}}" );
+
+            good( "{$ref:1}" );
+            bad( "{$ref:1,$a:2}" );
         }
     };
 
