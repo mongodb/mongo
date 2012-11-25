@@ -643,7 +643,7 @@ namespace mongo {
             }
 
             double state = member["state"].Number();
-            if (member["health"].Number() == 1 && (state == 1 || state == 2)) {
+            if ((state == 1 || state == 2) && member["health"].Number() == 1) {
                 LOG(1) << "dbclient_rs nodes["<<m<<"].ok = true " << host << endl;
                 scoped_lock lk( _lock );
                 _nodes[m].ok = true;
