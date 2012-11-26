@@ -419,7 +419,7 @@ env.Library( "coreshard", [ "client/distlock.cpp",
                             "s/chunk.cpp",
                             "s/shard.cpp",
                             "s/shardkey.cpp"],
-                            LIBDEPS=['s/config'] )
+                            LIBDEPS=['s/base'] )
 
 mongosLibraryFiles = [
     "s/interrupt_status_mongos.cpp",

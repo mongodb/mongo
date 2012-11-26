@@ -204,8 +204,17 @@ namespace mongo {
 # define MONGO_dassert(x)
 #endif
 
+    /** Allows to jump code during exeuction. */
+    inline bool debugCompare(bool inDebug, bool condition) { return inDebug && condition; }
+
+#if defined(_DEBUG)
+# define MONGO_debug_and(x) debugCompare(true, (x))
+#else
+# define MONGO_debug_and(x) debugCompare(false, (x))
+#endif
 
 #ifdef MONGO_EXPOSE_MACROS
+# define dcompare MONGO_debug_and
 # define dassert MONGO_dassert
 # define verify MONGO_verify
 # define uassert MONGO_uassert
