@@ -250,7 +250,8 @@ namespace mongo {
                                   << principal->getName(),
                           0);
         }
-        if (principal->getName() == internalSecurity.user) {
+         // TODO: move internalSecurity into AuthorizationManager
+        if (principal->getName() == "__system") {
             // Grant full access to internal user
             ActionSet allActions;
             allActions.addAllActions();
