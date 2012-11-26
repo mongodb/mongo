@@ -30,6 +30,10 @@ namespace mongo {
         return new ScopedDbConnection(host, socketTimeout);
     }
 
+    ScopedDbConnection* ScopedDbConnection::getScopedDbConnection(const ConnectionString& host,
+                                                                  double socketTimeout) {
+        return new ScopedDbConnection(host, socketTimeout);
+    }
 
     // In the client code, these functions are the same as the ones above, since we don't have to
     // do special handling of authentication for commands in the client.
@@ -38,6 +42,11 @@ namespace mongo {
     }
 
     ScopedDbConnection* ScopedDbConnection::getInternalScopedDbConnection(const string& host,
+                                                                          double socketTimeout) {
+        return getScopedDbConnection( host, socketTimeout );
+    }
+
+    ScopedDbConnection* ScopedDbConnection::getInternalScopedDbConnection(const ConnectionString& host,
                                                                           double socketTimeout) {
         return getScopedDbConnection( host, socketTimeout );
     }

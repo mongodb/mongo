@@ -249,6 +249,10 @@ namespace mongo {
             _setSocketTimeout();
         }
 
+        explicit ScopedDbConnection(const ConnectionString& host, double socketTimeout = 0) : _host(host.toString()), _conn( pool.get(host, socketTimeout) ), _socketTimeout( socketTimeout ) {
+            _setSocketTimeout();
+        }
+
         ScopedDbConnection() : _host( "" ) , _conn(0), _socketTimeout( 0 ) {}
 
         /* @param conn - bind to an existing connection */
@@ -264,6 +268,8 @@ namespace mongo {
         // of whether or not the user is authorized, then use getInternalScopedDbConnection().
         static ScopedDbConnection* getScopedDbConnection(const string& host,
                                                          double socketTimeout = 0);
+        static ScopedDbConnection* getScopedDbConnection(const ConnectionString& host,
+                                                         double socketTimeout = 0);
         static ScopedDbConnection* getScopedDbConnection();
 
         // Gets a ScopedDbConnection designed to be used for internal communication within a cluster
@@ -273,6 +279,8 @@ namespace mongo {
         // shard if the client has permission to do so, then use getScopedDbConnection().
         // These functions should not be called by consumers of the C++ client library.
         static ScopedDbConnection* getInternalScopedDbConnection(const string& host,
+                                                                 double socketTimeout = 0);
+        static ScopedDbConnection* getInternalScopedDbConnection(const ConnectionString& host,
                                                                  double socketTimeout = 0);
         static ScopedDbConnection* getInternalScopedDbConnection();
 
