@@ -131,8 +131,8 @@ static CONFIG c[] = {
 	  0, 0, 0, M(2), &g.c_ops, NULL },
 
 	{ "prefix",
-	  "if keys are prefix compressed",		/* 90% */
-	  C_ROW, C_BOOL, 90, 0, &g.c_prefix, NULL },
+	  "if keys are prefix compressed",		/* 80% */
+	  C_ROW, C_BOOL, 80, 0, &g.c_prefix, NULL },
 
 	{ "repeat_data_pct",
 	  "percent duplicate values in row- or variable-length column-stores",
