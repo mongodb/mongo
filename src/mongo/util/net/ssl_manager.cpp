@@ -27,6 +27,18 @@
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
+
+    /**
+     * Multithreaded Support for SSL.
+     *
+     * In order to allow OpenSSL to work in a multithreaded environment, you
+     * must provide some callbacks for it to use for locking.  The following code
+     * sets up a vector of mutexes and uses thread-local storage to assign an id
+     * to each thread.
+     * The so-called SSLThreadInfo class encapsulates most of the logic required for
+     * OpenSSL multithreaded support.
+     */
+
     static unsigned long _ssl_id_callback();
     static void _ssl_locking_callback(int mode, int type, const char *file, int line);
 
@@ -87,6 +99,10 @@ namespace mongo {
     std::vector<SimpleMutex*> SSLThreadInfo::_mutex;
     boost::thread_specific_ptr<SSLThreadInfo> SSLThreadInfo::_thread;
     
+    ////////////////////////////////////////////////////////////////
+
+    
+
 
     SSLManager::SSLManager(bool client) {
         _client = client;
@@ -95,10 +111,12 @@ namespace mongo {
         ERR_load_crypto_strings();
         
         _context = SSL_CTX_new( client ? SSLv23_client_method() : SSLv23_server_method() );
-        massert( 15864 , mongoutils::str::stream() << "can't create SSL Context: " 
-                 << ERR_error_string(ERR_get_error(), NULL) , _context );
-        
-        SSL_CTX_set_options( _context, SSL_OP_ALL);   
+        massert( 15864 , mongoutils::str::stream() << "can't create SSL Context: " << 
+                 ERR_error_string(ERR_get_error(), NULL) , _context );
+   
+        // Activate all bug workaround options, to support buggy client SSL's.
+        SSL_CTX_set_options(_context, SSL_OP_ALL);
+
         SSLThreadInfo::init();
         SSLThreadInfo::get();
     }
@@ -144,7 +162,10 @@ namespace mongo {
     }
         
     SSL * SSLManager::secure(int fd) {
+        // This just ensures that SSL multithreading support is set up for this thread,
+        // if it's not already.
         SSLThreadInfo::get();
+
         SSL * ssl = SSL_new(_context);
         massert( 15861 , "can't create SSL" , ssl );
         SSL_set_fd( ssl , fd );
