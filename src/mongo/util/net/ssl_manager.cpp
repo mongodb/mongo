@@ -117,6 +117,10 @@ namespace mongo {
         // Activate all bug workaround options, to support buggy client SSL's.
         SSL_CTX_set_options(_context, SSL_OP_ALL);
 
+        // If renegotiation is needed, don't return from recv() or send() until it's successful.
+        // Note: this is for blocking sockets only.
+        SSL_CTX_set_mode(_context, SSL_MODE_AUTO_RETRY);
+
         SSLThreadInfo::init();
         SSLThreadInfo::get();
     }
