@@ -23,6 +23,7 @@
 
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/s/cluster_constants.h"
+#include "mongo/util/timer.h"
 
 namespace mongo {
 
@@ -1021,6 +1022,90 @@ namespace mongo {
         warning() << "distributed lock '" << lockName << "' couldn't consummate unlock request. "
                   << "lock may be taken over after " << ( _lockTimeout / (60 * 1000) )
                   << " minutes timeout." << endl;
+    }
+
+    ScopedDistributedLock::ScopedDistributedLock(const ConnectionString& conn,
+                                                 const string& name,
+                                                 const string& why,
+                                                 int lockTryIntervalMillis,
+                                                 unsigned long long lockTimeout,
+                                                 bool asProcess) :
+            _lock(conn, name, lockTimeout, asProcess),
+            _why(why),
+            _lockTryIntervalMillis(lockTryIntervalMillis),
+            _acquired(false)
+    {
+    }
+
+    ScopedDistributedLock::~ScopedDistributedLock() {
+        if (_acquired) {
+            unlock();
+        }
+    }
+
+    bool ScopedDistributedLock::tryAcquireOnce(string* errMsg) {
+        bool acquired = false;
+        try {
+            acquired = _lock.lock_try(_why, false, &_other);
+        }
+        catch (const DBException& e) {
+
+            *errMsg = str::stream() << "error acquiring distributed lock " << _lock._name << " for "
+                                    << _why << causedBy(e);
+
+            return false;
+        }
+
+        return acquired;
+    }
+
+    void ScopedDistributedLock::unlock() {
+        _lock.unlock(&_other);
+    }
+
+    bool ScopedDistributedLock::tryAcquire(long long waitForMillis, string* errMsg) {
+
+        string dummy;
+        if (!errMsg) errMsg = &dummy;
+
+        Timer timer;
+        Timer msgTimer;
+
+        while (!_acquired && (waitForMillis <= 0 || timer.millis() < waitForMillis)) {
+
+            string acquireErrMsg;
+            _acquired = tryAcquireOnce(&acquireErrMsg);
+
+            if (_acquired) break;
+
+            // Set our error message to the last error, in case we break with !_acquired
+            *errMsg = acquireErrMsg;
+
+            if (waitForMillis == 0) break;
+
+            // Periodically message for debugging reasons
+            if (msgTimer.seconds() > 10) {
+
+                log() << "waited " << timer.seconds() << "s for distributed lock " << _lock._name
+                      << " for " << _why;
+
+                msgTimer.reset();
+            }
+
+            long long timeRemainingMillis = std::max(0LL, waitForMillis - timer.millis());
+            sleepmillis(std::min(_lockTryIntervalMillis, timeRemainingMillis));
+        }
+
+        if (_acquired) {
+            verify(!_other.isEmpty());
+        }
+        else {
+            *errMsg = str::stream() << "could not acquire distributed lock " << _lock._name
+                                    << " for " << _why << " after " << timer.seconds()
+                                    << "s, other lock may be held: " << _other << causedBy(errMsg);
+        }
+
+        return _acquired;
     }
 
 

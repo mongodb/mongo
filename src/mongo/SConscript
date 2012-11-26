@@ -420,6 +420,7 @@ serverOnlyFiles += mmapFiles
 serverOnlyFiles += [ "db/stats/snapshots.cpp" ]
 
 env.Library( "coreshard", [ "client/distlock.cpp",
+                            "s/balancer_lock.cpp",
                             "s/config.cpp",
                             "s/grid.cpp",
                             "s/chunk.cpp",
