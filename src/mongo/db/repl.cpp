@@ -848,10 +848,10 @@ namespace mongo {
                 save();
             }
 
-            BSONObjBuilder q;
-            q.appendDate("$gte", syncedTo.asDate());
+            BSONObjBuilder gte;
+            gte.appendTimestamp("$gte", syncedTo.asDate());
             BSONObjBuilder query;
-            query.append("ts", q.done());
+            query.append("ts", gte.done());
             if ( !only.empty() ) {
                 // note we may here skip a LOT of data table scanning, a lot of work for the master.
                 // maybe append "\\." here?
