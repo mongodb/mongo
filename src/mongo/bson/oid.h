@@ -44,7 +44,8 @@ namespace mongo {
         OID() : a(0), b(0) { }
 
         enum {
-            kOIDSize = 12
+            kOIDSize = 12,
+            kIncSize = 3
         };
 
         /** init from a 24 char hex string */
@@ -69,6 +70,8 @@ namespace mongo {
         /** @return the object ID output as 24 hex digits */
         std::string str() const { return toHexLower(data, kOIDSize); }
         std::string toString() const { return str(); }
+        /** @return the random/sequential part of the object ID as 6 hex digits */
+        std::string toIncString() const { return toHexLower(_inc, kIncSize); }
 
         static OID gen() { OID o; o.init(); return o; }
 
