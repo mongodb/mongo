@@ -88,42 +88,43 @@ namespace mongo {
     boost::thread_specific_ptr<SSLThreadInfo> SSLThreadInfo::_thread;
     
 
-    SSLManager::SSLManager( bool client ) {
+    SSLManager::SSLManager(bool client) {
         _client = client;
         SSL_library_init();
         SSL_load_error_strings();
         ERR_load_crypto_strings();
         
         _context = SSL_CTX_new( client ? SSLv23_client_method() : SSLv23_server_method() );
-        massert( 15864 , mongoutils::str::stream() << "can't create SSL Context: " << ERR_error_string(ERR_get_error(), NULL) , _context );
+        massert( 15864 , mongoutils::str::stream() << "can't create SSL Context: " 
+                 << ERR_error_string(ERR_get_error(), NULL) , _context );
         
         SSL_CTX_set_options( _context, SSL_OP_ALL);   
         SSLThreadInfo::init();
         SSLThreadInfo::get();
     }
 
-    void SSLManager::setupPubPriv( const std::string& privateKeyFile , const std::string& publicKeyFile ) {
-        massert( 15865 , 
-                 mongoutils::str::stream() << "Can't read SSL certificate from file " 
-                 << publicKeyFile << ":" <<  ERR_error_string(ERR_get_error(), NULL) ,
-                 SSL_CTX_use_certificate_file(_context, publicKeyFile.c_str(), SSL_FILETYPE_PEM) );
+    void SSLManager::setupPubPriv(const std::string& privateKeyFile, const std::string& publicKeyFile) {
+        massert(15865, 
+                mongoutils::str::stream() << "Can't read SSL certificate from file " 
+                << publicKeyFile << ":" <<  ERR_error_string(ERR_get_error(), NULL) ,
+                SSL_CTX_use_certificate_file(_context, publicKeyFile.c_str(), SSL_FILETYPE_PEM));
   
 
-        massert( 15866 , 
+        massert(15866 , 
                  mongoutils::str::stream() << "Can't read SSL private key from file " 
                  << privateKeyFile << " : " << ERR_error_string(ERR_get_error(), NULL) ,
-                 SSL_CTX_use_PrivateKey_file(_context, privateKeyFile.c_str(), SSL_FILETYPE_PEM) );
+                 SSL_CTX_use_PrivateKey_file(_context, privateKeyFile.c_str(), SSL_FILETYPE_PEM));
     }
     
     
-    int SSLManager::password_cb(char *buf,int num, int rwflag,void *userdata){
-        SSLManager* sm = (SSLManager*)userdata;
+    int SSLManager::password_cb(char *buf,int num, int rwflag,void *userdata) {
+        SSLManager* sm = static_cast<SSLManager*>(userdata);
         std::string pass = sm->_password;
         strcpy(buf,pass.c_str());
         return(pass.size());
     }
 
-    bool SSLManager::setupPEM( const std::string& keyFile , const std::string& password ) {
+    bool SSLManager::setupPEM(const std::string& keyFile , const std::string& password) {
         _password = password;
         
         if ( SSL_CTX_use_certificate_chain_file( _context , keyFile.c_str() ) != 1 ) {
@@ -142,9 +143,9 @@ namespace mongo {
         return true;
     }
         
-    SSL * SSLManager::secure( int fd ) {
+    SSL * SSLManager::secure(int fd) {
         SSLThreadInfo::get();
-        SSL * ssl = SSL_new( _context );
+        SSL * ssl = SSL_new(_context);
         massert( 15861 , "can't create SSL" , ssl );
         SSL_set_fd( ssl , fd );
         return ssl;
