@@ -75,9 +75,11 @@ __wt_block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	blk = WT_BLOCK_HEADER_REF(buf->mem);
 
 	/* Buffers should be aligned for writing. */
-	if (!F_ISSET(buf, WT_ITEM_ALIGNED))
+	if (!F_ISSET(buf, WT_ITEM_ALIGNED)) {
+		WT_ASSERT(session, F_ISSET(buf, WT_ITEM_ALIGNED));
 		WT_RET_MSG(session, EINVAL,
 		    "direct I/O check: write buffer incorrectly allocated");
+	}
 
 	/*
 	 * Align the size to an allocation unit.
@@ -87,9 +89,11 @@ __wt_block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	 * from the block-manager layer the maximum size of the eventual write.
 	 */
 	align_size = WT_ALIGN(buf->size, block->allocsize);
-	if (align_size > buf->memsize)
+	if (align_size > buf->memsize) {
+		WT_ASSERT(session, align_size <= buf->memsize);
 		WT_RET_MSG(session, EINVAL,
 		    "buffer size check: write buffer incorrectly allocated");
+	}
 
 	/* Zero out any unused bytes at the end of the buffer. */
 	memset((uint8_t *)buf->mem + buf->size, 0, align_size - buf->size);
