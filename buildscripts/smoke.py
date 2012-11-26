@@ -513,7 +513,7 @@ def run_tests(tests):
 
                     if small_oplog or small_oplog_rs:
                         master.wait_for_repl()
-                    elif test[1]: # reach inside test and see if startmongod is true
+                    elif test[1]: # reach inside test and see if "usedb" is true
                         if (tests_run+1) % 20 == 0:
                             # restart mongo every 20 times, for our 32-bit machines
                             master.__exit__(None, None, None)
@@ -862,7 +862,7 @@ def main():
     if options.mode == 'suite':
         tests = expand_suites(tests)
     elif options.mode == 'files':
-        tests = [(os.path.abspath(test), True) for test in tests]
+        tests = [(os.path.abspath(test), start_mongod) for test in tests]
 
     if options.ignore_files != None :
         ignore_patt = re.compile( options.ignore_files )
