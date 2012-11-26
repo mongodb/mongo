@@ -85,7 +85,9 @@ __wt_lsm_bloom_worker(void *arg)
 	WT_CLEAR(cookie);
 
 	for (;;) {
-		WT_ERR(__wt_lsm_copy_chunks(session, lsm_tree, &cookie));
+		/* Ignore the return value - it is discarded anyway. */
+		if (__wt_lsm_copy_chunks(session, lsm_tree, &cookie) != 0)
+			goto err;
 
 		/* Create bloom filters in all checkpointed chunks. */
 		for (i = 0, j = 0; i < cookie.nchunks; i++) {
