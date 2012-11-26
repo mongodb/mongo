@@ -72,7 +72,6 @@ __wt_lsm_merge_worker(void *vargs)
 void *
 __wt_lsm_bloom_worker(void *arg)
 {
-	WT_DECL_RET;
 	WT_LSM_CHUNK *chunk;
 	WT_LSM_TREE *lsm_tree;
 	WT_LSM_WORKER_COOKIE cookie;
