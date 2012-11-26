@@ -33,12 +33,14 @@
 # include <sys/uio.h>
 #endif
 
-#endif // _WIN32
+#endif // not _WIN32
 
 #ifdef MONGO_SSL
 #include <openssl/ssl.h>
 #include "mongo/util/net/ssl_manager.h"
 #endif
+
+#include "mongo/platform/compiler.h"
 
 namespace mongo {
 
@@ -233,16 +235,17 @@ namespace mongo {
     private:
         void _init();
 
-        /** raw send, same semantics as ::send */
-    public:
-        int _send( const char * data , int len );
-    private:
-        
         /** sends dumbly, just each buffer at a time */
         void _send( const vector< pair< char *, int > > &data, const char *context );
 
+        /** raw send, same semantics as ::send */
+        int _send( const char * data , int len );
+
         /** raw recv, same semantics as ::recv */
         int _recv( char * buf , int max );
+
+        void _handleRecvError(int ret, int len, int* retries);
+        MONGO_COMPILER_NORETURN void _handleSendError(int ret, const char* context);
 
         int _fd;
         uint64_t _fdCreationMicroSec;
