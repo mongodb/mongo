@@ -1066,8 +1066,7 @@ namespace mongo {
         else {
             BSONObj user;
             {
-                Lock::GlobalWrite lk;
-                Client::Context ctxt("local.");
+                Client::ReadContext ctxt("local.");
                 if( !Helpers::findOne("local.system.users", userReplQuery, user) ||
                         // try the first user in local
                         !Helpers::getSingleton("local.system.users", user) ) {
