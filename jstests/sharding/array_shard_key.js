@@ -34,6 +34,10 @@ var checkError = function( shouldError ){
 coll.insert({ i : [ 1, 2 ] })
 checkError( true )
 
+// Insert an object with all the right fields, but an invalid array val for _id
+coll.insert({ _id : [ 1, 2 ] , i : 3})
+checkError( true )
+
 // Insert an object with valid array key
 coll.insert({ i : 1 })
 checkError( false )
