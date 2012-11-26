@@ -1585,11 +1585,12 @@ struct __wt_compressor {
 	 * 1MB of key and value items will be accumulated for consideration
 	 * before WiredTiger calls the WT_COMPRESSOR::compress_raw callback.
 	 *
-	 * The WT_COMPRESSOR::compress_raw callback may only be configured for
-	 * row-store and variable-length column-store object types.
-	 * WT_COMPRESSOR::compress_raw is incompatible with both row-store key
-	 * prefix compression, and row-store and variable-length column-store
-	 * dictionary compression.
+	 * The WT_COMPRESSOR::compress_raw callback is only called for objects
+	 * where it is applicable, that is, for row-store and variable-length
+	 * column-store objects, where both row-store key prefix compression
+	 * and row-store and variable-length column-store dictionary compression
+	 * are \b not configured.  When WT_COMPRESSOR::compress_raw is not
+	 * applicable, the WT_COMPRESSOR::compress callback is used instead.
 	 *
 	 * @param[in] src the data to compress
 	 * @param[in] offsets the byte offsets of the byte strings in src

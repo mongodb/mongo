@@ -297,26 +297,6 @@ __btree_conf(WT_SESSION_IMPL *session, const char *cfg[])
 			    "unknown block compressor '%.*s'",
 			    (int)cval.len, cval.str);
 	}
-	if (btree->compressor != NULL &&
-	    btree->compressor->compress_raw != NULL)
-		switch (btree->type) {
-		case BTREE_COL_FIX:
-			WT_RET_MSG(session, EINVAL,
-			    "WT_COMPRESSOR::compress_raw is not applicable to "
-			    "fixed-size column-store objects");
-		case BTREE_ROW:
-			if (btree->prefix_compression)
-				WT_RET_MSG(session, EINVAL,
-				    "WT_COMPRESSOR::compress_raw may not be "
-				    "combined with prefix compression");
-			/* FALLTHROUGH */
-		case BTREE_COL_VAR:
-			if (btree->dictionary)
-				WT_RET_MSG(session, EINVAL,
-				    "WT_COMPRESSOR::compress_raw may not be "
-				    "combined with dictionary compression");
-			break;
-		}
 
 	/* Overflow lock. */
 	WT_RET(__wt_rwlock_alloc(

@@ -637,12 +637,20 @@ __rec_write_init(
 
 	/*
 	 * Raw compression, the application builds disk images: applicable only
-	 * to row-and variable-length column-store objects, both dictionary and
-	 * prefix compression must be turned off at the API level.
+	 * to row-and variable-length column-store objects.  Dictionary and
+	 * prefix compression must be turned off or we ignore raw-compression,
+	 * raw compression can't support either one.  (Technically, we could
+	 * still use the raw callback on column-store variable length internal
+	 * pages with dictionary compression configured, because dictionary
+	 * compression only applies to column-store leaf pages, but that seems
+	 * an unlikely use case.)
 	 */
 	r->raw_compression =
 	    btree->compressor != NULL &&
-	    btree->compressor->compress_raw != NULL;
+	    btree->compressor->compress_raw != NULL &&
+	    page->type != WT_PAGE_COL_FIX &&
+	    btree->dictionary == 0 &&
+	    btree->prefix_compression == 0;
 
 	/* Per-page reconciliation: track skipped updates. */
 	r->upd_skipped = 0;

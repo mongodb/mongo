@@ -179,14 +179,6 @@ config_compression(void)
 				cstr = "compression=bzip";
 			break;
 		case 5:					/* 10% */
-			/*
-			 * Fixed-length column store files, and both dictionary
-			 * and prefix compression are not compatible with raw
-			 * compression.  If any of them are set, don't config
-			 * raw compression.
-			 */
-			if (g.type == FIX || g.c_dictionary || g.c_prefix)
-				break;
 			if (access(BZIP_PATH, R_OK) == 0)
 				cstr = "compression=raw";
 			break;
