@@ -488,6 +488,12 @@ static void edit( const string& whatToEdit ) {
 
     string js;
     if ( editingVariable ) {
+        // If "whatToEdit" is undeclared or uninitialized, declare 
+        int varType = shellMainScope->type( whatToEdit.c_str() );
+        if ( varType == Undefined ) {
+            shellMainScope->exec( "var " + whatToEdit , "(shell)", false, true, false );
+        }
+
         // Convert "whatToEdit" to JavaScript (JSON) text
         if ( !shellMainScope->exec( "__jsout__ = tojson(" + whatToEdit + ")", "tojs", false, false, false ) )
             return; // Error already printed
