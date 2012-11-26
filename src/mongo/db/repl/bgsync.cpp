@@ -508,11 +508,12 @@ namespace replset {
         }
 
         if (!_buffer.empty()) {
-            log() << "replset " << _buffer.size() << " ops were not applied from buffer, this should "
-                  << "cause a rollback on the former primary" << rsLog;
+            log() << "replset " << _buffer.size()
+                  << " bytes were not applied from network buffer; this should"
+                  << " trigger a rollback on the former primary" << rsLog;
         }
 
-        // get rid of pending ops
+        // get rid of pending ops (SERVER-7759 TODO)
         _buffer.clear();
     }
 
