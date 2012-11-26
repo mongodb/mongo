@@ -20,6 +20,7 @@
 #include "mongo/base/initializer.h"
 #include "db/json.h"
 #include "db/oplogreader.h"
+#include "util/version.h"
 
 #include "tool.h"
 
@@ -69,6 +70,8 @@ public:
         string ns = getParam( "oplogns" );
         r.tailingQueryGTE( ns.c_str() , start );
 
+        bool legacyApplyOps = (versionCmp(mongodVersion(), "2.2.0") < 0);
+
         int num = 0;
         while ( r.more() ) {
             BSONObj o = r.next();
@@ -88,6 +91,8 @@ public:
             if ( o["op"].String() == "n" )
                 continue;
 
+            string dbname = legacyApplyOps? nsToDatabase(o["ns"].String()) : "admin";
+
             BSONObjBuilder b( o.objsize() + 32 );
             BSONArrayBuilder updates( b.subarrayStart( "applyOps" ) );
             updates.append( o );
@@ -96,7 +101,7 @@ public:
             BSONObj c = b.obj();
             
             BSONObj res;
-            bool ok = conn().runCommand( "admin" , c , res );
+            bool ok = conn().runCommand( dbname , c , res );
             if ( print || ! ok )
                 log() << res << endl;
         }
