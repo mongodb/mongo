@@ -1527,31 +1527,34 @@ struct __wt_compressor {
 	 *
 	 * WT_COMPRESSOR::compress_raw gives applications fine-grained control
 	 * over disk block size when writing row-store or variable-length
-	 * column-store pages.
+	 * column-store pages.  Where this level of control is not required by
+	 * the underlying storage device, set the WT_COMPRESSOR::compress_raw
+	 * callback to \c NULL and WiredTiger will internally split each page
+	 * into blocks, each block then compressed by WT_COMPRESSOR::compress.
 	 *
 	 * WT_COMPRESSOR::compress_raw takes a source buffer and an array of
 	 * 0-based offsets of byte strings in that buffer.  The callback then
 	 * encodes none, some or all of the byte strings and copies the encoded
 	 * representation into a destination buffer.  The callback returns the
 	 * number of byte strings encoded and the bytes needed for the encoded
-	 * representation.   The encoded representation then has 64 bytes of
-	 * header information prepended, and is then written as a block to the
-	 * underlying file object.
+	 * representation.   The encoded representation has header information
+	 * prepended and is written as a block to the underlying file object.
 	 *
 	 * On entry, \c src points to the source buffer; \c offsets is an array
-	 * of <code>slots</code> 0-based offsets into \c src, where each offset
-	 * is the start of a byte string, except for the last offset, which is
-	 * the offset of the first byte past the end of the last byte string.
-	 * (In other words, <code>offsets[0]</code> will be 0, the offset of the
+	 * of \c slots 0-based offsets into \c src, where each offset is the
+	 * start of a byte string, except for the last offset, which is the
+	 * offset of the first byte past the end of the last byte string.  (In
+	 * other words, <code>offsets[0]</code> will be 0, the offset of the
 	 * first byte of the first byte string in \c src, and
 	 * <code>offsets[slots]</code> is the total length of all of the byte
 	 * strings in the \c src buffer.)
 	 *
 	 * The argument \c dst points to the destination buffer with a length
-	 * of \c dst_len (the destination buffer is guaranteed to be at least
-	 * as large as the maximum page size configured for the object, that
-	 * is, when writing a row-store leaf page, the destination buffer will
-	 * be at least as large as the \c leaf_page_max configuration).
+	 * of \c dst_len (the destination buffer is will be the maximum page
+	 * size for the page being written, less the prepended header size.
+	 * That is, when writing a row-store leaf page, the destination buffer
+	 * size will be the \c leaf_page_max configuration less the size of the
+	 * header).
 	 *
 	 * After successful completion, the callback should return \c 0, and
 	 * set \c result_slotsp to the number of byte strings encoded and
@@ -1575,15 +1578,6 @@ struct __wt_compressor {
 	 * (for example, if WT_COMPRESSOR::compress_raw callback chooses not to
 	 * compress a small number of rows, but the page being written has no
 	 * more rows to accumulate), will be passed to WT_COMPRESSOR::compress.
-	 *
-	 * Page size configuration (\c internal_page_max and \c leaf_page_max),
-	 * is still relevant when the WT_COMPRESSOR::compress_raw callback is
-	 * specified even though the callback controls the final block sizes.
-	 * The maximum page size guides how many rows are accumulated before
-	 * WT_COMPRESSOR::compress_raw is called, in other words, if the
-	 * \c leaf_page_max configuration value for a row-store is 1MB, roughly
-	 * 1MB of key and value items will be accumulated for consideration
-	 * before WiredTiger calls the WT_COMPRESSOR::compress_raw callback.
 	 *
 	 * The WT_COMPRESSOR::compress_raw callback is only called for objects
 	 * where it is applicable, that is, for row-store and variable-length

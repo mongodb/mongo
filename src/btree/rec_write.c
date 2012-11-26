@@ -60,13 +60,27 @@ typedef struct {
 	uint64_t *raw_recnos;		/* Raw compression recno count */
 
 	/*
-	 * Reconciliation gets tricky if we have to split a page, that is, if
-	 * the disk image we create exceeds the maximum size of disk images for
-	 * this page type.  First, the split sizes: reconciliation splits to a
+	 * Reconciliation gets tricky if we have to split a page, which happens
+	 * when the disk image we create exceeds the page type's maximum disk
+	 * image size.
+	 *
+	 * First, the sizes of the page we're building.  If WiredTiger is doing
+	 * page layout, page_size is the same as page_size_max.  We accumulate
+	 * the maximum page size of raw data and when we reach that size, we
+	 * split the page into multiple chunks, eventually compressing those
+	 * chunks.  When the application is doing page layout (raw compression
+	 * is configured), page_size can continue to grow past page_size_max,
+	 * and we keep accumulating raw data until the raw compression callback
+	 * accepts it.
+	 */
+	uint32_t page_size;		/* Current page size */
+	uint32_t page_size_max;		/* Maximum on-disk page size */
+
+	/*
+	 * Second, the split size: if we're doing the page layout, split to a
 	 * smaller-than-maximum page size when a split is required so we don't
 	 * repeatedly split a packed page.
 	 */
-	uint32_t page_size;		/* Maximum page size */
 	uint32_t split_size;		/* Split page size */
 
 	/*
@@ -112,7 +126,7 @@ typedef struct {
 		WT_ITEM key;		/* Promoted row-store key */
 
 		/*
-		 * During wrapup after reconciling the root page, we write a
+		 * During wrapup, after reconciling the root page, we write a
 		 * final block as part of a checkpoint.  If raw compression
 		 * was configured, that block may have already been compressed.
 		 */
@@ -600,19 +614,39 @@ __rec_write_init(
 		}
 
 	/*
-	 * Suffix compression is a hack to shorten internal page keys
-	 * by discarding trailing bytes that aren't necessary for tree
-	 * navigation.  We don't do suffix compression if there is a
-	 * custom collator because we don't know what bytes a custom
-	 * collator might use.  Some custom collators (for example, a
-	 * collator implementing reverse ordering of strings), won't
-	 * have any problem with suffix compression: if there's ever a
-	 * reason to implement suffix compression for custom collators,
-	 * we can add a setting to the collator, configured when the
-	 * collator is added, that turns on suffix compression.
+	 * Raw compression, the application builds disk images: applicable only
+	 * to row-and variable-length column-store objects.  Dictionary and
+	 * prefix compression must be turned off or we ignore raw-compression,
+	 * raw compression can't support either one.  (Technically, we could
+	 * still use the raw callback on column-store variable length internal
+	 * pages with dictionary compression configured, because dictionary
+	 * compression only applies to column-store leaf pages, but that seems
+	 * an unlikely use case.)
+	 */
+	r->raw_compression =
+	    btree->compressor != NULL &&
+	    btree->compressor->compress_raw != NULL &&
+	    page->type != WT_PAGE_COL_FIX &&
+	    btree->dictionary == 0 &&
+	    btree->prefix_compression == 0;
+
+	/*
+	 * Suffix compression shortens internal page keys by discarding trailing
+	 * bytes that aren't necessary for tree navigation.  We don't do suffix
+	 * compression if there is a custom collator because we don't know what
+	 * bytes a custom collator might use.  Some custom collators (for
+	 * example, a collator implementing reverse ordering of strings), won't
+	 * have any problem with suffix compression: if there's ever a reason to
+	 * implement suffix compression for custom collators, we can add a
+	 * setting to the collator, configured when the collator is added, that
+	 * turns on suffix compression.
+	 *
+	 * The raw compression routines don't even consider suffix compression,
+	 * but it doesn't hurt to confirm that.
 	 */
 	r->key_sfx_compress_conf = 0;
-	if (btree->collator == NULL && btree->internal_key_truncate)
+	if (btree->collator == NULL &&
+	    btree->internal_key_truncate && !r->raw_compression)
 		r->key_sfx_compress_conf = 1;
 
 	/* Prefix compression discards key's repeated prefix bytes. */
@@ -634,23 +668,6 @@ __rec_write_init(
 		WT_RET(__rec_dictionary_init(session,
 		    r, btree->dictionary < 100 ? 100 : btree->dictionary));
 	__rec_dictionary_reset(r);
-
-	/*
-	 * Raw compression, the application builds disk images: applicable only
-	 * to row-and variable-length column-store objects.  Dictionary and
-	 * prefix compression must be turned off or we ignore raw-compression,
-	 * raw compression can't support either one.  (Technically, we could
-	 * still use the raw callback on column-store variable length internal
-	 * pages with dictionary compression configured, because dictionary
-	 * compression only applies to column-store leaf pages, but that seems
-	 * an unlikely use case.)
-	 */
-	r->raw_compression =
-	    btree->compressor != NULL &&
-	    btree->compressor->compress_raw != NULL &&
-	    page->type != WT_PAGE_COL_FIX &&
-	    btree->dictionary == 0 &&
-	    btree->prefix_compression == 0;
 
 	/* Per-page reconciliation: track skipped updates. */
 	r->upd_skipped = 0;
@@ -882,17 +899,29 @@ __rec_split_init(WT_SESSION_IMPL *session,
 {
 	WT_BTREE *btree;
 	WT_PAGE_HEADER *dsk;
-	uint32_t corrected_max;
+	uint32_t corrected_page_size;
 
 	btree = session->btree;
 
 	/*
-	 * Ensure the disk image buffer is large enough for the max object,
-	 * as corrected by the underlying block manager.
+	 * Set the page sizes.  If we're doing the page layout, the maximum page
+	 * size is the same as the page size.  If the application is doing page
+	 * layout (raw compression is configured), we accumulate some amount of
+	 * additional data because we don't know how well it will compress, and
+	 * we don't want to increment our way up to the amount of data needed by
+	 * the application to successfully compress to the target page size.
 	 */
-	corrected_max = max;
-	WT_RET(__wt_bm_write_size(session, &corrected_max));
-	WT_RET(__wt_buf_init(session, &r->dsk, (size_t)corrected_max));
+	r->page_size = r->page_size_max = max;
+	if (r->raw_compression)
+		r->page_size *= 10;
+
+	/*
+	 * Ensure the disk image buffer is large enough for the max object, as
+	 * corrected by the underlying block manager.
+	 */
+	corrected_page_size = r->page_size;
+	WT_RET(__wt_bm_write_size(session, &corrected_page_size));
+	WT_RET(__wt_buf_init(session, &r->dsk, (size_t)corrected_page_size));
 
 	/*
 	 * Clear the header and set the page type (the type doesn't change, and
@@ -932,11 +961,13 @@ __rec_split_init(WT_SESSION_IMPL *session,
 	 * size, never anything smaller.  In raw compression, the underlying
 	 * compression routine decides when we split, so it's not our problem.
 	 */
-	r->page_size = max;
-	r->split_size =
-	    page->type == WT_PAGE_COL_FIX || r->raw_compression ?
-	    max :
-	    WT_SPLIT_PAGE_SIZE(max, btree->allocsize, btree->split_pct);
+	if (r->raw_compression)
+		r->split_size = 0;
+	else if (page->type == WT_PAGE_COL_FIX)
+		r->split_size = r->page_size;
+	else
+		r->split_size = WT_SPLIT_PAGE_SIZE(
+		    r->page_size, btree->allocsize, btree->split_pct);
 
 	/*
 	 * If the maximum page size is the same as the split page size, either
@@ -963,13 +994,17 @@ __rec_split_init(WT_SESSION_IMPL *session,
 	r->total_entries = 0;
 
 	/*
-	 * Set the caller's information and configure so the loop calls us
-	 * when approaching the split boundary.
+	 * Set the caller's information and configuration so the loop calls the
+	 * split function when approaching the split boundary.
 	 */
 	r->recno = recno;
 	r->entries = 0;
 	r->first_free = WT_PAGE_HEADER_BYTE(btree, dsk);
-	r->space_avail = r->split_size - WT_PAGE_HEADER_BYTE_SIZE(btree);
+	if (r->raw_compression)
+		r->space_avail = r->page_size - WT_PAGE_HEADER_BYTE_SIZE(btree);
+	else
+		r->space_avail =
+		    r->split_size - WT_PAGE_HEADER_BYTE_SIZE(btree);
 
 	/* New page, compression off. */
 	r->key_pfx_compress = r->key_sfx_compress = 0;
@@ -1267,7 +1302,7 @@ __rec_split_raw_worker(WT_SESSION_IMPL *session, WT_RECONCILE *r, int final)
 	WT_SESSION *wt_session;
 	size_t result_len;
 	uint64_t recno;
-	uint32_t entry, i, len, max, result_slots, slots;
+	uint32_t corrected_page_size, entry, i, len, result_slots, slots;
 	uint8_t *dsk_start;
 
 	wt_session = (WT_SESSION *)session;
@@ -1389,20 +1424,17 @@ __rec_split_raw_worker(WT_SESSION_IMPL *session, WT_RECONCILE *r, int final)
 
 	/*
 	 * Allocate a destination buffer and initialize it, then call the
-	 * compression function.
-	 *
-	 * Assumes the underlying compression routine won't require more memory
-	 * than the source buffer has.  We document the size of the destination
-	 * buffer to be the maximum object size (for a row-store leaf page, that
-	 * would be the maximum leaf page size), this shouldn't surprise anyone.
+	 * compression function.  We document the size of the destination
+	 * buffer to be the maximum object size.
 	 */
-	WT_RET(__wt_scr_alloc(session, r->dsk.memsize, &dst));
+	WT_RET(__wt_scr_alloc(session, r->page_size_max, &dst));
 	memcpy(dst->mem, dsk, WT_BLOCK_COMPRESS_SKIP);
 	WT_ERR(compressor->compress_raw(compressor, wt_session,
 	    (uint8_t *)dsk + WT_BLOCK_COMPRESS_SKIP,
 	    r->raw_offsets, slots,
 	    (uint8_t *)dst->mem + WT_BLOCK_COMPRESS_SKIP,
-	    dst->memsize - WT_BLOCK_COMPRESS_SKIP, &result_len, &result_slots));
+	    r->page_size_max -
+	    WT_BLOCK_COMPRESS_SKIP, &result_len, &result_slots));
 	dst->size = (uint32_t)result_len + WT_BLOCK_COMPRESS_SKIP;
 
 	if (result_slots != 0) {
@@ -1476,10 +1508,10 @@ more_rows:	/*
 		 * again after we accumulate some more rows.
 		 */
 		len = WT_PTRDIFF32(r->first_free, r->dsk.mem);
-		max = r->page_size * 2;
-		WT_ERR(__wt_bm_write_size(session, &max));
-		WT_ERR(__wt_buf_grow(session, &r->dsk, max));
-		r->page_size = max;
+		corrected_page_size = r->page_size * 2;
+		WT_ERR(__wt_bm_write_size(session, &corrected_page_size));
+		WT_ERR(__wt_buf_grow(session, &r->dsk, corrected_page_size));
+		r->page_size *= 2;
 		r->first_free = (uint8_t *)r->dsk.mem + len;
 		r->space_avail =
 		    r->page_size - (WT_PAGE_HEADER_BYTE_SIZE(btree) + len);

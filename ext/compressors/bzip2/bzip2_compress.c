@@ -226,29 +226,37 @@ bzip2_compress_raw(WT_COMPRESSOR *compressor, WT_SESSION *session,
 	 * be because the btree is wrapping up a page, but that's OK, that is
 	 * going to happen a lot.   In addition, add a 2% chance of not taking
 	 * anything at all just because we don't want to take it.  Otherwise,
-	 * select between 80 and 100% of the slots and compress them.
+	 * select between 80 and 100% of the slots and compress them, stepping
+	 * down by 5 slots at a time until something works.
 	 */
 	take = slots;
-	if (take < 10 || __bzip2_compress_raw_random() % 100 < 2) {
+	if (take < 10 || __bzip2_compress_raw_random() % 100 < 2)
 		take = 0;
-		*result_lenp = 0;
-		*result_slotsp = 0;
-	} else {
+	else {
 		twenty_pct = (slots / 10) * 2;
 		if (twenty_pct < slots)
 			take -= __bzip2_compress_raw_random() % twenty_pct;
 
-		if ((ret = bzip2_compress(compressor, session,
-		    src, offsets[take],
-		    dst, dst_len, result_lenp, &compression_failed)) != 0)
-			return (ret);
-		if (compression_failed) {
-			take = 0;
-			*result_lenp = 0;
-			*result_slotsp = 0;
-		} else
-			*result_slotsp = take;
+		for (;;) {
+			if ((ret = bzip2_compress(compressor, session,
+			    src, offsets[take],
+			    dst, dst_len,
+			    result_lenp, &compression_failed)) != 0)
+				return (ret);
+			if (!compression_failed)
+				break;
+			if (take < 10) {
+				take = 0;
+				break;
+			}
+			take -= 5;
+		}
 	}
+
+	*result_slotsp = take;
+	if (take == 0)
+		*result_lenp = 0;
+
 #if 0
 	fprintf(stderr,
 	    "bzip2_compress_raw: slots %" PRIu32 ", take %" PRIu32 ": %" PRIu32
