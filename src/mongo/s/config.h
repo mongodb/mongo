@@ -33,11 +33,6 @@
 
 namespace mongo {
 
-    struct ShardNS {
-        static string mongos;
-        static string settings;
-    };
-
     class ConfigServer;
 
     class DBConfig;

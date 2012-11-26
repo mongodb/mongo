@@ -549,7 +549,7 @@ namespace mongo {
            return;
         }
 
-        int csize = o["value"].numberInt();
+        int csize = o[SettingsFields::chunksize()].numberInt();
 
         // validate chunksize before proceeding
         if ( csize == 0 ) {

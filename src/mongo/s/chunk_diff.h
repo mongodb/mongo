@@ -1,4 +1,4 @@
-// @file chunk.h
+// @file chunk_diff.h
 
 /**
 *    Copyright (C) 2008 10gen Inc.
@@ -23,8 +23,7 @@
 #include "../client/dbclientcursor.h"
 #include "../client/connpool.h"
 
-// TODO: Ideally wouldn't need this, but ShardNS data isn't extracted from config.h
-#include "config.h"
+#include "mongo/s/chunk.h"
 
 namespace mongo {
 

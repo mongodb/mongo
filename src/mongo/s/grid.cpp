@@ -464,7 +464,8 @@ namespace mongo {
 
         try {
             // look for the stop balancer marker
-            balancerDoc = conn->get()->findOne( ShardNS::settings, BSON( "_id" << "balancer" ) );
+            balancerDoc = conn->get()->findOne( ConfigNS::settings,
+                                                BSON( SettingsFields::key("balancer") ) );
             if( ns.size() > 0 ) collDoc = conn->get()->findOne(ConfigNS::collection,
                                                                BSON( CollectionFields::name(ns)));
             conn->done();
@@ -492,7 +493,7 @@ namespace mongo {
     bool Grid::_balancerStopped( const BSONObj& balancerDoc ) {
         // check the 'stopped' marker maker
         // if present, it is a simple bool
-        BSONElement stoppedElem = balancerDoc["stopped"];
+        BSONElement stoppedElem = balancerDoc[SettingsFields::balancerStopped()];
         return stoppedElem.trueValue();
     }
 
@@ -500,7 +501,7 @@ namespace mongo {
         // check the 'activeWindow' marker
         // if present, it is an interval during the day when the balancer should be active
         // { start: "08:00" , stop: "19:30" }, strftime format is %H:%M
-        BSONElement windowElem = balancerDoc["activeWindow"];
+        BSONElement windowElem = balancerDoc[SettingsFields::balancerActiveWindow()];
         if ( windowElem.eoo() ) {
             return true;
         }
@@ -574,7 +575,8 @@ namespace mongo {
     BSONObj Grid::getConfigSetting( const std::string& name ) const {
         scoped_ptr<ScopedDbConnection> conn( ScopedDbConnection::getInternalScopedDbConnection(
                 configServer.getPrimary().getConnString() ) );
-        BSONObj result = conn->get()->findOne( ShardNS::settings, BSON( "_id" << name ) );
+        BSONObj result = conn->get()->findOne( ConfigNS::settings,
+                                               BSON( SettingsFields::key(name) ) );
         conn->done();
 
         return result;
@@ -600,10 +602,18 @@ namespace mongo {
             const string T3 = "21:30";
             const string E = "28:35";
 
-            BSONObj w1 = BSON( "activeWindow" << BSON( "start" << T0 << "stop" << T1 ) ); // closed in the past
-            BSONObj w2 = BSON( "activeWindow" << BSON( "start" << T2 << "stop" << T3 ) ); // not opened until the future
-            BSONObj w3 = BSON( "activeWindow" << BSON( "start" << T1 << "stop" << T2 ) ); // open now
-            BSONObj w4 = BSON( "activeWindow" << BSON( "start" << T3 << "stop" << T2 ) ); // open since last day
+            // closed in the past
+            BSONObj w1 = BSON( SettingsFields::balancerActiveWindow( BSON( "start" << T0 <<
+                                                                           "stop" << T1 ) ) );
+            // not opened until the future
+            BSONObj w2 = BSON( SettingsFields::balancerActiveWindow( BSON( "start" << T2 <<
+                                                                           "stop" << T3 ) ) );
+            // open now
+            BSONObj w3 = BSON( SettingsFields::balancerActiveWindow( BSON( "start" << T1 <<
+                                                                           "stop" << T2 ) ) );
+            // open since last day
+            BSONObj w4 = BSON( SettingsFields::balancerActiveWindow( BSON( "start" << T3 <<
+                                                                           "stop" << T2 ) ) );
 
             verify( ! Grid::_inBalancingWindow( w1 , now ) );
             verify( ! Grid::_inBalancingWindow( w2 , now ) );
@@ -612,11 +622,21 @@ namespace mongo {
 
             // bad input should not stop the balancer
 
-            BSONObj w5; // empty window
-            BSONObj w6 = BSON( "activeWindow" << BSON( "start" << 1 ) ); // missing stop
-            BSONObj w7 = BSON( "activeWindow" << BSON( "stop" << 1 ) ); // missing start
-            BSONObj w8 = BSON( "wrongMarker" << 1 << "start" << 1 << "stop" << 1 ); // active window marker missing
-            BSONObj w9 = BSON( "activeWindow" << BSON( "start" << T3 << "stop" << E ) ); // garbage in window
+            // empty window
+            BSONObj w5;
+
+            // missing stop
+            BSONObj w6 = BSON( SettingsFields::balancerActiveWindow( BSON( "start" << 1 ) ) );
+
+            // missing start
+            BSONObj w7 = BSON( SettingsFields::balancerActiveWindow( BSON( "stop" << 1 ) ) );
+
+            // active window marker missing
+            BSONObj w8 = BSON( "wrongMarker" << 1 << "start" << 1 << "stop" << 1 );
+
+            // garbage in window
+            BSONObj w9 = BSON( SettingsFields::balancerActiveWindow( BSON( "start" << T3 <<
+                                                                           "stop" << E ) ) );
 
             verify( Grid::_inBalancingWindow( w5 , now ) );
             verify( Grid::_inBalancingWindow( w6 , now ) );

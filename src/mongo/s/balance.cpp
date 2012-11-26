@@ -337,7 +337,8 @@ namespace mongo {
                     continue;
                 }
 
-                sleepTime = balancerConfig["_nosleep"].trueValue() ? 30 : 6;
+                sleepTime = balancerConfig[SettingsFields::shortBalancerSleep()].trueValue() ? 30 :
+                                                                                               6;
                 
                 uassert( 13258 , "oids broken after resetting!" , _checkOIDs() );
 
@@ -364,7 +365,8 @@ namespace mongo {
                         _balancedLastTime = 0;
                     }
                     else {
-                        _balancedLastTime = _moveChunks( &candidateChunks, balancerConfig["_secondaryThrottle"].trueValue() );
+                        _balancedLastTime = _moveChunks( &candidateChunks,
+                                                         balancerConfig[SettingsFields::secondaryThrottle()].trueValue() );
                     }
                     
                     LOG(1) << "*** end of balancing round" << endl;
