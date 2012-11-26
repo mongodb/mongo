@@ -136,13 +136,16 @@ file_config = format_meta + lsm_config + [
 		do not ever evict the object's pages; see @ref
 		tuning_cache_resident for more information''',
 		type='boolean'),
-	Config('checksum', 'true', r'''
-		configure file block checksums; if false, the block
-		manager is free to not write or check block checksums.
-		This can increase performance in applications where
-		compression provides checksum functionality or read-only
-		applications where blocks require no verification''',
-		type='boolean'),
+	Config('checksum', 'on', r'''
+		configure file block checksums; permitted values are
+		<code>on</code> (checksum all file blocks),
+		<code>off</code> (checksum no file blocks) and
+		<code>uncompresssed</code> (checksum only file blocks
+		which are not compressed for some reason).  The \c
+		uncompressed value is for applications which can
+		reasonably rely on decompression to fail if a block has
+		been corrupted''',
+		choices=['on', 'off', 'uncompressed']),
 	Config('collator', '', r'''
 		configure custom collation for keys.  Value must be a collator
 		name created with WT_CONNECTION::add_collator'''),
@@ -171,7 +174,9 @@ file_config = format_meta + lsm_config + [
 		the maximum page size for internal nodes, in bytes; the size
 		must be a multiple of the allocation size and is significant
 		for applications wanting to avoid excessive L2 cache misses
-		while searching the tree''',
+		while searching the tree.  The page maximum is the bytes of
+		uncompressed data, that is, the limit is applied before any
+		block compression is done''',
 		min='512B', max='512MB'),
 	Config('internal_item_max', '0', r'''
 		the maximum key size stored on internal nodes, in bytes.  If
@@ -187,7 +192,9 @@ file_config = format_meta + lsm_config + [
 		the maximum page size for leaf nodes, in bytes; the size must
 		be a multiple of the allocation size, and is significant for
 		applications wanting to maximize sequential data transfer from
-		a storage device''',
+		a storage device.  The page maximum is the bytes of uncompressed
+		data, that is, the limit is applied before any block compression
+		is done''',
 		min='512B', max='512MB'),
 	Config('leaf_item_max', '0', r'''
 		the maximum key or value size stored on leaf nodes, in bytes.
@@ -302,7 +309,13 @@ methods = {
 
 'session.close' : Method([]),
 
-'session.compact' : Method([]),
+'session.compact' : Method([
+	Config('trigger', '30', r'''
+		Compaction will not be attempted unless the specified
+		percentage of the underlying objects is expected to be
+		recovered by compaction''',
+		min='10', max='50'),
+]),
 
 'session.create' : Method(table_meta + file_config + source_meta + [
 	Config('exclusive', 'false', r'''

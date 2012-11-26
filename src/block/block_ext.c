@@ -931,13 +931,13 @@ __block_merge(WT_SESSION_IMPL *session, WT_EXTLIST *el, off_t off, off_t size)
  */
 int
 __wt_block_extlist_read_avail(
-    WT_SESSION_IMPL *session, WT_BLOCK *block, WT_EXTLIST *el)
+    WT_SESSION_IMPL *session, WT_BLOCK *block, WT_EXTLIST *el, off_t ckpt_size)
 {
 	/* If there isn't a list, we're done. */
 	if (el->offset == WT_BLOCK_INVALID_OFFSET)
 		return (0);
 
-	WT_RET(__wt_block_extlist_read(session, block, el));
+	WT_RET(__wt_block_extlist_read(session, block, el, ckpt_size));
 
 	/*
 	 * Extent blocks are allocated from the available list: if reading the
@@ -955,12 +955,12 @@ __wt_block_extlist_read_avail(
  */
 int
 __wt_block_extlist_read(
-    WT_SESSION_IMPL *session, WT_BLOCK *block, WT_EXTLIST *el)
+    WT_SESSION_IMPL *session, WT_BLOCK *block, WT_EXTLIST *el, off_t ckpt_size)
 {
 	WT_DECL_ITEM(tmp);
 	WT_DECL_RET;
 	off_t off, size;
-	uint8_t *p;
+	const uint8_t *p;
 
 	/* If there isn't a list, we're done. */
 	if (el->offset == WT_BLOCK_INVALID_OFFSET)
@@ -971,8 +971,9 @@ __wt_block_extlist_read(
 	    session, block, tmp, el->offset, el->size, el->cksum));
 
 #define	WT_EXTLIST_READ(p, v) do {					\
-	(v) = *(off_t *)(p);						\
-	(p) += sizeof(off_t);						\
+	uint64_t _v;							\
+	WT_ERR(__wt_vunpack_uint(&(p), 0, &_v));			\
+	(v) = (off_t)_v;						\
 } while (0)
 
 	p = WT_BLOCK_HEADER_BYTE(tmp->mem);
@@ -989,14 +990,14 @@ __wt_block_extlist_read(
 		/*
 		 * We check the offset/size pairs represent valid file ranges,
 		 * then insert them into the list.  We don't necessarily have
-		 * to check for offsets past the end-of-file, but it's a cheap
-		 * and easy test to do here and we'd have to do the check as
-		 * part of file verification, regardless.
+		 * to check for offsets past the end of the checkpoint, but it's
+		 * a cheap test to do here and we'd have to do the check as part
+		 * of file verification, regardless.
 		 */
 		if (off < WT_BLOCK_DESC_SECTOR ||
 		    (off - WT_BLOCK_DESC_SECTOR) % block->allocsize != 0 ||
 		    size % block->allocsize != 0 ||
-		    off + size > block->fh->file_size)
+		    off + size > ckpt_size)
 corrupted:		WT_ERR_MSG(session, WT_ERROR,
 			    "file contains a corrupted %s extent list, range %"
 			    PRIdMAX "-%" PRIdMAX " past end-of-file",
@@ -1032,7 +1033,7 @@ __wt_block_extlist_write(WT_SESSION_IMPL *session,
 	WT_DECL_RET;
 	WT_EXT *ext;
 	WT_PAGE_HEADER *dsk;
-	uint32_t datasize, entries, size;
+	uint32_t entries, size;
 	uint8_t *p;
 
 	if (WT_VERBOSE_ISSET(session, block))
@@ -1052,27 +1053,21 @@ __wt_block_extlist_write(WT_SESSION_IMPL *session,
 
 	/*
 	 * Get a scratch buffer, clear the page's header and data, initialize
-	 * the header.  Allocate an allocation-sized aligned buffer so the
-	 * block write function can zero-out unused bytes and write it without
-	 * copying to something larger.
+	 * the header.
 	 *
 	 * Allocate memory for the extent list entries plus two additional
 	 * entries: the initial WT_BLOCK_EXTLIST_MAGIC/0 pair and the list-
 	 * terminating WT_BLOCK_INVALID_OFFSET/0 pair.
 	 */
-	datasize = size = (entries + 2) * WT_STORE_SIZE(sizeof(off_t)  * 2);
+	size = (entries + 2) * WT_INTPACK64_MAXSIZE;
 	WT_RET(__wt_block_write_size(session, block, &size));
 	WT_RET(__wt_scr_alloc(session, size, &tmp));
 	dsk = tmp->mem;
 	memset(dsk, 0, WT_BLOCK_HEADER_BYTE_SIZE);
-	dsk->u.datalen = WT_STORE_SIZE(datasize);
 	dsk->type = WT_PAGE_BLOCK_MANAGER;
-	tmp->size = WT_STORE_SIZE(WT_BLOCK_HEADER_BYTE_SIZE + datasize);
 
-#define	WT_EXTLIST_WRITE(p, v) do {					\
-	*(off_t *)(p) = (v);						\
-	(p) += sizeof(off_t);						\
-} while (0)
+#define	WT_EXTLIST_WRITE(p, v)						\
+	WT_ERR(__wt_vpack_uint(&(p), 0, (uint64_t)(v)))
 
 	/* Fill the page's data. */
 	p = WT_BLOCK_HEADER_BYTE(dsk);
@@ -1090,9 +1085,23 @@ __wt_block_extlist_write(WT_SESSION_IMPL *session,
 	WT_EXTLIST_WRITE(p, WT_BLOCK_INVALID_OFFSET);	/* Ending value */
 	WT_EXTLIST_WRITE(p, 0);
 
+	dsk->u.datalen =
+	    WT_STORE_SIZE(WT_PTRDIFF32(p, WT_BLOCK_HEADER_BYTE(dsk)));
+	dsk->mem_size = tmp->size = WT_STORE_SIZE(WT_PTRDIFF32(p, dsk));
+
+#ifdef HAVE_DIAGNOSTIC
+	/*
+	 * The extent list is written as a valid btree page because the salvage
+	 * functionality might move into the btree layer some day, besides, we
+	 * don't need another format and this way the page format can be easily
+	 * verified.
+	 */
+	WT_ERR(__wt_verify_dsk(session, "[extent list check]", tmp));
+#endif
+
 	/* Write the extent list to disk. */
 	WT_ERR(__wt_block_write_off(
-	    session, block, tmp, &el->offset, &el->size, &el->cksum, 1));
+	    session, block, tmp, &el->offset, &el->size, &el->cksum, 1, 1));
 
 	WT_VERBOSE_ERR(session, block,
 	    "%s written %" PRIdMAX "/%" PRIu32,

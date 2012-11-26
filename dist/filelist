@@ -5,7 +5,6 @@ src/api/api_strerror.c
 src/api/api_version.c
 src/block/block_addr.c
 src/block/block_ckpt.c
-src/block/block_cksum.c
 src/block/block_compact.c
 src/block/block_ext.c
 src/block/block_mgr.c
@@ -25,6 +24,7 @@ src/btree/bt_discard.c
 src/btree/bt_evict.c
 src/btree/bt_handle.c
 src/btree/bt_huffman.c
+src/btree/bt_io.c
 src/btree/bt_misc.c
 src/btree/bt_ovfl.c
 src/btree/bt_page.c
@@ -50,10 +50,10 @@ src/config/config_check.c
 src/config/config_collapse.c
 src/config/config_concat.c
 src/config/config_def.c
-src/conn/conn_cache.c
-src/conn/conn_cache_pool.c
 src/conn/conn_api.c
 src/conn/conn_btree.c
+src/conn/conn_cache.c
+src/conn/conn_cache_pool.c
 src/conn/conn_handle.c
 src/conn/conn_open.c
 src/conn/conn_stat.c
@@ -116,6 +116,7 @@ src/schema/schema_worker.c
 src/session/session_api.c
 src/session/session_btree.c
 src/session/session_salvage.c
+src/support/cksum.c
 src/support/err.c
 src/support/filename.c
 src/support/global.c

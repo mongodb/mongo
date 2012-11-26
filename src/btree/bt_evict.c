@@ -737,7 +737,7 @@ __evict_get_page(
 	WT_CACHE *cache;
 	WT_EVICT_ENTRY *evict;
 	WT_REF *ref;
-	int candidates;
+	uint32_t candidates;
 
 	cache = S2C(session)->cache;
 	*btreep = NULL;

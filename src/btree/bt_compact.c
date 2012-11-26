@@ -14,14 +14,16 @@
 int
 __wt_compact(WT_SESSION_IMPL *session, const char *cfg[])
 {
+	WT_CONFIG_ITEM cval;
 	WT_DECL_RET;
 	WT_PAGE *page;
-	int skip;
+	int trigger, skip;
 
-	WT_UNUSED(cfg);
+	WT_RET(__wt_config_gets(session, cfg, "trigger", &cval));
+	trigger = (int)cval.val;
 
 	/* Check if compaction might be useful. */
-	WT_RET(__wt_bm_compact_skip(session, &skip));
+	WT_RET(__wt_bm_compact_skip(session, trigger, &skip));
 	if (skip)
 		return (0);
 

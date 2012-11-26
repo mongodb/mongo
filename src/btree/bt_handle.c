@@ -46,12 +46,12 @@ __wt_btree_open(WT_SESSION_IMPL *session,
 	WT_BTREE *btree;
 	WT_CONFIG_ITEM cval;
 	WT_DECL_RET;
-	WT_ITEM dsk;
-	const char *filename;
+	uint32_t root_addr_size;
 	int created, forced_salvage;
+	const char *filename;
+	uint8_t root_addr[WT_BTREE_MAX_ADDR_COOKIE];
 
 	btree = session->btree;
-	WT_CLEAR(dsk);
 
 	/* Initialize and configure the WT_BTREE structure. */
 	WT_ERR(__btree_conf(session, cfg));
@@ -96,12 +96,13 @@ __wt_btree_open(WT_SESSION_IMPL *session,
 	 * either there is no checkpoint (the file is being created), or the
 	 * load call returns no root page (the checkpoint is for an empty file).
 	 */
-	WT_ERR(
-	    __wt_bm_checkpoint_load(session, &dsk, addr, addr_size, readonly));
-	if (created || dsk.size == 0)
+	WT_ERR(__wt_bm_checkpoint_load(
+	    session, addr, addr_size, root_addr, &root_addr_size, readonly));
+	if (created || root_addr_size == 0)
 		WT_ERR(__btree_tree_open_empty(session, created));
 	else {
-		WT_ERR(__wt_btree_tree_open(session, &dsk));
+		WT_ERR(
+		    __wt_btree_tree_open(session, root_addr, root_addr_size));
 
 		/* Get the last record number in a column-store file. */
 		if (btree->type != BTREE_ROW)
@@ -109,8 +110,7 @@ __wt_btree_open(WT_SESSION_IMPL *session,
 	}
 
 	if (0) {
-err:		__wt_buf_free(session, &dsk);
-		(void)__wt_btree_close(session);
+err:		(void)__wt_btree_close(session);
 	}
 
 	return (ret);
@@ -164,6 +164,7 @@ __btree_conf(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_NAMED_COLLATOR *ncoll;
+	WT_NAMED_COMPRESSOR *ncomp;
 	uint32_t bitcnt;
 	int fixed;
 	const char *config;
@@ -242,21 +243,82 @@ __btree_conf(WT_SESSION_IMPL *session, const char *cfg[])
 			    WT_BTREE_NO_EVICTION | WT_BTREE_NO_HAZARD);
 	}
 
+	/* Checksums */
+	WT_RET(__wt_config_getones(session, config, "checksum", &cval));
+	if (WT_STRING_MATCH("on", cval.str, cval.len))
+		btree->checksum = CKSUM_ON;
+	else if (WT_STRING_MATCH("off", cval.str, cval.len))
+		btree->checksum = CKSUM_OFF;
+	else
+		btree->checksum = CKSUM_UNCOMPRESSED;
+
 	/* Huffman encoding */
 	WT_RET(__wt_btree_huffman_open(session, config));
 
-	/* Reconciliation configuration. */
-	WT_RET(__wt_config_getones(session, config, "dictionary", &cval));
-	btree->dictionary = (u_int)cval.val;
-	WT_RET(__wt_config_getones(
-	    session, config, "internal_key_truncate", &cval));
-	btree->internal_key_truncate = cval.val == 0 ? 0 : 1;
-	WT_RET(
-	    __wt_config_getones(session, config, "prefix_compression", &cval));
-	btree->prefix_compression = cval.val == 0 ? 0 : 1;
+	/*
+	 * Reconciliation configuration:
+	 *	Block compression (all)
+	 *	Dictionary compression (variable-length column-store, row-store)
+	 *	Page-split percentage
+	 *	Prefix compression (row-store)
+	 *	Suffix compression (row-store)
+	 */
+	switch (btree->type) {
+	case BTREE_COL_FIX:
+		break;
+	case BTREE_ROW:
+		WT_RET(__wt_config_getones(
+		    session, config, "internal_key_truncate", &cval));
+		btree->internal_key_truncate = cval.val == 0 ? 0 : 1;
+
+		WT_RET(__wt_config_getones(
+		    session, config, "prefix_compression", &cval));
+		btree->prefix_compression = cval.val == 0 ? 0 : 1;
+		/* FALLTHROUGH */
+	case BTREE_COL_VAR:
+		WT_RET(
+		    __wt_config_getones(session, config, "dictionary", &cval));
+		btree->dictionary = (u_int)cval.val;
+		break;
+	}
+
 	WT_RET(__wt_config_getones(session, config, "split_pct", &cval));
 	btree->split_pct = (u_int)cval.val;
 
+	WT_RET(__wt_config_getones(session, config, "block_compressor", &cval));
+	if (cval.len > 0) {
+		TAILQ_FOREACH(ncomp, &conn->compqh, q)
+			if (WT_STRING_MATCH(ncomp->name, cval.str, cval.len)) {
+				btree->compressor = ncomp->compressor;
+				break;
+			}
+		if (btree->compressor == NULL)
+			WT_RET_MSG(session, EINVAL,
+			    "unknown block compressor '%.*s'",
+			    (int)cval.len, cval.str);
+	}
+	if (btree->compressor != NULL &&
+	    btree->compressor->compress_raw != NULL)
+		switch (btree->type) {
+		case BTREE_COL_FIX:
+			WT_RET_MSG(session, EINVAL,
+			    "WT_COMPRESSOR::compress_raw is not applicable to "
+			    "fixed-size column-store objects");
+		case BTREE_ROW:
+			if (btree->prefix_compression)
+				WT_RET_MSG(session, EINVAL,
+				    "WT_COMPRESSOR::compress_raw may not be "
+				    "combined with prefix compression");
+			/* FALLTHROUGH */
+		case BTREE_COL_VAR:
+			if (btree->dictionary)
+				WT_RET_MSG(session, EINVAL,
+				    "WT_COMPRESSOR::compress_raw may not be "
+				    "combined with dictionary compression");
+			break;
+		}
+
+	/* Overflow lock. */
 	WT_RET(__wt_rwlock_alloc(
 	    session, "btree overflow lock", &btree->val_ovfl_lock));
 
@@ -273,18 +335,31 @@ __btree_conf(WT_SESSION_IMPL *session, const char *cfg[])
  *	Read in a tree from disk.
  */
 int
-__wt_btree_tree_open(WT_SESSION_IMPL *session, WT_ITEM *dsk)
+__wt_btree_tree_open(
+    WT_SESSION_IMPL *session, const uint8_t *addr, uint32_t addr_size)
 {
 	WT_BTREE *btree;
+	WT_DECL_RET;
+	WT_ITEM dsk;
 	WT_PAGE *page;
 
 	btree = session->btree;
 
-	/* Build the in-memory version of the page. */
-	WT_RET(__wt_page_inmem(session, NULL, NULL, dsk->mem, &page));
+	/*
+	 * A buffer into which we read a root page; don't use a scratch buffer,
+	 * the buffer's allocated memory becomes the persistent in-memory page.
+	 */
+	WT_CLEAR(dsk);
+
+	/* Read the page, then build the in-memory version of the page. */
+	WT_ERR(__wt_bt_read(session, &dsk, addr, addr_size));
+	WT_ERR(__wt_page_inmem(session, NULL, NULL, dsk.mem, &page));
 	btree->root_page = page;
 
-	return (0);
+	if (0) {
+err:		__wt_buf_free(session, &dsk);
+	}
+	return (ret);
 }
 
 /*

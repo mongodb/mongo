@@ -1,8 +1,35 @@
 /*! @page upgrading Upgrading WiredTiger applications
 
-@section version_138 Upgrading to Version 1.3.8
-
+@section version_139 Upgrading to Version 1.3.9
 <dl>
+
+<dt>Compression</dt>
+<dd>
+A new member, WT_COMPRESSOR::compress_raw, was added to the WT_COMPRESSOR
+extension API.  Applications using the WT_COMPRESSOR extension API should
+add a NULL as the second field of that structure.
+</dd>
+
+<dt>Checksums</dt>
+<dd>
+The WT_SESSION::create method's \c checksum configuration string has
+been changed from a boolean type to a string type.  Applications using
+the checksum configuration string should change a value of \c true to
+the string \c on, and a value of \c false to the string \c off or the
+string \c uncompressed.
+</dd>
+
+<dt>File format changes</dt>
+<dd>
+The underlying file formats changed in the 1.3.9 release; tables and files
+should be dumped and re-loaded into a new database.
+</dd>
+
+</dl>
+<hr>
+@section version_138 Upgrading to Version 1.3.8
+<dl>
+
 <dt>Statistics keys</dt>
 <dd>
 The @ref statistics_keys "statistics key constants" have been renamed to use
@@ -10,6 +37,8 @@ all capitals, and use consistent prefixes to distinguish between connection
 statistics and statistics for data sources.
 </dd>
 
+</dl>
+<hr>
 @section version_136 Upgrading to Version 1.3.6
 <dl>
 
@@ -61,7 +90,6 @@ should be dumped and re-loaded into a new database.
 </dl>
 <hr>
 @section version_13 Upgrading to Version 1.3
-
 <dl>
 
 <dt>Checkpoint and Snapshot</dt>

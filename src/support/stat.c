@@ -12,15 +12,17 @@ __wt_stat_alloc_dsrc_stats(WT_SESSION_IMPL *session, WT_DSRC_STATS **statsp)
 	stats->block_alloc.desc = "block allocations";
 	stats->block_extend.desc = "block allocations required file extension";
 	stats->block_free.desc = "block frees";
-	stats->bloom_count.desc = "Number of Bloom filters in the LSM tree";
+	stats->bloom_count.desc = "number of Bloom filters in the LSM tree";
 	stats->bloom_false_positive.desc =
-	    "Number of Bloom filter false positives";
-	stats->bloom_hit.desc = "Number of Bloom filter hits";
-	stats->bloom_miss.desc = "Number of Bloom filter misses";
+	    "number of Bloom filter false positives";
+	stats->bloom_hit.desc = "number of Bloom filter hits";
+	stats->bloom_miss.desc = "number of Bloom filter misses";
 	stats->bloom_page_evict.desc =
-	    "Number of Bloom pages evicted from cache";
-	stats->bloom_page_read.desc = "Number of Bloom pages read into cache";
-	stats->bloom_size.desc = "Total size of Bloom filters";
+	    "number of Bloom pages evicted from cache";
+	stats->bloom_page_read.desc = "number of Bloom pages read into cache";
+	stats->bloom_size.desc = "total size of Bloom filters";
+	stats->byte_read.desc = "bytes read into cache";
+	stats->byte_write.desc = "bytes written from cache";
 	stats->ckpt_size.desc = "checkpoint size";
 	stats->cursor_insert.desc = "cursor-inserts";
 	stats->cursor_read.desc = "cursor-read";
@@ -43,11 +45,11 @@ __wt_stat_alloc_dsrc_stats(WT_SESSION_IMPL *session, WT_DSRC_STATS **statsp)
 	stats->file_maxleafpage.desc = "maximum leaf page size";
 	stats->file_minor.desc = "minor version number";
 	stats->file_size.desc = "file size";
-	stats->lsm_chunk_count.desc = "Number of chunks in the LSM tree";
+	stats->lsm_chunk_count.desc = "number of chunks in the LSM tree";
 	stats->lsm_generation_max.desc =
-	    "Highest merge generation in the LSM tree";
+	    "highest merge generation in the LSM tree";
 	stats->lsm_lookup_no_bloom.desc =
-	    "Number of queries that could have benefited from a Bloom filter that did not exist";
+	    "number of queries that could have benefited from a Bloom filter that did not exist";
 	stats->overflow_page.desc = "overflow pages";
 	stats->overflow_read.desc = "overflow pages read into cache";
 	stats->overflow_value_cache.desc = "overflow values cached in memory";
@@ -71,7 +73,7 @@ __wt_stat_alloc_dsrc_stats(WT_SESSION_IMPL *session, WT_DSRC_STATS **statsp)
 	stats->rec_page_merge.desc = "deleted or temporary pages merged";
 	stats->rec_split_intl.desc = "internal pages split";
 	stats->rec_split_leaf.desc = "leaf pages split";
-	stats->rec_written.desc = "pages written";
+	stats->rec_written.desc = "pages written from reconciliation";
 	stats->txn_update_conflict.desc = "update conflicts";
 	stats->txn_write_conflict.desc = "write generation conflicts";
 
@@ -95,6 +97,8 @@ __wt_stat_clear_dsrc_stats(WT_STATS *stats_arg)
 	stats->bloom_page_evict.v = 0;
 	stats->bloom_page_read.v = 0;
 	stats->bloom_size.v = 0;
+	stats->byte_read.v = 0;
+	stats->byte_write.v = 0;
 	stats->ckpt_size.v = 0;
 	stats->cursor_insert.v = 0;
 	stats->cursor_read.v = 0;
@@ -155,6 +159,8 @@ __wt_stat_alloc_connection_stats(WT_SESSION_IMPL *session, WT_CONNECTION_STATS *
 
 	stats->block_read.desc = "blocks read from a file";
 	stats->block_write.desc = "blocks written to a file";
+	stats->byte_read.desc = "bytes read from a file";
+	stats->byte_write.desc = "bytes written to a file";
 	stats->cache_bytes_inuse.desc =
 	    "cache: bytes currently held in the cache";
 	stats->cache_bytes_max.desc = "cache: maximum bytes configured";
@@ -195,6 +201,8 @@ __wt_stat_clear_connection_stats(WT_STATS *stats_arg)
 	stats = (WT_CONNECTION_STATS *)stats_arg;
 	stats->block_read.v = 0;
 	stats->block_write.v = 0;
+	stats->byte_read.v = 0;
+	stats->byte_write.v = 0;
 	stats->cache_evict_hazard.v = 0;
 	stats->cache_evict_internal.v = 0;
 	stats->cache_evict_modified.v = 0;

@@ -47,6 +47,7 @@ CURSORs
 CURSTD
 CallsCustDate
 Checksum
+Checksums
 CityHash
 Comparator
 Config
@@ -464,6 +465,7 @@ lex
 lexicographically
 lf
 lfence
+libs
 lld
 llll
 llu
@@ -575,9 +577,11 @@ readprev
 readserver
 realloc
 recno
+recnos
 req
 rescan
 resizing
+resultp
 ret
 retp
 rf
@@ -608,6 +612,7 @@ sizep
 sizev
 skiplist
 skiplists
+slotsp
 slvg
 snaplen
 snprintf
@@ -701,6 +706,7 @@ uB
 uint
 unbare
 uncompressing
+uncompresssed
 undef
 unesc
 unescaped

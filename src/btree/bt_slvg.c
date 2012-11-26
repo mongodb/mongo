@@ -136,8 +136,7 @@ static int  __slvg_trk_ovfl(WT_SESSION_IMPL *,
  *	Salvage a Btree.
  */
 int
-__wt_bt_salvage(
-    WT_SESSION_IMPL *session, WT_CKPT *ckptbase, const char *cfg[])
+__wt_bt_salvage(WT_SESSION_IMPL *session, WT_CKPT *ckptbase, const char *cfg[])
 {
 	WT_BTREE *btree;
 	WT_DECL_RET;
@@ -322,15 +321,27 @@ __slvg_read(WT_SESSION_IMPL *session, WT_STUFF *ss)
 	WT_ERR(__wt_scr_alloc(session, 0, &buf));
 
 	for (;;) {
+		/* Get the next block address from the block manager. */
 		WT_ERR(__wt_bm_salvage_next(
-		    session, buf, addrbuf, &addrbuf_size, &gen, &eof));
+		    session, addrbuf, &addrbuf_size, &gen, &eof));
 		if (eof)
 			break;
-		dsk = buf->mem;
 
-		/* Report progress every 10 reads. */
+		/* Report progress every 10 chunks. */
 		if (++ss->fcnt % 10 == 0)
 			WT_ERR(__wt_progress(session, NULL, ss->fcnt));
+
+		/*
+		 * Read (and potentially decompress) the block; the underlying
+		 * block manager might only return good blocks if checksums are
+		 * configured, else we may be relying on compression.  If the
+		 * read fails, simply move to the next potential block.
+		 */
+		if (__wt_bt_read(session, buf, addrbuf, addrbuf_size) != 0)
+			continue;
+
+		/* Tell the block manager we're taking this one. */
+		WT_ERR(__wt_bm_salvage_valid(session, addrbuf, addrbuf_size));
 
 		/* Create a printable version of the address. */
 		WT_ERR(__wt_bm_addr_string(session, as, addrbuf, addrbuf_size));
@@ -344,6 +355,7 @@ __slvg_read(WT_SESSION_IMPL *session, WT_STUFF *ss)
 		 * grow as little as possible, or shrink, and future salvage
 		 * calls don't need them either.
 		 */
+		dsk = buf->mem;
 		switch (dsk->type) {
 		case WT_PAGE_BLOCK_MANAGER:
 		case WT_PAGE_COL_INT:
@@ -466,7 +478,8 @@ __slvg_trk_leaf(WT_SESSION_IMPL *session, WT_PAGE_HEADER *dsk,
 		   (ss->pages_next + 1000) * sizeof(WT_TRACK *), &ss->pages));
 
 	/* Allocate a WT_TRACK entry for this new page and fill it in. */
-	WT_RET(__slvg_trk_init(session, addr, size, dsk->size, gen, ss, &trk));
+	WT_RET(
+	    __slvg_trk_init(session, addr, size, dsk->mem_size, gen, ss, &trk));
 
 	switch (dsk->type) {
 	case WT_PAGE_COL_FIX:
@@ -573,7 +586,8 @@ __slvg_trk_ovfl(WT_SESSION_IMPL *session, WT_PAGE_HEADER *dsk,
 		WT_RET(__wt_realloc(session, &ss->ovfl_allocated,
 		   (ss->ovfl_next + 1000) * sizeof(WT_TRACK *), &ss->ovfl));
 
-	WT_RET(__slvg_trk_init(session, addr, size, dsk->size, gen, ss, &trk));
+	WT_RET(
+	    __slvg_trk_init(session, addr, size, dsk->mem_size, gen, ss, &trk));
 	ss->ovfl[ss->ovfl_next++] = trk;
 
 	return (0);
@@ -1575,7 +1589,7 @@ __slvg_row_trk_update_start(
 	 * page successfully).
 	 */
 	WT_RET(__wt_scr_alloc(session, trk->size, &dsk));
-	WT_ERR(__wt_bm_read(session, dsk, trk->addr.addr, trk->addr.size));
+	WT_ERR(__wt_bt_read(session, dsk, trk->addr.addr, trk->addr.size));
 	WT_ERR(__wt_page_inmem(session, NULL, NULL, dsk->mem, &page));
 
 	/*

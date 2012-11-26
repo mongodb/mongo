@@ -49,8 +49,9 @@ __wt_verify(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_BTREE *btree;
 	WT_CKPT *ckptbase, *ckpt;
 	WT_DECL_RET;
-	WT_ITEM dsk;
 	WT_VSTUFF *vs, _vstuff;
+	uint32_t root_addr_size;
+	uint8_t root_addr[WT_BTREE_MAX_ADDR_COOKIE];
 
 	btree = session->btree;
 	ckptbase = NULL;
@@ -88,16 +89,14 @@ __wt_verify(WT_SESSION_IMPL *session, const char *cfg[])
 		/* House-keeping between checkpoints. */
 		__verify_checkpoint_reset(vs);
 
-		/*
-		 * Load the checkpoint -- if the size of the root page is 0, the
-		 * file is empty.
-		 */
-		WT_CLEAR(dsk);
-		WT_ERR(__wt_bm_checkpoint_load(
-		    session, &dsk, ckpt->raw.data, ckpt->raw.size, 1));
-		if (dsk.size != 0) {
+		/* Load the checkpoint, ignore trees with no root page. */
+		WT_ERR(__wt_bm_checkpoint_load(session,
+		    ckpt->raw.data, ckpt->raw.size,
+		    root_addr, &root_addr_size, 1));
+		if (root_addr_size != 0) {
 			/* Verify then discard the checkpoint from the cache. */
-			if ((ret = __wt_btree_tree_open(session, &dsk)) == 0) {
+			if ((ret = __wt_btree_tree_open(
+			    session, root_addr, root_addr_size)) == 0) {
 				ret = __verify_tree(
 				    session, btree->root_page, vs);
 				WT_TRET(__wt_bt_cache_flush(
@@ -577,7 +576,7 @@ __verify_overflow(WT_SESSION_IMPL *session,
 	WT_PAGE_HEADER *dsk;
 
 	/* Read and verify the overflow item. */
-	WT_RET(__wt_bm_read(session, vs->tmp1, addr, addr_size));
+	WT_RET(__wt_bt_read(session, vs->tmp1, addr, addr_size));
 
 	/*
 	 * The physical page has already been verified, but we haven't confirmed

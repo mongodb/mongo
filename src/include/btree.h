@@ -102,12 +102,17 @@ struct __wt_btree {
 	void *huffman_key;		/* Key huffman encoding */
 	void *huffman_value;		/* Value huffman encoding */
 
+	enum {	CKSUM_ON=1,		/* On */
+		CKSUM_OFF=2,		/* Off */
+		CKSUM_UNCOMPRESSED=3	/* Uncompressed blocks only */
+	} checksum;			/* Checksum configuration */
+
 	u_int dictionary;		/* Reconcile: dictionary slots */
 	int   internal_key_truncate;	/* Reconcile: internal key truncate */
 	int   prefix_compression;	/* Reconcile: key prefix compression */
 	u_int split_pct;		/* Reconcile: split page percent */
-
-	WT_RWLOCK *val_ovfl_lock;	/* Overflow value lock */
+	WT_COMPRESSOR *compressor;	/* Reconcile: page compressor */
+	WT_RWLOCK *val_ovfl_lock;	/* Reconcile: overflow value lock */
 
 	uint64_t last_recno;		/* Column-store last record number */
 

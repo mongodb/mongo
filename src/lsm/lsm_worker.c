@@ -166,7 +166,7 @@ __wt_lsm_checkpoint_worker(void *arg)
 			    chunk->uri, __wt_checkpoint, cfg, 0));
 
 			if (ret != 0) {
-				(void)__wt_err(session, ret,
+				__wt_err(session, ret,
 				    "LSM checkpoint failed");
 				break;
 			}
@@ -179,7 +179,7 @@ __wt_lsm_checkpoint_worker(void *arg)
 			__wt_rwunlock(session, lsm_tree->rwlock);
 
 			if (ret != 0) {
-				(void)__wt_err(session, ret,
+				__wt_err(session, ret,
 				    "LSM checkpoint metadata write failed");
 				break;
 			}

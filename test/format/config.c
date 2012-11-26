@@ -28,8 +28,10 @@
 #include "format.h"
 #include "config.h"
 
+static void	   config_compression(void);
 static const char *config_file_type(u_int);
 static CONFIG	  *config_find(const char *, size_t);
+static int	   config_find_is_perm(const char *, size_t);
 static u_int	   config_translate(const char *);
 
 /*
@@ -40,7 +42,6 @@ void
 config_setup(void)
 {
 	CONFIG *cp;
-	const char *cstr;
 
 	/* Clear any temporary values. */
 	config_clear();
@@ -50,8 +51,7 @@ config_setup(void)
 	 * trees are only compatible with row-store) and other items depend on
 	 * them.
 	 */
-	cp = config_find("data_source", strlen("data_source"));
-	if (!(cp->flags & C_PERM))
+	if (!config_find_is_perm("data_source", strlen("data_source")))
 		switch (MMRAND(0, 2)) {
 		case 0:
 			config_single("data_source=file", 0);
@@ -66,8 +66,7 @@ config_setup(void)
 			break;
 		}
 
-	cp = config_find("file_type", strlen("file_type"));
-	if (!(cp->flags & C_PERM)) {
+	if (!config_find_is_perm("file_type", strlen("file_type"))) {
 		if (strcmp(g.c_data_source, "lsm") == 0)
 			config_single("file_type=row", 0);
 		else
@@ -96,48 +95,6 @@ config_setup(void)
 		exit(EXIT_FAILURE);
 	}
 
-	/*
-	 * Compression: choose something if compression wasn't specified,
-	 * otherwise confirm the appropriate shared library is available.
-	 */
-	cp = config_find("compression", strlen("compression"));
-	if (!(cp->flags & C_PERM)) {
-		cstr = "compression=none";
-		switch (MMRAND(0, 9)) {
-		case 0:					/* 10% */
-			break;
-		case 1: case 2: case 3: case 4:		/* 40% */
-			if (access(BZIP_PATH, R_OK) == 0)
-				cstr = "compression=bzip";
-			break;
-		case 5:					/* 10% */
-#if 0
-			cstr = "compression=ext";
-#endif
-			break;
-		case 6: case 7: case 8: case 9:		/* 40% */
-			if (access(SNAPPY_PATH, R_OK) == 0)
-				cstr = "compression=snappy";
-			break;
-		}
-		config_single(cstr, 0);
-	}
-	g.compression = config_translate(g.c_compression);
-	if (cp->flags & C_PERM) {
-		if (g.compression == COMPRESS_BZIP &&
-		    access(BZIP_PATH, R_OK) != 0) {
-			fprintf(stderr,
-			    "bzip library not found or not readable\n");
-			exit(EXIT_FAILURE);
-		}
-		if (g.compression == COMPRESS_SNAPPY &&
-		    access(SNAPPY_PATH, R_OK) != 0) {
-			fprintf(stderr,
-			    "snappy library not found or not readable\n");
-			exit(EXIT_FAILURE);
-		}
-	}
-
 	/* Build the object name. */
 	if ((g.uri = malloc(
 	    strlen(g.c_data_source) + strlen(WT_NAME) + 2)) == NULL)
@@ -145,9 +102,6 @@ config_setup(void)
 	strcpy(g.uri, g.c_data_source);
 	strcat(g.uri, ":");
 	strcat(g.uri, WT_NAME);
-
-	/* Reset the key count. */
-	g.key_cnt = 0;
 
 	/* Default single-threaded half of the time. */
 	cp = config_find("threads", strlen("threads"));
@@ -169,6 +123,8 @@ config_setup(void)
 		else
 			*cp->v = CONF_RAND(cp);
 	}
+
+	config_compression();
 
 	/* Clear operations values if the whole run is read-only. */
 	if (g.c_ops == 0)
@@ -192,6 +148,74 @@ config_setup(void)
 		if (cp->name != NULL &&
 		    !(cp->flags & (C_IGNORE | C_PERM | C_TEMP)))
 			g.c_delete_pct = 0;
+	}
+
+	/* Reset the key count. */
+	g.key_cnt = 0;
+}
+
+/*
+ * config_compression --
+ *	Compression configuration.
+ */
+static void
+config_compression(void)
+{
+	CONFIG *cp;
+	const char *cstr;
+
+	/*
+	 * Compression: choose something if compression wasn't specified,
+	 * otherwise confirm the appropriate shared library is available.
+	 */
+	cp = config_find("compression", strlen("compression"));
+	if (!(cp->flags & C_PERM)) {
+		cstr = "compression=none";
+		switch (MMRAND(0, 9)) {
+		case 0:					/* 10% */
+			break;
+		case 1: case 2: case 3: case 4:		/* 40% */
+			if (access(BZIP_PATH, R_OK) == 0)
+				cstr = "compression=bzip";
+			break;
+		case 5:					/* 10% */
+			/*
+			 * Fixed-length column store files, and both dictionary
+			 * and prefix compression are not compatible with raw
+			 * compression.  If any of them are set, don't config
+			 * raw compression.
+			 */
+			if (g.type == FIX || g.c_dictionary || g.c_prefix)
+				break;
+			if (access(BZIP_PATH, R_OK) == 0)
+				cstr = "compression=raw";
+			break;
+		case 6: case 7: case 8: case 9:		/* 40% */
+			if (access(SNAPPY_PATH, R_OK) == 0)
+				cstr = "compression=snappy";
+			break;
+		}
+		config_single(cstr, 0);
+	}
+	g.compression = config_translate(g.c_compression);
+	if (!(cp->flags & C_PERM))
+		return;
+
+	switch (g.compression) {
+	case COMPRESS_BZIP:
+	case COMPRESS_RAW:
+		if (access(BZIP_PATH, R_OK) != 0) {
+			fprintf(stderr,
+			    "bzip library not found or not readable\n");
+			exit(EXIT_FAILURE);
+		}
+		break;
+	case COMPRESS_SNAPPY:
+		if (access(SNAPPY_PATH, R_OK) != 0) {
+			fprintf(stderr,
+			    "snappy library not found or not readable\n");
+			exit(EXIT_FAILURE);
+		}
 	}
 }
 
@@ -388,8 +412,8 @@ config_translate(const char *s)
 		return (COMPRESS_NONE);
 	if (strcmp(s, "bzip") == 0)
 		return (COMPRESS_BZIP);
-	if (strcmp(s, "ext") == 0)
-		return (COMPRESS_EXT);
+	if (strcmp(s, "raw") == 0)
+		return (COMPRESS_RAW);
 	if (strcmp(s, "snappy") == 0)
 		return (COMPRESS_SNAPPY);
 
@@ -414,6 +438,19 @@ config_find(const char *s, size_t len)
 	    "%s: %s: unknown configuration keyword\n", g.progname, s);
 	config_error();
 	exit(EXIT_FAILURE);
+}
+
+/*
+ * config_find_is_perm
+ *	Return if a specific configuration entry was permanently set.
+ */
+static int
+config_find_is_perm(const char *s, size_t len)
+{
+	CONFIG *cp;
+
+	cp = config_find(s, len);
+	return (cp->flags & C_PERM ? 1 : 0);
 }
 
 /*

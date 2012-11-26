@@ -221,15 +221,10 @@ __wt_off_page(WT_PAGE *page, const void *p)
 	/*
 	 * There may be no underlying page, in which case the reference is
 	 * off-page by definition.
-	 *
-	 * We use the page's disk size, not the page parent's reference disk
-	 * size for a reason: the page may already be disconnected from the
-	 * parent reference (when being discarded), or not yet be connected
-	 * to the parent reference (when being created).
 	 */
 	return (page->dsk == NULL ||
 	    p < (void *)page->dsk ||
-	    p >= (void *)((uint8_t *)page->dsk + page->dsk->size));
+	    p >= (void *)((uint8_t *)page->dsk + page->dsk->mem_size));
 }
 
 /*

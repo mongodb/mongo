@@ -75,10 +75,11 @@ wts_open(void)
 	 */
 	snprintf(config, sizeof(config),
 	    "create,error_prefix=\"%s\",cache_size=%" PRIu32 "MB,sync=false,"
-	    "extensions=[\"%s\",\"%s\", \"%s\"],%s",
+	    "extensions=[\"%s\", \"%s\", \"%s\", \"%s\"], %s",
 	    g.progname, g.c_cache,
 	    access(BZIP_PATH, R_OK) == 0 ? BZIP_PATH : "",
 	    access(SNAPPY_PATH, R_OK) == 0 ? SNAPPY_PATH : "",
+	    access(BZIP_PATH, R_OK) == 0 ? FC_PATH : "",
 	    REVERSE_PATH,
 	    g.config_open == NULL ? "" : g.config_open);
 
@@ -128,6 +129,9 @@ wts_open(void)
 		if (g.c_huffman_key)
 			p += snprintf(p, (size_t)(end - p),
 			    ",huffman_key=english");
+		if (!g.c_prefix)
+			p += snprintf(p, (size_t)(end - p),
+			    ",prefix_compression=false");
 		if (g.c_reverse)
 			p += snprintf(p, (size_t)(end - p),
 			    ",collator=reverse");
@@ -142,6 +146,20 @@ wts_open(void)
 		break;
 	}
 
+	/* Configure checksums. */
+	switch MMRAND(1, 10) {
+	case 1:						/* 10% */
+		p += snprintf(p, (size_t)(end - p), ",checksum=\"on\"");
+		break;
+	case 2:						/* 10% */
+		p += snprintf(p, (size_t)(end - p), ",checksum=\"off\"");
+		break;
+	default:					/* 80% */
+		p += snprintf(
+		    p, (size_t)(end - p), ",checksum=\"uncompressed\"");
+		break;
+	}
+
 	/* Configure compression. */
 	switch (g.compression) {
 	case COMPRESS_NONE:
@@ -150,7 +168,9 @@ wts_open(void)
 		p += snprintf(p, (size_t)(end - p),
 		    ",block_compressor=\"bzip2\"");
 		break;
-	case COMPRESS_EXT:
+	case COMPRESS_RAW:
+		p += snprintf(p, (size_t)(end - p),
+		    ",block_compressor=\"raw\"");
 		break;
 	case COMPRESS_SNAPPY:
 		p += snprintf(p, (size_t)(end - p),
