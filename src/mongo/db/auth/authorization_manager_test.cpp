@@ -56,6 +56,9 @@ namespace {
         ASSERT_NULL(authManager.checkAuthorization("otherDb", ActionType::insert));
         ASSERT_OK(authManager.acquirePrivilege(allDBsWritePrivilege));
         ASSERT_EQUALS(principal, authManager.checkAuthorization("otherDb", ActionType::insert));
+        // Auth checks on a collection should be applied to the database name.
+        ASSERT_EQUALS(principal, authManager.checkAuthorization("otherDb.collectionName",
+                                                                ActionType::insert));
     }
 
     TEST(AuthorizationManagerTest, GetPrivilegesFromPrivilegeDocument) {
