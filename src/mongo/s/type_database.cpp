@@ -102,7 +102,7 @@ namespace mongo {
         _draining = false;
     }
 
-    void DatabaseType::cloneTo(DatabaseType* other) {
+    void DatabaseType::cloneTo(DatabaseType* other) const {
         other->clear();
         other->_name = _name;
         other->_primary = _primary;

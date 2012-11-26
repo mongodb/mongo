@@ -101,7 +101,7 @@ namespace mongo {
         /**
          * Copies all the fields present in 'this' to 'other'.
          */
-        void cloneTo(DatabaseType* other);
+        void cloneTo(DatabaseType* other) const;
 
         /**
          * Returns a string representation of the current internal state.

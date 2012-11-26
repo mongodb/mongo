@@ -39,10 +39,9 @@ namespace mongo {
     }
 
     bool ShardType::isValid(std::string* errMsg) const {
-        std::string dummy;
-        if (errMsg == NULL) {
-            errMsg = &dummy;
-        }
+
+        string dummy;
+        if (!errMsg) errMsg = &dummy;
 
         // All the mandatory fields must be present.
         if (_name.empty()) {
@@ -67,18 +66,19 @@ namespace mongo {
         return builder.obj();
     }
 
-    void ShardType::parseBSON(BSONObj source) {
+    bool ShardType::parseBSON(BSONObj source, string* errMsg) {
         clear();
 
-        bool ok = true;
-        ok &= FieldParser::extract(source, name, "", &_name);
-        ok &= FieldParser::extract(source, host, "", &_host);
-        ok &= FieldParser::extract(source, draining, false, &_draining);
-        ok &= FieldParser::extract(source, maxSize, 0LL, &_maxSize);
-        ok &= FieldParser::extract(source, tags, BSONArray(), &_tags);
-        if (! ok) {
-            clear();
-        }
+        string dummy;
+        if (!errMsg) errMsg = &dummy;
+
+        if (!FieldParser::extract(source, name, "", &_name, errMsg)) return false;
+        if (!FieldParser::extract(source, host, "", &_host, errMsg)) return false;
+        if (!FieldParser::extract(source, draining, false, &_draining, errMsg)) return false;
+        if (!FieldParser::extract(source, maxSize, 0LL, &_maxSize, errMsg)) return false;
+        if (!FieldParser::extract(source, tags, BSONArray(), &_tags, errMsg)) return false;
+
+        return true;
     }
 
     void ShardType::clear() {
@@ -89,7 +89,7 @@ namespace mongo {
         _tags = BSONArray();
     }
 
-    void ShardType::cloneTo(ShardType* other) {
+    void ShardType::cloneTo(ShardType* other) const {
         other->clear();
         other->_name = _name;
         other->_host = _host;

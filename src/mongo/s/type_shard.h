@@ -84,7 +84,7 @@ namespace mongo {
          * Clears and populates the internal state using the 'source' BSON object if the
          * latter contains valid values. Otherwise clear the internal state.
          */
-        void parseBSON(BSONObj source);
+        bool parseBSON(BSONObj source, std::string* errMsg);
 
         /**
          * Clears the internal state.
@@ -94,7 +94,7 @@ namespace mongo {
         /**
          * Copies all the fields present in 'this' to 'other'.
          */
-        void cloneTo(ShardType* other);
+        void cloneTo(ShardType* other) const;
 
         /**
          * Returns a string representation of the current internal state.

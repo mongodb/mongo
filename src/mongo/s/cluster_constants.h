@@ -82,6 +82,7 @@ namespace mongo {
         static BSONField<Date_t> lastmod;  // when collecation was created
         static BSONField<bool> dropped;    // logical deletion
         static BSONField<bool> noBalance;  // true if balancing is disabled
+        static BSONField<OID> epoch;       // Epoch of collection
     };
 
     /**

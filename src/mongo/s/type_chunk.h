@@ -22,7 +22,6 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/s/util.h" // for ShardChunkVersion
-
 namespace mongo {
 
     /**
@@ -71,8 +70,8 @@ namespace mongo {
 
         // Transition to new format, 2.2 -> 2.4
         // 2.2 can read both lastmod + lastmodEpoch format and 2.4 [ lastmod, OID ] formats.
-        static BSONField<Date_t> DEPRECATED_lastmod;  // major | minor versions
-        static BSONField<OID> DEPRECATED_epoch;       // disambiguates collection incarnations
+        static BSONField<Date_t> DEPRECATED_lastmod; // major | minor versions
+        static BSONField<OID> DEPRECATED_epoch; // disambiguates collection incarnations
 
         //
         // chunk type methods
@@ -96,7 +95,7 @@ namespace mongo {
          * Clears and populates the internal state using the 'source' BSON object if the
          * latter contains valid values. Otherwise clear the internal state.
          */
-        void parseBSON(BSONObj source);
+        bool parseBSON(BSONObj source, std::string* errMsg);
 
         /**
          * Clears the internal state.
@@ -106,7 +105,7 @@ namespace mongo {
         /**
          * Copies all the fields present in 'this' to 'other'.
          */
-        void cloneTo(ChunkType* other);
+        void cloneTo(ChunkType* other) const;
 
         /**
          * Returns a string representation of the current internal state.
@@ -117,36 +116,71 @@ namespace mongo {
         // individual field accessors
         //
 
-        void setName(const StringData& name) { _name = std::string(name.data(), name.size()); }
-        const std::string& getName() const { return _name; }
+        void setName(const StringData& name) {
+            _name = std::string(name.data(), name.size());
+        }
 
-        void setNS(const StringData& ns) { _ns = std::string(ns.data(), ns.size()); }
-        const std::string& getNS() const { return _ns; }
+        const std::string& getName() const {
+            return _name;
+        }
 
-        void setMin(const BSONObj& min) { _min = min.getOwned(); }
-        BSONObj getMin() const { return _min; }
+        void setNS(const StringData& ns) {
+            _ns = std::string(ns.data(), ns.size());
+        }
 
-        void setMax(const BSONObj& max) { _max = max.getOwned(); }
-        BSONObj getMax() const { return _max; }
+        const std::string& getNS() const {
+            return _ns;
+        }
 
-        void setVersion(const ShardChunkVersion& version) { _version = version; }
-        const ShardChunkVersion& getVersion() const { return _version; }
+        void setMin(const BSONObj& min) {
+            _min = min.getOwned();
+        }
 
-        void setShard(const StringData& shard)  { _shard=std::string(shard.data(), shard.size()); }
-        const std::string& getShard() const { return _shard; }
+        BSONObj getMin() const {
+            return _min;
+        }
 
-        void setJumbo(bool jumbo) { _jumbo = jumbo; }
-        bool getJumbo() const { return _jumbo; }
+        void setMax(const BSONObj& max) {
+            _max = max.getOwned();
+        }
+
+        BSONObj getMax() const {
+            return _max;
+        }
+
+        void setVersion(const ShardChunkVersion& version) {
+            _version = version;
+        }
+
+        const ShardChunkVersion& getVersion() const {
+            return _version;
+        }
+
+        void setShard(const StringData& shard) {
+            _shard = std::string(shard.data(), shard.size());
+        }
+
+        const std::string& getShard() const {
+            return _shard;
+        }
+
+        void setJumbo(bool jumbo) {
+            _jumbo = jumbo;
+        }
+
+        bool getJumbo() const {
+            return _jumbo;
+        }
 
     private:
         // Convention: (M)andatory, (O)ptional, (S)pecial rule.
-        string _name;                // (M) chunk's id
-        string _ns;                  // (M) collection this chunk is in
-        BSONObj _min;                // (M) first key of the range, inclusive
-        BSONObj _max;                // (M) last key of the range, non-inclusive
-        ShardChunkVersion _version;  // (M) version of this chunk
-        string _shard;               // (M) shard this chunk lives in
-        bool _jumbo;                 // (O) too big to move?
+        string _name; // (M) chunk's id
+        string _ns; // (M) collection this chunk is in
+        BSONObj _min; // (M) first key of the range, inclusive
+        BSONObj _max; // (M) last key of the range, non-inclusive
+        ShardChunkVersion _version; // (M) version of this chunk
+        string _shard; // (M) shard this chunk lives in
+        bool _jumbo; // (O) too big to move?
     };
 
-}  // namespace mongo
+} // namespace mongo

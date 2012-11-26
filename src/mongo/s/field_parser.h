@@ -41,37 +41,67 @@ namespace mongo {
         static bool extract(BSONObj doc,
                             const BSONField<bool>& field,
                             bool def,
-                            bool* out);
+                            bool* out,
+                            string* errMsg = NULL);
 
         static bool extract(BSONObj doc,
                             const BSONField<BSONArray>& field,
                             const BSONArray& def,
-                            BSONArray* out);
+                            BSONArray* out,
+                            string* errMsg = NULL);
 
         static bool extract(BSONObj doc,
                             const BSONField<BSONObj>& field,
                             const BSONObj& def,
-                            BSONObj* out);
+                            BSONObj* out,
+                            string* errMsg = NULL);
 
         static bool extract(BSONObj doc,
                             const BSONField<Date_t>& field,
                             const Date_t def,
-                            Date_t* out);
+                            Date_t* out,
+                            string* errMsg = NULL);
 
         static bool extract(BSONObj doc,
                             const BSONField<string>& field,
                             const string& def,
-                            string* out);
+                            string* out,
+                            string* errMsg = NULL);
 
         static bool extract(BSONObj doc,
                             const BSONField<OID>& field,
                             const OID& def,
-                            OID* out);
+                            OID* out,
+                            string* errMsg = NULL);
+
+        static bool extract(BSONObj doc,
+                            const BSONField<int>& field,
+                            const int& def,
+                            int* out,
+                            string* errMsg = NULL);
 
         static bool extract(BSONObj doc,
                             const BSONField<long long>& field,
                             const long long& def,
-                            long long* out);
+                            long long* out,
+                            string* errMsg = NULL);
+
+        /**
+         * The following extractNumber methods do implicit conversion between any numeric type and
+         * the BSONField type.  This can be useful when an exact numeric type is not needed, for
+         * example if the field is sometimes modified from the shell which can change the type.
+         */
+        static bool extractNumber(BSONObj doc,
+                                  const BSONField<int>& field,
+                                  const int& def,
+                                  int* out,
+                                  string* errMsg = NULL);
+
+        static bool extractNumber(BSONObj doc,
+                                  const BSONField<long long>& field,
+                                  const long long& def,
+                                  long long* out,
+                                  string* errMsg = NULL);
     };
 
 } // namespace mongo

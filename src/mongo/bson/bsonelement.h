@@ -467,10 +467,17 @@ namespace mongo {
         const BSONElement& chk(int t) const {
             if ( t != type() ) {
                 StringBuilder ss;
-                if( eoo() )
-                    ss << "field not found, expected type " << t;
-                else
-                    ss << "wrong type for field (" << fieldName() << ") " << type() << " != " << t;
+                if (eoo()) {
+                    ss << "field '" << fieldName() << "' not found, expected type "
+                       << typeName(static_cast<BSONType>(t)) << "(" << t << ")";
+                }
+                else {
+                    ss << "wrong type for field '" << fieldName() << "' "
+                       << typeName(type()) << "(" << type() << ")"
+                       << " != "
+                       << typeName(static_cast<BSONType>(t)) << "(" << t << ")"
+                       << ", value is " << toString(false);
+                }
                 msgasserted(13111, ss.str() );
             }
             return *this;

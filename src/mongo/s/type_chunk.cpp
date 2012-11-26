@@ -15,7 +15,6 @@
  */
 
 #include <cstring> // for strcmp
-
 #include "mongo/s/type_chunk.h"
 
 #include "mongo/s/field_parser.h"
@@ -47,9 +46,8 @@ namespace mongo {
 
     bool ChunkType::isValid(std::string* errMsg) const {
         std::string dummy;
-        if (errMsg == NULL) {
-            errMsg = &dummy;
-        }
+
+        if (errMsg == NULL) errMsg = &dummy;
 
         // All the mandatory fields must be present.
         if (_name.empty()) {
@@ -60,11 +58,11 @@ namespace mongo {
             *errMsg = stream() << "missing " << ns.name() << " field";
             return false;
         }
-        if (! _min.nFields()) {
+        if (!_min.nFields()) {
             *errMsg = stream() << "missing " << min.name() << " field";
             return false;
         }
-        if (! _max.nFields()) {
+        if (!_max.nFields()) {
             *errMsg = stream() << "missing " << max.name() << " field";
             return false;
         }
@@ -110,12 +108,10 @@ namespace mongo {
         if (_min.nFields()) builder.append(min(), _min);
         if (_max.nFields()) builder.append(max(), _max);
 
-        if (_version._combined != 0ULL) {
-            BSONArrayBuilder arrBuilder(builder.subarrayStart(version()));
-            arrBuilder.appendTimestamp(_version._major, _version._minor);
-            arrBuilder.append(_version._epoch);
-            arrBuilder.done();
-        }
+        // For now, write both the deprecated *and* the new fields
+
+        _version.addToBSON(builder, version());
+        _version.addToBSON(builder, DEPRECATED_lastmod());
 
         if (!_shard.empty()) builder.append(shard(), _shard);
         if (_jumbo) builder.append(jumbo(), _jumbo);
@@ -123,53 +119,37 @@ namespace mongo {
         return builder.obj();
     }
 
-    void ChunkType::parseBSON(BSONObj source) {
+    string ChunkType::toString() const {
+        return toBSON().toString();
+    }
+
+    bool ChunkType::parseBSON(BSONObj source, string* errMsg) {
         clear();
 
-        bool ok = true;
-        ok &= FieldParser::extract(source, name, "", &_name);
-        ok &= FieldParser::extract(source, ns, "", &_ns);
-        ok &= FieldParser::extract(source, min, BSONObj(), &_min);
-        ok &= FieldParser::extract(source, max, BSONObj(), &_max);
-        ok &= FieldParser::extract(source, shard, "", &_shard);
-        ok &= FieldParser::extract(source, jumbo, false, &_jumbo);
-        if (! ok) {
-            clear();
-            return;
-        }
+        string dummy;
+        if (!errMsg) errMsg = &dummy;
+
+        if (!FieldParser::extract(source, name, "", &_name, errMsg)) return false;
+        if (!FieldParser::extract(source, ns, "", &_ns, errMsg)) return false;
+        if (!FieldParser::extract(source, min, BSONObj(), &_min, errMsg)) return false;
+        if (!FieldParser::extract(source, max, BSONObj(), &_max, errMsg)) return false;
+        if (!FieldParser::extract(source, shard, "", &_shard, errMsg)) return false;
+        if (!FieldParser::extract(source, jumbo, false, &_jumbo, errMsg)) return false;
 
         //
-        // ShardChunkVersion backward compatibility logic
+        // ShardChunkVersion backward compatibility logic contained in ShardChunkVersion
         //
 
         // ShardChunkVersion is currently encoded as { 'version': [<TS>,<OID>] }
-        BSONArray arrVersion;
-        ok = FieldParser::extract(source, version, BSONArray(), &arrVersion);
-        if (! ok) {
-            clear();
-            return;
+
+        if (ShardChunkVersion::canParseBSON(source, version())) {
+            _version = ShardChunkVersion::fromBSON(source, version());
         }
-        else if (arrVersion.nFields()) {
-            bool okVersion;
-            _version = ShardChunkVersion::fromBSON(arrVersion, &okVersion);
-            if (! okVersion) {
-                clear();
-            }
-            return;
+        else if (ShardChunkVersion::canParseBSON(source, DEPRECATED_lastmod())) {
+            _version = ShardChunkVersion::fromBSON(source, DEPRECATED_lastmod());
         }
 
-        // If we haven't found the current format try parsing the deprecated format
-        // { lastmod: <TS>, lastmodEpoch: <OID> }.
-        Date_t lastmod;
-        OID epoch;
-        ok = FieldParser::extract(source, DEPRECATED_lastmod, time(0), &lastmod);
-        ok &= FieldParser::extract(source, DEPRECATED_epoch, OID(), &epoch);
-        if (! ok) {
-            clear();
-        }
-        else {
-            _version = ShardChunkVersion(lastmod.millis, epoch);
-        }
+        return true;
     }
 
     void ChunkType::clear() {
@@ -182,7 +162,7 @@ namespace mongo {
         _jumbo = false;
     }
 
-    void ChunkType::cloneTo(ChunkType* other) {
+    void ChunkType::cloneTo(ChunkType* other) const {
         other->clear();
         other->_name = _name;
         other->_ns = _ns;

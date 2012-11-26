@@ -43,6 +43,7 @@ namespace mongo {
     BSONField<Date_t> CollectionFields::lastmod("lastmod");
     BSONField<bool> CollectionFields::dropped("dropped");
     BSONField<bool> CollectionFields::noBalance("noBalance");
+    BSONField<OID> CollectionFields::epoch("lastmodEpoch");
 
     const string ConfigNS::chunk = "config.chunks";
     BSONField<string> ChunkFields::name("_id");

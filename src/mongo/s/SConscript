@@ -11,7 +11,8 @@ env.StaticLibrary('base', ['cluster_constants.cpp',
                            'type_chunk.cpp',
                            'type_collection.cpp',
                            'type_database.cpp',
-                           'type_shard.cpp'],
+                           'type_shard.cpp',
+                           'type_config_version.cpp'],
                   LIBDEPS=['$BUILD_DIR/mongo/base/base',
                            '$BUILD_DIR/mongo/bson'])
 
