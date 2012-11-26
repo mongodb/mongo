@@ -175,6 +175,9 @@ namespace mongo {
     inline std::string causedBy( const DBException& e ){ return causedBy( e.toString().c_str() ); }
     inline std::string causedBy( const std::exception& e ){ return causedBy( e.what() ); }
     inline std::string causedBy( const std::string& e ){ return causedBy( e.c_str() ); }
+    inline std::string causedBy( const std::string* e ){
+        return (e && *e != "") ? causedBy(*e) : "";
+    }
 
     /** aborts on condition failure */
     inline void fassert(int msgid, bool testOK) {if (MONGO_unlikely(!testOK)) fassertFailed(msgid);}
