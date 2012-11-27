@@ -22,6 +22,8 @@
 
 #include <boost/checked_delete.hpp>
 
+#include "mongo/db/auth/action_type.h"
+#include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/background.h"
 #include "mongo/db/btree.h"
 #include "mongo/db/index_update.h"
@@ -29,6 +31,7 @@
 #include "mongo/db/ops/delete.h"
 #include "mongo/db/repl/rs.h"
 #include "mongo/util/scopeguard.h"
+#include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 
@@ -292,15 +295,20 @@ namespace mongo {
                              BSONObj& fixedIndexObject) {
         sourceCollection = 0;
 
-        // logical name of the index.  todo: get rid of the name, we don't need it!
-        const char *name = io.getStringField("name");
-        uassert(12523, "no index name specified", *name);
-
         // the collection for which we are building an index
         sourceNS = io.getStringField("ns");
         uassert(10096, "invalid ns to index", sourceNS.find( '.' ) != string::npos);
         massert(10097, str::stream() << "bad table to index name on add index attempt current db: " << cc().database()->name << "  source: " << sourceNS ,
                 cc().database()->name == nsToDatabase(sourceNS.c_str()));
+
+        uassert(16548,
+                mongoutils::str::stream() << "not authorized to create index on " << sourceNS,
+                cc().getAuthorizationManager()->checkAuthorization(sourceNS,
+                                                                   ActionType::ensureIndex));
+
+        // logical name of the index.  todo: get rid of the name, we don't need it!
+        const char *name = io.getStringField("name");
+        uassert(12523, "no index name specified", *name);
 
         BSONObj key = io.getObjectField("key");
         uassert(12524, "index key pattern too large", key.objsize() <= 2048);

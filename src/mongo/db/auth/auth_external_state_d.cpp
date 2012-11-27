@@ -32,15 +32,21 @@ namespace mongo {
                                                          const string& principalName,
                                                          BSONObj* result) {
         Client::GodScope gs;
+        Client::ReadContext(dbname + ".system.users");
         DBDirectClient conn;
         return getPrivilegeDocumentOverConnection(&conn, dbname, principalName, result);
     }
 
     bool AuthExternalStateMongod::hasPrivilegeDocument(const std::string& dbname) const {
         Client::GodScope gs;
+        Client::ReadContext(dbname + ".system.users");
         DBDirectClient conn;
         BSONObj result = conn.findOne(dbname + ".system.users", Query());
         return !result.isEmpty();
+    }
+
+    bool AuthExternalStateMongod::shouldIgnoreAuthChecks() const {
+        return cc().isGod() || AuthExternalStateServerCommon::shouldIgnoreAuthChecks();
     }
 
 } // namespace mongo

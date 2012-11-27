@@ -17,6 +17,7 @@
 #include "mongo/db/auth/authorization_manager.h"
 
 #include <string>
+#include <vector>
 
 #include "mongo/base/init.h"
 #include "mongo/base/status.h"
@@ -98,6 +99,8 @@ namespace mongo {
         dbAdminRoleActions.addAction(ActionType::convertToCapped);
         dbAdminRoleActions.addAction(ActionType::dbStats);
         dbAdminRoleActions.addAction(ActionType::dropCollection);
+        dbAdminRoleActions.addAction(ActionType::profileEnable);
+        dbAdminRoleActions.addAction(ActionType::profileRead);
         dbAdminRoleActions.addAction(ActionType::reIndex); // TODO: Should readWrite have this also? This isn't consistent with ENSURE_INDEX and DROP_INDEXES
         dbAdminRoleActions.addAction(ActionType::renameCollection);
         dbAdminRoleActions.addAction(ActionType::validate);
@@ -117,9 +120,10 @@ namespace mongo {
         serverAdminRoleActions.addAction(ActionType::getShardMap);
         serverAdminRoleActions.addAction(ActionType::getShardVersion);
         serverAdminRoleActions.addAction(ActionType::hostInfo);
+        serverAdminRoleActions.addAction(ActionType::inprog);
+        serverAdminRoleActions.addAction(ActionType::killop);
         serverAdminRoleActions.addAction(ActionType::listDatabases);
         serverAdminRoleActions.addAction(ActionType::logRotate);
-        serverAdminRoleActions.addAction(ActionType::profile); // TODO: should this be dbAdmin?
         serverAdminRoleActions.addAction(ActionType::repairDatabase);
         serverAdminRoleActions.addAction(ActionType::replSetFreeze);
         serverAdminRoleActions.addAction(ActionType::replSetGetStatus);
@@ -133,6 +137,7 @@ namespace mongo {
         serverAdminRoleActions.addAction(ActionType::shutdown);
         serverAdminRoleActions.addAction(ActionType::top);
         serverAdminRoleActions.addAction(ActionType::touch);
+        serverAdminRoleActions.addAction(ActionType::unlock);
 
         // Cluster admin role
         clusterAdminRoleActions.addAction(ActionType::addShard);
@@ -349,6 +354,120 @@ namespace mongo {
         }
 
         return NULL; // Not authorized
+    }
+
+    Status AuthorizationManager::checkAuthForQuery(const std::string& ns) {
+        NamespaceString namespaceString(ns);
+        verify(!namespaceString.isCommand());
+        if (namespaceString.coll == "system.users") {
+            if (!checkAuthorization(ns, ActionType::userAdmin)) {
+                return Status(ErrorCodes::Unauthorized,
+                              mongoutils::str::stream() <<
+                                      "unauthorized to read user information for database " <<
+                                      namespaceString.db,
+                              0);
+            }
+        }
+        else if (namespaceString.coll == "system.profile") {
+            if (!checkAuthorization(ns, ActionType::profileRead)) {
+                return Status(ErrorCodes::Unauthorized,
+                              mongoutils::str::stream() << "unauthorized to read " <<
+                                      namespaceString.db << ".system.profile",
+                              0);
+            }
+        }
+        else {
+            if (!checkAuthorization(ns, ActionType::find)) {
+                return Status(ErrorCodes::Unauthorized,
+                              mongoutils::str::stream() << "unauthorized for query on " << ns,
+                              0);
+            }
+        }
+        return Status::OK();
+    }
+
+    Status AuthorizationManager::checkAuthForInsert(const std::string& ns) {
+        NamespaceString namespaceString(ns);
+        if (namespaceString.coll == "system.users") {
+            if (!checkAuthorization(ns, ActionType::userAdmin)) {
+                return Status(ErrorCodes::Unauthorized,
+                              mongoutils::str::stream() <<
+                                      "unauthorized to create user for database " <<
+                                      namespaceString.db,
+                              0);
+            }
+        }
+        else {
+            if (!checkAuthorization(ns, ActionType::insert)) {
+                return Status(ErrorCodes::Unauthorized,
+                              mongoutils::str::stream() << "unauthorized for insert on " << ns,
+                              0);
+            }
+        }
+        return Status::OK();
+    }
+
+    Status AuthorizationManager::checkAuthForUpdate(const std::string& ns, bool upsert) {
+        NamespaceString namespaceString(ns);
+        if (namespaceString.coll == "system.users") {
+            if (!checkAuthorization(ns, ActionType::userAdmin)) {
+                return Status(ErrorCodes::Unauthorized,
+                              mongoutils::str::stream() <<
+                                      "not authorized to update user information for database " <<
+                                      namespaceString.db,
+                              0);
+            }
+        }
+        else {
+            if (!checkAuthorization(ns, ActionType::update)) {
+                return Status(ErrorCodes::Unauthorized,
+                              mongoutils::str::stream() << "not authorized for update on " << ns,
+                              0);
+            }
+            if (upsert && !checkAuthorization(ns, ActionType::insert)) {
+                return Status(ErrorCodes::Unauthorized,
+                              mongoutils::str::stream() << "not authorized for upsert on " << ns,
+                              0);
+            }
+        }
+        return Status::OK();
+    }
+
+    Status AuthorizationManager::checkAuthForDelete(const std::string& ns) {
+        NamespaceString namespaceString(ns);
+        if (namespaceString.coll == "system.users") {
+            if (!checkAuthorization(ns, ActionType::userAdmin)) {
+                return Status(ErrorCodes::Unauthorized,
+                              mongoutils::str::stream() <<
+                                      "not authorized to remove user from database " <<
+                                      namespaceString.db,
+                              0);
+            }
+        }
+        else {
+            if (!checkAuthorization(ns, ActionType::remove)) {
+                return Status(ErrorCodes::Unauthorized,
+                              mongoutils::str::stream() << "not authorized to remove from " << ns,
+                              0);
+            }
+        }
+        return Status::OK();
+    }
+
+    Status AuthorizationManager::checkAuthForGetMore(const std::string& ns) {
+        return checkAuthForQuery(ns);
+    }
+
+    Status AuthorizationManager::checkAuthForPrivileges(const vector<Privilege>& privileges) {
+        for (std::vector<Privilege>::const_iterator it = privileges.begin();
+                it != privileges.end(); ++it) {
+            const Privilege& privilege = *it;
+            ActionSet actions = privilege.getActions();
+            if (!checkAuthorization(privilege.getResource(), privilege.getActions())) {
+                return Status(ErrorCodes::Unauthorized, "unauthorized", 0);
+            }
+        }
+        return Status::OK();
     }
 
 } // namespace mongo

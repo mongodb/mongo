@@ -484,9 +484,8 @@ namespace mongo {
                                            const BSONObj& cmdObj,
                                            std::vector<Privilege>* out) {
             ActionSet actions;
-            actions.addAction(ActionType::profile);
-            // TODO: should the resource here be the database instead of server?
-            out->push_back(Privilege(AuthorizationManager::SERVER_RESOURCE_NAME, actions));
+            actions.addAction(ActionType::profileEnable);
+            out->push_back(Privilege(dbname, actions));
         }
         CmdProfile() : Command("profile") {}
         bool run(const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
@@ -1929,6 +1928,17 @@ namespace mongo {
             result.append( "errmsg" ,  "access denied; use admin db" );
             log() << "command denied: " << cmdObj.toString() << endl;
             return false;
+        }
+
+        if (c->requiresAuth()) {
+            std::vector<Privilege> privileges;
+            c->addRequiredPrivileges(dbname, cmdObj, &privileges);
+            Status status = client.getAuthorizationManager()->checkAuthForPrivileges(privileges);
+            if (!status.isOK()) {
+                result.append("errmsg", status.reason());
+                log() << "command denied: " << cmdObj.toString() << endl;
+                return false;
+            }
         }
 
         if ( cmdObj["help"].trueValue() ) {

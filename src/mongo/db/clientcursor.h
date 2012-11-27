@@ -324,13 +324,19 @@ namespace mongo {
         /**
          * Deletes the cursor with the provided @param 'id' if one exists.
          * @throw if the cursor with the provided id is pinned.
+         * This does not do any auth checking and should be used only when erasing cursors as part
+         * of cleaning up internal operations.
          */
         static bool erase(CursorId id);
+        // Same as erase but checks to make sure this thread has read permission on the cursor's
+        // namespace.  This should be called when receiving killCursors from a client.
+        static bool eraseIfAuthorized(CursorId id);
 
         /**
          * @return number of cursors found
          */
-        static int erase( int n , long long * ids );
+        static int erase(int n, long long* ids);
+        static int eraseIfAuthorized(int n, long long* ids);
 
         void mayUpgradeStorage() {
             /* if ( !ids_.get() )
@@ -377,6 +383,7 @@ namespace mongo {
         CCByLoc& byLoc() { return _db->ccByLoc; }
         
         Record* _recordForYield( RecordNeeds need );
+        static bool _erase_inlock(ClientCursor* cursor);
 
     private:
 

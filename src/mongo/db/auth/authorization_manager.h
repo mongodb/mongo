@@ -17,6 +17,7 @@
 #pragma once
 
 #include <string>
+#include <vector>
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
@@ -103,11 +104,34 @@ namespace mongo {
             return _externalState->getPrivilegeDocument(dbname, userName, result);
         }
 
+        // Checks if this connection has the privileges necessary to perform a query on the given
+        // namespace.
+        Status checkAuthForQuery(const std::string& ns);
+
+        // Checks if this connection has the privileges necessary to perform an update on the given
+        // namespace.
+        Status checkAuthForUpdate(const std::string& ns, bool upsert);
+
+        // Checks if this connection has the privileges necessary to perform an insert to the given
+        // namespace.
+        Status checkAuthForInsert(const std::string& ns);
+
+        // Checks if this connection has the privileges necessary to perform a delete on the given
+        // namespace.
+        Status checkAuthForDelete(const std::string& ns);
+
+        // Checks if this connection has the privileges necessary to perform a getMore on the given
+        // namespace.
+        Status checkAuthForGetMore(const std::string& ns);
+
+        // Checks if this connection is authorized for all the given Privileges
+        Status checkAuthForPrivileges(const vector<Privilege>& privileges);
+
         // Given a database name and a readOnly flag return an ActionSet describing all the actions
         // that an old-style user with those attributes should be given.
         static ActionSet getActionsForOldStyleUser(const std::string& dbname, bool readOnly);
 
-        // Parses the privilege document and returns a PrivilegeSet of all the Capabilities that
+        // Parses the privilege document and returns a PrivilegeSet of all the Privileges that
         // the privilege document grants.
         static Status buildPrivilegeSet(const std::string& dbname,
                                         Principal* principal,

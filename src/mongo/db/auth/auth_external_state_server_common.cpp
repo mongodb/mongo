@@ -37,8 +37,9 @@ namespace mongo {
     }
 
     bool AuthExternalStateServerCommon::shouldIgnoreAuthChecks() const {
-
-        return noauth || cc().isGod() || (cc().getIsLocalHostConnection() && _allowLocalhost());
+        // TODO: cache if admin user exists and if it once existed don't query admin.system.users
+        ClientBasic* client = ClientBasic::getCurrent();
+        return noauth || (client->getIsLocalHostConnection() && _allowLocalhost());
     }
 
 } // namespace mongo

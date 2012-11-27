@@ -36,6 +36,8 @@ namespace mongo {
                                             const string& principalName,
                                             BSONObj* result);
 
+        virtual bool shouldIgnoreAuthChecks() const;
+
     protected:
         virtual bool hasPrivilegeDocument(const std::string& dbname) const;
     };

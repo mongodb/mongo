@@ -263,8 +263,8 @@ namespace mongo {
                                                const BSONObj& cmdObj,
                                                std::vector<Privilege>* out) {
                 ActionSet actions;
-                actions.addAction(ActionType::profile);
-                out->push_back(Privilege(AuthorizationManager::SERVER_RESOURCE_NAME, actions));
+                actions.addAction(ActionType::profileEnable);
+                out->push_back(Privilege(dbname, actions));
             }
         } profileCmd;
         
@@ -1844,10 +1844,15 @@ namespace mongo {
 
             char cl[256];
             nsToDatabase(ns, cl);
-            if( c->requiresAuth() && !ai->isAuthorizedForLock(cl, c->locktype())) {
+            std::vector<Privilege> privileges;
+            c->addRequiredPrivileges(cl, jsobj, &privileges);
+            if (c->requiresAuth() &&
+                    (!client->getAuthorizationManager()->checkAuthForPrivileges(privileges).isOK()
+                            || !ai->isAuthorizedForLock(cl, c->locktype()))) {
                 ok = false;
                 errmsg = "unauthorized";
-                anObjBuilder.append( "note" , str::stream() << "need to authorized on db: " << cl << " for command: " << e.fieldName() );
+                anObjBuilder.append("note", str::stream() << "unauthorized for command: " <<
+                                    e.fieldName() << " on database " << cl);
             }
             else if( c->adminOnly() && c->localHostOnlyIfNoAuth( jsobj ) && noauth && !ai->isLocalHost() ) {
                 ok = false;

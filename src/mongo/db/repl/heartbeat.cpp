@@ -245,8 +245,7 @@ namespace mongo {
                 if( ok ) {
                     up(info, mem);
                 }
-                else if (!info["errmsg"].eoo() &&
-                         info["errmsg"].str() == "need to login") {
+                else if (!info["errmsg"].eoo() && info["errmsg"].str() == "unauthorized") {
                     authIssue(mem);
                 }
                 else {

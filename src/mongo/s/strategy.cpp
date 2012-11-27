@@ -18,15 +18,18 @@
 
 #include "pch.h"
 
-#include "../client/connpool.h"
-#include "../db/commands.h"
+#include "mongo/s/strategy.h"
 
-#include "grid.h"
-#include "request.h"
-#include "server.h"
-#include "writeback_listener.h"
+#include "mongo/client/connpool.h"
+#include "mongo/db/auth/action_type.h"
+#include "mongo/db/auth/authorization_manager.h"
+#include "mongo/db/commands.h"
+#include "mongo/s/grid.h"
+#include "mongo/s/request.h"
+#include "mongo/s/server.h"
+#include "mongo/s/writeback_listener.h"
+#include "mongo/util/mongoutils/str.h"
 
-#include "strategy.h"
 
 namespace mongo {
 
