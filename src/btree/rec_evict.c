@@ -13,7 +13,7 @@ static void __rec_discard_tree(WT_SESSION_IMPL *, WT_PAGE *, int);
 static void __rec_excl_clear(WT_SESSION_IMPL *);
 static void __rec_page_clean_update(WT_SESSION_IMPL *, WT_PAGE *);
 static int  __rec_page_dirty_update(WT_SESSION_IMPL *, WT_PAGE *);
-static int  __rec_review(WT_SESSION_IMPL *, WT_REF *, WT_PAGE *, uint32_t, int);
+static int  __rec_review(WT_SESSION_IMPL *, WT_REF *, WT_PAGE *, int, int);
 static void __rec_root_update(WT_SESSION_IMPL *);
 
 /*
@@ -21,11 +21,10 @@ static void __rec_root_update(WT_SESSION_IMPL *);
  *	Reconciliation plus eviction.
  */
 int
-__wt_rec_evict(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
+__wt_rec_evict(WT_SESSION_IMPL *session, WT_PAGE *page, int exclusive)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
-	int single;
 
 	conn = S2C(session);
 
@@ -33,7 +32,6 @@ __wt_rec_evict(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 	    "page %p (%s)", page, __wt_page_type_string(page->type));
 
 	WT_ASSERT(session, session->excl_next == 0);
-	single = LF_ISSET(WT_REC_SINGLE) ? 1 : 0;
 
 	/*
 	 * Get exclusive access to the page and review the page and its subtree
@@ -47,17 +45,18 @@ __wt_rec_evict(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 	 * or during salvage).  That's OK if WT_REC_SINGLE is set: we won't
 	 * check hazard references in that case.
 	 */
-	WT_ERR(__rec_review(session, page->ref, page, flags, 1));
+	WT_ERR(__rec_review(session, page->ref, page, exclusive, 1));
 
 	/* Count evictions of internal pages during normal operation. */
-	if (!single &&
+	if (!exclusive &&
 	    (page->type == WT_PAGE_COL_INT || page->type == WT_PAGE_ROW_INT))
 		WT_STAT_INCR(conn->stats, cache_evict_internal);
 
 	/* Update the parent and discard the page. */
 	if (page->modify == NULL || !F_ISSET(page->modify, WT_PM_REC_MASK)) {
 		WT_STAT_INCR(conn->stats, cache_evict_unmodified);
-		WT_ASSERT(session, single || page->ref->state == WT_REF_LOCKED);
+		WT_ASSERT(session,
+		    exclusive || page->ref->state == WT_REF_LOCKED);
 
 		if (WT_PAGE_IS_ROOT(page))
 			__rec_root_update(session);
@@ -65,7 +64,7 @@ __wt_rec_evict(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 			__rec_page_clean_update(session, page);
 
 		/* Discard the page. */
-		__rec_discard_page(session, page, single);
+		__rec_discard_page(session, page, exclusive);
 	} else {
 		WT_STAT_INCR(conn->stats, cache_evict_modified);
 
@@ -75,7 +74,7 @@ __wt_rec_evict(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 			WT_ERR(__rec_page_dirty_update(session, page));
 
 		/* Discard the tree rooted in this page. */
-		__rec_discard_tree(session, page, single);
+		__rec_discard_tree(session, page, exclusive);
 	}
 	if (0) {
 err:		/*
@@ -179,7 +178,7 @@ __rec_page_dirty_update(WT_SESSION_IMPL *session, WT_PAGE *page)
  * then the page itself.
  */
 static void
-__rec_discard_tree(WT_SESSION_IMPL *session, WT_PAGE *page, int single)
+__rec_discard_tree(WT_SESSION_IMPL *session, WT_PAGE *page, int exclusive)
 {
 	WT_REF *ref;
 	uint32_t i;
@@ -193,12 +192,12 @@ __rec_discard_tree(WT_SESSION_IMPL *session, WT_PAGE *page, int single)
 			    ref->state == WT_REF_DELETED)
 				continue;
 			WT_ASSERT(session,
-			    single || ref->state == WT_REF_LOCKED);
-			__rec_discard_tree(session, ref->page, single);
+			    exclusive || ref->state == WT_REF_LOCKED);
+			__rec_discard_tree(session, ref->page, exclusive);
 		}
 		/* FALLTHROUGH */
 	default:
-		__rec_discard_page(session, page, single);
+		__rec_discard_page(session, page, exclusive);
 		break;
 	}
 }
@@ -208,13 +207,13 @@ __rec_discard_tree(WT_SESSION_IMPL *session, WT_PAGE *page, int single)
  *	Discard the page.
  */
 static void
-__rec_discard_page(WT_SESSION_IMPL *session, WT_PAGE *page, int single)
+__rec_discard_page(WT_SESSION_IMPL *session, WT_PAGE *page, int exclusive)
 {
 	/* We should never evict the file's current eviction point. */
 	WT_ASSERT(session, session->btree->evict_page != page);
 
 	/* Make sure a page is not in the eviction request list. */
-	if (!single)
+	if (!exclusive)
 		__wt_evict_list_clr_page(session, page);
 
 	/* Discard the page. */
@@ -234,7 +233,7 @@ __rec_discard_page(WT_SESSION_IMPL *session, WT_PAGE *page, int single)
  */
 static int
 __rec_review(WT_SESSION_IMPL *session,
-    WT_REF *ref, WT_PAGE *page, uint32_t flags, int top)
+    WT_REF *ref, WT_PAGE *page, int exclusive, int top)
 {
 	WT_DECL_RET;
 	WT_PAGE_MODIFY *mod;
@@ -247,7 +246,7 @@ __rec_review(WT_SESSION_IMPL *session,
 	 * Get exclusive access to the page if our caller doesn't have the tree
 	 * locked down.
 	 */
-	if (!LF_ISSET(WT_REC_SINGLE))
+	if (!exclusive)
 		WT_RET(__hazard_exclusive(session, ref, top));
 
 	/*
@@ -263,7 +262,7 @@ __rec_review(WT_SESSION_IMPL *session,
 				break;
 			case WT_REF_MEM:		/* In-memory */
 				WT_RET(__rec_review(
-				    session, ref, ref->page, flags, 0));
+				    session, ref, ref->page, exclusive, 0));
 				break;
 			case WT_REF_EVICT_WALK:		/* Walk point */
 			case WT_REF_LOCKED:		/* Being evicted */
@@ -319,11 +318,10 @@ __rec_review(WT_SESSION_IMPL *session,
 	/* If the page is dirty, write it so we know the final state. */
 	if (__wt_page_is_modified(page) &&
 	    !F_ISSET(mod, WT_PM_REC_SPLIT_MERGE)) {
-		ret = __wt_rec_write(session, page, NULL, flags);
+		ret = __wt_rec_write(session, page, NULL, exclusive);
 
 		/* If there are unwritten changes on the page, give up. */
-		if (ret == 0 &&
-		    !LF_ISSET(WT_REC_SINGLE) && __wt_page_is_modified(page))
+		if (ret == 0 && !exclusive && __wt_page_is_modified(page))
 			ret = EBUSY;
 		if (ret == EBUSY) {
 			WT_VERBOSE_RET(session, evict,

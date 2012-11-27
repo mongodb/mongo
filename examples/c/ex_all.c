@@ -750,7 +750,7 @@ add_compressor(WT_CONNECTION *conn)
 
 	/*! [WT_COMPRESSOR register] */
 	static WT_COMPRESSOR my_compressor = {
-	    my_compress, my_decompress, my_pre_size };
+	    my_compress, NULL, my_decompress, my_pre_size };
 	ret = conn->add_compressor(conn, "my_compress", &my_compressor, NULL);
 	/*! [WT_COMPRESSOR register] */
 

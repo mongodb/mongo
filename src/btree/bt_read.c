@@ -101,7 +101,7 @@ __wt_cache_read(WT_SESSION_IMPL *session, WT_PAGE *parent, WT_REF *ref)
 		WT_ERR(__wt_btree_leaf_create(session, parent, ref, &page));
 	} else {
 		/* Read the backing disk page. */
-		WT_ERR(__wt_bm_read(session, &tmp, addr, size));
+		WT_ERR(__wt_bt_read(session, &tmp, addr, size));
 
 		/* Build the in-memory version of the page. */
 		WT_ERR(__wt_page_inmem(session, parent, ref, tmp.mem, &page));

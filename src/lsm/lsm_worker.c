@@ -72,7 +72,6 @@ __wt_lsm_merge_worker(void *vargs)
 void *
 __wt_lsm_bloom_worker(void *arg)
 {
-	WT_DECL_RET;
 	WT_LSM_CHUNK *chunk;
 	WT_LSM_TREE *lsm_tree;
 	WT_LSM_WORKER_COOKIE cookie;
@@ -85,7 +84,9 @@ __wt_lsm_bloom_worker(void *arg)
 	WT_CLEAR(cookie);
 
 	for (;;) {
-		WT_ERR(__wt_lsm_copy_chunks(session, lsm_tree, &cookie));
+		/* Ignore the return value - it is discarded anyway. */
+		if (__wt_lsm_copy_chunks(session, lsm_tree, &cookie) != 0)
+			goto err;
 
 		/* Create bloom filters in all checkpointed chunks. */
 		for (i = 0, j = 0; i < cookie.nchunks; i++) {
@@ -166,7 +167,7 @@ __wt_lsm_checkpoint_worker(void *arg)
 			    chunk->uri, __wt_checkpoint, cfg, 0));
 
 			if (ret != 0) {
-				(void)__wt_err(session, ret,
+				__wt_err(session, ret,
 				    "LSM checkpoint failed");
 				break;
 			}
@@ -179,7 +180,7 @@ __wt_lsm_checkpoint_worker(void *arg)
 			__wt_rwunlock(session, lsm_tree->rwlock);
 
 			if (ret != 0) {
-				(void)__wt_err(session, ret,
+				__wt_err(session, ret,
 				    "LSM checkpoint metadata write failed");
 				break;
 			}

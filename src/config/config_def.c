@@ -126,14 +126,14 @@ __wt_confchk_cursor_close[] = {
 const char *
 __wt_confdfl_file_meta =
 	"allocation_size=512B,block_compressor=,cache_resident=0,checkpoint=,"
-	"checksum=,collator=,columns=,dictionary=0,format=btree,huffman_key=,"
-	"huffman_value=,internal_item_max=0,internal_key_truncate=,"
-	"internal_page_max=2KB,key_format=u,key_gap=10,leaf_item_max=0,"
-	"leaf_page_max=1MB,lsm_bloom=,lsm_bloom_bit_count=8,lsm_bloom_config="
-	",lsm_bloom_hash_count=4,lsm_bloom_newest=0,lsm_bloom_oldest=0,"
-	"lsm_chunk_size=2MB,lsm_merge_max=15,lsm_merge_threads=1,"
-	"prefix_compression=,split_pct=75,value_format=u,version=(major=0,"
-	"minor=0)";
+	"checksum=on,collator=,columns=,dictionary=0,format=btree,"
+	"huffman_key=,huffman_value=,internal_item_max=0,"
+	"internal_key_truncate=,internal_page_max=2KB,key_format=u,key_gap=10"
+	",leaf_item_max=0,leaf_page_max=1MB,lsm_bloom=,lsm_bloom_bit_count=8,"
+	"lsm_bloom_config=,lsm_bloom_hash_count=4,lsm_bloom_newest=0,"
+	"lsm_bloom_oldest=0,lsm_chunk_size=2MB,lsm_merge_max=15,"
+	"lsm_merge_threads=1,prefix_compression=,split_pct=75,value_format=u,"
+	"version=(major=0,minor=0)";
 
 WT_CONFIG_CHECK
 __wt_confchk_file_meta[] = {
@@ -141,7 +141,9 @@ __wt_confchk_file_meta[] = {
 	{ "block_compressor", "string", NULL, NULL},
 	{ "cache_resident", "boolean", NULL, NULL},
 	{ "checkpoint", "string", NULL, NULL},
-	{ "checksum", "boolean", NULL, NULL},
+	{ "checksum", "string",
+	    "choices=[\"on\",\"off\",\"uncompressed\"]",
+	    NULL},
 	{ "collator", "string", NULL, NULL},
 	{ "columns", "list", NULL, NULL},
 	{ "dictionary", "int", "min=0", NULL},
@@ -236,16 +238,17 @@ __wt_confchk_session_commit_transaction[] = {
 
 const char *
 __wt_confdfl_session_compact =
-	"";
+	"trigger=30";
 
 WT_CONFIG_CHECK
 __wt_confchk_session_compact[] = {
+	{ "trigger", "int", "min=10,max=50", NULL},
 	{ NULL, NULL, NULL, NULL }
 };
 
 const char *
 __wt_confdfl_session_create =
-	"allocation_size=512B,block_compressor=,cache_resident=0,checksum=,"
+	"allocation_size=512B,block_compressor=,cache_resident=0,checksum=on,"
 	"colgroups=,collator=,columns=,columns=,dictionary=0,exclusive=0,"
 	"format=btree,huffman_key=,huffman_value=,internal_item_max=0,"
 	"internal_key_truncate=,internal_page_max=2KB,key_format=u,"
@@ -260,7 +263,9 @@ __wt_confchk_session_create[] = {
 	{ "allocation_size", "int", "min=512B,max=128MB", NULL},
 	{ "block_compressor", "string", NULL, NULL},
 	{ "cache_resident", "boolean", NULL, NULL},
-	{ "checksum", "boolean", NULL, NULL},
+	{ "checksum", "string",
+	    "choices=[\"on\",\"off\",\"uncompressed\"]",
+	    NULL},
 	{ "colgroups", "list", NULL, NULL},
 	{ "collator", "string", NULL, NULL},
 	{ "columns", "list", NULL, NULL},

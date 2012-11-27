@@ -51,10 +51,14 @@ struct __wt_stats {
 		WT_STAT_SET((session)->btree->stats, fld, v);		\
 	}								\
 } while (0)
-
 #define	WT_CSTAT_INCR(session, fld) do {				\
 	if (WT_STAT_CHECK_SESSION(session)) {				\
 		WT_STAT_INCR(S2C(session)->stats, fld);			\
+	}								\
+} while (0)
+#define	WT_CSTAT_INCRV(session, fld, v) do {				\
+	if (WT_STAT_CHECK_SESSION(session)) {				\
+		WT_STAT_INCRV(S2C(session)->stats, fld, v);		\
 	}								\
 } while (0)
 
@@ -81,6 +85,9 @@ struct __wt_dsrc_stats {
 	WT_STATS bloom_page_evict;
 	WT_STATS bloom_page_read;
 	WT_STATS bloom_size;
+	WT_STATS byte_changed;
+	WT_STATS byte_read;
+	WT_STATS byte_write;
 	WT_STATS ckpt_size;
 	WT_STATS cursor_insert;
 	WT_STATS cursor_read;
@@ -138,6 +145,8 @@ struct __wt_dsrc_stats {
 struct __wt_connection_stats {
 	WT_STATS block_read;
 	WT_STATS block_write;
+	WT_STATS byte_read;
+	WT_STATS byte_write;
 	WT_STATS cache_bytes_dirty;
 	WT_STATS cache_bytes_dirty_calc;
 	WT_STATS cache_bytes_inuse;

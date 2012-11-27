@@ -153,7 +153,7 @@ __wt_page_inmem(WT_SESSION_IMPL *session,
 	}
 
 	__wt_cache_page_read(
-	    session, page, sizeof(WT_PAGE) + dsk->size + inmem_size);
+	    session, page, sizeof(WT_PAGE) + dsk->mem_size + inmem_size);
 
 	*pagep = page;
 	return (0);
@@ -520,7 +520,7 @@ __inmem_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *inmem_sizep)
 	 * no subsequent value cell).  Assert that to be true, the bug would be
 	 * difficult to find/diagnose in the field.
 	 */
-	WT_ASSERT(session, cell == (WT_CELL *)((uint8_t *)dsk + dsk->size));
+	WT_ASSERT(session, cell == (WT_CELL *)((uint8_t *)dsk + dsk->mem_size));
 
 	WT_RET((__wt_calloc_def(session, (size_t)nindx, &page->u.row.d)));
 	if (inmem_sizep != NULL)

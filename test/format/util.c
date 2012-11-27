@@ -203,15 +203,14 @@ track(const char *tag, uint64_t cnt, TINFO *tinfo)
 uint32_t
 wts_rand(void)
 {
-	struct timeval t;
+	static int seeded = 0;
 	char buf[64];
 	uint32_t r;
 
 	/* If it's not a replay, seed the random number generator. */
-	if (!g.replay) {
-		if (gettimeofday(&t, NULL) != 0)
-			die(errno, "gettimeofday");
-		srand((u_int)(0xdeadbeef ^ (u_int)t.tv_usec));
+	if (!g.replay && !seeded) {
+		srand((u_int)(0xdeadbeef ^ (u_int)time(NULL)));
+		seeded = 1;
 	}
 
 	/* If we're threaded, it's not repeatable, ignore the log. */

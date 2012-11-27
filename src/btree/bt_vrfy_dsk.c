@@ -43,7 +43,7 @@ __wt_verify_dsk(WT_SESSION_IMPL *session, const char *addr, WT_ITEM *buf)
 {
 	WT_PAGE_HEADER *dsk;
 	uint32_t size;
-	uint8_t *p;
+	uint8_t *p, *end;
 	u_int i;
 
 	dsk = buf->mem;
@@ -87,12 +87,16 @@ __wt_verify_dsk(WT_SESSION_IMPL *session, const char *addr, WT_ITEM *buf)
 		    __wt_page_type_string(dsk->type), addr);
 	}
 
-	/* Check the in-memory size. */
-	if (dsk->size != size)
+	/* Check the page flags. */
+	switch (dsk->flags) {
+	case 0:
+	case WT_PAGE_COMPRESSED:
+		break;
+	default:
 		WT_RET_VRFY(session,
-		    "%s page at %s has an incorrect size (%" PRIu32 " != %"
-		    PRIu32 ")",
-		    __wt_page_type_string(dsk->type), addr, dsk->size, size);
+		    "page at %s has an invalid flags value of 0x%" PRIx32,
+		    addr, (uint32_t)dsk->flags);
+	}
 
 	/* Unused bytes */
 	for (p = dsk->unused, i = sizeof(dsk->unused); i > 0; --i)
@@ -100,6 +104,15 @@ __wt_verify_dsk(WT_SESSION_IMPL *session, const char *addr, WT_ITEM *buf)
 			WT_RET_VRFY(session,
 			    "page at %s has non-zero unused page header bytes",
 			    addr);
+
+	/* Any bytes after the data chunk should be nul bytes. */
+	p = (uint8_t *)dsk + dsk->mem_size;
+	end = (uint8_t *)dsk + size;
+	for (; p < end; ++p)
+		if (*p != '\0')
+			WT_RET_VRFY(session,
+			    "%s page at %s has non-zero trailing bytes",
+			    __wt_page_type_string(dsk->type), addr);
 
 	/* Verify the items on the page. */
 	switch (dsk->type) {
@@ -151,7 +164,7 @@ __verify_dsk_row(
 	WT_ERR(__wt_scr_alloc(session, 0, &last_ovfl));
 	last = last_ovfl;
 
-	end = (uint8_t *)dsk + dsk->size;
+	end = (uint8_t *)dsk + dsk->mem_size;
 
 	last_cell_type = FIRST;
 	cell_num = 0;
@@ -375,7 +388,7 @@ __verify_dsk_col_int(
 
 	btree = session->btree;
 	unpack = &_unpack;
-	end = (uint8_t *)dsk + dsk->size;
+	end = (uint8_t *)dsk + dsk->mem_size;
 
 	cell_num = 0;
 	WT_CELL_FOREACH(btree, dsk, cell, unpack, i) {
@@ -434,7 +447,7 @@ __verify_dsk_col_var(
 
 	btree = session->btree;
 	unpack = &_unpack;
-	end = (uint8_t *)dsk + dsk->size;
+	end = (uint8_t *)dsk + dsk->mem_size;
 
 	last_data = NULL;
 	last_size = 0;
@@ -512,7 +525,7 @@ __verify_dsk_chunk(WT_SESSION_IMPL *session,
 	uint8_t *p, *end;
 
 	btree = session->btree;
-	end = (uint8_t *)dsk + dsk->size;
+	end = (uint8_t *)dsk + dsk->mem_size;
 
 	/*
 	 * Fixed-length column-store and overflow pages are simple chunks of

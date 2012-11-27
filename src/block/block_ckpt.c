@@ -60,22 +60,23 @@ __wt_block_ckpt_init(WT_SESSION_IMPL *session,
  *	Load a checkpoint.
  */
 int
-__wt_block_checkpoint_load(WT_SESSION_IMPL *session,
-    WT_BLOCK *block, WT_ITEM *dsk, const uint8_t *addr, uint32_t addr_size,
-    int readonly)
+__wt_block_checkpoint_load(WT_SESSION_IMPL *session, WT_BLOCK *block,
+    const uint8_t *addr, uint32_t addr_size,
+    uint8_t *root_addr, uint32_t *root_addr_size, int readonly)
 {
 	WT_BLOCK_CKPT *ci;
 	WT_DECL_ITEM(tmp);
 	WT_DECL_RET;
+	uint8_t *endp;
 
 	WT_UNUSED(addr_size);
 
 	/*
 	 * Sometimes we don't find a root page (we weren't given a checkpoint,
-	 * or the referenced checkpoint was empty).  In that case we return a
-	 * root page size of 0.  Set that up now.
+	 * or the referenced checkpoint was empty).  In that case we return an
+	 * empty root address, set that up now.
 	 */
-	dsk->size = 0;
+	*root_addr_size = 0;
 
 	ci = &block->live;
 	WT_RET(__wt_block_ckpt_init(session, block, ci, "live", 1));
@@ -95,25 +96,18 @@ __wt_block_checkpoint_load(WT_SESSION_IMPL *session,
 		return (0);
 
 	/* Crack the checkpoint cookie. */
-	if (addr != NULL)
-		WT_ERR(__wt_block_buffer_to_ckpt(session, block, addr, ci));
+	WT_ERR(__wt_block_buffer_to_ckpt(session, block, addr, ci));
 
 	/* Verify sets up next. */
 	if (block->verify)
 		WT_ERR(__wt_verify_ckpt_load(session, block, ci));
 
-	/* Read, and optionally verify, any root page. */
+	/* Read any root page. */
 	if (ci->root_offset != WT_BLOCK_INVALID_OFFSET) {
-		WT_ERR(__wt_block_read_off(session, block,
-		    dsk, ci->root_offset, ci->root_size, ci->root_cksum));
-		if (block->verify) {
-			if (tmp == NULL) {
-				WT_ERR(__wt_scr_alloc(session, 0, &tmp));
-				WT_ERR(__ckpt_string(
-				    session, block, addr, tmp));
-			}
-			WT_ERR(__wt_verify_dsk(session, tmp->data, dsk));
-		}
+		endp = root_addr;
+		WT_ERR(__wt_block_addr_to_buffer(block, &endp,
+		    ci->root_offset, ci->root_size, ci->root_cksum));
+		*root_addr_size = WT_PTRDIFF32(endp, addr);
 	}
 
 	/*
@@ -121,8 +115,8 @@ __wt_block_checkpoint_load(WT_SESSION_IMPL *session,
 	 * which we can allocate.
 	 */
 	if (!readonly)
-		WT_ERR(
-		    __wt_block_extlist_read_avail(session, block, &ci->avail));
+		WT_ERR(__wt_block_extlist_read_avail(
+		    session, block, &ci->avail, ci->file_size));
 
 	/*
 	 * If the checkpoint can be written, that means anything written after
@@ -192,7 +186,7 @@ __wt_block_ckpt_destroy(WT_SESSION_IMPL *session, WT_BLOCK_CKPT *ci)
  */
 int
 __wt_block_checkpoint(WT_SESSION_IMPL *session,
-    WT_BLOCK *block, WT_ITEM *buf, WT_CKPT *ckptbase)
+    WT_BLOCK *block, WT_ITEM *buf, WT_CKPT *ckptbase, int data_cksum)
 {
 	WT_BLOCK_CKPT *ci;
 
@@ -213,7 +207,8 @@ __wt_block_checkpoint(WT_SESSION_IMPL *session,
 		ci->root_size = ci->root_cksum = 0;
 	} else
 		WT_RET(__wt_block_write_off(session, block, buf,
-		    &ci->root_offset, &ci->root_size, &ci->root_cksum, 0));
+		    &ci->root_offset, &ci->root_size, &ci->root_cksum,
+		    data_cksum, 0));
 
 	/* Process the checkpoint list, deleting and updating as required. */
 	WT_RET(__ckpt_process(session, block, ckptbase));
@@ -255,8 +250,10 @@ __ckpt_extlist_read(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_CKPT *ckpt)
 	ci = ckpt->bpriv;
 	WT_RET(__wt_block_ckpt_init(session, block, ci, ckpt->name, 0));
 	WT_RET(__wt_block_buffer_to_ckpt(session, block, ckpt->raw.data, ci));
-	WT_RET(__wt_block_extlist_read(session, block, &ci->alloc));
-	WT_RET(__wt_block_extlist_read(session, block, &ci->discard));
+	WT_RET(__wt_block_extlist_read(
+	    session, block, &ci->alloc, ci->file_size));
+	WT_RET(__wt_block_extlist_read(
+	    session, block, &ci->discard, ci->file_size));
 
 	return (0);
 }

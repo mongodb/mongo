@@ -25,9 +25,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include <sys/types.h>
 #include <sys/stat.h>
-#include <sys/time.h>
 
 #include <assert.h>
 #include <ctype.h>
@@ -54,6 +52,7 @@
 	EXTPATH "compressors/snappy/.libs/libwiredtiger_snappy.so"
 #define	REVERSE_PATH							\
 	EXTPATH "collators/reverse/.libs/libwiredtiger_reverse_collator.so"
+#define	FC_PATH	".libs/raw_compress.so"
 
 #define	M(v)		((v) * 1000000)		/* Million */
 #define	UNUSED(var)	(void)(var)		/* Quiet unused var warnings */
@@ -97,7 +96,7 @@ typedef struct {
 
 #define	COMPRESS_NONE	1
 #define	COMPRESS_BZIP	2
-#define	COMPRESS_EXT	3
+#define	COMPRESS_RAW	3
 #define	COMPRESS_SNAPPY	4
 	u_int compression;			/* Compression type */
 
@@ -119,6 +118,7 @@ typedef struct {
 	u_int c_key_min;
 	u_int c_leaf_page_max;
 	u_int c_ops;
+	u_int c_prefix;
 	u_int c_repeat_data_pct;
 	u_int c_reverse;
 	u_int c_rows;

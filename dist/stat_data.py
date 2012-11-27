@@ -22,13 +22,16 @@ class Stat:
 connection_stats = [
 	Stat('block_read', 'blocks read from a file'),
 	Stat('block_write', 'blocks written to a file'),
+	Stat('byte_read', 'bytes read from a file'),
+	Stat('byte_write', 'bytes written to a file'),
 	Stat('cache_bytes_dirty', 'cache: tracked dirty bytes in the cache'),
 	Stat('cache_bytes_dirty_calc', 'cache: counted dirty bytes in the cache'),
 	Stat('cache_bytes_inuse',
 		'cache: bytes currently held in the cache', perm=1),
 	Stat('cache_bytes_max', 'cache: maximum bytes configured', perm=1),
-	Stat('cache_evict_hazard', 'cache: pages selected for eviction not ' +
-		'evicted because of a hazard reference'),
+	Stat('cache_evict_hazard',
+	    'cache: pages selected for eviction not ' +
+	    'evicted because of a hazard reference'),
 	Stat('cache_evict_internal', 'cache: internal pages evicted'),
 	Stat('cache_evict_modified', 'cache: modified pages evicted'),
 	Stat('cache_evict_slow',
@@ -63,6 +66,12 @@ dsrc_stats = [
 	Stat('block_alloc', 'block allocations'),
 	Stat('block_extend', 'block allocations required file extension'),
 	Stat('block_free', 'block frees'),
+	Stat('byte_changed',
+	    'approximate measure of bytes changed: counts key and value ' +
+	    'bytes inserted with cursor.insert, value bytes updated with ' +
+	    'cursor.update and key bytes removed using cursor.remove'),
+	Stat('byte_read', 'bytes read into cache'),
+	Stat('byte_write', 'bytes written from cache'),
 	Stat('ckpt_size', 'checkpoint size'),
 	Stat('cursor_insert', 'cursor-inserts'),
 	Stat('cursor_read', 'cursor-read'),
@@ -85,20 +94,20 @@ dsrc_stats = [
 	Stat('file_maxleafpage', 'maximum leaf page size'),
 	Stat('file_minor', 'minor version number'),
 	Stat('file_size', 'file size'),
+	Stat('overflow_page', 'overflow pages'),
+	Stat('overflow_read', 'overflow pages read into cache'),
+	Stat('overflow_value_cache', 'overflow values cached in memory'),
 	Stat('page_col_deleted', 'column-store deleted values'),
 	Stat('page_col_fix', 'column-store fixed-size leaf pages'),
 	Stat('page_col_int', 'column-store internal pages'),
 	Stat('page_col_var', 'column-store variable-size leaf pages'),
 	Stat('page_evict', 'pages evicted from the data source'),
 	Stat('page_evict_fail',
-		'pages that were selected for eviction that could not be evicted'),
+	    'pages that were selected for eviction that could not be evicted'),
 	Stat('page_read', 'pages read into cache'),
 	Stat('page_row_int', 'row-store internal pages'),
 	Stat('page_row_leaf', 'row-store leaf pages'),
 	Stat('page_write', 'pages written from cache'),
-	Stat('overflow_page', 'overflow pages'),
-	Stat('overflow_read', 'overflow pages read into cache'),
-	Stat('overflow_value_cache', 'overflow values cached in memory'),
 	Stat('rec_dictionary', 'reconcile: dictionary match'),
 	Stat('rec_hazard', 'reconciliation unable to acquire hazard reference'),
 	Stat('rec_ovfl_key', 'reconciliation overflow key'),
@@ -107,25 +116,26 @@ dsrc_stats = [
 	Stat('rec_page_merge', 'deleted or temporary pages merged'),
 	Stat('rec_split_intl', 'internal pages split'),
 	Stat('rec_split_leaf', 'leaf pages split'),
-	Stat('rec_written', 'pages written'),
+	Stat('rec_written', 'pages written from reconciliation'),
 	Stat('txn_update_conflict', 'update conflicts'),
 	Stat('txn_write_conflict', 'write generation conflicts'),
+
 ##########################################
 # LSM statistics
 ##########################################
-	Stat('bloom_false_positive',
-	    'Number of Bloom filter false positives'),
-	Stat('bloom_hit', 'Number of Bloom filter hits'),
-	Stat('bloom_miss', 'Number of Bloom filter misses'),
-	Stat('bloom_size', 'Total size of Bloom filters'),
-	Stat('bloom_page_evict', 'Number of Bloom pages evicted from cache'),
-	Stat('bloom_page_read', 'Number of Bloom pages read into cache'),
-	Stat('bloom_count',
-		'Number of Bloom filters in the LSM tree'),
-	Stat('lsm_chunk_count', 'Number of chunks in the LSM tree'),
-	Stat('lsm_generation_max', 'Highest merge generation in the LSM tree'),
-	Stat('lsm_lookup_no_bloom', 'Number of queries that could have benefited ' +
-		'from a Bloom filter that did not exist'),
+	Stat('bloom_count', 'number of Bloom filters in the LSM tree'),
+	Stat('bloom_false_positive', 'number of Bloom filter false positives'),
+	Stat('bloom_hit', 'number of Bloom filter hits'),
+	Stat('bloom_miss', 'number of Bloom filter misses'),
+	Stat('bloom_page_evict', 'number of Bloom pages evicted from cache'),
+	Stat('bloom_page_read', 'number of Bloom pages read into cache'),
+	Stat('bloom_size', 'total size of Bloom filters'),
+	Stat('lsm_chunk_count', 'number of chunks in the LSM tree'),
+	Stat('lsm_generation_max', 'highest merge generation in the LSM tree'),
+	Stat('lsm_lookup_no_bloom',
+	    'number of queries that could have benefited ' +
+	    'from a Bloom filter that did not exist'),
+
 ]
 
 dsrc_stats = sorted(dsrc_stats, key=attrgetter('name'))

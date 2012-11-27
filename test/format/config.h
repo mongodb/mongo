@@ -79,7 +79,7 @@ static CONFIG c[] = {
 	  0, 0, 1, 500, &g.c_cache, NULL },
 
 	{ "compression",
-	  "type of compression (none | bzip | ext | snappy)",
+	  "type of compression (none | bzip | raw | snappy)",
 	  0, C_IGNORE|C_STRING, 1, 4, NULL, &g.c_compression },
 
 	{ "data_source",
@@ -129,6 +129,10 @@ static CONFIG c[] = {
 	{ "ops",
 	  "the number of modification operations done per run",
 	  0, 0, 0, M(2), &g.c_ops, NULL },
+
+	{ "prefix",
+	  "if keys are prefix compressed",		/* 80% */
+	  C_ROW, C_BOOL, 80, 0, &g.c_prefix, NULL },
 
 	{ "repeat_data_pct",
 	  "percent duplicate values in row- or variable-length column-stores",

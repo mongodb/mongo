@@ -481,8 +481,7 @@ __evict_file_request(WT_SESSION_IMPL *session, int syncop)
 		case WT_SYNC_DISCARD:
 			/* Write dirty pages for sync and sync with discard. */
 			if (__wt_page_is_modified(page))
-				WT_ERR(__wt_rec_write(
-				    session, page, NULL, WT_REC_SINGLE));
+				WT_ERR(__wt_rec_write(session, page, NULL, 1));
 			if (syncop == WT_SYNC)
 				break;
 
@@ -496,8 +495,7 @@ __evict_file_request(WT_SESSION_IMPL *session, int syncop)
 			if (WT_PAGE_IS_ROOT(page) || page->modify == NULL ||
 			    !F_ISSET(page->modify, WT_PM_REC_EMPTY |
 			    WT_PM_REC_SPLIT | WT_PM_REC_SPLIT_MERGE))
-				WT_ERR(__wt_rec_evict(
-				    session, page, WT_REC_SINGLE));
+				WT_ERR(__wt_rec_evict(session, page, 1));
 			break;
 		case WT_SYNC_DISCARD_NOWRITE:
 			/*
@@ -747,7 +745,7 @@ __evict_get_page(
 	WT_CACHE *cache;
 	WT_EVICT_ENTRY *evict;
 	WT_REF *ref;
-	int candidates;
+	uint32_t candidates;
 
 	cache = S2C(session)->cache;
 	*btreep = NULL;
