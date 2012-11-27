@@ -999,4 +999,39 @@ dodouble:
         }
         return b.obj();
     }
+
+    template<typename T> bool BSONObj::coerceVector( std::vector<T>* out ) const {
+        BSONObjIterator i( *this );
+        while ( i.more() ) {
+            BSONElement e = i.next();
+            T t;
+            if ( ! e.coerce<T>( &t ) )
+                return false;
+            out->push_back( t );
+        }
+        return true;
+    }
+
+
+    template<> inline bool BSONElement::coerce<std::string>( std::string* out ) const {
+        if ( type() != mongo::String )
+            return false;
+        *out = String();
+        return true;
+    }
+
+    template<> inline bool BSONElement::coerce<int>( int* out ) const {
+        if ( !isNumber() )
+            return false;
+        *out = numberInt();
+        return true;
+    }
+
+    template<> inline bool BSONElement::coerce< std::vector<std::string> >( std::vector<std::string>* out ) const {
+        if ( type() != mongo::Array )
+            return false;
+        return Obj().coerceVector<std::string>( out );
+    }
+
+
 }

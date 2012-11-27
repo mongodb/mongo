@@ -454,6 +454,8 @@ namespace mongo {
         std::string _asCode() const;
         OpTime _opTime() const;
 
+        template<typename T> bool coerce( T* out ) const;
+
     private:
         const char *data;
         mutable int fieldNameSize_; // cached value

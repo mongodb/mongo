@@ -224,9 +224,9 @@ namespace mongo {
         }
 
         /** @return true if field exists */
-        bool hasField( const char * name ) const { return !getField(name).eoo(); }
+        bool hasField( const StringData& name ) const { return !getField(name).eoo(); }
         /** @return true if field exists */
-        bool hasElement(const char *name) const { return hasField(name); }
+        bool hasElement(const StringData& name) const { return hasField(name); }
 
         /** @return "" if DNE or wrong type */
         const char * getStringField(const char *name) const;
@@ -465,6 +465,8 @@ namespace mongo {
             verify( objsize() );
             b.appendBuf(reinterpret_cast<const void *>( objdata() ), objsize());
         }
+
+        template<typename T> bool coerceVector( std::vector<T>* out ) const;
 
 #pragma pack(1)
         class Holder : boost::noncopyable {
