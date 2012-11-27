@@ -88,6 +88,19 @@ namespace mongo {
                             BSONObj dbObj = conn->get()->findOne( ConfigNS::database , b.obj() );
                             conn->done();
 
+                            // If our name is exactly the same as the name we want, try loading
+                            // the database again.
+                            if (!dbObj.isEmpty() &&
+                                dbObj[DatabaseFields::name()].String() == database)
+                            {
+                                if (dbConfig->load()) return dbConfig;
+                            }
+
+                            // TODO: This really shouldn't fall through, but without metadata
+                            // management there's no good way to make sure this works all the time
+                            // when the database is getting rapidly created and dropped.
+                            // For now, just do exactly what we used to do.
+
                             if ( ! dbObj.isEmpty() ) {
                                 uasserted( DatabaseDifferCaseCode, str::stream()
                                     <<  "can't have 2 databases that just differ on case "
