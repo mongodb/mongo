@@ -99,6 +99,11 @@ namespace mongo {
             BSONElement cmdElement(cmdIterator.next());
             const char *pFieldName = cmdElement.fieldName();
 
+            // ignore top-level fields prefixed with $. They are for the command processor, not us.
+            if (pFieldName[0] == '$') {
+                continue;
+            }
+
             /* look for the aggregation command */
             if (!strcmp(pFieldName, commandName)) {
                 pPipeline->collectionName = cmdElement.String();
@@ -126,18 +131,6 @@ namespace mongo {
             /* check for debug options */
             if (!strcmp(pFieldName, splitMongodPipelineName)) {
                 pPipeline->splitMongodPipeline = true;
-                continue;
-            }
-
-            /* Ignore $auth information sent along with the command. The authentication system will
-             * use it, it's not a part of the pipeline.
-             */
-            if (!strcmp(pFieldName, AuthenticationTable::fieldName.c_str())) {
-                continue;
-            }
-
-            // Ignore $queryOptions (like read preference)
-            if (strcmp(pFieldName, "$queryOptions") == 0) {
                 continue;
             }
 
