@@ -474,6 +474,17 @@ __config_next(WT_CONFIG *conf, WT_CONFIG_ITEM *key, WT_CONFIG_ITEM *value)
 }
 
 /*
+ * Arithmetic shift of a negative number is undefined by ISO/IEC 9899, and the
+ * WiredTiger API supports negative numbers.  Check it's not a negative number,
+ * and then cast the shift out of paranoia.
+ */
+#define	WT_SHIFT_INT64(v, s) do {					\
+	if ((v) < 0)							\
+		goto range;						\
+	(v) = (int64_t)(((uint64_t)(v)) << (s));			\
+} while (0)
+
+/*
  * __config_process_value
  *	Deal with special config values like true / false.
  */
@@ -507,23 +518,23 @@ __config_process_value(WT_CONFIG *conf, WT_CONFIG_ITEM *value)
 				break;
 			case 'k':
 			case 'K':
-				value->val <<= 10;
+				WT_SHIFT_INT64(value->val, 10);
 				break;
 			case 'm':
 			case 'M':
-				value->val <<= 20;
+				WT_SHIFT_INT64(value->val, 20);
 				break;
 			case 'g':
 			case 'G':
-				value->val <<= 30;
+				WT_SHIFT_INT64(value->val, 30);
 				break;
 			case 't':
 			case 'T':
-				value->val <<= 40;
+				WT_SHIFT_INT64(value->val, 40);
 				break;
 			case 'p':
 			case 'P':
-				value->val <<= 50;
+				WT_SHIFT_INT64(value->val, 50);
 				break;
 			default:
 				/*
@@ -542,11 +553,13 @@ __config_process_value(WT_CONFIG *conf, WT_CONFIG_ITEM *value)
 		 * that will be caught by __wt_config_check.
 		 */
 		if (value->type == ITEM_NUM && errno == ERANGE)
-			return (
-			    __config_err(conf, "Number out of range", ERANGE));
+			goto range;
 	}
 
 	return (0);
+
+range:
+	return (__config_err(conf, "Number out of range", ERANGE));
 }
 
 /*
