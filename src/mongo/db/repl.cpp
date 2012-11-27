@@ -50,6 +50,7 @@
 #include "pcrecpp.h"
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/instance.h"
+#include "mongo/db/server_parameters.h"
 #include "mongo/db/queryutil.h"
 
 namespace mongo {
@@ -803,7 +804,49 @@ namespace mongo {
         }
     }
 
-    extern unsigned replApplyBatchSize;
+    class ReplApplyBatchSize : public ServerParameter {
+    public:
+        ReplApplyBatchSize()
+            : ServerParameter( ServerParameterSet::getGlobal(), "replApplyBatchSize" ),
+              _value( 1 ) {
+        }
+
+        int get() const { return _value; }
+
+        virtual void append( BSONObjBuilder& b ) {
+            b.append( name(), _value );
+        }
+
+        virtual Status set( const BSONElement& newValuElement ) {
+            return set( newValuElement.numberInt() );
+        }
+
+        virtual Status set( int b ) {
+            if( b < 1 || b > 1024 ) {
+                return Status( ErrorCodes::BadValue,
+                               "replApplyBatchSize has to be >= 1 and < 1024" );
+            }
+
+            if ( replSettings.slavedelay != 0 && b > 1 ) {
+                return Status( ErrorCodes::BadValue,
+                               "can't use a batch size > 1 with slavedelay" );
+            }
+            if ( ! replSettings.slave ) {
+                return Status( ErrorCodes::BadValue,
+                               "can't set replApplyBatchSize on a non-slave machine" );
+            }
+
+            _value = b;
+            return Status::OK();
+        }
+
+        virtual Status setFromString( const string& str ) {
+            return set( atoi( str.c_str() ) );
+        }
+
+        int _value;
+
+    } replApplyBatchSize;
 
     /* slave: pull some data from the master's oplog
        note: not yet in db mutex at this point.
@@ -1008,7 +1051,7 @@ namespace mongo {
 
                 BSONObj op = oplogReader.next();
 
-                unsigned b = replApplyBatchSize;
+                int b = replApplyBatchSize.get();
                 bool justOne = b == 1;
                 scoped_ptr<Lock::GlobalWrite> lk( justOne ? 0 : new Lock::GlobalWrite() );
                 while( 1 ) {
@@ -1541,30 +1584,6 @@ namespace mongo {
         tp.join();
     }
 
-    class ReplApplyBatchSizeValidator : public ParameterValidator {
-    public:
-        ReplApplyBatchSizeValidator() : ParameterValidator( "replApplyBatchSize" ) {}
-
-        virtual bool isValid( BSONElement e , string& errmsg ) const {
-            int b = e.numberInt();
-            if( b < 1 || b > 1024 ) {
-                errmsg = "replApplyBatchSize has to be >= 1 and < 1024";
-                return false;
-            }
-
-            if ( replSettings.slavedelay != 0 && b > 1 ) {
-                errmsg = "can't use a batch size > 1 with slavedelay";
-                return false;
-            }
-            if ( ! replSettings.slave ) {
-                errmsg = "can't set replApplyBatchSize on a non-slave machine";
-                return false;
-            }
-
-            return true;
-        }
-    } replApplyBatchSizeValidator;
-    
     /** we allow queries to SimpleSlave's */
     void replVerifyReadsOk(const ParsedQuery* pq) {
         if( replSet ) {

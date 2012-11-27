@@ -219,26 +219,5 @@ namespace mongo {
     extern CmdLine cmdLine;
 
     void printCommandLineOpts();
-
-    /**
-     * used for setParameter command
-     * so you can write validation code that lives with code using it
-     * rather than all in the command place
-     * also lets you have mongos or mongod specific code
-     * without pulling it all sorts of things
-     */
-    class ParameterValidator {
-    public:
-        ParameterValidator( const std::string& name );
-        virtual ~ParameterValidator() {}
-
-        virtual bool isValid( BSONElement e , std::string& errmsg ) const = 0;
-
-        static ParameterValidator * get( const std::string& name );
-
-    private:
-        const std::string _name;
-    };
-
 }
 

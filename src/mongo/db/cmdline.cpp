@@ -453,17 +453,4 @@ namespace {
     void printCommandLineOpts() {
         log() << "options: " << parsedOpts << endl;
     }
-
-    map<string,ParameterValidator*>* pv_all(NULL);
-
-    ParameterValidator::ParameterValidator( const string& name ) : _name( name ) {
-        if ( ! pv_all)
-            pv_all = new map<string,ParameterValidator*>();
-        (*pv_all)[_name] = this;
-    }
-
-    ParameterValidator* ParameterValidator::get( const string& name ) {
-        return mapFindWithDefault(*pv_all, name, static_cast<ParameterValidator*>(NULL));
-    }
-
 }

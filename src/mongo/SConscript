@@ -163,6 +163,15 @@ env.CppUnitTest("processinfo_test",
                 ["util/processinfo_test.cpp"],
                 LIBDEPS=["processinfo"])
 
+env.StaticLibrary("server_parameters",
+                  ["db/server_parameters.cpp"],
+                  LIBDEPS=["foundation","bson"])
+
+env.CppUnitTest("server_parameters_test",
+                [ "db/server_parameters_test.cpp" ],
+                LIBDEPS=["server_parameters"] )
+
+
 env.StaticLibrary("fail_point",
                   ["util/fail_point.cpp",
                    "util/fail_point_registry.cpp",
@@ -190,6 +199,7 @@ env.StaticLibrary("coredb", [
         "db/commands/hashcmd.cpp",
         "db/commands/isself.cpp",
         "db/commands/server_status.cpp",
+        "db/commands/parameters.cpp",
         "db/pipeline/pipeline.cpp",
         "db/dbcommands_generic.cpp",
         "db/dbwebserver.cpp",
@@ -232,7 +242,9 @@ env.StaticLibrary("coredb", [
         "db/stats/top.cpp",
         "s/shardconnection.cpp",
         ],
-                  LIBDEPS=['db/auth/auth', 'db/auth/serverauth'])
+                  LIBDEPS=['db/auth/auth',
+                           'db/auth/serverauth',
+                           'server_parameters'])
 
 coreServerFiles = [ "db/common.cpp",
                     "util/net/miniwebserver.cpp",
