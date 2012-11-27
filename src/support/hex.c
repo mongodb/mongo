@@ -26,7 +26,7 @@ __wt_raw_to_hex(
 	 * In the worst case, every character takes up 2 spaces, plus a
 	 * trailing nul byte.
 	 */
-	len = size * 2 + 1;
+	len = (size_t)size * 2 + 1;
 	WT_RET(__wt_buf_init(session, to, len));
 
 	for (p = from, t = to->mem, i = size; i > 0; --i, ++p) {
