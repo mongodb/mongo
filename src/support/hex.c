@@ -17,6 +17,7 @@ int
 __wt_raw_to_hex(
     WT_SESSION_IMPL *session, const uint8_t *from, uint32_t size, WT_ITEM *to)
 {
+	size_t len;
 	uint32_t i;
 	const uint8_t *p;
 	u_char *t;
@@ -25,8 +26,8 @@ __wt_raw_to_hex(
 	 * In the worst case, every character takes up 2 spaces, plus a
 	 * trailing nul byte.
 	 */
-	size = size * 2 + 1;
-	WT_RET(__wt_buf_init(session, to, (size_t)size));
+	len = size * 2 + 1;
+	WT_RET(__wt_buf_init(session, to, len));
 
 	for (p = from, t = to->mem, i = size; i > 0; --i, ++p) {
 		*t++ = hex[(*p & 0xf0) >> 4];
