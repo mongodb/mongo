@@ -1059,7 +1059,7 @@ __wt_block_extlist_write(WT_SESSION_IMPL *session,
 	 * entries: the initial WT_BLOCK_EXTLIST_MAGIC/0 pair and the list-
 	 * terminating WT_BLOCK_INVALID_OFFSET/0 pair.
 	 */
-	size = (entries + 2) * WT_INTPACK64_MAXSIZE;
+	size = (entries + 2) * 2 * WT_INTPACK64_MAXSIZE;
 	WT_RET(__wt_block_write_size(session, block, &size));
 	WT_RET(__wt_scr_alloc(session, size, &tmp));
 	dsk = tmp->mem;
