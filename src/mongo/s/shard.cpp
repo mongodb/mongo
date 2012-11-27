@@ -22,6 +22,7 @@
 
 #include "mongo/client/dbclient_rs.h"
 #include "mongo/client/dbclientcursor.h"
+#include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/commands.h"
 #include "mongo/s/config.h"
 #include "mongo/s/client_info.h"

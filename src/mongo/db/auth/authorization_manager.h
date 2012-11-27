@@ -32,6 +32,16 @@
 namespace mongo {
 
     /**
+     * Internal secret key info.
+     */
+    struct AuthInfo {
+        AuthInfo();
+        string user;
+        string pwd;
+    };
+    extern AuthInfo internalSecurity; // set at startup and not changed after initialization.
+
+    /**
      * Contains all the authorization logic for a single client connection.  It contains a set of
      * the principals which have been authenticated, as well as a set of privileges that have been
      * granted by those principals to perform various actions.

@@ -34,6 +34,11 @@
 
 namespace mongo {
 
+    AuthInfo::AuthInfo() {
+        user = "__system";
+    }
+    AuthInfo internalSecurity;
+
     const std::string AuthorizationManager::SERVER_RESOURCE_NAME = "$SERVER";
     const std::string AuthorizationManager::CLUSTER_RESOURCE_NAME = "$CLUSTER";
 
@@ -251,8 +256,7 @@ namespace mongo {
                                   << principal->getName(),
                           0);
         }
-         // TODO: move internalSecurity into AuthorizationManager
-        if (principal->getName() == "__system") {
+        if (principal->getName() == internalSecurity.user) {
             // Grant full access to internal user
             ActionSet allActions;
             allActions.addAllActions();

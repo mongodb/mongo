@@ -29,6 +29,7 @@
 
 #include <boost/thread/thread.hpp>
 
+#include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/dbhelpers.h"
 #include "../db/commands.h"
 #include "mongo/db/hasher.h"

@@ -20,6 +20,7 @@
 
 #include "../util/timer.h"
 
+#include "mongo/db/auth/authorization_manager.h"
 #include "config.h"
 #include "grid.h"
 #include "request.h"

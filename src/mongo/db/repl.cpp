@@ -30,6 +30,7 @@
 
 #include <boost/thread/thread.hpp>
 
+#include "mongo/db/auth/authorization_manager.h"
 #include "jsobj.h"
 #include "../util/goodies.h"
 #include "repl.h"

@@ -23,20 +23,8 @@
 
 namespace mongo {
 
-    /**
-     * Internal secret key info.
-     */
-    struct AuthInfo {
-        AuthInfo() {
-            user = "__system";
-        }
-        string user;
-        string pwd;
-    };
-
     // --noauth cmd line option
     extern bool noauth;
-    extern AuthInfo internalSecurity; // set at startup and not changed after initialization.
 
     /**
      * This method checks the validity of filename as a security key, hashes its

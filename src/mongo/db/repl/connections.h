@@ -19,7 +19,8 @@
 #pragma once
 
 #include <map>
-#include "../security_common.h"
+
+#include "mongo/db/auth/authorization_manager.h"
 
 namespace mongo {
 

@@ -18,6 +18,8 @@
 // security.cpp
 
 #include "pch.h"
+
+#include "mongo/db/auth/authorization_manager.h"
 #include "../db/security_common.h"
 #include "../db/security.h"
 #include "config.h"
