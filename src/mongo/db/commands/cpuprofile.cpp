@@ -37,7 +37,7 @@
  *         --cpppath=/usr/local/include --libpath=/usr/local/lib
  */
 
-#include "google/profiler.h"
+#include "third_party/gperftools-2.0/src/gperftools/profiler.h"
 #include "mongo/db/commands.h"
 
 namespace mongo {

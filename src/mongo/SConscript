@@ -521,7 +521,7 @@ env.StaticLibrary("gridfs", "client/gridfs.cpp")
 
 if has_option( 'use-cpu-profiler' ):
     coreServerFiles.append( 'db/commands/cpuprofile.cpp' )
-    env.Append( LIBS=['profiler'] )
+    env.Append(LIBS=['unwind'])
 
 env.StaticLibrary("coreserver", coreServerFiles, LIBDEPS=["mongocommon", "scripting"])
 

@@ -160,7 +160,7 @@
 #define HAVE_TLS 1
 
 /* Define to 1 if you have the <ucontext.h> header file. */
-/* #undef HAVE_UCONTEXT_H */
+#define HAVE_UCONTEXT_H
 
 /* Define to 1 if you have the <unistd.h> header file. */
 #define HAVE_UNISTD_H 1
@@ -215,7 +215,11 @@
 #define PACKAGE_VERSION "2.0"
 
 /* How to access the PC from a struct ucontext */
-/* #undef PC_FROM_UCONTEXT */
+#ifdef __i386
+#define PC_FROM_UCONTEXT uc_mcontext.gregs[REG_EIP]
+#else
+#define PC_FROM_UCONTEXT uc_mcontext.gregs[REG_RIP]
+#endif
 
 /* Always the empty-string on non-windows systems. On windows, should be
    "__declspec(dllexport)". This way, when we compile the dll, we export our
