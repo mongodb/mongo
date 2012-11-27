@@ -144,6 +144,26 @@ __wt_rec_track(WT_SESSION_IMPL *session, WT_PAGE *page,
 		memcpy(track->data, data, data_size);
 	}
 
+	/*
+	 * Overflow items are potentially large and on-page items remain in the
+	 * tracking list until the page is evicted.  If we're tracking a lot of
+	 * them, their memory might matter: increment the page and cache memory
+	 * totals.   This is unlikely to matter, but it's inexpensive (unless
+	 * there are lots of them, in with case I guess the memory matters).
+	 *
+	 * If this reconciliation were to fail, we would reasonably perform the
+	 * inverse operation in __wt_rec_track_wrapup_err.  I'm not bothering
+	 * with that because we'd have to crack the structure itself to figure
+	 * out how much to decrement and I don't think it's worth the effort.
+	 * The potential problem is repeatedly failing reconciliation of a page
+	 * with a large number of overflow items, which causes the page's memory
+	 * memory footprint to become incorrectly high, causing us to push the
+	 * page out of cache unnecessarily.  Like I said, not worth the effort.
+	 */
+	if (LF_ISSET(WT_TRK_ONPAGE))
+		__wt_cache_page_inmem_incr(
+		    session, page, addr_size + data_size);
+
 	if (WT_VERBOSE_ISSET(session, reconcile))
 		WT_RET(__track_msg(session, page, "add", track));
 	return (0);

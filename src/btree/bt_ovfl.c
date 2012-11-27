@@ -118,9 +118,6 @@ __val_ovfl_cache_col(
 	WT_ERR(__wt_rec_track(session, page, addr, addr_size,
 	    value.data, value.size, WT_TRK_ONPAGE | WT_TRK_OVFL_VALUE));
 
-	/* Update the in-memory footprint. */
-	__wt_cache_page_inmem_incr(session, page, value.size);
-
 err:	__wt_buf_free(session, &value);
 	return (ret);
 }
