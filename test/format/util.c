@@ -203,15 +203,8 @@ track(const char *tag, uint64_t cnt, TINFO *tinfo)
 uint32_t
 wts_rand(void)
 {
-	static int seeded = 0;
 	char buf[64];
 	uint32_t r;
-
-	/* If it's not a replay, seed the random number generator. */
-	if (!g.replay && !seeded) {
-		srand((u_int)(0xdeadbeef ^ (u_int)time(NULL)));
-		seeded = 1;
-	}
 
 	/* If we're threaded, it's not repeatable, ignore the log. */
 	if (!SINGLETHREADED)
@@ -225,14 +218,11 @@ wts_rand(void)
 	 * internally, and so that messes up the pattern of random numbers
 	 * (and WT might call rand() in the future, who knows?)
 	 */
-	if (g.rand_log == NULL) {
-		if ((g.rand_log =
-		    fopen("RUNDIR/rand", g.replay ? "r" : "w")) == NULL)
-			die(errno, "fopen: RUNDIR/rand");
-		if (!g.replay)
-			(void)setvbuf(g.rand_log, NULL, _IOLBF, 0);
-	}
 	if (g.replay) {
+		if (g.rand_log == NULL &&
+		   (g.rand_log = fopen("RUNDIR/rand", "r")) == NULL)
+			die(errno, "fopen: RUNDIR/rand");
+
 		if (fgets(buf, sizeof(buf), g.rand_log) == NULL) {
 			if (feof(g.rand_log)) {
 				fprintf(stderr,
@@ -245,6 +235,17 @@ wts_rand(void)
 
 		r = (uint32_t)strtoul(buf, NULL, 10);
 	} else {
+		if (g.rand_log == NULL) {
+			if ((g.rand_log = fopen("RUNDIR/rand", "w")) == NULL)
+				die(errno, "fopen: RUNDIR/rand");
+			(void)setvbuf(g.rand_log, NULL, _IOLBF, 0);
+
+			/*
+			 * Seed the random number generator for each new run (we
+			 * know it's a new run when we re-open the log file).
+			 */
+			srand((u_int)(0xdeadbeef ^ (u_int)time(NULL)));
+		}
 		r = (uint32_t)rand();
 		fprintf(g.rand_log, "%" PRIu32 "\n", r);
 	}
