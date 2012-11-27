@@ -54,15 +54,15 @@ namespace mongo {
                     _authorizationManager != NULL);
             return _authorizationManager.get();
         }
-        // setAuthorizationManager must be called in the initialization of any ClientBasic that
-        // corresponds to an incoming client connection.
-        void setAuthorizationManager(AuthorizationManager* authorizationManager) {
-            massert(16477,
-                    "An AuthorizationManager has already been set up for this connection",
-                    _authorizationManager == NULL);
-            _authorizationManager.reset(authorizationManager);
+        // Must be called in the initialization of any ClientBasic that corresponds to an incoming
+        // client connection.
+        void initializeAuthorizationManager();
+        bool getIsLocalHostConnection() {
+            if (!hasRemote()) {
+                return false;
+            }
+            return getRemote().isLocalHost();
         }
-        bool getIsLocalHostConnection() { return getRemote().isLocalHost(); }
 
         virtual bool hasRemote() const { return _messagingPort; }
         virtual HostAndPort getRemote() const {
@@ -81,5 +81,12 @@ namespace mongo {
         boost::scoped_ptr<AuthenticationSession> _authenticationSession;
         boost::scoped_ptr<AuthorizationManager> _authorizationManager;
         AbstractMessagingPort* const _messagingPort;
+
+        void setAuthorizationManager(AuthorizationManager* authorizationManager) {
+            massert(16477,
+                    "An AuthorizationManager has already been set up for this connection",
+                    _authorizationManager == NULL);
+            _authorizationManager.reset(authorizationManager);
+        }
     };
 }
