@@ -243,7 +243,12 @@ namespace mongo {
             break;
 
         case Timestamp:
-            s << "{ \"t\" : " << timestampTime() << " , \"i\" : " << timestampInc() << " }";
+            if ( format == TenGen ) {
+                s << "Timestamp( " << ( timestampTime() / 1000 ) << ", " << timestampInc() << " )";
+            }
+            else {
+                s << "{ \"$timestamp\" : { \"t\" : " << ( timestampTime() / 1000 ) << ", \"i\" : " << timestampInc() << " } }";
+            }
             break;
 
         case MinKey:

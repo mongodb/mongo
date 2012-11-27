@@ -357,7 +357,11 @@ namespace JsonTests {
                 BSONObjBuilder b;
                 b.appendTimestamp( "x" , 4000 , 10 );
                 BSONObj o = b.obj();
-                ASSERT_EQUALS( "{ \"x\" : { \"t\" : 4000 , \"i\" : 10 } }" , o.jsonString() );
+                ASSERT_EQUALS( "{ \"x\" : { \"$timestamp\" : { \"t\" : 4, \"i\" : 10 } } }",
+                        o.jsonString( Strict ) );
+                ASSERT_EQUALS( "{ \"x\" : { \"$timestamp\" : { \"t\" : 4, \"i\" : 10 } } }",
+                        o.jsonString( JS ) );
+                ASSERT_EQUALS( "{ \"x\" : Timestamp( 4, 10 ) }", o.jsonString( TenGen ) );
             }
         };
 
