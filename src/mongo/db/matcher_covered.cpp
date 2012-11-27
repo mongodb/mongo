@@ -55,10 +55,20 @@ namespace mongo {
 
     bool CoveredIndexMatcher::matchesCurrent( Cursor * cursor , MatchDetails * details ) const {
         // bool keyUsable = ! cursor->isMultiKey() && check for $orish like conditions in matcher SERVER-1264
-        return matches( cursor->currKey() , cursor->currLoc() , details ,
-                       !cursor->indexKeyPattern().isEmpty() // unindexed cursor
-                       && !cursor->isMultiKey() // multikey cursor
-                       );
+
+        bool keyUsable = true;
+        if ( cursor->indexKeyPattern().isEmpty() ) { // unindexed cursor
+            keyUsable = false;
+        }
+        else if ( cursor->isMultiKey() ) {
+            keyUsable =
+                _keyMatcher.singleSimpleCriterion() &&
+                ( ! _docMatcher || _docMatcher->singleSimpleCriterion() );
+        }
+        return matches( cursor->currKey(),
+                        cursor->currLoc(),
+                        details,
+                        keyUsable );
     }
 
     bool CoveredIndexMatcher::matches( const BSONObj& key, const DiskLoc& recLoc,
