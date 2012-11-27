@@ -246,7 +246,10 @@ __wt_btcur_insert(WT_CURSOR_BTREE *cbt)
 	btree = cbt->btree;
 	cursor = &cbt->iface;
 	session = (WT_SESSION_IMPL *)cursor->session;
+
 	WT_BSTAT_INCR(session, cursor_insert);
+	WT_BSTAT_INCRV(
+	    session, byte_changed, cursor->key.size + cursor->value.size);
 
 	if (btree->type == BTREE_ROW)
 		WT_RET(__cursor_size_chk(session, &cursor->key));
@@ -336,7 +339,9 @@ __wt_btcur_remove(WT_CURSOR_BTREE *cbt)
 	btree = cbt->btree;
 	cursor = &cbt->iface;
 	session = (WT_SESSION_IMPL *)cursor->session;
+
 	WT_BSTAT_INCR(session, cursor_remove);
+	WT_BSTAT_INCRV(session, byte_changed, cursor->key.size);
 
 	if (btree->type == BTREE_ROW)
 		WT_RET(__cursor_size_chk(session, &cursor->key));
@@ -398,7 +403,9 @@ __wt_btcur_update(WT_CURSOR_BTREE *cbt)
 	btree = cbt->btree;
 	cursor = &cbt->iface;
 	session = (WT_SESSION_IMPL *)cursor->session;
+
 	WT_BSTAT_INCR(session, cursor_update);
+	WT_BSTAT_INCRV(session, byte_changed, cursor->value.size);
 
 	if (btree->type == BTREE_ROW)
 		WT_RET(__cursor_size_chk(session, &cursor->key));
@@ -429,7 +436,7 @@ retry:	__cursor_func_init(cbt, 1);
 		ret = __wt_col_modify(session, cbt, 3);
 		break;
 	case BTREE_ROW:
-		/* Update the record it it exists. */
+		/* Update the record if it exists. */
 		WT_ERR(__wt_row_search(session, cbt, 1));
 		if (cbt->compare != 0 || __cursor_invalid(cbt))
 			WT_ERR(WT_NOTFOUND);

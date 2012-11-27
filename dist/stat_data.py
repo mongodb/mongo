@@ -62,6 +62,10 @@ dsrc_stats = [
 	Stat('block_alloc', 'block allocations'),
 	Stat('block_extend', 'block allocations required file extension'),
 	Stat('block_free', 'block frees'),
+	Stat('byte_changed',
+	    'approximate measure of bytes changed: counts key and value ' +
+	    'bytes inserted with cursor.insert, value bytes updated with ' +
+	    'cursor.update and key bytes removed using cursor.remove'),
 	Stat('byte_read', 'bytes read into cache'),
 	Stat('byte_write', 'bytes written from cache'),
 	Stat('ckpt_size', 'checkpoint size'),

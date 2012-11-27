@@ -21,6 +21,8 @@ __wt_stat_alloc_dsrc_stats(WT_SESSION_IMPL *session, WT_DSRC_STATS **statsp)
 	    "number of Bloom pages evicted from cache";
 	stats->bloom_page_read.desc = "number of Bloom pages read into cache";
 	stats->bloom_size.desc = "total size of Bloom filters";
+	stats->byte_changed.desc =
+	    "approximate measure of bytes changed: counts key and value bytes inserted with cursor.insert, value bytes updated with cursor.update and key bytes removed using cursor.remove";
 	stats->byte_read.desc = "bytes read into cache";
 	stats->byte_write.desc = "bytes written from cache";
 	stats->ckpt_size.desc = "checkpoint size";
@@ -97,6 +99,7 @@ __wt_stat_clear_dsrc_stats(WT_STATS *stats_arg)
 	stats->bloom_page_evict.v = 0;
 	stats->bloom_page_read.v = 0;
 	stats->bloom_size.v = 0;
+	stats->byte_changed.v = 0;
 	stats->byte_read.v = 0;
 	stats->byte_write.v = 0;
 	stats->ckpt_size.v = 0;

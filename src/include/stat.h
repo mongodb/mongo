@@ -85,6 +85,7 @@ struct __wt_dsrc_stats {
 	WT_STATS bloom_page_evict;
 	WT_STATS bloom_page_read;
 	WT_STATS bloom_size;
+	WT_STATS byte_changed;
 	WT_STATS byte_read;
 	WT_STATS byte_write;
 	WT_STATS ckpt_size;
