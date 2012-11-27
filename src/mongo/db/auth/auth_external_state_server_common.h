@@ -24,31 +24,21 @@
 namespace mongo {
 
     /**
-     * The actual implementation of AuthExternalState
+     * The implementation of AuthExternalState functionality common to mongod and mongos.
      */
-    class AuthExternalStateImpl : public AuthExternalState {
-        MONGO_DISALLOW_COPYING(AuthExternalStateImpl);
+    class AuthExternalStateServerCommon : public AuthExternalState {
+        MONGO_DISALLOW_COPYING(AuthExternalStateServerCommon);
 
     public:
+        virtual ~AuthExternalStateServerCommon();
 
-        AuthExternalStateImpl() {};
-        virtual ~AuthExternalStateImpl() {};
-
-        // Returns true if this connection should be treated as if it has full access to do
-        // anything, regardless of the current auth state.  Currently the reasons why this could be
-        // are that auth isn't enabled, the connection is from localhost and there are admin users,
-        // or the connection is a "god" connection.
         virtual bool shouldIgnoreAuthChecks() const;
-
-        // adminDBConnection is a connection that can be used to access the admin database.  It is
-        // used to determine if there are any admin users configured for the cluster, and thus if
-        // localhost connections should be given special admin access.
-        // This function *must* be called on any new AuthExternalState, after the constructor but
-        // before any other methods are called on the AuthExternalState.
         virtual Status initialize(DBClientBase* adminDBConnection);
 
-    private:
+    protected:
+        AuthExternalStateServerCommon();
 
+    private:
         bool _adminUserExists;
     };
 

@@ -19,38 +19,23 @@
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
 #include "mongo/client/dbclientinterface.h"
-#include "mongo/db/auth/auth_external_state.h"
+#include "mongo/db/auth/auth_external_state_server_common.h"
 
 namespace mongo {
 
     /**
-     * Mock of the AuthExternalState class used only for testing.
+     * The implementation of AuthExternalState functionality for mongod.
      */
-    class AuthExternalStateMock : public AuthExternalState {
-        MONGO_DISALLOW_COPYING(AuthExternalStateMock);
+    class AuthExternalStateMongod : public AuthExternalStateServerCommon {
+        MONGO_DISALLOW_COPYING(AuthExternalStateMongod);
 
     public:
-        AuthExternalStateMock() : _returnValue(false) {}
-
-        virtual bool shouldIgnoreAuthChecks() const {
-            return _returnValue;
-        }
-
-        void setReturnValueForShouldIgnoreAuthChecks(bool returnValue) {
-            _returnValue = returnValue;
-        }
-
-        // This is a no-op for the mock
-        virtual Status initialize(DBClientBase* adminDBConnection) { return Status::OK(); }
+        AuthExternalStateMongod();
+        virtual ~AuthExternalStateMongod();
 
         virtual Status getPrivilegeDocument(const string& dbname,
-                                            const string& user,
-                                            BSONObj* result) {
-            return Status(ErrorCodes::InternalError, "Not Implemented!");
-        }
-
-    private:
-        bool _returnValue;
+                                            const string& principalName,
+                                            BSONObj* result);
     };
 
 } // namespace mongo

@@ -97,10 +97,11 @@ namespace mongo {
 
         // Returns the privilege document with the given user name in the given database. Currently
         // this information comes from the system.users collection in that database.
-        static Status getPrivilegeDocument(DBClientBase* conn,
-                                           const std::string& dbname,
-                                           const std::string& userName,
-                                           BSONObj* result);
+        Status getPrivilegeDocument(const std::string& dbname,
+                                    const std::string& userName,
+                                    BSONObj* result) {
+            return _externalState->getPrivilegeDocument(dbname, userName, result);
+        }
 
         // Returns true if there exists at least one privilege document in the given database.
         static bool hasPrivilegeDocument(DBClientBase* conn, const std::string& dbname);

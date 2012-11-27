@@ -14,41 +14,43 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "mongo/db/auth/auth_external_state_impl.h"
+#include "mongo/db/auth/auth_external_state.h"
 
-#include "mongo/base/status.h"
-#include "mongo/client/dbclientinterface.h"
 #include "mongo/db/auth/authorization_manager.h"
-#include "mongo/db/client.h"
-#include "mongo/util/debug_util.h"
 
 namespace mongo {
 
-    Status AuthExternalStateImpl::initialize(DBClientBase* adminDBConnection) {
-        if (noauth) {
+    AuthExternalState::AuthExternalState() {}
+    AuthExternalState::~AuthExternalState() {}
+
+    Status AuthExternalState::getPrivilegeDocumentOverConnection(DBClientBase* conn,
+                                                                 const std::string& dbname,
+                                                                 const std::string& principalName,
+                                                                 BSONObj* result) {
+        if (principalName == internalSecurity.user) {
+            if (internalSecurity.pwd.empty()) {
+                return Status(ErrorCodes::UserNotFound,
+                              "key file must be used to log in with internal user",
+                              15889);
+            }
+            *result = BSON("user" << principalName << "pwd" << internalSecurity.pwd).getOwned();
             return Status::OK();
         }
 
-        try {
-            _adminUserExists = AuthorizationManager::hasPrivilegeDocument(adminDBConnection,
-                                                                          "admin");
-        } catch (DBException& e) {
-            return Status(ErrorCodes::InternalError,
-                          mongoutils::str::stream() << "An error occurred while checking for the "
-                                  "existence of an admin user: " << e.what(),
+        std::string usersNamespace = dbname + ".system.users";
+
+        BSONObj userBSONObj;
+        BSONObj query = BSON("user" << principalName);
+        userBSONObj = conn->findOne(usersNamespace, query, 0, QueryOption_SlaveOk);
+        if (userBSONObj.isEmpty()) {
+            return Status(ErrorCodes::UserNotFound,
+                          mongoutils::str::stream() << "auth: couldn't find user " << principalName
+                                                    << ", " << usersNamespace,
                           0);
         }
-        ONCE {
-            if (!_adminUserExists) {
-                log() << "note: no users configured in admin.system.users, allowing localhost access"
-                      << endl;
-            }
-        }
+
+        *result = userBSONObj.getOwned();
         return Status::OK();
     }
 
-    bool AuthExternalStateImpl::shouldIgnoreAuthChecks() const {
-        return noauth || (!_adminUserExists && cc().getIsLocalHostConnection()) || cc().isGod();
-    }
-
-} // namespace mongo
+}  // namespace mongo

@@ -16,6 +16,8 @@
 
 #pragma once
 
+#include <string>
+
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
 #include "mongo/client/dbclientinterface.h"
@@ -33,7 +35,7 @@ namespace mongo {
 
     public:
 
-        virtual ~AuthExternalState() {};
+        virtual ~AuthExternalState();
 
         // Returns true if this connection should be treated as if it has full access to do
         // anything, regardless of the current auth state.  Currently the reasons why this could be
@@ -48,8 +50,24 @@ namespace mongo {
         // before any other methods are called on the AuthExternalState.
         virtual Status initialize(DBClientBase* adminDBConnection) = 0;
 
+        // Gets the privilege information document for "principalName" on "dbname".
+        //
+        // On success, returns Status::OK() and stores a shared-ownership copy of the document into
+        // "result".
+        virtual Status getPrivilegeDocument(const std::string& dbname,
+                                            const std::string& principalName,
+                                            BSONObj* result) = 0;
+
+
     protected:
-        AuthExternalState() {}; // This class should never be instantiated directly.
+        // Look up the privilege document for "principalName" in database "dbname", over "conn".
+        static Status getPrivilegeDocumentOverConnection(DBClientBase* conn,
+                                                         const std::string& dbname,
+                                                         const std::string& userName,
+                                                         BSONObj* result);
+
+
+        AuthExternalState(); // This class should never be instantiated directly.
     };
 
 } // namespace mongo

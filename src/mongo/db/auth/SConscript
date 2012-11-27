@@ -10,6 +10,7 @@ env.Command(['action_type.h', 'action_type.cpp'], ['generate_action_types.py', '
 # Just the data structures used
 env.StaticLibrary('authcore', ['action_set.cpp',
                                'action_type.cpp',
+                               'auth_external_state.cpp',
                                'authorization_manager.cpp',
                                'principal.cpp',
                                'principal_set.cpp',
@@ -17,7 +18,17 @@ env.StaticLibrary('authcore', ['action_set.cpp',
                                'privilege_set.cpp'],
                   LIBDEPS=['$BUILD_DIR/mongo/base/base', '$BUILD_DIR/mongo/stringutils'])
 
-env.StaticLibrary('auth', ['auth_external_state.cpp'], LIBDEPS=['authcore'])
+env.StaticLibrary('authservercommon',
+                  ['auth_external_state_server_common.cpp'],
+                  LIBDEPS=['authcore'])
+
+env.StaticLibrary('authmongod',
+                  ['auth_external_state_d.cpp'],
+                  LIBDEPS=['authservercommon'])
+
+env.StaticLibrary('authmongos',
+                  ['auth_external_state_s.cpp'],
+                  LIBDEPS=['authservercommon'])
 
 env.CppUnitTest('action_set_test', 'action_set_test.cpp', LIBDEPS=['authcore'])
 env.CppUnitTest('principal_set_test', 'principal_set_test.cpp', LIBDEPS=['authcore'])

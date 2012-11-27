@@ -242,8 +242,7 @@ env.StaticLibrary("coredb", [
         "db/stats/top.cpp",
         "s/shardconnection.cpp",
         ],
-                  LIBDEPS=['db/auth/auth',
-                           'db/auth/serverauth',
+                  LIBDEPS=['db/auth/serverauth',
                            'server_parameters'])
 
 coreServerFiles = [ "db/common.cpp",
@@ -439,7 +438,7 @@ mongosLibraryFiles = [
     "s/security.cpp",
     ]
 
-env.Library( "mongoscore" , mongosLibraryFiles )
+env.Library( "mongoscore" , mongosLibraryFiles, LIBDEPS=['db/auth/authmongos'] )
 
 env.CppUnitTest( "balancer_policy_test" , [ "s/balancer_policy_tests.cpp" ] ,
                  LIBDEPS=["mongoscore", "coreshard","mongocommon","coreserver","coredb","dbcmdline","mongodandmongos"] ,
@@ -505,6 +504,7 @@ env.CppUnitTest("geojsonparser_test", [ "db/geo/geojsonparser_test.cpp" ], LIBDE
 
 env.StaticLibrary("serveronly", serverOnlyFiles,
                   LIBDEPS=["coreshard",
+                           "db/auth/authmongod",
                            "dbcmdline",
                            "defaultversion",
                            "geojson",

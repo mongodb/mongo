@@ -24,7 +24,7 @@
 #include "mongo/db/auth/acquired_privilege.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
-#include "mongo/db/auth/auth_external_state_impl.h"
+#include "mongo/db/auth/auth_external_state.h"
 #include "mongo/db/auth/principal.h"
 #include "mongo/db/auth/principal_set.h"
 #include "mongo/db/auth/privilege_set.h"
@@ -197,30 +197,6 @@ namespace mongo {
 
         _acquiredPrivileges.grantPrivilege(privilege);
 
-        return Status::OK();
-    }
-
-    Status AuthorizationManager::getPrivilegeDocument(DBClientBase* conn,
-                                                      const std::string& dbname,
-                                                      const std::string& userName,
-                                                      BSONObj* result) {
-        std::string usersNamespace = dbname + ".system.users";
-
-        BSONObj userBSONObj;
-        {
-            BSONObj query = BSON("user" << userName);
-            userBSONObj = conn->findOne(usersNamespace, query, 0, QueryOption_SlaveOk);
-            if (userBSONObj.isEmpty()) {
-                return Status(ErrorCodes::UserNotFound,
-                              mongoutils::str::stream() << "No matching entry in "
-                                                        << usersNamespace
-                                                        << " found with name: "
-                                                        << userName,
-                              0);
-            }
-        }
-
-        *result = userBSONObj.getOwned();
         return Status::OK();
     }
 

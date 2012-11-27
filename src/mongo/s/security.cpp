@@ -32,41 +32,6 @@ namespace mongo {
 
     bool AuthenticationInfo::_warned;
 
-    bool CmdAuthenticate::getUserObj(const string& dbname, const string& user, BSONObj& userObj, string& pwd) {
-        if (user == internalSecurity.user) {
-            uassert(15890, "key file must be used to log in with internal user",
-                    !cmdLine.keyFile.empty());
-            pwd = internalSecurity.pwd;
-        }
-        else {
-            string systemUsers = dbname + ".system.users";
-            DBConfigPtr config = grid.getDBConfig( systemUsers );
-            Shard s = config->getShard( systemUsers );
-
-            static BSONObj userPattern = BSON("user" << 1);
-
-            scoped_ptr<ScopedDbConnection> conn(
-                    ScopedDbConnection::getInternalScopedDbConnection( s.getConnString(), 30.0 ) );
-            OCCASIONALLY conn->get()->ensureIndex(systemUsers, userPattern, false, "user_1");
-            {
-                BSONObjBuilder b;
-                b << "user" << user;
-                BSONObj query = b.done();
-                userObj = conn->get()->findOne(systemUsers, query, 0, QueryOption_SlaveOk);
-                if( userObj.isEmpty() ) {
-                    log() << "auth: couldn't find user " << user << ", " << systemUsers << endl;
-                    conn->done(); // return to pool
-                    return false;
-                }
-            }
-
-            pwd = userObj.getStringField("pwd");
-
-            conn->done(); // return to pool
-        }
-        return true;
-    }
-
     void AuthenticationInfo::startRequest() {
         _checkLocalHostSpecialAdmin();
     }

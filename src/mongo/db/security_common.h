@@ -18,8 +18,7 @@
 
 #pragma once
 
-#include "commands.h"
-#include "../util/concurrency/spin_lock.h"
+#include "mongo/db/commands.h"
 
 namespace mongo {
 
@@ -49,10 +48,8 @@ namespace mongo {
         CmdAuthenticate() : Command("authenticate") {}
         bool run(const string& dbname , BSONObj& cmdObj, int options, string& errmsg, BSONObjBuilder& result, bool fromRepl);
         void authenticate(const string& dbname, const string& user, const bool readOnly);
-    private:
-        bool getUserObj(const string& dbname, const string& user, BSONObj& userObj, string& pwd);
     };
-    
+
     extern CmdAuthenticate cmdAuthenticate;
 
     class CmdLogout : public Command {
