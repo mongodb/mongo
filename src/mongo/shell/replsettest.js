@@ -469,6 +469,8 @@ ReplSetTest.prototype.initiate = function( cfg , initCmd , timeout ) {
         return result['ok'] == 1;
     });
 
+    this.awaitSecondaryNodes();
+
     // Setup authentication if running test with authentication
     if (jsTestOptions().keyFile && !this.keyFile) {
         master = this.getMaster();
