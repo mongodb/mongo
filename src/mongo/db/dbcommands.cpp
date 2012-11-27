@@ -242,7 +242,10 @@ namespace mongo {
                     }
                     else {
                         // w=2 and no repl
-                        result.append( "wnote" , "no replication has been enabled, so w=2+ won't work" );
+                        stringstream errmsg;
+                        errmsg << "no replication has been enabled, so w=" <<
+                                  e.toString(false) << " won't work";
+                        result.append( "wnote" , errmsg.str() );
                         result.append( "err", "norepl" );
                         return true;
                     }
