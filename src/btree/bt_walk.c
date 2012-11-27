@@ -95,7 +95,7 @@ __tree_walk_delete(
 	 * we write the tree.
 	 */
 	WT_ERR(__wt_page_modify_init(session, page));
-	__wt_page_modify_set(page);
+	__wt_page_modify_set(session, page);
 
 	*skipp = 1;
 

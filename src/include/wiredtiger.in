@@ -1706,51 +1706,59 @@ extern int wiredtiger_extension_init(WT_SESSION *session,
 #define	WT_STAT_CONN_BLOCK_READ				0
 /*! blocks written to a file */
 #define	WT_STAT_CONN_BLOCK_WRITE			1
+/*! cache: tracked dirty bytes in the cache */
+#define	WT_STAT_CONN_CACHE_BYTES_DIRTY			2
+/*! cache: counted dirty bytes in the cache */
+#define	WT_STAT_CONN_CACHE_BYTES_DIRTY_CALC		3
 /*! cache: bytes currently held in the cache */
-#define	WT_STAT_CONN_CACHE_BYTES_INUSE			2
+#define	WT_STAT_CONN_CACHE_BYTES_INUSE			4
 /*! cache: maximum bytes configured */
-#define	WT_STAT_CONN_CACHE_BYTES_MAX			3
+#define	WT_STAT_CONN_CACHE_BYTES_MAX			5
 /*! cache: pages selected for eviction not evicted because of a hazard
  * reference */
-#define	WT_STAT_CONN_CACHE_EVICT_HAZARD			4
+#define	WT_STAT_CONN_CACHE_EVICT_HAZARD			6
 /*! cache: internal pages evicted */
-#define	WT_STAT_CONN_CACHE_EVICT_INTERNAL		5
+#define	WT_STAT_CONN_CACHE_EVICT_INTERNAL		7
 /*! cache: modified pages evicted */
-#define	WT_STAT_CONN_CACHE_EVICT_MODIFIED		6
+#define	WT_STAT_CONN_CACHE_EVICT_MODIFIED		8
 /*! cache: eviction server unable to reach eviction goal */
-#define	WT_STAT_CONN_CACHE_EVICT_SLOW			7
+#define	WT_STAT_CONN_CACHE_EVICT_SLOW			9
 /*! cache: unmodified pages evicted */
-#define	WT_STAT_CONN_CACHE_EVICT_UNMODIFIED		8
+#define	WT_STAT_CONN_CACHE_EVICT_UNMODIFIED		10
+/*! cache: tracked dirty pages in the cache */
+#define	WT_STAT_CONN_CACHE_PAGES_DIRTY			11
+/*! cache: counted dirty pages in the cache */
+#define	WT_STAT_CONN_CACHE_PAGES_DIRTY_CALC		12
 /*! cache: pages currently held in the cache */
-#define	WT_STAT_CONN_CACHE_PAGES_INUSE			9
+#define	WT_STAT_CONN_CACHE_PAGES_INUSE			13
 /*! checkpoints */
-#define	WT_STAT_CONN_CHECKPOINT				10
+#define	WT_STAT_CONN_CHECKPOINT				14
 /*! condition wait calls */
-#define	WT_STAT_CONN_COND_WAIT				11
+#define	WT_STAT_CONN_COND_WAIT				15
 /*! files currently open */
-#define	WT_STAT_CONN_FILE_OPEN				12
+#define	WT_STAT_CONN_FILE_OPEN				16
 /*! total memory allocations */
-#define	WT_STAT_CONN_MEMALLOC				13
+#define	WT_STAT_CONN_MEMALLOC				17
 /*! total memory frees */
-#define	WT_STAT_CONN_MEMFREE				14
+#define	WT_STAT_CONN_MEMFREE				18
 /*! rwlock readlock calls */
-#define	WT_STAT_CONN_RWLOCK_RDLOCK			15
+#define	WT_STAT_CONN_RWLOCK_RDLOCK			19
 /*! rwlock writelock calls */
-#define	WT_STAT_CONN_RWLOCK_WRLOCK			16
+#define	WT_STAT_CONN_RWLOCK_WRLOCK			20
 /*! total read I/Os */
-#define	WT_STAT_CONN_TOTAL_READ_IO			17
+#define	WT_STAT_CONN_TOTAL_READ_IO			21
 /*! total write I/Os */
-#define	WT_STAT_CONN_TOTAL_WRITE_IO			18
+#define	WT_STAT_CONN_TOTAL_WRITE_IO			22
 /*! ancient transactions */
-#define	WT_STAT_CONN_TXN_ANCIENT			19
+#define	WT_STAT_CONN_TXN_ANCIENT			23
 /*! transactions */
-#define	WT_STAT_CONN_TXN_BEGIN				20
+#define	WT_STAT_CONN_TXN_BEGIN				24
 /*! transactions committed */
-#define	WT_STAT_CONN_TXN_COMMIT				21
+#define	WT_STAT_CONN_TXN_COMMIT				25
 /*! transaction failures due to cache overflow */
-#define	WT_STAT_CONN_TXN_FAIL_CACHE			22
+#define	WT_STAT_CONN_TXN_FAIL_CACHE			26
 /*! transactions rolled-back */
-#define	WT_STAT_CONN_TXN_ROLLBACK			23
+#define	WT_STAT_CONN_TXN_ROLLBACK			27
 
 /*!
  * @}

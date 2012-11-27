@@ -806,7 +806,7 @@ connection_ops(WT_CONNECTION *conn)
 
 	/*! [Setup cache dirty target] */
 	ret = conn->reconfigure(conn, "eviction_dirty_target=75");
-	/*! [Reconfigure a connection] */
+	/*! [Setup cache dirty target] */
 
 	/*! [Get the database home directory] */
 	printf("The database home is %s\n", conn->get_home(conn));

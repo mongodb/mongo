@@ -476,7 +476,7 @@ __wt_rec_write(WT_SESSION_IMPL *session,
 				break;
 		}
 		WT_RET(__wt_page_modify_init(session, page));
-		__wt_page_modify_set(page);
+		__wt_page_modify_set(session, page);
 
 		return (0);
 	}
@@ -524,7 +524,7 @@ __wt_rec_write(WT_SESSION_IMPL *session,
 	WT_VERBOSE_RET(session, reconcile,
 	    "root page split %p -> %p", page, page->modify->u.split);
 	page = page->modify->u.split;
-	__wt_page_modify_set(page);
+	__wt_page_modify_set(session, page);
 	F_CLR(page->modify, WT_PM_REC_SPLIT_MERGE);
 
 	WT_RET(__wt_rec_write(session, page, NULL, flags));
@@ -1389,7 +1389,7 @@ __wt_rec_bulk_wrapup(WT_CURSOR_BULK *cbulk)
 
 	/* Mark the page's parent dirty. */
 	WT_RET(__wt_page_modify_init(session, page->parent));
-	__wt_page_modify_set(page->parent);
+	__wt_page_modify_set(session, page->parent);
 
 	__wt_rec_destroy(session, &cbulk->reconcile);
 
@@ -3178,6 +3178,7 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	WT_DECL_RET;
 	WT_PAGE_MODIFY *mod;
 	uint32_t i;
+	int was_modified;
 
 	btree = session->btree;
 	mod = page->modify;
@@ -3375,8 +3376,10 @@ err:			__wt_scr_free(&tkey);
 	 * started.
 	 */
 	if (!r->upd_skipped) {
-		__wt_cache_dirty_decr(session, page->memory_footprint);
+		was_modified = __wt_page_is_modified(page);
 		mod->disk_gen = r->orig_write_gen;
+		if (was_modified && !__wt_page_is_modified(page))
+			__wt_cache_dirty_decr(session, page->memory_footprint);
 	}
 
 	return (0);

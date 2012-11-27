@@ -22,6 +22,8 @@ class Stat:
 connection_stats = [
 	Stat('block_read', 'blocks read from a file'),
 	Stat('block_write', 'blocks written to a file'),
+	Stat('cache_bytes_dirty', 'cache: tracked dirty bytes in the cache'),
+	Stat('cache_bytes_dirty_calc', 'cache: counted dirty bytes in the cache'),
 	Stat('cache_bytes_inuse',
 		'cache: bytes currently held in the cache', perm=1),
 	Stat('cache_bytes_max', 'cache: maximum bytes configured', perm=1),
@@ -32,6 +34,8 @@ connection_stats = [
 	Stat('cache_evict_slow',
 		'cache: eviction server unable to reach eviction goal'),
 	Stat('cache_evict_unmodified', 'cache: unmodified pages evicted'),
+	Stat('cache_pages_dirty', 'cache: tracked dirty pages in the cache'),
+	Stat('cache_pages_dirty_calc', 'cache: counted dirty pages in the cache'),
 	Stat('cache_pages_inuse',
 		'cache: pages currently held in the cache', perm=1),
 	Stat('checkpoint', 'checkpoints'),

@@ -38,10 +38,13 @@ static inline void
 __wt_cache_page_inmem_decr(
     WT_SESSION_IMPL *session, WT_PAGE *page, size_t size)
 {
-	(void)WT_ATOMIC_SUB(S2C(session)->cache->bytes_inmem, size);
+	WT_CACHE *cache;
+	cache = S2C(session)->cache;
+
+	(void)WT_ATOMIC_SUB(cache->bytes_inmem, size);
 	(void)WT_ATOMIC_SUB(page->memory_footprint, WT_STORE_SIZE(size));
 	if (__wt_page_is_modified(page))
-		(void)WT_ATOMIC_SUB(S2C(session)->cache->bytes_dirty, size);
+		(void)WT_ATOMIC_SUB(cache->bytes_dirty, size);
 }
 
 /*
@@ -53,8 +56,13 @@ static inline void
 __wt_cache_dirty_decr(
     WT_SESSION_IMPL *session, size_t size)
 {
-	(void)WT_ATOMIC_SUB(
-	    S2C(session)->cache->bytes_dirty, size);
+	WT_CACHE *cache;
+	cache = S2C(session)->cache;
+
+	WT_ASSERT(session,
+	    cache->bytes_dirty >= size && cache->pages_dirty > 0);
+	(void)WT_ATOMIC_SUB(cache->bytes_dirty, size);
+	(void)WT_ATOMIC_SUB(cache->pages_dirty, 1);
 }
 
 /*
@@ -90,12 +98,6 @@ __wt_cache_page_evict(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 	(void)WT_ATOMIC_ADD(cache->pages_evict, 1);
 	(void)WT_ATOMIC_ADD(cache->bytes_evict, page->memory_footprint);
-
-	if (__wt_page_is_modified(page)) {
-		(void)WT_ATOMIC_SUB(cache->pages_dirty, 1);
-		WT_ASSERT(session, cache->bytes_dirty > page->memory_footprint);
-		(void)WT_ATOMIC_SUB(cache->bytes_dirty, page->memory_footprint);
-	}
 
 	page->memory_footprint = 0;
 }
@@ -176,11 +178,6 @@ __wt_page_modify_init(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 */
 	if (!WT_ATOMIC_CAS(page->modify, NULL, modify))
 		__wt_free(session, modify);
-	else {
-		(void)WT_ATOMIC_ADD(S2C(session)->cache->pages_dirty, 1);
-		(void)WT_ATOMIC_ADD(
-		    S2C(session)->cache->bytes_dirty, page->memory_footprint);
-	}
 	return (0);
 }
 
@@ -189,8 +186,13 @@ __wt_page_modify_init(WT_SESSION_IMPL *session, WT_PAGE *page)
  *	Mark the page dirty.
  */
 static inline void
-__wt_page_modify_set(WT_PAGE *page)
+__wt_page_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
+	if (!__wt_page_is_modified(page)) {
+		(void)WT_ATOMIC_ADD(S2C(session)->cache->pages_dirty, 1);
+		(void)WT_ATOMIC_ADD(
+		    S2C(session)->cache->bytes_dirty, page->memory_footprint);
+	}
 	/*
 	 * Publish: there must be a barrier to ensure all changes to the page
 	 * are flushed before we update the page's write generation, otherwise
@@ -220,7 +222,7 @@ __wt_page_and_tree_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 */
 	btree->modified = 1;
 
-	__wt_page_modify_set(page);
+	__wt_page_modify_set(session, page);
 }
 
 /*

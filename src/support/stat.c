@@ -155,6 +155,10 @@ __wt_stat_alloc_connection_stats(WT_SESSION_IMPL *session, WT_CONNECTION_STATS *
 
 	stats->block_read.desc = "blocks read from a file";
 	stats->block_write.desc = "blocks written to a file";
+	stats->cache_bytes_dirty.desc =
+	    "cache: tracked dirty bytes in the cache";
+	stats->cache_bytes_dirty_calc.desc =
+	    "cache: counted dirty bytes in the cache";
 	stats->cache_bytes_inuse.desc =
 	    "cache: bytes currently held in the cache";
 	stats->cache_bytes_max.desc = "cache: maximum bytes configured";
@@ -165,6 +169,10 @@ __wt_stat_alloc_connection_stats(WT_SESSION_IMPL *session, WT_CONNECTION_STATS *
 	stats->cache_evict_slow.desc =
 	    "cache: eviction server unable to reach eviction goal";
 	stats->cache_evict_unmodified.desc = "cache: unmodified pages evicted";
+	stats->cache_pages_dirty.desc =
+	    "cache: tracked dirty pages in the cache";
+	stats->cache_pages_dirty_calc.desc =
+	    "cache: counted dirty pages in the cache";
 	stats->cache_pages_inuse.desc =
 	    "cache: pages currently held in the cache";
 	stats->checkpoint.desc = "checkpoints";
@@ -195,11 +203,15 @@ __wt_stat_clear_connection_stats(WT_STATS *stats_arg)
 	stats = (WT_CONNECTION_STATS *)stats_arg;
 	stats->block_read.v = 0;
 	stats->block_write.v = 0;
+	stats->cache_bytes_dirty.v = 0;
+	stats->cache_bytes_dirty_calc.v = 0;
 	stats->cache_evict_hazard.v = 0;
 	stats->cache_evict_internal.v = 0;
 	stats->cache_evict_modified.v = 0;
 	stats->cache_evict_slow.v = 0;
 	stats->cache_evict_unmodified.v = 0;
+	stats->cache_pages_dirty.v = 0;
+	stats->cache_pages_dirty_calc.v = 0;
 	stats->checkpoint.v = 0;
 	stats->cond_wait.v = 0;
 	stats->file_open.v = 0;
