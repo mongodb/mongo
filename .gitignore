@@ -48,6 +48,7 @@
 /src/mongo/db/.gdb*
 /src/mongo/db/makefile.local
 /src/mongo/db/_ReSharper.db
+/src/third_party/*/*.cache
 /src/third_party/*/*.tlog
 /src/third_party/*/*.lastbuildstate
 config.log
