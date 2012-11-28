@@ -319,7 +319,8 @@ namespace mongo {
         void reset( int maxSize = 0 ) { _buf.reset( maxSize ); }
 
         std::string str() const { return std::string(_buf.data, _buf.l); }
-        
+
+        /** size of current string */
         int len() const { return _buf.l; }
 
     private:
