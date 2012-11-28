@@ -123,6 +123,8 @@ struct __wt_btree {
 	void *block;			/* Block manager */
 	u_int block_header;		/* Block manager header length */
 
+	uint64_t write_gen;		/* Write generation */
+
 	WT_PAGE *evict_page;		/* Eviction thread's location */
 	uint64_t evict_priority;	/* Relative priority of cached pages. */
 	volatile uint32_t lru_count;	/* Count of threads in LRU eviction */

@@ -128,8 +128,6 @@ struct __wt_block_ckpt {
 	off_t	   file_size;			/* Checkpoint file size */
 	uint64_t   ckpt_size;			/* Checkpoint byte count */
 	WT_EXTLIST ckpt_avail;			/* Checkpoint free'd extents */
-
-	uint64_t write_gen;			/* Write generation */
 };
 
 /*
@@ -190,53 +188,40 @@ struct __wt_block_desc {
  */
 struct __wt_block_header {
 	/*
-	 * We maintain page write-generations in the non-transactional case
-	 * (where, instead of a transactional LSN, the value is a counter),
-	 * as that's how salvage can determine the most recent page between
-	 * pages overlapping the same key range.
-	 *
-	 * !!!
-	 * The write-generation is "owned" by the btree layer, but it's easier
-	 * to set (when physically writing blocks) and restore (during salvage),
-	 * in the block-manager layer.
-	 */
-	uint64_t write_gen;		/* 00-07: write generation */
-
-	/*
 	 * We write the page size in the on-disk page header because it makes
 	 * salvage easier.  (If we don't know the expected page length, we'd
 	 * have to read increasingly larger chunks from the file until we find
 	 * one that checksums, and that's going to be harsh given WiredTiger's
 	 * potentially large page sizes.)
 	 */
-	uint32_t disk_size;		/* 08-11: on-disk page size */
+	uint32_t disk_size;		/* 00-03: on-disk page size */
 
 	/*
-	 * Page checksums are stored in two places.  First, a page's checksum
-	 * is in the internal page that references a page as part of the
-	 * address cookie.  This is done to improve the chances of detecting
-	 * not only disk corruption but software bugs (for example, overwriting
-	 * a page with another valid page image).  Second, a page's checksum is
+	 * Page checksums are stored in two places.  First, the page checksum
+	 * is written within the internal page that references it as part of
+	 * the address cookie.  This is done to improve the chances of detecting
+	 * not only disk corruption but other bugs (for example, overwriting a
+	 * page with another valid page image).  Second, a page's checksum is
 	 * stored in the disk header.  This is for salvage, so salvage knows it
 	 * has found a page that may be useful.
 	 */
-	uint32_t cksum;			/* 12-15: checksum */
+	uint32_t cksum;			/* 04-07: checksum */
 
 #define	WT_BLOCK_DATA_CKSUM	0x01	/* Block data is part of the checksum */
-	uint8_t flags;			/* 16: flags */
+	uint8_t flags;			/* 08: flags */
 
 	/*
 	 * End the structure with 3 bytes of padding: it wastes space, but it
 	 * leaves the structure 32-bit aligned and having a few bytes to play
 	 * with in the future can't hurt.
 	 */
-	uint8_t unused[3];		/* 17-19: unused padding */
+	uint8_t unused[3];		/* 09-11: unused padding */
 };
 /*
  * WT_BLOCK_HEADER_SIZE is the number of bytes we allocate for the structure: if
  * the compiler inserts padding it will break the world.
  */
-#define	WT_BLOCK_HEADER_SIZE		20
+#define	WT_BLOCK_HEADER_SIZE		12
 
 /*
  * WT_BLOCK_HEADER_BYTE

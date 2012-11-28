@@ -580,6 +580,14 @@ __wt_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_ERR(__wt_bt_cache_flush(session,
 	    ckptbase, is_checkpoint ? WT_SYNC : WT_SYNC_DISCARD));
 
+	/*
+	 * All blocks being written have been written; set the object's write
+	 * generation.
+	 */
+	WT_CKPT_FOREACH(ckptbase, ckpt)
+		if (F_ISSET(ckpt, WT_CKPT_ADD))
+			ckpt->write_gen = btree->write_gen;
+
 fake:
 	/* Update the object's metadata. */
 	txn->isolation = TXN_ISO_READ_UNCOMMITTED;

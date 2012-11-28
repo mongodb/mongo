@@ -204,7 +204,6 @@ __conn_btree_open(WT_SESSION_IMPL *session,
     const char *config, const char *cfg[], uint32_t flags)
 {
 	WT_BTREE *btree;
-	WT_DECL_ITEM(addr);
 	WT_DECL_RET;
 
 	btree = session->btree;
@@ -226,16 +225,11 @@ __conn_btree_open(WT_SESSION_IMPL *session,
 	if (F_ISSET(btree, WT_BTREE_OPEN))
 		WT_RET(__wt_conn_btree_sync_and_close(session));
 
-	WT_RET(__wt_scr_alloc(session, WT_BTREE_MAX_ADDR_COOKIE, &addr));
-
 	/* Set any special flags on the handle. */
 	F_SET(btree, LF_ISSET(WT_BTREE_SPECIAL_FLAGS));
 
 	do {
-		WT_ERR(__wt_meta_checkpoint_addr(
-		    session, btree->name, btree->checkpoint, addr));
-		WT_ERR(__wt_btree_open(session, addr->data, addr->size, cfg,
-		    btree->checkpoint == NULL ? 0 : 1));
+		WT_ERR(__wt_btree_open(session, cfg));
 		F_SET(btree, WT_BTREE_OPEN);
 		/*
 		 * Checkpoint handles are read only, so eviction calculations
@@ -257,7 +251,6 @@ err:		F_CLR(btree, WT_BTREE_SPECIAL_FLAGS);
 		(void)__wt_conn_btree_close(session, 1);
 	}
 
-	__wt_scr_free(&addr);
 	return (ret);
 }
 
