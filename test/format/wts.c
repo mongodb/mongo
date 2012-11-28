@@ -1,8 +1,28 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
- *	All rights reserved.
+ * Public Domain 2008-2012 WiredTiger, Inc.
  *
- * See the file LICENSE for redistribution information.
+ * This is free and unencumbered software released into the public domain.
+ *
+ * Anyone is free to copy, modify, publish, use, compile, sell, or
+ * distribute this software, either in source code form or as a compiled
+ * binary, for any purpose, commercial or non-commercial, and by any
+ * means.
+ *
+ * In jurisdictions that recognize copyright laws, the author or authors
+ * of this software dedicate any and all copyright interest in the
+ * software to the public domain. We make this dedication for the benefit
+ * of the public at large and to the detriment of our heirs and
+ * successors. We intend this dedication to be an overt act of
+ * relinquishment in perpetuity of all present and future rights to this
+ * software under copyright law.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+ * IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+ * OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+ * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+ * OTHER DEALINGS IN THE SOFTWARE.
  */
 
 #include "format.h"
@@ -45,40 +65,47 @@ wts_open(void)
 	WT_SESSION *session;
 	uint32_t maxintlpage, maxintlitem, maxleafpage, maxleafitem;
 	int ret;
-	const char *ext1, *ext2;
-	char config[512], *end, *p;
-
-	/* If the bzip2 compression module has been built, use it. */
-	ext1 = "../../ext/compressors/bzip2_compress/.libs/bzip2_compress.so";
-	if (access(ext1, R_OK) != 0) {
-		ext1 = "";
-		g.c_bzip = 0;
-	}
-	ext2 = "../../ext/collators/reverse/.libs/reverse_collator.so";
+	char config[1024], *end, *p;
 
 	/*
-	 * Open configuration -- put command line configuration options at the
-	 * end so they can override "standard" configuration.
+	 * Open configuration.
+	 *
+	 * Put command line configuration options at the end so they override
+	 * the standard configuration.
 	 */
 	snprintf(config, sizeof(config),
 	    "create,error_prefix=\"%s\",cache_size=%" PRIu32 "MB,sync=false,"
-	    "extensions=[\"%s\",\"%s\"],%s",
-	    g.progname, g.c_cache, ext1, ext2,
+	    "extensions=[\"%s\", \"%s\", \"%s\", \"%s\"], %s",
+	    g.progname, g.c_cache,
+	    access(BZIP_PATH, R_OK) == 0 ? BZIP_PATH : "",
+	    access(SNAPPY_PATH, R_OK) == 0 ? SNAPPY_PATH : "",
+	    access(BZIP_PATH, R_OK) == 0 ? FC_PATH : "",
+	    REVERSE_PATH,
 	    g.config_open == NULL ? "" : g.config_open);
 
-	if ((ret = wiredtiger_open(NULL, &event_handler, config, &conn)) != 0)
+	if ((ret =
+	    wiredtiger_open("RUNDIR", &event_handler, config, &conn)) != 0)
 		die(ret, "wiredtiger_open");
+	g.wts_conn = conn;
 
 	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
 		die(ret, "connection.open_session");
 
+	/*
+	 * Create the object.
+	 *
+	 * Make sure at least 2 internal page per thread can fit in cache.
+	 */
 	maxintlpage = 1U << g.c_intl_page_max;
+	while (2 * g.c_threads * maxintlpage > g.c_cache << 20)
+		maxintlpage >>= 1;
 	maxintlitem = MMRAND(maxintlpage / 50, maxintlpage / 40);
 	if (maxintlitem < 40)
 		maxintlitem = 40;
+
+	/* Make sure at least one leaf page per thread can fit in cache. */
 	maxleafpage = 1U << g.c_leaf_page_max;
-	/* Make sure at least 3 leaf pages can fix in cache. */
-	while (3 * maxleafpage > g.c_cache << 20)
+	while (g.c_threads * (maxintlpage + maxleafpage) > g.c_cache << 20)
 		maxleafpage >>= 1;
 	maxleafitem = MMRAND(maxleafpage / 50, maxleafpage / 40);
 	if (maxleafitem < 40)
@@ -90,14 +117,10 @@ wts_open(void)
 	    "key_format=%s,"
 	    "internal_page_max=%d,internal_item_max=%d,"
 	    "leaf_page_max=%d,leaf_item_max=%d",
-	    (g.c_file_type == ROW) ? "u" : "r",
+	    (g.type == ROW) ? "u" : "r",
 	    maxintlpage, maxintlitem, maxleafpage, maxleafitem);
 
-	if (g.c_bzip)
-		p += snprintf(p, (size_t)(end - p),
-		    ",block_compressor=\"bzip2_compress\"");
-
-	switch (g.c_file_type) {
+	switch (g.type) {
 	case FIX:
 		p += snprintf(p, (size_t)(end - p),
 		    ",value_format=%dt", g.c_bitcnt);
@@ -106,6 +129,9 @@ wts_open(void)
 		if (g.c_huffman_key)
 			p += snprintf(p, (size_t)(end - p),
 			    ",huffman_key=english");
+		if (!g.c_prefix)
+			p += snprintf(p, (size_t)(end - p),
+			    ",prefix_compression=false");
 		if (g.c_reverse)
 			p += snprintf(p, (size_t)(end - p),
 			    ",collator=reverse");
@@ -114,16 +140,49 @@ wts_open(void)
 		if (g.c_huffman_value)
 			p += snprintf(p, (size_t)(end - p),
 			    ",huffman_value=english");
+		if (g.c_dictionary)
+			p += snprintf(p, (size_t)(end - p),
+			    ",dictionary=%d", MMRAND(123, 517));
 		break;
 	}
 
-	if ((ret = session->create(session, WT_TABLENAME, config)) != 0)
-		die(ret, "session.create: %s", WT_TABLENAME);
+	/* Configure checksums. */
+	switch MMRAND(1, 10) {
+	case 1:						/* 10% */
+		p += snprintf(p, (size_t)(end - p), ",checksum=\"on\"");
+		break;
+	case 2:						/* 10% */
+		p += snprintf(p, (size_t)(end - p), ",checksum=\"off\"");
+		break;
+	default:					/* 80% */
+		p += snprintf(
+		    p, (size_t)(end - p), ",checksum=\"uncompressed\"");
+		break;
+	}
+
+	/* Configure compression. */
+	switch (g.compression) {
+	case COMPRESS_NONE:
+		break;
+	case COMPRESS_BZIP:
+		p += snprintf(p, (size_t)(end - p),
+		    ",block_compressor=\"bzip2\"");
+		break;
+	case COMPRESS_RAW:
+		p += snprintf(p, (size_t)(end - p),
+		    ",block_compressor=\"raw\"");
+		break;
+	case COMPRESS_SNAPPY:
+		p += snprintf(p, (size_t)(end - p),
+		    ",block_compressor=\"snappy\"");
+		break;
+	}
+
+	if ((ret = session->create(session, g.uri, config)) != 0)
+		die(ret, "session.create: %s", g.uri);
 
 	if ((ret = session->close(session, NULL)) != 0)
 		die(ret, "session.close");
-
-	g.wts_conn = conn;
 }
 
 void
@@ -141,22 +200,21 @@ wts_close()
 void
 wts_dump(const char *tag, int dump_bdb)
 {
-	int ret;
+	int offset, ret;
 	char cmd[256];
 
 	track("dump files and compare", 0ULL, NULL);
-	switch (g.c_file_type) {
-	case FIX:
-	case VAR:
-		snprintf(cmd, sizeof(cmd),
-		    "sh ./s_dumpcmp%s -c", dump_bdb ? " -b" : "");
-		break;
-	default:
-	case ROW:
-		snprintf(cmd, sizeof(cmd),
-		    "sh ./s_dumpcmp%s", dump_bdb ? " -b" : "");
-		break;
-	}
+	offset = snprintf(cmd, sizeof(cmd), "sh s_dumpcmp");
+	if (dump_bdb)
+		offset += snprintf(cmd + offset,
+		    sizeof(cmd) - (size_t)offset, " -b");
+	if (g.type == FIX || g.type == VAR)
+		offset += snprintf(cmd + offset,
+		    sizeof(cmd) - (size_t)offset, " -c");
+
+	if (g.uri != NULL)
+		offset += snprintf(cmd + offset,
+		    sizeof(cmd) - (size_t)offset, " -n %s", g.uri);
 	if ((ret = system(cmd)) != 0)
 		die(ret, "%s: dump comparison failed", tag);
 }
@@ -177,15 +235,16 @@ wts_salvage(void)
 	 * step as necessary.
 	 */
 	if ((ret = system(
-	    "rm -rf __slvg.copy && "
-	    "mkdir __slvg.copy && "
-	    "cp WiredTiger* __wt __slvg.copy/")) != 0)
-		die(ret, "salvage cleanup step failed");
+	    "cd RUNDIR && "
+	    "rm -rf slvg.copy && "
+	    "mkdir slvg.copy && "
+	    "cp WiredTiger* wt* slvg.copy/")) != 0)
+		die(ret, "salvage copy step failed");
 
 	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
 		die(ret, "connection.open_session");
-	if ((ret = session->salvage(session, WT_TABLENAME, NULL)) != 0)
-		die(ret, "session.salvage: %s", WT_TABLENAME);
+	if ((ret = session->salvage(session, g.uri, NULL)) != 0)
+		die(ret, "session.salvage: %s", g.uri);
 	if ((ret = session->close(session, NULL)) != 0)
 		die(ret, "session.close");
 }
@@ -203,8 +262,14 @@ wts_verify(const char *tag)
 
 	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
 		die(ret, "connection.open_session");
-	if ((ret = session->verify(session, WT_TABLENAME, NULL)) != 0)
-		die(ret, "session.verify: %s: %s", WT_TABLENAME, tag);
+	if (g.logging != 0)
+		(void)session->msg_printf(session,
+		    "=============== verify start ===============");
+	if ((ret = session->verify(session, g.uri, NULL)) != 0)
+		die(ret, "session.verify: %s: %s", g.uri, tag);
+	if (g.logging != 0)
+		(void)session->msg_printf(session,
+		    "=============== verify stop ===============");
 	if ((ret = session->close(session, NULL)) != 0)
 		die(ret, "session.close");
 }
@@ -220,6 +285,7 @@ wts_stats(void)
 	WT_CURSOR *cursor;
 	WT_SESSION *session;
 	FILE *fp;
+	char *stat_name;
 	const char *pval, *desc;
 	uint64_t v;
 	int ret;
@@ -230,10 +296,11 @@ wts_stats(void)
 	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
 		die(ret, "connection.open_session");
 
-	if ((fp = fopen("__stats", "w")) == NULL)
-		die(errno, "fopen: __stats");
+	if ((fp = fopen("RUNDIR/stats", "w")) == NULL)
+		die(errno, "fopen: RUNDIR/stats");
 
 	/* Connection statistics. */
+	fprintf(fp, "====== Connection statistics:\n");
 	if ((ret = session->open_cursor(session,
 	    "statistics:", NULL, NULL, &cursor)) != 0)
 		die(ret, "session.open_cursor");
@@ -248,10 +315,23 @@ wts_stats(void)
 	if ((ret = cursor->close(cursor)) != 0)
 		die(ret, "cursor.close");
 
+	/*
+	 * XXX
+	 * WiredTiger only supports file object statistics.
+	 */
+	if (strcmp(g.c_data_source, "file") != 0)
+		goto skip;
+
 	/* File statistics. */
-	if ((ret = session->open_cursor(session,
-	    "statistics:" WT_TABLENAME, NULL, NULL, &cursor)) != 0)
+	fprintf(fp, "\n\n====== File statistics:\n");
+	if ((stat_name =
+	    malloc(strlen("statistics:") + strlen(g.uri) + 1)) == NULL)
+		syserr("malloc");
+	sprintf(stat_name, "statistics:%s", g.uri);
+	if ((ret = session->open_cursor(
+	    session, stat_name, NULL, NULL, &cursor)) != 0)
 		die(ret, "session.open_cursor");
+	free(stat_name);
 
 	while ((ret = cursor->next(cursor)) == 0 &&
 	    (ret = cursor->get_value(cursor, &desc, &pval, &v)) == 0)
@@ -263,7 +343,7 @@ wts_stats(void)
 	if ((ret = cursor->close(cursor)) != 0)
 		die(ret, "cursor.close");
 
-	if ((ret = fclose(fp)) != 0)
+skip:	if ((ret = fclose(fp)) != 0)
 		die(ret, "fclose");
 
 	if ((ret = session->close(session, NULL)) != 0)

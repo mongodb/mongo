@@ -7,8 +7,7 @@
 
 #include "util.h"
 
-static int dump_config(WT_SESSION *, const char *);
-static int dump_file_config(WT_SESSION *, const char *);
+static int dump_config(WT_SESSION *, const char *, int);
 static int dump_prefix(int);
 static int dump_suffix(void);
 static int dump_table_config(WT_SESSION *, WT_CURSOR *, const char *);
@@ -86,13 +85,11 @@ util_dump(WT_SESSION *session, int argc, char *argv[])
 	/* The remaining argument is the uri. */
 	if (argc != 1)
 		return (usage());
-	if ((name =
-	    util_name(*argv, "table", UTIL_FILE_OK | UTIL_TABLE_OK)) == NULL)
+	if ((name = util_name(*argv,
+	    "table", UTIL_FILE_OK | UTIL_LSM_OK | UTIL_TABLE_OK)) == NULL)
 		goto err;
 
-	if (dump_prefix(hex) != 0 ||
-	    dump_config(session, name) != 0 ||
-	    dump_suffix() != 0)
+	if (dump_config(session, name, hex) != 0)
 		goto err;
 
 	len =
@@ -137,11 +134,12 @@ err:		ret = 1;
  *	Dump the config for the uri.
  */
 static int
-dump_config(WT_SESSION *session, const char *uri)
+dump_config(WT_SESSION *session, const char *uri, int hex)
 {
 	WT_CURSOR *cursor;
 	WT_DECL_RET;
 	int tret;
+	const char *value;
 
 	/* Dump the config. */
 	if (WT_PREFIX_MATCH(uri, "table:")) {
@@ -153,13 +151,45 @@ dump_config(WT_SESSION *session, const char *uri)
 			    WT_METADATA_URI, wiredtiger_strerror(ret));
 			return (1);
 		}
+		/*
+		 * Search for the object itself, just to make sure it exists,
+		 * we don't want to output a header if the user entered the
+		 * wrong name.  This where we find out a table object doesn't
+		 * exist, use a simple error message.
+		 */
+		cursor->set_key(cursor, uri);
+		if ((ret = cursor->search(cursor)) == 0) {
+			if (dump_prefix(hex) != 0 ||
+			    dump_table_config(session, cursor, uri) != 0 ||
+			    dump_suffix() != 0)
+				ret = 1;
+		} else if (ret == WT_NOTFOUND)
+			ret = util_err(0, "%s: No such object exists", uri);
+		else
+			ret = util_err(ret, "%s", uri);
 
-		ret = dump_table_config(session, cursor, uri);
-
-		if ((tret = cursor->close(cursor)) != 0 && ret == 0)
-			ret = tret;
-	} else
-		ret = dump_file_config(session, uri);
+		if (cursor != NULL && (tret = cursor->close(cursor)) != 0)
+			ret = util_cerr(uri, "close", tret);
+	} else {
+		/*
+		 * We want to be able to dump the metadata file itself, but the
+		 * configuration for that file lives in the turtle file.  Reach
+		 * down into the library and ask for the file's configuration,
+		 * that will work in all cases.
+		 *
+		 * This where we find out a file object doesn't exist, use a
+		 * simple error message.
+		 */
+		if ((ret = __wt_metadata_get(session, uri, &value)) == 0) {
+			if (dump_prefix(hex) != 0 ||
+			    print_config(session, uri, value, NULL) != 0 ||
+			    dump_suffix() != 0)
+				ret = 1;
+		} else if (ret == WT_NOTFOUND)
+			ret = util_err(0, "%s: No such object exists", uri);
+		else
+			ret = util_err(ret, "%s", uri);
+	}
 
 	return (ret);
 }
@@ -286,29 +316,6 @@ dump_table_config(WT_SESSION *session, WT_CURSOR *cursor, const char *uri)
 
 	/* Leak the memory, I don't care. */
 	return (0);
-}
-
-/*
- * dump_file_config --
- *	Dump the config for a file.
- */
-static int
-dump_file_config(WT_SESSION *session, const char *uri)
-{
-	WT_DECL_RET;
-	const char *value;
-
-	/*
-	 * We want to be able to dump the metadata file itself, but the
-	 * configuration for that file lives in the turtle file.  Reach
-	 * down into the library and ask for the file's configuration,
-	 * that will work in all cases.
-	 */
-	if ((ret = __wt_metadata_get(session, uri, &value)) != 0)
-		return (util_err(ret, "metadata read: %s", uri));
-
-	/* Leak the memory, I don't care. */
-	return (print_config(session, uri, value, NULL));
 }
 
 /*

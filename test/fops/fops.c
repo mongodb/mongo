@@ -1,8 +1,28 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
- *	All rights reserved.
+ * Public Domain 2008-2012 WiredTiger, Inc.
  *
- * See the file LICENSE for redistribution information.
+ * This is free and unencumbered software released into the public domain.
+ *
+ * Anyone is free to copy, modify, publish, use, compile, sell, or
+ * distribute this software, either in source code form or as a compiled
+ * binary, for any purpose, commercial or non-commercial, and by any
+ * means.
+ *
+ * In jurisdictions that recognize copyright laws, the author or authors
+ * of this software dedicate any and all copyright interest in the
+ * software to the public domain. We make this dedication for the benefit
+ * of the public at large and to the detriment of our heirs and
+ * successors. We intend this dedication to be an overt act of
+ * relinquishment in perpetuity of all present and future rights to this
+ * software under copyright law.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+ * IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+ * OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+ * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+ * OTHER DEALINGS IN THE SOFTWARE.
  */
 
 #include "thread.h"
@@ -11,9 +31,11 @@ static void *fop(void *);
 static void  print_stats(u_int);
 
 typedef struct {
-	int create;				/* session.create */
-	int drop;				/* session.drop */
+	int bulk;				/* bulk load */
 	int ckpt;				/* session.checkpoint */
+	int create;				/* session.create */
+	int cursor;				/* session.open_cursor */
+	int drop;				/* session.drop */
 	int upgrade;				/* session.upgrade */
 	int verify;				/* session.verify */
 } STATS;
@@ -48,7 +70,7 @@ r(void)
 int
 fop_start(u_int nthreads)
 {
-	clock_t start, stop;
+	struct timeval start, stop;
 	double seconds;
 	pthread_t *tids;
 	u_int i;
@@ -61,7 +83,7 @@ fop_start(u_int nthreads)
 	    (tids = calloc((size_t)(nthreads), sizeof(*tids))) == NULL)
 		die("calloc", errno);
 
-	start = clock();
+	(void)gettimeofday(&start, NULL);
 
 	/* Create threads. */
 	for (i = 0; i < nthreads; ++i)
@@ -73,12 +95,13 @@ fop_start(u_int nthreads)
 	for (i = 0; i < nthreads; ++i)
 		(void)pthread_join(tids[i], &thread_ret);
 
-	stop = clock();
-	seconds = (stop - start) / (double)CLOCKS_PER_SEC;
-	fprintf(stderr, "timer: %.2lf seconds (%d ops/second)\n",
-	    seconds, (int)((nthreads * nops) / seconds));
+	(void)gettimeofday(&stop, NULL);
+	seconds = (stop.tv_sec - start.tv_sec) +
+	    (stop.tv_usec - start.tv_usec) * 1e-6;
 
 	print_stats(nthreads);
+	printf("timer: %.2lf seconds (%d ops/second)\n",
+	    seconds, (int)((nthreads * nops) / seconds));
 
 	free(run_stats);
 	free(tids);
@@ -94,37 +117,41 @@ static void *
 fop(void *arg)
 {
 	STATS *s;
-	pthread_t tid;
 	u_int i;
 	int id;
 
 	id = (int)(uintptr_t)arg;
-	tid = pthread_self();
-	printf(
-	    "file operation thread %2d starting: tid: %p\n", id, (void *)tid);
 	sched_yield();		/* Get all the threads created. */
 
 	s = &run_stats[id];
 
 	for (i = 0; i < nops; ++i, sched_yield())
-		switch (r() % 5) {
+		switch (r() % 7) {
 		case 0:
+			++s->bulk;
+			obj_bulk();
+			break;
+		case 1:
 			++s->create;
 			obj_create();
 			break;
-		case 1:
+		case 2:
+			++s->cursor;
+			obj_cursor();
+			break;
+		case 3:
 			++s->drop;
 			obj_drop();
 			break;
-		case 2:
+		case 4:
 			++s->ckpt;
 			obj_checkpoint();
 			break;
-		case 3:
+		case 5:
 			++s->upgrade;
 			obj_upgrade();
 			break;
-		case 4:
+		case 6:
 			++s->verify;
 			obj_verify();
 			break;
@@ -148,7 +175,8 @@ print_stats(u_int nthreads)
 	s = run_stats;
 	for (id = 0; id < nthreads; ++id, ++s)
 		printf(
-		    "%3d: create %6d, drop %6d, ckpt %6d, upgrade %6d, "
-		    "verify %6d\n",
-		    id, s->create, s->drop, s->ckpt, s->upgrade, s->verify);
+		    "%2d: bulk %3d, ckpt %3d, create %3d, cursor %3d, "
+		    "drop %3d, upg %3d, vrfy %3d\n",
+		    id, s->bulk, s->ckpt, s->create, s->cursor,
+		    s->drop, s->upgrade, s->verify);
 }

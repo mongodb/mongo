@@ -45,7 +45,20 @@ The following are command-specific options for the \c backup command:
 @par <code>-t uri</code>
 By default, the \c backup command does a hot backup of the entire
 database; the \c -t option changes the \c backup command to do a hot
-backup of only the listed \c file: and \c table: objects.
+backup of only the named objects.
+
+<hr>
+@section util_compact wt compact
+Compact a table or file.
+
+The \c compact command attempts to rewrite the specified table or file
+to consume less disk space.
+
+@subsection util_compact_synopsis Synopsis
+<code>wt [-Vv] [-C config] [-h directory] compact uri</code>
+
+@subsection util_compact_options Options
+The \c compact command has no command-specific options.
 
 <hr>
 @section util_create wt create
@@ -106,25 +119,6 @@ Dump in reverse order, from largest key to smallest.
 @par <code>-x</code>
 Dump all characters in a hexadecimal encoding (the default is to leave
 printable characters unencoded).
-
-<hr>
-@section util_dumpfile wt dumpfile
-Dump a file in a debugging format.
-
-The \c dumpfile command dumps the specified physical file in a non-portable,
-debugging format, exiting success if the file is correct, and failure if the
-file is corrupted.
-
-@subsection util_dumpfile_synopsis Synopsis
-<code>wt [-Vv] [-C config] [-h directory] dumpfile [-f output] file</code>
-
-@subsection util_dumpfile_options Options
-The following are command-specific options for the \c dumpfile command:
-
-@par <code>-f</code>
-By default, the \c dumpfile command output is written to the standard
-output; the \c -f option re-directs the output to the specified
-file.
 
 <hr>
 @section util_list wt list

@@ -34,7 +34,7 @@ __curbackup_next(WT_CURSOR *cursor)
 	WT_SESSION_IMPL *session;
 
 	cb = (WT_CURSOR_BACKUP *)cursor;
-	CURSOR_API_CALL_NOCONF(cursor, session, next, NULL);
+	CURSOR_API_CALL(cursor, session, next, NULL);
 
 	if (cb->list == NULL || cb->list[cb->next] == NULL) {
 		F_CLR(cursor, WT_CURSTD_KEY_SET);
@@ -62,7 +62,7 @@ __curbackup_reset(WT_CURSOR *cursor)
 	WT_SESSION_IMPL *session;
 
 	cb = (WT_CURSOR_BACKUP *)cursor;
-	CURSOR_API_CALL_NOCONF(cursor, session, reset, NULL);
+	CURSOR_API_CALL(cursor, session, reset, NULL);
 
 	cb->next = 0;
 	F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
@@ -85,7 +85,7 @@ __curbackup_close(WT_CURSOR *cursor)
 	int tret;
 
 	cb = (WT_CURSOR_BACKUP *)cursor;
-	CURSOR_API_CALL_NOCONF(cursor, session, close, NULL);
+	CURSOR_API_CALL(cursor, session, close, NULL);
 
 	/* Free the list of files. */
 	if (cb->list != NULL) {
@@ -124,7 +124,7 @@ __wt_curbackup_open(WT_SESSION_IMPL *session,
 		    (WT_CURSOR *, ...))__wt_cursor_notsup,
 		(void (*)		/* set-value */
 		    (WT_CURSOR *, ...))__wt_cursor_notsup,
-		NULL,
+		NULL,			/* compare */
 		__curbackup_next,
 		__wt_cursor_notsup,	/* prev */
 		__curbackup_reset,	/* reset */
@@ -155,6 +155,7 @@ __wt_curbackup_open(WT_SESSION_IMPL *session,
 	cursor->session = &session->iface;
 
 	cursor->key_format = "S";	/* Return the file names as the key. */
+	cursor->value_format = "";	/* No value. */
 
 	/*
 	 * Start the backup and fill in the cursor's list.  Acquire the API
@@ -194,9 +195,8 @@ __backup_start(
 	cb->list = NULL;
 
 	/*
-	 * Checkpoints cannot be deleted until the backup finishes; no barrier
-	 * is necessary, we're holding the checkpoint lock, so this write must
-	 * complete before that lock is released.
+	 * Checkpoints cannot be deleted until the backup finishes: set the
+	 * flag while holding the API lock, which blocks any checkpoint calls.
 	 */
 	if (conn->ckpt_backup)
 		WT_ERR_MSG(session, EINVAL,
@@ -471,14 +471,19 @@ __backup_table_element(WT_SESSION_IMPL *session, WT_CURSOR_BACKUP *cb,
 		WT_ERR_TEST(
 		    (fprintf(bfp, "%s\n%s\n", key, value) < 0), __wt_errno());
 
-		/* Save the file name. */
-		WT_ERR(__wt_config_getones(session, value, "filename", &cval));
-		if (cval.len > 0) {
-			WT_ERR(__wt_buf_fmt(
-			    session, tmp, "%.*s", (int)cval.len, cval.str));
+		/* Save the source URI, if it is a file. */
+		WT_ERR(__wt_config_getones(session, value, "source", &cval));
+		if (cval.len > strlen("file:") &&
+		    WT_PREFIX_MATCH(cval.str, "file:")) {
+			WT_ERR(__wt_buf_fmt(session, tmp, "%.*s",
+			    (int)(cval.len - strlen("file:")),
+			    cval.str + strlen("file:")));
 			WT_ERR(__backup_list_append(
-			    session, cb, (char *)tmp->data));
-		}
+			    session, cb, (const char *)tmp->data));
+		} else
+			WT_ERR_MSG(session, EINVAL,
+			    "%s: unknown data source '%.*s'",
+			    (const char *)tmp->data, (int)cval.len, cval.str);
 	}
 
 err:	__wt_scr_free(&tmp);

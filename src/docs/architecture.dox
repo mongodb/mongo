@@ -48,17 +48,23 @@ memory requirements.  Finally, row-and column-stores can be
 mixed-and-matched at the table level: for example, a row-store index can
 be created on a column-store table.
 
+WiredTiger supports @ref lsm, where updates are buffered in small files
+that fit in cache for fast random updates, then automatically merged into
+larger files in the background so that read latency approaches that of
+traditional Btree files.  LSM trees automatically create Bloom filters to
+avoid unnecessary reads from files that cannot containing matching keys.
+
 WiredTiger supports different-sized Btree internal and leaf pages in the
 same file.  Applications can maximize the amount of data transferred in
 each I/O by configuring large leaf pages, and still minimize CPU cache
 misses when searching the tree.
 
+WiredTiger supports key prefix compression and value dictionaries,
+reducing the amount of memory keys and values require.
+
 WiredTiger supports static encoding with a configurable Huffman engine,
 which typically reduces the amount of information maintained in memory
 by 20-50%.
-
-WiredTiger supports key prefix encoding, reducing the number of bytes
-from each key maintained in memory.
 
 @section io Making I/O more valuable
 
@@ -73,13 +79,13 @@ WiredTiger supports variable-length pages, meaning there is less wasted
 space for large objects, and no need for compaction as pages grow and
 shrink naturally when key/value pairs are inserted or deleted.
 
-WiredTiger supports stream compression on every page of a table.
-Because WiredTiger supports variable-length pages, pages do not have to
-shrink by a fixed amount in order to benefit from stream compression.
-Stream compression is selectable on a per-table basis, allowing
-applications to choose the compression algorithm most appropriate for
-their data.  Stream compression typically reduces the amount of
-information written to disk by 30-80%.
+WiredTiger supports block compression on table pages.  Because
+WiredTiger supports variable-length pages, pages do not have to shrink
+by a fixed amount in order to benefit from block compression.  Block
+compression is selectable on a per-table basis, allowing applications
+to choose the compression algorithm most appropriate for their data.
+Block compression typically reduces the amount of information written
+to disk by 30-80%.
 
 WiredTiger supports leaf pages of up to 512MB in size.  Disk seeks are
 less likely when reading large amounts of data from disk, significantly

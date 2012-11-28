@@ -16,7 +16,7 @@ static int  __stat_page_row_leaf(WT_SESSION_IMPL *, WT_PAGE *);
  *	Initialize the Btree statistics.
  */
 int
-__wt_btree_stat_init(WT_SESSION_IMPL *session)
+__wt_btree_stat_init(WT_SESSION_IMPL *session, uint32_t flags)
 {
 	WT_BTREE *btree;
 	WT_DECL_RET;
@@ -34,7 +34,10 @@ __wt_btree_stat_init(WT_SESSION_IMPL *session)
 	WT_BSTAT_SET(session, file_maxleafitem, btree->maxleafitem);
 
 	page = NULL;
-	while ((ret = __wt_tree_np(session, &page, 0, 1)) == 0 && page != NULL)
+	if (LF_ISSET(WT_STATISTICS_FAST))
+		return (0);
+
+	while ((ret = __wt_tree_walk(session, &page, 0)) == 0 && page != NULL)
 		WT_RET(__stat_page(session, page));
 	return (ret == WT_NOTFOUND ? 0 : ret);
 }
@@ -52,22 +55,22 @@ __stat_page(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 */
 	switch (page->type) {
 	case WT_PAGE_COL_FIX:
-		WT_BSTAT_INCR(session, file_col_fix_pages);
-		WT_BSTAT_INCRV(session, file_entries, page->entries);
+		WT_BSTAT_INCR(session, page_col_fix);
+		WT_BSTAT_INCRV(session, entries, page->entries);
 		break;
 	case WT_PAGE_COL_INT:
-		WT_BSTAT_INCR(session, file_col_int_pages);
-		WT_BSTAT_INCRV(session, file_entries, page->entries);
+		WT_BSTAT_INCR(session, page_col_int);
+		WT_BSTAT_INCRV(session, entries, page->entries);
 		break;
 	case WT_PAGE_COL_VAR:
 		WT_RET(__stat_page_col_var(session, page));
 		break;
 	case WT_PAGE_OVFL:
-		WT_BSTAT_INCR(session, file_overflow);
+		WT_BSTAT_INCR(session, overflow_page);
 		break;
 	case WT_PAGE_ROW_INT:
-		WT_BSTAT_INCR(session, file_row_int_pages);
-		WT_BSTAT_INCRV(session, file_entries, page->entries);
+		WT_BSTAT_INCR(session, page_row_int);
+		WT_BSTAT_INCRV(session, entries, page->entries);
 		break;
 	case WT_PAGE_ROW_LEAF:
 		WT_RET(__stat_page_row_leaf(session, page));
@@ -94,7 +97,7 @@ __stat_page_col_var(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 	unpack = &_unpack;
 
-	WT_BSTAT_INCR(session, file_col_var_pages);
+	WT_BSTAT_INCR(session, page_col_var);
 
 	/*
 	 * Walk the page, counting regular and overflow data items, and checking
@@ -106,12 +109,12 @@ __stat_page_col_var(WT_SESSION_IMPL *session, WT_PAGE *page)
 	WT_COL_FOREACH(page, cip, i) {
 		if ((cell = WT_COL_PTR(page, cip)) == NULL) {
 			orig_deleted = 1;
-			WT_BSTAT_INCR(session, file_col_deleted);
+			WT_BSTAT_INCR(session, page_col_deleted);
 		} else {
 			orig_deleted = 0;
 			__wt_cell_unpack(cell, unpack);
 			WT_BSTAT_INCRV(
-			    session, file_entries, __wt_cell_rle(unpack));
+			    session, entries, __wt_cell_rle(unpack));
 		}
 
 		/*
@@ -123,13 +126,13 @@ __stat_page_col_var(WT_SESSION_IMPL *session, WT_PAGE *page)
 			if (WT_UPDATE_DELETED_ISSET(upd)) {
 				if (orig_deleted)
 					continue;
-				WT_BSTAT_INCR(session, file_col_deleted);
-				WT_BSTAT_DECR(session, file_entries);
+				WT_BSTAT_INCR(session, page_col_deleted);
+				WT_BSTAT_DECR(session, entries);
 			} else {
 				if (!orig_deleted)
 					continue;
-				WT_BSTAT_DECR(session, file_col_deleted);
-				WT_BSTAT_INCR(session, file_entries);
+				WT_BSTAT_DECR(session, page_col_deleted);
+				WT_BSTAT_INCR(session, entries);
 			}
 		}
 	}
@@ -148,7 +151,7 @@ __stat_page_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page)
 	WT_UPDATE *upd;
 	uint32_t cnt, i;
 
-	WT_BSTAT_INCR(session, file_row_leaf_pages);
+	WT_BSTAT_INCR(session, page_row_leaf);
 
 	/*
 	 * Stat any K/V pairs inserted into the page before the first from-disk
@@ -171,7 +174,7 @@ __stat_page_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page)
 				++cnt;
 	}
 
-	WT_BSTAT_INCRV(session, file_entries, cnt);
+	WT_BSTAT_INCRV(session, entries, cnt);
 
 	return (0);
 }

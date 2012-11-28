@@ -7,8 +7,14 @@
 #cache
 #	size of the cache in MB
 
+#data_source
+#	type of data source to create (file | table | lsm)
+
 #delete_pct
 #	percent operations that are deletes
+
+#dictionary
+#	if values are dictionary compressed
 
 #file_type
 #	type of file to create (fix | var | row)
@@ -38,7 +44,7 @@
 #	the number of modification operations done per run
 
 #repeat_data_pct
-#	percent duplicate values in variable-len column-store files
+#	percent duplicate values in row- or variable-length column-stores
 
 #reverse
 #	collate in reverse order

@@ -1,3 +1,601 @@
+WiredTiger release 1.3.8, 2012-11-22
+------------------------------------
+
+This release improves the performance of LSM trees, changes how statistics are
+reported and adds a shared cache implementation:
+
+New features and API changes:
+
+[232] Add a "size of checkpoint" statistic.
+
+* Add a shared cache pool implemention.  Manages a single cache among
+  multiple databases within a process.
+
+* Merge statistics from file and LSM sources into a "data source" statistic
+  structure.  Rename and regroup some shared stastistics.  Add a helper to
+  the Python API to lookup in a cursor in a simple expression.
+
+* Add support for sub groups of options in configuration strings.
+
+Performance tuning for LSM trees:
+
+* Don't try to merge with a chunk that is much larger than a small chunk.
+
+* After an LSM merge, fault in some pages before the new tree goes live to
+  avoid stalling application threads.
+
+* Don't automatically fail inserts if the write generation check fails:
+  compare keys instead.
+
+* Switch the LSM tree lock to a read/write lock, so cursors can read the
+  state of the tree in parallel.
+
+Bug fixes:
+
+* Fix a bug where we could write past the end of a buffer after it was grown.
+
+
+WiredTiger release 1.3.7, 2012-11-09
+------------------------------------
+
+This release fixes a bug and improves performance with Bloom filters:
+
+* Drop any old Bloom filter before creating a new one -- we may have been
+  interrupted in between creating it and updating the metadata.  Write the
+  metadata after creating missing Bloom filters.
+
+* Use a separate thread for creation of Bloom filters for the newest,
+  unmerged LSM chunks.
+
+* Changes to the ex_test_perf example: change the default configuration to
+  4KB pages and disable prefix compression.  Change the "-i" command line
+  option to be a simple count of records to insert.  Clean up error
+  handling and add option to populate using multiple threads.
+
+* Clarify the docs for the default buffer_alignment setting.
+
+
+WiredTiger release 1.3.6, 2012-11-06
+------------------------------------
+
+This is a bugfix and performance tuning release. The changes are as follows:
+
+* Rename the WiredTiger installed modules to libwiredtiger_XXX.  Don't install
+  the nop and reverse collator modules.
+
+* Replace test/format's bzip configuration string with compression, which can
+  take one of four arguments (none, bzip, ext, snappy), change format to run
+  snappy compression if the library is available.
+
+* Rename the builtin block compressor names from "bzip2_compress" to "bzip2",
+  and from "snappy_compress" to "snappy".
+
+* Support multiple LSM merge threads with the "lsm_merge_threads" config key.
+  Use IDs rather than array index to mark the start chunk in a merge, in case
+  we race with another thread.
+
+* Cache the hash values used for Bloom filter lookups, rather than hashing for
+  each Bloom filter in an LSM tree.
+
+* Only switch trees in an LSM cursor if the primary chunk is on disk.
+
+* Add a per-btree cache priority, currently only used to make it more likely
+  for Bloom filter pages to stay in cache.
+
+* Only evict pages with read generations in the bottom quarter of the range we
+  see.  Fix a 32-bit wrapping bug in assigning read generations.
+
+* For update-only LSM cursors, only open a cursor in the primary chunk.
+
+* LSM: Report errors from the checkpoint thread.
+
+* LSM: only save a Bloom URI in the metadata after it is successfully created.
+
+* LSM: Create missing Bloom filters when reading from an LSM tree if
+  "lsm_bloom_newest"is set.
+
+* LSM: Include all of the chosen chunks in a merge.  Only pin the current chunk
+  in an LSM cursor if it is writeable.
+
+
+WiredTiger release 1.3.5, 2012-10-26
+------------------------------------
+
+This is a bugfix and performance tuning release. The changes are as follows:
+
+[#370] Document that applications are responsible for figuring out their
+       upgrade path if they might swap out compression engines.
+
+[#371] When a single session was used to reconcile multiple btrees, one of
+       which had dictionaries configured and one of which didn't, we failed to
+       clear the dictionary when starting page reconciliation.   Be consistent,
+       never use anything other than the btree handle's configuration to decide
+       if we're using a dictionary in a reconcilation run.
+
+[#372] Fix several potential integer overflow bugs.
+
+[#373] Fix a bug where calls that performed an operation on multiple objects
+       (such as creating a table that implicitly creates a column group)
+       could leave the metadata incomplete if a process exited without
+       calling `WT_CONNECTION::close`.
+       Hold the schema lock while opening tables. Fixes the error "cannot be
+       opened until all column groups are created" message when create calls
+       race with open_cursor.
+
+[#374] Fix a race that caused crashes when using the Python API with
+       multi-threaded code.
+
+[#375] Fix a bug in __wt_cond_wait - so that it returns after timeout expires.
+
+* Protect the list of LSM trees with the schema lock to avoid races during
+  create.
+
+* Update ex_test_perf to output statistics during populate and improve timing
+  accuracy.
+
+* Skew eviction in favor of leaf pages - which improves read-only performance
+  for large LSM trees.
+
+* Hold the LSM tree lock while gathering statistics.
+
+* Fix a bug in bulk load of bitmap files.
+
+* Fix a related bug in the bloom code that uses bitmap stores.
+
+* Don't attempt to drop the first chunk of an LSM tree before creating it.
+
+* Instead of entering a fake key cell after the last cell on the page just
+  in case the page ends with a key cell which has no value, use the end of
+  the page to detect that case.
+
+* Cache cursor key/value formats in Python, to save a native call from every
+  get_key/value.
+
+* Don't sync the directory after open if the global "sync" flag is false.
+
+* Fix a race for LSM trees that could happen if two threads race to open a
+  cursor and drop the LSM tree.
+
+WiredTiger release 1.3.4, 2012-10-19
+------------------------------------
+
+This release includes several important new features, including:
+
+* support for online compaction of files;
+* support for tables, column groups and indices that use LSM trees for
+  storage; and
+* improved statistics and configuration for LSM trees and Bloom filters.
+
+In addition, there are some significant performance improvements and bug
+fixes.  The full list of changes is:
+
+[#248]	Add support for online compaction.
+
+[#310]	Fixed a bug where overflow blocks could be accessed by a
+	long-running reader after they had been freed in a checkpoint.
+
+[#358]	Allocate checkpoint blocks from the live system's list of available
+	blocks rather than always extending the file.
+
+[#361]	Sync the directory after creating a file: this is apparently
+	required for durability on Linux, according to the Linux fsync man
+	page.
+
+[#362]	Don't check if a page is on the avail or discard lists if we're
+	salvaging the file, that is okay.
+
+[#363]	Remove obsolete code dealing with forced eviction.
+
+[#366]	Fake checkpoints may have the delete flag set, ignore them when
+	rolling checkpoints forward.
+
+[#367]	All metadata reads should ignore the application's transactional
+	context.
+
+[#369]	Support LSM as a data source for tables, column groups and indices.
+
+* Add tuning options for LSM bloom filters, including controlling whether
+  the oldest level in the tree has a Bloom filter, whether newly-created
+  (level 0) files have Bloom filters, and passing arbitrary file
+  configuration for Bloom filters.
+
+* Add a merge generation to LSM chunks.  Add a statistic that reports the
+  highest merge generation in a tree.
+
+* Add a new LSM statistic tracking searches that could benefit from bloom
+  filters.
+
+* Enable LSM statistics in the "wt stat" utility.
+
+* Interrupt LSM merge operations, rather than waiting on close.
+
+* Wait for a while before looking for LSM major merges, in case merges
+  catch up with inserts.
+
+* Fix LSM index searches.  The main issue was LSM search_near was not
+  always returning the closest key to the search key, which calling code
+  expects.  It now tries hard to find the smallest cursor larger than the
+  search key, and only if no larger record exists does it return the
+  largest record smaller than the search key.
+
+* Reset any old cursor position before an LSM search.  This limits hazard
+  references in an LSM search to a single chunk.
+
+* Fix a memory leak in an error path in Bloom filters.
+
+* Tweak the search loops in hazard_{set,clear} in favor of
+  last-in-first-out ordering.
+
+* If there are many files open, some hotter than others, walk more files
+  looking for pages to evict.
+
+* Don't stop evicting until we reach the target, have eviction wake up
+  periodically regardless of whether the application signals it.  This
+  latter requires a "timed condition wait" operation.
+
+* Tweaks to file handle flags for out-of-cache read performance on Linux
+  (disable readahead and access time updates).
+
+* Replace the WT_SESSION::dumpfile method with configuration strings to
+  WT_SESSION::verify.
+
+* Fix a bug where we weren't skipping unnecessary default checkpoints
+  because we weren't handling the generational number included in the
+  internal checkpoint name.
+
+* Add a "force" configuration flag to WT_SESSION::checkpoint, object
+  compaction needs it because the work it wants done is done by the block
+  manager.
+
+* Make compact and checkpoint operate on a table's indices.
+
+* When doing a page truncate, lock down the page before we unpack the
+  on-page cell -- it's possible the page could be instantiated, modified
+  and reconciled while we're sleeping, in which case the WT_REF.addr field
+  would no longer point on-page.
+
+
+WiredTiger release 1.3.3, 2012-10-11
+------------------------------------
+
+This is a bugfix and performance tuning release, primarily related to LSM
+trees.  The changes are as follows:
+
+[#350] Checkpoint the metadata after successful schema-level operations.
+       Otherwise, if process exits without closing the connection or
+       running a checkpoint, created objects exist but there is no record
+       in the metadata.
+
+[#351] Don't put checkpoint extent blocks on the available list, blocks on
+       it are considered for truncation; they have to go on the "checkpoint
+       available" list.
+
+* Choose LSM merges based on a measure of efficiency (levels collapsed per
+  record), rather than simply choosing a minor or a major merge.  Tweak the
+  merge heuristic so we don't end up with runs of smaller chunks in the
+  middle of the tree.
+
+* Add a connection-wide flag to disable LSM merges.
+
+* Don't create Bloom filters for the oldest chunk in the system.  Add the
+  ability to disable Bloom filters entirely.
+
+* Fix fast-path for bit values in WT_CURSOR::set_value.
+
+* Clean up allocation of LSM chunk IDs.
+
+* Update bloom_get so that it doesn't hold a cursor position.
+
+* Respect the page size for fixed-length column stores, remembering there
+  are 8 bits per byte.
+
+* Support bulk loading a bitmap into a fixed-length column store, update
+  Bloom filter code to use this.
+
+* Add an example program, ex_test_perf, to demonstrate basic LSM usage.
+
+* Add a new statistics cursor type "statistics:lsm".  Update ex_stat.c to
+  demonstrate usage.
+
+* Add a statistics_fast flag to file statistics cursors.  Update LSM
+  statistics so that they aggregate some cache statistics.  Add ability to
+  open a statistics cursor on a checkpoint.
+
+* Walk a constant number of pages for LRU eviction.
+
+* Move the cache full check to after an update operation completes, when it
+  is no longer holding hazard references.  This improves behavior with
+  small caches.
+
+
+WiredTiger release 1.3.2, 2012-10-03
+------------------------------------
+
+This is a bugfix and performance tuning release, primarily related to LSM
+trees.  The changes are as follows:
+
+* Implement minor merges for LSM trees, prefer them to major merges.
+
+* Update hazard references, so the active array grows as needed.  Change
+  the default hazard_max to 1000.
+
+* Abort transactions if the cache is so full that they cannot make
+  progress.
+
+* Fix a bug where verify could crash if an empty checkpoint exists.
+
+* Make the maximum number of chunks for merges configurable, rather than
+  deriving a value from the number of hazard references available.
+
+* Switch to an atomic add to allocate transaction IDs.  This fixes a subtle
+  race before where two threads could temporarily have the same ID in the
+  global state table.  If one of the threads timed out and the other thread
+  committed its transaction with that ID, the commit would not become
+  visible immediately.  This could lead to deadlock errors in workloads
+  that are logically conflict-free.
+
+* Have auto-commit transactions retry deadlocks.  This requires that we
+  keep the user's key and value in the cursor.
+
+* Simplify the code handling updated records in variable-length
+  column-store reconciliation.
+
+* Never wait for eviction when holding the schema lock.  This avoids
+  deadlocks between opening a column store file and taking a checkpoint.
+
+* Take care with the loop termination when walking files for eviction.  We
+  were making one extra call into __wt_tree_walk, which would leave a leaf
+  page in the WT_REF_EVICT_WALK state, unable to be evicted.  In some
+  workloads, including LSM loads, we could end up with many files all
+  consisting of a single leaf page, none of which could be evicted.
+
+* Pause updates when the cache is full.
+
+* In files marked as "out of cache", don't wait for eviction when reading a
+  page.
+
+* Fix the record count calculation for minor merges.  This was leading to
+  no Bloom filter being created for minor merges after running for some
+  time, leading to merges taking increasingly long to complete.
+
+* Only sleep in the LSM checkpoint thread if no work is done.
+
+* Add sanity check of cache size to LSM open.
+
+[#338] Create fake checkpoints until an object is modified, so that a
+       checkpoint between the cursor create and the bulk load doesn't make
+       it impossible to do a bulk-load on the cursor.
+
+
+WiredTiger release 1.3.1, 2012-09-25
+------------------------------------
+
+This is a bugfix release, primarily related to LSM trees.  The changes are
+as follows:
+
+[#309] Implement auto-commit of transactions at the API.  As well as
+       ensuring the atomicity of complex operations, this change simplified
+       code that simulated auto-commit internally and fixed a number of
+       bugs.
+
+[#321] Bulk-cursors no longer block checkpoints.  We can't write files that
+       are being bulk-loaded, so change checkpoint to create checkpoints in
+       the metadata that, if accessed, look like empty files.
+
+       Tighten down the requirements for bulk-load, the only thing that can
+       be bulk-loaded now is a newly created tree, not any empty file.
+
+[#329] Add dictionary support to variable-length column store objects.
+       Support large row-store reconciliation dictionaries: add a skiplist
+       as the indexing mechanism.
+
+[#333] Fix a leak of the in-memory transaction log structure and the LSM
+       data source handle.
+
+[#334] Fix a memory leak where a page's replacement address wasn't being
+       freed.
+
+* Check that LSM trees are not configured as column stores.
+
+* Fix a race when starting the LSM worker thread. It was possible for the
+  thread to exit immediately if it started fast enough.
+
+* Two fixes for LSM, one to ensure that cursors read from a checkpoint if
+  one is available. The other to reduce the number of empty chunks that can
+  be created initially.
+
+* Fix a bug that disabled bloom filters.
+
+* The configure script checks for Python support in SWIG.
+
+* If a drop operation fails to acquire all of the handle locks it needs,
+  make sure it releases the primary handle lock.
+
+* Fix a number of other minor bugs and memory leaks.
+
+
+WiredTiger release 1.3.0, 2012-09-17
+------------------------------------
+
+This release contains a number of major new features, including:
+
+* support for LSM trees with Bloom filters;
+* support for hot backups; and
+* support for fast truncation of files.
+
+In addition, there are some critical bug fixes.  We recommend that all users
+upgrade.  Here is the full list of changes:
+
+[#143] Implement random record lookups.
+
+[#168] Add support for LSM trees.
+
+[#168] Add support for Bloom filters in LSM trees.
+
+[#198] Handle page-generation wraparound.
+
+[#236] Implement hot backups.
+
+[#244] Index cursors for column-store objects may not be created using the
+       record number as the index key.
+
+[#247] Add a fast-path for WT_SESSION::truncate that avoids reading most
+       data to be deleted.
+
+[#259] Performance hack for cursor open: don't parse the configuration
+       strings for a default value if the application didn't specify a
+       configuration string.
+
+[#262] Disable dump on child cursors: only the top-level cursor is wrapped
+       in a dump cursor.
+
+[#266] Deal with new / dropped indices in __wt_schema_open_index. 
+
+[#269] Checkpoint handles must not be open when they are overwritten. 
+
+[#271] Add support for a reserved checkpoint name "WiredTigerCheckpoint"
+       that opens the object's last checkpoint.
+
+[#271] Add the ability to access unnamed checkpoints.
+
+[#274] Change cursor.equals to return a standard error value and store the
+       cursor equality result in a separate argument.
+
+[#275] If exclusive handle is required for an operation and it is not
+       available, fail immediately: don't block. 
+
+[#276] Fix methods that return integer parameters from Python.  This
+       includes cursor.equals and cursor.search_near. 
+
+[#277] Acquire the schema lock when creating the metadata file.  We're
+       single-threaded, so it isn't protecting against anything, but the
+       handle management code expects to have the schema lock. 
+
+[#279] Some optimizations for __wt_config_gets_defno.  Specifically, if
+       we're dealing with a simple stack of config strings, just parse the
+       application string rather than the full list of defaults. 
+
+[#279] Split the description string into a set of structures, to reduce the
+       number of string comparisons and manipulation that's required.
+
+[#282] Remove the cursor.reconfigure method, and replace it with
+       documentation showing how to "reconfigure" cursors using the
+       session.open_cursor method to duplicate them with different
+       configuration strings.
+
+[#284] Fix for a hazard reference race, where page eviction races with the
+       creation of the hazard reference, we have to check the pointer
+       itself as well as the state of the pointer.
+
+[#285] We can clear the tree's modified flag on checkpoint, as long as the
+       checkpoint writes all modifications.   Clear the tree's modified
+       flag before we start the checkpoint, but reset it as necessary if
+       reconciliation is unable to write all of the changes in a page.
+
+[#287] Fix __wt_config_check to handle overlapping config values correctly.
+
+[#289] Add support for read-committed isolation, make it the default.  Add
+       a session-level "isolation" setting.
+
+[#294] If txn_commit fails, document the transaction was rolled-back.
+
+[#295] Expand the documentation on using cursors without explicit
+       transactions. 
+
+[#300] Include all changes whenever closing a file, don't check for
+       visibility.  If updates are skipped while evicting a page, give up. 
+
+[#305] Have "wt dump" fail more gracefully if the object doesn't exist.
+
+[#310] When freeing a tracked address in reconcilation, clear it to avoid
+       freeing the same address again on error. 
+
+[#314] Replace cursor.equals with cursor.compare
+
+[#319] Clear the bulk_load_ok flag when closing handles. 
+
+
+* Add an "ancient transaction" statistic so we can find out if they're
+  actually occurring in the field.
+
+* Add an "was object ever modified" flag to the btree handle, and use it to
+  avoid writing read-only objects during internal checkpoints, issue
+
+* Add per-connection statistics counters for transaction checkpoint, begin,
+  commit and rollback.  Add per-btree statistics counters for update
+  conflicts.
+
+* Another fixed-length column-store implicit record fix: if the earliest
+  row in the object is row 10, and it's on an append list, we still must
+  return rows 1-9, they've been implicitly created.
+
+* Bulk cursors: disallow cursor.{equals,next,prev,reset,search,
+  search_near,update,remove}; only close and insert are supported.
+
+* Change session.truncate to support any cursor position for range
+  truncation, not just keys that are known to exist.
+
+* Checkpoint has to flush the metadata file, but only after it's flushed
+  all of the other files.
+
+* Discard obsolete WT_UPDATE structures during updates.
+
+* Document that duplicated cursors are positioned at the same point as the
+  cursor that was duplicated.
+
+* Fix a (very unlikely) deadlock at startup, if an application issues a
+  checkpoint before the eviction server has managed to open its sesssion.
+
+* Fix a core dump if we verify a file that's corrupted such that we are
+  unable to load any checkpoints at all, and the per-checkpoint bit map is
+  never set.
+
+* If a page selected for eviction cannot be freed because it has some
+  recent updates, try instead to free memory by trimming old updates.
+
+* If a thread fails to evict a page, try to bump its snapshot.  This avoids
+  the common case of read-committed threads getting stuck because one
+  thread falls behind (e.g., because we can't evict during a checkpoint).
+
+* If an exclusive table create fails, return EEXIST.
+
+* If we try to remove a file that doesn't exist, don't complain, return
+  success.
+
+* If we're repeatedly taking a checkpoint with the same name, skip the work
+  for read-only objects.
+
+* Instead of flagging the empty tree's leaf page empty as part of creating
+  an empty tree in memory, set the page as modified (to force
+  reconciliation); if the leaf page is still empty at that time, then we'll
+  figure it out during that reconciliation.  This fixes a memory leak where
+  the leaf page of a empty tree wasn't being freed.
+
+* It's not unreasonable to open a cursor on a non-existent table, don't
+  complain, just return not-found.
+
+* Move dist/RELEASE to the top level of the tree.
+
+* Optimization: don't repeatedly look up btree handles for schema
+  operations.
+
+* Return keys from all operations: don't keep pointing to the application's
+  key.
+
+* Update btree usage of 64 bitstring implementation, so it's cleaner.
+
+* Update the bitstring implementation to use 64 bit length strings.
+
+* Updates performed without an active transaction should become visible
+  with the current transaction ID.
+
+* Upgrade to doxygen 1.8.x
+
+* Use a real snapshot transaction for checkpoints.  Otherwise, the snapshot
+  can be updated in between checkpointing multiple files (when updating the
+  metadata).
+
+
 WiredTiger release 1.2.2, 2012-06-20
 ------------------------------------
 

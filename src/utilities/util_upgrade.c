@@ -29,8 +29,8 @@ util_upgrade(WT_SESSION *session, int argc, char *argv[])
 	/* The remaining argument is the table name. */
 	if (argc != 1)
 		return (usage());
-	if ((name = util_name(
-	    *argv, "table", UTIL_FILE_OK | UTIL_TABLE_OK)) == NULL)
+	if ((name = util_name(*argv,
+	    "table", UTIL_FILE_OK | UTIL_LSM_OK | UTIL_TABLE_OK)) == NULL)
 		return (1);
 
 	if ((ret = session->upgrade(session, name, NULL)) != 0) {
@@ -38,6 +38,8 @@ util_upgrade(WT_SESSION *session, int argc, char *argv[])
 		    progname, name, wiredtiger_strerror(ret));
 		goto err;
 	}
+
+	/* Verbose configures a progress counter, move to the next line. */
 	if (verbose)
 		printf("\n");
 
@@ -56,7 +58,7 @@ usage(void)
 {
 	(void)fprintf(stderr,
 	    "usage: %s %s "
-	    "upgrade file\n",
+	    "upgrade uri\n",
 	    progname, usage_prefix);
 	return (1);
 }

@@ -33,16 +33,19 @@ from helper import confirm_does_not_exist, complex_populate, simple_populate
 #    session level drop operation
 class test_drop(wttest.WiredTigerTestCase):
     name = 'test_drop'
+    extra_config = ''
 
     scenarios = [
         ('file', dict(uri='file:')),
-        ('table', dict(uri='table:'))
-        ]
+        ('table', dict(uri='table:')),
+        #Not yet: drop failing with an open cursor needs handle locking
+        #('table-lsm', dict(uri='table:', extra_config=',type=lsm')),
+    ]
 
     # Populate an object, remove it and confirm it no longer exists.
     def drop(self, populate, with_cursor):
         uri = self.uri + self.name
-        populate(self, uri, 'key_format=S', 10)
+        populate(self, uri, 'key_format=S' + self.extra_config, 10)
 
         # Open cursors should cause failure.
         if with_cursor:

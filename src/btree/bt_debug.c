@@ -201,26 +201,6 @@ err:	__wt_scr_free(&buf);
 }
 
 /*
- * __wt_debug_off --
- *	Read and dump a disk page in debugging mode, using an offset/size pair.
- */
-int
-__wt_debug_off(
-    WT_SESSION_IMPL *session, uint32_t offset, uint32_t size, const char *ofile)
-{
-	WT_DECL_ITEM(buf);
-	WT_DECL_RET;
-
-	WT_RET(__wt_scr_alloc(session, size, &buf));
-	WT_ERR(__wt_block_read_off(
-	    session, session->btree->block, buf, offset, size, 0));
-	ret = __wt_debug_disk(session, buf->mem, ofile);
-err:	__wt_scr_free(&buf);
-
-	return (ret);
-}
-
-/*
  * __wt_debug_disk --
  *	Dump a disk page in debugging mode.
  */
@@ -798,8 +778,8 @@ __debug_ref(WT_DBG *ds, WT_REF *ref, WT_PAGE *page)
 	case WT_REF_DISK:
 		__dmsg(ds, "disk");
 		break;
-	case WT_REF_EVICT_FORCE:
-		__dmsg(ds, "evict-force %p", ref->page);
+	case WT_REF_DELETED:
+		__dmsg(ds, "deleted");
 		break;
 	case WT_REF_EVICT_WALK:
 		__dmsg(ds, "evict-walk %p", ref->page);
@@ -836,12 +816,14 @@ __debug_cell(WT_DBG *ds, WT_PAGE_HEADER *dsk, WT_CELL_UNPACK *unpack)
 	WT_DECL_ITEM(buf);
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
+	const char *type;
 
 	session = ds->session;
 
 	__dmsg(ds, "\t%s: len %" PRIu32,
 	    __wt_cell_type_string(unpack->raw), unpack->size);
 
+	/* Dump cell's per-disk page type information. */
 	switch (dsk->type) {
 	case WT_PAGE_COL_INT:
 		switch (unpack->type) {
@@ -855,6 +837,7 @@ __debug_cell(WT_DBG *ds, WT_PAGE_HEADER *dsk, WT_CELL_UNPACK *unpack)
 		case WT_CELL_DEL:
 		case WT_CELL_VALUE:
 		case WT_CELL_VALUE_OVFL:
+		case WT_CELL_VALUE_OVFL_RM:
 			__dmsg(ds, ", rle: %" PRIu64, __wt_cell_rle(unpack));
 			break;
 		}
@@ -869,16 +852,25 @@ __debug_cell(WT_DBG *ds, WT_PAGE_HEADER *dsk, WT_CELL_UNPACK *unpack)
 		break;
 	}
 
-	switch (unpack->type) {
+	/* Dump addresses. */
+	switch (unpack->raw) {
 	case WT_CELL_ADDR:
+		type = "addr";
+		goto addr;
+	case WT_CELL_ADDR_DEL:
+		type = "addr/del";
+		goto addr;
+	case WT_CELL_ADDR_LNO:
+		type = "addr/lno";
+		goto addr;
 	case WT_CELL_KEY_OVFL:
 	case WT_CELL_VALUE_OVFL:
-		WT_RET(__wt_scr_alloc(session, 64, &buf));
+	case WT_CELL_VALUE_OVFL_RM:
+		type = "ovfl";
+addr:		WT_RET(__wt_scr_alloc(session, 128, &buf));
 		if ((ret = __wt_bm_addr_string(
 		    session, buf, unpack->data, unpack->size)) == 0)
-			__dmsg(ds, ", %s %s",
-			    unpack->type == WT_CELL_ADDR ? "addr" : "ovfl",
-			    (char *)buf->data);
+			__dmsg(ds, ", %s %s", type, (const char *)buf->data);
 		__wt_scr_free(&buf);
 		WT_RET(ret);
 		break;
@@ -908,19 +900,29 @@ __debug_cell_data(WT_DBG *ds, const char *tag, WT_CELL_UNPACK *unpack)
 	if (unpack == NULL)
 		goto deleted;
 
-	switch (unpack->type) {
+	switch (unpack->raw) {
 	case WT_CELL_ADDR:
 		__debug_item(ds, tag, "addr", strlen("addr"));
+		break;
+	case WT_CELL_ADDR_DEL:
+		__debug_item(ds, tag, "addr/del", strlen("addr/del"));
+		break;
+	case WT_CELL_ADDR_LNO:
+		__debug_item(ds, tag, "addr/lno", strlen("addr/lno"));
 		break;
 	case WT_CELL_DEL:
 deleted:	__debug_item(ds, tag, "deleted", strlen("deleted"));
 		break;
 	case WT_CELL_KEY:
 	case WT_CELL_KEY_OVFL:
+	case WT_CELL_KEY_SHORT:
 	case WT_CELL_VALUE:
+	case WT_CELL_VALUE_COPY:
 	case WT_CELL_VALUE_OVFL:
+	case WT_CELL_VALUE_OVFL_RM:
+	case WT_CELL_VALUE_SHORT:
 		WT_RET(__wt_scr_alloc(session, 256, &buf));
-		if ((ret = __wt_cell_unpack_copy(session, unpack, buf)) == 0)
+		if ((ret = __wt_cell_unpack_ref(session, unpack, buf)) == 0)
 			__debug_item(ds, tag, buf->data, buf->size);
 		__wt_scr_free(&buf);
 		break;

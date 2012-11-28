@@ -20,9 +20,9 @@ __wt_bt_cache_force_write(WT_SESSION_IMPL *session)
 	btree = session->btree;
 	page = btree->root_page;
 
-	/* If forcing a checkpoint, dirty the root page to ensure a write. */
+	/* Dirty the root page to ensure a write. */
 	WT_RET(__wt_page_modify_init(session, page));
-	__wt_page_modify_set(session, page);
+	__wt_page_modify_set(page);
 
 	return (0);
 }
@@ -61,30 +61,35 @@ __wt_bt_cache_flush(WT_SESSION_IMPL *session, WT_CKPT *ckptbase, int op)
 	 * already works that way.   None of these problems can't be fixed, but
 	 * I don't see a reason to change at this time, either.
 	 */
-	btree->ckpt = ckptbase;
-	ret = __wt_sync_file_serial(session, op);
-	btree->ckpt = NULL;
-	WT_RET(ret);
+
+	/*
+	 * XXX
+	 * Set the checkpoint reference for reconciliation -- this is ugly,
+	 * but there's no data structure path from here to reconciliation.
+	 * Publish: there must be a barrier to ensure the structure fields are
+	 * set before the eviction thread can see the request.
+	 */
+	WT_PUBLISH(btree->ckpt, ckptbase);
+
+	/*
+	 * Schedule and wake the eviction server, then wait for the eviction
+	 * server to wake us.
+	 */
+	WT_ERR(__wt_sync_file_serial(session, op));
+	__wt_evict_server_wake(session);
+	__wt_cond_wait(session, session->cond, 0);
+	ret = session->syncop_ret;
 
 	switch (op) {
 	case WT_SYNC:
 		break;
 	case WT_SYNC_DISCARD:
-		/* If discarding the tree, the root page should be gone. */
-		WT_ASSERT(session, btree->root_page == NULL);
-		break;
 	case WT_SYNC_DISCARD_NOWRITE:
-		/*
-		 * XXX
-		 * I'm not sure this is the right place to do this, but it's
-		 * the point in the btree engine where we know the root page
-		 * is gone.  Unlike WT_SYNC_DISCARD, which writes, evicts and
-		 * discards the root page, WT_SYNC_DISCARD_NOWRITE simply
-		 * discards the pages, which means "eviction" never happens.
-		 */
-		btree->root_page = NULL;
+		/* If discarding the tree, the root page should be gone. */
+		WT_ASSERT(session, ret != 0 || btree->root_page == NULL);
 		break;
 	}
 
-	return (0);
+err:	btree->ckpt = NULL;
+	return (ret);
 }

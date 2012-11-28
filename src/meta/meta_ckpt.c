@@ -145,7 +145,9 @@ __ckpt_named_addr(WT_SESSION_IMPL *session,
 	while (__wt_config_next(&ckptconf, &k, &v) == 0)
 		if (WT_STRING_MATCH(checkpoint, k.str, k.len)) {
 			WT_RET(__wt_config_subgets(session, &v, "addr", &a));
-			WT_RET(__wt_nhex_to_raw(session, a.str, a.len, addr));
+			if (a.len != 0)
+				WT_RET(__wt_nhex_to_raw(
+				    session, a.str, a.len, addr));
 			return (0);
 		}
 	return (WT_NOTFOUND);
@@ -177,9 +179,8 @@ __ckpt_last_addr(
 		 * the hex.
 		 */
 		WT_RET(__wt_config_subgets(session, &v, "addr", &a));
-		if (a.len == 0)
-			WT_RET(EINVAL);
-		WT_RET(__wt_nhex_to_raw(session, a.str, a.len, addr));
+		if (a.len != 0)
+			WT_RET(__wt_nhex_to_raw(session, a.str, a.len, addr));
 	}
 
 	return (found ? 0 : WT_NOTFOUND);
@@ -285,18 +286,19 @@ __wt_meta_ckptlist_get(
 
 			/*
 			 * Copy the name, address (raw and hex), order and time
-			 * into the slot.
+			 * into the slot.  If there's no address, it's a fake.
 			 */
 			WT_ERR(
 			    __wt_strndup(session, k.str, k.len, &ckpt->name));
 
 			WT_ERR(__wt_config_subgets(session, &v, "addr", &a));
+			WT_ERR(
+			    __wt_buf_set(session, &ckpt->addr, a.str, a.len));
 			if (a.len == 0)
-				goto format;
-			WT_ERR(__wt_buf_set(
-			    session, &ckpt->addr, a.str, a.len));
-			WT_ERR(__wt_nhex_to_raw(
-			    session, a.str, a.len, &ckpt->raw));
+				F_SET(ckpt, WT_CKPT_FAKE);
+			else
+				WT_ERR(__wt_nhex_to_raw(
+				    session, a.str, a.len, &ckpt->raw));
 
 			WT_ERR(__wt_config_subgets(session, &v, "order", &a));
 			if (a.val == 0)
@@ -327,7 +329,7 @@ __wt_meta_ckptlist_get(
 	 * checkpoint).  All of that cooperation is handled in the WT_CKPT
 	 * structure referenced from the WT_BTREE structure.
 	 */
-	if ((slot + 2) * sizeof(WT_CKPT) >= allocated)
+	if ((slot + 2) * sizeof(WT_CKPT) > allocated)
 		WT_ERR(__wt_realloc(session, &allocated,
 		    (slot + 2) * sizeof(WT_CKPT), &ckptbase));
 
@@ -355,6 +357,7 @@ int
 __wt_meta_ckptlist_set(
     WT_SESSION_IMPL *session, const char *fname, WT_CKPT *ckptbase)
 {
+	struct timespec ts;
 	WT_CKPT *ckpt;
 	WT_DECL_RET;
 	WT_ITEM *buf;
@@ -389,12 +392,24 @@ __wt_meta_ckptlist_set(
 			continue;
 
 		if (F_ISSET(ckpt, WT_CKPT_ADD | WT_CKPT_UPDATE)) {
-			/* Convert the raw cookie to a hex string. */
-			WT_ERR(__wt_raw_to_hex(session,
-			    ckpt->raw.data, ckpt->raw.size, &ckpt->addr));
+			/*
+			 * We fake checkpoints for handles in the middle of a
+			 * bulk load.  If there is a checkpoint, convert the
+			 * raw cookie to a hex string.
+			 */
+			if (ckpt->raw.size == 0)
+				ckpt->addr.size = 0;
+			else
+				WT_ERR(__wt_raw_to_hex(session,
+				    ckpt->raw.data,
+				    ckpt->raw.size, &ckpt->addr));
 
+			/* Set the order and timestamp. */
 			if (F_ISSET(ckpt, WT_CKPT_ADD))
 				ckpt->order = ++maxorder;
+
+			WT_ERR(__wt_epoch(session, &ts));
+			ckpt->sec = (uintmax_t)ts.tv_sec;
 		}
 		if (strcmp(ckpt->name, WT_CHECKPOINT) == 0)
 			WT_ERR(__wt_buf_catfmt(session, buf,

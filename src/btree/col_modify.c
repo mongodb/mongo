@@ -23,15 +23,16 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int op)
 	WT_INSERT_HEAD **inshead, *new_inshead, **new_inslist;
 	WT_ITEM *value, _value;
 	WT_PAGE *page;
-	WT_UPDATE *upd;
+	WT_UPDATE *upd, *upd_obsolete;
 	size_t ins_size, new_inshead_size, new_inslist_size, upd_size;
 	uint64_t recno;
 	u_int skipdepth;
-	int i;
+	int i, logged;
 
 	btree = cbt->btree;
 	page = cbt->page;
 	recno = cbt->iface.recno;
+	logged = 0;
 
 	WT_ASSERT(session, op != 1);
 
@@ -79,17 +80,26 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int op)
 	 * the WT_INSERT structure.
 	 */
 	if (cbt->compare == 0 && cbt->ins != NULL) {
-		/* Discard obsolete WT_UPDATE structures. */
-		__wt_update_obsolete(session, page, cbt->ins);
-
 		/* Make sure the update can proceed. */
 		WT_ERR(__wt_update_check(session, page, cbt->ins->upd));
 
-		/* Allocate and insert a WT_UPDATE structure. */
+		/* Allocate the WT_UPDATE structure and transaction ID. */
 		WT_ERR(__wt_update_alloc(session, value, &upd, &upd_size));
+		WT_ERR(__wt_txn_modify(session, &upd->txnid));
+		logged = 1;
+
+		/* Serialize the update. */
 		WT_ERR(__wt_update_serial(session, page,
-		    cbt->write_gen, &cbt->ins->upd, NULL, 0, &upd, upd_size));
+		    cbt->write_gen, &cbt->ins->upd, NULL, 0, &upd, upd_size,
+		    &upd_obsolete));
+
+		/* Discard any obsolete WT_UPDATE structures. */
+		if (upd_obsolete != NULL)
+			__wt_update_obsolete_free(session, page, upd_obsolete);
 	} else {
+		/* Make sure the update can proceed. */
+		WT_ERR(__wt_update_check(session, page, NULL));
+
 		/* There may be no insert list, allocate as necessary. */
 		new_inshead_size = new_inslist_size = 0;
 		if (op == 1) {
@@ -124,8 +134,10 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int op)
 		if (*inshead == NULL) {
 			new_inshead_size = sizeof(WT_INSERT_HEAD);
 			WT_ERR(__wt_calloc_def(session, 1, &new_inshead));
-			for (i = 0; i < WT_SKIP_MAXDEPTH; i++)
+			for (i = 0; i < WT_SKIP_MAXDEPTH; i++) {
 				cbt->ins_stack[i] = &new_inshead->head[i];
+				cbt->next_stack[i] = NULL;
+			}
 			cbt->ins_head = new_inshead;
 		}
 
@@ -133,20 +145,19 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int op)
 		skipdepth = __wt_skip_choose_depth();
 
 		/*
-		 * Allocate a WT_INSERT/WT_UPDATE pair, and update the cursor
-		 * to reference it.
+		 * Allocate a WT_INSERT/WT_UPDATE pair and transaction ID, and
+		 * update the cursor to reference it.
 		 */
 		WT_ERR(__col_insert_alloc(
 		    session, recno, skipdepth, &ins, &ins_size));
-		WT_ERR(__wt_update_check(session, page, NULL));
 		WT_ERR(__wt_update_alloc(session, value, &upd, &upd_size));
+		WT_ERR(__wt_txn_modify(session, &upd->txnid));
+		logged = 1;
 		ins->upd = upd;
 		ins_size += upd_size;
 		cbt->ins = ins;
 
-		/*
-		 * Insert or append the WT_INSERT structure.
-		 */
+		/* Insert or append the WT_INSERT structure. */
 		if (op == 1) {
 			/*
 			 * The serialized function clears ins: take a copy of
@@ -155,7 +166,8 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int op)
 			ins_copy = ins;
 
 			WT_ERR(__wt_col_append_serial(session,
-			    page, cbt->write_gen, inshead, cbt->ins_stack,
+			    page, cbt->write_gen, inshead,
+			    cbt->ins_stack, cbt->next_stack,
 			    &new_inslist, new_inslist_size,
 			    &new_inshead, new_inshead_size,
 			    &ins, ins_size, skipdepth));
@@ -164,24 +176,22 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int op)
 			cbt->recno = WT_INSERT_RECNO(ins_copy);
 		} else
 			WT_ERR(__wt_insert_serial(session,
-			    page, cbt->write_gen,
-			    inshead, cbt->ins_stack,
+			    page, cbt->write_gen, inshead,
+			    cbt->ins_stack, cbt->next_stack,
 			    &new_inslist, new_inslist_size,
 			    &new_inshead, new_inshead_size,
 			    &ins, ins_size, skipdepth));
 	}
 
 	if (0) {
-err:		if (ins != NULL)
-			__wt_free(session, ins);
-		if (upd != NULL) {
-			/*
-			 * Remove the update from the current transaction, so we
-			 * don't try to modify it on rollback.
-			 */
+err:		/*
+		 * Remove the update from the current transaction, so we don't
+		 * try to modify it on rollback.
+		 */
+		if (logged)
 			__wt_txn_unmodify(session);
-			__wt_free(session, upd);
-		}
+		__wt_free(session, ins);
+		__wt_free(session, upd);
 	}
 
 	__wt_free(session, new_inslist);
@@ -219,12 +229,11 @@ __col_insert_alloc(WT_SESSION_IMPL *session,
  * __wt_col_append_serial_func --
  *	Server function to append an WT_INSERT entry to the tree.
  */
-void
-__wt_col_append_serial_func(WT_SESSION_IMPL *session)
+int
+__wt_col_append_serial_func(WT_SESSION_IMPL *session, void *args)
 {
 	WT_BTREE *btree;
-	WT_DECL_RET;
-	WT_INSERT *ins, *new_ins, ***ins_stack;
+	WT_INSERT *ins, *new_ins, ***ins_stack, **next_stack;
 	WT_INSERT_HEAD *inshead, **insheadp, **new_inslist, *new_inshead;
 	WT_PAGE *page;
 	uint64_t recno;
@@ -233,11 +242,12 @@ __wt_col_append_serial_func(WT_SESSION_IMPL *session)
 
 	btree = session->btree;
 
-	__wt_col_append_unpack(session, &page, &write_gen, &insheadp,
-	    &ins_stack, &new_inslist, &new_inshead, &new_ins, &skipdepth);
+	__wt_col_append_unpack(args,
+	    &page, &write_gen, &insheadp, &ins_stack, &next_stack,
+	    &new_inslist, &new_inshead, &new_ins, &skipdepth);
 
 	/* Check the page's write-generation. */
-	WT_ERR(__wt_page_write_gen_check(session, page, write_gen));
+	WT_RET(__wt_page_write_gen_check(session, page, write_gen));
 
 	if ((inshead = *insheadp) == NULL)
 		inshead = new_inshead;
@@ -253,11 +263,11 @@ __wt_col_append_serial_func(WT_SESSION_IMPL *session)
 	if ((recno = WT_INSERT_RECNO(new_ins)) == 0)
 		recno = WT_INSERT_RECNO(new_ins) = ++btree->last_recno;
 
-	ins = __col_insert_search(inshead, ins_stack, recno);
+	ins = __col_insert_search(inshead, ins_stack, next_stack, recno);
 
 	/* If we find the record number, there's been a race. */
 	if (ins != NULL && WT_INSERT_RECNO(ins) == recno)
-		WT_ERR(WT_RESTART);
+		WT_RET(WT_RESTART);
 
 	/*
 	 * Publish: First, point the new WT_INSERT item's skiplist references
@@ -275,7 +285,7 @@ __wt_col_append_serial_func(WT_SESSION_IMPL *session)
 		*ins_stack[i] = new_ins;
 	}
 
-	__wt_col_append_new_ins_taken(session, page);
+	__wt_col_append_new_ins_taken(session, args, page);
 
 	/*
 	 * If the insert head does not yet have an insert list, our caller
@@ -286,7 +296,7 @@ __wt_col_append_serial_func(WT_SESSION_IMPL *session)
 	 */
 	if (*insheadp == NULL) {
 		WT_PUBLISH(*insheadp, new_inshead);
-		__wt_col_append_new_inshead_taken(session, page);
+		__wt_col_append_new_inshead_taken(session, args, page);
 	}
 
 	/*
@@ -298,7 +308,7 @@ __wt_col_append_serial_func(WT_SESSION_IMPL *session)
 	 */
 	if (page->modify->append == NULL) {
 		page->modify->append = new_inslist;
-		__wt_col_append_new_inslist_taken(session, page);
+		__wt_col_append_new_inslist_taken(session, args, page);
 	}
 
 	/*
@@ -308,5 +318,44 @@ __wt_col_append_serial_func(WT_SESSION_IMPL *session)
 	if (recno > btree->last_recno)
 		btree->last_recno = recno;
 
-err:	__wt_session_serialize_wrapup(session, page, ret);
+	__wt_page_and_tree_modify_set(session, page);
+	return (0);
+}
+
+/*
+ * __wt_col_leaf_obsolete --
+ *	Discard all obsolete updates on a column-store leaf page.
+ */
+void
+__wt_col_leaf_obsolete(WT_SESSION_IMPL *session, WT_PAGE *page)
+{
+	uint32_t i;
+	WT_COL *cip;
+	WT_INSERT *ins;
+	WT_UPDATE *upd;
+
+	switch (page->type) {
+	case WT_PAGE_COL_FIX:
+		WT_SKIP_FOREACH(ins, WT_COL_UPDATE_SINGLE(page))
+			if ((upd = __wt_update_obsolete_check(
+			    session, ins->upd)) != NULL)
+				__wt_update_obsolete_free(session, page, upd);
+		break;
+
+	case WT_PAGE_COL_VAR:
+		WT_COL_FOREACH(page, cip, i)
+			WT_SKIP_FOREACH(ins, WT_COL_UPDATE(page, cip))
+				if ((upd = __wt_update_obsolete_check(
+				    session, ins->upd)) != NULL)
+					__wt_update_obsolete_free(
+					    session, page, upd);
+		break;
+	}
+
+	/* Walk any append list. */
+	WT_SKIP_FOREACH(ins, WT_COL_APPEND(page)) {
+		if ((upd =
+		    __wt_update_obsolete_check(session, ins->upd)) != NULL)
+			__wt_update_obsolete_free(session, page, upd);
+	}
 }

@@ -1,8 +1,28 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
- *	All rights reserved.
+ * Public Domain 2008-2012 WiredTiger, Inc.
  *
- * See the file LICENSE for redistribution information.
+ * This is free and unencumbered software released into the public domain.
+ *
+ * Anyone is free to copy, modify, publish, use, compile, sell, or
+ * distribute this software, either in source code form or as a compiled
+ * binary, for any purpose, commercial or non-commercial, and by any
+ * means.
+ *
+ * In jurisdictions that recognize copyright laws, the author or authors
+ * of this software dedicate any and all copyright interest in the
+ * software to the public domain. We make this dedication for the benefit
+ * of the public at large and to the detriment of our heirs and
+ * successors. We intend this dedication to be an overt act of
+ * relinquishment in perpetuity of all present and future rights to this
+ * software under copyright law.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+ * IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+ * OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+ * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+ * OTHER DEALINGS IN THE SOFTWARE.
  */
 
 #include "thread.h"
@@ -47,7 +67,7 @@ r(void)
 int
 rw_start(u_int readers, u_int writers)
 {
-	clock_t start, stop;
+	struct timeval start, stop;
 	double seconds;
 	pthread_t *tids;
 	u_int i;
@@ -60,7 +80,7 @@ rw_start(u_int readers, u_int writers)
 	    (tids = calloc((size_t)(readers + writers), sizeof(*tids))) == NULL)
 		die("calloc", errno);
 
-	start = clock();
+	(void)gettimeofday(&start, NULL);
 
 	/* Create threads. */
 	for (i = 0; i < readers; ++i)
@@ -77,8 +97,9 @@ rw_start(u_int readers, u_int writers)
 	for (i = 0; i < readers + writers; ++i)
 		(void)pthread_join(tids[i], &thread_ret);
 
-	stop = clock();
-	seconds = (stop - start) / (double)CLOCKS_PER_SEC;
+	(void)gettimeofday(&stop, NULL);
+	seconds = (stop.tv_sec - start.tv_sec) +
+	    (stop.tv_usec - start.tv_usec) * 1e-6;
 	fprintf(stderr, "timer: %.2lf seconds (%d ops/second)\n",
 	    seconds, (int)(((readers + writers) * nops) / seconds));
 

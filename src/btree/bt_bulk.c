@@ -16,18 +16,22 @@ static int __bulk_row_keycmp_err(WT_CURSOR_BULK *);
 int
 __wt_bulk_init(WT_CURSOR_BULK *cbulk)
 {
-	WT_DECL_RET;
+	WT_BTREE *btree;
 	WT_SESSION_IMPL *session;
 
 	session = (WT_SESSION_IMPL *)cbulk->cbt.iface.session;
+	btree = session->btree;
 
 	/*
-	 * You can't bulk-load into existing trees.  Check, and retrieve the
-	 * leaf page we're going to use.
+	 * Bulk-load is only permitted on newly created files, not any empty
+	 * file -- see the checkpoint code for a discussion.
 	 */
-	if ((ret = __wt_btree_root_empty(session, &cbulk->leaf)) != 0)
-		WT_RET_MSG(
-		    session, ret, "bulk-load is only possible for empty trees");
+	if (!btree->bulk_load_ok)
+		WT_RET_MSG(session, EINVAL,
+		    "bulk-load is only possible for newly created trees");
+
+	/* Set a reference to the empty leaf page. */
+	cbulk->leaf = btree->root_page->u.intl.t->page;
 
 	WT_RET(__wt_rec_bulk_init(cbulk));
 
@@ -150,7 +154,8 @@ __bulk_row_keycmp_err(WT_CURSOR_BULK *cbulk)
 	WT_ERR_MSG(session, EINVAL,
 	    "bulk-load presented with out-of-order keys: %.*s compares smaller "
 	    "than previously inserted key %.*s",
-	    (int)a->size, (char *)a->data, (int)b->size, (char *)b->data);
+	    (int)a->size, (const char *)a->data,
+	    (int)b->size, (const char *)b->data);
 
 err:	__wt_scr_free(&a);
 	__wt_scr_free(&b);

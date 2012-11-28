@@ -13,7 +13,7 @@
  */
 int
 __wt_cond_alloc(WT_SESSION_IMPL *session,
-    const char *name, int is_locked, WT_CONDVAR **condp)
+    const char *name, int is_signalled, WT_CONDVAR **condp)
 {
 	WT_CONDVAR *cond;
 
@@ -32,7 +32,7 @@ __wt_cond_alloc(WT_SESSION_IMPL *session,
 		goto err;
 
 	cond->name = name;
-	cond->locked = is_locked;
+	cond->signalled = is_signalled;
 
 	*condp = cond;
 	return (0);
@@ -46,45 +46,67 @@ err:	__wt_free(session, cond);
  *	Lock a mutex.
  */
 void
-__wt_cond_wait(WT_SESSION_IMPL *session, WT_CONDVAR *cond)
+__wt_cond_wait(WT_SESSION_IMPL *session, WT_CONDVAR *cond, long usecs)
 {
 	WT_DECL_RET;
+	int locked;
+
+	locked = 0;
 
 	/*
 	 * !!!
 	 * This function MUST handle a NULL session handle.
 	 */
-	if (session != NULL)
+	if (session != NULL) {
+		WT_CSTAT_INCR(session, cond_wait);
+
 		WT_VERBOSE_VOID(
 		    session, mutex, "lock %s mutex (%p)", cond->name, cond);
+	}
 
 	WT_ERR(pthread_mutex_lock(&cond->mtx));
+	locked = 1;
 
-	/*
-	 * Check pthread_cond_wait() return for EINTR, ETIME and ETIMEDOUT,
-	 * it's known to return these errors on some systems.
-	 */
-	while (cond->locked) {
-		ret = pthread_cond_wait(&cond->cond, &cond->mtx);
+	while (!cond->signalled) {
+		if (usecs > 0) {
+			struct timespec ts;
+
+			WT_ERR(__wt_epoch(session, &ts));
+			ts.tv_nsec += 1000 * usecs;
+			if (ts.tv_nsec > 1000000000) {
+				++ts.tv_sec;
+				ts.tv_nsec -= 1000000000;
+			}
+			ret = pthread_cond_timedwait(
+			    &cond->cond, &cond->mtx, &ts);
+			if (ret == ETIMEDOUT) {
+				ret = 0;
+				break;
+			}
+		} else
+			ret = pthread_cond_wait(&cond->cond, &cond->mtx);
+
+		/*
+		 * Check pthread_cond_wait() return for EINTR, ETIME and
+		 * ETIMEDOUT, some systems return these errors.
+		 */
 		if (ret != 0 &&
 		    ret != EINTR &&
 #ifdef ETIME
 		    ret != ETIME &&
 #endif
-		    ret != ETIMEDOUT) {
-			(void)pthread_mutex_unlock(&cond->mtx);
-			goto err;
-		}
+		    ret != ETIMEDOUT)
+			WT_ERR(ret);
 	}
 
-	cond->locked = 1;
-	if (session != NULL)
-		WT_CSTAT_INCR(session, cond_wait);
+	cond->signalled = 0;
 
-	WT_ERR(pthread_mutex_unlock(&cond->mtx));
-	return;
+err:	if (locked)
+		WT_TRET(pthread_mutex_unlock(&cond->mtx));
+	if (ret == 0)
+		return;
 
-err:	__wt_err(session, ret, "mutex lock failed");
+	__wt_err(session, ret, "mutex lock failed");
 	__wt_abort(session);
 }
 
@@ -106,8 +128,8 @@ __wt_cond_signal(WT_SESSION_IMPL *session, WT_CONDVAR *cond)
 		    session, mutex, "signal %s cond (%p)", cond->name, cond);
 
 	WT_ERR(pthread_mutex_lock(&cond->mtx));
-	if (cond->locked) {
-		cond->locked = 0;
+	if (!cond->signalled) {
+		cond->signalled = 1;
 		WT_ERR(pthread_cond_signal(&cond->cond));
 	}
 	WT_ERR(pthread_mutex_unlock(&cond->mtx));

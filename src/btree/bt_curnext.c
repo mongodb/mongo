@@ -25,9 +25,20 @@ __cursor_fix_append_next(WT_CURSOR_BTREE *cbt, int newpage)
 		if ((cbt->ins = WT_SKIP_FIRST(cbt->ins_head)) == NULL)
 			return (WT_NOTFOUND);
 	} else
-		if (cbt->recno == WT_INSERT_RECNO(cbt->ins) &&
+		if (cbt->recno >= WT_INSERT_RECNO(cbt->ins) &&
 		    (cbt->ins = WT_SKIP_NEXT(cbt->ins)) == NULL)
 			return (WT_NOTFOUND);
+
+	/*
+	 * This code looks different from the cursor-previous code.  The append
+	 * list appears on the last page of the tree, but it may be preceded by
+	 * other rows, which means the cursor's recno will be set to a value and
+	 * we simply want to increment it.  If the cursor's recno is NOT set,
+	 * we're starting our iteration in a tree that has only appended items.
+	 * In that case, recno will be 0 and happily enough the increment will
+	 * set it to 1, which is correct.
+	 */
+	__cursor_set_recno(cbt, cbt->recno + 1);
 
 	/*
 	 * Fixed-width column store appends are inherently non-transactional.
@@ -45,7 +56,6 @@ __cursor_fix_append_next(WT_CURSOR_BTREE *cbt, int newpage)
 	 * insert is aborted, we simply return zero (empty), regardless of
 	 * whether we are at the end of the data.
 	 */
-	__cursor_set_recno(cbt, cbt->recno + 1);
 	if (cbt->recno < WT_INSERT_RECNO(cbt->ins) ||
 	    (upd = __wt_txn_read(session, cbt->ins->upd)) == NULL) {
 		cbt->v = 0;
@@ -64,7 +74,6 @@ static inline int
 __cursor_fix_next(WT_CURSOR_BTREE *cbt, int newpage)
 {
 	WT_BTREE *btree;
-	WT_INSERT *ins;
 	WT_ITEM *val;
 	WT_SESSION_IMPL *session;
 	WT_UPDATE *upd;
@@ -89,9 +98,15 @@ __cursor_fix_next(WT_CURSOR_BTREE *cbt, int newpage)
 		__cursor_set_recno(cbt, cbt->recno + 1);
 
 new_page:	/* Check any insert list for a matching record. */
-		if ((ins = __col_insert_search_match(
-		    WT_COL_UPDATE_SINGLE(cbt->page), cbt->recno)) != NULL &&
-		    (upd = __wt_txn_read(session, ins->upd)) != NULL) {
+		cbt->ins_head = WT_COL_UPDATE_SINGLE(cbt->page);
+		cbt->ins = __col_insert_search(
+		    cbt->ins_head, cbt->ins_stack, cbt->next_stack, cbt->recno);
+		if (cbt->ins != NULL &&
+		    cbt->recno != WT_INSERT_RECNO(cbt->ins))
+			cbt->ins = NULL;
+		upd = cbt->ins == NULL ?
+		    NULL : __wt_txn_read(session, cbt->ins->upd);
+		if (upd != NULL) {
 			val->data = WT_UPDATE_DATA(upd);
 			val->size = 1;
 			return (0);
@@ -150,7 +165,7 @@ __cursor_var_next(WT_CURSOR_BTREE *cbt, int newpage)
 	WT_CELL *cell;
 	WT_CELL_UNPACK unpack;
 	WT_COL *cip;
-	WT_INSERT *ins;
+	WT_DECL_RET;
 	WT_ITEM *val;
 	WT_SESSION_IMPL *session;
 	WT_UPDATE *upd;
@@ -176,13 +191,17 @@ __cursor_var_next(WT_CURSOR_BTREE *cbt, int newpage)
 new_page:	/* Find the matching WT_COL slot. */
 		if ((cip = __col_var_search(cbt->page, cbt->recno)) == NULL)
 			return (WT_NOTFOUND);
+		cbt->slot = WT_COL_SLOT(cbt->page, cip);
 
 		/* Check any insert list for a matching record. */
-		if ((ins = __col_insert_search_match(
-		    WT_COL_UPDATE(cbt->page, cip), cbt->recno)) != NULL &&
-		    (upd = __wt_txn_read(session, ins->upd)) != NULL) {
+		cbt->ins_head = WT_COL_UPDATE_SLOT(cbt->page, cbt->slot);
+		cbt->ins = __col_insert_search_match(cbt->ins_head, cbt->recno);
+		upd = cbt->ins == NULL ?
+		    NULL : __wt_txn_read(session, cbt->ins->upd);
+		if (upd != NULL) {
 			if (WT_UPDATE_DELETED_ISSET(upd))
 				continue;
+
 			val->data = WT_UPDATE_DATA(upd);
 			val->size = upd->size;
 			return (0);
@@ -199,20 +218,23 @@ new_page:	/* Find the matching WT_COL slot. */
 			if ((cell = WT_COL_PTR(cbt->page, cip)) == NULL)
 				continue;
 			__wt_cell_unpack(cell, &unpack);
-			switch (unpack.type) {
-			case WT_CELL_DEL:
+			if (unpack.type == WT_CELL_DEL)
 				continue;
-			case WT_CELL_VALUE:
-				if (session->btree->huffman_value == NULL) {
-					cbt->tmp.data = unpack.data;
-					cbt->tmp.size = unpack.size;
-					break;
-				}
-				/* FALLTHROUGH */
-			default:
-				WT_RET(__wt_cell_unpack_copy(
-				    session, &unpack, &cbt->tmp));
-			}
+
+			/*
+			 * Restart for a variable-length column-store.  We could
+			 * catch restart higher up the call-stack but there's no
+			 * point to it: unlike row-store (where a normal search
+			 * path finds cached overflow values), we have to access
+			 * the page's reconciliation structures, and that's as
+			 * easy here as higher up the stack.
+			 */
+			if ((ret = __wt_cell_unpack_ref(
+			    session, &unpack, &cbt->tmp)) == WT_RESTART)
+				ret = __wt_ovfl_cache_col_restart(
+				    session, cbt->page, &unpack, &cbt->tmp);
+			WT_RET(ret);
+
 			cbt->cip_saved = cip;
 		}
 		val->data = cbt->tmp.data;
@@ -302,7 +324,7 @@ new_insert:	if ((ins = cbt->ins) != NULL) {
 		if (upd != NULL && WT_UPDATE_DELETED_ISSET(upd))
 			continue;
 
-		return (__cursor_row_slot_return(cbt, rip));
+		return (__cursor_row_slot_return(cbt, rip, upd));
 	}
 	/* NOTREACHED */
 }
@@ -369,17 +391,23 @@ __wt_btcur_iterate_setup(WT_CURSOR_BTREE *cbt, int next)
  *	Move to the next record in the tree.
  */
 int
-__wt_btcur_next(WT_CURSOR_BTREE *cbt, int is_modify)
+__wt_btcur_next(WT_CURSOR_BTREE *cbt, int discard)
 {
 	WT_DECL_RET;
 	WT_PAGE *page;
 	WT_SESSION_IMPL *session;
+	uint32_t flags;
 	int newpage;
 
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
 	WT_BSTAT_INCR(session, cursor_read_next);
 
-	__cursor_func_init(cbt, 0);
+	flags = 0;					/* Tree walk flags. */
+	if (discard)
+		LF_SET(WT_TREE_DISCARD);
+
+retry:	__cursor_func_init(cbt, 0);
+	__cursor_position_clear(cbt);
 
 	/*
 	 * If we aren't already iterating in the right direction, there's
@@ -393,7 +421,7 @@ __wt_btcur_next(WT_CURSOR_BTREE *cbt, int is_modify)
 	 * page, save the write generation.
 	 */
 	page = cbt->page;
-	if (is_modify && page != NULL) {
+	if (discard && page != NULL) {
 		WT_ERR(__wt_page_modify_init(session, page));
 		WT_ORDERED_READ(cbt->write_gen, page->modify->write_gen);
 	}
@@ -449,7 +477,7 @@ __wt_btcur_next(WT_CURSOR_BTREE *cbt, int is_modify)
 
 		cbt->page = NULL;
 		do {
-			WT_ERR(__wt_tree_np(session, &page, 0, 1));
+			WT_ERR(__wt_tree_walk(session, &page, flags));
 			WT_ERR_TEST(page == NULL, WT_NOTFOUND);
 		} while (
 		    page->type == WT_PAGE_COL_INT ||
@@ -457,14 +485,16 @@ __wt_btcur_next(WT_CURSOR_BTREE *cbt, int is_modify)
 		cbt->page = page;
 
 		/* Initialize the page's modification information */
-		if (is_modify) {
+		if (discard) {
 			WT_ERR(__wt_page_modify_init(session, page));
 			WT_ORDERED_READ(
 			    cbt->write_gen, page->modify->write_gen);
 		}
 	}
 
-err:	__cursor_func_resolve(cbt, ret);
+err:	if (ret == WT_RESTART)
+		goto retry;
+	__cursor_func_resolve(cbt, ret);
 	return (ret);
 }
 
@@ -483,7 +513,8 @@ __wt_btcur_next_random(WT_CURSOR_BTREE *cbt)
 	btree = cbt->btree;
 	WT_BSTAT_INCR(session, cursor_read_next);
 
-	__cursor_func_init(cbt, 1);
+retry:	__cursor_func_init(cbt, 1);
+	__cursor_position_clear(cbt);
 
 	/*
 	 * Only supports row-store: applications can trivially select a random
@@ -494,7 +525,8 @@ __wt_btcur_next_random(WT_CURSOR_BTREE *cbt)
 	ret = cbt->compare == 0 ?
 	    __wt_kv_return(session, cbt) : WT_NOTFOUND;
 
-err:	__cursor_func_resolve(cbt, ret);
-
+err:	if (ret == WT_RESTART)
+		goto retry;
+	__cursor_func_resolve(cbt, ret);
 	return (ret);
 }

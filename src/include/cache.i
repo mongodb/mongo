@@ -31,40 +31,38 @@ __wt_eviction_check(WT_SESSION_IMPL *session, int *read_lockoutp, int wake)
 		*read_lockoutp = (bytes_inuse > bytes_max);
 
 	/* Wake eviction when we're over the trigger cache size. */
-	if (wake && bytes_inuse > cache->eviction_trigger * (bytes_max / 100))
+	if (wake && bytes_inuse >= (cache->eviction_trigger * bytes_max) / 100)
 		__wt_evict_server_wake(session);
 }
 
 /*
- * __wt_eviction_page_check --
- *	Return if a page should be forcibly evicted.
+ * __wt_cache_full_check --
+ *      Wait for there to be space in the cache before a read or update.
  */
 static inline int
-__wt_eviction_page_check(WT_SESSION_IMPL *session, WT_PAGE *page)
+__wt_cache_full_check(WT_SESSION_IMPL *session)
 {
-	WT_CONNECTION_IMPL *conn;
-	WT_PAGE_MODIFY *mod;
-
-	conn = S2C(session);
-	mod = page->modify;
-
-	/* Root pages and clean pages are never forcibly evicted. */
-	if (WT_PAGE_IS_ROOT(page) || !__wt_page_is_modified(page))
-		return (0);
-
-	/* Check the page's memory footprint. */
-	if ((int64_t)page->memory_footprint > conn->cache_size / 2 ||
-	    page->memory_footprint > 20 * session->btree->maxleafpage)
-		return (1);
+	WT_BTREE *btree;
+	WT_DECL_RET;
+	int lockout, wake;
 
 	/*
-	 * If the page's write-generation has wrapped and caught up with the
-	 * page's disk generation (wildly unlikely as it requires 4B updates
-	 * between page reconciliations, but is technically possible), forcibly
-	 * evict the page.
+	 * Only wake the eviction server the first time through here (if the
+	 * cache is too full), or every hundred times after that.  Otherwise,
+	 * we are just wasting effort and making a busy condition variable
+	 * busier.
 	 */
-	if (mod != NULL && mod->write_gen + 1 == mod->disk_gen)
-		return (1);
-
-	return (0);
+	for (wake = 0;; wake = (wake + 1) % 100) {
+		__wt_eviction_check(session, &lockout, wake == 0);
+		if (!lockout || F_ISSET(session,
+		    WT_SESSION_NO_CACHE_CHECK | WT_SESSION_SCHEMA_LOCKED))
+			return (0);
+		if ((btree = session->btree) != NULL && F_ISSET(btree,
+		    WT_BTREE_BULK | WT_BTREE_NO_CACHE | WT_BTREE_NO_EVICTION))
+			return (0);
+		if ((ret = __wt_evict_lru_page(session, 1)) == EBUSY)
+			__wt_yield();
+		else
+			WT_RET_NOTFOUND_OK(ret);
+	}
 }

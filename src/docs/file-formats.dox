@@ -38,20 +38,71 @@ maximum file allocation unit is 512MB.  File block offsets are 64-bit
 
 @section file_formats_compression File formats and compression
 
-Row-stores support three types of compression: prefix compression (where
-any identical portion of each key byte string is only stored once),
-Huffman encoding of individual key/value items, (see @subpage huffman
-for details), and stream compression of the blocks in the file (see @ref
-compression for details).
+Row-stores support four types of compression: key prefix compression,
+dictionary compression, Huffman encoding and block compression.
 
-Column-stores with variable-length byte string values support three
-types of compression: run-length encoding (where duplicate values are
-only stored a single time), Huffman encoding of individual value items,
-(see @ref huffman for details), and stream compression of the blocks in
-the file (see @ref compression for details).
+- Key prefix compression reduces the size requirement of both in-memory
+and on-disk objects by storing any identical key prefix only once per
+page.  The cost is minor additional CPU and memory use when reading
+pages into memory, when searching the in-memory tree and when writing
+pages to disk.  Applications with poor cache locality of reference may
+choose to turn off key prefix compression to avoid this additional cost.
+
+- Dictionary compression reduces the size requirement of both the
+in-memory and on-disk objects by storing any identical value only once
+per page.  The cost is minor additional CPU and memory use when
+returning values from the in-memory tree and when writing pages to disk.
+
+- Huffman encoding reduces the size requirement of both the in-memory
+and on-disk objects by compressing individual key/value items, and can
+be separately configured either or both keys and values.  The cost is
+additional CPU and memory use when searching the in-memory tree (if keys
+are encoded), and additional CPU and memory use when returning values
+from the in-memory tree and when writing pages to disk.  Note the
+additional CPU cost of Huffman encoding can be high, and should be
+considered.  (See @subpage huffman for details)
+
+- Block compression reduces the size requirement of on-disk objects by
+compressing blocks of the backing object's file.  The cost is additional
+CPU and memory use when reading and writing pages to disk.  Note the
+additional CPU cost of block compression can be high, and should be
+considered.   (See @ref compression for details).
+
+Column-stores with variable-length byte string values support four
+types of compression: run-length encoding, dictionary compression,
+Huffman encoding and block compression.
+
+- Run-length encoding reduces the size requirement of both the in-memory
+and on-disk objects by storing sequential, duplicate values in the store
+only a single time (with an associated count).  The cost is minor
+additional CPU and memory use when returning values from the in-memory
+tree and when writing pages to disk.
+
+- Dictionary compression reduces the size requirement of both the
+in-memory and on-disk objects by storing any identical value only once
+per page.  The cost is minor additional CPU and memory use when
+returning values from the in-memory tree and when writing pages to disk.
+
+- Huffman encoding reduces the size requirement of both the in-memory
+and on-disk objects by compressing individual value items.  The cost is
+additional CPU and memory use when returning values from the in-memory
+tree and when writing pages to disk.  Note the additional CPU cost of
+Huffman encoding can be high, and should be considered.
+(See @ref huffman for details)
+
+- Block compression reduces the size requirement of on-disk objects by
+compressing blocks of the backing object's file.  The cost is additional
+CPU and memory use when reading and writing pages to disk.  Note the
+additional CPU cost of block compression can be high, and should be
+considered.   (See @ref compression for details).
 
 Column-stores with fixed-length byte values support a single type of
-compression: stream compression of the blocks in the file (see @ref
-compression for details).
+compression: block compression.
+
+- Block compression reduces the size requirement of on-disk objects by
+compressing blocks of the backing object's file.  The cost is additional
+CPU and memory use when reading and writing pages to disk.  Note the
+additional CPU cost of block compression can be high, and should be
+considered.   (See @ref compression for details).
 
 */

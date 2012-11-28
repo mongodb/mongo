@@ -1,8 +1,28 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
- *	All rights reserved.
+ * Public Domain 2008-2012 WiredTiger, Inc.
  *
- * See the file LICENSE for redistribution information.
+ * This is free and unencumbered software released into the public domain.
+ *
+ * Anyone is free to copy, modify, publish, use, compile, sell, or
+ * distribute this software, either in source code form or as a compiled
+ * binary, for any purpose, commercial or non-commercial, and by any
+ * means.
+ *
+ * In jurisdictions that recognize copyright laws, the author or authors
+ * of this software dedicate any and all copyright interest in the
+ * software to the public domain. We make this dedication for the benefit
+ * of the public at large and to the detriment of our heirs and
+ * successors. We intend this dedication to be an overt act of
+ * relinquishment in perpetuity of all present and future rights to this
+ * software under copyright law.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+ * IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+ * OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+ * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+ * OTHER DEALINGS IN THE SOFTWARE.
  */
 
 #include "format.h"
@@ -28,22 +48,17 @@ wts_ops(void)
 	TINFO *tinfo, total;
 	WT_CONNECTION *conn;
 	WT_SESSION *session;
-	time_t now;
 	int ret, running;
 	uint32_t i;
 
 	conn = g.wts_conn;
 
 	/* Open a session. */
-	session = NULL;
-	if (g.logging == LOG_OPS) {
+	if (g.logging != 0) {
 		if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
 			die(ret, "connection.open_session");
-
-		(void)time(&now);
 		(void)session->msg_printf(session,
-		    "===============\nthread ops start: %s===============",
-		    ctime(&now));
+		    "=============== thread ops start ===============");
 	}
 
 	if (SINGLETHREADED) {
@@ -92,12 +107,9 @@ wts_ops(void)
 		free(tinfo);
 	}
 
-	if (session != NULL) {
-		(void)time(&now);
+	if (g.logging != 0) {
 		(void)session->msg_printf(session,
-		    "===============\nthread ops stop: %s===============",
-		    ctime(&now));
-
+		    "=============== thread ops stop ===============");
 		if ((ret = session->close(session, NULL)) != 0)
 			die(ret, "session.close");
 	}
@@ -128,8 +140,11 @@ ops(void *arg)
 	memset(&value, 0, sizeof(value));
 	val_gen_setup(&valbuf);
 
-	/* Each thread does its share of the total operations. */
-	thread_ops = g.c_ops / g.c_threads;
+	/*
+	 * Each thread does its share of the total operations, and make sure
+	 * that it's not 0 (testing runs: threads might be larger than ops).
+	 */
+	thread_ops = g.c_threads + g.c_ops / g.c_threads;
 
 	/* Pick a period for re-opening the session and cursors. */
 	session = NULL;
@@ -167,11 +182,12 @@ ops(void *arg)
 			 * append configuration.
 			 */
 			if ((ret = session->open_cursor(session,
-			    WT_TABLENAME, NULL, "overwrite", &cursor)) != 0)
+			    g.uri, NULL, "overwrite", &cursor)) != 0)
 				die(ret, "session.open_cursor");
-			if ((g.c_file_type == FIX || g.c_file_type == VAR) &&
-			    (ret = session->open_cursor(session,
-			    WT_TABLENAME, NULL, "append", &cursor_insert)) != 0)
+			if ((g.type == FIX || g.type == VAR) &&
+			    (ret = session->open_cursor(
+			    session, g.uri,
+			    NULL, "append", &cursor_insert)) != 0)
 				die(ret, "session.open_cursor");
 		}
 
@@ -216,7 +232,7 @@ ops(void *arg)
 		op = (uint32_t)(wts_rand() % 100);
 		if (op < g.c_delete_pct) {
 			++tinfo->remove;
-			switch (g.c_file_type) {
+			switch (g.type) {
 			case ROW:
 				/*
 				 * If deleting a non-existent record, the cursor
@@ -231,7 +247,7 @@ ops(void *arg)
 			}
 		} else if (op < g.c_delete_pct + g.c_insert_pct) {
 			++tinfo->insert;
-			switch (g.c_file_type) {
+			switch (g.type) {
 			case ROW:
 				row_update(cursor, &key, &value, keyno, 1);
 				break;
@@ -250,7 +266,7 @@ ops(void *arg)
 		} else if (
 		    op < g.c_delete_pct + g.c_insert_pct + g.c_write_pct) {
 			++tinfo->update;
-			switch (g.c_file_type) {
+			switch (g.type) {
 			case ROW:
 				row_update(cursor, &key, &value, keyno, 0);
 				break;
@@ -319,7 +335,7 @@ wts_read_scan(void)
 	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
 		die(ret, "connection.open_session");
 	if ((ret = session->open_cursor(
-	    session, WT_TABLENAME, NULL, NULL, &cursor)) != 0)
+	    session, g.uri, NULL, NULL, &cursor)) != 0)
 		die(ret, "session.open_cursor");
 
 	/* Check a random subset of the records using the key. */
@@ -362,7 +378,7 @@ read_row(WT_CURSOR *cursor, WT_ITEM *key, uint64_t keyno)
 		    session, "%-10s%" PRIu64, "read", keyno);
 
 	/* Retrieve the key/value pair by key. */
-	switch (g.c_file_type) {
+	switch (g.type) {
 	case FIX:
 	case VAR:
 		cursor->set_key(cursor, keyno);
@@ -374,7 +390,7 @@ read_row(WT_CURSOR *cursor, WT_ITEM *key, uint64_t keyno)
 	}
 
 	if ((ret = cursor->search(cursor)) == 0) {
-		if (g.c_file_type == FIX) {
+		if (g.type == FIX) {
 			ret = cursor->get_value(cursor, &bitfield);
 			value.data = &bitfield;
 			value.size = 1;
@@ -400,7 +416,7 @@ read_row(WT_CURSOR *cursor, WT_ITEM *key, uint64_t keyno)
 	 * are treated as not found.  Treat this the same as a zero value
 	 * in the key space, to match BDB's behavior.
 	 */
-	if (g.c_file_type == FIX && ret == WT_NOTFOUND) {
+	if (g.type == FIX && ret == WT_NOTFOUND) {
 		bitfield = 0;
 		ret = 0;
 	}
@@ -440,7 +456,7 @@ nextprev(WT_CURSOR *cursor, int next, int *notfoundp)
 	keyno = 0;
 	ret = next ? cursor->next(cursor) : cursor->prev(cursor);
 	if (ret == 0)
-		switch (g.c_file_type) {
+		switch (g.type) {
 		case FIX:
 			if ((ret = cursor->get_key(cursor, &keyno)) == 0 &&
 			    (ret = cursor->get_value(cursor, &bitfield)) == 0) {
@@ -472,7 +488,7 @@ nextprev(WT_CURSOR *cursor, int next, int *notfoundp)
 		return;
 
 	/* Compare the two. */
-	if (g.c_file_type == ROW) {
+	if (g.type == ROW) {
 		if (key.size != bdb_key.size ||
 		    memcmp(key.data, bdb_key.data, key.size) != 0) {
 			fprintf(stderr, "nextprev: %s key mismatch:\n", which);
@@ -500,7 +516,7 @@ nextprev(WT_CURSOR *cursor, int next, int *notfoundp)
 	}
 
 	if (g.logging == LOG_OPS)
-		switch (g.c_file_type) {
+		switch (g.type) {
 		case FIX:
 			(void)session->msg_printf(
 			    session, "%-10s%" PRIu64 " {0x%02x}", which,
@@ -575,7 +591,7 @@ col_update(WT_CURSOR *cursor, WT_ITEM *key, WT_ITEM *value, uint64_t keyno)
 
 	/* Log the operation */
 	if (g.logging == LOG_OPS) {
-		if (g.c_file_type == FIX)
+		if (g.type == FIX)
 			(void)session->msg_printf(session,
 			    "%-10s%" PRIu64 " {0x%02" PRIx8 "}",
 			    "update", keyno,
@@ -588,7 +604,7 @@ col_update(WT_CURSOR *cursor, WT_ITEM *key, WT_ITEM *value, uint64_t keyno)
 	}
 
 	cursor->set_key(cursor, keyno);
-	if (g.c_file_type == FIX)
+	if (g.type == FIX)
 		cursor->set_value(cursor, *(uint8_t *)value->data);
 	else
 		cursor->set_value(cursor, value);
@@ -619,7 +635,7 @@ col_insert(WT_CURSOR *cursor, WT_ITEM *key, WT_ITEM *value, uint64_t *keynop)
 
 	value_gen((uint8_t *)value->data, &value->size, g.rows + 1);
 
-	if (g.c_file_type == FIX)
+	if (g.type == FIX)
 		cursor->set_value(cursor, *(uint8_t *)value->data);
 	else
 		cursor->set_value(cursor, value);
@@ -638,7 +654,7 @@ col_insert(WT_CURSOR *cursor, WT_ITEM *key, WT_ITEM *value, uint64_t *keynop)
 	g.rows = (uint32_t)keyno;
 
 	if (g.logging == LOG_OPS) {
-		if (g.c_file_type == FIX)
+		if (g.type == FIX)
 			(void)session->msg_printf(session,
 			    "%-10s%" PRIu64 " {0x%02" PRIx8 "}",
 			    "insert", keyno,
@@ -686,7 +702,12 @@ row_remove(WT_CURSOR *cursor, WT_ITEM *key, uint64_t keyno, int *notfoundp)
 		return;
 
 	bdb_remove(keyno, &notfound);
-	(void)notfound_chk("row_remove", ret, notfound, keyno);
+
+	/* LSM trees don't check for existence if "overwrite" is set. */
+	if (strncmp(cursor->uri, "lsm:", 4) == 0)
+		*notfoundp = notfound;
+	else
+		(void)notfound_chk("row_remove", ret, notfound, keyno);
 }
 
 /*
@@ -719,7 +740,7 @@ col_remove(WT_CURSOR *cursor, WT_ITEM *key, uint64_t keyno, int *notfoundp)
 	 * Deleting a fixed-length item is the same as setting the bits to 0;
 	 * do the same thing for the BDB store.
 	 */
-	if (g.c_file_type == FIX) {
+	if (g.type == FIX) {
 		key_gen((uint8_t *)key->data, &key->size, keyno, 0);
 		bdb_update(key->data, key->size, "\0", 1, &notfound);
 	} else
@@ -774,7 +795,7 @@ print_item(const char *tag, WT_ITEM *item)
 	size = item->size;
 
 	fprintf(stderr, "\t%s {", tag);
-	if (g.c_file_type == FIX)
+	if (g.type == FIX)
 		fprintf(stderr, "0x%02x", data[0]);
 	else
 		for (; size > 0; --size, ++data) {

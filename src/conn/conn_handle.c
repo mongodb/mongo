@@ -25,19 +25,16 @@ __wt_connection_init(WT_CONNECTION_IMPL *conn)
 	TAILQ_INIT(&conn->collqh);		/* Collator list */
 	TAILQ_INIT(&conn->compqh);		/* Compressor list */
 
+	TAILQ_INIT(&conn->lsmqh);		/* WT_LSM_TREE list */
+
 	/* Statistics. */
 	WT_RET(__wt_stat_alloc_connection_stats(session, &conn->stats));
 
-	/* API spinlock. */
+	/* Locks. */
 	__wt_spin_init(session, &conn->api_lock);
-
-	/* File handle spinlock. */
 	__wt_spin_init(session, &conn->fh_lock);
-
-	/* Schema operation spinlock. */
+	__wt_spin_init(session, &conn->metadata_lock);
 	__wt_spin_init(session, &conn->schema_lock);
-
-	/* Serialized function call spinlock. */
 	__wt_spin_init(session, &conn->serial_lock);
 
 	return (0);
@@ -76,8 +73,9 @@ __wt_connection_destroy(WT_CONNECTION_IMPL *conn)
 
 	__wt_spin_destroy(session, &conn->api_lock);
 	__wt_spin_destroy(session, &conn->fh_lock);
-	__wt_spin_destroy(session, &conn->serial_lock);
+	__wt_spin_destroy(session, &conn->metadata_lock);
 	__wt_spin_destroy(session, &conn->schema_lock);
+	__wt_spin_destroy(session, &conn->serial_lock);
 
 	/* Free allocated memory. */
 	__wt_free(session, conn->home);

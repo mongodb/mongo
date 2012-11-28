@@ -1,8 +1,28 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
- *	All rights reserved.
+ * Public Domain 2008-2012 WiredTiger, Inc.
  *
- * See the file LICENSE for redistribution information.
+ * This is free and unencumbered software released into the public domain.
+ *
+ * Anyone is free to copy, modify, publish, use, compile, sell, or
+ * distribute this software, either in source code form or as a compiled
+ * binary, for any purpose, commercial or non-commercial, and by any
+ * means.
+ *
+ * In jurisdictions that recognize copyright laws, the author or authors
+ * of this software dedicate any and all copyright interest in the
+ * software to the public domain. We make this dedication for the benefit
+ * of the public at large and to the detriment of our heirs and
+ * successors. We intend this dedication to be an overt act of
+ * relinquishment in perpetuity of all present and future rights to this
+ * software under copyright law.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+ * IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+ * OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+ * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+ * OTHER DEALINGS IN THE SOFTWARE.
  */
 
 #include "thread.h"
@@ -10,6 +30,7 @@
 WT_CONNECTION *conn;				/* WiredTiger connection */
 u_int nops;					/* Operations */
 const char *uri;				/* Object */
+const char *config;				/* Object config */
 
 static char *progname;				/* Program name */
 static FILE *logfp;				/* Log file */
@@ -25,10 +46,22 @@ static void wt_shutdown(void);
 int
 main(int argc, char *argv[])
 {
+	static struct config {
+		const char *uri;
+		const char *desc;
+		const char *config;
+	} *cp, configs[] = {
+		{ "file:__wt",	NULL, NULL },
+		{ "table:__wt",	NULL, NULL },
+/* Configure for a modest cache size. */
+#define	LSM_CONFIG	"lsm_chunk_size=1m,lsm_merge_max=2,leaf_page_max=4k"
+		{ "lsm:__wt",	NULL, LSM_CONFIG },
+		{ "table:__wt",	" [lsm]", "type=lsm," LSM_CONFIG },
+		{ NULL,		NULL, NULL }
+	};
 	u_int nthreads;
 	int ch, cnt, runs;
 	char *config_open;
-	const char **objp, *objs[] = { "file:__wt", "table:__wt", NULL };
 
 	if ((progname = strrchr(argv[0], '/')) == NULL)
 		progname = argv[0];
@@ -77,12 +110,17 @@ main(int argc, char *argv[])
 	for (cnt = 1; runs == 0 || cnt <= runs; ++cnt) {
 		shutdown();			/* Clean up previous runs */
 
-		for (objp = objs; *objp != NULL; objp++) {
-			uri = *objp;
-			printf("%5d: %u threads on %s\n", cnt, nthreads, uri);
+		for (cp = configs; cp->uri != NULL; ++cp) {
+			uri = cp->uri;
+			config = cp->config;
+			printf("%5d: %u threads on %s%s\n", cnt, nthreads, uri,
+			    cp->desc == NULL ? "" : cp->desc);
+
 			wt_startup(config_open);
+
 			if (fop_start(nthreads))
 				return (EXIT_FAILURE);
+
 			wt_shutdown();
 			printf("\n");
 		}
@@ -103,15 +141,16 @@ wt_startup(char *config_open)
 		NULL
 	};
 	int ret;
-	char config[128];
+	char config_buf[128];
 
-	snprintf(config, sizeof(config),
+	snprintf(config_buf, sizeof(config_buf),
 	    "create,error_prefix=\"%s\",cache_size=5MB%s%s",
 	    progname,
 	    config_open == NULL ? "" : ",",
 	    config_open == NULL ? "" : config_open);
 
-	if ((ret = wiredtiger_open(NULL, &event_handler, config, &conn)) != 0)
+	if ((ret = wiredtiger_open(
+	    NULL, &event_handler, config_buf, &conn)) != 0)
 		die("wiredtiger_open", ret);
 }
 
@@ -135,7 +174,7 @@ wt_shutdown(void)
 static void
 shutdown(void)
 {
-	(void)system("rm -f WildTiger WiredTiger.* __wt*");
+	(void)system("rm -f WiredTiger* __wt*");
 }
 
 static int
@@ -147,6 +186,12 @@ handle_error(WT_EVENT_HANDLER *handler, int error, const char *errmsg)
 	/* Ignore complaints about missing files. */
 	if (error == ENOENT)
 		return (0);
+
+	/* Ignore complaints about failure to open bulk cursors. */
+	if (strstr(
+	    errmsg, "bulk-load is only supported on newly created") != NULL)
+		return (0);
+
 	return (fprintf(stderr, "%s\n", errmsg) < 0 ? -1 : 0);
 }
 
@@ -196,8 +241,7 @@ usage(void)
 {
 	fprintf(stderr,
 	    "usage: %s "
-	    "[-S] [-C wiredtiger-config] [-k keys] [-l log]\n\t"
-	    "[-n ops] [-R readers] [-r runs] [-t f|r|v] [-W writers]\n",
+	    "[-C wiredtiger-config] [-l log] [-n ops] [-r runs] [-t threads]\n",
 	    progname);
 	fprintf(stderr, "%s",
 	    "\t-C specify wiredtiger_open configuration arguments\n"

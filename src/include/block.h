@@ -142,23 +142,19 @@ struct __wt_block {
 	WT_FH	*fh;			/* Backing file handle */
 
 	uint32_t allocsize;		/* Allocation size */
-	int	 checksum;		/* If checksums configured */
 
 	WT_SPINLOCK	live_lock;	/* Live checkpoint lock */
 	WT_BLOCK_CKPT	live;		/* Live checkpoint */
 	int		live_load;	/* Live checkpoint loaded */
 
-	WT_COMPRESSOR *compressor;	/* Page compressor */
-
 				/* Salvage support */
-	int	slvg;			/* If performing salvage */
 	off_t	slvg_off;		/* Salvage file offset */
 
 				/* Verification support */
 	int	   verify;		/* If performing verification */
 	off_t	   verify_size;		/* Checkpoint's file size */
 	WT_EXTLIST verify_alloc;	/* Verification allocation list */
-	uint32_t   frags;		/* Maximum frags in the file */
+	uint64_t   frags;		/* Maximum frags in the file */
 	uint8_t   *fragfile;		/* Per-file frag tracking list */
 	uint8_t   *fragckpt;		/* Per-checkpoint frag tracking list */
 };
@@ -201,9 +197,8 @@ struct __wt_block_header {
 	 *
 	 * !!!
 	 * The write-generation is "owned" by the btree layer, but it's easier
-	 * to set it (when physically writing blocks), to persist it (in the
-	 * WT_BLOCK_DESC structure, rather than the metadata file), and restore
-	 * it during salvage, in the block-manager layer.
+	 * to set (when physically writing blocks) and restore (during salvage),
+	 * in the block-manager layer.
 	 */
 	uint64_t write_gen;		/* 00-07: write generation */
 
@@ -219,28 +214,29 @@ struct __wt_block_header {
 	/*
 	 * Page checksums are stored in two places.  First, a page's checksum
 	 * is in the internal page that references a page as part of the
-	 * address cookie.  This is done to improve the chances that we detect
-	 * corruption (e.g., overwriting a page with another valid page image).
-	 * Second, a page's checksum is stored in the disk header.  This is for
-	 * salvage, so that salvage knows when it has found a page that may be
-	 * useful.
-	 *
-	 * Applications can turn off checksums, which is a promise that the
-	 * file can never become corrupted, but people sometimes make promises
-	 * they can't keep.  If no checksums are configured, we use a pattern
-	 * of alternating bits as the checksum, as that is unlikely to occur as
-	 * the result of corruption in the file.  If a page happens to checksum
-	 * to this special bit pattern, we bump it by one during reads and
-	 * writes to avoid ambiguity.
+	 * address cookie.  This is done to improve the chances of detecting
+	 * not only disk corruption but software bugs (for example, overwriting
+	 * a page with another valid page image).  Second, a page's checksum is
+	 * stored in the disk header.  This is for salvage, so salvage knows it
+	 * has found a page that may be useful.
 	 */
-#define	WT_BLOCK_CHECKSUM_NOT_SET	0xA5C35A3C
 	uint32_t cksum;			/* 12-15: checksum */
+
+#define	WT_BLOCK_DATA_CKSUM	0x01	/* Block data is part of the checksum */
+	uint8_t flags;			/* 16: flags */
+
+	/*
+	 * End the structure with 3 bytes of padding: it wastes space, but it
+	 * leaves the structure 32-bit aligned and having a few bytes to play
+	 * with in the future can't hurt.
+	 */
+	uint8_t unused[3];		/* 17-19: unused padding */
 };
 /*
  * WT_BLOCK_HEADER_SIZE is the number of bytes we allocate for the structure: if
  * the compiler inserts padding it will break the world.
  */
-#define	WT_BLOCK_HEADER_SIZE		16
+#define	WT_BLOCK_HEADER_SIZE		20
 
 /*
  * WT_BLOCK_HEADER_BYTE

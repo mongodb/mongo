@@ -29,8 +29,8 @@ util_rename(WT_SESSION *session, int argc, char *argv[])
 	/* The remaining arguments are the object uri and new name. */
 	if (argc != 2)
 		return (usage());
-	if ((uri = util_name(
-	    *argv, "table", UTIL_FILE_OK | UTIL_TABLE_OK)) == NULL)
+	if ((uri = util_name(*argv,
+	    "table", UTIL_FILE_OK | UTIL_LSM_OK | UTIL_TABLE_OK)) == NULL)
 		return (1);
 	newname = argv[1];
 
@@ -39,8 +39,6 @@ util_rename(WT_SESSION *session, int argc, char *argv[])
 		    progname, uri, newname, wiredtiger_strerror(ret));
 		goto err;
 	}
-	if (verbose)
-		printf("\n");
 
 	if (0) {
 err:		ret = 1;

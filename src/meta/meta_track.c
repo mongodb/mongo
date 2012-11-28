@@ -23,6 +23,7 @@ typedef struct __wt_meta_track {
 	} op;
 	const char *a, *b;		/* Strings */
 	WT_BTREE *btree;		/* Locked handle */
+	int created;			/* Handle on newly created file */
 } WT_META_TRACK;
 
 /*
@@ -35,7 +36,7 @@ __meta_track_next(WT_SESSION_IMPL *session, WT_META_TRACK **trkp)
 {
 	size_t offset, sub_off;
 
-	if (!WT_META_TRACKING(session))
+	if (session->meta_track_next == NULL)
 		session->meta_track_next = session->meta_track;
 
 	offset = WT_PTRDIFF(session->meta_track_next, session->meta_track);
@@ -82,7 +83,10 @@ __wt_meta_track_discard(WT_SESSION_IMPL *session)
 int
 __wt_meta_track_on(WT_SESSION_IMPL *session)
 {
-	return (__meta_track_next(session, NULL));
+	if (session->meta_track_nest++ == 0)
+		WT_RET(__meta_track_next(session, NULL));
+
+	return (0);
 }
 
 static int
@@ -112,8 +116,8 @@ __meta_track_apply(WT_SESSION_IMPL *session, WT_META_TRACK *trk, int unroll)
 	case WT_ST_LOCK:	/* Handle lock, see above */
 		saved_btree = session->btree;
 		session->btree = trk->btree;
-		if (session->created_btree == trk->btree)
-			session->created_btree = NULL;
+		if (unroll && trk->created)
+			F_SET(session->btree, WT_BTREE_DISCARD);
 		WT_TRET(__wt_session_release_btree(session));
 		session->btree = saved_btree;
 		break;
@@ -132,11 +136,6 @@ __meta_track_apply(WT_SESSION_IMPL *session, WT_META_TRACK *trk, int unroll)
 			    trk->b, trk->a);
 			WT_TRET(tret);
 		} else if (trk->a == NULL) {
-			saved_btree = session->btree;
-			if ((session->btree = session->created_btree) != NULL)
-				WT_TRET(
-				    __wt_conn_btree_sync_and_close(session));
-			session->btree = saved_btree;
 			if ((tret = __wt_remove(session,
 			    trk->b + strlen("file:"))) != 0) {
 				__wt_err(session, tret,
@@ -187,10 +186,14 @@ free:	trk->op = WT_ST_EMPTY;
 int
 __wt_meta_track_off(WT_SESSION_IMPL *session, int unroll)
 {
+	WT_BTREE *saved_btree;
 	WT_DECL_RET;
 	WT_META_TRACK *trk, *trk_orig;
+	const char *ckpt_cfg[] = API_CONF_DEFAULTS(session, checkpoint, NULL);
 
-	if (!WT_META_TRACKING(session))
+	WT_ASSERT(session,
+	    WT_META_TRACKING(session) && session->meta_track_nest > 0);
+	if (--session->meta_track_nest != 0)
 		return (0);
 
 	trk_orig = session->meta_track;
@@ -201,6 +204,14 @@ __wt_meta_track_off(WT_SESSION_IMPL *session, int unroll)
 
 	while (--trk >= trk_orig)
 		WT_TRET(__meta_track_apply(session, trk, unroll));
+
+	/* If the operation succeeded, checkpoint the metadata. */
+	if (!unroll && ret == 0 && session->metafile != NULL) {
+		saved_btree = session->btree;
+		session->btree = session->metafile;
+		ret = __wt_checkpoint(session, ckpt_cfg);
+		session->btree = saved_btree;
+	}
 
 	return (ret);
 }
@@ -329,7 +340,7 @@ __wt_meta_track_fileop(
  *	Track a locked handle.
  */
 int
-__wt_meta_track_handle_lock(WT_SESSION_IMPL *session)
+__wt_meta_track_handle_lock(WT_SESSION_IMPL *session, int created)
 {
 	WT_META_TRACK *trk;
 
@@ -339,5 +350,6 @@ __wt_meta_track_handle_lock(WT_SESSION_IMPL *session)
 
 	trk->op = WT_ST_LOCK;
 	trk->btree = session->btree;
+	trk->created = created;
 	return (0);
 }

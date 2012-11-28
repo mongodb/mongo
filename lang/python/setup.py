@@ -19,7 +19,11 @@ if sys.platform == 'darwin':
     kernel_version = os.uname()[2] # e.g. 12.0.0 is Mountain Lion
     major_version = int(kernel_version.split('.')[0])
     if major_version >= 12:
-        extra_cflags += ['-Wno-self-assign', '-Qunused-arguments']
+        extra_cflags += [
+				'-Wno-self-assign',
+				'-Wno-unused-value',
+				'-Qunused-arguments'
+		]
 
 dir = os.path.dirname(__file__)
 

@@ -8,6 +8,38 @@
 #include "wt_internal.h"
 
 /*
+ * __curfile_compare --
+ *	WT_CURSOR->compare method for the btree cursor type.
+ */
+static int
+__curfile_compare(WT_CURSOR *a, WT_CURSOR *b, int *cmpp)
+{
+	WT_CURSOR_BTREE *cbt;
+	WT_DECL_RET;
+	WT_SESSION_IMPL *session;
+
+	cbt = (WT_CURSOR_BTREE *)a;
+	CURSOR_API_CALL(a, session, compare, cbt->btree);
+
+	/*
+	 * Confirm both cursors refer to the same source and have keys, then
+	 * call the underlying object to compare them.
+	 */
+	if (strcmp(a->uri, b->uri) != 0)
+		WT_ERR_MSG(session, EINVAL,
+		    "comparison method cursors must reference the same object");
+
+	WT_CURSOR_NEEDKEY(a);
+	WT_CURSOR_NEEDKEY(b);
+
+	ret = __wt_btcur_compare(
+	    (WT_CURSOR_BTREE *)a, (WT_CURSOR_BTREE *)b, cmpp);
+err:	API_END(session);
+
+	return (ret);
+}
+
+/*
  * __curfile_next --
  *	WT_CURSOR->next method for the btree cursor type.
  */
@@ -19,7 +51,7 @@ __curfile_next(WT_CURSOR *cursor)
 	WT_SESSION_IMPL *session;
 
 	cbt = (WT_CURSOR_BTREE *)cursor;
-	CURSOR_API_CALL_NOCONF(cursor, session, next, cbt->btree);
+	CURSOR_API_CALL(cursor, session, next, cbt->btree);
 	ret = __wt_btcur_next((WT_CURSOR_BTREE *)cursor, 0);
 	API_END(session);
 
@@ -39,7 +71,7 @@ __curfile_next_random(WT_CURSOR *cursor)
 	WT_SESSION_IMPL *session;
 
 	cbt = (WT_CURSOR_BTREE *)cursor;
-	CURSOR_API_CALL_NOCONF(cursor, session, next, cbt->btree);
+	CURSOR_API_CALL(cursor, session, next, cbt->btree);
 	ret = __wt_btcur_next_random(cbt);
 	API_END(session);
 
@@ -58,7 +90,7 @@ __curfile_prev(WT_CURSOR *cursor)
 	WT_SESSION_IMPL *session;
 
 	cbt = (WT_CURSOR_BTREE *)cursor;
-	CURSOR_API_CALL_NOCONF(cursor, session, prev, cbt->btree);
+	CURSOR_API_CALL(cursor, session, prev, cbt->btree);
 	ret = __wt_btcur_prev((WT_CURSOR_BTREE *)cursor, 0);
 	API_END(session);
 
@@ -77,7 +109,7 @@ __curfile_reset(WT_CURSOR *cursor)
 	WT_SESSION_IMPL *session;
 
 	cbt = (WT_CURSOR_BTREE *)cursor;
-	CURSOR_API_CALL_NOCONF(cursor, session, reset, cbt->btree);
+	CURSOR_API_CALL(cursor, session, reset, cbt->btree);
 	ret = __wt_btcur_reset(cbt);
 	API_END(session);
 
@@ -96,7 +128,7 @@ __curfile_search(WT_CURSOR *cursor)
 	WT_SESSION_IMPL *session;
 
 	cbt = (WT_CURSOR_BTREE *)cursor;
-	CURSOR_API_CALL_NOCONF(cursor, session, search, cbt->btree);
+	CURSOR_API_CALL(cursor, session, search, cbt->btree);
 	WT_CURSOR_NEEDKEY(cursor);
 	ret = __wt_btcur_search(cbt);
 err:	API_END(session);
@@ -116,7 +148,7 @@ __curfile_search_near(WT_CURSOR *cursor, int *exact)
 	WT_SESSION_IMPL *session;
 
 	cbt = (WT_CURSOR_BTREE *)cursor;
-	CURSOR_API_CALL_NOCONF(cursor, session, search_near, cbt->btree);
+	CURSOR_API_CALL(cursor, session, search_near, cbt->btree);
 	WT_CURSOR_NEEDKEY(cursor);
 	ret = __wt_btcur_search_near(cbt, exact);
 err:	API_END(session);
@@ -136,12 +168,12 @@ __curfile_insert(WT_CURSOR *cursor)
 	WT_SESSION_IMPL *session;
 
 	cbt = (WT_CURSOR_BTREE *)cursor;
-	CURSOR_API_CALL_NOCONF(cursor, session, insert, cbt->btree);
+	CURSOR_UPDATE_API_CALL(cursor, session, insert, cbt->btree);
 	if (!F_ISSET(cursor, WT_CURSTD_APPEND))
 		WT_CURSOR_NEEDKEY(cursor);
 	WT_CURSOR_NEEDVALUE(cursor);
 	ret = __wt_btcur_insert((WT_CURSOR_BTREE *)cursor);
-err:	API_END_TXN_ERROR(session, ret);
+err:	CURSOR_UPDATE_API_END(session, ret);
 
 	return (ret);
 }
@@ -158,11 +190,11 @@ __curfile_update(WT_CURSOR *cursor)
 	WT_SESSION_IMPL *session;
 
 	cbt = (WT_CURSOR_BTREE *)cursor;
-	CURSOR_API_CALL_NOCONF(cursor, session, update, cbt->btree);
+	CURSOR_UPDATE_API_CALL(cursor, session, update, cbt->btree);
 	WT_CURSOR_NEEDKEY(cursor);
 	WT_CURSOR_NEEDVALUE(cursor);
 	ret = __wt_btcur_update((WT_CURSOR_BTREE *)cursor);
-err:	API_END_TXN_ERROR(session, ret);
+err:	CURSOR_UPDATE_API_END(session, ret);
 
 	return (ret);
 }
@@ -179,10 +211,10 @@ __curfile_remove(WT_CURSOR *cursor)
 	WT_SESSION_IMPL *session;
 
 	cbt = (WT_CURSOR_BTREE *)cursor;
-	CURSOR_API_CALL_NOCONF(cursor, session, remove, cbt->btree);
+	CURSOR_UPDATE_API_CALL(cursor, session, remove, cbt->btree);
 	WT_CURSOR_NEEDKEY(cursor);
 	ret = __wt_btcur_remove((WT_CURSOR_BTREE *)cursor);
-err:	API_END_TXN_ERROR(session, ret);
+err:	CURSOR_UPDATE_API_END(session, ret);
 
 	return (ret);
 }
@@ -200,11 +232,6 @@ __wt_curfile_truncate(
 	WT_DECL_RET;
 
 	/*
-	 * Our caller is either the session layer or the table-cursor truncate
-	 * code, both of which guarantee any open cursor is fully instantiated.
-	 * To minimize overhead when called from the table-cursor code, don't
-	 * do any further checking.
-	 *
 	 * !!!
 	 * We're doing a cursor operation but in the service of the session API;
 	 * set the session handle to reference the appropriate Btree, but don't
@@ -232,14 +259,14 @@ __curfile_close(WT_CURSOR *cursor)
 	WT_SESSION_IMPL *session;
 
 	cbt = (WT_CURSOR_BTREE *)cursor;
-	CURSOR_API_CALL_NOCONF(cursor, session, close, cbt->btree);
+	CURSOR_API_CALL(cursor, session, close, cbt->btree);
 	WT_TRET(__wt_btcur_close(cbt));
 	if (session->btree != NULL)
 		WT_TRET(__wt_session_release_btree(session));
 	/* The URI is owned by the btree handle. */
 	cursor->uri = NULL;
 	WT_TRET(__wt_cursor_close(cursor));
-	API_END_TXN_ERROR(session, ret);
+	API_END(session);
 
 	return (ret);
 }
@@ -261,7 +288,7 @@ __wt_curfile_create(WT_SESSION_IMPL *session,
 		NULL,
 		NULL,
 		NULL,
-		NULL,
+		__curfile_compare,
 		__curfile_next,
 		__curfile_prev,
 		__curfile_reset,
@@ -285,7 +312,7 @@ __wt_curfile_create(WT_SESSION_IMPL *session,
 	WT_CURSOR_BTREE *cbt;
 	WT_DECL_RET;
 	size_t csize;
-	int bulk;
+	int bitmap, bulk;
 
 	cbt = NULL;
 
@@ -293,7 +320,13 @@ __wt_curfile_create(WT_SESSION_IMPL *session,
 	WT_ASSERT(session, btree != NULL);
 
 	WT_RET(__wt_config_gets_defno(session, cfg, "bulk", &cval));
-	bulk = (cval.val != 0);
+	if ((cval.type == ITEM_ID || cval.type == ITEM_STRING) &&
+	    WT_STRING_MATCH("bitmap", cval.str, cval.len))
+		bitmap = bulk = 1;
+	else {
+		bitmap = 0;
+		bulk = (cval.val != 0);
+	}
 
 	csize = bulk ? sizeof(WT_CURSOR_BULK) : sizeof(WT_CURSOR_BTREE);
 	WT_RET(__wt_calloc(session, 1, csize, &cbt));
@@ -307,16 +340,28 @@ __wt_curfile_create(WT_SESSION_IMPL *session,
 
 	cbt->btree = session->btree;
 	if (bulk)
-		WT_ERR(__wt_curbulk_init((WT_CURSOR_BULK *)cbt));
+		WT_ERR(__wt_curbulk_init((WT_CURSOR_BULK *)cbt, bitmap));
+
+	/*
+	 * no_cache
+	 * No cache cursors are read-only.
+	 */
+	WT_ERR(__wt_config_gets_defno(session, cfg, "no_cache", &cval));
+	if (cval.val != 0) {
+		cursor->insert = __wt_cursor_notsup;
+		cursor->update = __wt_cursor_notsup;
+		cursor->remove = __wt_cursor_notsup;
+	}
 
 	/*
 	 * random_retrieval
-	 * Random retrieval cursors only support next and close.
+	 * Random retrieval cursors only support next, reset and close.
 	 */
 	WT_ERR(__wt_config_gets_defno(session, cfg, "next_random", &cval));
 	if (cval.val != 0) {
 		__wt_cursor_set_notsup(cursor);
 		cursor->next = __curfile_next_random;
+		cursor->reset = __curfile_reset;
 	}
 
 	/* __wt_cursor_init is last so we don't have to clean up on error. */
@@ -339,22 +384,35 @@ __wt_curfile_open(WT_SESSION_IMPL *session, const char *uri,
     WT_CURSOR *owner, const char *cfg[], WT_CURSOR **cursorp)
 {
 	WT_CONFIG_ITEM cval;
-	int bulk;
+	WT_DECL_RET;
+	uint32_t flags;
 
+	/*
+	 * Bulk and no cache handles are exclusive and may not be used by more
+	 * than a single thread.
+	 * Additionally set the discard flag on no cache handles so they are
+	 * destroyed on close.
+	 */
+	flags = 0;
 	WT_RET(__wt_config_gets_defno(session, cfg, "bulk", &cval));
-	bulk = (cval.val != 0);
+	if (cval.val != 0)
+		LF_SET(WT_BTREE_EXCLUSIVE | WT_BTREE_BULK);
+	WT_RET(__wt_config_gets_defno(session, cfg, "no_cache", &cval));
+	if (cval.val != 0)
+		LF_SET(WT_BTREE_EXCLUSIVE | WT_BTREE_NO_CACHE);
 
 	/* TODO: handle projections. */
 
 	/* Get the handle and lock it while the cursor is using it. */
-	if (WT_PREFIX_MATCH(uri, "colgroup:") || WT_PREFIX_MATCH(uri, "index:"))
-		WT_RET(__wt_schema_get_btree(session,
-		    uri, strlen(uri), cfg, bulk ? WT_BTREE_EXCLUSIVE : 0));
-	else if (WT_PREFIX_MATCH(uri, "file:"))
-		WT_RET(__wt_session_get_btree_ckpt(session,
-		    uri, cfg, bulk ? WT_BTREE_EXCLUSIVE : 0));
+	if (WT_PREFIX_MATCH(uri, "file:"))
+		WT_RET(__wt_session_get_btree_ckpt(session, uri, cfg, flags));
 	else
 		WT_RET(__wt_bad_object_type(session, uri));
 
-	return (__wt_curfile_create(session, owner, cfg, cursorp));
+	WT_ERR(__wt_curfile_create(session, owner, cfg, cursorp));
+	return (0);
+
+err:	/* If the cursor could not be opened, release the handle. */
+	(void)__wt_session_release_btree(session);
+	return (ret);
 }

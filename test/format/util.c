@@ -1,8 +1,28 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
- *	All rights reserved.
+ * Public Domain 2008-2012 WiredTiger, Inc.
  *
- * See the file LICENSE for redistribution information.
+ * This is free and unencumbered software released into the public domain.
+ *
+ * Anyone is free to copy, modify, publish, use, compile, sell, or
+ * distribute this software, either in source code form or as a compiled
+ * binary, for any purpose, commercial or non-commercial, and by any
+ * means.
+ *
+ * In jurisdictions that recognize copyright laws, the author or authors
+ * of this software dedicate any and all copyright interest in the
+ * software to the public domain. We make this dedication for the benefit
+ * of the public at large and to the detriment of our heirs and
+ * successors. We intend this dedication to be an overt act of
+ * relinquishment in perpetuity of all present and future rights to this
+ * software under copyright law.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+ * IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+ * OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+ * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+ * OTHER DEALINGS IN THE SOFTWARE.
  */
 
 #include "format.h"
@@ -32,7 +52,7 @@ key_gen_setup(uint8_t **keyp)
 	size_t i;
 
 	if ((key = malloc(g.c_key_max)) == NULL)
-		die(errno, "malloc");
+		syserr("malloc");
 	for (i = 0; i < g.c_key_max; ++i)
 		key[i] = (uint8_t)("abcdefghijklmnopqrstuvwxyz"[i % 26]);
 	*keyp = key;
@@ -55,7 +75,7 @@ key_gen(uint8_t *key, uint32_t *sizep, uint64_t keyno, int insert)
 	 * In a column-store, the key is only used for BDB, and so it doesn't
 	 * need a random length.
 	 */
-	if (g.c_file_type == ROW) {
+	if (g.type == ROW) {
 		key[len] = '/';
 		len = g.key_rand_len[keyno %
 		    (sizeof(g.key_rand_len) / sizeof(g.key_rand_len[0]))];
@@ -80,7 +100,7 @@ val_gen_setup(uint8_t **valp)
 	 */
 	len = g.c_value_max + 20;
 	if ((val = malloc(len)) == NULL)
-		die(errno, "malloc");
+		syserr("malloc");
 	for (i = 0; i < len; ++i)
 		val[i] = (uint8_t)("ABCDEFGHIJKLMNOPQRSTUVWXYZ"[i % 26]);
 
@@ -96,7 +116,7 @@ value_gen(uint8_t *val, uint32_t *sizep, uint64_t keyno)
 	 * Fixed-length records: take the low N bits from the last digit of
 	 * the record number.
 	 */
-	if (g.c_file_type == FIX) {
+	if (g.type == FIX) {
 		switch (g.c_bitcnt) {
 		case 8: val[0] = MMRAND(1, 0xff); break;
 		case 7: val[0] = MMRAND(1, 0x7f); break;
@@ -114,8 +134,9 @@ value_gen(uint8_t *val, uint32_t *sizep, uint64_t keyno)
 	/*
 	 * WiredTiger doesn't store zero-length data items in row-store files,
 	 * test that by inserting a zero-length data item every so often.
+	 * LSM doesn't support zero length items.
 	 */
-	if (keyno % 63 == 0) {
+	if (keyno % 63 == 0 && strcmp("lsm", g.c_data_source) != 0) {
 		val[0] = '\0';
 		*sizep = 0;
 		return;
@@ -129,9 +150,8 @@ value_gen(uint8_t *val, uint32_t *sizep, uint64_t keyno)
 	 * variable-length column-stores (that is, to test run-length encoding),
 	 * use the same data value all the time.
 	 */
-	if (g.c_file_type == VAR &&
-	    g.c_repeat_data_pct != 0 &&
-	    MMRAND(1, 100) > g.c_repeat_data_pct) {
+	if ((g.type == ROW || g.type == VAR) &&
+	    g.c_repeat_data_pct != 0 && MMRAND(1, 100) > g.c_repeat_data_pct) {
 		(void)strcpy((char *)val, "DUPLICATEV");
 		val[10] = '/';
 		*sizep = val_dup_data_len;
@@ -198,16 +218,11 @@ wts_rand(void)
 	 * internally, and so that messes up the pattern of random numbers
 	 * (and WT might call rand() in the future, who knows?)
 	 */
-	if (g.rand_log == NULL) {
-		if ((g.rand_log =
-		    fopen("__rand", g.replay ? "r" : "w")) == NULL)
-			die(errno, "fopen: __rand");
-		if (!g.replay) {
-			srand((u_int)(0xdeadbeef ^ (u_int)time(NULL)));
-			(void)setvbuf(g.rand_log, NULL, _IOLBF, 0);
-		}
-	}
 	if (g.replay) {
+		if (g.rand_log == NULL &&
+		   (g.rand_log = fopen("RUNDIR/rand", "r")) == NULL)
+			die(errno, "fopen: RUNDIR/rand");
+
 		if (fgets(buf, sizeof(buf), g.rand_log) == NULL) {
 			if (feof(g.rand_log)) {
 				fprintf(stderr,
@@ -220,6 +235,17 @@ wts_rand(void)
 
 		r = (uint32_t)strtoul(buf, NULL, 10);
 	} else {
+		if (g.rand_log == NULL) {
+			if ((g.rand_log = fopen("RUNDIR/rand", "w")) == NULL)
+				die(errno, "fopen: RUNDIR/rand");
+			(void)setvbuf(g.rand_log, NULL, _IOLBF, 0);
+
+			/*
+			 * Seed the random number generator for each new run (we
+			 * know it's a new run when we re-open the log file).
+			 */
+			srand((u_int)(0xdeadbeef ^ (u_int)time(NULL)));
+		}
 		r = (uint32_t)rand();
 		fprintf(g.rand_log, "%" PRIu32 "\n", r);
 	}

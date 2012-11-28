@@ -22,7 +22,9 @@ __wt_cache_config(WT_CONNECTION_IMPL *conn, const char *cfg[])
 	session = conn->default_session;
 	cache = conn->cache;
 
-	if ((ret = __wt_config_gets(session, cfg, "cache_size", &cval)) == 0)
+	/* Ignore the cache size if a shared cache is configured. */
+	if (!F_ISSET(conn, WT_CONN_CACHE_POOL) &&
+	    (ret = __wt_config_gets(session, cfg, "cache_size", &cval)) == 0)
 		conn->cache_size = (uint64_t)cval.val;
 	WT_RET_NOTFOUND_OK(ret);
 
@@ -52,7 +54,14 @@ __wt_cache_create(WT_CONNECTION_IMPL *conn, const char *cfg[])
 
 	session = conn->default_session;
 
-	WT_RET(__wt_calloc_def(session, 1, &conn->cache));
+	WT_ASSERT(session, conn->cache == NULL ||
+	    (F_ISSET(conn, WT_CONN_CACHE_POOL) && conn->cache != NULL));
+
+	if (F_ISSET(conn, WT_CONN_CACHE_POOL))
+		WT_RET(__wt_conn_cache_pool_open(session));
+	else
+		WT_RET(__wt_calloc_def(session, 1, &conn->cache));
+
 	cache = conn->cache;
 
 	/* Use a common routine for run-time configuration options. */
@@ -67,16 +76,8 @@ __wt_cache_create(WT_CONNECTION_IMPL *conn, const char *cfg[])
 		    "eviction target must be lower than the eviction trigger");
 
 	WT_ERR(__wt_cond_alloc(session,
-	    "cache eviction server", 1, &cache->evict_cond));
+	    "cache eviction server", 0, &cache->evict_cond));
 	__wt_spin_init(session, &cache->evict_lock);
-
-	/*
-	 * Allocate the forced page eviction request array.  We size it to
-	 * allow one eviction page request per session.
-	 */
-	cache->max_evict_request = conn->session_size;
-	WT_ERR(__wt_calloc_def(
-	    session, cache->max_evict_request, &cache->evict_request));
 
 	/*
 	 * We pull some values from the cache statistics (rather than have two
@@ -127,8 +128,6 @@ __wt_cache_destroy(WT_CONNECTION_IMPL *conn)
 	if (cache->evict_cond != NULL)
 		(void)__wt_cond_destroy(session, cache->evict_cond);
 	__wt_spin_destroy(session, &cache->evict_lock);
-
-	__wt_free(session, cache->evict_request);
 
 	__wt_free(session, conn->cache);
 }

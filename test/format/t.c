@@ -1,8 +1,28 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
- *	All rights reserved.
+ * Public Domain 2008-2012 WiredTiger, Inc.
  *
- * See the file LICENSE for redistribution information.
+ * This is free and unencumbered software released into the public domain.
+ *
+ * Anyone is free to copy, modify, publish, use, compile, sell, or
+ * distribute this software, either in source code form or as a compiled
+ * binary, for any purpose, commercial or non-commercial, and by any
+ * means.
+ *
+ * In jurisdictions that recognize copyright laws, the author or authors
+ * of this software dedicate any and all copyright interest in the
+ * software to the public domain. We make this dedication for the benefit
+ * of the public at large and to the detriment of our heirs and
+ * successors. We intend this dedication to be an overt act of
+ * relinquishment in perpetuity of all present and future rights to this
+ * software under copyright law.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+ * IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+ * OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+ * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+ * OTHER DEALINGS IN THE SOFTWARE.
  */
 
 #include "format.h"
@@ -32,6 +52,13 @@ main(int argc, char *argv[])
 
 	/* Track progress unless we're re-directing output to a file. */
 	g.track = isatty(STDOUT_FILENO) ? 1 : 0;
+
+	/* Create the run directory and change to it. */
+	if (access(RUNDIR, X_OK) != 0 && mkdir(RUNDIR, 0777)) {
+		fprintf(stderr,
+		    "%s: mkdir: %s %s\n", g.progname, RUNDIR, strerror(errno));
+		return (EXIT_FAILURE);
+	}
 
 	/* Set values from the command line. */
 	while ((ch = getopt(argc, argv, "1C:c:Llqrt:")) != EOF)
@@ -71,6 +98,9 @@ main(int argc, char *argv[])
 	argv += optind;
 	for (; *argv != NULL; ++argv)
 		config_single(*argv, 1);
+
+	/* Use line buffering on stdout so status updates aren't buffered. */
+	(void)setvbuf(stdout, NULL, _IOLBF, 0);
 
 	/* Clean up on signal. */
 	(void)signal(SIGINT, onint);
@@ -140,7 +170,9 @@ main(int argc, char *argv[])
 
 		wts_close();			/* Close */
 
-		printf("%4d: %-40s\n", g.run_cnt, config_dtype());
+		/* Overwrite the progress line with a completion line. */
+		printf("%4d: %s %-40s\n",
+		    g.run_cnt, g.c_file_type, g.c_data_source);
 	}
 
 	/* Flush/close any logging information. */
@@ -150,6 +182,8 @@ main(int argc, char *argv[])
 		(void)fclose(g.rand_log);
 
 	config_print(0);
+	config_clear();
+
 	return (EXIT_SUCCESS);
 }
 
@@ -172,13 +206,13 @@ startup(void)
 		g.rand_log = NULL;
 	}
 
-	/* Remove the run's files except for __rand. */
-	(void)system("rm -rf WiredTiger WiredTiger.* __[a-qs-z]* __run");
+	/* Remove the run's files except for rand. */
+	(void)system("cd RUNDIR && rm -rf `ls | sed /rand/d`");
 
 	/* Open/truncate the logging file. */
 	if (g.logging != 0) {
-		if ((g.logfp = fopen("__log", "w")) == NULL)
-			die(errno, "fopen: __log");
+		if ((g.logfp = fopen("RUNDIR/log", "w")) == NULL)
+			die(errno, "fopen: RUNDIR/log");
 		(void)setvbuf(g.logfp, NULL, _IOLBF, 0);
 	}
 }
@@ -192,10 +226,21 @@ onint(int signo)
 {
 	UNUSED(signo);
 
-	/* Remove the run's files except for __rand. */
-	(void)system("rm -rf WiredTiger WiredTiger.* __[a-qs-z]* __run");
+	/* Remove the run's files except for rand. */
+	(void)system("cd RUNDIR && rm -rf `ls | sed /rand/d`");
 
 	fprintf(stderr, "\n");
+	exit(EXIT_FAILURE);
+}
+
+/*
+ * syserr --
+ *	Die on a system error.
+ */
+void
+syserr(const char *f)
+{
+	fprintf(stderr, "%s: %s: %s\n", g.progname, f, strerror(errno));
 	exit(EXIT_FAILURE);
 }
 

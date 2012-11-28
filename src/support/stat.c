@@ -3,30 +3,41 @@
 #include "wt_internal.h"
 
 int
-__wt_stat_alloc_btree_stats(WT_SESSION_IMPL *session, WT_BTREE_STATS **statsp)
+__wt_stat_alloc_dsrc_stats(WT_SESSION_IMPL *session, WT_DSRC_STATS **statsp)
 {
-	WT_BTREE_STATS *stats;
+	WT_DSRC_STATS *stats;
 
 	WT_RET(__wt_calloc_def(session, 1, &stats));
 
-	stats->alloc.desc = "file: block allocations";
-	stats->cursor_inserts.desc = "cursor-inserts";
+	stats->block_alloc.desc = "block allocations";
+	stats->block_extend.desc = "block allocations required file extension";
+	stats->block_free.desc = "block frees";
+	stats->bloom_count.desc = "number of Bloom filters in the LSM tree";
+	stats->bloom_false_positive.desc =
+	    "number of Bloom filter false positives";
+	stats->bloom_hit.desc = "number of Bloom filter hits";
+	stats->bloom_miss.desc = "number of Bloom filter misses";
+	stats->bloom_page_evict.desc =
+	    "number of Bloom pages evicted from cache";
+	stats->bloom_page_read.desc = "number of Bloom pages read into cache";
+	stats->bloom_size.desc = "total size of Bloom filters";
+	stats->byte_changed.desc =
+	    "approximate measure of bytes changed: counts key and value bytes inserted with cursor.insert, value bytes updated with cursor.update and key bytes removed using cursor.remove";
+	stats->byte_read.desc = "bytes read into cache";
+	stats->byte_write.desc = "bytes written from cache";
+	stats->ckpt_size.desc = "checkpoint size";
+	stats->cursor_insert.desc = "cursor-inserts";
 	stats->cursor_read.desc = "cursor-read";
 	stats->cursor_read_near.desc = "cursor-read-near";
 	stats->cursor_read_next.desc = "cursor-read-next";
 	stats->cursor_read_prev.desc = "cursor-read-prev";
-	stats->cursor_removes.desc = "cursor-removes";
-	stats->cursor_resets.desc = "cursor-resets";
-	stats->cursor_updates.desc = "cursor-updates";
-	stats->extend.desc = "file: block allocations required file extension";
+	stats->cursor_remove.desc = "cursor-removes";
+	stats->cursor_reset.desc = "cursor-resets";
+	stats->cursor_update.desc = "cursor-updates";
+	stats->entries.desc = "total entries";
 	stats->file_allocsize.desc = "page size allocation unit";
 	stats->file_bulk_loaded.desc = "bulk-loaded entries";
-	stats->file_col_deleted.desc = "column-store deleted values";
-	stats->file_col_fix_pages.desc = "column-store fixed-size leaf pages";
-	stats->file_col_int_pages.desc = "column-store internal pages";
-	stats->file_col_var_pages.desc =
-	    "column-store variable-size leaf pages";
-	stats->file_entries.desc = "total entries";
+	stats->file_compact_rewrite.desc = "pages rewritten by compaction";
 	stats->file_fixed_len.desc = "fixed-record size";
 	stats->file_magic.desc = "magic number";
 	stats->file_major.desc = "major version number";
@@ -35,54 +46,75 @@ __wt_stat_alloc_btree_stats(WT_SESSION_IMPL *session, WT_BTREE_STATS **statsp)
 	stats->file_maxleafitem.desc = "maximum leaf page item size";
 	stats->file_maxleafpage.desc = "maximum leaf page size";
 	stats->file_minor.desc = "minor version number";
-	stats->file_overflow.desc = "overflow pages";
-	stats->file_row_int_pages.desc = "row-store internal pages";
-	stats->file_row_leaf_pages.desc = "row-store leaf pages";
-	stats->file_size.desc = "file: size";
-	stats->file_write_conflicts.desc = "write generation conflicts";
-	stats->free.desc = "file: block frees";
-	stats->overflow_read.desc = "file: overflow pages read from the file";
-	stats->page_read.desc = "file: pages read from the file";
-	stats->page_write.desc = "file: pages written to the file";
+	stats->file_size.desc = "file size";
+	stats->lsm_chunk_count.desc = "number of chunks in the LSM tree";
+	stats->lsm_generation_max.desc =
+	    "highest merge generation in the LSM tree";
+	stats->lsm_lookup_no_bloom.desc =
+	    "number of queries that could have benefited from a Bloom filter that did not exist";
+	stats->overflow_page.desc = "overflow pages";
+	stats->overflow_read.desc = "overflow pages read into cache";
+	stats->overflow_value_cache.desc = "overflow values cached in memory";
+	stats->page_col_deleted.desc = "column-store deleted values";
+	stats->page_col_fix.desc = "column-store fixed-size leaf pages";
+	stats->page_col_int.desc = "column-store internal pages";
+	stats->page_col_var.desc = "column-store variable-size leaf pages";
+	stats->page_evict.desc = "pages evicted from the data source";
+	stats->page_evict_fail.desc =
+	    "pages that were selected for eviction that could not be evicted";
+	stats->page_read.desc = "pages read into cache";
+	stats->page_row_int.desc = "row-store internal pages";
+	stats->page_row_leaf.desc = "row-store leaf pages";
+	stats->page_write.desc = "pages written from cache";
+	stats->rec_dictionary.desc = "reconcile: dictionary match";
 	stats->rec_hazard.desc =
-	    "reconcile: unable to acquire hazard reference";
-	stats->rec_ovfl_key.desc = "reconcile: overflow key";
-	stats->rec_ovfl_value.desc = "reconcile: overflow value";
-	stats->rec_page_delete.desc = "reconcile: pages deleted";
-	stats->rec_page_merge.desc =
-	    "reconcile: deleted or temporary pages merged";
-	stats->rec_split_intl.desc = "reconcile: internal pages split";
-	stats->rec_split_leaf.desc = "reconcile: leaf pages split";
-	stats->rec_written.desc = "reconcile: pages written";
-	stats->update_conflict.desc = "update conflicts";
+	    "reconciliation unable to acquire hazard reference";
+	stats->rec_ovfl_key.desc = "reconciliation overflow key";
+	stats->rec_ovfl_value.desc = "reconciliation overflow value";
+	stats->rec_page_delete.desc = "pages deleted";
+	stats->rec_page_merge.desc = "deleted or temporary pages merged";
+	stats->rec_split_intl.desc = "internal pages split";
+	stats->rec_split_leaf.desc = "leaf pages split";
+	stats->rec_written.desc = "pages written from reconciliation";
+	stats->txn_update_conflict.desc = "update conflicts";
+	stats->txn_write_conflict.desc = "write generation conflicts";
 
 	*statsp = stats;
 	return (0);
 }
 
 void
-__wt_stat_clear_btree_stats(WT_STATS *stats_arg)
+__wt_stat_clear_dsrc_stats(WT_STATS *stats_arg)
 {
-	WT_BTREE_STATS *stats;
+	WT_DSRC_STATS *stats;
 
-	stats = (WT_BTREE_STATS *)stats_arg;
-	stats->alloc.v = 0;
-	stats->cursor_inserts.v = 0;
+	stats = (WT_DSRC_STATS *)stats_arg;
+	stats->block_alloc.v = 0;
+	stats->block_extend.v = 0;
+	stats->block_free.v = 0;
+	stats->bloom_count.v = 0;
+	stats->bloom_false_positive.v = 0;
+	stats->bloom_hit.v = 0;
+	stats->bloom_miss.v = 0;
+	stats->bloom_page_evict.v = 0;
+	stats->bloom_page_read.v = 0;
+	stats->bloom_size.v = 0;
+	stats->byte_changed.v = 0;
+	stats->byte_read.v = 0;
+	stats->byte_write.v = 0;
+	stats->ckpt_size.v = 0;
+	stats->cursor_insert.v = 0;
 	stats->cursor_read.v = 0;
 	stats->cursor_read_near.v = 0;
 	stats->cursor_read_next.v = 0;
 	stats->cursor_read_prev.v = 0;
-	stats->cursor_removes.v = 0;
-	stats->cursor_resets.v = 0;
-	stats->cursor_updates.v = 0;
-	stats->extend.v = 0;
+	stats->cursor_remove.v = 0;
+	stats->cursor_reset.v = 0;
+	stats->cursor_update.v = 0;
+	stats->entries.v = 0;
 	stats->file_allocsize.v = 0;
 	stats->file_bulk_loaded.v = 0;
-	stats->file_col_deleted.v = 0;
-	stats->file_col_fix_pages.v = 0;
-	stats->file_col_int_pages.v = 0;
-	stats->file_col_var_pages.v = 0;
-	stats->file_entries.v = 0;
+	stats->file_compact_rewrite.v = 0;
 	stats->file_fixed_len.v = 0;
 	stats->file_magic.v = 0;
 	stats->file_major.v = 0;
@@ -91,15 +123,24 @@ __wt_stat_clear_btree_stats(WT_STATS *stats_arg)
 	stats->file_maxleafitem.v = 0;
 	stats->file_maxleafpage.v = 0;
 	stats->file_minor.v = 0;
-	stats->file_overflow.v = 0;
-	stats->file_row_int_pages.v = 0;
-	stats->file_row_leaf_pages.v = 0;
 	stats->file_size.v = 0;
-	stats->file_write_conflicts.v = 0;
-	stats->free.v = 0;
+	stats->lsm_chunk_count.v = 0;
+	stats->lsm_generation_max.v = 0;
+	stats->lsm_lookup_no_bloom.v = 0;
+	stats->overflow_page.v = 0;
 	stats->overflow_read.v = 0;
+	stats->overflow_value_cache.v = 0;
+	stats->page_col_deleted.v = 0;
+	stats->page_col_fix.v = 0;
+	stats->page_col_int.v = 0;
+	stats->page_col_var.v = 0;
+	stats->page_evict.v = 0;
+	stats->page_evict_fail.v = 0;
 	stats->page_read.v = 0;
+	stats->page_row_int.v = 0;
+	stats->page_row_leaf.v = 0;
 	stats->page_write.v = 0;
+	stats->rec_dictionary.v = 0;
 	stats->rec_hazard.v = 0;
 	stats->rec_ovfl_key.v = 0;
 	stats->rec_ovfl_value.v = 0;
@@ -108,7 +149,8 @@ __wt_stat_clear_btree_stats(WT_STATS *stats_arg)
 	stats->rec_split_intl.v = 0;
 	stats->rec_split_leaf.v = 0;
 	stats->rec_written.v = 0;
-	stats->update_conflict.v = 0;
+	stats->txn_update_conflict.v = 0;
+	stats->txn_write_conflict.v = 0;
 }
 
 int
@@ -120,6 +162,8 @@ __wt_stat_alloc_connection_stats(WT_SESSION_IMPL *session, WT_CONNECTION_STATS *
 
 	stats->block_read.desc = "blocks read from a file";
 	stats->block_write.desc = "blocks written to a file";
+	stats->byte_read.desc = "bytes read from a file";
+	stats->byte_write.desc = "bytes written to a file";
 	stats->cache_bytes_inuse.desc =
 	    "cache: bytes currently held in the cache";
 	stats->cache_bytes_max.desc = "cache: maximum bytes configured";
@@ -144,6 +188,8 @@ __wt_stat_alloc_connection_stats(WT_SESSION_IMPL *session, WT_CONNECTION_STATS *
 	stats->txn_ancient.desc = "ancient transactions";
 	stats->txn_begin.desc = "transactions";
 	stats->txn_commit.desc = "transactions committed";
+	stats->txn_fail_cache.desc =
+	    "transaction failures due to cache overflow";
 	stats->txn_rollback.desc = "transactions rolled-back";
 
 	*statsp = stats;
@@ -158,6 +204,8 @@ __wt_stat_clear_connection_stats(WT_STATS *stats_arg)
 	stats = (WT_CONNECTION_STATS *)stats_arg;
 	stats->block_read.v = 0;
 	stats->block_write.v = 0;
+	stats->byte_read.v = 0;
+	stats->byte_write.v = 0;
 	stats->cache_evict_hazard.v = 0;
 	stats->cache_evict_internal.v = 0;
 	stats->cache_evict_modified.v = 0;
@@ -175,5 +223,6 @@ __wt_stat_clear_connection_stats(WT_STATS *stats_arg)
 	stats->txn_ancient.v = 0;
 	stats->txn_begin.v = 0;
 	stats->txn_commit.v = 0;
+	stats->txn_fail_cache.v = 0;
 	stats->txn_rollback.v = 0;
 }

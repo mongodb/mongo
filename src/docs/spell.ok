@@ -4,6 +4,7 @@ Atomicity
 BLOBs
 CFLAGS
 CPPFLAGS
+Cheng
 DB's
 DBTs
 DbCursor
@@ -13,6 +14,7 @@ EB
 EmpId
 FreeBSD
 GCC
+Gawlick
 GitHub
 IEC
 LDFLAGS
@@ -26,6 +28,7 @@ Mewhort
 NoSQL
 RepMgr
 Rrx
+Seward's
 URIs
 Vv
 WiredTiger
@@ -158,6 +161,7 @@ loadtext
 logc
 lookup
 lrtf
+lsm
 lsn
 lt
 mailto
@@ -190,6 +194,7 @@ mutexes
 mutexing
 mvcc
 mygcc
+namespace
 ndary
 ndbm
 newsite

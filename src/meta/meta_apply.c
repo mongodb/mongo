@@ -14,8 +14,7 @@
  */
 int
 __wt_meta_btree_apply(WT_SESSION_IMPL *session,
-    int (*func)(WT_SESSION_IMPL *, const char *[]),
-    const char *cfg[], uint32_t flags)
+    int (*func)(WT_SESSION_IMPL *, const char *[]), const char *cfg[])
 {
 	WT_BTREE *saved_btree;
 	WT_CURSOR *cursor;
@@ -34,9 +33,14 @@ __wt_meta_btree_apply(WT_SESSION_IMPL *session,
 			break;
 		else if (strcmp(uri, WT_METADATA_URI) == 0)
 			continue;
-		WT_ERR(__wt_session_get_btree(session, uri, NULL, NULL, flags));
-		ret = func(session, cfg);
-		WT_TRET(__wt_session_release_btree(session));
+		ret = __wt_session_get_btree(session, uri, NULL, NULL, 0);
+		if (ret == EBUSY)
+			WT_ERR(__wt_conn_btree_apply_single(
+			    session, uri, func, cfg));
+		else {
+			ret = func(session, cfg);
+			WT_TRET(__wt_session_release_btree(session));
+		}
 		WT_ERR(ret);
 	}
 

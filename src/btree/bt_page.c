@@ -26,28 +26,22 @@ __wt_page_in_func(
 #endif
     )
 {
+	WT_DECL_RET;
 	WT_PAGE *page;
-	int busy, read_lockout, wake;
-
-	/*
-	 * Only wake the eviction server the first time through here (if the
-	 * cache is too full), or after we fail to evict a page.  Otherwise, we
-	 * are just wasting effort and making a busy mutex busier.
-	 */
-	wake = 1;
+	int busy;
 
 	for (;;) {
 		switch (ref->state) {
 		case WT_REF_DISK:
-			/* The page isn't in memory, attempt to read it. */
-			__wt_eviction_check(session, &read_lockout, wake);
-			wake = 0;
-			if (read_lockout)
-				break;
-
+		case WT_REF_DELETED:
+			/*
+			 * The page isn't in memory, attempt to read it.
+			 *
+			 * First make sure there is space in the cache.
+			 */
+			WT_RET(__wt_cache_full_check(session));
 			WT_RET(__wt_cache_read(session, parent, ref));
 			continue;
-		case WT_REF_EVICT_FORCE:
 		case WT_REF_LOCKED:
 		case WT_REF_READING:
 			/*
@@ -79,15 +73,21 @@ __wt_page_in_func(
 			 * Ensure the page doesn't have ancient updates on it.
 			 * If it did, reading the page could ignore committed
 			 * updates.  This should be extremely unlikely in real
-			 * applications, force eviction of the page to avoid
+			 * applications, wait for eviction of the page to avoid
 			 * the issue.
 			 */
 			if (page->modify != NULL &&
 			    __wt_txn_ancient(session, page->modify->first_id)) {
-				__wt_evict_page_request(session, page);
+				page->read_gen = 0;
 				__wt_hazard_clear(session, page);
 				__wt_evict_server_wake(session);
 				break;
+			}
+
+			/* Check if we need an autocommit transaction. */
+			if ((ret = __wt_txn_autocommit_check(session)) != 0) {
+				__wt_hazard_clear(session, page);
+				return (ret);
 			}
 
 			page->read_gen = __wt_cache_read_gen(session);
@@ -95,13 +95,8 @@ __wt_page_in_func(
 		WT_ILLEGAL_VALUE(session);
 		}
 
-		/*
-		 * Find a page to evict -- if that fails, we don't care why,
-		 * but we may need to wake the eviction server again if the
-		 * cache is still full.
-		 */
-		if (__wt_evict_lru_page(session, 1) != 0)
-			wake = 1;
+		/* We failed to get the page -- yield before retrying. */
+		__wt_yield();
 	}
 }
 
@@ -119,7 +114,7 @@ __wt_page_inmem(WT_SESSION_IMPL *session,
 
 	WT_ASSERT_RET(session, dsk->u.entries > 0);
 
-	*pagep = page = NULL;
+	*pagep = NULL;
 
 	/*
 	 * Allocate and initialize the WT_PAGE.
@@ -158,12 +153,16 @@ __wt_page_inmem(WT_SESSION_IMPL *session,
 	}
 
 	__wt_cache_page_read(
-	    session, page, sizeof(WT_PAGE) + dsk->size + inmem_size);
+	    session, page, sizeof(WT_PAGE) + dsk->mem_size + inmem_size);
 
 	*pagep = page;
 	return (0);
 
-err:	__wt_free(session, page);
+err:	/*
+	 * Our caller (specifically salvage) may have special concerns about the
+	 * underlying disk image, the caller owns that problem.
+	 */
+	__wt_page_out(session, &page, WT_PAGE_FREE_IGNORE_DISK);
 	return (ret);
 }
 
@@ -360,6 +359,39 @@ __inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *inmem_sizep)
 			break;
 		case WT_CELL_ADDR:
 			ref->addr = cell;
+
+			/*
+			 * A cell may reference a deleted leaf page: if a leaf
+			 * page was deleted without first being read, and the
+			 * deletion committed, but older transactions in the
+			 * system required the previous version of the page to
+			 * be available, a special deleted-address type cell is
+			 * written.  If we crash and recover to a page with a
+			 * deleted-address cell, we now want to delete the leaf
+			 * page (because it was never deleted, but by definition
+			 * no earlier transaction might need it).
+			 *
+			 * Re-create the WT_REF state of a deleted node, give
+			 * the page a modify structure and set the transaction
+			 * ID for the first update to the page (WT_TXN_NONE
+			 * because the transaction is committed and visible.)
+			 *
+			 * If the tree is already dirty and so will be written,
+			 * mark the page dirty.  (We'd like to free the deleted
+			 * pages, but if the handle is read-only or if the
+			 * application never modifies the tree, we're not able
+			 * to do so.)
+			 */
+			if (unpack->raw == WT_CELL_ADDR_DEL) {
+				ref->state = WT_REF_DELETED;
+				ref->txnid = WT_TXN_NONE;
+
+				WT_ERR(__wt_page_modify_init(session, page));
+				page->modify->first_id = WT_TXN_NONE;
+				if (btree->modified)
+					__wt_page_modify_set(page);
+			}
+
 			++ref;
 			continue;
 		WT_ILLEGAL_VALUE_ERR(session);
@@ -367,13 +399,13 @@ __inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *inmem_sizep)
 
 		/*
 		 * If Huffman decoding is required or it's an overflow record,
-		 * use the heavy-weight __wt_cell_unpack_copy() call to build
-		 * the key.  Else, we can do it faster internally as we don't
-		 * have to shuffle memory around as much.
+		 * unpack the cell to build the key, then resolve the prefix.
+		 * Else, we can do it faster internally as we don't have to
+		 * shuffle memory around as much.
 		 */
 		prefix = unpack->prefix;
 		if (huffman != NULL || unpack->ovfl) {
-			WT_ERR(__wt_cell_unpack_copy(session, unpack, current));
+			WT_ERR(__wt_cell_unpack_ref(session, unpack, current));
 
 			/*
 			 * If there's a prefix, make sure there's enough buffer
@@ -383,10 +415,10 @@ __inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *inmem_sizep)
 			if (prefix != 0) {
 				WT_ERR(__wt_buf_grow(
 				    session, current, prefix + current->size));
-				memmove((uint8_t *)current->data +
-				    prefix, current->data, current->size);
-				memcpy(
-				    (void *)current->data, last->data, prefix);
+				memmove((uint8_t *)current->mem + prefix,
+				    current->data, current->size);
+				memcpy(current->mem, last->data, prefix);
+				current->data = current->mem;
 				current->size += prefix;
 			}
 		} else {
@@ -394,20 +426,27 @@ __inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *inmem_sizep)
 			 * Get the cell's data/length and make sure we have
 			 * enough buffer space.
 			 */
-			WT_ERR(__wt_buf_grow(
+			WT_ERR(__wt_buf_init(
 			    session, current, prefix + unpack->size));
 
 			/* Copy the prefix then the data into place. */
 			if (prefix != 0)
-				memcpy((void *)
-				    current->data, last->data, prefix);
-			memcpy((uint8_t *)
-			    current->data + prefix, unpack->data, unpack->size);
+				memcpy(current->mem, last->data, prefix);
+			memcpy((uint8_t *)current->mem + prefix, unpack->data,
+			    unpack->size);
 			current->size = prefix + unpack->size;
 		}
 
 		/*
 		 * Allocate and initialize the instantiated key.
+		 *
+		 * Note: all keys on internal pages are instantiated, we assume
+		 * they're more likely to be useful than keys on leaf pages.
+		 * It's possible that's wrong (imagine a cursor reading a table
+		 * that's never randomly searched, the internal page keys are
+		 * unnecessary).  If this policy changes, it has implications
+		 * for reconciliation, the row-store reconciliation function
+		 * depends on keys always be instantiated.
 		 */
 		WT_ERR(__wt_row_ikey_alloc(session,
 		    WT_PAGE_DISK_OFFSET(page, cell),
@@ -450,15 +489,15 @@ __inmem_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *inmem_sizep)
 	unpack = &_unpack;
 
 	/*
-	 * Leaf row-store page entries map to a maximum of two-to-one to the
+	 * Leaf row-store page entries map to a maximum of one-to-one to the
 	 * number of physical entries on the page (each physical entry might be
 	 * a key without a subsequent data item).  To avoid over-allocation in
-	 * workloads with large numbers of empty data items, first walk the page
-	 * counting the number of keys, then allocate the indices.
+	 * workloads without empty data items, first walk the page counting the
+	 * number of keys, then allocate the indices.
 	 *
 	 * The page contains key/data pairs.  Keys are on-page (WT_CELL_KEY) or
-	 * overflow (WT_CELL_KEY_OVFL) items, data are either a single on-page
-	 * (WT_CELL_VALUE) or overflow (WT_CELL_VALUE_OVFL) item.
+	 * overflow (WT_CELL_KEY_OVFL) items, data are either non-existent or a
+	 * single on-page (WT_CELL_VALUE) or overflow (WT_CELL_VALUE_OVFL) item.
 	 */
 	nindx = 0;
 	WT_CELL_FOREACH(btree, dsk, cell, unpack, i) {
@@ -474,6 +513,14 @@ __inmem_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *inmem_sizep)
 		WT_ILLEGAL_VALUE(session);
 		}
 	}
+
+	/*
+	 * We use the fact that cells exactly fill a page to detect the case of
+	 * a row-store leaf page where the last cell is a key (that is, there's
+	 * no subsequent value cell).  Assert that to be true, the bug would be
+	 * difficult to find/diagnose in the field.
+	 */
+	WT_ASSERT(session, cell == (WT_CELL *)((uint8_t *)dsk + dsk->mem_size));
 
 	WT_RET((__wt_calloc_def(session, (size_t)nindx, &page->u.row.d)));
 	if (inmem_sizep != NULL)

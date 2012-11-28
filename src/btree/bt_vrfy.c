@@ -19,22 +19,25 @@ typedef struct {
 
 	uint64_t fcnt;				/* Progress counter */
 
-	int	 dumpfile;			/* Dump file stream */
+	int	 dump_address;
+	int	 dump_pages;
+	int	 dump_blocks;
 
 	WT_ITEM *tmp1;				/* Temporary buffer */
 	WT_ITEM *tmp2;				/* Temporary buffer */
 } WT_VSTUFF;
 
 static void __verify_checkpoint_reset(WT_VSTUFF *);
-static int  __verify_int(WT_SESSION_IMPL *, int);
+static int  __verify_config(WT_SESSION_IMPL *, const char *[], WT_VSTUFF *);
 static int  __verify_overflow(
 	WT_SESSION_IMPL *, const uint8_t *, uint32_t, WT_VSTUFF *);
-static int  __verify_overflow_cell(WT_SESSION_IMPL *, WT_PAGE *, WT_VSTUFF *);
+static int  __verify_overflow_cell(
+	WT_SESSION_IMPL *, WT_PAGE *, int *, WT_VSTUFF *);
 static int  __verify_row_int_key_order(
 	WT_SESSION_IMPL *, WT_PAGE *, WT_REF *, uint32_t, WT_VSTUFF *);
 static int  __verify_row_leaf_key_order(
 	WT_SESSION_IMPL *, WT_PAGE *, WT_VSTUFF *);
-static int  __verify_tree(WT_SESSION_IMPL *, WT_PAGE *, uint64_t, WT_VSTUFF *);
+static int  __verify_tree(WT_SESSION_IMPL *, WT_PAGE *, WT_VSTUFF *);
 
 /*
  * __wt_verify --
@@ -43,57 +46,25 @@ static int  __verify_tree(WT_SESSION_IMPL *, WT_PAGE *, uint64_t, WT_VSTUFF *);
 int
 __wt_verify(WT_SESSION_IMPL *session, const char *cfg[])
 {
-	WT_UNUSED(cfg);
-
-	return (__verify_int(session, 0));
-}
-
-/*
- * __wt_dumpfile --
- *	Dump a file in debugging mode.
- */
-int
-__wt_dumpfile(WT_SESSION_IMPL *session, const char *cfg[])
-{
-	WT_UNUSED(cfg);
-
-#ifdef HAVE_DIAGNOSTIC
-	/*
-	 * We use the verification code to do debugging dumps because if we're
-	 * dumping in debugging mode, we want to confirm the page is OK before
-	 * walking it.
-	 */
-	return (__verify_int(session, 1));
-#else
-	WT_RET_MSG(session, ENOTSUP,
-	    "the WiredTiger library was not built in diagnostic mode");
-#endif
-}
-
-/*
- * __verify_int --
- *	Internal version of verify: verify a Btree, optionally dumping each
- * page in debugging mode.
- */
-static int
-__verify_int(WT_SESSION_IMPL *session, int dumpfile)
-{
 	WT_BTREE *btree;
 	WT_CKPT *ckptbase, *ckpt;
 	WT_DECL_RET;
-	WT_ITEM dsk;
 	WT_VSTUFF *vs, _vstuff;
+	uint32_t root_addr_size;
+	uint8_t root_addr[WT_BTREE_MAX_ADDR_COOKIE];
 
 	btree = session->btree;
 	ckptbase = NULL;
 
 	WT_CLEAR(_vstuff);
 	vs = &_vstuff;
-	vs->dumpfile = dumpfile;
 	WT_ERR(__wt_scr_alloc(session, 0, &vs->max_key));
 	WT_ERR(__wt_scr_alloc(session, 0, &vs->max_addr));
 	WT_ERR(__wt_scr_alloc(session, 0, &vs->tmp1));
 	WT_ERR(__wt_scr_alloc(session, 0, &vs->tmp2));
+
+	/* Check configuration strings. */
+	WT_ERR(__verify_config(session, cfg, vs));
 
 	/* Get a list of the checkpoints for this file. */
 	WT_ERR(__wt_meta_ckptlist_get(session, btree->name, &ckptbase));
@@ -105,28 +76,29 @@ __verify_int(WT_SESSION_IMPL *session, int dumpfile)
 	WT_CKPT_FOREACH(ckptbase, ckpt) {
 		WT_VERBOSE_ERR(session, verify,
 		    "%s: checkpoint %s", btree->name, ckpt->name);
+#ifdef HAVE_DIAGNOSTIC
+		if (vs->dump_address || vs->dump_blocks || vs->dump_pages)
+			WT_ERR(__wt_msg(session,
+			    "%s: checkpoint %s", btree->name, ckpt->name));
+#endif
+
+		/* Fake checkpoints require no work. */
+		if (F_ISSET(ckpt, WT_CKPT_FAKE))
+			continue;
 
 		/* House-keeping between checkpoints. */
 		__verify_checkpoint_reset(vs);
 
-		/*
-		 * Load the checkpoint -- if the size of the root page is 0, the
-		 * file is empty.
-		 *
-		 * Clearing the root page reference here is not an error: any
-		 * root page we read will be discarded as part of calling the
-		 * underlying eviction thread to discard the in-cache version
-		 * of the tree.   Since our reference disappears in that call,
-		 * we can't ever use it again.
-		 */
-		WT_CLEAR(dsk);
-		WT_ERR(__wt_bm_checkpoint_load(
-		    session, &dsk, ckpt->raw.data, ckpt->raw.size, 1));
-		if (dsk.size != 0) {
+		/* Load the checkpoint, ignore trees with no root page. */
+		WT_ERR(__wt_bm_checkpoint_load(session,
+		    ckpt->raw.data, ckpt->raw.size,
+		    root_addr, &root_addr_size, 1));
+		if (root_addr_size != 0) {
 			/* Verify then discard the checkpoint from the cache. */
-			if ((ret = __wt_btree_tree_open(session, &dsk)) == 0) {
+			if ((ret = __wt_btree_tree_open(
+			    session, root_addr, root_addr_size)) == 0) {
 				ret = __verify_tree(
-				    session, btree->root_page, (uint64_t)1, vs);
+				    session, btree->root_page, vs);
 				WT_TRET(__wt_bt_cache_flush(
 				    session, NULL, WT_SYNC_DISCARD));
 			}
@@ -158,6 +130,48 @@ err:	__wt_meta_ckptlist_free(session, ckptbase);
 }
 
 /*
+ * __verify_config --
+ *	Verification supports dumping pages in various formats.
+ */
+static int
+__verify_config(WT_SESSION_IMPL *session, const char *cfg[], WT_VSTUFF *vs)
+{
+	WT_CONFIG_ITEM cval;
+	WT_DECL_RET;
+
+	ret = __wt_config_gets(session, cfg, "dump_address", &cval);
+	if (ret != 0 && ret != WT_NOTFOUND)
+		WT_RET(ret);
+	if (ret == 0 && cval.val != 0)
+		vs->dump_address = 1;
+
+	ret = __wt_config_gets(session, cfg, "dump_blocks", &cval);
+	if (ret != 0 && ret != WT_NOTFOUND)
+		WT_RET(ret);
+	if (ret == 0 && cval.val != 0)
+		vs->dump_blocks = 1;
+
+	ret = __wt_config_gets(session, cfg, "dump_pages", &cval);
+	if (ret != 0 && ret != WT_NOTFOUND)
+		WT_RET(ret);
+	if (ret == 0 && cval.val != 0)
+		vs->dump_pages = 1;
+
+#ifdef HAVE_DIAGNOSTIC
+	/*
+	 * We use the verification code to do debugging dumps because if we're
+	 * dumping in debugging mode, we want to confirm the page is OK before
+	 * walking it.
+	 */
+#else
+	if (vs->dump_address || vs->dump_blocks || vs->dump_pages)
+		WT_RET_MSG(session, ENOTSUP,
+		    "the WiredTiger library was not built in diagnostic mode");
+#endif
+	return (0);
+}
+
+/*
  * __verify_checkpoint_reset --
  *	Reset anything needing to be reset for each new checkpoint verification.
  */
@@ -182,8 +196,7 @@ __verify_checkpoint_reset(WT_VSTUFF *vs)
  * in the page and in the tree.
  */
 static int
-__verify_tree(WT_SESSION_IMPL *session,
-    WT_PAGE *page, uint64_t parent_recno, WT_VSTUFF *vs)
+__verify_tree(WT_SESSION_IMPL *session, WT_PAGE *page, WT_VSTUFF *vs)
 {
 	WT_CELL *cell;
 	WT_CELL_UNPACK *unpack, _unpack;
@@ -191,14 +204,20 @@ __verify_tree(WT_SESSION_IMPL *session,
 	WT_DECL_RET;
 	WT_REF *ref;
 	uint64_t recno;
-	uint32_t entry, i, size;
-	const uint8_t *addr;
+	uint32_t entry, i;
+	int found, lno;
 
 	unpack = &_unpack;
 
 	WT_VERBOSE_RET(session, verify, "%s %s",
 	    __wt_page_addr_string(session, vs->tmp1, page),
 	    __wt_page_type_string(page->type));
+#ifdef HAVE_DIAGNOSTIC
+	if (vs->dump_address)
+		WT_RET(__wt_msg(session, "%s %s",
+		    __wt_page_addr_string(session, vs->tmp1, page),
+		    __wt_page_type_string(page->type)));
+#endif
 
 	/*
 	 * The page's physical structure was verified when it was read into
@@ -228,15 +247,14 @@ __verify_tree(WT_SESSION_IMPL *session,
 
 #ifdef HAVE_DIAGNOSTIC
 	/* Optionally dump the page in debugging mode. */
-	if (vs->dumpfile) {
+	if (vs->dump_blocks && page->dsk != NULL)
+		WT_RET(__wt_debug_disk(session, page->dsk, NULL));
+	if (vs->dump_pages)
 		WT_RET(__wt_debug_page(session, page, NULL));
-		if (page->dsk != NULL)
-			WT_RET(__wt_debug_disk(session, page->dsk, NULL));
-	}
 #endif
 
 	/*
-	 * Column-store key order checks: check the starting record number,
+	 * Column-store key order checks: check the page's record number and
 	 * then update the total record count.
 	 */
 	switch (page->type) {
@@ -248,12 +266,12 @@ __verify_tree(WT_SESSION_IMPL *session,
 		goto recno_chk;
 	case WT_PAGE_COL_VAR:
 		recno = page->u.col_var.recno;
-recno_chk:	if (parent_recno != recno)
+recno_chk:	if (recno != vs->record_total + 1)
 			WT_RET_MSG(session, WT_ERROR,
 			    "page at %s has a starting record of %" PRIu64
 			    " when the expected starting record is %" PRIu64,
 			    __wt_page_addr_string(session, vs->tmp1, page),
-			    recno, parent_recno);
+			    recno, vs->record_total + 1);
 		break;
 	}
 	switch (page->type) {
@@ -288,12 +306,41 @@ recno_chk:	if (parent_recno != recno)
 	 * Check overflow pages.  We check overflow cells separately from other
 	 * tests that walk the page as it's simpler, and I don't care much how
 	 * fast table verify runs.
+	 *
+	 * Object if a leaf-no-overflow address cell references a page that has
+	 * overflow keys, but don't object if a standard address cell references
+	 * a page without overflow keys.  The leaf-no-overflow address cell is
+	 * an optimization for trees without few, if any, overflow items, and
+	 * may not be set by reconciliation in all possible cases.
 	 */
+	if (WT_PAGE_IS_ROOT(page))
+		lno = 0;
+	else {
+		__wt_cell_unpack(page->ref->addr, unpack);
+		lno = unpack->raw == WT_CELL_ADDR_LNO ? 1 : 0;
+	}
 	switch (page->type) {
+	case WT_PAGE_COL_FIX:
+		break;
 	case WT_PAGE_COL_VAR:
 	case WT_PAGE_ROW_INT:
 	case WT_PAGE_ROW_LEAF:
-		WT_RET(__verify_overflow_cell(session, page, vs));
+		WT_RET(__verify_overflow_cell(session, page, &found, vs));
+		if (found && lno)
+			WT_RET_MSG(session, WT_ERROR,
+			    "page at %s referenced in its parent by a cell of "
+			    "type %s illegally contains overflow items",
+			    __wt_page_addr_string(session, vs->tmp1, page),
+			    __wt_cell_type_string(WT_CELL_ADDR_LNO));
+		break;
+	default:
+		if (lno)
+			WT_RET_MSG(session, WT_ERROR,
+			    "page at %s is of type %s and is illegally "
+			    "referenced in its parent by a cell of type %s",
+			    __wt_page_addr_string(session, vs->tmp1, page),
+			    __wt_page_type_string(page->type),
+			    __wt_cell_type_string(WT_CELL_ADDR_LNO));
 		break;
 	}
 
@@ -301,36 +348,37 @@ recno_chk:	if (parent_recno != recno)
 	switch (page->type) {
 	case WT_PAGE_COL_INT:
 		/* For each entry in an internal page, verify the subtree. */
+		entry = 0;
 		WT_REF_FOREACH(page, ref, i) {
 			/*
 			 * It's a depth-first traversal: this entry's starting
 			 * record number should be 1 more than the total records
 			 * reviewed to this point.
 			 */
+			++entry;
 			if (ref->u.recno != vs->record_total + 1) {
-				WT_DECL_ITEM(tmp);
-				WT_RET(__wt_scr_alloc(session, 0, &tmp));
 				__wt_cell_unpack(ref->addr, unpack);
-				ret = __wt_bm_addr_string(
-				    session, tmp, unpack->data, unpack->size);
-				__wt_errx(session, "page at %s has a starting "
-				    "record of %" PRIu64 " when the expected "
-				    "starting record was %" PRIu64,
-				    ret == 0 ?
-				    (char *)tmp->data : "[Unknown address]",
-				    ref->u.recno, vs->record_total + 1);
-				__wt_scr_free(&tmp);
-				return (WT_ERROR);
+				WT_RET_MSG(session, WT_ERROR,
+				    "the starting record number in entry %"
+				    PRIu32 " of the column internal page at "
+				    "%s is %" PRIu64 " and the expected "
+				    "starting record number is %" PRIu64,
+				    entry,
+				    __wt_page_addr_string(
+				    session, vs->tmp1, page),
+				    ref->u.recno,
+				    vs->record_total + 1);
 			}
 
-			/* ref references the subtree containing the record */
-			__wt_get_addr(page, ref, &addr, &size);
+			/* Verify the subtree. */
 			WT_RET(__wt_page_in(session, page, ref));
-			ret =
-			    __verify_tree(session, ref->page, ref->u.recno, vs);
+			ret = __verify_tree(session, ref->page, vs);
 			__wt_page_release(session, ref->page);
 			WT_RET(ret);
-			WT_RET(__wt_bm_verify_addr(session, addr, size));
+
+			__wt_cell_unpack(ref->addr, unpack);
+			WT_RET(__wt_bm_verify_addr(
+			    session, unpack->data, unpack->size));
 		}
 		break;
 	case WT_PAGE_ROW_INT:
@@ -345,19 +393,20 @@ recno_chk:	if (parent_recno != recno)
 			 * The 0th key of any internal page is magic, and we
 			 * can't test against it.
 			 */
-			if (entry != 0)
+			++entry;
+			if (entry != 1)
 				WT_RET(__verify_row_int_key_order(
 				    session, page, ref, entry, vs));
-			++entry;
 
-			/* ref references the subtree containing the record */
-			__wt_get_addr(page, ref, &addr, &size);
+			/* Verify the subtree. */
 			WT_RET(__wt_page_in(session, page, ref));
-			ret =
-			    __verify_tree(session, ref->page, (uint64_t)0, vs);
+			ret = __verify_tree(session, ref->page, vs);
 			__wt_page_release(session, ref->page);
 			WT_RET(ret);
-			WT_RET(__wt_bm_verify_addr(session, addr, size));
+
+			__wt_cell_unpack(ref->addr, unpack);
+			WT_RET(__wt_bm_verify_addr(
+			    session, unpack->data, unpack->size));
 		}
 		break;
 	}
@@ -470,7 +519,8 @@ __verify_row_leaf_key_order(
  *	Verify any overflow cells on the page.
  */
 static int
-__verify_overflow_cell(WT_SESSION_IMPL *session, WT_PAGE *page, WT_VSTUFF *vs)
+__verify_overflow_cell(
+    WT_SESSION_IMPL *session, WT_PAGE *page, int *found, WT_VSTUFF *vs)
 {
 	WT_BTREE *btree;
 	WT_CELL *cell;
@@ -481,6 +531,7 @@ __verify_overflow_cell(WT_SESSION_IMPL *session, WT_PAGE *page, WT_VSTUFF *vs)
 
 	btree = session->btree;
 	unpack = &_unpack;
+	*found = 0;
 
 	/*
 	 * If a tree is empty (just created), it won't have a disk image;
@@ -497,11 +548,13 @@ __verify_overflow_cell(WT_SESSION_IMPL *session, WT_PAGE *page, WT_VSTUFF *vs)
 		switch (unpack->type) {
 		case WT_CELL_KEY_OVFL:
 		case WT_CELL_VALUE_OVFL:
+			*found = 1;
 			WT_ERR(__verify_overflow(
 			    session, unpack->data, unpack->size, vs));
 			break;
 		}
 	}
+
 	return (0);
 
 err:	WT_RET_MSG(session, ret,
@@ -523,7 +576,7 @@ __verify_overflow(WT_SESSION_IMPL *session,
 	WT_PAGE_HEADER *dsk;
 
 	/* Read and verify the overflow item. */
-	WT_RET(__wt_bm_read(session, vs->tmp1, addr, addr_size));
+	WT_RET(__wt_bt_read(session, vs->tmp1, addr, addr_size));
 
 	/*
 	 * The physical page has already been verified, but we haven't confirmed

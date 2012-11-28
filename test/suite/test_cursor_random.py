@@ -37,15 +37,14 @@ class test_cursor_random(wttest.WiredTigerTestCase):
         ]
 
     # Check that opening a random cursor on a row-store returns not-supported
-    # for every method except for next, and next returns not-found.
+    # for every method except for next and reset, and next returns not-found.
     def test_cursor_random_column(self):
         uri = self.type + 'random'
         self.session.create(uri, 'key_format=' + self.fmt + ',value_format=S')
         cursor = self.session.open_cursor(uri, None, "next_random=true")
         self.assertRaises(
-            wiredtiger.WiredTigerError, lambda: cursor.equals(cursor))
+            wiredtiger.WiredTigerError, lambda: cursor.compare(cursor))
         self.assertRaises(wiredtiger.WiredTigerError, lambda: cursor.prev())
-        self.assertRaises(wiredtiger.WiredTigerError, lambda: cursor.reset())
         self.assertRaises(wiredtiger.WiredTigerError, lambda: cursor.search())
         self.assertRaises(
             wiredtiger.WiredTigerError, lambda: cursor.search_near())
@@ -53,6 +52,7 @@ class test_cursor_random(wttest.WiredTigerTestCase):
         self.assertRaises(wiredtiger.WiredTigerError, lambda: cursor.update())
         self.assertRaises(wiredtiger.WiredTigerError, lambda: cursor.remove())
 
+        cursor.reset()
         self.assertTrue(cursor.next(), wiredtiger.WT_NOTFOUND)
         cursor.close()
 

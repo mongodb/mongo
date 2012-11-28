@@ -36,6 +36,9 @@ struct __wt_cursor_btree {
 					/* Search stack */
 	WT_INSERT	**ins_stack[WT_SKIP_MAXDEPTH];
 
+					/* Next item(s) found during search */
+	WT_INSERT	*next_stack[WT_SKIP_MAXDEPTH];
+
 	uint64_t recno;			/* Record number */
 	uint32_t write_gen;		/* Saved leaf page's write generation */
 
@@ -103,11 +106,12 @@ struct __wt_cursor_btree {
 	 */
 	uint8_t v;			/* Fixed-length return value */
 
-#define	WT_CBT_ITERATE_APPEND	0x01	/* Col-store: iterating append list */
-#define	WT_CBT_ITERATE_NEXT	0x02	/* Next iteration configuration */
-#define	WT_CBT_ITERATE_PREV	0x04	/* Prev iteration configuration */
-#define	WT_CBT_MAX_RECORD	0x08	/* Col-store: past end-of-table */
-#define	WT_CBT_SEARCH_SMALLEST	0x10	/* Row-store: small-key insert list */
+#define	WT_CBT_ACTIVE		0x01	/* Active in the tree */
+#define	WT_CBT_ITERATE_APPEND	0x02	/* Col-store: iterating append list */
+#define	WT_CBT_ITERATE_NEXT	0x04	/* Next iteration configuration */
+#define	WT_CBT_ITERATE_PREV	0x08	/* Prev iteration configuration */
+#define	WT_CBT_MAX_RECORD	0x10	/* Col-store: past end-of-table */
+#define	WT_CBT_SEARCH_SMALLEST	0x20	/* Row-store: small-key insert list */
 	uint8_t flags;
 };
 
@@ -135,6 +139,11 @@ struct __wt_cursor_bulk {
 	 */
 	uint32_t entry;				/* Entry count */
 	uint32_t nrecs;				/* Max records per chunk */
+
+	/* Special bitmap bulk load for fixed-length column stores. */
+	int	bitmap;
+
+	void	*reconcile;			/* Reconciliation information */
 };
 
 struct __wt_cursor_config {
@@ -148,11 +157,13 @@ struct __wt_cursor_dump {
 };
 
 struct __wt_cursor_index {
-	WT_CURSOR_BTREE cbt;
+	WT_CURSOR iface;
 
 	WT_TABLE *table;
 	WT_INDEX *index;
 	const char *key_plan, *value_plan;
+
+	WT_CURSOR *child;
 	WT_CURSOR **cg_cursors;
 };
 
@@ -181,14 +192,19 @@ struct __wt_cursor_table {
 	WT_CURSOR **idx_cursors;
 };
 
+#define	WT_CURSOR_PRIMARY(cursor)					\
+	(((WT_CURSOR_TABLE *)cursor)->cg_cursors[0])
+
 #define	WT_CURSOR_RECNO(cursor)	(strcmp((cursor)->key_format, "r") == 0)
 
 #define	WT_CURSOR_NEEDKEY(cursor) do {					\
 	if (!F_ISSET(cursor, WT_CURSTD_KEY_SET))			\
 		WT_ERR(__wt_cursor_kv_not_set(cursor, 1));		\
 } while (0)
-
 #define	WT_CURSOR_NEEDVALUE(cursor) do {				\
 	if (!F_ISSET(cursor, WT_CURSTD_VALUE_SET))			\
 		WT_ERR(__wt_cursor_kv_not_set(cursor, 0));		\
 } while (0)
+
+#define	WT_CURSOR_RAW_OK						\
+	WT_CURSTD_DUMP_HEX | WT_CURSTD_DUMP_PRINT | WT_CURSTD_RAW

@@ -19,18 +19,37 @@ __wt_cursor_notsup(WT_CURSOR *cursor)
 	return (ENOTSUP);
 }
 
+/* 
+ * __wt_cursor_noop --
+ *	Cursor noop.
+ */
+int
+__wt_cursor_noop(WT_CURSOR *cursor)
+{
+	WT_UNUSED(cursor);
+
+	return (0);
+}
+
 /*
  * __wt_cursor_set_notsup --
- *	Set all of the cursor methods (except for close), to not-supported.
+ *	Reset the cursor methods to not-supported.
  */
 void
 __wt_cursor_set_notsup(WT_CURSOR *cursor)
 {
-	cursor->equals =
+	/*
+	 * Set all of the cursor methods (except for close and reset), to fail.
+	 * Close is unchanged so the cursor can be discarded, reset defaults to
+	 * a no-op because session transactional operations reset all of the
+	 * cursors in a session, and random cursors shouldn't block transactions
+	 * or checkpoints.
+	 */
+	cursor->compare =
 	    (int (*)(WT_CURSOR *, WT_CURSOR *, int *))__wt_cursor_notsup;
 	cursor->next = __wt_cursor_notsup;
 	cursor->prev = __wt_cursor_notsup;
-	cursor->reset = __wt_cursor_notsup;
+	cursor->reset = __wt_cursor_noop;
 	cursor->search = __wt_cursor_notsup;
 	cursor->search_near = (int (*)(WT_CURSOR *, int *))__wt_cursor_notsup;
 	cursor->insert = __wt_cursor_notsup;
@@ -135,7 +154,7 @@ __wt_cursor_get_keyv(WT_CURSOR *cursor, uint32_t flags, va_list ap)
 	size_t size;
 	const char *fmt;
 
-	CURSOR_API_CALL_NOCONF(cursor, session, get_key, NULL);
+	CURSOR_API_CALL(cursor, session, get_key, NULL);
 	WT_CURSOR_NEEDKEY(cursor);
 
 	if (WT_CURSOR_RECNO(cursor)) {
@@ -151,8 +170,7 @@ __wt_cursor_get_keyv(WT_CURSOR *cursor, uint32_t flags, va_list ap)
 			*va_arg(ap, uint64_t *) = cursor->recno;
 	} else {
 		fmt = cursor->key_format;
-		if (LF_ISSET(
-		    WT_CURSTD_DUMP_HEX | WT_CURSTD_DUMP_PRINT | WT_CURSTD_RAW))
+		if (LF_ISSET(WT_CURSOR_RAW_OK))
 			fmt = "u";
 		ret = __wt_struct_unpackv(
 		    session, cursor->key.data, cursor->key.size, fmt, ap);
@@ -176,7 +194,7 @@ __wt_cursor_set_keyv(WT_CURSOR *cursor, uint32_t flags, va_list ap)
 	va_list ap_copy;
 	const char *fmt, *str;
 
-	CURSOR_API_CALL_NOCONF(cursor, session, set_key, NULL);
+	CURSOR_API_CALL(cursor, session, set_key, NULL);
 
 	/* Fast path some common cases: single strings or byte arrays. */
 	if (WT_CURSOR_RECNO(cursor)) {
@@ -193,17 +211,14 @@ __wt_cursor_set_keyv(WT_CURSOR *cursor, uint32_t flags, va_list ap)
 		sz = sizeof(cursor->recno);
 	} else {
 		fmt = cursor->key_format;
-		if (LF_ISSET(
-		    WT_CURSTD_DUMP_HEX | WT_CURSTD_DUMP_PRINT | WT_CURSTD_RAW))
-			fmt = "u";
-		if (strcmp(fmt, "S") == 0) {
+		if (LF_ISSET(WT_CURSOR_RAW_OK) || strcmp(fmt, "u") == 0) {
+			item = va_arg(ap, WT_ITEM *);
+			sz = item->size;
+			cursor->key.data = item->data;
+		} else if (strcmp(fmt, "S") == 0) {
 			str = va_arg(ap, const char *);
 			sz = strlen(str) + 1;
 			cursor->key.data = (void *)str;
-		} else if (strcmp(fmt, "u") == 0) {
-			item = va_arg(ap, WT_ITEM *);
-			sz = item->size;
-			cursor->key.data = (void *)item->data;
 		} else {
 			buf = &cursor->key;
 
@@ -246,13 +261,11 @@ __wt_cursor_get_value(WT_CURSOR *cursor, ...)
 	const char *fmt;
 	va_list ap;
 
-	CURSOR_API_CALL_NOCONF(cursor, session, get_value, NULL);
+	CURSOR_API_CALL(cursor, session, get_value, NULL);
 	WT_CURSOR_NEEDVALUE(cursor);
 
 	va_start(ap, cursor);
-	fmt = F_ISSET(cursor,
-	    WT_CURSTD_DUMP_HEX | WT_CURSTD_DUMP_PRINT | WT_CURSTD_RAW) ?
-	    "u" : cursor->value_format;
+	fmt = F_ISSET(cursor, WT_CURSOR_RAW_OK) ? "u" : cursor->value_format;
 	ret = __wt_struct_unpackv(session,
 	    cursor->value.data, cursor->value.size, fmt, ap);
 	va_end(ap);
@@ -275,41 +288,45 @@ __wt_cursor_set_value(WT_CURSOR *cursor, ...)
 	size_t sz;
 	va_list ap;
 
-	CURSOR_API_CALL_NOCONF(cursor, session, set_value, NULL);
+	CURSOR_API_CALL(cursor, session, set_value, NULL);
 
 	va_start(ap, cursor);
-	fmt = F_ISSET(cursor,
-	    WT_CURSTD_DUMP_HEX | WT_CURSTD_DUMP_PRINT | WT_CURSTD_RAW) ?
-	    "u" : cursor->value_format;
-	/* Fast path some common cases: single strings or byte arrays. */
+	fmt = F_ISSET(cursor, WT_CURSOR_RAW_OK) ? "u" : cursor->value_format;
+
+	/* Fast path some common cases: single strings, byte arrays and bits. */
 	if (strcmp(fmt, "S") == 0) {
 		str = va_arg(ap, const char *);
 		sz = strlen(str) + 1;
 		cursor->value.data = str;
-	} else if (strcmp(fmt, "u") == 0) {
+	} else if (F_ISSET(cursor, WT_CURSOR_RAW_OK) || strcmp(fmt, "u") == 0) {
 		item = va_arg(ap, WT_ITEM *);
 		sz = item->size;
 		cursor->value.data = item->data;
-	} else {
+	} else if (strcmp(fmt, "t") == 0 ||
+	    (isdigit(fmt[0]) && strcmp(fmt + 1, "t") == 0)) {
+		sz = 1;
 		buf = &cursor->value;
-		ret = __wt_struct_sizev(session, &sz, cursor->value_format, ap);
+		WT_ERR(__wt_buf_initsize(session, buf, sz));
+		*(uint8_t *)buf->mem = (uint8_t)va_arg(ap, int);
+	} else {
+		WT_ERR(
+		    __wt_struct_sizev(session, &sz, cursor->value_format, ap));
 		va_end(ap);
-		WT_ERR(ret);
 		va_start(ap, cursor);
-		if ((ret = __wt_buf_initsize(session, buf, sz)) != 0 ||
-		    (ret = __wt_struct_packv(session, buf->mem, sz,
-		    cursor->value_format, ap)) != 0) {
-			cursor->saved_err = ret;
-			F_CLR(cursor, WT_CURSTD_VALUE_SET);
-			goto err;
-		}
-		cursor->value.data = buf->mem;
+		buf = &cursor->value;
+		WT_ERR(__wt_buf_initsize(session, buf, sz));
+		WT_ERR(__wt_struct_packv(session, buf->mem, sz,
+		    cursor->value_format, ap));
 	}
 	F_SET(cursor, WT_CURSTD_VALUE_SET);
 	cursor->value.size = WT_STORE_SIZE(sz);
-	va_end(ap);
 
-err:	API_END(session);
+	if (0) {
+err:		cursor->saved_err = ret;
+		F_CLR(cursor, WT_CURSTD_VALUE_SET);
+	}
+	va_end(ap);
+	API_END(session);
 }
 
 /*
@@ -326,41 +343,6 @@ __cursor_search(WT_CURSOR *cursor)
 }
 
 /*
- * __cursor_equals --
- *	WT_CURSOR->equals default implementation.
- */
-static int
-__cursor_equals(WT_CURSOR *cursor, WT_CURSOR *other, int *equalp)
-{
-	WT_ITEM aitem, bitem;
-	WT_DECL_RET;
-	WT_SESSION_IMPL *session;
-
-	CURSOR_API_CALL_NOCONF(cursor, session, equals, NULL);
-
-	*equalp = 0;
-
-	/*
-	 * Confirm both cursors refer to the same source, then retrieve their
-	 * raw keys and compare them.
-	 */
-	if (other != NULL && strcmp(cursor->uri, other->uri) == 0) {
-		/*
-		 * Don't clear (or allocate memory for) the WT_ITEM structures
-		 * because all that happens underneath is their data and size
-		 * fields are reset to reference the cursor's key.
-		 */
-		WT_ERR(__wt_cursor_get_raw_key(cursor, &aitem));
-		WT_ERR(__wt_cursor_get_raw_key(other, &bitem));
-		*equalp = (aitem.size == bitem.size &&
-		    memcmp(aitem.data, bitem.data, aitem.size) == 0) ? 1 : 0;
-	}
-
-err:	API_END(session);
-	return (ret);
-}
-
-/*
  * __wt_cursor_close --
  *	WT_CURSOR->close default implementation.
  */
@@ -370,7 +352,7 @@ __wt_cursor_close(WT_CURSOR *cursor)
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 
-	CURSOR_API_CALL_NOCONF(cursor, session, close, NULL);
+	CURSOR_API_CALL(cursor, session, close, NULL);
 
 	__wt_buf_free(session, &cursor->key);
 	__wt_buf_free(session, &cursor->value);
@@ -416,18 +398,14 @@ __cursor_runtime_config(WT_CURSOR *cursor, const char *cfg[])
  */
 int
 __wt_cursor_dup(WT_SESSION_IMPL *session,
-    WT_CURSOR *to_dup, const char *config, WT_CURSOR **cursorp)
+    WT_CURSOR *to_dup, const char *cfg[], WT_CURSOR **cursorp)
 {
 	WT_CURSOR *cursor;
 	WT_DECL_RET;
 	WT_ITEM key;
-	WT_SESSION *wt_session;
-
-	wt_session = &session->iface;
 
 	/* Open a new cursor with the same URI. */
-	WT_ERR(wt_session->open_cursor(
-	    wt_session, to_dup->uri, NULL, config, &cursor));
+	WT_ERR(__wt_open_cursor(session, to_dup->uri, NULL, cfg, &cursor));
 
 	/*
 	 * Get a copy of the cursor's raw key, and set it in the new cursor,
@@ -485,14 +463,15 @@ __wt_cursor_init(WT_CURSOR *cursor,
 		cursor->set_key = __wt_cursor_set_key;
 	if (cursor->set_value == NULL)
 		cursor->set_value = __wt_cursor_set_value;
-	if (cursor->equals == NULL)
-		cursor->equals = __cursor_equals;
+	if (cursor->compare == NULL)
+		cursor->compare = (int (*)
+		    (WT_CURSOR *, WT_CURSOR *, int *))__wt_cursor_notsup;
 	if (cursor->next == NULL)
 		cursor->next = __wt_cursor_notsup;
 	if (cursor->prev == NULL)
 		cursor->prev = __wt_cursor_notsup;
 	if (cursor->reset == NULL)
-		cursor->reset = __wt_cursor_notsup;
+		cursor->reset = __wt_cursor_noop;
 	if (cursor->search == NULL)
 		cursor->search = __cursor_search;
 	if (cursor->search_near == NULL)
@@ -506,6 +485,9 @@ __wt_cursor_init(WT_CURSOR *cursor,
 		cursor->remove = __wt_cursor_notsup;
 	if (cursor->close == NULL)
 		WT_RET_MSG(session, EINVAL, "cursor lacks a close method");
+	if (cursor->compare == NULL)
+		cursor->compare = (int (*)
+		    (WT_CURSOR *, WT_CURSOR *, int *))__wt_cursor_notsup;
 
 	if (cursor->uri == NULL)
 		WT_RET(__wt_strdup(session, uri, &cursor->uri));

@@ -43,6 +43,8 @@ extern "C" {
  * DO NOT EDIT: automatically built by dist/s_typedef.
  * Forward type declarations for internal types: BEGIN
  */
+enum __wt_page_state;
+    typedef enum __wt_page_state WT_PAGE_STATE;
 enum __wt_txn_isolation;
     typedef enum __wt_txn_isolation WT_TXN_ISOLATION;
 struct __wt_addr;
@@ -55,14 +57,18 @@ struct __wt_block_desc;
     typedef struct __wt_block_desc WT_BLOCK_DESC;
 struct __wt_block_header;
     typedef struct __wt_block_header WT_BLOCK_HEADER;
+struct __wt_bloom;
+    typedef struct __wt_bloom WT_BLOOM;
+struct __wt_bloom_hash;
+    typedef struct __wt_bloom_hash WT_BLOOM_HASH;
 struct __wt_btree;
     typedef struct __wt_btree WT_BTREE;
 struct __wt_btree_session;
     typedef struct __wt_btree_session WT_BTREE_SESSION;
-struct __wt_btree_stats;
-    typedef struct __wt_btree_stats WT_BTREE_STATS;
 struct __wt_cache;
     typedef struct __wt_cache WT_CACHE;
+struct __wt_cache_pool;
+    typedef struct __wt_cache_pool WT_CACHE_POOL;
 struct __wt_cell;
     typedef struct __wt_cell WT_CELL;
 struct __wt_cell_unpack;
@@ -99,12 +105,16 @@ struct __wt_cursor_dump;
     typedef struct __wt_cursor_dump WT_CURSOR_DUMP;
 struct __wt_cursor_index;
     typedef struct __wt_cursor_index WT_CURSOR_INDEX;
+struct __wt_cursor_lsm;
+    typedef struct __wt_cursor_lsm WT_CURSOR_LSM;
 struct __wt_cursor_stat;
     typedef struct __wt_cursor_stat WT_CURSOR_STAT;
 struct __wt_cursor_table;
     typedef struct __wt_cursor_table WT_CURSOR_TABLE;
 struct __wt_dlh;
     typedef struct __wt_dlh WT_DLH;
+struct __wt_dsrc_stats;
+    typedef struct __wt_dsrc_stats WT_DSRC_STATS;
 struct __wt_evict_entry;
     typedef struct __wt_evict_entry WT_EVICT_ENTRY;
 struct __wt_ext;
@@ -123,6 +133,16 @@ struct __wt_insert;
     typedef struct __wt_insert WT_INSERT;
 struct __wt_insert_head;
     typedef struct __wt_insert_head WT_INSERT_HEAD;
+struct __wt_lsm_chunk;
+    typedef struct __wt_lsm_chunk WT_LSM_CHUNK;
+struct __wt_lsm_data_source;
+    typedef struct __wt_lsm_data_source WT_LSM_DATA_SOURCE;
+struct __wt_lsm_tree;
+    typedef struct __wt_lsm_tree WT_LSM_TREE;
+struct __wt_lsm_worker_args;
+    typedef struct __wt_lsm_worker_args WT_LSM_WORKER_ARGS;
+struct __wt_lsm_worker_cookie;
+    typedef struct __wt_lsm_worker_cookie WT_LSM_WORKER_COOKIE;
 struct __wt_named_collator;
     typedef struct __wt_named_collator WT_NAMED_COLLATOR;
 struct __wt_named_compressor;
@@ -190,7 +210,9 @@ struct __wt_update;
 #include "stat.h"
 
 #include "api.h"
+#include "bloom.h"
 #include "cursor.h"
+#include "lsm.h"
 #include "meta.h"
 #include "schema.h"
 
@@ -201,6 +223,9 @@ struct __wt_update;
 #include "intpack.i"
 #include "cell.i"
 
+/* Required by cursor.i */
+#include "txn.i"
+
 #include "bitstring.i"
 #include "btree.i"
 #include "cache.i"
@@ -209,9 +234,7 @@ struct __wt_update;
 #include "log.i"
 #include "mutex.i"
 #include "packing.i"
-#include "serial.i"
 #include "serial_funcs.i"
-#include "txn.i"
 
 #if defined(__cplusplus)
 }

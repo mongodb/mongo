@@ -5,57 +5,55 @@
  * See the file LICENSE for redistribution information.
  */
 
-/*
- * __wt_txn_getid --
- *	Get a transaction ID for a non-transactional operation.
- */
-static inline void
-__wt_txn_getid(WT_SESSION_IMPL *session)
-{
-	WT_TXN *txn;
-	WT_TXN_GLOBAL *txn_global;
-	wt_txnid_t id;
-
-	txn = &session->txn;
-
-	if (F_ISSET(txn, TXN_RUNNING))
-		return;
-
-	/* If we already have the latest ID, keep using it. */
-	id = txn->id;
-	txn_global = &S2C(session)->txn_global;
-	if (id + 1 == txn_global->current &&
-	    id != WT_TXN_NONE && id != WT_TXN_ABORTED)
-		return;
-
-	do {
-		id = txn_global->current;
-	} while (!WT_ATOMIC_CAS(txn_global->current, id, id + 1) ||
-	    id == WT_TXN_NONE || id == WT_TXN_ABORTED);
-
-	txn->id = id;
-}
+static inline void __wt_txn_read_first(WT_SESSION_IMPL *session);
+static inline void __wt_txn_read_last(WT_SESSION_IMPL *session);
 
 /*
  * __wt_txn_modify --
- *	Mark an object modified by the current transaction.
+ *	Mark a WT_UPDATE object modified by the current transaction.
  */
 static inline int
 __wt_txn_modify(WT_SESSION_IMPL *session, wt_txnid_t *id)
 {
 	WT_TXN *txn;
 
-	txn = &session->txn;
-	if (F_ISSET(txn, TXN_RUNNING)) {
-		if (txn->mod_count * sizeof(wt_txnid_t *) == txn->mod_alloc)
-			WT_RET(__wt_realloc(session, &txn->mod_alloc,
-			    WT_MAX(10, 2 * txn->mod_count) *
-			    sizeof(wt_txnid_t *), &txn->mod));
-		txn->mod[txn->mod_count++] = id;
-	} else
-		__wt_txn_getid(session);
+	if (!F_ISSET(S2C(session), WT_CONN_TRANSACTIONAL))
+		return (0);
 
+	txn = &session->txn;
+	WT_ASSERT(session, F_ISSET(txn, TXN_RUNNING));
+	if (txn->mod_count * sizeof(wt_txnid_t *) == txn->mod_alloc)
+		WT_RET(__wt_realloc(session, &txn->mod_alloc,
+		    WT_MAX(10, 2 * txn->mod_count) *
+		    sizeof(wt_txnid_t *), &txn->mod));
+
+	txn->mod[txn->mod_count++] = id;
 	*id = txn->id;
+	return (0);
+}
+
+/*
+ * __wt_txn_modify_ref --
+ *	Mark a WT_REF object modified by the current transaction.
+ */
+static inline int
+__wt_txn_modify_ref(WT_SESSION_IMPL *session, WT_REF *ref)
+{
+	WT_TXN *txn;
+
+	if (!F_ISSET(S2C(session), WT_CONN_TRANSACTIONAL))
+		return (0);
+
+	txn = &session->txn;
+	WT_ASSERT(session, F_ISSET(txn, TXN_RUNNING));
+	if (txn->modref_count *
+	    sizeof(WT_REF *) == txn->modref_alloc)
+		WT_RET(__wt_realloc(session, &txn->modref_alloc,
+		    WT_MAX(10, 2 * txn->modref_count) *
+		    sizeof(WT_REF *), &txn->modref));
+
+	txn->modref[txn->modref_count++] = ref;
+	ref->txnid = txn->id;
 	return (0);
 }
 
@@ -69,6 +67,9 @@ static inline void
 __wt_txn_unmodify(WT_SESSION_IMPL *session)
 {
 	WT_TXN *txn;
+
+	if (!F_ISSET(S2C(session), WT_CONN_TRANSACTIONAL))
+		return;
 
 	txn = &session->txn;
 	if (F_ISSET(txn, TXN_RUNNING)) {
@@ -96,29 +97,53 @@ __wt_txn_visible(WT_SESSION_IMPL *session, wt_txnid_t id)
 
 	/* Transactions see their own changes. */
 	txn = &session->txn;
-	if (F_ISSET(txn, TXN_RUNNING) && id == txn->id)
-		return (1);
-
-	/* Read-uncommitted transactions see all other changes. */
-	if (txn->isolation == TXN_ISO_READ_UNCOMMITTED)
+	if (id == txn->id)
 		return (1);
 
 	/*
-	 * TXN_ISO_SNAPSHOT, TXN_ISO_READ_COMMITTED:
-	 * Otherwise, the ID is visible if it is not the result of a concurrent
-	 * transaction, that is, if it is not in the snapshot list.
+	 * Read-uncommitted transactions see all other changes.
+	 *
+	 * All metadata reads are at read-uncommitted isolation.  That's
+	 * because once a schema-level operation completes, subsequent
+	 * operations must see the current version of checkpoint metadata, or
+	 * they may try to read blocks that may have been freed from a file.
+	 * Metadata updates use non-transactional techniques (such as the
+	 * schema and metadata locks) to protect access to in-flight updates.
 	 */
-	if (txn->snapshot_count == 0 || TXNID_LT(id, txn->snap_min))
+	if (txn->isolation == TXN_ISO_READ_UNCOMMITTED ||
+	    session->btree == session->metafile)
 		return (1);
+
+	/*
+	 * TXN_ISO_SNAPSHOT, TXN_ISO_READ_COMMITTED: the ID is visible if it is
+	 * not the result of a concurrent transaction, that is, if was
+	 * committed before the snapshot was taken.
+	 *
+	 * The order here is important: anything newer than the maximum ID we
+	 * saw when taking the snapshot should be invisible, even if the
+	 * snapshot is empty.
+	 */
 	if (TXNID_LT(txn->snap_max, id))
 		return (0);
+	if (txn->snapshot_count == 0 || TXNID_LT(id, txn->snap_min))
+		return (1);
 
-	/*
-	 * Fast path the single-threaded case where there are no concurrent
-	 * transactions.
-	 */
 	return (bsearch(&id, txn->snapshot, txn->snapshot_count,
 	    sizeof(wt_txnid_t), __wt_txnid_cmp) == NULL);
+}
+
+/*
+ * __wt_txn_visible_all --
+ *	Check if a given transaction ID is "globally visible".  This is, if
+ *	all sessions in the system will see the transaction ID.
+ */
+static inline int
+__wt_txn_visible_all(WT_SESSION_IMPL *session, wt_txnid_t id)
+{
+	WT_TXN *txn;
+
+	txn = &session->txn;
+	return (TXNID_LT(id, txn->oldest_snap_min));
 }
 
 /*
@@ -164,7 +189,7 @@ __wt_txn_update_check(WT_SESSION_IMPL *session, WT_UPDATE *upd)
 	if (txn->isolation == TXN_ISO_SNAPSHOT)
 		while (upd != NULL && !__wt_txn_visible(session, upd->txnid)) {
 			if (upd->txnid != WT_TXN_ABORTED) {
-				WT_BSTAT_INCR(session, update_conflict);
+				WT_BSTAT_INCR(session, txn_update_conflict);
 				return (WT_DEADLOCK);
 			}
 			upd = upd->next;
@@ -206,10 +231,28 @@ __wt_txn_ancient(WT_SESSION_IMPL *session, wt_txnid_t id)
 }
 
 /*
+ * __wt_txn_autocommit_check --
+ *	If an auto-commit transaction is required, start one.
+ */
+static inline int
+__wt_txn_autocommit_check(WT_SESSION_IMPL *session)
+{
+	WT_TXN *txn;
+
+	txn = &session->txn;
+	if (F_ISSET(txn, TXN_AUTOCOMMIT)) {
+		F_CLR(txn, TXN_AUTOCOMMIT);
+		return (__wt_txn_begin(session, NULL));
+	}
+
+	return (0);
+}
+
+/*
  * __wt_txn_read_first --
  *	Called for the first page read for a session.
  */
-static inline int
+static inline void
 __wt_txn_read_first(WT_SESSION_IMPL *session)
 {
 	WT_TXN *txn;
@@ -225,18 +268,16 @@ __wt_txn_read_first(WT_SESSION_IMPL *session)
 	 * the oldest reader in the system can be tracked.  This prevents any
 	 * update the we are reading from being trimmed to save memory.
 	 */
-	if (!F_ISSET(txn, TXN_RUNNING)) {
-		WT_ASSERT(session, txn_state->id == WT_TXN_NONE &&
-		    !F_ISSET(txn_state, TXN_STATE_RUNNING));
-		txn_state->id = txn_global->current;
-	}
+	WT_ASSERT(session, F_ISSET(txn, TXN_RUNNING) ||
+	    (txn_state->id == WT_TXN_NONE &&
+	    txn_state->snap_min == WT_TXN_NONE));
 
 	if (txn->isolation == TXN_ISO_READ_COMMITTED ||
 	    (!F_ISSET(txn, TXN_RUNNING) &&
 	    txn->isolation == TXN_ISO_SNAPSHOT))
-		WT_RET(__wt_txn_get_snapshot(session, WT_TXN_NONE));
-
-	return (0);
+		__wt_txn_get_snapshot(session, WT_TXN_NONE, WT_TXN_NONE);
+	else if (!F_ISSET(txn, TXN_RUNNING))
+		txn_state->snap_min = txn_global->current;
 }
 
 /*
@@ -252,18 +293,11 @@ __wt_txn_read_last(WT_SESSION_IMPL *session)
 	txn = &session->txn;
 	txn_state = &S2C(session)->txn_global.states[session->id];
 
-	/*
-	 * If there is no transaction running, release the ID we put in the
-	 * global table.
-	 */
-	if (!F_ISSET(txn, TXN_RUNNING)) {
-		WT_ASSERT(session, txn_state->id != WT_TXN_NONE &&
-		    !F_ISSET(txn_state, TXN_STATE_RUNNING));
-		txn_state->id = WT_TXN_NONE;
-	}
-
+	/* Release the snap_min ID we put in the global table. */
 	if (txn->isolation == TXN_ISO_READ_COMMITTED ||
 	    (!F_ISSET(txn, TXN_RUNNING) &&
 	    txn->isolation == TXN_ISO_SNAPSHOT))
 		__wt_txn_release_snapshot(session);
+	else if (!F_ISSET(txn, TXN_RUNNING))
+		txn_state->snap_min = WT_TXN_NONE;
 }

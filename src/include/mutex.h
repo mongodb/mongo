@@ -70,10 +70,10 @@
  * (compare and swap) operations.
  */
 #if defined(_lint)
-#define	WT_ATOMIC_ADD(v, val)
+#define	WT_ATOMIC_ADD(v, val)	((v) += (val), (v))
 #define	WT_ATOMIC_CAS(v, oldv, newv)					\
 	((v) == (oldv) || (v) == (newv) ? 1 : 0)
-#define	WT_ATOMIC_SUB(v, val)
+#define	WT_ATOMIC_SUB(v, val)	((v) -= (val), (v))
 #define	WT_FULL_BARRIER()
 #define	WT_READ_BARRIER()
 #define	WT_WRITE_BARRIER()
@@ -161,7 +161,7 @@ struct __wt_condvar {
 	pthread_mutex_t mtx;		/* Mutex */
 	pthread_cond_t  cond;		/* Condition variable */
 
-	int locked;			/* Mutex is locked */
+	int signalled;			/* Condition signalled */
 };
 
 /*

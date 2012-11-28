@@ -34,7 +34,7 @@ struct __wt_cache {
 	/*
 	 * Read information.
 	 */
-	uint32_t   read_gen;		/* Page read generation (LRU) */
+	uint64_t   read_gen;		/* Page read generation (LRU) */
 
 	/*
 	 * Eviction thread information.
@@ -52,16 +52,39 @@ struct __wt_cache {
 	WT_EVICT_ENTRY *evict_current;	/* LRU current page to be evicted */
 	size_t   evict_allocated;	/* LRU list bytes allocated */
 	uint32_t evict_entries;		/* LRU list eviction slots */
-
-	/*
-	 * Forced-page eviction request information.
-	 */
-	WT_EVICT_ENTRY *evict_request;	/* Forced page eviction request list */
-	uint32_t max_evict_request;	/* Size of the eviction request array */
+	uint32_t evict_candidates;	/* LRU list pages to evict */
+	u_int    evict_file_next;	/* LRU: next file to search */
 
 	/*
 	 * Sync/flush request information.
 	 */
 	volatile uint64_t sync_request;	/* File sync requests */
 	volatile uint64_t sync_complete;/* File sync requests completed */
+
+	/*
+	 * Cache pool information.
+	 */
+	uint64_t cp_saved_evict;	/* Evict count from last pass */
+	uint64_t cp_current_evict;	/* Evict count from current pass */
+	uint32_t cp_skip_count;		/* Post change stabilization */
+};
+
+/*
+ * WT_CACHE_POOL --
+ *	A structure that represents a shared cache.
+ */
+struct __wt_cache_pool {
+	WT_SPINLOCK cache_pool_lock;
+	pthread_t cache_pool_tid;
+	WT_CONDVAR *cache_pool_cond;
+	WT_SESSION_IMPL *session;
+	const char *name;
+	uint64_t size;
+	uint64_t min;		/* The minimum size per connection. */
+	uint64_t chunk;
+	uint64_t currently_used;
+	uint32_t flags;
+	uint32_t refs;		/* Reference count for structure. */
+	/* Locked: List of connections participating in the cache pool. */
+	TAILQ_HEAD(__wt_cache_pool_qh, __wt_connection_impl) cache_pool_qh;
 };

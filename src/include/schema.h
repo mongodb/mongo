@@ -31,6 +31,8 @@ struct __wt_index {
 	const char *key_format;		/* Key format */
 	const char *key_plan;		/* Key projection plan */
 	const char *value_plan;		/* Value projection plan */
+
+	int need_value;			/* Index must have a non-empty value. */
 };
 
 /*
@@ -68,4 +70,11 @@ struct __wt_table {
 	(op);								\
 	F_CLR(session, WT_SESSION_SCHEMA_LOCKED);			\
 	__wt_spin_unlock(session, &S2C(session)->schema_lock);		\
+} while (0)
+
+#define	WT_WITH_SCHEMA_LOCK_OPT(session, op) do {			\
+	if (F_ISSET(session, WT_SESSION_SCHEMA_LOCKED))			\
+		(op);							\
+	else								\
+		WT_WITH_SCHEMA_LOCK(session, op);			\
 } while (0)

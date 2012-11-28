@@ -136,8 +136,7 @@ static int  __slvg_trk_ovfl(WT_SESSION_IMPL *,
  *	Salvage a Btree.
  */
 int
-__wt_bt_salvage(
-    WT_SESSION_IMPL *session, WT_CKPT *ckptbase, const char *cfg[])
+__wt_bt_salvage(WT_SESSION_IMPL *session, WT_CKPT *ckptbase, const char *cfg[])
 {
 	WT_BTREE *btree;
 	WT_DECL_RET;
@@ -274,7 +273,7 @@ __wt_bt_salvage(
 	 */
 	if (ss->root_page != NULL) {
 		btree->ckpt = ckptbase;
-		ret = __wt_rec_evict(session, ss->root_page, WT_REC_SINGLE);
+		ret = __wt_rec_evict(session, ss->root_page, 1);
 		btree->ckpt = NULL;
 		ss->root_page = NULL;
 	}
@@ -322,15 +321,27 @@ __slvg_read(WT_SESSION_IMPL *session, WT_STUFF *ss)
 	WT_ERR(__wt_scr_alloc(session, 0, &buf));
 
 	for (;;) {
+		/* Get the next block address from the block manager. */
 		WT_ERR(__wt_bm_salvage_next(
-		    session, buf, addrbuf, &addrbuf_size, &gen, &eof));
+		    session, addrbuf, &addrbuf_size, &gen, &eof));
 		if (eof)
 			break;
-		dsk = buf->mem;
 
-		/* Report progress every 10 reads. */
+		/* Report progress every 10 chunks. */
 		if (++ss->fcnt % 10 == 0)
 			WT_ERR(__wt_progress(session, NULL, ss->fcnt));
+
+		/*
+		 * Read (and potentially decompress) the block; the underlying
+		 * block manager might only return good blocks if checksums are
+		 * configured, else we may be relying on compression.  If the
+		 * read fails, simply move to the next potential block.
+		 */
+		if (__wt_bt_read(session, buf, addrbuf, addrbuf_size) != 0)
+			continue;
+
+		/* Tell the block manager we're taking this one. */
+		WT_ERR(__wt_bm_salvage_valid(session, addrbuf, addrbuf_size));
 
 		/* Create a printable version of the address. */
 		WT_ERR(__wt_bm_addr_string(session, as, addrbuf, addrbuf_size));
@@ -344,36 +355,41 @@ __slvg_read(WT_SESSION_IMPL *session, WT_STUFF *ss)
 		 * grow as little as possible, or shrink, and future salvage
 		 * calls don't need them either.
 		 */
+		dsk = buf->mem;
 		switch (dsk->type) {
 		case WT_PAGE_BLOCK_MANAGER:
 		case WT_PAGE_COL_INT:
 		case WT_PAGE_ROW_INT:
 			WT_VERBOSE_ERR(session, salvage,
 			    "%s page ignored %s",
-			    __wt_page_type_string(dsk->type), (char *)as->data);
+			    __wt_page_type_string(dsk->type),
+			    (const char *)as->data);
 			WT_ERR(__wt_bm_free(session, addrbuf, addrbuf_size));
 			continue;
 		}
 
 		/*
-		 * Next, verify the page.  It's vanishingly unlikely a page
-		 * could pass checksum and still be broken, but a degree of
-		 * paranoia is healthy in salvage.  Regardless, verify does
-		 * return failure because it detects failures we'd expect to
-		 * see in a corrupted file, like overflow references past the
-		 * end of the file, might as well discard these pages now.
+		 * Verify the page.  It's unlikely a page could have a valid
+		 * checksum and still be broken, but paranoia is healthy in
+		 * salvage.  Regardless, verify does return failure because
+		 * it detects failures we'd expect to see in a corrupted file,
+		 * like overflow references past the the end of the file or
+		 * overflow references to non-existent pages, might as well
+		 * discard these pages now.
 		 */
-		if (__wt_verify_dsk(session, (char *)as->data, buf) != 0) {
+		if (__wt_verify_dsk(session, as->data, buf) != 0) {
 			WT_VERBOSE_ERR(session, salvage,
 			    "%s page failed verify %s",
-			    __wt_page_type_string(dsk->type), (char *)as->data);
+			    __wt_page_type_string(dsk->type),
+			    (const char *)as->data);
 			WT_ERR(__wt_bm_free(session, addrbuf, addrbuf_size));
 			continue;
 		}
 
 		WT_VERBOSE_ERR(session, salvage,
 		    "tracking %s page, generation %" PRIu64 " %s",
-		    __wt_page_type_string(dsk->type), gen, (char *)as->data);
+		    __wt_page_type_string(dsk->type), gen,
+		    (const char *)as->data);
 
 		switch (dsk->type) {
 		case WT_PAGE_COL_FIX:
@@ -462,7 +478,8 @@ __slvg_trk_leaf(WT_SESSION_IMPL *session, WT_PAGE_HEADER *dsk,
 		   (ss->pages_next + 1000) * sizeof(WT_TRACK *), &ss->pages));
 
 	/* Allocate a WT_TRACK entry for this new page and fill it in. */
-	WT_RET(__slvg_trk_init(session, addr, size, dsk->size, gen, ss, &trk));
+	WT_RET(
+	    __slvg_trk_init(session, addr, size, dsk->mem_size, gen, ss, &trk));
 
 	switch (dsk->type) {
 	case WT_PAGE_COL_FIX:
@@ -569,7 +586,8 @@ __slvg_trk_ovfl(WT_SESSION_IMPL *session, WT_PAGE_HEADER *dsk,
 		WT_RET(__wt_realloc(session, &ss->ovfl_allocated,
 		   (ss->ovfl_next + 1000) * sizeof(WT_TRACK *), &ss->ovfl));
 
-	WT_RET(__slvg_trk_init(session, addr, size, dsk->size, gen, ss, &trk));
+	WT_RET(
+	    __slvg_trk_init(session, addr, size, dsk->mem_size, gen, ss, &trk));
 	ss->ovfl[ss->ovfl_next++] = trk;
 
 	return (0);
@@ -1030,6 +1048,27 @@ __slvg_col_range_missing(WT_SESSION_IMPL *session, WT_STUFF *ss)
 }
 
 /*
+ * __slvg_modify_init --
+ *	Initialize a salvage page's modification information.
+ */
+static int
+__slvg_modify_init(WT_SESSION_IMPL *session, WT_PAGE *page)
+{
+	WT_BTREE *btree;
+
+	btree = session->btree;
+
+	/* The tree is dirty. */
+	btree->modified = 1;
+
+	/* The page is dirty. */
+	WT_RET(__wt_page_modify_init(session, page));
+	__wt_page_modify_set(page);
+
+	return (0);
+}
+
+/*
  * __slvg_col_build_internal --
  *	Build a column-store in-memory page that references all of the leaf
  *	pages we've found.
@@ -1056,8 +1095,7 @@ __slvg_col_build_internal(
 	page->u.intl.recno = 1;
 	page->entries = leaf_cnt;
 	page->type = WT_PAGE_COL_INT;
-	WT_ERR(__wt_page_modify_init(session, page));
-	__wt_page_modify_set(session, page);
+	WT_ERR(__slvg_modify_init(session, page));
 
 	for (ref = page->u.intl.t, i = 0; i < ss->pages_next; ++i) {
 		if ((trk = ss->pages[i]) == NULL)
@@ -1067,6 +1105,8 @@ __slvg_col_build_internal(
 		WT_ERR(__wt_strndup(session,
 		    (char *)trk->addr.addr, trk->addr.size, &addr->addr));
 		addr->size = trk->addr.size;
+		addr->leaf_no_overflow = trk->ovfl_cnt == 0 ? 1 : 0;
+
 		ref->page = NULL;
 		ref->addr = addr;
 		ref->u.recno = trk->col_start;
@@ -1174,16 +1214,15 @@ __slvg_col_build_leaf(
 	ref->addr = NULL;
 
 	/* Write the new version of the leaf page to disk. */
-	WT_ERR(__wt_page_modify_init(session, page));
-	__wt_page_modify_set(session, page);
-	WT_ERR(__wt_rec_write(session, page, cookie));
+	WT_ERR(__slvg_modify_init(session, page));
+	WT_ERR(__wt_rec_write(session, page, cookie, 0));
 
 	/* Reset the page. */
 	page->u.col_var.d = save_col_var;
 	page->entries = save_entries;
 
 	__wt_page_release(session, page);
-	ret = __wt_rec_evict(session, page, WT_REC_SINGLE);
+	ret = __wt_rec_evict(session, page, 1);
 
 	if (0) {
 err:		__wt_page_release(session, page);
@@ -1550,7 +1589,7 @@ __slvg_row_trk_update_start(
 	 * page successfully).
 	 */
 	WT_RET(__wt_scr_alloc(session, trk->size, &dsk));
-	WT_ERR(__wt_bm_read(session, dsk, trk->addr.addr, trk->addr.size));
+	WT_ERR(__wt_bt_read(session, dsk, trk->addr.addr, trk->addr.size));
 	WT_ERR(__wt_page_inmem(session, NULL, NULL, dsk->mem, &page));
 
 	/*
@@ -1630,8 +1669,7 @@ __slvg_row_build_internal(
 	page->read_gen = 0;
 	page->entries = leaf_cnt;
 	page->type = WT_PAGE_ROW_INT;
-	WT_ERR(__wt_page_modify_init(session, page));
-	__wt_page_modify_set(session, page);
+	WT_ERR(__slvg_modify_init(session, page));
 
 	for (ref = page->u.intl.t, i = 0; i < ss->pages_next; ++i) {
 		if ((trk = ss->pages[i]) == NULL)
@@ -1641,9 +1679,11 @@ __slvg_row_build_internal(
 		WT_ERR(__wt_strndup(session,
 		    (char *)trk->addr.addr, trk->addr.size, &addr->addr));
 		addr->size = trk->addr.size;
+		addr->leaf_no_overflow = trk->ovfl_cnt == 0 ? 1 : 0;
 
 		ref->page = NULL;
 		ref->addr = addr;
+		ref->u.key = NULL;
 		ref->state = WT_REF_DISK;
 
 		/*
@@ -1827,9 +1867,8 @@ __slvg_row_build_leaf(WT_SESSION_IMPL *session,
 		ref->addr = NULL;
 
 		/* Write the new version of the leaf page to disk. */
-		WT_ERR(__wt_page_modify_init(session, page));
-		__wt_page_modify_set(session, page);
-		WT_ERR(__wt_rec_write(session, page, cookie));
+		WT_ERR(__slvg_modify_init(session, page));
+		WT_ERR(__wt_rec_write(session, page, cookie, 0));
 
 		/* Reset the page. */
 		page->entries += skip_stop;
@@ -1840,7 +1879,7 @@ __slvg_row_build_leaf(WT_SESSION_IMPL *session,
 	 * parent's reference.
 	 */
 	__wt_page_release(session, page);
-	ret = __wt_rec_evict(session, page, WT_REC_SINGLE);
+	ret = __wt_rec_evict(session, page, 1);
 
 	if (0) {
 err:		__wt_page_release(session, page);

@@ -52,6 +52,9 @@
 #define	WT_SKIP_MAXDEPTH	10
 #define	WT_SKIP_PROBABILITY	(UINT32_MAX >> 2)
 
+/* The number of hazard references that can be in use is grown dynamically. */
+#define	WT_HAZARD_INCR		10
+
 /*
  * Quiet compiler warnings about unused parameters.
  */
@@ -169,6 +172,12 @@
 /* Function return value and scratch buffer declaration and initialization. */
 #define	WT_DECL_ITEM(i)	WT_ITEM *i = NULL
 #define	WT_DECL_RET	int ret = 0
+
+/* Flags for the tree-walk function. */
+#define	WT_TREE_COMPACT	0x01			/* Compaction */
+#define	WT_TREE_DISCARD	0x02			/* Discarding */
+#define	WT_TREE_EVICT	0x04			/* Eviction */
+#define	WT_TREE_PREV	0x08			/* Backward walk */
 
 /*
  * In diagnostic mode we track the locations from which hazard references and

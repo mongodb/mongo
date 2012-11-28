@@ -174,13 +174,17 @@ cursor_ops(WT_SESSION *session)
 
 	{
 	WT_CURSOR *other = NULL;
-	/*! [Test cursor equality] */
-	int equal;
-	ret = cursor->equals(cursor, other, &equal);
-	if (equal) {
-		/* Take some action. */
+	/*! [Cursor comparison] */
+	int compare;
+	ret = cursor->compare(cursor, other, &compare);
+	if (compare == 0) {
+		/* Cursors reference the same key */
+	} else if (compare < 0) {
+		/* Cursor key less than other key */
+	} else if (compare > 0) {
+		/* Cursor key greater than other key */
 	}
-	/*! [Test cursor equality] */
+	/*! [Cursor comparison] */
 	}
 
 	{
@@ -391,18 +395,37 @@ session_ops(WT_SESSION *session)
 	    "table:mytable", "key_format=S,value_format=S");
 	/*! [Create a table] */
 
+	/*
+	 * This example code gets run, and the compression libraries might not
+	 * be loaded, causing the create to fail.  The documentation requires
+	 * the code snippets, use #ifdef's to avoid running it.
+	 */
+#ifdef MIGHT_NOT_RUN
+	/*! [Create a bzip2 compressed table] */
+	ret = session->create(session,
+	    "table:mytable",
+	    "block_compressor=bzip2,key_format=S,value_format=S");
+	/*! [Create a bzip2 compressed table] */
+
+	/*! [Create a snappy compressed table] */
+	ret = session->create(session,
+	    "table:mytable",
+	    "block_compressor=snappy,key_format=S,value_format=S");
+	/*! [Create a snappy compressed table] */
+#endif
+
 	/*! [Create a cache-resident object] */
 	ret = session->create(session,
 	    "table:mytable", "key_format=r,value_format=S,cache_resident=true");
 	/*! [Create a cache-resident object] */
 
+	/*! [Compact a table] */
+	ret = session->compact(session, "table:mytable", NULL);
+	/*! [Compact a table] */
+
 	/*! [Drop a table] */
 	ret = session->drop(session, "table:mytable", NULL);
 	/*! [Drop a table] */
-
-	/*! [Dump a file] */
-	ret = session->dumpfile(session, "file:myfile", NULL);
-	/*! [Dump a file] */
 
 	/*! [Print to the message stream] */
 	ret = session->msg_printf(
@@ -519,12 +542,13 @@ transaction_ops(WT_CONNECTION *conn, WT_SESSION *session)
 /*! [WT_DATA_SOURCE create] */
 static int
 my_create(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
-    const char *name, const char *config)
+    const char *name, int exclusive, const char *config)
 {
 	/* Unused parameters */
 	(void)dsrc;
 	(void)session;
 	(void)name;
+	(void)exclusive;
 	(void)config;
 
 	return (0);
@@ -534,13 +558,13 @@ my_create(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 /*! [WT_DATA_SOURCE drop] */
 static int
 my_drop(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
-    const char *name, const char *config)
+    const char *name, const char *cfg[])
 {
 	/* Unused parameters */
 	(void)dsrc;
 	(void)session;
 	(void)name;
-	(void)config;
+	(void)cfg;
 
 	return (0);
 }
@@ -549,7 +573,7 @@ my_drop(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 /*! [WT_DATA_SOURCE open_cursor] */
 static int
 my_open_cursor(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
-    const char *obj, WT_CURSOR *old_cursor, const char *config,
+    const char *obj, WT_CURSOR *owner, const char *cfg[],
     WT_CURSOR **new_cursor)
 {
 	/* Unused parameters */
@@ -557,8 +581,8 @@ my_open_cursor(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 
 	(void)session;
 	(void)obj;
-	(void)old_cursor;
-	(void)config;
+	(void)owner;
+	(void)cfg;
 	(void)new_cursor;
 
 	return (0);
@@ -568,44 +592,29 @@ my_open_cursor(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 /*! [WT_DATA_SOURCE rename] */
 static int
 my_rename(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
-    const char *oldname, const char *newname, const char *config)
+    const char *oldname, const char *newname, const char *cfg[])
 {
 	/* Unused parameters */
 	(void)dsrc;
 	(void)session;
 	(void)oldname;
 	(void)newname;
-	(void)config;
+	(void)cfg;
 
 	return (0);
 }
 /*! [WT_DATA_SOURCE rename] */
 
-/*! [WT_DATA_SOURCE sync] */
-static int
-my_sync(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
-    const char *name, const char *config)
-{
-	/* Unused parameters */
-	(void)dsrc;
-	(void)session;
-	(void)name;
-	(void)config;
-
-	return (0);
-}
-/*! [WT_DATA_SOURCE sync] */
-
 /*! [WT_DATA_SOURCE truncate] */
 static int
 my_truncate(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
-    const char *name, const char *config)
+    const char *name, const char *cfg[])
 {
 	/* Unused parameters */
 	(void)dsrc;
 	(void)session;
 	(void)name;
-	(void)config;
+	(void)cfg;
 
 	return (0);
 }
@@ -622,7 +631,6 @@ add_data_source(WT_CONNECTION *conn)
 		my_drop,
 		my_open_cursor,
 		my_rename,
-		my_sync,
 		my_truncate
 	};
 	ret = conn->add_data_source(conn, "dsrc:", &my_dsrc, NULL);
@@ -742,7 +750,7 @@ add_compressor(WT_CONNECTION *conn)
 
 	/*! [WT_COMPRESSOR register] */
 	static WT_COMPRESSOR my_compressor = {
-	    my_compress, my_decompress, my_pre_size };
+	    my_compress, NULL, my_decompress, my_pre_size };
 	ret = conn->add_compressor(conn, "my_compress", &my_compressor, NULL);
 	/*! [WT_COMPRESSOR register] */
 
@@ -902,13 +910,43 @@ main(void)
 {
 	int ret;
 
+	system("rm -rf WiredTigerHome && mkdir WiredTigerHome");
+
 	{
 	/*! [Open a connection] */
 	WT_CONNECTION *conn;
-	const char *home = "WT_TEST";
-	ret = wiredtiger_open(home, NULL, "create,transactional", &conn);
+
+	ret = wiredtiger_open(
+	    "WiredTigerHome", NULL, "create,transactional", &conn);
 	/*! [Open a connection] */
 	}
+
+	/*
+	 * This example code gets run, and the compression libraries might not
+	 * be installed, causing the open to fail.  The documentation requires
+	 * the code snippets, use #ifdef's to avoid running it.
+	 */
+#ifdef MIGHT_NOT_RUN
+	{
+	/*! [Configure bzip2 extension] */
+	WT_CONNECTION *conn;
+
+	ret = wiredtiger_open("WiredTigerHome", NULL,
+	    "create,"
+	    "extensions=[\"/usr/local/lib/wiredtiger_bzip2.so\"]", &conn);
+	/*! [Configure bzip2 extension] */
+	}
+
+	{
+	/*! [Configure snappy extension] */
+	WT_CONNECTION *conn;
+
+	ret = wiredtiger_open("WiredTigerHome", NULL,
+	    "create,"
+	    "extensions=[\"/usr/local/lib/wiredtiger_snappy.so\"]", &conn);
+	/*! [Configure snappy extension] */
+	}
+#endif
 
 	/*! [Get the WiredTiger library version #1] */
 	printf("WiredTiger version %s\n", wiredtiger_version(NULL, NULL, NULL));

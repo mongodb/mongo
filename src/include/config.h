@@ -26,4 +26,5 @@ struct __wt_config_check {
 	const char *name;
 	const char *type;
 	const char *checks;
+	WT_CONFIG_CHECK *subconfigs;
 };

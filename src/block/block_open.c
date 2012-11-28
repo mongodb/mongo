@@ -86,28 +86,6 @@ __wt_block_open(WT_SESSION_IMPL *session, const char *filename,
 	WT_ERR(__wt_config_getones(session, config, "allocation_size", &cval));
 	block->allocsize = (uint32_t)cval.val;
 
-	/* Check if configured for checksums. */
-	WT_ERR(__wt_config_getones(session, config, "checksum", &cval));
-	block->checksum = cval.val == 0 ? 0 : 1;
-
-	/* Page compressor */
-	WT_ERR(__wt_config_getones(session, config, "block_compressor", &cval));
-	if (cval.len > 0) {
-		WT_CONNECTION_IMPL *conn;
-		WT_NAMED_COMPRESSOR *ncomp;
-
-		conn = S2C(session);
-		TAILQ_FOREACH(ncomp, &conn->compqh, q)
-			if (WT_STRING_MATCH(ncomp->name, cval.str, cval.len)) {
-				block->compressor = ncomp->compressor;
-				break;
-			}
-		if (block->compressor == NULL)
-			WT_ERR_MSG(session, EINVAL,
-			    "unknown block_compressor '%.*s'",
-			    (int)cval.len, cval.str);
-	}
-
 	/* Open the underlying file handle. */
 	WT_ERR(__wt_open(session, filename, 0, 0, 1, &block->fh));
 
@@ -164,8 +142,8 @@ int
 __wt_desc_init(WT_SESSION_IMPL *session, WT_FH *fh)
 {
 	WT_BLOCK_DESC *desc;
+	WT_DECL_ITEM(buf);
 	WT_DECL_RET;
-	WT_ITEM *buf;
 
 	/* Use a scratch buffer to get correct alignment for direct I/O. */
 	WT_RET(__wt_scr_alloc(session, WT_BLOCK_DESC_SECTOR, &buf));
@@ -194,8 +172,8 @@ static int
 __desc_read(WT_SESSION_IMPL *session, WT_BLOCK *block)
 {
 	WT_BLOCK_DESC *desc;
+	WT_DECL_ITEM(buf);
 	WT_DECL_RET;
-	WT_ITEM *buf;
 	uint32_t cksum;
 
 	/* Use a scratch buffer to get correct alignment for direct I/O. */
@@ -238,7 +216,7 @@ __desc_read(WT_SESSION_IMPL *session, WT_BLOCK *block)
 		    block->name);
 
 err:	__wt_scr_free(&buf);
-	return (0);
+	return (ret);
 }
 
 /*
@@ -248,6 +226,7 @@ err:	__wt_scr_free(&buf);
 void
 __wt_block_stat(WT_SESSION_IMPL *session, WT_BLOCK *block)
 {
+	WT_BSTAT_SET(session, ckpt_size, block->live.ckpt_size);
 	WT_BSTAT_SET(session, file_size, block->fh->file_size);
 	WT_BSTAT_SET(session, file_magic, WT_BLOCK_MAGIC);
 	WT_BSTAT_SET(session, file_major, WT_BLOCK_MAJOR_VERSION);

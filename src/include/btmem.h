@@ -18,7 +18,11 @@ struct __wt_page_header {
 	 */
 	uint64_t recno;			/* 00-07: column-store starting recno */
 
-	uint32_t size;			/* 08-11: page size */
+	/*
+	 * The page's in-memory size isn't rounded or aligned, it's the actual
+	 * number of bytes the disk-image consumes when instantiated in memory.
+	 */
+	uint32_t mem_size;		/* 08-11: in-memory page size */
 
 	union {
 		uint32_t entries;	/* 12-15: number of cells on page */
@@ -27,12 +31,15 @@ struct __wt_page_header {
 
 	uint8_t type;			/* 16: page type */
 
+#define	WT_PAGE_COMPRESSED	0x01	/* Page is compressed on disk */
+	uint8_t flags;			/* 17: flags */
+
 	/*
-	 * End the WT_PAGE_HEADER structure with 3 bytes of padding: it wastes
-	 * space, but it leaves the WT_PAGE_HEADER structure 32-bit aligned and
-	 * having a small amount of space to play with in the future can't hurt.
+	 * End the structure with 2 bytes of padding: it wastes space, but it
+	 * leaves the structure 32-bit aligned and having a few bytes to play
+	 * with in the future can't hurt.
 	 */
-	uint8_t unused[3];		/* 17-19: unused padding */
+	uint8_t unused[2];		/* 18-19: unused padding */
 };
 /*
  * WT_PAGE_HEADER_SIZE is the number of bytes we allocate for the structure: if
@@ -59,11 +66,12 @@ struct __wt_page_header {
 
 /*
  * WT_ADDR --
- *	A block location.
+ *	An in-memory structure to hold a block's location.
  */
 struct __wt_addr {
-	uint8_t *addr;			/* Cookie */
-	uint32_t size;			/* Cookie length */
+	uint8_t *addr;			/* Block-manager's cookie */
+	uint32_t size;			/* Block-manager's cookie length */
+	uint8_t  leaf_no_overflow;	/* 1/0: a leaf page w/o overflow */
 };
 
 /*
@@ -165,6 +173,7 @@ struct __wt_page_modify {
 #define	WT_TRK_JUST_ADDED	0x004	/* Object added this reconciliation */
 #define	WT_TRK_OBJECT		0x008	/* Slot set (not empty) */
 #define	WT_TRK_ONPAGE		0x010	/* Object was referenced from a page */
+#define	WT_TRK_OVFL_VALUE	0x020	/* Cached deleted overflow value */
 		uint8_t  flags;
 	} *track;			/* Array of tracked objects */
 	uint32_t track_entries;		/* Total track slots */
@@ -269,7 +278,7 @@ struct __wt_page {
 	 * The read-generation is not declared volatile: read-generation is set
 	 * a lot (on every access), and we don't want to write it that much.
 	 */
-	 uint64_t read_gen;
+	uint64_t read_gen;
 
 	/*
 	 * In-memory pages optionally reference a number of entries originally
@@ -277,10 +286,7 @@ struct __wt_page {
 	 */
 	uint32_t entries;
 
-	/*
-	 * Memory attached to the page (although not exact or complete), used
-	 * to force eviction of a page tying too much memory down.
-	 */
+	/* Memory attached to the page. */
 	uint32_t memory_footprint;
 
 #define	WT_PAGE_INVALID		0	/* Invalid page */
@@ -308,6 +314,66 @@ struct __wt_page {
 	((void *)((uint8_t *)((page)->dsk) + (o)))
 
 /*
+ * Page state.
+ *
+ * Synchronization is based on the WT_REF->state field, which has a number of
+ * possible states:
+ *
+ * WT_REF_DISK:
+ *	The initial setting before a page is brought into memory, and set as a
+ * result of page eviction; the page is on disk, and must be read into memory
+ * before use.  WT_REF_DISK has a value of 0 (the default state after allocating
+ * cleared memory).
+ *
+ * WT_REF_DELETED:
+ *	The page is on disk, but has been deleted from the tree; we can delete
+ * row-store leaf pages without reading them if they don't reference overflow
+ * items.
+ *
+ * WT_REF_EVICT_WALK:
+ *	The next page to be walked for LRU eviction.  This page is available for
+ * reads but not eviction.
+ *
+ * WT_REF_LOCKED:
+ *	Set by eviction; an eviction thread has selected this page or a parent
+ * for eviction.  Once hazard references are checked, the page will be evicted.
+ *
+ * WT_REF_MEM:
+ *	Set by a reading thread once the page has been read from disk; the page
+ * is in the cache and the page reference is OK.
+ *
+ * WT_REF_READING:
+ *	Set by a reading thread before reading a page from disk; other readers
+ * of the page wait until the read completes.
+ *
+ * The life cycle of a typical page goes like this: pages are read into memory
+ * from disk and their state set to WT_REF_MEM.  When the page is selected for
+ * eviction, the page state is set to WT_REF_LOCKED.  In all cases, evicting
+ * threads reset the page's state when finished with the page: if eviction was
+ * successful (a clean page was discarded, and a dirty page was written to disk
+ * and then discarded), the page state is set to WT_REF_DISK; if eviction failed
+ * because the page was busy, page state is reset to WT_REF_MEM.
+ *
+ * Readers check the state field and if it's WT_REF_MEM, they set a hazard
+ * reference to the page, flush memory and re-confirm the page state.  If the
+ * page state is unchanged, the reader has a valid reference and can proceed.
+ *
+ * When an evicting thread wants to discard a page from the tree, it sets the
+ * WT_REF_LOCKED state, flushes memory, then checks hazard references.  If a
+ * hazard reference is found, state is reset to WT_REF_MEM, restoring the page
+ * to the readers.  If the evicting thread does not find a hazard reference,
+ * the page is evicted.
+ */
+enum __wt_page_state {
+	WT_REF_DISK=0,			/* Page is on disk */
+	WT_REF_DELETED,			/* Page is on disk, but deleted */
+	WT_REF_EVICT_WALK,		/* Next page for LRU eviction */
+	WT_REF_LOCKED,			/* Page being evicted */
+	WT_REF_MEM,			/* Page is in cache and valid */
+	WT_REF_READING			/* Page being read */
+};
+
+/*
  * WT_REF --
  *	A single in-memory page and the state information used to determine if
  * it's OK to dereference the pointer to the page.
@@ -321,68 +387,9 @@ struct __wt_ref {
 		uint64_t recno;		/* Column-store: starting recno */
 		void	*key;		/* Row-store: on-page cell or WT_IKEY */
 	} u;
+	wt_txnid_t txnid;		/* Transaction ID */
 
-	/*
-	 * Page state.
-	 *
-	 * Synchronization is based on the WT_REF->state field, which has a
-	 * number of possible states:
-	 *
-	 * WT_REF_DISK:
-	 *	The initial setting before a page is brought into memory, and
-	 *	set as a result of page eviction; the page is on disk, and must
-	 *	be read into into memory before use.  WT_REF_DISK has a value
-	 *	of 0, the default state after allocating cleared memory.
-	 *
-	 * WT_REF_EVICT_FORCE:
-	 *	Set by eviction when a page is awaiting forced eviction;
-	 *	prevents a page from being evicted multiple times concurrently.
-	 *
-	 * WT_REF_EVICT_WALK:
-	 *	The next page to be walked for LRU eviction.  This page is
-	 *	available for reads but not eviction.
-	 *
-	 * WT_REF_LOCKED:
-	 *	Set by eviction; an eviction thread has selected this page or
-	 *	a parent for eviction; once hazard references are checked, the
-	 *	page will be evicted.
-	 *
-	 * WT_REF_MEM:
-	 *	Set by a reading thread once the page has been read from disk;
-	 *	the page is in the cache and the page reference is OK.
-	 *
-	 * WT_REF_READING:
-	 *	Set by a reading thread before reading a page from disk; other
-	 *	readers of the page wait until the read completes.
-	 *
-	 * The life cycle of a typical page goes like this: pages are read into
-	 * memory from disk and their state set to WT_REF_MEM.  When the page is
-	 * selected for eviction, the page state is set to WT_REF_LOCKED.  In
-	 * all cases, evicting threads reset the page's state when finished with
-	 * the page: if eviction was successful (a clean page was discarded, and
-	 * a dirty page was written to disk and then discarded), the page state
-	 * is set to WT_REF_DISK; if eviction failed because the page was busy,
-	 * page state is reset to WT_REF_MEM.
-	 *
-	 * Readers check the state field and if it's WT_REF_MEM, they set a
-	 * hazard reference to the page, flush memory and re-confirm the page
-	 * state.  If the page state is unchanged, the reader has a valid
-	 * reference and can proceed.
-	 *
-	 * When an evicting thread wants to discard a page from the tree, it
-	 * sets the WT_REF_LOCKED state, flushes memory, then checks hazard
-	 * references.  If a hazard reference is found, state is reset to
-	 * WT_REF_MEM, restoring the page to the readers.  If the evicting
-	 * thread does not find a hazard reference, the page is evicted.
-	 */
-	volatile enum {
-		WT_REF_DISK=0,		/* Page is on disk */
-		WT_REF_EVICT_FORCE,	/* Page is awaiting force eviction */
-		WT_REF_EVICT_WALK,	/* Next page for LRU eviction */
-		WT_REF_LOCKED,		/* Page being evicted */
-		WT_REF_MEM,		/* Page is in cache and valid */
-		WT_REF_READING		/* Page being read */
-	} state;
+	volatile WT_PAGE_STATE state;	/* Page state */
 };
 
 /*

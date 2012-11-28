@@ -7,6 +7,7 @@
 
 #include "wt_internal.h"
 
+static int __session_checkpoint(WT_SESSION *, const char *);
 static int __session_rollback_transaction(WT_SESSION *, const char *);
 
 /*
@@ -25,17 +26,35 @@ __session_reset_cursors(WT_SESSION_IMPL *session)
 }
 
 /*
+ * __session_close_cache --
+ *	Close any cached handles in a session.  Called holding the schema lock.
+ */
+static int
+__session_close_cache(WT_SESSION_IMPL *session)
+{
+	WT_BTREE_SESSION *btree_session;
+	WT_DECL_RET;
+
+	while ((btree_session = TAILQ_FIRST(&session->btrees)) != NULL)
+		WT_TRET(__wt_session_discard_btree(session, btree_session));
+
+	WT_TRET(__wt_schema_close_tables(session));
+
+	return (ret);
+}
+
+/*
  * __session_close --
  *	WT_SESSION->close method.
  */
 static int
 __session_close(WT_SESSION *wt_session, const char *config)
 {
-	WT_BTREE_SESSION *btree_session;
 	WT_CONNECTION_IMPL *conn;
 	WT_CURSOR *cursor;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
+	int tret;
 
 	conn = (WT_CONNECTION_IMPL *)wt_session->connection;
 	session = (WT_SESSION_IMPL *)wt_session;
@@ -51,17 +70,17 @@ __session_close(WT_SESSION *wt_session, const char *config)
 	while ((cursor = TAILQ_FIRST(&session->cursors)) != NULL)
 		WT_TRET(cursor->close(cursor));
 
-	/* Acquire the schema lock: we may be closing btree handles. */
-	__wt_spin_lock(session, &S2C(session)->schema_lock);
-	F_SET(session, WT_SESSION_SCHEMA_LOCKED);
+	WT_ASSERT(session, session->ncursors == 0);
 
-	while ((btree_session = TAILQ_FIRST(&session->btrees)) != NULL)
-		WT_TRET(__wt_session_discard_btree(session, btree_session));
-
-	WT_TRET(__wt_schema_close_tables(session));
-
-	F_CLR(session, WT_SESSION_SCHEMA_LOCKED);
-	__wt_spin_unlock(session, &S2C(session)->schema_lock);
+	/*
+	 * Acquire the schema lock: we may be closing btree handles.
+	 *
+	 * Note that in some special cases, the schema may already be locked
+	 * (e.g., if this session is an LSM tree worker and the tree is being
+	 * dropped).
+	 */
+	WT_WITH_SCHEMA_LOCK_OPT(session, tret = __session_close_cache(session));
+	WT_TRET(tret);
 
 	/* Discard metadata tracking. */
 	__wt_meta_track_discard(session);
@@ -76,7 +95,7 @@ __session_close(WT_SESSION *wt_session, const char *config)
 	__wt_hazard_close(session);
 
 	/* Free the reconciliation information. */
-	__wt_rec_destroy(session);
+	__wt_rec_destroy(session, &session->reconcile);
 
 	/* Free the eviction exclusive-lock information. */
 	__wt_free(session, session->excl);
@@ -142,7 +161,7 @@ __session_reconfigure(WT_SESSION *wt_session, const char *config)
 			WT_ERR_MSG(session, EINVAL,
 			    "Database not configured for transactions");
 
-		session->isolation =
+		session->isolation = session->txn.isolation =
 		    WT_STRING_MATCH("snapshot", cval.str, cval.len) ?
 		    TXN_ISO_SNAPSHOT :
 		    WT_STRING_MATCH("read-uncommitted", cval.str, cval.len) ?
@@ -150,6 +169,45 @@ __session_reconfigure(WT_SESSION *wt_session, const char *config)
 	}
 
 err:	API_END_NOTFOUND_MAP(session, ret);
+}
+
+/*
+ * __wt_open_cursor --
+ *	Internal version of WT_SESSION::open_cursor.
+ */
+int
+__wt_open_cursor(WT_SESSION_IMPL *session,
+    const char *uri, WT_CURSOR *owner, const char *cfg[], WT_CURSOR **cursorp)
+{
+	WT_COLGROUP *colgroup;
+	WT_DATA_SOURCE *dsrc;
+	WT_DECL_RET;
+
+	if (WT_PREFIX_MATCH(uri, "backup:"))
+		ret = __wt_curbackup_open(session, uri, cfg, cursorp);
+	else if (WT_PREFIX_MATCH(uri, "colgroup:")) {
+		/*
+		 * Column groups are a special case: open a cursor on the
+		 * underlying data source.
+		 */
+		WT_RET(__wt_schema_get_colgroup(session, uri, NULL, &colgroup));
+		ret = __wt_open_cursor(
+		    session, colgroup->source, owner, cfg, cursorp);
+	} else if (WT_PREFIX_MATCH(uri, "config:"))
+		ret = __wt_curconfig_open(session, uri, cfg, cursorp);
+	else if (WT_PREFIX_MATCH(uri, "file:"))
+		ret = __wt_curfile_open(session, uri, owner, cfg, cursorp);
+	else if (WT_PREFIX_MATCH(uri, "index:"))
+		ret = __wt_curindex_open(session, uri, cfg, cursorp);
+	else if (WT_PREFIX_MATCH(uri, "statistics:"))
+		ret = __wt_curstat_open(session, uri, cfg, cursorp);
+	else if (WT_PREFIX_MATCH(uri, "table:"))
+		ret = __wt_curtable_open(session, uri, cfg, cursorp);
+	else if ((ret = __wt_schema_get_source(session, uri, &dsrc)) == 0)
+		ret = dsrc->open_cursor(dsrc, &session->iface,
+		    uri, owner, cfg, cursorp);
+
+	return (ret);
 }
 
 /*
@@ -176,26 +234,13 @@ __session_open_cursor(WT_SESSION *wt_session,
 		if (WT_PREFIX_MATCH(uri, "colgroup:") ||
 		    WT_PREFIX_MATCH(uri, "index:") ||
 		    WT_PREFIX_MATCH(uri, "file:") ||
+		    WT_PREFIX_MATCH(uri, "lsm:") ||
 		    WT_PREFIX_MATCH(uri, "table:"))
-			ret = __wt_cursor_dup(session, to_dup, config, cursorp);
+			ret = __wt_cursor_dup(session, to_dup, cfg, cursorp);
 		else
 			ret = __wt_bad_object_type(session, uri);
-	} else if (WT_PREFIX_MATCH(uri, "backup:"))
-		ret = __wt_curbackup_open(session, uri, cfg, cursorp);
-	else if (WT_PREFIX_MATCH(uri, "colgroup:"))
-		ret = __wt_curfile_open(session, uri, NULL, cfg, cursorp);
-	else if (WT_PREFIX_MATCH(uri, "config:"))
-		ret = __wt_curconfig_open(session, uri, cfg, cursorp);
-	else if (WT_PREFIX_MATCH(uri, "file:"))
-		ret = __wt_curfile_open(session, uri, NULL, cfg, cursorp);
-	else if (WT_PREFIX_MATCH(uri, "index:"))
-		ret = __wt_curindex_open(session, uri, cfg, cursorp);
-	else if (WT_PREFIX_MATCH(uri, "statistics:"))
-		ret = __wt_curstat_open(session, uri, cfg, cursorp);
-	else if (WT_PREFIX_MATCH(uri, "table:"))
-		ret = __wt_curtable_open(session, uri, cfg, cursorp);
-	else
-		ret = __wt_bad_object_type(session, uri);
+	} else
+		ret = __wt_open_cursor(session, uri, NULL, cfg, cursorp);
 
 err:	API_END_NOTFOUND_MAP(session, ret);
 }
@@ -259,6 +304,97 @@ err:	API_END_NOTFOUND_MAP(session, ret);
 }
 
 /*
+ * __session_compact_worker --
+ *	Worker function to do the actual compaction call.
+ */
+static int
+__session_compact_worker(
+    WT_SESSION *wt_session, const char *uri, const char *config)
+{
+	WT_DECL_RET;
+	WT_SESSION_IMPL *session;
+
+	session = (WT_SESSION_IMPL *)wt_session;
+	SESSION_API_CALL(session, compact, config, cfg);
+
+	WT_WITH_SCHEMA_LOCK(session,
+	    ret = __wt_schema_worker(session, uri, __wt_compact, cfg, 0));
+
+err:	API_END_NOTFOUND_MAP(session, ret);
+}
+
+/*
+ * __session_compact --
+ *	WT_SESSION.compact method.
+ */
+static int
+__session_compact(WT_SESSION *wt_session, const char *uri, const char *config)
+{
+	WT_DECL_RET;
+	WT_ITEM *t;
+	WT_SESSION_IMPL *session;
+
+	session = (WT_SESSION_IMPL *)wt_session;
+
+	/* Compaction makes no sense for LSM objects, ignore requests. */
+	if (WT_PREFIX_MATCH(uri, "lsm:"))
+		return (0);
+	if (!WT_PREFIX_MATCH(uri, "colgroup:") &&
+	    !WT_PREFIX_MATCH(uri, "file:") &&
+	    !WT_PREFIX_MATCH(uri, "index:") &&
+	    !WT_PREFIX_MATCH(uri, "table:"))
+		return (__wt_bad_object_type(session, uri));
+
+	/*
+	 * Compaction requires 2, and possibly 3 checkpoints, how many is block
+	 * manager specific: all block managers will need the first checkpoint,
+	 * but may or may not need the last two.
+	 *
+	 * The first checkpoint frees emptied pages to the underlying block
+	 * manager (when rows are deleted, underlying blocks aren't freed until
+	 * the page is reconciled, and checkpoint makes that happen).  Because
+	 * compaction is based on having available blocks in the block manager,
+	 * compaction could do no work without the first checkpoint.
+	 *
+	 * After the first checkpoint, we compact the tree.
+	 *
+	 * The second and third checkpoints are done because the default block
+	 * manager does checkpoints in two steps: blocks made available for
+	 * re-use during a checkpoint are put on a special checkpoint-available
+	 * list and only moved onto the real available list once the metadata
+	 * has been updated with the newly written checkpoint information.  This
+	 * means blocks allocated by the checkpoint itself cannot be taken from
+	 * the blocks made available by the checkpoint.
+	 *
+	 * In other words, the second checkpoint puts the blocks from the end of
+	 * the file that were freed by compaction onto the checkpoint-available
+	 * list, but then potentially writes checkpoint blocks at the end of the
+	 * file, which would prevent any file truncation.  When the second
+	 * checkpoint resolves, those blocks become available for the third
+	 * checkpoint, so it's able to write its blocks toward the beginning of
+	 * the file, and then the file can be truncated.
+	 *
+	 * We do the work here so applications don't get confused why compaction
+	 * isn't helping until after multiple, subsequent checkpoint calls.
+	 *
+	 * Force the checkpoint: we don't want to skip it because the work we
+	 * need to have done is done in the underlying block manager.
+	 */
+	WT_RET(__wt_scr_alloc(session, 0, &t));
+	WT_ERR(__wt_buf_fmt(session, t, "target=(\"%s\")", uri));
+	WT_ERR(__session_checkpoint(wt_session, t->data));
+
+	WT_ERR(__session_compact_worker(wt_session, uri, config));
+
+	WT_ERR(__wt_buf_fmt(session, t, "target=(\"%s\"),force=1", uri));
+	WT_ERR(__session_checkpoint(wt_session, t->data));
+	WT_ERR(__session_checkpoint(wt_session, t->data));
+
+err:	__wt_scr_free(&t);
+	return (ret);
+}
+
+/*
  * __session_drop --
  *	WT_SESSION->drop method.
  */
@@ -276,25 +412,6 @@ __session_drop(WT_SESSION *wt_session, const char *uri, const char *config)
 
 err:	/* Note: drop operations cannot be unrolled (yet?). */
 	API_END_NOTFOUND_MAP(session, ret);
-}
-
-/*
- * __session_dumpfile --
- *	WT_SESSION->dumpfile method.
- */
-static int
-__session_dumpfile(WT_SESSION *wt_session, const char *uri, const char *config)
-{
-	WT_DECL_RET;
-	WT_SESSION_IMPL *session;
-
-	session = (WT_SESSION_IMPL *)wt_session;
-	SESSION_API_CALL(session, dumpfile, config, cfg);
-	WT_WITH_SCHEMA_LOCK(session,
-	    ret = __wt_schema_worker(session, uri,
-		__wt_dumpfile, cfg, WT_BTREE_EXCLUSIVE | WT_BTREE_VERIFY));
-
-err:	API_END_NOTFOUND_MAP(session, ret);
 }
 
 /*
@@ -328,10 +445,11 @@ __session_truncate(WT_SESSION *wt_session,
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 	WT_CURSOR *cursor;
+	int cmp;
 
 	session = (WT_SESSION_IMPL *)wt_session;
 
-	SESSION_API_CALL(session, truncate, config, cfg);
+	SESSION_TXN_API_CALL(session, truncate, config, cfg);
 	/*
 	 * If the URI is specified, we don't need a start/stop, if start/stop
 	 * is specified, we don't need a URI.
@@ -347,39 +465,72 @@ __session_truncate(WT_SESSION *wt_session,
 		    "the truncate method should be passed either a URI or "
 		    "start/stop cursors, but not both");
 
-	if (uri == NULL) {
-		if (start != NULL && stop != NULL &&
-		    strcmp(start->uri, stop->uri) != 0)
-			WT_ERR_MSG(session, EINVAL,
-			    "truncate method cursors must reference the same "
-			    "object");
-
-		/*
-		 * For table truncation, we need the complete table cursor setup
-		 * (including indices), and for file truncation, we need a fully
-		 * initialized btree cursor.  There's no reason to believe any
-		 * of that is done, yet, the application may have only set the
-		 * keys and done nothing further.  Because the table cursor code
-		 * sits on top of the file cursor code, the easy solution is to
-		 * do a search now, that fully instantiates everything we need,
-		 * and then we don't have to deal with it further.
-		 */
-		if (start != NULL)
-			WT_ERR(start->search(start));
-		if (stop != NULL)
-			WT_ERR(stop->search(stop));
-		cursor = start == NULL ? stop : start;
-		if (WT_PREFIX_MATCH(cursor->uri, "file:"))
-			ret = __wt_curfile_truncate(session, start, stop);
-		else if (WT_PREFIX_MATCH(cursor->uri, "table:"))
-			ret = __wt_curtable_truncate(session, start, stop);
-		else
-			ret = __wt_bad_object_type(session, cursor->uri);
-	} else
+	if (uri != NULL) {
 		WT_WITH_SCHEMA_LOCK(session,
 		    ret = __wt_schema_truncate(session, uri, cfg));
+		goto done;
+	}
 
-err:	API_END_NOTFOUND_MAP(session, ret);
+	/* Truncate is only supported for file and table objects. */
+	cursor = start == NULL ? stop : start;
+	if (!WT_PREFIX_MATCH(cursor->uri, "file:") &&
+	    !WT_PREFIX_MATCH(cursor->uri, "table:"))
+		WT_ERR(__wt_bad_object_type(session, cursor->uri));
+
+	/*
+	 * If both cursors set, check they're correctly ordered with respect to
+	 * each other.  We have to test this before any search, the search can
+	 * change the initial cursor position.
+	 *
+	 * Rather happily, the compare routine will also confirm the cursors
+	 * reference the same object and the keys are set.
+	 */
+	if (start != NULL && stop != NULL) {
+		WT_ERR(start->compare(start, stop, &cmp));
+		if (cmp > 0)
+			WT_ERR_MSG(session, EINVAL,
+			    "the start cursor position is after the stop "
+			    "cursor position");
+	}
+
+	/*
+	 * Truncate does not require keys actually exist so that applications
+	 * can discard parts of the object's name space without knowing exactly
+	 * what records currently appear in the object.  For this reason, do a
+	 * search-near, rather than a search.  Additionally, we have to correct
+	 * after calling search-near, to position the start/stop cursors on the
+	 * next record greater than/less than the original key.  If the cursors
+	 * hit the beginning/end of the object, or the start/stop keys cross,
+	 * we're done, the range must be empty.
+	 */
+	if (start != NULL) {
+		WT_ERR(start->search_near(start, &cmp));
+		if (cmp < 0 && (ret = start->next(start)) != 0) {
+			WT_ERR_NOTFOUND_OK(ret);
+			goto done;
+		}
+	}
+	if (stop != NULL) {
+		WT_ERR(stop->search_near(stop, &cmp));
+		if (cmp > 0 && (ret = stop->prev(stop)) != 0) {
+			WT_ERR_NOTFOUND_OK(ret);
+			goto done;
+		}
+
+		if (start != NULL) {
+			WT_ERR(start->compare(start, stop, &cmp));
+			if (cmp > 0)
+				goto done;
+		}
+	}
+
+	if (WT_PREFIX_MATCH(cursor->uri, "file:"))
+		WT_ERR(__wt_curfile_truncate(session, start, stop));
+	else
+		WT_ERR(__wt_curtable_truncate(session, start, stop));
+
+done:
+err:	TXN_API_END_NOTFOUND_MAP(session, ret);
 }
 
 /*
@@ -513,11 +664,40 @@ __session_checkpoint(WT_SESSION *wt_session, const char *config)
 {
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
+	WT_TXN *txn;
 
 	session = (WT_SESSION_IMPL *)wt_session;
-	WT_CSTAT_INCR(session, checkpoint);
+	txn = &session->txn;
 
+	WT_CSTAT_INCR(session, checkpoint);
 	SESSION_API_CALL(session, checkpoint, config, cfg);
+
+	/*
+	 * Checkpoints require a snapshot to write a transactionally consistent
+	 * snapshot of the data.
+	 *
+	 * We can't use an application's transaction: if it has uncommitted
+	 * changes, they will be written in the checkpoint and may appear after
+	 * a crash.
+	 *
+	 * Use a real snapshot transaction: we don't want any chance of the
+	 * snapshot being updated during the checkpoint.  Eviction is prevented
+	 * from evicting anything newer than this because we track the oldest
+	 * transaction ID in the system that is not visible to all readers.
+	 */
+	if (F_ISSET(txn, TXN_RUNNING))
+		WT_ERR_MSG(session, EINVAL,
+		    "Checkpoint not permitted in a transaction");
+
+	/*
+	 * Reset open cursors.
+	 *
+	 * We do this here explicitly even though it will happen implicitly in
+	 * the call to begin_transaction for the checkpoint, in case some
+	 * implementation of WT_CURSOR::reset needs the schema lock.
+	 */
+	WT_ERR(__session_reset_cursors(session));
+
 	WT_WITH_SCHEMA_LOCK(session,
 	    ret = __wt_txn_checkpoint(session, cfg));
 
@@ -557,6 +737,7 @@ __wt_open_session(WT_CONNECTION_IMPL *conn, int internal,
 		__session_reconfigure,
 		__session_open_cursor,
 		__session_create,
+		__session_compact,
 		__session_drop,
 		__session_rename,
 		__session_salvage,
@@ -567,7 +748,6 @@ __wt_open_session(WT_CONNECTION_IMPL *conn, int internal,
 		__session_commit_transaction,
 		__session_rollback_transaction,
 		__session_checkpoint,
-		__session_dumpfile,
 		__session_msg_printf
 	};
 	WT_DECL_RET;
@@ -601,7 +781,7 @@ __wt_open_session(WT_CONNECTION_IMPL *conn, int internal,
 	session_ret->iface = stds;
 	session_ret->iface.connection = &conn->iface;
 
-	WT_ERR(__wt_cond_alloc(session, "session", 1, &session_ret->cond));
+	WT_ERR(__wt_cond_alloc(session, "session", 0, &session_ret->cond));
 
 	__wt_event_handler_set(session_ret,
 	    event_handler == NULL ? session->event_handler : event_handler);
@@ -618,8 +798,15 @@ __wt_open_session(WT_CONNECTION_IMPL *conn, int internal,
 	 * first time we open this session.
 	 */
 	if (session_ret->hazard == NULL)
-		WT_ERR(__wt_calloc(session, conn->hazard_size,
+		WT_ERR(__wt_calloc(session, conn->hazard_max,
 		    sizeof(WT_HAZARD), &session_ret->hazard));
+	/*
+	 * Set an initial size for the hazard array. It will be grown as
+	 * required up to hazard_max. The hazard_size is reset on close, since
+	 * __wt_hazard_close ensures the array is cleared - so it is safe to
+	 * reset the starting size on each open.
+	 */
+	session_ret->hazard_size = WT_HAZARD_INCR;
 
 	/*
 	 * Public sessions are automatically closed during WT_CONNECTION->close.

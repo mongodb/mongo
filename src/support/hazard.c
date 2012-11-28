@@ -23,15 +23,14 @@ __wt_hazard_set(WT_SESSION_IMPL *session, WT_REF *ref, int *busyp
     )
 {
 	WT_BTREE *btree;
-	WT_CONNECTION_IMPL *conn;
 	WT_HAZARD *hp;
+	int restarts = 0;
 
 	btree = session->btree;
-	conn = S2C(session);
 	*busyp = 0;
 
-	/* If a file cannot be evicted, hazard references aren't required. */
-	if (btree->cache_resident)
+	/* If a file can never be evicted, hazard references aren't required. */
+	if (F_ISSET(btree, WT_BTREE_NO_HAZARD))
 		return (0);
 
 	/*
@@ -47,9 +46,28 @@ __wt_hazard_set(WT_SESSION_IMPL *session, WT_REF *ref, int *busyp
 	 * reference before it discards the page (the eviction server sets the
 	 * state to WT_REF_LOCKED, then flushes memory and checks the hazard
 	 * references).
+	 *
+	 * For sessions with many active hazard references, skip most of the
+	 * active slots: there may be a free slot in there, but checking is
+	 * expensive.  Most hazard references are released quickly: optimize
+	 * for that case.
 	 */
-	for (hp = session->hazard;
-	    hp < session->hazard + conn->hazard_size; ++hp) {
+	for (hp = session->hazard + session->nhazard;; ++hp) {
+		/* Expand the number of hazard references if available.*/
+		if (hp >= session->hazard + session->hazard_size) {
+			if (session->hazard_size >= S2C(session)->hazard_max)
+				break;
+			/* Restart the search. */
+			if (session->nhazard < session->hazard_size &&
+			    restarts++ == 0) {
+				hp = session->hazard;
+				continue;
+			}
+			WT_PUBLISH(session->hazard_size,
+			    WT_MIN(session->hazard_size + WT_HAZARD_INCR,
+			    S2C(session)->hazard_max));
+		}
+
 		if (hp->page != NULL)
 			continue;
 
@@ -78,13 +96,7 @@ __wt_hazard_set(WT_SESSION_IMPL *session, WT_REF *ref, int *busyp
 			WT_VERBOSE_RET(session, hazard,
 			    "session %p hazard %p: set", session, ref->page);
 
-			/*
-			 * If this is the first hazard reference in the session,
-			 * we may need to update our transactional context.
-			 */
-			if (session->nhazard++ == 0)
-				WT_RET(__wt_txn_read_first(session));
-
+			++session->nhazard;
 			return (0);
 		}
 
@@ -120,14 +132,12 @@ void
 __wt_hazard_clear(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_BTREE *btree;
-	WT_CONNECTION_IMPL *conn;
 	WT_HAZARD *hp;
 
 	btree = session->btree;
-	conn = S2C(session);
 
-	/* If a file cannot be evicted, hazard references aren't required. */
-	if (btree->cache_resident)
+	/* If a file can never be evicted, hazard references aren't required. */
+	if (F_ISSET(btree, WT_BTREE_NO_HAZARD))
 		return;
 
 	/*
@@ -136,21 +146,15 @@ __wt_hazard_clear(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 */
 	WT_ASSERT(session, page != NULL);
 
-	/* Clear the caller's hazard pointer. */
-	for (hp = session->hazard;
-	    hp < session->hazard + conn->hazard_size; ++hp)
+	/*
+	 * Clear the caller's hazard pointer.
+	 * The common pattern is LIFO, so do a reverse search.
+	 */
+	for (hp = session->hazard + session->hazard_size - 1;
+	    hp >= session->hazard;
+	    --hp)
 		if (hp->page == page) {
 			/*
-			 * Check to see if the page has grown too big and force
-			 * eviction.  We have to request eviction while holding
-			 * a hazard reference (else the page might disappear out
-			 * from under us), but we can't wake the eviction server
-			 * until we've released our hazard reference because our
-			 * hazard reference blocks the page eviction.  A little
-			 * dance: check the page, schedule the forced eviction,
-			 * clear/publish the hazard reference, wake the eviction
-			 * server.
-			 *
 			 * We don't publish the hazard reference clear in the
 			 * general case.  It's not required for correctness;
 			 * it gives the page server thread faster access to the
@@ -158,20 +162,13 @@ __wt_hazard_clear(WT_SESSION_IMPL *session, WT_PAGE *page)
 			 * generation number was just set, so it's unlikely the
 			 * page will be selected for eviction.
 			 */
-			if (__wt_eviction_page_check(session, page)) {
-				__wt_evict_page_request(session, page);
-				WT_PUBLISH(hp->page, NULL);
-				__wt_evict_server_wake(session);
-			} else
-				hp->page = NULL;
+			hp->page = NULL;
 
 			/*
 			 * If this was the last hazard reference in the session,
 			 * we may need to update our transactional context.
 			 */
-			if (--session->nhazard == 0)
-				__wt_txn_read_last(session);
-
+			--session->nhazard;
 			return;
 		}
 	__wt_errx(session,
@@ -188,15 +185,12 @@ __wt_hazard_clear(WT_SESSION_IMPL *session, WT_PAGE *page)
 void
 __wt_hazard_close(WT_SESSION_IMPL *session)
 {
-	WT_CONNECTION_IMPL *conn;
 	WT_HAZARD *hp;
 	int found;
 
-	conn = S2C(session);
-
 	/* Check for a set hazard reference and complain if we find one. */
 	for (found = 0, hp = session->hazard;
-	    hp < session->hazard + conn->hazard_size; ++hp)
+	    hp < session->hazard + session->hazard_size; ++hp)
 		if (hp->page != NULL) {
 			__wt_errx(session,
 			    "session %p: hazard reference table not empty: "
@@ -220,21 +214,14 @@ __wt_hazard_close(WT_SESSION_IMPL *session)
 	 * evicted.
 	 */
 	for (hp = session->hazard;
-	    hp < session->hazard + conn->hazard_size; ++hp)
+	    hp < session->hazard + session->hazard_size; ++hp)
 		if (hp->page != NULL)
 			__wt_hazard_clear(session, hp->page);
 
-	if (session->nhazard == 0)
-		return;
-
-	/*
-	 * Clean up the transactional state, we've released all our hazard
-	 * references.
-	 */
-	__wt_errx(session,
-	    "session %p: hazard reference count didn't match table entries",
-	    session);
-	__wt_txn_read_last(session);
+	if (session->nhazard != 0)
+		__wt_errx(session, "session %p: "
+		    "hazard reference count didn't match table entries",
+		    session);
 }
 
 #ifdef HAVE_DIAGNOSTIC
@@ -245,13 +232,10 @@ __wt_hazard_close(WT_SESSION_IMPL *session)
 static void
 __hazard_dump(WT_SESSION_IMPL *session)
 {
-	WT_CONNECTION_IMPL *conn;
 	WT_HAZARD *hp;
 
-	conn = S2C(session);
-
 	for (hp = session->hazard;
-	    hp < session->hazard + conn->hazard_size; ++hp)
+	    hp < session->hazard + session->hazard_size; ++hp)
 		if (hp->page != NULL)
 			__wt_errx(session,
 			    "session %p: hazard reference %p: %s, line %d",

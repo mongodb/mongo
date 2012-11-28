@@ -13,8 +13,8 @@ static inline void
 __wt_cache_page_inmem_incr(
     WT_SESSION_IMPL *session, WT_PAGE *page, size_t size)
 {
-	WT_ATOMIC_ADD(S2C(session)->cache->bytes_inmem, size);
-	WT_ATOMIC_ADD(page->memory_footprint, WT_STORE_SIZE(size));
+	(void)WT_ATOMIC_ADD(S2C(session)->cache->bytes_inmem, size);
+	(void)WT_ATOMIC_ADD(page->memory_footprint, WT_STORE_SIZE(size));
 }
 
 /*
@@ -25,8 +25,8 @@ static inline void
 __wt_cache_page_inmem_decr(
     WT_SESSION_IMPL *session, WT_PAGE *page, size_t size)
 {
-	WT_ATOMIC_SUB(S2C(session)->cache->bytes_inmem, size);
-	WT_ATOMIC_SUB(page->memory_footprint, WT_STORE_SIZE(size));
+	(void)WT_ATOMIC_SUB(S2C(session)->cache->bytes_inmem, size);
+	(void)WT_ATOMIC_SUB(page->memory_footprint, WT_STORE_SIZE(size));
 }
 
 /*
@@ -42,9 +42,9 @@ __wt_cache_page_read(WT_SESSION_IMPL *session, WT_PAGE *page, size_t size)
 
 	WT_ASSERT(session, size != 0);
 
-	WT_ATOMIC_ADD(cache->pages_read, 1);
-	WT_ATOMIC_ADD(cache->bytes_read, size);
-	WT_ATOMIC_ADD(page->memory_footprint, WT_STORE_SIZE(size));
+	(void)WT_ATOMIC_ADD(cache->pages_read, 1);
+	(void)WT_ATOMIC_ADD(cache->bytes_read, size);
+	(void)WT_ATOMIC_ADD(page->memory_footprint, WT_STORE_SIZE(size));
 }
 
 /*
@@ -60,8 +60,8 @@ __wt_cache_page_evict(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 	WT_ASSERT(session, page->memory_footprint != 0);
 
-	WT_ATOMIC_ADD(cache->pages_evict, 1);
-	WT_ATOMIC_ADD(cache->bytes_evict, page->memory_footprint);
+	(void)WT_ATOMIC_ADD(cache->pages_evict, 1);
+	(void)WT_ATOMIC_ADD(cache->bytes_evict, page->memory_footprint);
 
 	page->memory_footprint = 0;
 }
@@ -140,11 +140,8 @@ __wt_page_modify_init(WT_SESSION_IMPL *session, WT_PAGE *page)
  *	Mark the page dirty.
  */
 static inline void
-__wt_page_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page)
+__wt_page_modify_set(WT_PAGE *page)
 {
-	/* Set the tree modified flag. */
-	session->btree->modified = 1;
-
 	/*
 	 * Publish: there must be a barrier to ensure all changes to the page
 	 * are flushed before we update the page's write generation, otherwise
@@ -155,6 +152,26 @@ __wt_page_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 	/* The page is dirty if the disk and write generations differ. */
 	++page->modify->write_gen;
+}
+
+/*
+ * __wt_page_and_tree_modify_set --
+ *	Mark both the page and tree dirty.
+ */
+static inline void
+__wt_page_and_tree_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page)
+{
+	WT_BTREE *btree;
+
+	btree = session->btree;
+
+	/*
+	 * A memory barrier is required for setting the tree's modified value,
+	 * we depend on the barrier called in setting the page's modified value.
+	 */
+	btree->modified = 1;
+
+	__wt_page_modify_set(page);
 }
 
 /*
@@ -190,7 +207,7 @@ __wt_page_write_gen_check(
 	if (mod->write_gen == write_gen && mod->write_gen + 1 != mod->disk_gen)
 		return (0);
 
-	WT_BSTAT_INCR(session, file_write_conflicts);
+	WT_BSTAT_INCR(session, txn_write_conflict);
 	return (WT_RESTART);
 }
 
@@ -204,15 +221,10 @@ __wt_off_page(WT_PAGE *page, const void *p)
 	/*
 	 * There may be no underlying page, in which case the reference is
 	 * off-page by definition.
-	 *
-	 * We use the page's disk size, not the page parent's reference disk
-	 * size for a reason: the page may already be disconnected from the
-	 * parent reference (when being discarded), or not yet be connected
-	 * to the parent reference (when being created).
 	 */
 	return (page->dsk == NULL ||
 	    p < (void *)page->dsk ||
-	    p >= (void *)((uint8_t *)page->dsk + page->dsk->size));
+	    p >= (void *)((uint8_t *)page->dsk + page->dsk->mem_size));
 }
 
 /*
@@ -298,9 +310,43 @@ __wt_get_addr(
 static inline void
 __wt_page_release(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
-	/* We never acquired a hazard reference on the root page. */
-	if (page != NULL && !WT_PAGE_IS_ROOT(page))
-		__wt_hazard_clear(session, page);
+	WT_BTREE *btree;
+
+	btree = session->btree;
+
+	/*
+	 * Fast-track pages we don't have and the root page, which sticks
+	 * in memory, regardless.
+	 */
+	if (page == NULL || WT_PAGE_IS_ROOT(page))
+		return;
+
+	/* If this is a non cached page, discard it. */
+	if (F_ISSET(btree, WT_BTREE_NO_CACHE)) {
+		page->ref->page = NULL;
+		page->ref->state = WT_REF_DISK;
+		__wt_page_out(session, &page, 0);
+		return;
+	}
+
+	/* Discard our hazard reference. */
+	__wt_hazard_clear(session, page);
+}
+
+/*
+ * __wt_stack_release --
+ *	Release references to a page stack.
+ */
+static inline void
+__wt_stack_release(WT_SESSION_IMPL *session, WT_PAGE *page)
+{
+	WT_PAGE *next;
+
+	while (page != NULL && !WT_PAGE_IS_ROOT(page)) {
+		next = page->parent;
+		__wt_page_release(session, page);
+		page = next;
+	}
 }
 
 /*
@@ -313,7 +359,7 @@ __wt_page_hazard_check(WT_SESSION_IMPL *session, WT_PAGE *page)
 	WT_CONNECTION_IMPL *conn;
 	WT_HAZARD *hp;
 	WT_SESSION_IMPL *s;
-	uint32_t i, session_cnt;
+	uint32_t i, hazard_size, session_cnt;
 
 	conn = S2C(session);
 
@@ -329,7 +375,8 @@ __wt_page_hazard_check(WT_SESSION_IMPL *session, WT_PAGE *page)
 	for (s = conn->sessions, i = 0; i < session_cnt; ++s, ++i) {
 		if (!s->active)
 			continue;
-		for (hp = s->hazard; hp < s->hazard + conn->hazard_size; ++hp)
+		WT_ORDERED_READ(hazard_size, s->hazard_size);
+		for (hp = s->hazard; hp < s->hazard + hazard_size; ++hp)
 			if (hp->page == page)
 				return (hp);
 	}

@@ -60,7 +60,10 @@
 #include "wt_internal.h"
 
 static inline uint64_t CityHash64(const char *, size_t);
-/* Wired Tiger wrapper around third party hash implementations. */
+/*
+ * __wt_hash_city64 --
+ * Wired Tiger wrapper around third party hash implementation.
+ */
 uint64_t
 __wt_hash_city64(const void *string, uint32_t len)
 {
@@ -114,14 +117,6 @@ static uint32_t UNALIGNED_LOAD32(const char *p) {
 #define	uint64_in_expected_order(x) (bswap_64(x))
 
 #endif  /* WORDS_BIGENDIAN */
-
-#if !defined(LIKELY)
-#ifdef HAVE_BUILTIN_EXPECT
-#define	LIKELY(x) (__builtin_expect(!!(x), 1))
-#else
-#define	LIKELY(x) (x)
-#endif
-#endif
 
 static uint64_t Fetch64(const char *p) {
 	return uint64_in_expected_order(UNALIGNED_LOAD64(p));
@@ -199,9 +194,9 @@ static uint64_t HashLen0to16(const char *s, size_t len) {
 		return HashLen16(len + (a64 << 3), Fetch32(s + len - 4));
 	}
 	if (len > 0) {
-		a8 = s[0];
-		b8 = s[len >> 1];
-		c8 = s[len - 1];
+		a8 = (uint8_t)s[0];
+		b8 = (uint8_t)s[len >> 1];
+		c8 = (uint8_t)s[len - 1];
 		y = (uint32_t)(a8) + ((uint32_t)(b8) << 8);
 		z = (uint32_t)len + ((uint32_t)(c8) << 2);
 		return ShiftMix(y * k2 ^ z * k3) * k2;
@@ -219,7 +214,7 @@ static uint64_t HashLen17to32(const char *s, size_t len) {
 	uint64_t c = Fetch64(s + len - 8) * k2;
 	uint64_t d = Fetch64(s + len - 16) * k0;
 	return HashLen16(Rotate(a - b, 43) + Rotate(c, 30) + d,
-			a + Rotate(b ^ k3, 20) - c + len);
+			a + Rotate(b ^ k3, 20) + len - c);
 }
 
 /*
@@ -248,13 +243,13 @@ static void WeakHashLen32WithSeeds6(uint64_t w, uint64_t x,
  */
 static void WeakHashLen32WithSeeds(
 		const char* s, uint64_t a, uint64_t b, uint128 *ret) {
-	return WeakHashLen32WithSeeds6(Fetch64(s),
-			Fetch64(s + 8),
-			Fetch64(s + 16),
-			Fetch64(s + 24),
-			a,
-			b,
-			ret);
+	WeakHashLen32WithSeeds6(Fetch64(s),
+	    Fetch64(s + 8),
+	    Fetch64(s + 16),
+	    Fetch64(s + 24),
+	    a,
+	    b,
+	    ret);
 }
 
 /* Return an 8-byte hash for 33 to 64 bytes. */
@@ -308,11 +303,9 @@ static inline uint64_t CityHash64(const char *s, size_t len) {
 	x = x * k1 + Fetch64(s);
 
 	/*
-	 * Decrease len to the nearest multiple of 64, and operate on 64-byte
-	 * chunks.
+	 * Use len to count multiples of 64, and operate on 64-byte chunks.
 	 */
-	len = (len - 1) & ~(size_t)(63);
-	do {
+	for (len = (len - 1) >> 6; len != 0; len--) {
 		x = Rotate(x + y + v.first + Fetch64(s + 8), 37) * k1;
 		y = Rotate(y + v.second + Fetch64(s + 48), 42) * k1;
 		x ^= w.second;
@@ -325,8 +318,7 @@ static inline uint64_t CityHash64(const char *s, size_t len) {
 		z = x;
 		x = temp;
 		s += 64;
-		len -= 64;
-	} while (len != 0);
+	}
 	return HashLen16(HashLen16(v.first, w.first) + ShiftMix(y) * k1 + z,
 	    HashLen16(v.second, w.second) + x);
 }

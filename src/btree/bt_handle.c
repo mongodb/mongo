@@ -7,10 +7,10 @@
 
 #include "wt_internal.h"
 
-static int __btree_conf(WT_SESSION_IMPL *);
+static int __btree_conf(WT_SESSION_IMPL *, const char *[]);
 static int __btree_get_last_recno(WT_SESSION_IMPL *);
 static int __btree_page_sizes(WT_SESSION_IMPL *, const char *);
-static int __btree_tree_open_empty(WT_SESSION_IMPL *);
+static int __btree_tree_open_empty(WT_SESSION_IMPL *, int);
 
 static int pse1(WT_SESSION_IMPL *, const char *, uint32_t, uint32_t);
 static int pse2(WT_SESSION_IMPL *, const char *, uint32_t, uint32_t, uint32_t);
@@ -46,22 +46,32 @@ __wt_btree_open(WT_SESSION_IMPL *session,
 	WT_BTREE *btree;
 	WT_CONFIG_ITEM cval;
 	WT_DECL_RET;
-	WT_ITEM dsk;
+	uint32_t root_addr_size;
+	int created, forced_salvage;
 	const char *filename;
-	int forced_salvage;
+	uint8_t root_addr[WT_BTREE_MAX_ADDR_COOKIE];
 
 	btree = session->btree;
-	WT_CLEAR(dsk);
 
 	/* Initialize and configure the WT_BTREE structure. */
-	WT_ERR(__btree_conf(session));
+	WT_ERR(__btree_conf(session, cfg));
 
+	/*
+	 * Bulk-load is only permitted on newly created files, not any empty
+	 * file -- see the checkpoint code for a discussion.
+	 */
+	created = addr == NULL || addr_size == 0;
+	if (!created && F_ISSET(btree, WT_BTREE_BULK))
+		WT_ERR_MSG(session, EINVAL,
+		    "bulk-load is only supported on newly created objects");
+
+	/* Handle salvage configuration. */
 	forced_salvage = 0;
-	if (F_ISSET(btree, WT_BTREE_SALVAGE)) {
+	if (F_ISSET(btree, WT_BTREE_SALVAGE) && cfg != NULL) {
 		ret = __wt_config_gets(session, cfg, "force", &cval);
 		if (ret != 0 && ret != WT_NOTFOUND)
 			WT_ERR(ret);
-		if (cval.val != 0)
+		if (ret == 0 && cval.val != 0)
 			forced_salvage = 1;
 	}
 
@@ -86,12 +96,13 @@ __wt_btree_open(WT_SESSION_IMPL *session,
 	 * either there is no checkpoint (the file is being created), or the
 	 * load call returns no root page (the checkpoint is for an empty file).
 	 */
-	WT_ERR(
-	    __wt_bm_checkpoint_load(session, &dsk, addr, addr_size, readonly));
-	if (addr == NULL || addr_size == 0 || dsk.size == 0)
-		WT_ERR(__btree_tree_open_empty(session));
+	WT_ERR(__wt_bm_checkpoint_load(
+	    session, addr, addr_size, root_addr, &root_addr_size, readonly));
+	if (created || root_addr_size == 0)
+		WT_ERR(__btree_tree_open_empty(session, created));
 	else {
-		WT_ERR(__wt_btree_tree_open(session, &dsk));
+		WT_ERR(
+		    __wt_btree_tree_open(session, root_addr, root_addr_size));
 
 		/* Get the last record number in a column-store file. */
 		if (btree->type != BTREE_ROW)
@@ -99,8 +110,7 @@ __wt_btree_open(WT_SESSION_IMPL *session,
 	}
 
 	if (0) {
-err:		__wt_buf_free(session, &dsk);
-		(void)__wt_btree_close(session);
+err:		(void)__wt_btree_close(session);
 	}
 
 	return (ret);
@@ -133,7 +143,11 @@ __wt_btree_close(WT_SESSION_IMPL *session)
 	/* Free allocated memory. */
 	__wt_free(session, btree->key_format);
 	__wt_free(session, btree->value_format);
+	if (btree->val_ovfl_lock != NULL)
+		__wt_rwlock_destroy(session, &btree->val_ovfl_lock);
 	__wt_free(session, btree->stats);
+
+	btree->bulk_load_ok = 0;
 
 	return (ret);
 }
@@ -143,12 +157,14 @@ __wt_btree_close(WT_SESSION_IMPL *session)
  *	Configure a WT_BTREE structure.
  */
 static int
-__btree_conf(WT_SESSION_IMPL *session)
+__btree_conf(WT_SESSION_IMPL *session, const char *cfg[])
 {
 	WT_BTREE *btree;
 	WT_CONFIG_ITEM cval;
 	WT_CONNECTION_IMPL *conn;
+	WT_DECL_RET;
 	WT_NAMED_COLLATOR *ncoll;
+	WT_NAMED_COMPRESSOR *ncomp;
 	uint32_t bitcnt;
 	int fixed;
 	const char *config;
@@ -171,8 +187,7 @@ __btree_conf(WT_SESSION_IMPL *session)
 
 	/* Row-store key comparison and key gap for prefix compression. */
 	if (btree->type == BTREE_ROW) {
-		WT_RET(__wt_config_getones(
-		    session, config, "collator", &cval));
+		WT_RET(__wt_config_getones(session, config, "collator", &cval));
 		if (cval.len > 0) {
 			TAILQ_FOREACH(ncoll, &conn->collqh, q) {
 				if (WT_STRING_MATCH(
@@ -208,14 +223,89 @@ __btree_conf(WT_SESSION_IMPL *session)
 
 	/* Eviction; the metadata file is never evicted. */
 	if (strcmp(btree->name, WT_METADATA_URI) == 0)
-		btree->cache_resident = 1;
-	WT_RET(__wt_config_getones(session, config, "cache_resident", &cval));
-	btree->cache_resident = cval.val ? 1 : 0;
+		F_SET(btree, WT_BTREE_NO_EVICTION | WT_BTREE_NO_HAZARD);
+	else {
+		WT_RET(__wt_config_getones(
+		    session, config, "cache_resident", &cval));
+		if (cval.val)
+			F_SET(btree, WT_BTREE_NO_EVICTION | WT_BTREE_NO_HAZARD);
+		else
+			F_CLR(btree, WT_BTREE_NO_EVICTION);
+	}
+
+	/* No-cache files are never evicted or cached. */
+	if (cfg != NULL) {
+		ret = __wt_config_gets(session, cfg, "no_cache", &cval);
+		if (ret != 0 && ret != WT_NOTFOUND)
+			WT_RET(ret);
+		if (ret == 0 && cval.val != 0)
+			F_SET(session->btree, WT_BTREE_NO_CACHE |
+			    WT_BTREE_NO_EVICTION | WT_BTREE_NO_HAZARD);
+	}
+
+	/* Checksums */
+	WT_RET(__wt_config_getones(session, config, "checksum", &cval));
+	if (WT_STRING_MATCH("on", cval.str, cval.len))
+		btree->checksum = CKSUM_ON;
+	else if (WT_STRING_MATCH("off", cval.str, cval.len))
+		btree->checksum = CKSUM_OFF;
+	else
+		btree->checksum = CKSUM_UNCOMPRESSED;
 
 	/* Huffman encoding */
 	WT_RET(__wt_btree_huffman_open(session, config));
 
-	WT_RET(__wt_stat_alloc_btree_stats(session, &btree->stats));
+	/*
+	 * Reconciliation configuration:
+	 *	Block compression (all)
+	 *	Dictionary compression (variable-length column-store, row-store)
+	 *	Page-split percentage
+	 *	Prefix compression (row-store)
+	 *	Suffix compression (row-store)
+	 */
+	switch (btree->type) {
+	case BTREE_COL_FIX:
+		break;
+	case BTREE_ROW:
+		WT_RET(__wt_config_getones(
+		    session, config, "internal_key_truncate", &cval));
+		btree->internal_key_truncate = cval.val == 0 ? 0 : 1;
+
+		WT_RET(__wt_config_getones(
+		    session, config, "prefix_compression", &cval));
+		btree->prefix_compression = cval.val == 0 ? 0 : 1;
+		/* FALLTHROUGH */
+	case BTREE_COL_VAR:
+		WT_RET(
+		    __wt_config_getones(session, config, "dictionary", &cval));
+		btree->dictionary = (u_int)cval.val;
+		break;
+	}
+
+	WT_RET(__wt_config_getones(session, config, "split_pct", &cval));
+	btree->split_pct = (u_int)cval.val;
+
+	WT_RET(__wt_config_getones(session, config, "block_compressor", &cval));
+	if (cval.len > 0) {
+		TAILQ_FOREACH(ncomp, &conn->compqh, q)
+			if (WT_STRING_MATCH(ncomp->name, cval.str, cval.len)) {
+				btree->compressor = ncomp->compressor;
+				break;
+			}
+		if (btree->compressor == NULL)
+			WT_RET_MSG(session, EINVAL,
+			    "unknown block compressor '%.*s'",
+			    (int)cval.len, cval.str);
+	}
+
+	/* Overflow lock. */
+	WT_RET(__wt_rwlock_alloc(
+	    session, "btree overflow lock", &btree->val_ovfl_lock));
+
+	WT_RET(__wt_stat_alloc_dsrc_stats(session, &btree->stats));
+
+	/* The tree has not been modified. */
+	btree->modified = 0;
 
 	return (0);
 }
@@ -225,18 +315,31 @@ __btree_conf(WT_SESSION_IMPL *session)
  *	Read in a tree from disk.
  */
 int
-__wt_btree_tree_open(WT_SESSION_IMPL *session, WT_ITEM *dsk)
+__wt_btree_tree_open(
+    WT_SESSION_IMPL *session, const uint8_t *addr, uint32_t addr_size)
 {
 	WT_BTREE *btree;
+	WT_DECL_RET;
+	WT_ITEM dsk;
 	WT_PAGE *page;
 
 	btree = session->btree;
 
-	/* Build the in-memory version of the page. */
-	WT_RET(__wt_page_inmem(session, NULL, NULL, dsk->mem, &page));
+	/*
+	 * A buffer into which we read a root page; don't use a scratch buffer,
+	 * the buffer's allocated memory becomes the persistent in-memory page.
+	 */
+	WT_CLEAR(dsk);
+
+	/* Read the page, then build the in-memory version of the page. */
+	WT_ERR(__wt_bt_read(session, &dsk, addr, addr_size));
+	WT_ERR(__wt_page_inmem(session, NULL, NULL, dsk.mem, &page));
 	btree->root_page = page;
 
-	return (0);
+	if (0) {
+err:		__wt_buf_free(session, &dsk);
+	}
+	return (ret);
 }
 
 /*
@@ -244,7 +347,7 @@ __wt_btree_tree_open(WT_SESSION_IMPL *session, WT_ITEM *dsk)
  *	Create an empty in-memory tree.
  */
 static int
-__btree_tree_open_empty(WT_SESSION_IMPL *session)
+__btree_tree_open_empty(WT_SESSION_IMPL *session, int created)
 {
 	WT_BTREE *btree;
 	WT_DECL_RET;
@@ -255,32 +358,21 @@ __btree_tree_open_empty(WT_SESSION_IMPL *session)
 	root = leaf = NULL;
 
 	/*
+	 * Newly created objects can be used for cursor inserts or for bulk
+	 * loads; set a flag that's cleared when a row is inserted into the
+	 * tree.
+	 */
+	if (created)
+		btree->bulk_load_ok = 1;
+
+	/*
 	 * A note about empty trees: the initial tree is a root page and a leaf
 	 * page.  We need a pair of pages instead of just a single page because
 	 * we can reconcile the leaf page while the root stays pinned in memory.
 	 * If the pair is evicted without being modified, that's OK, nothing is
 	 * ever written.
 	 *
-	 * Create the leaf page.
-	 */
-	WT_ERR(__wt_calloc_def(session, 1, &leaf));
-	switch (btree->type) {
-	case BTREE_COL_FIX:
-		leaf->u.col_fix.recno = 1;
-		leaf->type = WT_PAGE_COL_FIX;
-		break;
-	case BTREE_COL_VAR:
-		leaf->u.col_var.recno = 1;
-		leaf->type = WT_PAGE_COL_VAR;
-		break;
-	case BTREE_ROW:
-		leaf->type = WT_PAGE_ROW_LEAF;
-		break;
-	}
-	leaf->entries = 0;
-
-	/*
-	 * Create the root page.
+	 * Create the root and leaf pages.
 	 *
 	 * !!!
 	 * Be cautious about changing the order of updates in this code: to call
@@ -295,6 +387,7 @@ __btree_tree_open_empty(WT_SESSION_IMPL *session)
 		root->u.intl.recno = 1;
 		WT_ERR(__wt_calloc_def(session, 1, &root->u.intl.t));
 		ref = root->u.intl.t;
+		WT_ERR(__wt_btree_leaf_create(session, root, ref, &leaf));
 		ref->page = leaf;
 		ref->addr = NULL;
 		ref->state = WT_REF_MEM;
@@ -304,6 +397,7 @@ __btree_tree_open_empty(WT_SESSION_IMPL *session)
 		root->type = WT_PAGE_ROW_INT;
 		WT_ERR(__wt_calloc_def(session, 1, &root->u.intl.t));
 		ref = root->u.intl.t;
+		WT_ERR(__wt_btree_leaf_create(session, root, ref, &leaf));
 		ref->page = leaf;
 		ref->addr = NULL;
 		ref->state = WT_REF_MEM;
@@ -314,11 +408,6 @@ __btree_tree_open_empty(WT_SESSION_IMPL *session)
 	root->entries = 1;
 	root->parent = NULL;
 	root->ref = NULL;
-
-	leaf->ref = ref;
-	leaf->parent = root;
-
-	btree->root_page = root;
 
 	/*
 	 * Mark the leaf page dirty: we didn't create an entirely valid root
@@ -340,14 +429,15 @@ __btree_tree_open_empty(WT_SESSION_IMPL *session)
 	 * simply has no records, for whatever reason, and trust reconciliation
 	 * to figure out it's empty and not write any blocks.
 	 *    We do not set the tree's modified flag because the checkpoint code
-	 * skips unmodified files in default checkpoints (checkpoints that don't
-	 * require a write unless the file is actually dirty).  There's no
-	 * reason to reconcile this file unless the application requires it as
-	 * part of a forced checkpoint or if the application actually modifies
-	 * it.
+	 * skips unmodified files in closing checkpoints (checkpoints that don't
+	 * require a write unless the file is actually dirty).  There's no need
+	 * to reconcile this file unless the application does a real checkpoint
+	 * or it's actually modified.
 	 */
 	WT_ERR(__wt_page_modify_init(session, leaf));
-	++leaf->modify->write_gen;
+	__wt_page_modify_set(leaf);
+
+	btree->root_page = root;
 
 	return (0);
 
@@ -359,26 +449,73 @@ err:	if (leaf != NULL)
 }
 
 /*
- * __wt_btree_root_empty --
- *	Bulk loads only work on empty trees: check before doing a bulk load.
+ * __wt_btree_leaf_create --
+ *	Create an empty leaf page.
  */
 int
-__wt_btree_root_empty(WT_SESSION_IMPL *session, WT_PAGE **leafp)
+__wt_btree_leaf_create(
+    WT_SESSION_IMPL *session, WT_PAGE *parent, WT_REF *ref, WT_PAGE **pagep)
 {
 	WT_BTREE *btree;
-	WT_PAGE *root, *child;
+	WT_PAGE *leaf;
 
 	btree = session->btree;
+
+	WT_RET(__wt_calloc_def(session, 1, &leaf));
+	switch (btree->type) {
+	case BTREE_COL_FIX:
+		leaf->u.col_fix.recno = 1;
+		leaf->type = WT_PAGE_COL_FIX;
+		break;
+	case BTREE_COL_VAR:
+		leaf->u.col_var.recno = 1;
+		leaf->type = WT_PAGE_COL_VAR;
+		break;
+	case BTREE_ROW:
+		leaf->type = WT_PAGE_ROW_LEAF;
+		break;
+	}
+	leaf->entries = 0;
+	leaf->ref = ref;
+	leaf->parent = parent;
+
+	*pagep = leaf;
+	return (0);
+}
+
+/*
+ * __wt_btree_get_memsize --
+ *      Access the size of an in-memory tree with a single leaf page.
+ */
+int
+__wt_btree_get_memsize(
+    WT_SESSION_IMPL *session, WT_BTREE *btree, uint32_t **memsizep)
+{
+	WT_PAGE *root, *child;
+
+	WT_UNUSED(session);
 	root = btree->root_page;
-
-	if (root->entries != 1)
-		return (WT_ERROR);
-
 	child = root->u.intl.t->page;
-	if (child->entries != 0)
-		return (WT_ERROR);
 
-	*leafp = child;
+	if (root->entries != 1 || child == NULL) {
+		*memsizep = NULL;
+		return (WT_ERROR);
+	}
+
+	*memsizep = &child->memory_footprint;
+	F_SET(btree, WT_BTREE_NO_EVICTION);
+	return (0);
+}
+
+/*
+ * __wt_btree_release_memsize --
+ *      Release a cache-resident tree.
+ */
+int
+__wt_btree_release_memsize(WT_SESSION_IMPL *session, WT_BTREE *btree)
+{
+	WT_UNUSED(session);
+	F_CLR(btree, WT_BTREE_NO_EVICTION);
 	return (0);
 }
 
@@ -395,12 +532,12 @@ __btree_get_last_recno(WT_SESSION_IMPL *session)
 	btree = session->btree;
 
 	page = NULL;
-	WT_RET(__wt_tree_np(session, &page, 0, 0));
+	WT_RET(__wt_tree_walk(session, &page, WT_TREE_PREV));
 	if (page == NULL)
 		return (WT_NOTFOUND);
 
 	btree->last_recno = __col_last_recno(page);
-	__wt_page_release(session, page);
+	__wt_stack_release(session, page);
 
 	return (0);
 }

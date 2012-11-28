@@ -35,27 +35,24 @@ int
 __wt_schema_name_check(WT_SESSION_IMPL *session, const char *uri)
 {
 	const char *name, *sep;
+	int skipped;
 
 	/*
 	 * Check if name is somewhere in the WiredTiger name space: it would be
-	 * "bad" if the application truncated the metadata file.  We get passed
-	 * both objects and simple strings, skip any leading URI prefix.
+	 * "bad" if the application truncated the metadata file.  Skip any
+	 * leading URI prefix, check and then skip over a table name.
 	 */
 	name = uri;
-	if (WT_PREFIX_SKIP(name, "colgroup:") ||
-	    WT_PREFIX_SKIP(name, "index:")) {
-		/* These URIs normally reference a table name. */
-		if ((sep = strchr(name, ':')) != NULL)
-			name = sep + 1;
-	} else if (!WT_PREFIX_SKIP(name, "table:") &&
-	    !WT_PREFIX_SKIP(name, "file:"))
-		return (__wt_bad_object_type(session, uri));
+	for (skipped = 0; skipped < 2; skipped++) {
+		if ((sep = strchr(name, ':')) == NULL)
+			break;
 
-	if (WT_PREFIX_MATCH(name, "WiredTiger"))
-		WT_RET_MSG(session, EINVAL,
-		    "%s: the \"WiredTiger\" name space may not be used by "
-		    "applications",
-		    name);
+		name = sep + 1;
+		if (WT_PREFIX_MATCH(name, "WiredTiger"))
+			WT_RET_MSG(session, EINVAL,
+			    "%s: the \"WiredTiger\" name space may not be "
+			    "used by applications", name);
+	}
 
 	/*
 	 * Disallow JSON quoting characters -- the config string parsing code
@@ -67,5 +64,6 @@ __wt_schema_name_check(WT_SESSION_IMPL *session, const char *uri)
 		    "%s: WiredTiger objects should not include grouping "
 		    "characters in their names",
 		    name);
+
 	return (0);
 }

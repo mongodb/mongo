@@ -43,7 +43,7 @@ __wt_verify_dsk(WT_SESSION_IMPL *session, const char *addr, WT_ITEM *buf)
 {
 	WT_PAGE_HEADER *dsk;
 	uint32_t size;
-	uint8_t *p;
+	uint8_t *p, *end;
 	u_int i;
 
 	dsk = buf->mem;
@@ -87,12 +87,16 @@ __wt_verify_dsk(WT_SESSION_IMPL *session, const char *addr, WT_ITEM *buf)
 		    __wt_page_type_string(dsk->type), addr);
 	}
 
-	/* Check the in-memory size. */
-	if (dsk->size != size)
+	/* Check the page flags. */
+	switch (dsk->flags) {
+	case 0:
+	case WT_PAGE_COMPRESSED:
+		break;
+	default:
 		WT_RET_VRFY(session,
-		    "%s page at %s has an incorrect size (%" PRIu32 " != %"
-		    PRIu32 ")",
-		    __wt_page_type_string(dsk->type), addr, dsk->size, size);
+		    "page at %s has an invalid flags value of 0x%" PRIx32,
+		    addr, (uint32_t)dsk->flags);
+	}
 
 	/* Unused bytes */
 	for (p = dsk->unused, i = sizeof(dsk->unused); i > 0; --i)
@@ -100,6 +104,15 @@ __wt_verify_dsk(WT_SESSION_IMPL *session, const char *addr, WT_ITEM *buf)
 			WT_RET_VRFY(session,
 			    "page at %s has non-zero unused page header bytes",
 			    addr);
+
+	/* Any bytes after the data chunk should be nul bytes. */
+	p = (uint8_t *)dsk + dsk->mem_size;
+	end = (uint8_t *)dsk + size;
+	for (; p < end; ++p)
+		if (*p != '\0')
+			WT_RET_VRFY(session,
+			    "%s page at %s has non-zero trailing bytes",
+			    __wt_page_type_string(dsk->type), addr);
 
 	/* Verify the items on the page. */
 	switch (dsk->type) {
@@ -151,7 +164,7 @@ __verify_dsk_row(
 	WT_ERR(__wt_scr_alloc(session, 0, &last_ovfl));
 	last = last_ovfl;
 
-	end = (uint8_t *)dsk + dsk->size;
+	end = (uint8_t *)dsk + dsk->mem_size;
 
 	last_cell_type = FIRST;
 	cell_num = 0;
@@ -164,12 +177,11 @@ __verify_dsk_row(
 			goto err;
 		}
 
-		/*
-		 * Check the raw cell type, then collapse the short key/data
-		 * types.
-		 */
+		/* Check the raw and collapsed cell types. */
 		WT_ERR(__err_cell_type(
 		    session, cell_num, addr, unpack->raw, dsk->type));
+		WT_ERR(__err_cell_type(
+		    session, cell_num, addr, unpack->type, dsk->type));
 		cell_type = unpack->type;
 
 		/*
@@ -240,7 +252,7 @@ __verify_dsk_row(
 		case WT_CELL_KEY:
 			break;
 		case WT_CELL_KEY_OVFL:
-			WT_ERR(__wt_cell_unpack_copy(session, unpack, current));
+			WT_ERR(__wt_cell_unpack_ref(session, unpack, current));
 			goto key_compare;
 		default:
 			/* Not a key -- continue with the next cell. */
@@ -271,43 +283,43 @@ __verify_dsk_row(
 			    cell_num, addr, prefix, last->size);
 
 		/*
-		 * If Huffman decoding required, use the heavy-weight call to
-		 * __wt_cell_unpack_copy() to build the key, up to the prefix.
-		 * Else, we can do it faster internally because we don't have
-		 * to shuffle memory around as much.
+		 * If Huffman decoding required, unpack the cell to build the
+		 * key, then resolve the prefix.  Else, we can do it faster
+		 * internally because we don't have to shuffle memory around as
+		 * much.
 		 */
-		if (huffman == NULL) {
-			/*
-			 * Get the cell's data/length and make sure we have
-			 * enough buffer space.
-			 */
-			WT_ERR(__wt_buf_grow(
-			    session, current, prefix + unpack->size));
-
-			/* Copy the prefix then the data into place. */
-			if (prefix != 0)
-				memcpy((void *)
-				    current->data, last->data, prefix);
-			memcpy((uint8_t *)
-			    current->data + prefix, unpack->data, unpack->size);
-			current->size = prefix + unpack->size;
-		} else {
-			WT_ERR(__wt_cell_unpack_copy(session, unpack, current));
+		if (huffman != NULL) {
+			WT_ERR(__wt_cell_unpack_ref(session, unpack, current));
 
 			/*
 			 * If there's a prefix, make sure there's enough buffer
 			 * space, then shift the decoded data past the prefix
-			 * and copy the prefix into place.
+			 * and copy the prefix into place.  Take care with the
+			 * pointers: current->data may be pointing inside the
 			 */
 			if (prefix != 0) {
 				WT_ERR(__wt_buf_grow(
 				    session, current, prefix + current->size));
-				memmove((uint8_t *)current->data +
-				    prefix, current->data, current->size);
-				memcpy(
-				    (void *)current->data, last->data, prefix);
+				memmove((uint8_t *)current->mem + prefix,
+				    current->data, current->size);
+				memcpy(current->mem, last->data, prefix);
+				current->data = current->mem;
 				current->size += prefix;
 			}
+		} else {
+			/*
+			 * Get the cell's data/length and make sure we have
+			 * enough buffer space.
+			 */
+			WT_ERR(__wt_buf_init(
+			    session, current, prefix + unpack->size));
+
+			/* Copy the prefix then the data into place. */
+			if (prefix != 0)
+				memcpy(current->mem, last->data, prefix);
+			memcpy((uint8_t *)current->mem + prefix, unpack->data,
+			    unpack->size);
+			current->size = prefix + unpack->size;
 		}
 
 key_compare:	/*
@@ -376,7 +388,7 @@ __verify_dsk_col_int(
 
 	btree = session->btree;
 	unpack = &_unpack;
-	end = (uint8_t *)dsk + dsk->size;
+	end = (uint8_t *)dsk + dsk->mem_size;
 
 	cell_num = 0;
 	WT_CELL_FOREACH(btree, dsk, cell, unpack, i) {
@@ -386,9 +398,11 @@ __verify_dsk_col_int(
 		if (__wt_cell_unpack_safe(cell, unpack, end) != 0)
 			return (__err_cell_corrupted(session, cell_num, addr));
 
-		/* Check the cell type. */
+		/* Check the raw and collapsed cell types. */
 		WT_RET (__err_cell_type(
 		    session, cell_num, addr, unpack->raw, dsk->type));
+		WT_RET (__err_cell_type(
+		    session, cell_num, addr, unpack->type, dsk->type));
 
 		/* Check if any referenced item is entirely in the file. */
 		if (!__wt_bm_addr_valid(session, unpack->data, unpack->size))
@@ -433,7 +447,7 @@ __verify_dsk_col_var(
 
 	btree = session->btree;
 	unpack = &_unpack;
-	end = (uint8_t *)dsk + dsk->size;
+	end = (uint8_t *)dsk + dsk->mem_size;
 
 	last_data = NULL;
 	last_size = 0;
@@ -447,12 +461,11 @@ __verify_dsk_col_var(
 		if (__wt_cell_unpack_safe(cell, unpack, end) != 0)
 			return (__err_cell_corrupted(session, cell_num, addr));
 
-		/*
-		 * Check the raw cell type, then collapse the short key/data
-		 * types.
-		 */
+		/* Check the raw and collapsed cell types. */
 		WT_RET (__err_cell_type(
 		    session, cell_num, addr, unpack->raw, dsk->type));
+		WT_RET (__err_cell_type(
+		    session, cell_num, addr, unpack->type, dsk->type));
 		cell_type = unpack->type;
 
 		/* Check if any referenced item is entirely in the file.
@@ -512,7 +525,7 @@ __verify_dsk_chunk(WT_SESSION_IMPL *session,
 	uint8_t *p, *end;
 
 	btree = session->btree;
-	end = (uint8_t *)dsk + dsk->size;
+	end = (uint8_t *)dsk + dsk->mem_size;
 
 	/*
 	 * Fixed-length column-store and overflow pages are simple chunks of
@@ -563,6 +576,8 @@ __err_cell_type(WT_SESSION_IMPL *session,
 {
 	switch (cell_type) {
 	case WT_CELL_ADDR:
+	case WT_CELL_ADDR_DEL:
+	case WT_CELL_ADDR_LNO:
 		if (dsk_type == WT_PAGE_COL_INT ||
 		    dsk_type == WT_PAGE_ROW_INT)
 			return (0);
@@ -579,11 +594,18 @@ __err_cell_type(WT_SESSION_IMPL *session,
 			return (0);
 		break;
 	case WT_CELL_VALUE:
-	case WT_CELL_VALUE_SHORT:
+	case WT_CELL_VALUE_COPY:
 	case WT_CELL_VALUE_OVFL:
+	case WT_CELL_VALUE_SHORT:
 		if (dsk_type == WT_PAGE_COL_VAR ||
 		    dsk_type == WT_PAGE_ROW_LEAF)
 			return (0);
+		break;
+	case WT_CELL_VALUE_OVFL_RM:
+		/*
+		 * The overflow-value deleted cell is in-memory only, it's an
+		 * error to ever see it on a disk page.
+		 */
 		break;
 	default:
 		break;

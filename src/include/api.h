@@ -14,6 +14,7 @@ struct __wt_process {
 
 					/* Locked: connection queue */
 	TAILQ_HEAD(__wt_connection_impl_qh, __wt_connection_impl) connqh;
+	WT_CACHE_POOL *cache_pool;
 };
 
 /*******************************************
@@ -69,8 +70,6 @@ struct __wt_session_impl {
 	WT_BTREE *btree;		/* Current file */
 	TAILQ_HEAD(__btrees, __wt_btree_session) btrees;
 
-	WT_BTREE *created_btree;	/* File being created */
-
 	WT_CURSOR *cursor;		/* Current cursor */
 					/* Cursors closed with the session */
 	TAILQ_HEAD(__cursors, __wt_cursor) cursors;
@@ -80,6 +79,7 @@ struct __wt_session_impl {
 	void	*meta_track_next;	/* Current position */
 	void	*meta_track_sub;	/* Child transaction / save point */
 	size_t	 meta_track_alloc;	/* Currently allocated */
+	int	 meta_track_nest;	/* Nesting level of meta transaction */
 #define	WT_META_TRACKING(session)	(session->meta_track_next != NULL)
 
 	TAILQ_HEAD(__tables, __wt_table) tables;
@@ -101,13 +101,10 @@ struct __wt_session_impl {
 		int line;
 	} *scratch_track;
 #endif
-					/* Serialized operation state */
-	void	*wq_args;		/* Operation arguments */
-	int	wq_sleeping;		/* Thread is blocked */
-	int	wq_ret;			/* Return value */
 
 	WT_TXN_ISOLATION isolation;
 	WT_TXN	txn;			/* Transaction state */
+	u_int	ncursors;		/* Count of active file cursors. */
 
 	void	*reconcile;		/* Reconciliation information */
 
@@ -116,9 +113,11 @@ struct __wt_session_impl {
 	size_t	 excl_allocated;	/* Bytes allocated */
 
 #define	WT_SYNC			1	/* Sync the file */
-#define	WT_SYNC_DISCARD		2	/* Sync the file, discard pages */
-#define	WT_SYNC_DISCARD_NOWRITE	3	/* Discard the file */
+#define	WT_SYNC_COMPACT		2	/* Compact the file */
+#define	WT_SYNC_DISCARD		3	/* Sync the file, discard pages */
+#define	WT_SYNC_DISCARD_NOWRITE	4	/* Discard the file */
 	int syncop;			/* File operation */
+	int syncop_ret;			/* Return value */
 
 	uint32_t id;			/* Offset in conn->session_array */
 
@@ -131,7 +130,9 @@ struct __wt_session_impl {
 	 * easily call a function to clear memory up to, but not including, the
 	 * hazard reference.
 	 */
-	u_int nhazard;
+	uint32_t   hazard_size;		/* Allocated slots in hazard array. */
+	uint32_t   nhazard;		/* Count of active hazard references */
+
 #define	WT_SESSION_CLEAR(s)	memset(s, 0, WT_PTRDIFF(&(s)->hazard, s))
 	WT_HAZARD *hazard;		/* Hazard reference array */
 };
@@ -188,6 +189,7 @@ struct __wt_connection_impl {
 
 	WT_SPINLOCK api_lock;		/* Connection API spinlock */
 	WT_SPINLOCK fh_lock;		/* File handle queue spinlock */
+	WT_SPINLOCK metadata_lock;	/* Metadata spinlock */
 	WT_SPINLOCK schema_lock;	/* Schema operation spinlock */
 	WT_SPINLOCK serial_lock;	/* Serial function call spinlock */
 
@@ -195,6 +197,8 @@ struct __wt_connection_impl {
 
 					/* Connection queue */
 	TAILQ_ENTRY(__wt_connection_impl) q;
+					/* Cache pool queue */
+	TAILQ_ENTRY(__wt_connection_impl) cpq;
 
 	const char *home;		/* Database home */
 	int is_new;			/* Connection created database */
@@ -202,17 +206,18 @@ struct __wt_connection_impl {
 	WT_FH *lock_fh;			/* Lock file handle */
 
 	pthread_t cache_evict_tid;	/* Cache eviction server thread ID */
-	pthread_t cache_read_tid;	/* Cache read server thread ID */
 
 					/* Locked: btree list */
 	TAILQ_HEAD(__wt_btree_qh, __wt_btree) btqh;
+					/* Locked: LSM handle list. */
+	TAILQ_HEAD(__wt_lsm_qh, __wt_lsm_tree) lsmqh;
 					/* Locked: file list */
 	TAILQ_HEAD(__wt_fh_qh, __wt_fh) fhqh;
 
 					/* Locked: library list */
 	TAILQ_HEAD(__wt_dlh_qh, __wt_dlh) dlhqh;
 
-	u_int btqcnt;			/* Locked: btree count */
+	u_int open_btree_count;		/* Locked: open writable btree count */
 	u_int next_file_id;		/* Locked: file ID counter */
 
 	/*
@@ -231,12 +236,10 @@ struct __wt_connection_impl {
 	uint32_t	 session_cnt;	/* Session count */
 
 	/*
-	 * WiredTiger allocates space for 15 hazard references in each thread of
-	 * control, by default.  There's no code path that requires more than 15
-	 * pages at a time (and if we find one, the right change is to increase
-	 * the default).
+	 * WiredTiger allocates space for a fixed number of hazard references
+	 * in each thread of control.
 	 */
-	uint32_t   hazard_size;		/* Hazard array size */
+	uint32_t   hazard_max;		/* Hazard array size */
 
 	WT_CACHE  *cache;		/* Page cache */
 	uint64_t   cache_size;
@@ -286,7 +289,7 @@ struct __wt_connection_impl {
 	const char *cfgvar[] = API_CONF_DEFAULTS(h, n, cfg);		\
 	API_SESSION_INIT(s, h, n, cur, bt);				\
 	WT_ERR(((cfg) != NULL) ?					\
-	    __wt_config_check((s), __wt_confchk_##h##_##n, (cfg)) : 0)
+	    __wt_config_check((s), __wt_confchk_##h##_##n, (cfg), 0) : 0)
 
 #define	API_END(s)							\
 	if ((s) != NULL) {						\
@@ -295,11 +298,50 @@ struct __wt_connection_impl {
 	}								\
 } while (0)
 
-/* If an error is returned, mark that the transaction requires abort. */
-#define	API_END_TXN_ERROR(s, ret)					\
+/* An API call wrapped in a transaction if necessary. */
+#define	TXN_API_CALL(s, h, n, cur, bt, cfg, cfgvar) do {		\
+	int __autotxn = 0;						\
+	API_CALL(s, h, n, bt, cur, cfg, cfgvar);			\
+	__autotxn = F_ISSET(S2C(s), WT_CONN_TRANSACTIONAL) &&		\
+	    !F_ISSET(&(s)->txn, TXN_RUNNING);				\
+	if (__autotxn)							\
+		F_SET(&(s)->txn, TXN_AUTOCOMMIT)
+
+/* An API call wrapped in a transaction if necessary. */
+#define	TXN_API_CALL_NOCONF(s, h, n, cur, bt) do {			\
+	int __autotxn = 0;						\
+	API_CALL_NOCONF(s, h, n, cur, bt);				\
+	__autotxn = F_ISSET(S2C(s), WT_CONN_TRANSACTIONAL) &&		\
+	    !F_ISSET(&(s)->txn, TXN_AUTOCOMMIT | TXN_RUNNING);		\
+	if (__autotxn)							\
+		F_SET(&(s)->txn, TXN_AUTOCOMMIT)
+
+/*
+ * End a transactional API call.
+ *
+ * If committing and any cursors are positioned, update the read snapshot so
+ * the changes become visible.
+ */
+#define	TXN_API_END(s, ret)						\
 	API_END(s);							\
-	if ((ret) != 0 && (ret) != WT_NOTFOUND && (ret) != WT_DUPLICATE_KEY) \
-		F_SET(&(s)->txn, TXN_ERROR)
+	if (__autotxn) {						\
+		if (F_ISSET(&(s)->txn, TXN_AUTOCOMMIT))			\
+			F_CLR(&(s)->txn, TXN_AUTOCOMMIT);		\
+		else if (ret == 0 && !F_ISSET(&(s)->txn, TXN_ERROR))	\
+			ret = __wt_txn_commit((s), NULL);		\
+		else {							\
+			WT_TRET(__wt_txn_rollback((s), NULL));		\
+			if (ret == 0 || ret == WT_DEADLOCK) {		\
+				ret = 0;				\
+				continue;				\
+			}						\
+		}							\
+	} else if (F_ISSET(&(s)->txn, TXN_RUNNING) && (ret) != 0 &&	\
+	    (ret) != WT_NOTFOUND &&					\
+	    (ret) != WT_DUPLICATE_KEY)					\
+		F_SET(&(s)->txn, TXN_ERROR);				\
+	break;								\
+} while (1)
 
 /*
  * If a session or connection method is about to return WT_NOTFOUND (some
@@ -310,16 +352,30 @@ struct __wt_connection_impl {
 	API_END(s);							\
 	return ((ret) == WT_NOTFOUND ? ENOENT : (ret))
 
+#define	TXN_API_END_NOTFOUND_MAP(s, ret)				\
+	TXN_API_END(s, ret);						\
+	return ((ret) == WT_NOTFOUND ? ENOENT : (ret))
+
 #define	CONNECTION_API_CALL(conn, s, n, cfg, cfgvar)			\
 	s = (conn)->default_session;					\
-	API_CALL(s, connection, n, NULL, NULL, cfg, cfgvar);		\
+	API_CALL(s, connection, n, NULL, NULL, cfg, cfgvar)
 
 #define	SESSION_API_CALL(s, n, cfg, cfgvar)				\
-	API_CALL(s, session, n, NULL, NULL, cfg, cfgvar);
+	API_CALL(s, session, n, NULL, NULL, cfg, cfgvar)
 
-#define	CURSOR_API_CALL_NOCONF(cur, s, n, bt)				\
+#define	SESSION_TXN_API_CALL(s, n, cfg, cfgvar)				\
+	TXN_API_CALL(s, session, n, NULL, NULL, cfg, cfgvar)
+
+#define	CURSOR_API_CALL(cur, s, n, bt)					\
 	(s) = (WT_SESSION_IMPL *)(cur)->session;			\
-	API_CALL_NOCONF(s, cursor, n, cur, bt);				\
+	API_CALL_NOCONF(s, cursor, n, cur, bt)
+
+#define	CURSOR_UPDATE_API_CALL(cur, s, n, bt)				\
+	(s) = (WT_SESSION_IMPL *)(cur)->session;			\
+	TXN_API_CALL_NOCONF(s, cursor, n, cur, bt)
+
+#define	CURSOR_UPDATE_API_END(s, ret)					\
+	TXN_API_END(s, ret)
 
 /*******************************************
  * Global variables.
@@ -332,27 +388,32 @@ extern WT_PROCESS __wt_process;
  * DO NOT EDIT: automatically built by dist/api_flags.py.
  * API flags section: BEGIN
  */
-#define	WT_CONN_NOSYNC					0x00000004
+#define	WT_CACHE_POOL_RUN				0x00000001
+#define	WT_CONN_CACHE_POOL				0x00000010
+#define	WT_CONN_LSM_MERGE				0x00000008
+#define	WT_CONN_SYNC					0x00000004
 #define	WT_CONN_TRANSACTIONAL				0x00000002
 #define	WT_DIRECTIO_DATA				0x00000002
 #define	WT_DIRECTIO_LOG					0x00000001
 #define	WT_PAGE_FREE_IGNORE_DISK			0x00000001
-#define	WT_REC_SINGLE					0x00000001
 #define	WT_SERVER_RUN					0x00000001
-#define	WT_SESSION_INTERNAL				0x00000004
+#define	WT_SESSION_INTERNAL				0x00000008
+#define	WT_SESSION_NO_CACHE_CHECK			0x00000004
 #define	WT_SESSION_SALVAGE_QUIET_ERR			0x00000002
 #define	WT_SESSION_SCHEMA_LOCKED			0x00000001
-#define	WT_VERB_block					0x00001000
-#define	WT_VERB_ckpt					0x00000800
-#define	WT_VERB_evict					0x00000400
-#define	WT_VERB_evictserver				0x00000200
-#define	WT_VERB_fileops					0x00000100
-#define	WT_VERB_hazard					0x00000080
-#define	WT_VERB_mutex					0x00000040
-#define	WT_VERB_read					0x00000020
-#define	WT_VERB_readserver				0x00000010
-#define	WT_VERB_reconcile				0x00000008
-#define	WT_VERB_salvage					0x00000004
+#define	WT_VERB_block					0x00004000
+#define	WT_VERB_ckpt					0x00002000
+#define	WT_VERB_evict					0x00001000
+#define	WT_VERB_evictserver				0x00000800
+#define	WT_VERB_fileops					0x00000400
+#define	WT_VERB_hazard					0x00000200
+#define	WT_VERB_lsm					0x00000100
+#define	WT_VERB_mutex					0x00000080
+#define	WT_VERB_read					0x00000040
+#define	WT_VERB_readserver				0x00000020
+#define	WT_VERB_reconcile				0x00000010
+#define	WT_VERB_salvage					0x00000008
+#define	WT_VERB_shared_cache				0x00000004
 #define	WT_VERB_verify					0x00000002
 #define	WT_VERB_write					0x00000001
 /*

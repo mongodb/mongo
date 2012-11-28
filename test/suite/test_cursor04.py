@@ -37,9 +37,10 @@ class test_cursor04(wttest.WiredTigerTestCase):
     nentries = 20
 
     scenarios = [
-        ('row', dict(tablekind='row')),
-        ('col', dict(tablekind='col')),
-        ('fix', dict(tablekind='fix'))
+        ('row', dict(tablekind='row', uri='table')),
+        ('lsm-row', dict(tablekind='row', uri='lsm')),
+        ('col', dict(tablekind='col', uri='table')),
+        ('fix', dict(tablekind='fix', uri='table'))
         ]
 
     def config_string(self):
@@ -60,7 +61,7 @@ class test_cursor04(wttest.WiredTigerTestCase):
             raise
 
     def create_session_and_cursor(self):
-        tablearg = "table:" + self.table_name1
+        tablearg = self.uri + ":" + self.table_name1
         if self.tablekind == 'row':
             keyformat = 'key_format=S'
         else:
@@ -127,22 +128,10 @@ class test_cursor04(wttest.WiredTigerTestCase):
             cursor.insert()
 
         # 1. Calling search for a value that exists
-        cursor.set_key(self.genkey(5))
-        self.assertEqual(cursor.search(), 0)
-        self.assertEqual(cursor.get_key(), self.genkey(5))
-        self.assertEqual(cursor.get_value(), self.genvalue(5))
+        self.assertEqual(cursor[self.genkey(5)], self.genvalue(5))
 
         # 2. Calling search for a value that does not exist
-        cursor.set_key(self.genkey(self.nentries))
-        self.assertEqual(cursor.search(), wiredtiger.WT_NOTFOUND)
-
-        # The key/value should be cleared on NOTFOUND
-        keymsg = 'cursor.get_key: requires key be set: Invalid argument\n'
-        valuemsg = 'cursor.get_value: requires value be set: Invalid argument\n'
-        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
-            cursor.get_key, keymsg)
-        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
-            cursor.get_value, valuemsg)
+        self.assertRaises(KeyError, lambda: cursor[self.genkey(self.nentries)])
 
         # 2. Calling search_near for a value beyond the end
         cursor.set_key(self.genkey(self.nentries))
