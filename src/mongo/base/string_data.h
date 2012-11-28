@@ -98,6 +98,7 @@ namespace mongo {
         size_t size() const { fillSize(); return _size; }
         bool empty() const { return size() == 0; }
         string toString() const { return string(data(), size()); }
+        char operator[] ( unsigned pos ) const { return _data[pos]; }
 
     private:
         const char* const _data;  // is always null terminated, but see "notes" above
