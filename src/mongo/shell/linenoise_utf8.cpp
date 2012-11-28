@@ -238,7 +238,7 @@ size_t copyString32to8counted( UChar8* dest8, const UChar32* source32, size_t ou
     size_t outputUTF8ByteCount = 0;
     if ( outputBufferSizeInBytes ) {
         size_t reducedBufferSize = outputBufferSizeInBytes - 4;
-        while ( *source32 && charCount-- && outputUTF8ByteCount < reducedBufferSize ) {
+        while ( charCount-- && *source32 && outputUTF8ByteCount < reducedBufferSize ) {
             UChar32 c = *source32++;
             if ( c <= 0x7F ) {
                 *dest8++ = c;
