@@ -543,14 +543,34 @@ namespace mongo {
         }
         return e->firstRecord;
     }
+
     inline DiskLoc Record::getPrev(const DiskLoc& myLoc) {
         _accessing();
-        if ( _prevOfs != DiskLoc::NullOfs )
+
+        // Check if we still have records on our current extent
+        if ( _prevOfs != DiskLoc::NullOfs ) {
             return DiskLoc(myLoc.a(), _prevOfs);
+        }
+
+        // Get the current extent
         Extent *e = myExtent(myLoc);
-        if ( e->xprev.isNull() )
-            return DiskLoc();
-        return e->xprev.ext()->lastRecord;
+        while ( 1 ) {
+            if ( e->xprev.isNull() ) {
+                // There are no more extents before this one
+                return DiskLoc();
+            }
+
+            // Move to the extent before this one
+            e = e->xprev.ext();
+
+            if ( !e->lastRecord.isNull() ) {
+                // We have found a non empty extent
+                break;
+            }
+        }
+
+        // Return the last record in our new extent
+        return e->lastRecord;
     }
 
     inline BSONObj DiskLoc::obj() const {
