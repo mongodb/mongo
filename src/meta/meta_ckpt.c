@@ -41,10 +41,7 @@ __wt_meta_checkpoint(WT_SESSION_IMPL *session,
 	 * If we don't find a named checkpoint, we're done, they're read-only.
 	 * If we don't find a default checkpoint, it's creation, return "no
 	 * data" and let our caller handle it.
-	 *
-	 * Clear any stack-allocated structure.
 	 */
-	WT_CLEAR(*ckpt);
 	if (checkpoint == NULL) {
 		if ((ret = __ckpt_last(session, config, ckpt)) == WT_NOTFOUND) {
 			ret = 0;

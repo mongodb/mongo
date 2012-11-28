@@ -55,6 +55,7 @@ __wt_btree_open(WT_SESSION_IMPL *session, const char *cfg[])
 	readonly = btree->checkpoint == NULL ? 0 : 1;
 
 	/* Get the checkpoint information for this name/checkpoint pair. */
+	WT_CLEAR(ckpt);
 	WT_RET(__wt_meta_checkpoint(
 	    session, btree->name, btree->checkpoint, &ckpt));
 
@@ -91,27 +92,27 @@ __wt_btree_open(WT_SESSION_IMPL *session, const char *cfg[])
 	 * Open the specified checkpoint unless it's a special command (special
 	 * commands are responsible for loading their own checkpoints, if any).
 	 */
-	if (F_ISSET(btree,
-	    WT_BTREE_SALVAGE | WT_BTREE_UPGRADE | WT_BTREE_VERIFY))
-		return (0);
+	if (!F_ISSET(btree,
+	    WT_BTREE_SALVAGE | WT_BTREE_UPGRADE | WT_BTREE_VERIFY)) {
+		/*
+		 * There are two reasons to load an empty tree rather than a
+		 * checkpoint: either there is no checkpoint (the file is
+		 * being created), or the load call returns no root page (the
+		 * checkpoint is for an empty file).
+		 */
+		WT_ERR(__wt_bm_checkpoint_load(session,
+		    ckpt.raw.data, ckpt.raw.size,
+		    root_addr, &root_addr_size, readonly));
+		if (creation || root_addr_size == 0)
+			WT_ERR(__btree_tree_open_empty(session, creation));
+		else {
+			WT_ERR(__wt_btree_tree_open(
+			    session, root_addr, root_addr_size));
 
-	/*
-	 * There are two reasons to load an empty tree rather than a checkpoint:
-	 * either there is no checkpoint (the file is being created), or the
-	 * load call returns no root page (the checkpoint is for an empty file).
-	 */
-	WT_ERR(__wt_bm_checkpoint_load(session,
-	    ckpt.raw.data, ckpt.raw.size,
-	    root_addr, &root_addr_size, readonly));
-	if (creation || root_addr_size == 0)
-		WT_ERR(__btree_tree_open_empty(session, creation));
-	else {
-		WT_ERR(
-		    __wt_btree_tree_open(session, root_addr, root_addr_size));
-
-		/* Get the last record number in a column-store file. */
-		if (btree->type != BTREE_ROW)
-			WT_ERR(__btree_get_last_recno(session));
+			/* Get the last record number in a column-store file. */
+			if (btree->type != BTREE_ROW)
+				WT_ERR(__btree_get_last_recno(session));
+		}
 	}
 
 	if (0) {
