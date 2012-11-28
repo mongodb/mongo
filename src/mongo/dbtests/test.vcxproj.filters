@@ -1116,6 +1116,12 @@
     <ClInclude Include="..\s\type_shard.h">
       <Filter>s</Filter>
     </ClInclude>
+    <ClInclude Include="..\db\server_parameters.h">
+      <Filter>db\Header Files\o to z</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\server_parameters_inline.h">
+      <Filter>db\Header Files\o to z</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\client\connpool.cpp">
@@ -2121,6 +2127,12 @@
     </ClCompile>
     <ClCompile Include="..\s\type_shard.cpp">
       <Filter>s</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\commands\parameters.cpp">
+      <Filter>db\commands</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\server_parameters.cpp">
+      <Filter>db\Source Files\o to z</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

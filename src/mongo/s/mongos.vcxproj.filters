@@ -876,6 +876,12 @@
     <ClCompile Include="type_shard.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\db\commands\parameters.cpp">
+      <Filter>db\commands</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\server_parameters.cpp">
+      <Filter>db\Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\pch.h" />
@@ -1598,6 +1604,12 @@
     </ClInclude>
     <ClInclude Include="type_shard.h">
       <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\server_parameters.h">
+      <Filter>db\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\server_parameters_inline.h">
+      <Filter>db\Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

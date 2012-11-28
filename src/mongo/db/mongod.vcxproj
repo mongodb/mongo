@@ -1161,6 +1161,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="cap.cpp" />
     <ClCompile Include="commands\distinct.cpp" />
     <ClCompile Include="commands\fail_point_cmd.cpp" />
+    <ClCompile Include="commands\parameters.cpp" />
     <ClCompile Include="commands\server_status.cpp" />
     <ClCompile Include="geo\geojsonparser.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
@@ -1296,6 +1297,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="prefetch.cpp" />
     <ClCompile Include="projection.cpp" />
     <ClCompile Include="repl\bgsync.cpp" />
+    <ClCompile Include="server_parameters.cpp" />
     <ClCompile Include="ttl.cpp" />
     <ClInclude Include="..\..\third_party\boost\boost\smart_ptr\scoped_ptr.hpp" />
     <ClInclude Include="..\..\third_party\js-1.7\jsarena.h" />
@@ -1576,6 +1578,8 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="repl\rs.cpp" />
     <ClCompile Include="repl\replset_commands.cpp" />
     <ClCompile Include="repl\rs_config.cpp" />
+    <ClInclude Include="server_parameters.h" />
+    <ClInclude Include="server_parameters_inline.h" />
     <ClInclude Include="ttl.h" />
   </ItemGroup>
   <ItemGroup>
