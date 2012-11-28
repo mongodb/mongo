@@ -207,6 +207,7 @@ namespace mongo {
         {"$ifNull", ExpressionIfNull::create, OpDesc::FIXED_COUNT, 2},
         {"$lt", ExpressionCompare::createLt, OpDesc::FIXED_COUNT, 2},
         {"$lte", ExpressionCompare::createLte, OpDesc::FIXED_COUNT, 2},
+        {"$millisecond", ExpressionMillisecond::create, OpDesc::FIXED_COUNT, 1},
         {"$minute", ExpressionMinute::create, OpDesc::FIXED_COUNT, 1},
         {"$mod", ExpressionMod::create, OpDesc::FIXED_COUNT, 2},
         {"$month", ExpressionMonth::create, OpDesc::FIXED_COUNT, 1},
@@ -1688,6 +1689,36 @@ namespace mongo {
         }
 
         return true;
+    }
+
+    /* ------------------------- ExpressionMillisecond ----------------------------- */
+
+    ExpressionMillisecond::~ExpressionMillisecond() {
+    }
+
+    intrusive_ptr<ExpressionNary> ExpressionMillisecond::create() {
+        intrusive_ptr<ExpressionMillisecond> pExpression(new ExpressionMillisecond());
+        return pExpression;
+    }
+
+    ExpressionMillisecond::ExpressionMillisecond():
+        ExpressionNary() {
+    }
+
+    void ExpressionMillisecond::addOperand(const intrusive_ptr<Expression>& pExpression) {
+        checkArgLimit(1);
+        ExpressionNary::addOperand(pExpression);
+    }
+
+    Value ExpressionMillisecond::evaluate(const Document& document) const {
+        checkArgCount(1);
+        Value date(vpOperand[0]->evaluate(document));
+        const int ms = date.coerceToDate() % 1000LL;
+        return Value::createInt( ms >= 0 ? ms : 1000 + ms );
+    }
+
+    const char *ExpressionMillisecond::getOpName() const {
+        return "$millisecond";
     }
 
     /* ------------------------- ExpressionMinute -------------------------- */
