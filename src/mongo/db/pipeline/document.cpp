@@ -296,28 +296,22 @@ namespace mongo {
     }
 
     int Document::compare(const Document& rL, const Document& rR) {
-        const size_t lSize = rL->storage().size();
-        const size_t rSize = rR->storage().size();
-
         DocumentStorageIterator lIt = rL.storage().iterator();
         DocumentStorageIterator rIt = rR.storage().iterator();
 
-        for(size_t i = 0; true; ++i) {
-            if (i >= lSize) {
-                if (i >= rSize)
+        while (true) {
+            if (lIt.atEnd()) {
+                if (rIt.atEnd())
                     return 0; // documents are the same length
 
                 return -1; // left document is shorter
             }
 
-            if (i >= rSize)
+            if (rIt.atEnd())
                 return 1; // right document is shorter
 
             const ValueElement& rField = rIt.get();
             const ValueElement& lField = lIt.get();
-
-            rIt.advance();
-            lIt.advance();
 
             const int nameCmp = strcmp(lField.name, rField.name);
             if (nameCmp)
@@ -326,6 +320,9 @@ namespace mongo {
             const int valueCmp = Value::compare(lField.val, rField.val);
             if (valueCmp)
                 return valueCmp; // fields are unequal
+
+            rIt.advance();
+            lIt.advance();
         }
     }
 

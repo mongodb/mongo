@@ -59,6 +59,7 @@ namespace mongo {
         explicit Value(long long value) : _storage(NumberLong, value) {}
         explicit Value(double value) : _storage(NumberDouble, value) {}
         explicit Value(const OpTime& value) : _storage(Timestamp, value.asDate()) {}
+        explicit Value(const OID& value) : _storage(jstOID, value) {}
         explicit Value(StringData value) : _storage(String, value) {}
         explicit Value(const string& value) : _storage(String, StringData(value)) {}
         explicit Value(const char* value) : _storage(String, StringData(value)) {}

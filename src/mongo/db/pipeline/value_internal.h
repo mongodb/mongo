@@ -53,7 +53,7 @@ namespace mongo {
         ValueStorage(BSONType t, const RCVector* a) { zero(); type = t; putVector(a); }
         ValueStorage(BSONType t, StringData s)      { zero(); type = t; putString(s); }
 
-        ValueStorage(BSONType t, OID& o) {
+        ValueStorage(BSONType t, const OID& o) {
             zero();
             type = t;
             memcpy(&oid, &o, sizeof(OID));

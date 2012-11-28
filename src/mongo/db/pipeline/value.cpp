@@ -568,106 +568,84 @@ namespace mongo {
         } // switch(getType())
     }
 
-    int Value::compare(const Value& rL, const Value& rR) {
-        // missing is treated as undefined for compatibility with BSONObj::woCompare
-        BSONType lType = rL.missing() ? Undefined : rL.getType();
-        BSONType rType = rR.missing() ? Undefined : rR.getType();
-
-        /*
-          Special handling for Undefined and NULL values; these are types,
-          so it's easier to handle them here before we go below to handle
-          values of the same types.  This allows us to compare Undefined and
-          NULL values with everything else.  As coded now:
-          (*) Undefined is less than everything except itself (which is equal)
-          (*) NULL is less than everything except Undefined and itself
-         */
-        if (lType == Undefined) {
-            if (rType == Undefined)
-                return 0;
-
-            /* if rType is anything else, the left value is less */
+    // Helper function for Value::compare.
+    // Better than l-r for cases where difference > MAX_INT
+    template <typename T>
+    inline static int cmp(const T& left, const T& right) {
+        if (left < right) {
             return -1;
         }
-        
-        if (lType == jstNULL) {
-            if (rType == Undefined)
-                return 1;
-            if (rType == jstNULL)
-                return 0;
-
-            return -1;
+        else if (left == right) {
+            return 0;
         }
-
-        if ((rType == Undefined) || (rType == jstNULL)) {
-            /*
-              We know the left value isn't Undefined, because of the above.
-              Count a NULL value as greater than an undefined one.
-            */
+        else {
+            dassert(left > right);
             return 1;
         }
+    }
 
-        /* if the comparisons are numeric, prepare to promote the values */
-        if (((lType == NumberDouble) || (lType == NumberLong) ||
-             (lType == NumberInt)) &&
-            ((rType == NumberDouble) || (rType == NumberLong) ||
-             (rType == NumberInt))) {
+    // Special case for double since it needs special NaN handling
+    inline static int cmp(double left, double right) {
+        // The following is lifted directly from compareElementValues
+        // to ensure identical handling of NaN
+        if (left < right) 
+            return -1;
+        if (left == right)
+            return 0;
+        if (isNaN(left))
+            return isNaN(right) ? 0 : -1;
+        return 1;
+    }
 
-            /* if the biggest type of either is a double, compare as doubles */
-            if ((lType == NumberDouble) || (rType == NumberDouble)) {
-                const double left = rL.getDouble();
-                const double right = rR.getDouble();
-                if (left < right)
-                    return -1;
-                if (left > right)
-                    return 1;
-                return 0;
-            }
+    int Value::compare(const Value& rL, const Value& rR) {
+        // TODO: remove conditional after SERVER-6571
+        BSONType lType = rL.missing() ? EOO : rL.getType();
+        BSONType rType = rR.missing() ? EOO : rR.getType();
 
-            /* if the biggest type of either is a long, compare as longs */
-            if ((lType == NumberLong) || (rType == NumberLong)) {
-                const long long left = rL.getLong();
-                const long long right = rR.getLong();
-                if (left < right)
-                    return -1;
-                if (left > right)
-                    return 1;
-                return 0;
-            }
+        int ret = lType == rType
+                    ? 0 // fast-path common case
+                    : cmp(canonicalizeBSONType(lType),
+                          canonicalizeBSONType(rType));
 
-            /* if we got here, they must both be ints; compare as ints */
-            {
-                const int left = rL.getInt();
-                const int right = rR.getInt();
-                if (left < right)
-                    return -1;
-                if (left > right)
-                    return 1;
-                return 0;
-            }
-        }
-
-        // CW TODO for now, only compare like values
-        uassert(16016, str::stream() <<
-                "can't compare values of BSON types " << typeName(lType) <<
-                " and " << typeName(rType),
-                lType == rType);
+        if (ret)
+            return ret;
 
         switch(lType) {
-        case NumberDouble:
-        case NumberInt:
-        case NumberLong:
-            /* these types were handled above */
-            verify(false);
+        // For supported types, order is the same as in compareElementValues().
+        // All unsupported types at end.
 
-        case String: {
-            StringData r = rR.getStringData();
-            StringData l = rL.getStringData();
-            size_t bytes = min(r.size(), l.size());
-            int ret = memcmp(l.__data(), r.__data(), bytes);
-            if (ret)
-                return ret;
-            return l.size() - r.size();
-        }
+        // These are valueless types
+        case EOO:
+        case Undefined:
+        case jstNULL:
+            return ret;
+
+        case Bool:
+            return rL.getBool() - rR.getBool();
+
+        // WARNING: Timestamp and Date have same canonical type, but compare differently.
+        // Maintaining behavior from normal BSON.
+        case Timestamp: // unsigned
+            return cmp(rL._storage.timestampValue, rR._storage.timestampValue);
+        case Date: // signed
+            return cmp(rL._storage.dateValue, rR._storage.dateValue);
+
+        // Numbers should compare by equivalence even if different types
+        case NumberDouble:
+        case NumberLong:
+        case NumberInt:
+            switch (getWidestNumeric(lType, rType)) {
+            case NumberDouble: return cmp(rL.getDouble(), rR.getDouble());
+            case NumberLong:   return cmp(rL.getLong(),   rR.getLong());
+            case NumberInt:    return cmp(rL.getInt(),    rR.getInt());
+            default: verify(false);
+            }
+
+        case jstOID:
+            return memcmp(rL._storage.oid, rR._storage.oid, sizeof(OID));
+
+        case String:
+            return rL.getStringData().compare(rR.getStringData());
 
         case Object:
             return Document::compare(rL.getDocument(), rR.getDocument());
@@ -676,91 +654,42 @@ namespace mongo {
             const vector<Value>& lArr = rL.getArray();
             const vector<Value>& rArr = rR.getArray();
 
-            vector<Value>::const_iterator lIt =  lArr.begin();
-            vector<Value>::const_iterator lEnd = lArr.end();
-            vector<Value>::const_iterator rIt =  rArr.begin();
-            vector<Value>::const_iterator rEnd = rArr.end();
-
-            for ( ; lIt != lEnd && rIt != rEnd; ++lIt, ++rIt ) {
+            const size_t elems = min(lArr.size(), rArr.size());
+            for (size_t i = 0; i < elems; i++ ) {
                 // compare the two corresponding elements
-                const int cmp = Value::compare(*lIt, *rIt);
+                const int cmp = Value::compare(lArr[i], rArr[i]);
                 if (cmp)
                     return cmp; // values are unequal
             }
 
-            if (lIt == lEnd && rIt == rEnd) {
-                return 0; // the arrays are the same length
-            }
-            else if (lIt == lEnd && rIt != rEnd) {
-                return -1; // the left array is shorter
-            }
-            else if (lIt != lEnd && rIt == rEnd) {
-                return 1; // the right array is shorter
-            }
-            else {
-                verify(false); // we shouldn't have exited the loop in this case
-            }
+            // if we get here we are either equal or one is prefix of the other 
+            return cmp(lArr.size(), rArr.size());
         }
 
+        case RegEx: // TODO: consider flags
+            return rL.getRegex().compare(rR.getRegex());
+
+        // unsupported types
         case BinData:
         case Symbol:
         case CodeWScope:
-            uassert(16017, str::stream() <<
-                    "comparisons of values of BSON type " << typeName(lType) <<
-                    " are not supported", false);
-            break;
-
-        case jstOID:
-            if (rL.getOid() < rR.getOid())
-                return -1;
-            if (rL.getOid() == rR.getOid())
-                return 0;
-            return 1;
-
-        case Bool:
-            if (rL.getBool() == rR.getBool())
-                return 0;
-            if (rL.getBool())
-                return 1;
-            return -1;
-
-        case Date: {
-            long long l = rL.getDate();
-            long long r = rR.getDate();
-            if (l < r)
-                return -1;
-            if (l > r)
-                return 1;
-            return 0;
-        }
-
-        case RegEx:
-            return rL.getRegex().compare(rR.getRegex());
-
-        case Timestamp:
-            if (rL.getTimestamp() < rR.getTimestamp())
-                return -1;
-            if (rL.getTimestamp() > rR.getTimestamp())
-                return 1;
-            return 0;
-
-        case Undefined:
-        case jstNULL:
-            return 0; // treat two Undefined or NULL values as equal
-
-            /* these shouldn't happen in this context */
         case MinKey:
-        case EOO:
         case DBRef:
         case Code:
         case MaxKey:
-            verify(false);
+            uassert(16017, str::stream() <<
+                    "comparisons of values of BSON type " << typeName(lType) <<
+                    " are not supported", false);
         } // switch(lType)
 
         verify(false);
     }
 
     void Value::hash_combine(size_t &seed) const {
+        // TODO: remove conditional after SERVER-6571
+        if (missing()) {
+            return; // same as Undefined
+        }
         switch(getType()) {
             /*
               Numbers whose values are equal need to hash to the same thing
@@ -978,7 +907,7 @@ namespace mongo {
         case NumberInt: return out << val.getInt();
         case jstNULL: return out << "null";
         case Undefined: return out << "undefined";
-        case Date: return out << Date_t(val.getDate()).toString();
+        case Date: return out << time_t_to_String_short(val.coerceToTimeT());
         case Timestamp: return out << val.getTimestamp().toString();
         case Object: return out << val.getDocument()->toString();
         case Array: {

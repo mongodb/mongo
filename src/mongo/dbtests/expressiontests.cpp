@@ -737,14 +737,14 @@ namespace ExpressionTests {
             BSONObj spec() { return BSON( "$gt" << BSON_ARRAY( 2 << 3 << 4 ) ); }
         };
         
-        /** Incompatible types cannot be compared. */
+        /** Incompatible types can be compared. */
         class IncompatibleTypes {
         public:
             void run() {
                 BSONObj specObject = BSON( "" << BSON( "$ne" << BSON_ARRAY( "a" << 1 ) ) );
                 BSONElement specElement = specObject.firstElement();
                 intrusive_ptr<Expression> expression = Expression::parseOperand( &specElement );
-                ASSERT_THROWS( expression->evaluate( Document() ), UserException );
+                ASSERT_EQUALS(expression->evaluate(Document()), Value(true));
             }
         };
 
@@ -1310,7 +1310,7 @@ namespace ExpressionTests {
             }
         };
 
-        /** Comparison is not performed for multikey values. */
+        /** Comparison is performed for multikey values rather than set-containment. */
         class Multikey {
         public:
             void run() {
@@ -1319,7 +1319,7 @@ namespace ExpressionTests {
                                                       Expression::EQ, Value(0) );
                 Document document =
                         fromBson( BSON( "a" << BSON_ARRAY( 1 << 0 << 2 ) ) );
-                ASSERT_THROWS( expression->evaluate( document ), UserException );
+                ASSERT_EQUALS(expression->evaluate(document), Value(false));
             }
         };
         

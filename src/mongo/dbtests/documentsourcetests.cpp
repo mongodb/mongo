@@ -1346,10 +1346,13 @@ namespace DocumentSourceTests {
         };
 
         /** Sorting different types is not supported. */
-        class InconsistentTypeSort : public InvalidOperationBase {
+        class InconsistentTypeSort : public CheckResultsBase {
             void populateData() {
-                client.insert( ns, BSON( "a" << 1 ) );
-                client.insert( ns, BSON( "a" << "foo" ) );
+                client.insert( ns, BSON("_id" << 0 << "a" << 1) );
+                client.insert( ns, BSON("_id" << 1 << "a" << "foo") );
+            }
+            string expectedResultSetString() {
+                return "[{_id:0,a:1},{_id:1,a:\"foo\"}]";
             }
         };
 
