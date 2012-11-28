@@ -379,7 +379,7 @@ namespace mutablebson {
         SiblingIterator(const SiblingIterator& it);
 
         // iterator interface
-        Iterator& operator++();
+        SiblingIterator& operator++();
         bool done() const;
 
     protected:    // state

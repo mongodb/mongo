@@ -1127,7 +1127,7 @@ ElementRep& dstRep = _doc->_elements->_vec[(*sibIt)._rep];
     SiblingIterator::SiblingIterator(const SiblingIterator& it) : Iterator(it) {}
     SiblingIterator::~SiblingIterator() { }
 
-    Iterator& SiblingIterator::operator++() {
+    SiblingIterator& SiblingIterator::operator++() {
         advance();
         return *this;
     }
