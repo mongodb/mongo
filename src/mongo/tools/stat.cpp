@@ -288,7 +288,7 @@ namespace mongo {
             string password;
         };
 
-        static void serverThread( shared_ptr<ServerState> state ) {
+        static void serverThread( shared_ptr<ServerState> state , int sleepTime) {
             try {
                 DBClientConnection conn( true );
                 conn._logLevel = 1;
@@ -335,7 +335,7 @@ namespace mongo {
                         state->error = e.what();
                     }
 
-                    sleepsecs( 1 );
+                    sleepsecs( sleepTime );
                 }
 
 
@@ -357,7 +357,10 @@ namespace mongo {
 
             state.reset( new ServerState() );
             state->host = host;
-            state->thr.reset( new boost::thread( boost::bind( serverThread , state ) ) );
+            /* For each new thread, pass in a thread state object and the delta between samples */
+            state->thr.reset( new boost::thread( boost::bind( serverThread,
+                                                              state,
+                                                              (int)ceil(_statUtil.getSeconds()) ) ) );
             state->username = _username;
             state->password = _password;
 
