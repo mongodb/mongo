@@ -104,7 +104,7 @@ public:
         _keepIndexVersion = hasParam("keepIndexVersion");
         _restoreOptions = !hasParam("noOptionsRestore");
         _restoreIndexes = !hasParam("noIndexRestore");
-        _w = getParam( "w" , 1 );
+        _w = getParam( "w" , 0 );
 
         bool doOplog = hasParam( "oplogReplay" );
 
@@ -360,7 +360,7 @@ public:
             conn().runCommand(db, cmd, out);
 
             // wait for ops to propagate to "w" nodes (doesn't warn if w used without replset)
-            if ( _w > 1 ) {
+            if ( _w > 0 ) {
                 conn().getLastError(db, false, false, _w);
             }
         }
@@ -377,7 +377,7 @@ public:
             conn().insert( _curns , obj );
 
             // wait for insert to propagate to "w" nodes (doesn't warn if w used without replset)
-            if ( _w > 1 ) {
+            if ( _w > 0 ) {
                 conn().getLastErrorDetailed(_curdb, false, false, _w);
             }
         }
