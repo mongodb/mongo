@@ -121,6 +121,9 @@ namespace mongo {
         /// Add this document to the BSONObj under construction with the given BSONObjBuilder.
         void toBson(BSONObjBuilder *pBsonObjBuilder) const;
 
+        // Support BSONObjBuilder and BSONArrayBuilder "stream" API
+        friend BSONObjBuilder& operator << (BSONObjBuilderValueStream& builder, const Document& d);
+
         /** Return the abstract Position of a field, suitable to pass to operator[] or getField().
          *  This can potentially save time if you need to refer to a field multiple times.
          */

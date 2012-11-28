@@ -241,108 +241,60 @@ namespace mongo {
         return getDocument()[name];
     }
 
-    void Value::addToBson(Builder* pBuilder) const {
-        switch(getType()) {
-        case NumberDouble:
-            pBuilder->append(getDouble());
-            break;
+    BSONObjBuilder& operator << (BSONObjBuilderValueStream& builder, const Value& val) {
+        if (val.missing())
+            return builder.builder();
 
-        case String:
-            pBuilder->append(getStringData());
-            break;
-
-        case Object: {
-            Document pDocument(getDocument());
-            BSONObjBuilder subBuilder;
-            pDocument->toBson(&subBuilder);
-            subBuilder.done();
-            pBuilder->append(&subBuilder);
-            break;
-        }
+        switch(val.getType()) {
+        case jstNULL:      return builder << BSONNULL;
+        case Undefined:    return builder << BSONUndefined;
+        case jstOID:       return builder << val.getOid();
+        case NumberInt:    return builder << val.getInt();
+        case NumberLong:   return builder << val.getLong();
+        case NumberDouble: return builder << val.getDouble();
+        case String:       return builder << val.getStringData();
+        case Bool:         return builder << val.getBool();
+        case Date:         return builder << Date_t(val.getDate());
+        case Timestamp:    return builder << val.getTimestamp();
+        case Object:       return builder << val.getDocument();
 
         case Array: {
-            const size_t n = getArray().size();
-            BSONArrayBuilder arrayBuilder(n);
-            for(size_t i = 0; i < n; ++i) {
-                getArray()[i].addToBsonArray(&arrayBuilder);
+            const vector<Value>& array = val.getArray();
+            const size_t n = array.size();
+            BSONArrayBuilder arrayBuilder(builder.subarrayStart());
+            for(size_t i = 0; i < n; i++) {
+                array[i].addToBsonArray(&arrayBuilder);
             }
-
-            pBuilder->append(&arrayBuilder);
-            break;
+            arrayBuilder.doneFast();
+            return builder.builder();
         }
 
-        case BinData:
-            // pBuilder->appendBinData(fieldName, ...);
-            verify(false); // CW TODO unimplemented
-            break;
 
-        case jstOID:
-            pBuilder->append(getOid());
-            break;
-
-        case Bool:
-            pBuilder->append(getBool());
-            break;
-
-        case Date:
-            pBuilder->append(Date_t(getDate()));
-            break;
-
-        case RegEx:
-            pBuilder->append(getRegex());
-            break;
-
-        case Symbol:
-            pBuilder->append(getSymbol());
-            break;
-
-        case CodeWScope:
-            verify(false); // CW TODO unimplemented
-            break;
-
-        case NumberInt:
-            pBuilder->append(getInt());
-            break;
-
-        case Timestamp:
-            pBuilder->append(getTimestamp());
-            break;
-
-        case NumberLong:
-            pBuilder->append(getLong());
-            break;
-
-        case Undefined:
-            pBuilder->appendUndefined();
-            break;
-
-        case jstNULL:
-            pBuilder->append();
-            break;
+        // TODO: these need to not be appended as strings SERVER-6470
+        case RegEx:  return builder << val.getRegex();
+        case Symbol: return builder << val.getSymbol();
 
             /* these shouldn't appear in this context */
+        case BinData:
+        case CodeWScope:
         case MinKey:
         case EOO:
         case DBRef:
         case Code:
         case MaxKey:
             verify(false); // CW TODO better message
-            break;
         }
+        verify(false);
     }
 
     void Value::addToBsonObj(BSONObjBuilder* pBuilder, StringData fieldName) const {
-        if (missing()) return;
-
-        BuilderObj objBuilder(pBuilder, fieldName);
-        addToBson(&objBuilder);
+        *pBuilder << fieldName.data() << *this;
     }
 
     void Value::addToBsonArray(BSONArrayBuilder* pBuilder) const {
-        if (missing()) return;
-
-        BuilderArray arrBuilder(pBuilder);
-        addToBson(&arrBuilder);
+        if (!missing()) { // don't want to increment builder's counter
+            *pBuilder << *this;
+        }
     }
 
     bool Value::coerceToBool() const {

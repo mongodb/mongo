@@ -125,6 +125,9 @@ namespace mongo {
         /// Add this field to the BSON array under construction.
         void addToBsonArray(BSONArrayBuilder* pBuilder) const;
 
+        // Support BSONObjBuilder and BSONArrayBuilder "stream" API
+        friend BSONObjBuilder& operator << (BSONObjBuilderValueStream& builder, const Value& val);
+
         /** Coerce a value to a bool using BSONElement::trueValue() rules.
          *  Some types unsupported.  SERVER-6120
          */
@@ -213,8 +216,6 @@ namespace mongo {
          */
         template <typename InvalidArgumentType>
         explicit Value(const InvalidArgumentType& invalidArgument);
-
-        void addToBson(Builder* pBuilder) const;
 
         ValueStorage _storage;
         friend class MutableValue; // gets and sets _storage.genericRCPtr

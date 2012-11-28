@@ -208,9 +208,16 @@ namespace mongo {
         *this = md.freeze();
     }
 
+    BSONObjBuilder& operator << (BSONObjBuilderValueStream& builder, const Document& doc) {
+        BSONObjBuilder subobj(builder.subobjStart());
+        doc.toBson(&subobj);
+        subobj.doneFast();
+        return builder.builder();
+    }
+
     void Document::toBson(BSONObjBuilder* pBuilder) const {
         for (DocumentStorageIterator it = storage().iterator(); !it.atEnd(); it.advance()) {
-            it->val.addToBsonObj(pBuilder, it->nameSD());
+            *pBuilder << it->name << it->val;
         }
     }
 
