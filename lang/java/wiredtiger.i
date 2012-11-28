@@ -129,8 +129,8 @@ SELFHELPER(struct __wt_cursor, cursor)
 %javamethodmodifiers __wt_cursor::prev "protected";
 %rename (prev_wrap) __wt_cursor::prev;
 
-%ignore __wt_cursor::equals(WT_CURSOR *, WT_CURSOR *, int *);
-%rename (equals_wrap) __wt_cursor::equals;
+%ignore __wt_cursor::compare(WT_CURSOR *, WT_CURSOR *, int *);
+%rename (compare_wrap) __wt_cursor::compare;
 
 /* SWIG magic to turn Java byte strings into data / size. */
 %apply (char *STRING, int LENGTH) { (char *data, int size) };
@@ -203,8 +203,8 @@ enum SearchStatus { FOUND, NOTFOUND, SMALLER, LARGER };
 		return $self->update($self);
 	}
 
-	bool equals_wrap(JNIEnv *jenv, WT_CURSOR *other) {
-                int cmp, ret = $self->equals($self, other, &cmp);
+	bool compare_wrap(JNIEnv *jenv, WT_CURSOR *other) {
+		int cmp, ret = $self->compare($self, other, &cmp);
 		if (ret != 0)
 			throwDbException(jenv, wiredtiger_strerror(ret));
 		return (bool)cmp;
