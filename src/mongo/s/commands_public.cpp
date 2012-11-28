@@ -329,6 +329,7 @@ namespace mongo {
 
             virtual void aggregateResults(const vector<BSONObj>& results, BSONObjBuilder& output) {
                 long long objects = 0;
+                long long unscaledDataSize = 0;
                 long long dataSize = 0;
                 long long storageSize = 0;
                 long long numExtents = 0;
@@ -339,6 +340,7 @@ namespace mongo {
                 for (vector<BSONObj>::const_iterator it(results.begin()), end(results.end()); it != end; ++it) {
                     const BSONObj& b = *it;
                     objects     += b["objects"].numberLong();
+                    unscaledDataSize    += b["avgObjSize"].numberLong() * b["objects"].numberLong();
                     dataSize    += b["dataSize"].numberLong();
                     storageSize += b["storageSize"].numberLong();
                     numExtents  += b["numExtents"].numberLong();
@@ -349,7 +351,10 @@ namespace mongo {
 
                 //result.appendNumber( "collections" , ncollections ); //TODO: need to find a good way to get this
                 output.appendNumber( "objects" , objects );
-                output.append      ( "avgObjSize" , double(dataSize) / double(objects) );
+                /* avgObjSize on mongod is not scaled based on the argument to db.stats(), so we use
+                 * unscaledDataSize here for consistency.  See SERVER-7347. */
+                output.append      ( "avgObjSize" , objects == 0 ? 0 : double(unscaledDataSize) /
+                                                                       double(objects) );
                 output.appendNumber( "dataSize" , dataSize );
                 output.appendNumber( "storageSize" , storageSize);
                 output.appendNumber( "numExtents" , numExtents );
