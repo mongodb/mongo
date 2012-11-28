@@ -1411,6 +1411,88 @@ namespace JsobjTests {
             }
         };
 
+        class AllTypes {
+        public:
+            void run() {
+                // These are listed in order of BSONType
+
+                ASSERT_EQUALS(objTypeOf(MINKEY), MinKey);
+                ASSERT_EQUALS(arrTypeOf(MINKEY), MinKey);
+
+                // EOO not valid in middle of BSONObj
+
+                ASSERT_EQUALS(objTypeOf(1.0), NumberDouble);
+                ASSERT_EQUALS(arrTypeOf(1.0), NumberDouble);
+
+                ASSERT_EQUALS(objTypeOf(""), String);
+                ASSERT_EQUALS(arrTypeOf(""), String);
+                ASSERT_EQUALS(objTypeOf(string()), String);
+                ASSERT_EQUALS(arrTypeOf(string()), String);
+                ASSERT_EQUALS(objTypeOf(StringData("")), String);
+                ASSERT_EQUALS(arrTypeOf(StringData("")), String);
+
+                ASSERT_EQUALS(objTypeOf(BSONObj()), Object);
+                ASSERT_EQUALS(arrTypeOf(BSONObj()), Object);
+
+                ASSERT_EQUALS(objTypeOf(BSONArray()), Array);
+                ASSERT_EQUALS(arrTypeOf(BSONArray()), Array);
+
+                ASSERT_EQUALS(objTypeOf(BSONBinData("", 0, BinDataGeneral)), BinData);
+                ASSERT_EQUALS(arrTypeOf(BSONBinData("", 0, BinDataGeneral)), BinData);
+
+                ASSERT_EQUALS(objTypeOf(BSONUndefined), Undefined);
+                ASSERT_EQUALS(arrTypeOf(BSONUndefined), Undefined);
+
+                ASSERT_EQUALS(objTypeOf(OID()), jstOID);
+                ASSERT_EQUALS(arrTypeOf(OID()), jstOID);
+
+                ASSERT_EQUALS(objTypeOf(true), Bool);
+                ASSERT_EQUALS(arrTypeOf(true), Bool);
+
+                ASSERT_EQUALS(objTypeOf(Date_t()), Date);
+                ASSERT_EQUALS(arrTypeOf(Date_t()), Date);
+
+                ASSERT_EQUALS(objTypeOf(BSONNULL), jstNULL);
+                ASSERT_EQUALS(arrTypeOf(BSONNULL), jstNULL);
+
+                ASSERT_EQUALS(objTypeOf(BSONRegEx("", "")), RegEx);
+                ASSERT_EQUALS(arrTypeOf(BSONRegEx("", "")), RegEx);
+
+                ASSERT_EQUALS(objTypeOf(BSONDBRef("", OID())), DBRef);
+                ASSERT_EQUALS(arrTypeOf(BSONDBRef("", OID())), DBRef);
+
+                ASSERT_EQUALS(objTypeOf(BSONCode("")), Code);
+                ASSERT_EQUALS(arrTypeOf(BSONCode("")), Code);
+
+                ASSERT_EQUALS(objTypeOf(BSONSymbol("")), Symbol);
+                ASSERT_EQUALS(arrTypeOf(BSONSymbol("")), Symbol);
+
+                ASSERT_EQUALS(objTypeOf(BSONCodeWScope("", BSONObj())), CodeWScope);
+                ASSERT_EQUALS(arrTypeOf(BSONCodeWScope("", BSONObj())), CodeWScope);
+
+                ASSERT_EQUALS(objTypeOf(1), NumberInt);
+                ASSERT_EQUALS(arrTypeOf(1), NumberInt);
+
+                ASSERT_EQUALS(objTypeOf(OpTime()), Timestamp);
+                ASSERT_EQUALS(arrTypeOf(OpTime()), Timestamp);
+
+                ASSERT_EQUALS(objTypeOf(1LL), NumberLong);
+                ASSERT_EQUALS(arrTypeOf(1LL), NumberLong);
+
+                ASSERT_EQUALS(objTypeOf(MAXKEY), MaxKey);
+                ASSERT_EQUALS(arrTypeOf(MAXKEY), MaxKey);
+            }
+
+            template<typename T>
+            BSONType objTypeOf(const T& thing) {
+                return BSON("" << thing).firstElement().type();
+            }
+
+            template<typename T>
+            BSONType arrTypeOf(const T& thing) {
+                return BSON_ARRAY(thing).firstElement().type();
+            }
+        };
     } // namespace ValueStreamTests
 
     class SubObjectBuilder {
@@ -2100,6 +2182,7 @@ namespace JsobjTests {
             add< ValueStreamTests::LabelishOr >();
             add< ValueStreamTests::Unallowed >();
             add< ValueStreamTests::ElementAppend >();
+            add< ValueStreamTests::AllTypes >();
             add< SubObjectBuilder >();
             add< DateBuilder >();
             add< DateNowBuilder >();

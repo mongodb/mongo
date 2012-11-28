@@ -94,6 +94,12 @@ namespace mongo {
     */
     extern struct NullLabeler { } BSONNULL;
 
+    /* Utility class to assign an Undefined value to a given attribute
+       Example:
+         std::cout << BSON( "a" << BSONUndefined ); // { a : undefined }
+    */
+    extern struct UndefinedLabeler { } BSONUndefined;
+
     /* Utility class to add the minKey (minus infinity) to a given attribute
        Example:
          std::cout << BSON( "a" << MINKEY ); // { "a" : { "$minKey" : 1 } }
@@ -121,6 +127,47 @@ namespace mongo {
     private:
         const Label &l_;
         BSONObjBuilderValueStream *s_;
+    };
+
+    // Utility class to allow adding a string to BSON as a Symbol
+    struct BSONSymbol {
+        explicit BSONSymbol(const StringData& sym) :symbol(sym) {}
+        StringData symbol;
+    };
+
+    // Utility class to allow adding a string to BSON as Code
+    struct BSONCode {
+        explicit BSONCode(const StringData& str) :code(str) {}
+        StringData code;
+    };
+
+    // Utility class to allow adding CodeWScope to BSON
+    struct BSONCodeWScope {
+        explicit BSONCodeWScope(const StringData& str, const BSONObj& obj) :code(str), scope(obj) {}
+        StringData code;
+        BSONObj scope;
+    };
+
+    // Utility class to allow adding a RegEx to BSON
+    struct BSONRegEx {
+        explicit BSONRegEx(const StringData& pat, const StringData& f="") :pattern(pat), flags(f) {}
+        StringData pattern;
+        StringData flags;
+    };
+
+    // Utility class to allow adding binary data to BSON
+    struct BSONBinData {
+        BSONBinData(const void* d, int l, BinDataType t) :data(d), length(l), type(t) {}
+        const void* data;
+        int length;
+        BinDataType type;
+    };
+
+    // Utility class to allow adding deprecated DBRef type to BSON
+    struct BSONDBRef {
+        BSONDBRef(const StringData& nameSpace, const OID& o) :ns(nameSpace), oid(o) {}
+        StringData ns;
+        OID oid;
     };
 
     extern Labeler::Label GT;
@@ -152,18 +199,27 @@ namespace mongo {
         template<class T>
         BSONObjBuilder& operator<<( T value );
 
-        BSONObjBuilder& operator<<(DateNowLabeler& id);
+        BSONObjBuilder& operator<<(const DateNowLabeler& id);
 
-        BSONObjBuilder& operator<<(NullLabeler& id);
+        BSONObjBuilder& operator<<(const NullLabeler& id);
+        BSONObjBuilder& operator<<(const UndefinedLabeler& id);
 
-        BSONObjBuilder& operator<<(MinKeyLabeler& id);
-        BSONObjBuilder& operator<<(MaxKeyLabeler& id);
+        BSONObjBuilder& operator<<(const MinKeyLabeler& id);
+        BSONObjBuilder& operator<<(const MaxKeyLabeler& id);
 
         Labeler operator<<( const Labeler::Label &l );
 
         void endField( const char *nextFieldName = 0 );
         bool subobjStarted() const { return _fieldName != 0; }
 
+        // The following methods provide API compatibility with BSONArrayBuilder
+        BufBuilder& subobjStart();
+        BufBuilder& subarrayStart();
+
+        // This method should only be called from inside of implementations of
+        // BSONObjBuilder& operator<<(BSONObjBuilderValueStream&, SOME_TYPE)
+        // to provide the return value.
+        BSONObjBuilder& builder() { return *_builder; }
     private:
         const char * _fieldName;
         BSONObjBuilder * _builder;

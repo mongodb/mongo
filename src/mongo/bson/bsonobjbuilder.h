@@ -338,12 +338,20 @@ namespace mongo {
             return *this;
         }
 
+        BSONObjBuilder& append(const StringData& fieldName, const BSONRegEx& regex) {
+            return appendRegex(fieldName, regex.pattern, regex.flags);
+        }
+
         BSONObjBuilder& appendCode(const StringData& fieldName, const StringData& code) {
             _b.appendNum((char) Code);
             _b.appendStr(fieldName);
             _b.appendNum((int) code.size()+1);
             _b.appendStr(code);
             return *this;
+        }
+
+        BSONObjBuilder& append(const StringData& fieldName, const BSONCode& code) {
+            return appendCode(fieldName, code.code);
         }
 
         /** Append a string element. 
@@ -380,6 +388,10 @@ namespace mongo {
             return *this;
         }
 
+        BSONObjBuilder& append(const StringData& fieldName, const BSONSymbol& symbol) {
+            return appendSymbol(fieldName, symbol.symbol);
+        }
+
         /** Implements builder interface but no-op in ObjBuilder */
         void appendNull() {
             msgasserted(16234, "Invalid call to appendNull in BSONObj Builder.");
@@ -414,7 +426,13 @@ namespace mongo {
         }
 
         /**
-         * To store an OpTime in BSON, use this function. Pass the OpTime as a Date, as follows:
+         * To store an OpTime in BSON, use this function.
+         * This captures both the secs and inc fields.
+         */
+        BSONObjBuilder& append(const StringData& fieldName, OpTime optime);
+
+        /**
+         * Alternative way to store an OpTime in BSON. Pass the OpTime as a Date, as follows:
          *
          *     builder.appendTimestamp("field", optime.asDate());
          *
@@ -447,6 +465,10 @@ namespace mongo {
             return *this;
         }
 
+        BSONObjBuilder& append(const StringData& fieldName, const BSONDBRef& dbref) {
+            return appendDBRef(fieldName, dbref.ns, dbref.oid);
+        }
+
         /** Append a binary data element
             @param fieldName name of the field
             @param len length of the binary data in bytes
@@ -461,6 +483,10 @@ namespace mongo {
             _b.appendNum( (char) type );
             _b.appendBuf( data, len );
             return *this;
+        }
+
+        BSONObjBuilder& append(const StringData& fieldName, const BSONBinData& bd) {
+            return appendBinData(fieldName, bd.length, bd.type, bd.data);
         }
 
         /**
@@ -490,6 +516,10 @@ namespace mongo {
             _b.appendStr( code );
             _b.appendBuf( ( void * )scope.objdata(), scope.objsize() );
             return *this;
+        }
+
+        BSONObjBuilder& append(const StringData& fieldName, const BSONCodeWScope& cws) {
+            return appendCodeWScope(fieldName, cws.code, cws.scope);
         }
 
         void appendUndefined( const StringData& fieldName ) {
@@ -687,7 +717,8 @@ namespace mongo {
 
         template <typename T>
         BSONArrayBuilder& operator<<(const T& x) {
-            return append(x);
+            _b << num().c_str() << x;
+            return *this;
         }
 
         void appendNull() {
