@@ -45,9 +45,13 @@ __wt_meta_checkpoint(WT_SESSION_IMPL *session,
 	 * Clear any stack-allocated structure.
 	 */
 	WT_CLEAR(*ckpt);
-	if (checkpoint == NULL)
-		WT_ERR(__ckpt_last(session, config, ckpt));
-	else
+	if (checkpoint == NULL) {
+		if ((ret = __ckpt_last(session, config, ckpt)) == WT_NOTFOUND) {
+			ret = 0;
+			ckpt->addr.data = ckpt->raw.data = NULL;
+			ckpt->addr.size = ckpt->raw.size = 0;
+		}
+	} else
 		WT_ERR(__ckpt_named(session, checkpoint, config, ckpt));
 
 err:	__wt_free(session, config);

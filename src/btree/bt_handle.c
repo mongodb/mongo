@@ -48,26 +48,22 @@ __wt_btree_open(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_DECL_RET;
 	uint32_t root_addr_size;
 	uint8_t root_addr[WT_BTREE_MAX_ADDR_COOKIE];
-	int created, forced_salvage, readonly;
+	int creation, forced_salvage, readonly;
 	const char *filename;
 
 	btree = session->btree;
 	readonly = btree->checkpoint == NULL ? 0 : 1;
 
 	/* Get the checkpoint information for this name/checkpoint pair. */
-	created = 0;
-	if ((ret = __wt_meta_checkpoint(
-	    session, btree->name, btree->checkpoint, &ckpt)) != 0) {
-		if (ret != WT_NOTFOUND)
-			WT_ERR(ret);
-		created = 1;
-	}
+	WT_RET(__wt_meta_checkpoint(
+	    session, btree->name, btree->checkpoint, &ckpt));
 
 	/*
 	 * Bulk-load is only permitted on newly created files, not any empty
 	 * file -- see the checkpoint code for a discussion.
 	 */
-	if (!created && F_ISSET(btree, WT_BTREE_BULK))
+	creation = ckpt.raw.size == 0;
+	if (!creation && F_ISSET(btree, WT_BTREE_BULK))
 		WT_ERR_MSG(session, EINVAL,
 		    "bulk-load is only supported on newly created objects");
 
@@ -107,8 +103,8 @@ __wt_btree_open(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_ERR(__wt_bm_checkpoint_load(session,
 	    ckpt.raw.data, ckpt.raw.size,
 	    root_addr, &root_addr_size, readonly));
-	if (created || root_addr_size == 0)
-		WT_ERR(__btree_tree_open_empty(session, created));
+	if (creation || root_addr_size == 0)
+		WT_ERR(__btree_tree_open_empty(session, creation));
 	else {
 		WT_ERR(
 		    __wt_btree_tree_open(session, root_addr, root_addr_size));
@@ -357,7 +353,7 @@ err:		__wt_buf_free(session, &dsk);
  *	Create an empty in-memory tree.
  */
 static int
-__btree_tree_open_empty(WT_SESSION_IMPL *session, int created)
+__btree_tree_open_empty(WT_SESSION_IMPL *session, int creation)
 {
 	WT_BTREE *btree;
 	WT_DECL_RET;
@@ -372,7 +368,7 @@ __btree_tree_open_empty(WT_SESSION_IMPL *session, int created)
 	 * loads; set a flag that's cleared when a row is inserted into the
 	 * tree.
 	 */
-	if (created)
+	if (creation)
 		btree->bulk_load_ok = 1;
 
 	/*
