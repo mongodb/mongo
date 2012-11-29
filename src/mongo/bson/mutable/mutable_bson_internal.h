@@ -126,7 +126,6 @@ namespace mutablebson {
         ElementRep(int32_t type, uint32_t nameref, ValueType value, uint32_t parentref);
         ~ElementRep() ;
 
-        std::ostream& put(std::ostream&) const;
         void clearSiblings();
         void clearParent();
 

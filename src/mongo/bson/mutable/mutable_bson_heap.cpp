@@ -17,8 +17,6 @@
 
 #include "mongo/bson/mutable/mutable_bson_heap.h"
 
-#define __TRACE__ __FILE__ << ":" << __FUNCTION__ << " [" << __LINE__ << "]"
-
 namespace mongo {
 namespace mutablebson {
 

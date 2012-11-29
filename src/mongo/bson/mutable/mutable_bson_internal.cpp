@@ -17,12 +17,8 @@
 
 #include "mongo/bson/mutable/mutable_bson_internal.h"
 
-#define __TRACE__ __FILE__ << ":" << __FUNCTION__ << " [" << __LINE__ << "]"
-
 namespace mongo {
 namespace mutablebson {
-
-    static bool debug_level0 = false;
 
     //
     // ElementRep implementation
@@ -84,20 +80,6 @@ namespace mutablebson {
     ElementRep::~ElementRep() {
     }
 
-    std::ostream& ElementRep::put(std::ostream& os) const {
-        os <<
-            "ElememtRep["
-            "\n type="<<_type<<
-            "\n nameref="<<_nameref<<
-            "\n child.left="<<_child._left<<
-            "\n child.right="<<_child._right<<
-            "\n sibling.left="<<_sibling._left<<
-            "\n sibling.right="<<_sibling._right<<
-            "\n parent="<<_parent<<
-            "]";
-        return os;
-    }
-
     void ElementRep::clearSiblings() {
         _sibling._left = EMPTY_REP;
         _sibling._right = EMPTY_REP;
@@ -106,7 +88,6 @@ namespace mutablebson {
     void ElementRep::clearParent() {
         _parent = EMPTY_REP;
     }
-
 
     //
     // ElementVector implementation
@@ -131,9 +112,6 @@ namespace mutablebson {
     }
 
     void ElementVector::push_back(const ElementRep& rep) {
-        if (debug_level0) {
-            rep.put(std::cout << __TRACE__ << " : rep = ") << std::endl;
-        }
         _vec.push_back(rep);
     }
 

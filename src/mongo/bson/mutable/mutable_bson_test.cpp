@@ -28,7 +28,6 @@
 namespace {
 
 #define EMPTY_REP  ((uint32_t)-1)
-#define __TRACE__ __FILE__ << ":" << __FUNCTION__ << " [" << __LINE__ << "]"
 
     TEST(TopologyBuilding, TopDownFromScratch) {
         /*

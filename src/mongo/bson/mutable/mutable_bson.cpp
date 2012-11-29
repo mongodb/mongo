@@ -34,20 +34,6 @@ namespace mutablebson {
 #define SHORTBIT        (1<<16)
 #define DEPTH_LIMIT     50
 #define SHORT_LIMIT     16
-#define __TRACE__ __FILE__ << ":" << __FUNCTION__ << " [" << __LINE__ << "]"
-
-    static const std::string indentv[] = { "    ",
-                                           "        ",
-                                           "            ",
-                                           "                ",
-                                           "                    ",
-                                           "                        ",
-                                           "                            ",
-                                           "                                " };
-
-    // for debugging only:
-    //ElementRep& Element::getElementRep() { return _doc->_elements->_vec[_rep]; }
-    //ElementRep& Element::getElementRep() const { return _doc->_elements->_vec[_rep]; }
 
     uint32_t Element::getRep() const { return _rep; }
     void Element::setRep(uint32_t rep) { _rep = rep; }
@@ -825,102 +811,6 @@ ElementRep& dstRep = _doc->_elements->_vec[(*sibIt)._rep];
 
     Status Element::appendSafeNum(const StringData& fieldName, const SafeNum num) {
         return addChild(_doc->makeSafeNumElement(fieldName, num));
-    }
-
-    //
-    // Element output methods - mainly for debugging
-    //
-
-    std::ostream& Element::putValue(std::ostream& os) const {
-        switch (type()) {
-        case mongo::MinKey: os << "MinKey"; break;
-        case mongo::EOO: os << "EOO"; break;
-        case mongo::NumberDouble: os << getDoubleValue(); break;
-        case mongo::String: os << "\"" << getStringValue() << "\""; break;
-        case mongo::Object: break;
-        case mongo::Array: break;
-        case mongo::BinData: os << "|" << getStringValue() << "|"; break;
-        case mongo::Undefined: os << "Undefined"; break;
-        case mongo::jstOID: os << getOIDValue(); break;
-        case mongo::Bool: os << getBoolValue(); break;
-        case mongo::Date: os << getDateValue(); break;
-        case mongo::jstNULL: os << "jstNULL"; break;
-        case mongo::RegEx: os << "Regex(\"" << getStringValue() << "\")"; break;
-        case mongo::Symbol: os << "Symbol(\"" << getStringValue() << "\")"; break;
-        case mongo::CodeWScope: os << "CodeWithScope(\"" << getStringValue() << "\")"; break;
-        case mongo::NumberInt: os << getIntValue(); break;
-        case mongo::Timestamp : os << getDateValue(); break;
-        case mongo::NumberLong : os << getLongValue(); break;
-        case mongo::MaxKey: os << "MaxKey"; break;
-        default:;
-        }
-        return os;
-    }
-
-    string Element::putType() const {
-        switch (type()) {
-        case mongo::MinKey: return "MinKey";
-        case mongo::EOO: return "EOO";
-        case mongo::NumberDouble: return "NumberDouble";
-        case mongo::String: return (isInlineType() ? "ShortString" : "String");
-        case mongo::Object: return "Object";
-        case mongo::Array: return "Array";
-        case mongo::BinData: return "BinData";
-        case mongo::Undefined: return "Undefined";
-        case mongo::jstOID: return "jstOID";
-        case mongo::Bool: return "Bool";
-        case mongo::Date: return "Date";
-        case mongo::jstNULL: return "jstNULL";
-        case mongo::RegEx: return (isInlineType() ? "ShortRegEx" : "RegEx");
-        case mongo::Symbol: return "Symbol";
-        case mongo::CodeWScope: return "CodeWScope";
-        case mongo::NumberInt: return "NumberInt";
-        case mongo::Timestamp: return "Timestamp";
-        case mongo::NumberLong: return "NumberLong";
-        case mongo::MaxKey: return "MaxKey";
-        default: return "UnknownElementType";
-        }
-    }
-
-    std::ostream& Element::put(std::ostream& os, uint32_t depth) const {
-
-        ElementRep& e = _doc->_elements->_vec[_rep];
-        os <<
-            indentv[depth] << "[type=" << putType() <<
-            ", rep=" << getRep() << ", name=" << fieldName();
-
-        if (isSimpleType()) {
-            putValue(os << ", value=") << std::endl;
-        }
-        else {
-            uint32_t rightChildRep = e._child._right;
-            if (rightChildRep != EMPTY_REP) os << ", rightChildRep=" << rightChildRep;
-            uint32_t leftChildRep = e._child._left;
-            if (leftChildRep != EMPTY_REP) {
-                Element eLeft(_doc, leftChildRep);
-                eLeft.put(os << indentv[depth] << " leftChild=\n", depth+1) << std::endl;
-            }
-        }
-
-        uint32_t rightSiblingRep = e._sibling._right;
-        if (rightSiblingRep != EMPTY_REP) {
-            Element eRight(_doc, rightSiblingRep);
-            eRight.put(os << indentv[depth] << " rightSibling=\n", depth) << std::endl;
-            os << indentv[depth] << ']';
-        }
-        else {
-            os << ']';
-        }
-
-        return os;
-    }
-
-    //
-    // Element operator overloading
-    //
-
-    std::ostream& operator<<(std::ostream& os, const Element& e) {
-        return e.put(os, 0);
     }
 
     //

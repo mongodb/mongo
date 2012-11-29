@@ -216,12 +216,6 @@ namespace mutablebson {
         Status appendSafeNum(const StringData& fieldName, const SafeNum num);
 
         //
-        // operator overloading
-        //
-
-        friend std::ostream& operator<<(std::ostream&, const Element&);
-
-        //
         // encapsulate state
         //
 
@@ -233,21 +227,6 @@ namespace mutablebson {
 
         std::string fieldName() const;
         int fieldNameSize() const;
-
-        //
-        // output : mainly for debugging
-        //
-
-        std::ostream& put(std::ostream& os, uint32_t depth) const;
-        std::ostream& putValue(std::ostream& os) const;
-        std::string putType() const;
-
-        //
-        // For testing/debugging only: treat as private
-        //
-
-        ElementRep& getElementRep();
-        ElementRep& getElementRep() const;
 
         //
         // helper methods

@@ -22,8 +22,6 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 
-#define __TRACE__  __FILE__ << ":" << __FUNCTION__ << " [" << __LINE__ << "]"
-
 namespace mongo {
 namespace mutablebson {
 
@@ -213,13 +211,11 @@ namespace mutablebson {
             string re("");
             Status err = src.regex(&re);
             if (err.code() != ErrorCodes::OK) {
-                std::cout << __TRACE__ << " : [Debug] bad regex : " << src << std:: endl;
                 break;
             }
             string flags("");
             err = src.regexFlags(&flags);
             if (err.code() != ErrorCodes::OK) {
-                std::cout << __TRACE__ << " : [Debug] bad regex flags : " << src << std:: endl;
                 break;
             }
             dst->appendRegex(src.fieldName(), re, flags);
@@ -229,13 +225,11 @@ namespace mutablebson {
             string ns("");
             Status err = src.dbrefNS(&ns);
             if (err.code() != ErrorCodes::OK) {
-                std::cout << __TRACE__ << " : [Debug] bad dbref ns: " << src << std:: endl;
                 break;
             }
             string oidStr("");
             err = src.dbrefOID(&oidStr);
             if (err.code() != ErrorCodes::OK) {
-                std::cout << __TRACE__ << " : [Debug] bad dbref oid: " << src << std:: endl;
                 break;
             }
             mongo::OID oid(oidStr);
@@ -255,13 +249,11 @@ namespace mutablebson {
             string code("");
             Status err = src.codeWScopeCode(&code);
             if (err.code() != ErrorCodes::OK) {
-                std::cout << __TRACE__ << " : [Debug] bad codeWScope code : " << src << std:: endl;
                 break;
             }
             string scope("");
             err = src.codeWScopeScope(&scope);
             if (err.code() != ErrorCodes::OK) {
-                std::cout << __TRACE__ << " : [Debug] bad codeWScope scope: " << src << std:: endl;
                 break;
             }
             dst->appendCode(code, scope);
