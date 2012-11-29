@@ -29,7 +29,6 @@ namespace mutablebson {
 
     class Document;
     class ElementVector;
-    class FilterIterator;
     class Heap;
     class SiblingIterator;
     struct ElementRep;
@@ -57,17 +56,8 @@ namespace mutablebson {
      *     e0.addChild(e1);
      *     // Document is: { e0 : { e1 : {} } }
      *
-     *     // traversal
-     *     mutablebson::SubtreeIterator it(&doc, e0);
-     *     while (!it.done()) {
-     *         cout << mutablebson::Element(&doc, it.getRep()).fieldName()) << endl;
-     *     }
+     * TODO: Add iteration and search examples
      *
-     *     // look up
-     *     mutablebson::FilterIterator it = e0.find("e1");
-     *     if (!it.done()) {
-     *         cout << mongo::mutablebson::Element(&doc, it.getRep()).fieldName( ) << endl;
-     *     }
      */
     class Element {
     public:
@@ -86,9 +76,6 @@ namespace mutablebson {
         Element leftSibling() const;
         Element rightSibling() const;
         Element parent() const;
-
-        /** Find subtree nodes with a given name */
-        FilterIterator find(const std::string& fieldName) const;
 
         /** Iterate children of this node */
         SiblingIterator children();
@@ -295,7 +282,6 @@ namespace mutablebson {
 
     private:
         friend class Element;
-        friend class SubtreeIterator;
         friend class SiblingIterator;
 
         Heap* const _heap;
@@ -332,27 +318,6 @@ namespace mutablebson {
         uint32_t _theRep;
     };
 
-
-    /** implementation: subtree pre-order traversal */
-    class SubtreeIterator : public Iterator {
-    public:
-        virtual ~SubtreeIterator();
-        SubtreeIterator();
-        SubtreeIterator(Element e);
-        SubtreeIterator(const SubtreeIterator& it);
-
-        // iterator interface
-        virtual Iterator& operator++();
-        virtual bool done() const;
-
-    protected:
-        bool advance();
-
-    protected:  // state
-        bool _theDoneBit;
-    };
-
-
     /** implementation: sibling iterator */
     class SiblingIterator : public Iterator {
     public:
@@ -373,48 +338,6 @@ namespace mutablebson {
 
     private:
         bool advance();
-    };
-
-
-    /** interface: generic node filter - used by FilterIterator */
-    class Filter {
-    public:
-        virtual ~Filter() {}
-
-        // filter interface
-        virtual bool match(Element) const = 0;
-    };
-
-
-    /** implementation: field name filter */
-    class FieldNameFilter : public Filter {
-    public:
-        FieldNameFilter(const std::string& fieldName);
-        ~FieldNameFilter();
-
-        // filter interface
-        bool match(Element e) const;
-
-    private:
-        std::string _fieldName;
-    };
-
-
-    /** implementation: filtered subtree pre-order traversal */
-    class FilterIterator : public SubtreeIterator {
-
-    public:
-        ~FilterIterator();
-        FilterIterator();
-        FilterIterator(Element e, const Filter* filt);
-        FilterIterator(const FilterIterator& it);
-
-        // iterator interface
-        Iterator& operator++();
-        bool done() const;
-
-    private:
-        const Filter* _filter;
     };
 
 } // namespace mutablebson

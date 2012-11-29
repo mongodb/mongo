@@ -206,7 +206,6 @@ namespace mutablebson {
 
     private:
         friend class Element;
-        friend class SubtreeIterator;
         friend class SiblingIterator;
 
         std::vector<ElementRep> _vec;

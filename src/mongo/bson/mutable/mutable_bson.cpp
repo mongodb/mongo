@@ -32,7 +32,6 @@ namespace mutablebson {
  All these constants are scaffolding that can be torn away as needed.
 */
 #define SHORTBIT        (1<<16)
-#define DEPTH_LIMIT     50
 
     //
     // Element navigation
@@ -60,11 +59,6 @@ namespace mutablebson {
 
     SiblingIterator Element::children() {
         return SiblingIterator(leftChild());
-    }
-
-    FilterIterator Element::find(const std::string& fieldName) const {
-        FieldNameFilter* filter = new FieldNameFilter(fieldName);
-        return FilterIterator(*this, filter);
     }
 
     std::string Element::fieldName() const {
@@ -1033,61 +1027,6 @@ ElementRep& dstRep = _doc->_elements->_vec[(*sibIt)._rep];
     Iterator::Iterator() : _doc(NULL), _theRep(EMPTY_REP) {}
 
     //
-    // SubtreeIterator
-    //
-
-    SubtreeIterator::SubtreeIterator() : Iterator(), _theDoneBit(true) {}
-
-    SubtreeIterator::SubtreeIterator(Element e) :
-        Iterator(e),
-        _theDoneBit(false || e.getRep() == EMPTY_REP)
-    {}
-
-    SubtreeIterator::SubtreeIterator(const SubtreeIterator& it) :
-        Iterator(it),
-        _theDoneBit(it._theDoneBit)
-    {}
-
-    SubtreeIterator::~SubtreeIterator() {}
-
-    bool SubtreeIterator::advance() {
-        if (_theRep == EMPTY_REP) return true;
-
-        ElementRep& er = _doc->_elements->_vec[_theRep];
-        const Element& e = **this;
-
-        if (!e.isSimpleType()) {
-            if (er._child._left != EMPTY_REP) {
-                _theRep = er._child._left;
-                return false;
-            }
-        }
-        if (er._sibling._right != EMPTY_REP) {
-            _theRep = er._sibling._right;
-            return false;
-        }
-
-        uint32_t count(0);
-        for (_theRep = er._parent; _theRep != EMPTY_REP && count < DEPTH_LIMIT; ++count) {
-            ElementRep& e2 = _doc->_elements->_vec[_theRep];
-            if (e2._sibling._right != EMPTY_REP) {
-                _theRep = e2._sibling._right;
-                return false;
-            }
-            if (e2._parent == EMPTY_REP) break;
-            _theRep = e2._parent;
-        }
-        return true;
-    }
-
-    Iterator& SubtreeIterator::operator++() {
-        _theDoneBit = advance();
-        return *this;
-    }
-
-    bool SubtreeIterator::done() const { return _theDoneBit; }
-
-    //
     // SiblingIterator
     //
 
@@ -1099,46 +1038,6 @@ ElementRep& dstRep = _doc->_elements->_vec[(*sibIt)._rep];
         _theRep = e._sibling._right;
         return (_theRep == EMPTY_REP);
     }
-
-    //
-    // FieldNameFilter
-    //
-
-    FieldNameFilter::FieldNameFilter(const std::string& fieldName) : _fieldName(fieldName) {}
-    FieldNameFilter::~FieldNameFilter() {}
-    bool FieldNameFilter::match(Element e) const { return (_fieldName == e.fieldName()); }
-
-    //
-    // FilterIterator
-    //
-
-    FilterIterator::FilterIterator() : SubtreeIterator(), _filter(NULL) {}
-
-    FilterIterator::FilterIterator(Element e, const Filter* filter) :
-        SubtreeIterator(e),
-        _filter(filter) {
-        operator++();
-    }
-
-    FilterIterator::FilterIterator(const FilterIterator& it) :
-        SubtreeIterator(it),
-        _filter(it._filter)
-    {}
-
-    FilterIterator::~FilterIterator() {}
-
-    Iterator& FilterIterator::operator++() {
-        if (_theDoneBit) return *this;
-        while (true) {
-            _theDoneBit = advance();
-            if (_theDoneBit) break;
-            Element e(_doc, _theRep);
-            if (_filter->match(e)) break;
-        }
-        return *this;
-    }
-
-    bool FilterIterator::done() const { return _theDoneBit; }
 
 } // namespace mutablebson
 } // namespace mongo

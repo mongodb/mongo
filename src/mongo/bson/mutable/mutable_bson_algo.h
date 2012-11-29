@@ -64,5 +64,13 @@ namespace mutablebson {
         return findElement(first, FieldNameEquals(fieldName));
     }
 
+    /**
+     * Finds the first child under 'parent' that matches the given
+     * field name, or returns a done Iterator.
+     */
+    inline SiblingIterator findFirstChildNamed(Element parent, const StringData& fieldName) {
+        return findElementNamed(parent.children(), fieldName);
+    }
+
 } // namespace mutablebson
 } // namespace mongo

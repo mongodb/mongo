@@ -27,78 +27,30 @@
 
 namespace {
 
-    TEST(StreamingAPI, FromJSON) {
+    // TODO: This object should contain a representative for every
+    // BSON type, including deprecated values.
+    static const char jsonSample[] =
+        "{_id:ObjectId(\"47cc67093475061e3d95369d\"),"
+        "query:\"kate hudson\","
+        "owner:1234567887654321,"
+        "date:\"2011-05-13T14:22:46.777Z\","
+        "score:123.456,"
+        "field1:Infinity,"
+        "\"field2\":-Infinity,"
+        "\"field3\":NaN,"
+        "users:["
+        "{uname:\"@aaaa\",editid:\"1234\",date:1303959350,yes_votes:0,no_votes:0},"
+        "{uname:\"@bbbb\",editid:\"5678\",date:1303959350,yes_votes:0,no_votes:0}],"
+        "pattern:/match.*this/,"
+        "lastfield:\"last\"}";
+
+    TEST(BuilderAPI, RoundTrip) {
         mongo::mutablebson::BasicHeap myHeap;
         mongo::mutablebson::Document doc(&myHeap);
-
-        const char* jsonSample =
-            "{_id:ObjectId(\"47cc67093475061e3d95369d\"),"
-            "query:\"kate hudson\","
-            "owner:1234567887654321,"
-            "date:\"2011-05-13T14:22:46.777Z\","
-            "score:123.456,"
-            "field1:Infinity,"
-            "\"field2\":-Infinity,"
-            "\"field3\":NaN,"
-            "users:["
-            "{uname:\"@aaaa\",editid:\"1234\",date:1303959350,yes_votes:0,no_votes:0},"
-            "{uname:\"@bbbb\",editid:\"5678\",date:1303959350,yes_votes:0,no_votes:0}],"
-            "pattern:/match.*this/,"
-            "lastfield:\"last\"}";
 
         int len;
         mongo::BSONObj obj = mongo::fromjson(jsonSample, &len);
         mongo::mutablebson::ElementBuilder::parse(obj, &doc);
-        mongo::mutablebson::SubtreeIterator it(doc.root());
-
-        ASSERT_EQUALS((++it).done(), false);
-        ASSERT_EQUALS("_id", mongo::mutablebson::Element(&doc, it.getRep()).fieldName());
-        ASSERT_EQUALS((++it).done(), false);
-        ASSERT_EQUALS("query", mongo::mutablebson::Element(&doc, it.getRep()).fieldName());
-        ASSERT_EQUALS((++it).done(), false);
-        ASSERT_EQUALS("owner", mongo::mutablebson::Element(&doc, it.getRep()).fieldName());
-        ASSERT_EQUALS((++it).done(), false);
-        ASSERT_EQUALS("date", mongo::mutablebson::Element(&doc, it.getRep()).fieldName());
-        ASSERT_EQUALS((++it).done(), false);
-        ASSERT_EQUALS("score", mongo::mutablebson::Element(&doc, it.getRep()).fieldName());
-        ASSERT_EQUALS((++it).done(), false);
-        ASSERT_EQUALS("field1", mongo::mutablebson::Element(&doc, it.getRep()).fieldName());
-        ASSERT_EQUALS((++it).done(), false);
-        ASSERT_EQUALS("field2", mongo::mutablebson::Element(&doc, it.getRep()).fieldName());
-        ASSERT_EQUALS((++it).done(), false);
-        ASSERT_EQUALS("field3", mongo::mutablebson::Element(&doc, it.getRep()).fieldName());
-        ASSERT_EQUALS((++it).done(), false);
-        ASSERT_EQUALS("users", mongo::mutablebson::Element(&doc, it.getRep()).fieldName());
-        ASSERT_EQUALS((++it).done(), false);
-        ASSERT_EQUALS("0", mongo::mutablebson::Element(&doc, it.getRep()).fieldName());
-        ASSERT_EQUALS((++it).done(), false);
-        ASSERT_EQUALS("uname", mongo::mutablebson::Element(&doc, it.getRep()).fieldName());
-        ASSERT_EQUALS((++it).done(), false);
-        ASSERT_EQUALS("editid", mongo::mutablebson::Element(&doc, it.getRep()).fieldName());
-        ASSERT_EQUALS((++it).done(), false);
-        ASSERT_EQUALS("date", mongo::mutablebson::Element(&doc, it.getRep()).fieldName());
-        ASSERT_EQUALS((++it).done(), false);
-        ASSERT_EQUALS("yes_votes", mongo::mutablebson::Element(&doc, it.getRep()).fieldName());
-        ASSERT_EQUALS((++it).done(), false);
-        ASSERT_EQUALS("no_votes", mongo::mutablebson::Element(&doc, it.getRep()).fieldName());
-        ASSERT_EQUALS((++it).done(), false);
-        ASSERT_EQUALS("1", mongo::mutablebson::Element(&doc, it.getRep()).fieldName());
-        ASSERT_EQUALS((++it).done(), false);
-        ASSERT_EQUALS("uname", mongo::mutablebson::Element(&doc, it.getRep()).fieldName());
-        ASSERT_EQUALS((++it).done(), false);
-        ASSERT_EQUALS("editid", mongo::mutablebson::Element(&doc, it.getRep()).fieldName());
-        ASSERT_EQUALS((++it).done(), false);
-        ASSERT_EQUALS("date", mongo::mutablebson::Element(&doc, it.getRep()).fieldName());
-        ASSERT_EQUALS((++it).done(), false);
-        ASSERT_EQUALS("yes_votes", mongo::mutablebson::Element(&doc, it.getRep()).fieldName());
-        ASSERT_EQUALS((++it).done(), false);
-        ASSERT_EQUALS("no_votes", mongo::mutablebson::Element(&doc, it.getRep()).fieldName());
-        ASSERT_EQUALS((++it).done(), false);
-        ASSERT_EQUALS("pattern", mongo::mutablebson::Element(&doc, it.getRep()).fieldName());
-        ASSERT_EQUALS((++it).done(), false);
-        ASSERT_EQUALS("lastfield", mongo::mutablebson::Element(&doc, it.getRep()).fieldName());
-
-        ASSERT_EQUALS((++it).done(), true);
 
         mongo::BSONObjBuilder builder;
         mongo::mutablebson::BSONBuilder::build(doc.root(), &builder);
