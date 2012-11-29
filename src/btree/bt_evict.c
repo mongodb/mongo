@@ -876,13 +876,18 @@ __evict_dirty_validate(WT_CONNECTION_IMPL *conn)
 	WT_DECL_RET;
 	WT_PAGE *page;
 	WT_SESSION_IMPL *session;
-	uint64_t bytes;
+	uint64_t bytes, bytes_baseline;
 
 	cache = conn->cache;
 	session = conn->default_session;
 	page = NULL;
 	btree = NULL;
 	bytes = 0;
+
+	if (!WT_VERBOSE_ISSET(session, evictserver))
+		return;
+
+	bytes_baseline = cache->bytes_dirty;
 
 	TAILQ_FOREACH(btree, &conn->btqh, q) {
 		/* Reference the correct WT_BTREE handle. */
@@ -895,8 +900,15 @@ __evict_dirty_validate(WT_CONNECTION_IMPL *conn)
 		}
 		WT_CLEAR_BTREE_IN_SESSION(session);
 	}
-	if (ret == 0 || ret == WT_NOTFOUND)
-		WT_ASSERT(session, bytes == cache->bytes_dirty);
+	if ((ret == 0 || ret == WT_NOTFOUND) && bytes != 0) {
+		if (bytes < WT_MIN(bytes_baseline, cache->bytes_dirty) ||
+		    bytes > WT_MAX(bytes_baseline, cache->bytes_dirty))
+			WT_VERBOSE_VOID(session, evictserver,
+			    "Cache dirty count mismatch. Expected a value "
+			    "between: %" PRIu64 " and %" PRIu64
+			    " got: %" PRIu64,
+			    bytes_baseline, cache->bytes_dirty, bytes);
+	}
 #else
 	WT_UNUSED(conn);
 #endif

@@ -248,7 +248,8 @@ descend:	for (;;) {
 				 * There is a race here, but worse case is
 				 * that the page will be read back in to cache.
 				 */
-				if (ref->state != WT_REF_MEM)
+				if (ref->state != WT_REF_MEM &&
+				    ref->state != WT_REF_EVICT_WALK)
 					break;
 				/* Grab a hazard reference. */
 				WT_RET(__wt_page_in(session, page, ref));
