@@ -157,6 +157,17 @@ namespace mutablebson {
         void setStringValue(const StringData& stringVal);
         void setRegexValue(const StringData& re);
         void setSafeNumValue(const SafeNum& safeNum);
+        void setMinKey();
+        void setMaxKey();
+        void setUndefined();
+        void setNull();
+        void setSymbol(const StringData& symbolVal);
+
+        /** Set the value of this element to equal the value of the
+         *  provided BSONElement 'val'. The name of this Element is
+         *  not modified.
+         */
+        void setValueFromBSONElement(const BSONElement& val);
 
         // additional methods needed for BSON decoding
         Status prefix(std::string* result, char delim) const;

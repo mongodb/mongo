@@ -505,6 +505,7 @@ ElementRep& dstRep = _doc->_elements->_vec[(*sibIt)._rep];
         ElementRep& e = _doc->_elements->_vec[_rep];
         e._type = mongo::String;
         if (stringVal.size() < SHORT_LIMIT) {
+            // TODO: This probably needs to be memcpy.
             strcpy(e._value.shortStr, stringVal.data());
             e._type |= SHORTBIT;
         }
@@ -528,6 +529,110 @@ ElementRep& dstRep = _doc->_elements->_vec[(*sibIt)._rep];
             break;
         default:
             // Invalid type - e._type was set to EOO above, so we're done
+            break;
+        }
+    }
+
+    void Element::setMinKey() {
+        ElementRep& e = _doc->_elements->_vec[_rep];
+        e._type = mongo::MinKey;
+    }
+
+    void Element::setMaxKey() {
+        ElementRep& e = _doc->_elements->_vec[_rep];
+        e._type = mongo::MinKey;
+    }
+
+    void Element::setUndefined() {
+        ElementRep& e = _doc->_elements->_vec[_rep];
+        e._type = mongo::Undefined;
+    }
+
+    void Element::setNull() {
+        ElementRep& e = _doc->_elements->_vec[_rep];
+        e._type = mongo::jstNULL;
+    }
+
+    void Element::setSymbol(const StringData& symbolVal) {
+        ElementRep& e = _doc->_elements->_vec[_rep];
+        e._type = mongo::Symbol;
+        if (symbolVal.size() < SHORT_LIMIT) {
+            // TODO: This probably should be memcpy
+            strcpy(e._value.shortStr, symbolVal.data());
+            e._type |= SHORTBIT;
+        }
+        else {
+            e._value.valueRef = _doc->_heap->putString(symbolVal);
+        }
+    }
+
+    void Element::setValueFromBSONElement(const BSONElement& val) {
+        switch(val.type()) {
+        case MinKey:
+            setMinKey();
+            break;
+        case EOO:
+            verify(false);
+            break;
+        case NumberDouble:
+            setDoubleValue(val._numberDouble());
+            break;
+        case String:
+            setStringValue(StringData(val.valuestr(), val.valuestrsize()));
+            break;
+        case Object:
+            verify(false);
+            break;
+        case Array:
+            verify(false);
+            break;
+        case BinData:
+            verify(false);
+            break;
+        case Undefined:
+            setUndefined();
+            break;
+        case jstOID:
+            setOIDValue(val.__oid());
+            break;
+        case Bool:
+            setBoolValue(val.boolean());
+            break;
+        case Date:
+            setDateValue(val.date());
+            break;
+        case jstNULL:
+            setNull();
+            break;
+        case RegEx:
+            verify(false);
+            break;
+        case DBRef:
+            verify(false);
+            break;
+        case Code:
+            verify(false);
+            break;
+        case Symbol:
+            setSymbol(StringData(val.valuestr(), val.valuestrsize()));
+            break;
+        case CodeWScope:
+            verify(false);
+            break;
+        case NumberInt:
+            setIntValue(val._numberInt());
+            break;
+        case Timestamp:
+            setTSValue(val._opTime());
+            break;
+        case NumberLong:
+            setLongValue(val._numberLong());
+            break;
+        case MaxKey:
+            setMaxKey();
+            break;
+        default:
+            verify(false);
             break;
         }
     }
