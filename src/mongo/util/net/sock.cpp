@@ -502,6 +502,17 @@ namespace mongo {
         _timeout = timeout;
         _init();
     }
+
+    Socket::~Socket() {
+        close();
+#ifdef MONGO_SSL
+        if ( _ssl ) {
+            SSL_shutdown( _ssl );
+            SSL_free( _ssl );
+            _ssl = 0;
+        }
+#endif
+    }
     
     void Socket::_init() {
         _bytesOut = 0;
@@ -513,13 +524,6 @@ namespace mongo {
     }
 
     void Socket::close() {
-#ifdef MONGO_SSL
-        if ( _ssl ) {
-            SSL_shutdown( _ssl );
-            SSL_free( _ssl );
-            _ssl = 0;
-        }
-#endif
         if ( _fd >= 0 ) {
             closesocket( _fd );
             _fd = -1;
