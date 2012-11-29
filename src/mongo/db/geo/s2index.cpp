@@ -188,8 +188,8 @@ namespace mongo {
                 if (nearQuery && intersectQuery) {
                     // Sigh.  This can be handled better.  TODO.
                     for (size_t j = 0; j < regions.size(); ++j) { regions[j].free(); }
-                    throw UserException(16474, "Can't do both near and intersect, query: "
-                                               +  query.toString());
+                    uasserted(16474, "Can't do both near and intersect, query: "
+                                     +  query.toString());
                 }
 
                 BSONObjIterator argIt(e.embeddedObject());
@@ -227,7 +227,7 @@ namespace mongo {
                                                 numWanted);
                 return shared_ptr<Cursor>(cursor);
             } else {
-                throw UserException(16475, "Asking for s2 cursor w/bad query: " + query.toString());
+                uasserted(16475, "Asking for s2 cursor w/bad query: " + query.toString());
             }
         }
 
