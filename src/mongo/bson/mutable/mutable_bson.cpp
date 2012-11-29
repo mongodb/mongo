@@ -28,10 +28,9 @@
 namespace mongo {
 namespace mutablebson {
 
-/**
- All these constants are scaffolding that can be torn away as needed.
-*/
-#define SHORTBIT        (1<<16)
+namespace {
+    const int32_t SHORTBIT = (1<<16);
+} // namespace
 
     //
     // Element navigation
