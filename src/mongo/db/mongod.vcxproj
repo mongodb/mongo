@@ -1057,6 +1057,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="..\scripting\bson_template_evaluator.cpp" />
     <ClCompile Include="..\scripting\sm_db.cpp" />
     <ClCompile Include="..\s\cluster_constants.cpp" />
+    <ClCompile Include="..\s\collection_manager.cpp" />
     <ClCompile Include="..\s\default_version.cpp" />
     <ClCompile Include="..\..\third_party\pcre-8.30\pcrecpp.cc" />
     <ClCompile Include="..\..\third_party\pcre-8.30\pcre_chartables.c" />
@@ -1091,6 +1092,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="..\s\d_writeback.cpp" />
     <ClCompile Include="..\s\field_parser.cpp" />
     <ClCompile Include="..\s\grid.cpp" />
+    <ClCompile Include="..\s\metadata_loader.cpp" />
     <ClCompile Include="..\s\shard.cpp" />
     <ClCompile Include="..\s\shardconnection.cpp" />
     <ClCompile Include="..\s\shardkey.cpp" />
@@ -1150,6 +1152,8 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="auth\action_type.cpp" />
     <ClCompile Include="auth\authorization_manager.cpp" />
     <ClCompile Include="auth\auth_external_state.cpp" />
+    <ClCompile Include="auth\auth_external_state_d.cpp" />
+    <ClCompile Include="auth\auth_external_state_server_common.cpp" />
     <ClCompile Include="auth\mongo_authentication_session.cpp" />
     <ClCompile Include="auth\principal.cpp" />
     <ClCompile Include="auth\principal_set.cpp" />
@@ -1390,11 +1394,13 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="..\scripting\bson_template_evaluator.h" />
     <ClInclude Include="..\s\chunk.h" />
     <ClInclude Include="..\s\cluster_constants.h" />
+    <ClInclude Include="..\s\collection_manager.h" />
     <ClInclude Include="..\s\config.h" />
     <ClInclude Include="..\s\d_chunk_manager.h" />
     <ClInclude Include="..\s\d_writeback.h" />
     <ClInclude Include="..\s\field_parser.h" />
     <ClInclude Include="..\s\grid.h" />
+    <ClInclude Include="..\s\metadata_loader.h" />
     <ClInclude Include="..\s\type_chunk.h" />
     <ClInclude Include="..\s\type_collection.h" />
     <ClInclude Include="..\s\type_database.h" />
@@ -1444,7 +1450,8 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="auth\authentication_session.h" />
     <ClInclude Include="auth\authorization_manager.h" />
     <ClInclude Include="auth\auth_external_state.h" />
-    <ClInclude Include="auth\auth_external_state_impl.h" />
+    <ClInclude Include="auth\auth_external_state_d.h" />
+    <ClInclude Include="auth\auth_external_state_server_common.h" />
     <ClInclude Include="auth\mongo_authentication_session.h" />
     <ClInclude Include="auth\principal.h" />
     <ClInclude Include="auth\principal_set.h" />

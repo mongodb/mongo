@@ -1427,6 +1427,18 @@
     <ClCompile Include="server_parameters.cpp">
       <Filter>db\Source Files\o to z</Filter>
     </ClCompile>
+    <ClCompile Include="auth\auth_external_state_d.cpp">
+      <Filter>db\auth</Filter>
+    </ClCompile>
+    <ClCompile Include="auth\auth_external_state_server_common.cpp">
+      <Filter>db\auth</Filter>
+    </ClCompile>
+    <ClCompile Include="..\s\collection_manager.cpp">
+      <Filter>s</Filter>
+    </ClCompile>
+    <ClCompile Include="..\s\metadata_loader.cpp">
+      <Filter>s</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\targetver.h" />
@@ -2829,9 +2841,6 @@
     <ClInclude Include="auth\auth_external_state.h">
       <Filter>db\auth</Filter>
     </ClInclude>
-    <ClInclude Include="auth\auth_external_state_impl.h">
-      <Filter>db\auth</Filter>
-    </ClInclude>
     <ClInclude Include="..\s\field_parser.h">
       <Filter>s</Filter>
     </ClInclude>
@@ -2951,6 +2960,18 @@
     </ClInclude>
     <ClInclude Include="server_parameters_inline.h">
       <Filter>db\Header Files\o to z</Filter>
+    </ClInclude>
+    <ClInclude Include="auth\auth_external_state_d.h">
+      <Filter>db\auth</Filter>
+    </ClInclude>
+    <ClInclude Include="auth\auth_external_state_server_common.h">
+      <Filter>db\auth</Filter>
+    </ClInclude>
+    <ClInclude Include="..\s\collection_manager.h">
+      <Filter>s</Filter>
+    </ClInclude>
+    <ClInclude Include="..\s\metadata_loader.h">
+      <Filter>s</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
