@@ -119,15 +119,62 @@ namespace mutablebson {
         without change upstairs.
      */
     struct ElementRep {
-        ElementRep();
-        ElementRep(int32_t type);
-        ElementRep(int32_t type, uint32_t nameref);
-        ElementRep(int32_t type, uint32_t nameref, ValueType value);
-        ElementRep(int32_t type, uint32_t nameref, ValueType value, uint32_t parentref);
-        ~ElementRep() ;
+        ElementRep()
+        : _type(mongo::Undefined)
+        , _nameref(NULL_REF)
+        , _parent(EMPTY_REP) {
+            _child._left = EMPTY_REP;
+            _child._right = EMPTY_REP;
+            _sibling._left = EMPTY_REP;
+            _sibling._right = EMPTY_REP;
+        }
 
-        void clearSiblings();
-        void clearParent();
+        ElementRep(int32_t type)
+        : _type(type)
+        , _nameref(NULL_REF)
+        , _parent(EMPTY_REP) {
+            _child._left = EMPTY_REP;
+            _child._right = EMPTY_REP;
+            _sibling._left = EMPTY_REP;
+            _sibling._right = EMPTY_REP;
+        }
+
+        ElementRep(int32_t type, uint32_t nameref)
+        : _type(type)
+        , _nameref(nameref)
+        , _parent(EMPTY_REP) {
+            _child._left = EMPTY_REP;
+            _child._right = EMPTY_REP;
+            _sibling._left = EMPTY_REP;
+            _sibling._right = EMPTY_REP;
+        }
+
+        ElementRep(int32_t type, uint32_t nameref, ValueType value)
+        : _type(type)
+        , _nameref(nameref)
+        , _value(value)
+        , _parent(EMPTY_REP) {
+            _sibling._left = EMPTY_REP;
+            _sibling._right = EMPTY_REP;
+        }
+
+        ElementRep(int32_t type, uint32_t nameref, ValueType value, uint32_t parentref)
+        : _type(type)
+        , _nameref(nameref)
+        , _value(value)
+        , _parent(parentref) {
+            _sibling._left = EMPTY_REP;
+            _sibling._right = EMPTY_REP;
+        }
+
+        void clearSiblings() {
+            _sibling._left = EMPTY_REP;
+            _sibling._right = EMPTY_REP;
+        }
+
+        void clearParent() {
+            _parent = EMPTY_REP;
+        }
 
         int32_t _type;
         uint32_t _nameref;
@@ -150,14 +197,11 @@ namespace mutablebson {
     /** node store - as vector of ElementRep's */
     class ElementVector {
     public:
-        ElementVector();
-        ~ElementVector();
-
         // vector interface
-        void push_back(const ElementRep& elemRep);
-        ElementRep& operator[](uint32_t index);
-        const ElementRep& operator[](uint32_t index) const;
-        uint32_t size() const;
+        void push_back(const ElementRep& elemRep) { _vec.push_back(elemRep); }
+        ElementRep& operator[](uint32_t index) { return _vec[index]; }
+        const ElementRep& operator[](uint32_t index) const { return _vec[index]; }
+        uint32_t size() const { return _vec.size(); }
 
     private:
         friend class Element;

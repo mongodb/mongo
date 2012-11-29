@@ -219,21 +219,15 @@ namespace mutablebson {
         // encapsulate state
         //
 
-        uint32_t getRep() const;
-        void setRep(uint32_t rep);
-
-        Document* getDocument() const;
-        void setDocument(Document* doc);
+        uint32_t getRep() const { return _rep; };
+        Document* getDocument() const { return _doc; }
 
         std::string fieldName() const;
         int fieldNameSize() const;
 
-        //
-        // helper methods
-        //
-        Status checkSubtreeIsClean(Element e);
-
     private:
+        inline Status checkSubtreeIsClean(Element e);
+
         // We carry the document in every element. The document determines the element:
         // '_rep' is resolved through the document ElementVector and Heap
         Document* _doc;
@@ -261,10 +255,6 @@ namespace mutablebson {
 
         Heap* getHeap() { return _heap; }
         const Heap* getHeap() const { return _heap; }
-        std::string getString(uint32_t offset) const;
-        char* getStringBuffer(uint32_t offset) const;
-        uint32_t elementVectorSize() const;
-
 
         //
         // The distinguished root Element of the document, which is
@@ -319,20 +309,23 @@ namespace mutablebson {
 
     class Iterator {
     public:
-        virtual ~Iterator() {}
         Iterator();
-        Iterator(Element e);
-        Iterator(const Iterator& it);
+
+        explicit Iterator(Element e)
+            : _doc(e.getDocument())
+            , _theRep(e.getRep()) {}
+
+        virtual ~Iterator() {}
 
         // iterator interface
         virtual Iterator& operator++() = 0;
         virtual bool done() const = 0;
-        Element operator*();
-        Element operator->();
+
+        Element operator*() { return Element(getDocument(), getRep()); }
 
         // acessors
-        Document* getDocument() const;
-        uint32_t getRep() const;
+        Document* getDocument() const { return _doc; }
+        uint32_t getRep() const { return _theRep; }
 
     protected:
         Document* _doc;
@@ -363,16 +356,22 @@ namespace mutablebson {
     /** implementation: sibling iterator */
     class SiblingIterator : public Iterator {
     public:
-        ~SiblingIterator();
-        SiblingIterator();
-        SiblingIterator(Element e);
-        SiblingIterator(const SiblingIterator& it);
+        SiblingIterator()
+            : Iterator() {}
 
-        // iterator interface
-        SiblingIterator& operator++();
-        bool done() const;
+        explicit SiblingIterator(Element e)
+            : Iterator(e) {}
 
-    protected:    // state
+        virtual ~SiblingIterator() {}
+
+        virtual SiblingIterator& operator++() {
+            advance();
+            return *this;
+        }
+
+        virtual bool done() const;
+
+    private:
         bool advance();
     };
 

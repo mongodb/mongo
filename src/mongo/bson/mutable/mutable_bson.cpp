@@ -35,11 +35,6 @@ namespace mutablebson {
 #define DEPTH_LIMIT     50
 #define SHORT_LIMIT     16
 
-    uint32_t Element::getRep() const { return _rep; }
-    void Element::setRep(uint32_t rep) { _rep = rep; }
-    Document* Element::getDocument() const { return _doc; }
-    void Element::setDocument(Document* doc) { _doc = doc; }
-
     //
     // Element navigation
     //
@@ -74,12 +69,12 @@ namespace mutablebson {
     }
 
     std::string Element::fieldName() const {
-        return _doc->getString(_doc->_elements->_vec[_rep]._nameref);
+        return _doc->getHeap()->getString(_doc->_elements->_vec[_rep]._nameref);
     }
 
     /** Needs optimization to avoid allocating a string. (aaron) */
     int Element::fieldNameSize() const {
-        return _doc->getString(_doc->_elements->_vec[_rep]._nameref).size();
+        return _doc->getHeap()->getString(_doc->_elements->_vec[_rep]._nameref).size();
     }
 
     //
@@ -420,7 +415,7 @@ ElementRep& dstRep = _doc->_elements->_vec[(*sibIt)._rep];
             return &_doc->_elements->_vec[_rep]._value.shortStr[0];
         }
         else {
-            return _doc->getStringBuffer(_doc->_elements->_vec[_rep]._value.valueRef);
+            return _doc->getHeap()->getStringBuffer(_doc->_elements->_vec[_rep]._value.valueRef);
         }
     }
 
@@ -818,7 +813,7 @@ ElementRep& dstRep = _doc->_elements->_vec[(*sibIt)._rep];
     //
 
     /** check that new element roots a clean subtree, no dangling references */
-    Status Element::checkSubtreeIsClean(Element e) {
+    inline Status Element::checkSubtreeIsClean(Element e) {
         ElementRep& rep = e._doc->_elements->_vec[e._rep];
         if (rep._sibling._left != EMPTY_REP) {
             return Status(ErrorCodes::IllegalOperation, "addChild: dangling left sibling");
@@ -844,19 +839,6 @@ ElementRep& dstRep = _doc->_elements->_vec[(*sibIt)._rep];
     }
 
     Document::~Document() {}
-
-    std::string Document::getString(uint32_t offset) const {
-        return _heap->getString(offset);
-    }
-
-    char* Document::getStringBuffer(uint32_t offset) const {
-        return _heap->getStringBuffer(offset);
-    }
-
-    uint32_t Document::elementVectorSize() const {
-        return _elements->size();
-    }
-
 
     // Document factory methods
 
@@ -1050,13 +1032,6 @@ ElementRep& dstRep = _doc->_elements->_vec[(*sibIt)._rep];
     //
 
     Iterator::Iterator() : _doc(NULL), _theRep(EMPTY_REP) {}
-    Iterator::Iterator(Element e) : _doc(e.getDocument()), _theRep(e.getRep()) {}
-    Iterator::Iterator(const Iterator& it) : _doc(it._doc), _theRep(it._theRep) {}
-
-    uint32_t Iterator::getRep() const { return _theRep; }
-    Document* Iterator::getDocument() const { return _doc; }
-    Element Iterator::operator*() { return Element(_doc, _theRep); }
-    Element Iterator::operator->() { return Element(_doc, _theRep); }
 
     //
     // SubtreeIterator
@@ -1116,16 +1091,6 @@ ElementRep& dstRep = _doc->_elements->_vec[(*sibIt)._rep];
     //
     // SiblingIterator
     //
-
-    SiblingIterator::SiblingIterator() : Iterator() {}
-    SiblingIterator::SiblingIterator(Element e) : Iterator(e) {}
-    SiblingIterator::SiblingIterator(const SiblingIterator& it) : Iterator(it) {}
-    SiblingIterator::~SiblingIterator() { }
-
-    SiblingIterator& SiblingIterator::operator++() {
-        advance();
-        return *this;
-    }
 
     bool SiblingIterator::done() const { return (_theRep == EMPTY_REP); }
 
