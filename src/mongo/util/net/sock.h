@@ -186,9 +186,7 @@ namespace mongo {
         */
         Socket(double so_timeout = 0, int logLevel = 0 );
 
-        ~Socket() {
-            close();
-        }
+        ~Socket();
 
         bool connect(SockAddr& farEnd);
         void close();
