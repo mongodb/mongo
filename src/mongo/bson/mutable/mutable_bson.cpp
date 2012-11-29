@@ -33,7 +33,6 @@ namespace mutablebson {
 */
 #define SHORTBIT        (1<<16)
 #define DEPTH_LIMIT     50
-#define SHORT_LIMIT     16
 
     //
     // Element navigation

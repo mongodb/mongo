@@ -27,8 +27,6 @@
 
 namespace {
 
-#define EMPTY_REP  ((uint32_t)-1)
-
     TEST(TopologyBuilding, TopDownFromScratch) {
         /*
                        [ e0 ]
@@ -472,7 +470,7 @@ namespace {
         ASSERT_EQUALS(e1.arraySize(&n), mongo::Status::OK());
         ASSERT_EQUALS(6, (int)n);
 
-        mongo::mutablebson::Element e(&doc, EMPTY_REP);
+        mongo::mutablebson::Element e(&doc, mongo::mutablebson::EMPTY_REP);
         ASSERT_EQUALS(e1.get(0, &e), mongo::Status::OK());
         ASSERT_EQUALS(0, e.getIntValue());
         ASSERT_EQUALS(e1.get(1, &e), mongo::Status::OK());

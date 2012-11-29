@@ -97,6 +97,7 @@ namespace mutablebson {
 
     static const uint32_t EMPTY_REP = (uint32_t)-1;
     static const uint32_t NULL_REF  = (uint32_t)-1;
+    static const uint32_t SHORT_LIMIT = 16;
 
     union ValueType {
         bool boolVal;
@@ -105,7 +106,7 @@ namespace mutablebson {
         int64_t tsVal;
         int64_t dateVal;
         double doubleVal;
-        char shortStr[16];  /* OID and short strings */
+        char shortStr[SHORT_LIMIT];  /* OID and short strings */
         uint64_t valueRef;  /* index to heap (strings, binary, regex) */
     };
 
