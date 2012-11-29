@@ -355,7 +355,7 @@ class test_truncate_cursor(wttest.WiredTigerTestCase):
 
                 # Optionally insert initial skipped records.
                 cursor = self.session.open_cursor(uri, None, "overwrite")
-                start = 0;
+                start = 0
                 for i in range(0, begin_skipped):
                     start += 1
                     k = key_populate(cursor, start)

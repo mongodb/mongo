@@ -63,7 +63,7 @@ def compare_tables(self, session, uris, config=None):
             for next_cursor in cursors:
                 if (next_cursor.next() == wiredtiger.WT_NOTFOUND):
                     done = True
-                    break;
+                    break
                 keys.append(next_cursor.get_value())
             match = all(x == keys[0] for x in keys)
             if not match:
@@ -145,7 +145,7 @@ def simple_populate_check(self, uri):
         i += 1
         self.assertEqual(key, key_populate(cursor, i))
         if cursor.value_format == '8t' and val == 0:    # deleted
-            continue;
+            continue
         self.assertEqual(val, value_populate(cursor, i))
     cursor.close()
 

@@ -45,7 +45,7 @@ class test_bug001(wttest.WiredTigerTestCase):
             cursor.set_key(r)
             cursor.set_value(0xab)
             cursor.insert()
-        r += trailing;
+        r += trailing
         cursor.set_key(r + 1)
         cursor.set_value(0xbb)
         cursor.insert()

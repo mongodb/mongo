@@ -75,7 +75,7 @@ class test_compact(wttest.WiredTigerTestCase, suite_subprocess):
         # Compact it, using either the session method or the utility.
         if self.utility == 1:
             self.session.checkpoint(None)
-            self.close_conn();
+            self.close_conn()
             self.runWt(["compact", uri])
         else:
             # Optionally reopen the connection so we do more on-disk tests.

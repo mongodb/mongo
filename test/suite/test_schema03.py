@@ -405,7 +405,7 @@ class test_schema03(wttest.WiredTigerTestCase):
             #     colgroups named 'g0' --> 'g<N>'
             #     indices named 'i0' --> 'i<N>'
 
-            config = "";
+            config = ""
             config += "key_format=" + tc.keyformats
             config += ",value_format=" + tc.valueformats
             config += ",columns=("

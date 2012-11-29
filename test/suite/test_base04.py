@@ -67,7 +67,7 @@ class test_base04(wttest.WiredTigerTestCase):
     def insert(self, key, value):
         self.pr('insert')
         cursor = self.cursor()
-        cursor.set_key(key);
+        cursor.set_key(key)
         cursor.set_value(value)
         cursor.insert()
         cursor.close()
@@ -77,7 +77,7 @@ class test_base04(wttest.WiredTigerTestCase):
     def remove(self, key):
         self.pr('remove')
         cursor = self.cursor()
-        cursor.set_key(key);
+        cursor.set_key(key)
         cursor.remove()
         cursor.close()
         if self.reconcile:

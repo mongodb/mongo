@@ -377,8 +377,8 @@ class test_checkpoint_empty(wttest.WiredTigerTestCase):
         cursor.close()
 
         cursor = self.session.open_cursor(self.uri, None)
-        cursor.set_key("key");
-        cursor.set_value("value");
+        cursor.set_key("key")
+        cursor.set_value("value")
         cursor.insert()
         self.session.checkpoint()
 
@@ -394,8 +394,8 @@ class test_checkpoint_empty(wttest.WiredTigerTestCase):
         cursor.close()
 
         cursor = self.session.open_cursor(self.uri, None)
-        cursor.set_key("key");
-        cursor.set_value("value");
+        cursor.set_key("key")
+        cursor.set_value("value")
         cursor.insert()
         self.session.checkpoint('name=ckpt')
 
