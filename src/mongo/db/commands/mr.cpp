@@ -254,12 +254,6 @@ namespace mongo {
                     outputOptions.outDB = o["db"].String();
                 }
 
-                if ( outputOptions.outType != INMEMORY ) {
-                    outputOptions.finalNamespace = str::stream() <<
-                            (outputOptions.outDB.empty() ? dbname : outputOptions.outDB) <<
-                            "." << outputOptions.collectionName;
-                }
-
                 if (o.hasElement("nonAtomic")) {
                     outputOptions.outNonAtomic = o["nonAtomic"].Bool();
                     if (outputOptions.outNonAtomic)
@@ -271,6 +265,12 @@ namespace mongo {
             }
             else {
                 uasserted( 13606 , "'out' has to be a string or an object" );
+            }
+
+            if ( outputOptions.outType != INMEMORY ) {
+                outputOptions.finalNamespace = str::stream() <<
+                        (outputOptions.outDB.empty() ? dbname : outputOptions.outDB) <<
+                        "." << outputOptions.collectionName;
             }
 
             return outputOptions;
