@@ -20,6 +20,7 @@
 
 #include "mongo/pch.h"
 #include "../jsobj.h"
+#include "shapes.h"
 
 #include <cmath>
 
@@ -400,106 +401,6 @@ namespace mongo {
         virtual void unhash( const GeoHash& h , double& x , double& y ) const = 0;
         virtual GeoHash hash( double x , double y ) const = 0;
     };
-
-    class Point {
-    public:
-
-        Point( const GeoConvert * g , const GeoHash& hash ) {
-            g->unhash( hash , _x , _y );
-        }
-
-        explicit Point( const BSONElement& e ) {
-            BSONObjIterator i(e.Obj());
-            _x = i.next().number();
-            _y = i.next().number();
-        }
-
-        explicit Point( const BSONObj& o ) {
-            BSONObjIterator i(o);
-            _x = i.next().number();
-            _y = i.next().number();
-        }
-
-        Point( double x , double y )
-            : _x( x ) , _y( y ) {
-        }
-
-        Point() : _x(0),_y(0) {
-        }
-
-        GeoHash hash( const GeoConvert * g ) {
-            return g->hash( _x , _y );
-        }
-
-        double distance( const Point& p ) const {
-            double a = _x - p._x;
-            double b = _y - p._y;
-
-            // Avoid numerical error if possible...
-            if( a == 0 ) return abs( _y - p._y );
-            if( b == 0 ) return abs( _x - p._x );
-
-            return sqrt( ( a * a ) + ( b * b ) );
-        }
-
-        /**
-         * Distance method that compares x or y coords when other direction is zero,
-         * avoids numerical error when distances are very close to radius but axis-aligned.
-         *
-         * An example of the problem is:
-         * (52.0 - 51.9999) - 0.0001 = 3.31965e-15 and 52.0 - 51.9999 > 0.0001 in double arithmetic
-         * but:
-         * 51.9999 + 0.0001 <= 52.0
-         *
-         * This avoids some (but not all!) suprising results in $center queries where points are
-         * ( radius + center.x, center.y ) or vice-versa.
-         */
-        bool distanceWithin( const Point& p, double radius ) const {
-            double a = _x - p._x;
-            double b = _y - p._y;
-
-            if( a == 0 ) {
-                //
-                // Note:  For some, unknown reason, when a 32-bit g++ optimizes this call, the sum is
-                // calculated imprecisely.  We need to force the compiler to always evaluate it correctly,
-                // hence the weirdness.
-                //
-                // On some 32-bit linux machines, removing the volatile keyword or calculating the sum inline
-                // will make certain geo tests fail.  Of course this check will force volatile for all 32-bit systems,
-                // not just affected systems.
-                if( sizeof(void*) <= 4 ){
-                    volatile double sum = _y > p._y ? p._y + radius : _y + radius;
-                    return _y > p._y ? sum >= _y : sum >= p._y;
-                }
-                else {
-                    // Original math, correct for most systems
-                    return _y > p._y ? p._y + radius >= _y : _y + radius >= p._y;
-                }
-            }
-            if( b == 0 ) {
-                if( sizeof(void*) <= 4 ){
-                    volatile double sum = _x > p._x ? p._x + radius : _x + radius;
-                    return _x > p._x ? sum >= _x : sum >= p._x;
-                }
-                else {
-                    return _x > p._x ? p._x + radius >= _x : _x + radius >= p._x;
-                }
-            }
-
-            return sqrt( ( a * a ) + ( b * b ) ) <= radius;
-        }
-
-        string toString() const {
-            StringBuilder buf;
-            buf << "(" << _x << "," << _y << ")";
-            return buf.str();
-
-        }
-
-        double _x;
-        double _y;
-    };
-
 
     extern const double EARTH_RADIUS_KM;
     extern const double EARTH_RADIUS_MILES;

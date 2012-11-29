@@ -458,349 +458,23 @@ namespace mongo {
         double _errorSphere;
     };
 
-    class Box {
-    public:
-
-        Box( const Geo2dType * g , const GeoHash& hash )
-            : _min( g , hash ) ,
-              _max( _min._x + g->sizeEdge( hash ) , _min._y + g->sizeEdge( hash ) ) {
-        }
-
-        Box( double x , double y , double size )
-            : _min( x , y ) ,
-              _max( x + size , y + size ) {
-        }
-
-        Box( Point min , Point max )
-            : _min( min ) , _max( max ) {
-        }
-
-        Box() {}
-
-        BSONArray toBSON() const {
-            return BSON_ARRAY( BSON_ARRAY( _min._x << _min._y ) << BSON_ARRAY( _max._x << _max._y ) );
-        }
-
-        string toString() const {
-            StringBuilder buf;
-            buf << _min.toString() << " -->> " << _max.toString();
-            return buf.str();
-        }
-
-        bool between( double min , double max , double val , double fudge=0) const {
-            return val + fudge >= min && val <= max + fudge;
-        }
-
-        bool onBoundary( double bound, double val, double fudge = 0 ) const {
-            return ( val >= bound - fudge && val <= bound + fudge );
-        }
-
-        bool mid( double amin , double amax , double bmin , double bmax , bool min , double& res ) const {
-            verify( amin <= amax );
-            verify( bmin <= bmax );
-
-            if ( amin < bmin ) {
-                if ( amax < bmin )
-                    return false;
-                res = min ? bmin : amax;
-                return true;
-            }
-            if ( amin > bmax )
-                return false;
-            res = min ? amin : bmax;
-            return true;
-        }
-
-        double intersects( const Box& other ) const {
-
-            Point boundMin(0,0);
-            Point boundMax(0,0);
-
-            if ( mid( _min._x , _max._x , other._min._x , other._max._x , true , boundMin._x ) == false ||
-                    mid( _min._x , _max._x , other._min._x , other._max._x , false , boundMax._x ) == false ||
-                    mid( _min._y , _max._y , other._min._y , other._max._y , true , boundMin._y ) == false ||
-                    mid( _min._y , _max._y , other._min._y , other._max._y , false , boundMax._y ) == false )
-                return 0;
-
-            Box intersection( boundMin , boundMax );
-
-            return intersection.area() / area();
-        }
-
-        double area() const {
-            return ( _max._x - _min._x ) * ( _max._y - _min._y );
-        }
-
-        double maxDim() const {
-            return max( _max._x - _min._x, _max._y - _min._y );
-        }
-
-        Point center() const {
-            return Point( ( _min._x + _max._x ) / 2 ,
-                          ( _min._y + _max._y ) / 2 );
-        }
-
-        void truncate( const Geo2dType* g ) {
-            if( _min._x < g->_min ) _min._x = g->_min;
-            if( _min._y < g->_min ) _min._y = g->_min;
-            if( _max._x > g->_max ) _max._x = g->_max;
-            if( _max._y > g->_max ) _max._y = g->_max;
-        }
-
-        void fudge( const Geo2dType* g ) {
-            _min._x -= g->_error;
-            _min._y -= g->_error;
-            _max._x += g->_error;
-            _max._y += g->_error;
-        }
-
-        bool onBoundary( Point p, double fudge = 0 ) {
-            return onBoundary( _min._x, p._x, fudge ) ||
-                   onBoundary( _max._x, p._x, fudge ) ||
-                   onBoundary( _min._y, p._y, fudge ) ||
-                   onBoundary( _max._y, p._y, fudge );
-        }
-
-        bool inside( Point p , double fudge = 0 ) {
-            bool res = inside( p._x , p._y , fudge );
-            //cout << "is : " << p.toString() << " in " << toString() << " = " << res << endl;
-            return res;
-        }
-
-        bool inside( double x , double y , double fudge = 0 ) {
-            return
-                between( _min._x , _max._x  , x , fudge ) &&
-                between( _min._y , _max._y  , y , fudge );
-        }
-
-        bool contains(const Box& other, double fudge=0) {
-            return inside(other._min, fudge) && inside(other._max, fudge);
-        }
-
-        Point _min;
-        Point _max;
-    };
-
-
-    class Polygon {
-    public:
-
-        Polygon( void ) : _centroidCalculated( false ) {}
-
-        Polygon( vector<Point> points ) : _centroidCalculated( false ),
-            _points( points ) { }
-
-        void add( Point p ) {
-            _centroidCalculated = false;
-            _points.push_back( p );
-        }
-
-        int size( void ) const {
-            return _points.size();
-        }
-
-        /**
-         * Determine if the point supplied is contained by the current polygon.
-         *
-         * The algorithm uses a ray casting method.
-         */
-        bool contains( const Point& p ) const {
-            return contains( p, 0 ) > 0;
-        }
-
-        int contains( const Point &p, double fudge ) const {
-
-            Box fudgeBox( Point( p._x - fudge, p._y - fudge ), Point( p._x + fudge, p._y + fudge ) );
-
-            int counter = 0;
-            Point p1 = _points[0];
-            for ( int i = 1; i <= size(); i++ ) {
-                Point p2 = _points[i % size()];
-
-                GEODEBUG( "Doing intersection check of " << fudgeBox.toString() << " with seg " << p1.toString() << " to " << p2.toString() );
-
-                // We need to check whether or not this segment intersects our error box
-                if( fudge > 0 &&
-                        // Points not too far below box
-                        fudgeBox._min._y <= std::max( p1._y, p2._y ) &&
-                        // Points not too far above box
-                        fudgeBox._max._y >= std::min( p1._y, p2._y ) &&
-                        // Points not too far to left of box
-                        fudgeBox._min._x <= std::max( p1._x, p2._x ) &&
-                        // Points not too far to right of box
-                        fudgeBox._max._x >= std::min( p1._x, p2._x ) ) {
-
-                    GEODEBUG( "Doing detailed check" );
-
-                    // If our box contains one or more of these points, we need to do an exact check.
-                    if( fudgeBox.inside(p1) ) {
-                        GEODEBUG( "Point 1 inside" );
-                        return 0;
-                    }
-                    if( fudgeBox.inside(p2) ) {
-                        GEODEBUG( "Point 2 inside" );
-                        return 0;
-                    }
-
-                    // Do intersection check for vertical sides
-                    if ( p1._y != p2._y ) {
-
-                        double invSlope = ( p2._x - p1._x ) / ( p2._y - p1._y );
-
-                        double xintersT = ( fudgeBox._max._y - p1._y ) * invSlope + p1._x;
-                        if( fudgeBox._min._x <= xintersT && fudgeBox._max._x >= xintersT ) {
-                            GEODEBUG( "Top intersection @ " << xintersT );
-                            return 0;
-                        }
-
-                        double xintersB = ( fudgeBox._min._y - p1._y ) * invSlope + p1._x;
-                        if( fudgeBox._min._x <= xintersB && fudgeBox._max._x >= xintersB ) {
-                            GEODEBUG( "Bottom intersection @ " << xintersB );
-                            return 0;
-                        }
-
-                    }
-
-                    // Do intersection check for horizontal sides
-                    if( p1._x != p2._x ) {
-
-                        double slope = ( p2._y - p1._y ) / ( p2._x - p1._x );
-
-                        double yintersR = ( p1._x - fudgeBox._max._x ) * slope + p1._y;
-                        if( fudgeBox._min._y <= yintersR && fudgeBox._max._y >= yintersR ) {
-                            GEODEBUG( "Right intersection @ " << yintersR );
-                            return 0;
-                        }
-
-                        double yintersL = ( p1._x - fudgeBox._min._x ) * slope + p1._y;
-                        if( fudgeBox._min._y <= yintersL && fudgeBox._max._y >= yintersL ) {
-                            GEODEBUG( "Left intersection @ " << yintersL );
-                            return 0;
-                        }
-
-                    }
-
-                }
-                else if( fudge == 0 ){
-
-                    // If this is an exact vertex, we won't intersect, so check this
-                    if( p._y == p1._y && p._x == p1._x ) return 1;
-                    else if( p._y == p2._y && p._x == p2._x ) return 1;
-
-                    // If this is a horizontal line we won't intersect, so check this
-                    if( p1._y == p2._y && p._y == p1._y ){
-                        // Check that the x-coord lies in the line
-                        if( p._x >= std::min( p1._x, p2._x ) && p._x <= std::max( p1._x, p2._x ) ) return 1;
-                    }
-
-                }
-
-                // Normal intersection test.
-                // TODO: Invert these for clearer logic?
-                if ( p._y > std::min( p1._y, p2._y ) ) {
-                    if ( p._y <= std::max( p1._y, p2._y ) ) {
-                        if ( p._x <= std::max( p1._x, p2._x ) ) {
-                            if ( p1._y != p2._y ) {
-                                double xinters = (p._y-p1._y)*(p2._x-p1._x)/(p2._y-p1._y)+p1._x;
-                                // Special case of point on vertical line
-                                if ( p1._x == p2._x && p._x == p1._x ){
-
-                                    // Need special case for the vertical edges, for example:
-                                    // 1) \e   pe/----->
-                                    // vs.
-                                    // 2) \ep---e/----->
-                                    //
-                                    // if we count exact as intersection, then 1 is in but 2 is out
-                                    // if we count exact as no-int then 1 is out but 2 is in.
-
-                                    return 1;
-                                }
-                                else if( p1._x == p2._x || p._x <= xinters ) {
-                                    counter++;
-                                }
-                            }
-                        }
-                    }
-                }
-
-                p1 = p2;
-            }
-
-            if ( counter % 2 == 0 ) {
-                return -1;
-            }
-            else {
-                return 1;
-            }
-        }
-
-        /**
-         * Calculate the centroid, or center of mass of the polygon object.
-         */
-        Point centroid( void ) {
-
-            /* Centroid is cached, it won't change betwen points */
-            if ( _centroidCalculated ) {
-                return _centroid;
-            }
-
-            Point cent;
-            double signedArea = 0.0;
-            double area = 0.0;  // Partial signed area
-
-            /// For all vertices except last
-            int i = 0;
-            for ( i = 0; i < size() - 1; ++i ) {
-                area = _points[i]._x * _points[i+1]._y - _points[i+1]._x * _points[i]._y ;
-                signedArea += area;
-                cent._x += ( _points[i]._x + _points[i+1]._x ) * area;
-                cent._y += ( _points[i]._y + _points[i+1]._y ) * area;
-            }
-
-            // Do last vertex
-            area = _points[i]._x * _points[0]._y - _points[0]._x * _points[i]._y;
-            cent._x += ( _points[i]._x + _points[0]._x ) * area;
-            cent._y += ( _points[i]._y + _points[0]._y ) * area;
-            signedArea += area;
-            signedArea *= 0.5;
-            cent._x /= ( 6 * signedArea );
-            cent._y /= ( 6 * signedArea );
-
-            _centroidCalculated = true;
-            _centroid = cent;
-
-            return cent;
-        }
-
-        Box bounds( void ) {
-
-            // TODO: Cache this
-
-            _bounds._max = _points[0];
-            _bounds._min = _points[0];
-
-            for ( int i = 1; i < size(); i++ ) {
-
-                _bounds._max._x = max( _bounds._max._x, _points[i]._x );
-                _bounds._max._y = max( _bounds._max._y, _points[i]._y );
-                _bounds._min._x = min( _bounds._min._x, _points[i]._x );
-                _bounds._min._y = min( _bounds._min._y, _points[i]._y );
-
-            }
-
-            return _bounds;
-
-        }
-
-    private:
-
-        bool _centroidCalculated;
-        Point _centroid;
-
-        Box _bounds;
-
-        vector<Point> _points;
-    };
+    // Equal to Point::Point(args)
+    inline Point pointFromHash(const GeoConvert* g, const GeoHash& hash) {
+        double x, y;
+        g->unhash(hash, x, y);
+        return Point(x, y);
+    }
+    // Point::hash
+    inline GeoHash pointToHash(Point p, const GeoConvert* g) {
+        return g->hash(p._x, p._y);
+    }
+    // Box::Box(...)
+    inline Box boxFromHash(const Geo2dType* g, const GeoHash& hash) {
+        Point min = pointFromHash(g, hash);
+        double edgeSize = g->sizeEdge(hash);
+        Point max = Point(min._x + edgeSize, min._y + edgeSize);
+        return Box(min, max);
+    }
 
     class Geo2dPlugin : public IndexPlugin {
     public:
@@ -1024,7 +698,7 @@ namespace mongo {
             // Approximate distance check using key data
             ////
             double keyD = 0;
-            Point keyP( _g, GeoHash( node._key.firstElement(), _g->_bits ) );
+            Point keyP(pointFromHash(_g, GeoHash( node._key.firstElement(), _g->_bits )));
             KeyResult keyOk = approxKeyCheck( keyP, keyD );
             if ( keyOk == BAD ) {
                 GEODEBUG( "\t\t\t\t bad distance : " << node.recordLoc.obj()  << "\t" << keyD );
@@ -1664,7 +1338,7 @@ namespace mongo {
 
                     if( ! isNeighbor ) {
                         _centerPrefix = _prefix;
-                        _centerBox = Box( _g, _centerPrefix );
+                        _centerBox = boxFromHash( _g, _centerPrefix );
                         isNeighbor = true;
                     }
 
@@ -1702,7 +1376,7 @@ namespace mongo {
                     while( _fringe.size() > 0 ) {
 
                         _prefix = _neighborPrefix + _fringe.back();
-                        Box cur( _g , _prefix );
+                        Box cur(boxFromHash( _g , _prefix ));
 
                         PREFIXDEBUG( _prefix, _g );
 
@@ -1874,7 +1548,7 @@ namespace mongo {
             BSONObjBuilder bob;
             BSONArrayBuilder bab;
             for( i = _expPrefixes.begin(); i != _expPrefixes.end(); ++i ){
-                bab << Box( _g, *i ).toBSON();
+                bab << Box(boxFromHash( _g, *i )).toBSON();
             }
             bob << _g->_geo << bab.arr();
 
@@ -2626,7 +2300,7 @@ namespace mongo {
             _want._max = Point( i.next() );
 
             _wantRegion = _want;
-            _wantRegion.fudge( g ); // Need to make sure we're checking regions within error bounds of where we want
+            _wantRegion.fudge( g->_error ); // Need to make sure we're checking regions within error bounds of where we want
             fixBox( g, _wantRegion );
             fixBox( g, _want );
 
@@ -2716,8 +2390,8 @@ namespace mongo {
             uassert( 14030, "polygon must be defined by three points or more", _poly.size() >= 3 );
 
             _bounds = _poly.bounds();
-            _bounds.fudge( g ); // We need to check regions within the error bounds of these bounds
-            _bounds.truncate( g ); // We don't need to look anywhere outside the space
+            _bounds.fudge( g->_error ); // We need to check regions within the error bounds of these bounds
+            _bounds.truncate( g->_min, g->_max ); // We don't need to look anywhere outside the space
 
             _maxDim = _g->_error + _bounds.maxDim() / 2;
 
