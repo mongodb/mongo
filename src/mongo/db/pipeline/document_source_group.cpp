@@ -194,47 +194,17 @@ namespace mongo {
                 else if (groupType == String) {
                     string groupString(groupField.str());
                     const char *pGroupString = groupString.c_str();
-                    if ((groupString.length() == 0) ||
-                        (pGroupString[0] != '$'))
-                        goto StringConstantId;
-
-                    string pathString(
-                        Expression::removeFieldPrefix(groupString));
-                    intrusive_ptr<ExpressionFieldPath> pFieldPath(
-                        ExpressionFieldPath::create(pathString));
-                    pGroup->setIdExpression(pFieldPath);
-                    idSet = true;
-                }
-                else {
-                    /* pick out the constant types that are allowed */
-                    switch(groupType) {
-                    case NumberDouble:
-                    case String:
-                    case Object:
-                    case Array:
-                    case jstOID:
-                    case Bool:
-                    case Date:
-                    case NumberInt:
-                    case Timestamp:
-                    case NumberLong:
-                    case jstNULL:
-                    StringConstantId: // from string case above
-                    {
-                        Value pValue(
-                            Value::createFromBsonElement(&groupField));
-                        intrusive_ptr<ExpressionConstant> pConstant(
-                            ExpressionConstant::create(pValue));
-                        pGroup->setIdExpression(pConstant);
+                    if (pGroupString[0] == '$') {
+                        string pathString = Expression::removeFieldPrefix(groupString);
+                        pGroup->setIdExpression(ExpressionFieldPath::create(pathString));
                         idSet = true;
-                        break;
                     }
+                }
 
-                    default:
-                        uassert(15949, str::stream() <<
-                                "a group's _id may not include fields of BSON type " << groupType,
-                                false);
-                    }
+                if (!idSet) {
+                    // constant id - single group
+                    pGroup->setIdExpression(ExpressionConstant::create(Value(groupField)));
+                    idSet = true;
                 }
             }
             else {

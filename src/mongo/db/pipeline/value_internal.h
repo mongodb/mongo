@@ -17,7 +17,9 @@
 #pragma once
 
 #include <algorithm>
+#include "bson/bsonobj.h"
 #include "bson/bsontypes.h"
+#include "bson/bsonmisc.h"
 #include "bson/oid.h"
 #include "util/intrusive_counter.h"
 #include "util/optime.h"
@@ -37,21 +39,42 @@ namespace mongo {
         vector<Value> vec;
     };
 
+    class RCCodeWScope : public RefCountable {
+    public:
+        RCCodeWScope(const string& str, BSONObj obj) :code(str), scope(obj.getOwned()) {}
+        const string code;
+        const BSONObj scope; // Not worth converting to Document for now
+    };
+
+    class RCDBRef : public RefCountable {
+    public:
+        RCDBRef(const string& str, const OID& o) :ns(str), oid(o) {}
+        const string ns;
+        const OID oid;
+    };
+
 #pragma pack(1)
     class ValueStorage {
     public:
+        // Note: it is important the memory is zeroed out (by calling zero()) at the start of every
+        // constructor. Much code relies on every byte being predictably initialized to zero.
+
         // This is a "missing" Value
         ValueStorage() { zero(); type = EOO; }
 
-        explicit ValueStorage(BSONType t)           { zero(); type = t;}
-        ValueStorage(BSONType t, int i)             { zero(); type = t; intValue = i; }
-        ValueStorage(BSONType t, long long l)       { zero(); type = t; longValue = l; }
-        ValueStorage(BSONType t, double d)          { zero(); type = t; doubleValue = d; }
-        ValueStorage(BSONType t, ReplTime r)        { zero(); type = t; timestampValue = r; }
-        ValueStorage(BSONType t, bool b)            { zero(); type = t; boolValue = b; }
-        ValueStorage(BSONType t, const Document& d) { zero(); type = t; putDocument(d); }
-        ValueStorage(BSONType t, const RCVector* a) { zero(); type = t; putVector(a); }
-        ValueStorage(BSONType t, StringData s)      { zero(); type = t; putString(s); }
+        explicit ValueStorage(BSONType t)                  { zero(); type = t; }
+        ValueStorage(BSONType t, int i)                    { zero(); type = t; intValue = i; }
+        ValueStorage(BSONType t, long long l)              { zero(); type = t; longValue = l; }
+        ValueStorage(BSONType t, double d)                 { zero(); type = t; doubleValue = d; }
+        ValueStorage(BSONType t, ReplTime r)               { zero(); type = t; timestampValue = r; }
+        ValueStorage(BSONType t, bool b)                   { zero(); type = t; boolValue = b; }
+        ValueStorage(BSONType t, const Document& d)        { zero(); type = t; putDocument(d); }
+        ValueStorage(BSONType t, const RCVector* a)        { zero(); type = t; putVector(a); }
+        ValueStorage(BSONType t, const StringData& s)      { zero(); type = t; putString(s); }
+        ValueStorage(BSONType t, const BSONBinData& bd)    { zero(); type = t; putBinData(bd); }
+        ValueStorage(BSONType t, const BSONRegEx& re)      { zero(); type = t; putRegEx(re); }
+        ValueStorage(BSONType t, const BSONCodeWScope& cs) { zero(); type = t; putCodeWScope(cs); }
+        ValueStorage(BSONType t, const BSONDBRef& dbref)   { zero(); type = t; putDBRef(dbref); }
 
         ValueStorage(BSONType t, const OID& o) {
             zero();
@@ -91,9 +114,31 @@ namespace mongo {
         }
 
         /// These are only to be called during Value construction on an empty Value
-        void putString(StringData s);
+        void putString(const StringData& s);
         void putVector(const RCVector* v);
         void putDocument(const Document& d);
+        void putRegEx(const BSONRegEx& re);
+        void putBinData(const BSONBinData& bd) {
+            putString(StringData(static_cast<const char*>(bd.data), bd.length));
+            binSubType = bd.type;
+        }
+
+        void putDBRef(const BSONDBRef& dbref) {
+            putRefCountable(new RCDBRef(dbref.ns.toString(), dbref.oid));
+        }
+
+        void putCodeWScope(const BSONCodeWScope& cws) {
+            putRefCountable(new RCCodeWScope(cws.code.toString(), cws.scope));
+        }
+
+        void putRefCountable(intrusive_ptr<const RefCountable> ptr) {
+            genericRCPtr = ptr.get();
+
+            if (genericRCPtr) {
+                intrusive_ptr_add_ref(genericRCPtr);
+                refCounter = true;
+            }
+        }
 
         StringData getString() const {
             if (shortStr) {
@@ -112,6 +157,16 @@ namespace mongo {
             return arrayPtr->vec;
         }
 
+        intrusive_ptr<const RCCodeWScope> getCodeWScope() const {
+            dassert(typeid(*genericRCPtr) == typeid(const RCCodeWScope));
+            return static_cast<const RCCodeWScope*>(genericRCPtr);
+        }
+
+        intrusive_ptr<const RCDBRef> getDBRef() const {
+            dassert(typeid(*genericRCPtr) == typeid(const RCDBRef));
+            return static_cast<const RCDBRef*>(genericRCPtr);
+        }
+
         // Document is incomplete here so this can't be inline
         Document getDocument() const;
 
@@ -120,8 +175,12 @@ namespace mongo {
             return BSONType(type);
         }
 
+        BinDataType binDataType() const {
+            dassert(type == BinData);
+            return BinDataType(binSubType);
+        }
+
         void zero() {
-            // This is important for identical()
             memset(this, 0, sizeof(*this));
         }
 
@@ -150,7 +209,11 @@ namespace mongo {
 
                     struct {
                         char shortStrSize; // TODO Consider moving into flags union (4 bits)
-                        char shortStrStorage[16 - 3]; // ValueStorage is 16 bytes, 3 byte offset
+                        char shortStrStorage[16/*total bytes*/ - 3/*offset*/ - 1/*NUL byte*/];
+                        union {
+                            char nulTerminator;
+                            unsigned char binSubType; // type always goes here even if !shortStr
+                        };
                     };
 
                     struct {

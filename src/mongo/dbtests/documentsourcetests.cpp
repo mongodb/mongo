@@ -518,7 +518,7 @@ namespace DocumentSourceTests {
         };
 
         /** $group _id is a regular expression (not supported). */
-        class IdRegularExpression : public ParseErrorBase {
+        class IdRegularExpression : public IdConstantBase {
             BSONObj spec() { return fromjson( "{_id:/a/}" ); }
         };
 

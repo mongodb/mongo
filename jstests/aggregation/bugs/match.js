@@ -147,9 +147,7 @@ function checkMatchResults( indexed ) {
     t.save( { a:NumberLong( 2 ) } );
     t.save( { a:66.6 } );
     t.save( { a:'abc' } );
-    if ( 0 ) { // SERVER-6470
     t.save( { a:/xyz/ } );
-    }
     t.save( { a:{ q:1 } } );
     t.save( { a:true } );
     t.save( { a:new Date() } );

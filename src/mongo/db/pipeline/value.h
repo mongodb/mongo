@@ -54,17 +54,31 @@ namespace mongo {
          */
 
         Value(): _storage() {} // "Missing" value
-        explicit Value(bool value) : _storage(Bool, value) {}
-        explicit Value(int value) : _storage(NumberInt, value) {}
-        explicit Value(long long value) : _storage(NumberLong, value) {}
-        explicit Value(double value) : _storage(NumberDouble, value) {}
-        explicit Value(const OpTime& value) : _storage(Timestamp, value.asDate()) {}
-        explicit Value(const OID& value) : _storage(jstOID, value) {}
-        explicit Value(StringData value) : _storage(String, value) {}
-        explicit Value(const string& value) : _storage(String, StringData(value)) {}
-        explicit Value(const char* value) : _storage(String, StringData(value)) {}
-        explicit Value(const Document& doc) : _storage(Object, doc) {}
-        explicit Value(const vector<Value>& vec) : _storage(Array, new RCVector(vec)) {}
+        explicit Value(bool value)                : _storage(Bool, value) {}
+        explicit Value(int value)                 : _storage(NumberInt, value) {}
+        explicit Value(long long value)           : _storage(NumberLong, value) {}
+        explicit Value(double value)              : _storage(NumberDouble, value) {}
+        explicit Value(const OpTime& value)       : _storage(Timestamp, value.asDate()) {}
+        explicit Value(const OID& value)          : _storage(jstOID, value) {}
+        explicit Value(const StringData& value)   : _storage(String, value) {}
+        explicit Value(const string& value)       : _storage(String, StringData(value)) {}
+        explicit Value(const char* value)         : _storage(String, StringData(value)) {}
+        explicit Value(const Document& doc)       : _storage(Object, doc) {}
+        explicit Value(const BSONObj& obj);//     : _storage(Object, Document(obj)) {} // in cpp
+        explicit Value(const vector<Value>& vec)  : _storage(Array, new RCVector(vec)) {}
+        explicit Value(const BSONBinData& bd)     : _storage(BinData, bd) {}
+        explicit Value(const BSONRegEx& re)       : _storage(RegEx, re) {}
+        explicit Value(const BSONCodeWScope& cws) : _storage(CodeWScope, cws) {}
+        explicit Value(const BSONDBRef& dbref)    : _storage(DBRef, dbref) {}
+        explicit Value(const BSONSymbol& sym)     : _storage(Symbol, sym.symbol) {}
+        explicit Value(const BSONCode& code)      : _storage(Code, code.code) {}
+        explicit Value(const NullLabeler&)        : _storage(jstNULL) {}   // BSONNull
+        explicit Value(const UndefinedLabeler&)   : _storage(Undefined) {} // BSONUndefined
+        explicit Value(const MinKeyLabeler&)      : _storage(MinKey) {}    // MINKEY
+        explicit Value(const MaxKeyLabeler&)      : _storage(MaxKey) {}    // MAXKEY
+        explicit Value(const Date_t& date)
+            : _storage(Date, static_cast<long long>(date.millis)) // millis really signed
+        {}
 
         /** Creates an empty or zero value of specified type.
          *  This is currently the only way to create Undefined or Null Values.
@@ -100,14 +114,15 @@ namespace mongo {
          */
         double getDouble() const;
         string getString() const;
-        StringData getStringData() const; // May contain embedded NUL bytes
         Document getDocument() const;
         OID getOid() const;
         bool getBool() const;
         long long getDate() const; // in milliseconds
         OpTime getTimestamp() const;
-        string getRegex() const;
+        const char* getRegex() const;
+        const char* getRegexFlags() const;
         string getSymbol() const;
+        string getCode() const;
         int getInt() const;
         long long getLong() const;
         const vector<Value>& getArray() const { return _storage.getArray(); }
@@ -217,6 +232,9 @@ namespace mongo {
         template <typename InvalidArgumentType>
         explicit Value(const InvalidArgumentType& invalidArgument);
 
+        // does no type checking
+        StringData getStringData() const; // May contain embedded NUL bytes
+
         ValueStorage _storage;
         friend class MutableValue; // gets and sets _storage.genericRCPtr
     };
@@ -245,14 +263,12 @@ namespace mongo {
     }
 
     inline StringData Value::getStringData() const {
-        verify(getType() == String);
         return _storage.getString();
     }
 
     inline string Value::getString() const {
         verify(getType() == String);
-        StringData sd = _storage.getString();
-        return sd.toString();
+        return _storage.getString().toString();
     }
 
     inline OID Value::getOid() const {
@@ -275,16 +291,25 @@ namespace mongo {
         return _storage.timestampValue;
     }
 
-    inline string Value::getRegex() const {
+    inline const char* Value::getRegex() const {
         verify(getType() == RegEx);
-        StringData sd = _storage.getString();
-        return sd.toString();
+        return _storage.getString().rawData(); // this is known to be NUL terminated
+    }
+    inline const char* Value::getRegexFlags() const {
+        verify(getType() == RegEx);
+        const char* pattern = _storage.getString().rawData(); // this is known to be NUL terminated
+        const char* flags = pattern + strlen(pattern) + 1; // first byte after pattern's NUL
+        dassert(flags + strlen(flags) == pattern + _storage.getString().size());
+        return flags;
     }
 
     inline string Value::getSymbol() const {
         verify(getType() == Symbol);
-        StringData sd = _storage.getString();
-        return sd.toString();
+        return _storage.getString().toString();
+    }
+    inline string Value::getCode() const {
+        verify(getType() == Code);
+        return _storage.getString().toString();
     }
 
     inline int Value::getInt() const {
