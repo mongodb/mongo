@@ -280,7 +280,7 @@ namespace mongo {
         if (it == _chunksMap.end()) {
             *errMsg =  stream() << "couldn't find chunk " << chunk.getMin()
                                 << "->" << chunk.getMax();
-            return NULL;
+            return false;
         }
 
         if (it->second.woCompare(chunk.getMax()) != 0) {
