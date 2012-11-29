@@ -50,6 +50,11 @@ util_read_line(ULINE *l, int eof_expected, int *eofp)
 	++line;
 	*eofp = 0;
 
+	if (l->memsize == 0) {
+		if ((l->mem = realloc(l->mem, l->memsize + 1024)) == NULL)
+			return (util_err(errno, NULL));
+		l->memsize = 1024;
+	}
 	for (len = 0;; ++len) {
 		if ((ch = getchar()) == EOF) {
 			if (len == 0) {
@@ -70,7 +75,7 @@ util_read_line(ULINE *l, int eof_expected, int *eofp)
 		 * line into a record number, that means we always need one
 		 * extra byte at the end.
 		 */
-		if (l->memsize == 0 || len >= l->memsize - 1) {
+		if (len >= l->memsize - 1) {
 			if ((l->mem =
 			    realloc(l->mem, l->memsize + 1024)) == NULL)
 				return (util_err(errno, NULL));
