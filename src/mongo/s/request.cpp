@@ -179,7 +179,7 @@ namespace mongo {
         long long cursor =response.header()->getCursor();
         if ( cursor ) {
             if ( fromServer.size() ) {
-                cursorCache.storeRef( fromServer , cursor );
+                cursorCache.storeRef(fromServer, cursor, getns());
             }
             else {
                 // probably a getMore

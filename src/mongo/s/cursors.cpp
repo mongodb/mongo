@@ -169,6 +169,7 @@ namespace mongo {
         bool print = logLevel > 0;
         if ( _cursors.size() || _refs.size() )
             print = true;
+        verify(_refs.size() == _refsNS.size());
         
         if ( print ) 
             cout << " CursorCache at shutdown - "
@@ -202,11 +203,12 @@ namespace mongo {
         _cursors.erase( id );
     }
     
-    void CursorCache::storeRef( const string& server , long long id ) {
+    void CursorCache::storeRef(const std::string& server, long long id, const std::string& ns) {
         LOG(_myLogLevel) << "CursorCache::storeRef server: " << server << " id: " << id << endl;
         verify( id );
         scoped_lock lk( _mutex );
         _refs[id] = server;
+        _refsNS[id] = ns;
     }
 
     string CursorCache::getRef( long long id ) const {
@@ -217,6 +219,19 @@ namespace mongo {
         LOG(_myLogLevel) << "CursorCache::getRef id: " << id << " out: " << ( i == _refs.end() ? " NONE " : i->second ) << endl;
 
         if ( i == _refs.end() )
+            return "";
+        return i->second;
+    }
+
+    std::string CursorCache::getRefNS(long long id) const {
+        verify(id);
+        scoped_lock lk(_mutex);
+        MapNormal::const_iterator i = _refsNS.find(id);
+
+        LOG(_myLogLevel) << "CursorCache::getRefNs id: " << id
+                << " out: " << ( i == _refsNS.end() ? " NONE " : i->second ) << std::endl;
+
+        if ( i == _refsNS.end() )
             return "";
         return i->second;
     }
@@ -280,13 +295,16 @@ namespace mongo {
                     continue;
                 }
 
-                MapNormal::iterator j = _refs.find( id );
-                if ( j == _refs.end() ) {
+                MapNormal::iterator refsIt = _refs.find(id);
+                MapNormal::iterator refsNSIt = _refsNS.find(id);
+                if (refsIt == _refs.end()) {
                     LOG( LL_WARNING ) << "can't find cursor: " << id << endl;
                     continue;
                 }
-                server = j->second;
-                _refs.erase( j );
+                verify(refsNSIt != _refsNS.end());
+                server = refsIt->second;
+                _refs.erase(refsIt);
+                _refsNS.erase(refsNSIt);
             }
 
             LOG(_myLogLevel) << "CursorCache::found gotKillCursors id: " << id << " server: " << server << endl;
