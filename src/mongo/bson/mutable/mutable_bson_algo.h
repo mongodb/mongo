@@ -43,14 +43,14 @@ namespace mutablebson {
          *  lifetime of 'fieldName'.
          */
         explicit FieldNameEquals(const StringData& fieldName)
-            : fieldName_(fieldName) {}
+            : _fieldName(fieldName) {}
 
         bool operator()(const Element& element) const {
-            return (fieldName_ == element.getFieldName());
+            return (_fieldName == element.getFieldName());
         }
 
     private:
-        const StringData& fieldName_;
+        const StringData& _fieldName;
     };
 
     /**
