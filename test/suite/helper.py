@@ -149,7 +149,7 @@ def simple_populate_check_cursor(self, cursor):
 def simple_populate_check(self, uri):
     self.pr('simple_populate_check: ' + uri)
     cursor = self.session.open_cursor(uri, None)
-    simple_populate_check_cursor(cursor)
+    simple_populate_check_cursor(self, cursor)
     cursor.close()
 
 # Return the value stored in a complex object.
@@ -207,5 +207,5 @@ def complex_populate_check_cursor(self, cursor):
 def complex_populate_check(self, uri):
     self.pr('complex_populate_check: ' + uri)
     cursor = self.session.open_cursor(uri, None)
-    complex_populate_check_cursor(cursor)
+    complex_populate_check_cursor(self, cursor)
     cursor.close()
