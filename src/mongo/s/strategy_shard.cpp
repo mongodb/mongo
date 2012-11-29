@@ -42,11 +42,7 @@ namespace mongo {
 
         virtual void queryOp( Request& r ) {
 
-            // TODO: These probably should just be handled here.
-            if ( r.isCommand() ) {
-                SINGLE->queryOp( r );
-                return;
-            }
+            verify(!r.isCommand()); // Commands are handled in strategy_single.cpp
 
             QueryMessage q( r.d() );
 
@@ -74,7 +70,7 @@ namespace mongo {
                     myShard.reset( new Shard( *shards.begin() ) );
                 }
                 
-                doQuery( r, *myShard );
+                doIndexQuery( r, *myShard );
                 return;
             }
             

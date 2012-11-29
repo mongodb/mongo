@@ -58,7 +58,7 @@ namespace mongo {
     }
 
 
-    void Strategy::doQuery( Request& r , const Shard& shard ) {
+    void Strategy::doIndexQuery( Request& r , const Shard& shard ) {
 
         r.checkAuth( Auth::READ );
 
@@ -81,48 +81,6 @@ namespace mongo {
         }
 
         r.reply( response , actualServer.size() ? actualServer : c.getServerAddress() );
-        dbcon.done();
-    }
-
-    void Strategy::insert( const Shard& shard , const char * ns , const BSONObj& obj , int flags, bool safe ) {
-        ShardConnection dbcon( shard , ns );
-        if ( dbcon.setVersion() ) {
-            dbcon.done();
-            // Version is zero b/c we don't yet have a way to get the local version conflict
-            throw RecvStaleConfigException( ns , "for insert", ShardChunkVersion( 0, OID() ), ShardChunkVersion( 0, OID() ) );
-        }
-        dbcon->insert( ns , obj , flags);
-        if (safe)
-            dbcon->getLastError();
-        dbcon.done();
-    }
-
-    void Strategy::insert( const Shard& shard , const char * ns , const vector<BSONObj>& v , int flags, bool safe ) {
-        ShardConnection dbcon( shard , ns );
-        if ( dbcon.setVersion() ) {
-            dbcon.done();
-            // Version is zero b/c we don't yet have a way to get the local version conflict
-            throw RecvStaleConfigException( ns , "for insert", ShardChunkVersion( 0, OID() ), ShardChunkVersion( 0, OID() ) );
-        }
-        dbcon->insert( ns , v , flags);
-        if (safe)
-            dbcon->getLastError();
-        dbcon.done();
-    }
-
-    void Strategy::update( const Shard& shard , const char * ns , const BSONObj& query , const BSONObj& toupdate , int flags, bool safe ) {
-        bool upsert = flags & UpdateOption_Upsert;
-        bool multi = flags & UpdateOption_Multi;
-
-        ShardConnection dbcon( shard , ns );
-        if ( dbcon.setVersion() ) {
-            dbcon.done();
-            // Version is zero b/c we don't yet have a way to get the local version conflict
-            throw RecvStaleConfigException( ns , "for insert", ShardChunkVersion( 0, OID() ), ShardChunkVersion( 0, OID() ) );
-        }
-        dbcon->update( ns , query , toupdate, upsert, multi);
-        if (safe)
-            dbcon->getLastError();
         dbcon.done();
     }
 

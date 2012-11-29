@@ -137,7 +137,12 @@ namespace mongo {
         bool iscmd = false;
         if ( op == dbQuery ) {
             iscmd = isCommand();
-            s->queryOp( *this );
+            if (iscmd) {
+                SINGLE->queryOp(*this);
+            }
+            else {
+                s->queryOp( *this );
+            }
         }
         else if ( op == dbGetMore ) {
             checkAuth( Auth::READ ); // this is important so someone can't steal a cursor

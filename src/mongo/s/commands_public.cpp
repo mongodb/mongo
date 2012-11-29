@@ -1301,15 +1301,6 @@ namespace mongo {
                 return b.obj();
             }
 
-            ChunkPtr insertSharded( ChunkManagerPtr manager, const char* ns, BSONObj& o, int flags, bool safe ) {
-                // note here, the MR output process requires no splitting / migration during process, hence StaleConfigException should not happen
-                Strategy* s = SHARDED;
-                ChunkPtr c = manager->findChunkForDoc( o );
-                LOG(4) << "  server:" << c->getShard().toString() << " " << o << endl;
-                s->insert( c->getShard() , ns , o , flags, safe);
-                return c;
-            }
-
             void cleanUp( const set<ServerAndQuery>& servers, string dbName, string shardResultCollection ) {
                 try {
                     // drop collections with tmp results on each shard
