@@ -97,9 +97,11 @@ env.CppUnitTest('descriptive_stats_test',
                 ['util/descriptive_stats_test.cpp'],
                 LIBDEPS=['foundation', 'bson']);
 
+env.StaticLibrary( 'mongohasher', [ "db/hasher.cpp" ] )
+
+
 commonFiles = [ "pch.cpp",
                 "buildinfo.cpp",
-                "db/hasher.cpp",
                 "db/lasterror.cpp",
                 "db/namespace.cpp",
                 "shell/mongo.cpp",
@@ -181,6 +183,7 @@ env.StaticLibrary("fail_point",
 env.StaticLibrary('mongocommon', commonFiles,
                   LIBDEPS=['bson',
                            'foundation',
+                           'mongohasher',
                            'md5',
                            'processinfo',
                            'stacktrace',
