@@ -153,7 +153,8 @@ __create_colgroup(WT_SESSION_IMPL *session,
 		;
 
 	/* Add the source to the colgroup config before collapsing. */
-	if (__wt_config_getones(session, config, "source", &cval) == 0) {
+	if (__wt_config_getones(
+	    session, config, "source", &cval) == 0 && cval.len != 0) {
 		WT_ERR(__wt_buf_fmt(
 		    session, &namebuf, "%.*s", (int)cval.len, cval.str));
 		source = namebuf.data;
