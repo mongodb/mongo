@@ -17,6 +17,7 @@
 
 #include <algorithm>  // for min
 #include <cstring>
+#include <iosfwd>
 #include <string>
 
 namespace mongo {
@@ -134,5 +135,7 @@ namespace mongo {
     inline bool operator>=(const StringData& lhs, const StringData& rhs) {
         return lhs.compare(rhs) >= 0;
     }
+
+    std::ostream& operator<<(std::ostream& stream, const StringData& value);
 
 } // namespace mongo

@@ -15,7 +15,8 @@ env.StaticLibrary('base', ['configuration_variable_manager.cpp',
                            'initializer_dependency_graph.cpp',
                            'make_string_vector.cpp',
                            'parse_number.cpp',
-                           'status.cpp'])
+                           'status.cpp',
+                           'string_data.cpp'])
 
 env.CppUnitTest('configuration_variable_manager_test',
                 ['configuration_variable_manager_test.cpp'],
