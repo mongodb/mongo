@@ -60,6 +60,7 @@ namespace mongo {
         static BSONField<std::string> host;
         static BSONField<bool> draining;
         static BSONField<long long> maxSize;
+        static BSONField<BSONArray> tags;
 
         //
         // shard type methods
@@ -116,12 +117,16 @@ namespace mongo {
         void setMaxSize(uint64_t maxSize) { _maxSize = maxSize; }
         uint64_t getMaxSize() const { return _maxSize; }
 
+        void setTags(const BSONArray& tags) { _tags = tags; }
+        BSONArray getTags() const { return _tags; }
+
     private:
         // Convention: (M)andatory, (O)ptional, (S)pecial rule.
         std::string _name;   // (M) shard's id
         std::string _host;   // (M) connection string for the host(s)
         bool _draining;      // (O) is it draining chunks?
         long long _maxSize;  // (O) maximum allowed disk space in MB
+        BSONArray _tags;     // (O) shard tags
     };
 
 }  // namespace mongo

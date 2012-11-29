@@ -29,6 +29,7 @@ namespace mongo {
     BSONField<std::string> ShardType::host("host");
     BSONField<bool> ShardType::draining("draining");
     BSONField<long long> ShardType::maxSize("maxSize");
+    BSONField<BSONArray> ShardType::tags("tags");
 
     ShardType::ShardType() {
         clear();
@@ -62,6 +63,7 @@ namespace mongo {
         if (!_host.empty()) builder.append(host(), _host);
         if (_draining) builder.append(draining(), _draining);
         if (_maxSize > 0) builder.append(maxSize(), _maxSize);
+        if (_tags.nFields()) builder.append(tags(), _tags);
         return builder.obj();
     }
 
@@ -73,6 +75,7 @@ namespace mongo {
         ok &= FieldParser::extract(source, host, "", &_host);
         ok &= FieldParser::extract(source, draining, false, &_draining);
         ok &= FieldParser::extract(source, maxSize, 0LL, &_maxSize);
+        ok &= FieldParser::extract(source, tags, BSONArray(), &_tags);
         if (! ok) {
             clear();
         }
@@ -83,6 +86,7 @@ namespace mongo {
         _host.clear();
         _draining = false;
         _maxSize = 0;
+        _tags = BSONArray();
     }
 
     void ShardType::cloneTo(ShardType* other) {
@@ -91,6 +95,7 @@ namespace mongo {
         other->_host = _host;
         other->_draining = _draining;
         other->_maxSize = _maxSize;
+        other->_tags = _tags;
     }
 
     std::string ShardType::toString() const {

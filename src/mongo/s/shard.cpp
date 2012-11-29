@@ -76,8 +76,8 @@ namespace mongo {
             
             for ( list<BSONObj>::iterator i=all.begin(); i!=all.end(); ++i ) {
                 BSONObj o = *i;
-                string name = o["_id"].String();
-                string host = o["host"].String();
+                string name = o[ ShardFields::name() ].String();
+                string host = o[ ShardFields::host() ].String();
 
                 long long maxSize = 0;
                 BSONElement maxSizeElem = o[ ShardFields::maxSize.name() ];
@@ -93,8 +93,8 @@ namespace mongo {
 
                 ShardPtr s( new Shard( name , host , maxSize , isDraining ) );
 
-                if ( o["tags"].type() == Array ) {
-                    vector<BSONElement> v = o["tags"].Array();
+                if ( o[ ShardFields::tags() ].type() == Array ) {
+                    vector<BSONElement> v = o[ ShardFields::tags() ].Array();
                     for ( unsigned j=0; j<v.size(); j++ ) {
                         s->addTag( v[j].String() );
                     }

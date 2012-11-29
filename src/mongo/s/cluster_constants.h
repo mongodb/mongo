@@ -51,6 +51,7 @@ namespace mongo {
         static BSONField<string> host;       // connection string for the host(s)
         static BSONField<bool> draining;     // is it draining chunks?
         static BSONField<long long> maxSize; // max allowe disk space usage
+        static BSONField<BSONArray> tags;    // shard tags
     };
 
     /**
@@ -131,8 +132,6 @@ namespace mongo {
         // for testing purposes
         static BSONField<bool> waiting;
     };
-
-    // ============  below not yet hooked  ============
 
     /**
      * SettingsFields holds all the field names and types for the settings collection.
