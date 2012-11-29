@@ -99,6 +99,6 @@ namespace mongo {
                         const CollectionManager* oldManager,
                         CollectionManager* manager,
                         string* errMsg);
-   };
+    };
 
 } // namespace mongo
