@@ -8,6 +8,7 @@
 #include "wt_internal.h"
 
 static void __evict_clear_tree_walk(WT_SESSION_IMPL *, WT_PAGE *);
+static void __evict_dirty_validate(WT_CONNECTION_IMPL *conn);
 static int  __evict_file_request(WT_SESSION_IMPL *, int);
 static int  __evict_file_request_walk(WT_SESSION_IMPL *);
 static int  __evict_lru(WT_SESSION_IMPL *);
@@ -280,6 +281,7 @@ __evict_worker(WT_SESSION_IMPL *session)
 		    bytes_max, bytes_inuse, dirty_inuse);
 		WT_RET(__evict_lru(session));
 
+		__evict_dirty_validate(conn);
 		/*
 		 * If we're making progress, keep going; if we're not making
 		 * any progress at all, go back to sleep, it's not something
@@ -858,3 +860,45 @@ __wt_evict_lru_page(WT_SESSION_IMPL *session, int is_app)
 
 	return (ret);
 }
+
+/*
+ * __evict_dirty_validate --
+ *	Walk the cache counting dirty entries so we can validate dirty counts.
+ *	This belongs in eviction, because it's the only time we can safely
+ *	traverse the btree queue without locking.
+ */
+static void
+__evict_dirty_validate(WT_CONNECTION_IMPL *conn)
+{
+#ifdef HAVE_DIAGNOSTIC
+	WT_BTREE *btree;
+	WT_CACHE *cache;
+	WT_DECL_RET;
+	WT_PAGE *page;
+	WT_SESSION_IMPL *session;
+	uint64_t bytes;
+
+	cache = conn->cache;
+	session = conn->default_session;
+	page = NULL;
+	btree = NULL;
+	bytes = 0;
+
+	TAILQ_FOREACH(btree, &conn->btqh, q) {
+		/* Reference the correct WT_BTREE handle. */
+		WT_SET_BTREE_IN_SESSION(session, btree);
+		while ((ret = __wt_tree_walk(
+		    session, &page, WT_TREE_EVICT)) == 0 &&
+		    page != NULL) {
+			if (__wt_page_is_modified(page))
+				bytes += page->memory_footprint;
+		}
+		WT_CLEAR_BTREE_IN_SESSION(session);
+	}
+	if (ret == 0 || ret == WT_NOTFOUND)
+		WT_ASSERT(session, bytes == cache->bytes_dirty);
+#else
+	WT_UNUSED(conn);
+#endif
+}
+

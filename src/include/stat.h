@@ -148,7 +148,6 @@ struct __wt_connection_stats {
 	WT_STATS byte_read;
 	WT_STATS byte_write;
 	WT_STATS cache_bytes_dirty;
-	WT_STATS cache_bytes_dirty_calc;
 	WT_STATS cache_bytes_inuse;
 	WT_STATS cache_bytes_max;
 	WT_STATS cache_evict_hazard;
@@ -157,7 +156,6 @@ struct __wt_connection_stats {
 	WT_STATS cache_evict_slow;
 	WT_STATS cache_evict_unmodified;
 	WT_STATS cache_pages_dirty;
-	WT_STATS cache_pages_dirty_calc;
 	WT_STATS cache_pages_inuse;
 	WT_STATS checkpoint;
 	WT_STATS cond_wait;

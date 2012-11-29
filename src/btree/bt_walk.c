@@ -155,7 +155,7 @@ __wt_tree_walk(WT_SESSION_IMPL *session, WT_PAGE **pagep, uint32_t flags)
 	WT_PAGE *page, *t;
 	WT_REF *ref;
 	uint32_t slot;
-	int compact, discard, eviction, prev, set_read_gen, skip;
+	int cache, compact, discard, eviction, prev, set_read_gen, skip;
 
 	btree = session->btree;
 
@@ -164,6 +164,7 @@ __wt_tree_walk(WT_SESSION_IMPL *session, WT_PAGE **pagep, uint32_t flags)
 
 	compact = LF_ISSET(WT_TREE_COMPACT) ? 1 : 0;
 	eviction = LF_ISSET(WT_TREE_EVICT) ? 1 : 0;
+	cache = LF_ISSET(WT_TREE_CACHE) ? 1 : 0;
 	prev = LF_ISSET(WT_TREE_PREV) ? 1 : 0;
 
 	/*
@@ -241,6 +242,16 @@ descend:	for (;;) {
 				if (!WT_ATOMIC_CAS(ref->state,
 				    WT_REF_MEM, WT_REF_EVICT_WALK))
 					break;
+			} else if (cache) {
+				/*
+				 * Only look at pages that are in memory.
+				 * There is a race here, but worse case is
+				 * that the page will be read back in to cache.
+				 */
+				if (ref->state != WT_REF_MEM)
+					break;
+				/* Grab a hazard reference. */
+				WT_RET(__wt_page_in(session, page, ref));
 			} else if (discard) {
 				/*
 				 * If deleting a range, try to delete the page

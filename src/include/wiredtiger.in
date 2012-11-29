@@ -1013,7 +1013,7 @@ struct __wt_connection {
 	 * default empty.}
 	 * @config{eviction_dirty_target, continue evicting until the cache has
 	 * less dirty pages than this (as a percentage).,an integer between 10
-	 * and 99; default \c 80.}
+	 * and 99; default \c 99.}
 	 * @config{eviction_target, continue evicting until the cache becomes
 	 * less full than this (as a percentage).  Must be less than \c
 	 * eviction_trigger.,an integer between 10 and 99; default \c 80.}
@@ -1206,7 +1206,7 @@ struct __wt_connection {
  * empty.}
  * @config{eviction_dirty_target, continue evicting until the cache has less
  * dirty pages than this (as a percentage).,an integer between 10 and 99;
- * default \c 80.}
+ * default \c 99.}
  * @config{eviction_target, continue evicting until the cache becomes less full
  * than this (as a percentage).  Must be less than \c eviction_trigger.,an
  * integer between 10 and 99; default \c 80.}
@@ -1801,57 +1801,53 @@ extern int wiredtiger_extension_init(WT_SESSION *session,
 #define	WT_STAT_CONN_BYTE_WRITE				3
 /*! cache: tracked dirty bytes in the cache */
 #define	WT_STAT_CONN_CACHE_BYTES_DIRTY			4
-/*! cache: counted dirty bytes in the cache */
-#define	WT_STAT_CONN_CACHE_BYTES_DIRTY_CALC		5
 /*! cache: bytes currently held in the cache */
-#define	WT_STAT_CONN_CACHE_BYTES_INUSE			6
+#define	WT_STAT_CONN_CACHE_BYTES_INUSE			5
 /*! cache: maximum bytes configured */
-#define	WT_STAT_CONN_CACHE_BYTES_MAX			7
+#define	WT_STAT_CONN_CACHE_BYTES_MAX			6
 /*! cache: pages selected for eviction not evicted because of a hazard
  * reference */
-#define	WT_STAT_CONN_CACHE_EVICT_HAZARD			8
+#define	WT_STAT_CONN_CACHE_EVICT_HAZARD			7
 /*! cache: internal pages evicted */
-#define	WT_STAT_CONN_CACHE_EVICT_INTERNAL		9
+#define	WT_STAT_CONN_CACHE_EVICT_INTERNAL		8
 /*! cache: modified pages evicted */
-#define	WT_STAT_CONN_CACHE_EVICT_MODIFIED		10
+#define	WT_STAT_CONN_CACHE_EVICT_MODIFIED		9
 /*! cache: eviction server unable to reach eviction goal */
-#define	WT_STAT_CONN_CACHE_EVICT_SLOW			11
+#define	WT_STAT_CONN_CACHE_EVICT_SLOW			10
 /*! cache: unmodified pages evicted */
-#define	WT_STAT_CONN_CACHE_EVICT_UNMODIFIED		12
+#define	WT_STAT_CONN_CACHE_EVICT_UNMODIFIED		11
 /*! cache: tracked dirty pages in the cache */
-#define	WT_STAT_CONN_CACHE_PAGES_DIRTY			13
-/*! cache: counted dirty pages in the cache */
-#define	WT_STAT_CONN_CACHE_PAGES_DIRTY_CALC		14
+#define	WT_STAT_CONN_CACHE_PAGES_DIRTY			12
 /*! cache: pages currently held in the cache */
-#define	WT_STAT_CONN_CACHE_PAGES_INUSE			15
+#define	WT_STAT_CONN_CACHE_PAGES_INUSE			13
 /*! checkpoints */
-#define	WT_STAT_CONN_CHECKPOINT				16
+#define	WT_STAT_CONN_CHECKPOINT				14
 /*! condition wait calls */
-#define	WT_STAT_CONN_COND_WAIT				17
+#define	WT_STAT_CONN_COND_WAIT				15
 /*! files currently open */
-#define	WT_STAT_CONN_FILE_OPEN				18
+#define	WT_STAT_CONN_FILE_OPEN				16
 /*! total memory allocations */
-#define	WT_STAT_CONN_MEMALLOC				19
+#define	WT_STAT_CONN_MEMALLOC				17
 /*! total memory frees */
-#define	WT_STAT_CONN_MEMFREE				20
+#define	WT_STAT_CONN_MEMFREE				18
 /*! rwlock readlock calls */
-#define	WT_STAT_CONN_RWLOCK_RDLOCK			21
+#define	WT_STAT_CONN_RWLOCK_RDLOCK			19
 /*! rwlock writelock calls */
-#define	WT_STAT_CONN_RWLOCK_WRLOCK			22
+#define	WT_STAT_CONN_RWLOCK_WRLOCK			20
 /*! total read I/Os */
-#define	WT_STAT_CONN_TOTAL_READ_IO			23
+#define	WT_STAT_CONN_TOTAL_READ_IO			21
 /*! total write I/Os */
-#define	WT_STAT_CONN_TOTAL_WRITE_IO			24
+#define	WT_STAT_CONN_TOTAL_WRITE_IO			22
 /*! ancient transactions */
-#define	WT_STAT_CONN_TXN_ANCIENT			25
+#define	WT_STAT_CONN_TXN_ANCIENT			23
 /*! transactions */
-#define	WT_STAT_CONN_TXN_BEGIN				26
+#define	WT_STAT_CONN_TXN_BEGIN				24
 /*! transactions committed */
-#define	WT_STAT_CONN_TXN_COMMIT				27
+#define	WT_STAT_CONN_TXN_COMMIT				25
 /*! transaction failures due to cache overflow */
-#define	WT_STAT_CONN_TXN_FAIL_CACHE			28
+#define	WT_STAT_CONN_TXN_FAIL_CACHE			26
 /*! transactions rolled-back */
-#define	WT_STAT_CONN_TXN_ROLLBACK			29
+#define	WT_STAT_CONN_TXN_ROLLBACK			27
 
 /*!
  * @}

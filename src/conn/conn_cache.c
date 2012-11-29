@@ -7,8 +7,6 @@
 
 #include "wt_internal.h"
 
-static void __cache_stats_traverse(WT_CONNECTION_IMPL *conn);
-
 /*
  * __wt_cache_config --
  *	Configure the underlying cache.
@@ -107,6 +105,7 @@ __wt_cache_stats_update(WT_CONNECTION_IMPL *conn, uint32_t flags)
 {
 	WT_CACHE *cache;
 
+	WT_UNUSED(flags);
 	cache = conn->cache;
 
 	WT_STAT_SET(conn->stats, cache_bytes_max, conn->cache_size);
@@ -118,48 +117,6 @@ __wt_cache_stats_update(WT_CONNECTION_IMPL *conn, uint32_t flags)
 	    conn->stats, cache_bytes_dirty, __wt_cache_dirty_bytes(cache));
 	WT_STAT_SET(
 	    conn->stats, cache_pages_dirty, cache->pages_dirty);
-
-	if (!LF_ISSET(WT_STATISTICS_FAST))
-		__cache_stats_traverse(conn);
-}
-
-/*
- * __cache_stats_traverse --
- *	Generate statistics that require traversing the cache.
- */
-static void
-__cache_stats_traverse(WT_CONNECTION_IMPL *conn)
-{
-	WT_BTREE *btree;
-	WT_CACHE *cache;
-	WT_DECL_RET;
-	WT_PAGE *page;
-	WT_SESSION_IMPL *session;
-
-	cache = conn->cache;
-	session = conn->default_session;
-	page = NULL;
-	btree = NULL;
-
-	WT_STAT_SET(conn->stats, cache_bytes_dirty_calc, 0);
-	WT_STAT_SET(conn->stats, cache_pages_dirty_calc, 0);
-
-	TAILQ_FOREACH(btree, &conn->btqh, q) {
-		/* Reference the correct WT_BTREE handle. */
-		WT_SET_BTREE_IN_SESSION(session, btree);
-		while ((ret = __wt_tree_walk(
-		    session, &page, WT_TREE_EVICT)) == 0 &&
-		    page != NULL) {
-			if (__wt_page_is_modified(page)) {
-				WT_STAT_INCRV(conn->stats,
-				    cache_bytes_dirty_calc,
-				    page->memory_footprint);
-				WT_STAT_INCRV(conn->stats,
-				    cache_pages_dirty_calc, 1);
-			}
-		}
-		WT_CLEAR_BTREE_IN_SESSION(session);
-	}
 }
 
 /*

@@ -76,7 +76,7 @@ static CONFIG c[] = {
 
 	{ "cache",
 	  "size of the cache in MB",
-	  0, 0, 1, 500, &g.c_cache, NULL },
+	  0, 0, 1, 100, &g.c_cache, NULL },
 
 	{ "compression",
 	  "type of compression (none | bzip | raw | snappy)",

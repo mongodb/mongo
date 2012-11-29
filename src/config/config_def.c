@@ -84,7 +84,7 @@ __wt_confchk_connection_open_session[] = {
 
 const char *
 __wt_confdfl_connection_reconfigure =
-	"cache_size=100MB,error_prefix=,eviction_dirty_target=80,"
+	"cache_size=100MB,error_prefix=,eviction_dirty_target=99,"
 	"eviction_target=80,eviction_trigger=95,shared_cache=(chunk=10MB,"
 	"min=50MB,name=,size=500MB),verbose=";
 
@@ -429,7 +429,7 @@ __wt_confchk_table_meta[] = {
 const char *
 __wt_confdfl_wiredtiger_open =
 	"buffer_alignment=-1,cache_size=100MB,create=0,direct_io=,"
-	"error_prefix=,eviction_dirty_target=80,eviction_target=80,"
+	"error_prefix=,eviction_dirty_target=99,eviction_target=80,"
 	"eviction_trigger=95,extensions=,hazard_max=1000,logging=0,lsm_merge="
 	",multiprocess=0,session_max=50,shared_cache=(chunk=10MB,min=50MB,"
 	"name=,size=500MB),sync=,transactional=,use_environment_priv=0,"
