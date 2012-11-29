@@ -151,7 +151,7 @@ class test_backup(wttest.WiredTigerTestCase, suite_subprocess):
         while True:
             ret = cursor.next()
             if ret != 0:
-                break;
+                break
             i += 1
         self.assertEqual(ret, wiredtiger.WT_NOTFOUND)
         total = i * 2
@@ -159,7 +159,7 @@ class test_backup(wttest.WiredTigerTestCase, suite_subprocess):
         while True:
             ret = cursor.next()
             if ret != 0:
-                break;
+                break
             i += 1
         self.assertEqual(ret, wiredtiger.WT_NOTFOUND)
         self.assertEqual(i, total)

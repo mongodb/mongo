@@ -101,3 +101,9 @@ test -s $t && {
 	echo '[tab] characters appear in test suite scripts:'
 	cat $t
 }
+# Check for trailing semi-colons.
+egrep ';$' test/suite/*.py > $t
+test -s $t && {
+	echo 'trailing semi-colon characters appear in test suite scripts:'
+	cat $t
+}

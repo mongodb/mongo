@@ -60,7 +60,7 @@ class test_overwrite(wttest.WiredTigerTestCase):
         self.assertRaises(wiredtiger.WiredTigerError, lambda: cursor.insert())
 
         cursor.set_key(key_populate(cursor, 10))
-        dupc = self.session.open_cursor(None, cursor, "overwrite");
+        dupc = self.session.open_cursor(None, cursor, "overwrite")
         dupc.set_value('XXXXXXXXXX')
         dupc.insert()
 

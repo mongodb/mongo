@@ -233,7 +233,7 @@ table_only_meta = [
 
 colgroup_meta = column_meta + source_meta
 
-index_meta = column_meta + format_meta + source_meta
+index_meta = format_meta + source_meta
 
 table_meta = format_meta + table_only_meta
 
@@ -321,7 +321,7 @@ methods = {
 		min='10', max='50'),
 ]),
 
-'session.create' : Method(table_meta + file_config + source_meta + [
+'session.create' : Method(table_only_meta + file_config + source_meta + [
 	Config('exclusive', 'false', r'''
 		fail if the object exists.  When false (the default), if the
 		object exists, check that its settings match the specified
