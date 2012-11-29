@@ -46,11 +46,7 @@ namespace mutablebson {
             : fieldName_(fieldName) {}
 
         bool operator()(const Element& element) const {
-            // TODO: This is inefficient since Element is constructing
-            // a std::string to return the fieldName. The Element API
-            // should be improved to provide efficient access to field
-            // names.
-            return (StringData(element.fieldName()) == fieldName_);
+            return (fieldName_ == element.getFieldName());
         }
 
     private:

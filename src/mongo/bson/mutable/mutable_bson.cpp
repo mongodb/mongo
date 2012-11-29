@@ -61,13 +61,8 @@ namespace mutablebson {
         return SiblingIterator(leftChild());
     }
 
-    std::string Element::fieldName() const {
+    StringData Element::getFieldName() const {
         return _doc->getHeap()->getString(_doc->_elements->_vec[_rep]._nameref);
-    }
-
-    /** Needs optimization to avoid allocating a string. (aaron) */
-    int Element::fieldNameSize() const {
-        return _doc->getHeap()->getString(_doc->_elements->_vec[_rep]._nameref).size();
     }
 
     //

@@ -146,30 +146,33 @@ namespace mutablebson {
     //
 
     void BSONBuilder::buildFromElement(Element src, BSONObjBuilder* dst) {
+
+        const StringData srcFieldName = src.getFieldName();
+
         switch (src.type()) {
         case MinKey: {
-            dst->appendMinKey(src.fieldName());
+            dst->appendMinKey(srcFieldName);
             break;
         }
         case EOO: {
             break;
         }
         case NumberDouble: {
-            dst->appendNumber(src.fieldName(), src.getDoubleValue());
+            dst->appendNumber(srcFieldName, src.getDoubleValue());
             break;
         }
         case String: {
-            dst->append(src.fieldName(), src.getStringValue());
+            dst->append(srcFieldName, src.getStringValue());
             break;
         }
         case Object: {
-            BSONObjBuilder subBuilder(dst->subobjStart(src.fieldName()));
+            BSONObjBuilder subBuilder(dst->subobjStart(srcFieldName));
             BSONBuilder::build(src, &subBuilder);
             subBuilder.doneFast();
             break;
         }
         case Array: {
-            BSONObjBuilder subBuilder(dst->subarrayStart(src.fieldName()));
+            BSONObjBuilder subBuilder(dst->subarrayStart(srcFieldName));
             SiblingIterator arrayIt = src.children();
             for (uint32_t n=0; !arrayIt.done(); ++arrayIt,++n) {
                 Element e0 = *arrayIt;
@@ -183,28 +186,28 @@ namespace mutablebson {
         case BinData: {
             uint32_t len(0);
             BinDataType subType(mongo::BinDataGeneral);
-            dst->appendBinData(src.fieldName(), len, subType, src.getStringValue());
+            dst->appendBinData(srcFieldName, len, subType, src.getStringValue());
             break;
         }
         case Undefined: {
-            dst->appendUndefined(src.fieldName());
+            dst->appendUndefined(srcFieldName);
             break;
         }
         case jstOID: {
             OID oid = src.getOIDValue();
-            dst->appendOID(src.fieldName(), &oid);
+            dst->appendOID(srcFieldName, &oid);
             break;
         }
         case Bool: {
-            dst->appendBool(src.fieldName(), src.getBoolValue());
+            dst->appendBool(srcFieldName, src.getBoolValue());
             break;
         }
         case Date: {
-            dst->appendDate(src.fieldName(), src.getDateValue());
+            dst->appendDate(srcFieldName, src.getDateValue());
             break;
         }
         case jstNULL: {
-            dst->appendNull(src.fieldName());
+            dst->appendNull(srcFieldName);
             break;
         }
         case RegEx: {
@@ -218,7 +221,7 @@ namespace mutablebson {
             if (err.code() != ErrorCodes::OK) {
                 break;
             }
-            dst->appendRegex(src.fieldName(), re, flags);
+            dst->appendRegex(srcFieldName, re, flags);
             break;
         }
         case DBRef: {
@@ -233,16 +236,16 @@ namespace mutablebson {
                 break;
             }
             mongo::OID oid(oidStr);
-            dst->appendDBRef(src.fieldName(), ns, oid);
+            dst->appendDBRef(srcFieldName, ns, oid);
             break;
         }
 
         case Code: {
-            dst->appendCode(src.fieldName(), src.getStringValue());
+            dst->appendCode(srcFieldName, src.getStringValue());
             break;
         }
         case Symbol: {
-            dst->appendSymbol(src.fieldName(), src.getStringValue());
+            dst->appendSymbol(srcFieldName, src.getStringValue());
             break;
         }
         case CodeWScope: {
@@ -261,19 +264,19 @@ namespace mutablebson {
         }
 
         case NumberInt: {
-            dst->appendNumber(src.fieldName(), src.getIntValue());
+            dst->appendNumber(srcFieldName, src.getIntValue());
             break;
         }
         case Timestamp: {
-            dst->appendTimeT(src.fieldName(), src.getLongValue());
+            dst->appendTimeT(srcFieldName, src.getLongValue());
             break;
         }
         case NumberLong: {
-            dst->appendNumber(src.fieldName(), static_cast<long long>(src.getLongValue()));
+            dst->appendNumber(srcFieldName, static_cast<long long>(src.getLongValue()));
             break;
         }
         case MaxKey: {
-            dst->appendMaxKey(src.fieldName());
+            dst->appendMaxKey(srcFieldName);
             break;
         }
         default: {

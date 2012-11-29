@@ -209,8 +209,7 @@ namespace mutablebson {
         uint32_t getRep() const { return _rep; };
         Document* getDocument() const { return _doc; }
 
-        std::string fieldName() const;
-        int fieldNameSize() const;
+        StringData getFieldName() const;
 
     private:
         inline Status checkSubtreeIsClean(Element e);

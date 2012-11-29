@@ -67,7 +67,7 @@ namespace {
         SiblingIterator next = findElementNamed(children, "t");
         ASSERT_FALSE(next.done());
         ASSERT_EQUALS(children.getDocument(), next.getDocument());
-        ASSERT_EQUALS((*next).fieldName(), "t");
+        ASSERT_EQUALS((*next).getFieldName(), "t");
         next = findElementNamed(++next, "t");
         ASSERT_TRUE(next.done());
         ASSERT_EQUALS(children.getDocument(), next.getDocument());
@@ -91,7 +91,7 @@ namespace {
         ASSERT_FALSE(children.done());
         SiblingIterator next = findElementNamed(children, kName);
         ASSERT_FALSE(next.done());
-        ASSERT_EQUALS((*next).fieldName(), kName);
+        ASSERT_EQUALS((*next).getFieldName(), kName);
         ASSERT_EQUALS(children.getDocument(), next.getDocument());
         ASSERT_TRUE(findElementNamed(++next, kName).done());
     }
@@ -102,7 +102,7 @@ namespace {
         ASSERT_FALSE(children.done());
         SiblingIterator next = findElementNamed(children, kName);
         ASSERT_FALSE(next.done());
-        ASSERT_EQUALS((*next).fieldName(), kName);
+        ASSERT_EQUALS((*next).getFieldName(), kName);
         ASSERT_EQUALS(children.getDocument(), next.getDocument());
         ASSERT_TRUE(findElementNamed(++next, kName).done());
     }
@@ -113,7 +113,7 @@ namespace {
         ASSERT_FALSE(children.done());
         SiblingIterator next = findElementNamed(children, kName);
         ASSERT_FALSE(next.done());
-        ASSERT_EQUALS((*next).fieldName(), kName);
+        ASSERT_EQUALS((*next).getFieldName(), kName);
         ASSERT_EQUALS(children.getDocument(), next.getDocument());
         ASSERT_TRUE(findElementNamed(++next, kName).done());
     }
@@ -124,7 +124,7 @@ namespace {
         ASSERT_FALSE(children.done());
         SiblingIterator first = findElementNamed(children, kName);
         ASSERT_FALSE(first.done());
-        ASSERT_EQUALS((*first).fieldName(), kName);
+        ASSERT_EQUALS((*first).getFieldName(), kName);
         ASSERT_EQUALS(children.getDocument(), first.getDocument());
         SiblingIterator second = findElementNamed(++SiblingIterator(first), kName);
         ASSERT_FALSE(second.done());
@@ -140,7 +140,7 @@ namespace {
         ASSERT_FALSE(children.done());
         SiblingIterator first = findElementNamed(children, kName);
         ASSERT_FALSE(first.done());
-        ASSERT_EQUALS((*first).fieldName(), kName);
+        ASSERT_EQUALS((*first).getFieldName(), kName);
         ASSERT_EQUALS(children.getDocument(), first.getDocument());
         SiblingIterator second = findElementNamed(++SiblingIterator(first), kName);
         ASSERT_FALSE(second.done());

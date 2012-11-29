@@ -58,23 +58,23 @@ namespace {
         ASSERT_EQUALS(e3.addChild(e4), mongo::Status::OK());
         ASSERT_EQUALS(e3.addChild(e5), mongo::Status::OK());
 
-        ASSERT_EQUALS("e0", e0.fieldName());
-        ASSERT_EQUALS("e1", e0.leftChild().fieldName());
-        ASSERT_EQUALS("e2", e0.rightChild().fieldName());
-        ASSERT_EQUALS("e0", e1.parent().fieldName());
-        ASSERT_EQUALS("e0", e2.parent().fieldName());
-        ASSERT_EQUALS("e2", e1.rightSibling().fieldName());
-        ASSERT_EQUALS("e1", e2.leftSibling().fieldName());
-        ASSERT_EQUALS("e3", e2.leftChild().fieldName());
-        ASSERT_EQUALS("e3", e2.rightChild().fieldName());
+        ASSERT_EQUALS("e0", e0.getFieldName());
+        ASSERT_EQUALS("e1", e0.leftChild().getFieldName());
+        ASSERT_EQUALS("e2", e0.rightChild().getFieldName());
+        ASSERT_EQUALS("e0", e1.parent().getFieldName());
+        ASSERT_EQUALS("e0", e2.parent().getFieldName());
+        ASSERT_EQUALS("e2", e1.rightSibling().getFieldName());
+        ASSERT_EQUALS("e1", e2.leftSibling().getFieldName());
+        ASSERT_EQUALS("e3", e2.leftChild().getFieldName());
+        ASSERT_EQUALS("e3", e2.rightChild().getFieldName());
 
-        ASSERT_EQUALS("e2", e3.parent().fieldName());
-        ASSERT_EQUALS("e4", e3.leftChild().fieldName());
-        ASSERT_EQUALS("e5", e3.rightChild().fieldName());
-        ASSERT_EQUALS("e4", e5.leftSibling().fieldName());
-        ASSERT_EQUALS("e5", e4.rightSibling().fieldName());
-        ASSERT_EQUALS("e3", e4.parent().fieldName());
-        ASSERT_EQUALS("e3", e5.parent().fieldName());
+        ASSERT_EQUALS("e2", e3.parent().getFieldName());
+        ASSERT_EQUALS("e4", e3.leftChild().getFieldName());
+        ASSERT_EQUALS("e5", e3.rightChild().getFieldName());
+        ASSERT_EQUALS("e4", e5.leftSibling().getFieldName());
+        ASSERT_EQUALS("e5", e4.rightSibling().getFieldName());
+        ASSERT_EQUALS("e3", e4.parent().getFieldName());
+        ASSERT_EQUALS("e3", e5.parent().getFieldName());
     }
 
     TEST(TopologyBuilding, AddSiblingAfter) {
@@ -102,11 +102,11 @@ namespace {
         ASSERT_EQUALS(e2.addChild(e3), mongo::Status::OK());
         ASSERT_EQUALS(e3.addSiblingAfter(e4), mongo::Status::OK());
 
-        ASSERT_EQUALS("e4", e3.rightSibling().fieldName());
-        ASSERT_EQUALS("e3", e4.leftSibling().fieldName());
-        ASSERT_EQUALS("e2", e4.parent().fieldName());
-        ASSERT_EQUALS("e3", e2.leftChild().fieldName());
-        ASSERT_EQUALS("e4", e2.rightChild().fieldName());
+        ASSERT_EQUALS("e4", e3.rightSibling().getFieldName());
+        ASSERT_EQUALS("e3", e4.leftSibling().getFieldName());
+        ASSERT_EQUALS("e2", e4.parent().getFieldName());
+        ASSERT_EQUALS("e3", e2.leftChild().getFieldName());
+        ASSERT_EQUALS("e4", e2.rightChild().getFieldName());
     }
 
     TEST(TopologyBuilding, AddSiblingBefore) {
@@ -136,16 +136,16 @@ namespace {
         ASSERT_EQUALS(e5.addSiblingAfter(e6), mongo::Status::OK());
         ASSERT_EQUALS(e5.addSiblingBefore(e7), mongo::Status::OK());
 
-        ASSERT_EQUALS("e5", e7.rightSibling().fieldName());
-        ASSERT_EQUALS("e7", e5.leftSibling().fieldName());
-        ASSERT_EQUALS("e6", e5.rightSibling().fieldName());
-        ASSERT_EQUALS("e5", e6.leftSibling().fieldName());
+        ASSERT_EQUALS("e5", e7.rightSibling().getFieldName());
+        ASSERT_EQUALS("e7", e5.leftSibling().getFieldName());
+        ASSERT_EQUALS("e6", e5.rightSibling().getFieldName());
+        ASSERT_EQUALS("e5", e6.leftSibling().getFieldName());
 
-        ASSERT_EQUALS("e3", e5.parent().fieldName());
-        ASSERT_EQUALS("e3", e6.parent().fieldName());
-        ASSERT_EQUALS("e3", e7.parent().fieldName());
-        ASSERT_EQUALS("e7", e3.leftChild().fieldName());
-        ASSERT_EQUALS("e6", e3.rightChild().fieldName());
+        ASSERT_EQUALS("e3", e5.parent().getFieldName());
+        ASSERT_EQUALS("e3", e6.parent().getFieldName());
+        ASSERT_EQUALS("e3", e7.parent().getFieldName());
+        ASSERT_EQUALS("e7", e3.leftChild().getFieldName());
+        ASSERT_EQUALS("e6", e3.rightChild().getFieldName());
     }
 
     TEST(TopologyBuilding, AddSubtreeBottomUp) {
@@ -179,15 +179,15 @@ namespace {
         ASSERT_EQUALS(e8.addChild(e10), mongo::Status::OK());
         ASSERT_EQUALS(e5.addChild(e8), mongo::Status::OK());
 
-        ASSERT_EQUALS("e8", e9.parent().fieldName());
-        ASSERT_EQUALS("e8", e10.parent().fieldName());
-        ASSERT_EQUALS("e9", e8.leftChild().fieldName());
-        ASSERT_EQUALS("e10", e8.rightChild().fieldName());
-        ASSERT_EQUALS("e9", e10.leftSibling().fieldName());
-        ASSERT_EQUALS("e10", e9.rightSibling().fieldName());
-        ASSERT_EQUALS("e5", e8.parent().fieldName());
-        ASSERT_EQUALS("e8", e5.leftChild().fieldName());
-        ASSERT_EQUALS("e8", e5.rightChild().fieldName());
+        ASSERT_EQUALS("e8", e9.parent().getFieldName());
+        ASSERT_EQUALS("e8", e10.parent().getFieldName());
+        ASSERT_EQUALS("e9", e8.leftChild().getFieldName());
+        ASSERT_EQUALS("e10", e8.rightChild().getFieldName());
+        ASSERT_EQUALS("e9", e10.leftSibling().getFieldName());
+        ASSERT_EQUALS("e10", e9.rightSibling().getFieldName());
+        ASSERT_EQUALS("e5", e8.parent().getFieldName());
+        ASSERT_EQUALS("e8", e5.leftChild().getFieldName());
+        ASSERT_EQUALS("e8", e5.rightChild().getFieldName());
     }
 
     TEST(TopologyBuilding, RemoveLeafNode) {
@@ -208,8 +208,8 @@ namespace {
         ASSERT_EQUALS(e0.addChild(e2), mongo::Status::OK());
         ASSERT_EQUALS(e1.remove(), mongo::Status::OK());
 
-        ASSERT_EQUALS("e2", e0.leftChild().fieldName());
-        ASSERT_EQUALS("e2", e0.rightChild().fieldName());
+        ASSERT_EQUALS("e2", e0.leftChild().getFieldName());
+        ASSERT_EQUALS("e2", e0.rightChild().getFieldName());
     }
 
     TEST(TopologyBuilding, RemoveSubtree) {
@@ -245,10 +245,10 @@ namespace {
         ASSERT_EQUALS(e5.addChild(e8), mongo::Status::OK());
         ASSERT_EQUALS(e5.remove(), mongo::Status::OK());
 
-        ASSERT_EQUALS("e3", e4.parent().fieldName());
-        ASSERT_EQUALS("e3", e6.parent().fieldName());
-        ASSERT_EQUALS("e4", e3.leftChild().fieldName());
-        ASSERT_EQUALS("e6", e3.rightChild().fieldName());
+        ASSERT_EQUALS("e3", e4.parent().getFieldName());
+        ASSERT_EQUALS("e3", e6.parent().getFieldName());
+        ASSERT_EQUALS("e4", e3.leftChild().getFieldName());
+        ASSERT_EQUALS("e6", e3.rightChild().getFieldName());
     }
 
     TEST(TopologyBuilding, RenameNode) {
@@ -271,7 +271,7 @@ namespace {
         ASSERT_EQUALS(e0.addChild(e2), mongo::Status::OK());
         ASSERT_EQUALS(e0.rename("f0"), mongo::Status::OK());
 
-        ASSERT_EQUALS("f0", e0.fieldName());
+        ASSERT_EQUALS("f0", e0.getFieldName());
     }
 
     TEST(TopologyBuilding, MoveNode) {
@@ -304,28 +304,28 @@ namespace {
         ASSERT_EQUALS(e3.addChild(e4), mongo::Status::OK());
         ASSERT_EQUALS(e3.addChild(e5), mongo::Status::OK());
 
-        ASSERT_EQUALS("e0", e0.fieldName());
-        ASSERT_EQUALS("e1", e0.leftChild().fieldName());
-        ASSERT_EQUALS("e2", e0.rightChild().fieldName());
-        ASSERT_EQUALS("e0", e1.parent().fieldName());
-        ASSERT_EQUALS("e0", e2.parent().fieldName());
-        ASSERT_EQUALS("e2", e1.rightSibling().fieldName());
-        ASSERT_EQUALS("e1", e2.leftSibling().fieldName());
-        ASSERT_EQUALS("e3", e2.leftChild().fieldName());
-        ASSERT_EQUALS("e3", e2.rightChild().fieldName());
-        ASSERT_EQUALS("e4", e3.leftChild().fieldName());
-        ASSERT_EQUALS("e5", e3.rightChild().fieldName());
-        ASSERT_EQUALS("e5", e4.rightSibling().fieldName());
-        ASSERT_EQUALS("e4", e5.leftSibling().fieldName());
+        ASSERT_EQUALS("e0", e0.getFieldName());
+        ASSERT_EQUALS("e1", e0.leftChild().getFieldName());
+        ASSERT_EQUALS("e2", e0.rightChild().getFieldName());
+        ASSERT_EQUALS("e0", e1.parent().getFieldName());
+        ASSERT_EQUALS("e0", e2.parent().getFieldName());
+        ASSERT_EQUALS("e2", e1.rightSibling().getFieldName());
+        ASSERT_EQUALS("e1", e2.leftSibling().getFieldName());
+        ASSERT_EQUALS("e3", e2.leftChild().getFieldName());
+        ASSERT_EQUALS("e3", e2.rightChild().getFieldName());
+        ASSERT_EQUALS("e4", e3.leftChild().getFieldName());
+        ASSERT_EQUALS("e5", e3.rightChild().getFieldName());
+        ASSERT_EQUALS("e5", e4.rightSibling().getFieldName());
+        ASSERT_EQUALS("e4", e5.leftSibling().getFieldName());
         ASSERT_EQUALS(e3.move(e0), mongo::Status::OK());
 
-        ASSERT_EQUALS("e0", e3.parent().fieldName());
-        ASSERT_EQUALS("e1", e0.leftChild().fieldName());
-        ASSERT_EQUALS("e3", e0.rightChild().fieldName());
-        ASSERT_EQUALS("e3", e2.rightSibling().fieldName());
-        ASSERT_EQUALS("e2", e3.leftSibling().fieldName());
-        ASSERT_EQUALS("e4", e3.leftChild().fieldName());
-        ASSERT_EQUALS("e5", e3.rightChild().fieldName());
+        ASSERT_EQUALS("e0", e3.parent().getFieldName());
+        ASSERT_EQUALS("e1", e0.leftChild().getFieldName());
+        ASSERT_EQUALS("e3", e0.rightChild().getFieldName());
+        ASSERT_EQUALS("e3", e2.rightSibling().getFieldName());
+        ASSERT_EQUALS("e2", e3.leftSibling().getFieldName());
+        ASSERT_EQUALS("e4", e3.leftChild().getFieldName());
+        ASSERT_EQUALS("e5", e3.rightChild().getFieldName());
     }
 
     TEST(ArrayAPI, SimpleNumericArray) {
