@@ -870,14 +870,30 @@ DB.prototype.printReplicationInfo = function() {
 }
 
 DB.prototype.printSlaveReplicationInfo = function() {
+    var startOptimeDate = null;
+
     function getReplLag(st) {
-        var now = new Date();
+        assert( startOptimeDate , "how could this be null (getReplLag startOptimeDate)" );
         print("\t syncedTo: " + st.toString() );
-        var ago = (now-st)/1000;
+        var ago = (startOptimeDate-st)/1000;
         var hrs = Math.round(ago/36)/100;
         print("\t\t = " + Math.round(ago) + " secs ago (" + hrs + "hrs)");
     };
-    
+
+    function getMaster(members) {
+        var found;
+        members.forEach(function(row) {
+            if (row.self) {
+                found = row;
+                return false;
+            }
+        });
+
+        if (found) {
+            return found;
+        }
+    };
+
     function g(x) {
         assert( x , "how could this be null (printSlaveReplicationInfo gx)" )
         print("source:   " + x.host);
@@ -909,9 +925,11 @@ DB.prototype.printSlaveReplicationInfo = function() {
 
     if (L.system.replset.count() != 0) {
         var status = this.adminCommand({'replSetGetStatus' : 1});
+        startOptimeDate = getMaster(status.members).optimeDate; 
         status.members.forEach(r);
     }
     else if( L.sources.count() != 0 ) {
+        startOptimeDate = new Date();
         L.sources.find().forEach(g);
     }
     else {
