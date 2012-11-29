@@ -203,11 +203,11 @@ enum SearchStatus { FOUND, NOTFOUND, SMALLER, LARGER };
 		return $self->update($self);
 	}
 
-	bool compare_wrap(JNIEnv *jenv, WT_CURSOR *other) {
+	int compare_wrap(JNIEnv *jenv, WT_CURSOR *other) {
 		int cmp, ret = $self->compare($self, other, &cmp);
 		if (ret != 0)
 			throwDbException(jenv, wiredtiger_strerror(ret));
-		return (bool)cmp;
+		return cmp;
 	}
 }
 
@@ -241,6 +241,10 @@ enum SearchStatus { FOUND, NOTFOUND, SMALLER, LARGER };
 
 	public int remove() {
 		return remove_wrap(key);
+	}
+
+	public int compare(Cursor other) {
+		return compare_wrap(other);
 	}
 
 	public int next() {
