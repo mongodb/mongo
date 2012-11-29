@@ -875,7 +875,11 @@ namespace mongo {
         public:
             MoveChunkCmd() : GridAdminCmd( "moveChunk" ) {}
             virtual void help( stringstream& help ) const {
-                help << "{ movechunk : 'test.foo' , find : { num : 1 } , to : 'localhost:30001' }";
+                help << "Example: move chunk that contains the doc {num : 7} to shard001\n"
+                     << "  { movechunk : 'test.foo' , find : { num : 7 } , to : 'shard0001' }\n"
+                     << "Example: move chunk with lower bound 0 and upper bound 10 to shard001\n"
+                     << "  { movechunk : 'test.foo' , bounds : [ { num : 0 } , { num : 10 } ] "
+                     << " , to : 'shard001' }\n";
             }
             virtual void addRequiredPrivileges(const std::string& dbname,
                                                const BSONObj& cmdObj,
@@ -911,12 +915,6 @@ namespace mongo {
                     }
                 }
 
-                BSONObj find = cmdObj.getObjectField( "find" );
-                if ( find.isEmpty() ) {
-                    errmsg = "need to specify find.  see help";
-                    return false;
-                }
-
                 string toString = cmdObj["to"].valuestrsafe();
                 if ( ! toString.size()  ) {
                     errmsg = "you have to specify where you want to move the chunk";
@@ -931,16 +929,34 @@ namespace mongo {
                     maxChunkSizeBytes = Chunk::MaxChunkSize;
                 }
 
-                tlog() << "CMD: movechunk: " << cmdObj << endl;
+                BSONObj find = cmdObj.getObjectField( "find" );
+                BSONObj bounds = cmdObj.getObjectField( "bounds" );
+
+                // check that only one of the two chunk specification methods is used
+                if ( find.isEmpty() == bounds.isEmpty() ) {
+                    errmsg = "need to specify either a find query, or both lower and upper bounds.";
+                    return false;
+                }
 
                 ChunkManagerPtr info = config->getChunkManager( ns );
-                ChunkPtr c = info->findChunkForDoc( find );
+                ChunkPtr c = find.isEmpty() ?
+                                info->findIntersectingChunk( bounds[0].Obj() ) :
+                                info->findChunkForDoc( find );
+
+                if ( ! bounds.isEmpty() && ( c->getMin() != bounds[0].Obj() ||
+                                             c->getMax() != bounds[1].Obj() ) ) {
+                    errmsg = "no chunk found with those upper and lower bounds";
+                    return false;
+                }
+
                 const Shard& from = c->getShard();
 
                 if ( from == to ) {
                     errmsg = "that chunk is already on that shard";
                     return false;
                 }
+
+                tlog() << "CMD: movechunk: " << cmdObj << endl;
 
                 BSONObj res;
                 if ( ! c->moveAndCommit( to , maxChunkSizeBytes , cmdObj["_secondaryThrottle"].trueValue() , res ) ) {
