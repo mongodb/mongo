@@ -226,7 +226,10 @@ namespace mongo {
                 _radiusIncrement *= 2;
                 nextAnnulus();
             }
-        } while (_results.empty() && _innerRadius < M_PI  * _params.radius);
+        } while (_results.empty()
+                 && _innerRadius < _maxDistance
+                 && _innerRadius < _outerRadius
+                 && _innerRadius < M_PI  * _params.radius);
         // TODO: consider shrinking _radiusIncrement if _results.size() meets some criteria.
     }
 }  // namespace mongo
