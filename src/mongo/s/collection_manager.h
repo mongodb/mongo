@@ -16,8 +16,6 @@
 
 #pragma once
 
-#include <boost/function.hpp>
-
 #include "mongo/base/disallow_copying.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/s/type_chunk.h"
@@ -33,9 +31,9 @@ namespace mongo {
      * document belongs to it or not. (In some scenarios such as chunk migration, a given
      * document is in a shard but cannot be accessed.)
      *
-     * To build a collection from config data, please check ConfigReader. The methods here
-     * allow building a new incarnation of a collection's metadata based on an existing one
-     * (e.g, we're splitting in a given collection.).
+     * To build a collection from config data, please check the MetadataLoader. The methods
+     * here allow building a new incarnation of a collection's metadata based on an existing
+     * one (e.g, we're splitting in a given collection.).
      *
      * This class is immutable once constructed.
      */
@@ -150,8 +148,8 @@ namespace mongo {
         RangeMap _rangesMap;
 
         /**
-         * Use the ConfigReader to build new managers using config server data, or the clone*()
-         * methods to use existing managers to build new ones.
+         * Use the MetadataLoader to build new managers using config server data, or the
+         * clone*() methods to use existing managers to build new ones.
          */
         CollectionManager();
 
