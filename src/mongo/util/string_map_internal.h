@@ -31,9 +31,9 @@ namespace mongo {
         return hash;
     }
 
-    template< typename K_L, typename K_S, typename V, typename H, typename E, typename C >
-    inline typename UnorderedFastKeyTable<K_L, K_S, V, H, E, C>::const_iterator
-    UnorderedFastKeyTable<K_L, K_S, V, H, E, C>::find( const K_L& key ) const {
+    template< typename K_L, typename K_S, typename V, typename H, typename E, typename C, typename C_LS >
+    inline typename UnorderedFastKeyTable<K_L, K_S, V, H, E, C, C_LS>::const_iterator
+    UnorderedFastKeyTable<K_L, K_S, V, H, E, C, C_LS>::find( const K_L& key ) const {
         if ( _size == 0 )
             return const_iterator();
         int pos = _area.find( key, _hash(key), 0, *this );
@@ -42,9 +42,9 @@ namespace mongo {
         return const_iterator( &_area._entries[pos] );
     }
 
-    template< typename K_L, typename K_S, typename V, typename H, typename E, typename C >
-    inline typename UnorderedFastKeyTable<K_L, K_S, V, H, E, C>::const_iterator
-    UnorderedFastKeyTable<K_L, K_S, V, H, E, C>::end() const {
+    template< typename K_L, typename K_S, typename V, typename H, typename E, typename C, typename C_LS >
+    inline typename UnorderedFastKeyTable<K_L, K_S, V, H, E, C, C_LS>::const_iterator
+    UnorderedFastKeyTable<K_L, K_S, V, H, E, C, C_LS>::end() const {
         return const_iterator();
     }
 

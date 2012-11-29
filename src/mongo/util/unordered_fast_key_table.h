@@ -23,12 +23,20 @@
 
 namespace mongo {
 
+    template<typename K_L, typename K_S>
+    struct UnorderedFastKeyTable_LS_C {
+        K_S operator()( const K_L& a ) {
+            return K_S(a);
+        }
+    };
+
     template< typename K_L, // key lookup
               typename K_S, // key storage
               typename V, // value
               typename H , // hash of K_L
               typename E, // equal of K_L
-              typename C // convertor from K_S -> K_L
+              typename C, // convertor from K_S -> K_L
+              typename C_LS=UnorderedFastKeyTable_LS_C<K_L,K_S> // convertor from K_L -> K_S
               >
     class UnorderedFastKeyTable {
         MONGO_DISALLOW_COPYING(UnorderedFastKeyTable);
@@ -137,6 +145,7 @@ namespace mongo {
         H _hash;
         E _equals;
         C _convertor;
+        C_LS _convertorOther;
     };
 
 }
