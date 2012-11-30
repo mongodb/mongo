@@ -83,12 +83,12 @@ __wt_cache_page_read(WT_SESSION_IMPL *session, WT_PAGE *page, size_t size)
 	(void)WT_ATOMIC_ADD(cache->bytes_read, size);
 	(void)WT_ATOMIC_ADD(page->memory_footprint, WT_STORE_SIZE(size));
 
-        /*
-         * It's unusual, but possible, that the page is already dirty.
-         * For example, when reading an in-memory page with references to
-         * deleted leaf pages, the internal page may be marked dirty.  If so,
-         * update the total bytes dirty here.
-         */
+	/*
+	 * It's unusual, but possible, that the page is already dirty.
+	 * For example, when reading an in-memory page with references to
+	 * deleted leaf pages, the internal page may be marked dirty.  If so,
+	 * update the total bytes dirty here.
+	 */
 	if (__wt_page_is_modified(page))
 		(void)WT_ATOMIC_ADD(cache->bytes_dirty, size);
 }
