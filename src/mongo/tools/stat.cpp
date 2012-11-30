@@ -18,15 +18,15 @@
 
 #include "mongo/tools/tool.h"
 
-#include <fstream>
-#include <iostream>
 #include <boost/program_options.hpp>
 #include <boost/thread/thread.hpp>
+#include <fstream>
+#include <iostream>
 
 #include "mongo/base/initializer.h"
 #include "mongo/client/dbclientcursor.h"
-#include "mongo/db/json.h"
 #include "mongo/db/jsobjmanipulator.h"
+#include "mongo/db/json.h"
 #include "mongo/s/cluster_constants.h"
 #include "mongo/tools/stat_util.h"
 #include "mongo/util/net/httpclient.h"

@@ -18,18 +18,17 @@
 
 #include "pch.h"
 
+#include "pcrecpp.h"
 #include <iomanip>
 
-#include "pcrecpp.h"
-
 #include "mongo/client/connpool.h"
-#include "mongo/db/namespacestring.h"
 #include "mongo/db/json.h"
+#include "mongo/db/namespacestring.h"
+#include "mongo/s/cluster_constants.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/shard.h"
-#include "mongo/s/cluster_constants.h"
-#include "mongo/util/stringutils.h"
 #include "mongo/util/startup_test.h"
+#include "mongo/util/stringutils.h"
 
 namespace mongo {
 

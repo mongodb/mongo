@@ -25,45 +25,41 @@
 #include "pch.h"
 
 #include <algorithm>
+#include <boost/thread/thread.hpp>
 #include <map>
 #include <string>
 #include <vector>
 
-#include <boost/thread/thread.hpp>
-
+#include "mongo/client/connpool.h"
+#include "mongo/client/dbclientcursor.h"
+#include "mongo/client/distlock.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/privilege.h"
-#include "mongo/db/dbhelpers.h"
-#include "../db/commands.h"
-#include "mongo/db/hasher.h"
-#include "../db/jsobj.h"
-#include "../db/cmdline.h"
-#include "../db/queryoptimizer.h"
 #include "mongo/db/btreecursor.h"
-#include "../db/repl_block.h"
-#include "../db/dur.h"
-#include "../db/clientcursor.h"
-#include "../db/pagefault.h"
-#include "../db/repl.h"
-#include "../db/kill_current_op.h"
-
-#include "../client/connpool.h"
-#include "../client/distlock.h"
-#include "mongo/client/dbclientcursor.h"
-
-#include "../util/queue.h"
-#include "../util/startup_test.h"
-#include "../util/processinfo.h"
-#include "../util/ramlog.h"
-#include "mongo/util/elapsed_tracker.h"
-
-#include "shard.h"
-#include "d_logic.h"
-#include "config.h"
-#include "chunk.h"
+#include "mongo/db/clientcursor.h"
+#include "mongo/db/cmdline.h"
+#include "mongo/db/commands.h"
+#include "mongo/db/dbhelpers.h"
+#include "mongo/db/dur.h"
+#include "mongo/db/hasher.h"
+#include "mongo/db/jsobj.h"
+#include "mongo/db/kill_current_op.h"
+#include "mongo/db/pagefault.h"
+#include "mongo/db/queryoptimizer.h"
+#include "mongo/db/repl.h"
+#include "mongo/db/repl_block.h"
+#include "mongo/s/chunk.h"
+#include "mongo/s/config.h"
+#include "mongo/s/d_logic.h"
+#include "mongo/s/shard.h"
 #include "mongo/s/type_chunk.h"
+#include "mongo/util/elapsed_tracker.h"
+#include "mongo/util/processinfo.h"
+#include "mongo/util/queue.h"
+#include "mongo/util/ramlog.h"
+#include "mongo/util/startup_test.h"
 
 using namespace std;
 

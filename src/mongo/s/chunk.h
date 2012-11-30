@@ -18,8 +18,6 @@
 
 #pragma once
 
-#include "mongo/pch.h"
-
 #include "mongo/bson/util/atomic_int.h"
 #include "mongo/client/distlock.h"
 #include "mongo/s/cluster_constants.h"

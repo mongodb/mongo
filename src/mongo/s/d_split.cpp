@@ -17,29 +17,28 @@
 */
 
 #include "pch.h"
+
 #include <map>
 #include <string>
 #include <vector>
 
+#include "mongo/client/connpool.h"
+#include "mongo/client/dbclientcursor.h"
+#include "mongo/client/distlock.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/btreecursor.h"
-#include "../db/commands.h"
-#include "../db/jsobj.h"
-#include "../db/instance.h"
-#include "../db/queryoptimizer.h"
-#include "../db/clientcursor.h"
-#include "mongo/client/dbclientcursor.h"
-
-#include "../client/connpool.h"
-#include "../client/distlock.h"
-#include "../util/timer.h"
-
-#include "chunk.h" // for static genID only
-#include "config.h"
-#include "d_logic.h"
+#include "mongo/db/clientcursor.h"
+#include "mongo/db/commands.h"
+#include "mongo/db/instance.h"
+#include "mongo/db/jsobj.h"
+#include "mongo/db/queryoptimizer.h"
+#include "mongo/s/chunk.h" // for static genID only
+#include "mongo/s/config.h"
+#include "mongo/s/d_logic.h"
 #include "mongo/s/type_chunk.h"
+#include "mongo/util/timer.h"
 
 namespace mongo {
 

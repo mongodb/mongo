@@ -30,9 +30,9 @@
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/s/config.h"
 #include "mongo/s/client_info.h"
 #include "mongo/s/cluster_constants.h"
+#include "mongo/s/config.h"
 #include "mongo/s/request.h"
 #include "mongo/s/shard.h"
 

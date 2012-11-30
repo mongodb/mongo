@@ -18,16 +18,16 @@
 
 #include "pch.h"
 
-#include "mongo/util/net/message.h"
 #include "mongo/client/connpool.h"
-#include "mongo/client/model.h"
 #include "mongo/client/dbclientcursor.h"
-#include "mongo/db/pdfile.h"
+#include "mongo/client/model.h"
 #include "mongo/db/cmdline.h"
-#include "mongo/s/server.h"
-#include "mongo/s/config.h"
+#include "mongo/db/pdfile.h"
 #include "mongo/s/chunk.h"
+#include "mongo/s/config.h"
+#include "mongo/s/server.h"
 #include "mongo/s/type_chunk.h"
+#include "mongo/util/net/message.h"
 
 namespace mongo {
 
