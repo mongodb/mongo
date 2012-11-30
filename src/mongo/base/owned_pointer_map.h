@@ -15,50 +15,50 @@
 
 #pragma once
 
-#include <vector>
+#include <map>
 
 #include "mongo/base/disallow_copying.h"
 
 namespace mongo {
 
     /**
-     * An std::vector wrapper that deletes pointers within a vector on destruction.  The objects
+     * An std::map wrapper that deletes pointers within a vector on destruction.  The objects
      * referenced by the vector's pointers are 'owned' by an object of this class.
-     * NOTE that an OwnedPointerVector<T> wraps an std::vector<T*>.
+     * NOTE that an OwnedPointerMap<K,T> wraps an std::map<K,T*>.
      */
-    template<class T>
-    class OwnedPointerVector {
-        MONGO_DISALLOW_COPYING(OwnedPointerVector);
+    template<class K, class T>
+    class OwnedPointerMap {
+        MONGO_DISALLOW_COPYING(OwnedPointerMap);
 
     public:
-        OwnedPointerVector();
-        ~OwnedPointerVector();
+        OwnedPointerMap();
+        ~OwnedPointerMap();
 
-        /** Access the vector. */
-        const std::vector<T*>& vector() { return _vector; }
-        std::vector<T*>& mutableVector() { return _vector; }
+        /** Access the map. */
+        const std::map<K, T*>& map() { return _map; }
+        std::map<K, T*>& mutableMap() { return _map; }
 
         void clear();
 
     private:
-        std::vector<T*> _vector;
+        std::map<K, T*> _map;
     };
 
-    template<class T>
-    OwnedPointerVector<T>::OwnedPointerVector() {
+    template<class K, class T>
+    OwnedPointerMap<K, T>::OwnedPointerMap() {
     }
 
-    template<class T>
-    OwnedPointerVector<T>::~OwnedPointerVector() {
+    template<class K, class T>
+    OwnedPointerMap<K, T>::~OwnedPointerMap() {
         clear();
     }
 
-    template<class T>
-    void OwnedPointerVector<T>::clear() {
-        for( typename std::vector<T*>::iterator i = _vector.begin(); i != _vector.end(); ++i ) {
-            delete *i;
+    template<class K, class T>
+    void OwnedPointerMap<K, T>::clear() {
+        for( typename std::map<K, T*>::iterator i = _map.begin(); i != _map.end(); ++i ) {
+            delete i->second;
         }
-        _vector.clear();
+        _map.clear();
     }
 
 } // namespace mongo
