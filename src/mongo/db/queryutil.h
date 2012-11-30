@@ -359,6 +359,8 @@ namespace mongo {
          */
         void reverse( FieldRange &ret ) const;
 
+        bool hasSpecialThatNeedsIndex() const { verify( _special.size() ); return _specialNeedsIndex; }
+
         string toString() const;
     private:
         BSONObj addObj( const BSONObj &o );
@@ -368,6 +370,7 @@ namespace mongo {
         // Owns memory for our BSONElements.
         vector<BSONObj> _objData;
         string _special;
+        bool _specialNeedsIndex;
         bool _exactMatchRepresentation;
     };
     
@@ -457,6 +460,7 @@ namespace mongo {
         
         QueryPattern pattern( const BSONObj &sort = BSONObj() ) const;
         string getSpecial() const;
+        bool hasSpecialThatNeedsIndex() const;
 
         /**
          * @return a FieldRangeSet approximation of the documents in 'this' but
@@ -578,6 +582,7 @@ namespace mongo {
         const char *ns() const { return _singleKey.ns(); }
 
         string getSpecial() const { return _singleKey.getSpecial(); }
+        bool hasSpecialThatNeedsIndex() const { return _singleKey.hasSpecialThatNeedsIndex(); }
 
         /** Intersect with another FieldRangeSetPair. */
         FieldRangeSetPair &operator&=( const FieldRangeSetPair &other );

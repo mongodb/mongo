@@ -642,6 +642,7 @@ doneCheckOrder:
     
     bool QueryPlanGenerator::addSpecialPlan( NamespaceDetails *d ) {
         DEBUGQO( "\t special : " << _qps.frsp().getSpecial() );
+        // If an index exists for the special query component, use it.
         if ( _qps.frsp().getSpecial().size() ) {
             string special = _qps.frsp().getSpecial();
             NamespaceDetails::IndexIterator i = d->ii();
@@ -656,6 +657,12 @@ doneCheckOrder:
                     return true;
                 }
             }
+
+            // If no index exists but the index is not mandatory (Matcher has functionality to
+            // support it), have the caller fall through to using a normal query plan.
+            if (!_qps.frsp().hasSpecialThatNeedsIndex()) { return false; }
+
+            // Otherwise, error.
             uassert( 13038, (string)"can't find special index: " + special +
                     " for: " + _qps.originalQuery().toString(), false );
         }

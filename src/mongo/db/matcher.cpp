@@ -366,44 +366,45 @@ namespace mongo {
         case BSONObj::opWITHIN: {
             BSONObj shapeObj = fe.embeddedObject();
             BSONObjIterator argIt(shapeObj);
+            uassert(16481, "Empty obj for $within: " + shapeObj.toString(), argIt.more());
 
-            while (argIt.more()) {
-                BSONElement elt = argIt.next();
-                if (!elt.isABSONObj()) { break; }
+            BSONElement elt = argIt.next();
+            uassert(16466, "Within must be provided a BSONObj: " + elt.toString(),
+                    elt.isABSONObj());
+            BSONObj obj = elt.Obj();
+            BSONObjIterator coordIt(elt.Obj());
+            uassert(16482, "Malformed $within: ", coordIt.more());
 
-                if (!strcmp(elt.fieldName(), "$box")) {
-                    BSONObjIterator coordIt(elt.Obj());
-                    BSONElement minE = coordIt.next();
-                    if (!minE.isABSONObj()) { break; }
-                    if (!coordIt.more()) { break; }
-                    BSONElement maxE = coordIt.next();
-                    if (!maxE.isABSONObj()) { break; }
-                    _geo.push_back(GeoMatcher::makeBox(e.fieldName(), minE.Obj(), maxE.Obj()));
-                } else if (!strcmp(elt.fieldName(), "$center")) {
-                    BSONObjIterator coordIt(elt.Obj());
-                    BSONElement center = coordIt.next();
-                    if (!center.isABSONObj()) { break; }
-                    if (!coordIt.more()) { break; }
-                    BSONElement radius = coordIt.next();
-                    if (!radius.isNumber()) { break; }
-                    _geo.push_back(
+            if (str::equals(elt.fieldName(), "$box")) {
+                BSONElement minE = coordIt.next();
+                uassert(16467, "Malformed $box: " + obj.toString(), minE.isABSONObj());
+                uassert(16468, "Malformed $box: " + obj.toString(), coordIt.more());
+                BSONElement maxE = coordIt.next();
+                uassert(16469, "Malformed $box: " + obj.toString(), minE.isABSONObj());
+                _geo.push_back(GeoMatcher::makeBox(e.fieldName(), minE.Obj(), maxE.Obj()));
+            } else if (str::equals(elt.fieldName(), "$center")) {
+                BSONElement center = coordIt.next();
+                uassert(16473, "Malformed $center: " + obj.toString(), center.isABSONObj());
+                uassert(16474, "Malformed $center: " + obj.toString(), coordIt.more());
+                BSONElement radius = coordIt.next();
+                uassert(16475, "Malformed $center: " + obj.toString(), radius.isNumber());
+                _geo.push_back(
                         GeoMatcher::makeCircle(e.fieldName(), center.Obj(), radius.number()));
-                } else if (!strcmp(elt.fieldName(), "$polygon")) {
-                    BSONObjIterator coordIt(elt.Obj());
-                    bool valid = true;
-                    while (coordIt.more()) {
-                        BSONElement coord = coordIt.next();
-                        if (!coord.isABSONObj()) { valid = false; break; }
-                        BSONObjIterator numIt(coord.Obj());
-                        if (!numIt.more()) { valid = false; break; }
-                        BSONElement x = numIt.next();
-                        if (!x.isNumber()) { valid = false; break; }
-                        BSONElement y = numIt.next();
-                        if (!y.isNumber()) { valid = false; break; }
-                    }
-                    if (!valid) { break; }
-                    _geo.push_back(GeoMatcher::makePolygon(e.fieldName(), elt.Obj()));
+            } else if (str::equals(elt.fieldName(), "$polygon")) {
+                while (coordIt.more()) {
+                    BSONElement coord = coordIt.next();
+                    uassert(16476, "Malformed $polygon: " + obj.toString(), coord.isABSONObj());
+                    BSONObjIterator numIt(coord.Obj());
+                    uassert(16477, "Malformed $polygon: " + obj.toString(), numIt.more());
+                    BSONElement x = numIt.next();
+                    uassert(16478, "Malformed $polygon: " + obj.toString(), x.isNumber());
+                    uassert(16484, "Malformed $polygon: " + obj.toString(), numIt.more());
+                    BSONElement y = numIt.next();
+                    uassert(16479, "Malformed $polygon: " + obj.toString(), y.isNumber());
                 }
+                _geo.push_back(GeoMatcher::makePolygon(e.fieldName(), elt.Obj()));
+            } else {
+                uasserted(16483, "Couldn't pull any geometry out of $within query: " + obj.toString());
             }
             break;
         }
@@ -980,25 +981,15 @@ namespace mongo {
         }
 
         for (vector<GeoMatcher>::const_iterator it = _geo.begin(); it != _geo.end(); ++it) {
+            verify(_constrainIndexKey.isEmpty());
             BSONElementSet s;
-            // XXX: when do we do this and why?
-            if (!_constrainIndexKey.isEmpty()) {
-                BSONElement e = jsobj.getFieldUsingIndexNames(it->getFieldName().c_str(), _constrainIndexKey);
-                if (Array == e.type()) {
-                    BSONObjIterator i(e.Obj());
-                    while (i.more()) { s.insert(i.next()); }
-                } else if (!e.eoo()) {
-                    s.insert(e);
-                }
-            } else {
-                jsobj.getFieldsDotted(it->getFieldName().c_str(), s, false);
-            }
+            jsobj.getFieldsDotted(it->getFieldName().c_str(), s, false);
             int matches = 0;
             for (BSONElementSet::const_iterator i = s.begin(); i != s.end(); ++i) {
                 if (!i->isABSONObj()) { continue; }
                 Point p;
                 if (!GeoMatcher::pointFrom(i->Obj(), &p)) { continue; }
-                if (it->containsPoint(p)) { ++matches; }
+                if (it->containsPoint(p)) { ++matches; break; }
             }
             if (0 == matches) { return false; }
         }
@@ -1242,6 +1233,9 @@ namespace mongo {
         
         // Check that all match components are available in the index matcher.
         if ( !( _basics.size() == docMatcher._basics.size() && _regexs.size() == docMatcher._regexs.size() && !docMatcher._where ) ) {
+            return false;
+        }
+        if (_geo.size() != docMatcher._geo.size()) {
             return false;
         }
         if ( _andMatchers.size() != docMatcher._andMatchers.size() ) {
