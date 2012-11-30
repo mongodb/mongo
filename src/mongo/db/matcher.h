@@ -63,15 +63,15 @@ namespace mongo {
         static GeoMatcher makeBox(const string& field, const BSONObj &min, const BSONObj &max) {
             GeoMatcher m(field);
             m._isBox = true;
-            pointFromArray(min, &m._box._min);
-            pointFromArray(max, &m._box._max);
+            pointFrom(min, &m._box._min);
+            pointFrom(max, &m._box._max);
             return m;
         }
 
         static GeoMatcher makeCircle(const string& field, const BSONObj &center, double rad) {
             GeoMatcher m(field);
             m._isCircle = true;
-            pointFromArray(center, &m._center);
+            pointFrom(center, &m._center);
             m._radius = rad;
             return m;
         }
@@ -85,7 +85,7 @@ namespace mongo {
             while (coordIt.more()) {
                 BSONElement coord = coordIt.next();
                 Point p;
-                pointFromArray(coord.Obj(), &p);
+                pointFrom(coord.Obj(), &p);
                 points.push_back(p);
             }
             m._polygon = Polygon(points);
@@ -116,9 +116,9 @@ namespace mongo {
             return ss.str();
         }
 
-        // XXX: change to pointFromJSON and deal with x: foo, y:foo
-        static bool pointFromArray(const BSONObj o, Point *p) {
+        static bool pointFrom(const BSONObj o, Point *p) {
             BSONObjIterator i(o);
+            if (!i.more()) { return false; }
             BSONElement xe = i.next();
             if (!i.more()) { return false; }
             BSONElement ye = i.next();

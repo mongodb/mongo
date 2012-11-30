@@ -374,15 +374,15 @@ namespace mongo {
                 if (!strcmp(elt.fieldName(), "$box")) {
                     BSONObjIterator coordIt(elt.Obj());
                     BSONElement minE = coordIt.next();
-                    if (Array != minE.type()) { break; }
+                    if (!minE.isABSONObj()) { break; }
                     if (!coordIt.more()) { break; }
                     BSONElement maxE = coordIt.next();
-                    if (Array != maxE.type()) { break; }
+                    if (!maxE.isABSONObj()) { break; }
                     _geo.push_back(GeoMatcher::makeBox(e.fieldName(), minE.Obj(), maxE.Obj()));
                 } else if (!strcmp(elt.fieldName(), "$center")) {
                     BSONObjIterator coordIt(elt.Obj());
                     BSONElement center = coordIt.next();
-                    if (Array != center.type()) { break; }
+                    if (!center.isABSONObj()) { break; }
                     if (!coordIt.more()) { break; }
                     BSONElement radius = coordIt.next();
                     if (!radius.isNumber()) { break; }
@@ -393,7 +393,7 @@ namespace mongo {
                     bool valid = true;
                     while (coordIt.more()) {
                         BSONElement coord = coordIt.next();
-                        if (Array != coord.type()) { valid = false; break; }
+                        if (!coord.isABSONObj()) { valid = false; break; }
                         BSONObjIterator numIt(coord.Obj());
                         if (!numIt.more()) { valid = false; break; }
                         BSONElement x = numIt.next();
@@ -995,9 +995,9 @@ namespace mongo {
             }
             int matches = 0;
             for (BSONElementSet::const_iterator i = s.begin(); i != s.end(); ++i) {
-                if (Array != i->type()) { continue; }
+                if (!i->isABSONObj()) { continue; }
                 Point p;
-                if (!GeoMatcher::pointFromArray(i->Obj(), &p)) { continue; }
+                if (!GeoMatcher::pointFrom(i->Obj(), &p)) { continue; }
                 if (it->containsPoint(p)) { ++matches; }
             }
             if (0 == matches) { return false; }
