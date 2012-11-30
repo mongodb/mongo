@@ -369,8 +369,51 @@ namespace mongo {
             flags = fe.valuestrsafe();
             break;
         }
+        case BSONObj::opWITHIN: {
+            BSONObj shapeObj = fe.embeddedObject();
+            BSONObjIterator argIt(shapeObj);
+
+            while (argIt.more()) {
+                BSONElement elt = argIt.next();
+                if (!elt.isABSONObj()) { break; }
+
+                if (!strcmp(elt.fieldName(), "$box")) {
+                    BSONObjIterator coordIt(elt.Obj());
+                    BSONElement minE = coordIt.next();
+                    if (!minE.isABSONObj()) { break; }
+                    if (!coordIt.more()) { break; }
+                    BSONElement maxE = coordIt.next();
+                    if (!maxE.isABSONObj()) { break; }
+                    _geo.push_back(GeoMatcher::makeBox(e.fieldName(), minE.Obj(), maxE.Obj()));
+                } else if (!strcmp(elt.fieldName(), "$center")) {
+                    BSONObjIterator coordIt(elt.Obj());
+                    BSONElement center = coordIt.next();
+                    if (!center.isABSONObj()) { break; }
+                    if (!coordIt.more()) { break; }
+                    BSONElement radius = coordIt.next();
+                    if (!radius.isNumber()) { break; }
+                    _geo.push_back(
+                        GeoMatcher::makeCircle(e.fieldName(), center.Obj(), radius.number()));
+                } else if (!strcmp(elt.fieldName(), "$polygon")) {
+                    BSONObjIterator coordIt(elt.Obj());
+                    bool valid = true;
+                    while (coordIt.more()) {
+                        BSONElement coord = coordIt.next();
+                        if (!coord.isABSONObj()) { valid = false; break; }
+                        BSONObjIterator numIt(coord.Obj());
+                        if (!numIt.more()) { valid = false; break; }
+                        BSONElement x = numIt.next();
+                        if (!x.isNumber()) { valid = false; break; }
+                        BSONElement y = numIt.next();
+                        if (!y.isNumber()) { valid = false; break; }
+                    }
+                    if (!valid) { break; }
+                    _geo.push_back(GeoMatcher::makePolygon(e.fieldName(), elt.Obj()));
+                }
+            }
+            break;
+        }
         case BSONObj::opNEAR:
-        case BSONObj::opWITHIN:
         case BSONObj::opINTERSECT:
         case BSONObj::opMAX_DISTANCE:
             break;
@@ -941,6 +984,30 @@ namespace mongo {
                     }
                 }
             }
+        }
+
+        for (vector<GeoMatcher>::const_iterator it = _geo.begin(); it != _geo.end(); ++it) {
+            BSONElementSet s;
+            // XXX: when do we do this and why?
+            if (!_constrainIndexKey.isEmpty()) {
+                BSONElement e = jsobj.getFieldUsingIndexNames(it->getFieldName().c_str(), _constrainIndexKey);
+                if (Array == e.type()) {
+                    BSONObjIterator i(e.Obj());
+                    while (i.more()) { s.insert(i.next()); }
+                } else if (!e.eoo()) {
+                    s.insert(e);
+                }
+            } else {
+                jsobj.getFieldsDotted(it->getFieldName().c_str(), s, false);
+            }
+            int matches = 0;
+            for (BSONElementSet::const_iterator i = s.begin(); i != s.end(); ++i) {
+                if (!i->isABSONObj()) { continue; }
+                Point p;
+                if (!GeoMatcher::pointFrom(i->Obj(), &p)) { continue; }
+                if (it->containsPoint(p)) { ++matches; }
+            }
+            if (0 == matches) { return false; }
         }
 
         for (vector<RegexMatcher>::const_iterator it = _regexs.begin();

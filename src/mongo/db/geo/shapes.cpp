@@ -141,12 +141,12 @@ namespace mongo {
                onBoundary(_max.y, p.y, fudge);
     }
 
-    bool Box::inside(Point p, double fudge) {
+    bool Box::inside(Point p, double fudge) const {
         bool res = inside(p.x, p.y, fudge);
         return res;
     }
 
-    bool Box::inside(double x, double y, double fudge) {
+    bool Box::inside(double x, double y, double fudge) const {
         return between(_min.x, _max.x , x, fudge) &&
                between(_min.y, _max.y , y, fudge);
     }

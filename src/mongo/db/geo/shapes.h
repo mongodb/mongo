@@ -62,8 +62,8 @@ namespace mongo {
         void truncate(double min, double max);
         void fudge(double error);
         bool onBoundary(Point p, double fudge = 0);
-        bool inside(Point p, double fudge = 0);
-        bool inside(double x, double y, double fudge = 0);
+        bool inside(Point p, double fudge = 0) const;
+        bool inside(double x, double y, double fudge = 0) const;
         bool contains(const Box& other, double fudge = 0);
         // TODO(hk): This could be private and Polygon could be our friend, or we could
         // have getters/setters (lots of code change).
