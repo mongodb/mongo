@@ -20,8 +20,8 @@ __wt_lsm_meta_read(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	WT_ITEM buf;
 	WT_LSM_CHUNK *chunk;
 	const char *config;
-	int nchunks;
 	size_t chunk_sz, alloc;
+	u_int nchunks;
 
 	WT_CLEAR(buf);
 	chunk_sz = sizeof(WT_LSM_CHUNK);
@@ -62,7 +62,7 @@ __wt_lsm_meta_read(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 		else if (WT_STRING_MATCH("lsm_merge_threads", ck.str, ck.len))
 			lsm_tree->merge_threads = (uint32_t)cv.val;
 		else if (WT_STRING_MATCH("last", ck.str, ck.len))
-			lsm_tree->last = (int)cv.val;
+			lsm_tree->last = (u_int)cv.val;
 		else if (WT_STRING_MATCH("chunks", ck.str, ck.len)) {
 			WT_ERR(__wt_config_subinit(session, &lparser, &cv));
 			for (nchunks = 0; (ret =
@@ -95,7 +95,7 @@ __wt_lsm_meta_read(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 					continue;
 				} else if (WT_STRING_MATCH(
 				    "count", lk.str, lk.len)) {
-					chunk->count = lv.val;
+					chunk->count = (uint64_t)lv.val;
 					continue;
 				} else if (WT_STRING_MATCH(
 				    "generation", lk.str, lk.len)) {
@@ -124,9 +124,9 @@ __wt_lsm_meta_read(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 					    lsm_tree->nold_chunks +
 					    2 * nchunks),
 					    &lsm_tree->old_chunks));
-					lsm_tree->nold_chunks = (int)
+					lsm_tree->nold_chunks = (u_int)
 					    (lsm_tree->old_alloc / chunk_sz);
-					lsm_tree->old_avail += (int)
+					lsm_tree->old_avail += (u_int)
 					    ((lsm_tree->old_alloc - alloc) /
 					    chunk_sz);
 				}
@@ -160,7 +160,8 @@ __wt_lsm_meta_write(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	WT_DECL_ITEM(buf);
 	WT_DECL_RET;
 	WT_LSM_CHUNK *chunk;
-	int first, i;
+	u_int i;
+	int first;
 
 	WT_RET(__wt_scr_alloc(session, 0, &buf));
 	WT_ERR(__wt_buf_fmt(session, buf,
@@ -192,7 +193,7 @@ __wt_lsm_meta_write(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	WT_ERR(__wt_buf_catfmt(session, buf, "]"));
 	WT_ERR(__wt_buf_catfmt(session, buf, ",old_chunks=["));
 	first = 1;
-	for (i = 0; i < (int)lsm_tree->nold_chunks; i++) {
+	for (i = 0; i < lsm_tree->nold_chunks; i++) {
 		chunk = lsm_tree->old_chunks[i];
 		if (chunk == NULL)
 			continue;

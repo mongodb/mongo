@@ -81,9 +81,9 @@ void *populate_thread(void *);
 void print_config(CONFIG *);
 void *read_thread(void *);
 int setup_log_file(CONFIG *);
-int start_threads(CONFIG *, int, pthread_t **, void *(*func)(void *));
+int start_threads(CONFIG *, u_int, pthread_t **, void *(*func)(void *));
 void *stat_worker(void *);
-int stop_threads(CONFIG *, int, pthread_t *);
+int stop_threads(CONFIG *, u_int, pthread_t *);
 void usage(void);
 
 #define	DEFAULT_LSM_CONFIG						\
@@ -231,7 +231,8 @@ read_thread(void *arg)
 	while (g_running) {
 		++g_nops;
 		/* Get a value in range, avoid zero. */
-		sprintf(key_buf, "%d", (rand() % (cfg->icount - 1)) + 1);
+		sprintf(key_buf, "%d",
+		    (uint32_t)rand() % (cfg->icount - 1) + 1);
 		cursor->set_key(cursor, key_buf);
 		/* Report errors and continue. */
 		if ((search_ret = cursor->search(cursor)) != 0)
@@ -572,7 +573,7 @@ int main(int argc, char **argv)
 	while ((ch = getopt(argc, argv, opts)) != EOF)
 		switch (ch) {
 		case 'd':
-			cfg.data_sz = atoi(optarg);
+			cfg.data_sz = (uint32_t)atoi(optarg);
 			break;
 		case 'e':
 			cfg.create = 0;
@@ -581,34 +582,34 @@ int main(int argc, char **argv)
 			cfg.home = optarg;
 			break;
 		case 'i':
-			cfg.icount = atoi(optarg);
+			cfg.icount = (uint32_t)atoi(optarg);
 			break;
 		case 'k':
-			cfg.key_sz = atoi(optarg);
+			cfg.key_sz = (uint32_t)atoi(optarg);
 			break;
 		case 'l':
 			cfg.stat_thread = 1;
 			break;
 		case 'r':
-			cfg.read_time = atoi(optarg);
+			cfg.read_time = (uint32_t)atoi(optarg);
 			break;
 		case 's':
-			cfg.rand_seed = atoi(optarg);
+			cfg.rand_seed = (uint32_t)atoi(optarg);
 			break;
 		case 'u':
 			cfg.uri = optarg;
 			break;
 		case 'v':
-			cfg.verbose = atoi(optarg);
+			cfg.verbose = (uint32_t)atoi(optarg);
 			break;
 		case 'C':
 			user_cconfig = optarg;
 			break;
 		case 'P':
-			cfg.populate_threads = atoi(optarg);
+			cfg.populate_threads = (uint32_t)atoi(optarg);
 			break;
 		case 'R':
-			cfg.read_threads = atoi(optarg);
+			cfg.read_threads = (uint32_t)atoi(optarg);
 			break;
 		case 'T':
 			user_tconfig = optarg;
@@ -725,10 +726,12 @@ err:	if (cfg.stat_thread)
  * Following are utility functions.
  */
 int
-start_threads(CONFIG *cfg, int num, pthread_t **threadsp, void *(*func)(void *))
+start_threads(
+    CONFIG *cfg, u_int num, pthread_t **threadsp, void *(*func)(void *))
 {
 	pthread_t *threads;
-	int i, ret;
+	u_int i;
+	int ret;
 
 	g_running = 1;
 	g_nops = 0;
@@ -749,9 +752,11 @@ start_threads(CONFIG *cfg, int num, pthread_t **threadsp, void *(*func)(void *))
 }
 
 int
-stop_threads(CONFIG *cfg, int num, pthread_t *threads)
+stop_threads(CONFIG *cfg, u_int num, pthread_t *threads)
 {
-	int i, ret;
+	u_int i;
+	int ret;
+
 	g_running = 0;
 
 	for (i = 0; i < num; i++) {

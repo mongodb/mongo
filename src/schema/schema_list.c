@@ -117,7 +117,7 @@ __wt_schema_destroy_table(WT_SESSION_IMPL *session, WT_TABLE *table)
 {
 	WT_COLGROUP *colgroup;
 	WT_INDEX *idx;
-	int i;
+	u_int i;
 
 	__wt_free(session, table->name);
 	__wt_free(session, table->config);

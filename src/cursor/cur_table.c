@@ -12,7 +12,7 @@ static int __curtable_update(WT_CURSOR *cursor);
 
 #define	APPLY_CG(ctable, f) do {					\
 	WT_CURSOR **__cp;						\
-	int __i;							\
+	u_int __i;							\
 	for (__i = 0, __cp = ctable->cg_cursors;			\
 	    __i < WT_COLGROUPS(ctable->table);				\
 	    __i++, __cp++)						\
@@ -22,7 +22,7 @@ static int __curtable_update(WT_CURSOR *cursor);
 #define	APPLY_IDX(ctable, f) do {					\
 	WT_INDEX *idx;							\
 	WT_CURSOR **__cp;						\
-	int __i;							\
+	u_int __i;							\
 	WT_ERR(__curtable_open_indices(ctable));			\
 	__cp = (ctable)->idx_cursors;					\
 	for (__i = 0; __i < ctable->table->nindices; __i++, __cp++) {	\
@@ -109,7 +109,7 @@ __wt_curtable_set_key(WT_CURSOR *cursor, ...)
 	WT_CURSOR **cp, *primary;
 	WT_CURSOR_TABLE *ctable;
 	va_list ap;
-	int i;
+	u_int i;
 
 	ctable = (WT_CURSOR_TABLE *)cursor;
 	cp = ctable->cg_cursors;
@@ -144,7 +144,7 @@ __wt_curtable_set_value(WT_CURSOR *cursor, ...)
 	WT_ITEM *item;
 	WT_SESSION_IMPL *session;
 	va_list ap;
-	int i;
+	u_int i;
 
 	ctable = (WT_CURSOR_TABLE *)cursor;
 	CURSOR_API_CALL(cursor, session, set_value, NULL);
@@ -235,7 +235,7 @@ __curtable_next_random(WT_CURSOR *cursor)
 	WT_CURSOR_TABLE *ctable;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
-	int i;
+	u_int i;
 
 	ctable = (WT_CURSOR_TABLE *)cursor;
 	CURSOR_API_CALL(cursor, session, next, NULL);
@@ -327,7 +327,7 @@ __curtable_search_near(WT_CURSOR *cursor, int *exact)
 	WT_CURSOR *primary, **cp;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
-	int i;
+	u_int i;
 
 	ctable = (WT_CURSOR_TABLE *)cursor;
 	CURSOR_API_CALL(cursor, session, search_near, NULL);
@@ -357,7 +357,7 @@ __curtable_insert(WT_CURSOR *cursor)
 	WT_CURSOR_TABLE *ctable;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
-	int i;
+	u_int i;
 
 	ctable = (WT_CURSOR_TABLE *)cursor;
 	CURSOR_UPDATE_API_CALL(cursor, session, insert, NULL);
@@ -475,7 +475,8 @@ __wt_curtable_truncate(
 	WT_DECL_ITEM(key);
 	WT_DECL_RET;
 	WT_ITEM raw;
-	int cmp, i;
+	u_int i;
+	int cmp;
 
 	WT_RET(__wt_scr_alloc(session, 128, &key));
 
@@ -597,7 +598,7 @@ __curtable_close(WT_CURSOR *cursor)
 	WT_CURSOR **cp;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
-	int i;
+	u_int i;
 
 	ctable = (WT_CURSOR_TABLE *)cursor;
 	CURSOR_API_CALL(cursor, session, close, NULL);
@@ -644,7 +645,7 @@ __curtable_open_colgroups(WT_CURSOR_TABLE *ctable, const char *cfg_arg[])
 	const char *cfg[] = {
 		cfg_arg[0], cfg_arg[1], "dump=\"\",overwrite=false", NULL, NULL
 	};
-	int i;
+	u_int i;
 
 	session = (WT_SESSION_IMPL *)ctable->iface.session;
 	table = ctable->table;
@@ -674,7 +675,7 @@ __curtable_open_indices(WT_CURSOR_TABLE *ctable)
 	WT_SESSION_IMPL *session;
 	WT_TABLE *table;
 	const char *cfg[] = API_CONF_DEFAULTS(session, open_cursor, NULL);
-	int i;
+	u_int i;
 
 	session = (WT_SESSION_IMPL *)ctable->iface.session;
 	table = ctable->table;

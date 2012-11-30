@@ -14,10 +14,11 @@
  */
 int
 __wt_lsm_merge_update_tree(WT_SESSION_IMPL *session,
-    WT_LSM_TREE *lsm_tree, int start_chunk, int nchunks, WT_LSM_CHUNK *chunk)
+    WT_LSM_TREE *lsm_tree, u_int start_chunk, u_int nchunks,
+    WT_LSM_CHUNK *chunk)
 {
 	size_t chunk_sz, chunks_after_merge;
-	int i, j;
+	u_int i, j;
 
 	WT_ASSERT(session, start_chunk + nchunks <= lsm_tree->nchunks);
 
@@ -28,9 +29,9 @@ __wt_lsm_merge_update_tree(WT_SESSION_IMPL *session,
 		    &lsm_tree->old_alloc,
 		    chunk_sz * WT_MAX(10, lsm_tree->nold_chunks + 2 * nchunks),
 		    &lsm_tree->old_chunks));
-		lsm_tree->old_avail += (int)(lsm_tree->old_alloc / chunk_sz) -
+		lsm_tree->old_avail += (u_int)(lsm_tree->old_alloc / chunk_sz) -
 		    lsm_tree->nold_chunks;
-		lsm_tree->nold_chunks = (int)(lsm_tree->old_alloc / chunk_sz);
+		lsm_tree->nold_chunks = (u_int)(lsm_tree->old_alloc / chunk_sz);
 	}
 	/* Copy entries one at a time, so we can reuse gaps in the list. */
 	for (i = j = 0; j < nchunks && i < lsm_tree->nold_chunks; i++) {
@@ -64,7 +65,7 @@ __wt_lsm_merge_update_tree(WT_SESSION_IMPL *session,
  */
 int
 __wt_lsm_merge(
-    WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, uint32_t id, int stalls)
+    WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, u_int id, int stalls)
 {
 	WT_BLOOM *bloom;
 	WT_CURSOR *src, *dest;
@@ -78,12 +79,12 @@ __wt_lsm_merge(
 	    "checkpoint=WiredTigerCheckpoint,next_random");
 	uint32_t generation, start_id;
 	uint64_t insert_count, record_count, r;
-	int create_bloom, dest_id, end_chunk, i;
-	int max_chunks, nchunks, start_chunk;
+	u_int dest_id, end_chunk, i, max_chunks, nchunks, start_chunk;
+	int create_bloom;
 
 	src = dest = NULL;
 	bloom = NULL;
-	max_chunks = (int)lsm_tree->merge_max;
+	max_chunks = lsm_tree->merge_max;
 	create_bloom = 0;
 
 	/*

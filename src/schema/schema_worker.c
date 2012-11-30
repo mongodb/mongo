@@ -23,7 +23,7 @@ __wt_schema_worker(WT_SESSION_IMPL *session,
 	WT_INDEX *idx;
 	WT_TABLE *table;
 	const char *tablename;
-	int i;
+	u_int i;
 
 	tablename = uri;
 

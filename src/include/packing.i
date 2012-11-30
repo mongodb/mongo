@@ -219,8 +219,8 @@ __pack_size(WT_SESSION_IMPL *session, WT_PACK_VALUE *pv)
 		return (sizeof (uint64_t));
 	}
 
-	WT_RET_MSG(
-	    session, EINVAL, "unknown pack-value type: %c", (int)pv->type);
+	__wt_err(session, EINVAL, "unknown pack-value type: %c", (int)pv->type);
+	return ((size_t)-1);
 }
 
 static inline int

@@ -8,8 +8,8 @@
 #include "wt_internal.h"
 
 #define	FORALL_CURSORS(clsm, c, i)					\
-	for ((i) = (clsm)->nchunks - 1; (i) >= 0; (i)--)		\
-		if (((c) = (clsm)->cursors[i]) != NULL)
+	for ((i) = (clsm)->nchunks; (i) > 0;)				\
+		if (((c) = (clsm)->cursors[--i]) != NULL)
 
 #define	WT_LSM_CMP(s, lsm_tree, k1, k2, cmp)				\
 	(((lsm_tree)->collator == NULL) ?				\
@@ -33,7 +33,7 @@
 	CURSOR_UPDATE_API_CALL(cursor, session, n, NULL);		\
 	WT_ERR(__clsm_enter(clsm, 1))
 
-static int __clsm_open_cursors(WT_CURSOR_LSM *, int, int, uint32_t);
+static int __clsm_open_cursors(WT_CURSOR_LSM *, int, u_int, uint32_t);
 static int __clsm_search(WT_CURSOR *);
 
 static inline int
@@ -78,7 +78,7 @@ __clsm_close_cursors(WT_CURSOR_LSM *clsm)
 {
 	WT_BLOOM *bloom;
 	WT_CURSOR *c;
-	int i;
+	u_int i;
 
 	if (clsm->cursors == NULL)
 		return (0);
@@ -108,7 +108,7 @@ __clsm_close_cursors(WT_CURSOR_LSM *clsm)
  */
 static int
 __clsm_open_cursors(
-    WT_CURSOR_LSM *clsm, int update, int start_chunk, uint32_t start_id)
+    WT_CURSOR_LSM *clsm, int update, u_int start_chunk, uint32_t start_id)
 {
 	WT_CURSOR *c, **cp;
 	WT_DECL_RET;
@@ -119,7 +119,7 @@ __clsm_open_cursors(
 	    "checkpoint=WiredTigerCheckpoint,raw");
 	const char *merge_cfg[] = API_CONF_DEFAULTS(session, open_cursor,
 	    "checkpoint=WiredTigerCheckpoint,no_cache,raw");
-	int i, nchunks;
+	u_int i, nchunks;
 
 	session = (WT_SESSION_IMPL *)clsm->iface.session;
 	lsm_tree = clsm->lsm_tree;
@@ -229,7 +229,7 @@ err:	F_CLR(session, WT_SESSION_NO_CACHE_CHECK);
  */
 int
 __wt_clsm_init_merge(
-    WT_CURSOR *cursor, int start_chunk, uint32_t start_id, int nchunks)
+    WT_CURSOR *cursor, u_int start_chunk, uint32_t start_id, u_int nchunks)
 {
 	WT_CURSOR_LSM *clsm;
 
@@ -251,8 +251,8 @@ __clsm_get_current(
     WT_SESSION_IMPL *session, WT_CURSOR_LSM *clsm, int smallest, int *deletedp)
 {
 	WT_CURSOR *c, *current;
-	int i;
 	int cmp, multiple;
+	u_int i;
 
 	current = NULL;
 	multiple = 0;
@@ -339,7 +339,8 @@ __clsm_next(WT_CURSOR *cursor)
 	WT_CURSOR *c;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
-	int check, cmp, deleted, i;
+	u_int i;
+	int check, cmp, deleted;
 
 	WT_LSM_ENTER(clsm, cursor, session, next);
 
@@ -420,7 +421,8 @@ __clsm_prev(WT_CURSOR *cursor)
 	WT_CURSOR *c;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
-	int check, cmp, deleted, i;
+	u_int i;
+	int check, cmp, deleted;
 
 	WT_LSM_ENTER(clsm, cursor, session, next);
 
@@ -532,7 +534,8 @@ __clsm_search(WT_CURSOR *cursor)
 	WT_CURSOR_LSM *clsm;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
-	int have_hash, i;
+	u_int i;
+	int have_hash;
 
 	have_hash = 0;
 
@@ -611,7 +614,8 @@ __clsm_search_near(WT_CURSOR *cursor, int *exactp)
 	WT_DECL_RET;
 	WT_ITEM v;
 	WT_SESSION_IMPL *session;
-	int cmp, deleted, i;
+	u_int i;
+	int cmp, deleted;
 
 	larger = smaller = NULL;
 

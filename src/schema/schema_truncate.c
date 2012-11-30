@@ -41,7 +41,7 @@ __truncate_table(WT_SESSION_IMPL *session, const char *name)
 	WT_DECL_ITEM(namebuf);
 	WT_DECL_RET;
 	WT_TABLE *table;
-	int i;
+	u_int i;
 
 	WT_RET(__wt_schema_get_table(session, name, strlen(name), 0, &table));
 	WT_RET(__wt_scr_alloc(session, 0, &namebuf));

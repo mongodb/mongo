@@ -41,7 +41,7 @@ __wt_schema_open_colgroups(WT_SESSION_IMPL *session, WT_TABLE *table)
 	WT_DECL_RET;
 	WT_DECL_ITEM(buf);
 	const char *cgconfig;
-	int i;
+	u_int i;
 
 	if (table->cg_complete)
 		return (0);
@@ -120,8 +120,7 @@ __open_index(WT_SESSION_IMPL *session, WT_TABLE *table, WT_INDEX *idx)
 	WT_DECL_ITEM(buf);
 	WT_DECL_ITEM(plan);
 	WT_DECL_RET;
-	u_int cursor_key_cols;
-	int i;
+	u_int cursor_key_cols, i;
 
 	WT_ERR(__wt_scr_alloc(session, 0, &buf));
 
@@ -216,7 +215,8 @@ __wt_schema_open_index(WT_SESSION_IMPL *session,
 	WT_DECL_ITEM(tmp);
 	WT_DECL_RET;
 	WT_INDEX *idx;
-	int cmp, i, match;
+	u_int i;
+	int cmp, match;
 	const char *idxconf, *name, *tablename, *uri;
 
 	/* Check if we've already done the work. */
@@ -418,7 +418,7 @@ __wt_schema_get_colgroup(WT_SESSION_IMPL *session,
 	WT_COLGROUP *colgroup;
 	WT_TABLE *table;
 	const char *tablename, *tend;
-	int i;
+	u_int i;
 
 	*colgroupp = NULL;
 
@@ -455,7 +455,7 @@ __wt_schema_get_index(WT_SESSION_IMPL *session,
 	WT_INDEX *idx;
 	WT_TABLE *table;
 	const char *tablename, *tend;
-	int i;
+	u_int i;
 
 	*indexp = NULL;
 

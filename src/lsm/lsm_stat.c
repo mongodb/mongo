@@ -24,8 +24,8 @@ __wt_lsm_stat_init(
 	const char *disk_cfg[] = API_CONF_DEFAULTS(session,
 	    open_cursor, "checkpoint=WiredTigerCheckpoint,statistics_fast=on");
 	const char *desc, *pvalue;
-	int i;
 	uint64_t value;
+	u_int i;
 
 	WT_UNUSED(flags);
 	WT_ERR(__wt_scr_alloc(session, 0, &uribuf));

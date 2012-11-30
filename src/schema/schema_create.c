@@ -245,7 +245,7 @@ __create_index(WT_SESSION_IMPL *session,
 	const char *sourceconf, *source, *idxconf, *idxname;
 	const char *tablename;
 	size_t tlen;
-	int i;
+	u_int i;
 
 	idxconf = sourceconf = NULL;
 	WT_CLEAR(confbuf);

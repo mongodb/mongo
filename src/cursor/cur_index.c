@@ -71,7 +71,7 @@ __curindex_move(WT_CURSOR_INDEX *cindex)
 	WT_CURSOR **cp, *first;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
-	int i;
+	u_int i;
 
 	session = (WT_SESSION_IMPL *)cindex->iface.session;
 	first = NULL;
@@ -166,7 +166,7 @@ __curindex_reset(WT_CURSOR *cursor)
 	WT_CURSOR_INDEX *cindex;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
-	int i;
+	u_int i;
 
 	cindex = (WT_CURSOR_INDEX *)cursor;
 	CURSOR_API_CALL(cursor, session, reset, NULL);
@@ -269,7 +269,7 @@ __curindex_close(WT_CURSOR *cursor)
 	WT_DECL_RET;
 	WT_INDEX *idx;
 	WT_SESSION_IMPL *session;
-	int i;
+	u_int i;
 
 	cindex = (WT_CURSOR_INDEX *)cursor;
 	idx = cindex->index;

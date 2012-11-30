@@ -18,7 +18,7 @@ static void
 __lsm_tree_discard(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 {
 	WT_LSM_CHUNK *chunk;
-	int i;
+	u_int i;
 
 	/* We may be destroying an lsm_tree before it was added. */
 	if (F_ISSET(lsm_tree, WT_LSM_TREE_OPEN))
@@ -545,7 +545,7 @@ __wt_lsm_tree_drop(
 	WT_DECL_RET;
 	WT_LSM_CHUNK *chunk;
 	WT_LSM_TREE *lsm_tree;
-	int i;
+	u_int i;
 
 	/* Get the LSM tree. */
 	WT_RET(__wt_lsm_tree_get(session, name, 1, &lsm_tree));
@@ -597,7 +597,7 @@ __wt_lsm_tree_rename(WT_SESSION_IMPL *session,
 	WT_LSM_CHUNK *chunk;
 	WT_LSM_TREE *lsm_tree;
 	const char *old;
-	int i;
+	u_int i;
 
 	old = NULL;
 	WT_CLEAR(buf);
@@ -711,7 +711,7 @@ __wt_lsm_tree_worker(WT_SESSION_IMPL *session,
 	WT_DECL_RET;
 	WT_LSM_CHUNK *chunk;
 	WT_LSM_TREE *lsm_tree;
-	int i;
+	u_int i;
 
 	WT_RET(__wt_lsm_tree_get(session, uri,
 	    FLD_ISSET(open_flags, WT_BTREE_EXCLUSIVE) ? 1 : 0, &lsm_tree));

@@ -15,7 +15,7 @@ struct __wt_cursor_lsm {
 	WT_LSM_TREE *lsm_tree;
 	uint64_t dsk_gen;
 
-	int nchunks;
+	u_int nchunks;
 	WT_BLOOM **blooms;
 	WT_CURSOR **cursors;
 	WT_CURSOR *current;     	/* The current cursor for iteration */
@@ -74,8 +74,8 @@ struct __wt_lsm_tree {
 	uint32_t bloom_bit_count;
 	uint32_t bloom_hash_count;
 	uint32_t chunk_size;
-	uint32_t merge_max;
-	uint32_t merge_threads;
+	u_int merge_max;
+	u_int merge_threads;
 
 #define	WT_LSM_BLOOM_MERGED				0x00000001
 #define	WT_LSM_BLOOM_NEWEST				0x00000002
@@ -96,13 +96,13 @@ struct __wt_lsm_tree {
 
 	WT_LSM_CHUNK **chunk;		/* Array of active LSM chunks */
 	size_t chunk_alloc;		/* Space allocated for chunks */
-	int nchunks;			/* Number of active chunks */
+	u_int nchunks;			/* Number of active chunks */
 	uint32_t last;			/* Last allocated ID */
 
 	WT_LSM_CHUNK **old_chunks;	/* Array of old LSM chunks */
 	size_t old_alloc;		/* Space allocated for old chunks */
-	int nold_chunks;		/* Number of old chunks */
-	int old_avail;			/* Available old chunk slots */
+	u_int nold_chunks;		/* Number of old chunks */
+	u_int old_avail;		/* Available old chunk slots */
 
 #define	WT_LSM_TREE_WORKING	0x01
 #define	WT_LSM_TREE_OPEN	0x02
@@ -126,7 +126,7 @@ struct __wt_lsm_data_source {
 struct __wt_lsm_worker_cookie {
 	WT_LSM_CHUNK **chunk_array;
 	size_t chunk_alloc;
-	int nchunks;
+	u_int nchunks;
 };
 
 /*
@@ -135,5 +135,5 @@ struct __wt_lsm_worker_cookie {
  */
 struct __wt_lsm_worker_args {
 	WT_LSM_TREE *lsm_tree;
-	int id;
+	u_int id;
 };

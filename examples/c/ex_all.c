@@ -229,7 +229,7 @@ cursor_ops(WT_SESSION *session)
 	cursor->set_value(cursor, value);
 	ret = cursor->insert(cursor);
 	if (ret == 0)
-		recno = cursor->get_key(cursor, &recno);
+		ret = cursor->get_key(cursor, &recno);
 	/*! [Insert a new record and assign a record number] */
 	}
 

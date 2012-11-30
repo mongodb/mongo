@@ -9,14 +9,15 @@
 
 static int
 __find_next_col(WT_SESSION_IMPL *session, WT_TABLE *table,
-    WT_CONFIG_ITEM *colname, int *cgnump, int *colnump, char *coltype)
+    WT_CONFIG_ITEM *colname, u_int *cgnump, u_int *colnump, char *coltype)
 {
 	WT_COLGROUP *colgroup;
 	WT_CONFIG conf;
 	WT_CONFIG_ITEM cval, k, v;
-	int cg, col, foundcg, foundcol, getnext;
+	u_int cg, col, foundcg, foundcol;
+	int getnext;
 
-	foundcg = foundcol = -1;
+	foundcg = foundcol = -1U;
 
 	getnext = 1;
 	for (colgroup = NULL, cg = 0; cg < WT_COLGROUPS(table); cg++) {
@@ -53,7 +54,7 @@ cgcols:			cval = colgroup->colconf;
 		colgroup = NULL;
 	}
 
-	if (foundcg == -1)
+	if (foundcg == -1U)
 		return (WT_NOTFOUND);
 
 	*cgnump = foundcg;
@@ -74,14 +75,14 @@ cgcols:			cval = colgroup->colconf;
 int
 __wt_schema_colcheck(WT_SESSION_IMPL *session,
     const char *key_format, const char *value_format, WT_CONFIG_ITEM *colconf,
-    int *kcolsp, int *vcolsp)
+    u_int *kcolsp, u_int *vcolsp)
 {
 	WT_CONFIG conf;
 	WT_CONFIG_ITEM k, v;
 	WT_DECL_RET;
 	WT_PACK pack;
 	WT_PACK_VALUE pv;
-	int kcols, ncols, vcols;
+	u_int kcols, ncols, vcols;
 
 	WT_RET(__pack_init(session, &pack, key_format));
 	for (kcols = 0; (ret = __pack_next(&pack, &pv)) == 0; kcols++)
@@ -121,7 +122,7 @@ __wt_table_check(WT_SESSION_IMPL *session, WT_TABLE *table)
 	WT_CONFIG conf;
 	WT_CONFIG_ITEM k, v;
 	WT_DECL_RET;
-	int cg, col, i;
+	u_int cg, col, i;
 	char coltype;
 
 	if (table->is_simple)
@@ -168,12 +169,12 @@ __wt_struct_plan(WT_SESSION_IMPL *session, WT_TABLE *table,
 	WT_CONFIG conf;
 	WT_CONFIG_ITEM k, v;
 	WT_DECL_RET;
-	int cg, col, current_cg, current_col, start_cg, start_col;
-	int i, have_it;
+	u_int cg, col, current_cg, current_col, i, start_cg, start_col;
+	int have_it;
 	char coltype, current_coltype;
 
 	saved_btree = session->btree;
-	start_cg = start_col = -1;		/* -Wuninitialized */
+	start_cg = start_col = -1U;		/* -Wuninitialized */
 
 	/* Work through the value columns by skipping over the key columns. */
 	WT_ERR(__wt_config_initn(session, &conf, columns, len));

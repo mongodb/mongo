@@ -725,9 +725,9 @@ extern int __wt_log_printf(WT_SESSION_IMPL *session,
     3)));
 extern WT_LOGREC_DESC __wt_logdesc_debug;
 extern int __wt_clsm_init_merge( WT_CURSOR *cursor,
-    int start_chunk,
+    u_int start_chunk,
     uint32_t start_id,
-    int nchunks);
+    u_int nchunks);
 extern int __wt_clsm_open(WT_SESSION_IMPL *session,
     const char *uri,
     WT_CURSOR *owner,
@@ -737,12 +737,12 @@ extern int __wt_lsm_init(WT_CONNECTION *wt_conn, const char *config);
 extern int __wt_lsm_cleanup(WT_CONNECTION *wt_conn);
 extern int __wt_lsm_merge_update_tree(WT_SESSION_IMPL *session,
     WT_LSM_TREE *lsm_tree,
-    int start_chunk,
-    int nchunks,
+    u_int start_chunk,
+    u_int nchunks,
     WT_LSM_CHUNK *chunk);
 extern int __wt_lsm_merge( WT_SESSION_IMPL *session,
     WT_LSM_TREE *lsm_tree,
-    uint32_t id,
+    u_int id,
     int stalls);
 extern int __wt_lsm_meta_read(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree);
 extern int __wt_lsm_meta_write(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree);
@@ -1030,8 +1030,8 @@ extern int __wt_schema_colcheck(WT_SESSION_IMPL *session,
     const char *key_format,
     const char *value_format,
     WT_CONFIG_ITEM *colconf,
-    int *kcolsp,
-    int *vcolsp);
+    u_int *kcolsp,
+    u_int *vcolsp);
 extern int __wt_table_check(WT_SESSION_IMPL *session, WT_TABLE *table);
 extern int __wt_struct_plan(WT_SESSION_IMPL *session,
     WT_TABLE *table,

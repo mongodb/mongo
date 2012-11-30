@@ -82,7 +82,7 @@ wts_ops(void)
 		for (;;) {
 			total.search =
 			    total.insert = total.remove = total.update = 0;
-			for (i = running = 0; i < g.c_threads; ++i) {
+			for (i = 0, running = 0; i < g.c_threads; ++i) {
 				total.search += tinfo[i].search;
 				total.insert += tinfo[i].insert;
 				total.remove += tinfo[i].remove;

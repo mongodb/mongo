@@ -22,7 +22,8 @@ __wt_lsm_merge_worker(void *vargs)
 	WT_LSM_WORKER_ARGS *args;
 	WT_LSM_TREE *lsm_tree;
 	WT_SESSION_IMPL *session;
-	int id, progress, stalls;
+	u_int id;
+	int progress, stalls;
 
 	args = vargs;
 	lsm_tree = args->lsm_tree;
@@ -76,7 +77,7 @@ __wt_lsm_bloom_worker(void *arg)
 	WT_LSM_TREE *lsm_tree;
 	WT_LSM_WORKER_COOKIE cookie;
 	WT_SESSION_IMPL *session;
-	int i, j;
+	u_int i, j;
 
 	lsm_tree = arg;
 	session = lsm_tree->bloom_session;
@@ -135,7 +136,7 @@ __wt_lsm_checkpoint_worker(void *arg)
 	WT_LSM_WORKER_COOKIE cookie;
 	WT_SESSION_IMPL *session;
 	const char *cfg[] = API_CONF_DEFAULTS(session, checkpoint, NULL);
-	int i, j;
+	u_int i, j;
 
 	lsm_tree = arg;
 	session = lsm_tree->ckpt_session;
@@ -206,7 +207,7 @@ __wt_lsm_copy_chunks(WT_SESSION_IMPL *session,
     WT_LSM_TREE *lsm_tree, WT_LSM_WORKER_COOKIE *cookie)
 {
 	WT_DECL_RET;
-	int nchunks;
+	u_int nchunks;
 
 	/* Always return zero chunks on error. */
 	cookie->nchunks = 0;
@@ -321,7 +322,8 @@ __lsm_free_chunks(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	WT_DECL_RET;
 	WT_LSM_CHUNK *chunk;
 	const char *drop_cfg[] = API_CONF_DEFAULTS(session, drop, NULL);
-	int locked, progress, i;
+	u_int i;
+	int locked, progress;
 
 	locked = progress = 0;
 	for (i = 0; i < lsm_tree->nold_chunks; i++) {

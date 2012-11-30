@@ -177,7 +177,7 @@ __rename_table(WT_SESSION_IMPL *session,
 	WT_DECL_ITEM(buf);
 	WT_DECL_RET;
 	WT_TABLE *table;
-	int i;
+	u_int i;
 	const char *oldname, *value;
 
 	oldname = uri;
