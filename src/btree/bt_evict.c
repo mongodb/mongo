@@ -248,6 +248,7 @@ __evict_worker(WT_SESSION_IMPL *session)
 {
 	WT_CACHE *cache;
 	WT_CONNECTION_IMPL *conn;
+	WT_DECL_RET;
 	uint32_t flags;
 	uint64_t bytes_inuse, bytes_max, dirty_inuse;
 	int loop;
@@ -265,10 +266,11 @@ __evict_worker(WT_SESSION_IMPL *session)
 		__wt_spin_lock(session, &cache->evict_lock);
 
 		/* If there is a file sync request, satisfy it. */
-		while (cache->sync_complete != cache->sync_request)
-			WT_RET(__evict_file_request_walk(session));
+		while (ret == 0 && cache->sync_complete != cache->sync_request)
+			ret = __evict_file_request_walk(session);
 
 		__wt_spin_unlock(session, &cache->evict_lock);
+		WT_RET(ret);
 
 		/*
 		 * Keep evicting until we hit the target cache usage and the
@@ -286,7 +288,7 @@ __evict_worker(WT_SESSION_IMPL *session)
 		if (dirty_inuse >
 		    (cache->eviction_dirty_target * bytes_max) / 100)
 			LF_SET(WT_EVICT_DIRTY);
-		if (bytes_inuse < (cache->eviction_target * bytes_max) / 100)
+		if (bytes_inuse > (cache->eviction_target * bytes_max) / 100)
 			LF_SET(WT_EVICT_CLEAN);
 		if (!LF_ISSET(WT_EVICT_CLEAN) && !LF_ISSET(WT_EVICT_DIRTY))
 			break;
