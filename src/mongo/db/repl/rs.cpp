@@ -854,7 +854,7 @@ namespace mongo {
         cc().getAuthenticationInfo()->authorize("local","_repl");
         cc().getAuthorizationManager()->grantInternalAuthorization("_repl");
     }
-    
+
     void ReplSetImpl::setMinValid(BSONObj obj) {
         BSONObjBuilder builder;
         builder.appendTimestamp("ts", obj["ts"].date());
@@ -863,5 +863,13 @@ namespace mongo {
         Helpers::putSingleton("local.replset.minvalid", builder.obj());
     }
 
+    OpTime ReplSetImpl::getMinValid() {
+        Lock::DBRead lk("local.replset.minvalid");
+        BSONObj mv;
+        if (Helpers::getSingleton("local.replset.minvalid", mv)) {
+            return mv["ts"]._opTime();
+        }
+        return OpTime();
+    }
 }
 
