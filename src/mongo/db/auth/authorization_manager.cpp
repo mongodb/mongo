@@ -293,4 +293,24 @@ namespace mongo {
         return NULL; // Not authorized
     }
 
+    const Principal* AuthorizationManager::checkAuthorization(const std::string& resource,
+                                                              ActionSet actions) const {
+
+        if (_externalState->shouldIgnoreAuthChecks()) {
+            return &specialAdminPrincipal;
+        }
+
+        const AcquiredPrivilege* privilege;
+        privilege = _acquiredPrivileges.getPrivilegeForActions(nsToDatabase(resource), actions);
+        if (privilege) {
+            return privilege->getPrincipal();
+        }
+        privilege = _acquiredPrivileges.getPrivilegeForActions(WILDCARD_DBNAME, actions);
+        if (privilege) {
+            return privilege->getPrincipal();
+        }
+
+        return NULL; // Not authorized
+    }
+
 } // namespace mongo

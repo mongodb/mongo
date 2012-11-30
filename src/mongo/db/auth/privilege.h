@@ -38,6 +38,8 @@ namespace mongo {
 
         // Checks if the given action is present in the Privilege.
         bool includesAction(const ActionType& action) const;
+        // Checks if the given actions are present in the Privilege.
+        bool includesActions(const ActionSet& actions) const;
 
     private:
 

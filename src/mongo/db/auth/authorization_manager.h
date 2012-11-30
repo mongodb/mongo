@@ -80,6 +80,9 @@ namespace mongo {
         // not because of a standard user Principal but for a special reason such as the localhost
         // exception, it returns a pointer to specialAdminPrincipal.
         const Principal* checkAuthorization(const std::string& resource, ActionType action) const;
+        // Same as above but takes an ActionSet instead of a single ActionType.  The one principal
+        // returned must be able to perform all the actions in the ActionSet on the given resource.
+        const Principal* checkAuthorization(const std::string& resource, ActionSet actions) const;
 
         // Parses the privilege documents and acquires all privileges that the privilege document
         // grants

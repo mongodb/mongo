@@ -30,4 +30,8 @@ namespace mongo {
         return _actions.contains(action);
     }
 
+    bool Privilege::includesActions(const ActionSet& actions) const {
+        return _actions.isSupersetOf(actions);
+    }
+
 } // namespace mongo

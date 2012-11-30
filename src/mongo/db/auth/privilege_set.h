@@ -50,6 +50,10 @@ namespace mongo {
         // on the PrivilegeSet.
         const AcquiredPrivilege* getPrivilegeForAction(const std::string& resource,
                                                        const ActionType& action) const;
+        // Same as above but takes an ActionSet.  The AcquiredPrivilege returned must include
+        // permission to perform all the actions in the ActionSet on the given resource.
+        const AcquiredPrivilege* getPrivilegeForActions(const std::string& resource,
+                                                        const ActionSet& action) const;
 
     private:
 

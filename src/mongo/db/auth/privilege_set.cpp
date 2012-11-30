@@ -46,6 +46,21 @@ namespace mongo {
         return NULL;
     }
 
+    const AcquiredPrivilege* PrivilegeSet::getPrivilegeForActions(const std::string& resource,
+                                                                  const ActionSet& actions) const {
+        PrivilegeSetConstRange range;
+        PrivilegeRangeConstIterator it;
+
+        range = _privileges.equal_range(resource);
+        for (it = range.first; it != range.second; ++it) {
+            const AcquiredPrivilege& privilege = it->second;
+            if (privilege.getPrivilege().includesActions(actions)) {
+                return &privilege;
+            }
+        }
+        return NULL;
+    }
+
     void PrivilegeSet::revokePrivilegesFromPrincipal(Principal* principal) {
         PrivilegeRangeIterator it = _privileges.begin();
 
