@@ -1,11 +1,11 @@
 #bitcnt
 #	number of bits for fixed-length column-store files
 
-#bzip
-#	if blocks are BZIP2 encoded
-
 #cache
 #	size of the cache in MB
+
+#compression
+#	type of compression (none | bzip | raw | snappy)
 
 #data_source
 #	type of data source to create (file | table | lsm)
@@ -42,6 +42,9 @@
 
 #ops
 #	the number of modification operations done per run
+
+#prefix
+#	if keys are prefix compressed
 
 #repeat_data_pct
 #	percent duplicate values in row- or variable-length column-stores
