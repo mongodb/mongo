@@ -20,8 +20,10 @@
 
 #include "mongo/db/cmdline.h"
 
-#include "mongo/util/map_util.h"
+#include "mongo/base/status.h"
 #include "mongo/bson/util/builder.h"
+#include "mongo/db/server_parameters.h"
+#include "mongo/util/map_util.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/net/listen.h"
 #include "mongo/util/password.h"
@@ -84,6 +86,8 @@ namespace {
         ("keyFile", po::value<string>(), "private key for cluster authentication")
         ("enableFaultInjection", "enable the fault injection framework, for debugging."
                 " DO NOT USE IN PRODUCTION")
+        ("setParameter", po::value< std::vector<std::string> >()->composing(),
+                "Set a configurable parameter")
 #ifndef _WIN32
         ("nounixsocket", "disable listening on unix sockets")
         ("unixSocketPrefix", po::value<string>(), "alternative directory for UNIX domain sockets (defaults to /tmp)")
@@ -361,6 +365,33 @@ namespace {
 
         if ( params.count("pidfilepath")) {
             cmdLine.pidFile = params["pidfilepath"].as<string>();
+        }
+
+        if (params.count("setParameter")) {
+            std::vector<std::string> parameters =
+                params["setParameter"].as<std::vector<std::string> >();
+            for (size_t i = 0, length = parameters.size(); i < length; ++i) {
+                std::string name;
+                std::string value;
+                if (!mongoutils::str::splitOn(parameters[i], '=', name, value)) {
+                    cout << "Illegal option assignment: \"" << parameters[i] << "\"" << endl;
+                    return false;
+                }
+                ServerParameter* parameter = mapFindWithDefault(
+                        ServerParameterSet::getGlobal()->getMap(),
+                        name,
+                        static_cast<ServerParameter*>(NULL));
+                if (NULL == parameter) {
+                    cout << "Illegal --option parameter: \"" << name << "\"" << endl;
+                    return false;
+                }
+                Status status = parameter->setFromString(value);
+                if (!status.isOK()) {
+                    cout << "Bad value for parameter \"" << name << "\": " << status.reason()
+                         << endl;
+                    return false;
+                }
+            }
         }
 
 #ifdef MONGO_SSL
