@@ -263,7 +263,8 @@ connection_runtime_config = [
 		prefix string for error messages'''),
 	Config('eviction_dirty_target', '80', r'''
 		continue evicting until the cache has less dirty pages than this
-		(as a percentage)''',
+		(as a percentage). Dirty pages will only be evicted if the cache
+		is full enough to trigger eviction''',
 		min=10, max=99),
 	Config('eviction_target', '80', r'''
 		continue evicting until the cache becomes less full than this

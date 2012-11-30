@@ -1012,8 +1012,9 @@ struct __wt_connection {
 	 * @config{error_prefix, prefix string for error messages.,a string;
 	 * default empty.}
 	 * @config{eviction_dirty_target, continue evicting until the cache has
-	 * less dirty pages than this (as a percentage).,an integer between 10
-	 * and 99; default \c 80.}
+	 * less dirty pages than this (as a percentage). Dirty pages will only
+	 * be evicted if the cache is full enough to trigger eviction.,an
+	 * integer between 10 and 99; default \c 80.}
 	 * @config{eviction_target, continue evicting until the cache becomes
 	 * less full than this (as a percentage).  Must be less than \c
 	 * eviction_trigger.,an integer between 10 and 99; default \c 80.}
@@ -1205,7 +1206,8 @@ struct __wt_connection {
  * @config{error_prefix, prefix string for error messages.,a string; default
  * empty.}
  * @config{eviction_dirty_target, continue evicting until the cache has less
- * dirty pages than this (as a percentage).,an integer between 10 and 99;
+ * dirty pages than this (as a percentage). Dirty pages will only be evicted if
+ * the cache is full enough to trigger eviction.,an integer between 10 and 99;
  * default \c 80.}
  * @config{eviction_target, continue evicting until the cache becomes less full
  * than this (as a percentage).  Must be less than \c eviction_trigger.,an
