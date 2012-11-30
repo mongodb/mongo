@@ -15,7 +15,7 @@ for (var x = -points; x < points; x += 1) {
 
 origin = { "type" : "Point", "coordinates": [ lng, lat ] }
 
-t.ensureIndex({ geo : "s2d" })
+t.ensureIndex({ geo : "2dsphere" })
 
 res = t.find({ "geo" : { "$near" : { "$geometry" : origin, $maxDistance: 2000} } }).limit(10)
 assert.eq(res.itcount(), 10)

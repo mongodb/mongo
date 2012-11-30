@@ -1081,7 +1081,7 @@ namespace mongo {
         OrRangeGenerator org(_ns.c_str(), query, false);
 
         const set<string> special = org.getSpecial();
-        if (special.end() != special.find("2d") || special.end() != special.find("s2d")) {
+        if (special.end() != special.find("2d") || special.end() != special.find("2dsphere")) {
             BSONForEach(field, query) {
                 if (getGtLtOp(field) == BSONObj::opNEAR) {
                     uassert(13501, "use geoNear command rather than $near query", false);

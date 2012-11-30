@@ -42,7 +42,7 @@ namespace {
 
 namespace mongo {
 
-    static const string SPHERE_2D_NAME = "s2d";
+    static const string SPHERE_2D_NAME = "2dsphere";
 
     class GeoSphere2DType : public IndexType {
     public:

@@ -450,10 +450,10 @@ namespace mongo {
             break;
         case BSONObj::opNEAR:
             _special.insert("2d");
-            _special.insert("s2d");
+            _special.insert("2dsphere");
             break;
         case BSONObj::opINTERSECT:
-            _special.insert("s2d");
+            _special.insert("2dsphere");
             break;
         case BSONObj::opEXISTS: {
             if ( !existsSpec ) {
