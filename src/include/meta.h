@@ -38,6 +38,8 @@ struct __wt_ckpt {
 
 	uint64_t ckpt_size;			/* Checkpoint size */
 
+	uint64_t write_gen;			/* Write generation */
+
 	void	*bpriv;				/* Block manager private */
 
 #define	WT_CKPT_ADD	0x01			/* Checkpoint to be added */

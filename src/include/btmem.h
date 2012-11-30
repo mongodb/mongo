@@ -19,33 +19,40 @@ struct __wt_page_header {
 	uint64_t recno;			/* 00-07: column-store starting recno */
 
 	/*
+	 * We maintain page write-generations in the non-transactional case
+	 * as that's how salvage can determine the most recent page between
+	 * pages overlapping the same key range.
+	 */
+	uint64_t write_gen;		/* 08-15: write generation */
+
+	/*
 	 * The page's in-memory size isn't rounded or aligned, it's the actual
 	 * number of bytes the disk-image consumes when instantiated in memory.
 	 */
-	uint32_t mem_size;		/* 08-11: in-memory page size */
+	uint32_t mem_size;		/* 16-19: in-memory page size */
 
 	union {
-		uint32_t entries;	/* 12-15: number of cells on page */
-		uint32_t datalen;	/* 12-15: overflow data length */
+		uint32_t entries;	/* 20-23: number of cells on page */
+		uint32_t datalen;	/* 20-23: overflow data length */
 	} u;
 
-	uint8_t type;			/* 16: page type */
+	uint8_t type;			/* 24: page type */
 
 #define	WT_PAGE_COMPRESSED	0x01	/* Page is compressed on disk */
-	uint8_t flags;			/* 17: flags */
+	uint8_t flags;			/* 25: flags */
 
 	/*
 	 * End the structure with 2 bytes of padding: it wastes space, but it
 	 * leaves the structure 32-bit aligned and having a few bytes to play
 	 * with in the future can't hurt.
 	 */
-	uint8_t unused[2];		/* 18-19: unused padding */
+	uint8_t unused[2];		/* 26-27: unused padding */
 };
 /*
  * WT_PAGE_HEADER_SIZE is the number of bytes we allocate for the structure: if
  * the compiler inserts padding it will break the world.
  */
-#define	WT_PAGE_HEADER_SIZE		20
+#define	WT_PAGE_HEADER_SIZE		28
 
 /*
  * The block-manager specific information immediately follows the WT_PAGE_DISK

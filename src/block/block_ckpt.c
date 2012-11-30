@@ -745,10 +745,7 @@ __ckpt_string(WT_SESSION_IMPL *session,
 		    (uintmax_t)(ci->discard.offset + ci->discard.size),
 		    ci->discard.size, ci->discard.cksum));
 	WT_RET(__wt_buf_catfmt(session, buf,
-	    ", file size=%" PRIuMAX
-	    ", write generation=%" PRIu64,
-	    (uintmax_t)ci->file_size,
-	    ci->write_gen));
+	    ", file size=%" PRIuMAX, (uintmax_t)ci->file_size));
 
 	__wt_block_ckpt_destroy(session, ci);
 

@@ -574,8 +574,8 @@ copy(u_int gen, u_int recno)
 		dsk = (void *)buf;
 		if (page_type != WT_PAGE_ROW_LEAF)
 			dsk->recno = recno;
+		dsk->write_gen = gen;
 		blk = WT_BLOCK_HEADER_REF(buf);
-		blk->write_gen = gen;
 		blk->cksum = 0;
 		blk->cksum = __wt_cksum(dsk, PSIZE);
 		assert(fwrite(buf, 1, PSIZE, ofp) == PSIZE);

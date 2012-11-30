@@ -7,7 +7,7 @@
 
 #include "wt_internal.h"
 
-static int __btree_conf(WT_SESSION_IMPL *, const char *[]);
+static int __btree_conf(WT_SESSION_IMPL *, WT_CKPT *ckpt, const char *[]);
 static int __btree_get_last_recno(WT_SESSION_IMPL *);
 static int __btree_page_sizes(WT_SESSION_IMPL *, const char *);
 static int __btree_tree_open_empty(WT_SESSION_IMPL *, int);
@@ -40,28 +40,31 @@ __wt_btree_truncate(WT_SESSION_IMPL *session, const char *filename)
  *	Open a Btree.
  */
 int
-__wt_btree_open(WT_SESSION_IMPL *session,
-    const uint8_t *addr, uint32_t addr_size, const char *cfg[], int readonly)
+__wt_btree_open(WT_SESSION_IMPL *session, const char *cfg[])
 {
 	WT_BTREE *btree;
+	WT_CKPT ckpt;
 	WT_CONFIG_ITEM cval;
 	WT_DECL_RET;
 	uint32_t root_addr_size;
-	int created, forced_salvage;
-	const char *filename;
 	uint8_t root_addr[WT_BTREE_MAX_ADDR_COOKIE];
+	int creation, forced_salvage, readonly;
+	const char *filename;
 
 	btree = session->btree;
+	readonly = btree->checkpoint == NULL ? 0 : 1;
 
-	/* Initialize and configure the WT_BTREE structure. */
-	WT_ERR(__btree_conf(session, cfg));
+	/* Get the checkpoint information for this name/checkpoint pair. */
+	WT_CLEAR(ckpt);
+	WT_RET(__wt_meta_checkpoint(
+	    session, btree->name, btree->checkpoint, &ckpt));
 
 	/*
 	 * Bulk-load is only permitted on newly created files, not any empty
 	 * file -- see the checkpoint code for a discussion.
 	 */
-	created = addr == NULL || addr_size == 0;
-	if (!created && F_ISSET(btree, WT_BTREE_BULK))
+	creation = ckpt.raw.size == 0;
+	if (!creation && F_ISSET(btree, WT_BTREE_BULK))
 		WT_ERR_MSG(session, EINVAL,
 		    "bulk-load is only supported on newly created objects");
 
@@ -75,11 +78,13 @@ __wt_btree_open(WT_SESSION_IMPL *session,
 			forced_salvage = 1;
 	}
 
+	/* Initialize and configure the WT_BTREE structure. */
+	WT_ERR(__btree_conf(session, &ckpt, cfg));
+
 	/* Connect to the underlying block manager. */
 	filename = btree->name;
 	if (!WT_PREFIX_SKIP(filename, "file:"))
 		WT_ERR_MSG(session, EINVAL, "expected a 'file:' URI");
-
 	WT_ERR(__wt_bm_open(
 	    session, filename, btree->config, cfg, forced_salvage));
 
@@ -87,31 +92,33 @@ __wt_btree_open(WT_SESSION_IMPL *session,
 	 * Open the specified checkpoint unless it's a special command (special
 	 * commands are responsible for loading their own checkpoints, if any).
 	 */
-	if (F_ISSET(btree,
-	    WT_BTREE_SALVAGE | WT_BTREE_UPGRADE | WT_BTREE_VERIFY))
-		return (0);
+	if (!F_ISSET(btree,
+	    WT_BTREE_SALVAGE | WT_BTREE_UPGRADE | WT_BTREE_VERIFY)) {
+		/*
+		 * There are two reasons to load an empty tree rather than a
+		 * checkpoint: either there is no checkpoint (the file is
+		 * being created), or the load call returns no root page (the
+		 * checkpoint is for an empty file).
+		 */
+		WT_ERR(__wt_bm_checkpoint_load(session,
+		    ckpt.raw.data, ckpt.raw.size,
+		    root_addr, &root_addr_size, readonly));
+		if (creation || root_addr_size == 0)
+			WT_ERR(__btree_tree_open_empty(session, creation));
+		else {
+			WT_ERR(__wt_btree_tree_open(
+			    session, root_addr, root_addr_size));
 
-	/*
-	 * There are two reasons to load an empty tree rather than a checkpoint:
-	 * either there is no checkpoint (the file is being created), or the
-	 * load call returns no root page (the checkpoint is for an empty file).
-	 */
-	WT_ERR(__wt_bm_checkpoint_load(
-	    session, addr, addr_size, root_addr, &root_addr_size, readonly));
-	if (created || root_addr_size == 0)
-		WT_ERR(__btree_tree_open_empty(session, created));
-	else {
-		WT_ERR(
-		    __wt_btree_tree_open(session, root_addr, root_addr_size));
-
-		/* Get the last record number in a column-store file. */
-		if (btree->type != BTREE_ROW)
-			WT_ERR(__btree_get_last_recno(session));
+			/* Get the last record number in a column-store file. */
+			if (btree->type != BTREE_ROW)
+				WT_ERR(__btree_get_last_recno(session));
+		}
 	}
 
 	if (0) {
 err:		(void)__wt_btree_close(session);
 	}
+	__wt_meta_checkpoint_free(session, &ckpt);
 
 	return (ret);
 }
@@ -157,7 +164,7 @@ __wt_btree_close(WT_SESSION_IMPL *session)
  *	Configure a WT_BTREE structure.
  */
 static int
-__btree_conf(WT_SESSION_IMPL *session, const char *cfg[])
+__btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt, const char *cfg[])
 {
 	WT_BTREE *btree;
 	WT_CONFIG_ITEM cval;
@@ -304,8 +311,8 @@ __btree_conf(WT_SESSION_IMPL *session, const char *cfg[])
 
 	WT_RET(__wt_stat_alloc_dsrc_stats(session, &btree->stats));
 
-	/* The tree has not been modified. */
-	btree->modified = 0;
+	btree->write_gen = ckpt->write_gen;		/* Write generation */
+	btree->modified = 0;				/* Clean */
 
 	return (0);
 }
@@ -347,7 +354,7 @@ err:		__wt_buf_free(session, &dsk);
  *	Create an empty in-memory tree.
  */
 static int
-__btree_tree_open_empty(WT_SESSION_IMPL *session, int created)
+__btree_tree_open_empty(WT_SESSION_IMPL *session, int creation)
 {
 	WT_BTREE *btree;
 	WT_DECL_RET;
@@ -362,7 +369,7 @@ __btree_tree_open_empty(WT_SESSION_IMPL *session, int created)
 	 * loads; set a flag that's cleared when a row is inserted into the
 	 * tree.
 	 */
-	if (created)
+	if (creation)
 		btree->bulk_load_ok = 1;
 
 	/*
