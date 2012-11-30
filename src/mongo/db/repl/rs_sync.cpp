@@ -565,21 +565,15 @@ namespace replset {
             }
         }
 
-        {
-            Lock::DBRead lk("local.replset.minvalid");
-            BSONObj mv;
-            if( Helpers::getSingleton("local.replset.minvalid", mv) ) {
-                minvalid = mv["ts"]._opTime();
-                if( minvalid <= lastOpTimeWritten ) {
-                    golive=true;
-                }
-                else {
-                    sethbmsg(str::stream() << "still syncing, not yet to minValid optime " << minvalid.toString());
-                }
-            }
-            else
-                golive = true; /* must have been the original member */
+        minvalid = getMinValid();
+        if( minvalid <= lastOpTimeWritten ) {
+            golive=true;
         }
+        else {
+            sethbmsg(str::stream() << "still syncing, not yet to minValid optime " <<
+                     minvalid.toString());
+        }
+
         if( golive ) {
             sethbmsg("");
             changeState(MemberState::RS_SECONDARY);
@@ -674,7 +668,7 @@ namespace replset {
         }
 
         /* do we have anything at all? */
-        if( lastOpTimeWritten.isNull() ) {
+        if (getMinValid().isNull() || lastOpTimeWritten.isNull()) {
             syncDoInitialSync();
             return; // _syncThread will be recalled, starts from top again in case sync failed.
         }
