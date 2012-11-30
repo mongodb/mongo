@@ -18,7 +18,6 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
-#include "mongo/client/dbclientinterface.h"
 #include "mongo/db/auth/auth_external_state_server_common.h"
 
 namespace mongo {
@@ -36,6 +35,9 @@ namespace mongo {
         virtual Status getPrivilegeDocument(const string& dbname,
                                             const string& principalName,
                                             BSONObj* result);
+
+    protected:
+        virtual bool hasPrivilegeDocument(const std::string& dbname) const;
     };
 
 } // namespace mongo

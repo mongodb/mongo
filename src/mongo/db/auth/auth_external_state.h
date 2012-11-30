@@ -43,13 +43,6 @@ namespace mongo {
         // or the connection is a "god" connection.
         virtual bool shouldIgnoreAuthChecks() const = 0;
 
-        // adminDBConnection is a connection that can be used to access the admin database.  It is
-        // used to determine if there are any admin users configured for the cluster, and thus if
-        // localhost connections should be given special admin access.
-        // This function *must* be called on any new AuthExternalState, after the constructor but
-        // before any other methods are called on the AuthExternalState.
-        virtual Status initialize(DBClientBase* adminDBConnection) = 0;
-
         // Gets the privilege information document for "principalName" on "dbname".
         //
         // On success, returns Status::OK() and stores a shared-ownership copy of the document into
@@ -58,14 +51,12 @@ namespace mongo {
                                             const std::string& principalName,
                                             BSONObj* result) = 0;
 
-
     protected:
         // Look up the privilege document for "principalName" in database "dbname", over "conn".
         static Status getPrivilegeDocumentOverConnection(DBClientBase* conn,
                                                          const std::string& dbname,
                                                          const std::string& userName,
                                                          BSONObj* result);
-
 
         AuthExternalState(); // This class should never be instantiated directly.
     };

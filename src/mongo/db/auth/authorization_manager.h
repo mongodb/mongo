@@ -20,7 +20,6 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
-#include "mongo/client/dbclientinterface.h"
 #include "mongo/db/auth/acquired_privilege.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
@@ -59,13 +58,6 @@ namespace mongo {
         explicit AuthorizationManager(AuthExternalState* externalState);
         ~AuthorizationManager();
 
-        // adminDBConnection is a connection that can be used to access the admin database.  It is
-        // used to determine if there are any admin users configured for the cluster, and thus if
-        // localhost connections should be given special admin access.
-        // This function *must* be called on any new AuthorizationManager, after the constructor but
-        // before any other methods are called on the AuthorizationManager.
-        Status initialize(DBClientBase* adminDBConnection);
-
         // Takes ownership of the principal (by putting into _authenticatedPrincipals).
         void addAuthorizedPrincipal(Principal* principal);
 
@@ -103,9 +95,6 @@ namespace mongo {
             return _externalState->getPrivilegeDocument(dbname, userName, result);
         }
 
-        // Returns true if there exists at least one privilege document in the given database.
-        static bool hasPrivilegeDocument(DBClientBase* conn, const std::string& dbname);
-
         // Given a database name and a readOnly flag return an ActionSet describing all the actions
         // that an old-style user with those attributes should be given.
         static ActionSet getActionsForOldStyleUser(const std::string& dbname, bool readOnly);
@@ -133,7 +122,6 @@ namespace mongo {
         PrivilegeSet _acquiredPrivileges;
         // All principals who have been authenticated on this connection
         PrincipalSet _authenticatedPrincipals;
-        bool _initialized;
     };
 
 } // namespace mongo

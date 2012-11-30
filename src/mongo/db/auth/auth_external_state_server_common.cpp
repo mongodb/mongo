@@ -17,8 +17,6 @@
 #include "mongo/db/auth/auth_external_state_server_common.h"
 
 #include "mongo/base/status.h"
-#include "mongo/client/dbclientinterface.h"
-#include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/client.h"
 #include "mongo/util/debug_util.h"
 
@@ -27,31 +25,20 @@ namespace mongo {
     AuthExternalStateServerCommon::AuthExternalStateServerCommon() {}
     AuthExternalStateServerCommon::~AuthExternalStateServerCommon() {}
 
-    Status AuthExternalStateServerCommon::initialize(DBClientBase* adminDBConnection) {
-        if (noauth) {
-            return Status::OK();
-        }
-
-        try {
-            _adminUserExists = AuthorizationManager::hasPrivilegeDocument(adminDBConnection,
-                                                                          "admin");
-        } catch (DBException& e) {
-            return Status(ErrorCodes::InternalError,
-                          mongoutils::str::stream() << "An error occurred while checking for the "
-                                  "existence of an admin user: " << e.what(),
-                          0);
-        }
-        ONCE {
-            if (!_adminUserExists) {
-                log() << "note: no users configured in admin.system.users, allowing localhost access"
-                      << endl;
+    bool AuthExternalStateServerCommon::_allowLocalhost() const {
+        bool allow = !hasPrivilegeDocument("admin");
+        if (allow) {
+            ONCE {
+                log() << "note: no users configured in admin.system.users, allowing localhost "
+                        "access" << std::endl;
             }
         }
-        return Status::OK();
+        return allow;
     }
 
     bool AuthExternalStateServerCommon::shouldIgnoreAuthChecks() const {
-        return noauth || (!_adminUserExists && cc().getIsLocalHostConnection()) || cc().isGod();
+
+        return noauth || cc().isGod() || (cc().getIsLocalHostConnection() && _allowLocalhost());
     }
 
 } // namespace mongo

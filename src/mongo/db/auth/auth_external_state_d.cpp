@@ -21,7 +21,7 @@
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/client.h"
 #include "mongo/db/instance.h"
-#include "mongo/util/debug_util.h"
+#include "mongo/db/jsobj.h"
 
 namespace mongo {
 
@@ -34,6 +34,13 @@ namespace mongo {
         Client::GodScope gs;
         DBDirectClient conn;
         return getPrivilegeDocumentOverConnection(&conn, dbname, principalName, result);
+    }
+
+    bool AuthExternalStateMongod::hasPrivilegeDocument(const std::string& dbname) const {
+        Client::GodScope gs;
+        DBDirectClient conn;
+        BSONObj result = conn.findOne(dbname + ".system.users", Query());
+        return !result.isEmpty();
     }
 
 } // namespace mongo

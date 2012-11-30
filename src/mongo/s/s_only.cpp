@@ -61,25 +61,7 @@ namespace mongo {
     bool Client::shutdown() { return true; }
 
     void ClientBasic::initializeAuthorizationManager() {
-        std::string adminNs = "admin";
-        DBConfigPtr config = grid.getDBConfig(adminNs);
-        Shard shard = config->getShard(adminNs);
-        scoped_ptr<ScopedDbConnection> connPtr(
-                ScopedDbConnection::getInternalScopedDbConnection(shard.getConnString(), 30.0));
-        ScopedDbConnection& conn = *connPtr;
-
-        //
-        // Note: The connection mechanism here is *not* ideal, and should not be used elsewhere.
-        // It is safe in this particular case because the admin database is always on the config
-        // server and does not move.
-        //
-
         AuthorizationManager* authManager = new AuthorizationManager(new AuthExternalStateMongos);
-        Status status = authManager->initialize(conn.get());
-        massert(16479,
-                mongoutils::str::stream() << "Error initializing AuthorizationManager: "
-                                          << status.reason(),
-                status == Status::OK());
         setAuthorizationManager(authManager);
     }
 

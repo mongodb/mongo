@@ -16,6 +16,8 @@
 
 #include "mongo/db/auth/auth_external_state.h"
 
+#include "mongo/base/status.h"
+#include "mongo/client/dbclientinterface.h"
 #include "mongo/db/auth/authorization_manager.h"
 
 namespace mongo {

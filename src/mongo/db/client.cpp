@@ -112,14 +112,6 @@ namespace mongo {
         // AuthorizationManager
         AuthExternalState* externalState = new AuthExternalStateMongod;
         AuthorizationManager* authManager = new AuthorizationManager(externalState);
-        // Go into God scope so that the AuthorizationManager can query the local admin DB
-        // as part of its initialization without needing auth.
-        Client::GodScope gs;
-        Status status = authManager->initialize(new DBDirectClient());
-        massert(16480,
-                mongoutils::str::stream() << "Error initializing AuthorizationManager: "
-                << status.reason(),
-                status == Status::OK());
         setAuthorizationManager(authManager);
     }
 

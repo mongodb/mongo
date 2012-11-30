@@ -20,7 +20,6 @@
 
 #include "mongo/base/init.h"
 #include "mongo/base/status.h"
-#include "mongo/client/dbclientinterface.h"
 #include "mongo/db/auth/acquired_privilege.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
@@ -152,26 +151,11 @@ namespace mongo {
         return Status::OK();
     }
 
-    AuthorizationManager::AuthorizationManager(AuthExternalState* externalState) :
-            _initialized(false) {
+    AuthorizationManager::AuthorizationManager(AuthExternalState* externalState) {
         _externalState.reset(externalState);
     }
 
     AuthorizationManager::~AuthorizationManager(){}
-
-    Status AuthorizationManager::initialize(DBClientBase* adminDBConnection) {
-        if (_initialized) {
-            // This should never happen.
-            return Status(ErrorCodes::InternalError,
-                          "AuthorizationManager already initialized!",
-                          0);
-        }
-        Status status = _externalState->initialize(adminDBConnection);
-        if (status == Status::OK()) {
-            _initialized = true;
-        }
-        return status;
-    }
 
     void AuthorizationManager::addAuthorizedPrincipal(Principal* principal) {
         _authenticatedPrincipals.add(principal);
@@ -198,11 +182,6 @@ namespace mongo {
         _acquiredPrivileges.grantPrivilege(privilege);
 
         return Status::OK();
-    }
-
-    bool AuthorizationManager::hasPrivilegeDocument(DBClientBase* conn, const std::string& dbname) {
-        BSONObj result = conn->findOne(dbname + ".system.users", Query());
-        return !result.isEmpty();
     }
 
     ActionSet AuthorizationManager::getActionsForOldStyleUser(const std::string& dbname,
@@ -296,7 +275,6 @@ namespace mongo {
 
     const Principal* AuthorizationManager::checkAuthorization(const std::string& resource,
                                                               ActionType action) const {
-        massert(16470, "AuthorizationManager has not been initialized!", _initialized);
 
         if (_externalState->shouldIgnoreAuthChecks()) {
             return &specialAdminPrincipal;
