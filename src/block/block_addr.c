@@ -156,8 +156,6 @@ __wt_block_buffer_to_ckpt(WT_SESSION_IMPL *session,
 	ci->file_size = (off_t)a;
 	WT_RET(__wt_vunpack_uint(pp, 0, &a));
 	ci->ckpt_size = a;
-	WT_RET(__wt_vunpack_uint(pp, 0, &a));
-	ci->write_gen = a;
 
 	return (0);
 }
@@ -189,8 +187,6 @@ __wt_block_ckpt_to_buffer(WT_SESSION_IMPL *session,
 	a = (uint64_t)ci->file_size;
 	WT_RET(__wt_vpack_uint(pp, 0, a));
 	a = (uint64_t)ci->ckpt_size;
-	WT_RET(__wt_vpack_uint(pp, 0, a));
-	a = ci->write_gen;
 	WT_RET(__wt_vpack_uint(pp, 0, a));
 
 	return (0);

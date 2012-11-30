@@ -173,10 +173,9 @@ extern int __wt_bm_write(WT_SESSION_IMPL *session,
     int data_cksum);
 extern int __wt_bm_stat(WT_SESSION_IMPL *session);
 extern int __wt_bm_salvage_start(WT_SESSION_IMPL *session);
-extern int __wt_bm_salvage_next(WT_SESSION_IMPL *session,
+extern int __wt_bm_salvage_next( WT_SESSION_IMPL *session,
     uint8_t *addr,
     uint32_t *addr_sizep,
-    uint64_t *write_genp,
     int *eofp);
 extern int __wt_bm_salvage_valid( WT_SESSION_IMPL *session,
     uint8_t *addr,
@@ -211,11 +210,10 @@ extern int __wt_block_read_off(WT_SESSION_IMPL *session,
     uint32_t cksum);
 extern int __wt_block_salvage_start(WT_SESSION_IMPL *session, WT_BLOCK *block);
 extern int __wt_block_salvage_end(WT_SESSION_IMPL *session, WT_BLOCK *block);
-extern int __wt_block_salvage_next( WT_SESSION_IMPL *session,
+extern int __wt_block_salvage_next(WT_SESSION_IMPL *session,
     WT_BLOCK *block,
     uint8_t *addr,
     uint32_t *addr_sizep,
-    uint64_t *write_genp,
     int *eofp);
 extern int __wt_block_salvage_valid(WT_SESSION_IMPL *session,
     WT_BLOCK *block,
@@ -323,11 +321,7 @@ extern void *__wt_cache_evict_server(void *arg);
 extern int __wt_evict_lru_page(WT_SESSION_IMPL *session, int is_app);
 extern int __wt_btree_create(WT_SESSION_IMPL *session, const char *filename);
 extern int __wt_btree_truncate(WT_SESSION_IMPL *session, const char *filename);
-extern int __wt_btree_open(WT_SESSION_IMPL *session,
-    const uint8_t *addr,
-    uint32_t addr_size,
-    const char *cfg[],
-    int readonly);
+extern int __wt_btree_open(WT_SESSION_IMPL *session, const char *cfg[]);
 extern int __wt_btree_close(WT_SESSION_IMPL *session);
 extern int __wt_btree_tree_open( WT_SESSION_IMPL *session,
     const uint8_t *addr,
@@ -812,10 +806,10 @@ extern int __wt_meta_btree_apply(WT_SESSION_IMPL *session,
     int (*func)(WT_SESSION_IMPL *,
     const char *[]),
     const char *cfg[]);
-extern int __wt_meta_checkpoint_addr(WT_SESSION_IMPL *session,
+extern int __wt_meta_checkpoint(WT_SESSION_IMPL *session,
     const char *fname,
     const char *checkpoint,
-    WT_ITEM *addr);
+    WT_CKPT *ckpt);
 extern int __wt_meta_checkpoint_last_name( WT_SESSION_IMPL *session,
     const char *fname,
     const char **namep);
@@ -829,6 +823,7 @@ extern int __wt_meta_ckptlist_set( WT_SESSION_IMPL *session,
     WT_CKPT *ckptbase);
 extern void __wt_meta_ckptlist_free(WT_SESSION_IMPL *session,
     WT_CKPT *ckptbase);
+extern void __wt_meta_checkpoint_free(WT_SESSION_IMPL *session, WT_CKPT *ckpt);
 extern int __wt_metadata_open(WT_SESSION_IMPL *session);
 extern int __wt_metadata_load_backup(WT_SESSION_IMPL *session);
 extern int __wt_metadata_cursor( WT_SESSION_IMPL *session,

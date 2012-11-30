@@ -74,9 +74,8 @@ __wt_block_salvage_end(WT_SESSION_IMPL *session, WT_BLOCK *block)
  *	Return the address for the next potential block from the file.
  */
 int
-__wt_block_salvage_next(
-    WT_SESSION_IMPL *session, WT_BLOCK *block,
-    uint8_t *addr, uint32_t *addr_sizep, uint64_t *write_genp, int *eofp)
+__wt_block_salvage_next(WT_SESSION_IMPL *session,
+    WT_BLOCK *block, uint8_t *addr, uint32_t *addr_sizep, int *eofp)
 {
 	WT_BLOCK_HEADER *blk;
 	WT_DECL_ITEM(tmp);
@@ -139,17 +138,6 @@ skip:		WT_VERBOSE_ERR(session, salvage,
 		WT_ERR(__wt_block_off_free(
 		    session, block, offset, (off_t)allocsize));
 	}
-
-	/*
-	 * Track the largest write-generation we've seen in the file so future
-	 * writes, done after salvage completes, are preferred to these blocks.
-	 *
-	 * The read may have grown the buffer, reset our reference.
-	 */
-	blk = WT_BLOCK_HEADER_REF(tmp->mem);
-	*write_genp = blk->write_gen;
-	if (block->live.write_gen < blk->write_gen)
-		block->live.write_gen = blk->write_gen;
 
 	/* Re-create the address cookie that should reference this block. */
 	endp = addr;
