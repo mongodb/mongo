@@ -63,7 +63,7 @@ def compare_tables(self, session, uris, config=None):
             for next_cursor in cursors:
                 if (next_cursor.next() == wiredtiger.WT_NOTFOUND):
                     done = True
-                    break;
+                    break
                 keys.append(next_cursor.get_value())
             match = all(x == keys[0] for x in keys)
             if not match:
@@ -137,16 +137,19 @@ def simple_populate(self, uri, config, rows):
         cursor.insert()
     cursor.close()
 
-def simple_populate_check(self, uri):
-    self.pr('simple_populate_check: ' + uri)
-    cursor = self.session.open_cursor(uri, None)
+def simple_populate_check_cursor(self, cursor):
     i = 0
     for key,val in cursor:
         i += 1
         self.assertEqual(key, key_populate(cursor, i))
         if cursor.value_format == '8t' and val == 0:    # deleted
-            continue;
+            continue
         self.assertEqual(val, value_populate(cursor, i))
+
+def simple_populate_check(self, uri):
+    self.pr('simple_populate_check: ' + uri)
+    cursor = self.session.open_cursor(uri, None)
+    simple_populate_check_cursor(self, cursor)
     cursor.close()
 
 # Return the value stored in a complex object.
@@ -190,9 +193,7 @@ def complex_populate(self, uri, config, rows):
         cursor.insert()
     cursor.close()
 
-def complex_populate_check(self, uri):
-    self.pr('complex_populate_check: ' + uri)
-    cursor = self.session.open_cursor(uri, None)
+def complex_populate_check_cursor(self, cursor):
     i = 0
     for key, s1, i2, s3, s4 in cursor:
         i += 1
@@ -202,4 +203,9 @@ def complex_populate_check(self, uri):
         self.assertEqual(i2, v[1])
         self.assertEqual(s3, v[2])
         self.assertEqual(s4, v[3])
+
+def complex_populate_check(self, uri):
+    self.pr('complex_populate_check: ' + uri)
+    cursor = self.session.open_cursor(uri, None)
+    complex_populate_check_cursor(self, cursor)
     cursor.close()

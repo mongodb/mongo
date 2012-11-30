@@ -63,7 +63,7 @@ class backup_thread(threading.Thread):
             while True:
                 ret = cursor.next()
                 if ret != 0:
-                    break;
+                    break
                 files.append(cursor.get_key())
                 shutil.copy(cursor.get_key(), self.backup_dir)
 
@@ -75,7 +75,7 @@ class backup_thread(threading.Thread):
             uris = list()
             for next_file in files:
                 if next_file.startswith("WiredTiger"):
-                    continue;
+                    continue
                 uri = "file:" + next_file
                 uris.append(uri)
 

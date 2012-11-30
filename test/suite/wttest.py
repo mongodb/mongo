@@ -262,7 +262,7 @@ class WiredTigerTestCase(unittest.TestCase):
         self.origcwd = os.getcwd()
         removeAll(self.testdir)
         if os.path.exists(self.testdir):
-            raise Exception(self.testdir + ": cannot remove directory");
+            raise Exception(self.testdir + ": cannot remove directory")
         os.makedirs(self.testdir)
         try:
             os.chdir(self.testdir)
