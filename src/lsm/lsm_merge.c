@@ -186,7 +186,7 @@ __wt_lsm_merge(
 	/* Find the merge generation. */
 	for (generation = 0, i = 0; i < nchunks; i++)
 		generation = WT_MAX(generation,
-		    lsm_tree->chunk[start_chunk + i]->generation);
+		    lsm_tree->chunk[start_chunk + i]->generation + 1);
 
 	start_id = lsm_tree->chunk[start_chunk]->id;
 	__wt_rwunlock(session, lsm_tree->rwlock);
@@ -310,7 +310,7 @@ __wt_lsm_merge(
 	if (create_bloom)
 		F_SET(chunk, WT_LSM_CHUNK_BLOOM);
 	chunk->count = insert_count;
-	chunk->generation = ++generation;
+	chunk->generation = generation;
 	F_SET(chunk, WT_LSM_CHUNK_ONDISK);
 
 	ret = __wt_lsm_meta_write(session, lsm_tree);
