@@ -1011,6 +1011,10 @@ struct __wt_connection {
 	 * both.,an integer between 1MB and 10TB; default \c 100MB.}
 	 * @config{error_prefix, prefix string for error messages.,a string;
 	 * default empty.}
+	 * @config{eviction_dirty_target, continue evicting until the cache has
+	 * less dirty pages than this (as a percentage). Dirty pages will only
+	 * be evicted if the cache is full enough to trigger eviction.,an
+	 * integer between 10 and 99; default \c 80.}
 	 * @config{eviction_target, continue evicting until the cache becomes
 	 * less full than this (as a percentage).  Must be less than \c
 	 * eviction_trigger.,an integer between 10 and 99; default \c 80.}
@@ -1201,6 +1205,10 @@ struct __wt_connection {
  * from the following options: \c "data"\, \c "log"; default empty.}
  * @config{error_prefix, prefix string for error messages.,a string; default
  * empty.}
+ * @config{eviction_dirty_target, continue evicting until the cache has less
+ * dirty pages than this (as a percentage). Dirty pages will only be evicted if
+ * the cache is full enough to trigger eviction.,an integer between 10 and 99;
+ * default \c 80.}
  * @config{eviction_target, continue evicting until the cache becomes less full
  * than this (as a percentage).  Must be less than \c eviction_trigger.,an
  * integer between 10 and 99; default \c 80.}
@@ -1793,51 +1801,55 @@ extern int wiredtiger_extension_init(WT_SESSION *session,
 #define	WT_STAT_CONN_BYTE_READ				2
 /*! bytes written to a file */
 #define	WT_STAT_CONN_BYTE_WRITE				3
+/*! cache: tracked dirty bytes in the cache */
+#define	WT_STAT_CONN_CACHE_BYTES_DIRTY			4
 /*! cache: bytes currently held in the cache */
-#define	WT_STAT_CONN_CACHE_BYTES_INUSE			4
+#define	WT_STAT_CONN_CACHE_BYTES_INUSE			5
 /*! cache: maximum bytes configured */
-#define	WT_STAT_CONN_CACHE_BYTES_MAX			5
+#define	WT_STAT_CONN_CACHE_BYTES_MAX			6
 /*! cache: pages selected for eviction not evicted because of a hazard
  * reference */
-#define	WT_STAT_CONN_CACHE_EVICT_HAZARD			6
+#define	WT_STAT_CONN_CACHE_EVICT_HAZARD			7
 /*! cache: internal pages evicted */
-#define	WT_STAT_CONN_CACHE_EVICT_INTERNAL		7
+#define	WT_STAT_CONN_CACHE_EVICT_INTERNAL		8
 /*! cache: modified pages evicted */
-#define	WT_STAT_CONN_CACHE_EVICT_MODIFIED		8
+#define	WT_STAT_CONN_CACHE_EVICT_MODIFIED		9
 /*! cache: eviction server unable to reach eviction goal */
-#define	WT_STAT_CONN_CACHE_EVICT_SLOW			9
+#define	WT_STAT_CONN_CACHE_EVICT_SLOW			10
 /*! cache: unmodified pages evicted */
-#define	WT_STAT_CONN_CACHE_EVICT_UNMODIFIED		10
+#define	WT_STAT_CONN_CACHE_EVICT_UNMODIFIED		11
+/*! cache: tracked dirty pages in the cache */
+#define	WT_STAT_CONN_CACHE_PAGES_DIRTY			12
 /*! cache: pages currently held in the cache */
-#define	WT_STAT_CONN_CACHE_PAGES_INUSE			11
+#define	WT_STAT_CONN_CACHE_PAGES_INUSE			13
 /*! checkpoints */
-#define	WT_STAT_CONN_CHECKPOINT				12
+#define	WT_STAT_CONN_CHECKPOINT				14
 /*! condition wait calls */
-#define	WT_STAT_CONN_COND_WAIT				13
+#define	WT_STAT_CONN_COND_WAIT				15
 /*! files currently open */
-#define	WT_STAT_CONN_FILE_OPEN				14
+#define	WT_STAT_CONN_FILE_OPEN				16
 /*! total memory allocations */
-#define	WT_STAT_CONN_MEMALLOC				15
+#define	WT_STAT_CONN_MEMALLOC				17
 /*! total memory frees */
-#define	WT_STAT_CONN_MEMFREE				16
+#define	WT_STAT_CONN_MEMFREE				18
 /*! rwlock readlock calls */
-#define	WT_STAT_CONN_RWLOCK_RDLOCK			17
+#define	WT_STAT_CONN_RWLOCK_RDLOCK			19
 /*! rwlock writelock calls */
-#define	WT_STAT_CONN_RWLOCK_WRLOCK			18
+#define	WT_STAT_CONN_RWLOCK_WRLOCK			20
 /*! total read I/Os */
-#define	WT_STAT_CONN_TOTAL_READ_IO			19
+#define	WT_STAT_CONN_TOTAL_READ_IO			21
 /*! total write I/Os */
-#define	WT_STAT_CONN_TOTAL_WRITE_IO			20
+#define	WT_STAT_CONN_TOTAL_WRITE_IO			22
 /*! ancient transactions */
-#define	WT_STAT_CONN_TXN_ANCIENT			21
+#define	WT_STAT_CONN_TXN_ANCIENT			23
 /*! transactions */
-#define	WT_STAT_CONN_TXN_BEGIN				22
+#define	WT_STAT_CONN_TXN_BEGIN				24
 /*! transactions committed */
-#define	WT_STAT_CONN_TXN_COMMIT				23
+#define	WT_STAT_CONN_TXN_COMMIT				25
 /*! transaction failures due to cache overflow */
-#define	WT_STAT_CONN_TXN_FAIL_CACHE			24
+#define	WT_STAT_CONN_TXN_FAIL_CACHE			26
 /*! transactions rolled-back */
-#define	WT_STAT_CONN_TXN_ROLLBACK			25
+#define	WT_STAT_CONN_TXN_ROLLBACK			27
 
 /*!
  * @}

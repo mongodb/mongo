@@ -389,7 +389,7 @@ __inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *inmem_sizep)
 				WT_ERR(__wt_page_modify_init(session, page));
 				page->modify->first_id = WT_TXN_NONE;
 				if (btree->modified)
-					__wt_page_modify_set(page);
+					__wt_page_modify_set(session, page);
 			}
 
 			++ref;

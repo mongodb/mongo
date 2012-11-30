@@ -6,6 +6,17 @@
  */
 
 /*
+ * __wt_page_is_modified --
+ *	Return if the page is dirty.
+ */
+static inline int
+__wt_page_is_modified(WT_PAGE *page)
+{
+	return (page->modify != NULL &&
+	    page->modify->write_gen != page->modify->disk_gen ? 1 : 0);
+}
+
+/*
  * __wt_cache_page_inmem_incr --
  *	Increment a page's memory footprint in the cache.
  */
@@ -13,8 +24,13 @@ static inline void
 __wt_cache_page_inmem_incr(
     WT_SESSION_IMPL *session, WT_PAGE *page, size_t size)
 {
-	(void)WT_ATOMIC_ADD(S2C(session)->cache->bytes_inmem, size);
+	WT_CACHE *cache;
+
+	cache = S2C(session)->cache;
+	(void)WT_ATOMIC_ADD(cache->bytes_inmem, size);
 	(void)WT_ATOMIC_ADD(page->memory_footprint, WT_STORE_SIZE(size));
+	if (__wt_page_is_modified(page))
+		(void)WT_ATOMIC_ADD(cache->bytes_dirty, size);
 }
 
 /*
@@ -25,8 +41,31 @@ static inline void
 __wt_cache_page_inmem_decr(
     WT_SESSION_IMPL *session, WT_PAGE *page, size_t size)
 {
-	(void)WT_ATOMIC_SUB(S2C(session)->cache->bytes_inmem, size);
+	WT_CACHE *cache;
+
+	cache = S2C(session)->cache;
+	(void)WT_ATOMIC_SUB(cache->bytes_inmem, size);
 	(void)WT_ATOMIC_SUB(page->memory_footprint, WT_STORE_SIZE(size));
+	if (__wt_page_is_modified(page))
+		(void)WT_ATOMIC_SUB(cache->bytes_dirty, size);
+}
+
+/*
+ * __wt_cache_dirty_decr --
+ *	Decrement a page's memory footprint from the cache dirty count. Will
+ *      be called after a reconciliation leaves a page clean.
+ */
+static inline void
+__wt_cache_dirty_decr(
+    WT_SESSION_IMPL *session, size_t size)
+{
+	WT_CACHE *cache;
+
+	cache = S2C(session)->cache;
+	WT_ASSERT(session,
+	    cache->bytes_dirty >= size && cache->pages_dirty > 0);
+	(void)WT_ATOMIC_SUB(cache->bytes_dirty, size);
+	(void)WT_ATOMIC_SUB(cache->pages_dirty, 1);
 }
 
 /*
@@ -39,12 +78,19 @@ __wt_cache_page_read(WT_SESSION_IMPL *session, WT_PAGE *page, size_t size)
 	WT_CACHE *cache;
 
 	cache = S2C(session)->cache;
-
 	WT_ASSERT(session, size != 0);
-
 	(void)WT_ATOMIC_ADD(cache->pages_read, 1);
 	(void)WT_ATOMIC_ADD(cache->bytes_read, size);
 	(void)WT_ATOMIC_ADD(page->memory_footprint, WT_STORE_SIZE(size));
+
+	/*
+	 * It's unusual, but possible, that the page is already dirty.
+	 * For example, when reading an in-memory page with references to
+	 * deleted leaf pages, the internal page may be marked dirty.  If so,
+	 * update the total bytes dirty here.
+	 */
+	if (__wt_page_is_modified(page))
+		(void)WT_ATOMIC_ADD(cache->bytes_dirty, size);
 }
 
 /*
@@ -57,9 +103,7 @@ __wt_cache_page_evict(WT_SESSION_IMPL *session, WT_PAGE *page)
 	WT_CACHE *cache;
 
 	cache = S2C(session)->cache;
-
 	WT_ASSERT(session, page->memory_footprint != 0);
-
 	(void)WT_ATOMIC_ADD(cache->pages_evict, 1);
 	(void)WT_ATOMIC_ADD(cache->bytes_evict, page->memory_footprint);
 
@@ -113,6 +157,16 @@ __wt_cache_bytes_inuse(WT_CACHE *cache)
 }
 
 /*
+ * __wt_cache_dirty_bytes --
+ *	Return the number of bytes in cache marked dirty.
+ */
+static inline uint64_t
+__wt_cache_dirty_bytes(WT_CACHE *cache)
+{
+	return (cache->bytes_dirty);
+}
+
+/*
  * __wt_page_modify_init --
  *	A page is about to be modified, allocate the modification structure.
  */
@@ -140,8 +194,13 @@ __wt_page_modify_init(WT_SESSION_IMPL *session, WT_PAGE *page)
  *	Mark the page dirty.
  */
 static inline void
-__wt_page_modify_set(WT_PAGE *page)
+__wt_page_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
+	if (!__wt_page_is_modified(page)) {
+		(void)WT_ATOMIC_ADD(S2C(session)->cache->pages_dirty, 1);
+		(void)WT_ATOMIC_ADD(
+		    S2C(session)->cache->bytes_dirty, page->memory_footprint);
+	}
 	/*
 	 * Publish: there must be a barrier to ensure all changes to the page
 	 * are flushed before we update the page's write generation, otherwise
@@ -171,18 +230,7 @@ __wt_page_and_tree_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 */
 	btree->modified = 1;
 
-	__wt_page_modify_set(page);
-}
-
-/*
- * __wt_page_is_modified --
- *	Return if the page is dirty.
- */
-static inline int
-__wt_page_is_modified(WT_PAGE *page)
-{
-	return (page->modify != NULL &&
-	    page->modify->write_gen != page->modify->disk_gen ? 1 : 0);
+	__wt_page_modify_set(session, page);
 }
 
 /*

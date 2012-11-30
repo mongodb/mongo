@@ -340,23 +340,21 @@ config_single(const char *s, int perm)
 	++ep;
 
 	if (cp->flags & C_STRING) {
-		if (strncmp(s, "data_source", strlen("data_source")) == 0) {
-			if (strncmp("file", ep, strlen("file")) != 0 &&
-			    strncmp("table", ep, strlen("table")) != 0 &&
-			    strncmp("lsm", ep, strlen("lsm")) != 0) {
+		if (strncmp(s, "data_source", strlen("data_source")) == 0 &&
+		    strncmp("file", ep, strlen("file")) != 0 &&
+		    strncmp("table", ep, strlen("table")) != 0 &&
+		    strncmp("lsm", ep, strlen("lsm")) != 0) {
 			    fprintf(stderr,
-				"Invalid file type option: %s\n", ep);
+				"Invalid data source option: %s\n", ep);
 			    exit(EXIT_FAILURE);
-			}
-			*cp->vstr = strdup(ep);
 		}
-		else if (strncmp(s, "file_type", strlen("file_type")) == 0)
+		if (strncmp(s, "file_type", strlen("file_type")) == 0)
 			*cp->vstr = strdup(
 			    config_file_type(config_translate(ep)));
-		else if (strncmp(s, "compression", strlen("compression")) == 0)
+		else
 			*cp->vstr = strdup(ep);
 		if (*cp->vstr == NULL)
-			syserr("strdup");
+			syserr("Config string parsing");
 		return;
 	}
 

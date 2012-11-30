@@ -637,7 +637,7 @@ extern int __wt_conn_btree_discard_single(WT_SESSION_IMPL *session,
 extern int __wt_conn_btree_discard(WT_CONNECTION_IMPL *conn);
 extern int __wt_cache_config(WT_CONNECTION_IMPL *conn, const char *cfg[]);
 extern int __wt_cache_create(WT_CONNECTION_IMPL *conn, const char *cfg[]);
-extern void __wt_cache_stats_update(WT_CONNECTION_IMPL *conn);
+extern void __wt_cache_stats_update(WT_CONNECTION_IMPL *conn, uint32_t flags);
 extern void __wt_cache_destroy(WT_CONNECTION_IMPL *conn);
 extern int __wt_conn_cache_pool_config(WT_SESSION_IMPL *session,
     const char **cfg);

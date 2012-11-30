@@ -38,6 +38,11 @@ __wt_cache_config(WT_CONNECTION_IMPL *conn, const char *cfg[])
 		cache->eviction_trigger = (u_int)cval.val;
 	WT_RET_NOTFOUND_OK(ret);
 
+	if ((ret = __wt_config_gets(
+	    session, cfg, "eviction_dirty_target", &cval)) == 0)
+		cache->eviction_dirty_target = (u_int)cval.val;
+	WT_RET_NOTFOUND_OK(ret);
+
 	return (0);
 }
 
@@ -83,7 +88,7 @@ __wt_cache_create(WT_CONNECTION_IMPL *conn, const char *cfg[])
 	 * We pull some values from the cache statistics (rather than have two
 	 * copies).   Set them.
 	 */
-	__wt_cache_stats_update(conn);
+	__wt_cache_stats_update(conn, 0);
 
 	return (0);
 
@@ -96,10 +101,11 @@ err:	__wt_cache_destroy(conn);
  *	Update the cache statistics for return to the application.
  */
 void
-__wt_cache_stats_update(WT_CONNECTION_IMPL *conn)
+__wt_cache_stats_update(WT_CONNECTION_IMPL *conn, uint32_t flags)
 {
 	WT_CACHE *cache;
 
+	WT_UNUSED(flags);
 	cache = conn->cache;
 
 	WT_STAT_SET(conn->stats, cache_bytes_max, conn->cache_size);
@@ -107,6 +113,10 @@ __wt_cache_stats_update(WT_CONNECTION_IMPL *conn)
 	    conn->stats, cache_bytes_inuse, __wt_cache_bytes_inuse(cache));
 	WT_STAT_SET(
 	    conn->stats, cache_pages_inuse, __wt_cache_pages_inuse(cache));
+	WT_STAT_SET(
+	    conn->stats, cache_bytes_dirty, __wt_cache_dirty_bytes(cache));
+	WT_STAT_SET(
+	    conn->stats, cache_pages_dirty, cache->pages_dirty);
 }
 
 /*

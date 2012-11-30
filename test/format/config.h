@@ -162,6 +162,10 @@ static CONFIG c[] = {
 	  "minimum size of values",
 	  C_ROW|C_VAR, 0, 1, 20, &g.c_value_min, NULL },
 
+	{ "wiredtiger_config",
+	  "configuration string used to wiredtiger_open",
+	  0, C_IGNORE|C_STRING, 0, 0, NULL, &g.c_config_open },
+
 	{ "write_pct",
 	  "percent operations that are writes",
 	  0, C_OPS, 0, 90, &g.c_write_pct, NULL },
