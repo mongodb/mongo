@@ -41,29 +41,37 @@ namespace mongo {
             const Member* hopeful = theReplSet->findById(id);
             const Member *highestPriority = theReplSet->getMostElectable();
 
-            if( !hopeful ) {
+            if (!hopeful) {
                 errmsg = str::stream() << "replSet couldn't find member with id " << id;
                 return true;
             }
-            else if( theReplSet->isPrimary() && theReplSet->lastOpTimeWritten >= hopeful->hbinfo().opTime ) {
+
+            if (theReplSet->isPrimary() &&
+                theReplSet->lastOpTimeWritten >= hopeful->hbinfo().opTime) {
                 // hbinfo is not updated, so we have to check the primary's last optime separately
                 errmsg = str::stream() << "I am already primary, " << hopeful->fullName() <<
                     " can try again once I've stepped down";
                 return true;
             }
-            else if( primary && primary->hbinfo().opTime >= hopeful->hbinfo().opTime ) {
+
+            if (primary && primary->hbinfo().opTime >= hopeful->hbinfo().opTime) {
                 // other members might be aware of more up-to-date nodes
-                errmsg = str::stream() << hopeful->fullName() << " is trying to elect itself but " <<
-                    primary->fullName() << " is already primary and more up-to-date";
-                return true;
-            }
-            else if( highestPriority && highestPriority->config().priority > hopeful->config().priority) {
-                errmsg = str::stream() << hopeful->fullName() << " has lower priority than " << highestPriority->fullName();
+                errmsg = str::stream() << hopeful->fullName() <<
+                    " is trying to elect itself but " << primary->fullName() <<
+                    " is already primary and more up-to-date";
                 return true;
             }
 
-            if ( !theReplSet->isElectable(id) ||
-                (highestPriority && highestPriority->config().priority > hopeful->config().priority)) {
+            if (highestPriority &&
+                highestPriority->config().priority > hopeful->config().priority) {
+                errmsg = str::stream() << hopeful->fullName() << " has lower priority than " <<
+                    highestPriority->fullName();
+                return true;
+            }
+
+            if (!theReplSet->isElectable(id)) {
+                errmsg = str::stream() << "I don't think " << hopeful->fullName() <<
+                    " is electable";
                 return true;
             }
 
@@ -95,7 +103,12 @@ namespace mongo {
             }
             result.appendDate("opTime", theReplSet->lastOpTimeWritten.asDate());
             result.append("fresher", weAreFresher);
-            result.append("veto", shouldVeto(cmdObj, errmsg));
+
+            bool veto = shouldVeto(cmdObj, errmsg);
+            result.append("veto", veto);
+            if (veto) {
+                result.append("errmsg", errmsg);
+            }
 
             return true;
         }
