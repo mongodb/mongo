@@ -50,15 +50,4 @@ namespace mongo {
         x = sp;
     }
 
-
-    // obviously this is a sample, not real
-    // below this is all samples and won't be in the real one
-
-    ExportedServerParameter<int> logLevelParam( ServerParameterSet::getGlobal(), "logLevel", &logLevel );
-
-    string x = "a";
-    ExportedServerParameter<string> xxx( ServerParameterSet::getGlobal(), "xxx", &x );
-
-    MONGO_EXPORT_SERVER_PARAMETER( y, string, "hh" );
-
 }
