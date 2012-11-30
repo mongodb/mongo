@@ -177,15 +177,16 @@ __wt_lsm_merge(
 	/* Don't do small merges unless we have waited for 2s. */
 	if (nchunks <= 1 ||
 	    (id == 0 && stalls < 2 && nchunks < max_chunks / 2)) {
-		for (i = start_chunk; i <= end_chunk; i++)
-			F_CLR(lsm_tree->chunk[i], WT_LSM_CHUNK_MERGING);
+		for (i = 0; i < nchunks; i++)
+			F_CLR(lsm_tree->chunk[start_chunk + i],
+			    WT_LSM_CHUNK_MERGING);
 		nchunks = 0;
 	}
 
 	/* Find the merge generation. */
 	for (generation = 0, i = 0; i < nchunks; i++)
-		if (lsm_tree->chunk[start_chunk + i]->generation > generation)
-			generation = lsm_tree->chunk[i]->generation;
+		generation = WT_MAX(generation,
+		    lsm_tree->chunk[start_chunk + i]->generation);
 
 	start_id = lsm_tree->chunk[start_chunk]->id;
 	__wt_rwunlock(session, lsm_tree->rwlock);
