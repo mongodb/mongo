@@ -17,7 +17,7 @@ __find_next_col(WT_SESSION_IMPL *session, WT_TABLE *table,
 	u_int cg, col, foundcg, foundcol;
 	int getnext;
 
-	foundcg = foundcol = -1U;
+	foundcg = foundcol = UINT_MAX;
 
 	getnext = 1;
 	for (colgroup = NULL, cg = 0; cg < WT_COLGROUPS(table); cg++) {
@@ -54,7 +54,7 @@ cgcols:			cval = colgroup->colconf;
 		colgroup = NULL;
 	}
 
-	if (foundcg == -1U)
+	if (foundcg == UINT_MAX)
 		return (WT_NOTFOUND);
 
 	*cgnump = foundcg;
@@ -174,7 +174,7 @@ __wt_struct_plan(WT_SESSION_IMPL *session, WT_TABLE *table,
 	char coltype, current_coltype;
 
 	saved_btree = session->btree;
-	start_cg = start_col = -1U;		/* -Wuninitialized */
+	start_cg = start_col = UINT_MAX;	/* -Wuninitialized */
 
 	/* Work through the value columns by skipping over the key columns. */
 	WT_ERR(__wt_config_initn(session, &conf, columns, len));
