@@ -25,7 +25,7 @@
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/instance.h"
 #include "mongo/s/chunk_diff.h"
-#include "mongo/s/cluster_constants.h"
+#include "mongo/s/type_chunk.h"
 
 namespace mongo {
 
@@ -40,8 +40,8 @@ namespace mongo {
         SCMConfigDiffTracker( const string& currShard ) : _currShard( currShard ) {}
 
         virtual bool isTracked( const BSONObj& chunkDoc ) const {
-            return chunkDoc[ChunkFields::shard()].type() == String &&
-                   chunkDoc[ChunkFields::shard()].String() == _currShard;
+            return chunkDoc[ChunkType::shard()].type() == String &&
+                   chunkDoc[ChunkType::shard()].String() == _currShard;
         }
 
         virtual BSONObj maxFrom( const BSONObj& val ) const {
@@ -125,7 +125,7 @@ namespace mongo {
 
         // Need to do the query ourselves, since we may use direct conns to the db
         Query query = differ.configDiffQuery();
-        auto_ptr<DBClientCursor> cursor = conn->query(ConfigNS::chunk, query);
+        auto_ptr<DBClientCursor> cursor = conn->query(ChunkType::ConfigNS, query);
 
         uassert( 16181, str::stream() << "could not initialize cursor to config server chunks collection for ns " << ns, cursor.get() );
 
@@ -193,10 +193,10 @@ namespace mongo {
         ShardChunkVersion version;
         while ( cursor->more() ) {
             BSONObj d = cursor->next();
-            _chunksMap.insert(make_pair(d[ChunkFields::min()].Obj().getOwned(),
-                                        d[ChunkFields::max()].Obj().getOwned()));
+            _chunksMap.insert(make_pair(d[ChunkType::min()].Obj().getOwned(),
+                                        d[ChunkType::max()].Obj().getOwned()));
 
-            ShardChunkVersion currVersion = ShardChunkVersion::fromBSON(d[ChunkFields::lastmod()]);
+            ShardChunkVersion currVersion = ShardChunkVersion::fromBSON(d[ChunkType::DEPRECATED_lastmod()]);
             if ( currVersion > version ) {
                 version = currVersion;
             }

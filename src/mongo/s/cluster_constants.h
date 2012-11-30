@@ -86,27 +86,6 @@ namespace mongo {
     };
 
     /**
-     * ChunkFields holds all the field names and types for the chunks collection.
-     */
-    struct ChunkFields {
-        static BSONField<string> name;            // chunk's id
-        static BSONField<string> ns;              // namespace this collection is in
-        static BSONField<BSONObj> min;            // first key of the chunk, including
-        static BSONField<BSONObj> max;            // last key of the chunk, non-including
-        static BSONField<string> lastmod;         // major | minor versions
-        static BSONField<string> shard;           // home of this chunk
-        static BSONField<bool> jumbo;             // too big to move?
-
-        // Transition to new format, 2.2 -> 2.4
-        // 2.2 can read both lastmod + lastmodEpoch format and 2.4 [ lastmod, OID ] formats.
-        static BSONField<OID> lastmodEpoch;       // OID, to disambiguate collection incarnations
-
-        // Being added in 2.4
-        // This will deprecate lastmod + lastmodEpoch format.
-        static BSONField<BSONArray> NEW_lastmod;  // [Date_t, OID] format
-    };
-
-    /**
      * TagFields holds all the field names and types for the tags collection.
      */
     struct TagFields {

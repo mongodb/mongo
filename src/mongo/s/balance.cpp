@@ -23,7 +23,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/cmdline.h"
 #include "mongo/s/chunk.h"
-#include "mongo/s/cluster_constants.h"
+#include "mongo/s/type_chunk.h"
 #include "mongo/s/config.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/server.h"
@@ -213,12 +213,12 @@ namespace mongo {
             const string& ns = *it;
 
             map< string,vector<BSONObj> > shardToChunksMap;
-            cursor = conn.query(ConfigNS::chunk,
-                                QUERY(ChunkFields::ns(ns)).sort(ChunkFields::min()));
+            cursor = conn.query(ChunkType::ConfigNS,
+                                QUERY(ChunkType::ns(ns)).sort(ChunkType::min()));
 
             while ( cursor->more() ) {
                 BSONObj chunk = cursor->nextSafe();
-                vector<BSONObj>& chunks = shardToChunksMap[chunk[ChunkFields::shard()].String()];
+                vector<BSONObj>& chunks = shardToChunksMap[chunk[ChunkType::shard()].String()];
                 chunks.push_back( chunk.getOwned() );
             }
             cursor.reset();

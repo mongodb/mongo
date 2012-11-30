@@ -27,7 +27,7 @@
 #include "mongo/s/server.h"
 #include "mongo/s/config.h"
 #include "mongo/s/chunk.h"
-#include "mongo/s/cluster_constants.h"
+#include "mongo/s/type_chunk.h"
 
 namespace mongo {
 
@@ -171,19 +171,19 @@ namespace mongo {
             {
                 unsigned num = 0;
                 map<string,BSONObj> chunks;
-                auto_ptr<DBClientCursor> c = conn->query(ConfigNS::chunk, BSONObj());
+                auto_ptr<DBClientCursor> c = conn->query(ChunkType::ConfigNS, BSONObj());
                 while ( c->more() ) {
                     BSONObj x = c->next();
                     BSONObjBuilder b;
 
-                    string id = Chunk::genID(x[ChunkFields::ns()].String(),
-                                             x[ChunkFields::min()].Obj() );
+                    string id = Chunk::genID(x[ChunkType::ns()].String(),
+                                             x[ChunkType::min()].Obj() );
                     b.append( "_id" , id );
 
                     BSONObjIterator i(x);
                     while ( i.more() ) {
                         BSONElement e = i.next();
-                        if (strcmp(e.fieldName(), ChunkFields::name().c_str()) == 0)
+                        if (strcmp(e.fieldName(), ChunkType::name().c_str()) == 0)
                             continue;
                         b.append( e );
                     }
@@ -196,9 +196,9 @@ namespace mongo {
 
                 verify( num == chunks.size() );
 
-                conn->remove(ConfigNS::chunk , BSONObj());
+                conn->remove(ChunkType::ConfigNS , BSONObj());
                 for ( map<string,BSONObj>::iterator i=chunks.begin(); i!=chunks.end(); i++ ) {
-                    conn->insert(ConfigNS::chunk, i->second);
+                    conn->insert(ChunkType::ConfigNS, i->second);
                 }
 
             }

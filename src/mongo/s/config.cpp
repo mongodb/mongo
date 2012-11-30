@@ -26,7 +26,7 @@
 #include "mongo/db/pdfile.h"
 #include "mongo/db/cmdline.h"
 #include "mongo/s/chunk.h"
-#include "mongo/s/cluster_constants.h"
+#include "mongo/s/type_chunk.h"
 #include "mongo/s/config.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/server.h"
@@ -318,12 +318,12 @@ namespace mongo {
         if ( oldVersion.isSet() && ! forceReload ) {
             scoped_ptr<ScopedDbConnection> conn( ScopedDbConnection::getInternalScopedDbConnection(
                     configServer.modelServer(), 30.0 ) );
-            newest = conn->get()->findOne(ConfigNS::chunk,
-                                          Query(BSON(ChunkFields::ns(ns))).sort(ChunkFields::lastmod(), -1));
+            newest = conn->get()->findOne(ChunkType::ConfigNS,
+                                          Query(BSON(ChunkType::ns(ns))).sort(ChunkType::DEPRECATED_lastmod(), -1));
             conn->done();
             
             if ( ! newest.isEmpty() ) {
-                ShardChunkVersion v = ShardChunkVersion::fromBSON(newest, ChunkFields::lastmod());
+                ShardChunkVersion v = ShardChunkVersion::fromBSON(newest, ChunkType::DEPRECATED_lastmod());
                 if ( v.isEquivalentTo( oldVersion ) ) {
                     scoped_lock lk( _lock );
                     CollectionInfo& ci = _collections[ns];
@@ -354,7 +354,7 @@ namespace mongo {
                 if ( ci.isSharded() && ci.getCM() ) {
 
                     ShardChunkVersion currentVersion =
-                        ShardChunkVersion::fromBSON(newest, ChunkFields::lastmod());
+                        ShardChunkVersion::fromBSON(newest, ChunkType::DEPRECATED_lastmod());
 
                     // Only reload if the version we found is newer than our own in the same
                     // epoch
@@ -941,17 +941,17 @@ namespace mongo {
             }
 
             // indexes
-            conn->get()->ensureIndex(ConfigNS::chunk,
-                                     BSON(ChunkFields::ns() << 1 << ChunkFields::min() << 1 ), true);
+            conn->get()->ensureIndex(ChunkType::ConfigNS,
+                                     BSON(ChunkType::ns() << 1 << ChunkType::min() << 1 ), true);
 
-            conn->get()->ensureIndex(ConfigNS::chunk,
-                                     BSON(ChunkFields::ns() << 1 <<
-                                          ChunkFields::shard() << 1 <<
-                                          ChunkFields::min() << 1 ), true);
+            conn->get()->ensureIndex(ChunkType::ConfigNS,
+                                     BSON(ChunkType::ns() << 1 <<
+                                          ChunkType::shard() << 1 <<
+                                          ChunkType::min() << 1 ), true);
 
-            conn->get()->ensureIndex(ConfigNS::chunk,
-                                     BSON(ChunkFields::ns() << 1 <<
-                                          ChunkFields::lastmod() << 1 ), true );
+            conn->get()->ensureIndex(ChunkType::ConfigNS,
+                                     BSON(ChunkType::ns() << 1 <<
+                                          ChunkType::DEPRECATED_lastmod() << 1 ), true );
 
             conn->get()->ensureIndex(ConfigNS::shard, BSON(ShardFields::host() << 1), true);
 

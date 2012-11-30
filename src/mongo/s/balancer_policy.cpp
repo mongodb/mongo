@@ -169,7 +169,7 @@ namespace mongo {
         if ( _tagRanges.size() == 0 )
             return "";
 
-        BSONObj min = chunk[ChunkFields::min()].Obj();
+        BSONObj min = chunk[ChunkType::min()].Obj();
 
         map<BSONObj,TagRange>::const_iterator i = _tagRanges.upper_bound( min );
         if ( i == _tagRanges.end() )
@@ -205,7 +205,7 @@ namespace mongo {
     }
 
     bool BalancerPolicy::_isJumbo( const BSONObj& chunk ) {
-        if ( chunk[ChunkFields::jumbo()].trueValue() ) {
+        if ( chunk[ChunkType::jumbo()].trueValue() ) {
             LOG(1) << "chunk: " << chunk << "is marked as jumbo" << endl;
             return true;
         }

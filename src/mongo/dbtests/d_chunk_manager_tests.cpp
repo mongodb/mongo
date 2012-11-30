@@ -22,6 +22,7 @@
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/s/d_chunk_manager.h"
 #include "mongo/s/cluster_constants.h"
+#include "mongo/s/type_chunk.h"
 
 namespace {
 
@@ -34,10 +35,10 @@ namespace {
                                       CollectionFields::unique(false));
 
             // single-chunk collection
-            BSONArray chunks = BSON_ARRAY(BSON(ChunkFields::name("test.foo-a_MinKey") <<
-                                               ChunkFields::ns("test.foo") <<
-                                               ChunkFields::min(BSON("a" << MINKEY)) <<
-                                               ChunkFields::max(BSON("a" << MAXKEY))));
+            BSONArray chunks = BSON_ARRAY(BSON(ChunkType::name("test.foo-a_MinKey") <<
+                                               ChunkType::ns("test.foo") <<
+                                               ChunkType::min(BSON("a" << MINKEY)) <<
+                                               ChunkType::max(BSON("a" << MAXKEY))));
 
             ShardChunkManager s ( collection , chunks );
 
@@ -59,11 +60,11 @@ namespace {
                                       CollectionFields::unique(false));
 
             // single-chunk collection
-            BSONArray chunks = BSON_ARRAY(BSON(ChunkFields::name("test.foo-a_MinKeyb_MinKey") <<
-                                               ChunkFields::ns("test.foo") <<
-                                               ChunkFields::min(BSON("a" << MINKEY <<
+            BSONArray chunks = BSON_ARRAY(BSON(ChunkType::name("test.foo-a_MinKeyb_MinKey") <<
+                                               ChunkType::ns("test.foo") <<
+                                               ChunkType::min(BSON("a" << MINKEY <<
                                                                      "b" << MINKEY)) <<
-                                               ChunkFields::max(BSON("a" << MAXKEY <<
+                                               ChunkType::max(BSON("a" << MAXKEY <<
                                                                      "b" << MINKEY))));
 
             ShardChunkManager s ( collection , chunks );
@@ -89,20 +90,20 @@ namespace {
 
             // 3-chunk collection, 2 of them being contiguous
             // [min->10) , [10->20) , <gap> , [30->max)
-            BSONArray chunks = BSON_ARRAY(BSON(ChunkFields::name("x.y-a_MinKey") <<
-                                               ChunkFields::ns("x.y") <<
-                                               ChunkFields::min(BSON("a" << MINKEY)) <<
-                                               ChunkFields::max(BSON("a" << 10))) <<
+            BSONArray chunks = BSON_ARRAY(BSON(ChunkType::name("x.y-a_MinKey") <<
+                                               ChunkType::ns("x.y") <<
+                                               ChunkType::min(BSON("a" << MINKEY)) <<
+                                               ChunkType::max(BSON("a" << 10))) <<
 
-                                          BSON(ChunkFields::name("x.y-a_10") <<
-                                               ChunkFields::ns("x.y") <<
-                                               ChunkFields::min(BSON("a" << 10)) <<
-                                               ChunkFields::max(BSON("a" << 20))) <<
+                                          BSON(ChunkType::name("x.y-a_10") <<
+                                               ChunkType::ns("x.y") <<
+                                               ChunkType::min(BSON("a" << 10)) <<
+                                               ChunkType::max(BSON("a" << 20))) <<
 
-                                          BSON(ChunkFields::name("x.y-a_30") <<
-                                               ChunkFields::ns("x.y") <<
-                                               ChunkFields::min(BSON("a" << 30)) <<
-                                               ChunkFields::max(BSON("a" << MAXKEY))));
+                                          BSON(ChunkType::name("x.y-a_30") <<
+                                               ChunkType::ns("x.y") <<
+                                               ChunkType::min(BSON("a" << 30)) <<
+                                               ChunkType::max(BSON("a" << MAXKEY))));
 
             ShardChunkManager s ( collection , chunks );
 
@@ -146,10 +147,10 @@ namespace {
             // [10->20]
             BSONObj key_a10 = BSON( "a" << 10 );
             BSONObj key_a20 = BSON( "a" << 20 );
-            BSONArray chunks2 = BSON_ARRAY(BSON(ChunkFields::name("x.y-a_10") <<
-                                                ChunkFields::ns("x.y") <<
-                                                ChunkFields::min(key_a10) <<
-                                                ChunkFields::max(key_a20)));
+            BSONArray chunks2 = BSON_ARRAY(BSON(ChunkType::name("x.y-a_10") <<
+                                                ChunkType::ns("x.y") <<
+                                                ChunkType::min(key_a10) <<
+                                                ChunkType::max(key_a20)));
             ShardChunkManager s2( collection , chunks2 );
             ASSERT( s2.getNextChunk( empty , &foundMin , &foundMax ) );
             ASSERT( foundMin.woCompare( key_a10 ) == 0 );
@@ -160,18 +161,18 @@ namespace {
             BSONObj key_a30 = BSON( "a" << 30 );
             BSONObj key_min = BSON( "a" << MINKEY );
             BSONObj key_max = BSON( "a" << MAXKEY );
-            BSONArray chunks3 = BSON_ARRAY(BSON(ChunkFields::name("x.y-a_MinKey") <<
-                                                ChunkFields::ns("x.y") <<
-                                                ChunkFields::min(key_min) <<
-                                                ChunkFields::max(key_a10)) <<
-                                           BSON(ChunkFields::name("x.y-a_10") <<
-                                                ChunkFields::ns("x.y") <<
-                                                ChunkFields::min(key_a10)  <<
-                                                ChunkFields::max(key_a20)) <<
-                                           BSON(ChunkFields::name("x.y-a_30") <<
-                                                ChunkFields::ns("x.y") <<
-                                                ChunkFields::min(key_a30)  <<
-                                                ChunkFields::max(key_max)));
+            BSONArray chunks3 = BSON_ARRAY(BSON(ChunkType::name("x.y-a_MinKey") <<
+                                                ChunkType::ns("x.y") <<
+                                                ChunkType::min(key_min) <<
+                                                ChunkType::max(key_a10)) <<
+                                           BSON(ChunkType::name("x.y-a_10") <<
+                                                ChunkType::ns("x.y") <<
+                                                ChunkType::min(key_a10)  <<
+                                                ChunkType::max(key_a20)) <<
+                                           BSON(ChunkType::name("x.y-a_30") <<
+                                                ChunkType::ns("x.y") <<
+                                                ChunkType::min(key_a30)  <<
+                                                ChunkType::max(key_max)));
             ShardChunkManager s3( collection , chunks3 );
             ASSERT( ! s3.getNextChunk( empty , &foundMin , &foundMax ) ); // not eof
             ASSERT( foundMin.woCompare( key_min ) == 0 );
@@ -205,10 +206,10 @@ namespace {
 
             // 1-chunk collection
             // [10,0-20,0)
-            BSONArray chunks = BSON_ARRAY(BSON(ChunkFields::name("test.foo-a_MinKey") <<
-                                               ChunkFields::ns("test.foo") <<
-                                               ChunkFields::min(BSON("a" << 10 << "b" << 0)) <<
-                                               ChunkFields::max(BSON("a" << 20 << "b" << 0))));
+            BSONArray chunks = BSON_ARRAY(BSON(ChunkType::name("test.foo-a_MinKey") <<
+                                               ChunkType::ns("test.foo") <<
+                                               ChunkType::min(BSON("a" << 10 << "b" << 0)) <<
+                                               ChunkType::max(BSON("a" << 20 << "b" << 0))));
 
             ShardChunkManager s ( collection , chunks );
 
@@ -238,10 +239,10 @@ namespace {
 
             // 1-chunk collection
             // [10,0-20,0)
-            BSONArray chunks = BSON_ARRAY(BSON(ChunkFields::name("test.foo-a_MinKey") <<
-                                               ChunkFields::ns("test.foo") <<
-                                               ChunkFields::min(BSON("a" << 10 << "b" << 0)) <<
-                                               ChunkFields::max(BSON("a" << 20 << "b" << 0))));
+            BSONArray chunks = BSON_ARRAY(BSON(ChunkType::name("test.foo-a_MinKey") <<
+                                               ChunkType::ns("test.foo") <<
+                                               ChunkType::min(BSON("a" << 10 << "b" << 0)) <<
+                                               ChunkType::max(BSON("a" << 20 << "b" << 0))));
 
             ShardChunkManager s ( collection , chunks );
 
@@ -262,14 +263,14 @@ namespace {
 
             // 2-chunk collection
             // [10,0->20,0) , <gap> , [30,0->40,0)
-            BSONArray chunks = BSON_ARRAY(BSON(ChunkFields::name("x.y-a_10b_0") <<
-                                               ChunkFields::ns("x.y") <<
-                                               ChunkFields::min(BSON("a" << 10 << "b" << 0)) <<
-                                               ChunkFields::max(BSON("a" << 20 << "b" << 0))) <<
-                                          BSON(ChunkFields::name("x.y-a_30b_0") <<
-                                               ChunkFields::ns("x.y") <<
-                                               ChunkFields::min(BSON("a" << 30 << "b" << 0)) <<
-                                               ChunkFields::max(BSON("a" << 40 << "b" << 0))));
+            BSONArray chunks = BSON_ARRAY(BSON(ChunkType::name("x.y-a_10b_0") <<
+                                               ChunkType::ns("x.y") <<
+                                               ChunkType::min(BSON("a" << 10 << "b" << 0)) <<
+                                               ChunkType::max(BSON("a" << 20 << "b" << 0))) <<
+                                          BSON(ChunkType::name("x.y-a_30b_0") <<
+                                               ChunkType::ns("x.y") <<
+                                               ChunkType::min(BSON("a" << 30 << "b" << 0)) <<
+                                               ChunkType::max(BSON("a" << 40 << "b" << 0))));
 
             ShardChunkManager s ( collection , chunks );
 
@@ -301,14 +302,14 @@ namespace {
 
             // 2-chunk collection
             // [10,0->20,0) , <gap> , [30,0->40,0)
-            BSONArray chunks = BSON_ARRAY(BSON(ChunkFields::name("x.y-a_10b_0") <<
-                                               ChunkFields::ns("x.y") <<
-                                               ChunkFields::min(BSON("a" << 10 << "b" << 0)) <<
-                                               ChunkFields::max(BSON("a" << 20 << "b" << 0))) <<
-                                          BSON(ChunkFields::name("x.y-a_30b_0") <<
-                                               ChunkFields::ns("x.y") <<
-                                               ChunkFields::min(BSON("a" << 30 << "b" << 0)) <<
-                                               ChunkFields::max(BSON("a" << 40 << "b" << 0))));
+            BSONArray chunks = BSON_ARRAY(BSON(ChunkType::name("x.y-a_10b_0") <<
+                                               ChunkType::ns("x.y") <<
+                                               ChunkType::min(BSON("a" << 10 << "b" << 0)) <<
+                                               ChunkType::max(BSON("a" << 20 << "b" << 0))) <<
+                                          BSON(ChunkType::name("x.y-a_30b_0") <<
+                                               ChunkType::ns("x.y") <<
+                                               ChunkType::min(BSON("a" << 30 << "b" << 0)) <<
+                                               ChunkType::max(BSON("a" << 40 << "b" << 0))));
 
             ShardChunkManager s ( collection , chunks );
 
@@ -337,10 +338,10 @@ namespace {
             // [10,0-20,0)
             BSONObj min = BSON( "a" << 10 << "b" << 0 );
             BSONObj max = BSON( "a" << 20 << "b" << 0 );
-            BSONArray chunks = BSON_ARRAY(BSON(ChunkFields::name("test.foo-a_MinKey") <<
-                                               ChunkFields::ns("test.foo") <<
-                                               ChunkFields::min(min) <<
-                                               ChunkFields::max(max)));
+            BSONArray chunks = BSON_ARRAY(BSON(ChunkType::name("test.foo-a_MinKey") <<
+                                               ChunkType::ns("test.foo") <<
+                                               ChunkType::min(min) <<
+                                               ChunkType::max(max)));
 
             ShardChunkManager s ( collection , chunks );
 
@@ -376,10 +377,10 @@ namespace {
             // [10,0-20,0)
             BSONObj min = BSON( "a" << 10 << "b" << 0 );
             BSONObj max = BSON( "a" << 20 << "b" << 0 );
-            BSONArray chunks = BSON_ARRAY(BSON(ChunkFields::name("test.foo-a_MinKey") <<
-                                               ChunkFields::ns("test.foo") <<
-                                               ChunkFields::min(min) <<
-                                               ChunkFields::max(max)));
+            BSONArray chunks = BSON_ARRAY(BSON(ChunkType::name("test.foo-a_MinKey") <<
+                                               ChunkType::ns("test.foo") <<
+                                               ChunkType::min(min) <<
+                                               ChunkType::max(max)));
 
             ShardChunkManager s ( collection , chunks );
 
@@ -425,10 +426,10 @@ namespace {
 
             // 1-chunk collection
             // [10->20)
-            BSONArray chunks = BSON_ARRAY(BSON(ChunkFields::name("test.foo-a_10") <<
-                                               ChunkFields::ns("test.foo") <<
-                                               ChunkFields::min(BSON("a" << 10)) <<
-                                               ChunkFields::max(BSON("a" << 20))));
+            BSONArray chunks = BSON_ARRAY(BSON(ChunkType::name("test.foo-a_10") <<
+                                               ChunkType::ns("test.foo") <<
+                                               ChunkType::min(BSON("a" << 10)) <<
+                                               ChunkType::max(BSON("a" << 20))));
 
             ShardChunkManager s( collection , chunks );
             BSONObj min = BSON( "a" << 10 );

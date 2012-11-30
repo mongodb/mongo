@@ -28,7 +28,7 @@
 #include "mongo/db/stats/counters.h"
 #include "mongo/s/chunk.h"
 #include "mongo/s/client_info.h"
-#include "mongo/s/cluster_constants.h"
+#include "mongo/s/type_chunk.h"
 #include "mongo/s/config.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/stats.h"
@@ -1195,8 +1195,8 @@ namespace mongo {
 
                 // If the server has been completely drained, remove it from the ConfigDB.
                 // Check not only for chunks but also databases.
-                BSONObj shardIDDoc = BSON(ChunkFields::shard(shardDoc[ShardFields::name()].str()));
-                long long chunkCount = conn->count(ConfigNS::chunk, shardIDDoc);
+                BSONObj shardIDDoc = BSON(ChunkType::shard(shardDoc[ShardFields::name()].str()));
+                long long chunkCount = conn->count(ChunkType::ConfigNS, shardIDDoc);
                 long long dbCount = conn->count( ConfigNS::database , primaryDoc );
                 if ( ( chunkCount == 0 ) && ( dbCount == 0 ) ) {
                     log() << "going to remove shard: " << s.getName() << endl;

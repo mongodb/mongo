@@ -45,17 +45,6 @@ namespace mongo {
     BSONField<bool> CollectionFields::noBalance("noBalance");
     BSONField<OID> CollectionFields::epoch("lastmodEpoch");
 
-    const string ConfigNS::chunk = "config.chunks";
-    BSONField<string> ChunkFields::name("_id");
-    BSONField<string> ChunkFields::ns("ns");
-    BSONField<BSONObj> ChunkFields::min("min");
-    BSONField<BSONObj> ChunkFields::max("max");
-    BSONField<string> ChunkFields::lastmod("lastmod");
-    BSONField<string> ChunkFields::shard("shard");
-    BSONField<bool> ChunkFields::jumbo("jumbo");
-    BSONField<OID> ChunkFields::lastmodEpoch("lastmodEpoch");
-    BSONField<BSONArray> ChunkFields::NEW_lastmod("lastmod");
-
     const string ConfigNS::tag = "config.tags";
     BSONField<string> TagFields::ns("ns");
     BSONField<string> TagFields::tag("tag");

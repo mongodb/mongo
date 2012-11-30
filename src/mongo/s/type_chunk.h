@@ -60,18 +60,18 @@ namespace mongo {
         static const std::string ConfigNS;
 
         // Field names and types in the chunk collection type.
-        static BSONField<std::string> name;
-        static BSONField<std::string> ns;
-        static BSONField<BSONObj> min;
-        static BSONField<BSONObj> max;
-        static BSONField<BSONArray> version;
-        static BSONField<std::string> shard;
-        static BSONField<bool> jumbo;
+        static BSONField<std::string> name;     // chunk's id
+        static BSONField<std::string> ns;       // namespace this chunk is in
+        static BSONField<BSONObj> min;          // first key of the chunk, including
+        static BSONField<BSONObj> max;          // last key of the chunk, non-including
+        static BSONField<BSONArray> version;    // [Date_t, OID]
+        static BSONField<std::string> shard;    // home of this chunk
+        static BSONField<bool> jumbo;           // too big to move?
 
         // Transition to new format, 2.2 -> 2.4
         // 2.2 can read both lastmod + lastmodEpoch format and 2.4 [ lastmod, OID ] formats.
-        static BSONField<Date_t> DEPRECATED_lastmod; // major | minor versions
-        static BSONField<OID> DEPRECATED_epoch; // disambiguates collection incarnations
+        static BSONField<Date_t> DEPRECATED_lastmod;  // major | minor versions
+        static BSONField<OID> DEPRECATED_epoch;       // OID, to disambiguate collection incarnations
 
         //
         // chunk type methods
