@@ -1035,6 +1035,8 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="..\db\auth\privilege.cpp" />
     <ClCompile Include="..\db\auth\privilege_set.cpp" />
     <ClCompile Include="..\db\commands\fail_point_cmd.cpp" />
+    <ClCompile Include="..\db\commands\find_and_modify_common.cpp" />
+    <ClCompile Include="..\db\commands\mr_common.cpp" />
     <ClCompile Include="..\db\commands\parameters.cpp" />
     <ClCompile Include="..\db\commands\server_status.cpp" />
     <ClCompile Include="..\db\hasher.cpp" />
@@ -1323,6 +1325,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="..\db\auth\privilege.h" />
     <ClInclude Include="..\db\auth\privilege_set.h" />
     <ClInclude Include="..\db\commands\fail_point_cmd.h" />
+    <ClInclude Include="..\db\commands\find_and_modify.h" />
     <ClInclude Include="..\db\commands\server_status.h" />
     <ClInclude Include="..\db\hasher.h" />
     <ClInclude Include="..\db\initialize_server_global_state.h" />

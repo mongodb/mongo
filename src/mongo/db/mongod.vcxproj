@@ -1165,6 +1165,8 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="cap.cpp" />
     <ClCompile Include="commands\distinct.cpp" />
     <ClCompile Include="commands\fail_point_cmd.cpp" />
+    <ClCompile Include="commands\find_and_modify_common.cpp" />
+    <ClCompile Include="commands\mr_common.cpp" />
     <ClCompile Include="commands\parameters.cpp" />
     <ClCompile Include="commands\server_status.cpp" />
     <ClCompile Include="geo\geojsonparser.cpp">
@@ -1463,6 +1465,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="btree_stats.h" />
     <ClInclude Include="cc_by_loc.h" />
     <ClInclude Include="commands\fail_point_cmd.h" />
+    <ClInclude Include="commands\find_and_modify.h" />
     <ClInclude Include="commands\fsync.h" />
     <ClInclude Include="commands\mr.h" />
     <ClInclude Include="commands\server_status.h" />

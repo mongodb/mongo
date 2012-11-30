@@ -1439,6 +1439,12 @@
     <ClCompile Include="..\s\metadata_loader.cpp">
       <Filter>s</Filter>
     </ClCompile>
+    <ClCompile Include="commands\find_and_modify_common.cpp">
+      <Filter>db\commands</Filter>
+    </ClCompile>
+    <ClCompile Include="commands\mr_common.cpp">
+      <Filter>db\commands</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\targetver.h" />
@@ -2972,6 +2978,9 @@
     </ClInclude>
     <ClInclude Include="..\s\metadata_loader.h">
       <Filter>s</Filter>
+    </ClInclude>
+    <ClInclude Include="commands\find_and_modify.h">
+      <Filter>db\commands</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

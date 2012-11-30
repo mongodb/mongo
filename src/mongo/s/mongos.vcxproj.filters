@@ -894,6 +894,12 @@
     <ClCompile Include="metadata_loader.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\db\commands\find_and_modify_common.cpp">
+      <Filter>db\commands</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\commands\mr_common.cpp">
+      <Filter>db\commands</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\pch.h" />
@@ -1631,6 +1637,9 @@
     </ClInclude>
     <ClInclude Include="..\db\auth\auth_external_state_server_common.h">
       <Filter>db\auth</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\commands\find_and_modify.h">
+      <Filter>db\commands</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
