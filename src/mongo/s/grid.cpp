@@ -27,6 +27,7 @@
 #include "mongo/s/cluster_constants.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/shard.h"
+#include "mongo/s/type_shard.h"
 #include "mongo/util/startup_test.h"
 #include "mongo/util/stringutils.h"
 
@@ -366,11 +367,11 @@ namespace mongo {
 
         // build the ConfigDB shard document
         BSONObjBuilder b;
-        b.append(ShardFields::name(), *name);
-        b.append(ShardFields::host(),
+        b.append(ShardType::name(), *name);
+        b.append(ShardType::host(),
                  rsMonitor ? rsMonitor->getServerAddress() : servers.toString());
         if (maxSize > 0) {
-            b.append(ShardFields::maxSize(), maxSize);
+            b.append(ShardType::maxSize(), maxSize);
         }
         BSONObj shardDoc = b.obj();
 
@@ -379,8 +380,8 @@ namespace mongo {
                     configServer.getPrimary().getConnString(), 30));
 
             // check whether the set of hosts (or single host) is not an already a known shard
-            BSONObj old = conn->get()->findOne(ConfigNS::shard,
-                                               BSON(ShardFields::host(servers.toString())));
+            BSONObj old = conn->get()->findOne(ShardType::ConfigNS,
+                                               BSON(ShardType::host(servers.toString())));
 
             if ( ! old.isEmpty() ) {
                 errMsg = "host already used";
@@ -390,7 +391,7 @@ namespace mongo {
 
             log() << "going to add shard: " << shardDoc << endl;
 
-            conn->get()->insert(ConfigNS::shard , shardDoc);
+            conn->get()->insert(ShardType::ConfigNS , shardDoc);
             errMsg = conn->get()->getLastError();
             if ( ! errMsg.empty() ) {
                 log() << "error adding shard: " << shardDoc << " err: " << errMsg << endl;
@@ -417,7 +418,7 @@ namespace mongo {
     bool Grid::knowAboutShard( const string& name ) const {
         scoped_ptr<ScopedDbConnection> conn( ScopedDbConnection::getInternalScopedDbConnection(
                 configServer.getPrimary().getConnString(), 30));
-        BSONObj shard = conn->get()->findOne(ConfigNS::shard, BSON(ShardFields::host(name)));
+        BSONObj shard = conn->get()->findOne(ShardType::ConfigNS, BSON(ShardType::host(name)));
         conn->done();
         return ! shard.isEmpty();
     }
@@ -430,11 +431,11 @@ namespace mongo {
 
         scoped_ptr<ScopedDbConnection> conn( ScopedDbConnection::getInternalScopedDbConnection(
                 configServer.getPrimary().getConnString(), 30));
-        BSONObj o = conn->get()->findOne(ConfigNS::shard,
-                                         Query(fromjson("{" + ShardFields::name() + ": /^shard/}"))
-                                         .sort(BSON(ShardFields::name() << -1 )));
+        BSONObj o = conn->get()->findOne(ShardType::ConfigNS,
+                                         Query(fromjson("{" + ShardType::name() + ": /^shard/}"))
+                                         .sort(BSON(ShardType::name() << -1 )));
         if ( ! o.isEmpty() ) {
-            string last = o[ShardFields::name()].String();
+            string last = o[ShardType::name()].String();
             istringstream is( last.substr( 5 ) );
             is >> count;
             count++;

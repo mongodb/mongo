@@ -44,17 +44,6 @@ namespace mongo {
     };
 
     /**
-     * ShardFields holds all the field names and types for the shard collection.
-     */
-    struct ShardFields {
-        static BSONField<string> name;       // shard's id
-        static BSONField<string> host;       // connection string for the host(s)
-        static BSONField<bool> draining;     // is it draining chunks?
-        static BSONField<long long> maxSize; // max allowe disk space usage
-        static BSONField<BSONArray> tags;    // shard tags
-    };
-
-    /**
      * DatabaseFields holds all the field names and types for the database collection.
      */
     struct DatabaseFields {

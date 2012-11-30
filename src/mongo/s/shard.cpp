@@ -31,10 +31,10 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/s/client_info.h"
-#include "mongo/s/cluster_constants.h"
 #include "mongo/s/config.h"
 #include "mongo/s/request.h"
 #include "mongo/s/shard.h"
+#include "mongo/s/type_shard.h"
 
 namespace mongo {
 
@@ -48,7 +48,7 @@ namespace mongo {
                 scoped_ptr<ScopedDbConnection> conn(
                         ScopedDbConnection::getInternalScopedDbConnection(
                                 configServer.getPrimary().getConnString(), 30));
-                auto_ptr<DBClientCursor> c = conn->get()->query(ConfigNS::shard , Query());
+                auto_ptr<DBClientCursor> c = conn->get()->query(ShardType::ConfigNS , Query());
                 massert( 13632 , "couldn't get updated shard list from config server" , c.get() );
                 while ( c->more() ) {
                     all.push_back( c->next().getOwned() );
@@ -76,25 +76,25 @@ namespace mongo {
             
             for ( list<BSONObj>::iterator i=all.begin(); i!=all.end(); ++i ) {
                 BSONObj o = *i;
-                string name = o[ ShardFields::name() ].String();
-                string host = o[ ShardFields::host() ].String();
+                string name = o[ ShardType::name() ].String();
+                string host = o[ ShardType::host() ].String();
 
                 long long maxSize = 0;
-                BSONElement maxSizeElem = o[ ShardFields::maxSize.name() ];
+                BSONElement maxSizeElem = o[ ShardType::maxSize.name() ];
                 if ( ! maxSizeElem.eoo() ) {
                     maxSize = maxSizeElem.numberLong();
                 }
 
                 bool isDraining = false;
-                BSONElement isDrainingElem = o[ ShardFields::draining.name() ];
+                BSONElement isDrainingElem = o[ ShardType::draining.name() ];
                 if ( ! isDrainingElem.eoo() ) {
                     isDraining = isDrainingElem.Bool();
                 }
 
                 ShardPtr s( new Shard( name , host , maxSize , isDraining ) );
 
-                if ( o[ ShardFields::tags() ].type() == Array ) {
-                    vector<BSONElement> v = o[ ShardFields::tags() ].Array();
+                if ( o[ ShardType::tags() ].type() == Array ) {
+                    vector<BSONElement> v = o[ ShardType::tags() ].Array();
                     for ( unsigned j=0; j<v.size(); j++ ) {
                         s->addTag( v[j].String() );
                     }

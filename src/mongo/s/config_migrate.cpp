@@ -27,6 +27,7 @@
 #include "mongo/s/config.h"
 #include "mongo/s/server.h"
 #include "mongo/s/type_chunk.h"
+#include "mongo/s/type_shard.h"
 #include "mongo/util/net/message.h"
 
 namespace mongo {
@@ -90,14 +91,14 @@ namespace mongo {
             // shards
             {
                 unsigned n = 0;
-                auto_ptr<DBClientCursor> c = conn->query(ConfigNS::shard, BSONObj());
+                auto_ptr<DBClientCursor> c = conn->query(ShardType::ConfigNS, BSONObj());
                 while ( c->more() ) {
                     BSONObj o = c->next();
-                    string host = o[ShardFields::host()].String();
+                    string host = o[ShardType::host()].String();
 
                     string name = "";
 
-                    BSONElement id = o[ShardFields::name()];
+                    BSONElement id = o[ShardType::name()];
                     if ( id.type() == String ) {
                         name = id.String();
                     }
@@ -115,11 +116,11 @@ namespace mongo {
                 verify( n == hostToShard.size() );
                 verify( n == shards.size() );
 
-                conn->remove(ConfigNS::shard, BSONObj());
+                conn->remove(ShardType::ConfigNS, BSONObj());
 
                 for ( map<string,string>::iterator i=hostToShard.begin(); i != hostToShard.end(); i++ ) {
-                    conn->insert(ConfigNS::shard,
-                                 BSON(ShardFields::name(i->second) << ShardFields::host(i->first)));
+                    conn->insert(ShardType::ConfigNS,
+                                 BSON(ShardType::name(i->second) << ShardType::host(i->first)));
                 }
             }
 

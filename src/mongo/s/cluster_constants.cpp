@@ -18,13 +18,6 @@
 
 namespace mongo {
 
-    const string ConfigNS::shard = "config.shards";
-    BSONField<string> ShardFields::name("_id");
-    BSONField<string> ShardFields::host("host");
-    BSONField<bool> ShardFields::draining("draining");
-    BSONField<long long> ShardFields::maxSize("maxSize");
-    BSONField<BSONArray> ShardFields::tags("tags");
-
     const string ConfigNS::database = "config.databases";
     BSONField<string> DatabaseFields::name("_id");
     BSONField<bool> DatabaseFields::partitioned("partitioned");

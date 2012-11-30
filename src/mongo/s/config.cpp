@@ -30,6 +30,7 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/server.h"
 #include "mongo/s/type_chunk.h"
+#include "mongo/s/type_shard.h"
 #include "mongo/util/net/message.h"
 #include "mongo/util/stringutils.h"
 
@@ -888,7 +889,7 @@ namespace mongo {
             uassert( 10189 ,  "should only have 1 thing in config.version" , ! c->more() );
         }
         else {
-            if ( conn.count(ConfigNS::shard) || conn.count( ConfigNS::database ) ) {
+            if ( conn.count(ShardType::ConfigNS) || conn.count( ConfigNS::database ) ) {
                 version = 1;
             }
         }
@@ -953,7 +954,7 @@ namespace mongo {
                                      BSON(ChunkType::ns() << 1 <<
                                           ChunkType::DEPRECATED_lastmod() << 1 ), true );
 
-            conn->get()->ensureIndex(ConfigNS::shard, BSON(ShardFields::host() << 1), true);
+            conn->get()->ensureIndex(ShardType::ConfigNS, BSON(ShardType::host() << 1), true);
 
             conn->done();
         }
@@ -1039,10 +1040,10 @@ namespace mongo {
             }
             scoped_ptr<ScopedDbConnection> conn( ScopedDbConnection::getInternalScopedDbConnection(
                     configServer.getConnectionString().toString(), 30.0 ) );
-            conn->get()->update(ConfigNS::shard,
-                                BSON(ShardFields::name(s.getName())),
+            conn->get()->update(ShardType::ConfigNS,
+                                BSON(ShardType::name(s.getName())),
                                 BSON("$set" <<
-                                     BSON(ShardFields::host(monitor->getServerAddress()))));
+                                     BSON(ShardType::host(monitor->getServerAddress()))));
             conn->done();
         }
         catch (DBException& e) {

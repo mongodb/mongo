@@ -56,11 +56,11 @@ namespace mongo {
         static const std::string ConfigNS;
 
         // Field names and types in the shard collection type.
-        static BSONField<std::string> name;
-        static BSONField<std::string> host;
-        static BSONField<bool> draining;
-        static BSONField<long long> maxSize;
-        static BSONField<BSONArray> tags;
+        static BSONField<std::string> name;     // shard's id
+        static BSONField<std::string> host;     // connection string for the host(s)
+        static BSONField<bool> draining;        // is it draining chunks?
+        static BSONField<long long> maxSize;    // max allowed disk space usage
+        static BSONField<BSONArray> tags;       // shard tags
 
         //
         // shard type methods

@@ -27,7 +27,7 @@
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/db/jsobjmanipulator.h"
 #include "mongo/db/json.h"
-#include "mongo/s/cluster_constants.h"
+#include "mongo/s/type_shard.h"
 #include "mongo/tools/stat_util.h"
 #include "mongo/util/net/httpclient.h"
 #include "mongo/util/text.h"
@@ -320,7 +320,7 @@ namespace mongo {
                              out["process"].String() == "mongos" ) {
                             state->mongos = true;
                             if ( cycleNumber % 10 == 1 ) {
-                                auto_ptr<DBClientCursor> c = conn.query( ConfigNS::shard , BSONObj() );
+                                auto_ptr<DBClientCursor> c = conn.query( ShardType::ConfigNS , BSONObj() );
                                 vector<BSONObj> shards;
                                 while ( c->more() ) {
                                     shards.push_back( c->next().getOwned() );
