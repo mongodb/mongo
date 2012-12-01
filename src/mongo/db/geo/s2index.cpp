@@ -92,43 +92,35 @@ namespace mongo {
                 BSONElementSet fieldElements;
                 obj.getFieldsDotted(field.name, fieldElements);
 
-                BSONObj keysForThisField;
+                BSONObjSet keysForThisField;
                 if (IndexedField::GEO == field.type) {
-                    keysForThisField = getGeoKeys(fieldElements);
+                    getGeoKeys(fieldElements, &keysForThisField);
                 } else if (IndexedField::LITERAL == field.type) {
-                    keysForThisField = getLiteralKeys(fieldElements);
+                    getLiteralKeys(fieldElements, &keysForThisField);
                 } else {
                     verify(0);
                 }
 
                 // We expect there to be _spec->_missingField() present in the keys if data is
                 // missing.  So, this should be non-empty.
-                verify(!keysForThisField.isEmpty());
+                verify(keysForThisField.size() > 0);
 
                 // We take the Cartesian product of all of the keys.  This requires that we have
                 // some keys to take the Cartesian product with.  If keysToAdd.empty(), we
                 // initialize it.  
                 if (keysToAdd.empty()) {
-                    // This should only happen w/the first field.
-                    verify(0 == i);
-                    BSONObjIterator newIt(keysForThisField);
-                    while (newIt.more()) {
-                        BSONObjBuilder b;
-                        b.append("", newIt.next().String());
-                        keysToAdd.insert(b.obj());
-                    }
+                    keysToAdd = keysForThisField;
                     continue;
                 }
 
                 BSONObjSet updatedKeysToAdd;
                 for (BSONObjSet::const_iterator it = keysToAdd.begin(); it != keysToAdd.end();
                      ++it) {
-
-                    BSONObjIterator newIt(keysForThisField);
-                    while (newIt.more()) {
+                    for (BSONObjSet::const_iterator newIt = keysForThisField.begin();
+                         newIt!= keysForThisField.end(); ++newIt) {
                         BSONObjBuilder b;
                         b.appendElements(*it);
-                        b.append("", newIt.next().String());
+                        b.append(newIt->firstElement());
                         updatedKeysToAdd.insert(b.obj());
                     }
                 }
@@ -253,9 +245,7 @@ namespace mongo {
         const IndexDetails* getDetails() const { return _spec->getDetails(); }
     private:
         // Get the index keys for elements that are GeoJSON.
-        BSONObj getGeoKeys(const BSONElementSet &elements) const {
-            BSONArrayBuilder aBuilder;
-
+        void getGeoKeys(const BSONElementSet &elements, BSONObjSet *out) const {
             S2RegionCoverer coverer;
             _params.configureCoverer(&coverer);
 
@@ -281,29 +271,38 @@ namespace mongo {
                 }
 
                 for (vector<string>::const_iterator it = cells.begin(); it != cells.end(); ++it) {
-                    aBuilder.append(*it);
+                    BSONObjBuilder b;
+                    b.append("", *it);
+                    out->insert(b.obj());
                 }
             }
 
-            if (0 == aBuilder.arrSize()) {
-                // TODO(hk): We use "" for empty.  I should verify this actually works.
-                aBuilder.append("");
+            if (0 == out->size()) {
+                BSONObjBuilder b;
+                b.appendNull("");
+                out->insert(b.obj());
             }
-
-            return aBuilder.arr();
         }
 
         // elements is a non-geo field.  Add the values literally, expanding arrays.
-        BSONObj getLiteralKeys(const BSONElementSet &elements) const {
-            BSONArrayBuilder builder;
+        void getLiteralKeys(const BSONElementSet &elements, BSONObjSet *out) const {
             if (0 == elements.size()) {
-                builder.append("");
+                BSONObjBuilder b;
+                b.appendNull("");
+                out->insert(b.obj());
+            } else if (1 == elements.size()) {
+                BSONObjBuilder b;
+                b.appendAs(*elements.begin(), "");
+                out->insert(b.obj());
             } else {
+                BSONArrayBuilder aBuilder;
                 for (BSONElementSet::iterator i = elements.begin(); i != elements.end(); ++i) {
-                    builder.append(*i);
+                    aBuilder.append(*i);
                 }
+                BSONObjBuilder b;
+                b.append("", aBuilder.arr());
+                out->insert(b.obj());
             }
-            return builder.arr();
         }
 
         vector<IndexedField> _fields;
