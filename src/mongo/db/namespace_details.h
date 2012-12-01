@@ -374,7 +374,10 @@ namespace mongo {
         */
         DiskLoc allocWillBeAt(const char *ns, int lenToAlloc);
 
-        /* allocate a new record.  lenToAlloc includes headers. */
+        /** allocate space for a new record from deleted lists.
+            @param lenToAlloc is WITH header
+            @return null diskloc if no room - allocate a new extent then
+        */
         DiskLoc alloc(const char* ns, int lenToAlloc);
 
         /* add a given record to the deleted chains for this NS */
