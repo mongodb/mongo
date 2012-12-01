@@ -27,6 +27,7 @@
 #include "mongo/s/config.h"
 #include "mongo/s/server.h"
 #include "mongo/s/type_chunk.h"
+#include "mongo/s/type_database.h"
 #include "mongo/s/type_shard.h"
 #include "mongo/util/net/message.h"
 
@@ -126,27 +127,27 @@ namespace mongo {
 
             // databases
             {
-                auto_ptr<DBClientCursor> c = conn->query( ConfigNS::database , BSONObj() );
+                auto_ptr<DBClientCursor> c = conn->query( DatabaseType::ConfigNS , BSONObj() );
                 map<string,BSONObj> newDBs;
                 unsigned n = 0;
                 while ( c->more() ) {
                     BSONObj old = c->next();
                     n++;
 
-                    if ( old[DatabaseFields::DEPRECATED_name()].eoo() ) {
+                    if ( old[DatabaseType::DEPRECATED_name()].eoo() ) {
                         // already done
-                        newDBs[old[DatabaseFields::name()].String()] = old;
+                        newDBs[old[DatabaseType::name()].String()] = old;
                         continue;
                     }
 
                     BSONObjBuilder b(old.objsize());
-                    b.appendAs( old[DatabaseFields::DEPRECATED_name()] , DatabaseFields::name() );
+                    b.appendAs( old[DatabaseType::DEPRECATED_name()] , DatabaseType::name() );
 
                     BSONObjIterator i(old);
                     while ( i.more() ) {
                         BSONElement e = i.next();
-                        if ( strcmp( DatabaseFields::name().c_str() , e.fieldName() ) == 0 ||
-                             strcmp( DatabaseFields::DEPRECATED_name().c_str() , e.fieldName() ) == 0 ) {
+                        if ( strcmp( DatabaseType::name().c_str() , e.fieldName() ) == 0 ||
+                             strcmp( DatabaseType::DEPRECATED_name().c_str() , e.fieldName() ) == 0 ) {
                             continue;
                         }
 
@@ -155,15 +156,15 @@ namespace mongo {
 
                     BSONObj x = b.obj();
                     log() << old << "\n\t" << x << endl;
-                    newDBs[old[DatabaseFields::DEPRECATED_name()].String()] = x;
+                    newDBs[old[DatabaseType::DEPRECATED_name()].String()] = x;
                 }
 
                 verify( n == newDBs.size() );
 
-                conn->remove( ConfigNS::database , BSONObj() );
+                conn->remove( DatabaseType::ConfigNS , BSONObj() );
 
                 for ( map<string,BSONObj>::iterator i=newDBs.begin(); i!=newDBs.end(); i++ ) {
-                    conn->insert( ConfigNS::database , i->second );
+                    conn->insert( DatabaseType::ConfigNS , i->second );
                 }
 
             }

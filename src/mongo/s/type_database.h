@@ -57,9 +57,9 @@ namespace mongo {
         static const std::string ConfigNS;
 
         // Field names and types in the database collection type.
-        static BSONField<std::string> name;
-        static BSONField<std::string> primary;
-        static BSONField<bool> draining;
+        static BSONField<std::string> name;     // database's name
+        static BSONField<std::string> primary;  // primary shard for the database
+        static BSONField<bool> draining;        // is the database being removed?
 
         // This field was last used in 2.2 series (version 3).
         static BSONField<bool> DEPRECATED_partitioned;

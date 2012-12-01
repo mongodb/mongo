@@ -33,6 +33,7 @@
 #include "mongo/s/stats.h"
 #include "mongo/s/strategy.h"
 #include "mongo/s/type_chunk.h"
+#include "mongo/s/type_database.h"
 #include "mongo/s/type_shard.h"
 #include "mongo/s/writeback_listener.h"
 #include "mongo/util/net/listen.h"
@@ -1133,11 +1134,11 @@ namespace mongo {
                     return false;
                 }
 
-                BSONObj primaryDoc = BSON(DatabaseFields::name.ne("local") <<
-                                          DatabaseFields::primary(s.getName()));
+                BSONObj primaryDoc = BSON(DatabaseType::name.ne("local") <<
+                                          DatabaseType::primary(s.getName()));
                 BSONObj dbInfo; // appended at end of result on success
                 {
-                    boost::scoped_ptr<DBClientCursor> cursor (conn->query(ConfigNS::database, primaryDoc));
+                    boost::scoped_ptr<DBClientCursor> cursor (conn->query(DatabaseType::ConfigNS, primaryDoc));
                     if (cursor->more()) { // skip block and allocations if empty
                         BSONObjBuilder dbInfoBuilder;
                         dbInfoBuilder.append("note", "you need to drop or movePrimary these databases");
@@ -1145,7 +1146,7 @@ namespace mongo {
 
                         while (cursor->more()){
                             BSONObj db = cursor->nextSafe();
-                            dbs.append(db[DatabaseFields::name()]);
+                            dbs.append(db[DatabaseType::name()]);
                         }
                         dbs.doneFast();
 
@@ -1171,12 +1172,12 @@ namespace mongo {
                         return false;
                     }
 
-                    BSONObj primaryLocalDoc = BSON(DatabaseFields::name("local") <<
-                                                   DatabaseFields::primary(s.getName()));
+                    BSONObj primaryLocalDoc = BSON(DatabaseType::name("local") <<
+                                                   DatabaseType::primary(s.getName()));
                     PRINT(primaryLocalDoc);
-                    if (conn->count(ConfigNS::database, primaryLocalDoc)) {
+                    if (conn->count(DatabaseType::ConfigNS, primaryLocalDoc)) {
                         log() << "This shard is listed as primary of local db. Removing entry." << endl;
-                        conn->remove(ConfigNS::database, BSON(DatabaseFields::name("local")));
+                        conn->remove(DatabaseType::ConfigNS, BSON(DatabaseType::name("local")));
                         errmsg = conn->getLastError();
                         if ( errmsg.size() ) {
                             log() << "error removing local db: " << errmsg << endl;
@@ -1198,7 +1199,7 @@ namespace mongo {
                 // Check not only for chunks but also databases.
                 BSONObj shardIDDoc = BSON(ChunkType::shard(shardDoc[ShardType::name()].str()));
                 long long chunkCount = conn->count(ChunkType::ConfigNS, shardIDDoc);
-                long long dbCount = conn->count( ConfigNS::database , primaryDoc );
+                long long dbCount = conn->count( DatabaseType::ConfigNS , primaryDoc );
                 if ( ( chunkCount == 0 ) && ( dbCount == 0 ) ) {
                     log() << "going to remove shard: " << s.getName() << endl;
                     conn->remove( ShardType::ConfigNS , searchDoc );

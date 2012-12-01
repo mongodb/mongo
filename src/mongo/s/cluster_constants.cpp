@@ -18,16 +18,6 @@
 
 namespace mongo {
 
-    const string ConfigNS::database = "config.databases";
-    BSONField<string> DatabaseFields::name("_id");
-    BSONField<bool> DatabaseFields::partitioned("partitioned");
-    BSONField<string> DatabaseFields::primary("primary");
-    BSONField<string> DatabaseFields::DEPRECATED_name("name");
-    BSONField<bool> DatabaseFields::DEPRECATED_sharded("sharded");
-    BSONField<string> DatabaseFields::NEW_shard("shard");
-    BSONField<bool> DatabaseFields::NEW_draining("draining");
-    BSONField<bool> DatabaseFields::NEW_scatterCollections("scatterCollections");
-
     const string ConfigNS::tag = "config.tags";
     BSONField<string> TagFields::ns("ns");
     BSONField<string> TagFields::tag("tag");

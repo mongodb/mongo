@@ -29,7 +29,6 @@ namespace mongo {
      * ConfigNS holds the names for all the metadata collections stored in a config server.
      */
     struct ConfigNS {
-        static const string database;
         static const string tag;
         static const string mongos;
         static const string settings;
@@ -38,23 +37,6 @@ namespace mongo {
         static const string lockpings;
 
         static const int version = 3;
-    };
-
-    /**
-     * DatabaseFields holds all the field names and types for the database collection.
-     */
-    struct DatabaseFields {
-        static BSONField<string> name;                  // database's name
-        static BSONField<bool> partitioned;             // To be deprecated in 2.4
-        static BSONField<string> primary;               // To be deprecated in 2.4
-
-        static BSONField<string> DEPRECATED_name;       // last used in 1.4 series (version 2)
-        static BSONField<bool> DEPRECATED_sharded;      // last used in 1.4 series
-
-        // Being added in 2.4
-        static BSONField<string> NEW_shard;             // primary shard for the database
-        static BSONField<bool> NEW_draining;            // is the database being removed?
-        static BSONField<bool> NEW_scatterCollections;  // distribute collection among shards
     };
 
     /**

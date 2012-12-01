@@ -28,6 +28,7 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/shard.h"
 #include "mongo/s/type_collection.h"
+#include "mongo/s/type_database.h"
 #include "mongo/s/type_shard.h"
 #include "mongo/util/startup_test.h"
 #include "mongo/util/stringutils.h"
@@ -86,13 +87,13 @@ namespace mongo {
                             BSONObjBuilder b;
                             b.appendRegex( "_id" , (string)"^" +
                                            pcrecpp::RE::QuoteMeta( database ) + "$" , "i" );
-                            BSONObj dbObj = conn->get()->findOne( ConfigNS::database , b.obj() );
+                            BSONObj dbObj = conn->get()->findOne( DatabaseType::ConfigNS , b.obj() );
                             conn->done();
 
                             // If our name is exactly the same as the name we want, try loading
                             // the database again.
                             if (!dbObj.isEmpty() &&
-                                dbObj[DatabaseFields::name()].String() == database)
+                                dbObj[DatabaseType::name()].String() == database)
                             {
                                 if (dbConfig->load()) return dbConfig;
                             }
@@ -105,7 +106,7 @@ namespace mongo {
                             if ( ! dbObj.isEmpty() ) {
                                 uasserted( DatabaseDifferCaseCode, str::stream()
                                     <<  "can't have 2 databases that just differ on case "
-                                    << " have: " << dbObj[DatabaseFields::name()].String()
+                                    << " have: " << dbObj[DatabaseType::name()].String()
                                     << " want to add: " << database );
                             }
                         }

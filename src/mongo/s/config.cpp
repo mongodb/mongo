@@ -31,6 +31,7 @@
 #include "mongo/s/server.h"
 #include "mongo/s/type_chunk.h"
 #include "mongo/s/type_collection.h"
+#include "mongo/s/type_database.h"
 #include "mongo/s/type_shard.h"
 #include "mongo/util/net/message.h"
 #include "mongo/util/stringutils.h"
@@ -426,21 +427,21 @@ namespace mongo {
 
     void DBConfig::serialize(BSONObjBuilder& to) {
         to.append("_id", _name);
-        to.appendBool(DatabaseFields::partitioned(), _shardingEnabled );
-        to.append(DatabaseFields::primary(), _primary.getName() );
+        to.appendBool(DatabaseType::DEPRECATED_partitioned(), _shardingEnabled );
+        to.append(DatabaseType::primary(), _primary.getName() );
     }
 
     void DBConfig::unserialize(const BSONObj& from) {
         LOG(1) << "DBConfig unserialize: " << _name << " " << from << endl;
-        verify( _name == from[DatabaseFields::name()].String() );
+        verify( _name == from[DatabaseType::name()].String() );
 
-        _shardingEnabled = from.getBoolField(DatabaseFields::partitioned().c_str());
-        _primary.reset( from.getStringField(DatabaseFields::primary().c_str()));
+        _shardingEnabled = from.getBoolField(DatabaseType::DEPRECATED_partitioned().c_str());
+        _primary.reset( from.getStringField(DatabaseType::primary().c_str()));
 
         // In the 1.5.x series, we used to have collection metadata nested in the database entry. The 1.6.x series
         // had migration code that ported that info to where it belongs now: the 'collections' collection. We now
         // just assert that we're not migrating from a 1.5.x directly into a 1.7.x without first converting.
-        BSONObj sharded = from.getObjectField(DatabaseFields::DEPRECATED_sharded().c_str());
+        BSONObj sharded = from.getObjectField(DatabaseType::DEPRECATED_sharded().c_str());
         if ( ! sharded.isEmpty() )
             uasserted( 13509 , "can't migrate from 1.5.x release to the current one; need to upgrade to 1.6.x first");
     }
@@ -454,8 +455,8 @@ namespace mongo {
         scoped_ptr<ScopedDbConnection> conn( ScopedDbConnection::getInternalScopedDbConnection(
                 configServer.modelServer(), 30.0 ) );
 
-        BSONObj dbObj = conn->get()->findOne( ConfigNS::database,
-                                              BSON( DatabaseFields::name( _name ) ) );
+        BSONObj dbObj = conn->get()->findOne( DatabaseType::ConfigNS,
+                                              BSON( DatabaseType::name( _name ) ) );
 
         if ( dbObj.isEmpty() ) {
             conn->done();
@@ -509,7 +510,7 @@ namespace mongo {
                 n = b.obj();
             }
 
-            conn->get()->update( ConfigNS::database , BSON( DatabaseFields::name( _name ) ) , n , true );
+            conn->get()->update( DatabaseType::ConfigNS , BSON( DatabaseType::name( _name ) ) , n , true );
             string err = conn->get()->getLastError();
             uassert( 13396 , (string)"DBConfig save failed: " + err , err.size() == 0 );
 
@@ -574,7 +575,7 @@ namespace mongo {
         {
             scoped_ptr<ScopedDbConnection> conn( ScopedDbConnection::getInternalScopedDbConnection(
                     configServer.modelServer(), 30.0 ) );
-            conn->get()->remove( ConfigNS::database , BSON( DatabaseFields::name( _name ) ) );
+            conn->get()->remove( DatabaseType::ConfigNS , BSON( DatabaseType::name( _name ) ) );
             errmsg = conn->get()->getLastError();
             if ( ! errmsg.empty() ) {
                 log() << "could not drop '" << _name << "': " << errmsg << endl;
@@ -890,7 +891,7 @@ namespace mongo {
             uassert( 10189 ,  "should only have 1 thing in config.version" , ! c->more() );
         }
         else {
-            if ( conn.count(ShardType::ConfigNS) || conn.count( ConfigNS::database ) ) {
+            if ( conn.count(ShardType::ConfigNS) || conn.count( DatabaseType::ConfigNS ) ) {
                 version = 1;
             }
         }
