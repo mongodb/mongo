@@ -107,14 +107,6 @@ namespace mongo {
     };
 #endif
 
-    void ClientBasic::initializeAuthorizationManager() {
-        // This thread corresponds to an incoming user connection, and thus needs an
-        // AuthorizationManager
-        AuthExternalState* externalState = new AuthExternalStateMongod;
-        AuthorizationManager* authManager = new AuthorizationManager(externalState);
-        setAuthorizationManager(authManager);
-    }
-
     /* each thread which does db operations has a Client object in TLS.
        call this when your thread starts.
     */
@@ -131,9 +123,7 @@ namespace mongo {
         Client *c = new Client(desc, mp);
         currentClient.reset(c);
         mongo::lastError.initThread();
-        if (mp != NULL) {
-            c->initializeAuthorizationManager();
-        }
+        c->setAuthorizationManager(new AuthorizationManager(new AuthExternalStateMongod()));
         return *c;
     }
 

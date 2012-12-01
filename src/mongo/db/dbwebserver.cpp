@@ -556,8 +556,7 @@ namespace mongo {
 
     void webServerThread(const AdminAccess* adminAccess) {
         boost::scoped_ptr<const AdminAccess> adminAccessPtr(adminAccess); // adminAccess is owned here
-        Client& client = Client::initThread("websvr");
-        client.initializeAuthorizationManager();
+        Client::initThread("websvr");
         const int p = cmdLine.port + 1000;
         DbWebServer mini(cmdLine.bind_ip, p, adminAccessPtr.get());
         mini.initAndListen();

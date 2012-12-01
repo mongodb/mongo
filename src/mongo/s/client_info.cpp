@@ -18,6 +18,8 @@
 
 #include "pch.h"
 
+#include "mongo/db/auth/authorization_manager.h"
+#include "mongo/db/auth/auth_external_state_s.h"
 #include "server.h"
 #include "../util/scopeguard.h"
 #include "../db/commands.h"
@@ -80,7 +82,7 @@ namespace mongo {
         massert(16472, "A ClientInfo already exists for this thread", !info);
         info = new ClientInfo(messagingPort);
         _tlInfo.reset( info );
-        info->initializeAuthorizationManager();
+        info->setAuthorizationManager(new AuthorizationManager(new AuthExternalStateMongos()));
         info->newRequest();
         return info;
     }

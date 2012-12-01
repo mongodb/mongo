@@ -60,11 +60,6 @@ namespace mongo {
     Client::~Client() {}
     bool Client::shutdown() { return true; }
 
-    void ClientBasic::initializeAuthorizationManager() {
-        AuthorizationManager* authManager = new AuthorizationManager(new AuthExternalStateMongos);
-        setAuthorizationManager(authManager);
-    }
-
     Client& Client::initThread(const char *desc, AbstractMessagingPort *mp) {
         // mp is non-null only for client connections, and mongos uses ClientInfo for those
         massert(16478, "Client being used for incoming connection thread in mongos", mp == NULL);
@@ -75,6 +70,7 @@ namespace mongo {
                 "Non-null messaging port provided to Client::initThread in a mongos",
                 mp == NULL);
         Client *c = new Client(desc, mp);
+        c->setAuthorizationManager(new AuthorizationManager(new AuthExternalStateMongos()));
         currentClient.reset(c);
         mongo::lastError.initThread();
         return *c;
