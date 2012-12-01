@@ -22,16 +22,17 @@
 #include "mongo/s/cluster_constants.h"
 #include "mongo/s/d_chunk_manager.h"
 #include "mongo/s/type_chunk.h"
+#include "mongo/s/type_collection.h"
 
 namespace {
 
     class BasicTests {
     public:
         void run() {
-            BSONObj collection = BSON(CollectionFields::name("test.foo") <<
-                                      CollectionFields::dropped(false) <<
-                                      CollectionFields::key(BSON("a" << 1)) <<
-                                      CollectionFields::unique(false));
+            BSONObj collection = BSON(CollectionType::ns("test.foo") <<
+                                      CollectionType::dropped(false) <<
+                                      CollectionType::keyPattern(BSON("a" << 1)) <<
+                                      CollectionType::unique(false));
 
             // single-chunk collection
             BSONArray chunks = BSON_ARRAY(BSON(ChunkType::name("test.foo-a_MinKey") <<
@@ -53,10 +54,10 @@ namespace {
     class BasicCompoundTests {
     public:
         void run() {
-            BSONObj collection = BSON(CollectionFields::name("test.foo") <<
-                                      CollectionFields::dropped(false) <<
-                                      CollectionFields::key(BSON("a" << 1 << "b" << 1)) <<
-                                      CollectionFields::unique(false));
+            BSONObj collection = BSON(CollectionType::ns("test.foo") <<
+                                      CollectionType::dropped(false) <<
+                                      CollectionType::keyPattern(BSON("a" << 1 << "b" << 1)) <<
+                                      CollectionType::unique(false));
 
             // single-chunk collection
             BSONArray chunks = BSON_ARRAY(BSON(ChunkType::name("test.foo-a_MinKeyb_MinKey") <<
@@ -82,10 +83,10 @@ namespace {
     class RangeTests {
     public:
         void run() {
-            BSONObj collection = BSON(CollectionFields::name("x.y") <<
-                                      CollectionFields::dropped(false) <<
-                                      CollectionFields::key(BSON("a" << 1)) <<
-                                      CollectionFields::unique(false));
+            BSONObj collection = BSON(CollectionType::ns("x.y") <<
+                                      CollectionType::dropped(false) <<
+                                      CollectionType::keyPattern(BSON("a" << 1)) <<
+                                      CollectionType::unique(false));
 
             // 3-chunk collection, 2 of them being contiguous
             // [min->10) , [10->20) , <gap> , [30->max)
@@ -122,10 +123,10 @@ namespace {
     class GetNextTests {
     public:
         void run() {
-            BSONObj collection = BSON(CollectionFields::name("x.y") <<
-                                      CollectionFields::dropped(false) <<
-                                      CollectionFields::key(BSON("a" << 1)) <<
-                                      CollectionFields::unique(false));
+            BSONObj collection = BSON(CollectionType::ns("x.y") <<
+                                      CollectionType::dropped(false) <<
+                                      CollectionType::keyPattern(BSON("a" << 1)) <<
+                                      CollectionType::unique(false));
 
             // empty collection
             BSONArray chunks1 = BSONArray();
@@ -186,8 +187,8 @@ namespace {
     class DeletedTests {
     public:
         void run() {
-            BSONObj collection = BSON(CollectionFields::name("test.foo") <<
-                                      CollectionFields::dropped(true));
+            BSONObj collection = BSON(CollectionType::ns("test.foo") <<
+                                      CollectionType::dropped(true));
 
             BSONArray chunks = BSONArray();
 
@@ -198,10 +199,10 @@ namespace {
     class ClonePlusTests {
     public:
         void run() {
-            BSONObj collection = BSON(CollectionFields::name("test.foo") <<
-                                      CollectionFields::dropped(false) <<
-                                      CollectionFields::key(BSON("a" << 1 << "b" << 1)) <<
-                                      CollectionFields::unique(false));
+            BSONObj collection = BSON(CollectionType::ns("test.foo") <<
+                                      CollectionType::dropped(false) <<
+                                      CollectionType::keyPattern(BSON("a" << 1 << "b" << 1)) <<
+                                      CollectionType::unique(false));
 
             // 1-chunk collection
             // [10,0-20,0)
@@ -231,10 +232,10 @@ namespace {
     class ClonePlusExceptionTests {
     public:
         void run() {
-            BSONObj collection = BSON(CollectionFields::name("test.foo") <<
-                                      CollectionFields::dropped(false) <<
-                                      CollectionFields::key(BSON("a" << 1 << "b" << 1)) <<
-                                      CollectionFields::unique(false));
+            BSONObj collection = BSON(CollectionType::ns("test.foo") <<
+                                      CollectionType::dropped(false) <<
+                                      CollectionType::keyPattern(BSON("a" << 1 << "b" << 1)) <<
+                                      CollectionType::unique(false));
 
             // 1-chunk collection
             // [10,0-20,0)
@@ -255,10 +256,10 @@ namespace {
     class CloneMinusTests {
     public:
         void run() {
-            BSONObj collection = BSON(CollectionFields::name("x.y") <<
-                                      CollectionFields::dropped(false) <<
-                                      CollectionFields::key(BSON("a" << 1 << "b" << 1)) <<
-                                      CollectionFields::unique(false));
+            BSONObj collection = BSON(CollectionType::ns("x.y") <<
+                                      CollectionType::dropped(false) <<
+                                      CollectionType::keyPattern(BSON("a" << 1 << "b" << 1)) <<
+                                      CollectionType::unique(false));
 
             // 2-chunk collection
             // [10,0->20,0) , <gap> , [30,0->40,0)
@@ -294,10 +295,10 @@ namespace {
     class CloneMinusExceptionTests {
     public:
         void run() {
-            BSONObj collection = BSON(CollectionFields::name("x.y") <<
-                                      CollectionFields::dropped(false) <<
-                                      CollectionFields::key(BSON("a" << 1 << "b" << 1)) <<
-                                      CollectionFields::unique(false));
+            BSONObj collection = BSON(CollectionType::ns("x.y") <<
+                                      CollectionType::dropped(false) <<
+                                      CollectionType::keyPattern(BSON("a" << 1 << "b" << 1)) <<
+                                      CollectionType::unique(false));
 
             // 2-chunk collection
             // [10,0->20,0) , <gap> , [30,0->40,0)
@@ -328,10 +329,10 @@ namespace {
     class CloneSplitTests {
     public:
         void run() {
-            BSONObj collection = BSON(CollectionFields::name("test.foo") <<
-                                      CollectionFields::dropped(false) <<
-                                      CollectionFields::key(BSON("a" << 1 << "b" << 1)) <<
-                                      CollectionFields::unique(false));
+            BSONObj collection = BSON(CollectionType::ns("test.foo") <<
+                                      CollectionType::dropped(false) <<
+                                      CollectionType::keyPattern(BSON("a" << 1 << "b" << 1)) <<
+                                      CollectionType::unique(false));
 
             // 1-chunk collection
             // [10,0-20,0)
@@ -367,10 +368,10 @@ namespace {
     class CloneSplitExceptionTests {
     public:
         void run() {
-            BSONObj collection = BSON(CollectionFields::name("test.foo") <<
-                                      CollectionFields::dropped(false) <<
-                                      CollectionFields::key(BSON("a" << 1 << "b" << 1)) <<
-                                      CollectionFields::unique(false));
+            BSONObj collection = BSON(CollectionType::ns("test.foo") <<
+                                      CollectionType::dropped(false) <<
+                                      CollectionType::keyPattern(BSON("a" << 1 << "b" << 1)) <<
+                                      CollectionType::unique(false));
 
             // 1-chunk collection
             // [10,0-20,0)
@@ -399,10 +400,10 @@ namespace {
     class EmptyShardTests {
     public:
         void run() {
-            BSONObj collection = BSON(CollectionFields::name("test.foo") <<
-                                      CollectionFields::dropped(false) <<
-                                      CollectionFields::key(BSON("a" << 1)) <<
-                                      CollectionFields::unique(false));
+            BSONObj collection = BSON(CollectionType::ns("test.foo") <<
+                                      CollectionType::dropped(false) <<
+                                      CollectionType::keyPattern(BSON("a" << 1)) <<
+                                      CollectionType::unique(false));
 
             // no chunks on this shard
             BSONArray chunks;
@@ -418,10 +419,10 @@ namespace {
     class LastChunkTests {
     public:
         void run() {
-            BSONObj collection = BSON(CollectionFields::name("test.foo") <<
-                                      CollectionFields::dropped(false) <<
-                                      CollectionFields::key(BSON("a" << 1)) <<
-                                      CollectionFields::unique(false));
+            BSONObj collection = BSON(CollectionType::ns("test.foo") <<
+                                      CollectionType::dropped(false) <<
+                                      CollectionType::keyPattern(BSON("a" << 1)) <<
+                                      CollectionType::unique(false));
 
             // 1-chunk collection
             // [10->20)

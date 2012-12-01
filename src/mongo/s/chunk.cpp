@@ -18,18 +18,20 @@
 
 #include "pch.h"
 
+#include "mongo/s/chunk.h"
+
 #include "mongo/client/connpool.h"
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/db/queryutil.h"
 #include "mongo/platform/random.h"
-#include "mongo/s/chunk.h"
 #include "mongo/s/chunk_diff.h"
 #include "mongo/s/client_info.h"
 #include "mongo/s/config.h"
 #include "mongo/s/cursors.h"
 #include "mongo/s/grid.h"
-#include "mongo/util/concurrency/ticketholder.h"
 #include "mongo/s/strategy.h"
+#include "mongo/s/type_collection.h"
+#include "mongo/util/concurrency/ticketholder.h"
 #include "mongo/util/startup_test.h"
 #include "mongo/util/timer.h"
 
@@ -596,13 +598,13 @@ namespace mongo {
     ChunkManager::ChunkManager( const BSONObj& collDoc ) :
         // Need the ns early, to construct the lock
         // TODO: Construct lock on demand?  Not sure why we need to keep it around
-        _ns(collDoc[CollectionFields::name()].type() == String ?
-                                                        collDoc[CollectionFields::name()].String() :
+        _ns(collDoc[CollectionType::ns()].type() == String ?
+                                                        collDoc[CollectionType::ns()].String() :
                                                         ""),
-        _key(collDoc[CollectionFields::key()].type() == Object ?
-                                                        collDoc[CollectionFields::key()].Obj().getOwned() :
+        _key(collDoc[CollectionType::keyPattern()].type() == Object ?
+                                                        collDoc[CollectionType::keyPattern()].Obj().getOwned() :
                                                         BSONObj()),
-        _unique(collDoc[CollectionFields::unique()].trueValue()),
+        _unique(collDoc[CollectionType::unique()].trueValue()),
         _chunkRanges(),
         _mutex("ChunkManager"),
         // The shard versioning mechanism hinges on keeping track of the number of times we reloaded ChunkManager's.
@@ -1290,6 +1292,12 @@ namespace mongo {
 
     ShardChunkVersion ChunkManager::getVersion() const {
         return _version;
+    }
+
+    void ChunkManager::getInfo( BSONObjBuilder& b ) const {
+        b.append(CollectionType::keyPattern(), _key.key());
+        b.appendBool(CollectionType::unique(), _unique);
+        _version.addEpochToBSON(b, CollectionType::DEPRECATED_lastmod());
     }
 
     string ChunkManager::toString() const {

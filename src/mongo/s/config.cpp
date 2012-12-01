@@ -30,6 +30,7 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/server.h"
 #include "mongo/s/type_chunk.h"
+#include "mongo/s/type_collection.h"
 #include "mongo/s/type_shard.h"
 #include "mongo/util/net/message.h"
 #include "mongo/util/stringutils.h"
@@ -45,9 +46,9 @@ namespace mongo {
 
     DBConfig::CollectionInfo::CollectionInfo( const BSONObj& in ) {
         _dirty = false;
-        _dropped = in[CollectionFields::dropped()].trueValue();
+        _dropped = in[CollectionType::dropped()].trueValue();
 
-        if ( in[CollectionFields::key()].isABSONObj() ) {
+        if ( in[CollectionType::keyPattern()].isABSONObj() ) {
             shard( new ChunkManager( in ) );
         }
 
@@ -89,13 +90,13 @@ namespace mongo {
         BSONObj key = BSON( "_id" << ns );
 
         BSONObjBuilder val;
-        val.append(CollectionFields::name(), ns);
-        val.appendDate(CollectionFields::lastmod(), time(0));
-        val.appendBool(CollectionFields::dropped(), _dropped);
+        val.append(CollectionType::ns(), ns);
+        val.appendDate(CollectionType::DEPRECATED_lastmod(), time(0));
+        val.appendBool(CollectionType::dropped(), _dropped);
         if ( _cm )
             _cm->getInfo( val );
 
-        conn->update(ConfigNS::collection, key, val.obj(), true);
+        conn->update(CollectionType::ConfigNS, key, val.obj(), true);
         string err = conn->getLastError();
         uassert( 13473 , (string)"failed to save collection (" + ns + "): " + err , err.size() == 0 );
 
@@ -464,20 +465,20 @@ namespace mongo {
         unserialize( dbObj );
 
         BSONObjBuilder b;
-        b.appendRegex(CollectionFields::name(),
+        b.appendRegex(CollectionType::ns(),
                       (string)"^" + pcrecpp::RE::QuoteMeta( _name ) + "\\." );
 
         int numCollsErased = 0;
         int numCollsSharded = 0;
 
-        auto_ptr<DBClientCursor> cursor = conn->get()->query(ConfigNS::collection, b.obj());
+        auto_ptr<DBClientCursor> cursor = conn->get()->query(CollectionType::ConfigNS, b.obj());
         verify( cursor.get() );
         while ( cursor->more() ) {
 
             BSONObj collObj = cursor->next();
-            string collName = collObj[CollectionFields::name()].String();
+            string collName = collObj[CollectionType::ns()].String();
 
-            if( collObj[CollectionFields::dropped()].trueValue() ){
+            if( collObj[CollectionType::dropped()].trueValue() ){
                 _collections.erase( collName );
                 numCollsErased++;
             }

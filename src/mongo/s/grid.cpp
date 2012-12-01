@@ -27,6 +27,7 @@
 #include "mongo/s/cluster_constants.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/shard.h"
+#include "mongo/s/type_collection.h"
 #include "mongo/s/type_shard.h"
 #include "mongo/util/startup_test.h"
 #include "mongo/util/stringutils.h"
@@ -466,8 +467,8 @@ namespace mongo {
             // look for the stop balancer marker
             balancerDoc = conn->get()->findOne( ConfigNS::settings,
                                                 BSON( SettingsFields::key("balancer") ) );
-            if( ns.size() > 0 ) collDoc = conn->get()->findOne(ConfigNS::collection,
-                                                               BSON( CollectionFields::name(ns)));
+            if( ns.size() > 0 ) collDoc = conn->get()->findOne(CollectionType::ConfigNS,
+                                                               BSON( CollectionType::ns(ns)));
             conn->done();
         }
         catch( DBException& e ){

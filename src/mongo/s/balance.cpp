@@ -28,6 +28,7 @@
 #include "mongo/s/server.h"
 #include "mongo/s/shard.h"
 #include "mongo/s/type_chunk.h"
+#include "mongo/s/type_collection.h"
 
 namespace mongo {
 
@@ -155,18 +156,18 @@ namespace mongo {
         // the ShardsNS::collections collection
         //
 
-        auto_ptr<DBClientCursor> cursor = conn.query(ConfigNS::collection, BSONObj());
+        auto_ptr<DBClientCursor> cursor = conn.query(CollectionType::ConfigNS, BSONObj());
         vector< string > collections;
         while ( cursor->more() ) {
             BSONObj col = cursor->nextSafe();
 
             // sharded collections will have a shard "key".
-            if ( ! col[CollectionFields::key()].eoo() &&
-                 ! col[CollectionFields::noBalance()].trueValue() ){
-                collections.push_back( col[CollectionFields::name()].String() );
+            if ( ! col[CollectionType::keyPattern()].eoo() &&
+                 ! col[CollectionType::noBalance()].trueValue() ){
+                collections.push_back( col[CollectionType::ns()].String() );
             }
-            else if( col[CollectionFields::noBalance()].trueValue() ){
-                LOG(1) << "not balancing collection " << col[CollectionFields::name()].String()
+            else if( col[CollectionType::noBalance()].trueValue() ){
+                LOG(1) << "not balancing collection " << col[CollectionType::ns()].String()
                        << ", explicitly disabled" << endl;
             }
 

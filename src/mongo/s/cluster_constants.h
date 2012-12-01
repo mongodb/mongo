@@ -29,10 +29,7 @@ namespace mongo {
      * ConfigNS holds the names for all the metadata collections stored in a config server.
      */
     struct ConfigNS {
-        static const string shard;
         static const string database;
-        static const string collection;
-        static const string chunk;
         static const string tag;
         static const string mongos;
         static const string settings;
@@ -58,20 +55,6 @@ namespace mongo {
         static BSONField<string> NEW_shard;             // primary shard for the database
         static BSONField<bool> NEW_draining;            // is the database being removed?
         static BSONField<bool> NEW_scatterCollections;  // distribute collection among shards
-    };
-
-    /**
-     * CollectionFields holds all the field names and types for the collections collection.
-     */
-    struct CollectionFields {
-        static BSONField<string> name;     // collection's name
-        static BSONField<string> shard;    // primary, if not sharded
-        static BSONField<BSONObj> key;     // sharding key, if sharded
-        static BSONField<bool> unique;     // sharding key unique?
-        static BSONField<Date_t> lastmod;  // when collecation was created
-        static BSONField<bool> dropped;    // logical deletion
-        static BSONField<bool> noBalance;  // true if balancing is disabled
-        static BSONField<OID> epoch;       // Epoch of collection
     };
 
     /**

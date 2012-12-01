@@ -26,6 +26,7 @@
 #include "mongo/db/instance.h"
 #include "mongo/s/chunk_diff.h"
 #include "mongo/s/type_chunk.h"
+#include "mongo/s/type_collection.h"
 
 namespace mongo {
 
@@ -88,14 +89,14 @@ namespace mongo {
         }
 
         // get this collection's sharding key
-        BSONObj collectionDoc = conn->findOne(ConfigNS::collection, BSON(CollectionFields::name(ns)));
+        BSONObj collectionDoc = conn->findOne(CollectionType::ConfigNS, BSON(CollectionType::ns(ns)));
 
         if( collectionDoc.isEmpty() ){
             warning() << ns << " does not exist as a sharded collection" << endl;
             return;
         }
 
-        if( collectionDoc[CollectionFields::dropped()].Bool() ){
+        if( collectionDoc[CollectionType::dropped()].Bool() ){
             warning() << ns << " was dropped.  Re-shard collection first." << endl;
             return;
         }

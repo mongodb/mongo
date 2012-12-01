@@ -414,11 +414,7 @@ namespace mongo {
         ShardChunkVersion getVersion( const Shard& shard ) const;
         ShardChunkVersion getVersion() const;
 
-        void getInfo( BSONObjBuilder& b ) const {
-            b.append(CollectionFields::key(), _key.key());
-            b.appendBool(CollectionFields::unique(), _unique);
-            _version.addEpochToBSON(b, CollectionFields::lastmod());
-        }
+        void getInfo( BSONObjBuilder& b ) const;
 
         /**
          * @param me - so i don't get deleted before i'm done

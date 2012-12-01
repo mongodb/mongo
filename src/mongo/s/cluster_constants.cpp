@@ -28,16 +28,6 @@ namespace mongo {
     BSONField<bool> DatabaseFields::NEW_draining("draining");
     BSONField<bool> DatabaseFields::NEW_scatterCollections("scatterCollections");
 
-    const string ConfigNS::collection = "config.collections";
-    BSONField<string> CollectionFields::name("_id");
-    BSONField<string> CollectionFields::shard("shard");
-    BSONField<BSONObj> CollectionFields::key("key");
-    BSONField<bool> CollectionFields::unique("unique");
-    BSONField<Date_t> CollectionFields::lastmod("lastmod");
-    BSONField<bool> CollectionFields::dropped("dropped");
-    BSONField<bool> CollectionFields::noBalance("noBalance");
-    BSONField<OID> CollectionFields::epoch("lastmodEpoch");
-
     const string ConfigNS::tag = "config.tags";
     BSONField<string> TagFields::ns("ns");
     BSONField<string> TagFields::tag("tag");
