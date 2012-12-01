@@ -17,6 +17,9 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/base/owned_pointer_vector.h"
+#include "mongo/base/status.h"
+#include "mongo/db/auth/authorization_manager.h"
+#include "mongo/db/auth/principal.h"
 #include "mongo/db/client.h"
 #include "mongo/db/cmdline.h"
 #include "mongo/db/dbhelpers.h"
@@ -849,6 +852,7 @@ namespace mongo {
         if ( noauth )
             return;
         cc().getAuthenticationInfo()->authorize("local","_repl");
+        cc().getAuthorizationManager()->grantInternalAuthorization("_repl");
     }
     
     void ReplSetImpl::setMinValid(BSONObj obj) {

@@ -740,6 +740,7 @@ namespace mongo {
 
         if (!noauth) {
             cc().getAuthenticationInfo()->authorize("local", internalSecurity.user);
+            cc().getAuthorizationManager()->grantInternalAuthorization("_cleanupOldData");
         }
 
         log() << " (start) waiting to cleanup " << cleanup
@@ -1926,6 +1927,7 @@ namespace mongo {
         if (!noauth) {
             ShardedConnectionInfo::addHook();
             cc().getAuthenticationInfo()->authorize("local", internalSecurity.user);
+            cc().getAuthorizationManager()->grantInternalAuthorization("_migrateThread");
         }
         migrateStatus.go();
         cc().shutdown();

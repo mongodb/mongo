@@ -184,6 +184,17 @@ namespace mongo {
         return Status::OK();
     }
 
+    void AuthorizationManager::grantInternalAuthorization(const std::string& principalName) {
+        Principal* principal = new Principal(principalName);
+        ActionSet actions;
+        actions.addAllActions();
+        AcquiredPrivilege privilege(Privilege("*", actions), principal);
+
+        addAuthorizedPrincipal(principal);
+        Status status = acquirePrivilege(privilege);
+        verify(status.isOK());
+    }
+
     ActionSet AuthorizationManager::getActionsForOldStyleUser(const std::string& dbname,
                                                               bool readOnly) {
         ActionSet actions;

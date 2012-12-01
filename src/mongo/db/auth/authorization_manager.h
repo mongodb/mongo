@@ -73,6 +73,10 @@ namespace mongo {
         // Grant this connection the given privilege.
         Status acquirePrivilege(const AcquiredPrivilege& privilege);
 
+        // Adds a new principal with the given principal name and authorizes it with full access.
+        // Used to grant internal threads full access.
+        void grantInternalAuthorization(const std::string& principalName);
+
         // Checks if this connection has the privileges required to perform the given action
         // on the given resource.  Contains all the authorization logic including handling things
         // like the localhost exception.  If it is authorized, returns the principal that granted
