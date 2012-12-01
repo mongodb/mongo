@@ -302,6 +302,7 @@ connectionp
 cp
 crc
 cref
+ctime
 ctype
 curbackup
 curbtree
