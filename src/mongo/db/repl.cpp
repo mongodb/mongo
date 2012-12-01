@@ -160,7 +160,7 @@ namespace mongo {
 
     bool replAuthenticate(DBClientBase *conn);
 
-    void appendReplicationInfo( BSONObjBuilder& result , bool userIsAdmin , int level ) {
+    void appendReplicationInfo(BSONObjBuilder& result, int level) {
         if ( replSet ) {
             if( theReplSet == 0 || theReplSet->state().shunned() ) {
                 result.append("ismaster", false);
@@ -192,7 +192,7 @@ namespace mongo {
             int n = 0;
             list<BSONObj> src;
             {
-                Client::ReadContext ctx( "local.sources", dbpath, userIsAdmin );
+                Client::ReadContext ctx( "local.sources", dbpath, false );
                 shared_ptr<Cursor> c = findTableScan("local.sources", BSONObj());
                 while ( c->ok() ) {
                     src.push_back(c->current());
@@ -254,7 +254,7 @@ namespace mongo {
             int level = configElement.numberInt();
             
             BSONObjBuilder result;
-            appendReplicationInfo( result, userIsAdmin, level );
+            appendReplicationInfo(result, level);
             return result.obj();
         }
     } replicationInfoServerStatus;
@@ -278,11 +278,8 @@ namespace mongo {
         virtual bool run(const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool /*fromRepl*/) {
             /* currently request to arbiter is (somewhat arbitrarily) an ismaster request that is not
                authenticated.
-               we allow unauthenticated ismaster but we aren't as verbose informationally if
-               one is not authenticated for admin db to be safe.
             */
-            bool authed = cc().getAuthenticationInfo()->isAuthorizedReads("admin");
-            appendReplicationInfo( result , authed , 0 );
+            appendReplicationInfo(result, 0);
 
             result.appendNumber("maxBsonObjectSize", BSONObjMaxUserSize);
             result.appendDate("localTime", jsTime());
