@@ -122,6 +122,14 @@ namespace mongo {
             }
             details = db->namespaceIndex.details(profileName);
         }
+        else if ( details ) {
+            massert( 16510,
+                     str::stream()
+                     << "want to get profile collection, "
+                     << "but, " << profileName << " exists but isn't capped",
+                     details->isCapped() );
+        }
+
         if (!details) {
             // failed to get or create profile collection
             static time_t last = time(0) - 10;  // warn the first time

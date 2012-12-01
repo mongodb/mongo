@@ -61,8 +61,8 @@ try {
     assert.eq(0, db.runCommand({profile: -1}).was, "F");
     
     db.createCollection("system.profile");
-    db.runCommand({profile: 2});
-    assert.eq(2, db.runCommand({profile: -1}).was, "G");
+    assert.eq( 0, db.runCommand({profile: 2}).ok );
+    assert.eq( 0, db.runCommand({profile: -1}).was, "G");
     assert.eq(null, db.system.profile.stats().capped, "G1");
     
     /* With no system.profile collection */

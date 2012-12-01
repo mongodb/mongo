@@ -1654,6 +1654,12 @@ namespace mongo {
         RARELY verify( d == nsdetails(ns) );
         DEV verify( d == nsdetails(ns) );
 
+        massert( 16509,
+                 str::stream()
+                 << "fast_oplog_insert requires a capped collection "
+                 << " but " << ns << " is not capped",
+                 d->isCapped() );
+
         int lenWHdr = len + Record::HeaderSize;
         DiskLoc loc = d->alloc(ns, lenWHdr);
         verify( !loc.isNull() );
