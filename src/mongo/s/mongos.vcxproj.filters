@@ -96,6 +96,9 @@
     <Filter Include="third_party\MurmurHash3">
       <UniqueIdentifier>{9225469c-f0a7-45fb-b0c2-afb44d347ce2}</UniqueIdentifier>
     </Filter>
+    <Filter Include="db\geo">
+      <UniqueIdentifier>{caef26f2-57df-406b-83c0-7ca71a16a98a}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="balance.cpp">
@@ -900,6 +903,27 @@
     <ClCompile Include="..\db\commands\mr_common.cpp">
       <Filter>db\commands</Filter>
     </ClCompile>
+    <ClCompile Include="..\db\geo\shapes.cpp">
+      <Filter>db\geo</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\geo\hash.cpp">
+      <Filter>db\geo</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\geo\geojsonparser.cpp">
+      <Filter>db\geo</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\geo\s2common.cpp">
+      <Filter>db\geo</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\geo\s2cursor.cpp">
+      <Filter>db\geo</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\geo\s2index.cpp">
+      <Filter>db\geo</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\geo\s2nearcursor.cpp">
+      <Filter>db\geo</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\pch.h" />
@@ -1640,6 +1664,27 @@
     </ClInclude>
     <ClInclude Include="..\db\commands\find_and_modify.h">
       <Filter>db\commands</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\geo\shapes.h">
+      <Filter>db\geo</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\geo\core.h">
+      <Filter>db\geo</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\geo\geojsonparser.h">
+      <Filter>db\geo</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\geo\hash.h">
+      <Filter>db\geo</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\geo\s2common.h">
+      <Filter>db\geo</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\geo\s2cursor.h">
+      <Filter>db\geo</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\geo\s2nearcursor.h">
+      <Filter>db\geo</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
