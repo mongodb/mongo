@@ -25,8 +25,9 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include <signal.h>
 #include "wt_internal.h"
+
+#include <signal.h>
 
 typedef struct {
 	char *progname;				/* Program name */
