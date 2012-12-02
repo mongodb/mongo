@@ -12,8 +12,8 @@
 #define	WT_KILOBYTE	(1024)
 #define	WT_MEGABYTE	(1048576)
 #define	WT_GIGABYTE	(1073741824)
-#define	WT_TERABYTE	(1099511627776)
-#define	WT_PETABYTE	(1125899906842624)
+#define	WT_TERABYTE	(1099511627776ULL)
+#define	WT_PETABYTE	(1125899906842624ULL)
 
 /*
  * Sizes that cannot be larger than 2**32 are stored in uint32_t fields in
