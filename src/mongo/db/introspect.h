@@ -38,6 +38,6 @@ namespace mongo {
      * @param   force   Always create the collection if it does not exist
      * @return  NamespaceDetails for the newly created collection, or NULL on error
     **/
-    NamespaceDetails* getOrCreateProfileCollection(Database *db, bool force = false);
+    NamespaceDetails* getOrCreateProfileCollection(Database *db, bool force = false, string* errmsg = NULL);
 
 } // namespace mongo

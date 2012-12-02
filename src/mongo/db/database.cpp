@@ -379,7 +379,7 @@ namespace mongo {
 
         verify( cc().database() == this );
 
-        if (!getOrCreateProfileCollection(this, true))
+        if (!getOrCreateProfileCollection(this, true, &errmsg))
             return false;
 
         profile = newLevel;
