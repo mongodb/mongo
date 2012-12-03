@@ -258,10 +258,11 @@ config_print(int error_display)
 
 	/* Display configuration values. */
 	for (cp = c; cp->name != NULL; ++cp)
-		if (cp->type_mask != 0 &&
+		if ((cp->type_mask != 0 &&
 		    ((g.type == FIX && !(cp->type_mask & C_FIX)) ||
 		    (g.type == ROW && !(cp->type_mask & C_ROW)) ||
-		    (g.type == VAR && !(cp->type_mask & C_VAR))))
+		    (g.type == VAR && !(cp->type_mask & C_VAR)))) ||
+		    (cp->flags & C_STRING && *(cp->vstr) == NULL))
 			fprintf(fp,
 			    "# %s not applicable to this run\n", cp->name);
 		else if (cp->flags & C_STRING)
