@@ -108,7 +108,7 @@ util_str2recno(const char *p, uint64_t *recnop)
 		goto format;
 
 	errno = 0;
-	recno = strtouq(p, &endptr, 0);
+	recno = __wt_strtouq(p, &endptr, 0);
 	if (recno == ULLONG_MAX && errno == ERANGE)
 		return (util_err(ERANGE, "%s: invalid record number", p));
 

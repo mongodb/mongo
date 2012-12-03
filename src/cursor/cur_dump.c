@@ -104,7 +104,7 @@ str2recno(WT_SESSION_IMPL *session, const char *p, uint64_t *recnop)
 		goto format;
 
 	errno = 0;
-	recno = strtouq(p, &endptr, 0);
+	recno = __wt_strtouq(p, &endptr, 0);
 	if (recno == ULLONG_MAX && errno == ERANGE)
 		WT_RET_MSG(session, ERANGE, "%s: invalid record number", p);
 	if (endptr[0] != '\0')

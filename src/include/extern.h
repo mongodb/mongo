@@ -934,6 +934,7 @@ extern int __wt_write(WT_SESSION_IMPL *session,
     uint32_t bytes,
     const void *buf);
 extern void __wt_sleep(long seconds, long micro_seconds);
+extern uint64_t __wt_strtouq(const char *nptr, char **endptr, int base);
 extern int __wt_thread_create(pthread_t *tidret,
     void *(*func)(void *),
     void *arg);

@@ -7,15 +7,17 @@
 
 #include "wt_internal.h"
 
-#if !defined(HAVE_STRTOUQ)
 /*
  * Convert a string to an unsigned quad integer.
  */
 uint64_t
-strtouq(const char *nptr, char **endptr, int base)
+__wt_strtouq(const char *nptr, char **endptr, int base)
 {
+#if defined(HAVE_STRTOUQ)
+	return (__wt_strtouq(nptr, endptr, base));
+#else
 	STATIC_ASSERT(sizeof(uint64_t) == sizeof(unsigned long long));
 
 	return (strtoull(nptr, endptr, base));
-}
 #endif
+}
