@@ -86,7 +86,8 @@ namespace mongo {
 
     /**
      * Tests that the ScopedDistributedLock respects the DistributedLock and vice-versa.
-     */TEST_F(ScopedBalancerLockTests, BasicLockTest) {
+     */
+    TEST_F(ScopedBalancerLockTests, BasicLockTest) {
 
         ConnectionString configLoc(string("$dummy:10000"));
 
