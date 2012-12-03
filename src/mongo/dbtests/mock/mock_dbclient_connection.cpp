@@ -15,6 +15,7 @@
 
 #include "mongo/dbtests/mock/mock_dbclient_connection.h"
 
+#include "mongo/dbtests/mock/mock_dbclient_cursor.h"
 #include "mongo/util/net/sock.h"
 #include "mongo/util/time_support.h"
 
@@ -24,11 +25,13 @@ using std::string;
 using std::vector;
 
 namespace mongo_test {
-    MockDBClientConnection::MockDBClientConnection(MockRemoteDBServer* remoteServer):
+    MockDBClientConnection::MockDBClientConnection(MockRemoteDBServer* remoteServer,
+            bool autoReconnect):
             _remoteServerInstanceID(remoteServer->getInstanceID()),
             _remoteServer(remoteServer),
             _isFailed(false),
-            _sockCreationTime(mongo::curTimeMicros64()) {
+            _sockCreationTime(mongo::curTimeMicros64()),
+            _autoReconnect(autoReconnect) {
     }
 
     MockDBClientConnection::~MockDBClientConnection() {
@@ -36,6 +39,8 @@ namespace mongo_test {
 
     bool MockDBClientConnection::runCommand(const string& dbname, const BSONObj& cmdObj,
             BSONObj &info, int options, const mongo::AuthenticationTable* auth) {
+        checkConnection();
+
         try {
             return _remoteServer->runCommand(_remoteServerInstanceID, dbname, cmdObj,
                     info, options, auth);
@@ -55,9 +60,15 @@ namespace mongo_test {
             const BSONObj* fieldsToReturn,
             int queryOptions,
             int batchSize) {
+        checkConnection();
+
         try {
-            return _remoteServer->query(_remoteServerInstanceID, ns, query, nToReturn,
-                    nToSkip, fieldsToReturn, queryOptions, batchSize);
+            mongo::BSONArray result(_remoteServer->query(_remoteServerInstanceID, ns, query,
+                    nToReturn, nToSkip, fieldsToReturn, queryOptions, batchSize));
+
+            std::auto_ptr<mongo::DBClientCursor> cursor;
+            cursor.reset(new MockDBClientCursor(this, result));
+            return cursor;
         }
         catch (const mongo::SocketException&) {
             _isFailed = true;
@@ -139,5 +150,11 @@ namespace mongo_test {
 
     double MockDBClientConnection::getSoTimeout() const {
         return 0;
+    }
+
+    void MockDBClientConnection::checkConnection() {
+        if (_isFailed && _autoReconnect) {
+            _remoteServerInstanceID = _remoteServer->getInstanceID();
+        }
     }
 }

@@ -68,11 +68,18 @@ namespace mongo_test {
         MockRemoteDBServer* getNode(const std::string& hostName);
 
         /**
-         * Kills a node.
+         * Kills a node belonging to this set.
          *
          * @param hostName the name of the replica node to kill.
          */
         void kill(const std::string& hostName);
+
+        /**
+         * Kills a set of host belonging to this set.
+         *
+         * @param hostList the list of host names of the servers to kill.
+         */
+        void kill(const std::vector<std::string>& hostList);
 
         /**
          * Reboots a node.

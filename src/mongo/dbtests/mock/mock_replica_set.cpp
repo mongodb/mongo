@@ -42,7 +42,17 @@ namespace mongo_test {
         verify(servers.size() == 1);
 
         const string serverName = servers.front().toString(true);
-        return new MockDBClientConnection(_replSet->getNode(serverName));
+
+        MockRemoteDBServer* node = _replSet->getNode(serverName);
+
+        if (node->isRunning()) {
+            // Follow ConnectionString::connect to set autoReconnect to true
+            return new MockDBClientConnection(node, true);
+        }
+
+        // mimic ConnectionString::connect for MASTER type connection to return NULL
+        // if the destination is unreachable
+        return NULL;
     }
 
     MockReplicaSet::MockReplicaSet(const string& setName, size_t nodes):
@@ -141,6 +151,13 @@ namespace mongo_test {
     void MockReplicaSet::kill(const string& hostName) {
         verify(_nodeMap.count(hostName) == 1);
         _nodeMap[hostName]->shutdown();
+    }
+
+    void MockReplicaSet::kill(const vector<string>& hostList) {
+        for (vector<string>::const_iterator iter = hostList.begin();
+                iter != hostList.end(); ++iter) {
+            kill(*iter);
+        }
     }
 
     void MockReplicaSet::restore(const string& hostName) {

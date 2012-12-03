@@ -106,6 +106,11 @@ namespace mongo_test {
         _cmdMap[cmdName].reset(new CircularBSONIterator(replySequence));
     }
 
+    void MockRemoteDBServer::setQueryReply(const mongo::BSONArray& resultSet) {
+        scoped_spinlock sLock(_lock);
+        _queryReply = mongo::BSONArray(resultSet.copy());
+    }
+
     bool MockRemoteDBServer::runCommand(MockRemoteDBServer::InstanceID id,
             const string& dbname,
             const BSONObj& cmdObj,
@@ -147,7 +152,7 @@ namespace mongo_test {
         return info["ok"].trueValue();
     }
 
-    std::auto_ptr<mongo::DBClientCursor> MockRemoteDBServer::query(
+    mongo::BSONArray MockRemoteDBServer::query(
             MockRemoteDBServer::InstanceID id,
             const string& ns,
             mongo::Query query,
@@ -164,11 +169,9 @@ namespace mongo_test {
 
         checkIfUp(id);
 
-        std::auto_ptr<mongo::DBClientCursor> cursor;
-
         scoped_spinlock sLock(_lock);
         _queryCount++;
-        return cursor;
+        return _queryReply;
     }
 
     mongo::ConnectionString::ConnectionType MockRemoteDBServer::type() const {

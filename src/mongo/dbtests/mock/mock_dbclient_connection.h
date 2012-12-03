@@ -37,8 +37,11 @@ namespace mongo_test {
          * @param remoteServer the remote server to connect to. The caller is
          *     responsible for making sure that the life of remoteServer is
          *     longer than this connection.
+         * @param autoReconnect will automatically re-establish connection the
+         *     next time an operation is requested when the last operation caused
+         *     this connection to fall into a failed state.
          */
-        MockDBClientConnection(MockRemoteDBServer* remoteServer);
+        MockDBClientConnection(MockRemoteDBServer* remoteServer, bool autoReconnect = false);
         virtual ~MockDBClientConnection();
 
         //
@@ -94,9 +97,12 @@ namespace mongo_test {
         bool lazySupported() const;
 
     private:
-        const MockRemoteDBServer::InstanceID _remoteServerInstanceID;
+        void checkConnection();
+
+        MockRemoteDBServer::InstanceID _remoteServerInstanceID;
         MockRemoteDBServer* _remoteServer;
         bool _isFailed;
         uint64_t _sockCreationTime;
+        bool _autoReconnect;
     };
 }

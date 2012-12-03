@@ -110,6 +110,14 @@ namespace mongo_test {
         void setCommandReply(const std::string& cmdName,
                 const std::vector<mongo::BSONObj>& replySequence);
 
+        /**
+         * Sets the reply of the query.
+         *
+         * @param resultSet the array of results where each element in the array
+         *     would represent a single document in the resulting cursor.
+         */
+        void setQueryReply(const mongo::BSONArray& resultSet);
+
         //
         // DBClientBase methods
         //
@@ -118,7 +126,7 @@ namespace mongo_test {
                 mongo::BSONObj &info, int options = 0,
                 const mongo::AuthenticationTable* auth = NULL);
 
-        std::auto_ptr<mongo::DBClientCursor> query(InstanceID id,
+        mongo::BSONArray query(InstanceID id,
                 const std::string &ns,
                 mongo::Query query = mongo::Query(),
                 int nToReturn = 0,
@@ -199,7 +207,11 @@ namespace mongo_test {
         std::string _hostName;
         long long _delayMilliSec;
 
+        //
+        // Mock replies
+        //
         CmdToReplyObj _cmdMap;
+        mongo::BSONArray _queryReply;
 
         //
         // Op Counters
