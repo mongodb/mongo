@@ -6,7 +6,7 @@ trap 'rm -f $t; exit 0' 0 1 2 3 13 15
 
 cd ..
 
-# Returns in functions after a jump to the error lable.
+# Returns in functions after a jump to the error label.
 for f in `find examples ext src test -name '*.[ci]'`; do
 	sed -n \
 	    -e '/^{$/,/^}$/{=;p;}' $f |
