@@ -270,6 +270,9 @@ namespace mongo {
 #ifdef _WIN32
         _file = ::_open( file.c_str(), _O_BINARY | _O_RDWR | _O_CREAT , _S_IREAD | _S_IWRITE );
 #else
+#ifndef O_NOATIME
+#define O_NOATIME 0
+#endif
         _file = ::open( file.c_str(), O_CREAT | O_RDWR | O_NOATIME , S_IRUSR | S_IWUSR );
 #endif
         massert( 16392, 

@@ -18,16 +18,15 @@
 #include "pch.h"
 
 #include <boost/filesystem/convenience.hpp>
-
 #include <fstream>
 
-#include "mongo/util/net/sock.h"
-
+#include "mongo/scripting/engine.h"
 #include "mongo/shell/shell_utils.h"
 #include "mongo/shell/shell_utils_launcher.h"
-#include "mongo/util/md5.hpp"
 #include "mongo/util/file.h"
-#include "mongo/scripting/engine.h"
+#include "mongo/util/md5.hpp"
+#include "mongo/util/net/sock.h"
+#include "mongo/util/text.h"
 
 namespace mongo {
 

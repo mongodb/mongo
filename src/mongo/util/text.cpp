@@ -17,13 +17,14 @@
 
 #include "pch.h"
 
-#include "mongo/util/text.h"
-#include "mongo/util/mongoutils/str.h"
 #include <boost/smart_ptr/scoped_array.hpp>
-
 #ifdef _WIN32
 #include <io.h>
 #endif
+
+#include "mongo/platform/basic.h"
+#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/text.h"
 
 using namespace std;
 

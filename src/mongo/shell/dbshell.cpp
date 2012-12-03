@@ -35,9 +35,11 @@
 #include "mongo/util/password.h"
 #include "mongo/util/stacktrace.h"
 #include "mongo/util/startup_test.h"
+#include "mongo/util/text.h"
 #include "mongo/util/version.h"
 
 #ifdef _WIN32
+#include <io.h>
 #define isatty _isatty
 #else
 #include <unistd.h>

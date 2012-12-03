@@ -21,7 +21,9 @@
 #include <boost/thread/thread.hpp>
 #include <fstream>
 #include <boost/filesystem/operations.hpp>
-#if !defined(_WIN32)
+#if defined(_WIN32)
+#include <io.h>
+#else
 #include <sys/file.h>
 #endif
 
