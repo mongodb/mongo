@@ -915,7 +915,7 @@ __evict_dirty_validate(WT_CONNECTION_IMPL *conn)
 		/* Reference the correct WT_BTREE handle. */
 		WT_SET_BTREE_IN_SESSION(session, btree);
 		while ((ret = __wt_tree_walk(
-		    session, &page, WT_TREE_EVICT)) == 0 &&
+		    session, &page, WT_TREE_CACHE)) == 0 &&
 		    page != NULL) {
 			if (__wt_page_is_modified(page))
 				bytes += page->memory_footprint;

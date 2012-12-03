@@ -3651,7 +3651,7 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	WT_BOUNDARY *bnd;
 	WT_DECL_RET;
 	WT_PAGE_MODIFY *mod;
-	uint32_t i;
+	uint32_t i, page_size;
 	int was_modified;
 
 	btree = session->btree;
@@ -3851,9 +3851,10 @@ err:			__wt_scr_free(&tkey);
 	 */
 	if (!r->upd_skipped) {
 		was_modified = __wt_page_is_modified(page);
+		WT_ORDERED_READ(page_size, page->memory_footprint);
 		mod->disk_gen = r->orig_write_gen;
 		if (was_modified && !__wt_page_is_modified(page))
-			__wt_cache_dirty_decr(session, page->memory_footprint);
+			__wt_cache_dirty_decr(session, page_size);
 	}
 
 	return (0);

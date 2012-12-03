@@ -62,10 +62,16 @@ __wt_cache_dirty_decr(
 	WT_CACHE *cache;
 
 	cache = S2C(session)->cache;
-	WT_ASSERT(session,
-	    cache->bytes_dirty >= size && cache->pages_dirty > 0);
-	(void)WT_ATOMIC_SUB(cache->bytes_dirty, size);
-	(void)WT_ATOMIC_SUB(cache->pages_dirty, 1);
+	if (cache->bytes_dirty < size || cache->pages_dirty == 0) {
+		WT_VERBOSE_VOID(session, evictserver,
+		    "Cache dirty count. Needed: %" PRIu64 " have: %" PRIu64,
+		    size, cache->bytes_dirty);
+		cache->bytes_dirty = 0;
+		cache->pages_dirty = 0;
+	} else {
+		(void)WT_ATOMIC_SUB(cache->bytes_dirty, size);
+		(void)WT_ATOMIC_SUB(cache->pages_dirty, 1);
+	}
 }
 
 /*
