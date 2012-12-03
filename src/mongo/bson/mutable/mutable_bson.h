@@ -88,7 +88,7 @@ namespace mutablebson {
         Status addSiblingBefore(Element e);
         Status addSiblingAfter(Element e);
         Status remove();
-        Status rename(const std::string& newName);
+        Status rename(const StringData& newName);
         Status move(Element newParent);
 
         //

@@ -211,7 +211,7 @@ namespace {
         return Status::OK();
     }
 
-    Status Element::rename(const std::string& newName) {
+    Status Element::rename(const StringData& newName) {
         ElementRep& thisRep = _doc->_elements->_vec[_rep];
         thisRep._nameref = _doc->getHeap()->putString(newName);
         return Status::OK();
