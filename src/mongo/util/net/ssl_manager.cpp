@@ -25,6 +25,7 @@
 #include "mongo/bson/util/atomic_int.h"
 #include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/mongoutils/str.h"
+#include "mongo/util/net/sock.h"
 
 namespace mongo {
 
@@ -101,9 +102,6 @@ namespace mongo {
     
     ////////////////////////////////////////////////////////////////
 
-    
-
-
     SSLManager::SSLManager(bool client) {
         _client = client;
         SSL_library_init();
@@ -111,8 +109,10 @@ namespace mongo {
         ERR_load_crypto_strings();
         
         _context = SSL_CTX_new( client ? SSLv23_client_method() : SSLv23_server_method() );
-        massert( 15864 , mongoutils::str::stream() << "can't create SSL Context: " << 
-                 ERR_error_string(ERR_get_error(), NULL) , _context );
+        massert(15864, 
+                mongoutils::str::stream() << "can't create SSL Context: " << 
+                _getSSLErrorMessage(ERR_get_error()), 
+                _context);
    
         // Activate all bug workaround options, to support buggy client SSL's.
         SSL_CTX_set_options(_context, SSL_OP_ALL);
@@ -125,20 +125,6 @@ namespace mongo {
         SSLThreadInfo::get();
     }
 
-    void SSLManager::setupPubPriv(const std::string& privateKeyFile, const std::string& publicKeyFile) {
-        massert(15865, 
-                mongoutils::str::stream() << "Can't read SSL certificate from file " 
-                << publicKeyFile << ":" <<  ERR_error_string(ERR_get_error(), NULL) ,
-                SSL_CTX_use_certificate_file(_context, publicKeyFile.c_str(), SSL_FILETYPE_PEM));
-  
-
-        massert(15866 , 
-                 mongoutils::str::stream() << "Can't read SSL private key from file " 
-                 << privateKeyFile << " : " << ERR_error_string(ERR_get_error(), NULL) ,
-                 SSL_CTX_use_PrivateKey_file(_context, privateKeyFile.c_str(), SSL_FILETYPE_PEM));
-    }
-    
-    
     int SSLManager::password_cb(char *buf,int num, int rwflag,void *userdata) {
         SSLManager* sm = static_cast<SSLManager*>(userdata);
         std::string pass = sm->_password;
@@ -150,7 +136,8 @@ namespace mongo {
         _password = password;
         
         if ( SSL_CTX_use_certificate_chain_file( _context , keyFile.c_str() ) != 1 ) {
-            log() << "Can't read certificate file: " << keyFile << endl;
+            log() << "Can't read certificate file: " << keyFile << " " <<
+                _getSSLErrorMessage(ERR_get_error()) << endl;
             return false;
         }
         
@@ -158,22 +145,95 @@ namespace mongo {
         SSL_CTX_set_default_passwd_cb( _context, &SSLManager::password_cb );
         
         if ( SSL_CTX_use_PrivateKey_file( _context , keyFile.c_str() , SSL_FILETYPE_PEM ) != 1 ) {
-            log() << "Can't read key file: " << keyFile << endl;
+            log() << "Can't read key file: " << keyFile << " " <<
+                _getSSLErrorMessage(ERR_get_error()) << endl;
             return false;
         }
         
+        // Verify that the certificate and the key go together.
+        if (SSL_CTX_check_private_key(_context) != 1) {
+            log() << "SSL certificate validation: " << _getSSLErrorMessage(ERR_get_error()) << endl;
+            return false;
+        }
         return true;
     }
-        
+                
     SSL * SSLManager::secure(int fd) {
         // This just ensures that SSL multithreading support is set up for this thread,
         // if it's not already.
         SSLThreadInfo::get();
 
         SSL * ssl = SSL_new(_context);
-        massert( 15861 , "can't create SSL" , ssl );
-        SSL_set_fd( ssl , fd );
+        massert(15861, 
+                _getSSLErrorMessage(ERR_get_error()),
+                ssl);
+        
+        int status = SSL_set_fd( ssl , fd );
+        massert(16509, 
+                _getSSLErrorMessage(ERR_get_error()), 
+                status == 1);
+
         return ssl;
     }
+
+    void SSLManager::connect(SSL* ssl) {
+        int ret = SSL_connect(ssl);
+        if (ret != 1)
+            _handleSSLError(SSL_get_error(ssl, ret));
+    }
+
+    void SSLManager::accept(SSL* ssl) {
+        int ret = SSL_accept(ssl);
+        if (ret != 1)
+            _handleSSLError(SSL_get_error(ssl, ret));
+    }
+
+    std::string SSLManager::_getSSLErrorMessage(int code) {
+        // 120 from the SSL documentation for ERR_error_string
+        static const size_t msglen = 120;
+
+        char msg[msglen];
+        ERR_error_string_n(code, msg, msglen);
+        return msg;
+    }
+
+    void SSLManager::_handleSSLError(int code) {
+        switch (code) {
+        case SSL_ERROR_WANT_READ:
+        case SSL_ERROR_WANT_WRITE:
+            // should not happen because we turned on AUTO_RETRY
+            log() << "SSL error" << endl;
+            throw SocketException(SocketException::CONNECT_ERROR, "");
+            break;
+
+        case SSL_ERROR_SYSCALL:
+            if (code < 0) {
+                log() << "socket error: " << errnoWithDescription() << endl;
+                throw SocketException(SocketException::CONNECT_ERROR, "");
+            }
+            log() << "could not negotiate SSL connection: EOF detected" << endl;
+            throw SocketException(SocketException::CONNECT_ERROR, "");
+            break;
+
+        case SSL_ERROR_SSL:
+        {
+            int ret = ERR_get_error();
+            log() << _getSSLErrorMessage(ret) << endl;
+            throw SocketException(SocketException::CONNECT_ERROR, "");
+            break;
+        }
+        case SSL_ERROR_ZERO_RETURN:
+            log() << "could not negotiate SSL connection: EOF detected" << endl;
+            throw SocketException(SocketException::CONNECT_ERROR, "");
+            break;
+        
+        default:
+            log() << "unrecognized SSL error" << endl;
+            throw SocketException(SocketException::CONNECT_ERROR, "");
+            break;
+        }
+    }       
+
 }
 #endif
+        

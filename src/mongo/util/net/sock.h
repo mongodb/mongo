@@ -219,9 +219,12 @@ namespace mongo {
 #endif
         
         /**
-         * call this after a fork for server sockets
+         * This function calls SSL_accept() if SSL-encrypted sockets
+         * are desired. SSL_accept() waits until the remote host calls
+         * SSL_connect().
+         * This function may throw SocketException.
          */
-        void postFork();
+        void doSSLHandshake();
         
         /**
          * @return the time when the socket was opened.

@@ -109,24 +109,30 @@ namespace mongo {
     }
 
     void MiniWebServer::accepted(boost::shared_ptr<Socket> psock, long long connectionId ) {
-        psock->postFork();
-        psock->setTimeout(8);
         char buf[4096];
         int len = 0;
-        while ( 1 ) {
-            int left = sizeof(buf) - 1 - len;
-            if( left == 0 )
-                break;
-            int x = psock->unsafe_recv( buf + len , left );
-            if ( x <= 0 ) {
-                psock->close();
-                return;
+        try {
+            psock->doSSLHandshake();
+            psock->setTimeout(8);
+            while ( 1 ) {
+                int left = sizeof(buf) - 1 - len;
+                if( left == 0 )
+                    break;
+                int x = psock->unsafe_recv( buf + len , left );
+                if ( x <= 0 ) {
+                    psock->close();
+                    return;
+                }
+                len += x;
+                buf[ len ] = 0;
+                if ( fullReceive( buf ) ) {
+                    break;
+                }
             }
-            len += x;
-            buf[ len ] = 0;
-            if ( fullReceive( buf ) ) {
-                break;
-            }
+        }
+        catch (const SocketException& e) {
+            LOG(1) << "couldn't recv data via http client: " << e << endl;
+            return;
         }
         buf[len] = 0;
 

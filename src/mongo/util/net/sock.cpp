@@ -436,7 +436,7 @@ namespace mongo {
         fassert(16504, !_ssl);
         fassert(16505, _fd >= 0);
         _ssl = ssl->secure( _fd );
-        SSL_connect( _ssl );
+        ssl->connect(_ssl);
     }
 
     void Socket::secureAccepted( SSLManager * ssl ) { 
@@ -444,12 +444,12 @@ namespace mongo {
     }
 #endif
 
-    void Socket::postFork() {
+    void Socket::doSSLHandshake() {
 #ifdef MONGO_SSL
         if ( _sslAccepted ) {
             fassert(16506, _fd);
             _ssl = _sslAccepted->secure( _fd );
-            SSL_accept( _ssl );
+            _sslAccepted->accept(_ssl);
             _sslAccepted = 0;
         }
 #endif

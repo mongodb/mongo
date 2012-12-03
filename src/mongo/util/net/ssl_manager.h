@@ -29,16 +29,25 @@ namespace mongo {
     MONGO_DISALLOW_COPYING(SSLManager);
     public:
         SSLManager( bool client );
-        
+
         /** @return true if was successful, otherwise false */
         bool setupPEM( const std::string& keyFile , const std::string& password );
-        void setupPubPriv( const std::string& privateKeyFile , const std::string& publicKeyFile );
 
         /**
          * creates an SSL context to be used for this file descriptor
          * caller should delete
          */
         SSL * secure( int fd );
+
+        /**
+         * Initiates a TLS connection
+         */
+        void connect(SSL* ssl);
+
+        /**
+         * Waits for the other side to initiate a TLS connection
+         */
+        void accept(SSL* ssl);
         
         static int password_cb( char *buf,int num, int rwflag,void *userdata );
 
@@ -46,6 +55,17 @@ namespace mongo {
         bool _client;
         SSL_CTX* _context;
         std::string _password;
+
+        /**
+         * Fetches the error text for an error code, in a thread-safe manner.
+         */
+        std::string _getSSLErrorMessage(int code);
+
+        /**
+         * Given an error code from an SSL-type IO function, logs an 
+         * appropriate message and throws a SocketException
+         */
+        void _handleSSLError(int code);
     };
 }
 #endif

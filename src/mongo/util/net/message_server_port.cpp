@@ -176,8 +176,6 @@ namespace mongo {
             inPort->psock->setLogLevel(1);
             scoped_ptr<MessagingPort> p( inPort );
 
-            p->psock->postFork();
-
             string otherSide;
 
             Message m;
@@ -187,6 +185,7 @@ namespace mongo {
 
                 otherSide = p->psock->remoteString();
 
+                p->psock->doSSLHandshake();
                 handler->connected( p.get() );
 
                 while ( ! inShutdown() ) {
