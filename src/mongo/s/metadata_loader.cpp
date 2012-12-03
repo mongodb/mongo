@@ -129,8 +129,7 @@ namespace mongo {
         }
 
         CollectionType collDoc;
-        collDoc.parseBSON(collObj);
-        if (!collDoc.isValid(errMsg)) {
+        if (!collDoc.parseBSON(collObj, errMsg) || !collDoc.isValid(errMsg)) {
             return false;
         }
 

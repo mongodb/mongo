@@ -21,13 +21,16 @@
 
 namespace {
 
+    using std::string;
     using mongo::ShardType;
     using mongo::BSONObj;
 
     TEST(Validity, Empty) {
         ShardType shard;
         BSONObj emptyObj = BSONObj();
-        shard.parseBSON(emptyObj);
+        string errMsg;
+        ASSERT(shard.parseBSON(emptyObj, &errMsg));
+        ASSERT(errMsg == "");
         ASSERT_FALSE(shard.isValid(NULL));
     }
 
@@ -35,7 +38,9 @@ namespace {
         ShardType shard;
         BSONObj obj = BSON(ShardType::name("shard0000") <<
                            ShardType::host("localhost:27017"));
-        shard.parseBSON(obj);
+        string errMsg;
+        ASSERT(shard.parseBSON(obj, &errMsg));
+        ASSERT(errMsg == "");
         ASSERT_TRUE(shard.isValid(NULL));
     }
 
@@ -45,7 +50,9 @@ namespace {
                            ShardType::host("localhost:27017") <<
                            ShardType::draining(true) <<
                            ShardType::maxSize(100));
-        shard.parseBSON(obj);
+        string errMsg;
+        ASSERT(shard.parseBSON(obj, &errMsg));
+        ASSERT(errMsg == "");
         ASSERT_TRUE(shard.isValid(NULL));
     }
 

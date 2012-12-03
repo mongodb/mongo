@@ -23,6 +23,7 @@
 
 namespace {
 
+    using std::string;
     using mongo::CollectionType;
     using mongo::BSONObj;
     using mongo::OID;
@@ -31,7 +32,9 @@ namespace {
     TEST(Validity, Empty) {
         CollectionType coll;
         BSONObj emptyObj = BSONObj();
-        coll.parseBSON(emptyObj);
+        string errMsg;
+        ASSERT(coll.parseBSON(emptyObj, &errMsg));
+        ASSERT(errMsg == "");
         ASSERT_FALSE(coll.isValid(NULL));
     }
 
@@ -39,9 +42,11 @@ namespace {
         CollectionType coll;
         BSONObj obj = BSON(CollectionType::ns("db.coll") <<
                            CollectionType::keyPattern(BSON("a" << 1)) <<
-                           CollectionType::createdAt(1ULL) <<
+                           CollectionType::updatedAt(1ULL) <<
                            CollectionType::epoch(OID::gen()));
-        coll.parseBSON(obj);
+        string errMsg;
+        ASSERT(coll.parseBSON(obj, &errMsg));
+        ASSERT(errMsg == "");
         ASSERT_TRUE(coll.isValid(NULL));
     }
 
@@ -49,18 +54,22 @@ namespace {
         CollectionType coll;
         BSONObj obj = BSON(CollectionType::ns("db.coll") <<
                            CollectionType::primary("my_primary_shard") <<
-                           CollectionType::createdAt(1ULL) <<
+                           CollectionType::updatedAt(1ULL) <<
                            CollectionType::epoch(OID::gen()));
-        coll.parseBSON(obj);
+        string errMsg;
+        ASSERT(coll.parseBSON(obj, &errMsg));
+        ASSERT(errMsg == "");
         ASSERT_TRUE(coll.isValid(NULL));
     }
 
     TEST(Validity, MixingOptionals) {
         CollectionType coll;
         BSONObj obj = BSON(CollectionType::ns("db.coll") <<
-                           CollectionType::createdAt(time(0)) <<
+                           CollectionType::updatedAt(time(0)) <<
                            CollectionType::unique(true));
-        coll.parseBSON(obj);
+        string errMsg;
+        ASSERT(coll.parseBSON(obj, &errMsg));
+        ASSERT(errMsg == "");
         ASSERT_FALSE(coll.isValid(NULL));
     }
 
@@ -71,9 +80,11 @@ namespace {
                            CollectionType::primary("my_primary_shard") <<
                            CollectionType::DEPRECATED_lastmod(creation) <<
                            CollectionType::epoch(OID::gen()));
-        coll.parseBSON(obj);
+        string errMsg;
+        ASSERT(coll.parseBSON(obj, &errMsg));
+        ASSERT(errMsg == "");
         ASSERT_TRUE(coll.isValid(NULL));
-        ASSERT_EQUALS(coll.getCreatedAt(), creation);
+        ASSERT_EQUALS(coll.getUpdatedAt(), creation);
     }
 
     TEST(Compatibility, OldEpoch) {
@@ -81,9 +92,11 @@ namespace {
         OID epoch = OID::gen();
         BSONObj obj = BSON(CollectionType::ns("db.coll") <<
                            CollectionType::primary("my_primary_shard") <<
-                           CollectionType::createdAt(1ULL) <<
+                           CollectionType::updatedAt(1ULL) <<
                            CollectionType::DEPRECATED_lastmodEpoch(epoch));
-        coll.parseBSON(obj);
+        string errMsg;
+        ASSERT(coll.parseBSON(obj, &errMsg));
+        ASSERT(errMsg == "");
         ASSERT_TRUE(coll.isValid(NULL));
         ASSERT_EQUALS(coll.getEpoch(), epoch);
     }
@@ -97,12 +110,14 @@ namespace {
                            CollectionType::unique(false) <<
                            CollectionType::DEPRECATED_lastmod(1ULL) <<
                            CollectionType::DEPRECATED_lastmodEpoch(OID::gen()) <<
-                           CollectionType::DEPRECATED_dropped(true));
-        coll.parseBSON(obj);
+                           CollectionType::dropped(true));
+        string errMsg;
+        ASSERT(coll.parseBSON(obj, &errMsg));
+        ASSERT(errMsg == "");
         ASSERT_EQUALS(coll.getNS(), "");
         ASSERT_EQUALS(coll.getKeyPattern(), BSONObj());
-        ASSERT_EQUALS(coll.getUnique(), false);
-        ASSERT_EQUALS(coll.getCreatedAt(), 0ULL);
+        ASSERT_EQUALS(coll.isUnique(), false);
+        ASSERT_EQUALS(coll.getUpdatedAt(), 0ULL);
         ASSERT_EQUALS(coll.getEpoch(), OID());
         ASSERT_FALSE(coll.isValid(NULL));
     }
@@ -115,12 +130,14 @@ namespace {
                            CollectionType::unique(true) <<
                            CollectionType::DEPRECATED_lastmod(1ULL) <<
                            CollectionType::DEPRECATED_lastmodEpoch(epoch) <<
-                           CollectionType::DEPRECATED_dropped(false));
-        coll.parseBSON(obj);
+                           CollectionType::dropped(false));
+        string errMsg;
+        ASSERT(coll.parseBSON(obj, &errMsg));
+        ASSERT(errMsg == "");
         ASSERT_EQUALS(coll.getNS(), "db.coll");
         ASSERT_EQUALS(coll.getKeyPattern(), BSON("a" << 1));
-        ASSERT_EQUALS(coll.getUnique(), true);
-        ASSERT_EQUALS(coll.getCreatedAt(), 1ULL);
+        ASSERT_EQUALS(coll.isUnique(), true);
+        ASSERT_EQUALS(coll.getUpdatedAt(), 1ULL);
         ASSERT_EQUALS(coll.getEpoch(), epoch);
         ASSERT_TRUE(coll.isValid(NULL));
     }

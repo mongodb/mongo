@@ -46,7 +46,7 @@ namespace {
         DestructionLogger::destroyedNames().clear();
         {
             OwnedPointerVector<DestructionLogger> owned;
-            owned.vector().push_back( new DestructionLogger( "foo" ) );
+            owned.mutableVector().push_back( new DestructionLogger( "foo" ) );
             // owned destroyed
         }
         ASSERT_EQUALS( 1U, DestructionLogger::destroyedNames().size() );
@@ -57,7 +57,7 @@ namespace {
         DestructionLogger::destroyedNames().clear();
         {
             OwnedPointerVector<const DestructionLogger> owned;
-            owned.vector().push_back( new DestructionLogger( "foo" ) );
+            owned.mutableVector().push_back( new DestructionLogger( "foo" ) );
             // owned destroyed
         }
         ASSERT_EQUALS( 1U, DestructionLogger::destroyedNames().size() );
@@ -68,8 +68,8 @@ namespace {
         DestructionLogger::destroyedNames().clear();
         {
             OwnedPointerVector<DestructionLogger> owned;
-            owned.vector().push_back( new DestructionLogger( "first" ) );
-            owned.vector().push_back( new DestructionLogger( "second" ) );
+            owned.mutableVector().push_back( new DestructionLogger( "first" ) );
+            owned.mutableVector().push_back( new DestructionLogger( "second" ) );
             // owned destroyed
         }
         ASSERT_EQUALS( 2U, DestructionLogger::destroyedNames().size() );

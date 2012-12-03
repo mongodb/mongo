@@ -58,7 +58,7 @@ namespace {
             BSONObj collFoo =  BSON(CollectionType::ns("test.foo") <<
                                     CollectionType::keyPattern(BSON("a" << 1)) <<
                                     CollectionType::unique(false) <<
-                                    CollectionType::createdAt(1ULL) <<
+                                    CollectionType::updatedAt(1ULL) <<
                                     CollectionType::epoch(OID::gen()));
             // XXX Awaiting mock review
             //_dummyConfig.setQueryReply("config.collections", BSONArray(collFoo));
