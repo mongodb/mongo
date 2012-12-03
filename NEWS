@@ -1,3 +1,37 @@
+WiredTiger release 1.4.0, 2012-12-03
+------------------------------------
+
+This release adds several major new features, a number of performance
+improvements and bug fixes. The significant changes are outlined below:
+
+New features and API changes:
+
+[242] Track the percentage of cache that is dirty, trigger eviction to bound
+      it. This can be used to bound much data checkpoints write.
+
+[324] Add support for WT_COMPRESS::compress_raw, which lets the compression
+      routine select how many rows are included in each disk block.
+
+[381] Add statistics to track read and write amplification (application data
+      size versus I/O size)
+
+* Add a trigger configuration option to WT_SESSION::compact API.
+
+* Make WT_SESSION::create's checksum configuration 3-state: on, off, or
+  uncompressed blocks only.
+
+Bug fixes:
+
+* Fix build issues on Solaris.
+
+* Fix a bug calculating the generation of an LSM merge.
+
+* Fix WiredTiger dump and load for tables.
+
+* Fix a memory leak in checkpoints.
+
+* Improve accuracy of cache memory tracking with overflow items.
+
 WiredTiger release 1.3.8, 2012-11-22
 ------------------------------------
 
