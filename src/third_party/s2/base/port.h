@@ -688,13 +688,19 @@ extern inline void prefetch(const char *x) {}
 #ifdef _WIN32
 inline double drem(double x, double y) {
     double quot = x/y;
-    if (quot > 0) {
-        quot = quot + 0.5;
+    int iquot;
+    // If quot is slightly less than 0.5, we round down explicitly.  We have to
+    // do this explicitly because (0.5 + quot) when quot=(0.5-epsilon) gives you 1
+    // and that's rounding the wrong way.  Oh, floating point!
+    if (quot < 0.5 && quot > -0.5) {
+        iquot = 0;
+    } else if (quot > 0) {
+        iquot = quot + 0.5;
     } else {
-        quot = quot - 0.5;
+        iquot = quot - 0.5;
     }
-    int iquot = quot;
-    return x - iquot * y;
+    double ret = x - iquot * y;
+    return ret;
 }
 #define strtoll  _strtoi64
 #define strtoull _strtoui64
