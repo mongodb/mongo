@@ -61,7 +61,7 @@ namespace {
     }
 
     StringData Element::getFieldName() const {
-        return _doc->getHeap()->getString(_doc->_elements->_vec[_rep]._nameref);
+        return _doc->getHeap()->getStringBuffer(_doc->_elements->_vec[_rep]._nameref);
     }
 
     //
