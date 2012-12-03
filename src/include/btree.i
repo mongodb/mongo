@@ -65,7 +65,7 @@ __wt_cache_dirty_decr(
 	if (cache->bytes_dirty < size || cache->pages_dirty == 0) {
 		WT_VERBOSE_VOID(session, evictserver,
 		    "Cache dirty count. Needed: %" PRIu64 " have: %" PRIu64,
-		    size, cache->bytes_dirty);
+		    (uint64_t)size, cache->bytes_dirty);
 		cache->bytes_dirty = 0;
 		cache->pages_dirty = 0;
 	} else {
