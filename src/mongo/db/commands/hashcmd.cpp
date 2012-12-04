@@ -23,6 +23,8 @@
 #include <string>
 #include <vector>
 
+#include "mongo/base/init.h"
+#include "mongo/base/status.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_manager.h"
@@ -33,14 +35,17 @@
 
 namespace mongo {
 
+    // Testing only, enabled via command-line.
     class CmdHashElt : public Command {
     public:
         CmdHashElt() : Command("_hashBSONElement") {};
         virtual LockType locktype() const { return NONE; }
         virtual bool slaveOk() const { return true; }
+        // No auth needed because it only works when enabled via command line.
+        virtual bool requiresAuth() { return false; }
         virtual void addRequiredPrivileges(const std::string& dbname,
                                            const BSONObj& cmdObj,
-                                           std::vector<Privilege>* out) {} // No auth required
+                                           std::vector<Privilege>* out) {}
         virtual void help( stringstream& help ) const {
             help << "returns the hash of the first BSONElement val in a BSONObj";
         }
@@ -77,5 +82,12 @@ namespace mongo {
             result.append( "out" , BSONElementHasher::hash64( cmdObj.firstElement() , seed ) );
             return true;
         }
-    } cmdHashElt;
+    };
+    MONGO_INITIALIZER(RegisterHashEltCmd)(InitializerContext* context) {
+        if (Command::testCommandsEnabled) {
+            // Leaked intentionally: a Command registers itself when constructed.
+            new CmdHashElt();
+        }
+        return Status::OK();
+    }
 }

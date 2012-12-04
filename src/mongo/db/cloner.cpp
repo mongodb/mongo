@@ -775,7 +775,7 @@ namespace mongo {
         }
     };
 
-    MONGO_INITIALIZER(RegisterGodInsertCmd)(InitializerContext* context) {
+    MONGO_INITIALIZER(RegisterNotWithAuthCommands)(InitializerContext* context) {
         if (noauth) {
             // Leaked intentionally: a Command registers itself when constructed.
             new CmdClone();
