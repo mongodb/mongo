@@ -57,6 +57,7 @@ btree
 builtin
 bzip
 cachesize
+calc
 callbk
 cd
 cdb

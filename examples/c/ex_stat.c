@@ -38,8 +38,9 @@
 int print_cursor(WT_CURSOR *);
 int print_database_stats(WT_SESSION *);
 int print_file_stats(WT_SESSION *);
-int print_lsm_stats(WT_SESSION *);
 int print_overflow_pages(WT_SESSION *);
+int get_stat(WT_CURSOR *cursor, int stat_field, uint64_t *valuep);
+int print_derived_stats(WT_SESSION *);
 
 const char *home = "WT_TEST";
 
@@ -51,10 +52,10 @@ print_cursor(WT_CURSOR *cursor)
 	uint64_t value;
 	int ret;
 
-	while (
-	    (ret = cursor->next(cursor)) == 0 &&
+	while ((ret = cursor->next(cursor)) == 0 &&
 	    (ret = cursor->get_value(cursor, &desc, &pvalue, &value)) == 0)
-		printf("%s=%s\n", desc, pvalue);
+		if (value != 0)
+			printf("%s=%s\n", desc, pvalue);
 
 	return (ret == WT_NOTFOUND ? 0 : ret);
 }
@@ -71,8 +72,11 @@ print_database_stats(WT_SESSION *session)
 	    "statistics:", NULL, NULL, &cursor)) != 0)
 		return (ret);
 
-	return (print_cursor(cursor));
+	ret = print_cursor(cursor);
+	ret = cursor->close(cursor);
 	/*! [statistics database function] */
+
+	return (ret);
 }
 
 int 
@@ -81,32 +85,16 @@ print_file_stats(WT_SESSION *session)
 	WT_CURSOR *cursor;
 	int ret;
 
-	/*! [statistics file function] */
+	/*! [statistics table function] */
 	if ((ret = session->open_cursor(session,
-	    "statistics:file:access.wt", NULL, NULL, &cursor)) != 0)
+	    "statistics:table:access", NULL, NULL, &cursor)) != 0)
 		return (ret);
 
-	return (print_cursor(cursor));
-	/*! [statistics file function] */
-}
+	ret = print_cursor(cursor);
+	ret = cursor->close(cursor);
+	/*! [statistics table function] */
 
-int 
-print_lsm_stats(WT_SESSION *session)
-{
-	WT_CURSOR *cursor;
-	int ret;
-
-	/* Create an LSM tree, and add some content. */
-	ret = session->create(session,
-	    "lsm:access", "key_format=S,value_format=S");
-
-	/*! [statistics lsm function] */
-	if ((ret = session->open_cursor(session,
-	    "statistics:lsm:access", NULL, NULL, &cursor)) != 0)
-		return (ret);
-
-	return (print_cursor(cursor));
-	/*! [statistics lsm function] */
+	return (ret);
 }
 
 int 
@@ -119,14 +107,71 @@ print_overflow_pages(WT_SESSION *session)
 	int ret;
 
 	if ((ret = session->open_cursor(session,
-	    "statistics:file:access.wt", NULL, NULL, &cursor)) != 0)
+	    "statistics:table:access", NULL, NULL, &cursor)) != 0)
 		return (ret);
 
 	cursor->set_key(cursor, WT_STAT_DSRC_OVERFLOW_PAGE);
 	ret = cursor->search(cursor);
 	ret = cursor->get_value(cursor, &desc, &pvalue, &value);
 	printf("%s=%s\n", desc, pvalue);
+
+	ret = cursor->close(cursor);
 	/*! [statistics retrieve by key] */
+
+	return (ret);
+}
+
+/*! [statistics calculation helper function] */
+int
+get_stat(WT_CURSOR *cursor, int stat_field, uint64_t *valuep)
+{
+	const char *desc, *pvalue;
+	int ret;
+
+	cursor->set_key(cursor, stat_field);
+	if ((ret = cursor->search(cursor)) != 0)
+		return (ret);
+
+	return (cursor->get_value(cursor, &desc, &pvalue, valuep));
+}
+/*! [statistics calculation helper function] */
+
+int
+print_derived_stats(WT_SESSION *session)
+{
+	WT_CURSOR *cursor;
+	int ret;
+
+	/*! [statistics calculate open table stats] */
+	if ((ret = session->open_cursor(session,
+	    "statistics:table:access", NULL, NULL, &cursor)) != 0)
+		return (ret);
+	/*! [statistics calculate open table stats] */
+
+	{
+	/*! [statistics calculate table fragmentation] */
+	uint64_t ckpt_size, file_size;
+	ret = get_stat(cursor, WT_STAT_DSRC_CKPT_SIZE, &ckpt_size);
+	ret = get_stat(cursor, WT_STAT_DSRC_FILE_SIZE, &file_size);
+
+	printf("File is %d%% fragmented\n",
+	    (int)(100 * (file_size - ckpt_size) / file_size));
+	/*! [statistics calculate table fragmentation] */
+	}
+
+	{
+	/*! [statistics calculate write amplification] */
+	uint64_t app_writes, fs_writes;
+
+	ret = get_stat(cursor, WT_STAT_DSRC_BYTE_WRITE, &fs_writes);
+	ret = get_stat(cursor, WT_STAT_DSRC_BYTE_CHANGED, &app_writes);
+
+	printf("Write amplification is %.2lf\n",
+	    (double)fs_writes / app_writes);
+	/*! [statistics calculate write amplification] */
+	}
+
+	ret = cursor->close(cursor);
 
 	return (ret);
 }
@@ -135,6 +180,7 @@ int
 main(void)
 {
 	WT_CONNECTION *conn;
+	WT_CURSOR *cursor;
 	WT_SESSION *session;
 	int ret;
 
@@ -143,13 +189,22 @@ main(void)
 	ret = session->create(
 	    session, "table:access", "key_format=S,value_format=S");
 
+	ret = session->open_cursor(
+	    session, "table:access", NULL, NULL, &cursor);
+	cursor->set_key(cursor, "key");
+	cursor->set_value(cursor, "value");
+	ret = cursor->insert(cursor);
+	cursor->close(cursor);
+
+	ret = session->checkpoint(session, NULL);
+
 	ret = print_database_stats(session);
 
 	ret = print_file_stats(session);
 
-	ret = print_lsm_stats(session);
-
 	ret = print_overflow_pages(session);
+
+	ret = print_derived_stats(session);
 
 	return (conn->close(conn, NULL) == 0 ? ret : EXIT_FAILURE);
 }
