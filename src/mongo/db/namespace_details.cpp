@@ -54,7 +54,7 @@ namespace mongo {
         lastExtentSize = 0;
         nIndexes = 0;
         _isCapped = capped;
-        _maxDocsInCapped = -1; // no limit
+        _maxDocsInCapped = 0x7fffffff; // no limit (value is for pre-v2.3.2 compatability)
         _paddingFactor = 1.0;
         _systemFlags = 0;
         _userFlags = 0;
@@ -620,7 +620,7 @@ namespace mongo {
     bool NamespaceDetails::validMaxCappedDocs( long long* max ) {
         if ( *max <= 0 ||
              *max == numeric_limits<long long>::max() ) {
-            *max = -1;
+            *max = 0x7fffffff;
             return true;
         }
 
@@ -633,7 +633,7 @@ namespace mongo {
 
     long long NamespaceDetails::maxCappedDocs() const {
         verify( isCapped() );
-        if ( _maxDocsInCapped == -1 )
+        if ( _maxDocsInCapped == 0x7fffffff )
             return numeric_limits<long long>::max();
         return _maxDocsInCapped;
     }
