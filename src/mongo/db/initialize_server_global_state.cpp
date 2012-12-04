@@ -195,11 +195,6 @@ namespace mongo {
 #ifdef MONGO_SSL
         if (cmdLine.sslOnNormalPorts) {
 
-            if ( cmdLine.sslPEMKeyPassword.size() == 0 ) {
-                log() << "need sslPEMKeyPassword" << endl;
-                return false;
-            }
-
             if ( cmdLine.sslPEMKeyFile.size() == 0 ) {
                 log() << "need sslPEMKeyFile" << endl;
                 return false;
