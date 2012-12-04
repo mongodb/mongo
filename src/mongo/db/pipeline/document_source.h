@@ -38,6 +38,7 @@ namespace mongo {
     class ExpressionContext;
     class ExpressionFieldPath;
     class ExpressionObject;
+    class DocumentSourceLimit;
     class Matcher;
 
     class DocumentSource :
@@ -186,11 +187,13 @@ namespace mongo {
           convert the inner part of the object which will be added to the
           array being built here.
 
+          A subclass may choose to overwrite this rather than addToBsonArray
+          if it should output multiple stages.
+
           @param pBuilder the array builder to add the operation to.
           @param explain create explain output
          */
-        virtual void addToBsonArray(BSONArrayBuilder *pBuilder,
-            bool explain = false) const;
+        virtual void addToBsonArray(BSONArrayBuilder *pBuilder, bool explain=false) const;
         
     protected:
         /**
@@ -848,6 +851,8 @@ namespace mongo {
         virtual bool advance();
         virtual const char *getSourceName() const;
         virtual Document getCurrent();
+        virtual void addToBsonArray(BSONArrayBuilder *pBuilder, bool explain=false) const;
+        virtual bool coalesce(const intrusive_ptr<DocumentSource> &pNextSource);
 
         virtual GetDepsReturn getDependencies(set<string>& deps) const;
 
@@ -867,10 +872,10 @@ namespace mongo {
             const intrusive_ptr<ExpressionContext> &pExpCtx);
 
         // Virtuals for SplittableDocumentSource
-        // All work for sort is done in router currently
-        // TODO: do partial sorts on the shards then merge in the router
-        //       Not currently possible due to DocumentSource's cursor-like interface
-        virtual intrusive_ptr<DocumentSource> getShardSource() { return NULL; }
+        // All work for sort is done in router currently if there is no limit.
+        // If there is a limit, the $sort/$limit combination is performed on the
+        // shards, then the results are resorted and limited on mongos
+        virtual intrusive_ptr<DocumentSource> getShardSource() { return limitSrc ? this : NULL; }
         virtual intrusive_ptr<DocumentSource> getRouterSource() { return this; }
 
         /**
@@ -908,12 +913,16 @@ namespace mongo {
             BSONElement *pBsonElement,
             const intrusive_ptr<ExpressionContext> &pExpCtx);
 
+        /// returns -1 for no limit
+        long long getLimit();
 
         static const char sortName[];
 
     protected:
         // virtuals from DocumentSource
-        virtual void sourceToBson(BSONObjBuilder *pBuilder, bool explain) const;
+        virtual void sourceToBson(BSONObjBuilder *pBuilder, bool explain) const {
+            verify(false); // should call addToBsonArray instead
+        }
 
     private:
         DocumentSourceSort(const intrusive_ptr<ExpressionContext> &pExpCtx);
@@ -927,10 +936,15 @@ namespace mongo {
         void populate();
         bool populated;
 
+        // These are called by populate()
+        void populateAll();  // no limit
+        void populateOne();  // limit == 1
+        void populateTopK(); // limit > 1
+
         /* these two parallel each other */
         typedef vector<intrusive_ptr<ExpressionFieldPath> > SortPaths;
         SortPaths vSortKey;
-        vector<bool> vAscending;
+        vector<char> vAscending; // used like vector<bool> but without specialization
 
         /*
           Compare two documents according to the specified sort key.
@@ -940,7 +954,7 @@ namespace mongo {
           @returns a number less than, equal to, or greater than zero,
             indicating pL < pR, pL == pR, or pL > pR, respectively
          */
-        int compare(const Document& pL, const Document& pR);
+        int compare(const Document& pL, const Document& pR) const;
 
         /*
           This is a utility class just for the STL sort that is done
@@ -948,16 +962,12 @@ namespace mongo {
          */
         class Comparator {
         public:
-            bool operator()(const Document& pL, const Document& pR) {
-                return (pSort->compare(pL, pR) < 0);
+            explicit Comparator(const DocumentSourceSort& source): _source(source) {}
+            bool operator()(const Document& pL, const Document& pR) const {
+                return (_source.compare(pL, pR) < 0);
             }
-
-            inline Comparator(DocumentSourceSort *pS):
-                pSort(pS) {
-            }
-
         private:
-            DocumentSourceSort *pSort;
+            const DocumentSourceSort& _source;
         };
 
         typedef vector<Document> VectorType;
@@ -965,6 +975,7 @@ namespace mongo {
 
         VectorType::iterator docIterator;
         Document pCurrent;
+        intrusive_ptr<DocumentSourceLimit> limitSrc;
     };
 
 

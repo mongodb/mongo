@@ -57,7 +57,7 @@ var strings = [
 var nItems = 200000;
 for(i = 1; i <= nItems; ++i) {
     db.ts1.save(
-        {counter: ++count, number: strings[i % 20],
+        {counter: ++count, number: strings[i % 20], random: Math.random(),
          filler: "0123456789012345678901234567890123456789"});
 }
 
@@ -152,6 +152,26 @@ testSkipLimit([{$limit:10}, {$skip:5}], 10 - 5);
 testSkipLimit([{$skip:5}, {$skip: 3}, {$limit:10}], 10);
 testSkipLimit([{$skip:5}, {$limit:10}, {$skip: 3}], 10 - 3);
 testSkipLimit([{$limit:10}, {$skip:5}, {$skip: 3}], 10 - 3 - 5);
+
+// test sort + limit (using random to pull from both shards)
+function testSortLimit(limit, direction) {
+    var from_cursor = db.ts1.find({},{random:1, _id:0})
+                            .sort({random: direction})
+                            .limit(limit)
+                            .toArray();
+    var from_agg = db.ts1.aggregate({$project: {random:1, _id:0}}
+                                   ,{$sort: {random: direction}}
+                                   ,{$limit: limit}
+                                   ).result;
+    assert.eq(from_cursor, from_agg);
+}
+testSortLimit(1,  1);
+testSortLimit(1, -1);
+testSortLimit(10,  1);
+testSortLimit(10, -1);
+testSortLimit(100,  1);
+testSortLimit(100, -1);
+
 
 // shut everything down
 shardedAggTest.stop();

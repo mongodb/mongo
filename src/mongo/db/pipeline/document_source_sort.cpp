@@ -68,11 +68,33 @@ namespace mongo {
         return pCurrent;
     }
 
-    void DocumentSourceSort::sourceToBson(
-        BSONObjBuilder *pBuilder, bool explain) const {
-        BSONObjBuilder insides;
-        sortKeyToBson(&insides, false);
-        pBuilder->append(sortName, insides.done());
+    void DocumentSourceSort::addToBsonArray(BSONArrayBuilder *pBuilder, bool explain) const {
+        if (explain) { // always one obj for combined $sort + $limit
+            BSONObjBuilder sortObj (pBuilder->subobjStart());
+            BSONObjBuilder insides (sortObj.subobjStart(sortName));
+            BSONObjBuilder sortKey (insides.subobjStart("sortKey"));
+            sortKeyToBson(&sortKey, false);
+            sortKey.doneFast();
+
+            if (explain && limitSrc) {
+                insides.appendNumber("limit", limitSrc->getLimit());
+            }
+            insides.doneFast();
+            sortObj.doneFast();
+        }
+        else { // one obj for $sort + maybe one obj for $limit
+            {
+                BSONObjBuilder sortObj (pBuilder->subobjStart());
+                BSONObjBuilder insides (sortObj.subobjStart(sortName));
+                sortKeyToBson(&insides, false);
+                insides.doneFast();
+                sortObj.doneFast();
+            }
+
+            if (limitSrc) {
+                limitSrc->addToBsonArray(pBuilder, explain);
+            }
+        }
     }
 
     intrusive_ptr<DocumentSourceSort> DocumentSourceSort::create(
@@ -82,10 +104,23 @@ namespace mongo {
         return pSource;
     }
 
-    DocumentSourceSort::DocumentSourceSort(
-        const intrusive_ptr<ExpressionContext> &pExpCtx):
-        SplittableDocumentSource(pExpCtx),
-        populated(false) {
+    DocumentSourceSort::DocumentSourceSort(const intrusive_ptr<ExpressionContext> &pExpCtx)
+        : SplittableDocumentSource(pExpCtx)
+        , populated(false)
+    {}
+
+    long long DocumentSourceSort::getLimit() {
+        return limitSrc ? limitSrc->getLimit() : -1;
+    }
+
+    bool DocumentSourceSort::coalesce(const intrusive_ptr<DocumentSource> &pNextSource) {
+        if (!limitSrc) {
+            limitSrc = dynamic_cast<DocumentSourceLimit*>(pNextSource.get());
+            return limitSrc; // false if next is not a $limit
+        }
+        else {
+            return limitSrc->coalesce(pNextSource);
+        }
     }
 
     void DocumentSourceSort::addKey(const string &fieldPath, bool ascending) {
@@ -158,21 +193,12 @@ namespace mongo {
         /* make sure we've got a sort key */
         verify(vSortKey.size());
 
-        /* track and warn about how much physical memory has been used */
-        DocMemMonitor dmm(this);
-
-        /* pull everything from the underlying source */
-        for(bool hasNext = !pSource->eof(); hasNext;
-            hasNext = pSource->advance()) {
-            Document pDocument(pSource->getCurrent());
-            documents.push_back(pDocument);
-
-            dmm.addToTotal(pDocument->getApproximateSize());
-        }
-
-        /* sort the list */
-        Comparator comparator(this);
-        sort(documents.begin(), documents.end(), comparator);
+        if (!limitSrc)
+            populateAll();
+        else if (limitSrc->getLimit() == 1)
+            populateOne();
+        else
+            populateTopK();
 
         /* start the sort iterator */
         docIterator = documents.begin();
@@ -182,7 +208,73 @@ namespace mongo {
         populated = true;
     }
 
-    int DocumentSourceSort::compare(const Document& pL, const Document& pR) {
+    void DocumentSourceSort::populateAll() {
+        /* track and warn about how much physical memory has been used */
+        DocMemMonitor dmm(this);
+
+        /* pull everything from the underlying source */
+        for (bool hasNext = !pSource->eof(); hasNext; hasNext = pSource->advance()) {
+            documents.push_back(pSource->getCurrent());
+            dmm.addToTotal(documents.back()->getApproximateSize());
+        }
+
+        /* sort the list */
+        Comparator comparator(*this);
+        sort(documents.begin(), documents.end(), comparator);
+    }
+
+    void DocumentSourceSort::populateOne() {
+        if (pSource->eof())
+            return;
+
+        Document best = pSource->getCurrent();
+        while (pSource->advance()) {
+            Document next = pSource->getCurrent();
+            if (compare(next, best) < 0) {
+                // we have a new best
+                best.swap(next);
+            }
+        }
+
+        documents.push_back(best);
+    }
+
+    void DocumentSourceSort::populateTopK() {
+        bool hasNext = !pSource->eof();
+
+        size_t limit = limitSrc->getLimit();
+
+        // Pull first K documents unconditionally
+        for (; hasNext && documents.size() < limit; hasNext = pSource->advance()) {
+            documents.push_back(pSource->getCurrent());
+        }
+
+        // We now maintain a MaxHeap of K items. This means that the least-best
+        // document is at the top of the heap (documents.front()). If a new
+        // document is better than the top of the heap, we pop the top and add
+        // the new document to the heap.
+
+        Comparator comp (*this);
+
+        // after this, documents.front() is least-best document
+        std::make_heap(documents.begin(), documents.end(), comp);
+
+        for (; hasNext; hasNext = pSource->advance()) {
+            Document next = pSource->getCurrent();
+            if (compare(next, documents.front()) < 0) {
+                // remove least-best from heap
+                std::pop_heap(documents.begin(), documents.end(), comp);
+
+                // add next to heap
+                documents.back().swap(next);
+                std::push_heap(documents.begin(), documents.end(), comp);
+            }
+        }
+
+        std::sort_heap(documents.begin(), documents.end(), comp);
+    }
+
+    int DocumentSourceSort::compare(const Document& pL, const Document& pR) const {
 
         /*
           populate() already checked that there is a non-empty sort key,

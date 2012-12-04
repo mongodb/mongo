@@ -1075,7 +1075,7 @@ namespace DocumentSourceTests {
                 checkBsonRepresentation( spec );
                 _sort->setSource( source() );
             }
-            DocumentSource* sort() { return _sort.get(); }
+            DocumentSourceSort* sort() { return dynamic_cast<DocumentSourceSort*>(_sort.get()); }
             /** Assert that iterator state accessors consistently report the source is exhausted. */
             void assertExhausted() const {
                 // eof() is true.
@@ -1119,6 +1119,44 @@ namespace DocumentSourceTests {
                 // Another result is available, so advance() succeeds.
                 ASSERT( sort()->advance() );
                 ASSERT_EQUALS( 2, sort()->getCurrent()->getField( "a" ).getInt() );
+            }
+        };
+
+        class SortWithLimit : public Base {
+        public:
+            void run() {
+                createSort(BSON("a" << 1));
+                ASSERT_EQUALS(sort()->getLimit(), -1);
+
+                { // pre-limit checks
+                    BSONArrayBuilder arr;
+                    sort()->addToBsonArray(&arr, false);
+                    ASSERT_EQUALS(arr.arr(), BSON_ARRAY(BSON("$sort" << BSON("a" << 1))));
+
+                    ASSERT(sort()->getShardSource() == NULL);
+                    ASSERT(sort()->getRouterSource() != NULL);
+                }
+
+                ASSERT_TRUE(sort()->coalesce(mkLimit(10)));
+                ASSERT_EQUALS(sort()->getLimit(), 10);
+                ASSERT_TRUE(sort()->coalesce(mkLimit(15)));
+                ASSERT_EQUALS(sort()->getLimit(), 10); // unchanged
+                ASSERT_TRUE(sort()->coalesce(mkLimit(5)));
+                ASSERT_EQUALS(sort()->getLimit(), 5); // reduced
+
+                BSONArrayBuilder arr;
+                sort()->addToBsonArray(&arr, false);
+                ASSERT_EQUALS(arr.arr(), BSON_ARRAY(BSON("$sort" << BSON("a" << 1))
+                                                 << BSON("$limit" << sort()->getLimit())));
+
+                ASSERT(sort()->getShardSource() != NULL);
+                ASSERT(sort()->getRouterSource() != NULL);
+            }
+
+            intrusive_ptr<DocumentSource> mkLimit(int limit) {
+                BSONObj obj = BSON("$limit" << limit);
+                BSONElement e = obj.firstElement();
+                return mongo::DocumentSourceLimit::createFromBson(&e, ctx());
             }
         };
 
