@@ -169,7 +169,7 @@ namespace mongo {
                 ssl);
         
         int status = SSL_set_fd( ssl , fd );
-        massert(16509, 
+        massert(16510, 
                 _getSSLErrorMessage(ERR_get_error()), 
                 status == 1);
 
