@@ -677,6 +677,11 @@ extern int __wt_curindex_open(WT_SESSION_IMPL *session,
     const char *uri,
     const char *cfg[],
     WT_CURSOR **cursorp);
+extern int __wt_curstat_init(WT_SESSION_IMPL *session,
+    const char *uri,
+    const char *cfg[],
+    WT_CURSOR_STAT *cst,
+    uint32_t flags);
 extern int __wt_curstat_open(WT_SESSION_IMPL *session,
     const char *uri,
     const char *cfg[],
@@ -746,8 +751,9 @@ extern int __wt_lsm_merge( WT_SESSION_IMPL *session,
     int stalls);
 extern int __wt_lsm_meta_read(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree);
 extern int __wt_lsm_meta_write(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree);
-extern int __wt_lsm_stat_init( WT_SESSION_IMPL *session,
+extern int __wt_lsm_stat_init(WT_SESSION_IMPL *session,
     WT_LSM_TREE *lsm_tree,
+    WT_CURSOR_STAT *cst,
     uint32_t flags);
 extern int __wt_lsm_tree_close_all(WT_SESSION_IMPL *session);
 extern int __wt_lsm_tree_bloom_name( WT_SESSION_IMPL *session,
@@ -1074,6 +1080,11 @@ extern int __wt_schema_rename(WT_SESSION_IMPL *session,
     const char *uri,
     const char *newuri,
     const char *cfg[]);
+extern int __wt_schema_stat_init(WT_SESSION_IMPL *session,
+    const char *uri,
+    const char *cfg[],
+    WT_CURSOR_STAT *cst,
+    uint32_t flags);
 extern int __wt_schema_truncate( WT_SESSION_IMPL *session,
     const char *uri,
     const char *cfg[]);

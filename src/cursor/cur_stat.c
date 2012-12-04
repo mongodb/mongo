@@ -290,6 +290,7 @@ __curstat_close(WT_CURSOR *cursor)
 		cst->btree = session->btree = NULL;
 	}
 
+	__wt_free(session, cst->stats);
 	WT_TRET(__wt_cursor_close(cursor));
 
 	API_END(session);
@@ -352,17 +353,36 @@ __curstat_lsm_init(WT_SESSION_IMPL *session,
 	    ret = __wt_lsm_tree_get(session, uri, 0, &lsm_tree));
 	WT_RET(ret);
 
-	ret = __wt_lsm_stat_init(session, lsm_tree, flags);
+	ret = __wt_lsm_stat_init(session, lsm_tree, cst, flags);
 	__wt_lsm_tree_release(session, lsm_tree);
 	WT_RET(ret);
 
 	cst->btree = NULL;
 	cst->notpositioned = 1;
-	cst->stats_first = (WT_STATS *)lsm_tree->stats;
-	cst->stats_count = sizeof(*lsm_tree->stats) / sizeof(WT_STATS);
 	cst->clear_func = LF_ISSET(WT_STATISTICS_CLEAR) ?
 	    __wt_stat_clear_dsrc_stats : NULL;
 	return (0);
+}
+
+/*
+ * __wt_curstat_init --
+ *	Initialize a statistics cursor.
+ */
+int
+__wt_curstat_init(WT_SESSION_IMPL *session,
+    const char *uri, const char *cfg[], WT_CURSOR_STAT *cst, uint32_t flags)
+{
+	if (strcmp(uri, "statistics:") == 0) {
+		__curstat_conn_init(session, cst, flags);
+		return (0);
+	} else if (WT_PREFIX_MATCH(uri, "statistics:file:"))
+		return (__curstat_file_init(session,
+		    uri + strlen("statistics:"), cfg, cst, flags));
+	else if (WT_PREFIX_MATCH(uri, "statistics:lsm:"))
+		return (__curstat_lsm_init(session,
+		    uri + strlen("statistics:"), cst, flags));
+	else
+		return (__wt_schema_stat_init(session, uri, cfg, cst, flags));
 }
 
 /*
@@ -429,17 +449,7 @@ __wt_curstat_open(WT_SESSION_IMPL *session,
 	 */
 	cursor->key_format = "i";
 	cursor->value_format = "SSq";
-
-	if (strcmp(uri, "statistics:") == 0)
-		__curstat_conn_init(session, cst, flags);
-	else if (WT_PREFIX_MATCH(uri, "statistics:file:"))
-		WT_ERR(__curstat_file_init(session,
-		    uri + strlen("statistics:"), cfg, cst, flags));
-	else if (WT_PREFIX_MATCH(uri, "statistics:lsm:"))
-		WT_ERR(__curstat_lsm_init(session,
-		    uri + strlen("statistics:"), cst, flags));
-	else
-		WT_ERR(__wt_bad_object_type(session, uri));
+	WT_ERR(__wt_curstat_init(session, uri, cfg, cst, flags));
 
 	/* __wt_cursor_init is last so we don't have to clean up on error. */
 	STATIC_ASSERT(offsetof(WT_CURSOR_STAT, iface) == 0);

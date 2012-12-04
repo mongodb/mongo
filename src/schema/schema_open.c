@@ -423,9 +423,11 @@ __wt_schema_get_colgroup(WT_SESSION_IMPL *session,
 	*colgroupp = NULL;
 
 	tablename = uri;
-	if (!WT_PREFIX_SKIP(tablename, "colgroup:") ||
-	    (tend = strchr(tablename, ':')) == NULL)
+	if (!WT_PREFIX_SKIP(tablename, "colgroup:"))
 		return (__wt_bad_object_type(session, uri));
+
+	if ((tend = strchr(tablename, ':')) == NULL)
+		tend = tablename + strlen(tablename);
 
 	WT_RET(__wt_schema_get_table(session,
 	    tablename, WT_PTRDIFF(tend, tablename), 0, &table));

@@ -170,6 +170,7 @@ struct __wt_cursor_index {
 struct __wt_cursor_stat {
 	WT_CURSOR iface;
 
+	WT_STATS *stats;		/* Stats owned by the cursor. */
 	WT_STATS *stats_first;		/* First stats reference */
 	int	  stats_count;		/* Count of stats elements */
 
