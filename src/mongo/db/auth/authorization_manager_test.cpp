@@ -31,7 +31,7 @@ namespace mongo {
 namespace {
 
     TEST(AuthorizationManagerTest, AcquirePrivilegeAndCheckAuthorization) {
-        Principal* principal = new Principal("Spencer");
+        Principal* principal = new Principal("Spencer", "test");
         ActionSet actions;
         actions.addAction(ActionType::insert);
         AcquiredPrivilege writePrivilege(Privilege("test", actions), principal);
@@ -58,10 +58,13 @@ namespace {
         // Auth checks on a collection should be applied to the database name.
         ASSERT_EQUALS(principal, authManager.checkAuthorization("otherDb.collectionName",
                                                                 ActionType::insert));
+
+        authManager.logoutDatabase("test");
+        ASSERT_NULL(authManager.checkAuthorization("test", ActionType::insert));
     }
 
     TEST(AuthorizationManagerTest, GetPrivilegesFromPrivilegeDocument) {
-        Principal* principal = new Principal("Spencer");
+        Principal* principal = new Principal("Spencer", "test");
         BSONObj invalid;
         BSONObj readWrite = BSON("user" << "Spencer" << "pwd" << "passwordHash");
         BSONObj readOnly = BSON("user" << "Spencer" << "pwd" << "passwordHash" <<

@@ -16,11 +16,10 @@
 #pragma once
 
 #include <string>
+#include <vector>
 
 #include "mongo/base/disallow_copying.h"
-#include "mongo/base/status.h"
 #include "mongo/db/auth/principal.h"
-#include "mongo/platform/unordered_map.h"
 
 namespace mongo {
 
@@ -39,18 +38,25 @@ namespace mongo {
         // The PrincipalSet takes ownership of the passed-in principal and is responsible for
         // deleting it eventually
         void add(Principal* principal);
-        Status removeByName(const std::string& name);
-        // Returns NULL if not found
+
+        // Removes all principals whose authentication credentials came from dbname.
+        void removeByDBName(const std::string& dbname);
+
+        // Returns the Principal with the given principal name whose authentication credentials
+        // came from dbname, or NULL if not found.
         // Ownership of the returned Principal remains with the PrincipalSet.  The pointer
         // returned is only guaranteed to remain valid until the next non-const method is called
         // on the PrincipalSet.
-        Principal* lookup(const std::string& name) const;
+        Principal* lookup(const std::string& name, const std::string& dbname) const;
+
+        // Gets the principal whose authentication credentials came from dbname, or NULL if none
+        // exist.  There should be at most one such principal.
+        Principal* lookupByDBName(const std::string& dbname) const;
 
     private:
-        // Key is principal name.
         // The PrincipalSet maintains ownership of the Principals in it, and is responsible for
         // deleting them when done with them.
-        unordered_map<std::string, Principal*> _principals;
+        std::vector<Principal*> _principals;
     };
 
 } // namespace mongo

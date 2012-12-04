@@ -124,7 +124,9 @@ namespace mongo {
 
     bool CmdLogout::run(const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
         AuthenticationInfo *ai = cc().getAuthenticationInfo();
+        AuthorizationManager* authManager = cc().getAuthorizationManager();
         ai->logout(dbname);
+        authManager->logoutDatabase(dbname);
         return true;
     }
 

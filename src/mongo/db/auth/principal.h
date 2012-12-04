@@ -29,18 +29,24 @@ namespace mongo {
     class Principal {
     public:
         // No expiration is represented as boost::posix_time::pos_infin
-        Principal(const std::string& name, const boost::posix_time::ptime& expirationTime);
-        explicit Principal(const std::string& name);
+        Principal(const std::string& name,
+                  const std::string& dbname,
+                  const boost::posix_time::ptime& expirationTime);
+        Principal(const std::string& name, const std::string& dbname);
         Principal();
         ~Principal(){}
 
         const std::string& getName() const;
+        const std::string& getDBName() const;
         const boost::posix_time::ptime& getExpirationTime() const;
 
         void setExpirationTime(boost::posix_time::ptime& expiration);
 
     private:
         std::string _name;
+        // Database where authentication credential information is stored for this principal.
+        // For externally authenticated principals this will be "$sasl".
+        std::string _dbname;
         boost::posix_time::ptime _expirationTime;
     };
 

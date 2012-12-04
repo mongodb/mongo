@@ -82,7 +82,7 @@ namespace mongo {
         }
 
         void _authorizePrincipal(const std::string& principalName, bool readOnly) {
-            Principal* principal = new Principal(principalName);
+            Principal* principal = new Principal(principalName, "local");
             ActionSet actions = AuthorizationManager::getActionsForOldStyleUser(
                     "admin", readOnly);
             AcquiredPrivilege privilege(Privilege("*", actions), principal);

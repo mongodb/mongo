@@ -43,7 +43,7 @@ namespace mongo {
     const std::string AuthorizationManager::CLUSTER_RESOURCE_NAME = "$CLUSTER";
 
     namespace {
-        Principal specialAdminPrincipal("special");
+        Principal specialAdminPrincipal("special", "local");
         const std::string ADMIN_DBNAME = "admin";
         const std::string LOCAL_DBNAME = "local";
         const std::string WILDCARD_DBNAME = "*";
@@ -181,21 +181,26 @@ namespace mongo {
         _authenticatedPrincipals.add(principal);
     }
 
-    Status AuthorizationManager::removeAuthorizedPrincipal(const Principal* principal) {
-        return _authenticatedPrincipals.removeByName(principal->getName());
+    Principal* AuthorizationManager::lookupPrincipal(const std::string& name,
+                                                     const std::string& userSource) {
+        return _authenticatedPrincipals.lookup(name, userSource);
     }
 
-    Principal* AuthorizationManager::lookupPrincipal(const std::string& name) const {
-        return _authenticatedPrincipals.lookup(name);
+    void AuthorizationManager::logoutDatabase(const std::string& dbname) {
+        Principal* principal = _authenticatedPrincipals.lookupByDBName(dbname);
+        _acquiredPrivileges.revokePrivilegesFromPrincipal(principal);
+        _authenticatedPrincipals.removeByDBName(dbname);
     }
 
     Status AuthorizationManager::acquirePrivilege(const AcquiredPrivilege& privilege) {
-        const std::string& userName = privilege.getPrincipal()->getName();
-        if (!_authenticatedPrincipals.lookup(userName)) {
+        const Principal* principal = privilege.getPrincipal();
+        if (!_authenticatedPrincipals.lookup(principal->getName(), principal->getDBName())) {
             return Status(ErrorCodes::UserNotFound,
                           mongoutils::str::stream()
                                   << "No authenticated principle found with name: "
-                                  << userName,
+                                  << principal->getName()
+                                  << " from database "
+                                  << principal->getDBName(),
                           0);
         }
 
@@ -205,7 +210,7 @@ namespace mongo {
     }
 
     void AuthorizationManager::grantInternalAuthorization(const std::string& principalName) {
-        Principal* principal = new Principal(principalName);
+        Principal* principal = new Principal(principalName, "local");
         ActionSet actions;
         actions.addAllActions();
         AcquiredPrivilege privilege(Privilege("*", actions), principal);
@@ -236,11 +241,13 @@ namespace mongo {
 
     Status AuthorizationManager::acquirePrivilegesFromPrivilegeDocument(
             const std::string& dbname, Principal* principal, const BSONObj& privilegeDocument) {
-        if (!_authenticatedPrincipals.lookup(principal->getName())) {
+        if (!_authenticatedPrincipals.lookup(principal->getName(), dbname)) {
             return Status(ErrorCodes::UserNotFound,
                           mongoutils::str::stream()
                                   << "No authenticated principle found with name: "
-                                  << principal->getName(),
+                                  << principal->getName()
+                                  << " from database "
+                                  << principal->getDBName(),
                           0);
         }
         if (principal->getName() == internalSecurity.user) {
