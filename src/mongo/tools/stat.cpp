@@ -315,7 +315,8 @@ namespace mongo {
                             state->lastUpdate = time(0);
                         }
 
-                        if ( out["shardCursorType"].type() == Object ) {
+                        if ( out["shardCursorType"].type() == Object ||
+                             out["process"].String() == "mongos" ) {
                             state->mongos = true;
                             if ( cycleNumber % 10 == 1 ) {
                                 auto_ptr<DBClientCursor> c = conn.query( "config.shards" , BSONObj() );
