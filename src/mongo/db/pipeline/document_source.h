@@ -917,7 +917,6 @@ namespace mongo {
         long long getLimit();
 
         static const char sortName[];
-
     protected:
         // virtuals from DocumentSource
         virtual void sourceToBson(BSONObjBuilder *pBuilder, bool explain) const {
@@ -946,15 +945,15 @@ namespace mongo {
         SortPaths vSortKey;
         vector<char> vAscending; // used like vector<bool> but without specialization
 
-        /*
-          Compare two documents according to the specified sort key.
+        struct KeyAndDoc {
+            explicit KeyAndDoc(const Document& d, const SortPaths& sp); // extracts sort key
+            Value key; // array of keys if vSortKey.size() > 1
+            Document doc;
+        };
+        friend void swap(KeyAndDoc& l, KeyAndDoc& r);
 
-          @param rL reference to the left document
-          @param rR reference to the right document
-          @returns a number less than, equal to, or greater than zero,
-            indicating pL < pR, pL == pR, or pL > pR, respectively
-         */
-        int compare(const Document& pL, const Document& pR) const;
+        /// Compare two KeyAndDocs according to the specified sort key.
+        int compare(const KeyAndDoc& lhs, const KeyAndDoc& rhs) const;
 
         /*
           This is a utility class just for the STL sort that is done
@@ -963,21 +962,24 @@ namespace mongo {
         class Comparator {
         public:
             explicit Comparator(const DocumentSourceSort& source): _source(source) {}
-            bool operator()(const Document& pL, const Document& pR) const {
-                return (_source.compare(pL, pR) < 0);
+            bool operator()(const KeyAndDoc& lhs, const KeyAndDoc& rhs) const {
+                return (_source.compare(lhs, rhs) < 0);
             }
         private:
             const DocumentSourceSort& _source;
         };
 
-        typedef vector<Document> VectorType;
+        typedef vector<KeyAndDoc> VectorType;
         VectorType documents;
 
         VectorType::iterator docIterator;
         Document pCurrent;
         intrusive_ptr<DocumentSourceLimit> limitSrc;
     };
-
+    inline void swap(DocumentSourceSort::KeyAndDoc& l, DocumentSourceSort::KeyAndDoc& r) {
+        l.key.swap(r.key);
+        l.doc.swap(r.doc);
+    }
 
     class DocumentSourceLimit :
         public SplittableDocumentSource {
