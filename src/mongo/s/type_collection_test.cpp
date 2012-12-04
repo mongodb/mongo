@@ -102,8 +102,8 @@ namespace {
     }
 
     TEST(Compatibility, OldDroppedTrue) {
-        // The 'dropped' field creates a special case. We'd parse the doc containing it but
-        // would generate an empty CollectionType, which is not valid.
+        // The 'dropped' field creates a special case. We still validly parse the document
+        // containing it but we need to ignore dropped collections in code which uses this.
         CollectionType coll;
         BSONObj obj = BSON(CollectionType::ns("db.coll") <<
                            CollectionType::keyPattern(BSON("a" << 1)) <<
@@ -114,12 +114,7 @@ namespace {
         string errMsg;
         ASSERT(coll.parseBSON(obj, &errMsg));
         ASSERT(errMsg == "");
-        ASSERT_EQUALS(coll.getNS(), "");
-        ASSERT_EQUALS(coll.getKeyPattern(), BSONObj());
-        ASSERT_EQUALS(coll.isUnique(), false);
-        ASSERT_EQUALS(coll.getUpdatedAt(), 0ULL);
-        ASSERT_EQUALS(coll.getEpoch(), OID());
-        ASSERT_FALSE(coll.isValid(NULL));
+        ASSERT_TRUE(coll.isValid(NULL));
     }
 
     TEST(Compatibility, OldDroppedFalse) {
