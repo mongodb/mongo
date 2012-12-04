@@ -110,7 +110,7 @@ namespace mongo {
 
             try {
                 connPtr.reset(
-                    ScopedDbConnection::getInternalScopedDbConnection(_configLoc.toString()));
+                    ScopedDbConnection::getInternalScopedDbConnection(_configLoc.toString(), 30));
                 ScopedDbConnection& conn = *connPtr;
 
                 collObj = conn->findOne(CollectionType::ConfigNS, QUERY(CollectionType::ns()<<ns));
@@ -208,7 +208,7 @@ namespace mongo {
         try {
 
             scoped_ptr<ScopedDbConnection> connPtr(
-                ScopedDbConnection::getInternalScopedDbConnection(_configLoc.toString()));
+                ScopedDbConnection::getInternalScopedDbConnection(_configLoc.toString(), 30));
             ScopedDbConnection& conn = *connPtr;
 
             auto_ptr<DBClientCursor> cursor = conn->query(ChunkType::ConfigNS,

@@ -560,7 +560,7 @@ namespace mongo {
             {
                 scoped_ptr<ScopedDbConnection> conn(
                         ScopedDbConnection::getInternalScopedDbConnection(
-                                shardingState.getConfigServer() ) );
+                                shardingState.getConfigServer(), 30));
 
                 BSONObj x = conn->get()->findOne(ConfigNS::chunk,
                                                  Query(BSON(ChunkFields::ns(ns)))
@@ -708,7 +708,7 @@ namespace mongo {
             {
                 scoped_ptr<ScopedDbConnection> conn(
                         ScopedDbConnection::getInternalScopedDbConnection(
-                                shardingState.getConfigServer() ) );
+                                shardingState.getConfigServer(), 30));
                 ok = conn->get()->runCommand( "config" , cmd , cmdResult );
                 conn->done();
             }

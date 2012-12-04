@@ -42,7 +42,8 @@ namespace mongo {
 
     bool tryStopBalancer(const ConnectionString& configLoc, bool* wasStopped, string* errmsg) {
 
-        scoped_ptr<ScopedDbConnection> connPtr(ScopedDbConnection::getInternalScopedDbConnection(configLoc));
+        scoped_ptr<ScopedDbConnection> connPtr(
+                ScopedDbConnection::getInternalScopedDbConnection(configLoc, 30));
         ScopedDbConnection& conn = *connPtr;
 
         BSONObj balancerDoc;
@@ -85,7 +86,8 @@ namespace mongo {
 
     bool tryStartBalancer(const ConnectionString& configLoc, string* errmsg) {
 
-        scoped_ptr<ScopedDbConnection> connPtr(ScopedDbConnection::getInternalScopedDbConnection(configLoc));
+        scoped_ptr<ScopedDbConnection> connPtr(
+                ScopedDbConnection::getInternalScopedDbConnection(configLoc, 30));
         ScopedDbConnection& conn = *connPtr;
 
         BSONObj balancerDoc;
