@@ -19,6 +19,7 @@
 #include <vector>
 
 #include "mongo/db/jsobj.h"
+#include "mongo/dbtests/mock/mock_conn_registry.h"
 #include "mongo/dbtests/mock/mock_remote_db_server.h"
 #include "mongo/s/collection_manager.h"
 #include "mongo/s/metadata_loader.h"
@@ -44,7 +45,8 @@ namespace {
     using mongo::MINKEY;
     using mongo::OID;
     using mongo::ShardChunkVersion;
-    using mongo_test::MockRemoteDBServer;
+    using mongo::MockConnRegistry;
+    using mongo::MockRemoteDBServer;
     using std::string;
     using std::vector;
 
@@ -56,10 +58,12 @@ namespace {
     class SingleChunkFixture : public mongo::unittest::Test {
     protected:
         scoped_ptr<CollectionManager> manager;
+        scoped_ptr<MockRemoteDBServer> dummyConfig;
 
         void setUp() {
-            MockRemoteDBServer dummyConfig("$dummy_config");
-            mongo::ConnectionString::setConnectionHook(dummyConfig.getConnectionHook());
+            dummyConfig.reset(new MockRemoteDBServer("$dummy_config"));
+            mongo::ConnectionString::setConnectionHook(MockConnRegistry::get()->getConnStrHook());
+            MockConnRegistry::get()->addServer(dummyConfig.get());
 
             BSONObj collFoo =  BSON(CollectionType::ns("test.foo") <<
                                     CollectionType::keyPattern(BSON("a" << 1)) <<
@@ -84,6 +88,7 @@ namespace {
         }
 
         void tearDown() {
+            MockConnRegistry::get()->removeServer(dummyConfig->getServerAddress());
         }
     };
 
