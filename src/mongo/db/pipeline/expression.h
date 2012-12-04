@@ -720,6 +720,22 @@ namespace mongo {
     };
 
 
+    class ExpressionMillisecond :
+        public ExpressionNary {
+    public:
+        // virtuals from ExpressionNary
+        virtual ~ExpressionMillisecond();
+        virtual Value evaluate(const Document& document) const;
+        virtual const char* getOpName() const;
+        virtual void addOperand(const intrusive_ptr<Expression>& pExpression);
+
+        static intrusive_ptr<ExpressionNary> create();
+
+    private:
+        ExpressionMillisecond();
+    };
+
+
     class ExpressionMinute :
         public ExpressionNary {
     public:
