@@ -63,6 +63,16 @@ namespace ntservice {
     bool shouldStartService();
 
     /**
+     * Construct an argv array that Windows should use to start mongod/mongos as a service
+     * if mongo was started with "inputArgv", which is assumed to be an argument vector that
+     * dictates that Windows should install mongo as a service.
+     *
+     * The result is suitable for passing to mongo::constructUtf8WindowsCommandLine() to construct
+     * a properly quoted command line string.
+     */
+    std::vector<std::string> constructServiceArgv(const std::vector<std::string>& inputArgv);
+
+    /**
      * Start the service.  Never returns.
      */
     MONGO_COMPILER_NORETURN void startService();

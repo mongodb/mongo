@@ -264,7 +264,11 @@ coreServerFiles = [ "db/common.cpp",
                     "db/stats/service_stats.cpp",
                     ]
 
-env.StaticLibrary('ntservice', ['util/ntservice.cpp'])
+env.StaticLibrary('ntservice', ['util/ntservice.cpp'], LIBDEPS=['foundation'])
+if windows:
+    env.CppUnitTest('ntservice_test', 'util/ntservice_test.cpp',
+                    LIBDEPS=['ntservice'],
+                    LIBS=['shell32', env['LIBS']])
 
 scripting_common_files = [ "scripting/engine.cpp",
                            "scripting/utils.cpp",

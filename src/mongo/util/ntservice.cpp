@@ -174,6 +174,71 @@ namespace {
         }
     }
 
+    // This implementation assumes that inputArgv was a valid argv to mongod.  That is, it assumes
+    // that options that take arguments received them, and options that do not take arguments did
+    // not.
+    std::vector<std::string> constructServiceArgv(const std::vector<std::string>& inputArgv) {
+
+        static const char*const optionsWithoutArgumentsToStrip[] = {
+            "-install", "--install",
+            "-reinstall", "--reinstall",
+            "-service", "--service"
+        };
+
+        // Pointer to just past the end of optionsWithoutArgumentsToStrip, for use as an "end"
+        // iterator.
+        static const char*const *const optionsWithoutArgumentsToStripEnd =
+            optionsWithoutArgumentsToStrip + boost::size(optionsWithoutArgumentsToStrip);
+
+        static const char*const optionsWithArgumentsToStrip[] = {
+            "-serviceName", "--serviceName",
+            "-serviceUser", "--serviceUser",
+            "-servicePassword", "--servicePassword",
+            "-serviceDescription", "--serviceDescription",
+            "-serviceDisplayName", "--serviceDisplayName"
+        };
+
+        // Pointer to just past the end of optionsWithArgumentsToStrip, for use as an "end"
+        // iterator.
+        static const char*const *const optionsWithArgumentsToStripEnd =
+            optionsWithArgumentsToStrip + boost::size(optionsWithArgumentsToStrip);
+
+        std::vector<std::string> result;
+        for (std::vector<std::string>::const_iterator iter = inputArgv.begin(),
+                 end = inputArgv.end(); iter != end; ++iter) {
+
+            if (optionsWithoutArgumentsToStripEnd != std::find(optionsWithoutArgumentsToStrip,
+                                                               optionsWithoutArgumentsToStripEnd,
+                                                               *iter)) {
+                // The current element of inputArgv is an option that we wish to strip, that takes
+                // no arguments.  Skip adding it to "result".
+                continue;
+            }
+
+            std::string name;
+            std::string value;
+            bool foundEqualSign = mongoutils::str::splitOn(*iter, '=', name, value);
+            if (!foundEqualSign)
+                name = *iter;
+            if (optionsWithArgumentsToStripEnd != std::find(optionsWithArgumentsToStrip,
+                                                            optionsWithArgumentsToStripEnd,
+                                                            name)) {
+                // The current element, and maybe the next one, form an option and its argument.
+                // Skip adding them to "result".
+                if (!foundEqualSign)  {
+                    // The next argv value must be the argument to the parameter, so strip it.
+                    ++iter;
+                }
+                continue;
+            }
+
+            result.push_back(*iter);
+        }
+
+        result.push_back("--service");  // Service command lines all contain "--service".
+        return result;
+    }
+
     void installServiceOrDie(
             const wstring& serviceName,
             const wstring& displayName,
@@ -184,71 +249,13 @@ namespace {
     ) {
         log() << "Trying to install Windows service '" << toUtf8String(serviceName) << "'" << endl;
 
-        stringstream commandLine;
+        std::vector<std::string> serviceArgv = constructServiceArgv(argv);
 
         char exePath[1024];
         GetModuleFileNameA( NULL, exePath, sizeof exePath );
-        commandLine << '"' << exePath << "\" ";
+        serviceArgv.at(0) = exePath;
 
-        // because we use allow_long_disguise in our style for boost::program_options
-        // parsing (to make -vvvvv work) we will accept "-install" and "--install" and
-        // likewise for all options.  this means that when parsing option-by-option as
-        // we do here, we need to handle both "-" and "--" prefixes.
-
-        const size_t argc = argv.size();
-        for ( size_t i = 1; i < argc; i++ ) {
-            std::string arg(argv[i]);
-            // replace install command to indicate process is being started as a service
-            if ( arg == "-install" || arg == "--install" || arg == "-reinstall" || arg == "--reinstall" ) {
-                arg = "--service";
-            }
-            else if ( (arg == "-dbpath" || arg == "--dbpath") && i + 1 < argc ) {
-                commandLine << arg << " \"" << argv[i+1] << "\" ";
-                i++;
-                continue;
-            }
-            else if ( (arg == "-logpath" || arg == "--logpath") && i + 1 < argc ) {
-                commandLine << arg << " \"" << argv[i+1] << "\" ";
-                i++;
-                continue;
-            }
-            else if ( arg == "-f" && i + 1 < argc ) {
-                commandLine << arg << " \"" << argv[i+1] << "\" ";
-                i++;
-                continue;
-            }
-            else if ( (arg == "-config" || arg == "--config") && i + 1 < argc ) {
-                commandLine << arg << " \"" << argv[i+1] << "\" ";
-                i++;
-                continue;
-            }
-            else if ( (arg == "-pidfilepath" || arg == "--pidfilepath") && i + 1 < argc ) {
-                commandLine << arg << " \"" << argv[i+1] << "\" ";
-                i++;
-                continue;
-            }
-            else if ( (arg == "-repairpath" || arg == "--repairpath") && i + 1 < argc ) {
-                commandLine << arg << " \"" << argv[i+1] << "\" ";
-                i++;
-                continue;
-            }
-            else if ( (arg == "-keyfile" || arg == "--keyfile") && i + 1 < argc ) {
-                commandLine << arg << " \"" << argv[i+1] << "\" ";
-                i++;
-                continue;
-            }
-            else if ( arg.length() > 8 && arg.substr(0, 8) == "-service" ) {
-                // Strip off --service(Name|User|Password) arguments
-                i++;
-                continue;
-            }
-            else if ( arg.length() > 9 && arg.substr(0, 9) == "--service" ) {
-                // Strip off --service(Name|User|Password) arguments
-                i++;
-                continue;
-            }
-            commandLine << arg << " ";
-        }
+        std::string commandLine = constructUtf8WindowsCommandLine(serviceArgv);
 
         SC_HANDLE schSCManager = ::OpenSCManager( NULL, NULL, SC_MANAGER_ALL_ACCESS );
         if ( schSCManager == NULL ) {
@@ -266,11 +273,10 @@ namespace {
             ::CloseServiceHandle( schSCManager );
             ::_exit(EXIT_NTSERVICE_ERROR);
         }
-        std::basic_ostringstream< TCHAR > commandLineWide;
-        commandLineWide << commandLine.str().c_str();
+        std::wstring commandLineWide = toWideString(commandLine.c_str());
 
         // create new service
-        schService = ::CreateService(
+        schService = ::CreateServiceW(
                 schSCManager,                   // Service Control Manager handle
                 serviceName.c_str(),            // service name
                 displayName.c_str(),            // service display name
@@ -278,7 +284,7 @@ namespace {
                 SERVICE_WIN32_OWN_PROCESS,      // service type
                 SERVICE_AUTO_START,             // start type
                 SERVICE_ERROR_NORMAL,           // error control
-                commandLineWide.str().c_str(),  // command line
+                commandLineWide.c_str(),        // command line
                 NULL,                           // load order group
                 NULL,                           // tag id
                 L"\0\0",                        // dependencies
@@ -292,7 +298,7 @@ namespace {
         }
 
         log() << "Service '" << toUtf8String(serviceName) << "' (" << toUtf8String(displayName) <<
-                ") installed with command line '" << commandLine.str() << "'" << endl;
+                ") installed with command line '" << commandLine << "'" << endl;
         string typeableName( ( serviceName.find(L' ') != wstring::npos ) ?
                              "\"" + toUtf8String(serviceName) + "\""     :
                              toUtf8String(serviceName) );
