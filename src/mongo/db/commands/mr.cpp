@@ -532,13 +532,26 @@ namespace mongo {
 
                 op->setMessage( "m/r: reduce post processing" , _safeCount( _db, _config.tempLong, BSONObj() ) );
                 auto_ptr<DBClientCursor> cursor = _db.query( _config.tempLong , BSONObj() );
+                auto_ptr<Lock::GlobalWrite> globalWriteLock;
                 while ( cursor->more() ) {
-                    Lock::GlobalWrite lock; // TODO(erh) why global?
+                    // nonAtomic option isset
+                    // we can't use here separate locks between findOne() / upsert() / finalReduce()
+                    if ( !_config.outNonAtomic ) {
+                        globalWriteLock.reset( new Lock::GlobalWrite ); // TODO(erh) why global?
+                    }
+
                     BSONObj temp = cursor->next();
                     BSONObj old;
 
                     bool found;
                     {
+                        auto_ptr<Lock::DBRead> readLock;
+                        // read lock only for findOne operation, if "nonAtomic" options set
+                        // otherwise global lock earlier
+                        if ( _config.outNonAtomic ) {
+                            readLock.reset( new Lock::DBRead( _config.finalLong ) );
+                        }
+
                         Client::Context tx( _config.finalLong );
                         found = Helpers::findOne( _config.finalLong.c_str() , temp["_id"].wrap() , old , true );
                     }
@@ -548,10 +561,25 @@ namespace mongo {
                         values.clear();
                         values.push_back( temp );
                         values.push_back( old );
-                        Helpers::upsert( _config.finalLong , _config.reducer->finalReduce( values , _config.finalizer.get() ) );
+
+                        temp = _config.reducer->finalReduce( values , _config.finalizer.get() );
                     }
-                    else {
+
+                    // block only for upsert operation, if "nonAtomic" options set
+                    // otherwise lock earlier
+                    {
+                        auto_ptr<Lock::DBWrite> writeLock;
+                        if ( _config.outNonAtomic ) {
+                            writeLock.reset( new Lock::DBWrite( _config.finalLong ) );
+                        }
                         Helpers::upsert( _config.finalLong , temp );
+                    }
+
+                    auto_ptr<Lock::DBRead> readLock;
+                    // read lock only for commitIfNeeded() operation, if "nonAtomic" options set
+                    // otherwise global lock earlier
+                    if ( _config.outNonAtomic ) {
+                        readLock.reset( new Lock::DBRead( _config.finalLong ) );
                     }
                     getDur().commitIfNeeded();
                     pm.hit();
