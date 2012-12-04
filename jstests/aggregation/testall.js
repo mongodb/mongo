@@ -3,7 +3,7 @@
 */
 
 /* load the test documents */
-load('jstests/aggregation/data/articles.js');
+load('data/articles.js');
 
 // make sure we're using the right db; this is the same as "use mydb;" in shell
 db = db.getSiblingDB("aggdb");
@@ -1007,6 +1007,43 @@ var p17result = [
 ];
 
 assert.eq(p17.result, p17result, 'p17 failed');
+
+
+//split test 1
+
+var pSplit1 = db.runCommand( 
+{ aggregate: 'article', pipeline: [
+    { $match: { _id : 2 } },
+    {$project:{  
+        splited : { $split: [ "$title", "is" ]}
+}} ]});
+
+var pSplit1result = [
+    {
+        "_id" : 2,
+        "splited" : ["th", " is your title"]
+    }
+];
+
+assert.eq(pSplit1.result, pSplit1result, 'pSplit1 failed');
+
+//split test 2: split string must be smaller than splitable element "aa".split("aaa") => Not Good
+
+var pSplit1 = db.runCommand( 
+{ aggregate: 'article', pipeline: [
+    { $match: { _id : 2 } },
+    {$project:{  
+        splited : { $split: [ "$title", "Extremely large string to be found" ]}
+}} ]});
+
+var pSplit1result = [
+    {
+        "_id" : 2,
+        "splited" : ["this is your title"]
+    }
+];
+
+assert.eq(pSplit1.result, pSplit1result, 'pSplit2 failed');
 
 
 // strcasecmp test
