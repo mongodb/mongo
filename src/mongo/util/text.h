@@ -89,4 +89,13 @@ namespace mongo {
 
 #endif // #if defined(_WIN32)
 
+    /**
+     * Construct a Windows command line string, UTF-8 encoded, from a vector of
+     * UTF-8 arguments, "argv".
+     *
+     * See "Parsing C++ Command-Line Arguments (C++)"
+     * http://msdn.microsoft.com/en-us/library/windows/desktop/17w5ykft(v=vs.85).aspx
+     */
+    std::string constructUtf8WindowsCommandLine(const std::vector<std::string>& argv);
+
 } // namespace mongo

@@ -18,6 +18,8 @@
 #include "pch.h"
 
 #include <boost/smart_ptr/scoped_array.hpp>
+#include <sstream>
+
 #ifdef _WIN32
 #include <io.h>
 #endif
@@ -299,5 +301,51 @@ namespace mongo {
 
 #endif // #if defined(_WIN32)
 
+    // See "Parsing C++ Command-Line Arguments (C++)"
+    // http://msdn.microsoft.com/en-us/library/windows/desktop/17w5ykft(v=vs.85).aspx
+    static void quoteForWindowsCommandLine(const std::string& arg, std::ostream& os) {
+        if (arg.find_first_of(" \t\"") == std::string::npos) {
+            os << arg;
+        }
+        else {
+            os << '"';
+            std::string backslashes = "";
+            for (std::string::const_iterator iter = arg.begin(), end = arg.end();
+                 iter != end; ++iter) {
+
+                switch (*iter) {
+                case '\\':
+                    backslashes.push_back(*iter);
+                    if (iter + 1 == end)
+                        os << backslashes << backslashes;
+                    break;
+                case '"':
+                    os << backslashes << backslashes << "\\\"";
+                    break;
+                default:
+                    os << backslashes << *iter;
+                    backslashes.clear();
+                    break;
+                }
+            }
+            os << '"';
+        }
+    }
+
+    std::string constructUtf8WindowsCommandLine(const std::vector<std::string>& argv) {
+        if (argv.empty())
+            return "";
+
+        std::ostringstream commandLine;
+        std::vector<std::string>::const_iterator iter = argv.begin();
+        std::vector<std::string>::const_iterator end = argv.end();
+        quoteForWindowsCommandLine(*iter, commandLine);
+        ++iter;
+        for (; iter != end; ++iter) {
+            commandLine << ' ';
+            quoteForWindowsCommandLine(*iter, commandLine);
+        }
+        return commandLine.str();
+    }
 }
 
