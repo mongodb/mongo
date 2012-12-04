@@ -2251,6 +2251,9 @@ namespace mongo {
         else if (numWanted == 0)
             numWanted = 100;
 
+        // false means we want to filter OUT geoFieldsToNuke, not filter to include only that.
+        BSONObj filteredQuery = query.filterFieldsUndotted(BSON(_geo << ""), false);
+
         BSONObjIterator i(query);
         while (i.more()) {
             BSONElement e = i.next();
@@ -2262,8 +2265,7 @@ namespace mongo {
                 // If we get an array query, assume it is a location, and do a $within { $center :
                 // [[x, y], 0] } search
                 BSONObj circle = BSON("0" << e.embeddedObjectUserCheck() << "1" << 0);
-                BSONObj filter = query.filterFieldsUndotted(BSON(_geo << ""), false);
-                shared_ptr<Cursor> c(new GeoCircleBrowse(this, circle, filter, "$center", true));
+                shared_ptr<Cursor> c(new GeoCircleBrowse(this, circle, filteredQuery, "$center", true));
                 return c;
             }
             else if (e.type() == Object) {
@@ -2306,7 +2308,7 @@ namespace mongo {
                     bool uniqueDocs = false;
                     if(! n["$uniqueDocs"].eoo()) uniqueDocs = n["$uniqueDocs"].trueValue();
 
-                    shared_ptr<GeoSearch> s(new GeoSearch(this, Point(e), numWanted, query,
+                    shared_ptr<GeoSearch> s(new GeoSearch(this, Point(e), numWanted, filteredQuery,
                                                           maxDistance, type, uniqueDocs));
                     s->exec();
                     shared_ptr<Cursor> c;
@@ -2329,19 +2331,19 @@ namespace mongo {
                     if (startsWith(type,  "$center")) {
                         uassert(13059, "$center has to take an object or array", e.isABSONObj());
                         shared_ptr<Cursor> c(new GeoCircleBrowse(this, e.embeddedObjectUserCheck(), 
-                                                                 query, type, uniqueDocs));
+                                                                 filteredQuery, type, uniqueDocs));
                         return c;
                     }
                     else if (type == "$box") {
                         uassert(13065, "$box has to take an object or array", e.isABSONObj());
                         shared_ptr<Cursor> c(new GeoBoxBrowse(this, e.embeddedObjectUserCheck(),
-                                                              query, uniqueDocs));
+                                                              filteredQuery, uniqueDocs));
                         return c;
                     }
                     else if (startsWith(type, "$poly")) {
                         uassert(14029, "$polygon has to take an object or array", e.isABSONObj());
                         shared_ptr<Cursor> c(new GeoPolygonBrowse(this, e.embeddedObjectUserCheck(),
-                                                                  query, uniqueDocs));
+                                                                  filteredQuery, uniqueDocs));
                         return c;
                     }
                     throw UserException(13058, str::stream() << "unknown $within information : "
@@ -2352,7 +2354,7 @@ namespace mongo {
                     // Otherwise... assume the object defines a point, and we want to do a
                     // zero-radius $within $center
 
-                    shared_ptr<Cursor> c(new GeoCircleBrowse(this, BSON("0" << e.embeddedObjectUserCheck() << "1" << 0), query.filterFieldsUndotted(BSON(_geo << ""), false)));
+                    shared_ptr<Cursor> c(new GeoCircleBrowse(this, BSON("0" << e.embeddedObjectUserCheck() << "1" << 0), filteredQuery));
 
                     return c;
                 }

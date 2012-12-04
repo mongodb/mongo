@@ -137,12 +137,12 @@ namespace mongo {
         _index = &_d->idx(_idxNo);
 
         // If the parsing or index indicates this is a special query, don't continue the processing
-        if ( _special.size() ||
+        if (!_special.empty() ||
             ( _index->getSpec().getType() &&
              _index->getSpec().getType()->suitability( _originalQuery, _order ) != USELESS ) ) {
 
             _type  = _index->getSpec().getType();
-            if( !_special.size() ) _special = _index->getSpec().getType()->getPlugin()->getName();
+            if (_special.empty()) _special = _index->getSpec().getType()->getPlugin()->getName();
 
             massert( 13040 , (string)"no type for special: " + _special , _type );
             // hopefully safe to use original query in these contexts;
@@ -998,27 +998,28 @@ doneCheckOrder:
     }
     
     bool QueryPlanGenerator::addSpecialPlan( NamespaceDetails *d ) {
-        DEBUGQO( "\t special : " << _qps.frsp().getSpecial() );
-        set<string> special = _qps.frsp().getSpecial();
+        DEBUGQO( "\t special : " << _qps.frsp().getSpecial().toString() );
+        SpecialIndices special = _qps.frsp().getSpecial();
         if (!special.empty()) {
+            // Try to handle the special part of the query with an index
             NamespaceDetails::IndexIterator i = d->ii();
             while( i.more() ) {
                 int j = i.pos();
                 IndexDetails& ii = i.next();
                 const IndexSpec& spec = ii.getSpec();
-                if ((special.end() != special.find(spec.getTypeName())) && 
-                    spec.suitability( _qps.originalQuery(), _qps.order())) {
+                // TODO(hk): Make sure we can do a $near and $within query, one using
+                // the index one using the matcher.
+                if (special.has(spec.getTypeName())
+                    && spec.suitability( _qps.originalQuery(), _qps.order())) {
                     uassert( 16330, "'special' query operator not allowed", _allowSpecial );
                     _qps.setSinglePlan( newPlan( d, j, BSONObj(), BSONObj(), spec.getTypeName()));
                     return true;
                 }
             }
-            stringstream ss;
-            for (set<string>::const_iterator it = special.begin(); it != special.end(); ++it) {
-                ss << *it << ", ";
+            if (special.anyRequireIndex()) {
+                uassert(13038, "can't find any special indices: " + special.toString()
+                               + " for: " + _qps.originalQuery().toString(), false );
             }
-            uassert(13038, "can't find any special indices: " + ss.str()
-                           + " for: " + _qps.originalQuery().toString(), false );
         }
         return false;
     }

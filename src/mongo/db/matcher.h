@@ -52,7 +52,8 @@ namespace mongo {
 
     class GeoMatcher {
     private:
-        GeoMatcher(const string& field) : _isBox(false), _isCircle(false), _fieldName(field) {}
+        GeoMatcher(const string& field) : _isBox(false), _isCircle(false), _isPolygon(false),
+                                          _fieldName(field) {}
         bool _isBox;
         Box _box;
 
@@ -70,15 +71,15 @@ namespace mongo {
         static GeoMatcher makeBox(const string& field, const BSONObj &min, const BSONObj &max) {
             GeoMatcher m(field);
             m._isBox = true;
-            pointFrom(min, &m._box._min);
-            pointFrom(max, &m._box._max);
+            uassert(16511, "Malformed coord: " + min.toString(), pointFrom(min, &m._box._min));
+            uassert(16512, "Malformed coord: " + max.toString(), pointFrom(max, &m._box._max));
             return m;
         }
 
         static GeoMatcher makeCircle(const string& field, const BSONObj &center, double rad) {
             GeoMatcher m(field);
             m._isCircle = true;
-            pointFrom(center, &m._center);
+            uassert(16513, "Malformed coord: " + center.toString(), pointFrom(center, &m._center));
             m._radius = rad;
             return m;
         }
@@ -91,8 +92,9 @@ namespace mongo {
             BSONObjIterator coordIt(poly);
             while (coordIt.more()) {
                 BSONElement coord = coordIt.next();
+                BSONObj obj = coord.Obj();
                 Point p;
-                pointFrom(coord.Obj(), &p);
+                uassert(16514, "Malformed coord: " + obj.toString(), pointFrom(obj, &p));
                 points.push_back(p);
             }
             m._polygon = Polygon(points);
@@ -103,7 +105,7 @@ namespace mongo {
             if (_isBox) {
                 return _box.inside(p, 0);
             } else if (_isCircle) {
-                return distance(_center, p) <= _radius;
+                return distance(p, _center) <= _radius;
             } else if (_isPolygon) {
                 return _polygon.contains(p);
             } else {
