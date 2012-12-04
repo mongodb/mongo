@@ -14,6 +14,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <boost/algorithm/string.hpp>
+
 #include "pch.h"
 #include "db/pipeline/expression.h"
 
@@ -27,6 +29,69 @@
 
 namespace mongo {
     using namespace mongoutils;
+
+    /// Helper function to easily wrap constants with $const.
+    static Value serializeConstant(Value val) {
+        return Value(DOC("$const" << val));
+    }
+
+    void Variables::uassertValidNameForUserWrite(StringData varName) {
+        // System variables users allowed to write to (currently just one)
+        if (varName == "CURRENT") {
+            return;
+        }
+
+        uassert(16866, "empty variable names are not allowed",
+                !varName.empty());
+
+        const bool firstCharIsValid = (varName[0] >= 'a' &&  varName[0] <= 'z')
+                                   || (varName[0] & '\x80') // non-ascii
+                                   ;
+
+        uassert(16867, str::stream() <<
+                   "'" << varName << "' starts with an invalid character for a user variable name",
+                firstCharIsValid);
+
+        for (size_t i = 1; i < varName.size(); i++) {
+            const bool charIsValid = (varName[i] >= 'a' &&  varName[i] <= 'z')
+                                  || (varName[i] >= 'A' &&  varName[i] <= 'Z')
+                                  || (varName[i] >= '0' &&  varName[i] <= '9')
+                                  || (varName[i] == '_')
+                                  || (varName[i] & '\x80') // non-ascii
+                                  ;
+
+            uassert(16868, str::stream() << "'" << varName << "' contains an invalid character "
+                                         << "for a variable name: '" << varName[i] << "'",
+                    charIsValid);
+        }
+    }
+
+    void Variables::uassertValidNameForUserRead(StringData varName) {
+        uassert(16869, "empty variable names are not allowed",
+                !varName.empty());
+
+        const bool firstCharIsValid = (varName[0] >= 'a' &&  varName[0] <= 'z')
+                                   || (varName[0] >= 'A' &&  varName[0] <= 'Z')
+                                   || (varName[0] & '\x80') // non-ascii
+                                   ;
+
+        uassert(16870, str::stream() <<
+                   "'" << varName << "' starts with an invalid character for a variable name",
+                firstCharIsValid);
+
+        for (size_t i = 1; i < varName.size(); i++) {
+            const bool charIsValid = (varName[i] >= 'a' &&  varName[i] <= 'z')
+                                  || (varName[i] >= 'A' &&  varName[i] <= 'Z')
+                                  || (varName[i] >= '0' &&  varName[i] <= '9')
+                                  || (varName[i] == '_')
+                                  || (varName[i] & '\x80') // non-ascii
+                                  ;
+
+            uassert(16871, str::stream() << "'" << varName << "' contains an invalid character "
+                                         << "for a variable name: '" << varName[i] << "'",
+                    charIsValid);
+        }
+    }
 
     /* --------------------------- Expression ------------------------------ */
 
@@ -111,7 +176,8 @@ namespace mongo {
                     verify(pCtx->documentOk());
                     // CW TODO error: document not allowed in this context
 
-                    pExpressionObject = ExpressionObject::create();
+                    pExpressionObject = pCtx->topLevel() ? ExpressionObject::createRoot()
+                                                         : ExpressionObject::create();
                     pExpression = pExpressionObject;
 
                     /* this "object" is not an operator expression */
@@ -134,10 +200,8 @@ namespace mongo {
                     case String: {
                         /* it's a renamed field */
                         // CW TODO could also be a constant
-                        intrusive_ptr<Expression> pPath(
-                            ExpressionFieldPath::create(
-                                removeFieldPrefix(fieldElement.str())));
-                        pExpressionObject->addField(fieldName, pPath);
+                        pExpressionObject->addField(fieldName,
+                                                    ExpressionFieldPath::parse(fieldElement.str()));
                         break;
                     }
                     case Bool:
@@ -206,6 +270,8 @@ namespace mongo {
         {"$gte", ExpressionCompare::createGte, OpDesc::FIXED_COUNT, 2},
         {"$hour", ExpressionHour::create, OpDesc::FIXED_COUNT, 1},
         {"$ifNull", ExpressionIfNull::create, OpDesc::FIXED_COUNT, 2},
+        // $let handled specially in parseExpression
+        // $map handled specially in parseExpression
         {"$lt", ExpressionCompare::createLt, OpDesc::FIXED_COUNT, 2},
         {"$lte", ExpressionCompare::createLte, OpDesc::FIXED_COUNT, 2},
         {"$millisecond", ExpressionMillisecond::create, OpDesc::FIXED_COUNT, 1},
@@ -235,6 +301,12 @@ namespace mongo {
 
         if (str::equals(pOpName, "$const")) {
             return ExpressionConstant::createFromBsonElement(pBsonElement);
+        }
+        else if (str::equals(pOpName, "$let")) {
+            return ExpressionLet::parse(*pBsonElement);
+        }
+        else if (str::equals(pOpName, "$map")) {
+            return ExpressionMap::parse(*pBsonElement);
         }
 
         OpDesc key;
@@ -307,8 +379,7 @@ namespace mongo {
 
         if (type == String && pBsonElement->valuestr()[0] == '$') {
             /* if we got here, this is a field path expression */
-            string fieldPath = removeFieldPrefix(pBsonElement->str());
-            return ExpressionFieldPath::create(fieldPath);
+            return ExpressionFieldPath::parse(pBsonElement->str());
         }
         else if (type == Object) {
             ObjectCtx oCtx(ObjectCtx::DOCUMENT_OK);
@@ -329,7 +400,7 @@ namespace mongo {
         return pExpression;
     }
 
-    Value ExpressionAdd::evaluate(const Document& pDocument) const {
+    Value ExpressionAdd::evaluateInternal(const Variables& vars) const {
 
         /*
           We'll try to return the narrowest possible result value.  To do that
@@ -344,7 +415,7 @@ namespace mongo {
 
         const size_t n = vpOperand.size();
         for (size_t i = 0; i < n; ++i) {
-            Value val = vpOperand[i]->evaluate(pDocument);
+            Value val = vpOperand[i]->evaluateInternal(vars);
 
             if (val.numeric()) {
                 totalType = Value::getWidestNumeric(totalType, val.getType());
@@ -374,13 +445,13 @@ namespace mongo {
         if (haveDate) {
             if (totalType == NumberDouble)
                 longTotal = static_cast<long long>(doubleTotal);
-            return Value::createDate(longTotal);
+            return Value(Date_t(longTotal));
         }
         else if (totalType == NumberLong) {
-            return Value::createLong(longTotal);
+            return Value(longTotal);
         }
         else if (totalType == NumberDouble) {
-            return Value::createDouble(doubleTotal);
+            return Value(doubleTotal);
         }
         else if (totalType == NumberInt) {
             return Value::createIntOrLong(longTotal);
@@ -439,7 +510,7 @@ namespace mongo {
           Evaluate and coerce the last argument to a boolean.  If it's false,
           then we can replace this entire expression.
          */
-        bool last = pLast->evaluate(Document()).coerceToBool();
+        bool last = pLast->evaluateInternal(Variables()).coerceToBool();
         if (!last) {
             intrusive_ptr<ExpressionConstant> pFinal(
                 ExpressionConstant::create(Value(false)));
@@ -469,10 +540,10 @@ namespace mongo {
         return pE;
     }
 
-    Value ExpressionAnd::evaluate(const Document& pDocument) const {
+    Value ExpressionAnd::evaluateInternal(const Variables& vars) const {
         const size_t n = vpOperand.size();
         for(size_t i = 0; i < n; ++i) {
-            Value pValue(vpOperand[i]->evaluate(pDocument));
+            Value pValue(vpOperand[i]->evaluateInternal(vars));
             if (!pValue.coerceToBool())
                 return Value(false);
         }
@@ -538,33 +609,17 @@ namespace mongo {
         pExpression->addDependencies(deps);
     }
 
-    Value ExpressionCoerceToBool::evaluate(const Document& pDocument) const {
-        Value pResult(pExpression->evaluate(pDocument));
+    Value ExpressionCoerceToBool::evaluateInternal(const Variables& vars) const {
+        Value pResult(pExpression->evaluateInternal(vars));
         bool b = pResult.coerceToBool();
         if (b)
             return Value(true);
         return Value(false);
     }
 
-    void ExpressionCoerceToBool::addToBsonObj(BSONObjBuilder *pBuilder,
-                                              StringData fieldName,
-                                              bool requireExpression) const {
+    Value ExpressionCoerceToBool::serialize() const {
         // Serializing as an $and expression which will become a CoerceToBool
-        BSONObjBuilder sub (pBuilder->subobjStart(fieldName));
-        BSONArrayBuilder arr (sub.subarrayStart("$and"));
-        pExpression->addToBsonArray(&arr);
-        arr.doneFast();
-        sub.doneFast();
-    }
-
-    void ExpressionCoerceToBool::addToBsonArray(
-            BSONArrayBuilder *pBuilder) const {
-        // Serializing as an $and expression which will become a CoerceToBool
-        BSONObjBuilder sub (pBuilder->subobjStart());
-        BSONArrayBuilder arr (sub.subarrayStart("$and"));
-        pExpression->addToBsonArray(&arr);
-        arr.doneFast();
-        sub.doneFast();
+        return Value(DOC("$and" << DOC_ARRAY(pExpression->serialize())));
     }
 
     /* ----------------------- ExpressionCompare --------------------------- */
@@ -700,10 +755,10 @@ namespace mongo {
             pFieldPath, newOp, pConstant->getValue());
     }
 
-    Value ExpressionCompare::evaluate(const Document& pDocument) const {
+    Value ExpressionCompare::evaluateInternal(const Variables& vars) const {
         checkArgCount(2);
-        Value pLeft(vpOperand[0]->evaluate(pDocument));
-        Value pRight(vpOperand[1]->evaluate(pDocument));
+        Value pLeft(vpOperand[0]->evaluateInternal(vars));
+        Value pRight(vpOperand[1]->evaluateInternal(vars));
 
         int cmp = signum(Value::compare(pLeft, pRight));
 
@@ -736,12 +791,12 @@ namespace mongo {
         return new ExpressionConcat();
     }
 
-    Value ExpressionConcat::evaluate(const Document& input) const {
+    Value ExpressionConcat::evaluateInternal(const Variables& vars) const {
         const size_t n = vpOperand.size();
 
         StringBuilder result;
         for (size_t i = 0; i < n; ++i) {
-            Value val = vpOperand[i]->evaluate(input);
+            Value val = vpOperand[i]->evaluateInternal(vars);
             if (val.nullish())
                 return Value(BSONNULL);
 
@@ -752,7 +807,7 @@ namespace mongo {
             result << val.coerceToString();
         }
 
-        return Value::createString(result.str());
+        return Value(result.str());
     }
 
     const char *ExpressionConcat::getOpName() const {
@@ -779,11 +834,11 @@ namespace mongo {
         ExpressionNary::addOperand(pExpression);
     }
 
-    Value ExpressionCond::evaluate(const Document& pDocument) const {
+    Value ExpressionCond::evaluateInternal(const Variables& vars) const {
         checkArgCount(3);
-        Value pCond(vpOperand[0]->evaluate(pDocument));
+        Value pCond(vpOperand[0]->evaluateInternal(vars));
         int idx = pCond.coerceToBool() ? 1 : 2;
-        return vpOperand[idx]->evaluate(pDocument);
+        return vpOperand[idx]->evaluateInternal(vars);
     }
 
     const char *ExpressionCond::getOpName() const {
@@ -803,7 +858,7 @@ namespace mongo {
     }
 
     ExpressionConstant::ExpressionConstant(BSONElement *pBsonElement):
-        pValue(Value::createFromBsonElement(pBsonElement)) {
+        pValue(Value(*pBsonElement)) {
     }
 
     intrusive_ptr<ExpressionConstant> ExpressionConstant::create(const Value& pValue) {
@@ -823,51 +878,12 @@ namespace mongo {
         /* nothing to do */
     }
 
-    Value ExpressionConstant::evaluate(const Document& pDocument) const {
+    Value ExpressionConstant::evaluateInternal(const Variables& vars) const {
         return pValue;
     }
 
-    void ExpressionConstant::addToBsonObj(BSONObjBuilder *pBuilder,
-                                          StringData fieldName,
-                                          bool requireExpression) const {
-        /*
-          If we don't need an expression, but can use a naked scalar,
-          do the regular thing.
-
-          This is geared to handle $project, which uses expressions as a cue
-          that the field is a new virtual field rather than just an
-          inclusion (or exclusion):
-          { $project : {
-              x : true, // include
-              y : { $const: true }
-          }}
-
-          This can happen as a result of optimizations.  For example, the
-          above may have originally been
-          { $project : {
-              x : true, // include
-              y : { $eq:["foo", "foo"] }
-          }}
-          When this is optimized, the $eq will be replaced with true.  However,
-          if the pipeline is rematerialized (as happens for a split for
-          sharding) and sent to another node, it will now have
-              y : true
-          which will look like an inclusion rather than a computed field.
-        */
-        if (!requireExpression) {
-            pValue.addToBsonObj(pBuilder, fieldName);
-            return;
-        }
-
-        // We require an expression, so build one here, and use that.
-        BSONObjBuilder constBuilder (pBuilder->subobjStart(fieldName));
-        pValue.addToBsonObj(&constBuilder, getOpName());
-        constBuilder.done();
-    }
-
-    void ExpressionConstant::addToBsonArray(
-        BSONArrayBuilder *pBuilder) const {
-        pValue.addToBsonArray(pBuilder);
+    Value ExpressionConstant::serialize() const {
+        return serializeConstant(pValue);
     }
 
     const char *ExpressionConstant::getOpName() const {
@@ -894,11 +910,11 @@ namespace mongo {
         ExpressionNary::addOperand(pExpression);
     }
 
-    Value ExpressionDayOfMonth::evaluate(const Document& pDocument) const {
+    Value ExpressionDayOfMonth::evaluateInternal(const Variables& vars) const {
         checkArgCount(1);
-        Value pDate(vpOperand[0]->evaluate(pDocument));
+        Value pDate(vpOperand[0]->evaluateInternal(vars));
         tm date = pDate.coerceToTm();
-        return Value::createInt(date.tm_mday); 
+        return Value(date.tm_mday);
     }
 
     const char *ExpressionDayOfMonth::getOpName() const {
@@ -924,11 +940,11 @@ namespace mongo {
         ExpressionNary::addOperand(pExpression);
     }
 
-    Value ExpressionDayOfWeek::evaluate(const Document& pDocument) const {
+    Value ExpressionDayOfWeek::evaluateInternal(const Variables& vars) const {
         checkArgCount(1);
-        Value pDate(vpOperand[0]->evaluate(pDocument));
+        Value pDate(vpOperand[0]->evaluateInternal(vars));
         tm date = pDate.coerceToTm();
-        return Value::createInt(date.tm_wday+1); // MySQL uses 1-7 tm uses 0-6
+        return Value(date.tm_wday+1); // MySQL uses 1-7 tm uses 0-6
     }
 
     const char *ExpressionDayOfWeek::getOpName() const {
@@ -954,11 +970,11 @@ namespace mongo {
         ExpressionNary::addOperand(pExpression);
     }
 
-    Value ExpressionDayOfYear::evaluate(const Document& pDocument) const {
+    Value ExpressionDayOfYear::evaluateInternal(const Variables& vars) const {
         checkArgCount(1);
-        Value pDate(vpOperand[0]->evaluate(pDocument));
+        Value pDate(vpOperand[0]->evaluateInternal(vars));
         tm date = pDate.coerceToTm();
-        return Value::createInt(date.tm_yday+1); // MySQL uses 1-366 tm uses 0-365
+        return Value(date.tm_yday+1); // MySQL uses 1-366 tm uses 0-365
     }
 
     const char *ExpressionDayOfYear::getOpName() const {
@@ -985,10 +1001,10 @@ namespace mongo {
         ExpressionNary::addOperand(pExpression);
     }
 
-    Value ExpressionDivide::evaluate(const Document& pDocument) const {
+    Value ExpressionDivide::evaluateInternal(const Variables& vars) const {
         checkArgCount(2);
-        Value lhs = vpOperand[0]->evaluate(pDocument);
-        Value rhs = vpOperand[1]->evaluate(pDocument);
+        Value lhs = vpOperand[0]->evaluateInternal(vars);
+        Value rhs = vpOperand[1]->evaluateInternal(vars);
 
         if (lhs.numeric() && rhs.numeric()) {
             double numer = lhs.coerceToDouble();
@@ -996,7 +1012,7 @@ namespace mongo {
             uassert(16608, "can't $divide by zero",
                     denom != 0);
 
-            return Value::createDouble(numer / denom);
+            return Value(numer / denom);
         }
         else if (lhs.nullish() || rhs.nullish()) {
             return Value(BSONNULL);
@@ -1019,15 +1035,20 @@ namespace mongo {
     }
 
     intrusive_ptr<ExpressionObject> ExpressionObject::create() {
-        intrusive_ptr<ExpressionObject> pExpression(new ExpressionObject());
-        return pExpression;
+        return new ExpressionObject(false);
     }
 
-    ExpressionObject::ExpressionObject(): _excludeId(false) {
+    intrusive_ptr<ExpressionObject> ExpressionObject::createRoot() {
+        return new ExpressionObject(true);
     }
+
+    ExpressionObject::ExpressionObject(bool atRoot)
+        : _excludeId(false)
+        , _atRoot(atRoot)
+    {}
 
     intrusive_ptr<Expression> ExpressionObject::optimize() {
-        for (ExpressionMap::iterator it(_expressions.begin()); it!=_expressions.end(); ++it) {
+        for (FieldMap::iterator it(_expressions.begin()); it!=_expressions.end(); ++it) {
             if (it->second)
                 it->second = it->second->optimize();
         }
@@ -1036,7 +1057,7 @@ namespace mongo {
     }
 
     bool ExpressionObject::isSimple() {
-        for (ExpressionMap::iterator it(_expressions.begin()); it!=_expressions.end(); ++it) {
+        for (FieldMap::iterator it(_expressions.begin()); it!=_expressions.end(); ++it) {
             if (it->second && !it->second->isSimple())
                 return false;
         }
@@ -1062,7 +1083,7 @@ namespace mongo {
         }
         
 
-        for (ExpressionMap::const_iterator it(_expressions.begin()); it!=_expressions.end(); ++it) {
+        for (FieldMap::const_iterator it(_expressions.begin()); it!=_expressions.end(); ++it) {
             if (it->second) {
                 if (path) path->push_back(it->first);
                 it->second->addDependencies(deps, path);
@@ -1079,28 +1100,26 @@ namespace mongo {
 
     void ExpressionObject::addToDocument(
         MutableDocument& out,
-        const Document& pDocument,
-        const Document& rootDoc
+        const Document& currentDoc,
+        const Variables& vars
         ) const
     {
-        const bool atRoot = (pDocument == rootDoc);
-
-        ExpressionMap::const_iterator end = _expressions.end();
+        FieldMap::const_iterator end = _expressions.end();
 
         // This is used to mark fields we've done so that we can add the ones we haven't
         set<string> doneFields;
 
-        FieldIterator fields(pDocument);
+        FieldIterator fields(currentDoc);
         while(fields.more()) {
             Document::FieldPair field (fields.next());
 
             // TODO don't make a new string here
             const string fieldName = field.first.toString();
-            ExpressionMap::const_iterator exprIter = _expressions.find(fieldName);
+            FieldMap::const_iterator exprIter = _expressions.find(fieldName);
 
             // This field is not supposed to be in the output (unless it is _id)
             if (exprIter == end) {
-                if (!_excludeId && atRoot && field.first == "_id") {
+                if (!_excludeId && _atRoot && field.first == "_id") {
                     // _id from the root doc is always included (until exclusion is supported)
                     // not updating doneFields since "_id" isn't in _expressions
                     out.addField(field.first, field.second);
@@ -1124,7 +1143,7 @@ namespace mongo {
             if ((valueType != Object && valueType != Array) || !exprObj ) {
                 // This expression replace the whole field
                 
-                Value pValue(expr->evaluate(rootDoc));
+                Value pValue(expr->evaluateInternal(vars));
 
                 // don't add field if nothing was found in the subobject
                 if (exprObj && pValue.getDocument()->getFieldCount() == 0)
@@ -1148,8 +1167,8 @@ namespace mongo {
             */
             if (valueType == Object) {
                 MutableDocument sub (exprObj->getSizeHint());
-                exprObj->addToDocument(sub, field.second.getDocument(), rootDoc);
-                out.addField(field.first, Value(sub.freeze()));
+                exprObj->addToDocument(sub, field.second.getDocument(), vars);
+                out.addField(field.first, sub.freezeToValue());
             }
             else if (valueType == Array) {
                 /*
@@ -1165,11 +1184,11 @@ namespace mongo {
                         continue;
 
                     MutableDocument doc (exprObj->getSizeHint());
-                    exprObj->addToDocument(doc, input[i].getDocument(), rootDoc);
-                    result.push_back(Value(doc.freeze()));
+                    exprObj->addToDocument(doc, input[i].getDocument(), vars);
+                    result.push_back(doc.freezeToValue());
                 }
 
-                out.addField(field.first, Value(result));
+                out.addField(field.first, Value::consume(result));
             }
             else {
                 verify( false );
@@ -1181,7 +1200,7 @@ namespace mongo {
 
         /* add any remaining fields we haven't already taken care of */
         for (vector<string>::const_iterator i(_order.begin()); i!=_order.end(); ++i) {
-            ExpressionMap::const_iterator it = _expressions.find(*i);
+            FieldMap::const_iterator it = _expressions.find(*i);
             string fieldName(it->first);
 
             /* if we've already dealt with this field, above, do nothing */
@@ -1192,7 +1211,7 @@ namespace mongo {
             if (!it->second)
                 continue;
 
-            Value pValue(it->second->evaluate(rootDoc));
+            Value pValue(it->second->evaluateInternal(vars));
 
             /*
               Don't add non-existent values (note:  different from NULL or Undefined);
@@ -1217,18 +1236,18 @@ namespace mongo {
         return _expressions.size() + (_excludeId ? 0 : 1);
     }
 
-    Document ExpressionObject::evaluateDocument(const Document& pDocument) const {
+    Document ExpressionObject::evaluateDocument(const Variables& vars) const {
         /* create and populate the result */
         MutableDocument out (getSizeHint());
         
         addToDocument(out,
                       Document(), // No inclusion field matching.
-                      pDocument);
+                      vars);
         return out.freeze();
     }
 
-    Value ExpressionObject::evaluate(const Document& pDocument) const {
-        return Value::createDocument(evaluateDocument(pDocument));
+    Value ExpressionObject::evaluateInternal(const Variables& vars) const {
+        return Value(evaluateDocument(vars));
     }
 
     void ExpressionObject::addField(const FieldPath &fieldPath,
@@ -1289,40 +1308,25 @@ namespace mongo {
         addField(theFieldPath, NULL);
     }
 
-    void ExpressionObject::documentToBson(BSONObjBuilder *pBuilder, bool requireExpression) const {
+    Value ExpressionObject::serialize() const {
+        MutableDocument valBuilder;
         if (_excludeId)
-            pBuilder->appendBool("_id", false);
+            valBuilder["_id"] = Value(false);
 
         for (vector<string>::const_iterator it(_order.begin()); it!=_order.end(); ++it) {
             string fieldName = *it;
             verify(_expressions.find(fieldName) != _expressions.end());
             intrusive_ptr<Expression> expr = _expressions.find(fieldName)->second;
-            
+
             if (!expr) {
                 // this is inclusion, not an expression
-                pBuilder->appendBool(fieldName, true);
+                valBuilder[fieldName] = Value(true);
             }
             else {
-                expr->addToBsonObj(pBuilder, fieldName, requireExpression);
+                valBuilder[fieldName] = expr->serialize();
             }
         }
-    }
-
-    void ExpressionObject::addToBsonObj(BSONObjBuilder *pBuilder,
-                                        StringData fieldName,
-                                        bool requireExpression) const {
-
-        BSONObjBuilder objBuilder (pBuilder->subobjStart(fieldName));
-        documentToBson(&objBuilder, requireExpression);
-        objBuilder.done();
-    }
-
-    void ExpressionObject::addToBsonArray(
-        BSONArrayBuilder *pBuilder) const {
-
-        BSONObjBuilder objBuilder (pBuilder->subobjStart());
-        documentToBson(&objBuilder, false);
-        objBuilder.done();
+        return valBuilder.freezeToValue();
     }
 
     /* --------------------- ExpressionFieldPath --------------------------- */
@@ -1330,17 +1334,38 @@ namespace mongo {
     ExpressionFieldPath::~ExpressionFieldPath() {
     }
 
-    intrusive_ptr<ExpressionFieldPath> ExpressionFieldPath::create(
-        const string &fieldPath) {
-        intrusive_ptr<ExpressionFieldPath> pExpression(
-            new ExpressionFieldPath(fieldPath));
-        return pExpression;
+    // this is the old deprecated version
+    intrusive_ptr<ExpressionFieldPath> ExpressionFieldPath::create(const string& fieldPath) {
+        return new ExpressionFieldPath("CURRENT." + fieldPath);
     }
 
-    ExpressionFieldPath::ExpressionFieldPath(
-        const string &theFieldPath):
-        fieldPath(theFieldPath) {
+    // this is the new version that supports every syntax
+    intrusive_ptr<ExpressionFieldPath> ExpressionFieldPath::parse(const string& raw) {
+        uassert(16873, str::stream() << "FieldPath '" << raw << "' doesn't start with $",
+                raw.c_str()[0] == '$'); // c_str()[0] is always a valid reference.
+
+        uassert(16872, str::stream() << "'$' by itself is not a valid FieldPath",
+                raw.size() >= 2); // need at least "$" and either "$" or a field name
+
+        if (raw[1] == '$') {
+            const StringData rawSD = raw;
+            const StringData fieldPath = rawSD.substr(2); // strip off $$
+            const StringData varName = fieldPath.substr(0, fieldPath.find('.')-1);
+            Variables::uassertValidNameForUserRead(varName);
+            return new ExpressionFieldPath(fieldPath.toString());
+        }
+        else {
+            return new ExpressionFieldPath("CURRENT." + raw.substr(1)); // strip the "$" prefix
+        }
     }
+
+
+    ExpressionFieldPath::ExpressionFieldPath(const string& theFieldPath)
+        : _fieldPath(theFieldPath)
+        , _baseVar(_fieldPath.getFieldName(0) == "CURRENT" ? CURRENT :
+                   _fieldPath.getFieldName(0) == "ROOT" ?    ROOT :
+                                                             OTHER)
+    {}
 
     intrusive_ptr<Expression> ExpressionFieldPath::optimize() {
         /* nothing can be done for these */
@@ -1348,7 +1373,10 @@ namespace mongo {
     }
 
     void ExpressionFieldPath::addDependencies(set<string>& deps, vector<string>* path) const {
-        deps.insert(fieldPath.getPath(false));
+        // TODO consider state of variables
+        if (_baseVar == ROOT || _baseVar == CURRENT) {
+            deps.insert(_fieldPath.tail().getPath(false));
+        }
     }
 
     Value ExpressionFieldPath::evaluatePathArray(size_t index, const Value& input) const {
@@ -1366,18 +1394,18 @@ namespace mongo {
                 result.push_back(nested);
         }
 
-        return Value::createArray(result);
+        return Value::consume(result);
     }
     Value ExpressionFieldPath::evaluatePath(size_t index, const Document& input) const {
         // Note this function is very hot so it is important that is is well optimized.
         // In particular, all return paths should support RVO.
 
         /* if we've hit the end of the path, stop */
-        if (index == fieldPath.getPathLength() - 1)
-            return input[fieldPath.getFieldName(index)];
+        if (index == _fieldPath.getPathLength() - 1)
+            return input[_fieldPath.getFieldName(index)];
 
         // Try to dive deeper
-        const Value val = input[fieldPath.getFieldName(index)];
+        const Value val = input[_fieldPath.getFieldName(index)];
         switch (val.getType()) {
         case Object:
             return evaluatePath(index+1, val.getDocument());
@@ -1390,19 +1418,32 @@ namespace mongo {
         }
     }
 
-    Value ExpressionFieldPath::evaluate(const Document& pDocument) const {
-        return evaluatePath(0, pDocument);
+    Value ExpressionFieldPath::evaluateInternal(const Variables& vars) const {
+        Value var;
+        switch (_baseVar) {
+        case CURRENT: var = vars.current; break;
+        case ROOT:    var = vars.root; break;
+        default:      var = vars.rest[_fieldPath.getFieldName(0)]; break;
+        }
+
+        if (_fieldPath.getPathLength() == 1)
+            return var;
+
+        switch (var.getType()) {
+        case Object: return evaluatePath(1, var.getDocument());
+        case Array: return evaluatePathArray(1, var);
+        default: return Value();
+        }
     }
 
-    void ExpressionFieldPath::addToBsonObj(BSONObjBuilder *pBuilder,
-                                           StringData fieldName,
-                                           bool requireExpression) const {
-        pBuilder->append(fieldName, fieldPath.getPath(true));
-    }
-
-    void ExpressionFieldPath::addToBsonArray(
-        BSONArrayBuilder *pBuilder) const {
-        pBuilder->append(getFieldPath(true));
+    Value ExpressionFieldPath::serialize() const {
+        if (_fieldPath.getFieldName(0) == "CURRENT" && _fieldPath.getPathLength() > 1) {
+            // use short form for "$$CURRENT.foo" but not just "$$CURRENT"
+            return Value("$" + _fieldPath.tail().getPath(false));
+        }
+        else {
+            return Value("$$" + _fieldPath.getPath(false));
+        }
     }
 
     /* --------------------- ExpressionFieldRange -------------------------- */
@@ -1435,13 +1476,13 @@ namespace mongo {
         pFieldPath->addDependencies(deps);
     }
 
-    Value ExpressionFieldRange::evaluate(const Document& pDocument) const {
+    Value ExpressionFieldRange::evaluateInternal(const Variables& vars) const {
         /* if there's no range, there can't be a match */
         if (!pRange.get())
             return Value(false);
 
         /* get the value of the specified field */
-        Value pValue(pFieldPath->evaluate(pDocument));
+        Value pValue(pFieldPath->evaluateInternal(vars));
 
         /* see if it fits within any of the ranges */
         if (pRange->contains(pValue))
@@ -1450,82 +1491,53 @@ namespace mongo {
         return Value(false);
     }
 
-    void ExpressionFieldRange::addToBson(Builder *pBuilder) const {
+    Value ExpressionFieldRange::serialize() const {
+        // serializing results in an unoptimized form that will be reoptimized at parse time
+
         if (!pRange.get()) {
             /* nothing will satisfy this predicate */
-            pBuilder->append(false);
-            return;
+            return serializeConstant(Value(false));
         }
 
         if (pRange->pTop.missing() && pRange->pBottom.missing()) {
             /* any value will satisfy this predicate */
-            pBuilder->append(true);
-            return;
+            return serializeConstant(Value(true));
         }
 
         // FIXME Append constant values using the $const operator.  SERVER-6769
 
         // FIXME This checks pointer equality not value equality.
         if (pRange->pTop == pRange->pBottom) {
-            BSONArrayBuilder operands;
-            pFieldPath->addToBsonArray(&operands);
-            pRange->pTop.addToBsonArray(&operands);
-            
-            BSONObjBuilder equals;
-            equals.append("$eq", operands.arr());
-            pBuilder->append(&equals);
-            return;
+            return Value(DOC("$eq" << DOC_ARRAY(pFieldPath->serialize()
+                                             << serializeConstant(pRange->pTop)
+                                             )));
         }
 
-        BSONObjBuilder leftOperator;
+        Document gtDoc;
         if (!pRange->pBottom.missing()) {
-            BSONArrayBuilder leftOperands;
-            pFieldPath->addToBsonArray(&leftOperands);
-            pRange->pBottom.addToBsonArray(&leftOperands);
-            leftOperator.append(
-                (pRange->bottomOpen ? "$gt" : "$gte"),
-                leftOperands.arr());
+            const StringData& op = (pRange->bottomOpen ? "$gt" : "$gte");
+            gtDoc = DOC(op << DOC_ARRAY(pFieldPath->serialize()
+                                     << serializeConstant(pRange->pBottom)
+                                     ));
 
             if (pRange->pTop.missing()) {
-                pBuilder->append(&leftOperator);
-                return;
+                return Value(gtDoc);
             }
         }
 
-        BSONObjBuilder rightOperator;
+        Document ltDoc;
         if (!pRange->pTop.missing()) {
-            BSONArrayBuilder rightOperands;
-            pFieldPath->addToBsonArray(&rightOperands);
-            pRange->pTop.addToBsonArray(&rightOperands);
-            rightOperator.append(
-                (pRange->topOpen ? "$lt" : "$lte"),
-                rightOperands.arr());
+            const StringData& op = (pRange->topOpen ? "$lt" : "$lte");
+            ltDoc = DOC(op << DOC_ARRAY(pFieldPath->serialize()
+                                     << serializeConstant(pRange->pTop)
+                                     ));
 
             if (pRange->pBottom.missing()) {
-                pBuilder->append(&rightOperator);
-                return;
+                return Value(ltDoc);
             }
         }
 
-        BSONArrayBuilder andOperands;
-        andOperands.append(leftOperator.done());
-        andOperands.append(rightOperator.done());
-        BSONObjBuilder andOperator;
-        andOperator.append("$and", andOperands.arr());
-        pBuilder->append(&andOperator);
-    }
-
-    void ExpressionFieldRange::addToBsonObj(BSONObjBuilder *pBuilder,
-                                            StringData fieldName,
-                                            bool requireExpression) const {
-        BuilderObj builder(pBuilder, fieldName);
-        addToBson(&builder);
-    }
-
-    void ExpressionFieldRange::addToBsonArray(
-        BSONArrayBuilder *pBuilder) const {
-        BuilderArray builder(pBuilder);
-        addToBson(&builder);
+        return Value(DOC("$and" << DOC_ARRAY(gtDoc << ltDoc)));
     }
 
     void ExpressionFieldRange::toMatcherBson(
@@ -1537,7 +1549,8 @@ namespace mongo {
             return; // nothing to add to the predicate
 
         /* we're going to need the field path */
-        string fieldPath(pFieldPath->getFieldPath(false));
+        //TODO Fix for $$vars. This method isn't currently used so low-priority
+        string fieldPath(pFieldPath->getFieldPath().getPath(false));
 
         BSONObjBuilder range;
         if (!pRange->pBottom.missing()) {
@@ -1719,6 +1732,222 @@ namespace mongo {
         return true;
     }
 
+
+    /* ------------------------- ExpressionLet ----------------------------- */
+
+    ExpressionLet::~ExpressionLet() {}
+
+    intrusive_ptr<ExpressionLet> ExpressionLet::parse(BSONElement expr) {
+        verify(str::equals(expr.fieldName(), "$let"));
+
+        uassert(16874, "$let only supports an object as it's argument",
+                expr.type() == Object);
+        const BSONObj args = expr.embeddedObject();
+
+        // used for input validation
+        bool haveVars = false;
+        bool haveIn = false;
+
+        VariableMap vars;
+        intrusive_ptr<Expression> subExpression;
+        BSONForEach(arg, args) {
+            if (str::equals(arg.fieldName(), "vars")) {
+                haveVars = true;
+                BSONForEach(variable, arg.embeddedObjectUserCheck()) {
+                    Variables::uassertValidNameForUserWrite(variable.fieldName());
+                    vars[variable.fieldName()] = parseOperand(&variable);
+                }
+            } else if (str::equals(arg.fieldName(), "in")) {
+                haveIn = true;
+                subExpression = parseOperand(&arg);
+            } else {
+                uasserted(16875, str::stream()
+                        << "Unrecognized parameter to $let: " << arg.fieldName());
+            }
+        }
+
+        uassert(16876, "Missing 'vars' parameter to $let",
+                haveVars);
+        uassert(16877, "Missing 'in' parameter to $let",
+                haveIn);
+
+        return new ExpressionLet(vars, subExpression);
+    }
+
+    ExpressionLet::ExpressionLet(const VariableMap& vars, intrusive_ptr<Expression> subExpression)
+        : _variables(vars)
+        , _subExpression(subExpression)
+    {}
+
+    intrusive_ptr<Expression> ExpressionLet::optimize() {
+        if (_variables.empty()) {
+            // we aren't binding any variables so just return the subexpression
+            return _subExpression->optimize();
+        }
+
+        for (VariableMap::iterator it=_variables.begin(), end=_variables.end(); it != end; ++it) {
+            it->second = it->second->optimize();
+        }
+
+        // TODO be smarter with constant "variables"
+        _subExpression = _subExpression->optimize();
+
+        return this;
+    }
+
+    Value ExpressionLet::serialize() const {
+        MutableDocument vars;
+        for (VariableMap::const_iterator it=_variables.begin(), end=_variables.end();
+                it != end; ++it) {
+            vars[it->first] = it->second->serialize();
+        }
+
+        return Value(DOC("$let" << DOC("vars" << vars.freeze()
+                                    << "in" << _subExpression->serialize())
+                                    ));
+    }
+
+    Value ExpressionLet::evaluateInternal(const Variables& originalVars) const {
+        Variables newVars = originalVars;
+        MutableDocument newRest(originalVars.rest);
+        for (VariableMap::const_iterator it=_variables.begin(), end=_variables.end();
+                it != end; ++it) {
+
+            const Value newVar = it->second->evaluateInternal(originalVars);
+
+            // Can't set ROOT (checked in parse())
+            if (it->first == "CURRENT") {
+                newVars.current = newVar;
+            } else {
+                newRest[it->first] = newVar;
+            }
+        }
+
+        newVars.rest = newRest.freeze();
+        return _subExpression->evaluateInternal(newVars);
+    }
+
+    void ExpressionLet::addDependencies(set<string>& deps, vector<string>* path) const {
+        for (VariableMap::const_iterator it=_variables.begin(), end=_variables.end();
+                it != end; ++it) {
+            it->second->addDependencies(deps);
+        }
+
+        // TODO be smarter when CURRENT is a bound variable
+        _subExpression->addDependencies(deps);
+    }
+
+
+    /* ------------------------- ExpressionMap ----------------------------- */
+
+    ExpressionMap::~ExpressionMap() {}
+
+    intrusive_ptr<ExpressionMap> ExpressionMap::parse(BSONElement expr) {
+        verify(str::equals(expr.fieldName(), "$map"));
+
+        uassert(16878, "$map only supports an object as it's argument",
+                expr.type() == Object);
+
+        // used for input validation
+        bool haveInput = false;
+        bool haveAs = false;
+        bool haveIn = false;
+
+        string varName;
+        intrusive_ptr<Expression> input;
+        intrusive_ptr<Expression> in;
+
+        const BSONObj args = expr.embeddedObject();
+        BSONForEach(arg, args) {
+            if (str::equals(arg.fieldName(), "input")) {
+                haveInput = true;
+                input = parseOperand(&arg);
+            } else if (str::equals(arg.fieldName(), "as")) {
+                haveAs = true;
+                varName = arg.str();
+                Variables::uassertValidNameForUserWrite(varName);
+            } else if (str::equals(arg.fieldName(), "in")) {
+                haveIn = true;
+                in = parseOperand(&arg);
+            } else {
+                uasserted(16879, str::stream()
+                        << "Unrecognized parameter to $map: " << arg.fieldName());
+            }
+        }
+
+        uassert(16880, "Missing 'input' parameter to $map",
+                haveInput);
+        uassert(16881, "Missing 'as' parameter to $map",
+                haveAs);
+        uassert(16882, "Missing 'in' parameter to $map",
+                haveIn);
+
+        return new ExpressionMap(varName, input, in);
+    }
+
+    ExpressionMap::ExpressionMap(const string& varName,
+                                 intrusive_ptr<Expression> input,
+                                 intrusive_ptr<Expression> each)
+        : _varName(varName)
+        , _input(input)
+        , _each(each)
+    {}
+
+    intrusive_ptr<Expression> ExpressionMap::optimize() {
+        // TODO handle when _input is constant
+        _input = _input->optimize();
+        _each = _each->optimize();
+        return this;
+    }
+
+    Value ExpressionMap::serialize() const {
+        return Value(DOC("$map" << DOC("input" << _input->serialize()
+                                    << "as" << _varName
+                                    << "in" << _each->serialize()
+                                    )));
+    }
+
+    Value ExpressionMap::evaluateInternal(const Variables& originalVars) const {
+        const Value inputVal = _input->evaluateInternal(originalVars);
+        if (inputVal.nullish())
+            return Value(BSONNULL);
+
+        uassert(16883, str::stream() << "input to $map must be an Array not "
+                                     << typeName(inputVal.getType()),
+                inputVal.getType() == Array);
+
+        const vector<Value>& input = inputVal.getArray();
+
+        if (input.empty())
+            return inputVal;
+
+        MutableDocument newRest(originalVars.rest);
+        vector<Value> output;
+        output.reserve(input.size());
+        for (size_t i=0; i < input.size(); i++) {
+            Variables newVars = originalVars;
+            if (_varName == "CURRENT") { // Can't set ROOT (checked in parse())
+                newVars.current = input[i];
+            } else {
+                newRest[_varName] = input[i];
+                newVars.rest = newRest.peek();
+            }
+
+            Value toInsert = _each->evaluateInternal(newVars);
+            if (toInsert.missing())
+                toInsert = Value(BSONNULL); // can't insert missing values into array
+
+            output.push_back(toInsert);
+        }
+
+        return Value::consume(output);
+    }
+
+    void ExpressionMap::addDependencies(set<string>& deps, vector<string>* path) const {
+        _input->addDependencies(deps);
+        _each->addDependencies(deps);
+    }
+
     /* ------------------------- ExpressionMillisecond ----------------------------- */
 
     ExpressionMillisecond::~ExpressionMillisecond() {
@@ -1738,11 +1967,12 @@ namespace mongo {
         ExpressionNary::addOperand(pExpression);
     }
 
-    Value ExpressionMillisecond::evaluate(const Document& document) const {
+    Value ExpressionMillisecond::evaluateInternal(const Variables& vars) const {
         checkArgCount(1);
-        Value date(vpOperand[0]->evaluate(document));
+        Value date(vpOperand[0]->evaluateInternal(vars));
         const int ms = date.coerceToDate() % 1000LL;
-        return Value::createInt( ms >= 0 ? ms : 1000 + ms );
+        // adding 1000 since dates before 1970 would have negative ms
+        return Value(ms >= 0 ? ms : 1000 + ms);
     }
 
     const char *ExpressionMillisecond::getOpName() const {
@@ -1769,11 +1999,11 @@ namespace mongo {
         ExpressionNary::addOperand(pExpression);
     }
 
-    Value ExpressionMinute::evaluate(const Document& pDocument) const {
+    Value ExpressionMinute::evaluateInternal(const Variables& vars) const {
         checkArgCount(1);
-        Value pDate(vpOperand[0]->evaluate(pDocument));
+        Value pDate(vpOperand[0]->evaluateInternal(vars));
         tm date = pDate.coerceToTm();
-        return Value::createInt(date.tm_min);
+        return Value(date.tm_min);
     }
 
     const char *ExpressionMinute::getOpName() const {
@@ -1800,10 +2030,10 @@ namespace mongo {
         ExpressionNary::addOperand(pExpression);
     }
 
-    Value ExpressionMod::evaluate(const Document& pDocument) const {
+    Value ExpressionMod::evaluateInternal(const Variables& vars) const {
         checkArgCount(2);
-        Value lhs = vpOperand[0]->evaluate(pDocument);
-        Value rhs = vpOperand[1]->evaluate(pDocument);
+        Value lhs = vpOperand[0]->evaluateInternal(vars);
+        Value rhs = vpOperand[1]->evaluateInternal(vars);
 
         BSONType leftType = lhs.getType();
         BSONType rightType = rhs.getType();
@@ -1822,19 +2052,19 @@ namespace mongo {
                 // Integer-valued double case is handled below
 
                 double left = lhs.coerceToDouble();
-                return Value::createDouble(fmod(left, right));
+                return Value(fmod(left, right));
             }
             else if (leftType == NumberLong || rightType == NumberLong) {
                 // if either is long, return long
                 long long left = lhs.coerceToLong();
                 long long rightLong = rhs.coerceToLong();
-                return Value::createLong(left % rightLong);
+                return Value(left % rightLong);
             }
 
             // lastly they must both be ints, return int
             int left = lhs.coerceToInt();
             int rightInt = rhs.coerceToInt();
-            return Value::createInt(left % rightInt);
+            return Value(left % rightInt);
         }
         else if (lhs.nullish() || rhs.nullish()) {
             return Value(BSONNULL);
@@ -1870,11 +2100,11 @@ namespace mongo {
         ExpressionNary::addOperand(pExpression);
     }
 
-    Value ExpressionMonth::evaluate(const Document& pDocument) const {
+    Value ExpressionMonth::evaluateInternal(const Variables& vars) const {
         checkArgCount(1);
-        Value pDate(vpOperand[0]->evaluate(pDocument));
+        Value pDate(vpOperand[0]->evaluateInternal(vars));
         tm date = pDate.coerceToTm();
-        return Value::createInt(date.tm_mon + 1); // MySQL uses 1-12 tm uses 0-11
+        return Value(date.tm_mon + 1); // MySQL uses 1-12 tm uses 0-11
     }
 
     const char *ExpressionMonth::getOpName() const {
@@ -1895,7 +2125,7 @@ namespace mongo {
         ExpressionNary() {
     }
 
-    Value ExpressionMultiply::evaluate(const Document& pDocument) const {
+    Value ExpressionMultiply::evaluateInternal(const Variables& vars) const {
         /*
           We'll try to return the narrowest possible result value.  To do that
           without creating intermediate Values, do the arithmetic for double
@@ -1908,7 +2138,7 @@ namespace mongo {
 
         const size_t n = vpOperand.size();
         for(size_t i = 0; i < n; ++i) {
-            Value val = vpOperand[i]->evaluate(pDocument);
+            Value val = vpOperand[i]->evaluateInternal(vars);
 
             if (val.numeric()) {
                 productType = Value::getWidestNumeric(productType, val.getType());
@@ -1926,9 +2156,9 @@ namespace mongo {
         }
 
         if (productType == NumberDouble)
-            return Value::createDouble(doubleProduct);
+            return Value(doubleProduct);
         else if (productType == NumberLong)
-            return Value::createLong(longProduct);
+            return Value(longProduct);
         else if (productType == NumberInt)
             return Value::createIntOrLong(longProduct);
         else
@@ -1962,11 +2192,11 @@ namespace mongo {
         ExpressionNary::addOperand(pExpression);
     }
 
-    Value ExpressionHour::evaluate(const Document& pDocument) const {
+    Value ExpressionHour::evaluateInternal(const Variables& vars) const {
         checkArgCount(1);
-        Value pDate(vpOperand[0]->evaluate(pDocument));
+        Value pDate(vpOperand[0]->evaluateInternal(vars));
         tm date = pDate.coerceToTm();
-        return Value::createInt(date.tm_hour);
+        return Value(date.tm_hour);
     }
 
     const char *ExpressionHour::getOpName() const {
@@ -1993,14 +2223,14 @@ namespace mongo {
         ExpressionNary::addOperand(pExpression);
     }
 
-    Value ExpressionIfNull::evaluate(const Document& pDocument) const {
+    Value ExpressionIfNull::evaluateInternal(const Variables& vars) const {
         checkArgCount(2);
 
-        Value pLeft(vpOperand[0]->evaluate(pDocument));
+        Value pLeft(vpOperand[0]->evaluateInternal(vars));
         if (!pLeft.nullish())
             return pLeft;
 
-        Value pRight(vpOperand[1]->evaluate(pDocument));
+        Value pRight(vpOperand[1]->evaluateInternal(vars));
         return pRight;
     }
 
@@ -2041,7 +2271,7 @@ namespace mongo {
           ExpressionConstant never refers to the argument Document.
         */
         if (constCount == n) {
-            Value pResult(evaluate(Document()));
+            Value pResult(evaluateInternal(Variables()));
             intrusive_ptr<Expression> pReplacement(
                 ExpressionConstant::create(pResult));
             return pReplacement;
@@ -2137,7 +2367,7 @@ namespace mongo {
               together before adding the result to the end of the expression
               operand vector.
             */
-            Value pResult(pConst->evaluate(Document()));
+            Value pResult(pConst->evaluateInternal(Variables()));
             pNew->addOperand(ExpressionConstant::create(pResult));
         }
 
@@ -2160,29 +2390,14 @@ namespace mongo {
         return NULL;
     }
 
-    void ExpressionNary::toBson(BSONObjBuilder *pBuilder, const char *pOpName) const {
+    Value ExpressionNary::serialize() const {
         const size_t nOperand = vpOperand.size();
-
+        vector<Value> array;
         /* build up the array */
-        BSONArrayBuilder arrBuilder (pBuilder->subarrayStart(pOpName));
-        for(size_t i = 0; i < nOperand; ++i)
-            vpOperand[i]->addToBsonArray(&arrBuilder);
-        arrBuilder.doneFast();
-    }
+        for(size_t i = 0; i < nOperand; i++)
+            array.push_back(vpOperand[i]->serialize());
 
-    void ExpressionNary::addToBsonObj(BSONObjBuilder *pBuilder,
-                                      StringData fieldName,
-                                      bool requireExpression) const {
-        BSONObjBuilder exprBuilder;
-        toBson(&exprBuilder, getOpName());
-        pBuilder->append(fieldName, exprBuilder.done());
-    }
-
-    void ExpressionNary::addToBsonArray(
-        BSONArrayBuilder *pBuilder) const {
-        BSONObjBuilder exprBuilder;
-        toBson(&exprBuilder, getOpName());
-        pBuilder->append(exprBuilder.done());
+        return Value(DOC(getOpName() << array));
     }
 
     void ExpressionNary::checkArgLimit(unsigned maxArgs) const {
@@ -2218,9 +2433,9 @@ namespace mongo {
         ExpressionNary::addOperand(pExpression);
     }
 
-    Value ExpressionNot::evaluate(const Document& pDocument) const {
+    Value ExpressionNot::evaluateInternal(const Variables& vars) const {
         checkArgCount(1);
-        Value pOp(vpOperand[0]->evaluate(pDocument));
+        Value pOp(vpOperand[0]->evaluateInternal(vars));
 
         bool b = pOp.coerceToBool();
         return Value(!b);
@@ -2244,10 +2459,10 @@ namespace mongo {
         ExpressionNary() {
     }
 
-    Value ExpressionOr::evaluate(const Document& pDocument) const {
+    Value ExpressionOr::evaluateInternal(const Variables& vars) const {
         const size_t n = vpOperand.size();
         for(size_t i = 0; i < n; ++i) {
-            Value pValue(vpOperand[i]->evaluate(pDocument));
+            Value pValue(vpOperand[i]->evaluateInternal(vars));
             if (pValue.coerceToBool())
                 return Value(true);
         }
@@ -2296,7 +2511,7 @@ namespace mongo {
           Evaluate and coerce the last argument to a boolean.  If it's true,
           then we can replace this entire expression.
          */
-        bool last = pLast->evaluate(Document()).coerceToBool();
+        bool last = pLast->evaluateInternal(Variables()).coerceToBool();
         if (last) {
             intrusive_ptr<ExpressionConstant> pFinal(
                 ExpressionConstant::create(Value(true)));
@@ -2345,11 +2560,11 @@ namespace mongo {
         ExpressionNary::addOperand(pExpression);
     }
 
-    Value ExpressionSecond::evaluate(const Document& pDocument) const {
+    Value ExpressionSecond::evaluateInternal(const Variables& vars) const {
         checkArgCount(1);
-        Value pDate(vpOperand[0]->evaluate(pDocument));
+        Value pDate(vpOperand[0]->evaluateInternal(vars));
         tm date = pDate.coerceToTm();
-        return Value::createInt(date.tm_sec);
+        return Value(date.tm_sec);
     }
 
     const char *ExpressionSecond::getOpName() const {
@@ -2379,32 +2594,27 @@ namespace mongo {
 
         Value ExpressionSplit::evaluate(const Document& pDocument) const {
             checkArgCount(2);
-            Value string1 = vpOperand[0]->evaluate(pDocument);
-            Value string2 = vpOperand[1]->evaluate(pDocument);
+            Value pString1(vpOperand[0]->evaluate(pDocument));
+            Value pString2(vpOperand[1]->evaluate(pDocument));
 
-            string toSplit = string1.coerceToString();
-            string pattern = string2.coerceToString();
+
+            string toSplit = pString1.coerceToString();
+            string pattern = pString2.coerceToString();
+
 
             string::size_type length = pattern.length();
             string::size_type limit = toSplit.length();
             vector<Value> result;
 
-            if ( pattern != "" && limit >= length ){
-                size_t current = 0;
-                string::size_type next = -1;
-                do{
-                    next = toSplit.find(pattern, current);
-                    Value toPush = Value::createString(toSplit.substr( current, next - current));
-                    result.push_back(toPush);
-                    current = next + length;
-
-                }while ( next != string::npos);
+            if ( pattern != "" ){
+				size_t current;
+				string::size_type next = -1;
+				do{
+					current = next + length;
+					next = toSplit.find_first_of(pattern, current);
+					result.push_back(Value::createString(toSplit.substr( current, next - current )));
+				}while ( next != string::npos);
             } else {
-            	result.push_back(Value::createString(toSplit));
-            }
-
-            //case the pattern is not found we return an array with the original value.
-            if ( result.size() == 0 ){
             	result.push_back(Value::createString(toSplit));
             }
 
@@ -2436,10 +2646,10 @@ namespace mongo {
         ExpressionNary::addOperand(pExpression);
     }
 
-    Value ExpressionStrcasecmp::evaluate(const Document& pDocument) const {
+    Value ExpressionStrcasecmp::evaluateInternal(const Variables& vars) const {
         checkArgCount(2);
-        Value pString1(vpOperand[0]->evaluate(pDocument));
-        Value pString2(vpOperand[1]->evaluate(pDocument));
+        Value pString1(vpOperand[0]->evaluateInternal(vars));
+        Value pString2(vpOperand[1]->evaluateInternal(vars));
 
         /* boost::iequals returns a bool not an int so strings must actually be allocated */
         string str1 = boost::to_upper_copy( pString1.coerceToString() );
@@ -2478,11 +2688,11 @@ namespace mongo {
         ExpressionNary::addOperand(pExpression);
     }
 
-    Value ExpressionSubstr::evaluate(const Document& pDocument) const {
+    Value ExpressionSubstr::evaluateInternal(const Variables& vars) const {
         checkArgCount(3);
-        Value pString(vpOperand[0]->evaluate(pDocument));
-        Value pLower(vpOperand[1]->evaluate(pDocument));
-        Value pLength(vpOperand[2]->evaluate(pDocument));
+        Value pString(vpOperand[0]->evaluateInternal(vars));
+        Value pLower(vpOperand[1]->evaluateInternal(vars));
+        Value pLength(vpOperand[2]->evaluateInternal(vars));
 
         string str = pString.coerceToString();
         uassert(16034, str::stream() << getOpName() <<
@@ -2502,9 +2712,9 @@ namespace mongo {
         if ( lower >= str.length() ) {
             // If lower > str.length() then string::substr() will throw out_of_range, so return an
             // empty string if lower is not a valid string index.
-            return Value::createString( "" );
+            return Value("");
         }
-        return Value::createString( str.substr(lower, length) );
+        return Value(str.substr(lower, length));
     }
 
     const char *ExpressionSubstr::getOpName() const {
@@ -2531,22 +2741,22 @@ namespace mongo {
         ExpressionNary::addOperand(pExpression);
     }
 
-    Value ExpressionSubtract::evaluate(const Document& pDocument) const {
+    Value ExpressionSubtract::evaluateInternal(const Variables& vars) const {
         checkArgCount(2);
-        Value lhs = vpOperand[0]->evaluate(pDocument);
-        Value rhs = vpOperand[1]->evaluate(pDocument);
+        Value lhs = vpOperand[0]->evaluateInternal(vars);
+        Value rhs = vpOperand[1]->evaluateInternal(vars);
             
         BSONType diffType = Value::getWidestNumeric(rhs.getType(), lhs.getType());
 
         if (diffType == NumberDouble) {
             double right = rhs.coerceToDouble();
             double left = lhs.coerceToDouble();
-            return Value::createDouble(left - right);
+            return Value(left - right);
         } 
         else if (diffType == NumberLong) {
             long long right = rhs.coerceToLong();
             long long left = lhs.coerceToLong();
-            return Value::createLong(left - right);
+            return Value(left - right);
         }
         else if (diffType == NumberInt) {
             long long right = rhs.coerceToLong();
@@ -2602,12 +2812,12 @@ namespace mongo {
         ExpressionNary::addOperand(pExpression);
     }
 
-    Value ExpressionToLower::evaluate(const Document& pDocument) const {
+    Value ExpressionToLower::evaluateInternal(const Variables& vars) const {
         checkArgCount(1);
-        Value pString(vpOperand[0]->evaluate(pDocument));
+        Value pString(vpOperand[0]->evaluateInternal(vars));
         string str = pString.coerceToString();
         boost::to_lower(str);
-        return Value::createString(str);
+        return Value(str);
     }
 
     const char *ExpressionToLower::getOpName() const {
@@ -2634,12 +2844,12 @@ namespace mongo {
         ExpressionNary::addOperand(pExpression);
     }
 
-    Value ExpressionToUpper::evaluate(const Document& pDocument) const {
+    Value ExpressionToUpper::evaluateInternal(const Variables& vars) const {
         checkArgCount(1);
-        Value pString(vpOperand[0]->evaluate(pDocument));
+        Value pString(vpOperand[0]->evaluateInternal(vars));
         string str(pString.coerceToString());
         boost::to_upper(str);
-        return Value::createString(str);
+        return Value(str);
     }
 
     const char *ExpressionToUpper::getOpName() const {
@@ -2665,9 +2875,9 @@ namespace mongo {
         ExpressionNary::addOperand(pExpression);
     }
 
-    Value ExpressionWeek::evaluate(const Document& pDocument) const {
+    Value ExpressionWeek::evaluateInternal(const Variables& vars) const {
         checkArgCount(1);
-        Value pDate(vpOperand[0]->evaluate(pDocument));
+        Value pDate(vpOperand[0]->evaluateInternal(vars));
         tm date = pDate.coerceToTm();
         int dayOfWeek = date.tm_wday;
         int dayOfYear = date.tm_yday;
@@ -2685,7 +2895,7 @@ namespace mongo {
             verify(int(str::toUnsigned(buf))==nextSundayWeek);
         }
 
-        return Value::createInt(nextSundayWeek);
+        return Value(nextSundayWeek);
     }
 
     const char *ExpressionWeek::getOpName() const {
@@ -2712,11 +2922,11 @@ namespace mongo {
         ExpressionNary::addOperand(pExpression);
     }
 
-    Value ExpressionYear::evaluate(const Document& pDocument) const {
+    Value ExpressionYear::evaluateInternal(const Variables& vars) const {
         checkArgCount(1);
-        Value pDate(vpOperand[0]->evaluate(pDocument));
+        Value pDate(vpOperand[0]->evaluateInternal(vars));
         tm date = pDate.coerceToTm();
-        return Value::createInt(date.tm_year + 1900); // tm_year is years since 1900
+        return Value(date.tm_year + 1900); // tm_year is years since 1900
     }
 
     const char *ExpressionYear::getOpName() const {
