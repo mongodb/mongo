@@ -90,13 +90,13 @@ __wt_cond_wait(WT_SESSION_IMPL *session, WT_CONDVAR *cond, long usecs)
 		 * Check pthread_cond_wait() return for EINTR, ETIME and
 		 * ETIMEDOUT, some systems return these errors.
 		 */
-		if (ret != 0 &&
-		    ret != EINTR &&
+		if (ret == EINTR ||
 #ifdef ETIME
-		    ret != ETIME &&
+		    ret == ETIME ||
 #endif
-		    ret != ETIMEDOUT)
-			WT_ERR(ret);
+		    ret == ETIMEDOUT)
+			ret = 0;
+		WT_ERR(ret);
 	}
 
 	cond->signalled = 0;

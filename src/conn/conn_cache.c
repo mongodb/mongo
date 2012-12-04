@@ -86,10 +86,9 @@ __wt_cache_create(WT_CONNECTION_IMPL *conn, const char *cfg[])
 
 	/*
 	 * We pull some values from the cache statistics (rather than have two
-	 * copies).   Set them.
+	 * copies).  Set them.
 	 */
 	__wt_cache_stats_update(conn, 0);
-
 	return (0);
 
 err:	__wt_cache_destroy(conn);
