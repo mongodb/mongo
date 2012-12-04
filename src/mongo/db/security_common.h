@@ -36,6 +36,8 @@ namespace mongo {
 
     class CmdAuthenticate : public Command {
     public:
+        static void disableCommand();
+
         virtual bool requiresAuth() { return false; }
         virtual bool logTheOp() {
             return false;
