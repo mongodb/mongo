@@ -18,12 +18,6 @@
 
 namespace mongo {
 
-    const string ConfigNS::mongos = "config.mongos";
-    BSONField<string> MongosFields::name("_id");
-    BSONField<Date_t> MongosFields::ping("ping");
-    BSONField<int> MongosFields::up("up");
-    BSONField<bool> MongosFields::waiting("waiting");
-
     const string ConfigNS::changelog = "config.changelog";
     BSONField<string> ChangelogFields::changeID("_id");
     BSONField<string> ChangelogFields::server("server");

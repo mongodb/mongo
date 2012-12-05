@@ -29,30 +29,11 @@ namespace mongo {
      * ConfigNS holds the names for all the metadata collections stored in a config server.
      */
     struct ConfigNS {
-        static const string mongos;
         static const string changelog;
         static const string locks;
         static const string lockpings;
 
         static const int version = 3;
-    };
-
-    /**
-     * MongosFields holds all the field names and types for the mongos collection.
-     */
-    struct MongosFields {
-
-        // "host:port" for this mongos
-        static BSONField<string> name;
-
-        // last time it was seen alive
-        static BSONField<Date_t> ping;
-
-        // uptime at the last ping
-        static BSONField<int> up;
-
-        // for testing purposes
-        static BSONField<bool> waiting;
     };
 
     /**

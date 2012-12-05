@@ -29,6 +29,7 @@
 #include "mongo/s/shard.h"
 #include "mongo/s/type_chunk.h"
 #include "mongo/s/type_collection.h"
+#include "mongo/s/type_mongos.h"
 #include "mongo/s/type_settings.h"
 #include "mongo/s/type_tags.h"
 
@@ -112,11 +113,11 @@ namespace mongo {
         WriteConcern w = conn.getWriteConcern();
         conn.setWriteConcern( W_NONE );
 
-        conn.update( ConfigNS::mongos ,
-                     BSON( MongosFields::name(_myid) ) ,
-                     BSON( "$set" << BSON( MongosFields::ping(jsTime()) <<
-                                           MongosFields::up((int)(time(0)-_started)) <<
-                                           MongosFields::waiting(waiting) ) ) ,
+        conn.update( MongosType::ConfigNS ,
+                     BSON( MongosType::name(_myid) ) ,
+                     BSON( "$set" << BSON( MongosType::ping(jsTime()) <<
+                                           MongosType::up((int)(time(0)-_started)) <<
+                                           MongosType::waiting(waiting) ) ) ,
                      true );
 
         conn.setWriteConcern( w);
