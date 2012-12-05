@@ -43,8 +43,8 @@ TEST(WindowsCommandLineConstruction, EmptyCommandLine) {
 }
 
 TEST(WindowsCommandLineConstruction, NothingToQuote) {
-    ASSERT_EQUALS("abc d e",
-                  constructUtf8WindowsCommandLine(svec("abc", "d", "e", NULL)));
+    ASSERT_EQUALS("abc d \"\" e",
+                  constructUtf8WindowsCommandLine(svec("abc", "d", "", "e", NULL)));
 }
 
 TEST(WindowsCommandLineConstruction, ThingsToQuote) {
@@ -56,4 +56,26 @@ TEST(WindowsCommandLineConstruction, ThingsToQuote) {
                   constructUtf8WindowsCommandLine(svec("a \\", "\\", NULL)));
     ASSERT_EQUALS("\"\\\\\\\\\\\"\"",
                   constructUtf8WindowsCommandLine(svec("\\\\\"", NULL)));
+}
+
+TEST(WindowsCommandLineConstruction, RegressionSERVER_7252) {
+    ASSERT_EQUALS("mongod \"--serviceName=My Service\" --serviceDescription \"My Service\" "
+                  "--serviceDisplayName \"My Service\" --dbpath C:\\mongo\\data\\config "
+                  "--port 20001 --logpath C:\\mongo\\logs\\mongo_config.log.txt "
+                  "--configsvr --service",
+                  constructUtf8WindowsCommandLine(svec("mongod",
+                                                       "--serviceName=My Service",
+                                                       "--serviceDescription",
+                                                       "My Service",
+                                                       "--serviceDisplayName",
+                                                       "My Service",
+                                                       "--dbpath",
+                                                       "C:\\mongo\\data\\config",
+                                                       "--port", "20001",
+                                                       "--logpath",
+                                                       "C:\\mongo\\logs\\mongo_config.log.txt",
+                                                       "--configsvr",
+                                                       "--service",
+                                                       NULL)));
+
 }

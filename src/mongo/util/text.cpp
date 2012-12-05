@@ -304,7 +304,10 @@ namespace mongo {
     // See "Parsing C++ Command-Line Arguments (C++)"
     // http://msdn.microsoft.com/en-us/library/windows/desktop/17w5ykft(v=vs.85).aspx
     static void quoteForWindowsCommandLine(const std::string& arg, std::ostream& os) {
-        if (arg.find_first_of(" \t\"") == std::string::npos) {
+        if (arg.empty()) {
+            os << "\"\"";
+        }
+        else if (arg.find_first_of(" \t\"") == std::string::npos) {
             os << arg;
         }
         else {
