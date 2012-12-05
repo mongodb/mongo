@@ -40,7 +40,7 @@ namespace mongo {
      *         instruct the server to await separate privilege-acquisition commands.
      *     "principal": The string name of the principal to authenticate, GSASL_AUTHID.
      *     "principalSource": The database target of the auth command, which identifies the location
-     *         of the credential information for the principal.  May be "$external" if credential
+     *         of the credential information for the principal.  May be "$sasl" if credential
      *         information is stored outside of the mongo cluster.
      *     "password": The password data, GSASL_PASSWORD.
      *     "serviceName": The GSSAPI service name to use.  Defaults to "mongodb".
@@ -117,7 +117,7 @@ namespace mongo {
     extern const char* const saslCommandPrincipalFieldName;
 
     /// Field containing the string identifier of the database containing credential information,
-    /// or "$external" if the credential information is stored outside of the mongo cluster.
+    /// or "$sasl" if the credential information is stored outside of the mongo cluster.
     extern const char* const saslCommandPrincipalSourceFieldName;
 
     /// Field overriding the FQDN of the hostname hosting the mongodb srevice in
