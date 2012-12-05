@@ -29,6 +29,7 @@
 #include "mongo/s/config.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/server.h"
+#include "mongo/s/type_changelog.h"
 #include "mongo/s/type_chunk.h"
 #include "mongo/s/type_collection.h"
 #include "mongo/s/type_database.h"
@@ -995,13 +996,13 @@ namespace mongo {
 
             // send a copy of the message to the log in case it doesn't manage to reach config.changelog
             Client* c = currentClient.get();
-            BSONObj msg = BSON( ChangelogFields::changeID(changeID) <<
-                                ChangelogFields::server(getHostNameCached()) <<
-                                ChangelogFields::clientAddr((c ? c->clientAddress(true) : "N/A")) <<
-                                ChangelogFields::time(jsTime()) <<
-                                ChangelogFields::what(what) <<
-                                ChangelogFields::ns(ns) <<
-                                ChangelogFields::details(detail) );
+            BSONObj msg = BSON( ChangelogType::changeID(changeID) <<
+                                ChangelogType::server(getHostNameCached()) <<
+                                ChangelogType::clientAddr((c ? c->clientAddress(true) : "N/A")) <<
+                                ChangelogType::time(jsTime()) <<
+                                ChangelogType::what(what) <<
+                                ChangelogType::ns(ns) <<
+                                ChangelogType::details(detail) );
             log() << "about to log metadata event: " << msg << endl;
 
             verify( _primary.ok() );
@@ -1013,7 +1014,7 @@ namespace mongo {
             static bool createdCapped = false;
             if ( ! createdCapped ) {
                 try {
-                    conn->get()->createCollection( ConfigNS::changelog , 1024 * 1024 * 10 , true );
+                    conn->get()->createCollection( ChangelogType::ConfigNS , 1024 * 1024 * 10 , true );
                 }
                 catch ( UserException& e ) {
                     LOG(1) << "couldn't create changelog (like race condition): " << e << endl;
@@ -1022,7 +1023,7 @@ namespace mongo {
                 createdCapped = true;
             }
 
-            conn->get()->insert( ConfigNS::changelog , msg );
+            conn->get()->insert( ChangelogType::ConfigNS , msg );
 
             conn->done();
 

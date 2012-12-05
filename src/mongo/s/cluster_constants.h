@@ -29,37 +29,9 @@ namespace mongo {
      * ConfigNS holds the names for all the metadata collections stored in a config server.
      */
     struct ConfigNS {
-        static const string changelog;
         static const string locks;
 
         static const int version = 3;
-    };
-
-    /**
-     * ChangelogFields holds all the field names and types for the changelog collection.
-     */
-    struct ChangelogFields {
-
-        // id for this change "<hostname>-<current_time>-<increment>"
-        static BSONField<string> changeID;
-
-        // hostname of server that we are making the change on.  Does not include port.
-        static BSONField<string> server;
-
-        // hostname:port of the client that made this change
-        static BSONField<string> clientAddr;
-
-        // time this change was made
-        static BSONField<Date_t> time;
-
-        // description of the change
-        static BSONField<string> what;
-
-        // database or collection this change applies to
-        static BSONField<string> ns;
-
-        // A BSONObj containing extra information about some operations
-        static BSONField<BSONObj> details;
     };
 
 } // namespace mongo

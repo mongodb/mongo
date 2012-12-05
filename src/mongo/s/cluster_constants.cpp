@@ -18,13 +18,4 @@
 
 namespace mongo {
 
-    const string ConfigNS::changelog = "config.changelog";
-    BSONField<string> ChangelogFields::changeID("_id");
-    BSONField<string> ChangelogFields::server("server");
-    BSONField<string> ChangelogFields::clientAddr("clientAddr");
-    BSONField<Date_t> ChangelogFields::time("time");
-    BSONField<string> ChangelogFields::what("what");
-    BSONField<string> ChangelogFields::ns("ns");
-    BSONField<BSONObj> ChangelogFields::details("details");
-
 } // namespace mongo
