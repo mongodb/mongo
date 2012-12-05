@@ -62,10 +62,8 @@ env.CppUnitTest( "stringutils_test", [ "util/stringutils_test.cpp" ],
                  LIBDEPS=["stringutils"] )
 
 env.StaticLibrary('bson', [
-        'bson/mutable/mutable_bson.cpp',
-        'bson/mutable/mutable_bson_builder.cpp',
-        'bson/mutable/mutable_bson_heap.cpp',
-        'bson/mutable/mutable_bson_internal.cpp',
+        'bson/mutable/document.cpp',
+        'bson/mutable/element.cpp',
         'bson/util/bson_extract.cpp',
         'util/safe_num.cpp',
         'bson/bson_validate.cpp',
@@ -84,12 +82,6 @@ env.CppUnitTest('builder_test', ['bson/util/builder_test.cpp'],
 
 env.CppUnitTest('mutable_bson_test', ['bson/mutable/mutable_bson_test.cpp'],
                  LIBDEPS=['bson'])
-
-env.CppUnitTest('mutable_bson_heap_test', ['bson/mutable/mutable_bson_heap_test.cpp'],
-                 LIBDEPS=['bson'])
-
-env.CppUnitTest('mutable_bson_builder_test', ['bson/mutable/mutable_bson_builder_test.cpp'],
-                LIBDEPS=['bson'])
 
 env.CppUnitTest('mutable_bson_algo_test', ['bson/mutable/mutable_bson_algo_test.cpp'],
                 LIBDEPS=['bson'])
