@@ -38,8 +38,10 @@ namespace mongo {
      *     "autoAuthorize": Truthy values tell the server to automatically acquire privileges on
      *         all resources after successful authentication, which is the default.  Falsey values
      *         instruct the server to await separate privilege-acquisition commands.
-     *     "database": The database target of the auth command.  Optional for GSSAPI/Kerberos.
      *     "principal": The string name of the principal to authenticate, GSASL_AUTHID.
+     *     "principalSource": The database target of the auth command, which identifies the location
+     *         of the credential information for the principal.  May be "$external" if credential
+     *         information is stored outside of the mongo cluster.
      *     "password": The password data, GSASL_PASSWORD.
      *     "serviceName": The GSSAPI service name to use.  Defaults to "mongodb".
      *     "serviceHostname": The GSSAPI hostname to use.  Defaults to the name of the remote host.
@@ -113,6 +115,10 @@ namespace mongo {
     /// Field containing the string identifier of the principal to authenticate in
     /// saslClientAuthenticate().
     extern const char* const saslCommandPrincipalFieldName;
+
+    /// Field containing the string identifier of the database containing credential information,
+    /// or "$external" if the credential information is stored outside of the mongo cluster.
+    extern const char* const saslCommandPrincipalSourceFieldName;
 
     /// Field overriding the FQDN of the hostname hosting the mongodb srevice in
     /// saslClientAuthenticate().
