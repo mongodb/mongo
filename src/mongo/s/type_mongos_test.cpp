@@ -14,8 +14,6 @@
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-//#include "mongo/pch.h"
-
 #include "mongo/bson/util/misc.h" // for Date_t
 #include "mongo/s/type_mongos.h"
 #include "mongo/unittest/unittest.h"
