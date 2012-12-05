@@ -286,11 +286,11 @@ namespace mongo {
             Document pDocument(pSource->getCurrent());
 
             /* get the _id value */
-            Value pId(pIdExpression->evaluate(pDocument));
+            Value pId = pIdExpression->evaluate(pDocument);
 
-            /* treat Undefined the same as NULL SERVER-4674 */
-            if (pId.getType() == Undefined)
-                pId = Value(jstNULL);
+            /* treat missing values the same as NULL SERVER-4674 */
+            if (pId.missing())
+                pId = Value(BSONNULL);
 
             /*
               Look for the _id value in the map; if it's not there, add a
@@ -349,8 +349,13 @@ namespace mongo {
         /* add the rest of the fields */
         for(size_t i = 0; i < n; ++i) {
             Value pValue((*pGroup)[i]->getValue());
-            if (pValue.getType() != Undefined)
+            if (pValue.missing()) {
+                // we return undefined in this case so return objects are predictable
+                out.addField(vFieldName[i], Value(BSONUndefined));
+            }
+            else {
                 out.addField(vFieldName[i], pValue);
+            }
         }
 
         return out.freeze();

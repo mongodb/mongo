@@ -29,7 +29,7 @@ namespace mongo {
 
         // do nothing with non numeric types
         if (!(rhsType == NumberInt || rhsType == NumberLong || rhsType == NumberDouble))
-            return Value(0);
+            return Value();
 
         // upgrade to the widest type required to hold the result
         totalType = Value::getWidestNumeric(totalType, rhsType);

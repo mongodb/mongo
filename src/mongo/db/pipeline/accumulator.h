@@ -121,6 +121,7 @@ namespace mongo {
             const intrusive_ptr<ExpressionContext> &pCtx);
 
     private:
+        mutable bool _haveFirst;
         AccumulatorFirst();
     };
 

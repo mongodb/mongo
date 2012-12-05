@@ -246,23 +246,20 @@ namespace mongo {
     }
 
     Value Value::operator[] (size_t index) const {
-        if (missing() || getType() != Array || index >= getArrayLength())
+        if (getType() != Array || index >= getArrayLength())
             return Value();
 
         return getArray()[index];
     }
 
     Value Value::operator[] (StringData name) const {
-        if (missing() || getType() != Object)
+        if (getType() != Object)
             return Value();
 
         return getDocument()[name];
     }
 
     BSONObjBuilder& operator << (BSONObjBuilderValueStream& builder, const Value& val) {
-        if (val.missing())
-            return builder.builder();
-
         switch(val.getType()) {
         case EOO:          return builder.builder(); // nothing appended
         case MinKey:       return builder << MINKEY;
@@ -319,9 +316,6 @@ namespace mongo {
     }
 
     bool Value::coerceToBool() const {
-        if (missing())
-            return false;
-
         // TODO Unify the implementation with BSONElement::trueValue().
         switch(getType()) {
         case CodeWScope:
@@ -364,6 +358,7 @@ namespace mongo {
         case NumberLong:
             return static_cast<int>(_storage.longValue);
 
+        case EOO:
         case jstNULL:
         case Undefined:
             return 0;
@@ -387,6 +382,7 @@ namespace mongo {
         case NumberLong:
             return _storage.longValue;
 
+        case EOO:
         case jstNULL:
         case Undefined:
             return 0;
@@ -410,6 +406,7 @@ namespace mongo {
         case NumberLong:
             return static_cast<double>(_storage.longValue);
 
+        case EOO:
         case jstNULL:
         case Undefined:
             return 0;
@@ -515,6 +512,7 @@ namespace mongo {
         case Date:
             return tmToISODateString(coerceToTm());
 
+        case EOO:
         case jstNULL:
         case Undefined:
             return "";
@@ -572,10 +570,8 @@ namespace mongo {
     int Value::compare(const Value& rL, const Value& rR) {
         // Note, this function needs to behave identically to BSON's compareElementValues().
         // Additionally, any changes here must be replicated in hash_combine().
-
-        // TODO: remove conditional after SERVER-6571
-        BSONType lType = rL.missing() ? EOO : rL.getType();
-        BSONType rType = rR.missing() ? EOO : rR.getType();
+        BSONType lType = rL.getType();
+        BSONType rType = rR.getType();
 
         int ret = lType == rType
                     ? 0 // fast-path common case
@@ -694,8 +690,7 @@ namespace mongo {
     }
 
     void Value::hash_combine(size_t &seed) const {
-        // TODO: remove conditional after SERVER-6571
-        BSONType type = missing() ? EOO : getType();
+        BSONType type = getType();
 
         boost::hash_combine(seed, canonicalizeBSONType(type));
 
@@ -802,6 +797,7 @@ namespace mongo {
             case NumberDouble:
             case NumberLong:
             case NumberInt:
+            case EOO:
             case jstNULL:
             case Undefined:
                 return NumberDouble;
@@ -817,6 +813,7 @@ namespace mongo {
 
             case NumberLong:
             case NumberInt:
+            case EOO:
             case jstNULL:
             case Undefined:
                 return NumberLong;
@@ -834,6 +831,7 @@ namespace mongo {
                 return NumberLong;
 
             case NumberInt:
+            case EOO:
             case jstNULL:
             case Undefined:
                 return NumberInt;
@@ -842,7 +840,7 @@ namespace mongo {
                 break;
             }
         }
-        else if ((lType == jstNULL) || (lType == Undefined)) {
+        else if (lType == EOO || lType == jstNULL || lType == Undefined) {
             switch(rType) {
             case NumberDouble:
                 return NumberDouble;
@@ -919,8 +917,6 @@ namespace mongo {
     }
 
     ostream& operator << (ostream& out, const Value& val) {
-        if (val.missing()) return out << "MISSING";
-
         switch(val.getType()) {
         case EOO: return out << "MISSING";
         case MinKey: return out << "MinKey";

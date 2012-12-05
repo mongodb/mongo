@@ -946,7 +946,7 @@ namespace mongo {
 
         double right = pRight.coerceToDouble();
         if (right == 0)
-            return Value(Undefined);
+            return Value(BSONUndefined);
 
         double left = pLeft.coerceToDouble();
 
@@ -1075,14 +1075,12 @@ namespace mongo {
                     continue;
 
                 /*
-                   Don't add non-existent values (note:  different from NULL);
+                   Don't add non-existent values (note:  different from NULL or Undefined);
                    this is consistent with existing selection syntax which doesn't
                    force the appearance of non-existent fields.
                    */
-                // TODO make missing distinct from Undefined
-                if (pValue.getType() != Undefined)
+                if (!pValue.missing())
                     out.addField(field.first, pValue);
-
 
                 continue;
             }
@@ -1141,11 +1139,11 @@ namespace mongo {
             Value pValue(it->second->evaluate(rootDoc));
 
             /*
-              Don't add non-existent values (note:  different from NULL);
+              Don't add non-existent values (note:  different from NULL or Undefined);
               this is consistent with existing selection syntax which doesn't
               force the appearnance of non-existent fields.
             */
-            if (pValue.getType() == Undefined)
+            if (pValue.missing())
                 continue;
 
             // don't add field if nothing was found in the subobject
@@ -1310,7 +1308,7 @@ namespace mongo {
 
         /* if the field doesn't exist, quit with an undefined value */
         if (pValue.missing())
-            return Value(Undefined);
+            return Value();
 
         /* if we've hit the end of the path, stop */
         ++index;
@@ -1320,10 +1318,10 @@ namespace mongo {
         /*
           We're diving deeper.  If the value was null, return null.
         */
-        BSONType type = pValue.getType();
-        if ((type == Undefined) || (type == jstNULL))
-            return Value(Undefined);
+        if (pValue.nullish())
+            return Value();
 
+        BSONType type = pValue.getType();
         if (type == Object) {
             /* extract from the next level down */
             return evaluatePath(index, pathLength, pValue.getDocument());
@@ -1338,8 +1336,7 @@ namespace mongo {
             const vector<Value>& input = pValue.getArray();
             for (size_t i=0; i < input.size(); i++) {
                 const Value& item = input[i];
-                BSONType iType = item.getType();
-                if ((iType == Undefined) || (iType == jstNULL)) {
+                if (item.nullish()) {
                     result.push_back(item);
                     continue;
                 }
@@ -1349,15 +1346,15 @@ namespace mongo {
                         "' along the dotted path '" <<
                         fieldPath.getPath(false) <<
                         "' is not an object, and cannot be navigated",
-                        iType == Object);
+                        item.getType() == Object);
 
                 result.push_back(evaluatePath(index, pathLength, item.getDocument()));
             }
 
             return Value::createArray(result);
         }
-        // subdocument field does not exist, return undefined
-        return Value(Undefined);
+        // subdocument field does not exist
+        return Value();
     }
 
     Value ExpressionFieldPath::evaluate(const Document& pDocument) const {
@@ -1745,20 +1742,21 @@ namespace mongo {
         Value pLeft(vpOperand[0]->evaluate(pDocument));
         Value pRight(vpOperand[1]->evaluate(pDocument));
 
+        // pass along nullish values
+        if (pLeft.nullish())
+            return pLeft;
+        if (pRight.nullish())
+            return pRight;
+
         BSONType leftType = pLeft.getType();
         BSONType rightType = pRight.getType();
 
         uassert(16374, "$mod does not support dates", leftType != Date && rightType != Date);
 
-        // pass along jstNULLs and Undefineds
-        if (leftType == jstNULL || leftType == Undefined)
-            return pLeft;
-        if (rightType == jstNULL || rightType == Undefined)
-            return pRight;
         // ensure we aren't modding by 0
         double right = pRight.coerceToDouble();
         if (right == 0)
-            return Value(Undefined);
+            return Value(BSONUndefined);
 
         if (leftType == NumberDouble) {
             // left is a double, return a double
@@ -1927,10 +1925,9 @@ namespace mongo {
 
     Value ExpressionIfNull::evaluate(const Document& pDocument) const {
         checkArgCount(2);
-        Value pLeft(vpOperand[0]->evaluate(pDocument));
-        BSONType leftType = pLeft.getType();
 
-        if ((leftType != Undefined) && (leftType != jstNULL))
+        Value pLeft(vpOperand[0]->evaluate(pDocument));
+        if (!pLeft.nullish())
             return pLeft;
 
         Value pRight(vpOperand[1]->evaluate(pDocument));

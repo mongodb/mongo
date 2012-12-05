@@ -25,11 +25,10 @@ namespace mongo {
         verify(vpOperand.size() == 1);
         Value prhs(vpOperand[0]->evaluate(pDocument));
 
-        if (prhs.getType() == Undefined) {
-            /* nothing to add to the array */
-        }
-        else if (!pCtx->getDoingMerge()) {
-            vpValue.push_back(prhs);
+        if (!pCtx->getDoingMerge()) {
+            if (!prhs.missing()) {
+                vpValue.push_back(prhs);
+            }
         }
         else {
             /*

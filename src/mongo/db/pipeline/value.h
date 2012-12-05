@@ -103,9 +103,14 @@ namespace mongo {
          */
         bool missing() const { return _storage.type == EOO; }
 
-        /** Get the BSON type of the field.
-         *  Warning: currently asserts if missing. This will probably change in the future.
-         */
+        /// true if missing() or type is jstNULL or Undefined
+        bool nullish() const {
+            return missing()
+                || _storage.type == jstNULL
+                || _storage.type == Undefined;
+        }
+
+        /// Get the BSON type of the field.
         BSONType getType() const { return _storage.bsonType(); }
 
         /** Exact type getters.

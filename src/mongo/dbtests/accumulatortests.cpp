@@ -359,13 +359,13 @@ namespace AccumulatorTests {
             }
         };
         
-        /* The accumulator evaluates one document with the field missing retains undefined. */
+        /* The accumulator evaluates one document with the field missing, returns missing value. */
         class Missing : public Base {
         public:
             void run() {
                 createAccumulator();
                 accumulator()->evaluate( fromjson( "{}" ) );
-                ASSERT_EQUALS( Undefined, accumulator()->getValue().getType() );
+                ASSERT_EQUALS( EOO, accumulator()->getValue().getType() );
             }
         };
         
@@ -380,14 +380,14 @@ namespace AccumulatorTests {
             }
         };
         
-        /* The accumulator evaluates two documents and retains the undefined value in the first. */
+        /* The accumulator evaluates two documents and retains the missing value in the first. */
         class FirstMissing : public Base {
         public:
             void run() {
                 createAccumulator();
                 accumulator()->evaluate( fromjson( "{}" ) );
                 accumulator()->evaluate( fromjson( "{a:7}" ) );
-                ASSERT_EQUALS( Undefined, accumulator()->getValue().getType() );
+                ASSERT_EQUALS( EOO, accumulator()->getValue().getType() );
             }
         };
         
@@ -433,7 +433,7 @@ namespace AccumulatorTests {
             void run() {
                 createAccumulator();
                 accumulator()->evaluate( fromjson( "{}" ) );
-                ASSERT_EQUALS( Undefined, accumulator()->getValue().getType() );
+                ASSERT_EQUALS( EOO , accumulator()->getValue().getType() );
             }
         };
         
@@ -455,7 +455,7 @@ namespace AccumulatorTests {
                 createAccumulator();
                 accumulator()->evaluate( fromjson( "{b:7}" ) );
                 accumulator()->evaluate( fromjson( "{}" ) );
-                ASSERT_EQUALS( Undefined, accumulator()->getValue().getType() );
+                ASSERT_EQUALS( EOO , accumulator()->getValue().getType() );
             }
         };
         
@@ -501,7 +501,7 @@ namespace AccumulatorTests {
             void run() {
                 createAccumulator();
                 accumulator()->evaluate( fromjson( "{}" ) );
-                ASSERT_EQUALS( Undefined, accumulator()->getValue().getType() );
+                ASSERT_EQUALS( EOO , accumulator()->getValue().getType() );
             }
         };
         
@@ -523,7 +523,7 @@ namespace AccumulatorTests {
                 createAccumulator();
                 accumulator()->evaluate( fromjson( "{c:7}" ) );
                 accumulator()->evaluate( fromjson( "{}" ) );
-                ASSERT_EQUALS( Undefined, accumulator()->getValue().getType() );
+                ASSERT_EQUALS( 7 , accumulator()->getValue().getInt() );
             }
         };
         
@@ -569,7 +569,7 @@ namespace AccumulatorTests {
             void run() {
                 createAccumulator();
                 accumulator()->evaluate( fromjson( "{}" ) );
-                ASSERT_EQUALS( Undefined, accumulator()->getValue().getType() );
+                ASSERT_EQUALS( EOO, accumulator()->getValue().getType() );
             }
         };
         

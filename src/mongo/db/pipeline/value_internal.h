@@ -171,7 +171,6 @@ namespace mongo {
         Document getDocument() const;
 
         BSONType bsonType() const {
-            verify(type != EOO);
             return BSONType(type);
         }
 
