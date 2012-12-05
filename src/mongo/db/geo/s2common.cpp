@@ -93,7 +93,20 @@ namespace mongo {
         return queryBuilder.obj();
     }
 
-    bool GeoQueryField::parseFrom(BSONObj& obj) {
+    string QueryGeometry::toString() const {
+        stringstream ss;
+        ss << "field = " << field;
+        if (NULL != cell) {
+            ss << ", cell";
+        } else if (NULL != line) {
+            ss << ", line = ";
+        } else if (NULL != polygon) {
+            ss << ", polygon = ";
+        }
+        return ss.str();
+    }
+
+    bool QueryGeometry::parseFrom(const BSONObj& obj) {
         if (GeoJSONParser::isPolygon(obj)) {
             // We can't really pass these things around willy-nilly except by ptr.
             polygon = new S2Polygon();
@@ -110,8 +123,8 @@ namespace mongo {
         return true;
     }
 
-    // Does this (GeoQueryField) intersect the provided data?
-    bool GeoQueryField::intersectsPoint(const S2Cell &otherPoint) {
+    // Does this (QueryGeometry) intersect the provided data?
+    bool QueryGeometry::intersectsPoint(const S2Cell &otherPoint) {
         if (NULL != cell) {
             return cell->MayIntersect(otherPoint);
         } else if (NULL != line) {
@@ -121,7 +134,7 @@ namespace mongo {
         }
     }
 
-    bool GeoQueryField::intersectsLine(const S2Polyline& otherLine) {
+    bool QueryGeometry::intersectsLine(const S2Polyline& otherLine) {
         if (NULL != cell) {
             return otherLine.MayIntersect(*cell);
         } else if (NULL != line) {
@@ -138,7 +151,7 @@ namespace mongo {
         return false;
     }
 
-    bool GeoQueryField::intersectsPolygon(const S2Polygon& otherPolygon) {
+    bool QueryGeometry::intersectsPolygon(const S2Polygon& otherPolygon) {
         if (NULL != cell) {
             return otherPolygon.MayIntersect(*cell);
         } else if (NULL != line) {
@@ -154,7 +167,10 @@ namespace mongo {
         }
     }
 
-    S2Point GeoQueryField::getCentroid() const {
+    S2Point QueryGeometry::getCentroid() const {
+        // TODO(hk): If the projection is planar this isn't valid.  Fix this
+        // when we actually use planar projections, or remove planar projections
+        // from the code.
         if (NULL != cell) {
             return cell->GetCenter();
         } else if (NULL != line) {
@@ -165,7 +181,7 @@ namespace mongo {
         }
     }
 
-    const S2Region& GeoQueryField::getRegion() const {
+    const S2Region& QueryGeometry::getRegion() const {
         if (NULL != cell) {
             return *cell;
         } else if (NULL != line) {
@@ -176,7 +192,7 @@ namespace mongo {
         }
     }
 
-    void GeoQueryField::free() {
+    void QueryGeometry::free() {
         if (NULL != cell) {
             delete cell;
         } else if (NULL != line) {

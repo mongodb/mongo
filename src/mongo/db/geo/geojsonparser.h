@@ -25,22 +25,43 @@ class S2Polyline;
 class S2Polygon;
 
 namespace mongo {
+    // TODO: move this to geoparser, perhaps?
     // This class parses a subset of GeoJSON and creates S2 shapes from it.
     // See http://geojson.org/geojson-spec.html for the spec.
+    //
+    // This class also parses the ad-hoc geo formats that MongoDB introduced.
     //
     // We assume that if you're trying to parse something, you know it's valid.
     // This means don't call parsePoint(x) unless you're sure isPoint(x).
     // Perhaps there should just be parsePoint that returns bool and calls isPoint itself?
     class GeoJSONParser {
     public:
+        // GeoJSON routines
+        static bool isGeoJSONPoint(const BSONObj &obj);
+        static void parseGeoJSONPoint(const BSONObj &obj, S2Point *out);
+        static void parseGeoJSONPoint(const BSONObj &obj, S2Cell *out);
+
+        static bool isGeoJSONLineString(const BSONObj &obj);
+        static void parseGeoJSONLineString(const BSONObj &obj, S2Polyline *out);
+
+        static bool isGeoJSONPolygon(const BSONObj &obj);
+        static void parseGeoJSONPolygon(const BSONObj &obj, S2Polygon *out);
+
+        static bool isLegacyPoint(const BSONObj &obj);
+        static void parseLegacyPoint(const BSONObj &obj, S2Point *out);
+        // There are no legacy lines.
+        static bool isLegacyPolygon(const BSONObj &obj);
+        static void parseLegacyPolygon(const BSONObj &obj, S2Polygon *out);
+
+        // Check to see if it's GeoJSON or if it's legacy geo.
         static bool isPoint(const BSONObj &obj);
-        static void parsePoint(const BSONObj &obj, S2Point *out);
-        static void parsePoint(const BSONObj &obj, S2Cell *out);
-
         static bool isLineString(const BSONObj &obj);
-        static void parseLineString(const BSONObj &obj, S2Polyline *out);
-
         static bool isPolygon(const BSONObj &obj);
-        static void parsePolygon(const BSONObj &obj, S2Polygon *out);
+
+        // Try to parse GeoJSON, then try legacy format, return true if either succeed.
+        static bool parsePoint(const BSONObj &obj, S2Point *out);
+        static bool parsePoint(const BSONObj &obj, S2Cell *out);
+        static bool parseLineString(const BSONObj &obj, S2Polyline *out);
+        static bool parsePolygon(const BSONObj &obj, S2Polygon *out);
     };
 }  // namespace mongo

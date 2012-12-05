@@ -29,7 +29,7 @@ namespace mongo {
     class S2Cursor : public Cursor {
     public:
         S2Cursor(const BSONObj &keyPattern, const IndexDetails* details, const BSONObj &query,
-                 const vector<GeoQueryField> &regions, const S2IndexingParams &params,
+                 const vector<QueryGeometry> &regions, const S2IndexingParams &params,
                  int numWanted);
         virtual ~S2Cursor(); 
         virtual CoveredIndexMatcher *matcher() const;
@@ -64,7 +64,7 @@ namespace mongo {
         // The query with the geo stuff taken out.  We use this with a matcher.
         BSONObj _filteredQuery;
         // What geo regions are we looking for?
-        vector<GeoQueryField> _fields;
+        vector<QueryGeometry> _fields;
         // We use this for matching non-GEO stuff.
         shared_ptr<CoveredIndexMatcher> _matcher;
         // How were the keys created?  We need this to search for the right stuff.

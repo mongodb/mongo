@@ -25,7 +25,7 @@
 
 namespace mongo {
     S2NearCursor::S2NearCursor(const BSONObj &keyPattern, const IndexDetails *details,
-                       const BSONObj &query, const vector<GeoQueryField> &fields,
+                       const BSONObj &query, const vector<QueryGeometry> &fields,
                        const S2IndexingParams &params, int numWanted, double maxDistance)
         : _details(details), _fields(fields), _params(params), _keyPattern(keyPattern),
           _numToReturn(numWanted), _maxDistance(maxDistance) {
@@ -107,6 +107,7 @@ namespace mongo {
             _returned.insert(_results.top().loc);
             _results.pop();
             --_numToReturn;
+            ++_nscanned;
             // Safe to grow the radius as we've returned everything in our shell.  We don't do this
             // check outside of !_results.empty() because we could have results, yield, dump them
             // (_results would be empty), then need to recreate them w/the same radii.  In that case
@@ -128,7 +129,7 @@ namespace mongo {
         _params.configureCoverer(&coverer);
         // Step 1: Make the monstrous BSONObj that describes what keys we want.
         for (size_t i = 0; i < _fields.size(); ++i) {
-            const GeoQueryField &field = _fields[i];
+            const QueryGeometry &field = _fields[i];
             S2Point center = field.getCentroid();
             BSONObj inExpr;
             // Caps are inclusive and inverting a cap includes the border.  This means that our
@@ -168,7 +169,6 @@ namespace mongo {
             // Do the actual search through this annulus.
             size_t considered = 0;
             for (; cursor->ok(); cursor->advance()) {
-                ++_nscanned;
                 ++considered;
 
                 MatchDetails details;
@@ -181,44 +181,34 @@ namespace mongo {
                 double minMatchingDistance = 1e20;
 
                 // Calculate the distance from our query point(s) to the geo field(s).
+                // For each geo field in the query...
                 for (size_t i = 0; i < _fields.size(); ++i) {
-                    const GeoQueryField& field = _fields[i];
+                    const QueryGeometry& field = _fields[i];
 
+                    // Get all the fields with that name from the document.
                     BSONElementSet geoFieldElements;
-                    indexedObj.getFieldsDotted(field.field, geoFieldElements);
+                    indexedObj.getFieldsDotted(field.field, geoFieldElements, false);
                     if (geoFieldElements.empty()) { continue; }
 
-                    S2Point us = field.getCentroid();
+                    // For each field with that name in the document...
                     for (BSONElementSet::iterator oi = geoFieldElements.begin();
                             oi != geoFieldElements.end(); ++oi) {
-                        const BSONObj &geoObj = oi->Obj();
-                        double dist = -1;
-                        S2Point them;
-                        if (GeoJSONParser::isPolygon(geoObj)) {
-                            S2Polygon shape;
-                            GeoJSONParser::parsePolygon(geoObj, &shape);
-                            them = shape.Project(us);
-                        } else if (GeoJSONParser::isLineString(geoObj)) {
-                            S2Polyline shape;
-                            GeoJSONParser::parseLineString(geoObj, &shape);
-                            int tmp;
-                            them = shape.Project(us, &tmp);
-                        } else if (GeoJSONParser::isPoint(geoObj)) {
-                            S2Cell point;
-                            GeoJSONParser::parsePoint(geoObj, &point);
-                            them = point.GetCenter();
-                        }
-                        S1Angle angle(us, them);
-                        dist = angle.radians() * _params.radius;
+                        if (!oi->isABSONObj()) { continue; }
+                        double dist = distanceBetween(field, oi->Obj());
+                        // If it satisfies our distance criteria...
                         if (dist >= _innerRadius && dist <= _outerRadius) {
+                            // Success!  For this field.
                             ++geoFieldsInRange;
                             minMatchingDistance = min(dist, minMatchingDistance);
                         }
                     }
                 }
+                // If all the geo query fields had something in range
                 if (_fields.size() == geoFieldsInRange) {
+                    // The result is valid.  We have to de-dup ourselves here.
                     if (_returned.end() == _returned.find(cursor->currLoc())) {
-                        _results.push(Result(cursor->currLoc(), cursor->currKey(), minMatchingDistance));
+                        _results.push(Result(cursor->currLoc(), cursor->currKey(),
+                                             minMatchingDistance));
                     }
                 }
             }
@@ -231,5 +221,26 @@ namespace mongo {
                  && _innerRadius < _outerRadius
                  && _innerRadius < M_PI  * _params.radius);
         // TODO: consider shrinking _radiusIncrement if _results.size() meets some criteria.
+    }
+
+    double S2NearCursor::distanceBetween(const QueryGeometry &field, const BSONObj &obj) {
+        S2Point us = field.getCentroid();
+        S2Point them;
+
+        S2Polygon polygon;
+        S2Polyline line;
+        S2Cell point;
+        if (GeoJSONParser::parsePolygon(obj, &polygon)) {
+            them = polygon.Project(us);
+        } else if (GeoJSONParser::parseLineString(obj, &line)) {
+            int tmp;
+            them = line.Project(us, &tmp);
+        } else if (GeoJSONParser::parsePoint(obj, &point)) {
+            them = point.GetCenter();
+        } else {
+            warning() << "unknown geometry: " << obj.toString();
+        }
+        S1Angle angle(us, them);
+        return angle.radians() * _params.radius;
     }
 }  // namespace mongo
