@@ -68,6 +68,8 @@ namespace mongo {
             DBException::traceExceptions = true;
             // Make all connections redirect to the direct client
             ConnectionString::setConnectionHook(this);
+            // Disable the lock pinger
+            setLockPingerEnabled(false);
 
             // Create the default config database before querying, necessary for direct connections
             client().dropDatabase("config");
@@ -79,6 +81,8 @@ namespace mongo {
             DBException::traceExceptions = false;
             // Make all connections redirect to the direct client
             ConnectionString::setConnectionHook(NULL);
+            // Reset the pinger
+            setLockPingerEnabled(true);
         }
 
         CustomDirectClient _client;

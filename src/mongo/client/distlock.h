@@ -182,6 +182,12 @@ namespace mongo {
 
     };
 
+    // Helper functions for tests, allows us to turn the creation of a lock pinger on and off.
+    // *NOT* thread-safe
+    bool isLockPingerEnabled();
+    void setLockPingerEnabled(bool enabled);
+
+
     class dist_lock_try {
     public:
 
