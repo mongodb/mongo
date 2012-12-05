@@ -19,10 +19,6 @@
 
 namespace mongo {
 
-    FieldRef::~FieldRef() {
-        clear();
-    }
-
     void FieldRef::parse(const StringData& dottedField) {
         if (dottedField.size() == 0) {
             return;
@@ -30,7 +26,7 @@ namespace mongo {
 
         // We guarantee that accesses through getPart() will be valid while 'this' is. So we
         // take a copy. We're going to be "chopping" up the copy into c-strings.
-        _fieldBase.reset(new char[dottedField.size()]+1);
+        _fieldBase.reset(new char[dottedField.size()+1]);
         memcpy(_fieldBase.get(), dottedField.data(), dottedField.size());
         _fieldBase[dottedField.size()] = '\0';
 
@@ -59,23 +55,16 @@ namespace mongo {
     void FieldRef::setPart(size_t i, const StringData& part) {
         dassert(i < _size);
 
-        // If the part was replaced before, we can dispose of its memory.
-        StringData currPart = getPart(i);
-        PartsSet::iterator it = _replacements.find(currPart.data());
-        if (it != _replacements.end()) {
-            delete [] *it;
-            _replacements.erase(it);
+        if (_replacements.size() != _size) {
+            _replacements.resize(_size);
         }
 
-        char* repl = new char[part.size()+1];
-        memcpy(repl, part.data(), part.size());
-        repl[part.size()] = '\0';
-        _replacements.insert(repl);
+        _replacements[i] = part.toString();
         if (i < kReserveAhead) {
-            _fixed[i] = PartRef(repl, part.size());
+            _fixed[i] = PartRef(_replacements[i].c_str(), part.size());
         }
         else {
-            _variable[getIndex(i)] = PartRef(repl, part.size());
+            _variable[getIndex(i)] = PartRef(_replacements[i].c_str(), part.size());
         }
     }
 
@@ -104,9 +93,6 @@ namespace mongo {
         _size = 0;
         _variable.clear();
         _fieldBase.reset();
-        for (PartsSet::iterator it = _replacements.begin(); it != _replacements.end(); ++it) {
-            delete [] *it;
-        }
         _replacements.clear();
     }
 
@@ -121,6 +107,16 @@ namespace mongo {
             res.append(1, '.');
             StringData part = getPart(i);
             res.append(part.data(), part.size());
+        }
+        return res;
+    }
+
+    size_t FieldRef::numReplaced() const {
+        size_t res = 0;
+        for (size_t i = 0; i < _replacements.size(); i++) {
+            if (!_replacements[i].empty()) {
+                res++;
+            }
         }
         return res;
     }

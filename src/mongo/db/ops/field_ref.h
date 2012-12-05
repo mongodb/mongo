@@ -22,7 +22,6 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/string_data.h"
-#include "mongo/platform/unordered_set.h"
 
 namespace mongo {
 
@@ -45,7 +44,7 @@ namespace mongo {
          * Field parts accessed through getPart() calls no longer would be valid, after the
          * destructor ran.
          */
-        ~FieldRef();
+        ~FieldRef() {}
 
         /**
          * Builds a field path out of each field part in 'dottedField'.
@@ -57,11 +56,6 @@ namespace mongo {
          * undefined otherwise.
          */
         void setPart(size_t i, const StringData& part);
-
-        /**
-         * Returns the new number of parts after appending 'part' to this field path.
-         */
-        size_t appendPart(const StringData& part);
 
         /**
          * Returns the 'i-th' field part. Assumes i < size(). Behavior is undefined otherwise.
@@ -92,11 +86,9 @@ namespace mongo {
          * Returns the number of fields parts that were replaced so far. Replacing the same
          * fields several times only counts for 1.
          */
-        size_t numReplaced() const { return _replacements.size(); }
+        size_t numReplaced() const;
 
     private:
-        typedef unordered_set<const char*> PartsSet;
-
         // Dotted fields are most often not longer than three parts. We use a mixed structure
         // here that will not require any extra memory allocation when that is the case. And
         // handle larger dotted fields if it is. The idea is not to penalize the common case
@@ -119,10 +111,16 @@ namespace mongo {
 
         // Areas that _fixed and _variable point to.
         boost::scoped_array<char> _fieldBase;        // concatenation of null-terminated parts
-        PartsSet _replacements;                      // added with the setPart call; owned here
+        std::vector<std::string> _replacements;      // added with the setPart call
 
         /** Converts the field part index to the variable part equivalent */
         size_t getIndex(size_t i) const { return i-kReserveAhead; }
+
+        /**
+         * Returns the new number of parts after appending 'part' to this field path. It
+         * assumes that 'part' is pointing to an internally allocated area.
+         */
+        size_t appendPart(const StringData& part);
 
     };
 
