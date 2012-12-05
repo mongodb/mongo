@@ -57,6 +57,10 @@ namespace mongo {
     ActionSet dbAdminRoleActions;
     ActionSet serverAdminRoleActions;
     ActionSet clusterAdminRoleActions;
+    // Can only be performed by internal connections.  Nothing ever explicitly grants these actions,
+    // but they're included when calling addAllActions on an ActionSet, which is how internal
+    // connections are granted their privileges.
+    ActionSet internalActions;
 
     // This sets up the system role ActionSets.  This is what determines what actions each role
     // is authorized to perform
@@ -147,6 +151,22 @@ namespace mongo {
         clusterAdminRoleActions.addAction(ActionType::splitChunk);
         clusterAdminRoleActions.addAction(ActionType::splitVector);
         clusterAdminRoleActions.addAction(ActionType::unsetSharding);
+
+        // Internal commands
+        internalActions.addAction(ActionType::handshake);
+        internalActions.addAction(ActionType::mapReduceShardedFinish);
+        internalActions.addAction(ActionType::replSetElect);
+        internalActions.addAction(ActionType::replSetFresh);
+        internalActions.addAction(ActionType::replSetGetRBID);
+        internalActions.addAction(ActionType::replSetHeartbeat);
+        internalActions.addAction(ActionType::writebacklisten);
+        internalActions.addAction(ActionType::writeBacksQueued);
+        internalActions.addAction(ActionType::_migrateClone);
+        internalActions.addAction(ActionType::_recvChunkAbort);
+        internalActions.addAction(ActionType::_recvChunkCommit);
+        internalActions.addAction(ActionType::_recvChunkStart);
+        internalActions.addAction(ActionType::_recvChunkStatus);
+        internalActions.addAction(ActionType::_transferMods);
 
         return Status::OK();
     }

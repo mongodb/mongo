@@ -41,6 +41,7 @@
 "listDatabases",
 "listShards",
 "logRotate",
+"mapReduceShardedFinish",
 "moveChunk",
 "movePrimary",
 "netstat",
