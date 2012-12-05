@@ -51,9 +51,9 @@ namespace mongo {
         return reply;
     }
 
-    MockRemoteDBServer::MockRemoteDBServer(const string& hostName):
+    MockRemoteDBServer::MockRemoteDBServer(const string& hostAndPort):
             _isRunning(true),
-            _hostName(hostName),
+            _hostAndPort(hostAndPort),
             _delayMilliSec(0),
             _cmdCount(0),
             _queryCount(0),
@@ -191,18 +191,18 @@ namespace mongo {
     }
 
     string MockRemoteDBServer::getServerAddress() const {
-        return _hostName;
+        return _hostAndPort;
     }
 
     string MockRemoteDBServer::toString() {
-        return _hostName;
+        return _hostAndPort;
     }
 
     void MockRemoteDBServer::checkIfUp(InstanceID id) const {
         scoped_spinlock sLock(_lock);
 
         if (!_isRunning || id < _instanceID) {
-            throw mongo::SocketException(mongo::SocketException::CLOSED, _hostName);
+            throw mongo::SocketException(mongo::SocketException::CLOSED, _hostAndPort);
         }
     }
 }

@@ -60,7 +60,7 @@ namespace mongo {
 }
 
 namespace mongo_test {
-    const string TARGET_HOST = "$dummy";
+    const string TARGET_HOST = "$dummy:27017";
 
     /**
      * Warning: cannot run in parallel

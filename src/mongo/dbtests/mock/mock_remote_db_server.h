@@ -41,20 +41,20 @@ namespace mongo {
          * ConnectionString class by using mongo::MockConnRegistry as follows:
          *
          * ConnectionString::setConnectionHook(MockConnRegistry::get()->getConnStrHook());
-         * MockRemoteDBServer server("$a");
+         * MockRemoteDBServer server("$a:27017");
          * MockConnRegistry::get()->addServer(&server);
          *
          * This allows clients using the ConnectionString::connect interface to create
          * connections to this server. The requirements to make this hook fully functional are:
          *
-         * 1. hostName of this server should start with $.
-         * 2. No other instance has the same hostName as this.
+         * 1. hostAndPort of this server should start with $.
+         * 2. No other instance has the same hostAndPort as this.
          *
-         * @param hostName the host name for this server.
+         * @param hostAndPort the host name with port for this server.
          *
          * @see MockConnRegistry
          */
-        MockRemoteDBServer(const std::string& hostName);
+        MockRemoteDBServer(const std::string& hostAndPort);
         virtual ~MockRemoteDBServer();
 
         //
@@ -140,6 +140,12 @@ namespace mongo {
         InstanceID getInstanceID() const;
         mongo::ConnectionString::ConnectionType type() const;
         double getSoTimeout() const;
+
+        /**
+         * @return the exact string address passed to hostAndPort parameter of the
+         *     constructor. In other words, doesn't automatically append a
+         *     'default' port if none is specified.
+         */
         std::string getServerAddress() const;
         std::string toString();
 
@@ -179,7 +185,7 @@ namespace mongo {
 
         bool _isRunning;
 
-        const std::string _hostName;
+        const std::string _hostAndPort;
         long long _delayMilliSec;
 
         //
