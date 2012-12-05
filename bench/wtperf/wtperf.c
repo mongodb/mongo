@@ -24,7 +24,7 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  *
- * ex_test_perf.c
+ * wtperf.c
  *	This is an application that executes parallel random read workload.
  */
 
@@ -61,9 +61,9 @@ typedef struct {
 	uint32_t stat_thread;	/* Whether to create a stat thread. */
 	WT_CONNECTION *conn;
 	FILE *logf;
-#define	LSM_TEST_PERF_INIT	0x00
-#define	LSM_TEST_PERF_POP	0x01
-#define	LSM_TEST_PERF_READ	0x02
+#define	WT_PERF_INIT	0x00
+#define	WT_PERF_POP	0x01
+#define	WT_PERF_READ	0x02
 	uint32_t phase;
 	struct timeval phase_start_time;
 } CONFIG;
@@ -110,7 +110,7 @@ CONFIG default_cfg = {
 	0,		/* stat_thread */
 	NULL,		/* conn */
 	NULL,		/* logf */
-	LSM_TEST_PERF_INIT, /* phase */
+	WT_PERF_INIT, /* phase */
 	{0, 0}		/* phase_start_time */
 };
 /* Small config values - these are small. */
@@ -134,7 +134,7 @@ CONFIG small_cfg = {
 	0,		/* stat_thread */
 	NULL,		/* conn */
 	NULL,		/* logf */
-	LSM_TEST_PERF_INIT, /* phase */
+	WT_PERF_INIT, /* phase */
 	{0, 0}		/* phase_start_time */
 };
 /* Default values - these are small, we want the basic run to be fast. */
@@ -158,7 +158,7 @@ CONFIG med_cfg = {
 	0,		/* stat_thread */
 	NULL,		/* conn */
 	NULL,		/* logf */
-	LSM_TEST_PERF_INIT, /* phase */
+	WT_PERF_INIT, /* phase */
 	{0, 0}		/* phase_start_time */
 };
 /* Default values - these are small, we want the basic run to be fast. */
@@ -182,7 +182,7 @@ CONFIG large_cfg = {
 	0,		/* stat_thread */
 	NULL,		/* conn */
 	NULL,		/* logf */
-	LSM_TEST_PERF_INIT, /* phase */
+	WT_PERF_INIT, /* phase */
 	{0, 0}		/* phase_start_time */
 };
 
@@ -272,7 +272,7 @@ populate_thread(void *arg)
 	session = NULL;
 	data_buf = key_buf = NULL;
 
-	cfg->phase = LSM_TEST_PERF_POP;
+	cfg->phase = WT_PERF_POP;
 
 	data_buf = calloc(cfg->data_sz, 1);
 	if (data_buf == NULL) {
@@ -333,17 +333,18 @@ stat_worker(void *arg)
 	WT_CONNECTION *conn;
 	WT_SESSION *session;
 	WT_CURSOR *cursor;
+	struct timeval e;
 	const char *desc, *pvalue;
-	char *lsm_uri;
+	char *stat_uri;
+	uint64_t value;
+	size_t uri_len;
 	double secs;
 	int ret;
-	struct timeval e;
-	uint64_t value;
 
 	session = NULL;
 	cfg = (CONFIG *)arg;
 	conn = cfg->conn;
-	lsm_uri = NULL;
+	stat_uri = NULL;
 
 	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0) {
 		lprintf(cfg, ret, 0,
@@ -351,16 +352,12 @@ stat_worker(void *arg)
 		goto err;
 	}
 
-	if (strncmp(cfg->uri, "lsm:", strlen("lsm:")) == 0) {
-		lsm_uri = calloc(
-		    strlen(cfg->uri) + strlen("statistics:") + 1, 1);
-		if (lsm_uri == NULL) {
-			lprintf(
-			    cfg, ENOMEM, 0, "Statistics thread uri create.");
-			goto err;
-		}
-		sprintf(lsm_uri, "statistics:%s", cfg->uri);
+	uri_len = strlen("statistics:") + strlen(cfg->uri) + 1;
+	if ((stat_uri = malloc(uri_len)) == NULL) {
+		lprintf(cfg, ENOMEM, 0, "Statistics thread uri create.");
+		goto err;
 	}
+	(void)snprintf(stat_uri, uri_len, "statistics:%s", cfg->uri);
 
 	while (g_stat_running) {
 		sleep(cfg->report_interval);
@@ -375,25 +372,23 @@ stat_worker(void *arg)
 			++secs;
 		lprintf(cfg, 0, cfg->verbose,
 		    "%s completed: %" PRIu64", elapsed time: %.2f",
-		    cfg->phase == LSM_TEST_PERF_READ ? "reads" : "inserts",
+		    cfg->phase == WT_PERF_READ ? "reads" : "inserts",
 		    g_nops, secs);
-		/* Report LSM tree stats, if using LSM. */
-		if (lsm_uri != NULL) {
-			if ((ret = session->open_cursor(session, lsm_uri,
-			    NULL, NULL, &cursor)) != 0) {
-				lprintf(cfg, ret, 0,
-				    "open_cursor failed in LSM statistics");
-				goto err;
-			}
-			while (
-			    (ret = cursor->next(cursor)) == 0 &&
-			    (ret = cursor->get_value(
-			    cursor, &desc, &pvalue, &value)) == 0)
-				lprintf(cfg, 0, cfg->verbose,
-				    "stat:lsm: %s=%s", desc, pvalue);
-			cursor->close(cursor);
-			lprintf(cfg, 0, cfg->verbose, "-----------------");
+
+		/* Report data source stats. */
+		if ((ret = session->open_cursor(session, stat_uri,
+		    NULL, NULL, &cursor)) != 0) {
+			lprintf(cfg, ret, 0,
+			    "open_cursor failed for data source statistics");
+			goto err;
 		}
+		while ((ret = cursor->next(cursor)) == 0 && (ret =
+		    cursor->get_value(cursor, &desc, &pvalue, &value)) == 0 &&
+		    value != 0)
+			lprintf(cfg, 0, cfg->verbose,
+			    "stat:lsm: %s=%s", desc, pvalue);
+		cursor->close(cursor);
+		lprintf(cfg, 0, cfg->verbose, "-----------------");
 
 		/* Dump the connection statistics since last time. */
 		if ((ret = session->open_cursor(session, "statistics:",
@@ -402,19 +397,17 @@ stat_worker(void *arg)
 			    "open_cursor failed in statistics");
 			goto err;
 		}
-		while (
-		    (ret = cursor->next(cursor)) == 0 &&
-		    (ret = cursor->get_value(
-		    cursor, &desc, &pvalue, &value)) == 0)
+		while ((ret = cursor->next(cursor)) == 0 && (ret =
+		    cursor->get_value(cursor, &desc, &pvalue, &value)) == 0 &&
+		    value != 0)
 			lprintf(cfg, 0, cfg->verbose,
 			    "stat:conn: %s=%s", desc, pvalue);
 		cursor->close(cursor);
-
 	}
 err:	if (session != NULL)
 		session->close(session, NULL);
-	if (lsm_uri != NULL)
-		free(lsm_uri);
+	if (stat_uri != NULL)
+		free(stat_uri);
 	return (arg);
 }
 
@@ -429,7 +422,7 @@ int execute_populate(CONFIG *cfg)
 	struct timeval e;
 
 	conn = cfg->conn;
-	cfg->phase = LSM_TEST_PERF_POP;
+	cfg->phase = WT_PERF_POP;
 	lprintf(cfg, 0, 1, "Starting populate threads");
 
 	/* First create the table. */
@@ -497,7 +490,7 @@ int execute_reads(CONFIG *cfg)
 	int ret;
 	uint64_t last_ops;
 
-	cfg->phase = LSM_TEST_PERF_READ;
+	cfg->phase = WT_PERF_READ;
 	lprintf(cfg, 0, 1, "Starting read threads");
 
 	if ((ret = start_threads(
@@ -864,7 +857,7 @@ void print_config(CONFIG *cfg)
 
 void usage(void)
 {
-	printf("ex_perf_test [-CLMPRSTdehikrsuv]\n");
+	printf("wtperf [-CLMPRSTdehikrsuv]\n");
 	printf("\t-S Use a small default configuration\n");
 	printf("\t-M Use a medium default configuration\n");
 	printf("\t-L Use a large default configuration\n");
