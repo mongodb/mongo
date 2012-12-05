@@ -501,20 +501,25 @@ struct __wt_session {
 	 *  @row{<tt>colgroup:\<tablename\>.\<columnset\></tt>,
 	 *	column group cursor,
 	 *	table key\, column group value(s)}
-	 *  @row{<tt>table:\<tablename\></tt>,
-	 *	table cursor,
-	 *	table key\, table value(s)}
+	 *  @row{<tt>config:</tt>,
+	 *	object configuration cursor (key=config string\,
+	 *	value=config value}
 	 *  @row{<tt>file:\<filename\></tt>,
 	 *	file cursor,
 	 *	file key\, file value(s)}
 	 *  @row{<tt>index:\<tablename\>.\<indexname\></tt>,
 	 *	index cursor,
 	 *	key=index key\, value=table value(s)}
+	 *  @row{<tt>lsm:\<name\></tt>,
+	 *	LSM cursor (key=LSM key\, value=LSM value), See also: @ref lsm}
 	 *  @row{<tt>statistics:[file</tt><tt>:\<filename\>]</tt>,
 	 *	database or file statistics cursor,
 	 *	key=<code>int id</code>\, value=(<code>string description\,
 	 *	string value\, uint64_t value</code>)\,
 	 *	see @ref data_statistics for details}
+	 *  @row{<tt>table:\<tablename\></tt>,
+	 *	table cursor,
+	 *	table key\, table value(s)}
 	 *  </table>
 	 * @param to_dup a cursor to duplicate
 	 * @param session the session handle
@@ -873,7 +878,7 @@ struct __wt_session {
 	 *
 	 * All open cursors are reset.
 	 *
-	 * WT_SESSION::transaction_begin will fail if a transaction is already
+	 * WT_SESSION::begin_transaction will fail if a transaction is already
 	 * in progress in the session.
 	 *
 	 * @snippet ex_all.c transaction commit/rollback
