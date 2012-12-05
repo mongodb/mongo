@@ -53,7 +53,7 @@ __wt_compact(WT_SESSION_IMPL *session, const char *cfg[])
 		}
 		__wt_page_and_tree_modify_set(session, page);
 
-		WT_BSTAT_INCR(session, file_compact_rewrite);
+		WT_BSTAT_INCR(session, btree_compact_rewrite);
 	}
 
 	return (0);
@@ -168,6 +168,6 @@ disk:		__wt_get_addr(page->parent, page->ref, &addr, &addr_size);
 	WT_RET(__wt_page_modify_init(session, page));
 	__wt_page_and_tree_modify_set(session, page);
 
-	WT_BSTAT_INCR(session, file_compact_rewrite);
+	WT_BSTAT_INCR(session, btree_compact_rewrite);
 	return (0);
 }

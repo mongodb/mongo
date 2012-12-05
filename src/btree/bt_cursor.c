@@ -132,7 +132,7 @@ __wt_btcur_search(WT_CURSOR_BTREE *cbt)
 	btree = cbt->btree;
 	cursor = &cbt->iface;
 	session = (WT_SESSION_IMPL *)cursor->session;
-	WT_BSTAT_INCR(session, cursor_read);
+	WT_BSTAT_INCR(session, cursor_search);
 
 	if (btree->type == BTREE_ROW)
 		WT_RET(__cursor_size_chk(session, &cursor->key));
@@ -178,7 +178,7 @@ __wt_btcur_search_near(WT_CURSOR_BTREE *cbt, int *exact)
 	btree = cbt->btree;
 	cursor = &cbt->iface;
 	session = (WT_SESSION_IMPL *)cursor->session;
-	WT_BSTAT_INCR(session, cursor_read_near);
+	WT_BSTAT_INCR(session, cursor_search_near);
 
 	if (btree->type == BTREE_ROW)
 		WT_RET(__cursor_size_chk(session, &cursor->key));
@@ -248,8 +248,8 @@ __wt_btcur_insert(WT_CURSOR_BTREE *cbt)
 	session = (WT_SESSION_IMPL *)cursor->session;
 
 	WT_BSTAT_INCR(session, cursor_insert);
-	WT_BSTAT_INCRV(
-	    session, byte_changed, cursor->key.size + cursor->value.size);
+	WT_BSTAT_INCRV(session,
+	    cache_bytes_changed, cursor->key.size + cursor->value.size);
 
 	if (btree->type == BTREE_ROW)
 		WT_RET(__cursor_size_chk(session, &cursor->key));
@@ -341,7 +341,7 @@ __wt_btcur_remove(WT_CURSOR_BTREE *cbt)
 	session = (WT_SESSION_IMPL *)cursor->session;
 
 	WT_BSTAT_INCR(session, cursor_remove);
-	WT_BSTAT_INCRV(session, byte_changed, cursor->key.size);
+	WT_BSTAT_INCRV(session, cache_bytes_changed, cursor->key.size);
 
 	if (btree->type == BTREE_ROW)
 		WT_RET(__cursor_size_chk(session, &cursor->key));
@@ -405,7 +405,7 @@ __wt_btcur_update(WT_CURSOR_BTREE *cbt)
 	session = (WT_SESSION_IMPL *)cursor->session;
 
 	WT_BSTAT_INCR(session, cursor_update);
-	WT_BSTAT_INCRV(session, byte_changed, cursor->value.size);
+	WT_BSTAT_INCRV(session, cache_bytes_changed, cursor->value.size);
 
 	if (btree->type == BTREE_ROW)
 		WT_RET(__cursor_size_chk(session, &cursor->key));

@@ -107,8 +107,10 @@ __wt_bt_read(WT_SESSION_IMPL *session,
 		WT_ERR(__wt_verify_dsk(session, (const char *)tmp->data, buf));
 	}
 
-	WT_BSTAT_INCR(session, page_read);
-	WT_BSTAT_INCRV(session, byte_read, addr_size);
+	WT_CSTAT_INCR(session, cache_read);
+	WT_BSTAT_INCR(session, cache_read);
+	WT_CSTAT_INCRV(session, cache_bytes_read, addr_size);
+	WT_BSTAT_INCRV(session, cache_bytes_read, addr_size);
 
 err:	__wt_scr_free(&tmp);
 	return (ret);
@@ -278,8 +280,10 @@ __wt_bt_write(WT_SESSION_IMPL *session, WT_ITEM *buf,
 	    __wt_bm_checkpoint(session, ip, btree->ckpt, data_cksum) :
 	    __wt_bm_write(session, ip, addr, addr_size, data_cksum));
 
-	WT_BSTAT_INCR(session, page_write);
-	WT_BSTAT_INCRV(session, byte_write, ip->size);
+	WT_CSTAT_INCR(session, cache_write);
+	WT_BSTAT_INCR(session, cache_write);
+	WT_CSTAT_INCRV(session, cache_bytes_write, ip->size);
+	WT_BSTAT_INCRV(session, cache_bytes_write, ip->size);
 
 err:	__wt_scr_free(&tmp);
 	return (ret);

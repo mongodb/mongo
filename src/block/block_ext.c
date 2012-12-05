@@ -474,7 +474,7 @@ __wt_block_extend(
 	*offp = fh->file_size;
 	fh->file_size += size;
 
-	WT_BSTAT_INCR(session, block_extend);
+	WT_BSTAT_INCR(session, block_extension);
 	WT_VERBOSE_RET(session, block,
 	    "file extend %" PRIdMAX "B @ %" PRIdMAX,
 	    (intmax_t)size, (intmax_t)*offp);

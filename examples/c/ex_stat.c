@@ -110,7 +110,7 @@ print_overflow_pages(WT_SESSION *session)
 	    "statistics:table:access", NULL, NULL, &cursor)) != 0)
 		return (ret);
 
-	cursor->set_key(cursor, WT_STAT_DSRC_OVERFLOW_PAGE);
+	cursor->set_key(cursor, WT_STAT_DSRC_BTREE_OVERFLOW);
 	ret = cursor->search(cursor);
 	ret = cursor->get_value(cursor, &desc, &pvalue, &value);
 	printf("%s=%s\n", desc, pvalue);
@@ -151,8 +151,8 @@ print_derived_stats(WT_SESSION *session)
 	{
 	/*! [statistics calculate table fragmentation] */
 	uint64_t ckpt_size, file_size;
-	ret = get_stat(cursor, WT_STAT_DSRC_CKPT_SIZE, &ckpt_size);
-	ret = get_stat(cursor, WT_STAT_DSRC_FILE_SIZE, &file_size);
+	ret = get_stat(cursor, WT_STAT_DSRC_BLOCK_CHECKPOINT_SIZE, &ckpt_size);
+	ret = get_stat(cursor, WT_STAT_DSRC_BLOCK_SIZE, &file_size);
 
 	printf("File is %d%% fragmented\n",
 	    (int)(100 * (file_size - ckpt_size) / file_size));
@@ -163,8 +163,8 @@ print_derived_stats(WT_SESSION *session)
 	/*! [statistics calculate write amplification] */
 	uint64_t app_writes, fs_writes;
 
-	ret = get_stat(cursor, WT_STAT_DSRC_BYTE_WRITE, &fs_writes);
-	ret = get_stat(cursor, WT_STAT_DSRC_BYTE_CHANGED, &app_writes);
+	ret = get_stat(cursor, WT_STAT_DSRC_CACHE_BYTES_WRITE, &fs_writes);
+	ret = get_stat(cursor, WT_STAT_DSRC_CACHE_BYTES_CHANGED, &app_writes);
 
 	printf("Write amplification is %.2lf\n",
 	    (double)fs_writes / app_writes);
