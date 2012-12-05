@@ -85,8 +85,7 @@ namespace mongo {
          * @return slowOn if fail point is active.
          */
         inline RetCode shouldFailOpenBlock() {
-            // TODO: optimization - use unordered load once available
-            if (MONGO_likely((_fpInfo.load() & ACTIVE_BIT) == 0)) {
+            if (MONGO_likely((_fpInfo.loadRelaxed() & ACTIVE_BIT) == 0)) {
                 return fastOff;
             }
 
