@@ -263,11 +263,8 @@ __wt_conn_btree_get(WT_SESSION_IMPL *session,
     const char *name, const char *ckpt, const char *cfg[], uint32_t flags)
 {
 	WT_BTREE *btree;
-	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	const char *treeconf;
-
-	conn = S2C(session);
 
 	WT_RET(__conn_btree_get(session, name, ckpt, flags));
 
