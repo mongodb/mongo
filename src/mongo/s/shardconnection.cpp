@@ -81,7 +81,7 @@ namespace mongo {
                 shardConnectionPool.onHandedOut( c.get() ); // May throw an exception
             } else {
                 s->created++;
-                c.reset( shardConnectionPool.get( addr ) );
+                c.reset( shardConnectionPool.get( addr, cmdLine.defaultSocketTimeout ) );
             }
             if ( !noauth ) {
                 c->setAuthenticationTable( ClientBasic::getCurrent()->getAuthenticationInfo()->
@@ -160,7 +160,7 @@ namespace mongo {
                     }
 
                     if( ! s->avail )
-                        s->avail = shardConnectionPool.get( sconnString );
+                        s->avail = shardConnectionPool.get( sconnString, cmdLine.defaultSocketTimeout );
 
                     versionManager.checkShardVersionCB( s->avail, ns, false, 1 );
                 } catch(...) { 

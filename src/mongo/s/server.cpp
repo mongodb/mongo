@@ -324,6 +324,7 @@ static void processCommandLineOptions(const std::vector<std::string>& argv) {
     ( "configdb" , po::value<string>() , "1 or 3 comma separated config servers" )
     ( "localThreshold", po::value <int>(), "ping time (in ms) for a node to be "
                                            "considered local (default 15ms)" )
+    ( "socketTimeout", po::value <double>(), "default socket timeout (in seconds)" )
     ( "test" , "just run unit tests" )
     ( "upgrade" , "upgrade meta data version" )
     ( "chunkSize" , po::value<int>(), "maximum amount of data per chunk" )
@@ -382,6 +383,10 @@ static void processCommandLineOptions(const std::vector<std::string>& argv) {
 
     if ( params.count( "localThreshold" ) ) {
         cmdLine.defaultLocalThresholdMillis = params["localThreshold"].as<int>();
+    }
+
+    if ( params.count( "socketTimeout" ) ) {
+        cmdLine.defaultSocketTimeout = params["socketTimeout"].as<double>();
     }
 
     if ( params.count( "ipv6" ) ) {

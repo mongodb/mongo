@@ -142,6 +142,7 @@ namespace mongo {
 
         SSLManager* sslServerManager; // currently leaks on close
 #endif
+        double defaultSocketTimeout;  // --socketTimeout in seconds
 
         /**
          * Switches to enable experimental (unsupported) features.
@@ -195,7 +196,7 @@ namespace mongo {
         durOptions(0), objcheck(false), oplogSize(0), defaultProfile(0),
         slowMS(100), defaultLocalThresholdMillis(15), pretouch(0), moveParanoia( true ),
         syncdelay(60), noUnixSocket(false), doFork(0), socket("/tmp"), maxConns(DEFAULT_MAX_CONN),
-        logAppend(false), logWithSyslog(false)
+        logAppend(false), logWithSyslog(false), defaultSocketTimeout(0)
     {
         started = time(0);
 
