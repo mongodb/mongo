@@ -304,9 +304,9 @@ __conn_close(WT_CONNECTION *wt_conn, const char *config)
 
 	/*
 	 * Close open, external sessions.
-	 * Additionally, the session's hazard reference memory isn't discarded
+	 * Additionally, the session's hazard pointer memory isn't discarded
 	 * during normal session close because access to it isn't serialized.
-	 * Discard it now.  Note the loop for the hazard reference memory, it's
+	 * Discard it now.  Note the loop for the hazard pointer memory, it's
 	 * the entire session array, not only the active session count, as the
 	 * active session count may be less than the maximum session count.
 	 */

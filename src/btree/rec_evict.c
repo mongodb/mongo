@@ -40,7 +40,7 @@ __wt_rec_evict(WT_SESSION_IMPL *session, WT_PAGE *page, int exclusive)
 	 *
 	 * Note that page->ref may be NULL in some cases (e.g., for root pages
 	 * or during salvage).  That's OK if WT_REC_SINGLE is set: we won't
-	 * check hazard references in that case.
+	 * check hazard pointers in that case.
 	 */
 	WT_ERR(__rec_review(session, page->ref, page, exclusive, 1));
 
@@ -234,7 +234,7 @@ __rec_discard_page(WT_SESSION_IMPL *session, WT_PAGE *page, int exclusive)
  *	ref->page == page and page->ref == ref.  However, we need both because
  *	(a) there are cases where ref == NULL (e.g., for root page or during
  *	salvage), and (b) we can't safely look at page->ref until we have a
- *	hazard reference.
+ *	hazard pointer.
  */
 static int
 __rec_review(WT_SESSION_IMPL *session,
@@ -426,7 +426,7 @@ __hazard_exclusive(WT_SESSION_IMPL *session, WT_REF *ref, int top)
 		    &session->excl));
 
 	/*
-	 * Hazard references are acquired down the tree, which means we can't
+	 * Hazard pointers are acquired down the tree, which means we can't
 	 * deadlock.
 	 *
 	 * Request exclusive access to the page.  The top-level page should
@@ -439,7 +439,7 @@ __hazard_exclusive(WT_SESSION_IMPL *session, WT_REF *ref, int top)
 
 	session->excl[session->excl_next++] = ref;
 
-	/* Check for a matching hazard reference. */
+	/* Check for a matching hazard pointer. */
 	if (__wt_page_hazard_check(session, ref->page) == NULL)
 		return (0);
 
