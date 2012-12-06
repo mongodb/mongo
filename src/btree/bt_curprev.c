@@ -492,7 +492,7 @@ __wt_btcur_prev(WT_CURSOR_BTREE *cbt, int discard)
 	int newpage;
 
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
-	WT_BSTAT_INCR(session, cursor_read_prev);
+	WT_DSTAT_INCR(session, cursor_prev);
 
 	flags = WT_TREE_PREV;				/* Tree walk flags. */
 	if (discard)

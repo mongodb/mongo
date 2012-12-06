@@ -75,17 +75,18 @@ class test_stat01(wttest.WiredTigerTestCase):
     def test_basic_conn_stats(self):
         self.printVerbose(2, 'overall database stats:')
         allstat_cursor = self.session.open_cursor('statistics:', None, None)
-        self.check_stats(allstat_cursor, 10, 'blocks written to a file')
+        self.check_stats(
+            allstat_cursor, 10, 'blocks written by the block manager')
 
         # See that we can get a specific stat value by its key,
         # and verify that its entry is self-consistent
         values = allstat_cursor[stat.conn.block_write]
-        self.assertEqual(values[0], 'blocks written to a file')
+        self.assertEqual(values[0], 'blocks written by the block manager')
         val = self.statstr_to_int(values[1])
         self.assertEqual(val, values[2])
         allstat_cursor.close()
 
-    def test_basic_file_stats(self):
+    def test_basic_data_source_stats(self):
         self.session.create(self.uri, self.config)
         cursor = self.session.open_cursor(self.uri, None, None)
         value = ""
@@ -97,17 +98,18 @@ class test_stat01(wttest.WiredTigerTestCase):
             cursor.insert()
         cursor.close()
 
-        self.printVerbose(2, 'file specific stats:')
-        filestat_cursor = self.session.open_cursor('statistics:' + self.uri, None, None)
-        self.check_stats(filestat_cursor, 10, 'overflow pages')
+        self.printVerbose(2, 'data source specific stats:')
+        cursor = self.session.open_cursor(
+            'statistics:' + self.uri, None, None)
+        self.check_stats(cursor, 10, 'overflow pages')
 
         # See that we can get a specific stat value by its key,
         # and verify that its entry is self-consistent
-        values = filestat_cursor[stat.dsrc.overflow_page]
+        values = cursor[stat.dsrc.btree_overflow]
         self.assertEqual(values[0], 'overflow pages')
         val = self.statstr_to_int(values[1])
         self.assertEqual(val, values[2])
-        filestat_cursor.close()
+        cursor.close()
 
     def test_missing_file_stats(self):
         self.assertRaises(wiredtiger.WiredTigerError, lambda:
@@ -122,7 +124,7 @@ class test_stat01(wttest.WiredTigerTestCase):
             self.session.checkpoint('name=' + name)
             cursor = self.session.open_cursor(
                 'statistics:' + self.uri, None, 'checkpoint=' + name)
-            size = cursor[stat.dsrc.overflow_page][1]
+            size = cursor[stat.dsrc.btree_overflow][1]
             self.assertTrue(size >= last_size)
             last_size = size
             cursor.close()

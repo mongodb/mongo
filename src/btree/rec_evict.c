@@ -23,10 +23,7 @@ static void __rec_root_update(WT_SESSION_IMPL *);
 int
 __wt_rec_evict(WT_SESSION_IMPL *session, WT_PAGE *page, int exclusive)
 {
-	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
-
-	conn = S2C(session);
 
 	WT_VERBOSE_RET(session, evict,
 	    "page %p (%s)", page, __wt_page_type_string(page->type));
@@ -49,12 +46,13 @@ __wt_rec_evict(WT_SESSION_IMPL *session, WT_PAGE *page, int exclusive)
 
 	/* Count evictions of internal pages during normal operation. */
 	if (!exclusive &&
-	    (page->type == WT_PAGE_COL_INT || page->type == WT_PAGE_ROW_INT))
-		WT_STAT_INCR(conn->stats, cache_evict_internal);
+	    (page->type == WT_PAGE_COL_INT || page->type == WT_PAGE_ROW_INT)) {
+		WT_CSTAT_INCR(session, cache_eviction_internal);
+		WT_DSTAT_INCR(session, cache_eviction_internal);
+	}
 
 	/* Update the parent and discard the page. */
 	if (page->modify == NULL || !F_ISSET(page->modify, WT_PM_REC_MASK)) {
-		WT_STAT_INCR(conn->stats, cache_evict_unmodified);
 		WT_ASSERT(session,
 		    exclusive || page->ref->state == WT_REF_LOCKED);
 
@@ -65,9 +63,10 @@ __wt_rec_evict(WT_SESSION_IMPL *session, WT_PAGE *page, int exclusive)
 
 		/* Discard the page. */
 		__rec_discard_page(session, page, exclusive);
-	} else {
-		WT_STAT_INCR(conn->stats, cache_evict_modified);
 
+		WT_CSTAT_INCR(session, cache_eviction_clean);
+		WT_DSTAT_INCR(session, cache_eviction_clean);
+	} else {
 		if (WT_PAGE_IS_ROOT(page))
 			__rec_root_update(session);
 		else
@@ -75,6 +74,9 @@ __wt_rec_evict(WT_SESSION_IMPL *session, WT_PAGE *page, int exclusive)
 
 		/* Discard the tree rooted in this page. */
 		__rec_discard_tree(session, page, exclusive);
+
+		WT_CSTAT_INCR(session, cache_eviction_dirty);
+		WT_DSTAT_INCR(session, cache_eviction_dirty);
 	}
 	if (0) {
 err:		/*
@@ -82,6 +84,9 @@ err:		/*
 		 * we've acquired.
 		 */
 		__rec_excl_clear(session);
+
+		WT_CSTAT_INCR(session, cache_eviction_fail);
+		WT_DSTAT_INCR(session, cache_eviction_fail);
 	}
 	session->excl_next = 0;
 
@@ -331,8 +336,7 @@ __rec_review(WT_SESSION_IMPL *session,
 			    ++txn->eviction_fails >= 100) {
 				txn->eviction_fails = 0;
 				ret = WT_DEADLOCK;
-				WT_STAT_INCR(
-				    S2C(session)->stats, txn_fail_cache);
+				WT_CSTAT_INCR(session, txn_fail_cache);
 			}
 
 			/*
@@ -439,8 +443,8 @@ __hazard_exclusive(WT_SESSION_IMPL *session, WT_REF *ref, int top)
 	if (__wt_page_hazard_check(session, ref->page) == NULL)
 		return (0);
 
-	WT_BSTAT_INCR(session, rec_hazard);
-	WT_CSTAT_INCR(session, cache_evict_hazard);
+	WT_DSTAT_INCR(session, cache_eviction_hazard);
+	WT_CSTAT_INCR(session, cache_eviction_hazard);
 
 	WT_VERBOSE_RET(
 	    session, evict, "page %p hazard request failed", ref->page);

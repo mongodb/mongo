@@ -192,7 +192,7 @@ __wt_readlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 	    "rwlock: readlock %s (%p)", rwlock->name, rwlock);
 
 	WT_ERR(pthread_rwlock_rdlock(&rwlock->rwlock));
-	WT_CSTAT_INCR(session, rwlock_rdlock);
+	WT_CSTAT_INCR(session, rwlock_read);
 
 	if (0) {
 err:		__wt_err(session, ret, "rwlock readlock failed");
@@ -213,7 +213,7 @@ __wt_try_writelock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 	    "rwlock: try_writelock %s (%p)", rwlock->name, rwlock);
 
 	if ((ret = pthread_rwlock_trywrlock(&rwlock->rwlock)) == 0)
-		WT_CSTAT_INCR(session, rwlock_wrlock);
+		WT_CSTAT_INCR(session, rwlock_write);
 	else if (ret != EBUSY) {
 		__wt_err(session, ret, "rwlock try_writelock failed");
 		__wt_abort(session);
@@ -235,7 +235,7 @@ __wt_writelock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 	    "rwlock: writelock %s (%p)", rwlock->name, rwlock);
 
 	WT_ERR(pthread_rwlock_wrlock(&rwlock->rwlock));
-	WT_CSTAT_INCR(session, rwlock_wrlock);
+	WT_CSTAT_INCR(session, rwlock_write);
 
 	if (0) {
 err:		__wt_err(session, ret, "rwlock writelock failed");

@@ -72,6 +72,8 @@ struct __wt_btree {
 	const char *checkpoint;		/* Checkpoint name (or NULL) */
 	const char *config;		/* Configuration string */
 
+	WT_DSRC_STATS *stats;		/* Data-source statistics */
+
 	/*
 	 * XXX Everything above here should move into the session-level
 	 * handle structure.
@@ -128,8 +130,6 @@ struct __wt_btree {
 	WT_PAGE *evict_page;		/* Eviction thread's location */
 	uint64_t evict_priority;	/* Relative priority of cached pages. */
 	volatile uint32_t lru_count;	/* Count of threads in LRU eviction */
-
-	WT_DSRC_STATS *stats;		/* Btree statistics */
 
 #define	WT_BTREE_BULK		0x0001	/* Bulk-load handle */
 #define	WT_BTREE_DISCARD	0x0002	/* Discard on release */

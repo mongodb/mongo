@@ -1798,63 +1798,72 @@ extern int wiredtiger_extension_init(WT_SESSION *session,
  * keys.  See @ref data_statistics for more information.
  * @{
  */
-/*! blocks read from a file */
-#define	WT_STAT_CONN_BLOCK_READ				0
-/*! blocks written to a file */
-#define	WT_STAT_CONN_BLOCK_WRITE			1
-/*! bytes read from a file */
-#define	WT_STAT_CONN_BYTE_READ				2
-/*! bytes written to a file */
-#define	WT_STAT_CONN_BYTE_WRITE				3
+/*! bytes read by the block manager */
+#define	WT_STAT_CONN_BLOCK_BYTE_READ			0
+/*! bytes written by the block manager */
+#define	WT_STAT_CONN_BLOCK_BYTE_WRITE			1
+/*! blocks read by the block manager */
+#define	WT_STAT_CONN_BLOCK_READ				2
+/*! blocks written by the block manager */
+#define	WT_STAT_CONN_BLOCK_WRITE			3
 /*! cache: tracked dirty bytes in the cache */
 #define	WT_STAT_CONN_CACHE_BYTES_DIRTY			4
-/*! cache: bytes currently held in the cache */
+/*! cache: bytes currently in the cache */
 #define	WT_STAT_CONN_CACHE_BYTES_INUSE			5
 /*! cache: maximum bytes configured */
 #define	WT_STAT_CONN_CACHE_BYTES_MAX			6
-/*! cache: pages selected for eviction not evicted because of a hazard
- * reference */
-#define	WT_STAT_CONN_CACHE_EVICT_HAZARD			7
-/*! cache: internal pages evicted */
-#define	WT_STAT_CONN_CACHE_EVICT_INTERNAL		8
-/*! cache: modified pages evicted */
-#define	WT_STAT_CONN_CACHE_EVICT_MODIFIED		9
-/*! cache: eviction server unable to reach eviction goal */
-#define	WT_STAT_CONN_CACHE_EVICT_SLOW			10
+/*! cache: bytes read into cache */
+#define	WT_STAT_CONN_CACHE_BYTES_READ			7
+/*! cache: bytes written from cache */
+#define	WT_STAT_CONN_CACHE_BYTES_WRITE			8
 /*! cache: unmodified pages evicted */
-#define	WT_STAT_CONN_CACHE_EVICT_UNMODIFIED		11
+#define	WT_STAT_CONN_CACHE_EVICTION_CLEAN		9
+/*! cache: modified pages evicted */
+#define	WT_STAT_CONN_CACHE_EVICTION_DIRTY		10
+/*! cache: pages selected for eviction unable to be evicted */
+#define	WT_STAT_CONN_CACHE_EVICTION_FAIL		11
+/*! cache: eviction unable to acquire hazard reference */
+#define	WT_STAT_CONN_CACHE_EVICTION_HAZARD		12
+/*! cache: internal pages evicted */
+#define	WT_STAT_CONN_CACHE_EVICTION_INTERNAL		13
+/*! cache: eviction server unable to reach eviction goal */
+#define	WT_STAT_CONN_CACHE_EVICTION_SLOW		14
 /*! cache: tracked dirty pages in the cache */
-#define	WT_STAT_CONN_CACHE_PAGES_DIRTY			12
+#define	WT_STAT_CONN_CACHE_PAGES_DIRTY			15
 /*! cache: pages currently held in the cache */
-#define	WT_STAT_CONN_CACHE_PAGES_INUSE			13
-/*! checkpoints */
-#define	WT_STAT_CONN_CHECKPOINT				14
-/*! condition wait calls */
-#define	WT_STAT_CONN_COND_WAIT				15
+#define	WT_STAT_CONN_CACHE_PAGES_INUSE			16
+/*! cache: pages read into cache */
+#define	WT_STAT_CONN_CACHE_READ				17
+/*! cache: pages written from cache */
+#define	WT_STAT_CONN_CACHE_WRITE			18
+/*! pthread mutex condition wait calls */
+#define	WT_STAT_CONN_COND_WAIT				19
 /*! files currently open */
-#define	WT_STAT_CONN_FILE_OPEN				16
-/*! total memory allocations */
-#define	WT_STAT_CONN_MEMALLOC				17
-/*! total memory frees */
-#define	WT_STAT_CONN_MEMFREE				18
-/*! rwlock readlock calls */
-#define	WT_STAT_CONN_RWLOCK_RDLOCK			19
-/*! rwlock writelock calls */
-#define	WT_STAT_CONN_RWLOCK_WRLOCK			20
+#define	WT_STAT_CONN_FILE_OPEN				20
+/*! total heap memory allocations */
+#define	WT_STAT_CONN_MEMORY_ALLOCATION			21
+/*! total heap memory frees */
+#define	WT_STAT_CONN_MEMORY_FREE			22
 /*! total read I/Os */
-#define	WT_STAT_CONN_TOTAL_READ_IO			21
-/*! total write I/Os */
-#define	WT_STAT_CONN_TOTAL_WRITE_IO			22
+#define	WT_STAT_CONN_READ_IO				23
+/*! pthread mutex shared lock read-lock calls */
+#define	WT_STAT_CONN_RWLOCK_READ			24
+/*! pthread mutex shared lock write-lock calls */
+#define	WT_STAT_CONN_RWLOCK_WRITE			25
 /*! ancient transactions */
-#define	WT_STAT_CONN_TXN_ANCIENT			23
+#define	WT_STAT_CONN_TXN_ANCIENT			26
 /*! transactions */
-#define	WT_STAT_CONN_TXN_BEGIN				24
+#define	WT_STAT_CONN_TXN_BEGIN				27
+/*! transaction checkpoints */
+#define	WT_STAT_CONN_TXN_CHECKPOINT			28
 /*! transactions committed */
-#define	WT_STAT_CONN_TXN_COMMIT				25
+#define	WT_STAT_CONN_TXN_COMMIT				29
 /*! transaction failures due to cache overflow */
-#define	WT_STAT_CONN_TXN_FAIL_CACHE			26
+#define	WT_STAT_CONN_TXN_FAIL_CACHE			30
 /*! transactions rolled-back */
-#define	WT_STAT_CONN_TXN_ROLLBACK			27
+#define	WT_STAT_CONN_TXN_ROLLBACK			31
+/*! total write I/Os */
+#define	WT_STAT_CONN_WRITE_IO				32
 
 /*!
  * @}
@@ -1862,133 +1871,139 @@ extern int wiredtiger_extension_init(WT_SESSION *session,
  * @anchor statistics_dsrc
  * @{
  */
-/*! block allocations */
+/*! blocks allocated */
 #define	WT_STAT_DSRC_BLOCK_ALLOC			0
-/*! block allocations required file extension */
-#define	WT_STAT_DSRC_BLOCK_EXTEND			1
-/*! block frees */
-#define	WT_STAT_DSRC_BLOCK_FREE				2
-/*! number of Bloom filters in the LSM tree */
-#define	WT_STAT_DSRC_BLOOM_COUNT			3
-/*! number of Bloom filter false positives */
-#define	WT_STAT_DSRC_BLOOM_FALSE_POSITIVE		4
-/*! number of Bloom filter hits */
-#define	WT_STAT_DSRC_BLOOM_HIT				5
-/*! number of Bloom filter misses */
-#define	WT_STAT_DSRC_BLOOM_MISS				6
-/*! number of Bloom pages evicted from cache */
-#define	WT_STAT_DSRC_BLOOM_PAGE_EVICT			7
-/*! number of Bloom pages read into cache */
-#define	WT_STAT_DSRC_BLOOM_PAGE_READ			8
-/*! total size of Bloom filters */
-#define	WT_STAT_DSRC_BLOOM_SIZE				9
-/*! approximate measure of bytes changed: counts key and value bytes
- * inserted with cursor.insert, value bytes updated with cursor.update
- * and key bytes removed using cursor.remove */
-#define	WT_STAT_DSRC_BYTE_CHANGED			10
-/*! bytes read into cache */
-#define	WT_STAT_DSRC_BYTE_READ				11
-/*! bytes written from cache */
-#define	WT_STAT_DSRC_BYTE_WRITE				12
+/*! block manager file allocation unit size */
+#define	WT_STAT_DSRC_BLOCK_ALLOCSIZE			1
 /*! checkpoint size */
-#define	WT_STAT_DSRC_CKPT_SIZE				13
-/*! cursor-inserts */
-#define	WT_STAT_DSRC_CURSOR_INSERT			14
-/*! cursor-read */
-#define	WT_STAT_DSRC_CURSOR_READ			15
-/*! cursor-read-near */
-#define	WT_STAT_DSRC_CURSOR_READ_NEAR			16
-/*! cursor-read-next */
-#define	WT_STAT_DSRC_CURSOR_READ_NEXT			17
-/*! cursor-read-prev */
-#define	WT_STAT_DSRC_CURSOR_READ_PREV			18
-/*! cursor-removes */
-#define	WT_STAT_DSRC_CURSOR_REMOVE			19
-/*! cursor-resets */
-#define	WT_STAT_DSRC_CURSOR_RESET			20
-/*! cursor-updates */
-#define	WT_STAT_DSRC_CURSOR_UPDATE			21
-/*! total entries */
-#define	WT_STAT_DSRC_ENTRIES				22
-/*! page size allocation unit */
-#define	WT_STAT_DSRC_FILE_ALLOCSIZE			23
-/*! bulk-loaded entries */
-#define	WT_STAT_DSRC_FILE_BULK_LOADED			24
-/*! pages rewritten by compaction */
-#define	WT_STAT_DSRC_FILE_COMPACT_REWRITE		25
-/*! fixed-record size */
-#define	WT_STAT_DSRC_FILE_FIXED_LEN			26
-/*! magic number */
-#define	WT_STAT_DSRC_FILE_MAGIC				27
-/*! major version number */
-#define	WT_STAT_DSRC_FILE_MAJOR				28
-/*! maximum internal page item size */
-#define	WT_STAT_DSRC_FILE_MAXINTLITEM			29
-/*! maximum internal page size */
-#define	WT_STAT_DSRC_FILE_MAXINTLPAGE			30
-/*! maximum leaf page item size */
-#define	WT_STAT_DSRC_FILE_MAXLEAFITEM			31
-/*! maximum leaf page size */
-#define	WT_STAT_DSRC_FILE_MAXLEAFPAGE			32
+#define	WT_STAT_DSRC_BLOCK_CHECKPOINT_SIZE		2
+/*! block allocations requiring file extension */
+#define	WT_STAT_DSRC_BLOCK_EXTENSION			3
+/*! blocks freed */
+#define	WT_STAT_DSRC_BLOCK_FREE				4
+/*! file magic number */
+#define	WT_STAT_DSRC_BLOCK_MAGIC			5
+/*! file major version number */
+#define	WT_STAT_DSRC_BLOCK_MAJOR			6
 /*! minor version number */
-#define	WT_STAT_DSRC_FILE_MINOR				33
-/*! file size */
-#define	WT_STAT_DSRC_FILE_SIZE				34
-/*! number of chunks in the LSM tree */
-#define	WT_STAT_DSRC_LSM_CHUNK_COUNT			35
-/*! highest merge generation in the LSM tree */
-#define	WT_STAT_DSRC_LSM_GENERATION_MAX			36
-/*! number of queries that could have benefited from a Bloom filter that
- * did not exist */
-#define	WT_STAT_DSRC_LSM_LOOKUP_NO_BLOOM		37
-/*! overflow pages */
-#define	WT_STAT_DSRC_OVERFLOW_PAGE			38
-/*! overflow pages read into cache */
-#define	WT_STAT_DSRC_OVERFLOW_READ			39
-/*! overflow values cached in memory */
-#define	WT_STAT_DSRC_OVERFLOW_VALUE_CACHE		40
-/*! column-store deleted values */
-#define	WT_STAT_DSRC_PAGE_COL_DELETED			41
+#define	WT_STAT_DSRC_BLOCK_MINOR			7
+/*! block manager size */
+#define	WT_STAT_DSRC_BLOCK_SIZE				8
+/*! bloom filters in the LSM tree */
+#define	WT_STAT_DSRC_BLOOM_COUNT			9
+/*! bloom filter false positives */
+#define	WT_STAT_DSRC_BLOOM_FALSE_POSITIVE		10
+/*! bloom filter hits */
+#define	WT_STAT_DSRC_BLOOM_HIT				11
+/*! bloom filter misses */
+#define	WT_STAT_DSRC_BLOOM_MISS				12
+/*! bloom filter pages evicted from cache */
+#define	WT_STAT_DSRC_BLOOM_PAGE_EVICT			13
+/*! bloom filter pages read into cache */
+#define	WT_STAT_DSRC_BLOOM_PAGE_READ			14
+/*! total size of bloom filters */
+#define	WT_STAT_DSRC_BLOOM_SIZE				15
+/*! column-store variable-size deleted values */
+#define	WT_STAT_DSRC_BTREE_COLUMN_DELETED		16
 /*! column-store fixed-size leaf pages */
-#define	WT_STAT_DSRC_PAGE_COL_FIX			42
+#define	WT_STAT_DSRC_BTREE_COLUMN_FIX			17
 /*! column-store internal pages */
-#define	WT_STAT_DSRC_PAGE_COL_INT			43
+#define	WT_STAT_DSRC_BTREE_COLUMN_INTERNAL		18
 /*! column-store variable-size leaf pages */
-#define	WT_STAT_DSRC_PAGE_COL_VAR			44
-/*! pages evicted from the data source */
-#define	WT_STAT_DSRC_PAGE_EVICT				45
-/*! pages that were selected for eviction that could not be evicted */
-#define	WT_STAT_DSRC_PAGE_EVICT_FAIL			46
-/*! pages read into cache */
-#define	WT_STAT_DSRC_PAGE_READ				47
+#define	WT_STAT_DSRC_BTREE_COLUMN_VARIABLE		19
+/*! tree pages rewritten by compaction */
+#define	WT_STAT_DSRC_BTREE_COMPACT_REWRITE		20
+/*! total LSM, table or file object key/value pairs */
+#define	WT_STAT_DSRC_BTREE_ENTRIES			21
+/*! fixed-record size */
+#define	WT_STAT_DSRC_BTREE_FIXED_LEN			22
+/*! maximum internal page item size */
+#define	WT_STAT_DSRC_BTREE_MAXINTLITEM			23
+/*! maximum internal page size */
+#define	WT_STAT_DSRC_BTREE_MAXINTLPAGE			24
+/*! maximum leaf page item size */
+#define	WT_STAT_DSRC_BTREE_MAXLEAFITEM			25
+/*! maximum leaf page size */
+#define	WT_STAT_DSRC_BTREE_MAXLEAFPAGE			26
+/*! overflow pages */
+#define	WT_STAT_DSRC_BTREE_OVERFLOW			27
 /*! row-store internal pages */
-#define	WT_STAT_DSRC_PAGE_ROW_INT			48
+#define	WT_STAT_DSRC_BTREE_ROW_INTERNAL			28
 /*! row-store leaf pages */
-#define	WT_STAT_DSRC_PAGE_ROW_LEAF			49
+#define	WT_STAT_DSRC_BTREE_ROW_LEAF			29
+/*! bytes read into cache */
+#define	WT_STAT_DSRC_CACHE_BYTES_READ			30
+/*! bytes written from cache */
+#define	WT_STAT_DSRC_CACHE_BYTES_WRITE			31
+/*! unmodified pages evicted */
+#define	WT_STAT_DSRC_CACHE_EVICTION_CLEAN		32
+/*! modified pages evicted */
+#define	WT_STAT_DSRC_CACHE_EVICTION_DIRTY		33
+/*! data source pages selected for eviction unable to be evicted */
+#define	WT_STAT_DSRC_CACHE_EVICTION_FAIL		34
+/*! eviction unable to acquire hazard reference */
+#define	WT_STAT_DSRC_CACHE_EVICTION_HAZARD		35
+/*! internal pages evicted */
+#define	WT_STAT_DSRC_CACHE_EVICTION_INTERNAL		36
+/*! overflow values cached in memory */
+#define	WT_STAT_DSRC_CACHE_OVERFLOW_VALUE		37
+/*! pages read into cache */
+#define	WT_STAT_DSRC_CACHE_READ				38
+/*! overflow pages read into cache */
+#define	WT_STAT_DSRC_CACHE_READ_OVERFLOW		39
 /*! pages written from cache */
-#define	WT_STAT_DSRC_PAGE_WRITE				50
-/*! reconcile: dictionary match */
-#define	WT_STAT_DSRC_REC_DICTIONARY			51
-/*! reconciliation unable to acquire hazard reference */
-#define	WT_STAT_DSRC_REC_HAZARD				52
-/*! reconciliation overflow key */
-#define	WT_STAT_DSRC_REC_OVFL_KEY			53
-/*! reconciliation overflow value */
-#define	WT_STAT_DSRC_REC_OVFL_VALUE			54
-/*! pages deleted */
-#define	WT_STAT_DSRC_REC_PAGE_DELETE			55
-/*! deleted or temporary pages merged */
-#define	WT_STAT_DSRC_REC_PAGE_MERGE			56
-/*! internal pages split */
-#define	WT_STAT_DSRC_REC_SPLIT_INTL			57
-/*! leaf pages split */
-#define	WT_STAT_DSRC_REC_SPLIT_LEAF			58
-/*! pages written from reconciliation */
-#define	WT_STAT_DSRC_REC_WRITTEN			59
+#define	WT_STAT_DSRC_CACHE_WRITE			40
+/*! cursor insert calls */
+#define	WT_STAT_DSRC_CURSOR_INSERT			41
+/*! bulk-loaded cursor-insert calls */
+#define	WT_STAT_DSRC_CURSOR_INSERT_BULK			42
+/*! cursor-insert key and value bytes inserted */
+#define	WT_STAT_DSRC_CURSOR_INSERT_BYTES		43
+/*! cursor next calls */
+#define	WT_STAT_DSRC_CURSOR_NEXT			44
+/*! cursor prev calls */
+#define	WT_STAT_DSRC_CURSOR_PREV			45
+/*! cursor remove calls */
+#define	WT_STAT_DSRC_CURSOR_REMOVE			46
+/*! cursor-remove key bytes removed */
+#define	WT_STAT_DSRC_CURSOR_REMOVE_BYTES		47
+/*! cursor reset calls */
+#define	WT_STAT_DSRC_CURSOR_RESET			48
+/*! cursor search calls */
+#define	WT_STAT_DSRC_CURSOR_SEARCH			49
+/*! cursor search near calls */
+#define	WT_STAT_DSRC_CURSOR_SEARCH_NEAR			50
+/*! cursor update calls */
+#define	WT_STAT_DSRC_CURSOR_UPDATE			51
+/*! cursor-update value bytes updated */
+#define	WT_STAT_DSRC_CURSOR_UPDATE_BYTES		52
+/*! chunks in the LSM tree */
+#define	WT_STAT_DSRC_LSM_CHUNK_COUNT			53
+/*! highest merge generation in the LSM tree */
+#define	WT_STAT_DSRC_LSM_GENERATION_MAX			54
+/*! queries that could have benefited from a Bloom filter that did not
+ * exist */
+#define	WT_STAT_DSRC_LSM_LOOKUP_NO_BLOOM		55
+/*! reconciliation dictionary matches */
+#define	WT_STAT_DSRC_REC_DICTIONARY			56
+/*! reconciliation overflow keys written */
+#define	WT_STAT_DSRC_REC_OVFL_KEY			57
+/*! reconciliation overflow values written */
+#define	WT_STAT_DSRC_REC_OVFL_VALUE			58
+/*! reconciliation pages deleted */
+#define	WT_STAT_DSRC_REC_PAGE_DELETE			59
+/*! reconciliation pages merged */
+#define	WT_STAT_DSRC_REC_PAGE_MERGE			60
+/*! reconciliation internal pages split */
+#define	WT_STAT_DSRC_REC_SPLIT_INTL			61
+/*! reconciliation leaf pages split */
+#define	WT_STAT_DSRC_REC_SPLIT_LEAF			62
+/*! reconciliation pages written */
+#define	WT_STAT_DSRC_REC_WRITTEN			63
 /*! update conflicts */
-#define	WT_STAT_DSRC_TXN_UPDATE_CONFLICT		60
+#define	WT_STAT_DSRC_TXN_UPDATE_CONFLICT		64
 /*! write generation conflicts */
-#define	WT_STAT_DSRC_TXN_WRITE_CONFLICT			61
+#define	WT_STAT_DSRC_TXN_WRITE_CONFLICT			65
 /*! @} */
 /*
  * Statistics section: END

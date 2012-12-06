@@ -308,7 +308,7 @@ __evict_worker(WT_SESSION_IMPL *session)
 		if (LF_ISSET(WT_EVICT_CLEAN) &&
 		    __wt_cache_bytes_inuse(cache) >= bytes_inuse) {
 			if (loop == 10) {
-				WT_STAT_INCR(conn->stats, cache_evict_slow);
+				WT_CSTAT_INCR(session, cache_eviction_slow);
 				WT_VERBOSE_RET(session, evictserver,
 				    "unable to reach eviction goal");
 				break;
@@ -870,10 +870,6 @@ __wt_evict_lru_page(WT_SESSION_IMPL *session, int is_app)
 	WT_SET_BTREE_IN_SESSION(session, btree);
 
 	ret = __evict_page(session, page);
-	if (ret == 0)
-		WT_BSTAT_INCR(session, page_evict);
-	else
-		WT_BSTAT_INCR(session, page_evict_fail);
 
 	(void)WT_ATOMIC_SUB(btree->lru_count, 1);
 
