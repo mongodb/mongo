@@ -161,13 +161,16 @@ print_derived_stats(WT_SESSION *session)
 
 	{
 	/*! [statistics calculate write amplification] */
-	uint64_t app_writes, fs_writes;
+	uint64_t app_insert, app_remove, app_update, fs_writes;
+
+	ret = get_stat(cursor, WT_STAT_DSRC_CURSOR_INSERT_BYTES, &app_insert);
+	ret = get_stat(cursor, WT_STAT_DSRC_CURSOR_REMOVE_BYTES, &app_remove);
+	ret = get_stat(cursor, WT_STAT_DSRC_CURSOR_UPDATE_BYTES, &app_update);
 
 	ret = get_stat(cursor, WT_STAT_DSRC_CACHE_BYTES_WRITE, &fs_writes);
-	ret = get_stat(cursor, WT_STAT_DSRC_CACHE_BYTES_CHANGED, &app_writes);
 
 	printf("Write amplification is %.2lf\n",
-	    (double)fs_writes / app_writes);
+	    (double)fs_writes / (app_insert + app_remove + app_update));
 	/*! [statistics calculate write amplification] */
 	}
 

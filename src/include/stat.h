@@ -113,7 +113,6 @@ struct __wt_dsrc_stats {
 	WT_STATS btree_overflow;
 	WT_STATS btree_row_internal;
 	WT_STATS btree_row_leaf;
-	WT_STATS cache_bytes_changed;
 	WT_STATS cache_bytes_read;
 	WT_STATS cache_bytes_write;
 	WT_STATS cache_eviction_clean;
@@ -127,13 +126,16 @@ struct __wt_dsrc_stats {
 	WT_STATS cache_write;
 	WT_STATS cursor_insert;
 	WT_STATS cursor_insert_bulk;
+	WT_STATS cursor_insert_bytes;
 	WT_STATS cursor_next;
 	WT_STATS cursor_prev;
 	WT_STATS cursor_remove;
+	WT_STATS cursor_remove_bytes;
 	WT_STATS cursor_reset;
 	WT_STATS cursor_search;
 	WT_STATS cursor_search_near;
 	WT_STATS cursor_update;
+	WT_STATS cursor_update_bytes;
 	WT_STATS lsm_chunk_count;
 	WT_STATS lsm_generation_max;
 	WT_STATS lsm_lookup_no_bloom;

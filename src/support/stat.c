@@ -45,8 +45,6 @@ __wt_stat_alloc_dsrc_stats(WT_SESSION_IMPL *session, WT_DSRC_STATS **statsp)
 	stats->btree_overflow.desc = "overflow pages";
 	stats->btree_row_internal.desc = "row-store internal pages";
 	stats->btree_row_leaf.desc = "row-store leaf pages";
-	stats->cache_bytes_changed.desc =
-	    "approximate measure of bytes changed: counts key and value bytes inserted with cursor.insert, value bytes updated with cursor.update and key bytes removed using cursor.remove";
 	stats->cache_bytes_read.desc = "bytes read into cache";
 	stats->cache_bytes_write.desc = "bytes written from cache";
 	stats->cache_eviction_clean.desc = "unmodified pages evicted";
@@ -60,15 +58,19 @@ __wt_stat_alloc_dsrc_stats(WT_SESSION_IMPL *session, WT_DSRC_STATS **statsp)
 	stats->cache_read.desc = "pages read into cache";
 	stats->cache_read_overflow.desc = "overflow pages read into cache";
 	stats->cache_write.desc = "pages written from cache";
-	stats->cursor_insert.desc = "cursor-inserts";
-	stats->cursor_insert_bulk.desc = "bulk-loaded cursor-inserts";
-	stats->cursor_next.desc = "cursor next";
-	stats->cursor_prev.desc = "cursor prev";
-	stats->cursor_remove.desc = "cursor remove";
-	stats->cursor_reset.desc = "cursor reset";
-	stats->cursor_search.desc = "cursor search";
-	stats->cursor_search_near.desc = "cursor search near";
-	stats->cursor_update.desc = "cursor update";
+	stats->cursor_insert.desc = "cursor insert calls";
+	stats->cursor_insert_bulk.desc = "bulk-loaded cursor-insert calls";
+	stats->cursor_insert_bytes.desc =
+	    "cursor-insert key and value bytes inserted";
+	stats->cursor_next.desc = "cursor next calls";
+	stats->cursor_prev.desc = "cursor prev calls";
+	stats->cursor_remove.desc = "cursor remove calls";
+	stats->cursor_remove_bytes.desc = "cursor-remove key bytes removed";
+	stats->cursor_reset.desc = "cursor reset calls";
+	stats->cursor_search.desc = "cursor search calls";
+	stats->cursor_search_near.desc = "cursor search near calls";
+	stats->cursor_update.desc = "cursor update calls";
+	stats->cursor_update_bytes.desc = "cursor-update value bytes updated";
 	stats->lsm_chunk_count.desc = "chunks in the LSM tree";
 	stats->lsm_generation_max.desc =
 	    "highest merge generation in the LSM tree";
@@ -125,7 +127,6 @@ __wt_stat_clear_dsrc_stats(WT_STATS *stats_arg)
 	stats->btree_overflow.v = 0;
 	stats->btree_row_internal.v = 0;
 	stats->btree_row_leaf.v = 0;
-	stats->cache_bytes_changed.v = 0;
 	stats->cache_bytes_read.v = 0;
 	stats->cache_bytes_write.v = 0;
 	stats->cache_eviction_clean.v = 0;
@@ -139,13 +140,16 @@ __wt_stat_clear_dsrc_stats(WT_STATS *stats_arg)
 	stats->cache_write.v = 0;
 	stats->cursor_insert.v = 0;
 	stats->cursor_insert_bulk.v = 0;
+	stats->cursor_insert_bytes.v = 0;
 	stats->cursor_next.v = 0;
 	stats->cursor_prev.v = 0;
 	stats->cursor_remove.v = 0;
+	stats->cursor_remove_bytes.v = 0;
 	stats->cursor_reset.v = 0;
 	stats->cursor_search.v = 0;
 	stats->cursor_search_near.v = 0;
 	stats->cursor_update.v = 0;
+	stats->cursor_update_bytes.v = 0;
 	stats->lsm_chunk_count.v = 0;
 	stats->lsm_generation_max.v = 0;
 	stats->lsm_lookup_no_bloom.v = 0;

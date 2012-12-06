@@ -249,7 +249,7 @@ __wt_btcur_insert(WT_CURSOR_BTREE *cbt)
 
 	WT_DSTAT_INCR(session, cursor_insert);
 	WT_DSTAT_INCRV(session,
-	    cache_bytes_changed, cursor->key.size + cursor->value.size);
+	    cursor_insert_bytes, cursor->key.size + cursor->value.size);
 
 	if (btree->type == BTREE_ROW)
 		WT_RET(__cursor_size_chk(session, &cursor->key));
@@ -341,7 +341,7 @@ __wt_btcur_remove(WT_CURSOR_BTREE *cbt)
 	session = (WT_SESSION_IMPL *)cursor->session;
 
 	WT_DSTAT_INCR(session, cursor_remove);
-	WT_DSTAT_INCRV(session, cache_bytes_changed, cursor->key.size);
+	WT_DSTAT_INCRV(session, cursor_remove_bytes, cursor->key.size);
 
 	if (btree->type == BTREE_ROW)
 		WT_RET(__cursor_size_chk(session, &cursor->key));
@@ -405,7 +405,7 @@ __wt_btcur_update(WT_CURSOR_BTREE *cbt)
 	session = (WT_SESSION_IMPL *)cursor->session;
 
 	WT_DSTAT_INCR(session, cursor_update);
-	WT_DSTAT_INCRV(session, cache_bytes_changed, cursor->value.size);
+	WT_DSTAT_INCRV(session, cursor_update_bytes, cursor->value.size);
 
 	if (btree->type == BTREE_ROW)
 		WT_RET(__cursor_size_chk(session, &cursor->key));

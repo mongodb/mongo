@@ -84,15 +84,19 @@ dsrc_stats = [
 	##########################################
 	# Operations
 	##########################################
-	Stat('cursor_insert', 'cursor-inserts'),
-	Stat('cursor_insert_bulk', 'bulk-loaded cursor-inserts'),
-	Stat('cursor_next', 'cursor next'),
-	Stat('cursor_prev', 'cursor prev'),
-	Stat('cursor_remove', 'cursor remove'),
-	Stat('cursor_reset', 'cursor reset'),
-	Stat('cursor_search', 'cursor search'),
-	Stat('cursor_search_near', 'cursor search near'),
-	Stat('cursor_update', 'cursor update'),
+	Stat('cursor_insert', 'cursor insert calls'),
+	Stat('cursor_insert_bulk', 'bulk-loaded cursor-insert calls'),
+	Stat('cursor_insert_bytes',
+	    'cursor-insert key and value bytes inserted'),
+	Stat('cursor_next', 'cursor next calls'),
+	Stat('cursor_prev', 'cursor prev calls'),
+	Stat('cursor_remove', 'cursor remove calls'),
+	Stat('cursor_remove_bytes', 'cursor-remove key bytes removed'),
+	Stat('cursor_reset', 'cursor reset calls'),
+	Stat('cursor_search', 'cursor search calls'),
+	Stat('cursor_search_near', 'cursor search near calls'),
+	Stat('cursor_update', 'cursor update calls'),
+	Stat('cursor_update_bytes', 'cursor-update value bytes updated'),
 
 	##########################################
 	# Btree statistics
@@ -146,10 +150,6 @@ dsrc_stats = [
 	##########################################
 	# Cache and eviction statistics
 	##########################################
-	Stat('cache_bytes_changed',
-	    'approximate measure of bytes changed: counts key and value ' +
-	    'bytes inserted with cursor.insert, value bytes updated with ' +
-	    'cursor.update and key bytes removed using cursor.remove'),
 	Stat('cache_bytes_read', 'bytes read into cache'),
 	Stat('cache_bytes_write', 'bytes written from cache'),
 	Stat('cache_eviction_clean', 'unmodified pages evicted'),
