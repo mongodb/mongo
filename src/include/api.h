@@ -33,7 +33,7 @@ struct __wt_btree_session {
 
 /*
  * WT_HAZARD --
- *	A hazard reference.
+ *	A hazard pointer.
  */
 struct __wt_hazard {
 	WT_PAGE *page;			/* Page address */
@@ -124,17 +124,17 @@ struct __wt_session_impl {
 	uint32_t flags;
 
 	/*
-	 * The hazard reference must be placed at the end of the structure: the
-	 * structure is cleared when closed, all except the hazard reference.
-	 * Putting the hazard reference at the end of the structure allows us to
+	 * The hazard pointer must be placed at the end of the structure: the
+	 * structure is cleared when closed, all except the hazard pointer.
+	 * Putting the hazard pointer at the end of the structure allows us to
 	 * easily call a function to clear memory up to, but not including, the
-	 * hazard reference.
+	 * hazard pointer.
 	 */
 	uint32_t   hazard_size;		/* Allocated slots in hazard array. */
-	uint32_t   nhazard;		/* Count of active hazard references */
+	uint32_t   nhazard;		/* Count of active hazard pointers */
 
 #define	WT_SESSION_CLEAR(s)	memset(s, 0, WT_PTRDIFF(&(s)->hazard, s))
-	WT_HAZARD *hazard;		/* Hazard reference array */
+	WT_HAZARD *hazard;		/* Hazard pointer array */
 };
 
 /*******************************************
@@ -236,7 +236,7 @@ struct __wt_connection_impl {
 	uint32_t	 session_cnt;	/* Session count */
 
 	/*
-	 * WiredTiger allocates space for a fixed number of hazard references
+	 * WiredTiger allocates space for a fixed number of hazard pointers
 	 * in each thread of control.
 	 */
 	uint32_t   hazard_max;		/* Hazard array size */

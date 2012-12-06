@@ -15,7 +15,7 @@ static int  __inmem_row_leaf(WT_SESSION_IMPL *, WT_PAGE *, size_t *);
 
 /*
  * __wt_page_in --
- *	Acquire a hazard reference to a page; if the page is not in-memory,
+ *	Acquire a hazard pointer to a page; if the page is not in-memory,
  *	read it from the disk and build an in-memory version.
  */
 int
@@ -52,9 +52,9 @@ __wt_page_in_func(
 		case WT_REF_EVICT_WALK:
 		case WT_REF_MEM:
 			/*
-			 * The page is in memory: get a hazard reference, update
+			 * The page is in memory: get a hazard pointer, update
 			 * the page's LRU and return.  The expected reason we
-			 * can't get a hazard reference is because the page is
+			 * can't get a hazard pointer is because the page is
 			 * being evicted; yield and try again.
 			 */
 #ifdef HAVE_DIAGNOSTIC

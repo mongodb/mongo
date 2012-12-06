@@ -103,7 +103,7 @@ equivalent to <code>'B'</code>, and a full byte is used to store it.
 
 When referenced by a record number (that is, a key format of \c 'r'),
 the <code>'t'</code> type will be stored in a fixed-length column-store,
-and will not have a out-of-band value to indicate the record does not
+and will not have an out-of-band value to indicate the record does not
 exist.  In this case, a 0 byte value is used to indicate the record does
 not exist.  This means removing a record with WT_CURSOR::remove is
 equivalent to storing a value of 0 in the record with WT_CURSOR::update

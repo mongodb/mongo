@@ -383,7 +383,7 @@ __wt_page_release(WT_SESSION_IMPL *session, WT_PAGE *page)
 		return;
 	}
 
-	/* Discard our hazard reference. */
+	/* Discard our hazard pointer. */
 	__wt_hazard_clear(session, page);
 }
 
@@ -405,7 +405,7 @@ __wt_stack_release(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 /*
  * __wt_page_hazard_check --
- *	Return if there's a hazard reference to the page in the system.
+ *	Return if there's a hazard pointer to the page in the system.
  */
 static inline WT_HAZARD *
 __wt_page_hazard_check(WT_SESSION_IMPL *session, WT_PAGE *page)
@@ -420,7 +420,7 @@ __wt_page_hazard_check(WT_SESSION_IMPL *session, WT_PAGE *page)
 	/*
 	 * No lock is required because the session array is fixed size, but it
 	 * it may contain inactive entries.  We must review any active session
-	 * that might contain a hazard reference, so insert a barrier before
+	 * that might contain a hazard pointer, so insert a barrier before
 	 * reading the active session count.  That way, no matter what sessions
 	 * come or go, we'll check the slots for all of the sessions that could
 	 * have been active when we started our check.

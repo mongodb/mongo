@@ -91,7 +91,7 @@ __session_close(WT_SESSION *wt_session, const char *config)
 	/* Free transaction information. */
 	__wt_txn_destroy(session);
 
-	/* Confirm we're not holding any hazard references. */
+	/* Confirm we're not holding any hazard pointers. */
 	__wt_hazard_close(session);
 
 	/* Free the reconciliation information. */
@@ -112,12 +112,12 @@ __session_close(WT_SESSION *wt_session, const char *config)
 	 * field to 0, which will exclude the hazard array from review by the
 	 * eviction thread.   Note: there's no serialization support around the
 	 * review of the hazard array, which means threads checking for hazard
-	 * references first check the active field (which may be 0) and then use
+	 * pointers first check the active field (which may be 0) and then use
 	 * the hazard pointer (which cannot be NULL).  For this reason, clear
 	 * the session structure carefully.
 	 *
 	 * We don't need to publish here, because regardless of the active field
-	 * being non-zero, the hazard reference is always valid.
+	 * being non-zero, the hazard pointer is always valid.
 	 */
 	WT_SESSION_CLEAR(session);
 	session = conn->default_session;
@@ -793,7 +793,7 @@ __wt_open_session(WT_CONNECTION_IMPL *conn, int internal,
 	WT_ERR(__wt_txn_init(session_ret));
 
 	/*
-	 * The session's hazard reference memory isn't discarded during normal
+	 * The session's hazard pointer memory isn't discarded during normal
 	 * session close because access to it isn't serialized.  Allocate the
 	 * first time we open this session.
 	 */

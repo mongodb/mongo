@@ -113,7 +113,7 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 	 * session in case of any error messages from the remaining operations
 	 * while destroying the connection handle.
 	 *
-	 * Additionally, the session's hazard reference memory isn't discarded
+	 * Additionally, the session's hazard pointer memory isn't discarded
 	 * during normal session close because access to it isn't serialized.
 	 * Discard it now.
 	 */

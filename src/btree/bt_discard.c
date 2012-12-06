@@ -44,7 +44,7 @@ __wt_page_out(WT_SESSION_IMPL *session, WT_PAGE **pagep, uint32_t flags)
 	WT_HAZARD *hp;
 	if ((hp = __wt_page_hazard_check(session, page)) != NULL)
 		__wt_errx(session,
-		    "discarded page has hazard reference: (%p: %s, line %d)",
+		    "discarded page has hazard pointer: (%p: %s, line %d)",
 		    hp->page, hp->file, hp->line);
 	}
 #endif

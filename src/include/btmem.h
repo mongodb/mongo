@@ -343,7 +343,7 @@ struct __wt_page {
  *
  * WT_REF_LOCKED:
  *	Set by eviction; an eviction thread has selected this page or a parent
- * for eviction.  Once hazard references are checked, the page will be evicted.
+ * for eviction.  Once hazard pointers are checked, the page will be evicted.
  *
  * WT_REF_MEM:
  *	Set by a reading thread once the page has been read from disk; the page
@@ -362,13 +362,13 @@ struct __wt_page {
  * because the page was busy, page state is reset to WT_REF_MEM.
  *
  * Readers check the state field and if it's WT_REF_MEM, they set a hazard
- * reference to the page, flush memory and re-confirm the page state.  If the
+ * pointer to the page, flush memory and re-confirm the page state.  If the
  * page state is unchanged, the reader has a valid reference and can proceed.
  *
  * When an evicting thread wants to discard a page from the tree, it sets the
- * WT_REF_LOCKED state, flushes memory, then checks hazard references.  If a
- * hazard reference is found, state is reset to WT_REF_MEM, restoring the page
- * to the readers.  If the evicting thread does not find a hazard reference,
+ * WT_REF_LOCKED state, flushes memory, then checks hazard pointers.  If a
+ * hazard pointer is found, state is reset to WT_REF_MEM, restoring the page
+ * to the readers.  If the evicting thread does not find a hazard pointer,
  * the page is evicted.
  */
 enum __wt_page_state {

@@ -46,7 +46,7 @@ __wt_bt_cache_flush(WT_SESSION_IMPL *session, WT_CKPT *ckptbase, int op)
 	 * Reconciliation is just another reader of the page, so it's probably
 	 * possible to do this work in the current thread, rather than poking
 	 * the eviction thread.  The trick is for the sync thread to acquire
-	 * hazard references on each dirty page, which would block the eviction
+	 * hazard pointers on each dirty page, which would block the eviction
 	 * thread from attempting to evict the pages.
 	 *
 	 * I'm not doing it for a few reasons: (1) I don't want sync to update

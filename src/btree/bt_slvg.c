@@ -1874,7 +1874,7 @@ __slvg_row_build_leaf(WT_SESSION_IMPL *session,
 	}
 
 	/*
-	 * Discard our hazard reference and evict the page, updating the
+	 * Discard our hazard pointer and evict the page, updating the
 	 * parent's reference.
 	 */
 	__wt_page_release(session, page);

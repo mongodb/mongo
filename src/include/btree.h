@@ -137,7 +137,7 @@ struct __wt_btree {
 #define	WT_BTREE_LOCK_ONLY	0x0008	/* Handle is only needed for locking */
 #define	WT_BTREE_NO_CACHE	0x0010	/* Disable caching */
 #define	WT_BTREE_NO_EVICTION	0x0020	/* Disable eviction */
-#define	WT_BTREE_NO_HAZARD	0x0040	/* Disable hazard references */
+#define	WT_BTREE_NO_HAZARD	0x0040	/* Disable hazard pointers */
 #define	WT_BTREE_OPEN		0x0080	/* Handle is open */
 #define	WT_BTREE_SALVAGE	0x0100	/* Handle is for salvage */
 #define	WT_BTREE_UPGRADE	0x0200	/* Handle is for upgrade */

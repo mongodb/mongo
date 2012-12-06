@@ -52,7 +52,7 @@
 #define	WT_SKIP_MAXDEPTH	10
 #define	WT_SKIP_PROBABILITY	(UINT32_MAX >> 2)
 
-/* The number of hazard references that can be in use is grown dynamically. */
+/* The number of hazard pointers that can be in use is grown dynamically. */
 #define	WT_HAZARD_INCR		10
 
 /*
@@ -181,7 +181,7 @@
 #define	WT_TREE_PREV	0x10			/* Backward walk */
 
 /*
- * In diagnostic mode we track the locations from which hazard references and
+ * In diagnostic mode we track the locations from which hazard pointers and
  * scratch buffers were acquired.
  */
 #ifdef HAVE_DIAGNOSTIC

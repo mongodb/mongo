@@ -534,7 +534,7 @@ __wt_rec_write(WT_SESSION_IMPL *session,
 	 * they have no parent and the new root page must be written.  We also
 	 * have to write the root page immediately; the alternative would be to
 	 * split the page in memory and continue, but that won't work because
-	 * (1) we'd have to require incoming threads use hazard references to
+	 * (1) we'd have to require incoming threads use hazard pointers to
 	 * read the root page, and (2) the sync or close triggering the split
 	 * won't see the new root page during the current traversal.
 	 *

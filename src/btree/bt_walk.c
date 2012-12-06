@@ -29,7 +29,7 @@ __wt_tree_walk_delete_rollback(WT_REF *ref)
 	/*
 	 * The page is either instantiated or being instantiated -- wait for
 	 * the page to settle down, as needed, and then clean up the update
-	 * structures.  We don't need a hazard reference or anything on the
+	 * structures.  We don't need a hazard pointer or anything on the
 	 * page because there are unresolved transactions, the page can't go
 	 * anywhere.
 	 */
@@ -168,7 +168,7 @@ __wt_tree_walk(WT_SESSION_IMPL *session, WT_PAGE **pagep, uint32_t flags)
 	prev = LF_ISSET(WT_TREE_PREV) ? 1 : 0;
 
 	/*
-	 * Take a copy of any returned page; we have a hazard reference on the
+	 * Take a copy of any returned page; we have a hazard pointer on the
 	 * page, by definition.
 	 */
 	page = *pagep;
@@ -190,7 +190,7 @@ __wt_tree_walk(WT_SESSION_IMPL *session, WT_PAGE **pagep, uint32_t flags)
 	t = page->parent;
 	slot = (uint32_t)(page->ref - t->u.intl.t);
 
-	/* If not the eviction thread, release the page's hazard reference. */
+	/* If not the eviction thread, release the page's hazard pointer. */
 	if (eviction) {
 		if (page->ref->state == WT_REF_EVICT_WALK)
 			page->ref->state = WT_REF_MEM;
@@ -251,7 +251,7 @@ descend:	for (;;) {
 				if (ref->state != WT_REF_MEM &&
 				    ref->state != WT_REF_EVICT_WALK)
 					break;
-				/* Grab a hazard reference. */
+				/* Grab a hazard pointer. */
 				WT_RET(__wt_page_in(session, page, ref));
 			} else if (discard) {
 				/*
