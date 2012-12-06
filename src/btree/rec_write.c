@@ -440,7 +440,7 @@ __wt_rec_write(WT_SESSION_IMPL *session,
 	WT_VERBOSE_RET(session, reconcile,
 	    "page %p %s", page, __wt_page_type_string(page->type));
 
-	WT_BSTAT_INCR(session, rec_written);
+	WT_DSTAT_INCR(session, rec_written);
 
 	/* We're shouldn't get called with a clean page, that's an error. */
 	WT_ASSERT_RET(session, __wt_page_is_modified(page));
@@ -2057,7 +2057,7 @@ __rec_col_merge(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	uint32_t i;
 	int modified;
 
-	WT_BSTAT_INCR(session, rec_page_merge);
+	WT_DSTAT_INCR(session, rec_page_merge);
 
 	val = &r->v;
 	unpack = &_unpack;
@@ -3029,7 +3029,7 @@ __rec_row_merge(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	int modified, ovfl_key;
 	const void *p;
 
-	WT_BSTAT_INCR(session, rec_page_merge);
+	WT_DSTAT_INCR(session, rec_page_merge);
 
 	key = &r->k;
 	val = &r->v;
@@ -3725,7 +3725,7 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	switch (r->bnd_next) {
 	case 0:						/* Page delete */
 		WT_VERBOSE_RET(session, reconcile, "page %p empty", page);
-		WT_BSTAT_INCR(session, rec_page_delete);
+		WT_DSTAT_INCR(session, rec_page_delete);
 
 		/* If this is the root page, we need to create a sync point. */
 		if (WT_PAGE_IS_ROOT(page))
@@ -3770,12 +3770,12 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		switch (page->type) {
 		case WT_PAGE_COL_INT:
 		case WT_PAGE_ROW_INT:
-			WT_BSTAT_INCR(session, rec_split_intl);
+			WT_DSTAT_INCR(session, rec_split_intl);
 			break;
 		case WT_PAGE_COL_FIX:
 		case WT_PAGE_COL_VAR:
 		case WT_PAGE_ROW_LEAF:
-			WT_BSTAT_INCR(session, rec_split_leaf);
+			WT_DSTAT_INCR(session, rec_split_leaf);
 			break;
 		WT_ILLEGAL_VALUE(session);
 		}
@@ -4080,7 +4080,7 @@ __rec_cell_build_key(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 		 * object that was prefix compressed.
 		 */
 		if (pfx == 0) {
-			WT_BSTAT_INCR(session, rec_ovfl_key);
+			WT_DSTAT_INCR(session, rec_ovfl_key);
 
 			*is_ovflp = 1;
 			return (__rec_cell_build_ovfl(
@@ -4161,7 +4161,7 @@ __rec_cell_build_val(WT_SESSION_IMPL *session,
 
 		/* Create an overflow object if the data won't fit. */
 		if (val->buf.size > btree->maxleafitem) {
-			WT_BSTAT_INCR(session, rec_ovfl_value);
+			WT_DSTAT_INCR(session, rec_ovfl_value);
 
 			return (__rec_cell_build_ovfl(
 			    session, r, val, WT_CELL_VALUE_OVFL, rle));
@@ -4400,7 +4400,7 @@ __rec_dictionary_lookup(
 		WT_RET(__wt_cell_pack_data_match(
 		    dp->cell, &val->cell, val->buf.data, &match));
 		if (match) {
-			WT_BSTAT_INCR(session, rec_dictionary);
+			WT_DSTAT_INCR(session, rec_dictionary);
 			*dpp = dp;
 			return (0);
 		}

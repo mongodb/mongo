@@ -97,31 +97,41 @@ __wt_lsm_stat_init(WT_SESSION_IMPL *session,
 		WT_ERR(__wt_curstat_open(session, uribuf->data,
 		    cfg, &stat_cursor));
 
-		stat_cursor->set_key(stat_cursor, WT_STAT_DSRC_PAGE_EVICT);
+		stat_cursor->set_key(
+		    stat_cursor, WT_STAT_DSRC_CACHE_EVICTION_CLEAN);
 		WT_ERR(stat_cursor->search(stat_cursor));
 		WT_ERR(stat_cursor->get_value(
 		    stat_cursor, &desc, &pvalue, &value));
-		WT_STAT_INCRV(stats, page_evict, value);
+		WT_STAT_INCRV(stats, cache_eviction_clean, value);
 		WT_STAT_INCRV(stats, bloom_page_evict, value);
 
-		stat_cursor->set_key(stat_cursor, WT_STAT_DSRC_PAGE_EVICT_FAIL);
+		stat_cursor->set_key(
+		    stat_cursor, WT_STAT_DSRC_CACHE_EVICTION_DIRTY);
 		WT_ERR(stat_cursor->search(stat_cursor));
 		WT_ERR(stat_cursor->get_value(
 		    stat_cursor, &desc, &pvalue, &value));
-		WT_STAT_INCRV(stats, page_evict_fail, value);
+		WT_STAT_INCRV(stats, cache_eviction_dirty, value);
+		WT_STAT_INCRV(stats, bloom_page_evict, value);
 
-		stat_cursor->set_key(stat_cursor, WT_STAT_DSRC_PAGE_READ);
+		stat_cursor->set_key(
+		    stat_cursor, WT_STAT_DSRC_CACHE_EVICTION_FAIL);
 		WT_ERR(stat_cursor->search(stat_cursor));
 		WT_ERR(stat_cursor->get_value(
 		    stat_cursor, &desc, &pvalue, &value));
-		WT_STAT_INCRV(stats, page_read, value);
+		WT_STAT_INCRV(stats, cache_eviction_fail, value);
+
+		stat_cursor->set_key(stat_cursor, WT_STAT_DSRC_CACHE_READ);
+		WT_ERR(stat_cursor->search(stat_cursor));
+		WT_ERR(stat_cursor->get_value(
+		    stat_cursor, &desc, &pvalue, &value));
+		WT_STAT_INCRV(stats, cache_read, value);
 		WT_STAT_INCRV(stats, bloom_page_read, value);
 
-		stat_cursor->set_key(stat_cursor, WT_STAT_DSRC_PAGE_WRITE);
+		stat_cursor->set_key(stat_cursor, WT_STAT_DSRC_CACHE_WRITE);
 		WT_ERR(stat_cursor->search(stat_cursor));
 		WT_ERR(stat_cursor->get_value(
 		    stat_cursor, &desc, &pvalue, &value));
-		WT_STAT_INCRV(stats, page_write, value);
+		WT_STAT_INCRV(stats, cache_write, value);
 		WT_ERR(stat_cursor->close(stat_cursor));
 	}
 

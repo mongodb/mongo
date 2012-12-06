@@ -669,7 +669,7 @@ __session_checkpoint(WT_SESSION *wt_session, const char *config)
 	session = (WT_SESSION_IMPL *)wt_session;
 	txn = &session->txn;
 
-	WT_CSTAT_INCR(session, checkpoint);
+	WT_CSTAT_INCR(session, txn_checkpoint);
 	SESSION_API_CALL(session, checkpoint, config, cfg);
 
 	/*
