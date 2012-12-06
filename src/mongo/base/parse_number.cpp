@@ -15,103 +15,180 @@
 
 #include "mongo/base/parse_number.h"
 
-#include <cerrno>
-#include <cstdlib>
-#include <cstring>
 #include <limits>
 
-#include "mongo/platform/strtoll.h"
-
-/**
- * Macro providing the specialized implementation of parseNumberFromStringWithBase<NUMBER_TYPE>
- * in terms of the strtol-like function CONV_FUNC.
- */
-#define DEFINE_PARSE_NUMBER_FROM_STRING_WITH_BASE(NUMBER_TYPE, CONV_FUNC) \
-    template<>                                                          \
-    Status parseNumberFromStringWithBase<NUMBER_TYPE>(                  \
-            const char* stringValue,                                    \
-            int base,                                                   \
-            NUMBER_TYPE* out) {                                         \
-                                                                        \
-        typedef ::std::numeric_limits<NUMBER_TYPE> limits;              \
-                                                                        \
-        if (base == 1 || base < 0 || base > 36)                         \
-            return Status(ErrorCodes::BadValue, "Invalid base", 0);     \
-                                                                        \
-        if (stringValue[0] == '\0' || ::isspace(stringValue[0]))        \
-            return Status(ErrorCodes::FailedToParse, "Unparseable string", 0); \
-                                                                        \
-        if (!limits::is_signed && (stringValue[0] == '-'))              \
-            return Status(ErrorCodes::FailedToParse, "Negative value", 0);   \
-                                                                        \
-        errno = 0;                                                      \
-        char* endPtr;                                                   \
-        NUMBER_TYPE result = CONV_FUNC(stringValue, &endPtr, base);     \
-        if (*endPtr != '\0')                                            \
-            return Status(ErrorCodes::FailedToParse, "Non-digit characters at end of string");\
-                                                                        \
-        if ((ERANGE == errno) && ((result == limits::max()) || (result == limits::min()))) \
-            return Status(ErrorCodes::FailedToParse, "Value out of range", 0); \
-                                                                        \
-        if (errno != 0 && result == 0)                                  \
-            return Status(ErrorCodes::FailedToParse, "Unparseable string", 0); \
-                                                                        \
-        *out = result;                                                  \
-        return Status::OK();                                            \
-    }
-
-/**
- * Macro providing the specialized implementation of parseNumberFromStringWithBase<NUMBER_TYPE>
- * in terms of parseNumberFromStringWithBase<BIGGER_NUMBER_TYPE>.
- */
-#define DEFINE_PARSE_NUMBER_FROM_STRING_WITH_BASE_IN_TERMS_OF(NUMBER_TYPE, BIGGER_NUMBER_TYPE) \
-    template<>                                                          \
-    Status parseNumberFromStringWithBase<NUMBER_TYPE>(                  \
-            const char* stringValue,                                    \
-            int base,                                                   \
-            NUMBER_TYPE* out) {                                         \
-                                                                        \
-        return parseNumberFromStringWithBaseUsingBiggerNumberType<NUMBER_TYPE, \
-                                                                  BIGGER_NUMBER_TYPE>( \
-                stringValue, base, out);                                \
-    }
+#include "mongo/platform/cstdint.h"
 
 namespace mongo {
 
-namespace {
+    /**
+     * Returns the substring of "str" starting at the "begin"th character, ending just before the
+     * "end"th character.
+     */
+    static inline StringData sdsubstr(
+            const StringData& str, size_t begin, size_t end = std::numeric_limits<size_t>::max()) {
+
+        if (end > str.size())
+            end = str.size();
+        if (begin > str.size())
+            begin = str.size();
+        return StringData(str.data() + begin, end - begin);
+    }
 
     /**
-     * This function implements the functionality of parseNumberFromStringWithBase<NumberType>
-     * by calling parseNumberFromStringWithBase<BiggerNumberType> and checking for overflow on
-     * the range of NumberType.  Used for "int" and "short" types, for which an equivalent to
-     * strtol is unavailable.
+     * Returns the value of the digit "c", with the same conversion behavior as strtol.
+     *
+     * Assumes "c" is an ASCII character or UTF-8 octet.
      */
-    template<typename NumberType, typename BiggerNumberType>
-    Status parseNumberFromStringWithBaseUsingBiggerNumberType(
-            const char* stringValue,
-            int base,
-            NumberType* out) {
+    static uint8_t _digitValue(char c) {
+        if (c >= '0' && c <= '9')
+            return uint8_t(c - '0');
+        if (c >= 'a' && c <= 'z')
+            return uint8_t(c - 'a' + 10);
+        if (c >= 'A' && c <= 'Z')
+            return uint8_t(c - 'A' + 10);
+        return 36;  // Illegal digit value for all supported bases.
+    }
+
+    /**
+     * Assuming "stringValue" represents a parseable number, extracts the sign and returns a
+     * substring with any sign characters stripped away.  "*isNegative" is set to true if the
+     * number is negative, and false otherwise.
+     */
+    static inline StringData _extractSign(const StringData& stringValue, bool* isNegative) {
+        if (stringValue.empty()) {
+            *isNegative = false;
+            return stringValue;
+        }
+
+        bool foundSignMarker;
+        switch (stringValue[0]) {
+        case '-':
+            foundSignMarker = true;
+            *isNegative = true;
+            break;
+        case '+':
+            foundSignMarker = true;
+            *isNegative = false;
+            break;
+        default:
+            foundSignMarker = false;
+            *isNegative = false;
+            break;
+        }
+
+        if (foundSignMarker)
+            return sdsubstr(stringValue, 1);
+        return stringValue;
+    }
+
+    /**
+     * Assuming "stringValue" represents a parseable number, determines what base to use given
+     * "inputBase".  Stores the correct base into "*outputBase".  Follows strtol rules.  If
+     * "inputBase" is not 0, *outputBase is set to "inputBase".  Otherwise, if "stringValue" starts
+     * with "0x" or "0X", sets outputBase to 16, or if it starts with 0, sets outputBase to 8.
+     *
+     * Returns the substring of "stringValue" with the base-indicating prefix stripped off.
+     */
+    static inline StringData _extractBase(
+            const StringData& stringValue, int inputBase, int* outputBase) {
+
+        if (inputBase == 0) {
+            if (stringValue.size() == 0) {
+                *outputBase = inputBase;
+                return stringValue;
+            }
+            if (stringValue[0] == '0') {
+                if (stringValue.size() > 1 && (stringValue[1] == 'x' || stringValue[1] == 'X')) {
+                    *outputBase = 16;
+                    return sdsubstr(stringValue, 2);
+                }
+                *outputBase = 8;
+                return sdsubstr(stringValue, 1);
+            }
+            *outputBase = 10;
+            return stringValue;
+        }
+        else {
+            *outputBase = inputBase;
+            if (inputBase == 16) {
+                StringData prefix = sdsubstr(stringValue, 0, 2);
+                if (prefix == "0x" || prefix == "0X")
+                    return sdsubstr(stringValue, 2);
+            }
+            return stringValue;
+        }
+    }
+
+    template <typename NumberType>
+    Status parseNumberFromStringWithBase(
+            const StringData& stringValue, int base, NumberType* result) {
+
         typedef ::std::numeric_limits<NumberType> limits;
-        BiggerNumberType result;
-        Status status = parseNumberFromStringWithBase(stringValue, base, &result);
-        if (Status::OK() != status)
-            return status;
-        if ((result < limits::min()) || (result > limits::max()))
-            return Status(ErrorCodes::FailedToParse, "Value out of range", 0);
-        *out = static_cast<NumberType>(result);
+
+        if (base == 1 || base < 0 || base > 36)
+            return Status(ErrorCodes::BadValue, "Invalid base", 0);
+
+        if (stringValue.size() == 0)
+            return Status(ErrorCodes::FailedToParse, "Empty string");
+
+        bool isNegative = false;
+        StringData str = _extractBase(_extractSign(stringValue, &isNegative), base, &base);
+
+        NumberType n(0);
+        if (isNegative) {
+            if (limits::is_signed) {
+                for (size_t i = 0; i < str.size(); ++i) {
+                    NumberType digitValue = NumberType(_digitValue(str[i]));
+                    if (int(digitValue) >= base)
+                        return Status(ErrorCodes::FailedToParse, "Bad digit");
+                    if ((NumberType(limits::min() / base) > n) ||
+                        ((limits::min() - NumberType(n * base)) > -digitValue)) {
+
+                        return Status(ErrorCodes::FailedToParse, "Underflow");
+                    }
+
+                    n *= NumberType(base);
+                    n -= NumberType(digitValue);
+                }
+            }
+            else {
+                return Status(ErrorCodes::FailedToParse, "Negative value");
+            }
+        }
+        else {
+            for (size_t i = 0; i < str.size(); ++i) {
+                NumberType digitValue = NumberType(_digitValue(str[i]));
+                if (int(digitValue) >= base)
+                    return Status(ErrorCodes::FailedToParse, "Bad digit");
+                if ((NumberType(limits::max() / base) < n) ||
+                    (NumberType(limits::max() - n * base) < digitValue)) {
+
+                    return Status(ErrorCodes::FailedToParse, "Overflow");
+                }
+
+                n *= NumberType(base);
+                n += NumberType(digitValue);
+            }
+        }
+        *result = n;
         return Status::OK();
     }
-}  // namespace
 
     // Definition of the various supported implementations of parseNumberFromStringWithBase.
 
-    DEFINE_PARSE_NUMBER_FROM_STRING_WITH_BASE(long, strtol)
-    DEFINE_PARSE_NUMBER_FROM_STRING_WITH_BASE(long long, strtoll)
-    DEFINE_PARSE_NUMBER_FROM_STRING_WITH_BASE(unsigned long, strtoul)
-    DEFINE_PARSE_NUMBER_FROM_STRING_WITH_BASE(unsigned long long, strtoull)
+#define DEFINE_PARSE_NUMBER_FROM_STRING_WITH_BASE(NUMBER_TYPE)          \
+    template Status parseNumberFromStringWithBase<NUMBER_TYPE>(const StringData&, int, NUMBER_TYPE*);
 
-    DEFINE_PARSE_NUMBER_FROM_STRING_WITH_BASE_IN_TERMS_OF(short, long)
-    DEFINE_PARSE_NUMBER_FROM_STRING_WITH_BASE_IN_TERMS_OF(unsigned short, unsigned long)
-    DEFINE_PARSE_NUMBER_FROM_STRING_WITH_BASE_IN_TERMS_OF(int, long)
-    DEFINE_PARSE_NUMBER_FROM_STRING_WITH_BASE_IN_TERMS_OF(unsigned int, unsigned long)
+    DEFINE_PARSE_NUMBER_FROM_STRING_WITH_BASE(long)
+    DEFINE_PARSE_NUMBER_FROM_STRING_WITH_BASE(long long)
+    DEFINE_PARSE_NUMBER_FROM_STRING_WITH_BASE(unsigned long)
+    DEFINE_PARSE_NUMBER_FROM_STRING_WITH_BASE(unsigned long long)
+    DEFINE_PARSE_NUMBER_FROM_STRING_WITH_BASE(short)
+    DEFINE_PARSE_NUMBER_FROM_STRING_WITH_BASE(unsigned short)
+    DEFINE_PARSE_NUMBER_FROM_STRING_WITH_BASE(int)
+    DEFINE_PARSE_NUMBER_FROM_STRING_WITH_BASE(unsigned int)
+    DEFINE_PARSE_NUMBER_FROM_STRING_WITH_BASE(signed char);
+    DEFINE_PARSE_NUMBER_FROM_STRING_WITH_BASE(unsigned char);
+
 }  // namespace mongo
