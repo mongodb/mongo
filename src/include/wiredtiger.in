@@ -1913,54 +1913,54 @@ extern int wiredtiger_extension_init(WT_SESSION *session,
 #define	WT_STAT_DSRC_BTREE_COLUMN_VARIABLE		19
 /*! tree pages rewritten by compaction */
 #define	WT_STAT_DSRC_BTREE_COMPACT_REWRITE		20
-/*! total key/value pairs */
+/*! total LSM, table or file object key/value pairs */
 #define	WT_STAT_DSRC_BTREE_ENTRIES			21
-/*! total bulk-loaded key/value pairs */
-#define	WT_STAT_DSRC_BTREE_ENTRIES_BULK_LOADED		22
 /*! fixed-record size */
-#define	WT_STAT_DSRC_BTREE_FIXED_LEN			23
+#define	WT_STAT_DSRC_BTREE_FIXED_LEN			22
 /*! maximum internal page item size */
-#define	WT_STAT_DSRC_BTREE_MAXINTLITEM			24
+#define	WT_STAT_DSRC_BTREE_MAXINTLITEM			23
 /*! maximum internal page size */
-#define	WT_STAT_DSRC_BTREE_MAXINTLPAGE			25
+#define	WT_STAT_DSRC_BTREE_MAXINTLPAGE			24
 /*! maximum leaf page item size */
-#define	WT_STAT_DSRC_BTREE_MAXLEAFITEM			26
+#define	WT_STAT_DSRC_BTREE_MAXLEAFITEM			25
 /*! maximum leaf page size */
-#define	WT_STAT_DSRC_BTREE_MAXLEAFPAGE			27
+#define	WT_STAT_DSRC_BTREE_MAXLEAFPAGE			26
 /*! overflow pages */
-#define	WT_STAT_DSRC_BTREE_OVERFLOW			28
+#define	WT_STAT_DSRC_BTREE_OVERFLOW			27
 /*! row-store internal pages */
-#define	WT_STAT_DSRC_BTREE_ROW_INTERNAL			29
+#define	WT_STAT_DSRC_BTREE_ROW_INTERNAL			28
 /*! row-store leaf pages */
-#define	WT_STAT_DSRC_BTREE_ROW_LEAF			30
+#define	WT_STAT_DSRC_BTREE_ROW_LEAF			29
 /*! approximate measure of bytes changed: counts key and value bytes
  * inserted with cursor.insert, value bytes updated with cursor.update
  * and key bytes removed using cursor.remove */
-#define	WT_STAT_DSRC_CACHE_BYTES_CHANGED		31
+#define	WT_STAT_DSRC_CACHE_BYTES_CHANGED		30
 /*! bytes read into cache */
-#define	WT_STAT_DSRC_CACHE_BYTES_READ			32
+#define	WT_STAT_DSRC_CACHE_BYTES_READ			31
 /*! bytes written from cache */
-#define	WT_STAT_DSRC_CACHE_BYTES_WRITE			33
+#define	WT_STAT_DSRC_CACHE_BYTES_WRITE			32
 /*! unmodified pages evicted */
-#define	WT_STAT_DSRC_CACHE_EVICTION_CLEAN		34
+#define	WT_STAT_DSRC_CACHE_EVICTION_CLEAN		33
 /*! modified pages evicted */
-#define	WT_STAT_DSRC_CACHE_EVICTION_DIRTY		35
+#define	WT_STAT_DSRC_CACHE_EVICTION_DIRTY		34
 /*! data source pages selected for eviction unable to be evicted */
-#define	WT_STAT_DSRC_CACHE_EVICTION_FAIL		36
+#define	WT_STAT_DSRC_CACHE_EVICTION_FAIL		35
 /*! eviction unable to acquire hazard reference */
-#define	WT_STAT_DSRC_CACHE_EVICTION_HAZARD		37
+#define	WT_STAT_DSRC_CACHE_EVICTION_HAZARD		36
 /*! internal pages evicted */
-#define	WT_STAT_DSRC_CACHE_EVICTION_INTERNAL		38
+#define	WT_STAT_DSRC_CACHE_EVICTION_INTERNAL		37
 /*! overflow values cached in memory */
-#define	WT_STAT_DSRC_CACHE_OVERFLOW_VALUE		39
+#define	WT_STAT_DSRC_CACHE_OVERFLOW_VALUE		38
 /*! pages read into cache */
-#define	WT_STAT_DSRC_CACHE_READ				40
+#define	WT_STAT_DSRC_CACHE_READ				39
 /*! overflow pages read into cache */
-#define	WT_STAT_DSRC_CACHE_READ_OVERFLOW		41
+#define	WT_STAT_DSRC_CACHE_READ_OVERFLOW		40
 /*! pages written from cache */
-#define	WT_STAT_DSRC_CACHE_WRITE			42
+#define	WT_STAT_DSRC_CACHE_WRITE			41
 /*! cursor-inserts */
-#define	WT_STAT_DSRC_CURSOR_INSERT			43
+#define	WT_STAT_DSRC_CURSOR_INSERT			42
+/*! bulk-loaded cursor-inserts */
+#define	WT_STAT_DSRC_CURSOR_INSERT_BULK			43
 /*! cursor next */
 #define	WT_STAT_DSRC_CURSOR_NEXT			44
 /*! cursor prev */

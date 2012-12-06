@@ -108,7 +108,7 @@ __wt_btcur_reset(WT_CURSOR_BTREE *cbt)
 	WT_SESSION_IMPL *session;
 
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
-	WT_BSTAT_INCR(session, cursor_reset);
+	WT_DSTAT_INCR(session, cursor_reset);
 
 	__cursor_leave(cbt);
 	__cursor_search_clear(cbt);
@@ -132,7 +132,7 @@ __wt_btcur_search(WT_CURSOR_BTREE *cbt)
 	btree = cbt->btree;
 	cursor = &cbt->iface;
 	session = (WT_SESSION_IMPL *)cursor->session;
-	WT_BSTAT_INCR(session, cursor_search);
+	WT_DSTAT_INCR(session, cursor_search);
 
 	if (btree->type == BTREE_ROW)
 		WT_RET(__cursor_size_chk(session, &cursor->key));
@@ -178,7 +178,7 @@ __wt_btcur_search_near(WT_CURSOR_BTREE *cbt, int *exact)
 	btree = cbt->btree;
 	cursor = &cbt->iface;
 	session = (WT_SESSION_IMPL *)cursor->session;
-	WT_BSTAT_INCR(session, cursor_search_near);
+	WT_DSTAT_INCR(session, cursor_search_near);
 
 	if (btree->type == BTREE_ROW)
 		WT_RET(__cursor_size_chk(session, &cursor->key));
@@ -247,8 +247,8 @@ __wt_btcur_insert(WT_CURSOR_BTREE *cbt)
 	cursor = &cbt->iface;
 	session = (WT_SESSION_IMPL *)cursor->session;
 
-	WT_BSTAT_INCR(session, cursor_insert);
-	WT_BSTAT_INCRV(session,
+	WT_DSTAT_INCR(session, cursor_insert);
+	WT_DSTAT_INCRV(session,
 	    cache_bytes_changed, cursor->key.size + cursor->value.size);
 
 	if (btree->type == BTREE_ROW)
@@ -340,8 +340,8 @@ __wt_btcur_remove(WT_CURSOR_BTREE *cbt)
 	cursor = &cbt->iface;
 	session = (WT_SESSION_IMPL *)cursor->session;
 
-	WT_BSTAT_INCR(session, cursor_remove);
-	WT_BSTAT_INCRV(session, cache_bytes_changed, cursor->key.size);
+	WT_DSTAT_INCR(session, cursor_remove);
+	WT_DSTAT_INCRV(session, cache_bytes_changed, cursor->key.size);
 
 	if (btree->type == BTREE_ROW)
 		WT_RET(__cursor_size_chk(session, &cursor->key));
@@ -404,8 +404,8 @@ __wt_btcur_update(WT_CURSOR_BTREE *cbt)
 	cursor = &cbt->iface;
 	session = (WT_SESSION_IMPL *)cursor->session;
 
-	WT_BSTAT_INCR(session, cursor_update);
-	WT_BSTAT_INCRV(session, cache_bytes_changed, cursor->value.size);
+	WT_DSTAT_INCR(session, cursor_update);
+	WT_DSTAT_INCRV(session, cache_bytes_changed, cursor->value.size);
 
 	if (btree->type == BTREE_ROW)
 		WT_RET(__cursor_size_chk(session, &cursor->key));

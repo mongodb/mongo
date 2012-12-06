@@ -226,10 +226,10 @@ err:	__wt_scr_free(&buf);
 void
 __wt_block_stat(WT_SESSION_IMPL *session, WT_BLOCK *block)
 {
-	WT_BSTAT_SET(session, block_allocsize, block->allocsize);
-	WT_BSTAT_SET(session, block_checkpoint_size, block->live.ckpt_size);
-	WT_BSTAT_SET(session, block_magic, WT_BLOCK_MAGIC);
-	WT_BSTAT_SET(session, block_major, WT_BLOCK_MAJOR_VERSION);
-	WT_BSTAT_SET(session, block_minor, WT_BLOCK_MINOR_VERSION);
-	WT_BSTAT_SET(session, block_size, block->fh->file_size);
+	WT_DSTAT_SET(session, block_allocsize, block->allocsize);
+	WT_DSTAT_SET(session, block_checkpoint_size, block->live.ckpt_size);
+	WT_DSTAT_SET(session, block_magic, WT_BLOCK_MAGIC);
+	WT_DSTAT_SET(session, block_major, WT_BLOCK_MAJOR_VERSION);
+	WT_DSTAT_SET(session, block_minor, WT_BLOCK_MINOR_VERSION);
+	WT_DSTAT_SET(session, block_size, block->fh->file_size);
 }

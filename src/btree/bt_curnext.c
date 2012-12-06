@@ -400,7 +400,7 @@ __wt_btcur_next(WT_CURSOR_BTREE *cbt, int discard)
 	int newpage;
 
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
-	WT_BSTAT_INCR(session, cursor_next);
+	WT_DSTAT_INCR(session, cursor_next);
 
 	flags = 0;					/* Tree walk flags. */
 	if (discard)
@@ -511,7 +511,7 @@ __wt_btcur_next_random(WT_CURSOR_BTREE *cbt)
 
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
 	btree = cbt->btree;
-	WT_BSTAT_INCR(session, cursor_next);
+	WT_DSTAT_INCR(session, cursor_next);
 
 retry:	__cursor_func_init(cbt, 1);
 	__cursor_position_clear(cbt);

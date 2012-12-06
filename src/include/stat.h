@@ -31,26 +31,7 @@ struct __wt_stats {
 #define	WT_STAT_CHECK_SESSION(session)					\
 	((session) != NULL && (session) != S2C(session)->default_session)
 
-#define	WT_BSTAT_INCR(session, fld) do {				\
-	if (WT_STAT_CHECK_SESSION(session)) {				\
-		WT_STAT_INCR((session)->btree->stats, fld);		\
-	}								\
-} while (0)
-#define	WT_BSTAT_INCRV(session, fld, v) do {				\
-	if (WT_STAT_CHECK_SESSION(session)) {				\
-		WT_STAT_INCRV((session)->btree->stats, fld, v);		\
-	}								\
-} while (0)
-#define	WT_BSTAT_DECR(session, fld) do {				\
-	if (WT_STAT_CHECK_SESSION(session)) {				\
-		WT_STAT_DECR((session)->btree->stats, fld);		\
-	}								\
-} while (0)
-#define	WT_BSTAT_SET(session, fld, v) do {				\
-	if (WT_STAT_CHECK_SESSION(session)) {				\
-		WT_STAT_SET((session)->btree->stats, fld, v);		\
-	}								\
-} while (0)
+/* Connection statistics. */
 #define	WT_CSTAT_DECR(session, fld) do {				\
 	if (WT_STAT_CHECK_SESSION(session)) {				\
 		WT_STAT_DECR(S2C(session)->stats, fld);			\
@@ -64,6 +45,28 @@ struct __wt_stats {
 #define	WT_CSTAT_INCRV(session, fld, v) do {				\
 	if (WT_STAT_CHECK_SESSION(session)) {				\
 		WT_STAT_INCRV(S2C(session)->stats, fld, v);		\
+	}								\
+} while (0)
+
+/* Data-source statistics. */
+#define	WT_DSTAT_INCR(session, fld) do {				\
+	if (WT_STAT_CHECK_SESSION(session)) {				\
+		WT_STAT_INCR((session)->btree->stats, fld);		\
+	}								\
+} while (0)
+#define	WT_DSTAT_INCRV(session, fld, v) do {				\
+	if (WT_STAT_CHECK_SESSION(session)) {				\
+		WT_STAT_INCRV((session)->btree->stats, fld, v);		\
+	}								\
+} while (0)
+#define	WT_DSTAT_DECR(session, fld) do {				\
+	if (WT_STAT_CHECK_SESSION(session)) {				\
+		WT_STAT_DECR((session)->btree->stats, fld);		\
+	}								\
+} while (0)
+#define	WT_DSTAT_SET(session, fld, v) do {				\
+	if (WT_STAT_CHECK_SESSION(session)) {				\
+		WT_STAT_SET((session)->btree->stats, fld, v);		\
 	}								\
 } while (0)
 
@@ -102,7 +105,6 @@ struct __wt_dsrc_stats {
 	WT_STATS btree_column_variable;
 	WT_STATS btree_compact_rewrite;
 	WT_STATS btree_entries;
-	WT_STATS btree_entries_bulk_loaded;
 	WT_STATS btree_fixed_len;
 	WT_STATS btree_maxintlitem;
 	WT_STATS btree_maxintlpage;
@@ -124,6 +126,7 @@ struct __wt_dsrc_stats {
 	WT_STATS cache_read_overflow;
 	WT_STATS cache_write;
 	WT_STATS cursor_insert;
+	WT_STATS cursor_insert_bulk;
 	WT_STATS cursor_next;
 	WT_STATS cursor_prev;
 	WT_STATS cursor_remove;

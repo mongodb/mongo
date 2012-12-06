@@ -48,7 +48,7 @@ __wt_rec_evict(WT_SESSION_IMPL *session, WT_PAGE *page, int exclusive)
 	if (!exclusive &&
 	    (page->type == WT_PAGE_COL_INT || page->type == WT_PAGE_ROW_INT)) {
 		WT_CSTAT_INCR(session, cache_eviction_internal);
-		WT_BSTAT_INCR(session, cache_eviction_internal);
+		WT_DSTAT_INCR(session, cache_eviction_internal);
 	}
 
 	/* Update the parent and discard the page. */
@@ -65,7 +65,7 @@ __wt_rec_evict(WT_SESSION_IMPL *session, WT_PAGE *page, int exclusive)
 		__rec_discard_page(session, page, exclusive);
 
 		WT_CSTAT_INCR(session, cache_eviction_clean);
-		WT_BSTAT_INCR(session, cache_eviction_clean);
+		WT_DSTAT_INCR(session, cache_eviction_clean);
 	} else {
 		if (WT_PAGE_IS_ROOT(page))
 			__rec_root_update(session);
@@ -76,7 +76,7 @@ __wt_rec_evict(WT_SESSION_IMPL *session, WT_PAGE *page, int exclusive)
 		__rec_discard_tree(session, page, exclusive);
 
 		WT_CSTAT_INCR(session, cache_eviction_dirty);
-		WT_BSTAT_INCR(session, cache_eviction_dirty);
+		WT_DSTAT_INCR(session, cache_eviction_dirty);
 	}
 	if (0) {
 err:		/*
@@ -86,7 +86,7 @@ err:		/*
 		__rec_excl_clear(session);
 
 		WT_CSTAT_INCR(session, cache_eviction_fail);
-		WT_BSTAT_INCR(session, cache_eviction_fail);
+		WT_DSTAT_INCR(session, cache_eviction_fail);
 	}
 	session->excl_next = 0;
 
@@ -443,7 +443,7 @@ __hazard_exclusive(WT_SESSION_IMPL *session, WT_REF *ref, int top)
 	if (__wt_page_hazard_check(session, ref->page) == NULL)
 		return (0);
 
-	WT_BSTAT_INCR(session, cache_eviction_hazard);
+	WT_DSTAT_INCR(session, cache_eviction_hazard);
 	WT_CSTAT_INCR(session, cache_eviction_hazard);
 
 	WT_VERBOSE_RET(
