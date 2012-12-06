@@ -336,8 +336,7 @@ __rec_review(WT_SESSION_IMPL *session,
 			    ++txn->eviction_fails >= 100) {
 				txn->eviction_fails = 0;
 				ret = WT_DEADLOCK;
-				WT_STAT_INCR(
-				    S2C(session)->stats, txn_fail_cache);
+				WT_CSTAT_INCR(session, txn_fail_cache);
 			}
 
 			/*
