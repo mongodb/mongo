@@ -11,6 +11,7 @@ env.StaticLibrary('base', ['cluster_constants.cpp',
                            'type_chunk.cpp',
                            'type_collection.cpp',
                            'type_database.cpp',
+                           'type_locks.cpp',
                            'type_settings.cpp',
                            'type_shard.cpp',
                            'type_config_version.cpp',
@@ -25,6 +26,8 @@ env.CppUnitTest('type_chunk_test', 'type_chunk_test.cpp', LIBDEPS=['base'])
 env.CppUnitTest('type_collection_test', 'type_collection_test.cpp', LIBDEPS=['base'])
 
 env.CppUnitTest('type_database_test', 'type_database_test.cpp', LIBDEPS=['base'])
+
+env.CppUnitTest('type_locks_test', 'type_locks_test.cpp', LIBDEPS=['base'])
 
 env.CppUnitTest('type_settings_test', 'type_settings_test.cpp', LIBDEPS=['base'])
 
