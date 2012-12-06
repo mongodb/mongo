@@ -1814,9 +1814,9 @@ extern int wiredtiger_extension_init(WT_SESSION *session,
 #define	WT_STAT_CONN_CACHE_BYTES_INUSE			6
 /*! cache: maximum bytes configured */
 #define	WT_STAT_CONN_CACHE_BYTES_MAX			7
-/*! bytes read into cache */
+/*! cache: bytes read into cache */
 #define	WT_STAT_CONN_CACHE_BYTES_READ			8
-/*! bytes written from cache */
+/*! cache: bytes written from cache */
 #define	WT_STAT_CONN_CACHE_BYTES_WRITE			9
 /*! cache: unmodified pages evicted */
 #define	WT_STAT_CONN_CACHE_EVICTION_CLEAN		10
@@ -1834,9 +1834,9 @@ extern int wiredtiger_extension_init(WT_SESSION *session,
 #define	WT_STAT_CONN_CACHE_PAGES_DIRTY			16
 /*! cache: pages currently held in the cache */
 #define	WT_STAT_CONN_CACHE_PAGES_INUSE			17
-/*! pages read into cache */
+/*! cache: pages read into cache */
 #define	WT_STAT_CONN_CACHE_READ				18
-/*! pages written from cache */
+/*! cache: pages written from cache */
 #define	WT_STAT_CONN_CACHE_WRITE			19
 /*! pthread mutex condition wait calls */
 #define	WT_STAT_CONN_COND_WAIT				20

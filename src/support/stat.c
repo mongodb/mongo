@@ -178,8 +178,8 @@ __wt_stat_alloc_connection_stats(WT_SESSION_IMPL *session, WT_CONNECTION_STATS *
 	    "cache: tracked dirty bytes in the cache";
 	stats->cache_bytes_inuse.desc = "cache: bytes currently in the cache";
 	stats->cache_bytes_max.desc = "cache: maximum bytes configured";
-	stats->cache_bytes_read.desc = "bytes read into cache";
-	stats->cache_bytes_write.desc = "bytes written from cache";
+	stats->cache_bytes_read.desc = "cache: bytes read into cache";
+	stats->cache_bytes_write.desc = "cache: bytes written from cache";
 	stats->cache_eviction_clean.desc = "cache: unmodified pages evicted";
 	stats->cache_eviction_dirty.desc = "cache: modified pages evicted";
 	stats->cache_eviction_fail.desc =
@@ -193,8 +193,8 @@ __wt_stat_alloc_connection_stats(WT_SESSION_IMPL *session, WT_CONNECTION_STATS *
 	    "cache: tracked dirty pages in the cache";
 	stats->cache_pages_inuse.desc =
 	    "cache: pages currently held in the cache";
-	stats->cache_read.desc = "pages read into cache";
-	stats->cache_write.desc = "pages written from cache";
+	stats->cache_read.desc = "cache: pages read into cache";
+	stats->cache_write.desc = "cache: pages written from cache";
 	stats->cond_wait.desc = "pthread mutex condition wait calls";
 	stats->memory_allocation.desc = "total heap memory allocations";
 	stats->memory_free.desc = "total heap memory frees";
