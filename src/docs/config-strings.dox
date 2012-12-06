@@ -65,7 +65,7 @@ For example, in Python, code might look as follows:
 @todo improve the example
 
 Open a connection to a database, creating it if it does not exist and set a
-cache size of 10MB, then open a session in the database:
+cache size of 500MB, then open a session in the database:
 
 @snippet ex_config.c configure cache size
 

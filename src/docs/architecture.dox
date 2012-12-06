@@ -26,7 +26,7 @@ WiredTiger's design is focused on a few core principles:
 @section multi_core Multi-core scaling
 
 WiredTiger scales on modern, multi-CPU architectures.  Using a variety of
-programming techniques such as hazard references, lock-free algorithms, fast
+programming techniques such as hazard pointers, lock-free algorithms, fast
 latching and message passing, WiredTiger performs more work per CPU core than
 alternative engines.
 
