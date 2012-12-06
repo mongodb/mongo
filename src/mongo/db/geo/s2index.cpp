@@ -135,11 +135,11 @@ namespace mongo {
             }
         }
 
-        bool parseLegacy(const BSONObj &obj, QueryGeometry *out, bool *near, bool *intersect,
+        bool parseLegacy(const BSONObj &obj, QueryGeometry *out, bool *isNear, bool *intersect,
                          double *maxDistance) const {
             // Legacy intersect parsing: t.find({ loc : [0,0] })
             if (out->parseFrom(obj)) {
-                *near = true;
+                *isNear = true;
                 return true;
             }
 
@@ -151,7 +151,7 @@ namespace mongo {
                 // Legacy near parsing: t.find({ loc : { $near: [0,0] }})
                 if (mongoutils::str::equals(e.fieldName(), "$near")) {
                     if (out->parseFrom(e.embeddedObject())) {
-                        *near = true;
+                        *isNear = true;
                         ret = true;
                     }
                 } else if (mongoutils::str::equals(e.fieldName(), "$maxDistance")) {
@@ -161,7 +161,7 @@ namespace mongo {
             return ret;
         }
 
-        bool parseQuery(const BSONObj &obj, QueryGeometry *out, bool *near, bool *intersect,
+        bool parseQuery(const BSONObj &obj, QueryGeometry *out, bool *isNear, bool *intersect,
                         double *maxDistance) const {
             // pointA = { "type" : "Point", "coordinates": [ 40, 5 ] }
             // t.find({ "geo" : { "$intersect" : { "$geometry" : pointA} } })
@@ -174,7 +174,7 @@ namespace mongo {
             if (BSONObj::opINTERSECT == matchType) {
                 *intersect = true;
             } else if (BSONObj::opNEAR == matchType) {
-                *near = true;
+                *isNear = true;
             } else {
                 return false;
             }
