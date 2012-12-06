@@ -43,11 +43,12 @@ namespace mongo {
     const int PDFILE_VERSION = 4;
     const int PDFILE_VERSION_MINOR = 5;
 
+    class Cursor;
     class DataFileHeader;
     class Extent;
-    class Record;
-    class Cursor;
     class OpDebug;
+    class Record;
+    class SortPhaseOne;
 
     void dropDatabase(const std::string& db);
     bool repairDatabase(string db, string &errmsg, bool preserveClonedFilesOnFailure = false, bool backupOriginalFiles = false);
@@ -115,6 +116,7 @@ namespace mongo {
     class DataFileMgr {
         friend class BasicCursor;
     public:
+        DataFileMgr();
         void init(const string& path );
 
         /* see if we can find an extent of the right size in the freelist. */
@@ -182,8 +184,21 @@ namespace mongo {
         /* does not clean up indexes, etc. : just deletes the record in the pdfile. use deleteRecord() to unindex */
         void _deleteRecord(NamespaceDetails *d, const char *ns, Record *todelete, const DiskLoc& dl);
 
+        /**
+         * accessor/mutator for the 'precalced' keys (that is, sorted index keys)
+         *
+         * NB: 'precalced' is accessed from fastBuildIndex(), which is called from insert-related
+         * methods like insertWithObjMod().  It is mutated from various callers of the insert
+         * methods, which assume 'precalced' will not change while in the insert method.  This
+         * should likely be refactored so theDataFileMgr takes full responsibility.
+         */
+        SortPhaseOne* getPrecalced() const;
+        void setPrecalced(SortPhaseOne* precalced);
+        mongo::mutex _precalcedMutex;
+
     private:
         vector<MongoDataFile *> files;
+        SortPhaseOne* _precalced;
     };
 
     extern DataFileMgr theDataFileMgr;

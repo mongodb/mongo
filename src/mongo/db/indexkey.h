@@ -165,6 +165,8 @@ namespace mongo {
 
         bool isSparse() const { return _sparse; }
 
+        string toString() const;
+
     protected:
 
         int indexVersion() const;

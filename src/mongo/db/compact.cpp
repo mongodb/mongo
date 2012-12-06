@@ -20,8 +20,6 @@
 
 #include "pch.h"
 
-#include "mongo/db/compact.h"
-
 #include <string>
 #include <vector>
 
@@ -39,6 +37,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/kill_current_op.h"
 #include "mongo/db/pdfile.h"
+#include "mongo/db/sort_phase_one.h"
 #include "mongo/util/concurrency/task.h"
 #include "mongo/util/timer.h"
 #include "mongo/util/touch_pages.h"
@@ -186,8 +185,6 @@ namespace mongo {
         return skipped;
     }
 
-    extern SortPhaseOne *precalced;
-
     bool _compact(const char *ns, NamespaceDetails *d, string& errmsg, bool validate, BSONObjBuilder& result, double pf, int pb) { 
         // this is a big job, so might as well make things tidy before we start just to be nice.
         getDur().commitIfNeeded();
@@ -296,15 +293,16 @@ namespace mongo {
             killCurrentOp.checkForInterrupt(false);
             BSONObj info = indexSpecs[i].info;
             log() << "compact create index " << info["key"].Obj().toString() << endl;
+            scoped_lock precalcLock(theDataFileMgr._precalcedMutex);
             try {
-                precalced = &phase1[i];
+                theDataFileMgr.setPrecalced(&phase1[i]);
                 theDataFileMgr.insert(si.c_str(), info.objdata(), info.objsize());
             }
-            catch(...) { 
-                precalced = 0;
+            catch(...) {
+                theDataFileMgr.setPrecalced(NULL);
                 throw;
             }
-            precalced = 0;
+            theDataFileMgr.setPrecalced(NULL);
         }
 
         return true;

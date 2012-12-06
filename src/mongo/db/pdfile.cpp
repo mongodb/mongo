@@ -36,7 +36,6 @@ _ disallow system* manipulations from the database.
 #include "mongo/db/background.h"
 #include "mongo/db/btree.h"
 #include "mongo/db/commands/server_status.h"
-#include "mongo/db/compact.h"
 #include "mongo/db/curop-inl.h"
 #include "mongo/db/db.h"
 #include "mongo/db/dbhelpers.h"
@@ -50,6 +49,7 @@ _ disallow system* manipulations from the database.
 #include "mongo/db/ops/delete.h"
 #include "mongo/db/repl.h"
 #include "mongo/db/replutil.h"
+#include "mongo/db/sort_phase_one.h"
 #include "mongo/util/file.h"
 #include "mongo/util/file_allocator.h"
 #include "mongo/util/hashtab.h"
@@ -805,6 +805,17 @@ namespace mongo {
     }
 
     /*---------------------------------------------------------------------*/
+
+    DataFileMgr::DataFileMgr() : _precalcedMutex("PrecalcedMutex"), _precalced(NULL) {
+    }
+
+    SortPhaseOne* DataFileMgr::getPrecalced() const {
+        return _precalced;
+    }
+
+    void DataFileMgr::setPrecalced(SortPhaseOne* precalced) {
+        _precalced = precalced;
+    }
 
     shared_ptr<Cursor> DataFileMgr::findAll(const char *ns, const DiskLoc &startLoc) {
         NamespaceDetails * d = nsdetails( ns );
@@ -1881,9 +1892,11 @@ namespace mongo {
             Client::Context ctx( dbName, reservedPathString );
             verify( ctx.justCreated() );
 
-            res = cloneFrom(localhost.c_str(), errmsg, dbName,
-                            /*logForReplication=*/false, /*slaveOk*/false, /*replauth*/false,
-                            /*snapshot*/false, /*mayYield*/false, /*mayBeInterrupted*/true);
+            res = Cloner::cloneFrom(localhost.c_str(), errmsg, dbName,
+                                    /*logForReplication=*/false, /*slaveOk*/false,
+                                    /*replauth*/false, /*snapshot*/false, /*mayYield*/false,
+                                    /*mayBeInterrupted*/true);
+ 
             Database::closeDatabase( dbName, reservedPathString.c_str() );
         }
 

@@ -22,7 +22,6 @@
 #include "mongo/db/background.h"
 #include "mongo/db/btreebuilder.h"
 #include "mongo/db/clientcursor.h"
-#include "mongo/db/compact.h"
 #include "mongo/db/extsort.h"
 #include "mongo/db/index.h"
 #include "mongo/db/kill_current_op.h"
@@ -30,6 +29,7 @@
 #include "mongo/db/pdfile_private.h"
 #include "mongo/db/replutil.h"
 #include "mongo/db/repl/rs.h"
+#include "mongo/db/sort_phase_one.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/startup_test.h"
 
@@ -314,8 +314,6 @@ namespace mongo {
         }
     }
 
-    SortPhaseOne* precalced = 0;
-
     // throws DBException
     uint64_t fastBuildIndex(const char* ns,
                             NamespaceDetails* d,
@@ -339,7 +337,7 @@ namespace mongo {
         /* get and sort all the keys ----- */
         ProgressMeterHolder pm( op->setMessage( "index: (1/3) external sort" , d->stats.nrecords , 10 ) );
         SortPhaseOne _ours;
-        SortPhaseOne *phase1 = precalced;
+        SortPhaseOne *phase1 = theDataFileMgr.getPrecalced();
         if( phase1 == 0 ) {
             phase1 = &_ours;
             addKeysToPhaseOne( ns, idx, order, phase1, d->stats.nrecords, pm.get(), mayInterrupt );

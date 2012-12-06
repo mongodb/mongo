@@ -47,11 +47,12 @@
 
 namespace mongo {
 
-    struct HowToFixUp;
-    struct Target;
+    class Cloner;
     class DBClientConnection;
-    class ReplSetImpl;
+    class HowToFixUp;
     class OplogReader;
+    class ReplSetImpl;
+    class Target;
     extern bool replSet; // true if using repl sets
     extern class ReplSet *theReplSet; // null until initialized
     extern Tee *rsLog;
@@ -501,7 +502,8 @@ namespace mongo {
         friend class Consensus;
 
     private:
-        bool _syncDoInitialSync_clone( const char *master, const list<string>& dbs , bool dataPass );
+        bool _syncDoInitialSync_clone(Cloner &cloner, const char *master,
+                                      const list<string>& dbs, bool dataPass);
         bool _syncDoInitialSync_applyToHead( replset::SyncTail& syncer, OplogReader* r ,
                                              const Member* source, const BSONObj& lastOp,
                                              BSONObj& minValidOut);

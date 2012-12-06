@@ -20,10 +20,10 @@
 
 #include "mongo/db/btree.h"
 #include "mongo/db/btreecursor.h"
-#include "mongo/db/compact.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/kill_current_op.h"
 #include "mongo/db/pdfile.h"
+#include "mongo/db/sort_phase_one.h"
 #include "mongo/platform/cstdint.h"
 
 #include "mongo/dbtests/dbtests.h"

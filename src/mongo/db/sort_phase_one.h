@@ -21,8 +21,8 @@
 namespace mongo {
 
     /** for bottom up fastbuildindex (where we presort keys) */
-    struct SortPhaseOne { 
-        SortPhaseOne() { 
+    struct SortPhaseOne {
+        SortPhaseOne() {
             n = 0;
             nkeys = 0;
             multi = false;
