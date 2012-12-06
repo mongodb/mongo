@@ -15,7 +15,8 @@ env.StaticLibrary('base', ['cluster_constants.cpp',
                            'type_settings.cpp',
                            'type_shard.cpp',
                            'type_config_version.cpp',
-                           'type_mongos.cpp'],
+                           'type_mongos.cpp',
+                           'type_tags.cpp'],
                   LIBDEPS=['$BUILD_DIR/mongo/base/base',
                            '$BUILD_DIR/mongo/bson'])
 
@@ -34,6 +35,8 @@ env.CppUnitTest('type_settings_test', 'type_settings_test.cpp', LIBDEPS=['base']
 env.CppUnitTest('type_shard_test', 'type_shard_test.cpp', LIBDEPS=['base'])
 
 env.CppUnitTest('type_mongos_test', 'type_mongos_test.cpp', LIBDEPS=['base'])
+
+env.CppUnitTest('type_tags_test', 'type_tags_test.cpp', LIBDEPS=['base'])
 
 #
 # Support for maintaining persistent sharding state and data.
