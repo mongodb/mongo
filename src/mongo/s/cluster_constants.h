@@ -94,32 +94,6 @@ namespace mongo {
     };
 
     /**
-     * LockFields holds all the field names and types for the locks collection.
-     */
-    struct LockFields {
-
-        // name of the lock
-        static BSONField<string> name;
-
-        // 0: Unlocked | 1: Locks in contention | 2: Lock held
-        static BSONField<int> state;
-
-        // the process field contains the (unique) identifier for the instance
-        // of mongod/mongos which has requested the lock
-        static BSONField<string> process;
-
-        // a unique identifier for the instance of the lock itself. Allows for
-        // safe cleanup after network partitioning
-        static BSONField<OID> lockID;
-
-        // a note about why the lock is held, or which subcomponent is holding it
-        static BSONField<string> who;
-
-        // a human readable description of the purpose of the lock
-        static BSONField<string> why;
-    };
-
-    /**
      * LockPingFields holds all the field names and types for the lockpings collection.
      */
     struct LockPingFields {

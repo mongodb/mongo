@@ -39,14 +39,6 @@ namespace mongo {
     BSONField<string> ChangelogFields::ns("ns");
     BSONField<BSONObj> ChangelogFields::details("details");
 
-    const string ConfigNS::locks = "config.locks";
-    BSONField<string> LockFields::name("_id");
-    BSONField<int> LockFields::state("state");
-    BSONField<string> LockFields::process("process");
-    BSONField<OID> LockFields::lockID("ts");
-    BSONField<string> LockFields::who("who");
-    BSONField<string> LockFields::why("why");
-
     const string ConfigNS::lockpings = "config.lockpings";
     BSONField<string> LockPingFields::process("_id");
     BSONField<Date_t> LockPingFields::ping("ping");
