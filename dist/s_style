@@ -44,6 +44,16 @@ for f in `find examples ext src test -name '*.[chisy]' -o -name '*.in' |
 		cat $t
 	}
 
+	# Direct calls to strtouq, not __wt_strtouq
+	if ! expr "$f" : '.*/os_strtouq.c' > /dev/null; then
+		egrep strtouq $f | egrep -v __wt_strtouq | \
+		egrep -v '^[[:space:]].*\*' > $t
+		test -s $t && {
+			echo "$f: explicit call to strtouq"
+			cat $t
+		}
+	fi
+
 	if ! expr "$f" : 'examples/.*' > /dev/null &&
 	   ! expr "$f" : 'test/.*' > /dev/null &&
 	   ! expr "$f" : 'ext/.*' > /dev/null; then
