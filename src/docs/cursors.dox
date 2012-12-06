@@ -61,7 +61,7 @@ hot backup cursor, See also: @ref hot_backup}
 column group cursor,}
    @row{<tt>config:[\<uri\>]</tt>,
 object configuration cursor, (key=config string\,
-value=config value),}
+value=config value)}
   @row{<tt>file:\<filename\></tt>,
 file cursor (key=file key\, value=file value),}
   @row{<tt>index:\<tablename\>.\<indexname\></tt>,
