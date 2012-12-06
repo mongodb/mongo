@@ -18,9 +18,6 @@ struct __wt_stats {
 #define	WT_STAT_INCR(stats, fld) do {					\
 	++(stats)->fld.v;						\
 } while (0)
-#define	WT_STAT_DECRV(stats, fld, value) do {				\
-	(stats)->fld.v -= (value);					\
-} while (0)
 #define	WT_STAT_INCRV(stats, fld, value) do {				\
 	(stats)->fld.v += (value);					\
 } while (0)
