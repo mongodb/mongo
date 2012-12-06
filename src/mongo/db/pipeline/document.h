@@ -298,8 +298,11 @@ namespace mongo {
          *  TODO: there are some optimizations that may make sense at freeze time.
          */
         Document freeze() {
-            Document ret(storagePtr());
-            reset(NULL);
+            // This essentially moves _storage into a new Document by way of temp.
+            Document ret;
+            intrusive_ptr<const DocumentStorage> temp (storagePtr(), /*inc_ref_count=*/false);
+            temp.swap(ret._storage);
+            _storage = NULL;
             return ret;
         }
 
