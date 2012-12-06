@@ -109,6 +109,7 @@ will not be cleared by an error.
 Applications that cannot re-position the cursor after failure must
 duplicate the cursor by calling WT_SESSION::open_cursor and passing the
 cursor as the \c to_dup parameter before calling a cursor method that will
-attempt to re-position the cursor.
+attempt to re-position the cursor.  Cursor duplication is not supported
+for the backup, config and statistics cursor types.
 
  */

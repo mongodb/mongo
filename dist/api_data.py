@@ -388,9 +388,6 @@ methods = {
 		ignore the encodings for the key and value, manage data as if
 		the formats were \c "u".  See @ref cursor_raw for details''',
 		type='boolean'),
-	Config('statistics', 'false', r'''
-		configure the cursor for statistics''',
-		type='boolean'),
 	Config('statistics_clear', 'false', r'''
 		reset statistics counters when the cursor is closed; valid
 		only for statistics cursors''',

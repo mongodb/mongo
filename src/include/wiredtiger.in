@@ -314,7 +314,7 @@ struct __wt_cursor {
 	 * must be set; if the record already exists, the key's value will be
 	 * updated, otherwise, the record will be inserted.
 	 *
-	 * In a cursor with record number keys was configured with "append",
+	 * If a cursor with record number keys was configured with "append",
 	 * the value must be set; a new record will be appended and the record
 	 * number set as the cursor key value.
 	 *
@@ -366,7 +366,7 @@ struct __wt_cursor {
 	/*! Close the cursor.
 	 *
 	 * This releases the resources associated with the cursor handle.
-	 * Cursors are closed implicitly by ending the enclosing transaction or
+	 * Cursors are closed implicitly by ending the enclosing connection or
 	 * closing the session in which they were opened.
 	 *
 	 * @snippet ex_all.c Close the cursor
@@ -501,9 +501,9 @@ struct __wt_session {
 	 *  @row{<tt>colgroup:\<tablename\>.\<columnset\></tt>,
 	 *	column group cursor,
 	 *	table key\, column group value(s)}
-	 *  @row{<tt>config:</tt>,
-	 *	object configuration cursor (key=config string\,
-	 *	value=config value}
+	 *  @row{<tt>config:[\<uri\>]</tt>,
+	 *	object configuration cursor, (key=config string\,
+	 *	value=config value),}
 	 *  @row{<tt>file:\<filename\></tt>,
 	 *	file cursor,
 	 *	file key\, file value(s)}
@@ -522,7 +522,6 @@ struct __wt_session {
 	 *	table key\, table value(s)}
 	 *  </table>
 	 * @param to_dup a cursor to duplicate
-	 * @param session the session handle
 	 * @configstart{session.open_cursor, see dist/api_data.py}
 	 * @config{append, append the value as a new record\, creating a new
 	 * record number key; valid only for cursors with record number keys.,a
@@ -559,8 +558,6 @@ struct __wt_session {
 	 * @config{raw, ignore the encodings for the key and value\, manage data
 	 * as if the formats were \c "u".  See @ref cursor_raw for details.,a
 	 * boolean flag; default \c false.}
-	 * @config{statistics, configure the cursor for statistics.,a boolean
-	 * flag; default \c false.}
 	 * @config{statistics_clear, reset statistics counters when the cursor
 	 * is closed; valid only for statistics cursors.,a boolean flag; default
 	 * \c false.}
