@@ -807,8 +807,11 @@ namespace mongo {
         const char *ns = d.getns();
         op.debug().ns = ns;
 
-        Status status = cc().getAuthorizationManager()->checkAuthForInsert(ns);
-        uassert(16544, status.reason(), status.isOK());
+        // Auth checking for index writes happens later.
+        if (NamespaceString(ns).coll != "system.indexes") {
+            Status status = cc().getAuthorizationManager()->checkAuthForInsert(ns);
+            uassert(16544, status.reason(), status.isOK());
+        }
 
         if( !d.moreJSObjs() ) {
             // strange.  should we complain?
