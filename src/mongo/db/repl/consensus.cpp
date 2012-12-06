@@ -27,6 +27,13 @@ namespace mongo {
     class CmdReplSetFresh : public ReplSetCommand {
     public:
         CmdReplSetFresh() : ReplSetCommand("replSetFresh") { }
+        virtual void addRequiredPrivileges(const std::string& dbname,
+                                           const BSONObj& cmdObj,
+                                           std::vector<Privilege>* out) {
+            ActionSet actions;
+            actions.addAction(ActionType::replSetFresh);
+            out->push_back(Privilege(AuthorizationManager::SERVER_RESOURCE_NAME, actions));
+        }
     private:
 
         bool shouldVeto(const BSONObj& cmdObj, string& errmsg) {
@@ -117,6 +124,13 @@ namespace mongo {
     class CmdReplSetElect : public ReplSetCommand {
     public:
         CmdReplSetElect() : ReplSetCommand("replSetElect") { }
+        virtual void addRequiredPrivileges(const std::string& dbname,
+                                           const BSONObj& cmdObj,
+                                           std::vector<Privilege>* out) {
+            ActionSet actions;
+            actions.addAction(ActionType::replSetElect);
+            out->push_back(Privilege(AuthorizationManager::SERVER_RESOURCE_NAME, actions));
+        }
     private:
         virtual bool run(const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             if( !check(errmsg, result) )
