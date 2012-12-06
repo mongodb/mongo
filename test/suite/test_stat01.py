@@ -100,7 +100,7 @@ class test_stat01(wttest.WiredTigerTestCase):
 
         self.printVerbose(2, 'data source specific stats:')
         cursor = self.session.open_cursor(
-	    'statistics:' + self.uri, None, None)
+            'statistics:' + self.uri, None, None)
         self.check_stats(cursor, 10, 'overflow pages')
 
         # See that we can get a specific stat value by its key,
