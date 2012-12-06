@@ -467,8 +467,7 @@ def runTest(test):
         try:
             c = Connection(host="127.0.0.1", port=int(mongod_port), ssl=use_ssl)
         except Exception,e:
-            t,v,tb = sys.exc_info()
-            print_exception(t,v,tb)
+            print "Exception from pymongo: ", e
             raise TestServerFailure(path)
 
     print ""
