@@ -1224,7 +1224,7 @@ struct __wt_connection {
  * WT_CONNECTION::load_extension.  Complex paths may require quoting\, for
  * example\, <code>extensions=("/path/ext.so"="entry=my_entry")</code>.,a list
  * of strings; default empty.}
- * @config{hazard_max, maximum number of simultaneous hazard references per
+ * @config{hazard_max, maximum number of simultaneous hazard pointers per
  * session handle.,an integer greater than or equal to 15; default \c 1000.}
  * @config{logging, enable logging.,a boolean flag; default \c false.}
  * @config{lsm_merge, merge LSM chunks where possible.,a boolean flag; default
@@ -1822,7 +1822,7 @@ extern int wiredtiger_extension_init(WT_SESSION *session,
 #define	WT_STAT_CONN_CACHE_EVICTION_DIRTY		10
 /*! cache: pages selected for eviction unable to be evicted */
 #define	WT_STAT_CONN_CACHE_EVICTION_FAIL		11
-/*! cache: eviction unable to acquire hazard reference */
+/*! cache: eviction unable to acquire hazard pointer */
 #define	WT_STAT_CONN_CACHE_EVICTION_HAZARD		12
 /*! cache: internal pages evicted */
 #define	WT_STAT_CONN_CACHE_EVICTION_INTERNAL		13
@@ -1941,7 +1941,7 @@ extern int wiredtiger_extension_init(WT_SESSION *session,
 #define	WT_STAT_DSRC_CACHE_EVICTION_DIRTY		33
 /*! data source pages selected for eviction unable to be evicted */
 #define	WT_STAT_DSRC_CACHE_EVICTION_FAIL		34
-/*! eviction unable to acquire hazard reference */
+/*! eviction unable to acquire hazard pointer */
 #define	WT_STAT_DSRC_CACHE_EVICTION_HAZARD		35
 /*! internal pages evicted */
 #define	WT_STAT_DSRC_CACHE_EVICTION_INTERNAL		36

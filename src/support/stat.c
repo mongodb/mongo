@@ -52,7 +52,7 @@ __wt_stat_alloc_dsrc_stats(WT_SESSION_IMPL *session, WT_DSRC_STATS **statsp)
 	stats->cache_eviction_fail.desc =
 	    "data source pages selected for eviction unable to be evicted";
 	stats->cache_eviction_hazard.desc =
-	    "eviction unable to acquire hazard reference";
+	    "eviction unable to acquire hazard pointer";
 	stats->cache_eviction_internal.desc = "internal pages evicted";
 	stats->cache_overflow_value.desc = "overflow values cached in memory";
 	stats->cache_read.desc = "pages read into cache";
@@ -187,7 +187,7 @@ __wt_stat_alloc_connection_stats(WT_SESSION_IMPL *session, WT_CONNECTION_STATS *
 	stats->cache_eviction_fail.desc =
 	    "cache: pages selected for eviction unable to be evicted";
 	stats->cache_eviction_hazard.desc =
-	    "cache: eviction unable to acquire hazard reference";
+	    "cache: eviction unable to acquire hazard pointer";
 	stats->cache_eviction_internal.desc = "cache: internal pages evicted";
 	stats->cache_eviction_slow.desc =
 	    "cache: eviction server unable to reach eviction goal";
