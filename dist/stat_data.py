@@ -85,6 +85,7 @@ dsrc_stats = [
 	# Operations
 	##########################################
 	Stat('cursor_insert', 'cursor-inserts'),
+	Stat('cursor_insert_bulk', 'bulk-loaded cursor-inserts'),
 	Stat('cursor_next', 'cursor next'),
 	Stat('cursor_prev', 'cursor prev'),
 	Stat('cursor_remove', 'cursor remove'),
@@ -104,7 +105,6 @@ dsrc_stats = [
 	Stat('btree_compact_rewrite', 'tree pages rewritten by compaction'),
 	Stat('btree_entries',
 	    'total LSM, table or file object key/value pairs'),
-	Stat('btree_entries_bulk_loaded', 'total bulk-loaded key/value pairs'),
 	Stat('btree_fixed_len', 'fixed-record size'),
 	Stat('btree_maxintlitem', 'maximum internal page item size'),
 	Stat('btree_maxintlpage', 'maximum internal page size'),
