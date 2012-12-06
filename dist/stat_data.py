@@ -24,17 +24,13 @@ connection_stats = [
 	# System statistics
 	##########################################
 	Stat('cond_wait', 'pthread mutex condition wait calls'),
+	Stat('file_open', 'files currently open'),
 	Stat('memory_allocation', 'total heap memory allocations'),
 	Stat('memory_free', 'total heap memory frees'),
 	Stat('read_io', 'total read I/Os'),
 	Stat('rwlock_read', 'pthread mutex shared lock read-lock calls'),
 	Stat('rwlock_write', 'pthread mutex shared lock write-lock calls'),
 	Stat('write_io', 'total write I/Os'),
-
-	##########################################
-	# Btree statistics
-	##########################################
-	Stat('btree_file_open', 'btree (including LSM) files currently open'),
 
 	##########################################
 	# Block manager statistics

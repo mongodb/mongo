@@ -172,8 +172,6 @@ __wt_stat_alloc_connection_stats(WT_SESSION_IMPL *session, WT_CONNECTION_STATS *
 	stats->block_byte_write.desc = "bytes written by the block manager";
 	stats->block_read.desc = "blocks read by the block manager";
 	stats->block_write.desc = "blocks written by the block manager";
-	stats->btree_file_open.desc =
-	    "btree (including LSM) files currently open";
 	stats->cache_bytes_dirty.desc =
 	    "cache: tracked dirty bytes in the cache";
 	stats->cache_bytes_inuse.desc = "cache: bytes currently in the cache";
@@ -196,6 +194,7 @@ __wt_stat_alloc_connection_stats(WT_SESSION_IMPL *session, WT_CONNECTION_STATS *
 	stats->cache_read.desc = "cache: pages read into cache";
 	stats->cache_write.desc = "cache: pages written from cache";
 	stats->cond_wait.desc = "pthread mutex condition wait calls";
+	stats->file_open.desc = "files currently open";
 	stats->memory_allocation.desc = "total heap memory allocations";
 	stats->memory_free.desc = "total heap memory frees";
 	stats->read_io.desc = "total read I/Os";
@@ -225,7 +224,6 @@ __wt_stat_clear_connection_stats(WT_STATS *stats_arg)
 	stats->block_byte_write.v = 0;
 	stats->block_read.v = 0;
 	stats->block_write.v = 0;
-	stats->btree_file_open.v = 0;
 	stats->cache_bytes_dirty.v = 0;
 	stats->cache_bytes_read.v = 0;
 	stats->cache_bytes_write.v = 0;
@@ -239,6 +237,7 @@ __wt_stat_clear_connection_stats(WT_STATS *stats_arg)
 	stats->cache_read.v = 0;
 	stats->cache_write.v = 0;
 	stats->cond_wait.v = 0;
+	stats->file_open.v = 0;
 	stats->memory_allocation.v = 0;
 	stats->memory_free.v = 0;
 	stats->read_io.v = 0;

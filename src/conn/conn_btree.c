@@ -269,8 +269,6 @@ __wt_conn_btree_get(WT_SESSION_IMPL *session,
 
 	conn = S2C(session);
 
-	WT_STAT_INCR(conn->stats, btree_file_open);
-
 	WT_RET(__conn_btree_get(session, name, ckpt, flags));
 
 	btree = session->btree;
@@ -379,9 +377,6 @@ __wt_conn_btree_close(WT_SESSION_IMPL *session, int locked)
 
 	btree = session->btree;
 	conn = S2C(session);
-
-	if (F_ISSET(btree, WT_BTREE_OPEN))
-		WT_STAT_DECR(conn->stats, btree_file_open);
 
 	WT_ASSERT(session, F_ISSET(session, WT_SESSION_SCHEMA_LOCKED));
 

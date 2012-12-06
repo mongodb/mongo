@@ -153,6 +153,7 @@ __wt_open(WT_SESSION_IMPL *session,
 	/* Link onto the environment's list of files. */
 	__wt_spin_lock(session, &conn->fh_lock);
 	TAILQ_INSERT_TAIL(&conn->fhqh, fh, q);
+	WT_CSTAT_INCR(session, file_open);
 	__wt_spin_unlock(session, &conn->fh_lock);
 
 	*fhp = fh;
@@ -190,6 +191,7 @@ __wt_close(WT_SESSION_IMPL *session, WT_FH *fh)
 	/* Remove from the list and discard the memory. */
 	__wt_spin_lock(session, &conn->fh_lock);
 	TAILQ_REMOVE(&conn->fhqh, fh, q);
+	WT_CSTAT_DECR(session, file_open);
 	__wt_spin_unlock(session, &conn->fh_lock);
 
 	if (close(fh->fd) != 0) {

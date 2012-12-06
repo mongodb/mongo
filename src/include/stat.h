@@ -54,6 +54,11 @@ struct __wt_stats {
 		WT_STAT_SET((session)->btree->stats, fld, v);		\
 	}								\
 } while (0)
+#define	WT_CSTAT_DECR(session, fld) do {				\
+	if (WT_STAT_CHECK_SESSION(session)) {				\
+		WT_STAT_DECR(S2C(session)->stats, fld);			\
+	}								\
+} while (0)
 #define	WT_CSTAT_INCR(session, fld) do {				\
 	if (WT_STAT_CHECK_SESSION(session)) {				\
 		WT_STAT_INCR(S2C(session)->stats, fld);			\
@@ -152,7 +157,6 @@ struct __wt_connection_stats {
 	WT_STATS block_byte_write;
 	WT_STATS block_read;
 	WT_STATS block_write;
-	WT_STATS btree_file_open;
 	WT_STATS cache_bytes_dirty;
 	WT_STATS cache_bytes_inuse;
 	WT_STATS cache_bytes_max;
@@ -169,6 +173,7 @@ struct __wt_connection_stats {
 	WT_STATS cache_read;
 	WT_STATS cache_write;
 	WT_STATS cond_wait;
+	WT_STATS file_open;
 	WT_STATS memory_allocation;
 	WT_STATS memory_free;
 	WT_STATS read_io;

@@ -1806,40 +1806,40 @@ extern int wiredtiger_extension_init(WT_SESSION *session,
 #define	WT_STAT_CONN_BLOCK_READ				2
 /*! blocks written by the block manager */
 #define	WT_STAT_CONN_BLOCK_WRITE			3
-/*! btree (including LSM) files currently open */
-#define	WT_STAT_CONN_BTREE_FILE_OPEN			4
 /*! cache: tracked dirty bytes in the cache */
-#define	WT_STAT_CONN_CACHE_BYTES_DIRTY			5
+#define	WT_STAT_CONN_CACHE_BYTES_DIRTY			4
 /*! cache: bytes currently in the cache */
-#define	WT_STAT_CONN_CACHE_BYTES_INUSE			6
+#define	WT_STAT_CONN_CACHE_BYTES_INUSE			5
 /*! cache: maximum bytes configured */
-#define	WT_STAT_CONN_CACHE_BYTES_MAX			7
+#define	WT_STAT_CONN_CACHE_BYTES_MAX			6
 /*! cache: bytes read into cache */
-#define	WT_STAT_CONN_CACHE_BYTES_READ			8
+#define	WT_STAT_CONN_CACHE_BYTES_READ			7
 /*! cache: bytes written from cache */
-#define	WT_STAT_CONN_CACHE_BYTES_WRITE			9
+#define	WT_STAT_CONN_CACHE_BYTES_WRITE			8
 /*! cache: unmodified pages evicted */
-#define	WT_STAT_CONN_CACHE_EVICTION_CLEAN		10
+#define	WT_STAT_CONN_CACHE_EVICTION_CLEAN		9
 /*! cache: modified pages evicted */
-#define	WT_STAT_CONN_CACHE_EVICTION_DIRTY		11
+#define	WT_STAT_CONN_CACHE_EVICTION_DIRTY		10
 /*! cache: pages selected for eviction unable to be evicted */
-#define	WT_STAT_CONN_CACHE_EVICTION_FAIL		12
+#define	WT_STAT_CONN_CACHE_EVICTION_FAIL		11
 /*! cache: eviction unable to acquire hazard reference */
-#define	WT_STAT_CONN_CACHE_EVICTION_HAZARD		13
+#define	WT_STAT_CONN_CACHE_EVICTION_HAZARD		12
 /*! cache: internal pages evicted */
-#define	WT_STAT_CONN_CACHE_EVICTION_INTERNAL		14
+#define	WT_STAT_CONN_CACHE_EVICTION_INTERNAL		13
 /*! cache: eviction server unable to reach eviction goal */
-#define	WT_STAT_CONN_CACHE_EVICTION_SLOW		15
+#define	WT_STAT_CONN_CACHE_EVICTION_SLOW		14
 /*! cache: tracked dirty pages in the cache */
-#define	WT_STAT_CONN_CACHE_PAGES_DIRTY			16
+#define	WT_STAT_CONN_CACHE_PAGES_DIRTY			15
 /*! cache: pages currently held in the cache */
-#define	WT_STAT_CONN_CACHE_PAGES_INUSE			17
+#define	WT_STAT_CONN_CACHE_PAGES_INUSE			16
 /*! cache: pages read into cache */
-#define	WT_STAT_CONN_CACHE_READ				18
+#define	WT_STAT_CONN_CACHE_READ				17
 /*! cache: pages written from cache */
-#define	WT_STAT_CONN_CACHE_WRITE			19
+#define	WT_STAT_CONN_CACHE_WRITE			18
 /*! pthread mutex condition wait calls */
-#define	WT_STAT_CONN_COND_WAIT				20
+#define	WT_STAT_CONN_COND_WAIT				19
+/*! files currently open */
+#define	WT_STAT_CONN_FILE_OPEN				20
 /*! total heap memory allocations */
 #define	WT_STAT_CONN_MEMORY_ALLOCATION			21
 /*! total heap memory frees */
