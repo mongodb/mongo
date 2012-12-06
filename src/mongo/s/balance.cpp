@@ -30,6 +30,7 @@
 #include "mongo/s/type_chunk.h"
 #include "mongo/s/type_collection.h"
 #include "mongo/s/type_settings.h"
+#include "mongo/s/type_tags.h"
 
 namespace mongo {
 
@@ -239,19 +240,19 @@ namespace mongo {
             DistributionStatus status( shardInfo, shardToChunksMap );
 
             // load tags
-            conn.ensureIndex(ConfigNS::tag,
-                             BSON(TagFields::ns() << 1 << TagFields::min() << 1),
+            conn.ensureIndex(TagsType::ConfigNS,
+                             BSON(TagsType::ns() << 1 << TagsType::min() << 1),
                              true);
 
-            cursor = conn.query(ConfigNS::tag,
-                                QUERY(TagFields::ns(ns)).sort(TagFields::min()));
+            cursor = conn.query(TagsType::ConfigNS,
+                                QUERY(TagsType::ns(ns)).sort(TagsType::min()));
 
             while ( cursor->more() ) {
                 BSONObj tag = cursor->nextSafe();
                 uassert(16356 , str::stream() << "tag ranges not valid for: " << ns ,
-                        status.addTagRange(TagRange(tag[TagFields::min()].Obj().getOwned(),
-                                                    tag[TagFields::max()].Obj().getOwned(),
-                                                    tag[TagFields::tag()].String())));
+                        status.addTagRange(TagRange(tag[TagsType::min()].Obj().getOwned(),
+                                                    tag[TagsType::max()].Obj().getOwned(),
+                                                    tag[TagsType::tag()].String())));
 
             }
             cursor.reset();

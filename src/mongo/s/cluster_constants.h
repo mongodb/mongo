@@ -29,23 +29,12 @@ namespace mongo {
      * ConfigNS holds the names for all the metadata collections stored in a config server.
      */
     struct ConfigNS {
-        static const string tag;
         static const string mongos;
         static const string changelog;
         static const string locks;
         static const string lockpings;
 
         static const int version = 3;
-    };
-
-    /**
-     * TagFields holds all the field names and types for the tags collection.
-     */
-    struct TagFields {
-        static BSONField<string> ns;    // namespace this tag is for
-        static BSONField<string> tag;   // tag name
-        static BSONField<BSONObj> min;  // first key of the tag, including
-        static BSONField<BSONObj> max;  // last key of the tag, non-including
     };
 
     /**

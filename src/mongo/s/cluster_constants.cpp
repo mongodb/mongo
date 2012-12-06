@@ -18,12 +18,6 @@
 
 namespace mongo {
 
-    const string ConfigNS::tag = "config.tags";
-    BSONField<string> TagFields::ns("ns");
-    BSONField<string> TagFields::tag("tag");
-    BSONField<BSONObj> TagFields::min("min");
-    BSONField<BSONObj> TagFields::max("max");
-
     const string ConfigNS::mongos = "config.mongos";
     BSONField<string> MongosFields::name("_id");
     BSONField<Date_t> MongosFields::ping("ping");
