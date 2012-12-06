@@ -1930,7 +1930,7 @@ namespace mongo {
             return false;
         }
 
-        if (c->requiresAuth()) {
+        if (!noauth && c->requiresAuth()) {
             std::vector<Privilege> privileges;
             c->addRequiredPrivileges(dbname, cmdObj, &privileges);
             Status status = client.getAuthorizationManager()->checkAuthForPrivileges(privileges);

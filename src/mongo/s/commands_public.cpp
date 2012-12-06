@@ -1828,7 +1828,7 @@ namespace mongo {
         if ( !p ) return false;
         if ( strcmp(p, ".$cmd") != 0 ) return false;
 
-        bool ok = false;
+        bool ok = true;
 
         BSONElement e = jsobj.firstElement();
         map<string,Command*>::iterator i;
@@ -1844,26 +1844,29 @@ namespace mongo {
 
             char cl[256];
             nsToDatabase(ns, cl);
-            std::vector<Privilege> privileges;
-            c->addRequiredPrivileges(cl, jsobj, &privileges);
-            if (c->requiresAuth() &&
-                    (!client->getAuthorizationManager()->checkAuthForPrivileges(privileges).isOK()
-                            || !ai->isAuthorizedForLock(cl, c->locktype()))) {
-                ok = false;
-                errmsg = "unauthorized";
-                anObjBuilder.append("note", str::stream() << "unauthorized for command: " <<
-                                    e.fieldName() << " on database " << cl);
+            if (!noauth) {
+                std::vector<Privilege> privileges;
+                c->addRequiredPrivileges(cl, jsobj, &privileges);
+                AuthorizationManager* authManager = client->getAuthorizationManager();
+                if (c->requiresAuth() && (!authManager->checkAuthForPrivileges(privileges).isOK()
+                                || !ai->isAuthorizedForLock(cl, c->locktype()))) {
+                    ok = false;
+                    errmsg = "unauthorized";
+                    anObjBuilder.append("note", str::stream() << "unauthorized for command: " <<
+                                        e.fieldName() << " on database " << cl);
+                }
             }
-            else if( c->adminOnly() && c->localHostOnlyIfNoAuth( jsobj ) && noauth && !ai->isLocalHost() ) {
+            if (ok && c->adminOnly() && c->localHostOnlyIfNoAuth(jsobj) && noauth &&
+                    !ai->isLocalHost()) {
                 ok = false;
                 errmsg = "unauthorized: this command must run from localhost when running db without auth";
                 log() << "command denied: " << jsobj.toString() << endl;
             }
-            else if ( c->adminOnly() && !startsWith(ns, "admin.") ) {
+            if (ok && c->adminOnly() && !startsWith(ns, "admin.")) {
                 ok = false;
                 errmsg = "access denied - use admin db";
             }
-            else if ( jsobj.getBoolField( "help" ) ) {
+            if (ok && jsobj.getBoolField("help")) {
                 stringstream help;
                 help << "help for: " << e.fieldName() << " ";
                 c->help( help );
