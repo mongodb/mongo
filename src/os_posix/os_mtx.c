@@ -49,6 +49,7 @@ void
 __wt_cond_wait(WT_SESSION_IMPL *session, WT_CONDVAR *cond, long usecs)
 {
 	WT_DECL_RET;
+	struct timespec ts;
 	int locked;
 
 	locked = 0;
@@ -61,7 +62,7 @@ __wt_cond_wait(WT_SESSION_IMPL *session, WT_CONDVAR *cond, long usecs)
 		WT_CSTAT_INCR(session, cond_wait);
 
 		WT_VERBOSE_VOID(
-		    session, mutex, "lock %s mutex (%p)", cond->name, cond);
+		    session, mutex, "wait %s cond (%p)", cond->name, cond);
 	}
 
 	WT_ERR(pthread_mutex_lock(&cond->mtx));
@@ -69,14 +70,9 @@ __wt_cond_wait(WT_SESSION_IMPL *session, WT_CONDVAR *cond, long usecs)
 
 	while (!cond->signalled) {
 		if (usecs > 0) {
-			struct timespec ts;
-
 			WT_ERR(__wt_epoch(session, &ts));
-			ts.tv_nsec += 1000 * usecs;
-			if (ts.tv_nsec > 1000000000) {
-				++ts.tv_sec;
-				ts.tv_nsec -= 1000000000;
-			}
+			ts.tv_sec += (ts.tv_nsec + 1000 * usecs) / WT_BILLION;
+			ts.tv_nsec = (ts.tv_nsec + 1000 * usecs) % WT_BILLION;
 			ret = pthread_cond_timedwait(
 			    &cond->cond, &cond->mtx, &ts);
 			if (ret == ETIMEDOUT) {
@@ -106,7 +102,7 @@ err:	if (locked)
 	if (ret == 0)
 		return;
 
-	__wt_err(session, ret, "mutex lock failed");
+	__wt_err(session, ret, "cond wait failed");
 	__wt_abort(session);
 }
 
@@ -135,7 +131,7 @@ __wt_cond_signal(WT_SESSION_IMPL *session, WT_CONDVAR *cond)
 	WT_ERR(pthread_mutex_unlock(&cond->mtx));
 	return;
 
-err:	__wt_err(session, ret, "mutex unlock failed");
+err:	__wt_err(session, ret, "cond signal failed");
 	__wt_abort(session);
 }
 
