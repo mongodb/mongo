@@ -1068,7 +1068,7 @@ namespace ExpressionTests {
         public:
             void run() {
                 intrusive_ptr<Expression> expression = ExpressionFieldPath::create( "a.b" );
-                assertBinaryEqual( fromjson( "{'':[null]}" ),
+                assertBinaryEqual( fromjson( "{'':[]}" ),
                                    toBson( expression->evaluate
                                           ( fromBson( fromjson( "{a:[null]}" ) ) ) ) );
             }            
@@ -1079,7 +1079,7 @@ namespace ExpressionTests {
         public:
             void run() {
                 intrusive_ptr<Expression> expression = ExpressionFieldPath::create( "a.b" );
-                assertBinaryEqual( fromjson( "{'':[undefined]}" ),
+                assertBinaryEqual( fromjson( "{'':[]}" ),
                                    toBson( expression->evaluate
                                           ( fromBson( fromjson( "{a:[undefined]}" ) ) ) ) );
             }            
@@ -1090,8 +1090,9 @@ namespace ExpressionTests {
         public:
             void run() {
                 intrusive_ptr<Expression> expression = ExpressionFieldPath::create( "a.b" );
-                ASSERT_THROWS( expression->evaluate( fromBson( fromjson( "{a:[1]}" ) ) ),
-                               UserException );
+                assertBinaryEqual( fromjson( "{'':[]}" ),
+                                   toBson( expression->evaluate
+                                          ( fromBson( fromjson( "{a:[1]}" ) ) ) ) );
             }            
         };
 
@@ -1111,7 +1112,7 @@ namespace ExpressionTests {
         public:
             void run() {
                 intrusive_ptr<Expression> expression = ExpressionFieldPath::create( "a.b" );
-                assertBinaryEqual( fromjson( "{'':[9,null,undefined,20]}" ),
+                assertBinaryEqual( fromjson( "{'':[9,20]}" ),
                                     toBson( expression->evaluate
                                            ( fromBson( fromjson
                                                       ( "{a:[{b:9},null,undefined,{g:4},{b:20},{}]}"

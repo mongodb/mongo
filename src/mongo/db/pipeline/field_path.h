@@ -103,7 +103,7 @@ namespace mongo {
     }
 
     inline const string& FieldPath::getFieldName(size_t i) const {
-        verify(i < getPathLength());
+        dassert(i < getPathLength());
         return vFieldName[i];
     }
 

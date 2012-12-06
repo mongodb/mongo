@@ -584,13 +584,13 @@ namespace mongo {
           a be an array of objects in order to navigate more deeply.
 
           @param index current path field index to extract
-          @param pathLength maximum number of fields on field path
-          @param pDocument current document traversed to (not the top-level one)
+          @param input current document traversed to (not the top-level one)
           @returns the field found; could be an array
          */
-        Value evaluatePath(
-            size_t index, const size_t pathLength, 
-            Document pDocument) const;
+        Value evaluatePath(size_t index, const Document& input) const;
+
+        // Helper for evaluatePath to handle Array case
+        Value evaluatePathArray(size_t index, const Value& input) const;
 
         FieldPath fieldPath;
     };

@@ -1389,11 +1389,14 @@ namespace DocumentSourceTests {
             }
         };
 
-        /** A missing nested object within an array is not supported. */
-        class MissingObjectWithinArray : public InvalidOperationBase {
+        /** A missing nested object within an array returns an empty array. */
+        class MissingObjectWithinArray : public CheckResultsBase {
             void populateData() {
                 client.insert( ns, BSON( "_id" << 0 << "a" << BSON_ARRAY( 1 ) ) );
-                client.insert( ns, BSON( "_id" << 1 << "a" << BSON_ARRAY( 0 ) ) );
+                client.insert( ns, BSON( "_id" << 1 << "a" << BSON_ARRAY( BSON("b" << 1) ) ) );
+            }
+            string expectedResultSetString() {
+                return "[{_id:0,a:[1]},{_id:1,a:[{b:1}]}]";
             }
             BSONObj sortSpec() { return BSON( "a.b" << 1 ); }
         };

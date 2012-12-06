@@ -1300,65 +1300,47 @@ namespace mongo {
         deps.insert(fieldPath.getPath(false));
     }
 
-    Value ExpressionFieldPath::evaluatePath(size_t index,
-                                            size_t pathLength,
-                                            Document pDocument) const {
-        // return value
-        Value pValue = pDocument->getValue(fieldPath.getFieldName(index));
+    Value ExpressionFieldPath::evaluatePathArray(size_t index, const Value& input) const {
+        dassert(input.getType() == Array);
 
-        /* if the field doesn't exist, quit with an undefined value */
-        if (pValue.missing())
-            return Value();
+        // Check for remaining path in each element of array
+        vector<Value> result;
+        const vector<Value>& array = input.getArray();
+        for (size_t i=0; i < array.size(); i++) {
+            if (array[i].getType() != Object)
+                continue;
+
+            const Value nested = evaluatePath(index, array[i].getDocument());
+            if (!nested.missing())
+                result.push_back(nested);
+        }
+
+        return Value::createArray(result);
+    }
+    Value ExpressionFieldPath::evaluatePath(size_t index, const Document& input) const {
+        // Note this function is very hot so it is important that is is well optimized.
+        // In particular, all return paths should support RVO.
 
         /* if we've hit the end of the path, stop */
-        ++index;
-        if (index >= pathLength)
-            return pValue;
+        if (index == fieldPath.getPathLength() - 1)
+            return input[fieldPath.getFieldName(index)];
 
-        /*
-          We're diving deeper.  If the value was null, return null.
-        */
-        if (pValue.nullish())
+        // Try to dive deeper
+        const Value val = input[fieldPath.getFieldName(index)];
+        switch (val.getType()) {
+        case Object:
+            return evaluatePath(index+1, val.getDocument());
+
+        case Array:
+            return evaluatePathArray(index+1, val);
+
+        default:
             return Value();
-
-        BSONType type = pValue.getType();
-        if (type == Object) {
-            /* extract from the next level down */
-            return evaluatePath(index, pathLength, pValue.getDocument());
         }
-
-        if (type == Array) {
-            /*
-              We're going to repeat this for each member of the array,
-              building up a new array as we go.
-            */
-            vector<Value> result;
-            const vector<Value>& input = pValue.getArray();
-            for (size_t i=0; i < input.size(); i++) {
-                const Value& item = input[i];
-                if (item.nullish()) {
-                    result.push_back(item);
-                    continue;
-                }
-
-                uassert(16014, str::stream() << 
-                        "the element '" << fieldPath.getFieldName(index) <<
-                        "' along the dotted path '" <<
-                        fieldPath.getPath(false) <<
-                        "' is not an object, and cannot be navigated",
-                        item.getType() == Object);
-
-                result.push_back(evaluatePath(index, pathLength, item.getDocument()));
-            }
-
-            return Value::createArray(result);
-        }
-        // subdocument field does not exist
-        return Value();
     }
 
     Value ExpressionFieldPath::evaluate(const Document& pDocument) const {
-        return evaluatePath(0, fieldPath.getPathLength(), pDocument);
+        return evaluatePath(0, pDocument);
     }
 
     void ExpressionFieldPath::addToBsonObj(BSONObjBuilder *pBuilder,
