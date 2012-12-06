@@ -24,6 +24,7 @@
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/s/cluster_constants.h"
 #include "mongo/s/type_locks.h"
+#include "mongo/s/type_lockpings.h"
 #include "mongo/util/timer.h"
 
 namespace mongo {
@@ -115,9 +116,9 @@ namespace mongo {
                     pingTime = jsTime();
 
                     // refresh the entry corresponding to this process in the lockpings collection
-                    conn->update( ConfigNS::lockpings,
-                                  BSON( LockPingFields::process(process) ),
-                                  BSON( "$set" << BSON( LockPingFields::ping(pingTime) ) ),
+                    conn->update( LockpingsType::ConfigNS,
+                                  BSON( LockpingsType::process(process) ),
+                                  BSON( "$set" << BSON( LockpingsType::ping(pingTime) ) ),
                                   true );
 
                     string err = conn->getLastError();
@@ -148,9 +149,9 @@ namespace mongo {
                     }
 
                     Date_t fourDays = pingTime - ( 4 * 86400 * 1000 ); // 4 days
-                    conn->remove( ConfigNS::lockpings,
-                                  BSON( LockPingFields::process() << BSON( "$nin" << pids ) <<
-                                        LockPingFields::ping() << LT << fourDays ) );
+                    conn->remove( LockpingsType::ConfigNS,
+                                  BSON( LockpingsType::process() << NIN << pids <<
+                                        LockpingsType::ping() << LT << fourDays ) );
                     err = conn->getLastError();
                     if ( ! err.empty() ) {
                         warning() << "ping cleanup for distributed lock pinger '" << pingId << " failed."
@@ -164,7 +165,7 @@ namespace mongo {
 
                     // create index so remove is fast even with a lot of servers
                     if ( loops++ == 0 ) {
-                        conn->ensureIndex( ConfigNS::lockpings, BSON( LockPingFields::ping(1) ) );
+                        conn->ensureIndex( LockpingsType::ConfigNS, BSON( LockpingsType::ping(1) ) );
                     }
 
                     LOG( DistributedLock::logLvl - ( loops % 10 == 0 ? 1 : 0 ) ) << "cluster " << addr << " pinged successfully at " << pingTime
@@ -571,12 +572,12 @@ namespace mongo {
                     return false;
                 }
 
-                BSONObj lastPing = conn->findOne( ConfigNS::lockpings, o[LocksType::process()].wrap( LockPingFields::process() ) );
+                BSONObj lastPing = conn->findOne( LockpingsType::ConfigNS, o[LocksType::process()].wrap( LockpingsType::process() ) );
                 if ( lastPing.isEmpty() ) {
                     LOG( logLvl ) << "empty ping found for process in lock '" << lockName << "'" << endl;
                     // TODO:  Using 0 as a "no time found" value Will fail if dates roll over, but then, so will a lot.
-                    lastPing = BSON( LockPingFields::process(o[LocksType::process()].String()) <<
-                                     LockPingFields::ping((Date_t) 0) );
+                    lastPing = BSON( LockpingsType::process(o[LocksType::process()].String()) <<
+                                     LockpingsType::ping((Date_t) 0) );
                 }
 
                 unsigned long long elapsed = 0;
@@ -593,14 +594,14 @@ namespace mongo {
                     // For non-finalized locks, timeout 15 minutes since last seen (ts)
                     // For finalized locks, timeout 15 minutes since last ping
                     bool recPingChange = o[LocksType::state()].numberInt() == 2 &&
-                                         ( _lastPingCheck.id != lastPing[LockPingFields::process()].String() ||
-                                           _lastPingCheck.lastPing != lastPing[LockPingFields::ping()].Date() );
+                                         ( _lastPingCheck.id != lastPing[LockpingsType::process()].String() ||
+                                           _lastPingCheck.lastPing != lastPing[LockpingsType::ping()].Date() );
                     bool recTSChange = _lastPingCheck.ts != o[LocksType::lockID()].OID();
 
                     if( recPingChange || recTSChange ) {
                         // If the ping has changed since we last checked, mark the current date and time
-                        setLastPing( PingData( lastPing[LockPingFields::process()].String().c_str(),
-                                               lastPing[LockPingFields::ping()].Date(),
+                        setLastPing( PingData( lastPing[LockpingsType::process()].String().c_str(),
+                                               lastPing[LockpingsType::ping()].Date(),
                                                remote, o[LocksType::lockID()].OID() ) );
                     }
                     else {

@@ -27,8 +27,4 @@ namespace mongo {
     BSONField<string> ChangelogFields::ns("ns");
     BSONField<BSONObj> ChangelogFields::details("details");
 
-    const string ConfigNS::lockpings = "config.lockpings";
-    BSONField<string> LockPingFields::process("_id");
-    BSONField<Date_t> LockPingFields::ping("ping");
-
 } // namespace mongo

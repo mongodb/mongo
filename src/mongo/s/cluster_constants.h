@@ -31,7 +31,6 @@ namespace mongo {
     struct ConfigNS {
         static const string changelog;
         static const string locks;
-        static const string lockpings;
 
         static const int version = 3;
     };
@@ -61,18 +60,6 @@ namespace mongo {
 
         // A BSONObj containing extra information about some operations
         static BSONField<BSONObj> details;
-    };
-
-    /**
-     * LockPingFields holds all the field names and types for the lockpings collection.
-     */
-    struct LockPingFields {
-
-        // string describing the process holding the lock
-        static BSONField<string> process;
-
-        // last time the holding process updated this document
-        static BSONField<Date_t> ping;
     };
 
 } // namespace mongo
