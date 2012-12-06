@@ -16,11 +16,12 @@
 #pragma once
 
 #include <boost/shared_ptr.hpp>
-#include <map>
 #include <string>
 #include <vector>
 
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/client/dbclientinterface.h"
+#include "mongo/platform/unordered_map.h"
 #include "mongo/util/concurrency/spin_lock.h"
 
 namespace mongo {
@@ -109,12 +110,22 @@ namespace mongo {
                 const std::vector<mongo::BSONObj>& replySequence);
 
         /**
-         * Sets the reply of the query.
+         * Inserts a single document to this server.
          *
-         * @param resultSet the array of results where each element in the array
-         *     would represent a single document in the resulting cursor.
+         * @param ns the namespace to insert the document to.
+         * @param obj the document to insert.
+         * @param flags ignored.
          */
-        void setQueryReply(const mongo::BSONArray& resultSet);
+        void insert(const string& ns, BSONObj obj, int flags = 0);
+
+        /**
+         * Removes documents from this server.
+         *
+         * @param ns the namespace to remove documents from.
+         * @param query ignored.
+         * @param flags ignored.
+         */
+        void remove(const string& ns, Query query, int flags = 0);
 
         //
         // DBClientBase methods
@@ -181,7 +192,8 @@ namespace mongo {
          */
         void checkIfUp(InstanceID id) const;
 
-        typedef std::map<std::string, boost::shared_ptr<CircularBSONIterator> > CmdToReplyObj;
+        typedef unordered_map<std::string, boost::shared_ptr<CircularBSONIterator> > CmdToReplyObj;
+        typedef unordered_map<std::string, mongo::BSONArrayBuilder*> MockDataMgr;
 
         bool _isRunning;
 
@@ -192,7 +204,7 @@ namespace mongo {
         // Mock replies
         //
         CmdToReplyObj _cmdMap;
-        mongo::BSONArray _queryReply;
+        MockDataMgr _dataMgr;
 
         //
         // Op Counters

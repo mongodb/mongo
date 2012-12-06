@@ -128,6 +128,27 @@ namespace mongo {
         return _sockCreationTime;
     }
 
+    void MockDBClientConnection::insert(const string &ns, BSONObj obj, int flags) {
+        _remoteServer->insert(ns, obj, flags);
+    }
+
+    void MockDBClientConnection::insert(const string &ns,
+            const vector<BSONObj>& objList,
+            int flags) {
+        for (vector<BSONObj>::const_iterator iter = objList.begin();
+                iter != objList.end(); ++iter) {
+            insert(ns, *iter, flags);
+        }
+    }
+
+    void MockDBClientConnection::remove(const string& ns, Query query, bool justOne) {
+        remove(ns, query, (justOne ? RemoveOption_JustOne : 0));
+    }
+
+    void MockDBClientConnection::remove(const string& ns, Query query, int flags) {
+        _remoteServer->remove(ns, query, flags);
+    }
+
     void MockDBClientConnection::killCursor(long long cursorID) {
         verify(false); // unimplemented
     }

@@ -16,7 +16,6 @@
 #pragma once
 
 #include <boost/shared_ptr.hpp>
-#include <map>
 #include <string>
 #include <vector>
 
@@ -67,6 +66,14 @@ namespace mongo {
                 int batchSize = 0);
 
         uint64_t getSockCreationMicroSec() const;
+
+        virtual void insert(const string& ns, BSONObj obj, int flags = 0);
+
+        virtual void insert(const string& ns, const vector<BSONObj>& objList, int flags = 0);
+
+        virtual void remove(const string& ns, Query query, bool justOne = false);
+
+        virtual void remove(const string& ns, Query query, int flags = 0);
 
         //
         // Getters

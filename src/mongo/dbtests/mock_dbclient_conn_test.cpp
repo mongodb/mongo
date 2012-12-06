@@ -32,6 +32,7 @@ using mongo::BSONObj;
 using mongo::ConnectionString;
 using mongo::MockDBClientConnection;
 using mongo::MockRemoteDBServer;
+using mongo::Query;
 
 using std::string;
 using std::vector;
@@ -65,25 +66,22 @@ namespace mongo_test {
         }
     }
 
-    TEST(MockDBClientConnTest, SetQueryReply) {
+    TEST(MockDBClientConnTest, InsertAndQuery) {
         MockRemoteDBServer server("test");
+        const string ns("test.user");
 
         {
             MockDBClientConnection conn(&server);
-            std::auto_ptr<mongo::DBClientCursor> cursor = conn.query("test.user");
+            std::auto_ptr<mongo::DBClientCursor> cursor = conn.query(ns);
             ASSERT(!cursor->more());
-        }
 
-        {
-            mongo::BSONArrayBuilder arrBuilder;
-            arrBuilder.append(BSON("x" << 1));
-            arrBuilder.append(BSON("y" << 2));
-            server.setQueryReply(arrBuilder.arr());
+            server.insert(ns, BSON("x" << 1));
+            server.insert(ns, BSON("y" << 2));
         }
 
         {
             MockDBClientConnection conn(&server);
-            std::auto_ptr<mongo::DBClientCursor> cursor = conn.query("test.user");
+            std::auto_ptr<mongo::DBClientCursor> cursor = conn.query(ns);
 
             ASSERT(cursor->more());
             BSONObj firstDoc = cursor->next();
@@ -99,7 +97,7 @@ namespace mongo_test {
         // Make sure that repeated calls will still give you the same result
         {
             MockDBClientConnection conn(&server);
-            std::auto_ptr<mongo::DBClientCursor> cursor = conn.query("test.user");
+            std::auto_ptr<mongo::DBClientCursor> cursor = conn.query(ns);
 
             ASSERT(cursor->more());
             BSONObj firstDoc = cursor->next();
@@ -108,6 +106,190 @@ namespace mongo_test {
             ASSERT(cursor->more());
             BSONObj secondDoc = cursor->next();
             ASSERT_EQUALS(2, secondDoc["y"].numberInt());
+
+            ASSERT(!cursor->more());
+        }
+    }
+
+    TEST(MockDBClientConnTest, MultiNSInsertAndQuery) {
+        MockRemoteDBServer server("test");
+        const string ns1("test.user");
+        const string ns2("foo.bar");
+        const string ns3("mongo.db");
+
+        {
+            MockDBClientConnection conn(&server);
+            conn.insert(ns1, BSON("a" << 1));
+            conn.insert(ns2, BSON("ef" << "gh"));
+            conn.insert(ns3, BSON("x" << 2));
+
+            conn.insert(ns1, BSON("b" << 3));
+            conn.insert(ns2, BSON("jk" << "lm"));
+
+            conn.insert(ns2, BSON("x" << "yz"));
+        }
+
+        {
+            MockDBClientConnection conn(&server);
+            std::auto_ptr<mongo::DBClientCursor> cursor = conn.query(ns1);
+
+            ASSERT(cursor->more());
+            BSONObj firstDoc = cursor->next();
+            ASSERT_EQUALS(1, firstDoc["a"].numberInt());
+
+            ASSERT(cursor->more());
+            BSONObj secondDoc = cursor->next();
+            ASSERT_EQUALS(3, secondDoc["b"].numberInt());
+
+            ASSERT(!cursor->more());
+        }
+
+        {
+            MockDBClientConnection conn(&server);
+            std::auto_ptr<mongo::DBClientCursor> cursor = conn.query(ns2);
+
+            ASSERT(cursor->more());
+            BSONObj firstDoc = cursor->next();
+            ASSERT_EQUALS("gh", firstDoc["ef"].String());
+
+            ASSERT(cursor->more());
+            BSONObj secondDoc = cursor->next();
+            ASSERT_EQUALS("lm", secondDoc["jk"].String());
+
+            ASSERT(cursor->more());
+            BSONObj thirdDoc = cursor->next();
+            ASSERT_EQUALS("yz", thirdDoc["x"].String());
+
+            ASSERT(!cursor->more());
+        }
+
+        {
+            MockDBClientConnection conn(&server);
+            std::auto_ptr<mongo::DBClientCursor> cursor = conn.query(ns3);
+
+            ASSERT(cursor->more());
+            BSONObj firstDoc = cursor->next();
+            ASSERT_EQUALS(2, firstDoc["x"].numberInt());
+
+            ASSERT(!cursor->more());
+        }
+    }
+
+    TEST(MockDBClientConnTest, SimpleRemove) {
+        MockRemoteDBServer server("test");
+        const string ns("test.user");
+
+        {
+            MockDBClientConnection conn(&server);
+            std::auto_ptr<mongo::DBClientCursor> cursor = conn.query(ns);
+            ASSERT(!cursor->more());
+
+            conn.insert(ns, BSON("x" << 1));
+            conn.insert(ns, BSON("y" << 1));
+        }
+
+        {
+            MockDBClientConnection conn(&server);
+            conn.remove(ns, Query(), false);
+        }
+
+        {
+            MockDBClientConnection conn(&server);
+            std::auto_ptr<mongo::DBClientCursor> cursor = conn.query(ns);
+
+            ASSERT(!cursor->more());
+        }
+
+        // Make sure that repeated calls will still give you the same result
+        {
+            MockDBClientConnection conn(&server);
+            std::auto_ptr<mongo::DBClientCursor> cursor = conn.query(ns);
+
+            ASSERT(!cursor->more());
+        }
+    }
+
+    TEST(MockDBClientConnTest, MultiNSRemove) {
+        MockRemoteDBServer server("test");
+        const string ns1("test.user");
+        const string ns2("foo.bar");
+        const string ns3("mongo.db");
+
+        {
+            MockDBClientConnection conn(&server);
+            conn.insert(ns1, BSON("a" << 1));
+            conn.insert(ns2, BSON("ef" << "gh"));
+            conn.insert(ns3, BSON("x" << 2));
+
+            conn.insert(ns1, BSON("b" << 3));
+            conn.insert(ns2, BSON("jk" << "lm"));
+
+            conn.insert(ns2, BSON("x" << "yz"));
+        }
+
+        {
+            MockDBClientConnection conn(&server);
+            conn.remove(ns2, Query(), false);
+
+            std::auto_ptr<mongo::DBClientCursor> cursor = conn.query(ns2);
+            ASSERT(!cursor->more());
+        }
+
+        {
+            MockDBClientConnection conn(&server);
+            std::auto_ptr<mongo::DBClientCursor> cursor = conn.query(ns1);
+
+            ASSERT(cursor->more());
+            BSONObj firstDoc = cursor->next();
+            ASSERT_EQUALS(1, firstDoc["a"].numberInt());
+
+            ASSERT(cursor->more());
+            BSONObj secondDoc = cursor->next();
+            ASSERT_EQUALS(3, secondDoc["b"].numberInt());
+
+            ASSERT(!cursor->more());
+        }
+
+        {
+            MockDBClientConnection conn(&server);
+            std::auto_ptr<mongo::DBClientCursor> cursor = conn.query(ns3);
+
+            ASSERT(cursor->more());
+            BSONObj firstDoc = cursor->next();
+            ASSERT_EQUALS(2, firstDoc["x"].numberInt());
+
+            ASSERT(!cursor->more());
+        }
+    }
+
+    TEST(MockDBClientConnTest, InsertAfterRemove) {
+        MockRemoteDBServer server("test");
+        const string ns("test.user");
+
+        {
+            MockDBClientConnection conn(&server);
+            conn.insert(ns, BSON("a" << 1));
+            conn.insert(ns, BSON("b" << 3));
+            conn.insert(ns, BSON("x" << "yz"));
+        }
+
+        {
+            MockDBClientConnection conn(&server);
+            conn.remove(ns, Query(), false);
+        }
+
+        {
+            MockDBClientConnection conn(&server);
+            conn.insert(ns, BSON("x" << 100));
+        }
+
+        {
+            MockDBClientConnection conn(&server);
+            std::auto_ptr<mongo::DBClientCursor> cursor = conn.query(ns);
+
+            ASSERT(cursor->more());
+            BSONObj firstDoc = cursor->next();
+            ASSERT_EQUALS(100, firstDoc["x"].numberInt());
 
             ASSERT(!cursor->more());
         }

@@ -20,10 +20,6 @@
 #include "mongo/util/net/sock.h"
 #include "mongo/util/time_support.h"
 
-using mongo::BSONObj;
-using mongo::scoped_spinlock;
-using mongo::str::stream;
-
 using std::string;
 using std::vector;
 
@@ -102,9 +98,25 @@ namespace mongo {
         _cmdMap[cmdName].reset(new CircularBSONIterator(replySequence));
     }
 
-    void MockRemoteDBServer::setQueryReply(const mongo::BSONArray& resultSet) {
+    void MockRemoteDBServer::insert(const string &ns, BSONObj obj, int flags) {
         scoped_spinlock sLock(_lock);
-        _queryReply = mongo::BSONArray(resultSet.copy());
+
+        if (_dataMgr.count(ns) == 0) {
+            _dataMgr[ns] = new BSONArrayBuilder();
+        }
+
+        BSONArrayBuilder* mockCollection = _dataMgr[ns];
+        mockCollection->append(obj.copy());
+    }
+
+    void MockRemoteDBServer::remove(const string& ns, Query query, int flags) {
+        scoped_spinlock sLock(_lock);
+        if (_dataMgr.count(ns) == 0) {
+            return;
+        }
+
+        delete _dataMgr[ns];
+        _dataMgr.erase(ns);
     }
 
     bool MockRemoteDBServer::runCommand(MockRemoteDBServer::InstanceID id,
@@ -130,7 +142,8 @@ namespace mongo {
         }
 
         string cmdName = innerCmdObj.firstElement().fieldName();
-        uassert(16430, stream() << "no reply for cmd: " << cmdName, _cmdMap.count(cmdName) == 1);
+        uassert(16430, str::stream() << "no reply for cmd: " << cmdName,
+                _cmdMap.count(cmdName) == 1);
 
         {
             scoped_spinlock sLock(_lock);
@@ -167,7 +180,13 @@ namespace mongo {
 
         scoped_spinlock sLock(_lock);
         _queryCount++;
-        return _queryReply;
+
+        MockDataMgr::iterator collIter = _dataMgr.find(ns);
+        if (collIter == _dataMgr.end()) {
+            return BSONArray();
+        }
+
+        return BSONArray((collIter->second)->done().copy());
     }
 
     mongo::ConnectionString::ConnectionType MockRemoteDBServer::type() const {
