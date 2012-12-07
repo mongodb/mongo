@@ -273,7 +273,7 @@ namespace mongo {
                 node.conn.reset(dynamic_cast<DBClientConnection*>(
                         connStr.connect(errmsg, ReplicaSetMonitor::SOCKET_TIMEOUT_SECS)));
             }
-            catch (const AssertionException& ex) {
+            catch (const AssertionException&) {
                 node.ok = false;
             }
         }

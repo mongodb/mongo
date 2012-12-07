@@ -23,7 +23,7 @@
 
 namespace mongo {
 
-    class CloneOptions;
+    struct CloneOptions;
     class IndexSpec;
     class DBClientBase;
     class DBClientCursor;

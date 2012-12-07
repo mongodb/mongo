@@ -49,10 +49,10 @@ namespace mongo {
 
     class Cloner;
     class DBClientConnection;
-    class HowToFixUp;
+    struct HowToFixUp;
     class OplogReader;
     class ReplSetImpl;
-    class Target;
+    struct Target;
     extern bool replSet; // true if using repl sets
     extern class ReplSet *theReplSet; // null until initialized
     extern Tee *rsLog;
@@ -147,8 +147,6 @@ namespace mongo {
         void associateSlave(const BSONObj& rid, const int memberId);
         void updateSlave(const mongo::OID& id, const OpTime& last);
     };
-
-    struct Target;
 
     class Consensus {
         ReplSetImpl &rs;

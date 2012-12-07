@@ -249,7 +249,7 @@ namespace mongo {
                     error() << "error: exception cloning object in " << from_collection << ' ' << e.what() << " obj:" << js.toString() << '\n';
                     throw;
                 }
-                catch(const DBException& e) {
+                catch(const DBException&) {
                     theDataFileMgr.setPrecalced(NULL);
                     throw;
                 }
