@@ -118,7 +118,6 @@ namespace mongo {
         serverAdminRoleActions.addAction(ActionType::getLog);
         serverAdminRoleActions.addAction(ActionType::getParameter);
         serverAdminRoleActions.addAction(ActionType::getShardMap);
-        serverAdminRoleActions.addAction(ActionType::getShardVersion);
         serverAdminRoleActions.addAction(ActionType::hostInfo);
         serverAdminRoleActions.addAction(ActionType::inprog);
         serverAdminRoleActions.addAction(ActionType::killop);
@@ -144,6 +143,7 @@ namespace mongo {
         clusterAdminRoleActions.addAction(ActionType::dropDatabase); // TODO: Should there be a CREATE_DATABASE also?
         clusterAdminRoleActions.addAction(ActionType::enableSharding);
         clusterAdminRoleActions.addAction(ActionType::flushRouterConfig);
+        clusterAdminRoleActions.addAction(ActionType::getShardVersion);
         clusterAdminRoleActions.addAction(ActionType::listShards);
         clusterAdminRoleActions.addAction(ActionType::moveChunk);
         clusterAdminRoleActions.addAction(ActionType::movePrimary);
