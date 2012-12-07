@@ -140,7 +140,7 @@ __wt_evict_list_clr_page(WT_SESSION_IMPL *session, WT_PAGE *page)
  * __wt_evict_server_wake --
  *	Wake the eviction server thread.
  */
-void
+int
 __wt_evict_server_wake(WT_SESSION_IMPL *session)
 {
 	WT_CACHE *cache;
@@ -152,14 +152,14 @@ __wt_evict_server_wake(WT_SESSION_IMPL *session)
 	bytes_inuse = __wt_cache_bytes_inuse(cache);
 	bytes_max = conn->cache_size;
 
-	WT_VERBOSE_VOID(session, evictserver,
+	WT_VERBOSE_RET(session, evictserver,
 	    "waking, bytes inuse %s max (%" PRIu64 "MB %s %" PRIu64 "MB), ",
 	    bytes_inuse <= bytes_max ? "<=" : ">",
 	    bytes_inuse / WT_MEGABYTE,
 	    bytes_inuse <= bytes_max ? "<=" : ">",
 	    bytes_max / WT_MEGABYTE);
 
-	__wt_cond_signal(session, cache->evict_cond);
+	return (__wt_cond_signal(session, cache->evict_cond));
 }
 
 /*
@@ -213,7 +213,7 @@ __wt_cache_evict_server(void *arg)
 
 		WT_VERBOSE_ERR(session, evictserver, "sleeping");
 		/* Don't rely on signals: check periodically. */
-		__wt_cond_wait(session, cache->evict_cond, 100000);
+		WT_ERR(__wt_cond_wait(session, cache->evict_cond, 100000));
 		WT_VERBOSE_ERR(session, evictserver, "waking");
 	}
 
@@ -465,9 +465,7 @@ __evict_file_request_walk(WT_SESSION_IMPL *session)
 	 */
 	WT_PUBLISH(request_session->syncop_ret,
 	    __evict_file_request(request_session, syncop));
-	__wt_cond_signal(request_session, request_session->cond);
-
-	return (0);
+	return (__wt_cond_signal(request_session, request_session->cond));
 }
 
 /*
