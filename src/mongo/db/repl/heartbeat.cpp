@@ -14,27 +14,26 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "pch.h"
+#include "mongo/pch.h"
 
 #include <boost/thread/thread.hpp>
 
-#include "rs.h"
-#include "health.h"
-#include "../../util/background.h"
-
-#include "../commands.h"
-#include "../../util/concurrency/value.h"
-#include "../../util/concurrency/task.h"
-#include "../../util/concurrency/msg.h"
-#include "../../util/mongoutils/html.h"
-#include "../../util/goodies.h"
-#include "../../util/ramlog.h"
-#include "../helpers/dblogger.h"
-#include "connections.h"
-#include "../instance.h"
-#include "../repl.h"
+#include "mongo/db/commands.h"
+#include "mongo/db/helpers/dblogger.h"
+#include "mongo/db/instance.h"
+#include "mongo/db/repl.h"
 #include "mongo/db/repl/bgsync.h"
+#include "mongo/db/repl/connections.h"
+#include "mongo/db/repl/health.h"
+#include "mongo/db/repl/rs.h"
 #include "mongo/db/security.h"
+#include "mongo/util/background.h"
+#include "mongo/util/concurrency/msg.h"
+#include "mongo/util/concurrency/task.h"
+#include "mongo/util/concurrency/value.h"
+#include "mongo/util/goodies.h"
+#include "mongo/util/mongoutils/html.h"
+#include "mongo/util/ramlog.h"
 
 namespace mongo {
 
