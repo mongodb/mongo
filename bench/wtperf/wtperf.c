@@ -430,7 +430,7 @@ stat_worker(void *arg)
 			    g_nops, secs);
 		else
 			lprintf(cfg, 0, cfg->verbose,
-			    "reads: %" PRIu64 "updates: %" PRIu64
+			    "reads: %" PRIu64 " updates: %" PRIu64
 			    ", elapsed time: %.2f",
 			    g_nread_ops, g_nupdate_ops, secs);
 
@@ -477,6 +477,8 @@ checkpoint_worker(void *arg)
 	WT_CONNECTION *conn;
 	WT_SESSION *session;
 	int ret;
+	struct timeval e, s;
+	uint64_t ms;
 
 	session = NULL;
 	cfg = (CONFIG *)arg;
@@ -495,10 +497,15 @@ checkpoint_worker(void *arg)
 		 */
 		sleep(cfg->checkpoint_interval);
 
+		gettimeofday(&s, NULL);
 		if ((ret = session->checkpoint(session, NULL)) != 0)
 			/* Report errors and continue. */
 			lprintf(cfg, ret, 0, "Checkpoint failed.");
-		lprintf(cfg, 0, 1, "Finished checkpoint.");
+		gettimeofday(&e, NULL);
+		ms = (e.tv_sec * 1000) + (e.tv_usec / 1000.0);
+		ms -= (s.tv_sec * 1000) + (s.tv_usec / 1000.0);
+		lprintf(cfg, 0, 1,
+		    "Finished checkpoint in %" PRIu64 " ms.", ms);
 	}
 err:	if (session != NULL)
 		session->close(session, NULL);
@@ -606,7 +613,7 @@ int execute_workload(CONFIG *cfg)
 	    cfg->elapsed_time += cfg->report_interval) {
 		sleep(cfg->report_interval);
 		lprintf(cfg, 0, 1,
-		    "%" PRIu64 " reads, %" PRIu64 "updates in %d secs",
+		    "%" PRIu64 " reads, %" PRIu64 " updates in %d secs",
 		    g_nread_ops - last_reads, g_nupdate_ops - last_updates,
 		    cfg->report_interval);
 		last_reads = g_nread_ops;
@@ -811,8 +818,9 @@ int main(int argc, char **argv)
 			goto err;
 
 	lprintf(&cfg, 0, 1,
-	    "Ran performance test example with %d threads for %d seconds.",
-	    cfg.read_threads, cfg.run_time);
+	    "Ran performance test example with %d read threads"
+	    " and %d update threads for %d seconds.",
+	    cfg.read_threads, cfg.update_threads, cfg.run_time);
 
 	if (cfg.read_threads != 0)
 		lprintf(&cfg, 0, 1,
@@ -894,7 +902,8 @@ stop_threads(CONFIG *cfg, u_int num, pthread_t *threads)
 /*
  * Log printf - output a log message.
  */
-int lprintf(CONFIG *cfg, int err, uint32_t level, const char *fmt, ...)
+int
+lprintf(CONFIG *cfg, int err, uint32_t level, const char *fmt, ...)
 {
 	va_list ap;
 
@@ -1002,6 +1011,7 @@ void usage(void)
 	printf("\t-h <string> Wired Tiger home must exist, default WT_TEST \n");
 	printf("\t-i <int> number of records to insert\n");
 	printf("\t-k <int> key item size\n");
+	printf("\t-l log statistics at regular intervals\n");
 	printf("\t-r <int> number of seconds to run workload phase\n");
 	printf("\t-s <int> seed for random number generator\n");
 	printf("\t-u <string> table uri, default lsm:test\n");
