@@ -52,6 +52,7 @@
 #include "mongo/scripting/engine.h"
 #include "mongo/util/background.h"
 #include "mongo/util/concurrency/task.h"
+#include "mongo/util/exception_filter_win32.h"
 #include "mongo/util/file_allocator.h"
 #include "mongo/util/net/message_server.h"
 #include "mongo/util/ntservice.h"
@@ -61,9 +62,7 @@
 #include "mongo/util/text.h"
 #include "mongo/util/version.h"
 
-#if defined(_WIN32)
-# include <DbgHelp.h>
-#else
+#if !defined(_WIN32)
 # include <sys/file.h>
 #endif
 
@@ -1420,94 +1419,6 @@ namespace mongo {
         }
     }
 
-    LPTOP_LEVEL_EXCEPTION_FILTER filtLast = 0;
-
-    /* create a process dump.
-        To use, load up windbg.  Set your symbol and source path.
-        Open the crash dump file.  To see the crashing context, use .ecxr
-        */
-    void doMinidump(struct _EXCEPTION_POINTERS* exceptionInfo) {
-        LPCWSTR dumpFilename = L"mongo.dmp";
-        HANDLE hFile = CreateFileW(dumpFilename,
-            GENERIC_WRITE,
-            0,
-            NULL,
-            CREATE_ALWAYS,
-            FILE_ATTRIBUTE_NORMAL,
-            NULL);
-        if ( INVALID_HANDLE_VALUE == hFile ) {
-            DWORD lasterr = GetLastError();
-            log() << "failed to open minidump file " << toUtf8String(dumpFilename) << " : "
-                  << errnoWithDescription( lasterr ) << endl;
-            return;
-        }
-
-        MINIDUMP_EXCEPTION_INFORMATION aMiniDumpInfo;
-        aMiniDumpInfo.ThreadId = GetCurrentThreadId();
-        aMiniDumpInfo.ExceptionPointers = exceptionInfo;
-        aMiniDumpInfo.ClientPointers = TRUE;
-
-        log() << "writing minidump diagnostic file " << toUtf8String(dumpFilename) << endl;
-        BOOL bstatus = MiniDumpWriteDump(GetCurrentProcess(),
-            GetCurrentProcessId(),
-            hFile,
-            MiniDumpNormal,
-            &aMiniDumpInfo,
-            NULL,
-            NULL);
-        if ( FALSE == bstatus ) {
-            DWORD lasterr = GetLastError();
-            log() << "failed to create minidump : "
-                  << errnoWithDescription( lasterr ) << endl;
-        }
-
-        CloseHandle(hFile);
-    }
-
-    LONG WINAPI exceptionFilter( struct _EXCEPTION_POINTERS *excPointers ) {
-        char exceptionString[128];
-        sprintf_s( exceptionString, sizeof( exceptionString ),
-                ( excPointers->ExceptionRecord->ExceptionCode == EXCEPTION_ACCESS_VIOLATION ) ?
-                "(access violation)" : "0x%08X", excPointers->ExceptionRecord->ExceptionCode );
-        char addressString[32];
-        sprintf_s( addressString, sizeof( addressString ), "0x%p",
-                 excPointers->ExceptionRecord->ExceptionAddress );
-        log() << "*** unhandled exception " << exceptionString <<
-                " at " << addressString << ", terminating" << endl;
-        if ( excPointers->ExceptionRecord->ExceptionCode == EXCEPTION_ACCESS_VIOLATION ) {
-            ULONG acType = excPointers->ExceptionRecord->ExceptionInformation[0];
-            const char* acTypeString;
-            switch ( acType ) {
-            case 0:
-                acTypeString = "read from";
-                break;
-            case 1:
-                acTypeString = "write to";
-                break;
-            case 8:
-                acTypeString = "DEP violation at";
-                break;
-            default:
-                acTypeString = "unknown violation at";
-                break;
-            }
-            sprintf_s( addressString, sizeof( addressString ), " 0x%p",
-                     excPointers->ExceptionRecord->ExceptionInformation[1] );
-            log() << "*** access violation was a " << acTypeString << addressString << endl;
-        }
-
-        log() << "*** stack trace for unhandled exception:" << endl;
-        printWindowsStackTrace( *excPointers->ContextRecord );
-        doMinidump(excPointers);
-
-        // Don't go through normal shutdown procedure. It may make things worse.
-        log() << "*** immediate exit due to unhandled exception" << endl;
-        ::_exit(EXIT_ABRUPT);
-
-        // We won't reach here
-        return EXCEPTION_EXECUTE_HANDLER;
-    }
-
     // called by mongoAbort()
     extern void (*reportEventToSystem)(const char *msg);
     void reportEventToSystemImpl(const char *msg) {
@@ -1533,8 +1444,10 @@ namespace mongo {
 
     void setupSignals( bool inFork ) {
         reportEventToSystem = reportEventToSystemImpl;
-        filtLast = SetUnhandledExceptionFilter(exceptionFilter);
-        massert(10297 , "Couldn't register Windows Ctrl-C handler", SetConsoleCtrlHandler((PHANDLER_ROUTINE) CtrlHandler, TRUE));
+        setWindowsUnhandledExceptionFilter();
+        massert(10297,
+                "Couldn't register Windows Ctrl-C handler",
+                SetConsoleCtrlHandler(static_cast<PHANDLER_ROUTINE>(CtrlHandler), TRUE));
         _set_purecall_handler( myPurecallHandler );
     }
 

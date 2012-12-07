@@ -48,6 +48,7 @@
 #include "../util/processinfo.h"
 #include "mongo/db/lasterror.h"
 #include "mongo/util/stacktrace.h"
+#include "mongo/util/exception_filter_win32.h"
 
 #if defined(_WIN32)
 # include "../util/ntservice.h"
@@ -176,6 +177,7 @@ namespace mongo {
         signal( SIGPIPE , SIG_IGN );
 #endif
 
+        setWindowsUnhandledExceptionFilter();
         set_new_handler( my_new_handler );
     }
 
