@@ -22,7 +22,7 @@ if ( db.adminCommand( "buildinfo" ).bits == 64 ){
             break;
         }
         
-        if ( t.getLastError() != null )
+        if ( db.getLastError() != null )
             break;
         x++;
     }
