@@ -1025,7 +1025,7 @@ namespace mongo {
                 errmsg.clear();
 
                 if ( !ClientBasic::getCurrent()->getAuthenticationInfo()->isAuthorized("admin") ) {
-                    errmsg = "unauthorized. Need admin authentication to add a shard ";
+                    errmsg = "unauthorized. Need admin authentication to add a shard";
                     log() << "addshard request " << cmdObj << " failed:" << errmsg << endl;
                     return false;
                 }
@@ -1284,6 +1284,7 @@ namespace mongo {
                 return true;
             }
             virtual LockType locktype() const { return NONE; }
+            virtual bool requiresAuth() { return false; }
             virtual void addRequiredPrivileges(const std::string& dbname,
                                                const BSONObj& cmdObj,
                                                std::vector<Privilege>* out) {} // No auth required
@@ -1327,6 +1328,7 @@ namespace mongo {
             virtual void help( stringstream& help ) const {
                 help << "check for an error on the last command executed";
             }
+            virtual bool requiresAuth() { return false; }
             virtual void addRequiredPrivileges(const std::string& dbname,
                                                const BSONObj& cmdObj,
                                                std::vector<Privilege>* out) {} // No auth required
@@ -1358,6 +1360,7 @@ namespace mongo {
         virtual bool slaveOk() const {
             return true;
         }
+        virtual bool requiresAuth() { return false; }
         virtual void addRequiredPrivileges(const std::string& dbname,
                                            const BSONObj& cmdObj,
                                            std::vector<Privilege>* out) {} // No auth required
