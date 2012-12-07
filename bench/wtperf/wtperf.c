@@ -53,10 +53,12 @@ typedef struct {
 	uint32_t data_sz;
 	uint32_t key_sz;
 	uint32_t report_interval;
-	uint32_t read_time;
+	uint32_t checkpoint_interval;	/* Zero to disable. */
+	uint32_t run_time;
 	uint32_t elapsed_time;
 	uint32_t populate_threads;/* Number of populate threads. */
 	uint32_t read_threads;	/* Number of read threads. */
+	uint32_t update_threads;/* Number of update threads. */
 	uint32_t verbose;
 	uint32_t stat_thread;	/* Whether to create a stat thread. */
 	WT_CONNECTION *conn;
@@ -70,13 +72,14 @@ typedef struct {
 
 /* Forward function definitions. */
 int execute_populate(CONFIG *);
-int execute_reads(CONFIG *);
+int execute_workload(CONFIG *);
 int get_next_op(uint64_t *);
 int lprintf(CONFIG *cfg, int err, uint32_t level, const char *fmt, ...)
 #ifdef __GNUC__
     __attribute__((format (printf, 4, 5)))
 #endif
 ;
+void *checkpoint_worker(void *);
 void *populate_thread(void *);
 void print_config(CONFIG *);
 void *read_thread(void *);
@@ -84,11 +87,17 @@ int setup_log_file(CONFIG *);
 int start_threads(CONFIG *, u_int, pthread_t **, void *(*func)(void *));
 void *stat_worker(void *);
 int stop_threads(CONFIG *, u_int, pthread_t *);
+void *update_thread(void *);
 void usage(void);
+void worker(CONFIG *, uint32_t);
 
 #define	DEFAULT_LSM_CONFIG						\
 	"key_format=S,value_format=S,exclusive,"			\
 	"leaf_page_max=4kb,internal_page_max=64kb,allocation_size=4kb,"
+
+/* Worker thread types. */
+#define WORKER_READ	0x01
+#define WORKER_UPDATE	0x02
 
 /* Default values - these are tiny, we want the basic run to be fast. */
 CONFIG default_cfg = {
@@ -102,10 +111,12 @@ CONFIG default_cfg = {
 	100,		/* data_sz */
 	20,		/* key_sz */
 	2,		/* report_interval */
-	2,		/* read_time */
+	0,		/* checkpoint_interval */
+	2,		/* run_time */
 	0,		/* elapsed_time */
 	1,		/* populate_threads */
 	2,		/* read_threads */
+	0,		/* update_threads */
 	0,		/* verbose */
 	0,		/* stat_thread */
 	NULL,		/* conn */
@@ -126,10 +137,12 @@ CONFIG small_cfg = {
 	100,		/* data_sz */
 	20,		/* key_sz */
 	10,		/* report_interval */
-	20,		/* read_time */
+	0,		/* checkpoint_interval */
+	20,		/* run_time */
 	0,		/* elapsed_time */
 	1,		/* populate_threads */
 	8,		/* read_threads */
+	0,		/* update_threads */
 	0,		/* verbose */
 	0,		/* stat_thread */
 	NULL,		/* conn */
@@ -150,10 +163,12 @@ CONFIG med_cfg = {
 	100,		/* data_sz */
 	20,		/* key_sz */
 	20,		/* report_interval */
-	100,		/* read_time */
+	0,		/* checkpoint_interval */
+	100,		/* run_time */
 	0,		/* elapsed_time */
 	1,		/* populate_threads */
 	16,		/* read_threads */
+	0,		/* update_threads */
 	0,		/* verbose */
 	0,		/* stat_thread */
 	NULL,		/* conn */
@@ -174,10 +189,12 @@ CONFIG large_cfg = {
 	100,		/* data_sz */
 	20,		/* key_sz */
 	20,		/* report_interval */
-	600,		/* read_time */
+	0,		/* checkpoint_interval */
+	600,		/* run_time */
 	0,		/* elapsed_time */
 	1,		/* populate_threads */
 	16,		/* read_threads */
+	0,		/* update_threads */
 	0,		/* verbose */
 	0,		/* stat_thread */
 	NULL,		/* conn */
@@ -191,24 +208,38 @@ const char *debug_tconfig = "";
 
 /* Global values shared by threads. */
 uint64_t g_nops;
+uint64_t g_nread_ops;
+uint64_t g_nupdate_ops;
 int g_running;
-int g_stat_running;
+int g_util_running;
 uint32_t g_threads_quit; /* For tracking threads that exit early. */
 
 void *
 read_thread(void *arg)
 {
-	CONFIG *cfg;
+	worker((CONFIG *)arg, WORKER_READ);
+	return (NULL);
+}
+
+void *
+update_thread(void *arg)
+{
+	worker((CONFIG *)arg, WORKER_UPDATE);
+	return (NULL);
+}
+
+void
+worker(CONFIG *cfg, uint32_t worker_type)
+{
 	WT_CONNECTION *conn;
 	WT_SESSION *session;
 	WT_CURSOR *cursor;
-	char *key_buf;
-	int ret, search_ret;
+	char *key_buf, *value;
+	int ret, op_ret;
 
 	session = NULL;
 	key_buf = NULL;
 
-	cfg = (CONFIG *)arg;
 	conn = cfg->conn;
 	key_buf = calloc(cfg->key_sz, 1);
 	if (key_buf == NULL) {
@@ -229,15 +260,39 @@ read_thread(void *arg)
 	}
 
 	while (g_running) {
-		++g_nops;
 		/* Get a value in range, avoid zero. */
 		sprintf(key_buf, "%d",
 		    (uint32_t)rand() % (cfg->icount - 1) + 1);
 		cursor->set_key(cursor, key_buf);
+		switch(worker_type) {
+		case WORKER_READ:
+			op_ret = cursor->search(cursor);
+			if (op_ret == 0)
+				++g_nread_ops;
+			break;
+		case WORKER_UPDATE:
+			op_ret = cursor->search(cursor);
+			if (op_ret == 0) {
+				cursor->get_value(cursor, &value);
+				if (value[0] == 'a')
+					value[0] = 'b';
+				else
+					value[0] = 'a';
+				op_ret = cursor->update(cursor);
+			}
+			if (op_ret == 0)
+				++g_nupdate_ops;
+			break;
+		default:
+			lprintf(cfg, EINVAL, 0, "Invalid worker type");
+		}
+
 		/* Report errors and continue. */
-		if ((search_ret = cursor->search(cursor)) != 0)
-			lprintf(cfg, search_ret, 0,
+		if (op_ret != 0)
+			lprintf(cfg, op_ret, 0,
 			    "Search failed for: %s", key_buf);
+		else
+			++g_nops;
 	}
 
 err:	if (ret != 0)
@@ -246,7 +301,6 @@ err:	if (ret != 0)
 		session->close(session, NULL);
 	if (key_buf != NULL)
 		free(key_buf);
-	return (arg);
 }
 
 /* Retrieve an ID for the next insert operation. */
@@ -359,7 +413,7 @@ stat_worker(void *arg)
 	}
 	(void)snprintf(stat_uri, uri_len, "statistics:%s", cfg->uri);
 
-	while (g_stat_running) {
+	while (g_util_running) {
 		sleep(cfg->report_interval);
 		/* Generic header. */
 		lprintf(cfg, 0, cfg->verbose,
@@ -370,10 +424,15 @@ stat_worker(void *arg)
 		    cfg->phase_start_time.tv_usec / 1000000.0);
 		if (secs == 0)
 			++secs;
-		lprintf(cfg, 0, cfg->verbose,
-		    "%s completed: %" PRIu64", elapsed time: %.2f",
-		    cfg->phase == WT_PERF_READ ? "reads" : "inserts",
-		    g_nops, secs);
+		if (cfg->phase == WT_PERF_READ)
+			lprintf(cfg, 0, cfg->verbose,
+			    "inserts: %" PRIu64 ", elapsed time: %.2f",
+			    g_nops, secs);
+		else
+			lprintf(cfg, 0, cfg->verbose,
+			    "reads: %" PRIu64 "updates: %" PRIu64
+			    ", elapsed time: %.2f",
+			    g_nread_ops, g_nupdate_ops, secs);
 
 		/* Report data source stats. */
 		if ((ret = session->open_cursor(session, stat_uri,
@@ -408,6 +467,41 @@ err:	if (session != NULL)
 		session->close(session, NULL);
 	if (stat_uri != NULL)
 		free(stat_uri);
+	return (arg);
+}
+
+void *
+checkpoint_worker(void *arg)
+{
+	CONFIG *cfg;
+	WT_CONNECTION *conn;
+	WT_SESSION *session;
+	int ret;
+
+	session = NULL;
+	cfg = (CONFIG *)arg;
+	conn = cfg->conn;
+
+	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0) {
+		lprintf(cfg, ret, 0,
+		    "open_session failed in checkpoint thread.");
+		goto err;
+	}
+
+	while (g_util_running) {
+		/*
+		 * TODO: do we care how long the checkpoint takes?
+		 *       Does this need to be interruptible?
+		 */
+		sleep(cfg->checkpoint_interval);
+
+		if ((ret = session->checkpoint(session, NULL)) != 0)
+			/* Report errors and continue. */
+			lprintf(cfg, ret, 0, "Checkpoint failed.");
+		lprintf(cfg, 0, 1, "Finished checkpoint.");
+	}
+err:	if (session != NULL)
+		session->close(session, NULL);
 	return (arg);
 }
 
@@ -484,40 +578,51 @@ int execute_populate(CONFIG *cfg)
 	return (0);
 }
 
-int execute_reads(CONFIG *cfg)
+int execute_workload(CONFIG *cfg)
 {
-	pthread_t *threads;
+	pthread_t *rthreads, *uthreads;
 	int ret;
-	uint64_t last_ops;
+	uint64_t last_reads, last_updates;
 
 	cfg->phase = WT_PERF_READ;
 	lprintf(cfg, 0, 1, "Starting read threads");
 
-	if ((ret = start_threads(
-	    cfg, cfg->read_threads, &threads, read_thread)) != 0)
+	if (cfg->read_threads != 0 && (ret = start_threads(
+	    cfg, cfg->read_threads, &rthreads, read_thread)) != 0)
+		return (ret);
+
+	if (cfg->update_threads != 0 && (ret = start_threads(
+	    cfg, cfg->update_threads, &uthreads, update_thread)) != 0)
 		return (ret);
 
 	/* Sanity check reporting interval. */
-	if (cfg->report_interval > cfg->read_time)
-		cfg->report_interval = cfg->read_time;
+	if (cfg->report_interval > cfg->run_time)
+		cfg->report_interval = cfg->run_time;
 
 	gettimeofday(&cfg->phase_start_time, NULL);
-	for (cfg->elapsed_time = 0, last_ops = 0;
-	    cfg->elapsed_time < cfg->read_time &&
+	for (cfg->elapsed_time = 0, last_reads = 0, last_updates = 0;
+	    cfg->elapsed_time < cfg->run_time &&
 	    g_threads_quit < cfg->read_threads;
 	    cfg->elapsed_time += cfg->report_interval) {
 		sleep(cfg->report_interval);
-		lprintf(cfg, 0, 1, "%" PRIu64 " ops in %d secs",
-		    g_nops - last_ops, cfg->report_interval);
-		last_ops = g_nops;
+		lprintf(cfg, 0, 1,
+		    "%" PRIu64 " reads, %" PRIu64 "updates in %d secs",
+		    g_nread_ops - last_reads, g_nupdate_ops - last_updates,
+		    cfg->report_interval);
+		last_reads = g_nread_ops;
+		last_updates = g_nupdate_ops;
 	}
-	if (g_threads_quit == cfg->populate_threads) {
+	/* Report if any worker threads didn't finish. */
+	if (g_threads_quit != 0)
 		lprintf(cfg, WT_ERROR, 0,
-		    "Populate threads exited without finishing.");
-		return (WT_ERROR);
-	}
+		    "Worker thread(s) exited without finishing.");
 
-	if ((ret = stop_threads(cfg, cfg->read_threads, threads)) != 0)
+	if (cfg->read_threads != 0 &&
+	    (ret = stop_threads(cfg, cfg->read_threads, rthreads)) != 0)
+		return (ret);
+
+	if (cfg->update_threads != 0 &&
+	    (ret = stop_threads(cfg, cfg->update_threads, uthreads)) != 0)
 		return (ret);
 
 	return (0);
@@ -528,10 +633,10 @@ int main(int argc, char **argv)
 	CONFIG cfg;
 	WT_CONNECTION *conn;
 	const char *user_cconfig, *user_tconfig;
-	const char *opts = "C:P:R:T:d:eh:i:k:lr:s:u:v:SML";
+	const char *opts = "C:P:R:U:T:c:d:eh:i:k:lr:s:u:v:SML";
 	char *cc_buf, *tc_buf;
-	int ch, ret, stat_created;
-	pthread_t stat;
+	int ch, checkpoint_created, ret, stat_created;
+	pthread_t checkpoint, stat;
 	uint64_t req_len;
 
 	/* Setup the default configuration values. */
@@ -539,7 +644,7 @@ int main(int argc, char **argv)
 	cc_buf = tc_buf = NULL;
 	user_cconfig = user_tconfig = NULL;
 	conn = NULL;
-	stat_created = 0;
+	checkpoint_created = stat_created = 0;
 
 	/*
 	 * First parse different config structures - other options override
@@ -568,6 +673,9 @@ int main(int argc, char **argv)
 		case 'd':
 			cfg.data_sz = (uint32_t)atoi(optarg);
 			break;
+		case 'c':
+			cfg.checkpoint_interval = (uint32_t)atoi(optarg);
+			break;
 		case 'e':
 			cfg.create = 0;
 			break;
@@ -584,7 +692,7 @@ int main(int argc, char **argv)
 			cfg.stat_thread = 1;
 			break;
 		case 'r':
-			cfg.read_time = (uint32_t)atoi(optarg);
+			cfg.run_time = (uint32_t)atoi(optarg);
 			break;
 		case 's':
 			cfg.rand_seed = (uint32_t)atoi(optarg);
@@ -603,6 +711,9 @@ int main(int argc, char **argv)
 			break;
 		case 'R':
 			cfg.read_threads = (uint32_t)atoi(optarg);
+			break;
+		case 'U':
+			cfg.update_threads = (uint32_t)atoi(optarg);
 			break;
 		case 'T':
 			user_tconfig = optarg;
@@ -672,8 +783,8 @@ int main(int argc, char **argv)
 
 	cfg.conn = conn;
 
+	g_util_running = 1;
 	if (cfg.stat_thread) {
-		g_stat_running = 1;
 		if ((ret = pthread_create(
 		    &stat, NULL, stat_worker, &cfg)) != 0) {
 			lprintf(&cfg, ret, 0,
@@ -682,22 +793,39 @@ int main(int argc, char **argv)
 		}
 		stat_created = 1;
 	}
+	if (cfg.checkpoint_interval != 0) {
+		if ((ret = pthread_create(
+		    &checkpoint, NULL, checkpoint_worker, &cfg)) != 0) {
+			lprintf(&cfg, ret, 0,
+			    "Error creating checkpoint thread.");
+			goto err;
+		}
+		checkpoint_created = 1;
+	}
 	if (cfg.create != 0 && execute_populate(&cfg) != 0)
 		goto err;
 
-	if (cfg.read_time != 0 && cfg.read_threads != 0 &&
-	    (ret = execute_reads(&cfg)) != 0)
+	if (cfg.run_time != 0 &&
+	    (cfg.read_threads != 0 || cfg.update_threads != 0) &&
+	    (ret = execute_workload(&cfg)) != 0)
 			goto err;
 
 	lprintf(&cfg, 0, 1,
 	    "Ran performance test example with %d threads for %d seconds.",
-	    cfg.read_threads, cfg.read_time);
-	lprintf(&cfg, 0, 1,
-	    "Executed %" PRIu64 " read operations", g_nops);
+	    cfg.read_threads, cfg.run_time);
 
-err:	if (cfg.stat_thread)
-		g_stat_running = 0;
+	if (cfg.read_threads != 0)
+		lprintf(&cfg, 0, 1,
+		    "Executed %" PRIu64 " read operations", g_nread_ops);
+	if (cfg.update_threads != 0)
+		lprintf(&cfg, 0, 1,
+		    "Executed %" PRIu64 " update operations", g_nupdate_ops);
 
+err:	g_util_running = 0;
+
+	if (checkpoint_created != 0 &&
+	    (ret = pthread_join(checkpoint, NULL)) != 0)
+		lprintf(&cfg, ret, 0, "Error joining checkpoint thread.");
 	if (stat_created != 0 && (ret = pthread_join(stat, NULL)) != 0)
 		lprintf(&cfg, ret, 0, "Error joining stat thread.");
 	if (conn != NULL && (ret = conn->close(conn, NULL)) != 0)
@@ -727,7 +855,7 @@ start_threads(
 	int ret;
 
 	g_running = 1;
-	g_nops = 0;
+	g_nops = g_nread_ops = g_nupdate_ops = 0;
 	g_threads_quit = 0;
 	threads = calloc(num, sizeof(pthread_t *));
 	if (threads == NULL)
@@ -788,14 +916,14 @@ int lprintf(CONFIG *cfg, int err, uint32_t level, const char *fmt, ...)
 
 	/* We are dealing with an error. */
 	va_start(ap, fmt);
-	vfprintf(cfg->logf, fmt, ap);
+	vfprintf(stderr, fmt, ap);
 	va_end(ap);
-	fprintf(cfg->logf, " Error: %s\n", wiredtiger_strerror(err));
-	if (cfg->logf != stderr) {
+	fprintf(stderr, " Error: %s\n", wiredtiger_strerror(err));
+	if (cfg->logf != NULL) {
 		va_start(ap, fmt);
-		vfprintf(stderr, fmt, ap);
+		vfprintf(cfg->logf, fmt, ap);
 		va_end(ap);
-		fprintf(stderr, " Error: %s\n", wiredtiger_strerror(err));
+		fprintf(cfg->logf, " Error: %s\n", wiredtiger_strerror(err));
 	}
 
 	return (0);
@@ -842,6 +970,7 @@ void print_config(CONFIG *cfg)
 	printf("\t Connection configuration: %s\n", cfg->conn_config);
 	printf("\t Table configuration: %s\n", cfg->table_config);
 	printf("\t %s\n", cfg->create ? "Creating" : "Using existing");
+	printf("\tCheckpoint interval: %d\n", cfg->checkpoint_interval);
 	printf("\t Random seed: %d\n", cfg->rand_seed);
 	if (cfg->create) {
 		printf("\t Insert count: %d\n", cfg->icount);
@@ -850,8 +979,9 @@ void print_config(CONFIG *cfg)
 	}
 	printf("\t key size: %d data size: %d\n", cfg->key_sz, cfg->data_sz);
 	printf("\t Reporting interval: %d\n", cfg->report_interval);
-	printf("\t Read workload period: %d\n", cfg->read_time);
+	printf("\t Workload period: %d\n", cfg->run_time);
 	printf("\t Number read threads: %d\n", cfg->read_threads);
+	printf("\t Number update threads: %d\n", cfg->update_threads);
 	printf("\t Verbosity: %d\n", cfg->verbose);
 }
 
@@ -864,13 +994,15 @@ void usage(void)
 	printf("\t-C <string> additional connection configuration\n");
 	printf("\t-P <int> number of populate threads\n");
 	printf("\t-R <int> number of read threads\n");
+	printf("\t-U <int> number of update threads\n");
 	printf("\t-T <string> additional table configuration\n");
+	printf("\t-c <int> checkpoint interval (default disabled)\n");
 	printf("\t-d <int> data item size\n");
 	printf("\t-e use existing database (skip population phase)\n");
 	printf("\t-h <string> Wired Tiger home must exist, default WT_TEST \n");
 	printf("\t-i <int> number of records to insert\n");
 	printf("\t-k <int> key item size\n");
-	printf("\t-r <int> number of seconds to run read phase\n");
+	printf("\t-r <int> number of seconds to run workload phase\n");
 	printf("\t-s <int> seed for random number generator\n");
 	printf("\t-u <string> table uri, default lsm:test\n");
 	printf("\t-v <int> verbosity\n");
