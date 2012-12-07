@@ -70,6 +70,8 @@ namespace mongo {
     DiskLoc S2NearCursor::refLoc() { return DiskLoc(); }
     long long S2NearCursor::nscanned() { return _nscanned; }
 
+    double S2NearCursor::currentDistance() const { return _results.top().distance; }
+
     // TODO: yielding is very un-tested.
     // This is called when we're about to yield.
     void S2NearCursor::noteLocation() { _results = priority_queue<Result>(); }

@@ -2367,124 +2367,88 @@ namespace mongo {
     // ------
     // commands
     // ------
+    bool run2DGeoNear(const IndexDetails &id, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result) {
+        Geo2dType * g = (Geo2dType*)id.getSpec().getType();
+        verify(&id == g->getDetails());
 
-    class Geo2dFindNearCmd : public Command {
-    public:
-        Geo2dFindNearCmd() : Command("geoNear") {}
-        virtual LockType locktype() const { return READ; }
-        bool slaveOk() const { return true; }
-        void help(stringstream& h) const { h << "http://dochub.mongodb.org/core/geo#GeospatialIndexing-geoNearCommand"; }
-        bool slaveOverrideOk() const { return true; }
-        bool run(const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-            string ns = dbname + "." + cmdObj.firstElement().valuestr();
-
-            NamespaceDetails * d = nsdetails(ns.c_str());
-            if (! d) {
-                errmsg = "can't find ns";
-                return false;
-            }
-
-            vector<int> idxs;
-            d->findIndexByType(GEO2DNAME, idxs);
-
-            if (idxs.size() > 1) {
-                errmsg = "more than 1 geo indexes :(";
-                return false;
-            }
-
-            if (idxs.size() == 0) {
-                errmsg = "no geo index :(";
-                return false;
-            }
-
-            int geoIdx = idxs[0];
-
-            result.append("ns", ns);
-
-            IndexDetails& id = d->idx(geoIdx);
-            Geo2dType * g = (Geo2dType*)id.getSpec().getType();
-            verify(&id == g->getDetails());
-
-            int numWanted = 100;
-            if (cmdObj["num"].isNumber()) {
-                numWanted = cmdObj["num"].numberInt();
-                verify(numWanted >= 0);
-            }
-
-            bool uniqueDocs = false;
-            if(! cmdObj["uniqueDocs"].eoo()) uniqueDocs = cmdObj["uniqueDocs"].trueValue();
-
-            bool includeLocs = false;
-            if(! cmdObj["includeLocs"].eoo()) includeLocs = cmdObj["includeLocs"].trueValue();
-
-            uassert(13046, "'near' param missing/invalid", !cmdObj["near"].eoo());
-            const Point n(cmdObj["near"]);
-            result.append("near", g->getConverter().hash(cmdObj["near"]).toString());
-
-            BSONObj filter;
-            if (cmdObj["query"].type() == Object)
-                filter = cmdObj["query"].embeddedObject();
-
-            double maxDistance = numeric_limits<double>::max();
-            if (cmdObj["maxDistance"].isNumber())
-                maxDistance = cmdObj["maxDistance"].number();
-
-            GeoDistType type = GEO_PLAIN;
-            if (cmdObj["spherical"].trueValue())
-                type = GEO_SPHERE;
-
-            GeoSearch gs(g, n, numWanted, filter, maxDistance, type, uniqueDocs, true);
-
-            if (cmdObj["start"].type() == String) {
-                GeoHash start ((string) cmdObj["start"].valuestr());
-                gs._start = start;
-            }
-
-            gs.exec();
-
-            double distanceMultiplier = 1;
-            if (cmdObj["distanceMultiplier"].isNumber())
-                distanceMultiplier = cmdObj["distanceMultiplier"].number();
-
-            double totalDistance = 0;
-
-            BSONObjBuilder arr(result.subarrayStart("results"));
-            int x = 0;
-            for (GeoHopper::Holder::iterator i=gs._points.begin(); i!=gs._points.end(); i++) {
-
-                const GeoPoint& p = *i;
-                double dis = distanceMultiplier * p.distance();
-                totalDistance += dis;
-
-                BSONObjBuilder bb(arr.subobjStart(BSONObjBuilder::numStr(x++)));
-                bb.append("dis", dis);
-                if(includeLocs){
-                    if(p._pt.couldBeArray()) bb.append("loc", BSONArray(p._pt));
-                    else bb.append("loc", p._pt);
-                }
-                bb.append("obj", p._o);
-                bb.done();
-
-                if (arr.len() > BSONObjMaxUserSize) {
-                    warning() << "Too many results to fit in single document. Truncating..." << endl;
-                    break;
-                }
-            }
-            arr.done();
-
-            BSONObjBuilder stats(result.subobjStart("stats"));
-            stats.append("time", cc().curop()->elapsedMillis());
-            stats.appendNumber("btreelocs", gs._nscanned);
-            stats.appendNumber("nscanned", gs._lookedAt);
-            stats.appendNumber("objectsLoaded", gs._objectsLoaded);
-            stats.append("avgDistance", totalDistance / x);
-            stats.append("maxDistance", gs.farthest());
-            stats.done();
-
-            return true;
+        int numWanted = 100;
+        if (cmdObj["num"].isNumber()) {
+            numWanted = cmdObj["num"].numberInt();
+            verify(numWanted >= 0);
         }
 
-    } geo2dFindNearCmd;
+        bool uniqueDocs = false;
+        if(! cmdObj["uniqueDocs"].eoo()) uniqueDocs = cmdObj["uniqueDocs"].trueValue();
+
+        bool includeLocs = false;
+        if(! cmdObj["includeLocs"].eoo()) includeLocs = cmdObj["includeLocs"].trueValue();
+
+        uassert(13046, "'near' param missing/invalid", !cmdObj["near"].eoo());
+        const Point n(cmdObj["near"]);
+        result.append("near", g->getConverter().hash(cmdObj["near"]).toString());
+
+        BSONObj filter;
+        if (cmdObj["query"].type() == Object)
+            filter = cmdObj["query"].embeddedObject();
+
+        double maxDistance = numeric_limits<double>::max();
+        if (cmdObj["maxDistance"].isNumber())
+            maxDistance = cmdObj["maxDistance"].number();
+
+        GeoDistType type = GEO_PLAIN;
+        if (cmdObj["spherical"].trueValue())
+            type = GEO_SPHERE;
+
+        GeoSearch gs(g, n, numWanted, filter, maxDistance, type, uniqueDocs, true);
+
+        if (cmdObj["start"].type() == String) {
+            GeoHash start ((string) cmdObj["start"].valuestr());
+            gs._start = start;
+        }
+
+        gs.exec();
+
+        double distanceMultiplier = 1;
+        if (cmdObj["distanceMultiplier"].isNumber())
+            distanceMultiplier = cmdObj["distanceMultiplier"].number();
+
+        double totalDistance = 0;
+
+        BSONObjBuilder arr(result.subarrayStart("results"));
+        int x = 0;
+        for (GeoHopper::Holder::iterator i=gs._points.begin(); i!=gs._points.end(); i++) {
+
+            const GeoPoint& p = *i;
+            double dis = distanceMultiplier * p.distance();
+            totalDistance += dis;
+
+            BSONObjBuilder bb(arr.subobjStart(BSONObjBuilder::numStr(x++)));
+            bb.append("dis", dis);
+            if(includeLocs){
+                if(p._pt.couldBeArray()) bb.append("loc", BSONArray(p._pt));
+                else bb.append("loc", p._pt);
+            }
+            bb.append("obj", p._o);
+            bb.done();
+
+            if (arr.len() > BSONObjMaxUserSize) {
+                warning() << "Too many results to fit in single document. Truncating..." << endl;
+                break;
+            }
+        }
+        arr.done();
+
+        BSONObjBuilder stats(result.subobjStart("stats"));
+        stats.append("time", cc().curop()->elapsedMillis());
+        stats.appendNumber("btreelocs", gs._nscanned);
+        stats.appendNumber("nscanned", gs._lookedAt);
+        stats.appendNumber("objectsLoaded", gs._objectsLoaded);
+        stats.append("avgDistance", totalDistance / x);
+        stats.append("maxDistance", gs.farthest());
+        stats.done();
+
+        return true;
+    }
 
     class GeoWalkCmd : public Command {
     public:

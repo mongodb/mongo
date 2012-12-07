@@ -52,6 +52,8 @@ namespace mongo {
         virtual void checkLocation();
         virtual long long nscanned();
         virtual void explainDetails(BSONObjBuilder& b);
+
+        double currentDistance() const;
     private:
         // We use this to cache results of the search.  Results are sorted to have decreasing
         // distance, and callers are interested in loc and key.

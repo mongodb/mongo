@@ -15,6 +15,8 @@
 */
 
 #include "mongo/db/namespace-inl.h"
+#include "mongo/db/client.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/index.h"
 #include "mongo/db/queryutil.h"
@@ -268,6 +270,16 @@ namespace mongo {
         }
 
         const IndexDetails* getDetails() const { return _spec->getDetails(); }
+
+        // These are used by the geoNear command.  geoNear constructs its own cursor.
+        const S2IndexingParams& getParams() const { return _params; }
+        void getGeoFieldNames(vector<string> *out) const {
+            for (size_t i = 0; i < _fields.size(); ++i) {
+                if (IndexedField::GEO == _fields[i].type) {
+                    out->push_back(_fields[i].name);
+                }
+            }
+        }
     private:
         // Get the index keys for elements that are GeoJSON.
         void getGeoKeys(const BSONElementSet &elements, BSONObjSet *out) const {
@@ -354,4 +366,88 @@ namespace mongo {
             return new S2IndexType(SPHERE_2D_NAME, this, spec, params);
         }
     } S2IndexPluginS2D;
+
+    bool run2DSphereGeoNear(const IndexDetails &id, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result) {
+        S2IndexType *idxType = static_cast<S2IndexType*>(id.getSpec().getType());
+        verify(&id == idxType->getDetails());
+
+        int numWanted = 100;
+        if (cmdObj["num"].isNumber()) {
+            numWanted = cmdObj["num"].numberInt();
+            verify(numWanted >= 0);
+        }
+
+        // Don't count any docs twice.  Isn't this default behavior?  Or will yields screw this up?
+        //bool uniqueDocs = false;
+        //if (!cmdObj["uniqueDocs"].eoo()) uniqueDocs = cmdObj["uniqueDocs"].trueValue();
+
+        // Add the location information to each result as a field with name 'loc'.
+        bool includeLocs = false;
+        if (!cmdObj["includeLocs"].eoo()) includeLocs = cmdObj["includeLocs"].trueValue();
+
+        // The actual query point
+        uassert(16551, "'near' param missing/invalid", !cmdObj["near"].eoo());
+        BSONObj nearObj = cmdObj["near"].embeddedObject();
+
+        // The non-near query part.
+        BSONObj query;
+        if (cmdObj["query"].isABSONObj())
+            query = cmdObj["query"].embeddedObject();
+
+        // The farthest away we're willing to look.
+        double maxDistance = numeric_limits<double>::max();
+        if (cmdObj["maxDistance"].isNumber())
+            maxDistance = cmdObj["maxDistance"].number();
+
+        vector<string> geoFieldNames;
+        idxType->getGeoFieldNames(&geoFieldNames);
+        uassert(16552, "geoNear called but no indexed geo fields?", 1 == geoFieldNames.size());
+        QueryGeometry queryGeo(geoFieldNames[0]);
+        uassert(16553, "geoNear couldn't parse geo: " + nearObj.toString(), queryGeo.parseFrom(nearObj));
+        vector<QueryGeometry> regions;
+        regions.push_back(queryGeo);
+
+        scoped_ptr<S2NearCursor> cursor(new S2NearCursor(idxType->keyPattern(), idxType->getDetails(), query, regions,
+                    idxType->getParams(), numWanted, maxDistance));
+
+        double totalDistance = 0;
+        int results = 0;
+        BSONObjBuilder resultBuilder(result.subarrayStart("results"));
+        double farthestDist = 0;
+
+        while (cursor->ok()) {
+            double dist = cursor->currentDistance();
+            totalDistance += dist;
+            cursor->advance();
+            if (dist > farthestDist) { farthestDist = dist; }
+
+            BSONObjBuilder oneResultBuilder(resultBuilder.subobjStart(BSONObjBuilder::numStr(results)));
+            oneResultBuilder.append("dis", dist);
+            if (includeLocs) {
+                BSONElementSet geoFieldElements;
+                cursor->current().getFieldsDotted(geoFieldNames[0], geoFieldElements, false);
+                for (BSONElementSet::iterator oi = geoFieldElements.begin();
+                        oi != geoFieldElements.end(); ++oi) {
+                    if (oi->isABSONObj()) {
+                        oneResultBuilder.append("loc", oi->Obj());
+                    }
+                }
+            }
+
+            oneResultBuilder.append("obj", cursor->current());
+            oneResultBuilder.done();
+            ++results;
+        }
+
+        resultBuilder.done();
+
+        BSONObjBuilder stats(result.subobjStart("stats"));
+        stats.append("time", cc().curop()->elapsedMillis());
+        stats.appendNumber("nscanned", cursor->nscanned());
+        stats.append("avgDistance", totalDistance / results);
+        stats.append("maxDistance", farthestDist);
+        stats.done();
+
+        return true;
+    }
 }  // namespace mongo
