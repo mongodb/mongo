@@ -84,7 +84,7 @@ __lsm_tree_close(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	/*
 	 * Close the worker thread sessions and free their hazard arrays
 	 * (necessary because we set WT_SESSION_INTERNAL to simplify shutdown
-	 * ordering.
+	 * ordering).
 	 *
 	 * Do this in the main thread to avoid deadlocks.
 	 */
@@ -641,8 +641,9 @@ __wt_lsm_tree_rename(WT_SESSION_IMPL *session,
 	}
 
 	__wt_rwunlock(session, lsm_tree->rwlock);
-	WT_ERR(__wt_lsm_meta_write(session, lsm_tree));
-	WT_ERR(__wt_metadata_remove(session, oldname));
+	ret = __wt_lsm_meta_write(session, lsm_tree);
+	if (ret == 0)
+		ret = __wt_metadata_remove(session, oldname);
 
 	if (0) {
 err:		__wt_rwunlock(session, lsm_tree->rwlock);
