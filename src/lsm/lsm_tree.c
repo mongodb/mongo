@@ -575,7 +575,7 @@ __wt_lsm_tree_drop(
 	}
 
 	__wt_rwunlock(session, lsm_tree->rwlock);
-	WT_ERR(__wt_metadata_remove(session, name));
+	ret = __wt_metadata_remove(session, name);
 
 	if (0) {
 err:		__wt_rwunlock(session, lsm_tree->rwlock);
