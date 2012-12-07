@@ -382,9 +382,9 @@ namespace mongo {
             // change its state to down (if it's already down, leave it down since we don't have
             // any info about it other than it's heartbeating us)
             if (m.lastHeartbeatRecv+2 >= time(0)) {
-                LOG(1) << "replset info " << h.toString()
-                       << " just heartbeated us, but our heartbeat failed: " << msg
-                       << ", not changing state" << rsLog;
+                log() << "replset info " << h.toString()
+                      << " just heartbeated us, but our heartbeat failed: " << msg
+                      << ", not changing state" << rsLog;
                 // we don't update any of the heartbeat info, though, since we didn't get any info
                 // other than "not down" from having it heartbeat us
                 return;
