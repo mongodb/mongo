@@ -19,11 +19,10 @@ if ( db.adminCommand( "buildinfo" ).bits == 64 ){
             o = n
         }
         catch ( e ){
-            db.getLastError();
             break;
         }
         
-        if ( db.getLastError() != null )
+        if ( t.getLastError() != null )
             break;
         x++;
     }
