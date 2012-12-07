@@ -8,6 +8,7 @@
 "applyOps",
 "captrunc",
 "clean",
+"clone",
 "closeAllDatabases",
 "collMod",
 "collStats",

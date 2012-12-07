@@ -158,6 +158,7 @@ namespace mongo {
         clusterAdminRoleActions.addAction(ActionType::unsetSharding);
 
         // Internal commands
+        internalActions.addAction(ActionType::clone);
         internalActions.addAction(ActionType::handshake);
         internalActions.addAction(ActionType::mapReduceShardedFinish);
         internalActions.addAction(ActionType::replSetElect);
@@ -187,7 +188,7 @@ namespace mongo {
     }
 
     Principal* AuthorizationManager::lookupPrincipal(const std::string& name,
-                                                     const std::string& userSource) {
+                                                     const std::string& userSource) const {
         return _authenticatedPrincipals.lookup(name, userSource);
     }
 
@@ -223,6 +224,12 @@ namespace mongo {
         addAuthorizedPrincipal(principal);
         Status status = acquirePrivilege(privilege);
         verify(status.isOK());
+    }
+
+    bool AuthorizationManager::hasInternalAuthorization() const {
+        ActionSet allActions;
+        allActions.addAllActions();
+        return _acquiredPrivileges.getPrivilegeForActions("*", allActions);
     }
 
     ActionSet AuthorizationManager::getActionsForOldStyleUser(const std::string& dbname,

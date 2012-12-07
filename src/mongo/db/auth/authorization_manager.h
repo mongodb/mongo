@@ -66,7 +66,7 @@ namespace mongo {
         // comes from userSource (will generally be a database name or $sasl).  Returns NULL
         // if no such user is found.
         // Ownership of the returned Principal remains with _authenticatedPrincipals
-        Principal* lookupPrincipal(const std::string& name, const std::string& userSource);
+        Principal* lookupPrincipal(const std::string& name, const std::string& userSource) const;
 
         // Removes any authenticated principals whose authorization credentials came from the given
         // database, and revokes any privileges that were granted via that principal.
@@ -78,6 +78,9 @@ namespace mongo {
         // Adds a new principal with the given principal name and authorizes it with full access.
         // Used to grant internal threads full access.
         void grantInternalAuthorization(const std::string& principalName);
+
+        // Checks if this connection has been authenticated as an internal user.
+        bool hasInternalAuthorization() const;
 
         // Checks if this connection has the privileges required to perform the given action
         // on the given resource.  Contains all the authorization logic including handling things
