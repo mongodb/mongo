@@ -1852,7 +1852,7 @@ namespace mongo {
                                 || !ai->isAuthorizedForLock(cl, c->locktype()))) {
                     ok = false;
                     errmsg = "unauthorized";
-                    anObjBuilder.append("note", str::stream() << "unauthorized for command: " <<
+                    anObjBuilder.append("note", str::stream() << "not authorized for command: " <<
                                         e.fieldName() << " on database " << cl);
                 }
             }
@@ -1872,7 +1872,7 @@ namespace mongo {
                 c->help( help );
                 anObjBuilder.append( "help" , help.str() );
             }
-            else {
+            if (ok) {
                 try {
                     ok = c->run( nsToDatabase( ns ) , jsobj, queryOptions, errmsg, anObjBuilder, false );
                 }
