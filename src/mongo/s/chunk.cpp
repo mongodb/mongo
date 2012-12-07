@@ -31,6 +31,7 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/strategy.h"
 #include "mongo/s/type_collection.h"
+#include "mongo/s/type_settings.h"
 #include "mongo/util/concurrency/ticketholder.h"
 #include "mongo/util/startup_test.h"
 #include "mongo/util/timer.h"
@@ -559,7 +560,7 @@ namespace mongo {
            return;
         }
 
-        int csize = o[SettingsFields::chunksize()].numberInt();
+        int csize = o[SettingsType::chunksize()].numberInt();
 
         // validate chunksize before proceeding
         if ( csize == 0 ) {

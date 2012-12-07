@@ -31,7 +31,6 @@ namespace mongo {
     struct ConfigNS {
         static const string tag;
         static const string mongos;
-        static const string settings;
         static const string changelog;
         static const string locks;
         static const string lockpings;
@@ -65,34 +64,6 @@ namespace mongo {
 
         // for testing purposes
         static BSONField<bool> waiting;
-    };
-
-    /**
-     * SettingsFields holds all the field names and types for the settings collection.
-     */
-    struct SettingsFields {
-
-        // key determining the type of setting document this is
-        static BSONField<string> key;
-
-        // === chunksize options ===
-
-        static BSONField<int> chunksize;
-
-        // === balancer options ===
-
-        // balancer enabled/disabled
-        static BSONField<bool> balancerStopped;
-
-        // if present, activeWindow is an interval during the day when the balancer should be
-        // active.  Format: { start: "08:00" , stop: "19:30" }, strftime format is %H:%M
-        static BSONField<BSONObj> balancerActiveWindow;
-
-        // controls how long the balancer sleeps in some situations
-        static BSONField<bool> shortBalancerSleep;
-
-        // only migrate chunks as fast as at least one secondary can keep up with
-        static BSONField<bool> secondaryThrottle;
     };
 
     /**

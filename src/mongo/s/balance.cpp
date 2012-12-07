@@ -29,6 +29,7 @@
 #include "mongo/s/shard.h"
 #include "mongo/s/type_chunk.h"
 #include "mongo/s/type_collection.h"
+#include "mongo/s/type_settings.h"
 
 namespace mongo {
 
@@ -343,8 +344,8 @@ namespace mongo {
                     continue;
                 }
 
-                sleepTime = balancerConfig[SettingsFields::shortBalancerSleep()].trueValue() ? 30 :
-                                                                                               6;
+                sleepTime = balancerConfig[SettingsType::shortBalancerSleep()].trueValue() ? 30 :
+                                                                                             6;
                 
                 uassert( 13258 , "oids broken after resetting!" , _checkOIDs() );
 
@@ -380,7 +381,7 @@ namespace mongo {
                     }
                     else {
                         _balancedLastTime = _moveChunks(&candidateChunks,
-                                balancerConfig[SettingsFields::secondaryThrottle()].trueValue(),
+                                balancerConfig[SettingsType::secondaryThrottle()].trueValue(),
                                 balancerConfig["_waitForDelete"].trueValue());
                     }
 

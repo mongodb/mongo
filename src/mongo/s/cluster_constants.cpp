@@ -30,14 +30,6 @@ namespace mongo {
     BSONField<int> MongosFields::up("up");
     BSONField<bool> MongosFields::waiting("waiting");
 
-    const string ConfigNS::settings = "config.settings";
-    BSONField<string> SettingsFields::key("_id");
-    BSONField<int> SettingsFields::chunksize("value");
-    BSONField<bool> SettingsFields::balancerStopped("stopped");
-    BSONField<BSONObj> SettingsFields::balancerActiveWindow("activeWindow");
-    BSONField<bool> SettingsFields::shortBalancerSleep("_nosleep");
-    BSONField<bool> SettingsFields::secondaryThrottle("_secondaryThrottle");
-
     const string ConfigNS::changelog = "config.changelog";
     BSONField<string> ChangelogFields::changeID("_id");
     BSONField<string> ChangelogFields::server("server");

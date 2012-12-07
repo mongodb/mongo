@@ -120,7 +120,7 @@ namespace mongo {
         // individual field accessors
         //
 
-        void setKey(const StringData& key) { _key = std::string(key.data(), key.size()); }
+        void setKey(const StringData& key) { _key = key.toString(); }
         const std::string& getKey() const { return _key; }
 
         void setChunksize(int chunksize) { _chunksize = chunksize; }
