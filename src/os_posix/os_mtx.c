@@ -186,21 +186,18 @@ err:		__wt_free(session, rwlock);
  * __wt_readlock
  *	Get a shared lock.
  */
-void
+int
 __wt_readlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 {
 	WT_DECL_RET;
 
-	WT_VERBOSE_VOID(session, mutex,
+	WT_VERBOSE_RET(session, mutex,
 	    "rwlock: readlock %s (%p)", rwlock->name, rwlock);
-
-	WT_ERR(pthread_rwlock_rdlock(&rwlock->rwlock));
 	WT_CSTAT_INCR(session, rwlock_read);
 
-	if (0) {
-err:		__wt_err(session, ret, "rwlock readlock failed");
-		__wt_abort(session);
-	}
+	if ((ret = pthread_rwlock_rdlock(&rwlock->rwlock)) == 0)
+		return (0);
+	WT_RET_MSG(session, ret, "pthread_rwlock_rdlock: %s", rwlock->name);
 }
 
 /*
@@ -212,45 +209,39 @@ __wt_try_writelock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 {
 	WT_DECL_RET;
 
-	WT_VERBOSE_VOID(session, mutex,
+	WT_VERBOSE_RET(session, mutex,
 	    "rwlock: try_writelock %s (%p)", rwlock->name, rwlock);
+	WT_CSTAT_INCR(session, rwlock_write);
 
-	if ((ret = pthread_rwlock_trywrlock(&rwlock->rwlock)) == 0)
-		WT_CSTAT_INCR(session, rwlock_write);
-	else if (ret != EBUSY) {
-		__wt_err(session, ret, "rwlock try_writelock failed");
-		__wt_abort(session);
-	}
-
-	return (ret);
+	if ((ret =
+	    pthread_rwlock_trywrlock(&rwlock->rwlock)) == 0 || ret == EBUSY)
+		return (ret);
+	WT_RET_MSG(session, ret, "pthread_rwlock_trywrlock: %s", rwlock->name);
 }
 
 /*
  * __wt_writelock
  *	Wait to get an exclusive lock.
  */
-void
+int
 __wt_writelock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 {
 	WT_DECL_RET;
 
-	WT_VERBOSE_VOID(session, mutex,
+	WT_VERBOSE_RET(session, mutex,
 	    "rwlock: writelock %s (%p)", rwlock->name, rwlock);
-
-	WT_ERR(pthread_rwlock_wrlock(&rwlock->rwlock));
 	WT_CSTAT_INCR(session, rwlock_write);
 
-	if (0) {
-err:		__wt_err(session, ret, "rwlock writelock failed");
-		__wt_abort(session);
-	}
+	if ((ret = pthread_rwlock_wrlock(&rwlock->rwlock)) == 0)
+		return (0);
+	WT_RET_MSG(session, ret, "pthread_rwlock_wrlock: %s", rwlock->name);
 }
 
 /*
  * __wt_rwunlock --
  *	Release a read/write lock.
  */
-void
+int
 __wt_rwunlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 {
 	WT_DECL_RET;
@@ -258,21 +249,19 @@ __wt_rwunlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 	WT_VERBOSE_VOID(session, mutex,
 	    "rwlock: unlock %s (%p)", rwlock->name, rwlock);
 
-	WT_ERR(pthread_rwlock_unlock(&rwlock->rwlock));
-
-	if (0) {
-err:		__wt_err(session, ret, "rwlock unlock failed");
-		__wt_abort(session);
-	}
+	if ((ret = pthread_rwlock_unlock(&rwlock->rwlock)) == 0)
+		return (0);
+	WT_RET_MSG(session, ret, "pthread_rwlock_unlock: %s", rwlock->name);
 }
 
 /*
  * __wt_rwlock_destroy --
  *	Destroy a mutex.
  */
-void
+int
 __wt_rwlock_destroy(WT_SESSION_IMPL *session, WT_RWLOCK **rwlockp)
 {
+	WT_DECL_RET;
 	WT_RWLOCK *rwlock;
 
 	rwlock = *rwlockp;		/* Clear our caller's reference. */
@@ -281,8 +270,11 @@ __wt_rwlock_destroy(WT_SESSION_IMPL *session, WT_RWLOCK **rwlockp)
 	WT_VERBOSE_VOID(session, mutex,
 	    "rwlock: destroy %s (%p)", rwlock->name, rwlock);
 
-	/* Errors are possible, but we're discarding memory, ignore them. */
-	(void)pthread_rwlock_destroy(&rwlock->rwlock);
+	if ((ret = pthread_rwlock_destroy(&rwlock->rwlock)) == 0) {
+		__wt_free(session, rwlock);
+		return (0);
+	}
 
-	__wt_free(session, rwlock);
+	/* Deliberately leak memory on error. */
+	WT_RET_MSG(session, ret, "pthread_rwlock_destroy: %s", rwlock->name);
 }

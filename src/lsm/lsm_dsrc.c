@@ -142,7 +142,7 @@ __wt_lsm_cleanup(WT_CONNECTION *wt_conn)
 
 	if ((ret = __wt_schema_get_source(session, "lsm:", &dsrc)) == 0) {
 		lsm_dsrc = (WT_LSM_DATA_SOURCE *)dsrc;
-		__wt_rwlock_destroy(session, &lsm_dsrc->rwlock);
+		ret = __wt_rwlock_destroy(session, &lsm_dsrc->rwlock);
 		__wt_free(session, dsrc);
 	}
 	if (ret == WT_NOTFOUND)

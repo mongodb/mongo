@@ -14,9 +14,10 @@ static int __lsm_tree_open(WT_SESSION_IMPL *, const char *, WT_LSM_TREE **);
  * __lsm_tree_discard --
  *	Free an LSM tree structure.
  */
-static void
+static int
 __lsm_tree_discard(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 {
+	WT_DECL_RET;
 	WT_LSM_CHUNK *chunk;
 	u_int i;
 
@@ -32,7 +33,7 @@ __lsm_tree_discard(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	__wt_free(session, lsm_tree->file_config);
 
 	if (lsm_tree->rwlock != NULL)
-		__wt_rwlock_destroy(session, &lsm_tree->rwlock);
+		WT_TRET(__wt_rwlock_destroy(session, &lsm_tree->rwlock));
 
 	__wt_free(session, lsm_tree->stats);
 
@@ -56,6 +57,8 @@ __lsm_tree_discard(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	}
 	__wt_free(session, lsm_tree->old_chunks);
 	__wt_free(session, lsm_tree);
+
+	return (ret);
 }
 
 /*
@@ -146,7 +149,7 @@ __wt_lsm_tree_close_all(WT_SESSION_IMPL *session)
 
 	while ((lsm_tree = TAILQ_FIRST(&S2C(session)->lsmqh)) != NULL) {
 		WT_TRET(__lsm_tree_close(session, lsm_tree));
-		__lsm_tree_discard(session, lsm_tree);
+		WT_TRET(__lsm_tree_discard(session, lsm_tree));
 	}
 
 	return (ret);
@@ -352,7 +355,7 @@ __wt_lsm_tree_create(WT_SESSION_IMPL *session,
 	WT_ERR(__wt_lsm_meta_write(session, lsm_tree));
 
 	/* Discard our partially populated handle. */
-	__lsm_tree_discard(session, lsm_tree);
+	ret = __lsm_tree_discard(session, lsm_tree);
 	lsm_tree = NULL;
 
 	/*
@@ -360,12 +363,13 @@ __wt_lsm_tree_create(WT_SESSION_IMPL *session,
 	 * error: the returned handle is NULL on error, and the metadata
 	 * tracking macros handle cleaning up on failure.
 	 */
-	ret = __lsm_tree_open(session, uri, &lsm_tree);
+	if (ret == 0)
+		ret = __lsm_tree_open(session, uri, &lsm_tree);
 	if (ret == 0)
 		__wt_lsm_tree_release(session, lsm_tree);
 
 	if (0) {
-err:		__lsm_tree_discard(session, lsm_tree);
+err:		WT_TRET(__lsm_tree_discard(session, lsm_tree));
 	}
 	__wt_scr_free(&buf);
 	return (ret);
@@ -450,7 +454,7 @@ __lsm_tree_open(
 	*treep = lsm_tree;
 
 	if (0) {
-err:		__lsm_tree_discard(session, lsm_tree);
+err:		WT_TRET(__lsm_tree_discard(session, lsm_tree));
 	}
 	return (ret);
 }
@@ -574,13 +578,14 @@ __wt_lsm_tree_drop(
 			    __wt_schema_drop(session, chunk->bloom_uri, cfg));
 	}
 
-	__wt_rwunlock(session, lsm_tree->rwlock);
-	ret = __wt_metadata_remove(session, name);
+	ret = __wt_rwunlock(session, lsm_tree->rwlock);
+	if (ret == 0)
+		ret = __wt_metadata_remove(session, name);
 
 	if (0) {
-err:		__wt_rwunlock(session, lsm_tree->rwlock);
+err:		WT_TRET(__wt_rwunlock(session, lsm_tree->rwlock));
 	}
-	__lsm_tree_discard(session, lsm_tree);
+	WT_TRET(__lsm_tree_discard(session, lsm_tree));
 	return (ret);
 }
 
@@ -640,17 +645,18 @@ __wt_lsm_tree_rename(WT_SESSION_IMPL *session,
 		}
 	}
 
-	__wt_rwunlock(session, lsm_tree->rwlock);
-	ret = __wt_lsm_meta_write(session, lsm_tree);
+	ret = __wt_rwunlock(session, lsm_tree->rwlock);
+	if (ret == 0)
+		ret = __wt_lsm_meta_write(session, lsm_tree);
 	if (ret == 0)
 		ret = __wt_metadata_remove(session, oldname);
 
 	if (0) {
-err:		__wt_rwunlock(session, lsm_tree->rwlock);
+err:		WT_TRET(__wt_rwunlock(session, lsm_tree->rwlock));
 	}
 	if (old != NULL)
 		__wt_free(session, old);
-	__lsm_tree_discard(session, lsm_tree);
+	WT_TRET(__lsm_tree_discard(session, lsm_tree));
 	return (ret);
 }
 
@@ -689,12 +695,13 @@ __wt_lsm_tree_truncate(
 	WT_ERR(__wt_lsm_meta_write(session, lsm_tree));
 
 	WT_ERR(__lsm_tree_start_worker(session, lsm_tree));
-	__wt_rwunlock(session, lsm_tree->rwlock);
-	__wt_lsm_tree_release(session, lsm_tree);
+	ret = __wt_rwunlock(session, lsm_tree->rwlock);
+	if (ret == 0)
+		__wt_lsm_tree_release(session, lsm_tree);
 
 	if (0) {
-err:		__wt_rwunlock(session, lsm_tree->rwlock);
-		__lsm_tree_discard(session, lsm_tree);
+err:		WT_TRET(__wt_rwunlock(session, lsm_tree->rwlock));
+		WT_TRET(__lsm_tree_discard(session, lsm_tree));
 	}
 	return (ret);
 }
