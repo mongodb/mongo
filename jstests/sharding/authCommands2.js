@@ -1,3 +1,4 @@
+if (0) { // SERVER-7881
 /**
  * This tests using DB commands with authentication enabled when sharded.
  */
@@ -324,3 +325,4 @@ adminDB.printShardingStatus();
 
 
 st.stop();
+}
