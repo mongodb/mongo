@@ -848,9 +848,6 @@ namespace mongo {
     }
 
     bool ClientCursor::_erase_inlock(ClientCursor* cursor) {
-        if ( ! cursor )
-            return false;
-
         // Must not have an active ClientCursor::Pin.
         massert( 16089,
                 str::stream() << "Cannot kill active cursor " << cursor->cursorid(),
@@ -863,12 +860,19 @@ namespace mongo {
     bool ClientCursor::erase(CursorId id) {
         recursive_scoped_lock lock(ccmutex);
         ClientCursor* cursor = find_inlock(id);
+        if (!cursor) {
+            return false;
+        }
+
         return _erase_inlock(cursor);
     }
 
     bool ClientCursor::eraseIfAuthorized(CursorId id) {
         recursive_scoped_lock lock(ccmutex);
         ClientCursor* cursor = find_inlock(id);
+        if (!cursor) {
+            return false;
+        }
 
         if (!cc().getAuthorizationManager()->checkAuthorization(cursor->ns(),
                                                                 ActionType::find)
