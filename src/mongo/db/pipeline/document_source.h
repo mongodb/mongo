@@ -862,15 +862,6 @@ namespace mongo {
         virtual bool coalesce(const intrusive_ptr<DocumentSource> &pNextSource);
         */
 
-        /**
-          Create a new sorting DocumentSource.
-          
-          @param pExpCtx the expression context for the pipeline
-          @returns the DocumentSource
-         */
-        static intrusive_ptr<DocumentSourceSort> create(
-            const intrusive_ptr<ExpressionContext> &pExpCtx);
-
         // Virtuals for SplittableDocumentSource
         // All work for sort is done in router currently if there is no limit.
         // If there is a limit, the $sort/$limit combination is performed on the
@@ -912,6 +903,12 @@ namespace mongo {
         static intrusive_ptr<DocumentSource> createFromBson(
             BSONElement *pBsonElement,
             const intrusive_ptr<ExpressionContext> &pExpCtx);
+
+        /// Create a DocumentSourceSort with a given sort and (optional) limit
+        static intrusive_ptr<DocumentSourceSort> create(
+            const intrusive_ptr<ExpressionContext> &pExpCtx,
+            BSONObj sortOrder,
+            long long limit=-1);
 
         /// returns -1 for no limit
         long long getLimit();
@@ -1003,7 +1000,8 @@ namespace mongo {
           @returns the DocumentSource
          */
         static intrusive_ptr<DocumentSourceLimit> create(
-            const intrusive_ptr<ExpressionContext> &pExpCtx);
+            const intrusive_ptr<ExpressionContext> &pExpCtx,
+            long long limit);
 
         // Virtuals for SplittableDocumentSource
         // Need to run on rounter. Running on shard as well is an optimization.
@@ -1035,8 +1033,8 @@ namespace mongo {
         virtual void sourceToBson(BSONObjBuilder *pBuilder, bool explain) const;
 
     private:
-        DocumentSourceLimit(
-            const intrusive_ptr<ExpressionContext> &pExpCtx);
+        DocumentSourceLimit(const intrusive_ptr<ExpressionContext> &pExpCtx,
+                            long long limit);
 
         long long limit;
         long long count;

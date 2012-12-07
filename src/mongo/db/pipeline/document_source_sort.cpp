@@ -96,13 +96,6 @@ namespace mongo {
         }
     }
 
-    intrusive_ptr<DocumentSourceSort> DocumentSourceSort::create(
-        const intrusive_ptr<ExpressionContext> &pExpCtx) {
-        intrusive_ptr<DocumentSourceSort> pSource(
-            new DocumentSourceSort(pExpCtx));
-        return pSource;
-    }
-
     DocumentSourceSort::DocumentSourceSort(const intrusive_ptr<ExpressionContext> &pExpCtx)
         : SplittableDocumentSource(pExpCtx)
         , populated(false)
@@ -158,12 +151,20 @@ namespace mongo {
                 sortName << " key specification must be an object",
                 pBsonElement->type() == Object);
 
-        intrusive_ptr<DocumentSourceSort> pSort(
-            DocumentSourceSort::create(pExpCtx));
+        return create(pExpCtx, pBsonElement->embeddedObject());
+
+    }
+
+    intrusive_ptr<DocumentSourceSort> DocumentSourceSort::create(
+            const intrusive_ptr<ExpressionContext> &pExpCtx,
+            BSONObj sortOrder,
+            long long limit) {
+
+        intrusive_ptr<DocumentSourceSort> pSort = new DocumentSourceSort(pExpCtx);
 
         /* check for then iterate over the sort object */
         size_t sortKeys = 0;
-        for(BSONObjIterator keyIterator(pBsonElement->Obj().begin());
+        for(BSONObjIterator keyIterator(sortOrder);
             keyIterator.more();) {
             BSONElement keyField(keyIterator.next());
             const char *pKeyFieldName = keyField.fieldName();
@@ -184,6 +185,12 @@ namespace mongo {
 
         uassert(15976, str::stream() << sortName <<
                 " must have at least one sort key", (sortKeys > 0));
+
+        if (limit > 0) {
+            bool coalesced = pSort->coalesce(DocumentSourceLimit::create(pExpCtx, limit));
+            verify(coalesced); // should always coalesce
+            verify(pSort->getLimit() == limit);
+        }
 
         return pSort;
     }
