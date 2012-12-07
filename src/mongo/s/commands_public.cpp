@@ -1877,6 +1877,7 @@ namespace mongo {
                     ok = c->run( nsToDatabase( ns ) , jsobj, queryOptions, errmsg, anObjBuilder, false );
                 }
                 catch (DBException& e) {
+                    ok = false;
                     int code = e.getCode();
                     if (code == RecvStaleConfigCode) { // code for StaleConfigException
                         throw;
