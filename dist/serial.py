@@ -39,12 +39,6 @@ Serial('insert', [
 		SerialArg('u_int', 'skipdepth'),
 	]),
 
-Serial('row_key', [
-		SerialArg('WT_PAGE *', 'page'),
-		SerialArg('WT_ROW *', 'row_arg'),
-		SerialArg('WT_IKEY *', 'ikey'),
-	]),
-
 Serial('sync_file', [
 		SerialArg('int', 'syncop'),
 	]),

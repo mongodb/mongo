@@ -467,7 +467,6 @@ extern int __wt_row_ikey_alloc(WT_SESSION_IMPL *session,
     const void *key,
     uint32_t size,
     void *ikeyp);
-extern int __wt_row_key_serial_func(WT_SESSION_IMPL *session, void *args);
 extern int __wt_row_modify(WT_SESSION_IMPL *session,
     WT_CURSOR_BTREE *cbt,
     int is_remove);
