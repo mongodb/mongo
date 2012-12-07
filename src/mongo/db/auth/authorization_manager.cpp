@@ -266,7 +266,7 @@ namespace mongo {
 
     Status AuthorizationManager::acquirePrivilegesFromPrivilegeDocument(
             const std::string& dbname, Principal* principal, const BSONObj& privilegeDocument) {
-        if (!_authenticatedPrincipals.lookup(principal->getName(), dbname)) {
+        if (!_authenticatedPrincipals.lookup(principal->getName(), principal->getDBName())) {
             return Status(ErrorCodes::UserNotFound,
                           mongoutils::str::stream()
                                   << "No authenticated principle found with name: "
