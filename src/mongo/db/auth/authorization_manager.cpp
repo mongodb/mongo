@@ -462,7 +462,6 @@ namespace mongo {
         for (std::vector<Privilege>::const_iterator it = privileges.begin();
                 it != privileges.end(); ++it) {
             const Privilege& privilege = *it;
-            ActionSet actions = privilege.getActions();
             if (!checkAuthorization(privilege.getResource(), privilege.getActions())) {
                 return Status(ErrorCodes::Unauthorized, "unauthorized", 0);
             }
