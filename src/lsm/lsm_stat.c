@@ -27,9 +27,11 @@ __wt_lsm_stat_init(WT_SESSION_IMPL *session,
 	const char *desc, *pvalue;
 	uint64_t value;
 	u_int i;
-	int stat_key;
+	int locked, stat_key;
 
 	WT_UNUSED(flags);
+	locked = 0;
+
 	WT_ERR(__wt_scr_alloc(session, 0, &uribuf));
 
 	/* Clear the statistics we are about to recalculate. */
@@ -47,6 +49,7 @@ __wt_lsm_stat_init(WT_SESSION_IMPL *session,
 
 	/* Hold the LSM lock so that we can safely walk through the chunks. */
 	__wt_readlock(session, lsm_tree->rwlock);
+	locked = 1;
 
 	/* Set the stats for this run. */
 	WT_STAT_SET(stats, lsm_chunk_count, lsm_tree->nchunks);
@@ -135,7 +138,8 @@ __wt_lsm_stat_init(WT_SESSION_IMPL *session,
 		WT_ERR(stat_cursor->close(stat_cursor));
 	}
 
-err:	__wt_rwunlock(session, lsm_tree->rwlock);
+err:	if (locked)
+		__wt_rwunlock(session, lsm_tree->rwlock);
 	__wt_scr_free(&uribuf);
 
 	return (ret);
