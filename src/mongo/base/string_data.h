@@ -37,20 +37,22 @@ namespace mongo {
      *
      *  + The object StringData wraps around must be alive while the StringData is.
      *
-     *  + Because strings accept null characters, we allow them in StringData. But this use is
-     *    *strongly* discouraged. One problem this case may encounter is when asking for data()
-     *    out of a StringData that was feed with, say "a\0b". If interpreted as a c-string,
-     *    the null character would cut the original string short.
+     *  + Because string data can be used to pass a substring around, one should never assume a
+     *    rawData() terminates with a null.
      */
     class StringData {
     public:
+
+        /** Constructs an empty string data */
+        StringData()
+            : _data(NULL), _size(0) {}
 
         /**
          * Constructs a StringData, for the case where the length of string is not known. 'c'
          * must be a pointer to a null-terminated string.
          */
         StringData( const char* c )
-            : _data(c), _size(string::npos){}
+            : _data(c), _size((c == NULL) ? 0 : string::npos) {}
 
         /**
          * Constructs a StringData explicitly, for the case where the length of the string is

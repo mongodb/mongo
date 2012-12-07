@@ -24,6 +24,12 @@ namespace {
     using mongo::StringData;
     using std::string;
 
+    TEST(Construction, Empty) {
+        StringData strData;
+        ASSERT_EQUALS(strData.size(), 0U);
+        ASSERT_TRUE(strData.rawData() == NULL);
+    }
+
     TEST(Construction, FromStdString) {
         std::string base("aaa");
         StringData strData(base);
@@ -36,6 +42,13 @@ namespace {
         StringData strData(base.c_str());
         ASSERT_EQUALS(strData.size(), base.size());
         ASSERT_EQUALS(strData.toString(), base);
+    }
+
+    TEST(Construction, FromNullCString) {
+        char* c = NULL;
+        StringData strData(c);
+        ASSERT_EQUALS(strData.size(), 0U);
+        ASSERT_TRUE(strData.rawData() == NULL);
     }
 
     TEST(Construction, FromLiteral) {
