@@ -1267,6 +1267,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="..\util\concurrency\thread_pool.cpp" />
     <ClCompile Include="..\util\debug_util.cpp" />
     <ClCompile Include="..\util\elapsed_tracker.cpp" />
+    <ClCompile Include="..\util\exception_filter_win32.cpp" />
     <ClCompile Include="..\util\fail_point.cpp" />
     <ClCompile Include="..\util\fail_point_registry.cpp" />
     <ClCompile Include="..\util\fail_point_service.cpp" />
@@ -1823,6 +1824,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="..\util\descriptive_stats-inl.h" />
     <ClInclude Include="..\util\descriptive_stats.h" />
     <ClInclude Include="..\util\elapsed_tracker.h" />
+    <ClInclude Include="..\util\exception_filter_win32.h" />
     <ClInclude Include="..\util\exit_code.h" />
     <ClInclude Include="..\util\fail_point.h" />
     <ClInclude Include="..\util\fail_point_registry.h" />

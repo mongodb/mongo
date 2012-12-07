@@ -1445,6 +1445,9 @@
     <ClCompile Include="commands\mr_common.cpp">
       <Filter>db\commands</Filter>
     </ClCompile>
+    <ClCompile Include="..\util\exception_filter_win32.cpp">
+      <Filter>util\Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\targetver.h" />
@@ -2981,6 +2984,9 @@
     </ClInclude>
     <ClInclude Include="commands\find_and_modify.h">
       <Filter>db\commands</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\exception_filter_win32.h">
+      <Filter>util\Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

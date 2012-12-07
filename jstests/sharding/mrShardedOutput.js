@@ -1,118 +1,150 @@
-s = new ShardingTest( "mrShardedOutput" , 2 , 1 , 1 , { chunksize : 1 } );
+// This test writes documents to a 'foo' collection in two passes, and runs a 'null' MapReduce job
+// with sharded output on the collection after each pass.  The map stage of the MapReduce job
+// simply emits all of its input documents (only the 1 KiB field) and the reduce stage returns its
+// input document.  Checks are made that all inserted records make it into the 'foo' collection,
+// and that the sharded output collection is evenly distributed across the shards.
 
-// reduce chunk size to split
-var config = s.getDB("config");
-config.settings.save({_id: "chunksize", value: 1});
+jsTest.log("Setting up new ShardingTest");
+var st = new ShardingTest( "mrShardedOutput", 2, 1, 1, { chunksize : 1 } );
 
-s.adminCommand( { enablesharding : "test" } )
-s.adminCommand( { shardcollection : "test.foo", key : { "a" : 1 } } )
+var config = st.getDB("config");
+st.adminCommand( { enablesharding: "test" } );
+st.adminCommand( { shardcollection: "test.foo", key: { "a": 1 } } );
 
-db = s.getDB( "test" );
+var testDB = st.getDB( "test" );
 var aaa = "aaaaaaaaaaaaaaaa";
 var str = aaa;
 while (str.length < 1*1024) { str += aaa; }
 
-s.printChunks();
-s.printChangeLog();
+st.printChunks();
+st.printChangeLog();
 
 function map2() { emit(this._id, {count: 1, y: this.y}); }
 function reduce2(key, values) { return values[0]; }
 
-var numdocs = 0;
-var numbatch = 100000;
-var nchunks = 0;
+var numDocs = 0;
+var buildIs32bits = (testDB.serverBuildInfo().bits == 32);
+var numBatch = buildIs32bits ? (30 * 1000) : (100 * 1000);
+var numChunks = 0;
 
 var numIterations = 2;
+for (var iter = 0; iter < numIterations; ++iter) {
+    jsTest.log("Iteration " + iter + ": saving new batch of " + numBatch + " documents");
 
-for (var it = 0; it < numIterations; it++) {
-    
-    jsTest.log("Starting new insert batch...");
-    
-    // add some more data for input so that chunks will get split further
-    for (i=0; i<numbatch; i++){ db.foo.save({a: Math.random() * 1000, y:str, i : numdocs + i})}
-    
-    assert.eq(null, db.getLastError());
-    
-    jsTest.log("No errors on insert batch.")
-    
-    numdocs += numbatch
-    
-    var isBad = db.foo.find().itcount() != numdocs
-    
-    if (isBad) jsTest.log("Insert count is smaller than full count!")
-    
-    if (isBad) {
-        
-        jsTest.log( "Showing document distribution because documents missed..." )
-        
-        // Stop balancing
-        s.stopBalancer();
-        
+    // Add some more data for input so that chunks will get split further
+    for (var i = 0; i < numBatch; ++i) {
+        if (i % 1000 == 0) {
+            print("\n========> Saved total of " + (numDocs + i) + " documents\n");
+        }
+        testDB.foo.save( {a: Math.random() * 1000, y: str, i: numDocs + i} );
+    }
+    print("\n========> Finished saving total of " + (numDocs + i) + " documents");
+
+    var GLE = testDB.getLastError();
+    assert.eq(null, GLE, "Setup FAILURE: testDB.getLastError() returned" + GLE);
+    jsTest.log("No errors on insert batch.");
+    numDocs += numBatch;
+
+    var savedCount = testDB.foo.find().itcount();
+    if (savedCount != numDocs) {
+        jsTest.log("Setup FAILURE: testDB.foo.find().itcount() = " + savedCount +
+                   " after saving " + numDocs + " documents -- (will assert after diagnostics)");
+
+        // Stop balancer
+        jsTest.log("Stopping balancer");
+        st.stopBalancer();
+
         // Wait for writebacks
-        sleep( 10000 );
-        
-        s.printShardingStatus(true);
-        
-        var shards = config.shards.find().toArray();
-        
-        for (var i = 0; i < shards.length; i++){
-            
-            var shard = new Mongo(shards[i].host)
-            
-            var partialColl = shard.getCollection(db.foo + "").find();
-            
-            while (partialColl.hasNext()) {
-                var obj = partialColl.next();
-                delete obj.y;
-                print(tojson(obj));
+        jsTest.log("Waiting 10 seconds for writebacks");
+        sleep(10000);
+
+        jsTest.log("Checking for missing documents");
+        for (i = 0; i < numDocs; ++i) {
+            if ( !testDB.foo.findOne({ i: i }, { i: 1 }) ) {
+                print("\n========> Could not find document " + i + "\n");
+            }
+            if (i % 1000 == 0) {
+                print( "\n========> Checked " + i + "\n");
             }
         }
-        
-        jsTest.log( "End document distribution." )
+        print("\n========> Finished checking " + i + "\n");
+        printShardingStatus(config, true);
+
+        // Verify that WriteBackListener weirdness isn't causing this
+        jsTest.log("Waiting for count to become correct");
+        assert.soon(function() { var c = testDB.foo.find().itcount();
+                                 print( "Count is " + c );
+                                 return c == numDocs; },
+                    "Setup FAILURE: Count did not become correct after 30 seconds",
+                    /* timeout */  30 * 1000,
+                    /* interval */ 1000);
+
+        assert(false,
+               "Setup FAILURE: getLastError was null for insert, but inserted count was wrong");
     }
-    
-    // Verify that wbl weirdness isn't causing this
-    assert.soon( function(){ var c = db.foo.find().itcount(); print( "Count is " + c ); return c == numdocs } )
-   
-    assert( ! isBad )
-    //assert.eq( numdocs, db.foo.find().itcount(), "Not all data was saved!" )
-    
-    res = db.foo.mapReduce(map2, reduce2, { out : { replace: "mrShardedOut", sharded: true }});
-    assert.eq( numdocs , res.counts.output , "Output is wrong " );
+
+
+    // Do the MapReduce step
+    jsTest.log("Setup OK: count matches (" + numDocs + ") -- Starting MapReduce");
+    var res = testDB.foo.mapReduce(map2, reduce2, {out: {replace: "mrShardedOut", sharded: true}});
+    var reduceOutputCount = res.counts.output;
+    assert.eq(numDocs,
+              reduceOutputCount,
+              "MapReduce FAILED: res.counts.output = " + reduceOutputCount +
+                   ", should be " + numDocs);
+    jsTest.log("MapReduce results:");
     printjson(res);
 
-    outColl = db["mrShardedOut"];
-    // SERVER-3645 -can't use count()
-    assert.eq( numdocs , outColl.find().itcount() , "Received wrong result, this may happen intermittently until resolution of SERVER-3627" );
-    // make sure it's sharded and split
-    var newnchunks = config.chunks.count({ns: db.mrShardedOut._fullName});
-    print("Number of chunks: " + newnchunks);
-    assert.gt( newnchunks, 1, "didnt split");
+    jsTest.log("Checking that all MapReduce output documents are in output collection");
+    var outColl = testDB["mrShardedOut"];
+    var outCollCount = outColl.find().itcount();    // SERVER-3645 -can't use count()
+    assert.eq(numDocs,
+              outCollCount,
+              "MapReduce FAILED: outColl.find().itcount() = " + outCollCount +
+                   ", should be " + numDocs +
+                   ": this may happen intermittently until resolution of SERVER-3627");
 
-    // make sure num of chunks increases over time
-    if (nchunks)
-        assert.gt( newnchunks, nchunks, "number of chunks did not increase between iterations");
-    nchunks = newnchunks;
+    // Make sure it's sharded and split
+    var newNumChunks = config.chunks.count({ns: testDB.mrShardedOut._fullName});
+    print("Number of chunks: " + newNumChunks);
+    assert.gt(newNumChunks,
+              1,
+              "Sharding FAILURE: " + testDB.mrShardedOut._fullName + " has only 1 chunk");
 
-    // check that chunks are well distributed
-    cur = config.chunks.find({ns: db.mrShardedOut._fullName});
+    // Make sure num of chunks increases over time
+    if (numChunks) {
+        assert.gt(newNumChunks,
+                  numChunks,
+                  "Sharding FAILURE: Number of chunks did not increase between iterations");
+    }
+    numChunks = newNumChunks;
+
+    // Check that chunks are well distributed
+    printShardingStatus(config, true);
+    jsTest.log("Checking chunk distribution");
+    cur = config.chunks.find({ns: testDB.mrShardedOut._fullName});
     shardChunks = {};
     while (cur.hasNext()) {
-        chunk = cur.next();
-        printjson(chunk);
-        sname = chunk.shard;
-        if (shardChunks[sname] == undefined) shardChunks[sname] = 0;
-        shardChunks[chunk.shard] += 1;
+        var chunk = cur.next();
+        var shardName = chunk.shard;
+        if (shardChunks[shardName]) {
+            shardChunks[shardName] += 1;
+        }
+        else {
+            shardChunks[shardName] = 1;
+        }
     }
-
     var count = 0;
     for (var prop in shardChunks) {
-        print ("NUMBER OF CHUNKS FOR SHARD " + prop + ": " + shardChunks[prop]);
-        if (!count)
+        print("Number of chunks for shard " + prop + ": " + shardChunks[prop]);
+        if (count == 0) {
             count = shardChunks[prop];
-        assert.lt(Math.abs(count - shardChunks[prop]), nchunks / 10, "Chunks are not well balanced: " + count + " vs " + shardChunks[prop]);
+        }
+        assert.lt(Math.abs(count - shardChunks[prop]),
+                  numChunks / 10,
+                  "Chunks are not well balanced: " + count + " vs. " + shardChunks[prop]);
     }
 }
 
-
-s.stop();
+jsTest.log("SUCCESS!  Stopping ShardingTest");
+st.stop();
