@@ -1,5 +1,3 @@
-// geo2d.cpp
-
 /**
 *    Copyright (C) 2008 10gen Inc.
 *
@@ -68,8 +66,6 @@ namespace mongo {
         virtual ~Geo2dType() { }
 
         Geo2dType(const IndexPlugin *plugin, const IndexSpec* spec) : IndexType(plugin, spec) {
-            BSONObjBuilder orderBuilder;
-
             BSONObjIterator i(spec->keyPattern);
             while (i.more()) {
                 BSONElement e = i.next();
@@ -78,9 +74,12 @@ namespace mongo {
                     uassert(13023, "2d has to be first in index", _other.size() == 0);
                     _geo = e.fieldName();
                 } else {
-                    _other.push_back(e.fieldName());
+                    int order = 1;
+                    if (e.isNumber()) {
+                        order = e.Number();
+                    }
+                    _other.push_back(make_pair(e.fieldName(), order));
                 }
-                orderBuilder.append("", 1);
             }
             uassert(13024, "no geo field specified", _geo.size());
 
@@ -95,8 +94,6 @@ namespace mongo {
             params.scaling = numBuckets / (params.max - params.min);
 
             _geoHashConverter.reset(new GeoHashConverter(params));
-
-            _order = orderBuilder.obj();
         }
 
         // XXX: what does this do
@@ -202,10 +199,11 @@ namespace mongo {
                     _geoHashConverter->hash(locObj, &obj).appendToBuilder(&b, "");
 
                     // Go through all the other index keys
-                    for (vector<string>::const_iterator i = _other.begin(); i != _other.end(); ++i) {
+                    for (vector<pair<string, int> >::const_iterator i = _other.begin();
+                         i != _other.end(); ++i) {
                         // Get *all* fields for the index key
                         BSONElementSet eSet;
-                        obj.getFieldsDotted(*i, eSet);
+                        obj.getFieldsDotted(i->first, eSet);
 
                         if (eSet.size() == 0)
                             b.appendAs(_spec->missingField(), "");
@@ -264,7 +262,7 @@ namespace mongo {
 
         // XXX: make private with a getter
         string _geo;
-        vector<string> _other;
+        vector<pair<string, int> > _other;
     private:
         double configValueWithDefault(const IndexSpec* spec, const string& name, double def) {
             BSONElement e = spec->info[name];
@@ -275,7 +273,6 @@ namespace mongo {
         }
 
         scoped_ptr<GeoHashConverter> _geoHashConverter;
-        BSONObj _order;
     };
 
     class Geo2dPlugin : public IndexPlugin {
@@ -677,8 +674,9 @@ namespace mongo {
 
             BSONObjBuilder bob;
             bob.append(spec->_geo, 1);
-            for(vector<string>::const_iterator i = spec->_other.begin(); i != spec->_other.end(); i++){
-                bob.append(*i, 1);
+            for(vector<pair<string, int> >::const_iterator i = spec->_other.begin();
+                i != spec->_other.end(); i++){
+                bob.append(i->first, i->second);
             }
             BSONObj iSpec = bob.obj();
 
@@ -1030,16 +1028,15 @@ namespace mongo {
                 // Get the very first hash point, if required
                 if(! isNeighbor)
                     _prefix = expandStartHash();
-
                 GEODEBUG("initializing btree");
 
 #ifdef GEODEBUGGING
                 log() << "Initializing from b-tree with hash of " << _prefix << " @ " << Box(_g, _prefix) << endl;
 #endif
 
-                if (! BtreeLocation::initial(*_id, _spec, _min, _max, _prefix, _foundInExp, this))
+                if (! BtreeLocation::initial(*_id, _spec, _min, _max, _prefix, _foundInExp, this)) {
                     _state = isNeighbor ? DONE_NEIGHBOR : DONE;
-                else {
+                } else {
                     _state = DOING_EXPAND;
                     _lastPrefix.reset();
                 }
@@ -1050,7 +1047,6 @@ namespace mongo {
 
             // Doing the actual box expansion
             if (_state == DOING_EXPAND) {
-
                 while (true) {
 
                     GEODEBUG("box prefix [" << _prefix << "]");
