@@ -230,9 +230,12 @@ namespace mongo {
                 try {
                     // set the 'precalculated' index data and add the index
                     SortersForNS::iterator sortIter = _sortersForNS.find(js["ns"].String());
-                    SortersForIndex::iterator it = sortIter->second.find(js["name"].String());
-                    if (it != sortIter->second.end())
-                        theDataFileMgr.setPrecalced(&it->second.preSortPhase);
+                    if (sortIter != _sortersForNS.end()) {
+                        SortersForIndex::iterator it = sortIter->second.find(js["name"].String());
+                        if (it != sortIter->second.end()) {
+                            theDataFileMgr.setPrecalced(&it->second.preSortPhase);
+                        }
+                    }
                     theDataFileMgr.insertWithObjMod(to_collection, js);
                     theDataFileMgr.setPrecalced(NULL);
 
