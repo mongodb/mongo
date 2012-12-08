@@ -85,24 +85,24 @@ int main(void)
 	 * that case, but is a safety check that the schema matches what the
 	 * program expects.
 	 */
-	ret = session->create(session, "table:population",
+	ret = session->create(session, "table:mytable",
 	    "key_format=r,"
 	    "value_format=5sHQ,"
 	    "columns=(id,country,year,population),"
 	    "colgroups=(main,population)");
 
 	/* Create the column groups to store population in its own file. */
-	ret = session->create(session, "colgroup:population:main",
+	ret = session->create(session, "colgroup:mytable:main",
 	    "columns=(country,year)");
 
-	ret = session->create(session, "colgroup:population:population",
+	ret = session->create(session, "colgroup:mytable:population",
 	    "columns=(population)");
 
 	/* Create an index with composite key (country,year). */
-	ret = session->create(session, "index:population:country_year",
+	ret = session->create(session, "index:mytable:country_year",
 	    "columns=(country,year)");
 
-	ret = session->open_cursor(session, "table:population",
+	ret = session->open_cursor(session, "table:mytable",
 	    NULL, "append", &cursor);
 
 	endp = pop_data + (sizeof (pop_data) / sizeof(pop_data[0]));
@@ -114,7 +114,7 @@ int main(void)
 
 	/* Now just read through the countries we know about */
 	ret = session->open_cursor(session,
-	    "index:population:country_year(id)",
+	    "index:mytable:country_year(id)",
 	    NULL, NULL, &cursor);
 
 	while ((ret = cursor->next(cursor)) == 0) {
