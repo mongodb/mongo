@@ -318,9 +318,6 @@ struct __wt_connection_impl {
 
 /*
  * End a transactional API call.
- *
- * If committing and any cursors are positioned, update the read snapshot so
- * the changes become visible.
  */
 #define	TXN_API_END(s, ret)						\
 	API_END(s);							\
