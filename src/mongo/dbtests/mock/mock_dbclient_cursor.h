@@ -36,5 +36,6 @@ namespace mongo {
 
     private:
         boost::scoped_ptr<mongo::DBClientMockCursor> _cursor;
+        mongo::BSONObj _resultSet;
     };
 }
