@@ -1386,7 +1386,7 @@ namespace mongo {
         exitCleanly( EXIT_KILL );
     }
 
-    BOOL CtrlHandler( DWORD fdwCtrlType ) {
+    BOOL WINAPI CtrlHandler( DWORD fdwCtrlType ) {
 
         switch( fdwCtrlType ) {
 
