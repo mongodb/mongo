@@ -76,7 +76,7 @@ namespace mongo {
                 } else {
                     int order = 1;
                     if (e.isNumber()) {
-                        order = e.Number();
+                        order = static_cast<int>(e.Number());
                     }
                     _other.push_back(make_pair(e.fieldName(), order));
                 }
