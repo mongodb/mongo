@@ -109,32 +109,18 @@ cursor_ops(WT_SESSION *session)
 	}
 
 	{
-	/*! [Get the cursor's record number key] */
-	uint64_t recno;		/* Get the cursor's record number key. */
-	ret = cursor->get_key(cursor, &recno);
-	/*! [Get the cursor's record number key] */
-	}
-
-	{
-	/*! [Get the cursor's string value] */
-	const char *value;	/* Get the cursor's string value. */
-	ret = cursor->get_value(cursor, &value);
-	/*! [Get the cursor's string value] */
-	}
-
-	{
-	/*! [Get the cursor's raw value] */
-	WT_ITEM value;		/* Get the cursor's raw value. */
-	ret = cursor->get_value(cursor, &value);
-	/*! [Get the cursor's raw value] */
-	}
-
-	{
 	/*! [Set the cursor's string key] */
 				/* Set the cursor's string key. */
 	const char *key = "another key";
 	cursor->set_key(cursor, key);
 	/*! [Set the cursor's string key] */
+	}
+
+	{
+	/*! [Get the cursor's record number key] */
+	uint64_t recno;		/* Get the cursor's record number key. */
+	ret = cursor->get_key(cursor, &recno);
+	/*! [Get the cursor's record number key] */
 	}
 
 	{
@@ -145,12 +131,43 @@ cursor_ops(WT_SESSION *session)
 	}
 
 	{
+	/*! [Get the cursor's composite key] */
+				/* Get the cursor's composite key. */
+	const char *first, *third;
+	int second;
+	cursor->get_key(cursor, &first, &second, &third);
+	/*! [Get the cursor's composite key] */
+	}
+
+	{
+	/*! [Set the cursor's composite key] */
+				/* Set the cursor's composite key. */
+	cursor->set_key(cursor, "first", 5, "second");
+	/*! [Set the cursor's composite key] */
+	}
+
+	{
+	/*! [Get the cursor's string value] */
+	const char *value;	/* Get the cursor's string value. */
+	ret = cursor->get_value(cursor, &value);
+	/*! [Get the cursor's string value] */
+	}
+
+	{
 	/*! [Set the cursor's string value] */
 				/* Set the cursor's string value. */
 	const char *value = "another value";
 	cursor->set_value(cursor, value);
 	/*! [Set the cursor's string value] */
 	}
+
+	{
+	/*! [Get the cursor's raw value] */
+	WT_ITEM value;		/* Get the cursor's raw value. */
+	ret = cursor->get_value(cursor, &value);
+	/*! [Get the cursor's raw value] */
+	}
+
 	{
 	/*! [Set the cursor's raw value] */
 	WT_ITEM value;		/* Set the cursor's raw value. */
@@ -394,6 +411,21 @@ session_ops(WT_SESSION *session)
 	ret = session->create(session,
 	    "table:mytable", "key_format=S,value_format=S");
 	/*! [Create a table] */
+
+	/*! [Create a column-store table] */
+	ret = session->create(session,
+	    "table:mytable", "key_format=r,value_format=S");
+	/*! [Create a column-store table] */
+
+	/*! [Create a table with columns] */
+	/*
+	 * Create a table with columns: keys are record numbers, values are
+	 * (string, integer, unsigned short).
+	 */
+	ret = session->create(session, "table:mytable",
+	    "key_format=r,value_format=SiH"
+	    "columns=(id,department,salary,year-started)");
+	/*! [Create a table with columns] */
 
 	/*
 	 * This example code gets run, and the compression libraries might not
