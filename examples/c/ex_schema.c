@@ -42,7 +42,7 @@ const char *home = "WT_TEST";
 typedef struct {
 	char country[5];
 	uint16_t year;
-	uint64_t population;
+	unsigned long long population;
 } POP_RECORD;
 /*! [schema decl] */
 
