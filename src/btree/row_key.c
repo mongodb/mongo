@@ -20,7 +20,7 @@ __wt_row_leaf_keys(WT_SESSION_IMPL *session, WT_PAGE *page)
 	WT_DECL_ITEM(tmp);
 	WT_DECL_RET;
 	WT_ROW *rip;
-	uint32_t i;
+	uint32_t gap, i;
 
 	btree = session->btree;
 
@@ -50,7 +50,9 @@ __wt_row_leaf_keys(WT_SESSION_IMPL *session, WT_PAGE *page)
 	WT_RET(__wt_scr_alloc(
 	    session, (uint32_t)__bitstr_size(page->entries), &tmp));
 
-	__inmem_row_leaf_slots(tmp->mem, 0, page->entries, btree->key_gap);
+	if ((gap = btree->key_gap) == 0)
+		gap = 1;
+	__inmem_row_leaf_slots(tmp->mem, 0, page->entries, gap);
 
 	/* Instantiate the keys. */
 	for (rip = page->u.row.d, i = 0; i < page->entries; ++rip, ++i)
