@@ -289,6 +289,17 @@ in the cursor URI when the cursor is opened.  For example:
 @snippet ex_schema.c Return the table's record number key using an index
 @snippet ex_schema.c Return a subset of the value columns from an index
 
+For performance reasons, it may be desirable to include a copy of all
+commonly needed data in the index, so it's possible to perform
+index-only searches where no column group other than the index is
+accessed.  In this case, all of the "hot" columns should be included in
+the index (always list the "real" index key columns first, so they will
+determine the sort order).  Then, open a cursor on the index that
+doesn't return any value columns, and no column groups other than the
+index will be accessed.
+
+@snippet ex_schema.c Access only the index
+
 Index cursors for column-store objects may not be created using the
 record number as the index key (there is no use for a secondary index
 on a column-store where the index key is the record number).

@@ -203,7 +203,7 @@ main(void)
 	ret = cursor->close(cursor);
 
 	/*! [Return a subset of the value columns from an index] */
-	/* Return the record number of the table entries using an index. */
+	/* Return just the population column using an index. */
 	ret = session->open_cursor(session,
 	    "index:mytable:country_plus_year(population)", NULL, NULL, &cursor);
 	while ((ret = cursor->next(cursor)) == 0) {
@@ -215,17 +215,22 @@ main(void)
 	/*! [Return a subset of the value columns from an index] */
 	ret = cursor->close(cursor);
 
-	/*! [Read the record number column from the composite index] */
-	/* Return the record number of the table entries using an index. */
+	/*! [Access only the index] */
+	/*
+	 * Avoid accessing any other column groups when using an index.
+	 *
+	 * It is illegal to use an empty list as the subset of the value columns
+	 * to be returned when configuring the index cursor, the list must have
+	 * a valid column.  List a key column to avoid accessing another column
+	 * group.
+	 */
 	ret = session->open_cursor(session,
-	    "index:mytable:country_plus_year(id)", NULL, NULL, &cursor);
+	    "index:mytable:country_plus_year(year)", NULL, NULL, &cursor);
 	while ((ret = cursor->next(cursor)) == 0) {
 		cursor->get_key(cursor, &country, &year);
-		cursor->get_value(cursor, &recno);
-		printf(
-		    "row ID %llu: country %s, year %u\n", recno, country, year);
+		printf("country %s, year %u\n", country, year);
 	}
-	/*! [Read a subset of information from the composite index] */
+	/*! [Access only the index] */
 	ret = cursor->close(cursor);
 	/*! [schema complete] */
 
