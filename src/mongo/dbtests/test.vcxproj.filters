@@ -122,6 +122,18 @@
     <Filter Include="bson\mutable">
       <UniqueIdentifier>{96220e3c-7484-4511-b445-b3d10f98df61}</UniqueIdentifier>
     </Filter>
+    <Filter Include="db\pipeline">
+      <UniqueIdentifier>{104a5e8c-d2a8-4734-9c2c-0f892d33aef0}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="db\pipeline\Header Files">
+      <UniqueIdentifier>{7068150e-f376-4697-adf5-dbf32ddaff9f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="db\pipeline\Source Files">
+      <UniqueIdentifier>{ee73613c-c6b7-4bd1-b5e7-55270183bf69}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="dbtests\mock">
+      <UniqueIdentifier>{c0778da2-106c-4649-8dda-9bb829f7c5e4}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\client\connpool.h">
@@ -1127,6 +1139,66 @@
     </ClInclude>
     <ClInclude Include="..\db\auth\auth_external_state_d.h">
       <Filter>db\auth</Filter>
+    </ClInclude>
+    <ClInclude Include="dbtests.h">
+      <Filter>dbtests</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\pipeline\accumulator.h">
+      <Filter>db\pipeline\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\pipeline\builder.h">
+      <Filter>db\pipeline\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\pipeline\doc_mem_monitor.h">
+      <Filter>db\pipeline\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\pipeline\document.h">
+      <Filter>db\pipeline\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\pipeline\document_internal.h">
+      <Filter>db\pipeline\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\pipeline\document_source.h">
+      <Filter>db\pipeline\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\pipeline\expression.h">
+      <Filter>db\pipeline\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\pipeline\expression_context.h">
+      <Filter>db\pipeline\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\pipeline\field_path.h">
+      <Filter>db\pipeline\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\pipeline\pipeline.h">
+      <Filter>db\pipeline\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\pipeline\pipeline_d.h">
+      <Filter>db\pipeline\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\pipeline\value.h">
+      <Filter>db\pipeline\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\pipeline\value_internal.h">
+      <Filter>db\pipeline\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="mock\mock_conn_registry.h">
+      <Filter>dbtests\mock</Filter>
+    </ClInclude>
+    <ClInclude Include="mock\mock_dbclient_connection.h">
+      <Filter>dbtests\mock</Filter>
+    </ClInclude>
+    <ClInclude Include="mock\mock_dbclient_cursor.h">
+      <Filter>dbtests\mock</Filter>
+    </ClInclude>
+    <ClInclude Include="mock\mock_remote_db_server.h">
+      <Filter>dbtests\mock</Filter>
+    </ClInclude>
+    <ClInclude Include="mock\mock_replica_set.h">
+      <Filter>dbtests\mock</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\interrupt_status_mongod.h">
+      <Filter>db\Header Files\e to n</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -2151,6 +2223,192 @@
     </ClCompile>
     <ClCompile Include="..\db\auth\auth_external_state_server_common.cpp">
       <Filter>db\auth</Filter>
+    </ClCompile>
+    <ClCompile Include="accumulatortests.cpp">
+      <Filter>dbtests</Filter>
+    </ClCompile>
+    <ClCompile Include="authtests.cpp">
+      <Filter>dbtests</Filter>
+    </ClCompile>
+    <ClCompile Include="background_job_test.cpp">
+      <Filter>dbtests</Filter>
+    </ClCompile>
+    <ClCompile Include="btreebuildertests.cpp">
+      <Filter>dbtests</Filter>
+    </ClCompile>
+    <ClCompile Include="btreepositiontests.cpp">
+      <Filter>dbtests</Filter>
+    </ClCompile>
+    <ClCompile Include="chunktests.cpp">
+      <Filter>dbtests</Filter>
+    </ClCompile>
+    <ClCompile Include="commandtests.cpp">
+      <Filter>dbtests</Filter>
+    </ClCompile>
+    <ClCompile Include="documentsourcetests.cpp">
+      <Filter>dbtests</Filter>
+    </ClCompile>
+    <ClCompile Include="documenttests.cpp">
+      <Filter>dbtests</Filter>
+    </ClCompile>
+    <ClCompile Include="expressiontests.cpp">
+      <Filter>dbtests</Filter>
+    </ClCompile>
+    <ClCompile Include="extsorttests.cpp">
+      <Filter>dbtests</Filter>
+    </ClCompile>
+    <ClCompile Include="gridfstest.cpp">
+      <Filter>dbtests</Filter>
+    </ClCompile>
+    <ClCompile Include="indexupdatetests.cpp">
+      <Filter>dbtests</Filter>
+    </ClCompile>
+    <ClCompile Include="intervalbtreecursortests.cpp">
+      <Filter>dbtests</Filter>
+    </ClCompile>
+    <ClCompile Include="macrotests.cpp">
+      <Filter>dbtests</Filter>
+    </ClCompile>
+    <ClCompile Include="mock_dbclient_conn_test.cpp">
+      <Filter>dbtests</Filter>
+    </ClCompile>
+    <ClCompile Include="mock_replica_set_test.cpp">
+      <Filter>dbtests</Filter>
+    </ClCompile>
+    <ClCompile Include="pipelinetests.cpp">
+      <Filter>dbtests</Filter>
+    </ClCompile>
+    <ClCompile Include="profile_test.cpp">
+      <Filter>dbtests</Filter>
+    </ClCompile>
+    <ClCompile Include="queryoptimizertests2.cpp">
+      <Filter>dbtests</Filter>
+    </ClCompile>
+    <ClCompile Include="replica_set_monitor_test.cpp">
+      <Filter>dbtests</Filter>
+    </ClCompile>
+    <ClCompile Include="stacktests.cpp">
+      <Filter>dbtests</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\pipeline\accumulator.cpp">
+      <Filter>db\pipeline\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\pipeline\accumulator_add_to_set.cpp">
+      <Filter>db\pipeline\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\pipeline\accumulator_avg.cpp">
+      <Filter>db\pipeline\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\pipeline\accumulator_first.cpp">
+      <Filter>db\pipeline\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\pipeline\accumulator_last.cpp">
+      <Filter>db\pipeline\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\pipeline\accumulator_min_max.cpp">
+      <Filter>db\pipeline\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\pipeline\accumulator_push.cpp">
+      <Filter>db\pipeline\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\pipeline\accumulator_single_value.cpp">
+      <Filter>db\pipeline\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\pipeline\accumulator_sum.cpp">
+      <Filter>db\pipeline\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\pipeline\builder.cpp">
+      <Filter>db\pipeline\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\pipeline\doc_mem_monitor.cpp">
+      <Filter>db\pipeline\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\pipeline\document.cpp">
+      <Filter>db\pipeline\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\pipeline\document_source.cpp">
+      <Filter>db\pipeline\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\pipeline\document_source_bson_array.cpp">
+      <Filter>db\pipeline\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\pipeline\document_source_command_shards.cpp">
+      <Filter>db\pipeline\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\pipeline\document_source_cursor.cpp">
+      <Filter>db\pipeline\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\pipeline\document_source_filter.cpp">
+      <Filter>db\pipeline\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\pipeline\document_source_filter_base.cpp">
+      <Filter>db\pipeline\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\pipeline\document_source_group.cpp">
+      <Filter>db\pipeline\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\pipeline\document_source_limit.cpp">
+      <Filter>db\pipeline\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\pipeline\document_source_match.cpp">
+      <Filter>db\pipeline\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\pipeline\document_source_out.cpp">
+      <Filter>db\pipeline\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\pipeline\document_source_project.cpp">
+      <Filter>db\pipeline\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\pipeline\document_source_skip.cpp">
+      <Filter>db\pipeline\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\pipeline\document_source_sort.cpp">
+      <Filter>db\pipeline\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\pipeline\document_source_unwind.cpp">
+      <Filter>db\pipeline\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\pipeline\expression.cpp">
+      <Filter>db\pipeline\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\pipeline\expression_context.cpp">
+      <Filter>db\pipeline\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\pipeline\field_path.cpp">
+      <Filter>db\pipeline\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\pipeline\pipeline.cpp">
+      <Filter>db\pipeline\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\pipeline\pipeline_d.cpp">
+      <Filter>db\pipeline\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\pipeline\value.cpp">
+      <Filter>db\pipeline\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="mock\mock_conn_registry.cpp">
+      <Filter>dbtests\mock</Filter>
+    </ClCompile>
+    <ClCompile Include="mock\mock_dbclient_connection.cpp">
+      <Filter>dbtests\mock</Filter>
+    </ClCompile>
+    <ClCompile Include="mock\mock_dbclient_cursor.cpp">
+      <Filter>dbtests\mock</Filter>
+    </ClCompile>
+    <ClCompile Include="mock\mock_remote_db_server.cpp">
+      <Filter>dbtests\mock</Filter>
+    </ClCompile>
+    <ClCompile Include="mock\mock_replica_set.cpp">
+      <Filter>dbtests\mock</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\intrusive_counter.cpp">
+      <Filter>util\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\interrupt_status_mongod.cpp">
+      <Filter>db\Source Files\e to n</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\systeminfo_win32.cpp">
+      <Filter>util\Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
