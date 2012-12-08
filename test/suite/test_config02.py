@@ -28,7 +28,7 @@
 import os
 import wiredtiger, wttest
 
-# test_config01.py
+# test_config02.py
 #    The home directory for wiredtiger_open
 class test_config02(wttest.WiredTigerTestCase):
     table_name1 = 'test_config02'
