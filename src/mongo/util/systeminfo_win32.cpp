@@ -22,27 +22,27 @@
 namespace mongo {
 
     size_t SystemInfo::getPhysicalRam() {
-	/*
-	  The value of this should not be changing while the system is running,
-	  so it should be safe to do this once for the lifetime of the
-	  application.
+        /*
+          The value of this should not be changing while the system is running,
+          so it should be safe to do this once for the lifetime of the
+          application.
 
-	  This could present a race condition if multiple threads do this at
-	  the same time, but all paths through here will produce the same
-	  result, so it's not worth locking or worrying about it.
-	 */
-	static bool unknown = true;
-	static size_t ramSize = 0;
+          This could present a race condition if multiple threads do this at
+          the same time, but all paths through here will produce the same
+          result, so it's not worth locking or worrying about it.
+         */
+        static bool unknown = true;
+        static size_t ramSize = 0;
 
-	if (unknown) {
-	    MEMORYSTATUSEX status;
-	    status.dwLength = sizeof(status);
-	    GlobalMemoryStatusEx(&status);
-	    ramSize = static_cast<size_t>(status.ullTotalPhys);
-	    unknown = false;
-	}
+        if (unknown) {
+            MEMORYSTATUSEX status;
+            status.dwLength = sizeof(status);
+            GlobalMemoryStatusEx(&status);
+            ramSize = static_cast<size_t>(status.ullTotalPhys);
+            unknown = false;
+        }
 
-	return ramSize;
+        return ramSize;
     }
 
 }
