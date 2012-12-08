@@ -65,7 +65,7 @@ wts_open(void)
 	WT_SESSION *session;
 	uint32_t maxintlpage, maxintlitem, maxleafpage, maxleafitem;
 	int ret;
-	char config[1024], *end, *p;
+	char config[2048], *end, *p;
 
 	/*
 	 * Open configuration.
@@ -148,7 +148,7 @@ wts_open(void)
 		break;
 	}
 
-	/* Configure checksums. */
+	/* Configure checksums (not configurable from the command line). */
 	switch MMRAND(1, 10) {
 	case 1:						/* 10% */
 		p += snprintf(p, (size_t)(end - p), ",checksum=\"on\"");
@@ -179,6 +179,17 @@ wts_open(void)
 		    ",block_compressor=\"snappy\"");
 		break;
 	}
+
+	/* Configure internal key truncation. */
+	p += snprintf(
+	    p, (size_t)(end - p), ",internal_key_truncate=%s",
+	    g.c_internal_key_truncation ? "true" : "false");
+
+	/* Configure Btree page key gap. */
+	p += snprintf(p, (size_t)(end - p), ",key_gap=%u", g.c_key_gap);
+
+	/* Configure Btree split page percentage. */
+	p += snprintf(p, (size_t)(end - p), ",split_pct=%u", g.c_split_pct);
 
 	if ((ret = session->create(session, g.uri, config)) != 0)
 		die(ret, "session.create: %s", g.uri);

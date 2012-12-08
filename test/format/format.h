@@ -114,7 +114,9 @@ typedef struct {
 	u_int c_huffman_key;
 	u_int c_huffman_value;
 	u_int c_insert_pct;
+	u_int c_internal_key_truncation;
 	u_int c_intl_page_max;
+	u_int c_key_gap;
 	u_int c_key_max;
 	u_int c_key_min;
 	u_int c_leaf_page_max;
@@ -124,6 +126,7 @@ typedef struct {
 	u_int c_reverse;
 	u_int c_rows;
 	u_int c_runs;
+	u_int c_split_pct;
 	u_int c_threads;
 	u_int c_value_max;
 	u_int c_value_min;

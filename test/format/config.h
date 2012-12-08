@@ -110,9 +110,17 @@ static CONFIG c[] = {
 	  "percent operations that are inserts",
 	  0, C_OPS, 0, 45, &g.c_insert_pct, NULL },
 
+	{ "internal_key_truncation",
+	 "if values are huffman encoded",		/* 2% */
+	 0, C_BOOL, 2, 0, &g.c_internal_key_truncation, NULL },
+
 	{ "internal_page_max",
 	  "maximum size of Btree internal nodes",
 	  0, 0, 9, 17, &g.c_intl_page_max, NULL },
+
+	{ "key_gap",
+	  "gap between instantiated keys on a Btree page",
+	  0, 0, 0, 20, &g.c_key_gap, NULL },
 
 	{ "key_max",
 	  "maximum size of keys",
@@ -149,6 +157,10 @@ static CONFIG c[] = {
 	{ "runs",
 	  "the number of runs",
 	  0, C_IGNORE, 0, UINT_MAX, &g.c_runs, NULL },
+
+	{ "split_pct",
+	  "Btree page split size as a percentage of the maximum page size",
+	  0, 0, 40, 85, &g.c_split_pct, NULL },
 
 	{ "threads",
 	  "the number of threads",
