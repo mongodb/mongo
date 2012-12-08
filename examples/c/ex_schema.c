@@ -221,8 +221,7 @@ main(void)
 	 *
 	 * It is illegal to use an empty list as the subset of the value columns
 	 * to be returned when configuring the index cursor, the list must have
-	 * a valid column.  List a key column to avoid accessing another column
-	 * group.
+	 * a valid column.  List a key column to avoid accessing other files.
 	 */
 	ret = session->open_cursor(session,
 	    "index:mytable:country_plus_year(year)", NULL, NULL, &cursor);

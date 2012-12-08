@@ -291,12 +291,11 @@ in the cursor URI when the cursor is opened.  For example:
 
 For performance reasons, it may be desirable to include a copy of all
 commonly needed data in the index, so it's possible to perform
-index-only searches where no column group other than the index is
-accessed.  In this case, all of the "hot" columns should be included in
-the index (always list the "real" index key columns first, so they will
-determine the sort order).  Then, open a cursor on the index that
-doesn't return any value columns, and no column groups other than the
-index will be accessed.
+index-only searches where no file other than the index is accessed.  In
+this case, all of the "hot" columns should be included in the index
+(always list the "real" index key columns first, so they will determine
+the sort order).  Then, open a cursor on the index that doesn't return
+any value columns, and no file other than the index will be accessed.
 
 @snippet ex_schema.c Access only the index
 
