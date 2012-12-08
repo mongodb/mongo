@@ -276,7 +276,7 @@ __curindex_close(WT_CURSOR *cursor)
 
 	CURSOR_API_CALL(cursor, session, close, NULL);
 
-	for (i = 0, cp = (cindex)->cg_cursors;
+	for (i = 0, cp = cindex->cg_cursors;
 	    i < WT_COLGROUPS(cindex->table); i++, cp++)
 		if (*cp != NULL) {
 			WT_TRET((*cp)->close(*cp));
