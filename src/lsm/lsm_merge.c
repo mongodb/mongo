@@ -101,7 +101,7 @@ __wt_lsm_merge(
 	 * avoid holding it while the merge is in progress: that may take a
 	 * long time.
 	 */
-	__wt_writelock(session, lsm_tree->rwlock);
+	WT_RET(__wt_writelock(session, lsm_tree->rwlock));
 
 	/*
 	 * Only include chunks that are stable on disk and not involved in a
@@ -189,7 +189,7 @@ __wt_lsm_merge(
 		    lsm_tree->chunk[start_chunk + i]->generation + 1);
 
 	start_id = lsm_tree->chunk[start_chunk]->id;
-	__wt_rwunlock(session, lsm_tree->rwlock);
+	WT_RET(__wt_rwunlock(session, lsm_tree->rwlock));
 
 	if (nchunks == 0)
 		return (WT_NOTFOUND);
@@ -290,7 +290,7 @@ __wt_lsm_merge(
 	dest = NULL;
 	WT_ERR_NOTFOUND_OK(ret);
 
-	__wt_writelock(session, lsm_tree->rwlock);
+	WT_ERR(__wt_writelock(session, lsm_tree->rwlock));
 
 	/*
 	 * Check whether we raced with another merge, and adjust the chunk
@@ -314,7 +314,7 @@ __wt_lsm_merge(
 	F_SET(chunk, WT_LSM_CHUNK_ONDISK);
 
 	ret = __wt_lsm_meta_write(session, lsm_tree);
-	__wt_rwunlock(session, lsm_tree->rwlock);
+	WT_TRET(__wt_rwunlock(session, lsm_tree->rwlock));
 
 err:	if (src != NULL)
 		WT_TRET(src->close(src));

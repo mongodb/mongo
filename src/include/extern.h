@@ -315,7 +315,7 @@ extern void __wt_page_out(WT_SESSION_IMPL *session,
     WT_PAGE **pagep,
     uint32_t flags);
 extern void __wt_evict_list_clr_page(WT_SESSION_IMPL *session, WT_PAGE *page);
-extern void __wt_evict_server_wake(WT_SESSION_IMPL *session);
+extern int __wt_evict_server_wake(WT_SESSION_IMPL *session);
 extern int __wt_sync_file_serial_func(WT_SESSION_IMPL *session, void *args);
 extern void *__wt_cache_evict_server(void *arg);
 extern int __wt_evict_lru_page(WT_SESSION_IMPL *session, int is_app);
@@ -904,19 +904,19 @@ extern int __wt_cond_alloc(WT_SESSION_IMPL *session,
     const char *name,
     int is_signalled,
     WT_CONDVAR **condp);
-extern void __wt_cond_wait(WT_SESSION_IMPL *session,
+extern int __wt_cond_wait(WT_SESSION_IMPL *session,
     WT_CONDVAR *cond,
     long usecs);
-extern void __wt_cond_signal(WT_SESSION_IMPL *session, WT_CONDVAR *cond);
+extern int __wt_cond_signal(WT_SESSION_IMPL *session, WT_CONDVAR *cond);
 extern int __wt_cond_destroy(WT_SESSION_IMPL *session, WT_CONDVAR *cond);
 extern int __wt_rwlock_alloc( WT_SESSION_IMPL *session,
     const char *name,
     WT_RWLOCK **rwlockp);
-extern void __wt_readlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock);
+extern int __wt_readlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock);
 extern int __wt_try_writelock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock);
-extern void __wt_writelock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock);
-extern void __wt_rwunlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock);
-extern void __wt_rwlock_destroy(WT_SESSION_IMPL *session, WT_RWLOCK **rwlockp);
+extern int __wt_writelock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock);
+extern int __wt_rwunlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock);
+extern int __wt_rwlock_destroy(WT_SESSION_IMPL *session, WT_RWLOCK **rwlockp);
 extern int __wt_open(WT_SESSION_IMPL *session,
     const char *name,
     int ok_create,

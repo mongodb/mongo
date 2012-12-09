@@ -89,7 +89,12 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 	/* Shut down the server threads. */
 	F_CLR(conn, WT_SERVER_RUN);
 	if (conn->cache_evict_tid != 0) {
-		__wt_evict_server_wake(session);
+		/*
+		 * XXX
+		 * If the server fails to wake, we'll hang in the join; panic
+		 * and return on failure instead.
+		 */
+		WT_TRET(__wt_evict_server_wake(session));
 		WT_TRET(__wt_thread_join(conn->cache_evict_tid));
 	}
 

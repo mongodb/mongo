@@ -33,8 +33,8 @@ __wt_compact(WT_SESSION_IMPL *session, const char *cfg[])
 	 * the only thread that can safely look at page reconciliation values).
 	 */
 	WT_RET(__wt_sync_file_serial(session, WT_SYNC_COMPACT));
-	__wt_evict_server_wake(session);
-	__wt_cond_wait(session, session->cond, 0);
+	WT_RET(__wt_evict_server_wake(session));
+	WT_RET(__wt_cond_wait(session, session->cond, 0));
 	WT_RET(session->syncop_ret);
 
 	/*

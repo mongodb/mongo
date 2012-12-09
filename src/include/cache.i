@@ -9,7 +9,7 @@
  * __wt_eviction_check --
  *	Wake the eviction server if necessary.
  */
-static inline void
+static inline int
 __wt_eviction_check(WT_SESSION_IMPL *session, int *read_lockoutp, int wake)
 {
 	WT_CACHE *cache;
@@ -35,7 +35,8 @@ __wt_eviction_check(WT_SESSION_IMPL *session, int *read_lockoutp, int wake)
 	if (wake &&
 	    (bytes_inuse > (cache->eviction_trigger * bytes_max) / 100 ||
 	    dirty_inuse > (cache->eviction_dirty_target * bytes_max) / 100))
-		__wt_evict_server_wake(session);
+		WT_RET(__wt_evict_server_wake(session));
+	return (0);
 }
 
 /*
@@ -56,7 +57,7 @@ __wt_cache_full_check(WT_SESSION_IMPL *session)
 	 * busier.
 	 */
 	for (wake = 0;; wake = (wake + 1) % 100) {
-		__wt_eviction_check(session, &lockout, wake == 0);
+		WT_RET(__wt_eviction_check(session, &lockout, wake == 0));
 		if (!lockout || F_ISSET(session,
 		    WT_SESSION_NO_CACHE_CHECK | WT_SESSION_SCHEMA_LOCKED))
 			return (0);

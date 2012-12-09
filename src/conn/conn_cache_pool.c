@@ -150,7 +150,7 @@ __wt_conn_cache_pool_open(WT_SESSION_IMPL *session)
 		    &cp->cache_pool_tid, __wt_cache_pool_server, NULL));
 	}
 	/* Wake up the cache pool server to get our initial chunk. */
-	__wt_cond_signal(session, cp->cache_pool_cond);
+	WT_ERR(__wt_cond_signal(session, cp->cache_pool_cond));
 
 err:	if (locked)
 		__wt_spin_unlock(session, &cp->cache_pool_lock);
@@ -236,8 +236,14 @@ __wt_conn_cache_pool_destroy(WT_CONNECTION_IMPL *conn)
 		__wt_process.cache_pool = NULL;
 		__wt_spin_unlock(session, &__wt_process.spinlock);
 		__wt_spin_unlock(session, &cp->cache_pool_lock);
-		/* Shut down the cache pool worker. */
-		__wt_cond_signal(session, cp->cache_pool_cond);
+
+		/*
+		 * Shut down the cache pool worker.
+		 * XXX
+		 * If the server fails to wake, we'll hang in the join; panic
+		 * and return on failure instead.
+		 */
+		WT_TRET(__wt_cond_signal(session, cp->cache_pool_cond));
 		WT_TRET(__wt_thread_join(cp->cache_pool_tid));
 
 		/* Now free the pool. */
@@ -379,11 +385,17 @@ void *
 __wt_cache_pool_server(void *arg)
 {
 	WT_CACHE_POOL *cp;
+	WT_DECL_RET;
+	WT_SESSION_IMPL *session;
+
+	WT_UNUSED(arg);
 
 	cp = __wt_process.cache_pool;
+	session = cp->session;
 
 	while (F_ISSET(cp, WT_CACHE_POOL_RUN)) {
-		__wt_cond_wait(cp->session, cp->cache_pool_cond, 1000000);
+		WT_ERR(
+		    __wt_cond_wait(session, cp->cache_pool_cond, 1000000));
 		/*
 		 * Re-check pool run flag - since we want to avoid getting the
 		 * lock on shutdown.
@@ -396,5 +408,9 @@ __wt_cache_pool_server(void *arg)
 		 */
 		(void)__cache_pool_balance();
 	}
-	return (arg);
+
+	if (0) {
+err:		__wt_err(session, ret, "cache pool manager server error");
+	}
+	return (NULL);
 }
