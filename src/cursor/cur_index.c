@@ -276,12 +276,13 @@ __curindex_close(WT_CURSOR *cursor)
 
 	CURSOR_API_CALL(cursor, session, close, NULL);
 
-	for (i = 0, cp = cindex->cg_cursors;
-	    i < WT_COLGROUPS(cindex->table); i++, cp++)
-		if (*cp != NULL) {
-			WT_TRET((*cp)->close(*cp));
-			*cp = NULL;
-		}
+	if ((cp = cindex->cg_cursors) != NULL)
+		for (i = 0, cp = cindex->cg_cursors;
+		    i < WT_COLGROUPS(cindex->table); i++, cp++)
+			if (*cp != NULL) {
+				WT_TRET((*cp)->close(*cp));
+				*cp = NULL;
+			}
 
 	__wt_free(session, cindex->cg_cursors);
 	if (cindex->key_plan != idx->key_plan)
