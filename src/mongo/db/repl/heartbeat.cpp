@@ -19,7 +19,6 @@
 #include <boost/thread/thread.hpp>
 
 #include "mongo/db/commands.h"
-#include "mongo/db/helpers/dblogger.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/repl.h"
 #include "mongo/db/repl/bgsync.h"

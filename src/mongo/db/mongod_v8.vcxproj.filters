@@ -1553,9 +1553,6 @@
     <ClInclude Include="pipeline\builder.h">
       <Filter>db\pipeline\Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="helpers\dblogger.h">
-      <Filter>db\helpers</Filter>
-    </ClInclude>
     <ClInclude Include="..\util\debug_util.h">
       <Filter>util\Header Files</Filter>
     </ClInclude>
