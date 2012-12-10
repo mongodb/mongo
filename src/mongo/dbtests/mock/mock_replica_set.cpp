@@ -22,16 +22,10 @@
 
 #include <sstream>
 
-using mongo::BSONObjBuilder;
-
-using std::map;
-using std::string;
-using std::vector;
-
 namespace mongo {
     MockReplicaSet::MockReplicaSet(const string& setName, size_t nodes):
             _setName(setName) {
-        std::vector<mongo::ReplSetConfig::MemberCfg> replConfig;
+        ReplConfigMap replConfig;
 
         for (size_t n = 0; n < nodes; n++) {
             std::stringstream str;
@@ -41,25 +35,22 @@ namespace mongo {
             if (n == 0) {
                 _primaryHost = hostName;
             }
-            else {
-                _secondaryHosts.push_back(hostName);
-            }
 
             MockRemoteDBServer* mockServer = new MockRemoteDBServer(hostName);
             _nodeMap[hostName] = mockServer;
 
             MockConnRegistry::get()->addServer(mockServer);
 
-            mongo::ReplSetConfig::MemberCfg config;
-            config.h = mongo::HostAndPort(hostName);
-            replConfig.push_back(config);
+            ReplSetConfig::MemberCfg config;
+            config.h = HostAndPort(hostName);
+            replConfig.insert(std::make_pair(hostName, config));
         }
 
         setConfig(replConfig);
     }
 
     MockReplicaSet::~MockReplicaSet() {
-        for (std::map<string, MockRemoteDBServer*>::iterator iter = _nodeMap.begin();
+        for (ReplNodeMap::iterator iter = _nodeMap.begin();
                 iter != _nodeMap.end(); ++iter) {
             MockConnRegistry::get()->removeServer(iter->second->getServerAddress());
             delete iter->second;
@@ -75,7 +66,7 @@ namespace mongo {
         str << _setName;
         str << "/";
 
-        std::map<string, MockRemoteDBServer*>::const_iterator iter = _nodeMap.begin();
+        ReplNodeMap::const_iterator iter = _nodeMap.begin();
         while (iter != _nodeMap.end()) {
             str << iter->second->getServerAddress();
             ++iter;
@@ -88,12 +79,12 @@ namespace mongo {
         return str.str();
     }
 
-    vector<mongo::HostAndPort> MockReplicaSet::getHosts() const {
-        vector<mongo::HostAndPort> list;
+    vector<HostAndPort> MockReplicaSet::getHosts() const {
+        vector<HostAndPort> list;
 
-        for (std::map<string, MockRemoteDBServer*>::const_iterator iter = _nodeMap.begin();
+        for (ReplNodeMap::const_iterator iter = _nodeMap.begin();
                 iter != _nodeMap.end(); ++iter) {
-            list.push_back(mongo::HostAndPort(iter->second->getServerAddress()));
+            list.push_back(HostAndPort(iter->second->getServerAddress()));
         }
 
         return list;
@@ -103,27 +94,49 @@ namespace mongo {
         return _primaryHost;
     }
 
-    const vector<string>& MockReplicaSet::getSecondaries() const {
-        return _secondaryHosts;
+    void MockReplicaSet::setPrimary(const string& hostAndPort) {
+        ReplConfigMap::const_iterator iter = _replConfig.find(hostAndPort);
+        fassert(16578, iter != _replConfig.end());
+
+        const ReplSetConfig::MemberCfg& config = iter->second;
+        fassert(16579, !config.hidden && config.priority > 0 && !config.arbiterOnly);
+
+        _primaryHost = hostAndPort;
+
+        mockIsMasterCmd();
+        mockReplSetGetStatusCmd();
     }
 
-    MockRemoteDBServer* MockReplicaSet::getNode(const string& hostName) {
-        return mapFindWithDefault(_nodeMap, hostName, static_cast<MockRemoteDBServer*>(NULL));
+    vector<string> MockReplicaSet::getSecondaries() const {
+        vector<string> secondaries;
+
+        for (ReplConfigMap::const_iterator iter = _replConfig.begin();
+                iter != _replConfig.end(); ++iter) {
+            if (iter->first != _primaryHost) {
+                secondaries.push_back(iter->first);
+            }
+        }
+
+        return secondaries;
     }
 
-    const vector<mongo::ReplSetConfig::MemberCfg>& MockReplicaSet::getReplConfig() const {
+    MockRemoteDBServer* MockReplicaSet::getNode(const string& hostAndPort) {
+        return mapFindWithDefault(_nodeMap, hostAndPort, static_cast<MockRemoteDBServer*>(NULL));
+    }
+
+    MockReplicaSet::ReplConfigMap MockReplicaSet::getReplConfig() const {
         return _replConfig;
     }
 
-    void MockReplicaSet::setConfig(const vector<mongo::ReplSetConfig::MemberCfg>& newConfig) {
+    void MockReplicaSet::setConfig(const MockReplicaSet::ReplConfigMap& newConfig) {
         _replConfig = newConfig;
         mockIsMasterCmd();
         mockReplSetGetStatusCmd();
     }
 
-    void MockReplicaSet::kill(const string& hostName) {
-        verify(_nodeMap.count(hostName) == 1);
-        _nodeMap[hostName]->shutdown();
+    void MockReplicaSet::kill(const string& hostAndPort) {
+        verify(_nodeMap.count(hostAndPort) == 1);
+        _nodeMap[hostAndPort]->shutdown();
     }
 
     void MockReplicaSet::kill(const vector<string>& hostList) {
@@ -133,89 +146,106 @@ namespace mongo {
         }
     }
 
-    void MockReplicaSet::restore(const string& hostName) {
-        verify(_nodeMap.count(hostName) == 1);
-        _nodeMap[hostName]->reboot();
+    void MockReplicaSet::restore(const string& hostAndPort) {
+        verify(_nodeMap.count(hostAndPort) == 1);
+        _nodeMap[hostAndPort]->reboot();
     }
 
     void MockReplicaSet::mockIsMasterCmd() {
         // Copied from ReplSetImpl::_fillIsMaster
-        for (vector<mongo::ReplSetConfig::MemberCfg>::iterator iter = _replConfig.begin();
-                iter != _replConfig.end(); ++iter) {
-            const string hostName(iter->h.toString(true));
+        for (ReplNodeMap::iterator nodeIter = _nodeMap.begin();
+                nodeIter != _nodeMap.end(); ++nodeIter) {
+            const string& hostAndPort = nodeIter->first;
+
             BSONObjBuilder builder;
             builder.append("setName", _setName);
 
-            const bool isPrimary = hostName == getPrimary();
-            builder.append("ismaster", isPrimary);
-            builder.append("secondary", !isPrimary);
+            ReplConfigMap::const_iterator configIter = _replConfig.find(hostAndPort);
+            if (configIter == _replConfig.end()) {
+                builder.append("ismaster", false);
+                builder.append("secondary", false);
 
-            {
-                // TODO: add passives & arbiters
                 vector<string> hostList;
-                hostList.push_back(getPrimary());
-                for (vector<string>::const_iterator secIter = getSecondaries().begin();
-                                secIter != getSecondaries().end(); ++secIter) {
-                    hostList.push_back(*secIter);
-                }
-
                 builder.append("hosts", hostList);
             }
+            else {
+                const bool isPrimary = hostAndPort == getPrimary();
+                builder.append("ismaster", isPrimary);
+                builder.append("secondary", !isPrimary);
 
-            builder.append("primary", getPrimary());
+                {
+                    // TODO: add passives & arbiters
+                    vector<string> hostList;
+                    hostList.push_back(getPrimary());
 
-            if (iter->arbiterOnly) {
-                builder.append("arbiterOnly", true);
-            }
+                    const vector<string> secondaries = getSecondaries();
+                    for (vector<string>::const_iterator secIter = secondaries.begin();
+                                    secIter != secondaries.end(); ++secIter) {
+                        hostList.push_back(*secIter);
+                    }
 
-            if (iter->priority == 0 && !iter->arbiterOnly) {
-                builder.append("passive", true);
-            }
-
-            if (iter->slaveDelay) {
-                builder.append("slaveDelay", iter->slaveDelay);
-            }
-
-            if (iter->hidden) {
-                builder.append("hidden", true);
-            }
-
-            if (!iter->buildIndexes) {
-                builder.append("buildIndexes", false);
-            }
-
-            if(!iter->tags.empty()) {
-                BSONObjBuilder tagBuilder;
-                for(map<string, string>::const_iterator tagIter = iter->tags.begin();
-                        tagIter != iter->tags.end(); tagIter++) {
-                    tagBuilder.append(tagIter->first, tagIter->second);
+                    builder.append("hosts", hostList);
                 }
 
-                builder.append("tags", tagBuilder.done());
+                builder.append("primary", getPrimary());
+
+                const ReplSetConfig::MemberCfg& replConfig = configIter->second;
+                if (replConfig.arbiterOnly) {
+                    builder.append("arbiterOnly", true);
+                }
+
+                if (replConfig.priority == 0 && !replConfig.arbiterOnly) {
+                    builder.append("passive", true);
+                }
+
+                if (replConfig.slaveDelay) {
+                    builder.append("slaveDelay", replConfig.slaveDelay);
+                }
+
+                if (replConfig.hidden) {
+                    builder.append("hidden", true);
+                }
+
+                if (!replConfig.buildIndexes) {
+                    builder.append("buildIndexes", false);
+                }
+
+                if(!replConfig.tags.empty()) {
+                    BSONObjBuilder tagBuilder;
+                    for(map<string, string>::const_iterator tagIter = replConfig.tags.begin();
+                            tagIter != replConfig.tags.end(); tagIter++) {
+                        tagBuilder.append(tagIter->first, tagIter->second);
+                    }
+
+                    builder.append("tags", tagBuilder.done());
+                }
             }
 
-            builder.append("me", hostName);
+            builder.append("me", hostAndPort);
             builder.append("ok", true);
 
-            getNode(hostName)->setCommandReply("ismaster", builder.done());
+            nodeIter->second->setCommandReply("ismaster", builder.done());
         }
     }
 
-    int MockReplicaSet::getState(const std::string& host) const {
-        if (host == getPrimary()) {
-            return static_cast<int>(mongo::MemberState::RS_PRIMARY);
+    int MockReplicaSet::getState(const std::string& hostAndPort) const {
+        if (_replConfig.count(hostAndPort) < 1) {
+            return static_cast<int>(MemberState::RS_SHUNNED);
+        }
+        else if (hostAndPort == getPrimary()) {
+            return static_cast<int>(MemberState::RS_PRIMARY);
         }
         else {
-            return static_cast<int>(mongo::MemberState::RS_SECONDARY);
+            return static_cast<int>(MemberState::RS_SECONDARY);
         }
     }
 
     void MockReplicaSet::mockReplSetGetStatusCmd() {
         // Copied from ReplSetImpl::_summarizeStatus
-        for (std::map<string, MockRemoteDBServer*>::iterator nodeIter = _nodeMap.begin();
-                        nodeIter != _nodeMap.end(); ++nodeIter) {
+        for (ReplNodeMap::iterator nodeIter = _nodeMap.begin();
+                nodeIter != _nodeMap.end(); ++nodeIter) {
             MockRemoteDBServer* node = nodeIter->second;
-            vector<mongo::BSONObj> hostsField;
+            vector<BSONObj> hostsField;
 
             BSONObjBuilder fullStatBuilder;
 
@@ -231,9 +261,9 @@ namespace mongo {
                 hostsField.push_back(selfStatBuilder.obj());
             }
 
-            for (std::map<string, MockRemoteDBServer*>::iterator hostNodeIter = _nodeMap.begin();
-                    hostNodeIter != _nodeMap.end(); ++hostNodeIter) {
-                MockRemoteDBServer* hostNode = hostNodeIter->second;
+            for (ReplConfigMap::const_iterator replConfIter = _replConfig.begin();
+                    replConfIter != _replConfig.end(); ++replConfIter) {
+                MockRemoteDBServer* hostNode = getNode(replConfIter->first);
 
                 if (hostNode == node) {
                     continue;
