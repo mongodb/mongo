@@ -215,6 +215,7 @@ namespace mongo {
         {"$not", ExpressionNot::create, OpDesc::FIXED_COUNT, 1},
         {"$or", ExpressionOr::create, 0},
         {"$second", ExpressionSecond::create, OpDesc::FIXED_COUNT, 1},
+        {"$split", ExpressionSplit::create, OpDesc::FIXED_COUNT, 2},
         {"$strcasecmp", ExpressionStrcasecmp::create, OpDesc::FIXED_COUNT, 2},
         {"$substr", ExpressionSubstr::create, OpDesc::FIXED_COUNT, 3},
         {"$subtract", ExpressionSubtract::create, OpDesc::FIXED_COUNT, 2},
@@ -2280,6 +2281,61 @@ namespace mongo {
     const char *ExpressionSecond::getOpName() const {
         return "$second";
     }
+
+    /* ----------------------- ExpressionSplit ---------------------------- */
+
+
+    ExpressionSplit::~ExpressionSplit() {
+        }
+
+        intrusive_ptr<ExpressionNary> ExpressionSplit::create() {
+            intrusive_ptr<ExpressionSplit> pExpression(new ExpressionSplit());
+            return pExpression;
+        }
+
+        ExpressionSplit::ExpressionSplit():
+            ExpressionNary() {
+        }
+
+        void ExpressionSplit::addOperand(
+            const intrusive_ptr<Expression> &pExpression) {
+            checkArgLimit(2);
+            ExpressionNary::addOperand(pExpression);
+        }
+
+        Value ExpressionSplit::evaluate(const Document& pDocument) const {
+            checkArgCount(2);
+            Value pString1(vpOperand[0]->evaluate(pDocument));
+            Value pString2(vpOperand[1]->evaluate(pDocument));
+
+
+            string toSplit = pString1.coerceToString();
+            string pattern = pString2.coerceToString();
+
+
+            string::size_type length = pattern.length();
+            string::size_type limit = toSplit.length();
+            vector<Value> result;
+
+            if ( pattern != "" ){
+				size_t current;
+				string::size_type next = -1;
+				do{
+					current = next + length;
+					next = toSplit.find_first_of(pattern, current);
+					result.push_back(Value::createString(toSplit.substr( current, next - current )));
+				}while ( next != string::npos);
+            } else {
+            	result.push_back(Value::createString(toSplit));
+            }
+
+            return Value::createArray(result);
+        }
+
+        const char *ExpressionSplit::getOpName() const {
+            return "$split";
+        }
+
 
     /* ----------------------- ExpressionStrcasecmp ---------------------------- */
 

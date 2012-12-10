@@ -1009,6 +1009,23 @@ namespace mongo {
     };
 
 
+    /*-------- Expression Split ------*/
+
+    class ExpressionSplit :
+            public ExpressionNary {
+        public:
+            // virtuals from ExpressionNary
+            virtual ~ExpressionSplit();
+            virtual Value evaluate(const Document& pDocument) const;
+            virtual const char *getOpName() const;
+            virtual void addOperand(const intrusive_ptr<Expression> &pExpression);
+
+            static intrusive_ptr<ExpressionNary> create();
+
+        private:
+            ExpressionSplit();
+        };
+
     class ExpressionStrcasecmp :
         public ExpressionNary {
     public:
