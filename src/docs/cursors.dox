@@ -104,9 +104,4 @@ WT_CURSOR::set_key and WT_CURSOR::set_value in raw mode, the WT_ITEM
 should be equivalent to calling ::wiredtiger_struct_pack for the
 cursor's \c key_format or \c value_format, respectively.
 
-@section cursor_rand Random lookup
-
-Cursors can be configured to return pseudo-random records from row-store
-objects.  See @subpage cursor_random for details.
-
 */
