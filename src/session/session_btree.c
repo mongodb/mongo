@@ -106,9 +106,11 @@ __wt_session_release_btree(WT_SESSION_IMPL *session)
 	 * If we had no cache flag set, close and free the btree handle. It was
 	 * never added to the handle cache.
 	 */
-	if (F_ISSET(btree, WT_BTREE_NO_CACHE))
+	if (F_ISSET(btree, WT_BTREE_NO_CACHE)) {
+		/* A write lock has been held since the handle was created. */
+		WT_RET(__wt_rwunlock(session, btree->rwlock));
 		WT_RET(__wt_conn_btree_discard_single(session, btree));
-	else {
+	} else {
 		/*
 		 * If we had special flags set, close the handle so that future
 		 * access can get a handle without special flags.

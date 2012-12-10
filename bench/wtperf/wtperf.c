@@ -54,13 +54,13 @@ typedef struct {
 	uint32_t key_sz;
 	uint32_t report_interval;
 	uint32_t checkpoint_interval;	/* Zero to disable. */
+	uint32_t stat_interval;		/* Zero to disable. */
 	uint32_t run_time;
 	uint32_t elapsed_time;
 	uint32_t populate_threads;/* Number of populate threads. */
 	uint32_t read_threads;	/* Number of read threads. */
 	uint32_t update_threads;/* Number of update threads. */
 	uint32_t verbose;
-	uint32_t stat_thread;	/* Whether to create a stat thread. */
 	WT_CONNECTION *conn;
 	FILE *logf;
 #define	WT_PERF_INIT	0x00
@@ -112,13 +112,13 @@ CONFIG default_cfg = {
 	20,		/* key_sz */
 	2,		/* report_interval */
 	0,		/* checkpoint_interval */
+	0,		/* stat_interval */
 	2,		/* run_time */
 	0,		/* elapsed_time */
 	1,		/* populate_threads */
 	2,		/* read_threads */
 	0,		/* update_threads */
 	0,		/* verbose */
-	0,		/* stat_thread */
 	NULL,		/* conn */
 	NULL,		/* logf */
 	WT_PERF_INIT, /* phase */
@@ -136,15 +136,15 @@ CONFIG small_cfg = {
 	500000,		/* icount 0.5 million */
 	100,		/* data_sz */
 	20,		/* key_sz */
-	10,		/* report_interval */
+	5,		/* report_interval */
 	0,		/* checkpoint_interval */
+	0,		/* stat_interval */
 	20,		/* run_time */
 	0,		/* elapsed_time */
 	1,		/* populate_threads */
 	8,		/* read_threads */
 	0,		/* update_threads */
 	0,		/* verbose */
-	0,		/* stat_thread */
 	NULL,		/* conn */
 	NULL,		/* logf */
 	WT_PERF_INIT, /* phase */
@@ -162,15 +162,15 @@ CONFIG med_cfg = {
 	50000000,	/* icount 50 million */
 	100,		/* data_sz */
 	20,		/* key_sz */
-	20,		/* report_interval */
+	5,		/* report_interval */
 	0,		/* checkpoint_interval */
+	0,		/* stat_interval */
 	100,		/* run_time */
 	0,		/* elapsed_time */
 	1,		/* populate_threads */
 	16,		/* read_threads */
 	0,		/* update_threads */
 	0,		/* verbose */
-	0,		/* stat_thread */
 	NULL,		/* conn */
 	NULL,		/* logf */
 	WT_PERF_INIT, /* phase */
@@ -188,15 +188,15 @@ CONFIG large_cfg = {
 	500000000,	/* icount 500 million */
 	100,		/* data_sz */
 	20,		/* key_sz */
-	20,		/* report_interval */
+	5,		/* report_interval */
 	0,		/* checkpoint_interval */
+	0,		/* stat_interval */
 	600,		/* run_time */
 	0,		/* elapsed_time */
 	1,		/* populate_threads */
 	16,		/* read_threads */
 	0,		/* update_threads */
 	0,		/* verbose */
-	0,		/* stat_thread */
 	NULL,		/* conn */
 	NULL,		/* logf */
 	WT_PERF_INIT, /* phase */
@@ -239,6 +239,7 @@ worker(CONFIG *cfg, uint32_t worker_type)
 
 	session = NULL;
 	key_buf = NULL;
+	op_ret = 0;
 
 	conn = cfg->conn;
 	key_buf = calloc(cfg->key_sz, 1);
@@ -385,15 +386,16 @@ stat_worker(void *arg)
 {
 	CONFIG *cfg;
 	WT_CONNECTION *conn;
-	WT_SESSION *session;
 	WT_CURSOR *cursor;
-	struct timeval e;
+	WT_SESSION *session;
 	const char *desc, *pvalue;
 	char *stat_uri;
-	uint64_t value;
-	size_t uri_len;
 	double secs;
 	int ret;
+	size_t uri_len;
+	struct timeval e;
+	uint32_t i;
+	uint64_t value;
 
 	session = NULL;
 	cfg = (CONFIG *)arg;
@@ -414,7 +416,12 @@ stat_worker(void *arg)
 	(void)snprintf(stat_uri, uri_len, "statistics:%s", cfg->uri);
 
 	while (g_util_running) {
-		sleep(cfg->report_interval);
+		/* Break the sleep up, so we notice interrupts faster. */
+		for (i = 0; i < cfg->stat_interval; i++) {
+			sleep(cfg->report_interval);
+			if (!g_util_running)
+				break;
+		}
 		/* Generic header. */
 		lprintf(cfg, 0, cfg->verbose,
 		    "=======================================");
@@ -424,7 +431,7 @@ stat_worker(void *arg)
 		    cfg->phase_start_time.tv_usec / 1000000.0);
 		if (secs == 0)
 			++secs;
-		if (cfg->phase == WT_PERF_READ)
+		if (cfg->phase == WT_PERF_POP)
 			lprintf(cfg, 0, cfg->verbose,
 			    "inserts: %" PRIu64 ", elapsed time: %.2f",
 			    g_nops, secs);
@@ -478,6 +485,7 @@ checkpoint_worker(void *arg)
 	WT_SESSION *session;
 	int ret;
 	struct timeval e, s;
+	uint32_t i;
 	uint64_t ms;
 
 	session = NULL;
@@ -493,9 +501,13 @@ checkpoint_worker(void *arg)
 	while (g_util_running) {
 		/*
 		 * TODO: do we care how long the checkpoint takes?
-		 *       Does this need to be interruptible?
 		 */
-		sleep(cfg->checkpoint_interval);
+		/* Break the sleep up, so we notice interrupts faster. */
+		for (i = 0; i < cfg->checkpoint_interval; i++) {
+			sleep(cfg->report_interval);
+			if (!g_util_running)
+				break;
+		}
 
 		gettimeofday(&s, NULL);
 		if ((ret = session->checkpoint(session, NULL)) != 0)
@@ -640,7 +652,7 @@ int main(int argc, char **argv)
 	CONFIG cfg;
 	WT_CONNECTION *conn;
 	const char *user_cconfig, *user_tconfig;
-	const char *opts = "C:P:R:U:T:c:d:eh:i:k:lr:s:u:v:SML";
+	const char *opts = "C:P:R:U:T:c:d:eh:i:k:l:r:s:t:u:v:SML";
 	char *cc_buf, *tc_buf;
 	int ch, checkpoint_created, ret, stat_created;
 	pthread_t checkpoint, stat;
@@ -696,13 +708,16 @@ int main(int argc, char **argv)
 			cfg.key_sz = (uint32_t)atoi(optarg);
 			break;
 		case 'l':
-			cfg.stat_thread = 1;
+			cfg.stat_interval = (uint32_t)atoi(optarg);
 			break;
 		case 'r':
 			cfg.run_time = (uint32_t)atoi(optarg);
 			break;
 		case 's':
 			cfg.rand_seed = (uint32_t)atoi(optarg);
+			break;
+		case 't':
+			cfg.report_interval = (uint32_t)atoi(optarg);
 			break;
 		case 'u':
 			cfg.uri = optarg;
@@ -791,7 +806,7 @@ int main(int argc, char **argv)
 	cfg.conn = conn;
 
 	g_util_running = 1;
-	if (cfg.stat_thread) {
+	if (cfg.stat_interval != 0) {
 		if ((ret = pthread_create(
 		    &stat, NULL, stat_worker, &cfg)) != 0) {
 			lprintf(&cfg, ret, 0,
@@ -944,7 +959,7 @@ int setup_log_file(CONFIG *cfg)
 	char *fname;
 	int offset;
 
-	if (cfg->verbose < 1 && cfg->stat_thread == 0)
+	if (cfg->verbose < 1 && cfg->stat_interval == 0)
 		return (0);
 
 	if ((fname = calloc(strlen(cfg->home) +
@@ -1005,15 +1020,18 @@ void usage(void)
 	printf("\t-R <int> number of read threads\n");
 	printf("\t-U <int> number of update threads\n");
 	printf("\t-T <string> additional table configuration\n");
-	printf("\t-c <int> checkpoint interval (default disabled)\n");
+	printf("\t-c <int> checkpoint every <int> report intervals."
+	    "Default disabled,\n");
 	printf("\t-d <int> data item size\n");
 	printf("\t-e use existing database (skip population phase)\n");
 	printf("\t-h <string> Wired Tiger home must exist, default WT_TEST \n");
 	printf("\t-i <int> number of records to insert\n");
 	printf("\t-k <int> key item size\n");
-	printf("\t-l log statistics at regular intervals\n");
+	printf("\t-l <int> log statistics every <int> report intervals."
+	    "Default disabled.\n");
 	printf("\t-r <int> number of seconds to run workload phase\n");
 	printf("\t-s <int> seed for random number generator\n");
+	printf("\t-t <int> How often to output throughput information\n");
 	printf("\t-u <string> table uri, default lsm:test\n");
 	printf("\t-v <int> verbosity\n");
 }
