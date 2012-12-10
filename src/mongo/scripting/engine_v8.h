@@ -250,8 +250,6 @@ namespace mongo {
         vector< Persistent<Value> > _funcs;
         v8::Persistent<v8::Object> _emptyObj;
 
-        v8::Persistent<v8::Function> _wrapper;
-
         enum ConnectState { NOT , LOCAL , EXTERNAL };
         ConnectState _connectState;
 

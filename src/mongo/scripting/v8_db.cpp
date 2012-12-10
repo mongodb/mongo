@@ -26,7 +26,6 @@
 #include "mongo/s/d_logic.h"
 #include "mongo/scripting/engine_v8.h"
 #include "mongo/scripting/v8_utils.h"
-#include "mongo/scripting/v8_wrapper.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/base64.h"
 #include "mongo/util/text.h"

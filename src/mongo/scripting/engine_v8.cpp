@@ -19,7 +19,6 @@
 
 #include "mongo/scripting/v8_db.h"
 #include "mongo/scripting/v8_utils.h"
-#include "mongo/scripting/v8_wrapper.h"
 #include "mongo/util/mongoutils/str.h"
 
 #define V8_SIMPLE_HEADER v8::Locker l(_isolate); v8::Isolate::Scope iscope(_isolate); HandleScope handle_scope; Context::Scope context_scope( _context );
@@ -461,8 +460,6 @@ namespace mongo {
         injectV8Function("version", Version);
         injectV8Function("load", load);
 
-        _wrapper = Persistent< v8::Function >::New( getObjectWrapperTemplate(this)->GetFunction() );
-
         injectV8Function("gc", GCV8);
 
         installDBTypes( this, _global );
@@ -474,7 +471,6 @@ namespace mongo {
 
         {
         V8_SIMPLE_HEADER
-        _wrapper.Dispose();
         _emptyObj.Dispose();
         for( unsigned i = 0; i < _funcs.size(); ++i )
             _funcs[ i ].Dispose();
@@ -766,18 +762,6 @@ namespace mongo {
         _global->Set( getV8Str( field ) , __createFunction(code) );
     }
 
-//    void V8Scope::setThis( const BSONObj * obj ) {
-//        V8_SIMPLE_HEADER
-//        if ( ! obj ) {
-//            _this = Persistent< v8::Object >::New( v8::Object::New() );
-//            return;
-//        }
-//
-//        //_this = mongoToV8( *obj );
-//        v8::Handle<v8::Value> argv[1];
-//        argv[0] = v8::External::New( createWrapperHolder( this, obj , true , false ) );
-//        _this = Persistent< v8::Object >::New( _wrapper->NewInstance( 1, argv ) );
-//    }
 
     void V8Scope::rename( const char * from , const char * to ) {
         V8_SIMPLE_HEADER;
