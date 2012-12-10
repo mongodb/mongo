@@ -13,8 +13,10 @@ _parsePath = function() {
 _parsePort = function() {
     var port = "";
     for( var i = 0; i < arguments.length; ++i )
-        if ( arguments[ i ] == "--port" )
-            port = arguments[ i + 1 ];
+        if (arguments[i].startsWith("--port")) {
+            port = arguments[i].split('=')[1];
+        }
+
 
     if ( port == "" )
         throw "No port specified";
@@ -248,9 +250,11 @@ MongoRunner.arrOptions = function( binaryName , args ){
             }
             else {
                 if( o[k] == undefined || o[k] == null ) continue
-                fullArgs.push( "--" + k )
-                if ( o[k] != "" )
-                    fullArgs.push( "" + o[k] ) 
+                var toPush = "--" + k;
+                if (o[k] != "") {
+                    toPush = toPush + "=" + o[k];
+                }
+                fullArgs.push(toPush);
             }
         } 
     }
@@ -269,10 +273,12 @@ MongoRunner.arrToOpts = function( arr ){
     for( var i = 1; i < arr.length; i++ ){
         if( arr[i].startsWith( "-" ) ){
             var opt = arr[i].replace( /^-/, "" ).replace( /^-/, "" )
-            
-            if( arr.length > i + 1 && ! arr[ i + 1 ].startsWith( "-" ) ){
-                opts[ opt ] = arr[ i + 1 ]
-                i++
+
+            var eqIndex = opt.indexOf("=");
+            if (eqIndex > 0) {
+                var key = opt.substring(0, eqIndex);
+                var value = opt.substring(eqIndex + 1);
+                opts[key] = value;
             }
             else{
                 opts[ opt ] = ""

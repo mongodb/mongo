@@ -36,10 +36,13 @@
 # include <sys/wait.h>
 #endif
 
+#include "mongo/base/parse_number.h"
+#include "mongo/base/status.h"
 #include "mongo/client/clientOnly-private.h"
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/shell/shell_utils.h"
+#include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 
@@ -202,10 +205,14 @@ namespace mongo {
                     verify( e.type() == mongo::String );
                     str = e.valuestr();
                 }
-                if ( str == "--port" )
-                    _port = -2;
-                else if ( _port == -2 )
-                    _port = strtol( str.c_str(), 0, 10 );
+                if (mongoutils::str::startsWith(str, "--port=" )) {
+                    std::string portStr = mongoutils::str::after(str, "--port=");
+                    Status status = parseNumberFromStringWithBase(portStr, 10, &_port);
+                    uassert(16561,
+                            mongoutils::str::stream() << "Invalid port: " << portStr,
+                            status.isOK());
+                }
+
                 _argv.push_back(str);
             }
 
