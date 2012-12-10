@@ -148,7 +148,8 @@ for( i=0; i < 3; i++ ){
     assert.eq( config.chunks.find( { ns : coll2.getFullName() } ).count() , 2 );
 
     // movechunk should move ALL docs since they have same value for skey
-    var moveRes = admin.runCommand( { moveChunk : coll2 + "", find : { skey : 0 }, to : shards[1]._id } );
+    moveRes = admin.runCommand({ moveChunk: coll2 + "", find: { skey: 0 },
+        to: shards[1]._id, _waitForDelete: true });
     assert.eq( moveRes.ok , 1 , "movechunk didn't work" );
 
     // Make sure our migration eventually goes through before testing individual shards

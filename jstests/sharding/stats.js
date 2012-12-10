@@ -23,7 +23,8 @@ s.adminCommand( { shardcollection : "test.zzz" , key : { _id : 1 } } );
 
 N = 10000;
 s.adminCommand( { split : "test.foo" , middle : { _id : N/2 } } )
-s.adminCommand( { moveChunk : "test.foo", find : { _id : 3 } ,to : s.getNonPrimaries( "test" )[0] } )
+s.adminCommand({ moveChunk: "test.foo", find: { _id: 3 },
+    to: s.getNonPrimaries("test")[0], _waitForDelete: true });
 
 for ( i=0; i<N; i++ )
     db.foo.insert( { _id : i } )

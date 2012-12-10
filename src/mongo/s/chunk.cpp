@@ -301,7 +301,12 @@ namespace mongo {
         return true;
     }
 
-    bool Chunk::moveAndCommit( const Shard& to , long long chunkSize /* bytes */, bool secondaryThrottle, BSONObj& res ) const {
+    bool Chunk::moveAndCommit(const Shard& to,
+                              long long chunkSize /* bytes */,
+                              bool secondaryThrottle,
+                              bool waitForDelete,
+                              BSONObj& res) const
+    {
         uassert( 10167 ,  "can't move shard to its current location!" , getShard() != to );
 
         log() << "moving chunk ns: " << _manager->getns() << " moving ( " << toString() << ") " << _shard.toString() << " -> " << to.toString() << endl;
@@ -324,7 +329,8 @@ namespace mongo {
                                                          "maxChunkSizeBytes" << chunkSize <<
                                                          "shardId" << genID() <<
                                                          "configdb" << configServer.modelServer() <<
-                                                         "secondaryThrottle" << secondaryThrottle
+                                                         "secondaryThrottle" << secondaryThrottle <<
+                                                         "waitForDelete" << waitForDelete
                                                          ) ,
                                                    res
                                                    );
@@ -425,6 +431,7 @@ namespace mongo {
                          toMove->moveAndCommit( newLocation , 
                                                 MaxChunkSize , 
                                                 false , /* secondaryThrottle - small chunk, no need */
+                                                false, /* waitForDelete - small chunk, no need */
                                                 res ) );
                 
                 // update our config

@@ -697,7 +697,8 @@ namespace mongo {
                             continue;
 
                         BSONObj moveResult;
-                        if ( ! chunk->moveAndCommit( to , Chunk::MaxChunkSize , false , moveResult ) ) {
+                        if (!chunk->moveAndCommit(to, Chunk::MaxChunkSize,
+                                false, true, moveResult)) {
                             warning() << "Couldn't move chunk " << chunk << " to shard "  << to
                                       << " while sharding collection " << ns << ". Reason: "
                                       <<  moveResult << endl;
@@ -959,7 +960,11 @@ namespace mongo {
                 tlog() << "CMD: movechunk: " << cmdObj << endl;
 
                 BSONObj res;
-                if ( ! c->moveAndCommit( to , maxChunkSizeBytes , cmdObj["_secondaryThrottle"].trueValue() , res ) ) {
+                if (!c->moveAndCommit(to,
+                                      maxChunkSizeBytes,
+                                      cmdObj["_secondaryThrottle"].trueValue(),
+                                      cmdObj["_waitForDelete"].trueValue(),
+                                      res)) {
                     errmsg = "move failed";
                     result.append( "cause" , res );
                     return false;

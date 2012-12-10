@@ -38,7 +38,10 @@ namespace mongo {
     Balancer::~Balancer() {
     }
 
-    int Balancer::_moveChunks( const vector<CandidateChunkPtr>* candidateChunks , bool secondaryThrottle ) {
+    int Balancer::_moveChunks(const vector<CandidateChunkPtr>* candidateChunks,
+                              bool secondaryThrottle,
+                              bool waitForDelete)
+    {
         int movedCount = 0;
 
         for ( vector<CandidateChunkPtr>::const_iterator it = candidateChunks->begin(); it != candidateChunks->end(); ++it ) {
@@ -64,7 +67,11 @@ namespace mongo {
             }
 
             BSONObj res;
-            if ( c->moveAndCommit( Shard::make( chunkInfo.to ) , Chunk::MaxChunkSize , secondaryThrottle , res ) ) {
+            if (c->moveAndCommit(Shard::make(chunkInfo.to),
+                                 Chunk::MaxChunkSize,
+                                 secondaryThrottle,
+                                 waitForDelete,
+                                 res)) {
                 movedCount++;
                 continue;
             }
@@ -358,6 +365,14 @@ namespace mongo {
                     
                     LOG(1) << "*** start balancing round" << endl;
 
+                    if (balancerConfig["_waitForDelete"].trueValue()) {
+                        LOG(1) << "balancer chunk moves will wait for cleanup" << endl;
+                    }
+
+                    if (balancerConfig["_secondaryThrottle"].trueValue()) {
+                        LOG(1) << "balancer chunk moves will wait for secondaries" << endl;
+                    }
+
                     vector<CandidateChunkPtr> candidateChunks;
                     _doBalanceRound( conn.conn() , &candidateChunks );
                     if ( candidateChunks.size() == 0 ) {
@@ -365,10 +380,11 @@ namespace mongo {
                         _balancedLastTime = 0;
                     }
                     else {
-                        _balancedLastTime = _moveChunks( &candidateChunks,
-                                                         balancerConfig[SettingsFields::secondaryThrottle()].trueValue() );
+                        _balancedLastTime = _moveChunks(&candidateChunks,
+                                balancerConfig[SettingsFields::secondaryThrottle()].trueValue(),
+                                balancerConfig["_waitForDelete"].trueValue());
                     }
-                    
+
                     LOG(1) << "*** end of balancing round" << endl;
                 }
 

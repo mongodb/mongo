@@ -44,7 +44,8 @@ assert( s.admin.runCommand( { addshard: "localhost:29000" , name: "myShard" } ).
 // other shard to create the collection on that shard
 s.adminCommand( { enablesharding : dbname } );
 s.adminCommand( { shardcollection : ns , key: { _id : 1 } } );
-s.adminCommand( { moveChunk : ns , find : { _id : 1 } , to : "shard0000" } );
+s.adminCommand({ moveChunk: ns, find: { _id: 1 },
+    to: "shard0000", _waitForDelete: true });
 
 print( "*************** Collection Stats On Other Shard ************" );
 var shard2 = s._connections[0].getDB( dbname );
