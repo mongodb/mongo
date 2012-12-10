@@ -43,10 +43,29 @@ namespace mongo {
     const std::string AuthorizationManager::SERVER_RESOURCE_NAME = "$SERVER";
     const std::string AuthorizationManager::CLUSTER_RESOURCE_NAME = "$CLUSTER";
 
-    namespace {
-        const std::string ADMIN_DBNAME = "admin";
-        const std::string LOCAL_DBNAME = "local";
-    }
+namespace {
+    const std::string ADMIN_DBNAME = "admin";
+    const std::string LOCAL_DBNAME = "local";
+
+    const std::string ROLES_FIELD_NAME = "roles";
+    const std::string OTHER_DB_ROLES_FIELD_NAME = "otherDBRoles";
+    const std::string READONLY_FIELD_NAME = "readOnly";
+    const std::string USERNAME_FIELD_NAME = "user";
+    const std::string USERSOURCE_FIELD_NAME = "userSource";
+    const std::string PASSWORD_FIELD_NAME = "pwd";
+
+    const std::string SYSTEM_ROLE_READ = "read";
+    const std::string SYSTEM_ROLE_READ_WRITE = "readWrite";
+    const std::string SYSTEM_ROLE_USER_ADMIN = "userAdmin";
+    const std::string SYSTEM_ROLE_DB_ADMIN = "dbAdmin";
+    const std::string SYSTEM_ROLE_SERVER_ADMIN = "serverAdmin";
+    const std::string SYSTEM_ROLE_CLUSTER_ADMIN = "clusterAdmin";
+    const std::string SYSTEM_ROLE_READ_ANY_DB = "readAnyDB";
+    const std::string SYSTEM_ROLE_READ_WRITE_ANY_DB = "readWriteAnyDatabase";
+    const std::string SYSTEM_ROLE_USER_ADMIN_ANY_DB = "userAdminAnyDatabase";
+    const std::string SYSTEM_ROLE_DB_ADMIN_ANY_DB = "dbAdminAnyDatabase";
+
+}  // namespace
 
     // ActionSets for the various system roles.  These ActionSets contain all the actions that
     // a user of each system role is granted.
@@ -58,8 +77,10 @@ namespace mongo {
     // compatibility with old-style read-only admin users.
     ActionSet serverAdminRoleReadActions;
     ActionSet serverAdminRoleWriteActions;
+    ActionSet serverAdminRoleActions;
     ActionSet clusterAdminRoleReadActions;
     ActionSet clusterAdminRoleWriteActions;
+    ActionSet clusterAdminRoleActions;
     // Can only be performed by internal connections.  Nothing ever explicitly grants these actions,
     // but they're included when calling addAllActions on an ActionSet, which is how internal
     // connections are granted their privileges.
@@ -142,6 +163,9 @@ namespace mongo {
         serverAdminRoleWriteActions.addAction(ActionType::replSetReconfig);
         serverAdminRoleWriteActions.addAction(ActionType::resync);
 
+        serverAdminRoleActions.addAllActionsFromSet(serverAdminRoleReadActions);
+        serverAdminRoleActions.addAllActionsFromSet(serverAdminRoleWriteActions);
+
         // Cluster admin role
         clusterAdminRoleReadActions.addAction(ActionType::getShardVersion);
         clusterAdminRoleReadActions.addAction(ActionType::listShards);
@@ -161,6 +185,9 @@ namespace mongo {
         clusterAdminRoleWriteActions.addAction(ActionType::shardingState);
         clusterAdminRoleWriteActions.addAction(ActionType::split);
         clusterAdminRoleWriteActions.addAction(ActionType::splitChunk);
+
+        clusterAdminRoleActions.addAllActionsFromSet(clusterAdminRoleReadActions);
+        clusterAdminRoleActions.addAllActionsFromSet(clusterAdminRoleWriteActions);
 
         // Internal commands
         internalActions.addAction(ActionType::clone);
@@ -295,7 +322,7 @@ namespace mongo {
                                                    const PrincipalName& principal,
                                                    const BSONObj& privilegeDocument,
                                                    PrivilegeSet* result) {
-        if (!privilegeDocument.hasField("privileges")) {
+        if (!privilegeDocument.hasField(ROLES_FIELD_NAME)) {
             // Old-style (v2.2 and prior) privilege document
             return _buildPrivilegeSetFromOldStylePrivilegeDocument(dbname,
                                                                    principal,
@@ -303,10 +330,8 @@ namespace mongo {
                                                                    result);
         }
         else {
-            return Status(ErrorCodes::UnsupportedFormat,
-                          mongoutils::str::stream() << "Invalid privilege document received when "
-                                  "trying to extract privileges: " << privilegeDocument,
-                          0);
+            return _buildPrivilegeSetFromExtendedPrivilegeDocument(
+                    dbname, principal, privilegeDocument, result);
         }
     }
 
@@ -315,30 +340,169 @@ namespace mongo {
             const PrincipalName& principal,
             const BSONObj& privilegeDocument,
             PrivilegeSet* result) {
-        if (!(privilegeDocument.hasField("user") && privilegeDocument.hasField("pwd"))) {
+        if (!(privilegeDocument.hasField(USERNAME_FIELD_NAME) &&
+              privilegeDocument.hasField(PASSWORD_FIELD_NAME))) {
+
             return Status(ErrorCodes::UnsupportedFormat,
                           mongoutils::str::stream() << "Invalid old-style privilege document "
                                   "received when trying to extract privileges: "
                                    << privilegeDocument,
                           0);
         }
-        if (privilegeDocument["user"].str() != principal.getUser()) {
+        if (privilegeDocument[USERNAME_FIELD_NAME].str() != principal.getUser()) {
             return Status(ErrorCodes::BadValue,
                           mongoutils::str::stream() << "Principal name from privilege document \""
-                                  << privilegeDocument["user"].str()
+                                  << privilegeDocument[USERNAME_FIELD_NAME].str()
                                   << "\" doesn't match name of provided Principal \""
                                   << principal.getUser()
                                   << "\"",
                           0);
         }
 
-        bool readOnly = privilegeDocument.hasField("readOnly") &&
-                privilegeDocument["readOnly"].trueValue();
+        bool readOnly = privilegeDocument[READONLY_FIELD_NAME].trueValue();
         ActionSet actions = getActionsForOldStyleUser(dbname, readOnly);
         std::string resourceName = (dbname == ADMIN_DBNAME || dbname == LOCAL_DBNAME) ?
             PrivilegeSet::WILDCARD_RESOURCE : dbname;
         result->grantPrivilege(Privilege(resourceName, actions), principal);
 
+        return Status::OK();
+    }
+
+    /**
+     * Adds to "outPrivileges" the privileges associated with having the named "role" on "dbname".
+     *
+     * Returns non-OK status if "role" is not a defined role in "dbname".
+     */
+    static Status _addPrivilegesForSystemRole(const std::string& dbname,
+                                              const std::string& role,
+                                              std::vector<Privilege>* outPrivileges) {
+        const bool isAdminDB = (dbname == ADMIN_DBNAME);
+
+        if (role == SYSTEM_ROLE_READ) {
+            outPrivileges->push_back(Privilege(dbname, readRoleActions));
+        }
+        else if (role == SYSTEM_ROLE_READ_WRITE) {
+            outPrivileges->push_back(Privilege(dbname, readWriteRoleActions));
+        }
+        else if (role == SYSTEM_ROLE_USER_ADMIN) {
+            outPrivileges->push_back(Privilege(dbname, userAdminRoleActions));
+        }
+        else if (role == SYSTEM_ROLE_DB_ADMIN) {
+            outPrivileges->push_back(Privilege(dbname, dbAdminRoleActions));
+        }
+        else if (isAdminDB && role == SYSTEM_ROLE_READ_ANY_DB) {
+            outPrivileges->push_back(Privilege(PrivilegeSet::WILDCARD_RESOURCE, readRoleActions));
+        }
+        else if (isAdminDB && role == SYSTEM_ROLE_READ_WRITE_ANY_DB) {
+            outPrivileges->push_back(
+                    Privilege(PrivilegeSet::WILDCARD_RESOURCE, readWriteRoleActions));
+        }
+        else if (isAdminDB && role == SYSTEM_ROLE_USER_ADMIN_ANY_DB) {
+            outPrivileges->push_back(
+                    Privilege(PrivilegeSet::WILDCARD_RESOURCE, userAdminRoleActions));
+        }
+        else if (isAdminDB && role == SYSTEM_ROLE_DB_ADMIN_ANY_DB) {
+            outPrivileges->push_back(
+                    Privilege(PrivilegeSet::WILDCARD_RESOURCE, dbAdminRoleActions));
+        }
+        else if (isAdminDB && role == SYSTEM_ROLE_SERVER_ADMIN) {
+            outPrivileges->push_back(
+                    Privilege(PrivilegeSet::WILDCARD_RESOURCE, serverAdminRoleActions));
+        }
+        else if (isAdminDB && role == SYSTEM_ROLE_CLUSTER_ADMIN) {
+            outPrivileges->push_back(
+                    Privilege(PrivilegeSet::WILDCARD_RESOURCE, clusterAdminRoleActions));
+        }
+        else {
+            return Status(ErrorCodes::BadValue,
+                          mongoutils::str::stream() <<"No such role, " << role <<
+                          ", in database " << dbname);
+        }
+        return Status::OK();
+    }
+
+    /**
+     * Given a database name and a BSONElement representing an array of roles, populates
+     * "outPrivileges" with the privileges associated with the given roles on the named database.
+     *
+     * Returns Status::OK() on success.
+     */
+    static Status _getPrivilegesFromRoles(const std::string& dbname,
+                                          const BSONElement& rolesElement,
+                                          std::vector<Privilege>* outPrivileges) {
+
+        static const char privilegesTypeMismatchMessage[] =
+            "Roles must be enumerated in an array of strings.";
+
+        if (dbname == PrivilegeSet::WILDCARD_RESOURCE) {
+            return Status(ErrorCodes::BadValue,
+                          PrivilegeSet::WILDCARD_RESOURCE + " is an invalid database name.");
+        }
+
+        if (rolesElement.type() != Array)
+            return Status(ErrorCodes::TypeMismatch, privilegesTypeMismatchMessage);
+
+        for (BSONObjIterator iter(rolesElement.embeddedObject()); iter.more(); iter.next()) {
+            BSONElement roleElement = *iter;
+            if (roleElement.type() != String)
+                return Status(ErrorCodes::TypeMismatch, privilegesTypeMismatchMessage);
+            Status status = _addPrivilegesForSystemRole(dbname, roleElement.str(), outPrivileges);
+            if (!status.isOK())
+                return status;
+        }
+        return Status::OK();
+    }
+
+    Status AuthorizationManager::_buildPrivilegeSetFromExtendedPrivilegeDocument(
+            const std::string& dbname,
+            const PrincipalName& principal,
+            const BSONObj& privilegeDocument,
+            PrivilegeSet* result) {
+
+        if (!privilegeDocument[READONLY_FIELD_NAME].eoo()) {
+            return Status(ErrorCodes::UnsupportedFormat,
+                          "Privilege documents may not contain both \"readonly\" and "
+                          "\"roles\" fields");
+        }
+
+        std::vector<Privilege> acquiredPrivileges;
+
+        // Acquire privileges on "dbname".
+        Status status = _getPrivilegesFromRoles(
+                dbname, privilegeDocument[ROLES_FIELD_NAME], &acquiredPrivileges);
+        if (!status.isOK())
+            return status;
+
+        // If "dbname" is the admin database, handle the otherDBPrivileges field, which
+        // grants privileges on databases other than "dbname".
+        BSONElement otherDbPrivileges = privilegeDocument[OTHER_DB_ROLES_FIELD_NAME];
+        if (dbname == ADMIN_DBNAME) {
+            switch (otherDbPrivileges.type()) {
+            case EOO:
+                break;
+            case Object: {
+                for (BSONObjIterator iter(otherDbPrivileges.embeddedObject());
+                     iter.more(); iter.next()) {
+
+                    BSONElement rolesElement = *iter;
+                    status = _getPrivilegesFromRoles(
+                            rolesElement.fieldName(), rolesElement, &acquiredPrivileges);
+                    if (!status.isOK())
+                        return status;
+                }
+                break;
+            }
+            default:
+                return Status(ErrorCodes::TypeMismatch,
+                              "Field \"otherDBRoles\" must be an object, if present.");
+            }
+        }
+        else if (!otherDbPrivileges.eoo()) {
+            return Status(ErrorCodes::BadValue, "Only the admin database may contain a field "
+                          "called \"otherDBRoles\"");
+        }
+
+        result->grantPrivileges(acquiredPrivileges, principal);
         return Status::OK();
     }
 

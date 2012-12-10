@@ -158,6 +158,17 @@ namespace mongo {
                 const BSONObj& privilegeDocument,
                 PrivilegeSet* result);
 
+        // Parses extended-form (2.4+) privilege documents and returns a PrivilegeSet of all the
+        // privileges that the document grants.
+        //
+        // The document, "privilegeDocument", is assumed to describe privileges for "principal", and
+        // to come from database "dbname".
+        static Status _buildPrivilegeSetFromExtendedPrivilegeDocument(
+                const std::string& dbname,
+                const PrincipalName& principal,
+                const BSONObj& privilegeDocument,
+                PrivilegeSet* result);
+
         scoped_ptr<AuthExternalState> _externalState;
 
         // All the privileges that have been acquired by the authenticated principals.
