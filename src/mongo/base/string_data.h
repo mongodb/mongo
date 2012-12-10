@@ -107,8 +107,7 @@ namespace mongo {
          */
         const char* rawData() const { return _data; }
 
-        // these 2 will be going away shortly
-        const char* data() const { return _data; }
+        // this will be going away shortly
         const char* __data() const { return _data; }
 
         size_t size() const { fillSize(); return _size; }
