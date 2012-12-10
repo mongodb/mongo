@@ -82,7 +82,7 @@ main(void)
 	/*
 	 * Create the population table.
 	 * Keys are record numbers, the format for values is (5-byte string,
-	 * unsigned short, unsigned long long).
+	 * uint16_t, uint64_t).
 	 * See ::wiredtiger_struct_pack for details of the format strings.
 	 */
 	ret = session->create(session, "table:poptable",
@@ -182,7 +182,7 @@ main(void)
 	/* Search in a composite index. */
 	ret = session->open_cursor(session,
 	    "index:poptable:country_plus_year", NULL, NULL, &cursor);
-	cursor->set_key(cursor, "USA\0\0", (unsigned short)1900);
+	cursor->set_key(cursor, "USA\0\0", (uint16_t)1900);
 	ret = cursor->search(cursor);
 	ret = cursor->get_value(cursor, &country, &year, &population);
 	printf("US 1900: country %s, year %u, population %" PRIu64 "\n",

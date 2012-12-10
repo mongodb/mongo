@@ -132,17 +132,18 @@ cursor_ops(WT_SESSION *session)
 
 	{
 	/*! [Get the cursor's composite key] */
-				/* Get the cursor's composite key. */
-	const char *first, *third;
-	int second;
+			/* Get the cursor's "SiH" format composite key. */
+	const char *first;
+	int32_t second;
+	uint16_t third;
 	cursor->get_key(cursor, &first, &second, &third);
 	/*! [Get the cursor's composite key] */
 	}
 
 	{
 	/*! [Set the cursor's composite key] */
-				/* Set the cursor's composite key. */
-	cursor->set_key(cursor, "first", 5, "second");
+			/* Set the cursor's "SiH" format composite key. */
+	cursor->set_key(cursor, "first", (int32_t)5, (uint16_t)7);
 	/*! [Set the cursor's composite key] */
 	}
 
@@ -420,7 +421,7 @@ session_ops(WT_SESSION *session)
 	/*! [Create a table with columns] */
 	/*
 	 * Create a table with columns: keys are record numbers, values are
-	 * (string, integer, unsigned short).
+	 * (string, signed 32-bit integer, unsigned 16-bit integer).
 	 */
 	ret = session->create(session, "table:mytable",
 	    "key_format=r,value_format=SiH"
