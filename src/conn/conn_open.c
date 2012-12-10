@@ -38,7 +38,7 @@ __wt_connection_open(WT_CONNECTION_IMPL *conn, const char *cfg[])
 	WT_WRITE_BARRIER();
 
 	/* Start worker threads. */
-	F_SET(conn, WT_SERVER_RUN);
+	F_SET(conn, WT_CONN_SERVER_RUN);
 
 	/*
 	 * Start the eviction thread.
@@ -87,7 +87,7 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 	}
 
 	/* Shut down the server threads. */
-	F_CLR(conn, WT_SERVER_RUN);
+	F_CLR(conn, WT_CONN_SERVER_RUN);
 	if (conn->cache_evict_tid != 0) {
 		/*
 		 * XXX

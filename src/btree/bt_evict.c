@@ -204,11 +204,11 @@ __wt_cache_evict_server(void *arg)
 	conn = S2C(session);
 	cache = conn->cache;
 
-	while (F_ISSET(conn, WT_SERVER_RUN)) {
+	while (F_ISSET(conn, WT_CONN_SERVER_RUN)) {
 		/* Evict pages from the cache as needed. */
 		WT_ERR(__evict_worker(session));
 
-		if (!F_ISSET(conn, WT_SERVER_RUN))
+		if (!F_ISSET(conn, WT_CONN_SERVER_RUN))
 			break;
 
 		WT_VERBOSE_ERR(session, evictserver, "sleeping");

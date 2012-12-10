@@ -572,9 +572,9 @@ flags = {
 	'conn' : [
 		'CONN_CACHE_POOL',
 		'CONN_LSM_MERGE',
+		'CONN_SERVER_RUN',
 		'CONN_SYNC',
 		'CONN_TRANSACTIONAL',
-		'SERVER_RUN'
 	],
 	'session' : [
 		'SESSION_INTERNAL',
