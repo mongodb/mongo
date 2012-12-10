@@ -165,7 +165,7 @@ namespace mongo {
                        bool god = false,
                        bool mayAddIndex = true,
                        bool* addedID = 0);
-        static shared_ptr<Cursor> findAll(const char *ns, const DiskLoc &startLoc = DiskLoc());
+        static shared_ptr<Cursor> findAll(const StringData& ns, const DiskLoc &startLoc = DiskLoc());
 
         /* special version of insert for transaction logging -- streamlined a bit.
            assumes ns is capped and no indexes
@@ -619,24 +619,23 @@ namespace mongo {
 
     boost::intmax_t dbSize( const char *database );
 
-    inline NamespaceIndex* nsindex(const char *ns) {
+    inline NamespaceIndex* nsindex(const StringData& ns) {
         Database *database = cc().database();
         verify( database );
         memconcept::is(database, memconcept::concept::database, ns, sizeof(Database));
         DEV {
-            char buf[256];
-            nsToDatabase(ns, buf);
-            if ( database->name != buf ) {
+            StringData dbname = nsToDatabaseSubstring( ns );
+            if ( database->name != dbname ) {
                 out() << "ERROR: attempt to write to wrong database\n";
                 out() << " ns:" << ns << '\n';
                 out() << " database->name:" << database->name << endl;
-                verify( database->name == buf );
+                verify( database->name == dbname );
             }
         }
         return &database->namespaceIndex;
     }
 
-    inline NamespaceDetails* nsdetails(const char *ns) {
+    inline NamespaceDetails* nsdetails(const StringData& ns) {
         // if this faults, did you set the current db first?  (Client::Context + dblock)
         NamespaceDetails *d = nsindex(ns)->details(ns);
         if( d ) {

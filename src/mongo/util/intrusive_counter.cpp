@@ -32,8 +32,7 @@ namespace mongo {
 
         ptr->_size = s.size();
         char* stringStart = reinterpret_cast<char*>(ptr.get()) + sizeof(RCString);
-        memcpy(stringStart, s.data(), sizeWithNUL);
-
+        s.copyTo( stringStart, true );
         return ptr;
     }
 

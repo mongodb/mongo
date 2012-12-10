@@ -1034,12 +1034,12 @@ namespace mongo {
             Document::FieldPair field (fields.next());
 
             // TODO don't make a new string here
-            const string fieldName (field.first.data(), field.first.size());
+            const string fieldName = field.first.toString();
             ExpressionMap::const_iterator exprIter = _expressions.find(fieldName);
 
             // This field is not supposed to be in the output (unless it is _id)
             if (exprIter == end) {
-                if (!_excludeId && atRoot && str::equals(field.first.data(), "_id")) {
+                if (!_excludeId && atRoot && field.first == "_id") {
                     // _id from the root doc is always included (until exclusion is supported)
                     // not updating doneFields since "_id" isn't in _expressions
                     out.addField(field.first, field.second);

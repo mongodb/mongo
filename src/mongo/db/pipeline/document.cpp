@@ -34,7 +34,7 @@ namespace mongo {
             Position pos = _hashTab[bucket];
             while (pos.found()) {
                 const ValueElement& elem = getField(pos);
-                if (str::equals(requested.data(), elem.name))
+                if (requested == elem.name)
                     return pos;
 
                 // possible collision
@@ -44,7 +44,7 @@ namespace mongo {
         else if (_numFields) { // linear scan
             for (DocumentStorageIterator it = iteratorAll(); !it.atEnd(); it.advance()) {
                 if (size_t(it->nameLen) == requested.size()
-                    && str::equals(it->name, requested.data())) {
+                    && requested == it->name ) {
                     return it.position();
                 }
             }
@@ -74,7 +74,7 @@ namespace mongo {
         append(value);
         append(nextCollision);
         append(nameSize);
-        memcpy(dest, name.data(), nameSize + 1/*NUL*/);
+        name.copyTo( dest, true );
         // Padding for alignment handled above
 #undef append
 
@@ -290,7 +290,7 @@ namespace mongo {
     void Document::hash_combine(size_t &seed) const {
         for (DocumentStorageIterator it = storage().iterator(); !it.atEnd(); it.advance()) {
             StringData name = it->nameSD();
-            boost::hash_range(seed, name.data(), name.data()+name.size());
+            boost::hash_range(seed, name.rawData(), name.rawData() + name.size());
             it->val.hash_combine(seed);
         }
     }

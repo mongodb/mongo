@@ -1304,7 +1304,7 @@ doneCheckOrder:
         return bab.arr().jsonString();
     }
     
-    MultiPlanScanner *MultiPlanScanner::make( const char *ns,
+    MultiPlanScanner *MultiPlanScanner::make( const StringData& ns,
                                              const BSONObj &query,
                                              const BSONObj &order,
                                              const shared_ptr<const ParsedQuery> &parsedQuery,
@@ -1538,12 +1538,12 @@ doneCheckOrder:
      * $nor component that would not be represented in QueryPattern.    
      */
     
-    MultiPlanScanner::MultiPlanScanner( const char *ns,
+    MultiPlanScanner::MultiPlanScanner( const StringData& ns,
                                        const BSONObj &query,
                                        const shared_ptr<const ParsedQuery> &parsedQuery,
                                        const BSONObj &hint,
                                        QueryPlanGenerator::RecordedPlanPolicy recordedPlanPolicy ) :
-        _ns( ns ),
+        _ns( ns.toString() ),
         _or( !query.getField( "$or" ).eoo() ),
         _query( query.getOwned() ),
         _parsedQuery( parsedQuery ),

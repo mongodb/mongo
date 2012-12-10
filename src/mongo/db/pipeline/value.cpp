@@ -33,7 +33,7 @@ namespace mongo {
         if (sizeWithNUL <= sizeof(shortStrStorage)) {
             shortStr = true;
             shortStrSize = s.size();
-            memcpy(shortStrStorage, s.data(), sizeWithNUL);
+            s.copyTo( shortStrStorage, true );
         }
         else {
             intrusive_ptr<const RCString> rcs = RCString::create(s);
@@ -663,7 +663,7 @@ namespace mongo {
             StringData r = rR.getStringData();
             StringData l = rL.getStringData();
             size_t bytes = min(r.size(), l.size());
-            int ret = memcmp(l.data(), r.data(), bytes);
+            int ret = memcmp(l.__data(), r.__data(), bytes);
             if (ret)
                 return ret;
             return l.size() - r.size();
@@ -781,7 +781,7 @@ namespace mongo {
 
         case String: {
             StringData sd = getStringData();
-            boost::hash_range(seed, sd.data(), (sd.data() + sd.size()));
+            boost::hash_range(seed, sd.rawData(), (sd.rawData() + sd.size()));
             break;
         }
 

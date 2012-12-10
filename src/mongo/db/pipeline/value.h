@@ -250,7 +250,7 @@ namespace mongo {
     inline string Value::getString() const {
         verify(getType() == String);
         StringData sd = _storage.getString();
-        return string(sd.data(), sd.size());
+        return sd.toString();
     }
 
     inline OID Value::getOid() const {
@@ -276,13 +276,13 @@ namespace mongo {
     inline string Value::getRegex() const {
         verify(getType() == RegEx);
         StringData sd = _storage.getString();
-        return string(sd.data(), sd.size());
+        return sd.toString();
     }
 
     inline string Value::getSymbol() const {
         verify(getType() == Symbol);
         StringData sd = _storage.getString();
-        return string(sd.data(), sd.size());
+        return sd.toString();
     }
 
     inline int Value::getInt() const {

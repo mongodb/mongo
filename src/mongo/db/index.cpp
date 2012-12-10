@@ -299,7 +299,7 @@ namespace mongo {
         sourceNS = io.getStringField("ns");
         uassert(10096, "invalid ns to index", sourceNS.find( '.' ) != string::npos);
         massert(10097, str::stream() << "bad table to index name on add index attempt current db: " << cc().database()->name << "  source: " << sourceNS ,
-                cc().database()->name == nsToDatabase(sourceNS.c_str()));
+                cc().database()->name == nsToDatabase(sourceNS));
 
         uassert(16548,
                 mongoutils::str::stream() << "not authorized to create index on " << sourceNS,

@@ -957,11 +957,8 @@ namespace mongo {
                 theDataFileMgr.insertWithObjMod( target.c_str(), o );
             }
 
-            char cl[256];
-            nsToDatabase( source.c_str(), cl );
-            string sourceIndexes = string( cl ) + ".system.indexes";
-            nsToDatabase( target.c_str(), cl );
-            string targetIndexes = string( cl ) + ".system.indexes";
+            string sourceIndexes = nsToDatabase( source ) + ".system.indexes";
+            string targetIndexes = nsToDatabase( target ) + ".system.indexes";
             {
                 c = bridge.query( sourceIndexes, QUERY( "ns" << source ), 0, 0, 0, fromRepl ? QueryOption_SlaveOk : 0 );
             }

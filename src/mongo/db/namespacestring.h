@@ -26,7 +26,7 @@ namespace mongo {
 
     /* in the mongo source code, "client" means "database". */
 
-    const int MaxDatabaseNameLen = 128; // max str len for the db name, including null char
+    const size_t MaxDatabaseNameLen = 128; // max str len for the db name, including null char
 
     /* e.g.
        NamespaceString ns("acme.orders");
@@ -133,33 +133,27 @@ namespace mongo {
     };
 
     // "database.a.b.c" -> "database"
-    inline void nsToDatabase(const char *ns, char *database) {
-        for( int i = 0; i < MaxDatabaseNameLen; i++ ) {
-            database[i] = ns[i];
-            if( database[i] == '.' ) {
-                database[i] = 0;
-                return;
-            }
-            if( database[i] == 0 ) {
-                return;
-            }
-        }
-        // other checks should have happened already, this is defensive. thus massert not uassert
-        massert(10078, "nsToDatabase: ns too long", false);
-    }
-    inline string nsToDatabase(const char *ns) {
-        char buf[MaxDatabaseNameLen];
-        nsToDatabase(ns, buf);
-        return buf;
-    }
-    inline string nsToDatabase(const string& ns) {
+    inline StringData nsToDatabaseSubstring( const StringData& ns ) {
         size_t i = ns.find( '.' );
-        if ( i == string::npos )
+        if ( i == string::npos ) {
+            massert(10078, "nsToDatabase: ns too long", ns.size() < MaxDatabaseNameLen );
             return ns;
-        massert(10088, "nsToDatabase: ns too long", i < (size_t)MaxDatabaseNameLen);
-        return ns.substr( 0 , i );
+        }
+        massert(10088, "nsToDatabase: ns too long", i < static_cast<size_t>(MaxDatabaseNameLen));
+        return ns.substr( 0, i );
     }
-    
+
+    // "database.a.b.c" -> "database"
+    inline void nsToDatabase(const StringData& ns, char *database) {
+        StringData db = nsToDatabaseSubstring( ns );
+        db.copyTo( database, true );
+    }
+
+    // TODO: make this return a StringData
+    inline string nsToDatabase(const StringData& ns) {
+        return nsToDatabaseSubstring( ns ).toString();
+    }
+
     /**
      * NamespaceDBHash and NamespaceDBEquals allow you to do something like
      * unordered_map<string,int,NamespaceDBHash,NamespaceDBEquals>

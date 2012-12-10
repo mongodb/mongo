@@ -58,7 +58,7 @@ namespace mongo {
 
     bool LockState::isLocked( const StringData& ns ) {
         char db[MaxDatabaseNameLen];
-        nsToDatabase(ns.data(), db);
+        nsToDatabase(ns, db);
         
         DEV verify( _otherName.find( '.' ) == string::npos ); // XXX this shouldn't be here, but somewhere
         if ( _otherCount && db == _otherName )

@@ -108,7 +108,7 @@ namespace mongo {
         return out;
     }
 
-    vector<string> getAllIPs(StringData iporhost) {
+    vector<string> getAllIPs(const string& iporhost) {
         addrinfo* addrs = NULL;
         addrinfo hints;
         memset(&hints, 0, sizeof(addrinfo));
@@ -119,9 +119,9 @@ namespace mongo {
 
         vector<string> out;
 
-        int ret = getaddrinfo(iporhost.data(), portNum.c_str(), &hints, &addrs);
+        int ret = getaddrinfo(iporhost.c_str(), portNum.c_str(), &hints, &addrs);
         if ( ret ) {
-            warning() << "getaddrinfo(\"" << iporhost.data() << "\") failed: " << gai_strerror(ret) << endl;
+            warning() << "getaddrinfo(\"" << iporhost << "\") failed: " << gai_strerror(ret) << endl;
             return out;
         }
 

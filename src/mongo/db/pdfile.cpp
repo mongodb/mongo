@@ -64,12 +64,14 @@ namespace mongo {
     bool isValidNS( const StringData& ns ) {
         // TODO: should check for invalid characters
 
-        const char * x = strchr( ns.data() , '.' );
-        if ( ! x )
+        size_t idx = ns.find( '.' );
+        if ( idx == string::npos )
             return false;
 
-        x++;
-        return *x > 0;
+        if ( idx == ns.size() - 1 )
+            return false;
+
+        return true;
     }
 
     // TODO SERVER-4328
@@ -315,7 +317,7 @@ namespace mongo {
         // capped ones in local w/o autoIndexID (reason for the exception is for the oplog and
         //  non-replicated capped colls)
         if( options.hasField( "autoIndexId" ) ||
-            (newCapped && str::equals( nsToDatabase( ns ).c_str() ,  "local" )) ) {
+            (newCapped && nsToDatabase( ns ) == "local" ) ) {
             ensure = options.getField( "autoIndexId" ).trueValue();
         }
 
@@ -347,8 +349,6 @@ namespace mongo {
     bool userCreateNS(const char *ns, BSONObj options, string& err, bool logForReplication, bool *deferIdIndex) {
         const char *coll = strchr( ns, '.' ) + 1;
         massert( 10356 ,  str::stream() << "invalid ns: " << ns , NamespaceString::validCollectionName(ns));
-        char cl[ 256 ];
-        nsToDatabase( ns, cl );
         bool ok = _userCreateNS(ns, options, err, deferIdIndex);
         if ( logForReplication && ok ) {
             if ( options.getField( "create" ).eoo() ) {
@@ -357,7 +357,7 @@ namespace mongo {
                 b.appendElements( options );
                 options = b.obj();
             }
-            string logNs = string( cl ) + ".$cmd";
+            string logNs = nsToDatabase(ns) + ".$cmd";
             logOp("c", logNs.c_str(), options);
         }
         return ok;
@@ -817,7 +817,7 @@ namespace mongo {
         _precalced = precalced;
     }
 
-    shared_ptr<Cursor> DataFileMgr::findAll(const char *ns, const DiskLoc &startLoc) {
+    shared_ptr<Cursor> DataFileMgr::findAll(const StringData& ns, const DiskLoc &startLoc) {
         NamespaceDetails * d = nsdetails( ns );
         if ( ! d )
             return shared_ptr<Cursor>(new BasicCursor(DiskLoc()));
@@ -1528,8 +1528,11 @@ namespace mongo {
             BSONElement idField = io.getField( "_id" );
             uassert( 10099 ,  "_id cannot be an array", idField.type() != Array );
             // we don't add _id for capped collections in local as they don't have an _id index
-            if( idField.eoo() && !wouldAddIndex &&
-                !str::equals( nsToDatabase( ns ).c_str() , "local" ) && d->haveIdIndex() ) {
+            if( idField.eoo() &&
+                !wouldAddIndex &&
+                nsToDatabase( ns ) != "local" &&
+                d->haveIdIndex() ) {
+
                 if( addedID )
                     *addedID = true;
                 addID = len;

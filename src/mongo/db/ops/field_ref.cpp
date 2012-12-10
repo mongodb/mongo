@@ -27,8 +27,7 @@ namespace mongo {
         // We guarantee that accesses through getPart() will be valid while 'this' is. So we
         // take a copy. We're going to be "chopping" up the copy into c-strings.
         _fieldBase.reset(new char[dottedField.size()+1]);
-        memcpy(_fieldBase.get(), dottedField.data(), dottedField.size());
-        _fieldBase[dottedField.size()] = '\0';
+        dottedField.copyTo( _fieldBase.get(), true );
 
         // Separate the field parts using '.' as a delimiter.
         char* beg = _fieldBase.get();
@@ -70,10 +69,10 @@ namespace mongo {
 
     size_t FieldRef::appendPart(const StringData& part) {
         if (_size < kReserveAhead) {
-            _fixed[_size] = PartRef(part.data(), part.size());
+            _fixed[_size] = PartRef(part.__data(), part.size());
         }
         else {
-            _variable.push_back(PartRef(part.data(), part.size()));
+            _variable.push_back(PartRef(part.__data(), part.size()));
         }
         return ++_size;
     }
@@ -106,7 +105,7 @@ namespace mongo {
         for (size_t i=1; i<_size; i++) {
             res.append(1, '.');
             StringData part = getPart(i);
-            res.append(part.data(), part.size());
+            res.append(part.rawData(), part.size());
         }
         return res;
     }

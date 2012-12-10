@@ -28,8 +28,8 @@ namespace mongo {
 #pragma pack(1)
     class Namespace {
     public:
-        explicit Namespace(const char *ns) { *this = ns; }
-        Namespace& operator=(const char *ns);
+        Namespace(const StringData& ns) { *this = ns; }
+        Namespace& operator=(const StringData& ns);
 
         bool hasDollarSign() const { return strchr( buf , '$' ) > 0;  }
         void kill() { buf[0] = 0x7f; }

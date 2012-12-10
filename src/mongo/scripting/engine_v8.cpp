@@ -854,7 +854,7 @@ namespace mongo {
 
         TryCatch try_catch;
 
-        Handle<Script> script = v8::Script::Compile( v8::String::New( code.data() ) ,
+        Handle<Script> script = v8::Script::Compile( v8::String::New( code.rawData(), code.size() ),
                                 v8::String::New( name.c_str() ) );
         if (script.IsEmpty()) {
             stringstream ss;

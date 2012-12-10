@@ -112,10 +112,10 @@ namespace mongo {
         // individual field accessors
         //
 
-        void setName(const StringData& name) { _name = std::string(name.data(), name.size()); }
+        void setName(const StringData& name) { _name = name.toString(); }
         const std::string& getName() const { return _name; }
 
-        void setPrimary(const StringData& shard) {_primary=std::string(shard.data(), shard.size());}
+        void setPrimary(const StringData& shard) { _primary = shard.toString(); }
         const std::string& getPrimary() const { return _primary; }
 
         void setScattered(bool scattered) { _scattered = scattered; }

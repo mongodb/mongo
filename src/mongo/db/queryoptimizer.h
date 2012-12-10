@@ -635,7 +635,7 @@ namespace mongo {
     class MultiPlanScanner {
     public:
         
-        static MultiPlanScanner *make( const char *ns,
+        static MultiPlanScanner *make( const StringData& ns,
                                       const BSONObj &query,
                                       const BSONObj &order,
                                       const shared_ptr<const ParsedQuery> &parsedQuery =
@@ -734,7 +734,7 @@ namespace mongo {
 
     private:
 
-        MultiPlanScanner( const char *ns,
+        MultiPlanScanner( const StringData& ns,
                          const BSONObj &query,
                          const shared_ptr<const ParsedQuery> &parsedQuery,
                          const BSONObj &hint,
