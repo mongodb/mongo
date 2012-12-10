@@ -43,18 +43,18 @@ namespace mongo {
     }
 
     void Top::record( const StringData& ns , int op , int lockType , long long micros , bool command ) {
-        if ( ns.data()[0] == '?' )
+        if ( ns[0] == '?' )
             return;
 
         //cout << "record: " << ns << "\t" << op << "\t" << command << endl;
         SimpleMutex::scoped_lock lk(_lock);
 
-        if ( ( command || op == dbQuery ) && str::equals( ns.data(), _lastDropped.c_str() ) ) {
+        if ( ( command || op == dbQuery ) && ns == _lastDropped ) {
             _lastDropped = "";
             return;
         }
 
-        CollectionData& coll = _usage[ns.data()];
+        CollectionData& coll = _usage[ns];
         _record( coll , op , lockType , micros , command );
         _record( _global , op , lockType , micros , command );
     }
@@ -122,7 +122,7 @@ namespace mongo {
         // pull all the names into a vector so we can sort them for the user
         
         vector<string> names;
-        for ( UsageMap::const_iterator i = map.begin(); i != map.end(); i++ ) {
+        for ( UsageMap::const_iterator i = map.begin(); i != map.end(); ++i ) {
             names.push_back( i->first );
         }
         
