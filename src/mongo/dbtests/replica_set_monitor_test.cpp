@@ -19,6 +19,7 @@
  * ReplicaSetMonitor::selectNode and TagSet
  */
 
+#include "mongo/client/connpool.h"
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/client/dbclient_rs.h"
 #include "mongo/dbtests/mock/mock_conn_registry.h"
@@ -32,14 +33,17 @@ using std::string;
 using boost::scoped_ptr;
 
 using mongo::BSONObj;
+using mongo::BSONObjBuilder;
 using mongo::BSONArray;
 using mongo::BSONArrayBuilder;
+using mongo::BSONElement;
 using mongo::ConnectionString;
 using mongo::HostAndPort;
 using mongo::MockReplicaSet;
 using mongo::ReadPreference;
 using mongo::ReplicaSetMonitor;
 using mongo::ReplicaSetMonitorPtr;
+using mongo::ScopedDbConnection;
 using mongo::TagSet;
 
 namespace mongo_test {
@@ -1501,6 +1505,8 @@ namespace mongo_test {
         void tearDown() {
             ConnectionString::setConnectionHook(_originalConnectionHook);
             ReplicaSetMonitor::remove(_replSet->getSetName(), true);
+            _replSet.reset();
+            mongo::ScopedDbConnection::clearPool();
         }
 
         MockReplicaSet* getReplSet() {
@@ -1531,5 +1537,55 @@ namespace mongo_test {
         ReplicaSetMonitorPtr monitor = ReplicaSetMonitor::get(replSet->getSetName());
         // Trigger calls to Node::getConnWithRefresh
         monitor->check(true);
+    }
+
+    // Stress test case for a node that is previously a primary being removed from the set.
+    // This test goes through configurations with different positions for the primary node
+    // in the host list returned from the isMaster command. The test here is to make sure
+    // that the ReplicaSetMonitor will not crash under these situations.
+    TEST(ReplicaSetMonitorTest, PrimaryRemovedFromSetStress) {
+        const size_t NODE_COUNT = 5;
+        MockReplicaSet replSet("test", NODE_COUNT);
+        ConnectionString::ConnectionHook* originalConnHook =
+                ConnectionString::getConnectionHook();
+        ConnectionString::setConnectionHook(mongo::MockConnRegistry::get()->getConnStrHook());
+
+        const string replSetName(replSet.getSetName());
+        vector<HostAndPort> seedList;
+        seedList.push_back(HostAndPort(replSet.getPrimary()));
+        ReplicaSetMonitor::createIfNeeded(replSetName, seedList);
+
+        const MockReplicaSet::ReplConfigMap origConfig = replSet.getReplConfig();
+        mongo::ReplicaSetMonitorPtr replMonitor = ReplicaSetMonitor::get(replSetName);
+
+        for (size_t idxToRemove = 0; idxToRemove < NODE_COUNT; idxToRemove++) {
+            MockReplicaSet::ReplConfigMap newConfig = origConfig;
+
+            replSet.setConfig(origConfig);
+            replMonitor->check(true); // Make sure the monitor sees the change
+
+            string hostToRemove;
+            {
+                BSONObjBuilder monitorStateBuilder;
+                replMonitor->appendInfo(monitorStateBuilder);
+                BSONObj monitorState = monitorStateBuilder.done();
+
+                BSONElement hostsElem = monitorState["hosts"];
+                BSONElement addrElem = hostsElem[mongo::str::stream() << idxToRemove]["addr"];
+                hostToRemove = addrElem.String();
+            }
+
+            replSet.setPrimary(hostToRemove);
+            replMonitor->check(true); // Make sure the monitor sees the new primary
+
+            newConfig.erase(hostToRemove);
+            replSet.setConfig(newConfig);
+            replSet.setPrimary(newConfig.begin()->first);
+            replMonitor->check(true); // Force refresh -> should not crash
+        }
+
+        ReplicaSetMonitor::remove(replSet.getSetName(), true);
+        ConnectionString::setConnectionHook(originalConnHook);
+        mongo::ScopedDbConnection::clearPool();
     }
 }
