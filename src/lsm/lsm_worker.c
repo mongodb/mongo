@@ -374,10 +374,10 @@ __lsm_free_chunks(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 		__wt_free(session, lsm_tree->old_chunks[i]);
 		++lsm_tree->old_avail;
 	}
-	if (locked) {
-err:		WT_TRET(__wt_lsm_meta_write(session, lsm_tree));
+err:	if (progress)
+		WT_TRET(__wt_lsm_meta_write(session, lsm_tree));
+	if (locked)
 		WT_TRET(__wt_rwunlock(session, lsm_tree->rwlock));
-	}
 
 	/* Returning non-zero means there is no work to do. */
 	if (!progress)
