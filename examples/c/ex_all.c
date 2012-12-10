@@ -270,7 +270,7 @@ cursor_ops(WT_SESSION *session)
 
 	{
 	/*! [Display an error] */
-	const char *key = "some key";
+	const char *key = "non-existent key";
 	cursor->set_key(cursor, key);
 	if ((ret = cursor->remove(cursor)) != 0) {
 		fprintf(stderr,
