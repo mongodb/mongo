@@ -306,24 +306,24 @@ next:		switch (direction) {
 	if (!is_local)
 		return (0);
 
-	/*
-	 * Allocate and initialize a WT_IKEY structure, we're instantiating
-	 * this key.
-	 */
+	/* If still needed, instantiate the key. */
 	key = WT_ROW_KEY_COPY(rip_arg);
-	WT_ERR(__wt_row_ikey_alloc(session,
-	    WT_PAGE_DISK_OFFSET(page, key), retb->data, retb->size, &ikey));
+	if (!__wt_off_page(page, key)) {
+		WT_ERR(__wt_row_ikey_alloc(session,
+		    WT_PAGE_DISK_OFFSET(page, key),
+		    retb->data, retb->size, &ikey));
 
-	/* Serialize the swap of the key into place. */
-	ret = __wt_row_key_serial(session, page, rip_arg, ikey);
-
-	/*
-	 * Free the WT_IKEY structure if the serialized call didn't use it for
-	 * the key.
-	 */
-	key = WT_ROW_KEY_COPY(rip_arg);
-	if (key != ikey)
-		__wt_free(session, ikey);
+		/*
+		 * Serialize the swap of the key into place.  If we succeed,
+		 * update the page's memory footprint; if we fail, free the
+		 * WT_IKEY structure.
+		 */
+		if (WT_ATOMIC_CAS(WT_ROW_KEY_COPY(rip), key, ikey))
+			__wt_cache_page_inmem_incr(
+			    session, page, sizeof(WT_IKEY) + ikey->size);
+		else
+			__wt_free(session, ikey);
+	}
 
 	__wt_scr_free(&retb);
 
@@ -399,31 +399,5 @@ __wt_row_ikey_alloc(WT_SESSION_IMPL *session,
 	memcpy(WT_IKEY_DATA(ikey), key, size);
 
 	*(WT_IKEY **)ikeyp = ikey;
-	return (0);
-}
-
-/*
- * __wt_row_key_serial_func --
- *	Server function to instantiate a key during a row-store search.
- */
-int
-__wt_row_key_serial_func(WT_SESSION_IMPL *session, void *args)
-{
-	WT_IKEY *ikey;
-	WT_PAGE *page;
-	WT_ROW *rip;
-
-	__wt_row_key_unpack(args, &page, &rip, &ikey);
-
-	/*
-	 * We don't care about the page's write generation -- there's a simpler
-	 * test, if the key we're interested in still needs to be instantiated,
-	 * because it can only be in one of two states.
-	 */
-	if (!__wt_off_page(page, WT_ROW_KEY_COPY(rip))) {
-		WT_ROW_KEY_SET(rip, ikey);
-		__wt_cache_page_inmem_incr(
-		    session, page, sizeof(WT_IKEY) + ikey->size);
-	}
 	return (0);
 }
