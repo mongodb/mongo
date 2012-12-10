@@ -33,7 +33,7 @@ __wt_schema_colgroup_name(WT_SESSION_IMPL *session,
  *	Open the column groups for a table.
  */
 int
-__wt_schema_open_colgroups(WT_SESSION_IMPL *session, WT_TABLE *table, int force)
+__wt_schema_open_colgroups(WT_SESSION_IMPL *session, WT_TABLE *table)
 {
 	WT_COLGROUP *colgroup;
 	WT_CONFIG cparser;
@@ -43,7 +43,7 @@ __wt_schema_open_colgroups(WT_SESSION_IMPL *session, WT_TABLE *table, int force)
 	const char *cgconfig;
 	u_int i;
 
-	if (!force && table->cg_complete)
+	if (table->cg_complete)
 		return (0);
 
 	WT_RET(__wt_scr_alloc(session, 0, &buf));
@@ -394,7 +394,7 @@ __wt_schema_open_table(WT_SESSION_IMPL *session,
 		goto err;
 
 	WT_ERR(__wt_calloc_def(session, WT_COLGROUPS(table), &table->cgroups));
-	WT_ERR(__wt_schema_open_colgroups(session, table, 0));
+	WT_ERR(__wt_schema_open_colgroups(session, table));
 	*tablep = table;
 
 	if (0) {

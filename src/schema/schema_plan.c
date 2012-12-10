@@ -14,10 +14,13 @@ __find_next_col(WT_SESSION_IMPL *session, WT_TABLE *table,
 	WT_COLGROUP *colgroup;
 	WT_CONFIG conf;
 	WT_CONFIG_ITEM cval, k, v;
-	u_int cg, col, foundcg, foundcol;
+	u_int cg, col, foundcg, foundcol, matchcg, matchcol;
 	int getnext;
 
 	foundcg = foundcol = UINT_MAX;
+	matchcg = *cgnump;
+	matchcol = (*coltype == WT_PROJ_KEY) ?
+	    *colnump : *colnump + table->nkey_columns;
 
 	getnext = 1;
 	for (colgroup = NULL, cg = 0; cg < WT_COLGROUPS(table); cg++) {
@@ -38,13 +41,13 @@ cgcols:			cval = colgroup->colconf;
 		}
 		WT_RET(__wt_config_subinit(session, &conf, &cval));
 		for (; __wt_config_next(&conf, &k, &v) == 0; col++) {
-			if (cg == *cgnump && col == *colnump)
-				getnext = 1;
-			if (getnext && k.len == colname->len &&
+			if (k.len == colname->len &&
 			    strncmp(colname->str, k.str, k.len) == 0) {
-				foundcg = cg;
-				foundcol = col;
-				getnext = 0;
+				if (getnext) {
+					foundcg = cg;
+					foundcol = col;
+				}
+				getnext = (cg == matchcg && col == matchcol);
 			}
 			if (cg == 0 && table->ncolgroups > 0 &&
 			    col == table->nkey_columns - 1)
@@ -135,6 +138,7 @@ __wt_table_check(WT_SESSION_IMPL *session, WT_TABLE *table)
 	for (i = 0; i < table->nkey_columns; i++)
 		WT_RET(__wt_config_next(&conf, &k, &v));
 	cg = col = 0;
+	coltype = 0;
 	while ((ret = __wt_config_next(&conf, &k, &v)) == 0) {
 		if (__find_next_col(
 		    session, table, &k, &cg, &col, &coltype) != 0)

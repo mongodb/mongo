@@ -1013,8 +1013,7 @@ extern int __wt_schema_colgroup_name(WT_SESSION_IMPL *session,
     size_t len,
     WT_ITEM *buf);
 extern int __wt_schema_open_colgroups(WT_SESSION_IMPL *session,
-    WT_TABLE *table,
-    int force);
+    WT_TABLE *table);
 extern int __wt_schema_open_index(WT_SESSION_IMPL *session,
     WT_TABLE *table,
     const char *idxname,
