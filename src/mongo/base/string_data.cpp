@@ -20,7 +20,7 @@
 namespace mongo {
 
     std::ostream& operator<<(std::ostream& stream, const StringData& value) {
-        return stream.write(value.data(), value.size());
+        return stream.write(value.rawData(), value.size());
     }
 
 } // namespace mongo

@@ -123,7 +123,7 @@ def generate_source(filename, error_codes, error_classes):
     symbol_to_string_cases = ';\n        '.join(
         'case %s: return "%s"' % (ec[0], ec[0]) for ec in error_codes)
     string_to_symbol_cases = ';\n        '.join(
-        'if (!strncmp("%s", name.data(), name.size())) return %s' % (ec[0], ec[0])
+        'if (name == "%s") return %s' % (ec[0], ec[0])
         for ec in error_codes)
     int_to_symbol_cases = ';\n        '.join(
         'case %s: return %s' % (ec[0], ec[0]) for ec in error_codes)

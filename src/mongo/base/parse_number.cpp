@@ -22,20 +22,6 @@
 namespace mongo {
 
     /**
-     * Returns the substring of "str" starting at the "begin"th character, ending just before the
-     * "end"th character.
-     */
-    static inline StringData sdsubstr(
-            const StringData& str, size_t begin, size_t end = std::numeric_limits<size_t>::max()) {
-
-        if (end > str.size())
-            end = str.size();
-        if (begin > str.size())
-            begin = str.size();
-        return StringData(str.data() + begin, end - begin);
-    }
-
-    /**
      * Returns the value of the digit "c", with the same conversion behavior as strtol.
      *
      * Assumes "c" is an ASCII character or UTF-8 octet.
@@ -78,7 +64,7 @@ namespace mongo {
         }
 
         if (foundSignMarker)
-            return sdsubstr(stringValue, 1);
+            return stringValue.substr(1);
         return stringValue;
     }
 
@@ -101,10 +87,10 @@ namespace mongo {
             if (stringValue[0] == '0') {
                 if (stringValue.size() > 1 && (stringValue[1] == 'x' || stringValue[1] == 'X')) {
                     *outputBase = 16;
-                    return sdsubstr(stringValue, 2);
+                    return stringValue.substr(2);
                 }
                 *outputBase = 8;
-                return sdsubstr(stringValue, 1);
+                return stringValue.substr(1);
             }
             *outputBase = 10;
             return stringValue;
@@ -112,9 +98,9 @@ namespace mongo {
         else {
             *outputBase = inputBase;
             if (inputBase == 16) {
-                StringData prefix = sdsubstr(stringValue, 0, 2);
+                StringData prefix = stringValue.substr(0, 2);
                 if (prefix == "0x" || prefix == "0X")
-                    return sdsubstr(stringValue, 2);
+                    return stringValue.substr(2);
             }
             return stringValue;
         }
