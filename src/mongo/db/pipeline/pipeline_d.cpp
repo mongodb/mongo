@@ -26,12 +26,13 @@
 
 namespace mongo {
 
-    intrusive_ptr<DocumentSourceCursor> PipelineD::prepareCursorSource(
+    void PipelineD::prepareCursorSource(
         const intrusive_ptr<Pipeline> &pPipeline,
         const string &dbName,
         const intrusive_ptr<ExpressionContext> &pExpCtx) {
 
-        Pipeline::SourceVector *pSources = &pPipeline->sourceVector;
+        // We will be modifying the source vector as we go
+        Pipeline::SourceContainer& sources = pPipeline->sources;
 
         /* look for an initial match */
         BSONObjBuilder queryBuilder;
@@ -41,7 +42,7 @@ namespace mongo {
               This will get built in to the Cursor we'll create, so
               remove the match from the pipeline
             */
-            pSources->erase(pSources->begin());
+            sources.pop_front();
         }
 
         /*
@@ -64,8 +65,8 @@ namespace mongo {
         {
             set<string> deps;
             DocumentSource::GetDepsReturn status = DocumentSource::SEE_NEXT;
-            for (size_t i=0; i < pSources->size() && status == DocumentSource::SEE_NEXT; i++) {
-                status = (*pSources)[i]->getDependencies(deps);
+            for (size_t i=0; i < sources.size() && status == DocumentSource::SEE_NEXT; i++) {
+                status = sources[i]->getDependencies(deps);
             }
 
             if (status == DocumentSource::EXHAUSTIVE) {
@@ -82,8 +83,8 @@ namespace mongo {
         */
         const DocumentSourceSort *pSort = NULL;
         BSONObjBuilder sortBuilder;
-        if (pSources->size()) {
-            const intrusive_ptr<DocumentSource> &pSC = pSources->front();
+        if (!sources.empty()) {
+            const intrusive_ptr<DocumentSource> &pSC = sources.front();
             pSort = dynamic_cast<DocumentSourceSort *>(pSC.get());
 
             if (pSort) {
@@ -150,7 +151,7 @@ namespace mongo {
 
             if (pSortedCursor.get()) {
                 /* success:  remove the sort from the pipeline */
-                pSources->erase(pSources->begin());
+                sources.pop_front();
 
                 pCursor = pSortedCursor;
                 initSort = true;
@@ -194,7 +195,12 @@ namespace mongo {
         if (!projection.isEmpty())
             pSource->setProjection(projection);
 
-        return pSource;
+        // If we are in an explain, we won't actually use the created cursor so release it.
+        // This is important to avoid double locking when we use DBDirectClient to run explain.
+        if (pPipeline->isExplain())
+            pSource->dispose();
+
+        pPipeline->addInitialSource(pSource);
     }
 
 } // namespace mongo

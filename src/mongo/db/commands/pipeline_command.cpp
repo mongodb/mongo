@@ -81,37 +81,10 @@ namespace mongo {
           For an explain, with no lock, it really outputs the pipeline
           chain rather than fetching the data.
          */
-        bool executePipeline(
-            BSONObjBuilder &result, string &errmsg, const string &ns,
-            intrusive_ptr<Pipeline> &pPipeline,
-            intrusive_ptr<DocumentSourceCursor> &pSource,
-            intrusive_ptr<ExpressionContext> &pCtx);
-
-        /*
-          The explain code path holds a lock while the original cursor is
-          parsed; we still need to take that step, because that is how we
-          determine whether or not indexes will allow the optimization of
-          early $match and/or $sort.
-
-          Once the Cursor is identified, it is released, and then the lock
-          is released (automatically, via end of a block), and then the
-          pipeline is executed.
-         */
-        bool runExplain(
-            BSONObjBuilder &result, string &errmsg,
-            const string &ns, const string &db,
-            intrusive_ptr<Pipeline> &pPipeline,
-            intrusive_ptr<ExpressionContext> &pCtx);
-
-        /**
-         * A read lock is acquired and a Cursor is created, then documents are retrieved until the
-         * cursor is exhausted (or another termination condition occurs).
-         */
-        bool runExecute(
-            BSONObjBuilder &result, string &errmsg,
-            const string &ns, const string &db,
-            intrusive_ptr<Pipeline> pPipeline,
-            intrusive_ptr<ExpressionContext> pCtx);
+        bool executeSplitPipeline(
+            BSONObjBuilder& result, string& errmsg, const string& ns, const string& db,
+            intrusive_ptr<Pipeline>& pPipeline,
+            intrusive_ptr<ExpressionContext>& pCtx);
     };
 
     // self-registering singleton static instance
@@ -145,68 +118,11 @@ namespace mongo {
     PipelineCommand::~PipelineCommand() {
     }
 
-    bool PipelineCommand::runExplain(
-        BSONObjBuilder &result, string &errmsg,
-        const string &ns, const string &db,
-        intrusive_ptr<Pipeline> &pPipeline,
-        intrusive_ptr<ExpressionContext> &pCtx) {
-
-        intrusive_ptr<DocumentSourceCursor> pSource;
-        
-        pSource = PipelineD::prepareCursorSource(pPipeline, db, pCtx);
-        // Release the Cursor and its read lock.  This prevents double locking when using a
-        // DBDirectClient.
-        pSource->dispose();
-
-        /*
-          For EXPLAIN this just uses the direct client to do an explain on
-          what the underlying Cursor was, based on its query and sort
-          settings, and then wraps it with JSON from the pipeline definition.
-          That does not require the lock or cursor, both of which were
-          released above.
-         */
-        return executePipeline(result, errmsg, ns, pPipeline, pSource, pCtx);
-    }
-
-    bool PipelineCommand::runExecute(
-        BSONObjBuilder &result, string &errmsg,
-        const string &ns, const string &db,
-        intrusive_ptr<Pipeline> pPipeline,
-        intrusive_ptr<ExpressionContext> pCtx) {
-
-#if _DEBUG
-        // This is outside of the if block to keep the object alive until the pipeline is finished.
-        BSONObj parsed;
-        if (!pCtx->getInShard()) {
-            // Make sure all operations round-trip through Pipeline::toBson()
-            // correctly by reparsing every command on DEBUG builds. This is
-            // important because sharded aggregations rely on this ability.
-            // Skipping when inShard because this has already been through the
-            // transformation (and this unsets pCtx->inShard).
-            BSONObjBuilder bb;
-            pPipeline->toBson(&bb);
-            parsed = bb.obj();
-            // PRINT(parsed); // when debugging failures uncomment this and the matching one in run
-            pPipeline = Pipeline::parseCommand(errmsg, parsed, pCtx);
-            verify(pPipeline);
-        }
-#endif
-
-        // The DocumentSourceCursor manages a read lock internally, see SERVER-6123.
-        intrusive_ptr<DocumentSourceCursor> pSource(
-            PipelineD::prepareCursorSource(pPipeline, db, pCtx));
-        return executePipeline(result, errmsg, ns, pPipeline, pSource, pCtx);
-    }
-
-    bool PipelineCommand::executePipeline(
-        BSONObjBuilder &result, string &errmsg, const string &ns,
-        intrusive_ptr<Pipeline> &pPipeline,
-        intrusive_ptr<DocumentSourceCursor> &pSource,
-        intrusive_ptr<ExpressionContext> &pCtx) {
-
-        /* this is the normal non-debug path */
-        if (!pPipeline->getSplitMongodPipeline())
-            return pPipeline->run(result, errmsg, pSource);
+    bool PipelineCommand::executeSplitPipeline(
+            BSONObjBuilder& result, string& errmsg,
+            const string& ns, const string& db,
+            intrusive_ptr<Pipeline>& pPipeline,
+            intrusive_ptr<ExpressionContext>& pCtx) {
 
         /* setup as if we're in the router */
         pCtx->setInRouter(true);
@@ -252,10 +168,12 @@ namespace mongo {
             return false;
         }
 
+        PipelineD::prepareCursorSource(pShardPipeline, nsToDatabase(ns), pCtx);
+
         /* run the shard pipeline */
         BSONObjBuilder shardResultBuilder;
         string shardErrmsg;
-        pShardPipeline->run(shardResultBuilder, shardErrmsg, pSource);
+        pShardPipeline->run(shardResultBuilder, shardErrmsg);
         BSONObj shardResult(shardResultBuilder.done());
 
         /* pick out the shard result, and prepare to read it */
@@ -267,14 +185,13 @@ namespace mongo {
 
             if ((strcmp(pFieldName, "result") == 0) ||
                 (strcmp(pFieldName, "serverPipeline") == 0)) {
-                pShardSource = DocumentSourceBsonArray::create(
-                    &shardElement, pCtx);
+                pPipeline->addInitialSource(DocumentSourceBsonArray::create(&shardElement, pCtx));
 
                 /*
                   Connect the output of the shard pipeline with the mongos
                   pipeline that will merge the results.
                 */
-                return pPipeline->run(result, errmsg, pShardSource);
+                return pPipeline->run(result, errmsg);
             }
         }
 
@@ -286,7 +203,6 @@ namespace mongo {
     bool PipelineCommand::run(const string &db, BSONObj &cmdObj,
                               int options, string &errmsg,
                               BSONObjBuilder &result, bool fromRepl) {
-        // PRINT(cmdObj); // uncomment when debugging
 
         intrusive_ptr<ExpressionContext> pCtx(
             ExpressionContext::create(&InterruptStatusMongod::status));
@@ -299,10 +215,31 @@ namespace mongo {
 
         string ns(parseNs(db, cmdObj));
 
-        if (pPipeline->isExplain())
-            return runExplain(result, errmsg, ns, db, pPipeline, pCtx);
-        else
-            return runExecute(result, errmsg, ns, db, pPipeline, pCtx);
+        if (pPipeline->getSplitMongodPipeline()) {
+            // This is only used in testing
+            return executeSplitPipeline(result, errmsg, ns, db, pPipeline, pCtx);
+        }
+
+#if _DEBUG
+        // This is outside of the if block to keep the object alive until the pipeline is finished.
+        BSONObj parsed;
+        if (!pPipeline->isExplain() && !pCtx->getInShard()) {
+            // Make sure all operations round-trip through Pipeline::toBson()
+            // correctly by reparsing every command on DEBUG builds. This is
+            // important because sharded aggregations rely on this ability.
+            // Skipping when inShard because this has already been through the
+            // transformation (and this unsets pCtx->inShard).
+            BSONObjBuilder bb;
+            pPipeline->toBson(&bb);
+            parsed = bb.obj();
+            pPipeline = Pipeline::parseCommand(errmsg, parsed, pCtx);
+            verify(pPipeline);
+        }
+#endif
+
+        // This does the mongod-specific stuff like creating a cursor
+        PipelineD::prepareCursorSource(pPipeline, nsToDatabase(ns), pCtx);
+        return pPipeline->run(result, errmsg);
     }
 
 } // namespace mongo

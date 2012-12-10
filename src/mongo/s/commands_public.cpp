@@ -1847,9 +1847,10 @@ namespace mongo {
             map<Shard, BSONObj> shardResults;
             SHARDED->commandOp(dbName, shardedCommand, options, fullns, shardQuery, shardResults);
 
+            pPipeline->addInitialSource(DocumentSourceCommandShards::create(shardResults, pExpCtx));
+
             // Combine the shards' output and finish the pipeline
-            pPipeline->run(result, errmsg,
-                    DocumentSourceCommandShards::create(shardResults, pExpCtx));
+            pPipeline->run(result, errmsg);
 
             if (errmsg.length() > 0)
                 return false;
