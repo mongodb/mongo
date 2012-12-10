@@ -239,6 +239,35 @@ namespace mongo {
 
     };
 
+    void logStartup() {
+        BSONObjBuilder toLog;
+        stringstream id;
+        id << getHostNameCached() << "-" << jsTime();
+        toLog.append( "_id", id.str() );
+        toLog.append( "hostname", getHostNameCached() );
+
+        toLog.appendTimeT( "startTime", time(0) );
+        char buf[64];
+        curTimeString( buf );
+        toLog.append( "startTimeLocal", buf );
+
+        toLog.append( "version", versionString );
+        toLog.append( "gitVersion", gitVersion() );
+
+        toLog.append( "cmdLine", CmdLine::getParsedOpts() );
+        toLog.append( "pid", getpid() );
+        toLog.append( "bits", static_cast<int>(sizeof(int*) * 8) );
+
+        BSONObj o = toLog.obj();
+
+        Lock::GlobalWrite lk;
+        Client::GodScope gs;
+        DBDirectClient c;
+        const char* name = "local.startup_log";
+        c.createCollection( name, 10 * 1024 * 1024, true );
+        c.insert( name, o);
+    }
+
     void listen(int port) {
         //testTheDb();
         MessageServer::Options options;
@@ -248,6 +277,7 @@ namespace mongo {
         MessageServer * server = createServer( options , new MyMessageHandler() );
         server->setAsTimeTracker();
 
+        logStartup();
         startReplication();
         if ( !noHttpInterface )
             boost::thread web( boost::bind(&webServerThread, new RestAdminAccess() /* takes ownership */));
