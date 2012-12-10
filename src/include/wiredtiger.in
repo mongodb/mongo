@@ -180,6 +180,8 @@ struct __wt_cursor {
 	 * @snippet ex_all.c Get the cursor's record number key
 	 *
 	 * @param cursor the cursor handle
+	 * @param ... pointers to hold key fields corresponding to
+	 * WT_CURSOR::key_format.
 	 * @errors
 	 */
 	int __F(get_key)(WT_CURSOR *cursor, ...);
@@ -191,6 +193,8 @@ struct __wt_cursor {
 	 * @snippet ex_all.c Get the cursor's raw value
 	 *
 	 * @param cursor the cursor handle
+	 * @param ... pointers to hold value fields corresponding to
+	 * WT_CURSOR::value_format.
 	 * @errors
 	 */
 	int __F(get_value)(WT_CURSOR *cursor, ...);
@@ -202,6 +206,7 @@ struct __wt_cursor {
 	 * @snippet ex_all.c Set the cursor's record number key
 	 *
 	 * @param cursor the cursor handle
+	 * @param ... key fields corresponding to WT_CURSOR::key_format.
 	 *
 	 * If an error occurs during this operation, a flag will be set in the
 	 * cursor, and the next operation to access the key will fail.  This
@@ -216,6 +221,7 @@ struct __wt_cursor {
 	 * @snippet ex_all.c Set the cursor's raw value
 	 *
 	 * @param cursor the cursor handle
+	 * @param ... value fields corresponding to WT_CURSOR::value_format.
 	 *
 	 * If an error occurs during this operation, a flag will be set in the
 	 * cursor, and the next operation to access the value will fail.  This

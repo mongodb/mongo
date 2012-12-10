@@ -220,14 +220,11 @@ main(void)
 
 	/*! [Access only the index] */
 	/*
-	 * Avoid accessing any other column groups when using an index.
-	 *
-	 * It is illegal to use an empty list as the subset of the value columns
-	 * to be returned when configuring the index cursor, the list must have
-	 * a valid column.  List a key column to avoid accessing other files.
+	 * Avoid accessing any other column groups when using an index: supply
+	 * an empty list of value columns.
 	 */
 	ret = session->open_cursor(session,
-	    "index:poptable:country_plus_year(year)", NULL, NULL, &cursor);
+	    "index:poptable:country_plus_year()", NULL, NULL, &cursor);
 	while ((ret = cursor->next(cursor)) == 0) {
 		ret = cursor->get_key(cursor, &country, &year);
 		printf("country %s, year %u\n", country, year);

@@ -162,6 +162,7 @@ lmin
 loadtext
 logc
 lookup
+lookups
 lrtf
 lsm
 lsn
@@ -265,6 +266,7 @@ spinlocks
 sql
 src
 startsync
+str
 strerror
 struct
 structs

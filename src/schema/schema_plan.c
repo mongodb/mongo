@@ -178,7 +178,6 @@ __wt_struct_plan(WT_SESSION_IMPL *session, WT_TABLE *table,
 
 	/* Work through the value columns by skipping over the key columns. */
 	WT_ERR(__wt_config_initn(session, &conf, columns, len));
-
 	if (value_only)
 		for (i = 0; i < table->nkey_columns; i++)
 			WT_ERR(__wt_config_next(&conf, &k, &v));
@@ -186,7 +185,7 @@ __wt_struct_plan(WT_SESSION_IMPL *session, WT_TABLE *table,
 	current_cg = cg = 0;
 	current_col = col = INT_MAX;
 	current_coltype = coltype = WT_PROJ_KEY; /* Keep lint quiet. */
-	while (__wt_config_next(&conf, &k, &v) == 0) {
+	for (i = 0; __wt_config_next(&conf, &k, &v) == 0; i++) {
 		have_it = 0;
 
 		while (__find_next_col(session, table,
@@ -241,6 +240,10 @@ __wt_struct_plan(WT_SESSION_IMPL *session, WT_TABLE *table,
 			current_col = col + 1;
 		}
 	}
+
+	/* Special case empty plans. */
+	if (i == 0 && plan->size == 0)
+		WT_ERR(__wt_buf_set(session, plan, "", 1));
 
 err:	session->btree = saved_btree;
 	return (ret);
@@ -301,10 +304,16 @@ __wt_struct_reformat(WT_SESSION_IMPL *session, WT_TABLE *table,
 	WT_CLEAR(pv);		/* -Wuninitialized */
 
 	WT_RET(__wt_config_initn(session, &config, columns, len));
+	/*
+	 * If an empty column list is specified, this will fail with
+	 * WT_NOTFOUND, that's okay.
+	 */
 	WT_RET_NOTFOUND_OK(ret = __wt_config_next(&config, &next_k, &next_v));
-	if (ret == WT_NOTFOUND)
-		WT_RET_MSG(session, EINVAL,
-		    "Empty column list '%.*s'", (int)len, columns);
+	if (ret == WT_NOTFOUND) {
+		if (format->size == 0)
+			WT_RET(__wt_buf_set(session, format, "", 1));
+		return (0);
+	}
 	do {
 		k = next_k;
 		ret = __wt_config_next(&config, &next_k, &next_v);
