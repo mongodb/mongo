@@ -41,8 +41,8 @@ const char *home = "WT_TEST";
 /* The C struct for the data we are storing in a WiredTiger table. */
 typedef struct {
 	char country[5];
-	unsigned short year;
-	unsigned long long population;
+	uint16_t year;
+	uint64_t population;
 } POP_RECORD;
 
 POP_RECORD pop_data[] = {
@@ -65,10 +65,9 @@ main(void)
 	WT_CONNECTION *conn;
 	WT_CURSOR *cursor;
 	WT_SESSION *session;
-	unsigned long long population;
-	uint64_t recno;
-	unsigned short year;
 	const char *country;
+	uint64_t recno, population;
+	uint16_t year;
 	int ret;
 
 	ret = wiredtiger_open(home, NULL, "create", &conn);
@@ -128,10 +127,11 @@ main(void)
 	ret = session->open_cursor(session,
 	    "table:mytable", NULL, NULL, &cursor);
 	while ((ret = cursor->next(cursor)) == 0) {
-		cursor->get_key(cursor, &recno);
-		cursor->get_value(cursor, &country, &year, &population);
-		printf("ID %" PRIu64 ": country %s, year %u, population %llu\n",
-		    recno, country, (unsigned int)year, population);
+		ret = cursor->get_key(cursor, &recno);
+		ret = cursor->get_value(cursor, &country, &year, &population);
+		printf("ID %" PRIu64, recno);
+		printf(": country %s, year %u, population %" PRIu64 "\n",
+		    country, year, population);
 	}
 	ret = cursor->close(cursor);
 
@@ -143,10 +143,11 @@ main(void)
 	ret = session->open_cursor(
 	    session, "colgroup:mytable:main", NULL, NULL, &cursor);
 	cursor->set_key(cursor, 2);
-	ret = cursor->search(cursor);
-	cursor->get_value(cursor, &country, &year, &population);
-	printf("ID 2: country %s, year %u, population %llu\n",
-	    country, (unsigned int)year, population);
+	if ((ret = cursor->search(cursor)) == 0) {
+		ret = cursor->get_value(cursor, &country, &year, &population);
+		printf("ID 2: country %s, year %u, population %" PRIu64 "\n",
+		    country, year, population);
+	}
 	/*! [Read population from the primary column group] */
 	ret = cursor->close(cursor);
 
@@ -158,9 +159,10 @@ main(void)
 	ret = session->open_cursor(session,
 	    "colgroup:mytable:population", NULL, NULL, &cursor);
 	cursor->set_key(cursor, 2);
-	ret = cursor->search(cursor);
-	cursor->get_value(cursor, &population);
-	printf("ID 2: population %llu\n", population);
+	if ((ret = cursor->search(cursor)) == 0) {
+		ret = cursor->get_value(cursor, &population);
+		printf("ID 2: population %" PRIu64 "\n", population);
+	}
 	/*! [Read population from the standalone column group] */
 	ret = cursor->close(cursor);
 
@@ -170,8 +172,8 @@ main(void)
 	    "index:mytable:country", NULL, NULL, &cursor);
 	cursor->set_key(cursor, "AU\0\0\0");
 	ret = cursor->search(cursor);
-	cursor->get_value(cursor, &country, &year, &population);
-	printf("AU: country %s, year %u, population %llu\n",
+	ret = cursor->get_value(cursor, &country, &year, &population);
+	printf("AU: country %s, year %u, population %" PRIu64 "\n",
 	    country, (unsigned int)year, population);
 	/*! [Search in a simple index] */
 	ret = cursor->close(cursor);
@@ -182,8 +184,8 @@ main(void)
 	    "index:mytable:country_plus_year", NULL, NULL, &cursor);
 	cursor->set_key(cursor, "USA\0\0", (unsigned short)1900);
 	ret = cursor->search(cursor);
-	cursor->get_value(cursor, &country, &year, &population);
-	printf("US 1900: country %s, year %u, population %llu\n",
+	ret = cursor->get_value(cursor, &country, &year, &population);
+	printf("US 1900: country %s, year %u, population %" PRIu64 "\n",
 	    country, (unsigned int)year, population);
 	/*! [Search in a composite index] */
 	ret = cursor->close(cursor);
@@ -193,8 +195,8 @@ main(void)
 	ret = session->open_cursor(session,
 	    "index:mytable:country_plus_year(id)", NULL, NULL, &cursor);
 	while ((ret = cursor->next(cursor)) == 0) {
-		cursor->get_key(cursor, &country, &year);
-		cursor->get_value(cursor, &recno);
+		ret = cursor->get_key(cursor, &country, &year);
+		ret = cursor->get_value(cursor, &recno);
 		printf(
 		    "row ID %" PRIu64 ": country %s, year %u\n",
 		    recno, country, year);
@@ -207,9 +209,9 @@ main(void)
 	ret = session->open_cursor(session,
 	    "index:mytable:country_plus_year(population)", NULL, NULL, &cursor);
 	while ((ret = cursor->next(cursor)) == 0) {
-		cursor->get_key(cursor, &country, &year);
-		cursor->get_value(cursor, &population);
-		printf("population %llu: country %s, year %u\n",
+		ret = cursor->get_key(cursor, &country, &year);
+		ret = cursor->get_value(cursor, &population);
+		printf("population %" PRIu64 ": country %s, year %u\n",
 		    population, country, year);
 	}
 	/*! [Return a subset of the value columns from an index] */
@@ -226,7 +228,7 @@ main(void)
 	ret = session->open_cursor(session,
 	    "index:mytable:country_plus_year(year)", NULL, NULL, &cursor);
 	while ((ret = cursor->next(cursor)) == 0) {
-		cursor->get_key(cursor, &country, &year);
+		ret = cursor->get_key(cursor, &country, &year);
 		printf("country %s, year %u\n", country, year);
 	}
 	/*! [Access only the index] */
