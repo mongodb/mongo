@@ -1,3 +1,5 @@
+// string_data.h
+
 /*    Copyright 2010 10gen Inc.
  *
  *    Licensed under the Apache License, Version 2.0 (the "License");
@@ -18,6 +20,7 @@
 #include <algorithm>  // for min
 #include <cstring>
 #include <iosfwd>
+#include <limits>
 #include <string>
 
 namespace mongo {
@@ -74,31 +77,43 @@ namespace mongo {
          * Returns -1, 0, or 1 if 'this' is less, equal, or greater than 'other' in
          * lexicographical order.
          */
-        int compare(const StringData& other) const {
-            // Sizes might not have been computed yet.
-            size();
-            other.size();
+        int compare(const StringData& other) const;
 
-            int res = memcmp(_data, other._data, std::min(_size, other._size));
-            if (res != 0) {
-                return res > 0 ? 1 : -1;
-            }
-            else if (_size == other._size) {
-                return 0;
-            }
-            else {
-                return _size > other._size ? 1 : -1;
-            }
-        }
+        /**
+         * note: this uses tolower, and therefore does not handle
+         *       come languages correctly.
+         *       should be use sparingly
+         */
+        bool equalCaseInsensitive( const StringData& other ) const;
+
+        void copyTo( char* dest, bool includeEndingNull ) const;
+
+        StringData substr( size_t pos, size_t n = std::numeric_limits<size_t>::max() ) const;
+
+        //
+        // finders
+        //
+
+        size_t find( char c ) const;
+        size_t find( const StringData& needle ) const;
 
         //
         // accessors
         //
 
+        /**
+         * this is not guaranteed to be null-terminated,
+         * if you use this without all using size(), you are likely doing something wrong
+         */
+        const char* rawData() const { return _data; }
+
+        // these 2 will be going away shortly
         const char* data() const { return _data; }
+        const char* __data() const { return _data; }
+
         size_t size() const { fillSize(); return _size; }
         bool empty() const { return size() == 0; }
-        string toString() const { return string(data(), size()); }
+        string toString() const { return string(_data, size()); }
         char operator[] ( unsigned pos ) const { return _data[pos]; }
 
     private:
@@ -139,3 +154,5 @@ namespace mongo {
     std::ostream& operator<<(std::ostream& stream, const StringData& value);
 
 } // namespace mongo
+
+#include "string_data-inl.h"
