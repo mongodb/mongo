@@ -79,9 +79,11 @@ namespace mongo {
         BSONHolder( BSONObj obj ) {
             _obj = obj.getOwned();
             _modified = false;
+            v8::V8::AdjustAmountOfExternalAllocatedMemory(_obj.objsize());
         }
 
         ~BSONHolder() {
+            v8::V8::AdjustAmountOfExternalAllocatedMemory(-_obj.objsize());
         }
 
         BSONObj _obj;

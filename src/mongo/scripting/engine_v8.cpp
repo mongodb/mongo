@@ -309,9 +309,14 @@ namespace mongo {
 //    }
 
     void gcCallback(GCType type, GCCallbackFlags flags) {
+        const int verbosity = 1;    // log level for stat collection
+        if (logLevel < verbosity)
+            // don't collect stats unless verbose
+            return;
+
         HeapStatistics stats;
         V8::GetHeapStatistics( &stats );
-        LOG(1) << "V8 GC heap stats - "
+        LOG(verbosity) << "V8 GC heap stats - "
                 << " total: " << stats.total_heap_size()
                 << " exec: " << stats.total_heap_size_executable()
                 << " used: " << stats.used_heap_size()<< " limit: "
@@ -320,12 +325,6 @@ namespace mongo {
     }
 
     V8ScriptEngine::V8ScriptEngine() {
-        // set resource contraints before any call
-        int K = 1024;
-        v8::ResourceConstraints rc;
-//        rc.set_max_young_space_size(4 * K * K);
-        rc.set_max_old_space_size( 64 * K * K );
-        v8::SetResourceConstraints( &rc );
 
         // keep engine up after OOM
         v8::V8::IgnoreOutOfMemoryException();
@@ -392,8 +391,8 @@ namespace mongo {
         // resource constraints must be set on isolate, before any call or lock
         int K = 1024;
         v8::ResourceConstraints rc;
-//        rc.set_max_young_space_size(4 * K * K);
-        rc.set_max_old_space_size( 64 * K * K );
+        rc.set_max_young_space_size(4 * K * K);
+        rc.set_max_old_space_size(64 * K * K);
         v8::SetResourceConstraints(&rc);
         V8::AddGCPrologueCallback(gcCallback, kGCTypeMarkSweepCompact);
 
