@@ -296,9 +296,8 @@ __wt_struct_reformat(WT_SESSION_IMPL *session, WT_TABLE *table,
 	WT_CONFIG_ITEM k, next_k, next_v;
 	WT_DECL_RET;
 	WT_PACK_VALUE pv;
-	int empty, have_next;
+	int have_next;
 
-	empty = 1;
 	WT_CLEAR(pv);		/* -Wuninitialized */
 
 	WT_RET(__wt_config_initn(session, &config, columns, len));
