@@ -278,7 +278,7 @@ __curdump_close(WT_CURSOR *cursor)
 	cursor->uri = NULL;
 	WT_TRET(__wt_cursor_close(cursor));
 
-	API_END(session);
+err:	API_END(session);
 	return (ret);
 }
 

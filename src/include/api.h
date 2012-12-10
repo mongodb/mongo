@@ -283,11 +283,13 @@ struct __wt_connection_impl {
 	(s)->name = #h "." #n;
 
 #define	API_CALL_NOCONF(s, h, n, cur, bt) do {				\
-	API_SESSION_INIT(s, h, n, cur, bt);
+	API_SESSION_INIT(s, h, n, cur, bt);				\
+	WT_ERR(F_ISSET(S2C(s), WT_CONN_PANIC) ? __wt_panic(s) : 0)
 
 #define	API_CALL(s, h, n, cur, bt, cfg, cfgvar) do {			\
 	const char *cfgvar[] = API_CONF_DEFAULTS(h, n, cfg);		\
 	API_SESSION_INIT(s, h, n, cur, bt);				\
+	WT_ERR(F_ISSET(S2C(s), WT_CONN_PANIC) ? __wt_panic(s) : 0);	\
 	WT_ERR(((cfg) != NULL) ?					\
 	    __wt_config_check((s), __wt_confchk_##h##_##n, (cfg), 0) : 0)
 
@@ -386,8 +388,9 @@ extern WT_PROCESS __wt_process;
  * API flags section: BEGIN
  */
 #define	WT_CACHE_POOL_RUN				0x00000001
-#define	WT_CONN_CACHE_POOL				0x00000010
-#define	WT_CONN_LSM_MERGE				0x00000008
+#define	WT_CONN_CACHE_POOL				0x00000020
+#define	WT_CONN_LSM_MERGE				0x00000010
+#define	WT_CONN_PANIC					0x00000008
 #define	WT_CONN_SERVER_RUN				0x00000004
 #define	WT_CONN_SYNC					0x00000002
 #define	WT_CONN_TRANSACTIONAL				0x00000001

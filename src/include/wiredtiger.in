@@ -1441,9 +1441,9 @@ const char *wiredtiger_version(int *majorp, int *minorp, int *patchp);
  * cursor's search key such as WT_CURSOR::update or WT_CURSOR::remove.
  */
 #define	WT_NOTFOUND	-31803
-/*! The application must exit the database.
+/*! WiredTiger library panic.
  * This error indicates an underlying problem that requires the application exit
- * the database and restart.
+ * and restart.
  */
 #define	WT_PANIC	-31804
 /*! @cond internal */

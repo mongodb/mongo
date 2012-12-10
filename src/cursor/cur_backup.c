@@ -59,6 +59,7 @@ static int
 __curbackup_reset(WT_CURSOR *cursor)
 {
 	WT_CURSOR_BACKUP *cb;
+	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 
 	cb = (WT_CURSOR_BACKUP *)cursor;
@@ -67,8 +68,8 @@ __curbackup_reset(WT_CURSOR *cursor)
 	cb->next = 0;
 	F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
 
-	API_END(session);
-	return (0);
+err:	API_END(session);
+	return (ret);
 }
 
 /*
@@ -100,7 +101,7 @@ __curbackup_close(WT_CURSOR *cursor)
 	    tret = __backup_stop(session));		/* Stop the backup. */
 	WT_TRET(tret);
 
-	API_END(session);
+err:	API_END(session);
 	return (ret);
 }
 

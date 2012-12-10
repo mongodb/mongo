@@ -54,7 +54,7 @@ __curfile_next(WT_CURSOR *cursor)
 	CURSOR_API_CALL(cursor, session, next, cbt->btree);
 	ret = __wt_btcur_next((WT_CURSOR_BTREE *)cursor, 0);
 
-	API_END(session);
+err:	API_END(session);
 	return (ret);
 }
 
@@ -74,7 +74,7 @@ __curfile_next_random(WT_CURSOR *cursor)
 	CURSOR_API_CALL(cursor, session, next, cbt->btree);
 	ret = __wt_btcur_next_random(cbt);
 
-	API_END(session);
+err:	API_END(session);
 	return (ret);
 }
 
@@ -93,7 +93,7 @@ __curfile_prev(WT_CURSOR *cursor)
 	CURSOR_API_CALL(cursor, session, prev, cbt->btree);
 	ret = __wt_btcur_prev((WT_CURSOR_BTREE *)cursor, 0);
 
-	API_END(session);
+err:	API_END(session);
 	return (ret);
 }
 
@@ -112,7 +112,7 @@ __curfile_reset(WT_CURSOR *cursor)
 	CURSOR_API_CALL(cursor, session, reset, cbt->btree);
 	ret = __wt_btcur_reset(cbt);
 
-	API_END(session);
+err:	API_END(session);
 	return (ret);
 }
 
@@ -267,7 +267,7 @@ __curfile_close(WT_CURSOR *cursor)
 	cursor->uri = NULL;
 	WT_TRET(__wt_cursor_close(cursor));
 
-	API_END(session);
+err:	API_END(session);
 	return (ret);
 }
 
