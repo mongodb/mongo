@@ -1419,7 +1419,7 @@ const char *wiredtiger_version(int *majorp, int *minorp, int *patchp);
  */
 /*! Conflict between concurrent operations.
  * This error is generated when an operation cannot be completed due to a
- * conflict with concurrent operations.  The operation should be retried.  If a
+ * conflict with concurrent operations.  The operation may be retried; if a
  * transaction is in progress, it should be rolled back and the operation
  * retried in a new transaction.
  */
@@ -1431,8 +1431,8 @@ const char *wiredtiger_version(int *majorp, int *minorp, int *patchp);
  */
 #define	WT_DUPLICATE_KEY	-31801
 /*! Non-specific WiredTiger error.
- * This error is generated for cases that are not covered by specific error
- * returns.
+ * This error is returned when an error is not covered by a specific error
+ * return.
  */
 #define	WT_ERROR	-31802
 /*! Cursor item not found.
@@ -1441,9 +1441,14 @@ const char *wiredtiger_version(int *majorp, int *minorp, int *patchp);
  * cursor's search key such as WT_CURSOR::update or WT_CURSOR::remove.
  */
 #define	WT_NOTFOUND	-31803
+/*! The application must exit the database.
+ * This error indicates an underlying problem that requires the application exit
+ * the database and restart.
+ */
+#define	WT_PANIC	-31804
 /*! @cond internal */
 /*! Restart the operation (internal). */
-#define	WT_RESTART	-31804
+#define	WT_RESTART	-31805
 /*! @endcond */
 /*
  * Error return section: END

@@ -24,6 +24,8 @@ wiredtiger_strerror(int error)
 		return ("WT_ERROR: non-specific WiredTiger error");
 	case WT_NOTFOUND:
 		return ("WT_NOTFOUND: cursor item not found");
+	case WT_PANIC:
+		return ("WT_PANIC: the application must exit the database");
 	case WT_RESTART:
 		return ("WT_RESTART: restart the operation (internal)");
 	default:

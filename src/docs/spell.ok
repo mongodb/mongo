@@ -11,6 +11,8 @@ DbCursor
 DbEnv
 DbMultiple
 EB
+EBUSY
+EINVAL
 EmpId
 FreeBSD
 GCC
@@ -25,6 +27,7 @@ MERCHANTABILITY
 MVCC's
 Makefiles
 Mewhort
+NOTFOUND
 NoSQL
 RepMgr
 Rrx
@@ -106,6 +109,7 @@ dups
 endcode
 endcond
 endian
+endif
 endinternal
 english
 env
