@@ -145,9 +145,6 @@ namespace mongo {
                                  bool mayInterrupt = false,
                                  bool god = false);
 
-        /** @param obj in value only for this version. */
-        void insertNoReturnVal(const char *ns, BSONObj o, bool god = false);
-
         /**
          * Insert the contents of @param buf with length @param len into namespace @param ns.
          * @param mayInterrupt When true, killop may interrupt the function call.
