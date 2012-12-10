@@ -236,13 +236,22 @@ namespace mongo {
             if (numWanted < 0) numWanted *= -1;
             if (0 == numWanted) numWanted = INT_MAX;
 
+            BSONObjBuilder geoFieldsToNuke;
+            for (size_t i = 0; i < _fields.size(); ++i) {
+                const IndexedField &field = _fields[i];
+                if (IndexedField::GEO != field.type) { continue; }
+                geoFieldsToNuke.append(field.name, "");
+            }
+            // false means we want to filter OUT geoFieldsToNuke, not filter to include only that.
+            BSONObj filteredQuery = query.filterFieldsUndotted(geoFieldsToNuke.obj(), false);
+
             if (isNear) {
-                S2NearCursor *cursor = new S2NearCursor(keyPattern(), getDetails(), query, regions,
+                S2NearCursor *cursor = new S2NearCursor(keyPattern(), getDetails(), filteredQuery, regions,
                                                         _params, numWanted, maxDistance);
                 return shared_ptr<Cursor>(cursor);
             } else {
                 // Default to intersect.
-                S2Cursor *cursor = new S2Cursor(keyPattern(), getDetails(), query, regions, _params,
+                S2Cursor *cursor = new S2Cursor(keyPattern(), getDetails(), filteredQuery, regions, _params,
                                                 numWanted);
                 return shared_ptr<Cursor>(cursor);
             }
@@ -407,8 +416,9 @@ namespace mongo {
         vector<QueryGeometry> regions;
         regions.push_back(queryGeo);
 
-        scoped_ptr<S2NearCursor> cursor(new S2NearCursor(idxType->keyPattern(), idxType->getDetails(), query, regions,
-                    idxType->getParams(), numWanted, maxDistance));
+        scoped_ptr<S2NearCursor> cursor(new S2NearCursor(idxType->keyPattern(), idxType->getDetails(),
+                                                         query, regions, idxType->getParams(),
+                                                         numWanted, maxDistance));
 
         double totalDistance = 0;
         int results = 0;

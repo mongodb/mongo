@@ -35,7 +35,8 @@ namespace mongo {
         }
         // false means we want to filter OUT geoFieldsToNuke, not filter to include only that.
         _filteredQuery = query.filterFieldsUndotted(geoFieldsToNuke.obj(), false);
-        _matcher.reset(new CoveredIndexMatcher(_filteredQuery, keyPattern));
+        // We match on the whole query, since it might have $within.
+        _matcher.reset(new CoveredIndexMatcher(query, keyPattern));
 
         // More indexing machinery.
         BSONObjBuilder specBuilder;

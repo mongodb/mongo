@@ -387,7 +387,7 @@ namespace mongo {
                 uassert(16519, "Malformed $box: " + obj.toString(), coordIt.more());
                 BSONElement maxE = coordIt.next();
                 uassert(16520, "Malformed $box: " + obj.toString(), minE.isABSONObj());
-                _geo.push_back(GeoMatcher::makeBox(e.fieldName(), minE.Obj(), maxE.Obj()));
+                _geo.push_back(GeoMatcher::makeBox(e.fieldName(), minE.Obj(), maxE.Obj(), isNot));
             } else if (str::equals(elt.fieldName(), "$center")) {
                 BSONElement center = coordIt.next();
                 uassert(16521, "Malformed $center: " + obj.toString(), center.isABSONObj());
@@ -395,7 +395,7 @@ namespace mongo {
                 BSONElement radius = coordIt.next();
                 uassert(16523, "Malformed $center: " + obj.toString(), radius.isNumber());
                 _geo.push_back(
-                        GeoMatcher::makeCircle(e.fieldName(), center.Obj(), radius.number()));
+                        GeoMatcher::makeCircle(e.fieldName(), center.Obj(), radius.number(), isNot));
             } else if (str::equals(elt.fieldName(), "$polygon")) {
                 while (coordIt.more()) {
                     BSONElement coord = coordIt.next();
@@ -408,7 +408,7 @@ namespace mongo {
                     BSONElement y = numIt.next();
                     uassert(16528, "Malformed $polygon: " + obj.toString(), y.isNumber());
                 }
-                _geo.push_back(GeoMatcher::makePolygon(e.fieldName(), elt.Obj()));
+                _geo.push_back(GeoMatcher::makePolygon(e.fieldName(), elt.Obj(), isNot));
             } else {
                 uasserted(16529, "Couldn't pull any geometry out of $within query: " + obj.toString());
             }

@@ -82,7 +82,13 @@ namespace mongo {
 
         // Need this to make a FieldRangeSet.
         const IndexDetails *_details;
-        // The query with the geo stuff taken out.  We use this with a matcher.
+
+        // How we need/use the query:
+        // Matcher: Can have geo fields in it, but only with $within.
+        //          This only really happens (right now) from geoNear command.
+        //          We assume the caller takes care of this in the right way.
+        // FRS:     No geo fields allowed!
+        // So, on that note: the query with the geo stuff taken out, used by makeFRSObject().
         BSONObj _filteredQuery;
         // What geo regions are we looking for?
         vector<QueryGeometry> _fields;
