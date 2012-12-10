@@ -286,6 +286,7 @@ worker(CONFIG *cfg, uint32_t worker_type)
 			break;
 		default:
 			lprintf(cfg, EINVAL, 0, "Invalid worker type");
+			goto err;
 		}
 
 		/* Report errors and continue. */
