@@ -356,7 +356,7 @@ namespace mongo {
                                            const BSONObj& cmdObj,
                                            std::vector<Privilege>* out) {
             ActionSet actions;
-            actions.addAction(ActionType::replSetGetStatus);
+            actions.addAction(ActionType::replSetMaintenance);
             out->push_back(Privilege(AuthorizationManager::SERVER_RESOURCE_NAME, actions));
         }
         CmdReplSetMaintenance() : ReplSetCommand("replSetMaintenance") { }
