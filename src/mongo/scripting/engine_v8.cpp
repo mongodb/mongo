@@ -620,7 +620,7 @@ namespace mongo {
         V8_SIMPLE_HEADER
         // Set() accepts a ReadOnly parameter, but this just prevents the field itself
         // from being overwritten and doesn't protect the object stored in 'field'.
-        _global->Set( getV8Str( field ) , mongoToLZV8( obj, false, readOnly) );
+        _global->Set(getV8Str(field), mongoToLZV8(obj, readOnly));
     }
 
     int V8Scope::type( const char *field ) {
@@ -799,7 +799,7 @@ namespace mongo {
         }
         Handle<v8::Object> v8recv;
         if (recv != 0)
-            v8recv = mongoToLZV8(*recv, false, readOnlyRecv);
+            v8recv = mongoToLZV8(*recv, readOnlyRecv);
         else
             v8recv = _global;
 
@@ -1109,7 +1109,7 @@ namespace mongo {
                 break;
             case mongo::Object:
                 sub = f.embeddedObject();
-                o->Set( name , mongoToLZV8( sub , false, readOnly ) );
+                o->Set(name, mongoToLZV8(sub, readOnly));
                 break;
 
             case mongo::Date:
@@ -1226,7 +1226,7 @@ namespace mongo {
     /**
      * converts a BSONObj to a Lazy V8 object
      */
-    Handle<v8::Object> V8Scope::mongoToLZV8( const BSONObj& m , bool array, bool readOnly ) {
+    Handle<v8::Object> V8Scope::mongoToLZV8(const BSONObj& m, bool readOnly) {
         Local<v8::Object> o;
         BSONHolder* own = new BSONHolder(m);
 
@@ -1238,29 +1238,18 @@ namespace mongo {
                                             "v8 still executing."),
                            *o != NULL);
         } else {
-            if (array) {
-                o = lzArrayTemplate->NewInstance();
-                massert(16498, mongoutils::str::stream() << "V8: NULL Array template instantiated. "
-                                         << (v8::V8::IsExecutionTerminating() ?
-                                                "v8 execution is terminating." :
-                                                "v8 still executing."),
-                               *o != NULL);
-                o->SetPrototype(v8::Array::New(1)->GetPrototype());
-                o->Set(V8STR_LENGTH, v8::Integer::New(m.nFields()), DontEnum);
-            } else {
-                o = lzObjectTemplate->NewInstance();
-                massert(16496, mongoutils::str::stream() << "V8: NULL Object template instantiated. "
-                                         << (v8::V8::IsExecutionTerminating() ?
-                                                "v8 execution is terminating." :
-                                                "v8 still executing."),
-                               *o != NULL);
-                static string ref = "$ref";
-                if ( ref == m.firstElement().fieldName() ) {
-                  const BSONElement& id = m["$id"];
-                  if (!id.eoo()) {
-                      v8::Function* dbRef = getNamedCons( "DBRef" );
-                      o->SetPrototype(dbRef->NewInstance()->GetPrototype());
-                  }
+            o = lzObjectTemplate->NewInstance();
+            massert(16496, mongoutils::str::stream() << "V8: NULL Object template instantiated. "
+                                     << (v8::V8::IsExecutionTerminating() ?
+                                            "v8 execution is terminating." :
+                                            "v8 still executing."),
+                           *o != NULL);
+            static string ref = "$ref";
+            if ( ref == m.firstElement().fieldName() ) {
+                const BSONElement& id = m["$id"];
+                if (!id.eoo()) {
+                    v8::Function* dbRef = getNamedCons( "DBRef" );
+                    o->SetPrototype(dbRef->NewInstance()->GetPrototype());
                 }
             }
         }
@@ -1313,7 +1302,7 @@ namespace mongo {
             // - most times when an array is accessed, all its values will be used
             return mongoToV8( f.embeddedObject() , true, readOnly );
         case mongo::Object:
-            return mongoToLZV8( f.embeddedObject() , false, readOnly);
+            return mongoToLZV8(f.embeddedObject(), readOnly);
 
         case mongo::Date:
             return v8::Date::New( (double) ((long long)f.date().millis) );
