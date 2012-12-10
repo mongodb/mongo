@@ -195,7 +195,12 @@ __create_colgroup(WT_SESSION_IMPL *session,
 			ret = exclusive ? EEXIST : 0;
 		goto err;
 	}
-	WT_ERR(__wt_schema_open_colgroups(session, table));
+
+	/*
+	 * We may be adding a column group to a table that already has column
+	 * groups covering all of the columns.  Make sure plans are updated.
+	 */
+	WT_ERR(__wt_schema_open_colgroups(session, table, 1));
 
 err:	__wt_free(session, cgconf);
 	__wt_free(session, sourceconf);
