@@ -17,34 +17,41 @@
 
 #pragma once
 
-#include <string>
+#include "mongo/base/string_data.h"
 #include "mongo/util/unordered_fast_key_table.h"
 
 namespace mongo {
 
     struct StringMapDefaultHash {
-        size_t operator()( const char* k ) const;
+        size_t operator()( const StringData& k ) const;
     };
 
     struct StringMapDefaultEqual {
-        bool operator()( const char* a, const char* b ) const {
-            return strcmp( a,b ) == 0;
+        bool operator()( const StringData& a, const StringData& b ) const {
+            return a == b;
         }
     };
 
     struct StringMapDefaultConvertor {
-        const char* operator()( const std::string& s ) const {
-            return s.c_str();
+        StringData operator()( const std::string& s ) const {
+            return StringData( s );
+        }
+    };
+
+    struct StringMapDefaultConvertorOther {
+        string operator()( const StringData& s ) const {
+            return s.toString();
         }
     };
 
     template< typename V >
-    class StringMap : public UnorderedFastKeyTable< const char*, // K_L
-                                      std::string, // K_S
-                                      V,           // V
-                                      StringMapDefaultHash,
-                                      StringMapDefaultEqual,
-                                      StringMapDefaultConvertor > {
+    class StringMap : public UnorderedFastKeyTable< StringData, // K_L
+                                                    std::string, // K_S
+                                                    V,           // V
+                                                    StringMapDefaultHash,
+                                                    StringMapDefaultEqual,
+                                                    StringMapDefaultConvertor,
+                                                    StringMapDefaultConvertorOther > {
     };
 }
 

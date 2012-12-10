@@ -25,7 +25,7 @@ namespace mongo {
 
     template<typename K_L, typename K_S>
     struct UnorderedFastKeyTable_LS_C {
-        K_S operator()( const K_L& a ) {
+        K_S operator()( const K_L& a ) const {
             return K_S(a);
         }
     };
@@ -39,7 +39,6 @@ namespace mongo {
               typename C_LS=UnorderedFastKeyTable_LS_C<K_L,K_S> // convertor from K_L -> K_S
               >
     class UnorderedFastKeyTable {
-        MONGO_DISALLOW_COPYING(UnorderedFastKeyTable);
     public:
         typedef std::pair<K_S, V> value_type;
         typedef V mapped_type;
@@ -58,15 +57,17 @@ namespace mongo {
 
         struct Area {
             Area( unsigned capacity, double maxProbeRatio );
+            Area( const Area& other );
 
             int find( const K_L& key, size_t hash, int* firstEmpty, const UnorderedFastKeyTable& sm ) const;
 
             void transfer( Area* newArea, const UnorderedFastKeyTable& sm ) const;
 
             void swap( Area* other ) {
-                std::swap( _capacity, other->_capacity );
-                std::swap( _maxProbe, other->_maxProbe );
-                _entries.swap( other->_entries );
+                using std::swap;
+                swap( _capacity, other->_capacity );
+                swap( _maxProbe, other->_maxProbe );
+                swap( _entries, other->_entries );
             }
 
             unsigned _capacity;
@@ -86,6 +87,15 @@ namespace mongo {
         UnorderedFastKeyTable( unsigned startingCapacity = DEFAULT_STARTING_CAPACITY,
                                double maxProbeRatio = 0.05 );
 
+        UnorderedFastKeyTable( const UnorderedFastKeyTable& other );
+
+        UnorderedFastKeyTable& operator=( const UnorderedFastKeyTable& other ) {
+            other.copyTo( this );
+            return *this;
+        }
+
+        void copyTo( UnorderedFastKeyTable* out ) const;
+
         /**
          * @return number of elements in map
          */
@@ -102,27 +112,71 @@ namespace mongo {
 
         V& get( const K_L& key );
 
+        /**
+         * @return number of elements removed
+         */
+        size_t erase( const K_L& key );
+
         class const_iterator {
         public:
-            const_iterator() { _theEntry = NULL; }
-            const_iterator( const Entry* entry ) { _theEntry = entry; }
+            const_iterator() { _position = -1; }
+            const_iterator( const Area* area ) {
+                _area = area;
+                _position = 0;
+                _max = _area->_capacity - 1;
+                _skip();
+            }
+            const_iterator( const Area* area, int pos ) {
+                _area = area;
+                _position = pos;
+                _max = pos;
+            }
 
-            const value_type* operator->() const { return &_theEntry->data; }
+            const value_type* operator->() const { return &_area->_entries[_position].data; }
 
-            const_iterator operator++( int n ) { _theEntry = NULL; return *this; }
+            const_iterator operator++() {
+                if ( _position < 0 )
+                    return *this;
+                _position++;
+                if ( _position > _max )
+                    _position = -1;
+                else
+                    _skip();
+                return *this;
+            }
 
             bool operator==( const const_iterator& other ) const {
-                return _theEntry == other._theEntry;
+                return _position == other._position;
             }
             bool operator!=( const const_iterator& other ) const {
-                return _theEntry != other._theEntry;
+                return _position != other._position;
             }
 
         private:
-            const Entry* _theEntry;
+
+            void _skip() {
+                while ( true ) {
+                    if ( _area->_entries[_position].used )
+                        break;
+                    if ( _position >= _max ) {
+                        _position = -1;
+                        break;
+                    }
+                    ++_position;
+                }
+            }
+
+            const Area* _area;
+            int _position;
+            int _max; // inclusive
         };
 
+        /**
+         * @return either a one-shot iterator with the key, or end()
+         */
         const_iterator find( const K_L& key ) const;
+
+        const_iterator begin() const;
 
         const_iterator end() const;
 
@@ -139,7 +193,7 @@ namespace mongo {
         // ----
 
         size_t _size;
-        const double _maxProbeRatio;
+        double _maxProbeRatio;
         Area _area;
 
         H _hash;
