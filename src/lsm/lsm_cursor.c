@@ -405,8 +405,8 @@ retry:		/*
 	if ((ret = __clsm_get_current(session, clsm, 1, &deleted)) == 0 &&
 	    deleted)
 		goto retry;
-err:	API_END(session);
 
+err:	API_END(session);
 	return (ret);
 }
 
@@ -487,8 +487,8 @@ retry:		/*
 	if ((ret = __clsm_get_current(session, clsm, 0, &deleted)) == 0 &&
 	    deleted)
 		goto retry;
-err:	API_END(session);
 
+err:	API_END(session);
 	return (ret);
 }
 
@@ -517,7 +517,6 @@ __clsm_reset(WT_CURSOR *cursor)
 	F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
 	F_CLR(clsm, WT_CLSM_ITERATE_NEXT | WT_CLSM_ITERATE_PREV);
 	API_END(session);
-
 	return (ret);
 }
 
@@ -945,8 +944,8 @@ __clsm_close(WT_CURSOR *cursor)
 	if (clsm->lsm_tree != NULL)
 		__wt_lsm_tree_release(session, clsm->lsm_tree);
 	WT_TRET(__wt_cursor_close(cursor));
-	API_END(session);
 
+	API_END(session);
 	return (ret);
 }
 

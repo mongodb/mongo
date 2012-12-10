@@ -34,8 +34,8 @@ __curfile_compare(WT_CURSOR *a, WT_CURSOR *b, int *cmpp)
 
 	ret = __wt_btcur_compare(
 	    (WT_CURSOR_BTREE *)a, (WT_CURSOR_BTREE *)b, cmpp);
-err:	API_END(session);
 
+err:	API_END(session);
 	return (ret);
 }
 
@@ -53,8 +53,8 @@ __curfile_next(WT_CURSOR *cursor)
 	cbt = (WT_CURSOR_BTREE *)cursor;
 	CURSOR_API_CALL(cursor, session, next, cbt->btree);
 	ret = __wt_btcur_next((WT_CURSOR_BTREE *)cursor, 0);
-	API_END(session);
 
+	API_END(session);
 	return (ret);
 }
 
@@ -73,8 +73,8 @@ __curfile_next_random(WT_CURSOR *cursor)
 	cbt = (WT_CURSOR_BTREE *)cursor;
 	CURSOR_API_CALL(cursor, session, next, cbt->btree);
 	ret = __wt_btcur_next_random(cbt);
-	API_END(session);
 
+	API_END(session);
 	return (ret);
 }
 
@@ -92,8 +92,8 @@ __curfile_prev(WT_CURSOR *cursor)
 	cbt = (WT_CURSOR_BTREE *)cursor;
 	CURSOR_API_CALL(cursor, session, prev, cbt->btree);
 	ret = __wt_btcur_prev((WT_CURSOR_BTREE *)cursor, 0);
-	API_END(session);
 
+	API_END(session);
 	return (ret);
 }
 
@@ -111,8 +111,8 @@ __curfile_reset(WT_CURSOR *cursor)
 	cbt = (WT_CURSOR_BTREE *)cursor;
 	CURSOR_API_CALL(cursor, session, reset, cbt->btree);
 	ret = __wt_btcur_reset(cbt);
-	API_END(session);
 
+	API_END(session);
 	return (ret);
 }
 
@@ -131,8 +131,8 @@ __curfile_search(WT_CURSOR *cursor)
 	CURSOR_API_CALL(cursor, session, search, cbt->btree);
 	WT_CURSOR_NEEDKEY(cursor);
 	ret = __wt_btcur_search(cbt);
-err:	API_END(session);
 
+err:	API_END(session);
 	return (ret);
 }
 
@@ -151,8 +151,8 @@ __curfile_search_near(WT_CURSOR *cursor, int *exact)
 	CURSOR_API_CALL(cursor, session, search_near, cbt->btree);
 	WT_CURSOR_NEEDKEY(cursor);
 	ret = __wt_btcur_search_near(cbt, exact);
-err:	API_END(session);
 
+err:	API_END(session);
 	return (ret);
 }
 
@@ -173,8 +173,8 @@ __curfile_insert(WT_CURSOR *cursor)
 		WT_CURSOR_NEEDKEY(cursor);
 	WT_CURSOR_NEEDVALUE(cursor);
 	ret = __wt_btcur_insert((WT_CURSOR_BTREE *)cursor);
-err:	CURSOR_UPDATE_API_END(session, ret);
 
+err:	CURSOR_UPDATE_API_END(session, ret);
 	return (ret);
 }
 
@@ -194,8 +194,8 @@ __curfile_update(WT_CURSOR *cursor)
 	WT_CURSOR_NEEDKEY(cursor);
 	WT_CURSOR_NEEDVALUE(cursor);
 	ret = __wt_btcur_update((WT_CURSOR_BTREE *)cursor);
-err:	CURSOR_UPDATE_API_END(session, ret);
 
+err:	CURSOR_UPDATE_API_END(session, ret);
 	return (ret);
 }
 
@@ -214,8 +214,8 @@ __curfile_remove(WT_CURSOR *cursor)
 	CURSOR_UPDATE_API_CALL(cursor, session, remove, cbt->btree);
 	WT_CURSOR_NEEDKEY(cursor);
 	ret = __wt_btcur_remove((WT_CURSOR_BTREE *)cursor);
-err:	CURSOR_UPDATE_API_END(session, ret);
 
+err:	CURSOR_UPDATE_API_END(session, ret);
 	return (ret);
 }
 
@@ -266,8 +266,8 @@ __curfile_close(WT_CURSOR *cursor)
 	/* The URI is owned by the btree handle. */
 	cursor->uri = NULL;
 	WT_TRET(__wt_cursor_close(cursor));
-	API_END(session);
 
+	API_END(session);
 	return (ret);
 }
 

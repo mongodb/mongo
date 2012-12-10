@@ -155,7 +155,6 @@ __curdump_set_key(WT_CURSOR *cursor, ...)
 err:		cursor->saved_err = ret;
 		F_CLR(cursor, WT_CURSTD_KEY_SET);
 	}
-
 	API_END(session);
 }
 
@@ -229,7 +228,6 @@ __curdump_set_value(WT_CURSOR *cursor, ...)
 err:		cursor->saved_err = ret;
 		F_CLR(cursor, WT_CURSTD_VALUE_SET);
 	}
-
 	API_END(session);
 }
 
@@ -279,8 +277,8 @@ __curdump_close(WT_CURSOR *cursor)
 	/* We shared the child's URI. */
 	cursor->uri = NULL;
 	WT_TRET(__wt_cursor_close(cursor));
-	API_END(session);
 
+	API_END(session);
 	return (ret);
 }
 

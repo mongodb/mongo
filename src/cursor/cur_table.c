@@ -95,7 +95,6 @@ __wt_curtable_get_value(WT_CURSOR *cursor, ...)
 		    ctable->cg_cursors, ctable->plan, ap);
 	va_end(ap);
 err:	API_END(session);
-
 	return (ret);
 }
 
@@ -200,7 +199,6 @@ __curtable_compare(WT_CURSOR *a, WT_CURSOR *b, int *cmpp)
 	    WT_CURSOR_PRIMARY(a), WT_CURSOR_PRIMARY(b), cmpp);
 
 err:	API_END(session);
-
 	return (ret);
 }
 
@@ -219,7 +217,6 @@ __curtable_next(WT_CURSOR *cursor)
 	CURSOR_API_CALL(cursor, session, next, NULL);
 	APPLY_CG(ctable, next);
 	API_END(session);
-
 	return (ret);
 }
 
@@ -255,7 +252,6 @@ __curtable_next_random(WT_CURSOR *cursor)
 	}
 
 err:	API_END(session);
-
 	return (ret);
 }
 
@@ -274,7 +270,6 @@ __curtable_prev(WT_CURSOR *cursor)
 	CURSOR_API_CALL(cursor, session, prev, NULL);
 	APPLY_CG(ctable, prev);
 	API_END(session);
-
 	return (ret);
 }
 
@@ -293,7 +288,6 @@ __curtable_reset(WT_CURSOR *cursor)
 	CURSOR_API_CALL(cursor, session, reset, NULL);
 	APPLY_CG(ctable, reset);
 	API_END(session);
-
 	return (ret);
 }
 
@@ -312,7 +306,6 @@ __curtable_search(WT_CURSOR *cursor)
 	CURSOR_API_CALL(cursor, session, search, NULL);
 	APPLY_CG(ctable, search);
 	API_END(session);
-
 	return (ret);
 }
 
@@ -341,8 +334,8 @@ __curtable_search_near(WT_CURSOR *cursor, int *exact)
 		(*cp)->recno = primary->recno;
 		WT_ERR((*cp)->search(*cp));
 	}
-err:	API_END(session);
 
+err:	API_END(session);
 	return (ret);
 }
 
@@ -389,8 +382,8 @@ __curtable_insert(WT_CURSOR *cursor)
 	}
 
 	APPLY_IDX(ctable, insert);
-err:	CURSOR_UPDATE_API_END(session, ret);
 
+err:	CURSOR_UPDATE_API_END(session, ret);
 	return (ret);
 }
 
@@ -429,8 +422,8 @@ __curtable_update(WT_CURSOR *cursor)
 	WT_ERR(ret);
 	if (ctable->idx_cursors != NULL)
 		APPLY_IDX(ctable, insert);
-err:	CURSOR_UPDATE_API_END(session, ret);
 
+err:	CURSOR_UPDATE_API_END(session, ret);
 	return (ret);
 }
 
@@ -457,8 +450,8 @@ __curtable_remove(WT_CURSOR *cursor)
 	}
 
 	APPLY_CG(ctable, remove);
-err:	CURSOR_UPDATE_API_END(session, ret);
 
+err:	CURSOR_UPDATE_API_END(session, ret);
 	return (ret);
 }
 
@@ -627,8 +620,8 @@ __curtable_close(WT_CURSOR *cursor)
 	/* The URI is owned by the table. */
 	cursor->uri = NULL;
 	WT_TRET(__wt_cursor_close(cursor));
-	API_END(session);
 
+	API_END(session);
 	return (ret);
 }
 

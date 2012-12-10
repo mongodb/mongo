@@ -38,8 +38,8 @@ __curindex_get_value(WT_CURSOR *cursor, ...)
 		ret = __wt_schema_project_out(session,
 		    cindex->cg_cursors, cindex->value_plan, ap);
 	va_end(ap);
-err:	API_END(session);
 
+err:	API_END(session);
 	return (ret);
 }
 
@@ -128,8 +128,8 @@ __curindex_next(WT_CURSOR *cursor)
 		ret = __curindex_move(cindex);
 	else
 		F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
-	API_END(session);
 
+	API_END(session);
 	return (ret);
 }
 
@@ -150,8 +150,8 @@ __curindex_prev(WT_CURSOR *cursor)
 		ret = __curindex_move(cindex);
 	else
 		F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
-	API_END(session);
 
+	API_END(session);
 	return (ret);
 }
 
@@ -179,8 +179,8 @@ __curindex_reset(WT_CURSOR *cursor)
 			continue;
 		WT_TRET((*cp)->reset(*cp));
 	}
-	API_END(session);
 
+	API_END(session);
 	return (ret);
 }
 
@@ -229,8 +229,8 @@ __curindex_search(WT_CURSOR *cursor)
 	if (0) {
 err:		F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
 	}
-	API_END(session);
 
+	API_END(session);
 	return (ret);
 }
 
@@ -252,8 +252,8 @@ __curindex_search_near(WT_CURSOR *cursor, int *exact)
 		ret = __curindex_move(cindex);
 	else
 		F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
-	API_END(session);
 
+	API_END(session);
 	return (ret);
 }
 
@@ -297,8 +297,8 @@ __curindex_close(WT_CURSOR *cursor)
 	/* The URI is owned by the index. */
 	cursor->uri = NULL;
 	WT_TRET(__wt_cursor_close(cursor));
-	API_END(session);
 
+	API_END(session);
 	return (ret);
 }
 
