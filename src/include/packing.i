@@ -411,13 +411,11 @@ __unpack_read(WT_SESSION_IMPL *session,
 		*va_arg(ap, int8_t *) = (int8_t)pv.u.i;			\
 		break;							\
 	case 'h':							\
-		*va_arg(ap, short *) = (short)pv.u.i;			\
+		*va_arg(ap, int16_t *) = (short)pv.u.i;			\
 		break;							\
 	case 'i':							\
-		*va_arg(ap, int *) = (int)pv.u.i;			\
-		break;							\
 	case 'l':							\
-		*va_arg(ap, long *) = (long)pv.u.i;			\
+		*va_arg(ap, int32_t *) = (int32_t)pv.u.i;		\
 		break;							\
 	case 'q':							\
 		*va_arg(ap, int64_t *) = pv.u.i;			\
@@ -427,13 +425,11 @@ __unpack_read(WT_SESSION_IMPL *session,
 		*va_arg(ap, uint8_t *) = (uint8_t)pv.u.u;		\
 		break;							\
 	case 'H':							\
-		*va_arg(ap, unsigned short *) = (unsigned short)pv.u.u; \
+		*va_arg(ap, uint16_t *) = (uint16_t)pv.u.u;             \
 		break;							\
 	case 'I':							\
-		*va_arg(ap, unsigned int *) = (unsigned int)pv.u.u;	\
-		break;							\
 	case 'L':							\
-		*va_arg(ap, unsigned long *) = (unsigned long)pv.u.u;	\
+		*va_arg(ap, uint32_t *) = (uint32_t)pv.u.u;	        \
 		break;							\
 	case 'Q':							\
 	case 'r':							\
