@@ -26,6 +26,7 @@
 #include <cmath>
 #include <limits>
 
+#include "mongo/base/parse_number.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonmisc.h"
@@ -364,7 +365,11 @@ namespace mongo {
         }
         /** Append a string element */
         BSONObjBuilder& append(const StringData& fieldName, const StringData& str) {
-            return append(fieldName, str.data(), (int) str.size()+1);
+            _b.appendNum((char) String);
+            _b.appendStr(fieldName);
+            _b.appendNum((int)str.size()+1);
+            _b.appendStr(str, true);
+            return *this;
         }
 
         BSONObjBuilder& appendSymbol(const StringData& fieldName, const StringData& symbol) {
@@ -797,10 +802,11 @@ namespace mongo {
         BSONObjBuilder& append(const StringData& fieldName, unsigned long long val);
 
         void fill( const StringData& name ) {
-            char *r;
-            long int n = strtol( name.data(), &r, 10 );
-            if ( *r )
-                uasserted( 13048, (std::string)"can't append to array using string field name [" + name.data() + "]" );
+            long int n;
+            Status status = parseNumberFromStringWithBase( name, 10, &n );
+            uassert( 13048,
+                     (string)"can't append to array using string field name: " + name.toString(),
+                     status.isOK() );
             fill(n);
         }
 

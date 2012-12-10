@@ -56,7 +56,7 @@ namespace mutablebson {
     uint32_t BasicHeap::putString(const StringData& s) {
         uint32_t index = alloc(s.size() + 1);
         char* buf = deref<char>(index);
-        strcpy(buf, s.data());
+        s.copyTo( buf, true );
         return index;
     }
 
@@ -142,7 +142,7 @@ namespace mutablebson {
     uint32_t BSONObjHeap::putString(const StringData& s) {
         uint32_t offset = alloc(s.size() + 1);
         char* buf = deref<char>(offset);
-        strcpy(buf, s.data());
+        s.copyTo( buf, true );
         return offset;
     }
 
