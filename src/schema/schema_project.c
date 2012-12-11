@@ -338,21 +338,23 @@ __wt_schema_project_slice(WT_SESSION_IMPL *session, WT_CURSOR **cp,
 				if (skip)
 					break;
 
-				/* Read the item we're about to overwrite. */
-				next = p;
-				if (p < end)
-					WT_RET(__unpack_read(session, &pv,
-					    &next, (size_t)(end - p)));
-				old_len = (size_t)(next - p);
-
 				/*
+				 * Read the item we're about to overwrite.
+				 *
 				 * There is subtlety here: the value format
 				 * may not exactly match the cursor's format.
 				 * In particular, we need lengths with raw
 				 * columns in the middle of a packed struct,
-				 * but not if they are at the end of a column.
+				 * but not if they are at the end of a struct.
 				 */
-				pv.u = vpv.u;
+				next = p;
+				if (p < end) {
+					WT_RET(__unpack_read(session, &pv,
+					    &next, (size_t)(end - p)));
+					pv.u = vpv.u;
+				} else
+					pv = vpv;
+				old_len = (size_t)(next - p);
 
 				len = __pack_size(session, &pv);
 				offset = WT_PTRDIFF(p, buf->data);

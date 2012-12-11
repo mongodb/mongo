@@ -41,13 +41,13 @@ cgcols:			cval = colgroup->colconf;
 		}
 		WT_RET(__wt_config_subinit(session, &conf, &cval));
 		for (; __wt_config_next(&conf, &k, &v) == 0; col++) {
-			if (cg == matchcg && col == matchcol)
-				getnext = 1;
-			if (getnext && k.len == colname->len &&
+			if (k.len == colname->len &&
 			    strncmp(colname->str, k.str, k.len) == 0) {
-				foundcg = cg;
-				foundcol = col;
-				getnext = 0;
+				if (getnext) {
+					foundcg = cg;
+					foundcol = col;
+				}
+				getnext = (cg == matchcg && col == matchcol);
 			}
 			if (cg == 0 && table->ncolgroups > 0 &&
 			    col == table->nkey_columns - 1)
