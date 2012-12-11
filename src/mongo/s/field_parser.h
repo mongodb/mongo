@@ -102,6 +102,33 @@ namespace mongo {
                                   const long long& def,
                                   long long* out,
                                   string* errMsg = NULL);
+
+        /**
+         * The following extract methods are templatized to handle extraction of vectors and
+         * maps of sub-objects.  Keys in the map should be StringData compatible.
+         *
+         * It's possible to nest extraction of vectors and maps to any depth, i.e:
+         *
+         * vector<map<string,vector<string> > > val;
+         * FieldParser::extract(doc, field, val, &val);
+         */
+        template<typename T>
+        static bool extract(BSONObj doc,
+                            const BSONField<vector<T> >& field,
+                            const vector<T>& def,
+                            vector<T>* out,
+                            string* errMsg = NULL);
+
+        template<typename K, typename T>
+        static bool extract(BSONObj doc,
+                            const BSONField<map<K, T> >& field,
+                            const map<K, T>& def,
+                            map<K, T>* out,
+                            string* errMsg = NULL);
     };
 
 } // namespace mongo
+
+// Inline functions for templating
+#include "field_parser-inl.h"
+
