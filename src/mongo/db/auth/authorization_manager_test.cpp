@@ -39,28 +39,26 @@ namespace {
         AuthExternalStateMock* externalState = new AuthExternalStateMock();
         AuthorizationManager authManager(externalState);
 
-        ASSERT_NULL(authManager.checkAuthorization("test", ActionType::insert));
+        ASSERT_FALSE(authManager.checkAuthorization("test", ActionType::insert));
         externalState->setReturnValueForShouldIgnoreAuthChecks(true);
-        ASSERT_EQUALS("special",
-                      authManager.checkAuthorization("test", ActionType::insert)->getName());
+        ASSERT_TRUE(authManager.checkAuthorization("test", ActionType::insert));
         externalState->setReturnValueForShouldIgnoreAuthChecks(false);
-        ASSERT_NULL(authManager.checkAuthorization("test", ActionType::insert));
+        ASSERT_FALSE(authManager.checkAuthorization("test", ActionType::insert));
 
         ASSERT_EQUALS(ErrorCodes::UserNotFound,
                       authManager.acquirePrivilege(writePrivilege).code());
         authManager.addAuthorizedPrincipal(principal);
         ASSERT_OK(authManager.acquirePrivilege(writePrivilege));
-        ASSERT_EQUALS(principal, authManager.checkAuthorization("test", ActionType::insert));
+        ASSERT_TRUE(authManager.checkAuthorization("test", ActionType::insert));
 
-        ASSERT_NULL(authManager.checkAuthorization("otherDb", ActionType::insert));
+        ASSERT_FALSE(authManager.checkAuthorization("otherDb", ActionType::insert));
         ASSERT_OK(authManager.acquirePrivilege(allDBsWritePrivilege));
-        ASSERT_EQUALS(principal, authManager.checkAuthorization("otherDb", ActionType::insert));
+        ASSERT_TRUE(authManager.checkAuthorization("otherDb", ActionType::insert));
         // Auth checks on a collection should be applied to the database name.
-        ASSERT_EQUALS(principal, authManager.checkAuthorization("otherDb.collectionName",
-                                                                ActionType::insert));
+        ASSERT_TRUE(authManager.checkAuthorization("otherDb.collectionName", ActionType::insert));
 
         authManager.logoutDatabase("test");
-        ASSERT_NULL(authManager.checkAuthorization("test", ActionType::insert));
+        ASSERT_FALSE(authManager.checkAuthorization("test", ActionType::insert));
     }
 
     TEST(AuthorizationManagerTest, GetPrivilegesFromPrivilegeDocument) {

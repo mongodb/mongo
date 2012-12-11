@@ -84,14 +84,12 @@ namespace mongo {
 
         // Checks if this connection has the privileges required to perform the given action
         // on the given resource.  Contains all the authorization logic including handling things
-        // like the localhost exception.  If it is authorized, returns the principal that granted
-        // the needed privilege.  Returns NULL if not authorized.  If the action is authorized but
-        // not because of a standard user Principal but for a special reason such as the localhost
-        // exception, it returns a pointer to specialAdminPrincipal.
-        const Principal* checkAuthorization(const std::string& resource, ActionType action) const;
-        // Same as above but takes an ActionSet instead of a single ActionType.  The one principal
-        // returned must be able to perform all the actions in the ActionSet on the given resource.
-        const Principal* checkAuthorization(const std::string& resource, ActionSet actions) const;
+        // like the localhost exception.  Returns true if the action may proceed on the resource.
+        bool checkAuthorization(const std::string& resource, ActionType action) const;
+
+        // Same as above but takes an ActionSet instead of a single ActionType.  Returns true if
+        // all of the actions may proceed on the resource.
+        bool checkAuthorization(const std::string& resource, ActionSet actions) const;
 
         // Parses the privilege documents and acquires all privileges that the privilege document
         // grants

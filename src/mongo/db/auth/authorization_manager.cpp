@@ -44,7 +44,6 @@ namespace mongo {
     const std::string AuthorizationManager::CLUSTER_RESOURCE_NAME = "$CLUSTER";
 
     namespace {
-        Principal specialAdminPrincipal("special", "local");
         const std::string ADMIN_DBNAME = "admin";
         const std::string LOCAL_DBNAME = "local";
         const std::string WILDCARD_DBNAME = "*";
@@ -336,44 +335,33 @@ namespace mongo {
         return Status::OK();
     }
 
-    const Principal* AuthorizationManager::checkAuthorization(const std::string& resource,
-                                                              ActionType action) const {
+    bool AuthorizationManager::checkAuthorization(const std::string& resource,
+                                                  ActionType action) const {
 
         if (_externalState->shouldIgnoreAuthChecks()) {
-            return &specialAdminPrincipal;
+            return true;
         }
 
-        const AcquiredPrivilege* privilege;
-        privilege = _acquiredPrivileges.getPrivilegeForAction(nsToDatabase(resource), action);
-        if (privilege) {
-            return privilege->getPrincipal();
-        }
-        privilege = _acquiredPrivileges.getPrivilegeForAction(WILDCARD_DBNAME, action);
-        if (privilege) {
-            return privilege->getPrincipal();
-        }
-
-        return NULL; // Not authorized
+        if (_acquiredPrivileges.getPrivilegeForAction(nsToDatabase(resource), action))
+            return true;
+        if (_acquiredPrivileges.getPrivilegeForAction(WILDCARD_DBNAME, action))
+            return true;
+        return false;
     }
 
-    const Principal* AuthorizationManager::checkAuthorization(const std::string& resource,
-                                                              ActionSet actions) const {
+    bool AuthorizationManager::checkAuthorization(const std::string& resource,
+                                                  ActionSet actions) const {
 
         if (_externalState->shouldIgnoreAuthChecks()) {
-            return &specialAdminPrincipal;
+            return true;
         }
 
-        const AcquiredPrivilege* privilege;
-        privilege = _acquiredPrivileges.getPrivilegeForActions(nsToDatabase(resource), actions);
-        if (privilege) {
-            return privilege->getPrincipal();
-        }
-        privilege = _acquiredPrivileges.getPrivilegeForActions(WILDCARD_DBNAME, actions);
-        if (privilege) {
-            return privilege->getPrincipal();
-        }
+        if (_acquiredPrivileges.getPrivilegeForActions(nsToDatabase(resource), actions))
+            return true;
+        if (_acquiredPrivileges.getPrivilegeForActions(WILDCARD_DBNAME, actions))
+            return true;
 
-        return NULL; // Not authorized
+        return false;
     }
 
     Status AuthorizationManager::checkAuthForQuery(const std::string& ns) {
