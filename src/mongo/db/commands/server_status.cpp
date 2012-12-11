@@ -18,6 +18,9 @@
 
 #include "mongo/pch.h"
 
+#include "mongo/db/auth/action_set.h"
+#include "mongo/db/auth/action_type.h"
+#include "mongo/db/auth/privilege.h"
 #include "mongo/db/client_common.h"
 #include "mongo/db/cmdline.h"
 #include "mongo/db/commands.h"
@@ -64,7 +67,13 @@ namespace mongo {
         virtual void help( stringstream& help ) const {
             help << "returns lots of administrative server statistics";
         }
-
+        virtual void addRequiredPrivileges(const std::string& dbname,
+                                           const BSONObj& cmdObj,
+                                           std::vector<Privilege>* out) {
+            ActionSet actions;
+            actions.addAction(ActionType::serverStatus);
+            out->push_back(Privilege(AuthorizationManager::SERVER_RESOURCE_NAME, actions));
+        }
         bool run(const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             
             _runCalled = true;

@@ -17,7 +17,12 @@
 
 
 #include "mongo/pch.h"
+
 #include "mongo/db/stats/top.h"
+
+#include "mongo/db/auth/action_set.h"
+#include "mongo/db/auth/action_type.h"
+#include "mongo/db/auth/privilege.h"
 #include "mongo/util/net/message.h"
 #include "mongo/db/commands.h"
 
@@ -164,7 +169,13 @@ namespace mongo {
         virtual bool adminOnly() const { return true; }
         virtual LockType locktype() const { return NONE; }
         virtual void help( stringstream& help ) const { help << "usage by collection, in micros "; }
-
+        virtual void addRequiredPrivileges(const std::string& dbname,
+                                           const BSONObj& cmdObj,
+                                           std::vector<Privilege>* out) {
+            ActionSet actions;
+            actions.addAction(ActionType::top);
+            out->push_back(Privilege(AuthorizationManager::SERVER_RESOURCE_NAME, actions));
+        }
         virtual bool run(const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             {
                 BSONObjBuilder b( result.subobjStart( "totals" ) );

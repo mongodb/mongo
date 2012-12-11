@@ -67,6 +67,7 @@
 "replSetStepDown",
 "replSetSyncFrom",
 "resync",
+"serverStatus",
 "setParameter",
 "setShardVersion",
 "shardCollection",

@@ -124,6 +124,7 @@ namespace mongo {
         serverAdminRoleReadActions.addAction(ActionType::replSetStepDown);
         serverAdminRoleReadActions.addAction(ActionType::replSetSyncFrom);
         serverAdminRoleReadActions.addAction(ActionType::setParameter);
+        serverAdminRoleReadActions.addAction(ActionType::serverStatus);
         serverAdminRoleReadActions.addAction(ActionType::shutdown);
         serverAdminRoleReadActions.addAction(ActionType::top);
         serverAdminRoleReadActions.addAction(ActionType::touch);
