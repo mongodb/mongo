@@ -19,7 +19,7 @@ __wt_schema_project_in(WT_SESSION_IMPL *session,
 	WT_CURSOR *c;
 	WT_ITEM *buf;
 	WT_PACK pack;
-	WT_PACK_VALUE pv;
+	WT_PACK_VALUE pv, old_pv;
 	char *proj;
 	uint8_t *p, *end;
 	const uint8_t *next;
@@ -75,50 +75,47 @@ __wt_schema_project_in(WT_SESSION_IMPL *session,
 		 */
 		for (arg = (arg == 0) ? 1 : arg; arg > 0; arg--) {
 			switch (*proj) {
-			case WT_PROJ_NEXT:
 			case WT_PROJ_SKIP:
 				WT_RET(__pack_next(&pack, &pv));
-				if (*proj == WT_PROJ_SKIP) {
-					/*
-					 * A nasty case: if we are inserting
-					 * out-of-order, we may reach the end
-					 * of the data.  That's okay: we want
-					 * to append in that case, and we're
-					 * positioned to do that.
-					 */
-					if (p == end) {
-						/* Set up an empty value. */
-						WT_CLEAR(pv.u);
-						if (pv.type == 'S' ||
-						    pv.type == 's')
-							pv.u.s = "";
+				/*
+				 * A nasty case: if we are inserting
+				 * out-of-order, we may reach the end of the
+				 * data.  That's okay: we want to append in
+				 * that case, and we're positioned to do that.
+				 */
+				if (p == end) {
+					/* Set up an empty value. */
+					WT_CLEAR(pv.u);
+					if (pv.type == 'S' || pv.type == 's')
+						pv.u.s = "";
 
-						len = __pack_size(session, &pv);
-						WT_RET(__wt_buf_grow(session,
-						    buf, buf->size + len));
-						p = (uint8_t *)buf->mem +
-						    buf->size;
-						WT_RET(__pack_write(
-						    session, &pv, &p, len));
-						buf->size += WT_STORE_SIZE(len);
-						end = (uint8_t *)buf->mem +
-						    buf->size;
-					} else if (*proj == WT_PROJ_SKIP)
-						WT_RET(__unpack_read(session,
-						    &pv, (const uint8_t **)&p,
-						    (size_t)(end - p)));
+					len = __pack_size(session, &pv);
+					WT_RET(__wt_buf_grow(session,
+					    buf, buf->size + len));
+					p = (uint8_t *)buf->mem + buf->size;
+					WT_RET(__pack_write(
+					    session, &pv, &p, len));
+					buf->size += WT_STORE_SIZE(len);
+					end = (uint8_t *)buf->mem + buf->size;
+				} else if (*proj == WT_PROJ_SKIP)
+					WT_RET(__unpack_read(session,
+					    &pv, (const uint8_t **)&p,
+					    (size_t)(end - p)));
+				break;
 
-					break;
-				}
+			case WT_PROJ_NEXT:
+				WT_RET(__pack_next(&pack, &pv));
 				WT_PACK_GET(session, pv, ap);
 				/* FALLTHROUGH */
 
 			case WT_PROJ_REUSE:
 				/* Read the item we're about to overwrite. */
 				next = p;
-				if (p < end)
-					WT_RET(__unpack_read(session, &pv,
+				if (p < end) {
+					old_pv = pv;
+					WT_RET(__unpack_read(session, &old_pv,
 					    &next, (size_t)(end - p)));
+				}
 				old_len = (size_t)(next - p);
 
 				len = __pack_size(session, &pv);
@@ -199,16 +196,14 @@ __wt_schema_project_out(WT_SESSION_IMPL *session,
 			switch (*proj) {
 			case WT_PROJ_NEXT:
 			case WT_PROJ_SKIP:
+			case WT_PROJ_REUSE:
 				WT_RET(__pack_next(&pack, &pv));
 				WT_RET(__unpack_read(session, &pv,
 				    (const uint8_t **)&p, (size_t)(end - p)));
-				if (*proj == WT_PROJ_SKIP)
+				/* Only copy the value out once. */
+				if (*proj != WT_PROJ_NEXT)
 					break;
 				WT_UNPACK_PUT(session, pv, ap);
-				/* FALLTHROUGH */
-
-			case WT_PROJ_REUSE:
-				/* Don't copy out the same value twice. */
 				break;
 			}
 		}
@@ -295,45 +290,42 @@ __wt_schema_project_slice(WT_SESSION_IMPL *session, WT_CURSOR **cp,
 		 */
 		for (arg = (arg == 0) ? 1 : arg; arg > 0; arg--) {
 			switch (*proj) {
-			case WT_PROJ_NEXT:
 			case WT_PROJ_SKIP:
-				if (!skip) {
-					WT_RET(__pack_next(&pack, &pv));
-
-					/*
-					 * A nasty case: if we are inserting
-					 * out-of-order, append a zero value
-					 * to keep the buffer in the correct
-					 * format.
-					 */
-					if (*proj == WT_PROJ_SKIP &&
-					    p == end) {
-						/* Set up an empty value. */
-						WT_CLEAR(pv.u);
-						if (pv.type == 'S' ||
-						    pv.type == 's')
-							pv.u.s = "";
-
-						len = __pack_size(session, &pv);
-						WT_RET(__wt_buf_grow(session,
-						    buf, buf->size + len));
-						p = (uint8_t *)buf->data +
-						    buf->size;
-						WT_RET(__pack_write(
-						    session, &pv, &p, len));
-						end = p;
-						buf->size += WT_STORE_SIZE(len);
-					} else if (*proj == WT_PROJ_SKIP)
-						WT_RET(__unpack_read(session,
-						    &pv, (const uint8_t **)&p,
-						    (size_t)(end - p)));
-				}
-				if (*proj == WT_PROJ_SKIP)
+				if (skip)
 					break;
+				WT_RET(__pack_next(&pack, &pv));
+
+				/*
+				 * A nasty case: if we are inserting
+				 * out-of-order, append a zero value to keep
+				 * the buffer in the correct format.
+				 */
+				if (p == end) {
+					/* Set up an empty value. */
+					WT_CLEAR(pv.u);
+					if (pv.type == 'S' || pv.type == 's')
+						pv.u.s = "";
+
+					len = __pack_size(session, &pv);
+					WT_RET(__wt_buf_grow(session,
+					    buf, buf->size + len));
+					p = (uint8_t *)buf->data + buf->size;
+					WT_RET(__pack_write(
+					    session, &pv, &p, len));
+					end = p;
+					buf->size += WT_STORE_SIZE(len);
+				} else
+					WT_RET(__unpack_read(session,
+					    &pv, (const uint8_t **)&p,
+					    (size_t)(end - p)));
+				break;
+
+			case WT_PROJ_NEXT:
 				WT_RET(__pack_next(&vpack, &vpv));
 				WT_RET(__unpack_read(session, &vpv,
 				    &vp, (size_t)(vend - vp)));
 				/* FALLTHROUGH */
+
 			case WT_PROJ_REUSE:
 				if (skip)
 					break;
@@ -347,14 +339,18 @@ __wt_schema_project_slice(WT_SESSION_IMPL *session, WT_CURSOR **cp,
 				 * columns in the middle of a packed struct,
 				 * but not if they are at the end of a struct.
 				 */
+				WT_RET(__pack_next(&pack, &pv));
+
 				next = p;
-				if (p < end) {
+				if (p < end)
 					WT_RET(__unpack_read(session, &pv,
 					    &next, (size_t)(end - p)));
-					pv.u = vpv.u;
-				} else
-					pv = vpv;
 				old_len = (size_t)(next - p);
+
+				/* Make sure the types are compatible. */
+				WT_ASSERT(session,
+				    tolower(pv.type) == tolower(vpv.type));
+				pv.u = vpv.u;
 
 				len = __pack_size(session, &pv);
 				offset = WT_PTRDIFF(p, buf->data);
@@ -442,13 +438,18 @@ __wt_schema_project_merge(WT_SESSION_IMPL *session,
 			switch (*proj) {
 			case WT_PROJ_NEXT:
 			case WT_PROJ_SKIP:
+			case WT_PROJ_REUSE:
 				WT_RET(__pack_next(&pack, &pv));
 				WT_RET(__unpack_read(session, &pv,
 				    &p, (size_t)(end - p)));
-				if (*proj == WT_PROJ_SKIP)
+				/* Only copy the value out once. */
+				if (*proj != WT_PROJ_NEXT)
 					break;
 
 				WT_RET(__pack_next(&vpack, &vpv));
+				/* Make sure the types are compatible. */
+				WT_ASSERT(session,
+				    tolower(pv.type) == tolower(vpv.type));
 				vpv.u = pv.u;
 				len = __pack_size(session, &vpv);
 				WT_RET(__wt_buf_grow(session,
@@ -456,10 +457,6 @@ __wt_schema_project_merge(WT_SESSION_IMPL *session,
 				vp = (uint8_t *)value->mem + value->size;
 				WT_RET(__pack_write(session, &vpv, &vp, len));
 				value->size += WT_STORE_SIZE(len);
-				/* FALLTHROUGH */
-
-			case WT_PROJ_REUSE:
-				/* Don't copy the same value twice. */
 				break;
 			}
 		}
