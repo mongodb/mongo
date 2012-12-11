@@ -196,8 +196,10 @@ class mongod(object):
             argv += ['--auth']
             self.auth = True
         if self.kwargs.get('use_ssl'):
-            argv += ['--sslOnNormalPorts', '--sslPEMKeyFile', 'jstests/libs/smoke.pem']
-
+            argv += ['--sslOnNormalPorts',
+                     '--sslPEMKeyFile', 'jstests/libs/server.pem',
+                     '--sslCAFile', 'jstests/libs/ca.pem']
+        
         print "running " + " ".join(argv)
         self.proc = self._start(buildlogger(argv, is_global=True))
 
@@ -393,7 +395,9 @@ def runTest(test):
         if small_oplog or small_oplog_rs:
             argv += ["--eval", 'testingReplication = true;']
         if use_ssl:
-            argv += ["--ssl"]
+            argv += ["--ssl",
+                     "--sslPEMKeyFile", "jstests/libs/client.pem",
+                     "--sslCAFile", "jstests/libs/ca.pem"]
         argv += [path]
     elif ext in ["", ".exe"]:
         # Blech.
@@ -406,7 +410,7 @@ def runTest(test):
             argv = [test_path and os.path.abspath(os.path.join(test_path, path)) or path,
                     "--port", mongod_port]
     else:
-        raise Bug("fell off in extenstion case: %s" % path)
+        raise Bug("fell off in extension case: %s" % path)
 
     if keyFile:
         f = open(keyFile, 'r')
