@@ -15,8 +15,12 @@ int
 __wt_thread_create(pthread_t *tidret, void *(*func)(void *), void *arg)
 {
 	/* Spawn a new thread of control. */
-	return ((pthread_create(tidret, NULL, func, arg) == 0) ? 0 : WT_ERROR);
+	return (pthread_create(tidret, NULL, func, arg));
 }
+
+#ifdef HAVE_PTHREAD_TIMEDJOIN_NP
+extern int pthread_timedjoin_np(pthread_t, void **, const struct timespec *);
+#endif
 
 /*
  * __wt_thread_join --
@@ -25,5 +29,13 @@ __wt_thread_create(pthread_t *tidret, void *(*func)(void *), void *arg)
 int
 __wt_thread_join(pthread_t tid)
 {
-	return (pthread_join(tid, NULL) == 0 ? 0 : WT_ERROR);
+#ifdef HAVE_PTHREAD_TIMEDJOIN_NP
+	struct timespec abstime;
+
+	abstime.tv_sec = 30;			/* Wait a max of 30 seconds. */
+	abstime.tv_nsec = 0;
+	return (pthread_timedjoin_np(tid, NULL, &abstime));
+#else
+	return (pthread_join(tid, NULL));
+#endif
 }

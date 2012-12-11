@@ -237,12 +237,7 @@ __wt_conn_cache_pool_destroy(WT_CONNECTION_IMPL *conn)
 		__wt_spin_unlock(session, &__wt_process.spinlock);
 		__wt_spin_unlock(session, &cp->cache_pool_lock);
 
-		/*
-		 * Shut down the cache pool worker.
-		 * XXX
-		 * If the server fails to wake, we'll hang in the join; panic
-		 * and return on failure instead.
-		 */
+		/* Shut down the cache pool worker. */
 		WT_TRET(__wt_cond_signal(session, cp->cache_pool_cond));
 		WT_TRET(__wt_thread_join(cp->cache_pool_tid));
 
