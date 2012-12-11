@@ -7,6 +7,14 @@ var m = startMongod( "--noprealloc", "--smallfiles", "--port", port, "--dbpath",
 db = m.getDB( "test" );
 
 var t = db[baseName];
+var getTotalNonLocalSize = function() {
+    var totalNonLocalDBSize = 0;
+    m.getDBs().databases.forEach( function(dbStats) {
+            if (dbStats.name != "local")
+                totalNonLocalDBSize += dbStats.sizeOnDisk;
+    });
+    return totalNonLocalDBSize;
+}
 
 for (var pass = 0; pass <= 1; pass++) {
 
@@ -14,9 +22,9 @@ for (var pass = 0; pass <= 1; pass++) {
     if( pass == 0 )
         t.drop();
 
-    size = m.getDBs().totalSize;
+    size = getTotalNonLocalSize();
     t.save({});
-    assert.eq(size, m.getDBs().totalSize);
+    assert.eq(size, getTotalNonLocalSize());
     assert(size <= 32 * 1024 * 1024);
 
     t.drop();
