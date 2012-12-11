@@ -1011,6 +1011,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="..\base\make_string_vector.cpp" />
     <ClCompile Include="..\base\parse_number.cpp" />
     <ClCompile Include="..\base\status.cpp" />
+    <ClCompile Include="..\base\string_data.cpp" />
     <ClCompile Include="..\bson\mutable\mutable_bson.cpp" />
     <ClCompile Include="..\bson\mutable\mutable_bson_builder.cpp" />
     <ClCompile Include="..\bson\mutable\mutable_bson_heap.cpp" />
@@ -1332,9 +1333,11 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="..\base\initializer_dependency_graph.h" />
     <ClInclude Include="..\base\initializer_function.h" />
     <ClInclude Include="..\base\make_string_vector.h" />
+    <ClInclude Include="..\base\owned_pointer_map.h" />
     <ClInclude Include="..\base\owned_pointer_vector.h" />
     <ClInclude Include="..\base\parse_number.h" />
     <ClInclude Include="..\base\status.h" />
+    <ClInclude Include="..\base\string_data-inl.h" />
     <ClInclude Include="..\bson\bson-inl.h" />
     <ClInclude Include="..\bson\bson.h" />
     <ClInclude Include="..\bson\bsonelement.h" />

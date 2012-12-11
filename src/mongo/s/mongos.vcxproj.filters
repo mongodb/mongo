@@ -927,6 +927,9 @@
     <ClCompile Include="..\util\exception_filter_win32.cpp">
       <Filter>util\Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\base\string_data.cpp">
+      <Filter>base</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\pch.h" />
@@ -1691,6 +1694,12 @@
     </ClInclude>
     <ClInclude Include="..\util\exception_filter_win32.h">
       <Filter>util\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\base\owned_pointer_map.h">
+      <Filter>base</Filter>
+    </ClInclude>
+    <ClInclude Include="..\base\string_data-inl.h">
+      <Filter>base</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

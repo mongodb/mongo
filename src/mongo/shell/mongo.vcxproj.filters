@@ -587,6 +587,9 @@
     <ClCompile Include="..\client\authentication_table_client.cpp">
       <Filter>client</Filter>
     </ClCompile>
+    <ClCompile Include="..\base\string_data.cpp">
+      <Filter>base</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="collection.js">
@@ -1399,6 +1402,12 @@
     </ClInclude>
     <ClInclude Include="..\util\unordered_fast_key_table_internal.h">
       <Filter>util\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\base\owned_pointer_map.h">
+      <Filter>base</Filter>
+    </ClInclude>
+    <ClInclude Include="..\base\string_data-inl.h">
+      <Filter>base</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

@@ -527,9 +527,6 @@
     <ClCompile Include="..\scripting\v8_utils.cpp">
       <Filter>scripting</Filter>
     </ClCompile>
-    <ClCompile Include="..\scripting\v8_wrapper.cpp">
-      <Filter>scripting</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\third_party\v8\src\extensions\externalize-string-extension.cc">
       <Filter>third_party\v8\src\extensions</Filter>
     </ClCompile>
@@ -985,6 +982,9 @@
     </ClCompile>
     <ClCompile Include="..\client\authentication_table_common.cpp">
       <Filter>client</Filter>
+    </ClCompile>
+    <ClCompile Include="..\base\string_data.cpp">
+      <Filter>base</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -1706,9 +1706,6 @@
     <ClInclude Include="..\scripting\v8_utils.h">
       <Filter>scripting</Filter>
     </ClInclude>
-    <ClInclude Include="..\scripting\v8_wrapper.h">
-      <Filter>scripting</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\third_party\v8\src\extensions\externalize-string-extension.h">
       <Filter>third_party\v8\src\extensions</Filter>
     </ClInclude>
@@ -2338,6 +2335,12 @@
     </ClInclude>
     <ClInclude Include="..\util\unordered_fast_key_table_internal.h">
       <Filter>util\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\base\owned_pointer_map.h">
+      <Filter>base</Filter>
+    </ClInclude>
+    <ClInclude Include="..\base\string_data-inl.h">
+      <Filter>base</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

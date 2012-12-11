@@ -1192,6 +1192,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="..\base\make_string_vector.cpp" />
     <ClCompile Include="..\base\parse_number.cpp" />
     <ClCompile Include="..\base\status.cpp" />
+    <ClCompile Include="..\base\string_data.cpp" />
     <ClCompile Include="..\bson\mutable\mutable_bson.cpp" />
     <ClCompile Include="..\bson\mutable\mutable_bson_builder.cpp" />
     <ClCompile Include="..\bson\mutable\mutable_bson_heap.cpp" />
@@ -1210,7 +1211,6 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="..\scripting\engine_v8.cpp" />
     <ClCompile Include="..\scripting\v8_db.cpp" />
     <ClCompile Include="..\scripting\v8_utils.cpp" />
-    <ClCompile Include="..\scripting\v8_wrapper.cpp" />
     <ClCompile Include="..\s\cluster_constants.cpp" />
     <ClCompile Include="..\s\collection_manager.cpp" />
     <ClCompile Include="..\s\default_version.cpp" />
@@ -1774,9 +1774,11 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="..\base\initializer_dependency_graph.h" />
     <ClInclude Include="..\base\initializer_function.h" />
     <ClInclude Include="..\base\make_string_vector.h" />
+    <ClInclude Include="..\base\owned_pointer_map.h" />
     <ClInclude Include="..\base\owned_pointer_vector.h" />
     <ClInclude Include="..\base\parse_number.h" />
     <ClInclude Include="..\base\status.h" />
+    <ClInclude Include="..\base\string_data-inl.h" />
     <ClInclude Include="..\bson\bson_builder_base.h" />
     <ClInclude Include="..\bson\bson_field.h" />
     <ClInclude Include="..\bson\mutable\mutable_bson.h" />
@@ -2179,7 +2181,6 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="..\scripting\engine_v8.h" />
     <ClInclude Include="..\scripting\v8_db.h" />
     <ClInclude Include="..\scripting\v8_utils.h" />
-    <ClInclude Include="..\scripting\v8_wrapper.h" />
     <ClInclude Include="btree.h" />
     <ClInclude Include="repl\health.h" />
     <ClInclude Include="repl\rs.h" />
