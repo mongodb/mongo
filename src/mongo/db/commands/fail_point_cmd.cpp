@@ -16,6 +16,11 @@
 
 #include "mongo/db/commands/fail_point_cmd.h"
 
+#include <vector>
+
+#include "mongo/db/auth/action_set.h"
+#include "mongo/db/auth/action_type.h"
+#include "mongo/db/auth/privilege.h"
 #include "mongo/db/commands.h"
 #include "mongo/util/fail_point_service.h"
 
@@ -57,6 +62,15 @@ namespace mongo {
         virtual bool adminOnly() const {
             return true;
         }
+
+        // No auth needed because it only works when enabled via command line.
+        virtual bool requiresAuth() {
+            return false;
+        }
+
+        virtual void addRequiredPrivileges(const std::string& dbname,
+                                           const BSONObj& cmdObj,
+                                           std::vector<Privilege>* out) {}
 
         virtual void help(stringstream& h) const {
             h << "modifies the settings of a fail point";
