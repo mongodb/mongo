@@ -460,7 +460,19 @@ def runTest(test):
     t2 = time.time()
     del os.environ['MONGO_TEST_FILENAME']
 
-    sys.stdout.write("                %fms\n" % ((t2 - t1) * 1000))
+    timediff = t2 - t1
+    # timediff is seconds by default
+    scale = 1
+    suffix = "seconds"
+    # if timediff is less than 10 seconds use ms
+    if timediff < 10:
+        scale = 1000
+        suffix = "ms"
+    # if timediff is more than 60 seconds use minutes
+    elif timediff > 60:
+        scale = 1.0 / 60.0
+        suffix = "minutes"
+    sys.stdout.write("                %10.4f %s\n" % ((timediff) * scale, suffix))
     sys.stdout.flush()
 
     if r != 0:
