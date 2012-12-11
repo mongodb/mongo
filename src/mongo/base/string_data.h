@@ -118,7 +118,7 @@ namespace mongo {
         char operator[] ( unsigned pos ) const { return _data[pos]; }
 
     private:
-        const char* const _data;  // is always null terminated, but see "notes" above
+        const char* _data;        // is always null terminated, but see "notes" above
         mutable size_t _size;     // 'size' does not include the null terminator
 
         void fillSize() const {
