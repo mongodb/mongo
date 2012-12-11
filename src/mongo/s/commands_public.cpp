@@ -18,6 +18,7 @@
 
 #include "pch.h"
 
+#include "mongo/base/init.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_manager.h"
@@ -540,7 +541,13 @@ namespace mongo {
         class CopyDBCmd : public PublicGridCommand {
         public:
             CopyDBCmd() : PublicGridCommand( "copydb" ) {}
-            // TODO: implement addRequiredPrivileges once we figure out the correct behavior here
+            virtual void addRequiredPrivileges(const std::string& dbname,
+                                               const BSONObj& cmdObj,
+                                               std::vector<Privilege>* out) {
+                // Should never get here because this command shouldn't get registered when auth is
+                // enabled
+                verify(0);
+            }
             bool run(const string& dbName, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
                 string todb = cmdObj.getStringField("todb");
                 uassert(13402, "need a todb argument", !todb.empty());
@@ -572,7 +579,16 @@ namespace mongo {
                 }
 
             }
-        } copyDBCmd;
+        };
+        MONGO_INITIALIZER(RegisterCopyDBCommand)(InitializerContext* context) {
+            if (noauth) {
+                // Leaked intentionally: a Command registers itself when constructed.
+                new CopyDBCmd();
+            } else {
+                new NotWithAuthCmd("copydb");
+            }
+            return Status::OK();
+        }
 
         class CountCmd : public PublicGridCommand {
         public:
