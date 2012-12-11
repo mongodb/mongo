@@ -306,7 +306,7 @@ MongoRunner.mongoOptions = function( opts ){
     opts = Object.merge( opts || {}, {} )
 
     // This should always be true for tests
-    opts['setParameter=enableTestCommands'] = 1
+    opts['setParameter'] = 'enableTestCommands=1';
 
     if( ! opts.restart ) opts.restart = false
     
