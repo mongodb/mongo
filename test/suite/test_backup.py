@@ -31,9 +31,7 @@ import shutil
 import string
 from suite_subprocess import suite_subprocess
 import wiredtiger, wttest
-from helper import compare_files, confirm_does_not_exist,\
-    complex_populate, complex_populate_check,\
-    simple_populate, simple_populate_check
+from helper import compare_files, complex_populate, simple_populate
 
 # test_backup.py
 #    Utilities: wt backup
