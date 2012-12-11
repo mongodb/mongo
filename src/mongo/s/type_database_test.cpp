@@ -23,30 +23,24 @@
 
 namespace {
 
+    using std::string;
     using mongo::DatabaseType;
     using mongo::BSONObj;
 
     TEST(Validity, Empty) {
         DatabaseType db;
         BSONObj emptyObj = BSONObj();
-        db.parseBSON(emptyObj);
+        string errMsg;
+        ASSERT_TRUE(db.parseBSON(emptyObj, &errMsg));
         ASSERT_FALSE(db.isValid(NULL));
     }
 
-    TEST(Validity, NonScatteredDatabase) {
+    TEST(Validity, BasicDatabase) {
         DatabaseType db;
         BSONObj obj = BSON(DatabaseType::name("mydb") <<
                            DatabaseType::primary("shard"));
-        db.parseBSON(obj);
-        ASSERT_TRUE(db.isValid(NULL));
-    }
-
-    TEST(Validity, ScatteredDatabase) {
-        DatabaseType db;
-        BSONObj obj = BSON(DatabaseType::name("mydb") <<
-                           DatabaseType::primary("shard") <<
-                           DatabaseType::scattered(true));
-        db.parseBSON(obj);
+        string errMsg;
+        ASSERT_TRUE(db.parseBSON(obj, &errMsg));
         ASSERT_TRUE(db.isValid(NULL));
     }
 
@@ -55,10 +49,10 @@ namespace {
         BSONObj obj = BSON(DatabaseType::name("mydb") <<
                            DatabaseType::primary("shard") <<
                            DatabaseType::DEPRECATED_partitioned(true));
-        db.parseBSON(obj);
+        string errMsg;
+        ASSERT_TRUE(db.parseBSON(obj, &errMsg));
         ASSERT_EQUALS(db.getName(), "mydb");
         ASSERT_EQUALS(db.getPrimary(), "shard");
-        ASSERT_EQUALS(db.getScattered(), false);
         ASSERT_EQUALS(db.getDraining(), false);
     }
 
