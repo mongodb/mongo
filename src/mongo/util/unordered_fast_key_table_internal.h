@@ -16,6 +16,8 @@
  *    limitations under the License.
  */
 
+#include "mongo/util/assert_util.h"
+
 namespace mongo {
     template< typename K_L, typename K_S, typename V, typename H, typename E, typename C, typename C_LS >
     inline UnorderedFastKeyTable<K_L, K_S, V, H, E, C, C_LS>::Area::Area(unsigned capacity,
