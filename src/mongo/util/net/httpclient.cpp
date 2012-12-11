@@ -102,7 +102,12 @@ namespace mongo {
         
         if ( ssl ) {
 #ifdef MONGO_SSL
-            sock.secure(SSLManager::getGlobal());
+            // never deleted
+            SSLManager* mgr = new SSLManager(cmdLine.sslPEMKeyFile, 
+                                             cmdLine.sslPEMKeyPassword, 
+                                             cmdLine.sslCAFile);
+
+            sock.secure(mgr);
 #else
             uasserted( 15862 , "no ssl support" );
 #endif

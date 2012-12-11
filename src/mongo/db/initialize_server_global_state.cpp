@@ -192,34 +192,6 @@ namespace mongo {
             noauth = false;
         }
 
-#ifdef MONGO_SSL
-        if (cmdLine.sslOnNormalPorts) {
-
-            if ( cmdLine.sslPEMKeyFile.size() == 0 ) {
-                log() << "need sslPEMKeyFile" << endl;
-                return false;
-            }
-
-            SSLManager* mgr = SSLManager::createGlobal();
-            if (!mgr->setupPEM(cmdLine.sslPEMKeyFile, 
-                               cmdLine.sslPEMKeyPassword)) {
-                return false;
-            }
-            if (cmdLine.sslCAFile.size() > 0) {
-                // Set up certificate validation with a certificate authority
-                if (!mgr->setupCA(cmdLine.sslCAFile)) {
-                    return false;
-                }
-            }
-
-
-        }
-        else if ( cmdLine.sslPEMKeyFile.size() || cmdLine.sslPEMKeyPassword.size() ) {
-            log() << "need to enable sslOnNormalPorts" << endl;
-            return false;
-        }
-#endif
-
         return true;
     }
 

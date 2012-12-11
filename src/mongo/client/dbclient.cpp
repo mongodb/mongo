@@ -1301,29 +1301,18 @@ namespace mongo {
     }
 
 #ifdef MONGO_SSL
-    SimpleMutex DBClientConnection::_mtx("SSLManager");
+    static SimpleMutex s_mtx("SSLManager");
+    static SSLManager* s_sslMgr(NULL);
 
     SSLManager* DBClientConnection::sslManager() {
-        SimpleMutex::scoped_lock lk(_mtx);
-        SSLManager* mgr = SSLManager::getGlobal();
-        if (mgr) 
-            return mgr;
+        SimpleMutex::scoped_lock lk(s_mtx);
+        if (s_sslMgr) 
+            return s_sslMgr;
         
-        mgr = SSLManager::createGlobal();
-
-        if (cmdLine.sslPEMKeyFile.size() > 0) {
-            if (!mgr->setupPEM(cmdLine.sslPEMKeyFile, 
-                               cmdLine.sslPEMKeyPassword)) {
-                uasserted(16559, "failed to set up SSL"); 
-            }
-        }
-        if (cmdLine.sslCAFile.size() > 0) {
-            // Set up certificate validation with a certificate authority
-            if (!mgr->setupCA(cmdLine.sslCAFile)) {
-                uasserted(16560, "failed to set up SSL"); 
-            }
-        }
-        return mgr;
+        s_sslMgr = new SSLManager(cmdLine.sslPEMKeyFile, 
+                                  cmdLine.sslPEMKeyPassword, 
+                                  cmdLine.sslCAFile);
+        return s_sslMgr;
     }
 #endif
 

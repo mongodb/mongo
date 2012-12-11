@@ -399,6 +399,14 @@ namespace {
 #ifdef MONGO_SSL
         if (params.count("sslOnNormalPorts") ) {
             cmdLine.sslOnNormalPorts = true;
+            if ( cmdLine.sslPEMKeyFile.size() == 0 ) {
+                log() << "need sslPEMKeyFile" << endl;
+                return false;
+            }
+        }
+        else if ( cmdLine.sslPEMKeyFile.size() || cmdLine.sslPEMKeyPassword.size() ) {
+            log() << "need to enable sslOnNormalPorts" << endl;
+            return false;
         }
 #endif
 

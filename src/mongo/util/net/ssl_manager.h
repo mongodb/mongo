@@ -28,15 +28,9 @@ namespace mongo {
     class SSLManager {
     MONGO_DISALLOW_COPYING(SSLManager);
     public:
-        SSLManager();
-
-        /** @return true if was successful, otherwise false */
-        bool setupPEM( const std::string& keyFile , const std::string& password );
-
-        /*
-         * Set up SSL for certificate validation by loading a CA
-         */
-        bool setupCA(const std::string& caFile);
+        SSLManager(std::string pemfile,
+                   std::string pempwd,
+                   std::string cafile = "");
 
         /**
          * Initiates a TLS connection.
@@ -64,9 +58,6 @@ namespace mongo {
         static int password_cb( char *buf,int num, int rwflag,void *userdata );
         static int verify_cb(int ok, X509_STORE_CTX *ctx);
 
-        static SSLManager* getGlobal();
-        static SSLManager* createGlobal();
-
     private:
         SSL_CTX* _context;
         std::string _password;
@@ -88,6 +79,14 @@ namespace mongo {
          * appropriate message and throws a SocketException
          */
         void _handleSSLError(int code);
+
+        /** @return true if was successful, otherwise false */
+        bool _setupPEM( const std::string& keyFile , const std::string& password );
+
+        /*
+         * Set up SSL for certificate validation by loading a CA
+         */
+        bool _setupCA(const std::string& caFile);
     };
 }
 #endif

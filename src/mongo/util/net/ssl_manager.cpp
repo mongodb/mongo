@@ -105,7 +105,10 @@ namespace mongo {
     
     ////////////////////////////////////////////////////////////////
 
-    SSLManager::SSLManager() : _validateCertificates(false) {
+    SSLManager::SSLManager(std::string pemfile,
+                           std::string pempwd,
+                           std::string cafile) : 
+        _validateCertificates(false) {
         SSL_library_init();
         SSL_load_error_strings();
         ERR_load_crypto_strings();
@@ -125,6 +128,18 @@ namespace mongo {
 
         SSLThreadInfo::init();
         SSLThreadInfo::get();
+
+        if (!pemfile.empty()) {
+            if (!_setupPEM(pemfile, pempwd)) {
+                uasserted(16562, "ssl initialization problem"); 
+            }
+        }
+        if (!cafile.empty()) {
+            // Set up certificate validation with a certificate authority
+            if (!_setupCA(cafile)) {
+                uasserted(16563, "ssl initialization problem"); 
+            }
+        }
     }
 
     int SSLManager::password_cb(char *buf,int num, int rwflag,void *userdata) {
@@ -138,7 +153,7 @@ namespace mongo {
 	return 1; // always succeed; we will catch the error in our get_verify_result() call
     }
 
-    bool SSLManager::setupPEM(const std::string& keyFile , const std::string& password) {
+    bool SSLManager::_setupPEM(const std::string& keyFile , const std::string& password) {
         _password = password;
         
         if ( SSL_CTX_use_certificate_chain_file( _context , keyFile.c_str() ) != 1 ) {
@@ -164,7 +179,7 @@ namespace mongo {
         return true;
     }
 
-    bool SSLManager::setupCA(const std::string& caFile) {
+    bool SSLManager::_setupCA(const std::string& caFile) {
         // Load trusted CA
         if (SSL_CTX_load_verify_locations(_context, caFile.c_str(), NULL) != 1) {
             log() << "Can't read certificate authority file: " << caFile << " " <<
@@ -235,24 +250,6 @@ namespace mongo {
 
         // TODO: check optional cipher restriction, using cert.
         // TODO: enforce CRL?
-    }
-
-    // Access to this via DBClientConnection is protected by a mutex in that class,
-    // because the C++ driver and shell lazily initialize SSL via DBClientConnection
-    // and multiple threads.
-    // For mongod, this is initialized via initialize_server_global_state, and thus
-    // does not need any locking, as all mongod consumers assume it has already been 
-    // initialized.
-    static SSLManager* s_manager(NULL);
-
-    SSLManager* SSLManager::getGlobal() {
-        return s_manager;
-    }
-
-    SSLManager* SSLManager::createGlobal() {
-        fassert(16558, s_manager == NULL);
-        s_manager = new SSLManager();
-        return s_manager;
     }
 
     std::string SSLManager::_getSSLErrorMessage(int code) {

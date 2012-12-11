@@ -1228,7 +1228,6 @@ namespace mongo {
 
 #ifdef MONGO_SSL
         SSLManager* sslManager();
-        static SimpleMutex _mtx;
 #endif
     };
 
