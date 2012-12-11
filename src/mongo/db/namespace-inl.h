@@ -31,6 +31,7 @@ namespace mongo {
         // if profiling indicates this method is a significant bottleneck, we could have a version we
         // use for reads which does not fill with zeroes, and keep the zeroing behavior on writes.
         //
+        memset( buf, 0, MaxNsLen );
         uassert( 10080 , "ns name too long, max size is 128", ns.size() < MaxNsLen - 1);
         ns.copyTo( buf, true );
         return *this;
