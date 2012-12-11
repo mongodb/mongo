@@ -27,8 +27,8 @@ namespace mongo {
     S2NearCursor::S2NearCursor(const BSONObj &keyPattern, const IndexDetails *details,
                        const BSONObj &query, const vector<QueryGeometry> &fields,
                        const S2IndexingParams &params, int numWanted, double maxDistance)
-        : _details(details), _fields(fields), _params(params), _keyPattern(keyPattern),
-          _numToReturn(numWanted), _maxDistance(maxDistance) {
+        : _details(details), _fields(fields), _params(params), _nscanned(0),
+          _keyPattern(keyPattern), _numToReturn(numWanted), _maxDistance(maxDistance) {
         BSONObjBuilder geoFieldsToNuke;
         for (size_t i = 0; i < _fields.size(); ++i) {
             geoFieldsToNuke.append(_fields[i].field, "");

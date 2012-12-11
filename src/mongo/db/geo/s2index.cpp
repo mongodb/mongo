@@ -376,7 +376,8 @@ namespace mongo {
         }
     } S2IndexPluginS2D;
 
-    bool run2DSphereGeoNear(const IndexDetails &id, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result) {
+    bool run2DSphereGeoNear(const IndexDetails &id, BSONObj& cmdObj, string& errmsg,
+                            BSONObjBuilder& result) {
         S2IndexType *idxType = static_cast<S2IndexType*>(id.getSpec().getType());
         verify(&id == idxType->getDetails());
 
