@@ -227,8 +227,10 @@ __wt_cache_evict_server(void *arg)
 			    __wt_cache_pages_inuse(cache),
 			    __wt_cache_bytes_inuse(cache));
 		}
-	} else
+	} else {
 err:		__wt_err(session, ret, "eviction server error");
+		(void)__wt_panic(session);
+	}
 
 	__wt_free(session, cache->evict);
 

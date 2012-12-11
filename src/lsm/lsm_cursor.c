@@ -516,7 +516,8 @@ __clsm_reset(WT_CURSOR *cursor)
 	}
 	F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
 	F_CLR(clsm, WT_CLSM_ITERATE_NEXT | WT_CLSM_ITERATE_PREV);
-	API_END(session);
+
+err:	API_END(session);
 	return (ret);
 }
 
@@ -945,7 +946,7 @@ __clsm_close(WT_CURSOR *cursor)
 		__wt_lsm_tree_release(session, clsm->lsm_tree);
 	WT_TRET(__wt_cursor_close(cursor));
 
-	API_END(session);
+err:	API_END(session);
 	return (ret);
 }
 

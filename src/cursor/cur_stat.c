@@ -44,8 +44,8 @@ __curstat_get_key(WT_CURSOR *cursor, ...)
 	va_list ap;
 
 	cst = (WT_CURSOR_STAT *)cursor;
-	CURSOR_API_CALL(cursor, session, get_key, cst->btree);
 	va_start(ap, cursor);
+	CURSOR_API_CALL(cursor, session, get_key, cst->btree);
 
 	WT_CURSOR_NEEDKEY(cursor);
 
@@ -82,8 +82,8 @@ __curstat_get_value(WT_CURSOR *cursor, ...)
 	size_t size;
 
 	cst = (WT_CURSOR_STAT *)cursor;
-	CURSOR_API_CALL(cursor, session, get_value, cst->btree);
 	va_start(ap, cursor);
+	CURSOR_API_CALL(cursor, session, get_value, cst->btree);
 
 	WT_CURSOR_NEEDVALUE(cursor);
 
@@ -139,7 +139,7 @@ __curstat_set_key(WT_CURSOR *cursor, ...)
 	else
 		F_CLR(cursor, WT_CURSTD_KEY_SET);
 
-	API_END(session);
+err:	API_END(session);
 }
 
 /*
@@ -226,6 +226,7 @@ static int
 __curstat_reset(WT_CURSOR *cursor)
 {
 	WT_CURSOR_STAT *cst;
+	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 
 	cst = (WT_CURSOR_STAT *)cursor;
@@ -234,8 +235,8 @@ __curstat_reset(WT_CURSOR *cursor)
 	cst->notpositioned = 1;
 	F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
 
-	API_END(session);
-	return (0);
+err:	API_END(session);
+	return (ret);
 }
 
 /*
@@ -293,7 +294,7 @@ __curstat_close(WT_CURSOR *cursor)
 	__wt_free(session, cst->stats);
 	WT_TRET(__wt_cursor_close(cursor));
 
-	API_END(session);
+err:	API_END(session);
 	return (ret);
 }
 

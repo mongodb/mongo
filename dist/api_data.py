@@ -25,9 +25,9 @@ errors = [
 		record to return.  This includes search and other
 		operations where no record matched the cursor's search
 		key such as WT_CURSOR::update or WT_CURSOR::remove.'''),
-	Error('WT_PANIC', 'the application must exit the database', '''
+	Error('WT_PANIC', 'WiredTiger library panic', '''
 		This error indicates an underlying problem that requires the
-		application exit the database and restart.'''),
+		application exit and restart.'''),
 	Error('WT_RESTART', 'restart the operation (internal)', undoc=True),
 ]
 
@@ -572,6 +572,7 @@ flags = {
 	'conn' : [
 		'CONN_CACHE_POOL',
 		'CONN_LSM_MERGE',
+		'CONN_PANIC',
 		'CONN_SERVER_RUN',
 		'CONN_SYNC',
 		'CONN_TRANSACTIONAL',

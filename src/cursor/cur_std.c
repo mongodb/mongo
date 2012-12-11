@@ -288,9 +288,9 @@ __wt_cursor_set_value(WT_CURSOR *cursor, ...)
 	size_t sz;
 	va_list ap;
 
+	va_start(ap, cursor);
 	CURSOR_API_CALL(cursor, session, set_value, NULL);
 
-	va_start(ap, cursor);
 	fmt = F_ISSET(cursor, WT_CURSOR_RAW_OK) ? "u" : cursor->value_format;
 
 	/* Fast path some common cases: single strings, byte arrays and bits. */
@@ -363,7 +363,7 @@ __wt_cursor_close(WT_CURSOR *cursor)
 	__wt_free(session, cursor->uri);
 	__wt_free(session, cursor);
 
-	API_END(session);
+err:	API_END(session);
 	return (ret);
 }
 

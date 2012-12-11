@@ -27,7 +27,7 @@ This error is returned when an error is not covered by a specific error return.
 This error indicates a cursor operation did not find a record to return. This includes search and other operations where no record matched the cursor's search key such as WT_CURSOR::update or WT_CURSOR::remove.
 
 @par <code>WT_PANIC</code>
-This error indicates an underlying problem that requires the application exit the database and restart.
+This error indicates an underlying problem that requires the application exit and restart.
 
 @if IGNORE_BUILT_BY_API_ERR_END
 @endif
