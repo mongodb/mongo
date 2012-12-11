@@ -1596,7 +1596,7 @@ namespace mongo {
                                            const BSONObj& cmdObj,
                                            std::vector<Privilege>* out) {} // No auth required
         virtual bool run(const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
-            BSONObj info = cc().curop()->infoNoauth();
+            BSONObj info = cc().curop()->info();
             result << "you" << info[ "client" ];
             return true;
         }

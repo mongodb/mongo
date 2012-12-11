@@ -175,7 +175,7 @@ namespace mongo {
                     }
                     verify( co );
                     if( all || co->displayInCurop() ) {
-                        BSONObj info = co->infoNoauth();
+                        BSONObj info = co->info();
                         if ( all || m->matches( info )) {
                             vals.push_back( info );
                         }
