@@ -29,7 +29,8 @@ namespace mongo {
     class Privilege {
     public:
 
-        Privilege(const std::string& resource, ActionSet actions);
+        Privilege(const std::string& resource, const ActionType& action);
+        Privilege(const std::string& resource, const ActionSet& actions);
         ~Privilege() {}
 
         const std::string& getResource() const { return _resource; }

@@ -65,7 +65,7 @@ namespace mongo {
         // Returns the authenticated principal with the given name.  Returns NULL
         // if no such user is found.
         // Ownership of the returned Principal remains with _authenticatedPrincipals
-        Principal* lookupPrincipal(const PrincipalName& name) const;
+        Principal* lookupPrincipal(const PrincipalName& name);
 
         // Removes any authenticated principals whose authorization credentials came from the given
         // database, and revokes any privileges that were granted via that principal.
@@ -79,16 +79,16 @@ namespace mongo {
         void grantInternalAuthorization(const std::string& principalName);
 
         // Checks if this connection has been authenticated as an internal user.
-        bool hasInternalAuthorization() const;
+        bool hasInternalAuthorization();
 
         // Checks if this connection has the privileges required to perform the given action
         // on the given resource.  Contains all the authorization logic including handling things
         // like the localhost exception.  Returns true if the action may proceed on the resource.
-        bool checkAuthorization(const std::string& resource, ActionType action) const;
+        bool checkAuthorization(const std::string& resource, ActionType action);
 
         // Same as above but takes an ActionSet instead of a single ActionType.  Returns true if
         // all of the actions may proceed on the resource.
-        bool checkAuthorization(const std::string& resource, ActionSet actions) const;
+        bool checkAuthorization(const std::string& resource, ActionSet actions);
 
         // Parses the privilege documents and acquires all privileges that the privilege document
         // grants

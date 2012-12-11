@@ -79,38 +79,37 @@ namespace {
                                                            principal,
                                                            readOnly,
                                                            &privilegeSet));
-        ASSERT_NULL(privilegeSet.getPrivilegeForAction("test", ActionType::insert));
-        ASSERT_NON_NULL(privilegeSet.getPrivilegeForAction("test", ActionType::find));
+        ASSERT(!privilegeSet.hasPrivilege(Privilege("test", ActionType::insert)));
+        ASSERT(privilegeSet.hasPrivilege(Privilege("test", ActionType::find)));
 
         ASSERT_OK(AuthorizationManager::buildPrivilegeSet("test",
                                                            principal,
                                                            readWrite,
                                                            &privilegeSet));
-        ASSERT_NON_NULL(privilegeSet.getPrivilegeForAction("test", ActionType::find));
-        ASSERT_NON_NULL(privilegeSet.getPrivilegeForAction("test", ActionType::insert));
-        ASSERT_NON_NULL(privilegeSet.getPrivilegeForAction("test", ActionType::userAdmin));
-        ASSERT_NON_NULL(privilegeSet.getPrivilegeForAction("test", ActionType::compact));
-        ASSERT_NULL(privilegeSet.getPrivilegeForAction("test", ActionType::shutdown));
-        ASSERT_NULL(privilegeSet.getPrivilegeForAction("test", ActionType::addShard));
+        ASSERT(privilegeSet.hasPrivilege(Privilege("test", ActionType::find)));
+        ASSERT(privilegeSet.hasPrivilege(Privilege("test", ActionType::insert)));
+        ASSERT(privilegeSet.hasPrivilege(Privilege("test", ActionType::userAdmin)));
+        ASSERT(privilegeSet.hasPrivilege(Privilege("test", ActionType::compact)));
+        ASSERT(!privilegeSet.hasPrivilege(Privilege("test", ActionType::shutdown)));
+        ASSERT(!privilegeSet.hasPrivilege(Privilege("test", ActionType::addShard)));
+        ASSERT(!privilegeSet.hasPrivilege(Privilege("admin", ActionType::find)));
+        ASSERT(!privilegeSet.hasPrivilege(Privilege("*", ActionType::find)));
 
-        ASSERT_NULL(privilegeSet.getPrivilegeForAction("admin", ActionType::find));
-        ASSERT_NULL(privilegeSet.getPrivilegeForAction("*", ActionType::find));
         ASSERT_OK(AuthorizationManager::buildPrivilegeSet("admin",
                                                            principal,
                                                            readOnly,
                                                            &privilegeSet));
-        // Should grant privileges on *, not on admin DB directly
-        ASSERT_NULL(privilegeSet.getPrivilegeForAction("admin", ActionType::find));
-        ASSERT_NON_NULL(privilegeSet.getPrivilegeForAction("*", ActionType::find));
+        // Should grant privileges on *.
+        ASSERT(privilegeSet.hasPrivilege(Privilege("*", ActionType::find)));
 
-        ASSERT_NULL(privilegeSet.getPrivilegeForAction("admin", ActionType::insert));
-        ASSERT_NULL(privilegeSet.getPrivilegeForAction("*", ActionType::insert));
+        ASSERT(!privilegeSet.hasPrivilege(Privilege("admin", ActionType::insert)));
+        ASSERT(!privilegeSet.hasPrivilege(Privilege("*", ActionType::insert)));
+
         ASSERT_OK(AuthorizationManager::buildPrivilegeSet("admin",
                                                            principal,
                                                            readWrite,
                                                            &privilegeSet));
-        ASSERT_NULL(privilegeSet.getPrivilegeForAction("admin", ActionType::insert));
-        ASSERT_NON_NULL(privilegeSet.getPrivilegeForAction("*", ActionType::insert));
+        ASSERT(privilegeSet.hasPrivilege(Privilege("*", ActionType::insert)));
     }
 
 }  // namespace

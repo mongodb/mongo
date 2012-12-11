@@ -39,6 +39,18 @@ namespace mongo {
         _actions = ~std::bitset<ActionType::NUM_ACTION_TYPES>();
     }
 
+    void ActionSet::removeAction(const ActionType& action) {
+        _actions.set(action.getIdentifier(), false);
+    }
+
+    void ActionSet::removeAllActionsFromSet(const ActionSet& other) {
+        _actions &= ~other._actions;
+    }
+
+    void ActionSet::removeAllActions() {
+        _actions = std::bitset<ActionType::NUM_ACTION_TYPES>();
+    }
+
     bool ActionSet::contains(const ActionType& action) const {
         return _actions[action.getIdentifier()];
     }

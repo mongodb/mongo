@@ -35,6 +35,12 @@ namespace mongo {
         void addAllActionsFromSet(const ActionSet& actionSet);
         void addAllActions();
 
+        void removeAction(const ActionType& action);
+        void removeAllActionsFromSet(const ActionSet& actionSet);
+        void removeAllActions();
+
+        bool empty() const { return _actions.none(); }
+
         bool contains(const ActionType& action) const;
 
         // Returns true only if this ActionSet contains all the actions present in the 'other'

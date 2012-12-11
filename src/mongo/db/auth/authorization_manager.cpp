@@ -46,7 +46,6 @@ namespace mongo {
     namespace {
         const std::string ADMIN_DBNAME = "admin";
         const std::string LOCAL_DBNAME = "local";
-        const std::string WILDCARD_DBNAME = "*";
     }
 
     // ActionSets for the various system roles.  These ActionSets contain all the actions that
@@ -193,13 +192,13 @@ namespace mongo {
         _authenticatedPrincipals.add(principal);
     }
 
-    Principal* AuthorizationManager::lookupPrincipal(const PrincipalName& name) const {
+    Principal* AuthorizationManager::lookupPrincipal(const PrincipalName& name) {
         return _authenticatedPrincipals.lookup(name);
     }
 
     void AuthorizationManager::logoutDatabase(const std::string& dbname) {
         Principal* principal = _authenticatedPrincipals.lookupByDBName(dbname);
-        _acquiredPrivileges.revokePrivilegesFromPrincipal(principal);
+        _acquiredPrivileges.revokePrivilegesFromPrincipal(principal->getName());
         _authenticatedPrincipals.removeByDBName(dbname);
     }
 
@@ -215,8 +214,7 @@ namespace mongo {
                           0);
         }
 
-        _acquiredPrivileges.grantPrivilege(privilege);
-
+        _acquiredPrivileges.grantPrivilege(privilege.getPrivilege(), principal->getName());
         return Status::OK();
     }
 
@@ -224,17 +222,17 @@ namespace mongo {
         Principal* principal = new Principal(PrincipalName(principalName, "local"));
         ActionSet actions;
         actions.addAllActions();
-        AcquiredPrivilege privilege(Privilege("*", actions), principal);
+        AcquiredPrivilege privilege(Privilege(PrivilegeSet::WILDCARD_RESOURCE, actions), principal);
 
         addAuthorizedPrincipal(principal);
-        Status status = acquirePrivilege(privilege);
-        verify(status.isOK());
+        fassert(0, acquirePrivilege(privilege).isOK());
     }
 
-    bool AuthorizationManager::hasInternalAuthorization() const {
+    bool AuthorizationManager::hasInternalAuthorization() {
         ActionSet allActions;
         allActions.addAllActions();
-        return _acquiredPrivileges.getPrivilegeForActions("*", allActions);
+        return _acquiredPrivileges.hasPrivilege(Privilege(PrivilegeSet::WILDCARD_RESOURCE,
+                                                          allActions));
     }
 
     ActionSet AuthorizationManager::getActionsForOldStyleUser(const std::string& dbname,
@@ -278,7 +276,8 @@ namespace mongo {
             // Grant full access to internal user
             ActionSet allActions;
             allActions.addAllActions();
-            AcquiredPrivilege privilege(Privilege(WILDCARD_DBNAME, allActions), principal);
+            AcquiredPrivilege privilege(Privilege(PrivilegeSet::WILDCARD_RESOURCE, allActions),
+                                        principal);
             return acquirePrivilege(privilege);
         }
         return buildPrivilegeSet(dbname, principal, privilegeDocument, &_acquiredPrivileges);
@@ -329,39 +328,26 @@ namespace mongo {
                 privilegeDocument["readOnly"].trueValue();
         ActionSet actions = getActionsForOldStyleUser(dbname, readOnly);
         std::string resourceName = (dbname == ADMIN_DBNAME || dbname == LOCAL_DBNAME) ?
-                WILDCARD_DBNAME : dbname;
-        result->grantPrivilege(AcquiredPrivilege(Privilege(resourceName, actions), principal));
+            PrivilegeSet::WILDCARD_RESOURCE : dbname;
+        result->grantPrivilege(Privilege(resourceName, actions), principal->getName());
 
         return Status::OK();
     }
 
     bool AuthorizationManager::checkAuthorization(const std::string& resource,
-                                                  ActionType action) const {
+                                                  ActionType action) {
+        if (_externalState->shouldIgnoreAuthChecks())
+            return true;
 
-        if (_externalState->shouldIgnoreAuthChecks()) {
-            return true;
-        }
-
-        if (_acquiredPrivileges.getPrivilegeForAction(nsToDatabase(resource), action))
-            return true;
-        if (_acquiredPrivileges.getPrivilegeForAction(WILDCARD_DBNAME, action))
-            return true;
-        return false;
+        return _acquiredPrivileges.hasPrivilege(Privilege(nsToDatabase(resource), action));
     }
 
     bool AuthorizationManager::checkAuthorization(const std::string& resource,
-                                                  ActionSet actions) const {
-
-        if (_externalState->shouldIgnoreAuthChecks()) {
-            return true;
-        }
-
-        if (_acquiredPrivileges.getPrivilegeForActions(nsToDatabase(resource), actions))
-            return true;
-        if (_acquiredPrivileges.getPrivilegeForActions(WILDCARD_DBNAME, actions))
+                                                  ActionSet actions) {
+        if (_externalState->shouldIgnoreAuthChecks())
             return true;
 
-        return false;
+        return _acquiredPrivileges.hasPrivilege(Privilege(nsToDatabase(resource), actions));
     }
 
     Status AuthorizationManager::checkAuthForQuery(const std::string& ns) {
