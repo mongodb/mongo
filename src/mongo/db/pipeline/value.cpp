@@ -729,7 +729,7 @@ namespace mongo {
         case NumberLong:
         case NumberInt: {
             const double dbl = getDouble();
-            if (isnan(dbl)) {
+            if (isNaN(dbl)) {
                 boost::hash_combine(seed, numeric_limits<double>::quiet_NaN());
             }
             else {
