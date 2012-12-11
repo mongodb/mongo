@@ -95,19 +95,9 @@ namespace mongo {
         // with allocations.
         static const size_t kReserveAhead = 4;
 
-        // We keep a number of references to field parts internally. These can be returned with
-        // very little effort as StringData's.
-        struct PartRef {
-            const char* data;
-            size_t len;
-
-            PartRef() : data(NULL), len(0) {}
-            PartRef(const char* aData, size_t aLen) : data(aData), len(aLen) {}
-        };
-
         size_t _size;                                // # of field parts stored
-        PartRef _fixed[kReserveAhead];               // first kResevedAhead field components
-        std::vector<PartRef> _variable;              // remaining field components
+        StringData _fixed[kReserveAhead];            // first kResevedAhead field components
+        std::vector<StringData> _variable;           // remaining field components
 
         // Areas that _fixed and _variable point to.
         boost::scoped_array<char> _fieldBase;        // concatenation of null-terminated parts

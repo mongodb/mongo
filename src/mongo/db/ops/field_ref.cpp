@@ -60,19 +60,19 @@ namespace mongo {
 
         _replacements[i] = part.toString();
         if (i < kReserveAhead) {
-            _fixed[i] = PartRef(_replacements[i].c_str(), part.size());
+            _fixed[i] = _replacements[i];
         }
         else {
-            _variable[getIndex(i)] = PartRef(_replacements[i].c_str(), part.size());
+            _variable[getIndex(i)] = _replacements[i];
         }
     }
 
     size_t FieldRef::appendPart(const StringData& part) {
         if (_size < kReserveAhead) {
-            _fixed[_size] = PartRef(part.__data(), part.size());
+            _fixed[_size] = part;
         }
         else {
-            _variable.push_back(PartRef(part.__data(), part.size()));
+            _variable.push_back(part);
         }
         return ++_size;
     }
@@ -81,10 +81,10 @@ namespace mongo {
         dassert(i < _size);
 
         if (i < kReserveAhead) {
-            return StringData(_fixed[i].data, _fixed[i].len);
+            return _fixed[i];
         }
         else {
-            return StringData(_variable[getIndex(i)].data, _variable[getIndex(i)].len);
+            return _variable[getIndex(i)];
         }
     }
 
@@ -101,7 +101,7 @@ namespace mongo {
             return res;
         }
 
-        res.append(_fixed[0].data, _fixed[0].len);
+        res.append(_fixed[0].rawData(), _fixed[0].size());
         for (size_t i=1; i<_size; i++) {
             res.append(1, '.');
             StringData part = getPart(i);
