@@ -180,6 +180,8 @@ class mongod(object):
             call(argv)
         utils.ensureDir(dir_name)
         argv = [mongod_executable, "--port", str(self.port), "--dbpath", dir_name]
+        # This should always be set for tests
+        argv += ['--setParameter', 'enableTestCommands=1']
         if self.kwargs.get('small_oplog'):
             argv += ["--master", "--oplogSize", "511"]
         if self.kwargs.get('small_oplog_rs'):
@@ -195,6 +197,7 @@ class mongod(object):
             self.auth = True
         if self.kwargs.get('use_ssl'):
             argv += ['--sslOnNormalPorts', '--sslPEMKeyFile', 'jstests/libs/smoke.pem']
+
         print "running " + " ".join(argv)
         self.proc = self._start(buildlogger(argv, is_global=True))
 

@@ -304,7 +304,10 @@ MongoRunner.mongoOptions = function( opts ){
     
     // Initialize and create a copy of the opts
     opts = Object.merge( opts || {}, {} )
-    
+
+    // This should always be true for tests
+    opts['setParameter=enableTestCommands'] = 1
+
     if( ! opts.restart ) opts.restart = false
     
     // RunId can come from a number of places

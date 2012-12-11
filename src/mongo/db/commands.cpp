@@ -39,8 +39,7 @@ namespace mongo {
     map<string,Command*> * Command::_webCommands;
     map<string,Command*> * Command::_commands;
 
-    // TODO: set to 0 once tests have been updated to enable this
-    int Command::testCommandsEnabled = 1;
+    int Command::testCommandsEnabled = 0;
 
     namespace {
         // TODO: This should only be settable at the command line, not at runtime. Need SERVER-7778
