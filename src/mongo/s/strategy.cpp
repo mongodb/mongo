@@ -63,8 +63,6 @@ namespace mongo {
 
     void Strategy::doIndexQuery( Request& r , const Shard& shard ) {
 
-        r.checkAuth( Auth::READ );
-
         ShardConnection dbcon( shard , r.getns() );
         DBClientBase &c = dbcon.conn();
 

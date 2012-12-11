@@ -70,11 +70,6 @@ namespace mongo {
             return _clientInfo;
         }
 
-        /**
-         * @param ns - 0=use ns from message
-         */
-        void checkAuth( Auth::Level levelNeeded , const char * ns=0 ) const;
-
         // ---- remote location info -----
 
 

@@ -50,20 +50,6 @@ namespace mongo {
         }
     }
 
-    void Request::checkAuth( Auth::Level levelNeeded , const char * need ) const {
-        char cl[256];
-
-        const char * use = cl;
-        if ( need )
-            use = need;
-        else
-            nsToDatabase(getns(), cl);
-
-        uassert( 15845 ,
-                 str::stream() << "unauthorized for db:" << use << " level: " << levelNeeded ,
-                 _clientInfo->getAuthenticationInfo()->isAuthorizedForLevel(use,levelNeeded) );
-    }
-
     void Request::init() {
         if ( _didInit )
             return;
@@ -145,11 +131,9 @@ namespace mongo {
             }
         }
         else if ( op == dbGetMore ) {
-            checkAuth( Auth::READ ); // this is important so someone can't steal a cursor
             s->getMore( *this );
         }
         else {
-            checkAuth( Auth::WRITE );
             s->writeOp( op, *this );
         }
 

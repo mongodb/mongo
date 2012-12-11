@@ -56,8 +56,6 @@ namespace mongo {
             Status status = authManager->checkAuthForQuery(q.ns);
             uassert(16549, status.reason(), status.isOK());
 
-            r.checkAuth( Auth::READ );
-
             LOG(3) << "shard query: " << q.ns << "  " << q.query << endl;
 
             if ( q.ntoreturn == 1 && strstr(q.ns, ".$cmd") )
