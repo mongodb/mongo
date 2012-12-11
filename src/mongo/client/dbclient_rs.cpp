@@ -1769,8 +1769,8 @@ namespace mongo {
         DBClientConnection* newConn = dynamic_cast<DBClientConnection*>(
                 connStr.connect(errmsg, _so_timeout));
 
-	// Assert here instead of returning NULL since the contract of this method is such
-	// that returning NULL means none of the nodes were good, which is not the case here.
+        // Assert here instead of returning NULL since the contract of this method is such
+        // that returning NULL means none of the nodes were good, which is not the case here.
         uassert(16532, str::stream() << "Failed to connect to "
                 << _lastSlaveOkHost.toString(true),
                 newConn != NULL);
