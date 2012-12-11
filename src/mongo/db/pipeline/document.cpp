@@ -230,30 +230,42 @@ namespace mongo {
         }
     }
 
-    MutableValue MutableDocument::getNestedFieldHelper(MutableDocument& md,
-                                                       const vector<Position>& positions,
+    MutableValue MutableDocument::getNestedFieldHelper(const FieldPath& dottedField,
                                                        size_t level) {
-        fassert(16488, !positions.empty());
-
-        if (level == positions.size()-1) {
-            return md[positions[level]];
+        if (level == dottedField.getPathLength()-1) {
+            return getField(dottedField.getFieldName(level));
         }
         else {
-            MutableDocument nested (md[positions[level]]);
-            return getNestedFieldHelper(nested, positions, level+1);
+            MutableDocument nested (getField(dottedField.getFieldName(level)));
+            return nested.getNestedFieldHelper(dottedField, level+1);
+        }
+    }
+
+    MutableValue MutableDocument::getNestedField(const FieldPath& dottedField) {
+        fassert(16601, dottedField.getPathLength());
+        return getNestedFieldHelper(dottedField, 0);
+    }
+
+    MutableValue MutableDocument::getNestedFieldHelper(const vector<Position>& positions,
+                                                       size_t level) {
+        if (level == positions.size()-1) {
+            return getField(positions[level]);
+        }
+        else {
+            MutableDocument nested (getField(positions[level]));
+            return nested.getNestedFieldHelper(positions, level+1);
         }
     }
 
     MutableValue MutableDocument::getNestedField(const vector<Position>& positions) {
-        return getNestedFieldHelper(*this, positions, 0);
+        fassert(16488, !positions.empty());
+        return getNestedFieldHelper(positions, 0);
     }
 
     static Value getNestedFieldHelper(const Document& doc,
                                       const FieldPath& fieldNames,
                                       vector<Position>* positions,
                                       size_t level) {
-
-        fassert(16489, fieldNames.getPathLength());
 
         const string& fieldName = fieldNames.getFieldName(level);
         const Position pos = doc.positionOf(fieldName);
@@ -276,6 +288,7 @@ namespace mongo {
 
     const Value Document::getNestedField(const FieldPath& fieldNames,
                                          vector<Position>* positions) const {
+        fassert(16489, fieldNames.getPathLength());
         return getNestedFieldHelper(*this, fieldNames, positions, 0);
     }
 

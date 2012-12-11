@@ -284,7 +284,17 @@ namespace mongo {
         /// Logically remove a field. Note that memory usage does not decrease.
         void remove(StringData key) { getField(key) = Value(); }
 
-        /// Takes positions vector from Document::getNestedField.
+        /** Gets/Sets a nested field given a path.
+         *
+         *  All fields along path are created as empty Documents if they don't exist
+         *  or are any other type.
+         */
+        MutableValue getNestedField(const FieldPath& dottedField);
+        void setNestedField(const FieldPath& dottedField, const Value& val) {
+            getNestedField(dottedField) = val;
+        }
+
+        /// Takes positions vector from Document::getNestedField. All fields in path must exist.
         MutableValue getNestedField(const vector<Position>& positions);
         void setNestedField(const vector<Position>& positions, const Value& val) {
             getNestedField(positions) = val;
@@ -349,9 +359,9 @@ namespace mongo {
             return const_cast<DocumentStorage&>(*storagePtr());
         }
 
-        MutableValue getNestedFieldHelper(MutableDocument& md,
-                                          const vector<Position>& positions,
-                                          size_t level);
+        // recursive helpers for same-named public methods
+        MutableValue getNestedFieldHelper(const FieldPath& dottedField, size_t level);
+        MutableValue getNestedFieldHelper(const vector<Position>& positions, size_t level);
 
         // this should only be called by storage methods and peek/freeze
         const DocumentStorage* storagePtr() const {
