@@ -26,8 +26,11 @@
 #include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/net/sock.h"
+#include "mongo/util/scopeguard.h"
 
 namespace mongo {
+
+    static const char* validateErrToString(long code);
 
     /**
      * Multithreaded Support for SSL.
@@ -102,13 +105,12 @@ namespace mongo {
     
     ////////////////////////////////////////////////////////////////
 
-    SSLManager::SSLManager(bool client) {
-        _client = client;
+    SSLManager::SSLManager() : _validateCertificates(false) {
         SSL_library_init();
         SSL_load_error_strings();
         ERR_load_crypto_strings();
         
-        _context = SSL_CTX_new( client ? SSLv23_client_method() : SSLv23_server_method() );
+        _context = SSL_CTX_new(SSLv23_method());
         massert(15864, 
                 mongoutils::str::stream() << "can't create SSL Context: " << 
                 _getSSLErrorMessage(ERR_get_error()), 
@@ -130,6 +132,10 @@ namespace mongo {
         std::string pass = sm->_password;
         strcpy(buf,pass.c_str());
         return(pass.size());
+    }
+
+    int SSLManager::verify_cb(int ok, X509_STORE_CTX *ctx) {
+	return 1; // always succeed; we will catch the error in our get_verify_result() call
     }
 
     bool SSLManager::setupPEM(const std::string& keyFile , const std::string& password) {
@@ -157,35 +163,96 @@ namespace mongo {
         }
         return true;
     }
+
+    bool SSLManager::setupCA(const std::string& caFile) {
+        // Load trusted CA
+        if (SSL_CTX_load_verify_locations(_context, caFile.c_str(), NULL) != 1) {
+            log() << "Can't read certificate authority file: " << caFile << " " <<
+                _getSSLErrorMessage(ERR_get_error()) << endl;
+            return false;
+        }
+        // Set SSL to require peer (client) certificate verification
+        // if a certificate is presented
+        SSL_CTX_set_verify(_context, SSL_VERIFY_PEER, &SSLManager::verify_cb);
+        _validateCertificates = true;
+        return true;
+    }
                 
-    SSL * SSLManager::secure(int fd) {
+    SSL* SSLManager::_secure(int fd) {
         // This just ensures that SSL multithreading support is set up for this thread,
         // if it's not already.
         SSLThreadInfo::get();
 
         SSL * ssl = SSL_new(_context);
-        massert(15861, 
+        massert(15861,
                 _getSSLErrorMessage(ERR_get_error()),
                 ssl);
         
         int status = SSL_set_fd( ssl , fd );
-        massert(16510, 
+        massert(16510,
                 _getSSLErrorMessage(ERR_get_error()), 
                 status == 1);
 
         return ssl;
     }
 
-    void SSLManager::connect(SSL* ssl) {
+    SSL* SSLManager::connect(int fd) {
+        SSL* ssl = _secure(fd);
         int ret = SSL_connect(ssl);
         if (ret != 1)
             _handleSSLError(SSL_get_error(ssl, ret));
+        return ssl;
     }
 
-    void SSLManager::accept(SSL* ssl) {
+    SSL* SSLManager::accept(int fd) {
+        SSL* ssl = _secure(fd);
         int ret = SSL_accept(ssl);
         if (ret != 1)
             _handleSSLError(SSL_get_error(ssl, ret));
+        return ssl;
+    }
+
+    void SSLManager::validatePeerCertificate(const SSL* ssl) {
+        if (!_validateCertificates) return;
+
+        X509* cert = SSL_get_peer_certificate(ssl);
+
+        if (cert == NULL) { // no certificate presented by peer
+            // TODO: if force_validation, throw an exception
+            // else
+            log() << "no SSL certificate provided by peer" << endl;
+            return;
+        }
+        ON_BLOCK_EXIT(X509_free, cert);
+
+        long result = SSL_get_verify_result(ssl);
+
+        if (result != X509_V_OK) {
+            error() << "SSL peer certificate validation failed:" << validateErrToString(result)
+                    << endl;
+            throw SocketException(SocketException::CONNECT_ERROR, "");
+        }
+
+        // TODO: check optional cipher restriction, using cert.
+        // TODO: enforce CRL?
+    }
+
+    // Access to this via DBClientConnection is protected by a mutex in that class,
+    // because the C++ driver and shell lazily initialize SSL via DBClientConnection
+    // and multiple threads.
+    // For mongod, this is initialized via initialize_server_global_state, and thus
+    // does not need any locking, as all mongod consumers assume it has already been 
+    // initialized.
+    static SSLManager* s_manager(NULL);
+
+    SSLManager* SSLManager::getGlobal() {
+        return s_manager;
+    }
+
+    SSLManager* SSLManager::createGlobal() {
+        fassert(16558, s_manager == NULL);
+        s_manager = new SSLManager();
+        return s_manager;
     }
 
     std::string SSLManager::_getSSLErrorMessage(int code) {
@@ -232,8 +299,95 @@ namespace mongo {
             throw SocketException(SocketException::CONNECT_ERROR, "");
             break;
         }
-    }       
+    }
 
+    const char* validateErrToString(long code) {
+        switch (code) {
+        case X509_V_ERR_UNABLE_TO_DECRYPT_CERT_SIGNATURE:
+            return "UNABLE_TO_DECRYPT_CERT_SIGNATURE";
+        
+        case X509_V_ERR_UNABLE_TO_DECRYPT_CRL_SIGNATURE:
+            return "UNABLE_TO_DECRYPT_CRL_SIGNATURE";
+
+        case X509_V_ERR_UNABLE_TO_DECODE_ISSUER_PUBLIC_KEY:
+            return "UNABLE_TO_DECODE_ISSUER_PUBLIC_KEY";
+
+        case X509_V_ERR_CERT_SIGNATURE_FAILURE:
+            return "CERT_SIGNATURE_FAILURE";
+
+        case X509_V_ERR_CRL_SIGNATURE_FAILURE:
+            return "CRL_SIGNATURE_FAILURE";
+
+        case X509_V_ERR_ERROR_IN_CERT_NOT_BEFORE_FIELD:
+            return "ERROR_IN_CERT_NOT_BEFORE_FIELD";
+
+        case X509_V_ERR_ERROR_IN_CERT_NOT_AFTER_FIELD:
+            return "ERROR_IN_CERT_NOT_AFTER_FIELD";
+
+        case X509_V_ERR_ERROR_IN_CRL_LAST_UPDATE_FIELD:
+            return "ERROR_IN_CRL_LAST_UPDATE_FIELD";
+
+        case X509_V_ERR_ERROR_IN_CRL_NEXT_UPDATE_FIELD:
+            return "ERROR_IN_CRL_NEXT_UPDATE_FIELD";
+
+        case X509_V_ERR_CERT_NOT_YET_VALID:
+            return "CERT_NOT_YET_VALID";
+
+        case X509_V_ERR_CERT_HAS_EXPIRED:
+            return "CERT_HAS_EXPIRED";
+
+        case X509_V_ERR_OUT_OF_MEM:
+            return "OUT_OF_MEM";
+
+        case X509_V_ERR_UNABLE_TO_GET_ISSUER_CERT:
+            return "UNABLE_TO_GET_ISSUER_CERT";
+
+        case X509_V_ERR_UNABLE_TO_GET_ISSUER_CERT_LOCALLY:
+            return "UNABLE_TO_GET_ISSUER_CERT_LOCALLY";
+
+        case X509_V_ERR_UNABLE_TO_VERIFY_LEAF_SIGNATURE:
+            return "UNABLE_TO_VERIFY_LEAF_SIGNATURE";
+
+        case X509_V_ERR_DEPTH_ZERO_SELF_SIGNED_CERT:
+            return "DEPTH_ZERO_SELF_SIGNED_CERT";
+
+        case X509_V_ERR_SELF_SIGNED_CERT_IN_CHAIN:
+            return "SELF_SIGNED_CERT_IN_CHAIN";
+
+        case X509_V_ERR_CERT_CHAIN_TOO_LONG:
+            return "CERT_CHAIN_TOO_LONG";
+
+        case X509_V_ERR_CERT_REVOKED:
+            return "CERT_REVOKED";
+
+        case X509_V_ERR_INVALID_CA:
+            return "INVALID_CA";
+
+        case X509_V_ERR_PATH_LENGTH_EXCEEDED:
+            return "PATH_LENGTH_EXCEEDED";
+
+        case X509_V_ERR_INVALID_PURPOSE:
+            return "INVALID_PURPOSE";
+
+        case X509_V_ERR_CERT_UNTRUSTED:
+            return "CERT_UNTRUSTED";
+
+        case X509_V_ERR_CERT_REJECTED:
+            return "CERT_REJECTED";
+
+        case X509_V_ERR_UNABLE_TO_GET_CRL:
+            return "UNABLE_TO_GET_CRL";
+
+        case X509_V_ERR_CRL_NOT_YET_VALID:
+            return "CRL_NOT_YET_VALID";
+
+        case X509_V_ERR_CRL_HAS_EXPIRED:
+            return "CRL_HAS_EXPIRED";
+        }
+
+        return "Unknown verify error";
+    }
 }
+
 #endif
         

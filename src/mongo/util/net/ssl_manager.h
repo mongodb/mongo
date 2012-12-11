@@ -28,33 +28,55 @@ namespace mongo {
     class SSLManager {
     MONGO_DISALLOW_COPYING(SSLManager);
     public:
-        SSLManager( bool client );
+        SSLManager();
 
         /** @return true if was successful, otherwise false */
         bool setupPEM( const std::string& keyFile , const std::string& password );
 
-        /**
-         * creates an SSL context to be used for this file descriptor
-         * caller should delete
+        /*
+         * Set up SSL for certificate validation by loading a CA
          */
-        SSL * secure( int fd );
+        bool setupCA(const std::string& caFile);
 
         /**
-         * Initiates a TLS connection
+         * Initiates a TLS connection.
+         * Throws SocketException on failure.
+         * @return a pointer to an SSL context; caller must SSL_free it.
          */
-        void connect(SSL* ssl);
+        SSL* connect(int fd);
 
         /**
-         * Waits for the other side to initiate a TLS connection
+         * Waits for the other side to initiate a TLS connection.
+         * Throws SocketException on failure.
+         * @return a pointer to an SSL context; caller must SSL_free it.
          */
-        void accept(SSL* ssl);
-        
+        SSL* accept(int fd);
+
+        /**
+         * Fetches a peer certificate and validates it if it exists
+         * Throws SocketException on failure
+         */
+        void validatePeerCertificate(const SSL* ssl);
+
+        /**
+         * Callbacks for SSL functions
+         */
         static int password_cb( char *buf,int num, int rwflag,void *userdata );
+        static int verify_cb(int ok, X509_STORE_CTX *ctx);
+
+        static SSLManager* getGlobal();
+        static SSLManager* createGlobal();
 
     private:
-        bool _client;
         SSL_CTX* _context;
         std::string _password;
+        bool _validateCertificates;
+
+        /**
+         * creates an SSL context to be used for this file descriptor.
+         * caller must SSL_free it.
+         */
+        SSL* _secure(int fd);
 
         /**
          * Fetches the error text for an error code, in a thread-safe manner.

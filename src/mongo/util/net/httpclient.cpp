@@ -102,8 +102,7 @@ namespace mongo {
         
         if ( ssl ) {
 #ifdef MONGO_SSL
-            _checkSSLManager();
-            sock.secure( _sslManager.get() );
+            sock.secure(SSLManager::getGlobal());
 #else
             uasserted( 15862 , "no ssl support" );
 #endif
@@ -168,11 +167,5 @@ namespace mongo {
 
         _body = entire;
     }
-
-#ifdef MONGO_SSL
-    void HttpClient::_checkSSLManager() {
-        _sslManager.reset( new SSLManager( true ) );
-    }
-#endif
 
 }

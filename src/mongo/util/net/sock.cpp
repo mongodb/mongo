@@ -431,12 +431,12 @@ namespace mongo {
     }
     
 #ifdef MONGO_SSL
-    void Socket::secure( SSLManager * ssl ) {
-        fassert(16503, ssl);
+    void Socket::secure(SSLManager* mgr) {
+        fassert(16503, mgr);
         fassert(16504, !_ssl);
         fassert(16505, _fd >= 0);
-        _ssl = ssl->secure( _fd );
-        ssl->connect(_ssl);
+        _ssl = mgr->connect(_fd);        
+        mgr->validatePeerCertificate(_ssl);
     }
 
     void Socket::secureAccepted( SSLManager * ssl ) { 
@@ -446,12 +446,14 @@ namespace mongo {
 
     void Socket::doSSLHandshake() {
 #ifdef MONGO_SSL
-        if ( _sslAccepted ) {
-            fassert(16506, _fd);
-            _ssl = _sslAccepted->secure( _fd );
-            _sslAccepted->accept(_ssl);
-            _sslAccepted = 0;
-        }
+        if (!_sslAccepted) return;
+        
+        fassert(16506, _fd);
+        _ssl = _sslAccepted->accept(_fd);
+        _sslAccepted->validatePeerCertificate(_ssl);
+        _sslAccepted = 0;
+        
+        
 #endif
     }
 

@@ -102,6 +102,8 @@ namespace {
         ("sslOnNormalPorts" , "use ssl on configured ports" )
         ("sslPEMKeyFile" , po::value<string>(&cmdLine.sslPEMKeyFile), "PEM file for ssl" )
         ("sslPEMKeyPassword" , new PasswordValue(&cmdLine.sslPEMKeyPassword) , "PEM file password" )
+        ("sslCAFile", po::value<std::string>(&cmdLine.sslCAFile), 
+         "Certificate Authority file for SSL")
 #endif
         ;
         

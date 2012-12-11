@@ -99,8 +99,8 @@ namespace mongo {
         _ssl = 0;
         _sslPort = 0;
 
-        if ( cmdLine.sslOnNormalPorts && cmdLine.sslServerManager ) {
-            secure( cmdLine.sslServerManager );
+        if (cmdLine.sslOnNormalPorts) {
+            secure(SSLManager::getGlobal());
         }
 #endif
     }

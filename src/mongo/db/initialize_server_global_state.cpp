@@ -200,10 +200,19 @@ namespace mongo {
                 return false;
             }
 
-            cmdLine.sslServerManager = new SSLManager( false );
-            if ( ! cmdLine.sslServerManager->setupPEM( cmdLine.sslPEMKeyFile , cmdLine.sslPEMKeyPassword ) ) {
+            SSLManager* mgr = SSLManager::createGlobal();
+            if (!mgr->setupPEM(cmdLine.sslPEMKeyFile, 
+                               cmdLine.sslPEMKeyPassword)) {
                 return false;
             }
+            if (cmdLine.sslCAFile.size() > 0) {
+                // Set up certificate validation with a certificate authority
+                if (!mgr->setupCA(cmdLine.sslCAFile)) {
+                    return false;
+                }
+            }
+
+
         }
         else if ( cmdLine.sslPEMKeyFile.size() || cmdLine.sslPEMKeyPassword.size() ) {
             log() << "need to enable sslOnNormalPorts" << endl;
