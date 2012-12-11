@@ -1295,8 +1295,11 @@ const char *wiredtiger_strerror(int err);
 struct __wt_event_handler {
 	/*!
 	 * Callback to handle error messages; by default, error messages are
-	 * written to the stderr stream.  If the handler returns non-zero,
-	 * the application's current operation will return an error.
+	 * written to the stderr stream.
+	 *
+	 * Error handler returns are not ignored: if the handler returns
+	 * non-zero, the error may cause the WiredTiger function posting the
+	 * event to fail, and may even cause operation or library failure.
 	 *
 	 * @param error a WiredTiger, C99 or POSIX error code, which can
 	 * be converted to a string using ::wiredtiger_strerror
@@ -1307,8 +1310,11 @@ struct __wt_event_handler {
 
 	/*!
 	 * Callback to handle informational messages; by default, informational
-	 * messages are written to the stdout stream.  If the handler returns
-	 * non-zero, the application's current operation will return an error.
+	 * messages are written to the stdout stream.
+	 *
+	 * Message handler returns are not ignored: if the handler returns
+	 * non-zero, the error may cause the WiredTiger function posting the
+	 * event to fail, and may even cause operation or library failure.
 	 *
 	 * @param message an informational string
 	 */
@@ -1316,8 +1322,11 @@ struct __wt_event_handler {
 
 	/*!
 	 * Callback to handle progress messages; by default, no progress
-	 * messages are written.  If the handler returns non-zero, the
-	 * application's current operation will return an error.
+	 * messages are written.
+	 *
+	 * Progress handler returns are not ignored: if the handler returns
+	 * non-zero, the error may cause the WiredTiger function posting the
+	 * event to fail, and may even cause operation or library failure.
 	 *
 	 * @param operation a string representation of the operation
 	 * @param progress a counter
