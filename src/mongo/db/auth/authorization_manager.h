@@ -62,11 +62,10 @@ namespace mongo {
         // Takes ownership of the principal (by putting into _authenticatedPrincipals).
         void addAuthorizedPrincipal(Principal* principal);
 
-        // Returns the authenticated principal with the given username whose credential information
-        // comes from userSource (will generally be a database name or $sasl).  Returns NULL
+        // Returns the authenticated principal with the given name.  Returns NULL
         // if no such user is found.
         // Ownership of the returned Principal remains with _authenticatedPrincipals
-        Principal* lookupPrincipal(const std::string& name, const std::string& userSource) const;
+        Principal* lookupPrincipal(const PrincipalName& name) const;
 
         // Removes any authenticated principals whose authorization credentials came from the given
         // database, and revokes any privileges that were granted via that principal.

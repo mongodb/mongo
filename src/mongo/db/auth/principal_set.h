@@ -19,7 +19,9 @@
 #include <vector>
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/base/string_data.h"
 #include "mongo/db/auth/principal.h"
+#include "mongo/db/auth/principal_name.h"
 
 namespace mongo {
 
@@ -40,18 +42,17 @@ namespace mongo {
         void add(Principal* principal);
 
         // Removes all principals whose authentication credentials came from dbname.
-        void removeByDBName(const std::string& dbname);
+        void removeByDBName(const StringData& dbname);
 
-        // Returns the Principal with the given principal name whose authentication credentials
-        // came from dbname, or NULL if not found.
+        // Returns the Principal with the given name, or NULL if not found.
         // Ownership of the returned Principal remains with the PrincipalSet.  The pointer
         // returned is only guaranteed to remain valid until the next non-const method is called
         // on the PrincipalSet.
-        Principal* lookup(const std::string& name, const std::string& dbname) const;
+        Principal* lookup(const PrincipalName& name) const;
 
         // Gets the principal whose authentication credentials came from dbname, or NULL if none
         // exist.  There should be at most one such principal.
-        Principal* lookupByDBName(const std::string& dbname) const;
+        Principal* lookupByDBName(const StringData& dbname) const;
 
     private:
         // The PrincipalSet maintains ownership of the Principals in it, and is responsible for

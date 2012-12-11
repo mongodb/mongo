@@ -28,8 +28,8 @@ namespace {
     TEST(PrivilegeSetTest, PrivilegeSet) {
         PrivilegeSet capSet;
         ActionSet actions;
-        Principal user1("user1", "test");
-        Principal user2("user2", "test2");
+        Principal user1(PrincipalName("user1", "test"));
+        Principal user2(PrincipalName("user2", "test2"));
 
         ASSERT_OK(ActionSet::parseActionSetFromString("find,update", &actions));
         AcquiredPrivilege fooUser(Privilege("foo", actions), &user2);

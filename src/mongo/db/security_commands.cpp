@@ -100,7 +100,7 @@ namespace mongo {
                                              const BSONObj& userObj) {
         AuthorizationManager* authorizationManager =
                 ClientBasic::getCurrent()->getAuthorizationManager();
-        Principal* principal = new Principal(principalName, dbname);
+        Principal* principal = new Principal(PrincipalName(principalName, dbname));
         authorizationManager->addAuthorizedPrincipal(principal);
         return authorizationManager->acquirePrivilegesFromPrivilegeDocument(dbname,
                                                                             principal,

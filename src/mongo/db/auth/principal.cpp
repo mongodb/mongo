@@ -20,26 +20,14 @@
 
 namespace mongo {
 
-    Principal::Principal(const std::string& name,
-                         const std::string& dbname,
+    Principal::Principal(const PrincipalName& name,
                          const boost::posix_time::ptime& expirationTime) :
-            _name(name), _dbname(dbname), _expirationTime(expirationTime) {}
-    Principal::Principal(const std::string& name, const std::string& dbname) :
-            _name(name), _dbname(dbname), _expirationTime(boost::posix_time::pos_infin) {}
-    Principal::Principal() :
-            _name(""), _dbname(""), _expirationTime(boost::posix_time::pos_infin) {}
+            _name(name), _expirationTime(expirationTime) {}
 
-    const std::string& Principal::getName() const {
-        return _name;
-    }
+    Principal::Principal(const PrincipalName& name) :
+            _name(name), _expirationTime(boost::posix_time::pos_infin) {}
 
-    const std::string& Principal::getDBName() const {
-        return _dbname;
-    }
-
-    const boost::posix_time::ptime& Principal::getExpirationTime() const {
-        return _expirationTime;
-    }
+    Principal::~Principal() {}
 
     void Principal::setExpirationTime(boost::posix_time::ptime& expiration) {
         _expirationTime = expiration;

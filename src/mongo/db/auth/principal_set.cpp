@@ -38,21 +38,21 @@ namespace mongo {
         for (std::vector<Principal*>::iterator it = _principals.begin();
                 it != _principals.end(); ++it) {
             Principal* current = *it;
-            if (current->getDBName() == principal->getDBName()) {
+            if (current->getName().getDB() == principal->getName().getDB()) {
                 // There can be only one principal per database.
                 delete current;
-                _principals.erase(it);
-                break;
+                *it = principal;
+                return;
             }
         }
         _principals.push_back(principal);
     }
 
-    void PrincipalSet::removeByDBName(const std::string& dbname) {
+    void PrincipalSet::removeByDBName(const StringData& dbname) {
         for (std::vector<Principal*>::iterator it = _principals.begin();
                 it != _principals.end(); ++it) {
             Principal* current = *it;
-            if (current->getDBName() == dbname) {
+            if (current->getName().getDB() == dbname) {
                 delete current;
                 _principals.erase(it);
                 break;
@@ -60,19 +60,19 @@ namespace mongo {
         }
     }
 
-    Principal* PrincipalSet::lookup(const std::string& name, const std::string& dbname) const {
-        Principal* principal = lookupByDBName(dbname);
+    Principal* PrincipalSet::lookup(const PrincipalName& name) const {
+        Principal* principal = lookupByDBName(name.getDB());
         if (principal && principal->getName() == name) {
             return principal;
         }
         return NULL;
     }
 
-    Principal* PrincipalSet::lookupByDBName(const std::string& dbname) const {
+    Principal* PrincipalSet::lookupByDBName(const StringData& dbname) const {
         for (std::vector<Principal*>::const_iterator it = _principals.begin();
                 it != _principals.end(); ++it) {
             Principal* current = *it;
-            if (current->getDBName() == dbname) {
+            if (current->getName().getDB() == dbname) {
                 return current;
             }
         }

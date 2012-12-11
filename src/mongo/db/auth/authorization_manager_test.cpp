@@ -31,7 +31,7 @@ namespace mongo {
 namespace {
 
     TEST(AuthorizationManagerTest, AcquirePrivilegeAndCheckAuthorization) {
-        Principal* principal = new Principal("Spencer", "test");
+        Principal* principal = new Principal(PrincipalName("Spencer", "test"));
         ActionSet actions;
         actions.addAction(ActionType::insert);
         AcquiredPrivilege writePrivilege(Privilege("test", actions), principal);
@@ -62,7 +62,7 @@ namespace {
     }
 
     TEST(AuthorizationManagerTest, GetPrivilegesFromPrivilegeDocument) {
-        Principal* principal = new Principal("Spencer", "test");
+        Principal* principal = new Principal(PrincipalName("Spencer", "test"));
         BSONObj invalid;
         BSONObj readWrite = BSON("user" << "Spencer" << "pwd" << "passwordHash");
         BSONObj readOnly = BSON("user" << "Spencer" << "pwd" << "passwordHash" <<
