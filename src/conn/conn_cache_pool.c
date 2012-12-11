@@ -146,7 +146,7 @@ __wt_conn_cache_pool_open(WT_SESSION_IMPL *session)
 	/* Start the cache pool server if required. */
 	if (create_server) {
 		F_SET(cp, WT_CACHE_POOL_RUN);
-		WT_ERR(__wt_thread_create(
+		WT_ERR(__wt_thread_create(session,
 		    &cp->cache_pool_tid, __wt_cache_pool_server, NULL));
 	}
 	/* Wake up the cache pool server to get our initial chunk. */
@@ -239,7 +239,7 @@ __wt_conn_cache_pool_destroy(WT_CONNECTION_IMPL *conn)
 
 		/* Shut down the cache pool worker. */
 		WT_TRET(__wt_cond_signal(session, cp->cache_pool_cond));
-		WT_TRET(__wt_thread_join(cp->cache_pool_tid));
+		WT_TRET(__wt_thread_join(session, cp->cache_pool_tid));
 
 		/* Now free the pool. */
 		__wt_free(session, cp->name);

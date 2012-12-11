@@ -940,10 +940,11 @@ extern int __wt_write(WT_SESSION_IMPL *session,
     const void *buf);
 extern void __wt_sleep(long seconds, long micro_seconds);
 extern uint64_t __wt_strtouq(const char *nptr, char **endptr, int base);
-extern int __wt_thread_create(pthread_t *tidret,
+extern int __wt_thread_create(WT_SESSION_IMPL *session,
+    pthread_t *tidret,
     void *(*func)(void *),
     void *arg);
-extern int __wt_thread_join(pthread_t tid);
+extern int __wt_thread_join(WT_SESSION_IMPL *session, pthread_t tid);
 extern int __wt_epoch(WT_SESSION_IMPL *session, struct timespec *tsp);
 extern void __wt_yield(void);
 extern int __wt_struct_check(WT_SESSION_IMPL *session,

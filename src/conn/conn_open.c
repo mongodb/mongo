@@ -49,7 +49,7 @@ __wt_connection_open(WT_CONNECTION_IMPL *conn, const char *cfg[])
 	 */
 	WT_ERR(__wt_open_session(conn, 1, NULL, NULL, &evict_session));
 	evict_session->name = "eviction-server";
-	WT_ERR(__wt_thread_create(
+	WT_ERR(__wt_thread_create(session,
 	    &conn->cache_evict_tid, __wt_cache_evict_server, evict_session));
 
 	return (0);
@@ -90,7 +90,7 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 	F_CLR(conn, WT_CONN_SERVER_RUN);
 	if (conn->cache_evict_tid != 0) {
 		WT_TRET(__wt_evict_server_wake(session));
-		WT_TRET(__wt_thread_join(conn->cache_evict_tid));
+		WT_TRET(__wt_thread_join(session, conn->cache_evict_tid));
 	}
 
 	/* Disconnect from shared cache - must be before cache destroy. */

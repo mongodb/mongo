@@ -78,10 +78,10 @@ __lsm_tree_close(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 		if (F_ISSET(S2C(session), WT_CONN_LSM_MERGE))
 			for (i = 0; i < lsm_tree->merge_threads; i++)
 				WT_TRET(__wt_thread_join(
-				    lsm_tree->worker_tids[i]));
-		WT_TRET(__wt_thread_join(lsm_tree->ckpt_tid));
+				    session, lsm_tree->worker_tids[i]));
+		WT_TRET(__wt_thread_join(session, lsm_tree->ckpt_tid));
 		if (FLD_ISSET(lsm_tree->bloom, WT_LSM_BLOOM_NEWEST))
-			WT_TRET(__wt_thread_join(lsm_tree->bloom_tid));
+			WT_TRET(__wt_thread_join(session, lsm_tree->bloom_tid));
 	}
 
 	/*
@@ -246,7 +246,8 @@ __lsm_tree_start_worker(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 			WT_RET(__wt_calloc_def(session, 1, &wargs));
 			wargs->lsm_tree = lsm_tree;
 			wargs->id = i;
-			WT_RET(__wt_thread_create(&lsm_tree->worker_tids[i],
+			WT_RET(__wt_thread_create(session,
+			    &lsm_tree->worker_tids[i],
 			    __wt_lsm_merge_worker, wargs));
 		}
 	if (FLD_ISSET(lsm_tree->bloom, WT_LSM_BLOOM_NEWEST)) {
@@ -254,10 +255,10 @@ __lsm_tree_start_worker(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 		lsm_tree->bloom_session = (WT_SESSION_IMPL *)wt_session;
 		F_SET(lsm_tree->bloom_session, WT_SESSION_INTERNAL);
 
-		WT_RET(__wt_thread_create(
+		WT_RET(__wt_thread_create(session,
 		    &lsm_tree->bloom_tid, __wt_lsm_bloom_worker, lsm_tree));
 	}
-	WT_RET(__wt_thread_create(
+	WT_RET(__wt_thread_create(session,
 	    &lsm_tree->ckpt_tid, __wt_lsm_checkpoint_worker, lsm_tree));
 
 	return (0);
