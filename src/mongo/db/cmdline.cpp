@@ -84,8 +84,6 @@ namespace {
         ("logappend" , "append to logpath instead of over-writing" )
         ("pidfilepath", po::value<string>(), "full path to pidfile (if not set, no pidfile is created)")
         ("keyFile", po::value<string>(), "private key for cluster authentication")
-        ("enableFaultInjection", "enable the fault injection framework, for debugging."
-                " DO NOT USE IN PRODUCTION")
         ("setParameter", po::value< std::vector<std::string> >()->composing(),
                 "Set a configurable parameter")
 #ifndef _WIN32

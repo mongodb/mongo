@@ -14,10 +14,9 @@
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "mongo/db/commands/fail_point_cmd.h"
-
 #include <vector>
 
+#include "mongo/base/init.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/privilege.h"
@@ -153,10 +152,11 @@ namespace mongo {
             return true;
         }
     };
-
-    scoped_ptr<FaultInjectCmd> _faultInjectCmd(NULL);
-
-    void enableFailPointCmd() {
-        _faultInjectCmd.reset(new FaultInjectCmd);
+    MONGO_INITIALIZER(RegisterFaultInjectCmd)(InitializerContext* context) {
+        if (Command::testCommandsEnabled) {
+            // Leaked intentionally: a Command registers itself when constructed.
+            new FaultInjectCmd();
+        }
+        return Status::OK();
     }
 }

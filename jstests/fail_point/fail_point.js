@@ -60,33 +60,12 @@ var runTest = function(adminDB) {
 };
 
 var conn = MongoRunner.runMongod({ port: 29000 });
-
-// configureFailPoint is only available if run with --enableFaultInjection
-assert.commandFailed(conn.getDB('admin').runCommand({ configureFailPoint: 'dummy' }));
-
-MongoRunner.stopMongod(conn.port);
-conn = MongoRunner.runMongod({ enableFaultInjection: '', port: conn.port, verbose: 6 });
-
 runTest(conn.getDB('admin'));
-
 MongoRunner.stopMongod(conn.port);
 
 ///////////////////////////////////////////////////////////
 // Test mongos
 var st = new ShardingTest({ shards: 1 });
-
-adminDB = st.s.getDB('admin');
-
-// configureFailPoint is only available if run with --enableFaultInjection
-// Note: mongos asserts when command is not found, unlike mongod
-assert.throws(function() {
-    adminDB.runCommand({ configureFailPoint: 'dummy' });
-});
-
-st.stop();
-
-st = new ShardingTest({ shards: 1, other: { mongosOptions: { enableFaultInjection: '' }}});
 runTest(st.s.getDB('admin'));
-
 st.stop();
 

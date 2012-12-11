@@ -27,7 +27,6 @@
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/cmdline.h"
 #include "mongo/db/commands/server_status.h"
-#include "mongo/db/commands/fail_point_cmd.h"
 #include "mongo/db/d_concurrency.h"
 #include "mongo/db/d_globals.h"
 #include "mongo/db/db.h"
@@ -1186,10 +1185,6 @@ static void processCommandLineOptions(const std::vector<std::string>& argv) {
             log() << endl;
             warning() << "32-bit servers don't have journaling enabled by default. Please use --journal if you want durability." << endl;
             log() << endl;
-        }
-
-        if (params.count("enableFaultInjection")) {
-            enableFailPointCmd();
         }
 
         Module::configAll(params);

@@ -21,7 +21,6 @@
 #include <boost/thread/thread.hpp>
 
 #include "mongo/base/initializer.h"
-#include "mongo/db/commands/fail_point_cmd.h"
 #include "mongo/db/initialize_server_global_state.h"
 #include "../util/net/message.h"
 #include "../util/startup_test.h"
@@ -427,10 +426,6 @@ static void processCommandLineOptions(const std::vector<std::string>& argv) {
 
     if( configdbs.size() == 1 ) {
         warning() << "running with 1 config server should be done only for testing purposes and is not recommended for production" << endl;
-    }
-
-    if (params.count("enableFaultInjection")) {
-        enableFailPointCmd();
     }
 
     _isUpgradeSwitchSet = params.count("upgrade");
