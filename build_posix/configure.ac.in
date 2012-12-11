@@ -67,6 +67,7 @@ AM_TYPES
 
 AC_PROG_INSTALL
 
+AC_CHECK_HEADERS([pthread_np.h])
 AC_CHECK_LIB(pthread, pthread_create)
 AC_CHECK_LIB(dl, dlopen)
 AC_CHECK_LIB(rt, sched_yield)

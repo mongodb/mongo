@@ -18,10 +18,6 @@ __wt_thread_create(pthread_t *tidret, void *(*func)(void *), void *arg)
 	return (pthread_create(tidret, NULL, func, arg));
 }
 
-#ifdef HAVE_PTHREAD_TIMEDJOIN_NP
-extern int pthread_timedjoin_np(pthread_t, void **, const struct timespec *);
-#endif
-
 /*
  * __wt_thread_join --
  *	Wait for a thread of control to exit.

@@ -29,6 +29,9 @@ extern "C" {
 #include <inttypes.h>
 #include <limits.h>
 #include <pthread.h>
+#ifdef HAVE_PTHREAD_NP_H
+#include <pthread_np.h>
+#endif
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
