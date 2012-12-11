@@ -1165,6 +1165,71 @@ namespace mongo {
         scoped_ptr<Unwinder> _unwinder;
     };
 
+    class DocumentSourceGeoNear : public SplittableDocumentSource {
+    public:
+        // virtuals from DocumentSource
+        virtual ~DocumentSourceGeoNear();
+        virtual bool eof();
+        virtual bool advance();
+        virtual Document getCurrent();
+        virtual const char *getSourceName() const;
+        virtual void setSource(DocumentSource *pSource); // errors out since this must be first
+        virtual bool coalesce(const intrusive_ptr<DocumentSource> &pNextSource);
+
+        // Virtuals for SplittableDocumentSource
+        virtual intrusive_ptr<DocumentSource> getShardSource();
+        virtual intrusive_ptr<DocumentSource> getRouterSource();
+
+        static intrusive_ptr<DocumentSource> createFromBson(
+            BSONElement *pBsonElement,
+            const intrusive_ptr<ExpressionContext> &pCtx);
+
+        static char geoNearName[];
+
+        long long getLimit() { return limit; }
+
+        // this should only be used for testing
+        static intrusive_ptr<DocumentSourceGeoNear> create(
+            const intrusive_ptr<ExpressionContext> &pCtx);
+
+    protected:
+        // virtuals from DocumentSource
+        virtual void sourceToBson(BSONObjBuilder *pBuilder, bool explain) const;
+
+    private:
+        DocumentSourceGeoNear(const intrusive_ptr<ExpressionContext> &pExpCtx);
+
+        void parseOptions(BSONObj options);
+        BSONObj buildGeoNearCmd(const StringData& collection) const;
+        void runCommand();
+
+        // These fields describe the command to run.
+        // coords and distanceField are required, rest are optional
+        BSONObj coords; // "near" option, but near is a reserved keyword on windows
+        bool coordsIsArray;
+        scoped_ptr<FieldPath> distanceField; // Using scoped_ptr because FieldPath can't be empty
+        long long limit;
+        double maxDistance;
+        BSONObj query;
+        bool spherical;
+        double distanceMultiplier;
+        scoped_ptr<FieldPath> includeLocs;
+        bool uniqueDocs;
+
+        // These fields are injected by PipelineD. This division of labor allows the
+        // DocumentSourceGeoNear class to be linked into both mongos and mongod while
+        // allowing it to run a command using DBDirectClient when in mongod.
+        string db;
+        string collection;
+        boost::scoped_ptr<DBClientWithCommands> client; // either NULL or a DBDirectClient
+        friend class PipelineD;
+
+        // these fields are used while processing the results
+        BSONObj cmdOutput;
+        boost::scoped_ptr<BSONObjIterator> resultsIterator; // iterator over cmdOutput["results"]
+        Document currentDoc;
+        bool hasCurrent;
+    };
 }
 
 

@@ -22,6 +22,7 @@
 #include "db/queryutil.h"
 #include "db/pipeline/document_source.h"
 #include "mongo/client/dbclientinterface.h"
+#include "mongo/db/instance.h"
 
 
 namespace mongo {
@@ -33,6 +34,17 @@ namespace mongo {
 
         // We will be modifying the source vector as we go
         Pipeline::SourceContainer& sources = pPipeline->sources;
+
+        if (!sources.empty()) {
+            DocumentSource* first = sources.front().get();
+            DocumentSourceGeoNear* geoNear = dynamic_cast<DocumentSourceGeoNear*>(first);
+            if (geoNear) {
+                geoNear->client.reset(new DBDirectClient);
+                geoNear->db = dbName;
+                geoNear->collection = pPipeline->collectionName;
+                return; // we don't need a DocumentSourceCursor in this case
+            }
+        }
 
         /* look for an initial match */
         BSONObjBuilder queryBuilder;

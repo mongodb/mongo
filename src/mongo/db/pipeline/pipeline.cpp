@@ -60,6 +60,8 @@ namespace mongo {
         {DocumentSourceFilter::filterName,
          DocumentSourceFilter::createFromBson},
 #endif
+        {DocumentSourceGeoNear::geoNearName,
+         DocumentSourceGeoNear::createFromBson},
         {DocumentSourceGroup::groupName,
          DocumentSourceGroup::createFromBson},
         {DocumentSourceLimit::limitName,
