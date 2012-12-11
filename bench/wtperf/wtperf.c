@@ -348,10 +348,8 @@ populate_thread(void *arg)
 		goto err;
 	}
 
-	/* Can only use bulk load single threaded. */
 	if ((ret = session->open_cursor(
-	    session, cfg->uri, NULL,
-	    cfg->populate_threads == 1 ? "bulk" : "", &cursor)) != 0) {
+	    session, cfg->uri, NULL, NULL, &cursor)) != 0) {
 		lprintf(cfg, ret, 0, "Error opening cursor %s", cfg->uri);
 		goto err;
 	}
@@ -585,7 +583,7 @@ int execute_populate(CONFIG *cfg)
 		return (ret);
 
 	lprintf(cfg, 0, 1,
-	    "Finished bulk load of %d items", cfg->icount);
+	    "Finished load of %d items", cfg->icount);
 	secs = e.tv_sec + e.tv_usec / 1000000.0;
 	secs -= (cfg->phase_start_time.tv_sec +
 	    cfg->phase_start_time.tv_usec / 1000000.0);
