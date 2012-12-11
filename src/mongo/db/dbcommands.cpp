@@ -1855,14 +1855,16 @@ namespace mongo {
         return Status::OK();
     }
 
-    bool _execCommand(Command *c, const string& dbname, BSONObj& cmdObj, int queryOptions, BSONObjBuilder& result, bool fromRepl) {
+    bool _execCommand(Command *c,
+                      const string& dbname,
+                      BSONObj& cmdObj,
+                      int queryOptions,
+                      std::string& errmsg,
+                      BSONObjBuilder& result,
+                      bool fromRepl) {
 
         try {
-            string errmsg;
-            if ( ! c->run(dbname, cmdObj, queryOptions, errmsg, result, fromRepl ) ) {
-                result.append( "errmsg" , errmsg );
-                return false;
-            }
+            return c->run(dbname, cmdObj, queryOptions, errmsg, result, fromRepl);
         }
         catch ( SendStaleConfigException& e ){
             LOG(1) << "command failed because of stale config, can retry" << causedBy( e ) << endl;
@@ -1878,8 +1880,6 @@ namespace mongo {
             result.append( "code" , e.getCode() );
             return false;
         }
-
-        return true;
     }
 
     /**
@@ -1890,13 +1890,15 @@ namespace mongo {
      - context
      then calls run()
     */
-    bool execCommand( Command * c ,
-                      Client& client , int queryOptions ,
-                      const char *cmdns, BSONObj& cmdObj ,
-                      BSONObjBuilder& result,
-                      bool fromRepl ) {
+    void Command::execCommand(Command * c ,
+                              Client& client,
+                              int queryOptions,
+                              const char *cmdns,
+                              BSONObj& cmdObj,
+                              BSONObjBuilder& result,
+                              bool fromRepl ) {
 
-        string dbname = nsToDatabase( cmdns );
+        std::string dbname = nsToDatabase( cmdns );
 
         AuthenticationInfo *ai = client.getAuthenticationInfo();
         // Won't clear the temporary auth if it's already set at this point
@@ -1912,26 +1914,29 @@ namespace mongo {
                 BSONObj authObj = cmdObj[AuthenticationTable::fieldName].Obj();
                 ai->setTemporaryAuthorization( authObj );
             } else {
-                result.append( "errmsg" ,
-                               "unauthorized: no auth credentials provided for command and "
-                               "authenticated using internal user.  This is most likely because "
-                               "you are using an old version of mongos" );
                 log() << "command denied: " << cmdObj.toString() << endl;
-                return false;
+                _finishExecCommand(result,
+                                   false,
+                                   "unauthorized: no auth credentials provided for command and "
+                                   "authenticated using internal user.  This is most likely because"
+                                   " you are using an old version of mongos");
+                return;
             }
         }
 
         if( c->adminOnly() && c->localHostOnlyIfNoAuth( cmdObj ) && noauth && !ai->isLocalHost() ) {
-            result.append( "errmsg" ,
-                           "unauthorized: this command must run from localhost when running db without auth" );
             log() << "command denied: " << cmdObj.toString() << endl;
-            return false;
+            _finishExecCommand(result,
+                               false,
+                               "unauthorized: this command must run from localhost when running db "
+                               "without auth");
+            return;
         }
 
         if ( c->adminOnly() && ! fromRepl && dbname != "admin" ) {
-            result.append( "errmsg" ,  "access denied; use admin db" );
             log() << "command denied: " << cmdObj.toString() << endl;
-            return false;
+            _finishExecCommand(result, false, "access denied; use admin db");
+            return;
         }
 
         if (!noauth && c->requiresAuth()) {
@@ -1939,9 +1944,9 @@ namespace mongo {
             c->addRequiredPrivileges(dbname, cmdObj, &privileges);
             Status status = client.getAuthorizationManager()->checkAuthForPrivileges(privileges);
             if (!status.isOK()) {
-                result.append("errmsg", status.reason());
                 log() << "command denied: " << cmdObj.toString() << endl;
-                return false;
+                _finishExecCommand(result, false, status.reason());
+                return;
             }
         }
 
@@ -1952,7 +1957,8 @@ namespace mongo {
             c->help( ss );
             result.append( "help" , ss.str() );
             result.append( "lockType" , c->locktype() );
-            return true;
+            _finishExecCommand(result, true, "");
+            return;
         }
 
         bool canRunHere =
@@ -1962,15 +1968,15 @@ namespace mongo {
             fromRepl;
 
         if ( ! canRunHere ) {
-            result.append( "errmsg" , "not master" );
             result.append( "note" , "from execCommand" );
-            return false;
+            _finishExecCommand(result, false, "not master");
+            return;
         }
 
         if ( ! c->maintenanceOk() && theReplSet && ! isMaster( dbname.c_str() ) && ! theReplSet->isSecondary() ) {
-            result.append( "errmsg" , "node is recovering" );
             result.append( "note" , "from execCommand" );
-            return false;
+            _finishExecCommand(result, false, "node is recovering");
+            return;
         }
 
         if ( c->adminOnly() )
@@ -1980,6 +1986,7 @@ namespace mongo {
             theReplSet->setMaintenanceMode(true);
         }
 
+        std::string errmsg;
         bool retval = false;
         if ( c->locktype() == Command::NONE ) {
             verify( !c->lockGlobally() );
@@ -1990,14 +1997,14 @@ namespace mongo {
             if ( c->requiresAuth() ) {
                 // test that the user at least as read permissions
                 if ( ! client.getAuthenticationInfo()->isAuthorizedReads( dbname ) ) {
-                    result.append( "errmsg" , "need to login" );
+                    errmsg = "need to login";
                     retval = false;
                 }
             }
 
             if (retval) {
                 client.curop()->ensureStarted();
-                retval = _execCommand(c, dbname , cmdObj , queryOptions, result , fromRepl );
+                retval = _execCommand(c, dbname, cmdObj, queryOptions, errmsg, result, fromRepl);
             }
         }
         else if( c->locktype() != Command::WRITE ) { 
@@ -2009,7 +2016,7 @@ namespace mongo {
                 lk.reset( new Lock::GlobalRead() );
             Client::ReadContext ctx( ns , dbpath, c->requiresAuth() ); // read locks
             client.curop()->ensureStarted();
-            retval = _execCommand(c, dbname , cmdObj , queryOptions, result , fromRepl );
+            retval = _execCommand(c, dbname, cmdObj, queryOptions, errmsg, result, fromRepl);
         }
         else {
             dassert( c->locktype() == Command::WRITE );
@@ -2028,7 +2035,7 @@ namespace mongo {
                                              static_cast<Lock::ScopedLock*>( new Lock::DBWrite( dbname ) ) );
             client.curop()->ensureStarted();
             Client::Context ctx( dbname , dbpath , c->requiresAuth() );
-            retval = _execCommand(c, dbname , cmdObj , queryOptions, result , fromRepl );
+            retval = _execCommand(c, dbname, cmdObj, queryOptions, errmsg, result, fromRepl);
             if ( retval && c->logTheOp() && ! fromRepl ) {
                 logOp("c", cmdns, cmdObj);
             }
@@ -2038,7 +2045,8 @@ namespace mongo {
             theReplSet->setMaintenanceMode(false);
         }
 
-        return retval;
+        _finishExecCommand(result, retval, errmsg);
+        return;
     }
 
 
@@ -2080,23 +2088,19 @@ namespace mongo {
         }
 
         Client& client = cc();
-        bool ok = false;
 
         BSONElement e = jsobj.firstElement();
 
         Command * c = e.type() ? Command::findCommand( e.fieldName() ) : 0;
 
         if ( c ) {
-            ok = execCommand( c , client , queryOptions , ns , jsobj , anObjBuilder , fromRepl );
+            Command::execCommand(c, client, queryOptions, ns, jsobj, anObjBuilder, fromRepl);
         }
         else {
             anObjBuilder.append("errmsg", str::stream() << "no such cmd: " << e.fieldName() );
             anObjBuilder.append("bad cmd" , _cmdobj );
         }
 
-        // switch to bool, but wait a bit longer before switching?
-        // anObjBuilder.append("ok", ok);
-        anObjBuilder.append("ok", ok?1.0:0.0);
         BSONObj x = anObjBuilder.done();
         b.appendBuf((void*) x.objdata(), x.objsize());
 

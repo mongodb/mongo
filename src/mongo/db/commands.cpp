@@ -179,6 +179,19 @@ namespace mongo {
         return c->locktype();
     }
 
+    void Command::_finishExecCommand(BSONObjBuilder& result, bool ok, const std::string& errmsg) {
+        BSONObj tmp = result.asTempObj();
+        bool have_ok = tmp.hasField("ok");
+        bool have_errmsg = tmp.hasField("errmsg");
+
+        if (!have_ok)
+            result.append( "ok" , ok ? 1.0 : 0.0 );
+
+        if ( !ok && !have_errmsg) {
+            result.append("errmsg", errmsg);
+        }
+    }
+
     // TODO: remove this default implementation so that all Command subclasses have to explicitly
     // declare their own.
     void Command::addRequiredPrivileges(const std::string& dbname,

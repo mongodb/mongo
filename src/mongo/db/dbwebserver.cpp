@@ -54,12 +54,6 @@ namespace mongo {
         unsigned long long start, timeLocked;
     };
 
-    bool execCommand( Command * c ,
-                      Client& client , int queryOptions ,
-                      const char *ns, BSONObj& cmdObj ,
-                      BSONObjBuilder& result,
-                      bool fromRepl );
-
     class DbWebServer : public MiniWebServer {
     public:
         DbWebServer(const string& ip, int port, const AdminAccess* webUsers)
@@ -532,7 +526,7 @@ namespace mongo {
             Client& client = cc();
 
             BSONObjBuilder result;
-            execCommand(c, client, 0, "admin.", cmdObj , result, false);
+            Command::execCommand(c, client, 0, "admin.", cmdObj , result, false);
 
             responseCode = 200;
 

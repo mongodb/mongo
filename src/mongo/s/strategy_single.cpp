@@ -72,8 +72,11 @@ namespace mongo {
                         }
                     }
 
-                    bool ok = Command::runAgainstRegistered(q.ns, cmdObj, builder, q.queryOptions);
-                    if ( ok ) {
+                    bool commandFound = Command::runAgainstRegistered(q.ns,
+                                                                      cmdObj,
+                                                                      builder,
+                                                                      q.queryOptions);
+                    if (commandFound) {
                         BSONObj x = builder.done();
                         replyToQuery(0, r.p(), r.m(), x);
                         return;

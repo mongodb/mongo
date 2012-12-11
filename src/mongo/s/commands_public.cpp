@@ -1854,90 +1854,22 @@ namespace mongo {
 
     } // namespace pub_grid_cmds
 
-    bool Command::runAgainstRegistered(const char *ns, BSONObj& jsobj, BSONObjBuilder& anObjBuilder, int queryOptions) {
-        const char *p = strchr(ns, '.');
-        if ( !p ) return false;
-        if ( strcmp(p, ".$cmd") != 0 ) return false;
+    bool Command::runAgainstRegistered(const char *ns, BSONObj& jsobj, BSONObjBuilder& anObjBuilder,
+                                       int queryOptions) {
 
-        bool ok = true;
-
-        BSONElement e = jsobj.firstElement();
-        map<string,Command*>::iterator i;
-
-        if ( e.eoo() )
-            ;
-        // check for properly registered command objects.
-        else if ( (i = _commands->find(e.fieldName())) != _commands->end() ) {
-            string errmsg;
-            Command *c = i->second;
-            ClientInfo *client = ClientInfo::get();
-            AuthenticationInfo *ai = client->getAuthenticationInfo();
-
-            char cl[256];
-            nsToDatabase(ns, cl);
-            if (!noauth) {
-                std::vector<Privilege> privileges;
-                c->addRequiredPrivileges(cl, jsobj, &privileges);
-                AuthorizationManager* authManager = client->getAuthorizationManager();
-                if (c->requiresAuth() && (!authManager->checkAuthForPrivileges(privileges).isOK()
-                                || !ai->isAuthorizedForLock(cl, c->locktype()))) {
-                    ok = false;
-                    errmsg = "unauthorized";
-                    anObjBuilder.append("note", str::stream() << "not authorized for command: " <<
-                                        e.fieldName() << " on database " << cl);
-                }
-            }
-            if (ok && c->adminOnly() && c->localHostOnlyIfNoAuth(jsobj) && noauth &&
-                    !ai->isLocalHost()) {
-                ok = false;
-                errmsg = "unauthorized: this command must run from localhost when running db without auth";
-                log() << "command denied: " << jsobj.toString() << endl;
-            }
-            if (ok && c->adminOnly() && !startsWith(ns, "admin.")) {
-                ok = false;
-                errmsg = "access denied - use admin db";
-            }
-            if (ok && jsobj.getBoolField("help")) {
-                stringstream help;
-                help << "help for: " << e.fieldName() << " ";
-                c->help( help );
-                anObjBuilder.append( "help" , help.str() );
-            }
-            if (ok) {
-                try {
-                    ok = c->run( nsToDatabase( ns ) , jsobj, queryOptions, errmsg, anObjBuilder, false );
-                }
-                catch (DBException& e) {
-                    ok = false;
-                    int code = e.getCode();
-                    if (code == RecvStaleConfigCode) { // code for StaleConfigException
-                        throw;
-                    }
-
-                    {
-                        stringstream ss;
-                        ss << "exception: " << e.what();
-                        anObjBuilder.append( "errmsg" , ss.str() );
-                        anObjBuilder.append( "code" , code );
-                    }
-                }
-            }
-
-            BSONObj tmp = anObjBuilder.asTempObj();
-            bool have_ok = tmp.hasField("ok");
-            bool have_errmsg = tmp.hasField("errmsg");
-
-            if (!have_ok)
-                anObjBuilder.append( "ok" , ok ? 1.0 : 0.0 );
-
-            if ( !ok && !have_errmsg) {
-                anObjBuilder.append("errmsg", errmsg);
-                setLastError(0, errmsg.c_str());
-            }
-            return true;
+        if (NamespaceString(ns).coll != "$cmd") {
+            return false;
         }
 
-        return false;
+        BSONElement e = jsobj.firstElement();
+        Command* c = e.type() ? Command::findCommand(e.fieldName()) : NULL;
+        if (!c) {
+            return false;
+        }
+        ClientInfo *client = ClientInfo::get();
+
+        execCommandClientBasic(c, *client, queryOptions, ns, jsobj, anObjBuilder, false);
+        return true;
     }
 
 } // namespace mongo
