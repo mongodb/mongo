@@ -644,7 +644,7 @@ extern int __wt_conn_cache_pool_open(WT_SESSION_IMPL *session);
 extern int __wt_conn_cache_pool_destroy(WT_CONNECTION_IMPL *conn);
 extern void *__wt_cache_pool_server(void *arg);
 extern int __wt_connection_init(WT_CONNECTION_IMPL *conn);
-extern void __wt_connection_destroy(WT_CONNECTION_IMPL *conn);
+extern int __wt_connection_destroy(WT_CONNECTION_IMPL *conn);
 extern int __wt_connection_open(WT_CONNECTION_IMPL *conn, const char *cfg[]);
 extern int __wt_connection_close(WT_CONNECTION_IMPL *conn);
 extern void __wt_conn_stat_init(WT_SESSION_IMPL *session, uint32_t flags);

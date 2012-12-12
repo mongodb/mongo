@@ -125,7 +125,7 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 	}
 
 	/* Destroy the handle. */
-	__wt_connection_destroy(conn);
+	WT_TRET(__wt_connection_destroy(conn));
 
 	return (ret);
 }
