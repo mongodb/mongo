@@ -105,7 +105,7 @@ err:	__wt_spin_unlock(session, &__wt_process.spinlock);
 		__wt_free(session, pool_name);
 	if (ret != 0 && created) {
 		__wt_free(session, cp->name);
-		(void)__wt_cond_destroy(session, cp->cache_pool_cond);
+		WT_TRET(__wt_cond_destroy(session, cp->cache_pool_cond));
 		__wt_free(session, cp);
 	}
 	return (ret);

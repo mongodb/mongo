@@ -1034,7 +1034,7 @@ __wt_clsm_open(WT_SESSION_IMPL *session,
 err:		if (lsm_tree != NULL)
 			__wt_lsm_tree_release(session, lsm_tree);
 		if (cursor != NULL)
-			(void)__clsm_close(cursor);
+			WT_TRET(__clsm_close(cursor));
 	}
 
 	return (ret);

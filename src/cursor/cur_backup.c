@@ -223,10 +223,10 @@ __backup_start(
 	conn->ckpt_backup = 1;
 
 err:	if (bfp != NULL)
-		(void)fclose(bfp);
+		WT_TRET(fclose(bfp) == 0 ? 0 : __wt_errno());
 
 	if (ret != 0)
-		(void)__backup_file_remove(session);
+		WT_TRET(__backup_file_remove(session));
 
 	return (ret);
 }

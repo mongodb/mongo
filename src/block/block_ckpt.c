@@ -133,7 +133,7 @@ __wt_block_checkpoint_load(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	}
 
 	if (0) {
-err:		(void)__wt_block_checkpoint_unload(session, block);
+err:		WT_TRET(__wt_block_checkpoint_unload(session, block));
 	}
 
 	__wt_scr_free(&tmp);

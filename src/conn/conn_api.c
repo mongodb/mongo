@@ -76,7 +76,7 @@ __conn_load_extension(
 
 	if (0) {
 err:		if (dlh != NULL)
-			(void)__wt_dlclose(session, dlh);
+			WT_TRET(__wt_dlclose(session, dlh));
 	}
 	__wt_free(session, entry_name);
 
@@ -707,7 +707,7 @@ __conn_single(WT_SESSION_IMPL *session, const char **cfg)
 	return (0);
 
 err:	if (conn->lock_fh != NULL) {
-		(void)__wt_close(session, conn->lock_fh);
+		WT_TRET(__wt_close(session, conn->lock_fh));
 		conn->lock_fh = NULL;
 	}
 	return (ret);

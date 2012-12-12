@@ -73,7 +73,6 @@ __create_file(WT_SESSION_IMPL *session,
 
 err:	__wt_scr_free(&val);
 	__wt_free(session, treeconf);
-
 	return (ret);
 }
 
@@ -418,7 +417,7 @@ __create_table(WT_SESSION_IMPL *session,
 
 	if (0) {
 err:		if (table != NULL)
-			(void)__wt_schema_remove_table(session, table);
+			WT_TRET(__wt_schema_remove_table(session, table));
 	}
 	__wt_free(session, cgname);
 	__wt_free(session, tableconf);

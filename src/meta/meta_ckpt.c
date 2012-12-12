@@ -449,7 +449,6 @@ __wt_meta_ckptlist_set(
 	WT_ERR(__ckpt_set(session, fname, buf->mem));
 
 err:	__wt_scr_free(&buf);
-
 	return (ret);
 }
 

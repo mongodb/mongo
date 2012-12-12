@@ -189,11 +189,11 @@ int
 __wt_lsm_tree_setup_chunk(
     WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, WT_LSM_CHUNK *chunk)
 {
-	WT_DECL_RET;
 	WT_ITEM buf;
 	const char *cfg[] = API_CONF_DEFAULTS(session, drop, "force");
 
 	WT_CLEAR(buf);
+
 	WT_RET(__wt_lsm_tree_chunk_name(session, lsm_tree, chunk->id, &buf));
 	chunk->uri = __wt_buf_steal(session, &buf, NULL);
 
@@ -207,10 +207,8 @@ __wt_lsm_tree_setup_chunk(
 	 * been the result of an interrupted merge, anyway.
 	 */
 	if (chunk->id > 1)
-		WT_ERR(__wt_schema_drop(session, chunk->uri, cfg));
-	WT_ERR(__wt_schema_create(session, chunk->uri, lsm_tree->file_config));
-
-err:	return (ret);
+		WT_RET(__wt_schema_drop(session, chunk->uri, cfg));
+	return (__wt_schema_create(session, chunk->uri, lsm_tree->file_config));
 }
 
 /*

@@ -806,7 +806,7 @@ __wt_curtable_open(WT_SESSION_IMPL *session,
 	WT_ERR(__curtable_open_colgroups(ctable, cfg));
 
 	if (0) {
-err:		(void)__curtable_close(cursor);
+err:		WT_TRET(__curtable_close(cursor));
 		*cursorp = NULL;
 	}
 

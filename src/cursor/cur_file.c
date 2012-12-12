@@ -413,6 +413,6 @@ __wt_curfile_open(WT_SESSION_IMPL *session, const char *uri,
 	return (0);
 
 err:	/* If the cursor could not be opened, release the handle. */
-	(void)__wt_session_release_btree(session);
+	WT_TRET(__wt_session_release_btree(session));
 	return (ret);
 }

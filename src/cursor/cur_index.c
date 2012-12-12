@@ -448,7 +448,7 @@ __wt_curindex_open(WT_SESSION_IMPL *session,
 	WT_ERR(__wt_cursor_init(cursor, cursor->uri, NULL, cfg, cursorp));
 
 	if (0) {
-err:		(void)__curindex_close(cursor);
+err:		WT_TRET(__curindex_close(cursor));
 	}
 
 	return (ret);

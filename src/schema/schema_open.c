@@ -199,7 +199,6 @@ __open_index(WT_SESSION_IMPL *session, WT_TABLE *table, WT_INDEX *idx)
 
 err:	__wt_scr_free(&buf);
 	__wt_scr_free(&plan);
-
 	return (ret);
 }
 

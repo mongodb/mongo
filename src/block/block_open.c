@@ -104,7 +104,7 @@ __wt_block_open(WT_SESSION_IMPL *session, const char *filename,
 	*(void **)blockp = block;
 	return (0);
 
-err:	(void)__wt_block_close(session, block);
+err:	WT_TRET(__wt_block_close(session, block));
 	return (ret);
 }
 

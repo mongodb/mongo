@@ -421,7 +421,7 @@ __wt_cursor_dup(WT_SESSION_IMPL *session,
 
 	if (0) {
 err:		if (cursor != NULL)
-			(void)cursor->close(cursor);
+			WT_TRET(cursor->close(cursor));
 		cursor = NULL;
 	}
 

@@ -66,7 +66,6 @@ __rename_file(
 
 err:	__wt_free(session, newvalue);
 	__wt_free(session, oldvalue);
-
 	return (ret);
 }
 

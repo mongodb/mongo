@@ -250,7 +250,7 @@ __conn_btree_open(WT_SESSION_IMPL *session,
 
 	if (0) {
 err:		F_CLR(btree, WT_BTREE_SPECIAL_FLAGS);
-		(void)__wt_conn_btree_close(session, 1);
+		WT_TRET(__wt_conn_btree_close(session, 1));
 	}
 
 	return (ret);

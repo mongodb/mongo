@@ -116,7 +116,7 @@ __wt_btree_open(WT_SESSION_IMPL *session, const char *cfg[])
 	}
 
 	if (0) {
-err:		(void)__wt_btree_close(session);
+err:		WT_TRET(__wt_btree_close(session));
 	}
 	__wt_meta_checkpoint_free(session, &ckpt);
 
