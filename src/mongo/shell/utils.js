@@ -1131,16 +1131,25 @@ jsTestPath = function(){
     return "__unknown_path__"
 }
 
+var _jsTestOptions = { enableTestCommands : true }; // Test commands should be enabled by default
+
 jsTestOptions = function(){
-    if( TestData ) return { noJournal : TestData.noJournal,
-                            noJournalPrealloc : TestData.noJournalPrealloc,
-                            auth : TestData.auth,
-                            keyFile : TestData.keyFile,
-                            authUser : "__system",
-                            authPassword : TestData.keyFileData,
-                            adminUser : "admin",
-                            adminPassword : "password" }
-    return {}
+    if( TestData ) {
+        return Object.merge(_jsTestOptions,
+                            { noJournal : TestData.noJournal,
+                              noJournalPrealloc : TestData.noJournalPrealloc,
+                              auth : TestData.auth,
+                              keyFile : TestData.keyFile,
+                              authUser : "__system",
+                              authPassword : TestData.keyFileData,
+                              adminUser : "admin",
+                              adminPassword : "password" });
+    }
+    return _jsTestOptions;
+}
+
+setJsTestOption = function(name, value) {
+    _jsTestOptions[name] = value;
 }
 
 jsTestLog = function(msg){
@@ -1153,6 +1162,7 @@ jsTest.name = jsTestName
 jsTest.file = jsTestFile
 jsTest.path = jsTestPath
 jsTest.options = jsTestOptions
+jsTest.setOption = setJsTestOption
 jsTest.log = jsTestLog
 
 jsTest.dir = function(){

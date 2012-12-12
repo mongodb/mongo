@@ -658,7 +658,7 @@ startMongoProgram = function(){
     // enabling this on 2.4 when testing 2.6
     var args = argumentsToArray( arguments );
     var programName = args[0];
-    if (programName.endsWith('mongod') || programName.endsWith('mongos')) {
+    if (jsTest.options().enableTestCommands && (programName.endsWith('mongod') || programName.endsWith('mongos'))) {
         args.push.apply(args, ['--setParameter', 'enableTestCommands=1']);
     }
 
