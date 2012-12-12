@@ -487,7 +487,7 @@ __wt_rec_write(WT_SESSION_IMPL *session,
 		 * are written to return an error value, but now we discard it,
 		 * we already have one.
 		 */
-		(void)__rec_write_wrapup_err(session, r, page);
+		WT_TRET(__rec_write_wrapup_err(session, r, page));
 		return (ret);
 	}
 
