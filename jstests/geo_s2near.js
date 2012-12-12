@@ -2,6 +2,7 @@
 t = db.geo_s2near
 t.drop();
 
+
 // FYI:
 // One degree of long @ 0 is 111km or so.
 // One degree of lat @ 0 is 110km or so.
@@ -18,6 +19,16 @@ origin = { "type" : "Point", "coordinates": [ lng, lat ] }
 
 t.ensureIndex({ geo : "2dsphere" })
 
+// Near only works when the query is a point.
+someline = { "type" : "LineString", "coordinates": [ [ 40, 5], [41, 6]]}
+somepoly = { "type" : "Polygon",
+             "coordinates" : [ [ [40,5], [40,6], [41,6], [41,5], [40,5]]]}
+assert.throws(function() { return t.find({ "geo" : { "$near" : { "$geometry" : someline } } }).count()})
+assert.throws(function() { return t.find({ "geo" : { "$near" : { "$geometry" : somepoly } } }).count()})
+assert.throws(function() { return db.runCommand({geoNear : t.getName(), near: someline }).results.length})
+assert.throws(function() { return db.runCommand({geoNear : t.getName(), near: somepoly }).results.length})
+
+// Do some basic near searches.
 res = t.find({ "geo" : { "$near" : { "$geometry" : origin, $maxDistance: 2000} } }).limit(10)
 resNear = db.runCommand({geoNear : t.getName(), near: [0,0], num: 10, maxDistance: 2000})
 assert.eq(res.itcount(), resNear.results.length, 10)

@@ -96,11 +96,11 @@ namespace mongo {
     string QueryGeometry::toString() const {
         stringstream ss;
         ss << "field = " << field;
-        if (NULL != cell) {
+        if (NULL != cell.get()) {
             ss << ", cell";
-        } else if (NULL != line) {
+        } else if (NULL != line.get()) {
             ss << ", line = ";
-        } else if (NULL != polygon) {
+        } else if (NULL != polygon.get()) {
             ss << ", polygon = ";
         }
         return ss.str();
@@ -109,14 +109,14 @@ namespace mongo {
     bool QueryGeometry::parseFrom(const BSONObj& obj) {
         if (GeoJSONParser::isPolygon(obj)) {
             // We can't really pass these things around willy-nilly except by ptr.
-            polygon = new S2Polygon();
-            GeoJSONParser::parsePolygon(obj, polygon);
+            polygon.reset(new S2Polygon());
+            GeoJSONParser::parsePolygon(obj, polygon.get());
         } else if (GeoJSONParser::isPoint(obj)) {
-            cell = new S2Cell();
-            GeoJSONParser::parsePoint(obj, cell);
+            cell.reset(new S2Cell());
+            GeoJSONParser::parsePoint(obj, cell.get());
         } else if (GeoJSONParser::isLineString(obj)) {
-            line = new S2Polyline();
-            GeoJSONParser::parseLineString(obj, line);
+            line.reset(new S2Polyline());
+            GeoJSONParser::parseLineString(obj, line.get());
         } else {
             return false;
         }
@@ -138,7 +138,7 @@ namespace mongo {
         if (NULL != cell) {
             return otherLine.MayIntersect(*cell);
         } else if (NULL != line) {
-            return otherLine.Intersects(line);
+            return otherLine.Intersects(line.get());
         } else {
             // TODO(hk): modify s2 library to just let us know if it intersected
             // rather than returning all this.
@@ -158,12 +158,12 @@ namespace mongo {
             // TODO(hk): modify s2 library to just let us know if it intersected
             // rather than returning all this.
             vector<S2Polyline*> clipped;
-            otherPolygon.IntersectWithPolyline(line, &clipped);
+            otherPolygon.IntersectWithPolyline(line.get(), &clipped);
             bool ret = clipped.size() > 0;
             for (size_t i = 0; i < clipped.size(); ++i) delete clipped[i];
             return ret;
         } else {
-            return otherPolygon.Intersects(polygon);
+            return otherPolygon.Intersects(polygon.get());
         }
     }
 
@@ -189,16 +189,6 @@ namespace mongo {
         } else {
             verify(NULL != polygon);
             return *polygon;
-        }
-    }
-
-    void QueryGeometry::free() {
-        if (NULL != cell) {
-            delete cell;
-        } else if (NULL != line) {
-            delete line;
-        } else if (NULL != polygon) {
-            delete polygon;
         }
     }
 }  // namespace mongo

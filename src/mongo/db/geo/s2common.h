@@ -36,16 +36,16 @@ namespace mongo {
 
     // Used for passing geo data from the newCursor entry point to the S2Cursor class.
     struct QueryGeometry {
-        QueryGeometry(const string& f) : field(f), cell(NULL), line(NULL), polygon(NULL) {}
+        QueryGeometry(const string& f) : field(f) {} //, cell(NULL), line(NULL), polygon(NULL) {}
 
         // Name of the field in the query.
         string field;
         // Only one of these should be non-NULL.  S2Region is a superclass but it only supports
         // testing against S2Cells.  We need the most specific class we can get.
         // Owned by S2Cursor.
-        S2Cell *cell;
-        S2Polyline *line;
-        S2Polygon *polygon;
+        shared_ptr<S2Cell> cell;
+        shared_ptr<S2Polyline> line;
+        shared_ptr<S2Polygon> polygon;
 
         string toString() const;
         
@@ -56,8 +56,6 @@ namespace mongo {
         bool intersectsPolygon(const S2Polygon& otherPolygon);
         // One region is not NULL and this returns it.
         const S2Region& getRegion() const;
-        // Delete the not NULL region.
-        void free();
         // Get the centroid, boring if we're a point, interesting if we're not.
         S2Point getCentroid() const;
         // Try to parse the provided object into the right place.

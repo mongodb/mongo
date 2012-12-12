@@ -149,10 +149,14 @@ namespace mongo {
             BSONObjIterator it(obj);
             while (it.more()) {
                 BSONElement e = it.next();
+                if (!e.isABSONObj()) { return false; }
+                BSONObj embeddedObj = e.embeddedObject();
                 // Legacy near parsing: t.find({ loc : { $near: [0,0], $maxDistance: 3 }})
                 // Legacy near parsing: t.find({ loc : { $near: [0,0] }})
                 if (mongoutils::str::equals(e.fieldName(), "$near")) {
-                    if (out->parseFrom(e.embeddedObject())) {
+                    if (out->parseFrom(embeddedObj)) {
+                        uassert(16573, "near requires point, given " + embeddedObj.toString(),
+                                GeoJSONParser::isPoint(embeddedObj));
                         *isNear = true;
                         ret = true;
                     }
@@ -173,7 +177,7 @@ namespace mongo {
             if (!e.isABSONObj()) { return false; }
 
             BSONObj::MatchType matchType = static_cast<BSONObj::MatchType>(e.getGtLtOp());
-            if (BSONObj::opINTERSECT == matchType) {
+            if (BSONObj::opGEO_INTERSECTS == matchType) {
                 *intersect = true;
             } else if (BSONObj::opNEAR == matchType) {
                 *isNear = true;
@@ -186,8 +190,13 @@ namespace mongo {
             while (argIt.more()) {
                 BSONElement e = argIt.next();
                 if (mongoutils::str::equals(e.fieldName(), "$geometry")) {
-                    if (e.isABSONObj() && out->parseFrom(e.Obj())) {
-                        ret = true;
+                    if (e.isABSONObj()) {
+                        BSONObj embeddedObj = e.embeddedObject();
+                         if (out->parseFrom(embeddedObj)) {
+                             uassert(16570, "near requires point, given " + embeddedObj.toString(),
+                                     !(*isNear) || GeoJSONParser::isPoint(embeddedObj));
+                             ret = true;
+                         }
                     }
                 } else if (mongoutils::str::equals(e.fieldName(), "$maxDistance")) {
                     if (e.isNumber()) {
@@ -201,6 +210,7 @@ namespace mongo {
         // Entry point for a search.
         virtual shared_ptr<Cursor> newCursor(const BSONObj& query, const BSONObj& order,
                                              int numWanted) const {
+            // XXX: scoped array!!!  with release
             vector<QueryGeometry> regions;
             double maxDistance = DBL_MAX;
             bool isNear = false;
@@ -228,7 +238,6 @@ namespace mongo {
             }
 
             if (isNear && isIntersect ) {
-                for (size_t j = 0; j < regions.size(); ++j) { regions[j].free(); }
                 uasserted(16474, "Can't do both near and intersect, query: " +  query.toString());
             }
 
@@ -269,7 +278,7 @@ namespace mongo {
                 // getGtLtOp is horribly misnamed and really means get the operation.
                 switch (e.embeddedObject().firstElement().getGtLtOp()) {
                     case BSONObj::opNEAR:
-                    case BSONObj::opINTERSECT:
+                    case BSONObj::opGEO_INTERSECTS:
                         return OPTIMAL;
                     default:
                         return HELPFUL;
@@ -311,7 +320,8 @@ namespace mongo {
                 } else if (GeoJSONParser::parsePoint(obj, &point)) {
                     keysFromRegion(&coverer, point, &cells);
                 } else {
-                    warning() << "unknown geometry: " << i->toString();
+                    uasserted(16572, "Can't extract geo keys from object, malformed geometry?:"
+                                     + obj.toString());
                 }
 
                 for (vector<string>::const_iterator it = cells.begin(); it != cells.end(); ++it) {
@@ -398,6 +408,12 @@ namespace mongo {
         // The actual query point
         uassert(16551, "'near' param missing/invalid", !cmdObj["near"].eoo());
         BSONObj nearObj = cmdObj["near"].embeddedObject();
+
+        // XXX
+        // nearObj must be a point.
+        uassert(16571, "near must be called with a point, called with " + nearObj.toString(),
+                GeoJSONParser::isPoint(nearObj));
+        // XXX
 
         // The non-near query part.
         BSONObj query;

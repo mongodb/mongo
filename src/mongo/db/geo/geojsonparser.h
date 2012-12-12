@@ -63,5 +63,12 @@ namespace mongo {
         static bool parsePoint(const BSONObj &obj, S2Cell *out);
         static bool parseLineString(const BSONObj &obj, S2Polyline *out);
         static bool parsePolygon(const BSONObj &obj, S2Polygon *out);
+
+        // Return true if the CRS field is 1. missing, or 2. is well-formed and
+        // has a datum we accept.  Otherwise, return false.
+        // TODO(hk): If this is ever used anywhere but internally, consider
+        // returning states: missing, invalid, unknown, ok, etc. -- whatever
+        // needed.
+        static bool crsIsOK(const BSONObj& obj);
     };
 }  // namespace mongo

@@ -26,26 +26,26 @@ somepoly = { "type" : "Polygon",
 t.insert( {geo : somepoly, nonGeo: ["somepoly"] })
 t.ensureIndex( { geo : "2dsphere", nonGeo: 1 } )
 
-res = t.find({ "geo" : { "$intersect" : { "$geometry" : pointA} } });
+res = t.find({ "geo" : { "$geoIntersects" : { "$geometry" : pointA} } });
 assert.eq(res.count(), 3);
 
-res = t.find({ "geo" : { "$intersect" : { "$geometry" : pointB} } });
+res = t.find({ "geo" : { "$geoIntersects" : { "$geometry" : pointB} } });
 assert.eq(res.count(), 4);
 
-res = t.find({ "geo" : { "$intersect" : { "$geometry" : pointD} } });
+res = t.find({ "geo" : { "$geoIntersects" : { "$geometry" : pointD} } });
 assert.eq(res.count(), 1);
 
-res = t.find({ "geo" : { "$intersect" : { "$geometry" : someline} } })
+res = t.find({ "geo" : { "$geoIntersects" : { "$geometry" : someline} } })
 assert.eq(res.count(), 5);
 
-res = t.find({ "geo" : { "$intersect" : { "$geometry" : somepoly} } })
+res = t.find({ "geo" : { "$geoIntersects" : { "$geometry" : somepoly} } })
 assert.eq(res.count(), 6);
 
-res = t.find({ "geo" : { "$intersect" : { "$geometry" : somepoly} } }).limit(1)
+res = t.find({ "geo" : { "$geoIntersects" : { "$geometry" : somepoly} } }).limit(1)
 assert.eq(res.itcount(), 1);
 
 res = t.find({ "nonGeo": "pointA",
-               "geo" : { "$intersect" : { "$geometry" : somepoly} } })
+               "geo" : { "$geoIntersects" : { "$geometry" : somepoly} } })
 assert.eq(res.count(), 1);
 
 // Don't crash mongod if we give it bad input.
@@ -54,5 +54,18 @@ t.ensureIndex({loc: "2dsphere", x:1})
 t.save({loc: [0,0]})
 assert.throws(function() { return t.count({loc: {$foo:[0,0]}}) })
 assert.throws(function() { return t.find({ "nonGeo": "pointA",
-                                           "geo" : { "$intersect" : { "$geometry" : somepoly},
+                                           "geo" : { "$geoIntersects" : { "$geometry" : somepoly},
                                                      "$near": {"$geometry" : somepoly }}}).count()}) 
+
+// If we specify a datum, it has to be valid (WGS84).
+t.drop()
+t.ensureIndex({loc: "2dsphere"})
+t.insert({loc: {type:'Point', coordinates: [40, 5], crs:{ type: 'name', properties:{name:'EPSG:2000'}}}})
+assert(db.getLastError());
+assert.eq(0, t.find().itcount())
+t.insert({loc: {type:'Point', coordinates: [40, 5]}})
+assert(!db.getLastError());
+t.insert({loc: {type:'Point', coordinates: [40, 5], crs:{ type: 'name', properties:{name:'EPSG:4326'}}}})
+assert(!db.getLastError());
+t.insert({loc: {type:'Point', coordinates: [40, 5], crs:{ type: 'name', properties:{name:'urn:ogc:def:crs:OGC:1.3:CRS84'}}}})
+assert(!db.getLastError());

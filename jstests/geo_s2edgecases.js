@@ -32,9 +32,9 @@ t.insert({geo : penguin2})
 
 t.ensureIndex( { geo : "2dsphere", nonGeo: 1 } )
 
-res = t.find({ "geo" : { "$intersect" : { "$geometry" : roundworldpoint} } });
+res = t.find({ "geo" : { "$geoIntersects" : { "$geometry" : roundworldpoint} } });
 assert.eq(res.count(), 2);
-res = t.find({ "geo" : { "$intersect" : { "$geometry" : santapoint} } });
+res = t.find({ "geo" : { "$geoIntersects" : { "$geometry" : santapoint} } });
 assert.eq(res.count(), 2);
-res = t.find({ "geo" : { "$intersect" : { "$geometry" : penguinpoint} } });
+res = t.find({ "geo" : { "$geoIntersects" : { "$geometry" : penguinpoint} } });
 assert.eq(res.count(), 2);

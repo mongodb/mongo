@@ -452,7 +452,7 @@ namespace mongo {
             _special.add("2d", SpecialIndices::INDEX_REQUIRED);
             _special.add("2dsphere", SpecialIndices::INDEX_REQUIRED);
             break;
-        case BSONObj::opINTERSECT:
+        case BSONObj::opGEO_INTERSECTS:
             _special.add("2dsphere", SpecialIndices::INDEX_REQUIRED);
             break;
         case BSONObj::opEXISTS: {

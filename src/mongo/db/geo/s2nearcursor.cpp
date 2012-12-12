@@ -55,12 +55,7 @@ namespace mongo {
         nextAnnulus();
     }
 
-    S2NearCursor::~S2NearCursor() {
-        // We own these pointers.
-        for (size_t i = 0; i < _fields.size(); ++i) {
-            _fields[i].free();
-        }
-    }
+    S2NearCursor::~S2NearCursor() { }
 
     CoveredIndexMatcher* S2NearCursor::matcher() const { return _matcher.get(); }
 

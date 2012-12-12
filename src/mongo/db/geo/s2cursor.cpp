@@ -37,12 +37,7 @@ namespace mongo {
         _matcher.reset(new CoveredIndexMatcher(_filteredQuery, keyPattern));
     }
 
-    S2Cursor::~S2Cursor() {
-        // We own these pointers.
-        for (size_t i = 0; i < _fields.size(); ++i) {
-            _fields[i].free();
-        }
-    }
+    S2Cursor::~S2Cursor() { }
 
     CoveredIndexMatcher* S2Cursor::matcher() const { return _matcher.get(); }
 

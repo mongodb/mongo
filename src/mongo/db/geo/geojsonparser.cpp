@@ -88,6 +88,11 @@ namespace mongo {
         if (type.eoo() || (String != type.type())) { return false; }
         if (GEOJSON_TYPE_POINT != type.String()) { return false; }
 
+        if (!crsIsOK(obj)) {
+            warning() << "Invalid CRS: " << obj.toString() << endl;
+            return false;
+        }
+
         BSONElement coordElt = obj.getFieldDotted(GEOJSON_COORDINATES);
         if (coordElt.eoo() || (Array != coordElt.type())) { return false; }
 
@@ -111,6 +116,11 @@ namespace mongo {
         if (type.eoo() || (String != type.type())) { return false; }
         if (GEOJSON_TYPE_LINESTRING != type.String()) { return false; }
 
+        if (!crsIsOK(obj)) {
+            warning() << "Invalid CRS: " << obj.toString() << endl;
+            return false;
+        }
+
         BSONElement coordElt = obj.getFieldDotted(GEOJSON_COORDINATES);
         if (coordElt.eoo() || (Array != coordElt.type())) { return false; }
 
@@ -129,6 +139,11 @@ namespace mongo {
         BSONElement type = obj.getFieldDotted(GEOJSON_TYPE);
         if (type.eoo() || (String != type.type())) { return false; }
         if (GEOJSON_TYPE_POLYGON != type.String()) { return false; }
+
+        if (!crsIsOK(obj)) {
+            warning() << "Invalid CRS: " << obj.toString() << endl;
+            return false;
+        }
 
         BSONElement coordElt = obj.getFieldDotted(GEOJSON_COORDINATES);
         if (coordElt.eoo() || (Array != coordElt.type())) { return false; }
@@ -304,5 +319,28 @@ namespace mongo {
 
     bool GeoJSONParser::isPolygon(const BSONObj &obj) {
         return isGeoJSONPolygon(obj) || isLegacyPolygon(obj);
+    }
+
+    bool GeoJSONParser::crsIsOK(const BSONObj &obj) {
+        if (!obj.hasField("crs")) { return true; }
+
+        if (!obj["crs"].isABSONObj()) { return false; }
+
+        BSONObj crsObj = obj["crs"].embeddedObject();
+        if (!crsObj.hasField("type")) { return false; }
+        if (String != crsObj["type"].type()) { return false; }
+        if ("name" != crsObj["type"].String()) { return false; }
+        if (!crsObj.hasField("properties")) { return false; }
+        if (!crsObj["properties"].isABSONObj()) { return false; }
+
+        BSONObj propertiesObj = crsObj["properties"].embeddedObject();
+        if (!propertiesObj.hasField("name")) { return false; }
+        if (String != propertiesObj["name"].type()) { return false; }
+        const string& name = propertiesObj["name"].String();
+
+        // see http://portal.opengeospatial.org/files/?artifact_id=24045
+        // and http://spatialreference.org/ref/epsg/4326/
+        // and http://www.geojson.org/geojson-spec.html#named-crs
+        return ("urn:ogc:def:crs:OGC:1.3:CRS84" == name) || ("EPSG:4326" == name);
     }
 }  // namespace mongo
