@@ -28,7 +28,7 @@ function killRepair() {
             var o = p[ i ];
             printjson( o );
             // Find the active 'repairDatabase' op and kill it.
-            if ( o.active && o.query.repairDatabase ) {
+            if ( o.active && o.query && o.query.repairDatabase ) {
              	db.killOp( o.opid );
                 return;
             }
