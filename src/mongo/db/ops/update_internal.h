@@ -36,8 +36,8 @@ namespace mongo {
      */
     struct Mod {
         // See opFromStr below
-        //        0    1    2     3         4     5          6    7      8       9       10    11        12           13
-        enum Op { INC, SET, PUSH, PUSH_ALL, PULL, PULL_ALL , POP, UNSET, BITAND, BITOR , BIT , ADDTOSET, RENAME_FROM, RENAME_TO } op;
+        //        0    1    2     3         4     5          6    7      8       9       10    11        12           13         14
+        enum Op { INC, SET, PUSH, PUSH_ALL, PULL, PULL_ALL , POP, UNSET, BITAND, BITOR , BIT , ADDTOSET, RENAME_FROM, RENAME_TO, SET_ON_INSERT } op;
 
         static const char* modNames[];
         static unsigned modNamesNum;
@@ -285,8 +285,16 @@ namespace mongo {
                 break;
             }
             case 's': {
-                if ( fn[2] == 'e' && fn[3] == 't' && fn[4] == 0 )
-                    return Mod::SET;
+                if ( fn[2] == 'e' && fn[3] == 't' ) {
+                    if ( fn[4] == 0 ) {
+                        return Mod::SET;
+                    }
+                    else if ( fn[4] == 'O' && fn[5] == 'n' && fn[6] == 'I' && fn[7] == 'n' &&
+                              fn[8] == 's' && fn[9] == 'e' && fn[10] == 'r' && fn[11] == 't' &&
+                              fn[12] == 0 ) {
+                        return Mod::SET_ON_INSERT;
+                    }
+                }
                 break;
             }
             case 'p': {
@@ -630,6 +638,7 @@ namespace mongo {
                 break;
 
             case Mod::INC:
+            case Mod::SET_ON_INSERT:
                 ms.fixedOpName = "$set";
             case Mod::SET: {
                 m._checkForAppending( m.elt );
