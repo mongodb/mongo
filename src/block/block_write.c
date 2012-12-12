@@ -135,7 +135,8 @@ __wt_block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	    session, block->fh, offset, align_size, buf->mem)) != 0) {
 		if (!locked)
 			__wt_spin_lock(session, &block->live_lock);
-		(void)__wt_block_off_free(session, block, offset, align_size);
+		WT_TRET(
+		    __wt_block_off_free(session, block, offset, align_size));
 		if (!locked)
 			__wt_spin_unlock(session, &block->live_lock);
 		WT_RET(ret);
