@@ -391,9 +391,11 @@ namespace mongo {
         S2IndexType *idxType = static_cast<S2IndexType*>(id.getSpec().getType());
         verify(&id == idxType->getDetails());
 
+        // We support both "num" and "limit" options to control limit
         int numWanted = 100;
-        if (cmdObj["num"].isNumber()) {
-            numWanted = cmdObj["num"].numberInt();
+        const char* limitName = cmdObj["num"].isNumber() ? "num" : "limit";
+        if (cmdObj[limitName].isNumber()) {
+            numWanted = cmdObj[limitName].numberInt();
             verify(numWanted >= 0);
         }
 

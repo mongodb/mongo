@@ -1209,9 +1209,11 @@ namespace mongo {
                 set<Shard> shards;
                 cm->getShardsForQuery(shards, query);
 
+                // We support both "num" and "limit" options to control limit
                 int limit = 100;
-                if (cmdObj["num"].isNumber())
-                    limit = cmdObj["num"].numberInt();
+                const char* limitName = cmdObj["num"].isNumber() ? "num" : "limit";
+                if (cmdObj[limitName].isNumber())
+                    limit = cmdObj[limitName].numberInt();
 
                 list< shared_ptr<Future::CommandResult> > futures;
                 BSONArrayBuilder shardArray;
