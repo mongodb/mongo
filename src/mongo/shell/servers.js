@@ -299,9 +299,6 @@ MongoRunner.mongoOptions = function( opts ){
     // Initialize and create a copy of the opts
     opts = Object.merge( opts || {}, {} )
 
-    // This should always be true for tests
-    opts['setParameter'] = 'enableTestCommands=1';
-
     if( ! opts.restart ) opts.restart = false
     
     // RunId can come from a number of places
@@ -656,7 +653,16 @@ startMongos = function(args){
 startMongoProgram = function(){
     var port = _parsePort.apply( null, arguments );
 
-    _startMongoProgram.apply( null, arguments );
+    // Enable test commands.
+    // TODO: Make this work better with multi-version testing so that we can support
+    // enabling this on 2.4 when testing 2.6
+    var args = argumentsToArray( arguments );
+    var programName = args[0];
+    if (programName.endsWith('mongod') || programName.endsWith('mongos')) {
+        args.push.apply(args, ['--setParameter', 'enableTestCommands=1']);
+    }
+
+    _startMongoProgram.apply( null, args );
 
     var m;
     assert.soon
