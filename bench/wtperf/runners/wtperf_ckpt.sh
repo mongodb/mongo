@@ -7,7 +7,7 @@
 BIN_DIR='.'
 ROOT_DIR=`/bin/pwd`
 SCRIPT_DIR=`dirname $0`
-RUNTIME=600
+RUNTIME=900
 VERBOSE=0
 PERF_BASE="M"
 
@@ -50,7 +50,7 @@ fi
 
 DB_HOME="$ROOT_DIR/WT_TEST"
 OUT_DIR="$ROOT_DIR/results"
-SHARED_OPTS="-${PERF_BASE} -R 1 -U 1 -l 60 -t 1 -v 1 -h ${DB_HOME} -u lsm:test"
+SHARED_OPTS="-${PERF_BASE} -R 1 -U 1 -l 60 -t 1 -v 1 -h ${DB_HOME} -u table:test"
 CREATE_OPTS="$SHARED_OPTS -r 0"
 RUN_OPTS="$SHARED_OPTS -e -r $RUNTIME"
 
