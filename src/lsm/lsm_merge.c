@@ -130,7 +130,7 @@ __wt_lsm_merge(
 	for (start_chunk = end_chunk + 1, record_count = 0;
 	    start_chunk > 0; ) {
 		chunk = lsm_tree->chunk[start_chunk - 1];
-		nchunks = end_chunk - start_chunk + 1;
+		nchunks = (end_chunk - start_chunk) + 1;
 
 		/* If the chunk is already involved in a merge, stop. */
 		if (F_ISSET(chunk, WT_LSM_CHUNK_MERGING))
@@ -171,7 +171,7 @@ __wt_lsm_merge(
 		}
 	}
 
-	nchunks = end_chunk - start_chunk + 1;
+	nchunks = (end_chunk - start_chunk) + 1;
 	WT_ASSERT(session, nchunks <= max_chunks);
 
 	/* Don't do small merges unless we have waited for 2s. */
