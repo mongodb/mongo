@@ -30,8 +30,6 @@
 
 namespace mongo {
 
-    static const char* validateErrToString(long code);
-
     /**
      * Multithreaded Support for SSL.
      *
@@ -243,8 +241,8 @@ namespace mongo {
         long result = SSL_get_verify_result(ssl);
 
         if (result != X509_V_OK) {
-            error() << "SSL peer certificate validation failed:" << validateErrToString(result)
-                    << endl;
+            error() << "SSL peer certificate validation failed:" << 
+                X509_verify_cert_error_string(result) << endl;
             throw SocketException(SocketException::CONNECT_ERROR, "");
         }
 
@@ -296,93 +294,6 @@ namespace mongo {
             throw SocketException(SocketException::CONNECT_ERROR, "");
             break;
         }
-    }
-
-    const char* validateErrToString(long code) {
-        switch (code) {
-        case X509_V_ERR_UNABLE_TO_DECRYPT_CERT_SIGNATURE:
-            return "UNABLE_TO_DECRYPT_CERT_SIGNATURE";
-        
-        case X509_V_ERR_UNABLE_TO_DECRYPT_CRL_SIGNATURE:
-            return "UNABLE_TO_DECRYPT_CRL_SIGNATURE";
-
-        case X509_V_ERR_UNABLE_TO_DECODE_ISSUER_PUBLIC_KEY:
-            return "UNABLE_TO_DECODE_ISSUER_PUBLIC_KEY";
-
-        case X509_V_ERR_CERT_SIGNATURE_FAILURE:
-            return "CERT_SIGNATURE_FAILURE";
-
-        case X509_V_ERR_CRL_SIGNATURE_FAILURE:
-            return "CRL_SIGNATURE_FAILURE";
-
-        case X509_V_ERR_ERROR_IN_CERT_NOT_BEFORE_FIELD:
-            return "ERROR_IN_CERT_NOT_BEFORE_FIELD";
-
-        case X509_V_ERR_ERROR_IN_CERT_NOT_AFTER_FIELD:
-            return "ERROR_IN_CERT_NOT_AFTER_FIELD";
-
-        case X509_V_ERR_ERROR_IN_CRL_LAST_UPDATE_FIELD:
-            return "ERROR_IN_CRL_LAST_UPDATE_FIELD";
-
-        case X509_V_ERR_ERROR_IN_CRL_NEXT_UPDATE_FIELD:
-            return "ERROR_IN_CRL_NEXT_UPDATE_FIELD";
-
-        case X509_V_ERR_CERT_NOT_YET_VALID:
-            return "CERT_NOT_YET_VALID";
-
-        case X509_V_ERR_CERT_HAS_EXPIRED:
-            return "CERT_HAS_EXPIRED";
-
-        case X509_V_ERR_OUT_OF_MEM:
-            return "OUT_OF_MEM";
-
-        case X509_V_ERR_UNABLE_TO_GET_ISSUER_CERT:
-            return "UNABLE_TO_GET_ISSUER_CERT";
-
-        case X509_V_ERR_UNABLE_TO_GET_ISSUER_CERT_LOCALLY:
-            return "UNABLE_TO_GET_ISSUER_CERT_LOCALLY";
-
-        case X509_V_ERR_UNABLE_TO_VERIFY_LEAF_SIGNATURE:
-            return "UNABLE_TO_VERIFY_LEAF_SIGNATURE";
-
-        case X509_V_ERR_DEPTH_ZERO_SELF_SIGNED_CERT:
-            return "DEPTH_ZERO_SELF_SIGNED_CERT";
-
-        case X509_V_ERR_SELF_SIGNED_CERT_IN_CHAIN:
-            return "SELF_SIGNED_CERT_IN_CHAIN";
-
-        case X509_V_ERR_CERT_CHAIN_TOO_LONG:
-            return "CERT_CHAIN_TOO_LONG";
-
-        case X509_V_ERR_CERT_REVOKED:
-            return "CERT_REVOKED";
-
-        case X509_V_ERR_INVALID_CA:
-            return "INVALID_CA";
-
-        case X509_V_ERR_PATH_LENGTH_EXCEEDED:
-            return "PATH_LENGTH_EXCEEDED";
-
-        case X509_V_ERR_INVALID_PURPOSE:
-            return "INVALID_PURPOSE";
-
-        case X509_V_ERR_CERT_UNTRUSTED:
-            return "CERT_UNTRUSTED";
-
-        case X509_V_ERR_CERT_REJECTED:
-            return "CERT_REJECTED";
-
-        case X509_V_ERR_UNABLE_TO_GET_CRL:
-            return "UNABLE_TO_GET_CRL";
-
-        case X509_V_ERR_CRL_NOT_YET_VALID:
-            return "CRL_NOT_YET_VALID";
-
-        case X509_V_ERR_CRL_HAS_EXPIRED:
-            return "CRL_HAS_EXPIRED";
-        }
-
-        return "Unknown verify error";
     }
 }
 
