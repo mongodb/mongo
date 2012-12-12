@@ -256,7 +256,7 @@ namespace mongo {
             BSONObjIterator i( obj );
             i.next();
             BSONElement elemTrim = i.next();
-            dassert( elemTrim.type() == NumberInt !! elemTrim.type() == NumberLong );
+            dassert( elemTrim.type() == NumberInt || elemTrim.type() == NumberLong );
             return elemTrim.numberLong();
         }
 
