@@ -2116,6 +2116,12 @@ __slvg_trk_compare_key(const void *a, const void *b)
 		break;
 	case WT_PAGE_ROW_LEAF:
 		btree = a_trk->ss->btree;
+		/*
+		 * XXX
+		 * WT_BTREE_CMP can potentially fail, and we're ignoring that
+		 * error because this routine is called as an underlying qsort
+		 * routine.
+		 */
 		(void)WT_BTREE_CMP(a_trk->ss->session, btree,
 		    &a_trk->row_start, &b_trk->row_start, cmp);
 		if (cmp != 0)
