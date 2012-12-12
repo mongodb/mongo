@@ -28,10 +28,16 @@
  */
 namespace mongo {
 
-    void ShardingConnectionHook::onHandedOut( DBClientBase * conn ) {
-        if( _shardedConnections ){
-            ClientInfo::get()->addShard( conn->getServerAddress() );
-        }
+    void* remapPrivateView(void *oldPrivateAddr) {
+        log() << "remapPrivateView called in mongos, aborting" << endl;
+        fassertFailed(16462);
+    }
+
+    /** When this callback is run, we record a shard that we've used for useful work
+     *  in an operation to be read later by getLastError()
+    */
+    void usingAShardConnection( const string& addr ) {
+        ClientInfo::get()->addShard( addr );
     }
 
     TSP_DEFINE(Client,currentClient)

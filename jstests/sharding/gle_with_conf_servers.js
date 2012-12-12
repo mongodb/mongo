@@ -11,14 +11,6 @@ function writeToConfigTest(){
 
     assert( gleObj.ok );
 
-    printjson( gleObj );
-    assert( gleObj.hasOwnProperty( 'shardRawGLE' ),
-        'missing shardRawGLE from get last error fields!' );
-    
-    var shardGLE = gleObj.shardRawGLE[ st.config0.host ];
-    assert( shardGLE.ok );
-    assert.neq( null, shardGLE.err );
-
     st.stop();
 }
 

@@ -820,7 +820,7 @@ namespace mongo {
 
     }
 
-    void ShardingConnectionHook::onHandedOut( DBClientBase * conn ) {
-        // no-op for mongod
+    void usingAShardConnection( const string& addr ) {
     }
+
 }
