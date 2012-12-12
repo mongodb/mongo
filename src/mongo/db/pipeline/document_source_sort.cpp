@@ -101,7 +101,7 @@ namespace mongo {
         , populated(false)
     {}
 
-    long long DocumentSourceSort::getLimit() {
+    long long DocumentSourceSort::getLimit() const {
         return limitSrc ? limitSrc->getLimit() : -1;
     }
 

@@ -911,7 +911,9 @@ namespace mongo {
             long long limit=-1);
 
         /// returns -1 for no limit
-        long long getLimit();
+        long long getLimit() const;
+
+        intrusive_ptr<DocumentSourceLimit> getLimitSrc() const { return limitSrc; }
 
         static const char sortName[];
     protected:
