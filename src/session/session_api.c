@@ -627,7 +627,7 @@ __session_commit_transaction(WT_SESSION *wt_session, const char *config)
 	if (ret == 0)
 		ret = __wt_txn_commit(session, cfg);
 	else
-		(void)__wt_txn_rollback(session, cfg);
+		WT_TRET(__wt_txn_rollback(session, cfg));
 
 err:	API_END(session);
 	return (ret);
