@@ -1233,11 +1233,17 @@ namespace mongo {
                         return false;
                     }
 
-                    nearStr = res->result()["near"].String();
+                    if (res->result().hasField("near")) {
+                        nearStr = res->result()["near"].String();
+                    }
                     time += res->result()["stats"]["time"].Number();
-                    btreelocs += res->result()["stats"]["btreelocs"].Number();
+                    if (!res->result()["stats"]["btreelocs"].eoo()) {
+                        btreelocs += res->result()["stats"]["btreelocs"].Number();
+                    }
                     nscanned += res->result()["stats"]["nscanned"].Number();
-                    objectsLoaded += res->result()["stats"]["objectsLoaded"].Number();
+                    if (!res->result()["stats"]["objectsLoaded"].eoo()) {
+                        objectsLoaded += res->result()["stats"]["objectsLoaded"].Number();
+                    }
 
                     BSONForEach(obj, res->result()["results"].embeddedObject()) {
                         results.insert(make_pair(obj["dis"].Number(), obj.embeddedObject().getOwned()));
