@@ -1071,8 +1071,8 @@ namespace mongo {
                     _expPrefix.reset(new GeoHash(_prefix));
 
                     // Find points inside this prefix
-                    while (_min.checkAndAdvance(_prefix, _foundInExp, this) && _foundInExp < maxFound && _found < maxAdded);
-                    while (_max.checkAndAdvance(_prefix, _foundInExp, this) && _foundInExp < maxFound && _found < maxAdded);
+                    while (_min.checkAndAdvance(_prefix, _foundInExp, this) && _foundInExp < maxFound && _found < maxAdded) {}
+                    while (_max.checkAndAdvance(_prefix, _foundInExp, this) && _foundInExp < maxFound && _found < maxAdded) {}
 
 #ifdef GEODEBUGGING
 
