@@ -189,11 +189,12 @@ namespace mongo {
          * @returns NULL or MigrateInfo of the best move to make towards balacing the collection.
          *          caller owns the MigrateInfo instance
          */
-        static MigrateInfo* balance( const string& ns, 
+        static MigrateInfo* balance( const string& ns,
                                      const DistributionStatus& distribution,
                                      int balancedLastTime );
-        
 
+    private:
+        static bool _isJumbo( const BSONObj& chunk );
     };
 
 

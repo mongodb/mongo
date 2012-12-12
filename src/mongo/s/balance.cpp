@@ -218,8 +218,6 @@ namespace mongo {
 
             while ( cursor->more() ) {
                 BSONObj chunk = cursor->nextSafe();
-                if (chunk[ChunkFields::jumbo()].trueValue())
-                    continue;
                 vector<BSONObj>& chunks = shardToChunksMap[chunk[ChunkFields::shard()].String()];
                 chunks.push_back( chunk.getOwned() );
             }

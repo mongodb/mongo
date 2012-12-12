@@ -204,6 +204,13 @@ namespace mongo {
         }
     }
 
+    bool BalancerPolicy::_isJumbo( const BSONObj& chunk ) {
+        if ( chunk[ChunkFields::jumbo()].trueValue() ) {
+            LOG(1) << "chunk: " << chunk << "is marked as jumbo" << endl;
+            return true;
+        }
+        return false;
+    }
     MigrateInfo* BalancerPolicy::balance( const string& ns,
                                           const DistributionStatus& distribution,
                                           int balancedLastTime ) {
@@ -238,10 +245,16 @@ namespace mongo {
                 }
 
                 const vector<BSONObj>& chunks = distribution.getChunks( shard );
+                unsigned numJumboChunks = 0;
 
                 // since we have to move all chunks, lets just do in order
                 for ( unsigned i=0; i<chunks.size(); i++ ) {
                     BSONObj chunkToMove = chunks[i];
+                    if ( _isJumbo( chunkToMove ) ) {
+                        numJumboChunks++;
+                        continue;
+                    }
+
                     string tag = distribution.getTagForChunk( chunkToMove );
                     string to = distribution.getBestReceieverShard( tag );
 
@@ -256,7 +269,10 @@ namespace mongo {
                     return new MigrateInfo( ns, to, shard, chunkToMove.getOwned() );
                 }
 
-                warning() << "can't find any chunk to move from: " << shard << " but we want to" << endl;
+                warning() << "can't find any chunk to move from: " << shard
+                          << " but we want to. "
+                          << " numJumboChunks: " << numJumboChunks
+                          << endl;
             }
         }
 
@@ -276,7 +292,14 @@ namespace mongo {
                         continue;
 
                     // uh oh, this chunk is in the wrong place
-                    log() << "chunk " << chunks[j] << " is not on a shard with the right tag: " << tag << endl;
+                    log() << "chunk " << chunks[j]
+                          << " is not on a shard with the right tag: "
+                          << tag << endl;
+
+                    if ( _isJumbo( chunks[j] ) ) {
+                        warning() << "chunk " << chunks[j] << " is jumbo, so cannot be moved" << endl;
+                        continue;
+                    }
 
                     string to = distribution.getBestReceieverShard( tag );
                     if ( to.size() == 0 ) {
@@ -340,14 +363,30 @@ namespace mongo {
                 continue;
 
             const vector<BSONObj>& chunks = distribution.getChunks( from );
+            unsigned numJumboChunks = 0;
             for ( unsigned j = 0; j < chunks.size(); j++ ) {
                 if ( distribution.getTagForChunk( chunks[j] ) != tag )
                     continue;
+
+                if ( _isJumbo( chunks[j] ) ) {
+                    numJumboChunks++;
+                    continue;
+                }
+
                 log() << " ns: " << ns << " going to move " << chunks[j]
                       << " from: " << from << " to: " << to << " tag [" << tag << "]"
                       << endl;
                 return new MigrateInfo( ns, to, from, chunks[j] );
             }
+
+            if ( numJumboChunks ) {
+                error() << "shard: " << from << "ns: " << ns
+                        << "has too many chunks, but they are all jumbo "
+                        << " numJumboChunks: " << numJumboChunks
+                        << endl;
+                continue;
+            }
+
             verify( false ); // should be impossible
         }
 
