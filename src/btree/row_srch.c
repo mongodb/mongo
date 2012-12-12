@@ -32,7 +32,7 @@ __wt_search_insert(WT_SESSION_IMPL *session,
 	/* Fast-path appends. */
 	insert_key.data = WT_INSERT_KEY(ret_ins);
 	insert_key.size = WT_INSERT_KEY_SIZE(ret_ins);
-	(void)WT_BTREE_CMP(session, btree, srch_key, &insert_key, cmp);
+	WT_RET(WT_BTREE_CMP(session, btree, srch_key, &insert_key, cmp));
 	if (cmp >= 0) {
 		/*
 		 * XXX We may race with another appending thread.
