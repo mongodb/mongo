@@ -128,8 +128,14 @@ namespace mongo {
                     NumberType digitValue = NumberType(_digitValue(str[i]));
                     if (int(digitValue) >= base)
                         return Status(ErrorCodes::FailedToParse, "Bad digit");
+
+// MSVC: warning C4146: unary minus operator applied to unsigned type, result still unsigned
+// This code is statically known to be dead when NumberType is unsigned, so the warning is not real
+#pragma warning(push)
+#pragma warning(disable:4146)
                     if ((NumberType(limits::min() / base) > n) ||
                         ((limits::min() - NumberType(n * base)) > -digitValue)) {
+#pragma warning(pop)
 
                         return Status(ErrorCodes::FailedToParse, "Underflow");
                     }
