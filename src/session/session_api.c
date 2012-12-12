@@ -102,7 +102,7 @@ __session_close(WT_SESSION *wt_session, const char *config)
 
 	/* Destroy the thread's mutex. */
 	if (session->cond != NULL)
-		(void)__wt_cond_destroy(session, session->cond);
+		WT_TRET(__wt_cond_destroy(session, session->cond));
 
 	/* The API lock protects opening and closing of sessions. */
 	__wt_spin_lock(session, &conn->api_lock);

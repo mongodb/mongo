@@ -91,7 +91,7 @@ __wt_cache_create(WT_CONNECTION_IMPL *conn, const char *cfg[])
 	__wt_cache_stats_update(conn, 0);
 	return (0);
 
-err:	__wt_cache_destroy(conn);
+err:	WT_RET(__wt_cache_destroy(conn));
 	return (ret);
 }
 
@@ -122,21 +122,23 @@ __wt_cache_stats_update(WT_CONNECTION_IMPL *conn, uint32_t flags)
  * __wt_cache_destroy --
  *	Discard the underlying cache.
  */
-void
+int
 __wt_cache_destroy(WT_CONNECTION_IMPL *conn)
 {
-	WT_SESSION_IMPL *session;
 	WT_CACHE *cache;
+	WT_DECL_RET;
+	WT_SESSION_IMPL *session;
 
 	session = conn->default_session;
 	cache = conn->cache;
 
 	if (cache == NULL)
-		return;
+		return (0);
 
 	if (cache->evict_cond != NULL)
-		(void)__wt_cond_destroy(session, cache->evict_cond);
+		WT_TRET(__wt_cond_destroy(session, cache->evict_cond));
 	__wt_spin_destroy(session, &cache->evict_lock);
 
 	__wt_free(session, conn->cache);
+	return (0);
 }

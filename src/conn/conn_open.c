@@ -97,7 +97,7 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 	WT_TRET(__wt_conn_cache_pool_destroy(conn));
 
 	/* Discard the cache. */
-	__wt_cache_destroy(conn);
+	WT_TRET(__wt_cache_destroy(conn));
 
 	/* Discard transaction state. */
 	__wt_txn_global_destroy(conn);
