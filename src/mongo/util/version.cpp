@@ -279,7 +279,7 @@ namespace mongo {
     }
 
     int versionCmp(StringData rhs, StringData lhs) {
-        if (strcmp(rhs.__data(),lhs.__data()) == 0)
+        if ( rhs == lhs )
             return 0;
 
         // handle "1.2.3-" and "1.2.3-pre"
