@@ -306,7 +306,7 @@ namespace mongo {
     }
 
     void Value::addToBsonObj(BSONObjBuilder* pBuilder, StringData fieldName) const {
-        *pBuilder << fieldName.__data() << *this;
+        *pBuilder << fieldName << *this;
     }
 
     void Value::addToBsonArray(BSONArrayBuilder* pBuilder) const {
