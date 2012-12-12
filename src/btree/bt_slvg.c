@@ -1220,11 +1220,12 @@ __slvg_col_build_leaf(
 	page->u.col_var.d = save_col_var;
 	page->entries = save_entries;
 
-	__wt_page_release(session, page);
-	ret = __wt_rec_evict(session, page, 1);
+	ret = __wt_page_release(session, page);
+	if (ret == 0)
+		ret = __wt_rec_evict(session, page, 1);
 
 	if (0) {
-err:		__wt_page_release(session, page);
+err:		WT_TRET(__wt_page_release(session, page));
 	}
 
 	return (ret);
@@ -1877,11 +1878,12 @@ __slvg_row_build_leaf(WT_SESSION_IMPL *session,
 	 * Discard our hazard pointer and evict the page, updating the
 	 * parent's reference.
 	 */
-	__wt_page_release(session, page);
-	ret = __wt_rec_evict(session, page, 1);
+	ret = __wt_page_release(session, page);
+	if (ret == 0)
+		ret = __wt_rec_evict(session, page, 1);
 
 	if (0) {
-err:		__wt_page_release(session, page);
+err:		WT_TRET(__wt_page_release(session, page));
 	}
 	__wt_scr_free(&key);
 

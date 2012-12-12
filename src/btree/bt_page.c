@@ -79,14 +79,14 @@ __wt_page_in_func(
 			if (page->modify != NULL &&
 			    __wt_txn_ancient(session, page->modify->first_id)) {
 				page->read_gen = 0;
-				__wt_hazard_clear(session, page);
+				WT_RET(__wt_hazard_clear(session, page));
 				WT_RET(__wt_evict_server_wake(session));
 				break;
 			}
 
 			/* Check if we need an autocommit transaction. */
 			if ((ret = __wt_txn_autocommit_check(session)) != 0) {
-				__wt_hazard_clear(session, page);
+				WT_TRET(__wt_hazard_clear(session, page));
 				return (ret);
 			}
 

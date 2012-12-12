@@ -361,7 +361,7 @@ __wt_get_addr(
  * __wt_page_release --
  *	Release a reference to a page.
  */
-static inline void
+static inline int
 __wt_page_release(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_BTREE *btree;
@@ -373,34 +373,35 @@ __wt_page_release(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * in memory, regardless.
 	 */
 	if (page == NULL || WT_PAGE_IS_ROOT(page))
-		return;
+		return (0);
 
-	/* If this is a non cached page, discard it. */
+	/* If this page isn't cached, discard it. */
 	if (F_ISSET(btree, WT_BTREE_NO_CACHE)) {
 		page->ref->page = NULL;
 		page->ref->state = WT_REF_DISK;
 		__wt_page_out(session, &page, 0);
-		return;
+		return (0);
 	}
 
 	/* Discard our hazard pointer. */
-	__wt_hazard_clear(session, page);
+	return (__wt_hazard_clear(session, page));
 }
 
 /*
  * __wt_stack_release --
  *	Release references to a page stack.
  */
-static inline void
+static inline int
 __wt_stack_release(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_PAGE *next;
 
 	while (page != NULL && !WT_PAGE_IS_ROOT(page)) {
 		next = page->parent;
-		__wt_page_release(session, page);
+		WT_RET(__wt_page_release(session, page));
 		page = next;
 	}
+	return (0);
 }
 
 /*

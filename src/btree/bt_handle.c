@@ -544,9 +544,7 @@ __btree_get_last_recno(WT_SESSION_IMPL *session)
 		return (WT_NOTFOUND);
 
 	btree->last_recno = __col_last_recno(page);
-	__wt_stack_release(session, page);
-
-	return (0);
+	return (__wt_stack_release(session, page));
 }
 
 /*

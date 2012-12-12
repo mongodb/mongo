@@ -259,7 +259,7 @@ __wt_row_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 	WT_ERR(__wt_search_insert(session, cbt, cbt->ins_head, srch_key));
 	return (0);
 
-err:	__wt_stack_release(session, page);
+err:	WT_TRET(__wt_stack_release(session, page));
 	return (ret);
 }
 
@@ -326,6 +326,6 @@ __wt_row_random(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 
 	return (0);
 
-err:	__wt_stack_release(session, page);
+err:	WT_TRET(__wt_stack_release(session, page));
 	return (ret);
 }

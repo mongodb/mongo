@@ -57,7 +57,7 @@ __cursor_search_clear(WT_CURSOR_BTREE *cbt)
  * __cursor_leave --
  *	Clear a cursor's position.
  */
-static inline void
+static inline int
 __cursor_leave(WT_CURSOR_BTREE *cbt)
 {
 	WT_CURSOR *cursor;
@@ -67,7 +67,7 @@ __cursor_leave(WT_CURSOR_BTREE *cbt)
 	session = (WT_SESSION_IMPL *)cursor->session;
 
 	/* Release any page references we're holding. */
-	__wt_stack_release(session, cbt->page);
+	WT_RET(__wt_stack_release(session, cbt->page));
 	cbt->page = NULL;
 
 	if (F_ISSET(cbt, WT_CBT_ACTIVE)) {
@@ -85,6 +85,7 @@ __cursor_leave(WT_CURSOR_BTREE *cbt)
 		}
 		F_CLR(cbt, WT_CBT_ACTIVE);
 	}
+	return (0);
 }
 
 /*
@@ -107,20 +108,21 @@ __cursor_enter(WT_CURSOR_BTREE *cbt)
  * __cursor_func_init --
  *	Cursor call setup.
  */
-static inline void
+static inline int
 __cursor_func_init(WT_CURSOR_BTREE *cbt, int reenter)
 {
 	if (reenter)
-		__cursor_leave(cbt);
+		WT_RET(__cursor_leave(cbt));
 	if (!F_ISSET(cbt, WT_CBT_ACTIVE))
 		__cursor_enter(cbt);
+	return (0);
 }
 
 /*
  * __cursor_func_resolve --
  *	Resolve the cursor's state for return.
  */
-static inline void
+static inline int
 __cursor_func_resolve(WT_CURSOR_BTREE *cbt, int ret)
 {
 	WT_CURSOR *cursor;
@@ -135,9 +137,10 @@ __cursor_func_resolve(WT_CURSOR_BTREE *cbt, int ret)
 	if (ret == 0)
 		F_SET(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
 	else {
-		__cursor_leave(cbt);
+		WT_RET(__cursor_leave(cbt));
 		__cursor_search_clear(cbt);
 	}
+	return (0);
 }
 
 /*

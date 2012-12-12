@@ -128,7 +128,7 @@ __wt_hazard_set(WT_SESSION_IMPL *session, WT_REF *ref, int *busyp
  * __wt_hazard_clear --
  *	Clear a hazard pointer.
  */
-void
+int
 __wt_hazard_clear(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_BTREE *btree;
@@ -138,13 +138,7 @@ __wt_hazard_clear(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 	/* If a file can never be evicted, hazard pointers aren't required. */
 	if (F_ISSET(btree, WT_BTREE_NO_HAZARD))
-		return;
-
-	/*
-	 * The default value for a WT_HAZARD slot is NULL, but clearing a
-	 * NULL reference isn't a good idea.
-	 */
-	WT_ASSERT(session, page != NULL);
+		return (0);
 
 	/*
 	 * Clear the caller's hazard pointer.
@@ -169,13 +163,16 @@ __wt_hazard_clear(WT_SESSION_IMPL *session, WT_PAGE *page)
 			 * we may need to update our transactional context.
 			 */
 			--session->nhazard;
-			return;
+			return (0);
 		}
+
+	/*
+	 * A serious error, we should always find the hazard pointer.  Panic,
+	 * because using a page we didn't have pinned down implies corruption.
+	 */
 	__wt_errx(session,
-	    "session %p: clear hazard pointer %p: not found", session, page);
-#ifdef HAVE_DIAGNOSTIC
-	__hazard_dump(session);
-#endif
+	    "session %p: clear hazard pointer: %p: not found", session, page);
+	return (__wt_panic(session));
 }
 
 /*
@@ -188,22 +185,26 @@ __wt_hazard_close(WT_SESSION_IMPL *session)
 	WT_HAZARD *hp;
 	int found;
 
-	/* Check for a set hazard pointer and complain if we find one. */
+	/*
+	 * Check for a set hazard pointer and complain if we find one.  We could
+	 * just check the session's hazard reference count, but this is a useful
+	 * diagnostic.
+	 */
 	for (found = 0, hp = session->hazard;
 	    hp < session->hazard + session->hazard_size; ++hp)
 		if (hp->page != NULL) {
-			__wt_errx(session,
-			    "session %p: hazard pointer table not empty: "
-			    "page %p",
-			    session, hp->page);
-#ifdef HAVE_DIAGNOSTIC
-			__hazard_dump(session);
-#endif
 			found = 1;
 			break;
 		}
-	if (!found)
+	if (session->nhazard == 0 && !found)
 		return;
+
+	__wt_errx(session,
+	    "session %p: close hazard pointer table: table not empty", session);
+
+#ifdef HAVE_DIAGNOSTIC
+	__hazard_dump(session);
+#endif
 
 	/*
 	 * Clear any hazard pointers because it's not a correctness problem
@@ -212,15 +213,21 @@ __wt_hazard_close(WT_SESSION_IMPL *session)
 	 * close isn't that common that it's an expensive check, and we don't
 	 * want to let a hazard pointer lie around, keeping a page from being
 	 * evicted.
+	 *
+	 * We don't panic: this shouldn't be a correctness issue (at least, I
+	 * can't think of a reason it would be).
 	 */
 	for (hp = session->hazard;
 	    hp < session->hazard + session->hazard_size; ++hp)
-		if (hp->page != NULL)
-			__wt_hazard_clear(session, hp->page);
+		if (hp->page != NULL) {
+			hp->page = NULL;
+			--session->nhazard;
+		}
 
 	if (session->nhazard != 0)
-		__wt_errx(session, "session %p: "
-		    "hazard pointer count didn't match table entries",
+		__wt_errx(session,
+		    "session %p: close hazard pointer table: count didn't "
+		    "match entries",
 		    session);
 }
 

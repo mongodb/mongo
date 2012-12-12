@@ -158,6 +158,6 @@ past_end:
 		F_SET(cbt, WT_CBT_MAX_RECORD);
 	return (0);
 
-err:	__wt_stack_release(session, page);
+err:	WT_TRET(__wt_stack_release(session, page));
 	return (ret);
 }

@@ -1182,7 +1182,7 @@ __wt_hazard_set(WT_SESSION_IMPL *session, WT_REF *ref, int *busyp
  , const char *file, int line
 #endif
  );
-extern void __wt_hazard_clear(WT_SESSION_IMPL *session, WT_PAGE *page);
+extern int __wt_hazard_clear(WT_SESSION_IMPL *session, WT_PAGE *page);
 extern void __wt_hazard_close(WT_SESSION_IMPL *session);
 extern int __wt_raw_to_hex( WT_SESSION_IMPL *session,
     const uint8_t *from,

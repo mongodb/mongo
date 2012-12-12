@@ -48,7 +48,7 @@ __wt_compact(WT_SESSION_IMPL *session, const char *cfg[])
 
 		/* Mark the page and tree dirty, we want to write this page. */
 		if ((ret = __wt_page_modify_init(session, page)) != 0) {
-			__wt_stack_release(session, page);
+			WT_TRET(__wt_stack_release(session, page));
 			WT_RET(ret);
 		}
 		__wt_page_and_tree_modify_set(session, page);

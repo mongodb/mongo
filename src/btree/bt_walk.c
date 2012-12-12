@@ -195,7 +195,7 @@ __wt_tree_walk(WT_SESSION_IMPL *session, WT_PAGE **pagep, uint32_t flags)
 		if (page->ref->state == WT_REF_EVICT_WALK)
 			page->ref->state = WT_REF_MEM;
 	} else
-		__wt_page_release(session, page);
+		WT_RET(__wt_page_release(session, page));
 
 	/* Switch to the parent. */
 	page = t;
