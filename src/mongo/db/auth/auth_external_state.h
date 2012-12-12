@@ -21,6 +21,7 @@
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
 #include "mongo/client/dbclientinterface.h"
+#include "mongo/db/auth/principal_name.h"
 
 namespace mongo {
 
@@ -48,14 +49,14 @@ namespace mongo {
         // On success, returns Status::OK() and stores a shared-ownership copy of the document into
         // "result".
         virtual Status getPrivilegeDocument(const std::string& dbname,
-                                            const std::string& principalName,
+                                            const PrincipalName& principalName,
                                             BSONObj* result) = 0;
 
     protected:
         // Look up the privilege document for "principalName" in database "dbname", over "conn".
         static Status getPrivilegeDocumentOverConnection(DBClientBase* conn,
                                                          const std::string& dbname,
-                                                         const std::string& userName,
+                                                         const PrincipalName& principalName,
                                                          BSONObj* result);
 
         AuthExternalState(); // This class should never be instantiated directly.

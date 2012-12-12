@@ -33,7 +33,7 @@ namespace mongo {
         virtual ~AuthExternalStateMongod();
 
         virtual Status getPrivilegeDocument(const string& dbname,
-                                            const string& principalName,
+                                            const PrincipalName& principalName,
                                             BSONObj* result);
 
         virtual bool shouldIgnoreAuthChecks() const;

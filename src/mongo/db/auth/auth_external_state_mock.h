@@ -40,7 +40,7 @@ namespace mongo {
         }
 
         virtual Status getPrivilegeDocument(const string& dbname,
-                                            const string& user,
+                                            const PrincipalName& user,
                                             BSONObj* result) {
             return Status(ErrorCodes::InternalError, "Not Implemented!");
         }

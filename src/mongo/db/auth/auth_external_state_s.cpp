@@ -46,7 +46,7 @@ namespace mongo {
     }
 
     Status AuthExternalStateMongos::getPrivilegeDocument(const std::string& dbname,
-                                                         const std::string& principalName,
+                                                         const PrincipalName& principalName,
                                                          BSONObj* result) {
         scoped_ptr<ScopedDbConnection> conn(getConnectionForUsersCollection(dbname));
         Status status = getPrivilegeDocumentOverConnection(

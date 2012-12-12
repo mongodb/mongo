@@ -29,7 +29,7 @@ namespace mongo {
     AuthExternalStateMongod::~AuthExternalStateMongod() {}
 
     Status AuthExternalStateMongod::getPrivilegeDocument(const string& dbname,
-                                                         const string& principalName,
+                                                         const PrincipalName& principalName,
                                                          BSONObj* result) {
         Client::GodScope gs;
         Client::ReadContext(dbname + ".system.users");
