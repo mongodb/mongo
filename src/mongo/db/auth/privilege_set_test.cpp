@@ -17,7 +17,8 @@
  * Unit tests of the PrivilegeSet type.
  */
 
-#include "mongo/db/auth/acquired_privilege.h"
+#include <iostream>
+
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/privilege_set.h"
 #include "mongo/unittest/unittest.h"

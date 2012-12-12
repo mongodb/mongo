@@ -103,7 +103,7 @@ namespace mongo {
         Principal* principal = new Principal(PrincipalName(principalName, dbname));
         authorizationManager->addAuthorizedPrincipal(principal);
         return authorizationManager->acquirePrivilegesFromPrivilegeDocument(dbname,
-                                                                            principal,
+                                                                            principal->getName(),
                                                                             userObj);
     }
 

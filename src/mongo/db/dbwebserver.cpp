@@ -21,7 +21,6 @@
 
 #include "pch.h"
 
-#include "mongo/db/auth/acquired_privilege.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/principal.h"
 #include "mongo/db/auth/privilege.h"
@@ -85,11 +84,11 @@ namespace mongo {
             Principal* principal = new Principal(PrincipalName(principalName, "local"));
             ActionSet actions = AuthorizationManager::getActionsForOldStyleUser(
                     "admin", readOnly);
-            AcquiredPrivilege privilege(Privilege("*", actions), principal);
 
             AuthorizationManager* authorizationManager = cc().getAuthorizationManager();
             authorizationManager->addAuthorizedPrincipal(principal);
-            Status status = authorizationManager->acquirePrivilege(privilege);
+            Status status = authorizationManager->acquirePrivilege(
+                    Privilege(PrivilegeSet::WILDCARD_RESOURCE, actions), principal->getName());
             verify (status == Status::OK());
         }
 

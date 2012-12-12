@@ -21,12 +21,13 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
-#include "mongo/db/auth/acquired_privilege.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/auth_external_state.h"
 #include "mongo/db/auth/principal.h"
+#include "mongo/db/auth/principal_name.h"
 #include "mongo/db/auth/principal_set.h"
+#include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/privilege_set.h"
 
 namespace mongo {
@@ -72,7 +73,8 @@ namespace mongo {
         void logoutDatabase(const std::string& dbname);
 
         // Grant this connection the given privilege.
-        Status acquirePrivilege(const AcquiredPrivilege& privilege);
+        Status acquirePrivilege(const Privilege& privilege,
+                                const PrincipalName& authorizingPrincipal);
 
         // Adds a new principal with the given principal name and authorizes it with full access.
         // Used to grant internal threads full access.
@@ -93,7 +95,7 @@ namespace mongo {
         // Parses the privilege documents and acquires all privileges that the privilege document
         // grants
         Status acquirePrivilegesFromPrivilegeDocument(const std::string& dbname,
-                                                      Principal* principal,
+                                                      const PrincipalName& principal,
                                                       const BSONObj& privilegeDocument);
 
         // Returns the privilege document with the given user name in the given database. Currently
@@ -134,7 +136,7 @@ namespace mongo {
         // Parses the privilege document and returns a PrivilegeSet of all the Privileges that
         // the privilege document grants.
         static Status buildPrivilegeSet(const std::string& dbname,
-                                        Principal* principal,
+                                        const PrincipalName& principal,
                                         const BSONObj& privilegeDocument,
                                         PrivilegeSet* result);
 
@@ -144,7 +146,7 @@ namespace mongo {
         // Privileges that the privilege document grants.
         static Status _buildPrivilegeSetFromOldStylePrivilegeDocument(
                 const std::string& dbname,
-                Principal* principal,
+                const PrincipalName& principal,
                 const BSONObj& privilegeDocument,
                 PrivilegeSet* result);
 

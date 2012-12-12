@@ -34,8 +34,8 @@ namespace {
         Principal* principal = new Principal(PrincipalName("Spencer", "test"));
         ActionSet actions;
         actions.addAction(ActionType::insert);
-        AcquiredPrivilege writePrivilege(Privilege("test", actions), principal);
-        AcquiredPrivilege allDBsWritePrivilege(Privilege("*", actions), principal);
+        Privilege writePrivilege("test", actions);
+        Privilege allDBsWritePrivilege("*", actions);
         AuthExternalStateMock* externalState = new AuthExternalStateMock();
         AuthorizationManager authManager(externalState);
 
@@ -46,13 +46,13 @@ namespace {
         ASSERT_FALSE(authManager.checkAuthorization("test", ActionType::insert));
 
         ASSERT_EQUALS(ErrorCodes::UserNotFound,
-                      authManager.acquirePrivilege(writePrivilege).code());
+                      authManager.acquirePrivilege(writePrivilege, principal->getName()));
         authManager.addAuthorizedPrincipal(principal);
-        ASSERT_OK(authManager.acquirePrivilege(writePrivilege));
+        ASSERT_OK(authManager.acquirePrivilege(writePrivilege, principal->getName()));
         ASSERT_TRUE(authManager.checkAuthorization("test", ActionType::insert));
 
         ASSERT_FALSE(authManager.checkAuthorization("otherDb", ActionType::insert));
-        ASSERT_OK(authManager.acquirePrivilege(allDBsWritePrivilege));
+        ASSERT_OK(authManager.acquirePrivilege(allDBsWritePrivilege, principal->getName()));
         ASSERT_TRUE(authManager.checkAuthorization("otherDb", ActionType::insert));
         // Auth checks on a collection should be applied to the database name.
         ASSERT_TRUE(authManager.checkAuthorization("otherDb.collectionName", ActionType::insert));
@@ -62,7 +62,7 @@ namespace {
     }
 
     TEST(AuthorizationManagerTest, GetPrivilegesFromPrivilegeDocument) {
-        Principal* principal = new Principal(PrincipalName("Spencer", "test"));
+        PrincipalName principal("Spencer", "test");
         BSONObj invalid;
         BSONObj readWrite = BSON("user" << "Spencer" << "pwd" << "passwordHash");
         BSONObj readOnly = BSON("user" << "Spencer" << "pwd" << "passwordHash" <<
