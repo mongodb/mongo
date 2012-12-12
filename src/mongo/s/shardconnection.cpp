@@ -268,7 +268,15 @@ namespace mongo {
     void ShardConnection::kill() {
         if ( _conn ) {
             if( versionManager.isVersionableCB( _conn ) ) versionManager.resetShardVersionCB( _conn );
-            delete _conn;
+
+            if (_conn->isFailed()) {
+                // Let the pool know about the bad connection and also delegate disposal to it.
+                ClientConnections::threadInstance()->done(_addr, _conn);
+            }
+            else {
+                delete _conn;
+            }
+
             _conn = 0;
             _finishedInit = true;
         }
