@@ -140,5 +140,5 @@ __wt_cache_destroy(WT_CONNECTION_IMPL *conn)
 	__wt_spin_destroy(session, &cache->evict_lock);
 
 	__wt_free(session, conn->cache);
-	return (0);
+	return (ret);
 }
