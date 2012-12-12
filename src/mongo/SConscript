@@ -544,6 +544,7 @@ env.StaticLibrary("serveronly", serverOnlyFiles,
 mongodAndMongosFiles = [
     "db/connection_factory.cpp",
     "db/initialize_server_global_state.cpp",
+    "db/server_extra_log_context.cpp",
     "util/net/message_server_port.cpp",
     ]
 env.StaticLibrary("mongodandmongos", mongodAndMongosFiles)
