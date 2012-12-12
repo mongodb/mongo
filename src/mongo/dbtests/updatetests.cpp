@@ -650,6 +650,29 @@ namespace UpdateTests {
         }
     };
 
+
+    class PushTrimInvalidTrimDouble : public SetBase {
+    public:
+        void run() {
+            client().insert( ns(), fromjson( "{'_id':0,a:[1,2]}" ) );
+            // { $push : { a : { $each : [ 3 ], $trimTo : 2.1 } } }
+            BSONObj pushObj = BSON( "$each" << BSON_ARRAY(3) << "$trimTo" << 2.1 );
+            client().update( ns(), Query(), BSON( "$push" << BSON( "a" << pushObj ) ) );
+            ASSERT( client().findOne( ns(), Query() ).woCompare(fromjson("{'_id':0,a:[1,2]}")) == 0);
+        }
+    };
+
+    class PushTrimValidTrimDouble : public SetBase {
+    public:
+        void run() {
+            client().insert( ns(), fromjson( "{'_id':0,a:[1,2]}" ) );
+            // { $push : { a : { $each : [ 3 ], $trimTo : 2.0 } } }
+            BSONObj pushObj = BSON( "$each" << BSON_ARRAY(3) << "$trimTo" << 2.0 );
+            client().update( ns(), Query(), BSON( "$push" << BSON( "a" << pushObj ) ) );
+            ASSERT_EQUALS(client().findOne(ns(), Query()) , fromjson("{'_id':0,a:[2,3]}"));
+        }
+    };
+
     class PushTrimInvalidTrim : public SetBase {
     public:
         void run() {
@@ -1664,6 +1687,8 @@ namespace UpdateTests {
             add< PushTrimInvalidEachType >();
             add< PushTrimInvalidTrimType >();
             add< PushTrimInvalidTrimValue >();
+            add< PushTrimInvalidTrimDouble >();
+            add< PushTrimValidTrimDouble >();
             add< PushTrimInvalidTrim >();
             add< CantIncParent >();
             add< DontDropEmpty >();

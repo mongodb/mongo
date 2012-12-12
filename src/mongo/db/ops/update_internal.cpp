@@ -1141,7 +1141,9 @@ namespace mongo {
                             uassert( 16567,
                                      "$trim value must be a numeric integer",
                                      trimElem.type() == NumberInt ||
-                                     trimElem.type() == NumberLong );
+                                     trimElem.type() == NumberLong ||
+                                     (trimElem.type() == NumberDouble &&
+                                      trimElem.numberDouble()==(long long)trimElem.numberDouble()));
                             uassert( 16568,
                                      "$trim value must be positive",
                                      trimElem.number() >= 0 );

@@ -256,8 +256,13 @@ namespace mongo {
             BSONObjIterator i( obj );
             i.next();
             BSONElement elemTrim = i.next();
-            dassert( elemTrim.type() == NumberInt || elemTrim.type() == NumberLong );
-            return elemTrim.numberLong();
+            dassert( elemTrim.isNumber() );
+            if ( elemTrim.type() == NumberDouble ) {
+                return (long long) elemTrim.numberDouble();
+            }
+            else {
+                return elemTrim.numberLong();
+            }
         }
 
         const char* renameFrom() const {
