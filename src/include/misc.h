@@ -179,6 +179,7 @@
 #define	WT_TREE_DISCARD	0x04			/* Discarding */
 #define	WT_TREE_EVICT	0x08			/* Eviction */
 #define	WT_TREE_PREV	0x10			/* Backward walk */
+#define	WT_TREE_WAIT	0x20			/* Wait for locked pages */
 
 /*
  * In diagnostic mode we track the locations from which hazard pointers and

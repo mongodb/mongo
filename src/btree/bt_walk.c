@@ -239,9 +239,16 @@ descend:	for (;;) {
 			 */
 			set_read_gen = 0;
 			if (eviction) {
-				if (!WT_ATOMIC_CAS(ref->state,
-				    WT_REF_MEM, WT_REF_EVICT_WALK))
+retry:				if (ref->state == WT_REF_DISK)
 					break;
+				if (!WT_ATOMIC_CAS(ref->state,
+				    WT_REF_MEM, WT_REF_EVICT_WALK)) {
+					if (LF_ISSET(WT_TREE_WAIT)) {
+						__wt_yield();
+						goto retry;
+					}
+					break;
+				}
 			} else if (cache) {
 				/*
 				 * Only look at pages that are in memory.

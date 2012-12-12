@@ -9,7 +9,6 @@
 
 static void __evict_clear_tree_walk(WT_SESSION_IMPL *, WT_PAGE *);
 static void __evict_dirty_validate(WT_CONNECTION_IMPL *conn);
-static int  __evict_file_request(WT_SESSION_IMPL *, int);
 static int  __evict_file_request_walk(WT_SESSION_IMPL *);
 static int  __evict_lru(WT_SESSION_IMPL *, uint32_t);
 static int  __evict_lru_cmp(const void *, const void *);
@@ -451,9 +450,9 @@ __evict_file_request_walk(WT_SESSION_IMPL *session)
 	__evict_list_clr_all(session, 0);
 
 	/*
-	 * Wait for LRU eviction activity to drain.  It is much easier to
-	 * reason about checkpoints if we know there are no other threads
-	 * evicting in the tree.
+	 * Wait for LRU eviction activity to drain.  It is much easier
+	 * to reason about checkpoints if we know there are no other
+	 * threads evicting in the tree.
 	 */
 	while (request_session->btree->lru_count > 0) {
 		__wt_spin_unlock(session, &cache->evict_lock);
@@ -466,7 +465,7 @@ __evict_file_request_walk(WT_SESSION_IMPL *session)
 	 * before the requesting thread wakes.
 	 */
 	WT_PUBLISH(request_session->syncop_ret,
-	    __evict_file_request(request_session, syncop));
+	    __wt_evict_file(request_session, syncop));
 	return (__wt_cond_signal(request_session, request_session->cond));
 }
 
@@ -474,25 +473,49 @@ __evict_file_request_walk(WT_SESSION_IMPL *session)
  * __evict_file_request --
  *	Flush pages for a specific file as part of a close/sync operation.
  */
-static int
-__evict_file_request(WT_SESSION_IMPL *session, int syncop)
+int
+__wt_evict_file(WT_SESSION_IMPL *session, int syncop)
 {
+	WT_CACHE *cache;
 	WT_DECL_RET;
 	WT_PAGE *next_page, *page;
+	uint32_t walk_flags = WT_TREE_EVICT;
 
-	/* Clear any existing tree walk, we may be about to discard the tree. */
-	__evict_clear_tree_walk(session, NULL);
+	cache = S2C(session)->cache;
+
+	/*
+	 * Checkpoints need to wait for any concurrent activity in a
+	 * page to be resolved.
+	 */
+	if (syncop == WT_SYNC) {
+		walk_flags |= WT_TREE_WAIT;
+
+		/*
+		 * Clear the eviction walk, otherwise we may never make
+		 * progress.
+		 */
+		__wt_spin_lock(session, &cache->evict_lock);
+		__evict_clear_tree_walk(session, NULL);
+		__wt_spin_unlock(session, &cache->evict_lock);
+	} else {
+		/*
+		 * Clear any existing tree walk, we may be about to discard the
+		 * tree.  In this path, we're already holding evict_lock.
+		 */
+		__evict_clear_tree_walk(session, NULL);
+	}
 
 	/*
 	 * We can't evict the page just returned to us, it marks our place in
 	 * the tree.  So, always stay one page ahead of the page being returned.
 	 */
 	next_page = NULL;
-	WT_RET(__wt_tree_walk(session, &next_page, WT_TREE_EVICT));
+	WT_RET(__wt_tree_walk(session, &next_page, walk_flags));
 	for (;;) {
 		if ((page = next_page) == NULL)
 			break;
-		WT_ERR(__wt_tree_walk(session, &next_page, WT_TREE_EVICT));
+		if (syncop != WT_SYNC)
+			WT_ERR(__wt_tree_walk(session, &next_page, walk_flags));
 
 		switch (syncop) {
 		case WT_SYNC_COMPACT:
@@ -531,6 +554,9 @@ __evict_file_request(WT_SESSION_IMPL *session, int syncop)
 			__wt_page_out(session, &page, 0);
 			break;
 		}
+
+		if (syncop == WT_SYNC)
+			WT_ERR(__wt_tree_walk(session, &next_page, walk_flags));
 	}
 
 	return (0);

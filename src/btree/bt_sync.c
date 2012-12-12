@@ -71,14 +71,19 @@ __wt_bt_cache_flush(WT_SESSION_IMPL *session, WT_CKPT *ckptbase, int op)
 	 */
 	WT_PUBLISH(btree->ckpt, ckptbase);
 
-	/*
-	 * Schedule and wake the eviction server, then wait for the eviction
-	 * server to wake us.
-	 */
-	WT_ERR(__wt_sync_file_serial(session, op));
-	WT_ERR(__wt_evict_server_wake(session));
-	WT_ERR(__wt_cond_wait(session, session->cond, 0));
-	ret = session->syncop_ret;
+	/* Ordinary checkpoints are done in the calling thread. */
+	if (op == WT_SYNC)
+		ret = __wt_evict_file(session, op);
+	else {
+		/*
+		 * Schedule and wake the eviction server, then wait for the
+		 * eviction server to wake us.
+		 */
+		WT_ERR(__wt_sync_file_serial(session, op));
+		WT_ERR(__wt_evict_server_wake(session));
+		WT_ERR(__wt_cond_wait(session, session->cond, 0));
+		ret = session->syncop_ret;
+	}
 
 	switch (op) {
 	case WT_SYNC:
