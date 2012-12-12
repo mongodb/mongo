@@ -619,24 +619,13 @@ namespace mongo {
         }
 
         /** Stream oriented way to add field names and values. */
-        BSONObjBuilderValueStream &operator<<(const char * name ) {
+        BSONObjBuilderValueStream &operator<<( const StringData& name ) {
             _s.endField( name );
             return _s;
         }
 
         /** Stream oriented way to add field names and values. */
         BSONObjBuilder& operator<<( GENOIDLabeler ) { return genOID(); }
-
-        // prevent implicit string conversions which would allow bad things like BSON( BSON( "foo" << 1 ) << 2 )
-        struct ForceExplicitString {
-            ForceExplicitString( const std::string &str ) : str_( str ) {}
-            std::string str_;
-        };
-
-        /** Stream oriented way to add field names and values. */
-        BSONObjBuilderValueStream &operator<<( const ForceExplicitString& name ) {
-            return operator<<( name.str_.c_str() );
-        }
 
         Labeler operator<<( const Labeler::Label &l ) {
             massert( 10336 ,  "No subobject started", _s.subobjStarted() );
@@ -645,13 +634,13 @@ namespace mongo {
 
         template<typename T>
         BSONObjBuilderValueStream& operator<<( const BSONField<T>& f ) {
-            _s.endField( f.name().c_str() );
+            _s.endField( f.name() );
             return _s;
         }
 
         template<typename T>
         BSONObjBuilder& operator<<( const BSONFieldValue<T>& v ) {
-            append( v.name().c_str() , v.value() );
+            append( v.name(), v.value() );
             return *this;
         }
 

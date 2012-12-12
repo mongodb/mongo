@@ -333,32 +333,31 @@ dodouble:
     }
 
     inline BSONObjBuilderValueStream::BSONObjBuilderValueStream( BSONObjBuilder * builder ) {
-        _fieldName = 0;
         _builder = builder;
     }
 
     template<class T>
     inline BSONObjBuilder& BSONObjBuilderValueStream::operator<<( T value ) {
         _builder->append(_fieldName, value);
-        _fieldName = 0;
+        _fieldName = StringData();
         return *_builder;
     }
 
     inline BSONObjBuilder& BSONObjBuilderValueStream::operator<<( const BSONElement& e ) {
         _builder->appendAs( e , _fieldName );
-        _fieldName = 0;
+        _fieldName = StringData();
         return *_builder;
     }
 
     inline BufBuilder& BSONObjBuilderValueStream::subobjStart() {
-        const char* tmp = _fieldName;
-        _fieldName = NULL;
+        StringData tmp = _fieldName;
+        _fieldName = StringData();
         return _builder->subobjStart(tmp);
     }
 
     inline BufBuilder& BSONObjBuilderValueStream::subarrayStart() {
-        const char* tmp = _fieldName;
-        _fieldName = NULL;
+        StringData tmp = _fieldName;
+        _fieldName = StringData();
         return _builder->subarrayStart(tmp);
     }
 
@@ -366,8 +365,9 @@ dodouble:
         return Labeler( l, this );
     }
 
-    inline void BSONObjBuilderValueStream::endField( const char *nextFieldName ) {
-        if ( _fieldName && haveSubobj() ) {
+    inline void BSONObjBuilderValueStream::endField( const StringData& nextFieldName ) {
+        if ( haveSubobj() ) {
+            verify( _fieldName.rawData() );
             _builder->append( _fieldName, subobj()->done() );
         }
         _subobj.reset();
