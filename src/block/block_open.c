@@ -55,7 +55,7 @@ __wt_block_create(WT_SESSION_IMPL *session, const char *filename)
 
 	/* Undo any create on error. */
 	if (ret != 0)
-		(void)__wt_remove(session, filename);
+		WT_TRET(__wt_remove(session, filename));
 
 	return (ret);
 }
