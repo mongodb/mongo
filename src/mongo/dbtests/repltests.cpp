@@ -833,6 +833,66 @@ namespace ReplTests {
             }
         };
 
+        class PushTrim : public Base {
+            void doIt() const {
+                client()->update( ns(),
+                                  BSON( "_id" << 0),
+                                  BSON( "$push" <<
+                                        BSON( "a" <<
+                                              BSON( "$each" << BSON_ARRAY(3) <<
+                                                    "$trimTo" << 2 ) ) ) );
+            }
+            using ReplTests::Base::check;
+            void check() const {
+                ASSERT_EQUALS( 1, count() );
+                check( fromjson( "{'_id':0, a:[2,3]}"), one( fromjson( "{'_id':0}" ) ) );
+            }
+            void reset() const {
+                deleteAll( ns() );
+                insert( BSON( "_id" << 0 << "a" << BSON_ARRAY( 1 << 2 ) ) );
+            }
+        };
+
+        class PushTrimInitiallyInexistent : public Base {
+            void doIt() const {
+                client()->update( ns(),
+                                  BSON( "_id" << 0),
+                                  BSON( "$push" <<
+                                        BSON( "a" <<
+                                              BSON( "$each" << BSON_ARRAY(1<<2) <<
+                                                    "$trimTo" << 2 ) ) ) );
+            }
+            using ReplTests::Base::check;
+            void check() const {
+                ASSERT_EQUALS( 1, count() );
+                check( fromjson( "{'_id':0, a:[1,2] }"), one( fromjson( "{'_id':0}" ) ) );
+            }
+            void reset() const {
+                deleteAll( ns() );
+                insert( BSON( "_id" << 0 ) );
+            }
+        };
+
+        class PushTrimToZero : public Base {
+            void doIt() const {
+                client()->update( ns(),
+                                  BSON( "_id" << 0),
+                                  BSON( "$push" <<
+                                        BSON( "a" <<
+                                              BSON( "$each" << BSON_ARRAY(3) <<
+                                                    "$trimTo" << 0 ) ) ) );
+            }
+            using ReplTests::Base::check;
+            void check() const {
+                ASSERT_EQUALS( 1, count() );
+                check( fromjson( "{'_id':0, a:[]}"), one( fromjson( "{'_id':0}" ) ) );
+            }
+            void reset() const {
+                deleteAll( ns() );
+                insert( BSON( "_id" << 0 ) );
+            }
+        };
+
         class PushAllUpsert : public Base {
         public:
             void doIt() const {
@@ -1563,6 +1623,9 @@ namespace ReplTests {
             add< Idempotence::EmptyPushSparseIndex >();
             add< Idempotence::PushAll >();
             add< Idempotence::PushWithDollarSigns >();
+            add< Idempotence::PushTrim >();
+            add< Idempotence::PushTrimInitiallyInexistent >();
+            add< Idempotence::PushTrimToZero >();
             add< Idempotence::PushAllUpsert >();
             add< Idempotence::EmptyPushAll >();
             add< Idempotence::Pull >();

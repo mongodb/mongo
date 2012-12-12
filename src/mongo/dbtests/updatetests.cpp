@@ -443,6 +443,206 @@ namespace UpdateTests {
         }
     };
 
+    class PushTrimBelowFull : public SetBase {
+    public:
+        void run() {
+            client().insert( ns(), fromjson( "{'_id':0,a:[1]}" ) );
+            // { $push : { a : { $each : [ 2 ] , $trimTo : 3 } } }
+            BSONObj pushObj = BSON( "$each" << BSON_ARRAY( 2 ) << "$trimTo" << 3 );
+            client().update( ns(), Query(), BSON( "$push" << BSON( "a" << pushObj ) ) );
+            ASSERT_EQUALS( client().findOne( ns(), Query() ) , fromjson( "{'_id':0,a:[1,2]}" ) );
+        }
+    };
+
+    class PushTrimReachedFullExact : public SetBase {
+    public:
+        void run() {
+            client().insert( ns(), fromjson( "{'_id':0,a:[1]}" ) );
+            // { $push : { a : { $each : [ 2 ] , $trimTo : 2 } } }
+            BSONObj pushObj = BSON( "$each" << BSON_ARRAY( 2 ) << "$trimTo" << 2 );
+            client().update( ns(), Query(), BSON( "$push" << BSON( "a" << pushObj ) ) );
+            ASSERT_EQUALS( client().findOne( ns(), Query() ) , fromjson( "{'_id':0,a:[1,2]}" ) );
+        }
+    };
+
+    class PushTrimReachedFullWithEach : public SetBase {
+    public:
+        void run() {
+            client().insert( ns(), fromjson( "{'_id':0,a:[1]}" ) );
+            // { $push : { a : { $each : [ 2 , 3 ] , $trimTo : 2 } } }
+            BSONObj pushObj = BSON( "$each" << BSON_ARRAY( 2 << 3 ) << "$trimTo" << 2 );
+            client().update( ns(), Query(), BSON( "$push" << BSON( "a" << pushObj ) ) );
+            ASSERT_EQUALS( client().findOne( ns(), Query() ) , fromjson( "{'_id':0,a:[2,3]}" ) );
+        }
+    };
+
+    class PushTrimReachedFullWithBoth : public SetBase {
+    public:
+        void run() {
+            client().insert( ns(), fromjson( "{'_id':0,a:[1,2]}" ) );
+            // { $push : { a : { $each : [ 3 ] , $trimTo : 2 } } }
+            BSONObj pushObj = BSON( "$each" << BSON_ARRAY( 3 ) << "$trimTo" << 2 );
+            client().update( ns(), Query(), BSON( "$push" << BSON( "a" << pushObj ) ) );
+            ASSERT_EQUALS( client().findOne( ns(), Query() ) , fromjson( "{'_id':0,a:[2,3]}" ) );
+        }
+    };
+
+    class PushTrimToZero : public SetBase {
+    public:
+        void run() {
+            client().insert( ns(), fromjson( "{'_id':0,a:[1,2]}" ) );
+            // { $push : { a : { $each : [ 3 ] , $trimTo : 0 } } }
+            BSONObj pushObj = BSON( "$each" << BSON_ARRAY( 3 ) << "$trimTo" << 0 );
+            client().update( ns(), Query(), BSON( "$push" << BSON( "a" << pushObj ) ) );
+            ASSERT_EQUALS( client().findOne( ns(), Query() ) , fromjson( "{'_id':0,a:[]}" ) );
+        }
+    };
+
+    class PushTrimToZeroFromNothing : public SetBase {
+    public:
+        void run() {
+            client().insert( ns(), fromjson( "{'_id':0}" ) );
+            // { $push : { a : { $each : [ 3 ] , $trimTo : 0 } } }
+            BSONObj pushObj = BSON( "$each" << BSON_ARRAY( 3 ) << "$trimTo" << 0 );
+            client().update( ns(), Query(), BSON( "$push" << BSON( "a" << pushObj ) ) );
+            ASSERT_EQUALS( client().findOne( ns(), Query() ) , fromjson( "{'_id':0,a:[]}" ) );
+        }
+    };
+
+    class PushTrimFromNothing : public SetBase {
+    public:
+        void run() {
+            client().insert( ns(), fromjson( "{'_id':0}" ) );
+            // { $push : { a : { $each : [ 1 , 2 ] , $trimTo : 3 } } }
+            BSONObj pushObj = BSON( "$each" << BSON_ARRAY( 1 << 2 ) << "$trimTo" << 3 );
+            client().update( ns(), Query(), BSON( "$push" << BSON( "a" << pushObj ) ) );
+            ASSERT_EQUALS( client().findOne( ns(), Query() ) , fromjson( "{'_id':0,a:[1,2]}" ) );
+        }
+    };
+
+    class PushTrimLongerThanTrimFromNothing : public SetBase {
+    public:
+        void run() {
+            client().insert( ns(), fromjson( "{'_id':0}" ) );
+            // { $push : { a : { $each : [ 1 , 2 , 3 ] , $trimTo : 2 } } }
+            BSONObj pushObj = BSON( "$each" << BSON_ARRAY( 1 << 2 << 3 ) << "$trimTo" << 2 );
+            client().update( ns(), Query(), BSON( "$push" << BSON( "a" << pushObj ) ) );
+            ASSERT_EQUALS( client().findOne( ns(), Query() ) , fromjson( "{'_id':0,a:[2,3]}" ) );
+        }
+    };
+
+    class PushTrimFromEmpty : public SetBase {
+    public:
+        void run() {
+            client().insert( ns(), fromjson( "{'_id':0,a:[]}" ) );
+            // { $push : { a : { $each : [ 1 ] , $trimTo : 3 } } }
+            BSONObj pushObj = BSON( "$each" << BSON_ARRAY( 1 ) << "$trimTo" << 3 );
+            client().update( ns(), Query(), BSON( "$push" << BSON( "a" << pushObj ) ) );
+            ASSERT_EQUALS( client().findOne( ns(), Query() ) , fromjson( "{'_id':0,a:[1]}" ) );
+        }
+    };
+
+    class PushTrimLongerThanTrimFromEmpty : public SetBase {
+    public:
+        void run() {
+            client().insert( ns(), fromjson( "{'_id':0,a:[]}" ) );
+            // { $push : { a : { $each : [ 1 , 2 , 3 ] , $trimTo : 2 } } }
+            BSONObj pushObj = BSON( "$each" << BSON_ARRAY( 1 << 2 << 3 ) << "$trimTo" << 2 );
+            client().update( ns(), Query(), BSON( "$push" << BSON( "a" << pushObj ) ) );
+            ASSERT_EQUALS( client().findOne( ns(), Query() ) , fromjson( "{'_id':0,a:[2,3]}" ) );
+        }
+    };
+
+    class PushTrimTwoFields : public SetBase {
+    public:
+        void run() {
+            client().insert( ns(), fromjson( "{'_id':0,a:[1,2],b:[3,4]}" ) );
+            // { $push: { a: { $each: [ 5 ] , $trimTo : 2 }, { b: $each: [ 6 ] , $trimTo: 1 } } }
+            BSONObj objA = BSON( "$each" << BSON_ARRAY( 5 ) << "$trimTo" << 2 );
+            BSONObj objB = BSON( "$each" << BSON_ARRAY( 6 ) << "$trimTo" << 1 );
+            client().update( ns(), Query(), BSON( "$push" << BSON( "a" << objA << "b" << objB ) ) );
+            ASSERT_EQUALS( client().findOne( ns(), Query() ) , fromjson("{'_id':0,a:[2,5],b:[6]}"));
+        }
+    };
+
+    class PushTrimAndNormal : public SetBase {
+    public:
+        void run() {
+            client().insert( ns(), fromjson( "{'_id':0,a:[1,2],b:[3]}" ) );
+            // { $push : { a : { $each : [ 5 ] , $trimTo : 2 } , { b : 4 } }
+            BSONObj objA = BSON( "$each" << BSON_ARRAY( 5 ) << "$trimTo" << 2 );
+            client().update( ns(), Query(), BSON("$push" << BSON("a" << objA << "b" << 4)));
+            ASSERT_EQUALS(client().findOne(ns(), Query()) , fromjson("{'_id':0,a:[2,5],b:[3,4]}"));
+        }
+    };
+
+    class PushTrimTwoFieldsConflict : public SetBase {
+    public:
+        void run() {
+            client().insert( ns(), fromjson( "{'_id':0,a:[1],b:[3]}" ) );
+            // { $push: { a: { $each: [ 5 ] , $trimTo: 2 } , { a: $each: [ 6 ] , $trimTo: 1 } } }
+            BSONObj objA = BSON( "$each" << BSON_ARRAY( 5 ) << "$trimTo" << 2 );
+            BSONObj other = BSON( "$each" << BSON_ARRAY( 6 ) << "$trimTo" << 1 );
+            client().update( ns(), Query(), BSON( "$push" << BSON( "a" << objA << "a" << other ) ) );
+            ASSERT(client().findOne( ns(), Query()).woCompare(fromjson("{'_id':0,a:[1],b:[3]}"))==0);
+        }
+    };
+
+    class PushTrimAndNormalConflict : public SetBase {
+    public:
+        void run() {
+            client().insert( ns(), fromjson( "{'_id':0,a:[1],b:[3]}" ) );
+            // { $push : { a : { $each : [ 5 ] , $trimTo : 2 } , { a : 4 } } }
+            BSONObj objA = BSON( "$each" << BSON_ARRAY( 5 ) << "$trimTo" << 2 );
+            client().update( ns(), Query(), BSON( "$push" << BSON( "a" << objA << "a" << 4 ) ) );
+            ASSERT(client().findOne( ns(), Query()).woCompare(fromjson("{'_id':0,a:[1],b:[3]}"))==0);
+        }
+    };
+
+    class PushTrimInvalidEachType : public SetBase {
+    public:
+        void run() {
+            client().insert( ns(), fromjson( "{'_id':0,a:[1,2]}" ) );
+            // { $push : { a : { $each : 3 , $trimTo : 2 } } }
+            BSONObj pushObj = BSON( "$each" << 3 << "$trimTo" << 2 );
+            client().update( ns(), Query(), BSON( "$push" << BSON( "a" << pushObj ) ) );
+            ASSERT( client().findOne(ns(), Query()).woCompare(fromjson("{'_id':0,a:[1,2]}")) == 0);
+        }
+    };
+
+    class PushTrimInvalidTrimType : public SetBase {
+    public:
+        void run() {
+            client().insert( ns(), fromjson( "{'_id':0,a:[1,2]}" ) );
+            // { $push : { a : { $each : [ 3 ], $trimTo : [ 2 ] } } }
+            BSONObj pushObj = BSON( "$each" << BSON_ARRAY(3) << "$trimTo" << BSON_ARRAY(2) );
+            client().update( ns(), Query(), BSON( "$push" << BSON( "a" << pushObj ) ) );
+            ASSERT( client().findOne( ns(), Query() ).woCompare(fromjson("{'_id':0,a:[1,2]}")) == 0);
+        }
+    };
+
+    class PushTrimInvalidTrimValue : public SetBase {
+    public:
+        void run() {
+            client().insert( ns(), fromjson( "{'_id':0,a:[1,2]}" ) );
+            // { $push : { a : { $each : [ 3 ], $trimTo : - 2 } } }
+            BSONObj pushObj = BSON( "$each" << BSON_ARRAY(3) << "$trimTo" << -2 );
+            client().update( ns(), Query(), BSON( "$push" << BSON( "a" << pushObj ) ) );
+            ASSERT( client().findOne( ns(), Query() ).woCompare(fromjson("{'_id':0,a:[1,2]}")) == 0);
+        }
+    };
+
+    class PushTrimInvalidTrim : public SetBase {
+    public:
+        void run() {
+            client().insert( ns(), fromjson( "{'_id':0,a:[1,2]}" ) );
+            // { $push : { a : { $each : [ 3 ], $xxxx :  2 } } }
+            BSONObj pushObj = BSON( "$each" << BSON_ARRAY(3) << "$xxxx" << 2 );
+            client().update( ns(), Query(), BSON( "$push" << BSON( "a" << pushObj ) ) );
+            ASSERT( client().findOne( ns(), Query() ).woCompare(fromjson("{'_id':0,a:[1,2]}")) == 0);
+        }
+    };
+
     class CantIncParent : public SetBase {
     public:
         void run() {
@@ -725,6 +925,22 @@ namespace UpdateTests {
             }
         };
 
+        class PushTrimRewriteExistingField {
+        public:
+            void run() {
+                BSONObj obj = BSON( "a" << BSON_ARRAY( 1 << 2 ) );
+                // { $push : { a : { $each : [ 3 ] , $trimTo : 2 } } }
+                BSONObj pushObj = BSON( "$each" << BSON_ARRAY( 3 ) << "$trimTo" << 2 );
+                BSONObj mod = BSON( "$push" << BSON( "a" << pushObj ) );
+                ModSet modSet( mod );
+                auto_ptr<ModSetState> modSetState = modSet.prepare( obj );
+                ASSERT_FALSE( modSetState->canApplyInPlace() );
+                modSetState->createNewFromMods();
+                ASSERT_EQUALS( BSON( "$set" << BSON( "a" <<  BSON_ARRAY( 2 << 3 ) ) ),
+                                     modSetState->getOpLogRewrite() );
+            }
+        };
+
         class PushRewriteNonExistingField {
         public:
             void run() {
@@ -736,6 +952,36 @@ namespace UpdateTests {
                 modSetState->createNewFromMods();
                 ASSERT_EQUALS( BSON( "$set" << BSON( "a" << BSON_ARRAY( 1 ) ) ),
                                      modSetState->getOpLogRewrite() );
+            }
+        };
+
+        class PushTrimRewriteNonExistingField {
+        public:
+            void run() {
+                BSONObj obj = BSON( "b" << 1 );
+                // { $push : { a : { $each : [ 1 , 2 ] , $trimTo : 2 } } }
+                BSONObj pushObj = BSON( "$each" << BSON_ARRAY( 1 << 2) << "$trimTo" << 2 );
+                BSONObj mod = BSON( "$push" << BSON( "a" << pushObj ) );
+                ModSet modSet( mod );
+                auto_ptr<ModSetState> modSetState = modSet.prepare( obj );
+                ASSERT_FALSE( modSetState->canApplyInPlace() );
+                modSetState->createNewFromMods();
+                ASSERT_EQUALS( BSON( "$set" << BSON( "a" << BSON_ARRAY( 1 << 2 ) ) ),
+                                     modSetState->getOpLogRewrite() );
+            }
+        };
+
+        class PushTrimRewriteNested {
+        public:
+            void run() {
+                BSONObj obj = fromjson( "{ a:{ b:[ 1, 2 ] } }" );
+                BSONObj mod = fromjson( "{ $push: { 'a.b': { $each: [3] , $trimTo: 2 } } }" );
+                ModSet modSet( mod );
+                auto_ptr<ModSetState> modSetState = modSet.prepare( obj );
+                ASSERT_FALSE( modSetState->canApplyInPlace() );
+                modSetState->createNewFromMods();
+                ASSERT_EQUALS( BSON( "$set" << BSON( "a.b" << BSON_ARRAY( 2 << 3 ) ) ),
+                               modSetState->getOpLogRewrite() );
             }
         };
 
@@ -865,7 +1111,6 @@ namespace UpdateTests {
                                modSetState->getOpLogRewrite() );
             }
         };
-
 
         // Pop is only applied in place if the target array remains the same size (i.e. if
         // it is empty already.
@@ -1340,6 +1585,24 @@ namespace UpdateTests {
             add< CantPushTwice >();
             add< SetEncapsulationConflictsWithExistingType >();
             add< CantPushToParent >();
+            add< PushTrimBelowFull >();
+            add< PushTrimReachedFullExact >();
+            add< PushTrimReachedFullWithEach >();
+            add< PushTrimReachedFullWithBoth >();
+            add< PushTrimToZero >();
+            add< PushTrimToZeroFromNothing >();
+            add< PushTrimFromNothing >();
+            add< PushTrimLongerThanTrimFromNothing >();
+            add< PushTrimFromEmpty >();
+            add< PushTrimLongerThanTrimFromEmpty >();
+            add< PushTrimTwoFields >();
+            add< PushTrimAndNormal >();
+            add< PushTrimTwoFieldsConflict >();
+            add< PushTrimAndNormalConflict >();
+            add< PushTrimInvalidEachType >();
+            add< PushTrimInvalidTrimType >();
+            add< PushTrimInvalidTrimValue >();
+            add< PushTrimInvalidTrim >();
             add< CantIncParent >();
             add< DontDropEmpty >();
             add< InsertInEmpty >();
@@ -1364,7 +1627,10 @@ namespace UpdateTests {
             add< ModSetTests::IncRewriteExistingField >();
             add< ModSetTests::IncRewriteNonExistingField >();
             add< ModSetTests::PushRewriteExistingField >();
+            add< ModSetTests::PushTrimRewriteExistingField >();
             add< ModSetTests::PushRewriteNonExistingField >();
+            add< ModSetTests::PushTrimRewriteNonExistingField >();
+            add< ModSetTests::PushTrimRewriteNested >();
             add< ModSetTests::PushAllRewriteExistingField >();
             add< ModSetTests::PushAllRewriteNonExistingField >();
             add< ModSetTests::PullRewriteInPlace >();

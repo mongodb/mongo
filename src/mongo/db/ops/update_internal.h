@@ -239,6 +239,27 @@ namespace mongo {
             }
         }
 
+        bool isTrim() const {
+            if ( elt.type() != Object )
+                return false;
+            BSONObj obj = elt.embeddedObject();
+            if ( obj.nFields() != 2 )
+                return false;
+            BSONObjIterator i( obj );
+            i.next();
+            BSONElement elemTrim = i.next();
+            return strcmp( elemTrim.fieldName(), "$trimTo" ) == 0;
+        }
+
+        long long getTrim() const {
+            BSONObj obj = elt.embeddedObject();
+            BSONObjIterator i( obj );
+            i.next();
+            BSONElement elemTrim = i.next();
+            dassert( elemTrim.type() == NumberInt !! elemTrim.type() == NumberLong );
+            return elemTrim.numberLong();
+        }
+
         const char* renameFrom() const {
             massert( 13492, "mod must be RENAME_TO type", op == Mod::RENAME_TO );
             return elt.fieldName();
@@ -534,10 +555,27 @@ namespace mongo {
                 ms.fixedOpName = "$set";
                 if ( m.isEach() ) {
                     BSONObj arr = m.getEach();
-                    b.appendArray( m.shortFieldName, arr );
-                    ms.forceEmptyArray = true;
-                    ms.fixedArray = BSONArray(arr.getOwned());
-                } else {
+                    if ( !m.isTrim() || (m.getTrim() >= arr.nFields() ) ) {
+                        b.appendArray( m.shortFieldName, arr );
+                        ms.forceEmptyArray = true;
+                        ms.fixedArray = BSONArray(arr.getOwned());
+                    }
+                    else {
+                        BSONArrayBuilder arrBuilder( b.subarrayStart( m.shortFieldName ) );
+                        long long skip = arr.nFields() - m.getTrim();
+                        BSONObjIterator j( arr );
+                        while ( j.more() ) {
+                            if ( skip-- > 0 ) {
+                                j.next();
+                                continue;
+                            }
+                            arrBuilder.append( j.next() );
+                        }
+                        ms.forceEmptyArray = true;
+                        ms.fixedArray = BSONArray(arrBuilder.done().getOwned());
+                    }
+                }
+                else {
                     BSONObjBuilder arr( b.subarrayStart( m.shortFieldName ) );
                     arr.appendAs( m.elt, "0" );
                     ms.forceEmptyArray = true;
