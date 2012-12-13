@@ -136,6 +136,7 @@ namespace mongo {
         int secsToSleep = 0;
         scoped_ptr<ShardChunkVersion> lastNeededVersion;
         int lastNeededCount = 0;
+        bool needsToReloadShardInfo = false;
 
         while ( ! inShutdown() ) {
 
@@ -146,6 +147,12 @@ namespace mongo {
             }
 
             try {
+                if (needsToReloadShardInfo) {
+                    // It's possible this shard was removed
+                    Shard::reloadShardInfo();
+                    needsToReloadShardInfo = false;
+                }
+
                 scoped_ptr<ScopedDbConnection> conn(
                         ScopedDbConnection::getInternalScopedDbConnection( _addr ) );
 
@@ -399,6 +406,8 @@ namespace mongo {
                 continue;
             }
             catch ( std::exception& e ) {
+                // Attention! Do not call any method that would throw an exception
+                // (or assert) in this block.
 
                 if ( inShutdown() ) {
                     // we're shutting down, so just clean up
@@ -407,8 +416,7 @@ namespace mongo {
 
                 log() << "WriteBackListener exception : " << e.what() << endl;
 
-                // It's possible this shard was removed
-                Shard::reloadShardInfo();
+                needsToReloadShardInfo = true;
             }
             catch ( ... ) {
                 log() << "WriteBackListener uncaught exception!" << endl;
