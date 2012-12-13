@@ -105,7 +105,8 @@ namespace mongo {
             // never deleted
             SSLManager* mgr = new SSLManager(cmdLine.sslPEMKeyFile, 
                                              cmdLine.sslPEMKeyPassword, 
-                                             cmdLine.sslCAFile);
+                                             cmdLine.sslCAFile,
+                                             cmdLine.sslCRLFile);
 
             sock.secure(mgr);
 #else

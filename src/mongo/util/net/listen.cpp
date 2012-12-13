@@ -96,10 +96,12 @@ namespace mongo {
     Listener::Listener(const string& name, const string &ip, int port, bool logConnect ) 
         : _port(port), _name(name), _ip(ip), _logConnect(logConnect), _elapsedTime(0) { 
 #ifdef MONGO_SSL
+        _ssl = NULL;
         if (cmdLine.sslOnNormalPorts) {
             _ssl = new SSLManager(cmdLine.sslPEMKeyFile, 
                                   cmdLine.sslPEMKeyPassword, 
-                                  cmdLine.sslCAFile);
+                                  cmdLine.sslCAFile,
+                                  cmdLine.sslCRLFile);
         }
 #endif
     }

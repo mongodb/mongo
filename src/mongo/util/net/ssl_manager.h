@@ -28,9 +28,10 @@ namespace mongo {
     class SSLManager {
     MONGO_DISALLOW_COPYING(SSLManager);
     public:
-        SSLManager(std::string pemfile,
-                   std::string pempwd,
-                   std::string cafile = "");
+        SSLManager(const std::string& pemfile,
+                   const std::string& pempwd,
+                   const std::string& cafile,
+                   const std::string& crlfile);
 
         /**
          * Initiates a TLS connection.
@@ -87,6 +88,12 @@ namespace mongo {
          * Set up SSL for certificate validation by loading a CA
          */
         bool _setupCA(const std::string& caFile);
+
+        /*
+         * Import a certificate revocation list into our SSL context
+         * for use with validating certificates
+         */
+        bool _setupCRL(const std::string& crlFile);
     };
 }
 #endif

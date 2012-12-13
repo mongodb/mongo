@@ -103,9 +103,10 @@ namespace mongo {
     
     ////////////////////////////////////////////////////////////////
 
-    SSLManager::SSLManager(std::string pemfile,
-                           std::string pempwd,
-                           std::string cafile) : 
+    SSLManager::SSLManager(const std::string& pemfile,
+                           const std::string& pempwd,
+                           const std::string& cafile,
+                           const std::string& crlfile) : 
         _validateCertificates(false) {
         SSL_library_init();
         SSL_load_error_strings();
@@ -138,6 +139,11 @@ namespace mongo {
                 uasserted(16563, "ssl initialization problem"); 
             }
         }
+        if (!crlfile.empty()) {
+            if (!_setupCRL(crlfile)) {
+                uasserted(16571, "ssl initialization problem");
+            }
+        }
     }
 
     int SSLManager::password_cb(char *buf,int num, int rwflag,void *userdata) {
@@ -155,7 +161,7 @@ namespace mongo {
         _password = password;
         
         if ( SSL_CTX_use_certificate_chain_file( _context , keyFile.c_str() ) != 1 ) {
-            log() << "Can't read certificate file: " << keyFile << " " <<
+            log() << "Can't read certificate file: " << keyFile << ' ' <<
                 _getSSLErrorMessage(ERR_get_error()) << endl;
             return false;
         }
@@ -164,7 +170,7 @@ namespace mongo {
         SSL_CTX_set_default_passwd_cb( _context, &SSLManager::password_cb );
         
         if ( SSL_CTX_use_PrivateKey_file( _context , keyFile.c_str() , SSL_FILETYPE_PEM ) != 1 ) {
-            log() << "Can't read key file: " << keyFile << " " <<
+            log() << "Can't read key file: " << keyFile << ' ' <<
                 _getSSLErrorMessage(ERR_get_error()) << endl;
             return false;
         }
@@ -188,6 +194,26 @@ namespace mongo {
         // if a certificate is presented
         SSL_CTX_set_verify(_context, SSL_VERIFY_PEER, &SSLManager::verify_cb);
         _validateCertificates = true;
+        return true;
+    }
+
+    bool SSLManager::_setupCRL(const std::string& crlFile) {
+        X509_STORE *store = SSL_CTX_get_cert_store(_context);
+        fassert(16569, store);
+        
+        X509_STORE_set_flags(store, X509_V_FLAG_CRL_CHECK);
+        X509_LOOKUP *lookup = X509_STORE_add_lookup(store, X509_LOOKUP_file());
+        fassert(16570, lookup);
+
+        int status = X509_load_crl_file(lookup, crlFile.c_str(), X509_FILETYPE_PEM);
+        if (status == 0) {
+            log() << "Can't read CRL file: " << crlFile << ' ' <<
+                _getSSLErrorMessage(ERR_get_error()) << endl;
+            return false;
+        }
+        log() << "ssl imported " << status << " revoked certificate" << 
+            ((status == 1) ? "" : "s") << " from the revocation list." << 
+            endl;
         return true;
     }
                 
