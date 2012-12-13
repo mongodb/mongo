@@ -25,13 +25,30 @@
 #include <openssl/ssl.h>
 
 namespace mongo {
+    class SSLParams {
+    public:
+        SSLParams(const std::string& pemfile, 
+                  const std::string& pempwd,
+                  const std::string& cafile = "",
+                  const std::string& crlfile = "",
+                  bool forceCertificateValidation = false) :
+            pemfile(pemfile),
+            pempwd(pempwd),
+            cafile(cafile),
+            crlfile(crlfile),
+            forceCertificateValidation(forceCertificateValidation) {};
+
+        std::string pemfile;
+        std::string pempwd;
+        std::string cafile;
+        std::string crlfile;
+        bool forceCertificateValidation;
+    };
+
     class SSLManager {
     MONGO_DISALLOW_COPYING(SSLManager);
     public:
-        SSLManager(const std::string& pemfile,
-                   const std::string& pempwd,
-                   const std::string& cafile,
-                   const std::string& crlfile);
+        SSLManager(const SSLParams& params);
 
         /**
          * Initiates a TLS connection.
@@ -63,7 +80,7 @@ namespace mongo {
         SSL_CTX* _context;
         std::string _password;
         bool _validateCertificates;
-
+        bool _forceValidation;
         /**
          * creates an SSL context to be used for this file descriptor.
          * caller must SSL_free it.

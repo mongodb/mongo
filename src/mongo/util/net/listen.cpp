@@ -98,10 +98,12 @@ namespace mongo {
 #ifdef MONGO_SSL
         _ssl = NULL;
         if (cmdLine.sslOnNormalPorts) {
-            _ssl = new SSLManager(cmdLine.sslPEMKeyFile, 
-                                  cmdLine.sslPEMKeyPassword, 
-                                  cmdLine.sslCAFile,
-                                  cmdLine.sslCRLFile);
+            const SSLParams params(cmdLine.sslPEMKeyFile, 
+                                   cmdLine.sslPEMKeyPassword,
+                                   cmdLine.sslCAFile,
+                                   cmdLine.sslCRLFile,
+                                   cmdLine.sslForceCertificateValidation);
+            _ssl = new SSLManager(params);
         }
 #endif
     }

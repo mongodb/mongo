@@ -103,11 +103,9 @@ namespace mongo {
     
     ////////////////////////////////////////////////////////////////
 
-    SSLManager::SSLManager(const std::string& pemfile,
-                           const std::string& pempwd,
-                           const std::string& cafile,
-                           const std::string& crlfile) : 
-        _validateCertificates(false) {
+    SSLManager::SSLManager(const SSLParams& params) : 
+        _validateCertificates(false),
+        _forceValidation(params.forceCertificateValidation) {
         SSL_library_init();
         SSL_load_error_strings();
         ERR_load_crypto_strings();
@@ -128,19 +126,19 @@ namespace mongo {
         SSLThreadInfo::init();
         SSLThreadInfo::get();
 
-        if (!pemfile.empty()) {
-            if (!_setupPEM(pemfile, pempwd)) {
+        if (!params.pemfile.empty()) {
+            if (!_setupPEM(params.pemfile, params.pempwd)) {
                 uasserted(16562, "ssl initialization problem"); 
             }
         }
-        if (!cafile.empty()) {
+        if (!params.cafile.empty()) {
             // Set up certificate validation with a certificate authority
-            if (!_setupCA(cafile)) {
+            if (!_setupCA(params.cafile)) {
                 uasserted(16563, "ssl initialization problem"); 
             }
         }
-        if (!crlfile.empty()) {
-            if (!_setupCRL(crlfile)) {
+        if (!params.crlfile.empty()) {
+            if (!_setupCRL(params.crlfile)) {
                 uasserted(16571, "ssl initialization problem");
             }
         }
@@ -257,9 +255,13 @@ namespace mongo {
         X509* cert = SSL_get_peer_certificate(ssl);
 
         if (cert == NULL) { // no certificate presented by peer
-            // TODO: if force_validation, throw an exception
-            // else
-            log() << "no SSL certificate provided by peer" << endl;
+            if (_forceValidation) {
+                log() << "no SSL certificate provided by peer; connection rejected" << endl;
+                throw SocketException(SocketException::CONNECT_ERROR, "");
+            }
+            else {
+                log() << "no SSL certificate provided by peer" << endl;
+            }
             return;
         }
         ON_BLOCK_EXIT(X509_free, cert);
@@ -273,7 +275,6 @@ namespace mongo {
         }
 
         // TODO: check optional cipher restriction, using cert.
-        // TODO: enforce CRL?
     }
 
     std::string SSLManager::_getSSLErrorMessage(int code) {
