@@ -1118,13 +1118,13 @@ namespace mongo {
                          "Modifier $pushAll/pullAll allowed for arrays only",
                          f.type() == Array || ( op != Mod::PUSH_ALL && op != Mod::PULL_ALL ) );
 
-                // Check whether $each and $trim syntax for $push is correct.
+                // Check whether $each and $trimTo syntax for $push is correct.
                 if ( ( op == Mod::PUSH ) && ( f.type() == Object ) ) {
                     BSONObj pushObj = f.embeddedObject();
                     if ( pushObj.nFields() > 0 &&
                          strcmp(pushObj.firstElement().fieldName(), "$each") == 0 ) {
                         uassert( 16564,
-                                 "$each term needs to occur alone (or with $trim)",
+                                 "$each term needs to occur alone (or with $trimTo)",
                                  pushObj.nFields() <= 2 );
                         uassert( 16565,
                                  "$each requires an array value",
@@ -1136,16 +1136,16 @@ namespace mongo {
                             BSONElement trimElem = i.next();
 
                             uassert( 16566,
-                                     "$each term takes only a $trim as a complement",
+                                     "$each term takes only a $trimTo as a complement",
                                      str::equals( trimElem.fieldName(), "$trimTo" ) );
                             uassert( 16567,
-                                     "$trim value must be a numeric integer",
+                                     "$trimTo value must be a numeric integer",
                                      trimElem.type() == NumberInt ||
                                      trimElem.type() == NumberLong ||
                                      (trimElem.type() == NumberDouble &&
                                       trimElem.numberDouble()==(long long)trimElem.numberDouble()));
                             uassert( 16568,
-                                     "$trim value must be positive",
+                                     "$trimTo value must be positive",
                                      trimElem.number() >= 0 );
                         }
                     }
