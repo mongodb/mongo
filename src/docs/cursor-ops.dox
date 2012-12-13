@@ -66,6 +66,9 @@ WT_SESSION::begin_transaction, WT_SESSION::commit_transaction or
 WT_SESSION::rollback_transaction will lose their position as if
 WT_CURSOR::reset was called.
 
+Cursors can be configured to move to a random position with WT_CURSOR::next
+is called, see @subpage cursor_random for details.
+
 @section cursor_writes Inserting and updating
 
 To insert new data, and optionally update existing data, using a cursor,
