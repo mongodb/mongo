@@ -11,6 +11,11 @@ static int __block_ext_overlap(WT_SESSION_IMPL *,
 	WT_BLOCK *, WT_EXTLIST *, WT_EXT **, WT_EXTLIST *, WT_EXT **);
 static int __block_merge(WT_SESSION_IMPL *, WT_EXTLIST *, off_t, off_t);
 
+#ifdef HAVE_VERBOSE
+static int __block_extlist_dump(
+	WT_SESSION_IMPL *, const char *, WT_EXTLIST *, int);
+#endif
+
 /*
  * __block_off_srch --
  *	Search a by-offset skiplist (either the primary by-offset list, or the
@@ -376,74 +381,11 @@ __wt_block_off_remove_overlap(
 }
 
 /*
- * __wt_block_alloc --
- *	Alloc a chunk of space from the underlying file.
- */
-int
-__wt_block_alloc(
-    WT_SESSION_IMPL *session, WT_BLOCK *block, off_t *offp, off_t size)
-{
-	WT_EXT *ext;
-	WT_SIZE *szp, **sstack[WT_SKIP_MAXDEPTH];
-
-	WT_DSTAT_INCR(session, block_alloc);
-	if (size % block->allocsize != 0)
-		WT_RET_MSG(session, EINVAL,
-		    "cannot allocate a block size %" PRIdMAX " that is not "
-		    "a multiple of the allocation size %" PRIu32,
-		    (intmax_t)size, block->allocsize);
-
-	/*
-	 * Allocation is first-fit by size, then by lowest offset: search the
-	 * by-size skiplist for the requested size and take the first entry on
-	 * the by-size offset list.  This means we prefer best-fit over lower
-	 * offset, but within a size we'll prefer an offset appearing earlier
-	 * in the file.  If we don't have anything big enough, extend the file.
-	 */
-	__block_size_srch(block->live.avail.sz, size, sstack);
-	szp = *sstack[0];
-	if (szp == NULL) {
-		WT_RET(__wt_block_extend(session, block, offp, size));
-		goto done;
-	}
-
-	/* Remove the first record, and set the returned offset. */
-	ext = szp->off[0];
-	WT_RET(__block_off_remove(session, &block->live.avail, ext->off, &ext));
-	*offp = ext->off;
-
-	/* If doing a partial allocation, adjust the record and put it back. */
-	if (ext->size > size) {
-		WT_VERBOSE_RET(session, block,
-		    "allocate %" PRIdMAX " from range %" PRIdMAX "-%"
-		    PRIdMAX ", range shrinks to %" PRIdMAX "-%" PRIdMAX,
-		    (intmax_t)size,
-		    (intmax_t)ext->off, (intmax_t)(ext->off + ext->size),
-		    (intmax_t)(ext->off + size),
-		    (intmax_t)(ext->off + size + ext->size - size));
-
-		ext->off += size;
-		ext->size -= size;
-		WT_RET(__block_ext_insert(session, &block->live.avail, ext));
-	} else {
-		WT_VERBOSE_RET(session, block,
-		    "allocate range %" PRIdMAX "-%" PRIdMAX,
-		    (intmax_t)ext->off, (intmax_t)(ext->off + ext->size));
-
-		__wt_free(session, ext);
-	}
-
-done:	/* Add the newly allocated extent to the list of allocations. */
-	WT_RET(__block_merge(session, &block->live.alloc, *offp, (off_t)size));
-	return (0);
-}
-
-/*
- * __wt_block_extend --
+ * __block_extend --
  *	Extend the file to allocate space.
  */
-int
-__wt_block_extend(
+static int
+__block_extend(
     WT_SESSION_IMPL *session, WT_BLOCK *block, off_t *offp, off_t size)
 {
 	WT_FH *fh;
@@ -479,6 +421,69 @@ __wt_block_extend(
 	    "file extend %" PRIdMAX "B @ %" PRIdMAX,
 	    (intmax_t)size, (intmax_t)*offp);
 
+	return (0);
+}
+
+/*
+ * __wt_block_alloc --
+ *	Alloc a chunk of space from the underlying file.
+ */
+int
+__wt_block_alloc(
+    WT_SESSION_IMPL *session, WT_BLOCK *block, off_t *offp, off_t size)
+{
+	WT_EXT *ext;
+	WT_SIZE *szp, **sstack[WT_SKIP_MAXDEPTH];
+
+	WT_DSTAT_INCR(session, block_alloc);
+	if (size % block->allocsize != 0)
+		WT_RET_MSG(session, EINVAL,
+		    "cannot allocate a block size %" PRIdMAX " that is not "
+		    "a multiple of the allocation size %" PRIu32,
+		    (intmax_t)size, block->allocsize);
+
+	/*
+	 * Allocation is first-fit by size, then by lowest offset: search the
+	 * by-size skiplist for the requested size and take the first entry on
+	 * the by-size offset list.  This means we prefer best-fit over lower
+	 * offset, but within a size we'll prefer an offset appearing earlier
+	 * in the file.  If we don't have anything big enough, extend the file.
+	 */
+	__block_size_srch(block->live.avail.sz, size, sstack);
+	szp = *sstack[0];
+	if (szp == NULL) {
+		WT_RET(__block_extend(session, block, offp, size));
+		goto done;
+	}
+
+	/* Remove the first record, and set the returned offset. */
+	ext = szp->off[0];
+	WT_RET(__block_off_remove(session, &block->live.avail, ext->off, &ext));
+	*offp = ext->off;
+
+	/* If doing a partial allocation, adjust the record and put it back. */
+	if (ext->size > size) {
+		WT_VERBOSE_RET(session, block,
+		    "allocate %" PRIdMAX " from range %" PRIdMAX "-%"
+		    PRIdMAX ", range shrinks to %" PRIdMAX "-%" PRIdMAX,
+		    (intmax_t)size,
+		    (intmax_t)ext->off, (intmax_t)(ext->off + ext->size),
+		    (intmax_t)(ext->off + size),
+		    (intmax_t)(ext->off + size + ext->size - size));
+
+		ext->off += size;
+		ext->size -= size;
+		WT_RET(__block_ext_insert(session, &block->live.avail, ext));
+	} else {
+		WT_VERBOSE_RET(session, block,
+		    "allocate range %" PRIdMAX "-%" PRIdMAX,
+		    (intmax_t)ext->off, (intmax_t)(ext->off + ext->size));
+
+		__wt_free(session, ext);
+	}
+
+done:	/* Add the newly allocated extent to the list of allocations. */
+	WT_RET(__block_merge(session, &block->live.alloc, *offp, (off_t)size));
 	return (0);
 }
 
@@ -1015,7 +1020,7 @@ corrupted:		WT_ERR_MSG(session, WT_ERROR,
 	}
 
 	if (WT_VERBOSE_ISSET(session, block))
-		WT_ERR(__wt_block_extlist_dump(session, "read extlist", el, 0));
+		WT_ERR(__block_extlist_dump(session, "read extlist", el, 0));
 
 err:	__wt_scr_free(&tmp);
 	return (ret);
@@ -1037,8 +1042,7 @@ __wt_block_extlist_write(WT_SESSION_IMPL *session,
 	uint8_t *p;
 
 	if (WT_VERBOSE_ISSET(session, block))
-		WT_RET(
-		    __wt_block_extlist_dump(session, "write extlist", el, 0));
+		WT_RET(__block_extlist_dump(session, "write extlist", el, 0));
 
 	/*
 	 * Figure out how many entries we're writing -- if there aren't any
@@ -1195,8 +1199,8 @@ __wt_block_extlist_free(WT_SESSION_IMPL *session, WT_EXTLIST *el)
 }
 
 #ifdef HAVE_VERBOSE
-int
-__wt_block_extlist_dump(
+static int
+__block_extlist_dump(
     WT_SESSION_IMPL *session, const char *tag, WT_EXTLIST *el, int show_size)
 {
 	WT_EXT *ext;
