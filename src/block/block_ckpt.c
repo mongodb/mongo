@@ -362,8 +362,8 @@ __ckpt_process(
 	 * underneath us.  I suspect we'll tighten this if checkpoints take too
 	 * much time away from real work: we read the historic checkpoint
 	 * information without a lock, but we could also merge and re-write the
-	 * delete checkpoint information without a lock, except for ranges
-	 * merged into the live tree.
+	 * deleted and merged checkpoint information without a lock, except for
+	 * the final merge of ranges into the live tree.
 	 */
 	__wt_spin_lock(session, &block->live_lock);
 	locked = 1;
