@@ -212,7 +212,11 @@ __clsm_open_cursors(
 		clsm->primary_chunk = chunk;
 		(void)WT_ATOMIC_ADD(clsm->primary_chunk->ncursor, 1);
 
-		/* Peek into the btree layer to track the in-memory size. */
+		/*
+		 * Peek into the btree layer to track the in-memory size.
+		 * Ignore error returns since it is OK for the btree to be
+		 * empty in this code path (and that is an error condition).
+		 */
 		if (lsm_tree->memsizep == NULL)
 			(void)__wt_btree_get_memsize(
 			    session, session->btree, &lsm_tree->memsizep);
