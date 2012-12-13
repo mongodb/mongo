@@ -71,7 +71,8 @@ esac
 AC_MSG_RESULT($wt_cv_enable_snappy)
 AM_CONDITIONAL([SNAPPY], [test x$wt_cv_enable_snappy = xyes])
 
-AH_TEMPLATE(HAVE_VERBOSE, [Define to 1 to support the Env.verbose_set method.])
+AH_TEMPLATE(HAVE_VERBOSE,
+    [Define to 1 to support the wiredtiger_open verbose configuration string.])
 AC_MSG_CHECKING(if --disable-verbose option specified)
 AC_ARG_ENABLE(verbose,
 	[AC_HELP_STRING([--disable-verbose],
