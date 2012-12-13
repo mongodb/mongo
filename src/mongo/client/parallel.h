@@ -79,6 +79,8 @@ namespace mongo {
         /** call before using */
         void init();
 
+        virtual std::string getNS() { return _ns; }
+
         virtual bool more() = 0;
         virtual BSONObj next() = 0;
 

@@ -47,11 +47,12 @@
 
 namespace mongo {
 
-    struct HowToFixUp;
-    struct Target;
+    class Cloner;
     class DBClientConnection;
-    class ReplSetImpl;
+    struct HowToFixUp;
     class OplogReader;
+    class ReplSetImpl;
+    struct Target;
     extern bool replSet; // true if using repl sets
     extern class ReplSet *theReplSet; // null until initialized
     extern Tee *rsLog;
@@ -146,8 +147,6 @@ namespace mongo {
         void associateSlave(const BSONObj& rid, const int memberId);
         void updateSlave(const mongo::OID& id, const OpTime& last);
     };
-
-    struct Target;
 
     class Consensus {
         ReplSetImpl &rs;
@@ -501,7 +500,8 @@ namespace mongo {
         friend class Consensus;
 
     private:
-        bool _syncDoInitialSync_clone( const char *master, const list<string>& dbs , bool dataPass );
+        bool _syncDoInitialSync_clone(Cloner &cloner, const char *master,
+                                      const list<string>& dbs, bool dataPass);
         bool _syncDoInitialSync_applyToHead( replset::SyncTail& syncer, OplogReader* r ,
                                              const Member* source, const BSONObj& lastOp,
                                              BSONObj& minValidOut);
@@ -543,8 +543,17 @@ namespace mongo {
         void syncRollback(OplogReader& r);
         void syncThread();
         const OpTime lastOtherOpTime() const;
+
+        /**
+         * When a member reaches its minValid optime it is in a consistent state.  Thus, minValid is
+         * set as the last step in initial sync (if no minValid is set, this indicates that initial
+         * sync is necessary). It is also used during "normal" sync: the last op in each batch is
+         * used to set minValid, to indicate that we are in a consistent state when the batch has
+         * been fully applied.
+         */
         static void setMinValid(BSONObj obj);
-        
+        static OpTime getMinValid();
+
         int oplogVersion;
     private:
         IndexPrefetchConfig _indexPrefetchConfig;

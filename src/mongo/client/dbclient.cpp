@@ -583,7 +583,7 @@ namespace mongo {
         BSONObj o;
         if ( info == 0 )    info = &o;
         BSONObjBuilder b;
-        string db = nsToDatabase(ns.c_str());
+        string db = nsToDatabase(ns);
         b.append("create", ns.c_str() + db.length() + 1);
         if ( size ) b.append("size", size);
         if ( capped ) b.append("capped", true);
@@ -911,6 +911,10 @@ namespace mongo {
         return n;
     }
 
+    void DBClientConnection::setReplSetClientCallback(DBClientReplicaSet* rsClient) {
+        clientSet = rsClient;
+    }
+
     unsigned long long DBClientConnection::query(
             boost::function<void(DBClientCursorBatchIterator &)> f,
             const string& ns,
@@ -1072,7 +1076,7 @@ namespace mongo {
 
     void DBClientWithCommands::dropIndex( const string& ns , const string& indexName ) {
         BSONObj info;
-        if ( ! runCommand( nsToDatabase( ns.c_str() ) ,
+        if ( ! runCommand( nsToDatabase( ns ) ,
                            BSON( "deleteIndexes" << NamespaceString( ns ).coll << "index" << indexName ) ,
                            info ) ) {
             LOG(_logLevel) << "dropIndex failed: " << info << endl;
@@ -1083,7 +1087,7 @@ namespace mongo {
 
     void DBClientWithCommands::dropIndexes( const string& ns ) {
         BSONObj info;
-        uassert( 10008 ,  "dropIndexes failed" , runCommand( nsToDatabase( ns.c_str() ) ,
+        uassert( 10008 ,  "dropIndexes failed" , runCommand( nsToDatabase( ns ) ,
                  BSON( "deleteIndexes" << NamespaceString( ns ).coll << "index" << "*") ,
                  info ) );
         resetIndexCache();
@@ -1297,16 +1301,19 @@ namespace mongo {
     }
 
 #ifdef MONGO_SSL
-    SSLManager* DBClientConnection::sslManager() {
-        if ( _sslManager )
-            return _sslManager;
-        
-        SSLManager* s = new SSLManager(true);
-        _sslManager = s;
-        return s;
-    }
+    static SimpleMutex s_mtx("SSLManager");
+    static SSLManager* s_sslMgr(NULL);
 
-    SSLManager* DBClientConnection::_sslManager = 0;
+    SSLManager* DBClientConnection::sslManager() {
+        SimpleMutex::scoped_lock lk(s_mtx);
+        if (s_sslMgr) 
+            return s_sslMgr;
+        
+        s_sslMgr = new SSLManager(cmdLine.sslPEMKeyFile, 
+                                  cmdLine.sslPEMKeyPassword, 
+                                  cmdLine.sslCAFile);
+        return s_sslMgr;
+    }
 #endif
 
     AtomicUInt DBClientConnection::_numConnections;

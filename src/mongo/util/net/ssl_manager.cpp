@@ -26,6 +26,7 @@
 #include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/net/sock.h"
+#include "mongo/util/scopeguard.h"
 
 namespace mongo {
 
@@ -102,13 +103,15 @@ namespace mongo {
     
     ////////////////////////////////////////////////////////////////
 
-    SSLManager::SSLManager(bool client) {
-        _client = client;
+    SSLManager::SSLManager(std::string pemfile,
+                           std::string pempwd,
+                           std::string cafile) : 
+        _validateCertificates(false) {
         SSL_library_init();
         SSL_load_error_strings();
         ERR_load_crypto_strings();
         
-        _context = SSL_CTX_new( client ? SSLv23_client_method() : SSLv23_server_method() );
+        _context = SSL_CTX_new(SSLv23_method());
         massert(15864, 
                 mongoutils::str::stream() << "can't create SSL Context: " << 
                 _getSSLErrorMessage(ERR_get_error()), 
@@ -123,6 +126,18 @@ namespace mongo {
 
         SSLThreadInfo::init();
         SSLThreadInfo::get();
+
+        if (!pemfile.empty()) {
+            if (!_setupPEM(pemfile, pempwd)) {
+                uasserted(16562, "ssl initialization problem"); 
+            }
+        }
+        if (!cafile.empty()) {
+            // Set up certificate validation with a certificate authority
+            if (!_setupCA(cafile)) {
+                uasserted(16563, "ssl initialization problem"); 
+            }
+        }
     }
 
     int SSLManager::password_cb(char *buf,int num, int rwflag,void *userdata) {
@@ -132,7 +147,11 @@ namespace mongo {
         return(pass.size());
     }
 
-    bool SSLManager::setupPEM(const std::string& keyFile , const std::string& password) {
+    int SSLManager::verify_cb(int ok, X509_STORE_CTX *ctx) {
+	return 1; // always succeed; we will catch the error in our get_verify_result() call
+    }
+
+    bool SSLManager::_setupPEM(const std::string& keyFile , const std::string& password) {
         _password = password;
         
         if ( SSL_CTX_use_certificate_chain_file( _context , keyFile.c_str() ) != 1 ) {
@@ -157,35 +176,78 @@ namespace mongo {
         }
         return true;
     }
+
+    bool SSLManager::_setupCA(const std::string& caFile) {
+        // Load trusted CA
+        if (SSL_CTX_load_verify_locations(_context, caFile.c_str(), NULL) != 1) {
+            log() << "Can't read certificate authority file: " << caFile << " " <<
+                _getSSLErrorMessage(ERR_get_error()) << endl;
+            return false;
+        }
+        // Set SSL to require peer (client) certificate verification
+        // if a certificate is presented
+        SSL_CTX_set_verify(_context, SSL_VERIFY_PEER, &SSLManager::verify_cb);
+        _validateCertificates = true;
+        return true;
+    }
                 
-    SSL * SSLManager::secure(int fd) {
+    SSL* SSLManager::_secure(int fd) {
         // This just ensures that SSL multithreading support is set up for this thread,
         // if it's not already.
         SSLThreadInfo::get();
 
         SSL * ssl = SSL_new(_context);
-        massert(15861, 
+        massert(15861,
                 _getSSLErrorMessage(ERR_get_error()),
                 ssl);
         
         int status = SSL_set_fd( ssl , fd );
-        massert(16510, 
+        massert(16510,
                 _getSSLErrorMessage(ERR_get_error()), 
                 status == 1);
 
         return ssl;
     }
 
-    void SSLManager::connect(SSL* ssl) {
+    SSL* SSLManager::connect(int fd) {
+        SSL* ssl = _secure(fd);
         int ret = SSL_connect(ssl);
         if (ret != 1)
             _handleSSLError(SSL_get_error(ssl, ret));
+        return ssl;
     }
 
-    void SSLManager::accept(SSL* ssl) {
+    SSL* SSLManager::accept(int fd) {
+        SSL* ssl = _secure(fd);
         int ret = SSL_accept(ssl);
         if (ret != 1)
             _handleSSLError(SSL_get_error(ssl, ret));
+        return ssl;
+    }
+
+    void SSLManager::validatePeerCertificate(const SSL* ssl) {
+        if (!_validateCertificates) return;
+
+        X509* cert = SSL_get_peer_certificate(ssl);
+
+        if (cert == NULL) { // no certificate presented by peer
+            // TODO: if force_validation, throw an exception
+            // else
+            log() << "no SSL certificate provided by peer" << endl;
+            return;
+        }
+        ON_BLOCK_EXIT(X509_free, cert);
+
+        long result = SSL_get_verify_result(ssl);
+
+        if (result != X509_V_OK) {
+            error() << "SSL peer certificate validation failed:" << 
+                X509_verify_cert_error_string(result) << endl;
+            throw SocketException(SocketException::CONNECT_ERROR, "");
+        }
+
+        // TODO: check optional cipher restriction, using cert.
+        // TODO: enforce CRL?
     }
 
     std::string SSLManager::_getSSLErrorMessage(int code) {
@@ -232,8 +294,8 @@ namespace mongo {
             throw SocketException(SocketException::CONNECT_ERROR, "");
             break;
         }
-    }       
-
+    }
 }
+
 #endif
         

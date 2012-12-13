@@ -19,14 +19,13 @@
 
 #pragma once
 
-#include <string>
-
 #include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
 
 namespace mongo {
 
     /**
-     * Parse a number out of a string.
+     * Parses a number out of a StringData.
      *
      * Parses "stringValue", interpreting it as a number of the given "base".  On success, stores
      * the parsed value into "*result" and returns Status::OK().
@@ -43,32 +42,11 @@ namespace mongo {
      * See parse_number.cpp for the available instantiations, and add any new instantiations there.
      */
     template <typename NumberType>
-    Status parseNumberFromStringWithBase(const char* stringValue, int base, NumberType* result);
+    Status parseNumberFromStringWithBase(const StringData& stringValue, int base, NumberType* result);
 
-    /**
-     * Equivalent to parseNumberFromStringWithBase(stringValue, 0, result);
-     */
     template <typename NumberType>
-    static inline Status parseNumberFromString(const char* stringValue, NumberType* result) {
+    static Status parseNumberFromString(const StringData& stringValue, NumberType* result) {
         return parseNumberFromStringWithBase(stringValue, 0, result);
-    }
-
-    /**
-     * Same as parseNumberFromStringWithBase, above, but taking a std::string instead of a c-style
-     * string.
-     */
-    template <typename NumberType>
-    static inline Status parseNumberFromStringWithBase(
-            const std::string& stringValue, int base, NumberType* result) {
-        return parseNumberFromStringWithBase(stringValue.c_str(), base, result);
-    }
-
-    /**
-     * Same as parseNumberFromString, above, but taking a std::string instead of a c-style string.
-     */
-    template <typename NumberType>
-    static inline Status parseNumberFromString(const std::string& stringValue, NumberType* result) {
-        return parseNumberFromString(stringValue.c_str(), result);
     }
 
 }  // namespace mongo

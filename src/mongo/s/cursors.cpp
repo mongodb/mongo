@@ -276,6 +276,8 @@ namespace mongo {
         uassert( 13287 , "too many cursors to kill" , n < 30000 );
 
         long long * cursors = (long long *)x;
+        AuthorizationManager* authManager =
+                ClientBasic::getCurrent()->getAuthorizationManager();
         for ( int i=0; i<n; i++ ) {
             long long id = cursors[i];
             LOG(_myLogLevel) << "CursorCache::gotKillCursors id: " << id << endl;
@@ -291,7 +293,9 @@ namespace mongo {
 
                 MapSharded::iterator i = _cursors.find( id );
                 if ( i != _cursors.end() ) {
-                    _cursors.erase( i );
+                    if (authManager->checkAuthorization(i->second->getNS(), ActionType::find)) {
+                        _cursors.erase( i );
+                    }
                     continue;
                 }
 
@@ -302,6 +306,9 @@ namespace mongo {
                     continue;
                 }
                 verify(refsNSIt != _refsNS.end());
+                if (!authManager->checkAuthorization(refsNSIt->second, ActionType::find)) {
+                    continue;
+                }
                 server = refsIt->second;
                 _refs.erase(refsIt);
                 _refsNS.erase(refsNSIt);

@@ -109,7 +109,10 @@ namespace mongo {
          */
         static int compare(const Document& lhs, const Document& rhs);
 
-        string toString() const; // TODO support streams
+        string toString() const;
+
+        friend
+        ostream& operator << (ostream& out, const Document& doc) { return out << doc.toString(); }
 
         /** Calculate a hash value.
          *
@@ -120,6 +123,9 @@ namespace mongo {
 
         /// Add this document to the BSONObj under construction with the given BSONObjBuilder.
         void toBson(BSONObjBuilder *pBsonObjBuilder) const;
+
+        // Support BSONObjBuilder and BSONArrayBuilder "stream" API
+        friend BSONObjBuilder& operator << (BSONObjBuilderValueStream& builder, const Document& d);
 
         /** Return the abstract Position of a field, suitable to pass to operator[] or getField().
          *  This can potentially save time if you need to refer to a field multiple times.
@@ -292,8 +298,11 @@ namespace mongo {
          *  TODO: there are some optimizations that may make sense at freeze time.
          */
         Document freeze() {
-            Document ret(storagePtr());
-            reset(NULL);
+            // This essentially moves _storage into a new Document by way of temp.
+            Document ret;
+            intrusive_ptr<const DocumentStorage> temp (storagePtr(), /*inc_ref_count=*/false);
+            temp.swap(ret._storage);
+            _storage = NULL;
             return ret;
         }
 

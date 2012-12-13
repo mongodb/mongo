@@ -35,7 +35,7 @@ if ( db.adminCommand( "buildinfo" ).bits == 64 ){
     assert.eq( x , t.count() , "A3" )
     
     for ( i=0; i<x; i++ ){
-        o = t.findOne( { _id : 1 } )
+        o = t.findOne( { _id : i } )
         assert( o , "B" + i );
     }
     

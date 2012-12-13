@@ -117,7 +117,7 @@ namespace mongo {
         //
 
         void setName(const StringData& name) {
-            _name = std::string(name.data(), name.size());
+            _name = name.toString();
         }
 
         const std::string& getName() const {
@@ -125,7 +125,7 @@ namespace mongo {
         }
 
         void setNS(const StringData& ns) {
-            _ns = std::string(ns.data(), ns.size());
+            _ns = ns.toString();
         }
 
         const std::string& getNS() const {
@@ -157,7 +157,7 @@ namespace mongo {
         }
 
         void setShard(const StringData& shard) {
-            _shard = std::string(shard.data(), shard.size());
+            _shard = shard.toString();
         }
 
         const std::string& getShard() const {

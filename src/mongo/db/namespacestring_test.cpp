@@ -72,5 +72,31 @@ namespace mongo {
         testNotEqualsBothWays( "." , "x.y" );
     }
 
+    TEST( NamespaceStringTest, nsToDatabase1 ) {
+        ASSERT_EQUALS( "foo", nsToDatabaseSubstring( "foo.bar" ) );
+        ASSERT_EQUALS( "foo", nsToDatabaseSubstring( "foo" ) );
+        ASSERT_EQUALS( "foo", nsToDatabase( "foo.bar" ) );
+        ASSERT_EQUALS( "foo", nsToDatabase( "foo" ) );
+        ASSERT_EQUALS( "foo", nsToDatabase( string("foo.bar") ) );
+        ASSERT_EQUALS( "foo", nsToDatabase( string("foo") ) );
+    }
+
+    TEST( NamespaceStringTest, nsToDatabase2 ) {
+        char buf[128];
+
+        nsToDatabase( "foo.bar", buf );
+        ASSERT_EQUALS( 'f', buf[0] );
+        ASSERT_EQUALS( 'o', buf[1] );
+        ASSERT_EQUALS( 'o', buf[2] );
+        ASSERT_EQUALS( 0, buf[3] );
+
+        nsToDatabase( "bar", buf );
+        ASSERT_EQUALS( 'b', buf[0] );
+        ASSERT_EQUALS( 'a', buf[1] );
+        ASSERT_EQUALS( 'r', buf[2] );
+        ASSERT_EQUALS( 0, buf[3] );
+
+
+    }
 }
 

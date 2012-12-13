@@ -85,7 +85,7 @@ namespace mongo {
     */
     DiskLoc Helpers::findOne(const StringData& ns, const BSONObj &query, bool requireIndex) {
         shared_ptr<Cursor> c =
-            NamespaceDetailsTransient::getCursor( ns.data() , query, BSONObj(),
+            NamespaceDetailsTransient::getCursor( ns, query, BSONObj(),
                                                   requireIndex ?
                                                   QueryPlanSelectionPolicy::indexOnly() :
                                                   QueryPlanSelectionPolicy::any() );

@@ -25,6 +25,8 @@
 
 #include <time.h>
 
+#include "mongo/base/init.h"
+#include "mongo/base/status.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
@@ -124,6 +126,7 @@ namespace mongo {
         virtual bool slaveOk() const {
             return true;
         }
+        virtual bool requiresAuth() { return false; }
         virtual void addRequiredPrivileges(const std::string& dbname,
                                            const BSONObj& cmdObj,
                                            std::vector<Privilege>* out) {} // No auth required
@@ -153,6 +156,7 @@ namespace mongo {
         virtual LockType locktype() const { return NONE;  }
         virtual bool logTheOp()           { return false; }
         virtual bool slaveOk() const      { return true;  }
+        virtual bool requiresAuth()       { return false; }
         virtual void addRequiredPrivileges(const std::string& dbname,
                                            const BSONObj& cmdObj,
                                            std::vector<Privilege>* out) {} // No auth required
@@ -303,6 +307,7 @@ namespace mongo {
         virtual bool slaveOk() const {
             return true;
         }
+        virtual bool requiresAuth() { return false; }
         virtual void addRequiredPrivileges(const std::string& dbname,
                                            const BSONObj& cmdObj,
                                            std::vector<Privilege>* out) {} // No auth required
@@ -396,7 +401,7 @@ namespace mongo {
                                            std::vector<Privilege>* out) {
             ActionSet actions;
             actions.addAction(ActionType::dropDatabase);
-            out->push_back(Privilege(AuthorizationManager::CLUSTER_RESOURCE_NAME, actions));
+            out->push_back(Privilege(dbname, actions));
         }
 
         // this is suboptimal but syncDataAndTruncateJournal is called from dropDatabase, and that 
@@ -442,7 +447,7 @@ namespace mongo {
                                            std::vector<Privilege>* out) {
             ActionSet actions;
             actions.addAction(ActionType::repairDatabase);
-            out->push_back(Privilege(AuthorizationManager::SERVER_RESOURCE_NAME, actions));
+            out->push_back(Privilege(dbname, actions));
         }
         CmdRepairDatabase() : Command("repairDatabase") {}
         bool run(const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
@@ -482,9 +487,8 @@ namespace mongo {
                                            const BSONObj& cmdObj,
                                            std::vector<Privilege>* out) {
             ActionSet actions;
-            actions.addAction(ActionType::profile);
-            // TODO: should the resource here be the database instead of server?
-            out->push_back(Privilege(AuthorizationManager::SERVER_RESOURCE_NAME, actions));
+            actions.addAction(ActionType::profileEnable);
+            out->push_back(Privilege(dbname, actions));
         }
         CmdProfile() : Command("profile") {}
         bool run(const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
@@ -1587,17 +1591,18 @@ namespace mongo {
         virtual void help( stringstream &help ) const {
             help << "{whatsmyuri:1}";
         }
+        virtual bool requiresAuth() { return false; }
         virtual void addRequiredPrivileges(const std::string& dbname,
                                            const BSONObj& cmdObj,
                                            std::vector<Privilege>* out) {} // No auth required
         virtual bool run(const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
-            BSONObj info = cc().curop()->infoNoauth();
+            BSONObj info = cc().curop()->info();
             result << "you" << info[ "client" ];
             return true;
         }
     } cmdWhatsMyUri;
 
-    /* For testing only, not for general use */
+    /* For testing only, not for general use. Enabled via command-line */
     class GodInsert : public Command {
     public:
         GodInsert() : Command( "godinsert" ) { }
@@ -1605,14 +1610,14 @@ namespace mongo {
         virtual bool logTheOp() { return false; }
         virtual bool slaveOk() const { return true; }
         virtual LockType locktype() const { return NONE; }
-        virtual bool requiresAuth() { return true; }
-        virtual void help( stringstream &help ) const {
-            help << "internal. for testing only.";
-        }
-        // No auth required, only enabled via command line for testing
+        // No auth needed because it only works when enabled via command line.
+        virtual bool requiresAuth() { return false; }
         virtual void addRequiredPrivileges(const std::string& dbname,
                                            const BSONObj& cmdObj,
                                            std::vector<Privilege>* out) {}
+        virtual void help( stringstream &help ) const {
+            help << "internal. for testing only.";
+        }
         virtual bool run(const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
 
             AuthenticationInfo *ai = cc().getAuthenticationInfo();
@@ -1633,7 +1638,15 @@ namespace mongo {
             }
             return true;
         }
-    } cmdGodInsert;
+    };
+
+    MONGO_INITIALIZER(RegisterGodInsertCmd)(InitializerContext* context) {
+        if (Command::testCommandsEnabled) {
+            // Leaked intentionally: a Command registers itself when constructed.
+            new GodInsert();
+        }
+        return Status::OK();
+    }
     
     class DBHashCmd : public Command {
     public:
@@ -1733,7 +1746,7 @@ namespace mongo {
 
     } dbhashCmd;
 
-    /* for diagnostic / testing purposes. */
+    /* for diagnostic / testing purposes. Enabled via command line. */
     class CmdSleep : public Command {
     public:
         virtual LockType locktype() const { return NONE; }
@@ -1744,7 +1757,8 @@ namespace mongo {
             help << "internal testing command.  Makes db block (in a read lock) for 100 seconds\n";
             help << "w:true write lock. secs:<seconds>";
         }
-        // No auth required, only enabled via command line for testing
+        // No auth needed because it only works when enabled via command line.
+        virtual bool requiresAuth() { return false; }
         virtual void addRequiredPrivileges(const std::string& dbname,
                                            const BSONObj& cmdObj,
                                            std::vector<Privilege>* out) {}
@@ -1764,23 +1778,26 @@ namespace mongo {
             }
             return true;
         }
-    } cmdSleep;
+    };
+    MONGO_INITIALIZER(RegisterSleepCmd)(InitializerContext* context) {
+        if (Command::testCommandsEnabled) {
+            // Leaked intentionally: a Command registers itself when constructed.
+            new CmdSleep();
+        }
+        return Status::OK();
+    }
 
-    // just for testing
+    // Testing only, enabled via command-line.
     class CapTrunc : public Command {
     public:
         CapTrunc() : Command( "captrunc" ) {}
         virtual bool slaveOk() const { return false; }
         virtual LockType locktype() const { return WRITE; }
-        virtual bool requiresAuth() { return true; }
-        // Only enabled via command line for testing
+        // No auth needed because it only works when enabled via command line.
+        virtual bool requiresAuth() { return false; }
         virtual void addRequiredPrivileges(const std::string& dbname,
                                            const BSONObj& cmdObj,
-                                           std::vector<Privilege>* out) {
-            ActionSet actions;
-            actions.addAction(ActionType::captrunc);
-            out->push_back(Privilege(parseNs(dbname, cmdObj), actions));
-        }
+                                           std::vector<Privilege>* out) {}
         virtual bool run(const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
             string coll = cmdObj[ "captrunc" ].valuestrsafe();
             uassert( 13416, "captrunc must specify a collection", !coll.empty() );
@@ -1799,24 +1816,27 @@ namespace mongo {
             nsd->cappedTruncateAfter( ns.c_str(), end, inc );
             return true;
         }
-    } capTruncCmd;
+    };
+    MONGO_INITIALIZER(RegisterCapTruncCmd)(InitializerContext* context) {
+        if (Command::testCommandsEnabled) {
+            // Leaked intentionally: a Command registers itself when constructed.
+            new CapTrunc();
+        }
+        return Status::OK();
+    }
 
-    // just for testing
+    // Testing-only, enabled via command line.
     class EmptyCapped : public Command {
     public:
         EmptyCapped() : Command( "emptycapped" ) {}
         virtual bool slaveOk() const { return false; }
         virtual LockType locktype() const { return WRITE; }
-        virtual bool requiresAuth() { return true; }
         virtual bool logTheOp() { return true; }
-        // Only enabled via command line for testing
+        // No auth needed because it only works when enabled via command line.
+        virtual bool requiresAuth() { return false; }
         virtual void addRequiredPrivileges(const std::string& dbname,
                                            const BSONObj& cmdObj,
-                                           std::vector<Privilege>* out) {
-            ActionSet actions;
-            actions.addAction(ActionType::emptycapped);
-            out->push_back(Privilege(parseNs(dbname, cmdObj), actions));
-        }
+                                           std::vector<Privilege>* out) {}
         virtual bool run(const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
             string coll = cmdObj[ "emptycapped" ].valuestrsafe();
             uassert( 13428, "emptycapped must specify a collection", !coll.empty() );
@@ -1826,7 +1846,14 @@ namespace mongo {
             nsd->emptyCappedCollection( ns.c_str() );
             return true;
         }
-    } emptyCappedCmd;
+    };
+    MONGO_INITIALIZER(RegisterEmptyCappedCmd)(InitializerContext* context) {
+        if (Command::testCommandsEnabled) {
+            // Leaked intentionally: a Command registers itself when constructed.
+            new EmptyCapped();
+        }
+        return Status::OK();
+    }
 
     bool _execCommand(Command *c, const string& dbname, BSONObj& cmdObj, int queryOptions, BSONObjBuilder& result, bool fromRepl) {
 
@@ -1905,6 +1932,17 @@ namespace mongo {
             result.append( "errmsg" ,  "access denied; use admin db" );
             log() << "command denied: " << cmdObj.toString() << endl;
             return false;
+        }
+
+        if (!noauth && c->requiresAuth()) {
+            std::vector<Privilege> privileges;
+            c->addRequiredPrivileges(dbname, cmdObj, &privileges);
+            Status status = client.getAuthorizationManager()->checkAuthForPrivileges(privileges);
+            if (!status.isOK()) {
+                result.append("errmsg", status.reason());
+                log() << "command denied: " << cmdObj.toString() << endl;
+                return false;
+            }
         }
 
         if ( cmdObj["help"].trueValue() ) {

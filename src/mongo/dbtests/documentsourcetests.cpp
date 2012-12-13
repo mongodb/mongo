@@ -518,7 +518,7 @@ namespace DocumentSourceTests {
         };
 
         /** $group _id is a regular expression (not supported). */
-        class IdRegularExpression : public ParseErrorBase {
+        class IdRegularExpression : public IdConstantBase {
             BSONObj spec() { return fromjson( "{_id:/a/}" ); }
         };
 
@@ -808,7 +808,7 @@ namespace DocumentSourceTests {
             virtual BSONObj groupSpec() {
                 return BSON( "_id" << 0 << "first" << BSON( "$first" << "$missing" ) );
             }
-            virtual string expectedResultSetString() { return "[{_id:0}]"; }            
+            virtual string expectedResultSetString() { return "[{_id:0, first:undefined}]"; }
         };
 
         /** Simulate merging sharded results in the router. */ 
@@ -1346,10 +1346,13 @@ namespace DocumentSourceTests {
         };
 
         /** Sorting different types is not supported. */
-        class InconsistentTypeSort : public InvalidOperationBase {
+        class InconsistentTypeSort : public CheckResultsBase {
             void populateData() {
-                client.insert( ns, BSON( "a" << 1 ) );
-                client.insert( ns, BSON( "a" << "foo" ) );
+                client.insert( ns, BSON("_id" << 0 << "a" << 1) );
+                client.insert( ns, BSON("_id" << 1 << "a" << "foo") );
+            }
+            string expectedResultSetString() {
+                return "[{_id:0,a:1},{_id:1,a:\"foo\"}]";
             }
         };
 
@@ -1386,11 +1389,14 @@ namespace DocumentSourceTests {
             }
         };
 
-        /** A missing nested object within an array is not supported. */
-        class MissingObjectWithinArray : public InvalidOperationBase {
+        /** A missing nested object within an array returns an empty array. */
+        class MissingObjectWithinArray : public CheckResultsBase {
             void populateData() {
                 client.insert( ns, BSON( "_id" << 0 << "a" << BSON_ARRAY( 1 ) ) );
-                client.insert( ns, BSON( "_id" << 1 << "a" << BSON_ARRAY( 0 ) ) );
+                client.insert( ns, BSON( "_id" << 1 << "a" << BSON_ARRAY( BSON("b" << 1) ) ) );
+            }
+            string expectedResultSetString() {
+                return "[{_id:0,a:[1]},{_id:1,a:[{b:1}]}]";
             }
             BSONObj sortSpec() { return BSON( "a.b" << 1 ); }
         };

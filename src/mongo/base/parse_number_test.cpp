@@ -20,6 +20,7 @@
 
 #include "mongo/base/parse_number.h"
 #include "mongo/base/status.h"
+#include "mongo/platform/cstdint.h"
 #include "mongo/util/mongoutils/str.h"  // for str::stream()!
 #include "mongo/unittest/unittest.h"
 
@@ -81,6 +82,17 @@ namespace {
             ASSERT_EQUALS(ErrorCodes::FailedToParse, parseNumberFromString(" ", &ignored));
             ASSERT_EQUALS(ErrorCodes::FailedToParse, parseNumberFromString(" 10", &ignored));
             ASSERT_EQUALS(ErrorCodes::FailedToParse, parseNumberFromString("15b", &ignored));
+            ASSERT_EQUALS(ErrorCodes::FailedToParse, parseNumberFromString("--10", &ignored));
+            ASSERT_EQUALS(ErrorCodes::FailedToParse, parseNumberFromString("+-10", &ignored));
+            ASSERT_EQUALS(ErrorCodes::FailedToParse, parseNumberFromString("++10", &ignored));
+            ASSERT_EQUALS(ErrorCodes::FailedToParse, parseNumberFromString("--10", &ignored));
+            ASSERT_EQUALS(ErrorCodes::FailedToParse, parseNumberFromString("0x+10", &ignored));
+            ASSERT_EQUALS(ErrorCodes::FailedToParse, parseNumberFromString("0x-10", &ignored));
+            ASSERT_EQUALS(ErrorCodes::FailedToParse, parseNumberFromString("0+10", &ignored));
+            ASSERT_EQUALS(ErrorCodes::FailedToParse, parseNumberFromString("0-10", &ignored));
+            ASSERT_EQUALS(ErrorCodes::FailedToParse, parseNumberFromString("1+10", &ignored));
+            ASSERT_EQUALS(ErrorCodes::FailedToParse, parseNumberFromString("1-10", &ignored));
+            ASSERT_EQUALS(ErrorCodes::FailedToParse, parseNumberFromString("48*3", &ignored));
         }
 
         static void TestParsingWithExplicitBase() {
@@ -95,15 +107,15 @@ namespace {
         static void TestParsingLimits() {
             using namespace mongoutils;
             NumberType ignored;
-            ASSERT_PARSES(NumberType, (str::stream() << Limits::max()), Limits::max());
-            ASSERT_PARSES(NumberType, (str::stream() << Limits::min()), Limits::min());
+            ASSERT_PARSES(NumberType, std::string(str::stream() << Limits::max()), Limits::max());
+            ASSERT_PARSES(NumberType, std::string(str::stream() << Limits::min()), Limits::min());
             ASSERT_EQUALS(ErrorCodes::FailedToParse,
-                          parseNumberFromString((str::stream() << Limits::max() << '0'), &ignored));
+                          parseNumberFromString(std::string(str::stream() << Limits::max() << '0'), &ignored));
 
             if (Limits::is_signed)
                 ASSERT_EQUALS(
                         ErrorCodes::FailedToParse,
-                        parseNumberFromString((str::stream() << Limits::min() << '0'), &ignored));
+                        parseNumberFromString(std::string(str::stream() << Limits::min() << '0'), &ignored));
         }
     };
 
@@ -145,6 +157,46 @@ namespace {
     GENERAL_NUMBER_TESTS(UInt16, uint16_t);
     GENERAL_NUMBER_TESTS(UInt32, uint32_t);
     GENERAL_NUMBER_TESTS(UInt64, uint64_t);
+
+    TEST(ParseNumber, NotNullTerminated) {
+        ASSERT_PARSES(int, StringData("1234", 3), 123);
+    }
+
+    TEST(ParseNumber, Int8) {
+        int8_t ignored;
+        ASSERT_EQUALS(ErrorCodes::FailedToParse,
+                      parseNumberFromString("-129", &ignored));
+        ASSERT_EQUALS(ErrorCodes::FailedToParse,
+                      parseNumberFromString("-130", &ignored));
+        ASSERT_EQUALS(ErrorCodes::FailedToParse,
+                      parseNumberFromString("-900", &ignored));
+        ASSERT_EQUALS(ErrorCodes::FailedToParse,
+                      parseNumberFromString("128", &ignored));
+        ASSERT_EQUALS(ErrorCodes::FailedToParse,
+                      parseNumberFromString("130", &ignored));
+        ASSERT_EQUALS(ErrorCodes::FailedToParse,
+                      parseNumberFromString("900", &ignored));
+
+        for (int32_t i = -128; i <= 127; ++i)
+            ASSERT_PARSES(int8_t, std::string(mongoutils::str::stream() << i), i);
+    }
+
+    TEST(ParseNumber, UInt8) {
+        uint8_t ignored;
+        ASSERT_EQUALS(ErrorCodes::FailedToParse,
+                      parseNumberFromString("-129", &ignored));
+        ASSERT_EQUALS(ErrorCodes::FailedToParse,
+                      parseNumberFromString("-130", &ignored));
+        ASSERT_EQUALS(ErrorCodes::FailedToParse,
+                      parseNumberFromString("-900", &ignored));
+        ASSERT_EQUALS(ErrorCodes::FailedToParse,
+                      parseNumberFromString("+256", &ignored));
+        ASSERT_EQUALS(ErrorCodes::FailedToParse,
+                      parseNumberFromString("+900", &ignored));
+
+        for (uint32_t i = 0; i <= 255; ++i)
+            ASSERT_PARSES(uint8_t, std::string(mongoutils::str::stream() << i), i);
+    }
 
 }  // namespace
 }  // namespace mongo

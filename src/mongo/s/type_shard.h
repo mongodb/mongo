@@ -105,10 +105,10 @@ namespace mongo {
         // individual field accessors
         //
 
-        void setName(const StringData& name) { _name = std::string(name.data(), name.size()); }
+        void setName(const StringData& name) { _name = name.toString(); }
         const std::string& getName() const { return _name; }
 
-        void setHost(const StringData& host) { _host = std::string(host.data(), host.size()); }
+        void setHost(const StringData& host) { _host = host.toString(); }
         const std::string& getHost() const { return _host; }
 
         void setDraining(bool draining) { _draining = draining; }

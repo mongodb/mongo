@@ -18,6 +18,7 @@
 
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/dbtests/mock/mock_conn_registry.h"
 #include "mongo/dbtests/mock/mock_remote_db_server.h"
 #include "mongo/s/collection_manager.h"
 #include "mongo/s/metadata_loader.h"
@@ -41,7 +42,8 @@ namespace {
     using mongo::MINKEY;
     using mongo::MetadataLoader;
     using mongo::OID;
-    using mongo_test::MockRemoteDBServer;
+    using mongo::MockConnRegistry;
+    using mongo::MockRemoteDBServer;
 
     // XXX
     // We'd move all the test involving building a new manager from config data and
@@ -53,7 +55,8 @@ namespace {
     protected:
         void setUp() {
             _dummyConfig.reset(new MockRemoteDBServer("$dummy_config"));
-            mongo::ConnectionString::setConnectionHook(_dummyConfig->getConnectionHook());
+            mongo::ConnectionString::setConnectionHook(MockConnRegistry::get()->getConnStrHook());
+            MockConnRegistry::get()->addServer(_dummyConfig.get());
 
             BSONObj collFoo =  BSON(CollectionType::ns("test.foo") <<
                                     CollectionType::keyPattern(BSON("a" << 1)) <<
@@ -71,6 +74,10 @@ namespace {
                                      ChunkType::shard("shard0000"));
             // XXX Awaiting mock review
             //_dummyConfig.setQueryReply("config.chunks", BSONArray(fooSingle));
+        }
+
+        void tearDown() {
+            MockConnRegistry::get()->removeServer(_dummyConfig->getServerAddress());
         }
 
     private:

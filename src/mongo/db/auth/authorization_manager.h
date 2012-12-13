@@ -17,6 +17,7 @@
 #pragma once
 
 #include <string>
+#include <vector>
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
@@ -61,14 +62,14 @@ namespace mongo {
         // Takes ownership of the principal (by putting into _authenticatedPrincipals).
         void addAuthorizedPrincipal(Principal* principal);
 
-        // Removes and deletes the given principal from the set of authenticated principals.
-        // Return an error Status if the given principal isn't a member of the
-        // _authenticatedPrincipals set.
-        Status removeAuthorizedPrincipal(const Principal* principal);
-
-        // Returns NULL if not found
+        // Returns the authenticated principal with the given name.  Returns NULL
+        // if no such user is found.
         // Ownership of the returned Principal remains with _authenticatedPrincipals
-        Principal* lookupPrincipal(const std::string& name) const;
+        Principal* lookupPrincipal(const PrincipalName& name) const;
+
+        // Removes any authenticated principals whose authorization credentials came from the given
+        // database, and revokes any privileges that were granted via that principal.
+        void logoutDatabase(const std::string& dbname);
 
         // Grant this connection the given privilege.
         Status acquirePrivilege(const AcquiredPrivilege& privilege);
@@ -77,16 +78,17 @@ namespace mongo {
         // Used to grant internal threads full access.
         void grantInternalAuthorization(const std::string& principalName);
 
+        // Checks if this connection has been authenticated as an internal user.
+        bool hasInternalAuthorization() const;
+
         // Checks if this connection has the privileges required to perform the given action
         // on the given resource.  Contains all the authorization logic including handling things
-        // like the localhost exception.  If it is authorized, returns the principal that granted
-        // the needed privilege.  Returns NULL if not authorized.  If the action is authorized but
-        // not because of a standard user Principal but for a special reason such as the localhost
-        // exception, it returns a pointer to specialAdminPrincipal.
-        const Principal* checkAuthorization(const std::string& resource, ActionType action) const;
-        // Same as above but takes an ActionSet instead of a single ActionType.  The one principal
-        // returned must be able to perform all the actions in the ActionSet on the given resource.
-        const Principal* checkAuthorization(const std::string& resource, ActionSet actions) const;
+        // like the localhost exception.  Returns true if the action may proceed on the resource.
+        bool checkAuthorization(const std::string& resource, ActionType action) const;
+
+        // Same as above but takes an ActionSet instead of a single ActionType.  Returns true if
+        // all of the actions may proceed on the resource.
+        bool checkAuthorization(const std::string& resource, ActionSet actions) const;
 
         // Parses the privilege documents and acquires all privileges that the privilege document
         // grants
@@ -102,11 +104,34 @@ namespace mongo {
             return _externalState->getPrivilegeDocument(dbname, userName, result);
         }
 
+        // Checks if this connection has the privileges necessary to perform a query on the given
+        // namespace.
+        Status checkAuthForQuery(const std::string& ns);
+
+        // Checks if this connection has the privileges necessary to perform an update on the given
+        // namespace.
+        Status checkAuthForUpdate(const std::string& ns, bool upsert);
+
+        // Checks if this connection has the privileges necessary to perform an insert to the given
+        // namespace.
+        Status checkAuthForInsert(const std::string& ns);
+
+        // Checks if this connection has the privileges necessary to perform a delete on the given
+        // namespace.
+        Status checkAuthForDelete(const std::string& ns);
+
+        // Checks if this connection has the privileges necessary to perform a getMore on the given
+        // namespace.
+        Status checkAuthForGetMore(const std::string& ns);
+
+        // Checks if this connection is authorized for all the given Privileges
+        Status checkAuthForPrivileges(const vector<Privilege>& privileges);
+
         // Given a database name and a readOnly flag return an ActionSet describing all the actions
         // that an old-style user with those attributes should be given.
         static ActionSet getActionsForOldStyleUser(const std::string& dbname, bool readOnly);
 
-        // Parses the privilege document and returns a PrivilegeSet of all the Capabilities that
+        // Parses the privilege document and returns a PrivilegeSet of all the Privileges that
         // the privilege document grants.
         static Status buildPrivilegeSet(const std::string& dbname,
                                         Principal* principal,

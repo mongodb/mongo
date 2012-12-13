@@ -344,12 +344,17 @@ namespace mongo {
             Value pValue(vpOperand[i]->evaluate(pDocument));
 
             BSONType valueType = pValue.getType();
+            // leaving explicit checks for now since these were supported in alpha releases
             uassert(16415, "$add does not support dates",
                     valueType != Date);
             uassert(16416, "$add does not support strings",
                     valueType != String);
 
-            totalType = Value::getWidestNumeric(totalType, pValue.getType());
+            totalType = Value::getWidestNumeric(totalType, valueType);
+
+            uassert(16554, "$add only supports numeric types",
+                    totalType != Undefined);
+
             doubleTotal += pValue.coerceToDouble();
             longTotal += pValue.coerceToLong();
         }
@@ -942,7 +947,7 @@ namespace mongo {
 
         double right = pRight.coerceToDouble();
         if (right == 0)
-            return Value(Undefined);
+            return Value(BSONUndefined);
 
         double left = pLeft.coerceToDouble();
 
@@ -1035,12 +1040,12 @@ namespace mongo {
             Document::FieldPair field (fields.next());
 
             // TODO don't make a new string here
-            const string fieldName (field.first.data(), field.first.size());
+            const string fieldName = field.first.toString();
             ExpressionMap::const_iterator exprIter = _expressions.find(fieldName);
 
             // This field is not supposed to be in the output (unless it is _id)
             if (exprIter == end) {
-                if (!_excludeId && atRoot && str::equals(field.first.data(), "_id")) {
+                if (!_excludeId && atRoot && field.first == "_id") {
                     // _id from the root doc is always included (until exclusion is supported)
                     // not updating doneFields since "_id" isn't in _expressions
                     out.addField(field.first, field.second);
@@ -1071,14 +1076,12 @@ namespace mongo {
                     continue;
 
                 /*
-                   Don't add non-existent values (note:  different from NULL);
+                   Don't add non-existent values (note:  different from NULL or Undefined);
                    this is consistent with existing selection syntax which doesn't
-                   force the appearnance of non-existent fields.
+                   force the appearance of non-existent fields.
                    */
-                // TODO make missing distinct from Undefined
-                if (pValue.getType() != Undefined)
+                if (!pValue.missing())
                     out.addField(field.first, pValue);
-
 
                 continue;
             }
@@ -1137,11 +1140,11 @@ namespace mongo {
             Value pValue(it->second->evaluate(rootDoc));
 
             /*
-              Don't add non-existent values (note:  different from NULL);
+              Don't add non-existent values (note:  different from NULL or Undefined);
               this is consistent with existing selection syntax which doesn't
               force the appearnance of non-existent fields.
             */
-            if (pValue.getType() == Undefined)
+            if (pValue.missing())
                 continue;
 
             // don't add field if nothing was found in the subobject
@@ -1298,66 +1301,47 @@ namespace mongo {
         deps.insert(fieldPath.getPath(false));
     }
 
-    Value ExpressionFieldPath::evaluatePath(size_t index,
-                                            size_t pathLength,
-                                            Document pDocument) const {
-        // return value
-        Value pValue = pDocument->getValue(fieldPath.getFieldName(index));
+    Value ExpressionFieldPath::evaluatePathArray(size_t index, const Value& input) const {
+        dassert(input.getType() == Array);
 
-        /* if the field doesn't exist, quit with an undefined value */
-        if (pValue.missing())
-            return Value(Undefined);
+        // Check for remaining path in each element of array
+        vector<Value> result;
+        const vector<Value>& array = input.getArray();
+        for (size_t i=0; i < array.size(); i++) {
+            if (array[i].getType() != Object)
+                continue;
+
+            const Value nested = evaluatePath(index, array[i].getDocument());
+            if (!nested.missing())
+                result.push_back(nested);
+        }
+
+        return Value::createArray(result);
+    }
+    Value ExpressionFieldPath::evaluatePath(size_t index, const Document& input) const {
+        // Note this function is very hot so it is important that is is well optimized.
+        // In particular, all return paths should support RVO.
 
         /* if we've hit the end of the path, stop */
-        ++index;
-        if (index >= pathLength)
-            return pValue;
+        if (index == fieldPath.getPathLength() - 1)
+            return input[fieldPath.getFieldName(index)];
 
-        /*
-          We're diving deeper.  If the value was null, return null.
-        */
-        BSONType type = pValue.getType();
-        if ((type == Undefined) || (type == jstNULL))
-            return Value(Undefined);
+        // Try to dive deeper
+        const Value val = input[fieldPath.getFieldName(index)];
+        switch (val.getType()) {
+        case Object:
+            return evaluatePath(index+1, val.getDocument());
 
-        if (type == Object) {
-            /* extract from the next level down */
-            return evaluatePath(index, pathLength, pValue.getDocument());
+        case Array:
+            return evaluatePathArray(index+1, val);
+
+        default:
+            return Value();
         }
-
-        if (type == Array) {
-            /*
-              We're going to repeat this for each member of the array,
-              building up a new array as we go.
-            */
-            vector<Value> result;
-            const vector<Value>& input = pValue.getArray();
-            for (size_t i=0; i < input.size(); i++) {
-                const Value& item = input[i];
-                BSONType iType = item.getType();
-                if ((iType == Undefined) || (iType == jstNULL)) {
-                    result.push_back(item);
-                    continue;
-                }
-
-                uassert(16014, str::stream() << 
-                        "the element '" << fieldPath.getFieldName(index) <<
-                        "' along the dotted path '" <<
-                        fieldPath.getPath(false) <<
-                        "' is not an object, and cannot be navigated",
-                        iType == Object);
-
-                result.push_back(evaluatePath(index, pathLength, item.getDocument()));
-            }
-
-            return Value::createArray(result);
-        }
-        // subdocument field does not exist, return undefined
-        return Value(Undefined);
     }
 
     Value ExpressionFieldPath::evaluate(const Document& pDocument) const {
-        return evaluatePath(0, fieldPath.getPathLength(), pDocument);
+        return evaluatePath(0, pDocument);
     }
 
     void ExpressionFieldPath::addToBsonObj(BSONObjBuilder *pBuilder,
@@ -1770,20 +1754,21 @@ namespace mongo {
         Value pLeft(vpOperand[0]->evaluate(pDocument));
         Value pRight(vpOperand[1]->evaluate(pDocument));
 
+        // pass along nullish values
+        if (pLeft.nullish())
+            return pLeft;
+        if (pRight.nullish())
+            return pRight;
+
         BSONType leftType = pLeft.getType();
         BSONType rightType = pRight.getType();
 
         uassert(16374, "$mod does not support dates", leftType != Date && rightType != Date);
 
-        // pass along jstNULLs and Undefineds
-        if (leftType == jstNULL || leftType == Undefined)
-            return pLeft;
-        if (rightType == jstNULL || rightType == Undefined)
-            return pRight;
         // ensure we aren't modding by 0
         double right = pRight.coerceToDouble();
         if (right == 0)
-            return Value(Undefined);
+            return Value(BSONUndefined);
 
         if (leftType == NumberDouble) {
             // left is a double, return a double
@@ -1875,6 +1860,9 @@ namespace mongo {
             uassert(16375, "$multiply does not support dates", pValue.getType() != Date);
 
             productType = Value::getWidestNumeric(productType, pValue.getType());
+            uassert(16555, "$mutiply only supports numeric types",
+                    productType != Undefined);
+
             doubleProduct *= pValue.coerceToDouble();
             longProduct *= pValue.coerceToLong();
         }
@@ -1949,10 +1937,9 @@ namespace mongo {
 
     Value ExpressionIfNull::evaluate(const Document& pDocument) const {
         checkArgCount(2);
-        Value pLeft(vpOperand[0]->evaluate(pDocument));
-        BSONType leftType = pLeft.getType();
 
-        if ((leftType != Undefined) && (leftType != jstNULL))
+        Value pLeft(vpOperand[0]->evaluate(pDocument));
+        if (!pLeft.nullish())
             return pLeft;
 
         Value pRight(vpOperand[1]->evaluate(pDocument));
@@ -2437,6 +2424,9 @@ namespace mongo {
         uassert(16376,
                 "$subtract does not support dates",
                 pLeft.getType() != Date && pRight.getType() != Date);
+
+        uassert(16556, "$subtract only supports numeric types",
+                productType != Undefined);
 
         if (productType == NumberDouble) {
             double right = pRight.coerceToDouble();

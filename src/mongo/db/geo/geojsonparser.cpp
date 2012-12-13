@@ -27,6 +27,8 @@
 #include "third_party/s2/s2polyline.h"
 
 // TODO(hk): Modify S2 library to make DCHECKS work like fassert.
+// TODO(hk): Consider moving s/field_parser.cpp into its own library and make use of it instead of
+// doing it ourselves.
 
 namespace mongo {
     // This field must be present, and...
@@ -39,16 +41,19 @@ namespace mongo {
     static const string GEOJSON_COORDINATES = "coordinates";
 
     //// Utility functions used by GeoJSONParser functions below.
-    static S2Point latLngToPoint(const vector<BSONElement>& coordElt) {
-        return S2LatLng::FromDegrees(coordElt[1].Number(),
-                                     coordElt[0].Number()).Normalized().ToPoint();
+    static S2Point coordToPoint(double p0, double p1) {
+        return S2LatLng::FromDegrees(p1, p0).Normalized().ToPoint();
+    }
+
+    static S2Point coordsToPoint(const vector<BSONElement>& coordElt) {
+        return coordToPoint(coordElt[0].Number(), coordElt[1].Number());
     }
 
     static void parsePoints(const vector<BSONElement>& coordElt, vector<S2Point>* out) {
         for (size_t i = 0; i < coordElt.size(); ++i) {
             const vector<BSONElement>& pointElt = coordElt[i].Array();
             if (pointElt.empty()) { continue; }
-            out->push_back(latLngToPoint(pointElt));
+            out->push_back(coordsToPoint(pointElt));
         }
     }
 
@@ -74,12 +79,11 @@ namespace mongo {
         y1 = coordinates[0].Array()[1].Number();
         x2 = coordinates[coordinates.size() - 1].Array()[0].Number();
         y2 = coordinates[coordinates.size() - 1].Array()[1].Number();
-        // TODO(hk): maybe use fuzzier comparison?
-        return x1 == x2 && y1 == y2;
+        return (fabs(x1 - x2) < 1e-6) && fabs(y1 - y2) < 1e-6;
     }
 
     //// What we publicly export
-    bool GeoJSONParser::isPoint(const BSONObj& obj) {
+    bool GeoJSONParser::isGeoJSONPoint(const BSONObj& obj) {
         BSONElement type = obj.getFieldDotted(GEOJSON_TYPE);
         if (type.eoo() || (String != type.type())) { return false; }
         if (GEOJSON_TYPE_POINT != type.String()) { return false; }
@@ -92,19 +96,17 @@ namespace mongo {
         return coordinates[0].isNumber() && coordinates[1].isNumber();
     }
 
-    void GeoJSONParser::parsePoint(const BSONObj& obj, S2Cell* out) {
-        const vector<BSONElement>& coords = obj.getFieldDotted(GEOJSON_COORDINATES).Array();
-        S2LatLng ll = S2LatLng::FromDegrees(coords[1].Number(),
-                                            coords[0].Number()).Normalized();
-        *out = S2Cell(ll);
+    void GeoJSONParser::parseGeoJSONPoint(const BSONObj& obj, S2Cell* out) {
+        S2Point point = coordsToPoint(obj.getFieldDotted(GEOJSON_COORDINATES).Array());
+        *out = S2Cell(point);
     }
 
-    void GeoJSONParser::parsePoint(const BSONObj& obj, S2Point* out) {
+    void GeoJSONParser::parseGeoJSONPoint(const BSONObj& obj, S2Point* out) {
         const vector<BSONElement>& coords = obj.getFieldDotted(GEOJSON_COORDINATES).Array();
-        *out = latLngToPoint(coords);
+        *out = coordsToPoint(coords);
     }
 
-    bool GeoJSONParser::isLineString(const BSONObj& obj) {
+    bool GeoJSONParser::isGeoJSONLineString(const BSONObj& obj) {
         BSONElement type = obj.getFieldDotted(GEOJSON_TYPE);
         if (type.eoo() || (String != type.type())) { return false; }
         if (GEOJSON_TYPE_LINESTRING != type.String()) { return false; }
@@ -117,13 +119,13 @@ namespace mongo {
         return isArrayOfCoordinates(coordinateArray);
     }
 
-    void GeoJSONParser::parseLineString(const BSONObj& obj, S2Polyline* out) {
+    void GeoJSONParser::parseGeoJSONLineString(const BSONObj& obj, S2Polyline* out) {
         vector<S2Point> vertices;
         parsePoints(obj.getFieldDotted(GEOJSON_COORDINATES).Array(), &vertices);
         out->Init(vertices);
     }
 
-    bool GeoJSONParser::isPolygon(const BSONObj& obj) {
+    bool GeoJSONParser::isGeoJSONPolygon(const BSONObj& obj) {
         BSONElement type = obj.getFieldDotted(GEOJSON_TYPE);
         if (type.eoo() || (String != type.type())) { return false; }
         if (GEOJSON_TYPE_POLYGON != type.String()) { return false; }
@@ -148,10 +150,12 @@ namespace mongo {
 
     void fixOrientationTo(vector<S2Point>* points, const bool wantClockwise) {
         const vector<S2Point>& pointsRef = *points;
-        massert(16463, "Don't have enough points in S2 orientation fixing to work with", 4 <= points->size());
+        massert(16463, "Don't have enough points in S2 orientation fixing to work with",
+                4 <= points->size());
         double sum = 0;
         // Sum the area under the curve...well really, it's twice the area.
         for (size_t i = 0; i < pointsRef.size(); ++i) {
+            // TODO(hk): Convince yourself thoroughly that this is right.
             S2Point a = pointsRef[i];
             S2Point b = pointsRef[(i + 1) % pointsRef.size()];
             sum += (b[1] - a[1]) * (b[0] - a[0]);
@@ -165,7 +169,7 @@ namespace mongo {
         }
     }
 
-    void GeoJSONParser::parsePolygon(const BSONObj& obj, S2Polygon* out) {
+    void GeoJSONParser::parseGeoJSONPolygon(const BSONObj& obj, S2Polygon* out) {
         const vector<BSONElement>& coordinates =
             obj.getFieldDotted(GEOJSON_COORDINATES).Array();
 
@@ -193,5 +197,112 @@ namespace mongo {
         }
 
         polyBuilder.AssemblePolygon(out, NULL);
+    }
+
+    bool GeoJSONParser::parsePoint(const BSONObj &obj, S2Point *out) {
+        if (isGeoJSONPoint(obj)) {
+            parseGeoJSONPoint(obj, out);
+            return true;
+        } else if (isLegacyPoint(obj)) {
+            BSONObjIterator it(obj);
+            BSONElement x = it.next();
+            BSONElement y = it.next();
+            *out = coordToPoint(x.number(), y.number());
+            return true;
+        }
+        return false;
+    }
+
+    bool GeoJSONParser::parsePoint(const BSONObj &obj, S2Cell *out) {
+        S2Point point;
+        if (parsePoint(obj, &point)) {
+            *out = S2Cell(point);
+            return true;
+        }
+        return false;
+    }
+
+    bool GeoJSONParser::parseLineString(const BSONObj &obj, S2Polyline *out) {
+        if (!isGeoJSONLineString(obj)) { return false; }
+        parseGeoJSONLineString(obj, out);
+        return true;
+    }
+
+    void GeoJSONParser::parseLegacyPoint(const BSONObj &obj, S2Point *out) {
+        BSONObjIterator it(obj);
+        BSONElement x = it.next();
+        BSONElement y = it.next();
+        *out = coordToPoint(x.number(), y.number());
+    }
+
+    void GeoJSONParser::parseLegacyPolygon(const BSONObj &obj, S2Polygon *out) {
+        vector<S2Point> points;
+
+        BSONObjIterator coordIt(obj);
+        while (coordIt.more()) {
+            BSONElement coord = coordIt.next();
+            S2Point point;
+            parseLegacyPoint(coord.Obj(), &point);
+            points.push_back(point);
+        }
+        points.push_back(points[0]);
+
+        fixOrientationTo(&points, false);
+
+        S2PolygonBuilderOptions polyOptions;
+        polyOptions.set_validate(true);
+        S2PolygonBuilder polyBuilder(polyOptions);
+        S2Loop exteriorLoop(points);
+        polyBuilder.AddLoop(&exteriorLoop);
+        polyBuilder.AssemblePolygon(out, NULL);
+    }
+
+    bool GeoJSONParser::parsePolygon(const BSONObj &obj, S2Polygon *out) {
+        if (isGeoJSONPolygon(obj)) {
+            parseGeoJSONPolygon(obj, out);
+            return true;
+        } else if (isLegacyPolygon(obj)) {
+            parseLegacyPolygon(obj, out);
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    bool GeoJSONParser::isLegacyPoint(const BSONObj &obj) {
+        BSONObjIterator it(obj);
+        if (!it.more()) { return false; }
+        BSONElement x = it.next();
+        if (!x.isNumber()) { return false; }
+        if (!it.more()) { return false; }
+        BSONElement y = it.next();
+        if (!y.isNumber()) { return false; }
+        if (it.more()) { return false; }
+        return true;
+    }
+
+    bool GeoJSONParser::isLegacyPolygon(const BSONObj &obj) {
+        BSONObjIterator coordIt(obj);
+        int vertices = 0;
+        while (coordIt.more()) {
+            BSONElement coord = coordIt.next();
+            if (!coord.isABSONObj()) { return false; }
+            if (!isLegacyPoint(coord.Obj())) { return false; }
+            ++vertices;
+        }
+        if (vertices < 3) { return false; }
+        return true;
+    }
+
+    bool GeoJSONParser::isPoint(const BSONObj &obj) {
+        return isGeoJSONPoint(obj) || isLegacyPoint(obj);
+    }
+
+    bool GeoJSONParser::isLineString(const BSONObj &obj) {
+        return isGeoJSONLineString(obj);
+    }
+
+    bool GeoJSONParser::isPolygon(const BSONObj &obj) {
+        return isGeoJSONPolygon(obj) || isLegacyPolygon(obj);
     }
 }  // namespace mongo

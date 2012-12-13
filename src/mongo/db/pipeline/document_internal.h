@@ -249,7 +249,7 @@ namespace mongo {
         static unsigned hashKey(StringData name) {
             // TODO consider FNV-1a once we have a better benchmark corpus
             unsigned out;
-            MurmurHash3_x86_32(name.data(), name.size(), 0, &out);
+            MurmurHash3_x86_32(name.rawData(), name.size(), 0, &out);
             return out;
         }
 

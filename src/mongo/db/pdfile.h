@@ -43,11 +43,12 @@ namespace mongo {
     const int PDFILE_VERSION = 4;
     const int PDFILE_VERSION_MINOR = 5;
 
+    class Cursor;
     class DataFileHeader;
     class Extent;
-    class Record;
-    class Cursor;
     class OpDebug;
+    class Record;
+    struct SortPhaseOne;
 
     void dropDatabase(const std::string& db);
     bool repairDatabase(string db, string &errmsg, bool preserveClonedFilesOnFailure = false, bool backupOriginalFiles = false);
@@ -115,6 +116,7 @@ namespace mongo {
     class DataFileMgr {
         friend class BasicCursor;
     public:
+        DataFileMgr();
         void init(const string& path );
 
         /* see if we can find an extent of the right size in the freelist. */
@@ -143,9 +145,6 @@ namespace mongo {
                                  bool mayInterrupt = false,
                                  bool god = false);
 
-        /** @param obj in value only for this version. */
-        void insertNoReturnVal(const char *ns, BSONObj o, bool god = false);
-
         /**
          * Insert the contents of @param buf with length @param len into namespace @param ns.
          * @param mayInterrupt When true, killop may interrupt the function call.
@@ -163,7 +162,7 @@ namespace mongo {
                        bool god = false,
                        bool mayAddIndex = true,
                        bool* addedID = 0);
-        static shared_ptr<Cursor> findAll(const char *ns, const DiskLoc &startLoc = DiskLoc());
+        static shared_ptr<Cursor> findAll(const StringData& ns, const DiskLoc &startLoc = DiskLoc());
 
         /* special version of insert for transaction logging -- streamlined a bit.
            assumes ns is capped and no indexes
@@ -182,8 +181,21 @@ namespace mongo {
         /* does not clean up indexes, etc. : just deletes the record in the pdfile. use deleteRecord() to unindex */
         void _deleteRecord(NamespaceDetails *d, const char *ns, Record *todelete, const DiskLoc& dl);
 
+        /**
+         * accessor/mutator for the 'precalced' keys (that is, sorted index keys)
+         *
+         * NB: 'precalced' is accessed from fastBuildIndex(), which is called from insert-related
+         * methods like insertWithObjMod().  It is mutated from various callers of the insert
+         * methods, which assume 'precalced' will not change while in the insert method.  This
+         * should likely be refactored so theDataFileMgr takes full responsibility.
+         */
+        SortPhaseOne* getPrecalced() const;
+        void setPrecalced(SortPhaseOne* precalced);
+        mongo::mutex _precalcedMutex;
+
     private:
         vector<MongoDataFile *> files;
+        SortPhaseOne* _precalced;
     };
 
     extern DataFileMgr theDataFileMgr;
@@ -604,24 +616,23 @@ namespace mongo {
 
     boost::intmax_t dbSize( const char *database );
 
-    inline NamespaceIndex* nsindex(const char *ns) {
+    inline NamespaceIndex* nsindex(const StringData& ns) {
         Database *database = cc().database();
         verify( database );
         memconcept::is(database, memconcept::concept::database, ns, sizeof(Database));
         DEV {
-            char buf[256];
-            nsToDatabase(ns, buf);
-            if ( database->name != buf ) {
+            StringData dbname = nsToDatabaseSubstring( ns );
+            if ( database->name != dbname ) {
                 out() << "ERROR: attempt to write to wrong database\n";
                 out() << " ns:" << ns << '\n';
                 out() << " database->name:" << database->name << endl;
-                verify( database->name == buf );
+                verify( database->name == dbname );
             }
         }
         return &database->namespaceIndex;
     }
 
-    inline NamespaceDetails* nsdetails(const char *ns) {
+    inline NamespaceDetails* nsdetails(const StringData& ns) {
         // if this faults, did you set the current db first?  (Client::Context + dblock)
         NamespaceDetails *d = nsindex(ns)->details(ns);
         if( d ) {

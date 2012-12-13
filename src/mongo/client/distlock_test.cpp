@@ -15,13 +15,21 @@
  *    limitations under the License.
  */
 
-#include <iostream>
 #include "pch.h"
-#include <boost/thread/thread.hpp>
+
 #include "distlock.h"
-#include "../db/commands.h"
-#include "../util/bson_util.h"
-#include "../util/timer.h"
+
+#include <vector>
+#include <iostream>
+#include <boost/thread/thread.hpp>
+
+#include "mongo/base/init.h"
+#include "mongo/db/auth/action_set.h"
+#include "mongo/db/auth/action_type.h"
+#include "mongo/db/auth/privilege.h"
+#include "mongo/db/commands.h"
+#include "mongo/util/bson_util.h"
+#include "mongo/util/timer.h"
 
 // Modify some config options for the RNG, since they cause MSVC to fail
 #include <boost/config.hpp>
@@ -68,7 +76,11 @@ namespace mongo {
         virtual LockType locktype() const {
             return NONE;
         }
-
+        // No auth needed because it only works when enabled via command line.
+        virtual bool requiresAuth() { return false; }
+        virtual void addRequiredPrivileges(const std::string& dbname,
+                                           const BSONObj& cmdObj,
+                                           std::vector<Privilege>* out) {}
         static void runThread() {
             while (keepGoing) {
                 if (current->lock_try( "test" )) {
@@ -131,7 +143,14 @@ namespace mongo {
 
         static bool keepGoing;
 
-    } testDistLockWithSyncCmd;
+    };
+    MONGO_INITIALIZER(RegisterDistLockWithSyncCmd)(InitializerContext* context) {
+        if (Command::testCommandsEnabled) {
+            // Leaked intentionally: a Command registers itself when constructed.
+            new TestDistLockWithSync();
+        }
+        return Status::OK();
+    }
 
     DistributedLock * TestDistLockWithSync::current;
     AtomicUInt TestDistLockWithSync::count;
@@ -162,6 +181,11 @@ namespace mongo {
         virtual LockType locktype() const {
             return NONE;
         }
+        // No auth needed because it only works when enabled via command line.
+        virtual bool requiresAuth() { return false; }
+        virtual void addRequiredPrivileges(const std::string& dbname,
+                                           const BSONObj& cmdObj,
+                                           std::vector<Privilege>* out) {}
 
         void runThread(ConnectionString& hostConn, unsigned threadId, unsigned seed,
                        BSONObj& cmdObj, BSONObjBuilder& result) {
@@ -403,8 +427,14 @@ namespace mongo {
         AtomicUInt count;
         bool keepGoing;
 
-    } testDistLockWithSkewCmd;
-
+    };
+    MONGO_INITIALIZER(RegisterDistLockWithSkewCmd)(InitializerContext* context) {
+        if (Command::testCommandsEnabled) {
+            // Leaked intentionally: a Command registers itself when constructed.
+            new TestDistLockWithSkew();
+        }
+        return Status::OK();
+    }
 
     /**
      * Utility command to virtually skew the clock of a mongo server a particular amount.
@@ -428,6 +458,11 @@ namespace mongo {
         virtual LockType locktype() const {
             return NONE;
         }
+        // No auth needed because it only works when enabled via command line.
+        virtual bool requiresAuth() { return false; }
+        virtual void addRequiredPrivileges(const std::string& dbname,
+                                           const BSONObj& cmdObj,
+                                           std::vector<Privilege>* out) {}
 
         bool run(const string&, BSONObj& cmdObj, int, string& errmsg,
                  BSONObjBuilder& result, bool) {
@@ -444,7 +479,13 @@ namespace mongo {
 
         }
 
-    } testSkewClockCommand;
-
+    };
+    MONGO_INITIALIZER(RegisterSkewClockCmd)(InitializerContext* context) {
+        if (Command::testCommandsEnabled) {
+            // Leaked intentionally: a Command registers itself when constructed.
+            new SkewClockCommand();
+        }
+        return Status::OK();
+    }
 }
 

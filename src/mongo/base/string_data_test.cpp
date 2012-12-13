@@ -24,6 +24,12 @@ namespace {
     using mongo::StringData;
     using std::string;
 
+    TEST(Construction, Empty) {
+        StringData strData;
+        ASSERT_EQUALS(strData.size(), 0U);
+        ASSERT_TRUE(strData.rawData() == NULL);
+    }
+
     TEST(Construction, FromStdString) {
         std::string base("aaa");
         StringData strData(base);
@@ -36,6 +42,13 @@ namespace {
         StringData strData(base.c_str());
         ASSERT_EQUALS(strData.size(), base.size());
         ASSERT_EQUALS(strData.toString(), base);
+    }
+
+    TEST(Construction, FromNullCString) {
+        char* c = NULL;
+        StringData strData(c);
+        ASSERT_EQUALS(strData.size(), 0U);
+        ASSERT_TRUE(strData.rawData() == NULL);
     }
 
     TEST(Construction, FromLiteral) {
@@ -87,6 +100,52 @@ namespace {
         ASSERT_TRUE(a >= empty);
         ASSERT_FALSE(a < empty);
         ASSERT_FALSE(a <= empty);
+    }
+
+    TEST(Find, Char1) {
+        ASSERT_EQUALS( string::npos, StringData( "foo" ).find( 'a' ) );
+        ASSERT_EQUALS( 0U, StringData( "foo" ).find( 'f' ) );
+        ASSERT_EQUALS( 1U, StringData( "foo" ).find( 'o' ) );
+    }
+
+    TEST(Find, Str1 ) {
+        ASSERT_EQUALS( string::npos, StringData( "foo" ).find( "asdsadasda" ) );
+        ASSERT_EQUALS( string::npos, StringData( "foo" ).find( "a" ) );
+        ASSERT_EQUALS( string::npos, StringData( "foo" ).find( "food" ) );
+        ASSERT_EQUALS( string::npos, StringData( "foo" ).find( "ooo" ) );
+
+        ASSERT_EQUALS( 0U, StringData( "foo" ).find( "f" ) );
+        ASSERT_EQUALS( 0U, StringData( "foo" ).find( "fo" ) );
+        ASSERT_EQUALS( 0U, StringData( "foo" ).find( "foo" ) );
+        ASSERT_EQUALS( 1U, StringData( "foo" ).find( "o" ) );
+        ASSERT_EQUALS( 1U, StringData( "foo" ).find( "oo" ) );
+
+        ASSERT_EQUALS( string("foo").find( "" ), StringData("foo").find( "" ) );
+    }
+
+    // this is to verify we match std::string
+#define SUBSTR_TEST_HELP(big,small,start,len)   \
+    ASSERT_EQUALS( (string)small, ((string)big).substr( start, len ) ); \
+    ASSERT_EQUALS( StringData(small), StringData(big).substr( start, len ) );
+
+    TEST(Substr, Simple1 ) {
+        SUBSTR_TEST_HELP( "abcde", "abcde", 0, 10 );
+        SUBSTR_TEST_HELP( "abcde", "abcde", 0, 5 );
+        SUBSTR_TEST_HELP( "abcde", "abc", 0, 3 );
+        SUBSTR_TEST_HELP( "abcde", "cde", 2, 5 );
+        SUBSTR_TEST_HELP( "abcde", "cde", 2, 3 );
+        SUBSTR_TEST_HELP( "abcde", "cd", 2, 2 );
+        SUBSTR_TEST_HELP( "abcde", "cd", 2, 2 );
+    }
+
+    TEST( equalCaseInsensitiveTest, Simple1 ) {
+        ASSERT( StringData( "abc" ).equalCaseInsensitive( "abc" ) );
+        ASSERT( StringData( "abc" ).equalCaseInsensitive( "ABC" ) );
+        ASSERT( StringData( "ABC" ).equalCaseInsensitive( "abc" ) );
+        ASSERT( StringData( "ABC" ).equalCaseInsensitive( "ABC" ) );
+        ASSERT( StringData( "ABC" ).equalCaseInsensitive( "AbC" ) );
+        ASSERT( !StringData( "ABC" ).equalCaseInsensitive( "AbCd" ) );
+        ASSERT( !StringData( "ABC" ).equalCaseInsensitive( "AdC" ) );
     }
 
 } // unnamed namespace

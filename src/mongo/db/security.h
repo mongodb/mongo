@@ -77,10 +77,6 @@ namespace mongo {
             return _isAuthorized( dbname , lockType > 0 ? Auth::WRITE : Auth::READ ); 
         }
 
-        bool isAuthorizedForLevel( const std::string& dbname , Auth::Level level ) const {
-            return _isAuthorized( dbname , level );
-        }
-
         std::string getUser( const std::string& dbname ) const;
 
         void print() const;

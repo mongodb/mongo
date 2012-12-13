@@ -43,7 +43,6 @@ namespace mongo {
      */
     class ReplicaSetMonitor {
     public:
-
         typedef boost::function1<void,const ReplicaSetMonitor*> ConfigChangeHook;
 
         /**
@@ -132,6 +131,8 @@ namespace mongo {
             int pingTimeMillis;
 
         };
+
+        static const double SOCKET_TIMEOUT_SECS;
 
         /**
          * Selects the right node given the nodes to pick from and the preference.

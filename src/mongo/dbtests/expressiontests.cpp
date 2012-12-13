@@ -737,14 +737,14 @@ namespace ExpressionTests {
             BSONObj spec() { return BSON( "$gt" << BSON_ARRAY( 2 << 3 << 4 ) ); }
         };
         
-        /** Incompatible types cannot be compared. */
+        /** Incompatible types can be compared. */
         class IncompatibleTypes {
         public:
             void run() {
                 BSONObj specObject = BSON( "" << BSON( "$ne" << BSON_ARRAY( "a" << 1 ) ) );
                 BSONElement specElement = specObject.firstElement();
                 intrusive_ptr<Expression> expression = Expression::parseOperand( &specElement );
-                ASSERT_THROWS( expression->evaluate( Document() ), UserException );
+                ASSERT_EQUALS(expression->evaluate(Document()), Value(true));
             }
         };
 
@@ -970,8 +970,7 @@ namespace ExpressionTests {
         public:
             void run() {
                 intrusive_ptr<Expression> expression = ExpressionFieldPath::create( "a" );
-                // Result is undefined.
-                assertBinaryEqual( fromjson( "{'':undefined}" ),
+                assertBinaryEqual( fromjson( "{}" ),
                                    toBson( expression->evaluate( Document() ) ) );
             }
         };
@@ -992,7 +991,7 @@ namespace ExpressionTests {
         public:
             void run() {
                 intrusive_ptr<Expression> expression = ExpressionFieldPath::create( "a.b" );
-                assertBinaryEqual( fromjson( "{'':undefined}" ),
+                assertBinaryEqual( fromjson( "{}" ),
                                    toBson( expression->evaluate
                                           ( fromBson( fromjson( "{a:null}" ) ) ) ) );
             }
@@ -1003,9 +1002,20 @@ namespace ExpressionTests {
         public:
             void run() {
                 intrusive_ptr<Expression> expression = ExpressionFieldPath::create( "a.b" );
-                assertBinaryEqual( fromjson( "{'':undefined}" ),
+                assertBinaryEqual( fromjson( "{}" ),
                                    toBson( expression->evaluate
                                           ( fromBson( fromjson( "{a:undefined}" ) ) ) ) );
+            }
+        };
+
+        /** Target field parent is missing. */
+        class NestedBelowMissing {
+        public:
+            void run() {
+                intrusive_ptr<Expression> expression = ExpressionFieldPath::create( "a.b" );
+                assertBinaryEqual( fromjson( "{}" ),
+                                   toBson( expression->evaluate
+                                          ( fromBson( fromjson( "{z:1}" ) ) ) ) );
             }
         };
         
@@ -1014,7 +1024,7 @@ namespace ExpressionTests {
         public:
             void run() {
                 intrusive_ptr<Expression> expression = ExpressionFieldPath::create( "a.b" );
-                assertBinaryEqual( fromjson( "{'':undefined}" ),
+                assertBinaryEqual( fromjson( "{}" ),
                                    toBson( expression->evaluate
                                           ( fromBson( BSON( "a" << 2 ) ) ) ) );
             }
@@ -1036,7 +1046,7 @@ namespace ExpressionTests {
         public:
             void run() {
                 intrusive_ptr<Expression> expression = ExpressionFieldPath::create( "a.b" );
-                assertBinaryEqual( fromjson( "{'':undefined}" ),
+                assertBinaryEqual( fromjson( "{}" ),
                                    toBson( expression->evaluate
                                           ( fromBson( BSON( "a" << BSONObj() ) ) ) ) );
             }            
@@ -1058,7 +1068,7 @@ namespace ExpressionTests {
         public:
             void run() {
                 intrusive_ptr<Expression> expression = ExpressionFieldPath::create( "a.b" );
-                assertBinaryEqual( fromjson( "{'':[null]}" ),
+                assertBinaryEqual( fromjson( "{'':[]}" ),
                                    toBson( expression->evaluate
                                           ( fromBson( fromjson( "{a:[null]}" ) ) ) ) );
             }            
@@ -1069,7 +1079,7 @@ namespace ExpressionTests {
         public:
             void run() {
                 intrusive_ptr<Expression> expression = ExpressionFieldPath::create( "a.b" );
-                assertBinaryEqual( fromjson( "{'':[undefined]}" ),
+                assertBinaryEqual( fromjson( "{'':[]}" ),
                                    toBson( expression->evaluate
                                           ( fromBson( fromjson( "{a:[undefined]}" ) ) ) ) );
             }            
@@ -1080,8 +1090,9 @@ namespace ExpressionTests {
         public:
             void run() {
                 intrusive_ptr<Expression> expression = ExpressionFieldPath::create( "a.b" );
-                ASSERT_THROWS( expression->evaluate( fromBson( fromjson( "{a:[1]}" ) ) ),
-                               UserException );
+                assertBinaryEqual( fromjson( "{'':[]}" ),
+                                   toBson( expression->evaluate
+                                          ( fromBson( fromjson( "{a:[1]}" ) ) ) ) );
             }            
         };
 
@@ -1101,7 +1112,7 @@ namespace ExpressionTests {
         public:
             void run() {
                 intrusive_ptr<Expression> expression = ExpressionFieldPath::create( "a.b" );
-                assertBinaryEqual( fromjson( "{'':[9,null,undefined,undefined,20,undefined]}" ),
+                assertBinaryEqual( fromjson( "{'':[9,20]}" ),
                                     toBson( expression->evaluate
                                            ( fromBson( fromjson
                                                       ( "{a:[{b:9},null,undefined,{g:4},{b:20},{}]}"
@@ -1310,7 +1321,7 @@ namespace ExpressionTests {
             }
         };
 
-        /** Comparison is not performed for multikey values. */
+        /** Comparison is performed for multikey values rather than set-containment. */
         class Multikey {
         public:
             void run() {
@@ -1319,7 +1330,7 @@ namespace ExpressionTests {
                                                       Expression::EQ, Value(0) );
                 Document document =
                         fromBson( BSON( "a" << BSON_ARRAY( 1 << 0 << 2 ) ) );
-                ASSERT_THROWS( expression->evaluate( document ), UserException );
+                ASSERT_EQUALS(expression->evaluate(document), Value(false));
             }
         };
         
@@ -1889,7 +1900,7 @@ namespace ExpressionTests {
             }
         };
         
-        /** An undefined value is not projected.. */
+        /** An undefined value is passed through */
         class ComputedUndefined : public ExpectedResultBase {
         public:
             virtual BSONObj source() {
@@ -1899,7 +1910,7 @@ namespace ExpressionTests {
                 expression()->addField( mongo::FieldPath( "a" ),
                                         ExpressionConstant::create( Value(mongo::Undefined) ) );
             }
-            BSONObj expected() { return BSON( "_id" << 0 ); }
+            BSONObj expected() { return BSON( "_id" << 0 << "a" << BSONUndefined); }
             BSONArray expectedDependencies() { return BSON_ARRAY( "_id" ); }
             BSONObj expectedBsonRepresentation() {
                 return fromjson( "{a:{$const:undefined}}" );
@@ -1986,13 +1997,13 @@ namespace ExpressionTests {
                 // Create a sub expression returning an empty object.
                 intrusive_ptr<ExpressionObject> subExpression = ExpressionObject::create();
                 subExpression->addField( mongo::FieldPath( "b" ),
-                                         ExpressionConstant::create( Value(mongo::Undefined) ) );
+                                         ExpressionFieldPath::create( "a.b" ) );
                 expression()->addField( mongo::FieldPath( "a" ), subExpression );
             }
             BSONObj expected() { return BSON( "_id" << 0 ); }
-            BSONArray expectedDependencies() { return BSON_ARRAY( "_id" ); }
+            BSONArray expectedDependencies() { return BSON_ARRAY( "_id" << "a.b"); }
             BSONObj expectedBsonRepresentation() {
-                return fromjson( "{a:{b:{$const:undefined}}}" );
+                return fromjson( "{a:{b:'$a.b'}}" );
             }
             bool expectedIsSimple() { return false; }
         };
@@ -3269,6 +3280,7 @@ namespace ExpressionTests {
             add<FieldPath::Present>();
             add<FieldPath::NestedBelowNull>();
             add<FieldPath::NestedBelowUndefined>();
+            add<FieldPath::NestedBelowMissing>();
             add<FieldPath::NestedBelowInt>();
             add<FieldPath::NestedValue>();
             add<FieldPath::NestedBelowEmptyObject>();

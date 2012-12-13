@@ -20,14 +20,10 @@
 #include "mongo/util/net/sock.h"
 #include "mongo/util/time_support.h"
 
-using mongo::BSONObj;
-using mongo::scoped_spinlock;
-using mongo::str::stream;
-
 using std::string;
 using std::vector;
 
-namespace mongo_test {
+namespace mongo {
     MockRemoteDBServer::CircularBSONIterator::CircularBSONIterator(
             const vector<BSONObj>& replyVector) {
         for (std::vector<mongo::BSONObj>::const_iterator iter = replyVector.begin();
@@ -51,20 +47,16 @@ namespace mongo_test {
         return reply;
     }
 
-    MockRemoteDBServer::MockRemoteDBServer(const string& hostName):
+    MockRemoteDBServer::MockRemoteDBServer(const string& hostAndPort):
             _isRunning(true),
-            _hostName(hostName),
+            _hostAndPort(hostAndPort),
             _delayMilliSec(0),
             _cmdCount(0),
             _queryCount(0),
-            _connStrHook(this) {
+            _instanceID(0) {
     }
 
     MockRemoteDBServer::~MockRemoteDBServer() {
-    }
-
-    mongo::ConnectionString::ConnectionHook* MockRemoteDBServer::getConnectionHook() {
-        return &_connStrHook;
     }
 
     void MockRemoteDBServer::setDelay(long long milliSec) {
@@ -106,6 +98,27 @@ namespace mongo_test {
         _cmdMap[cmdName].reset(new CircularBSONIterator(replySequence));
     }
 
+    void MockRemoteDBServer::insert(const string &ns, BSONObj obj, int flags) {
+        scoped_spinlock sLock(_lock);
+
+        if (_dataMgr.count(ns) == 0) {
+            _dataMgr[ns] = new BSONArrayBuilder();
+        }
+
+        BSONArrayBuilder* mockCollection = _dataMgr[ns];
+        mockCollection->append(obj.copy());
+    }
+
+    void MockRemoteDBServer::remove(const string& ns, Query query, int flags) {
+        scoped_spinlock sLock(_lock);
+        if (_dataMgr.count(ns) == 0) {
+            return;
+        }
+
+        delete _dataMgr[ns];
+        _dataMgr.erase(ns);
+    }
+
     bool MockRemoteDBServer::runCommand(MockRemoteDBServer::InstanceID id,
             const string& dbname,
             const BSONObj& cmdObj,
@@ -129,7 +142,8 @@ namespace mongo_test {
         }
 
         string cmdName = innerCmdObj.firstElement().fieldName();
-        uassert(16430, stream() << "no reply for cmd: " << cmdName, _cmdMap.count(cmdName) == 1);
+        uassert(16430, str::stream() << "no reply for cmd: " << cmdName,
+                _cmdMap.count(cmdName) == 1);
 
         {
             scoped_spinlock sLock(_lock);
@@ -147,7 +161,7 @@ namespace mongo_test {
         return info["ok"].trueValue();
     }
 
-    std::auto_ptr<mongo::DBClientCursor> MockRemoteDBServer::query(
+    mongo::BSONArray MockRemoteDBServer::query(
             MockRemoteDBServer::InstanceID id,
             const string& ns,
             mongo::Query query,
@@ -164,11 +178,15 @@ namespace mongo_test {
 
         checkIfUp(id);
 
-        std::auto_ptr<mongo::DBClientCursor> cursor;
-
         scoped_spinlock sLock(_lock);
         _queryCount++;
-        return cursor;
+
+        MockDataMgr::iterator collIter = _dataMgr.find(ns);
+        if (collIter == _dataMgr.end()) {
+            return BSONArray();
+        }
+
+        return BSONArray((collIter->second)->done().copy());
     }
 
     mongo::ConnectionString::ConnectionType MockRemoteDBServer::type() const {
@@ -192,39 +210,18 @@ namespace mongo_test {
     }
 
     string MockRemoteDBServer::getServerAddress() const {
-        return _hostName;
+        return _hostAndPort;
     }
 
     string MockRemoteDBServer::toString() {
-        return _hostName;
+        return _hostAndPort;
     }
 
     void MockRemoteDBServer::checkIfUp(InstanceID id) const {
         scoped_spinlock sLock(_lock);
 
         if (!_isRunning || id < _instanceID) {
-            throw mongo::SocketException(mongo::SocketException::CLOSED, _hostName);
-        }
-    }
-
-    MockRemoteDBServer::MockDBClientConnStrHook::MockDBClientConnStrHook(
-            MockRemoteDBServer* mockServer): _mockServer(mockServer) {
-    }
-
-    MockRemoteDBServer::MockDBClientConnStrHook::~MockDBClientConnStrHook() {
-    }
-
-    mongo::DBClientBase* MockRemoteDBServer::MockDBClientConnStrHook::connect(
-            const mongo::ConnectionString& connString,
-            std::string& errmsg,
-            double socketTimeout) {
-        if (_mockServer->isRunning()) {
-            return new MockDBClientConnection(_mockServer);
-        }
-        else {
-            // mimic ConnectionString::connect for MASTER type connection to return NULL
-            // if the destination is unreachable.
-            return NULL;
+            throw mongo::SocketException(mongo::SocketException::CLOSED, _hostAndPort);
         }
     }
 }

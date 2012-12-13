@@ -316,7 +316,6 @@ namespace mongo {
         }
 
         virtual void onCreate( DBClientBase * conn );
-        virtual void onHandedOut( DBClientBase * conn );
         virtual void onDestroy( DBClientBase * conn );
 
         bool _shardedConnections;

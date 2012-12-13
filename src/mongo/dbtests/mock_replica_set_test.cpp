@@ -24,9 +24,12 @@ using mongo::BSONElement;
 using mongo::BSONObj;
 using mongo::BSONObjIterator;
 using mongo::ConnectionString;
+using mongo::MockRemoteDBServer;
+using mongo::MockReplicaSet;
 
 using std::set;
 using std::string;
+using std::vector;
 
 namespace mongo_test {
     TEST(MockReplicaSetTest, SetName) {
@@ -238,6 +241,35 @@ namespace mongo_test {
         }
 
         ASSERT(expectedMembers == memberList);
+    }
+
+    TEST(MockReplicaSetTest, KillNode) {
+        MockReplicaSet replSet("n", 3);
+        const string priHostName(replSet.getPrimary());
+        replSet.kill(priHostName);
+
+        ASSERT(!replSet.getNode(priHostName)->isRunning());
+
+        const vector<string> secondaries = replSet.getSecondaries();
+        for (vector<string>::const_iterator iter = secondaries.begin();
+                iter != secondaries.end(); ++iter) {
+            ASSERT(replSet.getNode(*iter)->isRunning());
+        }
+    }
+
+    TEST(MockReplicaSetTest, KillMultipleNode) {
+        MockReplicaSet replSet("n", 3);
+
+        const vector<string> secondaries = replSet.getSecondaries();
+        replSet.kill(replSet.getSecondaries());
+
+        for (vector<string>::const_iterator iter = secondaries.begin();
+                iter != secondaries.end(); ++iter) {
+            ASSERT(!replSet.getNode(*iter)->isRunning());
+        }
+
+        const string priHostName(replSet.getPrimary());
+        ASSERT(replSet.getNode(priHostName)->isRunning());
     }
 }
 

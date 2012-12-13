@@ -35,16 +35,6 @@ namespace mongo {
 
         virtual ~Listener();
         
-#ifdef MONGO_SSL
-        /**
-         * make this an ssl socket
-         * ownership of SSLManager remains with the caller
-         */
-        void secure( SSLManager* manager );
-
-        void addSecurePort( SSLManager* manager , int additionalPort );
-#endif
-
         void initAndListen(); // never returns unless error (start a thread)
 
         /* spawn a thread, etc., then return */
@@ -82,7 +72,6 @@ namespace mongo {
         
 #ifdef MONGO_SSL
         SSLManager* _ssl;
-        int _sslPort;
 #endif
         
         /**

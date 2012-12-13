@@ -1,3 +1,4 @@
+// Test 2dsphere near search, called via find and geoNear.
 t = db.geo_s2near
 t.drop();
 
@@ -18,14 +19,17 @@ origin = { "type" : "Point", "coordinates": [ lng, lat ] }
 t.ensureIndex({ geo : "2dsphere" })
 
 res = t.find({ "geo" : { "$near" : { "$geometry" : origin, $maxDistance: 2000} } }).limit(10)
-assert.eq(res.itcount(), 10)
+resNear = db.runCommand({geoNear : t.getName(), near: [0,0], num: 10, maxDistance: 2000})
+assert.eq(res.itcount(), resNear.results.length, 10)
 
 res = t.find({ "geo" : { "$near" : { "$geometry" : origin } } }).limit(10)
-assert.eq(res.itcount(), 10)
+resNear = db.runCommand({geoNear : t.getName(), near: [0,0], num: 10})
+assert.eq(res.itcount(), resNear.results.length, 10)
 
 // Find all the points!
 res = t.find({ "geo" : { "$near" : { "$geometry" : origin } } }).limit(10000)
-assert.eq(res.itcount(), (2 * points) * (2 * points))
+resNear = db.runCommand({geoNear : t.getName(), near: [0,0], num: 10000})
+assert.eq(resNear.results.length, res.itcount(), (2 * points) * (2 * points))
 
 // longitude goes -180 to 180
 // latitude goes -90 to 90
@@ -36,4 +40,5 @@ t.insert({geo: { "type" : "Point", "coordinates" : [180, -90]}})
 t.insert({geo: { "type" : "Point", "coordinates" : [180, 90]}})
 t.insert({geo: { "type" : "Point", "coordinates" : [-180, 90]}})
 res = t.find({ "geo" : { "$near" : { "$geometry" : origin } } }).limit(10000)
-assert.eq(res.itcount(), (2 * points) * (2 * points) + 4)
+resNear = db.runCommand({geoNear : t.getName(), near: [0,0], num: 10000})
+assert.eq(res.itcount(), resNear.results.length, (2 * points) * (2 * points) + 4)

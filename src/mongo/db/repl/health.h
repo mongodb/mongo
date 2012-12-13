@@ -18,6 +18,8 @@
 
 #pragma once
 
+#include "mongo/db/jsobj.h"
+
 namespace mongo {
 
     /* throws */

@@ -17,7 +17,12 @@
 
 
 #include "mongo/pch.h"
+
 #include "mongo/db/stats/top.h"
+
+#include "mongo/db/auth/action_set.h"
+#include "mongo/db/auth/action_type.h"
+#include "mongo/db/auth/privilege.h"
 #include "mongo/util/net/message.h"
 #include "mongo/db/commands.h"
 
@@ -43,18 +48,18 @@ namespace mongo {
     }
 
     void Top::record( const StringData& ns , int op , int lockType , long long micros , bool command ) {
-        if ( ns.data()[0] == '?' )
+        if ( ns[0] == '?' )
             return;
 
         //cout << "record: " << ns << "\t" << op << "\t" << command << endl;
         SimpleMutex::scoped_lock lk(_lock);
 
-        if ( ( command || op == dbQuery ) && str::equals( ns.data(), _lastDropped.c_str() ) ) {
+        if ( ( command || op == dbQuery ) && ns == _lastDropped ) {
             _lastDropped = "";
             return;
         }
 
-        CollectionData& coll = _usage[ns.data()];
+        CollectionData& coll = _usage[ns];
         _record( coll , op , lockType , micros , command );
         _record( _global , op , lockType , micros , command );
     }
@@ -122,7 +127,7 @@ namespace mongo {
         // pull all the names into a vector so we can sort them for the user
         
         vector<string> names;
-        for ( UsageMap::const_iterator i = map.begin(); i != map.end(); i++ ) {
+        for ( UsageMap::const_iterator i = map.begin(); i != map.end(); ++i ) {
             names.push_back( i->first );
         }
         
@@ -164,7 +169,13 @@ namespace mongo {
         virtual bool adminOnly() const { return true; }
         virtual LockType locktype() const { return NONE; }
         virtual void help( stringstream& help ) const { help << "usage by collection, in micros "; }
-
+        virtual void addRequiredPrivileges(const std::string& dbname,
+                                           const BSONObj& cmdObj,
+                                           std::vector<Privilege>* out) {
+            ActionSet actions;
+            actions.addAction(ActionType::top);
+            out->push_back(Privilege(AuthorizationManager::SERVER_RESOURCE_NAME, actions));
+        }
         virtual bool run(const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             {
                 BSONObjBuilder b( result.subobjStart( "totals" ) );

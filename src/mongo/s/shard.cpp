@@ -47,7 +47,7 @@ namespace mongo {
             {
                 scoped_ptr<ScopedDbConnection> conn(
                         ScopedDbConnection::getInternalScopedDbConnection(
-                                configServer.getPrimary().getConnString() ) );
+                                configServer.getPrimary().getConnString(), 30));
                 auto_ptr<DBClientCursor> c = conn->get()->query(ConfigNS::shard , Query());
                 massert( 13632 , "couldn't get updated shard list from config server" , c.get() );
                 while ( c->more() ) {

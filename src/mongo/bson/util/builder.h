@@ -189,7 +189,7 @@ namespace mongo {
 
         void appendStr(const StringData &str , bool includeEndingNull = true ) {
             const int len = str.size() + ( includeEndingNull ? 1 : 0 );
-            memcpy(grow(len), str.data(), len);
+            str.copyTo( grow(len), includeEndingNull );
         }
 
         /** @return length of current string */
@@ -309,7 +309,7 @@ namespace mongo {
 
         void write( const char* buf, int len) { memcpy( _buf.grow( len ) , buf , len ); }
 
-        void append( const StringData& str ) { memcpy( _buf.grow( str.size() ) , str.data() , str.size() ); }
+        void append( const StringData& str ) { str.copyTo( _buf.grow( str.size() ), false ); }
 
         StringBuilderImpl& operator<<( const StringData& str ) {
             append( str );

@@ -159,6 +159,33 @@ namespace mongo {
         static bool runAgainstRegistered(const char *ns, BSONObj& jsobj, BSONObjBuilder& anObjBuilder, int queryOptions = 0);
         static LockType locktype( const string& name );
         static Command * findCommand( const string& name );
+        // Set by command line.  Controls whether or not testing-only commands should be available.
+        static int testCommandsEnabled;
+    };
+
+    // This will be registered instead of the real implementations of any commands that don't work
+    // when auth is enabled.
+    class NotWithAuthCmd : public Command {
+    public:
+        NotWithAuthCmd(const char* cmdName) : Command(cmdName) { }
+        virtual bool slaveOk() const { return true; }
+        virtual LockType locktype() const { return NONE; }
+        virtual bool requiresAuth() { return false; }
+        virtual void addRequiredPrivileges(const std::string& dbname,
+                                           const BSONObj& cmdObj,
+                                           std::vector<Privilege>* out) {}
+        virtual void help( stringstream &help ) const {
+            help << name << " is not supported when running with authentication enabled";
+        }
+        virtual bool run(const string&,
+                         BSONObj& cmdObj,
+                         int,
+                         string& errmsg,
+                         BSONObjBuilder& result,
+                         bool fromRepl) {
+            errmsg = name + " is not supported when running with authentication enabled";
+            return false;
+        }
     };
 
     class CmdShutdown : public Command {

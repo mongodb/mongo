@@ -34,7 +34,7 @@ namespace mongo {
     }
 
     void GsaslSession::setProperty(Gsasl_property property, const StringData& value) {
-        gsasl_property_set_raw(_gsaslSession, property, value.data(), value.size());
+        gsasl_property_set_raw(_gsaslSession, property, value.rawData(), value.size());
     }
 
     const std::string GsaslSession::getProperty(Gsasl_property property) const {
@@ -64,7 +64,7 @@ namespace mongo {
         if (_done || _gsaslSession)
             return Status(ErrorCodes::CannotReuseObject, "Cannot reuse GsaslSession.");
 
-        int rc = sessionStartFn(gsasl, mechanism.data(), &_gsaslSession);
+        int rc = sessionStartFn(gsasl, mechanism.toString().c_str(), &_gsaslSession);
         switch (rc) {
         case GSASL_OK:
             gsasl_session_hook_set(_gsaslSession, sessionHook);
@@ -80,7 +80,7 @@ namespace mongo {
         char* output;
         size_t outputSize;
         int rc = gsasl_step(_gsaslSession,
-                            inputData.data(), inputData.size(),
+                            inputData.rawData(), inputData.size(),
                             &output, &outputSize);
 
         if (GSASL_OK == rc)

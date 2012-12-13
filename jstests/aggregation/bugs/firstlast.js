@@ -100,7 +100,7 @@ assertFirstLast( undefined, undefined );
 t.drop();
 t.save( { a:1, b:[ { c:1 }, { c:2 } ] } );
 t.save( { a:1, b:[ { c:6 }, {} ] } );
-assertFirstLast( [ 1, 2 ], [ 6, null ], [], '$b.c' );
+assertFirstLast( [ 1, 2 ], [ 6 ], [], '$b.c' );
 
 // Computed expressions.
 t.drop();

@@ -22,20 +22,20 @@ namespace mongo {
 
     class SystemInfo {
     public:
-	/*
-	  Get the amount of physical memory available on the host.
+        /*
+          Get the amount of physical memory available on the host.
 
-	  This should only be used for "advisory" purposes, and not as a hard
-	  value, because this could be deceptive on virtual hosts, and because
-	  this will return zero on platforms that do not support it.
+          This should only be used for "advisory" purposes, and not as a hard
+          value, because this could be deceptive on virtual hosts, and because
+          this will return zero on platforms that do not support it.
 
-	  @returns amount of physical memory, or zero
-	 */
-	static size_t getPhysicalRam();
+          @returns amount of physical memory, or zero
+         */
+        static size_t getPhysicalRam();
 
     private:
-	// don't instantiate this class
-	SystemInfo(); // no implementation
+        // don't instantiate this class
+        SystemInfo(); // no implementation
     };
 
 }

@@ -30,77 +30,144 @@
 #include "third_party/s2/s2polygon.h"
 #include "third_party/s2/s2polyline.h"
 
-//using std::string;
-//using std::stringstream;
 using mongo::GeoJSONParser;
 using mongo::fromjson;
 
 namespace {
     TEST(GeoJSONParser, isValidPoint) {
         ASSERT_TRUE(GeoJSONParser::isPoint(fromjson("{'type':'Point', 'coordinates': [40, 5]}")));
-        ASSERT_TRUE(GeoJSONParser::isPoint(fromjson("{'type':'Point', 'coordinates': [-40.3, -5.0]}")));
-
+        ASSERT_TRUE(GeoJSONParser::isPoint(
+            fromjson("{'type':'Point', 'coordinates': [-40.3, -5.0]}")));
         ASSERT_FALSE(GeoJSONParser::isPoint(fromjson("{'typo':'Point', 'coordinates': [40, -5]}")));
         ASSERT_FALSE(GeoJSONParser::isPoint(fromjson("{'type':'Point', 'coordhats': [40, -5]}")));
-        ASSERT_FALSE(GeoJSONParser::isPoint(fromjson("{'type':['Point'], 'coordinates': [40, -5]}")));
+        ASSERT_FALSE(GeoJSONParser::isPoint(
+            fromjson("{'type':['Point'], 'coordinates': [40, -5]}")));
         ASSERT_FALSE(GeoJSONParser::isPoint(fromjson("{'type':'Point', 'coordinates': 40}")));
-        ASSERT_FALSE(GeoJSONParser::isPoint(fromjson("{'type':'Point', 'coordinates': [40, -5, 7]}")));
+        ASSERT_FALSE(GeoJSONParser::isPoint(
+            fromjson("{'type':'Point', 'coordinates': [40, -5, 7]}")));
     }
 
     TEST(GeoJSONParser, isValidLineString) {
-        ASSERT_TRUE(GeoJSONParser::isLineString(fromjson("{'type':'LineString', 'coordinates':[[1,2], [3,4]]}")));
-        ASSERT_TRUE(GeoJSONParser::isLineString(fromjson("{'type':'LineString', 'coordinates':[[1,2], [3,4], [5,6]]}")));
-
-        ASSERT_FALSE(GeoJSONParser::isLineString(fromjson("{'type':'LineString', 'coordinates':[[1,2]]}")));
-        ASSERT_FALSE(GeoJSONParser::isLineString(fromjson("{'type':'LineString', 'coordinates':[['chicken','little']]}")));
-        ASSERT_FALSE(GeoJSONParser::isLineString(fromjson("{'type':'LineString', 'coordinates':[1,2, 3, 4]}")));
-        ASSERT_FALSE(GeoJSONParser::isLineString(fromjson("{'type':'LineString', 'coordinates':[[1,2, 3], [3,4, 5], [5,6]]}")));
+        ASSERT_TRUE(GeoJSONParser::isLineString(
+            fromjson("{'type':'LineString', 'coordinates':[[1,2], [3,4]]}")));
+        ASSERT_TRUE(GeoJSONParser::isLineString(
+            fromjson("{'type':'LineString', 'coordinates':[[1,2], [3,4], [5,6]]}")));
+        ASSERT_FALSE(GeoJSONParser::isLineString(
+            fromjson("{'type':'LineString', 'coordinates':[[1,2]]}")));
+        ASSERT_FALSE(GeoJSONParser::isLineString(
+            fromjson("{'type':'LineString', 'coordinates':[['chicken','little']]}")));
+        ASSERT_FALSE(GeoJSONParser::isLineString(
+            fromjson("{'type':'LineString', 'coordinates':[1,2, 3, 4]}")));
+        ASSERT_FALSE(GeoJSONParser::isLineString(
+            fromjson("{'type':'LineString', 'coordinates':[[1,2, 3], [3,4, 5], [5,6]]}")));
     }
 
     TEST(GeoJSONParser, isValidPolygon) {
-        ASSERT_TRUE(GeoJSONParser::isPolygon(fromjson("{'type':'Polygon', 'coordinates':[ [[0,0],[5,0],[5,5],[0,5],[0,0]] ]}")));
+        ASSERT_TRUE(GeoJSONParser::isPolygon(
+            fromjson("{'type':'Polygon', 'coordinates':[ [[0,0],[5,0],[5,5],[0,5],[0,0]] ]}")));
         // And one with a hole.
-        ASSERT_TRUE(GeoJSONParser::isPolygon(fromjson("{'type':'Polygon', 'coordinates':[ [[0,0],[5,0],[5,5],[0,5],[0,0]],"
-                                                                                        " [[1,1],[4,1],[4,4],[1,4],[1,1]] ]}")));
+        ASSERT_TRUE(GeoJSONParser::isPolygon(
+            fromjson("{'type':'Polygon', 'coordinates':[ [[0,0],[5,0],[5,5],[0,5],[0,0]],"
+                     " [[1,1],[4,1],[4,4],[1,4],[1,1]] ]}")));
         // First point must be the same as the last.
-        ASSERT_FALSE(GeoJSONParser::isPolygon(fromjson("{'type':'Polygon', 'coordinates':[ [[1,2],[3,4],[5,6]] ]}")));
+        ASSERT_FALSE(GeoJSONParser::isPolygon(
+            fromjson("{'type':'Polygon', 'coordinates':[ [[1,2],[3,4],[5,6]] ]}")));
     }
 
     TEST(GeoJSONParser, parsePoint) {
         S2Point point;
-        GeoJSONParser::parsePoint(fromjson("{'type':'Point', 'coordinates': [40, 5]}"), &point);
-        GeoJSONParser::parsePoint(fromjson("{'type':'Point', 'coordinates': [-40.3, -5.0]}"), &point);
+        GeoJSONParser::parsePoint(fromjson("{'type':'Point', 'coordinates': [40, 5]}"),
+                                  &point);
+        GeoJSONParser::parsePoint(fromjson("{'type':'Point', 'coordinates': [-40.3, -5.0]}"),
+                                  &point);
     }
 
     TEST(GeoJSONParser, parseLineString) {
         S2Polyline polyline;
-        GeoJSONParser::parseLineString(fromjson("{'type':'LineString', 'coordinates':[[1,2], [3,4]]}"), &polyline);
-        GeoJSONParser::parseLineString(fromjson("{'type':'LineString', 'coordinates':[[1,2], [3,4], [5,6]]}"), &polyline);
+        GeoJSONParser::parseLineString(
+            fromjson("{'type':'LineString', 'coordinates':[[1,2],[3,4]]}"),
+            &polyline);
+        GeoJSONParser::parseLineString(
+            fromjson("{'type':'LineString', 'coordinates':[[1,2], [3,4], [5,6]]}"),
+            &polyline);
     }
 
     TEST(GeoJSONParser, parsePolygon) {
         S2Point point;
-        GeoJSONParser::parsePoint(fromjson("{'type':'Point', 'coordinates': [2, 2]}"), &point);
+        GeoJSONParser::parsePoint(fromjson("{'type':'Point', 'coordinates': [2, 2]}"),
+                                  &point);
 
         S2Polygon polygonA;
-        GeoJSONParser::parsePolygon(fromjson("{'type':'Polygon', 'coordinates':[ [[0,0],[5,0],[5,5],[0,5],[0,0]] ]}"), &polygonA);
+        GeoJSONParser::parsePolygon(
+            fromjson("{'type':'Polygon', 'coordinates':[ [[0,0],[5,0],[5,5],[0,5],[0,0]] ]}"),
+            &polygonA);
         ASSERT_TRUE(polygonA.Contains(point));
 
         S2Polygon polygonB;
-        GeoJSONParser::parsePolygon(fromjson("{'type':'Polygon', 'coordinates':[ [[0,0],[5,0],[5,5],[0,5],[0,0]],"
-                                                                                        " [[1,1],[1,4],[4,4],[4,1],[1,1]] ]}"), &polygonB);
-        // We removed this in the loop.
+        GeoJSONParser::parsePolygon(
+            fromjson("{'type':'Polygon', 'coordinates':[ [[0,0],[5,0],[5,5],[0,5],[0,0]],"
+                     " [[1,1],[1,4],[4,4],[4,1],[1,1]] ]}"),
+            &polygonB);
+        // We removed this in the hole.
         ASSERT_FALSE(polygonB.Contains(point));
 
-        // Now we reverse the orientations and verify that the code fixes it up (outer loop must be CCW, inner CW).
+        // Now we reverse the orientations and verify that the code fixes it up
+        // (outer loop must be CCW, inner CW).
         S2Polygon polygonC;
-        GeoJSONParser::parsePolygon(fromjson("{'type':'Polygon', 'coordinates':[ [[0,0],[0,5],[5,5],[5,0],[0,0]] ]}"), &polygonC);
+        GeoJSONParser::parsePolygon(
+            fromjson("{'type':'Polygon', 'coordinates':[ [[0,0],[0,5],[5,5],[5,0],[0,0]] ]}"),
+            &polygonC);
         ASSERT_TRUE(polygonC.Contains(point));
 
         S2Polygon polygonD;
-        GeoJSONParser::parsePolygon(fromjson("{'type':'Polygon', 'coordinates':[ [[0,0],[0,5],[5,5],[5,0],[0,0]],"
-                                                                                        " [[1,1],[1,4],[4,4],[4,1],[1,1]] ]}"), &polygonD);
+        GeoJSONParser::parsePolygon(
+            fromjson("{'type':'Polygon', 'coordinates':[ [[0,0],[0,5],[5,5],[5,0],[0,0]],"
+                     " [[1,1],[1,4],[4,4],[4,1],[1,1]] ]}"),
+            &polygonD);
         // Also removed in the loop.
         ASSERT_FALSE(polygonD.Contains(point));
+    }
+
+    TEST(GeoJSONParser, parseLegacyPoint) {
+        S2Point point;
+        ASSERT(GeoJSONParser::parsePoint(BSON_ARRAY(0 << 1), &point));
+        ASSERT_FALSE(GeoJSONParser::parsePoint(BSON_ARRAY(0), &point));
+        ASSERT_FALSE(GeoJSONParser::parsePoint(BSON_ARRAY(0 << 1 << 2), &point));
+        ASSERT(GeoJSONParser::parsePoint(fromjson("{x: 50, y:40}"), &point));
+        ASSERT_FALSE(GeoJSONParser::parsePoint(fromjson("{x: '50', y:40}"), &point));
+        ASSERT_FALSE(GeoJSONParser::parsePoint(fromjson("{x: 5, y:40, z:50}"), &point));
+        ASSERT_FALSE(GeoJSONParser::parsePoint(fromjson("{x: 5}"), &point));
+    }
+
+    TEST(GeoJSONParser, parseLegacyPolygon) {
+        S2Polygon polygon;
+        ASSERT(GeoJSONParser::parsePolygon(BSON_ARRAY(BSON_ARRAY(10 << 20) << BSON_ARRAY(10 << 40)
+                                                      << BSON_ARRAY(30 << 40)
+                                                      << BSON_ARRAY(30 << 20)),
+                                           &polygon));
+        polygon.Release(NULL);
+        ASSERT(GeoJSONParser::parsePolygon(BSON_ARRAY(BSON_ARRAY(10 << 20) << BSON_ARRAY(10 << 40)
+                                                      << BSON_ARRAY(30 << 40)),
+                                           &polygon));
+        polygon.Release(NULL);
+        ASSERT_FALSE(GeoJSONParser::parsePolygon(BSON_ARRAY(BSON_ARRAY(10 << 20)
+                                                            << BSON_ARRAY(10 << 40)),
+                                           &polygon));
+        polygon.Release(NULL);
+        ASSERT_FALSE(GeoJSONParser::parsePolygon(BSON_ARRAY(BSON_ARRAY("10" << 20)
+                                                            << BSON_ARRAY(10 << 40)
+                                                            << BSON_ARRAY(30 << 40)
+                                                            << BSON_ARRAY(30 << 20)),
+                                           &polygon));
+        polygon.Release(NULL);
+        ASSERT_FALSE(GeoJSONParser::parsePolygon(BSON_ARRAY(BSON_ARRAY(10 << 20 << 30)
+                                                            << BSON_ARRAY(10 << 40)
+                                                            << BSON_ARRAY(30 << 40)
+                                                            << BSON_ARRAY(30 << 20)),
+                                           &polygon));
+        polygon.Release(NULL);
+        ASSERT(GeoJSONParser::parsePolygon(
+            fromjson("{a:{x:40,y:5},b:{x:40,y:6},c:{x:41,y:6},d:{x:41,y:5}}"), &polygon));
+        polygon.Release(NULL);
     }
 }

@@ -619,6 +619,10 @@ int _main( int argc, char* argv[], char **envp ) {
     string username;
     string password;
 
+    std::string sslPEMKeyFile;
+    std::string sslPEMKeyPassword;
+    std::string sslCAFile;
+
     bool runShell = false;
     bool nodb = false;
     bool norc = false;
@@ -646,6 +650,10 @@ int _main( int argc, char* argv[], char **envp ) {
     ( "ipv6", "enable IPv6 support (disabled by default)" )
 #ifdef MONGO_SSL
     ( "ssl", "use SSL for all connections" )
+    ( "sslCAFile", po::value<std::string>(&sslCAFile), "Certificate Authority for SSL" )
+    ( "sslPEMKeyFile", po::value<std::string>(&sslPEMKeyFile), "PEM certificate/key file for SSL" )
+    ( "sslPEMKeyPassword", po::value<std::string>(&sslPEMKeyFile), 
+      "password for key in PEM file for SSL" )
 #endif
     ;
 
@@ -718,6 +726,15 @@ int _main( int argc, char* argv[], char **envp ) {
 #ifdef MONGO_SSL
     if ( params.count( "ssl" ) ) {
         mongo::cmdLine.sslOnNormalPorts = true;
+    }
+    if (params.count("sslPEMKeyFile")) {
+        mongo::cmdLine.sslPEMKeyFile = params["sslPEMKeyFile"].as<std::string>();
+    }
+    if (params.count("sslPEMKeyPassword")) {
+        mongo::cmdLine.sslPEMKeyPassword = params["sslPEMKeyPassword"].as<std::string>();
+    }
+    if (params.count("sslCAFile")) {
+        mongo::cmdLine.sslCAFile = params["sslCAFile"].as<std::string>();
     }
 #endif
     if ( params.count( "nokillop" ) ) {

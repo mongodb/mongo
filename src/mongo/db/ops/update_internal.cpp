@@ -18,6 +18,8 @@
 
 #include "pch.h"
 
+#include <algorithm> // for max
+
 #include "mongo/db/oplog.h"
 #include "mongo/db/jsobjmanipulator.h"
 #include "mongo/db/pdfile.h"
@@ -31,7 +33,8 @@
 namespace mongo {
 
     const char* Mod::modNames[] = { "$inc", "$set", "$push", "$pushAll", "$pull", "$pullAll" , "$pop", "$unset" ,
-                                    "$bitand" , "$bitor" , "$bit" , "$addToSet", "$rename", "$rename"
+                                    "$bitand" , "$bitor" , "$bit" , "$addToSet", "$rename", "$rename" ,
+                                    "$setOnInsert"
                                   };
     unsigned Mod::modNamesNum = sizeof(Mod::modNames)/sizeof(char*);
 
@@ -111,6 +114,12 @@ namespace mongo {
             break;
         }
 
+        case SET_ON_INSERT:
+            // $setOnInsert on an existing field should be a no-op (e.g., dontApply should be
+            // set for it), so we should never get here.
+            verify(false);
+            break;
+
         case UNSET: {
             appendUnset( builder );
             break;
@@ -118,24 +127,105 @@ namespace mongo {
 
         case PUSH: {
             uassert( 10131 ,  "$push can only be applied to an array" , in.type() == Array );
+
+            //
+            // We can be in a single element push case, a "push all" case, or a "push all" case
+            // with a trim requirement (ie, a "push to size"). In each of these, we decide
+            // differently how much of the existing- and of the parameter-array to copy to the
+            // final object.
+            //
+
+            // Start the resulting array's builder.
             BSONArrayBuilder bb( builder.subarrayStart( shortFieldName ) );
-            BSONObjIterator i( in.embeddedObject() );
-            while ( i.more() ) {
-                bb.append( i.next() );
+
+            // If in the single element push case, we'll copy all elements of the existing
+            // array and add the new one.
+            if ( ! isEach() ) {
+                BSONObjIterator i( in.embeddedObject() );
+                while ( i.more() ) {
+                    bb.append( i.next() );
+                }
+                bb.append( elt );
+
+                // We don't want to log a positional $set for which the '_checkForAppending' test
+                // won't pass. If we're in that case, fall back to non-optimized logging.
+                if ( (elt.type() == Object && elt.embeddedObject().okForStorage()) ||
+                     (elt.type() != Object) ) {
+                    ms.fixedOpName = "$set";
+                    ms.forcePositional = true;
+                    ms.position = bb.arrSize() - 1;
+                    bb.done();
+                }
+                else {
+                    ms.fixedOpName = "$set";
+                    ms.forceEmptyArray = true;
+                    ms.fixedArray = BSONArray( bb.done().getOwned() );
+                }
             }
 
-            bb.append( elt );
+            // If we're in the "push all" case, we'll copy all element of both the existing and
+            // parameter arrays.
+            else if ( isEach() && ! isTrim() ) {
+                BSONObjIterator i( in.embeddedObject() );
+                while ( i.more() ) {
+                    bb.append( i.next() );
+                }
+                BSONObjIterator j( elt.embeddedObject() );
+                while ( j.more() ) {
+                    bb.append( j.next() );
+                }
 
-            // We don't want to log a positional $set for which the '_checkForAppending' test
-            // won't pass. If we're in that case, fall back to non-optimized logging.
-            if ( (elt.type() == Object && elt.embeddedObject().okForStorage()) ||
-                 (elt.type() != Object) ) {
                 ms.fixedOpName = "$set";
-                ms.forcePositional = true;
-                ms.position = bb.arrSize() - 1;
-                bb.done();
+                ms.forceEmptyArray = true;
+                ms.fixedArray = BSONArray( bb.done().getOwned() );
             }
+
+            // If we're in the "push all" case with trim, we have to decide how much of each
+            // of the existing and parameter arrays to copy to the final object.
             else {
+                long long trim = getTrim();
+                BSONObj eachArray = getEach();
+                long long arraySize = in.embeddedObject().nFields();
+                long long eachArraySize = eachArray.nFields();
+
+                // Zero trim is equivalent to resetting the array in the final object, so
+                // we won't copy anything.
+                if (trim == 0) {
+                    // no-op
+                }
+
+                // If the parameter array alone is larger than the trim, then only copy
+                // object from that array.
+                else if (trim <= eachArraySize) {
+                    long long skip = eachArraySize - trim;
+                    BSONObjIterator j( getEach() );
+                    while ( j.more() ) {
+                        if ( skip-- > 0 ) {
+                            j.next();
+                            continue;
+                        }
+                        bb.append( j.next() );
+                    }
+                }
+
+                // If the parameter array is not sufficient to fill the trim, then some (or all)
+                // the elements from the existing array will be copied too.
+                else {
+                    long long skip = std::max(0LL, arraySize - (trim - eachArraySize) );
+                    BSONObjIterator i( in.embeddedObject() );
+                    while ( i.more() ) {
+                        if (skip-- > 0) {
+                            i.next();
+                            continue;
+                        }
+                        bb.append( i.next() );
+                    }
+                    BSONObjIterator j( getEach() );
+                    while ( j.more() ) {
+                        bb.append( j.next() );
+                    }
+                }
+
                 ms.fixedOpName = "$set";
                 ms.forceEmptyArray = true;
                 ms.fixedArray = BSONArray( bb.done().getOwned() );
@@ -466,6 +556,17 @@ namespace mongo {
                                          m.elt.valuesize() == e.valuesize() );
                 break;
 
+            case Mod::SET_ON_INSERT:
+                // In-place-ness was set before on the general test for e.eoo() above this
+                // switch. Just for documentation, this is what we'd like for $setOnInsert.
+                // mss->amIInPlacePossible( ! e.eoo() );
+
+                // If the element exists, $setOnInsert becomes a no-op.
+                if ( ! e.eoo() ) {
+                    ms.dontApply = true;
+                }
+                break;
+
             case Mod::PUSH:
             case Mod::PUSH_ALL:
                 uassert( 10141,
@@ -682,6 +783,10 @@ namespace mongo {
                     BSONElementManipulator( m.old ).ReplaceTypeAndValue( m.m->elt );
                 else
                     BSONElementManipulator( m.old ).replaceTypeAndValue( m.m->elt );
+                break;
+
+            case Mod::SET_ON_INSERT:
+                // this should have been handled by prepare
                 break;
 
             default:
@@ -1012,6 +1117,39 @@ namespace mongo {
                 uassert( 10153,
                          "Modifier $pushAll/pullAll allowed for arrays only",
                          f.type() == Array || ( op != Mod::PUSH_ALL && op != Mod::PULL_ALL ) );
+
+                // Check whether $each and $trim syntax for $push is correct.
+                if ( ( op == Mod::PUSH ) && ( f.type() == Object ) ) {
+                    BSONObj pushObj = f.embeddedObject();
+                    if ( pushObj.nFields() > 0 &&
+                         strcmp(pushObj.firstElement().fieldName(), "$each") == 0 ) {
+                        uassert( 16564,
+                                 "$each term needs to occur alone (or with $trim)",
+                                 pushObj.nFields() <= 2 );
+                        uassert( 16565,
+                                 "$each requires an array value",
+                                 pushObj.firstElement().type() == Array );
+
+                        if ( pushObj.nFields() == 2 ) {
+                            BSONObjIterator i( pushObj );
+                            i.next();
+                            BSONElement trimElem = i.next();
+
+                            uassert( 16566,
+                                     "$each term takes only a $trim as a complement",
+                                     str::equals( trimElem.fieldName(), "$trimTo" ) );
+                            uassert( 16567,
+                                     "$trim value must be a numeric integer",
+                                     trimElem.type() == NumberInt ||
+                                     trimElem.type() == NumberLong ||
+                                     (trimElem.type() == NumberDouble &&
+                                      trimElem.numberDouble()==(long long)trimElem.numberDouble()));
+                            uassert( 16568,
+                                     "$trim value must be positive",
+                                     trimElem.number() >= 0 );
+                        }
+                    }
+                }
 
                 if ( op == Mod::RENAME_TO ) {
                     uassert( 13494, "$rename target must be a string", f.type() == String );

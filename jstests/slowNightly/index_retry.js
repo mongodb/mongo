@@ -38,6 +38,10 @@ function indexBuildInProgress() {
             // accessing the 'test' database.
             if ( op.op == 'insert' && op.ns == 'test.system.indexes' ) {
                 debug(op.opid);
+                // SERVER-4295 Make sure the index details are there
+                assert.eq("a_1", op.insert.name);
+                assert.eq(1, op.insert.key.a);
+                assert.eq(true, op.insert.background);
                 indexBuildOpId = op.opid;
             }
         }

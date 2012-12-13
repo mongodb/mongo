@@ -230,10 +230,13 @@ namespace mongo {
         _init();
     }
 
+    void usingAShardConnection( const string& addr );
+
     void ShardConnection::_init() {
         verify( _addr.size() );
         _conn = ClientConnections::threadInstance()->get( _addr , _ns );
         _finishedInit = false;
+        usingAShardConnection( _addr );
     }
 
     void ShardConnection::_finishInit() {

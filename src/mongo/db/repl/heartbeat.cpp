@@ -14,27 +14,26 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "pch.h"
+#include "mongo/pch.h"
 
 #include <boost/thread/thread.hpp>
 
-#include "rs.h"
-#include "health.h"
-#include "../../util/background.h"
-
-#include "../commands.h"
-#include "../../util/concurrency/value.h"
-#include "../../util/concurrency/task.h"
-#include "../../util/concurrency/msg.h"
-#include "../../util/mongoutils/html.h"
-#include "../../util/goodies.h"
-#include "../../util/ramlog.h"
-#include "../helpers/dblogger.h"
-#include "connections.h"
-#include "../instance.h"
-#include "../repl.h"
+#include "mongo/db/commands.h"
+#include "mongo/db/helpers/dblogger.h"
+#include "mongo/db/instance.h"
+#include "mongo/db/repl.h"
 #include "mongo/db/repl/bgsync.h"
+#include "mongo/db/repl/connections.h"
+#include "mongo/db/repl/health.h"
+#include "mongo/db/repl/rs.h"
 #include "mongo/db/security.h"
+#include "mongo/util/background.h"
+#include "mongo/util/concurrency/msg.h"
+#include "mongo/util/concurrency/task.h"
+#include "mongo/util/concurrency/value.h"
+#include "mongo/util/goodies.h"
+#include "mongo/util/mongoutils/html.h"
+#include "mongo/util/ramlog.h"
 
 namespace mongo {
 
@@ -56,6 +55,13 @@ namespace mongo {
     class CmdReplSetHeartbeat : public ReplSetCommand {
     public:
         CmdReplSetHeartbeat() : ReplSetCommand("replSetHeartbeat") { }
+        virtual void addRequiredPrivileges(const std::string& dbname,
+                                           const BSONObj& cmdObj,
+                                           std::vector<Privilege>* out) {
+            ActionSet actions;
+            actions.addAction(ActionType::replSetHeartbeat);
+            out->push_back(Privilege(AuthorizationManager::SERVER_RESOURCE_NAME, actions));
+        }
         virtual bool run(const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             if( replSetBlind ) {
                 if (theReplSet) {
@@ -245,8 +251,7 @@ namespace mongo {
                 if( ok ) {
                     up(info, mem);
                 }
-                else if (!info["errmsg"].eoo() &&
-                         info["errmsg"].str() == "need to login") {
+                else if (!info["errmsg"].eoo() && info["errmsg"].str() == "unauthorized") {
                     authIssue(mem);
                 }
                 else {
@@ -377,9 +382,9 @@ namespace mongo {
             // change its state to down (if it's already down, leave it down since we don't have
             // any info about it other than it's heartbeating us)
             if (m.lastHeartbeatRecv+2 >= time(0)) {
-                LOG(1) << "replset info " << h.toString()
-                       << " just heartbeated us, but our heartbeat failed: " << msg
-                       << ", not changing state" << rsLog;
+                log() << "replset info " << h.toString()
+                      << " just heartbeated us, but our heartbeat failed: " << msg
+                      << ", not changing state" << rsLog;
                 // we don't update any of the heartbeat info, though, since we didn't get any info
                 // other than "not down" from having it heartbeat us
                 return;

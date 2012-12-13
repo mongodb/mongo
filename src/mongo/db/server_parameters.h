@@ -103,7 +103,7 @@ namespace mongo {
 
 #define MONGO_EXPORT_SERVER_PARAMETER( NAME, TYPE, INITIAL_VALUE ) \
     TYPE NAME = INITIAL_VALUE; \
-    ExportedServerParameter<TYPE> _##NAME( ServerParameterSet::getGlobal(), #NAME, &NAME );
+    ExportedServerParameter<TYPE> _##NAME( ServerParameterSet::getGlobal(), #NAME, &NAME )
 
 }
 

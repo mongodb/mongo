@@ -41,6 +41,12 @@
 
 namespace mongo {
 
+    static bool _areNonceAuthenticateCommandsEnabled = true;
+    static const char _nonceAuthenticateCommandsDisabledMessage[] =
+        "Challenge-response authentication using getnonce and authenticate commands is disabled.";
+
+    void CmdAuthenticate::disableCommand() { _areNonceAuthenticateCommandsEnabled = false; }
+
     /* authentication
 
        system.users contains
@@ -70,6 +76,11 @@ namespace mongo {
                                            const BSONObj& cmdObj,
                                            std::vector<Privilege>* out) {} // No auth required
         bool run(const string&, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+            if (!_areNonceAuthenticateCommandsEnabled) {
+                errmsg = _nonceAuthenticateCommandsDisabledMessage;
+                return false;
+            }
+
             nonce64 n = _random->nextInt64();
             stringstream ss;
             ss << hex << n;
@@ -89,7 +100,7 @@ namespace mongo {
                                              const BSONObj& userObj) {
         AuthorizationManager* authorizationManager =
                 ClientBasic::getCurrent()->getAuthorizationManager();
-        Principal* principal = new Principal(principalName);
+        Principal* principal = new Principal(PrincipalName(principalName, dbname));
         authorizationManager->addAuthorizedPrincipal(principal);
         return authorizationManager->acquirePrivilegesFromPrivilegeDocument(dbname,
                                                                             principal,
@@ -97,6 +108,11 @@ namespace mongo {
     }
 
     bool CmdAuthenticate::run(const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+        if (!_areNonceAuthenticateCommandsEnabled) {
+            errmsg = _nonceAuthenticateCommandsDisabledMessage;
+            return false;
+        }
+
         log() << " authenticate db: " << dbname << " " << cmdObj << endl;
 
         string user = cmdObj.getStringField("user");

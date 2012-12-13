@@ -25,11 +25,11 @@ namespace mongo {
         verify(vpOperand.size() == 1);
         Value prhs(vpOperand[0]->evaluate(pDocument));
 
-        if (prhs.getType() == Undefined)
-            ; /* nothing to add to the array */
-        else if (!pCtx->getDoingMerge())
-            set.insert(prhs);
-        else {
+        if (!pCtx->getDoingMerge()) {
+            if (!prhs.missing()) {
+                set.insert(prhs);
+            }
+        } else {
             /*
               If we're in the router, we need to take apart the arrays we
               receive and put their elements into the array we are collecting.

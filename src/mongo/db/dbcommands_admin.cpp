@@ -30,6 +30,8 @@
 #include <string>
 #include <vector>
 
+#include "mongo/base/init.h"
+#include "mongo/base/status.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_manager.h"
@@ -90,7 +92,8 @@ namespace mongo {
     namespace dur {
         boost::filesystem::path getJournalDir();
     }
- 
+
+    // Testing-only, enabled via command line
     class JournalLatencyTestCmd : public Command {
     public:
         JournalLatencyTestCmd() : Command( "journalLatencyTest" ) {}
@@ -99,7 +102,11 @@ namespace mongo {
         virtual LockType locktype() const { return NONE; }
         virtual bool adminOnly() const { return true; }
         virtual void help(stringstream& h) const { h << "test how long to write and fsync to a test file in the journal/ directory"; }
-
+        // No auth needed because it only works when enabled via command line.
+        virtual bool requiresAuth() { return false; }
+        virtual void addRequiredPrivileges(const std::string& dbname,
+                                           const BSONObj& cmdObj,
+                                           std::vector<Privilege>* out) {}
         bool run(const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
             boost::filesystem::path p = dur::getJournalDir();
             p /= "journalLatencyTest";
@@ -159,7 +166,14 @@ namespace mongo {
 
             return 1;
         }
-    } journalLatencyTestCmd;
+    };
+    MONGO_INITIALIZER(RegisterJournalLatencyTestCmd)(InitializerContext* context) {
+        if (Command::testCommandsEnabled) {
+            // Leaked intentionally: a Command registers itself when constructed.
+            new JournalLatencyTestCmd();
+        }
+        return Status::OK();
+    }
 
     class ValidateCmd : public Command {
     public:

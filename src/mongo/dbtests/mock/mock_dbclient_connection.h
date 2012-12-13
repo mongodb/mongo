@@ -16,14 +16,13 @@
 #pragma once
 
 #include <boost/shared_ptr.hpp>
-#include <map>
 #include <string>
 #include <vector>
 
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/dbtests/mock/mock_remote_db_server.h"
 
-namespace mongo_test {
+namespace mongo {
     /**
      * A simple class for mocking mongo::DBClientConnection.
      *
@@ -37,13 +36,22 @@ namespace mongo_test {
          * @param remoteServer the remote server to connect to. The caller is
          *     responsible for making sure that the life of remoteServer is
          *     longer than this connection.
+         * @param autoReconnect will automatically re-establish connection the
+         *     next time an operation is requested when the last operation caused
+         *     this connection to fall into a failed state.
          */
-        MockDBClientConnection(MockRemoteDBServer* remoteServer);
+        MockDBClientConnection(MockRemoteDBServer* remoteServer, bool autoReconnect = false);
         virtual ~MockDBClientConnection();
 
         //
         // DBClientBase methods
         //
+
+        bool connect(const char* hostName, std::string& errmsg);
+
+        inline bool connect(const HostAndPort& host, std::string& errmsg) {
+            return connect(host.toString().c_str(), errmsg);
+        }
 
         bool runCommand(const std::string& dbname, const mongo::BSONObj& cmdObj,
                 mongo::BSONObj &info, int options = 0,
@@ -58,6 +66,14 @@ namespace mongo_test {
                 int batchSize = 0);
 
         uint64_t getSockCreationMicroSec() const;
+
+        virtual void insert(const string& ns, BSONObj obj, int flags = 0);
+
+        virtual void insert(const string& ns, const vector<BSONObj>& objList, int flags = 0);
+
+        virtual void remove(const string& ns, Query query, bool justOne = false);
+
+        virtual void remove(const string& ns, Query query, int flags = 0);
 
         //
         // Getters
@@ -94,9 +110,12 @@ namespace mongo_test {
         bool lazySupported() const;
 
     private:
-        const MockRemoteDBServer::InstanceID _remoteServerInstanceID;
+        void checkConnection();
+
+        MockRemoteDBServer::InstanceID _remoteServerInstanceID;
         MockRemoteDBServer* _remoteServer;
         bool _isFailed;
         uint64_t _sockCreationTime;
+        bool _autoReconnect;
     };
 }

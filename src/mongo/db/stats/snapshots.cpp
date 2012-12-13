@@ -48,7 +48,7 @@ namespace mongo {
         verify( _newer._created > _older._created );
         Top::UsageMap u;
 
-        for ( Top::UsageMap::const_iterator i=_newer._usage.begin(); i != _newer._usage.end(); i++ ) {
+        for ( Top::UsageMap::const_iterator i=_newer._usage.begin(); i != _newer._usage.end(); ++i ) {
             Top::UsageMap::const_iterator j = _older._usage.find(i->first);
             if (j != _older._usage.end())
                 u[i->first] = Top::CollectionData( j->second , i->second );
@@ -210,7 +210,7 @@ namespace mongo {
             display( ss , (double) delta->elapsed() , "TOTAL" , delta->globalUsageDiff() );
 
             Top::UsageMap usage = delta->collectionUsageDiff();
-            for ( Top::UsageMap::iterator i=usage.begin(); i != usage.end(); i++ ) {
+            for ( Top::UsageMap::const_iterator i=usage.begin(); i != usage.end(); ++i ) {
                 display( ss , (double) delta->elapsed() , i->first , i->second );
             }
 

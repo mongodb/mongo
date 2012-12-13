@@ -130,6 +130,17 @@ namespace mongo {
         _finishedInit = true;
     }
 
+    string IndexSpec::toString() const {
+        stringstream s;
+        s << "IndexSpec @ " << hex << this << dec << ", "
+          << "Details @ " << hex << _details << dec << ", "
+          << "Type: " << getTypeName() << ", "
+          << "nFields: " << _nFields << ", "
+          << "KeyPattern: " << keyPattern << ", "
+          << "Info: " << info;
+        return s.str();
+    }
+
     void assertParallelArrays( const char *first, const char *second ) {
         stringstream ss;
         ss << "cannot index parallel arrays [" << first << "] [" << second << "]";

@@ -446,14 +446,14 @@ namespace mongo {
             break;
         }
         case BSONObj::opWITHIN:
-            _special.insert("2d");
+            _special.add("2d", SpecialIndices::NO_INDEX_REQUIRED);
             break;
         case BSONObj::opNEAR:
-            _special.insert("2d");
-            _special.insert("2dsphere");
+            _special.add("2d", SpecialIndices::INDEX_REQUIRED);
+            _special.add("2dsphere", SpecialIndices::INDEX_REQUIRED);
             break;
         case BSONObj::opINTERSECT:
-            _special.insert("2dsphere");
+            _special.add("2dsphere", SpecialIndices::INDEX_REQUIRED);
             break;
         case BSONObj::opEXISTS: {
             if ( !existsSpec ) {
@@ -508,7 +508,7 @@ namespace mongo {
         _intervals = newIntervals;
         for( vector<BSONObj>::const_iterator i = other._objData.begin(); i != other._objData.end(); ++i )
             _objData.push_back( *i );
-        if ( _special.size() == 0 && other._special.size() )
+        if (_special.empty() && !other._special.empty())
             _special = other._special;
         _exactMatchRepresentation = exactMatchRepresentation;
         // A manipulated FieldRange may no longer be valid within a parent context.
@@ -546,14 +546,14 @@ namespace mongo {
     const FieldRange &FieldRange::intersect( const FieldRange &other, bool singleKey ) {
         // If 'this' FieldRange is universal(), intersect by copying the 'other' range into 'this'.
         if ( universal() ) {
-            set<string> intersectSpecial = !_special.empty() ? _special : other._special;
+            SpecialIndices intersectSpecial = _special.combineWith(other._special);
             *this = other;
             _special = intersectSpecial;
             return *this;
         }
         // Range intersections are not taken for multikey indexes.  See SERVER-958.
         if ( !singleKey && !universal() ) {
-            set<string> intersectSpecial = !_special.empty() ? _special : other._special;
+            SpecialIndices intersectSpecial = _special.combineWith(other._special);
             // Pick 'other' range if it is smaller than or equal to 'this'.
             if ( other <= *this ) {
              	*this = other;
@@ -800,17 +800,10 @@ namespace mongo {
         return buf.str();
     }
 
-    static string setToString(const set<string>& s) {
-        stringstream ss;
-        for (set<string>::const_iterator it = s.begin(); it != s.end(); ++it) {
-            ss << *it << ", ";
-        }
-        return ss.str();
-    }
 
     string FieldRange::toString() const {
         StringBuilder buf;
-        buf << "(FieldRange special: { " << setToString(_special) << "} intervals: ";
+        buf << "(FieldRange special: { " << _special.toString() << "} intervals: ";
         for (vector<FieldInterval>::const_iterator i = _intervals.begin(); i != _intervals.end(); ++i) {
             buf << i->toString() << " ";
         }
@@ -818,13 +811,13 @@ namespace mongo {
         return buf.str();
     }
 
-    set<string> FieldRangeSet::getSpecial() const {
+    SpecialIndices FieldRangeSet::getSpecial() const {
         for (map<string, FieldRange>::const_iterator i = _ranges.begin(); i != _ranges.end(); i++) {
-            if (i->second.getSpecial().size() > 0) {
+            if (!i->second.getSpecial().empty()) {
                 return i->second.getSpecial();
             }
         }
-        return set<string>();
+        return SpecialIndices();
     }
 
     /**

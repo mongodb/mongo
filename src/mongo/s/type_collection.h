@@ -119,10 +119,10 @@ namespace mongo {
         // individual field accessors
         //
 
-        void setNS(const StringData& ns) { _ns = std::string(ns.data(), ns.size()); }
+        void setNS(const StringData& ns) { _ns = ns.toString(); }
         const std::string& getNS() const { return _ns; }
 
-        void setPrimary(const StringData& name) { _primary=std::string(name.data(), name.size()); }
+        void setPrimary(const StringData& name) { _primary = name.toString(); }
         const std::string& getPrimary() const { return _primary; }
 
         void setKeyPattern(const BSONObj keyPattern) { _keyPattern = keyPattern.getOwned(); }

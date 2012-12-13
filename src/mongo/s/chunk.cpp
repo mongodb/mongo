@@ -301,7 +301,12 @@ namespace mongo {
         return true;
     }
 
-    bool Chunk::moveAndCommit( const Shard& to , long long chunkSize /* bytes */, bool secondaryThrottle, BSONObj& res ) const {
+    bool Chunk::moveAndCommit(const Shard& to,
+                              long long chunkSize /* bytes */,
+                              bool secondaryThrottle,
+                              bool waitForDelete,
+                              BSONObj& res) const
+    {
         uassert( 10167 ,  "can't move shard to its current location!" , getShard() != to );
 
         log() << "moving chunk ns: " << _manager->getns() << " moving ( " << toString() << ") " << _shard.toString() << " -> " << to.toString() << endl;
@@ -324,7 +329,8 @@ namespace mongo {
                                                          "maxChunkSizeBytes" << chunkSize <<
                                                          "shardId" << genID() <<
                                                          "configdb" << configServer.modelServer() <<
-                                                         "secondaryThrottle" << secondaryThrottle
+                                                         "secondaryThrottle" << secondaryThrottle <<
+                                                         "waitForDelete" << waitForDelete
                                                          ) ,
                                                    res
                                                    );
@@ -425,6 +431,7 @@ namespace mongo {
                          toMove->moveAndCommit( newLocation , 
                                                 MaxChunkSize , 
                                                 false , /* secondaryThrottle - small chunk, no need */
+                                                false, /* waitForDelete - small chunk, no need */
                                                 res ) );
                 
                 // update our config
@@ -530,7 +537,8 @@ namespace mongo {
 
         try {
             scoped_ptr<ScopedDbConnection> conn(
-                    ScopedDbConnection::getInternalScopedDbConnection( configServer.modelServer() ) );
+                    ScopedDbConnection::getInternalScopedDbConnection(
+                            configServer.modelServer(), 30));
 
             conn->get()->update(ConfigNS::chunk,
                                 BSON(ChunkFields::name(genID())),
@@ -990,7 +998,7 @@ namespace mongo {
               << " using new epoch " << version.epoch() << endl;
         
         scoped_ptr<ScopedDbConnection> conn(
-                ScopedDbConnection::getInternalScopedDbConnection( config ) );
+                ScopedDbConnection::getInternalScopedDbConnection(config, 30));
 
         // Make sure we don't have any chunks that already exist here
         unsigned long long existingChunks =
@@ -1080,8 +1088,8 @@ namespace mongo {
         // TODO Determine if the third argument to OrRangeGenerator() is necessary, see SERVER-5165.
         OrRangeGenerator org(_ns.c_str(), query, false);
 
-        const set<string> special = org.getSpecial();
-        if (special.end() != special.find("2d") || special.end() != special.find("2dsphere")) {
+        const SpecialIndices special = org.getSpecial();
+        if (special.has("2d") || special.has("2dsphere")) {
             BSONForEach(field, query) {
                 if (getGtLtOp(field) == BSONObj::opNEAR) {
                     uassert(13501, "use geoNear command rather than $near query", false);
@@ -1090,11 +1098,7 @@ namespace mongo {
                 // $within queries are fine
             }
         } else if (!special.empty()) {
-            stringstream ss;
-            for (set<string>::const_iterator it = special.begin(); it != special.end(); ++it) {
-                ss << *it << ", ";
-            }
-            uassert(13502, "unrecognized special query type: " + ss.str(), false);
+            uassert(13502, "unrecognized special query type: " + special.toString(), false);
         }
 
         do {

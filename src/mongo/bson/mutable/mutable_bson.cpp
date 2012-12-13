@@ -473,8 +473,7 @@ ElementRep& dstRep = _doc->_elements->_vec[(*sibIt)._rep];
         ElementRep& e = _doc->_elements->_vec[_rep];
         e._type = mongo::String;
         if (stringVal.size() < SHORT_LIMIT) {
-            // TODO: This probably needs to be memcpy.
-            strcpy(e._value.shortStr, stringVal.data());
+            stringVal.copyTo( e._value.shortStr, true );
             e._type |= SHORTBIT;
         }
         else {
@@ -525,8 +524,7 @@ ElementRep& dstRep = _doc->_elements->_vec[(*sibIt)._rep];
         ElementRep& e = _doc->_elements->_vec[_rep];
         e._type = mongo::Symbol;
         if (symbolVal.size() < SHORT_LIMIT) {
-            // TODO: This probably should be memcpy
-            strcpy(e._value.shortStr, symbolVal.data());
+            symbolVal.copyTo( e._value.shortStr, true );
             e._type |= SHORTBIT;
         }
         else {
@@ -932,7 +930,7 @@ ElementRep& dstRep = _doc->_elements->_vec[(*sibIt)._rep];
         uint32_t nameref = _heap->putString(fieldName);
         ValueType val;
         if (stringVal.size() < SHORT_LIMIT) {
-            strcpy(val.shortStr, stringVal.data());
+            stringVal.copyTo( val.shortStr, true );
             _elements->push_back(ElementRep(mongo::String|SHORTBIT, nameref, val));
         }
         else {

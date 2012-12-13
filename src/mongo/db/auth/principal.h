@@ -18,6 +18,9 @@
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include <string>
 
+#include "mongo/base/disallow_copying.h"
+#include "mongo/db/auth/principal_name.h"
+
 namespace mongo {
 
     /**
@@ -27,20 +30,22 @@ namespace mongo {
      * synchronizing access.
      */
     class Principal {
+        MONGO_DISALLOW_COPYING(Principal);
+
     public:
         // No expiration is represented as boost::posix_time::pos_infin
-        Principal(const std::string& name, const boost::posix_time::ptime& expirationTime);
-        explicit Principal(const std::string& name);
-        Principal();
-        ~Principal(){}
+        Principal(const PrincipalName& name,
+                  const boost::posix_time::ptime& expirationTime);
+        explicit Principal(const PrincipalName& name);
+        ~Principal();
 
-        const std::string& getName() const;
-        const boost::posix_time::ptime& getExpirationTime() const;
+        const PrincipalName& getName() const { return _name; }
+        const boost::posix_time::ptime& getExpirationTime() const { return _expirationTime; }
 
         void setExpirationTime(boost::posix_time::ptime& expiration);
 
     private:
-        std::string _name;
+        PrincipalName _name;
         boost::posix_time::ptime _expirationTime;
     };
 

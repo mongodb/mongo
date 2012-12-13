@@ -36,4 +36,6 @@ print(after.uptimeEstimate);
 assert.lt( 2 , after.uptimeEstimate , "up1" )
 assert.gt( after.uptimeEstimate , before.uptimeEstimate , "up2" )
 
-// TODO: add more tests here
+
+assert.eq( db.runCommand( "buildinfo" ).gitVersion,
+           db.getSisterDB( "local" ).startup_log.find().sort( { $natural: -1 } ).limit(0)[0].gitVersion );

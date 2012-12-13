@@ -1604,7 +1604,7 @@ namespace spidermonkey {
             _reportError = reportError;
             JSBool worked = JS_EvaluateScript( _context,
                                                _global,
-                                               code.data(),
+                                               code.rawData(),
                                                code.size(),
                                                name.c_str(),
                                                1,

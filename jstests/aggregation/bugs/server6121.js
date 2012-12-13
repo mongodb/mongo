@@ -9,7 +9,7 @@
 /*
  * 1) Clear and create testing db
  * 2) Run an aggregation with all date expressions on a timestamp and a date
- * 3) Run an aggregation that will show timestamp and date can not be compared
+ * 3) Run an aggregation that will show timestamp and date can be compared
  * 4) Run an aggregation comparing two timestamps to show inc matters
  */
 
@@ -39,18 +39,24 @@ assert.eq(s6121.result[0], s6121.result[1], 's6121 failed');
 
 
 // Clear db for timestamp to date compare test
+// For historical reasons the compare the same if they are the same 64-bit representation.
+// That means that the Timestamp has an "inc" that is the same as the Date has millis.
 db.s6121.drop();
-db.s6121.save({time:new Timestamp(1341337661000, 1), date:new Date(1341337661000)});
+db.s6121.save({time:new Timestamp(   0, 1234), date:new Date(1234)});
+db.s6121.save({time:new Timestamp(1000, 1234), date:new Date(1234)});
+printjson(db.s6121.find().toArray());
 var s6121 = db.runCommand(
     {aggregate: "s6121", pipeline: [
         {$project: {
             _id: 0,
-            dates_arent_times: {$eq: ['$time', '$date']}
+            // comparison is different code path based on order (same as in bson)
+            ts_date: {$eq: ['$time', '$date']},
+            date_ts: {$eq: ['$date', '$time']}
         }}
 ]});
-// Assert we get the error we want
-assert.eq(s6121.ok, 0, 's6121 failed confirming that date and timestamp cant be compared');
-assert.eq(s6121.code, 16016, 's6121 failed confirming that date and timestamp cant be compared');
+assert.commandWorked(s6121);
+assert.eq(s6121.result, [{ts_date: true, date_ts: true}
+                        ,{ts_date: false, date_ts: false}]);
 
 
 // Clear db for timestamp comparison tests

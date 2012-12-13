@@ -68,18 +68,8 @@ namespace mongo {
         _index = 0;
 
         Value pathValue = document.getNestedField(_unwindPath, &_unwindPathFieldIndexes);
-        if (pathValue.missing()) {
-            // The path does not exist.
-            return;
-        }
-
-        bool nothingToEmit =
-            (pathValue.getType() == jstNULL) ||
-            (pathValue.getType() == Undefined) ||
-            ((pathValue.getType() == Array) && (pathValue.getArrayLength() == 0));
-
-        if (nothingToEmit) {
-            // The target field exists, but there are no values to unwind.
+        if (pathValue.nullish()) {
+            // The path does not exist or is null.
             return;
         }
 
@@ -88,13 +78,17 @@ namespace mongo {
                 << ":  value at end of field path must be an array",
                 pathValue.getType() == Array);
 
+        if (pathValue.getArray().empty()) {
+            // there are no values to unwind.
+            return;
+        }
+
         _inputArray = pathValue;
         verify(!eof()); // Checked above that the array is nonempty.
     }
 
     bool DocumentSourceUnwind::Unwinder::eof() const {
-        return (_inputArray.missing()) // getType asserts if missing
-            || (_inputArray.getType() != Array)
+        return (_inputArray.getType() != Array)
             || (_index == _inputArray.getArrayLength());
     }
 

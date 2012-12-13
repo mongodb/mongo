@@ -27,6 +27,12 @@
  *        Note: For both formats, a special boolean property 'arbiter' can be
  *          specified to denote a member is an arbiter.
  * 
+ *     nodeOptions {Object}: Options to apply to all nodes in the replica set.
+ *        Format for Object:
+ *          { cmdline-param-with-no-arg : "",
+ *            param-with-arg : arg }
+ *        This turns into "mongod --cmdline-param-with-no-arg --param-with-arg arg" 
+ *  
  *     oplogSize {number}: Default: 40
  *     useSeedList {boolean}: Use the connection string format of this set
  *        as the replica set name (overrides the name property). Default: false
@@ -59,16 +65,21 @@ ReplSetTest = function( opts ){
     if( isObject( this.numNodes ) ){
         var len = 0
         for( var i in this.numNodes ){
-            var options = this.nodeOptions[ "n" + len ] = this.numNodes[i]
-            if( i.startsWith( "a" ) ) options.arbiter = true
+            var options = this.nodeOptions[ "n" + len ] = Object.merge(opts.nodeOptions, 
+                                                                       this.numNodes[i]);
+            if( i.startsWith( "a" ) ) options.arbiter = true;
             len++
         }
         this.numNodes = len
     }
     else if( Array.isArray( this.numNodes ) ){
         for( var i = 0; i < this.numNodes.length; i++ )
-            this.nodeOptions[ "n" + i ] = this.numNodes[i]
+            this.nodeOptions[ "n" + i ] = Object.merge(opts.nodeOptions, this.numNodes[i]);
         this.numNodes = this.numNodes.length
+    }
+    else {
+        for ( var i =0; i < this.numNodes; i++ )
+            this.nodeOptions[ "n" + i ] = opts.nodeOptions;
     }
     
     if(this.bridged) {
@@ -600,7 +611,7 @@ ReplSetTest.prototype.start = function( n , options , restart , wait ){
                  dbpath : "$set-$node" }
     
     defaults = Object.merge( defaults, ReplSetTest.nodeOptions || {} )
-        
+
     // TODO : should we do something special if we don't currently know about this node?
     n = this.getNodeId( n )
     

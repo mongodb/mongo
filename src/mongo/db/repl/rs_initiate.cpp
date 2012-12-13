@@ -18,6 +18,12 @@
 */
 
 #include "pch.h"
+
+#include <vector>
+
+#include "mongo/db/auth/action_set.h"
+#include "mongo/db/auth/action_type.h"
+#include "mongo/db/auth/privilege.h"
 #include "../cmdline.h"
 #include "../commands.h"
 #include "../../util/mmap.h"
@@ -150,6 +156,13 @@ namespace mongo {
             h << "Initiate/christen a replica set.";
             h << "\nhttp://dochub.mongodb.org/core/replicasetcommands";
         }
+        virtual void addRequiredPrivileges(const std::string& dbname,
+                                           const BSONObj& cmdObj,
+                                           std::vector<Privilege>* out) {
+            ActionSet actions;
+            actions.addAction(ActionType::replSetInitiate);
+            out->push_back(Privilege(AuthorizationManager::SERVER_RESOURCE_NAME, actions));
+        }
         virtual bool run(const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             log() << "replSet replSetInitiate admin command received from client" << rsLog;
 
@@ -248,6 +261,12 @@ namespace mongo {
                 result.append("info", "Config now saved locally.  Should come online in about a minute.");
                 ReplSet::startupStatus = ReplSet::SOON;
                 ReplSet::startupStatusMsg.set("Received replSetInitiate - should come online shortly.");
+
+                // Dummy minvalid - just something non-null so we can be "up"
+                OpTime minvalid(1, 0);
+                BSONObjBuilder bob;
+                bob.appendTimestamp("ts", minvalid.asDate());
+                ReplSet::setMinValid(bob.done());
             }
             catch( DBException& e ) {
                 log() << "replSet replSetInitiate exception: " << e.what() << rsLog;

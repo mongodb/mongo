@@ -191,8 +191,8 @@ namespace DocumentTests {
                 assertComparison( 0, BSON( "a" << 2 ), BSON( "a" << 2 ) );
                 assertComparison( -1, BSON( "a" << 1 ), BSON( "a" << 2 ) );
                 assertComparison( -1, BSON( "a" << 1 << "b" << 1 ), BSON( "a" << 1 << "b" << 2 ) );
-                ASSERT_THROWS( assertComparison( 0, BSON( "a" << 1 ), BSON( "a" << "foo" ) ),
-                               UserException );
+                // numbers sort before strings
+                assertComparison( -1, BSON( "a" << 1 ), BSON( "a" << "foo" ) );
             }
         public:
             int cmp( const BSONObj& a, const BSONObj& b ) {
@@ -318,7 +318,83 @@ namespace DocumentTests {
                 ASSERT( !iterator.more() );
             }
         };
-        
+
+        class AllTypesDoc {
+        public:
+            void run() {
+                // These are listed in order of BSONType with some duplicates
+                append("minkey", MINKEY);
+                // EOO not valid in middle of BSONObj
+                append("double", 1.0);
+                append("c-string", "string\0after NUL"); // after NULL is ignored
+                append("c++", StringData("string\0after NUL", StringData::LiteralTag()).toString());
+                append("StringData", StringData("string\0after NUL", StringData::LiteralTag()));
+                append("emptyObj", BSONObj());
+                append("filledObj", BSON("a" << 1));
+                append("emptyArray", BSON("" << BSONArray()).firstElement());
+                append("filledArray", BSON("" << BSON_ARRAY(1 << "a")).firstElement());
+                append("binData", BSONBinData("a\0b", 3, BinDataGeneral));
+                append("binDataCustom", BSONBinData("a\0b", 3, bdtCustom));
+                append("undefined", BSONUndefined);
+                append("oid", OID());
+                append("true", true);
+                append("false", false);
+                append("date", jsTime());
+                append("null", BSONNULL);
+                append("regex", BSONRegEx(".*"));
+                append("regexFlags", BSONRegEx(".*", "i"));
+                append("regexEmpty", BSONRegEx("", ""));
+                append("dbref", BSONDBRef("foo", OID()));
+                append("code", BSONCode("function() {}"));
+                append("codeNul", BSONCode(StringData("var nul = '\0'", StringData::LiteralTag())));
+                append("symbol", BSONSymbol("foo"));
+                append("symbolNul", BSONSymbol(StringData("f\0o", StringData::LiteralTag())));
+                append("codeWScope", BSONCodeWScope("asdf", BSONObj()));
+                append("codeWScopeWScope", BSONCodeWScope("asdf", BSON("one" << 1)));
+                append("int", 1);
+                append("timestamp", OpTime());
+                append("long", 1LL);
+                append("very long", 1LL << 40);
+                append("maxkey", MAXKEY);
+
+                const BSONArray arr = arrBuilder.arr();
+
+                // can't use append any more since arrBuilder is done
+                objBuilder << "mega array" << arr;
+                docBuilder["mega array"] = mongo::Value(values);
+
+                const BSONObj obj = objBuilder.obj();
+                const Document doc = docBuilder.freeze();
+
+                const BSONObj obj2 = toBson(doc);
+                const Document doc2 = fromBson(obj);
+
+                // logical equality
+                ASSERT_EQUALS(obj, obj2);
+                if (Document::compare(doc, doc2)) {
+                    PRINT(doc);
+                    PRINT(doc2);
+                }
+                ASSERT_EQUALS(Document::compare(doc, doc2), 0);
+
+                // binary equality
+                ASSERT_EQUALS(obj.objsize(), obj2.objsize());
+                ASSERT_EQUALS(memcmp(obj.objdata(), obj2.objdata(), obj.objsize()), 0);
+            }
+
+            template <typename T>
+            void append(const char* name, const T& thing) {
+                objBuilder << name << thing;
+                arrBuilder         << thing;
+                docBuilder[name] = mongo::Value(thing);
+                values.push_back(mongo::Value(thing));
+            }
+
+            vector<mongo::Value> values;
+            MutableDocument docBuilder;
+            BSONObjBuilder objBuilder;
+            BSONArrayBuilder arrBuilder;
+        };
     } // namespace Document
 
     namespace Value {
@@ -326,6 +402,9 @@ namespace DocumentTests {
         using mongo::Value;
 
         BSONObj toBson( const Value& value ) {
+            if (value.missing())
+                return BSONObj(); // EOO
+
             BSONObjBuilder bob;
             value.addToBsonObj( &bob, "" );
             return bob.obj();
@@ -341,7 +420,8 @@ namespace DocumentTests {
             Value value2 = fromBson( obj1 );
             BSONObj obj2 = toBson( value2 );
             ASSERT_EQUALS( obj1, obj2 );
-            ASSERT( value1 == value2 );
+            ASSERT_EQUALS(value1, value2);
+            ASSERT_EQUALS(value1.getType(), value2.getType());
         }
 
         /** Int type. */
@@ -525,11 +605,9 @@ namespace DocumentTests {
         public:
             void run() {
                 Value value = fromBson( fromjson( "{'':/abc/}" ) );
-                ASSERT_EQUALS( "abc", value.getRegex() );
+                ASSERT_EQUALS( string("abc"), value.getRegex() );
                 ASSERT_EQUALS( RegEx, value.getType() );
-                if ( 0 ) { // SERVER-6470
                 assertRoundTrips( value );
-                }
             }
         };
 
@@ -537,9 +615,7 @@ namespace DocumentTests {
         class Symbol {
         public:
             void run() {
-                BSONObjBuilder bob;
-                bob.appendSymbol( "", "FOOBAR" );
-                Value value = fromBson( bob.obj() );
+                Value value (BSONSymbol("FOOBAR"));
                 ASSERT_EQUALS( "FOOBAR", value.getSymbol() );
                 ASSERT_EQUALS( mongo::Symbol, value.getType() );
                 assertRoundTrips( value );
@@ -1087,13 +1163,11 @@ namespace DocumentTests {
                 assertComparison( -1, 90, 90.1 );
                 assertComparison( 0, numeric_limits<double>::quiet_NaN(),
                                   numeric_limits<double>::signaling_NaN() );
-                if ( 0 ) { // SERVER-6126
                 assertComparison( -1, numeric_limits<double>::quiet_NaN(), 5 );
-                }
 
-                // Otherwise comparing different types is not supported.
-                ASSERT_THROWS( assertComparison( 0, 90, "abc" ), UserException );
-                ASSERT_THROWS( assertComparison( 0, 90, BSON( "a" << "b" ) ), UserException );
+                // strings compare between numbers and objects
+                assertComparison( 1, "abc", 90 );
+                assertComparison( -1, "abc", BSON( "a" << "b" ) );
 
                 // String comparison.
                 assertComparison( -1, "", "a" );
@@ -1104,10 +1178,8 @@ namespace DocumentTests {
                 assertComparison( 1, "bb", "b" );
                 assertComparison( 1, "b-", "b" );
                 assertComparison( -1, "b-", "ba" );
-                if ( 0 ) {
                 // With a null character.
                 assertComparison( 1, string( "a\0", 2 ), "a" );
-                }
 
                 // Object.
                 assertComparison( 0, fromjson( "{'':{}}" ), fromjson( "{'':{}}" ) );
@@ -1119,10 +1191,7 @@ namespace DocumentTests {
                 assertComparison( -1, fromjson( "{'':[0]}" ), fromjson( "{'':[1]}" ) );
                 assertComparison( -1, fromjson( "{'':[0,0]}" ), fromjson( "{'':[1]}" ) );
                 assertComparison( -1, fromjson( "{'':[0]}" ), fromjson( "{'':[0,0]}" ) );
-                // Assertion on nested type mismatch.
-                ASSERT_THROWS( assertComparison( 0, fromjson( "{'':[0]}" ),
-                                                 fromjson( "{'':['']}" ) ),
-                               UserException );
+                assertComparison( -1, fromjson( "{'':[0]}" ), fromjson( "{'':['']}" ) );
 
                 // OID.
                 assertComparison( 0, OID( "abcdefabcdefabcdefabcdef" ),
@@ -1143,14 +1212,35 @@ namespace DocumentTests {
 
                 // Regex.
                 assertComparison( 0, fromjson( "{'':/a/}" ), fromjson( "{'':/a/}" ) );
-                assertComparison( 0, fromjson( "{'':/a/}" ),
-                                  // Regex options are ignored.
-                                  fromjson( "{'':/a/i}" ) );
+                assertComparison( -1, fromjson( "{'':/a/}" ), fromjson( "{'':/a/i}" ) );
                 assertComparison( -1, fromjson( "{'':/a/}" ), fromjson( "{'':/aa/}" ) );
 
                 // Timestamp.
                 assertComparison( 0, OpTime( 1234 ), OpTime( 1234 ) );
                 assertComparison( -1, OpTime( 4 ), OpTime( 1234 ) );
+
+                // Cross-type comparisons. Listed in order of canonical types.
+                assertComparison(-1, Value(mongo::MINKEY), Value());
+                assertComparison(0,  Value(), Value(mongo::EOO));
+                assertComparison(0,  Value(), Value(mongo::Undefined));
+                assertComparison(-1, Value(mongo::Undefined), Value(mongo::jstNULL));
+                assertComparison(-1, Value(mongo::jstNULL), Value(1));
+                assertComparison(0,  Value(1), Value(1LL));
+                assertComparison(0,  Value(1), Value(1.0));
+                assertComparison(-1, Value(1), Value("string"));
+                assertComparison(0,  Value("string"), Value(BSONSymbol("string")));
+                assertComparison(-1, Value("string"), Value(mongo::Document()));
+                assertComparison(-1, Value(mongo::Document()), Value(mongo::Array));
+                assertComparison(-1, Value(mongo::Array), Value(BSONBinData("", 0, MD5Type)));
+                assertComparison(-1, Value(BSONBinData("", 0, MD5Type)), Value(mongo::OID()));
+                assertComparison(-1, Value(mongo::OID()), Value(false));
+                assertComparison(-1, Value(false), Value(OpTime()));
+                assertComparison(0,  Value(OpTime()), Value(Date_t(0)));
+                assertComparison(-1, Value(Date_t(0)), Value(BSONRegEx("")));
+                assertComparison(-1, Value(BSONRegEx("")), Value(BSONDBRef("", mongo::OID())));
+                assertComparison(-1, Value(BSONDBRef("", mongo::OID())), Value(BSONCode("")));
+                assertComparison(-1, Value(BSONCode("")), Value(BSONCodeWScope("", BSONObj())));
+                assertComparison(-1, Value(BSONCodeWScope("", BSONObj())), Value(mongo::MAXKEY));
             }
         private:
             template<class T,class U>
@@ -1164,26 +1254,39 @@ namespace DocumentTests {
                 second.appendTimestamp( "", b.asDate() );
                 assertComparison( expectedResult, first.obj(), second.obj() );
             }
-            int cmp( const BSONObj& a, const BSONObj& b ) {
-                Value va = fromBson(a);
-                Value vb = fromBson(b);
-                int result = Value::compare(va, vb);
-                return // sign
-                    result > 0 ? 1 :
-                    result < 0 ? -1 :
-                    0;
+            int sign(int cmp) {
+                if (cmp == 0) return 0;
+                else if (cmp < 0) return -1;
+                else return 1;
+            }
+            int cmp( const Value& a, const Value& b ) {
+                return sign(Value::compare(a, b));
             }
             void assertComparison( int expectedResult, const BSONObj& a, const BSONObj& b ) {
+                assertComparison(expectedResult, fromBson(a), fromBson(b));
+            }
+            void assertComparison(int expectedResult, const Value& a, const Value& b) {
+                log() << "testing " << a.toString() << " and " << b.toString() << endl;
+                // reflexivity
+                ASSERT_EQUALS(0, cmp(a, a));
+                ASSERT_EQUALS(0, cmp(b, b));
+
+                // symmetry
                 ASSERT_EQUALS( expectedResult, cmp( a, b ) );
                 ASSERT_EQUALS( -expectedResult, cmp( b, a ) );
+
+                // equal values must hash equally.
                 if ( expectedResult == 0 ) {
-                    // Equal values must hash equally.
                     ASSERT_EQUALS( hash( a ), hash( b ) );
                 }
+                
+                // same as BSON
+                ASSERT_EQUALS(expectedResult, sign(toBson(a).firstElement().woCompare(
+                                                   toBson(b).firstElement())));
             }
-            size_t hash( const BSONObj& obj ) {
+            size_t hash(const Value& v) {
                 size_t seed = 0xf00ba6;
-                fromBson( obj ).hash_combine( seed );
+                v.hash_combine( seed );
                 return seed;
             }
         };
@@ -1239,6 +1342,7 @@ namespace DocumentTests {
             add<Document::FieldIteratorEmpty>();
             add<Document::FieldIteratorSingle>();
             add<Document::FieldIteratorMultiple>();
+            add<Document::AllTypesDoc>();
 
             add<Value::Int>();
             add<Value::Long>();
@@ -1253,9 +1357,7 @@ namespace DocumentTests {
             add<Value::Oid>();
             add<Value::Bool>();
             add<Value::Regex>();
-            if ( 0 ) {
             add<Value::Symbol>();
-            }
             add<Value::Undefined>();
             add<Value::Null>();
             add<Value::True>();

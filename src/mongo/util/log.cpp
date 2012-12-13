@@ -90,10 +90,13 @@ namespace mongo {
                         string s = ss.str();
 
                         if ( ! rename( lp.c_str() , s.c_str() ) ) {
-                            cout << "log file [" << lp << "] exists; copied to temporary file [" << s << "]" << endl;
+                            cout << "log file [" << lp
+                                 << "] exists; copied to temporary file [" << s << "]" << endl;
                         } else {
-                            cout << "log file [" << lp << "] exists and couldn't make backup; run with --logappend or manually remove file (" << strerror(errno) << ")" << endl;
-                            
+                            cout << "log file [" << lp
+                                 << "] exists and couldn't make backup [" << s
+                                 << "]; run with --logappend or manually remove file: "
+                                 << errnoWithDescription() << endl;
                             return false;
                         }
                     }
@@ -137,7 +140,9 @@ namespace mongo {
                 ss << _path << "." << terseCurrentTime( false );
                 string s = ss.str();
                 if (0 != rename(_path.c_str(), s.c_str())) {
-                    error() << "Failed to rename " << _path << " to " << s;
+                    error() << "Failed to rename '" << _path
+                            << "' to '" << s
+                            << "': " << errnoWithDescription() << endl;
                     return false;
                 }
             }
@@ -271,17 +276,17 @@ namespace mongo {
             int fd = fileno( logfile );
             if ( _isatty( fd ) ) {
                 fflush( logfile );
-                writeUtf8ToWindowsConsole( s.data(), s.size() );
+                writeUtf8ToWindowsConsole( s.rawData(), s.size() );
                 return;
             }
 #else
             if ( isSyslog ) {
-                syslog( LOG_INFO , "%s" , s.data() );
+                syslog( LOG_INFO , "%s" , s.rawData() );
                 return;
             }
 #endif
 
-            if (fwrite(s.data(), s.size(), 1, logfile)) {
+            if (fwrite(s.rawData(), s.size(), 1, logfile)) {
                 fflush(logfile);
             }
             else {
@@ -290,7 +295,7 @@ namespace mongo {
             }
         }
         else {
-            cout << s.data();
+            cout << s;
             cout.flush();
         }
     }

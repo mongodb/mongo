@@ -269,33 +269,33 @@ namespace mongo {
             cerr << "assertion: " << e.toString() << endl;
             ret = -1;
         }
-	catch(const boost::filesystem::filesystem_error &fse) {
-	    /*
-	      https://jira.mongodb.org/browse/SERVER-2904
+        catch(const boost::filesystem::filesystem_error &fse) {
+            /*
+              https://jira.mongodb.org/browse/SERVER-2904
 
-	      Simple tools that don't access the database, such as
-	      bsondump, aren't throwing DBExceptions, but are throwing
-	      boost exceptions.
+              Simple tools that don't access the database, such as
+              bsondump, aren't throwing DBExceptions, but are throwing
+              boost exceptions.
 
-	      The currently available set of error codes don't seem to match
-	      boost documentation.  boost::filesystem::not_found_error
-	      (from http://www.boost.org/doc/libs/1_31_0/libs/filesystem/doc/exception.htm)
-	      doesn't seem to exist in our headers.  Also, fse.code() isn't
-	      boost::system::errc::no_such_file_or_directory when this
-	      happens, as you would expect.  And, determined from
-	      experimentation that the command-line argument gets turned into
-	      "\\?" instead of "/?" !!!
-	     */
+              The currently available set of error codes don't seem to match
+              boost documentation.  boost::filesystem::not_found_error
+              (from http://www.boost.org/doc/libs/1_31_0/libs/filesystem/doc/exception.htm)
+              doesn't seem to exist in our headers.  Also, fse.code() isn't
+              boost::system::errc::no_such_file_or_directory when this
+              happens, as you would expect.  And, determined from
+              experimentation that the command-line argument gets turned into
+              "\\?" instead of "/?" !!!
+             */
 #if defined(_WIN32)
-	    if (/*(fse.code() == boost::system::errc::no_such_file_or_directory) &&*/
-		(fse.path1() == "\\?"))
-		printHelp(cerr);
-	    else
+            if (/*(fse.code() == boost::system::errc::no_such_file_or_directory) &&*/
+                (fse.path1() == "\\?"))
+                printHelp(cerr);
+            else
 #endif // _WIN32
-		cerr << "error: " << fse.what() << endl;
+                cerr << "error: " << fse.what() << endl;
 
-	    ret = -1;
-	}
+            ret = -1;
+        }
 
         if ( currentClient.get() )
             currentClient.get()->shutdown();

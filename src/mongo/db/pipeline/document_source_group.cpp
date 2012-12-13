@@ -194,47 +194,17 @@ namespace mongo {
                 else if (groupType == String) {
                     string groupString(groupField.str());
                     const char *pGroupString = groupString.c_str();
-                    if ((groupString.length() == 0) ||
-                        (pGroupString[0] != '$'))
-                        goto StringConstantId;
-
-                    string pathString(
-                        Expression::removeFieldPrefix(groupString));
-                    intrusive_ptr<ExpressionFieldPath> pFieldPath(
-                        ExpressionFieldPath::create(pathString));
-                    pGroup->setIdExpression(pFieldPath);
-                    idSet = true;
-                }
-                else {
-                    /* pick out the constant types that are allowed */
-                    switch(groupType) {
-                    case NumberDouble:
-                    case String:
-                    case Object:
-                    case Array:
-                    case jstOID:
-                    case Bool:
-                    case Date:
-                    case NumberInt:
-                    case Timestamp:
-                    case NumberLong:
-                    case jstNULL:
-                    StringConstantId: // from string case above
-                    {
-                        Value pValue(
-                            Value::createFromBsonElement(&groupField));
-                        intrusive_ptr<ExpressionConstant> pConstant(
-                            ExpressionConstant::create(pValue));
-                        pGroup->setIdExpression(pConstant);
+                    if (pGroupString[0] == '$') {
+                        string pathString = Expression::removeFieldPrefix(groupString);
+                        pGroup->setIdExpression(ExpressionFieldPath::create(pathString));
                         idSet = true;
-                        break;
                     }
+                }
 
-                    default:
-                        uassert(15949, str::stream() <<
-                                "a group's _id may not include fields of BSON type " << groupType,
-                                false);
-                    }
+                if (!idSet) {
+                    // constant id - single group
+                    pGroup->setIdExpression(ExpressionConstant::create(Value(groupField)));
+                    idSet = true;
                 }
             }
             else {
@@ -316,11 +286,11 @@ namespace mongo {
             Document pDocument(pSource->getCurrent());
 
             /* get the _id value */
-            Value pId(pIdExpression->evaluate(pDocument));
+            Value pId = pIdExpression->evaluate(pDocument);
 
-            /* treat Undefined the same as NULL SERVER-4674 */
-            if (pId.getType() == Undefined)
-                pId = Value(jstNULL);
+            /* treat missing values the same as NULL SERVER-4674 */
+            if (pId.missing())
+                pId = Value(BSONNULL);
 
             /*
               Look for the _id value in the map; if it's not there, add a
@@ -379,8 +349,13 @@ namespace mongo {
         /* add the rest of the fields */
         for(size_t i = 0; i < n; ++i) {
             Value pValue((*pGroup)[i]->getValue());
-            if (pValue.getType() != Undefined)
+            if (pValue.missing()) {
+                // we return undefined in this case so return objects are predictable
+                out.addField(vFieldName[i], Value(BSONUndefined));
+            }
+            else {
                 out.addField(vFieldName[i], pValue);
+            }
         }
 
         return out.freeze();

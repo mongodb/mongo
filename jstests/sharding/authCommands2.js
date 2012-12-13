@@ -130,7 +130,6 @@ var checkReadOps = function( hasReadAuth ) {
     } else {
         print( "Checking read operations, should fail" );
         assert.throws( function() { testDB.foo.find().itcount(); } );
-        assert.eq(0, testDB.runCommand({getlasterror : 1}).ok);
         checkCommandFailed( testDB, {dbstats : 1} );
         checkCommandFailed( testDB, {collstats : 'foo'} );
         checkCommandFailed( testDB, {mapreduce : 'foo', map : map, reduce : reduce,
@@ -225,8 +224,8 @@ var checkAdminReadOps = function( hasReadAuth ) {
         checkCommandFailed( adminDB, {getCmdLineOpts : 1} );
         checkCommandFailed( adminDB, {serverStatus : 1} );
         checkCommandFailed( adminDB, {listShards : 1} );
-        checkCommandFailed( adminDB, {whatsmyuri : 1} );
-        // isdbgrid and ismaster don't require any auth
+        // whatsmyuri, isdbgrid, and ismaster don't require any auth
+        checkCommandSucceeded( adminDB, {whatsmyuri : 1} );
         checkCommandSucceeded( adminDB, {isdbgrid : 1} );
         checkCommandSucceeded( adminDB, {ismaster : 1} );
     }

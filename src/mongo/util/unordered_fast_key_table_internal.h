@@ -16,6 +16,8 @@
  *    limitations under the License.
  */
 
+#include "mongo/util/assert_util.h"
+
 namespace mongo {
     template< typename K_L, typename K_S, typename V, typename H, typename E, typename C, typename C_LS >
     inline UnorderedFastKeyTable<K_L, K_S, V, H, E, C, C_LS>::Area::Area(unsigned capacity,
@@ -23,6 +25,16 @@ namespace mongo {
         : _capacity( capacity ),
           _maxProbe( static_cast<unsigned>( capacity * maxProbeRatio ) ),
           _entries( new Entry[_capacity] ) {
+    }
+
+    template< typename K_L, typename K_S, typename V, typename H, typename E, typename C, typename C_LS >
+    inline UnorderedFastKeyTable<K_L, K_S, V, H, E, C, C_LS>::Area::Area(const Area& other )
+        : _capacity( other._capacity ),
+          _maxProbe( other._maxProbe ),
+          _entries( new Entry[_capacity] ) {
+        for ( unsigned i = 0; i < _capacity; i++ ) {
+            _entries[i] = other._entries[i];
+        }
     }
 
     template< typename K_L, typename K_S, typename V, typename H, typename E, typename C, typename C_LS >
@@ -94,6 +106,26 @@ namespace mongo {
     }
 
     template< typename K_L, typename K_S, typename V, typename H, typename E, typename C, typename C_LS >
+    inline UnorderedFastKeyTable<K_L, K_S, V, H, E, C, C_LS>::UnorderedFastKeyTable(
+            const UnorderedFastKeyTable& other )
+        : _size( other._size ),
+          _maxProbeRatio( other._maxProbeRatio ),
+          _area( other._area ),
+          _hash( other._hash ),
+          _equals( other._equals ),
+          _convertor( other._convertor ),
+          _convertorOther( other._convertorOther ) {
+    }
+
+    template< typename K_L, typename K_S, typename V, typename H, typename E, typename C, typename C_LS >
+    inline void UnorderedFastKeyTable<K_L, K_S, V, H, E, C, C_LS>::copyTo( UnorderedFastKeyTable* out ) const {
+        out->_size = _size;
+        out->_maxProbeRatio = _maxProbeRatio;
+        Area x( _area );
+        out->_area.swap( &x );
+    }
+
+    template< typename K_L, typename K_S, typename V, typename H, typename E, typename C, typename C_LS >
     inline V& UnorderedFastKeyTable<K_L, K_S, V, H, E, C, C_LS>::get( const K_L& key ) {
 
         const size_t hash = _hash( key );
@@ -122,10 +154,46 @@ namespace mongo {
     }
 
     template< typename K_L, typename K_S, typename V, typename H, typename E, typename C, typename C_LS >
+    inline size_t UnorderedFastKeyTable<K_L, K_S, V, H, E, C, C_LS>::erase( const K_L& key ) {
+
+        const size_t hash = _hash( key );
+        int pos = _area.find( key, hash, NULL, *this );
+
+        if ( pos < 0 )
+            return 0;
+
+        _area._entries[pos].used = false;
+        _area._entries[pos].data.second = V();
+        return 1;
+    }
+
+    template< typename K_L, typename K_S, typename V, typename H, typename E, typename C, typename C_LS >
     inline void UnorderedFastKeyTable<K_L, K_S, V, H, E, C, C_LS>::_grow() {
         Area newArea( _area._capacity * 2, _maxProbeRatio );
         _area.transfer( &newArea, *this );
         _area.swap( &newArea );
     }
 
+    template< typename K_L, typename K_S, typename V, typename H, typename E, typename C, typename C_LS >
+    inline typename UnorderedFastKeyTable<K_L, K_S, V, H, E, C, C_LS>::const_iterator
+    UnorderedFastKeyTable<K_L, K_S, V, H, E, C, C_LS>::find( const K_L& key ) const {
+        if ( _size == 0 )
+            return const_iterator();
+        int pos = _area.find( key, _hash(key), 0, *this );
+        if ( pos < 0 )
+            return const_iterator();
+        return const_iterator( &_area, pos );
+    }
+
+    template< typename K_L, typename K_S, typename V, typename H, typename E, typename C, typename C_LS >
+    inline typename UnorderedFastKeyTable<K_L, K_S, V, H, E, C, C_LS>::const_iterator
+    UnorderedFastKeyTable<K_L, K_S, V, H, E, C, C_LS>::end() const {
+        return const_iterator();
+    }
+
+    template< typename K_L, typename K_S, typename V, typename H, typename E, typename C, typename C_LS >
+    inline typename UnorderedFastKeyTable<K_L, K_S, V, H, E, C, C_LS>::const_iterator
+    UnorderedFastKeyTable<K_L, K_S, V, H, E, C, C_LS>::begin() const {
+        return const_iterator( &_area );
+    }
 }

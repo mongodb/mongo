@@ -36,8 +36,8 @@ namespace mongo {
      */
     struct Mod {
         // See opFromStr below
-        //        0    1    2     3         4     5          6    7      8       9       10    11        12           13
-        enum Op { INC, SET, PUSH, PUSH_ALL, PULL, PULL_ALL , POP, UNSET, BITAND, BITOR , BIT , ADDTOSET, RENAME_FROM, RENAME_TO } op;
+        //        0    1    2     3         4     5          6    7      8       9       10    11        12           13         14
+        enum Op { INC, SET, PUSH, PUSH_ALL, PULL, PULL_ALL , POP, UNSET, BITAND, BITOR , BIT , ADDTOSET, RENAME_FROM, RENAME_TO, SET_ON_INSERT } op;
 
         static const char* modNames[];
         static unsigned modNamesNum;
@@ -239,6 +239,32 @@ namespace mongo {
             }
         }
 
+        bool isTrim() const {
+            if ( elt.type() != Object )
+                return false;
+            BSONObj obj = elt.embeddedObject();
+            if ( obj.nFields() != 2 )
+                return false;
+            BSONObjIterator i( obj );
+            i.next();
+            BSONElement elemTrim = i.next();
+            return strcmp( elemTrim.fieldName(), "$trimTo" ) == 0;
+        }
+
+        long long getTrim() const {
+            BSONObj obj = elt.embeddedObject();
+            BSONObjIterator i( obj );
+            i.next();
+            BSONElement elemTrim = i.next();
+            dassert( elemTrim.isNumber() );
+            if ( elemTrim.type() == NumberDouble ) {
+                return (long long) elemTrim.numberDouble();
+            }
+            else {
+                return elemTrim.numberLong();
+            }
+        }
+
         const char* renameFrom() const {
             massert( 13492, "mod must be RENAME_TO type", op == Mod::RENAME_TO );
             return elt.fieldName();
@@ -264,8 +290,16 @@ namespace mongo {
                 break;
             }
             case 's': {
-                if ( fn[2] == 'e' && fn[3] == 't' && fn[4] == 0 )
-                    return Mod::SET;
+                if ( fn[2] == 'e' && fn[3] == 't' ) {
+                    if ( fn[4] == 0 ) {
+                        return Mod::SET;
+                    }
+                    else if ( fn[4] == 'O' && fn[5] == 'n' && fn[6] == 'I' && fn[7] == 'n' &&
+                              fn[8] == 's' && fn[9] == 'e' && fn[10] == 'r' && fn[11] == 't' &&
+                              fn[12] == 0 ) {
+                        return Mod::SET_ON_INSERT;
+                    }
+                }
                 break;
             }
             case 'p': {
@@ -534,10 +568,27 @@ namespace mongo {
                 ms.fixedOpName = "$set";
                 if ( m.isEach() ) {
                     BSONObj arr = m.getEach();
-                    b.appendArray( m.shortFieldName, arr );
-                    ms.forceEmptyArray = true;
-                    ms.fixedArray = BSONArray(arr.getOwned());
-                } else {
+                    if ( !m.isTrim() || (m.getTrim() >= arr.nFields() ) ) {
+                        b.appendArray( m.shortFieldName, arr );
+                        ms.forceEmptyArray = true;
+                        ms.fixedArray = BSONArray(arr.getOwned());
+                    }
+                    else {
+                        BSONArrayBuilder arrBuilder( b.subarrayStart( m.shortFieldName ) );
+                        long long skip = arr.nFields() - m.getTrim();
+                        BSONObjIterator j( arr );
+                        while ( j.more() ) {
+                            if ( skip-- > 0 ) {
+                                j.next();
+                                continue;
+                            }
+                            arrBuilder.append( j.next() );
+                        }
+                        ms.forceEmptyArray = true;
+                        ms.fixedArray = BSONArray(arrBuilder.done().getOwned());
+                    }
+                }
+                else {
                     BSONObjBuilder arr( b.subarrayStart( m.shortFieldName ) );
                     arr.appendAs( m.elt, "0" );
                     ms.forceEmptyArray = true;
@@ -592,6 +643,7 @@ namespace mongo {
                 break;
 
             case Mod::INC:
+            case Mod::SET_ON_INSERT:
                 ms.fixedOpName = "$set";
             case Mod::SET: {
                 m._checkForAppending( m.elt );

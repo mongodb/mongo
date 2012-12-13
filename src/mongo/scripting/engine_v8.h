@@ -79,9 +79,11 @@ namespace mongo {
         BSONHolder( BSONObj obj ) {
             _obj = obj.getOwned();
             _modified = false;
+            v8::V8::AdjustAmountOfExternalAllocatedMemory(_obj.objsize());
         }
 
         ~BSONHolder() {
+            v8::V8::AdjustAmountOfExternalAllocatedMemory(-_obj.objsize());
         }
 
         BSONObj _obj;
@@ -143,7 +145,7 @@ namespace mongo {
         Handle< Context > context() const { return _context; }
 
         v8::Local<v8::Object> mongoToV8( const mongo::BSONObj & m , bool array = 0 , bool readOnly = false );
-        v8::Handle<v8::Object> mongoToLZV8( const mongo::BSONObj & m , bool array = 0 , bool readOnly = false );
+        v8::Handle<v8::Object> mongoToLZV8(const mongo::BSONObj & m, bool readOnly = false);
         mongo::BSONObj v8ToMongo( v8::Handle<v8::Object> o , int depth = 0 );
 
         // v8 to mongo/BSON conversion functions
@@ -247,8 +249,6 @@ namespace mongo {
         string _error;
         vector< Persistent<Value> > _funcs;
         v8::Persistent<v8::Object> _emptyObj;
-
-        v8::Persistent<v8::Function> _wrapper;
 
         enum ConnectState { NOT , LOCAL , EXTERNAL };
         ConnectState _connectState;

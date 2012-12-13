@@ -266,7 +266,7 @@ dodouble:
         BSONObjIterator i(*this);
         while ( i.more() ) {
             BSONElement e = i.next();
-            if ( strcmp(e.fieldName(), name.data()) == 0 )
+            if ( name == e.fieldName() )
                 return e;
         }
         return BSONElement();
@@ -333,29 +333,41 @@ dodouble:
     }
 
     inline BSONObjBuilderValueStream::BSONObjBuilderValueStream( BSONObjBuilder * builder ) {
-        _fieldName = 0;
         _builder = builder;
     }
 
     template<class T>
     inline BSONObjBuilder& BSONObjBuilderValueStream::operator<<( T value ) {
         _builder->append(_fieldName, value);
-        _fieldName = 0;
+        _fieldName = StringData();
         return *_builder;
     }
 
     inline BSONObjBuilder& BSONObjBuilderValueStream::operator<<( const BSONElement& e ) {
         _builder->appendAs( e , _fieldName );
-        _fieldName = 0;
+        _fieldName = StringData();
         return *_builder;
+    }
+
+    inline BufBuilder& BSONObjBuilderValueStream::subobjStart() {
+        StringData tmp = _fieldName;
+        _fieldName = StringData();
+        return _builder->subobjStart(tmp);
+    }
+
+    inline BufBuilder& BSONObjBuilderValueStream::subarrayStart() {
+        StringData tmp = _fieldName;
+        _fieldName = StringData();
+        return _builder->subarrayStart(tmp);
     }
 
     inline Labeler BSONObjBuilderValueStream::operator<<( const Labeler::Label &l ) {
         return Labeler( l, this );
     }
 
-    inline void BSONObjBuilderValueStream::endField( const char *nextFieldName ) {
-        if ( _fieldName && haveSubobj() ) {
+    inline void BSONObjBuilderValueStream::endField( const StringData& nextFieldName ) {
+        if ( haveSubobj() ) {
+            verify( _fieldName.rawData() );
             _builder->append( _fieldName, subobj()->done() );
         }
         _subobj.reset();
@@ -405,7 +417,7 @@ dodouble:
     inline bool BSONObjBuilder::hasField( const StringData& name ) const {
         BSONObjIterator i = iterator();
         while ( i.more() )
-            if ( strcmp( name.data() , i.next().fieldName() ) == 0 )
+            if ( name == i.next().fieldName() )
                 return true;
         return false;
     }
@@ -988,13 +1000,13 @@ dodouble:
         verify( ! j.more() );
     }
 
-    inline BSONObj BSONObj::removeField(const StringData& name) const { 
+    inline BSONObj BSONObj::removeField(const StringData& name) const {
         BSONObjBuilder b;
         BSONObjIterator i(*this);
         while ( i.more() ) {
             BSONElement e = i.next();
             const char *fname = e.fieldName();
-            if( strcmp(name.data(), fname) )
+            if ( name != fname )
                 b.append(e);
         }
         return b.obj();

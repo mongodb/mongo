@@ -22,9 +22,9 @@ namespace mongo {
     Status bsonExtractField(const BSONObj& object,
                             const StringData& fieldName,
                             BSONElement* outElement) {
-        BSONElement element = object[fieldName.data()];
+        BSONElement element = object.getField(fieldName);
         if (element.eoo())
-            return Status(ErrorCodes::NoSuchKey, std::string(fieldName.data(), fieldName.size()));
+            return Status(ErrorCodes::NoSuchKey, fieldName.toString());
         *outElement = element;
         return Status::OK();
     }
@@ -82,7 +82,7 @@ namespace mongo {
                                              std::string* out) {
         Status status = bsonExtractStringField(object, fieldName, out);
         if (status == ErrorCodes::NoSuchKey) {
-            *out = std::string(defaultValue.data(), defaultValue.size());
+            *out = defaultValue.toString();
         }
         else if (!status.isOK()) {
             return status;

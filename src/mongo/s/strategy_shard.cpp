@@ -18,17 +18,22 @@
 
 #include "pch.h"
 
+#include "mongo/base/status.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/client/connpool.h"
 #include "mongo/client/dbclientcursor.h"
+#include "mongo/db/auth/action_type.h"
+#include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/index.h"
+#include "mongo/db/namespacestring.h"
 #include "mongo/s/client_info.h"
 #include "mongo/s/chunk.h"
 #include "mongo/s/cursors.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request.h"
 #include "mongo/s/stats.h"
+#include "mongo/util/mongoutils/str.h"
 
 // error codes 8010-8040
 
@@ -46,7 +51,10 @@ namespace mongo {
 
             QueryMessage q( r.d() );
 
-            r.checkAuth( Auth::READ );
+            AuthorizationManager* authManager =
+                    ClientBasic::getCurrent()->getAuthorizationManager();
+            Status status = authManager->checkAuthForQuery(q.ns);
+            uassert(16549, status.reason(), status.isOK());
 
             LOG(3) << "shard query: " << q.ns << "  " << q.query << endl;
 
@@ -165,6 +173,13 @@ namespace mongo {
 
         virtual void getMore( Request& r ) {
 
+            const char *ns = r.getns();
+
+            AuthorizationManager* authManager =
+                    ClientBasic::getCurrent()->getAuthorizationManager();
+            Status status = authManager->checkAuthForGetMore(ns);
+            uassert(16539, status.reason(), status.isOK());
+
             // TODO:  Handle stale config exceptions here from coll being dropped or sharded during op
             // for now has same semantics as legacy request
             ChunkManagerPtr info = r.getChunkManager();
@@ -174,8 +189,6 @@ namespace mongo {
             //
 
             if( ! info ){
-
-                const char *ns = r.getns();
 
                 LOG(3) << "single getmore: " << ns << endl;
 
@@ -498,6 +511,12 @@ namespace mongo {
         void _insert(Request& r, DbMessage& d) {
 
             const string& ns = r.getns();
+
+            AuthorizationManager* authManager =
+                    ClientBasic::getCurrent()->getAuthorizationManager();
+            Status status = authManager->checkAuthForInsert(ns);
+            uassert(16540, status.reason(), status.isOK());
+
 
             int flags = 0;
 
@@ -985,6 +1004,12 @@ namespace mongo {
             int flags = d.pullInt();
             const BSONObj query = d.nextJsObj();
 
+            bool upsert = flags & UpdateOption_Upsert;
+            AuthorizationManager* authManager =
+                    ClientBasic::getCurrent()->getAuthorizationManager();
+            Status status = authManager->checkAuthForUpdate(ns, upsert);
+            uassert(16537, status.reason(), status.isOK());
+
             uassert( 10201 ,  "invalid update" , d.moreJSObjs() );
 
             const BSONObj toUpdate = d.nextJsObj();
@@ -1141,6 +1166,11 @@ namespace mongo {
             const string& ns = r.getns();
             int flags = d.pullInt();
 
+            AuthorizationManager* authManager =
+                    ClientBasic::getCurrent()->getAuthorizationManager();
+            Status status = authManager->checkAuthForDelete(ns);
+            uassert(16541, status.reason(), status.isOK());
+
             uassert( 10203 ,  "bad delete message" , d.moreJSObjs() );
 
             const BSONObj query = d.nextJsObj();
@@ -1203,6 +1233,16 @@ namespace mongo {
             // TODO: This block goes away, system.indexes needs to handle better
             if( isIndexWrite ){
 
+                if (op == dbInsert) {
+                    // Insert is the only write op allowed on system.indexes, so it's the only one
+                    // we check auth for.
+                    AuthorizationManager* authManager =
+                            ClientBasic::getCurrent()->getAuthorizationManager();
+                    uassert(16547,
+                            mongoutils::str::stream() << "not authorized to create index on " << ns,
+                            authManager->checkAuthorization(ns, ActionType::ensureIndex));
+                }
+
                 if ( r.getConfig()->isShardingEnabled() ){
                     LOG(1) << "sharded index write for " << ns << endl;
                     handleIndexWrite( op , r );
@@ -1246,6 +1286,7 @@ namespace mongo {
                 while( d.moreJSObjs() ) {
                     BSONObj o = d.nextJsObj();
                     const char * ns = o["ns"].valuestr();
+
                     if ( r.getConfig()->isSharded( ns ) ) {
                         BSONObj newIndexKey = o["key"].embeddedObjectUserCheck();
 

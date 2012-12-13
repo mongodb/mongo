@@ -65,6 +65,42 @@ namespace mongo {
             ASSERT( c );
         }
 
+
+        TEST( BalancerPolicyTests , BalanceJumbo  ) {
+            // 2 chunks and 0 chunk shards
+            ShardToChunksMap chunkMap;
+            vector<BSONObj> chunks;
+            chunks.push_back(BSON(ChunkFields::min(BSON("x" << BSON("$minKey"<<1))) <<
+                                  ChunkFields::max(BSON("x" << 10)) <<
+                                  ChunkFields::jumbo(true)));
+            chunks.push_back(BSON(ChunkFields::min(BSON("x" << 10)) <<
+                                  ChunkFields::max(BSON("x" << 20)) <<
+                                  ChunkFields::jumbo(true)));
+            chunks.push_back(BSON(ChunkFields::min(BSON("x" << 20)) <<
+                                  ChunkFields::max(BSON("x" << 30))));
+            chunks.push_back(BSON(ChunkFields::min(BSON("x" << 30)) <<
+                                  ChunkFields::max(BSON("x" << 40)) <<
+                                  ChunkFields::jumbo(true)));
+            chunks.push_back(BSON(ChunkFields::min(BSON("x" << 40)) <<
+                                  ChunkFields::max(BSON("x" << BSON("$maxkey"<<1))) <<
+                                  ChunkFields::jumbo(true)));
+            chunkMap["shard0"] = chunks;
+            chunks.clear();
+            chunkMap["shard1"] = chunks;
+
+            // no limits
+            ShardInfoMap info;
+            info["shard0"] = ShardInfo( 0, 2, false, false );
+            info["shard1"] = ShardInfo( 0, 0, false, false );
+
+            MigrateInfo* c = NULL;
+            DistributionStatus status( info, chunkMap );
+            c = BalancerPolicy::balance( "ns", status, 1 );
+            ASSERT( c );
+            ASSERT_EQUALS( 30, c->chunk.max["x"].numberInt() );
+        }
+
+
         TEST( BalanceNormalTests ,  BalanceDrainingTest ) {
             // one normal, one draining
             // 2 chunks and 0 chunk shards

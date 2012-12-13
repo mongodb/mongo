@@ -16,14 +16,15 @@
 #pragma once
 
 #include <boost/shared_ptr.hpp>
-#include <map>
 #include <string>
 #include <vector>
 
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/client/dbclientinterface.h"
+#include "mongo/platform/unordered_map.h"
 #include "mongo/util/concurrency/spin_lock.h"
 
-namespace mongo_test {
+namespace mongo {
     /**
      * A very simple mock that acts like a database server. Every object keeps track of its own
      * InstanceID, which initially starts at zero and increments every time it is restarted.
@@ -37,27 +38,25 @@ namespace mongo_test {
         typedef size_t InstanceID;
 
         /**
-         * Creates a new mock server. This also setups a hook to this server that can be used
-         * to allow clients using the ConnectionString::connect interface to create connections
-         * to this server. The requirements to make this hook fully functional are:
+         * Creates a new mock server. This can also be setup to work with the
+         * ConnectionString class by using mongo::MockConnRegistry as follows:
          *
-         * 1. hostName of this server should start with $.
-         * 2. No other instance has the same hostName as this.
+         * ConnectionString::setConnectionHook(MockConnRegistry::get()->getConnStrHook());
+         * MockRemoteDBServer server("$a:27017");
+         * MockConnRegistry::get()->addServer(&server);
          *
-         * To register the hook, simply call setConnectionHook:
+         * This allows clients using the ConnectionString::connect interface to create
+         * connections to this server. The requirements to make this hook fully functional are:
          *
-         * MockRemoteDBServer mockServer;
-         * ConnectionString::setConnectionHook(mockServer.getConnectionHook());
+         * 1. hostAndPort of this server should start with $.
+         * 2. No other instance has the same hostAndPort as this.
          *
-         * @param hostName the host name for this server.
+         * @param hostAndPort the host name with port for this server.
+         *
+         * @see MockConnRegistry
          */
-        MockRemoteDBServer(const std::string& hostName);
+        MockRemoteDBServer(const std::string& hostAndPort);
         virtual ~MockRemoteDBServer();
-
-        /**
-         * @return the hook that can be used with ConnectionString.
-         */
-        mongo::ConnectionString::ConnectionHook* getConnectionHook();
 
         //
         // Connectivity methods
@@ -110,6 +109,24 @@ namespace mongo_test {
         void setCommandReply(const std::string& cmdName,
                 const std::vector<mongo::BSONObj>& replySequence);
 
+        /**
+         * Inserts a single document to this server.
+         *
+         * @param ns the namespace to insert the document to.
+         * @param obj the document to insert.
+         * @param flags ignored.
+         */
+        void insert(const string& ns, BSONObj obj, int flags = 0);
+
+        /**
+         * Removes documents from this server.
+         *
+         * @param ns the namespace to remove documents from.
+         * @param query ignored.
+         * @param flags ignored.
+         */
+        void remove(const string& ns, Query query, int flags = 0);
+
         //
         // DBClientBase methods
         //
@@ -118,7 +135,7 @@ namespace mongo_test {
                 mongo::BSONObj &info, int options = 0,
                 const mongo::AuthenticationTable* auth = NULL);
 
-        std::auto_ptr<mongo::DBClientCursor> query(InstanceID id,
+        mongo::BSONArray query(InstanceID id,
                 const std::string &ns,
                 mongo::Query query = mongo::Query(),
                 int nToReturn = 0,
@@ -134,6 +151,12 @@ namespace mongo_test {
         InstanceID getInstanceID() const;
         mongo::ConnectionString::ConnectionType type() const;
         double getSoTimeout() const;
+
+        /**
+         * @return the exact string address passed to hostAndPort parameter of the
+         *     constructor. In other words, doesn't automatically append a
+         *     'default' port if none is specified.
+         */
         std::string getServerAddress() const;
         std::string toString();
 
@@ -163,43 +186,25 @@ namespace mongo_test {
         };
 
         /**
-         * Custom connection hook that can be used with ConnectionString.
-         */
-        class MockDBClientConnStrHook: public mongo::ConnectionString::ConnectionHook {
-        public:
-            /**
-             * Creates a new connection hook for the ConnectionString class that
-             * can create mock connections to this server.
-             *
-             * @param replSet the mock replica set. Caller is responsible for managing
-             *     mockServer and making sure that it lives longer than this object.
-             */
-            MockDBClientConnStrHook(MockRemoteDBServer* mockServer);
-            ~MockDBClientConnStrHook();
-
-            mongo::DBClientBase* connect(
-                    const mongo::ConnectionString& connString,
-                    std::string& errmsg, double socketTimeout);
-
-        private:
-            MockRemoteDBServer* _mockServer;
-        };
-
-        /**
          * Checks whether the instance of the server is still up.
          *
          * @throws mongo::SocketException if this server is down
          */
         void checkIfUp(InstanceID id) const;
 
-        typedef std::map<std::string, boost::shared_ptr<CircularBSONIterator> > CmdToReplyObj;
+        typedef unordered_map<std::string, boost::shared_ptr<CircularBSONIterator> > CmdToReplyObj;
+        typedef unordered_map<std::string, mongo::BSONArrayBuilder*> MockDataMgr;
 
         bool _isRunning;
 
-        std::string _hostName;
+        const std::string _hostAndPort;
         long long _delayMilliSec;
 
+        //
+        // Mock replies
+        //
         CmdToReplyObj _cmdMap;
+        MockDataMgr _dataMgr;
 
         //
         // Op Counters
@@ -213,7 +218,5 @@ namespace mongo_test {
 
         // protects this entire instance
         mutable mongo::SpinLock _lock;
-
-        MockDBClientConnStrHook _connStrHook;
     };
 }

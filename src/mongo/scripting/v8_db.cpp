@@ -26,7 +26,6 @@
 #include "mongo/s/d_logic.h"
 #include "mongo/scripting/engine_v8.h"
 #include "mongo/scripting/v8_utils.h"
-#include "mongo/scripting/v8_wrapper.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/base64.h"
 #include "mongo/util/text.h"
@@ -515,7 +514,7 @@ namespace {
             return v8::ThrowException(v8::String::New(ex.what()));
         }
 
-        return scope->mongoToLZV8(ret, false, false);
+        return scope->mongoToLZV8(ret, false);
     }
 
 //    +    JSBool mongo_auth(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval) {
@@ -569,7 +568,7 @@ namespace {
         bool ro = false;
         if (args.This()->Has(scope->V8STR_RO))
             ro = args.This()->Get(scope->V8STR_RO)->BooleanValue();
-        return scope->mongoToLZV8( o, false, ro );
+        return scope->mongoToLZV8(o, ro);
     }
 
     v8::Handle<v8::Value> internalCursorHasNext(V8Scope* scope, const v8::Arguments& args) {

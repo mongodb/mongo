@@ -19,51 +19,64 @@
 
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include <string>
+#include <vector>
 
-#include "mongo/base/status.h"
 #include "mongo/db/auth/principal.h"
-#include "mongo/platform/unordered_map.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 
     PrincipalSet::PrincipalSet() {}
     PrincipalSet::~PrincipalSet() {
-        for (unordered_map<std::string, Principal*>::iterator it = _principals.begin();
+        for (std::vector<Principal*>::iterator it = _principals.begin();
                 it != _principals.end(); ++it) {
-            delete it->second;
+            delete *it;
         }
     }
 
     void PrincipalSet::add(Principal* principal) {
-        unordered_map<std::string, Principal*>::iterator it =
-                _principals.find(principal->getName());
-        if (it != _principals.end()) {
-            delete it->second;
+        for (std::vector<Principal*>::iterator it = _principals.begin();
+                it != _principals.end(); ++it) {
+            Principal* current = *it;
+            if (current->getName().getDB() == principal->getName().getDB()) {
+                // There can be only one principal per database.
+                delete current;
+                *it = principal;
+                return;
+            }
         }
-        _principals[principal->getName()] = principal;
+        _principals.push_back(principal);
     }
 
-    Status PrincipalSet::removeByName(const std::string& name) {
-        unordered_map<std::string, Principal*>::iterator it = _principals.find(name);
-        if (it == _principals.end()) {
-            return Status(ErrorCodes::NoSuchKey,
-                          mongoutils::str::stream() << "No matching principle found with name: "
-                                                    << name,
-                          0);
+    void PrincipalSet::removeByDBName(const StringData& dbname) {
+        for (std::vector<Principal*>::iterator it = _principals.begin();
+                it != _principals.end(); ++it) {
+            Principal* current = *it;
+            if (current->getName().getDB() == dbname) {
+                delete current;
+                _principals.erase(it);
+                break;
+            }
         }
-        delete it->second;
-        _principals.erase(it);
-        return Status::OK();
     }
 
-    Principal* PrincipalSet::lookup(const std::string& name) const {
-        unordered_map<std::string, Principal*>::const_iterator it = _principals.find(name);
-        if (it == _principals.end()) {
-            return NULL;
+    Principal* PrincipalSet::lookup(const PrincipalName& name) const {
+        Principal* principal = lookupByDBName(name.getDB());
+        if (principal && principal->getName() == name) {
+            return principal;
         }
+        return NULL;
+    }
 
-        return it->second;
+    Principal* PrincipalSet::lookupByDBName(const StringData& dbname) const {
+        for (std::vector<Principal*>::const_iterator it = _principals.begin();
+                it != _principals.end(); ++it) {
+            Principal* current = *it;
+            if (current->getName().getDB() == dbname) {
+                return current;
+            }
+        }
+        return NULL;
     }
 
 } // namespace mongo

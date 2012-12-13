@@ -92,10 +92,84 @@ namespace {
         ASSERT_TRUE( i != m.end() );
         ASSERT_EQUALS( 5, i->second );
         ASSERT_EQUALS( "foo", i->first );
-        i++;
+        ++i;
         ASSERT_TRUE( i == m.end() );
     }
 
+
+    TEST(StringMapTest, Erase1 ) {
+        StringMap<int> m;
+        char buf[64];
+
+        m["eliot"] = 5;
+        ASSERT_EQUALS( 5, m["eliot"] );
+        m.erase( "eliot" );
+        ASSERT( m.end() == m.find( "eliot" ) );
+        ASSERT_EQUALS( 0, m["eliot"] );
+        m.erase( "eliot" );
+        ASSERT( m.end() == m.find( "eliot" ) );
+
+        size_t before = m.capacity();
+        for ( int i = 0; i < 10000; i++ ) {
+            sprintf( buf, "foo%d", i );
+            m[buf] = i;
+            ASSERT_EQUALS( i, m[buf] );
+            m.erase( buf );
+            ASSERT( m.end() == m.find( buf ) );
+        }
+        ASSERT_EQUALS( before, m.capacity() );
+    }
+
+    TEST( StringMapTest, Iterator1 ) {
+        StringMap<int> m;
+        ASSERT( m.begin() == m.end() );
+    }
+
+    TEST( StringMapTest, Iterator2 ) {
+        StringMap<int> m;
+        m["eliot"] = 5;
+        StringMap<int>::const_iterator i = m.begin();
+        ASSERT_EQUALS( "eliot", i->first );
+        ASSERT_EQUALS( 5, i->second );
+        ++i;
+        ASSERT( i == m.end() );
+    }
+
+    TEST( StringMapTest, Iterator3 ) {
+        StringMap<int> m;
+        m["eliot"] = 5;
+        m["bob"] = 6;
+        StringMap<int>::const_iterator i = m.begin();
+        int sum = 0;
+        for ( ; i != m.end(); ++i ) {
+            sum += i->second;
+        }
+        ASSERT_EQUALS( 11, sum );
+    }
+
+
+    TEST( StringMapTest, Copy1 ) {
+        StringMap<int> m;
+        m["eliot"] = 5;
+        StringMap<int> y = m;
+        ASSERT_EQUALS( 5, y["eliot"] );
+
+        m["eliot"] = 6;
+        ASSERT_EQUALS( 6, m["eliot"] );
+        ASSERT_EQUALS( 5, y["eliot"] );
+    }
+
+    TEST( StringMapTest, Assign ) {
+        StringMap<int> m;
+        m["eliot"] = 5;
+
+        StringMap<int> y;
+        y["eliot"] = 6;
+        ASSERT_EQUALS( 6, y["eliot"] );
+
+        y = m;
+        ASSERT_EQUALS( 5, y["eliot"] );
+    }
 
     template<typename M>
     unsigned long long test_perf( M& m ) {

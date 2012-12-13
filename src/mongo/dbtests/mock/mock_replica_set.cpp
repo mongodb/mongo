@@ -16,7 +16,9 @@
 #include "mongo/dbtests/mock/mock_replica_set.h"
 
 #include "mongo/db/repl/rs_member.h"
+#include "mongo/dbtests/mock/mock_conn_registry.h"
 #include "mongo/dbtests/mock/mock_dbclient_connection.h"
+#include "mongo/util/map_util.h"
 
 #include <sstream>
 
@@ -26,28 +28,9 @@ using std::map;
 using std::string;
 using std::vector;
 
-namespace mongo_test {
-    MockReplicaSet::ReplSetConnHook::ReplSetConnHook(MockReplicaSet* replSet):
-            _replSet(replSet) {
-    }
-
-    MockReplicaSet::ReplSetConnHook::~ReplSetConnHook() {
-    }
-
-    mongo::DBClientBase* MockReplicaSet::ReplSetConnHook::connect(
-            const mongo::ConnectionString& connString,
-            std::string& errmsg,
-            double socketTimeout) {
-        vector<mongo::HostAndPort> servers = connString.getServers();
-        verify(servers.size() == 1);
-
-        const string serverName = servers.front().toString(true);
-        return new MockDBClientConnection(_replSet->getNode(serverName));
-    }
-
+namespace mongo {
     MockReplicaSet::MockReplicaSet(const string& setName, size_t nodes):
-            _setName(setName),
-            _connStringHook(this) {
+            _setName(setName) {
         std::vector<mongo::ReplSetConfig::MemberCfg> replConfig;
 
         for (size_t n = 0; n < nodes; n++) {
@@ -62,7 +45,10 @@ namespace mongo_test {
                 _secondaryHosts.push_back(hostName);
             }
 
-            _nodeMap[hostName] = new MockRemoteDBServer(hostName);
+            MockRemoteDBServer* mockServer = new MockRemoteDBServer(hostName);
+            _nodeMap[hostName] = mockServer;
+
+            MockConnRegistry::get()->addServer(mockServer);
 
             mongo::ReplSetConfig::MemberCfg config;
             config.h = mongo::HostAndPort(hostName);
@@ -75,6 +61,7 @@ namespace mongo_test {
     MockReplicaSet::~MockReplicaSet() {
         for (std::map<string, MockRemoteDBServer*>::iterator iter = _nodeMap.begin();
                 iter != _nodeMap.end(); ++iter) {
+            MockConnRegistry::get()->removeServer(iter->second->getServerAddress());
             delete iter->second;
         }
     }
@@ -120,12 +107,8 @@ namespace mongo_test {
         return _secondaryHosts;
     }
 
-    mongo::ConnectionString::ConnectionHook* MockReplicaSet::getConnectionHook() {
-        return &_connStringHook;
-    }
-
     MockRemoteDBServer* MockReplicaSet::getNode(const string& hostName) {
-        return _nodeMap[hostName];
+        return mapFindWithDefault(_nodeMap, hostName, static_cast<MockRemoteDBServer*>(NULL));
     }
 
     const vector<mongo::ReplSetConfig::MemberCfg>& MockReplicaSet::getReplConfig() const {
@@ -141,6 +124,13 @@ namespace mongo_test {
     void MockReplicaSet::kill(const string& hostName) {
         verify(_nodeMap.count(hostName) == 1);
         _nodeMap[hostName]->shutdown();
+    }
+
+    void MockReplicaSet::kill(const vector<string>& hostList) {
+        for (vector<string>::const_iterator iter = hostList.begin();
+                iter != hostList.end(); ++iter) {
+            kill(*iter);
+        }
     }
 
     void MockReplicaSet::restore(const string& hostName) {

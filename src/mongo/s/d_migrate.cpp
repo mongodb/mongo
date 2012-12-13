@@ -267,7 +267,8 @@ namespace mongo {
     class MigrateFromStatus {
     public:
 
-        MigrateFromStatus() : _mutex("MigrateFromStatus") , _workLock("MigrateFromStatus::workLock") {
+        MigrateFromStatus() : _mutex("MigrateFromStatus"),
+			      _cleanupTickets(1) /* only one cleanup thread at once */ {
             _active = false;
             _inCriticalSection = false;
             _memoryUsed = 0;
@@ -281,12 +282,6 @@ namespace mongo {
                     const BSONObj& min ,
                     const BSONObj& max ,
                     const BSONObj& shardKeyPattern ) {
-
-            //
-            // Do not hold _workLock
-            //
-
-            //scoped_lock ll(_workLock);
 
             scoped_lock l(_mutex); // reads and writes _active
 
@@ -664,18 +659,12 @@ namespace mongo {
         bool isActive() const { return _getActive(); }
         
         void doRemove( OldDataCleanup& cleanup ) {
-            int it = 0;
-            while ( true ) { 
-                if ( it > 20 && it % 10 == 0 ) log() << "doRemote iteration " << it << " for: " << cleanup << endl;
-                {
-                    scoped_lock ll(_workLock);
-                    if ( ! _active ) {
-                        cleanup.doRemove();
-                        return;
-                    }
-                }
-                sleepmillis( 1000 );
-            }
+
+            log() << "waiting to remove documents for " << cleanup.toString() << endl;
+
+            ScopedTicket ticket(&_cleanupTickets);
+
+            cleanup.doRemove();
         }
 
     private:
@@ -704,8 +693,8 @@ namespace mongo {
         list<BSONObj> _deleted; // objects deleted during clone that should be deleted later
         long long _memoryUsed; // bytes in _reload + _deleted
 
-        mutable mongo::mutex _workLock; // this is used to make sure only 1 thread is doing serious work
-                                        // for now, this means migrate or removing old chunk data
+        // this is used to make sure only a certain number of threads are doing cleanup at once.
+        mutable TicketHolder _cleanupTickets;
 
         bool _getActive() const { scoped_lock l(_mutex); return _active; }
         void _setActive( bool b ) { scoped_lock l(_mutex); _active = b; }
@@ -808,7 +797,13 @@ namespace mongo {
     class TransferModsCommand : public ChunkCommandHelper {
     public:
         TransferModsCommand() : ChunkCommandHelper( "_transferMods" ) {}
-
+        virtual void addRequiredPrivileges(const std::string& dbname,
+                                           const BSONObj& cmdObj,
+                                           std::vector<Privilege>* out) {
+            ActionSet actions;
+            actions.addAction(ActionType::_transferMods);
+            out->push_back(Privilege(AuthorizationManager::SERVER_RESOURCE_NAME, actions));
+        }
         bool run(const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
             return migrateFromStatus.transferMods( errmsg, result );
         }
@@ -818,7 +813,13 @@ namespace mongo {
     class InitialCloneCommand : public ChunkCommandHelper {
     public:
         InitialCloneCommand() : ChunkCommandHelper( "_migrateClone" ) {}
-
+        virtual void addRequiredPrivileges(const std::string& dbname,
+                                           const BSONObj& cmdObj,
+                                           std::vector<Privilege>* out) {
+            ActionSet actions;
+            actions.addAction(ActionType::_migrateClone);
+            out->push_back(Privilege(AuthorizationManager::SERVER_RESOURCE_NAME, actions));
+        }
         bool run(const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
             return migrateFromStatus.clone( errmsg, result );
         }
@@ -885,6 +886,12 @@ namespace mongo {
             if ( secondaryThrottle && ! anyReplEnabled() ) {
                 secondaryThrottle = false;
                 warning() << "secondaryThrottle selected but no replication" << endl;
+            }
+
+            // Do inline deletion
+            bool waitForDelete = cmdObj["waitForDelete"].trueValue();
+            if (waitForDelete) {
+                log() << "moveChunk waiting for full cleanup after move" << endl;
             }
 
             BSONObj min  = cmdObj["min"].Obj();
@@ -988,7 +995,7 @@ namespace mongo {
             {
                 scoped_ptr<ScopedDbConnection> conn(
                         ScopedDbConnection::getInternalScopedDbConnection(
-                                shardingState.getConfigServer() ) );
+                                shardingState.getConfigServer(), 30));
 
                 BSONObj x;
                 BSONObj currChunk;
@@ -1431,17 +1438,17 @@ namespace mongo {
                 c.max = max.getOwned();
                 c.shardKeyPattern = shardKeyPattern.getOwned();
                 ClientCursor::find( ns , c.initial );
-                if ( c.initial.size() ) {
-                    log() << "forking for cleaning up chunk data" << migrateLog;
+
+                if (!waitForDelete) {
+                    // 7.
+                    log() << "forking for cleanup of chunk data" << migrateLog;
                     boost::thread t( boost::bind( &cleanupOldData , c ) );
                 }
                 else {
-                    log() << "doing delete inline" << migrateLog;
                     // 7.
+                    log() << "doing delete inline for cleanup of chunk data" << migrateLog;
                     c.doRemove();
                 }
-
-
             }
             timing.done(6);
 
@@ -1938,7 +1945,13 @@ namespace mongo {
         RecvChunkStartCommand() : ChunkCommandHelper( "_recvChunkStart" ) {}
 
         virtual LockType locktype() const { return WRITE; }  // this is so don't have to do locking internally
-
+        virtual void addRequiredPrivileges(const std::string& dbname,
+                                           const BSONObj& cmdObj,
+                                           std::vector<Privilege>* out) {
+            ActionSet actions;
+            actions.addAction(ActionType::_recvChunkStart);
+            out->push_back(Privilege(AuthorizationManager::SERVER_RESOURCE_NAME, actions));
+        }
         bool run(const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
 
             if ( migrateStatus.getActive() ) {
@@ -1999,7 +2012,13 @@ namespace mongo {
     class RecvChunkStatusCommand : public ChunkCommandHelper {
     public:
         RecvChunkStatusCommand() : ChunkCommandHelper( "_recvChunkStatus" ) {}
-
+        virtual void addRequiredPrivileges(const std::string& dbname,
+                                           const BSONObj& cmdObj,
+                                           std::vector<Privilege>* out) {
+            ActionSet actions;
+            actions.addAction(ActionType::_recvChunkStatus);
+            out->push_back(Privilege(AuthorizationManager::SERVER_RESOURCE_NAME, actions));
+        }
         bool run(const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
             migrateStatus.status( result );
             return 1;
@@ -2010,7 +2029,13 @@ namespace mongo {
     class RecvChunkCommitCommand : public ChunkCommandHelper {
     public:
         RecvChunkCommitCommand() : ChunkCommandHelper( "_recvChunkCommit" ) {}
-
+        virtual void addRequiredPrivileges(const std::string& dbname,
+                                           const BSONObj& cmdObj,
+                                           std::vector<Privilege>* out) {
+            ActionSet actions;
+            actions.addAction(ActionType::_recvChunkCommit);
+            out->push_back(Privilege(AuthorizationManager::SERVER_RESOURCE_NAME, actions));
+        }
         bool run(const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
             bool ok = migrateStatus.startCommit();
             migrateStatus.status( result );
@@ -2022,7 +2047,13 @@ namespace mongo {
     class RecvChunkAbortCommand : public ChunkCommandHelper {
     public:
         RecvChunkAbortCommand() : ChunkCommandHelper( "_recvChunkAbort" ) {}
-
+        virtual void addRequiredPrivileges(const std::string& dbname,
+                                           const BSONObj& cmdObj,
+                                           std::vector<Privilege>* out) {
+            ActionSet actions;
+            actions.addAction(ActionType::_recvChunkAbort);
+            out->push_back(Privilege(AuthorizationManager::SERVER_RESOURCE_NAME, actions));
+        }
         bool run(const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
             migrateStatus.abort();
             migrateStatus.status( result );

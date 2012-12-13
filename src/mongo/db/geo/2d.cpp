@@ -1,5 +1,3 @@
-// geo2d.cpp
-
 /**
 *    Copyright (C) 2008 10gen Inc.
 *
@@ -17,6 +15,12 @@
 */
 
 #include "pch.h"
+
+#include <vector>
+
+#include "mongo/db/auth/action_set.h"
+#include "mongo/db/auth/action_type.h"
+#include "mongo/db/auth/privilege.h"
 #include "mongo/db/namespace-inl.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/index.h"
@@ -68,8 +72,6 @@ namespace mongo {
         virtual ~Geo2dType() { }
 
         Geo2dType(const IndexPlugin *plugin, const IndexSpec* spec) : IndexType(plugin, spec) {
-            BSONObjBuilder orderBuilder;
-
             BSONObjIterator i(spec->keyPattern);
             while (i.more()) {
                 BSONElement e = i.next();
@@ -78,9 +80,12 @@ namespace mongo {
                     uassert(13023, "2d has to be first in index", _other.size() == 0);
                     _geo = e.fieldName();
                 } else {
-                    _other.push_back(e.fieldName());
+                    int order = 1;
+                    if (e.isNumber()) {
+                        order = static_cast<int>(e.Number());
+                    }
+                    _other.push_back(make_pair(e.fieldName(), order));
                 }
-                orderBuilder.append("", 1);
             }
             uassert(13024, "no geo field specified", _geo.size());
 
@@ -95,8 +100,6 @@ namespace mongo {
             params.scaling = numBuckets / (params.max - params.min);
 
             _geoHashConverter.reset(new GeoHashConverter(params));
-
-            _order = orderBuilder.obj();
         }
 
         // XXX: what does this do
@@ -202,10 +205,11 @@ namespace mongo {
                     _geoHashConverter->hash(locObj, &obj).appendToBuilder(&b, "");
 
                     // Go through all the other index keys
-                    for (vector<string>::const_iterator i = _other.begin(); i != _other.end(); ++i) {
+                    for (vector<pair<string, int> >::const_iterator i = _other.begin();
+                         i != _other.end(); ++i) {
                         // Get *all* fields for the index key
                         BSONElementSet eSet;
-                        obj.getFieldsDotted(*i, eSet);
+                        obj.getFieldsDotted(i->first, eSet);
 
                         if (eSet.size() == 0)
                             b.appendAs(_spec->missingField(), "");
@@ -264,7 +268,7 @@ namespace mongo {
 
         // XXX: make private with a getter
         string _geo;
-        vector<string> _other;
+        vector<pair<string, int> > _other;
     private:
         double configValueWithDefault(const IndexSpec* spec, const string& name, double def) {
             BSONElement e = spec->info[name];
@@ -275,7 +279,6 @@ namespace mongo {
         }
 
         scoped_ptr<GeoHashConverter> _geoHashConverter;
-        BSONObj _order;
     };
 
     class Geo2dPlugin : public IndexPlugin {
@@ -677,8 +680,9 @@ namespace mongo {
 
             BSONObjBuilder bob;
             bob.append(spec->_geo, 1);
-            for(vector<string>::const_iterator i = spec->_other.begin(); i != spec->_other.end(); i++){
-                bob.append(*i, 1);
+            for(vector<pair<string, int> >::const_iterator i = spec->_other.begin();
+                i != spec->_other.end(); i++){
+                bob.append(i->first, i->second);
             }
             BSONObj iSpec = bob.obj();
 
@@ -1030,16 +1034,15 @@ namespace mongo {
                 // Get the very first hash point, if required
                 if(! isNeighbor)
                     _prefix = expandStartHash();
-
                 GEODEBUG("initializing btree");
 
 #ifdef GEODEBUGGING
                 log() << "Initializing from b-tree with hash of " << _prefix << " @ " << Box(_g, _prefix) << endl;
 #endif
 
-                if (! BtreeLocation::initial(*_id, _spec, _min, _max, _prefix, _foundInExp, this))
+                if (! BtreeLocation::initial(*_id, _spec, _min, _max, _prefix, _foundInExp, this)) {
                     _state = isNeighbor ? DONE_NEIGHBOR : DONE;
-                else {
+                } else {
                     _state = DOING_EXPAND;
                     _lastPrefix.reset();
                 }
@@ -1050,7 +1053,6 @@ namespace mongo {
 
             // Doing the actual box expansion
             if (_state == DOING_EXPAND) {
-
                 while (true) {
 
                     GEODEBUG("box prefix [" << _prefix << "]");
@@ -2251,6 +2253,9 @@ namespace mongo {
         else if (numWanted == 0)
             numWanted = 100;
 
+        // false means we want to filter OUT geoFieldsToNuke, not filter to include only that.
+        BSONObj filteredQuery = query.filterFieldsUndotted(BSON(_geo << ""), false);
+
         BSONObjIterator i(query);
         while (i.more()) {
             BSONElement e = i.next();
@@ -2262,8 +2267,7 @@ namespace mongo {
                 // If we get an array query, assume it is a location, and do a $within { $center :
                 // [[x, y], 0] } search
                 BSONObj circle = BSON("0" << e.embeddedObjectUserCheck() << "1" << 0);
-                BSONObj filter = query.filterFieldsUndotted(BSON(_geo << ""), false);
-                shared_ptr<Cursor> c(new GeoCircleBrowse(this, circle, filter, "$center", true));
+                shared_ptr<Cursor> c(new GeoCircleBrowse(this, circle, filteredQuery, "$center", true));
                 return c;
             }
             else if (e.type() == Object) {
@@ -2306,7 +2310,7 @@ namespace mongo {
                     bool uniqueDocs = false;
                     if(! n["$uniqueDocs"].eoo()) uniqueDocs = n["$uniqueDocs"].trueValue();
 
-                    shared_ptr<GeoSearch> s(new GeoSearch(this, Point(e), numWanted, query,
+                    shared_ptr<GeoSearch> s(new GeoSearch(this, Point(e), numWanted, filteredQuery,
                                                           maxDistance, type, uniqueDocs));
                     s->exec();
                     shared_ptr<Cursor> c;
@@ -2329,19 +2333,19 @@ namespace mongo {
                     if (startsWith(type,  "$center")) {
                         uassert(13059, "$center has to take an object or array", e.isABSONObj());
                         shared_ptr<Cursor> c(new GeoCircleBrowse(this, e.embeddedObjectUserCheck(), 
-                                                                 query, type, uniqueDocs));
+                                                                 filteredQuery, type, uniqueDocs));
                         return c;
                     }
                     else if (type == "$box") {
                         uassert(13065, "$box has to take an object or array", e.isABSONObj());
                         shared_ptr<Cursor> c(new GeoBoxBrowse(this, e.embeddedObjectUserCheck(),
-                                                              query, uniqueDocs));
+                                                              filteredQuery, uniqueDocs));
                         return c;
                     }
                     else if (startsWith(type, "$poly")) {
                         uassert(14029, "$polygon has to take an object or array", e.isABSONObj());
                         shared_ptr<Cursor> c(new GeoPolygonBrowse(this, e.embeddedObjectUserCheck(),
-                                                                  query, uniqueDocs));
+                                                                  filteredQuery, uniqueDocs));
                         return c;
                     }
                     throw UserException(13058, str::stream() << "unknown $within information : "
@@ -2352,7 +2356,7 @@ namespace mongo {
                     // Otherwise... assume the object defines a point, and we want to do a
                     // zero-radius $within $center
 
-                    shared_ptr<Cursor> c(new GeoCircleBrowse(this, BSON("0" << e.embeddedObjectUserCheck() << "1" << 0), query.filterFieldsUndotted(BSON(_geo << ""), false)));
+                    shared_ptr<Cursor> c(new GeoCircleBrowse(this, BSON("0" << e.embeddedObjectUserCheck() << "1" << 0), filteredQuery));
 
                     return c;
                 }
@@ -2365,124 +2369,88 @@ namespace mongo {
     // ------
     // commands
     // ------
+    bool run2DGeoNear(const IndexDetails &id, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result) {
+        Geo2dType * g = (Geo2dType*)id.getSpec().getType();
+        verify(&id == g->getDetails());
 
-    class Geo2dFindNearCmd : public Command {
-    public:
-        Geo2dFindNearCmd() : Command("geoNear") {}
-        virtual LockType locktype() const { return READ; }
-        bool slaveOk() const { return true; }
-        void help(stringstream& h) const { h << "http://dochub.mongodb.org/core/geo#GeospatialIndexing-geoNearCommand"; }
-        bool slaveOverrideOk() const { return true; }
-        bool run(const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-            string ns = dbname + "." + cmdObj.firstElement().valuestr();
-
-            NamespaceDetails * d = nsdetails(ns.c_str());
-            if (! d) {
-                errmsg = "can't find ns";
-                return false;
-            }
-
-            vector<int> idxs;
-            d->findIndexByType(GEO2DNAME, idxs);
-
-            if (idxs.size() > 1) {
-                errmsg = "more than 1 geo indexes :(";
-                return false;
-            }
-
-            if (idxs.size() == 0) {
-                errmsg = "no geo index :(";
-                return false;
-            }
-
-            int geoIdx = idxs[0];
-
-            result.append("ns", ns);
-
-            IndexDetails& id = d->idx(geoIdx);
-            Geo2dType * g = (Geo2dType*)id.getSpec().getType();
-            verify(&id == g->getDetails());
-
-            int numWanted = 100;
-            if (cmdObj["num"].isNumber()) {
-                numWanted = cmdObj["num"].numberInt();
-                verify(numWanted >= 0);
-            }
-
-            bool uniqueDocs = false;
-            if(! cmdObj["uniqueDocs"].eoo()) uniqueDocs = cmdObj["uniqueDocs"].trueValue();
-
-            bool includeLocs = false;
-            if(! cmdObj["includeLocs"].eoo()) includeLocs = cmdObj["includeLocs"].trueValue();
-
-            uassert(13046, "'near' param missing/invalid", !cmdObj["near"].eoo());
-            const Point n(cmdObj["near"]);
-            result.append("near", g->getConverter().hash(cmdObj["near"]).toString());
-
-            BSONObj filter;
-            if (cmdObj["query"].type() == Object)
-                filter = cmdObj["query"].embeddedObject();
-
-            double maxDistance = numeric_limits<double>::max();
-            if (cmdObj["maxDistance"].isNumber())
-                maxDistance = cmdObj["maxDistance"].number();
-
-            GeoDistType type = GEO_PLAIN;
-            if (cmdObj["spherical"].trueValue())
-                type = GEO_SPHERE;
-
-            GeoSearch gs(g, n, numWanted, filter, maxDistance, type, uniqueDocs, true);
-
-            if (cmdObj["start"].type() == String) {
-                GeoHash start ((string) cmdObj["start"].valuestr());
-                gs._start = start;
-            }
-
-            gs.exec();
-
-            double distanceMultiplier = 1;
-            if (cmdObj["distanceMultiplier"].isNumber())
-                distanceMultiplier = cmdObj["distanceMultiplier"].number();
-
-            double totalDistance = 0;
-
-            BSONObjBuilder arr(result.subarrayStart("results"));
-            int x = 0;
-            for (GeoHopper::Holder::iterator i=gs._points.begin(); i!=gs._points.end(); i++) {
-
-                const GeoPoint& p = *i;
-                double dis = distanceMultiplier * p.distance();
-                totalDistance += dis;
-
-                BSONObjBuilder bb(arr.subobjStart(BSONObjBuilder::numStr(x++)));
-                bb.append("dis", dis);
-                if(includeLocs){
-                    if(p._pt.couldBeArray()) bb.append("loc", BSONArray(p._pt));
-                    else bb.append("loc", p._pt);
-                }
-                bb.append("obj", p._o);
-                bb.done();
-
-                if (arr.len() > BSONObjMaxUserSize) {
-                    warning() << "Too many results to fit in single document. Truncating..." << endl;
-                    break;
-                }
-            }
-            arr.done();
-
-            BSONObjBuilder stats(result.subobjStart("stats"));
-            stats.append("time", cc().curop()->elapsedMillis());
-            stats.appendNumber("btreelocs", gs._nscanned);
-            stats.appendNumber("nscanned", gs._lookedAt);
-            stats.appendNumber("objectsLoaded", gs._objectsLoaded);
-            stats.append("avgDistance", totalDistance / x);
-            stats.append("maxDistance", gs.farthest());
-            stats.done();
-
-            return true;
+        int numWanted = 100;
+        if (cmdObj["num"].isNumber()) {
+            numWanted = cmdObj["num"].numberInt();
+            verify(numWanted >= 0);
         }
 
-    } geo2dFindNearCmd;
+        bool uniqueDocs = false;
+        if(! cmdObj["uniqueDocs"].eoo()) uniqueDocs = cmdObj["uniqueDocs"].trueValue();
+
+        bool includeLocs = false;
+        if(! cmdObj["includeLocs"].eoo()) includeLocs = cmdObj["includeLocs"].trueValue();
+
+        uassert(13046, "'near' param missing/invalid", !cmdObj["near"].eoo());
+        const Point n(cmdObj["near"]);
+        result.append("near", g->getConverter().hash(cmdObj["near"]).toString());
+
+        BSONObj filter;
+        if (cmdObj["query"].type() == Object)
+            filter = cmdObj["query"].embeddedObject();
+
+        double maxDistance = numeric_limits<double>::max();
+        if (cmdObj["maxDistance"].isNumber())
+            maxDistance = cmdObj["maxDistance"].number();
+
+        GeoDistType type = GEO_PLAIN;
+        if (cmdObj["spherical"].trueValue())
+            type = GEO_SPHERE;
+
+        GeoSearch gs(g, n, numWanted, filter, maxDistance, type, uniqueDocs, true);
+
+        if (cmdObj["start"].type() == String) {
+            GeoHash start ((string) cmdObj["start"].valuestr());
+            gs._start = start;
+        }
+
+        gs.exec();
+
+        double distanceMultiplier = 1;
+        if (cmdObj["distanceMultiplier"].isNumber())
+            distanceMultiplier = cmdObj["distanceMultiplier"].number();
+
+        double totalDistance = 0;
+
+        BSONObjBuilder arr(result.subarrayStart("results"));
+        int x = 0;
+        for (GeoHopper::Holder::iterator i=gs._points.begin(); i!=gs._points.end(); i++) {
+
+            const GeoPoint& p = *i;
+            double dis = distanceMultiplier * p.distance();
+            totalDistance += dis;
+
+            BSONObjBuilder bb(arr.subobjStart(BSONObjBuilder::numStr(x++)));
+            bb.append("dis", dis);
+            if(includeLocs){
+                if(p._pt.couldBeArray()) bb.append("loc", BSONArray(p._pt));
+                else bb.append("loc", p._pt);
+            }
+            bb.append("obj", p._o);
+            bb.done();
+
+            if (arr.len() > BSONObjMaxUserSize) {
+                warning() << "Too many results to fit in single document. Truncating..." << endl;
+                break;
+            }
+        }
+        arr.done();
+
+        BSONObjBuilder stats(result.subobjStart("stats"));
+        stats.append("time", cc().curop()->elapsedMillis());
+        stats.appendNumber("btreelocs", gs._nscanned);
+        stats.appendNumber("nscanned", gs._lookedAt);
+        stats.appendNumber("objectsLoaded", gs._objectsLoaded);
+        stats.append("avgDistance", totalDistance / x);
+        stats.append("maxDistance", gs.farthest());
+        stats.done();
+
+        return true;
+    }
 
     class GeoWalkCmd : public Command {
     public:
@@ -2490,6 +2458,13 @@ namespace mongo {
         virtual LockType locktype() const { return READ; }
         bool slaveOk() const { return true; }
         bool slaveOverrideOk() const { return true; }
+        virtual void addRequiredPrivileges(const std::string& dbname,
+                                           const BSONObj& cmdObj,
+                                           std::vector<Privilege>* out) {
+            ActionSet actions;
+            actions.addAction(ActionType::find);
+            out->push_back(Privilege(parseNs(dbname, cmdObj), actions));
+        }
         bool run(const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             string ns = dbname + "." + cmdObj.firstElement().valuestr();
 

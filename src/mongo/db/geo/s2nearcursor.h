@@ -28,7 +28,7 @@ namespace mongo {
     class S2NearCursor : public Cursor {
     public:
         S2NearCursor(const BSONObj &keyPattern, const IndexDetails* details, const BSONObj &query,
-                     const vector<GeoQueryField> &regions, const S2IndexingParams &params,
+                     const vector<QueryGeometry> &regions, const S2IndexingParams &params,
                      int numWanted, double maxDistance);
         virtual ~S2NearCursor(); 
         virtual CoveredIndexMatcher *matcher() const;
@@ -52,6 +52,8 @@ namespace mongo {
         virtual void checkLocation();
         virtual long long nscanned();
         virtual void explainDetails(BSONObjBuilder& b);
+
+        double currentDistance() const;
     private:
         // We use this to cache results of the search.  Results are sorted to have decreasing
         // distance, and callers are interested in loc and key.
@@ -76,13 +78,20 @@ namespace mongo {
         // Grow _innerRadius and _outerRadius by _radiusIncrement, capping _outerRadius at halfway
         // around the world (pi * _params.radius).
         void nextAnnulus();
+        double distanceBetween(const QueryGeometry &field, const BSONObj &obj);
 
         // Need this to make a FieldRangeSet.
         const IndexDetails *_details;
-        // The query with the geo stuff taken out.  We use this with a matcher.
+
+        // How we need/use the query:
+        // Matcher: Can have geo fields in it, but only with $within.
+        //          This only really happens (right now) from geoNear command.
+        //          We assume the caller takes care of this in the right way.
+        // FRS:     No geo fields allowed!
+        // So, on that note: the query with the geo stuff taken out, used by makeFRSObject().
         BSONObj _filteredQuery;
         // What geo regions are we looking for?
-        vector<GeoQueryField> _fields;
+        vector<QueryGeometry> _fields;
         // We use this for matching non-GEO stuff.
         shared_ptr<CoveredIndexMatcher> _matcher;
         // How were the keys created?  We need this to search for the right stuff.

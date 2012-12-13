@@ -41,9 +41,10 @@ printjson(admin.runCommand({shardCollection : collSh + "",
                             key : {ukey : 1}}))
 printjson(admin.runCommand({split : collSh + "",
                             middle : {ukey : 0}}));
-printjson(admin.runCommand({moveChunk : collSh + "",
-                            find : {ukey : 0},
-                            to : shards[0]._id}));
+printjson(admin.runCommand({ moveChunk: collSh + "",
+                             find: { ukey: 0 },
+                             to: shards[0]._id,
+                             _waitForDelete: true }));
 
 var resetColls = function()
 {

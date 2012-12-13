@@ -697,7 +697,8 @@ namespace mongo {
                             continue;
 
                         BSONObj moveResult;
-                        if ( ! chunk->moveAndCommit( to , Chunk::MaxChunkSize , false , moveResult ) ) {
+                        if (!chunk->moveAndCommit(to, Chunk::MaxChunkSize,
+                                false, true, moveResult)) {
                             warning() << "Couldn't move chunk " << chunk << " to shard "  << to
                                       << " while sharding collection " << ns << ". Reason: "
                                       <<  moveResult << endl;
@@ -959,7 +960,11 @@ namespace mongo {
                 tlog() << "CMD: movechunk: " << cmdObj << endl;
 
                 BSONObj res;
-                if ( ! c->moveAndCommit( to , maxChunkSizeBytes , cmdObj["_secondaryThrottle"].trueValue() , res ) ) {
+                if (!c->moveAndCommit(to,
+                                      maxChunkSizeBytes,
+                                      cmdObj["_secondaryThrottle"].trueValue(),
+                                      cmdObj["_waitForDelete"].trueValue(),
+                                      res)) {
                     errmsg = "move failed";
                     result.append( "cause" , res );
                     return false;
@@ -990,8 +995,8 @@ namespace mongo {
             }
             bool run(const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
                 scoped_ptr<ScopedDbConnection> conn(
-                        ScopedDbConnection::getInternalScopedDbConnection( configServer.getPrimary()
-                                                                           .getConnString() ) );
+                        ScopedDbConnection::getInternalScopedDbConnection(
+                                configServer.getPrimary().getConnString(), 30));
 
                 vector<BSONObj> all;
                 auto_ptr<DBClientCursor> cursor = conn->get()->query( ConfigNS::shard , BSONObj() );
@@ -1025,7 +1030,7 @@ namespace mongo {
                 errmsg.clear();
 
                 if ( !ClientBasic::getCurrent()->getAuthenticationInfo()->isAuthorized("admin") ) {
-                    errmsg = "unauthorized. Need admin authentication to add a shard ";
+                    errmsg = "unauthorized. Need admin authentication to add a shard";
                     log() << "addshard request " << cmdObj << " failed:" << errmsg << endl;
                     return false;
                 }
@@ -1109,8 +1114,8 @@ namespace mongo {
                 }
 
                 scoped_ptr<ScopedDbConnection> connPtr(
-                        ScopedDbConnection::getInternalScopedDbConnection( configServer.getPrimary()
-                                                                           .getConnString() ) );
+                        ScopedDbConnection::getInternalScopedDbConnection(
+                                configServer.getPrimary().getConnString(), 30));
                 ScopedDbConnection& conn = *connPtr;
 
                 if (conn->count(ConfigNS::shard,
@@ -1284,6 +1289,7 @@ namespace mongo {
                 return true;
             }
             virtual LockType locktype() const { return NONE; }
+            virtual bool requiresAuth() { return false; }
             virtual void addRequiredPrivileges(const std::string& dbname,
                                                const BSONObj& cmdObj,
                                                std::vector<Privilege>* out) {} // No auth required
@@ -1327,6 +1333,7 @@ namespace mongo {
             virtual void help( stringstream& help ) const {
                 help << "check for an error on the last command executed";
             }
+            virtual bool requiresAuth() { return false; }
             virtual void addRequiredPrivileges(const std::string& dbname,
                                                const BSONObj& cmdObj,
                                                std::vector<Privilege>* out) {} // No auth required
@@ -1358,6 +1365,7 @@ namespace mongo {
         virtual bool slaveOk() const {
             return true;
         }
+        virtual bool requiresAuth() { return false; }
         virtual void addRequiredPrivileges(const std::string& dbname,
                                            const BSONObj& cmdObj,
                                            std::vector<Privilege>* out) {} // No auth required
@@ -1459,8 +1467,8 @@ namespace mongo {
             
             if ( sizes.find( "config" ) == sizes.end() ){
                 scoped_ptr<ScopedDbConnection> conn(
-                        ScopedDbConnection::getInternalScopedDbConnection( configServer.getPrimary()
-                                                                           .getConnString() ) );
+                        ScopedDbConnection::getInternalScopedDbConnection(
+                                configServer.getPrimary().getConnString(), 30));
                 BSONObj x;
                 if ( conn->get()->simpleCommand( "config" , &x , "dbstats" ) ){
                     BSONObjBuilder b;

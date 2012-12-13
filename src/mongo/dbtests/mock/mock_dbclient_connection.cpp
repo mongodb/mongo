@@ -15,6 +15,7 @@
 
 #include "mongo/dbtests/mock/mock_dbclient_connection.h"
 
+#include "mongo/dbtests/mock/mock_dbclient_cursor.h"
 #include "mongo/util/net/sock.h"
 #include "mongo/util/time_support.h"
 
@@ -23,19 +24,33 @@ using mongo::BSONObj;
 using std::string;
 using std::vector;
 
-namespace mongo_test {
-    MockDBClientConnection::MockDBClientConnection(MockRemoteDBServer* remoteServer):
+namespace mongo {
+    MockDBClientConnection::MockDBClientConnection(MockRemoteDBServer* remoteServer,
+            bool autoReconnect):
             _remoteServerInstanceID(remoteServer->getInstanceID()),
             _remoteServer(remoteServer),
             _isFailed(false),
-            _sockCreationTime(mongo::curTimeMicros64()) {
+            _sockCreationTime(mongo::curTimeMicros64()),
+            _autoReconnect(autoReconnect) {
     }
 
     MockDBClientConnection::~MockDBClientConnection() {
     }
 
+    bool MockDBClientConnection::connect(const char* hostName, std::string& errmsg) {
+        if (_remoteServer->isRunning()) {
+            _remoteServerInstanceID = _remoteServer->getInstanceID();
+            return true;
+        }
+
+        errmsg.assign("cannot connect to " + _remoteServer->getServerAddress());
+        return false;
+    }
+
     bool MockDBClientConnection::runCommand(const string& dbname, const BSONObj& cmdObj,
             BSONObj &info, int options, const mongo::AuthenticationTable* auth) {
+        checkConnection();
+
         try {
             return _remoteServer->runCommand(_remoteServerInstanceID, dbname, cmdObj,
                     info, options, auth);
@@ -55,9 +70,15 @@ namespace mongo_test {
             const BSONObj* fieldsToReturn,
             int queryOptions,
             int batchSize) {
+        checkConnection();
+
         try {
-            return _remoteServer->query(_remoteServerInstanceID, ns, query, nToReturn,
-                    nToSkip, fieldsToReturn, queryOptions, batchSize);
+            mongo::BSONArray result(_remoteServer->query(_remoteServerInstanceID, ns, query,
+                    nToReturn, nToSkip, fieldsToReturn, queryOptions, batchSize));
+
+            std::auto_ptr<mongo::DBClientCursor> cursor;
+            cursor.reset(new MockDBClientCursor(this, result));
+            return cursor;
         }
         catch (const mongo::SocketException&) {
             _isFailed = true;
@@ -107,6 +128,27 @@ namespace mongo_test {
         return _sockCreationTime;
     }
 
+    void MockDBClientConnection::insert(const string &ns, BSONObj obj, int flags) {
+        _remoteServer->insert(ns, obj, flags);
+    }
+
+    void MockDBClientConnection::insert(const string &ns,
+            const vector<BSONObj>& objList,
+            int flags) {
+        for (vector<BSONObj>::const_iterator iter = objList.begin();
+                iter != objList.end(); ++iter) {
+            insert(ns, *iter, flags);
+        }
+    }
+
+    void MockDBClientConnection::remove(const string& ns, Query query, bool justOne) {
+        remove(ns, query, (justOne ? RemoveOption_JustOne : 0));
+    }
+
+    void MockDBClientConnection::remove(const string& ns, Query query, int flags) {
+        _remoteServer->remove(ns, query, flags);
+    }
+
     void MockDBClientConnection::killCursor(long long cursorID) {
         verify(false); // unimplemented
     }
@@ -139,5 +181,11 @@ namespace mongo_test {
 
     double MockDBClientConnection::getSoTimeout() const {
         return 0;
+    }
+
+    void MockDBClientConnection::checkConnection() {
+        if (_isFailed && _autoReconnect) {
+            _remoteServerInstanceID = _remoteServer->getInstanceID();
+        }
     }
 }

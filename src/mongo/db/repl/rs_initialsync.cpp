@@ -66,28 +66,9 @@ namespace mongo {
         fassert( 16233, failedAttempts < maxFailedAttempts);
     }
 
-    /* todo : progress metering to sethbmsg. */
-    static bool clone(const char *master, const std::string& db, bool dataPass ) {
-        CloneOptions options;
+    bool ReplSetImpl::_syncDoInitialSync_clone(Cloner& cloner, const char *master,
+                                               const list<string>& dbs, bool dataPass) {
 
-        options.fromDB = db;
-
-        options.logForRepl = false;
-        options.slaveOk = true;
-        options.useReplAuth = true;
-        options.snapshot = false;
-        options.mayYield = true;
-        options.mayBeInterrupted = false;
-        
-        options.syncData = dataPass;
-        options.syncIndexes = ! dataPass;
-
-        string err;
-        return cloneFrom(master, options , err );
-    }
-
-
-    bool ReplSetImpl::_syncDoInitialSync_clone( const char *master, const list<string>& dbs , bool dataPass ) {
         for( list<string>::const_iterator i = dbs.begin(); i != dbs.end(); i++ ) {
             string db = *i;
             if( db == "local" ) 
@@ -99,10 +80,25 @@ namespace mongo {
                 sethbmsg( str::stream() << "initial sync cloning indexes for : " << db , 0);
 
             Client::WriteContext ctx(db);
-            if ( ! clone( master, db, dataPass ) ) {
-                sethbmsg( str::stream() 
-                              << "initial sync error clone of " << db 
-                              << " dataPass: " << dataPass << " failed sleeping 5 minutes" ,0);
+
+            string err;
+            int errCode;
+            CloneOptions options;
+            options.fromDB = db;
+            options.logForRepl = false;
+            options.slaveOk = true;
+            options.useReplAuth = true;
+            options.snapshot = false;
+            options.mayYield = true;
+            options.mayBeInterrupted = false;
+            options.syncData = dataPass;
+            options.syncIndexes = ! dataPass;
+
+            if (!cloner.go(master, options, err, &errCode)) {
+                sethbmsg(str::stream() << "initial sync: error while "
+                                       << (dataPass ? "cloning " : "indexing ") << db
+                                       << ".  " << (err.empty() ? "" : err + ".  ")
+                                       << "sleeping 5 minutes" ,0);
                 return false;
             }
         }
@@ -399,7 +395,8 @@ namespace mongo {
 
             list<string> dbs = r.conn()->getDatabaseNames();
 
-            if ( ! _syncDoInitialSync_clone( sourceHostname.c_str(), dbs, true ) ) {
+            Cloner cloner;
+            if (!_syncDoInitialSync_clone(cloner, sourceHostname.c_str(), dbs, true)) {
                 veto(source->fullName(), 600);
                 sleepsecs(300);
                 return;
@@ -426,7 +423,7 @@ namespace mongo {
             lastOp = minValid;
 
             sethbmsg("initial sync building indexes",0);
-            if ( ! _syncDoInitialSync_clone( sourceHostname.c_str(), dbs, false ) ) {
+            if (!_syncDoInitialSync_clone(cloner, sourceHostname.c_str(), dbs, false)) {
                 veto(source->fullName(), 600);
                 sleepsecs(300);
                 return;

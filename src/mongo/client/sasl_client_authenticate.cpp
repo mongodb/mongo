@@ -41,9 +41,10 @@ namespace mongo {
     const char* const saslCommandPasswordFieldName = "password";
     const char* const saslCommandPayloadFieldName = "payload";
     const char* const saslCommandPrincipalFieldName = "principal";
+    const char* const saslCommandPrincipalSourceFieldName = "principalSource";
     const char* const saslCommandServiceHostnameFieldName = "serviceHostname";
     const char* const saslCommandServiceNameFieldName = "serviceName";
-    const char* const saslDefaultDBName = "admin";
+    const char* const saslDefaultDBName = "$sasl";
     const char* const saslDefaultServiceName = "mongodb";
 
     const char* const saslClientLogFieldName = "clientLogLevel";
@@ -172,6 +173,14 @@ namespace {
         if (!status.isOK())
             return status;
 
+        std::string targetDatabase;
+        status = bsonExtractStringFieldWithDefault(saslParameters,
+                                                   saslCommandPrincipalSourceFieldName,
+                                                   saslDefaultDBName,
+                                                   &targetDatabase);
+        if (!status.isOK())
+            return status;
+
         BSONObj saslFirstCommandPrefix = BSON(
                 saslStartCommandName << 1 <<
                 saslCommandMechanismFieldName << session.getMechanism());
@@ -207,7 +216,7 @@ namespace {
             if (!conversationId.eoo())
                 commandBuilder.append(conversationId);
 
-            if (!client->runCommand(saslDefaultDBName, commandBuilder.obj(), inputObj)) {
+            if (!client->runCommand(targetDatabase, commandBuilder.obj(), inputObj)) {
                 return Status(ErrorCodes::UnknownError,
                               inputObj[saslCommandErrmsgFieldName].str());
             }

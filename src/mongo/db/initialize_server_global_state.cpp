@@ -192,25 +192,6 @@ namespace mongo {
             noauth = false;
         }
 
-#ifdef MONGO_SSL
-        if (cmdLine.sslOnNormalPorts) {
-
-            if ( cmdLine.sslPEMKeyFile.size() == 0 ) {
-                log() << "need sslPEMKeyFile" << endl;
-                return false;
-            }
-
-            cmdLine.sslServerManager = new SSLManager( false );
-            if ( ! cmdLine.sslServerManager->setupPEM( cmdLine.sslPEMKeyFile , cmdLine.sslPEMKeyPassword ) ) {
-                return false;
-            }
-        }
-        else if ( cmdLine.sslPEMKeyFile.size() || cmdLine.sslPEMKeyPassword.size() ) {
-            log() << "need to enable sslOnNormalPorts" << endl;
-            return false;
-        }
-#endif
-
         return true;
     }
 

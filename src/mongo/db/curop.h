@@ -217,7 +217,6 @@ namespace mongo {
         void setQuery(const BSONObj& query) { _query.set( query ); }
         Client * getClient() const { return _client; }
         BSONObj info();
-        BSONObj infoNoauth();
         string getRemoteString( bool includePort = true ) { return _remote.toString(includePort); }
         ProgressMeter& setMessage( const char * msg , unsigned long long progressMeterTotal = 0 , int secondsBetween = 3 );
         string getMessage() const { return _message.toString(); }

@@ -1,6 +1,6 @@
-// v8_wrapper.h
+//@file dbclientmockcursor.h
 
-/*    Copyright 2009 10gen Inc.
+/*    Copyright 2012 10gen Inc.
  *
  *    Licensed under the Apache License, Version 2.0 (the "License");
  *    you may not use this file except in compliance with the License.
@@ -15,20 +15,21 @@
  *    limitations under the License.
  */
 
-#pragma once
-
-#include <v8.h>
-
-#include "mongo/db/jsobj.h"
-#include "mongo/scripting/engine_v8.h"
+#include "mongo/dbtests/mock/mock_dbclient_cursor.h"
 
 namespace mongo {
+    MockDBClientCursor::MockDBClientCursor(mongo::DBClientBase* client,
+            const mongo::BSONArray& resultSet):
+        mongo::DBClientCursor(client, "", 0, 0, 0) {
+        _resultSet = resultSet.copy();
+        _cursor.reset(new mongo::DBClientMockCursor(BSONArray(_resultSet)));
+    }
 
-    v8::Handle<v8::FunctionTemplate> getObjectWrapperTemplate(V8Scope* scope);
+    bool MockDBClientCursor::more() {
+        return _cursor->more();
+    }
 
-    class WrapperHolder;
-    WrapperHolder* createWrapperHolder(V8Scope* scope,
-                                       const BSONObj* o,
-                                       bool readOnly,
-                                       bool iDelete);
+    mongo::BSONObj MockDBClientCursor::next() {
+        return _cursor->next();
+    }
 }

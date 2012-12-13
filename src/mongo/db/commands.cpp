@@ -31,12 +31,22 @@
 #include "mongo/db/client.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/replutil.h"
+#include "mongo/db/server_parameters.h"
 
 namespace mongo {
 
     map<string,Command*> * Command::_commandsByBestName;
     map<string,Command*> * Command::_webCommands;
     map<string,Command*> * Command::_commands;
+
+    int Command::testCommandsEnabled = 0;
+
+    namespace {
+        // TODO: This should only be settable at the command line, not at runtime. Need SERVER-7778
+        ExportedServerParameter<int> testCommandsParameter(ServerParameterSet::getGlobal(),
+                                                           "enableTestCommands",
+                                                           &Command::testCommandsEnabled);
+    }
 
     string Command::parseNsFullyQualified(const string& dbname, const BSONObj& cmdObj) const { 
         string s = cmdObj.firstElement().valuestr();

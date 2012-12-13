@@ -26,7 +26,11 @@ coll.setSlaveOk();
 
 
 for ( i=0; i<20; i++ ) {
-    s.adminCommand( { moveChunk : "test.foo" , find : { _id : i * 100 } , to : other._id , _secondaryThrottle : true } );
+    // Needs to waitForDelete because we'll be performing a slaveOk query,
+    // and secondaries don't have a chunk manager so it doesn't know how to
+    // filter out docs it doesn't own.
+    s.adminCommand({ moveChunk: "test.foo", find: { _id: i * 100 }, to : other._id,
+        _secondaryThrottle: true, _waitForDelete: true });
     assert.eq( 2100, coll.find().itcount() );
 }
 

@@ -91,7 +91,9 @@ namespace mongo {
 
     bool CmdLogout::run(const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
         AuthenticationInfo *ai = ClientInfo::get()->getAuthenticationInfo();
+        AuthorizationManager* authManager = ClientInfo::get()->getAuthorizationManager();
         ai->logout(dbname);
+        authManager->logoutDatabase(dbname);
         return true;
     }
 }

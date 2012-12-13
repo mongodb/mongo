@@ -610,13 +610,13 @@ namespace mongo {
         }
     }
 
-    Lock::DBWrite::DBWrite( const StringData& ns ) 
-        : ScopedLock( 'w' ), _what(ns.data()), _nested(false) {
+    Lock::DBWrite::DBWrite( const StringData& ns )
+        : ScopedLock( 'w' ), _what(ns.toString()), _nested(false) {
         lockDB( _what );
     }
 
-    Lock::DBRead::DBRead( const StringData& ns )   
-        : ScopedLock( 'r' ), _what(ns.data()), _nested(false) {
+    Lock::DBRead::DBRead( const StringData& ns )
+        : ScopedLock( 'r' ), _what(ns.toString()), _nested(false) {
         lockDB( _what );
     }
 

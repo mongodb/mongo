@@ -18,7 +18,8 @@ test.insertPts(50);
 for (var i = (test.nPts/10); i < test.nPts; i+= (test.nPts/10)){
     s.adminCommand({split: ('test.' + testName), middle: {_id: i} });
     try {
-        s.adminCommand({moveChunk: ('test.' + testName), find: {_id: i-1}, to: ('shard000' + (i%3))});
+        s.adminCommand({ moveChunk: ('test.' + testName), find: { _id: i-1 },
+            to: ('shard000' + (i%3)), _waitForDelete: true });
     } catch (e) {
         // ignore this error
         if (! e.match(/that chunk is already on that shard/)){

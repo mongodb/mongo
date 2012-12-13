@@ -34,7 +34,7 @@ namespace mongo {
             Position pos = _hashTab[bucket];
             while (pos.found()) {
                 const ValueElement& elem = getField(pos);
-                if (str::equals(requested.data(), elem.name))
+                if (requested == elem.nameSD())
                     return pos;
 
                 // possible collision
@@ -44,7 +44,7 @@ namespace mongo {
         else if (_numFields) { // linear scan
             for (DocumentStorageIterator it = iteratorAll(); !it.atEnd(); it.advance()) {
                 if (size_t(it->nameLen) == requested.size()
-                    && str::equals(it->name, requested.data())) {
+                    && requested == it->nameSD()) {
                     return it.position();
                 }
             }
@@ -74,7 +74,7 @@ namespace mongo {
         append(value);
         append(nextCollision);
         append(nameSize);
-        memcpy(dest, name.data(), nameSize + 1/*NUL*/);
+        name.copyTo( dest, true );
         // Padding for alignment handled above
 #undef append
 
@@ -208,9 +208,16 @@ namespace mongo {
         *this = md.freeze();
     }
 
+    BSONObjBuilder& operator << (BSONObjBuilderValueStream& builder, const Document& doc) {
+        BSONObjBuilder subobj(builder.subobjStart());
+        doc.toBson(&subobj);
+        subobj.doneFast();
+        return builder.builder();
+    }
+
     void Document::toBson(BSONObjBuilder* pBuilder) const {
         for (DocumentStorageIterator it = storage().iterator(); !it.atEnd(); it.advance()) {
-            it->val.addToBsonObj(pBuilder, it->nameSD());
+            *pBuilder << it->name << it->val;
         }
     }
 
@@ -290,34 +297,28 @@ namespace mongo {
     void Document::hash_combine(size_t &seed) const {
         for (DocumentStorageIterator it = storage().iterator(); !it.atEnd(); it.advance()) {
             StringData name = it->nameSD();
-            boost::hash_range(seed, name.data(), name.data()+name.size());
+            boost::hash_range(seed, name.rawData(), name.rawData() + name.size());
             it->val.hash_combine(seed);
         }
     }
 
     int Document::compare(const Document& rL, const Document& rR) {
-        const size_t lSize = rL->storage().size();
-        const size_t rSize = rR->storage().size();
-
         DocumentStorageIterator lIt = rL.storage().iterator();
         DocumentStorageIterator rIt = rR.storage().iterator();
 
-        for(size_t i = 0; true; ++i) {
-            if (i >= lSize) {
-                if (i >= rSize)
+        while (true) {
+            if (lIt.atEnd()) {
+                if (rIt.atEnd())
                     return 0; // documents are the same length
 
                 return -1; // left document is shorter
             }
 
-            if (i >= rSize)
+            if (rIt.atEnd())
                 return 1; // right document is shorter
 
             const ValueElement& rField = rIt.get();
             const ValueElement& lField = lIt.get();
-
-            rIt.advance();
-            lIt.advance();
 
             const int nameCmp = strcmp(lField.name, rField.name);
             if (nameCmp)
@@ -326,6 +327,9 @@ namespace mongo {
             const int valueCmp = Value::compare(lField.val, rField.val);
             if (valueCmp)
                 return valueCmp; // fields are unequal
+
+            rIt.advance();
+            lIt.advance();
         }
     }
 

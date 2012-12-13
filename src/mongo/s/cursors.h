@@ -67,6 +67,8 @@ namespace mongo {
         /** @return idle time in ms */
         long long idleTime( long long now );
 
+        std::string getNS() { return _cursor->getNS(); }
+
         // The default initial buffer size for sending responses.
         static const int INIT_REPLY_BUFFER_SIZE;
 

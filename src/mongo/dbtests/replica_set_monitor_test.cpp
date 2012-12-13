@@ -19,23 +19,30 @@
  * ReplicaSetMonitor::selectNode and TagSet
  */
 
-#include <vector>
-
+#include "mongo/client/dbclientinterface.h"
 #include "mongo/client/dbclient_rs.h"
+#include "mongo/dbtests/mock/mock_conn_registry.h"
+#include "mongo/dbtests/mock/mock_replica_set.h"
 #include "mongo/unittest/unittest.h"
 
-namespace {
-    using std::vector;
-    using boost::scoped_ptr;
+#include <vector>
 
-    using mongo::BSONObj;
-    using mongo::BSONArray;
-    using mongo::BSONArrayBuilder;
-    using mongo::ReplicaSetMonitor;
-    using mongo::HostAndPort;
-    using mongo::ReadPreference;
-    using mongo::TagSet;
+using std::vector;
+using std::string;
+using boost::scoped_ptr;
 
+using mongo::BSONObj;
+using mongo::BSONArray;
+using mongo::BSONArrayBuilder;
+using mongo::ConnectionString;
+using mongo::HostAndPort;
+using mongo::MockReplicaSet;
+using mongo::ReadPreference;
+using mongo::ReplicaSetMonitor;
+using mongo::ReplicaSetMonitorPtr;
+using mongo::TagSet;
+
+namespace mongo_test {
     const BSONObj SampleIsMasterDoc = BSON("tags"
                                             << BSON("dc" << "NYC"
                                                     << "p" << "2"
@@ -1474,5 +1481,55 @@ namespace {
         // TODO: remove this guard once SERVER-6317 is fixed
         ASSERT_THROWS(tags.getCurrentTag(), mongo::AssertionException);
 #endif
+    }
+
+    // TODO: Port these existing tests here: replmonitor_bad_seed.js, repl_monitor_refresh.js
+
+    /**
+     * Warning: Tests running this fixture cannot be run in parallel with other tests
+     * that uses ConnectionString::setConnectionHook
+     */
+    class ReplicaSetMonitorTest: public mongo::unittest::Test {
+    protected:
+        void setUp() {
+            _replSet.reset(new MockReplicaSet("test", 3));
+            _originalConnectionHook = ConnectionString::getConnectionHook();
+            ConnectionString::setConnectionHook(
+                    mongo::MockConnRegistry::get()->getConnStrHook());
+        }
+
+        void tearDown() {
+            ConnectionString::setConnectionHook(_originalConnectionHook);
+            ReplicaSetMonitor::remove(_replSet->getSetName(), true);
+        }
+
+        MockReplicaSet* getReplSet() {
+            return _replSet.get();
+        }
+
+    private:
+        ConnectionString::ConnectionHook* _originalConnectionHook;
+        boost::scoped_ptr<MockReplicaSet> _replSet;
+    };
+
+    TEST_F(ReplicaSetMonitorTest, SeedWithPriOnlySecDown) {
+        // Test to make sure that the monitor doesn't crash when
+        // ConnectionString::connect returns NULL
+        MockReplicaSet* replSet = getReplSet();
+        replSet->kill(replSet->getSecondaries());
+
+        // Create a monitor with primary as the only seed list and the two secondaries
+        // down so a NULL connection object will be stored for these secondaries in
+        // the _nodes vector.
+        const string replSetName(replSet->getSetName());
+        vector<HostAndPort> seedList;
+        seedList.push_back(HostAndPort(replSet->getPrimary()));
+        ReplicaSetMonitor::createIfNeeded(replSetName, seedList);
+
+        replSet->kill(replSet->getPrimary());
+
+        ReplicaSetMonitorPtr monitor = ReplicaSetMonitor::get(replSet->getSetName());
+        // Trigger calls to Node::getConnWithRefresh
+        monitor->check(true);
     }
 }

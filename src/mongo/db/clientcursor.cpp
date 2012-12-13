@@ -847,35 +847,64 @@ namespace mongo {
         }
     }
 
-    bool ClientCursor::erase( CursorId id ) {
-        recursive_scoped_lock lock( ccmutex );
-        ClientCursor *cursor = find_inlock( id );
-        if ( ! cursor )
-            return false;
-
-        if ( ! cc().getAuthenticationInfo()->isAuthorizedReads( nsToDatabase( cursor->ns() ) ) )
-            return false;
-
+    bool ClientCursor::_erase_inlock(ClientCursor* cursor) {
         // Must not have an active ClientCursor::Pin.
         massert( 16089,
-                str::stream() << "Cannot kill active cursor " << id,
+                str::stream() << "Cannot kill active cursor " << cursor->cursorid(),
                 cursor->_pinValue < 100 );
-        
+
         delete cursor;
         return true;
+    }
+
+    bool ClientCursor::erase(CursorId id) {
+        recursive_scoped_lock lock(ccmutex);
+        ClientCursor* cursor = find_inlock(id);
+        if (!cursor) {
+            return false;
+        }
+
+        return _erase_inlock(cursor);
+    }
+
+    bool ClientCursor::eraseIfAuthorized(CursorId id) {
+        recursive_scoped_lock lock(ccmutex);
+        ClientCursor* cursor = find_inlock(id);
+        if (!cursor) {
+            return false;
+        }
+
+        if (!cc().getAuthorizationManager()->checkAuthorization(cursor->ns(),
+                                                                ActionType::find)
+                || !cc().getAuthenticationInfo()->isAuthorizedReads(nsToDatabase(cursor->ns()))) {
+            return false;
+        }
+
+        return _erase_inlock(cursor);
     }
 
     int ClientCursor::erase(int n, long long *ids) {
         int found = 0;
         for ( int i = 0; i < n; i++ ) {
-            if ( erase(ids[i]) )
+            if ( erase(ids[i]))
                 found++;
 
             if ( inShutdown() )
                 break;
         }
         return found;
+    }
 
+    int ClientCursor::eraseIfAuthorized(int n, long long *ids) {
+        int found = 0;
+        for ( int i = 0; i < n; i++ ) {
+            if ( eraseIfAuthorized(ids[i]))
+                found++;
+
+            if ( inShutdown() )
+                break;
+        }
+        return found;
     }
 
     ClientCursor::YieldLock::YieldLock( ptr<ClientCursor> cc )

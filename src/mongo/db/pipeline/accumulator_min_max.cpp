@@ -25,17 +25,15 @@ namespace mongo {
         verify(vpOperand.size() == 1);
         Value prhs(vpOperand[0]->evaluate(pDocument));
 
-        /* if this is the first value, just use it */
-        if (pValue.missing())
-            pValue = prhs;
-        else {
+        // nullish values should have no impact on result
+        if (!prhs.nullish()) {
             /* compare with the current value; swap if appropriate */
             int cmp = Value::compare(pValue, prhs) * sense;
-            if (cmp > 0)
+            if (cmp > 0 || pValue.missing()) // missing is lower than all other values
                 pValue = prhs;
         }
 
-        return pValue;
+        return Value();
     }
 
     AccumulatorMinMax::AccumulatorMinMax(int theSense):

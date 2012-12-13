@@ -288,7 +288,7 @@ namespace mongo {
         /** note these are virtual */
         Logstream& operator<<(const char *x) { ss << x; return *this; }
         Logstream& operator<<(const string& x) { ss << x; return *this; }
-        Logstream& operator<<(const StringData& x) { ss << x.data(); return *this; }
+        Logstream& operator<<(const StringData& x) { ss << x; return *this; }
         Logstream& operator<<(char *x)       { ss << x; return *this; }
         Logstream& operator<<(char x)        { ss << x; return *this; }
         Logstream& operator<<(int x)         { ss << x; return *this; }

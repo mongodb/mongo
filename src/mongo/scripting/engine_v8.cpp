@@ -19,7 +19,6 @@
 
 #include "mongo/scripting/v8_db.h"
 #include "mongo/scripting/v8_utils.h"
-#include "mongo/scripting/v8_wrapper.h"
 #include "mongo/util/mongoutils/str.h"
 
 #define V8_SIMPLE_HEADER v8::Locker l(_isolate); v8::Isolate::Scope iscope(_isolate); HandleScope handle_scope; Context::Scope context_scope( _context );
@@ -309,9 +308,14 @@ namespace mongo {
 //    }
 
     void gcCallback(GCType type, GCCallbackFlags flags) {
+        const int verbosity = 1;    // log level for stat collection
+        if (logLevel < verbosity)
+            // don't collect stats unless verbose
+            return;
+
         HeapStatistics stats;
         V8::GetHeapStatistics( &stats );
-        LOG(1) << "V8 GC heap stats - "
+        LOG(verbosity) << "V8 GC heap stats - "
                 << " total: " << stats.total_heap_size()
                 << " exec: " << stats.total_heap_size_executable()
                 << " used: " << stats.used_heap_size()<< " limit: "
@@ -320,12 +324,6 @@ namespace mongo {
     }
 
     V8ScriptEngine::V8ScriptEngine() {
-        // set resource contraints before any call
-        int K = 1024;
-        v8::ResourceConstraints rc;
-//        rc.set_max_young_space_size(4 * K * K);
-        rc.set_max_old_space_size( 64 * K * K );
-        v8::SetResourceConstraints( &rc );
 
         // keep engine up after OOM
         v8::V8::IgnoreOutOfMemoryException();
@@ -392,8 +390,8 @@ namespace mongo {
         // resource constraints must be set on isolate, before any call or lock
         int K = 1024;
         v8::ResourceConstraints rc;
-//        rc.set_max_young_space_size(4 * K * K);
-        rc.set_max_old_space_size( 64 * K * K );
+        rc.set_max_young_space_size(4 * K * K);
+        rc.set_max_old_space_size(64 * K * K);
         v8::SetResourceConstraints(&rc);
         V8::AddGCPrologueCallback(gcCallback, kGCTypeMarkSweepCompact);
 
@@ -462,8 +460,6 @@ namespace mongo {
         injectV8Function("version", Version);
         injectV8Function("load", load);
 
-        _wrapper = Persistent< v8::Function >::New( getObjectWrapperTemplate(this)->GetFunction() );
-
         injectV8Function("gc", GCV8);
 
         installDBTypes( this, _global );
@@ -475,7 +471,6 @@ namespace mongo {
 
         {
         V8_SIMPLE_HEADER
-        _wrapper.Dispose();
         _emptyObj.Dispose();
         for( unsigned i = 0; i < _funcs.size(); ++i )
             _funcs[ i ].Dispose();
@@ -625,7 +620,7 @@ namespace mongo {
         V8_SIMPLE_HEADER
         // Set() accepts a ReadOnly parameter, but this just prevents the field itself
         // from being overwritten and doesn't protect the object stored in 'field'.
-        _global->Set( getV8Str( field ) , mongoToLZV8( obj, false, readOnly) );
+        _global->Set(getV8Str(field), mongoToLZV8(obj, readOnly));
     }
 
     int V8Scope::type( const char *field ) {
@@ -767,18 +762,6 @@ namespace mongo {
         _global->Set( getV8Str( field ) , __createFunction(code) );
     }
 
-//    void V8Scope::setThis( const BSONObj * obj ) {
-//        V8_SIMPLE_HEADER
-//        if ( ! obj ) {
-//            _this = Persistent< v8::Object >::New( v8::Object::New() );
-//            return;
-//        }
-//
-//        //_this = mongoToV8( *obj );
-//        v8::Handle<v8::Value> argv[1];
-//        argv[0] = v8::External::New( createWrapperHolder( this, obj , true , false ) );
-//        _this = Persistent< v8::Object >::New( _wrapper->NewInstance( 1, argv ) );
-//    }
 
     void V8Scope::rename( const char * from , const char * to ) {
         V8_SIMPLE_HEADER;
@@ -816,7 +799,7 @@ namespace mongo {
         }
         Handle<v8::Object> v8recv;
         if (recv != 0)
-            v8recv = mongoToLZV8(*recv, false, readOnlyRecv);
+            v8recv = mongoToLZV8(*recv, readOnlyRecv);
         else
             v8recv = _global;
 
@@ -855,7 +838,7 @@ namespace mongo {
 
         TryCatch try_catch;
 
-        Handle<Script> script = v8::Script::Compile( v8::String::New( code.data() ) ,
+        Handle<Script> script = v8::Script::Compile( v8::String::New( code.rawData(), code.size() ),
                                 v8::String::New( name.c_str() ) );
         if (script.IsEmpty()) {
             stringstream ss;
@@ -1126,7 +1109,7 @@ namespace mongo {
                 break;
             case mongo::Object:
                 sub = f.embeddedObject();
-                o->Set( name , mongoToLZV8( sub , false, readOnly ) );
+                o->Set(name, mongoToLZV8(sub, readOnly));
                 break;
 
             case mongo::Date:
@@ -1243,7 +1226,7 @@ namespace mongo {
     /**
      * converts a BSONObj to a Lazy V8 object
      */
-    Handle<v8::Object> V8Scope::mongoToLZV8( const BSONObj& m , bool array, bool readOnly ) {
+    Handle<v8::Object> V8Scope::mongoToLZV8(const BSONObj& m, bool readOnly) {
         Local<v8::Object> o;
         BSONHolder* own = new BSONHolder(m);
 
@@ -1255,29 +1238,18 @@ namespace mongo {
                                             "v8 still executing."),
                            *o != NULL);
         } else {
-            if (array) {
-                o = lzArrayTemplate->NewInstance();
-                massert(16498, mongoutils::str::stream() << "V8: NULL Array template instantiated. "
-                                         << (v8::V8::IsExecutionTerminating() ?
-                                                "v8 execution is terminating." :
-                                                "v8 still executing."),
-                               *o != NULL);
-                o->SetPrototype(v8::Array::New(1)->GetPrototype());
-                o->Set(V8STR_LENGTH, v8::Integer::New(m.nFields()), DontEnum);
-            } else {
-                o = lzObjectTemplate->NewInstance();
-                massert(16496, mongoutils::str::stream() << "V8: NULL Object template instantiated. "
-                                         << (v8::V8::IsExecutionTerminating() ?
-                                                "v8 execution is terminating." :
-                                                "v8 still executing."),
-                               *o != NULL);
-                static string ref = "$ref";
-                if ( ref == m.firstElement().fieldName() ) {
-                  const BSONElement& id = m["$id"];
-                  if (!id.eoo()) {
-                      v8::Function* dbRef = getNamedCons( "DBRef" );
-                      o->SetPrototype(dbRef->NewInstance()->GetPrototype());
-                  }
+            o = lzObjectTemplate->NewInstance();
+            massert(16496, mongoutils::str::stream() << "V8: NULL Object template instantiated. "
+                                     << (v8::V8::IsExecutionTerminating() ?
+                                            "v8 execution is terminating." :
+                                            "v8 still executing."),
+                           *o != NULL);
+            static string ref = "$ref";
+            if ( ref == m.firstElement().fieldName() ) {
+                const BSONElement& id = m["$id"];
+                if (!id.eoo()) {
+                    v8::Function* dbRef = getNamedCons( "DBRef" );
+                    o->SetPrototype(dbRef->NewInstance()->GetPrototype());
                 }
             }
         }
@@ -1330,7 +1302,7 @@ namespace mongo {
             // - most times when an array is accessed, all its values will be used
             return mongoToV8( f.embeddedObject() , true, readOnly );
         case mongo::Object:
-            return mongoToLZV8( f.embeddedObject() , false, readOnly);
+            return mongoToLZV8(f.embeddedObject(), readOnly);
 
         case mongo::Date:
             return v8::Date::New( (double) ((long long)f.date().millis) );

@@ -39,10 +39,11 @@ namespace mongo {
         fassertFailed(16462);
     }
 
-    void ShardingConnectionHook::onHandedOut( DBClientBase * conn ) {
-        if( _shardedConnections ){
-            ClientInfo::get()->addShard( conn->getServerAddress() );
-        }
+    /** When this callback is run, we record a shard that we've used for useful work
+     *  in an operation to be read later by getLastError()
+    */
+    void usingAShardConnection( const string& addr ) {
+        ClientInfo::get()->addShard( addr );
     }
 
     TSP_DEFINE(Client,currentClient)

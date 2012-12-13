@@ -532,7 +532,7 @@ namespace mongo {
             ReplInfo r("resync: cloning a database");
             string errmsg;
             int errCode = 0;
-            bool ok = cloneFrom(hostName.c_str(), errmsg, cc().database()->name, false, /*slaveOk*/ true, /*replauth*/ true, /*snapshot*/false, /*mayYield*/true, /*mayBeInterrupted*/false, &errCode);
+            bool ok = Cloner::cloneFrom(hostName.c_str(), errmsg, cc().database()->name, false, /*slaveOk*/ true, /*replauth*/ true, /*snapshot*/false, /*mayYield*/true, /*mayBeInterrupted*/false, &errCode);
             if ( !ok ) {
                 if ( errCode == DatabaseDifferCaseCode ) {
                     resyncDrop( db.c_str(), "internal" );
@@ -1127,8 +1127,8 @@ namespace mongo {
         if( noauth ) {
             return true;
         }
-        if( ! cc().isAdmin() ) {
-            log() << "replauthenticate: requires admin permissions, failing" << endl;
+        if (!cc().isAdmin() || !cc().getAuthorizationManager()->hasInternalAuthorization()) {
+            log() << "replauthenticate: requires internal authorization, failing" << endl;
             return false;
         }
 
@@ -1216,7 +1216,9 @@ namespace mongo {
 
     bool OplogReader::commonConnect(const string& hostName) {
         if( conn() == 0 ) {
-            _conn = shared_ptr<DBClientConnection>(new DBClientConnection( false, 0, 60*10 /* tcp timeout */));
+            _conn = shared_ptr<DBClientConnection>(new DBClientConnection(false,
+                                                                          0,
+                                                                          30 /* tcp timeout */));
             string errmsg;
             ReplInfo r("trying to connect to sync source");
             if ( !_conn->connect(hostName.c_str(), errmsg) ||

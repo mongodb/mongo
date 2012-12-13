@@ -27,7 +27,6 @@ namespace mongo {
 
     BSONField<std::string> DatabaseType::name("_id");
     BSONField<std::string> DatabaseType::primary("primary");
-    BSONField<bool> DatabaseType::scattered("scatterCollections");
     BSONField<bool> DatabaseType::draining("draining");
 
     BSONField<bool> DatabaseType::DEPRECATED_partitioned("partitioned");
@@ -64,23 +63,19 @@ namespace mongo {
         BSONObjBuilder builder;
         if (!_name.empty()) builder.append(name(), _name);
         if (!_primary.empty()) builder.append(primary(), _primary);
-        if (_scattered) builder.append(scattered(), _scattered);
         if (_draining) builder.append(draining(), _draining);
         return builder.obj();
     }
 
-    void DatabaseType::parseBSON(BSONObj source) {
+    bool DatabaseType::parseBSON(BSONObj source, string* errMsg) {
         clear();
 
-        bool ok = true;
-        ok &= FieldParser::extract(source, name, "", &_name);
-        ok &= FieldParser::extract(source, primary, "", &_primary);
-        ok &= FieldParser::extract(source, scattered, false, &_scattered );
-        ok &= FieldParser::extract(source, draining, false, &_draining);
-        if (! ok) {
-            clear();
-            return;
-        }
+        std::string dummy;
+        if (!errMsg) errMsg = &dummy;
+
+        if (!FieldParser::extract(source, name, "", &_name, errMsg)) return false;
+        if (!FieldParser::extract(source, primary, "", &_primary, errMsg)) return false;
+        if (!FieldParser::extract(source, draining, false, &_draining, errMsg)) return false;
 
         //
         // backward compatibility
@@ -89,16 +84,14 @@ namespace mongo {
         // There used to be a flag called "partitioned" that would allow collections
         // under that database to be sharded. We don't require that anymore.
         bool partitioned;
-        if (! FieldParser::extract(source, DEPRECATED_partitioned, false, &partitioned)) {
-            clear();
-            return;
-        }
+        if (!FieldParser::extract(source, DEPRECATED_partitioned, false, &partitioned, errMsg)) return false;
+
+        return true;
     }
 
     void DatabaseType::clear() {
         _name.clear();
         _primary.clear();
-        _scattered = false;
         _draining = false;
     }
 
@@ -106,7 +99,6 @@ namespace mongo {
         other->clear();
         other->_name = _name;
         other->_primary = _primary;
-        other->_scattered = _scattered;
         other->_draining = _draining;
     }
 
