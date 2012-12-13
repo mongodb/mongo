@@ -26,6 +26,7 @@
 
 #include "mongo/bson/inline_decls.h"
 #include "mongo/base/string_data.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
     /* Accessing unaligned doubles on ARM generates an alignment trap and aborts with SIGBUS on Linux.
