@@ -1,11 +1,11 @@
 # -*- mode: python; -*-
 # build file for MongoDB
 # this requires scons
-# you can get from http://www.scons.org
+# you can get from http://www.scons.org/
 # then just type scons
 
 # some common tasks
-#   build 64-bit mac and pushing to s3
+#   build 64-bit Mac and pushing to s3
 #      scons --64 s3dist
 #      scons --distname=0.8 s3dist
 #      all s3 pushes require settings.py and simples3
