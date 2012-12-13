@@ -33,6 +33,36 @@ namespace mongo {
     class PrincipalSet {
         MONGO_DISALLOW_COPYING(PrincipalSet);
     public:
+        /**
+         * Forward iterator over the names of the principals stored in a PrincpalSet.
+         *
+         * Instances are valid until the underlying vector<Principal*> is modified.
+         */
+        class NameIterator {
+        public:
+            explicit NameIterator(const std::vector<Principal*>& principals) :
+                _curr(principals.begin()),
+                _end(principals.end()) {
+            }
+
+            NameIterator() {}
+
+            bool more() { return _curr != _end; }
+            const PrincipalName& next() {
+                ++_curr;
+                return get();
+            }
+
+            const PrincipalName& get() const { return (*(_curr - 1))->getName(); }
+
+            const PrincipalName& operator*() const { return get(); }
+            const PrincipalName* operator->() const { return &get(); }
+
+        private:
+            std::vector<Principal*>::const_iterator _curr;
+            std::vector<Principal*>::const_iterator _end;
+        };
+
         PrincipalSet();
         ~PrincipalSet();
 
@@ -53,6 +83,10 @@ namespace mongo {
         // Gets the principal whose authentication credentials came from dbname, or NULL if none
         // exist.  There should be at most one such principal.
         Principal* lookupByDBName(const StringData& dbname) const;
+
+        // Gets an iterator over the names of the principals stored in the set.  The iterator is
+        // valid until the next non-const method is called on the PrincipalSet.
+        NameIterator getNames() const { return NameIterator(_principals); }
 
     private:
         // The PrincipalSet maintains ownership of the Principals in it, and is responsible for

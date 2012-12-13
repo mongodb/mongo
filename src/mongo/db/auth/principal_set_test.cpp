@@ -27,6 +27,10 @@
 namespace mongo {
 namespace {
 
+    static inline std::ostream& operator<<(std::ostream& os, const PrincipalName& pname) {
+        return os << pname.toString();
+    }
+
     TEST(PrincipalSetTest, BasicTest) {
         PrincipalSet set;
 
@@ -72,6 +76,20 @@ namespace {
         ASSERT_NULL(set.lookupByDBName("test"));
         ASSERT_EQUALS(p3, set.lookup(PrincipalName("Bob", "test2")));
         ASSERT_EQUALS(p3, set.lookupByDBName("test2"));
+    }
+
+    TEST(PrincipalSetTest, IterateNames) {
+        PrincipalSet pset;
+        PrincipalSet::NameIterator iter = pset.getNames();
+        ASSERT(!iter.more());
+
+        pset.add(new Principal(PrincipalName("bob", "test")));
+
+        iter = pset.getNames();
+        ASSERT(iter.more());
+        ASSERT_EQUALS(iter.next(), PrincipalName("bob", "test"));
+        ASSERT_EQUALS(*iter, PrincipalName("bob", "test"));
+        ASSERT(!iter.more());
     }
 
 }  // namespace

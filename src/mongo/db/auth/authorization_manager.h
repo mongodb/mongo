@@ -68,6 +68,9 @@ namespace mongo {
         // Ownership of the returned Principal remains with _authenticatedPrincipals
         Principal* lookupPrincipal(const PrincipalName& name);
 
+        // Gets an iterator over the names of all authenticated principals stored in this manager.
+        PrincipalSet::NameIterator getAuthenticatedPrincipalNames();
+
         // Removes any authenticated principals whose authorization credentials came from the given
         // database, and revokes any privileges that were granted via that principal.
         void logoutDatabase(const std::string& dbname);
