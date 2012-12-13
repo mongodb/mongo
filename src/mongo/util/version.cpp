@@ -179,12 +179,13 @@ namespace mongo {
             // $ numactl --interleave=all cat /proc/self/numa_maps
             // 00400000 interleave:0-7 file=/bin/cat mapped=6 N4=6
 
-            File f;
-            f.open("/proc/self/numa_maps", /*read_only*/true);
-            if ( f.is_open() && ! f.bad() ) {
+            std::ifstream f("/proc/self/numa_maps", std::ifstream::in);
+            if (f.is_open()) {
                 char line[100]; //we only need the first line
-                if (read(f.fd, line, sizeof(line)) < 0){
-                    warning() << "failed to read from /proc/self/numa_maps: " << errnoWithDescription() << startupWarningsLog;
+                f.getline(line, sizeof(line));
+                if (f.fail()) {
+                    warning() << "failed to read from /proc/self/numa_maps: "
+                              << errnoWithDescription() << startupWarningsLog;
                     warned = true;
                 }
                 else {
