@@ -40,6 +40,11 @@ together, then the values of the next column, and so on:
 WiredTiger supports both storage formats, and can mix and match the storage
 of columns within a logical table.
 
+A \em table in WiredTiger consist of one or more \em "column groups" that
+together hold all of the columns in primary key order; and zero or more \em
+indices that enable fast lookup of records by columns in orders other than
+the primary key.
+
 Applications describe the format of their data by supplying a schema to
 WT_SESSION::create.  This specifies how the application's data can be split
 into fields and mapped onto rows and columns.
@@ -246,7 +251,7 @@ group.  Because column groups always have the same key as the table, key
 columns for column groups are retrieved using WT_CURSOR::get_key, not
 WT_CURSOR::get_value.
 
-@section schema_column_indices Column indices
+@section schema_indices Indices
 
 Columns are also used to create and configure indices on tables.
 
@@ -281,24 +286,25 @@ complicated WT_CURSOR::set_key call, but is otherwise the same:
 
 @snippet ex_schema.c Search in a composite index
 
-By default, index cursors return all of the table's value columns from
-WT_CURSOR::get_value.  To configure the cursor to return a key column
-or a subset of the available value columns, specify a list of columns
-in the cursor URI when the cursor is opened.  For example:
-
-@snippet ex_schema.c Return the table's record number key using an index
-
 @section schema_index_projections Index cursor projections
 
-When opening an index cursor, the application can specify that a subset of
-the usual columns should be returned in calls to WT_CURSOR::get_value by
+By default, index cursors return all of the table's value columns from
+WT_CURSOR::get_value.  The application can specify that a subset of the
+usual columns should be returned in calls to WT_CURSOR::get_value by
 appending a list of columns to the \c uri parameter of the
 WT_SESSION::open_cursor call.  This is called a \em projection, see @ref
 cursor_projections for more details.
 
 In the case of index cursors, a projection can be used to avoid lookups
-in column groups that do not hold columns relevant to the operation. For
-example:
+in column groups that do not hold columns relevant to the operation.
+
+The following example will return just the table's primary key (a record
+number, in this case) from the index:
+
+@snippet ex_schema.c Return the table's record number key using an index
+
+Here is an example of a projection that return a subset of columns from the
+index:
 
 @snippet ex_schema.c Return a subset of the value columns from an index
 

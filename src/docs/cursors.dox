@@ -86,8 +86,9 @@ from the listed columns are returned by WT_CURSOR::get_value.
 
 This is particularly useful with index cursors, because if all columns in
 the projection are available in the index (including primary key columns,
-which are the values of the index), there is no need to access any column
-groups.
+which are the values of the index), the data can be read from the index
+without accessing any column groups.  See @ref schema_indices for more
+details.
 
 @section cursor_raw Raw mode
 
