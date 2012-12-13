@@ -1,9 +1,9 @@
 // SERVER-7906
-load('jstests/libs/geo_near_random.js');
 
 var coll = 'points'
 
 function test(db, sharded, indexType) {
+    printjson(db);
     db[coll].drop();
 
     if (sharded) {
@@ -22,17 +22,18 @@ function test(db, sharded, indexType) {
         assert.eq(config.chunks.count({'ns': shardedDB[coll].getFullName()}), 10);
     }
 
-    var pointMaker = new GeoNearRandomTest(coll);
     var numPts = 10*1000;
     for (var i=0; i < numPts; i++) {
-        db[coll].insert({rand:Math.random(), loc: pointMaker.mkPt()})
+        var lat = 90 - Random.rand() * 180;
+        var lng = 180 - Random.rand() * 360;
+        db[coll].insert({rand:Math.random(), loc: [lat, lng]})
     }
     db.getLastError();
     assert.eq(db[coll].count(), numPts);
 
     db[coll].ensureIndex({loc: indexType})
 
-    var queryPoint = pointMaker.mkPt(0.25) // stick to center of map
+    var queryPoint = [0,0]
     geoCmd = {geoNear: coll, near: queryPoint, includeLocs: true};
     assert.commandWorked(db.runCommand(geoCmd), tojson({sharded: sharded, indexType: indexType}));
 }
@@ -41,10 +42,7 @@ var sharded = new ShardingTest({shards: 3, verbose: 0, mongos: 1});
 sharded.stopBalancer();
 sharded.adminCommand( { enablesharding : "test" } );
 var shardedDB = sharded.getDB('test');
+printjson(shardedDB);
 
-
-test(db, false, '2d');
-test(db, false, '2dsphere');
-test(shardedDB, true, '2d');
 test(shardedDB, true, '2dsphere');
 sharded.stop();
