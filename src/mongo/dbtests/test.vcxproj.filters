@@ -1206,6 +1206,9 @@
     <ClInclude Include="..\base\string_data-inl.h">
       <Filter>base</Filter>
     </ClInclude>
+    <ClInclude Include="..\db\auth\principal_name.h">
+      <Filter>db\auth</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\client\connpool.cpp">
@@ -2418,6 +2421,9 @@
     </ClCompile>
     <ClCompile Include="..\base\string_data.cpp">
       <Filter>base</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\file.cpp">
+      <Filter>util\Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
