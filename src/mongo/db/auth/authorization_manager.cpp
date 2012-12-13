@@ -73,9 +73,9 @@ namespace mongo {
         // TODO: Remove OLD_READ once commands require the proper actions
         readRoleActions.addAction(ActionType::oldRead);
         readRoleActions.addAction(ActionType::collStats);
+        readRoleActions.addAction(ActionType::dbHash);
         readRoleActions.addAction(ActionType::dbStats);
         readRoleActions.addAction(ActionType::find);
-        //TODO: should dbHash go here?
 
         // Read-write role
         readWriteRoleActions.addAllActionsFromSet(readRoleActions);
@@ -130,7 +130,7 @@ namespace mongo {
         serverAdminRoleReadActions.addAction(ActionType::touch);
         serverAdminRoleReadActions.addAction(ActionType::unlock);
 
-        // TODO: should applyOps go here?
+        serverAdminRoleWriteActions.addAction(ActionType::applyOps);
         serverAdminRoleWriteActions.addAction(ActionType::closeAllDatabases);
         serverAdminRoleWriteActions.addAction(ActionType::cpuProfiler);
         serverAdminRoleWriteActions.addAction(ActionType::cursorInfo);
