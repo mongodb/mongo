@@ -34,7 +34,6 @@ namespace mongo {
     void buildAnIndex(const std::string& ns,
                       NamespaceDetails *d,
                       IndexDetails& idx,
-                      int32_t idxNo,
                       bool background,
                       bool mayInterrupt);
 

@@ -668,4 +668,22 @@ namespace mongo {
 
     void addRecordToRecListInExtent(Record* r, DiskLoc loc);
 
+    /**
+     * Static helpers to manipulate the list of unfinished index builds.
+     */
+    class IndexBuildsInProgress {
+    public:
+        /**
+         * Find an unfinished index build by name.  Does not search finished index builds.
+         */
+        static int get(const char* ns, const std::string& indexName);
+
+        /**
+         * Remove an unfinished index build from the list of index builds and move every subsequent
+         * unfinished index build back one.  E.g., if x, y, z, and w are building and someone kills
+         * y, this method would rearrange the list to be x, z, w, (empty), etc.
+         */
+        static void remove(const char* ns, int offset);
+    };
+
 } // namespace mongo

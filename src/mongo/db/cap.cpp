@@ -427,8 +427,8 @@ namespace mongo {
     void NamespaceDetails::emptyCappedCollection( const char *ns ) {
         DEV verify( this == nsdetails(ns) );
         massert( 13424, "collection must be capped", isCapped() );
-        massert( 13425, "background index build in progress", !indexBuildInProgress );
-        
+        massert( 13425, "background index build in progress", !indexBuildsInProgress );
+
         vector<BSONObj> indexes = Helpers::findAll( Namespace( ns ).getSisterNS( "system.indexes" ) , BSON( "ns" << ns ) );
         for ( unsigned i=0; i<indexes.size(); i++ ) {
             indexes[i] = indexes[i].copy();

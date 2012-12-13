@@ -70,7 +70,7 @@ namespace mongo {
         multiKeyIndexBits = 0;
         reservedA = 0;
         extraOffset = 0;
-        indexBuildInProgress = 0;
+        indexBuildsInProgress = 0;
         memset(reserved, 0, sizeof(reserved));
     }
 
@@ -116,7 +116,7 @@ namespace mongo {
         cout << "ns         " << firstExtent.toString() << ' ' << lastExtent.toString() << " nidx:" << nIndexes << '\n';
         cout << "ns         " << stats.datasize << ' ' << stats.nrecords << ' ' << nIndexes << '\n';
         cout << "ns         " << isCapped() << ' ' << _paddingFactor << ' ' << _systemFlags << ' ' << _userFlags << ' ' << dataFileVersion << '\n';
-        cout << "ns         " << multiKeyIndexBits << ' ' << indexBuildInProgress << '\n';
+        cout << "ns         " << multiKeyIndexBits << ' ' << indexBuildsInProgress << '\n';
         cout << "ns         " << (int) reserved[0] << ' ' << (int) reserved[59];
         cout << endl;
     }
@@ -517,22 +517,41 @@ namespace mongo {
         return e;
     }
 
-    void NamespaceDetails::setIndexIsMultikey(const char *thisns, int i) {
-        dassert( i < NIndexesMax );
-        unsigned long long x = ((unsigned long long) 1) << i;
-        if( multiKeyIndexBits & x ) return;
-        *getDur().writing(&multiKeyIndexBits) |= x;
+    void NamespaceDetails::setIndexIsMultikey(const char *thisns, int i, bool multikey) {
+        massert(16577, "index number greater than NIndexesMax", i < NIndexesMax );
+
+        unsigned long long mask = 1ULL << i;
+
+        if (multikey) {
+            // Shortcut if the bit is already set correctly
+            if (multiKeyIndexBits & mask) {
+                return;
+            }
+
+            *getDur().writing(&multiKeyIndexBits) |= mask;
+        }
+        else {
+            // Shortcut if the bit is already set correctly
+            if (!(multiKeyIndexBits & mask)) {
+                return;
+            }
+
+            // Invert mask: all 1's except a 0 at the ith bit
+            mask = ~mask;
+            *getDur().writing(&multiKeyIndexBits) &= mask;
+        }
+
         NamespaceDetailsTransient::get(thisns).clearQueryCache();
     }
 
     IndexDetails& NamespaceDetails::getNextIndexDetails(const char* thisns) {
         IndexDetails *id;
         try {
-            id = &idx(nIndexes,true);
+            id = &idx(getTotalIndexCount(), true);
         }
         catch(DBException&) {
-            allocExtra(thisns, nIndexes);
-            id = &idx(nIndexes,false);
+            allocExtra(thisns, getTotalIndexCount());
+            id = &idx(getTotalIndexCount(), false);
         }
         return *id;
     }

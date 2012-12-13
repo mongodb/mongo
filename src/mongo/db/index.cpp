@@ -250,7 +250,7 @@ namespace mongo {
 
     void getIndexChanges(vector<IndexChanges>& v, const char *ns, NamespaceDetails& d,
                          BSONObj newObj, BSONObj oldObj, bool &changedId) {
-        int z = d.nIndexesBeingBuilt();
+        int z = d.getTotalIndexCount();
         v.resize(z);
         for( int i = 0; i < z; i++ ) {
             IndexDetails& idx = d.idx(i);
@@ -269,7 +269,7 @@ namespace mongo {
     }
 
     void dupCheck(vector<IndexChanges>& v, NamespaceDetails& d, DiskLoc curObjLoc) {
-        int z = d.nIndexesBeingBuilt();
+        int z = d.getTotalIndexCount();
         for( int i = 0; i < z; i++ ) {
             IndexDetails& idx = d.idx(i);
             v[i].dupCheck(idx, curObjLoc);
@@ -353,12 +353,6 @@ namespace mongo {
             log() << s << endl;
             uasserted(12505,s);
         }
-
-        /* we can't build a new index for the ns if a build is already in progress in the background -
-           EVEN IF this is a foreground build.
-           */
-        uassert(12588, "cannot add index with a background operation in progress",
-                !BackgroundOperation::inProgForNs(sourceNS.c_str()));
 
         /* this is because we want key patterns like { _id : 1 } and { _id : <someobjid> } to
            all be treated as the same pattern.

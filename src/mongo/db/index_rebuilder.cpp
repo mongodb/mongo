@@ -50,6 +50,7 @@ namespace mongo {
         DBDirectClient cli;
         scoped_ptr<DBClientCursor> cursor(cli.query(systemNS, Query()));
 
+        // This depends on system.namespaces not changing while we iterate
         while (cursor->more()) {
             BSONObj nsDoc = cursor->next();
             const char* ns = nsDoc["name"].valuestrsafe();
@@ -57,7 +58,7 @@ namespace mongo {
             Client::Context ctx(ns, dbpath, false, false);
             NamespaceDetails* nsd = nsdetails(ns);
 
-            if (!nsd || !nsd->indexBuildInProgress) {
+            if (!nsd || !nsd->indexBuildsInProgress) {
                 continue;
             }
 
@@ -67,27 +68,38 @@ namespace mongo {
             if (!cmdLine.indexBuildRetry) {
                 // If we crash between unsetting the inProg flag and cleaning up the index, the
                 // index space will be lost.
-                getDur().writingInt(nsd->indexBuildInProgress) = 0;
-                nsd->idx(nsd->nIndexes).kill_idx();
+                int inProg = nsd->indexBuildsInProgress;
+                getDur().writingInt(nsd->indexBuildsInProgress) = 0;
+
+                for (int i = 0; i < inProg; i++) {
+                    nsd->idx(nsd->nIndexes+i).kill_idx();
+                }
+
                 continue;
             }
 
-            retryIndexBuild(dbName, nsd);
+            // We go from right to left building these indexes, so that indexBuildInProgress-- has
+            // the correct effect of "popping" an index off the list.
+            while (nsd->indexBuildsInProgress > 0) {
+                retryIndexBuild(dbName, nsd, nsd->nIndexes+nsd->indexBuildsInProgress-1);
+            }
         }
     }
 
-    void IndexRebuilder::retryIndexBuild(const std::string& dbName, NamespaceDetails* nsd) {
+    void IndexRebuilder::retryIndexBuild(const std::string& dbName,
+                                         NamespaceDetails* nsd,
+                                         const int index) {
         // details.info is always a valid system.indexes entry because DataFileMgr::insert journals
         // creating the index doc and then insert_makeIndex durably assigns its DiskLoc to info.
-        // indexBuildInProgress is set after that, so if it is set, info must be set.
-        IndexDetails& details = nsd->idx(nsd->nIndexes);
+        // indexBuildsInProgress is set after that, so if it is set, info must be set.
+        IndexDetails& details = nsd->idx(index);
 
         // First, clean up the in progress index build.  Save the system.indexes entry so that we
         // can add it again afterwards.
         BSONObj indexObj = details.info.obj().getOwned();
 
         // Clean up the in-progress index build
-        getDur().writingInt(nsd->indexBuildInProgress) = 0;
+        getDur().writingInt(nsd->indexBuildsInProgress) -= 1;
         details.kill_idx();
         // The index has now been removed from system.indexes, so the only record of it is in-
         // memory. If there is a journal commit between now and when insert() rewrites the entry and

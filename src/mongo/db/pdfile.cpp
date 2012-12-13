@@ -113,7 +113,6 @@ namespace mongo {
     BackgroundOperation::BackgroundOperation(const char *ns) : _ns(ns) {
         SimpleMutex::scoped_lock lk(m);
         dbsInProg[_ns.db]++;
-        verify( nsInProg.count(_ns.ns()) == 0 );
         nsInProg.insert(_ns.ns());
     }
 
@@ -1163,7 +1162,7 @@ namespace mongo {
         /* have any index keys changed? */
         {
             int keyUpdates = 0;
-            int z = d->nIndexesBeingBuilt();
+            int z = d->getTotalIndexCount();
             for ( int x = 0; x < z; x++ ) {
                 IndexDetails& idx = d->idx(x);
                 IndexInterface& ii = idx.idxInterface();
@@ -1417,7 +1416,10 @@ namespace mongo {
             background = false;
         }
 
-        int idxNo = tableToIndex->nIndexes;
+        // The total number of indexes right before we write to the collection
+        int oldNIndexes = -1;
+        int idxNo = tableToIndex->getTotalIndexCount();
+        std::string idxName = info["name"].valuestr();
 
         // Set curop description before setting indexBuildInProg, so that there's something
         // commands can find and kill as soon as indexBuildInProg is set. Only set this if it's a
@@ -1433,8 +1435,8 @@ namespace mongo {
             getDur().writingDiskLoc(idx.info) = loc;
 
             try {
-                getDur().writingInt(tableToIndex->indexBuildInProgress) = 1;
-                buildAnIndex(tabletoidxns, tableToIndex, idx, idxNo, background, mayInterrupt);
+                getDur().writingInt(tableToIndex->indexBuildsInProgress) += 1;
+                buildAnIndex(tabletoidxns, tableToIndex, idx, background, mayInterrupt);
             }
             catch (DBException& e) {
                 // save our error msg string as an exception or dropIndexes will overwrite our message
@@ -1450,6 +1452,8 @@ namespace mongo {
                     saveerrmsg = e.what();
                 }
 
+                // Recalculate the index # so we can remove it from the list in the next catch
+                idxNo = IndexBuildsInProgress::get(tabletoidxns.c_str(), idxName);
                 // roll back this index
                 idx.kill_idx();
 
@@ -1458,9 +1462,39 @@ namespace mongo {
                 throw;
             }
 
+            // Recompute index numbers
+            tableToIndex = nsdetails(tabletoidxns.c_str());
+            idxNo = IndexBuildsInProgress::get(tabletoidxns.c_str(), idxName);
+            verify(idxNo > -1);
+
+            // Make sure the newly created index is relocated to nIndexes, if it isn't already there
+            if (idxNo != tableToIndex->nIndexes) {
+                log() << "switching indexes at position " << idxNo << " and "
+                      << tableToIndex->nIndexes << endl;
+                // We cannot use idx here, as it may point to a different index entry if it was
+                // flipped during building
+                IndexDetails temp = tableToIndex->idx(idxNo);
+                *getDur().writing(&tableToIndex->idx(idxNo)) =
+                    tableToIndex->idx(tableToIndex->nIndexes);
+                *getDur().writing(&tableToIndex->idx(tableToIndex->nIndexes)) = temp;
+
+                // We also have to flip multikey entries
+                bool tempMultikey = tableToIndex->isMultikey(idxNo);
+                tableToIndex->setIndexIsMultikey(tabletoidxns.c_str(), idxNo,
+                                                 tableToIndex->isMultikey(tableToIndex->nIndexes));
+                tableToIndex->setIndexIsMultikey(tabletoidxns.c_str(), tableToIndex->nIndexes,
+                                                 tempMultikey);
+
+                idxNo = tableToIndex->nIndexes;
+            }
+
+            // Store the current total of indexes in case something goes wrong actually adding the
+            // index
+            oldNIndexes = tableToIndex->getTotalIndexCount();
+
             // clear transient info caches so they refresh; increments nIndexes
             tableToIndex->addIndex(tabletoidxns.c_str());
-            getDur().writingInt(tableToIndex->indexBuildInProgress) = 0;
+            getDur().writingInt(tableToIndex->indexBuildsInProgress) -= 1;
         }
         catch (...) {
             // Generally, this will be called as an exception from building the index bubbles up.
@@ -1469,15 +1503,48 @@ namespace mongo {
             // successfully finished building and addIndex or kill_idx threw.
 
             // Check if nIndexes was incremented
-            if (idxNo < tableToIndex->nIndexes) {
-                // TODO: this will have to change when we can have multiple simultanious index
-                // builds
-                getDur().writingInt(tableToIndex->nIndexes) -= 1;
+            if (oldNIndexes != -1 && oldNIndexes != tableToIndex->nIndexes) {
+                getDur().writingInt(tableToIndex->nIndexes) = oldNIndexes;
             }
 
-            getDur().writingInt(tableToIndex->indexBuildInProgress) = 0;
+            // Move any other in prog indexes "back" one. It is important that idxNo is set
+            // correctly so that the correct index is removed
+            IndexBuildsInProgress::remove(tabletoidxns.c_str(), idxNo);
+            getDur().writingInt(tableToIndex->indexBuildsInProgress) -= 1;
 
             throw;
+        }
+    }
+
+    // indexName is passed in because index details may not be pointing to something valid at this
+    // point
+    int IndexBuildsInProgress::get(const char* ns, const std::string& indexName) {
+        Lock::assertWriteLocked(ns);
+        NamespaceDetails* nsd = nsdetails(ns);
+
+        // Go through unfinished index builds and try to find this index
+        for (int i=nsd->nIndexes; i<nsd->nIndexes+nsd->indexBuildsInProgress; i++) {
+            if (indexName == nsd->idx(i).indexName()) {
+                return i;
+            }
+        }
+
+        return -1;
+    }
+
+    void IndexBuildsInProgress::remove(const char* ns, int offset) {
+        Lock::assertWriteLocked(ns);
+        NamespaceDetails* nsd = nsdetails(ns);
+
+        for (int i=offset; i<nsd->getTotalIndexCount(); i++) {
+            if (i < NamespaceDetails::NIndexesMax-1) {
+                *getDur().writing(&nsd->idx(i)) = nsd->idx(i+1);
+                nsd->setIndexIsMultikey(ns, i, nsd->isMultikey(i+1));
+            }
+            else {
+                *getDur().writing(&nsd->idx(i)) = IndexDetails();
+                nsd->setIndexIsMultikey(ns, i, false);
+            }
         }
     }
 

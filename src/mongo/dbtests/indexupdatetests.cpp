@@ -511,6 +511,61 @@ namespace IndexUpdateTests {
         }
     };
 
+    class IndexBuildInProgressTest : public IndexBuildBase {
+    public:
+        void run() {
+            // _id_ is at 0, so nIndexes == 1
+            halfAddIndex("a");
+            halfAddIndex("b");
+            halfAddIndex("c");
+            halfAddIndex("d");
+            int offset = IndexBuildsInProgress::get(_ns, "b_1");
+            ASSERT_EQUALS(2, offset);
+
+            IndexBuildsInProgress::remove(_ns, offset);
+            nsdetails(_ns)->indexBuildsInProgress--;
+
+            ASSERT_EQUALS(2, IndexBuildsInProgress::get(_ns, "c_1"));
+            ASSERT_EQUALS(3, IndexBuildsInProgress::get(_ns, "d_1"));
+
+            offset = IndexBuildsInProgress::get(_ns, "d_1");
+            IndexBuildsInProgress::remove(_ns, offset);
+            nsdetails(_ns)->indexBuildsInProgress--;
+
+            ASSERT_EQUALS(2, IndexBuildsInProgress::get(_ns, "c_1"));
+            ASSERT_EQUALS(-1, IndexBuildsInProgress::get(_ns, "d_1"));
+
+            offset = IndexBuildsInProgress::get(_ns, "a_1");
+            IndexBuildsInProgress::remove(_ns, offset);
+            nsdetails(_ns)->indexBuildsInProgress--;
+
+            ASSERT_EQUALS(1, IndexBuildsInProgress::get(_ns, "c_1"));
+        }
+
+    private:
+        IndexDetails& halfAddIndex(const std::string& key) {
+            BSONObj indexInfo = BSON( "v" << 1 <<
+                                      "key" << BSON( key << 1 ) <<
+                                      "ns" << _ns <<
+                                      "name" << (key+"_1"));
+            int32_t lenWHdr = indexInfo.objsize() + Record::HeaderSize;
+            const char* systemIndexes = "unittests.system.indexes";
+            DiskLoc infoLoc = allocateSpaceForANewRecord( systemIndexes,
+                                                          nsdetails( systemIndexes ),
+                                                          lenWHdr,
+                                                          false );
+            Record* infoRecord = reinterpret_cast<Record*>( getDur().writingPtr( infoLoc.rec(),
+                                                                                 lenWHdr ) );
+            memcpy( infoRecord->data(), indexInfo.objdata(), indexInfo.objsize() );
+            addRecordToRecListInExtent( infoRecord, infoLoc );
+            IndexDetails& id = nsdetails( _ns )->getNextIndexDetails( _ns );
+            id.info = infoLoc;
+            nsdetails(_ns)->indexBuildsInProgress++;
+
+            return id;
+        }
+    };
+
     class IndexUpdateTests : public Suite {
     public:
         IndexUpdateTests() :
@@ -533,6 +588,7 @@ namespace IndexUpdateTests {
             add<InsertBuildIdIndexInterruptDisallowed>();
             add<DirectClientEnsureIndexInterruptDisallowed>();
             add<HelpersEnsureIndexInterruptDisallowed>();
+            add<IndexBuildInProgressTest>();
         }
     } indexUpdateTests;
 

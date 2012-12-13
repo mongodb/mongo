@@ -72,14 +72,15 @@ namespace mongo {
         int n = d->nIndexes;
         for ( int i = 0; i < n; i++ )
             _unindexRecord(d->idx(i), obj, dl, !noWarn);
-        if( d->indexBuildInProgress ) { // background index
-            // always pass nowarn here, as this one may be missing for valid reasons as we are concurrently building it
-            _unindexRecord(d->idx(n), obj, dl, false);
+
+        for (int i = 0; i < d->indexBuildsInProgress; i++) { // background index
+            // Always pass nowarn here, as this one may be missing for valid reasons as we are
+            // concurrently building it
+            _unindexRecord(d->idx(n+i), obj, dl, false);
         }
     }
 
     /* step one of adding keys to index idxNo for a new record
-       @return true means done.  false means multikey involved and more work to do
     */
     void fetchIndexInserters(BSONObjSet & /*out*/keys,
                              IndexInterface::IndexInserter &inserter,
@@ -103,7 +104,7 @@ namespace mongo {
                             idxNo, idx, recordLoc, *keys.begin(), ordering, dupsAllowed));
         }
         catch (AssertionException& e) {
-            if( e.getCode() == 10287 && idxNo == d->nIndexes ) {
+            if( e.getCode() == 10287 && idxNo >= d->nIndexes ) {
                 DEV log() << "info: caught key already in index on bg indexing (ok)" << endl;
             }
             else {
@@ -123,7 +124,7 @@ namespace mongo {
         IndexInterface::IndexInserter inserter;
 
         // Step 1, read phase.
-        int n = d->nIndexesBeingBuilt();
+        int n = d->getTotalIndexCount();
         {
             BSONObjSet keys;
             for ( int i = 0; i < n; i++ ) {
@@ -159,7 +160,7 @@ namespace mongo {
                 try {
                     ii.bt_insert(idx.head, loc, *k, ordering, dupsAllowed, idx);
                 } catch (AssertionException& e) {
-                    if( e.getCode() == 10287 && (int) i == d->nIndexes ) {
+                    if( e.getCode() == 10287 && (int) i >= d->nIndexes ) {
                         DEV log() << "info: caught key already in index on bg indexing (ok)" << endl;
                     }
                     else {
@@ -202,7 +203,7 @@ namespace mongo {
                 ii.bt_insert(idx.head, recordLoc, *i, ordering, dupsAllowed, idx);
             }
             catch (AssertionException& e) {
-                if( e.getCode() == 10287 && idxNo == d->nIndexes ) {
+                if( e.getCode() == 10287 && idxNo >= d->nIndexes ) {
                     DEV log() << "info: caught key already in index on bg indexing (ok)" << endl;
                     continue;
                 }
@@ -318,13 +319,12 @@ namespace mongo {
     uint64_t fastBuildIndex(const char* ns,
                             NamespaceDetails* d,
                             IndexDetails& idx,
-                            int32_t idxNo,
                             bool mayInterrupt) {
         CurOp * op = cc().curop();
 
         Timer t;
 
-        tlog(1) << "fastBuildIndex " << ns << " idxNo:" << idxNo << ' ' << idx.info.obj().toString() << endl;
+        tlog(1) << "fastBuildIndex " << ns << ' ' << idx.info.obj().toString() << endl;
 
         bool dupsAllowed = !idx.unique() || ignoreUniqueIndex(idx);
         bool dropDups = idx.dropDups() || inDBRepair;
@@ -348,8 +348,10 @@ namespace mongo {
         // Ensure the index and external sorter have a consistent index interface (and sort order).
         fassert( 16408, &idx.idxInterface() == &sorter.getIndexInterface() );
 
-        if( phase1->multi )
+        if( phase1->multi ) {
+            int idxNo = IndexBuildsInProgress::get(ns, idx.info.obj()["name"].valuestr());
             d->setIndexIsMultikey(ns, idxNo);
+        }
 
         if ( logLevel > 1 ) printMemInfo( "before final sort" );
         phase1->sorter->sort( mayInterrupt );
@@ -395,7 +397,8 @@ namespace mongo {
 
     class BackgroundIndexBuildJob : public BackgroundOperation {
 
-        unsigned long long addExistingToIndex(const char *ns, NamespaceDetails *d, IndexDetails& idx, int idxNo) {
+        unsigned long long addExistingToIndex(const char *ns, NamespaceDetails *d,
+                                              IndexDetails& idx) {
             bool dupsAllowed = !idx.unique();
             bool dropDups = idx.dropDups();
 
@@ -408,6 +411,14 @@ namespace mongo {
                 shared_ptr<Cursor> c = theDataFileMgr.findAll(ns);
                 cc.reset( new ClientCursor(QueryOption_NoCursorTimeout, c, ns) );
             }
+
+            std::string idxName = idx.indexName();
+            int idxNo = IndexBuildsInProgress::get(ns, idxName);
+            massert(16574, "Couldn't find index being built", idxNo != -1);
+
+            // After this yields in the loop, idx may point at a different index (if indexes get
+            // flipped, see insert_makeIndex) or even an empty IndexDetails, so nothing below should
+            // depend on idx. idxNo should be recalculated after each yield.
 
             while ( cc->ok() ) {
                 BSONObj js = cc->current();
@@ -444,6 +455,13 @@ namespace mongo {
                             }
                             break;
                         }
+
+                        // Recalculate idxNo if we yielded
+                        idxNo = IndexBuildsInProgress::get(ns, idxName);
+                        // This index must still be around, because this is thread that would clean
+                        // it up
+                        massert(16575, "cannot find index build anymore", idxNo != -1);
+
                         numDropped++;
                     }
                     else {
@@ -458,8 +476,14 @@ namespace mongo {
 
                 if ( cc->yieldSometimes( ClientCursor::WillNeed ) ) {
                     progress.setTotalWhileRunning( d->stats.nrecords );
+
+                    // Recalculate idxNo if we yielded
+                    idxNo = IndexBuildsInProgress::get(ns, idxName);
+                    // Someone may have interrupted the index build
+                    massert(16576, "cannot find index build anymore", idxNo != -1);
                 }
                 else {
+                    idxNo = -1;
                     cc.release();
                     uasserted(12584, "cursor gone during bg index");
                     break;
@@ -480,7 +504,7 @@ namespace mongo {
             uassert( 13130 , "can't start bg index b/c in recursive lock (db.eval?)" , !Lock::nested() );
             bgJobsInProgress.insert(d);
         }
-        void done(const char *ns, NamespaceDetails *d) {
+        void done(const char *ns) {
             NamespaceDetailsTransient::get(ns).addedIndex(); // clear query optimizer cache
             Lock::assertWriteLocked(ns);
         }
@@ -488,27 +512,25 @@ namespace mongo {
     public:
         BackgroundIndexBuildJob(const char *ns) : BackgroundOperation(ns) { }
 
-        unsigned long long go(string ns, NamespaceDetails *d, IndexDetails& idx, int idxNo) {
+        unsigned long long go(string ns, NamespaceDetails *d, IndexDetails& idx) {
             unsigned long long n = 0;
 
             prep(ns.c_str(), d);
-            verify( idxNo == d->nIndexes );
             try {
                 idx.head.writing() = idx.idxInterface().addBucket(idx);
-                n = addExistingToIndex(ns.c_str(), d, idx, idxNo);
+                n = addExistingToIndex(ns.c_str(), d, idx);
+                // idx may point at an invalid index entry at this point
             }
             catch(...) {
                 if( cc().database() && nsdetails(ns.c_str()) == d ) {
-                    verify( idxNo == d->nIndexes );
-                    done(ns.c_str(), d);
+                    done(ns.c_str());
                 }
                 else {
                     log() << "ERROR: db gone during bg index?" << endl;
                 }
                 throw;
             }
-            verify( idxNo == d->nIndexes );
-            done(ns.c_str(), d);
+            done(ns.c_str());
             return n;
         }
     };
@@ -517,57 +539,27 @@ namespace mongo {
     void buildAnIndex(const std::string& ns,
                       NamespaceDetails* d,
                       IndexDetails& idx,
-                      int32_t idxNo,
                       bool background,
                       bool mayInterrupt) {
         tlog() << "build index " << ns << ' ' << idx.keyPattern() << ( background ? " background" : "" ) << endl;
         Timer t;
         unsigned long long n;
 
-        verify( !BackgroundOperation::inProgForNs(ns.c_str()) ); // should have been checked earlier, better not be...
         verify( Lock::isWriteLocked(ns) );
 
         // Build index spec here in case the collection is empty and the index details are invalid
         idx.getSpec();
 
         if( inDBRepair || !background ) {
-            n = fastBuildIndex(ns.c_str(), d, idx, idxNo, mayInterrupt);
+            n = fastBuildIndex(ns.c_str(), d, idx, mayInterrupt);
             verify( !idx.head.isNull() );
         }
         else {
             BackgroundIndexBuildJob j(ns.c_str());
-            n = j.go(ns, d, idx, idxNo);
+            n = j.go(ns, d, idx);
         }
         tlog() << "build index done.  scanned " << n << " total records. " << t.millis() / 1000.0 << " secs" << endl;
     }
-
-    /* add keys to indexes for a new record */
-#if 0
-    static void oldIndexRecord__notused(NamespaceDetails *d, BSONObj obj, DiskLoc loc) {
-        int n = d->nIndexesBeingBuilt();
-        for ( int i = 0; i < n; i++ ) {
-            try {
-                bool unique = d->idx(i).unique();
-                addKeysToIndex(d, i, obj, loc, /*dupsAllowed*/!unique);
-            }
-            catch( DBException& ) {
-                /* try to roll back previously added index entries
-                   note <= i (not < i) is important here as the index we were just attempted
-                   may be multikey and require some cleanup.
-                */
-                for( int j = 0; j <= i; j++ ) {
-                    try {
-                        _unindexRecord(d->idx(j), obj, loc, false);
-                    }
-                    catch(...) {
-                        LOG(3) << "unindex fails on rollback after unique failure\n";
-                    }
-                }
-                throw;
-            }
-        }
-    }
-#endif
 
     extern BSONObj id_obj; // { _id : 1 }
 

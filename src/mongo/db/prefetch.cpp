@@ -124,7 +124,7 @@ namespace mongo {
         {
             // indexCount includes all indexes, including ones
             // in the process of being built
-            int indexCount = nsd->nIndexesBeingBuilt(); 
+            int indexCount = nsd->getTotalIndexCount();
             for ( int indexNo = 0; indexNo < indexCount; indexNo++ ) {
                 // This will page in all index pages for the given object.
                 try {

@@ -1264,7 +1264,41 @@ namespace NamespaceTests {
                 assertCachedIndexKey( BSON( "a" << 1 ) );
             }
         };
-        
+
+        class SwapIndexEntriesTest : public Base {
+        public:
+            void run() {
+                create();
+                NamespaceDetails *nsd = nsdetails(ns());
+
+                // Set 2 & 54 as multikey
+                nsd->setIndexIsMultikey(ns(), 2, true);
+                nsd->setIndexIsMultikey(ns(), 54, true);
+                ASSERT(nsd->isMultikey(2));
+                ASSERT(nsd->isMultikey(54));
+
+                // Flip 2 & 47
+                nsd->setIndexIsMultikey(ns(), 2, false);
+                nsd->setIndexIsMultikey(ns(), 47, true);
+                ASSERT(!nsd->isMultikey(2));
+                ASSERT(nsd->isMultikey(47));
+
+                // Reset entries that are already true
+                nsd->setIndexIsMultikey(ns(), 54, true);
+                nsd->setIndexIsMultikey(ns(), 47, true);
+                ASSERT(nsd->isMultikey(54));
+                ASSERT(nsd->isMultikey(47));
+
+                // Two non-multi-key
+                nsd->setIndexIsMultikey(ns(), 2, false);
+                nsd->setIndexIsMultikey(ns(), 43, false);
+                ASSERT(!nsd->isMultikey(2));
+                ASSERT(nsd->isMultikey(54));
+                ASSERT(nsd->isMultikey(47));
+                ASSERT(!nsd->isMultikey(43));
+            }
+        };
+
     } // namespace NamespaceDetailsTests
 
     namespace NamespaceDetailsTransientTests {
@@ -1335,6 +1369,7 @@ namespace NamespaceTests {
             add< NamespaceDetailsTests::TwoExtent >();
             add< NamespaceDetailsTests::TruncateCapped >();
             add< NamespaceDetailsTests::Migrate >();
+            add< NamespaceDetailsTests::SwapIndexEntriesTest >();
             //            add< NamespaceDetailsTests::BigCollection >();
             add< NamespaceDetailsTests::Size >();
             add< NamespaceDetailsTests::SetIndexIsMultikey >();

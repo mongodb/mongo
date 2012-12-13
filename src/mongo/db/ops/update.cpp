@@ -161,9 +161,11 @@ namespace mongo {
         bool isOperatorUpdate = updateobj.firstElementFieldName()[0] == '$';
         int modsIsIndexed = false; // really the # of indexes
         if ( isOperatorUpdate ) {
-            if( d && d->indexBuildInProgress ) {
+            if( d && d->indexBuildsInProgress ) {
                 set<string> bgKeys;
-                d->inProgIdx().keyPattern().getFieldNames(bgKeys);
+                for (int i = 0; i < d->indexBuildsInProgress; i++) {
+                    d->idx(d->nIndexes+i).keyPattern().getFieldNames(bgKeys);
+                }
                 mods.reset( new ModSet(updateobj, nsdt->indexKeys(), &bgKeys, forReplication) );
             }
             else {
@@ -250,10 +252,11 @@ namespace mongo {
                             break;
                         nsdt = &NamespaceDetailsTransient::get(ns);
                         if ( mods.get() && ! mods->isIndexed() ) {
-                            // we need to re-check indexes
                             set<string> bgKeys;
-                            if ( d->indexBuildInProgress )
-                                d->inProgIdx().keyPattern().getFieldNames(bgKeys);
+                            for (int i = 0; i < d->indexBuildsInProgress; i++) {
+                                // we need to re-check indexes
+                                d->idx(d->nIndexes+i).keyPattern().getFieldNames(bgKeys);
+                            }
                             mods->updateIsIndexed( nsdt->indexKeys() , &bgKeys );
                             modsIsIndexed = mods->isIndexed();
                         }
