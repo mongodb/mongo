@@ -1019,8 +1019,8 @@ corrupted:		WT_ERR_MSG(session, WT_ERROR,
 		WT_ERR(__block_merge(session, el, off, size));
 	}
 
-	if (WT_VERBOSE_ISSET(session, block))
-		WT_ERR(__block_extlist_dump(session, "read extlist", el, 0));
+	WT_VERBOSE_ERR_FUNC(session, block,
+	    (__block_extlist_dump(session, "read extlist", el, 0)));
 
 err:	__wt_scr_free(&tmp);
 	return (ret);
@@ -1041,8 +1041,8 @@ __wt_block_extlist_write(WT_SESSION_IMPL *session,
 	uint32_t entries, size;
 	uint8_t *p;
 
-	if (WT_VERBOSE_ISSET(session, block))
-		WT_RET(__block_extlist_dump(session, "write extlist", el, 0));
+	WT_VERBOSE_RET_FUNC(session, block,
+	    (__block_extlist_dump(session, "write extlist", el, 0)));
 
 	/*
 	 * Figure out how many entries we're writing -- if there aren't any

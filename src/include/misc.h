@@ -129,6 +129,10 @@
 	if (WT_VERBOSE_ISSET(session, f))				\
 		WT_ERR(__wt_verbose(session, #f ": " __VA_ARGS__));	\
 } while (0)
+#define	WT_VERBOSE_ERR_FUNC(session, f, a, ...) do {			\
+	if (WT_VERBOSE_ISSET(session, f))				\
+		WT_ERR(a);						\
+} while (0)
 #define	WT_VERBOSE_RET(session, f, ...) do {				\
 	if (WT_VERBOSE_ISSET(session, f))				\
 		WT_RET(__wt_verbose(session, #f ": " __VA_ARGS__));	\
@@ -137,16 +141,32 @@
 	if (WT_VERBOSE_ISSET(session, f))				\
 		(ret) = __wt_verbose(session, #f ": " __VA_ARGS__);	\
 } while (0)
+#define	WT_VERBOSE_RET_FUNC(session, f, a) do {				\
+	if (WT_VERBOSE_ISSET(session, f))				\
+		WT_RET(a);						\
+} while (0)
+#define	WT_VERBOSE_RET_TEST(session, f, a, ...) do {			\
+	if (WT_VERBOSE_ISSET(session, f) && (a))			\
+		WT_RET(__wt_verbose(session, #f ": " __VA_ARGS__));	\
+} while (0)
 #define	WT_VERBOSE_VOID(session, f, ...) do {				\
 	if (WT_VERBOSE_ISSET(session, f))				\
+		(void)__wt_verbose(session, #f ": " __VA_ARGS__);	\
+} while (0)
+#define	WT_VERBOSE_VOID_TEST(session, f, a, ...) do {			\
+	if (WT_VERBOSE_ISSET(session, f) && (a))			\
 		(void)__wt_verbose(session, #f ": " __VA_ARGS__);	\
 } while (0)
 #else
 #define	WT_VERBOSE_ISSET(session, f)	0
 #define	WT_VERBOSE_ERR(session, f, ...)
+#define	WT_VERBOSE_ERR_FUNC(session, f, ...)
 #define	WT_VERBOSE_RET(session, f, ...)
 #define	WT_VERBOSE_RETVAL(session, f, ret, ...)
+#define	WT_VERBOSE_RET_FUNC(session, f, a)
+#define	WT_VERBOSE_RET_TEST(session, f, a, ...)
 #define	WT_VERBOSE_VOID(session, f, ...)
+#define	WT_VERBOSE_VOID_TEST(session, f, a, ...)
 #endif
 
 /* Clear a structure. */

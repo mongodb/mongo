@@ -119,9 +119,8 @@ __wt_cond_signal(WT_SESSION_IMPL *session, WT_CONDVAR *cond)
 	 * !!!
 	 * This function MUST handle a NULL session handle.
 	 */
-	if (session != NULL)
-		WT_VERBOSE_RET(
-		    session, mutex, "signal %s cond (%p)", cond->name, cond);
+	WT_VERBOSE_RET_TEST(session,
+	    mutex, session != NULL, "signal %s cond (%p)", cond->name, cond);
 
 	WT_ERR(pthread_mutex_lock(&cond->mtx));
 	locked = 1;

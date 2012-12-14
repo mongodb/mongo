@@ -760,6 +760,8 @@ __conn_verbose_config(WT_SESSION_IMPL *session, const char *cfg[])
 	}
 #endif
 
+	WT_UNUSED(session);		/* unused if HAVE_VERBOSE not defined */
+	WT_UNUSED(cfg);			/* unused if HAVE_VERBOSE not defined */
 	return (0);
 }
 
