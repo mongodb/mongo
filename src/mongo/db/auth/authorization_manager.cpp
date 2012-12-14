@@ -198,6 +198,8 @@ namespace mongo {
 
     void AuthorizationManager::logoutDatabase(const std::string& dbname) {
         Principal* principal = _authenticatedPrincipals.lookupByDBName(dbname);
+        if (!principal)
+            return;
         _acquiredPrivileges.revokePrivilegesFromPrincipal(principal->getName());
         _authenticatedPrincipals.removeByDBName(dbname);
     }
