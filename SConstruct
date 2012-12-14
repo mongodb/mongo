@@ -748,8 +748,12 @@ if "uname" in dir(os):
 
 if has_option( "ssl" ):
     env.Append( CPPDEFINES=["MONGO_SSL"] )
-    env.Append( LIBS=["ssl"] )
-    env.Append( LIBS=["crypto"] )
+    if windows:
+        env.Append( LIBS=["libeay32"] )
+        env.Append( LIBS=["ssleay32"] )
+    else:
+        env.Append( LIBS=["ssl"] )
+        env.Append( LIBS=["crypto"] )
 
 try:
     umask = os.umask(022)
