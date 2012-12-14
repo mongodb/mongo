@@ -117,7 +117,7 @@ def get_variant_dir():
             a.append( name )
         else:
             x = get_option( name )
-            x = re.sub( "[,\\\\/]" , "_" , x )
+            x = re.sub( "[:,\\\\/]" , "_" , x )
             a.append( name + "_" + x )
             
     s = "#build/${PYSYSPLATFORM}/"
