@@ -60,10 +60,6 @@ namespace mongo {
         virtual bool run(const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             log() << "replSet replSetTest command received: " << cmdObj.toString() << rsLog;
 
-            if (!checkAuth(errmsg, result)) {
-                return false;
-            }
-
             if( cmdObj.hasElement("forceInitialSyncFailure") ) {
                 replSetForceInitialSyncFailure = (unsigned) cmdObj["forceInitialSyncFailure"].Number();
                 return true;
@@ -189,10 +185,6 @@ namespace mongo {
         }
     private:
         bool _run(const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-            if ( !checkAuth(errmsg, result) ) {
-                return false;
-            }
-
             if( cmdObj["replSetReconfig"].type() != Object ) {
                 errmsg = "no configuration specified";
                 return false;
@@ -388,10 +380,6 @@ namespace mongo {
         }
         CmdReplSetSyncFrom() : ReplSetCommand("replSetSyncFrom") { }
         virtual bool run(const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-            if (!checkAuth(errmsg, result) || !check(errmsg, result)) {
-                return false;
-            }
-
             string newTarget = cmdObj["replSetSyncFrom"].valuestrsafe();
             result.append("syncFromRequested", newTarget);
             return theReplSet->forceSyncFrom(newTarget, errmsg, result);
