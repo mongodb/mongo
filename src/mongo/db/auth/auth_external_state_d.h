@@ -32,14 +32,12 @@ namespace mongo {
         AuthExternalStateMongod();
         virtual ~AuthExternalStateMongod();
 
-        virtual Status getPrivilegeDocument(const string& dbname,
-                                            const PrincipalName& principalName,
-                                            BSONObj* result);
-
         virtual bool shouldIgnoreAuthChecks() const;
 
     protected:
-        virtual bool hasPrivilegeDocument(const std::string& dbname) const;
+        virtual bool _findUser(const string& usersNamespace,
+                               const BSONObj& query,
+                               BSONObj* result) const;
     };
 
 } // namespace mongo

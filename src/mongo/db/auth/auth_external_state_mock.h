@@ -45,6 +45,12 @@ namespace mongo {
             return Status(ErrorCodes::InternalError, "Not Implemented!");
         }
 
+        virtual bool _findUser(const std::string& usersNamespace,
+                                       const BSONObj& query,
+                                       BSONObj* result) const {
+            return false;
+        }
+
     private:
         bool _returnValue;
     };

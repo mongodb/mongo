@@ -29,10 +29,9 @@ namespace mongo {
     AuthExternalState::AuthExternalState() {}
     AuthExternalState::~AuthExternalState() {}
 
-    Status AuthExternalState::getPrivilegeDocumentOverConnection(DBClientBase* conn,
-                                                                 const std::string& dbname,
-                                                                 const PrincipalName& principalName,
-                                                                 BSONObj* result) {
+    Status AuthExternalState::getPrivilegeDocument(const std::string& dbname,
+                                                   const PrincipalName& principalName,
+                                                   BSONObj* result) {
         if (principalName.getUser() == internalSecurity.user) {
             if (internalSecurity.pwd.empty()) {
                 return Status(ErrorCodes::UserNotFound,
@@ -55,8 +54,9 @@ namespace mongo {
         else {
             queryBuilder.append(USER_SOURCE_FIELD, principalName.getDB());
         }
-        userBSONObj = conn->findOne(usersNamespace, queryBuilder.obj(), 0, QueryOption_SlaveOk);
-        if (userBSONObj.isEmpty()) {
+
+        bool found = _findUser(usersNamespace, queryBuilder.obj(), &userBSONObj);
+        if (!found) {
             return Status(ErrorCodes::UserNotFound,
                           mongoutils::str::stream() << "auth: couldn't find user " <<
                           principalName.toString() << ", " << usersNamespace,
@@ -65,6 +65,14 @@ namespace mongo {
 
         *result = userBSONObj.getOwned();
         return Status::OK();
+    }
+
+    bool AuthExternalState::_hasPrivilegeDocument(const std::string& dbname) const {
+        std::string usersNamespace = dbname + ".system.users";
+
+        BSONObj userBSONObj;
+        BSONObj query;
+        return _findUser(usersNamespace, query, &userBSONObj);
     }
 
 }  // namespace mongo

@@ -26,7 +26,7 @@ namespace mongo {
     AuthExternalStateServerCommon::~AuthExternalStateServerCommon() {}
 
     bool AuthExternalStateServerCommon::_allowLocalhost() const {
-        bool allow = !hasPrivilegeDocument("admin");
+        bool allow = !_hasPrivilegeDocument("admin");
         if (allow) {
             ONCE {
                 log() << "note: no users configured in admin.system.users, allowing localhost "

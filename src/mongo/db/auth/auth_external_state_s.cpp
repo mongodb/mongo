@@ -30,36 +30,27 @@ namespace mongo {
     AuthExternalStateMongos::~AuthExternalStateMongos() {}
 
     namespace {
-        ScopedDbConnection* getConnectionForUsersCollection(const std::string& dbname) {
+        ScopedDbConnection* getConnectionForUsersCollection(const std::string& ns) {
             //
             // Note: The connection mechanism here is *not* ideal, and should not be used elsewhere.
             // If the primary for the collection moves, this approach may throw rather than handle
             // version exceptions.
             //
 
-            std::string systemUsers = dbname + ".system.users";
-            DBConfigPtr config = grid.getDBConfig(systemUsers);
-            Shard s = config->getShard(systemUsers);
+            DBConfigPtr config = grid.getDBConfig(ns);
+            Shard s = config->getShard(ns);
 
             return ScopedDbConnection::getInternalScopedDbConnection(s.getConnString(), 30.0);
         }
     }
 
-    Status AuthExternalStateMongos::getPrivilegeDocument(const std::string& dbname,
-                                                         const PrincipalName& principalName,
-                                                         BSONObj* result) {
-        scoped_ptr<ScopedDbConnection> conn(getConnectionForUsersCollection(dbname));
-        Status status = getPrivilegeDocumentOverConnection(
-                conn->get(), dbname, principalName, result);
+    bool AuthExternalStateMongos::_findUser(const string& usersNamespace,
+                                            const BSONObj& query,
+                                            BSONObj* result) const {
+        scoped_ptr<ScopedDbConnection> conn(getConnectionForUsersCollection(usersNamespace));
+        *result = conn->get()->findOne(usersNamespace, query).getOwned();
         conn->done();
-        return status;
-    }
-
-    bool AuthExternalStateMongos::hasPrivilegeDocument(const std::string& dbname) const {
-        scoped_ptr<ScopedDbConnection> conn(getConnectionForUsersCollection(dbname));
-        BSONObj result = conn->get()->findOne(dbname + ".system.users", Query());
-        conn->done();
-        return !result.isEmpty();
+        return !result->isEmpty();
     }
 
 } // namespace mongo

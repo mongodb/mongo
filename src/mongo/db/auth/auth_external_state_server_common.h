@@ -36,9 +36,6 @@ namespace mongo {
     protected:
         AuthExternalStateServerCommon();
 
-        // Returns true if there exists at least one privilege document in the given database.
-        virtual bool hasPrivilegeDocument(const std::string& dbname) const = 0;
-
     private:
         // Returns true if localhost connections should be given full access.  Currently this is
         // only if there are no users in the admin database.

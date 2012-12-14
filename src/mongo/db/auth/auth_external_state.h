@@ -50,16 +50,19 @@ namespace mongo {
         // "result".
         virtual Status getPrivilegeDocument(const std::string& dbname,
                                             const PrincipalName& principalName,
-                                            BSONObj* result) = 0;
+                                            BSONObj* result);
 
     protected:
-        // Look up the privilege document for "principalName" in database "dbname", over "conn".
-        static Status getPrivilegeDocumentOverConnection(DBClientBase* conn,
-                                                         const std::string& dbname,
-                                                         const PrincipalName& principalName,
-                                                         BSONObj* result);
-
         AuthExternalState(); // This class should never be instantiated directly.
+
+        // Queries the userNamespace with the given query and returns the privilegeDocument found
+        // in *result.  Returns true if it finds a document matching the query, or false if not.
+        virtual bool _findUser(const std::string& usersNamespace,
+                               const BSONObj& query,
+                               BSONObj* result) const = 0;
+
+        // Returns true if there exists at least one privilege document in the given database.
+        bool _hasPrivilegeDocument(const std::string& dbname) const;
     };
 
 } // namespace mongo

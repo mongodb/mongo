@@ -20,6 +20,7 @@
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/client.h"
+#include "mongo/db/dbhelpers.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/jsobj.h"
 
@@ -28,21 +29,13 @@ namespace mongo {
     AuthExternalStateMongod::AuthExternalStateMongod() {}
     AuthExternalStateMongod::~AuthExternalStateMongod() {}
 
-    Status AuthExternalStateMongod::getPrivilegeDocument(const string& dbname,
-                                                         const PrincipalName& principalName,
-                                                         BSONObj* result) {
+    bool AuthExternalStateMongod::_findUser(const string& usersNamespace,
+                                            const BSONObj& query,
+                                            BSONObj* result) const {
         Client::GodScope gs;
-        Client::ReadContext(dbname + ".system.users");
-        DBDirectClient conn;
-        return getPrivilegeDocumentOverConnection(&conn, dbname, principalName, result);
-    }
+        Client::ReadContext ctx(usersNamespace);
 
-    bool AuthExternalStateMongod::hasPrivilegeDocument(const std::string& dbname) const {
-        Client::GodScope gs;
-        Client::ReadContext(dbname + ".system.users");
-        DBDirectClient conn;
-        BSONObj result = conn.findOne(dbname + ".system.users", Query());
-        return !result.isEmpty();
+        return Helpers::findOne(usersNamespace, query, *result);
     }
 
     bool AuthExternalStateMongod::shouldIgnoreAuthChecks() const {
