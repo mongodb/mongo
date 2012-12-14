@@ -738,7 +738,6 @@ __conn_verbose_config(WT_SESSION_IMPL *session, const char *cfg[])
 		{ "lsm",	WT_VERB_lsm },
 		{ "mutex",	WT_VERB_mutex },
 		{ "read",	WT_VERB_read },
-		{ "readserver",	WT_VERB_readserver },
 		{ "reconcile",	WT_VERB_reconcile },
 		{ "salvage",	WT_VERB_salvage },
 		{ "verify",	WT_VERB_verify },

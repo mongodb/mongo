@@ -559,7 +559,6 @@ flags = {
 		'VERB_hazard',
 		'VERB_mutex',
 		'VERB_read',
-		'VERB_readserver',
 		'VERB_reconcile',
 		'VERB_salvage',
 		'VERB_verify',
