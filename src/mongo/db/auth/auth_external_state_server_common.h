@@ -36,10 +36,14 @@ namespace mongo {
     protected:
         AuthExternalStateServerCommon();
 
+        // Checks whether or not localhost connections should be given full access and stores the
+        // result in _allowLocalhost.  Currently localhost connections are only given full access
+        // if there are no users in the admin database.
+        virtual void _checkShouldAllowLocalhost();
+
     private:
-        // Returns true if localhost connections should be given full access.  Currently this is
-        // only if there are no users in the admin database.
-        bool _allowLocalhost() const;
+
+        bool _allowLocalhost;
 
     };
 

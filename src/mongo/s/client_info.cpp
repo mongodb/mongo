@@ -44,7 +44,6 @@ namespace mongo {
         _cur = &_a;
         _prev = &_b;
         _autoSplitOk = true;
-        newRequest();
     }
 
     ClientInfo::~ClientInfo() {
@@ -75,14 +74,15 @@ namespace mongo {
         _prev = temp;
         _cur->clear();
         _ai.startRequest();
+        getAuthorizationManager()->startRequest();
     }
 
     ClientInfo* ClientInfo::create(AbstractMessagingPort* messagingPort) {
         ClientInfo * info = _tlInfo.get();
         massert(16472, "A ClientInfo already exists for this thread", !info);
         info = new ClientInfo(messagingPort);
-        _tlInfo.reset( info );
         info->setAuthorizationManager(new AuthorizationManager(new AuthExternalStateMongos()));
+        _tlInfo.reset( info );
         info->newRequest();
         return info;
     }

@@ -188,6 +188,10 @@ namespace mongo {
 
     AuthorizationManager::~AuthorizationManager(){}
 
+    void AuthorizationManager::startRequest() {
+        _externalState->startRequest();
+    }
+
     void AuthorizationManager::addAuthorizedPrincipal(Principal* principal) {
         _authenticatedPrincipals.add(principal);
     }

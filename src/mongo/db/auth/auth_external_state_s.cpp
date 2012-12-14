@@ -29,6 +29,10 @@ namespace mongo {
     AuthExternalStateMongos::AuthExternalStateMongos() {}
     AuthExternalStateMongos::~AuthExternalStateMongos() {}
 
+    void AuthExternalStateMongos::startRequest() {
+        _checkShouldAllowLocalhost();
+    }
+
     namespace {
         ScopedDbConnection* getConnectionForUsersCollection(const std::string& ns) {
             //

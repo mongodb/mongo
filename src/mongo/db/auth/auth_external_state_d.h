@@ -34,6 +34,8 @@ namespace mongo {
 
         virtual bool shouldIgnoreAuthChecks() const;
 
+        virtual void startRequest();
+
     protected:
         virtual bool _findUser(const string& usersNamespace,
                                const BSONObj& query,

@@ -60,6 +60,11 @@ namespace mongo {
         explicit AuthorizationManager(AuthExternalState* externalState);
         ~AuthorizationManager();
 
+        // Should be called at the beginning of every new request.  This performs the checks
+        // necessary to determine if localhost connections should be given full access.
+        // TODO: try to eliminate the need for this call.
+        void startRequest();
+
         // Takes ownership of the principal (by putting into _authenticatedPrincipals).
         void addAuthorizedPrincipal(Principal* principal);
 

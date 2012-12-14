@@ -21,6 +21,7 @@
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/client.h"
 #include "mongo/db/dbhelpers.h"
+#include "mongo/db/d_concurrency.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/jsobj.h"
 
@@ -28,6 +29,11 @@ namespace mongo {
 
     AuthExternalStateMongod::AuthExternalStateMongod() {}
     AuthExternalStateMongod::~AuthExternalStateMongod() {}
+
+    void AuthExternalStateMongod::startRequest() {
+        dassert(!Lock::isLocked());
+        _checkShouldAllowLocalhost();
+    }
 
     bool AuthExternalStateMongod::_findUser(const string& usersNamespace,
                                             const BSONObj& query,

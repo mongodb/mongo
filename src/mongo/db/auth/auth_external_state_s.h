@@ -32,6 +32,8 @@ namespace mongo {
         AuthExternalStateMongos();
         virtual ~AuthExternalStateMongos();
 
+        virtual void startRequest();
+
     protected:
         virtual bool _findUser(const string& usersNamespace,
                                const BSONObj& query,
