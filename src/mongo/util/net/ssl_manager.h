@@ -48,7 +48,7 @@ namespace mongo {
     class SSLManager {
     MONGO_DISALLOW_COPYING(SSLManager);
     public:
-        SSLManager(const SSLParams& params);
+        explicit SSLManager(const SSLParams& params);
 
         /**
          * Initiates a TLS connection.
