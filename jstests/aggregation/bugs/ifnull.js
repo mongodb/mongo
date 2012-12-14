@@ -51,8 +51,9 @@ assertResult( undefined, undefined, undefined );
 assertResult( 3, { $add:[ 1, 2 ] }, 5 );
 assertResult( 20, '$missingField', { $multiply:[ 4, 5 ] } );
 
-// Divide by 0.
-assertResult( 'div0', { $divide:[ 1, 0 ] }, 'div0' );
+// Divide/mod by 0.
+assertError(16608 , [{$divide: [1, 0]}, 0]);
+assertError(16610 , [{$mod: [1, 0]}, 0]);
 
 // Nested.
 t.drop();

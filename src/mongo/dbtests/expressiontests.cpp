@@ -153,13 +153,13 @@ namespace ExpressionTests {
         /** Single null argument. */
         class Null : public SingleOperandBase {
             BSONObj operand() { return BSON( "" << BSONNULL ); }
-            BSONObj expectedResult() { return BSON( "" << 0 ); }
+            BSONObj expectedResult() { return BSON( "" << BSONNULL ); }
         };
         
         /** Single undefined argument. */
         class Undefined : public SingleOperandBase {
             BSONObj operand() { return fromjson( "{'':undefined}" ); }
-            BSONObj expectedResult() { return BSON( "" << 0 ); }
+            BSONObj expectedResult() { return BSON( "" << BSONNULL ); }
         };
         
         class TwoOperandBase : public ExpectedResultBase {
@@ -246,14 +246,14 @@ namespace ExpressionTests {
         class IntNull : public TwoOperandBase {
             BSONObj operand1() { return BSON( "" << 1 ); }
             BSONObj operand2() { return BSON( "" << BSONNULL ); }
-            BSONObj expectedResult() { return BSON( "" << 1 ); }
+            BSONObj expectedResult() { return BSON( "" << BSONNULL ); }
         };
         
         /** Adding a long and undefined. */
         class LongUndefined : public TwoOperandBase {
             BSONObj operand1() { return BSON( "" << 5LL ); }
             BSONObj operand2() { return fromjson( "{'':undefined}" ); }
-            BSONObj expectedResult() { return BSON( "" << 5LL ); }
+            BSONObj expectedResult() { return BSON( "" << BSONNULL ); }
         };
         
     } // namespace Add

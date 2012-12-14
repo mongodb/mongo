@@ -110,6 +110,13 @@ namespace mongo {
                 || _storage.type == Undefined;
         }
 
+        /// true if type represents a number
+        bool numeric() const {
+            return _storage.type == NumberDouble
+                || _storage.type == NumberLong
+                || _storage.type == NumberInt;
+        }
+
         /// Get the BSON type of the field.
         BSONType getType() const { return _storage.bsonType(); }
 

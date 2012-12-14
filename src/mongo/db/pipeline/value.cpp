@@ -349,19 +349,14 @@ namespace mongo {
 
     int Value::coerceToInt() const {
         switch(getType()) {
-        case NumberDouble:
-            return static_cast<int>(_storage.doubleValue);
-
         case NumberInt:
             return _storage.intValue;
 
         case NumberLong:
             return static_cast<int>(_storage.longValue);
 
-        case EOO:
-        case jstNULL:
-        case Undefined:
-            return 0;
+        case NumberDouble:
+            return static_cast<int>(_storage.doubleValue);
 
         default:
             uassert(16003, str::stream() <<
@@ -373,19 +368,14 @@ namespace mongo {
 
     long long Value::coerceToLong() const {
         switch(getType()) {
-        case NumberDouble:
-            return static_cast<long long>(_storage.doubleValue);
+        case NumberLong:
+            return _storage.longValue;
 
         case NumberInt:
             return static_cast<long long>(_storage.intValue);
 
-        case NumberLong:
-            return _storage.longValue;
-
-        case EOO:
-        case jstNULL:
-        case Undefined:
-            return 0;
+        case NumberDouble:
+            return static_cast<long long>(_storage.doubleValue);
 
         default:
             uassert(16004, str::stream() <<
@@ -405,11 +395,6 @@ namespace mongo {
 
         case NumberLong:
             return static_cast<double>(_storage.longValue);
-
-        case EOO:
-        case jstNULL:
-        case Undefined:
-            return 0;
 
         default:
             uassert(16005, str::stream() <<
@@ -797,9 +782,6 @@ namespace mongo {
             case NumberDouble:
             case NumberLong:
             case NumberInt:
-            case EOO:
-            case jstNULL:
-            case Undefined:
                 return NumberDouble;
 
             default:
@@ -813,9 +795,6 @@ namespace mongo {
 
             case NumberLong:
             case NumberInt:
-            case EOO:
-            case jstNULL:
-            case Undefined:
                 return NumberLong;
 
             default:
@@ -823,24 +802,6 @@ namespace mongo {
             }
         }
         else if (lType == NumberInt) {
-            switch(rType) {
-            case NumberDouble:
-                return NumberDouble;
-
-            case NumberLong:
-                return NumberLong;
-
-            case NumberInt:
-            case EOO:
-            case jstNULL:
-            case Undefined:
-                return NumberInt;
-
-            default:
-                break;
-            }
-        }
-        else if (lType == EOO || lType == jstNULL || lType == Undefined) {
             switch(rType) {
             case NumberDouble:
                 return NumberDouble;

@@ -23,24 +23,22 @@ namespace mongo {
 
     Value AccumulatorSum::evaluate(const Document& pDocument) const {
         verify(vpOperand.size() == 1);
-        Value prhs(vpOperand[0]->evaluate(pDocument));
-
-        BSONType rhsType = prhs.getType();
+        Value rhs = vpOperand[0]->evaluate(pDocument);
 
         // do nothing with non numeric types
-        if (!(rhsType == NumberInt || rhsType == NumberLong || rhsType == NumberDouble))
+        if (!rhs.numeric())
             return Value();
 
         // upgrade to the widest type required to hold the result
-        totalType = Value::getWidestNumeric(totalType, rhsType);
+        totalType = Value::getWidestNumeric(totalType, rhs.getType());
 
         if (totalType == NumberInt || totalType == NumberLong) {
-            long long v = prhs.coerceToLong();
+            long long v = rhs.coerceToLong();
             longTotal += v;
             doubleTotal += v;
         }
         else if (totalType == NumberDouble) {
-            double v = prhs.coerceToDouble();
+            double v = rhs.coerceToDouble();
             doubleTotal += v;
         }
         else {

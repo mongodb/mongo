@@ -340,22 +340,25 @@ namespace mongo {
 
         const size_t n = vpOperand.size();
         for (size_t i = 0; i < n; ++i) {
-            Value pValue(vpOperand[i]->evaluate(pDocument));
+            Value val = vpOperand[i]->evaluate(pDocument);
 
-            BSONType valueType = pValue.getType();
-            // leaving explicit checks for now since these were supported in alpha releases
-            uassert(16415, "$add does not support dates",
-                    valueType != Date);
-            uassert(16416, "$add does not support strings",
-                    valueType != String);
+            if (val.numeric()) {
+                totalType = Value::getWidestNumeric(totalType, val.getType());
 
-            totalType = Value::getWidestNumeric(totalType, valueType);
-
-            uassert(16554, "$add only supports numeric types",
-                    totalType != Undefined);
-
-            doubleTotal += pValue.coerceToDouble();
-            longTotal += pValue.coerceToLong();
+                doubleTotal += val.coerceToDouble();
+                longTotal += val.coerceToLong();
+            }
+            else if (val.nullish()) {
+                return Value(BSONNULL);
+            }
+            else {
+                // leaving explicit checks for now since these were supported in alpha releases
+                uassert(16415, "$add does not support dates",
+                        val.getType() != Date);
+                uassert(16416, "$add does not support strings",
+                        val.getType() != String);
+                uasserted(16554, "$add only supports numeric types");
+            }
         }
 
         if (totalType == NumberLong) {
@@ -937,20 +940,25 @@ namespace mongo {
 
     Value ExpressionDivide::evaluate(const Document& pDocument) const {
         checkArgCount(2);
-        Value pLeft(vpOperand[0]->evaluate(pDocument));
-        Value pRight(vpOperand[1]->evaluate(pDocument));
+        Value lhs = vpOperand[0]->evaluate(pDocument);
+        Value rhs = vpOperand[1]->evaluate(pDocument);
 
-        uassert(16373,
-                "$divide does not support dates",
-                pLeft.getType() != Date && pRight.getType() != Date);
+        if (lhs.numeric() && rhs.numeric()) {
+            double numer = lhs.coerceToDouble();
+            double denom = rhs.coerceToDouble();
+            uassert(16608, "can't $divide by zero",
+                    denom != 0);
 
-        double right = pRight.coerceToDouble();
-        if (right == 0)
-            return Value(BSONUndefined);
-
-        double left = pLeft.coerceToDouble();
-
-        return Value::createDouble(left / right);
+            return Value::createDouble(numer / denom);
+        }
+        else if (lhs.nullish() || rhs.nullish()) {
+            return Value(BSONNULL);
+        }
+        else {
+            uassert(16373, "$divide does not support dates",
+                    lhs.getType() != Date && rhs.getType() != Date);
+            uasserted(16609, "$divide only supports numeric types");
+        }
     }
 
     const char *ExpressionDivide::getOpName() const {
@@ -1721,47 +1729,48 @@ namespace mongo {
 
     Value ExpressionMod::evaluate(const Document& pDocument) const {
         checkArgCount(2);
-        Value pLeft(vpOperand[0]->evaluate(pDocument));
-        Value pRight(vpOperand[1]->evaluate(pDocument));
+        Value lhs = vpOperand[0]->evaluate(pDocument);
+        Value rhs = vpOperand[1]->evaluate(pDocument);
 
-        // pass along nullish values
-        if (pLeft.nullish())
-            return pLeft;
-        if (pRight.nullish())
-            return pRight;
+        BSONType leftType = lhs.getType();
+        BSONType rightType = rhs.getType();
 
-        BSONType leftType = pLeft.getType();
-        BSONType rightType = pRight.getType();
+        if (lhs.numeric() && rhs.numeric()) {
+            // ensure we aren't modding by 0
+            double right = rhs.coerceToDouble();
 
-        uassert(16374, "$mod does not support dates", leftType != Date && rightType != Date);
+            uassert(16610, "can't $mod by 0",
+                    right != 0);
 
-        // ensure we aren't modding by 0
-        double right = pRight.coerceToDouble();
-        if (right == 0)
-            return Value(BSONUndefined);
+            if (leftType == NumberDouble
+                || (rightType == NumberDouble && rhs.coerceToInt() != right)) {
+                // the shell converts ints to doubles so if right is larger than int max or
+                // if right truncates to something other than itself, it is a real double.
+                // Integer-valued double case is handled below
 
-        if (leftType == NumberDouble) {
-            // left is a double, return a double
-            double left = pLeft.coerceToDouble();
-            return Value::createDouble(fmod(left, right));
+                double left = lhs.coerceToDouble();
+                return Value::createDouble(fmod(left, right));
+            }
+            else if (leftType == NumberLong || rightType == NumberLong) {
+                // if either is long, return long
+                long long left = lhs.coerceToLong();
+                long long rightLong = rhs.coerceToLong();
+                return Value::createLong(left % rightLong);
+            }
+
+            // lastly they must both be ints, return int
+            int left = lhs.coerceToInt();
+            int rightInt = rhs.coerceToInt();
+            return Value::createInt(left % rightInt);
         }
-        else if (rightType == NumberDouble && pRight.coerceToInt() != right) {
-            // the shell converts ints to doubles so if right is larger than int max or
-            // if right truncates to something other than itself, it is a real double.
-            // Integer-valued double case is handled below
-            double left = pLeft.coerceToDouble();
-            return Value::createDouble(fmod(left, right));
+        else if (lhs.nullish() || rhs.nullish()) {
+            return Value(BSONNULL);
         }
-        if (leftType == NumberLong || rightType == NumberLong) {
-            // if either is long, return long
-            long long left = pLeft.coerceToLong();
-            long long rightLong = pRight.coerceToLong();
-            return Value::createLong(left % rightLong);
+        else {
+            uassert(16374, "$mod does not support dates",
+                    leftType != Date && rightType != Date);
+            uasserted(16611, "$mod only supports numeric types");
         }
-        // lastly they must both be ints, return int
-        int left = pLeft.coerceToInt();
-        int rightInt = pRight.coerceToInt();
-        return Value::createInt(left % rightInt);
     }
 
     const char *ExpressionMod::getOpName() const {
@@ -1825,16 +1834,22 @@ namespace mongo {
 
         const size_t n = vpOperand.size();
         for(size_t i = 0; i < n; ++i) {
-            Value pValue(vpOperand[i]->evaluate(pDocument));
+            Value val = vpOperand[i]->evaluate(pDocument);
 
-            uassert(16375, "$multiply does not support dates", pValue.getType() != Date);
+            if (val.numeric()) {
+                productType = Value::getWidestNumeric(productType, val.getType());
 
-            productType = Value::getWidestNumeric(productType, pValue.getType());
-            uassert(16555, "$mutiply only supports numeric types",
-                    productType != Undefined);
-
-            doubleProduct *= pValue.coerceToDouble();
-            longProduct *= pValue.coerceToLong();
+                doubleProduct *= val.coerceToDouble();
+                longProduct *= val.coerceToLong();
+            }
+            else if (val.nullish()) {
+                return Value(BSONNULL);
+            }
+            else {
+                uassert(16375, "$multiply does not support dates",
+                        val.getType() != Date);
+                uasserted(16555, "$mutiply only supports numeric types");
+            }
         }
 
         if (productType == NumberDouble)
@@ -2384,35 +2399,36 @@ namespace mongo {
     }
 
     Value ExpressionSubtract::evaluate(const Document& pDocument) const {
-        BSONType productType;
         checkArgCount(2);
-        Value pLeft(vpOperand[0]->evaluate(pDocument));
-        Value pRight(vpOperand[1]->evaluate(pDocument));
+        Value lhs = vpOperand[0]->evaluate(pDocument);
+        Value rhs = vpOperand[1]->evaluate(pDocument);
             
-        productType = Value::getWidestNumeric(pRight.getType(), pLeft.getType());
-        
-        uassert(16376,
-                "$subtract does not support dates",
-                pLeft.getType() != Date && pRight.getType() != Date);
+        BSONType diffType = Value::getWidestNumeric(rhs.getType(), lhs.getType());
 
-        uassert(16556, "$subtract only supports numeric types",
-                productType != Undefined);
-
-        if (productType == NumberDouble) {
-            double right = pRight.coerceToDouble();
-            double left = pLeft.coerceToDouble();
+        if (diffType == NumberDouble) {
+            double right = rhs.coerceToDouble();
+            double left = lhs.coerceToDouble();
             return Value::createDouble(left - right);
         } 
-
-        long long right = pRight.coerceToLong();
-        long long left = pLeft.coerceToLong();
-        if (productType == NumberLong)
+        else if (diffType == NumberLong) {
+            long long right = rhs.coerceToLong();
+            long long left = lhs.coerceToLong();
             return Value::createLong(left - right);
-        else if (productType == NumberInt)
+        }
+        else if (diffType == NumberInt) {
+            long long right = rhs.coerceToLong();
+            long long left = lhs.coerceToLong();
             return Value::createIntOrLong(left - right);
-        else
-            massert(16413, "$subtract resulted in a non-numeric type", false);
-        
+        }
+        else if (lhs.nullish() || rhs.nullish()) {
+            return Value(BSONNULL);
+        }
+        else {
+            uassert(16376, "$subtract does not support dates",
+                    lhs.getType() != Date && rhs.getType() != Date);
+
+            uasserted(16556, "$subtract only supports numeric types");
+        }
     }
 
     const char *ExpressionSubtract::getOpName() const {

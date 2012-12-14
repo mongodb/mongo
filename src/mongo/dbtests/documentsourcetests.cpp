@@ -808,7 +808,7 @@ namespace DocumentSourceTests {
             virtual BSONObj groupSpec() {
                 return BSON( "_id" << 0 << "first" << BSON( "$first" << "$missing" ) );
             }
-            virtual string expectedResultSetString() { return "[{_id:0, first:undefined}]"; }
+            virtual string expectedResultSetString() { return "[{_id:0, first:null}]"; }
         };
 
         /** Simulate merging sharded results in the router. */ 

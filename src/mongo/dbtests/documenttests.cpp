@@ -803,11 +803,15 @@ namespace DocumentTests {
                 virtual ~ToIntBase() {
                 }
                 void run() {
-                    ASSERT_EQUALS( expected(), value().coerceToInt() );
+                    if (asserts())
+                        ASSERT_THROWS( value().coerceToInt(), UserException );
+                    else
+                        ASSERT_EQUALS( expected(), value().coerceToInt() );
                 }
             protected:
                 virtual Value value() = 0;
                 virtual int expected() { return 0; }
+                virtual bool asserts() { return false; }
             };
 
             /** Coerce -5 to int. */
@@ -831,11 +835,13 @@ namespace DocumentTests {
             /** Coerce null to int. */
             class NullToInt : public ToIntBase {
                 Value value() { return Value(mongo::jstNULL); }
+                bool asserts() { return true; }
             };
             
             /** Coerce undefined to int. */
             class UndefinedToInt : public ToIntBase {
                 Value value() { return Value(mongo::Undefined); }
+                bool asserts() { return true; }
             };
             
             /** Coerce "" to int unsupported. */
@@ -851,11 +857,15 @@ namespace DocumentTests {
                 virtual ~ToLongBase() {
                 }
                 void run() {
-                    ASSERT_EQUALS( expected(), value().coerceToLong() );
+                    if (asserts())
+                        ASSERT_THROWS( value().coerceToLong(), UserException );
+                    else
+                        ASSERT_EQUALS( expected(), value().coerceToLong() );
                 }
             protected:
                 virtual Value value() = 0;
                 virtual long long expected() { return 0; }
+                virtual bool asserts() { return false; }
             };
             
             /** Coerce -5 to long. */
@@ -879,11 +889,13 @@ namespace DocumentTests {
             /** Coerce null to long. */
             class NullToLong : public ToLongBase {
                 Value value() { return Value(mongo::jstNULL); }
+                bool asserts() { return true; }
             };
             
             /** Coerce undefined to long. */
             class UndefinedToLong : public ToLongBase {
                 Value value() { return Value(mongo::Undefined); }
+                bool asserts() { return true; }
             };
             
             /** Coerce string to long unsupported. */
@@ -899,11 +911,15 @@ namespace DocumentTests {
                 virtual ~ToDoubleBase() {
                 }
                 void run() {
-                    ASSERT_EQUALS( expected(), value().coerceToDouble() );
+                    if (asserts())
+                        ASSERT_THROWS( value().coerceToDouble(), UserException );
+                    else
+                        ASSERT_EQUALS( expected(), value().coerceToDouble() );
                 }
             protected:
                 virtual Value value() = 0;
                 virtual double expected() { return 0; }
+                virtual bool asserts() { return false; }
             };
             
             /** Coerce -5 to double. */
@@ -930,11 +946,13 @@ namespace DocumentTests {
             /** Coerce null to double. */
             class NullToDouble : public ToDoubleBase {
                 Value value() { return Value(mongo::jstNULL); }
+                bool asserts() { return true; }
             };
             
             /** Coerce undefined to double. */
             class UndefinedToDouble : public ToDoubleBase {
                 Value value() { return Value(mongo::Undefined); }
+                bool asserts() { return true; }
             };
             
             /** Coerce string to double unsupported. */
@@ -1086,13 +1104,13 @@ namespace DocumentTests {
                 assertWidest( NumberDouble, NumberLong, NumberDouble );
                 assertWidest( NumberDouble, NumberDouble, NumberDouble );
                 
-                // Missing value and numeric types.
-                assertWidest( NumberInt, NumberInt, jstNULL );
-                assertWidest( NumberInt, NumberInt, Undefined );
-                assertWidest( NumberLong, NumberLong, jstNULL );
-                assertWidest( NumberLong, NumberLong, Undefined );
-                assertWidest( NumberDouble, NumberDouble, jstNULL );
-                assertWidest( NumberDouble, NumberDouble, Undefined );
+                // Missing value and numeric types (result Undefined).
+                assertWidest( Undefined, NumberInt, Undefined );
+                assertWidest( Undefined, NumberInt, Undefined );
+                assertWidest( Undefined, NumberLong, jstNULL );
+                assertWidest( Undefined, NumberLong, Undefined );
+                assertWidest( Undefined, NumberDouble, jstNULL );
+                assertWidest( Undefined, NumberDouble, Undefined );
 
                 // Missing value types (result Undefined).
                 assertWidest( Undefined, jstNULL, jstNULL );
