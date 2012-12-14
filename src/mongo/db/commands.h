@@ -184,6 +184,7 @@ namespace mongo {
                          BSONObjBuilder& result,
                          bool fromRepl) {
             errmsg = name + " is not supported when running with authentication enabled";
+            log() << errmsg << std::endl;
             return false;
         }
     };
