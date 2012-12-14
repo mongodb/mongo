@@ -109,6 +109,9 @@ namespace mongo {
         SSL_library_init();
         SSL_load_error_strings();
         ERR_load_crypto_strings();
+        // Add all digests and ciphers to OpenSSL's internal table
+        // so that encryption/decryption is backwards compatible
+        OpenSSL_add_all_algorithms();
         
         _context = SSL_CTX_new(SSLv23_method());
         massert(15864, 
