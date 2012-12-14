@@ -305,6 +305,33 @@ env = Environment( BUILD_DIR=variantDir,
                    CONFIGURELOG = '#' + scons_data_dir + '/config.log'
                    )
 
+
+CXXenv=os.getenv("CXX", "")
+CXXopt=get_option( "cxx" )
+
+if has_option("clang"):
+    env["CC" ] = 'clang'
+    if (CXXenv and (CXXenv != 'clang++')) or (CXXopt and (CXXopt != 'clang++')):
+      print "Error: conflicting CXX/cxx and clang settings:"
+      if CXXenv:  print '  In the environment, CXX="%s".' % CXXenv
+      if CXXopt:  print '  The option "--cxx=%s" was given.' % CXXopt
+      exit()
+    env["CXX"] = 'clang++'
+else:
+  if CXXenv and not CXXopt:
+    env["CXX"] = CXXenv
+    print 'inherited CXX="%s" from the environment' % env["CXX"]
+  elif CXXopt and not CXXenv:
+    env["CXX"] = CXXopt
+    print 'using CXX="%s" as directed by command-line option' % env["CXX"]
+  elif CXXenv and CXXopt:
+    if CXXenv != CXXopt:
+      print 'Error: CXX="%s" in the environment but "-cxx=%s" was specified on the command line.' % (CXXenv, CXXopt)
+      exit()
+    env["CXX"] = CXXenv # it could have been either one in this case
+    print 'using CXX="%s" as directed by both command-line option and the environment' % env["CXX"]
+
+
 env['_LIBDEPS'] = '$_LIBDEPS_OBJS'
 
 if has_option('mute'):
@@ -327,13 +354,6 @@ if os.sys.platform == 'win32':
     env['OS_FAMILY'] = 'win'
 else:
     env['OS_FAMILY'] = 'posix'
-
-if has_option( "cxx" ):
-    env["CC"] = get_option( "cxx" )
-    env["CXX"] = get_option( "cxx" )
-elif has_option("clang"):
-    env["CC"] = 'clang'
-    env["CXX"] = 'clang++'
 
 if has_option( "cc" ):
     env["CC"] = get_option( "cc" )
@@ -686,7 +706,12 @@ if nix:
 
     env.Append( CPPDEFINES=["_FILE_OFFSET_BITS=64"] )
     env.Append( CXXFLAGS=["-Wnon-virtual-dtor", "-Woverloaded-virtual"] )
-    env.Append( LINKFLAGS=["-fPIC", "-pthread",  "-rdynamic"] )
+
+    if darwin: # maybe this should have e.g. "or windows"?  Reports exist on the Web of "-rdynamic" failing in MinGW...
+      env.Append( LINKFLAGS=["-fPIC", "-pthread"] )
+    else:
+      env.Append( LINKFLAGS=["-fPIC", "-pthread",  "-rdynamic"] )
+
     env.Append( LIBS=[] )
 
     #make scons colorgcc friendly
