@@ -560,11 +560,11 @@ __wt_evict_file(WT_SESSION_IMPL *session, int syncop)
 			WT_ERR(__wt_tree_walk(session, &next_page, walk_flags));
 	}
 
-	return (0);
-
-	/* On error, clear any left-over tree walk. */
-err:	if (next_page != NULL)
-		__wt_evict_clear_tree_walk(session, next_page);
+	if (0) {
+err:		/* On error, clear any left-over tree walk. */
+		if (next_page != NULL)
+			__wt_evict_clear_tree_walk(session, next_page);
+	}
 	if (syncop == WT_SYNC)
 		cache->disable_dirty_eviction = 0;
 	return (ret);
