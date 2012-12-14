@@ -30,7 +30,7 @@ namespace {
         BSONObj emptyObj = BSONObj();
         string errMsg;
         ASSERT(shard.parseBSON(emptyObj, &errMsg));
-        ASSERT(errMsg == "");
+        ASSERT_EQUALS(errMsg, "");
         ASSERT_FALSE(shard.isValid(NULL));
     }
 
@@ -40,7 +40,7 @@ namespace {
                            ShardType::host("localhost:27017"));
         string errMsg;
         ASSERT(shard.parseBSON(obj, &errMsg));
-        ASSERT(errMsg == "");
+        ASSERT_EQUALS(errMsg, "");
         ASSERT_TRUE(shard.isValid(NULL));
     }
 
@@ -52,8 +52,15 @@ namespace {
                            ShardType::maxSize(100));
         string errMsg;
         ASSERT(shard.parseBSON(obj, &errMsg));
-        ASSERT(errMsg == "");
+        ASSERT_EQUALS(errMsg, "");
         ASSERT_TRUE(shard.isValid(NULL));
+    }
+
+    TEST(Validity, BadType) {
+        ShardType shard;
+        BSONObj obj = BSON(ShardType::name() << 0);
+        string errMsg;
+        ASSERT((!shard.parseBSON(obj, &errMsg)) && (errMsg != ""));
     }
 
 }  // unnamed namespace

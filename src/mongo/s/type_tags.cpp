@@ -97,17 +97,18 @@ namespace mongo {
         return builder.obj();
     }
 
-    void TagsType::parseBSON(BSONObj source) {
+    bool TagsType::parseBSON(BSONObj source, string* errMsg) {
         clear();
 
-        bool ok = true;
-        ok &= FieldParser::extract(source, ns, "", &_ns);
-        ok &= FieldParser::extract(source, tag, "", &_tag);
-        ok &= FieldParser::extract(source, min, BSONObj(), &_min);
-        ok &= FieldParser::extract(source, max, BSONObj(), &_max);
-        if (! ok) {
-            clear();
-        }
+        string dummy;
+        if (!errMsg) errMsg = &dummy;
+
+        if (!FieldParser::extract(source, ns, "", &_ns, errMsg)) return false;
+        if (!FieldParser::extract(source, tag, "", &_tag, errMsg)) return false;
+        if (!FieldParser::extract(source, min, BSONObj(), &_min, errMsg)) return false;
+        if (!FieldParser::extract(source, max, BSONObj(), &_max, errMsg)) return false;
+
+        return true;
     }
 
     void TagsType::clear() {

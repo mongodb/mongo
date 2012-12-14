@@ -62,15 +62,16 @@ namespace mongo {
         return builder.obj();
     }
 
-    void LockpingsType::parseBSON(BSONObj source) {
+    bool LockpingsType::parseBSON(BSONObj source, string* errMsg) {
         clear();
 
-        bool ok = true;
-        ok &= FieldParser::extract(source, process, "", &_process);
-        ok &= FieldParser::extract(source, ping, 0ULL, &_ping);
-        if (! ok) {
-            clear();
-        }
+        string dummy;
+        if (!errMsg) errMsg = &dummy;
+
+        if (!FieldParser::extract(source, process, "", &_process, errMsg)) return false;
+        if (!FieldParser::extract(source, ping, 0ULL, &_ping, errMsg)) return false;
+
+        return true;
     }
 
     void LockpingsType::clear() {

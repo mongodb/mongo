@@ -34,7 +34,7 @@ namespace {
         BSONObj emptyObj = BSONObj();
         string errMsg;
         ASSERT(coll.parseBSON(emptyObj, &errMsg));
-        ASSERT(errMsg == "");
+        ASSERT_EQUALS(errMsg, "");
         ASSERT_FALSE(coll.isValid(NULL));
     }
 
@@ -46,7 +46,7 @@ namespace {
                            CollectionType::epoch(OID::gen()));
         string errMsg;
         ASSERT(coll.parseBSON(obj, &errMsg));
-        ASSERT(errMsg == "");
+        ASSERT_EQUALS(errMsg, "");
         ASSERT_TRUE(coll.isValid(NULL));
     }
 
@@ -58,7 +58,7 @@ namespace {
                            CollectionType::epoch(OID::gen()));
         string errMsg;
         ASSERT(coll.parseBSON(obj, &errMsg));
-        ASSERT(errMsg == "");
+        ASSERT_EQUALS(errMsg, "");
         ASSERT_TRUE(coll.isValid(NULL));
     }
 
@@ -69,7 +69,7 @@ namespace {
                            CollectionType::unique(true));
         string errMsg;
         ASSERT(coll.parseBSON(obj, &errMsg));
-        ASSERT(errMsg == "");
+        ASSERT_EQUALS(errMsg, "");
         ASSERT_FALSE(coll.isValid(NULL));
     }
 
@@ -82,7 +82,7 @@ namespace {
                            CollectionType::epoch(OID::gen()));
         string errMsg;
         ASSERT(coll.parseBSON(obj, &errMsg));
-        ASSERT(errMsg == "");
+        ASSERT_EQUALS(errMsg, "");
         ASSERT_TRUE(coll.isValid(NULL));
         ASSERT_EQUALS(coll.getUpdatedAt(), creation);
     }
@@ -96,7 +96,7 @@ namespace {
                            CollectionType::DEPRECATED_lastmodEpoch(epoch));
         string errMsg;
         ASSERT(coll.parseBSON(obj, &errMsg));
-        ASSERT(errMsg == "");
+        ASSERT_EQUALS(errMsg, "");
         ASSERT_TRUE(coll.isValid(NULL));
         ASSERT_EQUALS(coll.getEpoch(), epoch);
     }
@@ -113,7 +113,7 @@ namespace {
                            CollectionType::dropped(true));
         string errMsg;
         ASSERT(coll.parseBSON(obj, &errMsg));
-        ASSERT(errMsg == "");
+        ASSERT_EQUALS(errMsg, "");
         ASSERT_TRUE(coll.isValid(NULL));
     }
 
@@ -128,13 +128,20 @@ namespace {
                            CollectionType::dropped(false));
         string errMsg;
         ASSERT(coll.parseBSON(obj, &errMsg));
-        ASSERT(errMsg == "");
+        ASSERT_EQUALS(errMsg, "");
         ASSERT_EQUALS(coll.getNS(), "db.coll");
         ASSERT_EQUALS(coll.getKeyPattern(), BSON("a" << 1));
         ASSERT_EQUALS(coll.isUnique(), true);
         ASSERT_EQUALS(coll.getUpdatedAt(), 1ULL);
         ASSERT_EQUALS(coll.getEpoch(), epoch);
         ASSERT_TRUE(coll.isValid(NULL));
+    }
+
+    TEST(Validity, BadType) {
+        CollectionType coll;
+        BSONObj obj = BSON(CollectionType::ns() << 0);
+        string errMsg;
+        ASSERT((!coll.parseBSON(obj, &errMsg)) && (errMsg != ""));
     }
 
 } // unnamed namespace

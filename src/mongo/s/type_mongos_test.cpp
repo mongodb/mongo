@@ -20,6 +20,7 @@
 
 namespace {
 
+    using std::string;
     using mongo::BSONObj;
     using mongo::MongosType;
     using mongo::Date_t;
@@ -29,19 +30,23 @@ namespace {
         BSONObj objNoName = BSON(MongosType::ping(time(0)) <<
                                  MongosType::up(100) <<
                                  MongosType::waiting(false));
-        mongos.parseBSON(objNoName);
+        string errMsg;
+        ASSERT(mongos.parseBSON(objNoName, &errMsg));
+        ASSERT_EQUALS(errMsg, "");
         ASSERT_FALSE(mongos.isValid(NULL));
 
         BSONObj objNoPing = BSON(MongosType::name("localhost:27017") <<
                                  MongosType::up(100) <<
                                  MongosType::waiting(false));
-        mongos.parseBSON(objNoPing);
+        ASSERT(mongos.parseBSON(objNoPing, &errMsg));
+        ASSERT_EQUALS(errMsg, "");
         ASSERT_FALSE(mongos.isValid(NULL));
 
         BSONObj objNoUp = BSON(MongosType::name("localhost:27017") <<
                                MongosType::ping(time(0)) <<
                                MongosType::waiting(false));
-        mongos.parseBSON(objNoUp);
+        ASSERT(mongos.parseBSON(objNoUp, &errMsg));
+        ASSERT_EQUALS(errMsg, "");
         ASSERT_FALSE(mongos.isValid(NULL));
     }
 
@@ -51,12 +56,21 @@ namespace {
                            MongosType::ping(1ULL) <<
                            MongosType::up(100) <<
                            MongosType::waiting(false));
-        mongos.parseBSON(obj);
+        string errMsg;
+        ASSERT(mongos.parseBSON(obj, &errMsg));
+        ASSERT_EQUALS(errMsg, "");
         ASSERT_TRUE(mongos.isValid(NULL));
         ASSERT_EQUALS(mongos.getName(), "localhost:27017");
         ASSERT_EQUALS(mongos.getPing(), 1ULL);
         ASSERT_EQUALS(mongos.getUp(), 100);
         ASSERT_EQUALS(mongos.getWaiting(), false);
+    }
+
+    TEST(Validity, BadType) {
+        MongosType mongos;
+        BSONObj obj = BSON(MongosType::name() << 0);
+        string errMsg;
+        ASSERT((!mongos.parseBSON(obj, &errMsg)) && (errMsg != ""));
     }
 
 } // unnamed namespace

@@ -88,20 +88,21 @@ namespace mongo {
         return builder.obj();
     }
 
-    void ChangelogType::parseBSON(BSONObj source) {
+    bool ChangelogType::parseBSON(BSONObj source, string* errMsg) {
         clear();
 
-        bool ok = true;
-        ok &= FieldParser::extract(source, changeID, "", &_changeID);
-        ok &= FieldParser::extract(source, server, "", &_server);
-        ok &= FieldParser::extract(source, clientAddr, "", &_clientAddr);
-        ok &= FieldParser::extract(source, time, 0ULL, &_time);
-        ok &= FieldParser::extract(source, what, "", &_what);
-        ok &= FieldParser::extract(source, ns, "", &_ns);
-        ok &= FieldParser::extract(source, details, BSONObj(), &_details);
-        if (! ok) {
-            clear();
-        }
+        string dummy;
+        if (!errMsg) errMsg = &dummy;
+
+        if (!FieldParser::extract(source, changeID, "", &_changeID, errMsg)) return false;
+        if (!FieldParser::extract(source, server, "", &_server, errMsg)) return false;
+        if (!FieldParser::extract(source, clientAddr, "", &_clientAddr, errMsg)) return false;
+        if (!FieldParser::extract(source, time, 0ULL, &_time, errMsg)) return false;
+        if (!FieldParser::extract(source, what, "", &_what, errMsg)) return false;
+        if (!FieldParser::extract(source, ns, "", &_ns, errMsg)) return false;
+        if (!FieldParser::extract(source, details, BSONObj(), &_details, errMsg)) return false;
+
+        return true;
     }
 
     void ChangelogType::clear() {

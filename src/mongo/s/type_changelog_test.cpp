@@ -20,6 +20,7 @@
 
 namespace {
 
+    using std::string;
     using mongo::ChangelogType;
     using mongo::BSONObj;
     using mongo::Date_t;
@@ -27,7 +28,9 @@ namespace {
     TEST(Validity, Empty) {
         ChangelogType logEntry;
         BSONObj emptyObj = BSONObj();
-        logEntry.parseBSON(emptyObj);
+        string errMsg;
+        ASSERT(logEntry.parseBSON(emptyObj, &errMsg));
+        ASSERT_EQUALS(errMsg, "");
         ASSERT_FALSE(logEntry.isValid(NULL));
     }
 
@@ -40,7 +43,9 @@ namespace {
                            ChangelogType::what("split") <<
                            ChangelogType::ns("test.test") <<
                            ChangelogType::details(BSON("dummy" << "info")));
-        logEntry.parseBSON(obj);
+        string errMsg;
+        ASSERT(logEntry.parseBSON(obj, &errMsg));
+        ASSERT_EQUALS(errMsg, "");
         ASSERT_TRUE(logEntry.isValid(NULL));
         ASSERT_EQUALS(logEntry.getChangeID(), "host.local-2012-11-21T19:14:10-8");
         ASSERT_EQUALS(logEntry.getServer(), "host.local");
@@ -59,7 +64,9 @@ namespace {
                            ChangelogType::what("split") <<
                            ChangelogType::ns("test.test") <<
                            ChangelogType::details(BSON("dummy" << "info")));
-        logEntry.parseBSON(obj);
+        string errMsg;
+        ASSERT(logEntry.parseBSON(obj, &errMsg));
+        ASSERT_EQUALS(errMsg, "");
         ASSERT_FALSE(logEntry.isValid(NULL));
     }
 
@@ -71,7 +78,9 @@ namespace {
                            ChangelogType::what("split") <<
                            ChangelogType::ns("test.test") <<
                            ChangelogType::details(BSON("dummy" << "info")));
-        logEntry.parseBSON(obj);
+        string errMsg;
+        ASSERT(logEntry.parseBSON(obj, &errMsg));
+        ASSERT_EQUALS(errMsg, "");
         ASSERT_FALSE(logEntry.isValid(NULL));
     }
 
@@ -83,7 +92,9 @@ namespace {
                            ChangelogType::what("split") <<
                            ChangelogType::ns("test.test") <<
                            ChangelogType::details(BSON("dummy" << "info")));
-        logEntry.parseBSON(obj);
+        string errMsg;
+        ASSERT(logEntry.parseBSON(obj, &errMsg));
+        ASSERT_EQUALS(errMsg, "");
         ASSERT_FALSE(logEntry.isValid(NULL));
     }
 
@@ -95,7 +106,9 @@ namespace {
                            ChangelogType::what("split") <<
                            ChangelogType::ns("test.test") <<
                            ChangelogType::details(BSON("dummy" << "info")));
-        logEntry.parseBSON(obj);
+        string errMsg;
+        ASSERT(logEntry.parseBSON(obj, &errMsg));
+        ASSERT_EQUALS(errMsg, "");
         ASSERT_FALSE(logEntry.isValid(NULL));
     }
 
@@ -107,7 +120,9 @@ namespace {
                            ChangelogType::time(1ULL) <<
                            ChangelogType::ns("test.test") <<
                            ChangelogType::details(BSON("dummy" << "info")));
-        logEntry.parseBSON(obj);
+        string errMsg;
+        ASSERT(logEntry.parseBSON(obj, &errMsg));
+        ASSERT_EQUALS(errMsg, "");
         ASSERT_FALSE(logEntry.isValid(NULL));
     }
 
@@ -119,7 +134,9 @@ namespace {
                            ChangelogType::time(1ULL) <<
                            ChangelogType::what("split") <<
                            ChangelogType::details(BSON("dummy" << "info")));
-        logEntry.parseBSON(obj);
+        string errMsg;
+        ASSERT(logEntry.parseBSON(obj, &errMsg));
+        ASSERT_EQUALS(errMsg, "");
         ASSERT_FALSE(logEntry.isValid(NULL));
     }
 
@@ -131,8 +148,17 @@ namespace {
                            ChangelogType::time(1ULL) <<
                            ChangelogType::what("split") <<
                            ChangelogType::ns("test.test"));
-        logEntry.parseBSON(obj);
+        string errMsg;
+        ASSERT(logEntry.parseBSON(obj, &errMsg));
+        ASSERT_EQUALS(errMsg, "");
         ASSERT_FALSE(logEntry.isValid(NULL));
+    }
+
+    TEST(Validity, BadType) {
+        ChangelogType logEntry;
+        BSONObj obj = BSON(ChangelogType::changeID() << 0);
+        string errMsg;
+        ASSERT((!logEntry.parseBSON(obj, &errMsg)) && (errMsg != ""));
     }
 
 } // unnamed namespace

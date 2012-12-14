@@ -86,19 +86,20 @@ namespace mongo {
         return builder.obj();
     }
 
-    void LocksType::parseBSON(BSONObj source) {
+    bool LocksType::parseBSON(BSONObj source, string* errMsg) {
         clear();
 
-        bool ok = true;
-        ok &= FieldParser::extract(source, name, "", &_name);
-        ok &= FieldParser::extract(source, state, 0, &_state);
-        ok &= FieldParser::extract(source, process, "", &_process);
-        ok &= FieldParser::extract(source, lockID, OID(), &_lockID);
-        ok &= FieldParser::extract(source, who, "", &_who);
-        ok &= FieldParser::extract(source, why, "", &_why);
-        if (! ok) {
-            clear();
-        }
+        string dummy;
+        if (!errMsg) errMsg = &dummy;
+
+        if (!FieldParser::extract(source, name, "", &_name, errMsg)) return false;
+        if (!FieldParser::extract(source, state, 0, &_state, errMsg)) return false;
+        if (!FieldParser::extract(source, process, "", &_process, errMsg)) return false;
+        if (!FieldParser::extract(source, lockID, OID(), &_lockID, errMsg)) return false;
+        if (!FieldParser::extract(source, who, "", &_who, errMsg)) return false;
+        if (!FieldParser::extract(source, why, "", &_why, errMsg)) return false;
+
+        return true;
     }
 
     void LocksType::clear() {

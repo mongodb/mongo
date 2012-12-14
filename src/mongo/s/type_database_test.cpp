@@ -56,4 +56,11 @@ namespace {
         ASSERT_EQUALS(db.getDraining(), false);
     }
 
+    TEST(Validity, BadType) {
+        DatabaseType db;
+        BSONObj obj = BSON(DatabaseType::name() << 0);
+        string errMsg;
+        ASSERT((!db.parseBSON(obj, &errMsg)) && (errMsg != ""));
+    }
+
 } // unnamed namespace

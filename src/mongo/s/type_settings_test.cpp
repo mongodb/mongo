@@ -19,24 +19,30 @@
 
 namespace {
 
+    using std::string;
     using mongo::BSONObj;
     using mongo::SettingsType;
 
     TEST(Validity, MissingFields) {
         SettingsType settings;
         BSONObj objNoKey = BSONObj();
-        settings.parseBSON(objNoKey);
+        string errMsg;
+        ASSERT(settings.parseBSON(objNoKey, &errMsg));
+        ASSERT_EQUALS(errMsg, "");
         ASSERT_FALSE(settings.isValid(NULL));
 
         BSONObj objChunksizeNoValue = BSON(SettingsType::key("chunksize"));
-        settings.parseBSON(objChunksizeNoValue);
+        ASSERT(settings.parseBSON(objChunksizeNoValue, &errMsg));
+        ASSERT_EQUALS(errMsg, "");
         ASSERT_FALSE(settings.isValid(NULL));
     }
 
     TEST(Validity, UnsupportedSetting) {
         SettingsType settings;
         BSONObj objBadSetting = BSON(SettingsType::key("badsetting"));
-        settings.parseBSON(objBadSetting);
+        string errMsg;
+        ASSERT(settings.parseBSON(objBadSetting, &errMsg));
+        ASSERT_EQUALS(errMsg, "");
         ASSERT_FALSE(settings.isValid(NULL));
     }
 
@@ -47,14 +53,17 @@ namespace {
                                                                                   "23:00" <<
                                                                                   "end" << 
                                                                                   "6:00" )));
-        settings.parseBSON(objBalancerBadKeys);
+        string errMsg;
+        ASSERT(settings.parseBSON(objBalancerBadKeys, &errMsg));
+        ASSERT_EQUALS(errMsg, "");
         ASSERT_FALSE(settings.isValid(NULL));
         BSONObj objBalancerBadTimes = BSON(SettingsType::key("balancer") <<
                                            SettingsType::balancerActiveWindow(BSON("start" <<
                                                                                    "23" <<
                                                                                    "stop" <<
                                                                                    "6" )));
-        settings.parseBSON(objBalancerBadTimes);
+        ASSERT(settings.parseBSON(objBalancerBadTimes, &errMsg));
+        ASSERT_EQUALS(errMsg, "");
         ASSERT_FALSE(settings.isValid(NULL));
     }
 
@@ -62,7 +71,9 @@ namespace {
         SettingsType settings;
         BSONObj objChunksize = BSON(SettingsType::key("chunksize") <<
                                     SettingsType::chunksize(1));
-        settings.parseBSON(objChunksize);
+        string errMsg;
+        ASSERT(settings.parseBSON(objChunksize, &errMsg));
+        ASSERT_EQUALS(errMsg, "");
         ASSERT_TRUE(settings.isValid(NULL));
         ASSERT_EQUALS(settings.getKey(), "chunksize");
         ASSERT_EQUALS(settings.getChunksize(), 1);
@@ -73,7 +84,8 @@ namespace {
                                                                    "stop" << "6:00" )) <<
                            SettingsType::shortBalancerSleep(true) <<
                            SettingsType::secondaryThrottle(true));
-        settings.parseBSON(objBalancer);
+        ASSERT(settings.parseBSON(objBalancer, &errMsg));
+        ASSERT_EQUALS(errMsg, "");
         ASSERT_TRUE(settings.isValid(NULL));
         ASSERT_EQUALS(settings.getKey(), "balancer");
         ASSERT_EQUALS(settings.getBalancerStopped(), true);
@@ -81,6 +93,13 @@ namespace {
                                                                "stop" << "6:00" ));
         ASSERT_EQUALS(settings.getShortBalancerSleep(), true);
         ASSERT_EQUALS(settings.getSecondaryThrottle(), true);
+    }
+
+    TEST(Validity, BadType) {
+        SettingsType settings;
+        BSONObj obj = BSON(SettingsType::key() << 0);
+        string errMsg;
+        ASSERT((!settings.parseBSON(obj, &errMsg)) && (errMsg != ""));
     }
 
 } // unnamed namespace

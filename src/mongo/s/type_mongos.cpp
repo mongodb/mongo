@@ -73,17 +73,18 @@ namespace mongo {
         return builder.obj();
     }
 
-    void MongosType::parseBSON(BSONObj source) {
+    bool MongosType::parseBSON(BSONObj source, string* errMsg) {
         clear();
 
-        bool ok = true;
-        ok &= FieldParser::extract(source, name, "", &_name);
-        ok &= FieldParser::extract(source, ping, 0ULL, &_ping);
-        ok &= FieldParser::extract(source, up, 0, &_up);
-        ok &= FieldParser::extract(source, waiting, false, &_waiting);
-        if (! ok) {
-            clear();
-        }
+        string dummy;
+        if (!errMsg) errMsg = &dummy;
+
+        if (!FieldParser::extract(source, name, "", &_name, errMsg)) return false;
+        if (!FieldParser::extract(source, ping, 0ULL, &_ping, errMsg)) return false;
+        if (!FieldParser::extract(source, up, 0, &_up, errMsg)) return false;
+        if (!FieldParser::extract(source, waiting, false, &_waiting, errMsg)) return false;
+
+        return true;
     }
 
     void MongosType::clear() {

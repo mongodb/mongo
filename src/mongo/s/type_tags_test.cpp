@@ -19,6 +19,7 @@
 
 namespace {
 
+    using std::string;
     using mongo::BSONObj;
     using mongo::TagsType;
 
@@ -28,7 +29,9 @@ namespace {
                            TagsType::tag("tag") <<
                            TagsType::min(BSON("a" << 10)) <<
                            TagsType::max(BSON("a" << 20)));
-        tag.parseBSON(obj);
+        string errMsg;
+        ASSERT(tag.parseBSON(obj, &errMsg));
+        ASSERT_EQUALS(errMsg, "");
         ASSERT_TRUE(tag.isValid(NULL));
         ASSERT_EQUALS(tag.getNS(), "test.mycol");
         ASSERT_EQUALS(tag.getTag(), "tag");
@@ -41,18 +44,22 @@ namespace {
         BSONObj objModNS = BSON(TagsType::tag("tag") <<
                                 TagsType::min(BSON("a" << 10)) <<
                                 TagsType::max(BSON("a" << 20)));
-        tag.parseBSON(objModNS);
+        string errMsg;
+        ASSERT(tag.parseBSON(objModNS, &errMsg));
+        ASSERT_EQUALS(errMsg, "");
         ASSERT_FALSE(tag.isValid(NULL));
 
         BSONObj objModName = BSON(TagsType::ns("test.mycol") <<
                                   TagsType::min(BSON("a" << 10)) <<
                                   TagsType::max(BSON("a" << 20)));
-        tag.parseBSON(objModName);
+        ASSERT(tag.parseBSON(objModName, &errMsg));
+        ASSERT_EQUALS(errMsg, "");
         ASSERT_FALSE(tag.isValid(NULL));
 
         BSONObj objModKeys = BSON(TagsType::ns("test.mycol") <<
                                   TagsType::tag("tag"));
-        tag.parseBSON(objModKeys);
+        ASSERT(tag.parseBSON(objModKeys, &errMsg));
+        ASSERT_EQUALS(errMsg, "");
         ASSERT_FALSE(tag.isValid(NULL));
     }
 
@@ -62,7 +69,9 @@ namespace {
                            TagsType::ns("test.mycol") <<
                            TagsType::min(BSON("a" << 10 << "b" << 10)) <<
                            TagsType::max(BSON("a" << 20)));
-        tag.parseBSON(obj);
+        string errMsg;
+        ASSERT(tag.parseBSON(obj, &errMsg));
+        ASSERT_EQUALS(errMsg, "");
         ASSERT_FALSE(tag.isValid(NULL));
     }
 
@@ -72,7 +81,9 @@ namespace {
                            TagsType::ns("test.mycol") <<
                            TagsType::min(BSON("a" << 10)) <<
                            TagsType::max(BSON("b" << 20)));
-        tag.parseBSON(obj);
+        string errMsg;
+        ASSERT(tag.parseBSON(obj, &errMsg));
+        ASSERT_EQUALS(errMsg, "");
         ASSERT_FALSE(tag.isValid(NULL));
     }
 
@@ -82,7 +93,17 @@ namespace {
                            TagsType::ns("test.mycol") <<
                            TagsType::min(BSON("a" << 20)) <<
                            TagsType::max(BSON("a" << 10)));
-        tag.parseBSON(obj);
+        string errMsg;
+        ASSERT(tag.parseBSON(obj, &errMsg));
+        ASSERT_EQUALS(errMsg, "");
         ASSERT_FALSE(tag.isValid(NULL));
     }
+
+    TEST(Validity, BadType) {
+        TagsType tag;
+        BSONObj obj = BSON(TagsType::tag() << 0);
+        string errMsg;
+        ASSERT((!tag.parseBSON(obj, &errMsg)) && (errMsg != ""));
+    }
+
 } // unnamed namespace

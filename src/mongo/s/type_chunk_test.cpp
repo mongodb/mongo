@@ -43,7 +43,7 @@ namespace {
                                 ChunkType::shard("shard0001"));
         string errMsg;
         ASSERT(chunk.parseBSON(objModNS, &errMsg));
-        ASSERT(errMsg == "");
+        ASSERT_EQUALS(errMsg, "");
         ASSERT_FALSE(chunk.isValid(NULL));
 
         BSONObj objModName = BSON(ChunkType::ns("test.mycol") <<
@@ -53,7 +53,7 @@ namespace {
                                   ChunkType::shard("shard0001"));
 
         ASSERT(chunk.parseBSON(objModName, &errMsg));
-        ASSERT(errMsg == "");
+        ASSERT_EQUALS(errMsg, "");
         ASSERT_FALSE(chunk.isValid(NULL));
 
         BSONObj objModKeys = BSON(ChunkType::name("test.mycol-a_MinKey") <<
@@ -62,7 +62,7 @@ namespace {
                                   ChunkType::shard("shard0001"));
 
         ASSERT(chunk.parseBSON(objModKeys, &errMsg));
-        ASSERT(errMsg == "");
+        ASSERT_EQUALS(errMsg, "");
         ASSERT_FALSE(chunk.isValid(NULL));
 
         BSONObj objModVersion = BSON(ChunkType::name("test.mycol-a_MinKey") <<
@@ -72,7 +72,7 @@ namespace {
                                      ChunkType::shard("shard0001"));
 
         ASSERT(chunk.parseBSON(objModVersion, &errMsg));
-        ASSERT(errMsg == "");
+        ASSERT_EQUALS(errMsg, "");
         ASSERT_FALSE(chunk.isValid(NULL));
 
         BSONObj objModShard = BSON(ChunkType::name("test.mycol-a_MinKey") <<
@@ -83,7 +83,7 @@ namespace {
                                    ChunkType::shard("shard0001"));
 
         ASSERT(chunk.parseBSON(objModShard, &errMsg));
-        ASSERT(errMsg == "");
+        ASSERT_EQUALS(errMsg, "");
         ASSERT_FALSE(chunk.isValid(NULL));
     }
 
@@ -98,7 +98,7 @@ namespace {
                            ChunkType::shard("shard0001"));
         string errMsg;
         ASSERT(chunk.parseBSON(obj, &errMsg));
-        ASSERT(errMsg == "");
+        ASSERT_EQUALS(errMsg, "");
         ASSERT_FALSE(chunk.isValid(NULL));
     }
 
@@ -113,7 +113,7 @@ namespace {
                            ChunkType::shard("shard0001"));
         string errMsg;
         ASSERT(chunk.parseBSON(obj, &errMsg));
-        ASSERT(errMsg == "");
+        ASSERT_EQUALS(errMsg, "");
         ASSERT_FALSE(chunk.isValid(NULL));
     }
 
@@ -128,7 +128,7 @@ namespace {
                            ChunkType::shard("shard0001"));
         string errMsg;
         ASSERT(chunk.parseBSON(obj, &errMsg));
-        ASSERT(errMsg == "");
+        ASSERT_EQUALS(errMsg, "");
         ASSERT_FALSE(chunk.isValid(NULL));
     }
 
@@ -144,7 +144,7 @@ namespace {
                            ChunkType::shard("shard0001"));
         string errMsg;
         ASSERT(chunk.parseBSON(obj, &errMsg));
-        ASSERT(errMsg == "");
+        ASSERT_EQUALS(errMsg, "");
         ASSERT_TRUE(chunk.isValid(NULL));
         ASSERT_EQUALS(chunk.getName(), "test.mycol-a_MinKey");
         ASSERT_EQUALS(chunk.getNS(), "test.mycol");
@@ -168,7 +168,7 @@ namespace {
                            ChunkType::shard("shard0001"));
         string errMsg;
         ASSERT(chunk.parseBSON(obj, &errMsg));
-        ASSERT(errMsg == "");
+        ASSERT_EQUALS(errMsg, "");
         ASSERT_TRUE(chunk.isValid(NULL));
         ASSERT_EQUALS(chunk.getName(), "test.mycol-a_MinKey");
         ASSERT_EQUALS(chunk.getNS(), "test.mycol");
@@ -178,6 +178,13 @@ namespace {
         ASSERT_EQUALS(fetchedVersion._combined, 1ULL);
         ASSERT_EQUALS(fetchedVersion._epoch, epoch);
         ASSERT_EQUALS(chunk.getShard(), "shard0001");
+    }
+
+    TEST(Validity, BadType) {
+        ChunkType chunk;
+        BSONObj obj = BSON(ChunkType::name() << 0);
+        string errMsg;
+        ASSERT((!chunk.parseBSON(obj, &errMsg)) && (errMsg != ""));
     }
 
 } // unnamed namespace

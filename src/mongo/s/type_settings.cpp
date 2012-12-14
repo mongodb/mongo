@@ -100,19 +100,20 @@ namespace mongo {
         return builder.obj();
     }
 
-    void SettingsType::parseBSON(BSONObj source) {
+    bool SettingsType::parseBSON(BSONObj source, string* errMsg) {
         clear();
 
-        bool ok = true;
-        ok &= FieldParser::extract(source, key, "", &_key);
-        ok &= FieldParser::extract(source, chunksize, 0, &_chunksize);
-        ok &= FieldParser::extract(source, balancerStopped, false, &_balancerStopped);
-        ok &= FieldParser::extract(source, balancerActiveWindow, BSONObj(), &_balancerActiveWindow);
-        ok &= FieldParser::extract(source, shortBalancerSleep, false, &_shortBalancerSleep);
-        ok &= FieldParser::extract(source, secondaryThrottle, false, &_secondaryThrottle);
-        if (! ok) {
-            clear();
-        }
+        string dummy;
+        if (!errMsg) errMsg = &dummy;
+
+        if (!FieldParser::extract(source, key, "", &_key, errMsg)) return false;
+        if (!FieldParser::extract(source, chunksize, 0, &_chunksize, errMsg)) return false;
+        if (!FieldParser::extract(source, balancerStopped, false, &_balancerStopped, errMsg)) return false;
+        if (!FieldParser::extract(source, balancerActiveWindow, BSONObj(), &_balancerActiveWindow, errMsg)) return false;
+        if (!FieldParser::extract(source, shortBalancerSleep, false, &_shortBalancerSleep, errMsg)) return false;
+        if (!FieldParser::extract(source, secondaryThrottle, false, &_secondaryThrottle, errMsg)) return false;
+
+        return true;
     }
 
     void SettingsType::clear() {

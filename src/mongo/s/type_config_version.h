@@ -77,7 +77,7 @@ namespace mongo {
 
         /**
          * Clears and populates the internal state using the 'source' BSON object if the
-         * latter contains valid values. Otherwise clear the internal state.
+         * latter contains valid values. Otherwise sets errMsg and returns false.
          */
         bool parseBSON(const BSONObj& source, std::string* errMsg);
 
