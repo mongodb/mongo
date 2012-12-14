@@ -3,6 +3,8 @@
  *
  * This test validates the SERVER-6240 ticket. uassert when attempting to extract a date from a
  * null value. Prevously verify'd.
+ *
+ * This test also validates the error cases for SERVER-6239 (support $add and $subtract with dates)
  */
 
 /*
@@ -28,10 +30,10 @@ db.s6240.save({date:new Date()});
 var s6240add = db.runCommand(
     { aggregate: "s6240", pipeline: [
         { $project: {
-            add: { $add: ["$date", 2] }
+            add: { $add: ["$date", "$date"] }
     }}
 ]});
-check_answer(s6240add, 16415);
+check_answer(s6240add, 16612);
 
 
 // Divide
@@ -67,7 +69,7 @@ check_answer(s6240multiply, 16375);
 var s6240subtract = db.runCommand(
     { aggregate: "s6240", pipeline: [
         { $project: {
-            subtract: { $subtract: ["$date", 2] }
+            subtract: { $subtract: [2, "$date"] }
     }}
 ]});
-check_answer(s6240subtract, 16376);
+check_answer(s6240subtract, 16614);

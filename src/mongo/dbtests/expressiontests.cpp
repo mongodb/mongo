@@ -96,16 +96,6 @@ namespace ExpressionTests {
             virtual BSONObj expectedResult() { return BSON( "" << 0 ); }
         };
 
-        /** Date type unsupported. */
-        class Date {
-        public:
-            void run() {
-                intrusive_ptr<ExpressionNary> expression = ExpressionAdd::create();
-                expression->addOperand( ExpressionConstant::create( Value::createDate( 123456 ) ) );
-                ASSERT_THROWS( expression->evaluate( Document() ), UserException );
-            }
-        };
-
         /** String type unsupported. */
         class String {
         public:
@@ -150,6 +140,11 @@ namespace ExpressionTests {
             BSONObj operand() { return BSON( "" << 99.99 ); }
         };
         
+        /** Single Date argument. */
+        class Date : public SingleOperandBase {
+            BSONObj operand() { return BSON( "" << Date_t(12345) ); }
+        };
+
         /** Single null argument. */
         class Null : public SingleOperandBase {
             BSONObj operand() { return BSON( "" << BSONNULL ); }
@@ -223,6 +218,13 @@ namespace ExpressionTests {
             BSONObj operand1() { return BSON( "" << 9 ); }
             BSONObj operand2() { return BSON( "" << 1.1 ); }
             BSONObj expectedResult() { return BSON( "" << 10.1 ); }
+        };
+
+        /** Adding an int and a Date produces a Date. */
+        class IntDate : public TwoOperandBase {
+            BSONObj operand1() { return BSON( "" << 6 ); }
+            BSONObj operand2() { return BSON( "" << Date_t(123450) ); }
+            BSONObj expectedResult() { return BSON( "" << Date_t(123456) ); }
         };
         
         /** Adding a long and a double produces a double. */
@@ -3187,6 +3189,7 @@ namespace ExpressionTests {
             add<Add::IntLong>();
             add<Add::IntLongOverflow>();
             add<Add::IntDouble>();
+            add<Add::IntDate>();
             add<Add::LongDouble>();
             add<Add::LongDoubleNoOverflow>();
             add<Add::IntNull>();
