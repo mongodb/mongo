@@ -800,7 +800,7 @@ namespace mongo {
                 errmsg = ex.toString();
             }
 
-            if (!errmsg.empty()) {
+            if (errmsg.empty()) {
                 log() << "successfully connected to new host " << *i
                         << " in replica set " << this->_name << endl;
             }
