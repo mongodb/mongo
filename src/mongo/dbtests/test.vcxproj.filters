@@ -813,9 +813,6 @@
     <ClInclude Include="..\util\net\ssl_manager.h">
       <Filter>util\net</Filter>
     </ClInclude>
-    <ClInclude Include="..\s\cluster_constants.h">
-      <Filter>s</Filter>
-    </ClInclude>
     <ClInclude Include="..\util\elapsed_tracker.h">
       <Filter>util\Header Files</Filter>
     </ClInclude>
@@ -2130,9 +2127,6 @@
     </ClCompile>
     <ClCompile Include="..\util\net\ssl_manager.cpp">
       <Filter>util\net</Filter>
-    </ClCompile>
-    <ClCompile Include="..\s\cluster_constants.cpp">
-      <Filter>s</Filter>
     </ClCompile>
     <ClCompile Include="..\util\elapsed_tracker.cpp">
       <Filter>util\Source Files</Filter>

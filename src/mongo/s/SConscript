@@ -6,8 +6,7 @@ Import("env")
 # Schema and backward compatibility code for "config" collections.
 #
 
-env.StaticLibrary('base', ['cluster_constants.cpp',
-                           'field_parser.cpp',
+env.StaticLibrary('base', ['field_parser.cpp',
                            'type_changelog.cpp',
                            'type_chunk.cpp',
                            'type_collection.cpp',

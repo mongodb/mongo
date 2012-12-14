@@ -866,9 +866,6 @@
     <ClCompile Include="..\util\net\ssl_manager.cpp">
       <Filter>util\net</Filter>
     </ClCompile>
-    <ClCompile Include="..\s\cluster_constants.cpp">
-      <Filter>s</Filter>
-    </ClCompile>
     <ClCompile Include="..\util\elapsed_tracker.cpp">
       <Filter>util\Source Files</Filter>
     </ClCompile>
@@ -2162,9 +2159,6 @@
     </ClInclude>
     <ClInclude Include="memconcept.h">
       <Filter>db\Header Files\e to n</Filter>
-    </ClInclude>
-    <ClInclude Include="..\s\cluster_constants.h">
-      <Filter>s</Filter>
     </ClInclude>
     <ClInclude Include="..\s\config.h">
       <Filter>s</Filter>

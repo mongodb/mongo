@@ -19,7 +19,6 @@
 #include "pch.h"
 
 #include "mongo/dbtests/dbtests.h"
-#include "mongo/s/cluster_constants.h"
 #include "mongo/s/d_chunk_manager.h"
 #include "mongo/s/type_chunk.h"
 #include "mongo/s/type_collection.h"

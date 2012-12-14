@@ -15,7 +15,6 @@
  */
 
 #include "mongo/s/balancer_lock.h"
-#include "mongo/s/cluster_constants.h"
 #include "mongo/s/type_settings.h"
 
 namespace mongo {

@@ -20,7 +20,6 @@
 
 #include "mongo/bson/util/atomic_int.h"
 #include "mongo/client/distlock.h"
-#include "mongo/s/cluster_constants.h"
 #include "mongo/s/shard.h"
 #include "mongo/s/shardkey.h"
 #include "mongo/s/util.h"

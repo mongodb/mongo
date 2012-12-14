@@ -807,9 +807,6 @@
     <ClCompile Include="..\util\net\ssl_manager.cpp">
       <Filter>util\net</Filter>
     </ClCompile>
-    <ClCompile Include="cluster_constants.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="..\db\auth\action_type.cpp">
       <Filter>db\auth</Filter>
     </ClCompile>
@@ -1436,9 +1433,6 @@
     </ClInclude>
     <ClInclude Include="..\util\net\ssl_manager.h">
       <Filter>util\net</Filter>
-    </ClInclude>
-    <ClInclude Include="cluster_constants.h">
-      <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\db\auth\action_type.h">
       <Filter>db\auth</Filter>
