@@ -52,7 +52,7 @@ namespace mongo {
 
         ++groupsIterator;
         if (groupsIterator == groups.end()) {
-            pCurrent.reset();
+            dispose();
             return false;
         }
 
@@ -65,6 +65,14 @@ namespace mongo {
             populate();
 
         return pCurrent;
+    }
+
+    void DocumentSourceGroup::dispose() {
+        GroupsType().swap(groups);
+        groupsIterator = groups.end();
+        pCurrent = Document();
+
+        pSource->dispose();
     }
 
     void DocumentSourceGroup::sourceToBson(

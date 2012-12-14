@@ -603,6 +603,7 @@ namespace mongo {
         virtual const char *getSourceName() const;
         virtual Document getCurrent();
         virtual GetDepsReturn getDependencies(set<string>& deps) const;
+        virtual void dispose();
 
         /**
           Create a new grouping DocumentSource.
@@ -853,14 +854,9 @@ namespace mongo {
         virtual Document getCurrent();
         virtual void addToBsonArray(BSONArrayBuilder *pBuilder, bool explain=false) const;
         virtual bool coalesce(const intrusive_ptr<DocumentSource> &pNextSource);
+        virtual void dispose();
 
         virtual GetDepsReturn getDependencies(set<string>& deps) const;
-
-        /*
-          TODO
-          Adjacent sorts should reduce to the last sort.
-        virtual bool coalesce(const intrusive_ptr<DocumentSource> &pNextSource);
-        */
 
         // Virtuals for SplittableDocumentSource
         // All work for sort is done in router currently if there is no limit.
@@ -968,11 +964,8 @@ namespace mongo {
             const DocumentSourceSort& _source;
         };
 
-        typedef vector<KeyAndDoc> VectorType;
-        VectorType documents;
+        deque<KeyAndDoc> documents;
 
-        VectorType::iterator docIterator;
-        Document pCurrent;
         intrusive_ptr<DocumentSourceLimit> limitSrc;
     };
     inline void swap(DocumentSourceSort::KeyAndDoc& l, DocumentSourceSort::KeyAndDoc& r) {

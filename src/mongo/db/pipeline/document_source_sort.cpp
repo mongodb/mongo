@@ -39,7 +39,7 @@ namespace mongo {
         if (!populated)
             populate();
 
-        return (docIterator == documents.end());
+        return documents.empty();
     }
 
     bool DocumentSourceSort::advance() {
@@ -48,23 +48,15 @@ namespace mongo {
         if (!populated)
             populate();
 
-        verify(docIterator != documents.end());
+        if (!documents.empty())
+            documents.pop_front(); // this way we release memory as we go
 
-        ++docIterator;
-        if (docIterator == documents.end()) {
-            pCurrent.reset();
-            return false;
-        }
-        pCurrent = docIterator->doc;
-
-        return true;
+        return !documents.empty();
     }
 
     Document DocumentSourceSort::getCurrent() {
-        if (!populated)
-            populate();
-
-        return pCurrent;
+        verify(!documents.empty());
+        return documents.front().doc;
     }
 
     void DocumentSourceSort::addToBsonArray(BSONArrayBuilder *pBuilder, bool explain) const {
@@ -94,6 +86,11 @@ namespace mongo {
                 limitSrc->addToBsonArray(pBuilder, explain);
             }
         }
+    }
+
+    void DocumentSourceSort::dispose() {
+        documents.clear();
+        pSource->dispose();
     }
 
     DocumentSourceSort::DocumentSourceSort(const intrusive_ptr<ExpressionContext> &pExpCtx)
@@ -206,11 +203,6 @@ namespace mongo {
         else
             populateTopK();
 
-        /* start the sort iterator */
-        docIterator = documents.begin();
-
-        if (docIterator != documents.end())
-            pCurrent = docIterator->doc;
         populated = true;
     }
 
@@ -251,34 +243,36 @@ namespace mongo {
         size_t limit = limitSrc->getLimit();
 
         // Pull first K documents unconditionally
-        documents.reserve(limit);
-        for (; hasNext && documents.size() < limit; hasNext = pSource->advance()) {
-            documents.push_back(KeyAndDoc(pSource->getCurrent(), vSortKey));
+        vector<KeyAndDoc> heap;
+        heap.reserve(limit);
+        for (; hasNext && heap.size() < limit; hasNext = pSource->advance()) {
+            heap.push_back(KeyAndDoc(pSource->getCurrent(), vSortKey));
         }
 
         // We now maintain a MaxHeap of K items. This means that the least-best
-        // document is at the top of the heap (documents.front()). If a new
+        // document is at the top of the heap (heap.front()). If a new
         // document is better than the top of the heap, we pop the top and add
         // the new document to the heap.
 
         Comparator comp (*this);
 
-        // after this, documents.front() is least-best document
-        std::make_heap(documents.begin(), documents.end(), comp);
+        // after this, heap.front() is least-best document
+        std::make_heap(heap.begin(), heap.end(), comp);
 
         for (; hasNext; hasNext = pSource->advance()) {
             KeyAndDoc next (pSource->getCurrent(), vSortKey);
-            if (compare(next, documents.front()) < 0) {
+            if (compare(next, heap.front()) < 0) {
                 // remove least-best from heap
-                std::pop_heap(documents.begin(), documents.end(), comp);
+                std::pop_heap(heap.begin(), heap.end(), comp);
 
                 // add next to heap
-                swap(documents.back(), next);
-                std::push_heap(documents.begin(), documents.end(), comp);
+                swap(heap.back(), next);
+                std::push_heap(heap.begin(), heap.end(), comp);
             }
         }
 
-        std::sort_heap(documents.begin(), documents.end(), comp);
+        std::sort_heap(heap.begin(), heap.end(), comp);
+        documents.insert(documents.begin(), heap.begin(), heap.end());
     }
 
     DocumentSourceSort::KeyAndDoc::KeyAndDoc(const Document& d, const SortPaths& sp) :doc(d) {
