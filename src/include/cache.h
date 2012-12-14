@@ -42,7 +42,8 @@ struct __wt_cache {
 	 * Eviction thread information.
 	 */
 	WT_CONDVAR *evict_cond;		/* Cache eviction server mutex */
-	WT_SPINLOCK evict_lock;		/* Eviction serialization */
+	WT_SPINLOCK evict_lock;		/* Eviction LRU queue */
+	WT_SPINLOCK evict_walk_lock;	/* Eviction walk location */
 
 	u_int eviction_trigger;		/* Percent to trigger eviction */
 	u_int eviction_target;		/* Percent to end eviction */

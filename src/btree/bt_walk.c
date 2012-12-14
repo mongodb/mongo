@@ -243,11 +243,18 @@ retry:				if (ref->state == WT_REF_DISK)
 					break;
 				if (!WT_ATOMIC_CAS(ref->state,
 				    WT_REF_MEM, WT_REF_EVICT_WALK)) {
-					if (LF_ISSET(WT_TREE_WAIT)) {
-						__wt_yield();
-						goto retry;
-					}
-					break;
+					if (!LF_ISSET(WT_TREE_WAIT))
+						break;
+					/*
+					 * In case we're colliding with
+					 * references that are in the
+					 * EVICT_WALK state, clear the current
+					 * LRU walk.
+					 */
+					__wt_evict_clear_tree_walk(
+					    session, NULL);
+					__wt_yield();
+					goto retry;
 				}
 			} else if (cache) {
 				/*
