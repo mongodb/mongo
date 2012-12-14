@@ -31,8 +31,6 @@ namespace mongo {
      */
     class MockReplicaSet {
     public:
-        typedef std::map<std::string, ReplSetConfig::MemberCfg> ReplConfigMap;
-
         /**
          * Creates a mock replica set and automatically mocks the isMaster
          * and replSetGetStatus commands based on the default replica set
@@ -50,35 +48,30 @@ namespace mongo {
 
         std::string getSetName() const;
         std::string getConnectionString() const;
-        std::vector<HostAndPort> getHosts() const;
-        ReplConfigMap getReplConfig() const;
+        std::vector<mongo::HostAndPort> getHosts() const;
+        const std::vector<mongo::ReplSetConfig::MemberCfg>& getReplConfig() const;
         std::string getPrimary() const;
-        std::vector<std::string> getSecondaries() const;
+        const std::vector<std::string>& getSecondaries() const;
 
         /**
          * Sets the configuration for this replica sets. This also has a side effect
          * of mocking the ismaster and replSetGetStatus command responses based on
          * the new config.
-         *
-         * Note: does not automatically select a new primary. Can be done manually by
-         * calling setPrimary.
          */
-        void setConfig(const ReplConfigMap& newConfig);
-
-        void setPrimary(const std::string& hostAndPort);
+        void setConfig(const std::vector<mongo::ReplSetConfig::MemberCfg>& newConfig);
 
         /**
          * @return pointer to the mocked remote server with the given hostName.
          *     NULL if host doesn't exists.
          */
-        MockRemoteDBServer* getNode(const std::string& hostAndPort);
+        MockRemoteDBServer* getNode(const std::string& hostName);
 
         /**
          * Kills a node belonging to this set.
          *
          * @param hostName the name of the replica node to kill.
          */
-        void kill(const std::string& hostAndPort);
+        void kill(const std::string& hostName);
 
         /**
          * Kills a set of host belonging to this set.
@@ -95,8 +88,6 @@ namespace mongo {
         void restore(const std::string& hostName);
 
     private:
-        typedef std::map<std::string, MockRemoteDBServer*> ReplNodeMap;
-
         /**
          * Mocks the ismaster command based on the information on the current
          * replica set configuration.
@@ -112,12 +103,13 @@ namespace mongo {
         /**
          * @return the replica set state of the given host
          */
-        int getState(const std::string& hostAndPort) const;
+        int getState(const std::string& host) const;
 
         const std::string _setName;
-        ReplNodeMap _nodeMap;
-        ReplConfigMap _replConfig;
+        std::map<std::string, MockRemoteDBServer*> _nodeMap;
+        std::vector<mongo::ReplSetConfig::MemberCfg> _replConfig;
 
         std::string _primaryHost;
+        std::vector<std::string> _secondaryHosts;
     };
 }
