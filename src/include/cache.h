@@ -71,6 +71,8 @@ struct __wt_cache {
 	uint64_t cp_saved_evict;	/* Evict count from last pass */
 	uint64_t cp_current_evict;	/* Evict count from current pass */
 	uint32_t cp_skip_count;		/* Post change stabilization */
+
+	int disable_dirty_eviction;	/* Don't evict dirty pages */
 };
 
 /*

@@ -27,8 +27,8 @@ static int  __evict_worker(WT_SESSION_IMPL *);
 #define	WT_EVICT_WALK_INCR     100	/* Pages added each walk */
 
 /* Flags used to pass state to eviction functions. */
-#define	WT_EVICT_CLEAN		0x01	/* Cache usage is over trigger */
-#define	WT_EVICT_DIRTY		0x02	/* Dirty count is over threshold */
+#define	WT_EVICT_CLEAN		0x01	/* Try to evict clean pages */
+#define	WT_EVICT_DIRTY		0x02	/* Try to evict dirty pages */
 
 /*
  * __evict_read_gen --
@@ -289,7 +289,9 @@ __evict_worker(WT_SESSION_IMPL *session)
 		    (cache->eviction_dirty_target * bytes_max) / 100)
 			LF_SET(WT_EVICT_DIRTY);
 		if (bytes_inuse > (cache->eviction_target * bytes_max) / 100)
-			LF_SET(WT_EVICT_CLEAN);
+			LF_SET(WT_EVICT_CLEAN | WT_EVICT_DIRTY);
+		if (cache->disable_dirty_eviction)
+			LF_CLR(WT_EVICT_DIRTY);
 		if (!LF_ISSET(WT_EVICT_CLEAN) && !LF_ISSET(WT_EVICT_DIRTY))
 			break;
 
@@ -493,8 +495,10 @@ __wt_evict_file(WT_SESSION_IMPL *session, int syncop)
 	 * Checkpoints need to wait for any concurrent activity in a
 	 * page to be resolved.
 	 */
-	if (syncop == WT_SYNC)
+	if (syncop == WT_SYNC) {
 		walk_flags |= WT_TREE_WAIT;
+		cache->disable_dirty_eviction = 1;
+	}
 
 	/*
 	 * Clear any existing LRU walk, we may be about to discard the
@@ -561,6 +565,8 @@ __wt_evict_file(WT_SESSION_IMPL *session, int syncop)
 	/* On error, clear any left-over tree walk. */
 err:	if (next_page != NULL)
 		__wt_evict_clear_tree_walk(session, next_page);
+	if (syncop == WT_SYNC)
+		cache->disable_dirty_eviction = 0;
 	return (ret);
 }
 
@@ -766,7 +772,10 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, uint32_t flags)
 		    F_ISSET(page->modify, WT_PM_REC_SPLIT_MERGE)))
 			continue;
 
-		if (!LF_ISSET(WT_EVICT_CLEAN) && !__wt_page_is_modified(page))
+		if (__wt_page_is_modified(page)) {
+			if (!LF_ISSET(WT_EVICT_DIRTY))
+				continue;
+		} else if (!LF_ISSET(WT_EVICT_CLEAN))
 			continue;
 
 		WT_ASSERT(session, evict->page == NULL);
