@@ -80,17 +80,15 @@ namespace mongo {
                 if ( n1 && n2 ) {
                     // get rid of leading 0s
                     if ( startWord ) {
-                        while ( sd1[s1] == '0' ) s1++;
-                        while ( sd2[s2] == '0' ) s2++;
+                        while ( s1 < sd1.size() && sd1[s1] == '0' ) s1++;
+                        while ( s2 < sd2.size() && sd2[s2] == '0' ) s2++;
                     }
 
                     size_t e1 = s1;
                     size_t e2 = s2;
 
-                    // find length
-                    // if end of string, will break immediately ('\0')
-                    while ( isNumber( sd1[e1] ) ) e1++;
-                    while ( isNumber( sd2[e2] ) ) e2++;
+                    while ( e1 < sd1.size() && isNumber( sd1[e1] ) ) e1++;
+                    while ( e2 < sd2.size() && isNumber( sd2[e2] ) ) e2++;
 
                     size_t len1 = e1-s1;
                     size_t len2 = e2-s2;
@@ -136,9 +134,9 @@ namespace mongo {
             startWord = false;
         }
 
-        if ( sd1[s1] )
+        if ( s1 < sd1.size() && sd1[s1] )
             return 1;
-        if ( sd2[s2] )
+        if ( s2 < sd2.size() && sd2[s2] )
             return -1;
         return 0;
     }

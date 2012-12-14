@@ -55,6 +55,9 @@ env.StaticLibrary('md5', [
 env.CppUnitTest( "md5_test", ["util/md5_test.cpp", "util/md5main.cpp" ],
                  LIBDEPS=["md5"] )
 
+env.CppUnitTest( "stringutils_test", [ "util/stringutils_test.cpp" ],
+                 LIBDEPS=["stringutils"] )
+
 env.StaticLibrary('bson', [
         'bson/mutable/mutable_bson.cpp',
         'bson/mutable/mutable_bson_builder.cpp',
