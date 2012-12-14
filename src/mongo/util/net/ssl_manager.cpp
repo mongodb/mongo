@@ -139,7 +139,7 @@ namespace mongo {
         }
         if (!params.crlfile.empty()) {
             if (!_setupCRL(params.crlfile)) {
-                uasserted(16571, "ssl initialization problem");
+                uasserted(16578, "ssl initialization problem");
             }
         }
     }
@@ -197,11 +197,11 @@ namespace mongo {
 
     bool SSLManager::_setupCRL(const std::string& crlFile) {
         X509_STORE *store = SSL_CTX_get_cert_store(_context);
-        fassert(16569, store);
+        fassert(16579, store);
         
         X509_STORE_set_flags(store, X509_V_FLAG_CRL_CHECK);
         X509_LOOKUP *lookup = X509_STORE_add_lookup(store, X509_LOOKUP_file());
-        fassert(16570, lookup);
+        fassert(16580, lookup);
 
         int status = X509_load_crl_file(lookup, crlFile.c_str(), X509_FILETYPE_PEM);
         if (status == 0) {
