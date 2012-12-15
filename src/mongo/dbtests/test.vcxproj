@@ -646,6 +646,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="..\scripting\bson_template_evaluator.h" />
     <ClInclude Include="..\scripting\engine.h" />
     <ClInclude Include="..\scripting\engine_spidermonkey.h" />
+    <ClInclude Include="..\scripting\engine_spidermonkey_internal.h" />
     <ClInclude Include="..\server.h" />
     <ClInclude Include="..\s\chunk.h" />
     <ClInclude Include="..\s\cluster_constants.h" />
@@ -1477,6 +1478,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="..\db\pipeline\document_source_cursor.cpp" />
     <ClCompile Include="..\db\pipeline\document_source_filter.cpp" />
     <ClCompile Include="..\db\pipeline\document_source_filter_base.cpp" />
+    <ClCompile Include="..\db\pipeline\document_source_geo_near.cpp" />
     <ClCompile Include="..\db\pipeline\document_source_group.cpp" />
     <ClCompile Include="..\db\pipeline\document_source_limit.cpp" />
     <ClCompile Include="..\db\pipeline\document_source_match.cpp" />

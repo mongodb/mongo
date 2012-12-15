@@ -1237,6 +1237,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="commands\isself.cpp" />
     <ClCompile Include="commands\mr.cpp" />
     <ClCompile Include="commands\pipeline_command.cpp" />
+    <ClCompile Include="pipeline\document_source_geo_near.cpp" />
     <ClCompile Include="pipeline\pipeline.cpp" />
     <ClCompile Include="pipeline\pipeline_d.cpp" />
     <ClCompile Include="commands\touch.cpp" />
@@ -1597,6 +1598,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="repl\rs_config.cpp" />
     <ClInclude Include="server_parameters.h" />
     <ClInclude Include="server_parameters_inline.h" />
+    <ClInclude Include="sort_phase_one.h" />
     <ClInclude Include="ttl.h" />
   </ItemGroup>
   <ItemGroup>
@@ -1667,13 +1669,11 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="d_concurrency.h" />
     <ClInclude Include="d_globals.h" />
     <ClInclude Include="geo\core.h" />
-    <ClInclude Include="globals.h" />
     <ClInclude Include="helpers\dblogger.h" />
     <ClInclude Include="instance.h" />
     <ClInclude Include="interrupt_status.h" />
     <ClInclude Include="interrupt_status_mongod.h" />
     <ClInclude Include="mongommf.h" />
-    <ClInclude Include="mongomutex.h" />
     <ClInclude Include="namespace-inl.h" />
     <ClInclude Include="namespacestring.h" />
     <ClInclude Include="oplogreader.h" />

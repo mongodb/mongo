@@ -1109,6 +1109,9 @@
     <ClCompile Include="..\util\file.cpp">
       <Filter>util\Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="pipeline\document_source_geo_near.cpp">
+      <Filter>db\pipeline\Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\targetver.h" />
@@ -1539,9 +1542,6 @@
     <ClInclude Include="namespacestring.h">
       <Filter>db\Header Files\e to n</Filter>
     </ClInclude>
-    <ClInclude Include="globals.h">
-      <Filter>db\Header Files\e to n</Filter>
-    </ClInclude>
     <ClInclude Include="index.h">
       <Filter>db\Header Files\e to n</Filter>
     </ClInclude>
@@ -1579,9 +1579,6 @@
       <Filter>db\Header Files\e to n</Filter>
     </ClInclude>
     <ClInclude Include="mongommf.h">
-      <Filter>db\Header Files\e to n</Filter>
-    </ClInclude>
-    <ClInclude Include="mongomutex.h">
       <Filter>db\Header Files\e to n</Filter>
     </ClInclude>
     <ClInclude Include="namespace-inl.h">
@@ -2204,6 +2201,9 @@
     </ClInclude>
     <ClInclude Include="auth\principal_name.h">
       <Filter>db\auth</Filter>
+    </ClInclude>
+    <ClInclude Include="sort_phase_one.h">
+      <Filter>db\Header Files\o to z</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
