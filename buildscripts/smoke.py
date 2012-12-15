@@ -356,10 +356,6 @@ def skipTest(path):
                            ("sharding", "sync_conn_cmd.js"), #SERVER-6327
                            ("sharding", "gle_with_conf_servers.js"), # SERVER-6972
                            ("jstests", "copydb.js"), # SERVER-7864
-                           ("jstests", "evald.js"), # SERVER-7931
-                           ("jstests", "evalf.js"), # SERVER-7931
-                           ("jstests", "mr_killop.js"), # SERVER-7931
-                           ("sharding", "features3.js"), # SERVER-7931
                            ("sharding", "sync3.js"), # SERVER-6388 for this and those below
                            ("sharding", "sync6.js"),
                            ("sharding", "parallel.js"),
