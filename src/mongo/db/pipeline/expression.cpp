@@ -371,9 +371,9 @@ namespace mongo {
         }
 
         if (haveDate) {
-            return Value::createDate(totalType == NumberDouble
-                                        ? doubleTotal
-                                        : longTotal);
+            if (totalType == NumberDouble)
+                longTotal = static_cast<long long>(doubleTotal);
+            return Value::createDate(longTotal);
         }
         else if (totalType == NumberLong) {
             return Value::createLong(longTotal);
