@@ -1112,6 +1112,9 @@
     <ClCompile Include="pipeline\document_source_geo_near.cpp">
       <Filter>db\pipeline\Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\util\platform_init.cpp">
+      <Filter>util\Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\targetver.h" />

@@ -1166,6 +1166,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="..\util\net\listen.cpp" />
     <ClCompile Include="..\util\net\ssl_manager.cpp" />
     <ClCompile Include="..\util\ntservice.cpp" />
+    <ClCompile Include="..\util\platform_init.cpp" />
     <ClCompile Include="..\util\processinfo.cpp" />
     <ClCompile Include="..\util\ramlog.cpp" />
     <ClCompile Include="..\util\safe_num.cpp" />

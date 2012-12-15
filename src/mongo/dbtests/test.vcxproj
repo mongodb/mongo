@@ -1614,6 +1614,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="..\db\pdfile.cpp" />
     <ClCompile Include="..\db\queryoptimizer.cpp" />
     <ClCompile Include="..\util\net\ssl_manager.cpp" />
+    <ClCompile Include="..\util\platform_init.cpp" />
     <ClCompile Include="..\util\processinfo.cpp" />
     <ClCompile Include="..\db\repl.cpp" />
     <ClCompile Include="..\db\security.cpp" />
