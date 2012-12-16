@@ -295,6 +295,16 @@ namespace mongo {
             log() << ss.str() << std::endl;
         }
     }
+
+    // Print error message from C runtime followed by stack trace
+    int crtDebugCallback(int, char* originalMessage, int*) {
+        StringData message(originalMessage);
+        log() << "*** C runtime error: "
+              << message.substr(0, message.find('\n')) << std::endl;
+        printStackTrace();
+        return 1;           // 0 == not handled, non-0 == handled
+    }
+
 }
 
 #else

@@ -14,9 +14,13 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#ifdef _WIN32
+#include <crtdbg.h>
 #include <stdlib.h>
+#endif
 
 #include "mongo/base/init.h"
+#include "mongo/util/stacktrace.h"
 
 #ifdef _WIN32
 
@@ -26,6 +30,9 @@ namespace mongo {
 
         // do not display dialog on abort()
         _set_abort_behavior(0, _CALL_REPORTFAULT | _WRITE_ABORT_MSG);
+
+        // hook the C runtime's error display
+        _CrtSetReportHook(crtDebugCallback);
 
         return Status::OK();
     }
