@@ -8,6 +8,8 @@
 #include <map>
 #include <vector>
 
+#include "mongo/util/log.h"
+
 #ifdef _WIN32
 #include <sstream>
 #include <stdio.h>
@@ -16,7 +18,6 @@
 #include "mongo/platform/windows_basic.h"
 #include <DbgHelp.h>
 #include "mongo/util/assert_util.h"
-#include "mongo/util/log.h"
 #endif
 
 #ifdef MONGO_HAVE_EXECINFO_BACKTRACE
@@ -43,6 +44,12 @@ namespace mongo {
         char **strings;
         
         strings = ::backtrace_symbols( b, size );
+        if (strings == NULL) {
+            const int err = errno;
+            os << "Unable to collect backtrace symbols (" << errnoWithDescription(err) << ")"
+               << std::endl;
+            return;
+        }
         for ( int i = 0; i < size; i++ )
             os << ' ' << strings[i] << '\n';
         os.flush();
