@@ -87,13 +87,13 @@ for (var iter = 0; iter < numIterations; ++iter) {
     // Do the MapReduce step
     jsTest.log("Setup OK: count matches (" + numDocs + ") -- Starting MapReduce");
     var res = testDB.foo.mapReduce(map2, reduce2, {out: {replace: "mrShardedOut", sharded: true}});
+    jsTest.log("MapReduce results:");
+    printjson(res);
     var reduceOutputCount = res.counts.output;
     assert.eq(numDocs,
               reduceOutputCount,
               "MapReduce FAILED: res.counts.output = " + reduceOutputCount +
                    ", should be " + numDocs);
-    jsTest.log("MapReduce results:");
-    printjson(res);
 
     jsTest.log("Checking that all MapReduce output documents are in output collection");
     var outColl = testDB["mrShardedOut"];
