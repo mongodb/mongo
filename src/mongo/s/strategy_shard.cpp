@@ -915,7 +915,7 @@ namespace mongo {
                     if( ! skPattern.partOfShardKey( field.fieldName() ) || getGtLtOp( field ) != BSONObj::Equality )
                         continue;
 
-                    if( field != shardKey[ field.fieldName() ] ){
+                    if( field != toUpdate[ field.fieldName() ] ){
 
                         // Retry reloading the config data once
                         if( ! reloadConfigData ){
