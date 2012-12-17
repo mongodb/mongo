@@ -442,7 +442,7 @@ __lsm_tree_open(
 	/* Try to open the tree. */
 	WT_RET(__wt_calloc_def(session, 1, &lsm_tree));
 	WT_ERR(__wt_rwlock_alloc(session, "lsm tree", &lsm_tree->rwlock));
-	WT_RET(__lsm_tree_set_name(session, lsm_tree, uri));
+	WT_ERR(__lsm_tree_set_name(session, lsm_tree, uri));
 	WT_ERR(__wt_stat_alloc_dsrc_stats(session, &lsm_tree->stats));
 
 	WT_ERR(__wt_lsm_meta_read(session, lsm_tree));
@@ -638,7 +638,7 @@ __wt_lsm_tree_rename(WT_SESSION_IMPL *session,
 	locked = 1;
 
 	/* Set the new name. */
-	WT_RET(__lsm_tree_set_name(session, lsm_tree, newname));
+	WT_ERR(__lsm_tree_set_name(session, lsm_tree, newname));
 
 	/* Rename the chunks. */
 	for (i = 0; i < lsm_tree->nchunks; i++) {
