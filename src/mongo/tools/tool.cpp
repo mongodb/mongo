@@ -82,6 +82,12 @@ namespace mongo {
             ("collection,c",po::value<string>(), "collection to use (some commands)" )
             ;
 
+        if ( access & SPECIFY_GRIDFSNS )
+            _options->add_options()
+            ("db,d",po::value<string>(), "database to use" )
+            ("gridfsnamespace",po::value<string>(), "collection namespace prefix to use for GridFS operations")
+            ;
+
         _hidden_options = new po::options_description( name + " hidden options" );
 
         /* support for -vv -vvvv etc. */

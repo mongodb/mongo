@@ -35,7 +35,7 @@ namespace po = boost::program_options;
 
 class Files : public Tool {
 public:
-    Files() : Tool( "files" ) {
+    Files() : Tool( "files", REMOTE_SERVER | LOCAL_SERVER | SPECIFY_GRIDFSNS ) {
         add_options()
         ( "local,l", po::value<string>(), "local filename for put|get (default is to use the same name as 'gridfs filename')")
         ( "type,t", po::value<string>(), "MIME type for put (default is to omit)")
@@ -82,8 +82,10 @@ public:
             return -1;
         }
 
+        string gridNS = getParam( "gridfsnamespace" , "fs" );
+
         auth();
-        GridFS g( conn() , _db );
+        GridFS g( conn() , _db , gridNS );
 
         string filename = getParam( "file" );
 
@@ -135,11 +137,11 @@ public:
             cout << "added file: " << file << endl;
 
             if (hasParam("replace")) {
-                auto_ptr<DBClientCursor> cursor = conn().query(_db+".fs.files", BSON("filename" << filename << "_id" << NE << file["_id"] ));
+                auto_ptr<DBClientCursor> cursor = conn().query(_db+"."+gridNS+".files", BSON("filename" << filename << "_id" << NE << file["_id"] ));
                 while (cursor->more()) {
                     BSONObj o = cursor->nextSafe();
-                    conn().remove(_db+".fs.files", BSON("_id" << o["_id"]));
-                    conn().remove(_db+".fs.chunks", BSON("_id" << o["_id"]));
+                    conn().remove(_db+"."+gridNS+".files", BSON("_id" << o["_id"]));
+                    conn().remove(_db+"."+gridNS+".chunks", BSON("_id" << o["_id"]));
                     cout << "removed file: " << o << endl;
                 }
 
