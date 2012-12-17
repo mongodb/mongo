@@ -17,6 +17,7 @@
 #include "mongo/db/auth/auth_external_state_server_common.h"
 
 #include "mongo/base/status.h"
+#include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/client.h"
 #include "mongo/util/debug_util.h"
 
@@ -26,6 +27,8 @@ namespace mongo {
     AuthExternalStateServerCommon::~AuthExternalStateServerCommon() {}
 
     void AuthExternalStateServerCommon::_checkShouldAllowLocalhost() {
+        if (noauth)
+            return;
         // TODO: cache if admin user exists and if it once existed don't query admin.system.users
         _allowLocalhost = !_hasPrivilegeDocument("admin");
         if (_allowLocalhost) {
