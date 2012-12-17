@@ -24,16 +24,24 @@ function checkOutput(cmdOut, aggOut, expectedNum) {
     assert.eq(cmdOut.length, expectedNum);
     assert.eq(aggOut.length, expectedNum);
 
-    // massage geoNear command output to match output from agg pipeline
+    var allSame = true;
+    var massaged; // massage geoNear command output to match output from agg pipeline
     for (var i=0; i < cmdOut.length; i++) {
-        cmdOut[i].obj.stats = {'dis': cmdOut[i].dis,
-                               'loc': cmdOut[i].loc};
-        cmdOut[i] = cmdOut[i].obj;
+        massaged = {};
+        Object.extend(massaged, cmdOut[i].obj, /*deep=*/true)
+        massaged.stats = {'dis': cmdOut[i].dis,
+                          'loc': cmdOut[i].loc};
+
+        if (!friendlyEqual(massaged, aggOut[i])) {
+            allSame = false; // don't bail yet since we want to print all differences
+            print("Difference detected at index " + i + " of " + expectedNum);
+            print("from geoNear command:" + tojson(massaged));
+            print("from aggregate command:" + tojson(aggOut[i]));
+        }
     }
 
-    assert.eq(cmdOut, aggOut);
+    assert(allSame);
 }
-
     
 // We use this to generate points. Using a single global to avoid reseting RNG in each pass.
 var pointMaker = new GeoNearRandomTest(coll);
@@ -60,21 +68,21 @@ function test(db, sharded, indexType) {
     // insert points
     var numPts = 10*1000;
     for (var i=0; i < numPts; i++) {
-        db[coll].insert({rand:Math.random(), loc: pointMaker.mkPt()})
+        db[coll].insert({rand:Math.random(), loc: pointMaker.mkPt()});
     }
     db.getLastError();
     assert.eq(db[coll].count(), numPts);
 
-    db[coll].ensureIndex({loc: indexType})
+    db[coll].ensureIndex({loc: indexType});
 
     // test with defaults
-    var queryPoint = pointMaker.mkPt(0.25) // stick to center of map
+    var queryPoint = pointMaker.mkPt(0.25); // stick to center of map
     geoCmd = {geoNear: coll, near: queryPoint, includeLocs: true};
     aggCmd = {$geoNear: {near: queryPoint, includeLocs: 'stats.loc', distanceField: 'stats.dis'}};
     checkOutput(db.runCommand(geoCmd), db[coll].aggregate(aggCmd), 100);
 
     // test with num
-    queryPoint = pointMaker.mkPt(0.25)
+    queryPoint = pointMaker.mkPt(0.25);
     geoCmd.num = 75;
     geoCmd.near = queryPoint;
     aggCmd.$geoNear.num = 75;
@@ -82,7 +90,7 @@ function test(db, sharded, indexType) {
     checkOutput(db.runCommand(geoCmd), db[coll].aggregate(aggCmd), 75);
 
     // test with limit instead of num (they mean the same thing in $geoNear)
-    queryPoint = pointMaker.mkPt(0.25)
+    queryPoint = pointMaker.mkPt(0.25);
     geoCmd.near = queryPoint;
     aggCmd.$geoNear.near = queryPoint;
     delete aggCmd.$geoNear.num;
@@ -90,7 +98,7 @@ function test(db, sharded, indexType) {
     checkOutput(db.runCommand(geoCmd), db[coll].aggregate(aggCmd), 75);
 
     // test spherical
-    queryPoint = pointMaker.mkPt(0.25)
+    queryPoint = pointMaker.mkPt(0.25);
     geoCmd.spherical = true;
     geoCmd.near = queryPoint;
     aggCmd.$geoNear.spherical = true;
@@ -98,11 +106,11 @@ function test(db, sharded, indexType) {
     checkOutput(db.runCommand(geoCmd), db[coll].aggregate(aggCmd), 75);
 
     // test $geoNear + $limit coalescing
-    queryPoint = pointMaker.mkPt(0.25)
+    queryPoint = pointMaker.mkPt(0.25);
     geoCmd.num = 40;
     geoCmd.near = queryPoint;
     aggCmd.$geoNear.near = queryPoint;
-    aggArr = [aggCmd, {$limit: 50}, {$limit:60}, {$limit:40}]
+    aggArr = [aggCmd, {$limit: 50}, {$limit:60}, {$limit:40}];
     checkOutput(db.runCommand(geoCmd), db[coll].aggregate(aggArr), 40);
 }
 
@@ -116,7 +124,4 @@ sharded.adminCommand( { enablesharding : "test" } );
 test(sharded.getDB('test'), true, '2d');
 test(sharded.getDB('test'), true, '2dsphere');
 
-sharded.stop()
-
-
-
+sharded.stop();
