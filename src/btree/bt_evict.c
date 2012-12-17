@@ -918,13 +918,16 @@ __evict_dirty_validate(WT_CONNECTION_IMPL *conn)
 		}
 		WT_CLEAR_BTREE_IN_SESSION(session);
 	}
-	WT_VERBOSE_VOID_TEST(session, evictserver,
-	    (ret == 0 || ret == WT_NOTFOUND) && bytes != 0 &&
+
+	if (WT_VERBOSE_ISSET(session, evictserver) &&
+	    (ret == 0 || ret == WT_NOTFOUND) &&
+	    bytes != 0 &&
 	    (bytes < WT_MIN(bytes_baseline, cache->bytes_dirty) ||
-	    bytes > WT_MAX(bytes_baseline, cache->bytes_dirty)),
-	    "Cache dirty count mismatch. Expected a value between: %" PRIu64
-	    " and %" PRIu64 " got: %" PRIu64,
-	    bytes_baseline, cache->bytes_dirty, bytes);
+	    bytes > WT_MAX(bytes_baseline, cache->bytes_dirty)))
+		(void)__wt_verbose(session,
+		    "Cache dirty count mismatch. Expected a value between: %"
+		    PRIu64 " and %" PRIu64 " got: %" PRIu64,
+		    bytes_baseline, cache->bytes_dirty, bytes);
 #else
 	WT_UNUSED(conn);
 #endif

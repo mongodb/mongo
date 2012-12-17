@@ -63,9 +63,13 @@ __wt_cache_dirty_decr(
 
 	cache = S2C(session)->cache;
 	if (cache->bytes_dirty < size || cache->pages_dirty == 0) {
-		WT_VERBOSE_VOID(session, evictserver,
-		    "Cache dirty count. Needed: %" PRIu64 " have: %" PRIu64,
-		    (uint64_t)size, cache->bytes_dirty);
+		if (WT_VERBOSE_ISSET(session, evictserver))
+			(void)__wt_verbose(session,
+			    "Cache dirty decrement failed: %" PRIu64
+			    " pages dirty, %" PRIu64
+			    " bytes dirty, decrement size %" PRIuMAX,
+			    cache->pages_dirty,
+			    cache->bytes_dirty, (uintmax_t)size);
 		cache->bytes_dirty = 0;
 		cache->pages_dirty = 0;
 	} else {
