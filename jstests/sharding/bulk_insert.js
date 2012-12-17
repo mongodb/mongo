@@ -385,10 +385,12 @@ staleCollSh = staleMongos.getCollection(collSh + "");
 staleCollSh.findOne();
 printjson(admin.runCommand({moveChunk : collSh + "",
                             find : {ukey : 0},
-                            to : shards[1]._id}));
+                            to : shards[1]._id,
+                            _waitForDelete: true}));
 printjson(admin.runCommand({moveChunk : collSh + "",
                             find : {ukey : 0},
-                            to : shards[0]._id}));
+                            to : shards[0]._id,
+                            _waitForDelete: true}));
 
 staleCollSh.insert(inserts);
 var err = printPass(staleCollSh.getDB().getLastError());
