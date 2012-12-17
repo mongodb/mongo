@@ -32,6 +32,9 @@
 
 namespace mongo {
 
+    // --noauth cmd line option
+    extern bool noauth;
+
     /**
      * Internal secret key info.
      */
