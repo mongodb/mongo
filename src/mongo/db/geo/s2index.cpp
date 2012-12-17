@@ -445,7 +445,6 @@ namespace mongo {
         while (cursor->ok()) {
             double dist = cursor->currentDistance();
             totalDistance += dist;
-            cursor->advance();
             if (dist > farthestDist) { farthestDist = dist; }
 
             BSONObjBuilder oneResultBuilder(resultBuilder.subobjStart(BSONObjBuilder::numStr(results)));
@@ -464,6 +463,7 @@ namespace mongo {
             oneResultBuilder.append("obj", cursor->current());
             oneResultBuilder.done();
             ++results;
+            cursor->advance();
         }
 
         resultBuilder.done();
