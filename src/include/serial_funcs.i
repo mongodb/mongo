@@ -307,6 +307,7 @@ typedef struct {
 	WT_PAGE *page;
 	uint32_t write_gen;
 	WT_UPDATE **srch_upd;
+	WT_UPDATE *old_upd;
 	WT_UPDATE **new_upd;
 	size_t new_upd_size;
 	int new_upd_taken;
@@ -319,8 +320,9 @@ typedef struct {
 static inline int
 __wt_update_serial(
 	WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t write_gen, WT_UPDATE
-	**srch_upd, WT_UPDATE ***new_updp, size_t new_upd_size, WT_UPDATE
-	**updp, size_t upd_size, WT_UPDATE **upd_obsolete)
+	**srch_upd, WT_UPDATE *old_upd, WT_UPDATE ***new_updp, size_t
+	new_upd_size, WT_UPDATE **updp, size_t upd_size, WT_UPDATE
+	**upd_obsolete)
 {
 	__wt_update_args _args, *args = &_args;
 	WT_DECL_RET;
@@ -330,6 +332,8 @@ __wt_update_serial(
 	args->write_gen = write_gen;
 
 	args->srch_upd = srch_upd;
+
+	args->old_upd = old_upd;
 
 	if (new_updp == NULL)
 		args->new_upd = NULL;
@@ -365,14 +369,15 @@ __wt_update_serial(
 static inline void
 __wt_update_unpack(
     void *untyped_args, WT_PAGE **pagep, uint32_t *write_genp, WT_UPDATE
-    ***srch_updp, WT_UPDATE ***new_updp, WT_UPDATE **updp, WT_UPDATE
-    ***upd_obsoletep)
+    ***srch_updp, WT_UPDATE **old_updp, WT_UPDATE ***new_updp, WT_UPDATE
+    **updp, WT_UPDATE ***upd_obsoletep)
 {
 	__wt_update_args *args = (__wt_update_args *)untyped_args;
 
 	*pagep = args->page;
 	*write_genp = args->write_gen;
 	*srch_updp = args->srch_upd;
+	*old_updp = args->old_upd;
 	*new_updp = args->new_upd;
 	*updp = args->upd;
 	*upd_obsoletep = args->upd_obsolete;
