@@ -33,6 +33,8 @@ namespace mongo {
     class PrincipalSet {
         MONGO_DISALLOW_COPYING(PrincipalSet);
     public:
+        typedef std::vector<Principal*>::const_iterator iterator;
+
         /**
          * Forward iterator over the names of the principals stored in a PrincipalSet.
          *
@@ -91,6 +93,9 @@ namespace mongo {
         // Gets an iterator over the names of the principals stored in the set.  The iterator is
         // valid until the next non-const method is called on the PrincipalSet.
         NameIterator getNames() const { return NameIterator(_principals); }
+
+        iterator begin() const { return _principals.begin(); }
+        iterator end() const { return _principals.end(); }
 
     private:
         // The PrincipalSet maintains ownership of the Principals in it, and is responsible for

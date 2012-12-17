@@ -21,7 +21,9 @@
 #include "mongo/db/auth/auth_external_state_mock.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/namespacestring.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/map_util.h"
 
 #define ASSERT_NULL(EXPR) ASSERT_FALSE(EXPR)
 #define ASSERT_NON_NULL(EXPR) ASSERT_TRUE(EXPR)
@@ -468,6 +470,100 @@ namespace {
         // Empty roles list OK.
         ASSERT_OK(check("test", BSON("user" << "andy" << "pwd" << "a" <<
                                      "roles" << BSONArrayBuilder().arr())));
+    }
+
+
+    class AuthExternalStateImplictPriv : public AuthExternalStateMock {
+    public:
+        virtual bool _findUser(const string& usersNamespace,
+                               const BSONObj& query,
+                               BSONObj* result) const {
+
+            NamespaceString nsstring(usersNamespace);
+            std::string user = query[AuthorizationManager::USER_NAME_FIELD_NAME].String();
+            std::string userSource;
+            if (!query[AuthorizationManager::USER_SOURCE_FIELD_NAME].trueValue()) {
+                userSource = nsstring.db;
+            }
+            else {
+                userSource = query[AuthorizationManager::USER_SOURCE_FIELD_NAME].String();
+            }
+            *result = mapFindWithDefault(_privilegeDocs,
+                                         std::make_pair(nsstring.db,
+                                                        PrincipalName(user, userSource)),
+                                         BSON("invalid" << 1));
+            return  !(*result)["invalid"].trueValue();
+        }
+
+        void addPrivilegeDocument(const string& dbname,
+                                  const PrincipalName& user,
+                                  const BSONObj& doc) {
+
+            ASSERT(_privilegeDocs.insert(std::make_pair(std::make_pair(dbname, user),
+                                                        doc.getOwned())).second);
+        }
+
+    private:
+        std::map<std::pair<std::string, PrincipalName>, BSONObj > _privilegeDocs;
+    };
+
+    class ImplicitPriviligesTest : public ::mongo::unittest::Test {
+    public:
+        AuthExternalStateImplictPriv* state;
+        scoped_ptr<AuthorizationManager> authman;
+
+        void setUp() {
+            state = new AuthExternalStateImplictPriv;
+            authman.reset(new AuthorizationManager(state));
+        }
+    };
+
+    TEST_F(ImplicitPriviligesTest, ImplicitAcquireFromSomeDatabases) {
+        state->addPrivilegeDocument("test", PrincipalName("andy", "test"),
+                                    BSON("user" << "andy" <<
+                                         "pwd" << "a" <<
+                                         "roles" << BSON_ARRAY("readWrite")));
+        state->addPrivilegeDocument("test2", PrincipalName("andy", "test"),
+                                    BSON("user" << "andy" <<
+                                         "userSource" << "test" <<
+                                         "roles" <<  BSON_ARRAY("read")));
+        state->addPrivilegeDocument("admin", PrincipalName("andy", "test"),
+                                    BSON("user" << "andy" <<
+                                         "userSource" << "test" <<
+                                         "roles" << BSON_ARRAY("serverAdmin") <<
+                                         "otherDBRoles" << BSON("test3" << BSON_ARRAY("dbAdmin"))));
+
+        ASSERT(!authman->checkAuthorization("test.foo", ActionType::find));
+        ASSERT(!authman->checkAuthorization("test.foo", ActionType::insert));
+        ASSERT(!authman->checkAuthorization("test.foo", ActionType::collMod));
+        ASSERT(!authman->checkAuthorization("test2.foo", ActionType::find));
+        ASSERT(!authman->checkAuthorization("test2.foo", ActionType::insert));
+        ASSERT(!authman->checkAuthorization("test2.foo", ActionType::collMod));
+        ASSERT(!authman->checkAuthorization("test3.foo", ActionType::find));
+        ASSERT(!authman->checkAuthorization("test3.foo", ActionType::insert));
+        ASSERT(!authman->checkAuthorization("test3.foo", ActionType::collMod));
+        ASSERT(!authman->checkAuthorization("admin.foo", ActionType::find));
+        ASSERT(!authman->checkAuthorization("admin.foo", ActionType::insert));
+        ASSERT(!authman->checkAuthorization("admin.foo", ActionType::collMod));
+        ASSERT(!authman->checkAuthorization("$SERVER", ActionType::shutdown));
+
+        Principal* principal = new Principal(PrincipalName("andy", "test"));
+        principal->setImplicitPrivilegeAcquisition(true);
+        authman->addAuthorizedPrincipal(principal);
+
+        ASSERT(authman->checkAuthorization("test.foo", ActionType::find));
+        ASSERT(authman->checkAuthorization("test.foo", ActionType::insert));
+        ASSERT(!authman->checkAuthorization("test.foo", ActionType::collMod));
+        ASSERT(authman->checkAuthorization("test2.foo", ActionType::find));
+        ASSERT(!authman->checkAuthorization("test2.foo", ActionType::insert));
+        ASSERT(!authman->checkAuthorization("test2.foo", ActionType::collMod));
+        ASSERT(!authman->checkAuthorization("test3.foo", ActionType::find));
+        ASSERT(!authman->checkAuthorization("test3.foo", ActionType::insert));
+        ASSERT(authman->checkAuthorization("test3.foo", ActionType::collMod));
+        ASSERT(!authman->checkAuthorization("admin.foo", ActionType::find));
+        ASSERT(!authman->checkAuthorization("admin.foo", ActionType::insert));
+        ASSERT(!authman->checkAuthorization("admin.foo", ActionType::collMod));
+        ASSERT(authman->checkAuthorization("$SERVER", ActionType::shutdown));
     }
 
 }  // namespace

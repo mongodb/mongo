@@ -95,18 +95,6 @@ namespace mongo {
 
     CmdLogout cmdLogout;
 
-    Status authenticateAndAuthorizePrincipal(const std::string& principalName,
-                                             const std::string& dbname,
-                                             const BSONObj& userObj) {
-        AuthorizationManager* authorizationManager =
-                ClientBasic::getCurrent()->getAuthorizationManager();
-        Principal* principal = new Principal(PrincipalName(principalName, dbname));
-        authorizationManager->addAuthorizedPrincipal(principal);
-        return authorizationManager->acquirePrivilegesFromPrivilegeDocument(dbname,
-                                                                            principal->getName(),
-                                                                            userObj);
-    }
-
     bool CmdAuthenticate::run(const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
         if (!_areNonceAuthenticateCommandsEnabled) {
             errmsg = _nonceAuthenticateCommandsDisabledMessage;
@@ -186,11 +174,11 @@ namespace mongo {
             return false;
         }
 
-        status = authenticateAndAuthorizePrincipal(user, dbname, userObj);
-        uassert(16500,
-                mongoutils::str::stream() << "Problem acquiring privileges for principal \""
-                        << user << "\": " << status.reason(),
-                status == Status::OK());
+        AuthorizationManager* authorizationManager =
+            ClientBasic::getCurrent()->getAuthorizationManager();
+        Principal* principal = new Principal(PrincipalName(user, dbname));
+        principal->setImplicitPrivilegeAcquisition(true);
+        authorizationManager->addAuthorizedPrincipal(principal);
 
         bool readOnly = userObj["readOnly"].trueValue();
         // TODO: remove this once all auth checking goes through AuthorizationManager instead of

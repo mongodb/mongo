@@ -32,6 +32,8 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespacestring.h"
 #include "mongo/db/security_common.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
@@ -357,6 +359,27 @@ namespace {
 
     void AuthorizationManager::addAuthorizedPrincipal(Principal* principal) {
         _authenticatedPrincipals.add(principal);
+        if (!principal->isImplicitPrivilegeAcquisitionEnabled())
+            return;
+        _acquirePrivilegesForPrincipalFromDatabase(ADMIN_DBNAME, principal->getName());
+        principal->markDatabaseAsProbed(ADMIN_DBNAME);
+        const std::string dbname = principal->getName().getDB().toString();
+        _acquirePrivilegesForPrincipalFromDatabase(dbname, principal->getName());
+        principal->markDatabaseAsProbed(dbname);
+    }
+
+    void AuthorizationManager::_acquirePrivilegesForPrincipalFromDatabase(
+            const std::string& dbname, const PrincipalName& principal) {
+
+        BSONObj privilegeDocument;
+        Status status = getPrivilegeDocument(dbname, principal, &privilegeDocument);
+        if (status.isOK()) {
+            status = acquirePrivilegesFromPrivilegeDocument(dbname, principal, privilegeDocument);
+        }
+        if (!status.isOK() && status != ErrorCodes::UserNotFound) {
+            log() << "Privilege acquisition failed for " << principal << " in database " <<
+                dbname << ": " << status.reason() << " (" << status.codeString() << ")" << endl;
+        }
     }
 
     Principal* AuthorizationManager::lookupPrincipal(const PrincipalName& name) {
@@ -675,15 +698,22 @@ namespace {
 
     Status AuthorizationManager::checkAuthForUpdate(const std::string& ns, bool upsert) {
         NamespaceString namespaceString(ns);
-        if (!checkAuthorization(ns, ActionType::update)) {
-            return Status(ErrorCodes::Unauthorized,
-                          mongoutils::str::stream() << "not authorized for update on " << ns,
-                          0);
+        if (!upsert) {
+            if (!checkAuthorization(ns, ActionType::update)) {
+                return Status(ErrorCodes::Unauthorized,
+                              mongoutils::str::stream() << "not authorized for update on " << ns,
+                              0);
+            }
         }
-        if (upsert && !checkAuthorization(ns, ActionType::insert)) {
-            return Status(ErrorCodes::Unauthorized,
-                          mongoutils::str::stream() << "not authorized for upsert on " << ns,
-                          0);
+        else {
+            ActionSet required;
+            required.addAction(ActionType::update);
+            required.addAction(ActionType::insert);
+            if (!checkAuthorization(ns, required)) {
+                return Status(ErrorCodes::Unauthorized,
+                              mongoutils::str::stream() << "not authorized for upsert on " << ns,
+                              0);
+            }
         }
         return Status::OK();
     }
@@ -724,27 +754,43 @@ namespace {
         if (_externalState->shouldIgnoreAuthChecks())
             return Status::OK();
 
-        Privilege modifiedPrivilege = _modifyPrivilegeForSpecialCases(privilege);
-        if (!_acquiredPrivileges.hasPrivilege(modifiedPrivilege))
-            return Status(ErrorCodes::Unauthorized, "unauthorized", 0);
-
-        return Status::OK();
+        return _probeForPrivilege(privilege);
     }
 
     Status AuthorizationManager::checkAuthForPrivileges(const vector<Privilege>& privileges) {
         if (_externalState->shouldIgnoreAuthChecks())
             return Status::OK();
 
-        vector<Privilege> modifiedPrivileges;
-        for (vector<Privilege>::const_iterator it = privileges.begin(); it != privileges.end();
-                ++it) {
-            modifiedPrivileges.push_back(_modifyPrivilegeForSpecialCases(*it));
+        for (size_t i = 0; i < privileges.size(); ++i) {
+            Status status = _probeForPrivilege(privileges[i]);
+            if (!status.isOK())
+                return status;
         }
 
-        if (!_acquiredPrivileges.hasPrivileges(modifiedPrivileges))
-            return Status(ErrorCodes::Unauthorized, "unauthorized", 0);
-
         return Status::OK();
+    }
+
+    Status AuthorizationManager::_probeForPrivilege(const Privilege& privilege) {
+        Privilege modifiedPrivilege = _modifyPrivilegeForSpecialCases(privilege);
+        if (_acquiredPrivileges.hasPrivilege(modifiedPrivilege))
+            return Status::OK();
+
+        std::string dbname = nsToDatabase(modifiedPrivilege.getResource());
+        for (PrincipalSet::iterator iter = _authenticatedPrincipals.begin(),
+                 end = _authenticatedPrincipals.end();
+             iter != end; ++iter) {
+
+            Principal* principal = *iter;
+            if (!principal->isImplicitPrivilegeAcquisitionEnabled())
+                continue;
+            if (principal->isDatabaseProbed(dbname))
+                continue;
+            _acquirePrivilegesForPrincipalFromDatabase(dbname, principal->getName());
+            principal->markDatabaseAsProbed(dbname);
+            if (_acquiredPrivileges.hasPrivilege(modifiedPrivilege))
+                return Status::OK();
+        }
+        return Status(ErrorCodes::Unauthorized, "unauthorized", 0);
     }
 
 } // namespace mongo

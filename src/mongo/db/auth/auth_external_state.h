@@ -52,9 +52,9 @@ namespace mongo {
         //
         // On success, returns Status::OK() and stores a shared-ownership copy of the document into
         // "result".
-        virtual Status getPrivilegeDocument(const std::string& dbname,
-                                            const PrincipalName& principalName,
-                                            BSONObj* result);
+        Status getPrivilegeDocument(const std::string& dbname,
+                                    const PrincipalName& principalName,
+                                    BSONObj* result);
 
     protected:
         AuthExternalState(); // This class should never be instantiated directly.
