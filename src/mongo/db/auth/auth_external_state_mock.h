@@ -51,6 +51,8 @@ namespace mongo {
             return false;
         }
 
+        virtual void startRequest() {}
+
     private:
         bool _returnValue;
     };
