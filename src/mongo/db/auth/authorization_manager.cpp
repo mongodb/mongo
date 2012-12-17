@@ -522,18 +522,12 @@ namespace {
 
     bool AuthorizationManager::checkAuthorization(const std::string& resource,
                                                   ActionType action) {
-        if (_externalState->shouldIgnoreAuthChecks())
-            return true;
-
-        return _acquiredPrivileges.hasPrivilege(Privilege(nsToDatabase(resource), action));
+        return checkAuthForPrivilege(Privilege(resource, action)).isOK();
     }
 
     bool AuthorizationManager::checkAuthorization(const std::string& resource,
                                                   ActionSet actions) {
-        if (_externalState->shouldIgnoreAuthChecks())
-            return true;
-
-        return _acquiredPrivileges.hasPrivilege(Privilege(nsToDatabase(resource), actions));
+        return checkAuthForPrivilege(Privilege(resource, actions)).isOK();
     }
 
     Status AuthorizationManager::checkAuthForQuery(const std::string& ns) {
@@ -638,14 +632,23 @@ namespace {
         return checkAuthForQuery(ns);
     }
 
+    Status AuthorizationManager::checkAuthForPrivilege(const Privilege& privilege) {
+        if (_externalState->shouldIgnoreAuthChecks())
+            return Status::OK();
+
+        if (!_acquiredPrivileges.hasPrivilege(privilege))
+            return Status(ErrorCodes::Unauthorized, "unauthorized", 0);
+
+        return Status::OK();
+    }
+
     Status AuthorizationManager::checkAuthForPrivileges(const vector<Privilege>& privileges) {
-        for (std::vector<Privilege>::const_iterator it = privileges.begin();
-                it != privileges.end(); ++it) {
-            const Privilege& privilege = *it;
-            if (!checkAuthorization(privilege.getResource(), privilege.getActions())) {
-                return Status(ErrorCodes::Unauthorized, "unauthorized", 0);
-            }
-        }
+        if (_externalState->shouldIgnoreAuthChecks())
+            return Status::OK();
+
+        if (!_acquiredPrivileges.hasPrivileges(privileges))
+            return Status(ErrorCodes::Unauthorized, "unauthorized", 0);
+
         return Status::OK();
     }
 

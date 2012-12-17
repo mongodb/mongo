@@ -75,8 +75,11 @@ namespace mongo {
          * Returns true if the set authorizes "desiredPrivilege".
          *
          * The set is considered to authorize "desiredPrivilege" if each action in
-         * "desiredPrivilege" is satisfied either on "desiredPrivilege.getResource()" or on
-         * WILDCARD_RESOURCE.
+         * "desiredPrivilege" is satisfied either on the database component of
+         * "desiredPrivilege.getResource()" or on WILDCARD_RESOURCE.
+         *
+         * TODO: Support checking for the privilege on the full resource name as well as the
+         * database component, to support sub-database granularity privilege assignment.
          */
         bool hasPrivilege(const Privilege& desiredPrivilege);
 

@@ -137,7 +137,10 @@ namespace mongo {
         // namespace.
         Status checkAuthForGetMore(const std::string& ns);
 
-        // Checks if this connection is authorized for all the given Privileges
+        // Checks if this connection is authorized for the given Privilege.
+        Status checkAuthForPrivilege(const Privilege& privilege);
+
+        // Checks if this connection is authorized for all the given Privileges.
         Status checkAuthForPrivileges(const vector<Privilege>& privileges);
 
         // Given a database name and a readOnly flag return an ActionSet describing all the actions

@@ -23,6 +23,7 @@
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/principal.h"
+#include "mongo/db/namespacestring.h"
 #include "mongo/util/map_util.h"
 
 namespace mongo {
@@ -75,7 +76,7 @@ namespace mongo {
 
         StringData resourceSearchList[2];
         resourceSearchList[0] = WILDCARD_RESOURCE;
-        resourceSearchList[1] = desiredPrivilege.getResource();
+        resourceSearchList[1] = nsToDatabaseSubstring(desiredPrivilege.getResource());
 
         ActionSet unmetRequirements = desiredPrivilege.getActions();
         for (int i = 0; i < boost::size(resourceSearchList); ++i) {
