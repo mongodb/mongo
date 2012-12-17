@@ -2,6 +2,12 @@
 t = db.geo_s2near
 t.drop();
 
+// Make sure that geoNear gives us back loc
+goldenPoint = {type: "Point", coordinates: [ 31.0, 41.0]}
+t.insert({geo: goldenPoint})
+t.ensureIndex({ geo : "2dsphere" })
+resNear = db.runCommand({geoNear : t.getName(), near: [30, 40], num: 1, includeLocs: true})
+assert.eq(resNear.results[0].loc, goldenPoint)
 
 // FYI:
 // One degree of long @ 0 is 111km or so.

@@ -155,6 +155,7 @@ namespace mongo {
         verify(_results.empty());
         if (_innerRadius >= _outerRadius) { return; }
         if (_innerRadius > _maxDistance) { return; }
+        if (0 == _numToReturn) { return; }
 
         // We iterate until 1. our search radius is too big or 2. we find results.
         do {

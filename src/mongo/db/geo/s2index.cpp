@@ -455,7 +455,7 @@ namespace mongo {
                 for (BSONElementSet::iterator oi = geoFieldElements.begin();
                         oi != geoFieldElements.end(); ++oi) {
                     if (oi->isABSONObj()) {
-                        oneResultBuilder.append("loc", oi->Obj());
+                        oneResultBuilder.appendAs(*oi, "loc");
                     }
                 }
             }
