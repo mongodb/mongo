@@ -478,18 +478,29 @@ __evict_file_request_walk(WT_SESSION_IMPL *session)
 }
 
 /*
+ * __wt_evict_readonly --
+ *	Switch on/off read-only eviction.
+ */
+void
+__wt_evict_readonly(WT_SESSION_IMPL *session, int readonly)
+{
+	WT_CACHE *cache;
+
+	cache = S2C(session)->cache;
+
+	cache->disable_dirty_eviction = readonly;
+}
+
+/*
  * __wt_evict_file --
  *	Flush pages for a specific file as part of a close/sync operation.
  */
 int
 __wt_evict_file(WT_SESSION_IMPL *session, int syncop)
 {
-	WT_CACHE *cache;
 	WT_DECL_RET;
 	WT_PAGE *next_page, *page;
 	uint32_t walk_flags = WT_TREE_EVICT;
-
-	cache = S2C(session)->cache;
 
 	/*
 	 * Checkpoints need to wait for any concurrent activity in a
@@ -497,7 +508,6 @@ __wt_evict_file(WT_SESSION_IMPL *session, int syncop)
 	 */
 	if (syncop == WT_SYNC) {
 		walk_flags |= WT_TREE_WAIT;
-		cache->disable_dirty_eviction = 1;
 	}
 
 	/*
@@ -565,8 +575,6 @@ err:		/* On error, clear any left-over tree walk. */
 		if (next_page != NULL)
 			__wt_evict_clear_tree_walk(session, next_page);
 	}
-	if (syncop == WT_SYNC)
-		cache->disable_dirty_eviction = 0;
 	return (ret);
 }
 

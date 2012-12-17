@@ -572,8 +572,15 @@ __wt_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	btree->modified = 0;
 	WT_FULL_BARRIER();
 
-	/* If closing a handle, include everything in the checkpoint. */
-	if (!is_checkpoint)
+	/*
+	 * For ordinary checkpoints, disable LRU eviction of dirty pages until
+	 * the free lists are written.
+	 *
+	 * If closing a handle, include everything in the checkpoint.
+	 */
+	if (is_checkpoint)
+		__wt_evict_readonly(session, 1);
+	else
 		txn->isolation = TXN_ISO_READ_UNCOMMITTED;
 
 	/* Flush the file from the cache, creating the checkpoint. */
@@ -612,6 +619,8 @@ err:
 skip:	__wt_meta_ckptlist_free(session, ckptbase);
 	__wt_free(session, name_alloc);
 	txn->isolation = saved_isolation;
+	if (is_checkpoint)
+		__wt_evict_readonly(session, 0);
 
 	return (ret);
 }
