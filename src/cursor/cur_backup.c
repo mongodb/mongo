@@ -45,7 +45,7 @@ __curbackup_next(WT_CURSOR *cursor)
 	cb->iface.key.size = WT_STORE_SIZE(strlen(cb->list[cb->next]) + 1);
 	++cb->next;
 
-	F_SET(cursor, WT_CURSTD_KEY_SET);
+	F_SET(cursor, WT_CURSTD_KEY_RET);
 
 err:	API_END(session);
 	return (ret);

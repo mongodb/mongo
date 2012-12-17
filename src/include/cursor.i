@@ -135,7 +135,7 @@ __cursor_func_resolve(WT_CURSOR_BTREE *cbt, int ret)
 	 * we should release any page references we're holding.
 	 */
 	if (ret == 0)
-		F_SET(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
+		F_SET(cursor, WT_CURSTD_KEY_RET | WT_CURSTD_VALUE_RET);
 	else {
 		WT_RET(__cursor_leave(cbt));
 		__cursor_search_clear(cbt);

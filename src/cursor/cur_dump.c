@@ -153,7 +153,7 @@ __curdump_set_key(WT_CURSOR *cursor, ...)
 
 	if (0) {
 err:		cursor->saved_err = ret;
-		F_CLR(cursor, WT_CURSTD_KEY_SET);
+		F_CLR(cursor, WT_CURSTD_KEY_APP);
 	}
 	API_END(session);
 }
@@ -226,7 +226,7 @@ __curdump_set_value(WT_CURSOR *cursor, ...)
 
 	if (0) {
 err:		cursor->saved_err = ret;
-		F_CLR(cursor, WT_CURSTD_VALUE_SET);
+		F_CLR(cursor, WT_CURSTD_VALUE_APP);
 	}
 	API_END(session);
 }
