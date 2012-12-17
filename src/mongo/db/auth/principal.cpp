@@ -18,19 +18,32 @@
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include <string>
 
+#include "mongo/util/map_util.h"
+
 namespace mongo {
 
-    Principal::Principal(const PrincipalName& name,
-                         const boost::posix_time::ptime& expirationTime) :
-            _name(name), _expirationTime(expirationTime) {}
-
     Principal::Principal(const PrincipalName& name) :
-            _name(name), _expirationTime(boost::posix_time::pos_infin) {}
+        _name(name),
+        _expirationTime(boost::posix_time::pos_infin),
+        _enableImplicitPrivileges(false) {
+    }
 
     Principal::~Principal() {}
 
     void Principal::setExpirationTime(boost::posix_time::ptime& expiration) {
         _expirationTime = expiration;
+    }
+
+    void Principal::setImplicitPrivilegeAcquisition(bool enabled) {
+        _enableImplicitPrivileges = enabled;
+    }
+
+    bool Principal::isDatabaseProbed(const StringData& dbname) const {
+        return mapFindWithDefault(_probedDatabases, dbname, false);
+    }
+
+    void Principal::markDatabaseAsProbed(const StringData& dbname) {
+        _probedDatabases[dbname] = true;
     }
 
 } // namespace mongo

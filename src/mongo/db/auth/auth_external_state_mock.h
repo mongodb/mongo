@@ -39,15 +39,9 @@ namespace mongo {
             _returnValue = returnValue;
         }
 
-        virtual Status getPrivilegeDocument(const string& dbname,
-                                            const PrincipalName& user,
-                                            BSONObj* result) {
-            return Status(ErrorCodes::InternalError, "Not Implemented!");
-        }
-
         virtual bool _findUser(const std::string& usersNamespace,
-                                       const BSONObj& query,
-                                       BSONObj* result) const {
+                               const BSONObj& query,
+                               BSONObj* result) const {
             return false;
         }
 

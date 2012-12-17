@@ -78,7 +78,7 @@ namespace mongo {
         // TODO: try to eliminate the need for this call.
         void startRequest();
 
-        // Takes ownership of the principal (by putting into _authenticatedPrincipals).
+        // Adds "principal" to the authorization manager, and takes ownership of it.
         void addAuthorizedPrincipal(Principal* principal);
 
         // Returns the authenticated principal with the given name.  Returns NULL
@@ -169,6 +169,14 @@ namespace mongo {
         static ActionSet getAllUserActions();
 
     private:
+        // Finds the set of privileges attributed to "principal" in database "dbname",
+        // and adds them to the set of acquired privileges.
+        void _acquirePrivilegesForPrincipalFromDatabase(const std::string& dbname,
+                                                        const PrincipalName& principal);
+
+        // Checks to see if the given privilege is allowed, performing implicit privilege
+        // acquisition if enabled and necessary to resolve the privilege.
+        Status _probeForPrivilege(const Privilege& privilege);
 
         // Parses the old-style (pre 2.4) privilege document and returns a PrivilegeSet of all the
         // Privileges that the privilege document grants.
