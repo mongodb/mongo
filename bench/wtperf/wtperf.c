@@ -234,6 +234,7 @@ worker(CONFIG *cfg, uint32_t worker_type)
 	WT_CONNECTION *conn;
 	WT_SESSION *session;
 	WT_CURSOR *cursor;
+	const char *op_name = "search";
 	char *key_buf, *value;
 	int ret, op_ret;
 
@@ -280,6 +281,7 @@ worker(CONFIG *cfg, uint32_t worker_type)
 				else
 					value[0] = 'a';
 				op_ret = cursor->update(cursor);
+				op_name = "update";
 			}
 			if (op_ret == 0)
 				++g_nupdate_ops;
@@ -292,7 +294,7 @@ worker(CONFIG *cfg, uint32_t worker_type)
 		/* Report errors and continue. */
 		if (op_ret != 0)
 			lprintf(cfg, op_ret, 0,
-			    "Search failed for: %s", key_buf);
+			    "%s failed for: %s", op_name, key_buf);
 		else
 			++g_nops;
 	}
