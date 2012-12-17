@@ -68,8 +68,6 @@ namespace mongo {
             // geo breaks if it is not the first portion of the pipeline
             uassert(16424, "$near is not allowed inside of a $match aggregation expression",
                     ! str::equals(e.fieldName(), "$near"));
-            uassert(16425, "$within is not allowed inside of a $match aggregation expression",
-                    ! str::equals(e.fieldName(), "$within"));
             uassert(16426, "$nearSphere is not allowed inside of a $match aggregation expression",
                     ! str::equals(e.fieldName(), "$nearSphere"));
             if (e.isABSONObj())
