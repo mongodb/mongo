@@ -109,7 +109,8 @@ assert.eq( 1, explain.n );
 
 // Check that mongos will fallback to primary if none of tags given matches
 explain = coll.find().readPref( "secondaryPreferred", [{ z: "3" }, { dc: "ph" }] ).explain();
-assert.eq( primaryNode.name, explain.server );
+// Call getPrimary again since the primary could have changed after the restart.
+assert.eq(replTest.getPrimary().name, explain.server);
 assert.eq( 1, explain.n );
 
 // Kill all members except one
