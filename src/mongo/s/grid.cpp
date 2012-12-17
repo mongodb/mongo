@@ -257,6 +257,18 @@ namespace mongo {
                 return false;
             }
 
+            if( setName.empty() ) { 
+                // check this isn't a --configsvr
+                BSONObj res;
+                bool ok = newShardConn->runCommand("admin",BSON("replSetGetStatus"<<1),res);
+                ostringstream ss;
+                if( !ok && res["info"].type() == String && res["info"].String() == "configsvr" ) {
+                    errMsg = "the specified mongod is a --configsvr and should thus not be a shard server";
+                    newShardConn.done();
+                    return false;
+                }                
+            }
+
             // if the shard is part of a replica set, make sure all the hosts mentioned in 'servers' are part of
             // the set. It is fine if not all members of the set are present in 'servers'.
             bool foundAll = true;
