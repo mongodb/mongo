@@ -545,9 +545,23 @@ flags = {
 ###################################################
 # Internal routine flag declarations
 ###################################################
-	'shared_cache' : [ 'CACHE_POOL_RUN' ],
-	'direct_io' : [ 'DIRECTIO_DATA', 'DIRECTIO_LOG' ],
-	'page_free' : [ 'PAGE_FREE_IGNORE_DISK' ],
+	'shared_cache' : [
+		'CACHE_POOL_RUN'
+	],
+	'direct_io' : [
+		'DIRECTIO_DATA',
+		'DIRECTIO_LOG'
+	],
+	'page_free' : [
+		'PAGE_FREE_IGNORE_DISK'
+	],
+	'tree_walk' : [
+		'TREE_CACHE',
+		'TREE_COMPACT',
+		'TREE_DISCARD',
+		'TREE_EVICT',
+		'TREE_PREV',
+	],
 	'verbose' : [
 		'VERB_block',
 		'VERB_ckpt',
