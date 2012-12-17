@@ -19,6 +19,7 @@
 #include "mongo/db/jsobj.h"
 #include <vector>
 #include "third_party/s2/s2.h"
+#include "mongo/db/geo/shapes.h"
 
 class S2Cell;
 class S2Polyline;
@@ -34,35 +35,43 @@ namespace mongo {
     // We assume that if you're trying to parse something, you know it's valid.
     // This means don't call parsePoint(x) unless you're sure isPoint(x).
     // Perhaps there should just be parsePoint that returns bool and calls isPoint itself?
-    class GeoJSONParser {
+    class GeoParser {
     public:
-        // GeoJSON routines
+        // Try to parse GeoJSON, then try legacy format, return true if either succeed.
+        // These call the various isPoint and parsePoint methods below.
+        // You can just use these bool parsePoint(...) methods.
+        static bool parsePoint(const BSONObj &obj, S2Point *out);
+        static bool parsePoint(const BSONObj &obj, S2Cell *out);
+        // Check to see if it's GeoJSON or if it's legacy geo.
+        static bool isPoint(const BSONObj &obj);
         static bool isGeoJSONPoint(const BSONObj &obj);
         static void parseGeoJSONPoint(const BSONObj &obj, S2Point *out);
         static void parseGeoJSONPoint(const BSONObj &obj, S2Cell *out);
+        static bool isLegacyPoint(const BSONObj &obj);
+        // Point is the legacy/planar class (2d), S2Point is the future (2dsphere).
+        static void parseLegacyPoint(const BSONObj &obj, S2Point *out);
+        static void parseLegacyPoint(const BSONObj &obj, Point *out);
 
+        static bool parseLineString(const BSONObj &obj, S2Polyline *out);
+        static bool isLineString(const BSONObj &obj);
         static bool isGeoJSONLineString(const BSONObj &obj);
         static void parseGeoJSONLineString(const BSONObj &obj, S2Polyline *out);
-
-        static bool isGeoJSONPolygon(const BSONObj &obj);
-        static void parseGeoJSONPolygon(const BSONObj &obj, S2Polygon *out);
-
-        static bool isLegacyPoint(const BSONObj &obj);
-        static void parseLegacyPoint(const BSONObj &obj, S2Point *out);
         // There are no legacy lines.
-        static bool isLegacyPolygon(const BSONObj &obj);
-        static void parseLegacyPolygon(const BSONObj &obj, S2Polygon *out);
 
-        // Check to see if it's GeoJSON or if it's legacy geo.
-        static bool isPoint(const BSONObj &obj);
-        static bool isLineString(const BSONObj &obj);
-        static bool isPolygon(const BSONObj &obj);
-
-        // Try to parse GeoJSON, then try legacy format, return true if either succeed.
-        static bool parsePoint(const BSONObj &obj, S2Point *out);
-        static bool parsePoint(const BSONObj &obj, S2Cell *out);
-        static bool parseLineString(const BSONObj &obj, S2Polyline *out);
         static bool parsePolygon(const BSONObj &obj, S2Polygon *out);
+        static bool isPolygon(const BSONObj &obj);
+        static bool isGeoJSONPolygon(const BSONObj &obj);
+        static bool isLegacyPolygon(const BSONObj &obj);
+        static void parseGeoJSONPolygon(const BSONObj &obj, S2Polygon *out);
+        static void parseLegacyPolygon(const BSONObj &obj, S2Polygon *out);
+        static void parseLegacyPolygon(const BSONObj &obj, Polygon *out);
+
+        // TODO(hk): We could do this in 2dsphere with an S2LatLngRect.
+        static bool isLegacyBox(const BSONObj &obj);
+        static void parseLegacyBox(const BSONObj &obj, Box *out);
+
+        static bool isLegacyCenter(const BSONObj &obj);
+        static void parseLegacyCenter(const BSONObj &obj, Point *centerOut, double *radiusOut);
 
         // Return true if the CRS field is 1. missing, or 2. is well-formed and
         // has a datum we accept.  Otherwise, return false.

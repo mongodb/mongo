@@ -114,17 +114,17 @@ namespace mongo {
                      oi != geoFieldElements.end(); ++oi) {
                     if (!oi->isABSONObj()) { continue; }
                     const BSONObj &geoObj = oi->Obj();
-                    if (GeoJSONParser::isPolygon(geoObj)) {
+                    if (GeoParser::isPolygon(geoObj)) {
                         S2Polygon shape;
-                        GeoJSONParser::parsePolygon(geoObj, &shape);
+                        GeoParser::parsePolygon(geoObj, &shape);
                         match = _fields[i].intersectsPolygon(shape);
-                    } else if (GeoJSONParser::isLineString(geoObj)) {
+                    } else if (GeoParser::isLineString(geoObj)) {
                         S2Polyline shape;
-                        GeoJSONParser::parseLineString(geoObj, &shape);
+                        GeoParser::parseLineString(geoObj, &shape);
                         match = _fields[i].intersectsLine(shape);
-                    } else if (GeoJSONParser::isPoint(geoObj)) {
+                    } else if (GeoParser::isPoint(geoObj)) {
                         S2Cell point;
-                        GeoJSONParser::parsePoint(geoObj, &point);
+                        GeoParser::parsePoint(geoObj, &point);
                         match = _fields[i].intersectsPoint(point);
                     }
                     if (match) break;

@@ -20,7 +20,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/index.h"
 #include "mongo/db/queryutil.h"
-#include "mongo/db/geo/geojsonparser.h"
+#include "mongo/db/geo/geoparser.h"
 #include "mongo/db/geo/s2common.h"
 #include "mongo/db/geo/s2cursor.h"
 #include "mongo/db/geo/s2nearcursor.h"
@@ -156,7 +156,7 @@ namespace mongo {
                 if (mongoutils::str::equals(e.fieldName(), "$near")) {
                     if (out->parseFrom(embeddedObj)) {
                         uassert(16573, "near requires point, given " + embeddedObj.toString(),
-                                GeoJSONParser::isPoint(embeddedObj));
+                                GeoParser::isPoint(embeddedObj));
                         *isNear = true;
                         ret = true;
                     }
@@ -194,7 +194,7 @@ namespace mongo {
                         BSONObj embeddedObj = e.embeddedObject();
                          if (out->parseFrom(embeddedObj)) {
                              uassert(16570, "near requires point, given " + embeddedObj.toString(),
-                                     !(*isNear) || GeoJSONParser::isPoint(embeddedObj));
+                                     !(*isNear) || GeoParser::isPoint(embeddedObj));
                              ret = true;
                          }
                     }
@@ -210,7 +210,6 @@ namespace mongo {
         // Entry point for a search.
         virtual shared_ptr<Cursor> newCursor(const BSONObj& query, const BSONObj& order,
                                              int numWanted) const {
-            // XXX: scoped array!!!  with release
             vector<QueryGeometry> regions;
             double maxDistance = DBL_MAX;
             bool isNear = false;
@@ -313,11 +312,11 @@ namespace mongo {
                 S2Polygon polygon;
                 S2Polyline line;
                 S2Cell point;
-                if (GeoJSONParser::parsePolygon(obj, &polygon)) {
+                if (GeoParser::parsePolygon(obj, &polygon)) {
                     keysFromRegion(&coverer, polygon, &cells);
-                } else if (GeoJSONParser::parseLineString(obj, &line)) {
+                } else if (GeoParser::parseLineString(obj, &line)) {
                     keysFromRegion(&coverer, line, &cells);
-                } else if (GeoJSONParser::parsePoint(obj, &point)) {
+                } else if (GeoParser::parsePoint(obj, &point)) {
                     keysFromRegion(&coverer, point, &cells);
                 } else {
                     uasserted(16572, "Can't extract geo keys from object, malformed geometry?:"
@@ -411,11 +410,9 @@ namespace mongo {
         uassert(16551, "'near' param missing/invalid", !cmdObj["near"].eoo());
         BSONObj nearObj = cmdObj["near"].embeddedObject();
 
-        // XXX
         // nearObj must be a point.
         uassert(16571, "near must be called with a point, called with " + nearObj.toString(),
-                GeoJSONParser::isPoint(nearObj));
-        // XXX
+                GeoParser::isPoint(nearObj));
 
         // The non-near query part.
         BSONObj query;
