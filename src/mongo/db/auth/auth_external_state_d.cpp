@@ -31,8 +31,9 @@ namespace mongo {
     AuthExternalStateMongod::~AuthExternalStateMongod() {}
 
     void AuthExternalStateMongod::startRequest() {
-        dassert(!Lock::isLocked());
-        _checkShouldAllowLocalhost();
+        if (!Lock::isLocked()) {
+            _checkShouldAllowLocalhost();
+        }
     }
 
     bool AuthExternalStateMongod::_findUser(const string& usersNamespace,
