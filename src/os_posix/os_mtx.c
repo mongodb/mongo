@@ -119,8 +119,9 @@ __wt_cond_signal(WT_SESSION_IMPL *session, WT_CONDVAR *cond)
 	 * !!!
 	 * This function MUST handle a NULL session handle.
 	 */
-	WT_VERBOSE_RET_TEST(session,
-	    mutex, session != NULL, "signal %s cond (%p)", cond->name, cond);
+	if (session != NULL && WT_VERBOSE_ISSET(session, mutex))
+		WT_RET(__wt_verbose(
+		    session, "signal %s cond (%p)", cond->name, cond));
 
 	WT_ERR(pthread_mutex_lock(&cond->mtx));
 	locked = 1;
@@ -172,7 +173,7 @@ __wt_rwlock_alloc(
 	rwlock->name = name;
 	*rwlockp = rwlock;
 
-	WT_VERBOSE_VOID(session, mutex,
+	WT_VERBOSE_ERR(session, mutex,
 	    "rwlock: alloc %s (%p)", rwlock->name, rwlock);
 
 	if (0) {
@@ -245,7 +246,7 @@ __wt_rwunlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 {
 	WT_DECL_RET;
 
-	WT_VERBOSE_VOID(session, mutex,
+	WT_VERBOSE_RET(session, mutex,
 	    "rwlock: unlock %s (%p)", rwlock->name, rwlock);
 
 	if ((ret = pthread_rwlock_unlock(&rwlock->rwlock)) == 0)
@@ -266,7 +267,7 @@ __wt_rwlock_destroy(WT_SESSION_IMPL *session, WT_RWLOCK **rwlockp)
 	rwlock = *rwlockp;		/* Clear our caller's reference. */
 	*rwlockp = NULL;
 
-	WT_VERBOSE_VOID(session, mutex,
+	WT_VERBOSE_RET(session, mutex,
 	    "rwlock: destroy %s (%p)", rwlock->name, rwlock);
 
 	if ((ret = pthread_rwlock_destroy(&rwlock->rwlock)) == 0) {

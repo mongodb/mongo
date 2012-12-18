@@ -55,11 +55,9 @@
  * we need a place to stash it, and so we stash it in here.
  */
 
-#ifdef HAVE_VERBOSE
 static int __track_dump(WT_SESSION_IMPL *, WT_PAGE *, const char *);
 static int __track_msg(
 	WT_SESSION_IMPL *, WT_PAGE *, const char *, WT_PAGE_TRACK *);
-#endif
 
 /*
  * __rec_track_extend --
@@ -164,8 +162,8 @@ __wt_rec_track(WT_SESSION_IMPL *session, WT_PAGE *page,
 		__wt_cache_page_inmem_incr(
 		    session, page, addr_size + data_size);
 
-	WT_VERBOSE_RET_FUNC(
-	    session, reconcile, (__track_msg(session, page, "add", track)));
+	if (WT_VERBOSE_ISSET(session, reconcile))
+		WT_RET(__track_msg(session, page, "add", track));
 	return (0);
 }
 
@@ -326,12 +324,11 @@ __wt_rec_track_ovfl_reuse(
 		*addrp = track->addr.addr;
 		*addr_sizep = track->addr.size;
 		*foundp = 1;
-		WT_VERBOSE_RET_FUNC(session, reconcile,
-		    (__track_msg(session, page, "reactivate overflow", track)));
+		if (WT_VERBOSE_ISSET(session, reconcile))
+			WT_RET(__track_msg(
+			    session, page, "reactivate overflow", track));
 		return (0);
 	}
-
-	WT_UNUSED(session);		/* unused if HAVE_VERBOSE not defined */
 	return (0);
 }
 
@@ -343,11 +340,8 @@ __wt_rec_track_ovfl_reuse(
 int
 __wt_rec_track_init(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
-	WT_VERBOSE_RET_FUNC(session,
-	    reconcile, (__track_dump(session, page, "reconcile init")));
-
-	WT_UNUSED(session);		/* unused if HAVE_VERBOSE not defined */
-	WT_UNUSED(page);		/* unused if HAVE_VERBOSE not defined */
+	if (WT_VERBOSE_ISSET(session, reconcile))
+		WT_RET(__track_dump(session, page, "reconcile init"));
 	return (0);
 }
 
@@ -362,8 +356,8 @@ __wt_rec_track_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 	WT_PAGE_TRACK *track;
 	uint32_t i;
 
-	WT_VERBOSE_RET_FUNC(session, reconcile,
-	    (__track_dump(session, page, "reconcile wrapup")));
+	if (WT_VERBOSE_ISSET(session, reconcile))
+		WT_RET(__track_dump(session, page, "reconcile wrapup"));
 
 	/*
 	 * After the successful reconciliation of a page, some of the objects
@@ -407,8 +401,8 @@ __wt_rec_track_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 		 * The object isn't in-use and hasn't yet been discarded.  We
 		 * no longer need the underlying blocks, discard them.
 		 */
-		WT_VERBOSE_RET_FUNC(session, reconcile,
-		    __track_msg(session, page, "discard", track));
+		if (WT_VERBOSE_ISSET(session, reconcile))
+			WT_RET(__track_msg(session, page, "discard", track));
 		WT_RET(
 		    __wt_bm_free(session, track->addr.addr, track->addr.size));
 
@@ -482,7 +476,6 @@ __wt_rec_track_discard(WT_SESSION_IMPL *session, WT_PAGE *page)
 		__wt_free(session, track->addr.addr);
 }
 
-#ifdef HAVE_VERBOSE
 /*
  * __track_dump --
  *	Dump the list of tracked objects.
@@ -533,9 +526,7 @@ __track_msg(WT_SESSION_IMPL *session,
 err:	__wt_scr_free(&buf);
 	return (ret);
 }
-#endif
 
-#if defined(HAVE_DIAGNOSTIC) || defined(HAVE_VERBOSE)
 /*
  * __wt_track_string --
  *	Fill in a buffer, describing a track object.
@@ -569,4 +560,3 @@ __wt_track_string(WT_PAGE_TRACK *track, char *buf, size_t len)
 
 	return (buf);
 }
-#endif

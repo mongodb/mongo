@@ -9,12 +9,9 @@
 
 static int __block_ext_overlap(WT_SESSION_IMPL *,
 	WT_BLOCK *, WT_EXTLIST *, WT_EXT **, WT_EXTLIST *, WT_EXT **);
-static int __block_merge(WT_SESSION_IMPL *, WT_EXTLIST *, off_t, off_t);
-
-#ifdef HAVE_VERBOSE
 static int __block_extlist_dump(
 	WT_SESSION_IMPL *, const char *, WT_EXTLIST *, int);
-#endif
+static int __block_merge(WT_SESSION_IMPL *, WT_EXTLIST *, off_t, off_t);
 
 /*
  * __block_off_srch --
@@ -1019,8 +1016,8 @@ corrupted:		WT_ERR_MSG(session, WT_ERROR,
 		WT_ERR(__block_merge(session, el, off, size));
 	}
 
-	WT_VERBOSE_ERR_FUNC(session, block,
-	    (__block_extlist_dump(session, "read extlist", el, 0)));
+	if (WT_VERBOSE_ISSET(session, block))
+		WT_ERR(__block_extlist_dump(session, "read extlist", el, 0));
 
 err:	__wt_scr_free(&tmp);
 	return (ret);
@@ -1041,8 +1038,8 @@ __wt_block_extlist_write(WT_SESSION_IMPL *session,
 	uint32_t entries, size;
 	uint8_t *p;
 
-	WT_VERBOSE_RET_FUNC(session, block,
-	    (__block_extlist_dump(session, "write extlist", el, 0)));
+	if (WT_VERBOSE_ISSET(session, block))
+		WT_RET(__block_extlist_dump(session, "write extlist", el, 0));
 
 	/*
 	 * Figure out how many entries we're writing -- if there aren't any
@@ -1198,7 +1195,6 @@ __wt_block_extlist_free(WT_SESSION_IMPL *session, WT_EXTLIST *el)
 	memset(el, 0, sizeof(*el));
 }
 
-#ifdef HAVE_VERBOSE
 static int
 __block_extlist_dump(
     WT_SESSION_IMPL *session, const char *tag, WT_EXTLIST *el, int show_size)
@@ -1235,4 +1231,3 @@ __block_extlist_dump(
 	}
 	return (0);
 }
-#endif

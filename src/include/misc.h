@@ -121,53 +121,21 @@
 #define	FLD_ISSET(field, mask)	((field) & ((uint32_t)(mask)))
 #define	FLD_SET(field, mask)	((field) |= ((uint32_t)(mask)))
 
-/* Output a verbose message. */
-#ifdef HAVE_VERBOSE
+/* Verbose messages. */
 #define	WT_VERBOSE_ISSET(session, f)					\
 	(FLD_ISSET(S2C(session)->verbose, WT_VERB_##f))
 #define	WT_VERBOSE_ERR(session, f, ...) do {				\
 	if (WT_VERBOSE_ISSET(session, f))				\
 		WT_ERR(__wt_verbose(session, #f ": " __VA_ARGS__));	\
 } while (0)
-#define	WT_VERBOSE_ERR_FUNC(session, f, a, ...) do {			\
-	if (WT_VERBOSE_ISSET(session, f))				\
-		WT_ERR(a);						\
-} while (0)
 #define	WT_VERBOSE_RET(session, f, ...) do {				\
 	if (WT_VERBOSE_ISSET(session, f))				\
 		WT_RET(__wt_verbose(session, #f ": " __VA_ARGS__));	\
 } while (0)
-#define	WT_VERBOSE_RETVAL(session, f, ret, ...) do {			\
+#define	WT_VERBOSE_TRET(session, f, ...) do {				\
 	if (WT_VERBOSE_ISSET(session, f))				\
-		(ret) = __wt_verbose(session, #f ": " __VA_ARGS__);	\
+		WT_TRET(__wt_verbose(session, #f ": " __VA_ARGS__));	\
 } while (0)
-#define	WT_VERBOSE_RET_FUNC(session, f, a) do {				\
-	if (WT_VERBOSE_ISSET(session, f))				\
-		WT_RET(a);						\
-} while (0)
-#define	WT_VERBOSE_RET_TEST(session, f, a, ...) do {			\
-	if (WT_VERBOSE_ISSET(session, f) && (a))			\
-		WT_RET(__wt_verbose(session, #f ": " __VA_ARGS__));	\
-} while (0)
-#define	WT_VERBOSE_VOID(session, f, ...) do {				\
-	if (WT_VERBOSE_ISSET(session, f))				\
-		(void)__wt_verbose(session, #f ": " __VA_ARGS__);	\
-} while (0)
-#define	WT_VERBOSE_VOID_TEST(session, f, a, ...) do {			\
-	if (WT_VERBOSE_ISSET(session, f) && (a))			\
-		(void)__wt_verbose(session, #f ": " __VA_ARGS__);	\
-} while (0)
-#else
-#define	WT_VERBOSE_ISSET(session, f)	0
-#define	WT_VERBOSE_ERR(session, f, ...)
-#define	WT_VERBOSE_ERR_FUNC(session, f, ...)
-#define	WT_VERBOSE_RET(session, f, ...)
-#define	WT_VERBOSE_RETVAL(session, f, ret, ...)
-#define	WT_VERBOSE_RET_FUNC(session, f, a)
-#define	WT_VERBOSE_RET_TEST(session, f, a, ...)
-#define	WT_VERBOSE_VOID(session, f, ...)
-#define	WT_VERBOSE_VOID_TEST(session, f, a, ...)
-#endif
 
 /* Clear a structure. */
 #define	WT_CLEAR(s)							\
@@ -192,13 +160,6 @@
 /* Function return value and scratch buffer declaration and initialization. */
 #define	WT_DECL_ITEM(i)	WT_ITEM *i = NULL
 #define	WT_DECL_RET	int ret = 0
-
-/* Flags for the tree-walk function. */
-#define	WT_TREE_CACHE	0x01			/* Cache walk */
-#define	WT_TREE_COMPACT	0x02			/* Compaction */
-#define	WT_TREE_DISCARD	0x04			/* Discarding */
-#define	WT_TREE_EVICT	0x08			/* Eviction */
-#define	WT_TREE_PREV	0x10			/* Backward walk */
 
 /*
  * In diagnostic mode we track the locations from which hazard pointers and

@@ -336,10 +336,12 @@ err:	if (src != NULL)
 		__wt_free(session, chunk->uri);
 		__wt_free(session, chunk);
 
-		WT_VERBOSE_VOID_TEST(session, lsm, ret == EINTR,
-		    "Merge aborted due to close");
-		WT_VERBOSE_VOID_TEST(session, lsm, ret != EINTR,
-		    "Merge failed with %s", wiredtiger_strerror(ret));
+		if (ret == EINTR)
+			WT_VERBOSE_TRET(session, lsm,
+			    "Merge aborted due to close");
+		else
+			WT_VERBOSE_TRET(session, lsm,
+			    "Merge failed with %s", wiredtiger_strerror(ret));
 	}
 	return (ret);
 }

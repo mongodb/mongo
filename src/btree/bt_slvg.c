@@ -1043,8 +1043,6 @@ __slvg_col_range_missing(WT_SESSION_IMPL *session, WT_STUFF *ss)
 		}
 		r = trk->col_stop;
 	}
-
-	WT_UNUSED(session);		/* unused if HAVE_VERBOSE not defined */
 	return (0);
 }
 
@@ -1272,8 +1270,6 @@ __slvg_col_merge_ovfl(WT_SESSION_IMPL *session,
 
 		WT_RET(__wt_bm_free(session, unpack->data, unpack->size));
 	}
-
-	WT_UNUSED(trk);			/* unused if HAVE_VERBOSE not defined */
 	return (0);
 }
 
@@ -1943,8 +1939,6 @@ __slvg_row_merge_ovfl(WT_SESSION_IMPL *session,
 			    session, unpack->data, unpack->size));
 		}
 	}
-
-	WT_UNUSED(trk);			/* unused if HAVE_VERBOSE not defined */
 	return (0);
 }
 

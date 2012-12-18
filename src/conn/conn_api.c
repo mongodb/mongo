@@ -720,7 +720,6 @@ err:	if (conn->lock_fh != NULL) {
 static int
 __conn_verbose_config(WT_SESSION_IMPL *session, const char *cfg[])
 {
-#ifdef HAVE_VERBOSE
 	WT_CONFIG_ITEM cval, sval;
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
@@ -757,10 +756,6 @@ __conn_verbose_config(WT_SESSION_IMPL *session, const char *cfg[])
 
 		WT_RET_NOTFOUND_OK(ret);
 	}
-#endif
-
-	WT_UNUSED(session);		/* unused if HAVE_VERBOSE not defined */
-	WT_UNUSED(cfg);			/* unused if HAVE_VERBOSE not defined */
 	return (0);
 }
 

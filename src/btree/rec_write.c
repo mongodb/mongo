@@ -3779,7 +3779,6 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		WT_ILLEGAL_VALUE(session);
 		}
 
-#ifdef HAVE_VERBOSE
 		if (WT_VERBOSE_ISSET(session, reconcile)) {
 			WT_DECL_ITEM(tkey);
 			WT_DECL_RET;
@@ -3813,7 +3812,7 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 err:			__wt_scr_free(&tkey);
 			WT_RET(ret);
 		}
-#endif
+
 		switch (page->type) {
 		case WT_PAGE_ROW_INT:
 		case WT_PAGE_ROW_LEAF:

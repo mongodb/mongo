@@ -71,19 +71,6 @@ esac
 AC_MSG_RESULT($wt_cv_enable_snappy)
 AM_CONDITIONAL([SNAPPY], [test x$wt_cv_enable_snappy = xyes])
 
-AH_TEMPLATE(HAVE_VERBOSE,
-    [Define to 1 to support the wiredtiger_open verbose configuration string.])
-AC_MSG_CHECKING(if --disable-verbose option specified)
-AC_ARG_ENABLE(verbose,
-	[AS_HELP_STRING([--disable-verbose],
-	    [Disable support for verbose messages.])], r=$enableval, r=yes)
-case "$r" in
-no)	wt_cv_enable_verbose=no;;
-*)	AC_DEFINE(HAVE_VERBOSE)
-	wt_cv_enable_verbose=yes;;
-esac
-AC_MSG_RESULT($wt_cv_enable_verbose)
-
 AC_MSG_CHECKING(if --with-spinlock option specified)
 AH_TEMPLATE(SPINLOCK_TYPE, [Spinlock type from mutex.h.])
 AC_ARG_WITH(spinlock,
