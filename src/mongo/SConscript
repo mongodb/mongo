@@ -268,7 +268,8 @@ env.StaticLibrary("coredb", [
                            'server_parameters',
                            'geoparser'])
 
-coreServerFiles = [ "db/common.cpp",
+coreServerFiles = [ "db/client_basic.cpp",
+                    "db/common.cpp",
                     "util/net/miniwebserver.cpp",
                     "db/indexkey.cpp",
                     "db/stats/counters.cpp",

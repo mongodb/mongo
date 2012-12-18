@@ -26,7 +26,7 @@
 
 #include "mongo/pch.h"
 
-#include "mongo/db/client_common.h"
+#include "mongo/db/client_basic.h"
 #include "mongo/db/d_concurrency.h"
 #include "mongo/db/lasterror.h"
 #include "mongo/db/lockstate.h"

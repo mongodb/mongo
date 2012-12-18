@@ -2991,7 +2991,7 @@
     <ClInclude Include="auth\principal_name.h">
       <Filter>db\auth</Filter>
     </ClInclude>
-    <ClInclude Include="client_common.h">
+    <ClInclude Include="client_basic.h">
       <Filter>db\Header Files\a to d</Filter>
     </ClInclude>
     <ClInclude Include="oplog.h">

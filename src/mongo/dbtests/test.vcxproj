@@ -558,7 +558,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="..\db\btree_stats.h" />
     <ClInclude Include="..\db\cc_by_loc.h" />
     <ClInclude Include="..\db\client.h" />
-    <ClInclude Include="..\db\client_common.h" />
+    <ClInclude Include="..\db\client_basic.h" />
     <ClInclude Include="..\db\cloner.h" />
     <ClInclude Include="..\db\collection.h" />
     <ClInclude Include="..\db\commands\server_status.h" />

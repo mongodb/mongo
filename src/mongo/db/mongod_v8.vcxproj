@@ -1877,7 +1877,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="btreeposition.h" />
     <ClInclude Include="btree_stats.h" />
     <ClInclude Include="cc_by_loc.h" />
-    <ClInclude Include="client_common.h" />
+    <ClInclude Include="client_basic.h" />
     <ClInclude Include="cloner.h" />
     <ClInclude Include="collection.h" />
     <ClInclude Include="commands\fail_point_cmd.h" />
