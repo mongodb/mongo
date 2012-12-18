@@ -142,7 +142,7 @@ namespace mongo {
               << "bits" << ( sizeof( int* ) == 4 ? 32 : 64 );
        result.appendBool( "debug" , debug );
        result.appendNumber("maxBsonObjectSize", BSONObjMaxUserSize);
-   }
+    }
 
 
     Tee* const startupWarningsLog = new RamLog("startupWarnings"); //intentionally leaked
