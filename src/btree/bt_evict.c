@@ -502,14 +502,22 @@ __wt_evict_file(WT_SESSION_IMPL *session, int syncop)
 {
 	WT_DECL_RET;
 	WT_PAGE *next_page, *page;
-	uint32_t walk_flags = WT_TREE_EVICT;
+	uint32_t walk_flags;
 
-	/*
-	 * Checkpoints need to wait for any concurrent activity in a
-	 * page to be resolved.
-	 */
-	if (syncop == WT_SYNC) {
-		walk_flags |= WT_TREE_WAIT;
+	switch (syncop) {
+	case WT_SYNC:
+		/*
+		 * Checkpoints need to wait for any concurrent activity in a
+		 * page to be resolved.
+		 */
+		walk_flags = WT_TREE_CACHE | WT_TREE_WAIT;
+		break;
+	case WT_SYNC_FUZZY:
+		walk_flags = WT_TREE_CACHE;
+		break;
+	default:
+		walk_flags = WT_TREE_EVICT;
+		break;
 	}
 
 	/*
@@ -536,7 +544,8 @@ __wt_evict_file(WT_SESSION_IMPL *session, int syncop)
 			break;
 		case WT_SYNC_FUZZY:
 			/* Skip internal pages in the fuzzy sync. */
-			if (page->type == WT_PAGE_ROW_INT || page->type == WT_PAGE_COL_INT)
+			if (page->type == WT_PAGE_ROW_INT ||
+			    page->type == WT_PAGE_COL_INT)
 				break;
 			/* FALLTHROUGH */
 		case WT_SYNC:

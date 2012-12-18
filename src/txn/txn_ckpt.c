@@ -622,8 +622,6 @@ err:
 skip:	__wt_meta_ckptlist_free(session, ckptbase);
 	__wt_free(session, name_alloc);
 	txn->isolation = saved_isolation;
-	if (is_checkpoint)
-		__wt_evict_readonly(session, 0);
 
 	return (ret);
 }

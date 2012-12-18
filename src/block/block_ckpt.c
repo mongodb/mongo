@@ -214,6 +214,12 @@ __wt_block_checkpoint(WT_SESSION_IMPL *session,
 	WT_RET(__ckpt_process(session, block, ckptbase));
 
 	/*
+	 * If eviction of dirty pages was disabled, it can now be enabled
+	 * again.
+	 */
+	__wt_evict_readonly(session, 0);
+
+	/*
 	 * Checkpoints have to hit disk (it would be reasonable to configure for
 	 * lazy checkpoints, but we don't support them yet).  Regardless, we're
 	 * not holding any locks, other writers can proceed while we wait.

@@ -262,8 +262,12 @@ retry:				if (!WT_ATOMIC_CAS(ref->state,
 				 * There is a race here, but worse case is
 				 * that the page will be read back in to cache.
 				 */
-				if (ref->state != WT_REF_MEM &&
-				    ref->state != WT_REF_EVICT_WALK)
+				while (LF_ISSET(WT_TREE_WAIT) &&
+				    (ref->state == WT_REF_LOCKED ||
+				     ref->state == WT_REF_READING))
+					__wt_yield();
+				if (ref->state == WT_REF_DELETED ||
+				    ref->state == WT_REF_DISK)
 					break;
 				/* Grab a hazard pointer. */
 				WT_RET(__wt_page_in(session, page, ref));
