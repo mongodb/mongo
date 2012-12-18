@@ -1901,29 +1901,6 @@ namespace mongo {
         std::string dbname = nsToDatabase( cmdns );
 
         AuthenticationInfo *ai = client.getAuthenticationInfo();
-        // Won't clear the temporary auth if it's already set at this point
-        AuthenticationInfo::TemporaryAuthReleaser authRelease( ai );
-
-        // Some commands run other commands using the DBDirectClient. When this happens,the inner
-        // command doesn't get $auth added to the command object, but the temporary authorization
-        // for that thread is already set.  Therefore, we shouldn't error if no $auth is provided
-        // but we already have temporary auth credentials set.
-        if ( ai->usingInternalUser() && !ai->hasTemporaryAuthorization() ) {
-            // The temporary authentication will be cleared when authRelease goes out of scope
-            if ( cmdObj.hasField(AuthenticationTable::fieldName.c_str()) ) {
-                BSONObj authObj = cmdObj[AuthenticationTable::fieldName].Obj();
-                ai->setTemporaryAuthorization( authObj );
-            } else {
-                log() << "command denied: " << cmdObj.toString() << endl;
-                appendCommandStatus(result,
-                                    false,
-                                    "unauthorized: no auth credentials provided for command and "
-                                    "authenticated using internal user.  This is most likely "
-                                    "because you are using an old version of mongos");
-                return;
-            }
-        }
-
         if( c->adminOnly() && c->localHostOnlyIfNoAuth( cmdObj ) && noauth && !ai->isLocalHost() ) {
             log() << "command denied: " << cmdObj.toString() << endl;
             appendCommandStatus(result,
