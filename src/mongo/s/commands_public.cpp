@@ -1854,22 +1854,26 @@ namespace mongo {
 
     } // namespace pub_grid_cmds
 
-    bool Command::runAgainstRegistered(const char *ns, BSONObj& jsobj, BSONObjBuilder& anObjBuilder,
+    void Command::runAgainstRegistered(const char *ns, BSONObj& jsobj, BSONObjBuilder& anObjBuilder,
                                        int queryOptions) {
-
-        if (NamespaceString(ns).coll != "$cmd") {
-            return false;
-        }
+        // It should be impossible for this uassert to fail since there should be no way to get into
+        // this function with any other collection name.
+        uassert(16618,
+                "Illegal attempt to run a command against a namespace other than $cmd.",
+                NamespaceString(ns).coll == "$cmd");
 
         BSONElement e = jsobj.firstElement();
-        Command* c = e.type() ? Command::findCommand(e.fieldName()) : NULL;
+        std::string commandName = e.fieldName();
+        Command* c = e.type() ? Command::findCommand(commandName) : NULL;
         if (!c) {
-            return false;
+            Command::appendCommandStatus(anObjBuilder,
+                                         false,
+                                         str::stream() << "no such cmd: " << commandName);
+            return;
         }
         ClientInfo *client = ClientInfo::get();
 
         execCommandClientBasic(c, *client, queryOptions, ns, jsobj, anObjBuilder, false);
-        return true;
     }
 
 } // namespace mongo
