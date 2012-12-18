@@ -151,6 +151,10 @@ namespace mongo {
                                         const BSONObj& privilegeDocument,
                                         PrivilegeSet* result);
 
+        // Returns an ActionSet of all actions that can be be granted to users.  This does not
+        // include internal-only actions.
+        static ActionSet getAllUserActions();
+
     private:
 
         // Parses the old-style (pre 2.4) privilege document and returns a PrivilegeSet of all the

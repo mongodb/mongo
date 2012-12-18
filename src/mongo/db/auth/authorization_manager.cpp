@@ -218,6 +218,17 @@ namespace {
 
     AuthorizationManager::~AuthorizationManager(){}
 
+    ActionSet AuthorizationManager::getAllUserActions() {
+        ActionSet allActions;
+        allActions.addAllActionsFromSet(readRoleActions);
+        allActions.addAllActionsFromSet(readWriteRoleActions);
+        allActions.addAllActionsFromSet(userAdminRoleActions);
+        allActions.addAllActionsFromSet(dbAdminRoleActions);
+        allActions.addAllActionsFromSet(serverAdminRoleActions);
+        allActions.addAllActionsFromSet(clusterAdminRoleActions);
+        return allActions;
+    }
+
     void AuthorizationManager::startRequest() {
         _externalState->startRequest();
     }

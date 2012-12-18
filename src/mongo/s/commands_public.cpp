@@ -1738,6 +1738,13 @@ namespace mongo {
         class EvalCmd : public PublicGridCommand {
         public:
             EvalCmd() : PublicGridCommand( "$eval" ) {}
+            virtual void addRequiredPrivileges(const std::string& dbname,
+                                               const BSONObj& cmdObj,
+                                               std::vector<Privilege>* out) {
+                // $eval can do pretty much anything, so require all privileges.
+                out->push_back(Privilege(PrivilegeSet::WILDCARD_RESOURCE,
+                                         AuthorizationManager::getAllUserActions()));
+            }
             virtual bool run(const string& dbName,
                              BSONObj& cmdObj,
                              int,
