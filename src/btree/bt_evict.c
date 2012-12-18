@@ -490,8 +490,15 @@ __wt_evict_readonly(WT_SESSION_IMPL *session, int readonly)
 
 	if (readonly)
 		FLD_SET(cache->disabled_eviction, WT_EVICT_DIRTY);
-	else
+	else {
 		FLD_CLR(cache->disabled_eviction, WT_EVICT_DIRTY);
+
+		/*
+		 * Wake the eviction server, in case application threads have
+		 * stalled.
+		 */
+		__wt_evict_server_wake(session);
+	}
 }
 
 /*
