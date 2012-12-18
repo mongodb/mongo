@@ -196,7 +196,7 @@ namespace mongo {
                 if ( result.existing || ! upsert ) {
                     return result;
                 }
-                else if ( upsert && ! isOperatorUpdate && ! logop) {
+                else if ( upsert && ! isOperatorUpdate ) {
                     // this handles repl inserts
                     checkNoMods( updateobj );
                     debug.upsert = true;
