@@ -118,13 +118,13 @@ namespace mongo {
                             || !ai->isAuthorizedForLock(dbname, c->locktype()))) {
                 result.append("note", str::stream() << "not authorized for command: " <<
                                     c->name << " on database " << dbname);
-                _finishExecCommand(result, false, "unauthorized");
+                appendCommandStatus(result, false, "unauthorized");
                 return;
             }
         }
         if (c->adminOnly() && c->localHostOnlyIfNoAuth(cmdObj) && noauth && !ai->isLocalHost()) {
             log() << "command denied: " << cmdObj.toString() << endl;
-            _finishExecCommand(result,
+            appendCommandStatus(result,
                                false,
                                "unauthorized: this command must run from localhost when running db "
                                "without auth");
@@ -132,7 +132,7 @@ namespace mongo {
         }
         if (c->adminOnly() && !startsWith(ns, "admin.")) {
             log() << "command denied: " << cmdObj.toString() << endl;
-            _finishExecCommand(result, false, "access denied - use admin db");
+            appendCommandStatus(result, false, "access denied - use admin db");
             return;
         }
         // End of access control checks
@@ -143,7 +143,7 @@ namespace mongo {
             c->help( help );
             result.append( "help" , help.str() );
             result.append( "lockType" , c->locktype() );
-            _finishExecCommand(result, true, "");
+            appendCommandStatus(result, true, "");
             return;
         }
         std::string errmsg;
@@ -164,6 +164,6 @@ namespace mongo {
             result.append( "code" , code );
         }
 
-        _finishExecCommand(result, ok, errmsg);
+        appendCommandStatus(result, ok, errmsg);
     }
 }

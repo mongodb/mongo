@@ -179,7 +179,7 @@ namespace mongo {
         return c->locktype();
     }
 
-    void Command::_finishExecCommand(BSONObjBuilder& result, bool ok, const std::string& errmsg) {
+    void Command::appendCommandStatus(BSONObjBuilder& result, bool ok, const std::string& errmsg) {
         BSONObj tmp = result.asTempObj();
         bool have_ok = tmp.hasField("ok");
         bool have_errmsg = tmp.hasField("errmsg");

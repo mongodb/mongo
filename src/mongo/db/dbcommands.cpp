@@ -1915,27 +1915,27 @@ namespace mongo {
                 ai->setTemporaryAuthorization( authObj );
             } else {
                 log() << "command denied: " << cmdObj.toString() << endl;
-                _finishExecCommand(result,
-                                   false,
-                                   "unauthorized: no auth credentials provided for command and "
-                                   "authenticated using internal user.  This is most likely because"
-                                   " you are using an old version of mongos");
+                appendCommandStatus(result,
+                                    false,
+                                    "unauthorized: no auth credentials provided for command and "
+                                    "authenticated using internal user.  This is most likely "
+                                    "because you are using an old version of mongos");
                 return;
             }
         }
 
         if( c->adminOnly() && c->localHostOnlyIfNoAuth( cmdObj ) && noauth && !ai->isLocalHost() ) {
             log() << "command denied: " << cmdObj.toString() << endl;
-            _finishExecCommand(result,
-                               false,
-                               "unauthorized: this command must run from localhost when running db "
-                               "without auth");
+            appendCommandStatus(result,
+                                false,
+                                "unauthorized: this command must run from localhost when running "
+                                "db without auth");
             return;
         }
 
         if ( c->adminOnly() && ! fromRepl && dbname != "admin" ) {
             log() << "command denied: " << cmdObj.toString() << endl;
-            _finishExecCommand(result, false, "access denied; use admin db");
+            appendCommandStatus(result, false, "access denied; use admin db");
             return;
         }
 
@@ -1945,7 +1945,7 @@ namespace mongo {
             Status status = client.getAuthorizationManager()->checkAuthForPrivileges(privileges);
             if (!status.isOK()) {
                 log() << "command denied: " << cmdObj.toString() << endl;
-                _finishExecCommand(result, false, status.reason());
+                appendCommandStatus(result, false, status.reason());
                 return;
             }
         }
@@ -1957,7 +1957,7 @@ namespace mongo {
             c->help( ss );
             result.append( "help" , ss.str() );
             result.append( "lockType" , c->locktype() );
-            _finishExecCommand(result, true, "");
+            appendCommandStatus(result, true, "");
             return;
         }
 
@@ -1969,13 +1969,13 @@ namespace mongo {
 
         if ( ! canRunHere ) {
             result.append( "note" , "from execCommand" );
-            _finishExecCommand(result, false, "not master");
+            appendCommandStatus(result, false, "not master");
             return;
         }
 
         if ( ! c->maintenanceOk() && theReplSet && ! isMaster( dbname.c_str() ) && ! theReplSet->isSecondary() ) {
             result.append( "note" , "from execCommand" );
-            _finishExecCommand(result, false, "node is recovering");
+            appendCommandStatus(result, false, "node is recovering");
             return;
         }
 
@@ -2045,7 +2045,7 @@ namespace mongo {
             theReplSet->setMaintenanceMode(false);
         }
 
-        _finishExecCommand(result, retval, errmsg);
+        appendCommandStatus(result, retval, errmsg);
         return;
     }
 
@@ -2097,7 +2097,9 @@ namespace mongo {
             Command::execCommand(c, client, queryOptions, ns, jsobj, anObjBuilder, fromRepl);
         }
         else {
-            anObjBuilder.append("errmsg", str::stream() << "no such cmd: " << e.fieldName() );
+            Command::appendCommandStatus(anObjBuilder,
+                                         false,
+                                         str::stream() << "no such cmd: " << e.fieldName());
             anObjBuilder.append("bad cmd" , _cmdobj );
         }
 
