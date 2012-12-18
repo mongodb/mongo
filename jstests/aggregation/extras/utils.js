@@ -185,7 +185,7 @@ function resultsEq(rl, rr, v) {
 	for(var j = 0; j < rr.length; ++j) {
 	    if (!anyEq(rl[i], rr[j], v))
 		continue;
-	    
+
 	    /*
 	      Because we made the copies above, we can edit these out of the
 	      arrays so we don't check on them anymore.
@@ -230,3 +230,23 @@ function orderedArrayEq(al, ar, v) {
     return true;
 }
 
+/*
+  Assert that aggregation fails with a specific code.
+  Error message is optional.
+*/
+
+function assertErrorCode(coll, pipe, code, errmsg) {
+
+    if (!Array.isArray(pipe)) {
+        pipe = [pipe];
+    }
+
+    var res = coll.runCommand("aggregate", {pipeline: pipe});
+
+    if (res.ok || res.code != code)
+        printjson({pipeline: pipe, result: res});
+
+    /* assert failure with proper error code */
+    assert(!res.ok, errmsg || "failed in assertErrorCode");
+    assert.eq(res.code, code);
+}

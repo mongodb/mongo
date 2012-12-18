@@ -1,6 +1,8 @@
 // server-6335: don't allow $where clauses in a $match
-out = db.foo.aggregate({$match: {$where: "return true"}})
-assert.eq(out.code, 16395)
 
-out = db.foo.aggregate({$match: {$and:[{$where: "return true"}]}})
-assert.eq(out.code, 16395)
+// load the test utilities
+load('jstests/aggregation/extras/utils.js');
+
+assertErrorCode(db.foo, {$match: {$where: "return true"}}, 16395);
+assertErrorCode(db.foo, {$match: {$and:[{$where: "return true"}]}}, 16395);
+

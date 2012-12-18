@@ -1,5 +1,6 @@
 // server-7781 $geoNear pipeline stage
 load('jstests/libs/geo_near_random.js');
+load('jstests/aggregation/extras/utils.js');
 
 var coll = 'server7781';
 
@@ -7,10 +8,9 @@ db[coll].drop();
 db[coll].insert({loc:[0,0]});
 
 // $geoNear is only allowed as the first stage in a pipeline, nowhere else.
-var res = db.runCommand({aggregate: coll, pipeline:
-                             [{$match: {x:1}}, {$geoNear:{near: [1,1], distanceField: 'dis'}}]});
-assert.commandFailed(res);
-assert.eq(res.code, 16602, tojson(res));
+assertErrorCode(db[coll],
+                [{$match: {x:1}}, {$geoNear:{near: [1,1], distanceField: 'dis'}}],
+                16602);
 
 
 function checkOutput(cmdOut, aggOut, expectedNum) {

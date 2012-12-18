@@ -10,12 +10,12 @@ function assertSubstring( expected, str, offset, len ) {
                t.aggregate( { $project:{ a:{ $substr:[ str, offset, len ] } } } ).result[ 0 ].a );
 }
 
-function assertException( str, offset, len ) {
-    assert( !t.aggregate( { $project:{ a:{ $substr:[ str, offset, len ] } } } ).ok );
+function assertArgsException( args ) {
+    assert.commandFailed(t.runCommand('aggregate', {pipeline: [{$substr: args}]}));
 }
 
-function assertArgsException( args ) {
-    assert( !t.aggregate( { $project:{ a:{ $substr:args } } } ).ok );
+function assertException( str, offset, len ) {
+    assertArgsException([str, offset, len]);
 }
 
 // Wrong number of arguments.

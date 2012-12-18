@@ -14,7 +14,8 @@ function strcasecmp( a, b ) {
 }
 
 function assertException( args ) {
-    assert( !t.aggregate( { $project:{ a:{ $strcasecmp:args } } } ).ok );
+    assert.commandFailed(t.runCommand('aggregate',
+                                      {pipeline: [{$project: {a: {$strcasecmp: args}}}]}));
 }
 
 function assertStrcasecmp( expected, a, b ) {

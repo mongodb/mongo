@@ -1,4 +1,6 @@
+// server-6198: disallow dots in group output field names
+load('jstests/aggregation/extras/utils.js');
+
 db.server6198.drop();
 
-agg = db.server6198.aggregate({$group:{_id:null, "bar.baz": {$addToSet: "$foo"}}});
-assert.eq(agg.code, 16414);
+assertErrorCode(db.server6198, {$group:{_id:null, "bar.baz": {$addToSet: "$foo"}}}, 16414);

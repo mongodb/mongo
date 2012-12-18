@@ -1,5 +1,6 @@
 // $cond returns the evaluated second argument if the first evaluates to true but the evaluated
 // third argument if the first evaluates to false.
+load('jstests/aggregation/extras/utils.js');
 
 t = db.jstests_aggregation_cond;
 t.drop();
@@ -7,8 +8,7 @@ t.drop();
 t.save( {} );
 
 function assertError( expectedErrorCode, condSpec ) {
-    assert.eq( expectedErrorCode,
-               t.aggregate( { $project:{ a:{ $cond:condSpec } } } ).code );    
+    assertErrorCode(t, {$project: {a: {$cond: condSpec}}}, expectedErrorCode);
 }
 
 function assertResult( expectedResult, arg0, arg1, arg2 ) {
