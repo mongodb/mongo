@@ -86,9 +86,7 @@ __wt_lsm_bloom_worker(void *arg)
 	WT_CLEAR(cookie);
 
 	for (;;) {
-		if ((ret = __wt_lsm_copy_chunks(
-		    session, lsm_tree, &cookie)) != 0)
-			goto err;
+		WT_ERR(__wt_lsm_copy_chunks(session, lsm_tree, &cookie));
 		if (!F_ISSET(lsm_tree, WT_LSM_TREE_WORKING))
 			goto err;
 
