@@ -195,7 +195,7 @@ __wt_lsm_checkpoint_worker(void *arg)
 			}
 
 			WT_VERBOSE_ERR(session, lsm,
-			     "LSM worker checkpointed %d.", i);
+			     "LSM worker checkpointed %u", i);
 		}
 		if (j == 0)
 			__wt_sleep(0, 10000);
