@@ -38,10 +38,10 @@
  */
 
 #include "third_party/gperftools-2.0/src/gperftools/profiler.h"
+
 #include <string>
 #include <vector>
 
-#include "google/profiler.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_manager.h"
