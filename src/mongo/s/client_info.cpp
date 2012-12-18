@@ -120,7 +120,7 @@ namespace mongo {
         _lastAccess = 0;
     }
 
-    void ClientInfo::_addWriteBack( vector<WBInfo>& all , const BSONObj& gle ) {
+    void ClientInfo::_addWriteBack( vector<WBInfo>& all, const BSONObj& gle, bool fromLastOperation ) {
         BSONElement w = gle["writeback"];
 
         if ( w.type() != jstOID )
@@ -137,10 +137,12 @@ namespace mongo {
         if ( gle["instanceIdent"].type() == String )
             ident = gle["instanceIdent"].String();
 
-        all.push_back( WBInfo( WriteBackListener::ConnectionIdent( ident , cid.numberLong() ) , w.OID() ) );
+        all.push_back( WBInfo( WriteBackListener::ConnectionIdent( ident , cid.numberLong() ),
+                               w.OID(),
+                               fromLastOperation ) );
     }
 
-    vector<BSONObj> ClientInfo::_handleWriteBacks( vector<WBInfo>& all , bool fromWriteBackListener ) {
+    vector<BSONObj> ClientInfo::_handleWriteBacks( const vector<WBInfo>& all , bool fromWriteBackListener ) {
         vector<BSONObj> res;
 
         if ( all.size() == 0 )
@@ -218,7 +220,7 @@ namespace mongo {
                 conn.done();
             }
 
-            _addWriteBack( writebacks , res );
+            _addWriteBack( writebacks, res, true );
 
             LOG(4) << "gathering writebacks from " << sinceLastGetError().size() << " hosts for"
                    << " gle (" << theShard << ")" << endl;
@@ -234,7 +236,7 @@ namespace mongo {
                 try {
                     ShardConnection conn( temp , "" );
                     ON_BLOCK_EXIT_OBJ( conn, &ShardConnection::done );
-                    _addWriteBack( writebacks , conn->getLastErrorDetailed() );
+                    _addWriteBack( writebacks, conn->getLastErrorDetailed(), false );
 
                 }
                 catch( std::exception &e ){
@@ -260,10 +262,25 @@ namespace mongo {
                     // since that's the current write
                     // but we block for all
                     verify( v.size() >= 1 );
-                    result.appendElements( v[0] );
-                    result.appendElementsUnique( res );
-                    result.append( "writebackGLE" , v[0] );
-                    result.append( "initialGLEHost" , theShard );
+
+                    if ( res["writebackSince"].numberInt() > 0 ) {
+                        // got writeback from older op
+                        // ignore the result from it, just needed to wait
+                        result.appendElements( res );
+                    }
+                    else if ( writebacks[0].fromLastOperation ) {
+                        result.appendElements( v[0] );
+                        result.appendElementsUnique( res );
+                        result.append( "writebackGLE" , v[0] );
+                        result.append( "initialGLEHost" , theShard );
+                        result.append( "initialGLE", res );
+                    }
+                    else {
+                        // there was a writeback
+                        // but its from an old operations
+                        // so all that's important is that we block, not that we return stats
+                        result.appendElements( res );
+                    }
                 }
             }
             else {
@@ -316,7 +333,7 @@ namespace mongo {
                 return false;
             }
 
-            _addWriteBack( writebacks, res );
+            _addWriteBack( writebacks, res, true );
 
             string temp = DBClientWithCommands::getLastErrorString( res );
             if ( (*conn)->type() != ConnectionString::SYNC && ( ok == false || temp.size() ) ) {
@@ -355,7 +372,7 @@ namespace mongo {
 
             ShardConnection conn( temp , "" );
             try {
-                _addWriteBack( writebacks, conn->getLastErrorDetailed() );
+                _addWriteBack( writebacks, conn->getLastErrorDetailed(), false );
             }
             catch( std::exception &e ){
                 warning() << "could not clear last error from a shard " << temp << causedBy( e ) << endl;

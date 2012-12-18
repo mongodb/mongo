@@ -48,6 +48,7 @@ namespace mongo {
     void LastError::appendSelfStatus( BSONObjBuilder &b ) {
         if ( writebackId.isSet() ) {
             b.append( "writeback" , writebackId );
+            b.append( "writebackSince", writebackSince );
             b.append( "instanceIdent" , prettyHostName() ); // this can be any unique string
         }
     }
@@ -55,7 +56,7 @@ namespace mongo {
     bool LastError::appendSelf( BSONObjBuilder &b , bool blankErr ) {
 
         appendSelfStatus( b );
-        
+
         if ( !valid ) {
             if ( blankErr )
                 b.appendNull( "err" );
