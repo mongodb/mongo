@@ -150,8 +150,7 @@ __wt_block_checkpoint_unload(WT_SESSION_IMPL *session, WT_BLOCK *block)
 	WT_BLOCK_CKPT *ci;
 	WT_DECL_RET;
 
-	WT_VERBOSE_RETVAL(
-	    session, ckpt, ret, "%s: unload checkpoint", block->name);
+	WT_VERBOSE_TRET(session, ckpt, "%s: unload checkpoint", block->name);
 
 	ci = &block->live;
 

@@ -9,12 +9,9 @@
 
 static int __block_ext_overlap(WT_SESSION_IMPL *,
 	WT_BLOCK *, WT_EXTLIST *, WT_EXT **, WT_EXTLIST *, WT_EXT **);
-static int __block_merge(WT_SESSION_IMPL *, WT_EXTLIST *, off_t, off_t);
-
-#ifdef HAVE_VERBOSE
 static int __block_extlist_dump(
 	WT_SESSION_IMPL *, const char *, WT_EXTLIST *, int);
-#endif
+static int __block_merge(WT_SESSION_IMPL *, WT_EXTLIST *, off_t, off_t);
 
 /*
  * __block_off_srch --
@@ -1198,7 +1195,6 @@ __wt_block_extlist_free(WT_SESSION_IMPL *session, WT_EXTLIST *el)
 	memset(el, 0, sizeof(*el));
 }
 
-#ifdef HAVE_VERBOSE
 static int
 __block_extlist_dump(
     WT_SESSION_IMPL *session, const char *tag, WT_EXTLIST *el, int show_size)
@@ -1235,4 +1231,3 @@ __block_extlist_dump(
 	}
 	return (0);
 }
-#endif

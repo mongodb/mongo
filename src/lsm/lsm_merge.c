@@ -335,11 +335,12 @@ err:	if (src != NULL)
 		__wt_free(session, chunk->bloom_uri);
 		__wt_free(session, chunk->uri);
 		__wt_free(session, chunk);
+
 		if (ret == EINTR)
-			WT_VERBOSE_VOID(session, lsm,
+			WT_VERBOSE_TRET(session, lsm,
 			    "Merge aborted due to close");
 		else
-			WT_VERBOSE_VOID(session, lsm,
+			WT_VERBOSE_TRET(session, lsm,
 			    "Merge failed with %s", wiredtiger_strerror(ret));
 	}
 	return (ret);

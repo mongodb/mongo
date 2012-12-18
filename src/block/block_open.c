@@ -117,9 +117,9 @@ __wt_block_close(WT_SESSION_IMPL *session, WT_BLOCK *block)
 {
 	WT_DECL_RET;
 
-	WT_VERBOSE_RETVAL(session, block, ret, "close");
+	WT_VERBOSE_TRET(session, block, "close");
 
-	ret = __wt_block_checkpoint_unload(session, block);
+	WT_TRET(__wt_block_checkpoint_unload(session, block));
 
 	if (block->name != NULL)
 		__wt_free(session, block->name);

@@ -9,6 +9,8 @@
 
 static int __lsm_tree_open_check(WT_SESSION_IMPL *, WT_LSM_TREE *);
 static int __lsm_tree_open(WT_SESSION_IMPL *, const char *, WT_LSM_TREE **);
+static int __lsm_tree_set_name(
+	WT_SESSION_IMPL *, WT_LSM_TREE *, const char *);
 
 /*
  * __lsm_tree_discard --
@@ -156,6 +158,21 @@ __wt_lsm_tree_close_all(WT_SESSION_IMPL *session)
 }
 
 /*
+ * __lsm_tree_set_name --
+ *	Set or reset the name of an LSM tree
+ */
+static int
+__lsm_tree_set_name(WT_SESSION_IMPL *session,
+    WT_LSM_TREE *lsm_tree, const char *uri)
+{
+	if (lsm_tree->name != NULL)
+		__wt_free(session, lsm_tree->name);
+	WT_RET(__wt_strdup(session, uri, &lsm_tree->name));
+	lsm_tree->filename = lsm_tree->name + strlen("lsm:");
+	return (0);
+}
+
+/*
  * __wt_lsm_tree_bloom_name --
  *	Get the URI of the Bloom filter for a given chunk.
  */
@@ -297,8 +314,7 @@ __wt_lsm_tree_create(WT_SESSION_IMPL *session,
 
 	WT_RET(__wt_calloc_def(session, 1, &lsm_tree));
 
-	WT_RET(__wt_strdup(session, uri, &lsm_tree->name));
-	lsm_tree->filename = lsm_tree->name + strlen("lsm:");
+	WT_RET(__lsm_tree_set_name(session, lsm_tree, uri));
 
 	WT_ERR(__wt_config_gets(session, cfg, "key_format", &cval));
 	WT_ERR(__wt_strndup(session, cval.str, cval.len,
@@ -426,8 +442,7 @@ __lsm_tree_open(
 	/* Try to open the tree. */
 	WT_RET(__wt_calloc_def(session, 1, &lsm_tree));
 	WT_ERR(__wt_rwlock_alloc(session, "lsm tree", &lsm_tree->rwlock));
-	WT_ERR(__wt_strdup(session, uri, &lsm_tree->name));
-	lsm_tree->filename = lsm_tree->name + strlen("lsm:");
+	WT_ERR(__lsm_tree_set_name(session, lsm_tree, uri));
 	WT_ERR(__wt_stat_alloc_dsrc_stats(session, &lsm_tree->stats));
 
 	WT_ERR(__wt_lsm_meta_read(session, lsm_tree));
@@ -623,8 +638,7 @@ __wt_lsm_tree_rename(WT_SESSION_IMPL *session,
 	locked = 1;
 
 	/* Set the new name. */
-	__wt_free(session, lsm_tree->name);
-	WT_ERR(__wt_strdup(session, newname, &lsm_tree->name));
+	WT_ERR(__lsm_tree_set_name(session, lsm_tree, newname));
 
 	/* Rename the chunks. */
 	for (i = 0; i < lsm_tree->nchunks; i++) {
@@ -633,7 +647,7 @@ __wt_lsm_tree_rename(WT_SESSION_IMPL *session,
 		chunk->uri = NULL;
 
 		WT_ERR(__wt_lsm_tree_chunk_name(
-		    session, lsm_tree, (uint32_t)i, &buf));
+		    session, lsm_tree, chunk->id, &buf));
 		chunk->uri = __wt_buf_steal(session, &buf, NULL);
 		WT_ERR(__wt_schema_rename(session, old, chunk->uri, cfg));
 		__wt_free(session, old);
@@ -642,7 +656,7 @@ __wt_lsm_tree_rename(WT_SESSION_IMPL *session,
 			old = chunk->bloom_uri;
 			chunk->bloom_uri = NULL;
 			WT_ERR(__wt_lsm_tree_bloom_name(
-			    session, lsm_tree, (uint32_t)i, &buf));
+			    session, lsm_tree, chunk->id, &buf));
 			chunk->bloom_uri = __wt_buf_steal(session, &buf, NULL);
 			F_SET(chunk, WT_LSM_CHUNK_BLOOM);
 			WT_ERR(__wt_schema_rename(

@@ -55,11 +55,9 @@
  * we need a place to stash it, and so we stash it in here.
  */
 
-#ifdef HAVE_VERBOSE
 static int __track_dump(WT_SESSION_IMPL *, WT_PAGE *, const char *);
 static int __track_msg(
 	WT_SESSION_IMPL *, WT_PAGE *, const char *, WT_PAGE_TRACK *);
-#endif
 
 /*
  * __rec_track_extend --
@@ -344,7 +342,6 @@ __wt_rec_track_init(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	if (WT_VERBOSE_ISSET(session, reconcile))
 		WT_RET(__track_dump(session, page, "reconcile init"));
-
 	return (0);
 }
 
@@ -479,7 +476,6 @@ __wt_rec_track_discard(WT_SESSION_IMPL *session, WT_PAGE *page)
 		__wt_free(session, track->addr.addr);
 }
 
-#ifdef HAVE_VERBOSE
 /*
  * __track_dump --
  *	Dump the list of tracked objects.
@@ -564,4 +560,3 @@ __wt_track_string(WT_PAGE_TRACK *track, char *buf, size_t len)
 
 	return (buf);
 }
-#endif

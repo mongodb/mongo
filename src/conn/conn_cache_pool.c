@@ -192,8 +192,7 @@ __wt_conn_cache_pool_destroy(WT_CONNECTION_IMPL *conn)
 		    "Failed to find connection in shared cache pool.");
 	}
 
-	/* Ignore any errors - we want to continue closing things down. */
-	WT_VERBOSE_VOID(session, shared_cache,
+	WT_VERBOSE_TRET(session, shared_cache,
 	    "Removing %s from cache pool.", entry->home);
 	TAILQ_REMOVE(&cp->cache_pool_qh, entry, cpq);
 
@@ -209,7 +208,7 @@ __wt_conn_cache_pool_destroy(WT_CONNECTION_IMPL *conn)
 	 * connection. A new one will be created by the next balance pass.
 	 */
 	if (cp->session != NULL && entry == S2C(cp->session)) {
-		WT_VERBOSE_VOID(cp->session, shared_cache,
+		WT_VERBOSE_TRET(cp->session, shared_cache,
 		    "Freeing a cache pool session due to connection close.");
 		wt_session = &cp->session->iface;
 		WT_TRET(wt_session->close(wt_session, NULL));
@@ -224,8 +223,8 @@ __wt_conn_cache_pool_destroy(WT_CONNECTION_IMPL *conn)
 	if (F_ISSET(cp, WT_CACHE_POOL_RUN))
 		__wt_spin_unlock(session, &cp->cache_pool_lock);
 	else {
-		WT_VERBOSE_VOID(session, shared_cache,
-		    "Destroying cache pool.");
+		WT_VERBOSE_TRET(
+		    session, shared_cache, "Destroying cache pool.");
 		__wt_spin_lock(session, &__wt_process.spinlock);
 		cp = __wt_process.cache_pool;
 		/*

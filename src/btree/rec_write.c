@@ -3649,9 +3649,8 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 {
 	WT_BTREE *btree;
 	WT_BOUNDARY *bnd;
-	WT_DECL_RET;
 	WT_PAGE_MODIFY *mod;
-	uint32_t i, page_size;
+	uint32_t page_size;
 	int was_modified;
 
 	btree = session->btree;
@@ -3780,9 +3779,11 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		WT_ILLEGAL_VALUE(session);
 		}
 
-#ifdef HAVE_VERBOSE
 		if (WT_VERBOSE_ISSET(session, reconcile)) {
 			WT_DECL_ITEM(tkey);
+			WT_DECL_RET;
+			uint32_t i;
+
 			if (page->type == WT_PAGE_ROW_INT ||
 			    page->type == WT_PAGE_ROW_LEAF)
 				WT_RET(__wt_scr_alloc(session, 0, &tkey));
@@ -3811,7 +3812,7 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 err:			__wt_scr_free(&tkey);
 			WT_RET(ret);
 		}
-#endif
+
 		switch (page->type) {
 		case WT_PAGE_ROW_INT:
 		case WT_PAGE_ROW_LEAF:
