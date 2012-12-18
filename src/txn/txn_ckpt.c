@@ -573,14 +573,17 @@ __wt_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_FULL_BARRIER();
 
 	/*
-	 * For ordinary checkpoints, disable LRU eviction of dirty pages until
-	 * the free lists are written.
+	 * For ordinary checkpoints, first do a "fuzzy checkpoint" pass through
+	 * the file writing dirty leaf pages.  Then disable LRU eviction of
+	 * dirty pages for the real checkpoint until the free lists are
+	 * written.
 	 *
 	 * If closing a handle, include everything in the checkpoint.
 	 */
-	if (is_checkpoint)
+	if (is_checkpoint) {
+		WT_ERR(__wt_bt_cache_flush(session, ckptbase, WT_SYNC_FUZZY));
 		__wt_evict_readonly(session, 1);
-	else
+	} else
 		txn->isolation = TXN_ISO_READ_UNCOMMITTED;
 
 	/* Flush the file from the cache, creating the checkpoint. */

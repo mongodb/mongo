@@ -527,19 +527,24 @@ __wt_evict_file(WT_SESSION_IMPL *session, int syncop)
 	for (;;) {
 		if ((page = next_page) == NULL)
 			break;
-		if (syncop != WT_SYNC)
+		if (syncop != WT_SYNC && syncop != WT_SYNC_FUZZY)
 			WT_ERR(__wt_tree_walk(session, &next_page, walk_flags));
 
 		switch (syncop) {
 		case WT_SYNC_COMPACT:
 			WT_ERR(__wt_compact_evict(session, page));
 			break;
+		case WT_SYNC_FUZZY:
+			/* Skip internal pages in the fuzzy sync. */
+			if (page->type == WT_PAGE_ROW_INT || page->type == WT_PAGE_COL_INT)
+				break;
+			/* FALLTHROUGH */
 		case WT_SYNC:
 		case WT_SYNC_DISCARD:
 			/* Write dirty pages for sync and sync with discard. */
 			if (__wt_page_is_modified(page))
 				WT_ERR(__wt_rec_write(session, page, NULL, 1));
-			if (syncop == WT_SYNC)
+			if (syncop == WT_SYNC || syncop == WT_SYNC_FUZZY)
 				break;
 
 			/*
@@ -568,7 +573,7 @@ __wt_evict_file(WT_SESSION_IMPL *session, int syncop)
 			break;
 		}
 
-		if (syncop == WT_SYNC)
+		if (syncop == WT_SYNC || syncop == WT_SYNC_FUZZY)
 			WT_ERR(__wt_tree_walk(session, &next_page, walk_flags));
 	}
 

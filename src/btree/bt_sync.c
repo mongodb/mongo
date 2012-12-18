@@ -72,7 +72,7 @@ __wt_bt_cache_flush(WT_SESSION_IMPL *session, WT_CKPT *ckptbase, int op)
 	WT_PUBLISH(btree->ckpt, ckptbase);
 
 	/* Ordinary checkpoints are done in the calling thread. */
-	if (op == WT_SYNC)
+	if (op == WT_SYNC || op == WT_SYNC_FUZZY)
 		ret = __wt_evict_file(session, op);
 	else {
 		/*
@@ -87,6 +87,8 @@ __wt_bt_cache_flush(WT_SESSION_IMPL *session, WT_CKPT *ckptbase, int op)
 
 	switch (op) {
 	case WT_SYNC:
+	case WT_SYNC_COMPACT:
+	case WT_SYNC_FUZZY:
 		break;
 	case WT_SYNC_DISCARD:
 	case WT_SYNC_DISCARD_NOWRITE:

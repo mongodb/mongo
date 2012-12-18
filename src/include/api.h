@@ -116,6 +116,7 @@ struct __wt_session_impl {
 #define	WT_SYNC_COMPACT		2	/* Compact the file */
 #define	WT_SYNC_DISCARD		3	/* Sync the file, discard pages */
 #define	WT_SYNC_DISCARD_NOWRITE	4	/* Discard the file */
+#define	WT_SYNC_FUZZY		5	/* Write dirty leaf pages */
 	int syncop;			/* File operation */
 	int syncop_ret;			/* Return value */
 
