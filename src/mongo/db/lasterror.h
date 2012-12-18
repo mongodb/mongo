@@ -29,6 +29,7 @@ namespace mongo {
         enum UpdatedExistingType { NotUpdate, True, False } updatedExisting;
         OID upsertedId;
         OID writebackId; // this shouldn't get reset so that old GLE are handled
+        int writebackSince;
         long long nObjects;
         int nPrev;
         bool valid;
@@ -36,6 +37,7 @@ namespace mongo {
         void writeback( OID& oid ) {
             reset( true );
             writebackId = oid;
+            writebackSince = 0;
         }
         void raiseError(int _code , const char *_msg) {
             reset( true );
@@ -56,6 +58,7 @@ namespace mongo {
         }
         LastError() {
             reset();
+            writebackSince = 0;
         }
         void reset( bool _valid = false ) {
             code = 0;
@@ -63,6 +66,7 @@ namespace mongo {
             updatedExisting = NotUpdate;
             nObjects = 0;
             nPrev = 1;
+            writebackSince++;
             valid = _valid;
             disabled = false;
             upsertedId.clear();
