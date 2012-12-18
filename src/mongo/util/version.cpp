@@ -131,17 +131,17 @@ namespace mongo {
     }
 
     void appendBuildInfo(BSONObjBuilder& result) {
-	   result << "version" << versionString
-			  << "gitVersion" << gitVersion()
-			  << "sysInfo" << sysInfo()
-			  << "loaderFlags" << loaderFlags()
-			  << "compilerFlags" << compilerFlags()
-			  << "allocator" << allocator()
-			  << "versionArray" << versionArray
-			  << "interpreterVersion" << globalScriptEngine->getInterpreterVersionString()
-			  << "bits" << ( sizeof( int* ) == 4 ? 32 : 64 );
-	   result.appendBool( "debug" , debug );
-	   result.appendNumber("maxBsonObjectSize", BSONObjMaxUserSize);
+       result << "version" << versionString
+              << "gitVersion" << gitVersion()
+              << "sysInfo" << sysInfo()
+              << "loaderFlags" << loaderFlags()
+              << "compilerFlags" << compilerFlags()
+              << "allocator" << allocator()
+              << "versionArray" << versionArray
+//              << "interpreterVersion" << globalScriptEngine->getInterpreterVersionString()
+              << "bits" << ( sizeof( int* ) == 4 ? 32 : 64 );
+       result.appendBool( "debug" , debug );
+       result.appendNumber("maxBsonObjectSize", BSONObjMaxUserSize);
    }
 
 
