@@ -891,6 +891,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="..\base\parse_number.cpp" />
     <ClCompile Include="..\base\status.cpp" />
     <ClCompile Include="..\base\string_data.cpp" />
+    <ClCompile Include="..\bson\bson_validate.cpp" />
     <ClCompile Include="..\bson\mutable\mutable_bson.cpp" />
     <ClCompile Include="..\bson\mutable\mutable_bson_builder.cpp" />
     <ClCompile Include="..\bson\mutable\mutable_bson_heap.cpp" />
@@ -1131,6 +1132,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="..\bson\bson.h" />
     <ClInclude Include="..\bson\bson_builder_base.h" />
     <ClInclude Include="..\bson\bson_field.h" />
+    <ClInclude Include="..\bson\bson_validate.h" />
     <ClInclude Include="..\bson\mutable\mutable_bson.h" />
     <ClInclude Include="..\bson\mutable\mutable_bson_builder.h" />
     <ClInclude Include="..\bson\mutable\mutable_bson_heap.h" />

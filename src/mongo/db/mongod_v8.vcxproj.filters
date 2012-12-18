@@ -896,9 +896,6 @@
     <ClCompile Include="..\bson\mutable\mutable_bson_internal.cpp">
       <Filter>bson\mutable</Filter>
     </ClCompile>
-    <ClCompile Include="geo\geojsonparser.cpp">
-      <Filter>db\geo</Filter>
-    </ClCompile>
     <ClCompile Include="geo\s2cursor.cpp">
       <Filter>db\geo</Filter>
     </ClCompile>
@@ -1453,6 +1450,150 @@
     </ClCompile>
     <ClCompile Include="..\util\platform_init.cpp">
       <Filter>util\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="client_basic.cpp">
+      <Filter>db\Source Files\a to d</Filter>
+    </ClCompile>
+    <ClCompile Include="..\s\type_changelog.cpp">
+      <Filter>s</Filter>
+    </ClCompile>
+    <ClCompile Include="..\s\type_config_version.cpp">
+      <Filter>s</Filter>
+    </ClCompile>
+    <ClCompile Include="..\s\type_lockpings.cpp">
+      <Filter>s</Filter>
+    </ClCompile>
+    <ClCompile Include="..\s\type_locks.cpp">
+      <Filter>s</Filter>
+    </ClCompile>
+    <ClCompile Include="..\s\type_mongos.cpp">
+      <Filter>s</Filter>
+    </ClCompile>
+    <ClCompile Include="..\s\type_settings.cpp">
+      <Filter>s</Filter>
+    </ClCompile>
+    <ClCompile Include="..\s\type_tags.cpp">
+      <Filter>s</Filter>
+    </ClCompile>
+    <ClCompile Include="geo\geonear.cpp">
+      <Filter>db\geo</Filter>
+    </ClCompile>
+    <ClCompile Include="geo\geoparser.cpp">
+      <Filter>db\geo</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\s2\util\math\exactfloat\exactfloat.cc">
+      <Filter>third_party\s2\util\math\exactfloat</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\s2\util\math\mathlimits.cc">
+      <Filter>third_party\s2\util\math</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\s2\util\math\mathutil.cc">
+      <Filter>third_party\s2\util\math</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\s2\util\coding\coder.cc">
+      <Filter>third_party\s2\util\coding</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\s2\util\coding\varint.cc">
+      <Filter>third_party\s2\util\coding</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\s2\base\int128.cc">
+      <Filter>third_party\s2\base</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\s2\base\logging.cc">
+      <Filter>third_party\s2\base</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\s2\base\stringprintf.cc">
+      <Filter>third_party\s2\base</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\s2\base\strtoint.cc">
+      <Filter>third_party\s2\base</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\s2\strings\ascii_ctype.cc">
+      <Filter>third_party\s2\strings</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\s2\strings\split.cc">
+      <Filter>third_party\s2\strings</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\s2\strings\stringprintf.cc">
+      <Filter>third_party\s2\strings</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\s2\strings\strutil.cc">
+      <Filter>third_party\s2\strings</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\s2\s1angle.cc">
+      <Filter>third_party\s2</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\s2\s1interval.cc">
+      <Filter>third_party\s2</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\s2\s2.cc">
+      <Filter>third_party\s2</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\s2\s2cap.cc">
+      <Filter>third_party\s2</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\s2\s2cell.cc">
+      <Filter>third_party\s2</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\s2\s2cellid.cc">
+      <Filter>third_party\s2</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\s2\s2cellunion.cc">
+      <Filter>third_party\s2</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\s2\s2edgeindex.cc">
+      <Filter>third_party\s2</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\s2\s2edgeutil.cc">
+      <Filter>third_party\s2</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\s2\s2latlng.cc">
+      <Filter>third_party\s2</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\s2\s2latlngrect.cc">
+      <Filter>third_party\s2</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\s2\s2loop.cc">
+      <Filter>third_party\s2</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\s2\s2pointregion.cc">
+      <Filter>third_party\s2</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\s2\s2polygon.cc">
+      <Filter>third_party\s2</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\s2\s2polygonbuilder.cc">
+      <Filter>third_party\s2</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\s2\s2polyline.cc">
+      <Filter>third_party\s2</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\s2\s2r2rect.cc">
+      <Filter>third_party\s2</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\s2\s2region.cc">
+      <Filter>third_party\s2</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\s2\s2regioncoverer.cc">
+      <Filter>third_party\s2</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\s2\s2regionintersection.cc">
+      <Filter>third_party\s2</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\s2\s2regionunion.cc">
+      <Filter>third_party\s2</Filter>
+    </ClCompile>
+    <ClCompile Include="..\bson\bson_validate.cpp">
+      <Filter>bson</Filter>
+    </ClCompile>
+    <ClCompile Include="commands\index_stats.cpp">
+      <Filter>db\commands</Filter>
+    </ClCompile>
+    <ClCompile Include="commands\rename_collection_common.cpp">
+      <Filter>db\commands</Filter>
+    </ClCompile>
+    <ClCompile Include="commands\storage_details.cpp">
+      <Filter>db\commands</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -2213,9 +2354,6 @@
     </ClInclude>
     <ClInclude Include="..\bson\mutable\mutable_bson_internal.h">
       <Filter>bson\mutable</Filter>
-    </ClInclude>
-    <ClInclude Include="geo\geojsonparser.h">
-      <Filter>db\geo</Filter>
     </ClInclude>
     <ClInclude Include="geo\s2common.h">
       <Filter>db\geo</Filter>
@@ -3060,6 +3198,222 @@
     <ClInclude Include="dur_recover.h">
       <Filter>db\Header Files\a to d</Filter>
     </ClInclude>
+    <ClInclude Include="..\s\type_changelog.h">
+      <Filter>s</Filter>
+    </ClInclude>
+    <ClInclude Include="..\s\type_config_version.h">
+      <Filter>s</Filter>
+    </ClInclude>
+    <ClInclude Include="..\s\type_lockpings.h">
+      <Filter>s</Filter>
+    </ClInclude>
+    <ClInclude Include="..\s\type_locks.h">
+      <Filter>s</Filter>
+    </ClInclude>
+    <ClInclude Include="..\s\type_mongos.h">
+      <Filter>s</Filter>
+    </ClInclude>
+    <ClInclude Include="..\s\type_settings.h">
+      <Filter>s</Filter>
+    </ClInclude>
+    <ClInclude Include="..\s\type_tags.h">
+      <Filter>s</Filter>
+    </ClInclude>
+    <ClInclude Include="geo\2d.h">
+      <Filter>db\geo</Filter>
+    </ClInclude>
+    <ClInclude Include="geo\geoparser.h">
+      <Filter>db\geo</Filter>
+    </ClInclude>
+    <ClInclude Include="geo\s2index.h">
+      <Filter>db\geo</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\s2\util\math\exactfloat\exactfloat.h">
+      <Filter>third_party\s2\util\math\exactfloat</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\s2\util\math\mathlimits.h">
+      <Filter>third_party\s2\util\math</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\s2\util\math\mathutil.h">
+      <Filter>third_party\s2\util\math</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\s2\util\math\matrix3x3.h">
+      <Filter>third_party\s2\util\math</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\s2\util\math\matrix3x3-inl.h">
+      <Filter>third_party\s2\util\math</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\s2\util\math\vector2.h">
+      <Filter>third_party\s2\util\math</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\s2\util\math\vector2-inl.h">
+      <Filter>third_party\s2\util\math</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\s2\util\math\vector3.h">
+      <Filter>third_party\s2\util\math</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\s2\util\math\vector3-inl.h">
+      <Filter>third_party\s2\util\math</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\s2\util\math\vector4.h">
+      <Filter>third_party\s2\util\math</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\s2\util\math\vector4-inl.h">
+      <Filter>third_party\s2\util\math</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\s2\util\hash\hash_jenkins_lookup2.h">
+      <Filter>third_party\s2\util\hash</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\s2\util\endian\endian.h">
+      <Filter>third_party\s2\util\endian</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\s2\util\coding\coder.h">
+      <Filter>third_party\s2\util\coding</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\s2\util\coding\varint.h">
+      <Filter>third_party\s2\util\coding</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\s2\base\basictypes.h">
+      <Filter>third_party\s2\base</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\s2\base\casts.h">
+      <Filter>third_party\s2\base</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\s2\base\commandlineflags.h">
+      <Filter>third_party\s2\base</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\s2\base\definer.h">
+      <Filter>third_party\s2\base</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\s2\base\docid.h">
+      <Filter>third_party\s2\base</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\s2\base\int128.h">
+      <Filter>third_party\s2\base</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\s2\base\integral_types.h">
+      <Filter>third_party\s2\base</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\s2\base\logging.h">
+      <Filter>third_party\s2\base</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\s2\base\macros.h">
+      <Filter>third_party\s2\base</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\s2\base\port.h">
+      <Filter>third_party\s2\base</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\s2\base\scoped_ptr.h">
+      <Filter>third_party\s2\base</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\s2\base\stl_decl.h">
+      <Filter>third_party\s2\base</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\s2\base\stl_decl_msvc.h">
+      <Filter>third_party\s2\base</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\s2\base\stl_decl_osx.h">
+      <Filter>third_party\s2\base</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\s2\base\stringprintf.h">
+      <Filter>third_party\s2\base</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\s2\base\strtoint.h">
+      <Filter>third_party\s2\base</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\s2\base\template_util.h">
+      <Filter>third_party\s2\base</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\s2\base\type_traits.h">
+      <Filter>third_party\s2\base</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\s2\strings\ascii_ctype.h">
+      <Filter>third_party\s2\strings</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\s2\strings\split.h">
+      <Filter>third_party\s2\strings</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\s2\strings\stringprintf.h">
+      <Filter>third_party\s2\strings</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\s2\strings\strutil.h">
+      <Filter>third_party\s2\strings</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\s2\hash.h">
+      <Filter>third_party\s2</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\s2\r1interval.h">
+      <Filter>third_party\s2</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\s2\s1angle.h">
+      <Filter>third_party\s2</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\s2\s1interval.h">
+      <Filter>third_party\s2</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\s2\s2.h">
+      <Filter>third_party\s2</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\s2\s2cap.h">
+      <Filter>third_party\s2</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\s2\s2cell.h">
+      <Filter>third_party\s2</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\s2\s2cellid.h">
+      <Filter>third_party\s2</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\s2\s2cellunion.h">
+      <Filter>third_party\s2</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\s2\s2edgeindex.h">
+      <Filter>third_party\s2</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\s2\s2edgeutil.h">
+      <Filter>third_party\s2</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\s2\s2latlng.h">
+      <Filter>third_party\s2</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\s2\s2latlngrect.h">
+      <Filter>third_party\s2</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\s2\s2loop.h">
+      <Filter>third_party\s2</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\s2\s2pointregion.h">
+      <Filter>third_party\s2</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\s2\s2polygon.h">
+      <Filter>third_party\s2</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\s2\s2polygonbuilder.h">
+      <Filter>third_party\s2</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\s2\s2polyline.h">
+      <Filter>third_party\s2</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\s2\s2r2rect.h">
+      <Filter>third_party\s2</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\s2\s2region.h">
+      <Filter>third_party\s2</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\s2\s2regioncoverer.h">
+      <Filter>third_party\s2</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\s2\s2regionintersection.h">
+      <Filter>third_party\s2</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\s2\s2regionunion.h">
+      <Filter>third_party\s2</Filter>
+    </ClInclude>
+    <ClInclude Include="..\bson\bson_validate.h">
+      <Filter>bson</Filter>
+    </ClInclude>
+    <ClInclude Include="commands\rename_collection.h">
+      <Filter>db\commands</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="mongo.ico">
@@ -3133,6 +3487,9 @@
     </None>
     <None Include="..\..\third_party\v8\src\v8natives.js">
       <Filter>third_party\v8\src\JavaScript Files</Filter>
+    </None>
+    <None Include="..\..\third_party\s2\LICENSE-2.0.txt">
+      <Filter>third_party\s2</Filter>
     </None>
   </ItemGroup>
   <ItemGroup>
@@ -3324,6 +3681,33 @@
     </Filter>
     <Filter Include="third_party\v8\src\x64\Source Files">
       <UniqueIdentifier>{09905089-f860-497d-b782-6c50c0369c3b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="third_party\s2">
+      <UniqueIdentifier>{bb99b4b3-7ce2-4e2b-85df-8e406de5f0e8}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="third_party\s2\base">
+      <UniqueIdentifier>{e1d76f30-44e5-496b-ba12-3e92671f8416}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="third_party\s2\strings">
+      <UniqueIdentifier>{aa4e4004-9a58-41b3-82eb-36219a1c0c0b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="third_party\s2\util">
+      <UniqueIdentifier>{ae2ca70f-a280-4e47-96cc-30ecee8825d3}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="third_party\s2\util\coding">
+      <UniqueIdentifier>{5f0d68ee-6054-456a-aad4-feeea7dbaa35}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="third_party\s2\util\endian">
+      <UniqueIdentifier>{c1fc2b0e-11b0-4457-9587-b9e57bba0cfd}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="third_party\s2\util\hash">
+      <UniqueIdentifier>{bc2e0083-e118-4050-8c29-37b2f9b808bb}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="third_party\s2\util\math">
+      <UniqueIdentifier>{2d24b948-c864-49c4-9d38-113aba531be5}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="third_party\s2\util\math\exactfloat">
+      <UniqueIdentifier>{2734072a-9d11-4d80-be3e-be4ffac2f375}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>

@@ -596,6 +596,9 @@
     <ClCompile Include="..\util\platform_init.cpp">
       <Filter>util\Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\bson\bson_validate.cpp">
+      <Filter>bson</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="collection.js">
@@ -1420,6 +1423,9 @@
     </ClInclude>
     <ClInclude Include="..\scripting\engine_spidermonkey_internal.h">
       <Filter>scripting</Filter>
+    </ClInclude>
+    <ClInclude Include="..\bson\bson_validate.h">
+      <Filter>bson</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
