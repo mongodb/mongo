@@ -508,12 +508,19 @@ __wt_evict_file(WT_SESSION_IMPL *session, int syncop)
 	case WT_SYNC:
 		/*
 		 * Checkpoints need to wait for any concurrent activity in a
-		 * page to be resolved.
+		 * page to be resolved.  Using the EVICT_WALK state prevents
+		 * eviction from getting underneath an internal page that is
+		 * being evicted.
 		 */
-		walk_flags = WT_TREE_CACHE | WT_TREE_WAIT;
+		walk_flags = WT_TREE_EVICT | WT_TREE_WAIT;
 		break;
 	case WT_SYNC_FUZZY:
-		walk_flags = WT_TREE_CACHE;
+		/*
+		 * Walk all leaf pages, waiting for concurrent activity to be
+		 * resolved.  Use hazard references, so we don't prevent other
+		 * eviction from the same subtree.
+		 */
+		walk_flags = WT_TREE_CACHE | WT_TREE_WAIT;
 		break;
 	default:
 		walk_flags = WT_TREE_EVICT;
@@ -549,6 +556,16 @@ __wt_evict_file(WT_SESSION_IMPL *session, int syncop)
 				break;
 			/* FALLTHROUGH */
 		case WT_SYNC:
+			/*
+			 * We know we got all of the leaf pages on the first
+			 * pass.  Any updates in the meantime can't be part of
+			 * the checkpoint.  Skip them to keep the locked part
+			 * of checkpoint as fast as possible.
+			 */
+			if (syncop == WT_SYNC &&
+			    page->type != WT_PAGE_ROW_INT &&
+			    page->type != WT_PAGE_COL_INT)
+				break;
 		case WT_SYNC_DISCARD:
 			/* Write dirty pages for sync and sync with discard. */
 			if (__wt_page_is_modified(page))
