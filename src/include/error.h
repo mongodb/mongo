@@ -77,6 +77,10 @@
 		ret = __ret;						\
 } while (0)
 
+/* Test for expected error returns. */
+#define	WT_IS_ERROR(v)							\
+	((v) != 0 && (v) != WT_DUPLICATE_KEY && (v) != WT_NOTFOUND)
+
 /*
  * WT_ASSERT, WT_ASSERT_ERR, WT_ASSERT_RET --
  *	Assert an expression, abort in diagnostic mode, otherwise, optionally

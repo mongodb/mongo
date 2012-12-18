@@ -73,6 +73,7 @@ __wt_lsm_merge_worker(void *vargs)
 void *
 __wt_lsm_bloom_worker(void *arg)
 {
+	WT_DECL_RET;
 	WT_LSM_CHUNK *chunk;
 	WT_LSM_TREE *lsm_tree;
 	WT_LSM_WORKER_COOKIE cookie;
@@ -85,8 +86,10 @@ __wt_lsm_bloom_worker(void *arg)
 	WT_CLEAR(cookie);
 
 	for (;;) {
-		/* Ignore the return value - it is discarded anyway. */
-		if (__wt_lsm_copy_chunks(session, lsm_tree, &cookie) != 0)
+		if ((ret = __wt_lsm_copy_chunks(
+		    session, lsm_tree, &cookie)) != 0)
+			goto err;
+		if (!F_ISSET(lsm_tree, WT_LSM_TREE_WORKING))
 			goto err;
 
 		/* Create bloom filters in all checkpointed chunks. */
@@ -119,6 +122,9 @@ __wt_lsm_bloom_worker(void *arg)
 	}
 
 err:	__wt_free(session, cookie.chunk_array);
+	/* If the worker exited with failure, we can't continue. */
+	if (ret != 0)
+		(void)__wt_panic(session);
 	return (NULL);
 }
 
@@ -145,6 +151,8 @@ __wt_lsm_checkpoint_worker(void *arg)
 
 	for (;;) {
 		WT_ERR(__wt_lsm_copy_chunks(session, lsm_tree, &cookie));
+		if (!F_ISSET(lsm_tree, WT_LSM_TREE_WORKING))
+			goto err;
 
 		/* Write checkpoints in all completed files. */
 		for (i = 0, j = 0; i < cookie.nchunks - 1; i++) {
@@ -192,8 +200,10 @@ __wt_lsm_checkpoint_worker(void *arg)
 		if (j == 0)
 			__wt_sleep(0, 10000);
 	}
-
 err:	__wt_free(session, cookie.chunk_array);
+	/* If the worker exited with failure, we can't continue. */
+	if (WT_IS_ERROR(ret))
+		(void)__wt_panic(session);
 	return (NULL);
 }
 
@@ -215,9 +225,8 @@ __wt_lsm_copy_chunks(WT_SESSION_IMPL *session,
 	WT_RET(__wt_readlock(session, lsm_tree->rwlock));
 	if (!F_ISSET(lsm_tree, WT_LSM_TREE_WORKING)) {
 		WT_RET(__wt_rwunlock(session, lsm_tree->rwlock));
-
-		/* The actual error value is ignored. */
-		return (WT_ERROR);
+		cookie->nchunks = 0;
+		return (0);
 	}
 
 	/* Take a copy of the current state of the LSM tree. */

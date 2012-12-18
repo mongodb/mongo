@@ -135,6 +135,10 @@ __lsm_tree_close(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 		 */
 		__wt_free(NULL, lsm_tree->ckpt_session->hazard);
 	}
+	if (ret != 0) {
+		__wt_err(session, ret, "shutdown error while cleaning up LSM");
+		(void)__wt_panic(session);
+	}
 
 	return (ret);
 }
