@@ -463,14 +463,6 @@ namespace mongo {
                     return true;
                 }
 
-                // Make sure you have write auth to the database, otherwise you'll delete the
-                // database info from the config server before the command even reaches the shards.
-                if ( !ClientBasic::getCurrent()->getAuthenticationInfo()->isAuthorized( dbName ) ) {
-                    result.append( "errmsg",
-                                   str::stream() << "Not authorized to drop db: " << dbName );
-                    return false;
-                }
-
                 //
                 // Reload the database configuration so that we're sure a database entry exists
                 // TODO: This won't work with parallel dropping
