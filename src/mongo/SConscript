@@ -66,6 +66,7 @@ env.StaticLibrary('bson', [
         'bson/mutable/mutable_bson_internal.cpp',
         'bson/util/bson_extract.cpp',
         'util/safe_num.cpp',
+        'bson/bson_validate.cpp',
         'bson/oid.cpp',
         'db/jsobj.cpp',
         'db/json.cpp'

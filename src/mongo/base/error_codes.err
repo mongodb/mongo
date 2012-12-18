@@ -22,5 +22,7 @@ error_code("AuthenticationFailed", 18)
 error_code("CannotReuseObject", 19)
 error_code("IllegalOperation", 20)
 error_code("EmptyArrayOperation", 21)
+error_code("InvalidBSON", 22)
+
 
 error_class("NetworkError", ["HostUnreachable", "HostNotFound"])
