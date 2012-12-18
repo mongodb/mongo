@@ -139,7 +139,7 @@ namespace mongo {
         // If the parsing or index indicates this is a special query, don't continue the processing
         if (!_special.empty() ||
             ( _index->getSpec().getType() &&
-             _index->getSpec().getType()->suitability( _originalQuery, _order ) != USELESS ) ) {
+             _index->getSpec().getType()->suitability( _frs, _order ) != USELESS ) ) {
 
             _type  = _index->getSpec().getType();
             if (_special.empty()) _special = _index->getSpec().getType()->getPlugin()->getName();
@@ -1009,8 +1009,8 @@ doneCheckOrder:
                 const IndexSpec& spec = ii.getSpec();
                 // TODO(hk): Make sure we can do a $near and $within query, one using
                 // the index one using the matcher.
-                if (special.has(spec.getTypeName())
-                    && spec.suitability( _qps.originalQuery(), _qps.order())) {
+                if (special.has(spec.getTypeName()) &&
+                    spec.suitability( _qps.frsp().frsForIndex(d, j), _qps.order() ) != USELESS ) {
                     uassert( 16330, "'special' query operator not allowed", _allowSpecial );
                     _qps.setSinglePlan( newPlan( d, j, BSONObj(), BSONObj(), spec.getTypeName()));
                     return true;
@@ -1976,13 +1976,9 @@ doneCheckOrder:
             // No matches are possible in the index so the index may be useful.
             return true;   
         }
-        // Hashed index types can't use simplified query bounds, since they could turn equalities
-        // into ranges, e.g.{$in : [1,2] } into {$gte : 1 , $lte : 2}
-        // TODO: refactor suitability to take a FieldRangeSetPair, and get rid of this special case
-        // See SERVER-5858.
-        BSONObj query = ( d->idx( idxNo ).getSpec().getTypeName() == "hashed" ) ?
-                        frsp.originalQuery() : frsp.simplifiedQueryForIndex( d, idxNo, keyPattern );
-        return d->idx( idxNo ).getSpec().suitability( query, order ) != USELESS;
+
+        return d->idx( idxNo ).getSpec().suitability( frsp.frsForIndex( d , idxNo ) , order )
+               != USELESS;
     }
     
     void QueryUtilIndexed::clearIndexesForPatterns( const FieldRangeSetPair &frsp, const BSONObj &order ) {

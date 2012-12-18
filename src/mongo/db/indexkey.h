@@ -34,6 +34,7 @@ namespace mongo {
     class IndexType; // TODO: this name sucks
     class IndexPlugin;
     class IndexDetails;
+    class FieldRangeSet;
 
     enum IndexSuitability { USELESS = 0 , HELPFUL = 1 , OPTIMAL = 2 };
 
@@ -62,7 +63,15 @@ namespace mongo {
 
         const BSONObj& keyPattern() const;
 
-        virtual IndexSuitability suitability( const BSONObj& query , const BSONObj& order ) const ;
+        /* Determines the suitability level of this index for answering a given query. The query is
+         * represented as a set of constraints given by a FieldRangeSet, and a desired ordering of
+         * the output.
+         *
+         * Note: it is the responsibility of the caller to pass in the correct FieldRangeSet, which
+         * may depend upon whether this is a single or multi-key index at the time of calling.
+         */
+        virtual IndexSuitability suitability( const FieldRangeSet& queryConstraints ,
+                                              const BSONObj& order ) const;
 
         virtual bool scanAndOrderRequired( const BSONObj& query , const BSONObj& order ) const ;
 
@@ -161,7 +170,8 @@ namespace mongo {
             return _details;
         }
 
-        IndexSuitability suitability( const BSONObj& query , const BSONObj& order ) const ;
+        IndexSuitability suitability( const FieldRangeSet& queryConstraints ,
+                                      const BSONObj& order ) const ;
 
         bool isSparse() const { return _sparse; }
 
@@ -171,7 +181,8 @@ namespace mongo {
 
         int indexVersion() const;
         
-        IndexSuitability _suitability( const BSONObj& query , const BSONObj& order ) const ;
+        IndexSuitability _suitability( const FieldRangeSet& queryConstraints ,
+                                       const BSONObj& order ) const ;
 
         BSONSizeTracker _sizeTracker;
         vector<const char*> _fieldNames;

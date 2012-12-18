@@ -1482,10 +1482,6 @@ namespace mongo {
                     ).jsonString();
     }
     
-    BSONObj FieldRangeSetPair::simplifiedQueryForIndex( NamespaceDetails *d, int idxNo, const BSONObj &keyPattern ) const {
-        return frsForIndex( d, idxNo ).simplifiedQuery( keyPattern );
-    }    
-    
     void FieldRangeSetPair::assertValidIndex( const NamespaceDetails *d, int idxNo ) const {
         massert( 14048, "FieldRangeSetPair invalid index specified", idxNo >= 0 && idxNo < d->nIndexes );   
     }

@@ -23,6 +23,7 @@
 #include "../util/stringutils.h"
 #include "mongo/util/mongoutils/str.h"
 #include "../util/text.h"
+#include "mongo/db/queryutil.h"
 
 namespace mongo {
 
@@ -448,21 +449,25 @@ namespace mongo {
         return false;
     }
 
-    IndexSuitability IndexSpec::suitability( const BSONObj& query , const BSONObj& order ) const {
+    IndexSuitability IndexSpec::suitability( const FieldRangeSet& queryConstraints ,
+                                             const BSONObj& order ) const {
         if ( _indexType.get() )
-            return _indexType->suitability( query , order );
-        return _suitability( query , order );
+            return _indexType->suitability( queryConstraints , order );
+        return _suitability( queryConstraints , order );
     }
 
-    IndexSuitability IndexSpec::_suitability( const BSONObj& query , const BSONObj& order ) const {
+    IndexSuitability IndexSpec::_suitability( const FieldRangeSet& queryConstraints ,
+                                              const BSONObj& order ) const {
         // TODO: optimize
-        if ( anyElementNamesMatch( keyPattern , query ) == 0 && anyElementNamesMatch( keyPattern , order ) == 0 )
+        if ( ! anyElementNamesMatch( keyPattern , queryConstraints.simplifiedQuery(keyPattern) )  &&
+             ! anyElementNamesMatch( keyPattern , order ) )
             return USELESS;
         return HELPFUL;
     }
 
-    IndexSuitability IndexType::suitability( const BSONObj& query , const BSONObj& order ) const {
-        return _spec->_suitability( query , order );
+    IndexSuitability IndexType::suitability( const FieldRangeSet& queryConstraints ,
+                                             const BSONObj& order ) const {
+        return _spec->_suitability( queryConstraints , order );
     }
     
     int IndexSpec::indexVersion() const {

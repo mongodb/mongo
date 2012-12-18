@@ -265,7 +265,10 @@ namespace mongo {
             }
         }
 
-        virtual IndexSuitability suitability(const BSONObj& query, const BSONObj& order) const {
+        virtual IndexSuitability suitability( const FieldRangeSet& queryConstraints ,
+                                              const BSONObj& order ) const {
+            BSONObj query = queryConstraints.originalQuery();
+
             for (size_t i = 0; i < _fields.size(); ++i) {
                 const IndexedField &field = _fields[i];
                 if (IndexedField::GEO != field.type) { continue; }
