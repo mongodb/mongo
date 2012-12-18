@@ -36,7 +36,7 @@ namespace mongo {
     }
     
     TEST( LexNumCmp, Simple2 ) {
-        ASSERT( ! isNumber( (char)255 ) );
+        ASSERT( ! isdigit( (char)255 ) );
 
         assertCmp( 0, "a", "a" );
         assertCmp( -1, "a", "aa" );

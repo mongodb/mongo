@@ -317,6 +317,35 @@ namespace mongo {
         return def;
     }
 
+    /** transform a BSON array into a vector of BSONElements.
+        we match array # positions with their vector position, and ignore
+        any fields with non-numeric field names.
+        */
+    std::vector<BSONElement> BSONElement::Array() const {
+        chk(mongo::Array);
+        std::vector<BSONElement> v;
+        BSONObjIterator i(Obj());
+        while( i.more() ) {
+            BSONElement e = i.next();
+            const char *f = e.fieldName();
+
+            unsigned u;
+            Status status = parseNumberFromString( f, &u );
+            if ( status.isOK() ) {
+                verify( u < 1000000 );
+                if( u >= v.size() )
+                    v.resize(u+1);
+                v[u] = e;
+            }
+            else {
+                // ignore?
+            }
+        }
+        return v;
+    }
+
+
+
     /* Matcher --------------------------------------*/
 
 // If the element is something like:
