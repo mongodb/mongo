@@ -221,11 +221,8 @@ __wt_lsm_copy_chunks(WT_SESSION_IMPL *session,
 	cookie->nchunks = 0;
 
 	WT_RET(__wt_readlock(session, lsm_tree->rwlock));
-	if (!F_ISSET(lsm_tree, WT_LSM_TREE_WORKING)) {
-		WT_RET(__wt_rwunlock(session, lsm_tree->rwlock));
-		cookie->nchunks = 0;
-		return (0);
-	}
+	if (!F_ISSET(lsm_tree, WT_LSM_TREE_WORKING))
+		return (__wt_rwunlock(session, lsm_tree->rwlock));
 
 	/* Take a copy of the current state of the LSM tree. */
 	nchunks = lsm_tree->nchunks;
@@ -235,13 +232,14 @@ __wt_lsm_copy_chunks(WT_SESSION_IMPL *session,
 	 * increase the size of our current buffer to match.
 	 */
 	if (cookie->chunk_alloc < lsm_tree->chunk_alloc)
-		ret = __wt_realloc(session,
+		WT_ERR(__wt_realloc(session,
 		    &cookie->chunk_alloc, lsm_tree->chunk_alloc,
-		    &cookie->chunk_array);
-	if (ret == 0 && nchunks > 0)
+		    &cookie->chunk_array));
+	if (nchunks > 0)
 		memcpy(cookie->chunk_array, lsm_tree->chunk,
 		    nchunks * sizeof(*lsm_tree->chunk));
-	WT_RET(__wt_rwunlock(session, lsm_tree->rwlock));
+
+err:	WT_TRET(__wt_rwunlock(session, lsm_tree->rwlock));
 
 	if (ret == 0)
 		cookie->nchunks = nchunks;
