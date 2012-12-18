@@ -290,8 +290,7 @@ __evict_worker(WT_SESSION_IMPL *session)
 			LF_SET(WT_EVICT_DIRTY);
 		if (bytes_inuse > (cache->eviction_target * bytes_max) / 100)
 			LF_SET(WT_EVICT_CLEAN | WT_EVICT_DIRTY);
-		if (cache->disable_dirty_eviction)
-			LF_CLR(WT_EVICT_DIRTY);
+		LF_CLR(cache->disabled_eviction);
 		if (!LF_ISSET(WT_EVICT_CLEAN) && !LF_ISSET(WT_EVICT_DIRTY))
 			break;
 
@@ -488,7 +487,10 @@ __wt_evict_readonly(WT_SESSION_IMPL *session, int readonly)
 
 	cache = S2C(session)->cache;
 
-	cache->disable_dirty_eviction = readonly;
+	if (readonly)
+		FLD_SET(cache->disabled_eviction, WT_EVICT_DIRTY);
+	else
+		FLD_CLR(cache->disabled_eviction, WT_EVICT_DIRTY);
 }
 
 /*
