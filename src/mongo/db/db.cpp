@@ -250,12 +250,13 @@ namespace mongo {
         curTimeString( buf );
         toLog.append( "startTimeLocal", buf );
 
-        toLog.append( "version", versionString );
-        toLog.append( "gitVersion", gitVersion() );
-
         toLog.append( "cmdLine", CmdLine::getParsedOpts() );
         toLog.append( "pid", getpid() );
-        toLog.append( "bits", static_cast<int>(sizeof(int*) * 8) );
+
+
+        BSONObjBuilder buildinfo( toLog.subobjStart("buildinfo"));
+        appendBuildInfo(buildinfo);
+        buildinfo.doneFast();
 
         BSONObj o = toLog.obj();
 
@@ -594,6 +595,7 @@ namespace mongo {
         log() << mongodVersion() << endl;
         printGitVersion();
         printSysInfo();
+        printAllocator();
         printCommandLineOpts();
 
         {

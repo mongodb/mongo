@@ -927,12 +927,11 @@ namespace NamespaceTests {
         public:
             void run() {
                 IndexSpec spec( BSON( "a" << 1 ), BSONObj() );
-                ASSERT_EQUALS( HELPFUL,
-                              spec.suitability( BSON( "a" << 2 << "b" << 3 ), BSONObj() ) );
-                ASSERT_EQUALS( USELESS,
-                              spec.suitability( BSON( "b" << 3 ), BSONObj() ) );
-                ASSERT_EQUALS( HELPFUL,
-                              spec.suitability( BSON( "b" << 3 ), BSON( "a" << 1 ) ) );
+                FieldRangeSet frs1( "", BSON( "a" << 2 << "b" << 3 ), true , true );
+                ASSERT_EQUALS( HELPFUL, spec.suitability( frs1 , BSONObj() ) );
+                FieldRangeSet frs2( "", BSON( "b" << 3 ), true , true );
+                ASSERT_EQUALS( USELESS, spec.suitability( frs2, BSONObj() ) );
+                ASSERT_EQUALS( HELPFUL, spec.suitability( frs2, BSON( "a" << 1 ) ) );
             }
         };
         
@@ -941,12 +940,12 @@ namespace NamespaceTests {
         public:
             void run() {
                 IndexSpec spec( BSON( "1" << 1 ), BSONObj() );
-                ASSERT_EQUALS( HELPFUL,
-                              spec.suitability( BSON( "1" << 2 ), BSONObj() ) );
-                ASSERT_EQUALS( USELESS,
-                              spec.suitability( BSON( "01" << 3 ), BSON( "01" << 1 ) ) );
-                ASSERT_EQUALS( HELPFUL,
-                              spec.suitability( BSONObj(), BSON( "1" << 1 ) ) );                
+                FieldRangeSet frs1( "", BSON( "1" << 2 ), true , true );
+                ASSERT_EQUALS( HELPFUL, spec.suitability( frs1, BSONObj() ) );
+                FieldRangeSet frs2( "", BSON( "01" << 3), true , true );
+                ASSERT_EQUALS( USELESS, spec.suitability( frs2, BSON( "01" << 1 ) ) );
+                FieldRangeSet frs3( "", BSONObj() , true , true );
+                ASSERT_EQUALS( HELPFUL, spec.suitability( frs3, BSON( "1" << 1 ) ) );
             }
         };
         

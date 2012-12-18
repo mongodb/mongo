@@ -1,5 +1,6 @@
 // Providing the wrong number of fields in a pipeline stage specification triggers a parsing error.
 // SERVER-6861
+load('jstests/aggregation/extras/utils.js');
 
 t = db.jstests_server6861;
 t.drop();
@@ -7,7 +8,7 @@ t.drop();
 t.save( { a:1 } );
 
 function assertCode( code, expression ) {
-    assert.eq( code, t.aggregate( expression ).code );
+    assertErrorCode(t, expression, code);
 }
 
 function assertResult( result, expression ) {

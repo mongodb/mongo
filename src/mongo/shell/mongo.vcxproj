@@ -1203,7 +1203,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="..\client\undef_macros.h" />
     <ClInclude Include="..\db\client.h" />
     <ClInclude Include="..\db\clientcursor.h" />
-    <ClInclude Include="..\db\client_common.h" />
+    <ClInclude Include="..\db\client_basic.h" />
     <ClInclude Include="..\db\cloner.h" />
     <ClInclude Include="..\db\cmdline.h" />
     <ClInclude Include="..\db\commands.h" />

@@ -1,19 +1,19 @@
 // SERVER-6177: better error when projecting into a subfield with an existing expression
-c = db.c;
+
+// load the test utilities
+load('jstests/aggregation/extras/utils.js');
+
+var c = db.c;
 c.drop();
 
 c.save( {} );
 
-res = c.aggregate( { $project:{ 'x':{ $add:[ 1 ] }, 'x.b':1 } } );
-assert.eq(res.code, 16401);
-
 // These currently give different errors
-res = c.aggregate( { $project:{ 'x.b': 1, 'x':{ $add:[ 1 ] }} } );
-assert.eq(res.code, 16400);
+assertErrorCode(c, { $project:{ 'x':{ $add:[ 1 ] }, 'x.b':1 } }, 16401);
+assertErrorCode(c, { $project:{ 'x.b': 1, 'x':{ $add:[ 1 ] }} }, 16400);
 
 // These both give the same error however
-res = c.aggregate( { $project:{'x':{'b':1}, 'x.b': 1} } );
-assert.eq(res.code, 16400);
+assertErrorCode(c, { $project:{'x':{'b':1}, 'x.b': 1} }, 16400);
+assertErrorCode(c, { $project:{'x.b': 1, 'x':{'b':1}} }, 16400);
 
-res = c.aggregate( { $project:{'x.b': 1, 'x':{'b':1}} } );
-assert.eq(res.code, 16400);
+

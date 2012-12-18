@@ -13,8 +13,10 @@ function assertResult( expectedUpper, expectedLower, string ) {
 }
 
 function assertException( string ) {
-    assert( !t.aggregate( { $project:{ upper:{ $toUpper:string } } } ).ok );
-    assert( !t.aggregate( { $project:{ lower:{ $toLower:string } } } ).ok );
+    assert.commandFailed(t.runCommand('aggregate',
+                                      {pipeline: [{$project: {upper: {$toUpper: string}}}]}));
+    assert.commandFailed(t.runCommand('aggregate',
+                                      {pipeline: [{$project: {lower: {$toLower: string}}}]}));
 }
 
 // Wrong number of arguments.

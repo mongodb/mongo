@@ -19,7 +19,7 @@
 #pragma once
 
 #include "mongo/s/chunk_diff.h"
-#include "mongo/s/cluster_constants.h"
+#include "mongo/s/type_chunk.h"
 
 namespace mongo {
 
@@ -89,7 +89,7 @@ namespace mongo {
 
             // Open a cursor for the diff chunks
             auto_ptr<DBClientCursor> cursor = conn->get()->query(
-                    ConfigNS::chunk, diffQuery, 0, 0, 0, 0, ( DEBUG_BUILD ? 2 : 1000000 ) );
+                    ChunkType::ConfigNS, diffQuery, 0, 0, 0, 0, ( DEBUG_BUILD ? 2 : 1000000 ) );
             verify( cursor.get() );
 
             int diff = calculateConfigDiff( *cursor.get() );
@@ -130,11 +130,11 @@ namespace mongo {
 
             BSONObj diffChunkDoc = diffCursor.next();
 
-            ShardChunkVersion chunkVersion = ShardChunkVersion::fromBSON(diffChunkDoc, ChunkFields::lastmod());
+            ShardChunkVersion chunkVersion = ShardChunkVersion::fromBSON(diffChunkDoc, ChunkType::DEPRECATED_lastmod());
 
-            if( diffChunkDoc[ChunkFields::min()].type() != Object ||
-                diffChunkDoc[ChunkFields::max()].type() != Object ||
-                diffChunkDoc[ChunkFields::shard()].type() != String )
+            if( diffChunkDoc[ChunkType::min()].type() != Object ||
+                diffChunkDoc[ChunkType::max()].type() != Object ||
+                diffChunkDoc[ChunkType::shard()].type() != String )
             {
                 warning() << "got invalid chunk document " << diffChunkDoc
                           << " when trying to load differing chunks" << endl;
@@ -157,15 +157,15 @@ namespace mongo {
             if( chunkVersion > *_maxVersion ) *_maxVersion = chunkVersion;
 
             // Chunk version changes
-            ShardType shard = shardFor( diffChunkDoc[ChunkFields::shard()].String() );
+            ShardType shard = shardFor( diffChunkDoc[ChunkType::shard()].String() );
             typename map<ShardType, ShardChunkVersion>::iterator shardVersionIt = _maxShardVersions->find( shard );
             if( shardVersionIt == _maxShardVersions->end() || shardVersionIt->second < chunkVersion ){
                 (*_maxShardVersions)[ shard ] = chunkVersion;
             }
 
             // See if we need to remove any chunks we are currently tracking b/c of this chunk's changes
-            removeOverlapping(diffChunkDoc[ChunkFields::min()].Obj(),
-                              diffChunkDoc[ChunkFields::max()].Obj());
+            removeOverlapping(diffChunkDoc[ChunkType::min()].Obj(),
+                              diffChunkDoc[ChunkType::max()].Obj());
 
             // Figure out which of the new chunks we need to track
             // Important - we need to actually own this doc, in case the cursor decides to getMore or unbuffer
@@ -180,8 +180,8 @@ namespace mongo {
             BSONObj chunkDoc = *it;
 
             // Important - we need to make sure we actually own the min and max here
-            BSONObj min = chunkDoc[ChunkFields::min()].Obj().getOwned();
-            BSONObj max = chunkDoc[ChunkFields::max()].Obj().getOwned();
+            BSONObj min = chunkDoc[ChunkType::min()].Obj().getOwned();
+            BSONObj max = chunkDoc[ChunkType::max()].Obj().getOwned();
 
             // Invariant enforced by sharding
             // It's possible to read inconsistent state b/c of getMore() and yielding, so we want
@@ -218,7 +218,7 @@ namespace mongo {
         if( rand() % 2 ) numStaleMinorClauses = maxMinorVersionClauses;
 #endif
 
-        queryB.append(ChunkFields::ns(), _ns);
+        queryB.append(ChunkType::ns(), _ns);
 
         //
         // If we have only a few minor versions to refresh, we can be more selective in our query
@@ -232,7 +232,7 @@ namespace mongo {
             {
                 BSONObjBuilder queryNewB( queryOrB.subobjStart() );
                 {
-                    BSONObjBuilder ts(queryNewB.subobjStart(ChunkFields::lastmod()));
+                    BSONObjBuilder ts(queryNewB.subobjStart(ChunkType::DEPRECATED_lastmod()));
                     // We should *always* pull at least a single chunk back, this lets us quickly
                     // detect if our collection was unsharded (and most of the time if it was
                     // resharded) in the meantime
@@ -249,9 +249,9 @@ namespace mongo {
             for( typename map<ShardType, ShardChunkVersion>::const_iterator it = _maxShardVersions->begin(); it != _maxShardVersions->end(); it++ ){
 
                 BSONObjBuilder queryShardB( queryOrB.subobjStart() );
-                queryShardB.append(ChunkFields::shard(), nameFrom( it->first ) );
+                queryShardB.append(ChunkType::shard(), nameFrom( it->first ) );
                 {
-                    BSONObjBuilder ts(queryShardB.subobjStart(ChunkFields::lastmod()));
+                    BSONObjBuilder ts(queryShardB.subobjStart(ChunkType::DEPRECATED_lastmod()));
                     ts.appendTimestamp( "$gt", it->second.toLong() );
                     ts.done();
                 }
@@ -264,7 +264,7 @@ namespace mongo {
 
                 BSONObjBuilder queryShardB( queryOrB.subobjStart() );
                 {
-                    BSONObjBuilder ts(queryShardB.subobjStart(ChunkFields::lastmod()));
+                    BSONObjBuilder ts(queryShardB.subobjStart(ChunkType::DEPRECATED_lastmod()));
                     ts.appendTimestamp( "$gt", it->toLong() );
                     ts.appendTimestamp( "$lt",
                                         ShardChunkVersion( it->majorVersion() + 1, 0, OID() ).toLong() );

@@ -38,4 +38,4 @@ assert.gt( after.uptimeEstimate , before.uptimeEstimate , "up2" )
 
 
 assert.eq( db.runCommand( "buildinfo" ).gitVersion,
-           db.getSisterDB( "local" ).startup_log.find().sort( { $natural: -1 } ).limit(0)[0].gitVersion );
+           db.getSisterDB( "local" ).startup_log.find().sort( { $natural: -1 } ).limit(1).next().buildinfo.gitVersion );

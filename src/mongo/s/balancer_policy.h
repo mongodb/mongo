@@ -20,7 +20,7 @@
 #define S_BALANCER_POLICY_HEADER
 
 #include "mongo/db/jsobj.h"
-#include "mongo/s/cluster_constants.h"
+#include "mongo/s/type_chunk.h"
 
 namespace mongo {
 
@@ -33,8 +33,8 @@ namespace mongo {
             : min( a_min.getOwned() ), max( a_max.getOwned() ){}
 
         ChunkInfo( const BSONObj& chunk )
-            : min(chunk[ChunkFields::min()].Obj().getOwned()),
-              max(chunk[ChunkFields::max()].Obj().getOwned()) {
+            : min(chunk[ChunkType::min()].Obj().getOwned()),
+              max(chunk[ChunkType::max()].Obj().getOwned()) {
         }
 
         string toString() const;

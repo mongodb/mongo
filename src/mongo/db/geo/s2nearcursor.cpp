@@ -229,12 +229,12 @@ namespace mongo {
         S2Polygon polygon;
         S2Polyline line;
         S2Cell point;
-        if (GeoJSONParser::parsePolygon(obj, &polygon)) {
+        if (GeoParser::parsePolygon(obj, &polygon)) {
             them = polygon.Project(us);
-        } else if (GeoJSONParser::parseLineString(obj, &line)) {
+        } else if (GeoParser::parseLineString(obj, &line)) {
             int tmp;
             them = line.Project(us, &tmp);
-        } else if (GeoJSONParser::parsePoint(obj, &point)) {
+        } else if (GeoParser::parsePoint(obj, &point)) {
             them = point.GetCenter();
         } else {
             warning() << "unknown geometry: " << obj.toString();

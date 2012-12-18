@@ -1221,7 +1221,12 @@ namespace mongo {
     }
 
     bool DBClientConnection::recv( Message &m ) {
-        return port().recv(m);
+        if (port().recv(m)) {
+            return true;
+        }
+
+        _failed = true;
+        return false;
     }
 
     bool DBClientConnection::call( Message &toSend, Message &response, bool assertOk , string * actualServer ) {

@@ -1,5 +1,3 @@
-// client_common.h
-
 /**
 *    Copyright (C) 2008 10gen Inc.
 *
@@ -20,14 +18,14 @@
 
 #include <boost/scoped_ptr.hpp>
 
-#include "mongo/db/auth/authentication_session.h"
-#include "mongo/db/auth/authorization_manager.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/net/message_port.h"
 
 namespace mongo {
 
     class AuthenticationInfo;
+    class AuthenticationSession;
+    class AuthorizationManager;
 
     /**
      * this is the base class for Client and ClientInfo
@@ -38,28 +36,17 @@ namespace mongo {
      */
     class ClientBasic : boost::noncopyable {
     public:
-        virtual ~ClientBasic(){}
+        virtual ~ClientBasic();
         virtual const AuthenticationInfo * getAuthenticationInfo() const = 0;
         virtual AuthenticationInfo * getAuthenticationInfo() = 0;
-        AuthenticationSession* getAuthenticationSession() { return _authenticationSession.get(); }
-        void resetAuthenticationSession(AuthenticationSession* newSession) {
-            _authenticationSession.reset(newSession);
-        }
-        void swapAuthenticationSession(boost::scoped_ptr<AuthenticationSession>& other) {
-            _authenticationSession.swap(other);
-        }
-        AuthorizationManager* getAuthorizationManager() {
-            massert(16481,
-                    "No AuthorizationManager has been set up for this connection",
-                    _authorizationManager != NULL);
-            return _authorizationManager.get();
-        }
-        void setAuthorizationManager(AuthorizationManager* authorizationManager) {
-            massert(16477,
-                    "An AuthorizationManager has already been set up for this connection",
-                    _authorizationManager == NULL);
-            _authorizationManager.reset(authorizationManager);
-        }
+        AuthenticationSession* getAuthenticationSession();
+        void resetAuthenticationSession(AuthenticationSession* newSession);
+        void swapAuthenticationSession(boost::scoped_ptr<AuthenticationSession>& other);
+
+        bool hasAuthorizationManager();
+        AuthorizationManager* getAuthorizationManager();
+        void setAuthorizationManager(AuthorizationManager* authorizationManager);
+
         bool getIsLocalHostConnection() {
             if (!hasRemote()) {
                 return false;
@@ -78,7 +65,7 @@ namespace mongo {
         static bool hasCurrent();
 
     protected:
-        ClientBasic(AbstractMessagingPort* messagingPort) : _messagingPort(messagingPort) {}
+        ClientBasic(AbstractMessagingPort* messagingPort);
 
     private:
         boost::scoped_ptr<AuthenticationSession> _authenticationSession;

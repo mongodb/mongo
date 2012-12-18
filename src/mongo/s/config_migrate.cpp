@@ -18,16 +18,18 @@
 
 #include "pch.h"
 
-#include "mongo/util/net/message.h"
 #include "mongo/client/connpool.h"
-#include "mongo/client/model.h"
 #include "mongo/client/dbclientcursor.h"
-#include "mongo/db/pdfile.h"
+#include "mongo/client/model.h"
 #include "mongo/db/cmdline.h"
-#include "mongo/s/server.h"
-#include "mongo/s/config.h"
+#include "mongo/db/pdfile.h"
 #include "mongo/s/chunk.h"
-#include "mongo/s/cluster_constants.h"
+#include "mongo/s/config.h"
+#include "mongo/s/server.h"
+#include "mongo/s/type_chunk.h"
+#include "mongo/s/type_database.h"
+#include "mongo/s/type_shard.h"
+#include "mongo/util/net/message.h"
 
 namespace mongo {
 
@@ -90,14 +92,14 @@ namespace mongo {
             // shards
             {
                 unsigned n = 0;
-                auto_ptr<DBClientCursor> c = conn->query(ConfigNS::shard, BSONObj());
+                auto_ptr<DBClientCursor> c = conn->query(ShardType::ConfigNS, BSONObj());
                 while ( c->more() ) {
                     BSONObj o = c->next();
-                    string host = o[ShardFields::host()].String();
+                    string host = o[ShardType::host()].String();
 
                     string name = "";
 
-                    BSONElement id = o[ShardFields::name()];
+                    BSONElement id = o[ShardType::name()];
                     if ( id.type() == String ) {
                         name = id.String();
                     }
@@ -115,37 +117,37 @@ namespace mongo {
                 verify( n == hostToShard.size() );
                 verify( n == shards.size() );
 
-                conn->remove(ConfigNS::shard, BSONObj());
+                conn->remove(ShardType::ConfigNS, BSONObj());
 
                 for ( map<string,string>::iterator i=hostToShard.begin(); i != hostToShard.end(); i++ ) {
-                    conn->insert(ConfigNS::shard,
-                                 BSON(ShardFields::name(i->second) << ShardFields::host(i->first)));
+                    conn->insert(ShardType::ConfigNS,
+                                 BSON(ShardType::name(i->second) << ShardType::host(i->first)));
                 }
             }
 
             // databases
             {
-                auto_ptr<DBClientCursor> c = conn->query( ConfigNS::database , BSONObj() );
+                auto_ptr<DBClientCursor> c = conn->query( DatabaseType::ConfigNS , BSONObj() );
                 map<string,BSONObj> newDBs;
                 unsigned n = 0;
                 while ( c->more() ) {
                     BSONObj old = c->next();
                     n++;
 
-                    if ( old[DatabaseFields::DEPRECATED_name()].eoo() ) {
+                    if ( old[DatabaseType::DEPRECATED_name()].eoo() ) {
                         // already done
-                        newDBs[old[DatabaseFields::name()].String()] = old;
+                        newDBs[old[DatabaseType::name()].String()] = old;
                         continue;
                     }
 
                     BSONObjBuilder b(old.objsize());
-                    b.appendAs( old[DatabaseFields::DEPRECATED_name()] , DatabaseFields::name() );
+                    b.appendAs( old[DatabaseType::DEPRECATED_name()] , DatabaseType::name() );
 
                     BSONObjIterator i(old);
                     while ( i.more() ) {
                         BSONElement e = i.next();
-                        if ( strcmp( DatabaseFields::name().c_str() , e.fieldName() ) == 0 ||
-                             strcmp( DatabaseFields::DEPRECATED_name().c_str() , e.fieldName() ) == 0 ) {
+                        if ( strcmp( DatabaseType::name().c_str() , e.fieldName() ) == 0 ||
+                             strcmp( DatabaseType::DEPRECATED_name().c_str() , e.fieldName() ) == 0 ) {
                             continue;
                         }
 
@@ -154,15 +156,15 @@ namespace mongo {
 
                     BSONObj x = b.obj();
                     log() << old << "\n\t" << x << endl;
-                    newDBs[old[DatabaseFields::DEPRECATED_name()].String()] = x;
+                    newDBs[old[DatabaseType::DEPRECATED_name()].String()] = x;
                 }
 
                 verify( n == newDBs.size() );
 
-                conn->remove( ConfigNS::database , BSONObj() );
+                conn->remove( DatabaseType::ConfigNS , BSONObj() );
 
                 for ( map<string,BSONObj>::iterator i=newDBs.begin(); i!=newDBs.end(); i++ ) {
-                    conn->insert( ConfigNS::database , i->second );
+                    conn->insert( DatabaseType::ConfigNS , i->second );
                 }
 
             }
@@ -171,19 +173,19 @@ namespace mongo {
             {
                 unsigned num = 0;
                 map<string,BSONObj> chunks;
-                auto_ptr<DBClientCursor> c = conn->query(ConfigNS::chunk, BSONObj());
+                auto_ptr<DBClientCursor> c = conn->query(ChunkType::ConfigNS, BSONObj());
                 while ( c->more() ) {
                     BSONObj x = c->next();
                     BSONObjBuilder b;
 
-                    string id = Chunk::genID(x[ChunkFields::ns()].String(),
-                                             x[ChunkFields::min()].Obj() );
+                    string id = Chunk::genID(x[ChunkType::ns()].String(),
+                                             x[ChunkType::min()].Obj() );
                     b.append( "_id" , id );
 
                     BSONObjIterator i(x);
                     while ( i.more() ) {
                         BSONElement e = i.next();
-                        if (strcmp(e.fieldName(), ChunkFields::name().c_str()) == 0)
+                        if (strcmp(e.fieldName(), ChunkType::name().c_str()) == 0)
                             continue;
                         b.append( e );
                     }
@@ -196,9 +198,9 @@ namespace mongo {
 
                 verify( num == chunks.size() );
 
-                conn->remove(ConfigNS::chunk , BSONObj());
+                conn->remove(ChunkType::ConfigNS , BSONObj());
                 for ( map<string,BSONObj>::iterator i=chunks.begin(); i!=chunks.end(); i++ ) {
-                    conn->insert(ConfigNS::chunk, i->second);
+                    conn->insert(ChunkType::ConfigNS, i->second);
                 }
 
             }

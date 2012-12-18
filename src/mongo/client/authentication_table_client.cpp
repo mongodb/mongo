@@ -15,7 +15,7 @@
 
 
 #include "mongo/client/authentication_table.h"
-#include "mongo/db/client_common.h"
+#include "mongo/db/client_basic.h"
 #include "mongo/db/security.h"
 
 namespace mongo {

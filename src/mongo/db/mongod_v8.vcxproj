@@ -1211,7 +1211,6 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="..\scripting\engine_v8.cpp" />
     <ClCompile Include="..\scripting\v8_db.cpp" />
     <ClCompile Include="..\scripting\v8_utils.cpp" />
-    <ClCompile Include="..\s\cluster_constants.cpp" />
     <ClCompile Include="..\s\collection_manager.cpp" />
     <ClCompile Include="..\s\default_version.cpp" />
     <ClCompile Include="..\..\third_party\pcre-8.30\pcrecpp.cc" />
@@ -1807,7 +1806,6 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="..\scripting\bench.h" />
     <ClInclude Include="..\scripting\bson_template_evaluator.h" />
     <ClInclude Include="..\s\chunk.h" />
-    <ClInclude Include="..\s\cluster_constants.h" />
     <ClInclude Include="..\s\collection_manager.h" />
     <ClInclude Include="..\s\config.h" />
     <ClInclude Include="..\s\d_chunk_manager.h" />
@@ -1879,7 +1877,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="btreeposition.h" />
     <ClInclude Include="btree_stats.h" />
     <ClInclude Include="cc_by_loc.h" />
-    <ClInclude Include="client_common.h" />
+    <ClInclude Include="client_basic.h" />
     <ClInclude Include="cloner.h" />
     <ClInclude Include="collection.h" />
     <ClInclude Include="commands\fail_point_cmd.h" />

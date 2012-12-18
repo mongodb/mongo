@@ -194,7 +194,9 @@ namespace mongo {
             extents.push_back(L);
         log() << "compact " << extents.size() << " extents" << endl;
 
-        ProgressMeterHolder pm( cc().curop()->setMessage( "compact extent" , extents.size() ) );
+        ProgressMeterHolder pm(cc().curop()->setMessage("compact extent",
+                                                        "Extent Compating Progress",
+                                                        extents.size()));
 
         // same data, but might perform a little different after compact?
         NamespaceDetailsTransient::get(ns).clearQueryCache();

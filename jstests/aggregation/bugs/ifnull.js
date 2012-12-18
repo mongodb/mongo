@@ -1,5 +1,6 @@
 // $ifNull returns the result of the first expression if not null or undefined, otherwise of the
 // second expression.
+load('jstests/aggregation/extras/utils.js');
 
 t = db.jstests_aggregation_ifnull;
 t.drop();
@@ -7,8 +8,7 @@ t.drop();
 t.save( {} );
 
 function assertError( expectedErrorCode, ifNullSpec ) {
-    assert.eq( expectedErrorCode,
-               t.aggregate( { $project:{ a:{ $ifNull:ifNullSpec } } } ).code );    
+    assertErrorCode(t, {$project: {a: {$ifNull: ifNullSpec}}}, expectedErrorCode)
 }
 
 function assertResult( expectedResult, arg0, arg1 ) {

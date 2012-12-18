@@ -74,7 +74,8 @@ namespace mongo {
          *   {b : 3} USELESS
          *   {a : {$gt : 3}} USELESS
          */
-        IndexSuitability suitability( const BSONObj& query , const BSONObj& order ) const;
+        IndexSuitability suitability( const FieldRangeSet& queryConstraints ,
+                                      const BSONObj& order ) const;
 
         /* The input is "obj" which should have a field corresponding to the hashedfield.
          * The output is a BSONObj with a single BSONElement whose value is the hash

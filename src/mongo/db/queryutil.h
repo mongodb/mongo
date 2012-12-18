@@ -645,7 +645,6 @@ namespace mongo {
         void assertValidIndex( const NamespaceDetails *d, int idxNo ) const;
         void assertValidIndexOrNoIndex( const NamespaceDetails *d, int idxNo ) const;
         /** matchPossibleForIndex() must be true. */
-        BSONObj simplifiedQueryForIndex( NamespaceDetails *d, int idxNo, const BSONObj &keyPattern ) const;        
         FieldRangeSet _singleKey;
         FieldRangeSet _multiKey;
         friend class OrRangeGenerator;

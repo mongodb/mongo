@@ -86,7 +86,10 @@ namespace IndexUpdateTests {
             IndexDetails& id = addIndexWithInfo();
             // Create a SortPhaseOne.
             SortPhaseOne phaseOne;
-            ProgressMeterHolder pm( cc().curop()->setMessage( "AddKeysToPhaseOne", nDocs, nDocs ) );
+            ProgressMeterHolder pm (cc().curop()->setMessage("AddKeysToPhaseOne",
+                                                             "AddKeysToPhaseOne Progress",
+                                                             nDocs,
+                                                             nDocs));
             // Add keys to phaseOne.
             addKeysToPhaseOne( _ns, id, BSON( "a" << 1 ), &phaseOne, nDocs, pm.get(), true );
             // Keys for all documents were added to phaseOne.
@@ -110,9 +113,10 @@ namespace IndexUpdateTests {
             IndexDetails& id = addIndexWithInfo();
             // Create a SortPhaseOne.
             SortPhaseOne phaseOne;
-            ProgressMeterHolder pm( cc().curop()->setMessage( "InterruptAddKeysToPhaseOne",
-                                                              nDocs,
-                                                              nDocs ) );
+            ProgressMeterHolder pm (cc().curop()->setMessage("InterruptAddKeysToPhaseOne",
+                                                             "InterruptAddKeysToPhaseOne Progress",
+                                                             nDocs,
+                                                             nDocs));
             // Register a request to kill the current operation.
             cc().curop()->kill();
             if ( _mayInterrupt ) {
@@ -165,7 +169,10 @@ namespace IndexUpdateTests {
             // Set up remaining arguments.
             set<DiskLoc> dups;
             CurOp* op = cc().curop();
-            ProgressMeterHolder pm( op->setMessage( "BuildBottomUp", nKeys, nKeys ) );
+            ProgressMeterHolder pm (op->setMessage("BuildBottomUp",
+                                                   "BuildBottomUp Progress",
+                                                   nKeys,
+                                                   nKeys));
             pm.finished();
             Timer timer;
             // The index's root has not yet been set.
@@ -226,7 +233,10 @@ namespace IndexUpdateTests {
             // Set up remaining arguments.
             set<DiskLoc> dups;
             CurOp* op = cc().curop();
-            ProgressMeterHolder pm( op->setMessage( "InterruptBuildBottomUp", nKeys, nKeys ) );
+            ProgressMeterHolder pm (op->setMessage("InterruptBuildBottomUp",
+                                                   "InterruptBuildBottomUp Progress",
+                                                   nKeys,
+                                                   nKeys));
             pm.finished();
             Timer timer;
             // The index's root has not yet been set.

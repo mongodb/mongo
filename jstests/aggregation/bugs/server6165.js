@@ -18,8 +18,7 @@ db.s6165.save({});
 // Aggregate checking various combinations of number types
 // The $match portion ensures they are of the correct type as the shell turns 
 // the ints back to doubles at the end so we can not check types with asserts
-var s6165 = db.runCommand(
-    {aggregate: "s6165", pipeline: [
+var s6165 = db.s6165.aggregate(
         { $project: {
             _id: 0,
             dub_dub: {$mod: [138.5, 3.0]},
@@ -54,7 +53,7 @@ var s6165 = db.runCommand(
             long_long: {$type: 18},
             verylong_verylong: {$type: 18}
         }}
-]});
+);
 
 // Correct answers (it is mainly the types that are important here)
 var s6165result = [

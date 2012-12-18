@@ -26,6 +26,9 @@ buildinfo_template = '''
 
 namespace mongo {
     const char * gitVersion() { return "%(git_version)s"; }
+    const char * allocator() { return "%(allocator)s"; }
+    const char * loaderFlags() { return "%(loader_flags)s"; }
+    const char * compilerFlags() { return "%(compiler_flags)s"; }
     std::string sysInfo() { return "%(sys_info)s BOOST_LIB_VERSION=" BOOST_LIB_VERSION ; }
 }  // namespace mongo
 '''
@@ -36,7 +39,12 @@ def generate_buildinfo(env, target, source, **kw):
         git_version += " modules: " + ", ".join(env["MONGO_MODULES"])
 
     contents = str(source[0]) % dict(git_version=git_version,
-                                     sys_info=getSysInfo())
+                                     sys_info=getSysInfo(),
+                                     allocator=GetOption('allocator'),
+                                     loader_flags=env.subst('$LINKFLAGS $LDFLAGS',
+                                                            source=source, target=target),
+                                     compiler_flags=env.subst('$CXXFLAGS $CCFLAGS $CFLAGS',
+                                                              source=source, target=target))
     out = open(str(target[0]), 'wb')
     try:
         out.write(contents)

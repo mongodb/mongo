@@ -16,6 +16,8 @@
  * 5) Assert that all four position return the expected error
  */
 
+load('jstests/aggregation/extras/utils.js');
+
 // Use aggdb
 db = db.getSiblingDB('aggdb');
 
@@ -25,40 +27,17 @@ db.agg.insert({key: "string", value: 17});
 db.agg.insert({key: "yarn", value: 42});
 
 // As pipeline
-var s6045p1 = db.runCommand({aggregate:"aggtype", pipeline: [{}]});
+assertErrorCode(db.agg, [{}], 16435);
 // Start of pipeline
-var s6045p2 = db.runCommand({aggregate:"aggtype", pipeline: [
-                           { $project : {
-                               value : 1,
-                           } },
-                           {}
-                           ]});
+assertErrorCode(db.agg, [{$project: {value: 1}}
+                        ,{}
+                        ], 16435);
 // End of pipeline
-var s6045p3 = db.runCommand({aggregate:"aggtype", pipeline: [
-                           {},
-                           { $project : {
-                               value : 1,
-                           } }
-                           ]});
+assertErrorCode(db.agg, [{}
+                        ,{$project: {value: 1}}
+                        ], 16435);
 // Middle of pipeline
-var s6045p4 = db.runCommand({aggregate:"aggtype", pipeline: [
-                           { $project : {
-                               value : 1,
-                           } },
-                           {},
-                           { $project : {
-                               value : 1,
-                           } }
-                           ]});
-// Expected result
-var a6045 = {
-    "errmsg" : "exception: A pipeline stage specification object must contain exactly one field.",
-    "code" : 16435,
-    "ok" : 0
-};
-
-// Asserts
-assert.eq(s6045p1, a6045, 'server6045 failed' + s6045p1);
-assert.eq(s6045p2, a6045, 'server6045 failed' + s6045p2);
-assert.eq(s6045p3, a6045, 'server6045 failed' + s6045p3);
-assert.eq(s6045p4, a6045, 'server6045 failed' + s6045p4);
+assertErrorCode(db.agg, [{$project: {value: 1}}
+                        ,{}
+                        ,{$project: {value: 1}}
+                        ], 16435);

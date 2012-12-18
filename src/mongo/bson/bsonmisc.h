@@ -17,6 +17,8 @@
 
 #pragma once
 
+#include <memory>
+
 #include "mongo/bson/bsonelement.h"
 
 namespace mongo {

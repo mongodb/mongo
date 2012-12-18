@@ -23,6 +23,7 @@
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/privilege.h"
+#include "mongo/db/client_basic.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -155,10 +156,33 @@ namespace mongo {
     public:
         static const map<string,Command*>* commandsByBestName() { return _commandsByBestName; }
         static const map<string,Command*>* webCommands() { return _webCommands; }
-        /** @return if command was found and executed */
-        static bool runAgainstRegistered(const char *ns, BSONObj& jsobj, BSONObjBuilder& anObjBuilder, int queryOptions = 0);
+        /** @return if command was found */
+        static void runAgainstRegistered(const char *ns,
+                                         BSONObj& jsobj,
+                                         BSONObjBuilder& anObjBuilder,
+                                         int queryOptions = 0);
         static LockType locktype( const string& name );
         static Command * findCommand( const string& name );
+        // For mongod and webserver.
+        static void execCommand(Command* c,
+                                Client& client,
+                                int queryOptions,
+                                const char *ns,
+                                BSONObj& cmdObj,
+                                BSONObjBuilder& result,
+                                bool fromRepl );
+        // For mongos
+        static void execCommandClientBasic(Command* c,
+                                           ClientBasic& client,
+                                           int queryOptions,
+                                           const char *ns,
+                                           BSONObj& cmdObj,
+                                           BSONObjBuilder& result,
+                                           bool fromRepl );
+
+        // Helper for setting errmsg and ok field in command result object.
+        static void appendCommandStatus(BSONObjBuilder& result, bool ok, const std::string& errmsg);
+
         // Set by command line.  Controls whether or not testing-only commands should be available.
         static int testCommandsEnabled;
     };

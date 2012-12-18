@@ -237,7 +237,8 @@ namespace mongo {
             if( prefixIn == "" && ! obj[ "version" ].eoo() ){
                 prefix = (string)"version";
             }
-            /// TODO: use ChunkFields::lastmod()
+            // TODO: use ChunkType::DEPRECATED_lastmod()
+            // NOTE: type_chunk.h includes this file
             else if( prefixIn == "" && ! obj["lastmod"].eoo() ){
                 prefix = (string)"lastmod";
             }

@@ -25,6 +25,7 @@
 #include <boost/scoped_ptr.hpp>
 #include <boost/thread/tss.hpp>
 
+#include "mongo/base/status.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/debug_util.h"
@@ -247,6 +248,10 @@ namespace mongo {
         static std::vector<Tee*> * globalTees;
         static bool isSyslog;
     public:
+        // Type for optional function for inserting context information in log messages.  See
+        // registerExtraLogContextFn, below.
+        typedef void (*ExtraLogContextFn)(BufBuilder& builder);
+
         static void logLockless( const StringData& s );
 
         static void setLogFile(FILE* f);
@@ -339,6 +344,11 @@ namespace mongo {
         void indentDec(){ indent--; }
         int getIndent() const { return indent; }
 
+        // Replace any pre-existing function for appending context information to log lines with
+        // "contextFn".  Returns Status::OK on first call, and ErrorCodes::AlreadyInitialized if
+        // called more than once.  Returns ErrorCodes::BadValue if contextFn is NULL.
+        static Status registerExtraLogContextFn(ExtraLogContextFn contextFn);
+
     private:
         static boost::thread_specific_ptr<Logstream> tsp;
         Logstream() {
@@ -349,6 +359,7 @@ namespace mongo {
             ss.str("");
             logLevel = LL_INFO;
         }
+
     public:
         static Logstream& get();
     };

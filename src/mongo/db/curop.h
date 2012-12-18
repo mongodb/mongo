@@ -218,7 +218,10 @@ namespace mongo {
         Client * getClient() const { return _client; }
         BSONObj info();
         string getRemoteString( bool includePort = true ) { return _remote.toString(includePort); }
-        ProgressMeter& setMessage( const char * msg , unsigned long long progressMeterTotal = 0 , int secondsBetween = 3 );
+        ProgressMeter& setMessage(const char * msg,
+                                  std::string name = "Progress",
+                                  unsigned long long progressMeterTotal = 0,
+                                  int secondsBetween = 3);
         string getMessage() const { return _message.toString(); }
         ProgressMeter& getProgressMeter() { return _progressMeter; }
         CurOp *parent() const { return _wrapped; }

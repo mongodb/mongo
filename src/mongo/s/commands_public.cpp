@@ -463,14 +463,6 @@ namespace mongo {
                     return true;
                 }
 
-                // Make sure you have write auth to the database, otherwise you'll delete the
-                // database info from the config server before the command even reaches the shards.
-                if ( !ClientBasic::getCurrent()->getAuthenticationInfo()->isAuthorized( dbName ) ) {
-                    result.append( "errmsg",
-                                   str::stream() << "Not authorized to drop db: " << dbName );
-                    return false;
-                }
-
                 //
                 // Reload the database configuration so that we're sure a database entry exists
                 // TODO: This won't work with parallel dropping
@@ -1862,90 +1854,26 @@ namespace mongo {
 
     } // namespace pub_grid_cmds
 
-    bool Command::runAgainstRegistered(const char *ns, BSONObj& jsobj, BSONObjBuilder& anObjBuilder, int queryOptions) {
-        const char *p = strchr(ns, '.');
-        if ( !p ) return false;
-        if ( strcmp(p, ".$cmd") != 0 ) return false;
-
-        bool ok = true;
+    void Command::runAgainstRegistered(const char *ns, BSONObj& jsobj, BSONObjBuilder& anObjBuilder,
+                                       int queryOptions) {
+        // It should be impossible for this uassert to fail since there should be no way to get into
+        // this function with any other collection name.
+        uassert(16618,
+                "Illegal attempt to run a command against a namespace other than $cmd.",
+                NamespaceString(ns).coll == "$cmd");
 
         BSONElement e = jsobj.firstElement();
-        map<string,Command*>::iterator i;
-
-        if ( e.eoo() )
-            ;
-        // check for properly registered command objects.
-        else if ( (i = _commands->find(e.fieldName())) != _commands->end() ) {
-            string errmsg;
-            Command *c = i->second;
-            ClientInfo *client = ClientInfo::get();
-            AuthenticationInfo *ai = client->getAuthenticationInfo();
-
-            char cl[256];
-            nsToDatabase(ns, cl);
-            if (!noauth) {
-                std::vector<Privilege> privileges;
-                c->addRequiredPrivileges(cl, jsobj, &privileges);
-                AuthorizationManager* authManager = client->getAuthorizationManager();
-                if (c->requiresAuth() && (!authManager->checkAuthForPrivileges(privileges).isOK()
-                                || !ai->isAuthorizedForLock(cl, c->locktype()))) {
-                    ok = false;
-                    errmsg = "unauthorized";
-                    anObjBuilder.append("note", str::stream() << "not authorized for command: " <<
-                                        e.fieldName() << " on database " << cl);
-                }
-            }
-            if (ok && c->adminOnly() && c->localHostOnlyIfNoAuth(jsobj) && noauth &&
-                    !ai->isLocalHost()) {
-                ok = false;
-                errmsg = "unauthorized: this command must run from localhost when running db without auth";
-                log() << "command denied: " << jsobj.toString() << endl;
-            }
-            if (ok && c->adminOnly() && !startsWith(ns, "admin.")) {
-                ok = false;
-                errmsg = "access denied - use admin db";
-            }
-            if (ok && jsobj.getBoolField("help")) {
-                stringstream help;
-                help << "help for: " << e.fieldName() << " ";
-                c->help( help );
-                anObjBuilder.append( "help" , help.str() );
-            }
-            if (ok) {
-                try {
-                    ok = c->run( nsToDatabase( ns ) , jsobj, queryOptions, errmsg, anObjBuilder, false );
-                }
-                catch (DBException& e) {
-                    ok = false;
-                    int code = e.getCode();
-                    if (code == RecvStaleConfigCode) { // code for StaleConfigException
-                        throw;
-                    }
-
-                    {
-                        stringstream ss;
-                        ss << "exception: " << e.what();
-                        anObjBuilder.append( "errmsg" , ss.str() );
-                        anObjBuilder.append( "code" , code );
-                    }
-                }
-            }
-
-            BSONObj tmp = anObjBuilder.asTempObj();
-            bool have_ok = tmp.hasField("ok");
-            bool have_errmsg = tmp.hasField("errmsg");
-
-            if (!have_ok)
-                anObjBuilder.append( "ok" , ok ? 1.0 : 0.0 );
-
-            if ( !ok && !have_errmsg) {
-                anObjBuilder.append("errmsg", errmsg);
-                setLastError(0, errmsg.c_str());
-            }
-            return true;
+        std::string commandName = e.fieldName();
+        Command* c = e.type() ? Command::findCommand(commandName) : NULL;
+        if (!c) {
+            Command::appendCommandStatus(anObjBuilder,
+                                         false,
+                                         str::stream() << "no such cmd: " << commandName);
+            return;
         }
+        ClientInfo *client = ClientInfo::get();
 
-        return false;
+        execCommandClientBasic(c, *client, queryOptions, ns, jsobj, anObjBuilder, false);
     }
 
 } // namespace mongo

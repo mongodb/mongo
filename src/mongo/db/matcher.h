@@ -22,7 +22,7 @@
 
 #include "jsobj.h"
 #include "pcrecpp.h"
-#include "geo/shapes.h"
+#include "mongo/db/geo/geoparser.h"
 
 namespace mongo {
 
@@ -70,39 +70,24 @@ namespace mongo {
     public:
         const string& getFieldName() const { return _fieldName; }
 
-        static GeoMatcher makeBox(const string& field, const BSONObj &min, const BSONObj &max,
-                                  bool isNot) {
+        static GeoMatcher makeBoxMatcher(const string& field, const BSONObj &obj, bool isNot) {
             GeoMatcher m(field, isNot);
             m._isBox = true;
-            uassert(16511, "Malformed coord: " + min.toString(), pointFrom(min, &m._box._min));
-            uassert(16512, "Malformed coord: " + max.toString(), pointFrom(max, &m._box._max));
+            GeoParser::parseLegacyBox(obj, &m._box);
             return m;
         }
 
-        static GeoMatcher makeCircle(const string& field, const BSONObj &center, double rad,
-                                     bool isNot) {
+        static GeoMatcher makeCircleMatcher(const string& field, const BSONObj &obj, bool isNot) {
             GeoMatcher m(field, isNot);
             m._isCircle = true;
-            uassert(16513, "Malformed coord: " + center.toString(), pointFrom(center, &m._center));
-            m._radius = rad;
+            GeoParser::parseLegacyCenter(obj, &m._center, &m._radius);
             return m;
         }
 
-        static GeoMatcher makePolygon(const string& field, const BSONObj &poly,
-                                      bool isNot) {
+        static GeoMatcher makePolygonMatcher(const string& field, const BSONObj &obj, bool isNot) {
             GeoMatcher m(field, isNot);
-            vector<Point> points;
-
             m._isPolygon = true;
-            BSONObjIterator coordIt(poly);
-            while (coordIt.more()) {
-                BSONElement coord = coordIt.next();
-                BSONObj obj = coord.Obj();
-                Point p;
-                uassert(16514, "Malformed coord: " + obj.toString(), pointFrom(obj, &p));
-                points.push_back(p);
-            }
-            m._polygon = Polygon(points);
+            GeoParser::parseLegacyPolygon(obj, &m._polygon);
             return m;
         }
 
@@ -133,14 +118,8 @@ namespace mongo {
         }
 
         static bool pointFrom(const BSONObj o, Point *p) {
-            BSONObjIterator i(o);
-            if (!i.more()) { return false; }
-            BSONElement xe = i.next();
-            if (!i.more()) { return false; }
-            BSONElement ye = i.next();
-            if (!xe.isNumber() || !ye.isNumber()) { return false; }
-            p->x = xe.number();
-            p->y = ye.number();
+            if (!GeoParser::isLegacyPoint(o)) { return false; }
+            GeoParser::parseLegacyPoint(o, p);
             return true;
         }
     };

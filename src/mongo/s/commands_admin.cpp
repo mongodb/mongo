@@ -28,19 +28,21 @@
 #include "mongo/db/stats/counters.h"
 #include "mongo/s/chunk.h"
 #include "mongo/s/client_info.h"
-#include "mongo/s/cluster_constants.h"
 #include "mongo/s/config.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/stats.h"
 #include "mongo/s/strategy.h"
+#include "mongo/s/type_chunk.h"
+#include "mongo/s/type_database.h"
+#include "mongo/s/type_shard.h"
 #include "mongo/s/writeback_listener.h"
-#include "mongo/util/net/message.h"
 #include "mongo/util/net/listen.h"
+#include "mongo/util/net/message.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/ramlog.h"
 #include "mongo/util/stringutils.h"
-#include "mongo/util/version.h"
 #include "mongo/util/timer.h"
+#include "mongo/util/version.h"
 
 namespace mongo {
 
@@ -106,11 +108,6 @@ namespace mongo {
                 out->push_back(Privilege(AuthorizationManager::CLUSTER_RESOURCE_NAME, actions));
             }
             bool run(const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
-                if ( !ClientBasic::getCurrent()->getAuthenticationInfo()->isAuthorized("admin") ) {
-                    errmsg = "unauthorized. Need admin authentication for flushRouterConfig. ";
-                    return false;
-                }
-
                 grid.flushConfig();
                 result.appendBool( "flushed" , true );
                 return true;
@@ -336,12 +333,6 @@ namespace mongo {
                 out->push_back(Privilege(AuthorizationManager::CLUSTER_RESOURCE_NAME, actions));
             }
             bool run(const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
-                if ( !ClientBasic::getCurrent()->getAuthenticationInfo()->isAuthorized("admin") ) {
-                    errmsg = "unauthorized. Need admin authentication to enable sharding on a "
-                        "database";
-                    return false;
-                }
-
                 string dbname = cmdObj.firstElement().valuestrsafe();
                 if ( dbname.size() == 0 ) {
                     errmsg = "no db";
@@ -393,11 +384,6 @@ namespace mongo {
                 out->push_back(Privilege(AuthorizationManager::CLUSTER_RESOURCE_NAME, actions));
             }
             bool run(const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
-                if ( !ClientBasic::getCurrent()->getAuthenticationInfo()->isAuthorized("admin") ) {
-                    errmsg = "unauthorized. Need admin authentication to shard a collection";
-                    return false;
-                }
-
                 const string ns = cmdObj.firstElement().valuestrsafe();
                 if ( ns.size() == 0 ) {
                     errmsg = "no ns";
@@ -797,11 +783,6 @@ namespace mongo {
                 out->push_back(Privilege(AuthorizationManager::CLUSTER_RESOURCE_NAME, actions));
             }
             bool run(const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
-                if ( !ClientBasic::getCurrent()->getAuthenticationInfo()->isAuthorized("admin") ) {
-                    errmsg = "unauthorized. Need admin authentication to split a chunk ";
-                    return false;
-                }
-
                 if ( ! okForConfigChanges( errmsg ) )
                     return false;
 
@@ -890,11 +871,6 @@ namespace mongo {
                 out->push_back(Privilege(AuthorizationManager::CLUSTER_RESOURCE_NAME, actions));
             }
             bool run(const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
-                if ( !ClientBasic::getCurrent()->getAuthenticationInfo()->isAuthorized("admin") ) {
-                    errmsg = "unauthorized. Need admin authentication to move a chunk ";
-                    return false;
-                }
-
                 if ( ! okForConfigChanges( errmsg ) )
                     return false;
 
@@ -999,7 +975,7 @@ namespace mongo {
                                 configServer.getPrimary().getConnString(), 30));
 
                 vector<BSONObj> all;
-                auto_ptr<DBClientCursor> cursor = conn->get()->query( ConfigNS::shard , BSONObj() );
+                auto_ptr<DBClientCursor> cursor = conn->get()->query( ShardType::ConfigNS , BSONObj() );
                 while ( cursor->more() ) {
                     BSONObj o = cursor->next();
                     all.push_back( o );
@@ -1028,12 +1004,6 @@ namespace mongo {
             }
             bool run(const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
                 errmsg.clear();
-
-                if ( !ClientBasic::getCurrent()->getAuthenticationInfo()->isAuthorized("admin") ) {
-                    errmsg = "unauthorized. Need admin authentication to add a shard";
-                    log() << "addshard request " << cmdObj << " failed:" << errmsg << endl;
-                    return false;
-                }
 
                 // get replica set component hosts
                 ConnectionString servers = ConnectionString::parse( cmdObj.firstElement().valuestrsafe() , errmsg );
@@ -1069,8 +1039,8 @@ namespace mongo {
 
                 // maxSize is the space usage cap in a shard in MBs
                 long long maxSize = 0;
-                if ( cmdObj[ ShardFields::maxSize() ].isNumber() ) {
-                    maxSize = cmdObj[ ShardFields::maxSize() ].numberLong();
+                if ( cmdObj[ ShardType::maxSize() ].isNumber() ) {
+                    maxSize = cmdObj[ ShardType::maxSize() ].numberLong();
                 }
 
                 if ( ! grid.addShard( &name , servers , maxSize , errmsg ) ) {
@@ -1101,11 +1071,6 @@ namespace mongo {
                 out->push_back(Privilege(AuthorizationManager::CLUSTER_RESOURCE_NAME, actions));
             }
             bool run(const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
-                if ( !ClientBasic::getCurrent()->getAuthenticationInfo()->isAuthorized("admin") ) {
-                    errmsg = "unauthorized. Need admin authentication to remove a shard ";
-                    return false;
-                }
-
                 string target = cmdObj.firstElement().valuestrsafe();
                 Shard s = Shard::make( target );
                 if ( ! grid.knowAboutShard( s.getConnString() ) ) {
@@ -1118,25 +1083,25 @@ namespace mongo {
                                 configServer.getPrimary().getConnString(), 30));
                 ScopedDbConnection& conn = *connPtr;
 
-                if (conn->count(ConfigNS::shard,
-                                BSON(ShardFields::name() << NE << s.getName() <<
-                                     ShardFields::draining(true)))){
+                if (conn->count(ShardType::ConfigNS,
+                                BSON(ShardType::name() << NE << s.getName() <<
+                                     ShardType::draining(true)))){
                     conn.done();
                     errmsg = "Can't have more than one draining shard at a time";
                     return false;
                 }
 
-                if (conn->count(ConfigNS::shard, BSON(ShardFields::name() << NE << s.getName())) == 0){
+                if (conn->count(ShardType::ConfigNS, BSON(ShardType::name() << NE << s.getName())) == 0){
                     conn.done();
                     errmsg = "Can't remove last shard";
                     return false;
                 }
 
-                BSONObj primaryDoc = BSON(DatabaseFields::name.ne("local") <<
-                                          DatabaseFields::primary(s.getName()));
+                BSONObj primaryDoc = BSON(DatabaseType::name.ne("local") <<
+                                          DatabaseType::primary(s.getName()));
                 BSONObj dbInfo; // appended at end of result on success
                 {
-                    boost::scoped_ptr<DBClientCursor> cursor (conn->query(ConfigNS::database, primaryDoc));
+                    boost::scoped_ptr<DBClientCursor> cursor (conn->query(DatabaseType::ConfigNS, primaryDoc));
                     if (cursor->more()) { // skip block and allocations if empty
                         BSONObjBuilder dbInfoBuilder;
                         dbInfoBuilder.append("note", "you need to drop or movePrimary these databases");
@@ -1144,7 +1109,7 @@ namespace mongo {
 
                         while (cursor->more()){
                             BSONObj db = cursor->nextSafe();
-                            dbs.append(db[DatabaseFields::name()]);
+                            dbs.append(db[DatabaseType::name()]);
                         }
                         dbs.doneFast();
 
@@ -1153,16 +1118,16 @@ namespace mongo {
                 }
 
                 // If the server is not yet draining chunks, put it in draining mode.
-                BSONObj searchDoc = BSON(ShardFields::name() << s.getName());
-                BSONObj drainingDoc = BSON(ShardFields::name() << s.getName() << ShardFields::draining(true));
-                BSONObj shardDoc = conn->findOne(ConfigNS::shard, drainingDoc);
+                BSONObj searchDoc = BSON(ShardType::name() << s.getName());
+                BSONObj drainingDoc = BSON(ShardType::name() << s.getName() << ShardType::draining(true));
+                BSONObj shardDoc = conn->findOne(ShardType::ConfigNS, drainingDoc);
                 if ( shardDoc.isEmpty() ) {
 
                     // TODO prevent move chunks to this shard.
 
                     log() << "going to start draining shard: " << s.getName() << endl;
-                    BSONObj newStatus = BSON( "$set" << BSON( ShardFields::draining(true) ) );
-                    conn->update( ConfigNS::shard , searchDoc , newStatus, false /* do no upsert */);
+                    BSONObj newStatus = BSON( "$set" << BSON( ShardType::draining(true) ) );
+                    conn->update( ShardType::ConfigNS , searchDoc , newStatus, false /* do no upsert */);
 
                     errmsg = conn->getLastError();
                     if ( errmsg.size() ) {
@@ -1170,12 +1135,12 @@ namespace mongo {
                         return false;
                     }
 
-                    BSONObj primaryLocalDoc = BSON(DatabaseFields::name("local") <<
-                                                   DatabaseFields::primary(s.getName()));
+                    BSONObj primaryLocalDoc = BSON(DatabaseType::name("local") <<
+                                                   DatabaseType::primary(s.getName()));
                     PRINT(primaryLocalDoc);
-                    if (conn->count(ConfigNS::database, primaryLocalDoc)) {
+                    if (conn->count(DatabaseType::ConfigNS, primaryLocalDoc)) {
                         log() << "This shard is listed as primary of local db. Removing entry." << endl;
-                        conn->remove(ConfigNS::database, BSON(DatabaseFields::name("local")));
+                        conn->remove(DatabaseType::ConfigNS, BSON(DatabaseType::name("local")));
                         errmsg = conn->getLastError();
                         if ( errmsg.size() ) {
                             log() << "error removing local db: " << errmsg << endl;
@@ -1195,12 +1160,12 @@ namespace mongo {
 
                 // If the server has been completely drained, remove it from the ConfigDB.
                 // Check not only for chunks but also databases.
-                BSONObj shardIDDoc = BSON(ChunkFields::shard(shardDoc[ShardFields::name()].str()));
-                long long chunkCount = conn->count(ConfigNS::chunk, shardIDDoc);
-                long long dbCount = conn->count( ConfigNS::database , primaryDoc );
+                BSONObj shardIDDoc = BSON(ChunkType::shard(shardDoc[ShardType::name()].str()));
+                long long chunkCount = conn->count(ChunkType::ConfigNS, shardIDDoc);
+                long long dbCount = conn->count( DatabaseType::ConfigNS , primaryDoc );
                 if ( ( chunkCount == 0 ) && ( dbCount == 0 ) ) {
                     log() << "going to remove shard: " << s.getName() << endl;
-                    conn->remove( ConfigNS::shard , searchDoc );
+                    conn->remove( ShardType::ConfigNS , searchDoc );
 
                     errmsg = conn->getLastError();
                     if ( errmsg.size() ) {
@@ -1208,7 +1173,7 @@ namespace mongo {
                         return false;
                     }
 
-                    string shardName = shardDoc[ ShardFields::name() ].str();
+                    string shardName = shardDoc[ ShardType::name() ].str();
                     Shard::removeShard( shardName );
                     shardConnectionPool.removeHost( shardName );
                     ReplicaSetMonitor::remove( shardName, true );
@@ -1556,11 +1521,6 @@ namespace mongo {
     }
 
     bool CmdShutdown::run(const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-        if ( !ClientBasic::getCurrent()->getAuthenticationInfo()->isAuthorized("admin") ) {
-            errmsg = "unauthorized. Need admin authentication to run shutdown";
-            return false;
-        }
-
         return shutdownHelper();
     }
 

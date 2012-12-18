@@ -149,7 +149,7 @@ namespace mongo_test {
         uint32_t _maxPoolSizePerHost;
     };
 
-    TEST_F(ShardConnFixture, BasicScopedDbConnection) {
+    TEST_F(ShardConnFixture, BasicShardConnection) {
         ShardConnection conn1(TARGET_HOST, "test.user");
         ShardConnection conn2(TARGET_HOST, "test.user");
 
@@ -208,6 +208,58 @@ namespace mongo_test {
         conn2.done();
 
         checkNewConns(assertGreaterThan, badCreationTime, 10);
+    }
+
+    TEST_F(ShardConnFixture, BadConnClearsPoolWhenKilled) {
+        ShardConnection conn1(TARGET_HOST, "test.user");
+        ShardConnection conn2(TARGET_HOST, "test.user");
+        ShardConnection conn3(TARGET_HOST, "test.user");
+
+        conn1.done();
+        killServer();
+
+        try {
+            conn3.get()->query("test.user", mongo::Query());
+        }
+        catch (const mongo::SocketException&) {
+        }
+
+        restartServer();
+
+        const uint64_t badCreationTime = conn3.get()->getSockCreationMicroSec();
+        conn3.kill();
+        // attempting to put a 'bad' connection back to the pool
+        conn2.done();
+
+        checkNewConns(assertGreaterThan, badCreationTime, 10);
+    }
+
+    TEST_F(ShardConnFixture, KilledGoodConnShouldNotClearPool) {
+        ShardConnection conn1(TARGET_HOST, "test.user");
+        ShardConnection conn2(TARGET_HOST, "test.user");
+        ShardConnection conn3(TARGET_HOST, "test.user");
+
+        const uint64_t upperBoundCreationTime =
+                conn3.get()->getSockCreationMicroSec();
+        conn3.done();
+
+        const uint64_t badCreationTime = conn1.get()->getSockCreationMicroSec();
+        conn1.kill();
+
+        conn2.done();
+
+        ShardConnection conn4(TARGET_HOST, "test.user");
+        ShardConnection conn5(TARGET_HOST, "test.user");
+
+        ASSERT_GREATER_THAN(conn4.get()->getSockCreationMicroSec(), badCreationTime);
+        ASSERT_LESS_THAN_OR_EQUALS(conn4.get()->getSockCreationMicroSec(),
+                upperBoundCreationTime);
+
+        ASSERT_GREATER_THAN(conn5.get()->getSockCreationMicroSec(), badCreationTime);
+        ASSERT_LESS_THAN_OR_EQUALS(conn5.get()->getSockCreationMicroSec(),
+                upperBoundCreationTime);
+
+        checkNewConns(assertGreaterThan, upperBoundCreationTime, 10);
     }
 
     TEST_F(ShardConnFixture, InvalidateBadConnEvenWhenPoolIsFull) {

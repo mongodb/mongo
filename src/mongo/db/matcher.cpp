@@ -378,39 +378,21 @@ namespace mongo {
             uassert(16516, "Within must be provided a BSONObj: " + elt.toString(),
                     elt.isABSONObj());
             BSONObj obj = elt.Obj();
-            BSONObjIterator coordIt(elt.Obj());
-            uassert(16517, "Malformed $within: ", coordIt.more());
 
             if (str::equals(elt.fieldName(), "$box")) {
-                BSONElement minE = coordIt.next();
-                uassert(16518, "Malformed $box: " + obj.toString(), minE.isABSONObj());
-                uassert(16519, "Malformed $box: " + obj.toString(), coordIt.more());
-                BSONElement maxE = coordIt.next();
-                uassert(16520, "Malformed $box: " + obj.toString(), minE.isABSONObj());
-                _geo.push_back(GeoMatcher::makeBox(e.fieldName(), minE.Obj(), maxE.Obj(), isNot));
+                uassert(16615, "Malformed $box: " + obj.toString(), GeoParser::isLegacyBox(obj));
+                _geo.push_back(GeoMatcher::makeBoxMatcher(e.fieldName(), obj, isNot));
             } else if (str::equals(elt.fieldName(), "$center")) {
-                BSONElement center = coordIt.next();
-                uassert(16521, "Malformed $center: " + obj.toString(), center.isABSONObj());
-                uassert(16522, "Malformed $center: " + obj.toString(), coordIt.more());
-                BSONElement radius = coordIt.next();
-                uassert(16523, "Malformed $center: " + obj.toString(), radius.isNumber());
-                _geo.push_back(
-                        GeoMatcher::makeCircle(e.fieldName(), center.Obj(), radius.number(), isNot));
+                uassert(16616, "Malformed $center: " + obj.toString(),
+                        GeoParser::isLegacyCenter(obj));
+                _geo.push_back(GeoMatcher::makeCircleMatcher(e.fieldName(), obj, isNot));
             } else if (str::equals(elt.fieldName(), "$polygon")) {
-                while (coordIt.more()) {
-                    BSONElement coord = coordIt.next();
-                    uassert(16524, "Malformed $polygon: " + obj.toString(), coord.isABSONObj());
-                    BSONObjIterator numIt(coord.Obj());
-                    uassert(16525, "Malformed $polygon: " + obj.toString(), numIt.more());
-                    BSONElement x = numIt.next();
-                    uassert(16526, "Malformed $polygon: " + obj.toString(), x.isNumber());
-                    uassert(16527, "Malformed $polygon: " + obj.toString(), numIt.more());
-                    BSONElement y = numIt.next();
-                    uassert(16528, "Malformed $polygon: " + obj.toString(), y.isNumber());
-                }
-                _geo.push_back(GeoMatcher::makePolygon(e.fieldName(), elt.Obj(), isNot));
+                uassert(16617, "Malformed $polygon: " + obj.toString(),
+                        GeoParser::isLegacyPolygon(obj));
+                _geo.push_back(GeoMatcher::makePolygonMatcher(e.fieldName(), obj, isNot));
             } else {
-                uasserted(16529, "Couldn't pull any geometry out of $within query: " + obj.toString());
+                uasserted(16529, "Couldn't pull any geometry out of $within query: "
+                                 + obj.toString());
             }
             break;
         }

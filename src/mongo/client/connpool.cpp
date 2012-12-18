@@ -59,9 +59,9 @@ namespace mongo {
     void PoolForHost::reportBadConnectionAt(uint64_t microSec) {
         if (microSec != DBClientBase::INVALID_SOCK_CREATION_TIME &&
                 microSec > _minValidCreationTimeMicroSec) {
-            log() << "Detecting bad connection created at " << _minValidCreationTimeMicroSec
-                    << " microSec, clearing pool for " << _hostName << endl;
             _minValidCreationTimeMicroSec = microSec;
+            log() << "Detected bad connection created at " << _minValidCreationTimeMicroSec
+                    << " microSec, clearing pool for " << _hostName << endl;
             clear();
         }
     }

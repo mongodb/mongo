@@ -71,6 +71,7 @@ env.StaticLibrary('bson', [
         'db/jsobj.cpp',
         'db/json.cpp'
         ], LIBDEPS=[
+        'base/base',
         'md5',
         'stringutils',
         '$BUILD_DIR/mongo/platform/platform',
@@ -266,9 +267,10 @@ env.StaticLibrary("coredb", [
         ],
                   LIBDEPS=['db/auth/serverauth',
                            'server_parameters',
-                           'geometry'])
+                           'geoparser'])
 
-coreServerFiles = [ "db/common.cpp",
+coreServerFiles = [ "db/client_basic.cpp",
+                    "db/common.cpp",
                     "util/net/miniwebserver.cpp",
                     "db/indexkey.cpp",
                     "db/stats/counters.cpp",
@@ -523,26 +525,27 @@ serverOnlyFiles += [ "s/d_logic.cpp",
 env.StaticLibrary("defaultversion", "s/default_version.cpp")
 
 env.StaticLibrary("geometry", [ "db/geo/hash.cpp", "db/geo/shapes.cpp", ], LIBDEPS = [ "bson" ])
-env.StaticLibrary("geojson", [ "db/geo/geojsonparser.cpp", ],
+env.StaticLibrary("geoparser", [ "db/geo/geoparser.cpp", ],
                   LIBDEPS = [ "bson",
+                              "geometry",
                               '$BUILD_DIR/third_party/s2/s2' ])
 
 env.CppUnitTest("hash_test", [ "db/geo/hash_test.cpp" ], LIBDEPS = ["geometry" ])
-env.CppUnitTest("geojsonparser_test", [ "db/geo/geojsonparser_test.cpp" ], LIBDEPS = ["geojson"])
+env.CppUnitTest("geoparser_test", [ "db/geo/geoparser_test.cpp" ], LIBDEPS = ["geoparser"])
 
 env.StaticLibrary("serveronly", serverOnlyFiles,
                   LIBDEPS=["coreshard",
                            "db/auth/authmongod",
                            "dbcmdline",
                            "defaultversion",
-                           "geojson",
-                           "geometry",
+                           "geoparser",
                            '$BUILD_DIR/third_party/shim_snappy'])
 
 # These files go into mongos and mongod only, not into the shell or any tools.
 mongodAndMongosFiles = [
     "db/connection_factory.cpp",
     "db/initialize_server_global_state.cpp",
+    "db/server_extra_log_context.cpp",
     "util/net/message_server_port.cpp",
     ]
 env.StaticLibrary("mongodandmongos", mongodAndMongosFiles)

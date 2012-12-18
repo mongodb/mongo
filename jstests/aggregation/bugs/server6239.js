@@ -1,6 +1,8 @@
 // SERVER-6239 reenable $add and $subtract with dates with better semantics
 // Note: error conditions tested also in server6240.js
 
+load('jstests/aggregation/extras/utils.js');
+
 var millis = 12345;
 var num = 54312;
 
@@ -16,9 +18,7 @@ function test(expression, expected) {
     assert.eq(res.result[0].out, expected, tojson(expression));
 }
 function fail(expression, code) {
-    var res = db.s6239.aggregate({$project: {out: expression}});
-    assert.commandFailed(res, tojson(expression));
-    assert.eq(res.code, code, tojson(expression));
+    assertErrorCode(db.s6239, {$project: {out: expression}}, code);
 }
 
 test({$subtract: ['$date', '$date']}, NumberLong(0));

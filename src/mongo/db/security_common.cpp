@@ -36,7 +36,7 @@
 #include "security_common.h"
 #include "commands.h"
 #include "../util/md5.hpp"
-#include "client_common.h"
+#include "client_basic.h"
 #include "mongo/client/dbclientinterface.h"
 
 

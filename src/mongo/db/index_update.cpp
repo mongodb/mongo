@@ -254,7 +254,11 @@ namespace mongo {
         BtreeBuilder<V> btBuilder(dupsAllowed, idx);
         BSONObj keyLast;
         auto_ptr<BSONObjExternalSorter::Iterator> i = sorter.iterator();
-        verify( pm == op->setMessage( "index: (2/3) btree bottom up" , phase1->nkeys , 10 ) );
+        // verifies that pm and op refer to the same ProgressMeter
+        verify(pm == op->setMessage("index: (2/3) btree bottom up",
+                                    "Index: (2/3) BTree Bottom Up Progress",
+                                    phase1->nkeys,
+                                    10));
         while( i->more() ) {
             RARELY killCurrentOp.checkForInterrupt( !mayInterrupt );
             BSONObjExternalSorter::Data d = i->next();
@@ -290,7 +294,7 @@ namespace mongo {
             pm.hit();
         }
         pm.finished();
-        op->setMessage( "index: (3/3) btree-middle" );
+        op->setMessage("index: (3/3) btree-middle", "Index: (3/3) BTree Middle Progress");
         LOG(t.seconds() > 10 ? 0 : 1 ) << "\t done building bottom layer, going to commit" << endl;
         btBuilder.commit( mayInterrupt );
         if ( btBuilder.getn() != phase1->nkeys && ! dropDups ) {
@@ -335,7 +339,10 @@ namespace mongo {
         if ( logLevel > 1 ) printMemInfo( "before index start" );
 
         /* get and sort all the keys ----- */
-        ProgressMeterHolder pm( op->setMessage( "index: (1/3) external sort" , d->stats.nrecords , 10 ) );
+        ProgressMeterHolder pm(op->setMessage("index: (1/3) external sort",
+                                              "Index: (1/3) External Sort Progress",
+                                              d->stats.nrecords,
+                                              10));
         SortPhaseOne _ours;
         SortPhaseOne *phase1 = theDataFileMgr.getPrecalced();
         if( phase1 == 0 ) {
@@ -402,7 +409,9 @@ namespace mongo {
             bool dupsAllowed = !idx.unique();
             bool dropDups = idx.dropDups();
 
-            ProgressMeter& progress = cc().curop()->setMessage( "bg index build" , d->stats.nrecords );
+            ProgressMeter& progress = cc().curop()->setMessage("bg index build",
+                                                               "Background Index Build Progress",
+                                                               d->stats.nrecords);
 
             unsigned long long n = 0;
             unsigned long long numDropped = 0;

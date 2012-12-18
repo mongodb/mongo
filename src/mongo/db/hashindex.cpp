@@ -59,9 +59,9 @@ namespace mongo {
 
     HashedIndexType::~HashedIndexType() { }
 
-    IndexSuitability HashedIndexType::suitability( const BSONObj& query , const BSONObj& order ) const {
-        FieldRangeSet frs( "" , query , true, true );
-        if ( frs.isPointIntervalSet( _hashedField ) )
+    IndexSuitability HashedIndexType::suitability( const FieldRangeSet& queryConstraints ,
+                                                   const BSONObj& order ) const {
+        if ( queryConstraints.isPointIntervalSet( _hashedField ) )
             return HELPFUL;
         return USELESS;
     }

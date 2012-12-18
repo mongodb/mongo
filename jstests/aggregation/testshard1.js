@@ -65,7 +65,7 @@ for(i = 1; i <= nItems; ++i) {
 assert.eq(db.getLastError(), null);
 
 // a project and group in shards, result combined in mongos
-var a1 = db.runCommand({ aggregate:"ts1", pipeline:[
+var a1 = db.ts1.aggregate(
     { $project: {
         cMod10: {$mod:["$counter", 10]},
         number: 1,
@@ -77,7 +77,7 @@ var a1 = db.runCommand({ aggregate:"ts1", pipeline:[
         avgCounter: {$avg: "$cMod10"}
     }},
     { $sort: {_id:1} }
-]});
+);
 
 var a1result = a1.result;
 for(i = 0 ; i < 10; ++i) {
@@ -88,25 +88,25 @@ for(i = 0 ; i < 10; ++i) {
 }
 
 // an initial group starts the group in the shards, and combines them in mongos
-var a2 = db.runCommand({ aggregate:"ts1", pipeline:[
+var a2 = db.ts1.aggregate(
     { $group: {
         _id: "all",
         total: {$sum: "$counter"}
     }}
-]});
+);
 
 // sum of an arithmetic progression S(n) = (n/2)(a(1) + a(n));
 assert.eq(a2.result[0].total, (nItems/2)*(1 + nItems),
        'agg sharded test counter sum failed');
 
 // an initial group starts the group in the shards, and combines them in mongos
-var a3 = db.runCommand({ aggregate:"ts1", pipeline:[
+var a3 = db.ts1.aggregate(
     { $group: {
         _id: "$number",
         total: {$sum: 1}
     }},
     { $sort: {_id:1} }
-]});
+);
 
 var a3result = a3.result;
 for(i = 0 ; i < strings.length; ++i) {
@@ -115,12 +115,12 @@ for(i = 0 ; i < strings.length; ++i) {
 }
 
 // a match takes place in the shards; just returning the results from mongos
-var a4 = db.runCommand({ aggregate:"ts1", pipeline:[
+var a4 = db.ts1.aggregate(
     { $match: {$or:[{counter:55}, {counter:1111},
                     {counter: 2222}, {counter: 33333},
                     {counter: 99999}, {counter: 55555}]}
     }
-]});
+);
 
 var a4result = a4.result;
 for(i = 0; i < 6; ++i) {
@@ -139,7 +139,7 @@ function testSkipLimit(ops, expectedCount) {
 
     ops.push({$group: {_id:1, count: {$sum: 1}}});
 
-    var out = db.runCommand({aggregate:"ts1", pipeline:ops});
+    var out = db.ts1.aggregate(ops);
     assert.commandWorked(out);
     assert.eq(out.result[0].count, expectedCount);
 }

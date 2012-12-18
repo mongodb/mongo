@@ -15,7 +15,7 @@
  */
 
 #include "mongo/s/balancer_lock.h"
-#include "mongo/s/cluster_constants.h"
+#include "mongo/s/type_settings.h"
 
 namespace mongo {
 
@@ -50,7 +50,7 @@ namespace mongo {
         *wasStopped = false;
 
         try {
-            balancerDoc = conn->findOne(ConfigNS::settings, BSON("_id" << "balancer"));
+            balancerDoc = conn->findOne(SettingsType::ConfigNS, BSON("_id" << "balancer"));
         }
         catch (const DBException& e) {
             if (errmsg) {
@@ -67,7 +67,7 @@ namespace mongo {
         }
 
         try {
-            conn->update(ConfigNS::settings,
+            conn->update(SettingsType::ConfigNS,
                          BSON("_id" << "balancer"),
                          BSON("$set" << BSON("stopped" << true)),
                          true);
@@ -92,7 +92,7 @@ namespace mongo {
 
         BSONObj balancerDoc;
         try {
-            balancerDoc = conn->findOne(ConfigNS::settings, BSON("_id" << "balancer"));
+            balancerDoc = conn->findOne(SettingsType::ConfigNS, BSON("_id" << "balancer"));
         }
         catch (const DBException& e) {
             if (errmsg) {
@@ -109,7 +109,7 @@ namespace mongo {
         }
 
         try {
-            conn->update(ConfigNS::settings,
+            conn->update(SettingsType::ConfigNS,
                          BSON("_id" << "balancer"),
                          BSON("$set" << BSON("stopped" << false)),
                          true);

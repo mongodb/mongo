@@ -11,26 +11,17 @@
  * 3) Assert that we get the correct error
  */
 
+// load the test utilities
+load('jstests/aggregation/extras/utils.js');
+
 // Clear db
 db.s6143.drop();
 
 // Populate db
 db.s6143.save({a:null});
 
-// Aggregate using a date expression on a null value
-var s6143 = db.runCommand(
-{ aggregate: "s6143", pipeline : [
-    { $project : {
-        dateConvert : { $dayOfWeek: ["$a"] }
-    }}
-]});
+// Aggregate using a date expression on a null value, assert error
+assertErrorCode(db.s6143,
+                { $project : {dateConvert : {$dayOfWeek:["$a"]}}},
+                16006);
 
-// Result should be the following error document
-s6143result = {
-    "errmsg" : "exception: can't convert from BSON type NULL to Date",
-    "code" : 16006,
-    "ok" : 0
-}
-
-// Assert
-assert.eq(s6143, s6143result, 's6143 failed');

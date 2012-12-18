@@ -414,8 +414,18 @@ namespace mongo {
     };
 
 
-    class ExpressionCond :
-        public ExpressionNary {
+    class ExpressionConcat : public ExpressionNary {
+    public:
+        // virtuals from ExpressionNary
+        virtual ~ExpressionConcat();
+        virtual Value evaluate(const Document& input) const;
+        virtual const char *getOpName() const;
+
+        static intrusive_ptr<ExpressionNary> create();
+    };
+
+
+    class ExpressionCond : public ExpressionNary {
     public:
         // virtuals from ExpressionNary
         virtual ~ExpressionCond();
@@ -717,6 +727,22 @@ namespace mongo {
 
     private:
         ExpressionIfNull();
+    };
+
+
+    class ExpressionMillisecond :
+        public ExpressionNary {
+    public:
+        // virtuals from ExpressionNary
+        virtual ~ExpressionMillisecond();
+        virtual Value evaluate(const Document& document) const;
+        virtual const char* getOpName() const;
+        virtual void addOperand(const intrusive_ptr<Expression>& pExpression);
+
+        static intrusive_ptr<ExpressionNary> create();
+
+    private:
+        ExpressionMillisecond();
     };
 
 

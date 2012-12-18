@@ -20,6 +20,7 @@
 #include <string>
 
 #include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobjbuilder.h"
 
 namespace mongo {
     struct BSONArray;
@@ -30,11 +31,18 @@ namespace mongo {
     std::string mongodVersion();
     int versionCmp(StringData rhs, StringData lhs); // like strcmp
 
+    void appendBuildInfo(BSONObjBuilder& result);
+
     const char * gitVersion();
+    const char * allocator();
+    const char * loaderFlags();
+    const char * compilerFlags();
+
     void printGitVersion();
 
     std::string sysInfo();
     void printSysInfo();
+    void printAllocator();
 
     void show_warnings();
 

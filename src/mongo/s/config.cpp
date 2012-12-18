@@ -23,13 +23,18 @@
 #include "mongo/client/connpool.h"
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/client/model.h"
-#include "mongo/db/pdfile.h"
 #include "mongo/db/cmdline.h"
+#include "mongo/db/pdfile.h"
 #include "mongo/s/chunk.h"
-#include "mongo/s/cluster_constants.h"
 #include "mongo/s/config.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/server.h"
+#include "mongo/s/type_changelog.h"
+#include "mongo/s/type_chunk.h"
+#include "mongo/s/type_collection.h"
+#include "mongo/s/type_database.h"
+#include "mongo/s/type_settings.h"
+#include "mongo/s/type_shard.h"
 #include "mongo/util/net/message.h"
 #include "mongo/util/stringutils.h"
 
@@ -44,9 +49,9 @@ namespace mongo {
 
     DBConfig::CollectionInfo::CollectionInfo( const BSONObj& in ) {
         _dirty = false;
-        _dropped = in[CollectionFields::dropped()].trueValue();
+        _dropped = in[CollectionType::dropped()].trueValue();
 
-        if ( in[CollectionFields::key()].isABSONObj() ) {
+        if ( in[CollectionType::keyPattern()].isABSONObj() ) {
             shard( new ChunkManager( in ) );
         }
 
@@ -88,13 +93,13 @@ namespace mongo {
         BSONObj key = BSON( "_id" << ns );
 
         BSONObjBuilder val;
-        val.append(CollectionFields::name(), ns);
-        val.appendDate(CollectionFields::lastmod(), time(0));
-        val.appendBool(CollectionFields::dropped(), _dropped);
+        val.append(CollectionType::ns(), ns);
+        val.appendDate(CollectionType::DEPRECATED_lastmod(), time(0));
+        val.appendBool(CollectionType::dropped(), _dropped);
         if ( _cm )
             _cm->getInfo( val );
 
-        conn->update(ConfigNS::collection, key, val.obj(), true);
+        conn->update(CollectionType::ConfigNS, key, val.obj(), true);
         string err = conn->getLastError();
         uassert( 13473 , (string)"failed to save collection (" + ns + "): " + err , err.size() == 0 );
 
@@ -318,12 +323,12 @@ namespace mongo {
         if ( oldVersion.isSet() && ! forceReload ) {
             scoped_ptr<ScopedDbConnection> conn( ScopedDbConnection::getInternalScopedDbConnection(
                     configServer.modelServer(), 30.0 ) );
-            newest = conn->get()->findOne(ConfigNS::chunk,
-                                          Query(BSON(ChunkFields::ns(ns))).sort(ChunkFields::lastmod(), -1));
+            newest = conn->get()->findOne(ChunkType::ConfigNS,
+                                          Query(BSON(ChunkType::ns(ns))).sort(ChunkType::DEPRECATED_lastmod(), -1));
             conn->done();
             
             if ( ! newest.isEmpty() ) {
-                ShardChunkVersion v = ShardChunkVersion::fromBSON(newest, ChunkFields::lastmod());
+                ShardChunkVersion v = ShardChunkVersion::fromBSON(newest, ChunkType::DEPRECATED_lastmod());
                 if ( v.isEquivalentTo( oldVersion ) ) {
                     scoped_lock lk( _lock );
                     CollectionInfo& ci = _collections[ns];
@@ -354,7 +359,7 @@ namespace mongo {
                 if ( ci.isSharded() && ci.getCM() ) {
 
                     ShardChunkVersion currentVersion =
-                        ShardChunkVersion::fromBSON(newest, ChunkFields::lastmod());
+                        ShardChunkVersion::fromBSON(newest, ChunkType::DEPRECATED_lastmod());
 
                     // Only reload if the version we found is newer than our own in the same
                     // epoch
@@ -424,21 +429,21 @@ namespace mongo {
 
     void DBConfig::serialize(BSONObjBuilder& to) {
         to.append("_id", _name);
-        to.appendBool(DatabaseFields::partitioned(), _shardingEnabled );
-        to.append(DatabaseFields::primary(), _primary.getName() );
+        to.appendBool(DatabaseType::DEPRECATED_partitioned(), _shardingEnabled );
+        to.append(DatabaseType::primary(), _primary.getName() );
     }
 
     void DBConfig::unserialize(const BSONObj& from) {
         LOG(1) << "DBConfig unserialize: " << _name << " " << from << endl;
-        verify( _name == from[DatabaseFields::name()].String() );
+        verify( _name == from[DatabaseType::name()].String() );
 
-        _shardingEnabled = from.getBoolField(DatabaseFields::partitioned().c_str());
-        _primary.reset( from.getStringField(DatabaseFields::primary().c_str()));
+        _shardingEnabled = from.getBoolField(DatabaseType::DEPRECATED_partitioned().c_str());
+        _primary.reset( from.getStringField(DatabaseType::primary().c_str()));
 
         // In the 1.5.x series, we used to have collection metadata nested in the database entry. The 1.6.x series
         // had migration code that ported that info to where it belongs now: the 'collections' collection. We now
         // just assert that we're not migrating from a 1.5.x directly into a 1.7.x without first converting.
-        BSONObj sharded = from.getObjectField(DatabaseFields::DEPRECATED_sharded().c_str());
+        BSONObj sharded = from.getObjectField(DatabaseType::DEPRECATED_sharded().c_str());
         if ( ! sharded.isEmpty() )
             uasserted( 13509 , "can't migrate from 1.5.x release to the current one; need to upgrade to 1.6.x first");
     }
@@ -452,8 +457,8 @@ namespace mongo {
         scoped_ptr<ScopedDbConnection> conn( ScopedDbConnection::getInternalScopedDbConnection(
                 configServer.modelServer(), 30.0 ) );
 
-        BSONObj dbObj = conn->get()->findOne( ConfigNS::database,
-                                              BSON( DatabaseFields::name( _name ) ) );
+        BSONObj dbObj = conn->get()->findOne( DatabaseType::ConfigNS,
+                                              BSON( DatabaseType::name( _name ) ) );
 
         if ( dbObj.isEmpty() ) {
             conn->done();
@@ -463,20 +468,20 @@ namespace mongo {
         unserialize( dbObj );
 
         BSONObjBuilder b;
-        b.appendRegex(CollectionFields::name(),
+        b.appendRegex(CollectionType::ns(),
                       (string)"^" + pcrecpp::RE::QuoteMeta( _name ) + "\\." );
 
         int numCollsErased = 0;
         int numCollsSharded = 0;
 
-        auto_ptr<DBClientCursor> cursor = conn->get()->query(ConfigNS::collection, b.obj());
+        auto_ptr<DBClientCursor> cursor = conn->get()->query(CollectionType::ConfigNS, b.obj());
         verify( cursor.get() );
         while ( cursor->more() ) {
 
             BSONObj collObj = cursor->next();
-            string collName = collObj[CollectionFields::name()].String();
+            string collName = collObj[CollectionType::ns()].String();
 
-            if( collObj[CollectionFields::dropped()].trueValue() ){
+            if( collObj[CollectionType::dropped()].trueValue() ){
                 _collections.erase( collName );
                 numCollsErased++;
             }
@@ -507,7 +512,7 @@ namespace mongo {
                 n = b.obj();
             }
 
-            conn->get()->update( ConfigNS::database , BSON( DatabaseFields::name( _name ) ) , n , true );
+            conn->get()->update( DatabaseType::ConfigNS , BSON( DatabaseType::name( _name ) ) , n , true );
             string err = conn->get()->getLastError();
             uassert( 13396 , (string)"DBConfig save failed: " + err , err.size() == 0 );
 
@@ -572,7 +577,7 @@ namespace mongo {
         {
             scoped_ptr<ScopedDbConnection> conn( ScopedDbConnection::getInternalScopedDbConnection(
                     configServer.modelServer(), 30.0 ) );
-            conn->get()->remove( ConfigNS::database , BSON( DatabaseFields::name( _name ) ) );
+            conn->get()->remove( DatabaseType::ConfigNS , BSON( DatabaseType::name( _name ) ) );
             errmsg = conn->get()->getLastError();
             if ( ! errmsg.empty() ) {
                 log() << "could not drop '" << _name << "': " << errmsg << endl;
@@ -888,7 +893,7 @@ namespace mongo {
             uassert( 10189 ,  "should only have 1 thing in config.version" , ! c->more() );
         }
         else {
-            if ( conn.count(ConfigNS::shard) || conn.count( ConfigNS::database ) ) {
+            if ( conn.count(ShardType::ConfigNS) || conn.count( DatabaseType::ConfigNS ) ) {
                 version = 1;
             }
         }
@@ -905,15 +910,15 @@ namespace mongo {
         
         try {
             
-            auto_ptr<DBClientCursor> c = conn->get()->query( ConfigNS::settings , BSONObj() );
+            auto_ptr<DBClientCursor> c = conn->get()->query( SettingsType::ConfigNS , BSONObj() );
             verify( c.get() );
             while ( c->more() ) {
                 
                 BSONObj o = c->next();
-                string name = o[SettingsFields::key()].valuestrsafe();
+                string name = o[SettingsType::key()].valuestrsafe();
                 got.insert( name );
                 if ( name == "chunksize" ) {
-                    int csize = o[SettingsFields::chunksize()].numberInt();
+                    int csize = o[SettingsType::chunksize()].numberInt();
 
                     // validate chunksize before proceeding
                     if ( csize == 0 ) {
@@ -934,26 +939,26 @@ namespace mongo {
             }
 
             if ( ! got.count( "chunksize" ) ) {
-                conn->get()->insert(ConfigNS::settings,
-                                     BSON(SettingsFields::key("chunksize") <<
-                                          SettingsFields::chunksize(Chunk::MaxChunkSize /
+                conn->get()->insert(SettingsType::ConfigNS,
+                                     BSON(SettingsType::key("chunksize") <<
+                                          SettingsType::chunksize(Chunk::MaxChunkSize /
                                                                     (1024 * 1024))));
             }
 
             // indexes
-            conn->get()->ensureIndex(ConfigNS::chunk,
-                                     BSON(ChunkFields::ns() << 1 << ChunkFields::min() << 1 ), true);
+            conn->get()->ensureIndex(ChunkType::ConfigNS,
+                                     BSON(ChunkType::ns() << 1 << ChunkType::min() << 1 ), true);
 
-            conn->get()->ensureIndex(ConfigNS::chunk,
-                                     BSON(ChunkFields::ns() << 1 <<
-                                          ChunkFields::shard() << 1 <<
-                                          ChunkFields::min() << 1 ), true);
+            conn->get()->ensureIndex(ChunkType::ConfigNS,
+                                     BSON(ChunkType::ns() << 1 <<
+                                          ChunkType::shard() << 1 <<
+                                          ChunkType::min() << 1 ), true);
 
-            conn->get()->ensureIndex(ConfigNS::chunk,
-                                     BSON(ChunkFields::ns() << 1 <<
-                                          ChunkFields::lastmod() << 1 ), true );
+            conn->get()->ensureIndex(ChunkType::ConfigNS,
+                                     BSON(ChunkType::ns() << 1 <<
+                                          ChunkType::DEPRECATED_lastmod() << 1 ), true );
 
-            conn->get()->ensureIndex(ConfigNS::shard, BSON(ShardFields::host() << 1), true);
+            conn->get()->ensureIndex(ShardType::ConfigNS, BSON(ShardType::host() << 1), true);
 
             conn->done();
         }
@@ -991,13 +996,13 @@ namespace mongo {
 
             // send a copy of the message to the log in case it doesn't manage to reach config.changelog
             Client* c = currentClient.get();
-            BSONObj msg = BSON( ChangelogFields::changeID(changeID) <<
-                                ChangelogFields::server(getHostNameCached()) <<
-                                ChangelogFields::clientAddr((c ? c->clientAddress(true) : "N/A")) <<
-                                ChangelogFields::time(jsTime()) <<
-                                ChangelogFields::what(what) <<
-                                ChangelogFields::ns(ns) <<
-                                ChangelogFields::details(detail) );
+            BSONObj msg = BSON( ChangelogType::changeID(changeID) <<
+                                ChangelogType::server(getHostNameCached()) <<
+                                ChangelogType::clientAddr((c ? c->clientAddress(true) : "N/A")) <<
+                                ChangelogType::time(jsTime()) <<
+                                ChangelogType::what(what) <<
+                                ChangelogType::ns(ns) <<
+                                ChangelogType::details(detail) );
             log() << "about to log metadata event: " << msg << endl;
 
             verify( _primary.ok() );
@@ -1009,7 +1014,7 @@ namespace mongo {
             static bool createdCapped = false;
             if ( ! createdCapped ) {
                 try {
-                    conn->get()->createCollection( ConfigNS::changelog , 1024 * 1024 * 10 , true );
+                    conn->get()->createCollection( ChangelogType::ConfigNS , 1024 * 1024 * 10 , true );
                 }
                 catch ( UserException& e ) {
                     LOG(1) << "couldn't create changelog (like race condition): " << e << endl;
@@ -1018,7 +1023,7 @@ namespace mongo {
                 createdCapped = true;
             }
 
-            conn->get()->insert( ConfigNS::changelog , msg );
+            conn->get()->insert( ChangelogType::ConfigNS , msg );
 
             conn->done();
 
@@ -1039,10 +1044,10 @@ namespace mongo {
             }
             scoped_ptr<ScopedDbConnection> conn( ScopedDbConnection::getInternalScopedDbConnection(
                     configServer.getConnectionString().toString(), 30.0 ) );
-            conn->get()->update(ConfigNS::shard,
-                                BSON(ShardFields::name(s.getName())),
+            conn->get()->update(ShardType::ConfigNS,
+                                BSON(ShardType::name(s.getName())),
                                 BSON("$set" <<
-                                     BSON(ShardFields::host(monitor->getServerAddress()))));
+                                     BSON(ShardType::host(monitor->getServerAddress()))));
             conn->done();
         }
         catch (DBException& e) {

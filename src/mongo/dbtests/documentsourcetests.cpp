@@ -794,7 +794,7 @@ namespace DocumentSourceTests {
                 client.insert( ns, BSON( "a" << "d" << "b" << "eadbe" << "d" << "ef" ) );
             }
             virtual BSONObj groupSpec() {
-                return BSON( "_id" << BSON( "$add"
+                return BSON( "_id" << BSON( "$concat"
                                             << BSON_ARRAY( "$a" << "$b" << "$c" << "$d" ) ) );
             }
             virtual string expectedResultSetString() { return "[{_id:'deadbeef'}]"; }
@@ -1792,7 +1792,7 @@ namespace DocumentSourceTests {
             add<DocumentSourceGroup::FourValuesTwoKeys>();
             add<DocumentSourceGroup::FourValuesTwoKeysTwoAccumulators>();
             add<DocumentSourceGroup::GroupNullUndefinedIds>();
-            //add<DocumentSourceGroup::ComplexId>(); uncomment after 6195
+            add<DocumentSourceGroup::ComplexId>();
             add<DocumentSourceGroup::UndefinedAccumulatorValue>();
             add<DocumentSourceGroup::RouterMerger>();
             add<DocumentSourceGroup::Dependencies>();

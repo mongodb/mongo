@@ -240,7 +240,10 @@ namespace mongo {
         virtual shared_ptr<Cursor> newCursor(const BSONObj& query, const BSONObj& order,
                                              int numWanted) const;
 
-        virtual IndexSuitability suitability(const BSONObj& query, const BSONObj& order) const {
+        virtual IndexSuitability suitability( const FieldRangeSet& queryConstraints ,
+                                              const BSONObj& order ) const {
+            BSONObj query = queryConstraints.originalQuery();
+
             BSONElement e = query.getFieldDotted(_geo.c_str());
             switch (e.type()) {
             case Object: {

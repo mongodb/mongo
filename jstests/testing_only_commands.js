@@ -28,7 +28,7 @@ var assertCmdFound = function(db, cmdName) {
 
 jsTest.setOption('enableTestCommands', false);
 
-var conn = MongoRunner.runMongod({ port: 29000 });
+var conn = startMongodTest();
 for (i in testOnlyCommands) {
     assertCmdNotFound(conn.getDB('test'), testOnlyCommands[i]);
 }
@@ -37,7 +37,7 @@ MongoRunner.stopMongod(conn.port);
 // Now enable the commands
 jsTest.setOption('enableTestCommands', true);
 
-var conn = MongoRunner.runMongod({ port: 29000 });
+var conn = startMongodTest();
 for (i in testOnlyCommands) {
     assertCmdFound(conn.getDB('test'), testOnlyCommands[i]);
 }

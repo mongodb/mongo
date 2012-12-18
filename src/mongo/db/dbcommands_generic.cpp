@@ -117,22 +117,18 @@ namespace mongo {
             help << "get version #, etc.\n";
             help << "{ buildinfo:1 }";
         }
+
         bool run(const std::string& dbname,
                  BSONObj& jsobj,
                  int, // options
                  std::string& errmsg,
                  BSONObjBuilder& result,
                  bool fromRepl) {
-            result << "version" << versionString
-                   << "gitVersion" << gitVersion()
-                   << "sysInfo" << sysInfo()
-                   << "versionArray" << versionArray
-                   << "interpreterVersion" << globalScriptEngine->getInterpreterVersionString()
-                   << "bits" << ( sizeof( int* ) == 4 ? 32 : 64 );
-            result.appendBool( "debug" , debug );
-            result.appendNumber("maxBsonObjectSize", BSONObjMaxUserSize);
-            return true;
+        appendBuildInfo(result);
+        return true;
+
         }
+
     } cmdBuildInfo;
 
 

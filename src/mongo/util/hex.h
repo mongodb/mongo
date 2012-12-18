@@ -19,6 +19,7 @@
 
 #include <string>
 
+#include "mongo/base/string_data.h"
 #include "mongo/bson/util/builder.h"
 
 namespace mongo {
@@ -34,6 +35,9 @@ namespace mongo {
         return 0xff;
     }
     inline char fromHex( const char *c ) {
+        return (char)(( fromHex( c[ 0 ] ) << 4 ) | fromHex( c[ 1 ] ));
+    }
+    inline char fromHex( const StringData& c ) {
         return (char)(( fromHex( c[ 0 ] ) << 4 ) | fromHex( c[ 1 ] ));
     }
 

@@ -38,13 +38,12 @@ db.article.save( {
 var name = "$author";
 
 // Aggregate checking against the field $author
-var l1 = db.runCommand(
-{ aggregate: "article", pipeline : [
+var l1 = db.article.aggregate(
     { $project : {
         author : 1,
         authorWroteIt : { $eq:["$author", name] }
     }}
-]});
+);
 
 // All should be true since we are comparing a field to itself
 var l1result = [
@@ -71,13 +70,12 @@ var l1result = [
 ];
 
 // Aggregate checking against the literal string $author
-var l2 = db.runCommand(
-{ aggregate: "article", pipeline : [
+var l2 = db.article.aggregate(
     { $project : {
         author : 1,
         authorWroteIt : { $eq:["$author", { $literal: name } ] }
     }}
-]});
+);
 
 // Only the one written by $author should be true
 var l2result = [

@@ -72,13 +72,10 @@ namespace mongo {
                         }
                     }
 
-                    bool ok = Command::runAgainstRegistered(q.ns, cmdObj, builder, q.queryOptions);
-                    if ( ok ) {
-                        BSONObj x = builder.done();
-                        replyToQuery(0, r.p(), r.m(), x);
-                        return;
-                    }
-                    break;
+                    Command::runAgainstRegistered(q.ns, cmdObj, builder, q.queryOptions);
+                    BSONObj x = builder.done();
+                    replyToQuery(0, r.p(), r.m(), x);
+                    return;
                 }
                 catch ( StaleConfigException& e ) {
                     if ( loops <= 0 )
@@ -103,10 +100,6 @@ namespace mongo {
                     return;
                 }
             }
-
-            string commandName = q.query.firstElementFieldName();
-
-            uasserted(13390, "unrecognized command: " + commandName);
         }
 
         // Deprecated

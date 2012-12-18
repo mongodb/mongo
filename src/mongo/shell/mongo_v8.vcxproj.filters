@@ -1246,7 +1246,7 @@
     <ClInclude Include="..\db\client.h">
       <Filter>db\Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\db\client_common.h">
+    <ClInclude Include="..\db\client_basic.h">
       <Filter>db\Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\db\clientcursor.h">
@@ -1384,7 +1384,7 @@
     <ClInclude Include="..\db\client.h">
       <Filter>db\Header</Filter>
     </ClInclude>
-    <ClInclude Include="..\db\client_common.h">
+    <ClInclude Include="..\db\client_basic.h">
       <Filter>db\Header</Filter>
     </ClInclude>
     <ClInclude Include="..\db\clientcursor.h">
