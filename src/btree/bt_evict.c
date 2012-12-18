@@ -113,6 +113,7 @@ __wt_evict_list_clr_page(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 	WT_ASSERT(session, WT_PAGE_IS_ROOT(page) ||
 	    page->ref->page != page ||
+	    page->ref->state == WT_REF_EVICT_WALK ||
 	    page->ref->state == WT_REF_LOCKED);
 
 	/* Fast path: if the page isn't on the queue, don't bother searching. */
@@ -557,15 +558,18 @@ __wt_evict_file(WT_SESSION_IMPL *session, int syncop)
 			/* FALLTHROUGH */
 		case WT_SYNC:
 			/*
-			 * We know we got all of the leaf pages on the first
+			 * We know we got all of the leaf pages in the "fuzzy"
 			 * pass.  Any updates in the meantime can't be part of
 			 * the checkpoint.  Skip them to keep the locked part
 			 * of checkpoint as fast as possible.
 			 */
-			if (syncop == WT_SYNC &&
-			    page->type != WT_PAGE_ROW_INT &&
-			    page->type != WT_PAGE_COL_INT)
-				break;
+			if (syncop == WT_SYNC) {
+				__wt_evict_list_clr_page(session, page);
+				if (page->type != WT_PAGE_ROW_INT &&
+				    page->type != WT_PAGE_COL_INT)
+					break;
+			}
+			/* FALLTHROUGH */
 		case WT_SYNC_DISCARD:
 			/* Write dirty pages for sync and sync with discard. */
 			if (__wt_page_is_modified(page))
