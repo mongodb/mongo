@@ -23,6 +23,7 @@
 #include <string>
 #include <fstream>
 #include "mongo/util/startup_test.h"
+#include "mongo/scripting/engine.h"
 #include "version.h"
 #include "stringutils.h"
 #include "../db/jsobj.h"
@@ -95,6 +96,9 @@ namespace mongo {
 #ifndef _SCONS
     // only works in scons
     const char * gitVersion() { return "not-scons"; }
+    const char * allocator() { return ""; }
+    const char * loaderFlags() { return ""; }
+    const char * compilerFlags() { return ""; }
 #endif
 
     void printGitVersion() { log() << "git version: " << gitVersion() << endl; }
@@ -114,12 +118,31 @@ namespace mongo {
     }
 #else
     string sysInfo() { return ""; }
+
 #endif
 #endif
 
     void printSysInfo() {
         log() << "build info: " << sysInfo() << endl;
     }
+
+    void printAllocator() {
+        log() << "allocator: " << allocator() << endl;
+    }
+
+    void appendBuildInfo(BSONObjBuilder& result) {
+	   result << "version" << versionString
+			  << "gitVersion" << gitVersion()
+			  << "sysInfo" << sysInfo()
+			  << "loaderFlags" << loaderFlags()
+			  << "compilerFlags" << compilerFlags()
+			  << "allocator" << allocator()
+			  << "versionArray" << versionArray
+			  << "interpreterVersion" << globalScriptEngine->getInterpreterVersionString()
+			  << "bits" << ( sizeof( int* ) == 4 ? 32 : 64 );
+	   result.appendBool( "debug" , debug );
+	   result.appendNumber("maxBsonObjectSize", BSONObjMaxUserSize);
+   }
 
 
     Tee* const startupWarningsLog = new RamLog("startupWarnings"); //intentionally leaked
