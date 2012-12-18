@@ -1473,11 +1473,7 @@ namespace mongo {
                                    "")
                << endl;
 
-        return conn.runCommand( "admin",
-                                cmd,
-                                result,
-                                0,
-                                &AuthenticationTable::getInternalSecurityAuthenticationTable() );
+        return conn.runCommand("admin", cmd, result, 0);
     }
 
 } // namespace mongo

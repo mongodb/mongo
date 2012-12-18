@@ -132,8 +132,7 @@ namespace mongo {
         //
         bool runCommand(InstanceID id, const std::string& dbname,
                 const mongo::BSONObj& cmdObj,
-                mongo::BSONObj &info, int options = 0,
-                const mongo::AuthenticationTable* auth = NULL);
+                mongo::BSONObj &info, int options = 0);
 
         mongo::BSONArray query(InstanceID id,
                 const std::string &ns,

@@ -171,11 +171,7 @@ namespace mongo {
                 !Lock::somethingWriteLocked() || theReplSet == 0 || !theReplSet->lockedByMe() );
 
         ScopedConn conn(memberFullName);
-        return conn.runCommand("admin",
-                               cmd,
-                               result,
-                               0,
-                               &AuthenticationTable::getInternalSecurityAuthenticationTable());
+        return conn.runCommand("admin", cmd, result, 0);
     }
 
     /**

@@ -54,8 +54,7 @@ namespace mongo {
         }
 
         bool runCommand(const std::string& dbname, const mongo::BSONObj& cmdObj,
-                mongo::BSONObj &info, int options = 0,
-                const mongo::AuthenticationTable* auth = NULL);
+                mongo::BSONObj &info, int options = 0);
 
         std::auto_ptr<mongo::DBClientCursor> query(const std::string &ns,
                 mongo::Query query = mongo::Query(),

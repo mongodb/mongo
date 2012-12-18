@@ -48,12 +48,12 @@ namespace mongo {
     }
 
     bool MockDBClientConnection::runCommand(const string& dbname, const BSONObj& cmdObj,
-            BSONObj &info, int options, const mongo::AuthenticationTable* auth) {
+            BSONObj &info, int options) {
         checkConnection();
 
         try {
             return _remoteServer->runCommand(_remoteServerInstanceID, dbname, cmdObj,
-                    info, options, auth);
+                    info, options);
         }
         catch (const mongo::SocketException&) {
             _isFailed = true;

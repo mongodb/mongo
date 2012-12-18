@@ -596,7 +596,7 @@ namespace mongo {
             @return true if the command returned "ok".
         */
         virtual bool runCommand(const string &dbname, const BSONObj& cmd, BSONObj &info,
-                                int options=0, const AuthenticationTable* auth = NULL);
+                                int options=0);
 
         /** Authorize access to a particular database.
             Authentication is separate for each database on the server -- you may authenticate for any
@@ -935,9 +935,6 @@ namespace mongo {
 
         virtual QueryOptions _lookupAvailableOptions();
 
-        bool hasAuthenticationTable();
-        AuthenticationTable& getAuthenticationTable();
-
     private:
         enum QueryOptions _cachedAvailableOptions;
         bool _haveCachedAvailableOptions;
@@ -1146,8 +1143,7 @@ namespace mongo {
         virtual bool runCommand(const string &dbname,
                                 const BSONObj& cmd,
                                 BSONObj &info,
-                                int options=0,
-                                const AuthenticationTable* auth=NULL);
+                                int options=0);
 
         /**
            @return true if this connection is currently in a failed state.  When autoreconnect is on,

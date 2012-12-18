@@ -65,12 +65,8 @@ namespace mongo {
            So here what we do is wrapper known safe methods and not allow cursor-style queries at all.  This makes
            ScopedConn limited in functionality but very safe.  More non-cursor wrappers can be added here if needed.
            */
-        bool runCommand(const string &dbname,
-                        const BSONObj& cmd,
-                        BSONObj &info,
-                        int options=0,
-                        const AuthenticationTable* auth=NULL) {
-            return conn()->runCommand(dbname, cmd, info, options, noauth ? NULL : auth);
+        bool runCommand(const string &dbname, const BSONObj& cmd, BSONObj &info, int options=0) {
+            return conn()->runCommand(dbname, cmd, info, options);
         }
         unsigned long long count(const string &ns) {
             return conn()->count(ns);

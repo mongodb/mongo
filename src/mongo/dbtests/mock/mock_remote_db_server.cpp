@@ -123,8 +123,7 @@ namespace mongo {
             const string& dbname,
             const BSONObj& cmdObj,
             BSONObj &info,
-            int options,
-            const mongo::AuthenticationTable* auth) {
+            int options) {
         checkIfUp(id);
 
         // Get the name of the command - copied from _runCommands @ db/dbcommands.cpp

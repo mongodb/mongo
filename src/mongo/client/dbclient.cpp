@@ -378,28 +378,12 @@ namespace mongo {
         _hasAuthentication = false;
     }
 
-    bool DBClientWithCommands::hasAuthenticationTable() {
-        return _hasAuthentication;
-    }
-
-    AuthenticationTable& DBClientWithCommands::getAuthenticationTable() {
-        return _authTable;
-    }
-
     inline bool DBClientWithCommands::runCommand(const string &dbname,
                                                  const BSONObj& cmd,
                                                  BSONObj &info,
-                                                 int options,
-                                                 const AuthenticationTable* auth) {
+                                                 int options) {
         string ns = dbname + ".$cmd";
-        BSONObj actualCmd = cmd;
-        if ( _hasAuthentication || auth ) {
-            const AuthenticationTable* authTable = (auth ? auth : &_authTable);
-            LOG(4) << "Sending command " << cmd << " to " << getServerAddress() <<
-                    " with $auth: " << authTable->toBSON() << endl;
-            actualCmd = authTable->copyCommandObjAddingAuth( cmd );
-        }
-        info = findOne(ns, actualCmd, 0 , options);
+        info = findOne(ns, cmd, 0 , options);
         return isOk(info);
     }
 
@@ -792,9 +776,8 @@ namespace mongo {
     inline bool DBClientConnection::runCommand(const string &dbname,
                                                const BSONObj& cmd,
                                                BSONObj &info,
-                                               int options,
-                                               const AuthenticationTable* auth) {
-        if ( DBClientWithCommands::runCommand( dbname , cmd , info , options , auth ) )
+                                               int options) {
+        if (DBClientWithCommands::runCommand(dbname, cmd, info, options))
             return true;
         
         if ( clientSet && isNotMasterErrorString( info["errmsg"] ) ) {

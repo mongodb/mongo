@@ -301,11 +301,7 @@ namespace mongo {
     }
 
     bool SyncClusterConnection::_commandOnActive(const string &dbname, const BSONObj& cmd, BSONObj &info, int options ) {
-        BSONObj actualCmd = cmd;
-        if ( hasAuthenticationTable() ) {
-            actualCmd = getAuthenticationTable().copyCommandObjAddingAuth( cmd );
-        }
-        auto_ptr<DBClientCursor> cursor = _queryOnActive( dbname + ".$cmd" , actualCmd , 1 , 0 , 0 , options , 0 );
+        auto_ptr<DBClientCursor> cursor = _queryOnActive(dbname + ".$cmd", cmd, 1, 0, 0, options, 0);
         if ( cursor->more() )
             info = cursor->next().copy();
         else

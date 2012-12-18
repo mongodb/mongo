@@ -1667,12 +1667,7 @@ namespace mongo {
             }
 
             if ( _conn->lazySupported() ) {
-                BSONObj actualCommand = _cmd;
-                if ( !noauth ) {
-                    actualCommand = ClientBasic::getCurrent()->getAuthenticationInfo()->
-                        getAuthTable().copyCommandObjAddingAuth( _cmd );
-                }
-                _cursor.reset( new DBClientCursor(_conn, _db + ".$cmd", actualCommand,
+                _cursor.reset( new DBClientCursor(_conn, _db + ".$cmd", _cmd,
                                                   -1/*limit*/, 0, NULL, _options, 0));
                 _cursor->initLazy();
             }

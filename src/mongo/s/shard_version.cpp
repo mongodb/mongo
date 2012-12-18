@@ -120,11 +120,7 @@ namespace mongo {
         LOG(1) << "initializing shard connection to " << conn->toString() << endl;
         LOG(2) << "initial sharding settings : " << cmd << endl;
 
-        bool ok = conn->runCommand( "admin",
-                                    cmd,
-                                    result,
-                                    0,
-                                    &AuthenticationTable::getInternalSecurityAuthenticationTable() );
+        bool ok = conn->runCommand("admin", cmd, result, 0);
 
         // HACK for backwards compatibility with v1.8.x, v2.0.0 and v2.0.1
         // Result is false, but will still initialize serverID and configdb
