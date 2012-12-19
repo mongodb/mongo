@@ -596,14 +596,6 @@ namespace mongo {
             return temp;
         }
 
-        /* assume ownership of the buffer - you must then free it (with free()) */
-        char* decouple(int& l) {
-            char *x = _done();
-            verify( x );
-            l = _b.len();
-            _b.decouple();
-            return x;
-        }
         void decouple() {
             _b.decouple();    // post done() call version.  be sure jsobj frees...
         }
