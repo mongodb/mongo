@@ -19,7 +19,7 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 	WT_INSERT_HEAD **inshead, *new_inshead, **new_inslist;
 	WT_ITEM *key, *value;
 	WT_PAGE *page;
-	WT_UPDATE **new_upd, *upd, **upd_entry, *upd_obsolete;
+	WT_UPDATE **new_upd, *old_upd, *upd, **upd_entry, *upd_obsolete;
 	size_t ins_size, upd_size;
 	size_t new_inshead_size, new_inslist_size, new_upd_size;
 	uint32_t ins_slot;
@@ -67,7 +67,7 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 			upd_entry = &cbt->ins->upd;
 
 		/* Make sure the update can proceed. */
-		WT_ERR(__wt_update_check(session, page, *upd_entry));
+		WT_ERR(__wt_update_check(session, page, old_upd = *upd_entry));
 
 		/* Allocate the WT_UPDATE structure and transaction ID. */
 		WT_ERR(__wt_update_alloc(session, value, &upd, &upd_size));
@@ -76,7 +76,7 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 
 		/* Serialize the update. */
 		WT_ERR(__wt_update_serial(session, page, cbt->write_gen,
-		    upd_entry, &new_upd, new_upd_size, &upd, upd_size,
+		    upd_entry, old_upd, &new_upd, new_upd_size, &upd, upd_size,
 		    &upd_obsolete));
 
 		/* Discard any obsolete WT_UPDATE structures. */
@@ -225,8 +225,7 @@ __wt_insert_serial_func(WT_SESSION_IMPL *session, void *args)
 	 * are still in the expected position, and no item has been added where
 	 * our insert belongs.
 	 */
-	if (page->modify->write_gen + 1 == page->modify->disk_gen)
-		return (WT_RESTART);
+	WT_RET(__wt_page_write_gen_wrapped_check(page));
 
 	if (page->modify->write_gen != write_gen) {
 		for (i = 0; i < skipdepth; i++) {
@@ -455,14 +454,22 @@ int
 __wt_update_serial_func(WT_SESSION_IMPL *session, void *args)
 {
 	WT_PAGE *page;
-	WT_UPDATE **new_upd, *upd, **upd_entry, **upd_obsolete;
+	WT_UPDATE **new_upd, *old_upd, *upd, **upd_entry, **upd_obsolete;
 	uint32_t write_gen;
 
-	__wt_update_unpack(
-	    args, &page, &write_gen, &upd_entry, &new_upd, &upd, &upd_obsolete);
+	__wt_update_unpack(args, &page, &write_gen,
+	    &upd_entry, &old_upd, &new_upd, &upd, &upd_obsolete);
 
-	/* Check the page's write-generation. */
-	WT_RET(__wt_page_write_gen_check(session, page, write_gen));
+	/*
+	 * Check the page's write-generation: if that fails, check whether we
+	 * are still in the expected position, and no update has been added
+	 * where ours belongs.  If a new update has been installed, check
+	 * whether it conflicts.
+	 */
+	WT_RET(__wt_page_write_gen_wrapped_check(page));
+
+	if (page->modify->write_gen != write_gen && old_upd != *upd_entry)
+		WT_RET(__wt_update_check(session, page, *upd_entry));
 
 	upd->next = *upd_entry;
 	/*

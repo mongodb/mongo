@@ -53,7 +53,7 @@ __wt_cache_page_inmem_decr(
 /*
  * __wt_cache_dirty_decr --
  *	Decrement a page's memory footprint from the cache dirty count. Will
- *      be called after a reconciliation leaves a page clean.
+ *	be called after a reconciliation leaves a page clean.
  */
 static inline void
 __wt_cache_dirty_decr(
@@ -244,6 +244,25 @@ __wt_page_and_tree_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page)
 }
 
 /*
+ * __wt_page_write_gen_wrapped_check --
+ *	Confirm the page's write generation number hasn't wrapped.
+ */
+static inline int
+__wt_page_write_gen_wrapped_check(WT_PAGE *page)
+{
+	WT_PAGE_MODIFY *mod;
+
+	mod = page->modify;
+
+	/* 
+	 * If the page's write generation has wrapped and caught up with the
+	 * disk generation (wildly unlikely but technically possible as it
+	 * implies 4B updates between page reconciliations), fail the update.
+	 */
+	return (mod->write_gen + 1 == mod->disk_gen ? WT_RESTART : 0);
+}
+
+/*
  * __wt_page_write_gen_check --
  *	Confirm the page's write generation number is correct.
  */
@@ -253,7 +272,7 @@ __wt_page_write_gen_check(
 {
 	WT_PAGE_MODIFY *mod;
 
-	mod = page->modify;
+	WT_RET(__wt_page_write_gen_wrapped_check(page));
 
 	/*
 	 * If the page's write generation matches the search generation, we can
@@ -262,7 +281,8 @@ __wt_page_write_gen_check(
 	 * possible as it implies 4B updates between page reconciliations), fail
 	 * the update.
 	 */
-	if (mod->write_gen == write_gen && mod->write_gen + 1 != mod->disk_gen)
+	mod = page->modify;
+	if (mod->write_gen == write_gen)
 		return (0);
 
 	WT_DSTAT_INCR(session, txn_write_conflict);
