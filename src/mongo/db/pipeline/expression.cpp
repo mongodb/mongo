@@ -1318,11 +1318,6 @@ namespace mongo {
         objBuilder.done();
     }
 
-    void ExpressionObject::BuilderPathSink::path(
-        const string &path, bool include) {
-        pBuilder->append(path, include);
-    }
-
     /* --------------------- ExpressionFieldPath --------------------------- */
 
     ExpressionFieldPath::~ExpressionFieldPath() {
