@@ -229,11 +229,6 @@ namespace mongo {
         void reloadSettings();
 
         /**
-         * @return 0 = ok, otherwise error #
-         */
-        int checkConfigVersion( bool upgrade );
-
-        /**
          * Create a metadata change log entry in the config.changelog collection.
          *
          * @param what e.g. "split" , "migrate"

@@ -264,12 +264,8 @@ namespace mongo {
      */
     class ScopedDistributedLock {
     public:
-        ScopedDistributedLock(const ConnectionString& conn,
-                              const string& name,
-                              const string& why,
-                              int lockTryIntervalMillis = 1000,
-                              unsigned long long lockTimeout = 0,
-                              bool asProcess = false);
+
+        ScopedDistributedLock(const ConnectionString& conn, const string& name);
 
         virtual ~ScopedDistributedLock();
 
@@ -281,7 +277,7 @@ namespace mongo {
          *
          * @return if the lock was successfully acquired
          */
-        virtual bool tryAcquireOnce(string* errMsg);
+        virtual bool tryAcquire(string* errMsg);
 
         /**
          * Tries to unlock the lock if acquired.  Cannot report an error or block indefinitely
@@ -300,7 +296,7 @@ namespace mongo {
          * waitForMillis = -1 indicates we should retry indefinitely.
          * @return true if the lock was acquired
          */
-        bool tryAcquire(long long waitForMillis, string* errMsg);
+        bool acquire(long long waitForMillis, string* errMsg);
 
         bool isAcquired() const {
             return _acquired;
@@ -310,7 +306,19 @@ namespace mongo {
             return _lock._conn;
         }
 
-        string getLockWhy() const {
+        void setLockTryIntervalMillis(long long lockTryIntervalMillis) {
+            _lockTryIntervalMillis = lockTryIntervalMillis;
+        }
+
+        long long getLockTryIntervalMillis() const {
+            return _lockTryIntervalMillis;
+        }
+
+        void setLockMessage(const string& why) {
+            _why = why;
+        }
+
+        string getLockMessage() const {
             return _why;
         }
 

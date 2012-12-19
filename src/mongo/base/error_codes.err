@@ -24,5 +24,7 @@ error_code("IllegalOperation", 20)
 error_code("EmptyArrayOperation", 21)
 error_code("InvalidBSON", 22)
 error_code("AlreadyInitialized", 23)
+error_code("LockTimeout", 24)
+error_code("RemoteValidationError", 25)
 
 error_class("NetworkError", ["HostUnreachable", "HostNotFound"])

@@ -72,6 +72,17 @@ namespace mongo {
             return _ports.find( port )->second.first;
         }
         
+        int ProgramRegistry::portForPid(pid_t pid) const {
+            boost::recursive_mutex::scoped_lock lk(_mutex);
+            for (map<int, pair<pid_t, int> >::const_iterator it = _ports.begin();
+                    it != _ports.end(); ++it)
+            {
+                if (it->second.first == pid) return it->first;
+            }
+
+            return -1;
+        }
+
         void ProgramRegistry::registerPort( int port, pid_t pid, int output ) {
             boost::recursive_mutex::scoped_lock lk( _mutex );
             verify( !isPortRegistered( port ) );
@@ -106,13 +117,16 @@ namespace mongo {
             _pids.insert( make_pair( pid, output ) );
         }
         
-        void ProgramRegistry::deletePid( pid_t pid ) {
-            boost::recursive_mutex::scoped_lock lk( _mutex );
-            if ( !isPidRegistered( pid ) ) {
+        void ProgramRegistry::deletePid(pid_t pid) {
+            boost::recursive_mutex::scoped_lock lk(_mutex);
+            if (!isPidRegistered(pid)) {
+                int port = portForPid(pid);
+                if (port < 0) return;
+                deletePort(port);
                 return;
             }
-            close( _pids.find( pid )->second );
-            _pids.erase( pid );
+            close(_pids.find(pid)->second);
+            _pids.erase(pid);
         }
         
         void ProgramRegistry::getRegisteredPids( vector<pid_t> &pids ) {
@@ -481,6 +495,13 @@ namespace mongo {
             return undefinedReturn;
         }
 
+        BSONObj CheckProgram(const BSONObj& args, void* data) {
+            int pid = singleArg(args).numberInt();
+            bool isDead = wait_for_pid(pid, false);
+            if (isDead) registry.deletePid(pid);
+            return BSON( string( "" ) << (!isDead) );
+        }
+
         BSONObj WaitProgram( const BSONObj& a, void* data ) {
             int pid = singleArg( a ).numberInt();
             BSONObj x = BSON( "" << wait_for_pid( pid ) );
@@ -745,6 +766,7 @@ namespace mongo {
             scope.injectNative( "rawMongoProgramOutput", RawMongoProgramOutput );
             scope.injectNative( "clearRawMongoProgramOutput", ClearRawMongoProgramOutput );
             scope.injectNative( "waitProgram" , WaitProgram );
+            scope.injectNative( "checkProgram" , CheckProgram );
             scope.injectNative( "resetDbpath", ResetDbpath );
             scope.injectNative( "copyDbpath", CopyDbpath );
         }

@@ -32,6 +32,7 @@
 #include "mongo/s/type_mongos.h"
 #include "mongo/s/type_settings.h"
 #include "mongo/s/type_tags.h"
+#include "mongo/util/version.h"
 
 namespace mongo {
 
@@ -117,7 +118,8 @@ namespace mongo {
                      BSON( MongosType::name(_myid) ) ,
                      BSON( "$set" << BSON( MongosType::ping(jsTime()) <<
                                            MongosType::up((int)(time(0)-_started)) <<
-                                           MongosType::waiting(waiting) ) ) ,
+                                           MongosType::waiting(waiting) <<
+                                           MongosType::mongoVersion(versionString) ) ) ,
                      true );
 
         conn.setWriteConcern( w);

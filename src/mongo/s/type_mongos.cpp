@@ -29,6 +29,9 @@ namespace mongo {
     BSONField<Date_t> MongosType::ping("ping");
     BSONField<int> MongosType::up("up");
     BSONField<bool> MongosType::waiting("waiting");
+    BSONField<string> MongosType::mongoVersion("mongoVersion");
+    BSONField<int> MongosType::configVersion("configVersion");
+
 
     MongosType::MongosType() {
         clear();
@@ -54,8 +57,8 @@ namespace mongo {
             *errMsg = stream() << "missing " << ping.name() << " field";
             return false;
         }
-        if (!(_up > 0)) {
-            *errMsg = stream() << "uptime must be positive";
+        if (!(_up >= 0)) {
+            *errMsg = stream() << "uptime must be positive or 0";
             return false;
         }
 
@@ -69,6 +72,8 @@ namespace mongo {
         if (_ping.millis > 0ULL) builder.append(ping(), _ping);
         if (_up > 0) builder.append(up(), _up);
         if (_waiting) builder.append(waiting(), _waiting);
+        builder.append(mongoVersion(), _mongoVersion);
+        builder.append(configVersion(), _configVersion);
 
         return builder.obj();
     }
@@ -83,6 +88,8 @@ namespace mongo {
         if (!FieldParser::extract(source, ping, 0ULL, &_ping, errMsg)) return false;
         if (!FieldParser::extract(source, up, 0, &_up, errMsg)) return false;
         if (!FieldParser::extract(source, waiting, false, &_waiting, errMsg)) return false;
+        if (!FieldParser::extract(source, mongoVersion, "", &_mongoVersion, errMsg)) return false;
+        if (!FieldParser::extract(source, configVersion, 0, &_configVersion, errMsg)) return false;
 
         return true;
     }
@@ -92,6 +99,8 @@ namespace mongo {
         _ping = 0ULL;
         _up = 0;
         _waiting = false;
+        _mongoVersion = "";
+        _configVersion = 0;
     }
 
     void MongosType::cloneTo(MongosType* other) const {
@@ -100,6 +109,8 @@ namespace mongo {
         other->_ping = _ping;
         other->_up = _up;
         other->_waiting = _waiting;
+        other->_mongoVersion = _mongoVersion;
+        other->_configVersion = _configVersion;
     }
 
 } // namespace mongo

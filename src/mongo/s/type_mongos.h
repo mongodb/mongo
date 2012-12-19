@@ -65,6 +65,8 @@ namespace mongo {
         static BSONField<Date_t> ping;      // last time it was seen alive
         static BSONField<int> up;           // uptime at the last ping
         static BSONField<bool> waiting;     // for testing purposes
+        static BSONField<string> mongoVersion; // version of mongos
+        static BSONField<int> configVersion; // config version of mongos
 
         //
         // mongos type methods
@@ -121,12 +123,20 @@ namespace mongo {
         void setWaiting(bool waiting) { _waiting = waiting; }
         bool getWaiting() const { return _waiting; }
 
+        void setMongoVersion(const std::string& mongoVersion) { _mongoVersion = mongoVersion; }
+        const std::string getMongoVersion() const { return _mongoVersion; }
+
+        void setConfigVersion(int configVersion) { _configVersion = configVersion; }
+        int getConfigVersion() const { return _configVersion; }
+
     private:
         // Convention: (M)andatory, (O)ptional, (S)pecial rule.
         string _name;                // (M) "host:port" for this mongos
         Date_t _ping;                // (M) last time it was seen alive
         int _up;                     // (M) uptime at the last ping
         bool _waiting;               // (M) for testing purposes
+        string _mongoVersion;        // (M) the mongodb version of the pinging mongos
+        int _configVersion;          // (M) the config version of the pinging mongos
     };
 
 }  // namespace mongo

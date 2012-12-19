@@ -441,15 +441,14 @@ serverOnlyFiles += mmapFiles
 
 serverOnlyFiles += [ "db/stats/snapshots.cpp" ]
 
-env.Library( "coreshard", [ "client/distlock.cpp",
-                            "s/balancer_lock.cpp",
-                            "s/config.cpp",
-                            "s/grid.cpp",
-                            "s/chunk.cpp",
-                            "s/shard.cpp",
-                            "s/shardkey.cpp"],
-                            LIBDEPS=['s/base'] )
-
+env.Library('coreshard', ['client/distlock.cpp',
+                          's/config.cpp',
+                          's/grid.cpp',
+                          's/chunk.cpp',
+                          's/shard.cpp',
+                          's/shardkey.cpp'],
+            LIBDEPS=['s/base']);
+    
 mongosLibraryFiles = [
     "s/interrupt_status_mongos.cpp",
     "s/strategy.cpp",
@@ -460,7 +459,6 @@ mongosLibraryFiles = [
     "s/request.cpp",
     "s/client_info.cpp",
     "s/cursors.cpp",
-    "s/config_migrate.cpp",
     "s/s_only.cpp",
     "s/balance.cpp",
     "s/balancer_policy.cpp",
@@ -607,7 +605,7 @@ env.Install( '#/', [
 mongos = env.Program(
     "mongos", [ "s/server.cpp"] ,
     LIBDEPS=["mongoscore", "coreserver", "coredb", "mongocommon", "coreshard", "dbcmdline", "ntservice",
-             "mongodandmongos"] + env['MODULE_LIBDEPS_MONGOS'])
+             "mongodandmongos", "s/upgrade"] + env['MODULE_LIBDEPS_MONGOS'])
 env.Install( '#/', mongos )
 
 env.Library("clientandshell", ["client/authentication_table_client.cpp",
@@ -645,6 +643,7 @@ test = testEnv.Install(
                        "testframework",
                        "gridfs",
                        "notmongodormongos",
+                       "s/upgrade",
                        "mocklib"]))
 
 if len(testEnv.subst('$PROGSUFFIX')):

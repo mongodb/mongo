@@ -148,4 +148,18 @@ namespace mongo {
         return cmp( s1, s2 ) < 0;
     }
 
+    int versionCmp(const StringData rhs, const StringData lhs) {
+        if (rhs == lhs) return 0;
+
+        // handle "1.2.3-" and "1.2.3-pre"
+        if (rhs.size() < lhs.size()) {
+            if (strncmp(rhs.rawData(), lhs.rawData(), rhs.size()) == 0 && lhs[rhs.size()] == '-') return +1;
+        }
+        else if (rhs.size() > lhs.size()) {
+            if (strncmp(rhs.rawData(), lhs.rawData(), lhs.size()) == 0 && rhs[lhs.size()] == '-') return -1;
+        }
+
+        return LexNumCmp::cmp(rhs, lhs, false);
+    }
+
 } // namespace mongo

@@ -485,6 +485,14 @@ namespace mongo {
                 _collections.erase( collName );
                 numCollsErased++;
             }
+            else if( !collObj[CollectionType::primary()].eoo() ){
+                // For future compatibility, explicitly ignore any collection with the
+                // "primary" field set.
+
+                // Erased in case it was previously sharded, dropped, then init'd as unsharded
+                _collections.erase( collName );
+                numCollsErased++;
+            }
             else{
                 _collections[ collName ] = CollectionInfo( collObj );
                 if( _collections[ collName ].isSharded() ) numCollsSharded++;
@@ -990,8 +998,7 @@ namespace mongo {
         try {
             // get this entry's ID so we can use on the exception code path too
             stringstream id;
-            static AtomicUInt num;
-            id << getHostNameCached() << "-" << terseCurrentTime() << "-" << num++;
+            id << getHostNameCached() << "-" << terseCurrentTime() << "-" << OID::gen();
             changeID = id.str();
 
             // send a copy of the message to the log in case it doesn't manage to reach config.changelog

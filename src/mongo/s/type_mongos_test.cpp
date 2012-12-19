@@ -47,7 +47,7 @@ namespace {
                                MongosType::waiting(false));
         ASSERT(mongos.parseBSON(objNoUp, &errMsg));
         ASSERT_EQUALS(errMsg, "");
-        ASSERT_FALSE(mongos.isValid(NULL));
+        ASSERT_TRUE(mongos.isValid(NULL));
     }
 
     TEST(Validity, Valid) {

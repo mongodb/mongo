@@ -308,41 +308,6 @@ namespace mongo {
         }
     }
 
-    int versionCmp(StringData rhs, StringData lhs) {
-        if ( rhs == lhs )
-            return 0;
-
-        // handle "1.2.3-" and "1.2.3-pre"
-        if (rhs.size() < lhs.size()) {
-            if (strncmp(rhs.rawData(), lhs.rawData(), rhs.size()) == 0 && lhs[rhs.size()] == '-')
-                return +1;
-        }
-        else if (rhs.size() > lhs.size()) {
-            if (strncmp(rhs.rawData(), lhs.rawData(), lhs.size()) == 0 && rhs[lhs.size()] == '-')
-                return -1;
-        }
-
-        return LexNumCmp::cmp(rhs, lhs, false);
-    }
-
-    class VersionCmpTest : public StartupTest {
-    public:
-        void run() {
-            verify( versionCmp("1.2.3", "1.2.3") == 0 );
-            verify( versionCmp("1.2.3", "1.2.4") < 0 );
-            verify( versionCmp("1.2.3", "1.2.20") < 0 );
-            verify( versionCmp("1.2.3", "1.20.3") < 0 );
-            verify( versionCmp("2.2.3", "10.2.3") < 0 );
-            verify( versionCmp("1.2.3", "1.2.3-") > 0 );
-            verify( versionCmp("1.2.3", "1.2.3-pre") > 0 );
-            verify( versionCmp("1.2.3", "1.2.4-") < 0 );
-            verify( versionCmp("1.2.3-", "1.2.3") < 0 );
-            verify( versionCmp("1.2.3-pre", "1.2.3") < 0 );
-
-            LOG(1) << "versionCmpTest passed" << endl;
-        }
-    } versionCmpTest;
-
     class VersionArrayTest : public StartupTest {
     public:
         void run() {

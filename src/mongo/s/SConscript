@@ -7,6 +7,7 @@ Import("env")
 #
 
 env.StaticLibrary('base', ['field_parser.cpp',
+                           'mongo_version_range.cpp',
                            'type_changelog.cpp',
                            'type_chunk.cpp',
                            'type_collection.cpp',
@@ -23,11 +24,16 @@ env.StaticLibrary('base', ['field_parser.cpp',
 
 env.CppUnitTest('field_parser_test', 'field_parser_test.cpp', LIBDEPS=['base'])
 
+env.CppUnitTest('mongo_version_range_test', 'mongo_version_range_test.cpp', 
+                LIBDEPS=['base', '$BUILD_DIR/mongo/bson'])
+
 env.CppUnitTest('type_changelog_test', 'type_changelog_test.cpp', LIBDEPS=['base'])
 
 env.CppUnitTest('type_chunk_test', 'type_chunk_test.cpp', LIBDEPS=['base'])
 
 env.CppUnitTest('type_collection_test', 'type_collection_test.cpp', LIBDEPS=['base'])
+
+env.CppUnitTest('type_config_version_test', 'type_config_version_test.cpp', LIBDEPS=['base'])
 
 env.CppUnitTest('type_database_test', 'type_database_test.cpp', LIBDEPS=['base'])
 
@@ -42,6 +48,21 @@ env.CppUnitTest('type_shard_test', 'type_shard_test.cpp', LIBDEPS=['base'])
 env.CppUnitTest('type_mongos_test', 'type_mongos_test.cpp', LIBDEPS=['base'])
 
 env.CppUnitTest('type_tags_test', 'type_tags_test.cpp', LIBDEPS=['base'])
+
+#
+# Upgrade library for config database
+# Built only on 'mongocommon' because clientandshell pulls in 'defaultversion'
+#
+
+env.Library('upgrade', ['cluster_client_internal.cpp',
+                        'config_upgrade.cpp',
+                        'config_upgrade_helpers.cpp',
+                        'config_upgrade_v0_to_v4.cpp',
+                        'config_upgrade_v3_to_v4.cpp'],
+            LIBDEPS=['base',
+                     '$BUILD_DIR/mongo/mongocommon'])
+
+# TODO: config upgrade tests are currently in dbtests
 
 #
 # Support for maintaining persistent sharding state and data.
