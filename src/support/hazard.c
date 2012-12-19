@@ -170,9 +170,9 @@ __wt_hazard_clear(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * A serious error, we should always find the hazard pointer.  Panic,
 	 * because using a page we didn't have pinned down implies corruption.
 	 */
-	__wt_errx(session,
+	WT_PANIC_ERRX(session,
 	    "session %p: clear hazard pointer: %p: not found", session, page);
-	return (__wt_panic(session));
+	return (WT_PANIC);
 }
 
 /*

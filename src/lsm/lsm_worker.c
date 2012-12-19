@@ -120,9 +120,14 @@ __wt_lsm_bloom_worker(void *arg)
 	}
 
 err:	__wt_free(session, cookie.chunk_array);
-	/* If the worker exited with failure, we can't continue. */
+	/*
+	 * The thread will only exit with failure if we run out of memory or
+	 * there is some other system driven failure. We can't keep going
+	 * after such a failure - ensure WiredTiger shuts down.
+	 */
 	if (ret != 0)
-		(void)__wt_panic(session);
+		WT_PANIC_ERR(session, ret,
+		    "Shutting down LSM bloom utility thread");
 	return (NULL);
 }
 
@@ -199,9 +204,14 @@ __wt_lsm_checkpoint_worker(void *arg)
 			__wt_sleep(0, 10000);
 	}
 err:	__wt_free(session, cookie.chunk_array);
-	/* If the worker exited with failure, we can't continue. */
-	if (WT_IS_ERROR(ret))
-		(void)__wt_panic(session);
+	/*
+	 * The thread will only exit with failure if we run out of memory or
+	 * there is some other system driven failure. We can't keep going
+	 * after such a failure - ensure WiredTiger shuts down.
+	 */
+	if (ret != 0 && ret != WT_NOTFOUND)
+		WT_PANIC_ERR(session, ret,
+		    "Shutting down LSM checkpoint utility thread");
 	return (NULL);
 }
 
