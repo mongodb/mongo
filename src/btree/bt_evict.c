@@ -324,7 +324,7 @@ __evict_worker(WT_SESSION_IMPL *session)
  * __wt_evict_readonly --
  *	Switch on/off read-only eviction.
  */
-static int
+static void
 __evict_readonly(WT_SESSION_IMPL *session, int readonly)
 {
 	WT_CACHE *cache;
@@ -335,8 +335,6 @@ __evict_readonly(WT_SESSION_IMPL *session, int readonly)
 		FLD_SET(cache->disabled_eviction, WT_EVICT_DIRTY);
 	else
 		FLD_CLR(cache->disabled_eviction, WT_EVICT_DIRTY);
-
-	return (0);
 }
 
 /*
