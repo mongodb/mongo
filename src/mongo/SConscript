@@ -220,6 +220,7 @@ env.StaticLibrary("coredb", [
         "db/commands/hashcmd.cpp",
         "db/commands/isself.cpp",
         "db/commands/mr_common.cpp",
+        "db/commands/rename_collection_common.cpp",
         "db/commands/server_status.cpp",
         "db/commands/parameters.cpp",
         "db/pipeline/pipeline.cpp",

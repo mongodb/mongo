@@ -25,6 +25,7 @@
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/commands/find_and_modify.h"
 #include "mongo/db/commands/mr.h"
+#include "mongo/db/commands/rename_collection.h"
 #include "../util/net/message.h"
 #include "../db/dbmessage.h"
 #include "../client/connpool.h"
@@ -504,9 +505,7 @@ namespace mongo {
             virtual void addRequiredPrivileges(const std::string& dbname,
                                                const BSONObj& cmdObj,
                                                std::vector<Privilege>* out) {
-                ActionSet actions;
-                actions.addAction(ActionType::renameCollection);
-                out->push_back(Privilege(dbname, actions));
+                rename_collection::addPrivilegesRequiredForRenameCollection(dbname, cmdObj, out);
             }
             bool run(const string& dbName, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
                 string fullnsFrom = cmdObj.firstElement().valuestrsafe();

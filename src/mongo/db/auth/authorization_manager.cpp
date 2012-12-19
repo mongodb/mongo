@@ -95,6 +95,7 @@ namespace {
         // Read role
         // TODO: Remove OLD_READ once commands require the proper actions
         readRoleActions.addAction(ActionType::oldRead);
+        readWriteRoleActions.addAction(ActionType::cloneCollectionLocalSource);
         readRoleActions.addAction(ActionType::collStats);
         readRoleActions.addAction(ActionType::dbHash);
         readRoleActions.addAction(ActionType::dbStats);
@@ -104,14 +105,16 @@ namespace {
         readWriteRoleActions.addAllActionsFromSet(readRoleActions);
         // TODO: Remove OLD_WRITE once commands require the proper actions
         readWriteRoleActions.addAction(ActionType::oldWrite);
+        readWriteRoleActions.addAction(ActionType::cloneCollectionTarget);
         readWriteRoleActions.addAction(ActionType::convertToCapped);
-        readWriteRoleActions.addAction(ActionType::createCollection); // TODO: should db admin get this also?
+        readWriteRoleActions.addAction(ActionType::createCollection); // db admin gets this also
         readWriteRoleActions.addAction(ActionType::dropCollection);
         readWriteRoleActions.addAction(ActionType::dropIndexes);
         readWriteRoleActions.addAction(ActionType::emptycapped);
         readWriteRoleActions.addAction(ActionType::ensureIndex);
         readWriteRoleActions.addAction(ActionType::insert);
         readWriteRoleActions.addAction(ActionType::remove);
+        readWriteRoleActions.addAction(ActionType::renameCollectionSameDB); // db admin gets this also
         readWriteRoleActions.addAction(ActionType::update);
 
         // User admin role
@@ -123,12 +126,13 @@ namespace {
         dbAdminRoleActions.addAction(ActionType::collStats);
         dbAdminRoleActions.addAction(ActionType::compact);
         dbAdminRoleActions.addAction(ActionType::convertToCapped);
+        dbAdminRoleActions.addAction(ActionType::createCollection); // read_write gets this also
         dbAdminRoleActions.addAction(ActionType::dbStats);
         dbAdminRoleActions.addAction(ActionType::dropCollection);
         dbAdminRoleActions.addAction(ActionType::profileEnable);
         dbAdminRoleActions.addAction(ActionType::profileRead);
         dbAdminRoleActions.addAction(ActionType::reIndex); // TODO: Should readWrite have this also? This isn't consistent with ENSURE_INDEX and DROP_INDEXES
-        dbAdminRoleActions.addAction(ActionType::renameCollection);
+        dbAdminRoleActions.addAction(ActionType::renameCollectionSameDB); // read_write gets this also
         dbAdminRoleActions.addAction(ActionType::validate);
 
         // Server admin role
