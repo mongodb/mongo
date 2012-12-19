@@ -37,6 +37,8 @@ namespace replset {
                                        _lastOpTimeFetched(0, 0),
                                        _lastH(0),
                                        _pause(true),
+                                       _appliedBuffer(true),
+                                       _assumingPrimary(false),
                                        _currentSyncTarget(NULL),
                                        _oplogMarkerTarget(NULL),
                                        _oplogMarker(true /* doHandshake */),
@@ -71,13 +73,27 @@ namespace replset {
     }
 
     void BackgroundSync::notify() {
-        boost::unique_lock<boost::mutex> lock(s_mutex);
-        if (s_instance == NULL) {
-            return;
+        {
+            boost::unique_lock<boost::mutex> lock(s_mutex);
+            if (s_instance == NULL) {
+                return;
+            }
         }
 
-        boost::unique_lock<boost::mutex> opLock(s_instance->_lastOpMutex);
-        s_instance->_lastOpCond.notify_all();
+        {
+            boost::unique_lock<boost::mutex> opLock(s_instance->_lastOpMutex);
+            s_instance->_lastOpCond.notify_all();
+        }
+
+        {
+            boost::unique_lock<boost::mutex> lock(s_instance->_mutex);
+
+            // If all ops in the buffer have been applied, unblock waitForRepl (if it's waiting)
+            if (s_instance->_buffer.empty()) {
+                s_instance->_appliedBuffer = true;
+                s_instance->_condvar.notify_all();
+            }
+        }
     }
 
     void BackgroundSync::notifierThread() {
@@ -223,7 +239,7 @@ namespace replset {
         MemberState state = theReplSet->state();
 
         // we want to pause when the state changes to primary
-        if (state.primary()) {
+        if (isAssumingPrimary() || state.primary()) {
             if (!_pause) {
                 stop();
             }
@@ -292,7 +308,7 @@ namespace replset {
                         return;
                     }
 
-                    if (theReplSet->isPrimary()) {
+                    if (isAssumingPrimary() || theReplSet->isPrimary()) {
                         return;
                     }
 
@@ -308,6 +324,11 @@ namespace replset {
                     break;
 
                 BSONObj o = r.nextSafe().getOwned();
+
+                {
+                    boost::unique_lock<boost::mutex> lock(_mutex);
+                    _appliedBuffer = false;
+                }
 
                 Timer timer;
                 // the blocking queue will wait (forever) until there's room for us to push
@@ -509,24 +530,14 @@ namespace replset {
     }
 
     void BackgroundSync::stop() {
-        {
-            boost::unique_lock<boost::mutex> lock(_mutex);
+        boost::unique_lock<boost::mutex> lock(_mutex);
 
-            _pause = true;
-            _currentSyncTarget = NULL;
-            _lastOpTimeFetched = OpTime(0,0);
-            _lastH = 0;
-            _queueCounter.numElems = 0;
-        }
-
-        if (!_buffer.empty()) {
-            log() << "replset " << _buffer.size()
-                  << " bytes were not applied from network buffer; this should"
-                  << " trigger a rollback on the former primary" << rsLog;
-        }
-
-        // get rid of pending ops (SERVER-7759 TODO)
-        _buffer.clear();
+        _pause = true;
+        _currentSyncTarget = NULL;
+        _lastOpTimeFetched = OpTime(0,0);
+        _lastH = 0;
+        _queueCounter.numElems = 0;
+        _condvar.notify_all();
     }
 
     void BackgroundSync::start() {
@@ -540,6 +551,26 @@ namespace replset {
         _lastH = theReplSet->lastH;
 
         LOG(1) << "replset bgsync fetch queue set to: " << _lastOpTimeFetched << " " << _lastH << rsLog;
+    }
+
+    bool BackgroundSync::isAssumingPrimary() {
+        boost::unique_lock<boost::mutex> lck(_mutex);
+        return _assumingPrimary;
+    }
+
+    void BackgroundSync::stopReplicationAndFlushBuffer() {
+        boost::unique_lock<boost::mutex> lck(_mutex);
+
+        // 1. Tell syncing to stop
+        _assumingPrimary = true;
+
+        // 2. Wait for syncing to stop and buffer to be applied
+        while (!(_pause && _appliedBuffer)) {
+            _condvar.wait(lck);
+        }
+
+        // 3. Now actually become primary
+        _assumingPrimary = false;
     }
 
     class ReplNetworkQueueSSS : public ServerStatusSection {

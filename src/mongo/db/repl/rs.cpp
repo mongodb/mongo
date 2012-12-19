@@ -102,9 +102,12 @@ namespace mongo {
     void ReplSetImpl::assumePrimary() {
         LOG(2) << "replSet assuming primary" << endl;
         verify( iAmPotentiallyHot() );
-        // so we are synchronized with _logOp().  perhaps locking local db only would suffice, but until proven 
-        // will take this route, and this is very rare so it doesn't matter anyway
-        Lock::GlobalWrite lk; 
+
+        // Wait for replication to stop and buffer to be consumed
+        LOG(1) << "replSet waiting for replication to finish before becoming primary" << endl;
+        replset::BackgroundSync::get()->stopReplicationAndFlushBuffer();
+
+        Lock::GlobalWrite lk;
 
         // Make sure that new OpTimes are higher than existing ones even with clock skew
         DBDirectClient c;

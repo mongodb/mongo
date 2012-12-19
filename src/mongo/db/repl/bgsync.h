@@ -73,6 +73,9 @@ namespace replset {
         long long _lastH;
         // if produce thread should be running
         bool _pause;
+        bool _appliedBuffer;
+        bool _assumingPrimary;
+        boost::condition _condvar;
 
         const Member* _currentSyncTarget;
 
@@ -117,6 +120,9 @@ namespace replset {
         // tells the sync target where this member is synced to
         void markOplog();
         bool hasCursor();
+
+        bool isAssumingPrimary();
+
     public:
         static BackgroundSync* get();
         static void shutdown();
@@ -138,6 +144,10 @@ namespace replset {
 
         // For monitoring
         BSONObj getCounters();
+
+        // Wait for replication to finish and buffer to be applied so that the member can become
+        // primary.
+        void stopReplicationAndFlushBuffer();
     };
 
 

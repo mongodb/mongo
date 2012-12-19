@@ -356,6 +356,7 @@ namespace replset {
                    (ops.getSize() < replBatchLimitBytes)) {
 
                 if (theReplSet->isPrimary()) {
+                    massert(16620, "there are ops to sync, but I'm primary", ops.empty());
                     return;
                 }
 
@@ -388,6 +389,7 @@ namespace replset {
                         // When would mgr be null?  During replsettest'ing.
                         if (mgr) mgr->send(boost::bind(&Manager::msgCheckNewState, theReplSet->mgr));
                         sleepsecs(1);
+                        // There should never be ops to sync in a 1-member set, anyway
                         return;
                     }
                 }
