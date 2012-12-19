@@ -456,7 +456,7 @@ __evict_file_request_walk(WT_SESSION_IMPL *session)
 	/*
 	 * Clear the session's request (we don't want to find it again
 	 * on our next walk, and doing it now should help avoid coding
-	 * errors later.  No publish is required, all we care about is
+	 * errors later).  No publish is required, all we care about is
 	 * that we see it change.
 	 */
 	syncop = request_session->syncop;
@@ -464,9 +464,8 @@ __evict_file_request_walk(WT_SESSION_IMPL *session)
 
 	WT_VERBOSE_RET(session, evictserver,
 	    "file request: %s",
-	    (syncop == WT_SYNC_COMPACT ? "sync-compact" :
 	    (syncop == WT_SYNC_DISCARD ? "sync-discard" :
-	    "sync-discard-nowrite")));
+	    "sync-discard-nowrite"));
 
 	/*
 	 * The eviction candidate list might reference pages we are
@@ -520,9 +519,6 @@ __evict_file(WT_SESSION_IMPL *session, int syncop)
 		WT_ERR(__wt_tree_walk(session, &next_page, WT_TREE_EVICT));
 
 		switch (syncop) {
-		case WT_SYNC_COMPACT:
-			WT_ERR(__wt_compact_evict(session, page));
-			break;
 		case WT_SYNC_DISCARD:
 			/* Write dirty pages for sync and sync with discard. */
 			if (__wt_page_is_modified(page))
@@ -578,6 +574,13 @@ __wt_sync_file(WT_SESSION_IMPL *session, int syncop)
 
 	switch (syncop) {
 	case WT_SYNC_INTERNAL:
+		/*
+		 * A further complication is that pages that appearing in a
+		 * checkpoint cannot be freed until the block lists for the
+		 * checkpoint are stable.  This is dealt with by locking out
+		 * eviction of dirty pages while writing the internal nodes
+		 * of a tree.
+		 */
 		__evict_readonly(session, 1);
 
 		/*
@@ -588,11 +591,12 @@ __wt_sync_file(WT_SESSION_IMPL *session, int syncop)
 		 */
 		walk_flags = WT_TREE_EVICT | WT_TREE_WAIT;
 		break;
+	case WT_SYNC_COMPACT:
 	case WT_SYNC_LEAF:
 		/*
-		 * Walk all leaf pages, waiting for concurrent activity to be
-		 * resolved.  Use hazard references, so we don't prevent other
-		 * eviction from the same subtree.
+		 * Walk all pages (or all leaf pages), waiting for concurrent
+		 * activity to be resolved.  Use hazard references so we don't
+		 * prevent other eviction from the same subtree.
 		 */
 		walk_flags = WT_TREE_CACHE | WT_TREE_WAIT;
 		break;
@@ -610,6 +614,9 @@ __wt_sync_file(WT_SESSION_IMPL *session, int syncop)
 	WT_RET(__wt_tree_walk(session, &page, walk_flags));
 	while (page != NULL) {
 		switch (syncop) {
+		case WT_SYNC_COMPACT:
+			WT_ERR(__wt_compact_evict(session, page));
+			break;
 		case WT_SYNC_LEAF:
 			/* Skip internal pages in the fuzzy sync. */
 			if (page->type == WT_PAGE_ROW_INT ||

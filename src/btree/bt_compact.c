@@ -28,25 +28,24 @@ __wt_compact(WT_SESSION_IMPL *session, const char *cfg[])
 		return (0);
 
 	/*
-	 * Invoke the eviction server to review in-memory pages to see if they
-	 * need to be re-written (we must use the eviction server because it's
-	 * the only thread that can safely look at page reconciliation values).
+	 * Walk the cache reviewing in-memory pages to see if they need to be
+	 * re-written.
 	 */
-	WT_RET(__wt_sync_file_serial(session, WT_SYNC_COMPACT));
-	WT_RET(__wt_evict_server_wake(session));
-	WT_RET(__wt_cond_wait(session, session->cond, 0));
-	WT_RET(session->syncop_ret);
+	WT_RET(__wt_bt_cache_op(session, NULL, WT_SYNC_COMPACT));
 
 	/*
-	 * Walk the tree reviewing all of the on-disk pages to see if they
-	 * need to be re-written.
+	 * Walk the tree, reviewing on-disk pages to see if they need to be
+	 * re-written.
 	 */
 	for (page = NULL;;) {
 		WT_RET(__wt_tree_walk(session, &page, WT_TREE_COMPACT));
 		if (page == NULL)
 			break;
 
-		/* Mark the page and tree dirty, we want to write this page. */
+		/*
+		 * The only pages returned by the tree walk function are pages
+		 * we want to re-write; mark the page and tree dirty.
+		 */
 		if ((ret = __wt_page_modify_init(session, page)) != 0) {
 			WT_TRET(__wt_stack_release(session, page));
 			WT_RET(ret);
