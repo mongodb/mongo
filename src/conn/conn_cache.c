@@ -83,6 +83,7 @@ __wt_cache_create(WT_CONNECTION_IMPL *conn, const char *cfg[])
 	WT_ERR(__wt_cond_alloc(session,
 	    "cache eviction server", 0, &cache->evict_cond));
 	__wt_spin_init(session, &cache->evict_lock);
+	__wt_spin_init(session, &cache->evict_walk_lock);
 
 	/*
 	 * We pull some values from the cache statistics (rather than have two
@@ -138,6 +139,7 @@ __wt_cache_destroy(WT_CONNECTION_IMPL *conn)
 	if (cache->evict_cond != NULL)
 		WT_TRET(__wt_cond_destroy(session, cache->evict_cond));
 	__wt_spin_destroy(session, &cache->evict_lock);
+	__wt_spin_destroy(session, &cache->evict_walk_lock);
 
 	__wt_free(session, conn->cache);
 	return (ret);

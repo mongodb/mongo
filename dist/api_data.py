@@ -561,6 +561,7 @@ flags = {
 		'TREE_DISCARD',
 		'TREE_EVICT',
 		'TREE_PREV',
+		'TREE_WAIT',
 	],
 	'verbose' : [
 		'VERB_block',

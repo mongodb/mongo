@@ -40,26 +40,19 @@ __wt_bt_cache_flush(WT_SESSION_IMPL *session, WT_CKPT *ckptbase, int op)
 	btree = session->btree;
 
 	/*
-	 * Ask the eviction thread to flush any dirty pages, and optionally
-	 * discard the file from the cache.
+	 * Flush dirty pages, and optionally discard the file from the cache.
 	 *
-	 * Reconciliation is just another reader of the page, so it's probably
-	 * possible to do this work in the current thread, rather than poking
-	 * the eviction thread.  The trick is for the sync thread to acquire
-	 * hazard pointers on each dirty page, which would block the eviction
-	 * thread from attempting to evict the pages.
+	 * Reconciliation is just another reader of the page, so with some
+	 * care, it can be done in the current thread, leaving the eviction
+	 * thread to keep freeing spaces if the cache is full.  Sync and
+	 * eviction cannot operate on the same page at the same time, and there
+	 * are different modes inside __wt_tree_walk to make sure they don't
+	 * trip over each other.
 	 *
-	 * I'm not doing it for a few reasons: (1) I don't want sync to update
-	 * the page's read-generation number, and eviction already knows how to
-	 * do that, (2) I don't want more than a single sync running at a time,
-	 * and calling eviction makes it work that way without additional work,
-	 * (3) sync and eviction cannot operate on the same page at the same
-	 * time and I'd rather they didn't operate in the same file at the same
-	 * time, and using eviction makes it work that way without additional
-	 * synchronization, (4) eventually we'll have async write I/O, and this
-	 * approach results in one less page writer in the system, (5) the code
-	 * already works that way.   None of these problems can't be fixed, but
-	 * I don't see a reason to change at this time, either.
+	 * A further complication is that pages that appear in a checkpoint
+	 * cannot be freed until the block lists for the checkpoint are stable.
+	 * This is dealt with this by locking out eviction of dirty pages while
+	 * writing the internal nodes of a tree.
 	 */
 
 	/*
@@ -71,18 +64,21 @@ __wt_bt_cache_flush(WT_SESSION_IMPL *session, WT_CKPT *ckptbase, int op)
 	 */
 	WT_PUBLISH(btree->ckpt, ckptbase);
 
-	/*
-	 * Schedule and wake the eviction server, then wait for the eviction
-	 * server to wake us.
-	 */
-	WT_ERR(__wt_sync_file_serial(session, op));
-	WT_ERR(__wt_evict_server_wake(session));
-	WT_ERR(__wt_cond_wait(session, session->cond, 0));
-	ret = session->syncop_ret;
+	/* Ordinary checkpoints are done in the calling thread. */
+	if (op == WT_SYNC_INTERNAL || op == WT_SYNC_LEAF)
+		ret = __wt_sync_file(session, op);
+	else {
+		/*
+		 * Schedule and wake the eviction server, then wait for the
+		 * eviction server to wake us.
+		 */
+		WT_ERR(__wt_sync_file_serial(session, op));
+		WT_ERR(__wt_evict_server_wake(session));
+		WT_ERR(__wt_cond_wait(session, session->cond, 0));
+		ret = session->syncop_ret;
+	}
 
 	switch (op) {
-	case WT_SYNC:
-		break;
 	case WT_SYNC_DISCARD:
 	case WT_SYNC_DISCARD_NOWRITE:
 		/* If discarding the tree, the root page should be gone. */

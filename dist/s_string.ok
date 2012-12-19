@@ -578,6 +578,7 @@ rdlock
 readlock
 readnear
 readnext
+readonly
 readprev
 readserver
 realloc

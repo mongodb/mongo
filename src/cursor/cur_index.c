@@ -54,13 +54,9 @@ __curindex_set_value(WT_CURSOR *cursor, ...)
 	WT_SESSION_IMPL *session;
 
 	CURSOR_API_CALL(cursor, session, set_value, NULL);
-	cursor->saved_err = ENOTSUP;
+	ret = ENOTSUP;
+err:	cursor->saved_err = ret;
 	F_CLR(cursor, WT_CURSTD_VALUE_SET);
-
-	if (0) {
-err:		cursor->saved_err = ret;
-		F_CLR(cursor, WT_CURSTD_VALUE_SET);
-	}
 	API_END(session);
 }
 
@@ -73,7 +69,6 @@ static int
 __curindex_move(WT_CURSOR_INDEX *cindex)
 {
 	WT_CURSOR **cp, *first;
-	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 	u_int i;
 
@@ -82,6 +77,7 @@ __curindex_move(WT_CURSOR_INDEX *cindex)
 
 	/* Point the public cursor to the key in the child. */
 	__wt_cursor_set_raw_key(&cindex->iface, &cindex->child->key);
+	F_CLR(&cindex->iface, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
 
 	for (i = 0, cp = cindex->cg_cursors;
 	    i < WT_COLGROUPS(cindex->table);
@@ -94,7 +90,7 @@ __curindex_move(WT_CURSOR_INDEX *cindex)
 			 * key columns, so we have to use the full key format,
 			 * not just the public columns.
 			 */
-			WT_ERR(__wt_schema_project_slice(session,
+			WT_RET(__wt_schema_project_slice(session,
 			    cp, cindex->index->key_plan,
 			    1, cindex->index->key_format,
 			    &cindex->iface.key));
@@ -104,15 +100,12 @@ __curindex_move(WT_CURSOR_INDEX *cindex)
 			(*cp)->key.size = first->key.size;
 			(*cp)->recno = first->recno;
 		}
-		F_SET(*cp, WT_CURSTD_KEY_SET);
-		WT_ERR((*cp)->search(*cp));
+		F_SET(*cp, WT_CURSTD_KEY_APP);
+		WT_RET((*cp)->search(*cp));
 	}
 
-	F_SET(&cindex->iface, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
-	if (0) {
-err:		F_CLR(&cindex->iface, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
-	}
-	return (ret);
+	F_SET(&cindex->iface, WT_CURSTD_KEY_RET | WT_CURSTD_VALUE_RET);
+	return (0);
 }
 
 /*
@@ -128,10 +121,10 @@ __curindex_next(WT_CURSOR *cursor)
 
 	cindex = (WT_CURSOR_INDEX *)cursor;
 	CURSOR_API_CALL(cursor, session, next, NULL);
+	F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
+
 	if ((ret = cindex->child->next(cindex->child)) == 0)
 		ret = __curindex_move(cindex);
-	else
-		F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
 
 err:	API_END(session);
 	return (ret);
@@ -150,10 +143,10 @@ __curindex_prev(WT_CURSOR *cursor)
 
 	cindex = (WT_CURSOR_INDEX *)cursor;
 	CURSOR_API_CALL(cursor, session, prev, NULL);
+	F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
+
 	if ((ret = cindex->child->prev(cindex->child)) == 0)
 		ret = __curindex_move(cindex);
-	else
-		F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
 
 err:	API_END(session);
 	return (ret);
@@ -174,8 +167,9 @@ __curindex_reset(WT_CURSOR *cursor)
 
 	cindex = (WT_CURSOR_INDEX *)cursor;
 	CURSOR_API_CALL(cursor, session, reset, NULL);
-	WT_TRET(cindex->child->reset(cindex->child));
+	F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
 
+	WT_TRET(cindex->child->reset(cindex->child));
 	for (i = 0, cp = cindex->cg_cursors;
 	    i < WT_COLGROUPS(cindex->table);
 	    i++, cp++) {
@@ -231,7 +225,7 @@ __curindex_search(WT_CURSOR *cursor)
 	WT_ERR(__curindex_move(cindex));
 
 	if (0) {
-err:		F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
+err:		F_CLR(cursor, WT_CURSTD_KEY_RET | WT_CURSTD_VALUE_RET);
 	}
 
 	API_END(session);
@@ -255,7 +249,7 @@ __curindex_search_near(WT_CURSOR *cursor, int *exact)
 	if ((ret = cindex->child->search_near(cindex->child, exact)) == 0)
 		ret = __curindex_move(cindex);
 	else
-		F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
+		F_CLR(cursor, WT_CURSTD_KEY_RET | WT_CURSTD_VALUE_RET);
 
 err:	API_END(session);
 	return (ret);

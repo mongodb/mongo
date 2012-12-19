@@ -8,13 +8,14 @@ BIN_DIR='.'
 ROOT_DIR=`/bin/pwd`
 SCRIPT_DIR=`dirname $0`
 RUNTIME=900
+REUSE=0
 VERBOSE=0
 PERF_BASE="M"
 
-USAGE="Usage: `basename $0` [-hsv] [-b binary dir] [-r root dir]"
+USAGE="Usage: `basename $0` [-hRsv] [-b binary dir] [-r root dir]"
 
 # Parse command line options.
-while getopts b:hr:sv OPT; do
+while getopts b:hRr:sv OPT; do
     case "$OPT" in
         b)
             BIN_DIR=$OPTARG
@@ -22,6 +23,9 @@ while getopts b:hr:sv OPT; do
         h)
             echo $USAGE
             exit 0
+            ;;
+        R)
+            REUSE=1
             ;;
         r)
             ROOT_DIR=$OPTARG
@@ -54,19 +58,20 @@ SHARED_OPTS="-${PERF_BASE} -R 1 -U 1 -l 60 -t 1 -v 1 -h ${DB_HOME} -u table:test
 CREATE_OPTS="$SHARED_OPTS -r 0"
 RUN_OPTS="$SHARED_OPTS -e -r $RUNTIME"
 
-if [ $VERBOSE -ne 0 ]; then
-	echo "Creating database and archiving it for reuse."
+if [ $REUSE -eq 0 ]; then
+	if [ $VERBOSE -ne 0 ]; then
+		echo "Creating database and archiving it for reuse."
+	fi
+	rm -rf $DB_HOME && mkdir $DB_HOME
+	$WTPERF $CREATE_OPTS
+
+	# Save the database so that it can be re-used by all runs.
+	# I'd rather not hard code WT_TEST, but need to get the path right.
+	rm -f $ROOT_DIR/WT_TEST.tgz
+	tar zcf $ROOT_DIR/WT_TEST.tgz -C $ROOT_DIR WT_TEST
 fi
-rm -rf $DB_HOME && mkdir $DB_HOME
-$WTPERF $CREATE_OPTS
 
-# Save the database so that it can be re-used by all runs.
 rm -rf $OUT_DIR && mkdir $OUT_DIR
-
-# I'd rather not hard code WT_TEST, but need to get the path right.
-rm -f $ROOT_DIR/WT_TEST.tgz
-tar zcf $ROOT_DIR/WT_TEST.tgz -C $ROOT_DIR WT_TEST
-
 
 # Run the benchmarks..
 # for ckpt in "" "-c 120"; do

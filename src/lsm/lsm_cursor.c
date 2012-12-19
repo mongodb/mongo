@@ -7,7 +7,7 @@
 
 #include "wt_internal.h"
 
-#define	FORALL_CURSORS(clsm, c, i)					\
+#define	WT_FORALL_CURSORS(clsm, c, i)					\
 	for ((i) = (clsm)->nchunks; (i) > 0;)				\
 		if (((c) = (clsm)->cursors[--i]) != NULL)
 
@@ -89,7 +89,7 @@ __clsm_close_cursors(WT_CURSOR_LSM *clsm)
 		clsm->primary_chunk = NULL;
 	}
 
-	FORALL_CURSORS(clsm, c, i) {
+	WT_FORALL_CURSORS(clsm, c, i) {
 		clsm->cursors[i] = NULL;
 		WT_RET(c->close(c));
 		if ((bloom = clsm->blooms[i]) != NULL) {
@@ -130,12 +130,14 @@ __clsm_open_cursors(
 		F_SET(clsm, WT_CLSM_OPEN_READ);
 
 	/* Copy the key, so we don't lose the cursor position. */
-	if (F_ISSET(c, WT_CURSTD_KEY_SET)) {
+	if (F_ISSET(c, WT_CURSTD_KEY_RET)) {
+		F_CLR(c, WT_CURSTD_KEY_RET);
 		if (c->key.data != c->key.mem)
 			WT_RET(__wt_buf_set(
 			    session, &c->key, c->key.data, c->key.size));
-		F_CLR(clsm, WT_CLSM_ITERATE_NEXT | WT_CLSM_ITERATE_PREV);
+		F_SET(c, WT_CURSTD_KEY_APP);
 	}
+	F_CLR(clsm, WT_CLSM_ITERATE_NEXT | WT_CLSM_ITERATE_PREV);
 
 	WT_RET(__clsm_close_cursors(clsm));
 
@@ -261,8 +263,8 @@ __clsm_get_current(
 	current = NULL;
 	multiple = 0;
 
-	FORALL_CURSORS(clsm, c, i) {
-		if (!F_ISSET(c, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET))
+	WT_FORALL_CURSORS(clsm, c, i) {
+		if (!F_ISSET(c, WT_CURSTD_KEY_SET))
 			continue;
 		if (current == NULL) {
 			current = c;
@@ -290,9 +292,10 @@ __clsm_get_current(
 	WT_RET(current->get_key(current, &c->key));
 	WT_RET(current->get_value(current, &c->value));
 
-	if ((*deletedp = __clsm_deleted(clsm, &c->value)) == 0)
-		F_SET(c, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
-	else
+	if ((*deletedp = __clsm_deleted(clsm, &c->value)) == 0) {
+		F_CLR(c, WT_CURSTD_KEY_APP | WT_CURSTD_VALUE_APP);
+		F_SET(c, WT_CURSTD_KEY_RET | WT_CURSTD_VALUE_RET);
+	} else
 		F_CLR(c, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
 
 	return (0);
@@ -351,7 +354,7 @@ __clsm_next(WT_CURSOR *cursor)
 	/* If we aren't positioned for a forward scan, get started. */
 	if (clsm->current == NULL || !F_ISSET(clsm, WT_CLSM_ITERATE_NEXT)) {
 		F_CLR(clsm, WT_CLSM_MULTIPLE);
-		FORALL_CURSORS(clsm, c, i) {
+		WT_FORALL_CURSORS(clsm, c, i) {
 			if (!F_ISSET(cursor, WT_CURSTD_KEY_SET)) {
 				WT_ERR(c->reset(c));
 				ret = c->next(c);
@@ -384,9 +387,8 @@ retry:		/*
 		 */
 		if (F_ISSET(clsm, WT_CLSM_MULTIPLE)) {
 			check = 0;
-			FORALL_CURSORS(clsm, c, i) {
-				if (!F_ISSET(c,
-				    WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET))
+			WT_FORALL_CURSORS(clsm, c, i) {
+				if (!F_ISSET(c, WT_CURSTD_KEY_SET))
 					continue;
 				if (check) {
 					WT_ERR(WT_LSM_CURCMP(session,
@@ -428,12 +430,12 @@ __clsm_prev(WT_CURSOR *cursor)
 	u_int i;
 	int check, cmp, deleted;
 
-	WT_LSM_ENTER(clsm, cursor, session, next);
+	WT_LSM_ENTER(clsm, cursor, session, prev);
 
 	/* If we aren't positioned for a reverse scan, get started. */
 	if (clsm->current == NULL || !F_ISSET(clsm, WT_CLSM_ITERATE_PREV)) {
 		F_CLR(clsm, WT_CLSM_MULTIPLE);
-		FORALL_CURSORS(clsm, c, i) {
+		WT_FORALL_CURSORS(clsm, c, i) {
 			if (!F_ISSET(cursor, WT_CURSTD_KEY_SET)) {
 				WT_ERR(c->reset(c));
 				ret = c->prev(c);
@@ -466,9 +468,8 @@ retry:		/*
 		 */
 		if (F_ISSET(clsm, WT_CLSM_MULTIPLE)) {
 			check = 0;
-			FORALL_CURSORS(clsm, c, i) {
-				if (!F_ISSET(c,
-				    WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET))
+			WT_FORALL_CURSORS(clsm, c, i) {
+				if (!F_ISSET(c, WT_CURSTD_KEY_SET))
 					continue;
 				if (check) {
 					WT_ERR(WT_LSM_CURCMP(session,
@@ -558,7 +559,7 @@ __clsm_search(WT_CURSOR *cursor)
 		clsm->current = NULL;
 	}
 
-	FORALL_CURSORS(clsm, c, i) {
+	WT_FORALL_CURSORS(clsm, c, i) {
 		/* If there is a Bloom filter, see if we can skip the read. */
 		if ((bloom = clsm->blooms[i]) != NULL) {
 			if (!have_hash) {
@@ -598,9 +599,10 @@ __clsm_search(WT_CURSOR *cursor)
 
 done:
 err:	API_END(session);
-	if (ret == 0)
-		F_SET(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
-	else
+	if (ret == 0) {
+		F_CLR(cursor, WT_CURSTD_KEY_APP | WT_CURSTD_VALUE_APP);
+		F_SET(cursor, WT_CURSTD_KEY_RET | WT_CURSTD_VALUE_RET);
+	} else
 		F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
 
 	return (ret);
@@ -650,7 +652,7 @@ __clsm_search_near(WT_CURSOR *cursor, int *exactp)
 	 * return the smaller cursor, or if no record at all was found,
 	 * WT_NOTFOUND.
 	 */
-	FORALL_CURSORS(clsm, c, i) {
+	WT_FORALL_CURSORS(clsm, c, i) {
 		c->set_key(c, &cursor->key);
 		if ((ret = c->search_near(c, &cmp)) == WT_NOTFOUND) {
 			ret = 0;
@@ -761,9 +763,10 @@ err:	API_END(session);
 	if (larger != NULL)
 		WT_TRET(larger->reset(larger));
 
-	if (ret == 0)
-		F_SET(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
-	else
+	if (ret == 0) {
+		F_CLR(cursor, WT_CURSTD_KEY_APP | WT_CURSTD_VALUE_APP);
+		F_SET(cursor, WT_CURSTD_KEY_RET | WT_CURSTD_VALUE_RET);
+	} else
 		F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
 
 	return (ret);

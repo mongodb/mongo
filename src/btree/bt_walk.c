@@ -226,30 +226,59 @@ descend:	for (;;) {
 			}
 
 			/*
-			 * The eviction server walks an in-memory tree for two
-			 * reasons:
+			 * There are several reasons to walk an in-memory tree:
 			 *
-			 * (1) to sync a file (write all dirty pages); and
-			 * (2) to find pages to evict.
+			 * (1) to write all dirty leaf nodes;
+			 * (2) to find pages to evict;
+			 * (3) to find pages for compaction; and
+			 * (4) to write internal nodes (creating a checkpoint);
+			 * (5) to close a file, discarding pages;
+			 * (6) to perform cursor scans.
 			 *
-			 * We want all ordinary in-memory pages, and we swap
-			 * the state to WT_REF_EVICT_WALK temporarily to avoid
-			 * the page being evicted by another thread while it is
-			 * being evaluated.
+			 * For cases (2)-(4), we want all ordinary in-memory
+			 * pages, and we swap the state to WT_REF_EVICT_WALK
+			 * temporarily to avoid the page being evicted by
+			 * another thread while it is being evaluated.  The
+			 * other cases use __wt_page_in to get hazard pointers
+			 * and protect the page from eviction that way.
 			 */
 			set_read_gen = 0;
 			if (eviction) {
-				if (!WT_ATOMIC_CAS(ref->state,
-				    WT_REF_MEM, WT_REF_EVICT_WALK))
-					break;
+retry:				if (!WT_ATOMIC_CAS(ref->state,
+				    WT_REF_MEM, WT_REF_EVICT_WALK)) {
+					if (!LF_ISSET(WT_TREE_WAIT) ||
+					    ref->state == WT_REF_DELETED ||
+					    ref->state == WT_REF_DISK)
+						break;
+
+					/*
+					 * A walk to checkpoint the file may
+					 * collide with the current LRU
+					 * eviction walk.
+					 *
+					 * If so, clear the LRU walk, or the
+					 * checkpoint will be blocked until the
+					 * eviction thread next wakes up and
+					 * decides to search for some more
+					 * pages to evict.
+					 */
+					__wt_evict_clear_tree_walk(
+					    session, NULL);
+					__wt_yield();
+					goto retry;
+				}
 			} else if (cache) {
 				/*
 				 * Only look at pages that are in memory.
 				 * There is a race here, but worse case is
 				 * that the page will be read back in to cache.
 				 */
-				if (ref->state != WT_REF_MEM &&
-				    ref->state != WT_REF_EVICT_WALK)
+				while (LF_ISSET(WT_TREE_WAIT) &&
+				    (ref->state == WT_REF_LOCKED ||
+				     ref->state == WT_REF_READING))
+					__wt_yield();
+				if (ref->state == WT_REF_DELETED ||
+				    ref->state == WT_REF_DISK)
 					break;
 				/* Grab a hazard pointer. */
 				WT_RET(__wt_page_in(session, page, ref));
