@@ -368,16 +368,6 @@ namespace mongo {
         return QueryOptions(0);
     }
 
-    void DBClientWithCommands::setAuthenticationTable( const AuthenticationTable& auth ) {
-        _authTable = auth;
-        _hasAuthentication = true;
-    }
-
-    void DBClientWithCommands::clearAuthenticationTable() {
-        _authTable.clearAuth(); // This probably isn't necessary, but better to be safe.
-        _hasAuthentication = false;
-    }
-
     inline bool DBClientWithCommands::runCommand(const string &dbname,
                                                  const BSONObj& cmd,
                                                  BSONObj &info,

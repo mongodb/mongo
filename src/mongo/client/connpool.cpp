@@ -113,7 +113,6 @@ namespace mongo {
                 c.conn = NULL;
             }
             if ( alive ) {
-                c.conn->clearAuthenticationTable();
                 all.push_back( c );
             }
         }

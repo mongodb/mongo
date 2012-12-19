@@ -90,8 +90,6 @@ namespace mongo {
         // Returns true if this AuthenticationInfo has been auth'd to use the internal user
         bool usingInternalUser();
 
-        const AuthenticationTable getAuthTable() const;
-
         // When TemporaryAuthReleaser goes out of scope it clears the temporary authentication set
         // in its AuthenticationInfo object, unless that AuthenticationInfo already had temporary
         // auth set at the time that the TemporaryAuthReleaser was initialized.
