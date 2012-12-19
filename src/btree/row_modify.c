@@ -461,14 +461,13 @@ __wt_update_serial_func(WT_SESSION_IMPL *session, void *args)
 	    &upd_entry, &old_upd, &new_upd, &upd, &upd_obsolete);
 
 	/*
-	 * Check the page's write-generation: if that fails, check whether we
-	 * are still in the expected position, and no update has been added
-	 * where ours belongs.  If a new update has been installed, check
-	 * whether it conflicts.
+	 * Ignore the page's write-generation (other than the special case of
+	 * it wrapping).  If we're still in the expected position, we're good
+	 * to go and no update has been added where ours belongs.  If a new
+	 * update has been added, check if our update is still permitted.
 	 */
 	WT_RET(__wt_page_write_gen_wrapped_check(page));
-
-	if (page->modify->write_gen != write_gen && old_upd != *upd_entry)
+	if (old_upd != *upd_entry)
 		WT_RET(__wt_update_check(session, page, *upd_entry));
 
 	upd->next = *upd_entry;
