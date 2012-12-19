@@ -1,6 +1,6 @@
 /*
  * DO NOT EDIT: automatically built by dist/flags.py.
- * API flags section: BEGIN
+ * flags section: BEGIN
  */
 #define	WT_CACHE_POOL_RUN				0x00000001
 #define	WT_CONN_CACHE_POOL				0x00000020
@@ -37,6 +37,6 @@
 #define	WT_VERB_verify					0x00000002
 #define	WT_VERB_write					0x00000001
 /*
- * API flags section: END
- * DO NOT EDIT: automatically built by dist/api_flags.py.
+ * flags section: END
+ * DO NOT EDIT: automatically built by dist/flags.py.
  */

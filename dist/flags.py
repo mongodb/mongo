@@ -92,7 +92,7 @@ for f in sorted(flag_cnt.items(),\
 	for m in flag_name[f[0]]:
 		mask &= ~name_mask[m]
 	if mask == 0:
-		print >>sys.stder, "api_flags: ran out of flags at " + m + " method",
+		print >>sys.stder, "flags.py: ran out of flags at " + m + " method",
 		sys.exit(1)
 	for b in bits:
 		if mask & b:
@@ -117,12 +117,12 @@ tfile = open(tmp_file, 'w')
 skip = 0
 for line in open('../src/include/flags.h', 'r'):
 	if skip:
-		if line.count('API flags section: END'):
+		if line.count('flags section: END'):
 			tfile.write('/*\n' + line)
 			skip = 0
 	else:
 		tfile.write(line)
-	if line.count('API flags section: BEGIN'):
+	if line.count('flags section: BEGIN'):
 		skip = 1
 		tfile.write(' */\n')
 		tfile.write(flag_info)
