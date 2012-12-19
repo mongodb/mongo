@@ -111,7 +111,6 @@ namespace mongo {
         static ClientInfo* create(AbstractMessagingPort* messagingPort);
         const AuthenticationInfo* getAuthenticationInfo() const { return (AuthenticationInfo*)&_ai; }
         AuthenticationInfo* getAuthenticationInfo() { return (AuthenticationInfo*)&_ai; }
-        bool isAdmin() { return _ai.isAuthorized( "admin" ); }
 
     private:
         AuthenticationInfo _ai;
