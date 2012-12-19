@@ -1204,7 +1204,6 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="server.cpp" />
     <ClCompile Include="shard.cpp" />
     <ClCompile Include="shardkey.cpp" />
-    <ClCompile Include="stats.cpp" />
     <ClCompile Include="strategy.cpp" />
     <ClCompile Include="strategy_shard.cpp" />
     <ClCompile Include="strategy_single.cpp" />
@@ -1523,7 +1522,6 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="shard.h" />
     <ClInclude Include="shardkey.h" />
     <ClInclude Include="shard_version.h" />
-    <ClInclude Include="stats.h" />
     <ClInclude Include="strategy.h" />
     <ClInclude Include="..\util\background.h" />
     <ClInclude Include="..\db\commands.h" />

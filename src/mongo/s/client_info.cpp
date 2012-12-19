@@ -32,7 +32,6 @@
 #include "request.h"
 #include "config.h"
 #include "chunk.h"
-#include "stats.h"
 #include "cursors.h"
 #include "grid.h"
 #include "s/writeback_listener.h"

@@ -32,7 +32,6 @@
 #include "mongo/s/cursors.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request.h"
-#include "mongo/s/stats.h"
 #include "mongo/util/mongoutils/str.h"
 
 // error codes 8010-8040

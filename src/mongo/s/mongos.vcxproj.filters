@@ -137,9 +137,6 @@
     <ClCompile Include="shardkey.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="stats.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="strategy.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -1030,9 +1027,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="shardkey.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="stats.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="util.h">
