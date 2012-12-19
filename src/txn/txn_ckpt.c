@@ -257,11 +257,12 @@ __drop_to(WT_CKPT *ckptbase, const char *name, size_t len)
 }
 
 /*
- * __wt_checkpoint --
+ * __checkpoint_worker --
  *	Checkpoint a tree.
  */
-int
-__wt_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
+static int
+__checkpoint_worker(
+    WT_SESSION_IMPL *session, const char *cfg[], int is_checkpoint)
 {
 	WT_BTREE *btree;
 	WT_CKPT *ckpt, *ckptbase;
@@ -272,7 +273,7 @@ __wt_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_TXN *txn;
 	WT_TXN_ISOLATION saved_isolation;
 	const char *name;
-	int deleted, force, is_checkpoint, track_ckpt;
+	int deleted, force, track_ckpt;
 	char *name_alloc;
 
 	conn = S2C(session);
@@ -282,12 +283,6 @@ __wt_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	txn = &session->txn;
 	saved_isolation = txn->isolation;
 	track_ckpt = 1;
-
-	/*
-	 * We're called in two ways: either because a handle is closing or
-	 * session.checkpoint was called, figure it out.
-	 */
-	is_checkpoint = cfg == NULL ? 0 : 1;
 
 	/*
 	 * Checkpoint handles are read-only by definition and don't participate
@@ -392,7 +387,7 @@ __wt_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	 * means it must exist.
 	 */
 	force = 0;
-	if (!btree->modified) {
+	if (!btree->modified && cfg != NULL) {
 		ret = __wt_config_gets(session, cfg, "force", &cval);
 		if (ret != 0 && ret != WT_NOTFOUND)
 			WT_ERR(ret);
@@ -621,4 +616,24 @@ skip:	__wt_meta_ckptlist_free(session, ckptbase);
 	__wt_free(session, name_alloc);
 	txn->isolation = saved_isolation;
 	return (ret);
+}
+
+/*
+ * __wt_checkpoint --
+ *	Checkpoint a file.
+ */
+int
+__wt_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
+{
+	return (__checkpoint_worker(session, cfg, 1));
+}
+
+/*
+ * __wt_checkpoint_close --
+ *	Checkpoint a file as part of a close.
+ */
+int
+__wt_checkpoint_close(WT_SESSION_IMPL *session, const char *cfg[])
+{
+	return (__checkpoint_worker(session, cfg, 0));
 }

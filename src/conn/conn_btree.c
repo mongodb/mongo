@@ -186,7 +186,7 @@ __wt_conn_btree_sync_and_close(WT_SESSION_IMPL *session)
 
 	if (!F_ISSET(btree,
 	    WT_BTREE_SALVAGE | WT_BTREE_UPGRADE | WT_BTREE_VERIFY))
-		ret = __wt_checkpoint(session, NULL);
+		ret = __wt_checkpoint_close(session, NULL);
 
 	WT_TRET(__wt_btree_close(session));
 	F_CLR(btree, WT_BTREE_OPEN | WT_BTREE_SPECIAL_FLAGS);

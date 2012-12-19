@@ -144,7 +144,6 @@ __wt_lsm_checkpoint_worker(void *arg)
 	WT_LSM_TREE *lsm_tree;
 	WT_LSM_WORKER_COOKIE cookie;
 	WT_SESSION_IMPL *session;
-	const char *cfg[] = API_CONF_DEFAULTS(session, checkpoint, NULL);
 	u_int i, j;
 
 	lsm_tree = arg;
@@ -170,13 +169,9 @@ __wt_lsm_checkpoint_worker(void *arg)
 			if (F_ISSET(chunk, WT_LSM_CHUNK_ONDISK))
 				continue;
 
-			/*
-			 * NOTE: we pass a non-NULL config, because otherwise
-			 * __wt_checkpoint thinks we're closing the file.
-			 */
 			WT_WITH_SCHEMA_LOCK(session,
 			    ret = __wt_schema_worker(session,
-			    chunk->uri, __wt_checkpoint, cfg, 0));
+			    chunk->uri, __wt_checkpoint, NULL, 0));
 
 			if (ret != 0) {
 				__wt_err(session, ret,
