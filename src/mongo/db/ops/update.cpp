@@ -202,6 +202,9 @@ namespace mongo {
                     debug.upsert = true;
                     BSONObj no = updateobj;
                     theDataFileMgr.insertWithObjMod(ns, no, false, su);
+                    if ( logop )
+                        logOp( "i", ns, no, 0, 0, fromMigrate );
+
                     return UpdateResult( 0 , 0 , 1 , no );
                 }
             }
