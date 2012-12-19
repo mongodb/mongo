@@ -225,8 +225,7 @@ __wt_insert_serial_func(WT_SESSION_IMPL *session, void *args)
 	 * are still in the expected position, and no item has been added where
 	 * our insert belongs.
 	 */
-	if (page->modify->write_gen + 1 == page->modify->disk_gen)
-		return (WT_RESTART);
+	WT_RET(__wt_page_write_gen_wrapped_check(page));
 
 	if (page->modify->write_gen != write_gen) {
 		for (i = 0; i < skipdepth; i++) {
@@ -464,13 +463,13 @@ __wt_update_serial_func(WT_SESSION_IMPL *session, void *args)
 	/*
 	 * Check the page's write-generation: if that fails, check whether we
 	 * are still in the expected position, and no update has been added
-	 * where ours belongs.
+	 * where ours belongs.  If a new update has been installed, check
+	 * whether it conflicts.
 	 */
-	if (page->modify->write_gen + 1 == page->modify->disk_gen)
-		return (WT_RESTART);
+	WT_RET(__wt_page_write_gen_wrapped_check(page));
 
 	if (page->modify->write_gen != write_gen && old_upd != *upd_entry)
-		return (WT_RESTART);
+		WT_RET(__wt_update_check(session, page, *upd_entry));
 
 	upd->next = *upd_entry;
 	/*
