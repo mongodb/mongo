@@ -658,6 +658,16 @@ namespace replset {
         return _forceSyncTarget != 0;
     }
 
+    bool ReplSetImpl::shouldChangeSyncTarget(const OpTime& targetOpTime) const {
+        for (Member *m = _members.head(); m; m = m->next()) {
+            if (m->syncable() && targetOpTime.getSecs()+30 < m->hbinfo().opTime.getSecs()) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     void ReplSetImpl::_syncThread() {
         StateBox::SP sp = box.get();
         if( sp.state.primary() ) {

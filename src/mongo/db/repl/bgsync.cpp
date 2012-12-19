@@ -296,11 +296,9 @@ namespace replset {
                         return;
                     }
 
-                    {
-                        boost::unique_lock<boost::mutex> lock(_mutex);
-                        if (!_currentSyncTarget || !_currentSyncTarget->hbinfo().hbstate.readable()) {
-                            return;
-                        }
+                    // re-evaluate quality of sync target
+                    if (shouldChangeSyncTarget()) {
+                        return;
                     }
 
                     r.more();
@@ -346,6 +344,20 @@ namespace replset {
             // looping back is ok because this is a tailable cursor
         }
     }
+
+    bool BackgroundSync::shouldChangeSyncTarget() {
+        boost::unique_lock<boost::mutex> lock(_mutex);
+
+        // is it even still around?
+        if (!_currentSyncTarget || !_currentSyncTarget->hbinfo().hbstate.readable()) {
+            return true;
+        }
+
+        // check other members: is any member's optime more than 30 seconds ahead of the guy we're
+        // syncing from?
+        return theReplSet->shouldChangeSyncTarget(_currentSyncTarget->hbinfo().opTime);
+    }
+
 
     bool BackgroundSync::peek(BSONObj* op) {
         {

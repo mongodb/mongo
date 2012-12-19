@@ -77,6 +77,9 @@ namespace mongo {
 
         bool potentiallyHot() const { return _config.potentiallyHot(); } // not arbiter, not priority 0
         void summarizeMember(stringstream& s) const;
+        // If we could sync from this member.  This doesn't tell us anything about the quality of
+        // this member, just if they are a possible sync target.
+        bool syncable() const;
 
     private:
         friend class ReplSetImpl;
@@ -333,6 +336,9 @@ namespace mongo {
         OpTime lastOpTimeWritten;
         long long lastH; // hash we use to make sure we are reading the right flow of ops and aren't on an out-of-date "fork"
         bool forceSyncFrom(const string& host, string& errmsg, BSONObjBuilder& result);
+        // Check if the current sync target is suboptimal. This must be called while holding a mutex
+        // that prevents the sync source from changing.
+        bool shouldChangeSyncTarget(const OpTime& target) const;
 
         /**
          * Find the closest member (using ping time) with a higher latest optime.
