@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include "mongo/base/string_data.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -57,7 +58,7 @@ namespace mongo {
          * Returns true if the given fieldname is the name of one element of the (potentially)
          * compound key described by this KeyPattern.
          */
-        bool hasField( const char* fieldname ) const { return _pattern.hasField( fieldname ); }
+        bool hasField( const StringData& fieldname ) const { return _pattern.hasField( fieldname ); }
 
         /*
          * Gets the element of this pattern corresponding to the given fieldname.
