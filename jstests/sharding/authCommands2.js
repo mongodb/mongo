@@ -56,7 +56,6 @@ while ( str.length < 8000 ) {
 for ( var i = 0; i < 100; i++ ) {
     for ( var j = 0; j < 10; j++ ) {
         testDB.foo.save({i:i, j:j, str:str});
-        testDB.bar.save({i:i, j:j, str:str}); // non-sharded collection with same data
     }
 }
 testDB.getLastError( 'majority' );
@@ -113,8 +112,8 @@ var checkReadOps = function( hasReadAuth ) {
         checkCommandSucceeded( testDB, {dbstats : 1} );
         checkCommandSucceeded( testDB, {collstats : 'foo'} );
 
-        // inline map-reduce works read-only on non-sharded collections
-        var res = checkCommandSucceeded( testDB, {mapreduce : 'bar', map : map, reduce : reduce,
+        // inline map-reduce works read-only
+        var res = checkCommandSucceeded( testDB, {mapreduce : 'foo', map : map, reduce : reduce,
                                                   out : {inline : 1}});
         assert.eq( 100, res.results.length );
         assert.eq( 45, res.results[0].value );
@@ -150,11 +149,6 @@ var checkWriteOps = function( hasWriteAuth ) {
         assert.eq( null, testDB.runCommand({getlasterror : 1}).err );
         checkCommandSucceeded( testDB, {reIndex:'foo'} );
         checkCommandSucceeded( testDB, {repairDatabase : 1} );
-        // Test both inline and regular map-reduce
-        var res = checkCommandSucceeded( testDB, {mapreduce : 'foo', map : map, reduce : reduce,
-                                                  out : {inline : 1}});
-        assert.eq( 100, res.results.length );
-        assert.eq( 45, res.results[0].value );
         checkCommandSucceeded( testDB, {mapreduce : 'foo', map : map, reduce : reduce,
                                         out : 'mrOutput'} );
         assert.eq( 100, testDB.mrOutput.count() );
@@ -175,9 +169,6 @@ var checkWriteOps = function( hasWriteAuth ) {
                                       update: {$set: {b:1}}} );
         checkCommandFailed( testDB, {reIndex:'foo'} );
         checkCommandFailed( testDB, {repairDatabase : 1} );
-        // Test both inline and regular map-reduce.  Inline MR on sharded collections requires write access.
-        checkCommandFailed( testDB, {mapreduce : 'foo', map : map, reduce : reduce,
-                                     out : {inline : 1}} );
         checkCommandFailed( testDB, {mapreduce : 'foo', map : map, reduce : reduce,
                                      out : 'mrOutput'} );
         checkCommandFailed( testDB, {drop : 'foo'} );
@@ -238,6 +229,7 @@ var checkAdminWriteOps = function( hasWriteAuth ) {
         checkCommandFailed( testDB, { $eval : 'return db.baz.insert({a:1});'} );
         // Takes full admin privilege to run $eval, even if it's only doing a read operation
         checkCommandFailed( testDB, { $eval : 'return db.baz.findOne();'} );
+
     }
 }
 
