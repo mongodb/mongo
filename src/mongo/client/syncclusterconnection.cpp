@@ -274,20 +274,6 @@ namespace mongo {
 
     // TODO: logout is required for use of this class outside of a cluster environment
 
-    void SyncClusterConnection::setAuthenticationTable( const AuthenticationTable& auth ) {
-        for( size_t i = 0; i < _conns.size(); ++i ) {
-            _conns[i]->setAuthenticationTable( auth );
-        }
-        DBClientWithCommands::setAuthenticationTable( auth );
-    }
-
-    void SyncClusterConnection::clearAuthenticationTable() {
-        for( size_t i = 0; i < _conns.size(); ++i ) {
-            _conns[i]->clearAuthenticationTable();
-        }
-        DBClientWithCommands::clearAuthenticationTable();
-    }
-
     auto_ptr<DBClientCursor> SyncClusterConnection::query(const string &ns, Query query, int nToReturn, int nToSkip,
             const BSONObj *fieldsToReturn, int queryOptions, int batchSize ) {
         _lastErrors.clear();

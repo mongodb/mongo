@@ -135,8 +135,6 @@ namespace mongo {
                   log() << "could not authenticate against " << _hostport << ", " << err << rsLog;
                   return false;
               }
-              connInfo->cc->setAuthenticationTable(
-                      AuthenticationTable::getInternalSecurityAuthenticationTable() );
           }
 
           return true;

@@ -27,20 +27,12 @@ namespace mongo {
 
     ScopedDbConnection* ScopedDbConnection::getScopedDbConnection() {
         ScopedDbConnection* conn = new ScopedDbConnection();
-        if ( !noauth ) {
-            conn->_conn->setAuthenticationTable(
-                    ClientBasic::getCurrent()->getAuthenticationInfo()->getAuthTable() );
-        }
         return conn;
     }
 
     ScopedDbConnection* ScopedDbConnection::getScopedDbConnection(const string& host,
                                                                   double socketTimeout) {
         ScopedDbConnection* conn = new ScopedDbConnection(host, socketTimeout);
-        if ( !noauth ) {
-            conn->_conn->setAuthenticationTable(
-                    ClientBasic::getCurrent()->getAuthenticationInfo()->getAuthTable() );
-        }
         return conn;
     }
 
@@ -52,20 +44,12 @@ namespace mongo {
 
     ScopedDbConnection* ScopedDbConnection::getInternalScopedDbConnection() {
         ScopedDbConnection* conn = new ScopedDbConnection();
-        if ( !noauth ) {
-            conn->_conn->setAuthenticationTable(
-                    AuthenticationTable::getInternalSecurityAuthenticationTable() );
-        }
         return conn;
     }
 
     ScopedDbConnection* ScopedDbConnection::getInternalScopedDbConnection(const string& host,
                                                                           double socketTimeout) {
         ScopedDbConnection* conn = new ScopedDbConnection(host, socketTimeout);
-        if ( !noauth ) {
-            conn->_conn->setAuthenticationTable(
-                    AuthenticationTable::getInternalSecurityAuthenticationTable() );
-        }
         return conn;
     }
 

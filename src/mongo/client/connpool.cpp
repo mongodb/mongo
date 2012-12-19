@@ -101,10 +101,6 @@ namespace mongo {
             _pool.pop();
             bool res;
             bool alive = false;
-            // When a connection is in the pool it doesn't have an AuthenticationTable set.
-            // Set the table temporarily for the isMaster command.
-            c.conn->setAuthenticationTable(
-                    AuthenticationTable::getInternalSecurityAuthenticationTable() );
             try {
                 c.conn->isMaster( res );
                 alive = true;

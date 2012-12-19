@@ -413,12 +413,6 @@ namespace mongo {
 
             uassert( 15847, str::stream() << "can't authenticate to server "
                                           << conn->getServerAddress() << causedBy( err ), result );
-
-            if ( conn->type() == ConnectionString::SYNC ) {
-                // Connections to the config servers should always have full access.
-                conn->setAuthenticationTable(
-                        AuthenticationTable::getInternalSecurityAuthenticationTable() );
-            }
         }
 
         if ( _shardedConnections && versionManager.isVersionableCB( conn ) ) {
