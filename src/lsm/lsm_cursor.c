@@ -292,9 +292,10 @@ __clsm_get_current(
 	WT_RET(current->get_key(current, &c->key));
 	WT_RET(current->get_value(current, &c->value));
 
-	if ((*deletedp = __clsm_deleted(clsm, &c->value)) == 0)
+	if ((*deletedp = __clsm_deleted(clsm, &c->value)) == 0) {
+		F_CLR(c, WT_CURSTD_KEY_APP | WT_CURSTD_VALUE_APP);
 		F_SET(c, WT_CURSTD_KEY_RET | WT_CURSTD_VALUE_RET);
-	else
+	} else
 		F_CLR(c, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
 
 	return (0);
@@ -545,7 +546,6 @@ __clsm_search(WT_CURSOR *cursor)
 
 	WT_LSM_ENTER(clsm, cursor, session, search);
 	WT_CURSOR_NEEDKEY(cursor);
-	F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
 	F_CLR(clsm, WT_CLSM_ITERATE_NEXT | WT_CLSM_ITERATE_PREV);
 
 	/*
@@ -599,10 +599,11 @@ __clsm_search(WT_CURSOR *cursor)
 
 done:
 err:	API_END(session);
-	if (ret == 0)
+	if (ret == 0) {
+		F_CLR(cursor, WT_CURSTD_KEY_APP | WT_CURSTD_VALUE_APP);
 		F_SET(cursor, WT_CURSTD_KEY_RET | WT_CURSTD_VALUE_RET);
-	else
-		F_CLR(cursor, WT_CURSTD_KEY_RET | WT_CURSTD_VALUE_RET);
+	} else
+		F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
 
 	return (ret);
 }
@@ -626,7 +627,6 @@ __clsm_search_near(WT_CURSOR *cursor, int *exactp)
 
 	WT_LSM_ENTER(clsm, cursor, session, search_near);
 	WT_CURSOR_NEEDKEY(cursor);
-	F_CLR(cursor, WT_CURSTD_KEY_APP | WT_CURSTD_VALUE_APP);
 	F_CLR(clsm, WT_CLSM_ITERATE_NEXT | WT_CLSM_ITERATE_PREV);
 
 	/*
@@ -763,8 +763,11 @@ err:	API_END(session);
 	if (larger != NULL)
 		WT_TRET(larger->reset(larger));
 
-	if (ret == 0)
+	if (ret == 0) {
+		F_CLR(cursor, WT_CURSTD_KEY_APP | WT_CURSTD_VALUE_APP);
 		F_SET(cursor, WT_CURSTD_KEY_RET | WT_CURSTD_VALUE_RET);
+	} else
+		F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
 
 	return (ret);
 }

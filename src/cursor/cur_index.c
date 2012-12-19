@@ -100,7 +100,7 @@ __curindex_move(WT_CURSOR_INDEX *cindex)
 			(*cp)->key.size = first->key.size;
 			(*cp)->recno = first->recno;
 		}
-		F_SET(*cp, WT_CURSTD_KEY_RET);
+		F_SET(*cp, WT_CURSTD_KEY_APP);
 		WT_RET((*cp)->search(*cp));
 	}
 

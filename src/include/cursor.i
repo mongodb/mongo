@@ -66,8 +66,8 @@ __cursor_leave(WT_CURSOR_BTREE *cbt)
 	cursor = &cbt->iface;
 	session = (WT_SESSION_IMPL *)cursor->session;
 
-	/* The key and value may be gone, clear all flags here. */
-	F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
+	/* The key and value may be gone, clear the flags here. */
+	F_CLR(cursor, WT_CURSTD_KEY_RET | WT_CURSTD_VALUE_RET);
 
 	/* Release any page references we're holding. */
 	WT_RET(__wt_stack_release(session, cbt->page));
@@ -137,9 +137,10 @@ __cursor_func_resolve(WT_CURSOR_BTREE *cbt, int ret)
 	 * On error, we're not returning anything, we can't iterate, and
 	 * we should release any page references we're holding.
 	 */
-	if (ret == 0)
+	if (ret == 0) {
+		F_CLR(cursor, WT_CURSTD_KEY_APP | WT_CURSTD_VALUE_APP);
 		F_SET(cursor, WT_CURSTD_KEY_RET | WT_CURSTD_VALUE_RET);
-	else {
+	} else {
 		WT_RET(__cursor_leave(cbt));
 		__cursor_search_clear(cbt);
 	}
