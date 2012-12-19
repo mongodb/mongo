@@ -23,7 +23,7 @@ namespace mongo {
 
     // Extracts an array into a vector
     template<typename T>
-    bool FieldParser::extract(BSONObj doc,
+    FieldParser::FieldState FieldParser::extract(BSONObj doc,
                               const BSONField<vector<T> >& field,
                               const vector<T>& def,
                               vector<T>* out,
@@ -32,7 +32,7 @@ namespace mongo {
         BSONElement elem = doc[field.name()];
         if (elem.eoo()) {
             *out = def;
-            return true;
+            return FIELD_NONE;
         }
 
         if (elem.type() == Array) {
@@ -59,24 +59,24 @@ namespace mongo {
                         *errMsg = stream() << "error parsing element " << i << " of field "
                                            << field() << causedBy(elErrMsg);
                     }
-                    return false;
+                    return FIELD_INVALID;
                 }
                 i++;
             }
 
-            return true;
+            return FIELD_VALID;
         }
 
         if (errMsg) {
             *errMsg = stream() << "wrong type for '" << field() << "' field, expected "
                                << "vector array" << ", found " << doc[field.name()].toString();
         }
-        return false;
+        return FIELD_INVALID;
     }
 
     // Extracts an object into a map
     template<typename K, typename T>
-    bool FieldParser::extract(BSONObj doc,
+    FieldParser::FieldState FieldParser::extract(BSONObj doc,
                               const BSONField<map<K, T> >& field,
                               const map<K, T>& def,
                               map<K, T>* out,
@@ -85,7 +85,7 @@ namespace mongo {
         BSONElement elem = doc[field.name()];
         if (elem.eoo()) {
             *out = def;
-            return true;
+            return FIELD_NONE;
         }
 
         if (elem.type() == Object) {
@@ -103,18 +103,18 @@ namespace mongo {
                         *errMsg = stream() << "error parsing map element " << next.fieldName()
                                            << " of field " << field() << causedBy(elErrMsg);
                     }
-                    return false;
+                    return FIELD_INVALID;
                 }
             }
 
-            return true;
+            return FIELD_VALID;
         }
 
         if (errMsg) {
             *errMsg = stream() << "wrong type for '" << field() << "' field, expected "
                                << "vector array" << ", found " << doc[field.name()].toString();
         }
-        return false;
+        return FIELD_INVALID;
     }
 
 } // namespace mongo

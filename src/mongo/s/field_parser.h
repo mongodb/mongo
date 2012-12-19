@@ -38,49 +38,61 @@ namespace mongo {
          *   copying it. In practice this means that 'doc' MUST EXIST for as long as 'out'
          *   stays in scope.
          */
-        static bool extract(BSONObj doc,
+
+        enum FieldState {
+            // The field is present but has the wrong type
+            FIELD_INVALID = 0,
+
+            // The field is present and has the correct type
+            FIELD_VALID,
+
+            // The field is absent
+            FIELD_NONE
+        };
+
+        static FieldState extract(BSONObj doc,
                             const BSONField<bool>& field,
                             bool def,
                             bool* out,
                             string* errMsg = NULL);
 
-        static bool extract(BSONObj doc,
+        static FieldState extract(BSONObj doc,
                             const BSONField<BSONArray>& field,
                             const BSONArray& def,
                             BSONArray* out,
                             string* errMsg = NULL);
 
-        static bool extract(BSONObj doc,
+        static FieldState extract(BSONObj doc,
                             const BSONField<BSONObj>& field,
                             const BSONObj& def,
                             BSONObj* out,
                             string* errMsg = NULL);
 
-        static bool extract(BSONObj doc,
+        static FieldState extract(BSONObj doc,
                             const BSONField<Date_t>& field,
                             const Date_t def,
                             Date_t* out,
                             string* errMsg = NULL);
 
-        static bool extract(BSONObj doc,
+        static FieldState extract(BSONObj doc,
                             const BSONField<string>& field,
                             const string& def,
                             string* out,
                             string* errMsg = NULL);
 
-        static bool extract(BSONObj doc,
+        static FieldState extract(BSONObj doc,
                             const BSONField<OID>& field,
                             const OID& def,
                             OID* out,
                             string* errMsg = NULL);
 
-        static bool extract(BSONObj doc,
+        static FieldState extract(BSONObj doc,
                             const BSONField<int>& field,
                             const int& def,
                             int* out,
                             string* errMsg = NULL);
 
-        static bool extract(BSONObj doc,
+        static FieldState extract(BSONObj doc,
                             const BSONField<long long>& field,
                             const long long& def,
                             long long* out,
@@ -91,13 +103,13 @@ namespace mongo {
          * the BSONField type.  This can be useful when an exact numeric type is not needed, for
          * example if the field is sometimes modified from the shell which can change the type.
          */
-        static bool extractNumber(BSONObj doc,
+        static FieldState extractNumber(BSONObj doc,
                                   const BSONField<int>& field,
                                   const int& def,
                                   int* out,
                                   string* errMsg = NULL);
 
-        static bool extractNumber(BSONObj doc,
+        static FieldState extractNumber(BSONObj doc,
                                   const BSONField<long long>& field,
                                   const long long& def,
                                   long long* out,
@@ -113,14 +125,14 @@ namespace mongo {
          * FieldParser::extract(doc, field, val, &val);
          */
         template<typename T>
-        static bool extract(BSONObj doc,
+        static FieldState extract(BSONObj doc,
                             const BSONField<vector<T> >& field,
                             const vector<T>& def,
                             vector<T>* out,
                             string* errMsg = NULL);
 
         template<typename K, typename T>
-        static bool extract(BSONObj doc,
+        static FieldState extract(BSONObj doc,
                             const BSONField<map<K, T> >& field,
                             const map<K, T>& def,
                             map<K, T>* out,
