@@ -5,6 +5,22 @@
  * See the file LICENSE for redistribution information.
  */
 
+/*******************************************
+ * Global per-process structure.
+ *******************************************/
+/*
+ * WT_PROCESS --
+ *	Per-process information for the library.
+ */
+struct __wt_process {
+	WT_SPINLOCK spinlock;		/* Per-process spinlock */
+
+					/* Locked: connection queue */
+	TAILQ_HEAD(__wt_connection_impl_qh, __wt_connection_impl) connqh;
+	WT_CACHE_POOL *cache_pool;
+};
+extern WT_PROCESS __wt_process;
+
 /*
  * WT_NAMED_COLLATOR --
  *	A collator list entry
