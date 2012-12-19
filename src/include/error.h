@@ -77,6 +77,18 @@
 		ret = __ret;						\
 } while (0)
 
+#define	WT_PANIC_ERR(session, v, ...) do {				\
+	__wt_err((session), (v), __VA_ARGS__);				\
+	/* Return WT_PANIC regardless of earlier return codes. */	\
+	(v) = __wt_panic((session));					\
+} while (0)
+
+#define	WT_PANIC_ERRX(session, ...) do {				\
+	__wt_errx((session), __VA_ARGS__);				\
+	/* Return WT_PANIC regardless of earlier return codes. */	\
+	(void)__wt_panic((session));					\
+} while (0)
+
 /*
  * WT_ASSERT, WT_ASSERT_ERR, WT_ASSERT_RET --
  *	Assert an expression, abort in diagnostic mode, otherwise, optionally
