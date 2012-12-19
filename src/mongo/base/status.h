@@ -88,6 +88,8 @@ namespace mongo {
         const std::string& reason() const { return _error->reason; }
         int location() const { return _error->location; }
 
+        std::string toString() const;
+
         //
         // Below interface used for testing code only.
         //

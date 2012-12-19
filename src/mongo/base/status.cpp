@@ -16,6 +16,7 @@
 #include "mongo/base/status.h"
 
 #include <ostream>
+#include <sstream>
 
 namespace mongo {
 
@@ -110,6 +111,15 @@ namespace mongo {
         return os << ErrorCodes::errorString(code);
     }
 
+    std::string Status::toString() const {
+        std::ostringstream ss;
+        ss << codeString();
+        if ( !isOK() )
+            ss << " " << reason();
+        if ( location() != 0 )
+            ss << " @ " << location();
+        return ss.str();
+    }
 
 namespace {
     /// Ensure that Status::OK() is called at least once in single threaded context,
