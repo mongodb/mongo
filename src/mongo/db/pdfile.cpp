@@ -1101,7 +1101,7 @@ namespace mongo {
     }
 
     Counter64 moveCounter;
-    ServerStatusMetricField<Counter64> moveCounterDisplay( "record.moves", false, &moveCounter );
+    ServerStatusMetricField<Counter64> moveCounterDisplay( "record.moves", &moveCounter );
 
     /** Note: if the object shrinks a lot, we don't free up space, we leave extra at end of the record.
      */

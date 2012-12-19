@@ -245,9 +245,8 @@ namespace mongo {
     public:
         ReplicationInfoServerStatus() : ServerStatusSection( "repl" ){}
         bool includeByDefault() const { return true; }
-        bool adminOnly() const { return false; }
         
-        BSONObj generateSection( const BSONElement& configElement, bool userIsAdmin ) const {
+        BSONObj generateSection(const BSONElement& configElement) const {
             if ( ! anyReplEnabled() )
                 return BSONObj();
             

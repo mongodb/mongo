@@ -43,8 +43,8 @@ namespace mongo {
         void resetAuthenticationSession(AuthenticationSession* newSession);
         void swapAuthenticationSession(boost::scoped_ptr<AuthenticationSession>& other);
 
-        bool hasAuthorizationManager();
-        AuthorizationManager* getAuthorizationManager();
+        bool hasAuthorizationManager() const;
+        AuthorizationManager* getAuthorizationManager() const;
         void setAuthorizationManager(AuthorizationManager* authorizationManager);
 
         bool getIsLocalHostConnection() {

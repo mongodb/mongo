@@ -535,9 +535,8 @@ namespace mongo {
         public:
             WorkingSetSSS() : ServerStatusSection( "workingSet" ){}
             virtual bool includeByDefault() const { return false; }
-            virtual bool adminOnly() const { return false; }
             
-            BSONObj generateSection( const BSONElement& configElement, bool userIsAdmin ) const {
+            BSONObj generateSection(const BSONElement& configElement) const {
                 BSONObjBuilder b;
                 Record::appendWorkingSetInfo( b );
                 return b.obj();
@@ -549,9 +548,8 @@ namespace mongo {
         public:
             RecordStats() : ServerStatusSection( "recordStats" ){}
             virtual bool includeByDefault() const { return true; }
-            virtual bool adminOnly() const { return false; }
             
-            BSONObj generateSection( const BSONElement& configElement, bool userIsAdmin ) const {
+            BSONObj generateSection(const BSONElement& configElement) const {
                 BSONObjBuilder record;
                 
                 Record::appendStats( record );

@@ -893,9 +893,8 @@ namespace mongo {
         public:
             DurSSS() : ServerStatusSection( "dur" ){}
             virtual bool includeByDefault() const { return true; }
-            virtual bool adminOnly() const { return false; }
             
-            BSONObj generateSection( const BSONElement& configElement, bool userIsAdmin ) const {
+            BSONObj generateSection(const BSONElement& configElement) const {
                 if ( ! cmdLine.dur )
                     return BSONObj();
                 return dur::stats.asObj();

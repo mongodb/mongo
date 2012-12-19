@@ -435,7 +435,6 @@ namespace mongo {
         }
 
         virtual bool includeByDefault() const { return true; }
-        virtual bool adminOnly() const { return false; }
 
         string name() const { return "DataFileSync"; }
 
@@ -475,7 +474,7 @@ namespace mongo {
             }
         }
 
-        BSONObj generateSection( const BSONElement& configElement, bool userIsAdmin ) const {
+        BSONObj generateSection(const BSONElement& configElement) const {
             BSONObjBuilder b;
             b.appendNumber( "flushes" , _flushes );
             b.appendNumber( "total_ms" , _total_time );
@@ -505,7 +504,7 @@ namespace mongo {
     namespace {
         class MemJournalServerStatusMetric : public ServerStatusMetric {
         public:
-            MemJournalServerStatusMetric() : ServerStatusMetric( ".mem.mapped", false ) {}
+            MemJournalServerStatusMetric() : ServerStatusMetric(".mem.mapped") {}
             virtual void appendAtLeaf( BSONObjBuilder& b ) const {
                 int m = static_cast<int>(MemoryMappedFile::totalMappedLength() / ( 1024 * 1024 ));
                 b.appendNumber( "mapped" , m );

@@ -761,9 +761,8 @@ namespace mongo {
 
         CursorServerStats() : ServerStatusSection( "cursors" ){}
         virtual bool includeByDefault() const { return true; }
-        virtual bool adminOnly() const { return false; }
 
-        BSONObj generateSection( const BSONElement& configElement, bool userIsAdmin ) const {
+        BSONObj generateSection(const BSONElement& configElement) const {
             BSONObjBuilder b;
             ClientCursor::appendStats( b );
             return b.obj();

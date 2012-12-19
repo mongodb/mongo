@@ -808,9 +808,8 @@ namespace mongo {
         }
 
         virtual bool includeByDefault() const { return true; }
-        virtual bool adminOnly() const { return false; }
 
-        virtual BSONObj generateSection( const BSONElement& configElement, bool userIsAdmin ) const {
+        virtual BSONObj generateSection(const BSONElement& configElement) const {
             BSONObjBuilder t;
             
             t.append( "totalTime" , (long long)(1000 * ( curTimeMillis64() - _started ) ) );
@@ -848,9 +847,8 @@ namespace mongo {
     public:
         LockStatsServerStatusSection() : ServerStatusSection( "locks" ){}
         virtual bool includeByDefault() const { return true; }
-        virtual bool adminOnly() const { return false; }
         
-        BSONObj generateSection( const BSONElement& configElement, bool userIsAdmin ) const {
+        BSONObj generateSection( const BSONElement& configElement) const {
             BSONObjBuilder b;
             b.append(".", qlk.stats.report());
             b.append("admin", nestableLocks[Lock::admin]->stats.report());

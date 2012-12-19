@@ -577,9 +577,8 @@ namespace replset {
     public:
         ReplNetworkQueueSSS() : ServerStatusSection( "replNetworkQueue" ){}
         virtual bool includeByDefault() const { return true; }
-        virtual bool adminOnly() const { return false; }
 
-        BSONObj generateSection( const BSONElement& configElement, bool userIsAdmin ) const {
+        BSONObj generateSection(const BSONElement& configElement) const {
             if ( ! theReplSet )
                 return BSONObj();
             

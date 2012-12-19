@@ -226,7 +226,7 @@ namespace mongo {
 
     class WriteBacksQueuedSSM : public ServerStatusMetric {
     public:
-        WriteBacksQueuedSSM() : ServerStatusMetric( ".writeBacksQueued", false ){}
+        WriteBacksQueuedSSM() : ServerStatusMetric(".writeBacksQueued"){}
         virtual void appendAtLeaf( BSONObjBuilder& b ) const {
             b.appendBool( _leafName, ! writeBackManager.queuesEmpty() );
         }

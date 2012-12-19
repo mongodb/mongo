@@ -40,7 +40,7 @@ namespace mongo {
     IndexCounters::~IndexCounters(){
     }
 
-    BSONObj IndexCounters::generateSection( const BSONElement& configElement, bool userIsAdmin ) const {
+    BSONObj IndexCounters::generateSection(const BSONElement& configElement) const {
         if ( ! _memSupported ) {
             return BSON( "note" << "not supported on this platform" );
         }

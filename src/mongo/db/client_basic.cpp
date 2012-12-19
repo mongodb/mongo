@@ -41,11 +41,11 @@ namespace mongo {
         _authenticationSession.swap(other);
     }
 
-    bool ClientBasic::hasAuthorizationManager() {
+    bool ClientBasic::hasAuthorizationManager() const {
         return _authorizationManager.get();
     }
 
-    AuthorizationManager* ClientBasic::getAuthorizationManager() {
+    AuthorizationManager* ClientBasic::getAuthorizationManager() const {
             massert(16481,
                     "No AuthorizationManager has been set up for this connection",
                     hasAuthorizationManager());

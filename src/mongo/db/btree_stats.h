@@ -33,9 +33,8 @@ namespace mongo {
         virtual ~IndexCounters();
 
         virtual bool includeByDefault() const { return true; }
-        virtual bool adminOnly() const { return false; }
 
-        virtual BSONObj generateSection( const BSONElement& configElement, bool userIsAdmin ) const;
+        virtual BSONObj generateSection(const BSONElement& configElement) const;
 
 
         // used without a mutex intentionally (can race)
