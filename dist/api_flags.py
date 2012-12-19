@@ -1,16 +1,66 @@
-# Read the api_flags file and output a C header file using the minimum
-# number of distinct bits to ensure flags don't collide.
-#
-# The format of the api_flags file:
-#	Name (usually a method name)
-#	<tab>	Flag
+# Output a C header file using the minimum number of distinct bits to ensure
+# flags don't collide.
 
 import os, re, sys
 from dist import compare_srcfile
 
-# Load the flags dictionary.
-import api_data
-flags = api_data.flags
+flags = {
+###################################################
+# Internal routine flag declarations
+###################################################
+	'shared_cache' : [
+		'CACHE_POOL_RUN'
+	],
+	'direct_io' : [
+		'DIRECTIO_DATA',
+		'DIRECTIO_LOG'
+	],
+	'page_free' : [
+		'PAGE_FREE_IGNORE_DISK'
+	],
+	'tree_walk' : [
+		'TREE_CACHE',
+		'TREE_COMPACT',
+		'TREE_DISCARD',
+		'TREE_EVICT',
+		'TREE_PREV',
+		'TREE_WAIT',
+	],
+	'verbose' : [
+		'VERB_block',
+		'VERB_ckpt',
+		'VERB_evict',
+		'VERB_evictserver',
+		'VERB_fileops',
+		'VERB_hazard',
+		'VERB_lsm',
+		'VERB_mutex',
+		'VERB_read',
+		'VERB_reconcile',
+		'VERB_salvage',
+		'VERB_shared_cache',
+		'VERB_verify',
+		'VERB_write'
+	],
+
+###################################################
+# Structure flag declarations
+###################################################
+	'conn' : [
+		'CONN_CACHE_POOL',
+		'CONN_LSM_MERGE',
+		'CONN_PANIC',
+		'CONN_SERVER_RUN',
+		'CONN_SYNC',
+		'CONN_TRANSACTIONAL',
+	],
+	'session' : [
+		'SESSION_INTERNAL',
+		'SESSION_NO_CACHE_CHECK',
+		'SESSION_SALVAGE_QUIET_ERR',
+		'SESSION_SCHEMA_LOCKED',
+	],
+}
 
 flag_cnt = {}		# Dictionary [flag] : [reference count]
 flag_name = {}		# Dictionary [flag] : [name ...]
