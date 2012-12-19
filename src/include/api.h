@@ -112,11 +112,11 @@ struct __wt_session_impl {
 	u_int	 excl_next;		/* Next empty slot */
 	size_t	 excl_allocated;	/* Bytes allocated */
 
-#define	WT_SYNC			1	/* Sync the file */
-#define	WT_SYNC_COMPACT		2	/* Compact the file */
-#define	WT_SYNC_DISCARD		3	/* Sync the file, discard pages */
-#define	WT_SYNC_DISCARD_NOWRITE	4	/* Discard the file */
-#define	WT_SYNC_FUZZY		5	/* Write dirty leaf pages */
+#define	WT_SYNC_COMPACT		1	/* Compact the file */
+#define	WT_SYNC_DISCARD		2	/* Sync the file, discard pages */
+#define	WT_SYNC_DISCARD_NOWRITE	3	/* Discard the file */
+#define	WT_SYNC_INTERNAL	4	/* Sync the internal pages */
+#define	WT_SYNC_LEAF		5	/* Write dirty leaf pages */
 	int syncop;			/* File operation */
 	int syncop_ret;			/* Return value */
 
