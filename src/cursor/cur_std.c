@@ -195,7 +195,7 @@ __wt_cursor_set_keyv(WT_CURSOR *cursor, uint32_t flags, va_list ap)
 	const char *fmt, *str;
 
 	CURSOR_API_CALL(cursor, session, set_key, NULL);
-	F_CLR(cursor, WT_CURSTD_KEY_RET);
+	F_CLR(cursor, WT_CURSTD_KEY_SET);
 
 	/* Fast path some common cases: single strings or byte arrays. */
 	if (WT_CURSOR_RECNO(cursor)) {
@@ -244,7 +244,6 @@ __wt_cursor_set_keyv(WT_CURSOR *cursor, uint32_t flags, va_list ap)
 	F_SET(cursor, WT_CURSTD_KEY_APP);
 	if (0) {
 err:		cursor->saved_err = ret;
-		F_CLR(cursor, WT_CURSTD_KEY_APP);
 	}
 
 	API_END(session);
@@ -291,7 +290,7 @@ __wt_cursor_set_value(WT_CURSOR *cursor, ...)
 
 	va_start(ap, cursor);
 	CURSOR_API_CALL(cursor, session, set_value, NULL);
-	F_CLR(cursor, WT_CURSTD_VALUE_RET);
+	F_CLR(cursor, WT_CURSTD_VALUE_SET);
 
 	fmt = F_ISSET(cursor, WT_CURSOR_RAW_OK) ? "u" : cursor->value_format;
 
@@ -325,7 +324,6 @@ __wt_cursor_set_value(WT_CURSOR *cursor, ...)
 
 	if (0) {
 err:		cursor->saved_err = ret;
-		F_CLR(cursor, WT_CURSTD_VALUE_APP);
 	}
 	va_end(ap);
 	API_END(session);
