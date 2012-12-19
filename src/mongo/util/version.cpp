@@ -99,6 +99,7 @@ namespace mongo {
 #ifndef _SCONS
     // only works in scons
     const char * gitVersion() { return "not-scons"; }
+    const char * compiledJSEngine() { return ""; }
     const char * allocator() { return ""; }
     const char * loaderFlags() { return ""; }
     const char * compilerFlags() { return ""; }
@@ -141,6 +142,8 @@ namespace mongo {
               << "compilerFlags" << compilerFlags()
               << "allocator" << allocator()
               << "versionArray" << versionArray
+              << "javascriptEngine" << compiledJSEngine()
+/*TODO: add this back once the module system is in place -- maybe once we do something like serverstatus with callbacks*/
 //              << "interpreterVersion" << globalScriptEngine->getInterpreterVersionString()
               << "bits" << ( sizeof( int* ) == 4 ? 32 : 64 );
        result.appendBool( "debug" , debug );

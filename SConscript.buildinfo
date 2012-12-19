@@ -26,6 +26,7 @@ buildinfo_template = '''
 
 namespace mongo {
     const char * gitVersion() { return "%(git_version)s"; }
+    const char * compiledJSEngine() { return "%(js_engine)s"; }
     const char * allocator() { return "%(allocator)s"; }
     const char * loaderFlags() { return "%(loader_flags)s"; }
     const char * compilerFlags() { return "%(compiler_flags)s"; }
@@ -39,6 +40,7 @@ def generate_buildinfo(env, target, source, **kw):
         git_version += " modules: " + ", ".join(env["MONGO_MODULES"])
 
     contents = str(source[0]) % dict(git_version=git_version,
+                                     js_engine="V8" if GetOption('usev8') else "SpiderMonkey",
                                      sys_info=getSysInfo(),
                                      allocator=GetOption('allocator'),
                                      loader_flags=env.subst('$LINKFLAGS $LDFLAGS',
