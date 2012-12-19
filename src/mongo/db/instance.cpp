@@ -444,10 +444,6 @@ namespace mongo {
                     // Only killCursors doesn't care about namespaces
                     uassert( 16257, str::stream() << "Invalid ns [" << ns << "]", false );
                 }
-                else if ( ! c.getAuthenticationInfo()->isAuthorized(
-                                  nsToDatabase( m.singleData()->_data + 4 ) ) ) {
-                    setLastError(0, "unauthorized");
-                }
                 else if ( op == dbInsert ) {
                     receivedInsert(m, currentOp);
                 }

@@ -1619,13 +1619,6 @@ namespace mongo {
             help << "internal. for testing only.";
         }
         virtual bool run(const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
-
-            AuthenticationInfo *ai = cc().getAuthenticationInfo();
-            if ( ! ai->isLocalHost() ) {
-                errmsg = "godinsert only works locally";
-                return false;
-            }
-
             string coll = cmdObj[ "godinsert" ].valuestrsafe();
             log() << "test only command godinsert invoked coll:" << coll << endl;
             uassert( 13049, "godinsert must specify a collection", !coll.empty() );
