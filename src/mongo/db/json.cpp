@@ -17,6 +17,7 @@
 
 #include "mongo/db/jsobj.h"
 #include "mongo/platform/cstdint.h"
+#include "mongo/platform/strtoll.h"
 #include "mongo/util/base64.h"
 #include "mongo/util/hex.h"
 #include "mongo/util/mongoutils/str.h"
