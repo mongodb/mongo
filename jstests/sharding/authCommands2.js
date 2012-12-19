@@ -124,9 +124,6 @@ var checkReadOps = function( hasReadAuth ) {
                                       pipeline: [ {$project : {j : 1}},
                                                   {$group : {_id : 'j', sum : {$sum : '$j'}}}]} );
         assert.eq( 4500, res.result[0].sum );
-
-        res = checkCommandSucceeded( testDB, { $eval : 'return db.bar.findOne();'} );
-        assert.eq(str, res.retval.str);
     } else {
         print( "Checking read operations, should fail" );
         assert.throws( function() { testDB.foo.find().itcount(); } );
@@ -137,8 +134,6 @@ var checkReadOps = function( hasReadAuth ) {
         checkCommandFailed( testDB, {aggregate:'foo',
                                      pipeline: [ {$project : {j : 1}},
                                                  {$group : {_id : 'j', sum : {$sum : '$j'}}}]} );
-
-        checkCommandFailed( testDB, { $eval : 'return db.bar.findOne();'} );
     }
 }
 
@@ -172,8 +167,6 @@ var checkWriteOps = function( hasWriteAuth ) {
         checkCommandSucceeded( testDB, {dropDatabase : 1} );
         assert.eq( 0, testDB.foo.count() );
         checkCommandSucceeded( testDB, {create : 'baz'} );
-        checkCommandSucceeded( testDB, { $eval : 'db.baz.insert({a:1});'} );
-        assert.eq(1, testDB.baz.findOne().a);
     } else {
         print( "Checking write operations, should fail" );
         testDB.foo.insert({a : 1, i : 1, j : 1});
@@ -202,11 +195,6 @@ var checkWriteOps = function( hasWriteAuth ) {
             passed = false;
         }
         assert( !passed );
-        var res = testDB.runCommand( { $eval : 'db.baz.insert({a:1});'} );
-        printjson( res );
-        // If you have read-only auth and try to do a $eval that writes, the $eval command succeeds,
-        // but the write fails
-        assert( !res.ok || testDB.baz.count() == 0 );
     }
 }
 
@@ -237,11 +225,19 @@ var checkAdminWriteOps = function( hasWriteAuth ) {
         chunk = configDB.chunks.findOne({ shard : st.rs0.name });
         checkCommandSucceeded( adminDB, {moveChunk : 'test.foo', find : chunk.min,
                                          to : st.rs1.name, _waitForDelete : true} );
+        // $eval is now an admin operation
+        checkCommandSucceeded( testDB, { $eval : 'db.baz.insert({a:1});'} );
+        assert.eq(1, testDB.baz.findOne().a);
+        res = checkCommandSucceeded( testDB, { $eval : 'return db.baz.findOne();'} );
+        assert.eq(1, res.retval.a);
     } else {
         checkCommandFailed( adminDB, {split : 'test.foo', find : {i : 1, j : 1}} );
         chunkKey = { i : { $minKey : 1 }, j : { $minKey : 1 } };
         checkCommandFailed( adminDB, {moveChunk : 'test.foo', find : chunkKey,
                                       to : st.rs1.name, _waitForDelete : true} );
+        checkCommandFailed( testDB, { $eval : 'return db.baz.insert({a:1});'} );
+        // Takes full admin privilege to run $eval, even if it's only doing a read operation
+        checkCommandFailed( testDB, { $eval : 'return db.baz.findOne();'} );
     }
 }
 
