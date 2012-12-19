@@ -29,6 +29,7 @@
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/privilege_set.h"
 #include "mongo/db/client.h"
+#include "mongo/db/jsobj.h"
 #include "mongo/db/namespacestring.h"
 #include "mongo/db/security_common.h"
 #include "mongo/util/mongoutils/str.h"
@@ -208,6 +209,119 @@ namespace {
         internalActions.addAction(ActionType::_recvChunkStart);
         internalActions.addAction(ActionType::_recvChunkStatus);
         internalActions.addAction(ActionType::_transferMods);
+
+        return Status::OK();
+    }
+
+    static inline Status _badValue(const char* reason, int location) {
+        return Status(ErrorCodes::BadValue, reason, location);
+    }
+
+    static inline Status _badValue(const std::string& reason, int location) {
+        return Status(ErrorCodes::BadValue, reason, location);
+    }
+
+    static inline StringData makeStringDataFromBSONElement(const BSONElement& element) {
+        return StringData(element.valuestr(), element.valuestrsize() - 1);
+    }
+
+    static Status _checkRolesArray(const BSONElement& rolesElement) {
+        if (rolesElement.type() != Array) {
+            return _badValue("Role fields must be an array when present in  system.users entries",
+                             0);
+        }
+        for (BSONObjIterator iter(rolesElement.embeddedObject()); iter.more(); iter.next()) {
+            BSONElement element = *iter;
+            if (element.type() != String || makeStringDataFromBSONElement(element).empty()) {
+                return _badValue("Roles must be non-empty strings.", 0);
+            }
+        }
+        return Status::OK();
+    }
+
+    Status AuthorizationManager::checkValidPrivilegeDocument(const StringData& dbname,
+                                                             const BSONObj& doc) {
+        BSONElement userElement = doc[USERNAME_FIELD_NAME];
+        BSONElement userSourceElement = doc[USERSOURCE_FIELD_NAME];
+        BSONElement passwordElement = doc[PASSWORD_FIELD_NAME];
+        BSONElement rolesElement = doc[ROLES_FIELD_NAME];
+        BSONElement otherDBRolesElement = doc[OTHER_DB_ROLES_FIELD_NAME];
+        BSONElement readOnlyElement = doc[READONLY_FIELD_NAME];
+
+        // Validate the "user" element.
+        if (userElement.type() != String)
+            return _badValue("system.users entry needs 'user' field to be a string", 14051);
+        if (makeStringDataFromBSONElement(userElement).empty())
+            return _badValue("system.users entry needs 'user' field to be non-empty", 14053);
+
+        // Must set exactly one of "userSource" and "pwd" fields.
+        if (userSourceElement.eoo() == passwordElement.eoo()) {
+            return _badValue("system.users entry must have either a 'pwd' field or a 'userSource' "
+                             "field, but not both", 0);
+        }
+
+        // Cannot have both "roles" and "readOnly" elements.
+        if (!rolesElement.eoo() && !readOnlyElement.eoo()) {
+            return _badValue("system.users entry must not have both 'roles' and 'readOnly' fields",
+                             0);
+        }
+
+        // Validate the "pwd" element, if present.
+        if (!passwordElement.eoo()) {
+            if (passwordElement.type() != String)
+                return _badValue("system.users entry needs 'pwd' field to be a string", 14052);
+            if (makeStringDataFromBSONElement(passwordElement).empty())
+                return _badValue("system.users entry needs 'pwd' field to be non-empty", 14054);
+        }
+
+        // Validate the "userSource" element, if present.
+        if (!userSourceElement.eoo()) {
+            if (userSourceElement.type() != String ||
+                makeStringDataFromBSONElement(userSourceElement).empty()) {
+
+                return _badValue("system.users entry needs 'userSource' field to be a non-empty "
+                                 "string, if present", 0);
+            }
+            if (userSourceElement.str() == dbname) {
+                return _badValue(mongoutils::str::stream() << "'" << dbname <<
+                                 "' is not a valid value for the userSource field in " <<
+                                 dbname << ".system.users entries",
+                                 0);
+            }
+            if (rolesElement.eoo()) {
+                return _badValue("system.users entry needs 'roles' field if 'userSource' field "
+                                 "is present.", 0);
+            }
+        }
+
+        // Validate the "roles" element.
+        if (!rolesElement.eoo()) {
+            Status status = _checkRolesArray(rolesElement);
+            if (!status.isOK())
+                return status;
+        }
+
+        if (!otherDBRolesElement.eoo()) {
+            if (dbname != ADMIN_DBNAME) {
+                return _badValue("Only admin.system.users entries may contain 'otherDBRoles' "
+                                 "fields", 0);
+            }
+            if (rolesElement.eoo()) {
+                return _badValue("system.users entries with 'otherDBRoles' fields must contain "
+                                 "'roles' fields", 0);
+            }
+            if (otherDBRolesElement.type() != Object) {
+                return _badValue("'otherDBRoles' field must be an object when present in "
+                                 "system.users entries", 0);
+            }
+            for (BSONObjIterator iter(otherDBRolesElement.embeddedObject());
+                 iter.more(); iter.next()) {
+
+                Status status = _checkRolesArray(*iter);
+                if (!status.isOK())
+                    return status;
+            }
+        }
 
         return Status::OK();
     }
