@@ -23,6 +23,7 @@ skip	src/api/api_strerror.c
 skip	src/config/config_def.c
 skip	src/docs/tools/doxypy.py
 skip	src/include/extern.h
+skip	src/include/flags.h
 skip	src/include/log.i
 skip	src/include/queue.h
 skip	src/include/serial_funcs.i

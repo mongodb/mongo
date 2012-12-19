@@ -115,7 +115,7 @@ for f in sorted(flag_cnt.items()):
 tmp_file = '__tmp'
 tfile = open(tmp_file, 'w')
 skip = 0
-for line in open('../src/include/api.h', 'r'):
+for line in open('../src/include/flags.h', 'r'):
 	if skip:
 		if line.count('API flags section: END'):
 			tfile.write('/*\n' + line)
@@ -127,4 +127,4 @@ for line in open('../src/include/api.h', 'r'):
 		tfile.write(' */\n')
 		tfile.write(flag_info)
 tfile.close()
-compare_srcfile(tmp_file, '../src/include/api.h')
+compare_srcfile(tmp_file, '../src/include/flags.h')
