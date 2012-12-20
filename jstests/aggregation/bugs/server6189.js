@@ -7,7 +7,9 @@ function test(date, testSynthetics) {
     c.drop();
     c.save( {date: date} );
 
-    res = c.aggregate( { $project:{ _id: 0
+    // Can't use aggregate helper or assertErrorCode because we need to handle multiple error types
+    var res = c.runCommand('aggregate', {pipeline: [
+                     {$project: { _id: 0
                                 , year:{ $year: '$date' }
                                 , month:{ $month: '$date' }
                                 , dayOfMonth:{ $dayOfMonth: '$date' }
@@ -18,7 +20,7 @@ function test(date, testSynthetics) {
 
                                 // $substr will call coerceToString
                                 , string: {$substr: ['$date', 0,1000]}
-                                }} );
+                                }}]});
 
     if (date.valueOf() < 0 && _isWindows() && res.code == 16422) {
         // some versions of windows (but not all) fail with dates before 1970
