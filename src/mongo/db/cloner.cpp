@@ -830,7 +830,7 @@ namespace mongo {
         virtual bool adminOnly() const {
             return true;
         }
-        virtual bool requiresAuth() { return false; } // do our own auth
+        virtual bool requiresAuth() { return true; }
         virtual bool slaveOk() const {
             return false;
         }
@@ -842,7 +842,7 @@ namespace mongo {
         virtual void addRequiredPrivileges(const std::string& dbname,
                                            const BSONObj& cmdObj,
                                            std::vector<Privilege>* out) {
-            rename_collection::addPrivilegesRequiredForRenameCollection(dbname, cmdObj, out);
+            rename_collection::addPrivilegesRequiredForRenameCollection(cmdObj, out);
         }
         virtual void help( stringstream &help ) const {
             help << " example: { renameCollection: foo.a, to: bar.b }";

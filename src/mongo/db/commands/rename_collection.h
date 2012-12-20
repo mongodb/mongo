@@ -25,8 +25,7 @@
 namespace mongo {
 namespace rename_collection {
 
-    void addPrivilegesRequiredForRenameCollection(const std::string& dbname,
-                                                  const BSONObj& cmdObj,
+    void addPrivilegesRequiredForRenameCollection(const BSONObj& cmdObj,
                                                   std::vector<Privilege>* out);
 
 } // namespace rename_collection

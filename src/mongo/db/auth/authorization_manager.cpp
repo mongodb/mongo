@@ -96,7 +96,7 @@ namespace {
         // Read role
         // TODO: Remove OLD_READ once commands require the proper actions
         readRoleActions.addAction(ActionType::oldRead);
-        readWriteRoleActions.addAction(ActionType::cloneCollectionLocalSource);
+        readRoleActions.addAction(ActionType::cloneCollectionLocalSource);
         readRoleActions.addAction(ActionType::collStats);
         readRoleActions.addAction(ActionType::dbHash);
         readRoleActions.addAction(ActionType::dbStats);

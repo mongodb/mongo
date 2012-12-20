@@ -28,15 +28,14 @@
 namespace mongo {
 namespace rename_collection {
 
-    void addPrivilegesRequiredForRenameCollection(const std::string& dbname,
-                                                  const BSONObj& cmdObj,
+    void addPrivilegesRequiredForRenameCollection(const BSONObj& cmdObj,
                                                   std::vector<Privilege>* out) {
         NamespaceString sourceNS = NamespaceString(cmdObj.getStringField("renameCollection"));
         NamespaceString targetNS = NamespaceString(cmdObj.getStringField("to"));
         if (sourceNS.db == targetNS.db) {
             ActionSet actions;
             actions.addAction(ActionType::renameCollectionSameDB);
-            out->push_back(Privilege(dbname, actions));
+            out->push_back(Privilege(sourceNS.db, actions));
             return;
         }
 

@@ -505,7 +505,7 @@ namespace mongo {
             virtual void addRequiredPrivileges(const std::string& dbname,
                                                const BSONObj& cmdObj,
                                                std::vector<Privilege>* out) {
-                rename_collection::addPrivilegesRequiredForRenameCollection(dbname, cmdObj, out);
+                rename_collection::addPrivilegesRequiredForRenameCollection(cmdObj, out);
             }
             bool run(const string& dbName, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
                 string fullnsFrom = cmdObj.firstElement().valuestrsafe();
