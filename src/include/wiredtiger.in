@@ -1043,8 +1043,9 @@ struct __wt_connection {
 	 * 10MB and 10TB; default \c 50MB.}@config{&nbsp;&nbsp;&nbsp;&nbsp;name,
 	 * name of a cache that is shared between databases.,a string; default
 	 * empty.}@config{&nbsp;&nbsp;&nbsp;&nbsp;size, maximum memory to
-	 * allocate for the shared cache.,an integer between 1MB and 10TB;
-	 * default \c 500MB.}@config{ ),,}
+	 * allocate for the shared cache. Setting this will update the value if
+	 * one is already set.,an integer between 1MB and 10TB; default \c
+	 * 500MB.}@config{ ),,}
 	 * @config{verbose, enable messages for various events.  Options are
 	 * given as a list\, such as
 	 * <code>"verbose=[evictserver\,read]"</code>.,a list\, with values
@@ -1252,8 +1253,8 @@ struct __wt_connection {
  * 50MB.}@config{&nbsp;&nbsp;&nbsp;&nbsp;name, name of a cache that is shared
  * between databases.,a string; default
  * empty.}@config{&nbsp;&nbsp;&nbsp;&nbsp;size, maximum memory to allocate for
- * the shared cache.,an integer between 1MB and 10TB; default \c 500MB.}@config{
- * ),,}
+ * the shared cache. Setting this will update the value if one is already
+ * set.,an integer between 1MB and 10TB; default \c 500MB.}@config{ ),,}
  * @config{sync, flush files to stable storage when closing or writing
  * checkpoints.,a boolean flag; default \c true.}
  * @config{transactional, support transactional semantics.,a boolean flag;

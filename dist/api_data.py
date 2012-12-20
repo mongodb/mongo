@@ -254,7 +254,8 @@ connection_runtime_config = [
 		Config('name', '', r'''
 			name of a cache that is shared between databases'''),
 		Config('size', '500MB', r'''
-			maximum memory to allocate for the shared cache''',
+			maximum memory to allocate for the shared cache. Setting this
+			will update the value if one is already set''',
 			min='1MB', max='10TB')
 		]),
 	Config('cache_size', '100MB', r'''
