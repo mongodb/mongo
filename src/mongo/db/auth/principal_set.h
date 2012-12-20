@@ -34,9 +34,12 @@ namespace mongo {
         MONGO_DISALLOW_COPYING(PrincipalSet);
     public:
         /**
-         * Forward iterator over the names of the principals stored in a PrincpalSet.
+         * Forward iterator over the names of the principals stored in a PrincipalSet.
          *
          * Instances are valid until the underlying vector<Principal*> is modified.
+         *
+         * more() must be the first method called after construction, and must be checked
+         * after each call to next() before calling any other methods.
          */
         class NameIterator {
         public:
@@ -49,11 +52,12 @@ namespace mongo {
 
             bool more() { return _curr != _end; }
             const PrincipalName& next() {
+                const PrincipalName& ret = get();
                 ++_curr;
-                return get();
+                return ret;
             }
 
-            const PrincipalName& get() const { return (*(_curr - 1))->getName(); }
+            const PrincipalName& get() const { return (*_curr)->getName(); }
 
             const PrincipalName& operator*() const { return get(); }
             const PrincipalName* operator->() const { return &get(); }

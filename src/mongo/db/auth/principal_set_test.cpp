@@ -88,8 +88,8 @@ namespace {
 
         iter = pset.getNames();
         ASSERT(iter.more());
-        ASSERT_EQUALS(iter.next(), PrincipalName("bob", "test"));
         ASSERT_EQUALS(*iter, PrincipalName("bob", "test"));
+        ASSERT_EQUALS(iter.next(), PrincipalName("bob", "test"));
         ASSERT(!iter.more());
     }
 
