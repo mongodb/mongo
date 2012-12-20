@@ -27,6 +27,9 @@
 #include <boost/optional.hpp>
 
 #include "mongo/base/init.h"
+#include "mongo/db/auth/action_set.h"
+#include "mongo/db/auth/action_type.h"
+#include "mongo/db/auth/privilege.h"
 #include "mongo/db/btree.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/db.h"
@@ -483,6 +486,14 @@ namespace mongo {
         }
 
         virtual LockType locktype() const { return READ; }
+
+        virtual void addRequiredPrivileges(const std::string& dbname,
+                                           const BSONObj& cmdObj,
+                                           std::vector<Privilege>* out) {
+            ActionSet actions;
+            actions.addAction(ActionType::indexStats);
+            out->push_back(Privilege(parseNs(dbname, cmdObj), actions));
+        }
 
         bool run(const string& dbname, BSONObj& cmdObj, int, string& errmsg,
                  BSONObjBuilder& result, bool fromRepl) {

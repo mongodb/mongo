@@ -130,10 +130,12 @@ namespace {
         dbAdminRoleActions.addAction(ActionType::createCollection); // read_write gets this also
         dbAdminRoleActions.addAction(ActionType::dbStats);
         dbAdminRoleActions.addAction(ActionType::dropCollection);
+        dbAdminRoleActions.addAction(ActionType::indexStats);
         dbAdminRoleActions.addAction(ActionType::profileEnable);
         dbAdminRoleActions.addAction(ActionType::profileRead);
         dbAdminRoleActions.addAction(ActionType::reIndex); // TODO: Should readWrite have this also? This isn't consistent with ENSURE_INDEX and DROP_INDEXES
         dbAdminRoleActions.addAction(ActionType::renameCollectionSameDB); // read_write gets this also
+        dbAdminRoleActions.addAction(ActionType::storageDetails);
         dbAdminRoleActions.addAction(ActionType::validate);
 
         // Server admin role

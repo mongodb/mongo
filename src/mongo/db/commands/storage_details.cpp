@@ -19,6 +19,9 @@
 #include <string>
 
 #include "mongo/base/init.h"
+#include "mongo/db/auth/action_set.h"
+#include "mongo/db/auth/action_type.h"
+#include "mongo/db/auth/privilege.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/db.h"
 #include "mongo/db/jsobj.h"
@@ -306,6 +309,14 @@ namespace {
         }
 
         virtual LockType locktype() const { return READ; }
+
+        virtual void addRequiredPrivileges(const std::string& dbname,
+                                           const BSONObj& cmdObj,
+                                           std::vector<Privilege>* out) {
+            ActionSet actions;
+            actions.addAction(ActionType::storageDetails);
+            out->push_back(Privilege(parseNs(dbname, cmdObj), actions));
+        }
 
     private:
         /**
