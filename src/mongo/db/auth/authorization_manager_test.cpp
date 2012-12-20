@@ -371,5 +371,104 @@ namespace {
                               "anydb", principal, oldAndNewMixed, &result));
     }
 
+    TEST(AuthorizationManagerTest, DocumentValidationCompatibility) {
+        Status (*check)(const StringData&, const BSONObj&) =
+            &AuthorizationManager::checkValidPrivilegeDocument;
+
+        // Good documents, with and without "readOnly" fields.
+        ASSERT_OK(check("test", BSON("user" << "andy" << "pwd" << "a")));
+        ASSERT_OK(check("test", BSON("user" << "andy" << "pwd" << "a" << "readOnly" << 1)));
+        ASSERT_OK(check("test", BSON("user" << "andy" << "pwd" << "a" << "readOnly" << false)));
+        ASSERT_OK(check("test", BSON("user" << "andy" << "pwd" << "a" << "readOnly" << "yes")));
+
+        // Must have a "pwd" field.
+        ASSERT_NOT_OK(check("test", BSON("user" << "andy")));
+
+        // "pwd" field must be a string.
+        ASSERT_NOT_OK(check("test", BSON("user" << "andy" << "pwd" << 100)));
+
+        // "pwd" field string must not be empty.
+        ASSERT_NOT_OK(check("test", BSON("user" << "andy" << "pwd" << "")));
+
+        // Must have a "user" field.
+        ASSERT_NOT_OK(check("test", BSON("pwd" << "a")));
+
+        // "user" field must be a string.
+        ASSERT_NOT_OK(check("test", BSON("user" << 100 << "pwd" << "a")));
+
+        // "user" field string must not be empty.
+        ASSERT_NOT_OK(check("test", BSON("user" << "" << "pwd" << "a")));
+    }
+
+    TEST(AuthorizationManagerTest, DocumentValidationExtended) {
+        Status (*check)(const StringData&, const BSONObj&) =
+            &AuthorizationManager::checkValidPrivilegeDocument;
+
+        // Document describing new-style user on "test".
+        ASSERT_OK(check("test", BSON("user" << "andy" << "pwd" << "a" <<
+                                     "roles" << BSON_ARRAY("read"))));
+
+        // Document giving roles on "test" to a user from "test2".
+        ASSERT_OK(check("test", BSON("user" << "andy" << "userSource" << "test2" <<
+                                     "roles" << BSON_ARRAY("read"))));
+
+        // Cannot have "userSource" field value == dbname.
+        ASSERT_NOT_OK(check("test", BSON("user" << "andy" << "userSource" << "test" <<
+                                         "roles" << BSON_ARRAY("read"))));
+
+        // Cannot have both "userSource" and "pwd"
+        ASSERT_NOT_OK(check("test", BSON("user" << "andy" << "userSource" << "test2" <<
+                                         "pwd" << "a" << "roles" << BSON_ARRAY("read"))));
+
+        // Cannot have an otherDBRoles field except in the admin database.
+        ASSERT_NOT_OK(check("test",
+                            BSON("user" << "andy" << "userSource" << "test2" <<
+                                 "roles" << BSON_ARRAY("read") <<
+                                 "otherDBRoles" << BSON("test2" << BSON_ARRAY("readWrite")))));
+
+        ASSERT_OK(check("admin",
+                        BSON("user" << "andy" << "userSource" << "test2" <<
+                             "roles" << BSON_ARRAY("read") <<
+                             "otherDBRoles" << BSON("test2" << BSON_ARRAY("readWrite")))));
+
+        // Must have "roles" to have "otherDBRoles".
+        ASSERT_NOT_OK(check("admin",
+                            BSON("user" << "andy" << "pwd" << "a" <<
+                                 "otherDBRoles" << BSON("test2" << BSON_ARRAY("readWrite")))));
+
+        ASSERT_OK(check("admin",
+                        BSON("user" << "andy" << "pwd" << "a" <<
+                             "roles" << BSONArrayBuilder().arr() <<
+                             "otherDBRoles" << BSON("test2" << BSON_ARRAY("readWrite")))));
+
+        // "otherDBRoles" may be empty.
+        ASSERT_OK(check("admin",
+                        BSON("user" << "andy" << "pwd" << "a" <<
+                             "roles" << BSONArrayBuilder().arr() <<
+                             "otherDBRoles" << BSONObjBuilder().obj())));
+
+        // Cannot omit "roles" if "userSource" is present.
+        ASSERT_NOT_OK(check("test", BSON("user" << "andy" << "userSource" << "test2")));
+
+        // Cannot have both "roles" and "readOnly".
+        ASSERT_NOT_OK(check("test", BSON("user" << "andy" << "pwd" << "a" << "readOnly" << 1 <<
+                                         "roles" << BSON_ARRAY("read"))));
+
+        // Roles must be strings, not empty.
+        ASSERT_NOT_OK(check("test", BSON("user" << "andy" << "pwd" << "a" <<
+                                         "roles" << BSON_ARRAY("read" << ""))));
+
+        ASSERT_NOT_OK(check("test", BSON("user" << "andy" << "pwd" << "a" <<
+                                         "roles" << BSON_ARRAY(1 << "read"))));
+
+        // Multiple roles OK.
+        ASSERT_OK(check("test", BSON("user" << "andy" << "pwd" << "a" <<
+                                     "roles" << BSON_ARRAY("dbAdmin" << "read"))));
+
+        // Empty roles list OK.
+        ASSERT_OK(check("test", BSON("user" << "andy" << "pwd" << "a" <<
+                                     "roles" << BSONArrayBuilder().arr())));
+    }
+
 }  // namespace
 }  // namespace mongo

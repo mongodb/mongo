@@ -356,7 +356,13 @@ namespace mongo {
                         c->prepareToTouchEarlierIterate();
                     }
 
-                    if ( modsIsIndexed <= 0 && mss->canApplyInPlace() ) {
+                    // If we've made it this far, "ns" must contain a valid collection name, and so
+                    // is of the form "db.collection".  Therefore, the following expression must
+                    // always be valid.  "system.users" updates must never be done in place, in
+                    // order to ensure that they are validated inside DataFileMgr::updateRecord(.).
+                    bool isSystemUsersMod = (NamespaceString(ns).coll == "system.users");
+
+                    if ( modsIsIndexed <= 0 && mss->canApplyInPlace() && !isSystemUsersMod ) {
                         mss->applyModsInPlace( true );// const_cast<BSONObj&>(onDisk) );
 
                         DEBUGUPDATE( "\t\t\t doing in place update" );

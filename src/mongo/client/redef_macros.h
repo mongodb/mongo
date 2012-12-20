@@ -48,6 +48,9 @@
 #pragma push_macro("uassert")
 #undef uassert
 #define uassert MONGO_uassert
+#pragma push_macro("uassertStatusOK")
+#undef uassertStatusOK
+#define uassertStatusOK MONGO_uassertStatusOK
 #pragma push_macro("DESTRUCTOR_GUARD")
 #undef DESTRUCTOR_GUARD
 #define DESTRUCTOR_GUARD MONGO_DESTRUCTOR_GUARD
