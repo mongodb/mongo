@@ -192,20 +192,6 @@ namespace mongo {
         }
     }
 
-    // TODO: remove this default implementation so that all Command subclasses have to explicitly
-    // declare their own.
-    void Command::addRequiredPrivileges(const std::string& dbname,
-                                        const BSONObj& cmdObj,
-                                        std::vector<Privilege>* out) {
-        if (!requiresAuth()) {
-            return;
-        }
-        ActionSet actions;
-        actions.addAction(locktype() == WRITE ? ActionType::oldWrite : ActionType::oldRead);
-        Privilege privilege(adminOnly() ? "admin" : dbname, actions);
-        out->push_back(privilege);
-    }
-
     void Command::logIfSlow( const Timer& timer, const string& msg ) {
         int ms = timer.millis();
         if ( ms > cmdLine.slowMS ) {
