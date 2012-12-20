@@ -101,8 +101,6 @@ namespace mongo {
 
             Status status = Status::OK();
 
-            int sz;
-
             while ( true ) {
                 char type;
                 if ( !buffer->readNumber<char>(&type) )
@@ -154,7 +152,10 @@ namespace mongo {
                     buffer->skip( sizeof(OID) );
                     break;
 
-                case CodeWScope:
+                case CodeWScope: {
+                    int myStart = buffer->position();
+                    int sz;
+
                     if ( !buffer->readNumber<int>( &sz ) )
                         return Status( ErrorCodes::InvalidBSON, "invalid bson" );
 
@@ -166,8 +167,11 @@ namespace mongo {
                     if ( !status.isOK() )
                         return status;
 
-                    break;
+                    if ( sz != static_cast<int>(buffer->position() - myStart) )
+                        return Status( ErrorCodes::InvalidBSON, "CodeWScope len is wrong" );
 
+                    break;
+                }
                 case RegEx:
                     status = buffer->readCString( NULL );
                     if ( !status.isOK() )
@@ -186,13 +190,14 @@ namespace mongo {
                         return status;
                     break;
 
-                case BinData:
+                case BinData: {
+                    int sz;
                     if ( !buffer->readNumber<int>( &sz ) )
                         return Status( ErrorCodes::InvalidBSON, "invalid bson" );
                     if ( !buffer->skip( 1 + sz ) )
                         return Status( ErrorCodes::InvalidBSON, "invalid bson" );
                     break;
-
+                }
                 case Object:
                 case Array:
                     status = validateBSONInternal( buffer, NULL );
