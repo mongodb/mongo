@@ -28,6 +28,7 @@
 #include "mongo/db/repl/bgsync.h"
 #include "mongo/db/repl/connections.h"
 #include "mongo/db/repl/rs.h"
+#include "mongo/db/server_parameters.h"
 #include "mongo/platform/bits.h"
 #include "mongo/s/d_logic.h"
 #include "mongo/util/net/sock.h"
@@ -874,5 +875,65 @@ namespace mongo {
         }
         return OpTime();
     }
+
+    class ReplIndexPrefetch : public ServerParameter {
+    public:
+        ReplIndexPrefetch()
+            : ServerParameter( ServerParameterSet::getGlobal(), "replIndexPrefetch" ) {
+        }
+
+        virtual ~ReplIndexPrefetch() {
+        }
+
+        const char * _value() {
+            if (!theReplSet)
+                return "uninitialized";
+            ReplSetImpl::IndexPrefetchConfig ip = theReplSet->getIndexPrefetchConfig();
+            switch (ip) {
+            case ReplSetImpl::PREFETCH_NONE:
+                return "none";
+            case ReplSetImpl::PREFETCH_ID_ONLY:
+                return "_id_only";
+            case ReplSetImpl::PREFETCH_ALL:
+                return "all";
+            default:
+                return "invalid";
+            }
+        }
+
+        virtual void append( BSONObjBuilder& b ) {
+            b.append( name(), _value() );
+        }
+
+        virtual Status set( const BSONElement& newValueElement ) {
+            if (!theReplSet) {
+                return Status( ErrorCodes::BadValue, "replication is not enabled" );
+            }
+
+            std::string prefetch = newValueElement.valuestrsafe();
+            return setFromString( prefetch );
+        }
+
+        virtual Status setFromString( const string& prefetch ) {
+            log() << "changing replication index prefetch behavior to " << prefetch << endl;
+
+            ReplSetImpl::IndexPrefetchConfig prefetchConfig;
+
+            if (prefetch == "none")
+                prefetchConfig = ReplSetImpl::PREFETCH_NONE;
+            else if (prefetch == "_id_only")
+                prefetchConfig = ReplSetImpl::PREFETCH_ID_ONLY;
+            else if (prefetch == "all")
+                prefetchConfig = ReplSetImpl::PREFETCH_ALL;
+            else {
+                return Status( ErrorCodes::BadValue,
+                               str::stream() << "unrecognized indexPrefetch setting: " << prefetch );
+            }
+
+            theReplSet->setIndexPrefetchConfig(prefetchConfig);
+            return Status::OK();
+        }
+
+    } replIndexPrefetch;
 }
 

@@ -24,8 +24,6 @@
 
 namespace mongo {
 
-    const char* fetchReplIndexPrefetchParam();
-
     class CmdGet : public Command {
     public:
         CmdGet() : Command( "getParameter" ) { }
@@ -66,9 +64,6 @@ namespace mongo {
             if( all || cmdObj.hasElement("syncdelay") ) {
                 result.append("syncdelay", cmdLine.syncdelay);
             }
-            if (all || cmdObj.hasElement("replIndexPrefetch")) {
-                result.append("replIndexPrefetch", fetchReplIndexPrefetchParam());
-            }
 
             const ServerParameter::Map& m = ServerParameterSet::getGlobal()->getMap();
             for ( ServerParameter::Map::const_iterator i = m.begin(); i != m.end(); ++i ) {
@@ -84,9 +79,6 @@ namespace mongo {
             return true;
         }
     } cmdGet;
-
-    // tempish
-    bool setParmsMongodSpecific(const string& dbname, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl );
 
     class CmdSet : public Command {
     public:
@@ -113,7 +105,7 @@ namespace mongo {
         }
         bool run(const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
             int s = 0;
-            bool found = setParmsMongodSpecific(dbname, cmdObj, errmsg, result, fromRepl);
+            bool found = false;
             if( cmdObj.hasElement("journalCommitInterval") ) {
                 if( !cmdLine.dur ) {
                     errmsg = "journaling is off";

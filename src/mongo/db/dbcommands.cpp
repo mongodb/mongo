@@ -59,48 +59,6 @@
 
 namespace mongo {
 
-    /** @return true if fields found */
-    bool setParmsMongodSpecific(const string& dbname, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl ) { 
-        if( cmdObj.hasElement( "replIndexPrefetch" ) ) {
-            if (!theReplSet) {
-                errmsg = "replication is not enabled";
-                return false;
-            }
-            std::string prefetch = cmdObj["replIndexPrefetch"].valuestrsafe();
-            log() << "changing replication index prefetch behavior to " << prefetch << endl;
-            // default:
-            ReplSetImpl::IndexPrefetchConfig prefetchConfig = ReplSetImpl::PREFETCH_ALL;
-            if (prefetch == "none")
-                prefetchConfig = ReplSetImpl::PREFETCH_NONE;
-            else if (prefetch == "_id_only")
-                prefetchConfig = ReplSetImpl::PREFETCH_ID_ONLY;
-            else if (prefetch == "all")
-                prefetchConfig = ReplSetImpl::PREFETCH_ALL;
-            else {
-                warning() << "unrecognized indexPrefetch setting: " << prefetch << endl;
-            }
-            theReplSet->setIndexPrefetchConfig(prefetchConfig);
-            return true;
-        }
-
-        return false;
-    }
-
-    const char* fetchReplIndexPrefetchParam() {
-        if (!theReplSet) return "uninitialized";
-        ReplSetImpl::IndexPrefetchConfig ip = theReplSet->getIndexPrefetchConfig();
-        switch (ip) {
-        case ReplSetImpl::PREFETCH_NONE:
-            return "none";
-        case ReplSetImpl::PREFETCH_ID_ONLY:
-            return "_id_only";
-        case ReplSetImpl::PREFETCH_ALL:
-            return "all";
-        default:
-            return "invalid";
-        }
-    }
-
     /* reset any errors so that getlasterror comes back clean.
 
        useful before performing a long series of operations where we want to
