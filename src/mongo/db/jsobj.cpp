@@ -26,6 +26,7 @@
 #include <boost/lexical_cast.hpp>
 #include <boost/static_assert.hpp>
 
+#include "mongo/bson/bson_validate.h"
 #include "mongo/bson/oid.h"
 #include "mongo/bson/util/atomic_int.h"
 #include "mongo/db/jsobjmanipulator.h"
@@ -462,35 +463,12 @@ namespace mongo {
 
     bool BSONObj::valid() const {
         int mySize = objsize();
-
-        try {
-            BSONObjIterator it(*this);
-            while( it.moreWithEOO() ) {
-                // both throw exception on failure
-                BSONElement e = it.next(true);
-                if ( e.size() >= mySize )
-                    return false;
-
-                e.validate();
-
-                if (e.eoo()) {
-                    if (it.moreWithEOO())
-                        return false;
-                    return true;
-                }
-                else if (e.isABSONObj()) {
-                    if(!e.embeddedObject().valid())
-                        return false;
-                }
-                else if (e.type() == CodeWScope) {
-                    if(!e.codeWScopeObject().valid())
-                        return false;
-                }
-            }
-        }
-        catch (...) {
-        }
-        return false;
+        int otherSize;
+        Status status = validateBSON( objdata(), mySize, &otherSize );
+        if ( ! status.isOK() )
+            return false;
+        verify( mySize == otherSize ); // should be impossible
+        return true;
     }
 
     int BSONObj::woCompare(const BSONObj& r, const Ordering &o, bool considerFieldName) const {

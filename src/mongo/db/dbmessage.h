@@ -23,6 +23,7 @@
 #include "../util/net/message.h"
 #include "../client/constants.h"
 #include "instance.h"
+#include "mongo/bson/bson_validate.h"
 
 namespace mongo {
 
@@ -196,14 +197,21 @@ namespace mongo {
                 nextjsobj += strlen(data) + 1; // skip namespace
                 massert( 13066 ,  "Message contains no documents", theEnd > nextjsobj );
             }
-            massert( 10304 ,  "Client Error: Remaining data too small for BSON object", theEnd - nextjsobj > 3 );
-            BSONObj js(nextjsobj);
-            massert( 10305 ,  "Client Error: Invalid object size", js.objsize() > 3 );
-            massert( 10306 ,  "Client Error: Next object larger than space left in message",
-                     js.objsize() < ( theEnd - data ) );
-            if ( cmdLine.objcheck && !js.valid() ) {
-                massert( 10307 , "Client Error: bad object in message", false);
+            massert( 10304,
+                     "Client Error: Remaining data too small for BSON object",
+                     theEnd - nextjsobj >= 5 );
+
+            if ( cmdLine.objcheck ) {
+                Status status = validateBSON( nextjsobj, theEnd - nextjsobj, NULL );
+                massert( 10307,
+                         str::stream() << "Client Error: bad object in message: " << status.reason(),
+                         status.isOK() );
             }
+
+            BSONObj js(nextjsobj);
+            verify( js.objsize() >= 5 );
+            verify( js.objsize() < ( theEnd - data ) );
+
             nextjsobj += js.objsize();
             if ( nextjsobj >= theEnd )
                 nextjsobj = 0;

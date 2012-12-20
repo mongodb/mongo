@@ -146,7 +146,7 @@ namespace mongo {
         auto_ptr<Matcher> _matcher;
 
     public:
-        BSONTool( const char * name , DBAccess access=ALL, bool objcheck = false );
+        BSONTool( const char * name , DBAccess access=ALL, bool objcheck = true );
 
         virtual int doRun() = 0;
         virtual void gotObject( const BSONObj& obj ) = 0;

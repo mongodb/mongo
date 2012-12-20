@@ -441,13 +441,17 @@ namespace mongo {
 
         add_options()
         ("objcheck" , "validate object before inserting" )
+        ("noobjcheck" , "validate object before inserting" )
         ("filter" , po::value<string>() , "filter to apply before inserting" )
         ;
     }
 
 
     int BSONTool::run() {
-        _objcheck = hasParam( "objcheck" );
+        if ( hasParam( "objcheck" ) )
+            _objcheck = true;
+        else if ( hasParam( "noobjcheck" ) )
+            _objcheck = false;
 
         if ( hasParam( "filter" ) )
             _matcher.reset( new Matcher( fromjson( getParam( "filter" ) ) ) );

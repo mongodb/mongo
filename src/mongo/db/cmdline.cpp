@@ -79,7 +79,6 @@ namespace {
         ("port", po::value<int>(&cmdLine.port), portInfoBuilder.str().c_str())
         ("bind_ip", po::value<string>(&cmdLine.bind_ip), "comma separated list of ip addresses to listen on - all local ips by default")
         ("maxConns",po::value<int>(), maxConnInfoBuilder.str().c_str())
-        ("objcheck", "inspect client data for validity on receipt")
         ("logpath", po::value<string>() , "log file to send write to instead of stdout - has to be a file, not directory" )
         ("logappend" , "append to logpath instead of over-writing" )
         ("pidfilepath", po::value<string>(), "full path to pidfile (if not set, no pidfile is created)")
@@ -110,6 +109,8 @@ namespace {
         
         // Extra hidden options
         hidden.add_options()
+        ("objcheck", "inspect client data for validity on receipt (DEFAULT)")
+        ("noobjcheck", "do NOT inspect client data for validity on receipt")
         ("traceExceptions", "log stack traces for every exception")
         ("enableExperimentalIndexStatsCmd", po::bool_switch(&cmdLine.experimental.indexStatsCmdEnabled),
                 "EXPERIMENTAL (UNSUPPORTED). Enable command computing aggregate statistics on indexes.")
@@ -318,6 +319,13 @@ namespace {
 
         if (params.count("objcheck")) {
             cmdLine.objcheck = true;
+        }
+        if (params.count("noobjcheck")) {
+            if (params.count("objcheck")) {
+                out() << "can't have both --objcheck and --noobjcheck" << endl;
+                return false;
+            }
+            cmdLine.objcheck = false;
         }
 
         if (params.count("bind_ip")) {
