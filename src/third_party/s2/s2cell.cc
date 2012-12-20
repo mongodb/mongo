@@ -16,8 +16,11 @@
 //
 // The expression below rounds up (43 + sizeof(void*)) to the nearest
 // multiple of sizeof(void*).
+#pragma warning(push)
+#pragma warning( disable: 4146 )
 COMPILE_ASSERT(sizeof(S2Cell) <= ((43+2*sizeof(void*)-1) & -sizeof(void*)),
                S2Cell_is_getting_bloated);
+#pragma warning(pop)
 
 S2Point S2Cell::GetVertexRaw(int k) const {
   // Vertices are returned in the order SW, SE, NE, NW.

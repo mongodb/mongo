@@ -282,7 +282,10 @@ class S2CellId {
   // equal to (uint64(1) << (2 * (kMaxLevel - level))).  So for example,
   // a.lsb() <= b.lsb() if and only if a.level() >= b.level(), but the
   // first test is more efficient.
+#pragma warning(push)
+#pragma warning( disable: 4146 )
   uint64 lsb() const { return id_ & -id_; }
+#pragma warning(pop)
 
   // Return the lowest-numbered bit that is on for cells at the given level.
   inline static uint64 lsb_for_level(int level) {
@@ -407,14 +410,20 @@ inline S2CellId S2CellId::parent(int level) const {
   DCHECK_GE(level, 0);
   DCHECK_LE(level, this->level());
   uint64 new_lsb = lsb_for_level(level);
+#pragma warning(push)
+#pragma warning( disable: 4146 )
   return S2CellId((id_ & -new_lsb) | new_lsb);
+#pragma warning(pop)
 }
 
 inline S2CellId S2CellId::parent() const {
   DCHECK(is_valid());
   DCHECK(!is_face());
   uint64 new_lsb = lsb() << 2;
+#pragma warning(push)
+#pragma warning( disable: 4146 )
   return S2CellId((id_ & -new_lsb) | new_lsb);
+#pragma warning(pop)
 }
 
 inline S2CellId S2CellId::child(int position) const {

@@ -118,7 +118,10 @@ int S2CellId::level() const {
   }
   // We only need to look at even-numbered bits to determine the
   // level of a valid cell id.
+#pragma warning(push)
+#pragma warning( disable: 4146 )
   x &= -x;  // Get lowest bit.
+#pragma warning(pop)
   if (x & 0x00005555) level += 8;
   if (x & 0x00550055) level += 4;
   if (x & 0x05050505) level += 2;

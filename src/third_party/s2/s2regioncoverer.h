@@ -140,7 +140,10 @@ class S2RegionCoverer {
     S2Cell cell;
     bool is_terminal;        // Cell should not be expanded further.
     int num_children;        // Number of children that intersect the region.
+#pragma warning(push)
+#pragma warning( disable: 4200 )
     Candidate* children[0];  // Actual size may be 0, 4, 16, or 64 elements.
+#pragma warning(pop)
   };
 
   // If the cell intersects the given region, return a new candidate with no
