@@ -181,7 +181,9 @@ catch ( e ){
     y = e;
 }
 
-assert.eq( x , y , "assert format" )
+assert.eq( x.code , y.code , "assert format" )
+assert.eq( x.errmsg , y.errmsg , "assert format" )
+assert.eq( x.ok , y.ok , "assert format" )
 
 // isMaster and query-wrapped-command
 isMaster = db.runCommand({isMaster:1});
