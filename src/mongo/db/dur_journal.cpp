@@ -160,7 +160,6 @@ namespace mongo {
 
         Journal::Journal() :
             _curLogFileMutex("JournalLfMutex") {
-            _ageOut = true;
             _written = 0;
             _nextFileNumber = 0;
             _curLogFile = 0;
@@ -655,17 +654,6 @@ namespace mongo {
 
                 _oldJournalFiles.pop_front();
             }
-        }
-
-        /*int getAgeOutJournalFiles() {
-            mutex::try_lock lk(j._curLogFileMutex, 4000);
-            if( !lk.ok )
-                return -1;
-            return j._ageOut ? 1 : 0;
-        }*/
-        void setAgeOutJournalFiles(bool a) {
-            SimpleMutex::scoped_lock lk(j._curLogFileMutex);
-            j._ageOut = a;
         }
 
         void Journal::_rotate() {

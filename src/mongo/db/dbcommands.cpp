@@ -59,18 +59,8 @@
 
 namespace mongo {
 
-    namespace dur { 
-        void setAgeOutJournalFiles(bool rotate);
-    }
     /** @return true if fields found */
     bool setParmsMongodSpecific(const string& dbname, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl ) { 
-        BSONElement e = cmdObj["ageOutJournalFiles"];
-        if( !e.eoo() ) {
-            bool r = e.trueValue();
-            log() << "ageOutJournalFiles " << r << endl;
-            dur::setAgeOutJournalFiles(r);
-            return true;
-        }
         if( cmdObj.hasElement( "replIndexPrefetch" ) ) {
             if (!theReplSet) {
                 errmsg = "replication is not enabled";

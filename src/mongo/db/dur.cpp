@@ -150,11 +150,6 @@ namespace mongo {
                              "writeToDataFiles" << (unsigned) (_writeToDataFilesMicros/1000) <<
                              "remapPrivateView" << (unsigned) (_remapPrivateViewMicros/1000)
                            );
-            /*int r = getAgeOutJournalFiles();
-            if( r == -1 )
-                b << "ageOutJournalFiles" << "mutex timeout";
-            if( r == 0 )
-                b << "ageOutJournalFiles" << false;*/
             if( cmdLine.journalCommitInterval != 0 )
                 b << "journalCommitIntervalMs" << cmdLine.journalCommitInterval;
             return b.obj();
