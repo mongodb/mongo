@@ -72,7 +72,12 @@ namespace mongo {
     // This is called when we're about to yield.
     void S2NearCursor::noteLocation() { _results = priority_queue<Result>(); }
     // Called when we're un-yielding.
-    void S2NearCursor::checkLocation() { fillResults(); }
+    // Note that this is (apparently) a valid call sequence:
+    // 1. noteLocation()
+    // 2. ok()
+    // 3. checkLocation()
+    // As such we might have results and only want to fill the result queue if it's empty.
+    void S2NearCursor::checkLocation() { if (_results.empty()) { fillResults(); } }
 
     void S2NearCursor::explainDetails(BSONObjBuilder& b) {
         // TODO(hk): Dump more meaningful stats.
