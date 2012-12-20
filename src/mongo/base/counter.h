@@ -19,13 +19,14 @@
 #pragma once
 
 #include "mongo/platform/atomic_word.h"
+#include "mongo/platform/cstdint.h"
 
 namespace mongo {
 
     class Counter64 {
     public:
         
-        void increment() { _counter.addAndFetch(1); }
+        void increment( uint64_t n = 1 ) { _counter.addAndFetch(n); }
         
         long long get() const { return _counter.load(); }
         

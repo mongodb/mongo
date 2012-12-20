@@ -38,6 +38,8 @@ assert.soon(
 assert.eq( 0 , t.find( { x : { $lt : new Date( now - 20000000 ) } } ).count() );
 assert.eq( 12 , t.count() );
 
+assert.lte( 18, db.serverStatus().metrics.ttl.deletedDocuments );
+
 // Part 2
 t.ensureIndex( { y : 1 } , { expireAfterSeconds : 10000 } );
 
