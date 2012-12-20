@@ -217,7 +217,7 @@ namespace mongo {
 
     void Document::toBson(BSONObjBuilder* pBuilder) const {
         for (DocumentStorageIterator it = storage().iterator(); !it.atEnd(); it.advance()) {
-            *pBuilder << it->name << it->val;
+            *pBuilder << it->nameSD() << it->val;
         }
     }
 
@@ -333,7 +333,7 @@ namespace mongo {
             const ValueElement& rField = rIt.get();
             const ValueElement& lField = lIt.get();
 
-            const int nameCmp = strcmp(lField.name, rField.name);
+            const int nameCmp = lField.nameSD().compare(rField.nameSD());
             if (nameCmp)
                 return nameCmp; // field names are unequal
 
@@ -354,7 +354,7 @@ namespace mongo {
         const char* prefix = "{";
 
         for (DocumentStorageIterator it = storage().iterator(); !it.atEnd(); it.advance()) {
-            out << prefix << it->name << ": " << it->val.toString();
+            out << prefix << it->nameSD() << ": " << it->val.toString();
             prefix = ", ";
         }
         out << '}';
