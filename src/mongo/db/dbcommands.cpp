@@ -1893,8 +1893,8 @@ namespace mongo {
 
         std::string dbname = nsToDatabase( cmdns );
 
-        AuthenticationInfo *ai = client.getAuthenticationInfo();
-        if( c->adminOnly() && c->localHostOnlyIfNoAuth( cmdObj ) && noauth && !ai->isLocalHost() ) {
+        if (c->adminOnly() && c->localHostOnlyIfNoAuth(cmdObj) && noauth &&
+                !client.getIsLocalHostConnection()) {
             log() << "command denied: " << cmdObj.toString() << endl;
             appendCommandStatus(result,
                                 false,
@@ -1963,14 +1963,6 @@ namespace mongo {
 
             // we also trust that this won't crash
             retval = true;
-
-            if ( c->requiresAuth() ) {
-                // test that the user at least as read permissions
-                if ( ! client.getAuthenticationInfo()->isAuthorizedReads( dbname ) ) {
-                    errmsg = "need to login";
-                    retval = false;
-                }
-            }
 
             if (retval) {
                 client.curop()->ensureStarted();

@@ -873,9 +873,7 @@ namespace mongo {
             return false;
         }
 
-        if (!cc().getAuthorizationManager()->checkAuthorization(cursor->ns(),
-                                                                ActionType::find)
-                || !cc().getAuthenticationInfo()->isAuthorizedReads(nsToDatabase(cursor->ns()))) {
+        if (!cc().getAuthorizationManager()->checkAuthorization(cursor->ns(), ActionType::find)) {
             return false;
         }
 
