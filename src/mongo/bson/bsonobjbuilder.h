@@ -596,21 +596,6 @@ namespace mongo {
             return temp;
         }
 
-        // method commented out as it does not behave as expected and is not used by 10gen.
-        // under this implementation the return value cannot be freed directly. instead
-        // we return the start of the bson buffer which is an offset off of the malloc
-        // buffer.
-        // ** method will be removed after checkin to confirm it is unused **
-        //
-        /* assume ownership of the buffer - you must then free it (with free()) */
-//        char* decouple(int& l) {
-//            char *x = _done();
-//            verify( x );
-//            l = _b.len();
-//            _b.decouple();
-//            return x;
-//        }
-
         void decouple() {
             _b.decouple();    // post done() call version.  be sure jsobj frees...
         }
