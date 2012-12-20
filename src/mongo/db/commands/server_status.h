@@ -105,7 +105,7 @@ namespace mongo {
      * 
      * declared once
      *    Counter counter;
-     *    ServerStatusMetricField myAwesomeCounterDisplay( "path.to.counter", false, &counter );
+     *    ServerStatusMetricField myAwesomeCounterDisplay( "path.to.counter", &counter );
      * 
      * call
      *    counter.hit();

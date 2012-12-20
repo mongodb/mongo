@@ -34,8 +34,8 @@ namespace mongo {
     Counter64 ttlPasses;
     Counter64 ttlDocDeletes;
 
-    ServerStatusMetricField<Counter64> ttlPassesDisplay( "ttl.passes", false, &ttlPasses );
-    ServerStatusMetricField<Counter64> ttlDocDeletesDisplay( "ttl.deletedDocuments", false, &ttlDocDeletes );
+    ServerStatusMetricField<Counter64> ttlPassesDisplay("ttl.passes", &ttlPasses);
+    ServerStatusMetricField<Counter64> ttlDocDeletesDisplay("ttl.deletedDocuments", &ttlDocDeletes);
 
 
     
