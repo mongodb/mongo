@@ -185,6 +185,10 @@ namespace mongo {
                 const BSONObj& privilegeDocument,
                 PrivilegeSet* result);
 
+        // Returns a new privilege that has replaced the actions needed to handle special casing
+        // certain namespaces like system.users and system.profile.
+        Privilege _modifyPrivilegeForSpecialCases(const Privilege& privilege);
+
         scoped_ptr<AuthExternalState> _externalState;
 
         // All the privileges that have been acquired by the authenticated principals.

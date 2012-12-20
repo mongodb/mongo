@@ -653,97 +653,45 @@ namespace {
     Status AuthorizationManager::checkAuthForQuery(const std::string& ns) {
         NamespaceString namespaceString(ns);
         verify(!namespaceString.isCommand());
-        if (namespaceString.coll == "system.users") {
-            if (!checkAuthorization(ns, ActionType::userAdmin)) {
-                return Status(ErrorCodes::Unauthorized,
-                              mongoutils::str::stream() <<
-                                      "unauthorized to read user information for database " <<
-                                      namespaceString.db,
-                              0);
-            }
-        }
-        else if (namespaceString.coll == "system.profile") {
-            if (!checkAuthorization(ns, ActionType::profileRead)) {
-                return Status(ErrorCodes::Unauthorized,
-                              mongoutils::str::stream() << "unauthorized to read " <<
-                                      namespaceString.db << ".system.profile",
-                              0);
-            }
-        }
-        else {
-            if (!checkAuthorization(ns, ActionType::find)) {
-                return Status(ErrorCodes::Unauthorized,
-                              mongoutils::str::stream() << "unauthorized for query on " << ns,
-                              0);
-            }
+        if (!checkAuthorization(ns, ActionType::find)) {
+            return Status(ErrorCodes::Unauthorized,
+                          mongoutils::str::stream() << "not authorized for query on " << ns,
+                          0);
         }
         return Status::OK();
     }
 
     Status AuthorizationManager::checkAuthForInsert(const std::string& ns) {
         NamespaceString namespaceString(ns);
-        if (namespaceString.coll == "system.users") {
-            if (!checkAuthorization(ns, ActionType::userAdmin)) {
-                return Status(ErrorCodes::Unauthorized,
-                              mongoutils::str::stream() <<
-                                      "unauthorized to create user for database " <<
-                                      namespaceString.db,
-                              0);
-            }
-        }
-        else {
-            if (!checkAuthorization(ns, ActionType::insert)) {
-                return Status(ErrorCodes::Unauthorized,
-                              mongoutils::str::stream() << "unauthorized for insert on " << ns,
-                              0);
-            }
+        if (!checkAuthorization(ns, ActionType::insert)) {
+            return Status(ErrorCodes::Unauthorized,
+                          mongoutils::str::stream() << "not authorized for insert on " << ns,
+                          0);
         }
         return Status::OK();
     }
 
     Status AuthorizationManager::checkAuthForUpdate(const std::string& ns, bool upsert) {
         NamespaceString namespaceString(ns);
-        if (namespaceString.coll == "system.users") {
-            if (!checkAuthorization(ns, ActionType::userAdmin)) {
-                return Status(ErrorCodes::Unauthorized,
-                              mongoutils::str::stream() <<
-                                      "not authorized to update user information for database " <<
-                                      namespaceString.db,
-                              0);
-            }
+        if (!checkAuthorization(ns, ActionType::update)) {
+            return Status(ErrorCodes::Unauthorized,
+                          mongoutils::str::stream() << "not authorized for update on " << ns,
+                          0);
         }
-        else {
-            if (!checkAuthorization(ns, ActionType::update)) {
-                return Status(ErrorCodes::Unauthorized,
-                              mongoutils::str::stream() << "not authorized for update on " << ns,
-                              0);
-            }
-            if (upsert && !checkAuthorization(ns, ActionType::insert)) {
-                return Status(ErrorCodes::Unauthorized,
-                              mongoutils::str::stream() << "not authorized for upsert on " << ns,
-                              0);
-            }
+        if (upsert && !checkAuthorization(ns, ActionType::insert)) {
+            return Status(ErrorCodes::Unauthorized,
+                          mongoutils::str::stream() << "not authorized for upsert on " << ns,
+                          0);
         }
         return Status::OK();
     }
 
     Status AuthorizationManager::checkAuthForDelete(const std::string& ns) {
         NamespaceString namespaceString(ns);
-        if (namespaceString.coll == "system.users") {
-            if (!checkAuthorization(ns, ActionType::userAdmin)) {
-                return Status(ErrorCodes::Unauthorized,
-                              mongoutils::str::stream() <<
-                                      "not authorized to remove user from database " <<
-                                      namespaceString.db,
-                              0);
-            }
-        }
-        else {
-            if (!checkAuthorization(ns, ActionType::remove)) {
-                return Status(ErrorCodes::Unauthorized,
-                              mongoutils::str::stream() << "not authorized to remove from " << ns,
-                              0);
-            }
+        if (!checkAuthorization(ns, ActionType::remove)) {
+            return Status(ErrorCodes::Unauthorized,
+                          mongoutils::str::stream() << "not authorized to remove from " << ns,
+                          0);
         }
         return Status::OK();
     }
@@ -752,11 +700,30 @@ namespace {
         return checkAuthForQuery(ns);
     }
 
+    Privilege AuthorizationManager::_modifyPrivilegeForSpecialCases(const Privilege& privilege) {
+        ActionSet newActions;
+        newActions.addAllActionsFromSet(privilege.getActions());
+        std::string collectionName = NamespaceString(privilege.getResource()).coll;
+        if (collectionName == "system.users") {
+            newActions.removeAction(ActionType::find);
+            newActions.removeAction(ActionType::insert);
+            newActions.removeAction(ActionType::update);
+            newActions.removeAction(ActionType::remove);
+            newActions.addAction(ActionType::userAdmin);
+        } else if (collectionName == "system.profle" && newActions.contains(ActionType::find)) {
+            newActions.removeAction(ActionType::find);
+            newActions.addAction(ActionType::profileRead);
+        }
+
+        return Privilege(privilege.getResource(), newActions);
+    }
+
     Status AuthorizationManager::checkAuthForPrivilege(const Privilege& privilege) {
         if (_externalState->shouldIgnoreAuthChecks())
             return Status::OK();
 
-        if (!_acquiredPrivileges.hasPrivilege(privilege))
+        Privilege modifiedPrivilege = _modifyPrivilegeForSpecialCases(privilege);
+        if (!_acquiredPrivileges.hasPrivilege(modifiedPrivilege))
             return Status(ErrorCodes::Unauthorized, "unauthorized", 0);
 
         return Status::OK();
@@ -766,7 +733,13 @@ namespace {
         if (_externalState->shouldIgnoreAuthChecks())
             return Status::OK();
 
-        if (!_acquiredPrivileges.hasPrivileges(privileges))
+        vector<Privilege> modifiedPrivileges;
+        for (vector<Privilege>::const_iterator it = privileges.begin(); it != privileges.end();
+                ++it) {
+            modifiedPrivileges.push_back(_modifyPrivilegeForSpecialCases(*it));
+        }
+
+        if (!_acquiredPrivileges.hasPrivileges(modifiedPrivileges))
             return Status(ErrorCodes::Unauthorized, "unauthorized", 0);
 
         return Status::OK();
