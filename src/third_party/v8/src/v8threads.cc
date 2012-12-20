@@ -479,7 +479,7 @@ void ContextSwitcher::Run() {
 
 // Acknowledge the preemption by the receiving thread.
 void ContextSwitcher::PreemptionReceived() {
-  ASSERT(Locker::IsLocked());
+  ASSERT(Locker::IsLocked(reinterpret_cast<v8::Isolate*>(Isolate::Current())));
   // There is currently no accounting being done for this. But could be in the
   // future, which is why we leave this in.
 }
