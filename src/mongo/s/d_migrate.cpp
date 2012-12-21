@@ -67,7 +67,7 @@ namespace mongo {
 
     BSONObj findShardKeyIndexPattern_locked( const string& ns , const BSONObj& shardKeyPattern ) {
         verify( Lock::isLocked() );
-        NamespaceDetails* nsd = nsdetails( ns.c_str() );
+        NamespaceDetails* nsd = nsdetails( ns );
         verify( nsd );
         const IndexDetails* idx = nsd->findIndexByPrefix( shardKeyPattern , true );  /* require single key */
         verify( idx );
@@ -450,7 +450,7 @@ namespace mongo {
          */
         bool storeCurrentLocs( long long maxChunkSize , string& errmsg , BSONObjBuilder& result ) {
             Client::ReadContext ctx( _ns );
-            NamespaceDetails *d = nsdetails( _ns.c_str() );
+            NamespaceDetails *d = nsdetails( _ns );
             if ( ! d ) {
                 errmsg = "ns not found, should be impossible";
                 return false;
@@ -541,7 +541,7 @@ namespace mongo {
             int allocSize;
             {
                 Client::ReadContext ctx( _ns );
-                NamespaceDetails *d = nsdetails( _ns.c_str() );
+                NamespaceDetails *d = nsdetails( _ns );
                 verify( d );
                 scoped_spinlock lk( _trackerLocks );
                 allocSize = std::min(BSONObjMaxUserSize, (int)((12 + d->averageObjectSize()) * _cloneLocs.size()));
@@ -1533,7 +1533,7 @@ namespace mongo {
                 // 0. copy system.namespaces entry if collection doesn't already exist
                 Client::WriteContext ctx( ns );
                 // Only copy if ns doesn't already exist
-                if ( ! nsdetails( ns.c_str() ) ) {
+                if ( ! nsdetails( ns ) ) {
                     string system_namespaces = NamespaceString( ns ).db + ".system.namespaces";
                     BSONObj entry = conn->findOne( system_namespaces, BSON( "name" << ns ) );
                     if ( entry["options"].isABSONObj() ) {

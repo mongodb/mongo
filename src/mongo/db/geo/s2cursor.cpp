@@ -56,7 +56,7 @@ namespace mongo {
             // A lot of these arguments are opaque.
             FieldRangeSet frs(_details->parentNS().c_str(), makeFRSObject(), false, false);
             shared_ptr<FieldRangeVector> frv(new FieldRangeVector(frs, specForFRV, 1));
-            _btreeCursor.reset(BtreeCursor::make(nsdetails(_details->parentNS().c_str()),
+            _btreeCursor.reset(BtreeCursor::make(nsdetails(_details->parentNS()),
                                                  *_details, frv, 0, 1));
             return advance();
         }

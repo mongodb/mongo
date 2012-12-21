@@ -290,7 +290,7 @@ namespace mongo {
                 scoped_ptr<Cursor> c;
                 
                 {
-                    NamespaceDetails* nsd = nsdetails( ns.c_str() );
+                    NamespaceDetails* nsd = nsdetails( ns );
                     if ( ! nsd )
                         break;
                     

@@ -107,7 +107,7 @@ namespace mongo {
                 std::vector< std::string > indexes;
                 {
                     Client::ReadContext ctx(ns);
-                    NamespaceDetails *nsd = nsdetails(ns.c_str());
+                    NamespaceDetails *nsd = nsdetails(ns);
                     massert( 16153, "namespace does not exist", nsd );
                     
                     NamespaceDetails::IndexIterator ii = nsd->ii(); 

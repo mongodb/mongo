@@ -542,7 +542,7 @@ namespace mongo {
 
     Extent* DataFileMgr::allocFromFreeList(const char *ns, int approxSize, bool capped) {
         string s = cc().database()->name + FREELIST_NS;
-        NamespaceDetails *f = nsdetails(s.c_str());
+        NamespaceDetails *f = nsdetails(s);
         if( f ) {
             int low, high;
             if( capped ) {
@@ -897,7 +897,7 @@ namespace mongo {
     void printFreeList() {
         string s = cc().database()->name + FREELIST_NS;
         log() << "dump freelist " << s << endl;
-        NamespaceDetails *freeExtents = nsdetails(s.c_str());
+        NamespaceDetails *freeExtents = nsdetails(s);
         if( freeExtents == 0 ) {
             log() << "  freeExtents==0" << endl;
             return;
@@ -927,11 +927,11 @@ namespace mongo {
         }
 
         string s = cc().database()->name + FREELIST_NS;
-        NamespaceDetails *freeExtents = nsdetails(s.c_str());
+        NamespaceDetails *freeExtents = nsdetails(s);
         if( freeExtents == 0 ) {
             string err;
             _userCreateNS(s.c_str(), BSONObj(), err, 0); // todo: this actually allocates an extent, which is bad!
-            freeExtents = nsdetails(s.c_str());
+            freeExtents = nsdetails(s);
             massert( 10361 , "can't create .$freelist", freeExtents);
         }
         if( freeExtents->firstExtent.isNull() ) {
@@ -951,7 +951,7 @@ namespace mongo {
 
     /* drop a collection/namespace */
     void dropNS(const string& nsToDrop) {
-        NamespaceDetails* d = nsdetails(nsToDrop.c_str());
+        NamespaceDetails* d = nsdetails(nsToDrop);
         uassert( 10086 ,  (string)"ns not found: " + nsToDrop , d );
 
         BackgroundOperation::assertNoBgOpInProgForNs(nsToDrop.c_str());
@@ -986,7 +986,7 @@ namespace mongo {
 
     void dropCollection( const string &name, string &errmsg, BSONObjBuilder &result ) {
         LOG(1) << "dropCollection: " << name << endl;
-        NamespaceDetails *d = nsdetails(name.c_str());
+        NamespaceDetails *d = nsdetails(name);
         if( d == 0 )
             return;
 
@@ -1469,7 +1469,7 @@ namespace mongo {
             }
 
             // Recompute index numbers
-            tableToIndex = nsdetails(tabletoidxns.c_str());
+            tableToIndex = nsdetails(tabletoidxns);
             idxNo = IndexBuildsInProgress::get(tabletoidxns.c_str(), idxName);
             verify(idxNo > -1);
 

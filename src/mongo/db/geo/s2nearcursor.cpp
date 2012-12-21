@@ -167,7 +167,7 @@ namespace mongo {
             // Some of these arguments are opaque, look at the definitions of the involved classes.
             FieldRangeSet frs(_details->parentNS().c_str(), makeFRSObject(), false, false);
             shared_ptr<FieldRangeVector> frv(new FieldRangeVector(frs, _specForFRV, 1));
-            scoped_ptr<BtreeCursor> cursor(BtreeCursor::make(nsdetails(_details->parentNS().c_str()),
+            scoped_ptr<BtreeCursor> cursor(BtreeCursor::make(nsdetails(_details->parentNS()),
                                                              *_details, frv, 0, 1));
 
             // Do the actual search through this annulus.

@@ -543,7 +543,7 @@ namespace mongo {
         virtual LockType locktype() const { return WRITE; }
         virtual bool run(const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
             string nsToDrop = dbname + '.' + cmdObj.firstElement().valuestr();
-            NamespaceDetails *d = nsdetails(nsToDrop.c_str());
+            NamespaceDetails *d = nsdetails(nsToDrop);
             if ( !cmdLine.quiet )
                 tlog() << "CMD: drop " << nsToDrop << endl;
             if ( d == 0 ) {
@@ -676,7 +676,7 @@ namespace mongo {
         bool run(const string& dbname, BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& anObjBuilder, bool /*fromRepl*/) {
             BSONElement e = jsobj.firstElement();
             string toDeleteNs = dbname + '.' + e.valuestr();
-            NamespaceDetails *d = nsdetails(toDeleteNs.c_str());
+            NamespaceDetails *d = nsdetails(toDeleteNs);
             if ( !cmdLine.quiet )
                 tlog() << "CMD: dropIndexes " << toDeleteNs << endl;
             if ( d ) {
@@ -730,7 +730,7 @@ namespace mongo {
 
             BSONElement e = jsobj.firstElement();
             string toDeleteNs = dbname + '.' + e.valuestr();
-            NamespaceDetails *d = nsdetails(toDeleteNs.c_str());
+            NamespaceDetails *d = nsdetails(toDeleteNs);
             tlog() << "CMD: reIndex " << toDeleteNs << endl;
             BackgroundOperation::assertNoBgOpInProgForNs(toDeleteNs.c_str());
 
@@ -1061,7 +1061,7 @@ namespace mongo {
             bool estimate = jsobj["estimate"].trueValue();
 
             Client::Context ctx( ns );
-            NamespaceDetails *d = nsdetails(ns.c_str());
+            NamespaceDetails *d = nsdetails(ns);
 
             if ( ! d || d->stats.nrecords == 0 ) {
                 result.appendNumber( "size" , 0 );
@@ -1148,7 +1148,7 @@ namespace mongo {
         long long getIndexSizeForCollection(string db, string ns, BSONObjBuilder* details=NULL, int scale = 1 ) {
             Lock::assertAtLeastReadLocked(ns);
 
-            NamespaceDetails * nsd = nsdetails( ns.c_str() );
+            NamespaceDetails * nsd = nsdetails( ns );
             if ( ! nsd )
                 return 0;
 
@@ -1158,7 +1158,7 @@ namespace mongo {
             while ( ii.more() ) {
                 IndexDetails& d = ii.next();
                 string collNS = d.indexNamespace();
-                NamespaceDetails * mine = nsdetails( collNS.c_str() );
+                NamespaceDetails * mine = nsdetails( collNS );
                 if ( ! mine ) {
                     log() << "error: have index ["  << collNS << "] but no NamespaceDetails" << endl;
                     continue;
@@ -1191,7 +1191,7 @@ namespace mongo {
             string ns = dbname + "." + jsobj.firstElement().valuestr();
             Client::Context cx( ns );
 
-            NamespaceDetails * nsd = nsdetails( ns.c_str() );
+            NamespaceDetails * nsd = nsdetails( ns );
             if ( ! nsd ) {
                 errmsg = "ns not found";
                 return false;
@@ -1268,7 +1268,7 @@ namespace mongo {
         bool run(const string& dbname, BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
             string ns = dbname + "." + jsobj.firstElement().valuestr();
             Client::Context ctx( ns );
-            NamespaceDetails* nsd = nsdetails( ns.c_str() );
+            NamespaceDetails* nsd = nsdetails( ns );
             if ( ! nsd ) {
                 errmsg = "ns does not exist";
                 return false;
@@ -1353,7 +1353,7 @@ namespace mongo {
             for (list<string>::const_iterator it = collections.begin(); it != collections.end(); ++it) {
                 const string ns = *it;
 
-                NamespaceDetails * nsd = nsdetails( ns.c_str() );
+                NamespaceDetails * nsd = nsdetails( ns );
                 if ( ! nsd ) {
                     errmsg = "missing ns: ";
                     errmsg += ns;
@@ -1423,7 +1423,7 @@ namespace mongo {
 
             string fromNs = dbname + "." + from;
             string toNs = dbname + "." + to;
-            NamespaceDetails *nsd = nsdetails( fromNs.c_str() );
+            NamespaceDetails *nsd = nsdetails( fromNs );
             massert( 10301 ,  "source collection " + fromNs + " does not exist", nsd );
             long long excessSize = nsd->stats.datasize - size * 2; // datasize and extentSize can't be compared exactly, so add some padding to 'size'
             DiskLoc extent = nsd->firstExtent;
@@ -1622,7 +1622,7 @@ namespace mongo {
 
                 shared_ptr<Cursor> cursor;
 
-                NamespaceDetails * nsd = nsdetails( c.c_str() );
+                NamespaceDetails * nsd = nsdetails( c );
 
                 // debug SERVER-761
                 NamespaceDetails::IndexIterator ii = nsd->ii();
@@ -1747,7 +1747,7 @@ namespace mongo {
 
             // inclusive range?
             bool inc = cmdObj.getBoolField( "inc" );
-            NamespaceDetails *nsd = nsdetails( ns.c_str() );
+            NamespaceDetails *nsd = nsdetails( ns );
             ReverseCappedCursor c( nsd );
             massert( 13417, "captrunc collection not found or empty", c.ok() );
             for( int i = 0; i < n; ++i ) {
@@ -1782,7 +1782,7 @@ namespace mongo {
             string coll = cmdObj[ "emptycapped" ].valuestrsafe();
             uassert( 13428, "emptycapped must specify a collection", !coll.empty() );
             string ns = dbname + "." + coll;
-            NamespaceDetails *nsd = nsdetails( ns.c_str() );
+            NamespaceDetails *nsd = nsdetails( ns );
             massert( 13429, "emptycapped no such collection", nsd );
             nsd->emptyCappedCollection( ns.c_str() );
             return true;

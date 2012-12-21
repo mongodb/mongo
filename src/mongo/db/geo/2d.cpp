@@ -405,7 +405,7 @@ namespace mongo {
             }
 
             // Slow undirty
-            scoped_ptr<BtreeCursor> cursor(BtreeCursor::make(nsdetails(g->getDetails()->parentNS().c_str()),
+            scoped_ptr<BtreeCursor> cursor(BtreeCursor::make(nsdetails(g->getDetails()->parentNS()),
                                             *(g->getDetails()), _key, _key, true, 1));
 
             int count = 0;
@@ -696,7 +696,7 @@ namespace mongo {
             shared_ptr<FieldRangeVector> frvMax(new FieldRangeVector(*(max._frs), *(max._spec), 1));
 
             min._cursor.reset(
-                            BtreeCursor::make(nsdetails(spec->getDetails()->parentNS().c_str()),
+                            BtreeCursor::make(nsdetails(spec->getDetails()->parentNS()),
                                               *(spec->getDetails()),
                                               frvMin,
                                               0,
@@ -704,7 +704,7 @@ namespace mongo {
                    );
 
             max._cursor.reset(
-                           BtreeCursor::make(nsdetails(spec->getDetails()->parentNS().c_str()),
+                           BtreeCursor::make(nsdetails(spec->getDetails()->parentNS()),
                                              *(spec->getDetails()),
                                              frvMax,
                                              0,
@@ -2473,7 +2473,7 @@ namespace mongo {
         bool run(const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             string ns = dbname + "." + cmdObj.firstElement().valuestr();
 
-            NamespaceDetails * d = nsdetails(ns.c_str());
+            NamespaceDetails * d = nsdetails(ns);
             if (! d) {
                 errmsg = "can't find ns";
                 return false;

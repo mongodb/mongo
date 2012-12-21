@@ -882,7 +882,7 @@ namespace mongo {
             long long size = 0;
             {
                 Client::Context ctx( source ); // auths against source
-                NamespaceDetails *nsd = nsdetails( source.c_str() );
+                NamespaceDetails *nsd = nsdetails( source );
                 uassert( 10026 ,  "source namespace does not exist", nsd );
                 capped = nsd->isCapped();
                 if ( capped )
@@ -892,7 +892,7 @@ namespace mongo {
 
             Client::Context ctx( target ); //auths against target
 
-            if ( nsdetails( target.c_str() ) ) {
+            if ( nsdetails( target ) ) {
                 uassert( 10027 ,  "target namespace exists", cmdObj["dropTarget"].trueValue() );
                 BSONObjBuilder bb( result.subobjStart( "dropTarget" ) );
                 dropCollection( target , errmsg , bb );

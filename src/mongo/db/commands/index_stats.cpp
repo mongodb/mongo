@@ -499,7 +499,7 @@ namespace mongo {
                  BSONObjBuilder& result, bool fromRepl) {
 
             string ns = dbname + "." + cmdObj.firstElement().valuestrsafe();
-            const NamespaceDetails* nsd = nsdetails(ns.c_str());
+            const NamespaceDetails* nsd = nsdetails(ns);
             if (!cmdLine.quiet) {
                 tlog() << "CMD: indexStats " << ns << endl;
             }
