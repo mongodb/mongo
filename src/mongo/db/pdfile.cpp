@@ -230,8 +230,10 @@ namespace mongo {
     }
 
     void checkConfigNS(const char *ns) {
-        if ( cmdLine.configsvr && 
-             !( str::startsWith( ns, "config." ) || str::startsWith( ns, "admin." ) ) ) { 
+        if ( cmdLine.configsvr &&
+             !( str::startsWith( ns, "config." ) ||
+                str::startsWith( ns, "local." ) ||
+                str::startsWith( ns, "admin." ) ) ) {
             uasserted(14037, "can't create user databases on a --configsvr instance");
         }
     }
