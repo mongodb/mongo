@@ -109,7 +109,8 @@ namespace mongo {
                 , _it(first)
                 , _end(end)
                 , _includeMissing(includeMissing) {
-            skipMissing();
+            if (!_includeMissing)
+                skipMissing();
         }
 
         bool atEnd() const { return _it == _end; }
@@ -120,7 +121,8 @@ namespace mongo {
 
         void advance() {
             advanceOne();
-            skipMissing();
+            if (!_includeMissing)
+                skipMissing();
         }
 
         const ValueElement* operator-> () { return _it; }
@@ -132,10 +134,8 @@ namespace mongo {
         }
 
         void skipMissing() {
-            if (!_includeMissing) {
-                while (!atEnd() && _it->val.missing()) {
-                    advanceOne();
-                }
+            while (!atEnd() && _it->val.missing()) {
+                advanceOne();
             }
         }
 

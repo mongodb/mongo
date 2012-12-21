@@ -28,23 +28,27 @@ namespace mongo {
     using namespace mongoutils;
 
     Position DocumentStorage::findField(StringData requested) const {
+        int reqSize = requested.size(); // get size calculation out of the way if needed
+
         if (_numFields >= HASH_TAB_MIN) { // hash lookup
             const unsigned bucket = bucketForKey(requested);
 
             Position pos = _hashTab[bucket];
             while (pos.found()) {
                 const ValueElement& elem = getField(pos);
-                if (requested == elem.nameSD())
+                if (elem.nameLen == reqSize
+                    && memcmp(requested.rawData(), elem._name, reqSize) == 0) {
                     return pos;
+                }
 
                 // possible collision
                 pos = elem.nextCollision;
             }
         }
-        else if (_numFields) { // linear scan
+        else { // linear scan
             for (DocumentStorageIterator it = iteratorAll(); !it.atEnd(); it.advance()) {
-                if (size_t(it->nameLen) == requested.size()
-                    && requested == it->nameSD()) {
+                if (it->nameLen == reqSize
+                    && memcmp(requested.rawData(), it->_name, reqSize) == 0) {
                     return it.position();
                 }
             }
