@@ -1039,6 +1039,18 @@ dodouble:
         return true;
     }
 
+    template<> inline bool BSONElement::coerce<double>( double* out ) const {
+        if ( !isNumber() )
+            return false;
+        *out = numberDouble();
+        return true;
+    }
+
+    template<> inline bool BSONElement::coerce<bool>( bool* out ) const {
+        *out = trueValue();
+        return true;
+    }
+
     template<> inline bool BSONElement::coerce< std::vector<std::string> >( std::vector<std::string>* out ) const {
         if ( type() != mongo::Array )
             return false;
