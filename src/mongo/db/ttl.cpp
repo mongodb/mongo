@@ -32,10 +32,10 @@
 namespace mongo {
 
     Counter64 ttlPasses;
-    Counter64 ttlDocDeletes;
+    Counter64 ttlDeletedDocuments;
 
     ServerStatusMetricField<Counter64> ttlPassesDisplay("ttl.passes", &ttlPasses);
-    ServerStatusMetricField<Counter64> ttlDocDeletesDisplay("ttl.deletedDocuments", &ttlDocDeletes);
+    ServerStatusMetricField<Counter64> ttlDeletedDocumentsDisplay("ttl.deletedDocuments", &ttlDeletedDocuments);
 
 
     
@@ -105,7 +105,7 @@ namespace mongo {
                     }
 
                     n = deleteObjects( ns.c_str() , query , false , true );
-                    ttlDocDeletes.increment( n );
+                    ttlDeletedDocuments.increment( n );
                 }
 
                 LOG(1) << "\tTTL deleted: " << n << endl;
