@@ -48,6 +48,10 @@ __wt_eviction_check(WT_SESSION_IMPL *session, int *read_lockoutp, int wake)
 static inline int
 __wt_eviction_page_force(WT_BTREE *btree, WT_PAGE *page)
 {
+	/*
+	 * The number 60 is arbitrary here. It happens to be about 1MB
+	 * if the btree is using 16KB pages.
+	 */
 	return (!WT_PAGE_IS_ROOT(page) && __wt_page_is_modified(page) &&
 	    (page->memory_footprint > 60 * btree->maxleafpage));
 }
