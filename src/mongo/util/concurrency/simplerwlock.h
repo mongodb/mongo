@@ -16,6 +16,7 @@
 
 #pragma once
 
+#include "mongo/base/string_data.h"
 #include "mongo/bson/util/atomic_int.h"
 
 namespace mongo {
@@ -36,7 +37,7 @@ namespace mongo {
 #endif
     public:
         const string name;
-        SimpleRWLock(const char *name = 0);
+        SimpleRWLock(const StringData& name = "" );
         void lock();
         void unlock();
         void lock_shared();

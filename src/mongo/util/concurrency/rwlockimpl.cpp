@@ -40,7 +40,7 @@ using namespace std;
 namespace mongo {
 
 #if defined(_WIN32) && defined(MONGO_USE_SRW_ON_WINDOWS)
-    SimpleRWLock::SimpleRWLock(const char *p) : name(p?p:"") { 
+    SimpleRWLock::SimpleRWLock(const StringData& p) : name(p.toString()) {
         InitializeSRWLock(&_lock);
     }
 # if defined(_DEBUG)
@@ -91,7 +91,7 @@ namespace mongo {
     }
 # endif
 #else
-    SimpleRWLock::SimpleRWLock(const char *p) : name(p?p:"") { }
+    SimpleRWLock::SimpleRWLock(const StringData& p) : name(p.toString()) { }
     void SimpleRWLock::lock() { m.lock(); }
     void SimpleRWLock::unlock() { m.unlock(); }
     void SimpleRWLock::lock_shared() { m.lock_shared(); }

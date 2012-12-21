@@ -20,47 +20,50 @@
 
 namespace mongo {
 
-    /** Thread safe map.  
+    /** Thread safe map.
         Be careful not to use this too much or it could make things slow;
         if not a hot code path no problem.
-    
         Examples:
 
-        mapsf<int,int> mp;
+        mapsf< map<int,int>, int, int > mp;
 
         int x = mp.get();
 
-        map<int,int> two;
+        map< map<int,int>, int, int > two;
         mp.swap(two);
 
         {
-            mapsf<int,int>::ref r(mp);
+            mapsf< map<int,int>, int, int >::ref r(mp);
             r[9] = 1;
             map<int,int>::iterator i = r.r.begin();
         }
-        
     */
-    template< class K, class V >
+    template< class M >
     struct mapsf : boost::noncopyable {
         SimpleMutex m;
-        unordered_map<K,V> val;
+        M val;
         friend struct ref;
     public:
+
+        typedef typename M::const_iterator const_iterator;
+        typedef typename M::key_type key_type;
+        typedef typename M::mapped_type mapped_type;
+
         mapsf() : m("mapsf") { }
-        void swap(unordered_map<K,V>& rhs) {
+        void swap(M& rhs) {
             SimpleMutex::scoped_lock lk(m);
             val.swap(rhs);
         }
-        bool empty() { 
+        bool empty() {
             SimpleMutex::scoped_lock lk(m);
-            return val.empty(); 
+            return val.empty();
         }
         // safe as we pass by value:
-        V get(K k) { 
+        mapped_type get(key_type k) {
             SimpleMutex::scoped_lock lk(m);
-            typename unordered_map<K,V>::iterator i = val.find(k);
+            const_iterator i = val.find(k);
             if( i == val.end() )
-                return V();
+                return mapped_type();
             return i->second;
         }
         // think about deadlocks when using ref.  the other methods
@@ -68,9 +71,9 @@ namespace mongo {
         struct ref {
             SimpleMutex::scoped_lock lk;
         public:
-            unordered_map<K,V> &r;
-            ref(mapsf<K,V> &m) : lk(m.m), r(m.val) { }
-            V& operator[](const K& k) { return r[k]; }
+            M &r;
+            ref(mapsf &m) : lk(m.m), r(m.val) { }
+            mapped_type& operator[](const key_type& k) { return r[k]; }
         };
     };
 
