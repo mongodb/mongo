@@ -206,6 +206,11 @@ namespace mongo {
                     return true;
                 }
 
+                if ( !theReplSet && !e.isNumber() ) {
+                    result.append( "err", "cannot use non integer w values for non-repliac sets" );
+                    return true;
+                }
+
                 while ( 1 ) {
                     // check this first for w=0 or w=1
                     if ( opReplicatedEnough( op, e ) ) {
