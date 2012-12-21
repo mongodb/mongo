@@ -53,7 +53,7 @@ __wt_eviction_page_force(WT_BTREE *btree, WT_PAGE *page)
 	 * if the btree is using 16KB pages.
 	 */
 	return (!WT_PAGE_IS_ROOT(page) && __wt_page_is_modified(page) &&
-            page->type != WT_PAGE_ROW_INT && page->type != WT_PAGE_COL_INT &&
+	    page->type != WT_PAGE_ROW_INT && page->type != WT_PAGE_COL_INT &&
 	    (page->memory_footprint > 60 * btree->maxleafpage));
 }
 
