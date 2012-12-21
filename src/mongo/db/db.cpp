@@ -1132,6 +1132,9 @@ static void processCommandLineOptions(const std::vector<std::string>& argv) {
                 cmdLine.dur = true;
             if ( params.count( "dbpath" ) == 0 )
                 dbpath = "/data/configdb";
+            replSettings.master = true;
+            if ( params.count( "oplogsize" ) == 0 )
+                cmdLine.oplogSize = 5 * 1024 * 1024;
         }
         if ( params.count( "profile" ) ) {
             cmdLine.defaultProfile = params["profile"].as<int>();
