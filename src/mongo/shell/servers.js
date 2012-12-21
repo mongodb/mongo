@@ -595,10 +595,9 @@ MongoRunner.isStopped = function( port ){
     return MongoRunner.usedPortMap[ "" + parseInt( port ) ] ? false : true
 }
 
-__nextPort = 27000;
 startMongodTest = function (port, dirname, restart, extraOptions ) {
     if (!port)
-        port = __nextPort++;
+        port = MongoRunner.nextOpenPort();
     var f = startMongodEmpty;
     if (restart)
         f = startMongodNoReset;
