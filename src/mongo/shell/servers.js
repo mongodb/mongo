@@ -769,8 +769,9 @@ startMongoProgramNoConnect = function() {
     if ( jsTestOptions().auth ) {
         var progName = args[0];
         args = args.slice(1);
-        args.unshift( progName, '-u', jsTestOptions().adminUser,
-                      '-p', jsTestOptions().adminPassword );
+        args.unshift(progName, '-u', jsTestOptions().adminUser,
+                     '-p', jsTestOptions().adminPassword,
+                     '--authenticationMechanism', DB.prototype._defaultAuthenticationMechanism);
     }
     return _startMongoProgram.apply( null, args );
 }

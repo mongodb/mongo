@@ -618,6 +618,7 @@ int _main( int argc, char* argv[], char **envp ) {
 
     string username;
     string password;
+    string authenticationMechanism;
 
     std::string sslPEMKeyFile;
     std::string sslPEMKeyPassword;
@@ -644,6 +645,9 @@ int _main( int argc, char* argv[], char **envp ) {
     ( "eval", po::value<string>( &script ), "evaluate javascript" )
     ( "username,u", po::value<string>(&username), "username for authentication" )
     ( "password,p", new mongo::PasswordValue( &password ), "password for authentication" )
+    ("authenticationMechanism",
+     po::value<string>(&authenticationMechanism)->default_value("MONGO-CR"),
+     "authentication mechanism")
     ( "help,h", "show this usage information" )
     ( "version", "show version information" )
     ( "verbose", "increase verbosity" )
@@ -798,11 +802,32 @@ int _main( int argc, char* argv[], char **envp ) {
         if ( params.count( "password" ) && password.empty() )
             password = mongo::askPassword();
 
-        if ( username.size() && password.size() ) {
-            stringstream ss;
-            ss << "if ( ! db.auth( \"" << username << "\" , \"" << password << "\" ) ){ throw 'login failed'; }";
-            mongo::shell_utils::_dbAuth = ss.str();
+        // Construct the authentication-related code to execute on shell startup.
+        //
+        // This constructs and immediately executes an anonymous function, to avoid
+        // the shell's default behavior of printing statement results to the console.
+        //
+        // It constructs a statement of the following form:
+        //
+        // (function() {
+        //    // Set default authentication mechanism and, maybe, authenticate.
+        //  }())
+        stringstream authStringStream;
+        authStringStream << "(function() { " << endl;
+        if ( !authenticationMechanism.empty() ) {
+            authStringStream << "DB.prototype._defaultAuthenticationMechanism = \"" <<
+                authenticationMechanism << "\";" << endl;
         }
+
+        if ( username.size() ) {
+            authStringStream << "var username = \"" << username << "\";" << endl;
+            authStringStream << "var password = \"" << password << "\";" << endl;
+            authStringStream << "if (!db.auth(username, password)) { throw 'login failed'; }"
+                             << endl;
+        }
+        authStringStream << "}())";
+
+        mongo::shell_utils::_dbAuth = authStringStream.str();
     }
 
     mongo::ScriptEngine::setConnectCallback( mongo::shell_utils::onConnect );
