@@ -16,6 +16,8 @@
 
 #include "mongo/pch.h"
 
+#include "mongo/base/counter.h"
+#include "mongo/db/commands/server_status.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/database.h"
 #include "mongo/db/kill_current_op.h"
@@ -200,4 +202,41 @@ namespace mongo {
 
     AtomicUInt CurOp::_nextOpNum;
 
+    static Counter64 c_returned;
+    static Counter64 c_inserted;
+    static Counter64 c_updated;
+    static Counter64 c_deleted;
+    static Counter64 c_scanned;
+
+    static ServerStatusMetricField<Counter64> displayReturned( "document.returned", &c_returned );
+    static ServerStatusMetricField<Counter64> displayUpdated( "document.updated", &c_updated );
+    static ServerStatusMetricField<Counter64> displayInserted( "document.inserted", &c_inserted );
+    static ServerStatusMetricField<Counter64> displayDeleted( "document.deleted", &c_deleted );
+    static ServerStatusMetricField<Counter64> displayScanned( "document.scanned", &c_scanned );
+
+    static Counter64 c_idhack;
+    static Counter64 c_scanAndOrder;
+    static Counter64 c_fastmod;
+
+    static ServerStatusMetricField<Counter64> displayIdhack( "query.idhack", &c_idhack );
+    static ServerStatusMetricField<Counter64> displayScanAndOrder( "query.scanAndOrder", &c_scanAndOrder );
+    static ServerStatusMetricField<Counter64> displayFastMod( "query.fastmod", &c_fastmod );
+
+    void OpDebug::recordStats() {
+        if ( nreturned > 0 )
+            c_returned.increment( nreturned );
+        // TODO: insert
+        if ( nupdated > 0 )
+            c_updated.increment( nupdated );
+        // TODO: delete
+        if ( nscanned > 0 )
+            c_scanned.increment( nscanned );
+
+        if ( idhack )
+            c_idhack.increment();
+        if ( scanAndOrder )
+            c_scanAndOrder.increment();
+        if ( fastmod )
+            c_fastmod.increment();
+    }
 }

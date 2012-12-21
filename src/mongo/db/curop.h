@@ -39,7 +39,9 @@ namespace mongo {
         OpDebug() : ns(""){ reset(); }
 
         void reset();
-        
+
+        void recordStats();
+
         string report( const CurOp& curop ) const;
 
         /**
