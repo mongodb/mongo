@@ -31,7 +31,7 @@
 #include "mongo/db/replutil.h"
 #include "mongo/db/scanandorder.h"
 #include "mongo/s/d_logic.h"
-#include "mongo/s/util.h"  // for SendStaleConfigException
+#include "mongo/s/stale_exception.h"  // for SendStaleConfigException
 #include "mongo/server.h"
 
 namespace mongo {

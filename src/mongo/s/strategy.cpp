@@ -28,7 +28,7 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/request.h"
 #include "mongo/s/server.h"
-#include "mongo/s/util.h"  // for SendStaleConfigException
+#include "mongo/s/stale_exception.h"  // for SendStaleConfigException
 #include "mongo/s/writeback_listener.h"
 #include "mongo/util/mongoutils/str.h"
 

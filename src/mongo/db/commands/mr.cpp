@@ -17,21 +17,23 @@
  */
 
 #include "pch.h"
-#include "../db.h"
-#include "../instance.h"
-#include "../commands.h"
-#include "../../scripting/engine.h"
-#include "../../client/connpool.h"
-#include "../../client/parallel.h"
-#include "../matcher.h"
-#include "../clientcursor.h"
-#include "../replutil.h"
-#include "../../s/d_chunk_manager.h"
-#include "../../s/d_logic.h"
-#include "../../s/grid.h"
-#include "mongo/db/kill_current_op.h"
 
 #include "mr.h"
+
+#include "mongo/client/connpool.h"
+#include "mongo/client/parallel.h"
+#include "mongo/db/clientcursor.h"
+#include "mongo/db/commands.h"
+#include "mongo/db/db.h"
+#include "mongo/db/instance.h"
+#include "mongo/db/kill_current_op.h"
+#include "mongo/db/matcher.h"
+#include "mongo/db/replutil.h"
+#include "mongo/scripting/engine.h"
+#include "mongo/s/d_chunk_manager.h"
+#include "mongo/s/d_logic.h"
+#include "mongo/s/grid.h"
+#include "mongo/s/stale_exception.h"
 
 namespace mongo {
 

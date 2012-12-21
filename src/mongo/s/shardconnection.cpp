@@ -17,14 +17,17 @@
 */
 
 #include "pch.h"
-#include "../server.h"
-#include "shard.h"
-#include "config.h"
-#include "request.h"
+
+#include <set>
+
 #include "mongo/db/client.h"
 #include "mongo/db/security.h"
+#include "mongo/s/config.h"
+#include "mongo/s/request.h"
+#include "mongo/s/shard.h"
+#include "mongo/s/stale_exception.h"
+#include "mongo/server.h"
 #include "mongo/util/stacktrace.h"
-#include <set>
 
 namespace mongo {
 

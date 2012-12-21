@@ -23,7 +23,8 @@
 #include "mongo/s/config.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/shard.h"
-#include "mongo/s/util.h"  // for SendStaleConfigException
+#include "mongo/s/stale_exception.h" // for SendStaleConfigException
+#include "mongo/s/util.h"
 #include "mongo/s/writeback_listener.h"
 
 namespace mongo {
