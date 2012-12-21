@@ -125,7 +125,7 @@ for( testnum=0; testnum < numtests; testnum++ ){
     slave2db.system.indexes.find().forEach(printjson);
     print("");
 
-    // insure all nodes have _id index
+    // ensure all nodes have _id index
     assert.eq( 1 ,
                masterdb.system.indexes.find( { key:{"_id" : 1}, ns: dbname + "." + coll } ).count() ,
                "master has an _id index on capped collection");

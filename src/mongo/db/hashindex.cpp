@@ -95,7 +95,7 @@ namespace mongo {
         const vector<FieldInterval>& intervals = frs.range( _hashedField.c_str() ).intervals();
 
         //Force a match of the query against the actual document by giving
-        //the cursor a matcher with an empty indexKeyPattern.  This insures the
+        //the cursor a matcher with an empty indexKeyPattern.  This ensures the
         //index is not used as a covered index.
         //NOTE: this forcing is necessary due to potential hash collisions
         const shared_ptr< CoveredIndexMatcher > forceDocMatcher(

@@ -40,7 +40,7 @@ assert.soon(
     }, "TTL index on x didn't delete enough" , 70 * 1000
 );
 
-// insure that count ultimately ends up at 6
+// ensure that count ultimately ends up at 6
 assert.eq( 0 , t.find( { x : { $lt : new Date( now - 20000000 ) } } ).count() );
 assert.eq( 6 , t.count() );
 
