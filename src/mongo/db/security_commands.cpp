@@ -150,7 +150,7 @@ namespace mongo {
                 dbname, PrincipalName(user, dbname), &userObj);
         if (!status.isOK()) {
             log() << status.reason() << std::endl;
-            errmsg = status.reason();
+            errmsg = "auth fails";
             return false;
         }
         pwd = userObj["pwd"].String();

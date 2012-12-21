@@ -38,10 +38,10 @@ namespace mongo {
     const char* const saslCommandErrmsgFieldName = "errmsg";
     const char* const saslCommandMechanismFieldName = "mechanism";
     const char* const saslCommandMechanismListFieldName = "supportedMechanisms";
-    const char* const saslCommandPasswordFieldName = "password";
+    const char* const saslCommandPasswordFieldName = "pwd";
     const char* const saslCommandPayloadFieldName = "payload";
-    const char* const saslCommandPrincipalFieldName = "principal";
-    const char* const saslCommandPrincipalSourceFieldName = "principalSource";
+    const char* const saslCommandPrincipalFieldName = "user";
+    const char* const saslCommandPrincipalSourceFieldName = "userSource";
     const char* const saslCommandServiceHostnameFieldName = "serviceHostname";
     const char* const saslCommandServiceNameFieldName = "serviceName";
     const char* const saslDefaultDBName = "$sasl";
@@ -127,22 +127,24 @@ namespace {
             return status;
         session->setProperty(GSASL_HOSTNAME, hostname);
 
-        BSONElement element = saslParameters[saslCommandPrincipalFieldName];
-        if (element.type() == String) {
-            session->setProperty(GSASL_AUTHID, element.str());
+        BSONElement principalElement = saslParameters[saslCommandPrincipalFieldName];
+        if (principalElement.type() == String) {
+            session->setProperty(GSASL_AUTHID, principalElement.str());
         }
-        else if (!element.eoo()) {
+        else if (!principalElement.eoo()) {
             return Status(ErrorCodes::TypeMismatch,
-                          str::stream() << "Expected string for " << element);
+                          str::stream() << "Expected string for " << principalElement);
         }
 
-        element = saslParameters[saslCommandPasswordFieldName];
-        if (element.type() == String) {
-            session->setProperty(GSASL_PASSWORD, element.str());
+        BSONElement passwordElement = saslParameters[saslCommandPasswordFieldName];
+        if (passwordElement.type() == String) {
+            std::string passwordHash = client->createPasswordDigest(principalElement.str(),
+                                                                    passwordElement.str());
+            session->setProperty(GSASL_PASSWORD, passwordHash);
         }
-        else if (!element.eoo()) {
+        else if (!passwordElement.eoo()) {
             return Status(ErrorCodes::TypeMismatch,
-                          str::stream() << "Expected string for " << element);
+                          str::stream() << "Expected string for " << passwordElement);
         }
 
         return Status::OK();

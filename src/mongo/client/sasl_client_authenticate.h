@@ -38,11 +38,11 @@ namespace mongo {
      *     "autoAuthorize": Truthy values tell the server to automatically acquire privileges on
      *         all resources after successful authentication, which is the default.  Falsey values
      *         instruct the server to await separate privilege-acquisition commands.
-     *     "principal": The string name of the principal to authenticate, GSASL_AUTHID.
-     *     "principalSource": The database target of the auth command, which identifies the location
+     *     "user": The string name of the principal to authenticate, GSASL_AUTHID.
+     *     "userSource": The database target of the auth command, which identifies the location
      *         of the credential information for the principal.  May be "$sasl" if credential
      *         information is stored outside of the mongo cluster.
-     *     "password": The password data, GSASL_PASSWORD.
+     *     "pwd": The password data, GSASL_PASSWORD.
      *     "serviceName": The GSSAPI service name to use.  Defaults to "mongodb".
      *     "serviceHostname": The GSSAPI hostname to use.  Defaults to the name of the remote host.
      *
