@@ -2312,8 +2312,19 @@ namespace mongo {
 
                     bool uniqueDocs = false;
                     if(! n["$uniqueDocs"].eoo()) uniqueDocs = n["$uniqueDocs"].trueValue();
-
-                    shared_ptr<GeoSearch> s(new GeoSearch(this, Point(e), numWanted, filteredQuery,
+					
+					// throw exception if the cordinates is not a numbers.
+					BSONObjIterator i(e.Obj());
+					if (! i.next().isNumber())
+					{
+						throw UserException(26879, (string)"the coordinates: " + e.Obj().toString() + " is not a numbers");
+					}
+					else if (! i.next().isNumber())
+					{
+						throw UserException(26879, (string)"the coordinates: " + e.Obj().toString() + " is not a numbers");
+					}
+                    
+					shared_ptr<GeoSearch> s(new GeoSearch(this, Point(e), numWanted, filteredQuery,
                                                           maxDistance, type, uniqueDocs));
                     s->exec();
                     shared_ptr<Cursor> c;
