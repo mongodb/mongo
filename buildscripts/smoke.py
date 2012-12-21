@@ -205,6 +205,9 @@ class mongod(object):
             argv += ['--nopreallocj']
         if self.kwargs.get('auth'):
             argv += ['--auth']
+            authMechanism = self.kwargs.get('authMechanism', 'MONGO-CR')
+            if authMechanism != 'MONGO-CR':
+                argv.append('--setParameter=authenticationMechanisms=' + authMechanism)
             self.auth = True
         if self.kwargs.get('use_ssl'):
             argv += ['--sslOnNormalPorts',
@@ -449,6 +452,7 @@ def runTest(test):
                      'TestData.noJournal = ' + ternary( no_journal )  + ";" + \
                      'TestData.noJournalPrealloc = ' + ternary( no_preallocj )  + ";" + \
                      'TestData.auth = ' + ternary( auth ) + ";" + \
+                     'TestData.authMechanism = "' + authMechanism + '";' + \
                      'TestData.keyFile = ' + ternary( keyFile , '"' + str(keyFile) + '"' , 'null' ) + ";" + \
                      'TestData.keyFileData = ' + ternary( keyFile , '"' + str(keyFileData) + '"' , 'null' ) + ";"
         if os.sys.platform == "win32":
@@ -518,6 +522,7 @@ def run_tests(tests):
                         no_journal=no_journal,
                         no_preallocj=no_preallocj,
                         auth=auth,
+                        authMechanism=authMechanism,
                         use_ssl=use_ssl).__enter__()
     else:
         master = Nothing()
@@ -531,6 +536,7 @@ def run_tests(tests):
                            no_journal=no_journal,
                            no_preallocj=no_preallocj,
                            auth=auth,
+                           authMechanism=authMechanism,
                            use_ssl=use_ssl).__enter__()
             primary = Connection(port=master.port, slave_okay=True);
 
@@ -574,6 +580,7 @@ def run_tests(tests):
                                             no_journal=no_journal,
                                             no_preallocj=no_preallocj,
                                             auth=auth,
+                                            authMechanism=authMechanism,
                                             use_ssl=use_ssl).__enter__()
 
                 except TestFailure, f:
@@ -716,7 +723,7 @@ def add_exe(e):
 
 def set_globals(options, tests):
     global mongod_executable, mongod_port, shell_executable, continue_on_failure, small_oplog, small_oplog_rs
-    global no_journal, no_preallocj, auth, keyFile, smoke_db_prefix, test_path, start_mongod
+    global no_journal, no_preallocj, auth, authMechanism, keyFile, smoke_db_prefix, test_path, start_mongod
     global use_ssl
     global file_of_commands_mode
     start_mongod = options.start_mongod
@@ -750,6 +757,7 @@ def set_globals(options, tests):
         keyFile = False;
     else:
         auth = options.auth
+        authMechanism = options.authMechanism
         keyFile = options.keyFile
 
     if auth and not keyFile:
@@ -868,6 +876,8 @@ def main():
     parser.add_option('--auth', dest='auth', default=False,
                       action="store_true",
                       help='Run standalone mongods in tests with authentication enabled')
+    parser.add_option('--authMechanism', dest='authMechanism', default='MONGO-CR',
+                      help='Use the given authentication mechanism, when --auth is used.')
     parser.add_option('--keyFile', dest='keyFile', default=None,
                       help='Path to keyFile to use to run replSet and sharding tests with authentication enabled')
     parser.add_option('--ignore', dest='ignore_files', default=None,
