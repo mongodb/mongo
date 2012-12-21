@@ -855,7 +855,6 @@ namespace mongo {
     void replLocalAuth() {
         if ( noauth )
             return;
-        cc().getAuthenticationInfo()->authorize("local","_repl");
         cc().getAuthorizationManager()->grantInternalAuthorization("_repl");
     }
 

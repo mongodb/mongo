@@ -272,12 +272,7 @@ namespace mongo {
                                                          double socketTimeout = 0);
         static ScopedDbConnection* getScopedDbConnection();
 
-        // Gets a ScopedDbConnection designed to be used for internal communication within a cluster
-        // The mongod/mongos implementations of these set the AuthenticationTable on the underlying
-        // connection to the internalSecurity permissions.  All commands run on the shard mongods
-        // using this connection will have full access.  If the command should only be run on the
-        // shard if the client has permission to do so, then use getScopedDbConnection().
-        // These functions should not be called by consumers of the C++ client library.
+        // DEPRECATED. This is now just a synonym for getScopedDbConnection.
         static ScopedDbConnection* getInternalScopedDbConnection(const string& host,
                                                                  double socketTimeout = 0);
         static ScopedDbConnection* getInternalScopedDbConnection(const ConnectionString& host,

@@ -293,8 +293,6 @@ namespace mongo {
 
                             ClientInfo * ci = r.getClientInfo();
                             if (!noauth) {
-                                // TODO: Figure out why this is 'admin' instead of 'local'.
-                                ci->getAuthenticationInfo()->authorize("admin", internalSecurity.user);
                                 ci->getAuthorizationManager()->grantInternalAuthorization(
                                         "_writebackListener");
                             }

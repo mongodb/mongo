@@ -176,9 +176,7 @@ namespace mongo {
     class MyMessageHandler : public MessageHandler {
     public:
         virtual void connected( AbstractMessagingPort* p ) {
-            Client& c = Client::initThread("conn", p);
-            if( p->remote().isLocalHost() )
-                c.getAuthenticationInfo()->setIsALocalHostConnectionWithSpecialAuthPowers();
+            Client::initThread("conn", p);
         }
 
         virtual void process( Message& m , AbstractMessagingPort* port , LastError * le) {

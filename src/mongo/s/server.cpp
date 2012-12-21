@@ -94,9 +94,7 @@ namespace mongo {
         virtual ~ShardedMessageHandler() {}
 
         virtual void connected( AbstractMessagingPort* p ) {
-            ClientInfo *c = ClientInfo::create(p);
-            if( p->remote().isLocalHost() )
-                c->getAuthenticationInfo()->setIsALocalHostConnectionWithSpecialAuthPowers();
+            ClientInfo::create(p);
         }
 
         virtual void process( Message& m , AbstractMessagingPort* p , LastError * le) {
