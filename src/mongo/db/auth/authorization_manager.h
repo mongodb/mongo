@@ -59,6 +59,10 @@ namespace mongo {
         static const std::string SERVER_RESOURCE_NAME;
         static const std::string CLUSTER_RESOURCE_NAME;
 
+        static const std::string USER_NAME_FIELD_NAME;
+        static const std::string USER_SOURCE_FIELD_NAME;
+        static const std::string PASSWORD_FIELD_NAME;
+
         // Checks to see if "doc" is a valid privilege document, assuming it is stored in the
         // "system.users" collection of database "dbname".
         //

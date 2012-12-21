@@ -46,6 +46,9 @@ namespace mongo {
 
     const std::string AuthorizationManager::SERVER_RESOURCE_NAME = "$SERVER";
     const std::string AuthorizationManager::CLUSTER_RESOURCE_NAME = "$CLUSTER";
+    const std::string AuthorizationManager::USER_NAME_FIELD_NAME = "user";
+    const std::string AuthorizationManager::USER_SOURCE_FIELD_NAME = "userSource";
+    const std::string AuthorizationManager::PASSWORD_FIELD_NAME = "pwd";
 
 namespace {
     const std::string ADMIN_DBNAME = "admin";
@@ -54,9 +57,6 @@ namespace {
     const std::string ROLES_FIELD_NAME = "roles";
     const std::string OTHER_DB_ROLES_FIELD_NAME = "otherDBRoles";
     const std::string READONLY_FIELD_NAME = "readOnly";
-    const std::string USERNAME_FIELD_NAME = "user";
-    const std::string USERSOURCE_FIELD_NAME = "userSource";
-    const std::string PASSWORD_FIELD_NAME = "pwd";
 
     const std::string SYSTEM_ROLE_READ = "read";
     const std::string SYSTEM_ROLE_READ_WRITE = "readWrite";
@@ -247,8 +247,8 @@ namespace {
 
     Status AuthorizationManager::checkValidPrivilegeDocument(const StringData& dbname,
                                                              const BSONObj& doc) {
-        BSONElement userElement = doc[USERNAME_FIELD_NAME];
-        BSONElement userSourceElement = doc[USERSOURCE_FIELD_NAME];
+        BSONElement userElement = doc[USER_NAME_FIELD_NAME];
+        BSONElement userSourceElement = doc[USER_SOURCE_FIELD_NAME];
         BSONElement passwordElement = doc[PASSWORD_FIELD_NAME];
         BSONElement rolesElement = doc[ROLES_FIELD_NAME];
         BSONElement otherDBRolesElement = doc[OTHER_DB_ROLES_FIELD_NAME];
@@ -474,7 +474,7 @@ namespace {
             const PrincipalName& principal,
             const BSONObj& privilegeDocument,
             PrivilegeSet* result) {
-        if (!(privilegeDocument.hasField(USERNAME_FIELD_NAME) &&
+        if (!(privilegeDocument.hasField(USER_NAME_FIELD_NAME) &&
               privilegeDocument.hasField(PASSWORD_FIELD_NAME))) {
 
             return Status(ErrorCodes::UnsupportedFormat,
@@ -483,10 +483,10 @@ namespace {
                                    << privilegeDocument,
                           0);
         }
-        if (privilegeDocument[USERNAME_FIELD_NAME].str() != principal.getUser()) {
+        if (privilegeDocument[USER_NAME_FIELD_NAME].str() != principal.getUser()) {
             return Status(ErrorCodes::BadValue,
                           mongoutils::str::stream() << "Principal name from privilege document \""
-                                  << privilegeDocument[USERNAME_FIELD_NAME].str()
+                                  << privilegeDocument[USER_NAME_FIELD_NAME].str()
                                   << "\" doesn't match name of provided Principal \""
                                   << principal.getUser()
                                   << "\"",
