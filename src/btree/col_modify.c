@@ -286,7 +286,7 @@ __wt_col_append_serial_func(WT_SESSION_IMPL *session, void *args)
 		*ins_stack[i] = new_ins;
 	}
 
-	__wt_col_append_new_ins_taken(session, args, page);
+	__wt_col_append_new_ins_taken(args);
 
 	/*
 	 * If the insert head does not yet have an insert list, our caller
@@ -297,7 +297,7 @@ __wt_col_append_serial_func(WT_SESSION_IMPL *session, void *args)
 	 */
 	if (*insheadp == NULL) {
 		WT_PUBLISH(*insheadp, new_inshead);
-		__wt_col_append_new_inshead_taken(session, args, page);
+		__wt_col_append_new_inshead_taken(args);
 	}
 
 	/*
@@ -309,7 +309,7 @@ __wt_col_append_serial_func(WT_SESSION_IMPL *session, void *args)
 	 */
 	if (page->modify->append == NULL) {
 		page->modify->append = new_inslist;
-		__wt_col_append_new_inslist_taken(session, args, page);
+		__wt_col_append_new_inslist_taken(args);
 	}
 
 	/*

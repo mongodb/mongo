@@ -78,10 +78,11 @@ def output(entry, f):
 	f.write('''
 typedef struct {
 ''')
+	sizes = 0;
 	for l in entry.args:
 		f.write('\t' + decl(l) + ';\n')
 		if l.sized:
-			f.write('\tsize_t ' + l.name + '_size;\n')
+			sizes = 1
 			f.write('\tint ' + l.name + '_taken;\n')
 	f.write('} __wt_' + entry.name + '_args;\n\n')
 
@@ -95,12 +96,13 @@ typedef struct {
 			o += ', ' + decl(l)
 	o += ')'
 	f.write('\n'.join('\t' + l for l in textwrap.wrap(o, 70)))
-	f.write('''
-{
-\t__wt_''' + entry.name + '''_args _args, *args = &_args;
-\tWT_DECL_RET;
+	f.write(' {\n')
+	f.write('\t__wt_''' + entry.name + '_args _args, *args = &_args;\n')
+	f.write('\tWT_DECL_RET;\n')
+	if sizes:
+		f.write('\tsize_t incr_mem;\n')
+	f.write('\n')
 
-''')
 	for l in entry.args:
 		if l.sized:
 			f.write('''\tif (''' + l.name + '''p == NULL)
@@ -108,7 +110,6 @@ typedef struct {
 \telse {
 \t\targs->''' + l.name + ''' = *''' + l.name + '''p;
 \t\t*''' + l.name + '''p = NULL;
-\t\targs->''' + l.name + '''_size = ''' + l.name + '''_size;
 \t}
 \targs->''' + l.name + '''_taken = 0;
 
@@ -118,11 +119,24 @@ typedef struct {
 	f.write('\t__wt_spin_lock(session, &S2C(session)->serial_lock);\n')
 	f.write('\tret = __wt_' + entry.name + '_serial_func(session, args);\n')
 	f.write('\t__wt_spin_unlock(session, &S2C(session)->serial_lock);\n\n')
-	for l in entry.args:
-		if not l.sized:
-			continue
-		f.write('\tif (!args->' + l.name + '_taken)\n')
-		f.write('\t\t__wt_free(session, args->' + l.name + ');\n')
+
+	if sizes:
+		f.write('\tincr_mem = 0;\n')
+		for l in entry.args:
+			if not l.sized:
+				continue
+			f.write('\tif (args->' + l.name + '_taken) {\n')
+			f.write('\t\tWT_ASSERT(session, ' +
+			    l.name + '_size != 0);\n')
+			f.write('\t\tincr_mem += ' + l.name + '_size;\n')
+			f.write('\t} else\n')
+			f.write(
+			    '\t\t__wt_free(session, args->' + l.name + ');\n')
+		f.write('''\tif (incr_mem != 0)
+\t\t__wt_cache_page_inmem_incr(session, page, incr_mem);
+
+''')
+
 	f.write('\treturn (ret);\n')
 	f.write('}\n\n')
 
@@ -146,15 +160,12 @@ typedef struct {
 	for l in entry.args:
 		if l.sized:
 			f.write('''
-static inline void\n__wt_''' + entry.name + '_' + l.name + '''_taken(
-    WT_SESSION_IMPL *session, void *untyped_args, WT_PAGE *page)
+static inline void\n__wt_''' + entry.name + '_' + l.name +
+    '''_taken(void *untyped_args)
 {
 \t__wt_''' + entry.name + '''_args *args = (__wt_''' + entry.name + '''_args *)untyped_args;
 
 \targs->''' + l.name + '''_taken = 1;
-
-\tWT_ASSERT(session, args->''' + l.name + '''_size != 0);
-\t__wt_cache_page_inmem_incr(session, page, args->''' + l.name + '''_size);
 }
 ''')
 
