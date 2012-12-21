@@ -45,8 +45,9 @@ __evict_read_gen(const WT_EVICT_ENTRY *entry)
 		return (UINT64_MAX);
 
 	/* Always prioritize pages selected by force. */
-	if (__wt_eviction_page_force(entry->btree, entry->page))
-		return (0);
+	if (__wt_eviction_page_force(entry->btree, entry->page)) {
+		return (1);
+	}
 
 	read_gen = entry->page->read_gen + entry->btree->evict_priority;
 	if (entry->page->type == WT_PAGE_ROW_INT ||
@@ -284,19 +285,18 @@ __evict_worker(WT_SESSION_IMPL *session)
 		bytes_inuse = __wt_cache_bytes_inuse(cache);
 		dirty_inuse = __wt_cache_dirty_bytes(cache);
 		bytes_max = conn->cache_size;
-		if (F_ISSET(cache, WT_EVICT_FORCE_PASS) ||
+		if (!F_ISSET(cache, WT_EVICT_FORCE_PASS) &&
 		    (bytes_inuse < (cache->eviction_target * bytes_max) / 100 &&
 		    dirty_inuse <
 		    (cache->eviction_dirty_target * bytes_max) / 100))
 			break;
 
-		F_CLR(cache, WT_EVICT_FORCE_PASS);
-
 		/* Figure out how much we will focus on dirty pages. */
 		if (dirty_inuse >
 		    (cache->eviction_dirty_target * bytes_max) / 100)
 			LF_SET(WT_EVICT_DIRTY);
-		if (bytes_inuse > (cache->eviction_target * bytes_max) / 100)
+		if (F_ISSET(cache, WT_EVICT_FORCE_PASS) ||
+		    bytes_inuse > (cache->eviction_target * bytes_max) / 100)
 			LF_SET(WT_EVICT_CLEAN | WT_EVICT_DIRTY);
 		LF_CLR(cache->disabled_eviction);
 		if (!LF_ISSET(WT_EVICT_CLEAN) && !LF_ISSET(WT_EVICT_DIRTY))
@@ -306,6 +306,8 @@ __evict_worker(WT_SESSION_IMPL *session)
 		    "Eviction pass with: Max: %" PRIu64
 		    " In use: %" PRIu64 " Dirty: %" PRIu64,
 		    bytes_max, bytes_inuse, dirty_inuse);
+
+		F_CLR(cache, WT_EVICT_FORCE_PASS);
 		WT_RET(__evict_lru(session, flags));
 
 		__evict_dirty_validate(conn);
@@ -920,7 +922,7 @@ __evict_get_page(
 
 	candidates = cache->evict_candidates;
 	/* The eviction server only considers half of the entries. */
-	if (!is_app)
+	if (!is_app && candidates > 1)
 		candidates /= 2;
 
 	/*

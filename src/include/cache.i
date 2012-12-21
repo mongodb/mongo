@@ -49,7 +49,7 @@ static inline int
 __wt_eviction_page_force(WT_BTREE *btree, WT_PAGE *page)
 {
 	return (!WT_PAGE_IS_ROOT(page) && __wt_page_is_modified(page) &&
-	    (page->memory_footprint > 20 * btree->maxleafpage));
+	    (page->memory_footprint > 60 * btree->maxleafpage));
 }
 
 /*

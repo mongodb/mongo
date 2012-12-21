@@ -150,7 +150,7 @@ __wt_hazard_clear(WT_SESSION_IMPL *session, WT_PAGE *page)
 		if (hp->page == page) {
 			/*
 			 * Trigger eviction if we want to force the page out.
-			 * The page won't necessarily be chosen for eviction 
+			 * The page won't necessarily be chosen for eviction
 			 * every time, but it will be eventually.
 			 */
 			if (__wt_eviction_page_force(btree, page)) {
