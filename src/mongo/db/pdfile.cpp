@@ -32,6 +32,7 @@ _ disallow system* manipulations from the database.
 #include <list>
 
 #include "mongo/base/counter.h"
+#include "mongo/db/auth/auth_index_d.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/pdfile_private.h"
 #include "mongo/db/background.h"
@@ -161,6 +162,13 @@ namespace mongo {
                 strstr( ns, FREELIST_NS ) == 0 ) {
             LOG( 1 ) << "adding _id index for collection " << ns << endl;
             ensureHaveIdIndex( ns, false );
+        }
+    }
+
+    static void _ensureSystemIndexes(const char* ns) {
+        NamespaceString nsstring(ns);
+        if (StringData(nsstring.coll).substr(0, 7) == "system.") {
+            authindex::createSystemIndexes(nsstring);
         }
     }
 
@@ -329,7 +337,9 @@ namespace mongo {
             else
                 ensureIdIndexForNewNs( ns );
         }
-        
+
+        _ensureSystemIndexes(ns);
+
         if ( mx > 0 )
             d->setMaxCappedDocs( mx );
 
@@ -1402,6 +1412,7 @@ namespace mongo {
         NamespaceDetails *d = nsdetails(ns);
         if ( !god )
             ensureIdIndexForNewNs(ns);
+        _ensureSystemIndexes(ns);
         addNewNamespaceToCatalog(ns);
         return d;
     }
