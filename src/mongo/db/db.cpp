@@ -522,7 +522,7 @@ namespace mongo {
         return killCurrentOp.checkForInterruptNoAssert();
     }
 
-    unsigned jsGetInterruptSpecCallback() {
+    unsigned jsGetCurrentOpIdCallback() {
         return cc().curop()->opNum();
     }
 
@@ -646,7 +646,7 @@ namespace mongo {
         if ( scriptingEnabled ) {
             ScriptEngine::setup();
             globalScriptEngine->setCheckInterruptCallback( jsInterruptCallback );
-            globalScriptEngine->setGetInterruptSpecCallback( jsGetInterruptSpecCallback );
+            globalScriptEngine->setGetCurrentOpIdCallback( jsGetCurrentOpIdCallback );
         }
 
         repairDatabasesAndCheckVersion();
