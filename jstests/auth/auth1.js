@@ -64,7 +64,6 @@ assert.eq( 1000, tRO.count() , "B6" );
 // SERVER-4692 read-only users can't read system.users collection
 assert.throws(function(){dbRO.system.users.findOne()});
 assert.throws(function(){dbRO.system.users.count()});
-assert( dbRO.getLastError() , "B6.5" );
 
 assert.eq( 2, db.system.users.count() , "B7" ); // rw connection
 assert.throws(function(){dbRO.addUser( "a", "b" )});
