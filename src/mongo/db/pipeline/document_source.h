@@ -706,7 +706,6 @@ namespace mongo {
         Document makeDocument(const GroupsType::iterator &rIter);
 
         GroupsType::iterator groupsIterator;
-        Document pCurrent;
     };
 
 
