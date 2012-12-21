@@ -821,13 +821,9 @@ namespace mongo {
         qr->setOperation(opReply);
         qr->startingFrom = 0;
         qr->nReturned = nReturned;
-        
-        int duration = curop.elapsedMillis();
-        bool dbprofile = curop.shouldDBProfile( duration );
-        if ( dbprofile || duration >= cmdLine.slowMS ) {
-            curop.debug().nscanned = ( cursor ? cursor->nscanned() : 0LL );
-            curop.debug().ntoskip = pq.getSkip();
-        }
+
+        curop.debug().nscanned = ( cursor ? cursor->nscanned() : 0LL );
+        curop.debug().ntoskip = pq.getSkip();
         curop.debug().nreturned = nReturned;
 
         return curop.debug().exhaust ? ns : "";

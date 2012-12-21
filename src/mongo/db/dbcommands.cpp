@@ -441,7 +441,7 @@ namespace mongo {
         CmdProfile() : Command("profile") {}
         bool run(const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             BSONElement e = cmdObj.firstElement();
-            result.append("was", cc().database()->profile);
+            result.append("was", cc().database()->getProfilingLevel());
             result.append("slowms", cmdLine.slowMS );
 
             int p = (int) e.number();

@@ -113,7 +113,7 @@ namespace mongo {
         strncpy( _ns, context->ns(), Namespace::MaxNsLen);
         _ns[Namespace::MaxNsLen] = 0;
 
-        _dbprofile = std::max( context->_db ? context->_db->profile : 0 , _dbprofile );
+        _dbprofile = std::max( context->_db ? context->_db->getProfilingLevel() : 0 , _dbprofile );
     }
     
     void CurOp::leave( Client::Context * context ) {

@@ -969,10 +969,14 @@ namespace mongo {
         NamespaceString s(nsToDrop);
         verify( s.db == cc().database()->name );
         if( s.isSystem() ) {
-            if( s.coll == "system.profile" )
-                uassert( 10087 ,  "turn off profiling before dropping system.profile collection", cc().database()->profile == 0 );
-            else
+            if( s.coll == "system.profile" ) {
+                uassert( 10087,
+                         "turn off profiling before dropping system.profile collection",
+                         cc().database()->getProfilingLevel() == 0 );
+            }
+            else {
                 uasserted( 12502, "can't drop system ns" );
+            }
         }
 
         {

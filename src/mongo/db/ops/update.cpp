@@ -54,7 +54,6 @@ namespace mongo {
     static UpdateResult _updateById(bool isOperatorUpdate,
                                     int idIdxNo,
                                     ModSet* mods,
-                                    int profile,
                                     NamespaceDetails* d,
                                     NamespaceDetailsTransient *nsdt,
                                     bool su,
@@ -146,7 +145,6 @@ namespace mongo {
                      << " upsert: " << upsert << " multi: " << multi );
 
         Client& client = cc();
-        int profile = client.database()->profile;
 
         debug.updateobj = updateobj;
 
@@ -183,7 +181,6 @@ namespace mongo {
                 UpdateResult result = _updateById( isOperatorUpdate,
                                                    idxNo,
                                                    mods.get(),
-                                                   profile,
                                                    d,
                                                    nsdt,
                                                    su,
@@ -366,7 +363,7 @@ namespace mongo {
                         mss->applyModsInPlace( true );// const_cast<BSONObj&>(onDisk) );
 
                         DEBUGUPDATE( "\t\t\t doing in place update" );
-                        if ( profile && !multi )
+                        if ( !multi )
                             debug.fastmod = true;
 
                         if ( modsIsIndexed ) {

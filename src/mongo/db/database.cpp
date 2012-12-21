@@ -91,7 +91,7 @@ namespace mongo {
 #endif
             }
             newDb = namespaceIndex.exists();
-            profile = cmdLine.defaultProfile;
+            _profile = cmdLine.defaultProfile;
             checkDuplicateUncasedNames(true);
             // If already exists, open.  Otherwise behave as if empty until
             // there's a write, then open.
@@ -367,7 +367,7 @@ namespace mongo {
 
 
     bool Database::setProfilingLevel( int newLevel , string& errmsg ) {
-        if ( profile == newLevel )
+        if ( _profile == newLevel )
             return true;
 
         if ( newLevel < 0 || newLevel > 2 ) {
@@ -376,7 +376,7 @@ namespace mongo {
         }
 
         if ( newLevel == 0 ) {
-            profile = 0;
+            _profile = 0;
             return true;
         }
 
@@ -385,7 +385,7 @@ namespace mongo {
         if (!getOrCreateProfileCollection(this, true, &errmsg))
             return false;
 
-        profile = newLevel;
+        _profile = newLevel;
         return true;
     }
 
