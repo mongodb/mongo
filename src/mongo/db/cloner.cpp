@@ -881,7 +881,7 @@ namespace mongo {
             bool capped = false;
             long long size = 0;
             {
-                Client::Context ctx( source ); // auths against source
+                Client::Context ctx( source );
                 NamespaceDetails *nsd = nsdetails( source );
                 uassert( 10026 ,  "source namespace does not exist", nsd );
                 capped = nsd->isCapped();
@@ -890,7 +890,7 @@ namespace mongo {
                         size += i.ext()->length;
             }
 
-            Client::Context ctx( target ); //auths against target
+            Client::Context ctx( target );
 
             if ( nsdetails( target ) ) {
                 uassert( 10027 ,  "target namespace exists", cmdObj["dropTarget"].trueValue() );

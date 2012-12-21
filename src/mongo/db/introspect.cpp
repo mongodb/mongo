@@ -92,7 +92,7 @@ namespace mongo {
         try {
             Lock::DBWrite lk( currentOp.getNS() );
             if ( dbHolder()._isLoaded( nsToDatabase( currentOp.getNS() ) , dbpath ) ) {
-                Client::Context cx( currentOp.getNS(), dbpath, false );
+                Client::Context cx(currentOp.getNS(), dbpath);
                 _profile(c, currentOp, profileBufBuilder);
             }
             else {
