@@ -215,6 +215,7 @@ env.StaticLibrary("coredb", [
         "client/authentication_table_server.cpp",
         "client/parallel.cpp",
         "db/commands.cpp",
+        "db/commands/connection_status.cpp",
         "db/commands/fail_point_cmd.cpp",
         "db/commands/find_and_modify_common.cpp",
         "db/commands/hashcmd.cpp",
