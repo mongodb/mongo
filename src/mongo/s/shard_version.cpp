@@ -25,8 +25,6 @@
 #include "shard.h"
 #include "writeback_listener.h"
 
-#include "shard_version.h"
-
 namespace mongo {
 
     // Global version manager

@@ -43,7 +43,6 @@
 #include "balance.h"
 #include "grid.h"
 #include "cursors.h"
-#include "shard_version.h"
 #include "../util/processinfo.h"
 #include "mongo/db/lasterror.h"
 #include "mongo/s/config_upgrade.h"

@@ -18,7 +18,6 @@
 
 #include "pch.h"
 #include "s/util.h"
-#include "shard_version.h"
 
 namespace mongo {
 
