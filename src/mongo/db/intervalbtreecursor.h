@@ -139,7 +139,7 @@ namespace mongo {
 
         shared_ptr<CoveredIndexMatcher> _matcher;
         bool _multikeyFlag;
-        set<uint64_t> _dups;
+        unordered_set<DiskLoc,DiskLoc::Hasher> _dups;
     };
 
 } // namespace mongo

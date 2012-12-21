@@ -431,6 +431,8 @@ serverOnlyFiles = [ "db/curop.cpp",
 env.Library( "dbcmdline", "db/cmdline.cpp", LIBDEPS=['bson', 'server_parameters'] )
 env.CppUnitTest('cmdline_test', 'db/cmdline_test.cpp', LIBDEPS=['dbcmdline'])
 
+env.CppUnitTest('diskloc_test', 'db/diskloc_test.cpp', LIBDEPS=[])
+
 env.Library('stacktrace', 'util/stacktrace.cpp')
 
 env.Program('lame_stacktrace_test', 'util/lame_stacktrace_test.cpp',
