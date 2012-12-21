@@ -28,6 +28,7 @@
 #endif
 
 #include "mongo/util/time_support.h"
+#include "mongo/base/counter.h"
 #include "mongo/base/status.h"
 #include "mongo/bson/util/atomic_int.h"
 #include "mongo/db/auth/action_type.h"
@@ -35,6 +36,7 @@
 #include "mongo/db/background.h"
 #include "mongo/db/cmdline.h"
 #include "mongo/db/commands/fsync.h"
+#include "mongo/db/commands/server_status.h"
 #include "mongo/db/d_concurrency.h"
 #include "mongo/db/db.h"
 #include "mongo/db/dbmessage.h"
@@ -87,6 +89,8 @@ namespace mongo {
     HANDLE lockFileHandle;
 #endif
 
+    Counter64 recordTotalNScanned;
+    ServerStatusMetricField<Counter64> recordTotalNScannedDisplay( "record.totalNScanned", &recordTotalNScanned );
 
     /*static*/ OpTime OpTime::_now() {
         OpTime result;
@@ -490,7 +494,10 @@ namespace mongo {
                 profile(c, op, currentOp);
             }
         }
-        
+
+        if ( debug.nscanned > 0 )
+            recordTotalNScanned.increment( debug.nscanned );
+
         debug.reset();
     } /* assembleResponse() */
 
