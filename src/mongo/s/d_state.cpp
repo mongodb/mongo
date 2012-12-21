@@ -30,17 +30,16 @@
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/privilege.h"
-#include "../db/commands.h"
-#include "../db/jsobj.h"
-#include "../db/db.h"
-#include "../db/replutil.h"
-#include "../client/connpool.h"
-
-#include "../util/queue.h"
-
-#include "shard.h"
-#include "d_logic.h"
-#include "config.h"
+#include "mongo/db/commands.h"
+#include "mongo/db/jsobj.h"
+#include "mongo/db/db.h"
+#include "mongo/db/replutil.h"
+#include "mongo/client/connpool.h"
+#include "mongo/s/chunk_version.h"
+#include "mongo/s/config.h"
+#include "mongo/s/d_logic.h"
+#include "mongo/s/shard.h"
+#include "mongo/util/queue.h"
 #include "mongo/util/concurrency/ticketholder.h"
 
 using namespace std;
@@ -148,7 +147,7 @@ namespace mongo {
         }
     }
 
-    void ShardingState::donateChunk( const string& ns , const BSONObj& min , const BSONObj& max , ShardChunkVersion version ) {
+    void ShardingState::donateChunk( const string& ns , const BSONObj& min , const BSONObj& max , ChunkVersion version ) {
         scoped_lock lk( _mutex );
 
         ChunkManagersMap::const_iterator it = _chunks.find( ns );
@@ -156,7 +155,7 @@ namespace mongo {
         ShardChunkManagerPtr p = it->second;
 
         // empty shards should have version 0
-        version = ( p->getNumChunks() > 1 ) ? version : ShardChunkVersion( 0 , OID() );
+        version = ( p->getNumChunks() > 1 ) ? version : ChunkVersion( 0 , OID() );
 
         ShardChunkManagerPtr cloned( p->cloneMinus( min , max , version ) );
         // TODO: a bit dangerous to have two different zero-version states - no-manager and
@@ -164,7 +163,7 @@ namespace mongo {
         _chunks[ns] = cloned;
     }
 
-    void ShardingState::undoDonateChunk( const string& ns , const BSONObj& min , const BSONObj& max , ShardChunkVersion version ) {
+    void ShardingState::undoDonateChunk( const string& ns , const BSONObj& min , const BSONObj& max , ChunkVersion version ) {
         scoped_lock lk( _mutex );
         log() << "ShardingState::undoDonateChunk acquired _mutex" << endl;
 
@@ -175,7 +174,7 @@ namespace mongo {
     }
 
     void ShardingState::splitChunk( const string& ns , const BSONObj& min , const BSONObj& max , const vector<BSONObj>& splitKeys ,
-                                    ShardChunkVersion version ) {
+                                    ChunkVersion version ) {
         scoped_lock lk( _mutex );
 
         ChunkManagersMap::const_iterator it = _chunks.find( ns );
@@ -278,7 +277,7 @@ namespace mongo {
                 _chunks[ns] = p;
             }
 
-            ShardChunkVersion oldVersion = version;
+            ChunkVersion oldVersion = version;
             version = p->getVersion();
             return oldVersion.isEquivalentTo( version );
         }
@@ -616,12 +615,12 @@ namespace mongo {
             
             if ( oldVersion.isSet() && ! globalVersion.isSet() ) {
                 // this had been reset
-                info->setVersion( ns , ShardChunkVersion( 0, OID() ) );
+                info->setVersion( ns , ChunkVersion( 0, OID() ) );
             }
 
             if ( ! version.isSet() && ! globalVersion.isSet() ) {
                 // this connection is cleaning itself
-                info->setVersion( ns , ShardChunkVersion( 0, OID() ) );
+                info->setVersion( ns , ChunkVersion( 0, OID() ) );
                 return true;
             }
 
@@ -638,7 +637,7 @@ namespace mongo {
                 // only setting global version on purpose
                 // need clients to re-find meta-data
                 shardingState.resetVersion( ns );
-                info->setVersion( ns , ShardChunkVersion( 0, OID() ) );
+                info->setVersion( ns , ChunkVersion( 0, OID() ) );
                 return true;
             }
 
@@ -686,7 +685,7 @@ namespace mongo {
             {
                 dbtemprelease unlock;
 
-                ShardChunkVersion currVersion = version;
+                ChunkVersion currVersion = version;
                 if ( ! shardingState.trySetVersion( ns , currVersion ) ) {
                     errmsg = str::stream() << "client version differs from config's for collection '" << ns << "'";
                     result.append( "ns" , ns );

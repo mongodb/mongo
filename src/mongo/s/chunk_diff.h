@@ -18,12 +18,11 @@
 
 #pragma once
 
-#include "util.h"
-#include "../bson/bsonobj.h"
-#include "../client/dbclientcursor.h"
-#include "../client/connpool.h"
-
+#include "mongo/bson/bsonobj.h"
+#include "mongo/client/dbclientcursor.h"
+#include "mongo/client/connpool.h"
 #include "mongo/s/chunk.h"
+#include "mongo/s/chunk_version.h"
 
 namespace mongo {
 
@@ -66,8 +65,8 @@ namespace mongo {
          */
         void attach( const string& ns,
                      RangeMap& currMap,
-                     ShardChunkVersion& maxVersion,
-                     map<ShardType, ShardChunkVersion>& maxShardVersions )
+                     ChunkVersion& maxVersion,
+                     map<ShardType, ChunkVersion>& maxShardVersions )
         {
             _ns = ns;
             _currMap = &currMap;
@@ -136,7 +135,7 @@ namespace mongo {
         // Returns the number of diffs processed, or -1 if the diffs were inconsistent
         // Throws a DBException on connection errors
         int calculateConfigDiff( string config,
-                                 const set<ShardChunkVersion>& extraMinorVersions = set<ShardChunkVersion>() );
+                                 const set<ChunkVersion>& extraMinorVersions = set<ChunkVersion>() );
 
         // Applies changes to the config data from a cursor passed in
         // Returns the number of diffs processed, or -1 if the diffs were inconsistent
@@ -145,14 +144,14 @@ namespace mongo {
 
         // Returns the query needed to find new changes to a collection from the config server
         // Needed only if a custom connection is required to the config server
-        Query configDiffQuery( const set<ShardChunkVersion>& extraMinorVersions = set<ShardChunkVersion>() ) const;
+        Query configDiffQuery( const set<ChunkVersion>& extraMinorVersions = set<ChunkVersion>() ) const;
 
     private:
 
         string _ns;
         RangeMap* _currMap;
-        ShardChunkVersion* _maxVersion;
-        map<ShardType, ShardChunkVersion>* _maxShardVersions;
+        ChunkVersion* _maxVersion;
+        map<ShardType, ChunkVersion>* _maxShardVersions;
 
         // Store for later use
         int _validDiffs;

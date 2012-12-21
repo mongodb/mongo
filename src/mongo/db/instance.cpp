@@ -57,6 +57,7 @@
 #include "mongo/db/security.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/s/d_logic.h"
+#include "mongo/s/util.h" // for SendStaleConfigException
 #include "mongo/util/file_allocator.h"
 #include "mongo/util/goodies.h"
 #include "mongo/util/mongoutils/str.h"

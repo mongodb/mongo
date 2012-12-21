@@ -15,6 +15,7 @@
  */
 
 #include "mongo/dbtests/config_server_fixture.h"
+#include "mongo/s/chunk_version.h"
 #include "mongo/s/cluster_client_internal.h"
 #include "mongo/s/config_upgrade.h"
 #include "mongo/s/type_mongos.h"
@@ -22,7 +23,6 @@
 #include "mongo/s/type_chunk.h"
 #include "mongo/s/type_shard.h"
 #include "mongo/s/type_config_version.h"
-#include "mongo/s/util.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/version.h"
 
@@ -92,7 +92,7 @@ namespace mongo {
 
             BSONObjBuilder bob;
             bob << CollectionType::ns(ns);
-            bob << CollectionType::DEPRECATED_lastmod(ShardChunkVersion(1, 0, OID()).toLong());
+            bob << CollectionType::DEPRECATED_lastmod(ChunkVersion(1, 0, OID()).toLong());
             bob << CollectionType::keyPattern(BSON("_id" << 1));
             if (epochForCollection) {
                 bob << CollectionType::DEPRECATED_lastmodEpoch(epoch);
@@ -108,7 +108,7 @@ namespace mongo {
                 bob << ChunkType::min(BSON("_id" << i));
                 bob << ChunkType::max(BSON("_id" << (i + 1)));
                 bob << ChunkType::shard("test");
-                bob << ChunkType::DEPRECATED_lastmod(ShardChunkVersion(i + 1, 0, OID()).toLong());
+                bob << ChunkType::DEPRECATED_lastmod(ChunkVersion(i + 1, 0, OID()).toLong());
 
                 // Make sure the first chunk never has an epoch, so we can be sure there's something
                 // to upgrade

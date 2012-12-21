@@ -19,6 +19,7 @@
 #include "pch.h"
 
 #include "mongo/dbtests/dbtests.h"
+#include "mongo/s/chunk_version.h"
 #include "mongo/s/d_chunk_manager.h"
 #include "mongo/s/type_chunk.h"
 #include "mongo/s/type_collection.h"
@@ -215,7 +216,7 @@ namespace {
             // new chunk [20,0-30,0)
             BSONObj min = BSON( "a" << 20 << "b" << 0 );
             BSONObj max = BSON( "a" << 30 << "b" << 0 );
-            ShardChunkManagerPtr cloned( s.clonePlus( min , max , ShardChunkVersion( 1, 0, OID() ) /* TODO test version */ ) );
+            ShardChunkManagerPtr cloned( s.clonePlus( min , max , ChunkVersion( 1, 0, OID() ) /* TODO test version */ ) );
 
             BSONObj k1 = BSON( "a" << 5 << "b" << 0 );
             ASSERT( ! cloned->belongsToMe( k1 ) );
@@ -248,7 +249,7 @@ namespace {
             // [15,0-25,0) overlaps [10,0-20,0)
             BSONObj min = BSON( "a" << 15 << "b" << 0 );
             BSONObj max = BSON( "a" << 25 << "b" << 0 );
-            ASSERT_THROWS( s.clonePlus ( min , max , ShardChunkVersion( 1, 0, OID() ) /* TODO test version */ ) , UserException );
+            ASSERT_THROWS( s.clonePlus ( min , max , ChunkVersion( 1, 0, OID() ) /* TODO test version */ ) , UserException );
         }
     };
 
@@ -276,7 +277,7 @@ namespace {
             // deleting chunk [10,0-20,0)
             BSONObj min = BSON( "a" << 10 << "b" << 0 );
             BSONObj max = BSON( "a" << 20 << "b" << 0 );
-            ShardChunkManagerPtr cloned( s.cloneMinus( min , max , ShardChunkVersion( 1, 0, OID() ) /* TODO test version */ ) );
+            ShardChunkManagerPtr cloned( s.cloneMinus( min , max , ChunkVersion( 1, 0, OID() ) /* TODO test version */ ) );
 
             BSONObj k1 = BSON( "a" << 5 << "b" << 0 );
             ASSERT( ! cloned->belongsToMe( k1 ) );
@@ -315,13 +316,13 @@ namespace {
             // deleting non-existing chunk [25,0-28,0)
             BSONObj min1 = BSON( "a" << 25 << "b" << 0 );
             BSONObj max1 = BSON( "a" << 28 << "b" << 0 );
-            ASSERT_THROWS( s.cloneMinus( min1 , max1 , ShardChunkVersion( 1, 0, OID() ) /* TODO test version */ ) , UserException );
+            ASSERT_THROWS( s.cloneMinus( min1 , max1 , ChunkVersion( 1, 0, OID() ) /* TODO test version */ ) , UserException );
 
 
             // deletin an overlapping range (not exactly a chunk) [15,0-25,0)
             BSONObj min2 = BSON( "a" << 15 << "b" << 0 );
             BSONObj max2 = BSON( "a" << 25 << "b" << 0 );
-            ASSERT_THROWS( s.cloneMinus( min2 , max2 , ShardChunkVersion( 1, 0, OID() ) /* TODO test version */ ) , UserException );
+            ASSERT_THROWS( s.cloneMinus( min2 , max2 , ChunkVersion( 1, 0, OID() ) /* TODO test version */ ) , UserException );
         }
     };
 
@@ -349,7 +350,7 @@ namespace {
             vector<BSONObj> splitKeys;
             splitKeys.push_back( split1 );
             splitKeys.push_back( split2 );
-            ShardChunkVersion version( 1 , 99, OID() ); // first chunk 1|99 , second 1|100
+            ChunkVersion version( 1 , 99, OID() ); // first chunk 1|99 , second 1|100
             ShardChunkManagerPtr cloned( s.cloneSplit( min , max , splitKeys , version ) );
 
             version.incMinor(); /* second chunk 1|100, first split point */
@@ -386,13 +387,13 @@ namespace {
             BSONObj badSplit = BSON( "a" << 5 << "b" << 0 );
             vector<BSONObj> splitKeys;
             splitKeys.push_back( badSplit );
-            ASSERT_THROWS( s.cloneSplit( min , max , splitKeys , ShardChunkVersion( 1, 0, OID() ) ) , UserException );
+            ASSERT_THROWS( s.cloneSplit( min , max , splitKeys , ChunkVersion( 1, 0, OID() ) ) , UserException );
 
             BSONObj badMax = BSON( "a" << 25 << "b" << 0 );
             BSONObj split = BSON( "a" << 15 << "b" << 0 );
             splitKeys.clear();
             splitKeys.push_back( split );
-            ASSERT_THROWS( s.cloneSplit( min , badMax, splitKeys , ShardChunkVersion( 1, 0, OID() ) ) , UserException );
+            ASSERT_THROWS( s.cloneSplit( min , badMax, splitKeys , ChunkVersion( 1, 0, OID() ) ) , UserException );
         }
     };
 
@@ -410,7 +411,7 @@ namespace {
             // shard can have zero chunks for an existing collection
             // version should be 0, though
             ShardChunkManager s( collection , chunks );
-            ASSERT_EQUALS( s.getVersion().toLong() , ShardChunkVersion( 0, 0, OID() ).toLong() );
+            ASSERT_EQUALS( s.getVersion().toLong() , ChunkVersion( 0, 0, OID() ).toLong() );
             ASSERT_EQUALS( s.getNumChunks() , 0u );
         }
     };
@@ -435,17 +436,17 @@ namespace {
             BSONObj max = BSON( "a" << 20 );
 
             // if we remove the only chunk, the only version accepted is 0
-            ShardChunkVersion nonZero = ShardChunkVersion( 99, 0, OID() );
+            ChunkVersion nonZero = ChunkVersion( 99, 0, OID() );
             ASSERT_THROWS( s.cloneMinus( min , max , nonZero ) , UserException );
-            ShardChunkManagerPtr empty( s.cloneMinus( min , max , ShardChunkVersion( 0, 0, OID() ) ) );
-            ASSERT_EQUALS( empty->getVersion().toLong() , ShardChunkVersion( 0, 0, OID() ).toLong() );
+            ShardChunkManagerPtr empty( s.cloneMinus( min , max , ChunkVersion( 0, 0, OID() ) ) );
+            ASSERT_EQUALS( empty->getVersion().toLong() , ChunkVersion( 0, 0, OID() ).toLong() );
             ASSERT_EQUALS( empty->getNumChunks() , 0u );
             BSONObj k = BSON( "a" << 15 << "b" << 0 );
             ASSERT( ! empty->belongsToMe( k ) );
 
             // we can add a chunk to an empty manager
             // version should be provided
-            ASSERT_THROWS( empty->clonePlus( min , max , ShardChunkVersion( 0, 0, OID() ) ) , UserException );
+            ASSERT_THROWS( empty->clonePlus( min , max , ChunkVersion( 0, 0, OID() ) ) , UserException );
             ShardChunkManagerPtr cloned( empty->clonePlus( min , max , nonZero ) );
             ASSERT_EQUALS( cloned->getVersion().toLong(), nonZero.toLong() );
             ASSERT_EQUALS( cloned->getNumChunks() , 1u );

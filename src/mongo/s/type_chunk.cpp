@@ -137,16 +137,16 @@ namespace mongo {
         if (!FieldParser::extract(source, jumbo, false, &_jumbo, errMsg)) return false;
 
         //
-        // ShardChunkVersion backward compatibility logic contained in ShardChunkVersion
+        // ChunkVersion backward compatibility logic contained in ChunkVersion
         //
 
-        // ShardChunkVersion is currently encoded as { 'version': [<TS>,<OID>] }
+        // ChunkVersion is currently encoded as { 'version': [<TS>,<OID>] }
 
-        if (ShardChunkVersion::canParseBSON(source, version())) {
-            _version = ShardChunkVersion::fromBSON(source, version());
+        if (ChunkVersion::canParseBSON(source, version())) {
+            _version = ChunkVersion::fromBSON(source, version());
         }
-        else if (ShardChunkVersion::canParseBSON(source, DEPRECATED_lastmod())) {
-            _version = ShardChunkVersion::fromBSON(source, DEPRECATED_lastmod());
+        else if (ChunkVersion::canParseBSON(source, DEPRECATED_lastmod())) {
+            _version = ChunkVersion::fromBSON(source, DEPRECATED_lastmod());
         }
 
         return true;
@@ -157,7 +157,7 @@ namespace mongo {
         _ns.clear();
         _min = BSONObj();
         _max = BSONObj();
-        _version = ShardChunkVersion();
+        _version = ChunkVersion();
         _shard.clear();
         _jumbo = false;
     }

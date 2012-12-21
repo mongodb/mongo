@@ -6,7 +6,8 @@ Import("env")
 # Schema and backward compatibility code for "config" collections.
 #
 
-env.StaticLibrary('base', ['field_parser.cpp',
+env.StaticLibrary('base', [#'chunk_version.cpp',
+                           'field_parser.cpp',
                            'mongo_version_range.cpp',
                            'type_changelog.cpp',
                            'type_chunk.cpp',
@@ -21,6 +22,8 @@ env.StaticLibrary('base', ['field_parser.cpp',
                            'type_tags.cpp'],
                   LIBDEPS=['$BUILD_DIR/mongo/base/base',
                            '$BUILD_DIR/mongo/bson'])
+
+env.CppUnitTest('chunk_version_test', 'chunk_version_test.cpp', LIBDEPS=['base'])
 
 env.CppUnitTest('field_parser_test', 'field_parser_test.cpp', LIBDEPS=['base'])
 

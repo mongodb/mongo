@@ -18,8 +18,8 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/s/chunk_version.h"
 #include "mongo/s/type_chunk.h"
-#include "mongo/s/util.h" // for ShardChunkVersion
 
 namespace mongo {
 
@@ -56,7 +56,7 @@ namespace mongo {
          * provided.
          */
         CollectionManager* cloneMinus(const ChunkType& chunk,
-                                      const ShardChunkVersion& newShardVersion,
+                                      const ChunkVersion& newShardVersion,
                                       string* errMsg) const;
 
         /**
@@ -68,7 +68,7 @@ namespace mongo {
          * provided.
          */
         CollectionManager* clonePlus(const ChunkType& chunk,
-                                     const ShardChunkVersion& newShardVersion,
+                                     const ChunkVersion& newShardVersion,
                                      string* errMsg) const;
 
         /**
@@ -82,7 +82,7 @@ namespace mongo {
          */
         CollectionManager* cloneSplit(const ChunkType& chunk,
                                       const vector<BSONObj>& splitKeys,
-                                      const ShardChunkVersion& newShardVersion,
+                                      const ChunkVersion& newShardVersion,
                                       string* errMsg) const;
 
         //
@@ -109,9 +109,9 @@ namespace mongo {
         // accessors
         //
 
-        ShardChunkVersion getMaxCollVersion() const { return _maxCollVersion; }
+        ChunkVersion getMaxCollVersion() const { return _maxCollVersion; }
 
-        ShardChunkVersion getMaxShardVersion() const { return _maxShardVersion; }
+        ChunkVersion getMaxShardVersion() const { return _maxShardVersion; }
 
         BSONObj getKey() const { return _key; }
 
@@ -126,14 +126,14 @@ namespace mongo {
 
         // a version for this collection that identifies the collection incarnation (ie, a
         // dropped and recreated collection with the same name would have a different version)
-        ShardChunkVersion _maxCollVersion;
+        ChunkVersion _maxCollVersion;
 
         //
         // sharded state below, for when the colelction gets sharded
         //
 
-        // highest ShardChunkVersion for which this manager's information is accurate
-        ShardChunkVersion _maxShardVersion;
+        // highest ChunkVersion for which this manager's information is accurate
+        ChunkVersion _maxShardVersion;
 
         // key pattern for chunks under this range
         BSONObj _key;

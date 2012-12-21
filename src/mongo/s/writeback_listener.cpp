@@ -18,18 +18,17 @@
 
 #include "pch.h"
 
-#include "../util/timer.h"
+#include "writeback_listener.h"
 
 #include "mongo/db/auth/authorization_manager.h"
-#include "config.h"
-#include "grid.h"
-#include "request.h"
-#include "server.h"
-#include "shard.h"
-#include "util.h"
-#include "client_info.h"
-
-#include "writeback_listener.h"
+#include "mongo/s/chunk_version.h"
+#include "mongo/s/client_info.h"
+#include "mongo/s/config.h"
+#include "mongo/s/grid.h"
+#include "mongo/s/request.h"
+#include "mongo/s/server.h"
+#include "mongo/s/shard.h"
+#include "mongo/util/timer.h"
 
 namespace mongo {
 
@@ -134,7 +133,7 @@ namespace mongo {
     void WriteBackListener::run() {
 
         int secsToSleep = 0;
-        scoped_ptr<ShardChunkVersion> lastNeededVersion;
+        scoped_ptr<ChunkVersion> lastNeededVersion;
         int lastNeededCount = 0;
         bool needsToReloadShardInfo = false;
 
@@ -195,7 +194,7 @@ namespace mongo {
                     massert( 10427 ,  "invalid writeback message" , msg.header()->valid() );
 
                     DBConfigPtr db = grid.getDBConfig( ns );
-                    ShardChunkVersion needVersion = ShardChunkVersion::fromBSON( data, "version" );
+                    ChunkVersion needVersion = ChunkVersion::fromBSON( data, "version" );
 
                     //
                     // TODO: Refactor the sharded strategy to correctly handle all sharding state changes itself,
@@ -208,7 +207,7 @@ namespace mongo {
                     ShardPtr primary;
                     db->getChunkManagerOrPrimary( ns, manager, primary );
 
-                    ShardChunkVersion currVersion;
+                    ChunkVersion currVersion;
                     if( manager ) currVersion = manager->getVersion();
 
                     LOG(1) << "connectionId: " << cid << " writebackId: " << wid << " needVersion : " << needVersion.toString()
@@ -242,7 +241,7 @@ namespace mongo {
                     // Set our lastNeededVersion for next time
                     //
 
-                    lastNeededVersion.reset( new ShardChunkVersion( needVersion ) );
+                    lastNeededVersion.reset( new ChunkVersion( needVersion ) );
                     lastNeededCount++;
 
                     //

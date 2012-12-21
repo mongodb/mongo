@@ -29,6 +29,7 @@
 #include "mongo/db/namespacestring.h"
 #include "mongo/s/client_info.h"
 #include "mongo/s/chunk.h"
+#include "mongo/s/chunk_version.h"
 #include "mongo/s/cursors.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request.h"
@@ -582,8 +583,8 @@ namespace mongo {
                                 << group.shard
                                 << " at version "
                                 << (group.manager.get() ?
-                                        group.manager->getVersion().toString() :
-                                        ShardChunkVersion(0, OID()).toString())
+                                    group.manager->getVersion().toString() :
+                                    ChunkVersion(0, OID()).toString())
                                 << endl;
 
                         //
@@ -680,8 +681,8 @@ namespace mongo {
                                     << group.shard->toString()
                                     << " at version "
                                     << (group.manager.get() ?
-                                            group.manager->getVersion().toString() :
-                                            ShardChunkVersion(0, OID()).toString())
+                                        group.manager->getVersion().toString() :
+                                        ChunkVersion(0, OID()).toString())
                                     << causedBy(insertErr);
 
                             // If we're continuing-on-error and the insert error is superseded by

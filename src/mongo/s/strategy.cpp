@@ -24,9 +24,11 @@
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/commands.h"
+#include "mongo/s/chunk_version.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request.h"
 #include "mongo/s/server.h"
+#include "mongo/s/util.h"  // for SendStaleConfigException
 #include "mongo/s/writeback_listener.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -46,7 +48,7 @@ namespace mongo {
         else if ( conn.setVersion() ) {
             conn.done();
             // Version is zero b/c we don't yet have a way to get the local version conflict
-            throw RecvStaleConfigException( r.getns() , "doWrite" , ShardChunkVersion( 0, OID() ), ShardChunkVersion( 0, OID() ), true );
+            throw RecvStaleConfigException( r.getns() , "doWrite" , ChunkVersion( 0, OID() ), ChunkVersion( 0, OID() ), true );
         }
         conn->say( r.m() );
         conn.done();
@@ -77,7 +79,7 @@ namespace mongo {
             if ( qr->resultFlags() & ResultFlag_ShardConfigStale ) {
                 dbcon.done();
                 // Version is zero b/c this is deprecated codepath
-                throw RecvStaleConfigException( r.getns() , "Strategy::doQuery", ShardChunkVersion( 0, OID() ), ShardChunkVersion( 0, OID() ) );
+                throw RecvStaleConfigException( r.getns() , "Strategy::doQuery", ChunkVersion( 0, OID() ), ChunkVersion( 0, OID() ) );
             }
         }
 

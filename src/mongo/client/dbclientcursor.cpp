@@ -24,7 +24,7 @@
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/namespacestring.h"
 #include "mongo/s/shard.h"
-#include "mongo/s/util.h"
+#include "mongo/s/util.h"  // for RecvStaleConfigException
 
 namespace mongo {
 

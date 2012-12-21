@@ -52,6 +52,7 @@
 #include "mongo/db/replutil.h"
 #include "mongo/db/security.h"
 #include "mongo/s/d_writeback.h"
+#include "mongo/s/util.h"  // for SendStaleConfigException
 #include "mongo/scripting/engine.h"
 #include "mongo/server.h"
 #include "mongo/util/lruishmap.h"

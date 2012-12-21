@@ -28,7 +28,7 @@ namespace mongo {
     CollectionManager::~CollectionManager() { }
 
     CollectionManager* CollectionManager::cloneMinus(const ChunkType& chunk,
-                                                     const ShardChunkVersion& newShardVersion,
+                                                     const ChunkVersion& newShardVersion,
                                                      string* errMsg) const {
         // The error message string is optional.
         string dummy;
@@ -80,7 +80,7 @@ namespace mongo {
     }
 
     CollectionManager* CollectionManager::clonePlus(const ChunkType& chunk,
-                                                    const ShardChunkVersion& newShardVersion,
+                                                    const ChunkVersion& newShardVersion,
                                                     string* errMsg) const {
         // The error message string is optional.
         string dummy;
@@ -132,7 +132,7 @@ namespace mongo {
 
     CollectionManager* CollectionManager::cloneSplit(const ChunkType& chunk,
                                                      const vector<BSONObj>& splitKeys,
-                                                     const ShardChunkVersion& newShardVersion,
+                                                     const ChunkVersion& newShardVersion,
                                                      string* errMsg) const {
         // The error message string is optional.
         string dummy;

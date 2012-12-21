@@ -22,6 +22,7 @@
 #include "mongo/db/instance.h"
 #include "mongo/db/pipeline/document.h"
 #include "mongo/s/d_logic.h"
+#include "mongo/s/util.h" // for SendStaleConfigException
 
 namespace mongo {
 

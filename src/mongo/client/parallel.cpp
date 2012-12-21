@@ -17,15 +17,17 @@
 
 
 #include "pch.h"
-#include "parallel.h"
-#include "connpool.h"
-#include "../db/dbmessage.h"
-#include "../s/util.h"
-#include "../s/shard.h"
-#include "../s/chunk.h"
-#include "../s/config.h"
-#include "../s/grid.h"
+
+#include "mongo/client/connpool.h"
 #include "mongo/client/dbclientcursor.h"
+#include "mongo/client/parallel.h"
+#include "mongo/db/dbmessage.h"
+#include "mongo/s/chunk.h"
+#include "mongo/s/chunk_version.h"
+#include "mongo/s/config.h"
+#include "mongo/s/grid.h"
+#include "mongo/s/shard.h"
+#include "mongo/s/util.h" // for RecvStaleConfigException
 
 namespace mongo {
 
@@ -125,7 +127,7 @@ namespace mongo {
             if ( conn.setVersion() ) {
                 conn.done();
                 // Deprecated, so we don't care about versions here
-                throw RecvStaleConfigException( _ns , "ClusteredCursor::query" , ShardChunkVersion( 0, OID() ), ShardChunkVersion( 0, OID() ), true );
+                throw RecvStaleConfigException( _ns , "ClusteredCursor::query" , ChunkVersion( 0, OID() ), ChunkVersion( 0, OID() ), true );
             }
             
             LOG(5) << "ClusteredCursor::query (" << type() << ") server:" << server
@@ -1394,7 +1396,7 @@ namespace mongo {
                 if ( conns[i]->setVersion() ) {
                     conns[i]->done();
                     // Version is zero b/c this is deprecated codepath
-                    staleConfigExs.push_back( (string)"stale config detected for " + RecvStaleConfigException( _ns , "ParallelCursor::_init" , ShardChunkVersion( 0, OID() ), ShardChunkVersion( 0, OID() ), true ).what() + errLoc );
+                    staleConfigExs.push_back( (string)"stale config detected for " + RecvStaleConfigException( _ns , "ParallelCursor::_init" , ChunkVersion( 0, OID() ), ChunkVersion( 0, OID() ), true ).what() + errLoc );
                     break;
                 }
 
@@ -1548,7 +1550,7 @@ namespace mongo {
 
             if( throwException && staleConfigExs.size() > 0 ){
                 // Version is zero b/c this is deprecated codepath
-                throw RecvStaleConfigException( _ns , errMsg.str() , ShardChunkVersion( 0, OID() ), ShardChunkVersion( 0, OID() ), ! allConfigStale );
+                throw RecvStaleConfigException( _ns , errMsg.str() , ChunkVersion( 0, OID() ), ChunkVersion( 0, OID() ), ! allConfigStale );
             }
             else if( throwException )
                 throw DBException( errMsg.str(), 14827 );

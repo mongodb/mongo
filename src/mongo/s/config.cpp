@@ -26,6 +26,7 @@
 #include "mongo/db/cmdline.h"
 #include "mongo/db/pdfile.h"
 #include "mongo/s/chunk.h"
+#include "mongo/s/chunk_version.h"
 #include "mongo/s/config.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/server.h"
@@ -288,7 +289,7 @@ namespace mongo {
 
     ChunkManagerPtr DBConfig::getChunkManager( const string& ns , bool shouldReload, bool forceReload ) {
         BSONObj key;
-        ShardChunkVersion oldVersion;
+        ChunkVersion oldVersion;
         ChunkManagerPtr oldManager;
 
         {
@@ -328,7 +329,7 @@ namespace mongo {
             conn->done();
             
             if ( ! newest.isEmpty() ) {
-                ShardChunkVersion v = ShardChunkVersion::fromBSON(newest, ChunkType::DEPRECATED_lastmod());
+                ChunkVersion v = ChunkVersion::fromBSON(newest, ChunkType::DEPRECATED_lastmod());
                 if ( v.isEquivalentTo( oldVersion ) ) {
                     scoped_lock lk( _lock );
                     CollectionInfo& ci = _collections[ns];
@@ -358,8 +359,8 @@ namespace mongo {
                 CollectionInfo& ci = _collections[ns];
                 if ( ci.isSharded() && ci.getCM() ) {
 
-                    ShardChunkVersion currentVersion =
-                        ShardChunkVersion::fromBSON(newest, ChunkType::DEPRECATED_lastmod());
+                    ChunkVersion currentVersion =
+                        ChunkVersion::fromBSON(newest, ChunkType::DEPRECATED_lastmod());
 
                     // Only reload if the version we found is newer than our own in the same
                     // epoch

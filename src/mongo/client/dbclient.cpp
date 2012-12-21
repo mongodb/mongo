@@ -26,7 +26,7 @@
 #include "mongo/db/json.h"
 #include "mongo/db/namespace-inl.h"
 #include "mongo/db/namespacestring.h"
-#include "mongo/s/util.h"
+#include "mongo/s/util.h"  // for RecvStaleConfigException
 #include "mongo/util/md5.hpp"
 
 #ifdef MONGO_SSL
