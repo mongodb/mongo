@@ -218,9 +218,9 @@ namespace mongo {
     static Counter64 scanAndOrderCounter;
     static Counter64 fastmodCounter;
 
-    static ServerStatusMetricField<Counter64> displayIdhack( "query.idhack", &idhackCounter );
-    static ServerStatusMetricField<Counter64> displayScanAndOrder( "query.scanAndOrder", &scanAndOrderCounter );
-    static ServerStatusMetricField<Counter64> displayFastMod( "query.fastmod", &fastmodCounter );
+    static ServerStatusMetricField<Counter64> displayIdhack( "operation.idhack", &idhackCounter );
+    static ServerStatusMetricField<Counter64> displayScanAndOrder( "operation.scanAndOrder", &scanAndOrderCounter );
+    static ServerStatusMetricField<Counter64> displayFastMod( "operation.fastmod", &fastmodCounter );
 
     void OpDebug::recordStats() {
         if ( nreturned > 0 )
