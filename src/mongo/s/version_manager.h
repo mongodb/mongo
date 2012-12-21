@@ -18,10 +18,6 @@
 
 #include "mongo/db/jsobj.h"
 
-/**
-   some generic sharding utils that can be used in mongod or mongos
- */
-
 namespace mongo {
 
     class ShardConnection;

@@ -28,6 +28,7 @@
 #include "mongo/s/request.h"
 #include "mongo/s/server.h"
 #include "mongo/s/shard.h"
+#include "mongo/s/version_manager.h"
 #include "mongo/util/timer.h"
 
 namespace mongo {

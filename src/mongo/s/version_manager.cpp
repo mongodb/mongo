@@ -1,4 +1,4 @@
-// @file shard_version.cpp
+// @file version_manager.cpp
 
 /**
 *    Copyright (C) 2010 10gen Inc.
@@ -16,7 +16,7 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "pch.h"
+#include "mongo/s/version_manager.h"
 
 #include "mongo/s/chunk.h"
 #include "mongo/s/chunk_version.h"
@@ -24,7 +24,6 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/shard.h"
 #include "mongo/s/stale_exception.h" // for SendStaleConfigException
-#include "mongo/s/util.h"
 #include "mongo/s/writeback_listener.h"
 
 namespace mongo {

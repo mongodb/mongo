@@ -17,10 +17,12 @@
 // strategy_simple.cpp
 
 #include "pch.h"
-#include "request.h"
-#include "cursors.h"
-#include "../client/connpool.h"
-#include "../db/commands.h"
+
+#include "mongo/client/connpool.h"
+#include "mongo/db/commands.h"
+#include "mongo/s/request.h"
+#include "mongo/s/cursors.h"
+#include "mongo/s/version_manager.h"
 
 namespace mongo {
 

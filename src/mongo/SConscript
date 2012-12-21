@@ -463,7 +463,7 @@ mongosLibraryFiles = [
     "s/balance.cpp",
     "s/balancer_policy.cpp",
     "s/writeback_listener.cpp",
-    "s/shard_version.cpp",
+    "s/version_manager.cpp",
     "s/security.cpp",
     ]
 
