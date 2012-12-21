@@ -627,6 +627,7 @@ namespace mongo {
                 
                 long long n = deleteObjects(ns, pattern, justOne, true);
                 lastError.getSafe()->recordDelete( n );
+                op.debug().ndeleted = n;
                 break;
             }
             catch ( PageFaultException& e ) {
@@ -779,7 +780,7 @@ namespace mongo {
         logOp("i", ns, js);
     }
 
-    NOINLINE_DECL void insertMulti(bool keepGoing, const char *ns, vector<BSONObj>& objs) {
+    NOINLINE_DECL void insertMulti(bool keepGoing, const char *ns, vector<BSONObj>& objs, CurOp& op) {
         size_t i;
         for (i=0; i<objs.size(); i++){
             try {
@@ -795,6 +796,7 @@ namespace mongo {
         }
 
         globalOpCounters.incInsertInWriteLock(i);
+        op.debug().ninserted = i;
     }
 
     void receivedInsert(Message& m, CurOp& op) {
@@ -837,12 +839,13 @@ namespace mongo {
                 
                 if( !multi.empty() ) {
                     const bool keepGoing = d.reservedField() & InsertOption_ContinueOnError;
-                    insertMulti(keepGoing, ns, multi);
+                    insertMulti(keepGoing, ns, multi, op);
                     return;
                 }
                 
                 checkAndInsert(ns, first);
                 globalOpCounters.incInsertInWriteLock(1);
+                op.debug().ninserted = 1;
                 return;
             }
             catch ( PageFaultException& e ) {

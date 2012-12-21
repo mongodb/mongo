@@ -565,6 +565,8 @@ namespace mongo {
         idhack = false;
         scanAndOrder = false;
         nupdated = -1;
+        ninserted = -1;
+        ndeleted = -1;
         nmoved = -1;
         fastmod = false;
         fastmodinsert = false;
@@ -612,6 +614,8 @@ namespace mongo {
         OPDEBUG_TOSTRING_HELP_BOOL( scanAndOrder );
         OPDEBUG_TOSTRING_HELP( nmoved );
         OPDEBUG_TOSTRING_HELP( nupdated );
+        OPDEBUG_TOSTRING_HELP( ninserted );
+        OPDEBUG_TOSTRING_HELP( ndeleted );
         OPDEBUG_TOSTRING_HELP_BOOL( fastmod );
         OPDEBUG_TOSTRING_HELP_BOOL( fastmodinsert );
         OPDEBUG_TOSTRING_HELP_BOOL( upsert );
@@ -703,6 +707,8 @@ namespace mongo {
         OPDEBUG_APPEND_BOOL( moved );
         OPDEBUG_APPEND_NUMBER( nmoved );
         OPDEBUG_APPEND_NUMBER( nupdated );
+        OPDEBUG_APPEND_NUMBER( ninserted );
+        OPDEBUG_APPEND_NUMBER( ndeleted );
         OPDEBUG_APPEND_BOOL( fastmod );
         OPDEBUG_APPEND_BOOL( fastmodinsert );
         OPDEBUG_APPEND_BOOL( upsert );

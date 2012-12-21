@@ -82,6 +82,8 @@ namespace mongo {
         bool scanAndOrder;   // scanandorder query plan aspect was used
         long long  nupdated; // number of records updated
         long long  nmoved;   // updates resulted in a move (moves are expensive)
+        long long  ninserted;
+        long long  ndeleted;
         bool fastmod;
         bool fastmodinsert;  // upsert of an $operation. builds a default object
         bool upsert;         // true if the update actually did an insert

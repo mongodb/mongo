@@ -202,41 +202,43 @@ namespace mongo {
 
     AtomicUInt CurOp::_nextOpNum;
 
-    static Counter64 c_returned;
-    static Counter64 c_inserted;
-    static Counter64 c_updated;
-    static Counter64 c_deleted;
-    static Counter64 c_scanned;
+    static Counter64 returnedCounter;
+    static Counter64 insertedCounter;
+    static Counter64 updatedCounter;
+    static Counter64 deletedCounter;
+    static Counter64 scannedCounter;
 
-    static ServerStatusMetricField<Counter64> displayReturned( "document.returned", &c_returned );
-    static ServerStatusMetricField<Counter64> displayUpdated( "document.updated", &c_updated );
-    static ServerStatusMetricField<Counter64> displayInserted( "document.inserted", &c_inserted );
-    static ServerStatusMetricField<Counter64> displayDeleted( "document.deleted", &c_deleted );
-    static ServerStatusMetricField<Counter64> displayScanned( "document.scanned", &c_scanned );
+    static ServerStatusMetricField<Counter64> displayReturned( "document.returned", &returnedCounter );
+    static ServerStatusMetricField<Counter64> displayUpdated( "document.updated", &updatedCounter );
+    static ServerStatusMetricField<Counter64> displayInserted( "document.inserted", &insertedCounter );
+    static ServerStatusMetricField<Counter64> displayDeleted( "document.deleted", &deletedCounter );
+    static ServerStatusMetricField<Counter64> displayScanned( "document.scanned", &scannedCounter );
 
-    static Counter64 c_idhack;
-    static Counter64 c_scanAndOrder;
-    static Counter64 c_fastmod;
+    static Counter64 idhackCounter;
+    static Counter64 scanAndOrderCounter;
+    static Counter64 fastmodCounter;
 
-    static ServerStatusMetricField<Counter64> displayIdhack( "query.idhack", &c_idhack );
-    static ServerStatusMetricField<Counter64> displayScanAndOrder( "query.scanAndOrder", &c_scanAndOrder );
-    static ServerStatusMetricField<Counter64> displayFastMod( "query.fastmod", &c_fastmod );
+    static ServerStatusMetricField<Counter64> displayIdhack( "query.idhack", &idhackCounter );
+    static ServerStatusMetricField<Counter64> displayScanAndOrder( "query.scanAndOrder", &scanAndOrderCounter );
+    static ServerStatusMetricField<Counter64> displayFastMod( "query.fastmod", &fastmodCounter );
 
     void OpDebug::recordStats() {
         if ( nreturned > 0 )
-            c_returned.increment( nreturned );
-        // TODO: insert
+            returnedCounter.increment( nreturned );
+        if ( ninserted > 0 )
+            insertedCounter.increment( ninserted );
         if ( nupdated > 0 )
-            c_updated.increment( nupdated );
-        // TODO: delete
+            updatedCounter.increment( nupdated );
+        if ( ndeleted > 0 )
+            deletedCounter.increment( ndeleted );
         if ( nscanned > 0 )
-            c_scanned.increment( nscanned );
+            scannedCounter.increment( nscanned );
 
         if ( idhack )
-            c_idhack.increment();
+            idhackCounter.increment();
         if ( scanAndOrder )
-            c_scanAndOrder.increment();
+            scanAndOrderCounter.increment();
         if ( fastmod )
-            c_fastmod.increment();
+            fastmodCounter.increment();
     }
 }
