@@ -40,8 +40,13 @@ __evict_read_gen(const WT_EVICT_ENTRY *entry)
 {
 	uint64_t read_gen;
 
+	/* Never prioritize empty slots. */
 	if (entry->page == NULL)
 		return (UINT64_MAX);
+
+	/* Always prioritize pages selected by force. */
+	if (__wt_eviction_page_force(entry->btree, entry->page))
+		return (0);
 
 	read_gen = entry->page->read_gen + entry->btree->evict_priority;
 	if (entry->page->type == WT_PAGE_ROW_INT ||
@@ -279,10 +284,13 @@ __evict_worker(WT_SESSION_IMPL *session)
 		bytes_inuse = __wt_cache_bytes_inuse(cache);
 		dirty_inuse = __wt_cache_dirty_bytes(cache);
 		bytes_max = conn->cache_size;
-		if (bytes_inuse < (cache->eviction_target * bytes_max) / 100 &&
+		if (F_ISSET(cache, WT_EVICT_FORCE_PASS) ||
+		    (bytes_inuse < (cache->eviction_target * bytes_max) / 100 &&
 		    dirty_inuse <
-		    (cache->eviction_dirty_target * bytes_max) / 100)
+		    (cache->eviction_dirty_target * bytes_max) / 100))
 			break;
+
+		F_CLR(cache, WT_EVICT_FORCE_PASS);
 
 		/* Figure out how much we will focus on dirty pages. */
 		if (dirty_inuse >

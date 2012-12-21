@@ -73,6 +73,12 @@ struct __wt_cache {
 	uint32_t cp_skip_count;		/* Post change stabilization */
 
 	uint32_t disabled_eviction;	/* Disabled clean / dirty eviction */
+
+	/*
+	 * Flags.
+	 */
+#define	WT_EVICT_FORCE_PASS	0x01	/* Ignore the eviction trigger */
+	uint32_t flags;
 };
 
 /*
