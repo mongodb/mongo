@@ -56,7 +56,7 @@ namespace mongo {
         ASSERT_EQUALS( "c", v[2] );
 
         BSONObjBuilder b;
-        vv.append( b );
+        vv.append( b, vv.name() );
         BSONObj y = b.obj();
         ASSERT( x.firstElement().woCompare( y.firstElement(), false ) == 0 );
 

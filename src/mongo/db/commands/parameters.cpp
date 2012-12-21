@@ -24,6 +24,16 @@
 
 namespace mongo {
 
+    namespace {
+        void appendParameterNames( stringstream& help ) {
+            help << "supported:\n";
+            const ServerParameter::Map& m = ServerParameterSet::getGlobal()->getMap();
+            for ( ServerParameter::Map::const_iterator i = m.begin(); i != m.end(); ++i ) {
+                help << "  " << i->first << "\n";
+            }
+        }
+    }
+
     class CmdGet : public Command {
     public:
         CmdGet() : Command( "getParameter" ) { }
@@ -40,11 +50,7 @@ namespace mongo {
         virtual void help( stringstream &help ) const {
             help << "get administrative option(s)\nexample:\n";
             help << "{ getParameter:1, notablescan:1 }\n";
-            help << "supported so far:\n";
-            help << "  quiet\n";
-            help << "  notablescan\n";
-            help << "  logLevel\n";
-            help << "  syncdelay\n";
+            appendParameterNames( help );
             help << "{ getParameter:'*' } to get everything\n";
         }
         bool run(const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
@@ -52,23 +58,10 @@ namespace mongo {
 
             int before = result.len();
 
-            if( all || cmdObj.hasElement("quiet") ) {
-                result.append("quiet", cmdLine.quiet );
-            }
-            if( all || cmdObj.hasElement("notablescan") ) {
-                result.append("notablescan", cmdLine.noTableScan);
-            }
-            if( all || cmdObj.hasElement("logLevel") ) {
-                result.append("logLevel", logLevel);
-            }
-            if( all || cmdObj.hasElement("syncdelay") ) {
-                result.append("syncdelay", cmdLine.syncdelay);
-            }
-
             const ServerParameter::Map& m = ServerParameterSet::getGlobal()->getMap();
             for ( ServerParameter::Map::const_iterator i = m.begin(); i != m.end(); ++i ) {
                 if ( all || cmdObj.hasElement( i->first.c_str() ) ) {
-                    i->second->append( result );
+                    i->second->append( result, i->second->name() );
                 }
             }
 
@@ -96,16 +89,14 @@ namespace mongo {
         virtual void help( stringstream &help ) const {
             help << "set administrative option(s)\n";
             help << "{ setParameter:1, <param>:<value> }\n";
-            help << "supported so far:\n";
-            help << "  journalCommitInterval\n";
-            help << "  logLevel\n";
-            help << "  notablescan\n";
-            help << "  quiet\n";
-            help << "  syncdelay\n";
+            appendParameterNames( help );
         }
         bool run(const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
             int s = 0;
             bool found = false;
+
+            // TODO: remove these manual things
+
             if( cmdObj.hasElement("journalCommitInterval") ) {
                 if( !cmdLine.dur ) {
                     errmsg = "journaling is off";
@@ -115,32 +106,6 @@ namespace mongo {
                 verify( x > 1 && x < 500 );
                 cmdLine.journalCommitInterval = x;
                 log() << "setParameter journalCommitInterval=" << x << endl;
-                s++;
-            }
-            if( cmdObj.hasElement("notablescan") ) {
-                verify( !cmdLine.isMongos() );
-                if( s == 0 )
-                    result.append("was", cmdLine.noTableScan);
-                cmdLine.noTableScan = cmdObj["notablescan"].Bool();
-                s++;
-            }
-            if( cmdObj.hasElement("quiet") ) {
-                if( s == 0 )
-                    result.append("was", cmdLine.quiet );
-                cmdLine.quiet = cmdObj["quiet"].Bool();
-                s++;
-            }
-            if( cmdObj.hasElement("syncdelay") ) {
-                verify( !cmdLine.isMongos() );
-                if( s == 0 )
-                    result.append("was", cmdLine.syncdelay );
-                cmdLine.syncdelay = cmdObj["syncdelay"].Number();
-                s++;
-            }
-            if( cmdObj.hasElement( "logLevel" ) ) {
-                if( s == 0 )
-                    result.append("was", logLevel );
-                logLevel = cmdObj["logLevel"].numberInt();
                 s++;
             }
             if( cmdObj.hasElement( "traceExceptions" ) ) {
@@ -172,6 +137,9 @@ namespace mongo {
                     return false;
                 }
 
+                if ( s == 0 )
+                    j->second->append( result, "was" );
+
                 Status status = j->second->set( e );
                 if ( status.isOK() ) {
                     s++;
@@ -191,4 +159,23 @@ namespace mongo {
         }
     } cmdSet;
 
+    namespace {
+        ExportedServerParameter<int> LogLevelSetting( ServerParameterSet::getGlobal(),
+                                                      "logLevel",
+                                                      &logLevel );
+
+        ExportedServerParameter<bool> NoTableScanSetting( ServerParameterSet::getGlobal(),
+                                                          "notablescan",
+                                                          &cmdLine.noTableScan );
+
+        ExportedServerParameter<bool> QuietSetting( ServerParameterSet::getGlobal(),
+                                                    "quiet",
+                                                    &cmdLine.quiet );
+
+        ExportedServerParameter<double> SyncdelaySetting( ServerParameterSet::getGlobal(),
+                                                          "syncdelay",
+                                                          &cmdLine.syncdelay );
+    }
+
 }
+

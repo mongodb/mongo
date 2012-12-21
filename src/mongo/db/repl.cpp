@@ -824,8 +824,8 @@ namespace mongo {
 
         int get() const { return _value; }
 
-        virtual void append( BSONObjBuilder& b ) {
-            b.append( name(), _value );
+        virtual void append( BSONObjBuilder& b, const string& name ) {
+            b.append( name, _value );
         }
 
         virtual Status set( const BSONElement& newValuElement ) {

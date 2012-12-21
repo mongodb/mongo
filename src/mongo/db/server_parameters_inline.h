@@ -47,8 +47,29 @@ namespace mongo {
     }
 
     template<>
+    inline Status ExportedServerParameter<double>::setFromString( const string& str ) {
+        const char* start = str.c_str();
+        char* end;
+        double d = strtod( str.c_str(), &end );
+        if ( start == end )
+            return Status( ErrorCodes::BadValue, "not a double" );
+        return set( d );
+    }
+
+    template<>
     inline Status ExportedServerParameter<string>::setFromString( const string& str ) {
         return set( str );
+    }
+
+    template<>
+    inline Status ExportedServerParameter<bool>::setFromString( const string& str ) {
+        if ( str == "true" ||
+             str == "1" )
+            return set(true);
+        if ( str == "false" ||
+             str == "0" )
+            return set(false);
+        return Status( ErrorCodes::BadValue, "can't convert string to bool" );
     }
 
 
