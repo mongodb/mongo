@@ -180,6 +180,13 @@ namespace mongo {
          */
         static BSONObj depsToProjection(const set<string>& deps);
 
+        /** These functions take the same input as depsToProjection but are able to
+         *  produce a Document from a BSONObj with the needed fields much faster.
+         */
+        typedef Document ParsedDeps; // See implementation for structure
+        static ParsedDeps parseDeps(const set<string>& deps);
+        static Document documentFromBsonWithDeps(const BSONObj& object, const ParsedDeps& deps);
+
         /**
           Add the DocumentSource to the array builder.
 
@@ -435,7 +442,7 @@ namespace mongo {
          */
         void setSort(const shared_ptr<BSONObj> &pBsonObj);
 
-        void setProjection(BSONObj projection);
+        void setProjection(const BSONObj& projection, const ParsedDeps& deps);
     protected:
         // virtuals from DocumentSource
         virtual void sourceToBson(BSONObjBuilder *pBuilder, bool explain) const;
@@ -461,6 +468,7 @@ namespace mongo {
         shared_ptr<BSONObj> pQuery;
         shared_ptr<BSONObj> pSort;
         shared_ptr<Projection> _projection; // shared with pClientCursor
+        ParsedDeps _dependencies;
 
         shared_ptr<CursorWithContext> _cursorWithContext;
 
