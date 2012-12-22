@@ -41,9 +41,9 @@ assert.eq( 1000, t.find().toArray().length , "A2" );
 db.setProfilingLevel( 2 );
 t.count();
 db.setProfilingLevel( 0 );
-assert.lt( 0 , db.system.profile.find( { user : "eliot" } ).count() , "AP1" )
+assert.lt( 0 , db.system.profile.find( { user : "eliot@test" } ).count() , "AP1" )
 
-var p = { key : { i : true } , 
+var p = { key : { i : true } ,
     reduce : function(obj,prev) { prev.count++; },
 initial: { count: 0 }
 };
