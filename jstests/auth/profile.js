@@ -32,7 +32,8 @@ db1.foo.findOne();
 var last = lastOp(db1);
 assert.eq(principalName(username, db1), last.user);
 assert.eq(1, last.allUsers.length);
-assert.eq(principalName(username, db1), last.allUsers[0]);
+assert.eq(username, last.allUsers[0].user);
+assert.eq(db1, last.allUsers[0].userSource);
 
 db2.auth(username, "password");
 
@@ -41,9 +42,10 @@ var last = lastOp(db1);
 // Which user gets put in "user" and the ordering of users in "allUsers" is undefined.
 assert((principalName(username, db1) == last.user) || (principalName(username, db2) == last.user));
 assert.eq(2, last.allUsers.length);
-assert.gte(last.allUsers.indexOf(principalName(username, db1)), 0);
-assert.gte(last.allUsers.indexOf(principalName(username, db2)), 0);
-
+assert.eq(username, last.allUsers[0].user);
+assert.eq(username, last.allUsers[1].user);
+assert((db1 == last.allUsers[0].userSource && db2 == last.allUsers[1].userSource) ||
+       (db2 == last.allUsers[0].userSource && db1 == last.allUsers[1].userSource));
 
 db1.setProfilingLevel(0);
 db1.dropDatabase();
