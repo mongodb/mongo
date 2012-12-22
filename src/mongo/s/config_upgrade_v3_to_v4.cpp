@@ -95,7 +95,7 @@ namespace mongo {
                 return false;
             }
         }
-        catch (const DBException& e) {
+        catch (const DBException&) {
 
             *errMsg = stream() << "could not drop collections during cleanup of upgrade "
                                << lastUpgradeId;
