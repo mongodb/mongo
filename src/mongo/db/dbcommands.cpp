@@ -208,7 +208,8 @@ namespace mongo {
                 }
 
                 if ( !theReplSet && !e.isNumber() ) {
-                    result.append( "err", "cannot use non integer w values for non-replica sets" );
+                    result.append( "wnote", "cannot use non integer w values for non-replica sets" );
+                    result.append( "err", "noreplset" );
                     return true;
                 }
 

@@ -114,13 +114,18 @@ DB.prototype.addUser = function( username , pass, readOnly, replicatedTo, timeou
     // the user has been written and we're happy
     if( le.err == "norepl" ){
         return
-    }        
-    
+    }
+
     if ( le.err == "timeout" ){
         throw "timed out while waiting for user authentication to replicate - " +
               "database will not be fully secured until replication finishes"
     }
-    
+
+    if ( le.err == "noreplset" ){
+        // nothing we can do
+        return;
+    }
+
     if ( le.err )
         throw "couldn't add user: " + le.err
 }
