@@ -35,15 +35,35 @@ namespace {
 namespace mongo {
 
 namespace {
-    void _appendUserInfo(BSONObjBuilder& builder, AuthorizationManager* authManager) {
+    void _appendUserInfo(const Client& c, BSONObjBuilder& builder, AuthorizationManager* authManager) {
         PrincipalSet::NameIterator nameIter = authManager->getAuthenticatedPrincipalNames();
 
-        builder.append("user", nameIter.more() ? nameIter->getFullName() : "");
+        string bestUser;
+
+        StringData opdb( nsToDatabaseSubstring( c.ns() ) );
+
         BSONArrayBuilder allUsers(builder.subarrayStart("allUsers"));
         for ( ; nameIter.more(); nameIter.next()) {
-            allUsers.append(nameIter->getFullName());
+            const string& name = nameIter->getFullName();
+            allUsers.append(name);
+
+            if ( bestUser.size() == 0 ) {
+                bestUser = name;
+            }
+            else {
+                size_t idx = name.find( '@' );
+                if ( idx >= 0 ) {
+                    StringData db = StringData(name).substr( idx + 1 );
+                    log() << "eliot : " << db << " " << opdb << endl;
+                    if ( opdb == db )
+                        bestUser = name;
+                }
+            }
         }
         allUsers.doneFast();
+
+        builder.append("user", bestUser );
+
     }
 } // namespace
 
@@ -51,7 +71,7 @@ namespace {
         Database *db = c.database();
         DEV verify( db );
         const char *ns = db->profileName.c_str();
-        
+
         // build object
         BSONObjBuilder b(profileBufBuilder);
 
@@ -62,7 +82,7 @@ namespace {
         b.append("client", c.clientAddress());
 
         AuthorizationManager* authManager = c.getAuthorizationManager();
-        _appendUserInfo(b, authManager);
+        _appendUserInfo(c, b, authManager);
 
         BSONObj p = b.done();
 
@@ -75,7 +95,7 @@ namespace {
             BSONObjBuilder b(profileBufBuilder);
             b.appendDate("ts", jsTime());
             b.append("client", c.clientAddress() );
-            _appendUserInfo(b, authManager);
+            _appendUserInfo(c, b, authManager);
 
             b.append("err", "profile line too large (max is 100KB)");
 
