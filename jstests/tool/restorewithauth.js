@@ -97,6 +97,6 @@ assert.eq(foo.system.namespaces.count({name: "foo.bar"}), 1);
 assert.eq(foo.system.namespaces.count({name: "foo.baz"}), 1);
 assert.eq(foo.bar.count(), 4);
 assert.eq(foo.baz.count(), 4);
-assert.eq(foo.system.indexes.count(), 4); // _id on foo, _id on bar, x on foo, _id on system.users
+assert.eq(foo.system.indexes.count(), 5); // _id on foo, _id on bar, x on foo, _id + 1 on system.users
 
 stopMongod( port );

@@ -128,9 +128,6 @@ namespace QueryTests {
     class FindOneEmptyObj : public Base {
     public:
         void run() {
-            // todo: this is BAD.
-            cc().getAuthenticationInfo()->setIsALocalHostConnectionWithSpecialAuthPowers();
-
             // We don't normally allow empty objects in the database, but test that we can find
             // an empty object (one might be allowed inside a reserved namespace at some point).
             Lock::GlobalWrite lk;

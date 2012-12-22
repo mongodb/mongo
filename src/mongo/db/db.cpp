@@ -176,9 +176,7 @@ namespace mongo {
     class MyMessageHandler : public MessageHandler {
     public:
         virtual void connected( AbstractMessagingPort* p ) {
-            Client& c = Client::initThread("conn", p);
-            if( p->remote().isLocalHost() )
-                c.getAuthenticationInfo()->setIsALocalHostConnectionWithSpecialAuthPowers();
+            Client::initThread("conn", p);
         }
 
         virtual void process( Message& m , AbstractMessagingPort* port , LastError * le) {
@@ -524,7 +522,7 @@ namespace mongo {
         return killCurrentOp.checkForInterruptNoAssert();
     }
 
-    unsigned jsGetInterruptSpecCallback() {
+    unsigned jsGetCurrentOpIdCallback() {
         return cc().curop()->opNum();
     }
 
@@ -648,7 +646,7 @@ namespace mongo {
         if ( scriptingEnabled ) {
             ScriptEngine::setup();
             globalScriptEngine->setCheckInterruptCallback( jsInterruptCallback );
-            globalScriptEngine->setGetInterruptSpecCallback( jsGetInterruptSpecCallback );
+            globalScriptEngine->setGetCurrentOpIdCallback( jsGetCurrentOpIdCallback );
         }
 
         repairDatabasesAndCheckVersion();
@@ -683,7 +681,7 @@ namespace mongo {
         if( !noauth ) {
             // open admin db in case we need to use it later. TODO this is not the right way to
             // resolve this.
-            Client::WriteContext c("admin",dbpath,false);
+            Client::WriteContext c("admin", dbpath);
         }
 
         listen(listenPort);
@@ -760,6 +758,7 @@ static void buildOptionsDescriptions(po::options_description *pVisible,
     po::options_description rs_options("Replica set options");
     po::options_description replication_options("Replication options");
     po::options_description sharding_options("Sharding options");
+    po::options_description hidden_sharding_options("Sharding options");
     po::options_description ssl_options("SSL options");
 
     CmdLine::addGlobalOptions( general_options , hidden_options , ssl_options );
@@ -828,8 +827,13 @@ static void buildOptionsDescriptions(po::options_description *pVisible,
     sharding_options.add_options()
     ("configsvr", "declare this is a config db of a cluster; default port 27019; default dir /data/configdb")
     ("shardsvr", "declare this is a shard db of a cluster; default port 27018")
-    ("noMoveParanoia" , "turn off paranoid saving of data for moveChunk.  this is on by default for now, but default will switch" )
     ;
+
+    hidden_sharding_options.add_options()
+    ("noMoveParanoia" , "turn off paranoid saving of data for the moveChunk command; default" )
+    ("moveParanoia" , "turn on paranoid saving of data during the moveChunk command (used for internal system diagnostics)" )
+    ;
+    hidden_options.add(hidden_sharding_options);
 
     hidden_options.add_options()
     ("fastsync", "indicate that this instance is starting from a dbpath snapshot of the repl peer")
@@ -1132,6 +1136,9 @@ static void processCommandLineOptions(const std::vector<std::string>& argv) {
                 cmdLine.dur = true;
             if ( params.count( "dbpath" ) == 0 )
                 dbpath = "/data/configdb";
+            replSettings.master = true;
+            if ( params.count( "oplogsize" ) == 0 )
+                cmdLine.oplogSize = 5 * 1024 * 1024;
         }
         if ( params.count( "profile" ) ) {
             cmdLine.defaultProfile = params["profile"].as<int>();
@@ -1139,9 +1146,18 @@ static void processCommandLineOptions(const std::vector<std::string>& argv) {
         if (params.count("ipv6")) {
             enableIPv6();
         }
-        if (params.count("noMoveParanoia")) {
-            cmdLine.moveParanoia = false;
+
+        if (params.count("noMoveParanoia") > 0 && params.count("moveParanoia") > 0) {
+            out() << "The moveParanoia and noMoveParanoia flags cannot both be set; please use only one of them." << endl;
+            ::_exit( EXIT_BADOPTIONS );
         }
+
+        if (params.count("noMoveParanoia"))
+            cmdLine.moveParanoia = false;
+
+        if (params.count("moveParanoia"))
+            cmdLine.moveParanoia = true;
+
         if (params.count("pairwith") || params.count("arbiter") || params.count("opIdMem")) {
             out() << "****" << endl;
             out() << "Replica Pairs have been deprecated. Invalid options: --pairwith, --arbiter, and/or --opIdMem" << endl;

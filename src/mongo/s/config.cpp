@@ -26,6 +26,7 @@
 #include "mongo/db/cmdline.h"
 #include "mongo/db/pdfile.h"
 #include "mongo/s/chunk.h"
+#include "mongo/s/chunk_version.h"
 #include "mongo/s/config.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/server.h"
@@ -288,7 +289,7 @@ namespace mongo {
 
     ChunkManagerPtr DBConfig::getChunkManager( const string& ns , bool shouldReload, bool forceReload ) {
         BSONObj key;
-        ShardChunkVersion oldVersion;
+        ChunkVersion oldVersion;
         ChunkManagerPtr oldManager;
 
         {
@@ -328,7 +329,7 @@ namespace mongo {
             conn->done();
             
             if ( ! newest.isEmpty() ) {
-                ShardChunkVersion v = ShardChunkVersion::fromBSON(newest, ChunkType::DEPRECATED_lastmod());
+                ChunkVersion v = ChunkVersion::fromBSON(newest, ChunkType::DEPRECATED_lastmod());
                 if ( v.isEquivalentTo( oldVersion ) ) {
                     scoped_lock lk( _lock );
                     CollectionInfo& ci = _collections[ns];
@@ -358,8 +359,8 @@ namespace mongo {
                 CollectionInfo& ci = _collections[ns];
                 if ( ci.isSharded() && ci.getCM() ) {
 
-                    ShardChunkVersion currentVersion =
-                        ShardChunkVersion::fromBSON(newest, ChunkType::DEPRECATED_lastmod());
+                    ChunkVersion currentVersion =
+                        ChunkVersion::fromBSON(newest, ChunkType::DEPRECATED_lastmod());
 
                     // Only reload if the version we found is newer than our own in the same
                     // epoch
@@ -482,6 +483,14 @@ namespace mongo {
             string collName = collObj[CollectionType::ns()].String();
 
             if( collObj[CollectionType::dropped()].trueValue() ){
+                _collections.erase( collName );
+                numCollsErased++;
+            }
+            else if( !collObj[CollectionType::primary()].eoo() ){
+                // For future compatibility, explicitly ignore any collection with the
+                // "primary" field set.
+
+                // Erased in case it was previously sharded, dropped, then init'd as unsharded
                 _collections.erase( collName );
                 numCollsErased++;
             }
@@ -990,8 +999,7 @@ namespace mongo {
         try {
             // get this entry's ID so we can use on the exception code path too
             stringstream id;
-            static AtomicUInt num;
-            id << getHostNameCached() << "-" << terseCurrentTime() << "-" << num++;
+            id << getHostNameCached() << "-" << terseCurrentTime() << "-" << OID::gen();
             changeID = id.str();
 
             // send a copy of the message to the log in case it doesn't manage to reach config.changelog

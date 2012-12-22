@@ -25,7 +25,8 @@ env.StaticLibrary('authservercommon',
                   LIBDEPS=['authcore'])
 
 env.StaticLibrary('authmongod',
-                  ['auth_external_state_d.cpp'],
+                  ['auth_external_state_d.cpp',
+                   'auth_index_d.cpp'],
                   LIBDEPS=['authservercommon'])
 
 env.StaticLibrary('authmongos',

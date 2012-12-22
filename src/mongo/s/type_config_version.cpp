@@ -18,6 +18,7 @@
 
 #include "mongo/s/field_parser.h"
 #include "mongo/util/mongoutils/str.h"
+#include "mongo/util/version.h"
 
 namespace mongo {
 
@@ -25,10 +26,13 @@ namespace mongo {
 
     const string VersionType::ConfigNS("config.version");
 
-    const BSONField<int> VersionType::minVersion("minVersion");
-    const BSONField<int> VersionType::maxVersion("maxVersion");
+    const BSONField<int> VersionType::minCompatibleVersion("minCompatibleVersion");
+    const BSONField<int> VersionType::currentVersion("currentVersion");
+    const BSONField<BSONArray> VersionType::excludingMongoVersions("excluding");
     const BSONField<OID> VersionType::clusterId("clusterId");
     const BSONField<int> VersionType::version_DEPRECATED("version");
+    const BSONField<OID> VersionType::upgradeId("upgradeId");
+    const BSONField<BSONObj> VersionType::upgradeState("upgradeState");
 
     VersionType::VersionType() {
         clear();
@@ -53,7 +57,7 @@ namespace mongo {
         }
 
         // Hardcoded 3 here because it's the last version without a cluster id
-        if (_maxVersion > 3 && !_clusterId.isSet()) {
+        if (_currentVersion > 3 && !_clusterId.isSet()) {
             if (errMsg) {
                 *errMsg = stream() << "no clusterId found";
             }
@@ -65,8 +69,11 @@ namespace mongo {
 
     void VersionType::clear() {
         _minVersion = -1;
-        _maxVersion = -1;
+        _currentVersion = -1;
         _clusterId = OID();
+        _excludes = BSONArray();
+        _upgradeId = OID();
+        _upgradeState = BSONObj();
     }
 
     bool VersionType::parseBSON(const BSONObj& source, string* errMsg) {
@@ -75,29 +82,44 @@ namespace mongo {
         string dummy;
         if (!errMsg) errMsg = &dummy;
 
-        if (!FieldParser::extractNumber(source, minVersion, -1, &_minVersion, errMsg)) return false;
+        if (!FieldParser::extractNumber(source, minCompatibleVersion, -1, &_minVersion, errMsg)) return false;
 
         if (_minVersion == -1) {
             if (!FieldParser::extractNumber(source, version_DEPRECATED, -1, &_minVersion, errMsg)) return false;
         }
 
-        if (!FieldParser::extractNumber(source, maxVersion, -1, &_maxVersion, errMsg)) return false;
+        if (!FieldParser::extractNumber(source, currentVersion, -1, &_currentVersion, errMsg)) return false;
+
+        if (_currentVersion == -1) {
+            _currentVersion = _minVersion;
+        }
 
         if (!FieldParser::extract(source, clusterId, OID(), &_clusterId, errMsg)) return false;
 
-        if (_maxVersion == -1) {
-            _maxVersion = _minVersion;
-        }
+        if (!FieldParser::extract(source, excludingMongoVersions, _excludes, &_excludes, errMsg)) return false;
+
+        if (!FieldParser::extract(source, upgradeId, OID(), &_upgradeId, errMsg)) return false;
+        if (!FieldParser::extract(source, upgradeState, BSONObj(), &_upgradeState, errMsg)) return false;
 
         return true;
     }
 
     BSONObj VersionType::toBSON() const {
-        return BSON("_id" << 1
-                << version_DEPRECATED(_minVersion)
-                << minVersion(_minVersion)
-                << maxVersion(_maxVersion)
-                << clusterId(_clusterId));
+
+        BSONObjBuilder bob;
+        bob << "_id" << 1;
+        bob << version_DEPRECATED(_minVersion);
+        bob << minCompatibleVersion(_minVersion);
+        bob << currentVersion(_currentVersion);
+        bob << clusterId(_clusterId);
+        bob << excludingMongoVersions(_excludes);
+
+        if (_upgradeId.isSet()) {
+            bob << upgradeId(_upgradeId);
+            bob << upgradeState(_upgradeState);
+        }
+
+        return bob.obj();
     }
 
     string VersionType::toString() const {
@@ -120,37 +142,36 @@ namespace mongo {
         _minVersion = version;
     }
 
-    int VersionType::getMaxCompatibleVersion() const {
-        return _maxVersion;
+    int VersionType::getCurrentVersion() const {
+        return _currentVersion;
     }
 
-    void VersionType::setMaxCompatibleVersion(int version) {
-        _maxVersion = version;
+    void VersionType::setCurrentVersion(int version) {
+        _currentVersion = version;
     }
 
-    bool VersionType::isCompatibleVersion(int version) const {
-        return version >= _minVersion && version <= _maxVersion;
+    OID VersionType::getUpgradeId() const {
+        return _upgradeId;
+    }
+    void VersionType::setUpgradeId(const OID& upgradeId) {
+        _upgradeId = upgradeId;
     }
 
-    void VersionType::setDefaultVersion() {
-        _minVersion = 1;
-        _maxVersion = 1;
-        _clusterId = OID();
+    BSONObj VersionType::getUpgradeState() const {
+        return _upgradeState;
+    }
+    void VersionType::setUpgradeState(const BSONObj& upgradeState) {
+        _upgradeState = upgradeState;
     }
 
-    void VersionType::setEmptyVersion() {
-        _minVersion = 0;
-        _maxVersion = 0;
-        _clusterId = OID();
-    }
+    void VersionType::cloneTo(VersionType* other) const {
 
-    bool VersionType::isEmptyVersion() const {
-        return _minVersion == 0 && _maxVersion == 0 && _clusterId == OID();
-    }
+        other->clear();
 
-    bool VersionType::isEquivalentTo(const VersionType& other) const {
-        return _minVersion == other._minVersion && _maxVersion == other._maxVersion
-               && _clusterId == other._clusterId;
+        other->_minVersion = _minVersion;
+        other->_currentVersion = _currentVersion;
+        other->_clusterId = _clusterId;
+        other->_excludes = _excludes;
     }
 
 } // namespace mongo

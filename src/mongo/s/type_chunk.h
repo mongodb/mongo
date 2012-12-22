@@ -21,7 +21,8 @@
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/string_data.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/s/util.h" // for ShardChunkVersion
+#include "mongo/s/chunk_version.h"
+
 namespace mongo {
 
     /**
@@ -148,11 +149,11 @@ namespace mongo {
             return _max;
         }
 
-        void setVersion(const ShardChunkVersion& version) {
+        void setVersion(const ChunkVersion& version) {
             _version = version;
         }
 
-        const ShardChunkVersion& getVersion() const {
+        const ChunkVersion& getVersion() const {
             return _version;
         }
 
@@ -174,13 +175,13 @@ namespace mongo {
 
     private:
         // Convention: (M)andatory, (O)ptional, (S)pecial rule.
-        string _name; // (M) chunk's id
-        string _ns; // (M) collection this chunk is in
-        BSONObj _min; // (M) first key of the range, inclusive
-        BSONObj _max; // (M) last key of the range, non-inclusive
-        ShardChunkVersion _version; // (M) version of this chunk
-        string _shard; // (M) shard this chunk lives in
-        bool _jumbo; // (O) too big to move?
+        string _name;          // (M) chunk's id
+        string _ns;            // (M) collection this chunk is in
+        BSONObj _min;          // (M) first key of the range, inclusive
+        BSONObj _max;          // (M) last key of the range, non-inclusive
+        ChunkVersion _version; // (M) version of this chunk
+        string _shard;         // (M) shard this chunk lives in
+        bool _jumbo;           // (O) too big to move?
     };
 
 } // namespace mongo

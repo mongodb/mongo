@@ -21,6 +21,30 @@
 #include "mongo/util/stringutils.h"
 
 namespace mongo {
+
+    TEST(Comparison, Basic) {
+
+        //
+        // Basic version comparison tests with different version string types
+        //
+
+        // Equal
+        ASSERT(versionCmp("1.2.3", "1.2.3") == 0);
+
+        // Basic
+        ASSERT(versionCmp("1.2.3", "1.2.4") < 0);
+        ASSERT(versionCmp("1.2.3", "1.2.20") < 0);
+        ASSERT(versionCmp("1.2.3", "1.20.3") < 0);
+        ASSERT(versionCmp("2.2.3", "10.2.3") < 0);
+
+        // Post-fixed
+        ASSERT(versionCmp("1.2.3", "1.2.3-") > 0);
+        ASSERT(versionCmp("1.2.3", "1.2.3-pre") > 0);
+        ASSERT(versionCmp("1.2.3", "1.2.4-") < 0);
+        ASSERT(versionCmp("1.2.3-", "1.2.3") < 0);
+        ASSERT(versionCmp("1.2.3-pre", "1.2.3") < 0);
+    }
+
     TEST( LexNumCmp, Simple1 ) {
         ASSERT_EQUALS( 0, LexNumCmp::cmp( "a.b.c", "a.b.c", false ) );
     }

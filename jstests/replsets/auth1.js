@@ -46,12 +46,16 @@ if ( !_isWindows() ) {  // SERVER-5024
 
 print("start up rs");
 var rs = new ReplSetTest({"name" : name, "nodes" : 3, "startPort" : port[0]});
+print("restart 0 with keyFile");
 m = rs.restart(0, {"keyFile" : path+"key1"});
+print("restart 1 with keyFile");
 var s = rs.start(1, {"keyFile" : path+"key1"});
+print("restart 2 with keyFile");
 var s2 = rs.start(2, {"keyFile" : path+"key1"});
 
 var result = m.getDB("admin").auth("foo", "bar");
 assert.eq(result, 1, "login failed");
+print("Initializing replSet with config: " + tojson(rs.getReplSetConfig()));
 result = m.getDB("admin").runCommand({replSetInitiate : rs.getReplSetConfig()});
 assert.eq(result.ok, 1, "couldn't initiate: "+tojson(result));
 

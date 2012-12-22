@@ -1093,6 +1093,12 @@
     <None Include="..\..\third_party\run_if_newer.js">
       <Filter>third_party</Filter>
     </None>
+    <None Include="..\..\third_party\v8\ChangeLog">
+      <Filter>third_party\v8</Filter>
+    </None>
+    <None Include="..\..\third_party\v8\ChangeLog_10gen">
+      <Filter>third_party\v8</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\pch.h" />

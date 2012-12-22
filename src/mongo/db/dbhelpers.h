@@ -104,7 +104,7 @@ namespace mongo {
         /** You do not need to set the database before calling.
             @return true if collection is empty.
         */
-        static bool isEmpty(const char *ns, bool doAuth=true);
+        static bool isEmpty(const char *ns);
 
         // TODO: this should be somewhere else probably
         /* Takes object o, and returns a new object with the

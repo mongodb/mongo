@@ -46,16 +46,19 @@ namespace mongo {
      *
      */
     class VersionType {
-    MONGO_DISALLOW_COPYING(VersionType);
+        MONGO_DISALLOW_COPYING(VersionType);
     public:
 
         // Name of the versions collection in the config schema
         static const string ConfigNS;
 
         // Field names and types of the version document
-        static const BSONField<int> minVersion;
-        static const BSONField<int> maxVersion;
+        static const BSONField<int> minCompatibleVersion;
+        static const BSONField<int> currentVersion;
+        static const BSONField<BSONArray> excludingMongoVersions;
         static const BSONField<OID> clusterId;
+        static const BSONField<OID> upgradeId;
+        static const BSONField<BSONObj> upgradeState;
 
         // Transition to new format v2.2->v2.4
         // We eventually will not use version, minVersion and maxVersion instead
@@ -82,6 +85,11 @@ namespace mongo {
         bool parseBSON(const BSONObj& source, std::string* errMsg);
 
         /**
+         * Clones to another version entry
+         */
+        void cloneTo(VersionType* other) const;
+
+        /**
          * Clears the internal state.
          */
         void clear();
@@ -101,28 +109,35 @@ namespace mongo {
         int getMinCompatibleVersion() const;
         void setMinCompatibleVersion(int version);
 
-        int getMaxCompatibleVersion() const;
-        void setMaxCompatibleVersion(int version);
+        int getCurrentVersion() const;
+        void setCurrentVersion(int version);
 
-        bool isCompatibleVersion(int version) const;
+        //
+        // Range exclusions
+        //
+        // The type knows very little about these ranges, mostly because it's impossible right now
+        // to do generic BSON parsing of more complex types without template magick.  All
+        // interpretation of versions happens in the upgrade code.
+        //
 
-        // If there is no version document but other config collections exist,
-        // this is the default version we use
-        void setDefaultVersion();
+        const BSONArray& getExcludedRanges() const { return _excludes; }
+        void setExcludedRanges(const BSONArray& excludes) { _excludes = excludes; }
 
-        // If there is no data in the config server, this is the default version we use
-        void setEmptyVersion();
+        OID getUpgradeId() const;
+        void setUpgradeId(const OID& upgradeId);
 
-        bool isEmptyVersion() const;
-
-        // Checks whether two versions are equivalent
-        bool isEquivalentTo(const VersionType& other) const;
+        BSONObj getUpgradeState() const;
+        void setUpgradeState(const BSONObj& upgradeState);
 
     private:
 
-        int _minVersion;
-        int _maxVersion;
-        OID _clusterId;
+        // Convention: (M)andatory, (O)ptional, (S)pecial rule.
+        int _minVersion; // (M) minimum compatible version
+        int _currentVersion; // (M) current version
+        OID _clusterId; // (M) clusterId
+        BSONArray _excludes; // (O) mongodb versions excluded from the cluster
+        OID _upgradeId; // (O) upgrade id of current or last upgrade
+        BSONObj _upgradeState; // (S) upgrade state of current or last upgrade
     };
 
 } // namespace mongo

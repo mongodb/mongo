@@ -319,7 +319,7 @@ namespace mongo {
             Lock::DBWrite lk(ns);
             BackgroundOperation::assertNoBgOpInProgForNs(ns.c_str());
             Client::Context ctx(ns);
-            NamespaceDetails *d = nsdetails(ns.c_str());
+            NamespaceDetails *d = nsdetails(ns);
             massert( 13660, str::stream() << "namespace " << ns << " does not exist", d );
             massert( 13661, "cannot compact capped collection", !d->isCapped() );
             log() << "compact " << ns << " begin" << endl;
@@ -392,7 +392,7 @@ namespace mongo {
             {
                 Lock::DBWrite lk(ns);
                 Client::Context ctx(ns);
-                NamespaceDetails *d = nsdetails(ns.c_str());
+                NamespaceDetails *d = nsdetails(ns);
                 if( ! d ) {
                     errmsg = "namespace does not exist";
                     return false;

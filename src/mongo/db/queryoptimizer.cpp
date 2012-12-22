@@ -1685,7 +1685,7 @@ doneCheckOrder:
     }
 
     bool MultiPlanScanner::haveUselessOr() const {
-        NamespaceDetails *nsd = nsdetails( _ns.c_str() );
+        NamespaceDetails *nsd = nsdetails( _ns );
         if ( !nsd ) {
             return true;
         }

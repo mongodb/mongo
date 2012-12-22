@@ -840,7 +840,7 @@ namespace mongo {
         // defensive:
         this->parent.Null();
         string ns = id.indexNamespace();
-        theDataFileMgr._deleteRecord(nsdetails(ns.c_str()), ns.c_str(), thisLoc.rec(), thisLoc);
+        theDataFileMgr._deleteRecord(nsdetails(ns), ns.c_str(), thisLoc.rec(), thisLoc);
 #endif
     }
 

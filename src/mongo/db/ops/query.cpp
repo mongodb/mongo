@@ -17,19 +17,22 @@
  */
 
 #include "pch.h"
-#include "query.h"
-#include "../pdfile.h"
-#include "../clientcursor.h"
-#include "../oplog.h"
-#include "../../bson/util/builder.h"
-#include "../replutil.h"
-#include "../scanandorder.h"
-#include "../commands.h"
-#include "../queryoptimizer.h"
-#include "../../s/d_logic.h"
-#include "../../server.h"
-#include "../queryoptimizercursor.h"
-#include "../pagefault.h"
+
+#include "mongo/db/ops/query.h"
+
+#include "mongo/bson/util/builder.h"
+#include "mongo/db/clientcursor.h"
+#include "mongo/db/commands.h"
+#include "mongo/db/oplog.h"
+#include "mongo/db/pagefault.h"
+#include "mongo/db/pdfile.h"
+#include "mongo/db/queryoptimizer.h"
+#include "mongo/db/queryoptimizercursor.h"
+#include "mongo/db/replutil.h"
+#include "mongo/db/scanandorder.h"
+#include "mongo/s/d_logic.h"
+#include "mongo/s/stale_exception.h"  // for SendStaleConfigException
+#include "mongo/server.h"
 
 namespace mongo {
 
@@ -821,13 +824,9 @@ namespace mongo {
         qr->setOperation(opReply);
         qr->startingFrom = 0;
         qr->nReturned = nReturned;
-        
-        int duration = curop.elapsedMillis();
-        bool dbprofile = curop.shouldDBProfile( duration );
-        if ( dbprofile || duration >= cmdLine.slowMS ) {
-            curop.debug().nscanned = ( cursor ? cursor->nscanned() : 0LL );
-            curop.debug().ntoskip = pq.getSkip();
-        }
+
+        curop.debug().nscanned = ( cursor ? cursor->nscanned() : 0LL );
+        curop.debug().ntoskip = pq.getSkip();
         curop.debug().nreturned = nReturned;
 
         return curop.debug().exhaust ? ns : "";

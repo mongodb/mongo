@@ -21,6 +21,7 @@
 #include <typeinfo>
 #include <string>
 
+#include "mongo/base/status.h" // NOTE: This is safe as utils depend on base
 #include "mongo/bson/inline_decls.h"
 #include "mongo/platform/compiler.h"
 
@@ -98,6 +99,16 @@ namespace mongo {
         virtual void appendPrefix( std::stringstream& ss ) const { }
         virtual void addContext( const std::string& str ) {
             _ei.msg = str + causedBy( _ei.msg );
+        }
+
+        // Utilities for the migration to Status objects
+        static ErrorCodes::Error convertExceptionCode(int exCode);
+
+        Status toStatus(const std::string& context) const {
+            return Status(convertExceptionCode(getCode()), context + causedBy(*this));
+        }
+        Status toStatus() const {
+            return Status(convertExceptionCode(getCode()), this->toString());
         }
 
         // context when applicable. otherwise ""
@@ -178,6 +189,7 @@ namespace mongo {
     inline std::string causedBy( const std::string* e ){
         return (e && *e != "") ? causedBy(*e) : "";
     }
+    inline std::string causedBy( const Status& e ){ return causedBy( e.reason() ); }
 
     /** aborts on condition failure */
     inline void fassert(int msgid, bool testOK) {if (MONGO_unlikely(!testOK)) fassertFailed(msgid);}

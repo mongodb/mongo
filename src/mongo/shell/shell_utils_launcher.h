@@ -63,6 +63,8 @@ namespace mongo {
         /**
          * A registry of spawned programs that are identified by a bound port or else a system pid.
          * All public member functions are thread safe.
+         *
+         * TODO: Clean this up to make the semantics more consistent between pids and ports
          */
         class ProgramRegistry {
         public:
@@ -70,6 +72,8 @@ namespace mongo {
             bool isPortRegistered( int port ) const;
             /** @return pid for a registered port. */
             pid_t pidForPort( int port ) const;
+            /** @return port (-1 if doesn't exist) for a registered pid. */
+            int portForPid( int port ) const;
             /** Register an unregistered port. */
             void registerPort( int port, pid_t pid, int output );
             void deletePort( int port );

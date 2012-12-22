@@ -41,9 +41,9 @@ assert.eq( 1000, t.find().toArray().length , "A2" );
 db.setProfilingLevel( 2 );
 t.count();
 db.setProfilingLevel( 0 );
-assert.lt( 0 , db.system.profile.find( { user : "eliot" } ).count() , "AP1" )
+assert.lt( 0 , db.system.profile.find( { user : "eliot@test" } ).count() , "AP1" )
 
-var p = { key : { i : true } , 
+var p = { key : { i : true } ,
     reduce : function(obj,prev) { prev.count++; },
 initial: { count: 0 }
 };
@@ -64,7 +64,6 @@ assert.eq( 1000, tRO.count() , "B6" );
 // SERVER-4692 read-only users can't read system.users collection
 assert.throws(function(){dbRO.system.users.findOne()});
 assert.throws(function(){dbRO.system.users.count()});
-assert( dbRO.getLastError() , "B6.5" );
 
 assert.eq( 2, db.system.users.count() , "B7" ); // rw connection
 assert.throws(function(){dbRO.addUser( "a", "b" )});

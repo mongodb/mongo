@@ -19,6 +19,7 @@
 #pragma once
 
 #include "mongo/s/chunk_diff.h"
+#include "mongo/s/chunk_version.h"
 #include "mongo/s/type_chunk.h"
 
 namespace mongo {
@@ -75,7 +76,7 @@ namespace mongo {
     template < class ValType, class ShardType >
     int ConfigDiffTracker<ValType,ShardType>::
         calculateConfigDiff( string config,
-                             const set<ShardChunkVersion>& extraMinorVersions )
+                             const set<ChunkVersion>& extraMinorVersions )
     {
         verifyAttached();
 
@@ -130,7 +131,7 @@ namespace mongo {
 
             BSONObj diffChunkDoc = diffCursor.next();
 
-            ShardChunkVersion chunkVersion = ShardChunkVersion::fromBSON(diffChunkDoc, ChunkType::DEPRECATED_lastmod());
+            ChunkVersion chunkVersion = ChunkVersion::fromBSON(diffChunkDoc, ChunkType::DEPRECATED_lastmod());
 
             if( diffChunkDoc[ChunkType::min()].type() != Object ||
                 diffChunkDoc[ChunkType::max()].type() != Object ||
@@ -145,7 +146,7 @@ namespace mongo {
 
                 warning() << "got invalid chunk version " << chunkVersion << " in document " << diffChunkDoc
                           << " when trying to load differing chunks at version "
-                          << ShardChunkVersion( _maxVersion->toLong(), currEpoch ) << endl;
+                          << ChunkVersion( _maxVersion->toLong(), currEpoch ) << endl;
 
                 // Don't keep loading, since we know we'll be broken here
                 return -1;
@@ -158,7 +159,7 @@ namespace mongo {
 
             // Chunk version changes
             ShardType shard = shardFor( diffChunkDoc[ChunkType::shard()].String() );
-            typename map<ShardType, ShardChunkVersion>::iterator shardVersionIt = _maxShardVersions->find( shard );
+            typename map<ShardType, ChunkVersion>::iterator shardVersionIt = _maxShardVersions->find( shard );
             if( shardVersionIt == _maxShardVersions->end() || shardVersionIt->second < chunkVersion ){
                 (*_maxShardVersions)[ shard ] = chunkVersion;
             }
@@ -198,7 +199,7 @@ namespace mongo {
 
     template < class ValType, class ShardType >
     Query ConfigDiffTracker<ValType,ShardType>::
-        configDiffQuery( const set<ShardChunkVersion>& extraMinorVersions ) const
+        configDiffQuery( const set<ChunkVersion>& extraMinorVersions ) const
     {
         verifyAttached();
 
@@ -246,7 +247,7 @@ namespace mongo {
             // Get any shard version changes higher than we know currently
             // Needed since there could have been a split of the max version chunk of any shard
             // TODO: Ideally, we shouldn't care about these
-            for( typename map<ShardType, ShardChunkVersion>::const_iterator it = _maxShardVersions->begin(); it != _maxShardVersions->end(); it++ ){
+            for( typename map<ShardType, ChunkVersion>::const_iterator it = _maxShardVersions->begin(); it != _maxShardVersions->end(); it++ ){
 
                 BSONObjBuilder queryShardB( queryOrB.subobjStart() );
                 queryShardB.append(ChunkType::shard(), nameFrom( it->first ) );
@@ -260,14 +261,14 @@ namespace mongo {
 
             // Get any minor version changes we've marked as interesting
             // TODO: Ideally we shouldn't care about these
-            for( set<ShardChunkVersion>::const_iterator it = extraMinorVersions.begin(); it != extraMinorVersions.end(); it++ ){
+            for( set<ChunkVersion>::const_iterator it = extraMinorVersions.begin(); it != extraMinorVersions.end(); it++ ){
 
                 BSONObjBuilder queryShardB( queryOrB.subobjStart() );
                 {
                     BSONObjBuilder ts(queryShardB.subobjStart(ChunkType::DEPRECATED_lastmod()));
                     ts.appendTimestamp( "$gt", it->toLong() );
                     ts.appendTimestamp( "$lt",
-                                        ShardChunkVersion( it->majorVersion() + 1, 0, OID() ).toLong() );
+                                        ChunkVersion( it->majorVersion() + 1, 0, OID() ).toLong() );
                     ts.done();
                 }
                 queryShardB.done();

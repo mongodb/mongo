@@ -57,6 +57,7 @@
 #include "mongo/db/security.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/s/d_logic.h"
+#include "mongo/s/stale_exception.h" // for SendStaleConfigException
 #include "mongo/util/file_allocator.h"
 #include "mongo/util/goodies.h"
 #include "mongo/util/mongoutils/str.h"
@@ -86,7 +87,6 @@ namespace mongo {
 #ifdef _WIN32
     HANDLE lockFileHandle;
 #endif
-
 
     /*static*/ OpTime OpTime::_now() {
         OpTime result;
@@ -378,10 +378,7 @@ namespace mongo {
         globalOpCounters.gotOp( op , isCommand );
 
         Client& c = cc();
-        if (c.getAuthenticationInfo()) {
-            c.getAuthenticationInfo()->startRequest();
-            c.getAuthorizationManager()->startRequest();
-        }
+        c.getAuthorizationManager()->startRequest();
         
         auto_ptr<CurOp> nestedOp;
         CurOp* currentOpP = c.curop();
@@ -493,7 +490,8 @@ namespace mongo {
                 profile(c, op, currentOp);
             }
         }
-        
+
+        debug.recordStats();
         debug.reset();
     } /* assembleResponse() */
 
@@ -630,6 +628,7 @@ namespace mongo {
                 
                 long long n = deleteObjects(ns, pattern, justOne, true);
                 lastError.getSafe()->recordDelete( n );
+                op.debug().ndeleted = n;
                 break;
             }
             catch ( PageFaultException& e ) {
@@ -782,7 +781,7 @@ namespace mongo {
         logOp("i", ns, js);
     }
 
-    NOINLINE_DECL void insertMulti(bool keepGoing, const char *ns, vector<BSONObj>& objs) {
+    NOINLINE_DECL void insertMulti(bool keepGoing, const char *ns, vector<BSONObj>& objs, CurOp& op) {
         size_t i;
         for (i=0; i<objs.size(); i++){
             try {
@@ -798,6 +797,7 @@ namespace mongo {
         }
 
         globalOpCounters.incInsertInWriteLock(i);
+        op.debug().ninserted = i;
     }
 
     void receivedInsert(Message& m, CurOp& op) {
@@ -840,12 +840,13 @@ namespace mongo {
                 
                 if( !multi.empty() ) {
                     const bool keepGoing = d.reservedField() & InsertOption_ContinueOnError;
-                    insertMulti(keepGoing, ns, multi);
+                    insertMulti(keepGoing, ns, multi, op);
                     return;
                 }
                 
                 checkAndInsert(ns, first);
                 globalOpCounters.incInsertInWriteLock(1);
+                op.debug().ninserted = 1;
                 return;
             }
             catch ( PageFaultException& e ) {

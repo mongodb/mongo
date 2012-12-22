@@ -22,7 +22,7 @@ try {
 
     function profileCursor( query ) {
         query = query || {};
-        Object.extend( query, { user:username } );
+        Object.extend( query, { user:username + "@" + db.getName() } );
         return db.system.profile.find( query );
     }
     

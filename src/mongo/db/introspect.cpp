@@ -19,6 +19,8 @@
 #include "mongo/pch.h"
 
 #include "mongo/bson/util/builder.h"
+#include "mongo/db/auth/authorization_manager.h"
+#include "mongo/db/auth/principal_set.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/databaseholder.h"
 #include "mongo/db/introspect.h"
@@ -32,11 +34,44 @@ namespace {
 
 namespace mongo {
 
+namespace {
+    void _appendUserInfo(const Client& c, BSONObjBuilder& builder, AuthorizationManager* authManager) {
+        PrincipalSet::NameIterator nameIter = authManager->getAuthenticatedPrincipalNames();
+
+        string bestUser;
+
+        StringData opdb( nsToDatabaseSubstring( c.ns() ) );
+
+        BSONArrayBuilder allUsers(builder.subarrayStart("allUsers"));
+        for ( ; nameIter.more(); nameIter.next()) {
+            const string& name = nameIter->getFullName();
+            allUsers.append(name);
+
+            if ( bestUser.size() == 0 ) {
+                bestUser = name;
+            }
+            else {
+                size_t idx = name.find( '@' );
+                if ( idx >= 0 ) {
+                    StringData db = StringData(name).substr( idx + 1 );
+                    log() << "eliot : " << db << " " << opdb << endl;
+                    if ( opdb == db )
+                        bestUser = name;
+                }
+            }
+        }
+        allUsers.doneFast();
+
+        builder.append("user", bestUser );
+
+    }
+} // namespace
+
     static void _profile(const Client& c, CurOp& currentOp, BufBuilder& profileBufBuilder) {
         Database *db = c.database();
         DEV verify( db );
         const char *ns = db->profileName.c_str();
-        
+
         // build object
         BSONObjBuilder b(profileBufBuilder);
 
@@ -46,9 +81,8 @@ namespace mongo {
         b.appendDate("ts", jsTime());
         b.append("client", c.clientAddress());
 
-        if (c.getAuthenticationInfo()) {
-            b.append("user", c.getAuthenticationInfo()->getUser(nsToDatabase(ns)));
-        }
+        AuthorizationManager* authManager = c.getAuthorizationManager();
+        _appendUserInfo(c, b, authManager);
 
         BSONObj p = b.done();
 
@@ -61,8 +95,7 @@ namespace mongo {
             BSONObjBuilder b(profileBufBuilder);
             b.appendDate("ts", jsTime());
             b.append("client", c.clientAddress() );
-            if ( c.getAuthenticationInfo() )
-                b.append( "user" , c.getAuthenticationInfo()->getUser( nsToDatabase( ns ) ) );
+            _appendUserInfo(c, b, authManager);
 
             b.append("err", "profile line too large (max is 100KB)");
 
@@ -92,7 +125,7 @@ namespace mongo {
         try {
             Lock::DBWrite lk( currentOp.getNS() );
             if ( dbHolder()._isLoaded( nsToDatabase( currentOp.getNS() ) , dbpath ) ) {
-                Client::Context cx( currentOp.getNS(), dbpath, false );
+                Client::Context cx(currentOp.getNS(), dbpath);
                 _profile(c, currentOp, profileBufBuilder);
             }
             else {

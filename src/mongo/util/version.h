@@ -29,7 +29,6 @@ namespace mongo {
     extern const char versionString[];
     extern const BSONArray versionArray;
     std::string mongodVersion();
-    int versionCmp(StringData rhs, StringData lhs); // like strcmp
 
     void appendBuildInfo(BSONObjBuilder& result);
 

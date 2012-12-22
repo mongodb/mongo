@@ -20,6 +20,8 @@
 
 #include <string>
 
+#include "mongo/util/assert_util.h"
+
 namespace mongo {
 
     using std::string;

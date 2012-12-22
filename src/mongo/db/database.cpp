@@ -16,15 +16,18 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "pch.h"
-#include "pdfile.h"
-#include "database.h"
-#include "instance.h"
-#include "introspect.h"
-#include "clientcursor.h"
-#include "databaseholder.h"
+#include "mongo/pch.h"
+
+#include "mongo/db/database.h"
 
 #include <boost/filesystem/operations.hpp>
+
+#include "mongo/db/auth/auth_index_d.h"
+#include "mongo/db/clientcursor.h"
+#include "mongo/db/databaseholder.h"
+#include "mongo/db/instance.h"
+#include "mongo/db/introspect.h"
+#include "mongo/db/pdfile.h"
 
 namespace mongo {
 
@@ -88,7 +91,7 @@ namespace mongo {
 #endif
             }
             newDb = namespaceIndex.exists();
-            profile = cmdLine.defaultProfile;
+            _profile = cmdLine.defaultProfile;
             checkDuplicateUncasedNames(true);
             // If already exists, open.  Otherwise behave as if empty until
             // there's a write, then open.
@@ -364,7 +367,7 @@ namespace mongo {
 
 
     bool Database::setProfilingLevel( int newLevel , string& errmsg ) {
-        if ( profile == newLevel )
+        if ( _profile == newLevel )
             return true;
 
         if ( newLevel < 0 || newLevel > 2 ) {
@@ -373,7 +376,7 @@ namespace mongo {
         }
 
         if ( newLevel == 0 ) {
-            profile = 0;
+            _profile = 0;
             return true;
         }
 
@@ -382,7 +385,7 @@ namespace mongo {
         if (!getOrCreateProfileCollection(this, true, &errmsg))
             return false;
 
-        profile = newLevel;
+        _profile = newLevel;
         return true;
     }
 
@@ -444,6 +447,8 @@ namespace mongo {
             m[dbname] = db;
             _size++;
         }
+
+        authindex::configureSystemIndexes(dbname);
 
         return db;
     }

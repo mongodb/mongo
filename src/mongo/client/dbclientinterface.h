@@ -581,9 +581,7 @@ namespace mongo {
 
         /** Run a database command.  Database commands are represented as BSON objects.  Common database
             commands have prebuilt helper functions -- see below.  If a helper is not available you can
-            directly call runCommand.  If _authTable has been set, will append a BSON representation of
-            that AuthenticationTable to the command object, unless an AuthenticationTable object has been
-            passed to this method directly, in which case it will use that instead of _authTable.
+            directly call runCommand.
 
             @param dbname database name.  Use "admin" for global administrative commands.
             @param cmd  the command object to execute.  For example, { ismaster : 1 }

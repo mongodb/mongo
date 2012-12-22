@@ -43,9 +43,11 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/pagefault.h"
 #include "mongo/db/repl/rs.h"
-#include "mongo/s/d_logic.h"
-#include "mongo/scripting/engine.h"
 #include "mongo/db/security.h"
+#include "mongo/s/chunk_version.h"
+#include "mongo/s/d_logic.h"
+#include "mongo/s/stale_exception.h" // for SendStaleConfigException
+#include "mongo/scripting/engine.h"
 #include "mongo/util/file_allocator.h"
 #include "mongo/util/mongoutils/checksum.h"
 #include "mongo/util/mongoutils/html.h"
@@ -64,7 +66,7 @@ namespace mongo {
 
     struct StackChecker { 
 #if defined(_WIN32)
-        enum { SZ = 322 * 1024 };
+        enum { SZ = 330 * 1024 };
 #elif defined(__APPLE__) && defined(__MACH__)
         enum { SZ = 362 * 1024 };
 #elif defined(__linux__)
@@ -191,7 +193,7 @@ namespace mongo {
     }
 
     BSONObj CachedBSONObj::_tooBig = fromjson("{\"$msg\":\"query not recording (too large)\"}");
-    Client::Context::Context( const std::string& ns , Database * db, bool doauth ) :
+    Client::Context::Context(const std::string& ns , Database * db) :
         _client( currentClient.get() ), 
         _oldContext( _client->_context ),
         _path( mongo::dbpath ), // is this right? could be a different db? may need a dassert for this
@@ -204,7 +206,7 @@ namespace mongo {
         _client->_context = this;
     }
 
-    Client::Context::Context(const string& ns, const std::string& path , bool doauth, bool doVersion ) :
+    Client::Context::Context(const string& ns, const std::string& path, bool doVersion) :
         _client( currentClient.get() ), 
         _oldContext( _client->_context ),
         _path( path ), 
@@ -213,18 +215,18 @@ namespace mongo {
         _ns( ns ), 
         _db(0) 
     {
-        _finishInit( doauth );
+        _finishInit();
     }
        
     /** "read lock, and set my context, all in one operation" 
      *  This handles (if not recursively locked) opening an unopened database.
      */
-    Client::ReadContext::ReadContext(const string& ns, const std::string& path, bool doauth ) {
+    Client::ReadContext::ReadContext(const string& ns, const std::string& path) {
         {
             lk.reset( new Lock::DBRead(ns) );
             Database *db = dbHolder().get(ns, path);
             if( db ) {
-                c.reset( new Context(path, ns, db, doauth) );
+                c.reset( new Context(path, ns, db) );
                 return;
             }
         }
@@ -235,17 +237,17 @@ namespace mongo {
             if( Lock::isW() ) { 
                 // write locked already
                 DEV RARELY log() << "write locked on ReadContext construction " << ns << endl;
-                c.reset( new Context(ns, path, doauth) );
+                c.reset(new Context(ns, path));
             }
             else if( !Lock::nested() ) { 
                 lk.reset(0);
                 {
                     Lock::GlobalWrite w;
-                    Context c(ns, path, doauth);
+                    Context c(ns, path);
                 }
                 // db could be closed at this interim point -- that is ok, we will throw, and don't mind throwing.
                 lk.reset( new Lock::DBRead(ns) );
-                c.reset( new Context(ns, path, doauth) );
+                c.reset(new Context(ns, path));
             }
             else { 
                 uasserted(15928, str::stream() << "can't open a database from a nested read lock " << ns);
@@ -257,9 +259,9 @@ namespace mongo {
         //       it would be easy to first check that there is at least a .ns file, or something similar.
     }
 
-    Client::WriteContext::WriteContext(const string& ns, const std::string& path , bool doauth ) 
+    Client::WriteContext::WriteContext(const string& ns, const std::string& path)
         : _lk( ns ) ,
-          _c( ns , path , doauth ) {
+          _c(ns, path) {
     }
 
 
@@ -271,8 +273,8 @@ namespace mongo {
             break;
         default: {
             string errmsg;
-            ShardChunkVersion received;
-            ShardChunkVersion wanted;
+            ChunkVersion received;
+            ChunkVersion wanted;
             if ( ! shardVersionOk( _ns , errmsg, received, wanted ) ) {
                 ostringstream os;
                 os << "[" << _ns << "] shard version not ok in Client::Context: " << errmsg;
@@ -283,7 +285,7 @@ namespace mongo {
     }
 
     // invoked from ReadContext
-    Client::Context::Context(const string& path, const string& ns, Database *db , bool doauth) :
+    Client::Context::Context(const string& path, const string& ns, Database *db) :
         _client( currentClient.get() ), 
         _oldContext( _client->_context ),
         _path( path ), 
@@ -298,7 +300,7 @@ namespace mongo {
         _client->_curOp->enter( this );
     }
        
-    void Client::Context::_finishInit( bool doauth ) {
+    void Client::Context::_finishInit() {
         dassert( Lock::isLocked() );
         int writeLocked = Lock::somethingWriteLocked();
         if ( writeLocked && FileAllocator::get()->hasFailed() ) {
@@ -565,6 +567,8 @@ namespace mongo {
         idhack = false;
         scanAndOrder = false;
         nupdated = -1;
+        ninserted = -1;
+        ndeleted = -1;
         nmoved = -1;
         fastmod = false;
         fastmodinsert = false;
@@ -612,6 +616,8 @@ namespace mongo {
         OPDEBUG_TOSTRING_HELP_BOOL( scanAndOrder );
         OPDEBUG_TOSTRING_HELP( nmoved );
         OPDEBUG_TOSTRING_HELP( nupdated );
+        OPDEBUG_TOSTRING_HELP( ninserted );
+        OPDEBUG_TOSTRING_HELP( ndeleted );
         OPDEBUG_TOSTRING_HELP_BOOL( fastmod );
         OPDEBUG_TOSTRING_HELP_BOOL( fastmodinsert );
         OPDEBUG_TOSTRING_HELP_BOOL( upsert );
@@ -703,6 +709,8 @@ namespace mongo {
         OPDEBUG_APPEND_BOOL( moved );
         OPDEBUG_APPEND_NUMBER( nmoved );
         OPDEBUG_APPEND_NUMBER( nupdated );
+        OPDEBUG_APPEND_NUMBER( ninserted );
+        OPDEBUG_APPEND_NUMBER( ndeleted );
         OPDEBUG_APPEND_BOOL( fastmod );
         OPDEBUG_APPEND_BOOL( fastmodinsert );
         OPDEBUG_APPEND_BOOL( upsert );

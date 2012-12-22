@@ -22,10 +22,6 @@
 
 namespace mongo {
 
-    static const char USER_FIELD[] = "user";
-    static const char USER_SOURCE_FIELD[] = "userSource";
-    static const char PASSWORD_FIELD[] = "pwd";
-
     AuthExternalState::AuthExternalState() {}
     AuthExternalState::~AuthExternalState() {}
 
@@ -38,8 +34,10 @@ namespace mongo {
                               "key file must be used to log in with internal user",
                               15889);
             }
-            *result = BSON(USER_FIELD << internalSecurity.user <<
-                           PASSWORD_FIELD << internalSecurity.pwd).getOwned();
+            *result = BSON(AuthorizationManager::USER_NAME_FIELD_NAME <<
+                           internalSecurity.user <<
+                           AuthorizationManager::PASSWORD_FIELD_NAME <<
+                           internalSecurity.pwd).getOwned();
             return Status::OK();
         }
 
@@ -47,12 +45,13 @@ namespace mongo {
 
         BSONObj userBSONObj;
         BSONObjBuilder queryBuilder;
-        queryBuilder.append(USER_FIELD, principalName.getUser());
+        queryBuilder.append(AuthorizationManager::USER_NAME_FIELD_NAME, principalName.getUser());
         if (principalName.getDB() == dbname) {
-            queryBuilder.appendNull(USER_SOURCE_FIELD);
+            queryBuilder.appendNull(AuthorizationManager::USER_SOURCE_FIELD_NAME);
         }
         else {
-            queryBuilder.append(USER_SOURCE_FIELD, principalName.getDB());
+            queryBuilder.append(AuthorizationManager::USER_SOURCE_FIELD_NAME,
+                                principalName.getDB());
         }
 
         bool found = _findUser(usersNamespace, queryBuilder.obj(), &userBSONObj);

@@ -42,7 +42,7 @@ namespace mongo {
         Client::ReadContext ctx(ns);
         {
 
-            NamespaceDetails *nsd = nsdetails(ns.c_str());
+            NamespaceDetails *nsd = nsdetails(ns);
             uassert( 16154, "namespace does not exist", nsd );
             
             for( DiskLoc L = nsd->firstExtent; !L.isNull(); L = L.ext()->xnext )  {

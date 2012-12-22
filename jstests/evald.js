@@ -53,16 +53,46 @@ function doIt( ev, wait, where ) {
 
 }
 
-doIt( "db.jstests_evald.count( { $where: function() { while( 1 ) { sleep(1); } } } )", true, true );
-doIt( "db.jstests_evald.count( { $where: function() { while( 1 ) { sleep(1); } } } )", false, true );
-doIt( "while( true ) { sleep(1);}", false );
-doIt( "while( true ) { sleep(1);}", true );
+// nested scope with nested invoke()
+doIt("db.jstests_evald.count( { $where: function() { while(1) { sleep(1); } } } )", true, true);
+doIt("db.jstests_evald.count( { $where: function() { while(1) { sleep(1); } } } )", false, true);
+
+// simple tight loop tests with callback
+doIt("while(1) { sleep(1); }", false);
+doIt("while(1) { sleep(1); }", true);
+
+// simple tight loop tests without callback
+doIt("while(1) {;}", false);
+doIt("while(1) {;}", true);
 
 // the for loops are currently required, as a spawned op masks the parent op - see SERVER-1931
-doIt( "while( 1 ) { for( var i = 0; i < 10000; ++i ) {;} db.jstests_evald.count( {i:10} ); }", true );
-doIt( "while( 1 ) { for( var i = 0; i < 10000; ++i ) {;} db.jstests_evald.count( {i:10} ); }", false );
-doIt( "while( 1 ) { for( var i = 0; i < 10000; ++i ) {;} db.jstests_evald.count(); }", true );
-doIt( "while( 1 ) { for( var i = 0; i < 10000; ++i ) {;} db.jstests_evald.count(); }", false );
+doIt("while(1) { for( var i = 0; i < 10000; ++i ) {;} db.jstests_evald.count({i:10}); }", true);
+doIt("while(1) { for( var i = 0; i < 10000; ++i ) {;} db.jstests_evald.count({i:10}); }", false);
+doIt("while(1) { for( var i = 0; i < 10000; ++i ) {;} db.jstests_evald.count(); }", true);
+doIt("while(1) { for( var i = 0; i < 10000; ++i ) {;} db.jstests_evald.count(); }", false);
 
-doIt( "while( 1 ) { for( var i = 0; i < 10000; ++i ) {;} try { db.jstests_evald.count( {i:10} ); } catch ( e ) { } }", true );
-doIt( "while( 1 ) { try { while( 1 ) { sleep(1); } } catch ( e ) { } }", true );
+// try/catch with tight-loop kill tests.  Catch testing is important
+// due to v8::TerminateExecution internals.
+// native callback with nested invoke(), drop JS exceptions
+doIt("while(1) {                                  " +
+     "   for(var i = 0; i < 10000; ++i) {;}       " +
+     "   try {                                    " +
+     "      db.jstests_evald.count({i:10});       " +
+     "   } catch (e) {}                           " +
+     "}", true );
+
+// native callback, drop JS exceptions
+doIt("while(1) {            " +
+     "  try {               " +
+     "      while(1) {      " +
+     "          sleep(1);   " +
+     "      }               " +
+     "  } catch (e) {}      " +
+     "}", true );
+
+// no native callback and drop JS exceptions
+doIt("while(1) {              " +
+     "   try {                " +
+     "       while(1) {;}     " +
+     "   } catch (e) {}       " +
+     "}", true );

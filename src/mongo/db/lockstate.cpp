@@ -203,9 +203,9 @@ namespace mongo {
         _otherCount = type;
     }
 
-    void LockState::lockedOther( const string& other , int type , WrapperForRWLock* lock ) {
+    void LockState::lockedOther( const StringData& other , int type , WrapperForRWLock* lock ) {
         fassert( 16170 , _otherCount == 0 );
-        _otherName = other;
+        _otherName = other.toString();
         _otherCount = type;
         _otherLock = lock;
     }

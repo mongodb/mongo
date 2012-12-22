@@ -531,7 +531,7 @@ namespace mongo {
                 // idx may point at an invalid index entry at this point
             }
             catch(...) {
-                if( cc().database() && nsdetails(ns.c_str()) == d ) {
+                if( cc().database() && nsdetails(ns) == d ) {
                     done(ns.c_str());
                 }
                 else {

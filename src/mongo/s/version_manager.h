@@ -1,7 +1,5 @@
-// @file shard_version.h
-
 /**
-*    Copyright (C) 2010 10gen Inc.
+*    Copyright (C) 2008 10gen Inc.
 *
 *    This program is free software: you can redistribute it and/or  modify
 *    it under the terms of the GNU Affero General Public License, version 3,
@@ -18,15 +16,26 @@
 
 #pragma once
 
+#include "mongo/db/jsobj.h"
+
 namespace mongo {
 
-    /*
-     * Install chunk shard version callbacks in shardconnection code. This activates
-     * the chunk shard version control that mongos needs.
-     *
-     * MUST be called before accepting any connections.
-     */
-    void installChunkShardVersioning();
+    class ShardConnection;
+    class DBClientBase;
 
+    class VersionManager {
+    public:
+        VersionManager(){};
 
-}  // namespace mongo
+        bool isVersionableCB( DBClientBase* );
+        bool initShardVersionCB( DBClientBase*, BSONObj& );
+        bool forceRemoteCheckShardVersionCB( const string& );
+        bool checkShardVersionCB( DBClientBase*, const string&, bool, int );
+        bool checkShardVersionCB( ShardConnection*, bool, int );
+        void resetShardVersionCB( DBClientBase* );
+
+    };
+
+    extern VersionManager versionManager;
+
+} // namespace mongo

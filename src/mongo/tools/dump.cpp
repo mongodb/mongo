@@ -330,7 +330,7 @@ public:
     }
 
     void _repair( Database* db , string ns , boost::filesystem::path outfile ){
-        NamespaceDetails * nsd = nsdetails( ns.c_str() );
+        NamespaceDetails * nsd = nsdetails( ns );
         log() << "nrecords: " << nsd->stats.nrecords 
               << " datasize: " << nsd->stats.datasize 
               << " firstExtent: " << nsd->firstExtent 

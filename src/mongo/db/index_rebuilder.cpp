@@ -55,7 +55,7 @@ namespace mongo {
             BSONObj nsDoc = cursor->next();
             const char* ns = nsDoc["name"].valuestrsafe();
 
-            Client::Context ctx(ns, dbpath, false, false);
+            Client::Context ctx(ns, dbpath, false);
             NamespaceDetails* nsd = nsdetails(ns);
 
             if (!nsd || !nsd->indexBuildsInProgress) {

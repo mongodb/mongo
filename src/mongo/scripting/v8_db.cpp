@@ -62,12 +62,14 @@ namespace {
 
     static v8::Handle<v8::Value> newInstance( v8::Function* f, const v8::Arguments& args ) {
         // need to translate arguments into an array
+        v8::HandleScope handle_scope;
         int argc = args.Length();
-        scoped_array< Handle<Value> > argv( new Handle<Value>[argc] );
-        for (int i = 0; i < argc; ++i) {
+        // TODO SERVER-8016: properly allocate handles on the stack
+        v8::Handle<v8::Value> argv[24];
+        for (int i = 0; i < argc && i < 24; ++i) {
             argv[i] = args[i];
         }
-        return f->NewInstance(argc, argv.get());
+        return handle_scope.Close(f->NewInstance(argc, argv));
     }
 
     v8::Handle<v8::FunctionTemplate> getMongoFunctionTemplate( V8Scope* scope, bool local ) {
@@ -242,10 +244,7 @@ namespace {
 
 
         DBClientWithCommands * conn;
-        {
-            //V8Unlock ul;
-            conn = cs.connect( errmsg );
-        }
+        conn = cs.connect( errmsg );
         if ( ! conn )
             return v8::ThrowException( v8::String::New( errmsg.c_str() ) );
 
@@ -253,7 +252,6 @@ namespace {
         self.MakeWeak( conn , destroyConnection );
 
         {
-            //V8Unlock ul;
             ScriptEngine::runConnectCallback( *conn );
         }
 
@@ -270,10 +268,7 @@ namespace {
             return v8::ThrowException( v8::String::New( "local Mongo constructor takes no args" ) );
 
         DBClientBase * conn;
-        {
-            //V8Unlock ul;
-            conn = createDirectClient();
-        }
+        conn = createDirectClient();
 
         Persistent<v8::Object> self = Persistent<v8::Object>::New( args.This() );
         self.MakeWeak( conn , destroyConnection );
@@ -337,18 +332,13 @@ namespace {
             int nToSkip = (int)(args[4]->ToNumber()->Value());
             int batchSize = (int)(args[5]->ToNumber()->Value());
             int options = (int)(args[6]->ToNumber()->Value());
-            {
-                //V8Unlock u;
-                cursor = conn->query( ns.get(), q ,  nToReturn , nToSkip , haveFields ? &fields : 0, options , batchSize );
-                if ( ! cursor.get() ) 
-                    return v8::ThrowException( v8::String::New( "error doing query: failed" ) );
+            cursor = conn->query( ns.get(), q ,  nToReturn , nToSkip , haveFields ? &fields : 0, options , batchSize );
+            if (!cursor.get())
+                return v8::ThrowException(v8::String::New("error doing query: failed"));
+            v8::Function * cons = (v8::Function*)(*(mongo->Get(scope->getV8Str("internalCursor"))));
+            if (!cons) {
+                return v8::ThrowException(v8::String::New("Could not create a cursor"));
             }
-            v8::Function * cons = (v8::Function*)( *( mongo->Get( scope->getV8Str( "internalCursor" ) ) ) );
-            if ( !cons ) {
-                // may get here in case of thread termination
-                return v8::ThrowException( v8::String::New( "Could not create a cursor" ) );
-            }
-
             Persistent<v8::Object> c = Persistent<v8::Object>::New( cons->NewInstance() );
             c.MakeWeak( cursor.get() , destroyCursor );
             c->SetInternalField( 0 , External::New( cursor.release() ) );
@@ -393,7 +383,6 @@ namespace {
 
             DDD( "want to save batch : " << bos.length );
             try {
-                //V8Unlock u;
                 conn->insert( ns.get() , bos, flags->Int32Value() );
             }
             catch ( ... ) {
@@ -412,7 +401,6 @@ namespace {
 
             DDD( "want to save : " << o.jsonString() );
             try {
-                //V8Unlock u;
                 conn->insert( ns.get() , o );
             }
             catch ( ... ) {
@@ -444,7 +432,6 @@ namespace {
 
         DDD( "want to remove : " << o.jsonString() );
         try {
-            //V8Unlock u;
             conn->remove( ns.get() , o , justOne );
         }
         catch ( ... ) {
@@ -474,7 +461,6 @@ namespace {
         try {
             BSONObj q1 = scope->v8ToMongo( q );
             BSONObj o1 = scope->v8ToMongo( o );
-            //V8Unlock u;
             conn->update( ns.get() , q1 , o1 , upsert, multi );
         }
         catch ( ... ) {
@@ -561,10 +547,7 @@ namespace {
         if ( ! cursor )
             return v8::Undefined();
         BSONObj o;
-        {
-            //V8Unlock u;
-            o = cursor->next();
-        }
+        o = cursor->next();
         bool ro = false;
         if (args.This()->Has(scope->V8STR_RO))
             ro = args.This()->Get(scope->V8STR_RO)->BooleanValue();
@@ -576,10 +559,7 @@ namespace {
         if ( ! cursor )
             return Boolean::New( false );
         bool ret;
-        {
-            //V8Unlock u;
-            ret = cursor->more();
-        }
+        ret = cursor->more();
         return Boolean::New( ret );
     }
 
@@ -588,10 +568,7 @@ namespace {
         if ( ! cursor )
             return v8::Number::New( (double) 0 );
         int ret;
-        {
-            //V8Unlock u;
-            ret = cursor->objsLeftInBatch();
-        }
+        ret = cursor->objsLeftInBatch();
         return v8::Number::New( (double) ret );
     }
 
@@ -703,6 +680,8 @@ namespace {
     v8::Handle<v8::Value> collectionGetter( v8::Local<v8::String> name, const v8::AccessorInfo &info) {
         DDD( "collectionFallback [" << name << "]" );
 
+        TryCatch tryCatch;
+
         // first look in prototype, may be a function
         v8::Handle<v8::Value> real = info.This()->GetPrototype()->ToObject()->Get( name );
         if ( !real->IsUndefined() )
@@ -727,7 +706,6 @@ namespace {
         v8::Handle<v8::Value> getCollection = info.This()->GetPrototype()->ToObject()->Get( v8::String::New( "getCollection" ) );
         verify( getCollection->IsFunction() );
 
-        TryCatch tryCatch;
         v8::Function * f = (v8::Function*)(*getCollection);
         v8::Handle<v8::Value> argv[1];
         argv[0] = name;
@@ -1128,46 +1106,4 @@ namespace {
         return v8::Number::New( scope->v8ToMongo( args[ 0 ]->ToObject() ).objsize() );
     }
 
-    namespace v8Locks {
-        boost::mutex& __interruptMutex = *( new boost::mutex );
-
-        InterruptLock::InterruptLock() {
-            __interruptMutex.lock();
-        }
-
-        InterruptLock::~InterruptLock() {
-            __interruptMutex.unlock();
-        }
-
-        boost::mutex& __v8Mutex = *( new boost::mutex );
-        ThreadLocalValue< bool > __locked;
-
-        RecursiveLock::RecursiveLock() : _unlock() {
-            if ( !__locked.get() ) {
-                __v8Mutex.lock();
-                __locked.set( true );
-                _unlock = true;
-            }
-        }
-        RecursiveLock::~RecursiveLock() {
-            if ( _unlock ) {
-                __v8Mutex.unlock();
-                __locked.set( false );
-            }
-        }
-
-        RecursiveUnlock::RecursiveUnlock() : _lock() {
-            if ( __locked.get() ) {
-                __v8Mutex.unlock();
-                __locked.set( false );
-                _lock = true;
-            }
-        }
-        RecursiveUnlock::~RecursiveUnlock() {
-            if ( _lock ) {
-                __v8Mutex.lock();
-                __locked.set( true );
-            }
-        }
-    } // namespace v8Locks
 }

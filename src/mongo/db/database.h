@@ -139,14 +139,15 @@ namespace mongo {
     public: // this should be private later
 
         NamespaceIndex namespaceIndex;
-        int profile; // 0=off.
         const string profileName; // "alleyinsider.system.profile"
         CCByLoc ccByLoc;
         int magic; // used for making sure the object is still loaded in memory
 
+        int getProfilingLevel() const { return _profile; }
+
     private:
         RecordStats _recordStats;
-        
+        int _profile; // 0=off.
     };
 
 } // namespace mongo

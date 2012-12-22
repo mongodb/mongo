@@ -41,6 +41,7 @@ namespace mongo {
     class UnorderedFastKeyTable {
     public:
         typedef std::pair<K_S, V> value_type;
+        typedef K_L key_type;
         typedef V mapped_type;
 
     private:

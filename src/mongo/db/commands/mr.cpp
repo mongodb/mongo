@@ -17,21 +17,23 @@
  */
 
 #include "pch.h"
-#include "../db.h"
-#include "../instance.h"
-#include "../commands.h"
-#include "../../scripting/engine.h"
-#include "../../client/connpool.h"
-#include "../../client/parallel.h"
-#include "../matcher.h"
-#include "../clientcursor.h"
-#include "../replutil.h"
-#include "../../s/d_chunk_manager.h"
-#include "../../s/d_logic.h"
-#include "../../s/grid.h"
-#include "mongo/db/kill_current_op.h"
 
 #include "mr.h"
+
+#include "mongo/client/connpool.h"
+#include "mongo/client/parallel.h"
+#include "mongo/db/clientcursor.h"
+#include "mongo/db/commands.h"
+#include "mongo/db/db.h"
+#include "mongo/db/instance.h"
+#include "mongo/db/kill_current_op.h"
+#include "mongo/db/matcher.h"
+#include "mongo/db/replutil.h"
+#include "mongo/scripting/engine.h"
+#include "mongo/s/d_chunk_manager.h"
+#include "mongo/s/d_logic.h"
+#include "mongo/s/grid.h"
+#include "mongo/s/stale_exception.h"
 
 namespace mongo {
 
@@ -1070,7 +1072,7 @@ namespace mongo {
                         Lock::DBRead lock( config.ns );
                         // This context does no version check, safe b/c we checked earlier and have an
                         // open cursor
-                        Client::Context ctx( config.ns, dbpath, true, false );
+                        Client::Context ctx(config.ns, dbpath, false);
 
                         // obtain full cursor on data to apply mr to
                         shared_ptr<Cursor> temp = NamespaceDetailsTransient::getCursor( config.ns.c_str(), config.filter, config.sort );

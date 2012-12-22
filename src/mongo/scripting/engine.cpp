@@ -487,9 +487,9 @@ namespace mongo {
         }
     }
 
-    void ( *ScriptEngine::_connectCallback )( DBClientWithCommands & ) = 0;
-    const char * ( *ScriptEngine::_checkInterruptCallback )() = 0;
-    unsigned ( *ScriptEngine::_getInterruptSpecCallback )() = 0;
+    void (*ScriptEngine::_connectCallback)(DBClientWithCommands&) = 0;
+    const char* (*ScriptEngine::_checkInterruptCallback)() = 0;
+    unsigned (*ScriptEngine::_getCurrentOpIdCallback)() = 0;
 
     ScriptEngine * globalScriptEngine = 0;
 

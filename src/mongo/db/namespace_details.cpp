@@ -729,7 +729,7 @@ namespace mongo {
 
     void NamespaceDetailsTransient::computeIndexKeys() {
         _indexKeys.clear();
-        NamespaceDetails *d = nsdetails(_ns.c_str());
+        NamespaceDetails *d = nsdetails(_ns);
         if ( ! d )
             return;
         NamespaceDetails::IndexIterator i = d->ii();

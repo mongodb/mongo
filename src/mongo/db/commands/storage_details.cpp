@@ -775,7 +775,7 @@ namespace {
         }
 
         const string ns = dbname + "." + cmdObj.firstElement().valuestrsafe();
-        const NamespaceDetails* nsd = nsdetails(ns.c_str());
+        const NamespaceDetails* nsd = nsdetails(ns);
         if (!cmdLine.quiet) {
             tlog() << "CMD: storageDetails " << ns << ", analyze " << subCommandStr << endl;
         }

@@ -66,6 +66,11 @@ namespace mongo {
         }
     }
 
+    ErrorCodes::Error DBException::convertExceptionCode(int exCode) {
+        if (exCode == 0) return ErrorCodes::UnknownError;
+        return static_cast<ErrorCodes::Error>(exCode);
+    }
+
     void ExceptionInfo::append( BSONObjBuilder& b , const char * m , const char * c ) const {
         if ( msg.empty() )
             b.append( m , "unknown assertion" );

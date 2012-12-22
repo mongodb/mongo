@@ -190,7 +190,7 @@ namespace mongo {
         noTableScan(false), prealloc(true), preallocj(true), smallfiles(sizeof(int*) == 4),
         configsvr(false), quota(false), quotaFiles(8), cpu(false),
         durOptions(0), objcheck(true), oplogSize(0), defaultProfile(0),
-        slowMS(100), defaultLocalThresholdMillis(15), pretouch(0), moveParanoia( true ),
+        slowMS(100), defaultLocalThresholdMillis(15), pretouch(0), moveParanoia( false ),
         syncdelay(60), noUnixSocket(false), doFork(0), socket("/tmp"), maxConns(DEFAULT_MAX_CONN),
         logAppend(false), logWithSyslog(false)
     {

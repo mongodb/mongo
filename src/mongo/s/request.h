@@ -22,7 +22,6 @@
 #include "../util/net/message.h"
 #include "../db/dbmessage.h"
 #include "config.h"
-#include "util.h"
 
 namespace mongo {
 

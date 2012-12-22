@@ -154,8 +154,8 @@ namespace mongo {
         return all;
     }
 
-    bool Helpers::isEmpty(const char *ns, bool doAuth) {
-        Client::Context context(ns, dbpath, doAuth);
+    bool Helpers::isEmpty(const char *ns) {
+        Client::Context context(ns, dbpath);
         shared_ptr<Cursor> c = DataFileMgr::findAll(ns);
         return !c->ok();
     }
@@ -290,7 +290,7 @@ namespace mongo {
                 scoped_ptr<Cursor> c;
                 
                 {
-                    NamespaceDetails* nsd = nsdetails( ns.c_str() );
+                    NamespaceDetails* nsd = nsdetails( ns );
                     if ( ! nsd )
                         break;
                     

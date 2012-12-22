@@ -77,7 +77,7 @@ namespace replset {
             lk.reset(new Lock::DBWrite(ns)); 
         }
 
-        Client::Context ctx(ns, dbpath, false);
+        Client::Context ctx(ns, dbpath);
         ctx.getClient()->curop()->reset();
         // For non-initial-sync, we convert updates to upserts
         // to suppress errors when replaying oplog entries.

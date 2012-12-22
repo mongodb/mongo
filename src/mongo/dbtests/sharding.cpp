@@ -23,6 +23,7 @@
 #include "mongo/client/dbclientmockcursor.h"
 #include "mongo/client/parallel.h"
 #include "mongo/s/chunk_diff.h"
+#include "mongo/s/chunk_version.h"
 #include "mongo/s/type_chunk.h"
 
 namespace ShardingTests {
@@ -58,77 +59,6 @@ namespace ShardingTests {
         // Modding is bad, but don't really care in this case
         return max > 0 ? r % max : r;
     }
-
-    /**
-     * Tests parsing of BSON for versions.  In version 2.2, this parsing is meant to be very
-     * flexible so different formats can be tried and enforced later.
-     *
-     * Formats are:
-     *
-     * A) { vFieldName : <TSTYPE>, [ vFieldNameEpoch : <OID> ], ... }
-     * B) { fieldName : [ <TSTYPE>, <OID> ], ... }
-     *
-     * vFieldName is a specifyable name - usually "version" (default) or "lastmod".  <TSTYPE> is a
-     * type convertible to Timestamp, ideally Timestamp but also numeric.
-     * <OID> is a value of type OID.
-     *
-     */
-    class ShardVersionParsingTest {
-    public:
-        void run(){
-
-            {
-                // Legacy compatibility format (A)
-
-                BSONObjBuilder versionObjB;
-                versionObjB.appendTimestamp( "testVersion",
-                                             ShardChunkVersion( 1, 1, OID() ).toLong() );
-                versionObjB.append( "testVersionEpoch", OID::gen() );
-                BSONObj versionObj = versionObjB.obj();
-
-                ShardChunkVersion parsed =
-                        ShardChunkVersion::fromBSON( versionObj[ "testVersion" ] );
-
-                ASSERT( ShardChunkVersion::canParseBSON( versionObj[ "testVersion" ] ) );
-                ASSERT( parsed.majorVersion() == 1 );
-                ASSERT( parsed.minorVersion() == 1 );
-                ASSERT( ! parsed.epoch().isSet() );
-
-                parsed = ShardChunkVersion::fromBSON( versionObj, "testVersion" );
-
-                ASSERT( ShardChunkVersion::canParseBSON( versionObj, "testVersion" ) );
-                ASSERT( parsed.majorVersion() == 1 );
-                ASSERT( parsed.minorVersion() == 1 );
-                ASSERT( parsed.epoch().isSet() );
-            }
-
-            {
-                // Sub-array format (B)
-
-                BSONObjBuilder tsObjB;
-                tsObjB.appendTimestamp( "ts", ShardChunkVersion( 1, 1, OID() ).toLong() );
-                BSONObj tsObj = tsObjB.obj();
-
-                BSONObjBuilder versionObjB;
-                BSONArrayBuilder subArrB( versionObjB.subarrayStart( "testVersion" ) );
-                // Append this weird way so we're sure we get a timestamp type
-                subArrB.append( tsObj.firstElement() );
-                subArrB.append( OID::gen() );
-                subArrB.done();
-                BSONObj versionObj = versionObjB.obj();
-
-                ShardChunkVersion parsed =
-                        ShardChunkVersion::fromBSON( versionObj[ "testVersion" ] );
-
-                ASSERT( ShardChunkVersion::canParseBSON( versionObj[ "testVersion" ] ) );
-                ASSERT( ShardChunkVersion::canParseBSON( BSONArray( versionObj[ "testVersion" ].Obj() ) ) );
-                ASSERT( parsed.majorVersion() == 1 );
-                ASSERT( parsed.minorVersion() == 1 );
-                ASSERT( parsed.epoch().isSet() );
-            }
-        }
-
-    };
 
     //
     // Sets up a basic environment for loading chunks to/from the direct database connection
@@ -208,8 +138,8 @@ namespace ShardingTests {
             ASSERT(firstChunk[ChunkType::min()].Obj()[ "_id" ].type() == MinKey );
             ASSERT(firstChunk[ChunkType::max()].Obj()[ "_id" ].type() == MaxKey );
 
-            ShardChunkVersion version = ShardChunkVersion::fromBSON(firstChunk,
-                                                                    ChunkType::DEPRECATED_lastmod());
+            ChunkVersion version = ChunkVersion::fromBSON(firstChunk,
+                                                          ChunkType::DEPRECATED_lastmod());
 
             ASSERT( version.majorVersion() == 1 );
             ASSERT( version.minorVersion() == 0 );
@@ -271,8 +201,8 @@ namespace ShardingTests {
 
                 BSONObj chunk = cursor->next();
 
-                ShardChunkVersion version = ShardChunkVersion::fromBSON(chunk,
-                                                                        ChunkType::DEPRECATED_lastmod());
+                ChunkVersion version = ChunkVersion::fromBSON(chunk,
+                                                              ChunkType::DEPRECATED_lastmod());
 
                 ASSERT( version.majorVersion() == 1 );
                 ASSERT( version.isEpochSet() );
@@ -305,8 +235,8 @@ namespace ShardingTests {
 
             BSONObj firstChunk = client().findOne(ChunkType::ConfigNS, BSONObj()).getOwned();
 
-            ShardChunkVersion version = ShardChunkVersion::fromBSON(firstChunk,
-                                                                    ChunkType::DEPRECATED_lastmod());
+            ChunkVersion version = ChunkVersion::fromBSON(firstChunk,
+                                                          ChunkType::DEPRECATED_lastmod());
 
             // Make manager load existing chunks
             ChunkManagerPtr manager( new ChunkManager( collName(), ShardKeyPattern( BSON( "_id" << 1 ) ), false ) );
@@ -318,7 +248,7 @@ namespace ShardingTests {
 
             // Modify chunks collection
             BSONObjBuilder b;
-            ShardChunkVersion laterVersion = ShardChunkVersion( 2, 1, version.epoch() );
+            ChunkVersion laterVersion = ChunkVersion( 2, 1, version.epoch() );
             laterVersion.addToBSON(b, ChunkType::DEPRECATED_lastmod());
 
             client().update(ChunkType::ConfigNS, BSONObj(), BSON( "$set" << b.obj()));
@@ -340,7 +270,7 @@ namespace ShardingTests {
         bool _inverse;
 
         typedef map<BSONObj, BSONObj, BSONObjCmp> RangeMap;
-        typedef map<string, ShardChunkVersion> VersionMap;
+        typedef map<string, ChunkVersion> VersionMap;
 
         ChunkDiffUnitTest( bool inverse ) : _inverse( inverse ) {}
 
@@ -381,20 +311,20 @@ namespace ShardingTests {
         };
 
         // Allow validating with and without ranges (b/c our splits won't actually be updated by the diffs)
-        void validate( BSONArray chunks, ShardChunkVersion maxVersion, const VersionMap& maxShardVersions ){
+        void validate( BSONArray chunks, ChunkVersion maxVersion, const VersionMap& maxShardVersions ){
             validate( chunks, NULL, maxVersion, maxShardVersions );
         }
 
-        void validate( BSONArray chunks, const RangeMap& ranges, ShardChunkVersion maxVersion, const VersionMap& maxShardVersions ){
+        void validate( BSONArray chunks, const RangeMap& ranges, ChunkVersion maxVersion, const VersionMap& maxShardVersions ){
             validate( chunks, (RangeMap*)&ranges, maxVersion, maxShardVersions );
         }
 
         // Validates that the ranges and versions are valid given the chunks
-        void validate( const BSONArray& chunks, RangeMap* ranges, ShardChunkVersion maxVersion, const VersionMap& maxShardVersions ){
+        void validate( const BSONArray& chunks, RangeMap* ranges, ChunkVersion maxVersion, const VersionMap& maxShardVersions ){
 
             BSONObjIterator it( chunks );
             int chunkCount = 0;
-            ShardChunkVersion foundMaxVersion;
+            ChunkVersion foundMaxVersion;
             VersionMap foundMaxShardVersions;
 
             //
@@ -416,11 +346,11 @@ namespace ShardingTests {
                     ASSERT( chunkRange->second.woCompare( _inverse ? chunkDoc["min"].Obj() : chunkDoc["max"].Obj() ) == 0 );
                 }
 
-                ShardChunkVersion version =
-                    ShardChunkVersion::fromBSON(chunkDoc[ChunkType::DEPRECATED_lastmod()]);
+                ChunkVersion version =
+                    ChunkVersion::fromBSON(chunkDoc[ChunkType::DEPRECATED_lastmod()]);
                 if( version > foundMaxVersion ) foundMaxVersion = version;
 
-                ShardChunkVersion shardMaxVersion =
+                ChunkVersion shardMaxVersion =
                     foundMaxShardVersions[chunkDoc[ChunkType::shard()].String()];
                 if( version > shardMaxVersion ) {
                     foundMaxShardVersions[chunkDoc[ChunkType::shard()].String() ] = version;
@@ -437,7 +367,7 @@ namespace ShardingTests {
 
             for( VersionMap::iterator it = foundMaxShardVersions.begin(); it != foundMaxShardVersions.end(); it++ ){
 
-                ShardChunkVersion foundVersion = it->second;
+                ChunkVersion foundVersion = it->second;
                 VersionMap::const_iterator maxIt = maxShardVersions.find( it->first );
 
                 ASSERT( maxIt != maxShardVersions.end() );
@@ -457,7 +387,7 @@ namespace ShardingTests {
             BSONArrayBuilder chunksB;
 
             BSONObj lastSplitPt;
-            ShardChunkVersion version( 1, 0, OID() );
+            ChunkVersion version( 1, 0, OID() );
 
             //
             // Generate numChunks with a given key size over numShards
@@ -505,7 +435,7 @@ namespace ShardingTests {
 
             // Setup the empty ranges and versions first
             RangeMap ranges;
-            ShardChunkVersion maxVersion = ShardChunkVersion( 0, 0, OID() );
+            ChunkVersion maxVersion = ChunkVersion( 0, 0, OID() );
             VersionMap maxShardVersions;
 
             // Create a differ which will track our progress
@@ -669,7 +599,7 @@ namespace ShardingTests {
                 if( rand( 10 ) < 1 ){
                     diffs = chunks;
                     ranges.clear();
-                    maxVersion = ShardChunkVersion( 0, 0, OID() );
+                    maxVersion = ChunkVersion( 0, 0, OID() );
                     maxShardVersions.clear();
                 }
 
@@ -703,7 +633,6 @@ namespace ShardingTests {
 
         void setupTests() {
             add< serverandquerytests::test1 >();
-            add< ShardVersionParsingTest >();
             add< ChunkManagerCreateBasicTest >();
             add< ChunkManagerCreateFullTest >();
             add< ChunkManagerLoadBasicTest >();

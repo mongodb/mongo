@@ -1,0 +1,372 @@
+/**
+ *    Copyright (C) 2012 10gen Inc.
+ *
+ *    This program is free software: you can redistribute it and/or  modify
+ *    it under the terms of the GNU Affero General Public License, version 3,
+ *    as published by the Free Software Foundation.
+ *
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU Affero General Public License for more details.
+ *
+ *    You should have received a copy of the GNU Affero General Public License
+ *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
+#include "mongo/s/cluster_client_internal.h"
+
+#include <string>
+#include <vector>
+
+#include "mongo/client/connpool.h"
+#include "mongo/s/field_parser.h"
+#include "mongo/s/type_mongos.h"
+#include "mongo/s/type_shard.h"
+#include "mongo/s/type_changelog.h"
+#include "mongo/util/stringutils.h"
+
+namespace mongo {
+
+    using std::string;
+    using std::vector;
+    using mongoutils::str::stream;
+
+    Status checkClusterMongoVersions(const ConnectionString& configLoc,
+                                     const string& minMongoVersion)
+    {
+        scoped_ptr<ScopedDbConnection> connPtr;
+
+        //
+        // Find mongos pings in config server
+        //
+
+        try {
+            connPtr.reset(ScopedDbConnection::getInternalScopedDbConnection(configLoc, 30));
+            ScopedDbConnection& conn = *connPtr;
+            scoped_ptr<DBClientCursor> cursor(_safeCursor(conn->query(MongosType::ConfigNS,
+                                                                      Query())));
+
+            while (cursor->more()) {
+
+                BSONObj pingDoc = cursor->next();
+
+                MongosType ping;
+                string errMsg;
+                if (!ping.parseBSON(pingDoc, &errMsg) || !ping.isValid(&errMsg)) {
+                    warning() << "could not parse ping document: " << pingDoc << causedBy(errMsg)
+                              << endl;
+                }
+
+                string mongoVersion = "2.0";
+                // Hack to determine older mongos versions from ping format
+                if (!pingDoc[MongosType::waiting()].eoo()) mongoVersion = "2.2";
+                if (ping.getMongoVersion() != "") {
+                    mongoVersion = ping.getMongoVersion();
+                }
+
+                Date_t lastPing = ping.getPing();
+
+                long long quietIntervalMillis = static_cast<long long>(lastPing - jsTime());
+                long long quietIntervalSecs = quietIntervalMillis / 1000;
+                long long quietIntervalMins = quietIntervalSecs / 60;
+
+                // We assume that anything that hasn't pinged in 5 minutes is probably down
+                if (quietIntervalMins >= 5) {
+                    log() << "stale mongos detected " << quietIntervalMins << " minutes ago,"
+                          << " network location is " << pingDoc["_id"].String()
+                          << ", not checking version";
+                }
+                else {
+                    if (versionCmp(mongoVersion, minMongoVersion) < 0) {
+                        return Status(ErrorCodes::RemoteValidationError,
+                                      stream() << "version " << mongoVersion << " of mongos at "
+                                               << ping.getName()
+                                               << " is not compatible with the config update, "
+                                               << "you must wait 5 minutes "
+                                               << "after shutting down a pre-" << minMongoVersion
+                                               << " mongos");
+                    }
+                }
+            }
+        }
+        catch (const DBException& e) {
+            return e.toStatus("could not read mongos pings collection");
+        }
+
+        //
+        // Load shards from config server
+        //
+
+        vector<ConnectionString> shardLocs;
+
+        try {
+            ScopedDbConnection& conn = *connPtr;
+            scoped_ptr<DBClientCursor> cursor(_safeCursor(conn->query(ShardType::ConfigNS,
+                                                                      Query())));
+
+            while (cursor->more()) {
+
+                BSONObj shardDoc = cursor->next();
+
+                ShardType shard;
+                string errMsg;
+                if (!shard.parseBSON(shardDoc, &errMsg) || !shard.isValid(&errMsg)) {
+                    connPtr->done();
+                    return Status(ErrorCodes::UnsupportedFormat,
+                                  stream() << "invalid shard " << shardDoc
+                                           << " read from the config server" << causedBy(errMsg));
+                }
+
+                shardLocs.push_back(ConnectionString(shard.getHost()));
+            }
+        }
+        catch (const DBException& e) {
+            return e.toStatus("could not read shards collection");
+        }
+
+        connPtr->done();
+
+        //
+        // We've now got all the shard info from the config server, start contacting the shards
+        // and verifying their versions.
+        //
+
+        for (vector<ConnectionString>::iterator it = shardLocs.begin(); it != shardLocs.end(); ++it)
+        {
+            ConnectionString& shardLoc = *it;
+
+            vector<HostAndPort> servers = shardLoc.getServers();
+
+            for (vector<HostAndPort>::iterator serverIt = servers.begin();
+                    serverIt != servers.end(); ++serverIt)
+            {
+                ConnectionString serverLoc(serverIt->toString(true));
+
+                scoped_ptr<ScopedDbConnection> serverConnPtr;
+
+                bool resultOk;
+                BSONObj serverStatus;
+
+                try {
+                    serverConnPtr.reset(ScopedDbConnection::getInternalScopedDbConnection(serverLoc,
+                                                                                          30));
+                    ScopedDbConnection& serverConn = *serverConnPtr;
+
+                    resultOk = serverConn->runCommand("admin",
+                                                      BSON("serverStatus" << 1),
+                                                      serverStatus);
+                }
+                catch (const DBException& e) {
+                    warning() << "could not run server status command on " << serverLoc.toString()
+                              << causedBy(e) << ", you must manually verify this mongo server is "
+                              << "offline (for at least 5 minutes) or of a version >= 2.2" << endl;
+                    continue;
+                }
+
+                // TODO: Make running commands saner such that we can consolidate error handling
+                if (!resultOk) {
+                    return Status(ErrorCodes::UnknownError,
+                                  stream() << DBClientConnection::getLastErrorString(serverStatus)
+                                           << causedBy(serverStatus.toString()));
+                }
+
+                serverConnPtr->done();
+
+                verify(serverStatus["version"].type() == String);
+                string mongoVersion = serverStatus["version"].String();
+
+                if (versionCmp(mongoVersion, minMongoVersion) < 0) {
+                    return Status(ErrorCodes::RemoteValidationError,
+                                  stream() << "version " << mongoVersion << " of mongo server at "
+                                           << serverLoc.toString()
+                                           << " is not compatible with the config update");
+                }
+            }
+        }
+
+        return Status::OK();
+    }
+
+    Status _findAllCollections(const ConnectionString& configLoc,
+                               bool optionalEpochs,
+                               OwnedPointerMap<string, CollectionType>* collections)
+    {
+        scoped_ptr<ScopedDbConnection> connPtr;
+
+        try {
+            connPtr.reset(ScopedDbConnection::getInternalScopedDbConnection(configLoc, 30));
+
+            ScopedDbConnection& conn = *connPtr;
+            scoped_ptr<DBClientCursor> cursor(_safeCursor(conn->query(CollectionType::ConfigNS,
+                                                                      Query())));
+
+            while (cursor->more()) {
+
+                BSONObj collDoc = cursor->nextSafe();
+
+                CollectionType* coll = new CollectionType();
+                string errMsg;
+                coll->parseBSON(collDoc, &errMsg);
+
+                // Needed for the v3 to v4 upgrade
+                bool epochNotSet = !coll->getEpoch().isSet();
+                if (optionalEpochs && epochNotSet) {
+                    // Set our epoch to something here, just to allow
+                    coll->setEpoch(OID::gen());
+                }
+
+                if (errMsg != "" || !coll->isValid(&errMsg)) {
+                    return Status(ErrorCodes::UnsupportedFormat,
+                                  stream() << "invalid collection " << collDoc
+                                           << " read from the config server" << causedBy(errMsg));
+                }
+
+                if (coll->isDropped()) {
+                    continue;
+                }
+
+                if (optionalEpochs && epochNotSet) {
+                    coll->setEpoch(OID());
+                }
+
+                collections->mutableMap().insert(make_pair(coll->getNS(), coll));
+            }
+        }
+        catch (const DBException& e) {
+            return e.toStatus();
+        }
+
+        connPtr->done();
+        return Status::OK();
+    }
+
+    Status findAllCollections(const ConnectionString& configLoc,
+                              OwnedPointerMap<string, CollectionType>* collections)
+    {
+        return _findAllCollections(configLoc, false, collections);
+    }
+
+    Status findAllCollectionsV3(const ConnectionString& configLoc,
+                                OwnedPointerMap<string, CollectionType>* collections)
+    {
+        return _findAllCollections(configLoc, true, collections);
+    }
+
+    Status findAllChunks(const ConnectionString& configLoc,
+                         const string& ns,
+                         OwnedPointerVector<ChunkType>* chunks)
+    {
+        scoped_ptr<ScopedDbConnection> connPtr;
+        scoped_ptr<DBClientCursor> cursor;
+
+        try {
+            connPtr.reset(ScopedDbConnection::getInternalScopedDbConnection(configLoc, 30));
+            ScopedDbConnection& conn = *connPtr;
+            scoped_ptr<DBClientCursor> cursor(_safeCursor(conn->query(ChunkType::ConfigNS,
+                                                                      BSON(ChunkType::ns(ns)))));
+
+            while (cursor->more()) {
+
+                BSONObj chunkDoc = cursor->nextSafe();
+
+                ChunkType* chunk = new ChunkType();
+                string errMsg;
+                if (!chunk->parseBSON(chunkDoc, &errMsg) || !chunk->isValid(&errMsg)) {
+                    connPtr->done();
+                    return Status(ErrorCodes::UnsupportedFormat,
+                                  stream() << "invalid chunk " << chunkDoc
+                                           << " read from the config server" << causedBy(errMsg));
+                }
+
+                chunks->mutableVector().push_back(chunk);
+            }
+        }
+        catch (const DBException& e) {
+            return e.toStatus();
+        }
+
+        connPtr->done();
+        return Status::OK();
+    }
+
+    Status logConfigChange(const ConnectionString& configLoc,
+                           const string& clientHost,
+                           const string& ns,
+                           const string& description,
+                           const BSONObj& details)
+    {
+        //
+        // Duplicated here to avoid dependency issues
+        //
+
+        string changeID = stream() << getHostNameCached() << "-" << terseCurrentTime() << "-"
+                                   << OID::gen();
+
+        ChangelogType changelog;
+        changelog.setChangeID(changeID);
+        changelog.setServer(getHostNameCached());
+        changelog.setClientAddr(clientHost == "" ? "N/A" : clientHost);
+        changelog.setTime(jsTime());
+        changelog.setWhat(description);
+        changelog.setNS(ns);
+        changelog.setDetails(details);
+
+        log() << "about to log new metadata event: " << changelog.toBSON() << endl;
+
+        scoped_ptr<ScopedDbConnection> connPtr;
+
+        try {
+            connPtr.reset(ScopedDbConnection::getInternalScopedDbConnection(configLoc, 30));
+            ScopedDbConnection& conn = *connPtr;
+
+            // TODO: better way here
+            static bool createdCapped = false;
+            if (!createdCapped) {
+
+                try {
+                    conn->createCollection(ChangelogType::ConfigNS, 1024 * 1024 * 10, true);
+                }
+                catch (const DBException& e) {
+                    // don't care, someone else may have done this for us
+                    // if there's still a problem, caught in outer try
+                    LOG(1) << "couldn't create the changelog, continuing " << e << endl;
+                }
+
+                createdCapped = true;
+            }
+
+            conn->insert(ChangelogType::ConfigNS, changelog.toBSON());
+            _checkGLE(conn);
+        }
+        catch (const DBException& e) {
+            // if we got here, it means the config change is only in the log,
+            // it didn't make it to config.changelog
+            log() << "not logging config change: " << changeID << causedBy(e) << endl;
+            return e.toStatus();
+        }
+
+        connPtr->done();
+        return Status::OK();
+    }
+
+    // Helper function for safe writes to non-SCC config servers
+    void _checkGLE(ScopedDbConnection& conn) {
+        string error = conn->getLastError();
+        if (error != "") {
+            conn.done();
+            // TODO: Make error handling more consistent, throwing and re-catching makes things much
+            // simpler to manage
+            uasserted(16624, str::stream() << "operation failed" << causedBy(error));
+        }
+    }
+
+    // Helper function for safe cursors
+    DBClientCursor* _safeCursor(auto_ptr<DBClientCursor> cursor) {
+        // TODO: Make error handling more consistent, it's annoying that cursors error out by
+        // throwing exceptions *and* being empty
+        uassert(16625, str::stream() << "cursor not found, transport error", cursor.get());
+        return cursor.release();
+    }
+
+}

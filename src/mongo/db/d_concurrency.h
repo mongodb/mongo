@@ -163,7 +163,7 @@ namespace mongo {
 
             void lockTop(LockState&);
             void lockNestable(Nestable db);
-            void lockOther(const string& db);
+            void lockOther(const StringData& db);
             void lockDB(const string& ns);
             void unlockDB();
 
@@ -197,7 +197,7 @@ namespace mongo {
         class DBRead : public ScopedLock {
             void lockTop(LockState&);
             void lockNestable(Nestable db);
-            void lockOther(const string& db);
+            void lockOther(const StringData& db);
             void lockDB(const string& ns);
             void unlockDB();
 

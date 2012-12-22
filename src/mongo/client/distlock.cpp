@@ -1035,16 +1035,8 @@ namespace mongo {
                   << " minutes timeout." << endl;
     }
 
-    ScopedDistributedLock::ScopedDistributedLock(const ConnectionString& conn,
-                                                 const string& name,
-                                                 const string& why,
-                                                 int lockTryIntervalMillis,
-                                                 unsigned long long lockTimeout,
-                                                 bool asProcess) :
-            _lock(conn, name, lockTimeout, asProcess),
-            _why(why),
-            _lockTryIntervalMillis(lockTryIntervalMillis),
-            _acquired(false)
+    ScopedDistributedLock::ScopedDistributedLock(const ConnectionString& conn, const string& name) :
+            _lock(conn, name), _why(""), _lockTryIntervalMillis(1000), _acquired(false)
     {
     }
 
@@ -1054,7 +1046,7 @@ namespace mongo {
         }
     }
 
-    bool ScopedDistributedLock::tryAcquireOnce(string* errMsg) {
+    bool ScopedDistributedLock::tryAcquire(string* errMsg) {
         bool acquired = false;
         try {
             acquired = _lock.lock_try(_why, false, &_other);
@@ -1074,7 +1066,7 @@ namespace mongo {
         _lock.unlock(&_other);
     }
 
-    bool ScopedDistributedLock::tryAcquire(long long waitForMillis, string* errMsg) {
+    bool ScopedDistributedLock::acquire(long long waitForMillis, string* errMsg) {
 
         string dummy;
         if (!errMsg) errMsg = &dummy;
@@ -1085,7 +1077,7 @@ namespace mongo {
         while (!_acquired && (waitForMillis <= 0 || timer.millis() < waitForMillis)) {
 
             string acquireErrMsg;
-            _acquired = tryAcquireOnce(&acquireErrMsg);
+            _acquired = tryAcquire(&acquireErrMsg);
 
             if (_acquired) break;
 
@@ -1109,16 +1101,14 @@ namespace mongo {
 
         if (_acquired) {
             verify(!_other.isEmpty());
-        }
-        else {
-            *errMsg = str::stream() << "could not acquire distributed lock " << _lock._name
-                                    << " for " << _why << " after " << timer.seconds()
-                                    << "s, other lock may be held: " << _other << causedBy(errMsg);
+            return true;
         }
 
-        return _acquired;
+        *errMsg = str::stream() << "could not acquire distributed lock " << _lock._name << " for "
+                                << _why << " after " << timer.seconds()
+                                << "s, other lock may be held: " << _other << causedBy(errMsg);
+
+        return false;
     }
-
-
 
 }

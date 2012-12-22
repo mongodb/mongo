@@ -35,6 +35,7 @@
 #include "mongo/s/request.h"
 #include "mongo/s/shard.h"
 #include "mongo/s/type_shard.h"
+#include "mongo/s/version_manager.h"
 
 namespace mongo {
 

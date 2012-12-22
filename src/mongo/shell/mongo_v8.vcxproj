@@ -1225,6 +1225,8 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\third_party\run_if_newer.js" />
+    <None Include="..\..\third_party\v8\ChangeLog" />
+    <None Include="..\..\third_party\v8\ChangeLog_10gen" />
     <None Include="..\..\third_party\v8\src\apinatives.js" />
     <None Include="..\..\third_party\v8\src\array.js" />
     <None Include="..\..\third_party\v8\src\collection.js" />

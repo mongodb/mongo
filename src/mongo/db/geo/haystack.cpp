@@ -326,7 +326,7 @@ namespace mongo {
                  string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             string ns = dbname + "." + cmdObj.firstElement().valuestr();
 
-            NamespaceDetails *nsd = nsdetails(ns.c_str());
+            NamespaceDetails *nsd = nsdetails(ns);
             if (NULL == nsd) {
                 errmsg = "can't find ns";
                 return false;

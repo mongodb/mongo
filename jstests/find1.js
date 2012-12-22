@@ -1,6 +1,8 @@
 t = db.find1;
 t.drop();
 
+nscannedStart = db.serverStatus().metrics.document.scanned
+
 t.save( { a : 1 , b : "hi" } );
 t.save( { a : 2 , b : "hi" } );
 
@@ -29,3 +31,6 @@ assert( t.findOne( id , { a : 1 } ).a , "H" );
 assert( ! t.findOne( id , { a : 1 } ).b , "I" );
 
 assert(t.validate().valid,"not valid");
+
+nscannedEnd = db.serverStatus().metrics.document.scanned
+assert.lte( nscannedStart + 16, nscannedEnd );

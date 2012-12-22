@@ -16,6 +16,8 @@
 
 #include "mongo/pch.h"
 
+#include "mongo/base/counter.h"
+#include "mongo/db/commands/server_status.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/database.h"
 #include "mongo/db/kill_current_op.h"
@@ -113,7 +115,7 @@ namespace mongo {
         strncpy( _ns, context->ns(), Namespace::MaxNsLen);
         _ns[Namespace::MaxNsLen] = 0;
 
-        _dbprofile = std::max( context->_db ? context->_db->profile : 0 , _dbprofile );
+        _dbprofile = std::max( context->_db ? context->_db->getProfilingLevel() : 0 , _dbprofile );
     }
     
     void CurOp::leave( Client::Context * context ) {
@@ -200,4 +202,43 @@ namespace mongo {
 
     AtomicUInt CurOp::_nextOpNum;
 
+    static Counter64 returnedCounter;
+    static Counter64 insertedCounter;
+    static Counter64 updatedCounter;
+    static Counter64 deletedCounter;
+    static Counter64 scannedCounter;
+
+    static ServerStatusMetricField<Counter64> displayReturned( "document.returned", &returnedCounter );
+    static ServerStatusMetricField<Counter64> displayUpdated( "document.updated", &updatedCounter );
+    static ServerStatusMetricField<Counter64> displayInserted( "document.inserted", &insertedCounter );
+    static ServerStatusMetricField<Counter64> displayDeleted( "document.deleted", &deletedCounter );
+    static ServerStatusMetricField<Counter64> displayScanned( "document.scanned", &scannedCounter );
+
+    static Counter64 idhackCounter;
+    static Counter64 scanAndOrderCounter;
+    static Counter64 fastmodCounter;
+
+    static ServerStatusMetricField<Counter64> displayIdhack( "operation.idhack", &idhackCounter );
+    static ServerStatusMetricField<Counter64> displayScanAndOrder( "operation.scanAndOrder", &scanAndOrderCounter );
+    static ServerStatusMetricField<Counter64> displayFastMod( "operation.fastmod", &fastmodCounter );
+
+    void OpDebug::recordStats() {
+        if ( nreturned > 0 )
+            returnedCounter.increment( nreturned );
+        if ( ninserted > 0 )
+            insertedCounter.increment( ninserted );
+        if ( nupdated > 0 )
+            updatedCounter.increment( nupdated );
+        if ( ndeleted > 0 )
+            deletedCounter.increment( ndeleted );
+        if ( nscanned > 0 )
+            scannedCounter.increment( nscanned );
+
+        if ( idhack )
+            idhackCounter.increment();
+        if ( scanAndOrder )
+            scanAndOrderCounter.increment();
+        if ( fastmod )
+            fastmodCounter.increment();
+    }
 }

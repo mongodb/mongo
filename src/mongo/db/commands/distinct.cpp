@@ -69,7 +69,7 @@ namespace mongo {
             long long n = 0; // matches
             MatchDetails md;
 
-            NamespaceDetails * d = nsdetails( ns.c_str() );
+            NamespaceDetails * d = nsdetails( ns );
 
             if ( ! d ) {
                 result.appendArray( "values" , BSONObj() );
