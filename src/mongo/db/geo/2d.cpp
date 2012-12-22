@@ -2284,7 +2284,7 @@ namespace mongo {
 
 					// throw user Exception if the cordinates is not a numbers.
 					BSONObjIterator i(e.Obj());
-					uassert(26880, (string)"the coordinates: " + e.Obj().toString() + " is not a numbers", i.next().isNumber() && i.next().isNumber());
+					uassert(16626, (string)"the coordinates: " + e.Obj().toString() + " is not a numbers", i.next().isNumber() && i.next().isNumber());
 
                     const char* suffix = e.fieldName() + 5; // strlen("$near") == 5;
                     GeoDistType type;
