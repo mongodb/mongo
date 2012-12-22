@@ -824,6 +824,7 @@ namespace mongo {
         Handle<Value> funcValue = _funcs[func-1];
         TryCatch try_catch;
         v8::Local<v8::Value> result;
+        // TODO SERVER-8016: properly allocate handles on the stack
         v8::Handle<v8::Value> args[24];
 
         const int nargs = argsObject ? argsObject->nFields() : 0;

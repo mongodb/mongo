@@ -64,8 +64,9 @@ namespace {
         // need to translate arguments into an array
         v8::HandleScope handle_scope;
         int argc = args.Length();
-        Handle<Value> argv[argc];
-        for (int i = 0; i < argc; ++i) {
+        // TODO SERVER-8016: properly allocate handles on the stack
+        v8::Handle<v8::Value> argv[24];
+        for (int i = 0; i < argc && i < 24; ++i) {
             argv[i] = args[i];
         }
         return handle_scope.Close(f->NewInstance(argc, argv));
