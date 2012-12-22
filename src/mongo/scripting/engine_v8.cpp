@@ -823,14 +823,15 @@ namespace mongo {
         V8_SIMPLE_HEADER
         Handle<Value> funcValue = _funcs[func-1];
         TryCatch try_catch;
+        v8::Local<v8::Value> result;
+        v8::Handle<v8::Value> args[24];
 
-        int nargs = argsObject ? argsObject->nFields() : 0;
-        Handle<Value> args[nargs]; // safe to be zero due to check for nargs
-        if ( nargs ) {
-            BSONObjIterator it( *argsObject );
-            for ( int i=0; i<nargs; i++ ) {
+        const int nargs = argsObject ? argsObject->nFields() : 0;
+        if (nargs) {
+            BSONObjIterator it(*argsObject);
+            for (int i=0; i<nargs && i<24; i++) {
                 BSONElement next = it.next();
-                args[i] = mongoToV8Element( next, readOnlyArgs );
+                args[i] = mongoToV8Element(next, readOnlyArgs);
             }
             setObject( "args", *argsObject, readOnlyArgs); // for backwards compatibility
         }
@@ -850,7 +851,7 @@ namespace mongo {
             return 1;
         }
 
-        Local<Value> result = ((v8::Function*)(*funcValue))->Call(v8recv, nargs, nargs ? args : 0);
+        result = ((v8::Function*)(*funcValue))->Call(v8recv, nargs, nargs ? args : NULL);
 
         if (!nativePrologue()) {
             _error = mongoutils::str::stream() << "javascript execution interrupted";
