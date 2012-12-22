@@ -2157,6 +2157,77 @@ namespace UpdateTests {
                                modSetState->getOpLogRewrite() );
             }
         };
+
+        class PositionalWithoutElemMatchKey {
+        public:
+            void run() {
+                BSONObj querySpec = BSONObj();
+                BSONObj modSpec = BSON( "$set" << BSON( "a.$" << 1 ) );
+                ModSet modSet( modSpec );
+
+                // A positional operator must be replaced with an array index before calling
+                // prepare().
+                ASSERT_THROWS( modSet.prepare( querySpec ), UserException );
+            }
+        };
+
+        class PositionalWithoutNestedElemMatchKey {
+        public:
+            void run() {
+                BSONObj querySpec = BSONObj();
+                BSONObj modSpec = BSON( "$set" << BSON( "a.b.c.$.e.f" << 1 ) );
+                ModSet modSet( modSpec );
+
+                // A positional operator must be replaced with an array index before calling
+                // prepare().
+                ASSERT_THROWS( modSet.prepare( querySpec ), UserException );
+            }
+        };
+
+        class DbrefPassesPositionalValidation {
+        public:
+            void run() {
+                BSONObj querySpec = BSONObj();
+                BSONObj modSpec = BSON( "$set" << BSON( "a.$ref" << "foo" << "a.$id" << 0 ) );
+                ModSet modSet( modSpec );
+
+                // A positional operator must be replaced with an array index before calling
+                // prepare(), but $ prefixed fields encoding dbrefs are allowed.
+                modSet.prepare( querySpec ); // Does not throw.
+            }
+        };
+
+        class NoPositionalValidationOnReplication {
+        public:
+            void run() {
+                BSONObj querySpec = BSONObj();
+                BSONObj modSpec = BSON( "$set" << BSON( "a.$" << 1 ) );
+                ModSet modSet( modSpec, set<string>(), NULL, true );
+
+                // No positional operator validation is performed if a ModSet is 'forReplication'.
+                modSet.prepare( querySpec ); // Does not throw.
+            }
+        };
+
+        class NoPositionalValidationOnPartialFixedArrayReplication {
+        public:
+            void run() {
+                BSONObj querySpec = BSONObj( BSON( "a.b" << 1 ) );
+                BSONObj modSpec = BSON( "$set" << BSON( "a.$.b.$" << 1 ) );
+                ModSet modSet( modSpec, set<string>(), NULL, true );
+
+                // Attempt to fix the positional operator fields.
+                scoped_ptr<ModSet> fixedMods( modSet.fixDynamicArray( "0" ) );
+
+                // The first positional field is replaced, but the second is not (until SERVER-831
+                // is implemented).
+                ASSERT( fixedMods->haveModForField( "a.0.b.$" ) );
+
+                // No positional operator validation is performed if a ModSet is 'forReplication',
+                // even after an attempt to fix the positional operator fields.
+                fixedMods->prepare( querySpec ); // Does not throw.
+            }
+        };
     };
 
     namespace basic {
@@ -2510,6 +2581,11 @@ namespace UpdateTests {
             // add< ModSetTests::BitRewriteNonExistingField >();
             add< ModSetTests::SetIsNotRewritten >();
             add< ModSetTests::UnsetIsNotRewritten >();
+            add< ModSetTests::PositionalWithoutElemMatchKey >();
+            add< ModSetTests::PositionalWithoutNestedElemMatchKey >();
+            add< ModSetTests::DbrefPassesPositionalValidation >();
+            add< ModSetTests::NoPositionalValidationOnReplication >();
+            add< ModSetTests::NoPositionalValidationOnPartialFixedArrayReplication >();
 
             add< basic::inc1 >();
             add< basic::inc2 >();

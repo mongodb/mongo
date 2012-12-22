@@ -21,6 +21,7 @@
 #include <algorithm> // for max
 
 #include "mongo/db/oplog.h"
+#include "mongo/db/ops/field_ref.h"
 #include "mongo/db/jsobjmanipulator.h"
 #include "mongo/db/pdfile.h"
 #include "mongo/util/mongoutils/str.h"
@@ -539,6 +540,24 @@ namespace mongo {
             ModState& ms = *mss->_mods[i->first];
 
             const Mod& m = i->second;
+
+            // Check for any positional operators that have not been replaced with a numeric field
+            // name (from a query match element).
+            // Only perform this positional operator validation in 'strictApply' mode.  When
+            // replicating from a legacy primary that does not implement this validation, the
+            // secondary bypasses validation and remains consistent with the primary.
+            if ( m.strictApply ) {
+                FieldRef fieldRef;
+                fieldRef.parse( m.fieldName );
+                StringData positionalOpField( "$" );
+                for( size_t i = 0; i < fieldRef.numParts(); ++i ) {
+                     uassert( 16650,
+                              "Cannot apply the positional operator without a corresponding query "
+                              "field containing an array.",
+                              fieldRef.getPart( i ).compare( positionalOpField ) != 0 );
+                }
+            }
+
             BSONElement e = obj.getFieldDotted(m.fieldName);
 
             ms.m = &m;
