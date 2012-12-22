@@ -6,7 +6,7 @@ var stddb = db;
 var db = db.getSisterDB( 'evalb' );
 
 function profileCursor() {
-    return db.system.profile.find( { user:username } );
+    return db.system.profile.find( { user:username + "@" + db.getName() } );
 }
 
 function lastOp() {
