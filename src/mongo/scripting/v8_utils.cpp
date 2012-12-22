@@ -192,10 +192,11 @@ namespace mongo {
                 Local< v8::Function > f = v8::Function::Cast( *(scope->mongoToV8Element(args.firstElement(), true)) );
                 int argc = args.nFields() - 1;
 
-                Local<Value> argv[argc];
+                // TODO SERVER-8016: properly allocate handles on the stack
+                Local<Value> argv[24];
                 BSONObjIterator it(args);
                 it.next();
-                for(int i = 0; i < argc; ++i) {
+                for(int i = 0; i < argc && i < 24; ++i) {
                     argv[i] = Local< Value >::New(scope->mongoToV8Element(*it, true));
                     it.next();
                 }
