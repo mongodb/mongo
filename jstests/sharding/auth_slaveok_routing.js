@@ -1,4 +1,4 @@
-/**
+1/**
  * This tests whether slaveOk reads are properly routed through mongos in
  * an authenticated environment. This test also includes restarting the
  * entire set, then querying afterwards.
@@ -38,7 +38,7 @@ var nodeCount = replTest.nodes.length;
  * is no admin user.
  */
 var adminDB = mongos.getDB( 'admin' )
-adminDB.addUser( 'user', 'password', false, 3 );
+adminDB.addUser('user', 'password', false);
 adminDB.auth( 'user', 'password' );
 var priAdminDB = replTest.getPrimary().getDB( 'admin' );
 priAdminDB.addUser( 'user', 'password', false, 3 );
