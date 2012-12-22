@@ -200,6 +200,7 @@ try {
 } catch (x) { /* expected */ }
 
 replTest.awaitReplication(60000);
+printjson(replTest.status());
 
 print("force 2 to sync from 3");
 replTest.nodes[2].getDB("admin").runCommand({replSetSyncFrom: replTest.host+":"+replTest.ports[3]});
