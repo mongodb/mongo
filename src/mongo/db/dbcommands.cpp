@@ -178,6 +178,13 @@ namespace mongo {
 
             BSONElement e = cmdObj["w"];
             if ( e.ok() ) {
+
+                if ( cmdLine.configsvr ) {
+                    result.append( "wnote", "can't use w on config servers" );
+                    result.append( "err", "norepl" );
+                    return true;
+                }
+
                 int timeout = cmdObj["wtimeout"].numberInt();
                 Timer t;
 
