@@ -260,8 +260,9 @@ namespace mongo {
         // versionString is the global version of this process
         if (isInMongoVersionRanges(versionString, excludedRanges)) {
 
-            *whyNot = stream() << "not compatible with current config version, " << "version "
-                               << versionString << "has been excluded.";
+            *whyNot = stream() << "not compatible with current config version, version "
+                               << reinterpret_cast<const char*>(versionString)
+                               << "has been excluded.";
 
             return VersionStatus_Incompatible;
         }
