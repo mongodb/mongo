@@ -1641,6 +1641,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="auth\auth_external_state.cpp" />
     <ClCompile Include="auth\auth_external_state_d.cpp" />
     <ClCompile Include="auth\auth_external_state_server_common.cpp" />
+    <ClCompile Include="auth\auth_index_d.cpp" />
     <ClCompile Include="auth\mongo_authentication_session.cpp" />
     <ClCompile Include="auth\principal.cpp" />
     <ClCompile Include="auth\principal_set.cpp" />
@@ -1651,6 +1652,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="btree_stats.cpp" />
     <ClCompile Include="cap.cpp" />
     <ClCompile Include="client_basic.cpp" />
+    <ClCompile Include="commands\connection_status.cpp" />
     <ClCompile Include="commands\distinct.cpp" />
     <ClCompile Include="commands\fail_point_cmd.cpp" />
     <ClCompile Include="commands\find_and_modify_common.cpp" />
@@ -2025,7 +2027,6 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="..\util\unordered_fast_key_table_internal.h" />
     <ClInclude Include="..\util\version.h" />
     <ClInclude Include="..\util\winutil.h" />
-    <ClInclude Include="auth\acquired_privilege.h" />
     <ClInclude Include="auth\action_set.h" />
     <ClInclude Include="auth\action_type.h" />
     <ClInclude Include="auth\authentication_session.h" />
@@ -2033,6 +2034,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="auth\auth_external_state.h" />
     <ClInclude Include="auth\auth_external_state_d.h" />
     <ClInclude Include="auth\auth_external_state_server_common.h" />
+    <ClInclude Include="auth\auth_index_d.h" />
     <ClInclude Include="auth\mongo_authentication_session.h" />
     <ClInclude Include="auth\principal.h" />
     <ClInclude Include="auth\principal_name.h" />

@@ -1256,6 +1256,12 @@
     <ClCompile Include="..\bson\bson_validate.cpp">
       <Filter>bson</Filter>
     </ClCompile>
+    <ClCompile Include="commands\connection_status.cpp">
+      <Filter>db\commands</Filter>
+    </ClCompile>
+    <ClCompile Include="auth\auth_index_d.cpp">
+      <Filter>db\auth</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\targetver.h" />
@@ -2178,9 +2184,6 @@
     <ClInclude Include="..\bson\util\bson_extract.h">
       <Filter>bson\util</Filter>
     </ClInclude>
-    <ClInclude Include="auth\acquired_privilege.h">
-      <Filter>db\auth</Filter>
-    </ClInclude>
     <ClInclude Include="auth\privilege.h">
       <Filter>db\auth</Filter>
     </ClInclude>
@@ -2546,6 +2549,9 @@
     </ClInclude>
     <ClInclude Include="..\bson\bson_validate.h">
       <Filter>bson</Filter>
+    </ClInclude>
+    <ClInclude Include="auth\auth_index_d.h">
+      <Filter>db\auth</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

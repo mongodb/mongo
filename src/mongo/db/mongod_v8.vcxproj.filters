@@ -1595,6 +1595,12 @@
     <ClCompile Include="commands\storage_details.cpp">
       <Filter>db\commands</Filter>
     </ClCompile>
+    <ClCompile Include="auth\auth_index_d.cpp">
+      <Filter>db\auth</Filter>
+    </ClCompile>
+    <ClCompile Include="commands\connection_status.cpp">
+      <Filter>db\commands</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\targetver.h" />
@@ -2361,9 +2367,6 @@
     <ClInclude Include="geo\s2cursor.h">
       <Filter>db\geo</Filter>
     </ClInclude>
-    <ClInclude Include="commands\fail_point_cmd.h">
-      <Filter>db\commands</Filter>
-    </ClInclude>
     <ClInclude Include="..\util\fail_point_service.h">
       <Filter>util\Header Files</Filter>
     </ClInclude>
@@ -2967,9 +2970,6 @@
     <ClInclude Include="..\..\third_party\v8\src\x64\regexp-macro-assembler-x64.h">
       <Filter>third_party\v8\src\x64\Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="auth\acquired_privilege.h">
-      <Filter>db\auth</Filter>
-    </ClInclude>
     <ClInclude Include="auth\privilege.h">
       <Filter>db\auth</Filter>
     </ClInclude>
@@ -3414,6 +3414,9 @@
     <ClInclude Include="commands\rename_collection.h">
       <Filter>db\commands</Filter>
     </ClInclude>
+    <ClInclude Include="auth\auth_index_d.h">
+      <Filter>db\auth</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="mongo.ico">
@@ -3490,6 +3493,12 @@
     </None>
     <None Include="..\..\third_party\s2\LICENSE-2.0.txt">
       <Filter>third_party\s2</Filter>
+    </None>
+    <None Include="..\..\third_party\v8\ChangeLog">
+      <Filter>third_party\v8</Filter>
+    </None>
+    <None Include="..\..\third_party\v8\ChangeLog_10gen">
+      <Filter>third_party\v8</Filter>
     </None>
   </ItemGroup>
   <ItemGroup>

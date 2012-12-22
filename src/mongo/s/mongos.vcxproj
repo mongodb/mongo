@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
@@ -1689,6 +1689,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="..\db\auth\privilege.cpp" />
     <ClCompile Include="..\db\auth\privilege_set.cpp" />
     <ClCompile Include="..\db\client_basic.cpp" />
+    <ClCompile Include="..\db\commands\connection_status.cpp" />
     <ClCompile Include="..\db\commands\fail_point_cmd.cpp" />
     <ClCompile Include="..\db\commands\find_and_modify_common.cpp" />
     <ClCompile Include="..\db\commands\mr_common.cpp" />
@@ -1910,11 +1911,15 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="balancer_policy.cpp" />
     <ClCompile Include="chunk.cpp" />
     <ClCompile Include="client_info.cpp" />
+    <ClCompile Include="cluster_client_internal.cpp" />
     <ClCompile Include="collection_manager.cpp" />
     <ClCompile Include="commands_admin.cpp" />
     <ClCompile Include="commands_public.cpp" />
     <ClCompile Include="config.cpp" />
-    <ClCompile Include="config_migrate.cpp" />
+    <ClCompile Include="config_upgrade.cpp" />
+    <ClCompile Include="config_upgrade_helpers.cpp" />
+    <ClCompile Include="config_upgrade_v0_to_v4.cpp" />
+    <ClCompile Include="config_upgrade_v3_to_v4.cpp" />
     <ClCompile Include="cursors.cpp" />
     <ClCompile Include="..\pch.cpp" />
     <ClCompile Include="..\db\queryutil.cpp" />
@@ -1922,6 +1927,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="grid.cpp" />
     <ClCompile Include="interrupt_status_mongos.cpp" />
     <ClCompile Include="metadata_loader.cpp" />
+    <ClCompile Include="mongo_version_range.cpp" />
     <ClCompile Include="request.cpp" />
     <ClCompile Include="security.cpp" />
     <ClCompile Include="shardconnection.cpp" />
@@ -2162,7 +2168,6 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="..\client\redef_macros.h" />
     <ClInclude Include="..\client\syncclusterconnection.h" />
     <ClInclude Include="..\client\undef_macros.h" />
-    <ClInclude Include="..\db\auth\acquired_privilege.h" />
     <ClInclude Include="..\db\auth\action_set.h" />
     <ClInclude Include="..\db\auth\action_type.h" />
     <ClInclude Include="..\db\auth\authentication_session.h" />
@@ -2264,6 +2269,10 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="..\util\lruishmap.h" />
     <ClInclude Include="..\util\map_util.h" />
     <ClInclude Include="..\util\md5.h" />
+    <ClInclude Include="..\util\mongoutils\checksum.h" />
+    <ClInclude Include="..\util\mongoutils\hash.h" />
+    <ClInclude Include="..\util\mongoutils\html.h" />
+    <ClInclude Include="..\util\mongoutils\str.h" />
     <ClInclude Include="..\util\moveablebuffer.h" />
     <ClInclude Include="..\util\net\hostandport.h" />
     <ClInclude Include="..\util\net\listen.h" />
@@ -2300,14 +2309,17 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="..\util\version.h" />
     <ClInclude Include="..\util\winutil.h" />
     <ClInclude Include="balance.h" />
-    <ClInclude Include="balancer_lock.h" />
     <ClInclude Include="balancer_policy.h" />
     <ClInclude Include="chunk.h" />
     <ClInclude Include="chunk_diff.h" />
     <ClInclude Include="chunk_diff.hpp" />
+    <ClInclude Include="chunk_version.h" />
     <ClInclude Include="client_info.h" />
+    <ClInclude Include="cluster_client_internal.h" />
     <ClInclude Include="collection_manager.h" />
     <ClInclude Include="config.h" />
+    <ClInclude Include="config_upgrade.h" />
+    <ClInclude Include="config_upgrade_helpers.h" />
     <ClInclude Include="cursors.h" />
     <ClInclude Include="d_chunk_manager.h" />
     <ClInclude Include="d_logic.h" />
@@ -2315,15 +2327,14 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="field_parser-inl.h" />
     <ClInclude Include="field_parser.h" />
     <ClInclude Include="grid.h" />
-    <ClInclude Include="gridconfig.h" />
-    <ClInclude Include="griddatabase.h" />
     <ClInclude Include="interrupt_status_mongos.h" />
     <ClInclude Include="metadata_loader.h" />
+    <ClInclude Include="mongo_version_range.h" />
     <ClInclude Include="request.h" />
     <ClInclude Include="server.h" />
     <ClInclude Include="shard.h" />
     <ClInclude Include="shardkey.h" />
-    <ClInclude Include="shard_version.h" />
+    <ClInclude Include="stale_exception.h" />
     <ClInclude Include="strategy.h" />
     <ClInclude Include="..\util\background.h" />
     <ClInclude Include="..\db\commands.h" />
@@ -2348,7 +2359,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="type_settings.h" />
     <ClInclude Include="type_shard.h" />
     <ClInclude Include="type_tags.h" />
-    <ClInclude Include="util.h" />
+    <ClInclude Include="version_manager.h" />
     <ClInclude Include="writeback_listener.h" />
   </ItemGroup>
   <ItemGroup>

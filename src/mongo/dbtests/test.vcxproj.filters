@@ -879,9 +879,6 @@
     <ClInclude Include="..\db\auth\action_type.h">
       <Filter>db\auth</Filter>
     </ClInclude>
-    <ClInclude Include="..\db\auth\acquired_privilege.h">
-      <Filter>db\auth</Filter>
-    </ClInclude>
     <ClInclude Include="..\db\auth\action_set.h">
       <Filter>db\auth</Filter>
     </ClInclude>
@@ -1463,6 +1460,24 @@
     </ClInclude>
     <ClInclude Include="..\bson\bson_validate.h">
       <Filter>bson</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\auth\auth_index_d.h">
+      <Filter>db\auth</Filter>
+    </ClInclude>
+    <ClInclude Include="config_server_fixture.h">
+      <Filter>dbtests</Filter>
+    </ClInclude>
+    <ClInclude Include="..\s\cluster_client_internal.h">
+      <Filter>s</Filter>
+    </ClInclude>
+    <ClInclude Include="..\s\config_upgrade.h">
+      <Filter>s</Filter>
+    </ClInclude>
+    <ClInclude Include="..\s\config_upgrade_helpers.h">
+      <Filter>s</Filter>
+    </ClInclude>
+    <ClInclude Include="..\s\mongo_version_range.h">
+      <Filter>s</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -2835,6 +2850,36 @@
     </ClCompile>
     <ClCompile Include="..\bson\bson_validate.cpp">
       <Filter>bson</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\auth\auth_index_d.cpp">
+      <Filter>db\auth</Filter>
+    </ClCompile>
+    <ClCompile Include="config_server_fixture.cpp">
+      <Filter>dbtests</Filter>
+    </ClCompile>
+    <ClCompile Include="config_upgrade_tests.cpp">
+      <Filter>dbtests</Filter>
+    </ClCompile>
+    <ClCompile Include="..\s\cluster_client_internal.cpp">
+      <Filter>s</Filter>
+    </ClCompile>
+    <ClCompile Include="..\s\config_upgrade.cpp">
+      <Filter>s</Filter>
+    </ClCompile>
+    <ClCompile Include="..\s\config_upgrade_helpers.cpp">
+      <Filter>s</Filter>
+    </ClCompile>
+    <ClCompile Include="..\s\config_upgrade_v0_to_v4.cpp">
+      <Filter>s</Filter>
+    </ClCompile>
+    <ClCompile Include="..\s\config_upgrade_v3_to_v4.cpp">
+      <Filter>s</Filter>
+    </ClCompile>
+    <ClCompile Include="..\s\mongo_version_range.cpp">
+      <Filter>s</Filter>
+    </ClCompile>
+    <ClCompile Include="..\s\mongo_version_range_test.cpp">
+      <Filter>s</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
