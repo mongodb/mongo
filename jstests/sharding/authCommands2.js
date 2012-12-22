@@ -28,7 +28,7 @@ try {
 } catch (e) {} // expected b/c of SERVER-6101.  TODO: remove try/catch once SERVER-6101 is fixed.
 
 assert( adminDB.auth( rwUser, password ) );
-adminDB.addUser( roUser, password, true, st.rs0.numNodes );
+adminDB.addUser( roUser, password, true );
 testDB.addUser( rwUser, password, false, st.rs0.numNodes );
 testDB.addUser( roUser, password, true, st.rs0.numNodes );
 
