@@ -674,6 +674,14 @@ startMongos = function(args){
 MongoRunner.startWithArgs = function(argArray, waitForConnect) {
 
     var port = _parsePort.apply(null, argArray);
+    
+    // Enable test commands.
+    // TODO: Make there only be one codepath for starting mongo processes
+    var programName = argArray[0];
+    if (jsTest.options().enableTestCommands && (programName.endsWith('mongod') || programName.endsWith('mongos'))) {
+        argArray.push.apply(argArray, ['--setParameter', 'enableTestCommands=1']);
+    }
+    
     var pid = _startMongoProgram.apply(null, argArray);
 
     var conn = null;
