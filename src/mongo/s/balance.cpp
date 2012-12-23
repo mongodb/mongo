@@ -222,10 +222,13 @@ namespace mongo {
             cursor = conn.query(ChunkType::ConfigNS,
                                 QUERY(ChunkType::ns(ns)).sort(ChunkType::min()));
 
+            set<BSONObj> allChunkMinimums;
+
             while ( cursor->more() ) {
-                BSONObj chunk = cursor->nextSafe();
+                BSONObj chunk = cursor->nextSafe().getOwned();
                 vector<BSONObj>& chunks = shardToChunksMap[chunk[ChunkType::shard()].String()];
-                chunks.push_back( chunk.getOwned() );
+                allChunkMinimums.insert( chunk[ChunkType::min()].Obj() );
+                chunks.push_back( chunk );
             }
             cursor.reset();
 
@@ -233,7 +236,7 @@ namespace mongo {
                 LOG(1) << "skipping empty collection (" << ns << ")";
                 continue;
             }
-            
+
             for ( vector<Shard>::iterator i=allShards.begin(); i!=allShards.end(); ++i ) {
                 // this just makes sure there is an entry in shardToChunksMap for every shard
                 Shard s = *i;
@@ -250,16 +253,58 @@ namespace mongo {
             cursor = conn.query(TagsType::ConfigNS,
                                 QUERY(TagsType::ns(ns)).sort(TagsType::min()));
 
+            vector<TagRange> ranges;
+
             while ( cursor->more() ) {
                 BSONObj tag = cursor->nextSafe();
-                uassert(16356 , str::stream() << "tag ranges not valid for: " << ns ,
-                        status.addTagRange(TagRange(tag[TagsType::min()].Obj().getOwned(),
-                                                    tag[TagsType::max()].Obj().getOwned(),
-                                                    tag[TagsType::tag()].String())));
+                TagRange tr(tag[TagsType::min()].Obj().getOwned(),
+                            tag[TagsType::max()].Obj().getOwned(),
+                            tag[TagsType::tag()].String());
+                ranges.push_back(tr);
+                uassert(16356,
+                        str::stream() << "tag ranges not valid for: " << ns,
+                        status.addTagRange(tr) );
 
             }
             cursor.reset();
-            
+
+            // loop through tags, and make sure we have chinks split on each min
+            bool didAnySplits = false;
+            for ( unsigned i = 0; i < ranges.size(); i++ ) {
+                const TagRange& tr = ranges[i];
+                if ( allChunkMinimums.count( tr.min ) > 0 )
+                    continue;
+
+                didAnySplits = true;
+
+                log() << "ns: " << ns << " need to split on "
+                      << tr.min << " because there is a range there" << endl;
+
+                DBConfigPtr cfg = grid.getDBConfig( ns );
+                verify( cfg );
+
+                ChunkManagerPtr cm = cfg->getChunkManager( ns );
+                verify( cm );
+                ChunkPtr c = cm->findIntersectingChunk( tr.min );
+
+                vector<BSONObj> splitPoints;
+                splitPoints.push_back( tr.min );
+
+                BSONObj res;
+                if ( !c->multiSplit( splitPoints, res ) ) {
+                    error() << "split failed: " << res << endl;
+                }
+                else {
+                    LOG(1) << "split worked: " << res << endl;
+                }
+                break;
+            }
+
+            if ( didAnySplits ) {
+                // state change, just wait till next round
+                continue;
+            }
+
             CandidateChunk* p = _policy->balance( ns, status, _balancedLastTime );
             if ( p ) candidateChunks->push_back( CandidateChunkPtr( p ) );
         }
