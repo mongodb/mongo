@@ -143,7 +143,8 @@ add_option( "full", "include client and headers when doing scons install", 0 , F
 
 # linking options
 add_option( "release" , "release build" , 0 , True )
-add_option( "static" , "fully static build" , 0 , True )
+add_option( "static" , "fully static build" , 0 , False )
+add_option( "static-libstdc++" , "statically link libstdc++" , 0 , False )
 
 # base compile flags
 add_option( "64" , "whether to force 64 bit" , 0 , True , "force64" )
@@ -518,6 +519,8 @@ elif os.sys.platform.startswith("linux"):
 
     if static:
         env.Append( LINKFLAGS=" -static " )
+    if has_option( "static-libstdc++" ):
+        env.Append( LINKFLAGS=" -static-libstdc++ " )
 
 elif "sunos5" == os.sys.platform:
      nix = True
