@@ -1,4 +1,3 @@
-// security_common.cpp
 /*
  *    Copyright (C) 2010 10gen Inc.
  *
@@ -15,29 +14,17 @@
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-/**
- * This file contains inter-mongo instance security helpers.  Due to the
- * requirement that it be possible to compile this into mongos and mongod, it
- * should not depend on much external stuff.
- */
-
-#include "pch.h"
+#include "mongo/db/auth/security_key.h"
 
 #include <sys/stat.h>
 #include <string>
 #include <vector>
 
+#include "mongo/client/dbclientinterface.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/privilege.h"
-#include "mongo/db/jsobj.h"
-#include "security.h"
-#include "security_common.h"
-#include "commands.h"
-#include "../util/md5.hpp"
-#include "client_basic.h"
-#include "mongo/client/dbclientinterface.h"
 
 
 namespace mongo {

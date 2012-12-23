@@ -213,6 +213,7 @@ env.StaticLibrary('mongocommon', commonFiles,
 env.StaticLibrary("coredb", [
         "client/parallel.cpp",
         "db/commands.cpp",
+        "db/commands/authentication_commands.cpp",
         "db/commands/connection_status.cpp",
         "db/commands/fail_point_cmd.cpp",
         "db/commands/find_and_modify_common.cpp",
@@ -260,8 +261,6 @@ env.StaticLibrary("coredb", [
         "db/projection.cpp",
         "db/querypattern.cpp",
         "db/queryutil.cpp",
-        "db/security_commands.cpp",
-        "db/security_common.cpp",
         "db/stats/top.cpp",
         "s/shardconnection.cpp",
         ],
@@ -388,7 +387,6 @@ serverOnlyFiles = [ "db/curop.cpp",
                     "db/pdfile.cpp",
                     "db/record.cpp",
                     "db/cursor.cpp",
-                    "db/security.cpp",
                     "db/queryoptimizer.cpp",
                     "db/queryoptimizercursorimpl.cpp",
                     "db/extsort.cpp",
@@ -464,7 +462,6 @@ mongosLibraryFiles = [
     "s/balancer_policy.cpp",
     "s/writeback_listener.cpp",
     "s/version_manager.cpp",
-    "s/security.cpp",
     ]
 
 env.Library( "mongoscore" , mongosLibraryFiles, LIBDEPS=['db/auth/authmongos'] )

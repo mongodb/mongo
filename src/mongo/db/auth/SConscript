@@ -21,7 +21,8 @@ env.StaticLibrary('authcore', ['action_set.cpp',
                            '$BUILD_DIR/mongo/stringutils'])
 
 env.StaticLibrary('authservercommon',
-                  ['auth_external_state_server_common.cpp'],
+                  ['auth_external_state_server_common.cpp',
+                   'security_key.cpp'],
                   LIBDEPS=['authcore'])
 
 env.StaticLibrary('authmongod',

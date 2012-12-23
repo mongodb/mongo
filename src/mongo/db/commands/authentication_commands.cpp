@@ -1,20 +1,20 @@
-/*
- *    Copyright (C) 2010 10gen Inc.
- *
- *    This program is free software: you can redistribute it and/or  modify
- *    it under the terms of the GNU Affero General Public License, version 3,
- *    as published by the Free Software Foundation.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    GNU Affero General Public License for more details.
- *
- *    You should have received a copy of the GNU Affero General Public License
- *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
+/**
+*    Copyright (C) 2010 10gen Inc.
+*
+*    This program is free software: you can redistribute it and/or  modify
+*    it under the terms of the GNU Affero General Public License, version 3,
+*    as published by the Free Software Foundation.
+*
+*    This program is distributed in the hope that it will be useful,
+*    but WITHOUT ANY WARRANTY; without even the implied warranty of
+*    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+*    GNU Affero General Public License for more details.
+*
+*    You should have received a copy of the GNU Affero General Public License
+*    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+*/
 
-#include "mongo/pch.h"
+#include "mongo/db/commands/authentication_commands.h"
 
 #include <string>
 #include <vector>
@@ -23,22 +23,13 @@
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_manager.h"
-#include "mongo/db/auth/authentication_session.h"
 #include "mongo/db/auth/mongo_authentication_session.h"
-#include "mongo/db/auth/principal.h"
 #include "mongo/db/auth/privilege.h"
-#include "mongo/db/auth/privilege_set.h"
 #include "mongo/db/client_basic.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/db.h"
-#include "mongo/db/dbhelpers.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/json.h"
-#include "mongo/db/pdfile.h"
-#include "mongo/db/security_common.h"
 #include "mongo/platform/random.h"
 #include "mongo/util/md5.hpp"
-#include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 
@@ -65,7 +56,7 @@ namespace mongo {
         CmdGetNonce() : Command("getnonce") {
             _random = SecureRandom::create();
         }
-        
+
         virtual bool requiresAuth() { return false; }
         virtual bool logTheOp() { return false; }
         virtual bool slaveOk() const {
@@ -93,8 +84,6 @@ namespace mongo {
 
         SecureRandom* _random;
     } cmdGetNonce;
-
-    CmdLogout cmdLogout;
 
     bool CmdAuthenticate::run(const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
         if (!_areNonceAuthenticateCommandsEnabled) {
@@ -185,7 +174,31 @@ namespace mongo {
         result.append( "user" , user );
         return true;
     }
-
     CmdAuthenticate cmdAuthenticate;
 
-} // namespace mongo
+    class CmdLogout : public Command {
+    public:
+        virtual bool logTheOp() {
+            return false;
+        }
+        virtual bool slaveOk() const {
+            return true;
+        }
+        virtual void addRequiredPrivileges(const std::string& dbname,
+                                           const BSONObj& cmdObj,
+                                           std::vector<Privilege>* out) {} // No auth required
+        void help(stringstream& h) const { h << "de-authenticate"; }
+        virtual LockType locktype() const { return NONE; }
+        CmdLogout() : Command("logout") {}
+        bool run(const string& dbname,
+                 BSONObj& cmdObj,
+                 int options,
+                 string& errmsg,
+                 BSONObjBuilder& result,
+                 bool fromRepl) {
+            AuthorizationManager* authManager = ClientBasic::getCurrent()->getAuthorizationManager();
+            authManager->logoutDatabase(dbname);
+            return true;
+        }
+    } cmdLogout;
+}
