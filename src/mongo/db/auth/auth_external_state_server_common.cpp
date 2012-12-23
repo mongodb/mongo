@@ -23,13 +23,19 @@
 
 namespace mongo {
 
-    AuthExternalStateServerCommon::AuthExternalStateServerCommon() : _allowLocalhost(false) {}
+    // NOTE: we default _allowLocalhost to true under the assumption that _checkShouldAllowLocalhost
+    // will always be called before any calls to shouldIgnoreAuthChecks.  If this is not the case,
+    // it could cause a security hole.
+    AuthExternalStateServerCommon::AuthExternalStateServerCommon() : _allowLocalhost(true) {}
     AuthExternalStateServerCommon::~AuthExternalStateServerCommon() {}
 
     void AuthExternalStateServerCommon::_checkShouldAllowLocalhost() {
         if (noauth)
             return;
-        // TODO: cache if admin user exists and if it once existed don't query admin.system.users
+        // If we know that an admin user exists, don't re-check.
+        if (!_allowLocalhost)
+            return;
+
         _allowLocalhost = !_hasPrivilegeDocument("admin");
         if (_allowLocalhost) {
             ONCE {
