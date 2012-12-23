@@ -45,9 +45,8 @@ __evict_read_gen(const WT_EVICT_ENTRY *entry)
 		return (UINT64_MAX);
 
 	/* Always prioritize pages selected by force. */
-	if (__wt_eviction_page_force(entry->btree, entry->page)) {
+	if (__wt_eviction_page_force(entry->btree, entry->page))
 		return (1);
-	}
 
 	read_gen = entry->page->read_gen + entry->btree->evict_priority;
 	if (entry->page->type == WT_PAGE_ROW_INT ||

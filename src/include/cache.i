@@ -40,24 +40,6 @@ __wt_eviction_check(WT_SESSION_IMPL *session, int *read_lockoutp, int wake)
 }
 
 /*
- * __wt_eviction_page_force --
- *	Return if a page should be a high priority for eviction. The method
- *      does not use a session handle, since it is called from the eviction
- *      sort routine, that does not have a session easily available.
- */
-static inline int
-__wt_eviction_page_force(WT_BTREE *btree, WT_PAGE *page)
-{
-	/*
-	 * The number 60 is arbitrary here. It happens to be about 1MB
-	 * if the btree is using 16KB pages.
-	 */
-	return (!WT_PAGE_IS_ROOT(page) && __wt_page_is_modified(page) &&
-	    page->type != WT_PAGE_ROW_INT && page->type != WT_PAGE_COL_INT &&
-	    (page->memory_footprint > 60 * btree->maxleafpage));
-}
-
-/*
  * __wt_cache_full_check --
  *	Wait for there to be space in the cache before a read or update.
  */
