@@ -36,5 +36,5 @@ function setupMoveChunkTest(st) {
                                     find : { _id : 1 } ,
                                     to : to ,
                                     _waitForDelete : true} ); //some tests need this...
-    assert(result.ok, "movechunk failed")
+    assert(result, "movechunk failed: " + tojson( result ) )
 }
