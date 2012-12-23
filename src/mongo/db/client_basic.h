@@ -37,8 +37,6 @@ namespace mongo {
     class ClientBasic : boost::noncopyable {
     public:
         virtual ~ClientBasic();
-        virtual const AuthenticationInfo * getAuthenticationInfo() const = 0;
-        virtual AuthenticationInfo * getAuthenticationInfo() = 0;
         AuthenticationSession* getAuthenticationSession();
         void resetAuthenticationSession(AuthenticationSession* newSession);
         void swapAuthenticationSession(boost::scoped_ptr<AuthenticationSession>& other);

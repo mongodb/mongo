@@ -180,17 +180,8 @@ namespace mongo {
         principal->setImplicitPrivilegeAcquisition(true);
         authorizationManager->addAuthorizedPrincipal(principal);
 
-        bool readOnly = userObj["readOnly"].trueValue();
-        // TODO: remove this once all auth checking goes through AuthorizationManager instead of
-        // AuthenticationInfo
-        authenticate(dbname, user, readOnly );
-        
-        
         result.append( "dbname" , dbname );
         result.append( "user" , user );
-        result.appendBool( "readOnly" , readOnly );
-        
-
         return true;
     }
 

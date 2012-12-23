@@ -109,11 +109,8 @@ namespace mongo {
         static ClientInfo * get(AbstractMessagingPort* messagingPort = NULL);
         // Creates a ClientInfo and stores it in _tlInfo
         static ClientInfo* create(AbstractMessagingPort* messagingPort);
-        const AuthenticationInfo* getAuthenticationInfo() const { return (AuthenticationInfo*)&_ai; }
-        AuthenticationInfo* getAuthenticationInfo() { return (AuthenticationInfo*)&_ai; }
 
     private:
-        AuthenticationInfo _ai;
         struct WBInfo {
             WBInfo( const WriteBackListener::ConnectionIdent& c, OID o, bool fromLastOperation )
                 : ident( c ), id( o ), fromLastOperation( fromLastOperation ) {}

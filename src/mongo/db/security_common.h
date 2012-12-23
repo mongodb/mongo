@@ -53,7 +53,6 @@ namespace mongo {
                                            std::vector<Privilege>* out) {} // No auth required
         CmdAuthenticate() : Command("authenticate") {}
         bool run(const string& dbname , BSONObj& cmdObj, int options, string& errmsg, BSONObjBuilder& result, bool fromRepl);
-        void authenticate(const string& dbname, const string& user, const bool readOnly);
     };
 
     extern CmdAuthenticate cmdAuthenticate;
