@@ -22,10 +22,6 @@
 
 namespace mongo {
 
-    // --noauth cmd line option
-    // TODO: Remove this, should be getting this from authorization_manager.h
-    extern bool noauth;
-
     /**
      * This method checks the validity of filename as a security key, hashes its
      * contents, and stores it in the internalSecurity variable.  Prints an

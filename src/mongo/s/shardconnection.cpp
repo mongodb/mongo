@@ -21,7 +21,6 @@
 #include <set>
 
 #include "mongo/db/client.h"
-#include "mongo/db/security.h"
 #include "mongo/s/config.h"
 #include "mongo/s/request.h"
 #include "mongo/s/shard.h"

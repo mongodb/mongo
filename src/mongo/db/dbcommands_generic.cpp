@@ -39,7 +39,6 @@
 #include "db.h"
 #include "instance.h"
 #include "lasterror.h"
-#include "security.h"
 #include "../scripting/engine.h"
 #include "stats/counters.h"
 #include "background.h"

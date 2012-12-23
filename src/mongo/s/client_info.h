@@ -20,7 +20,6 @@
 #include "mongo/pch.h"
 
 #include "mongo/db/client_basic.h"
-#include "mongo/db/security.h"
 #include "mongo/s/chunk.h"
 #include "mongo/s/writeback_listener.h"
 #include "mongo/util/net/hostandport.h"

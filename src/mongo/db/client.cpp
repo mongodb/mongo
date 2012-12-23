@@ -43,7 +43,6 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/pagefault.h"
 #include "mongo/db/repl/rs.h"
-#include "mongo/db/security.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/d_logic.h"
 #include "mongo/s/stale_exception.h" // for SendStaleConfigException

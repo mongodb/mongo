@@ -50,7 +50,6 @@
 #include "mongo/db/repl.h"
 #include "mongo/db/repl_block.h"
 #include "mongo/db/replutil.h"
-#include "mongo/db/security.h"
 #include "mongo/s/d_writeback.h"
 #include "mongo/s/stale_exception.h"  // for SendStaleConfigException
 #include "mongo/scripting/engine.h"

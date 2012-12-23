@@ -35,6 +35,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
 #include "mongo/db/pdfile.h"
+#include "mongo/db/security_common.h"
 #include "mongo/platform/random.h"
 #include "mongo/util/md5.hpp"
 #include "mongo/util/mongoutils/str.h"

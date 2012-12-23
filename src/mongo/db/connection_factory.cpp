@@ -18,7 +18,6 @@
 
 #include "mongo/client/connpool.h"
 #include "mongo/db/client.h"
-#include "mongo/db/security.h"
 
 // This file contains the server-only (mongod and mongos) implementation of the factory functions
 // for getting ScopedDbConnections.  Handles setting authentication info on the underlying

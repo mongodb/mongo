@@ -29,7 +29,6 @@
 #include "../util/md5.hpp"
 #include "db.h"
 #include "instance.h"
-#include "security.h"
 #include "stats/snapshots.h"
 #include "background.h"
 #include "commands.h"
