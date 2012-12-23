@@ -467,6 +467,10 @@ namespace mongo {
         // required for busy loops in javascript which do not call native functions.
         v8::Locker::StartPreemption(500);
 
+        // if the isolate runs out of heap space, raise a flag on the StackGuard instead of
+        // calling abort()
+        v8::V8::IgnoreOutOfMemoryException();
+
         // create a global (rooted) object
         _global = Persistent< v8::Object >::New( _context->Global() );
 
@@ -861,7 +865,11 @@ namespace mongo {
         }
 
         if (result.IsEmpty()) {
-            _error = mongoutils::str::stream() << "javascript execution failed: " << toSTLString(&try_catch);
+            _error = mongoutils::str::stream() << "javascript execution failed: ";
+            if (try_catch.HasCaught())
+                _error += toSTLString(&try_catch);
+            if (hasOutOfMemoryException())
+                _error += "v8 out of memory";
             log() << _error << endl;
             return 1;
         }
