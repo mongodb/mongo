@@ -19,9 +19,14 @@
 #include "mongo/base/status.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/client.h"
+#include "mongo/db/server_parameters.h"
 #include "mongo/util/debug_util.h"
 
 namespace mongo {
+
+namespace {
+    MONGO_EXPORT_SERVER_PARAMETER(enableLocalhostAuthBypass, bool, true);
+} // namespace
 
     // NOTE: we default _allowLocalhost to true under the assumption that _checkShouldAllowLocalhost
     // will always be called before any calls to shouldIgnoreAuthChecks.  If this is not the case,
@@ -47,7 +52,8 @@ namespace mongo {
 
     bool AuthExternalStateServerCommon::shouldIgnoreAuthChecks() const {
         ClientBasic* client = ClientBasic::getCurrent();
-        return noauth || (client->getIsLocalHostConnection() && _allowLocalhost);
+        return noauth ||
+                (enableLocalhostAuthBypass &&client->getIsLocalHostConnection() && _allowLocalhost);
     }
 
 } // namespace mongo
