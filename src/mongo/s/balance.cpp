@@ -268,7 +268,7 @@ namespace mongo {
             }
             cursor.reset();
 
-            // loop through tags, and make sure we have chinks split on each min
+            // loop through tags to make sure no chunk spans tags; splits on tag min. for all chunks
             bool didAnySplits = false;
             for ( unsigned i = 0; i < ranges.size(); i++ ) {
                 const TagRange& tr = ranges[i];
