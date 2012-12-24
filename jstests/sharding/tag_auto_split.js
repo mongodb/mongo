@@ -45,8 +45,12 @@ assert.soon( function() {
 
 s.config.chunks.find().forEach(
     function(chunk){
-        assert( chunk.min._id );
-        assert( chunk.min.a );
+        var numFields = 0;
+        for ( var x in chunk.min ) {
+            numFields++;
+            assert( x == "_id" || x == "a", tojson(chunk) );
+        }
+        assert.eq( 2, numFields,tojson(chunk) );
     }
 );
 
