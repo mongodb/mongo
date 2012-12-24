@@ -43,6 +43,11 @@ assert.soon( function() {
     return s.config.chunks.count() == 3;
 }, "things didn't get split", 1000 * 60 * 10, 1000 );
 
-printjson( sh.status() );
+s.config.chunks.find().forEach(
+    function(chunk){
+        assert( chunk.min._id );
+        assert( chunk.min.a );
+    }
+);
 
 s.stop();

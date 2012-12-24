@@ -268,27 +268,30 @@ namespace mongo {
             }
             cursor.reset();
 
+            DBConfigPtr cfg = grid.getDBConfig( ns );
+            verify( cfg );
+            ChunkManagerPtr cm = cfg->getChunkManager( ns );
+            verify( cm );
+
             // loop through tags to make sure no chunk spans tags; splits on tag min. for all chunks
             bool didAnySplits = false;
             for ( unsigned i = 0; i < ranges.size(); i++ ) {
-                const TagRange& tr = ranges[i];
-                if ( allChunkMinimums.count( tr.min ) > 0 )
+                BSONObj min = ranges[i].min;
+
+                min = min.extractFields( cm->getShardKey().key(), true );
+
+                if ( allChunkMinimums.count( min ) > 0 )
                     continue;
 
                 didAnySplits = true;
 
                 log() << "ns: " << ns << " need to split on "
-                      << tr.min << " because there is a range there" << endl;
+                      << min << " because there is a range there" << endl;
 
-                DBConfigPtr cfg = grid.getDBConfig( ns );
-                verify( cfg );
-
-                ChunkManagerPtr cm = cfg->getChunkManager( ns );
-                verify( cm );
-                ChunkPtr c = cm->findIntersectingChunk( tr.min );
+                ChunkPtr c = cm->findIntersectingChunk( min );
 
                 vector<BSONObj> splitPoints;
-                splitPoints.push_back( tr.min );
+                splitPoints.push_back( min );
 
                 BSONObj res;
                 if ( !c->multiSplit( splitPoints, res ) ) {
