@@ -413,6 +413,7 @@ namespace mongo {
     void V8Scope::kill() {
         mongo::mutex::scoped_lock interruptLock(_interruptLock);
         if (!_inNativeExecution) {
+            // set the TERMINATE flag on the stack guard for this isolate
             v8::V8::TerminateExecution(_isolate);
             LOG(1) << "Killing V8 Scope.  Isolate: " << _isolate << endl;
         } else {
@@ -454,7 +455,7 @@ namespace mongo {
         rc.set_max_old_space_size(64 * 1024 * 1024);
         v8::SetResourceConstraints(&rc);
 
-        // Lock the isolate and enter the context
+        // lock the isolate and enter the context
         v8::Locker l(_isolate);
         HandleScope handleScope;
         _context = Context::New();
@@ -462,10 +463,6 @@ namespace mongo {
 
         // display heap statistics on MarkAndSweep GC run
         V8::AddGCPrologueCallback(gcCallback, kGCTypeMarkSweepCompact);
-
-        // start the v8 lock context switcher, and preempt execution every 500ms.  This is
-        // required for busy loops in javascript which do not call native functions.
-        v8::Locker::StartPreemption(500);
 
         // if the isolate runs out of heap space, raise a flag on the StackGuard instead of
         // calling abort()
@@ -537,7 +534,6 @@ namespace mongo {
         unregisterOpId();
         {
             V8_SIMPLE_HEADER
-            v8::Locker::StopPreemption();
             for( unsigned i = 0; i < _funcs.size(); ++i )
                 _funcs[ i ].Dispose();
             _funcs.clear();
