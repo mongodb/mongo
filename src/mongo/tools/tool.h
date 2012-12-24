@@ -28,7 +28,6 @@
 
 #include "db/instance.h"
 #include "db/matcher.h"
-#include "db/security.h"
 
 using std::string;
 
