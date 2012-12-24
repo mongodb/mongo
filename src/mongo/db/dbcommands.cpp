@@ -1263,13 +1263,14 @@ namespace mongo {
     class CollectionModCommand : public Command {
     public:
         CollectionModCommand() : Command( "collMod" ){}
-        virtual bool slaveOk() const { return true; }
+        virtual bool slaveOk() const { return false; }
         virtual LockType locktype() const { return WRITE; }
         virtual bool logTheOp() { return true; }
         virtual void help( stringstream &help ) const {
             help << 
                 "Sets collection options.\n"
-                "Example: { collMod: 'foo', usePowerOf2Sizes:true }";
+                "Example: { collMod: 'foo', usePowerOf2Sizes:true }\n"
+                "Example: { collMod: 'foo', index: {keyPattern: {a: 1}, expireAfterSeconds: 600} }";
         }
         virtual void addRequiredPrivileges(const std::string& dbname,
                                            const BSONObj& cmdObj,
@@ -1286,23 +1287,76 @@ namespace mongo {
                 errmsg = "ns does not exist";
                 return false;
             }
-            
+
             bool ok = true;
-            int oldFlags = nsd->userFlags();
-            
-            BSONObjIterator i( jsobj );
-            while ( i.more() ) {
-                const BSONElement& e = i.next();
+
+            BSONForEach( e, jsobj ) {
                 if ( str::equals( "collMod", e.fieldName() ) ) {
                     // no-op
                 }
                 else if ( str::equals( "usePowerOf2Sizes", e.fieldName() ) ) {
-                    result.appendBool( "usePowerOf2Sizes_old" , nsd->isUserFlagSet( NamespaceDetails::Flag_UsePowerOf2Sizes ) );
-                    if ( e.trueValue() ) {
-                        nsd->setUserFlag( NamespaceDetails::Flag_UsePowerOf2Sizes );
+                    bool oldPowerOf2 = nsd->isUserFlagSet(NamespaceDetails::Flag_UsePowerOf2Sizes);
+                    bool newPowerOf2 = e.trueValue();
+
+                    if ( oldPowerOf2 != newPowerOf2 ) {
+                        // change userFlags
+                        result.appendBool( "usePowerOf2Sizes_old", oldPowerOf2 );
+
+                        newPowerOf2 ? nsd->setUserFlag( NamespaceDetails::Flag_UsePowerOf2Sizes ) :
+                                      nsd->clearUserFlag( NamespaceDetails::Flag_UsePowerOf2Sizes );
+                        nsd->syncUserFlags( ns ); // must keep system.namespaces up-to-date
+
+                        result.appendBool( "usePowerOf2Sizes_new", newPowerOf2 );
                     }
-                    else {
-                        nsd->clearUserFlag( NamespaceDetails::Flag_UsePowerOf2Sizes );
+                }
+                else if ( str::equals( "index", e.fieldName() ) ) {
+                    BSONObj indexObj = e.Obj();
+                    BSONObj keyPattern = indexObj.getObjectField( "keyPattern" );
+
+                    if ( keyPattern.isEmpty() ){
+                        errmsg = "no keyPattern specified";
+                        ok = false;
+                        continue;
+                    }
+
+                    BSONElement newExpireSecs = indexObj["expireAfterSeconds"];
+                    if ( newExpireSecs.eoo() ) {
+                        errmsg = "no expireAfterSeconds field";
+                        ok = false;
+                        continue;
+                    }
+                    if ( ! newExpireSecs.isNumber() ) {
+                        errmsg = "expireAfterSeconds field must be a number";
+                        ok = false;
+                        continue;
+                    }
+
+                    int idxNo = nsd->findIndexByKeyPattern( keyPattern );
+                    if( idxNo < 0 ){
+                        errmsg = str::stream() << "cannot find index " << keyPattern
+                                               << " for ns " << ns;
+                        ok = false;
+                        continue;
+                    }
+
+                    IndexDetails idx = nsd->idx( idxNo );
+                    BSONElement oldExpireSecs = idx.info.obj().getField("expireAfterSeconds");
+                    if( oldExpireSecs.eoo() ){
+                        errmsg = "no expireAfterSeconds field to update";
+                        ok = false;
+                        continue;
+                    }
+                    if( ! oldExpireSecs.isNumber() ) {
+                        errmsg = "existing expireAfterSeconds field is not a number";
+                        ok = false;
+                        continue;
+                    }
+
+                    if ( oldExpireSecs != newExpireSecs ) {
+                        // change expireAfterSeconds
+                        result.appendAs( oldExpireSecs, "expireAfterSeconds_old" );
+                        nsd->updateTTLIndex( idxNo , newExpireSecs );
+                        result.appendAs( newExpireSecs , "expireAfterSeconds_new" );
                     }
                 }
                 else {
@@ -1311,10 +1365,6 @@ namespace mongo {
                 }
             }
             
-            if ( oldFlags != nsd->userFlags() ) {
-                nsd->syncUserFlags( ns );
-            }
-
             return ok;
         }
     } collectionModCommand;

@@ -738,6 +738,32 @@ namespace mongo {
         _keysComputed = true;
     }
 
+    void NamespaceDetails::updateTTLIndex( int idxNo , const BSONElement& newExpireSecs ) {
+        // Need to get the actual DiskLoc of the index to update. This is embedded in the 'info'
+        // object inside the IndexDetails.
+        IndexDetails idetails = idx( idxNo );
+        BSONElement oldExpireSecs = idetails.info.obj().getField("expireAfterSeconds");
+
+        // Important that we set the new value in-place.  We are writing directly to the
+        // object here so must be careful not to overwrite with a longer numeric type.
+        massert( 16630, "new 'expireAfterSeconds' must be a number", newExpireSecs.isNumber() );
+        BSONElementManipulator manip( oldExpireSecs );
+        switch( oldExpireSecs.type() ) {
+        case EOO:
+            massert( 16631, "index does not have an 'expireAfterSeconds' field", false );
+            break;
+        case NumberInt:
+        case NumberDouble:
+            manip.SetNumber( newExpireSecs.numberDouble() );
+            break;
+        case NumberLong:
+            manip.SetLong( newExpireSecs.numberLong() );
+            break;
+        default:
+            massert( 16632, "current 'expireAfterSeconds' is not a number", false );
+        }
+    }
+
     void NamespaceDetails::setSystemFlag( int flag ) {
         getDur().writingInt(_systemFlags) |= flag;
     }

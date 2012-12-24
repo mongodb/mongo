@@ -3,6 +3,7 @@
  *          and secondary get userFlags=1 (indicating that usePowerOf2Sizes is on),
  *          and check that the correct # of docs age out.
  *  Part 2: Add a new member to the set.  Check it also gets userFlags=1 and correct # of docs.
+ *  Part 3: Change the TTL expireAfterSeconds field and check successful propogation to secondary.
  */
 
 var rt = new ReplSetTest( { name : "ttl_repl" , nodes: 2 } );
@@ -18,8 +19,9 @@ var slave1 = rt.liveNodes.slaves[0];
 
 // shortcuts
 var masterdb = master.getDB( 'd' );
+var slave1db = slave1.getDB( 'd' );
 var mastercol = masterdb[ 'c' ];
-var slave1col = slave1.getDB( 'd' )[ 'c' ];
+var slave1col = slave1db[ 'c' ];
 
 // create new collection. insert 24 docs, aged at one-hour intervalss
 mastercol.drop();
@@ -76,6 +78,18 @@ printjson( slave2col.stats() );
 
 assert.eq( 1 , slave2col.stats().userFlags , "userFlags not 1 on new secondary");
 assert.eq( 6 , slave2col.count() , "wrong number of docs on new secondary");
+
+
+/******* Part 3 *****************/
+//Check that the collMod command successfully updates the expireAfterSeconds field
+masterdb.runCommand( { collMod : "c",
+                       index : { keyPattern : {x : 1}, expireAfterSeconds : 10000} } );
+
+var newTTLindex = { "key": { "x" : 1 } , "ns": "d.c" , "expireAfterSeconds" : 10000 };
+assert.eq( 1, masterdb.system.indexes.find( newTTLindex ).count(),
+           "primary index didn't get updated");
+assert.eq( 1, slave1db.system.indexes.find( newTTLindex ).count(),
+           "secondary index didn't get updated");
 
 // finish up
 rt.stopSet();
