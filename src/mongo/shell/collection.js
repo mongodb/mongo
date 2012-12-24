@@ -127,6 +127,9 @@ DBCollection.prototype._massageObject = function( q ){
 
 
 DBCollection.prototype._validateObject = function( o ){
+    if (typeof(o) != "object")
+        throw "attempted to save a " + typeof(o) + " value.  document expected.";
+
     if ( o._ensureSpecial && o._checkModify )
         throw "can't save a DBQuery object";
 }

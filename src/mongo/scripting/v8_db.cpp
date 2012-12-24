@@ -350,8 +350,8 @@ namespace {
     }
 
     v8::Handle<v8::Value> mongoInsert(V8Scope* scope, const v8::Arguments& args) {
-        jsassert( args.Length() == 3 , "insert needs 3 args" );
-        jsassert( args[1]->IsObject() , "have to insert an object" );
+        uassert(16626, "insert needs 3 args", args.Length() == 3);
+        uassert(16627, "attempted to insert a non-object", args[1]->IsObject());
 
         if ( args.This()->Get( scope->getV8Str( "readOnly" ) )->BooleanValue() )
             return v8::ThrowException( v8::String::New( "js db in read only mode" ) );
@@ -359,7 +359,6 @@ namespace {
         DBClientBase * conn = getConnection( args );
         GETNS;
 
-        v8::Handle<v8::Object> in = args[1]->ToObject();
         v8::Handle<v8::Integer> flags = args[2]->ToInteger();
 
         if( args[1]->IsArray() ){
@@ -367,10 +366,12 @@ namespace {
             v8::Local<v8::Array> arr = v8::Array::Cast( *args[1] );
             vector<BSONObj> bos;
             uint32_t len = arr->Length();
+            uassert(16629, "attempted to insert an empty array", len);
 
             for( uint32_t i = 0; i < len; i++ ){
 
                 v8::Local<v8::Object> el = arr->CloneElementAt( i );
+                uassert(16628, "attempted to insert an array of non-object types", !el.IsEmpty());
 
                 // Set ID on the element if necessary
                 if ( ! el->Has( scope->getV8Str( "_id" ) ) ) {
@@ -378,10 +379,9 @@ namespace {
                     el->Set( scope->getV8Str( "_id" ) , scope->getObjectIdCons()->NewInstance( 0 , argv ) );
                 }
 
-                bos.push_back( scope->v8ToMongo( arr->CloneElementAt( i ) ) );
+                bos.push_back(scope->v8ToMongo(el));
             }
 
-            DDD( "want to save batch : " << bos.length );
             try {
                 conn->insert( ns.get() , bos, flags->Int32Value() );
             }
@@ -391,7 +391,7 @@ namespace {
 
         }
         else {
-
+            v8::Handle<v8::Object> in = args[1]->ToObject();
             if ( ! in->Has( scope->getV8Str( "_id" ) ) ) {
                 v8::Handle<v8::Value> argv[1];
                 in->Set( scope->getV8Str( "_id" ) , scope->getObjectIdCons()->NewInstance( 0 , argv ) );
