@@ -29,8 +29,6 @@ clientSource = [
     'mongo/bson/bson_validate.cpp',
     'mongo/bson/oid.cpp',
     'mongo/buildinfo.cpp',
-    "mongo/client/authentication_table_common.cpp",
-    "mongo/client/authentication_table_client.cpp",
     'mongo/client/clientAndShell.cpp',
     'mongo/client/clientOnly.cpp',
     'mongo/client/connection_factory.cpp',
