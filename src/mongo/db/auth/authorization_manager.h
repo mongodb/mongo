@@ -63,6 +63,8 @@ namespace mongo {
         static const std::string USER_SOURCE_FIELD_NAME;
         static const std::string PASSWORD_FIELD_NAME;
 
+        static void setSupportOldStylePrivilegeDocuments(bool enabled);
+
         // Checks to see if "doc" is a valid privilege document, assuming it is stored in the
         // "system.users" collection of database "dbname".
         //
@@ -200,6 +202,8 @@ namespace mongo {
         // Returns a new privilege that has replaced the actions needed to handle special casing
         // certain namespaces like system.users and system.profile.
         Privilege _modifyPrivilegeForSpecialCases(const Privilege& privilege);
+
+        static bool _doesSupportOldStylePrivileges;
 
         scoped_ptr<AuthExternalState> _externalState;
 

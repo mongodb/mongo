@@ -51,6 +51,8 @@ namespace mongo {
     const std::string AuthorizationManager::USER_SOURCE_FIELD_NAME = "userSource";
     const std::string AuthorizationManager::PASSWORD_FIELD_NAME = "pwd";
 
+    bool AuthorizationManager::_doesSupportOldStylePrivileges = true;
+
 namespace {
     const std::string ADMIN_DBNAME = "admin";
     const std::string LOCAL_DBNAME = "local";
@@ -218,6 +220,16 @@ namespace {
         return Status::OK();
     }
 
+    void AuthorizationManager::setSupportOldStylePrivilegeDocuments(bool enabled) {
+        _doesSupportOldStylePrivileges = enabled;
+    }
+
+    static inline Status _oldPrivilegeFormatNotSupported() {
+        return Status(ErrorCodes::UnsupportedFormat,
+                      "Support for compatibility-form privilege documents disabled; "
+                      "All system.users entries must contain a 'roles' field");
+    }
+
     static inline Status _badValue(const char* reason, int location) {
         return Status(ErrorCodes::BadValue, reason, location);
     }
@@ -232,7 +244,7 @@ namespace {
 
     static Status _checkRolesArray(const BSONElement& rolesElement) {
         if (rolesElement.type() != Array) {
-            return _badValue("Role fields must be an array when present in  system.users entries",
+            return _badValue("Role fields must be an array when present in system.users entries",
                              0);
         }
         for (BSONObjIterator iter(rolesElement.embeddedObject()); iter.more(); iter.next()) {
@@ -263,6 +275,10 @@ namespace {
         if (userSourceElement.eoo() == passwordElement.eoo()) {
             return _badValue("system.users entry must have either a 'pwd' field or a 'userSource' "
                              "field, but not both", 0);
+        }
+
+        if (!_doesSupportOldStylePrivileges && rolesElement.eoo()) {
+            return _oldPrivilegeFormatNotSupported();
         }
 
         // Cannot have both "roles" and "readOnly" elements.
@@ -478,10 +494,15 @@ namespace {
                                                    PrivilegeSet* result) {
         if (!privilegeDocument.hasField(ROLES_FIELD_NAME)) {
             // Old-style (v2.2 and prior) privilege document
-            return _buildPrivilegeSetFromOldStylePrivilegeDocument(dbname,
-                                                                   principal,
-                                                                   privilegeDocument,
-                                                                   result);
+            if (_doesSupportOldStylePrivileges) {
+                return _buildPrivilegeSetFromOldStylePrivilegeDocument(dbname,
+                                                                       principal,
+                                                                       privilegeDocument,
+                                                                       result);
+            }
+            else {
+                return _oldPrivilegeFormatNotSupported();
+            }
         }
         else {
             return _buildPrivilegeSetFromExtendedPrivilegeDocument(
