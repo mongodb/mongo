@@ -505,54 +505,78 @@ ReplSetTest.prototype.awaitReplication = function(timeout) {
 
     this.getLastOpTimeWritten();
 
-    print("ReplSetTest " + this.latest);
+    var name = this.liveNodes.master.toString().substr(14); // strip "connection to "
+    print("ReplSetTest awaitReplication: starting: timestamp for primary, " +
+          name + ", is " + tojson(this.latest));
 
     jsTest.attempt({context: this, timeout: timeout, desc: "awaiting replication"},
                  function() {
                      try {
-                         var synced = true;
-                         for(var i=0; i<this.liveNodes.slaves.length; i++) {
+                         print("ReplSetTest awaitReplication: checking secondaries against timestamp " +
+                               tojson(this.latest));
+                         var secondaryCount = 0;
+                         for (var i=0; i<this.liveNodes.slaves.length; i++) {
                              var slave = this.liveNodes.slaves[i];
 
                              // Continue if we're connected to an arbiter
-                             if(res = slave.getDB("admin").runCommand({replSetGetStatus: 1})) {
-                                 if(res.myState == 7) {
+                             if (res = slave.getDB("admin").runCommand({replSetGetStatus: 1})) {
+                                 if (res.myState == 7) {
                                      continue;
                                  }
                              }
 
+                             ++secondaryCount;
+                             var name = slave.toString().substr(14); // strip "connection to "
+                             print("ReplSetTest awaitReplication: checking secondary #" +
+                                   secondaryCount + ": " + name);
                              slave.getDB("admin").getMongo().setSlaveOk();
                              var log = slave.getDB("local")['oplog.rs'];
-                             if(log.find({}).sort({'$natural': -1}).limit(1).hasNext()) {
+                             if (log.find({}).sort({'$natural': -1}).limit(1).hasNext()) {
                                  var entry = log.find({}).sort({'$natural': -1}).limit(1).next();
-                                 printjson( entry );
                                  var ts = entry['ts'];
-                                 print("ReplSetTest await TS for " + slave + " is " + ts.t+":"+ts.i + " and latest is " + this.latest.t+":"+this.latest.i);
-
-                                 if (this.latest.t < ts.t || (this.latest.t == ts.t && this.latest.i < ts.i)) {
-                                     this.latest = this.liveNodes.master.getDB("local")['oplog.rs'].find({}).sort({'$natural': -1}).limit(1).next()['ts'];
+                                 if (this.latest.t < ts.t ||
+                                        (this.latest.t == ts.t && this.latest.i < ts.i)) {
+                                     this.latest = this.liveNodes.master.getDB("local")['oplog.rs'].
+                                                        find({}).
+                                                        sort({'$natural': -1}).
+                                                        limit(1).
+                                                        next()['ts'];
+                                     print("ReplSetTest awaitReplication: timestamp for " + name +
+                                           " is newer, resetting latest to " + tojson(this.latest));
+                                     return false;
                                  }
-
-                                 print("ReplSetTest await oplog size for " + slave + " is " + log.count());
-                                 synced = (synced && friendlyEqual(this.latest,ts))
+                                 if (!friendlyEqual(this.latest, ts)) {
+                                     print("ReplSetTest awaitReplication: timestamp for secondary #" +
+                                           secondaryCount + ", " + name + ", is " + tojson(ts) +
+                                           " but latest is " + tojson(this.latest));
+                                     print("ReplSetTest awaitReplication: last oplog entry (of " +
+                                           log.count() + ") for secondary #" + secondaryCount +
+                                           ", " + name + ", is " + tojsononeline(entry));
+                                     print("ReplSetTest awaitReplication: secondary #" +
+                                           secondaryCount + ", " + name + ", is NOT synced");
+                                     return false;
+                                 }
+                                 print("ReplSetTest awaitReplication: secondary #" +
+                                       secondaryCount + ", " + name + ", is synced");
                              }
                              else {
-                                 print( "ReplSetTest waiting for " + slave + " to have an oplog built." )
-                                 synced = false;
+                                 print("ReplSetTest awaitReplication: waiting for secondary #" +
+                                       secondaryCount + ", " + name + ", to have an oplog built");
+                                 return false;
                              }
                          }
 
-                         if(synced) {
-                             print("ReplSetTest await synced=" + synced);
-                         }
-                         return synced;
+                         print("ReplSetTest awaitReplication: finished: all " + secondaryCount +
+                               " secondaries synced at timestamp " + tojson(this.latest));
+                         return true;
                      }
                      catch (e) {
-                         print("ReplSetTest.awaitReplication: caught exception "+e);
+                         print("ReplSetTest awaitReplication: caught exception: " + e);
 
                          // we might have a new master now
                          this.getLastOpTimeWritten();
-
+                         print("ReplSetTest awaitReplication: resetting: timestamp for primary " +
+                               this.liveNodes.master + " is " + tojson(this.latest));
                          return false;
                      }
                  });
