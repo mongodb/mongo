@@ -200,9 +200,6 @@
     <ClCompile Include="..\client\dbclient_rs.cpp">
       <Filter>client</Filter>
     </ClCompile>
-    <ClCompile Include="security.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClInclude Include="shard.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -591,9 +588,6 @@
     <ClCompile Include="..\db\cmdline.cpp">
       <Filter>db\Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\db\security_common.cpp">
-      <Filter>db\Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="..\db\commands.cpp">
       <Filter>db\Source Files</Filter>
     </ClCompile>
@@ -631,9 +625,6 @@
       <Filter>db\Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\db\queryutil.cpp">
-      <Filter>db\Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\db\security_commands.cpp">
       <Filter>db\Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\third_party\js-1.7\jsapi.c">
@@ -879,12 +870,6 @@
     <ClCompile Include="..\..\third_party\murmurhash3\MurmurHash3.cpp">
       <Filter>third_party\MurmurHash3</Filter>
     </ClCompile>
-    <ClCompile Include="..\client\authentication_table_common.cpp">
-      <Filter>client</Filter>
-    </ClCompile>
-    <ClCompile Include="..\client\authentication_table_server.cpp">
-      <Filter>client</Filter>
-    </ClCompile>
     <ClCompile Include="type_chunk.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -1115,6 +1100,9 @@
     </ClCompile>
     <ClCompile Include="..\db\commands\connection_status.cpp">
       <Filter>db\commands</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\auth\security_key.cpp">
+      <Filter>db\auth</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -1400,9 +1388,6 @@
     </ClInclude>
     <ClInclude Include="..\util\time_support.h">
       <Filter>util\Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\client\authentication_table.h">
-      <Filter>client</Filter>
     </ClInclude>
     <ClInclude Include="..\client\authlevel.h">
       <Filter>client</Filter>
@@ -2144,6 +2129,24 @@
     </ClInclude>
     <ClInclude Include="version_manager.h">
       <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\client\constants.h">
+      <Filter>client</Filter>
+    </ClInclude>
+    <ClInclude Include="..\client\dbclient_rs.h">
+      <Filter>client</Filter>
+    </ClInclude>
+    <ClInclude Include="..\client\dbclientcursor.h">
+      <Filter>client</Filter>
+    </ClInclude>
+    <ClInclude Include="..\client\dbclientinterface.h">
+      <Filter>client</Filter>
+    </ClInclude>
+    <ClInclude Include="..\client\distlock.h">
+      <Filter>client</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\auth\security_key.h">
+      <Filter>db\auth</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

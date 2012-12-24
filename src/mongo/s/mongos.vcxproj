@@ -1671,8 +1671,6 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="..\bson\mutable\mutable_bson_internal.cpp" />
     <ClCompile Include="..\bson\oid.cpp" />
     <ClCompile Include="..\bson\util\bson_extract.cpp" />
-    <ClCompile Include="..\client\authentication_table_common.cpp" />
-    <ClCompile Include="..\client\authentication_table_server.cpp" />
     <ClCompile Include="..\client\connection_factory.cpp" />
     <ClCompile Include="..\client\dbclientcursor.cpp" />
     <ClCompile Include="..\client\dbclient_rs.cpp" />
@@ -1688,6 +1686,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="..\db\auth\principal_set.cpp" />
     <ClCompile Include="..\db\auth\privilege.cpp" />
     <ClCompile Include="..\db\auth\privilege_set.cpp" />
+    <ClCompile Include="..\db\auth\security_key.cpp" />
     <ClCompile Include="..\db\client_basic.cpp" />
     <ClCompile Include="..\db\commands\connection_status.cpp" />
     <ClCompile Include="..\db\commands\fail_point_cmd.cpp" />
@@ -1859,8 +1858,6 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="..\db\pipeline\value.cpp" />
     <ClCompile Include="..\db\projection.cpp" />
     <ClCompile Include="..\db\querypattern.cpp" />
-    <ClCompile Include="..\db\security_commands.cpp" />
-    <ClCompile Include="..\db\security_common.cpp" />
     <ClCompile Include="..\db\server_parameters.cpp" />
     <ClCompile Include="..\db\stats\top.cpp" />
     <ClCompile Include="..\platform\random.cpp" />
@@ -1929,7 +1926,6 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="metadata_loader.cpp" />
     <ClCompile Include="mongo_version_range.cpp" />
     <ClCompile Include="request.cpp" />
-    <ClCompile Include="security.cpp" />
     <ClCompile Include="shardconnection.cpp" />
     <ClCompile Include="version_manager.cpp" />
     <ClCompile Include="s_only.cpp" />
@@ -2162,8 +2158,12 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="..\bson\util\bson_extract.h" />
     <ClInclude Include="..\bson\util\builder.h" />
     <ClInclude Include="..\bson\util\misc.h" />
-    <ClInclude Include="..\client\authentication_table.h" />
     <ClInclude Include="..\client\authlevel.h" />
+    <ClInclude Include="..\client\constants.h" />
+    <ClInclude Include="..\client\dbclientcursor.h" />
+    <ClInclude Include="..\client\dbclientinterface.h" />
+    <ClInclude Include="..\client\dbclient_rs.h" />
+    <ClInclude Include="..\client\distlock.h" />
     <ClInclude Include="..\client\parallel.h" />
     <ClInclude Include="..\client\redef_macros.h" />
     <ClInclude Include="..\client\syncclusterconnection.h" />
@@ -2181,6 +2181,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="..\db\auth\principal_set.h" />
     <ClInclude Include="..\db\auth\privilege.h" />
     <ClInclude Include="..\db\auth\privilege_set.h" />
+    <ClInclude Include="..\db\auth\security_key.h" />
     <ClInclude Include="..\db\client_basic.h" />
     <ClInclude Include="..\db\commands\fail_point_cmd.h" />
     <ClInclude Include="..\db\commands\find_and_modify.h" />

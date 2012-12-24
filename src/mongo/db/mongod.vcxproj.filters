@@ -710,15 +710,6 @@
     <ClCompile Include="scanandorder.cpp">
       <Filter>db\Source Files\o to z</Filter>
     </ClCompile>
-    <ClCompile Include="security.cpp">
-      <Filter>db\Source Files\o to z</Filter>
-    </ClCompile>
-    <ClCompile Include="security_commands.cpp">
-      <Filter>db\Source Files\o to z</Filter>
-    </ClCompile>
-    <ClCompile Include="security_common.cpp">
-      <Filter>db\Source Files\o to z</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\third_party\js-1.7\jsapi.c">
       <Filter>third_party\SpiderMonkey\Source Files</Filter>
     </ClCompile>
@@ -1049,12 +1040,6 @@
     <ClCompile Include="geo\s2nearcursor.cpp">
       <Filter>db\geo</Filter>
     </ClCompile>
-    <ClCompile Include="..\client\authentication_table_common.cpp">
-      <Filter>client\Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\client\authentication_table_server.cpp">
-      <Filter>client\Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="..\s\type_chunk.cpp">
       <Filter>s</Filter>
     </ClCompile>
@@ -1261,6 +1246,12 @@
     </ClCompile>
     <ClCompile Include="auth\auth_index_d.cpp">
       <Filter>db\auth</Filter>
+    </ClCompile>
+    <ClCompile Include="auth\security_key.cpp">
+      <Filter>db\auth</Filter>
+    </ClCompile>
+    <ClCompile Include="commands\authentication_commands.cpp">
+      <Filter>db\commands</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -1533,9 +1524,6 @@
     <ClInclude Include="..\client\redef_macros.h">
       <Filter>client\Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="repl\rsmember.h">
-      <Filter>db\repl</Filter>
-    </ClInclude>
     <ClInclude Include="repl\rs.h">
       <Filter>db\repl</Filter>
     </ClInclude>
@@ -1743,9 +1731,6 @@
     <ClInclude Include="oplogreader.h">
       <Filter>db\Header Files\o to z</Filter>
     </ClInclude>
-    <ClInclude Include="security.h">
-      <Filter>db\Header Files\o to z</Filter>
-    </ClInclude>
     <ClInclude Include="pagefault.h">
       <Filter>db\Header Files\o to z</Filter>
     </ClInclude>
@@ -1940,9 +1925,6 @@
     </ClInclude>
     <ClInclude Include="..\util\touch_pages.h">
       <Filter>util\Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\client\authentication_table.h">
-      <Filter>client\Header Files</Filter>
     </ClInclude>
     <ClInclude Include="hashindex.h">
       <Filter>db\Header Files\e to n</Filter>
@@ -2174,9 +2156,6 @@
     </ClInclude>
     <ClInclude Include="geo\s2cursor.h">
       <Filter>db\geo</Filter>
-    </ClInclude>
-    <ClInclude Include="commands\fail_point_cmd.h">
-      <Filter>db\commands</Filter>
     </ClInclude>
     <ClInclude Include="..\util\fail_point_service.h">
       <Filter>util\Header Files</Filter>
@@ -2553,6 +2532,90 @@
     <ClInclude Include="auth\auth_index_d.h">
       <Filter>db\auth</Filter>
     </ClInclude>
+    <ClInclude Include="repl\bgsync.h">
+      <Filter>db\repl</Filter>
+    </ClInclude>
+    <ClInclude Include="repl\rs_exception.h">
+      <Filter>db\repl</Filter>
+    </ClInclude>
+    <ClInclude Include="repl\rs_member.h">
+      <Filter>db\repl</Filter>
+    </ClInclude>
+    <ClInclude Include="repl\rs_sync.h">
+      <Filter>db\repl</Filter>
+    </ClInclude>
+    <ClInclude Include="auth\security_key.h">
+      <Filter>db\auth</Filter>
+    </ClInclude>
+    <ClInclude Include="commands\authentication_commands.h">
+      <Filter>db\commands</Filter>
+    </ClInclude>
+    <ClInclude Include="client_basic.h">
+      <Filter>db\Header Files\a to d</Filter>
+    </ClInclude>
+    <ClInclude Include="cloner.h">
+      <Filter>db\Header Files\a to d</Filter>
+    </ClInclude>
+    <ClInclude Include="collection.h">
+      <Filter>db\Header Files\a to d</Filter>
+    </ClInclude>
+    <ClInclude Include="curop-inl.h">
+      <Filter>db\Header Files\a to d</Filter>
+    </ClInclude>
+    <ClInclude Include="dbwebserver.h">
+      <Filter>db\Header Files\a to d</Filter>
+    </ClInclude>
+    <ClInclude Include="dur_recover.h">
+      <Filter>db\Header Files\a to d</Filter>
+    </ClInclude>
+    <ClInclude Include="extsort.h">
+      <Filter>db\Header Files\e to n</Filter>
+    </ClInclude>
+    <ClInclude Include="filever.h">
+      <Filter>db\Header Files\e to n</Filter>
+    </ClInclude>
+    <ClInclude Include="jsobjmanipulator.h">
+      <Filter>db\Header Files\e to n</Filter>
+    </ClInclude>
+    <ClInclude Include="key.h">
+      <Filter>db\Header Files\e to n</Filter>
+    </ClInclude>
+    <ClInclude Include="minilex.h">
+      <Filter>db\Header Files\e to n</Filter>
+    </ClInclude>
+    <ClInclude Include="module.h">
+      <Filter>db\Header Files\e to n</Filter>
+    </ClInclude>
+    <ClInclude Include="oplog.h">
+      <Filter>db\Header Files\o to z</Filter>
+    </ClInclude>
+    <ClInclude Include="pdfile_private.h">
+      <Filter>db\Header Files\o to z</Filter>
+    </ClInclude>
+    <ClInclude Include="queryoptimizercursor.h">
+      <Filter>db\Header Files\o to z</Filter>
+    </ClInclude>
+    <ClInclude Include="querypattern.h">
+      <Filter>db\Header Files\o to z</Filter>
+    </ClInclude>
+    <ClInclude Include="queryutil-inl.h">
+      <Filter>db\Header Files\o to z</Filter>
+    </ClInclude>
+    <ClInclude Include="record.h">
+      <Filter>db\Header Files\o to z</Filter>
+    </ClInclude>
+    <ClInclude Include="repl_block.h">
+      <Filter>db\Header Files\o to z</Filter>
+    </ClInclude>
+    <ClInclude Include="replutil.h">
+      <Filter>db\Header Files\o to z</Filter>
+    </ClInclude>
+    <ClInclude Include="restapi.h">
+      <Filter>db\Header Files\o to z</Filter>
+    </ClInclude>
+    <ClInclude Include="taskqueue.h">
+      <Filter>db\Header Files\o to z</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="mongo.ico">
@@ -2656,9 +2719,6 @@
     <Filter Include="db\stats">
       <UniqueIdentifier>{da58c1f7-ec48-4d5a-a63e-822a1f6f3900}</UniqueIdentifier>
     </Filter>
-    <Filter Include="db\helpers">
-      <UniqueIdentifier>{38d78620-c5c4-498c-a44c-46e263e563df}</UniqueIdentifier>
-    </Filter>
     <Filter Include="db\Resource Files">
       <UniqueIdentifier>{d3338818-34d0-4575-96a7-917f44ba2f91}</UniqueIdentifier>
     </Filter>
@@ -2670,9 +2730,6 @@
     </Filter>
     <Filter Include="util\concurrency">
       <UniqueIdentifier>{97d24b2e-60a3-41d4-a9d5-97c05002e0a5}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="db\modules">
-      <UniqueIdentifier>{787b60d2-85bd-44dd-9e9a-8d225053043d}</UniqueIdentifier>
     </Filter>
     <Filter Include="third_party\SpiderMonkey">
       <UniqueIdentifier>{95737c65-b228-499d-b975-f4113dae1d0d}</UniqueIdentifier>

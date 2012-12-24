@@ -977,12 +977,6 @@
     <ClCompile Include="..\util\fail_point_service.cpp">
       <Filter>util\Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\client\authentication_table_client.cpp">
-      <Filter>client</Filter>
-    </ClCompile>
-    <ClCompile Include="..\client\authentication_table_common.cpp">
-      <Filter>client</Filter>
-    </ClCompile>
     <ClCompile Include="..\base\string_data.cpp">
       <Filter>base</Filter>
     </ClCompile>
@@ -1270,9 +1264,6 @@
     <ClInclude Include="..\db\commands.h">
       <Filter>db\Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\db\concurrency.h">
-      <Filter>db\Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="..\db\curop-inl.h">
       <Filter>db\Header Files</Filter>
     </ClInclude>
@@ -1345,9 +1336,6 @@
     <ClInclude Include="..\db\mongommf.h">
       <Filter>db\Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\db\mongomutex.h">
-      <Filter>db\Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="..\db\namespacestring.h">
       <Filter>db\Header Files</Filter>
     </ClInclude>
@@ -1383,12 +1371,6 @@
     </ClInclude>
     <ClInclude Include="..\db\repl\rs.h">
       <Filter>db\repl</Filter>
-    </ClInclude>
-    <ClInclude Include="..\db\security.h">
-      <Filter>db\Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\db\security_common.h">
-      <Filter>db\Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\db\client.h">
       <Filter>db\Header</Filter>
@@ -1585,9 +1567,6 @@
     </ClInclude>
     <ClInclude Include="..\platform\windows_basic.h">
       <Filter>platform</Filter>
-    </ClInclude>
-    <ClInclude Include="..\client\authentication_table.h">
-      <Filter>client</Filter>
     </ClInclude>
     <ClInclude Include="..\scripting\bson_template_evaluator.h">
       <Filter>scripting</Filter>

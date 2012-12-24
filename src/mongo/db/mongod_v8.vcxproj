@@ -1860,8 +1860,6 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="..\bson\mutable\mutable_bson_internal.cpp" />
     <ClCompile Include="..\bson\oid.cpp" />
     <ClCompile Include="..\bson\util\bson_extract.cpp" />
-    <ClCompile Include="..\client\authentication_table_common.cpp" />
-    <ClCompile Include="..\client\authentication_table_server.cpp" />
     <ClCompile Include="..\client\dbclientcursor.cpp" />
     <ClCompile Include="..\client\dbclient_rs.cpp" />
     <ClCompile Include="..\client\distlock.cpp" />
@@ -1985,11 +1983,13 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="auth\principal_set.cpp" />
     <ClCompile Include="auth\privilege.cpp" />
     <ClCompile Include="auth\privilege_set.cpp" />
+    <ClCompile Include="auth\security_key.cpp" />
     <ClCompile Include="btreebuilder.cpp" />
     <ClCompile Include="btreeposition.cpp" />
     <ClCompile Include="btree_stats.cpp" />
     <ClCompile Include="cap.cpp" />
     <ClCompile Include="client_basic.cpp" />
+    <ClCompile Include="commands\authentication_commands.cpp" />
     <ClCompile Include="commands\connection_status.cpp" />
     <ClCompile Include="commands\distinct.cpp" />
     <ClCompile Include="commands\fail_point_cmd.cpp" />
@@ -2533,7 +2533,10 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="..\bson\mutable\mutable_bson_heap.h" />
     <ClInclude Include="..\bson\mutable\mutable_bson_internal.h" />
     <ClInclude Include="..\bson\util\bson_extract.h" />
-    <ClInclude Include="..\client\authentication_table.h" />
+    <ClInclude Include="..\client\authlevel.h" />
+    <ClInclude Include="..\client\constants.h" />
+    <ClInclude Include="..\client\dbclientinterface.h" />
+    <ClInclude Include="..\client\dbclient_rs.h" />
     <ClInclude Include="..\platform\atomic_intrinsics.h" />
     <ClInclude Include="..\platform\atomic_intrinsics_win32.h" />
     <ClInclude Include="..\platform\atomic_word.h" />
@@ -2624,6 +2627,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="auth\principal_set.h" />
     <ClInclude Include="auth\privilege.h" />
     <ClInclude Include="auth\privilege_set.h" />
+    <ClInclude Include="auth\security_key.h" />
     <ClInclude Include="btreebuilder.h" />
     <ClInclude Include="btreecursor.h" />
     <ClInclude Include="btreeposition.h" />
@@ -2632,6 +2636,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="client_basic.h" />
     <ClInclude Include="cloner.h" />
     <ClInclude Include="collection.h" />
+    <ClInclude Include="commands\authentication_commands.h" />
     <ClInclude Include="commands\find_and_modify.h" />
     <ClInclude Include="commands\fsync.h" />
     <ClInclude Include="commands\mr.h" />
@@ -2727,9 +2732,6 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="pdfile.cpp" />
     <ClCompile Include="queryoptimizer.cpp" />
     <ClCompile Include="scanandorder.cpp" />
-    <ClCompile Include="security.cpp" />
-    <ClCompile Include="security_commands.cpp" />
-    <ClCompile Include="security_common.cpp" />
     <ClCompile Include="stats\service_stats.cpp" />
     <ClCompile Include="tests.cpp" />
     <ClCompile Include="cmdline.cpp">
@@ -2773,9 +2775,12 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="queryutil-inl.h" />
     <ClInclude Include="record.h" />
     <ClInclude Include="replutil.h" />
+    <ClInclude Include="repl\bgsync.h" />
+    <ClInclude Include="repl\rs_exception.h" />
+    <ClInclude Include="repl\rs_member.h" />
+    <ClInclude Include="repl\rs_sync.h" />
     <ClInclude Include="repl_block.h" />
     <ClInclude Include="restapi.h" />
-    <ClInclude Include="security_common.h" />
     <ClInclude Include="server_parameters.h" />
     <ClInclude Include="server_parameters_inline.h" />
     <ClInclude Include="sort_phase_one.h" />
@@ -2893,7 +2898,6 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="repl.h" />
     <ClInclude Include="repl\connections.h" />
     <ClInclude Include="repl\multicmd.h" />
-    <ClInclude Include="repl\rsmember.h" />
     <ClInclude Include="repl\rs_optime.h" />
     <ClInclude Include="stats\counters.h" />
     <ClInclude Include="stats\service_stats.h" />
@@ -2928,7 +2932,6 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="queryoptimizer.h" />
     <ClInclude Include="resource.h" />
     <ClInclude Include="scanandorder.h" />
-    <ClInclude Include="security.h" />
     <ClInclude Include="..\util\allocator.h" />
     <ClInclude Include="..\util\array.h" />
     <ClInclude Include="..\util\assert_util.h" />

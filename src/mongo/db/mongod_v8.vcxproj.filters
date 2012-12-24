@@ -707,15 +707,6 @@
     <ClCompile Include="scanandorder.cpp">
       <Filter>db\Source Files\o to z</Filter>
     </ClCompile>
-    <ClCompile Include="security.cpp">
-      <Filter>db\Source Files\o to z</Filter>
-    </ClCompile>
-    <ClCompile Include="security_commands.cpp">
-      <Filter>db\Source Files\o to z</Filter>
-    </ClCompile>
-    <ClCompile Include="security_common.cpp">
-      <Filter>db\Source Files\o to z</Filter>
-    </ClCompile>
     <ClCompile Include="btreebuilder.cpp">
       <Filter>db\Source Files\a to d</Filter>
     </ClCompile>
@@ -1391,12 +1382,6 @@
     <ClCompile Include="geo\s2nearcursor.cpp">
       <Filter>db\geo</Filter>
     </ClCompile>
-    <ClCompile Include="..\client\authentication_table_common.cpp">
-      <Filter>client\Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\client\authentication_table_server.cpp">
-      <Filter>client\Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="..\s\type_chunk.cpp">
       <Filter>s</Filter>
     </ClCompile>
@@ -1599,6 +1584,12 @@
       <Filter>db\auth</Filter>
     </ClCompile>
     <ClCompile Include="commands\connection_status.cpp">
+      <Filter>db\commands</Filter>
+    </ClCompile>
+    <ClCompile Include="auth\security_key.cpp">
+      <Filter>db\auth</Filter>
+    </ClCompile>
+    <ClCompile Include="commands\authentication_commands.cpp">
       <Filter>db\commands</Filter>
     </ClCompile>
   </ItemGroup>
@@ -1869,9 +1860,6 @@
     <ClInclude Include="..\client\redef_macros.h">
       <Filter>client\Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="repl\rsmember.h">
-      <Filter>db\repl</Filter>
-    </ClInclude>
     <ClInclude Include="repl\rs.h">
       <Filter>db\repl</Filter>
     </ClInclude>
@@ -2076,9 +2064,6 @@
     <ClInclude Include="oplogreader.h">
       <Filter>db\Header Files\o to z</Filter>
     </ClInclude>
-    <ClInclude Include="security.h">
-      <Filter>db\Header Files\o to z</Filter>
-    </ClInclude>
     <ClInclude Include="pagefault.h">
       <Filter>db\Header Files\o to z</Filter>
     </ClInclude>
@@ -2132,9 +2117,6 @@
     </ClInclude>
     <ClInclude Include="..\util\touch_pages.h">
       <Filter>util\Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\client\authentication_table.h">
-      <Filter>client\Header Files</Filter>
     </ClInclude>
     <ClInclude Include="hashindex.h">
       <Filter>db\Header Files\e to n</Filter>
@@ -3156,9 +3138,6 @@
     <ClInclude Include="restapi.h">
       <Filter>db\Header Files\o to z</Filter>
     </ClInclude>
-    <ClInclude Include="security_common.h">
-      <Filter>db\Header Files\o to z</Filter>
-    </ClInclude>
     <ClInclude Include="sort_phase_one.h">
       <Filter>db\Header Files\o to z</Filter>
     </ClInclude>
@@ -3416,6 +3395,36 @@
     </ClInclude>
     <ClInclude Include="auth\auth_index_d.h">
       <Filter>db\auth</Filter>
+    </ClInclude>
+    <ClInclude Include="..\client\authlevel.h">
+      <Filter>client\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\client\constants.h">
+      <Filter>client\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\client\dbclient_rs.h">
+      <Filter>client\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\client\dbclientinterface.h">
+      <Filter>client\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="auth\security_key.h">
+      <Filter>db\auth</Filter>
+    </ClInclude>
+    <ClInclude Include="commands\authentication_commands.h">
+      <Filter>db\commands</Filter>
+    </ClInclude>
+    <ClInclude Include="repl\bgsync.h">
+      <Filter>db\repl</Filter>
+    </ClInclude>
+    <ClInclude Include="repl\rs_exception.h">
+      <Filter>db\repl</Filter>
+    </ClInclude>
+    <ClInclude Include="repl\rs_member.h">
+      <Filter>db\repl</Filter>
+    </ClInclude>
+    <ClInclude Include="repl\rs_sync.h">
+      <Filter>db\repl</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

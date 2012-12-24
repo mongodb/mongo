@@ -589,7 +589,6 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="..\bson\util\bson_extract.h" />
     <ClInclude Include="..\bson\util\builder.h" />
     <ClInclude Include="..\bson\util\misc.h" />
-    <ClInclude Include="..\client\authentication_table.h" />
     <ClInclude Include="..\client\authlevel.h" />
     <ClInclude Include="..\client\dbclientcursor.h" />
     <ClInclude Include="..\client\dbclientinterface.h" />
@@ -612,6 +611,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="..\db\auth\principal_set.h" />
     <ClInclude Include="..\db\auth\privilege.h" />
     <ClInclude Include="..\db\auth\privilege_set.h" />
+    <ClInclude Include="..\db\auth\security_key.h" />
     <ClInclude Include="..\db\background.h" />
     <ClInclude Include="..\db\btreebuilder.h" />
     <ClInclude Include="..\db\btreecursor.h" />
@@ -622,6 +622,10 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="..\db\client_basic.h" />
     <ClInclude Include="..\db\cloner.h" />
     <ClInclude Include="..\db\collection.h" />
+    <ClInclude Include="..\db\commands\authentication_commands.h" />
+    <ClInclude Include="..\db\commands\find_and_modify.h" />
+    <ClInclude Include="..\db\commands\fsync.h" />
+    <ClInclude Include="..\db\commands\mr.h" />
     <ClInclude Include="..\db\commands\rename_collection.h" />
     <ClInclude Include="..\db\commands\server_status.h" />
     <ClInclude Include="..\db\compact.h" />
@@ -776,7 +780,6 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="..\db\replset.h" />
     <ClInclude Include="..\db\resource.h" />
     <ClInclude Include="..\db\scanandorder.h" />
-    <ClInclude Include="..\db\security.h" />
     <ClInclude Include="..\..\third_party\snappy\config.h" />
     <ClInclude Include="..\..\third_party\snappy\snappy-c.h" />
     <ClInclude Include="..\..\third_party\snappy\snappy-internal.h" />
@@ -2137,8 +2140,6 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="..\bson\mutable\mutable_bson_internal.cpp" />
     <ClCompile Include="..\bson\oid.cpp" />
     <ClCompile Include="..\bson\util\bson_extract.cpp" />
-    <ClCompile Include="..\client\authentication_table_common.cpp" />
-    <ClCompile Include="..\client\authentication_table_server.cpp" />
     <ClCompile Include="..\client\connection_factory.cpp" />
     <ClCompile Include="..\client\dbclientcursor.cpp" />
     <ClCompile Include="..\client\dbclient_rs.cpp" />
@@ -2158,16 +2159,40 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="..\db\auth\principal_set.cpp" />
     <ClCompile Include="..\db\auth\privilege.cpp" />
     <ClCompile Include="..\db\auth\privilege_set.cpp" />
+    <ClCompile Include="..\db\auth\security_key.cpp" />
     <ClCompile Include="..\db\btreebuilder.cpp" />
     <ClCompile Include="..\db\btreeposition.cpp" />
     <ClCompile Include="..\db\btree_stats.cpp" />
     <ClCompile Include="..\db\cap.cpp" />
     <ClCompile Include="..\db\client_basic.cpp" />
+    <ClCompile Include="..\db\commands\authentication_commands.cpp" />
+    <ClCompile Include="..\db\commands\connection_status.cpp" />
+    <ClCompile Include="..\db\commands\distinct.cpp" />
+    <ClCompile Include="..\db\commands\fail_point_cmd.cpp" />
+    <ClCompile Include="..\db\commands\find_and_modify.cpp" />
+    <ClCompile Include="..\db\commands\find_and_modify_common.cpp" />
     <ClCompile Include="..\db\commands\fsync.cpp" />
+    <ClCompile Include="..\db\commands\group.cpp" />
+    <ClCompile Include="..\db\commands\hashcmd.cpp" />
+    <ClCompile Include="..\db\commands\index_stats.cpp" />
     <ClCompile Include="..\db\commands\isself.cpp" />
+    <ClCompile Include="..\db\commands\mr.cpp" />
+    <ClCompile Include="..\db\commands\mr_common.cpp" />
     <ClCompile Include="..\db\commands\parameters.cpp" />
+    <ClCompile Include="..\db\commands\pipeline_command.cpp" />
     <ClCompile Include="..\db\commands\rename_collection_common.cpp" />
     <ClCompile Include="..\db\commands\server_status.cpp" />
+    <ClCompile Include="..\db\commands\storage_details.cpp">
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">4355;4800;4267;4244;4351</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">4355;4800;4267;4244;4351</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">4355;4800;4267;4244;4351</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">4355;4800;4267;4244;4351</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">4355;4800;4267;4244;4351</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|x64'">4355;4800;4267;4244;4351</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">4355;4800;4267;4244;4351</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">4355;4800;4267;4244;4351</DisableSpecificWarnings>
+    </ClCompile>
+    <ClCompile Include="..\db\commands\touch.cpp" />
     <ClCompile Include="..\db\compact.cpp" />
     <ClCompile Include="..\db\curop.cpp" />
     <ClCompile Include="..\db\dbcommands_admin.cpp" />
@@ -2346,7 +2371,6 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="..\db\repl\rs_sync.cpp" />
     <ClCompile Include="..\db\restapi.cpp" />
     <ClCompile Include="..\db\scanandorder.cpp" />
-    <ClCompile Include="..\db\security_common.cpp" />
     <ClCompile Include="..\db\server_parameters.cpp" />
     <ClCompile Include="..\platform\random.cpp" />
     <ClCompile Include="..\scripting\bson_template_evaluator.cpp" />
@@ -2465,8 +2489,6 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="..\util\platform_init.cpp" />
     <ClCompile Include="..\util\processinfo.cpp" />
     <ClCompile Include="..\db\repl.cpp" />
-    <ClCompile Include="..\db\security.cpp" />
-    <ClCompile Include="..\db\security_commands.cpp" />
     <ClCompile Include="..\db\tests.cpp" />
     <ClCompile Include="..\db\cmdline.cpp">
       <ObjectFileName Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(IntDir)mongo_cmdline.obj</ObjectFileName>
@@ -2517,7 +2539,6 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="..\scripting\utils.cpp" />
     <ClCompile Include="..\util\version.cpp" />
     <ClCompile Include="accumulatortests.cpp" />
-    <ClCompile Include="authtests.cpp" />
     <ClCompile Include="background_job_test.cpp" />
     <ClCompile Include="basictests.cpp" />
     <ClCompile Include="btreebuildertests.cpp" />
