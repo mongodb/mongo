@@ -39,10 +39,13 @@ function indexBuildInProgress() {
             if ( op.op == 'insert' && op.ns == 'test.system.indexes' ) {
                 debug(op.opid);
                 // SERVER-4295 Make sure the index details are there
-                assert.eq("a_1", op.insert.name);
-                assert.eq(1, op.insert.key.a);
-                assert.eq(true, op.insert.background);
-                indexBuildOpId = op.opid;
+                // we can't assert these things, since there is a race in reporting
+                // but we won't count if they aren't
+                if ( "a_1" == op.insert.name &&
+                     1 == op.insert.key.a &&
+                     op.insert.background ) {
+                    indexBuildOpId = op.opid;
+                }
             }
         }
     );
