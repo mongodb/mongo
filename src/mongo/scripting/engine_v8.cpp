@@ -356,7 +356,7 @@ namespace mongo {
     }
 
     void V8Scope::registerOpId() {
-        scoped_lock(_engine->_globalInterruptLock);
+        scoped_lock giLock(_engine->_globalInterruptLock);
         if (_engine->haveGetCurrentOpIdCallback()) {
             // this scope has an associated operation
             _opId = _engine->getCurrentOpId();
@@ -369,7 +369,7 @@ namespace mongo {
     }
 
     void V8Scope::unregisterOpId() {
-        scoped_lock(_engine->_globalInterruptLock);
+        scoped_lock giLock(_engine->_globalInterruptLock);
         LOG(2) << "V8Scope " << this << " unregistered for op " << _opId << endl;
         if (_engine->haveGetCurrentOpIdCallback() || _opId != 0) {
             // scope is currently associated with an operation id
