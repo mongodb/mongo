@@ -1,0 +1,88 @@
+# -*- mode: python -*-
+
+Import("env")
+
+stop_word_lanages = [
+    'danish',
+    'dutch',
+    'english',
+    'finnish',
+    'french',
+    'german',
+    'hungarian',
+    'italian',
+    'norwegian',
+    'portuguese',
+    'romanian',
+    'russian',
+    'spanish',
+    'swedish',
+    'turkish',
+]
+
+env.Command( [ "stop_words_list.h", "stop_words_list.cpp"],
+             [ "generate_stop_words.py"] + [ 'stop_words_%s.txt' % x for x in stop_word_lanages ],
+             "$PYTHON $SOURCES $TARGETS" )
+
+# this is not awesome
+hack = env.Clone()
+hack.StaticLibrary( "stopwords", [ "stop_words_list.cpp" ] )
+if "-O3" in hack["CCFLAGS"]:
+    hack["CCFLAGS"] = hack["CCFLAGS"].remove( "-O3" )
+
+env.StaticLibrary('base', [
+        'fts_index_format.cpp',
+        'fts_matcher.cpp',
+        'fts_query.cpp',
+        'fts_spec.cpp',
+        'fts_util.cpp',
+        'stemmer.cpp',
+        'stop_words.cpp',
+        'tokenizer.cpp',
+        ], LIBDEPS=["stopwords",
+                    "$BUILD_DIR/mongo/base/base",
+                    "$BUILD_DIR/mongo/bson",
+                    "$BUILD_DIR/mongo/platform/platform",
+                    "$BUILD_DIR/third_party/libstemmer_c/stemmer"
+                    ])
+
+env.StaticLibrary( 'server_common', [
+                   'fts_command.cpp',
+                   'fts_enabled.cpp'
+                   ] )
+
+env.StaticLibrary('ftsmongod', [
+        'fts_command_mongod.cpp',
+        'fts_index.cpp',
+        'fts_search.cpp',
+        ], LIBDEPS=["base","server_common"])
+
+
+env.StaticLibrary('ftsmongos', [
+        'fts_command_mongos.cpp',
+        ], LIBDEPS=["server_common"])
+
+
+env.CppUnitTest( "fts_index_format_test", "fts_index_format_test.cpp",
+                 LIBDEPS=["base"] )
+
+env.CppUnitTest( "fts_stop_words_test", "stop_words_test.cpp",
+                 LIBDEPS=["base"] )
+
+env.CppUnitTest( "fts_stemmer_test", "stemmer_test.cpp",
+                 LIBDEPS=["base"] )
+
+env.CppUnitTest( "fts_tokenizer_test", "tokenizer_test.cpp",
+                 LIBDEPS=["base"] )
+
+env.CppUnitTest( "fts_query_test", "fts_query_test.cpp",
+                 LIBDEPS=["base"] )
+
+env.CppUnitTest( "fts_spec_test", "fts_spec_test.cpp",
+                 LIBDEPS=["base"] )
+
+env.CppUnitTest( "fts_matcher_test", "fts_matcher_test.cpp",
+                 LIBDEPS=["base"] )
+
+env.CppUnitTest( "fts_util_test", "fts_util_test.cpp",
+                 LIBDEPS=["base","$BUILD_DIR/mongo/mongohasher"] )
