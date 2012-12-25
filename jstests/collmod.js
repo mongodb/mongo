@@ -2,8 +2,11 @@
 // Test setting the usePowerOf2Sizes flag, and modifying TTL indexes.
 
 var coll = "collModTest";
-db.createCollection( coll );
 var t = db.getCollection( coll );
+t.drop();
+
+db.createCollection( coll );
+
 
 // Verify the new collection has userFlags set to 0
 assert.eq( t.stats().userFlags , 0 , "fresh collection doesn't have userFlags = 0 ");
