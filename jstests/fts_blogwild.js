@@ -1,5 +1,5 @@
 
-t = db.text_blog;
+t = db.text_blogwild;
 t.drop();
 
 t.save( { _id: 1 , title: "my blog post" , text: "this is a new blog i am writing. yay eliot" } );
