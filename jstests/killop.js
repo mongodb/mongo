@@ -1,5 +1,3 @@
-for (var i = 0; i<10000; i++) {
-
 t = db.jstests_killop
 t.drop();
 
@@ -46,5 +44,3 @@ s2();
 assert( ( new Date() ) - start < 30000 );
 
 //}
-
-}
