@@ -16,6 +16,7 @@ Import("darwin windows solaris linux nix")
 
 env.SConscript(['base/SConscript',
                 'db/auth/SConscript',
+                'db/fts/SConscript',
                 'db/ops/SConscript',
                 'platform/SConscript',
                 's/SConscript',
@@ -464,7 +465,11 @@ mongosLibraryFiles = [
     "s/version_manager.cpp",
     ]
 
-env.Library( "mongoscore" , mongosLibraryFiles, LIBDEPS=['db/auth/authmongos'] )
+env.Library( "mongoscore",
+             mongosLibraryFiles,
+             LIBDEPS=['db/auth/authmongos',
+                      'db/fts/ftsmongos'
+                      ] )
 
 env.CppUnitTest( "balancer_policy_test" , [ "s/balancer_policy_tests.cpp" ] ,
                  LIBDEPS=["mongoscore", "coreshard", "mongocommon","coreserver","coredb","dbcmdline","mongodandmongos"] ,
@@ -532,6 +537,7 @@ env.CppUnitTest("geoparser_test", [ "db/geo/geoparser_test.cpp" ], LIBDEPS = ["g
 env.StaticLibrary("serveronly", serverOnlyFiles,
                   LIBDEPS=["coreshard",
                            "db/auth/authmongod",
+                           "db/fts/ftsmongod",
                            "dbcmdline",
                            "defaultversion",
                            "geoparser",
