@@ -212,10 +212,9 @@ namespace mongo {
 
     protected:
         virtual Scope * createScope() = 0;
+        void (*_scopeInitCallback)(Scope &);
 
     private:
-        friend class V8Scope; // for _scopeInitCallback (due to v8 API requirements)
-        void (*_scopeInitCallback)(Scope &);
         static void (*_connectCallback)(DBClientWithCommands&);
         static const char* (*_checkInterruptCallback)();
         static unsigned (*_getCurrentOpIdCallback)();

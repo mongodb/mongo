@@ -383,10 +383,12 @@ namespace mongo {
         v8::Locker l(_isolate);
         mongo::mutex::scoped_lock cbEnterLock(_interruptLock);
         if (v8::V8::IsExecutionTerminating(_isolate)) {
+            LOG(2) << "v8 execution interrupted.  isolate: " << _isolate << endl;
             return false;
         }
         if (_pendingKill || globalScriptEngine->interrupted()) {
             // kill flag was set before entering our callback
+            LOG(2) << "marked for death while leaving callback.  isolate: " << _isolate << endl;
             v8::V8::TerminateExecution(_isolate);
             return false;
         }
@@ -399,11 +401,11 @@ namespace mongo {
         mongo::mutex::scoped_lock cbLeaveLock(_interruptLock);
         _inNativeExecution = false;
         if (v8::V8::IsExecutionTerminating(_isolate)) {
-            LOG(3) << "v8 execution preempted.  Isolate: " << _isolate << endl;
+            LOG(2) << "v8 execution interrupted.  isolate: " << _isolate << endl;
             return false;
         }
         if (_pendingKill || globalScriptEngine->interrupted()) {
-            LOG(3) << "Marked for death while leaving callback.  Isolate: " << _isolate << endl;
+            LOG(2) << "marked for death while leaving callback.  isolate: " << _isolate << endl;
             v8::V8::TerminateExecution(_isolate);
             return false;
         }
@@ -415,11 +417,10 @@ namespace mongo {
         if (!_inNativeExecution) {
             // set the TERMINATE flag on the stack guard for this isolate
             v8::V8::TerminateExecution(_isolate);
-            LOG(1) << "Killing V8 Scope.  Isolate: " << _isolate << endl;
-        } else {
-            LOG(1) << "Marking v8 scope for death.  Isolate: " << _isolate << endl;
-            _pendingKill = true;
+            LOG(1) << "killing v8 scope.  isolate: " << _isolate << endl;
         }
+        LOG(1) << "marking v8 scope for death.  isolate: " << _isolate << endl;
+        _pendingKill = true;
     }
 
     /**
