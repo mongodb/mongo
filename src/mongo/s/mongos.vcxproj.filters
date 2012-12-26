@@ -129,6 +129,15 @@
     <Filter Include="util\mongoutils">
       <UniqueIdentifier>{079dfd16-613d-4873-8a92-2150e9375010}</UniqueIdentifier>
     </Filter>
+    <Filter Include="db\fts">
+      <UniqueIdentifier>{1bd9e383-ecaf-451a-a503-578b99a5bb79}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="db\fts\test">
+      <UniqueIdentifier>{ad31d319-f58c-4fcc-ab7a-570b49d36234}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="db\fts\stop_words">
+      <UniqueIdentifier>{b96de9db-a11a-47a5-b8ac-f6c3df3e02fb}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="balance.cpp">
@@ -1103,6 +1112,75 @@
     </ClCompile>
     <ClCompile Include="..\db\auth\security_key.cpp">
       <Filter>db\auth</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\fts\fts_command.cpp">
+      <Filter>db\fts</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\fts\fts_command_mongod.cpp">
+      <Filter>db\fts</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\fts\fts_command_mongos.cpp">
+      <Filter>db\fts</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\fts\fts_enabled.cpp">
+      <Filter>db\fts</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\fts\fts_index.cpp">
+      <Filter>db\fts</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\fts\fts_index_format.cpp">
+      <Filter>db\fts</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\fts\fts_matcher.cpp">
+      <Filter>db\fts</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\fts\fts_query.cpp">
+      <Filter>db\fts</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\fts\fts_search.cpp">
+      <Filter>db\fts</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\fts\fts_spec.cpp">
+      <Filter>db\fts</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\fts\fts_util.cpp">
+      <Filter>db\fts</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\fts\stemmer.cpp">
+      <Filter>db\fts</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\fts\stop_words.cpp">
+      <Filter>db\fts</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\fts\stop_words_list.cpp">
+      <Filter>db\fts</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\fts\tokenizer.cpp">
+      <Filter>db\fts</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\fts\fts_index_format_test.cpp">
+      <Filter>db\fts\test</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\fts\fts_matcher_test.cpp">
+      <Filter>db\fts\test</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\fts\fts_query_test.cpp">
+      <Filter>db\fts\test</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\fts\fts_spec_test.cpp">
+      <Filter>db\fts\test</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\fts\fts_util_test.cpp">
+      <Filter>db\fts\test</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\fts\stemmer_test.cpp">
+      <Filter>db\fts\test</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\fts\stop_words_test.cpp">
+      <Filter>db\fts\test</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\fts\tokenizer_test.cpp">
+      <Filter>db\fts\test</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -2148,6 +2226,45 @@
     <ClInclude Include="..\db\auth\security_key.h">
       <Filter>db\auth</Filter>
     </ClInclude>
+    <ClInclude Include="..\db\fts\fts_command.h">
+      <Filter>db\fts</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\fts\fts_enabled.h">
+      <Filter>db\fts</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\fts\fts_index.h">
+      <Filter>db\fts</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\fts\fts_index_format.h">
+      <Filter>db\fts</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\fts\fts_matcher.h">
+      <Filter>db\fts</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\fts\fts_query.h">
+      <Filter>db\fts</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\fts\fts_search.h">
+      <Filter>db\fts</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\fts\fts_spec.h">
+      <Filter>db\fts</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\fts\fts_util.h">
+      <Filter>db\fts</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\fts\stemmer.h">
+      <Filter>db\fts</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\fts\stop_words.h">
+      <Filter>db\fts</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\fts\stop_words_list.h">
+      <Filter>db\fts</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\fts\tokenizer.h">
+      <Filter>db\fts</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\third_party\js-1.7\jskeyword.tbl">
@@ -2170,6 +2287,57 @@
     </None>
     <None Include="..\..\third_party\s2\LICENSE-2.0.txt">
       <Filter>third_party\s2</Filter>
+    </None>
+    <None Include="..\db\fts\stop_words_danish.txt">
+      <Filter>db\fts\stop_words</Filter>
+    </None>
+    <None Include="..\db\fts\stop_words_dutch.txt">
+      <Filter>db\fts\stop_words</Filter>
+    </None>
+    <None Include="..\db\fts\stop_words_english.txt">
+      <Filter>db\fts\stop_words</Filter>
+    </None>
+    <None Include="..\db\fts\stop_words_finnish.txt">
+      <Filter>db\fts\stop_words</Filter>
+    </None>
+    <None Include="..\db\fts\stop_words_french.txt">
+      <Filter>db\fts\stop_words</Filter>
+    </None>
+    <None Include="..\db\fts\stop_words_german.txt">
+      <Filter>db\fts\stop_words</Filter>
+    </None>
+    <None Include="..\db\fts\stop_words_hungarian.txt">
+      <Filter>db\fts\stop_words</Filter>
+    </None>
+    <None Include="..\db\fts\stop_words_italian.txt">
+      <Filter>db\fts\stop_words</Filter>
+    </None>
+    <None Include="..\db\fts\stop_words_norwegian.txt">
+      <Filter>db\fts\stop_words</Filter>
+    </None>
+    <None Include="..\db\fts\stop_words_portuguese.txt">
+      <Filter>db\fts\stop_words</Filter>
+    </None>
+    <None Include="..\db\fts\stop_words_romanian.txt">
+      <Filter>db\fts\stop_words</Filter>
+    </None>
+    <None Include="..\db\fts\stop_words_russian.txt">
+      <Filter>db\fts\stop_words</Filter>
+    </None>
+    <None Include="..\db\fts\stop_words_spanish.txt">
+      <Filter>db\fts\stop_words</Filter>
+    </None>
+    <None Include="..\db\fts\stop_words_swedish.txt">
+      <Filter>db\fts\stop_words</Filter>
+    </None>
+    <None Include="..\db\fts\stop_words_turkish.txt">
+      <Filter>db\fts\stop_words</Filter>
+    </None>
+    <None Include="..\db\fts\SConscript">
+      <Filter>db\fts</Filter>
+    </None>
+    <None Include="..\db\fts\generate_stop_words.py">
+      <Filter>db\fts</Filter>
     </None>
   </ItemGroup>
 </Project>

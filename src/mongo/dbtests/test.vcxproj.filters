@@ -161,6 +161,33 @@
     <Filter Include="third_party\s2\util\math\exactfloat">
       <UniqueIdentifier>{dbba633e-454f-406f-b8fa-90a994ab09ed}</UniqueIdentifier>
     </Filter>
+    <Filter Include="third_party\libstemmer_c">
+      <UniqueIdentifier>{90b237dd-94f1-4b7a-81a0-7988269e89d5}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="third_party\libstemmer_c\examples">
+      <UniqueIdentifier>{57e6b82d-0ef1-4040-bc92-28d1182a8a3d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="third_party\libstemmer_c\include">
+      <UniqueIdentifier>{3414c042-3806-4d27-b87f-f634cc7c3e2d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="third_party\libstemmer_c\libstemmer">
+      <UniqueIdentifier>{e7414f07-6dc8-4484-8158-8e831d12d59f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="third_party\libstemmer_c\runtime">
+      <UniqueIdentifier>{b3cacd55-cbfe-41b2-ad8d-fb6f43f864d6}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="third_party\libstemmer_c\src_c">
+      <UniqueIdentifier>{e85b9d8a-da94-43f6-91a6-1979ada0187d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="db\fts">
+      <UniqueIdentifier>{17520d10-24df-431e-8b88-3fbcbbd4fbdc}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="db\fts\test">
+      <UniqueIdentifier>{3231319e-c0d1-4b37-9c9a-a2781da0c202}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="db\fts\stop_words">
+      <UniqueIdentifier>{26332f66-8d18-4286-b951-815df0628c8b}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\client\connpool.h">
@@ -1487,6 +1514,153 @@
     </ClInclude>
     <ClInclude Include="..\db\commands\mr.h">
       <Filter>db\commands</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\libstemmer_c\include\libstemmer.h">
+      <Filter>third_party\libstemmer_c\include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\libstemmer_c\libstemmer\modules.h">
+      <Filter>third_party\libstemmer_c\libstemmer</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\libstemmer_c\libstemmer\modules_utf8.h">
+      <Filter>third_party\libstemmer_c\libstemmer</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\libstemmer_c\src_c\stem_ISO_8859_1_danish.h">
+      <Filter>third_party\libstemmer_c\src_c</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\libstemmer_c\src_c\stem_ISO_8859_1_dutch.h">
+      <Filter>third_party\libstemmer_c\src_c</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\libstemmer_c\src_c\stem_ISO_8859_1_english.h">
+      <Filter>third_party\libstemmer_c\src_c</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\libstemmer_c\src_c\stem_ISO_8859_1_finnish.h">
+      <Filter>third_party\libstemmer_c\src_c</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\libstemmer_c\src_c\stem_ISO_8859_1_french.h">
+      <Filter>third_party\libstemmer_c\src_c</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\libstemmer_c\src_c\stem_ISO_8859_1_german.h">
+      <Filter>third_party\libstemmer_c\src_c</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\libstemmer_c\src_c\stem_ISO_8859_1_hungarian.h">
+      <Filter>third_party\libstemmer_c\src_c</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\libstemmer_c\src_c\stem_ISO_8859_1_italian.h">
+      <Filter>third_party\libstemmer_c\src_c</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\libstemmer_c\src_c\stem_ISO_8859_1_norwegian.h">
+      <Filter>third_party\libstemmer_c\src_c</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\libstemmer_c\src_c\stem_ISO_8859_1_porter.h">
+      <Filter>third_party\libstemmer_c\src_c</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\libstemmer_c\src_c\stem_ISO_8859_1_portuguese.h">
+      <Filter>third_party\libstemmer_c\src_c</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\libstemmer_c\src_c\stem_ISO_8859_1_spanish.h">
+      <Filter>third_party\libstemmer_c\src_c</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\libstemmer_c\src_c\stem_ISO_8859_1_swedish.h">
+      <Filter>third_party\libstemmer_c\src_c</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\libstemmer_c\src_c\stem_ISO_8859_2_romanian.h">
+      <Filter>third_party\libstemmer_c\src_c</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\libstemmer_c\src_c\stem_KOI8_R_russian.h">
+      <Filter>third_party\libstemmer_c\src_c</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\libstemmer_c\src_c\stem_UTF_8_danish.h">
+      <Filter>third_party\libstemmer_c\src_c</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\libstemmer_c\src_c\stem_UTF_8_dutch.h">
+      <Filter>third_party\libstemmer_c\src_c</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\libstemmer_c\src_c\stem_UTF_8_english.h">
+      <Filter>third_party\libstemmer_c\src_c</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\libstemmer_c\src_c\stem_UTF_8_finnish.h">
+      <Filter>third_party\libstemmer_c\src_c</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\libstemmer_c\src_c\stem_UTF_8_french.h">
+      <Filter>third_party\libstemmer_c\src_c</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\libstemmer_c\src_c\stem_UTF_8_german.h">
+      <Filter>third_party\libstemmer_c\src_c</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\libstemmer_c\src_c\stem_UTF_8_hungarian.h">
+      <Filter>third_party\libstemmer_c\src_c</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\libstemmer_c\src_c\stem_UTF_8_italian.h">
+      <Filter>third_party\libstemmer_c\src_c</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\libstemmer_c\src_c\stem_UTF_8_norwegian.h">
+      <Filter>third_party\libstemmer_c\src_c</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\libstemmer_c\src_c\stem_UTF_8_porter.h">
+      <Filter>third_party\libstemmer_c\src_c</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\libstemmer_c\src_c\stem_UTF_8_portuguese.h">
+      <Filter>third_party\libstemmer_c\src_c</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\libstemmer_c\src_c\stem_UTF_8_romanian.h">
+      <Filter>third_party\libstemmer_c\src_c</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\libstemmer_c\src_c\stem_UTF_8_russian.h">
+      <Filter>third_party\libstemmer_c\src_c</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\libstemmer_c\src_c\stem_UTF_8_spanish.h">
+      <Filter>third_party\libstemmer_c\src_c</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\libstemmer_c\src_c\stem_UTF_8_swedish.h">
+      <Filter>third_party\libstemmer_c\src_c</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\libstemmer_c\src_c\stem_UTF_8_turkish.h">
+      <Filter>third_party\libstemmer_c\src_c</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\libstemmer_c\runtime\api.h">
+      <Filter>third_party\libstemmer_c\runtime</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\libstemmer_c\runtime\header.h">
+      <Filter>third_party\libstemmer_c\runtime</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\fts\fts_command.h">
+      <Filter>db\fts</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\fts\fts_enabled.h">
+      <Filter>db\fts</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\fts\fts_index.h">
+      <Filter>db\fts</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\fts\fts_index_format.h">
+      <Filter>db\fts</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\fts\fts_matcher.h">
+      <Filter>db\fts</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\fts\fts_query.h">
+      <Filter>db\fts</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\fts\fts_search.h">
+      <Filter>db\fts</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\fts\fts_spec.h">
+      <Filter>db\fts</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\fts\fts_util.h">
+      <Filter>db\fts</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\fts\stemmer.h">
+      <Filter>db\fts</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\fts\stop_words.h">
+      <Filter>db\fts</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\fts\stop_words_list.h">
+      <Filter>db\fts</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\fts\tokenizer.h">
+      <Filter>db\fts</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -2917,6 +3091,183 @@
     <ClCompile Include="..\db\commands\find_and_modify_common.cpp">
       <Filter>db\commands</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\third_party\libstemmer_c\examples\stemwords.c">
+      <Filter>third_party\libstemmer_c\examples</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\libstemmer_c\libstemmer\libstemmer.c">
+      <Filter>third_party\libstemmer_c\libstemmer</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\libstemmer_c\libstemmer\libstemmer_utf8.c">
+      <Filter>third_party\libstemmer_c\libstemmer</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\libstemmer_c\src_c\stem_ISO_8859_1_danish.c">
+      <Filter>third_party\libstemmer_c\src_c</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\libstemmer_c\src_c\stem_ISO_8859_1_dutch.c">
+      <Filter>third_party\libstemmer_c\src_c</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\libstemmer_c\src_c\stem_ISO_8859_1_english.c">
+      <Filter>third_party\libstemmer_c\src_c</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\libstemmer_c\src_c\stem_ISO_8859_1_finnish.c">
+      <Filter>third_party\libstemmer_c\src_c</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\libstemmer_c\src_c\stem_ISO_8859_1_french.c">
+      <Filter>third_party\libstemmer_c\src_c</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\libstemmer_c\src_c\stem_ISO_8859_1_german.c">
+      <Filter>third_party\libstemmer_c\src_c</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\libstemmer_c\src_c\stem_ISO_8859_1_hungarian.c">
+      <Filter>third_party\libstemmer_c\src_c</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\libstemmer_c\src_c\stem_ISO_8859_1_italian.c">
+      <Filter>third_party\libstemmer_c\src_c</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\libstemmer_c\src_c\stem_ISO_8859_1_norwegian.c">
+      <Filter>third_party\libstemmer_c\src_c</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\libstemmer_c\src_c\stem_ISO_8859_1_porter.c">
+      <Filter>third_party\libstemmer_c\src_c</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\libstemmer_c\src_c\stem_ISO_8859_1_portuguese.c">
+      <Filter>third_party\libstemmer_c\src_c</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\libstemmer_c\src_c\stem_ISO_8859_1_spanish.c">
+      <Filter>third_party\libstemmer_c\src_c</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\libstemmer_c\src_c\stem_ISO_8859_1_swedish.c">
+      <Filter>third_party\libstemmer_c\src_c</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\libstemmer_c\src_c\stem_ISO_8859_2_romanian.c">
+      <Filter>third_party\libstemmer_c\src_c</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\libstemmer_c\src_c\stem_KOI8_R_russian.c">
+      <Filter>third_party\libstemmer_c\src_c</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\libstemmer_c\src_c\stem_UTF_8_danish.c">
+      <Filter>third_party\libstemmer_c\src_c</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\libstemmer_c\src_c\stem_UTF_8_dutch.c">
+      <Filter>third_party\libstemmer_c\src_c</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\libstemmer_c\src_c\stem_UTF_8_english.c">
+      <Filter>third_party\libstemmer_c\src_c</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\libstemmer_c\src_c\stem_UTF_8_finnish.c">
+      <Filter>third_party\libstemmer_c\src_c</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\libstemmer_c\src_c\stem_UTF_8_french.c">
+      <Filter>third_party\libstemmer_c\src_c</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\libstemmer_c\src_c\stem_UTF_8_german.c">
+      <Filter>third_party\libstemmer_c\src_c</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\libstemmer_c\src_c\stem_UTF_8_hungarian.c">
+      <Filter>third_party\libstemmer_c\src_c</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\libstemmer_c\src_c\stem_UTF_8_italian.c">
+      <Filter>third_party\libstemmer_c\src_c</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\libstemmer_c\src_c\stem_UTF_8_norwegian.c">
+      <Filter>third_party\libstemmer_c\src_c</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\libstemmer_c\src_c\stem_UTF_8_porter.c">
+      <Filter>third_party\libstemmer_c\src_c</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\libstemmer_c\src_c\stem_UTF_8_portuguese.c">
+      <Filter>third_party\libstemmer_c\src_c</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\libstemmer_c\src_c\stem_UTF_8_romanian.c">
+      <Filter>third_party\libstemmer_c\src_c</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\libstemmer_c\src_c\stem_UTF_8_russian.c">
+      <Filter>third_party\libstemmer_c\src_c</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\libstemmer_c\src_c\stem_UTF_8_spanish.c">
+      <Filter>third_party\libstemmer_c\src_c</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\libstemmer_c\src_c\stem_UTF_8_swedish.c">
+      <Filter>third_party\libstemmer_c\src_c</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\libstemmer_c\src_c\stem_UTF_8_turkish.c">
+      <Filter>third_party\libstemmer_c\src_c</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\libstemmer_c\runtime\api.c">
+      <Filter>third_party\libstemmer_c\runtime</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\libstemmer_c\runtime\utilities.c">
+      <Filter>third_party\libstemmer_c\runtime</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\fts\fts_command.cpp">
+      <Filter>db\fts</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\fts\fts_command_mongod.cpp">
+      <Filter>db\fts</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\fts\fts_command_mongos.cpp">
+      <Filter>db\fts</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\fts\fts_enabled.cpp">
+      <Filter>db\fts</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\fts\fts_index.cpp">
+      <Filter>db\fts</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\fts\fts_index_format.cpp">
+      <Filter>db\fts</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\fts\fts_matcher.cpp">
+      <Filter>db\fts</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\fts\fts_query.cpp">
+      <Filter>db\fts</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\fts\fts_search.cpp">
+      <Filter>db\fts</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\fts\fts_spec.cpp">
+      <Filter>db\fts</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\fts\fts_util.cpp">
+      <Filter>db\fts</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\fts\stemmer.cpp">
+      <Filter>db\fts</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\fts\stop_words.cpp">
+      <Filter>db\fts</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\fts\stop_words_list.cpp">
+      <Filter>db\fts</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\fts\tokenizer.cpp">
+      <Filter>db\fts</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\fts\fts_index_format_test.cpp">
+      <Filter>db\fts\test</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\fts\fts_matcher_test.cpp">
+      <Filter>db\fts\test</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\fts\fts_query_test.cpp">
+      <Filter>db\fts\test</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\fts\fts_spec_test.cpp">
+      <Filter>db\fts\test</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\fts\fts_util_test.cpp">
+      <Filter>db\fts\test</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\fts\stemmer_test.cpp">
+      <Filter>db\fts\test</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\fts\stop_words_test.cpp">
+      <Filter>db\fts\test</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\fts\tokenizer_test.cpp">
+      <Filter>db\fts\test</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="btreetests.inl">
@@ -2936,6 +3287,69 @@
     </None>
     <None Include="..\..\third_party\s2\LICENSE-2.0.txt">
       <Filter>third_party\s2</Filter>
+    </None>
+    <None Include="..\..\third_party\libstemmer_c\SConscript">
+      <Filter>third_party\libstemmer_c</Filter>
+    </None>
+    <None Include="..\..\third_party\libstemmer_c\libstemmer\libstemmer_c.in">
+      <Filter>third_party\libstemmer_c\libstemmer</Filter>
+    </None>
+    <None Include="..\..\third_party\libstemmer_c\libstemmer\modules.txt">
+      <Filter>third_party\libstemmer_c\libstemmer</Filter>
+    </None>
+    <None Include="..\..\third_party\libstemmer_c\libstemmer\modules_utf8.txt">
+      <Filter>third_party\libstemmer_c\libstemmer</Filter>
+    </None>
+    <None Include="..\db\fts\stop_words_danish.txt">
+      <Filter>db\fts\stop_words</Filter>
+    </None>
+    <None Include="..\db\fts\stop_words_dutch.txt">
+      <Filter>db\fts\stop_words</Filter>
+    </None>
+    <None Include="..\db\fts\stop_words_english.txt">
+      <Filter>db\fts\stop_words</Filter>
+    </None>
+    <None Include="..\db\fts\stop_words_finnish.txt">
+      <Filter>db\fts\stop_words</Filter>
+    </None>
+    <None Include="..\db\fts\stop_words_french.txt">
+      <Filter>db\fts\stop_words</Filter>
+    </None>
+    <None Include="..\db\fts\stop_words_german.txt">
+      <Filter>db\fts\stop_words</Filter>
+    </None>
+    <None Include="..\db\fts\stop_words_hungarian.txt">
+      <Filter>db\fts\stop_words</Filter>
+    </None>
+    <None Include="..\db\fts\stop_words_italian.txt">
+      <Filter>db\fts\stop_words</Filter>
+    </None>
+    <None Include="..\db\fts\stop_words_norwegian.txt">
+      <Filter>db\fts\stop_words</Filter>
+    </None>
+    <None Include="..\db\fts\stop_words_portuguese.txt">
+      <Filter>db\fts\stop_words</Filter>
+    </None>
+    <None Include="..\db\fts\stop_words_romanian.txt">
+      <Filter>db\fts\stop_words</Filter>
+    </None>
+    <None Include="..\db\fts\stop_words_russian.txt">
+      <Filter>db\fts\stop_words</Filter>
+    </None>
+    <None Include="..\db\fts\stop_words_spanish.txt">
+      <Filter>db\fts\stop_words</Filter>
+    </None>
+    <None Include="..\db\fts\stop_words_swedish.txt">
+      <Filter>db\fts\stop_words</Filter>
+    </None>
+    <None Include="..\db\fts\stop_words_turkish.txt">
+      <Filter>db\fts\stop_words</Filter>
+    </None>
+    <None Include="..\db\fts\SConscript">
+      <Filter>db\fts</Filter>
+    </None>
+    <None Include="..\db\fts\generate_stop_words.py">
+      <Filter>db\fts</Filter>
     </None>
   </ItemGroup>
 </Project>
