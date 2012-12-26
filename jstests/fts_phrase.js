@@ -1,4 +1,6 @@
 
+load( "jstests/libs/fts.js" );
+
 t = db.text_phrase;
 t.drop()
 
