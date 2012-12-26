@@ -280,6 +280,7 @@ namespace mongo {
             appendReplicationInfo(result, 0);
 
             result.appendNumber("maxBsonObjectSize", BSONObjMaxUserSize);
+            result.appendNumber("maxMessageSizeBytes", MaxMessageSizeBytes);
             result.appendDate("localTime", jsTime());
             return true;
         }

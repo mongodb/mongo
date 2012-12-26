@@ -165,7 +165,7 @@ again:
             int lft = 4;
             psock->recv( lenbuf, lft );
 
-            if ( len < 16 || len > 48000000 ) { // messages must be large enough for headers
+            if ( len < 16 || len > MaxMessageSizeBytes ) { // messages must be large enough for headers
                 if ( len == -1 ) {
                     // Endian check from the client, after connecting, to see what mode server is running in.
                     unsigned foo = 0x10203040;
