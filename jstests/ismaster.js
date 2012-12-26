@@ -1,4 +1,3 @@
-var
 var res = db.isMaster();
 assert( res.maxBsonObjectSize &&
         isNumber(res.maxBsonObjectSize) &&
