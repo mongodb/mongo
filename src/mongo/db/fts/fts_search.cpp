@@ -137,6 +137,8 @@ namespace mongo {
             BSONObj key = cursor->currKey();
 
             BSONObjIterator i( key );
+            for ( unsigned j = 0; j < _fts->getFtsSpec().numExtraBefore(); j++ )
+                i.next();
             i.next(); // move pase indexToken
             BSONElement scoreElement = i.next();
 
