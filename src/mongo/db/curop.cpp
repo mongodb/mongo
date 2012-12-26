@@ -66,6 +66,32 @@ namespace mongo {
         _active = true; // this should be last for ui clarity
     }
 
+    CurOp* CurOp::getOp(const BSONObj& criteria) {
+        Matcher matcher(criteria);
+        Client& me = cc();
+
+        scoped_lock client_lock(Client::clientsMutex);
+        for (std::set<Client*>::iterator it = Client::clients.begin();
+             it != Client::clients.end();
+             it++) {
+
+            Client *client = *it;
+            verify(client);
+
+            CurOp* curop = client->curop();
+            if (client == &me || curop == NULL) {
+                continue;
+            }
+
+            BSONObj info = curop->info();
+            if (matcher.matches(info)) {
+                return curop;
+            }
+        }
+
+        return NULL;
+    }
+
     void CurOp::reset( const HostAndPort& remote, int op ) {
         reset();
         if( _remote != remote ) {

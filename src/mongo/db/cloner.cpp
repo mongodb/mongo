@@ -20,11 +20,16 @@
 
 #include "mongo/base/init.h"
 #include "mongo/base/status.h"
+#include "mongo/bson/mutable/mutable_bson.h"
+#include "mongo/bson/mutable/mutable_bson_algo.h"
+#include "mongo/bson/mutable/mutable_bson_builder.h"
+#include "mongo/bson/mutable/mutable_bson_heap.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/cloner.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/rename_collection.h"
 #include "mongo/db/db.h"
+#include "mongo/db/index_builder.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/kill_current_op.h"
@@ -847,6 +852,29 @@ namespace mongo {
         virtual void help( stringstream &help ) const {
             help << " example: { renameCollection: foo.a, to: bar.b }";
         }
+
+        virtual std::vector<BSONObj> stopIndexBuilds(const std::string& dbname, const BSONObj& cmdObj) {
+            string source = cmdObj.getStringField( name.c_str() );
+            string target = cmdObj.getStringField( "to" );
+
+            BSONObj criteria = BSON("op" << "insert" << "ns" << dbname+".system.indexes" <<
+                                    "insert.ns" << source);
+
+            std::vector<BSONObj> prelim = IndexBuilder::killMatchingIndexBuilds(criteria);
+            std::vector<BSONObj> indexes;
+
+            for (int i = 0; i < static_cast<int>(prelim.size()); i++) {
+                // Change the ns
+                BSONObj stripped = prelim[i].removeField("ns");
+                BSONObjBuilder builder;
+                builder.appendElements(stripped);
+                builder.append("ns", target);
+                indexes.push_back(builder.done());
+            }
+
+            return indexes;
+        }
+
         virtual bool run(const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             string source = cmdObj.getStringField( name.c_str() );
             string target = cmdObj.getStringField( "to" );
@@ -880,10 +908,12 @@ namespace mongo {
 
             bool capped = false;
             long long size = 0;
+            std::vector<BSONObj> indexesInProg;
             {
                 Client::Context ctx( source );
                 NamespaceDetails *nsd = nsdetails( source );
                 uassert( 10026 ,  "source namespace does not exist", nsd );
+                indexesInProg = stopIndexBuilds(dbname, cmdObj);
                 capped = nsd->isCapped();
                 if ( capped )
                     for( DiskLoc i = nsd->firstExtent; !i.isNull(); i = i.ext()->xnext )
@@ -969,6 +999,7 @@ namespace mongo {
             {
                 Client::Context ctx( source );
                 dropCollection( source, errmsg, result );
+                IndexBuilder::restoreIndexes(targetIndexes, indexesInProg);
             }
             return true;
         }

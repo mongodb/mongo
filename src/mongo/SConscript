@@ -392,6 +392,7 @@ serverOnlyFiles = [ "db/curop.cpp",
                     "db/queryoptimizercursorimpl.cpp",
                     "db/extsort.cpp",
                     "db/index.cpp",
+                    "db/index_builder.cpp",
                     "db/index_update.cpp",
                     "db/index_rebuilder.cpp",
                     "db/scanandorder.cpp",
@@ -410,6 +411,7 @@ serverOnlyFiles = [ "db/curop.cpp",
                     "db/ops/update.cpp",
                     "db/ops/update_internal.cpp",
                     "db/dbcommands.cpp",
+                    "db/compact.cpp",
                     "db/dbcommands_admin.cpp",
 
                     # most commands are only for mongod
@@ -558,7 +560,7 @@ everythingButMongodAndMongosFiles = [
     ]
 env.StaticLibrary("notmongodormongos", everythingButMongodAndMongosFiles)
 
-mongodOnlyFiles = [ "db/db.cpp", "db/compact.cpp", "db/commands/touch.cpp" ]
+mongodOnlyFiles = [ "db/db.cpp", "db/commands/touch.cpp" ]
 
 # ----- TARGETS ------
 

@@ -1428,14 +1428,6 @@ namespace mongo {
         uassert( 13143 , "can't create index on system.indexes" , tabletoidxns.find( ".system.indexes" ) == string::npos );
 
         BSONObj info = loc.obj();
-        bool background = info["background"].trueValue();
-        if (background && !isMasterNs(tabletoidxns.c_str())) {
-            /* don't do background indexing on slaves.  there are nuances.  this could be added later
-                but requires more code.
-                */
-            log() << "info: indexing in foreground on this replica; was a background index build on the primary" << endl;
-            background = false;
-        }
 
         // The total number of indexes right before we write to the collection
         int oldNIndexes = -1;
@@ -1457,7 +1449,7 @@ namespace mongo {
 
             try {
                 getDur().writingInt(tableToIndex->indexBuildsInProgress) += 1;
-                buildAnIndex(tabletoidxns, tableToIndex, idx, background, mayInterrupt);
+                buildAnIndex(tabletoidxns, tableToIndex, idx, mayInterrupt);
             }
             catch (DBException& e) {
                 // save our error msg string as an exception or dropIndexes will overwrite our message

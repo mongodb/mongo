@@ -34,7 +34,6 @@ namespace mongo {
     void buildAnIndex(const std::string& ns,
                       NamespaceDetails *d,
                       IndexDetails& idx,
-                      bool background,
                       bool mayInterrupt);
 
     // add index keys for a newly inserted record 
