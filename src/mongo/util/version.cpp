@@ -117,7 +117,7 @@ namespace mongo {
 #if( !defined(_MT) )
 #error _MT is not defined
 #endif
-        ss << (sizeof(char *) == 8) ? " 64bit" : " 32bit";
+        ss << (sizeof(char *) == 8 ? " 64bit" : " 32bit");
         return ss.str();
     }
 #else
