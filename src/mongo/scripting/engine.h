@@ -161,12 +161,7 @@ namespace mongo {
         virtual ~ScriptEngine();
 
         virtual Scope* newScope() {
-            Scope* s = createScope();
-            if (!s) return NULL;
-            if (_scopeInitCallback)
-                _scopeInitCallback(*s);
-            installGlobalUtils(*s);
-            return s;
+            return createScope();
         }
 
         virtual void runTest() = 0;
@@ -219,6 +214,7 @@ namespace mongo {
         virtual Scope * createScope() = 0;
 
     private:
+        friend class V8Scope; // for _scopeInitCallback (due to v8 API requirements)
         void (*_scopeInitCallback)(Scope &);
         static void (*_connectCallback)(DBClientWithCommands&);
         static const char* (*_checkInterruptCallback)();

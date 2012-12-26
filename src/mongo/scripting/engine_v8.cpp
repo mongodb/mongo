@@ -525,7 +525,15 @@ namespace mongo {
         injectV8Function("load", load);
         injectV8Function("gc", GCV8);
 
+        // install db and bson types in the global scope
         installDBTypes(this, _global);
+
+        // install db/shell-specific utilities in the global scope
+        if (_engine->_scopeInitCallback)
+            _engine->_scopeInitCallback(*this);
+
+        // install global utility functions
+        installGlobalUtils(*this);
 
         registerOpId();
     }
@@ -940,12 +948,11 @@ namespace mongo {
     }
 
     void V8Scope::injectNative( const char *field, NativeFunction func, void* data ) {
+        V8_SIMPLE_HEADER    // required due to public access
         injectNative(field, func, _global, data);
     }
 
     void V8Scope::injectNative( const char *field, NativeFunction func, Handle<v8::Object>& obj, void* data ) {
-        V8_SIMPLE_HEADER
-
         Handle< FunctionTemplate > ft = createV8Function(nativeCallback);
         ft->Set( this->V8STR_NATIVE_FUNC, External::New( (void*)func ) );
         ft->Set( this->V8STR_NATIVE_DATA, External::New( data ) );
@@ -957,26 +964,21 @@ namespace mongo {
     }
 
     void V8Scope::injectV8Function( const char *field, v8Function func, Handle<v8::Object>& obj ) {
-        V8_SIMPLE_HEADER
-
         Handle< FunctionTemplate > ft = createV8Function(func);
         Handle<v8::Function> f = ft->GetFunction();
         obj->Set( getV8Str( field ), f );
     }
 
     void V8Scope::injectV8Function( const char *field, v8Function func, Handle<v8::Template>& t ) {
-        V8_SIMPLE_HEADER
-
         Handle< FunctionTemplate > ft = createV8Function(func);
         Handle<v8::Function> f = ft->GetFunction();
         t->Set( getV8Str( field ), f );
     }
 
     Handle<FunctionTemplate> V8Scope::createV8Function( v8Function func ) {
-        V8_SIMPLE_HEADER
         Handle< FunctionTemplate > ft = v8::FunctionTemplate::New(v8Callback, External::New( this ));
         ft->Set( this->V8STR_V8_FUNC, External::New( (void*)func ) );
-        return handle_scope.Close(ft);
+        return ft;
     }
 
     void V8Scope::gc() {
