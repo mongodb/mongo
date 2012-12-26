@@ -203,10 +203,12 @@ replTest.awaitReplication(60000);
 printjson(replTest.status());
 
 print("force 2 to sync from 3");
-replTest.nodes[2].getDB("admin").runCommand({replSetSyncFrom: replTest.host+":"+replTest.ports[3]});
-assert.soon(function() {
-    return checkSyncingFrom(nodes[2], replTest.host+":"+replTest.ports[3]);
-});
+// This briefly causes 2 to sync from 3, but members have a strong prefrence for not syncing from
+// a slave delayed node so it may switch to another sync source quickly.
+result = replTest.nodes[2].getDB("admin")
+    .runCommand({replSetSyncFrom: replTest.host+":"+replTest.ports[3]});
+printjson(result);
+assert.eq(1, result.ok);
 
 print("do writes and check that 2 changes sync targets");
 assert.soon(function() {
