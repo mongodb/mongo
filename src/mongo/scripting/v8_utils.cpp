@@ -177,7 +177,6 @@ namespace mongo {
 
             void operator()() {
                 config_._scope.reset( dynamic_cast< V8Scope * >( globalScriptEngine->newScope() ) );
-                V8Scope* scope = config_._scope.get();
                 v8::Locker v8lock(config_._scope->getIsolate());
                 v8::Isolate::Scope iscope(config_._scope->getIsolate());
                 HandleScope handle_scope;
