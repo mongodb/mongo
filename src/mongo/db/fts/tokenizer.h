@@ -59,7 +59,7 @@ namespace mongo {
 
             unsigned _pos;
             bool _previousWhiteSpace;
-            const StringData& _raw;
+            const StringData _raw;
             bool _english;
         };
 
