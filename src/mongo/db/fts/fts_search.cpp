@@ -137,7 +137,6 @@ namespace mongo {
             BSONObj key = cursor->currKey();
 
             BSONObjIterator i( key );
-            BSONElement indexToken = i.next();
             BSONElement scoreElement = i.next();
 
             double score = scoreElement.number();
