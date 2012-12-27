@@ -493,9 +493,9 @@ namespace mongo {
             BSONObjIterator i( sortPattern );
             while ( i.more() ) {
                 BSONElement elem = i.next();
-                uassert( 16626, "sort pattern must be numeric", elem.isNumber() );
+                uassert( 16645, "sort pattern must be numeric", elem.isNumber() );
                 double val = elem.Number();
-                uassert( 16627, "sort pattern must contain 1 or -1", val*val == 1.0);
+                uassert( 16646, "sort pattern must contain 1 or -1", val*val == 1.0);
                 StringData field( elem.fieldName() );
                 size_t pos = field.find('.');
                 if ( pos != string::npos ) {

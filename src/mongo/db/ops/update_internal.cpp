@@ -1204,16 +1204,16 @@ namespace mongo {
                                              nextElem.number() >= 0 );
                                 }
                                 else if ( str::equals( nextElem.fieldName(), "$sort" ) ) {
-                                    uassert( 16628, "$sort appeared twice", !seenSort );
+                                    uassert( 16647, "$sort appeared twice", !seenSort );
                                     seenSort = true;
-                                    uassert( 16629,
+                                    uassert( 16648,
                                              "$sort component of $push must be an object",
                                              nextElem.type() == Object );
 
                                     BSONObjIterator j( nextElem.embeddedObject() );
                                     while ( j.more() ) {
                                         BSONElement fieldSortElem = j.next();
-                                        uassert( 16630,
+                                        uassert( 16641,
                                                  "$sort elements' values  must either 1 or -1",
                                                  ( fieldSortElem.type() == NumberInt ||
                                                    fieldSortElem.type() == NumberLong ||
@@ -1230,19 +1230,19 @@ namespace mongo {
                                     BSONObjIterator k( eachArray );
                                     while ( k.more() ) {
                                         BSONElement eachItem = k.next();
-                                        uassert( 16631,
+                                        uassert( 16642,
                                                  "$sort requires $each to be an array of objects",
                                                  eachItem.type() == Object );
                                     }
                                 }
                                 else {
-                                    uasserted( 16632,
+                                    uasserted( 16643,
                                                "$each term takes only $trimTo (and optionally "
                                                "$sort) as complements" );
                                 }
                             }
 
-                            uassert( 16633,
+                            uassert( 16644,
                                      "cannot have a $sort without a $trimTo",
                                      (seenTrimTo && seenSort) ||
                                      (seenTrimTo && !seenSort) );
