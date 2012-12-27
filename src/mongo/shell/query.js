@@ -63,14 +63,10 @@ DBQuery.prototype._ensureSpecial = function() {
         return this;
 
     var query = this._query;
-    var ns = this._ns;
 
     // Set special flag if the query doc starts with $query/query --
     // This is common when copied from the output of the log or query profiler
-    // Ignore this, though, for commands.
-    this._special = (query && (query["$query"] || query["query"]) && 
-                     ns && !(/\.\$cmd$/.test(ns)));
-                    
+    this._special = query && (query["$query"] || query["query"]) ? true : false;
     if (this._special && query) {
         // copy the input query fields to the new (wrapped query) -- converts to correct names
         var wrappedQuery = {};
