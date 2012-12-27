@@ -465,8 +465,9 @@ namespace mongo {
                 return false;
             }
             // Assume both min and max non-empty, append MinKey's to make them fit chosen index
-            BSONObj min = Helpers::modifiedRangeBound( _min , idx->keyPattern() , -1 );
-            BSONObj max = Helpers::modifiedRangeBound( _max , idx->keyPattern() , -1 );
+            KeyPattern kp( idx->keyPattern() );
+            BSONObj min = Helpers::toKeyFormat( kp.extendRangeBound( _min, false ) );
+            BSONObj max = Helpers::toKeyFormat( kp.extendRangeBound( _max, false ) );
 
             BtreeCursor* btreeCursor = BtreeCursor::make( d , *idx , min , max , false , 1 );
             auto_ptr<ClientCursor> cc(
@@ -1796,8 +1797,7 @@ namespace mongo {
 
                     // id object most likely has form { _id : ObjectId(...) }
                     // infer from that correct index to use, e.g. { _id : 1 }
-                    BSONObj idIndexPattern;
-                    Helpers::toKeyFormat( id , idIndexPattern );
+                    BSONObj idIndexPattern = Helpers::inferKeyPattern( id );
 
                     // TODO: create a better interface to remove objects directly
                     Helpers::removeRange( ns ,
@@ -1979,9 +1979,8 @@ namespace mongo {
                 // shardKeyPattern may not be provided if another shard is from pre 2.2
                 // In that case, assume the shard key pattern is the same as the range
                 // specifiers provided.
-                BSONObj keya , keyb;
-                Helpers::toKeyFormat( migrateStatus.min , keya );
-                Helpers::toKeyFormat( migrateStatus.max , keyb );
+                BSONObj keya = Helpers::inferKeyPattern( migrateStatus.min );
+                BSONObj keyb = Helpers::inferKeyPattern( migrateStatus.max );
                 verify( keya == keyb );
 
                 warning() << "No shard key pattern provided by source shard for migration."

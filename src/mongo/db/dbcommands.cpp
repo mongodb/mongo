@@ -1197,7 +1197,8 @@ namespace mongo {
             else {
 
                 if ( keyPattern.isEmpty() ){
-                    Helpers::toKeyFormat( min , keyPattern );
+                    // if keyPattern not provided, try to infer it from the fields in 'min'
+                    keyPattern = Helpers::inferKeyPattern( min );
                 }
 
                 const IndexDetails *idx = d->findIndexByPrefix( keyPattern ,
@@ -1207,8 +1208,9 @@ namespace mongo {
                     return false;
                 }
                 // If both min and max non-empty, append MinKey's to make them fit chosen index
-                min = Helpers::modifiedRangeBound( min , idx->keyPattern() , -1 );
-                max = Helpers::modifiedRangeBound( max , idx->keyPattern() , -1 );
+                KeyPattern kp( idx->keyPattern() );
+                min = Helpers::toKeyFormat( kp.extendRangeBound( min, false ) );
+                max = Helpers::toKeyFormat( kp.extendRangeBound( max, false ) );
 
                 c.reset( BtreeCursor::make( d, *idx, min, max, false, 1 ) );
             }

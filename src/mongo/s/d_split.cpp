@@ -113,13 +113,14 @@ namespace mongo {
                 return false;
             }
             // extend min to get (min, MinKey, MinKey, ....)
-            min = Helpers::modifiedRangeBound( min , idx->keyPattern() , -1 );
+            KeyPattern kp( idx->keyPattern() );
+            min = Helpers::toKeyFormat( kp.extendRangeBound( min, false ) );
             if  ( max.isEmpty() ) {
                 // if max not specified, make it (MaxKey, Maxkey, MaxKey...)
-                max = Helpers::modifiedRangeBound( max , idx->keyPattern() , 1 );
+                max = Helpers::toKeyFormat( kp.extendRangeBound( max, true ) );
             } else {
                 // otherwise make it (max,MinKey,MinKey...) so that bound is non-inclusive
-                max = Helpers::modifiedRangeBound( max , idx->keyPattern() , -1 );
+                max = Helpers::toKeyFormat( kp.extendRangeBound( max, false ) );
             }
 
             BtreeCursor* bc = BtreeCursor::make( d, *idx, min, max, false, 1 );
@@ -260,13 +261,14 @@ namespace mongo {
                     return false;
                 }
                 // extend min to get (min, MinKey, MinKey, ....)
-                min = Helpers::modifiedRangeBound( min , idx->keyPattern() , -1 );
+                KeyPattern kp( idx->keyPattern() );
+                min = Helpers::toKeyFormat( kp.extendRangeBound ( min, false ) );
                 if  ( max.isEmpty() ) {
                     // if max not specified, make it (MaxKey, Maxkey, MaxKey...)
-                    max = Helpers::modifiedRangeBound( max , idx->keyPattern() , 1 );
+                    max = Helpers::toKeyFormat( kp.extendRangeBound( max, true ) );
                 } else {
                     // otherwise make it (max,MinKey,MinKey...) so that bound is non-inclusive
-                    max = Helpers::modifiedRangeBound( max , idx->keyPattern() , -1 );
+                    max = Helpers::toKeyFormat( kp.extendRangeBound( max, false ) );
                 }
                 
                 const long long recCount = d->stats.nrecords;
@@ -793,8 +795,9 @@ namespace mongo {
                     }
 
                     ChunkInfo chunk = newChunks[i];
-                    BSONObj newmin = Helpers::modifiedRangeBound(chunk.min, idx->keyPattern(), -1);
-                    BSONObj newmax = Helpers::modifiedRangeBound(chunk.max , idx->keyPattern(), -1);
+                    KeyPattern kp( idx->keyPattern() );
+                    BSONObj newmin = Helpers::toKeyFormat( kp.extendRangeBound( chunk.min, false) );
+                    BSONObj newmax = Helpers::toKeyFormat( kp.extendRangeBound( chunk.max, false) );
 
                     scoped_ptr<BtreeCursor> bc( BtreeCursor::make( d,
                                                                    *idx,
