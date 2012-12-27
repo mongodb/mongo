@@ -34,6 +34,8 @@ namespace mongo {
         virtual void run();
         virtual std::string name() const;
 
+        void build() const;
+
         /**
          * Kill all in-progress indexes matching criteria and, optionally, store them in the
          * indexes list.

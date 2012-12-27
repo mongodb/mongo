@@ -775,7 +775,7 @@ namespace mongo {
                 else {
                     IndexBuilder builder(ns, o);
                     // Finish the foreground build before returning
-                    builder.run();
+                    builder.build();
                 }
             }
             else {
