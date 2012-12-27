@@ -370,7 +370,7 @@ namespace mongo {
             std::string systemIndexes = dbname+".system.indexes";
             std::string coll = cmdObj.firstElement().valuestr();
             std::string ns = dbname + "." + coll;
-            BSONObj criteria = BSON("ns" << ns << "op" << "insert" << "insert.ns" << ns);
+            BSONObj criteria = BSON("ns" << systemIndexes << "op" << "insert" << "insert.ns" << ns);
 
             return IndexBuilder::killMatchingIndexBuilds(criteria);
         }
