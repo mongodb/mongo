@@ -21,6 +21,8 @@
  * TODO: See if this stuff is more generally useful, distribute if so.
  */
 
+#pragma once
+
 #include "mongo/base/owned_pointer_map.h"
 #include "mongo/base/owned_pointer_vector.h"
 #include "mongo/client/dbclientinterface.h"

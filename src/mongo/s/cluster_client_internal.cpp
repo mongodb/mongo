@@ -21,9 +21,9 @@
 
 #include "mongo/client/connpool.h"
 #include "mongo/s/field_parser.h"
+#include "mongo/s/type_changelog.h"
 #include "mongo/s/type_mongos.h"
 #include "mongo/s/type_shard.h"
-#include "mongo/s/type_changelog.h"
 #include "mongo/util/stringutils.h"
 
 namespace mongo {
@@ -297,7 +297,9 @@ namespace mongo {
                            const BSONObj& details)
     {
         //
-        // Duplicated here to avoid dependency issues
+        // The code for writing to the changelog collection exists elsewhere - we duplicate here to
+        // avoid dependency issues.
+        // TODO: Merge again once config.cpp is cleaned up.
         //
 
         string changeID = stream() << getHostNameCached() << "-" << terseCurrentTime() << "-"

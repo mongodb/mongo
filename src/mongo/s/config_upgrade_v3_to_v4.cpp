@@ -51,6 +51,8 @@ namespace mongo {
             "http://docs.mongodb.org/upgrade\n"
             "******\n";
 
+    static const char* minMongoProcessVersion = "2.2";
+
     // Custom field used in upgrade state to determine if/where we failed on last upgrade
     const BSONField<bool> inCriticalSectionField(string("inCriticalSection"));
 
@@ -164,13 +166,14 @@ namespace mongo {
         // We can't upgrade if there are active pre-v2.2 processes in the cluster
         //
 
-        Status mongoVersionStatus = checkClusterMongoVersions(configLoc, "2.2");
+        Status mongoVersionStatus = checkClusterMongoVersions(configLoc,
+                                                              string(minMongoProcessVersion));
 
         if (!mongoVersionStatus.isOK()) {
 
-            *errMsg = stream()
-                    << "cannot upgrade with pre-2.2 mongo processes active in the cluster"
-                    << causedBy(mongoVersionStatus);
+            *errMsg = stream() << "cannot upgrade with pre-v" << minMongoProcessVersion
+                               << " mongo processes active in the cluster"
+                               << causedBy(mongoVersionStatus);
 
             return false;
         }
@@ -233,6 +236,8 @@ namespace mongo {
 
         OwnedPointerVector<ScopedDistributedLock> collectionLocks;
 
+        log() << "acquiring locks for " << collections.size() << " sharded collections..." << endl;
+
         for (map<string, CollectionType*>::const_iterator it = collections.begin();
                 it != collections.end(); ++it)
         {
@@ -254,6 +259,12 @@ namespace mongo {
             }
 
             collectionLocks.mutableVector().push_back(namespaceLock);
+
+            // Progress update
+            if (collectionLocks.vector().size() % 10 == 0) {
+                log() << "acquired " << collectionLocks.vector().size() << " locks out of "
+                      << collections.size() << " for config upgrade" << endl;
+            }
         }
 
         // We are now preventing all splits and migrates for all sharded collections
@@ -261,6 +272,9 @@ namespace mongo {
         // Get working and backup suffixes
         string workingSuffix = genWorkingSuffix(upgradeId);
         string backupSuffix = genBackupSuffix(upgradeId);
+
+        log() << "copying collection and chunk metadata to working and backup collections..."
+              << endl;
 
         // Get a backup and working copy of the config.collections and config.chunks collections
 
@@ -433,37 +447,83 @@ namespace mongo {
                     return false;
                 }
 
-                // Paranoid verify the write
-                try {
-                    ScopedDbConnection& conn = *connPtr;
+                connPtr->done();
+            }
+        }
 
-                    // Find chunks with a different epoch
-                    BSONObj diffChunk =
-                            conn->findOne(ChunkType::ConfigNS + workingSuffix,
-                                          BSON(ChunkType::ns(collection.getNS())
-                                                  << ChunkType::DEPRECATED_epoch() << NE << epoch));
+        //
+        // Paranoid verify the collection writes
+        //
 
-                    if (!diffChunk.isEmpty()) {
+        {
+            scoped_ptr<ScopedDbConnection> connPtr;
 
-                        *errMsg = stream() << "could not update chunk " << diffChunk
-                                           << " with new epoch " << epoch.toString()
-                                           << " in collection " << collection.getNS();
+            try {
+                connPtr.reset(ScopedDbConnection::getInternalScopedDbConnection(configLoc, 30));
+                ScopedDbConnection& conn = *connPtr;
 
-                        return false;
+                // Find collections with no epochs
+                BSONObj emptyDoc =
+                        conn->findOne(CollectionType::ConfigNS + workingSuffix,
+                                      BSON("$unset" << BSON(CollectionType::DEPRECATED_lastmodEpoch() << 1)));
 
-                    }
-                }
-                catch (const DBException& e) {
+                if (!emptyDoc.isEmpty()) {
 
-                    *errMsg = stream() << "could not verify new epoch " << epoch.toString()
-                                       << " written for chunks in " << collection.getNS()
-                                       << causedBy(e);
+                    *errMsg = stream() << "collection " << emptyDoc
+                                       << " is still missing epoch after config upgrade";
 
+                    connPtr->done();
                     return false;
                 }
 
-                connPtr->done();
+                // Find collections with empty epochs
+                emptyDoc = conn->findOne(CollectionType::ConfigNS + workingSuffix,
+                                         BSON(CollectionType::DEPRECATED_lastmodEpoch(OID())));
+
+                if (!emptyDoc.isEmpty()) {
+
+                    *errMsg = stream() << "collection " << emptyDoc
+                                       << " still has empty epoch after config upgrade";
+
+                    connPtr->done();
+                    return false;
+                }
+
+                // Find chunks with no epochs
+                emptyDoc =
+                        conn->findOne(ChunkType::ConfigNS + workingSuffix,
+                                      BSON("$unset" << BSON(ChunkType::DEPRECATED_epoch() << 1)));
+
+                if (!emptyDoc.isEmpty()) {
+
+                    *errMsg = stream() << "chunk " << emptyDoc
+                                       << " is still missing epoch after config upgrade";
+
+                    connPtr->done();
+                    return false;
+                }
+
+                // Find chunks with empty epochs
+                emptyDoc = conn->findOne(ChunkType::ConfigNS + workingSuffix,
+                                         BSON(ChunkType::DEPRECATED_epoch(OID())));
+
+                if (!emptyDoc.isEmpty()) {
+
+                    *errMsg = stream() << "chunk " << emptyDoc
+                                       << " still has empty epoch after config upgrade";
+
+                    connPtr->done();
+                    return false;
+                }
             }
+            catch (const DBException& e) {
+
+                *errMsg = stream() << "could not verify epoch writes" << causedBy(e);
+
+                return false;
+            }
+
+            connPtr->done();
         }
 
         //
@@ -562,7 +622,7 @@ namespace mongo {
         }
 
         //
-        // Finally update the version to 4 and add clusterId to version
+        // Finally update the version to latest and add clusterId to version
         //
 
         OID newClusterId = OID::gen();
@@ -572,7 +632,7 @@ namespace mongo {
         // we want to save the excludes that were set.
 
         newVersionInfo.setMinCompatibleVersion(UpgradeHistory_NoEpochVersion);
-        newVersionInfo.setCurrentVersion(UpgradeHistory_ManditoryEpochVersion);
+        newVersionInfo.setCurrentVersion(UpgradeHistory_MandatoryEpochVersion);
         newVersionInfo.setClusterId(newClusterId);
 
         // Leave critical section

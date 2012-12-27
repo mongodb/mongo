@@ -236,15 +236,15 @@ namespace mongo {
         // Check that we aren't too old
         if (CURRENT_CONFIG_VERSION < versionInfo.getMinCompatibleVersion()) {
 
-            *whyNot = stream() << "not compatible with current config version "
-                               << versionInfo.getMinCompatibleVersion() << ", our version is "
-                               << CURRENT_CONFIG_VERSION;
+            *whyNot = stream() << "the config version " << CURRENT_CONFIG_VERSION
+                               << " of our process is too old "
+                               << "for the detected config version "
+                               << versionInfo.getMinCompatibleVersion();
 
             return VersionStatus_Incompatible;
         }
 
-        // Check that we aren't excluded
-
+        // Check that the mongo version of this process hasn't been excluded from the cluster
         vector<MongoVersionRange> excludedRanges;
         if (!MongoVersionRange::parseBSONArray(versionInfo.getExcludedRanges(),
                                                &excludedRanges,
@@ -325,9 +325,7 @@ namespace mongo {
             return false;
         }
 
-        // Get the config version we've upgraded to
-        // This can't be done in _nextUpgrade, since
-
+        // Get the config version we've upgraded to and make sure it's sane
         Status verifyConfigStatus = getConfigVersion(configLoc, upgradedVersionInfo);
 
         if (!verifyConfigStatus.isOK()) {
@@ -393,7 +391,7 @@ namespace mongo {
         // if possible.
         //
 
-        // First check for the upgrade flag
+        // First check for the upgrade flag (but no flag is needed if we're upgrading from empty)
         if (!versionInfo->getCurrentVersion() == UpgradeHistory_EmptyVersion && !upgrade) {
 
             *errMsg = stream() << "newer version " << CURRENT_CONFIG_VERSION
