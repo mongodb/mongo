@@ -17,4 +17,7 @@ assert.soon( "c.findOne()" , "no data after sleep" );
 assert.eq( 1 , c.count() , "after restore 2" );
 assert.eq( 22 , c.findOne().a , "after restore 2" );
 
+// ensure that --collection is used with --db. See SERVER-7721
+var ret = t.runTool( "dump" , "--collection" , "col" );
+assert.neq( ret, 0, "mongodump should return failure code" );
 t.stop();
