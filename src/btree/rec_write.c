@@ -334,7 +334,7 @@ __rec_child_modify(WT_SESSION_IMPL *session,
 			/* FALLTHROUGH */
 		case WT_REF_MEM:
 			/*
-			 * The tree is being walked by leaf-apge checkpoint and
+			 * The tree is being walked by leaf-page checkpoint and
 			 * the page is being written.   The state is in-memory
 			 * and we're holding a hazard reference.
 			 *
