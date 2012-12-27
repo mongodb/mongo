@@ -1118,13 +1118,9 @@ namespace mongo {
             
             if ( frsp->matchPossibleForSingleKeyFRS( _key.key() ) ) {
                 BoundList ranges = _key.keyBounds( frsp->getSingleKeyFRS() );
-                for (BoundList::const_iterator it=ranges.begin(), end=ranges.end();
-                     it != end; ++it) {
+                for ( BoundList::const_iterator it=ranges.begin(); it != ranges.end(); ++it ){
 
-                    BSONObj minObj = it->first.replaceFieldNames(_key.key());
-                    BSONObj maxObj = it->second.replaceFieldNames(_key.key());
-
-                    getShardsForRange( shards, minObj, maxObj, false );
+                    getShardsForRange( shards, it->first /*min*/, it->second /*max*/ );
 
                     // once we know we need to visit all shards no need to keep looping
                     if( shards.size() == _shards.size() ) return;
@@ -1146,12 +1142,9 @@ namespace mongo {
         }
     }
 
-    void ChunkManager::getShardsForRange(set<Shard>& shards, const BSONObj& min, const BSONObj& max, bool fullKeyReq ) const {
-
-        if( fullKeyReq ){
-            uassert(13405, str::stream() << "min value " << min << " does not have shard key", hasShardKey(min));
-            uassert(13406, str::stream() << "max value " << max << " does not have shard key", hasShardKey(max));
-        }
+    void ChunkManager::getShardsForRange( set<Shard>& shards,
+                                          const BSONObj& min,
+                                          const BSONObj& max ) const {
 
         ChunkRangeMap::const_iterator it = _chunkRanges.upper_bound(min);
         ChunkRangeMap::const_iterator end = _chunkRanges.upper_bound(max);

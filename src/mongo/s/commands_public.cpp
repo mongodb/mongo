@@ -879,7 +879,12 @@ namespace mongo {
                 BSONObj max = cmdObj.getObjectField( "max" );
                 BSONObj keyPattern = cmdObj.getObjectField( "keyPattern" );
 
-                uassert(13408,  "keyPattern must equal shard key", cm->getShardKey().key() == keyPattern);
+                uassert( 13408, "keyPattern must equal shard key",
+                         cm->getShardKey().key() == keyPattern );
+                uassert( 13405, str::stream() << "min value " << min << " does not have shard key",
+                         cm->hasShardKey(min) );
+                uassert( 13406, str::stream() << "max value " << max << " does not have shard key",
+                         cm->hasShardKey(max) );
 
                 // yes these are doubles...
                 double size = 0;
