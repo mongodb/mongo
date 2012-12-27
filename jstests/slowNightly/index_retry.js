@@ -86,7 +86,8 @@ assert.soon(
         }
         return true;
     },
-    'index builds successfully'
+    'index builds successfully',
+    60000
 );
 
 print("Index built");
