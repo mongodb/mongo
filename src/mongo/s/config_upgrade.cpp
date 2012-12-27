@@ -260,6 +260,7 @@ namespace mongo {
         // versionString is the global version of this process
         if (isInMongoVersionRanges(versionString, excludedRanges)) {
 
+            // Cast needed here for MSVC compiler issue
             *whyNot = stream() << "not compatible with current config version, version "
                                << reinterpret_cast<const char*>(versionString)
                                << "has been excluded.";
