@@ -58,34 +58,13 @@ DBQuery.prototype.clone = function(){
     return q;
 }
 
-DBQuery.prototype._ensureSpecial = function() {
-    if (this._special)
-        return this;
-
-    var query = this._query;
-
-    // Set special flag if the query doc starts with $query/query --
-    // This is common when copied from the output of the log or query profiler
-    this._special = query && (query["$query"] || query["query"]) ? true : false;
-    if (this._special && query) {
-        // copy the input query fields to the new (wrapped query) -- converts to correct names
-        var wrappedQuery = {};
-        for (f in query)
-            if (f.endsWith("query")) { // convert [$]query into query
-                wrappedQuery["$query"] = query[f];
-            } else if (f.endsWith("orderby")) { // convert [$]orderby into
-                                                // orderby
-                wrappedQuery["orderby"] = query[f];
-            } else {
-                wrappedQuery[f] = query[f];
-            }
-        this._query = wrappedQuery;
-    } else {
-        // just wrap the query
-        this._query = { query : this._query };
-        this._special = true;
-    }
-    return this;
+DBQuery.prototype._ensureSpecial = function(){
+    if ( this._special )
+        return;
+    
+    var n = { query : this._query };
+    this._query = n;
+    this._special = true;
 }
 
 DBQuery.prototype._checkModify = function(){
@@ -342,7 +321,8 @@ DBQuery.prototype.explain = function (verbose) {
 }
 
 DBQuery.prototype.snapshot = function(){
-    this._addSpecial("$snapshot", true);
+    this._ensureSpecial();
+    this._query.$snapshot = true;
     return this;
 }
 
