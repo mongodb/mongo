@@ -252,7 +252,8 @@ namespace mongo {
                     }
                     sort( workArea.begin(), workArea.end(), ProjectKeyCmp( sortPattern ) );
 
-                    long long skip = std::max( 0ULL, workArea.size() - trim );
+                    long long skip = std::max( 0LL,
+                                               (long long)workArea.size() - trim );
                     for ( vector<BSONObj>::iterator it = workArea.begin();
                          it != workArea.end() && trim > 0;
                          ++it ) {

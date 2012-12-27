@@ -699,7 +699,8 @@ namespace mongo {
                         sort( workArea.begin(), workArea.end(), ProjectKeyCmp( sortPattern) );
 
                         // Trim to the appropriate size.
-                        long long skip = std::max( 0ULL, workArea.size() - trim );
+                        long long skip = std::max( 0LL,
+                                                   (long long)workArea.size() - trim );
                         BSONArrayBuilder arrBuilder( b.subarrayStart( m.shortFieldName ) );
                         for (vector<BSONObj>::iterator it = workArea.begin();
                              it != workArea.end() && trim > 0;
