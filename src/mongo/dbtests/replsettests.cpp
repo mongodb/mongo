@@ -29,6 +29,7 @@
 #include "mongo/db/repl.h"
 #include "mongo/db/repl/rs.h"
 #include "mongo/db/repl/bgsync.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
     void createOplog();
@@ -196,7 +197,7 @@ namespace ReplSetTests {
             // dbs can be opened (which requires the write lock)
             while (!_curop || !_curop->killPending()) {
                 dbtemprelease temp;
-                sleep(0);
+                sleepmillis(0);
             }
             cc().shutdown();
             _done = true;
@@ -205,13 +206,13 @@ namespace ReplSetTests {
         // Make sure the test doesn't end while this "index build" is still spinning
         void finish() {
             while (!_curop) {
-                sleep(0);
+                sleepmillis(0);
             }
 
             _curop->kill();
 
             while (!_done) {
-                sleep(0);
+                sleepmillis(0);
             }
         }
 
@@ -225,7 +226,7 @@ namespace ReplSetTests {
             }
 
             while (_client == NULL) {
-                sleep(0);
+                sleepmillis(0);
             }
 
             // On the first time through, make sure the curop is set up correctly
