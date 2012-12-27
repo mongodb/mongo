@@ -1769,6 +1769,15 @@
     <ClCompile Include="fts\tokenizer_test.cpp">
       <Filter>db\fts\test</Filter>
     </ClCompile>
+    <ClCompile Include="auth\auth_server_parameters.cpp">
+      <Filter>db\auth</Filter>
+    </ClCompile>
+    <ClCompile Include="index_builder.cpp">
+      <Filter>db\Source Files\e to n</Filter>
+    </ClCompile>
+    <ClCompile Include="ops\field_ref.cpp">
+      <Filter>db\ops</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\targetver.h" />
@@ -3750,6 +3759,15 @@
     <ClInclude Include="fts\tokenizer.h">
       <Filter>db\fts</Filter>
     </ClInclude>
+    <ClInclude Include="index_builder.h">
+      <Filter>db\Header Files\e to n</Filter>
+    </ClInclude>
+    <ClInclude Include="ops\field_ref.h">
+      <Filter>db\ops</Filter>
+    </ClInclude>
+    <ClInclude Include="ops\modifier_base.h">
+      <Filter>db\ops</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="mongo.ico">
@@ -3895,6 +3913,9 @@
     </None>
     <None Include="fts\generate_stop_words.py">
       <Filter>db\fts</Filter>
+    </None>
+    <None Include="ops\SConscript">
+      <Filter>db\ops</Filter>
     </None>
   </ItemGroup>
   <ItemGroup>

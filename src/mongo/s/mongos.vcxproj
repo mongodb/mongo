@@ -1681,6 +1681,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="..\db\auth\auth_external_state.cpp" />
     <ClCompile Include="..\db\auth\auth_external_state_s.cpp" />
     <ClCompile Include="..\db\auth\auth_external_state_server_common.cpp" />
+    <ClCompile Include="..\db\auth\auth_server_parameters.cpp" />
     <ClCompile Include="..\db\auth\mongo_authentication_session.cpp" />
     <ClCompile Include="..\db\auth\principal.cpp" />
     <ClCompile Include="..\db\auth\principal_set.cpp" />

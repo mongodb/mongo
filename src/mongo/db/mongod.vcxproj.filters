@@ -1430,6 +1430,15 @@
     <ClCompile Include="fts\stop_words_list.cpp">
       <Filter>db\fts</Filter>
     </ClCompile>
+    <ClCompile Include="index_builder.cpp">
+      <Filter>db\Source Files\e to n</Filter>
+    </ClCompile>
+    <ClCompile Include="auth\auth_server_parameters.cpp">
+      <Filter>db\auth</Filter>
+    </ClCompile>
+    <ClCompile Include="ops\field_ref.cpp">
+      <Filter>db\ops</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\targetver.h" />
@@ -2940,6 +2949,15 @@
     <ClInclude Include="fts\stop_words_list.h">
       <Filter>db\fts</Filter>
     </ClInclude>
+    <ClInclude Include="index_builder.h">
+      <Filter>db\Header Files\e to n</Filter>
+    </ClInclude>
+    <ClInclude Include="ops\field_ref.h">
+      <Filter>db\ops</Filter>
+    </ClInclude>
+    <ClInclude Include="ops\modifier_base.h">
+      <Filter>db\ops</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="mongo.ico">
@@ -3034,6 +3052,9 @@
     </None>
     <None Include="fts\stop_words_swedish.txt">
       <Filter>db\fts\stop_words</Filter>
+    </None>
+    <None Include="ops\SConscript">
+      <Filter>db\ops</Filter>
     </None>
   </ItemGroup>
   <ItemGroup>

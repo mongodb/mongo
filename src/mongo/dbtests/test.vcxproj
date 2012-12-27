@@ -713,6 +713,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="..\db\hashindex.h" />
     <ClInclude Include="..\db\index.h" />
     <ClInclude Include="..\db\indexkey.h" />
+    <ClInclude Include="..\db\index_builder.h" />
     <ClInclude Include="..\db\index_insertion_continuation.h" />
     <ClInclude Include="..\db\index_rebuilder.h" />
     <ClInclude Include="..\db\index_update.h" />
@@ -735,6 +736,8 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="..\db\namespace_details.h" />
     <ClInclude Include="..\db\ops\count.h" />
     <ClInclude Include="..\db\ops\delete.h" />
+    <ClInclude Include="..\db\ops\field_ref.h" />
+    <ClInclude Include="..\db\ops\modifier_base.h" />
     <ClInclude Include="..\db\ops\query.h" />
     <ClInclude Include="..\db\ops\update.h" />
     <ClInclude Include="..\db\ops\update_internal.h" />
@@ -1849,14 +1852,14 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
       <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|x64'">..\..;..\..\third_party\s2;..\..\third_party\boost</AdditionalIncludeDirectories>
       <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">..\..;..\..\third_party\s2;..\..\third_party\boost</AdditionalIncludeDirectories>
       <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">..\..;..\..\third_party\s2;..\..\third_party\boost</AdditionalIncludeDirectories>
-      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
-      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
-      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
-      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
-      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
-      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
-      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
-      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">4355;4800;4267;4244;4146;4996</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">4355;4800;4267;4244;4146;4996</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">4355;4800;4267;4244;4146;4996</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">4355;4800;4267;4244;4146;4996</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">4355;4800;4267;4244;4146;4996</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|x64'">4355;4800;4267;4244;4146;4996</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">4355;4800;4267;4244;4146;4996</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">4355;4800;4267;4244;4146;4996</DisableSpecificWarnings>
     </ClCompile>
     <ClCompile Include="..\..\third_party\s2\s2loop.cc">
       <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">..\..;..\..\third_party\s2;..\..\third_party\boost</AdditionalIncludeDirectories>
@@ -1867,14 +1870,14 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
       <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|x64'">..\..;..\..\third_party\s2;..\..\third_party\boost</AdditionalIncludeDirectories>
       <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">..\..;..\..\third_party\s2;..\..\third_party\boost</AdditionalIncludeDirectories>
       <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">..\..;..\..\third_party\s2;..\..\third_party\boost</AdditionalIncludeDirectories>
-      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
-      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
-      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
-      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
-      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
-      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
-      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
-      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">4355;4800;4267;4244;4146;4996</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">4355;4800;4267;4244;4146;4996</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">4355;4800;4267;4244;4146;4996</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">4355;4800;4267;4244;4146;4996</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">4355;4800;4267;4244;4146;4996</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|x64'">4355;4800;4267;4244;4146;4996</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">4355;4800;4267;4244;4146;4996</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">4355;4800;4267;4244;4146;4996</DisableSpecificWarnings>
     </ClCompile>
     <ClCompile Include="..\..\third_party\s2\s2pointregion.cc">
       <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">..\..;..\..\third_party\s2;..\..\third_party\boost</AdditionalIncludeDirectories>
@@ -1885,14 +1888,14 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
       <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|x64'">..\..;..\..\third_party\s2;..\..\third_party\boost</AdditionalIncludeDirectories>
       <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">..\..;..\..\third_party\s2;..\..\third_party\boost</AdditionalIncludeDirectories>
       <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">..\..;..\..\third_party\s2;..\..\third_party\boost</AdditionalIncludeDirectories>
-      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
-      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
-      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
-      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
-      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
-      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
-      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
-      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">4355;4800;4267;4244;4146;4996</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">4355;4800;4267;4244;4146;4996</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">4355;4800;4267;4244;4146;4996</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">4355;4800;4267;4244;4146;4996</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">4355;4800;4267;4244;4146;4996</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|x64'">4355;4800;4267;4244;4146;4996</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">4355;4800;4267;4244;4146;4996</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">4355;4800;4267;4244;4146;4996</DisableSpecificWarnings>
     </ClCompile>
     <ClCompile Include="..\..\third_party\s2\s2polygon.cc">
       <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">..\..;..\..\third_party\s2;..\..\third_party\boost</AdditionalIncludeDirectories>
@@ -1903,14 +1906,14 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
       <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|x64'">..\..;..\..\third_party\s2;..\..\third_party\boost</AdditionalIncludeDirectories>
       <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">..\..;..\..\third_party\s2;..\..\third_party\boost</AdditionalIncludeDirectories>
       <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">..\..;..\..\third_party\s2;..\..\third_party\boost</AdditionalIncludeDirectories>
-      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
-      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
-      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
-      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
-      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
-      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
-      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
-      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">4355;4800;4267;4244;4146;4996</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">4355;4800;4267;4244;4146;4996</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">4355;4800;4267;4244;4146;4996</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">4355;4800;4267;4244;4146;4996</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">4355;4800;4267;4244;4146;4996</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|x64'">4355;4800;4267;4244;4146;4996</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">4355;4800;4267;4244;4146;4996</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">4355;4800;4267;4244;4146;4996</DisableSpecificWarnings>
     </ClCompile>
     <ClCompile Include="..\..\third_party\s2\s2polygonbuilder.cc">
       <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">..\..;..\..\third_party\s2;..\..\third_party\boost</AdditionalIncludeDirectories>
@@ -1939,14 +1942,14 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
       <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|x64'">..\..;..\..\third_party\s2;..\..\third_party\boost</AdditionalIncludeDirectories>
       <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">..\..;..\..\third_party\s2;..\..\third_party\boost</AdditionalIncludeDirectories>
       <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">..\..;..\..\third_party\s2;..\..\third_party\boost</AdditionalIncludeDirectories>
-      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
-      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
-      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
-      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
-      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
-      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
-      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
-      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">4355;4800;4267;4244;4146;4996</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">4355;4800;4267;4244;4146;4996</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">4355;4800;4267;4244;4146;4996</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">4355;4800;4267;4244;4146;4996</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">4355;4800;4267;4244;4146;4996</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|x64'">4355;4800;4267;4244;4146;4996</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">4355;4800;4267;4244;4146;4996</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">4355;4800;4267;4244;4146;4996</DisableSpecificWarnings>
     </ClCompile>
     <ClCompile Include="..\..\third_party\s2\s2r2rect.cc">
       <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">..\..;..\..\third_party\s2;..\..\third_party\boost</AdditionalIncludeDirectories>
@@ -2135,14 +2138,14 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
       <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|x64'">..\..;..\..\third_party\s2;..\..\third_party\boost</AdditionalIncludeDirectories>
       <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">..\..;..\..\third_party\s2;..\..\third_party\boost</AdditionalIncludeDirectories>
       <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">..\..;..\..\third_party\s2;..\..\third_party\boost</AdditionalIncludeDirectories>
-      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
-      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
-      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
-      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
-      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
-      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
-      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
-      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">4355;4800;4267;4244;4146;4996</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">4355;4800;4267;4244;4146;4996</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">4355;4800;4267;4244;4146;4996</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">4355;4800;4267;4244;4146;4996</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">4355;4800;4267;4244;4146;4996</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|x64'">4355;4800;4267;4244;4146;4996</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">4355;4800;4267;4244;4146;4996</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">4355;4800;4267;4244;4146;4996</DisableSpecificWarnings>
     </ClCompile>
     <ClCompile Include="..\..\third_party\s2\util\coding\varint.cc">
       <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">..\..;..\..\third_party\s2;..\..\third_party\boost</AdditionalIncludeDirectories>
@@ -2265,6 +2268,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="..\db\auth\auth_external_state_d.cpp" />
     <ClCompile Include="..\db\auth\auth_external_state_server_common.cpp" />
     <ClCompile Include="..\db\auth\auth_index_d.cpp" />
+    <ClCompile Include="..\db\auth\auth_server_parameters.cpp" />
     <ClCompile Include="..\db\auth\mongo_authentication_session.cpp" />
     <ClCompile Include="..\db\auth\principal.cpp" />
     <ClCompile Include="..\db\auth\principal_set.cpp" />
@@ -2717,6 +2721,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     </ClCompile>
     <ClCompile Include="..\db\geo\shapes.cpp" />
     <ClCompile Include="..\db\hasher.cpp" />
+    <ClCompile Include="..\db\index_builder.cpp" />
     <ClCompile Include="..\db\index_rebuilder.cpp" />
     <ClCompile Include="..\db\index_update.cpp" />
     <ClCompile Include="..\db\interrupt_status_mongod.cpp" />
@@ -2730,6 +2735,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="..\db\namespace_details.cpp" />
     <ClCompile Include="..\db\ops\count.cpp" />
     <ClCompile Include="..\db\ops\delete.cpp" />
+    <ClCompile Include="..\db\ops\field_ref.cpp" />
     <ClCompile Include="..\db\ops\query.cpp" />
     <ClCompile Include="..\db\ops\update.cpp" />
     <ClCompile Include="..\db\ops\update_internal.cpp" />
@@ -2980,6 +2986,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="jsobjtests.cpp" />
     <ClCompile Include="jsontests.cpp" />
     <ClCompile Include="jstests.cpp" />
+    <ClCompile Include="keypatterntests.cpp" />
     <ClCompile Include="macrotests.cpp" />
     <ClCompile Include="matchertests.cpp" />
     <ClCompile Include="mmaptests.cpp" />
@@ -3014,7 +3021,16 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
       <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">4180;%(DisableSpecificWarnings)</DisableSpecificWarnings>
       <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">4180;%(DisableSpecificWarnings)</DisableSpecificWarnings>
     </ClCompile>
-    <ClCompile Include="updatetests.cpp" />
+    <ClCompile Include="updatetests.cpp">
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">4355;4800;4267;4244;4065</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">4355;4800;4267;4244;4065</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">4355;4800;4267;4244;4065</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">4355;4800;4267;4244;4065</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">4355;4800;4267;4244;4065</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|x64'">4355;4800;4267;4244;4065</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">4355;4800;4267;4244;4065</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">4355;4800;4267;4244;4065</DisableSpecificWarnings>
+    </ClCompile>
     <ClCompile Include="..\db\stats\counters.cpp" />
     <ClCompile Include="..\db\stats\snapshots.cpp" />
     <ClCompile Include="..\db\stats\top.cpp" />
@@ -3049,6 +3065,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <None Include="..\db\fts\stop_words_spanish.txt" />
     <None Include="..\db\fts\stop_words_swedish.txt" />
     <None Include="..\db\fts\stop_words_turkish.txt" />
+    <None Include="..\db\ops\SConscript" />
     <None Include="btreetests.inl" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

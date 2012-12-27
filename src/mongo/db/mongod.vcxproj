@@ -1702,6 +1702,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="auth\auth_external_state_d.cpp" />
     <ClCompile Include="auth\auth_external_state_server_common.cpp" />
     <ClCompile Include="auth\auth_index_d.cpp" />
+    <ClCompile Include="auth\auth_server_parameters.cpp" />
     <ClCompile Include="auth\mongo_authentication_session.cpp" />
     <ClCompile Include="auth\principal.cpp" />
     <ClCompile Include="auth\principal_set.cpp" />
@@ -2024,11 +2025,13 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
       <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
     </ClCompile>
     <ClCompile Include="geo\shapes.cpp" />
+    <ClCompile Include="index_builder.cpp" />
     <ClCompile Include="index_rebuilder.cpp" />
     <ClCompile Include="initialize_server_global_state.cpp" />
     <ClCompile Include="intervalbtreecursor.cpp" />
     <ClCompile Include="keypattern.cpp" />
     <ClCompile Include="kill_current_op.cpp" />
+    <ClCompile Include="ops\field_ref.cpp" />
     <ClCompile Include="pipeline\document_source_cursor.cpp" />
     <ClCompile Include="commands\find_and_modify.cpp" />
     <ClCompile Include="commands\fsync.cpp" />
@@ -2412,6 +2415,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="geo\shapes.h" />
     <ClInclude Include="hasher.h" />
     <ClInclude Include="hashindex.h" />
+    <ClInclude Include="index_builder.h" />
     <ClInclude Include="index_insertion_continuation.h" />
     <ClInclude Include="index_rebuilder.h" />
     <ClInclude Include="index_update.h" />
@@ -2429,6 +2433,8 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="namespace_details-inl.h" />
     <ClInclude Include="namespace_details.h" />
     <ClInclude Include="oplog.h" />
+    <ClInclude Include="ops\field_ref.h" />
+    <ClInclude Include="ops\modifier_base.h" />
     <ClInclude Include="ops\query.h" />
     <ClInclude Include="ops\update_internal.h" />
     <ClInclude Include="pdfile_private.h" />
@@ -2573,6 +2579,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <None Include="fts\stop_words_swedish.txt" />
     <None Include="fts\stop_words_turkish.txt" />
     <None Include="mongo.ico" />
+    <None Include="ops\SConscript" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\bson\bson-inl.h" />

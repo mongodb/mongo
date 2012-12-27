@@ -1662,6 +1662,15 @@
     <ClInclude Include="..\db\fts\tokenizer.h">
       <Filter>db\fts</Filter>
     </ClInclude>
+    <ClInclude Include="..\db\index_builder.h">
+      <Filter>db\Header Files\e to n</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\ops\field_ref.h">
+      <Filter>db\ops</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\ops\modifier_base.h">
+      <Filter>db\ops</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\client\connpool.cpp">
@@ -3268,6 +3277,18 @@
     <ClCompile Include="..\db\fts\tokenizer_test.cpp">
       <Filter>db\fts\test</Filter>
     </ClCompile>
+    <ClCompile Include="keypatterntests.cpp">
+      <Filter>dbtests</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\index_builder.cpp">
+      <Filter>db\Source Files\e to n</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\auth\auth_server_parameters.cpp">
+      <Filter>db\auth</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\ops\field_ref.cpp">
+      <Filter>db\ops</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="btreetests.inl">
@@ -3350,6 +3371,9 @@
     </None>
     <None Include="..\db\fts\generate_stop_words.py">
       <Filter>db\fts</Filter>
+    </None>
+    <None Include="..\db\ops\SConscript">
+      <Filter>db\ops</Filter>
     </None>
   </ItemGroup>
 </Project>

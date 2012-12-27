@@ -1182,6 +1182,9 @@
     <ClCompile Include="..\db\fts\tokenizer_test.cpp">
       <Filter>db\fts\test</Filter>
     </ClCompile>
+    <ClCompile Include="..\db\auth\auth_server_parameters.cpp">
+      <Filter>db\auth</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\pch.h" />
