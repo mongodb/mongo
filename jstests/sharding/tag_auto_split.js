@@ -54,4 +54,10 @@ s.config.chunks.find().forEach(
     }
 );
 
+// check chunk mins correspond exactly to tag range boundaries, extended to match shard key
+assert.eq( 1, s.config.chunks.find( {min : {_id : 5 , a : MinKey} } ).count(),
+           "bad chunk range boundary" );
+assert.eq( 1, s.config.chunks.find( {min : {_id : 10 , a : MinKey} } ).count(),
+           "bad chunk range boundary" );
+
 s.stop();

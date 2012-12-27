@@ -74,6 +74,31 @@ namespace mongo {
             return _pattern.isPrefixOf( other.toBSON() );
         }
 
+        /* Takes a BSONObj whose field names are a prefix of the fields in this keyPattern, and
+         * outputs a new bound with MinKey values appended to match the fields in this keyPattern
+         * (or MaxKey values for descending -1 fields). This is useful in sharding for
+         * calculating chunk boundaries when tag ranges are specified on a prefix of the actual
+         * shard key, or for calculating index bounds when the shard key is a prefix of the actual
+         * index used.
+         *
+         * @param makeUpperInclusive If true, then MaxKeys instead of MinKeys will be appended, so
+         * that the output bound will compare *greater* than the bound being extended (note that
+         * -1's in the keyPattern will swap MinKey/MaxKey vals. See examples).
+         *
+         * Examples:
+         * If this keyPattern is {a : 1}
+         *   extendRangeBound( {a : 55}, false) --> {a : 55}
+         *
+         * If this keyPattern is {a : 1, b : 1}
+         *   extendRangeBound( {a : 55}, false) --> {a : 55, b : MinKey}
+         *   extendRangeBound( {a : 55}, true ) --> {a : 55, b : MaxKey}
+         *
+         * If this keyPattern is {a : 1, b : -1}
+         *   extendRangeBound( {a : 55}, false) --> {a : 55, b : MaxKey}
+         *   extendRangeBound( {a : 55}, true ) --> {a : 55, b : MinKey}
+         */
+        BSONObj extendRangeBound( const BSONObj& bound , bool makeUpperInclusive ) const;
+
         /**
          * Returns true if this KeyPattern contains any computed values, (e.g. {a : "hashed"}),
          * and false if this KeyPattern consists of only ascending/descending fields

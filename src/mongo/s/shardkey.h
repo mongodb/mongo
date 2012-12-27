@@ -80,6 +80,10 @@ namespace mongo {
             return pattern.hasField(key);
         }
 
+        BSONObj extendRangeBound( const BSONObj& bound , bool makeUpperInclusive ) const {
+            return pattern.extendRangeBound( bound , makeUpperInclusive );
+        }
+
         /**
          * @return
          * true if 'this' is a prefix (not necessarily contained) of 'otherPattern'.

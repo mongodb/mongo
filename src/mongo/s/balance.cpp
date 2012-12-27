@@ -278,7 +278,7 @@ namespace mongo {
             for ( unsigned i = 0; i < ranges.size(); i++ ) {
                 BSONObj min = ranges[i].min;
 
-                min = min.extractFields( cm->getShardKey().key(), true );
+                min = cm->getShardKey().extendRangeBound( min, false );
 
                 if ( allChunkMinimums.count( min ) > 0 )
                     continue;
