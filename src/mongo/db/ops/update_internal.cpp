@@ -165,7 +165,7 @@ namespace mongo {
 
             // If we're in the "push all" case, we'll copy all element of both the existing and
             // parameter arrays.
-            else if ( isEach() && ! isTrim() ) {
+            else if ( isEach() && ! isTrimOnly() && ! isTrimAndSort() ) {
                 BSONObjIterator i( in.embeddedObject() );
                 while ( i.more() ) {
                     bb.append( i.next() );
@@ -182,7 +182,7 @@ namespace mongo {
 
             // If we're in the "push all" case with trim, we have to decide how much of each
             // of the existing and parameter arrays to copy to the final object.
-            else {
+            else if ( isTrimOnly() ) {
                 long long trim = getTrim();
                 BSONObj eachArray = getEach();
                 long long arraySize = in.embeddedObject().nFields();
@@ -223,6 +223,43 @@ namespace mongo {
                     BSONObjIterator j( getEach() );
                     while ( j.more() ) {
                         bb.append( j.next() );
+                    }
+                }
+
+                ms.fixedOpName = "$set";
+                ms.forceEmptyArray = true;
+                ms.fixedArray = BSONArray( bb.done().getOwned() );
+            }
+
+            // If we're in the "push all" case with sort, we have to concatenate the existing
+            // array with the $each array, sort the result, and then decide how much of each of
+            // the existing and the parameter arrays to copy to the final object.
+            else {
+                long long trim = getTrim();
+                BSONObj sortPattern = getSort();
+
+                // Zero trim is equivalent to resetting the array in the final object, so
+                // we only go into sorting if there is anything to sort.
+                if ( trim > 0 ) {
+                    vector<BSONObj> workArea;
+                    BSONObjIterator i( in.embeddedObject() );
+                    while ( i.more() ) {
+                        workArea.push_back( i.next().Obj() );
+                    }
+                    BSONObjIterator j( getEach() );
+                    while ( j.more() ) {
+                        workArea.push_back( j.next().Obj() );
+                    }
+                    sort( workArea.begin(), workArea.end(), ProjectKeyCmp( sortPattern ) );
+
+                    long long skip = std::max( 0ULL, workArea.size() - trim );
+                    for ( vector<BSONObj>::iterator it = workArea.begin();
+                         it != workArea.end() && trim > 0;
+                         ++it ) {
+                        if ( skip-- > 0 ) {
+                            continue;
+                        }
+                        bb.append( *it );
                     }
                 }
 
@@ -572,6 +609,18 @@ namespace mongo {
                 uassert( 10141,
                          "Cannot apply $push/$pushAll modifier to non-array",
                          e.type() == Array || e.eoo() );
+
+                // Currently, we require the base array of a $sort to be made of
+                // objects (as opposed to base types).
+                if ( !e.eoo() && m.isEach() && m.isTrimAndSort() ) {
+                    BSONObjIterator i( e.embeddedObject() );
+                    while ( i.more() ) {
+                        BSONElement arrayItem = i.next();
+                        uassert( 16638,
+                                 "$sort can only be applied to an array of objects",
+                                 arrayItem.type() == Object );
+                    }
+                }
                 mss->amIInPlacePossible( false );
                 break;
 
@@ -1118,35 +1167,85 @@ namespace mongo {
                          "Modifier $pushAll/pullAll allowed for arrays only",
                          f.type() == Array || ( op != Mod::PUSH_ALL && op != Mod::PULL_ALL ) );
 
-                // Check whether $each and $trimTo syntax for $push is correct.
+                // Check whether $each, $trimTo, and $sort syntax for $push is correct.
                 if ( ( op == Mod::PUSH ) && ( f.type() == Object ) ) {
                     BSONObj pushObj = f.embeddedObject();
                     if ( pushObj.nFields() > 0 &&
                          strcmp(pushObj.firstElement().fieldName(), "$each") == 0 ) {
                         uassert( 16564,
-                                 "$each term needs to occur alone (or with $trimTo)",
-                                 pushObj.nFields() <= 2 );
+                                 "$each term needs to occur alone (or with $trimTo/$sort)",
+                                 pushObj.nFields() <= 3 );
                         uassert( 16565,
                                  "$each requires an array value",
                                  pushObj.firstElement().type() == Array );
 
-                        if ( pushObj.nFields() == 2 ) {
+                        // If both $trimTo and $sort are present, thay may be switched.
+                        if ( pushObj.nFields() > 1 ) {
                             BSONObjIterator i( pushObj );
                             i.next();
-                            BSONElement trimElem = i.next();
 
-                            uassert( 16566,
-                                     "$each term takes only a $trimTo as a complement",
-                                     str::equals( trimElem.fieldName(), "$trimTo" ) );
-                            uassert( 16567,
-                                     "$trimTo value must be a numeric integer",
-                                     trimElem.type() == NumberInt ||
-                                     trimElem.type() == NumberLong ||
-                                     (trimElem.type() == NumberDouble &&
-                                      trimElem.numberDouble()==(long long)trimElem.numberDouble()));
-                            uassert( 16568,
-                                     "$trimTo value must be positive",
-                                     trimElem.number() >= 0 );
+                            bool seenTrimTo = false;
+                            bool seenSort = false;
+                            while ( i.more() ) {
+                                BSONElement nextElem = i.next();
+
+                                if ( str::equals( nextElem.fieldName(), "$trimTo" ) ) {
+                                    uassert( 16567, "$trimTo appeared twice", !seenTrimTo);
+                                    seenTrimTo = true;
+                                    uassert( 16568,
+                                             "$trimTo value must be a numeric integer",
+                                             nextElem.type() == NumberInt ||
+                                             nextElem.type() == NumberLong ||
+                                             (nextElem.type() == NumberDouble &&
+                                              nextElem.numberDouble() ==
+                                              (long long)nextElem.numberDouble() ) );
+                                    uassert( 16640,
+                                             "$trimTo value must be positive",
+                                             nextElem.number() >= 0 );
+                                }
+                                else if ( str::equals( nextElem.fieldName(), "$sort" ) ) {
+                                    uassert( 16628, "$sort appeared twice", !seenSort );
+                                    seenSort = true;
+                                    uassert( 16629,
+                                             "$sort component of $push must be an object",
+                                             nextElem.type() == Object );
+
+                                    BSONObjIterator j( nextElem.embeddedObject() );
+                                    while ( j.more() ) {
+                                        BSONElement fieldSortElem = j.next();
+                                        uassert( 16630,
+                                                 "$sort elements' values  must either 1 or -1",
+                                                 ( fieldSortElem.type() == NumberInt ||
+                                                   fieldSortElem.type() == NumberLong ||
+                                                   ( fieldSortElem.type() == NumberDouble &&
+                                                     fieldSortElem.numberDouble() ==
+                                                     (long long) fieldSortElem.numberDouble() ) ) &&
+                                                 fieldSortElem.Number()*fieldSortElem.Number()==1.0);
+                                    }
+
+                                    // Finally, check if the $each is made of objects (as opposed
+                                    // to basic types). Currently, $sort only supports operating
+                                    // on arrays of objects.
+                                    BSONObj eachArray = pushObj.firstElement().embeddedObject();
+                                    BSONObjIterator k( eachArray );
+                                    while ( k.more() ) {
+                                        BSONElement eachItem = k.next();
+                                        uassert( 16631,
+                                                 "$sort requires $each to be an array of objects",
+                                                 eachItem.type() == Object );
+                                    }
+                                }
+                                else {
+                                    uasserted( 16632,
+                                               "$each term takes only $trimTo (and optionally "
+                                               "$sort) as complements" );
+                                }
+                            }
+
+                            uassert( 16633,
+                                     "cannot have a $sort without a $trimTo",
+                                     (seenTrimTo && seenSort) ||
+                                     (seenTrimTo && !seenSort) );
                         }
                     }
                 }

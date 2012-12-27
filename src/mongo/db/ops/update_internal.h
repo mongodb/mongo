@@ -239,7 +239,7 @@ namespace mongo {
             }
         }
 
-        bool isTrim() const {
+        bool isTrimOnly() const {
             if ( elt.type() != Object )
                 return false;
             BSONObj obj = elt.embeddedObject();
@@ -252,17 +252,69 @@ namespace mongo {
         }
 
         long long getTrim() const {
+            // The $trimTo may be the second or the third elemen in the field object.
+            // { <field name>: { $each: [<each array>], $trimTo: N, $sort: <pattern> } }
+            // 'elt' here is the BSONElement above.
             BSONObj obj = elt.embeddedObject();
             BSONObjIterator i( obj );
             i.next();
-            BSONElement elemTrim = i.next();
-            dassert( elemTrim.isNumber() );
-            if ( elemTrim.type() == NumberDouble ) {
-                return (long long) elemTrim.numberDouble();
+            BSONElement elem = i.next();
+            if ( ! str::equals( elem.fieldName(), "$trimTo" ) ) {
+                elem = i.next();
+            }
+            dassert( elem.isNumber() );
+            if ( elem.type() == NumberDouble ) {
+                return (long long) elem.numberDouble();
             }
             else {
-                return elemTrim.numberLong();
+                return elem.numberLong();
             }
+        }
+
+        bool isTrimAndSort() const {
+            if ( elt.type() != Object )
+                return false;
+            BSONObj obj = elt.embeddedObject();
+            if ( obj.nFields() != 3 )
+                return false;
+            BSONObjIterator i( obj );
+            i.next();
+
+            // Trim and sort may be switched.
+            bool seenTrimTo = false;
+            bool seenSort = false;
+            while ( i.more() ) {
+                BSONElement elem = i.next();
+                if ( str::equals( elem.fieldName(), "$trimTo" ) ) {
+                    if ( seenTrimTo ) return false;
+                    seenTrimTo = true;
+                }
+                else if ( str::equals( elem.fieldName(), "$sort" ) ) {
+                    if ( seenSort ) return false;
+                    seenSort = true;
+                    if ( elem.type() != Object ) return false;
+                }
+                else {
+                    return false;
+                }
+            }
+
+            // If present, the $sort element would have been checked during ModSet construction.
+            return seenTrimTo && seenSort;
+        }
+
+        BSONObj getSort() const {
+            // The $sort may be the second or the third element in the field object.
+            // { <field name>: { $each: [<each array>], $trimTo: N, $sort: <pattern> } }
+            // 'elt' here is the BSONElement above.
+            BSONObj obj = elt.embeddedObject();
+            BSONObjIterator i( obj );
+            i.next();
+            BSONElement elem = i.next();
+            if ( ! str::equals( elem.fieldName(), "$sort" ) ) {
+                elem = i.next();
+            }
+            return elem.embeddedObject();
         }
 
         const char* renameFrom() const {
@@ -429,6 +481,45 @@ namespace mongo {
     };
 
     /**
+     * Comparator between two BSONObjects that takes in consideration only the keys and
+     * direction described in the sort pattern.
+     */
+    struct ProjectKeyCmp {
+        BSONObj sortPattern;
+        BSONObj projectionPattern;
+
+        ProjectKeyCmp( BSONObj pattern ) : sortPattern( pattern ) {
+            BSONObjBuilder projectBuilder;
+            BSONObjIterator i( sortPattern );
+            while ( i.more() ) {
+                BSONElement elem = i.next();
+                uassert( 16626, "sort pattern must be numeric", elem.isNumber() );
+                double val = elem.Number();
+                uassert( 16627, "sort pattern must contain 1 or -1", val*val == 1.0);
+                StringData field( elem.fieldName() );
+                size_t pos = field.find('.');
+                if ( pos != string::npos ) {
+                    size_t newPos = pos;
+                    while ( newPos != pos ) {
+                        field = field.substr( pos+1 );
+                        newPos = field.find('.');
+                    }
+                }
+                uassert( 16639, "invalid sort pattern", field.size() > 0 );
+                projectBuilder.append( field.toString(), 1 );
+
+            }
+            projectionPattern = projectBuilder.obj();
+        }
+
+        int operator()( const BSONObj& left, const BSONObj& right ) {
+            BSONObj keyLeft = left.extractFields( projectionPattern, true );
+            BSONObj keyRight = right.extractFields( projectionPattern, true );
+            return keyLeft.woCompare( keyRight, sortPattern ) < 0;
+        }
+    };
+
+    /**
      * stores any information about a single Mod operating on a single Object
      */
     class ModState : boost::noncopyable {
@@ -568,12 +659,19 @@ namespace mongo {
                 ms.fixedOpName = "$set";
                 if ( m.isEach() ) {
                     BSONObj arr = m.getEach();
-                    if ( !m.isTrim() || (m.getTrim() >= arr.nFields() ) ) {
+                    if ( !m.isTrimOnly() && !m.isTrimAndSort() ) {
                         b.appendArray( m.shortFieldName, arr );
+
                         ms.forceEmptyArray = true;
-                        ms.fixedArray = BSONArray(arr.getOwned());
+                        ms.fixedArray = BSONArray( arr.getOwned() );
                     }
-                    else {
+                    else if ( m.isTrimOnly() && ( m.getTrim() >= arr.nFields() ) ) {
+                        b.appendArray( m.shortFieldName, arr );
+
+                        ms.forceEmptyArray = true;
+                        ms.fixedArray = BSONArray( arr.getOwned() );
+                    }
+                    else if ( m.isTrimOnly() ) {
                         BSONArrayBuilder arrBuilder( b.subarrayStart( m.shortFieldName ) );
                         long long skip = arr.nFields() - m.getTrim();
                         BSONObjIterator j( arr );
@@ -584,13 +682,43 @@ namespace mongo {
                             }
                             arrBuilder.append( j.next() );
                         }
+
                         ms.forceEmptyArray = true;
-                        ms.fixedArray = BSONArray(arrBuilder.done().getOwned());
+                        ms.fixedArray = BSONArray( arrBuilder.done().getOwned() );
+                    }
+                    else if ( m.isTrimAndSort() ) {
+                        long long trim = m.getTrim();
+                        BSONObj sortPattern = m.getSort();
+
+                        // Sort the $each array over pattern.
+                        vector<BSONObj> workArea;
+                        BSONObjIterator j( arr );
+                        while ( j.more() ) {
+                            workArea.push_back( j.next().Obj() );
+                        }
+                        sort( workArea.begin(), workArea.end(), ProjectKeyCmp( sortPattern) );
+
+                        // Trim to the appropriate size.
+                        long long skip = std::max( 0ULL, workArea.size() - trim );
+                        BSONArrayBuilder arrBuilder( b.subarrayStart( m.shortFieldName ) );
+                        for (vector<BSONObj>::iterator it = workArea.begin();
+                             it != workArea.end() && trim > 0;
+                             ++it ) {
+                            if ( skip-- > 0 ) {
+                                continue;
+                            }
+                            arrBuilder.append( *it );
+                        }
+
+                        // Log the full resulting array.
+                        ms.forceEmptyArray = true;
+                        ms.fixedArray = BSONArray( arrBuilder.done().getOwned() );
                     }
                 }
                 else {
                     BSONObjBuilder arr( b.subarrayStart( m.shortFieldName ) );
                     arr.appendAs( m.elt, "0" );
+
                     ms.forceEmptyArray = true;
                     ms.fixedArray = BSONArray(arr.done().getOwned());
                 }
