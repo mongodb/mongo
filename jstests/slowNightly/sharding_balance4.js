@@ -28,7 +28,7 @@ counts = {}
 //
 // The core behavior of this test is to add a bunch of documents to a sharded collection, then
 // incrementally update each document and make sure the counts in the document match our update
-// counts while balancing occurs (doUpdate()).  Every once and awhile we also check (check())
+// counts while balancing occurs (doUpdate()).  Every once in a while we also check (check())
 // our counts via a query.
 //
 // If during a chunk migration an update is missed, we trigger an assertion and fail.
@@ -133,11 +133,6 @@ function diff1(){
     if ( Math.random() > .999 )
         printjson( x )
     return Math.max( x.shard0000 , x.shard0001 ) - Math.min( x.shard0000 , x.shard0001 );
-}
-
-function sum(){
-    var x = s.chunkCounts( "foo" )
-    return x.shard0000 + x.shard0001;
 }
 
 assert.lt( 20 , diff1() ,"initial load" );
