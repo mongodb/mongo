@@ -23,19 +23,37 @@ num = 0;
 
 counts = {}
 
-function doUpdate( includeString ){
+//
+// TODO: Rewrite to make much clearer.
+//
+// The core behavior of this test is to add a bunch of documents to a sharded collection, then
+// incrementally update each document and make sure the counts in the document match our update
+// counts while balancing occurs (doUpdate()).  Every once and awhile we also check (check())
+// our counts via a query.
+//
+// If during a chunk migration an update is missed, we trigger an assertion and fail.
+//
+
+
+function doUpdate( includeString, optionalId ){
     var up = { $inc : { x : 1 } }
     if ( includeString )
         up["$set"] = { s : bigString };
-    var myid = Random.randInt( N )
+    var myid = optionalId == undefined ? Random.randInt( N ) : optionalId
     db.foo.update( { _id : myid } , up , true );
 
     counts[myid] = ( counts[myid] ? counts[myid] : 0 ) + 1;
     return myid;
 }
 
-for ( i=0; i<N*10; i++ ){
-    doUpdate( true )
+// Initially update all documents from 1 to N, otherwise later checks can fail because no document
+// previously existed
+for ( i = 0; i < N; i++ ){
+    doUpdate( true, i )
+}
+
+for ( i=0; i<N*9; i++ ){
+    doUpdate( false )
 }
 db.getLastError();
 
