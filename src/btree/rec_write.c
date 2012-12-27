@@ -226,6 +226,8 @@ static int  __rec_cell_build_ovfl(WT_SESSION_IMPL *,
 		WT_RECONCILE *, WT_KV *, uint8_t, uint64_t);
 static int  __rec_cell_build_val(WT_SESSION_IMPL *,
 		WT_RECONCILE *, const void *, uint32_t, uint64_t);
+static int  __rec_child_modify(
+		WT_SESSION_IMPL *, WT_RECONCILE *, WT_PAGE *, WT_REF *, int *);
 static int  __rec_col_fix(WT_SESSION_IMPL *, WT_RECONCILE *, WT_PAGE *);
 static int  __rec_col_fix_slvg(WT_SESSION_IMPL *,
 		WT_RECONCILE *, WT_PAGE *, WT_SALVAGE_COOKIE *);
@@ -236,8 +238,6 @@ static int  __rec_col_var(WT_SESSION_IMPL *,
 static int  __rec_col_var_helper(WT_SESSION_IMPL *, WT_RECONCILE *,
 		WT_SALVAGE_COOKIE *, WT_ITEM *, int, int, uint64_t);
 static int  __rec_page_deleted(
-		WT_SESSION_IMPL *, WT_RECONCILE *, WT_PAGE *, WT_REF *, int *);
-static int  __rec_page_modified(
 		WT_SESSION_IMPL *, WT_RECONCILE *, WT_PAGE *, WT_REF *, int *);
 static int  __rec_row_int(WT_SESSION_IMPL *, WT_RECONCILE *, WT_PAGE *);
 static int  __rec_row_leaf(WT_SESSION_IMPL *,
@@ -267,21 +267,16 @@ static int  __rec_dictionary_lookup(
 static void __rec_dictionary_reset(WT_RECONCILE *);
 
 /*
- * __rec_page_modified --
- *	Return if the given WT_REF references any modifications.
- *
- * The reconciliation code is used in the following situations:
- *
- * (1) by the eviction server during sync; and
- * (2) by any thread during LRU eviction.
+ * __rec_child_modify --
+ *	Return if the internal page's child references any modifications.
  *
  * The complexity is checking the page state of child pages when looking for
  * pages to merge.
  *
  * We clearly want to consider all normal, in-memory pages (WT_REF_MEM).
  *
- * During LRU eviction in case (2), the eviction code has already locked the
- * subtree, so locked pages should be included in the merge (WT_REF_LOCKED).
+ * During LRU eviction, the eviction code has already locked the subtree, so
+ * locked pages should be included in the merge (WT_REF_LOCKED).
  *
  * To make this tractable, the eviction server guarantees that no thread is
  * doing LRU eviction in the tree when case (1) occurs.  That is, the only
@@ -295,7 +290,7 @@ static void __rec_dictionary_reset(WT_RECONCILE *);
  * proceed.
  */
 static int
-__rec_page_modified(WT_SESSION_IMPL *session,
+__rec_child_modify(WT_SESSION_IMPL *session,
     WT_RECONCILE *r, WT_PAGE *page, WT_REF *ref, int *modifyp)
 {
 	WT_DECL_RET;
@@ -323,9 +318,26 @@ __rec_page_modified(WT_SESSION_IMPL *session,
 			WT_PUBLISH(ref->state, WT_REF_DELETED);
 			return (ret);
 		case WT_REF_EVICT_WALK:
+			/*
+			 * The tree is being walked by internal-page checkpoint
+			 * (NOT eviction), and the page is being written.  The
+			 * state is in-memory, the checkpoint thread will reset
+			 * it after the write.
+			 */
+			/* FALLTHROUGH */
 		case WT_REF_LOCKED:
+			/*
+			 * The tree is being walked by eviction and the page is
+			 * being evicted.  The state is in-memory, the eviction
+			 * thread will reset it after the write.
+			 */
+			/* FALLTHROUGH */
 		case WT_REF_MEM:
 			/*
+			 * The tree is being walked by leaf-apge checkpoint and
+			 * the page is being written.   The state is in-memory
+			 * and we're holding a hazard reference.
+			 *
 			 * In-memory states: set modify based on the existence
 			 * of the page's modify structure.
 			 */
@@ -2072,7 +2084,7 @@ __rec_col_merge(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		 * Deleted/split pages are merged into the parent and discarded.
 		 */
 		addr = NULL;
-		WT_RET(__rec_page_modified(session, r, page, ref, &modified));
+		WT_RET(__rec_child_modify(session, r, page, ref, &modified));
 		if (modified) {
 			rp = ref->page;
 			switch (F_ISSET(rp->modify, WT_PM_REC_MASK)) {
@@ -2788,7 +2800,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		vtype = 0;
 		addr = NULL;
 		rp = ref->page;
-		WT_RET(__rec_page_modified(session, r, page, ref, &modified));
+		WT_RET(__rec_child_modify(session, r, page, ref, &modified));
 
 		/*
 		 * A modified WT_REF with no child page must be a page marked
@@ -3040,7 +3052,7 @@ __rec_row_merge(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		vtype = 0;
 		addr = NULL;
 		rp = ref->page;
-		WT_RET(__rec_page_modified(session, r, page, ref, &modified));
+		WT_RET(__rec_child_modify(session, r, page, ref, &modified));
 
 		/*
 		 * A modified WT_REF with no child page must be a page marked
