@@ -42,8 +42,6 @@ namespace mongo {
         replLocalAuth();
 
         Client::WriteContext ctx(_ns);
-        theDataFileMgr.insert(_ns.c_str(), _index.objdata(), _index.objsize(),
-                              true /* mayInterrupt */);
         build();
 
         cc().shutdown();

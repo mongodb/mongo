@@ -518,6 +518,9 @@ namespace ReplSetTests {
             BSONObj cmdObj = BSON("reIndex" << coll);
             Command *c = Command::findCommand("reIndex");
 
+            DBDirectClient cli;
+            int originalIndexCount = cli.count(dbname+".system.indexes");
+
             BSONObj indexOp1 = BSON("ns" << ns() << "name" << "foo_1" <<
                                     "key" << BSON("foo" << 1));
             BSONObj indexOp2 = BSON("ns" << (dbname+".something.else") << "name" << "baz_1" <<
@@ -539,12 +542,11 @@ namespace ReplSetTests {
             ASSERT(!t2.finished());
             t2.finish();
 
-            DBDirectClient cli;
             time_t max = time(0)+10;
             // assert.soon(t1.finished())
             while (time(0) < max) {
                 std::string ns = dbname+".system.indexes";
-                if (cli.count(ns) == 2) {
+                if (static_cast<int>(cli.count(ns)) == originalIndexCount+2) {
                     return;
                 }
             };
@@ -595,6 +597,8 @@ namespace ReplSetTests {
             std::string coll(strchr(ns(), '.')+1);
             BSONObj cmdObj = BSON("compact" << coll);
             Command *c = Command::findCommand("compact");
+            DBDirectClient cli;
+            int originalIndexCount = cli.count(dbname+".system.indexes");
 
             BSONObj indexOp1 = BSON("ns" << ns() << "name" << "foo_1" <<
                                     "key" << BSON("foo" << 1));
@@ -616,12 +620,11 @@ namespace ReplSetTests {
             ASSERT(!t2.finished());
             t2.finish();
 
-            DBDirectClient cli;
             time_t max = time(0)+10;
             // assert.soon(t1.finished())
             while (time(0) < max) {
                 std::string ns = dbname+".system.indexes";
-                if (cli.count(ns) == 2) {
+                if (static_cast<int>(cli.count(ns)) == originalIndexCount+2) {
                     return;
                 }
             };
@@ -633,9 +636,13 @@ namespace ReplSetTests {
     class TestRepair : public Base {
     public:
         void run() {
+            drop();
+
             std::string dbname = nsToDatabase(ns());
             Command *c = Command::findCommand("repairDatabase");
             BSONObj cmdObj = BSON("repairDatabase" << 1);
+            DBDirectClient cli;
+            int originalIndexCount = cli.count(dbname+".system.indexes");
 
             BSONObj indexOp1 = BSON("ns" << ns() << "name" << "foo_1" <<  "key" <<
                                     BSON("foo" << 1));
@@ -687,12 +694,11 @@ namespace ReplSetTests {
             t4.finish();
             t5.finish();
 
-            DBDirectClient cli;
             time_t max = time(0)+10;
             // assert.soon(t1.finished() && t2.finished())
             while (time(0) < max) {
                 std::string ns = dbname+".system.indexes";
-                if (cli.count(ns) == 4) {
+                if (static_cast<int>(cli.count(ns)) == originalIndexCount+4) {
                     return;
                 }
             };
