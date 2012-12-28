@@ -881,13 +881,15 @@ namespace mongo {
                 to = cmdObj["toShard"].String();
             }
 
-            // if we do a w=2 after very writea
+            // if we do a w=2 after every write
             bool secondaryThrottle = cmdObj["secondaryThrottle"].trueValue();
             if ( secondaryThrottle ) {
                 if ( theReplSet ) {
                     if ( theReplSet->config().getMajority() <= 1 ) {
                         secondaryThrottle = false;
-                        warning() << "not enough nodes in set to use secondaryThrottle" << endl;
+                        warning() << "not enough nodes in set to use secondaryThrottle: "
+                                  << " majority: " << theReplSet->config().getMajority()
+                                  << endl;
                     }
                 }
                 else if ( !anyReplEnabled() ) {
