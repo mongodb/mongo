@@ -124,6 +124,5 @@ namespace mongo {
             return true;
         }
 
-        FTSCommand ftsCommandSharded;
     }
 }
