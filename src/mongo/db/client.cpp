@@ -170,13 +170,19 @@ namespace mongo {
                 if ( ! _shutdown )
                     clients.erase(this);
             }
-            delete _curOp;
+
+            CurOp* last;
+            do {
+                last = _curOp;
+                delete _curOp;
+                // _curOp may have been reset to _curOp->_wrapped
+            } while (_curOp != last);
         }
     }
 
     bool Client::shutdown() {
 #if defined(_DEBUG)
-        { 
+        {
             if( sizeof(void*) == 8 ) {
                 StackChecker::check( desc().c_str() );
             }
