@@ -391,7 +391,7 @@ namespace mongo {
                     _ping( conn.conn(), true );
 
                     conn.done();
-                    
+
                     sleepsecs( sleepTime );
                     continue;
                 }
@@ -417,13 +417,18 @@ namespace mongo {
                     
                     LOG(1) << "*** start balancing round" << endl;
 
+                    bool waitForDelete = false;
                     if (balancerConfig["_waitForDelete"].trueValue()) {
-                        LOG(1) << "balancer chunk moves will wait for cleanup" << endl;
+                        waitForDelete = balancerConfig["_waitForDelete"].trueValue();
                     }
 
-                    if (balancerConfig["_secondaryThrottle"].trueValue()) {
-                        LOG(1) << "balancer chunk moves will wait for secondaries" << endl;
+                    bool secondaryThrottle = true; // default to on
+                    if ( balancerConfig[SettingsType::secondaryThrottle()].type() ) {
+                        secondaryThrottle = balancerConfig[SettingsType::secondaryThrottle()].trueValue();
                     }
+
+                    LOG(1) << "waitForDelete: " << waitForDelete << endl;
+                    LOG(1) << "secondaryThrottle: " << secondaryThrottle << endl;
 
                     vector<CandidateChunkPtr> candidateChunks;
                     _doBalanceRound( conn.conn() , &candidateChunks );
@@ -433,8 +438,8 @@ namespace mongo {
                     }
                     else {
                         _balancedLastTime = _moveChunks(&candidateChunks,
-                                balancerConfig[SettingsType::secondaryThrottle()].trueValue(),
-                                balancerConfig["_waitForDelete"].trueValue());
+                                                        secondaryThrottle,
+                                                        waitForDelete );
                     }
 
                     LOG(1) << "*** end of balancing round" << endl;

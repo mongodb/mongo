@@ -50,6 +50,8 @@
 #include "mongo/db/queryoptimizer.h"
 #include "mongo/db/repl.h"
 #include "mongo/db/repl_block.h"
+#include "mongo/db/repl/rs.h"
+#include "mongo/db/repl/rs_config.h"
 #include "mongo/s/chunk.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/config.h"
@@ -878,12 +880,25 @@ namespace mongo {
             if( cmdObj["toShard"].type() == String ){
                 to = cmdObj["toShard"].String();
             }
-            
-            // if we do a w=2 after very write
+
+            // if we do a w=2 after very writea
             bool secondaryThrottle = cmdObj["secondaryThrottle"].trueValue();
-            if ( secondaryThrottle && ! anyReplEnabled() ) {
-                secondaryThrottle = false;
-                warning() << "secondaryThrottle selected but no replication" << endl;
+            if ( secondaryThrottle ) {
+                if ( theReplSet ) {
+                    if ( theReplSet->config().getMajority() <= 1 ) {
+                        secondaryThrottle = false;
+                        warning() << "not enough nodes in set to use secondaryThrottle" << endl;
+                    }
+                }
+                else if ( !anyReplEnabled() ) {
+                    secondaryThrottle = false;
+                    warning() << "secondaryThrottle selected but no replication" << endl;
+                }
+                else {
+                    // master/slave
+                    secondaryThrottle = false;
+                    warning() << "secondaryThrottle not allowed with master/slave" << endl;
+                }
             }
 
             // Do inline deletion
