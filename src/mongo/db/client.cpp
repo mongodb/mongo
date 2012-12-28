@@ -165,9 +165,11 @@ namespace mongo {
 
         if ( ! inShutdown() ) {
             // we can't clean up safely once we're in shutdown
-            scoped_lock bl(clientsMutex);
-            if ( ! _shutdown )
-                clients.erase(this);
+            {
+                scoped_lock bl(clientsMutex);
+                if ( ! _shutdown )
+                    clients.erase(this);
+            }
             delete _curOp;
         }
     }
