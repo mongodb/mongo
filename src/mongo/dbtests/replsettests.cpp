@@ -25,6 +25,7 @@
 #include "mongo/db/index_builder.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/json.h"
+#include "mongo/db/kill_current_op.h"
 #include "mongo/db/oplog.h"
 #include "mongo/db/repl.h"
 #include "mongo/db/repl/rs.h"
@@ -190,7 +191,7 @@ namespace ReplSetTests {
             std::string ns = nsToDatabase(_index.getStringField("ns"))+".system.indexes";
 
             Client::initThread("in progress idx build");
-            Client::ReadContext ctx(ns);
+            Client::WriteContext ctx(ns);
             _client = currentClient.get();
 
             // This spins to mimic the db building an index.  Yield the read lock so that other
@@ -199,6 +200,8 @@ namespace ReplSetTests {
                 dbtemprelease temp;
                 sleepmillis(0);
             }
+
+            killCurrentOp.notifyAllWaiters();
             cc().shutdown();
             _done = true;
         }
@@ -662,7 +665,7 @@ namespace ReplSetTests {
             IndexBuildThread t2(indexOp2);
             IndexBuildThread t3(indexOp3);
             IndexBuildThread t4(indexOp4);
-            IndexBuildThread t5(indexOp4);
+            IndexBuildThread t5(indexOp5);
 
             t1.go();
             t2.go();
