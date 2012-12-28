@@ -1574,6 +1574,18 @@ shellHelper.show = function (what) {
         return ""
     }
 
+    if (what == "startupWarnings" ) {
+        if ( db ) {
+            var res = db.adminCommand( { getLog : "startupWarnings" } );
+            if ( res.ok ) {
+                print( "Server has startup warnings: " );
+                for ( var i=0; i<res.log.length; i++){
+                    print( res.log[i] )
+                }
+                return "";
+            }
+        }
+    }
 
     throw "don't know how to show [" + what + "]";
 
