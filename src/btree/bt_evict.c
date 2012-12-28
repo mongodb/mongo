@@ -520,9 +520,10 @@ __evict_file(WT_SESSION_IMPL *session, int syncop)
 			WT_ERR(__wt_compact_evict(session, page));
 			break;
 		case WT_SYNC_DISCARD:
-			/* Write dirty pages for sync and sync with discard. */
+			/* Write dirty pages for sync with discard. */
 			if (__wt_page_is_modified(page))
-				WT_ERR(__wt_rec_write(session, page, NULL, 1));
+				WT_ERR(__wt_rec_write(
+				    session, page, NULL, WT_SKIP_UPDATE_ERR));
 
 			/*
 			 * Evict the page for sync with discard.
@@ -621,7 +622,7 @@ __wt_sync_file(WT_SESSION_IMPL *session, int syncop)
 
 			/* Write dirty pages. */
 			if (__wt_page_is_modified(page))
-				WT_ERR(__wt_rec_write(session, page, NULL, 1));
+				WT_ERR(__wt_rec_write(session, page, NULL, 0));
 			break;
 		case WT_SYNC_INTERNAL:
 			/* Second pass: skip leaf pages. */
@@ -631,7 +632,7 @@ __wt_sync_file(WT_SESSION_IMPL *session, int syncop)
 
 			/* Write dirty pages. */
 			if (__wt_page_is_modified(page))
-				WT_ERR(__wt_rec_write(session, page, NULL, 1));
+				WT_ERR(__wt_rec_write(session, page, NULL, 0));
 			break;
 		}
 
@@ -816,7 +817,7 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, int clean)
 	WT_DECL_RET;
 	WT_EVICT_ENTRY *end, *evict, *start;
 	WT_PAGE *page;
-	int restarts;
+	int modified, restarts;
 
 	btree = session->btree;
 	cache = S2C(session)->cache;
@@ -866,13 +867,17 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, int clean)
 		 * If the file is being checkpointed, there's a period of time
 		 * where we have to turn off dirty writes and we can't discard
 		 * any page with a modification structure because it might race
-		 * with the checkpointing thread.
+		 * with the checkpointing thread.  This test isn't sufficient
+		 * by itself because the page might be modified after we select
+		 * it and before we get exclusive access, this test has to be
+		 * repeated durnig the page eviction review.
 		 */
-		if (btree->writes_disabled && page->modify != NULL)
+		modified = __wt_page_is_modified(page);
+		if (modified && btree->writes_disabled)
 			continue;
 
 		/* Optionally ignore clean pages. */
-		if (!clean && !__wt_page_is_modified(page))
+		if (!modified && !clean)
 			continue;
 
 		WT_ASSERT(session, evict->page == NULL);

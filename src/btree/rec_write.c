@@ -21,13 +21,13 @@ struct __rec_kv;		typedef struct __rec_kv WT_KV;
  */
 typedef struct {
 	WT_PAGE *page;			/* Page being reconciled */
+	uint32_t flags;			/* Caller's configuration */
 
 	WT_ITEM	 dsk;			/* Temporary disk-image buffer */
 
 	/* Track whether all changes to the page are written. */
 	uint32_t orig_write_gen;
-	int upd_skipped;
-	int upd_skip_fail;
+	int upd_skipped;		/* Skipped a page's update */
 
 	/*
 	 * Track if reconciliation has seen any overflow items.  Leaf pages with
@@ -255,7 +255,7 @@ static int  __rec_split_row_promote(
 		WT_SESSION_IMPL *, WT_RECONCILE *, uint8_t);
 static int  __rec_split_write(
 		WT_SESSION_IMPL *, WT_RECONCILE *, WT_BOUNDARY *, WT_ITEM *);
-static int  __rec_write_init(WT_SESSION_IMPL *, WT_PAGE *, int, void *);
+static int  __rec_write_init(WT_SESSION_IMPL *, WT_PAGE *, uint32_t, void *);
 static int  __rec_write_wrapup(WT_SESSION_IMPL *, WT_RECONCILE *, WT_PAGE *);
 static int  __rec_write_wrapup_err(
 		WT_SESSION_IMPL *, WT_RECONCILE *, WT_PAGE *);
@@ -317,26 +317,33 @@ __rec_child_modify(WT_SESSION_IMPL *session,
 			    __rec_page_deleted(session, r, page, ref, modifyp);
 			WT_PUBLISH(ref->state, WT_REF_DELETED);
 			return (ret);
+		case WT_REF_LOCKED:
+			/*
+			 * If being called by the eviction server, the page was
+			 * selected for eviction by us and the state is stable
+			 * until we reset it, treat it as an in-memory state.
+			 *
+			 * If being called by a checkpoint thread, the page is
+			 * being considered by the eviction server, and we have
+			 * to wait until the eviction server finishes evicting
+			 * it or decides to move on.
+			 */
+			if (!F_ISSET(r, WT_EVICTION_SERVER_LOCKED))
+				break;
+			/* FALLTHROUGH */
 		case WT_REF_EVICT_WALK:
 			/*
 			 * The tree is being walked by internal-page checkpoint
 			 * (NOT eviction), and the page is being written.  The
-			 * state is in-memory, the checkpoint thread will reset
-			 * it after the write.
-			 */
-			/* FALLTHROUGH */
-		case WT_REF_LOCKED:
-			/*
-			 * The tree is being walked by eviction and the page is
-			 * being evicted.  The state is in-memory, the eviction
-			 * thread will reset it after the write.
+			 * state is in-memory and stable, the checkpoint thread
+			 * will reset the state after the write.
 			 */
 			/* FALLTHROUGH */
 		case WT_REF_MEM:
 			/*
 			 * The tree is being walked by leaf-page checkpoint and
 			 * the page is being written.   The state is in-memory
-			 * and we're holding a hazard reference.
+			 * and stable, we're holding a hazard reference.
 			 *
 			 * In-memory states: set modify based on the existence
 			 * of the page's modify structure.
@@ -434,8 +441,24 @@ static inline int
 __rec_txn_read(
     WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_UPDATE *upd, WT_UPDATE **updp)
 {
-	*updp = __wt_txn_read_skip(session, upd, &r->upd_skipped);
-	return ((r->upd_skip_fail && r->upd_skipped) ? EBUSY : 0);
+	int skip;
+
+	*updp = __wt_txn_read_skip(session, upd, &skip);
+	if (skip == 0)
+		return (0);
+
+	r->upd_skipped = 1;
+	switch (F_ISSET(r, WT_SKIP_UPDATE_ERR | WT_SKIP_UPDATE_QUIT)) {
+	case WT_SKIP_UPDATE_ERR:
+		WT_PANIC_RET(session,
+		    EBUSY, "reconciliation illegally skipped an update");
+	case WT_SKIP_UPDATE_QUIT:
+		return (EBUSY);
+	case 0:
+	default:
+		break;
+	}
+	return (0);
 }
 
 /*
@@ -444,7 +467,7 @@ __rec_txn_read(
  */
 int
 __wt_rec_write(WT_SESSION_IMPL *session,
-    WT_PAGE *page, WT_SALVAGE_COOKIE *salvage, int eviction)
+    WT_PAGE *page, WT_SALVAGE_COOKIE *salvage, uint32_t flags)
 {
 	WT_RECONCILE *r;
 	WT_DECL_RET;
@@ -465,7 +488,7 @@ __wt_rec_write(WT_SESSION_IMPL *session,
 		return (0);
 
 	/* Initialize the reconciliation structure for each new run. */
-	WT_RET(__rec_write_init(session, page, eviction, &session->reconcile));
+	WT_RET(__rec_write_init(session, page, flags, &session->reconcile));
 	r = session->reconcile;
 
 	/* Initialize the tracking subsystem for each new run. */
@@ -572,7 +595,7 @@ __wt_rec_write(WT_SESSION_IMPL *session,
 	__wt_page_modify_set(session, page);
 	F_CLR(page->modify, WT_PM_REC_SPLIT_MERGE);
 
-	WT_RET(__wt_rec_write(session, page, NULL, eviction));
+	WT_RET(__wt_rec_write(session, page, NULL, flags));
 
 	return (0);
 }
@@ -583,7 +606,7 @@ __wt_rec_write(WT_SESSION_IMPL *session,
  */
 static int
 __rec_write_init(
-    WT_SESSION_IMPL *session, WT_PAGE *page, int eviction, void *retp)
+    WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags, void *retp)
 {
 	WT_BOUNDARY *bnd;
 	WT_BTREE *btree;
@@ -683,10 +706,12 @@ __rec_write_init(
 
 	/* Per-page reconciliation: track skipped updates. */
 	r->upd_skipped = 0;
-	r->upd_skip_fail = eviction ? 0 : 1;
 
 	/* Per-page reconciliation: track overflow items. */
 	r->ovfl_items = 0;
+
+	/* Remember the flags. */
+	r->flags = flags;
 
 	/* Read the disk generation before we read anything from the page. */
 	r->page = page;

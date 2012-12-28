@@ -240,11 +240,13 @@ static int
 __rec_review(WT_SESSION_IMPL *session,
     WT_REF *ref, WT_PAGE *page, int exclusive, int top)
 {
+	WT_BTREE *btree;
 	WT_DECL_RET;
 	WT_PAGE_MODIFY *mod;
 	WT_TXN *txn;
 	uint32_t i;
 
+	btree = session->btree;
 	txn = &session->txn;
 
 	/*
@@ -276,8 +278,17 @@ __rec_review(WT_SESSION_IMPL *session,
 			}
 
 	/*
-	 * Check if this page can be evicted:
+	 * Check if this page can be evicted.
 	 *
+	 * If the file is being checkpointed, there's a period of time where we
+	 * cannot evict dirty pages because it might race with the checkpointing
+	 * thread.  The LRU eviction code does not select dirty pages if writes
+	 * are disabled, but the page might have been dirtied after selection.
+	 */
+	if (btree->writes_disabled && __wt_page_is_modified(page))
+		return (EBUSY);
+
+	/*
 	 * Fail if the top-level page is a page expected to be removed from the
 	 * tree as part of eviction (an empty page or a split-merge page).  Note
 	 * "split" pages are NOT included in this test, because a split page can
@@ -323,11 +334,10 @@ __rec_review(WT_SESSION_IMPL *session,
 	/* If the page is dirty, write it so we know the final state. */
 	if (__wt_page_is_modified(page) &&
 	    !F_ISSET(mod, WT_PM_REC_SPLIT_MERGE)) {
-		ret = __wt_rec_write(session, page, NULL, exclusive);
+		ret = __wt_rec_write(session, page,
+		    NULL, WT_EVICTION_SERVER_LOCKED | WT_SKIP_UPDATE_QUIT);
 
 		/* If there are unwritten changes on the page, give up. */
-		if (ret == 0 && !exclusive && __wt_page_is_modified(page))
-			ret = EBUSY;
 		if (ret == EBUSY) {
 			WT_VERBOSE_RET(session, evict,
 			    "page %p written but not clean", page);
@@ -360,6 +370,7 @@ __rec_review(WT_SESSION_IMPL *session,
 		}
 		WT_RET(ret);
 
+		WT_ASSERT(session, __wt_page_is_modified(page) == 0);
 		txn->eviction_fails = 0;
 	}
 

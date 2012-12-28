@@ -443,7 +443,7 @@ extern char *__wt_track_string(WT_PAGE_TRACK *track, char *buf, size_t len);
 extern int __wt_rec_write(WT_SESSION_IMPL *session,
     WT_PAGE *page,
     WT_SALVAGE_COOKIE *salvage,
-    int eviction);
+    uint32_t flags);
 extern void __wt_rec_destroy(WT_SESSION_IMPL *session, void *retp);
 extern int __wt_rec_bulk_init(WT_CURSOR_BULK *cbulk);
 extern int __wt_rec_bulk_wrapup(WT_CURSOR_BULK *cbulk);
