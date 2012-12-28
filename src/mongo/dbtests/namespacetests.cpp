@@ -1092,6 +1092,76 @@ namespace NamespaceTests {
             }
         };
 
+
+        /**
+         * Test  Quantize record allocation size for various buckets
+         *       @see NamespaceDetails::quantizeAllocationSpace()
+         */
+        class QuantizeFixedBuckets : public Base {
+        public:
+            void run() {
+                create();
+                // explicitly test for a set of known values
+                ASSERT_EQUALS(NamespaceDetails::quantizeAllocationSpace(33),       36);
+                ASSERT_EQUALS(NamespaceDetails::quantizeAllocationSpace(1000),     1024);
+                ASSERT_EQUALS(NamespaceDetails::quantizeAllocationSpace(10001),    10240);
+                ASSERT_EQUALS(NamespaceDetails::quantizeAllocationSpace(100000),   106496);
+                ASSERT_EQUALS(NamespaceDetails::quantizeAllocationSpace(1000001),  1048576);
+                ASSERT_EQUALS(NamespaceDetails::quantizeAllocationSpace(10000000), 10223616);
+            }
+        };
+
+
+        /**
+         * Test  Quantize min/max record allocation size
+         *       @see NamespaceDetails::quantizeAllocationSpace()
+         */
+        class QuantizeMinMaxBound : public Base {
+        public:
+            void run() {
+                create();
+                // test upper and lower bound
+                const int maxSize = 16 * 1024 * 1024;
+                ASSERT_EQUALS(NamespaceDetails::quantizeAllocationSpace(1), 2);
+                ASSERT_EQUALS(NamespaceDetails::quantizeAllocationSpace(maxSize), maxSize);
+            }
+        };
+
+        /**
+         * Test  Quantize record allocation on every boundary, as well as boundary-1
+         *       @see NamespaceDetails::quantizeAllocationSpace()
+         */
+        class QuantizeRecordBoundary : public Base {
+        public:
+            void run() {
+                create();
+                for (int iBucket = 0; iBucket <= MaxBucket; ++iBucket) {
+                    // for each bucket in range [min, max)
+                    const int bucketSize = bucketSizes[iBucket];
+                    const int prevBucketSize = (iBucket - 1 >= 0) ? bucketSizes[iBucket - 1] : 0;
+                    const int intervalSize = bucketSize / 16;
+                    for (int iBoundary = prevBucketSize;
+                         iBoundary < bucketSize;
+                         iBoundary += intervalSize) {
+                        // for each quantization boundary within the bucket
+                        for (int iSize = iBoundary - 1; iSize <= iBoundary; ++iSize) {
+                            // test the quantization boundary - 1, and the boundary itself
+                            const int quantized =
+                                    NamespaceDetails::quantizeAllocationSpace(iSize);
+                            // assert quantized size is greater than or equal to requested size
+                            ASSERT(quantized >= iSize);
+                            // assert quantized size is within one quantization interval of
+                            // the requested size
+                            ASSERT(quantized - iSize <= intervalSize);
+                            // assert quantization is an idempotent operation
+                            ASSERT(quantized ==
+                                   NamespaceDetails::quantizeAllocationSpace(quantized));
+                        }
+                    }
+                }
+            }
+        };
+
         /* test  NamespaceDetails::cappedTruncateAfter(const char *ns, DiskLoc loc)
         */
         class TruncateCapped : public Base {
@@ -1365,6 +1435,9 @@ namespace NamespaceTests {
             add< NamespaceDetailsTests::Create >();
             add< NamespaceDetailsTests::SingleAlloc >();
             add< NamespaceDetailsTests::Realloc >();
+            add< NamespaceDetailsTests::QuantizeMinMaxBound >();
+            add< NamespaceDetailsTests::QuantizeFixedBuckets >();
+            add< NamespaceDetailsTests::QuantizeRecordBoundary >();
             add< NamespaceDetailsTests::TwoExtent >();
             add< NamespaceDetailsTests::TruncateCapped >();
             add< NamespaceDetailsTests::Migrate >();
