@@ -870,7 +870,7 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, int clean)
 		 * with the checkpointing thread.  This test isn't sufficient
 		 * by itself because the page might be modified after we select
 		 * it and before we get exclusive access, this test has to be
-		 * repeated durnig the page eviction review.
+		 * repeated during the page eviction review.
 		 */
 		modified = __wt_page_is_modified(page);
 		if (modified && btree->writes_disabled)

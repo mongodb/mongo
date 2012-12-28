@@ -450,8 +450,8 @@ __rec_txn_read(
 	r->upd_skipped = 1;
 	switch (F_ISSET(r, WT_SKIP_UPDATE_ERR | WT_SKIP_UPDATE_QUIT)) {
 	case WT_SKIP_UPDATE_ERR:
-		WT_PANIC_RET(session,
-		    EBUSY, "reconciliation illegally skipped an update");
+		WT_PANIC_RETX(
+		    session, "reconciliation illegally skipped an update");
 	case WT_SKIP_UPDATE_QUIT:
 		return (EBUSY);
 	case 0:

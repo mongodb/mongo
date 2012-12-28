@@ -78,19 +78,13 @@
 } while (0)
 
 #define	WT_PANIC_ERR(session, v, ...) do {				\
-	__wt_err((session), (v), __VA_ARGS__);				\
-	/* Return WT_PANIC regardless of earlier return codes. */	\
-	(v) = __wt_panic((session));					\
+	__wt_err(session, v, __VA_ARGS__);				\
+	(void)__wt_panic(session);					\
 } while (0)
-#define	WT_PANIC_ERRX(session, ...) do {				\
-	__wt_errx((session), __VA_ARGS__);				\
+#define	WT_PANIC_RETX(session, ...) do {				\
+	__wt_errx(session, __VA_ARGS__);				\
 	/* Return WT_PANIC regardless of earlier return codes. */	\
-	(void)__wt_panic((session));					\
-} while (0)
-#define	WT_PANIC_RET(session, v, ...) do {				\
-	__wt_err((session), (v), __VA_ARGS__);				\
-	/* Return WT_PANIC regardless of earlier return codes. */	\
-	return (__wt_panic((session)));					\
+	return (__wt_panic(session));					\
 } while (0)
 
 /*
