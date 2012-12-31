@@ -437,6 +437,10 @@ namespace mongo {
             massert(15927, "can't open database in a read lock. if db was just closed, consider retrying the query. might otherwise indicate an internal error", !cant);
         }
 
+        // we mark our thread as having done writes now as we do not want any exceptions
+        // once we start creating a new database
+        cc().writeHappened();
+
         // this locks _m for defensive checks, so we don't want to be locked right here : 
         Database *db = new Database( dbname.c_str() , justCreated , path );
 
