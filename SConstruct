@@ -518,6 +518,7 @@ elif os.sys.platform.startswith("linux"):
 
     if force32:
         env.Append( EXTRALIBPATH=["/usr/lib32"] )
+        env.Append( CCFLAGS=["-mmmx"] )
 
     nix = True
 

@@ -28,7 +28,7 @@ env.Command( [ "stop_words_list.h", "stop_words_list.cpp"],
 hack = env.Clone()
 hack.StaticLibrary( "stopwords", [ "stop_words_list.cpp" ] )
 if "-O3" in hack["CCFLAGS"]:
-    hack["CCFLAGS"] = hack["CCFLAGS"].remove( "-O3" )
+    hack["CCFLAGS"].remove( "-O3" )
 
 env.StaticLibrary('base', [
         'fts_index_format.cpp',
