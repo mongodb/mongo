@@ -975,6 +975,18 @@ ShardingTest.prototype.startBalancer = function( timeout, interval ) {
     db = oldDB
 }
 
+ShardingTest.prototype.isAnyBalanceInFlight = function() {
+    if ( this.config.locks.find({ _id : { $ne : "balancer" }, state : 2 }).count() > 0 )
+        return true;
+
+    var allCurrent = this.s.getDB( "admin" ).currentOp().inprog;
+    for ( var i = 0; i < allCurrent.length; i++ ) {
+        if ( allCurrent[i].name.indexOf( "cleanupOldData" ) == 0 )
+            return true;
+    }
+    return false;
+}
+
 /**
  * Kills the mongos with index n.
  */

@@ -20,8 +20,7 @@ removeShard = function(st, replTest) {
     // Need to wait for migration to be over... only works for inline deletes
     checkNSLock = function() {
         printjson( st.s.getDB( "config" ).locks.find().toArray() )
-        return st.s.getDB( "config" ).locks.find({ _id : { $ne : "balancer" }, state : 2 })
-                   .count() == 0
+        return !st.isAnyBalanceInFlight();
     }
     assert.soon( checkNSLock, "migrations did not end?" )
     

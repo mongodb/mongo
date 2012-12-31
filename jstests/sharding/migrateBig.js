@@ -54,6 +54,8 @@ s.config.settings.update( { _id: "balancer" }, { $set : { stopped: false } } , t
 
 assert.soon( function(){ var x = s.chunkDiff( "foo" , "test" ); print( "chunk diff: " + x ); return x < 2; } , "no balance happened" , 8 * 60 * 1000 , 2000 ) 
 
+assert.soon( function(){ return !s.isAnyBalanceInFlight(); } );
+
 assert.eq( coll.count() , coll.find().itcount() );
 
 s.stop()
