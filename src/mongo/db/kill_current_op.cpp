@@ -83,7 +83,6 @@ namespace mongo {
                     k->kill(pNotifyFlag);
                     for( CurOp *l = ( *j )->curop(); l; l = l->parent() ) {
                         l->kill();
-                        log() << "found a cool thing: " << l << " " << l->opNum().get() << endl;
                     }
 
                     found = true;
