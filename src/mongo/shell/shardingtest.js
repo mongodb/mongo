@@ -981,7 +981,8 @@ ShardingTest.prototype.isAnyBalanceInFlight = function() {
 
     var allCurrent = this.s.getDB( "admin" ).currentOp().inprog;
     for ( var i = 0; i < allCurrent.length; i++ ) {
-        if ( allCurrent[i].name.indexOf( "cleanupOldData" ) == 0 )
+        if ( allCurrent[i].desc &&
+             allCurrent[i].desc.indexOf( "cleanupOldData" ) == 0 )
             return true;
     }
     return false;
