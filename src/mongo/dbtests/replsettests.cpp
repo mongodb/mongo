@@ -196,7 +196,7 @@ namespace ReplSetTests {
 
             // This spins to mimic the db building an index.  Yield the read lock so that other
             // dbs can be opened (which requires the write lock)
-            while (!_curop || !_curop->killPending()) {
+            while (!_curop || !_curop->killPendingStrict()) {
                 dbtemprelease temp;
                 sleepmillis(0);
             }

@@ -36,6 +36,7 @@ namespace mongo {
         _active = false;
         _reset();
         _op = 0;
+        _opNum = _nextOpNum++;
         // These addresses should never be written to again.  The zeroes are
         // placed here as a precaution because currentOp may be accessed
         // without the db mutex.
@@ -82,6 +83,12 @@ namespace mongo {
             if (client == &me || curop == NULL) {
                 continue;
             }
+
+            if ( !curop->active() )
+                continue;
+
+            if ( curop->killPendingStrict() )
+                continue;
 
             BSONObj info = curop->info();
             if (matcher.matches(info)) {
