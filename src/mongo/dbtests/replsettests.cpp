@@ -124,7 +124,7 @@ namespace ReplSetTests {
     public:
         Base() {
             cmdLine._replSet = "foo";
-            cmdLine.oplogSize = 5;
+            cmdLine.oplogSize = 5 * 1024 * 1024;
             createOplog();
             setup();
         }
@@ -291,6 +291,8 @@ namespace ReplSetTests {
 
             dropDB->stopIndexBuilds(dbname, cmdObj);
 
+            sleepsecs(1);
+
             ASSERT(t1.finished());
             ASSERT(t2.finished());
             ASSERT(!t3.finished());
@@ -335,6 +337,8 @@ namespace ReplSetTests {
             BSONObj cmdObj = BSON("drop" << coll);
             drop->stopIndexBuilds(dbname, cmdObj);
 
+            sleepsecs(1);
+
             ASSERT(t1.finished());
             ASSERT(t2.finished());
             ASSERT(!t3.finished());
@@ -372,6 +376,8 @@ namespace ReplSetTests {
 
             c->stopIndexBuilds(dbname, cmd1);
 
+            sleepsecs(1);
+
             ASSERT(t1.finished());
             ASSERT(t2.finished());
             ASSERT(t3.finished());
@@ -403,6 +409,8 @@ namespace ReplSetTests {
             ASSERT(!t3.curop()->killPending());
 
             c->stopIndexBuilds(dbname, cmd2);
+
+            sleepsecs(1);
 
             ASSERT(!t1.finished());
             ASSERT(t2.finished());
@@ -437,6 +445,8 @@ namespace ReplSetTests {
             ASSERT(!t3.curop()->killPending());
 
             c->stopIndexBuilds(dbname, cmd3);
+
+            sleepsecs(1);
 
             ASSERT(!t1.finished());
             ASSERT(!t2.finished());
@@ -584,6 +594,8 @@ namespace ReplSetTests {
 
             c->stopIndexBuilds(dbname, cmdObj);
 
+            sleepsecs(1);
+
             ASSERT(t1.finished());
             ASSERT(!t2.finished());
 
@@ -680,6 +692,8 @@ namespace ReplSetTests {
             ASSERT(!t5.curop()->killPending());
 
             std::vector<BSONObj> indexes = c->stopIndexBuilds(dbname, cmdObj);
+
+            sleepsecs(1);
 
             ASSERT(t1.finished());
             ASSERT(t2.finished());
