@@ -31,7 +31,6 @@
 #include "mongo/db/lasterror.h"
 #include "mongo/db/lockstate.h"
 #include "mongo/db/namespace-inl.h"
-#include "mongo/db/security.h"
 #include "mongo/db/stats/top.h"
 #include "mongo/util/concurrency/rwlock.h"
 #include "mongo/util/concurrency/threadlocal.h"
@@ -81,8 +80,6 @@ namespace mongo {
         bool shutdown();
 
         string clientAddress(bool includePort=false) const;
-        const AuthenticationInfo * getAuthenticationInfo() const { return &_ai; }
-        AuthenticationInfo * getAuthenticationInfo() { return &_ai; }
         CurOp* curop() const { return _curOp; }
         Context* getContext() const { return _context; }
         Database* database() const {  return _context ? _context->db() : 0; }
@@ -125,7 +122,6 @@ namespace mongo {
         bool _shutdown; // to track if Client::shutdown() gets called
         std::string _desc;
         bool _god;
-        AuthenticationInfo _ai;
         OpTime _lastOp;
         BSONObj _handshake;
         BSONObj _remoteId;

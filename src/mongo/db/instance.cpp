@@ -54,7 +54,6 @@
 #include "mongo/db/pagefault.h"
 #include "mongo/db/repl.h"
 #include "mongo/db/replutil.h"
-#include "mongo/db/security.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/s/d_logic.h"
 #include "mongo/s/stale_exception.h" // for SendStaleConfigException

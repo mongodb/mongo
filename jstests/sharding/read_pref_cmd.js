@@ -23,7 +23,7 @@ var doTest = function(conn, hostList, isMongos) {
      *     look for the cmd just sent.
      */
     var cmdTest = function(cmdObj, secOk, profileQuery) {
-        var cmdResult = testDB.runCommand(cmdObj, { readPref: { mode: 'secondary' }});
+        var cmdResult = testDB.runCommand(cmdObj);
         jsTest.log('cmd result: ' + tojson(cmdResult));
         assert(cmdResult.ok);
 

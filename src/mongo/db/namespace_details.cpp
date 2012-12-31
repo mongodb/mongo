@@ -234,15 +234,15 @@ namespace mongo {
         const int bucketIdx = bucket(allocSize);
         int bucketSize = bucketSizes[bucketIdx];
         int quantizeUnit = bucketSize / 16;
-        if (allocSize % quantizeUnit == 0)
-            // size is already quantized
-            return allocSize;
         if (allocSize >= (1 << 22)) // 4mb
             // all allocatons > 4mb result in 4mb/16 quantization units, even if allocated in
             // the 8mb+ bucket.  idea is to reduce quantization overhead of large records at
             // the cost of increasing the DeletedRecord size distribution in the largest bucket
             // by factor of 4.
             quantizeUnit = (1 << 18); // 256k
+        if (allocSize % quantizeUnit == 0)
+            // size is already quantized
+            return allocSize;
         const int quantizedSpace = (allocSize | (quantizeUnit - 1)) + 1;
         fassert(16484, quantizedSpace >= allocSize);
         return quantizedSpace;
@@ -736,6 +736,32 @@ namespace mongo {
         while( i.more() )
             i.next().keyPattern().getFieldNames(_indexKeys);
         _keysComputed = true;
+    }
+
+    void NamespaceDetails::updateTTLIndex( int idxNo , const BSONElement& newExpireSecs ) {
+        // Need to get the actual DiskLoc of the index to update. This is embedded in the 'info'
+        // object inside the IndexDetails.
+        IndexDetails idetails = idx( idxNo );
+        BSONElement oldExpireSecs = idetails.info.obj().getField("expireAfterSeconds");
+
+        // Important that we set the new value in-place.  We are writing directly to the
+        // object here so must be careful not to overwrite with a longer numeric type.
+        massert( 16630, "new 'expireAfterSeconds' must be a number", newExpireSecs.isNumber() );
+        BSONElementManipulator manip( oldExpireSecs );
+        switch( oldExpireSecs.type() ) {
+        case EOO:
+            massert( 16631, "index does not have an 'expireAfterSeconds' field", false );
+            break;
+        case NumberInt:
+        case NumberDouble:
+            manip.SetNumber( newExpireSecs.numberDouble() );
+            break;
+        case NumberLong:
+            manip.SetLong( newExpireSecs.numberLong() );
+            break;
+        default:
+            massert( 16632, "current 'expireAfterSeconds' is not a number", false );
+        }
     }
 
     void NamespaceDetails::setSystemFlag( int flag ) {

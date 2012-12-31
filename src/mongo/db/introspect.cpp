@@ -38,31 +38,26 @@ namespace {
     void _appendUserInfo(const Client& c, BSONObjBuilder& builder, AuthorizationManager* authManager) {
         PrincipalSet::NameIterator nameIter = authManager->getAuthenticatedPrincipalNames();
 
-        string bestUser;
+        PrincipalName bestUser;
+        if (nameIter.more())
+            bestUser = *nameIter;
 
         StringData opdb( nsToDatabaseSubstring( c.ns() ) );
 
         BSONArrayBuilder allUsers(builder.subarrayStart("allUsers"));
         for ( ; nameIter.more(); nameIter.next()) {
-            const string& name = nameIter->getFullName();
-            allUsers.append(name);
+            BSONObjBuilder nextUser(allUsers.subobjStart());
+            nextUser.append(AuthorizationManager::USER_NAME_FIELD_NAME, nameIter->getUser());
+            nextUser.append(AuthorizationManager::USER_SOURCE_FIELD_NAME, nameIter->getDB());
+            nextUser.doneFast();
 
-            if ( bestUser.size() == 0 ) {
-                bestUser = name;
-            }
-            else {
-                size_t idx = name.find( '@' );
-                if ( idx >= 0 ) {
-                    StringData db = StringData(name).substr( idx + 1 );
-                    log() << "eliot : " << db << " " << opdb << endl;
-                    if ( opdb == db )
-                        bestUser = name;
-                }
+            if (nameIter->getDB() == opdb) {
+                bestUser = *nameIter;
             }
         }
         allUsers.doneFast();
 
-        builder.append("user", bestUser );
+        builder.append("user", bestUser.getUser().empty() ? "" : bestUser.getFullName());
 
     }
 } // namespace

@@ -24,6 +24,7 @@
 
 #include "mongo/db/jsobj.h"
 #include "mongo/platform/cstdint.h"
+#include "mongo/platform/unordered_set.h"
 
 namespace mongo {
 
@@ -131,7 +132,13 @@ namespace mongo {
             return compare(b) < 0;
         }
 
-        uint64_t asUint64() const { return *reinterpret_cast<const uint64_t*>( this ); }
+        /**
+         * Hash value for this disk location.  The hash implementation may be modified, and its
+         * behavior may differ across platforms.  Hash values should not be persisted.
+         */
+        struct Hasher {
+            size_t operator()( DiskLoc loc ) const;
+        };
 
         /**
          * Marks this disk loc for writing
@@ -160,6 +167,14 @@ namespace mongo {
         /*MongoDataFile& pdf() const;*/
     };
 #pragma pack()
+
+    inline size_t DiskLoc::Hasher::operator()( DiskLoc loc ) const {
+        // Older tr1 implementations do not support hashing 64 bit integers.  This implementation
+        // delegates to hashing 32 bit integers.
+        return
+            unordered_set<uint32_t>::hasher()( loc.a() ) ^
+            unordered_set<uint32_t>::hasher()( loc.getOfs() );
+    }
 
     inline std::ostream& operator<<( std::ostream &stream, const DiskLoc &loc ) {
         return stream << loc.toString();

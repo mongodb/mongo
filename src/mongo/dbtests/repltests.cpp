@@ -33,6 +33,7 @@
 
 namespace mongo {
     void createOplog();
+    void oldRepl();
 }
 
 namespace ReplTests {
@@ -46,6 +47,9 @@ namespace ReplTests {
         Client::Context _context;
     public:
         Base() : _context( ns() ) {
+            oldRepl();
+            cmdLine._replSet = "";
+            cmdLine.oplogSize = 5 * 1024 * 1024;
             replSettings.master = true;
             createOplog();
             ensureHaveIdIndex( ns(), false );

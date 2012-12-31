@@ -308,6 +308,12 @@ namespace mongo {
         const IndexDetails* findIndexByPrefix( const BSONObj &keyPattern ,
                                                bool requireSingleKey );
 
+        /* Updates the expireAfterSeconds field of the given index to the value in newExpireSecs.
+         * The specified index must already contain an expireAfterSeconds field, and the value in
+         * that field and newExpireSecs must both be numeric.
+         */
+        void updateTTLIndex( int idxNo , const BSONElement& newExpireSecs );
+
 
         const int systemFlags() const { return _systemFlags; }
         bool isSystemFlagSet( int flag ) const { return _systemFlags & flag; }

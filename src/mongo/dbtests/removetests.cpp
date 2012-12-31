@@ -75,91 +75,12 @@ namespace RemoveTests {
         int _min;
         int _max;
     };
-    
-    class ModifiedRangeBoundTest{
-    public:
-        void run(){
-
-            BSONObj bound = BSON( "a" << 55 );
-            BSONObj longBound = BSON("a" << 55 << "b" << 66);
-
-            //test keyPattern shorter than bound, should fail
-            {
-                BSONObj keyPat = BSONObj();
-                ASSERT_THROWS( Helpers::modifiedRangeBound( bound , keyPat , 1 ) ,
-                               MsgAssertionException );
-
-            }
-
-            //test keyPattern doesn't match bound, should fail
-            {
-                BSONObj keyPat = BSON( "b" << 1 );
-                ASSERT_THROWS( Helpers::modifiedRangeBound( bound , keyPat , 1 ) ,
-                               MsgAssertionException );
-            }
-            {
-                BSONObj keyPat = BSON( "a" << 1 << "c" << 1);
-                ASSERT_THROWS( Helpers::modifiedRangeBound( longBound , keyPat , 1 ) ,
-                               MsgAssertionException );
-
-            }
-
-            //test keyPattern same as bound
-            {
-                BSONObj keyPat = BSON( "a" << 1 );
-                BSONObj newB = Helpers::modifiedRangeBound( bound , keyPat , -1 );
-                ASSERT_EQUALS( newB , BSON("" << 55) );
-            }
-            {
-                BSONObj keyPat = BSON( "a" << 1 );
-                BSONObj newB = Helpers::modifiedRangeBound( bound , keyPat , 1 );
-                ASSERT_EQUALS( newB , BSON("" << 55) );
-            }
-
-            //test keyPattern longer than bound, simple
-            {
-                BSONObj keyPat = BSON( "a" << 1 << "b" << 1);
-                BSONObj newB = Helpers::modifiedRangeBound( bound , keyPat , -1 );
-                ASSERT_EQUALS( newB , BSON("" << 55 << "" << MINKEY ) );
-            }
-            {
-                BSONObj keyPat = BSON( "a" << 1 << "b" << 1);
-                BSONObj newB = Helpers::modifiedRangeBound( bound , keyPat , 1 );
-                ASSERT_EQUALS( newB , BSON("" << 55 << "" << MAXKEY ) );
-            }
-
-            //test keyPattern longer than bound, more complex pattern directions
-            {
-                BSONObj keyPat = BSON( "a" << 1 << "b" << -1);
-                BSONObj newB = Helpers::modifiedRangeBound( bound , keyPat , -1 );
-                ASSERT_EQUALS( newB , BSON("" << 55 << "" << MAXKEY ) );
-            }
-            {
-                BSONObj keyPat = BSON( "a" << 1 << "b" << -1);
-                BSONObj newB = Helpers::modifiedRangeBound( bound , keyPat , 1 );
-                ASSERT_EQUALS( newB , BSON("" << 55 << "" << MINKEY ) );
-            }
-            {
-
-                BSONObj keyPat = BSON( "a" << 1 << "b" << -1 << "c" << 1 );
-                BSONObj newB = Helpers::modifiedRangeBound( bound , keyPat , -1 );
-                ASSERT_EQUALS( newB , BSON("" << 55 << "" << MAXKEY << "" << MINKEY ) );
-            }
-            {
-                BSONObj keyPat = BSON( "a" << 1 << "b" << -1 << "c" << 1 );
-                BSONObj newB = Helpers::modifiedRangeBound( bound , keyPat , 1 );
-                ASSERT_EQUALS( newB , BSON("" << 55 << "" << MINKEY << "" << MAXKEY ) );
-            }
-
-        }
-    };
 
     class All : public Suite {
     public:
         All() : Suite( "remove" ) {
         }
         void setupTests() {
-            add<ModifiedRangeBoundTest>();
             add<RemoveRange>();
         }
     } myall;

@@ -228,6 +228,7 @@ namespace mongo {
 
             verify(fromNSS.isValid());
 
+            // TODO: EnsureIndex at some point, if it becomes easier?
             string indexesNS = fromNSS.db + ".system.indexes";
             scoped_ptr<DBClientCursor> cursor(_safeCursor(conn->query(indexesNS,
                                                                       BSON("ns" << fromNS))));

@@ -43,7 +43,6 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/pagefault.h"
 #include "mongo/db/repl/rs.h"
-#include "mongo/db/security.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/d_logic.h"
 #include "mongo/s/stale_exception.h" // for SendStaleConfigException
@@ -68,7 +67,7 @@ namespace mongo {
 #if defined(_WIN32)
         enum { SZ = 330 * 1024 };
 #elif defined(__APPLE__) && defined(__MACH__)
-        enum { SZ = 362 * 1024 };
+        enum { SZ = 374 * 1024 };
 #elif defined(__linux__)
         enum { SZ = 218 * 1024 };
 #else
@@ -166,16 +165,24 @@ namespace mongo {
 
         if ( ! inShutdown() ) {
             // we can't clean up safely once we're in shutdown
-            scoped_lock bl(clientsMutex);
-            if ( ! _shutdown )
-                clients.erase(this);
-            delete _curOp;
+            {
+                scoped_lock bl(clientsMutex);
+                if ( ! _shutdown )
+                    clients.erase(this);
+            }
+
+            CurOp* last;
+            do {
+                last = _curOp;
+                delete _curOp;
+                // _curOp may have been reset to _curOp->_wrapped
+            } while (_curOp != last);
         }
     }
 
     bool Client::shutdown() {
 #if defined(_DEBUG)
-        { 
+        {
             if( sizeof(void*) == 8 ) {
                 StackChecker::check( desc().c_str() );
             }

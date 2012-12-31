@@ -21,7 +21,6 @@
 
 
 #include "curop-inl.h"
-#include "security.h"
 #include "cmdline.h"
 #include "client.h"
 #include "mongo/client/dbclientinterface.h"

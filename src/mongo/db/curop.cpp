@@ -36,6 +36,7 @@ namespace mongo {
         _active = false;
         _reset();
         _op = 0;
+        _opNum = _nextOpNum++;
         // These addresses should never be written to again.  The zeroes are
         // placed here as a precaution because currentOp may be accessed
         // without the db mutex.
@@ -64,6 +65,38 @@ namespace mongo {
         _debug.reset();
         _query.reset();
         _active = true; // this should be last for ui clarity
+    }
+
+    CurOp* CurOp::getOp(const BSONObj& criteria) {
+        Matcher matcher(criteria);
+        Client& me = cc();
+
+        scoped_lock client_lock(Client::clientsMutex);
+        for (std::set<Client*>::iterator it = Client::clients.begin();
+             it != Client::clients.end();
+             it++) {
+
+            Client *client = *it;
+            verify(client);
+
+            CurOp* curop = client->curop();
+            if (client == &me || curop == NULL) {
+                continue;
+            }
+
+            if ( !curop->active() )
+                continue;
+
+            if ( curop->killPendingStrict() )
+                continue;
+
+            BSONObj info = curop->info();
+            if (matcher.matches(info)) {
+                return curop;
+            }
+        }
+
+        return NULL;
     }
 
     void CurOp::reset( const HostAndPort& remote, int op ) {

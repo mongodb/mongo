@@ -1239,6 +1239,9 @@ namespace mongo {
                 result.appendBool("ismaster", true );
                 result.append("msg", "isdbgrid");
                 result.appendNumber("maxBsonObjectSize", BSONObjMaxUserSize);
+                result.appendNumber("maxMessageSizeBytes", MaxMessageSizeBytes);
+                result.appendDate("localTime", jsTime());
+
                 return true;
             }
         } ismaster;

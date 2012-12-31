@@ -1279,6 +1279,15 @@ namespace spidermonkey {
 
         Scope * createScope();
 
+        virtual Scope* newScope() {
+            Scope* s = createScope();
+            if (!s) return NULL;
+            if (_scopeInitCallback)
+                _scopeInitCallback(*s);
+            installGlobalUtils(*s);
+            return s;
+        }
+
         void runTest();
 
         virtual bool utf8Ok() const { return JS_CStringsAreUTF8(); }

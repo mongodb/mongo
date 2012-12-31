@@ -1141,41 +1141,6 @@ namespace JsobjTests {
                 BSONType type_;
             };
 
-            // Randomized BSON parsing test.  See if we seg fault.
-            // NOTE This test is disabled (below), see SERVER-4948.
-            class Fuzz {
-            public:
-                Fuzz( double frequency ) : frequency_( frequency ) {}
-                void run() {
-                    BSONObj a = fromjson( "{\"a\": 1, \"b\": \"c\"}" );
-                    fuzz( a );
-                    a.valid();
-
-                    BSONObj b = fromjson( "{\"one\":2, \"two\":5, \"three\": {},"
-                                          "\"four\": { \"five\": { \"six\" : 11 } },"
-                                          "\"seven\": [ \"a\", \"bb\", \"ccc\", 5 ],"
-                                          "\"eight\": Dbref( \"rrr\", \"01234567890123456789aaaa\" ),"
-                                          "\"_id\": ObjectId( \"deadbeefdeadbeefdeadbeef\" ),"
-                                          "\"nine\": { \"$binary\": \"abc=\", \"$type\": \"00\" },"
-                                          "\"ten\": Date( 44 ), \"eleven\": /foooooo/i }" );
-                    fuzz( b );
-                    b.valid();
-                }
-            private:
-                void fuzz( BSONObj &o ) const {
-                    for( int i = 4; i < o.objsize(); ++i )
-                        for( unsigned char j = 1; j; j <<= 1 )
-                            if ( rand() < int( RAND_MAX * frequency_ ) ) {
-                                char *c = const_cast< char * >( o.objdata() ) + i;
-                                if ( *c & j )
-                                    *c &= ~j;
-                                else
-                                    *c |= j;
-                            }
-                }
-                double frequency_;
-            };
-
         } // namespace Validation
 
     } // namespace BSONObjTests
@@ -2159,13 +2124,6 @@ namespace JsobjTests {
             add< BSONObjTests::Validation::NoSize >( Object );
             add< BSONObjTests::Validation::NoSize >( Array );
             add< BSONObjTests::Validation::NoSize >( BinData );
-            if ( 0 ) { // SERVER-4948
-            add< BSONObjTests::Validation::Fuzz >( .5 );
-            add< BSONObjTests::Validation::Fuzz >( .1 );
-            add< BSONObjTests::Validation::Fuzz >( .05 );
-            add< BSONObjTests::Validation::Fuzz >( .01 );
-            add< BSONObjTests::Validation::Fuzz >( .001 );
-            }
             add< OIDTests::init1 >();
             add< OIDTests::initParse1 >();
             add< OIDTests::append >();

@@ -402,6 +402,32 @@ namespace {
         ASSERT_NOT_OK(check("test", BSON("user" << "" << "pwd" << "a")));
     }
 
+
+    class CompatibilityModeDisabler {
+    public:
+        CompatibilityModeDisabler() {
+            AuthorizationManager::setSupportOldStylePrivilegeDocuments(false);
+        }
+        ~CompatibilityModeDisabler() {
+            AuthorizationManager::setSupportOldStylePrivilegeDocuments(true);
+        }
+    };
+
+    TEST(AuthorizationManagerTest, DisableCompatibilityMode) {
+        Status (*check)(const StringData&, const BSONObj&) =
+            &AuthorizationManager::checkValidPrivilegeDocument;
+
+        CompatibilityModeDisabler disabler;
+
+        ASSERT_NOT_OK(check("test", BSON("user" << "andy" << "pwd" << "a")));
+        ASSERT_NOT_OK(check("test", BSON("user" << "andy" << "pwd" << "a" << "readOnly" << 1)));
+        ASSERT_NOT_OK(check("test", BSON("user" << "andy" << "pwd" << "a" << "readOnly" << false)));
+        ASSERT_NOT_OK(check("test", BSON("user" << "andy" << "pwd" << "a" << "readOnly" << "yes")));
+
+        ASSERT_OK(check("test", BSON("user" << "andy" << "pwd" << "a" <<
+                                     "roles" << BSON_ARRAY("dbAdmin" << "read"))));
+    }
+
     TEST(AuthorizationManagerTest, DocumentValidationExtended) {
         Status (*check)(const StringData&, const BSONObj&) =
             &AuthorizationManager::checkValidPrivilegeDocument;
@@ -471,7 +497,6 @@ namespace {
         ASSERT_OK(check("test", BSON("user" << "andy" << "pwd" << "a" <<
                                      "roles" << BSONArrayBuilder().arr())));
     }
-
 
     class AuthExternalStateImplictPriv : public AuthExternalStateMock {
     public:

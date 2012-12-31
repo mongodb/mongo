@@ -212,53 +212,20 @@ namespace mongo {
         context.getClient()->curop()->done();
     }
 
-    BSONObj Helpers::toKeyFormat( const BSONObj& o , BSONObj& key ) {
-        BSONObjBuilder me;
-        BSONObjBuilder k;
-
-        BSONObjIterator i( o );
-        while ( i.more() ) {
-            BSONElement e = i.next();
-            k.append( e.fieldName() , 1 );
-            me.appendAs( e , "" );
+    BSONObj Helpers::toKeyFormat( const BSONObj& o ) {
+        BSONObjBuilder keyObj( o.objsize() );
+        BSONForEach( e , o ) {
+            keyObj.appendAs( e , "" );
         }
-        key = k.obj();
-        return me.obj();
+        return keyObj.obj();
     }
 
-    BSONObj Helpers::modifiedRangeBound( const BSONObj& bound ,
-                                         const BSONObj& keyPattern ,
-                                         int minOrMax ){
-        BSONObjBuilder newBound;
-
-        BSONObjIterator src( bound );
-        BSONObjIterator pat( keyPattern );
-
-        while( src.more() ){
-            massert( 16341 ,
-                     str::stream() << "keyPattern " << keyPattern
-                                   << " shorter than bound " << bound ,
-                     pat.more() );
-            BSONElement srcElt = src.next();
-            BSONElement patElt = pat.next();
-            massert( 16333 ,
-                     str::stream() << "field names of bound " << bound
-                                   << " do not match those of keyPattern " << keyPattern ,
-                     str::equals( srcElt.fieldName() , patElt.fieldName() ) );
-            newBound.appendAs( srcElt , "" );
+    BSONObj Helpers::inferKeyPattern( const BSONObj& o ) {
+        BSONObjBuilder kpBuilder;
+        BSONForEach( e , o ) {
+            kpBuilder.append( e.fieldName() , 1 );
         }
-        while( pat.more() ){
-            BSONElement patElt = pat.next();
-            // for non 1/-1 field values, like {a : "hashed"}, treat order as ascending
-            int order = patElt.isNumber() ? patElt.numberInt() : 1;
-            if( minOrMax * order == 1 ){
-                newBound.appendMaxKey("");
-            }
-            else {
-                newBound.appendMinKey("");
-            }
-        }
-        return newBound.obj();
+        return kpBuilder.obj();
     }
 
     long long Helpers::removeRange( const string& ns ,
@@ -300,11 +267,11 @@ namespace mongo {
                     IndexDetails& i = nsd->idx( ii );
 
                     // Extend min to get (min, MinKey, MinKey, ....)
-                    BSONObj newMin = Helpers::modifiedRangeBound( min , keyPattern , -1 );
+                    KeyPattern kp( keyPattern );
+                    BSONObj newMin = Helpers::toKeyFormat( kp.extendRangeBound( min, false ) );
                     // If upper bound is included, extend max to get (max, MaxKey, MaxKey, ...)
                     // If not included, extend max to get (max, MinKey, MinKey, ....)
-                    int minOrMax = maxInclusive ? 1 : -1;
-                    BSONObj newMax = Helpers::modifiedRangeBound( max , keyPattern , minOrMax );
+                    BSONObj newMax = Helpers::toKeyFormat( kp.extendRangeBound(max, maxInclusive) );
                     
                     c.reset( BtreeCursor::make( nsd, i, newMin, newMax, maxInclusive, 1 ) );
                 }

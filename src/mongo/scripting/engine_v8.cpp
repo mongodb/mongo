@@ -356,7 +356,7 @@ namespace mongo {
     }
 
     void V8Scope::registerOpId() {
-        scoped_lock(_engine->_globalInterruptLock);
+        scoped_lock giLock(_engine->_globalInterruptLock);
         if (_engine->haveGetCurrentOpIdCallback()) {
             // this scope has an associated operation
             _opId = _engine->getCurrentOpId();
@@ -369,7 +369,7 @@ namespace mongo {
     }
 
     void V8Scope::unregisterOpId() {
-        scoped_lock(_engine->_globalInterruptLock);
+        scoped_lock giLock(_engine->_globalInterruptLock);
         LOG(2) << "V8Scope " << this << " unregistered for op " << _opId << endl;
         if (_engine->haveGetCurrentOpIdCallback() || _opId != 0) {
             // scope is currently associated with an operation id
@@ -383,10 +383,12 @@ namespace mongo {
         v8::Locker l(_isolate);
         mongo::mutex::scoped_lock cbEnterLock(_interruptLock);
         if (v8::V8::IsExecutionTerminating(_isolate)) {
+            LOG(2) << "v8 execution interrupted.  isolate: " << _isolate << endl;
             return false;
         }
         if (_pendingKill || globalScriptEngine->interrupted()) {
             // kill flag was set before entering our callback
+            LOG(2) << "marked for death while leaving callback.  isolate: " << _isolate << endl;
             v8::V8::TerminateExecution(_isolate);
             return false;
         }
@@ -399,11 +401,11 @@ namespace mongo {
         mongo::mutex::scoped_lock cbLeaveLock(_interruptLock);
         _inNativeExecution = false;
         if (v8::V8::IsExecutionTerminating(_isolate)) {
-            LOG(3) << "v8 execution preempted.  Isolate: " << _isolate << endl;
+            LOG(2) << "v8 execution interrupted.  isolate: " << _isolate << endl;
             return false;
         }
         if (_pendingKill || globalScriptEngine->interrupted()) {
-            LOG(3) << "Marked for death while leaving callback.  Isolate: " << _isolate << endl;
+            LOG(2) << "marked for death while leaving callback.  isolate: " << _isolate << endl;
             v8::V8::TerminateExecution(_isolate);
             return false;
         }
@@ -413,12 +415,12 @@ namespace mongo {
     void V8Scope::kill() {
         mongo::mutex::scoped_lock interruptLock(_interruptLock);
         if (!_inNativeExecution) {
+            // set the TERMINATE flag on the stack guard for this isolate
             v8::V8::TerminateExecution(_isolate);
-            LOG(1) << "Killing V8 Scope.  Isolate: " << _isolate << endl;
-        } else {
-            LOG(1) << "Marking v8 scope for death.  Isolate: " << _isolate << endl;
-            _pendingKill = true;
+            LOG(1) << "killing v8 scope.  isolate: " << _isolate << endl;
         }
+        LOG(1) << "marking v8 scope for death.  isolate: " << _isolate << endl;
+        _pendingKill = true;
     }
 
     /**
@@ -454,7 +456,7 @@ namespace mongo {
         rc.set_max_old_space_size(64 * 1024 * 1024);
         v8::SetResourceConstraints(&rc);
 
-        // Lock the isolate and enter the context
+        // lock the isolate and enter the context
         v8::Locker l(_isolate);
         HandleScope handleScope;
         _context = Context::New();
@@ -463,9 +465,9 @@ namespace mongo {
         // display heap statistics on MarkAndSweep GC run
         V8::AddGCPrologueCallback(gcCallback, kGCTypeMarkSweepCompact);
 
-        // start the v8 lock context switcher, and preempt execution every 500ms.  This is
-        // required for busy loops in javascript which do not call native functions.
-        v8::Locker::StartPreemption(500);
+        // if the isolate runs out of heap space, raise a flag on the StackGuard instead of
+        // calling abort()
+        v8::V8::IgnoreOutOfMemoryException();
 
         // create a global (rooted) object
         _global = Persistent< v8::Object >::New( _context->Global() );
@@ -524,7 +526,15 @@ namespace mongo {
         injectV8Function("load", load);
         injectV8Function("gc", GCV8);
 
+        // install db and bson types in the global scope
         installDBTypes(this, _global);
+
+        // install db/shell-specific utilities in the global scope
+        if (_engine->_scopeInitCallback)
+            _engine->_scopeInitCallback(*this);
+
+        // install global utility functions
+        installGlobalUtils(*this);
 
         registerOpId();
     }
@@ -533,7 +543,6 @@ namespace mongo {
         unregisterOpId();
         {
             V8_SIMPLE_HEADER
-            v8::Locker::StopPreemption();
             for( unsigned i = 0; i < _funcs.size(); ++i )
                 _funcs[ i ].Dispose();
             _funcs.clear();
@@ -861,7 +870,11 @@ namespace mongo {
         }
 
         if (result.IsEmpty()) {
-            _error = mongoutils::str::stream() << "javascript execution failed: " << toSTLString(&try_catch);
+            _error = mongoutils::str::stream() << "javascript execution failed: ";
+            if (try_catch.HasCaught())
+                _error += toSTLString(&try_catch);
+            if (hasOutOfMemoryException())
+                _error += "v8 out of memory";
             log() << _error << endl;
             return 1;
         }
@@ -936,12 +949,11 @@ namespace mongo {
     }
 
     void V8Scope::injectNative( const char *field, NativeFunction func, void* data ) {
+        V8_SIMPLE_HEADER    // required due to public access
         injectNative(field, func, _global, data);
     }
 
     void V8Scope::injectNative( const char *field, NativeFunction func, Handle<v8::Object>& obj, void* data ) {
-        V8_SIMPLE_HEADER
-
         Handle< FunctionTemplate > ft = createV8Function(nativeCallback);
         ft->Set( this->V8STR_NATIVE_FUNC, External::New( (void*)func ) );
         ft->Set( this->V8STR_NATIVE_DATA, External::New( data ) );
@@ -953,26 +965,21 @@ namespace mongo {
     }
 
     void V8Scope::injectV8Function( const char *field, v8Function func, Handle<v8::Object>& obj ) {
-        V8_SIMPLE_HEADER
-
         Handle< FunctionTemplate > ft = createV8Function(func);
         Handle<v8::Function> f = ft->GetFunction();
         obj->Set( getV8Str( field ), f );
     }
 
     void V8Scope::injectV8Function( const char *field, v8Function func, Handle<v8::Template>& t ) {
-        V8_SIMPLE_HEADER
-
         Handle< FunctionTemplate > ft = createV8Function(func);
         Handle<v8::Function> f = ft->GetFunction();
         t->Set( getV8Str( field ), f );
     }
 
     Handle<FunctionTemplate> V8Scope::createV8Function( v8Function func ) {
-        V8_SIMPLE_HEADER
         Handle< FunctionTemplate > ft = v8::FunctionTemplate::New(v8Callback, External::New( this ));
         ft->Set( this->V8STR_V8_FUNC, External::New( (void*)func ) );
-        return handle_scope.Close(ft);
+        return ft;
     }
 
     void V8Scope::gc() {

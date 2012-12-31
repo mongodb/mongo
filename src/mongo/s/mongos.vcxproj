@@ -1671,8 +1671,6 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="..\bson\mutable\mutable_bson_internal.cpp" />
     <ClCompile Include="..\bson\oid.cpp" />
     <ClCompile Include="..\bson\util\bson_extract.cpp" />
-    <ClCompile Include="..\client\authentication_table_common.cpp" />
-    <ClCompile Include="..\client\authentication_table_server.cpp" />
     <ClCompile Include="..\client\connection_factory.cpp" />
     <ClCompile Include="..\client\dbclientcursor.cpp" />
     <ClCompile Include="..\client\dbclient_rs.cpp" />
@@ -1683,11 +1681,13 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="..\db\auth\auth_external_state.cpp" />
     <ClCompile Include="..\db\auth\auth_external_state_s.cpp" />
     <ClCompile Include="..\db\auth\auth_external_state_server_common.cpp" />
+    <ClCompile Include="..\db\auth\auth_server_parameters.cpp" />
     <ClCompile Include="..\db\auth\mongo_authentication_session.cpp" />
     <ClCompile Include="..\db\auth\principal.cpp" />
     <ClCompile Include="..\db\auth\principal_set.cpp" />
     <ClCompile Include="..\db\auth\privilege.cpp" />
     <ClCompile Include="..\db\auth\privilege_set.cpp" />
+    <ClCompile Include="..\db\auth\security_key.cpp" />
     <ClCompile Include="..\db\client_basic.cpp" />
     <ClCompile Include="..\db\commands\connection_status.cpp" />
     <ClCompile Include="..\db\commands\fail_point_cmd.cpp" />
@@ -1696,6 +1696,396 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="..\db\commands\parameters.cpp" />
     <ClCompile Include="..\db\commands\rename_collection_common.cpp" />
     <ClCompile Include="..\db\commands\server_status.cpp" />
+    <ClCompile Include="..\db\fts\fts_command.cpp">
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\db\fts\fts_command_mongod.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">true</ExcludedFromBuild>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\db\fts\fts_command_mongos.cpp">
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\db\fts\fts_enabled.cpp">
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\db\fts\fts_index.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">true</ExcludedFromBuild>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\db\fts\fts_index_format.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">true</ExcludedFromBuild>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\db\fts\fts_index_format_test.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">true</ExcludedFromBuild>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\db\fts\fts_matcher.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">true</ExcludedFromBuild>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\db\fts\fts_matcher_test.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">true</ExcludedFromBuild>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\db\fts\fts_query.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">true</ExcludedFromBuild>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\db\fts\fts_query_test.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">true</ExcludedFromBuild>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\db\fts\fts_search.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">true</ExcludedFromBuild>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\db\fts\fts_spec.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">true</ExcludedFromBuild>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\db\fts\fts_spec_test.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">true</ExcludedFromBuild>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\db\fts\fts_util.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">true</ExcludedFromBuild>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\db\fts\fts_util_test.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">true</ExcludedFromBuild>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\db\fts\stemmer.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">true</ExcludedFromBuild>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\db\fts\stemmer_test.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">true</ExcludedFromBuild>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\db\fts\stop_words.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">true</ExcludedFromBuild>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\db\fts\stop_words_list.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">true</ExcludedFromBuild>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\db\fts\stop_words_test.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">true</ExcludedFromBuild>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\db\fts\tokenizer.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">true</ExcludedFromBuild>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="..\db\fts\tokenizer_test.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">true</ExcludedFromBuild>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+    </ClCompile>
     <ClCompile Include="..\db\geo\2d.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
@@ -1859,8 +2249,6 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="..\db\pipeline\value.cpp" />
     <ClCompile Include="..\db\projection.cpp" />
     <ClCompile Include="..\db\querypattern.cpp" />
-    <ClCompile Include="..\db\security_commands.cpp" />
-    <ClCompile Include="..\db\security_common.cpp" />
     <ClCompile Include="..\db\server_parameters.cpp" />
     <ClCompile Include="..\db\stats\top.cpp" />
     <ClCompile Include="..\platform\random.cpp" />
@@ -1929,7 +2317,6 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="metadata_loader.cpp" />
     <ClCompile Include="mongo_version_range.cpp" />
     <ClCompile Include="request.cpp" />
-    <ClCompile Include="security.cpp" />
     <ClCompile Include="shardconnection.cpp" />
     <ClCompile Include="version_manager.cpp" />
     <ClCompile Include="s_only.cpp" />
@@ -2162,8 +2549,12 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="..\bson\util\bson_extract.h" />
     <ClInclude Include="..\bson\util\builder.h" />
     <ClInclude Include="..\bson\util\misc.h" />
-    <ClInclude Include="..\client\authentication_table.h" />
     <ClInclude Include="..\client\authlevel.h" />
+    <ClInclude Include="..\client\constants.h" />
+    <ClInclude Include="..\client\dbclientcursor.h" />
+    <ClInclude Include="..\client\dbclientinterface.h" />
+    <ClInclude Include="..\client\dbclient_rs.h" />
+    <ClInclude Include="..\client\distlock.h" />
     <ClInclude Include="..\client\parallel.h" />
     <ClInclude Include="..\client\redef_macros.h" />
     <ClInclude Include="..\client\syncclusterconnection.h" />
@@ -2181,11 +2572,25 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="..\db\auth\principal_set.h" />
     <ClInclude Include="..\db\auth\privilege.h" />
     <ClInclude Include="..\db\auth\privilege_set.h" />
+    <ClInclude Include="..\db\auth\security_key.h" />
     <ClInclude Include="..\db\client_basic.h" />
     <ClInclude Include="..\db\commands\fail_point_cmd.h" />
     <ClInclude Include="..\db\commands\find_and_modify.h" />
     <ClInclude Include="..\db\commands\rename_collection.h" />
     <ClInclude Include="..\db\commands\server_status.h" />
+    <ClInclude Include="..\db\fts\fts_command.h" />
+    <ClInclude Include="..\db\fts\fts_enabled.h" />
+    <ClInclude Include="..\db\fts\fts_index.h" />
+    <ClInclude Include="..\db\fts\fts_index_format.h" />
+    <ClInclude Include="..\db\fts\fts_matcher.h" />
+    <ClInclude Include="..\db\fts\fts_query.h" />
+    <ClInclude Include="..\db\fts\fts_search.h" />
+    <ClInclude Include="..\db\fts\fts_spec.h" />
+    <ClInclude Include="..\db\fts\fts_util.h" />
+    <ClInclude Include="..\db\fts\stemmer.h" />
+    <ClInclude Include="..\db\fts\stop_words.h" />
+    <ClInclude Include="..\db\fts\stop_words_list.h" />
+    <ClInclude Include="..\db\fts\tokenizer.h" />
     <ClInclude Include="..\db\geo\2d.h" />
     <ClInclude Include="..\db\geo\core.h" />
     <ClInclude Include="..\db\geo\geoparser.h" />
@@ -2370,6 +2775,23 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <None Include="..\base\generate_error_codes.py" />
     <None Include="..\db\auth\action_types.txt" />
     <None Include="..\db\auth\generate_action_types.py" />
+    <None Include="..\db\fts\generate_stop_words.py" />
+    <None Include="..\db\fts\SConscript" />
+    <None Include="..\db\fts\stop_words_danish.txt" />
+    <None Include="..\db\fts\stop_words_dutch.txt" />
+    <None Include="..\db\fts\stop_words_english.txt" />
+    <None Include="..\db\fts\stop_words_finnish.txt" />
+    <None Include="..\db\fts\stop_words_french.txt" />
+    <None Include="..\db\fts\stop_words_german.txt" />
+    <None Include="..\db\fts\stop_words_hungarian.txt" />
+    <None Include="..\db\fts\stop_words_italian.txt" />
+    <None Include="..\db\fts\stop_words_norwegian.txt" />
+    <None Include="..\db\fts\stop_words_portuguese.txt" />
+    <None Include="..\db\fts\stop_words_romanian.txt" />
+    <None Include="..\db\fts\stop_words_russian.txt" />
+    <None Include="..\db\fts\stop_words_spanish.txt" />
+    <None Include="..\db\fts\stop_words_swedish.txt" />
+    <None Include="..\db\fts\stop_words_turkish.txt" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

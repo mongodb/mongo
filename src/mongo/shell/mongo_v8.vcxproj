@@ -1074,8 +1074,6 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="..\bson\mutable\mutable_bson_heap.cpp" />
     <ClCompile Include="..\bson\mutable\mutable_bson_internal.cpp" />
     <ClCompile Include="..\bson\util\bson_extract.cpp" />
-    <ClCompile Include="..\client\authentication_table_client.cpp" />
-    <ClCompile Include="..\client\authentication_table_common.cpp" />
     <ClCompile Include="..\client\connection_factory.cpp" />
     <ClCompile Include="..\db\dbmessage.cpp" />
     <ClCompile Include="..\platform\random.cpp" />
@@ -1585,7 +1583,6 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="..\bson\mutable\mutable_bson_heap.h" />
     <ClInclude Include="..\bson\mutable\mutable_bson_internal.h" />
     <ClInclude Include="..\bson\util\bson_extract.h" />
-    <ClInclude Include="..\client\authentication_table.h" />
     <ClInclude Include="..\client\dbclientinterface.h" />
     <ClInclude Include="..\platform\atomic_intrinsics.h" />
     <ClInclude Include="..\platform\atomic_intrinsics_win32.h" />
@@ -1666,7 +1663,6 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="..\db\cloner.h" />
     <ClInclude Include="..\db\cmdline.h" />
     <ClInclude Include="..\db\commands.h" />
-    <ClInclude Include="..\db\concurrency.h" />
     <ClInclude Include="..\db\curop-inl.h" />
     <ClInclude Include="..\db\curop.h" />
     <ClInclude Include="..\db\cursor.h" />
@@ -1690,7 +1686,6 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="linenoise.h" />
     <ClInclude Include="..\db\matcher.h" />
     <ClInclude Include="..\db\mongommf.h" />
-    <ClInclude Include="..\db\mongomutex.h" />
     <ClInclude Include="..\db\namespace-inl.h" />
     <ClInclude Include="..\db\namespace.h" />
     <ClInclude Include="..\db\namespacestring.h" />
@@ -1710,8 +1705,6 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="..\db\repl\rs_exception.h" />
     <ClInclude Include="..\db\repl\rs_member.h" />
     <ClInclude Include="..\db\repl\rs_optime.h" />
-    <ClInclude Include="..\db\security.h" />
-    <ClInclude Include="..\db\security_common.h" />
     <ClInclude Include="..\db\stats\top.h" />
     <ClInclude Include="..\pch.h" />
     <ClInclude Include="..\scripting\engine.h" />

@@ -16,6 +16,9 @@
 
 #include "mongo/s/mongo_version_range.h"
 
+#include <string>
+#include <vector>
+
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/unittest/unittest.h"
 

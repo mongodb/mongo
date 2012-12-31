@@ -94,7 +94,5 @@
 "_recvChunkCommit",
 "_recvChunkStart",
 "_recvChunkStatus",
-"_transferMods",
-"oldRead", # Temporary. For easing AuthorizationManager integration
-"oldWrite"] # Temporary. For easing AuthorizationManager integration
+"_transferMods"]
 

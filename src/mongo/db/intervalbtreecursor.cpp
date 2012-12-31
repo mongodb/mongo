@@ -150,7 +150,7 @@ namespace mongo {
         // TODO _multikeyFlag may be set part way through an iteration by checkLocation().  In this
         // case results returned earlier, when _multikeyFlag was false, will not be deduped.  This
         // is an old issue with all mongo btree cursor implementations.
-        return _multikeyFlag && !_dups.insert( loc.asUint64() ).second;
+        return _multikeyFlag && !_dups.insert( loc ).second;
     }
 
     BSONObj IntervalBtreeCursor::prettyIndexBounds() const {

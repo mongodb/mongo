@@ -380,7 +380,7 @@ namespace mongo {
         //docs claim hblkhd is included in uordblks but it isn't
 
         LinuxProc p(_pid);
-        info.append("page_faults", (int)p._maj_flt);
+        info.appendNumber("page_faults", static_cast<long long>(p._maj_flt) );
     }
 
     /**

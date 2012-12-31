@@ -40,7 +40,7 @@ function getShardName(rsTest) {
     return config._id+"/"+members.join(",");
 }
 
-var s = new ShardingTest( "auth1", 0 , 2 , 1 , {rs: true, extraOptions : {"keyFile" : "jstests/libs/key1"}, noChunkSize : true});
+var s = new ShardingTest( "auth1", 0 , 0 , 1 , {rs: true, extraOptions : {"keyFile" : "jstests/libs/key1"}, noChunkSize : true});
 
 print("logging in first, if there was an unclean shutdown the user might already exist");
 login(adminUser);
@@ -69,7 +69,7 @@ s.s = s._mongos[0] = s["s0"] = conn;
 login(adminUser);
 
 d1 = new ReplSetTest({name : "d1", nodes : 3, startPort : 31100, useHostName : true });
-d1.startSet({keyFile : "jstests/libs/key2", verbose : 2});
+d1.startSet({keyFile : "jstests/libs/key2", verbose : 0});
 d1.initiate();
 
 print("initiated");
@@ -98,7 +98,7 @@ assert(thrown);
 
 print("start rs w/correct key");
 d1.stopSet();
-d1.startSet({keyFile : "jstests/libs/key1", verbose : 2});
+d1.startSet({keyFile : "jstests/libs/key1", verbose : 0});
 d1.initiate();
 var master = d1.getMaster();
 
@@ -141,7 +141,7 @@ assert.eq( 1 , s.getDB( "test" ).foo.find().itcount() , tojson(result) );
 logout(testUser);
 
 d2 = new ReplSetTest({name : "d2", nodes : 3, startPort : 31200, useHostName : true });
-d2.startSet({keyFile : "jstests/libs/key1", verbose : 2});
+d2.startSet({keyFile : "jstests/libs/key1", verbose : 0});
 d2.initiate();
 d2.awaitSecondaryNodes();
 

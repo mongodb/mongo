@@ -25,8 +25,9 @@
 #include <sys/wait.h>
 #endif
 
+#include "mongo/db/auth/authorization_manager.h"
+#include "mongo/db/auth/security_key.h"
 #include "mongo/db/cmdline.h"
-#include "mongo/db/security_common.h"
 #include "mongo/util/log.h"
 #include "mongo/util/net/listen.h"
 #include "mongo/util/processinfo.h"

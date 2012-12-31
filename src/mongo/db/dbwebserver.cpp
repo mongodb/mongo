@@ -29,7 +29,6 @@
 #include "../util/md5.hpp"
 #include "db.h"
 #include "instance.h"
-#include "security.h"
 #include "stats/snapshots.h"
 #include "background.h"
 #include "commands.h"
@@ -89,10 +88,6 @@ namespace mongo {
         bool allowed( const char * rq , vector<string>& headers, const SockAddr &from ) {
             if ( from.isLocalHost() || !_webUsers->haveAdminUsers() ) {
                 _authorizePrincipal("RestUser", false);
-
-                // TODO: remove this once all auth checking goes through the AuthorizationManager
-                // instead of AuthenticationInfo
-                cmdAuthenticate.authenticate( "admin", "RestUser", false );
                 return true;
             }
 
@@ -135,10 +130,6 @@ namespace mongo {
                                 user[ "readOnly" ].boolean();
 
                         _authorizePrincipal(principalName, readOnly);
-
-                        // TODO: remove this once all auth checking goes through the
-                        // AuthorizationManager instead of AuthenticationInfo
-                        cmdAuthenticate.authenticate("admin", principalName, readOnly);
                         return true;
                     }
                 }

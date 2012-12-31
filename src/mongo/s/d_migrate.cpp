@@ -50,6 +50,8 @@
 #include "mongo/db/queryoptimizer.h"
 #include "mongo/db/repl.h"
 #include "mongo/db/repl_block.h"
+#include "mongo/db/repl/rs.h"
+#include "mongo/db/repl/rs_config.h"
 #include "mongo/s/chunk.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/config.h"
@@ -465,8 +467,9 @@ namespace mongo {
                 return false;
             }
             // Assume both min and max non-empty, append MinKey's to make them fit chosen index
-            BSONObj min = Helpers::modifiedRangeBound( _min , idx->keyPattern() , -1 );
-            BSONObj max = Helpers::modifiedRangeBound( _max , idx->keyPattern() , -1 );
+            KeyPattern kp( idx->keyPattern() );
+            BSONObj min = Helpers::toKeyFormat( kp.extendRangeBound( _min, false ) );
+            BSONObj max = Helpers::toKeyFormat( kp.extendRangeBound( _max, false ) );
 
             BtreeCursor* btreeCursor = BtreeCursor::make( d , *idx , min , max , false , 1 );
             auto_ptr<ClientCursor> cc(
@@ -877,12 +880,27 @@ namespace mongo {
             if( cmdObj["toShard"].type() == String ){
                 to = cmdObj["toShard"].String();
             }
-            
-            // if we do a w=2 after very write
+
+            // if we do a w=2 after every write
             bool secondaryThrottle = cmdObj["secondaryThrottle"].trueValue();
-            if ( secondaryThrottle && ! anyReplEnabled() ) {
-                secondaryThrottle = false;
-                warning() << "secondaryThrottle selected but no replication" << endl;
+            if ( secondaryThrottle ) {
+                if ( theReplSet ) {
+                    if ( theReplSet->config().getMajority() <= 1 ) {
+                        secondaryThrottle = false;
+                        warning() << "not enough nodes in set to use secondaryThrottle: "
+                                  << " majority: " << theReplSet->config().getMajority()
+                                  << endl;
+                    }
+                }
+                else if ( !anyReplEnabled() ) {
+                    secondaryThrottle = false;
+                    warning() << "secondaryThrottle selected but no replication" << endl;
+                }
+                else {
+                    // master/slave
+                    secondaryThrottle = false;
+                    warning() << "secondaryThrottle not allowed with master/slave" << endl;
+                }
             }
 
             // Do inline deletion
@@ -1796,8 +1814,7 @@ namespace mongo {
 
                     // id object most likely has form { _id : ObjectId(...) }
                     // infer from that correct index to use, e.g. { _id : 1 }
-                    BSONObj idIndexPattern;
-                    Helpers::toKeyFormat( id , idIndexPattern );
+                    BSONObj idIndexPattern = Helpers::inferKeyPattern( id );
 
                     // TODO: create a better interface to remove objects directly
                     Helpers::removeRange( ns ,
@@ -1979,9 +1996,8 @@ namespace mongo {
                 // shardKeyPattern may not be provided if another shard is from pre 2.2
                 // In that case, assume the shard key pattern is the same as the range
                 // specifiers provided.
-                BSONObj keya , keyb;
-                Helpers::toKeyFormat( migrateStatus.min , keya );
-                Helpers::toKeyFormat( migrateStatus.max , keyb );
+                BSONObj keya = Helpers::inferKeyPattern( migrateStatus.min );
+                BSONObj keyb = Helpers::inferKeyPattern( migrateStatus.max );
                 verify( keya == keyb );
 
                 warning() << "No shard key pattern provided by source shard for migration."

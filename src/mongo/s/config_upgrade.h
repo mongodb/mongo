@@ -62,6 +62,12 @@ namespace mongo {
         UpgradeHistory_UnreportedVersion = 1,
 
         /**
+         * NOTE: We skip version 2 here since it is very old and we shouldn't see it in the wild.
+         *
+         * Do not skip upgrade versions in the future.
+         */
+
+        /**
          * Base version used by pre-2.4 mongoses with no collection epochs.
          */
         UpgradeHistory_NoEpochVersion = 3,
@@ -77,7 +83,7 @@ namespace mongo {
          * + Mongos pings include a "configVersion" field indicating the current config version
          * + Mongos explicitly ignores any collection with a "primary" field
          */
-        UpgradeHistory_ManditoryEpochVersion = 4
+        UpgradeHistory_MandatoryEpochVersion = 4
     };
 
     //
@@ -89,7 +95,7 @@ namespace mongo {
     const int MIN_COMPATIBLE_CONFIG_VERSION = UpgradeHistory_NoEpochVersion;
 
     // Latest version we know how to communicate with
-    const int CURRENT_CONFIG_VERSION = UpgradeHistory_ManditoryEpochVersion;
+    const int CURRENT_CONFIG_VERSION = UpgradeHistory_MandatoryEpochVersion;
 
     //
     // DECLARATION OF UPGRADE FUNCTIONALITY

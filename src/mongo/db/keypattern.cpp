@@ -21,6 +21,8 @@
 #include "mongo/db/hasher.h"
 #include "mongo/db/queryutil.h"
 
+using namespace mongoutils;
+
 namespace mongo {
 
     BSONObj KeyPattern::extractSingleKey(const BSONObj& doc ) const {
@@ -59,6 +61,41 @@ namespace mongo {
             }
         }
         return true;
+    }
+
+    BSONObj KeyPattern::extendRangeBound( const BSONObj& bound , bool makeUpperInclusive ) const {
+        BSONObjBuilder newBound( bound.objsize() );
+
+        BSONObjIterator src( bound );
+        BSONObjIterator pat( _pattern );
+
+        while( src.more() ){
+            massert( 16649 ,
+                     str::stream() << "keyPattern " << _pattern << " shorter than bound " << bound,
+                     pat.more() );
+            BSONElement srcElt = src.next();
+            BSONElement patElt = pat.next();
+            massert( 16634 ,
+                     str::stream() << "field names of bound " << bound
+                                   << " do not match those of keyPattern " << _pattern ,
+                                   str::equals( srcElt.fieldName() , patElt.fieldName() ) );
+            newBound.append( srcElt );
+        }
+        while( pat.more() ){
+            BSONElement patElt = pat.next();
+            // for non 1/-1 field values, like {a : "hashed"}, treat order as ascending
+            int order = patElt.isNumber() ? patElt.numberInt() : 1;
+            // flip the order semantics if this is an upper bound
+            if ( makeUpperInclusive ) order *= -1;
+
+            if( order > 0 ){
+                newBound.appendMinKey( patElt.fieldName() );
+            }
+            else {
+                newBound.appendMaxKey( patElt.fieldName() );
+            }
+        }
+        return newBound.obj();
     }
 
     typedef vector<pair<BSONObj,BSONObj> >::const_iterator BoundListIter;

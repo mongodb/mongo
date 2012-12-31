@@ -20,7 +20,6 @@
 #include "mongo/pch.h"
 
 #include "mongo/db/client_basic.h"
-#include "mongo/db/security.h"
 #include "mongo/s/chunk.h"
 #include "mongo/s/writeback_listener.h"
 #include "mongo/util/net/hostandport.h"
@@ -109,11 +108,8 @@ namespace mongo {
         static ClientInfo * get(AbstractMessagingPort* messagingPort = NULL);
         // Creates a ClientInfo and stores it in _tlInfo
         static ClientInfo* create(AbstractMessagingPort* messagingPort);
-        const AuthenticationInfo* getAuthenticationInfo() const { return (AuthenticationInfo*)&_ai; }
-        AuthenticationInfo* getAuthenticationInfo() { return (AuthenticationInfo*)&_ai; }
 
     private:
-        AuthenticationInfo _ai;
         struct WBInfo {
             WBInfo( const WriteBackListener::ConnectionIdent& c, OID o, bool fromLastOperation )
                 : ident( c ), id( o ), fromLastOperation( fromLastOperation ) {}

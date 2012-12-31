@@ -2,6 +2,8 @@
  *  - Creates a new collection with a TTL index
  *  - Shards it, and moves one chunk containing half the docs to another shard.
  *  - Checks that both shards have TTL index, and docs get deleted on both shards.
+ *  - Run the collMod command to update the expireAfterSeconds field. Check that more docs get
+ *    deleted.
  */
 
 // start up a new sharded cluster
@@ -54,13 +56,33 @@ print("Shard 1 coll stats:")
 printjson( shard1.getCollection( coll ).stats() );
 
 // Check that TTL index (with expireAfterSeconds field) appears on both shards
-var ttlIndexPattern = { key: { "x" : 1 } , ns: dbname + "." + coll , expireAfterSeconds : 20000 };
+var ttlIndexPattern = { "key": { "x" : 1 } , "ns": ns , "expireAfterSeconds" : 20000 };
 assert.eq( 1 ,
            shard0.system.indexes.find( ttlIndexPattern ).count() ,
            "shard0 does not have TTL index");
 assert.eq( 1 ,
            shard1.system.indexes.find( ttlIndexPattern ).count() ,
            "shard1 does not have TTL index");
+
+// Check that the collMod command successfully updates the expireAfterSeconds field
+s.getDB( dbname ).runCommand( { collMod : coll,
+                                index : { keyPattern : {x : 1}, expireAfterSeconds : 10000} } );
+
+var newTTLindex = { "key": { "x" : 1 } , "ns": ns , "expireAfterSeconds" : 10000 };
+assert.eq( 1 ,
+           shard0.system.indexes.find( newTTLindex ).count(),
+           "shard0 index didn't get updated");
+assert.eq( 1 ,
+           shard1.system.indexes.find( newTTLindex ).count(),
+           "shard1 index didn't get updated");
+
+assert.soon(
+    function() {
+        return t.count() < 6;
+    }, "new expireAfterSeconds value not taking effect" , 70 * 1000
+);
+assert.eq( 0 , t.find( { x : { $lt : new Date( now - 10000000 ) } } ).count() );
+assert.eq( 3 , t.count() );
 
 s.stop();
 

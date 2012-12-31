@@ -395,7 +395,7 @@ namespace mongo {
         void getShardsForQuery( set<Shard>& shards , const BSONObj& query ) const;
         void getAllShards( set<Shard>& all ) const;
         /** @param shards set to the shards covered by the interval [min, max], see SERVER-4791 */
-        void getShardsForRange(set<Shard>& shards, const BSONObj& min, const BSONObj& max, bool fullKeyReq = true) const;
+        void getShardsForRange( set<Shard>& shards, const BSONObj& min, const BSONObj& max ) const;
 
         ChunkMap getChunkMap() const { return _chunkMap; }
 

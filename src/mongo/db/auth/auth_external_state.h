@@ -42,6 +42,8 @@ namespace mongo {
         // anything, regardless of the current auth state.  Currently the reasons why this could be
         // are that auth isn't enabled, the connection is from localhost and there are no admin
         // users, or the connection is a "god" connection.
+        // NOTE: _checkShouldAllowLocalhost MUST be called at least once before any call to
+        // shouldIgnoreAuthChecks or we could ignore auth checks incorrectly.
         virtual bool shouldIgnoreAuthChecks() const = 0;
 
         // Should be called at the beginning of every new request.  This performs the checks

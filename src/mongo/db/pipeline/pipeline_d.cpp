@@ -73,7 +73,9 @@ namespace mongo {
          * for fields that won't make it through the projection.
          */
 
+        bool haveProjection = false;
         BSONObj projection;
+        DocumentSource::ParsedDeps dependencies;
         {
             set<string> deps;
             DocumentSource::GetDepsReturn status = DocumentSource::SEE_NEXT;
@@ -83,6 +85,8 @@ namespace mongo {
 
             if (status == DocumentSource::EXHAUSTIVE) {
                 projection = DocumentSource::depsToProjection(deps);
+                dependencies = DocumentSource::parseDeps(deps);
+                haveProjection = true;
             }
         }
 
@@ -209,8 +213,9 @@ namespace mongo {
         if (initSort)
             pSource->setSort(pSortObj);
 
-        if (!projection.isEmpty())
-            pSource->setProjection(projection);
+        if (haveProjection) {
+            pSource->setProjection(projection, dependencies);
+        }
 
         // If we are in an explain, we won't actually use the created cursor so release it.
         // This is important to avoid double locking when we use DBDirectClient to run explain.

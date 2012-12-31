@@ -56,7 +56,6 @@ namespace mongo {
             return false;
         }
 
-        pCurrent = makeDocument(groupsIterator);
         return true;
     }
 
@@ -64,13 +63,12 @@ namespace mongo {
         if (!populated)
             populate();
 
-        return pCurrent;
+        return makeDocument(groupsIterator);
     }
 
     void DocumentSourceGroup::dispose() {
         GroupsType().swap(groups);
         groupsIterator = groups.end();
-        pCurrent = Document();
 
         pSource->dispose();
     }
@@ -289,59 +287,46 @@ namespace mongo {
     }
 
     void DocumentSourceGroup::populate() {
-        for(bool hasNext = !pSource->eof(); hasNext;
-                hasNext = pSource->advance()) {
-            Document pDocument(pSource->getCurrent());
+        const size_t numAccumulators = vpAccumulatorFactory.size();
+        dassert(numAccumulators == vpExpression.size());
+
+        for (bool hasNext = !pSource->eof(); hasNext; hasNext = pSource->advance()) {
+            Document input  = pSource->getCurrent();
 
             /* get the _id value */
-            Value pId = pIdExpression->evaluate(pDocument);
+            Value id = pIdExpression->evaluate(input);
 
             /* treat missing values the same as NULL SERVER-4674 */
-            if (pId.missing())
-                pId = Value(BSONNULL);
+            if (id.missing())
+                id = Value(BSONNULL);
 
             /*
               Look for the _id value in the map; if it's not there, add a
               new entry with a blank accumulator.
             */
-            vector<intrusive_ptr<Accumulator> > *pGroup;
-            GroupsType::iterator it(groups.find(pId));
-            if (it != groups.end()) {
-                /* point at the existing accumulators */
-                pGroup = &it->second;
-            }
-            else {
-                /* insert a new group into the map */
-                groups[pId] = vector<intrusive_ptr<Accumulator> >();
+            vector<intrusive_ptr<Accumulator> >& group = groups[id];
 
-                /* find the accumulator vector (the map value) */
-                it = groups.find(pId);
-                pGroup = &it->second;
+            if (numAccumulators == 0)
+                continue; // we are basically building a set
 
+            if (group.empty()) {
                 /* add the accumulators */
-                const size_t n = vpAccumulatorFactory.size();
-                pGroup->reserve(n);
-                for(size_t i = 0; i < n; ++i) {
-                    intrusive_ptr<Accumulator> pAccumulator(
-                        (*vpAccumulatorFactory[i])(pExpCtx));
-                    pAccumulator->addOperand(vpExpression[i]);
-                    pGroup->push_back(pAccumulator);
+                group.reserve(numAccumulators);
+                for (size_t i = 0; i < numAccumulators; i++) {
+                    intrusive_ptr<Accumulator> accum = (*vpAccumulatorFactory[i])(pExpCtx);
+                    accum->addOperand(vpExpression[i]);
+                    group.push_back(accum);
                 }
             }
 
-            /* point at the existing key */
-            // unneeded atm // pId = it.first;
-
             /* tickle all the accumulators for the group we found */
-            const size_t n = pGroup->size();
-            for(size_t i = 0; i < n; ++i)
-                (*pGroup)[i]->evaluate(pDocument);
+            dassert(numAccumulators == group.size());
+            for (size_t i = 0; i < numAccumulators; i++)
+                group[i]->evaluate(input);
         }
 
         /* start the group iterator */
         groupsIterator = groups.begin();
-        if (groupsIterator != groups.end())
-            pCurrent = makeDocument(groupsIterator);
         populated = true;
     }
 

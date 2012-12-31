@@ -726,7 +726,7 @@ startMongoProgram = function(){
         args.push.apply(args, ['--setParameter', 'enableTestCommands=1']);
     }
 
-    var pid = _startMongoProgram.apply( null, arguments );
+    var pid = _startMongoProgram.apply( null, args );
 
     var m;
     assert.soon

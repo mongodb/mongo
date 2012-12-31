@@ -17,7 +17,6 @@
 #include "pch.h"
 #include "db/pipeline/pipeline.h"
 
-#include "mongo/client/authentication_table.h"
 #include "db/jsobj.h"
 #include "db/pipeline/accumulator.h"
 #include "db/pipeline/document.h"

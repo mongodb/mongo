@@ -25,7 +25,6 @@
 #include "mongo/db/repl/connections.h"
 #include "mongo/db/repl/health.h"
 #include "mongo/db/repl/rs.h"
-#include "mongo/db/security.h"
 #include "mongo/util/background.h"
 #include "mongo/util/concurrency/msg.h"
 #include "mongo/util/concurrency/task.h"

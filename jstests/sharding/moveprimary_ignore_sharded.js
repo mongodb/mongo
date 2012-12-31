@@ -2,6 +2,9 @@
 
 var st = new ShardingTest({ shards : 2, mongos : 2, verbose : 1 })
 
+// Stop balancer, otherwise mongosB may load information about the database non-deterministically
+st.stopBalancer();
+
 var mongosA = st.s0
 var mongosB = st.s1
 

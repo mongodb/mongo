@@ -59,3 +59,5 @@ else:
     env.SConscript('gperftools-2.0/SConscript')
     env.StaticLibrary('shim_allocator', 'shim_allocator.cpp',
                       LIBDEPS=['gperftools-2.0/tcmalloc_minimal'])
+
+env.SConscript('libstemmer_c/SConscript')

@@ -19,17 +19,28 @@
 #include "mongo/base/status.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/client.h"
+#include "mongo/db/server_parameters.h"
 #include "mongo/util/debug_util.h"
 
 namespace mongo {
 
-    AuthExternalStateServerCommon::AuthExternalStateServerCommon() : _allowLocalhost(false) {}
+namespace {
+    MONGO_EXPORT_SERVER_PARAMETER(enableLocalhostAuthBypass, bool, true);
+} // namespace
+
+    // NOTE: we default _allowLocalhost to true under the assumption that _checkShouldAllowLocalhost
+    // will always be called before any calls to shouldIgnoreAuthChecks.  If this is not the case,
+    // it could cause a security hole.
+    AuthExternalStateServerCommon::AuthExternalStateServerCommon() : _allowLocalhost(true) {}
     AuthExternalStateServerCommon::~AuthExternalStateServerCommon() {}
 
     void AuthExternalStateServerCommon::_checkShouldAllowLocalhost() {
         if (noauth)
             return;
-        // TODO: cache if admin user exists and if it once existed don't query admin.system.users
+        // If we know that an admin user exists, don't re-check.
+        if (!_allowLocalhost)
+            return;
+
         _allowLocalhost = !_hasPrivilegeDocument("admin");
         if (_allowLocalhost) {
             ONCE {
@@ -41,7 +52,8 @@ namespace mongo {
 
     bool AuthExternalStateServerCommon::shouldIgnoreAuthChecks() const {
         ClientBasic* client = ClientBasic::getCurrent();
-        return noauth || (client->getIsLocalHostConnection() && _allowLocalhost);
+        return noauth ||
+                (enableLocalhostAuthBypass &&client->getIsLocalHostConnection() && _allowLocalhost);
     }
 
 } // namespace mongo

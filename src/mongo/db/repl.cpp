@@ -45,7 +45,6 @@
 #include "pdfile.h"
 #include "db.h"
 #include "commands.h"
-#include "security.h"
 #include "cmdline.h"
 #include "repl_block.h"
 #include "repl/rs.h"
@@ -281,6 +280,7 @@ namespace mongo {
             appendReplicationInfo(result, 0);
 
             result.appendNumber("maxBsonObjectSize", BSONObjMaxUserSize);
+            result.appendNumber("maxMessageSizeBytes", MaxMessageSizeBytes);
             result.appendDate("localTime", jsTime());
             return true;
         }
