@@ -6,23 +6,36 @@ seedString = function(replTest) {
 };
 
 removeShard = function(st, replTest) {
+
+
+
     print( "Removing shard with name: " + replTest.name );
     res = st.admin.runCommand( { removeshard: replTest.name } )
     printjson(res);
     assert( res.ok , "failed to start draining shard" );
+
     checkRemoveShard = function() {
         res = st.admin.runCommand( { removeshard: replTest.name } );
         printjson(res);
         return res.ok && res.msg == 'removeshard completed successfully';
     }
     assert.soon( checkRemoveShard , "failed to remove shard" );
-    
+
     // Need to wait for migration to be over... only works for inline deletes
     checkNSLock = function() {
         printjson( st.s.getDB( "config" ).locks.find().toArray() )
         return !st.isAnyBalanceInFlight();
     }
     assert.soon( checkNSLock, "migrations did not end?" )
+
+    sleep( 2000 );
+
+    var directdb = replTest.getPrimary().getDB( "admin" );
+    assert.soon( function(){
+           var res = directdb.currentOp( { desc: /^clean/ } );
+           print( "eliot: " + replTest.getPrimary() + "\t" + tojson(res) );
+           return res.inprog.length == 0;
+       }, "never clean", 60000, 1000 );
     
     replTest.getPrimary().getDB( coll.getDB().getName() ).dropDatabase();
     print( "Shard removed successfully" );
@@ -95,12 +108,13 @@ for( var i = 0; i < 300; i++ ){
     coll.insert( { i : i % 10, str : str } );
 }
 
+coll.getDB().getLastError();
+
+assert.eq( 300, coll.find().itcount() );
+
 assert.soon( function() {
     var x = st.chunkDiff( 'remove2' , "test" ); print( "chunk diff: " + x ); return x < 2;
 } , "no balance happened" );
-
-printjson(res);
-assert(res.ok);
 
 assert.eq( 300, coll.find().itcount() );
 
