@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -256,7 +256,7 @@ __wt_insert_serial_func(WT_SESSION_IMPL *session, void *args)
 		*ins_stack[i] = new_ins;
 	}
 
-	__wt_insert_new_ins_taken(session, args, page);
+	__wt_insert_new_ins_taken(args);
 
 	/*
 	 * If the insert head does not yet have an insert list, our caller
@@ -267,7 +267,7 @@ __wt_insert_serial_func(WT_SESSION_IMPL *session, void *args)
 	 */
 	if (*insheadp == NULL) {
 		WT_PUBLISH(*insheadp, new_inshead);
-		__wt_insert_new_inshead_taken(session, args, page);
+		__wt_insert_new_inshead_taken(args);
 	}
 
 	/*
@@ -280,12 +280,12 @@ __wt_insert_serial_func(WT_SESSION_IMPL *session, void *args)
 	if (page->type == WT_PAGE_ROW_LEAF) {
 		if (page->u.row.ins == NULL) {
 			page->u.row.ins = new_inslist;
-			__wt_insert_new_inslist_taken(session, args, page);
+			__wt_insert_new_inslist_taken(args);
 		}
 	} else
 		if (page->modify->update == NULL) {
 			page->modify->update = new_inslist;
-			__wt_insert_new_inslist_taken(session, args, page);
+			__wt_insert_new_inslist_taken(args);
 		}
 	__wt_page_and_tree_modify_set(session, page);
 	return (0);
@@ -476,7 +476,7 @@ __wt_update_serial_func(WT_SESSION_IMPL *session, void *args)
 	 * pointer is set before we update the linked list.
 	 */
 	WT_PUBLISH(*upd_entry, upd);
-	__wt_update_upd_taken(session, args, page);
+	__wt_update_upd_taken(args);
 
 	/*
 	 * If the page needs an update array (column-store pages and inserts on
@@ -489,7 +489,7 @@ __wt_update_serial_func(WT_SESSION_IMPL *session, void *args)
 	 */
 	if (new_upd != NULL && page->u.row.upd == NULL) {
 		page->u.row.upd = new_upd;
-		__wt_update_new_upd_taken(session, args, page);
+		__wt_update_new_upd_taken(args);
 	}
 
 	/* Discard obsolete WT_UPDATE structures. */

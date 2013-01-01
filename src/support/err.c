@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -365,16 +365,17 @@ __wt_panic(WT_SESSION_IMPL *session)
 	    "the WiredTiger library cannot continue; the process must exit "
 	    "and restart");
 
-#ifdef HAVE_DIAGNOSTIC
-	__wt_abort(session);			/* Drop core if testing. */
-	/* NOTREACHED */
-#endif
+#if !defined(HAVE_DIAGNOSTIC)
 	/*
 	 * Chaos reigns within.
 	 * Reflect, repent, and reboot.
 	 * Order shall return.
 	 */
 	return (WT_PANIC);
+#endif
+
+	__wt_abort(session);			/* Drop core if testing. */
+	/* NOTREACHED */
 }
 
 /*
@@ -388,11 +389,12 @@ __wt_illegal_value(WT_SESSION_IMPL *session, const char *name)
 	    name == NULL ? "" : name, name == NULL ? "" : ": ",
 	    "encountered an illegal file format or internal value");
 
-#ifdef HAVE_DIAGNOSTIC
+#if !defined(HAVE_DIAGNOSTIC)
+	return (__wt_panic(session));
+#endif
+
 	__wt_abort(session);			/* Drop core if testing. */
 	/* NOTREACHED */
-#endif
-	return (__wt_panic(session));
 }
 
 /*

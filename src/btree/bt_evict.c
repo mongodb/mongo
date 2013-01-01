@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -82,11 +82,11 @@ __evict_list_clr(WT_SESSION_IMPL *session, WT_EVICT_ENTRY *e)
 }
 
 /*
- * __evict_list_clr_all --
- *	Clear all entries in the LRU eviction list.
+ * __evict_list_clr_range --
+ *	Clear entries in the LRU eviction list, from a lower-bound to the end.
  */
 static inline void
-__evict_list_clr_all(WT_SESSION_IMPL *session, u_int start)
+__evict_list_clr_range(WT_SESSION_IMPL *session, u_int start)
 {
 	WT_CACHE *cache;
 	WT_EVICT_ENTRY *evict;
@@ -471,7 +471,7 @@ __evict_file_request_walk(WT_SESSION_IMPL *session)
 	 * The eviction candidate list might reference pages we are
 	 * about to discard; clear it.
 	 */
-	__evict_list_clr_all(session, 0);
+	__evict_list_clr_range(session, 0);
 
 	/*
 	 * Wait for LRU eviction activity to drain.  We are discarding or
@@ -722,7 +722,7 @@ __evict_lru(WT_SESSION_IMPL *session, uint32_t flags)
 			break;
 	cache->evict_candidates = i + 1;
 
-	__evict_list_clr_all(session, WT_EVICT_WALK_BASE);
+	__evict_list_clr_range(session, WT_EVICT_WALK_BASE);
 
 	cache->evict_current = cache->evict;
 	__wt_spin_unlock(session, &cache->evict_lock);
