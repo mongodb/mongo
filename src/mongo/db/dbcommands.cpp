@@ -389,13 +389,14 @@ namespace mongo {
                 return false;
             }
             BSONElement e = cmdObj.firstElement();
-            log() << "dropDatabase " << dbname << endl;
+            log() << "dropDatabase " << dbname << " starting" << endl;
             int p = (int) e.number();
             if ( p != 1 )
                 return false;
             stopIndexBuilds(dbname, cmdObj);
             dropDatabase(dbname);
             result.append( "dropped" , dbname );
+            log() << "dropDatabase " << dbname << " finished" << endl;
             return true;
         }
     } cmdDropDatabase;
