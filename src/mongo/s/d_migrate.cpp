@@ -68,21 +68,27 @@ using namespace std;
 
 namespace mongo {
 
-    BSONObj findShardKeyIndexPattern_locked( const string& ns , const BSONObj& shardKeyPattern ) {
+    bool findShardKeyIndexPattern_locked( const string& ns,
+                                          const BSONObj& shardKeyPattern,
+                                          BSONObj* indexPattern ) {
         verify( Lock::isLocked() );
         NamespaceDetails* nsd = nsdetails( ns );
-        verify( nsd );
+        if ( !nsd )
+            return false;
         const IndexDetails* idx = nsd->findIndexByPrefix( shardKeyPattern , true );  /* require single key */
-        verify( idx );
-        return idx->keyPattern().getOwned();
+        if ( !idx )
+            return false;
+        *indexPattern = idx->keyPattern().getOwned();
+        return true;
     }
 
-
-    BSONObj findShardKeyIndexPattern_unlocked( const string& ns , const BSONObj& shardKeyPattern ) {
+    bool findShardKeyIndexPattern_unlocked( const string& ns,
+                                            const BSONObj& shardKeyPattern,
+                                            BSONObj* indexPattern ) {
         Client::ReadContext context( ns );
-        return findShardKeyIndexPattern_locked( ns , shardKeyPattern ).getOwned();
+        return findShardKeyIndexPattern_locked( ns, shardKeyPattern, indexPattern );
     }
-    
+
     Tee* migrateLog = new RamLog( "migrate" );
 
     class MoveTimingHelper {
@@ -197,7 +203,7 @@ namespace mongo {
         string toString() const {
             return str::stream() << ns << " from " << min << " -> " << max;
         }
-        
+
         void doRemove() {
             ShardForceVersionOkModeBlock sf;
             {
@@ -205,21 +211,26 @@ namespace mongo {
 
                 log() << "moveChunk starting delete for: " << this->toString() << migrateLog;
 
+                BSONObj indexKeyPattern;
+                if ( !findShardKeyIndexPattern_unlocked( ns, shardKeyPattern, &indexKeyPattern ) ) {
+                    warning() << "collection or index dropped before data could be cleaned" << endl;
+                    return;
+                }
+
                 long long numDeleted =
-                        Helpers::removeRange( ns ,
-                                              min ,
-                                              max ,
-                                              findShardKeyIndexPattern_unlocked( ns , shardKeyPattern ) , 
-                                              false , /*maxInclusive*/
-                                              secondaryThrottle ,
-                                              cmdLine.moveParanoia ? &rs : 0 , /*callback*/
+                        Helpers::removeRange( ns,
+                                              min,
+                                              max,
+                                              indexKeyPattern,
+                                              false, /*maxInclusive*/
+                                              secondaryThrottle,
+                                              cmdLine.moveParanoia ? &rs : 0, /*callback*/
                                               true ); /*fromMigrate*/
 
                 log() << "moveChunk deleted " << numDeleted << " documents for "
                       << this->toString() << migrateLog;
             }
-            
-            
+
             ReplTime lastOpApplied = cc().getLastOp().asDate();
             Timer t;
             for ( int i=0; i<3600; i++ ) {
@@ -1586,15 +1597,24 @@ namespace mongo {
             }
 
             {
+
+                BSONObj indexKeyPattern;
+                if ( !findShardKeyIndexPattern_unlocked( ns, shardKeyPattern, &indexKeyPattern ) ) {
+                    errmsg = "collection or index dropped during migrate";
+                    warning() << errmsg << endl;
+                    state = FAIL;
+                    return;
+                }
+
                 // 2. delete any data already in range
                 RemoveSaver rs( "moveChunk" , ns , "preCleanup" );
-                long long num = Helpers::removeRange( ns ,
-                                                      min ,
-                                                      max ,
-                                                      findShardKeyIndexPattern_unlocked( ns , shardKeyPattern ) , 
-                                                      false , /*maxInclusive*/
-                                                      secondaryThrottle , /* secondaryThrottle */
-                                                      cmdLine.moveParanoia ? &rs : 0 , /*callback*/
+                long long num = Helpers::removeRange( ns,
+                                                      min,
+                                                      max,
+                                                      indexKeyPattern,
+                                                      false, /*maxInclusive*/
+                                                      secondaryThrottle, /* secondaryThrottle */
+                                                      cmdLine.moveParanoia ? &rs : 0, /*callback*/
                                                       true ); /* flag fromMigrate in oplog */
                 if ( num )
                     warning() << "moveChunkCmd deleted data already in chunk # objects: " << num << migrateLog;
