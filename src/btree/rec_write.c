@@ -216,6 +216,8 @@ typedef struct {
 	int key_pfx_compress_conf;	/* If prefix compression configured */
 	int key_sfx_compress;		/* If can suffix-compress next key */
 	int key_sfx_compress_conf;	/* If suffix compression configured */
+
+	int tested_ref_state;		/* Debugging information */
 } WT_RECONCILE;
 
 static void __rec_cell_build_addr(
@@ -297,8 +299,10 @@ __rec_child_modify(WT_SESSION_IMPL *session,
 
 	*modifyp = 0;
 	for (;; __wt_yield())
-		switch (ref->state) {
+		switch (r->tested_ref_state = ref->state) {
 		case WT_REF_DISK:
+			WT_HAVE_DIAGNOSTIC_YIELD;
+
 			/* On disk, not modified by definition. */
 			return (0);
 		case WT_REF_DELETED:
@@ -316,6 +320,8 @@ __rec_child_modify(WT_SESSION_IMPL *session,
 			ret =
 			    __rec_page_deleted(session, r, page, ref, modifyp);
 			WT_PUBLISH(ref->state, WT_REF_DELETED);
+
+			WT_HAVE_DIAGNOSTIC_YIELD;
 			return (ret);
 		case WT_REF_LOCKED:
 			/*
@@ -350,6 +356,8 @@ __rec_child_modify(WT_SESSION_IMPL *session,
 			 */
 			if (ref->page->modify != NULL)
 				*modifyp = 1;
+
+			WT_HAVE_DIAGNOSTIC_YIELD;
 			return (0);
 		case WT_REF_READING:
 			/*

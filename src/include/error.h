@@ -8,6 +8,15 @@
 #define	WT_DEBUG_POINT	((void *)0xdeadbeef)
 #define	WT_DEBUG_BYTE	(0xab)
 
+/* In DIAGNOSTIC mode, yield in places where we want to encourage races. */
+#ifdef HAVE_DIAGNOSTIC
+#define	WT_HAVE_DIAGNOSTIC_YIELD do {					\
+	__wt_yield();							\
+} while (0)
+#else
+#define	WT_HAVE_DIAGNOSTIC_YIELD
+#endif
+
 /* Return and branch-to-err-label cases for switch statements. */
 #define	WT_ILLEGAL_VALUE(session)					\
 	default:							\
