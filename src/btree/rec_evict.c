@@ -306,7 +306,7 @@ __rec_review(WT_SESSION_IMPL *session,
 	 *
 	 * We must check the full stack (we might be attempting to evict a leaf
 	 * page multiple levels beneath the internal page being reconciled as
-	 * part of the checkopint, and  all of the intermediate nodes are being
+	 * part of the checkpoint, and  all of the intermediate nodes are being
 	 * merged into the internal page).
 	 *
 	 * There's no simple test for knowing if a page in our page stack is
