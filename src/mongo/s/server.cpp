@@ -428,9 +428,19 @@ static void processCommandLineOptions(const std::vector<std::string>& argv) {
         ::_exit(EXIT_FAILURE);
     }
 
+	if ( params.count("port")) {
+		 if ( cmdLine.port <= 0 || cmdLine.port > 65535 ) 
+		 {
+            out() << "bad --port number" << endl;
+            ::_exit( EXIT_FAILURE );
+		 }
+	}
+
     if( configdbs.size() == 1 ) {
         warning() << "running with 1 config server should be done only for testing purposes and is not recommended for production" << endl;
     }
+
+	
 
     _isUpgradeSwitchSet = params.count("upgrade");
 

@@ -2282,6 +2282,10 @@ namespace mongo {
                     BSONObj n = e.embeddedObject();
                     e = n.firstElement();
 
+					// throw user Exception if the cordinates is not a numbers.
+					BSONObjIterator i(e.Obj());
+					uassert(16626, (string)"the coordinates: " + e.Obj().toString() + " is not a numbers", i.next().isNumber() && i.next().isNumber());
+
                     const char* suffix = e.fieldName() + 5; // strlen("$near") == 5;
                     GeoDistType type;
                     if (suffix[0] == '\0') {
@@ -2312,8 +2316,8 @@ namespace mongo {
 
                     bool uniqueDocs = false;
                     if(! n["$uniqueDocs"].eoo()) uniqueDocs = n["$uniqueDocs"].trueValue();
-
-                    shared_ptr<GeoSearch> s(new GeoSearch(this, Point(e), numWanted, filteredQuery,
+					
+					shared_ptr<GeoSearch> s(new GeoSearch(this, Point(e), numWanted, filteredQuery,
                                                           maxDistance, type, uniqueDocs));
                     s->exec();
                     shared_ptr<Cursor> c;
