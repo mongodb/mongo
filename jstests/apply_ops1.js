@@ -64,16 +64,3 @@ res = db.runCommand( { applyOps :
 assert.eq( true, res.results[0], "B5" );
 assert.eq( true, res.results[1], "B6" );
 
-// Test update on non-existing document will be treated as an upsert
-res = db.runCommand({ applyOps: [{ "op" : "u", "ns" : t.getFullName(),
-    "o2": { _id: 7 }, "o": { _id: 7, x: 1 }}] });
-
-assert(res.results[0]);
-assert(t.findOne({ _id: 7 }) != null);
-
-res = db.runCommand({ applyOps: [{ "op" : "u", "ns" : t.getFullName(),
-    "o2": { _id: 8 }, "o": { _id: 8, x: 1 }}], alwaysUpsert: false });
-
-assert(!res.results[0]);
-assert(t.findOne({ _id: 8 }) == null);
-
