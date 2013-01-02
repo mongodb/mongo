@@ -40,6 +40,7 @@ namespace mongo {
             REMOTE_SERVER = 1 << 1 ,
             LOCAL_SERVER = 1 << 2 ,
             SPECIFY_DBCOL = 1 << 3 ,
+            SPECIFY_GRIDFSNS = 1 << 4 ,
             ALL = REMOTE_SERVER | LOCAL_SERVER | SPECIFY_DBCOL
         };
 
