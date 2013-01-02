@@ -107,6 +107,11 @@ namespace mongo {
         // forever.  Thus, we're assuming no journaling will happen between now and the entry being
         // re-written.
 
+        // We need to force a foreground index build to prevent replication from replaying an
+        // incompatible op (like a drop) during a yield.
+        // TODO: once commands can interrupt/wait for index builds, this can be removed.
+        indexObj = indexObj.removeField("background");
+
         try {
             const std::string ns = dbName + ".system.indexes";
             theDataFileMgr.insert(ns.c_str(), indexObj.objdata(), indexObj.objsize(), false, true);

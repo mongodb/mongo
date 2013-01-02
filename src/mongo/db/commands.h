@@ -154,9 +154,6 @@ namespace mongo {
         static map<string,Command*> * _webCommands;
 
     public:
-        // Stop all index builds required to run this command and return indexes killed.
-        virtual std::vector<BSONObj> stopIndexBuilds(const std::string& dbname, const BSONObj& cmdObj);
-
         static const map<string,Command*>* commandsByBestName() { return _commandsByBestName; }
         static const map<string,Command*>* webCommands() { return _webCommands; }
         /** @return if command was found */

@@ -26,9 +26,9 @@ namespace mongo {
 
     // todo : move more here
 
-    CurOp::CurOp( Client * client , CurOp * wrapped ) : 
-        _client(client), 
-        _wrapped(wrapped) 
+    CurOp::CurOp( Client * client , CurOp * wrapped ) :
+        _client(client),
+        _wrapped(wrapped)
     {
         if ( _wrapped )
             _client->_curOp = this;
@@ -67,38 +67,6 @@ namespace mongo {
         _active = true; // this should be last for ui clarity
     }
 
-    CurOp* CurOp::getOp(const BSONObj& criteria) {
-        Matcher matcher(criteria);
-        Client& me = cc();
-
-        scoped_lock client_lock(Client::clientsMutex);
-        for (std::set<Client*>::iterator it = Client::clients.begin();
-             it != Client::clients.end();
-             it++) {
-
-            Client *client = *it;
-            verify(client);
-
-            CurOp* curop = client->curop();
-            if (client == &me || curop == NULL) {
-                continue;
-            }
-
-            if ( !curop->active() )
-                continue;
-
-            if ( curop->killPendingStrict() )
-                continue;
-
-            BSONObj info = curop->info();
-            if (matcher.matches(info)) {
-                return curop;
-            }
-        }
-
-        return NULL;
-    }
-
     void CurOp::reset( const HostAndPort& remote, int op ) {
         reset();
         if( _remote != remote ) {
@@ -107,7 +75,7 @@ namespace mongo {
         }
         _op = op;
     }
-        
+
     ProgressMeter& CurOp::setMessage(const char * msg,
                                      std::string name,
                                      unsigned long long progressMeterTotal,
@@ -150,7 +118,7 @@ namespace mongo {
 
         _dbprofile = std::max( context->_db ? context->_db->getProfilingLevel() : 0 , _dbprofile );
     }
-    
+
     void CurOp::leave( Client::Context * context ) {
     }
 
@@ -189,13 +157,13 @@ namespace mongo {
 
         if ( _client ) {
             b.append( "desc" , _client->desc() );
-            if ( _client->_threadId.size() ) 
+            if ( _client->_threadId.size() )
                 b.append( "threadId" , _client->_threadId );
             if ( _client->_connectionId )
                 b.appendNumber( "connectionId" , _client->_connectionId );
             _client->_ls.reportState(b);
         }
-        
+
         if ( ! _message.empty() ) {
             if ( _progressMeter.isActive() ) {
                 StringBuilder buf;
@@ -211,9 +179,9 @@ namespace mongo {
             }
         }
 
-        if( killPending() ) 
+        if( killPending() )
             b.append("killPending", true);
-        
+
         b.append( "numYields" , _numYields );
         b.append( "lockStats" , _lockStat.report() );
 
@@ -221,12 +189,12 @@ namespace mongo {
     }
 
     void CurOp::setKillWaiterFlags() {
-        for (size_t i = 0; i < _notifyList.size(); ++i) 
+        for (size_t i = 0; i < _notifyList.size(); ++i)
             *(_notifyList[i]) = true;
         _notifyList.clear();
     }
 
-    void CurOp::kill(bool* pNotifyFlag /* = NULL */) { 
+    void CurOp::kill(bool* pNotifyFlag /* = NULL */) {
         _killPending.store(1);
         if (pNotifyFlag) {
             _notifyList.push_back(pNotifyFlag);

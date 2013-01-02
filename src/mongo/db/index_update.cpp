@@ -548,10 +548,8 @@ namespace mongo {
     void buildAnIndex(const std::string& ns,
                       NamespaceDetails* d,
                       IndexDetails& idx,
+                      bool background,
                       bool mayInterrupt) {
-
-        bool background = idx.info.obj()["background"].trueValue();
-
         tlog() << "build index " << ns << ' ' << idx.keyPattern() << ( background ? " background" : "" ) << endl;
         Timer t;
         unsigned long long n;
