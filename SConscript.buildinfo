@@ -8,7 +8,7 @@ import sys
 
 import buildscripts.utils
 
-Import('env windows')
+Import('env windows usev8 usesm')
 
 def getSysInfo():
     if windows:
@@ -39,8 +39,15 @@ def generate_buildinfo(env, target, source, **kw):
     if len(env["MONGO_MODULES"]):
         git_version += " modules: " + ", ".join(env["MONGO_MODULES"])
 
+    if usev8:
+        js_engine = "V8"
+    elif usesm:
+        js_engine = "SpiderMonkey"
+    else:
+        js_engine = "Unknown"
+
     contents = str(source[0]) % dict(git_version=git_version,
-                                     js_engine="V8" if GetOption('usev8') else "SpiderMonkey",
+                                     js_engine=js_engine,
                                      sys_info=getSysInfo(),
                                      allocator=GetOption('allocator'),
                                      loader_flags=env.subst('$LINKFLAGS $LDFLAGS',
