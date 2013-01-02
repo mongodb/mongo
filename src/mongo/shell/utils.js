@@ -1139,7 +1139,6 @@ jsTestOptions = function(){
                             { noJournal : TestData.noJournal,
                               noJournalPrealloc : TestData.noJournalPrealloc,
                               auth : TestData.auth,
-                              authMechanism: TestData.authMechanism || "MONGO-CR",
                               keyFile : TestData.keyFile,
                               authUser : "__system",
                               authPassword : TestData.keyFileData,
@@ -1208,13 +1207,9 @@ jsTest.authenticate = function(conn) {
                            // Set authenticated to stop an infinite recursion from getDB calling
                            // back into authenticate.
                            conn.authenticated = true;
-                           print ("Authenticating to admin user with mechanism " +
-                                  jsTestOptions().authMechanism + " on connection: " + conn);
-                           conn.authenticated = conn.getDB('admin').auth({
-                               user: jsTestOptions().adminUser,
-                               pwd: jsTestOptions().adminPassword,
-                               mechanism: jsTestOptions().authMechanism
-                           });
+                           print ("Authenticating to admin user on connection: " + conn);
+                           conn.authenticated = conn.getDB('admin').auth(
+                               jsTestOptions().adminUser, jsTestOptions().adminPassword);
                            return conn.authenticated;
                        });
     } catch (e) {
