@@ -7,6 +7,7 @@
 /perf.data
 /massif.out.*
 .scons
+/smoke-last.json
 
 *~
 *.swp
