@@ -104,6 +104,10 @@ DB.prototype._createUser = function(userObj, replicatedTo, timeout) {
         print( "could not find getLastError object : " + tojson( e ) )
     }
 
+    if (!le.err) {
+        return;
+    }
+
     // We can't detect replica set shards via mongos, so we'll sometimes get this error
     // In this case though, we've already checked the local error before returning norepl, so
     // the user has been written and we're happy
@@ -125,8 +129,7 @@ DB.prototype._createUser = function(userObj, replicatedTo, timeout) {
         throw "User already exists with that username/userSource combination";
     }
 
-    if ( le.err )
-        throw "couldn't add user: " + le.err;
+    throw "couldn't add user: " + le.err;
 }
 
 function _hashPassword(username, password) {
