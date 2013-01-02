@@ -129,6 +129,10 @@ DB.prototype._createUser = function(userObj, replicatedTo, timeout) {
         throw "couldn't add user: " + le.err;
 }
 
+function _hashPassword(username, password) {
+    return hex_md5(username + ":mongo:" + password);
+}
+
 // For adding old-style user documents for backwards compatibily with pre-2.4 versions of MongoDB.
 DB.prototype._addUserV22 = function( username , pass, readOnly, replicatedTo, timeout ) {
     if ( pass == null || pass.length == 0 )
@@ -138,7 +142,7 @@ DB.prototype._addUserV22 = function( username , pass, readOnly, replicatedTo, ti
     var c = this.getCollection( "system.users" );
     var u = c.findOne({user : username, userSource:null}) || { user : username };
     u.readOnly = readOnly;
-    u.pwd = hex_md5( username + ":mongo:" + pass );
+    u.pwd = _hashPassword(username, pass);
 
     this._createUser(u, replicatedTo, timeout);
 }
@@ -150,7 +154,7 @@ DB.prototype._addUser = function(userObj, replicatedTo, timeout) {
         throw Error("'roles' field must be provided");
     }
     if (userObj['pwd'] != null) {
-        userObj.pwd = hex_md5(userObj['user'] + ":mongo:" + userObj['pwd']);
+        userObj.pwd = _hashPassword(userObj['user'], userObj['pwd']);
     }
     this._createUser(userObj, replicatedTo, timeout);
 }
@@ -166,6 +170,15 @@ DB.prototype.addUser = function() {
     }
 }
 
+DB.prototype.changeUserPassword = function(username, password) {
+    var hashedPassword = _hashPassword(username, password);
+    db.system.users.update({user : username, userSource : null}, {$set : {pwd : hashedPassword}});
+    var err = db.getLastError();
+    if (err) {
+        throw "Changing password failed: " + err;
+    }
+}
+
 DB.prototype.logout = function(){
     return this.getMongo().logout(this.getName());
 };
@@ -175,7 +188,7 @@ DB.prototype.removeUser = function( username ){
 }
 
 DB.prototype.__pwHash = function( nonce, username, pass ) {
-    return hex_md5( nonce + username + hex_md5( username + ":mongo:" + pass ) );
+    return hex_md5(nonce + username + _hashPassword(username, pass));
 }
 
 DB.prototype._authOrThrow = function () {

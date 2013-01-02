@@ -30,7 +30,12 @@ var errmsg = "unauthorized";
 assert.eq(db.runCommand({eval : "function() { return 1; }"}).errmsg, errmsg);
 assert.eq(db.adminCommand({getLog : "global"}).errmsg, errmsg);
 
-assert( db.auth( "eliot" , "eliot" ) , "auth failed" );
+assert(!db.auth("eliot", "eliot2"), "auth succeeded with wrong password");
+assert(db.auth("eliot", "eliot"), "auth failed");
+// Change password
+db.changeUserPassword("eliot", "eliot2");
+assert(!db.auth("eliot", "eliot"), "auth succeeded with wrong password");
+assert(db.auth("eliot", "eliot2"), "auth failed");
 
 for( i = 0; i < 1000; ++i ) {
     t.save( {i:i} );
