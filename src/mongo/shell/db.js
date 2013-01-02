@@ -1,6 +1,10 @@
 // db.js
 
-if ( typeof DB == "undefined" ){                     
+var DB;
+
+(function() {
+
+if (DB === undefined) {
     DB = function( mongo , name ){
         this._mongo = mongo;
         this._name = name;
@@ -960,3 +964,5 @@ DB.prototype.getSlaveOk = function() {
 DB.prototype.loadServerScripts = function(){
     this.system.js.find().forEach(function(u){eval(u._id + " = " + u.value);});
 }
+
+}());
