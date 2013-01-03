@@ -15,14 +15,6 @@
  *    limitations under the License.
  */
 
-#if defined(_WIN32)
-/** this is a hack - v8stdint.h defined uint16_t etc. on _WIN32 only, and that collides with 
-    our usage of boost */
-#include "boost/cstdint.hpp"
-using namespace boost;
-#define V8STDINT_H_
-#endif
-
 #include "mongo/scripting/v8_utils.h"
 
 #include <boost/smart_ptr.hpp>
@@ -33,36 +25,31 @@ using namespace boost;
 #include <sstream>
 #include <vector>
 
+#include "mongo/platform/cstdint.h"
 #include "mongo/scripting/engine_v8.h"
 #include "mongo/scripting/v8_db.h"
 #include "mongo/util/mongoutils/str.h"
 
 using namespace std;
-using namespace v8;
 
 namespace mongo {
 
-    std::string toSTLString( const Handle<v8::Value> & o ) {
+    std::string toSTLString(const v8::Handle<v8::Value>& o) {
         v8::String::Utf8Value str(o);
         const char * foo = *str;
         std::string s(foo);
         return s;
     }
 
-    std::string toSTLString( const v8::TryCatch * try_catch ) {
-
+    std::string toSTLString(const v8::TryCatch* try_catch) {
         stringstream ss;
-
-        //while ( try_catch ){ // disabled for v8 bleeding edge
-
         v8::String::Utf8Value exception(try_catch->Exception());
-        Handle<v8::Message> message = try_catch->Message();
+        v8::Handle<v8::Message> message = try_catch->Message();
 
         if (message.IsEmpty()) {
             ss << *exception << endl;
         }
         else {
-
             v8::String::Utf8Value filename(message->GetScriptResourceName());
             if (*filename) {
                 int linenum = message->GetLineNumber();
@@ -83,30 +70,24 @@ namespace mongo {
 
             ss << endl;
         }
-
-        //try_catch = try_catch->next_;
-        //}
-
         return ss.str();
     }
 
-
-    std::ostream& operator<<( std::ostream &s, const Handle<v8::Value> & o ) {
+    std::ostream& operator<<(std::ostream& s, const v8::Handle<v8::Value>& o) {
         v8::String::Utf8Value str(o);
         s << *str;
         return s;
     }
 
-    std::ostream& operator<<( std::ostream &s, const v8::TryCatch * try_catch ) {
-        HandleScope handle_scope;
+    std::ostream& operator<<(std::ostream& s, const v8::TryCatch* try_catch) {
+        v8::HandleScope handle_scope;
         v8::String::Utf8Value exception(try_catch->Exception());
-        Handle<v8::Message> message = try_catch->Message();
+        v8::Handle<v8::Message> message = try_catch->Message();
 
         if (message.IsEmpty()) {
             s << *exception << endl;
         }
         else {
-
             v8::String::Utf8Value filename(message->GetScriptResourceName());
             int linenum = message->GetLineNumber();
             cout << *filename << ":" << linenum << " " << *exception << endl;
@@ -124,10 +105,6 @@ namespace mongo {
 
             cout << endl;
         }
-
-        //if ( try_catch->next_ ) // disabled for v8 bleeding edge
-        //    s << try_catch->next_;
-
         return s;
     }
 
@@ -137,158 +114,165 @@ namespace mongo {
 
     class JSThreadConfig {
     public:
-        JSThreadConfig( V8Scope* scope, const Arguments &args, bool newScope = false ) : started_(), done_(), newScope_( newScope ) {
-            jsassert( args.Length() > 0, "need at least one argument" );
-            jsassert( args[ 0 ]->IsFunction(), "first argument must be a function" );
+        JSThreadConfig(V8Scope* scope, const v8::Arguments& args, bool newScope = false) :
+            _started(),
+            _done(),
+            _newScope(newScope) {
+            jsassert(args.Length() > 0, "need at least one argument");
+            jsassert(args[0]->IsFunction(), "first argument must be a function");
 
             // arguments need to be copied into the isolate, go through bson
             BSONObjBuilder b;
-            for( int i = 0; i < args.Length(); ++i ) {
+            for(int i = 0; i < args.Length(); ++i) {
                 scope->v8ToMongoElement(b, mongoutils::str::stream() << "arg" << i, args[i]);
             }
-            args_ = b.obj();
+            _args = b.obj();
         }
 
         ~JSThreadConfig() {
         }
 
         void start() {
-            jsassert( !started_, "Thread already started" );
-            JSThread jt( *this );
-            thread_.reset( new boost::thread( jt ) );
-            started_ = true;
+            jsassert(!_started, "Thread already started");
+            JSThread jt(*this);
+            _thread.reset(new boost::thread(jt));
+            _started = true;
         }
         void join() {
-            jsassert( started_ && !done_, "Thread not running" );
-            thread_->join();
-            done_ = true;
+            jsassert(_started && !_done, "Thread not running");
+            _thread->join();
+            _done = true;
         }
 
         BSONObj returnData() {
-            if ( !done_ )
+            if (!_done)
                 join();
-            return returnData_;
+            return _returnData;
         }
 
     private:
         class JSThread {
         public:
-            JSThread( JSThreadConfig &config ) : config_( config ) {}
+            JSThread(JSThreadConfig& config) : _config(config) {}
 
             void operator()() {
-                config_._scope.reset( dynamic_cast< V8Scope * >( globalScriptEngine->newScope() ) );
-                v8::Locker v8lock(config_._scope->getIsolate());
-                v8::Isolate::Scope iscope(config_._scope->getIsolate());
-                HandleScope handle_scope;
-                Context::Scope context_scope(config_._scope->getContext());
+                _config._scope.reset(static_cast<V8Scope*>(globalScriptEngine->newScope()));
+                v8::Locker v8lock(_config._scope->getIsolate());
+                v8::Isolate::Scope iscope(_config._scope->getIsolate());
+                v8::HandleScope handle_scope;
+                v8::Context::Scope context_scope(_config._scope->getContext());
 
-                BSONObj args = config_.args_;
-                Local< v8::Function > f = v8::Function::Cast( *(config_._scope->mongoToV8Element(args.firstElement(), true)) );
+                BSONObj args = _config._args;
+                v8::Local<v8::Function> f = v8::Function::Cast(
+                        *(_config._scope->mongoToV8Element(args.firstElement(), true)));
                 int argc = args.nFields() - 1;
 
                 // TODO SERVER-8016: properly allocate handles on the stack
-                Local<Value> argv[24];
+                v8::Local<v8::Value> argv[24];
                 BSONObjIterator it(args);
                 it.next();
                 for(int i = 0; i < argc && i < 24; ++i) {
-                    argv[i] = Local< Value >::New(config_._scope->mongoToV8Element(*it, true));
+                    argv[i] = v8::Local<v8::Value>::New(
+                            _config._scope->mongoToV8Element(*it, true));
                     it.next();
                 }
-                TryCatch try_catch;
-                Handle<Value> ret = f->Call(config_._scope->getContext()->Global(), argc, argv);
+                v8::TryCatch try_catch;
+                v8::Handle<v8::Value> ret =
+                        f->Call(_config._scope->getContext()->Global(), argc, argv);
                 if (ret.IsEmpty() || try_catch.HasCaught()) {
-                    string e = toSTLString( &try_catch );
+                    string e = toSTLString(&try_catch);
                     log() << "js thread raised exception: " << e << endl;
-                    // v8 probably does something sane if ret is empty, but not going to assume that for now
                     ret = v8::Undefined();
                 }
                 // ret is translated to BSON to switch isolate
                 BSONObjBuilder b;
-                config_._scope->v8ToMongoElement(b, "ret", ret);
-                config_.returnData_ = b.obj();
+                _config._scope->v8ToMongoElement(b, "ret", ret);
+                _config._returnData = b.obj();
             }
 
         private:
-            JSThreadConfig &config_;
+            JSThreadConfig& _config;
         };
 
-        bool started_;
-        bool done_;
-        bool newScope_;
-        BSONObj args_;
-        scoped_ptr< boost::thread > thread_;
-        scoped_ptr< V8Scope > _scope;
-        BSONObj returnData_;
+        bool _started;
+        bool _done;
+        bool _newScope;
+        BSONObj _args;
+        scoped_ptr<boost::thread> _thread;
+        scoped_ptr<V8Scope> _scope;
+        BSONObj _returnData;
     };
 
-    Handle< Value > ThreadInit( V8Scope* scope, const Arguments &args ) {
-        Handle<v8::Object> it = args.This();
+    v8::Handle<v8::Value> ThreadInit(V8Scope* scope, const v8::Arguments& args) {
+        v8::Handle<v8::Object> it = args.This();
         // NOTE I believe the passed JSThreadConfig will never be freed.  If this
         // policy is changed, JSThread may no longer be able to store JSThreadConfig
         // by reference.
-        it->SetHiddenValue( v8::String::New( "_JSThreadConfig" ), External::New( new JSThreadConfig( scope, args ) ) );
+        it->SetHiddenValue(v8::String::New("_JSThreadConfig"),
+                           v8::External::New(new JSThreadConfig(scope, args)));
         return v8::Undefined();
     }
 
-    Handle< Value > ScopedThreadInit( V8Scope* scope, const Arguments &args ) {
-        Handle<v8::Object> it = args.This();
+    v8::Handle<v8::Value> ScopedThreadInit(V8Scope* scope, const v8::Arguments& args) {
+        v8::Handle<v8::Object> it = args.This();
         // NOTE I believe the passed JSThreadConfig will never be freed.  If this
         // policy is changed, JSThread may no longer be able to store JSThreadConfig
         // by reference.
-        it->SetHiddenValue( v8::String::New( "_JSThreadConfig" ), External::New( new JSThreadConfig( scope, args, true ) ) );
+        it->SetHiddenValue(v8::String::New("_JSThreadConfig"),
+                           v8::External::New(new JSThreadConfig(scope, args, true)));
         return v8::Undefined();
     }
 
-    JSThreadConfig *thisConfig( V8Scope* scope, const Arguments &args ) {
-        Local< External > c = External::Cast( *(args.This()->GetHiddenValue( v8::String::New( "_JSThreadConfig" ) ) ) );
-        JSThreadConfig *config = (JSThreadConfig *)( c->Value() );
+    JSThreadConfig *thisConfig(V8Scope* scope, const v8::Arguments& args) {
+        v8::Local<v8::External> c = v8::External::Cast(
+                *(args.This()->GetHiddenValue(v8::String::New("_JSThreadConfig"))));
+        JSThreadConfig *config = (JSThreadConfig *)(c->Value());
         return config;
     }
 
-    Handle< Value > ThreadStart( V8Scope* scope, const Arguments &args ) {
-        thisConfig( scope, args )->start();
+    v8::Handle<v8::Value> ThreadStart(V8Scope* scope, const v8::Arguments& args) {
+        thisConfig(scope, args)->start();
         return v8::Undefined();
     }
 
-    Handle< Value > ThreadJoin( V8Scope* scope, const Arguments &args ) {
-        thisConfig( scope, args )->join();
+    v8::Handle<v8::Value> ThreadJoin(V8Scope* scope, const v8::Arguments& args) {
+        thisConfig(scope, args)->join();
         return v8::Undefined();
     }
 
-    Handle< Value > ThreadReturnData( V8Scope* scope, const Arguments &args ) {
-        BSONObj data = thisConfig( scope, args )->returnData();
+    v8::Handle<v8::Value> ThreadReturnData(V8Scope* scope, const v8::Arguments& args) {
+        BSONObj data = thisConfig(scope, args)->returnData();
         return scope->mongoToV8Element(data.firstElement(), true);
     }
 
-    Handle< Value > ThreadInject( V8Scope* scope, const Arguments &args ) {
+    v8::Handle<v8::Value> ThreadInject(V8Scope* scope, const v8::Arguments& args) {
         v8::HandleScope handle_scope;
-        jsassert( args.Length() == 1 , "threadInject takes exactly 1 argument" );
-        jsassert( args[0]->IsObject() , "threadInject needs to be passed a prototype" );
-
-        Local<v8::Object> o = args[0]->ToObject();
+        jsassert(args.Length() == 1, "threadInject takes exactly 1 argument");
+        jsassert(args[0]->IsObject(), "threadInject needs to be passed a prototype");
+        v8::Local<v8::Object> o = args[0]->ToObject();
 
         // install method on the Thread object
         scope->injectV8Function("init", ThreadInit, o);
         scope->injectV8Function("start", ThreadStart, o);
         scope->injectV8Function("join", ThreadJoin, o);
         scope->injectV8Function("returnData", ThreadReturnData, o);
-        return handle_scope.Close(v8::Handle<Value>());
+        return handle_scope.Close(v8::Handle<v8::Value>());
     }
 
-    Handle< Value > ScopedThreadInject( V8Scope* scope, const Arguments &args ) {
+    v8::Handle<v8::Value> ScopedThreadInject(V8Scope* scope, const v8::Arguments& args) {
         v8::HandleScope handle_scope;
-        jsassert( args.Length() == 1 , "threadInject takes exactly 1 argument" );
-        jsassert( args[0]->IsObject() , "threadInject needs to be passed a prototype" );
-
-        Local<v8::Object> o = args[0]->ToObject();
+        jsassert(args.Length() == 1, "threadInject takes exactly 1 argument");
+        jsassert(args[0]->IsObject(), "threadInject needs to be passed a prototype");
+        v8::Local<v8::Object> o = args[0]->ToObject();
 
         scope->injectV8Function("init", ScopedThreadInit, o);
         // inheritance takes care of other member functions
 
-        return handle_scope.Close(v8::Handle<Value>());
+        return handle_scope.Close(v8::Handle<v8::Value>());
     }
 
-    void installFork( V8Scope* scope, v8::Handle< v8::Object > &global, v8::Handle< v8::Context > &context ) {
+    void installFork(V8Scope* scope, v8::Handle<v8::Object>& global,
+                     v8::Handle<v8::Context>& context) {
         scope->injectV8Function("_threadInject", ThreadInject, global);
         scope->injectV8Function("_scopedThreadInject", ScopedThreadInject, global);
     }
