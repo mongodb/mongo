@@ -155,7 +155,8 @@ __wt_cursor_get_keyv(WT_CURSOR *cursor, uint32_t flags, va_list ap)
 	const char *fmt;
 
 	CURSOR_API_CALL(cursor, session, get_key, NULL);
-	WT_CURSOR_NEEDKEY(cursor);
+	if (!F_ISSET(cursor, WT_CURSTD_KEY_APP | WT_CURSTD_KEY_RET))
+		WT_ERR(__wt_cursor_kv_not_set(cursor, 1));
 
 	if (WT_CURSOR_RECNO(cursor)) {
 		if (LF_ISSET(WT_CURSTD_RAW)) {
@@ -169,11 +170,18 @@ __wt_cursor_get_keyv(WT_CURSOR *cursor, uint32_t flags, va_list ap)
 		} else
 			*va_arg(ap, uint64_t *) = cursor->recno;
 	} else {
-		fmt = cursor->key_format;
-		if (LF_ISSET(WT_CURSOR_RAW_OK))
-			fmt = "u";
-		ret = __wt_struct_unpackv(
-		    session, cursor->key.data, cursor->key.size, fmt, ap);
+		fmt = LF_ISSET(WT_CURSOR_RAW_OK) ? "u" : cursor->key_format;
+
+		/* Fast path some common cases. */
+		if (strcmp(fmt, "S") == 0)
+			*va_arg(ap, const char **) = cursor->key.data;
+		else if (strcmp(fmt, "u") == 0) {
+			key = va_arg(ap, WT_ITEM *);
+			key->data = cursor->key.data;
+			key->size = cursor->key.size;
+		} else
+			ret = __wt_struct_unpackv(session,
+			    cursor->key.data, cursor->key.size, fmt, ap);
 	}
 
 err:	API_END(session);
@@ -257,17 +265,30 @@ int
 __wt_cursor_get_value(WT_CURSOR *cursor, ...)
 {
 	WT_DECL_RET;
+	WT_ITEM *value;
 	WT_SESSION_IMPL *session;
 	const char *fmt;
 	va_list ap;
 
 	CURSOR_API_CALL(cursor, session, get_value, NULL);
-	WT_CURSOR_NEEDVALUE(cursor);
+
+	if (!F_ISSET(cursor, WT_CURSTD_VALUE_APP | WT_CURSTD_VALUE_RET))
+		WT_ERR(__wt_cursor_kv_not_set(cursor, 0));
 
 	va_start(ap, cursor);
 	fmt = F_ISSET(cursor, WT_CURSOR_RAW_OK) ? "u" : cursor->value_format;
-	ret = __wt_struct_unpackv(session,
-	    cursor->value.data, cursor->value.size, fmt, ap);
+
+	/* Fast path some common cases. */
+	if (strcmp(fmt, "S") == 0)
+		*va_arg(ap, const char **) = cursor->value.data;
+	else if (strcmp(fmt, "u") == 0) {
+		value = va_arg(ap, WT_ITEM *);
+		value->data = cursor->value.data;
+		value->size = cursor->value.size;
+	} else
+		ret = __wt_struct_unpackv(session,
+		    cursor->value.data, cursor->value.size, fmt, ap);
+
 	va_end(ap);
 
 err:	API_END(session);
