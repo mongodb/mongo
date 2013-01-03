@@ -239,7 +239,7 @@ namespace mongo {
             }
         }
 
-        bool isTrimOnly() const {
+        bool isSliceOnly() const {
             if ( elt.type() != Object )
                 return false;
             BSONObj obj = elt.embeddedObject();
@@ -247,31 +247,31 @@ namespace mongo {
                 return false;
             BSONObjIterator i( obj );
             i.next();
-            BSONElement elemTrim = i.next();
-            return strcmp( elemTrim.fieldName(), "$trimTo" ) == 0;
+            BSONElement elemSlice = i.next();
+            return strcmp( elemSlice.fieldName(), "$slice" ) == 0;
         }
 
-        long long getTrim() const {
-            // The $trimTo may be the second or the third elemen in the field object.
-            // { <field name>: { $each: [<each array>], $trimTo: N, $sort: <pattern> } }
+        long long getSlice() const {
+            // The $slice may be the second or the third elemen in the field object.
+            // { <field name>: { $each: [<each array>], $slice: -N, $sort: <pattern> } }
             // 'elt' here is the BSONElement above.
             BSONObj obj = elt.embeddedObject();
             BSONObjIterator i( obj );
             i.next();
             BSONElement elem = i.next();
-            if ( ! str::equals( elem.fieldName(), "$trimTo" ) ) {
+            if ( ! str::equals( elem.fieldName(), "$slice" ) ) {
                 elem = i.next();
             }
             dassert( elem.isNumber() );
-            if ( elem.type() == NumberDouble ) {
-                return (long long) elem.numberDouble();
-            }
-            else {
-                return elem.numberLong();
-            }
+
+            // For now, we're only supporting slicing from the back of the array, i.e.
+            // negative slice. But the code now is wired in the opposite way: trimming from the
+            // back of the array is positive.
+            // TODO: fix this.
+            return -elem.numberLong();
         }
 
-        bool isTrimAndSort() const {
+        bool isSliceAndSort() const {
             if ( elt.type() != Object )
                 return false;
             BSONObj obj = elt.embeddedObject();
@@ -280,14 +280,14 @@ namespace mongo {
             BSONObjIterator i( obj );
             i.next();
 
-            // Trim and sort may be switched.
-            bool seenTrimTo = false;
+            // Slice and sort may be switched.
+            bool seenSlice = false;
             bool seenSort = false;
             while ( i.more() ) {
                 BSONElement elem = i.next();
-                if ( str::equals( elem.fieldName(), "$trimTo" ) ) {
-                    if ( seenTrimTo ) return false;
-                    seenTrimTo = true;
+                if ( str::equals( elem.fieldName(), "$slice" ) ) {
+                    if ( seenSlice ) return false;
+                    seenSlice = true;
                 }
                 else if ( str::equals( elem.fieldName(), "$sort" ) ) {
                     if ( seenSort ) return false;
@@ -300,12 +300,12 @@ namespace mongo {
             }
 
             // If present, the $sort element would have been checked during ModSet construction.
-            return seenTrimTo && seenSort;
+            return seenSlice && seenSort;
         }
 
         BSONObj getSort() const {
             // The $sort may be the second or the third element in the field object.
-            // { <field name>: { $each: [<each array>], $trimTo: N, $sort: <pattern> } }
+            // { <field name>: { $each: [<each array>], $slice: -N, $sort: <pattern> } }
             // 'elt' here is the BSONElement above.
             BSONObj obj = elt.embeddedObject();
             BSONObjIterator i( obj );
@@ -494,19 +494,30 @@ namespace mongo {
             while ( i.more() ) {
                 BSONElement elem = i.next();
                 uassert( 16645, "sort pattern must be numeric", elem.isNumber() );
+
                 double val = elem.Number();
                 uassert( 16646, "sort pattern must contain 1 or -1", val*val == 1.0);
+
+                //
+                // If there are dots in the field name, check that they form a proper
+                // field path (e.g., no empty field parts).
+                //
+
                 StringData field( elem.fieldName() );
+                uassert( 16651, "sort pattern field name cannot be empty" , field.size() );
+
                 size_t pos = field.find('.');
-                if ( pos != string::npos ) {
-                    size_t newPos = pos;
-                    while ( newPos != pos ) {
-                        field = field.substr( pos+1 );
-                        newPos = field.find('.');
-                    }
+                while ( pos != string::npos ) {
+
+                    uassert( 16639,
+                             "empty field in dotted sort pattern",
+                             (pos > 0) && (pos != field.size() - 1) );
+
+                    field = field.substr( pos+1 );
+                    pos = field.find('.');
                 }
-                uassert( 16639, "invalid sort pattern", field.size() > 0 );
-                projectBuilder.append( field.toString(), 1 );
+
+                projectBuilder.append( elem.fieldName(), 1 );
 
             }
             projectionPattern = projectBuilder.obj();
@@ -659,21 +670,21 @@ namespace mongo {
                 ms.fixedOpName = "$set";
                 if ( m.isEach() ) {
                     BSONObj arr = m.getEach();
-                    if ( !m.isTrimOnly() && !m.isTrimAndSort() ) {
+                    if ( !m.isSliceOnly() && !m.isSliceAndSort() ) {
                         b.appendArray( m.shortFieldName, arr );
 
                         ms.forceEmptyArray = true;
                         ms.fixedArray = BSONArray( arr.getOwned() );
                     }
-                    else if ( m.isTrimOnly() && ( m.getTrim() >= arr.nFields() ) ) {
+                    else if ( m.isSliceOnly() && ( m.getSlice() >= arr.nFields() ) ) {
                         b.appendArray( m.shortFieldName, arr );
 
                         ms.forceEmptyArray = true;
                         ms.fixedArray = BSONArray( arr.getOwned() );
                     }
-                    else if ( m.isTrimOnly() ) {
+                    else if ( m.isSliceOnly() ) {
                         BSONArrayBuilder arrBuilder( b.subarrayStart( m.shortFieldName ) );
-                        long long skip = arr.nFields() - m.getTrim();
+                        long long skip = arr.nFields() - m.getSlice();
                         BSONObjIterator j( arr );
                         while ( j.more() ) {
                             if ( skip-- > 0 ) {
@@ -686,11 +697,11 @@ namespace mongo {
                         ms.forceEmptyArray = true;
                         ms.fixedArray = BSONArray( arrBuilder.done().getOwned() );
                     }
-                    else if ( m.isTrimAndSort() ) {
-                        long long trim = m.getTrim();
+                    else if ( m.isSliceAndSort() ) {
+                        long long slice = m.getSlice();
                         BSONObj sortPattern = m.getSort();
 
-                        // Sort the $each array over pattern.
+                        // Sort the $each array over sortPattern.
                         vector<BSONObj> workArea;
                         BSONObjIterator j( arr );
                         while ( j.more() ) {
@@ -698,17 +709,20 @@ namespace mongo {
                         }
                         sort( workArea.begin(), workArea.end(), ProjectKeyCmp( sortPattern) );
 
-                        // Trim to the appropriate size.
-                        long long skip = std::max( 0LL,
-                                                   (long long)workArea.size() - trim );
+                        // Slice to the appropriate size. If slice is zero, that's equivalent
+                        // to resetting the array, ie, a no-op.
                         BSONArrayBuilder arrBuilder( b.subarrayStart( m.shortFieldName ) );
-                        for (vector<BSONObj>::iterator it = workArea.begin();
-                             it != workArea.end() && trim > 0;
-                             ++it ) {
-                            if ( skip-- > 0 ) {
-                                continue;
+                        if (slice > 0) {
+                            long long skip = std::max( 0LL,
+                                                       (long long)workArea.size() - slice );
+                            for (vector<BSONObj>::iterator it = workArea.begin();
+                                 it != workArea.end();
+                                 ++it ) {
+                                if ( skip-- > 0 ) {
+                                    continue;
+                                }
+                                arrBuilder.append( *it );
                             }
-                            arrBuilder.append( *it );
                         }
 
                         // Log the full resulting array.

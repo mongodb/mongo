@@ -131,7 +131,7 @@ namespace mongo {
 
             //
             // We can be in a single element push case, a "push all" case, or a "push all" case
-            // with a trim requirement (ie, a "push to size"). In each of these, we decide
+            // with a slice requirement (ie, a "push to size"). In each of these, we decide
             // differently how much of the existing- and of the parameter-array to copy to the
             // final object.
             //
@@ -166,7 +166,7 @@ namespace mongo {
 
             // If we're in the "push all" case, we'll copy all element of both the existing and
             // parameter arrays.
-            else if ( isEach() && ! isTrimOnly() && ! isTrimAndSort() ) {
+            else if ( isEach() && ! isSliceOnly() && ! isSliceAndSort() ) {
                 BSONObjIterator i( in.embeddedObject() );
                 while ( i.more() ) {
                     bb.append( i.next() );
@@ -181,24 +181,24 @@ namespace mongo {
                 ms.fixedArray = BSONArray( bb.done().getOwned() );
             }
 
-            // If we're in the "push all" case with trim, we have to decide how much of each
+            // If we're in the "push all" case with slice, we have to decide how much of each
             // of the existing and parameter arrays to copy to the final object.
-            else if ( isTrimOnly() ) {
-                long long trim = getTrim();
+            else if ( isSliceOnly() ) {
+                long long slice = getSlice();
                 BSONObj eachArray = getEach();
                 long long arraySize = in.embeddedObject().nFields();
                 long long eachArraySize = eachArray.nFields();
 
-                // Zero trim is equivalent to resetting the array in the final object, so
+                // Zero slice is equivalent to resetting the array in the final object, so
                 // we won't copy anything.
-                if (trim == 0) {
+                if (slice == 0) {
                     // no-op
                 }
 
-                // If the parameter array alone is larger than the trim, then only copy
+                // If the parameter array alone is larger than the slice, then only copy
                 // object from that array.
-                else if (trim <= eachArraySize) {
-                    long long skip = eachArraySize - trim;
+                else if (slice <= eachArraySize) {
+                    long long skip = eachArraySize - slice;
                     BSONObjIterator j( getEach() );
                     while ( j.more() ) {
                         if ( skip-- > 0 ) {
@@ -209,10 +209,10 @@ namespace mongo {
                     }
                 }
 
-                // If the parameter array is not sufficient to fill the trim, then some (or all)
+                // If the parameter array is not sufficient to fill the slice, then some (or all)
                 // the elements from the existing array will be copied too.
                 else {
-                    long long skip = std::max(0LL, arraySize - (trim - eachArraySize) );
+                    long long skip = std::max(0LL, arraySize - (slice - eachArraySize) );
                     BSONObjIterator i( in.embeddedObject() );
                     while ( i.more() ) {
                         if (skip-- > 0) {
@@ -232,16 +232,16 @@ namespace mongo {
                 ms.fixedArray = BSONArray( bb.done().getOwned() );
             }
 
-            // If we're in the "push all" case with sort, we have to concatenate the existing
-            // array with the $each array, sort the result, and then decide how much of each of
-            // the existing and the parameter arrays to copy to the final object.
+            // If we're in the "push all" case ($push with a $each) with sort, we have to
+            // concatenate the existing array with the $each array, sort the result, and then
+            // decide how much of each of the resulting work area to copy to the final object.
             else {
-                long long trim = getTrim();
+                long long slice = getSlice();
                 BSONObj sortPattern = getSort();
 
-                // Zero trim is equivalent to resetting the array in the final object, so
+                // Zero slice is equivalent to resetting the array in the final object, so
                 // we only go into sorting if there is anything to sort.
-                if ( trim > 0 ) {
+                if ( slice > 0 ) {
                     vector<BSONObj> workArea;
                     BSONObjIterator i( in.embeddedObject() );
                     while ( i.more() ) {
@@ -254,9 +254,9 @@ namespace mongo {
                     sort( workArea.begin(), workArea.end(), ProjectKeyCmp( sortPattern ) );
 
                     long long skip = std::max( 0LL,
-                                               (long long)workArea.size() - trim );
+                                               (long long)workArea.size() - slice );
                     for ( vector<BSONObj>::iterator it = workArea.begin();
-                         it != workArea.end() && trim > 0;
+                         it != workArea.end();
                          ++it ) {
                         if ( skip-- > 0 ) {
                             continue;
@@ -632,7 +632,7 @@ namespace mongo {
 
                 // Currently, we require the base array of a $sort to be made of
                 // objects (as opposed to base types).
-                if ( !e.eoo() && m.isEach() && m.isTrimAndSort() ) {
+                if ( !e.eoo() && m.isEach() && m.isSliceAndSort() ) {
                     BSONObjIterator i( e.embeddedObject() );
                     while ( i.more() ) {
                         BSONElement arrayItem = i.next();
@@ -1187,41 +1187,41 @@ namespace mongo {
                          "Modifier $pushAll/pullAll allowed for arrays only",
                          f.type() == Array || ( op != Mod::PUSH_ALL && op != Mod::PULL_ALL ) );
 
-                // Check whether $each, $trimTo, and $sort syntax for $push is correct.
+                // Check whether $each, $slice, and $sort syntax for $push is correct.
                 if ( ( op == Mod::PUSH ) && ( f.type() == Object ) ) {
                     BSONObj pushObj = f.embeddedObject();
                     if ( pushObj.nFields() > 0 &&
                          strcmp(pushObj.firstElement().fieldName(), "$each") == 0 ) {
                         uassert( 16564,
-                                 "$each term needs to occur alone (or with $trimTo/$sort)",
+                                 "$each term needs to occur alone (or with $slice/$sort)",
                                  pushObj.nFields() <= 3 );
                         uassert( 16565,
                                  "$each requires an array value",
                                  pushObj.firstElement().type() == Array );
 
-                        // If both $trimTo and $sort are present, thay may be switched.
+                        // If both $slice and $sort are present, they may be switched.
                         if ( pushObj.nFields() > 1 ) {
                             BSONObjIterator i( pushObj );
                             i.next();
 
-                            bool seenTrimTo = false;
+                            bool seenSlice = false;
                             bool seenSort = false;
                             while ( i.more() ) {
                                 BSONElement nextElem = i.next();
 
-                                if ( str::equals( nextElem.fieldName(), "$trimTo" ) ) {
-                                    uassert( 16567, "$trimTo appeared twice", !seenTrimTo);
-                                    seenTrimTo = true;
+                                if ( str::equals( nextElem.fieldName(), "$slice" ) ) {
+                                    uassert( 16567, "$slice appeared twice", !seenSlice);
+                                    seenSlice = true;
                                     uassert( 16568,
-                                             "$trimTo value must be a numeric integer",
+                                             "$slice value must be a numeric integer",
                                              nextElem.type() == NumberInt ||
                                              nextElem.type() == NumberLong ||
                                              (nextElem.type() == NumberDouble &&
                                               nextElem.numberDouble() ==
                                               (long long)nextElem.numberDouble() ) );
                                     uassert( 16640,
-                                             "$trimTo value must be positive",
-                                             nextElem.number() >= 0 );
+                                             "$slice value must be negative or zero",
+                                             nextElem.number() <= 0 );
                                 }
                                 else if ( str::equals( nextElem.fieldName(), "$sort" ) ) {
                                     uassert( 16647, "$sort appeared twice", !seenSort );
@@ -1240,7 +1240,8 @@ namespace mongo {
                                                    ( fieldSortElem.type() == NumberDouble &&
                                                      fieldSortElem.numberDouble() ==
                                                      (long long) fieldSortElem.numberDouble() ) ) &&
-                                                 fieldSortElem.Number()*fieldSortElem.Number()==1.0);
+                                                 fieldSortElem.Number()*fieldSortElem.Number()
+                                                 == 1.0);
                                     }
 
                                     // Finally, check if the $each is made of objects (as opposed
@@ -1257,15 +1258,12 @@ namespace mongo {
                                 }
                                 else {
                                     uasserted( 16643,
-                                               "$each term takes only $trimTo (and optionally "
+                                               "$each term takes only $slice (and optionally "
                                                "$sort) as complements" );
                                 }
                             }
 
-                            uassert( 16644,
-                                     "cannot have a $sort without a $trimTo",
-                                     (seenTrimTo && seenSort) ||
-                                     (seenTrimTo && !seenSort) );
+                            uassert( 16644, "cannot have a $sort without a $slice", seenSlice );
                         }
                     }
                 }
