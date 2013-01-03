@@ -291,7 +291,7 @@ __checkpoint_worker(
 	 */
 	if (btree->checkpoint != NULL)
 		return (is_checkpoint ? 0 :
-		    __wt_bt_cache_flush(
+		    __wt_bt_cache_op(
 		    session, NULL, WT_SYNC_DISCARD_NOWRITE));
 
 	/*
@@ -301,7 +301,7 @@ __checkpoint_worker(
 	 * nature of the checkpoint.
 	 */
 	if (!btree->modified && !is_checkpoint)
-		return (__wt_bt_cache_flush(
+		return (__wt_bt_cache_op(
 		    session, NULL, WT_SYNC_DISCARD_NOWRITE));
 
 	/*
@@ -311,7 +311,7 @@ __checkpoint_worker(
 	 */
 	if ((ret = __wt_meta_ckptlist_get(
 	    session, btree->name, &ckptbase)) == WT_NOTFOUND)
-		return (__wt_bt_cache_flush(
+		return (__wt_bt_cache_op(
 		    session, NULL, WT_SYNC_DISCARD_NOWRITE));
 	WT_ERR(ret);
 
@@ -567,21 +567,14 @@ __checkpoint_worker(
 	btree->modified = 0;
 	WT_FULL_BARRIER();
 
-	/*
-	 * For ordinary checkpoints, first write all dirty leaf pages before
-	 * doing the full flush of internal pages later (which locks out
-	 * eviction of dirty pages).
-	 *
-	 * Otherwise, if closing a handle, include everything in the checkpoint.
-	 */
+	/* Flush the file from the cache, creating the checkpoint. */
 	if (is_checkpoint)
-		WT_ERR(__wt_bt_cache_flush(session, NULL, WT_SYNC_LEAF));
-	else
+		WT_ERR(__wt_bt_cache_op(session, ckptbase, WT_SYNC_INTERNAL));
+	else {
 		txn->isolation = TXN_ISO_READ_UNCOMMITTED;
 
-	/* Flush the file from the cache, creating the checkpoint. */
-	WT_ERR(__wt_bt_cache_flush(session,
-	    ckptbase, is_checkpoint ? WT_SYNC_INTERNAL : WT_SYNC_DISCARD));
+		WT_ERR(__wt_bt_cache_op(session, ckptbase, WT_SYNC_DISCARD));
+	}
 
 	/*
 	 * All blocks being written have been written; set the object's write
