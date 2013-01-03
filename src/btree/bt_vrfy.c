@@ -100,7 +100,7 @@ __wt_verify(WT_SESSION_IMPL *session, const char *cfg[])
 				ret = __verify_tree(
 				    session, btree->root_page, vs);
 				WT_TRET(__wt_bt_cache_op(
-				    session, NULL, WT_SYNC_DISCARD));
+				    session, NULL, WT_SYNC_DISCARD_NOWRITE));
 			}
 		}
 
