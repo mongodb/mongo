@@ -971,11 +971,12 @@ def main():
         run_tests(tests)
     finally:
         add_to_failfile(fails, options)
-        report()
 
-    f = open( "smoke-last.json", "wb" )
-    f.write( json.dumps( { "results" : all_test_results } ) )
-    f.close()
+        f = open( "smoke-last.json", "wb" )
+        f.write( json.dumps( { "results" : all_test_results } ) )
+        f.close()
+
+        report()
 
 if __name__ == "__main__":
     main()
