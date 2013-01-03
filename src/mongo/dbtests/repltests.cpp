@@ -837,14 +837,14 @@ namespace ReplTests {
             }
         };
 
-        class PushTrim : public Base {
+        class PushSlice : public Base {
             void doIt() const {
                 client()->update( ns(),
                                   BSON( "_id" << 0),
                                   BSON( "$push" <<
                                         BSON( "a" <<
                                               BSON( "$each" << BSON_ARRAY(3) <<
-                                                    "$trimTo" << 2 ) ) ) );
+                                                    "$slice" << -2 ) ) ) );
             }
             using ReplTests::Base::check;
             void check() const {
@@ -857,14 +857,14 @@ namespace ReplTests {
             }
         };
 
-        class PushTrimInitiallyInexistent : public Base {
+        class PushSliceInitiallyInexistent : public Base {
             void doIt() const {
                 client()->update( ns(),
                                   BSON( "_id" << 0),
                                   BSON( "$push" <<
                                         BSON( "a" <<
                                               BSON( "$each" << BSON_ARRAY(1<<2) <<
-                                                    "$trimTo" << 2 ) ) ) );
+                                                    "$slice" << -2 ) ) ) );
             }
             using ReplTests::Base::check;
             void check() const {
@@ -877,14 +877,14 @@ namespace ReplTests {
             }
         };
 
-        class PushTrimToZero : public Base {
+        class PushSliceToZero : public Base {
             void doIt() const {
                 client()->update( ns(),
                                   BSON( "_id" << 0),
                                   BSON( "$push" <<
                                         BSON( "a" <<
                                               BSON( "$each" << BSON_ARRAY(3) <<
-                                                    "$trimTo" << 0 ) ) ) );
+                                                    "$slice" << 0 ) ) ) );
             }
             using ReplTests::Base::check;
             void check() const {
@@ -1627,9 +1627,9 @@ namespace ReplTests {
             add< Idempotence::EmptyPushSparseIndex >();
             add< Idempotence::PushAll >();
             add< Idempotence::PushWithDollarSigns >();
-            add< Idempotence::PushTrim >();
-            add< Idempotence::PushTrimInitiallyInexistent >();
-            add< Idempotence::PushTrimToZero >();
+            add< Idempotence::PushSlice >();
+            add< Idempotence::PushSliceInitiallyInexistent >();
+            add< Idempotence::PushSliceToZero >();
             add< Idempotence::PushAllUpsert >();
             add< Idempotence::EmptyPushAll >();
             add< Idempotence::Pull >();
