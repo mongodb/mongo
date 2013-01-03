@@ -211,7 +211,7 @@ namespace mongo {
         virtual shared_ptr<Cursor> newCursor(const BSONObj& query, const BSONObj& order,
                                              int numWanted) const {
             vector<QueryGeometry> regions;
-            double maxDistance = DBL_MAX;
+            double maxDistance = std::numeric_limits<double>::max();
             bool isNear = false;
             bool isIntersect = false;
 

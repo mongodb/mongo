@@ -28,7 +28,10 @@ namespace mongo {
                        const BSONObj &query, const vector<QueryGeometry> &fields,
                        const S2IndexingParams &params, int numWanted, double maxDistance)
         : _details(details), _fields(fields), _params(params), _nscanned(0),
-          _keyPattern(keyPattern), _numToReturn(numWanted), _maxDistance(maxDistance) {
+          _keyPattern(keyPattern), _numToReturn(numWanted),
+          // _outerRadius can't be greater than (pi * r) or we wrap around the opposite
+          // side of the world.
+          _maxDistance(min(M_PI * _params.radius, maxDistance)) {
         BSONObjBuilder geoFieldsToNuke;
         for (size_t i = 0; i < _fields.size(); ++i) {
             geoFieldsToNuke.append(_fields[i].field, "");
@@ -95,10 +98,7 @@ namespace mongo {
     void S2NearCursor::nextAnnulus() {
         _innerRadius = _outerRadius;
         _outerRadius += _radiusIncrement;
-        // Don't look farther than we're supposed to.
         _outerRadius = min(_outerRadius, _maxDistance);
-        // _outerRadius can't be greater than this or we wrap around the opposite side of the world.
-        _outerRadius = min(_outerRadius, M_PI * _params.radius);
         verify(_innerRadius <= _outerRadius);
     }
 
@@ -222,8 +222,7 @@ namespace mongo {
             }
         } while (_results.empty()
                  && _innerRadius < _maxDistance
-                 && _innerRadius < _outerRadius
-                 && _innerRadius < M_PI  * _params.radius);
+                 && _innerRadius < _outerRadius);
         // TODO: consider shrinking _radiusIncrement if _results.size() meets some criteria.
     }
 
