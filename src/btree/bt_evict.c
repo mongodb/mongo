@@ -487,11 +487,7 @@ __evict_file(WT_SESSION_IMPL *session, int syncop)
 	WT_DECL_RET;
 	WT_PAGE *next_page, *page;
 
-	/*
-	 * Clear any existing LRU eviction walk, this call usually means we're
-	 * discarding the tree.  (Yeah, we could check for compaction, but why
-	 * bother?)
-	 */
+	/* Clear any existing LRU eviction walk, we're discarding the tree. */
 	__wt_evict_clear_tree_walk(session, NULL);
 
 	/*
@@ -534,8 +530,7 @@ __evict_file(WT_SESSION_IMPL *session, int syncop)
 				session->btree->root_page = NULL;
 			__wt_page_out(session, &page, 0);
 			break;
-		default:
-			WT_ERR(ENOTSUP);
+		WT_ILLEGAL_VALUE_ERR(session);
 		}
 	}
 
@@ -598,8 +593,7 @@ __wt_sync_file(WT_SESSION_IMPL *session, int syncop)
 		 */
 		walk_flags = WT_TREE_CACHE | WT_TREE_WAIT;
 		break;
-	default:
-		return (ENOTSUP);
+	WT_ILLEGAL_VALUE(session);
 	}
 
 	page = NULL;
