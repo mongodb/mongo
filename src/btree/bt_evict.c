@@ -575,11 +575,10 @@ __wt_sync_file(WT_SESSION_IMPL *session, int syncop)
 	switch (syncop) {
 	case WT_SYNC_INTERNAL:
 		/*
-		 * A further complication is that pages that appearing in a
-		 * checkpoint cannot be freed until the block lists for the
-		 * checkpoint are stable.  This is dealt with by locking out
-		 * eviction of dirty pages while writing the internal nodes
-		 * of a tree.
+		 * A further complication is pages appearing in a checkpoint
+		 * cannot be freed until the block lists for the checkpoint
+		 * are stable.  This is dealt with by locking out eviction of
+		 * dirty pages while writing the internal nodes of a tree.
 		 */
 		__evict_readonly(session, 1);
 
