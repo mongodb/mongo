@@ -278,6 +278,7 @@ __rec_review(WT_SESSION_IMPL *session,
 				return (EBUSY);
 			}
 
+#if 0
 	/*
 	 * Check if this page can be evicted.
 	 *
@@ -288,6 +289,7 @@ __rec_review(WT_SESSION_IMPL *session,
 	 */
 	if (btree->writes_disabled && __wt_page_is_modified(page))
 		return (EBUSY);
+#endif
 
 	/*
 	 * If the file is being checkpointed, the checkpoint's reconciliation of

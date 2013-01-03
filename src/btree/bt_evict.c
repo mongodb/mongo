@@ -826,7 +826,7 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, int clean)
 	WT_DECL_RET;
 	WT_EVICT_ENTRY *end, *evict, *start;
 	WT_PAGE *page;
-	int modified, restarts;
+	int restarts;
 
 	btree = session->btree;
 	cache = S2C(session)->cache;
@@ -872,21 +872,8 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, int clean)
 		    F_ISSET(page->modify, WT_PM_REC_SPLIT_MERGE)))
 			continue;
 
-		/*
-		 * If the file is being checkpointed, there's a period of time
-		 * where we have to turn off dirty writes and we can't discard
-		 * any page with a modification structure because it might race
-		 * with the checkpointing thread.  This test isn't sufficient
-		 * by itself because the page might be modified after we select
-		 * it and before we get exclusive access, this test has to be
-		 * repeated during the page eviction review.
-		 */
-		modified = __wt_page_is_modified(page);
-		if (modified && btree->writes_disabled)
-			continue;
-
 		/* Optionally ignore clean pages. */
-		if (!modified && !clean)
+		if (!clean && !__wt_page_is_modified(page))
 			continue;
 
 		WT_ASSERT(session, evict->page == NULL);
