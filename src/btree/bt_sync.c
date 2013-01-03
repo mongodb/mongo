@@ -88,6 +88,7 @@ __wt_bt_cache_op(WT_SESSION_IMPL *session, WT_CKPT *ckptbase, int op)
 		/* If discarding the tree, the root page should be gone. */
 		WT_ASSERT(session, ret != 0 || btree->root_page == NULL);
 		break;
+	WT_ILLEGAL_VALUE_ERR(session);
 	}
 
 err:	btree->ckpt = NULL;
