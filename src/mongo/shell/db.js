@@ -111,18 +111,14 @@ DB.prototype._createUser = function(userObj, replicatedTo, timeout) {
     // We can't detect replica set shards via mongos, so we'll sometimes get this error
     // In this case though, we've already checked the local error before returning norepl, so
     // the user has been written and we're happy
-    if( le.err == "norepl" ){
-        return
-    }
-
-    if ( le.err == "timeout" ){
-        throw "timed out while waiting for user authentication to replicate - " +
-              "database will not be fully secured until replication finishes"
-    }
-
-    if ( le.err == "noreplset" ){
+    if (le.err == "norepl" || le.err == "noreplset") {
         // nothing we can do
         return;
+    }
+
+    if (le.err == "timeout") {
+        throw "timed out while waiting for user authentication to replicate - " +
+              "database will not be fully secured until replication finishes"
     }
 
     if (le.err.startsWith("E11000 duplicate key error")) {
