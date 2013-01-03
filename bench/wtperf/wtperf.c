@@ -269,13 +269,13 @@ worker(CONFIG *cfg, uint32_t worker_type)
 	conn = cfg->conn;
 	key_buf = calloc(cfg->key_sz + 1, 1);
 	if (key_buf == NULL) {
-		ret = ENOMEM;
+		lprintf(cfg, ret = ENOMEM, 0, "Populate key buffer");
 		goto err;
 	}
 	if (worker_type == WORKER_INSERT) {
 		data_buf = calloc(cfg->data_sz, 1);
 		if (data_buf == NULL) {
-			lprintf(cfg, ENOMEM, 0, "Populate data buffer");
+			lprintf(cfg, ret = ENOMEM, 0, "Populate data buffer");
 			goto err;
 		}
 		memset(data_buf, 'a', cfg->data_sz - 1);
