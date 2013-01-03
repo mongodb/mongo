@@ -564,25 +564,36 @@ int
 __wt_sync_file(WT_SESSION_IMPL *session, int syncop)
 {
 	WT_BTREE *btree;
+	WT_CACHE *cache;
 	WT_DECL_RET;
 	WT_PAGE *page;
 	uint32_t walk_flags;
 
 	btree = session->btree;
+	cache = S2C(session)->cache;
 	page = NULL;
 
 	switch (syncop) {
 	case WT_SYNC_INTERNAL:
 		/*
 		 * Writes in the file have to be disabled when the checkpoint
-		 * writes a file's internal nodes.  Set the disable flag and
-		 * get the eviction server to drain all activity in that file.
+		 * writes a file's internal nodes.  Set the disable flag, then
+		 * wait for any existing eviction to complete.
 		 */
-		WT_PUBLISH(btree->writes_disabled, 1);
+		__wt_spin_lock(session, &cache->evict_lock);
+		btree->writes_disabled = 1;
+		while (btree->lru_count > 0) {
+			__wt_spin_unlock(session, &cache->evict_lock);
+			__wt_yield();
+			__wt_spin_lock(session, &cache->evict_lock);
+		}
+		__wt_spin_unlock(session, &cache->evict_lock);
+#if 0
 		WT_ERR(__wt_sync_file_serial(session, WT_SYNC_DIRTY_DISABLE));
 		WT_ERR(__wt_evict_server_wake(session));
 		WT_ERR(__wt_cond_wait(session, session->cond, 0));
 		WT_ERR(session->syncop_ret);
+#endif
 
 		/*
 		 * Checkpoints need to wait for any concurrent activity in a
@@ -644,8 +655,8 @@ err:		/* On error, clear any left-over tree walk. */
 	}
 
 	if (syncop == WT_SYNC_INTERNAL) {
-		/* Re-enable writes to the file, and push the change. */
-		WT_PUBLISH(btree->writes_disabled, 0);
+		/* Re-enable writes to the file. */
+		btree->writes_disabled = 0;
 
 		/*
 		 * Wake the eviction server, in case application threads have
