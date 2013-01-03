@@ -99,6 +99,59 @@ MongoRunner = function(){}
 MongoRunner.dataDir = "/data/db"
 MongoRunner.dataPath = "/data/db/"
 MongoRunner.usedPortMap = {}
+
+MongoRunner.VersionSub = function(regex, version) {
+    this.regex = regex;
+    this.version = version;
+}
+
+// These patterns allow substituting the binary versions used for each
+// version string to support the dev/stable MongoDB release cycle.
+MongoRunner.binVersionSubs = [ new MongoRunner.VersionSub(/^latest$/, ""),
+                               new MongoRunner.VersionSub(/^last-stable$/, "2.2"),
+                               new MongoRunner.VersionSub(/^oldest-supported$/, "1.8"),
+                               // Latest unstable and next stable are effectively the
+                               // same release
+                               new MongoRunner.VersionSub(/^2\.3(\..*){0,1}/, ""),
+                               new MongoRunner.VersionSub(/^2\.4(\..*){0,1}/, "") ];
+
+MongoRunner.getBinVersionFor = function(version) {
+ 
+    // If this is a version iterator, iterate the version via toString()
+    if (version instanceof MongoRunner.versionIterator.iterator) {
+        version = version.toString();
+    }
+
+    // No version set means we use no suffix, this is *different* from "latest"
+    // since latest may be mapped to a different version.
+    if (version == null) version = "";
+    version = version.trim();
+    if (version === "") return "";
+
+    // See if this version is affected by version substitutions
+    for (var i = 0; i < MongoRunner.binVersionSubs.length; i++) {
+        var sub = MongoRunner.binVersionSubs[i];
+        if (sub.regex.test(version)) {
+            version = sub.version;
+        }
+    }
+
+    return version;
+}
+
+MongoRunner.areBinVersionsTheSame = function(versionA, versionB) {
+
+    versionA = MongoRunner.getBinVersionFor(versionA);
+    versionB = MongoRunner.getBinVersionFor(versionB);
+
+    if (versionA === "" || versionB === "") {
+        return versionA === versionB;
+    }
+
+    return versionA.startsWith(versionB) ||
+           versionB.startsWith(versionA);
+}
+
 MongoRunner.logicalOptions = { runId : true,
                                pathOpts : true, 
                                remember : true,
@@ -184,16 +237,20 @@ MongoRunner.versionIterator = function( arr, isRandom ){
     // Starting pos
     var i = isRandom ? parseInt( Random.rand() * arr.length ) : 0;
     
-    var it = {
-        toString : function(){
-            i = ( i + 1 ) % arr.length
-            print( "Returning next version : " + i + " from " + tojson( arr ) + "..." )
-            return arr[ i ]
-        },
-        isVersionIterator : true
+    return new MongoRunner.versionIterator.iterator(i, arr); 
+}
+
+MongoRunner.versionIterator.iterator = function(i, arr) {
+
+    this.toString = function() {
+        i = ( i + 1 ) % arr.length
+        print( "Returning next version : " + i +
+               " (" + arr[i] + ") from " + tojson( arr ) + "..." );
+        return arr[ i ]
     }
-    
-    return it
+
+    this.isVersionIterator = true;
+
 }
 
 /**
@@ -342,19 +399,8 @@ MongoRunner.mongoOptions = function( opts ){
     
     var shouldRemember = ( ! opts.restart && ! opts.noRemember ) || ( opts.restart && opts.appendOptions )
     
-    // Normalize the binary version if it exists
-    if( opts.binVersion && opts.binVersion != "latest" && opts.binVersion != "" ){
-        
-        // Convert to string
-        opts.binVersion = opts.binVersion + ""
-        
-        // opts.binVersion = ( opts.binVersion + "" ).replace( /r|v/g, "" )
-        
-        var numSeps = opts.binVersion.replace( /[^\.]/g, "" ).length
-        if( numSeps == 0 ) opts.binVersion += ".0"
-            
-        // opts.binVersion = "r" + opts.binVersion
-    }    
+    // Normalize and get the binary version to use
+    opts.binVersion = MongoRunner.getBinVersionFor(opts.binVersion);
         
     if ( shouldRemember ){
         MongoRunner.savedOptions[ opts.runId ] = Object.merge( opts, {} )

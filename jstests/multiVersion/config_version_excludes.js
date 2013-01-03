@@ -2,6 +2,8 @@
 // Test checks whether or not config version excludes prevent mongos startup
 //
 
+load('./jstests/multiVersion/libs/verify_versions.js');
+
 jsTest.log( "Starting cluster..." );
 
 var options = {
@@ -28,8 +30,12 @@ var configConnStr = st._configDB;
 
 jsTest.log("Testing excluded mongos versions...")
 
-configVersion.update({ _id : 1 }, { $addToSet : { excluding : "2.3" } });
-configVersion.update({ _id : 1 }, { $addToSet : { excluding : "2.4" } });
+// Since the version isn't being tested via javascript, we want to find the actual version
+// that "latest" is mapped to.
+// Implicitly, the above cluster is started at "latest" version, so we can check this way.
+var realLatestVersion = mongos.getBinVersion();
+
+configVersion.update({ _id : 1 }, { $addToSet : { excluding : realLatestVersion } });
 printjson(configVersion.findOne());
 
 // Make sure down
@@ -39,7 +45,8 @@ assert.eq(null, mongosNew);
 jsTest.log("Testing excluded ranges...")
 
 configVersion.update({ _id : 1 }, { $unset : { excluding : 1 } });
-configVersion.update({ _id : 1 }, { $addToSet : { excluding : ["2.3", "2.4"] } });
+configVersion.update({ _id : 1 }, { $addToSet : { excluding : ["1.8", 
+                                                               realLatestVersion] } });
 printjson(configVersion.findOne());
 
 // Make sure down

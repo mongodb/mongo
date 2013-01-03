@@ -27,8 +27,8 @@
 //   * Verify that the desired indexes are present.
 //   * Verify can insert privilege documents that would have conflicted in 2.2 into the database.
 
-var oldVersion = "2.2.2";
-var newVersion = "latest";
+var oldVersion = "2.2";
+var newVersion = "2.4";
 
 // Raises an exception if "status" is not a GetLastError object indicating success.
 function assertGLEOK(status) {

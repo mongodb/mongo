@@ -99,7 +99,7 @@ var checkUpgraded = function() {
 jsTest.log("Upgrading empty config server from v3 to v4...");
 
 // Make sure up
-var mongosNew = MongoRunner.runMongos({ binVersion : "latest", configdb : configConnStr, upgrade : "" })
+var mongosNew = MongoRunner.runMongos({ binVersion : "2.4", configdb : configConnStr, upgrade : "" })
 assert.neq(null, mongosNew);
 MongoRunner.stopMongos(mongosNew);
 checkUpgraded();
@@ -117,7 +117,7 @@ config.getMongo().getCollection("config.version").remove({})
 assert.eq(null, config.getLastError());
 
 // Make sure down
-var mongosNew = MongoRunner.runMongos({ binVersion : "latest", configdb : configConnStr, upgrade : "" })
+var mongosNew = MongoRunner.runMongos({ binVersion : "2.4", configdb : configConnStr, upgrade : "" })
 assert.eq(null, mongosNew);
 resetVersion();
 resetBackupDBs();
@@ -133,7 +133,7 @@ config.getMongo().getCollection("config.version").update({ _id : 1 }, { $unset :
 assert.eq(null, config.getLastError());
 
 // Make sure down
-var mongosNew = MongoRunner.runMongos({ binVersion : "latest", configdb : configConnStr, upgrade : "" })
+var mongosNew = MongoRunner.runMongos({ binVersion : "2.4", configdb : configConnStr, upgrade : "" })
 assert.eq(null, mongosNew);
 resetVersion();
 resetBackupDBs();
@@ -155,7 +155,7 @@ config.collections.update({ _id : coll + "" }, { $set : { lastmodEpoch : ObjectI
 assert.eq(null, config.getLastError());
 
 // Make sure down
-var mongosNew = MongoRunner.runMongos({ binVersion : "latest", configdb : configConnStr, upgrade : "" })
+var mongosNew = MongoRunner.runMongos({ binVersion : "2.4", configdb : configConnStr, upgrade : "" })
 assert.eq(null, mongosNew);
 resetBackupDBs();
 
@@ -169,7 +169,7 @@ jsTest.log("Adding bad (dropped) sharded collection data...")
 config.collections.update({ _id : coll + "" }, { $set : { dropped : true }});
 
 // Make sure up
-var mongosNew = MongoRunner.runMongos({ binVersion : "latest", configdb : configConnStr, upgrade : "" })
+var mongosNew = MongoRunner.runMongos({ binVersion : "2.4", configdb : configConnStr, upgrade : "" })
 assert.neq(null, mongosNew);
 MongoRunner.stopMongos(mongosNew);
 checkUpgraded();
@@ -193,7 +193,7 @@ config.chunks.update({ ns : coll + "" }, { $set : { lastmodEpoch : ObjectId() }}
 assert.eq(null, config.getLastError());
 
 // Make sure down
-var mongosNew = MongoRunner.runMongos({ binVersion : "latest", configdb : configConnStr, upgrade : "" })
+var mongosNew = MongoRunner.runMongos({ binVersion : "2.4", configdb : configConnStr, upgrade : "" })
 assert.eq(null, mongosNew);
 resetBackupDBs();
 

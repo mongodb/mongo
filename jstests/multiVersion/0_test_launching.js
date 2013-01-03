@@ -2,17 +2,11 @@
 // Tests whether or not multi-version mongos/mongod instances can be launched
 //
 
-var verifyVersion = function( mongo, version ){
-    
-    var result = mongo.getDB( "admin" ).runCommand({ serverStatus : 1 })
-    
-    if( result.version != version ) printjson( result  )
-    
-    assert.eq( result.version, version )
-}
+load('./jstests/multiVersion/libs/verify_versions.js');
 
-var versionsToCheck = [ "1.8.5",
-                        "2.0.6" ]
+// Check our oldest and newest versions
+var versionsToCheck = [ "1.8",
+                        "latest"];
 
 for( var i = 0; i < versionsToCheck.length; i++ ){
 
@@ -22,8 +16,8 @@ for( var i = 0; i < versionsToCheck.length; i++ ){
     var mongos = MongoRunner.runMongos({ binVersion : version, configdb : mongod })
 
     // Make sure the started versions are actually the correct versions
-    verifyVersion( mongod, version )
-    verifyVersion( mongos, version )
+    assert.binVersion( mongod, version );
+    assert.binVersion( mongos, version );
 
     MongoRunner.stopMongos( mongos )
     MongoRunner.stopMongod( mongod )
