@@ -127,8 +127,11 @@ namespace mongo {
             }
 
             // --- counters
-            
-            if ( MetricTree::theMetricTree ) {
+            bool includeMetricTree = MetricTree::theMetricTree != NULL;
+            if ( cmdObj["metrics"].type() && !cmdObj["metrics"].trueValue() )
+                includeMetricTree = false;
+
+            if ( includeMetricTree ) {
                 MetricTree::theMetricTree->appendTo( result );
             }
 
