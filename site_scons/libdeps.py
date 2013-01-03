@@ -123,7 +123,7 @@ def __get_syslibdeps(node):
         for lib in __get_libdeps(node):
             for syslib in lib.get_env().get(syslibdeps_env_var, []):
                 syslibdeps.append(syslib)
-        setattr(node.attributes, cached_var_name, sorted(syslibdeps))
+        setattr(node.attributes, cached_var_name, syslibdeps)
     return getattr(node.attributes, cached_var_name)
 
 def update_scanner(builder):
@@ -169,7 +169,17 @@ def get_syslibdeps(source, target, env, for_signature):
     deps = __get_syslibdeps(target[0])
     lib_link_prefix = env.subst('$LIBLINKPREFIX')
     lib_link_suffix = env.subst('$LIBLINKSUFFIX')
-    result = ''.join([' %s%s%s' % (lib_link_prefix, d, lib_link_suffix) for d in deps])
+    result = []
+    for d in deps:
+        # Elements of syslibdeps are either strings (str or unicode), or they're File objects.
+        # If they're File objects, they can be passed straight through.  If they're strings,
+        # they're believed to represent library short names, that should be prefixed with -l
+        # or the compiler-specific equivalent.  I.e., 'm' becomes '-lm', but 'File("m.a") is passed
+        # through whole cloth.
+        if type(d) in (str, unicode):
+            result.append('%s%s%s' % (lib_link_prefix, d, lib_link_suffix))
+        else:
+            result.append(d)
     return result
 
 def libdeps_emitter(target, source, env):
