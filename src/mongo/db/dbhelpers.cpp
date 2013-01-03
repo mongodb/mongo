@@ -236,7 +236,8 @@ namespace mongo {
                                     bool maxInclusive ,
                                     bool secondaryThrottle ,
                                     RemoveCallback * callback,
-                                    bool fromMigrate ) {
+                                    bool fromMigrate,
+                                    bool onlyRemoveOrphanedDocs ) {
 
         Timer rangeRemoveTimer;
 
@@ -288,7 +289,7 @@ namespace mongo {
                 // this is so that we don't have to handle this cursor in the delete code
                 c.reset(0);
 
-                if (fromMigrate) {
+                if (fromMigrate && onlyRemoveOrphanedDocs) {
 
                     // Do a final check in the write lock to make absolutely sure that our
                     // collection hasn't been modified in a way that invalidates our migration
@@ -305,8 +306,8 @@ namespace mongo {
 
                         warning() << "aborting migration cleanup for chunk "
                                   << min << " to " << max
-                                  << (managerNow ? "" : (string)" at document " + obj.toString())
-                                  << ", collection " << ns << " has changed" << endl;
+                                  << (managerNow ? (string)" at document " + obj.toString() : "")
+                                  << ", collection " << ns << " has changed " << endl;
 
                         break;
                     }

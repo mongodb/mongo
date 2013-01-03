@@ -225,7 +225,8 @@ namespace mongo {
                                               false, /*maxInclusive*/
                                               secondaryThrottle,
                                               cmdLine.moveParanoia ? &rs : 0, /*callback*/
-                                              true ); /*fromMigrate*/
+                                              true, /*fromMigrate*/
+                                              true ); /*onlyRemoveOrphans*/ 
 
                 log() << "moveChunk deleted " << numDeleted << " documents for "
                       << this->toString() << migrateLog;

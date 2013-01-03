@@ -137,6 +137,7 @@ namespace mongo {
          * Caller must hold a write lock on 'ns'
          *
          * Does oplog the individual document deletions.
+         * // TODO: Refactor this mechanism, it is growing too large
          */
         static long long removeRange( const string& ns , 
                                       const BSONObj& min , 
@@ -145,7 +146,8 @@ namespace mongo {
                                       bool maxInclusive = false , 
                                       bool secondaryThrottle = false , 
                                       RemoveCallback * callback = 0, 
-                                      bool fromMigrate = false );
+                                      bool fromMigrate = false,
+                                      bool onlyRemoveOrphanedDocs = false );
 
         /**
          * Remove all documents from a collection.
