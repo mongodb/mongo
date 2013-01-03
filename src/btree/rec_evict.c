@@ -278,19 +278,6 @@ __rec_review(WT_SESSION_IMPL *session,
 				return (EBUSY);
 			}
 
-#if 0
-	/*
-	 * Check if this page can be evicted.
-	 *
-	 * If the file is being checkpointed, there's a period of time where we
-	 * cannot evict dirty pages because it might race with the checkpointing
-	 * thread.  The LRU eviction code does not select dirty pages if writes
-	 * are disabled, but the page might have been dirtied after selection.
-	 */
-	if (btree->writes_disabled && __wt_page_is_modified(page))
-		return (EBUSY);
-#endif
-
 	/*
 	 * If the file is being checkpointed, the checkpoint's reconciliation of
 	 * an internal page might race with us as we evict a child in the page's
@@ -324,7 +311,7 @@ __rec_review(WT_SESSION_IMPL *session,
 	 * we find a page which can't be merged into its parent, and failing if
 	 * we never find such a page.
 	 */
-	if (btree->writes_disabled && top)
+	if (btree->checkpointing && top)
 		for (t = page->parent;; t = t->parent) {
 			if (t == NULL || t->ref == NULL)	/* root */
 				return (EBUSY);

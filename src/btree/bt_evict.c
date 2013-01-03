@@ -445,9 +445,6 @@ __evict_file_request_walk(WT_SESSION_IMPL *session)
 	case WT_SYNC_DISCARD_NOWRITE:
 		msg = "sync-discard-nowrite";
 		break;
-	case WT_SYNC_DIRTY_DISABLE:
-		msg = "sync-dirty-disable";
-		break;
 	WT_ILLEGAL_VALUE(session);
 	}
 	WT_VERBOSE_RET(
@@ -471,18 +468,12 @@ __evict_file_request_walk(WT_SESSION_IMPL *session)
 	}
 
 	/*
-	 * If the application is simply turning off writes of a particular file,
-	 * all they needed was to drain the queue of eviction pages.  Otherwise,
-	 * handle the request.
-	 *
-	 * Publish: there must be a barrier to ensure the return value is set
-	 * before the requesting thread wakes.
+	 * Handle the request and publish the result: there must be a barrier
+	 * to ensure the return value is set before the requesting thread
+	 * wakes.
 	 */
-	if (syncop == WT_SYNC_DIRTY_DISABLE)
-		WT_PUBLISH(request_session->syncop_ret, 0);
-	else
-		WT_PUBLISH(request_session->syncop_ret,
-		    __evict_file(request_session, syncop));
+	WT_PUBLISH(request_session->syncop_ret,
+	    __evict_file(request_session, syncop));
 	return (__wt_cond_signal(request_session, request_session->cond));
 }
 
@@ -576,24 +567,19 @@ __wt_sync_file(WT_SESSION_IMPL *session, int syncop)
 	switch (syncop) {
 	case WT_SYNC_INTERNAL:
 		/*
-		 * Writes in the file have to be disabled when the checkpoint
-		 * writes a file's internal nodes.  Set the disable flag, then
-		 * wait for any existing eviction to complete.
+		 * Eviction has to be disabled in the subtree of any internal
+		 * node being evicted.  Set the disable flag, it is checked in
+		 * __rec_review before any page is evicted.
+		 *
+		 * If any thread is in the progress of evicting a page, it
+		 * will have switched the ref state to WT_REF_LOCKED while
+		 * holding evict_lock inside __evict_get_page, and the
+		 * checkpoint walk will notice that and wait for the eviction
+		 * to complete before proceeding.
 		 */
 		__wt_spin_lock(session, &cache->evict_lock);
-		btree->writes_disabled = 1;
-		while (btree->lru_count > 0) {
-			__wt_spin_unlock(session, &cache->evict_lock);
-			__wt_yield();
-			__wt_spin_lock(session, &cache->evict_lock);
-		}
+		btree->checkpointing = 1;
 		__wt_spin_unlock(session, &cache->evict_lock);
-#if 0
-		WT_ERR(__wt_sync_file_serial(session, WT_SYNC_DIRTY_DISABLE));
-		WT_ERR(__wt_evict_server_wake(session));
-		WT_ERR(__wt_cond_wait(session, session->cond, 0));
-		WT_ERR(session->syncop_ret);
-#endif
 
 		/*
 		 * Checkpoints need to wait for any concurrent activity in a
@@ -656,7 +642,7 @@ err:		/* On error, clear any left-over tree walk. */
 
 	if (syncop == WT_SYNC_INTERNAL) {
 		/* Re-enable writes to the file. */
-		btree->writes_disabled = 0;
+		btree->checkpointing = 0;
 
 		/*
 		 * Wake the eviction server, in case application threads have
