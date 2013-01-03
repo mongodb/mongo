@@ -29,6 +29,7 @@
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/pagefault.h"
 #include "mongo/db/repl_block.h"
+#include "mongo/s/d_logic.h"
 
 #include <fstream>
 
@@ -253,7 +254,7 @@ namespace mongo {
             try {
 
                 Client::WriteContext ctx(ns);
-                
+
                 scoped_ptr<Cursor> c;
                 
                 {
@@ -283,9 +284,33 @@ namespace mongo {
                 
                 DiskLoc rloc = c->currLoc();
                 BSONObj obj = c->current();
-                
+
                 // this is so that we don't have to handle this cursor in the delete code
                 c.reset(0);
+
+                if (fromMigrate) {
+
+                    // Do a final check in the write lock to make absolutely sure that our
+                    // collection hasn't been modified in a way that invalidates our migration
+                    // cleanup.
+
+                    // We should never be able to turn off the sharding state once enabled, but
+                    // in the future we might want to.
+                    verify(shardingState.enabled());
+
+                    // In write lock, so will be the most up-to-date version
+                    ShardChunkManagerPtr managerNow = shardingState.getShardChunkManager(ns);
+
+                    if (!managerNow || managerNow->belongsToMe(obj)) {
+
+                        warning() << "aborting migration cleanup for chunk "
+                                  << min << " to " << max
+                                  << (managerNow ? "" : (string)" at document " + obj.toString())
+                                  << ", collection " << ns << " has changed" << endl;
+
+                        break;
+                    }
+                }
                 
                 if ( callback )
                     callback->goingToDelete( obj );
