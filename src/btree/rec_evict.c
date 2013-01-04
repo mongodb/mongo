@@ -240,11 +240,14 @@ static int
 __rec_review(WT_SESSION_IMPL *session,
     WT_REF *ref, WT_PAGE *page, int exclusive, int top)
 {
+	WT_BTREE *btree;
 	WT_DECL_RET;
 	WT_PAGE_MODIFY *mod;
+	WT_PAGE *t;
 	WT_TXN *txn;
 	uint32_t i;
 
+	btree = session->btree;
 	txn = &session->txn;
 
 	/*
@@ -276,8 +279,51 @@ __rec_review(WT_SESSION_IMPL *session,
 			}
 
 	/*
-	 * Check if this page can be evicted:
+	 * If the file is being checkpointed, the checkpoint's reconciliation of
+	 * an internal page might race with us as we evict a child in the page's
+	 * subtree.
 	 *
+	 * One half of that test is in the reconciliation code: the checkpoint
+	 * thread waits for eviction-locked pages to settle before determining
+	 * their status.  The other half of the test is here: after acquiring
+	 * the exclusive eviction lock on a page, confirm no page in the page's
+	 * stack of pages from the root is being reconciled in a checkpoint.
+	 * This ensures we either see the checkpoint-walk state here, or the
+	 * reconciliation of the internal page sees our exclusive lock on the
+	 * child page and waits until we're finished evicting the child page
+	 * (or give up if eviction isn't possible).
+	 *
+	 * We must check the full stack (we might be attempting to evict a leaf
+	 * page multiple levels beneath the internal page being reconciled as
+	 * part of the checkpoint, and  all of the intermediate nodes are being
+	 * merged into the internal page).
+	 *
+	 * There's no simple test for knowing if a page in our page stack is
+	 * involved in a checkpoint.  The internal page's checkpoint-walk flag
+	 * is the best test, but it's not set anywhere for the root page, it's
+	 * not a complete test.
+	 *
+	 * Quit for any page that's not a simple, in-memory page.  (Almost the
+	 * same as checking for the checkpoint-walk flag.  I don't think there
+	 * are code paths that change the page's status from checkpoint-walk,
+	 * but these races are hard enough I'm not going to proceed if there's
+	 * anything other than a vanilla, in-memory tree stack.)  Climb until
+	 * we find a page which can't be merged into its parent, and failing if
+	 * we never find such a page.
+	 */
+	if (btree->checkpointing && top)
+		for (t = page->parent;; t = t->parent) {
+			if (t == NULL || t->ref == NULL)	/* root */
+				return (EBUSY);
+			if (t->ref->state != WT_REF_MEM)	/* scary */
+				return (EBUSY);
+			if (t->modify == NULL ||		/* not merged */
+			    !F_ISSET(t->modify, WT_PM_REC_EMPTY |
+			    WT_PM_REC_SPLIT | WT_PM_REC_SPLIT_MERGE))
+				break;
+		}
+
+	/*
 	 * Fail if the top-level page is a page expected to be removed from the
 	 * tree as part of eviction (an empty page or a split-merge page).  Note
 	 * "split" pages are NOT included in this test, because a split page can
@@ -323,14 +369,13 @@ __rec_review(WT_SESSION_IMPL *session,
 	/* If the page is dirty, write it so we know the final state. */
 	if (__wt_page_is_modified(page) &&
 	    !F_ISSET(mod, WT_PM_REC_SPLIT_MERGE)) {
-		ret = __wt_rec_write(session, page, NULL, exclusive);
+		ret = __wt_rec_write(session, page,
+		    NULL, WT_EVICTION_SERVER_LOCKED | WT_SKIP_UPDATE_QUIT);
 
 		/* If there are unwritten changes on the page, give up. */
-		if (ret == 0 && !exclusive && __wt_page_is_modified(page))
-			ret = EBUSY;
 		if (ret == EBUSY) {
 			WT_VERBOSE_RET(session, evict,
-			    "page %p written but not clean", page);
+			    "eviction failed, reconciled page not clean");
 
 			if (F_ISSET(txn, TXN_RUNNING) &&
 			    ++txn->eviction_fails >= 100) {
@@ -360,6 +405,7 @@ __rec_review(WT_SESSION_IMPL *session,
 		}
 		WT_RET(ret);
 
+		WT_ASSERT(session, __wt_page_is_modified(page) == 0);
 		txn->eviction_fails = 0;
 	}
 

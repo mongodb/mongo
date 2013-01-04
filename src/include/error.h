@@ -8,6 +8,15 @@
 #define	WT_DEBUG_POINT	((void *)0xdeadbeef)
 #define	WT_DEBUG_BYTE	(0xab)
 
+/* In DIAGNOSTIC mode, yield in places where we want to encourage races. */
+#ifdef HAVE_DIAGNOSTIC
+#define	WT_HAVE_DIAGNOSTIC_YIELD do {					\
+	__wt_yield();							\
+} while (0)
+#else
+#define	WT_HAVE_DIAGNOSTIC_YIELD
+#endif
+
 /* Return and branch-to-err-label cases for switch statements. */
 #define	WT_ILLEGAL_VALUE(session)					\
 	default:							\
@@ -78,15 +87,13 @@
 } while (0)
 
 #define	WT_PANIC_ERR(session, v, ...) do {				\
-	__wt_err((session), (v), __VA_ARGS__);				\
-	/* Return WT_PANIC regardless of earlier return codes. */	\
-	(v) = __wt_panic((session));					\
+	__wt_err(session, v, __VA_ARGS__);				\
+	(void)__wt_panic(session);					\
 } while (0)
-
-#define	WT_PANIC_ERRX(session, ...) do {				\
-	__wt_errx((session), __VA_ARGS__);				\
+#define	WT_PANIC_RETX(session, ...) do {				\
+	__wt_errx(session, __VA_ARGS__);				\
 	/* Return WT_PANIC regardless of earlier return codes. */	\
-	(void)__wt_panic((session));					\
+	return (__wt_panic(session));					\
 } while (0)
 
 /*
