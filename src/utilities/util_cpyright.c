@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -10,7 +10,7 @@
 void
 util_copyright(void)
 {
-	printf("%s\n", "Copyright (c) 2008-2012 WiredTiger, Inc.");
+	printf("%s\n", "Copyright (c) 2008-2013 WiredTiger, Inc.");
 	printf("%s\n\n", "All rights reserved.");
 
 	printf("%s\n\n",

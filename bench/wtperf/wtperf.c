@@ -1,5 +1,5 @@
 /*-
- * Public Domain 2008-2012 WiredTiger, Inc.
+ * Public Domain 2008-2013 WiredTiger, Inc.
  *
  * This is free and unencumbered software released into the public domain.
  *
@@ -267,15 +267,15 @@ worker(CONFIG *cfg, uint32_t worker_type)
 	op_ret = 0;
 
 	conn = cfg->conn;
-	key_buf = calloc(cfg->key_sz, 1);
+	key_buf = calloc(cfg->key_sz + 1, 1);
 	if (key_buf == NULL) {
-		ret = ENOMEM;
+		lprintf(cfg, ret = ENOMEM, 0, "Populate key buffer");
 		goto err;
 	}
 	if (worker_type == WORKER_INSERT) {
 		data_buf = calloc(cfg->data_sz, 1);
 		if (data_buf == NULL) {
-			lprintf(cfg, ENOMEM, 0, "Populate data buffer");
+			lprintf(cfg, ret = ENOMEM, 0, "Populate data buffer");
 			goto err;
 		}
 		memset(data_buf, 'a', cfg->data_sz - 1);
@@ -298,8 +298,8 @@ worker(CONFIG *cfg, uint32_t worker_type)
 #define VALUE_RANGE (cfg->icount + g_nins_ops - (cfg->insert_threads + 1))
 		next_val = (worker_type == WORKER_INSERT ?
 		    (cfg->icount + ATOMIC_ADD(g_nins_ops, 1)) :
-		    (rand() % VALUE_RANGE) + 1);
-		sprintf(key_buf, "%020" PRIu64, next_val);
+		    ((uint64_t)rand() % VALUE_RANGE) + 1);
+		sprintf(key_buf, "%0*" PRIu64, cfg->key_sz, next_val);
 		cursor->set_key(cursor, key_buf);
 		switch(worker_type) {
 		case WORKER_READ:
@@ -382,7 +382,7 @@ populate_thread(void *arg)
 		lprintf(cfg, ENOMEM, 0, "Populate data buffer");
 		goto err;
 	}
-	key_buf = calloc(cfg->key_sz, 1);
+	key_buf = calloc(cfg->key_sz + 1, 1);
 	if (key_buf == NULL) {
 		lprintf(cfg, ENOMEM, 0, "Populate key buffer");
 		goto err;
@@ -408,7 +408,7 @@ populate_thread(void *arg)
 		get_next_op(&op);
 		if (op > cfg->icount)
 			break;
-		sprintf(key_buf, "%020"PRIu64, op);
+		sprintf(key_buf, "%0*" PRIu64, cfg->key_sz, op);
 		cursor->set_key(cursor, key_buf);
 		if ((ret = cursor->insert(cursor)) != 0) {
 			lprintf(cfg, ret, 0, "Failed inserting");
@@ -733,7 +733,7 @@ int find_table_count(CONFIG *cfg)
 		goto err;
 	}
 	cursor->get_key(cursor, &key);
-	cfg->icount = atoi(key);
+	cfg->icount = (uint32_t)atoi(key);
 
 err:	session->close(session, NULL);
 	return (ret);

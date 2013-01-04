@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -50,6 +50,8 @@ __wt_cache_full_check(WT_SESSION_IMPL *session)
 	WT_DECL_RET;
 	int lockout, wake;
 
+	btree = session->btree;
+
 	/*
 	 * Only wake the eviction server the first time through here (if the
 	 * cache is too full), or every hundred times after that.  Otherwise,
@@ -61,7 +63,7 @@ __wt_cache_full_check(WT_SESSION_IMPL *session)
 		if (!lockout || F_ISSET(session,
 		    WT_SESSION_NO_CACHE_CHECK | WT_SESSION_SCHEMA_LOCKED))
 			return (0);
-		if ((btree = session->btree) != NULL && F_ISSET(btree,
+		if (F_ISSET(btree,
 		    WT_BTREE_BULK | WT_BTREE_NO_CACHE | WT_BTREE_NO_EVICTION))
 			return (0);
 		if ((ret = __wt_evict_lru_page(session, 1)) == EBUSY)

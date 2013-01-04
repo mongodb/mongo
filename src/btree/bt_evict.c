@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -10,10 +10,10 @@
 static void __evict_dirty_validate(WT_CONNECTION_IMPL *);
 static int  __evict_file_request_walk(WT_SESSION_IMPL *);
 static int  __evict_file(WT_SESSION_IMPL *, int);
-static int  __evict_lru(WT_SESSION_IMPL *, uint32_t);
+static int  __evict_lru(WT_SESSION_IMPL *, int);
 static int  __evict_lru_cmp(const void *, const void *);
-static int  __evict_walk(WT_SESSION_IMPL *, uint32_t *, uint32_t);
-static int  __evict_walk_file(WT_SESSION_IMPL *, u_int *, uint32_t);
+static int  __evict_walk(WT_SESSION_IMPL *, uint32_t *, int);
+static int  __evict_walk_file(WT_SESSION_IMPL *, u_int *, int);
 static int  __evict_worker(WT_SESSION_IMPL *);
 
 /*
@@ -26,10 +26,6 @@ static int  __evict_worker(WT_SESSION_IMPL *);
 #define	WT_EVICT_WALK_PER_FILE	 5	/* Pages to visit per file */
 #define	WT_EVICT_WALK_BASE     100	/* Pages tracked across file visits */
 #define	WT_EVICT_WALK_INCR     100	/* Pages added each walk */
-
-/* Flags used to pass state to eviction functions. */
-#define	WT_EVICT_CLEAN		0x01	/* Try to evict clean pages */
-#define	WT_EVICT_DIRTY		0x02	/* Try to evict dirty pages */
 
 /*
  * __evict_read_gen --
@@ -87,11 +83,11 @@ __evict_list_clr(WT_SESSION_IMPL *session, WT_EVICT_ENTRY *e)
 }
 
 /*
- * __evict_list_clr_all --
- *	Clear all entries in the LRU eviction list.
+ * __evict_list_clr_range --
+ *	Clear entries in the LRU eviction list, from a lower-bound to the end.
  */
 static inline void
-__evict_list_clr_all(WT_SESSION_IMPL *session, u_int start)
+__evict_list_clr_range(WT_SESSION_IMPL *session, u_int start)
 {
 	WT_CACHE *cache;
 	WT_EVICT_ENTRY *evict;
@@ -254,17 +250,14 @@ __evict_worker(WT_SESSION_IMPL *session)
 	WT_CACHE *cache;
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
-	uint32_t flags;
 	uint64_t bytes_inuse, bytes_max, dirty_inuse;
-	int loop;
+	int clean, loop;
 
 	conn = S2C(session);
 	cache = conn->cache;
 
 	/* Evict pages from the cache. */
 	for (loop = 0;; loop++) {
-		/* Clear eviction flags for each pass. */
-		flags = 0;
 		/*
 		 * Block out concurrent eviction while we are handling requests.
 		 */
@@ -289,25 +282,23 @@ __evict_worker(WT_SESSION_IMPL *session)
 		    dirty_inuse <
 		    (cache->eviction_dirty_target * bytes_max) / 100))
 			break;
-
-		/* Figure out how much we will focus on dirty pages. */
-		if (dirty_inuse >
-		    (cache->eviction_dirty_target * bytes_max) / 100)
-			LF_SET(WT_EVICT_DIRTY);
-		if (F_ISSET(cache, WT_EVICT_FORCE_PASS) ||
-		    bytes_inuse > (cache->eviction_target * bytes_max) / 100)
-			LF_SET(WT_EVICT_CLEAN | WT_EVICT_DIRTY);
-		LF_CLR(cache->disabled_eviction);
-		if (!LF_ISSET(WT_EVICT_CLEAN) && !LF_ISSET(WT_EVICT_DIRTY))
-			break;
+		F_CLR(cache, WT_EVICT_FORCE_PASS);
 
 		WT_VERBOSE_RET(session, evictserver,
 		    "Eviction pass with: Max: %" PRIu64
 		    " In use: %" PRIu64 " Dirty: %" PRIu64,
 		    bytes_max, bytes_inuse, dirty_inuse);
 
-		F_CLR(cache, WT_EVICT_FORCE_PASS);
-		WT_RET(__evict_lru(session, flags));
+		/*
+		 * Either the cache is too large or there are too many dirty
+		 * pages (or both).  Ignore clean pages unless the cache is
+		 * too large.
+		 */
+		clean = 0;
+		if (bytes_inuse > (cache->eviction_target * bytes_max) / 100)
+			clean = 1;
+
+		WT_RET(__evict_lru(session, clean));
 
 		__evict_dirty_validate(conn);
 		/*
@@ -315,8 +306,7 @@ __evict_worker(WT_SESSION_IMPL *session)
 		 * any progress at all, go back to sleep, it's not something
 		 * we can fix.
 		 */
-		if (LF_ISSET(WT_EVICT_CLEAN) &&
-		    __wt_cache_bytes_inuse(cache) >= bytes_inuse) {
+		if (clean && __wt_cache_bytes_inuse(cache) >= bytes_inuse) {
 			if (loop == 10) {
 				WT_CSTAT_INCR(session, cache_eviction_slow);
 				WT_VERBOSE_RET(session, evictserver,
@@ -327,23 +317,6 @@ __evict_worker(WT_SESSION_IMPL *session)
 			loop = 0;
 	}
 	return (0);
-}
-
-/*
- * __wt_evict_readonly --
- *	Switch on/off read-only eviction.
- */
-static void
-__evict_readonly(WT_SESSION_IMPL *session, int readonly)
-{
-	WT_CACHE *cache;
-
-	cache = S2C(session)->cache;
-
-	if (readonly)
-		FLD_SET(cache->disabled_eviction, WT_EVICT_DIRTY);
-	else
-		FLD_CLR(cache->disabled_eviction, WT_EVICT_DIRTY);
 }
 
 /*
@@ -437,6 +410,7 @@ __evict_file_request_walk(WT_SESSION_IMPL *session)
 	WT_SESSION_IMPL *request_session;
 	uint32_t i, session_cnt;
 	int syncop;
+	const char *msg;
 
 	conn = S2C(session);
 	cache = conn->cache;
@@ -465,28 +439,34 @@ __evict_file_request_walk(WT_SESSION_IMPL *session)
 	/*
 	 * Clear the session's request (we don't want to find it again
 	 * on our next walk, and doing it now should help avoid coding
-	 * errors later.  No publish is required, all we care about is
+	 * errors later).  No publish is required, all we care about is
 	 * that we see it change.
 	 */
 	syncop = request_session->syncop;
 	request_session->syncop = 0;
 
-	WT_VERBOSE_RET(session, evictserver,
-	    "file request: %s",
-	    (syncop == WT_SYNC_COMPACT ? "sync-compact" :
-	    (syncop == WT_SYNC_DISCARD ? "sync-discard" :
-	    "sync-discard-nowrite")));
+	switch (syncop) {
+	case WT_SYNC_DISCARD:
+		msg = "sync-discard";
+		break;
+	case WT_SYNC_DISCARD_NOWRITE:
+		msg = "sync-discard-nowrite";
+		break;
+	WT_ILLEGAL_VALUE(session);
+	}
+	WT_VERBOSE_RET(
+	    session, evictserver, "eviction server request: %s", msg);
 
 	/*
 	 * The eviction candidate list might reference pages we are
 	 * about to discard; clear it.
 	 */
-	__evict_list_clr_all(session, 0);
+	__evict_list_clr_range(session, 0);
 
 	/*
-	 * Wait for LRU eviction activity to drain.  We are discarding or
-	 * compacting the tree, we don't want any application threads
-	 * underneath us doing eviction.
+	 * Wait for LRU eviction activity to drain; if discarding or compacting
+	 * pages, or checkpointing internal pages for a file, we don't want any
+	 * application threads underneath us doing eviction.
 	 */
 	while (request_session->btree->lru_count > 0) {
 		__wt_spin_unlock(session, &cache->evict_lock);
@@ -495,8 +475,9 @@ __evict_file_request_walk(WT_SESSION_IMPL *session)
 	}
 
 	/*
-	 * Publish: there must be a barrier to ensure the return value is set
-	 * before the requesting thread wakes.
+	 * Handle the request and publish the result: there must be a barrier
+	 * to ensure the return value is set before the requesting thread
+	 * wakes.
 	 */
 	WT_PUBLISH(request_session->syncop_ret,
 	    __evict_file(request_session, syncop));
@@ -513,15 +494,12 @@ __evict_file(WT_SESSION_IMPL *session, int syncop)
 	WT_DECL_RET;
 	WT_PAGE *next_page, *page;
 
-	/*
-	 * Clear any existing LRU walk, we may be about to discard the
-	 * tree or we may be taking a checkpoint that would block.
-	 */
+	/* Clear any existing LRU eviction walk, we're discarding the tree. */
 	__wt_evict_clear_tree_walk(session, NULL);
 
 	/*
 	 * We can't evict the page just returned to us, it marks our place in
-	 * the tree.  So, always stay one page ahead of the page being returned.
+	 * the tree.  So, always walk one page ahead of the page being evicted.
 	 */
 	next_page = NULL;
 	WT_RET(__wt_tree_walk(session, &next_page, WT_TREE_EVICT));
@@ -529,13 +507,11 @@ __evict_file(WT_SESSION_IMPL *session, int syncop)
 		WT_ERR(__wt_tree_walk(session, &next_page, WT_TREE_EVICT));
 
 		switch (syncop) {
-		case WT_SYNC_COMPACT:
-			WT_ERR(__wt_compact_evict(session, page));
-			break;
 		case WT_SYNC_DISCARD:
-			/* Write dirty pages for sync and sync with discard. */
+			/* Write dirty pages for sync with discard. */
 			if (__wt_page_is_modified(page))
-				WT_ERR(__wt_rec_write(session, page, NULL, 1));
+				WT_ERR(__wt_rec_write(
+				    session, page, NULL, WT_SKIP_UPDATE_ERR));
 
 			/*
 			 * Evict the page for sync with discard.
@@ -561,8 +537,7 @@ __evict_file(WT_SESSION_IMPL *session, int syncop)
 				session->btree->root_page = NULL;
 			__wt_page_out(session, &page, 0);
 			break;
-		default:
-			WT_ERR(ENOTSUP);
+		WT_ILLEGAL_VALUE_ERR(session);
 		}
 	}
 
@@ -581,13 +556,35 @@ err:		/* On error, clear any left-over tree walk. */
 int
 __wt_sync_file(WT_SESSION_IMPL *session, int syncop)
 {
+	WT_BTREE *btree;
+	WT_CACHE *cache;
 	WT_DECL_RET;
 	WT_PAGE *page;
 	uint32_t walk_flags;
 
+	btree = session->btree;
+	cache = S2C(session)->cache;
+	page = NULL;
+
 	switch (syncop) {
 	case WT_SYNC_INTERNAL:
-		__evict_readonly(session, 1);
+		/*
+		 * Pages appearing in a checkpoint cannot be freed until the
+		 * block lists for the checkpoint are stable.  Eviction is
+		 * disabled in the subtree of any internal node being
+		 * reconciled, including eventually the whole tree when the
+		 * root page is written.  Set the checkpointing flag, it is
+		 * checked in __rec_review before any page is evicted.
+		 *
+		 * If any thread is in the progress of evicting a page, it
+		 * will have switched the ref state to WT_REF_LOCKED while
+		 * holding evict_lock inside __evict_get_page, and the
+		 * checkpoint walk will notice that and wait for the eviction
+		 * to complete before proceeding.
+		 */
+		__wt_spin_lock(session, &cache->evict_lock);
+		btree->checkpointing = 1;
+		__wt_spin_unlock(session, &cache->evict_lock);
 
 		/*
 		 * Checkpoints need to wait for any concurrent activity in a
@@ -597,62 +594,44 @@ __wt_sync_file(WT_SESSION_IMPL *session, int syncop)
 		 */
 		walk_flags = WT_TREE_EVICT | WT_TREE_WAIT;
 		break;
+	case WT_SYNC_COMPACT:
 	case WT_SYNC_LEAF:
 		/*
-		 * Walk all leaf pages, waiting for concurrent activity to be
-		 * resolved.  Use hazard references, so we don't prevent other
-		 * eviction from the same subtree.
+		 * Walk all pages (or all leaf pages), waiting for concurrent
+		 * activity to be resolved.  Use hazard references so we don't
+		 * prevent other eviction from the same subtree.
 		 */
 		walk_flags = WT_TREE_CACHE | WT_TREE_WAIT;
 		break;
-	default:
-		return (ENOTSUP);
+	WT_ILLEGAL_VALUE(session);
 	}
 
-	/*
-	 * Clear any existing LRU walk, we may be about to discard the
-	 * tree or we may be taking a checkpoint that would block.
-	 */
-	__wt_evict_clear_tree_walk(session, NULL);
-
 	page = NULL;
-	WT_RET(__wt_tree_walk(session, &page, walk_flags));
+	WT_ERR(__wt_tree_walk(session, &page, walk_flags));
 	while (page != NULL) {
 		switch (syncop) {
+		case WT_SYNC_COMPACT:
+			WT_ERR(__wt_compact_evict(session, page));
+			break;
 		case WT_SYNC_LEAF:
-			/* Skip internal pages in the fuzzy sync. */
+			/* First pass: skip internal pages. */
 			if (page->type == WT_PAGE_ROW_INT ||
 			    page->type == WT_PAGE_COL_INT)
 				break;
-			/* FALLTHROUGH */
-		case WT_SYNC_INTERNAL:
-			/*
-			 * We know we got all of the leaf pages in the first
-			 * pass.  Any updates to leaf pages in the meantime
-			 * can't be part of the checkpoint.  Skip them to keep
-			 * the locked part of checkpoint as fast as possible.
-			 *
-			 * However, we do need to make sure that no dirty page
-			 * is evicted underneath the internal page we are about
-			 * to write.  The could happen if a page was put on the
-			 * LRU queue and then became dirty, or if an evicting
-			 * thread was preempted while considering a page for
-			 * eviction.
-			 *
-			 * To deal with that, remove all pages in the subtree
-			 * from the eviction queue.  If one of these pages is
-			 * chosen after this, we know the evicting thread will
-			 * have seen that dirty eviction is disabled.
-			 */
-			if (syncop == WT_SYNC_INTERNAL) {
-				__wt_evict_list_clr_page(session, page);
-				if (page->type != WT_PAGE_ROW_INT &&
-				    page->type != WT_PAGE_COL_INT)
-					break;
-			}
-			/* Write dirty pages for sync and sync with discard. */
+
+			/* Write dirty pages. */
 			if (__wt_page_is_modified(page))
-				WT_ERR(__wt_rec_write(session, page, NULL, 1));
+				WT_ERR(__wt_rec_write(session, page, NULL, 0));
+			break;
+		case WT_SYNC_INTERNAL:
+			/* Second pass: skip leaf pages. */
+			if (page->type != WT_PAGE_ROW_INT &&
+			    page->type != WT_PAGE_COL_INT)
+				break;
+
+			/* Write dirty pages. */
+			if (__wt_page_is_modified(page))
+				WT_ERR(__wt_rec_write(session, page, NULL, 0));
 			break;
 		}
 
@@ -664,8 +643,10 @@ err:		/* On error, clear any left-over tree walk. */
 		if (page != NULL)
 			__wt_evict_clear_tree_walk(session, page);
 	}
+
 	if (syncop == WT_SYNC_INTERNAL) {
-		__evict_readonly(session, 0);
+		/* Re-enable writes to the file. */
+		btree->checkpointing = 0;
 
 		/*
 		 * Wake the eviction server, in case application threads have
@@ -673,7 +654,7 @@ err:		/* On error, clear any left-over tree walk. */
 		 * progress.  Without this, application threads will be stalled
 		 * until the eviction server next wakes.
 		 */
-		WT_RET(__wt_evict_server_wake(session));
+		WT_TRET(__wt_evict_server_wake(session));
 	}
 
 	return (ret);
@@ -684,7 +665,7 @@ err:		/* On error, clear any left-over tree walk. */
  *	Evict pages from the cache based on their read generation.
  */
 static int
-__evict_lru(WT_SESSION_IMPL *session, uint32_t flags)
+__evict_lru(WT_SESSION_IMPL *session, int clean)
 {
 	WT_CACHE *cache;
 	uint64_t cutoff;
@@ -693,7 +674,7 @@ __evict_lru(WT_SESSION_IMPL *session, uint32_t flags)
 	cache = S2C(session)->cache;
 
 	/* Get some more pages to consider for eviction. */
-	WT_RET(__evict_walk(session, &candidates, flags));
+	WT_RET(__evict_walk(session, &candidates, clean));
 
 	/* Sort the list into LRU order and restart. */
 	__wt_spin_lock(session, &cache->evict_lock);
@@ -724,7 +705,7 @@ __evict_lru(WT_SESSION_IMPL *session, uint32_t flags)
 			break;
 	cache->evict_candidates = i + 1;
 
-	__evict_list_clr_all(session, WT_EVICT_WALK_BASE);
+	__evict_list_clr_range(session, WT_EVICT_WALK_BASE);
 
 	cache->evict_current = cache->evict;
 	__wt_spin_unlock(session, &cache->evict_lock);
@@ -741,7 +722,7 @@ __evict_lru(WT_SESSION_IMPL *session, uint32_t flags)
  *	Fill in the array by walking the next set of pages.
  */
 static int
-__evict_walk(WT_SESSION_IMPL *session, u_int *entriesp, uint32_t flags)
+__evict_walk(WT_SESSION_IMPL *session, u_int *entriesp, int clean)
 {
 	WT_BTREE *btree;
 	WT_CACHE *cache;
@@ -801,7 +782,7 @@ retry:	file_count = 0;
 
 		/* Reference the correct WT_BTREE handle. */
 		WT_SET_BTREE_IN_SESSION(session, btree);
-		ret = __evict_walk_file(session, &i, flags);
+		ret = __evict_walk_file(session, &i, clean);
 		WT_CLEAR_BTREE_IN_SESSION(session);
 
 		__wt_spin_unlock(session, &cache->evict_walk_lock);
@@ -828,14 +809,14 @@ err:		__wt_spin_unlock(session, &cache->evict_lock);
  *	Get a few page eviction candidates from a single underlying file.
  */
 static int
-__evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, uint32_t flags)
+__evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, int clean)
 {
 	WT_BTREE *btree;
 	WT_CACHE *cache;
 	WT_DECL_RET;
 	WT_EVICT_ENTRY *end, *evict, *start;
 	WT_PAGE *page;
-	int restarts;
+	int modified, restarts;
 
 	btree = session->btree;
 	cache = S2C(session)->cache;
@@ -881,9 +862,25 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, uint32_t flags)
 		    F_ISSET(page->modify, WT_PM_REC_SPLIT_MERGE)))
 			continue;
 
-		if (__wt_page_is_modified(page) ?
-		    !LF_ISSET(WT_EVICT_DIRTY) :
-		    !LF_ISSET(WT_EVICT_CLEAN))
+		/*
+		 * If the file is being checkpointed, there's a period of time
+		 * where we can't discard any page with a modification
+		 * structure because it might race with the checkpointing
+		 * thread.
+		 *
+		 * During this phase, there is little point trying to evict
+		 * dirty pages: we might be lucky and find an internal page
+		 * that has not yet been checkpointed, but much more likely is
+		 * that we will waste effort considering dirty leaf pages that
+		 * cannot be evicted because they have modifications more
+		 * recent than the checkpoint.
+		 */
+		modified = __wt_page_is_modified(page);
+		if (modified && btree->checkpointing)
+			continue;
+
+		/* Optionally ignore clean pages. */
+		if (!modified && !clean)
 			continue;
 
 		WT_ASSERT(session, evict->page == NULL);
@@ -969,18 +966,6 @@ __evict_get_page(
 		WT_ASSERT(session, evict->page == ref->page);
 		if (!WT_ATOMIC_CAS(ref->state, WT_REF_MEM, WT_REF_LOCKED))
 			continue;
-
-		/*
-		 * Check if eviction is disabled for this page: it might have
-		 * been on the queue since before the eviction state changed,
-		 * or the page may have changed state in the meantime.
-		 */
-		if (__wt_page_is_modified(ref->page) ?
-		    FLD_ISSET(cache->disabled_eviction, WT_EVICT_DIRTY) :
-		    FLD_ISSET(cache->disabled_eviction, WT_EVICT_CLEAN)) {
-			ref->state = WT_REF_MEM;
-			continue;
-		}
 
 		/*
 		 * Increment the LRU count in the btree handle to prevent it

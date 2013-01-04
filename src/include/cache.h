@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -71,8 +71,6 @@ struct __wt_cache {
 	uint64_t cp_saved_evict;	/* Evict count from last pass */
 	uint64_t cp_current_evict;	/* Evict count from current pass */
 	uint32_t cp_skip_count;		/* Post change stabilization */
-
-	uint32_t disabled_eviction;	/* Disabled clean / dirty eviction */
 
 	/*
 	 * Flags.

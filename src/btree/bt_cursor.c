@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -69,8 +69,11 @@ __cursor_invalid(WT_CURSOR_BTREE *cbt)
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
 
 	/* If we found an item on an insert list, check there. */
-	if (ins != NULL && (upd = __wt_txn_read(session, ins->upd)) != NULL)
+	if (ins != NULL) {
+		if ((upd = __wt_txn_read(session, ins->upd)) == NULL)
+			return (1);
 		return (WT_UPDATE_DELETED_ISSET(upd) ? 1 : 0);
+	}
 
 	/* The page may be empty, the search routine doesn't check. */
 	if (page->entries == 0)

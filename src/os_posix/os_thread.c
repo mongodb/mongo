@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -36,7 +36,7 @@ __wt_thread_join(WT_SESSION_IMPL *session, pthread_t tid)
 	struct timespec abstime;
 
 	WT_RET(__wt_epoch(session, &abstime));
-	abstime.tv_sec += 30;			/* Wait a max of 30 seconds. */
+	abstime.tv_sec += 60;			/* Wait a max of 60 seconds. */
 	ret = pthread_timedjoin_np(tid, NULL, &abstime);
 #else
 	ret = pthread_join(tid, NULL);

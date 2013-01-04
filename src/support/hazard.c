@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -170,9 +170,8 @@ __wt_hazard_clear(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * A serious error, we should always find the hazard pointer.  Panic,
 	 * because using a page we didn't have pinned down implies corruption.
 	 */
-	WT_PANIC_ERRX(session,
+	WT_PANIC_RETX(session,
 	    "session %p: clear hazard pointer: %p: not found", session, page);
-	return (WT_PANIC);
 }
 
 /*

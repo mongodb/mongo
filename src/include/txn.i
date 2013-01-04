@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -154,6 +154,7 @@ __wt_txn_visible_all(WT_SESSION_IMPL *session, wt_txnid_t id)
 static inline WT_UPDATE *
 __wt_txn_read_skip(WT_SESSION_IMPL *session, WT_UPDATE *upd, int *skipp)
 {
+	*skipp = 0;
 	while (upd != NULL && !__wt_txn_visible(session, upd->txnid)) {
 		if (upd->txnid != WT_TXN_ABORTED)
 			*skipp = 1;

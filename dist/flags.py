@@ -8,8 +8,12 @@ flags = {
 ###################################################
 # Internal routine flag declarations
 ###################################################
-	'shared_cache' : [
-		'CACHE_POOL_RUN'
+	'cache_flush' : [
+		'SYNC_COMPACT',
+		'SYNC_DISCARD',
+		'SYNC_DISCARD_NOWRITE',
+		'SYNC_INTERNAL',
+		'SYNC_LEAF',
 	],
 	'direct_io' : [
 		'DIRECTIO_DATA',
@@ -17,6 +21,14 @@ flags = {
 	],
 	'page_free' : [
 		'PAGE_FREE_IGNORE_DISK'
+	],
+	'rec_write' : [
+		'EVICTION_SERVER_LOCKED',
+		'SKIP_UPDATE_ERR',
+		'SKIP_UPDATE_QUIT',
+	],
+	'shared_cache' : [
+		'CACHE_POOL_RUN'
 	],
 	'tree_walk' : [
 		'TREE_CACHE',
