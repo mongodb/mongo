@@ -33,7 +33,7 @@ This error indicates an underlying problem that requires the application exit an
 @endif
 
 The ::wiredtiger_strerror function returns the standard message
-associated with any WiredTiger error return.
+associated with any WiredTiger, ISO C99, or POSIX 1003.1-2001 function:
 
 @snippet ex_all.c Display an error
 
