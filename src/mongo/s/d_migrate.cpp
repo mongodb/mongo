@@ -1551,6 +1551,10 @@ namespace mongo {
             
             slaveCount = ( getSlaveCount() / 2 ) + 1;
 
+            log() << "starting receiving-end of migration of chunk " << min << " -> " << max <<
+                    " for collection " << ns << " from " << from <<
+                    " (" << getSlaveCount() << " slaves detected)" << endl;
+
             string errmsg;
             MoveTimingHelper timing( "to" , ns , min , max , 5 /* steps */ , errmsg );
 
