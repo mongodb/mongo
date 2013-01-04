@@ -501,13 +501,29 @@ __evict_file(WT_SESSION_IMPL *session, int syncop)
 
 		switch (syncop) {
 		case WT_SYNC_DISCARD:
-			/* Write dirty pages for sync with discard. */
+			/*
+			 * Eviction can fail when a page in the evicted page's
+			 * subtree switches state.  For example, if we don't
+			 * evict a page marked empty, because we expect it to
+			 * be merged into its parent, it might no longer be
+			 * empty after it's reconciled, in which case eviction
+			 * of its parent would fail.  We can either walk the
+			 * tree multiple times, until it's eventually empty,
+			 * or immediatley reconcile the page to get it to its
+			 * final state before considering if it's an eviction
+			 * target.
+			 *
+			 * We could limit this test to empty pages (only empty
+			 * pages can switch state this way, split pages always
+			 * merge into their parent, no matter what), but I see
+			 * no reason to do that now.
+			 */
 			if (__wt_page_is_modified(page))
 				WT_ERR(__wt_rec_write(
 				    session, page, NULL, WT_SKIP_UPDATE_ERR));
 
 			/*
-			 * Evict the page for sync with discard.
+			 * Evict the page.
 			 * Do not attempt to evict pages expected to be merged
 			 * into their parents, with the single exception that
 			 * the root page can't be merged into anything, it must
@@ -520,11 +536,11 @@ __evict_file(WT_SESSION_IMPL *session, int syncop)
 			break;
 		case WT_SYNC_DISCARD_NOWRITE:
 			/*
-			 * Simply discard the page for discard alone.  When we
-			 * discard the root page, clear the reference from the
-			 * btree handle.  It is important to do this here, so
-			 * that future eviction doesn't see root_page pointing
-			 * to freed memory.
+			 * Discard the page, whether clean or dirty.
+			 * Before we discard the root page, clear the reference
+			 * from the btree handle.  This is necessary so future
+			 * evictions don't see the handle's root page reference
+			 * pointing to freed memory.
 			 */
 			if (WT_PAGE_IS_ROOT(page))
 				session->btree->root_page = NULL;
