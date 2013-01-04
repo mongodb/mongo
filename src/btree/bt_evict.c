@@ -509,7 +509,7 @@ __evict_file(WT_SESSION_IMPL *session, int syncop)
 			 * empty after it's reconciled, in which case eviction
 			 * of its parent would fail.  We can either walk the
 			 * tree multiple times, until it's eventually empty,
-			 * or immediatley reconcile the page to get it to its
+			 * or immediately reconcile the page to get it to its
 			 * final state before considering if it's an eviction
 			 * target.
 			 *
