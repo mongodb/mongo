@@ -562,9 +562,12 @@ __wt_sync_file(WT_SESSION_IMPL *session, int syncop)
 	switch (syncop) {
 	case WT_SYNC_INTERNAL:
 		/*
-		 * Eviction has to be disabled in the subtree of any internal
-		 * node being evicted.  Set the disable flag, it is checked in
-		 * __rec_review before any page is evicted.
+		 * Pages appearing in a checkpoint cannot be freed until the
+		 * block lists for the checkpoint are stable.  Eviction is
+		 * disabled in the subtree of any internal node being
+		 * reconciled, including eventually the whole tree when the
+		 * root page is written.  Set the checkpointing flag, it is
+		 * checked in __rec_review before any page is evicted.
 		 *
 		 * If any thread is in the progress of evicting a page, it
 		 * will have switched the ref state to WT_REF_LOCKED while
