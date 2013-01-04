@@ -312,10 +312,12 @@ namespace mongo {
                 const BSONObj &obj = i->Obj();
 
                 vector<string> cells;
-                S2Polygon polygon;
                 S2Polyline line;
                 S2Cell point;
-                if (GeoParser::parsePolygon(obj, &polygon)) {
+                // We only support GeoJSON polygons.
+                if (GeoParser::isGeoJSONPolygon(obj)) {
+                    S2Polygon polygon;
+                    GeoParser::parseGeoJSONPolygon(obj, &polygon);
                     keysFromRegion(&coverer, polygon, &cells);
                 } else if (GeoParser::parseLineString(obj, &line)) {
                     keysFromRegion(&coverer, line, &cells);

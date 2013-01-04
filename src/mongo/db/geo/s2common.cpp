@@ -107,10 +107,10 @@ namespace mongo {
     }
 
     bool QueryGeometry::parseFrom(const BSONObj& obj) {
-        if (GeoParser::isPolygon(obj)) {
+        if (GeoParser::isGeoJSONPolygon(obj)) {
             // We can't really pass these things around willy-nilly except by ptr.
             polygon.reset(new S2Polygon());
-            GeoParser::parsePolygon(obj, polygon.get());
+            GeoParser::parseGeoJSONPolygon(obj, polygon.get());
         } else if (GeoParser::isPoint(obj)) {
             cell.reset(new S2Cell());
             GeoParser::parsePoint(obj, cell.get());
