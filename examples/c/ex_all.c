@@ -396,6 +396,15 @@ checkpoint_ops(WT_SESSION *session)
 	    "target=(\"table:mytable\"),name=July01,drop=(May01,June01)");
 	/*! [Checkpoint examples] */
 
+	/*! [JSON quoting example] */
+	/*
+	 * Checkpoint a list of objects.
+	 * JSON parsing requires quoting the list of target URIs.
+	 */
+	ret = session->
+	    checkpoint(session, "target=(\"table:table1\",\"table:table2\")");
+	/*! [JSON quoting example] */
+
 	return (ret);
 }
 
@@ -946,11 +955,10 @@ main(void)
 	system("rm -rf WiredTigerHome && mkdir WiredTigerHome");
 
 	{
-	/*! [Open a connection] */
 	WT_CONNECTION *conn;
-
+	/*! [Open a connection] */
 	ret = wiredtiger_open(
-	    "WiredTigerHome", NULL, "create,transactional", &conn);
+	    "WiredTigerHome", NULL, "create,cache_size=500M", &conn);
 	/*! [Open a connection] */
 	}
 
