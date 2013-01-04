@@ -806,7 +806,7 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, int clean)
 	WT_DECL_RET;
 	WT_EVICT_ENTRY *end, *evict, *start;
 	WT_PAGE *page;
-	int restarts;
+	int modified, restarts;
 
 	btree = session->btree;
 	cache = S2C(session)->cache;
@@ -852,8 +852,25 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, int clean)
 		    F_ISSET(page->modify, WT_PM_REC_SPLIT_MERGE)))
 			continue;
 
+		/*
+		 * If the file is being checkpointed, there's a period of time
+		 * where we can't discard any page with a modification
+		 * structure because it might race with the checkpointing
+		 * thread.
+		 *
+		 * During this phase, there is little point trying to evict
+		 * dirty pages: we might be lucky and find an internal page
+		 * that has not yet been checkpointed, but much more likely is
+		 * that we will waste effort considering dirty leaf pages that
+		 * cannot be evicted because they have modifications more
+		 * recent than the checkpoint.
+		 */
+		modified = __wt_page_is_modified(page);
+		if (modified && btree->checkpointing)
+			continue;
+
 		/* Optionally ignore clean pages. */
-		if (!clean && !__wt_page_is_modified(page))
+		if (!modified && !clean)
 			continue;
 
 		WT_ASSERT(session, evict->page == NULL);
