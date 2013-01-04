@@ -10,7 +10,6 @@ flags = {
 ###################################################
 	'cache_flush' : [
 		'SYNC_COMPACT',
-		'SYNC_DIRTY_DISABLE',
 		'SYNC_DISCARD',
 		'SYNC_DISCARD_NOWRITE',
 		'SYNC_INTERNAL',

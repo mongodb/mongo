@@ -445,9 +445,6 @@ __evict_file_request_walk(WT_SESSION_IMPL *session)
 	case WT_SYNC_DISCARD_NOWRITE:
 		msg = "sync-discard-nowrite";
 		break;
-	case WT_SYNC_DIRTY_DISABLE:
-		msg = "sync-dirty-disable";
-		break;
 	WT_ILLEGAL_VALUE(session);
 	}
 	WT_VERBOSE_RET(
@@ -471,18 +468,12 @@ __evict_file_request_walk(WT_SESSION_IMPL *session)
 	}
 
 	/*
-	 * If the application is simply turning off writes of a particular file,
-	 * all they needed was to drain the queue of eviction pages.  Otherwise,
-	 * handle the request.
-	 *
-	 * Publish: there must be a barrier to ensure the return value is set
-	 * before the requesting thread wakes.
+	 * Handle the request and publish the result: there must be a barrier
+	 * to ensure the return value is set before the requesting thread
+	 * wakes.
 	 */
-	if (syncop == WT_SYNC_DIRTY_DISABLE)
-		WT_PUBLISH(request_session->syncop_ret, 0);
-	else
-		WT_PUBLISH(request_session->syncop_ret,
-		    __evict_file(request_session, syncop));
+	WT_PUBLISH(request_session->syncop_ret,
+	    __evict_file(request_session, syncop));
 	return (__wt_cond_signal(request_session, request_session->cond));
 }
 
@@ -496,11 +487,7 @@ __evict_file(WT_SESSION_IMPL *session, int syncop)
 	WT_DECL_RET;
 	WT_PAGE *next_page, *page;
 
-	/*
-	 * Clear any existing LRU eviction walk, this call usually means we're
-	 * discarding the tree.  (Yeah, we could check for compaction, but why
-	 * bother?)
-	 */
+	/* Clear any existing LRU eviction walk, we're discarding the tree. */
 	__wt_evict_clear_tree_walk(session, NULL);
 
 	/*
@@ -543,8 +530,7 @@ __evict_file(WT_SESSION_IMPL *session, int syncop)
 				session->btree->root_page = NULL;
 			__wt_page_out(session, &page, 0);
 			break;
-		default:
-			WT_ERR(ENOTSUP);
+		WT_ILLEGAL_VALUE_ERR(session);
 		}
 	}
 
@@ -564,25 +550,31 @@ int
 __wt_sync_file(WT_SESSION_IMPL *session, int syncop)
 {
 	WT_BTREE *btree;
+	WT_CACHE *cache;
 	WT_DECL_RET;
 	WT_PAGE *page;
 	uint32_t walk_flags;
 
 	btree = session->btree;
+	cache = S2C(session)->cache;
 	page = NULL;
 
 	switch (syncop) {
 	case WT_SYNC_INTERNAL:
 		/*
-		 * Writes in the file have to be disabled when the checkpoint
-		 * writes a file's internal nodes.  Set the disable flag and
-		 * get the eviction server to drain all activity in that file.
+		 * Eviction has to be disabled in the subtree of any internal
+		 * node being evicted.  Set the disable flag, it is checked in
+		 * __rec_review before any page is evicted.
+		 *
+		 * If any thread is in the progress of evicting a page, it
+		 * will have switched the ref state to WT_REF_LOCKED while
+		 * holding evict_lock inside __evict_get_page, and the
+		 * checkpoint walk will notice that and wait for the eviction
+		 * to complete before proceeding.
 		 */
-		WT_PUBLISH(btree->writes_disabled, 1);
-		WT_ERR(__wt_sync_file_serial(session, WT_SYNC_DIRTY_DISABLE));
-		WT_ERR(__wt_evict_server_wake(session));
-		WT_ERR(__wt_cond_wait(session, session->cond, 0));
-		WT_ERR(session->syncop_ret);
+		__wt_spin_lock(session, &cache->evict_lock);
+		btree->checkpointing = 1;
+		__wt_spin_unlock(session, &cache->evict_lock);
 
 		/*
 		 * Checkpoints need to wait for any concurrent activity in a
@@ -601,8 +593,7 @@ __wt_sync_file(WT_SESSION_IMPL *session, int syncop)
 		 */
 		walk_flags = WT_TREE_CACHE | WT_TREE_WAIT;
 		break;
-	default:
-		return (ENOTSUP);
+	WT_ILLEGAL_VALUE(session);
 	}
 
 	page = NULL;
@@ -644,8 +635,8 @@ err:		/* On error, clear any left-over tree walk. */
 	}
 
 	if (syncop == WT_SYNC_INTERNAL) {
-		/* Re-enable writes to the file, and push the change. */
-		WT_PUBLISH(btree->writes_disabled, 0);
+		/* Re-enable writes to the file. */
+		btree->checkpointing = 0;
 
 		/*
 		 * Wake the eviction server, in case application threads have
@@ -863,15 +854,19 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, int clean)
 
 		/*
 		 * If the file is being checkpointed, there's a period of time
-		 * where we have to turn off dirty writes and we can't discard
-		 * any page with a modification structure because it might race
-		 * with the checkpointing thread.  This test isn't sufficient
-		 * by itself because the page might be modified after we select
-		 * it and before we get exclusive access, this test has to be
-		 * repeated during the page eviction review.
+		 * where we can't discard any page with a modification
+		 * structure because it might race with the checkpointing
+		 * thread.
+		 *
+		 * During this phase, there is little point trying to evict
+		 * dirty pages: we might be lucky and find an internal page
+		 * that has not yet been checkpointed, but much more likely is
+		 * that we will waste effort considering dirty leaf pages that
+		 * cannot be evicted because they have modifications more
+		 * recent than the checkpoint.
 		 */
 		modified = __wt_page_is_modified(page);
-		if (modified && btree->writes_disabled)
+		if (modified && btree->checkpointing)
 			continue;
 
 		/* Optionally ignore clean pages. */
