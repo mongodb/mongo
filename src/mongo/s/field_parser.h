@@ -46,7 +46,10 @@ namespace mongo {
             // The field is present and has the correct type
             FIELD_VALID,
 
-            // The field is absent
+            // The field is absent in the BSON object but set from default
+            FIELD_DEFAULT,
+
+            // The field is absent and no default was specified
             FIELD_NONE
         };
 

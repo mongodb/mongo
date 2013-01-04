@@ -40,8 +40,13 @@ namespace mongo {
     {
         BSONElement elem = doc[field.name()];
         if (elem.eoo()) {
-            *out = def;
-            return FIELD_NONE;
+            if (field.hasDefault()) {
+                *out = field.getDefault();
+                return FIELD_DEFAULT;
+            }
+            else {
+                return FIELD_NONE;
+            }
         }
 
         if (elem.type() == Bool) {
@@ -61,8 +66,13 @@ namespace mongo {
     {
         BSONElement elem = doc[field.name()];
         if (elem.eoo()) {
-            *out = def;
-            return FIELD_NONE;
+            if (field.hasDefault()) {
+                *out = field.getDefault();
+                return FIELD_DEFAULT;
+            }
+            else {
+                return FIELD_NONE;
+            }
         }
 
         if (elem.type() == Array) {
@@ -82,8 +92,13 @@ namespace mongo {
     {
         BSONElement elem = doc[field.name()];
         if (elem.eoo()) {
-            *out = def;
-            return FIELD_NONE;
+            if (field.hasDefault()) {
+                *out = field.getDefault();
+                return FIELD_DEFAULT;
+            }
+            else {
+                return FIELD_NONE;
+            }
         }
 
         if (elem.type() == Object) {
@@ -103,8 +118,13 @@ namespace mongo {
     {
         BSONElement elem = doc[field.name()];
         if (elem.eoo()) {
-            *out = def;
-            return FIELD_NONE;
+            if (field.hasDefault()) {
+                *out = field.getDefault();
+                return FIELD_DEFAULT;
+            }
+            else {
+                return FIELD_NONE;
+            }
         }
 
         if (elem.type() == Date) {
@@ -124,8 +144,13 @@ namespace mongo {
     {
         BSONElement elem = doc[field.name()];
         if (elem.eoo()) {
-            *out = def;
-            return FIELD_NONE;
+            if (field.hasDefault()) {
+                *out = field.getDefault();
+                return FIELD_DEFAULT;
+            }
+            else {
+                return FIELD_NONE;
+            }
         }
 
         if (elem.type() == String) {
@@ -145,8 +170,13 @@ namespace mongo {
     {
         BSONElement elem = doc[field.name()];
         if (elem.eoo()) {
-            *out = def;
-            return FIELD_NONE;
+            if (field.hasDefault()) {
+                *out = field.getDefault();
+                return FIELD_DEFAULT;
+            }
+            else {
+                return FIELD_NONE;
+            }
         }
 
         if (elem.type() == jstOID) {
@@ -166,8 +196,13 @@ namespace mongo {
     {
         BSONElement elem = doc[field.name()];
         if (elem.eoo()) {
-            *out = def;
-            return FIELD_NONE;
+            if (field.hasDefault()) {
+                *out = field.getDefault();
+                return FIELD_DEFAULT;
+            }
+            else {
+                return FIELD_NONE;
+            }
         }
 
         if (elem.type() == NumberInt) {
@@ -187,8 +222,13 @@ namespace mongo {
     {
         BSONElement elem = doc[field.name()];
         if (elem.eoo()) {
-            *out = def;
-            return FIELD_NONE;
+            if (field.hasDefault()) {
+                *out = field.getDefault();
+                return FIELD_DEFAULT;
+            }
+            else {
+                return FIELD_NONE;
+            }
         }
 
         if (elem.isNumber()) {
@@ -208,8 +248,13 @@ namespace mongo {
     {
         BSONElement elem = doc[field.name()];
         if (elem.eoo()) {
-            *out = def;
-            return FIELD_NONE;
+            if (field.hasDefault()) {
+                *out = field.getDefault();
+                return FIELD_DEFAULT;
+            }
+            else {
+                return FIELD_NONE;
+            }
         }
 
         if (elem.type() == NumberLong) {
@@ -229,8 +274,13 @@ namespace mongo {
     {
         BSONElement elem = doc[field.name()];
         if (elem.eoo()) {
-            *out = def;
-            return FIELD_NONE;
+            if (field.hasDefault()) {
+                *out = field.getDefault();
+                return FIELD_DEFAULT;
+            }
+            else {
+                return FIELD_NONE;
+            }
         }
 
         if (elem.isNumber()) {

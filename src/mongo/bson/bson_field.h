@@ -74,8 +74,11 @@ namespace mongo {
     template<typename T>
     class BSONField {
     public:
-        BSONField(const std::string& name, const std::string& longName="")
-            : _name(name), _longName(longName) {}
+        BSONField(const std::string& name)
+            : _name(name), _defaultSet(false) {}
+
+        BSONField(const std::string& name, const T& defaultVal)
+            : _name(name), _default(defaultVal), _defaultSet(true) {}
 
         BSONFieldValue<T> make(const T& t) const {
             return BSONFieldValue<T>(_name, t);
@@ -87,6 +90,14 @@ namespace mongo {
 
         const std::string& name() const {
             return _name;
+        }
+
+        const T& getDefault() const {
+            return _default;
+        }
+
+        const bool hasDefault() const {
+            return _defaultSet;
         }
 
         std::string operator()() const {
@@ -109,7 +120,8 @@ namespace mongo {
 
     private:
         std::string _name;
-        std::string _longName;
+        T _default;
+        bool _defaultSet;
     };
 
 } // namespace mongo
