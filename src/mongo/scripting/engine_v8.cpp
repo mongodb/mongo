@@ -788,7 +788,18 @@ namespace mongo {
             return handle_scope.Close(v8::Local<v8::Function>());
         }
 
+        if (!nativeEpilogue()) {
+            _error = str::stream() << "javascript execution terminated ";
+            return handle_scope.Close(v8::Handle<v8::Function>());
+        }
+
         v8::Local<v8::Value> result = script->Run();
+
+        if (!nativePrologue()) {
+            _error = str::stream() << "javascript execution terminated ";
+            return handle_scope.Close(v8::Handle<v8::Function>());
+        }
+
         if (result.IsEmpty()) {
             _error = (string)"compile error: " + toSTLString(&try_catch);
             log() << _error << endl;
@@ -907,8 +918,8 @@ namespace mongo {
             return false;
         }
 
-        if (globalScriptEngine->interrupted()) {
-            _error = (string)"JavaScript error: " + globalScriptEngine->checkInterrupt();
+        if (!nativeEpilogue()) {
+            _error = str::stream() << "javascript execution terminated (before call) ";
             if (reportError)
                 log() << _error << endl;
             if (assertOnError)
@@ -918,13 +929,20 @@ namespace mongo {
 
         v8::Handle<v8::Value> result = script->Run();
 
+        bool resultSuccess = true;
+        if (!nativePrologue()) {
+            resultSuccess = false;
+            _error = str::stream() << "javascript execution interrupted "
+                                   << (try_catch.HasCaught() && try_catch.CanContinue() ?
+                                            toSTLString(&try_catch) : "");
+        }
         if (result.IsEmpty()) {
-            stringstream ss;
-            ss << "JavaScript error: "
-               << ((try_catch.HasCaught() && try_catch.CanContinue()) ?
-                        toSTLString(&try_catch) :
-                        globalScriptEngine->checkInterrupt());
-            _error = ss.str();
+            resultSuccess = false;
+            _error = str::stream() << "javascript execution failed "
+                                   << (try_catch.HasCaught() && try_catch.CanContinue() ?
+                                            toSTLString(&try_catch) : "");
+        }
+        if (!resultSuccess) {
             if (reportError)
                 log() << _error << endl;
             if (assertOnError)
@@ -1044,16 +1062,30 @@ namespace mongo {
         registerOpId();
     }
 
-    v8::Local<v8::Value> newFunction(const char *code) {
+    v8::Local<v8::Value> V8Scope::newFunction(const char *code) {
         v8::HandleScope handle_scope;
         stringstream codeSS;
         codeSS << "____MongoToV8_newFunction_temp = " << code;
         string codeStr = codeSS.str();
-        string errStr = str::stream() << "Could not compile function: " << codeStr;
+        string errStr = str::stream() << "could not compile function: " << codeStr;
 
         v8::Local<v8::Script> compiled = v8::Script::New(v8::String::New(codeStr.c_str()));
         uassert(16670, errStr, !compiled.IsEmpty());
+
+        if (!nativeEpilogue()) {
+            _error = str::stream()
+                    << "javascript execution terminated during newFunction compilation";
+            return handle_scope.Close(v8::Handle<v8::Value>());
+        }
+
         v8::Local<v8::Value> ret = compiled->Run();
+
+        if (!nativePrologue()) {
+            _error = str::stream() << "javascript execution terminated";
+            if (!ret.IsEmpty())
+                return handle_scope.Close(ret);
+            return handle_scope.Close(v8::Handle<v8::Value>());
+        }
         uassert(16671, errStr, !ret.IsEmpty());
         return handle_scope.Close(ret);
     }

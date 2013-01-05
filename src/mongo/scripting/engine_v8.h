@@ -296,6 +296,11 @@ namespace mongo {
          */
         void unregisterOpId();
 
+        /**
+         * Create a new function; primarily used for BSON/V8 conversion.
+         */
+        v8::Local<v8::Value> newFunction(const char *code);
+
         V8ScriptEngine* _engine;
 
         v8::Persistent<v8::Context> _context;
