@@ -343,8 +343,7 @@ __verify_filefrag_add(WT_SESSION_IMPL *session,
 static int
 __verify_filefrag_chk(WT_SESSION_IMPL *session, WT_BLOCK *block)
 {
-	WT_DECL_RET;
-	uint64_t first, last;
+	uint64_t count, first, last;
 
 	/* If there's nothing to verify, it was a fast run. */
 	if (block->frags == 0)
@@ -372,7 +371,7 @@ __verify_filefrag_chk(WT_SESSION_IMPL *session, WT_BLOCK *block)
 	 * time after setting the clear bit(s) we found: it's simpler and this
 	 * isn't supposed to happen a lot.
 	 */
-	for (;;) {
+	for (count = 0;; ++count) {
 		if (__bit_ffc(block->fragfile, block->frags, &first) != 0)
 			break;
 		__bit_set(block->fragfile, first);
@@ -382,13 +381,19 @@ __verify_filefrag_chk(WT_SESSION_IMPL *session, WT_BLOCK *block)
 			__bit_set(block->fragfile, last);
 		}
 
+		if (!WT_VERBOSE_ISSET(session, verify))
+			continue;
+
 		__wt_errx(session,
 		    "file range %" PRIuMAX "-%" PRIuMAX " never verified",
 		    (uintmax_t)WT_FRAG_TO_OFF(block, first),
 		    (uintmax_t)WT_FRAG_TO_OFF(block, last));
-		ret = WT_ERROR;
 	}
-	return (ret);
+	if (count == 0)
+		return (0);
+
+	__wt_errx(session, "file ranges never verified: %" PRIuMAX, count);
+	return (WT_ERROR);
 }
 
 /*
@@ -442,8 +447,7 @@ __verify_ckptfrag_add(
 static int
 __verify_ckptfrag_chk(WT_SESSION_IMPL *session, WT_BLOCK *block)
 {
-	WT_DECL_RET;
-	uint64_t first, last;
+	uint64_t count, first, last;
 
 	/*
 	 * The checkpoint fragment memory is only allocated as a checkpoint
@@ -458,7 +462,7 @@ __verify_ckptfrag_chk(WT_SESSION_IMPL *session, WT_BLOCK *block)
 	 * after clearing the set bit(s) we found: it's simpler and this isn't
 	 * supposed to happen a lot.
 	 */
-	for (;;) {
+	for (count = 0;; ++count) {
 		if (__bit_ffs(block->fragckpt, block->frags, &first) != 0)
 			break;
 		__bit_clear(block->fragckpt, first);
@@ -468,11 +472,19 @@ __verify_ckptfrag_chk(WT_SESSION_IMPL *session, WT_BLOCK *block)
 			__bit_clear(block->fragckpt, last);
 		}
 
+		if (!WT_VERBOSE_ISSET(session, verify))
+			continue;
+
 		__wt_errx(session,
 		    "checkpoint range %" PRIuMAX "-%" PRIuMAX " never verified",
 		    (uintmax_t)WT_FRAG_TO_OFF(block, first),
 		    (uintmax_t)WT_FRAG_TO_OFF(block, last));
-		ret = WT_ERROR;
 	}
-	return (ret);
+
+	if (count == 0)
+		return (0);
+
+	__wt_errx(session,
+	    "checkpoint ranges never verified: %" PRIuMAX, count);
+	return (WT_ERROR);
 }
