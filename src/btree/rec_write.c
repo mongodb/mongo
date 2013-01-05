@@ -525,11 +525,6 @@ __wt_rec_write(WT_SESSION_IMPL *session,
 	WT_ILLEGAL_VALUE(session);
 	}
 	if (ret != 0) {
-		/*
-		 * The underlying wrapup-on-error functions can fail, and they
-		 * are written to return an error value, but now we discard it,
-		 * we already have one.
-		 */
 		WT_TRET(__rec_write_wrapup_err(session, r, page));
 		return (ret);
 	}
