@@ -15,12 +15,14 @@
 
 #pragma once
 
-#include <gsasl.h>
 #include <string>
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
+#include "mongo/platform/cstdint.h"  // Must be included at all because of SERVER-8086.
+
+#include <gsasl.h>  // Must be included here because of SERVER-8086.
 
 namespace mongo {
 

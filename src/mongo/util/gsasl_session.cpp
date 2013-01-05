@@ -16,7 +16,6 @@
 #include "mongo/util/gsasl_session.h"
 
 #include <cstdlib>
-#include <gsasl.h>
 
 #include "mongo/util/assert_util.h"
 
