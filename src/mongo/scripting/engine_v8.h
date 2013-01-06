@@ -88,6 +88,9 @@ namespace mongo {
          */
         virtual void kill();
 
+        /** check if there is a pending killOp request */
+        bool isKillPending() const;
+
         virtual void localConnect(const char* dbName);
 
         virtual void externalSetup();

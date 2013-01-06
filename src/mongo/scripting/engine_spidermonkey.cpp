@@ -1452,6 +1452,8 @@ namespace spidermonkey {
             return _convertor->getJSObject( _global , field );
     }
 
+    bool SMScope::isKillPending() const { return globalSMEngine->interrupted(); }
+
     int SMScope::type( const char *field ) {
             smlock;
             jsval val;

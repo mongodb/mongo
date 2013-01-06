@@ -586,7 +586,7 @@ namespace mongo {
                 }
             }
 
-            if (_scope) {
+            if (_scope && !_scope->isKillPending()) {
                 // cleanup js objects
                 ScriptingFunction cleanup = _scope->createFunction("delete _emitCt; delete _keyCt; delete _mrMap;");
                 _scope->invoke(cleanup, 0, 0, 0, true);

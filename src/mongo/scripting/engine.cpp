@@ -331,6 +331,7 @@ namespace mongo {
         void localConnect(const char* dbName) { _real->localConnect(dbName); }
         void externalSetup() { _real->externalSetup(); }
         void gc() { _real->gc(); }
+        bool isKillPending() const { return _real->isKillPending(); }
         int type(const char* field) { return _real->type(field); }
         string getError() { return _real->getError(); }
         bool hasOutOfMemoryException() { return _real->hasOutOfMemoryException(); }

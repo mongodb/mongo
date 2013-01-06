@@ -403,6 +403,11 @@ namespace mongo {
         _pendingKill = true;
     }
 
+    /** check if there is a pending killOp request */
+    bool V8Scope::isKillPending() const {
+        return _pendingKill || _engine->interrupted();
+    }
+
     /**
      * Display a list of all known ops (for verbose output)
      */
