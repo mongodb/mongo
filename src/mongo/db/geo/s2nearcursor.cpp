@@ -170,10 +170,28 @@ namespace mongo {
             scoped_ptr<BtreeCursor> cursor(BtreeCursor::make(nsdetails(_details->parentNS()),
                                                              *_details, frv, 0, 1));
 
+            // The cursor may return the same obj more than once for a given
+            // FRS, so we make sure to only consider it once in any given annulus.
+            //
+            // We don't want this outside of the 'do' loop because the covering
+            // for an annulus may return an object whose distance to the query
+            // point is actually contained in a subsequent annulus.  If we
+            // didn't consider every object in a given annulus we might miss
+            // the point.
+            //
+            // We don't use a global 'seen' because we get that by requiring
+            // the distance from the query point to the indexed geo to be
+            // within our 'current' annulus, and I want to dodge all yield
+            // issues if possible.
+            set<DiskLoc> seen;
+
             // Do the actual search through this annulus.
             size_t considered = 0;
             for (; cursor->ok(); cursor->advance()) {
                 ++considered;
+
+                if (seen.end() != seen.find(cursor->currLoc())) { continue; }
+                seen.insert(cursor->currLoc());
 
                 MatchDetails details;
                 bool matched = _matcher->matchesCurrent(cursor.get(), &details);
