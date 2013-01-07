@@ -392,7 +392,7 @@ __verify_filefrag_chk(WT_SESSION_IMPL *session, WT_BLOCK *block)
 	if (count == 0)
 		return (0);
 
-	__wt_errx(session, "file ranges never verified: %" PRIuMAX, count);
+	__wt_errx(session, "file ranges never verified: %" PRIu64, count);
 	return (WT_ERROR);
 }
 
@@ -485,6 +485,6 @@ __verify_ckptfrag_chk(WT_SESSION_IMPL *session, WT_BLOCK *block)
 		return (0);
 
 	__wt_errx(session,
-	    "checkpoint ranges never verified: %" PRIuMAX, count);
+	    "checkpoint ranges never verified: %" PRIu64, count);
 	return (WT_ERROR);
 }
