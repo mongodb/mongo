@@ -66,7 +66,6 @@ namespace mongo {
             updatedExisting = NotUpdate;
             nObjects = 0;
             nPrev = 1;
-            writebackSince++;
             valid = _valid;
             disabled = false;
             upsertedId.clear();
