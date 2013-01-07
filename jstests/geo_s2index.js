@@ -41,6 +41,9 @@ assert.eq(res.count(), 5);
 res = t.find({ "geo" : { "$geoIntersects" : { "$geometry" : somepoly} } })
 assert.eq(res.count(), 6);
 
+res = t.find({ "geo" : { "$within" : { "$geometry" : somepoly} } })
+assert.eq(res.count(), 6);
+
 res = t.find({ "geo" : { "$geoIntersects" : { "$geometry" : somepoly} } }).limit(1)
 assert.eq(res.itcount(), 1);
 

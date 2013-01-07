@@ -111,23 +111,10 @@ namespace mongo {
                 bool match = false;
 
                 for (BSONElementSet::iterator oi = geoFieldElements.begin();
-                     oi != geoFieldElements.end(); ++oi) {
+                     !match && (oi != geoFieldElements.end()); ++oi) {
                     if (!oi->isABSONObj()) { continue; }
                     const BSONObj &geoObj = oi->Obj();
-                    if (GeoParser::isPolygon(geoObj)) {
-                        S2Polygon shape;
-                        GeoParser::parsePolygon(geoObj, &shape);
-                        match = _fields[i].intersectsPolygon(shape);
-                    } else if (GeoParser::isLineString(geoObj)) {
-                        S2Polyline shape;
-                        GeoParser::parseLineString(geoObj, &shape);
-                        match = _fields[i].intersectsLine(shape);
-                    } else if (GeoParser::isPoint(geoObj)) {
-                        S2Cell point;
-                        GeoParser::parsePoint(geoObj, &point);
-                        match = _fields[i].intersectsPoint(point);
-                    }
-                    if (match) break;
+                    match = _fields[i].satisfiesPredicate(geoObj);
                 }
 
                 if (match) { ++geoFieldsMatched; }

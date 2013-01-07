@@ -138,10 +138,10 @@ namespace mongo {
         }
 
         bool parseLegacy(const BSONObj &obj, QueryGeometry *out, bool *isNear, bool *intersect,
-                         double *maxDistance) const {
-            // Legacy intersect parsing: t.find({ loc : [0,0] })
+                         bool *within, double *maxDistance) const {
+            // Legacy within parsing: t.find({ loc : [0,0] })
             if (out->parseFrom(obj)) {
-                *isNear = true;
+                *within = true;
                 return true;
             }
 
@@ -168,10 +168,11 @@ namespace mongo {
         }
 
         bool parseQuery(const BSONObj &obj, QueryGeometry *out, bool *isNear, bool *intersect,
-                        double *maxDistance) const {
+                        bool *within, double *maxDistance) const {
             // pointA = { "type" : "Point", "coordinates": [ 40, 5 ] }
             // t.find({ "geo" : { "$intersect" : { "$geometry" : pointA} } })
             // t.find({ "geo" : { "$near" : { "$geometry" : pointA, $maxDistance : 20 }}})
+            // t.find({ "geo" : { "$within" : { "$geometry" : polygon } } })
             // where field.name is "geo"
             BSONElement e = obj.firstElement();
             if (!e.isABSONObj()) { return false; }
@@ -181,6 +182,8 @@ namespace mongo {
                 *intersect = true;
             } else if (BSONObj::opNEAR == matchType) {
                 *isNear = true;
+            } else if (BSONObj::opWITHIN == matchType) {
+                *within = true;
             } else {
                 return false;
             }
@@ -212,8 +215,11 @@ namespace mongo {
                                              int numWanted) const {
             vector<QueryGeometry> regions;
             double maxDistance = std::numeric_limits<double>::max();
+            // TODO(hk): Move this stuff into QueryGeometry and then double-check that
+            // the geometries in the query are all consistent.
             bool isNear = false;
             bool isIntersect = false;
+            bool isWithin = false;
 
             // Go through the fields that we index, and for each geo one, make a QueryGeometry
             // object for the S2Cursor class to do intersection testing/cover generating with.
@@ -227,17 +233,46 @@ namespace mongo {
                 BSONObj obj = e.Obj();
 
                 QueryGeometry geoQueryField(field.name);
-                if (parseLegacy(obj, &geoQueryField, &isNear, &isIntersect, &maxDistance)) {
+                if (parseLegacy(obj, &geoQueryField, &isNear, &isIntersect, &isWithin, &maxDistance)) {
                     regions.push_back(geoQueryField);
-                } else if (parseQuery(obj, &geoQueryField, &isNear, &isIntersect, &maxDistance)) {
+                } else if (parseQuery(obj, &geoQueryField, &isNear, &isIntersect, &isWithin, &maxDistance)) {
                     regions.push_back(geoQueryField);
                 } else {
                     uasserted(16535, "can't parse query for *2d geo search: " + obj.toString());
                 }
             }
 
-            if (isNear && isIntersect ) {
-                uasserted(16474, "Can't do both near and intersect, query: " +  query.toString());
+            int queryTypes = 0;
+            if (isNear) ++queryTypes;
+            if (isIntersect) {
+                for (size_t i = 0; i < regions.size(); ++i) {
+                    regions[i].predicate = QueryGeometry::INTERSECT;
+                }
+                ++queryTypes;
+            }
+            if (isWithin) {
+                for (size_t i = 0; i < regions.size(); ++i) {
+                    regions[i].predicate = QueryGeometry::WITHIN;
+                    // Why do we only deal with polygons?
+
+                    // 1. Finding things within a point is silly and only valid
+                    // for points and degenerate lines/polys.
+
+                    // 2. Finding points within a line is easy but that's called intersect.
+                    // Finding lines within a line is kind of tricky given what S2 gives us.
+                    // Doing line-within-line is a valid yet unsupported feature, though I wonder if we want to preserve
+                    // orientation for lines or allow (a,b),(c,d) to be within (c,d),(a,b).
+                    // Polygons aren't in lines.
+
+                    // 3. Finding <anything> in a polygon is what we support.
+
+                    uassert(16672, "$within is only supported with polygonal geometry",
+                            NULL != regions[i].polygon.get());
+                }
+                ++queryTypes;
+            }
+            if (1 != queryTypes) {
+                uasserted(16474, "Malformed query, require just one type of predicate: " +  query.toString());
             }
 
             // I copied this from 2d.cpp.  Guard against perversion.
@@ -258,7 +293,6 @@ namespace mongo {
                                                         _params, numWanted, maxDistance);
                 return shared_ptr<Cursor>(cursor);
             } else {
-                // Default to intersect.
                 S2Cursor *cursor = new S2Cursor(keyPattern(), getDetails(), filteredQuery, regions, _params,
                                                 numWanted);
                 return shared_ptr<Cursor>(cursor);
@@ -280,6 +314,7 @@ namespace mongo {
                 // getGtLtOp is horribly misnamed and really means get the operation.
                 switch (e.embeddedObject().firstElement().getGtLtOp()) {
                     case BSONObj::opNEAR:
+                    case BSONObj::opWITHIN:
                     case BSONObj::opGEO_INTERSECTS:
                         return OPTIMAL;
                     default:
@@ -314,7 +349,9 @@ namespace mongo {
                 vector<string> cells;
                 S2Polyline line;
                 S2Cell point;
-                // We only support GeoJSON polygons.
+                // We only support GeoJSON polygons.  Why?:
+                // 1. we don't automagically do WGS84/flat -> WGS84, and
+                // 2. the old polygon format must die.
                 if (GeoParser::isGeoJSONPolygon(obj)) {
                     S2Polygon polygon;
                     GeoParser::parseGeoJSONPolygon(obj, &polygon);

@@ -44,12 +44,12 @@ namespace mongo {
             // there's nothing there.
             considerCoarser = false;
             coverer->GetCovering(region, &cover);
-            warning() << "Trying to create BSON indexing obj w/too many regions = " << oldCoverSize
-                      << endl;
-            warning() << "Modifying coverer from (" << coverer->max_level() << "," << oldMaxLevel
-                      << ") to (" << coverer->min_level() << "," << coverer->max_level() << ")"
-                      << endl;
-            warning() << "New #regions = " << cover.size() << endl;
+            LOG(2) << "Trying to create BSON indexing obj w/too many regions = " << oldCoverSize
+                   << endl;
+            LOG(2) << "Modifying coverer from (" << coverer->max_level() << "," << oldMaxLevel
+                   << ") to (" << coverer->min_level() << "," << coverer->max_level() << ")"
+                   << endl;
+            LOG(2) << "New #regions = " << cover.size() << endl;
         }
 
         // Look at the cells we cover and all cells that are within our covering and
@@ -96,14 +96,46 @@ namespace mongo {
     string QueryGeometry::toString() const {
         stringstream ss;
         ss << "field = " << field;
+        ss << ", predicate = " << ((WITHIN == predicate) ? "within" : "intersect");
         if (NULL != cell.get()) {
             ss << ", cell";
         } else if (NULL != line.get()) {
-            ss << ", line = ";
+            ss << ", line";
         } else if (NULL != polygon.get()) {
-            ss << ", polygon = ";
+            ss << ", polygon";
         }
         return ss.str();
+    }
+
+    bool QueryGeometry::satisfiesPredicate(const BSONObj &obj) {
+        verify(predicate == WITHIN || predicate == INTERSECT);
+
+        if (GeoParser::isPolygon(obj)) {
+            S2Polygon shape;
+            GeoParser::parsePolygon(obj, &shape);
+            if (WITHIN == predicate) {
+                return isWithin(shape);
+            } else {
+                return intersects(shape);
+            }
+        } else if (GeoParser::isLineString(obj)) {
+            S2Polyline shape;
+            GeoParser::parseLineString(obj, &shape);
+            if (WITHIN == predicate) {
+                return isWithin(shape);
+            } else {
+                return intersects(shape);
+            }
+        } else if (GeoParser::isPoint(obj)) {
+            S2Cell point;
+            GeoParser::parsePoint(obj, &point);
+            if (WITHIN == predicate) {
+                return isWithin(point);
+            } else {
+                return intersects(point);
+            }
+        }
+        return false;
     }
 
     bool QueryGeometry::parseFrom(const BSONObj& obj) {
@@ -123,8 +155,48 @@ namespace mongo {
         return true;
     }
 
+    // Is the geometry provided as an argument within our query geometry?
+    bool QueryGeometry::isWithin(const S2Cell &otherPoint) {
+        // Intersecting a point is containing a point.  Hooray!
+        return intersects(otherPoint);
+    }
+
+    bool QueryGeometry::isWithin(const S2Polyline& otherLine) {
+        if (NULL != cell) {
+            // Points don't contain lines.
+            return false;
+        } else if (NULL != line) {
+            // Doing line-in-line is scary.
+            return false;
+        } else {
+            // Kind of a mess.  We get a function for clipping the line to the
+            // polygon.  We do this and make sure the line is the same as the
+            // line we're clipping against.
+            vector<S2Polyline*> clipped;
+            polygon->IntersectWithPolyline(&otherLine, &clipped);
+            if (1 != clipped.size()) { return false; }
+            // If the line is entirely contained within the polygon, we should be
+            // getting it back verbatim, so really there should be no error.
+            bool ret = clipped[0]->NearlyCoversPolyline(otherLine, S1Angle::Degrees(1e-10));
+            for (size_t i = 0; i < clipped.size(); ++i) delete clipped[i];
+            return ret;
+        }
+    }
+
+    bool QueryGeometry::isWithin(const S2Polygon& otherPolygon) {
+        if (NULL != cell) {
+            // Points don't contain polygons.
+            return false;
+        } else if (NULL != line) {
+            // Lines don't contain polygons
+            return false;
+        } else {
+            return polygon->Contains(&otherPolygon);
+        }
+    }
+
     // Does this (QueryGeometry) intersect the provided data?
-    bool QueryGeometry::intersectsPoint(const S2Cell &otherPoint) {
+    bool QueryGeometry::intersects(const S2Cell &otherPoint) {
         if (NULL != cell) {
             return cell->MayIntersect(otherPoint);
         } else if (NULL != line) {
@@ -134,7 +206,7 @@ namespace mongo {
         }
     }
 
-    bool QueryGeometry::intersectsLine(const S2Polyline& otherLine) {
+    bool QueryGeometry::intersects(const S2Polyline& otherLine) {
         if (NULL != cell) {
             return otherLine.MayIntersect(*cell);
         } else if (NULL != line) {
@@ -148,10 +220,9 @@ namespace mongo {
             for (size_t i = 0; i < clipped.size(); ++i) delete clipped[i];
             return ret;
         }
-        return false;
     }
 
-    bool QueryGeometry::intersectsPolygon(const S2Polygon& otherPolygon) {
+    bool QueryGeometry::intersects(const S2Polygon& otherPolygon) {
         if (NULL != cell) {
             return otherPolygon.MayIntersect(*cell);
         } else if (NULL != line) {
@@ -168,9 +239,6 @@ namespace mongo {
     }
 
     S2Point QueryGeometry::getCentroid() const {
-        // TODO(hk): If the projection is planar this isn't valid.  Fix this
-        // when we actually use planar projections, or remove planar projections
-        // from the code.
         if (NULL != cell) {
             return cell->GetCenter();
         } else if (NULL != line) {

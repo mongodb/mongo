@@ -36,7 +36,11 @@ namespace mongo {
 
     // Used for passing geo data from the newCursor entry point to the S2Cursor class.
     struct QueryGeometry {
-        QueryGeometry(const string& f) : field(f) {} //, cell(NULL), line(NULL), polygon(NULL) {}
+        QueryGeometry(const string& f) : field(f), predicate(INTERSECT) {}
+        enum Predicate {
+            WITHIN,
+            INTERSECT,
+        };
 
         // Name of the field in the query.
         string field;
@@ -46,14 +50,22 @@ namespace mongo {
         shared_ptr<S2Cell> cell;
         shared_ptr<S2Polyline> line;
         shared_ptr<S2Polygon> polygon;
+        Predicate predicate;
 
         string toString() const;
+
+        bool satisfiesPredicate(const BSONObj &obj);
         
         // Does this QueryGeometry intersect the provided data?  Sadly there is no common good way
         // to check this, so we do different things for all query/data pairs.
-        bool intersectsPoint(const S2Cell& otherPoint);
-        bool intersectsLine(const S2Polyline& otherLine);
-        bool intersectsPolygon(const S2Polygon& otherPolygon);
+        bool intersects(const S2Cell& otherPoint);
+        bool intersects(const S2Polyline& otherLine);
+        bool intersects(const S2Polygon& otherPolygon);
+        // And, within.
+        bool isWithin(const S2Cell& otherPoint);
+        bool isWithin(const S2Polyline& otherLine);
+        bool isWithin(const S2Polygon& otherPolygon);
+
         // One region is not NULL and this returns it.
         const S2Region& getRegion() const;
         // Get the centroid, boring if we're a point, interesting if we're not.
