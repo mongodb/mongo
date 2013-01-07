@@ -2946,14 +2946,14 @@
     <ClInclude Include="fts\stop_words_list.h">
       <Filter>db\fts</Filter>
     </ClInclude>
-    <ClInclude Include="index_builder.h">
-      <Filter>db\Header Files\e to n</Filter>
-    </ClInclude>
     <ClInclude Include="ops\field_ref.h">
       <Filter>db\ops</Filter>
     </ClInclude>
     <ClInclude Include="ops\modifier_base.h">
       <Filter>db\ops</Filter>
+    </ClInclude>
+    <ClInclude Include="..\scripting\engine_spidermonkey_internal.h">
+      <Filter>scripting</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

@@ -2436,7 +2436,6 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
       <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">4355;4800;4267;4244;4351;4146</DisableSpecificWarnings>
     </ClCompile>
     <ClCompile Include="geo\shapes.cpp" />
-    <ClCompile Include="index_builder.cpp" />
     <ClCompile Include="index_rebuilder.cpp" />
     <ClCompile Include="initialize_server_global_state.cpp" />
     <ClCompile Include="intervalbtreecursor.cpp" />
@@ -3084,7 +3083,6 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="geo\shapes.h" />
     <ClInclude Include="hasher.h" />
     <ClInclude Include="hashindex.h" />
-    <ClInclude Include="index_builder.h" />
     <ClInclude Include="index_insertion_continuation.h" />
     <ClInclude Include="index_rebuilder.h" />
     <ClInclude Include="index_update.h" />

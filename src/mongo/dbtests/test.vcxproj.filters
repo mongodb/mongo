@@ -1662,9 +1662,6 @@
     <ClInclude Include="..\db\fts\tokenizer.h">
       <Filter>db\fts</Filter>
     </ClInclude>
-    <ClInclude Include="..\db\index_builder.h">
-      <Filter>db\Header Files\e to n</Filter>
-    </ClInclude>
     <ClInclude Include="..\db\ops\field_ref.h">
       <Filter>db\ops</Filter>
     </ClInclude>
@@ -3279,9 +3276,6 @@
     </ClCompile>
     <ClCompile Include="keypatterntests.cpp">
       <Filter>dbtests</Filter>
-    </ClCompile>
-    <ClCompile Include="..\db\index_builder.cpp">
-      <Filter>db\Source Files\e to n</Filter>
     </ClCompile>
     <ClCompile Include="..\db\auth\auth_server_parameters.cpp">
       <Filter>db\auth</Filter>

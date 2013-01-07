@@ -713,7 +713,6 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="..\db\hashindex.h" />
     <ClInclude Include="..\db\index.h" />
     <ClInclude Include="..\db\indexkey.h" />
-    <ClInclude Include="..\db\index_builder.h" />
     <ClInclude Include="..\db\index_insertion_continuation.h" />
     <ClInclude Include="..\db\index_rebuilder.h" />
     <ClInclude Include="..\db\index_update.h" />
@@ -2721,7 +2720,6 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     </ClCompile>
     <ClCompile Include="..\db\geo\shapes.cpp" />
     <ClCompile Include="..\db\hasher.cpp" />
-    <ClCompile Include="..\db\index_builder.cpp" />
     <ClCompile Include="..\db\index_rebuilder.cpp" />
     <ClCompile Include="..\db\index_update.cpp" />
     <ClCompile Include="..\db\interrupt_status_mongod.cpp" />
