@@ -2025,7 +2025,6 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
       <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
     </ClCompile>
     <ClCompile Include="geo\shapes.cpp" />
-    <ClCompile Include="index_builder.cpp" />
     <ClCompile Include="index_rebuilder.cpp" />
     <ClCompile Include="initialize_server_global_state.cpp" />
     <ClCompile Include="intervalbtreecursor.cpp" />

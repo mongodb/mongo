@@ -1430,9 +1430,6 @@
     <ClCompile Include="fts\stop_words_list.cpp">
       <Filter>db\fts</Filter>
     </ClCompile>
-    <ClCompile Include="index_builder.cpp">
-      <Filter>db\Source Files\e to n</Filter>
-    </ClCompile>
     <ClCompile Include="auth\auth_server_parameters.cpp">
       <Filter>db\auth</Filter>
     </ClCompile>
