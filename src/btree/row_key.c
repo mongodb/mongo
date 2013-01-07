@@ -268,14 +268,14 @@ __wt_row_key_copy(
 		 */
 		if (direction == FORWARD) {
 			/*
-			 * Get a copy of the current key;
-			 * Ensure the buffer can hold the key plus the prefix;
-			 * Append the key to the prefix (already in the buffer);
-			 * Set the final size of the key.
+			 * Get a reference to the current key's bytes;
+			 * Ensure the buffer can hold the key's bytes plus the
+			 *    prefix (and also setting the final buffer size);
+			 * Append the key to the prefix (already in the buffer).
 			 */
 			if (tmp == NULL)
 				WT_ERR(__wt_scr_alloc(session, 0, &tmp));
-			WT_ERR(__wt_cell_unpack_copy(session, unpack, tmp));
+			WT_ERR(__wt_cell_unpack_ref(session, unpack, tmp));
 			WT_ERR(__wt_buf_initsize(
 			    session, retb, tmp->size + unpack->prefix));
 			memcpy((uint8_t *)
