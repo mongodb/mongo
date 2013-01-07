@@ -962,6 +962,18 @@ main(void)
 	/*! [Open a connection] */
 	}
 
+	{
+	WT_CONNECTION *conn;
+	/*! [boolean configuration string example] */
+	ret = wiredtiger_open(
+	    "WiredTigerHome", NULL, "create,cache_size=500M", &conn);
+	ret = wiredtiger_open(
+	    "WiredTigerHome", NULL, "create=true,cache_size=500M", &conn);
+	ret = wiredtiger_open(
+	    "WiredTigerHome", NULL, "create=1,cache_size=500M", &conn);
+	/*! [boolean configuration string example] */
+	}
+
 	/*
 	 * This example code gets run, and the compression libraries might not
 	 * be installed, causing the open to fail.  The documentation requires

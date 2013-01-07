@@ -28,8 +28,13 @@ columns in a table, values are nested using parentheses.  For example:
 
 @snippet ex_all.c Create a table with columns
 
-If no value is specified for an integer key, a default value of 1 is
-assumed.
+Values of type of "boolean" can be set to any of \c false, \c true,
+\c 0 or \c 1.   If no value is specified for a value of type integer, a
+default value of 1 is assumed;  If no value is specified for a value of
+type boolean, a default value of true is assumed.  For example, all of
+the following forms of the \c create configuration string are identical:
+
+@snippet ex_all.c boolean configuration string example
 
 Configuration strings are processed in order from left to right, with
 later settings overriding earlier ones (unless multiple settings for a
