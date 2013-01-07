@@ -839,7 +839,7 @@ def run_old_fails():
 def add_to_failfile(tests, options):
     try:
         f = open(failfile, 'r')
-        testsAndOptions = pickle.load(f)
+        testsAndOptions = pickle.load(f)["testsAndOptions"]
     except Exception:
         testsAndOptions = []
 
