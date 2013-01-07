@@ -148,14 +148,23 @@ DB.prototype._addUserV22 = function( username , pass, readOnly, replicatedTo, ti
 
 DB.prototype._addUser = function(userObj, replicatedTo, timeout) {
     var roles = userObj['roles'];
+    var oldPwd;
+
     // To prevent creating old-style privilege documents
-    if (roles == null || roles.length == 0) {
+    if (roles == null) {
         throw Error("'roles' field must be provided");
     }
-    if (userObj['pwd'] != null) {
-        userObj.pwd = _hashPassword(userObj['user'], userObj['pwd']);
+
+    if (userObj.pwd != null) {
+        oldPwd = userObj.pwd;
+        userObj.pwd = _hashPassword(userObj.user, userObj.pwd);
     }
-    this._createUser(userObj, replicatedTo, timeout);
+    try {
+        this._createUser(userObj, replicatedTo, timeout);
+    } finally {
+        if (userObj.pwd != null)
+            userObj.pwd = oldPwd;
+    }
 }
 
 DB.prototype.addUser = function() {
