@@ -27,6 +27,7 @@
 #include "db.h"
 #include "instance.h"
 #include "repl.h"
+#include "notifications/notifier.hpp"
 
 namespace mongo {
 
@@ -165,7 +166,7 @@ namespace mongo {
                     theDataFileMgr.insertWithObjMod(to_collection, js);
                     if ( logForRepl )
                         logOp("i", to_collection, js);
-
+		    NOTIFY_INSERTION(to_collection,js);
                     getDur().commitIfNeeded();
                 }
                 catch( UserException& e ) {
@@ -222,7 +223,7 @@ namespace mongo {
                     theDataFileMgr.insertWithObjMod(to_collection, js);
                     if ( logForRepl )
                         logOp("i", to_collection, js);
-
+		    NOTIFY_INSERTION(to_collection,js);
                     getDur().commitIfNeeded();
                 }
                 catch( UserException& e ) {

@@ -1085,6 +1085,7 @@ namespace mongo {
                     debug.upsert = true;
                     BSONObj no = updateobj;
                     theDataFileMgr.insertWithObjMod(ns, no, god);
+		    NOTIFY_INSERTION(ns,no);
                     return UpdateResult( 0 , 0 , 1 , no );
                 }
             }
