@@ -308,6 +308,7 @@ struct __wt_page {
 
 #define	WT_PAGE_BUILD_KEYS	0x01	/* Keys have been built in memory */
 #define	WT_PAGE_EVICT_LRU	0x02	/* Page is on the LRU queue */
+#define	WT_PAGE_EVICT_LOCKED	0x04	/* Page was locked when queued */
 	uint8_t flags_atomic;		/* Atomic flags, use F_*_ATOMIC */
 };
 

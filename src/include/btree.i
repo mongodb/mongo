@@ -49,16 +49,6 @@ __wt_cache_page_inmem_incr(
 	(void)WT_ATOMIC_ADD(page->memory_footprint, WT_STORE_SIZE(size));
 	if (__wt_page_is_modified(page))
 		(void)WT_ATOMIC_ADD(cache->bytes_dirty, size);
-	/*
-	 * Trigger eviction if we want to force the page out. The page won't
-	 * necessarily be chosen for eviction every time, but it will
-	 * eventually be.
-	 */
-	if (__wt_eviction_page_force(session->btree, page)) {
-		F_SET(S2C(session)->cache, WT_EVICT_FORCE_PASS);
-		__wt_evict_server_wake(session);
-	}
-
 }
 
 /*

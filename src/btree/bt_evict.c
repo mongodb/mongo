@@ -10,6 +10,8 @@
 static void __evict_dirty_validate(WT_CONNECTION_IMPL *);
 static int  __evict_file_request_walk(WT_SESSION_IMPL *);
 static int  __evict_file(WT_SESSION_IMPL *, int);
+static int  __evict_init_candidate(
+    WT_SESSION_IMPL *, WT_EVICT_ENTRY *, WT_PAGE *);
 static int  __evict_lru(WT_SESSION_IMPL *, int);
 static int  __evict_lru_cmp(const void *, const void *);
 static int  __evict_walk(WT_SESSION_IMPL *, uint32_t *, int);
@@ -135,6 +137,57 @@ __wt_evict_list_clr_page(WT_SESSION_IMPL *session, WT_PAGE *page)
 	WT_ASSERT(session, !F_ISSET_ATOMIC(page, WT_PAGE_EVICT_LRU));
 
 	__wt_spin_unlock(session, &cache->evict_lock);
+}
+
+/*
+ * __wt_evict_add_forced_page --
+ *	Add a page to the head of the eviction queue.
+ */
+int
+__wt_evict_add_forced_page(WT_SESSION_IMPL *session, WT_PAGE *page)
+{
+	WT_CACHE *cache;
+	WT_CONNECTION_IMPL *conn;
+	WT_DECL_RET;
+	u_int count;
+
+	conn = S2C(session);
+	cache = conn->cache;
+
+	__wt_spin_lock(session, &cache->evict_lock);
+
+	/*
+	 * Add the page to the head of the eviction queue. Initialize the
+	 * eviction array if necessary.
+	 */
+	if (cache->evict_allocated == 0) {
+		count = WT_EVICT_WALK_BASE + WT_EVICT_WALK_INCR;
+		WT_ERR(__wt_realloc(session, &cache->evict_allocated,
+		    count * sizeof(WT_EVICT_ENTRY), &cache->evict));
+		cache->evict_entries = count;
+	}
+	WT_ERR(__evict_init_candidate(session, cache->evict, page));
+	/* Set the location in the eviction queue to the new entry. */
+	cache->evict_current = cache->evict;
+	/*
+	 * If the candidate list was empty we are adding a candidate, in all
+	 * other cases we are replacing an existing candidate.
+	 */
+	if (cache->evict_candidates == 0)
+		cache->evict_candidates++;
+
+	/*
+	 * Lock the page so other threads cannot get new read locks on the
+	 * page - which makes it more likely that the next pass of the eviction
+	 * server will successfully evict the page.
+	 */
+	if (!WT_ATOMIC_CAS(page->ref->state, WT_REF_MEM, WT_REF_LOCKED))
+		goto err;
+	/* Tell eviction that we already have the page locked. */
+	F_SET_ATOMIC(page, WT_PAGE_EVICT_LOCKED);
+
+err:	__wt_spin_unlock(session, &cache->evict_lock);
+	return (ret);
 }
 
 /*
@@ -270,6 +323,10 @@ __evict_worker(WT_SESSION_IMPL *session)
 		__wt_spin_unlock(session, &cache->evict_lock);
 		WT_RET(ret);
 
+		if (F_ISSET(cache, WT_EVICT_FORCE_PASS)) {
+			WT_RET(__wt_evict_lru_page(session, 0));
+			F_CLR(cache, WT_EVICT_FORCE_PASS);
+		}
 		/*
 		 * Keep evicting until we hit the target cache usage and the
 		 * target dirty percentage.
@@ -277,12 +334,10 @@ __evict_worker(WT_SESSION_IMPL *session)
 		bytes_inuse = __wt_cache_bytes_inuse(cache);
 		dirty_inuse = __wt_cache_dirty_bytes(cache);
 		bytes_max = conn->cache_size;
-		if (!F_ISSET(cache, WT_EVICT_FORCE_PASS) &&
-		    (bytes_inuse < (cache->eviction_target * bytes_max) / 100 &&
+		if ((bytes_inuse < (cache->eviction_target * bytes_max) / 100 &&
 		    dirty_inuse <
 		    (cache->eviction_dirty_target * bytes_max) / 100))
 			break;
-		F_CLR(cache, WT_EVICT_FORCE_PASS);
 
 		WT_VERBOSE_RET(session, evictserver,
 		    "Eviction pass with: Max: %" PRIu64
@@ -805,6 +860,24 @@ err:		__wt_spin_unlock(session, &cache->evict_lock);
 }
 
 /*
+ * __evict_init_candidate --
+ *	Initialize a WT_EVICT_ENTRY structure with a given page.
+ */
+static int
+__evict_init_candidate(
+    WT_SESSION_IMPL *session, WT_EVICT_ENTRY *evict, WT_PAGE *page)
+{
+	if (evict->page != NULL)
+		__evict_list_clr(session, evict);
+	evict->page = page;
+	evict->btree = session->btree;
+
+	/* Mark the page on the list */
+	F_SET_ATOMIC(page, WT_PAGE_EVICT_LRU);
+	return (0);
+}
+
+/*
  * __evict_walk_file --
  *	Get a few page eviction candidates from a single underlying file.
  */
@@ -884,12 +957,9 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, int clean)
 			continue;
 
 		WT_ASSERT(session, evict->page == NULL);
-		evict->page = page;
-		evict->btree = btree;
+		if (__evict_init_candidate(session, evict, page) != 0)
+			continue;
 		++evict;
-
-		/* Mark the page on the list */
-		F_SET_ATOMIC(page, WT_PAGE_EVICT_LRU);
 
 		WT_VERBOSE_RET(session, evictserver,
 		    "select: %p, size %" PRIu32, page, page->memory_footprint);
@@ -964,7 +1034,11 @@ __evict_get_page(
 		 */
 		ref = evict->page->ref;
 		WT_ASSERT(session, evict->page == ref->page);
-		if (!WT_ATOMIC_CAS(ref->state, WT_REF_MEM, WT_REF_LOCKED))
+
+		/* Explicitly requested pages are already locked. */
+		if (F_ISSET_ATOMIC(ref->page, WT_PAGE_EVICT_LOCKED))
+			F_CLR_ATOMIC(ref->page, WT_PAGE_EVICT_LOCKED);
+		else if (!WT_ATOMIC_CAS(ref->state, WT_REF_MEM, WT_REF_LOCKED))
 			continue;
 
 		/*
