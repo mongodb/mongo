@@ -284,8 +284,9 @@ retry:				if (!WT_ATOMIC_CAS(ref->state,
 				 * that the page will be read back in to cache.
 				 */
 				while (LF_ISSET(WT_TREE_WAIT) &&
-				    (ref->state == WT_REF_LOCKED ||
-				     ref->state == WT_REF_READING))
+				    (ref->state == WT_REF_EVICT_FORCE ||
+				    ref->state == WT_REF_LOCKED ||
+				    ref->state == WT_REF_READING))
 					__wt_yield();
 				if (ref->state == WT_REF_DELETED ||
 				    ref->state == WT_REF_DISK)

@@ -308,7 +308,6 @@ struct __wt_page {
 
 #define	WT_PAGE_BUILD_KEYS	0x01	/* Keys have been built in memory */
 #define	WT_PAGE_EVICT_LRU	0x02	/* Page is on the LRU queue */
-#define	WT_PAGE_EVICT_LOCKED	0x04	/* Page was locked when queued */
 	uint8_t flags_atomic;		/* Atomic flags, use F_*_ATOMIC */
 };
 
@@ -337,6 +336,11 @@ struct __wt_page {
  *	The page is on disk, but has been deleted from the tree; we can delete
  * row-store leaf pages without reading them if they don't reference overflow
  * items.
+ *
+ * WT_REF_EVICT_FORCE:
+ *	An application thread has selected this page for eviction. No other
+ * hazard references should be granted. If eviction fails, the eviction server
+ * should set the state back to WT_REF_MEM.
  *
  * WT_REF_EVICT_WALK:
  *	The next page to be walked for LRU eviction.  This page is available for
@@ -375,6 +379,7 @@ struct __wt_page {
 enum __wt_page_state {
 	WT_REF_DISK=0,			/* Page is on disk */
 	WT_REF_DELETED,			/* Page is on disk, but deleted */
+	WT_REF_EVICT_FORCE,		/* Page is ready for forced eviction */
 	WT_REF_EVICT_WALK,		/* Next page for LRU eviction */
 	WT_REF_LOCKED,			/* Page being evicted */
 	WT_REF_MEM,			/* Page is in cache and valid */
