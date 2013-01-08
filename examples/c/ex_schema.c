@@ -35,7 +35,7 @@
 #include <inttypes.h>
 #include <wiredtiger.h>
 
-const char *home = "WT_TEST";
+const char *home = NULL;
 
 /*! [schema declaration] */
 /* The C struct for the data we are storing in a WiredTiger table. */

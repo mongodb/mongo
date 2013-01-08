@@ -34,7 +34,7 @@
 
 #include <wiredtiger.h>
 
-const char *home = "WT_TEST";
+const char *home = NULL;
 
 /*! [case insensitive comparator] */
 /* A simple case insensitive comparator. */

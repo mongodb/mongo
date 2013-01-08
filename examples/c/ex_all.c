@@ -57,6 +57,7 @@ int session_ops(WT_SESSION *session);
 int transaction_ops(WT_CONNECTION *conn, WT_SESSION *session);
 
 const char *progname;
+const char *home = NULL;
 
 int
 cursor_ops(WT_SESSION *session)
@@ -963,13 +964,10 @@ main(void)
 {
 	int ret;
 
-	system("rm -rf WiredTigerHome && mkdir WiredTigerHome");
-
 	{
 	WT_CONNECTION *conn;
 	/*! [Open a connection] */
-	ret = wiredtiger_open(
-	    "WiredTigerHome", NULL, "create,cache_size=500M", &conn);
+	ret = wiredtiger_open(home, NULL, "create,cache_size=500M", &conn);
 	/*! [Open a connection] */
 	}
 
@@ -983,7 +981,7 @@ main(void)
 	/*! [Configure bzip2 extension] */
 	WT_CONNECTION *conn;
 
-	ret = wiredtiger_open("WiredTigerHome", NULL,
+	ret = wiredtiger_open(home, NULL,
 	    "create,"
 	    "extensions=[\"/usr/local/lib/wiredtiger_bzip2.so\"]", &conn);
 	/*! [Configure bzip2 extension] */
@@ -993,7 +991,7 @@ main(void)
 	/*! [Configure snappy extension] */
 	WT_CONNECTION *conn;
 
-	ret = wiredtiger_open("WiredTigerHome", NULL,
+	ret = wiredtiger_open(home, NULL,
 	    "create,"
 	    "extensions=[\"/usr/local/lib/wiredtiger_snappy.so\"]", &conn);
 	/*! [Configure snappy extension] */

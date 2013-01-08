@@ -47,3 +47,6 @@ $(top_srcdir)/src/include/wt_internal.h: auto-includes.chk
 
 auto-includes.chk: $(libwiredtiger_la_SOURCES)
 	@(cd $(srcdir)/dist && sh s_prototypes && sh s_typedef -b) && touch $@
+
+clean-local:
+	rm -rf WT_TEST

@@ -35,7 +35,7 @@
 
 #include <wiredtiger.h>
 
-const char *home = "WT_TEST";
+const char *home = NULL;
 
 /*! [call-center decl] */
 /*

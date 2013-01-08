@@ -33,7 +33,7 @@
 
 #include <wiredtiger.h>
 
-const char *home = "WT_TEST";
+const char *home = NULL;
 
 int main(void)
 {
