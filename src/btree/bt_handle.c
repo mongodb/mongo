@@ -590,12 +590,6 @@ __btree_page_sizes(WT_SESSION_IMPL *session, const char *config)
 		    "page sizes must be a multiple of the page allocation "
 		    "size (%" PRIu32 "B)", btree->allocsize);
 
-	/* In memory page size must be smaller than cache size. */
-	if (btree->maxmempage > S2C(session)->cache_size)
-		WT_RET_MSG(session, EINVAL,
-		    "Memory page maximum must be less than or equal to cache "
-		    "size (%" PRIu64 "B)", S2C(session)->cache_size);
-
 	/*
 	 * Set the split percentage: reconciliation splits to a
 	 * smaller-than-maximum page size so we don't split every time a new

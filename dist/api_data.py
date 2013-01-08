@@ -205,8 +205,8 @@ file_config = format_meta + lsm_config + [
 		min=0),
 	Config('memory_page_max', '5MB', r'''
 		the maximum size a page can grow to in memory before being reconciled
-		to disk. Must be less than the size of the cache. This limit is soft -
-		it is possible for pages to be temporarily larger than this value''',
+		to disk. This limit is soft - it is possible for pages to be
+		temporarily larger than this value''',
 		min='512B', max='10TB'),
 	Config('prefix_compression', 'true', r'''
 		configure row-store format key prefix compression''',
