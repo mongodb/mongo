@@ -319,7 +319,7 @@ namespace mongo {
           _lockTimeout( lockTimeout == 0 ? LOCK_TIMEOUT : lockTimeout ), _maxClockSkew( _lockTimeout / LOCK_SKEW_FACTOR ), _maxNetSkew( _maxClockSkew ), _lockPing( _maxClockSkew ),
           _mutex( "DistributedLock" )
     {
-        LOG( logLvl ) << "created new distributed lock for " << name << " on " << conn
+        log( logLvl ) << "created new distributed lock for " << name << " on " << conn
                       << " ( lock timeout : " << _lockTimeout
                       << ", ping interval : " << _lockPing << ", process : " << asProcess << " )" << endl;
 
@@ -492,7 +492,7 @@ namespace mongo {
         // This should always be true, if not, we are using the lock incorrectly.
         verify( _name != "" );
 
-        LOG( logLvl ) << "trying to acquire new distributed lock for " << _name << " on " << _conn
+        log( logLvl ) << "trying to acquire new distributed lock for " << _name << " on " << _conn
                       << " ( lock timeout : " << _lockTimeout
                       << ", ping interval : " << _lockPing << ", process : " << _processId << " )"
                       << endl;
