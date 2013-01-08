@@ -324,7 +324,16 @@ __evict_worker(WT_SESSION_IMPL *session)
 		WT_RET(ret);
 
 		if (F_ISSET(cache, WT_EVICT_FORCE_PASS)) {
-			WT_RET(__wt_evict_lru_page(session, 0));
+			ret = __wt_evict_lru_page(session, 0);
+			/*
+			 * Sometimes the page won't be available for eviction
+			 * because there is a reader still holding a hazard
+			 * reference. Give up in that case, the application
+			 * thread can add it again.
+			 */
+			if (ret == EBUSY)
+				ret = 0;
+			WT_RET(ret);
 			F_CLR(cache, WT_EVICT_FORCE_PASS);
 		}
 		/*
