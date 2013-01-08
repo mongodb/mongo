@@ -9,9 +9,16 @@ Random.setRandomSeed();
 t = new ParallelTester();
 
 numThreads = 200;
-if ( db.adminCommand( "buildInfo" ).bits < 64 )
+buildInfo = db.adminCommand( "buildInfo" )
+
+if ( buildInfo.bits < 64 ||
+     buildInfo.sysInfo.indexOf( "Linux" ) < 0 ||
+     buildInfo.debug ) {
     numThreads = 50;
+}
+
 numThreads = Math.min( numThreads, db.serverStatus().connections.available / 3 );
+
 print( "numThreads: " + numThreads );
 
 for( id = 0; id < numThreads; ++id ) {
