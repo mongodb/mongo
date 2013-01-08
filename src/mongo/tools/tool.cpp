@@ -356,7 +356,7 @@ namespace mongo {
     void Tool::addFieldOptions() {
         add_options()
         ("fields,f" , po::value<string>() , "comma separated list of field names e.g. -f name,age" )
-        ("fieldFile" , po::value<string>() , "file with fields names - 1 per line" )
+        ("fieldFile" , po::value<string>() , "file with field names - 1 per line" )
         ;
     }
 
@@ -507,7 +507,7 @@ namespace mongo {
 
             BSONObj o( buf );
             if ( _objcheck && ! o.valid() ) {
-                cerr << "INVALID OBJECT - going try and pring out " << endl;
+                cerr << "INVALID OBJECT - going to try and print out " << endl;
                 cerr << "size: " << size << endl;
                 BSONObjIterator i(o);
                 while ( i.more() ) {
