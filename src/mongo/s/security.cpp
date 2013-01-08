@@ -79,7 +79,9 @@ namespace mongo {
         DBConfigPtr config = grid.getDBConfig( adminNs );
         Shard s = config->getShard( adminNs );
 
-        ShardConnection conn( s, adminNs );
+        scoped_ptr<ScopedDbConnection> connPtr(
+            ScopedDbConnection::getInternalScopedDbConnection(s.getConnString(), 30.0));
+        ScopedDbConnection& conn = *connPtr;
         BSONObj result = conn->findOne("admin.system.users", Query());
         if( result.isEmpty() ) {
             if( ! _warned ) {
