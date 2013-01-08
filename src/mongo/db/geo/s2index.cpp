@@ -314,7 +314,21 @@ namespace mongo {
                 // getGtLtOp is horribly misnamed and really means get the operation.
                 switch (e.embeddedObject().firstElement().getGtLtOp()) {
                     case BSONObj::opNEAR:
-                    case BSONObj::opWITHIN:
+                        return OPTIMAL;
+                    case BSONObj::opWITHIN: {
+                        // This only works with $within : $geometry
+                        // TODO(hk): Have this work with $within : $centerSphere.
+                        // $within : $centerSphere could be done as a near search
+                        // or as a $within using a cap.
+                        BSONElement elt = e.embeddedObject().firstElement();
+                        if (Object != elt.type()) { continue; }
+                        const char* fname = elt.embeddedObject().firstElement().fieldName();
+                        if (mongoutils::str::equals("$geometry", fname)) {
+                            return OPTIMAL;
+                        } else {
+                            return USELESS;
+                        }
+                    }
                     case BSONObj::opGEO_INTERSECTS:
                         return OPTIMAL;
                     default:
