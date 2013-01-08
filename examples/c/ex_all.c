@@ -93,12 +93,23 @@ cursor_ops(WT_SESSION *session)
 
 	/* Reconfigure the cursor to overwrite the record. */
 	ret = session->open_cursor(
-	    session, NULL, cursor, "overwrite=true", &overwrite_cursor);
+	    session, NULL, cursor, "overwrite", &overwrite_cursor);
 	ret = cursor->close(cursor);
 
 	overwrite_cursor->set_value(overwrite_cursor, value);
 	ret = overwrite_cursor->insert(cursor);
 	/*! [Reconfigure a cursor] */
+	}
+
+	{
+	/*! [boolean configuration string example] */
+	ret = session->open_cursor(session, "table:mytable", NULL,
+	    "overwrite", &cursor);
+	ret = session->open_cursor(session, "table:mytable", NULL,
+	    "overwrite=true", &cursor);
+	ret = session->open_cursor(session, "table:mytable", NULL,
+	    "overwrite=1", &cursor);
+	/*! [boolean configuration string example] */
 	}
 
 	{
@@ -960,18 +971,6 @@ main(void)
 	ret = wiredtiger_open(
 	    "WiredTigerHome", NULL, "create,cache_size=500M", &conn);
 	/*! [Open a connection] */
-	}
-
-	{
-	WT_CONNECTION *conn;
-	/*! [boolean configuration string example] */
-	ret = wiredtiger_open(
-	    "WiredTigerHome", NULL, "create,cache_size=500M", &conn);
-	ret = wiredtiger_open(
-	    "WiredTigerHome", NULL, "create=true,cache_size=500M", &conn);
-	ret = wiredtiger_open(
-	    "WiredTigerHome", NULL, "create=1,cache_size=500M", &conn);
-	/*! [boolean configuration string example] */
 	}
 
 	/*
