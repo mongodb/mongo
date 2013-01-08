@@ -1016,10 +1016,13 @@ doneCheckOrder:
                     return true;
                 }
             }
-            if (special.anyRequireIndex()) {
+            // If all possible special indices require an index and we don't have one,
+            // error.
+            if (special.allRequireIndex()) {
                 uassert(13038, "can't find any special indices: " + special.toString()
                                + " for: " + _qps.originalQuery().toString(), false );
             }
+            // Otherwise, we can get the same functionality from the matcher.
         }
         return false;
     }
