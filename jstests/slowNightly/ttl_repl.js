@@ -84,6 +84,7 @@ assert.eq( 6 , slave2col.count() , "wrong number of docs on new secondary");
 //Check that the collMod command successfully updates the expireAfterSeconds field
 masterdb.runCommand( { collMod : "c",
                        index : { keyPattern : {x : 1}, expireAfterSeconds : 10000} } );
+rt.awaitReplication();
 
 var newTTLindex = { "key": { "x" : 1 } , "ns": "d.c" , "expireAfterSeconds" : 10000 };
 assert.eq( 1, masterdb.system.indexes.find( newTTLindex ).count(),
