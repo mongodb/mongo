@@ -149,19 +149,12 @@ __wt_hazard_clear(WT_SESSION_IMPL *session, WT_PAGE *page)
 	    --hp)
 		if (hp->page == page) {
 			/*
-			 * Trigger eviction if we want to force the page out.
+			 * Check if the page should be forcibly evicted.
 			 * Perform the check here since we want to do it when
 			 * we are about to release the hazard reference.
-			 * If adding the page failed, don't bother waking the
-			 * eviction server.
 			 */
-			if (__wt_eviction_page_force(btree, page) &&
-			    __wt_evict_add_forced_page(session, page) == 0) {
-				/* Wake eviction server. */
-				F_SET(S2C(session)->cache,
-				    WT_EVICT_FORCE_PASS);
-				__wt_evict_server_wake(session);
-			}
+			(void)__wt_evict_forced_page(session, page);
+
 			/*
 			 * We don't publish the hazard pointer clear in the
 			 * general case.  It's not required for correctness;

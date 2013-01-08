@@ -43,8 +43,8 @@ __evict_read_gen(const WT_EVICT_ENTRY *entry)
 		return (UINT64_MAX);
 
 	/* Always prioritize pages selected by force. */
-	if (__wt_eviction_page_force(entry->btree, entry->page))
-		return (1);
+	if (F_ISSET_ATOMIC(entry->page, WT_PAGE_EVICT_LOCKED))
+		return (0);
 
 	read_gen = entry->page->read_gen + entry->btree->evict_priority;
 	if (entry->page->type == WT_PAGE_ROW_INT ||
@@ -154,19 +154,25 @@ __wt_evict_list_clr_page(WT_SESSION_IMPL *session, WT_PAGE *page)
 }
 
 /*
- * __wt_evict_add_forced_page --
- *	Add a page to the head of the eviction queue.
+ * __wt_evict_forced_page --
+ *	If a page matches the force criteria add it to the eviction queue and
+ *	trigger the eviction server.
  */
 int
-__wt_evict_add_forced_page(WT_SESSION_IMPL *session, WT_PAGE *page)
+__wt_evict_forced_page(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
+	WT_BTREE *btree;
 	WT_CACHE *cache;
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	u_int count;
 
+	btree = session->btree;
 	conn = S2C(session);
 	cache = conn->cache;
+
+	if (!__wt_eviction_page_force_check(btree, page))
+		return (0);
 
 	__wt_spin_lock(session, &cache->evict_lock);
 
@@ -201,6 +207,11 @@ __wt_evict_add_forced_page(WT_SESSION_IMPL *session, WT_PAGE *page)
 	F_SET_ATOMIC(page, WT_PAGE_EVICT_LOCKED);
 
 err:	__wt_spin_unlock(session, &cache->evict_lock);
+	/* Only wake the server if the page was added and locked. */
+	if (ret == 0 && F_ISSET_ATOMIC(page, WT_PAGE_EVICT_LOCKED)) {
+		F_SET(S2C(session)->cache, WT_EVICT_FORCE_PASS);
+		__wt_evict_server_wake(session);
+	}
 	return (ret);
 }
 
@@ -357,9 +368,9 @@ __evict_worker(WT_SESSION_IMPL *session)
 		bytes_inuse = __wt_cache_bytes_inuse(cache);
 		dirty_inuse = __wt_cache_dirty_bytes(cache);
 		bytes_max = conn->cache_size;
-		if ((bytes_inuse < (cache->eviction_target * bytes_max) / 100 &&
+		if (bytes_inuse < (cache->eviction_target * bytes_max) / 100 &&
 		    dirty_inuse <
-		    (cache->eviction_dirty_target * bytes_max) / 100))
+		    (cache->eviction_dirty_target * bytes_max) / 100)
 			break;
 
 		WT_VERBOSE_RET(session, evictserver,
@@ -421,17 +432,6 @@ __wt_evict_clear_tree_walk(WT_SESSION_IMPL *session, WT_PAGE *page)
 	while (page != NULL && !WT_PAGE_IS_ROOT(page)) {
 		ref = page->ref;
 		page = page->parent;
-		/*
-		 * If the page has been locked to assist with eviction,
-		 * clear the locked state when removing it from the eviction
-		 * queue.
-		 */
-		if (F_ISSET_ATOMIC(ref->page, WT_PAGE_EVICT_LOCKED)) {
-			WT_ASSERT(session, ref->state == WT_REF_LOCKED);
-			(void)WT_ATOMIC_CAS(
-			    ref->state, WT_REF_LOCKED, WT_REF_MEM);
-			F_CLR_ATOMIC(ref->page, WT_PAGE_EVICT_LOCKED);
-		}
 		if (ref->state == WT_REF_EVICT_WALK)
 			ref->state = WT_REF_MEM;
 	}

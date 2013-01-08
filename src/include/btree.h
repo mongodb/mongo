@@ -100,6 +100,7 @@ struct __wt_btree {
 	uint32_t maxintlitem;		/* Internal page max item size */
 	uint32_t maxleafpage;		/* Leaf page max size */
 	uint32_t maxleafitem;		/* Leaf page max item size */
+	uint64_t maxmempage;		/* In memory page max size */
 
 	void *huffman_key;		/* Key huffman encoding */
 	void *huffman_value;		/* Value huffman encoding */
