@@ -1696,7 +1696,7 @@ Random.setRandomSeed = function( s ) {
 Random.genExp = function( mean ) {
     var r = Random.rand();
     if ( r == 0 ) {
-        r = Randan.rand();
+        r = Random.rand();
         if ( r == 0 ) {
             r = 0.000001;
         }
