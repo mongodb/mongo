@@ -1694,7 +1694,14 @@ Random.setRandomSeed = function( s ) {
 
 // generate a random value from the exponential distribution with the specified mean
 Random.genExp = function( mean ) {
-    return -Math.log( Random.rand() ) * mean;
+    var r = Random.rand();
+    if ( r == 0 ) {
+        r = Randan.rand();
+        if ( r == 0 ) {
+            r = 0.000001;
+        }
+    }
+    return -Math.log( r ) * mean;
 }
 
 Geo = {};
