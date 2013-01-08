@@ -36,19 +36,22 @@ static int  __evict_worker(WT_SESSION_IMPL *);
 static inline uint64_t
 __evict_read_gen(const WT_EVICT_ENTRY *entry)
 {
+	WT_PAGE *page;
 	uint64_t read_gen;
 
+	page = entry->page;
+
 	/* Never prioritize empty slots. */
-	if (entry->page == NULL)
+	if (page == NULL)
 		return (UINT64_MAX);
 
 	/* Always prioritize pages selected by force. */
-	if (F_ISSET_ATOMIC(entry->page, WT_PAGE_EVICT_LOCKED))
+	if (page->ref->state == WT_REF_EVICT_FORCE)
 		return (0);
 
-	read_gen = entry->page->read_gen + entry->btree->evict_priority;
-	if (entry->page->type == WT_PAGE_ROW_INT ||
-	    entry->page->type == WT_PAGE_COL_INT)
+	read_gen = page->read_gen + entry->btree->evict_priority;
+	if (page->type == WT_PAGE_ROW_INT ||
+	    page->type == WT_PAGE_COL_INT)
 		read_gen += WT_EVICT_INT_SKEW;
 
 	return (read_gen);
@@ -76,8 +79,6 @@ __evict_lru_cmp(const void *a, const void *b)
 static inline void
 __evict_list_clr(WT_SESSION_IMPL *session, WT_EVICT_ENTRY *e)
 {
-	WT_REF *ref;
-
 	if (e->page != NULL) {
 		WT_ASSERT(session, F_ISSET_ATOMIC(e->page, WT_PAGE_EVICT_LRU));
 		F_CLR_ATOMIC(e->page, WT_PAGE_EVICT_LRU);
@@ -86,13 +87,8 @@ __evict_list_clr(WT_SESSION_IMPL *session, WT_EVICT_ENTRY *e)
 		 * clear the locked state when removing it from the eviction
 		 * queue.
 		 */
-		if (F_ISSET_ATOMIC(e->page, WT_PAGE_EVICT_LOCKED)) {
-			ref = e->page->ref;
-			WT_ASSERT(session, ref->state == WT_REF_LOCKED);
-			(void)WT_ATOMIC_CAS(
-			    ref->state, WT_REF_LOCKED, WT_REF_MEM);
-			F_CLR_ATOMIC(e->page, WT_PAGE_EVICT_LOCKED);
-		}
+		(void)WT_ATOMIC_CAS(e->page->ref->state,
+		    WT_REF_EVICT_FORCE, WT_REF_MEM);
 	}
 	e->page = NULL;
 	e->btree = WT_DEBUG_POINT;
@@ -131,6 +127,7 @@ __wt_evict_list_clr_page(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 	WT_ASSERT(session, WT_PAGE_IS_ROOT(page) ||
 	    page->ref->page != page ||
+	    page->ref->state == WT_REF_EVICT_FORCE ||
 	    page->ref->state == WT_REF_EVICT_WALK ||
 	    page->ref->state == WT_REF_LOCKED);
 
@@ -201,14 +198,12 @@ __wt_evict_forced_page(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * page - which makes it more likely that the next pass of the eviction
 	 * server will successfully evict the page.
 	 */
-	if (!WT_ATOMIC_CAS(page->ref->state, WT_REF_MEM, WT_REF_LOCKED))
+	if (!WT_ATOMIC_CAS(page->ref->state, WT_REF_MEM, WT_REF_EVICT_FORCE))
 		goto err;
-	/* Tell eviction that we already have the page locked. */
-	F_SET_ATOMIC(page, WT_PAGE_EVICT_LOCKED);
 
 err:	__wt_spin_unlock(session, &cache->evict_lock);
 	/* Only wake the server if the page was added and locked. */
-	if (ret == 0 && F_ISSET_ATOMIC(page, WT_PAGE_EVICT_LOCKED)) {
+	if (ret == 0 && page->ref->state == WT_REF_EVICT_FORCE) {
 		F_SET(S2C(session)->cache, WT_EVICT_FORCE_PASS);
 		__wt_evict_server_wake(session);
 	}
@@ -1085,10 +1080,15 @@ __evict_get_page(
 		ref = evict->page->ref;
 		WT_ASSERT(session, evict->page == ref->page);
 
-		/* Explicitly requested pages are already locked. */
-		if (F_ISSET_ATOMIC(ref->page, WT_PAGE_EVICT_LOCKED))
-			F_CLR_ATOMIC(ref->page, WT_PAGE_EVICT_LOCKED);
-		else if (!WT_ATOMIC_CAS(ref->state, WT_REF_MEM, WT_REF_LOCKED))
+		/*
+		 * Switch pages from the evict force state to locked - the
+		 * logic for forced and regular eviction is identical from here
+		 * on, and having reconciliation be able to use a single
+		 * locked state simplifies that code.
+		 */
+		if (!WT_ATOMIC_CAS(
+		    ref->state, WT_REF_EVICT_FORCE, WT_REF_LOCKED) &&
+		    !WT_ATOMIC_CAS(ref->state, WT_REF_MEM, WT_REF_LOCKED))
 			continue;
 
 		/*
