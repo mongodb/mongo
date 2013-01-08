@@ -76,9 +76,23 @@ __evict_lru_cmp(const void *a, const void *b)
 static inline void
 __evict_list_clr(WT_SESSION_IMPL *session, WT_EVICT_ENTRY *e)
 {
+	WT_REF *ref;
+
 	if (e->page != NULL) {
 		WT_ASSERT(session, F_ISSET_ATOMIC(e->page, WT_PAGE_EVICT_LRU));
 		F_CLR_ATOMIC(e->page, WT_PAGE_EVICT_LRU);
+		/*
+		 * If the page has been locked to assist with eviction,
+		 * clear the locked state when removing it from the eviction
+		 * queue.
+		 */
+		if (F_ISSET_ATOMIC(e->page, WT_PAGE_EVICT_LOCKED)) {
+			ref = e->page->ref;
+			WT_ASSERT(session, ref->state == WT_REF_LOCKED);
+			(void)WT_ATOMIC_CAS(
+			    ref->state, WT_REF_LOCKED, WT_REF_MEM);
+			F_CLR_ATOMIC(e->page, WT_PAGE_EVICT_LOCKED);
+		}
 	}
 	e->page = NULL;
 	e->btree = WT_DEBUG_POINT;
@@ -407,6 +421,17 @@ __wt_evict_clear_tree_walk(WT_SESSION_IMPL *session, WT_PAGE *page)
 	while (page != NULL && !WT_PAGE_IS_ROOT(page)) {
 		ref = page->ref;
 		page = page->parent;
+		/*
+		 * If the page has been locked to assist with eviction,
+		 * clear the locked state when removing it from the eviction
+		 * queue.
+		 */
+		if (F_ISSET_ATOMIC(ref->page, WT_PAGE_EVICT_LOCKED)) {
+			WT_ASSERT(session, ref->state == WT_REF_LOCKED);
+			(void)WT_ATOMIC_CAS(
+			    ref->state, WT_REF_LOCKED, WT_REF_MEM);
+			F_CLR_ATOMIC(ref->page, WT_PAGE_EVICT_LOCKED);
+		}
 		if (ref->state == WT_REF_EVICT_WALK)
 			ref->state = WT_REF_MEM;
 	}
