@@ -37,7 +37,7 @@
 
 void *scan_thread(void *arg);
 
-const char *home = "WT_TEST";
+const char *home = NULL;
 #define	NUM_THREADS	10
 
 WT_CONNECTION *conn;

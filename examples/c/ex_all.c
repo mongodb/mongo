@@ -57,6 +57,7 @@ int session_ops(WT_SESSION *session);
 int transaction_ops(WT_CONNECTION *conn, WT_SESSION *session);
 
 const char *progname;
+const char *home = NULL;
 
 int
 cursor_ops(WT_SESSION *session)
@@ -93,12 +94,23 @@ cursor_ops(WT_SESSION *session)
 
 	/* Reconfigure the cursor to overwrite the record. */
 	ret = session->open_cursor(
-	    session, NULL, cursor, "overwrite=true", &overwrite_cursor);
+	    session, NULL, cursor, "overwrite", &overwrite_cursor);
 	ret = cursor->close(cursor);
 
 	overwrite_cursor->set_value(overwrite_cursor, value);
 	ret = overwrite_cursor->insert(cursor);
 	/*! [Reconfigure a cursor] */
+	}
+
+	{
+	/*! [boolean configuration string example] */
+	ret = session->open_cursor(session, "table:mytable", NULL,
+	    "overwrite", &cursor);
+	ret = session->open_cursor(session, "table:mytable", NULL,
+	    "overwrite=true", &cursor);
+	ret = session->open_cursor(session, "table:mytable", NULL,
+	    "overwrite=1", &cursor);
+	/*! [boolean configuration string example] */
 	}
 
 	{
@@ -395,6 +407,15 @@ checkpoint_ops(WT_SESSION *session)
 	ret = session->checkpoint(session,
 	    "target=(\"table:mytable\"),name=July01,drop=(May01,June01)");
 	/*! [Checkpoint examples] */
+
+	/*! [JSON quoting example] */
+	/*
+	 * Checkpoint a list of objects.
+	 * JSON parsing requires quoting the list of target URIs.
+	 */
+	ret = session->
+	    checkpoint(session, "target=(\"table:table1\",\"table:table2\")");
+	/*! [JSON quoting example] */
 
 	return (ret);
 }
@@ -943,14 +964,10 @@ main(void)
 {
 	int ret;
 
-	system("rm -rf WiredTigerHome && mkdir WiredTigerHome");
-
 	{
-	/*! [Open a connection] */
 	WT_CONNECTION *conn;
-
-	ret = wiredtiger_open(
-	    "WiredTigerHome", NULL, "create,transactional", &conn);
+	/*! [Open a connection] */
+	ret = wiredtiger_open(home, NULL, "create,cache_size=500M", &conn);
 	/*! [Open a connection] */
 	}
 
@@ -964,7 +981,7 @@ main(void)
 	/*! [Configure bzip2 extension] */
 	WT_CONNECTION *conn;
 
-	ret = wiredtiger_open("WiredTigerHome", NULL,
+	ret = wiredtiger_open(home, NULL,
 	    "create,"
 	    "extensions=[\"/usr/local/lib/wiredtiger_bzip2.so\"]", &conn);
 	/*! [Configure bzip2 extension] */
@@ -974,7 +991,7 @@ main(void)
 	/*! [Configure snappy extension] */
 	WT_CONNECTION *conn;
 
-	ret = wiredtiger_open("WiredTigerHome", NULL,
+	ret = wiredtiger_open(home, NULL,
 	    "create,"
 	    "extensions=[\"/usr/local/lib/wiredtiger_snappy.so\"]", &conn);
 	/*! [Configure snappy extension] */

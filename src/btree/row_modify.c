@@ -341,8 +341,7 @@ __wt_update_alloc(WT_SESSION_IMPL *session,
 	}
 
 	*updp = upd;
-	if (sizep != NULL)
-		*sizep = sizeof(WT_UPDATE) + size;
+	*sizep = sizeof(WT_UPDATE) + size;
 	return (0);
 }
 

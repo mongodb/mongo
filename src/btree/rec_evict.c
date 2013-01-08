@@ -279,8 +279,17 @@ __rec_review(WT_SESSION_IMPL *session,
 			}
 
 	/*
-	 * If the file is being checkpointed, the checkpoint's reconciliation of
-	 * an internal page might race with us as we evict a child in the page's
+	 * If the file is being checkpointed, we cannot evict dirty pages,
+	 * because that may free a page that appears on an internal page in the
+	 * checkpoint.  Don't rely on new updates being skipped by the
+	 * transaction used for transaction reads: (1) there are paths that
+	 * dirty pages for artificial reasons; (2) internal pages aren't
+	 * transactional; and (3) if an update was skipped during the
+	 * checkpoint (leaving the page dirty), then rolled back, we could
+	 * still successfully overwrite a page and corrupt the checkpoint.
+	 *
+	 * Further, even for clean pages, the checkpoint's reconciliation of an
+	 * internal page might race with us as we evict a child in the page's
 	 * subtree.
 	 *
 	 * One half of that test is in the reconciliation code: the checkpoint
@@ -311,6 +320,9 @@ __rec_review(WT_SESSION_IMPL *session,
 	 * we find a page which can't be merged into its parent, and failing if
 	 * we never find such a page.
 	 */
+	if (btree->checkpointing && __wt_page_is_modified(page))
+		return (EBUSY);
+
 	if (btree->checkpointing && top)
 		for (t = page->parent;; t = t->parent) {
 			if (t == NULL || t->ref == NULL)	/* root */

@@ -6,3 +6,6 @@ noinst_PROGRAMS = wtperf
 TESTS = $(noinst_PROGRAMS)
 
 TESTS_ENVIRONMENT = rm -rf WT_TEST ; mkdir WT_TEST ;
+
+clean-local:
+	rm -rf WT_TEST
