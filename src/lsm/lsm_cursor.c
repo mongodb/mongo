@@ -965,33 +965,21 @@ int
 __wt_clsm_open(WT_SESSION_IMPL *session,
     const char *uri, WT_CURSOR *owner, const char *cfg[], WT_CURSOR **cursorp)
 {
-	static WT_CURSOR iface = {
-		NULL,
-		NULL,
-		NULL,
-		NULL,
-		NULL,
-		NULL,
-		NULL,
-		NULL,
-		__clsm_compare,
-		__clsm_next,
-		__clsm_prev,
-		__clsm_reset,
-		__clsm_search,
-		__clsm_search_near,
-		__clsm_insert,
-		__clsm_update,
-		__clsm_remove,
-		__clsm_close,
-		{ NULL, NULL },		/* TAILQ_ENTRY q */
-		0,			/* recno key */
-		{ 0 },                  /* raw recno buffer */
-		{ NULL, 0, 0, NULL, 0 },/* WT_ITEM key */
-		{ NULL, 0, 0, NULL, 0 },/* WT_ITEM value */
-		0,			/* int saved_err */
-		0			/* uint32_t flags */
-	};
+	WT_CURSOR_STATIC_INIT(iface,
+	    NULL,			/* get-key */
+	    NULL,			/* get-value */
+	    NULL,			/* set-key */
+	    NULL,			/* set-value */
+	    __clsm_compare,		/* compare */
+	    __clsm_next,		/* next */
+	    __clsm_prev,		/* prev */
+	    __clsm_reset,		/* reset */
+	    __clsm_search,		/* search */
+	    __clsm_search_near,		/* search-near */
+	    __clsm_insert,		/* insert */
+	    __clsm_update,		/* update */
+	    __clsm_remove,		/* remove */
+	    __clsm_close);		/* close */
 	WT_CONFIG_ITEM cval;
 	WT_CURSOR *cursor;
 	WT_CURSOR_LSM *clsm;

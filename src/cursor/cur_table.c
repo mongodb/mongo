@@ -704,33 +704,21 @@ int
 __wt_curtable_open(WT_SESSION_IMPL *session,
     const char *uri, const char *cfg[], WT_CURSOR **cursorp)
 {
-	static WT_CURSOR iface = {
-		NULL,
-		NULL,
-		NULL,
-		NULL,
-		__wt_curtable_get_key,
-		__wt_curtable_get_value,
-		__wt_curtable_set_key,
-		__wt_curtable_set_value,
-		__curtable_compare,
-		__curtable_next,
-		__curtable_prev,
-		__curtable_reset,
-		__curtable_search,
-		__curtable_search_near,
-		__curtable_insert,
-		__curtable_update,
-		__curtable_remove,
-		__curtable_close,
-		{ NULL, NULL },		/* TAILQ_ENTRY q */
-		0,			/* recno key */
-		{ 0 },			/* raw recno buffer */
-		{ NULL, 0, 0, NULL, 0 },/* WT_ITEM key */
-		{ NULL, 0, 0, NULL, 0 },/* WT_ITEM value */
-		0,			/* int saved_err */
-		0			/* uint32_t flags */
-	};
+	WT_CURSOR_STATIC_INIT(iface,
+	    __wt_curtable_get_key,		/* get-key */
+	    __wt_curtable_get_value,		/* get-value */
+	    __wt_curtable_set_key,		/* set-key */
+	    __wt_curtable_set_value,		/* set-value */
+	    __curtable_compare,			/* compare */
+	    __curtable_next,			/* next */
+	    __curtable_prev,			/* prev */
+	    __curtable_reset,			/* reset */
+	    __curtable_search,			/* search */
+	    __curtable_search_near,		/* search-near */
+	    __curtable_insert,			/* insert */
+	    __curtable_update,			/* update */
+	    __curtable_remove,			/* remove */
+	    __curtable_close);			/* close */
 	WT_CONFIG_ITEM cval;
 	WT_CURSOR *cursor;
 	WT_CURSOR_TABLE *ctable;

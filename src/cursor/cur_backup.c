@@ -113,37 +113,21 @@ int
 __wt_curbackup_open(WT_SESSION_IMPL *session,
     const char *uri, const char *cfg[], WT_CURSOR **cursorp)
 {
-	static WT_CURSOR iface = {
-		NULL,
-		NULL,
-		NULL,
-		NULL,
-		NULL,			/* get-key */
-		(int (*)		/* get-value */
-		    (WT_CURSOR *, ...))__wt_cursor_notsup,
-		(void (*)		/* set-key */
-		    (WT_CURSOR *, ...))__wt_cursor_notsup,
-		(void (*)		/* set-value */
-		    (WT_CURSOR *, ...))__wt_cursor_notsup,
-		NULL,			/* compare */
-		__curbackup_next,
-		__wt_cursor_notsup,	/* prev */
-		__curbackup_reset,	/* reset */
-		__wt_cursor_notsup,	/* search */
-		(int (*)		/* search-near */
-		    (WT_CURSOR *, int *))__wt_cursor_notsup,
-		__wt_cursor_notsup,	/* insert */
-		__wt_cursor_notsup,	/* update */
-		__wt_cursor_notsup,	/* remove */
-		__curbackup_close,
-		{ NULL, NULL },		/* TAILQ_ENTRY q */
-		0,			/* recno key */
-		{ 0 },			/* recno raw buffer */
-		{ NULL, 0, 0, NULL, 0 },/* WT_ITEM key */
-		{ NULL, 0, 0, NULL, 0 },/* WT_ITEM value */
-		0,			/* int saved_err */
-		0			/* uint32_t flags */
-	};
+	WT_CURSOR_STATIC_INIT(iface,
+	    NULL,			/* get-key */
+	    __wt_cursor_notsup,		/* get-value */
+	    __wt_cursor_notsup,		/* set-key */
+	    __wt_cursor_notsup,		/* set-value */
+	    NULL,			/* compare */
+	    __curbackup_next,		/* next */
+	    __wt_cursor_notsup,		/* prev */
+	    __curbackup_reset,		/* reset */
+	    __wt_cursor_notsup,		/* search */
+	    __wt_cursor_notsup,		/* search-near */
+	    __wt_cursor_notsup,		/* insert */
+	    __wt_cursor_notsup,		/* update */
+	    __wt_cursor_notsup,		/* remove */
+	    __curbackup_close);		/* close */
 	WT_CURSOR *cursor;
 	WT_CURSOR_BACKUP *cb;
 	WT_DECL_RET;

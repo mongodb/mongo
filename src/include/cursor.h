@@ -5,6 +5,52 @@
  * See the file LICENSE for redistribution information.
  */
 
+/*
+ * Initialize a static WT_CURSOR structure.
+ */
+#define	WT_CURSOR_STATIC_INIT(n,					\
+	get_key,							\
+	get_value,							\
+	set_key,							\
+	set_value,							\
+	compare,							\
+	next,								\
+	prev,								\
+	reset,								\
+	search,								\
+	search_near,							\
+	insert,								\
+	update,								\
+	remove,								\
+	close)								\
+	static WT_CURSOR n = {						\
+	NULL,				/* session */			\
+	NULL,				/* uri */			\
+	NULL,				/* key_format */		\
+	NULL,				/* value_format */		\
+	(int (*)(WT_CURSOR *, ...))(get_key),				\
+	(int (*)(WT_CURSOR *, ...))(get_value),				\
+	(void (*)(WT_CURSOR *, ...))(set_key),				\
+	(void (*)(WT_CURSOR *, ...))(set_value),			\
+	(int (*)(WT_CURSOR *, WT_CURSOR *, int *))(compare),		\
+	next,								\
+	prev,								\
+	reset,								\
+	search,								\
+	(int (*)(WT_CURSOR *, int *))(search_near),			\
+	insert,								\
+	update,								\
+	remove,								\
+	close,								\
+	{ NULL, NULL },			/* TAILQ_ENTRY q */		\
+	0,				/* recno key */			\
+	{ 0 },				/* recno raw buffer */		\
+	{ NULL, 0, 0, NULL, 0 },	/* WT_ITEM key */		\
+	{ NULL, 0, 0, NULL, 0 },	/* WT_ITEM value */		\
+	0,				/* int saved_err */		\
+	0				/* uint32_t flags */		\
+}
+
 struct __wt_cursor_backup {
 	WT_CURSOR iface;
 

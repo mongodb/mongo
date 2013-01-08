@@ -289,33 +289,21 @@ err:	API_END(session);
 int
 __wt_curdump_create(WT_CURSOR *child, WT_CURSOR *owner, WT_CURSOR **cursorp)
 {
-	static WT_CURSOR iface = {
-		NULL,
-		NULL,
-		NULL,
-		NULL,
-		__curdump_get_key,
-		__curdump_get_value,
-		__curdump_set_key,
-		__curdump_set_value,
-		NULL,			/* compare */
-		__curdump_next,
-		__curdump_prev,
-		__curdump_reset,
-		__curdump_search,
-		__curdump_search_near,
-		__curdump_insert,
-		__curdump_update,
-		__curdump_remove,
-		__curdump_close,
-		{ NULL, NULL },		/* TAILQ_ENTRY q */
-		0,			/* recno key */
-		{ 0 },			/* recno raw buffer */
-		{ NULL, 0, 0, NULL, 0 },/* WT_ITEM key */
-		{ NULL, 0, 0, NULL, 0 },/* WT_ITEM value */
-		0,			/* int saved_err */
-		0			/* uint32_t flags */
-	};
+	WT_CURSOR_STATIC_INIT(iface,
+	    __curdump_get_key,		/* get-key */
+	    __curdump_get_value,	/* get-value */
+	    __curdump_set_key,		/* set-key */
+	    __curdump_set_value,	/* set-value */
+	    NULL,			/* compare */
+	    __curdump_next,		/* next */
+	    __curdump_prev,		/* prev */
+	    __curdump_reset,		/* reset */
+	    __curdump_search,		/* search */
+	    __curdump_search_near,	/* search-near */
+	    __curdump_insert,		/* insert */
+	    __curdump_update,		/* update */
+	    __curdump_remove,		/* remove */
+	    __curdump_close);		/* close */
 	WT_CURSOR *cursor;
 	WT_CURSOR_DUMP *cdump;
 	WT_SESSION_IMPL *session;

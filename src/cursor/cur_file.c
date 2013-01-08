@@ -279,33 +279,21 @@ int
 __wt_curfile_create(WT_SESSION_IMPL *session,
     WT_CURSOR *owner, const char *cfg[], WT_CURSOR **cursorp)
 {
-	static WT_CURSOR iface = {
-		NULL,
-		NULL,
-		NULL,
-		NULL,
-		NULL,
-		NULL,
-		NULL,
-		NULL,
-		__curfile_compare,
-		__curfile_next,
-		__curfile_prev,
-		__curfile_reset,
-		__curfile_search,
-		__curfile_search_near,
-		__curfile_insert,
-		__curfile_update,
-		__curfile_remove,
-		__curfile_close,
-		{ NULL, NULL },		/* TAILQ_ENTRY q */
-		0,			/* recno key */
-		{ 0 },			/* recno raw buffer */
-		{ NULL, 0, 0, NULL, 0 },/* WT_ITEM key */
-		{ NULL, 0, 0, NULL, 0 },/* WT_ITEM value */
-		0,			/* int saved_err */
-		0			/* uint32_t flags */
-	};
+	WT_CURSOR_STATIC_INIT(iface,
+	    NULL,			/* get-key */
+	    NULL,			/* get-value */
+	    NULL,			/* set-key */
+	    NULL,			/* set-value */
+	    __curfile_compare,		/* compare */
+	    __curfile_next,		/* next */
+	    __curfile_prev,		/* prev */
+	    __curfile_reset,		/* reset */
+	    __curfile_search,		/* search */
+	    __curfile_search_near,	/* search-near */
+	    __curfile_insert,		/* insert */
+	    __curfile_update,		/* update */
+	    __curfile_remove,		/* remove */
+	    __curfile_close);		/* close */
 	WT_BTREE *btree;
 	WT_CONFIG_ITEM cval;
 	WT_CURSOR *cursor;

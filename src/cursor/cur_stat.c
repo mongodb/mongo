@@ -393,34 +393,21 @@ int
 __wt_curstat_open(WT_SESSION_IMPL *session,
     const char *uri, const char *cfg[], WT_CURSOR **cursorp)
 {
-	static WT_CURSOR iface = {
-		NULL,
-		NULL,
-		NULL,
-		NULL,
-		__curstat_get_key,
-		__curstat_get_value,
-		__curstat_set_key,
-		__curstat_set_value,
-		NULL,			/* compare */
-		__curstat_next,
-		__curstat_prev,
-		__curstat_reset,
-		__curstat_search,
-					/* search-near */
-		(int (*)(WT_CURSOR *, int *))__wt_cursor_notsup,
-		__wt_cursor_notsup,	/* insert */
-		__wt_cursor_notsup,	/* update */
-		__wt_cursor_notsup,	/* remove */
-		__curstat_close,
-		{ NULL, NULL },		/* TAILQ_ENTRY q */
-		0,			/* recno key */
-		{ 0 },			/* recno raw buffer */
-		{ NULL, 0, 0, NULL, 0 },/* WT_ITEM key */
-		{ NULL, 0, 0, NULL, 0 },/* WT_ITEM value */
-		0,			/* int saved_err */
-		0			/* uint32_t flags */
-	};
+	WT_CURSOR_STATIC_INIT(iface,
+	    __curstat_get_key,		/* get-key */
+	    __curstat_get_value,	/* get-value */
+	    __curstat_set_key,		/* set-key */
+	    __curstat_set_value,	/* set-value */
+	    NULL,			/* compare */
+	    __curstat_next,		/* next */
+	    __curstat_prev,		/* prev */
+	    __curstat_reset,		/* reset */
+	    __curstat_search,		/* search */
+	    __wt_cursor_notsup,		/* search-near */
+	    __wt_cursor_notsup,		/* insert */
+	    __wt_cursor_notsup,		/* update */
+	    __wt_cursor_notsup,		/* remove */
+	    __curstat_close);		/* close */
 	WT_CONFIG_ITEM cval;
 	WT_CURSOR *cursor;
 	WT_CURSOR_STAT *cst;
