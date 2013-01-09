@@ -34,7 +34,7 @@ namespace mongo {
      * a.$ -> a
      * @return true if out is set and we made a change
      */
-    bool getCanonicalIndexField( const StringData& fullName, string* out );
+    bool getCanonicalIndexField( const string& fullName, string* out );
 
     /* Used for modifiers such as $inc, $set, $push, ...
      * stores the info about a single operation
@@ -165,13 +165,14 @@ namespace mongo {
          * @return true iff the mod is indexed
          */
         bool isIndexed( const set<string>& idxKeys ) const {
+            string myFieldName = fieldName;
 
             // first, check if full name is in idxKeys
-            if ( isIndexed( fieldName , idxKeys ) )
+            if ( isIndexed( myFieldName , idxKeys ) )
                 return true;
 
             string x;
-            if ( getCanonicalIndexField( fieldName, &x ) ) {
+            if ( getCanonicalIndexField( myFieldName, &x ) ) {
                 if ( isIndexed( x, idxKeys ) )
                     return true;
             }

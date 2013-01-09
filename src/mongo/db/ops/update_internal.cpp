@@ -1113,7 +1113,7 @@ namespace mongo {
             updateIsIndexed( i->second, idxKeys , backgroundKeys );
     }
 
-    bool getCanonicalIndexField( const StringData& fullName, string* out ) {
+    bool getCanonicalIndexField( const string& fullName, string* out ) {
         // check if fieldName contains ".$" or ".###" substrings (#=digit) and skip them
         if ( fullName.find( '.' ) == string::npos )
             return false;
