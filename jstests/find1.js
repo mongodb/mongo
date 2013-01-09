@@ -1,10 +1,20 @@
 t = db.find1;
 t.drop();
 
+lookAtDocumentMetrics = false;
+
 if ( db.serverStatus().metrics ) {
+    var ss = db.serverStatus();
+    lookAtDocumentMetrics = ss.metrics.document != null && ss.metrics.document.scanned != null;
+}
+
+print( "lookAtDocumentMetrics: " + lookAtDocumentMetrics );
+
+if ( lookAtDocumentMetrics ) {
     // ignore mongos
     nscannedStart = db.serverStatus().metrics.document.scanned
 }
+
 
 t.save( { a : 1 , b : "hi" } );
 t.save( { a : 2 , b : "hi" } );
@@ -35,7 +45,7 @@ assert( ! t.findOne( id , { a : 1 } ).b , "I" );
 
 assert(t.validate().valid,"not valid");
 
-if ( db.serverStatus().metrics ) {
+if ( lookAtDocumentMetrics ) {
     // ignore mongos
     nscannedEnd = db.serverStatus().metrics.document.scanned
     assert.lte( nscannedStart + 16, nscannedEnd );
