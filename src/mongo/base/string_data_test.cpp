@@ -148,4 +148,37 @@ namespace {
         ASSERT( !StringData( "ABC" ).equalCaseInsensitive( "AdC" ) );
     }
 
+    TEST(StartsWith, Simple) {
+        ASSERT(StringData("").startsWith(""));
+        ASSERT(!StringData("").startsWith("x"));
+        ASSERT(StringData("abcde").startsWith(""));
+        ASSERT(StringData("abcde").startsWith("a"));
+        ASSERT(StringData("abcde").startsWith("ab"));
+        ASSERT(StringData("abcde").startsWith("abc"));
+        ASSERT(StringData("abcde").startsWith("abcd"));
+        ASSERT(StringData("abcde").startsWith("abcde"));
+        ASSERT(!StringData("abcde").startsWith("abcdef"));
+        ASSERT(!StringData("abcde").startsWith("abdce"));
+        ASSERT(StringData("abcde").startsWith(StringData("abcdeXXXX").substr(0, 4)));
+        ASSERT(!StringData("abcde").startsWith(StringData("abdef").substr(0, 4)));
+        ASSERT(!StringData("abcde").substr(0, 3).startsWith("abcd"));
+    }
+
+    TEST(EndsWith, Simple) {
+        //ASSERT(StringData("").endsWith(""));
+        ASSERT(!StringData("").endsWith("x"));
+        //ASSERT(StringData("abcde").endsWith(""));
+        ASSERT(StringData("abcde").endsWith(StringData("e", 0)));
+        ASSERT(StringData("abcde").endsWith("e"));
+        ASSERT(StringData("abcde").endsWith("de"));
+        ASSERT(StringData("abcde").endsWith("cde"));
+        ASSERT(StringData("abcde").endsWith("bcde"));
+        ASSERT(StringData("abcde").endsWith("abcde"));
+        ASSERT(!StringData("abcde").endsWith("0abcde"));
+        ASSERT(!StringData("abcde").endsWith("abdce"));
+        ASSERT(StringData("abcde").endsWith(StringData("bcdef").substr(0, 4)));
+        ASSERT(!StringData("abcde").endsWith(StringData("bcde", 3)));
+        ASSERT(!StringData("abcde").substr(0, 3).endsWith("cde"));
+    }
+
 } // unnamed namespace

@@ -99,6 +99,16 @@ namespace mongo {
         size_t find( char c ) const;
         size_t find( const StringData& needle ) const;
 
+        /**
+         * Returns true if 'prefix' is a substring of this instance, anchored at position 0.
+         */
+        bool startsWith( const StringData& prefix ) const;
+
+        /**
+         * Returns true if 'suffix' is a substring of this instance, anchored at the end.
+         */
+        bool endsWith( const StringData& suffix ) const;
+
         //
         // accessors
         //

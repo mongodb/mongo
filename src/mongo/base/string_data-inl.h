@@ -97,4 +97,18 @@ namespace mongo {
         return StringData( _data + pos, n );
     }
 
-}
+    inline bool StringData::startsWith( const StringData& prefix ) const {
+        // TODO: Investigate an optimized implementation.
+        return substr(0, prefix.size()) == prefix;
+    }
+
+    inline bool StringData::endsWith( const StringData& suffix ) const {
+        // TODO: Investigate an optimized implementation.
+        const size_t thisSize = size();
+        const size_t suffixSize = suffix.size();
+        if (suffixSize > thisSize)
+            return false;
+        return substr(thisSize - suffixSize) == suffix;
+    }
+
+}  // namespace mongo
