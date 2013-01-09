@@ -127,7 +127,6 @@ __wt_evict_list_clr_page(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 	WT_ASSERT(session, WT_PAGE_IS_ROOT(page) ||
 	    page->ref->page != page ||
-	    page->ref->state == WT_REF_EVICT_FORCE ||
 	    page->ref->state == WT_REF_EVICT_WALK ||
 	    page->ref->state == WT_REF_LOCKED);
 
@@ -171,6 +170,17 @@ __wt_evict_forced_page(WT_SESSION_IMPL *session, WT_PAGE *page)
 	if (!__wt_eviction_page_force_check(btree, page))
 		return (0);
 
+	/*
+	 * Try to lock the page.  If this succeeds, we're going to queue
+	 * it for forced eviction.  We don't go right to the EVICT_FORCED
+	 * state, because that is cleared by __wt_evict_list_clr_page.
+	 */
+	if (!WT_ATOMIC_CAS(page->ref->state, WT_REF_MEM, WT_REF_LOCKED))
+		return (EBUSY);
+
+	/* If the page is already queued for ordinary eviction, clear it. */
+	__wt_evict_list_clr_page(session, page);
+
 	__wt_spin_lock(session, &cache->evict_lock);
 
 	/*
@@ -198,15 +208,20 @@ __wt_evict_forced_page(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * page - which makes it more likely that the next pass of the eviction
 	 * server will successfully evict the page.
 	 */
-	if (!WT_ATOMIC_CAS(page->ref->state, WT_REF_MEM, WT_REF_EVICT_FORCE))
-		goto err;
+	if (!WT_ATOMIC_CAS(page->ref->state, WT_REF_LOCKED, WT_REF_EVICT_FORCE))
+		WT_ERR(EBUSY);
 
 err:	__wt_spin_unlock(session, &cache->evict_lock);
-	/* Only wake the server if the page was added and locked. */
-	if (ret == 0 && page->ref->state == WT_REF_EVICT_FORCE) {
+
+	/*
+	 * Only wake the server if the page was successfully queued.
+	 * Otherwise, unlock it.
+	 */
+	if (ret == 0) {
 		F_SET(S2C(session)->cache, WT_EVICT_FORCE_PASS);
 		__wt_evict_server_wake(session);
-	}
+	} else
+		page->ref->state = WT_REF_MEM;
 	return (ret);
 }
 
@@ -324,7 +339,7 @@ __evict_worker(WT_SESSION_IMPL *session)
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	uint64_t bytes_inuse, bytes_max, dirty_inuse;
-	int clean, loop;
+	int clean, force, loop;
 
 	conn = S2C(session);
 	cache = conn->cache;
@@ -340,22 +355,23 @@ __evict_worker(WT_SESSION_IMPL *session)
 		while (ret == 0 && cache->sync_complete != cache->sync_request)
 			ret = __evict_file_request_walk(session);
 
+		/* Check for forced eviction while we hold the lock. */
+		force = F_ISSET(cache, WT_EVICT_FORCE_PASS) ? 1 : 0;
+		F_CLR(cache, WT_EVICT_FORCE_PASS);
+
 		__wt_spin_unlock(session, &cache->evict_lock);
 		WT_RET(ret);
 
-		if (F_ISSET(cache, WT_EVICT_FORCE_PASS)) {
-			ret = __wt_evict_lru_page(session, 0);
-			/*
-			 * Sometimes the page won't be available for eviction
-			 * because there is a reader still holding a hazard
-			 * reference. Give up in that case, the application
-			 * thread can add it again.
-			 */
-			if (ret == EBUSY)
-				ret = 0;
-			WT_RET(ret);
-			F_CLR(cache, WT_EVICT_FORCE_PASS);
-		}
+		/*
+		 * If we've been awoken for forced eviction, just try to evict
+		 * the first page in the queue: don't do a walk and sort first.
+		 * Sometimes the page won't be available for eviction because
+		 * there is a reader still holding a hazard reference. Give up
+		 * in that case, the application thread can add it again.
+		 */
+		if (force)
+			(void)__wt_evict_lru_page(session, 0);
+
 		/*
 		 * Keep evicting until we hit the target cache usage and the
 		 * target dirty percentage.
