@@ -10,12 +10,13 @@ SCRIPT_DIR=`dirname $0`
 RUNTIME=900
 REUSE=0
 VERBOSE=0
+WORKLOAD=0 # skip the populate phase.
 PERF_BASE="M"
 
-USAGE="Usage: `basename $0` [-hRsv] [-b binary dir] [-r root dir]"
+USAGE="Usage: `basename $0` [-hRWsv] [-b binary dir] [-r root dir]"
 
 # Parse command line options.
-while getopts b:hRr:sv OPT; do
+while getopts b:hRWr:sv OPT; do
     case "$OPT" in
         b)
             BIN_DIR=$OPTARG
@@ -37,6 +38,10 @@ while getopts b:hRr:sv OPT; do
         v)
             VERBOSE=1
             ;;
+        W)
+            WORKLOAD=1
+	    REUSE=1 # skip the populate phase.
+            ;;
         \?)
             # getopts issues an error message
             echo $USAGE >&2
@@ -54,9 +59,14 @@ fi
 
 DB_HOME="$ROOT_DIR/WT_TEST"
 OUT_DIR="$ROOT_DIR/results"
-SHARED_OPTS="-${PERF_BASE} -R 1 -U 1 -l 60 -t 1 -v 1 -h ${DB_HOME} -u table:test"
+SHARED_OPTS="-${PERF_BASE} -R 1 -U 1 -t 1 -v 1 -h ${DB_HOME} -u table:test"
 CREATE_OPTS="$SHARED_OPTS -r 0"
-RUN_OPTS="$SHARED_OPTS -e -r $RUNTIME"
+RUN_OPTS="$SHARED_OPTS -r $RUNTIME"
+if [ $WORKLOAD -eq 0 ]; then
+	RUN_OPTS="$RUN_OPTS -e"
+else
+	RUN_OPTS="$RUN_OPTS -i 0"
+fi
 
 if [ $REUSE -eq 0 ]; then
 	if [ $VERBOSE -ne 0 ]; then
@@ -84,7 +94,11 @@ for ckpt in "-c 120"; do
 		fi
 		res_name="run${ckpt}${opts}"
 		res_name=`echo $res_name | tr '[:upper:][=\- ]' '[:lower:]_'`
-		rm -rf $DB_HOME && tar zxf $ROOT_DIR/WT_TEST.tgz -C $ROOT_DIR
+		if [ $WORKLOAD -eq 0 ]; then
+			rm -rf $DB_HOME && tar zxf $ROOT_DIR/WT_TEST.tgz -C $ROOT_DIR
+		else
+			rm -rf $DB_HOME && mkdir $DB_HOME
+		fi
 		$WTPERF $RUN_OPTS $ckpt $opts &
 		pid=$!
 		t=0
@@ -102,6 +116,6 @@ if [ $VERBOSE -ne 0 ]; then
 	echo "Post processing result files."
 fi
 for f in ${OUT_DIR}/*res; do
-	grep "^[0-9]* reads" ${f} | sed -e 's/ reads//' -e 's/ updates in 1 secs//' > ${f}.out
+	grep "^[0-9]* reads" ${f} | sed -e 's/ reads//' -e 's/ inserts//' -e 's/ updates in 1 secs//' > ${f}.out
 	${SCRIPT_DIR}/get_ckpt.py < ${f} > ${f}.ckpt
 done

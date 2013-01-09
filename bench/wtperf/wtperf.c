@@ -299,6 +299,12 @@ worker(CONFIG *cfg, uint32_t worker_type)
 		next_val = (worker_type == WORKER_INSERT ?
 		    (cfg->icount + ATOMIC_ADD(g_nins_ops, 1)) :
 		    ((uint64_t)rand() % VALUE_RANGE) + 1);
+		/*
+		 * If the workload is started without a populate phase we
+		 * rely on at least one insert to get a valid item id.
+		 */
+		if (worker_type != WORKER_INSERT && VALUE_RANGE < next_val)
+			continue;
 		sprintf(key_buf, "%0*" PRIu64, cfg->key_sz, next_val);
 		cursor->set_key(cursor, key_buf);
 		switch(worker_type) {
@@ -648,9 +654,10 @@ int execute_workload(CONFIG *cfg)
 {
 	pthread_t *ithreads, *rthreads, *uthreads;
 	int ret;
-	uint64_t last_reads, last_updates;
+	uint64_t last_inserts, last_reads, last_updates;
 
 	cfg->phase = WT_PERF_READ;
+	last_inserts = last_reads = last_updates = 0;
 	lprintf(cfg, 0, 1, "Starting read threads");
 
 	if (cfg->read_threads != 0 && (ret = start_threads(
@@ -670,16 +677,20 @@ int execute_workload(CONFIG *cfg)
 		cfg->report_interval = cfg->run_time;
 
 	gettimeofday(&cfg->phase_start_time, NULL);
-	for (cfg->elapsed_time = 0, last_reads = 0, last_updates = 0;
+	for (cfg->elapsed_time = 0;
 	    cfg->elapsed_time < cfg->run_time &&
 	    g_threads_quit < cfg->read_threads;
 	    cfg->elapsed_time += cfg->report_interval) {
 		sleep(cfg->report_interval);
 		lprintf(cfg, 0, 1,
-		    "%" PRIu64 " reads, %" PRIu64 " updates in %d secs",
-		    g_nread_ops - last_reads, g_nupdate_ops - last_updates,
+		    "%" PRIu64 " reads, %" PRIu64 " inserts, %" PRIu64
+		    " updates in %d secs",
+		    g_nread_ops - last_reads,
+		    g_nins_ops - last_inserts,
+		    g_nupdate_ops - last_updates,
 		    cfg->report_interval);
 		last_reads = g_nread_ops;
+		last_inserts = g_nins_ops;
 		last_updates = g_nupdate_ops;
 	}
 	/* Report if any worker threads didn't finish. */

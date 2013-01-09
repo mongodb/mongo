@@ -35,7 +35,7 @@ print "%d, %d" % (0, 0)
 
 for line in sys.stdin:
     if line.strip().endswith('secs'):
-        time += int(line.split(' ')[5])
+        time += int(line.split(' ')[7])
     if line.startswith('Finished checkpoint'):
         duration = (int(line.split(' ')[3]) + 500) / 1000 # convert ms to secs
         print "%d, %d" % (time - duration, 1)
