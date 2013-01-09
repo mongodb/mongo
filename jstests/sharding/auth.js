@@ -132,6 +132,9 @@ s.getDB("test").foo.insert({x:1});
 login(testUser);
 assert.eq(s.getDB("test").foo.findOne(), null);
 
+print("Test that reading system.users as read-write user works");
+s.getDB("test").system.users.findOne();
+
 print("insert try 2");
 s.getDB("test").foo.insert({x:1});
 result = s.getDB("test").getLastErrorObj();
@@ -260,6 +263,9 @@ login( testUserReadOnly , readOnlyS );
 
 print( "   testing find that should work" );
 readOnlyDB.foo.findOne();
+
+print("   testing read of system.users that should fail");
+assert.throws(function() {readOnlyDB.system.users.findOne();});
 
 print( "   testing write that should fail" );
 readOnlyDB.foo.insert( { eliot : 1 } );
