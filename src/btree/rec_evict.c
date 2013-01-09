@@ -390,7 +390,15 @@ __rec_review(WT_SESSION_IMPL *session,
 			WT_VERBOSE_RET(session, evict,
 			    "eviction failed, reconciled page not clean");
 
+			/*
+			 * A pathological case: if we're in the middle of a
+			 * transaction and we're stuck trying to find space,
+			 * abort the transaction to give up all hazard
+			 * references before trying again.  Don't fail while
+			 * a checkpoint is running: we know that will pass.
+			 */
 			if (F_ISSET(txn, TXN_RUNNING) &&
+			    !btree->checkpointing &&
 			    ++txn->eviction_fails >= 100) {
 				txn->eviction_fails = 0;
 				ret = WT_DEADLOCK;
