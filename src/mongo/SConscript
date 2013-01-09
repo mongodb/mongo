@@ -262,6 +262,7 @@ env.StaticLibrary("coredb", [
         "db/projection.cpp",
         "db/querypattern.cpp",
         "db/queryutil.cpp",
+        "db/stats/timer_stats.cpp",
         "db/stats/top.cpp",
         "s/shardconnection.cpp",
         ],

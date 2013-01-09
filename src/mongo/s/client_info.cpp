@@ -23,8 +23,10 @@
 #include "server.h"
 #include "../util/scopeguard.h"
 #include "../db/commands.h"
+#include "../db/commands/server_status.h"
 #include "../db/dbmessage.h"
 #include "../db/stats/counters.h"
+#include "../db/stats/timer_stats.h"
 
 #include "../client/connpool.h"
 
@@ -164,12 +166,31 @@ namespace mongo {
         _prev = temp;
     }
 
+    static TimerStats gleWtimeStats;
+    static ServerStatusMetricField<TimerStats> displayGleLatency( "getLastError.wtime", &gleWtimeStats );
+
     bool ClientInfo::getLastError( const string& dbName,
                                    const BSONObj& options,
                                    BSONObjBuilder& result,
                                    string& errmsg,
                                    bool fromWriteBackListener)
     {
+
+        scoped_ptr<TimerHolder> gleTimerHolder;
+        if ( ! fromWriteBackListener ) {
+            bool doTiming = false;
+            const BSONElement& e = options["w"];
+            if ( e.isNumber() ) {
+                doTiming = e.numberInt() > 1;
+            }
+            else if ( e.type() == String ) {
+                doTiming = true;
+            }
+            if ( doTiming ) {
+                gleTimerHolder.reset( new TimerHolder( &gleWtimeStats ) );
+            }
+        }
+
 
         set<string> * shards = getPrev();
 
