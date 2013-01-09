@@ -391,7 +391,7 @@ namespace mongo {
                         GeoParser::isLegacyPolygon(obj));
                 _geo.push_back(GeoMatcher::makePolygonMatcher(e.fieldName(), obj, isNot));
             } else {
-                uasserted(16529, "Couldn't pull any geometry out of $within query: "
+                uasserted(16529, "Malformed $within query, or geo index required to handle query: "
                                  + obj.toString());
             }
             break;

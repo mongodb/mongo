@@ -54,6 +54,10 @@ namespace mongo {
         // Start with a conservative _radiusIncrement.
         _radiusIncrement = S2::kAvgEdge.GetValue(_params.finestIndexedLevel) * _params.radius;
         _innerRadius = _outerRadius = 0;
+        // We might want to adjust the sizes of our coverings if our search
+        // isn't local to the start point.
+        _finestLevel = _params.finestIndexedLevel;
+        _coarsestLevel = _params.coarsestIndexedLevel;
         // Set up _outerRadius with proper checks (maybe maxDistance is really small?)
         nextAnnulus();
     }
@@ -145,22 +149,9 @@ namespace mongo {
             regions.push_back(&outerCap);
             S2RegionIntersection shell(&regions);
             vector<S2CellId> cover;
-            _params.configureCoverer(&coverer);
+            coverer.set_min_level(_coarsestLevel);
+            coverer.set_max_level(_finestLevel);
             coverer.GetCovering(shell, &cover);
-            // TODO(hk): Remove this.  Grow the covering size when we grow the radius.
-            if (cover.size() > 5000) {
-                int oldCoverSize = cover.size();
-                int oldMaxLevel = coverer.max_level();
-                coverer.set_max_level(coverer.min_level());
-                coverer.set_min_level(3 * coverer.min_level() / 4);
-                coverer.GetCovering(shell, &cover);
-                LOG(2) << "Trying to create BSON indexing obj w/too many regions = " << oldCoverSize
-                    << endl;
-                LOG(2) << "Modifying coverer from (" << coverer.max_level() << "," << oldMaxLevel
-                    << ") to (" << coverer.min_level() << "," << coverer.max_level() << ")"
-                    << endl;
-                LOG(2) << "New #regions = " << cover.size() << endl;
-            }
             inExpr = S2SearchUtil::coverAsBSON(cover, field.field, _params.coarsestIndexedLevel);
             // Shell takes ownership of the regions we push in, but they're local variables and
             // deleting them would be bad.
@@ -180,6 +171,18 @@ namespace mongo {
 
         // We iterate until 1. our search radius is too big or 2. we find results.
         do {
+            // We want the size of our coverings to be proportional to the size of the annulus
+            // we're looking at, otherwise we may generate a covering set that is enormous.
+            //
+            // This penalizes users who start their searches far away from
+            // dense pockets of data and then encounter those dense pockets,
+            // but hey, you can't make every distribution of data work well.
+            S1Angle innerAngle = S1Angle::Radians(_innerRadius / _params.radius);
+            S1Angle outerAngle = S1Angle::Radians(_outerRadius / _params.radius);
+            S1Angle diff = outerAngle - innerAngle;
+            _coarsestLevel = S2::kAvgEdge.GetClosestLevel(diff.radians());
+            _finestLevel = _coarsestLevel + 1;
+
             // Some of these arguments are opaque, look at the definitions of the involved classes.
             FieldRangeSet frs(_details->parentNS().c_str(), makeFRSObject(), false, false);
             shared_ptr<FieldRangeVector> frv(new FieldRangeVector(frs, _specForFRV, 1));
@@ -257,7 +260,6 @@ namespace mongo {
         } while (_results.empty()
                  && _innerRadius < _maxDistance
                  && _innerRadius < _outerRadius);
-        // TODO: consider shrinking _radiusIncrement if _results.size() meets some criteria.
     }
 
     double S2NearCursor::distanceBetween(const QueryGeometry &field, const BSONObj &obj) {
