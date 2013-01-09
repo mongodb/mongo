@@ -29,7 +29,7 @@ namespace mongo {
         using namespace mongoutils;
 
         const double MAX_WEIGHT = 1000000000.0;
-
+        const double MAX_WORD_WEIGHT = MAX_WEIGHT / 10000;
 
         FTSSpec::FTSSpec( const BSONObj& indexInfo ) {
             _defaultLanguage = indexInfo["default_language"].valuestrsafe();
@@ -55,7 +55,7 @@ namespace mongo {
                     else {
                         double num = e.number();
                         _weights[ e.fieldName() ] = num;
-                        verify( num > 0 && num < MAX_WEIGHT );
+                        verify( num > 0 && num < MAX_WORD_WEIGHT );
                     }
                 }
                 verify( _wildcard || _weights.size() );
@@ -336,8 +336,11 @@ namespace mongo {
             BSONObj weights;
             {
                 BSONObjBuilder b;
-                for ( map<string,int>::iterator i = m.begin(); i != m.end(); ++i )
+                for ( map<string,int>::iterator i = m.begin(); i != m.end(); ++i ) {
+                    uassert( 16674, "score for word too high",
+                             i->second > 0 && i->second < MAX_WORD_WEIGHT );
                     b.append( i->first, i->second );
+                }
                 weights = b.obj();
             }
 
