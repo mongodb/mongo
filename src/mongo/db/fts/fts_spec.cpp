@@ -352,7 +352,8 @@ namespace mongo {
             if ( language_override.empty() )
                 language_override = "language";
 
-            int version = 0;
+            int version = -1;
+            int textIndexVersion = 1;
 
             BSONObjBuilder b;
             BSONObjIterator i( spec );
@@ -376,6 +377,10 @@ namespace mongo {
                 else if ( str::equals( e.fieldName(), "v" ) ) {
                     version = e.numberInt();
                 }
+                else if ( str::equals( e.fieldName(), "textIndexVersion" ) ) {
+                    textIndexVersion = e.numberInt();
+                }
+
                 else {
                     b.append( e );
                 }
@@ -388,7 +393,10 @@ namespace mongo {
             if ( !language_override.empty() )
                 b.append( "language_override", language_override);
 
-            b.append( "v", version );
+            if ( version >= 0 )
+                b.append( "v", version );
+
+            b.append( "textIndexVersion", textIndexVersion );
 
             return b.obj();
 

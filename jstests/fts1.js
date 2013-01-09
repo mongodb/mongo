@@ -14,5 +14,7 @@ t.ensureIndex( { x : "text" } );
 assert.eq( [1,2,3,4] , queryIDS( t , "c az" ) , "A1" );
 assert.eq( [4] , queryIDS( t , "d" ) , "A2" );
 
-
+idx = db.system.indexes.findOne( { ns: t.getFullName(), "weights.x" : 1 } )
+assert( idx.v >= 1, tojson( idx ) )
+assert( idx.textIndexVersion >= 1, tojson( idx ) )
 
