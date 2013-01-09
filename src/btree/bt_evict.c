@@ -219,7 +219,7 @@ err:	__wt_spin_unlock(session, &cache->evict_lock);
 	 */
 	if (ret == 0) {
 		F_SET(S2C(session)->cache, WT_EVICT_FORCE_PASS);
-		__wt_evict_server_wake(session);
+		ret = __wt_evict_server_wake(session);
 	} else
 		page->ref->state = WT_REF_MEM;
 	return (ret);
