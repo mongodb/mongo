@@ -54,7 +54,9 @@ namespace mongo {
             IndexSpec specForFRV(spec);
             // All the magic is in makeUnifiedFRS.  See below.
             // A lot of these arguments are opaque.
-            FieldRangeSet frs(_details->parentNS().c_str(), makeFRSObject(), false, false);
+            BSONObj frsObj;
+            if (!makeFRSObject(&frsObj)) { return false; }
+            FieldRangeSet frs(_details->parentNS().c_str(), frsObj, false, false);
             shared_ptr<FieldRangeVector> frv(new FieldRangeVector(frs, specForFRV, 1));
             _btreeCursor.reset(BtreeCursor::make(nsdetails(_details->parentNS()),
                                                  *_details, frv, 0, 1));
@@ -65,19 +67,25 @@ namespace mongo {
 
     // Make the FieldRangeSet of keys we look for.  Uses coverAsBSON to go from
     // a region to a covering to a set of keys for that covering.
-    BSONObj S2Cursor::makeFRSObject() {
+    // Returns false if the FRS object would be empty.
+    bool S2Cursor::makeFRSObject(BSONObj *out) {
         BSONObjBuilder frsObjBuilder;
         frsObjBuilder.appendElements(_filteredQuery);
 
         S2RegionCoverer coverer;
+        _params.configureCoverer(&coverer);
 
         for (size_t i = 0; i < _fields.size(); ++i) {
-            _params.configureCoverer(&coverer);
-            BSONObj fieldRange = S2SearchUtil::coverAsBSON(&coverer, _fields[i].getRegion(),
-                                                           _fields[i].field);
+            vector<S2CellId> cover;
+            coverer.GetCovering(_fields[i].getRegion(), &cover);
+            if (0 == cover.size()) { return false; }
+            BSONObj fieldRange = S2SearchUtil::coverAsBSON(cover, _fields[i].field,
+                _params.coarsestIndexedLevel);
             frsObjBuilder.appendElements(fieldRange);
         }
-        return frsObjBuilder.obj();
+
+        *out = frsObjBuilder.obj();
+        return true;
     }
 
     Record* S2Cursor::_current() { return _btreeCursor->currLoc().rec(); }

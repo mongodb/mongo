@@ -23,34 +23,16 @@ namespace mongo {
         return ss.str();
     }
 
-    BSONObj S2SearchUtil::coverAsBSON(S2RegionCoverer *coverer, const S2Region& region,
-                                      const string& field) {
+    BSONObj S2SearchUtil::coverAsBSON(const vector<S2CellId> &cover, const string& field,
+                                      const int coarsestIndexedLevel) {
         BSONObjBuilder queryBuilder;
         BSONObjBuilder inBuilder(queryBuilder.subobjStart(field));
         // To have an array where elements of that array are regexes, we have to do this.
         BSONObjBuilder inArrayBuilder(inBuilder.subarrayStart("$in"));
-        // Sadly we must keep track of this ourselves.  Oh, BSONObjBuilder, you rascsal!
+        // Sadly we must keep track of this ourselves.  Oh, BSONObjBuilder, you rascal!
         int arrayPos = 0;
 
-        bool considerCoarser = true;
-        vector<S2CellId> cover;
-        coverer->GetCovering(region, &cover);
-        if (cover.size() > 5000) {
-            int oldCoverSize = cover.size();
-            int oldMaxLevel = coverer->max_level();
-            coverer->set_max_level(coverer->min_level());
-            coverer->set_min_level(3 * coverer->min_level() / 4);
-            // Our finest level is the coarsest level in the index, so don't look coarser because
-            // there's nothing there.
-            considerCoarser = false;
-            coverer->GetCovering(region, &cover);
-            LOG(2) << "Trying to create BSON indexing obj w/too many regions = " << oldCoverSize
-                   << endl;
-            LOG(2) << "Modifying coverer from (" << coverer->max_level() << "," << oldMaxLevel
-                   << ") to (" << coverer->min_level() << "," << coverer->max_level() << ")"
-                   << endl;
-            LOG(2) << "New #regions = " << cover.size() << endl;
-        }
+        bool considerCoarser = false;
 
         // Look at the cells we cover and all cells that are within our covering and
         // finer.  Anything with our cover as a strict prefix is contained within the cover and
@@ -59,6 +41,9 @@ namespace mongo {
             // First argument is position in the array as a string.
             // Third argument is options to regex.
             inArrayBuilder.appendRegex(myitoa(arrayPos++), "^" + cover[i].toString(), "");
+            // If any of our covers could be covered by something in the index, we have
+            // to look at things coarser.
+            considerCoarser = considerCoarser || (cover[i].level() > coarsestIndexedLevel);
         }
 
         if (considerCoarser) {
@@ -77,7 +62,7 @@ namespace mongo {
             // stored (and therefore could be 1).
             set<S2CellId> parents;
             for (size_t i = 0; i < cover.size(); ++i) {
-                for (S2CellId id = cover[i].parent(); id.level() >= coverer->min_level();
+                for (S2CellId id = cover[i].parent(); id.level() >= coarsestIndexedLevel;
                         id = id.parent()) {
                     parents.insert(id);
                 }

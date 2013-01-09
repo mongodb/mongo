@@ -378,6 +378,9 @@ namespace mongo {
                     uasserted(16572, "Can't extract geo keys from object, malformed geometry?:"
                                      + obj.toString());
                 }
+                uassert(16673, "Unable to generate keys for (likely malformed) geometry: "
+                               + obj.toString(),
+                        cells.size() > 0);
 
                 for (vector<string>::const_iterator it = cells.begin(); it != cells.end(); ++it) {
                     BSONObjBuilder b;

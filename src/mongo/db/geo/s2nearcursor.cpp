@@ -129,7 +129,6 @@ namespace mongo {
         frsObjBuilder.appendElements(_filteredQuery);
 
         S2RegionCoverer coverer;
-        _params.configureCoverer(&coverer);
         // Step 1: Make the monstrous BSONObj that describes what keys we want.
         for (size_t i = 0; i < _fields.size(); ++i) {
             const QueryGeometry &field = _fields[i];
@@ -145,7 +144,24 @@ namespace mongo {
             regions.push_back(&invInnerCap);
             regions.push_back(&outerCap);
             S2RegionIntersection shell(&regions);
-            inExpr = S2SearchUtil::coverAsBSON(&coverer, shell, field.field);
+            vector<S2CellId> cover;
+            _params.configureCoverer(&coverer);
+            coverer.GetCovering(shell, &cover);
+            // TODO(hk): Remove this.  Grow the covering size when we grow the radius.
+            if (cover.size() > 5000) {
+                int oldCoverSize = cover.size();
+                int oldMaxLevel = coverer.max_level();
+                coverer.set_max_level(coverer.min_level());
+                coverer.set_min_level(3 * coverer.min_level() / 4);
+                coverer.GetCovering(shell, &cover);
+                LOG(2) << "Trying to create BSON indexing obj w/too many regions = " << oldCoverSize
+                    << endl;
+                LOG(2) << "Modifying coverer from (" << coverer.max_level() << "," << oldMaxLevel
+                    << ") to (" << coverer.min_level() << "," << coverer.max_level() << ")"
+                    << endl;
+                LOG(2) << "New #regions = " << cover.size() << endl;
+            }
+            inExpr = S2SearchUtil::coverAsBSON(cover, field.field, _params.coarsestIndexedLevel);
             // Shell takes ownership of the regions we push in, but they're local variables and
             // deleting them would be bad.
             shell.Release(NULL);

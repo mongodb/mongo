@@ -30,8 +30,8 @@ namespace mongo {
     public:
         // Given a coverer, region, and field name, generate a BSONObj that we can pass to a
         // FieldRangeSet so that we only examine the keys that the provided region may intersect.
-        static BSONObj coverAsBSON(S2RegionCoverer *coverer, const S2Region &region,
-                                   const string& field);
+        static BSONObj coverAsBSON(const vector<S2CellId> &cover, const string& field,
+                                   const int coarsestIndexedLevel);
     };
 
     // Used for passing geo data from the newCursor entry point to the S2Cursor class.
