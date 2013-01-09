@@ -25,13 +25,10 @@ __wt_page_is_modified(WT_PAGE *page)
 static inline int
 __wt_eviction_page_force_check(WT_BTREE *btree, WT_PAGE *page)
 {
-	/*
-	 * The leaf page multiplier is arbitrary here. It happens to be about
-	 * 1MB if the btree is using 16KB pages.
-	 */
-	return (btree != NULL && __wt_page_is_modified(page) &&
+	return (btree != NULL && !F_ISSET(btree, WT_BTREE_NO_EVICTION) &&
+            __wt_page_is_modified(page) &&
 	    page->type != WT_PAGE_ROW_INT && page->type != WT_PAGE_COL_INT &&
-	    (page->memory_footprint > btree->maxmempage));
+	    page->memory_footprint > btree->maxmempage);
 }
 
 /*
