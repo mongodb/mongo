@@ -165,7 +165,8 @@ __wt_tree_walk(WT_SESSION_IMPL *session, WT_PAGE **pagep, uint32_t flags)
 	WT_PAGE *page, *t;
 	WT_REF *ref;
 	uint32_t slot;
-	int cache, compact, discard, eviction, prev, set_read_gen, skip;
+	int cache, compact, discard, eviction, prev, set_read_gen;
+	int skip, skip_intl, skip_leaf;
 
 	btree = session->btree;
 
@@ -176,6 +177,8 @@ __wt_tree_walk(WT_SESSION_IMPL *session, WT_PAGE **pagep, uint32_t flags)
 	eviction = LF_ISSET(WT_TREE_EVICT) ? 1 : 0;
 	cache = LF_ISSET(WT_TREE_CACHE) ? 1 : 0;
 	prev = LF_ISSET(WT_TREE_PREV) ? 1 : 0;
+	skip_intl = LF_ISSET(WT_TREE_SKIP_INTL) ? 1 : 0;
+	skip_leaf = LF_ISSET(WT_TREE_SKIP_LEAF) ? 1 : 0;
 
 	/*
 	 * Take a copy of any returned page; we have a hazard pointer on the
@@ -192,7 +195,7 @@ __wt_tree_walk(WT_SESSION_IMPL *session, WT_PAGE **pagep, uint32_t flags)
 		goto descend;
 	}
 
-	/* If the active page was the root, we've reached the walk's end. */
+ascend:	/* If the active page was the root, we've reached the walk's end. */
 	if (WT_PAGE_IS_ROOT(page))
 		return (0);
 
@@ -218,6 +221,8 @@ __wt_tree_walk(WT_SESSION_IMPL *session, WT_PAGE **pagep, uint32_t flags)
 	for (;;) {
 		if ((prev && slot == 0) ||
 		    (!prev && slot == page->entries - 1)) {
+			if (skip_intl)
+				goto ascend;
 			*pagep = page;
 			return (0);
 		}
@@ -230,6 +235,8 @@ descend:	for (;;) {
 			if (page->type == WT_PAGE_ROW_INT ||
 			    page->type == WT_PAGE_COL_INT)
 				ref = &page->u.intl.t[slot];
+			else if (skip_leaf)
+				goto ascend;
 			else {
 				*pagep = page;
 				return (0);
@@ -284,8 +291,9 @@ retry:				if (!WT_ATOMIC_CAS(ref->state,
 				 * that the page will be read back in to cache.
 				 */
 				while (LF_ISSET(WT_TREE_WAIT) &&
-				    (ref->state == WT_REF_LOCKED ||
-				     ref->state == WT_REF_READING))
+				    (ref->state == WT_REF_EVICT_FORCE ||
+				    ref->state == WT_REF_LOCKED ||
+				    ref->state == WT_REF_READING))
 					__wt_yield();
 				if (ref->state == WT_REF_DELETED ||
 				    ref->state == WT_REF_DISK)

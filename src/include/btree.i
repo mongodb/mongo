@@ -17,6 +17,24 @@ __wt_page_is_modified(WT_PAGE *page)
 }
 
 /*
+ * __wt_eviction_page_force_check --
+ *	Return if a page should be a high priority for eviction. The method
+ *      does not use a session handle, since it is called from the eviction
+ *      sort routine, that does not have a session easily available.
+ */
+static inline int
+__wt_eviction_page_force_check(WT_BTREE *btree, WT_PAGE *page)
+{
+	/*
+	 * The leaf page multiplier is arbitrary here. It happens to be about
+	 * 1MB if the btree is using 16KB pages.
+	 */
+	return (btree != NULL && __wt_page_is_modified(page) &&
+	    page->type != WT_PAGE_ROW_INT && page->type != WT_PAGE_COL_INT &&
+	    (page->memory_footprint > btree->maxmempage));
+}
+
+/*
  * __wt_cache_page_inmem_incr --
  *	Increment a page's memory footprint in the cache.
  */

@@ -323,6 +323,7 @@ __rec_child_modify(WT_SESSION_IMPL *session,
 
 			WT_HAVE_DIAGNOSTIC_YIELD;
 			return (ret);
+		case WT_REF_EVICT_FORCE:
 		case WT_REF_LOCKED:
 			/*
 			 * If being called by the eviction server, the page was

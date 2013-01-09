@@ -573,6 +573,8 @@ __btree_page_sizes(WT_SESSION_IMPL *session, const char *config)
 	WT_RET(__wt_config_getones(
 	    session, config, "leaf_item_max", &cval));
 	btree->maxleafitem = (uint32_t)cval.val;
+	WT_RET(__wt_config_getones(session, config, "memory_page_max", &cval));
+	btree->maxmempage = (uint64_t)cval.val;
 
 	/* Allocation sizes must be a power-of-two, nothing else makes sense. */
 	if (!__wt_ispo2(btree->allocsize))
