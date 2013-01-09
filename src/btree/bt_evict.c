@@ -708,7 +708,7 @@ __wt_sync_file(WT_SESSION_IMPL *session, int syncop)
 		 * eviction from getting underneath an internal page that is
 		 * being evicted.
 		 */
-		walk_flags = WT_TREE_EVICT | WT_TREE_WAIT;
+		walk_flags = WT_TREE_EVICT | WT_TREE_SKIP_LEAF | WT_TREE_WAIT;
 		break;
 	case WT_SYNC_COMPACT:
 	case WT_SYNC_LEAF:
@@ -717,7 +717,7 @@ __wt_sync_file(WT_SESSION_IMPL *session, int syncop)
 		 * activity to be resolved.  Use hazard references so we don't
 		 * prevent other eviction from the same subtree.
 		 */
-		walk_flags = WT_TREE_CACHE | WT_TREE_WAIT;
+		walk_flags = WT_TREE_CACHE | WT_TREE_SKIP_INTL | WT_TREE_WAIT;
 		break;
 	WT_ILLEGAL_VALUE(session);
 	}
@@ -731,9 +731,8 @@ __wt_sync_file(WT_SESSION_IMPL *session, int syncop)
 			break;
 		case WT_SYNC_LEAF:
 			/* First pass: skip internal pages. */
-			if (page->type == WT_PAGE_ROW_INT ||
-			    page->type == WT_PAGE_COL_INT)
-				break;
+			WT_ASSERT(session, page->type != WT_PAGE_ROW_INT &&
+			    page->type != WT_PAGE_COL_INT);
 
 			/* Write dirty pages. */
 			if (__wt_page_is_modified(page))
@@ -741,9 +740,8 @@ __wt_sync_file(WT_SESSION_IMPL *session, int syncop)
 			break;
 		case WT_SYNC_INTERNAL:
 			/* Second pass: skip leaf pages. */
-			if (page->type != WT_PAGE_ROW_INT &&
-			    page->type != WT_PAGE_COL_INT)
-				break;
+			WT_ASSERT(session, page->type == WT_PAGE_ROW_INT ||
+			    page->type == WT_PAGE_COL_INT);
 
 			/* Write dirty pages. */
 			if (__wt_page_is_modified(page))

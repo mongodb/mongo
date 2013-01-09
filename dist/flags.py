@@ -36,6 +36,8 @@ flags = {
 		'TREE_DISCARD',
 		'TREE_EVICT',
 		'TREE_PREV',
+		'TREE_SKIP_INTL',
+		'TREE_SKIP_LEAF',
 		'TREE_WAIT',
 	],
 	'verbose' : [
