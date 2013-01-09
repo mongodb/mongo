@@ -23,6 +23,7 @@
 #include "../util/startup_test.h"
 #include "../util/timer.h"
 #include "mongo/client/dbclientcursor.h"
+#include "mongo/db/namespacestring.h"
 
 #include "chunk.h"
 #include "chunk_diff.h"
@@ -364,7 +365,7 @@ namespace mongo {
             // this does mean mongos has more back pressure than mongod alone
             // since it nots 100% tcp queue bound
             // this was implicit before since we did a splitVector on the same socket
-            ShardConnection::sync();
+            ShardConnection::sync( NamespaceString(getManager()->getns()).db );
 
             LOG(1) << "about to initiate autosplit: " << *this << " dataWritten: " << _dataWritten << " splitThreshold: " << splitThreshold << endl;
 

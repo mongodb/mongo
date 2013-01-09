@@ -267,7 +267,7 @@ namespace mongo {
             return _setVersion;
         }
 
-        static void sync();
+        static void sync( const string& db );
 
         void donotCheckVersion() {
             _setVersion = false;

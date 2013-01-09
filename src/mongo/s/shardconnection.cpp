@@ -98,12 +98,12 @@ namespace mongo {
             s->avail = conn;
         }
 
-        void sync() {
+        void sync( const string& db ) {
             for ( HostMap::iterator i=_hosts.begin(); i!=_hosts.end(); ++i ) {
                 string addr = i->first;
                 Status* ss = i->second;
                 if ( ss->avail )
-                    ss->avail->getLastError();
+                    ss->avail->getLastError(db);
                 
             }
         }
@@ -221,8 +221,8 @@ namespace mongo {
         }
     }
 
-    void ShardConnection::sync() {
-        ClientConnections::threadInstance()->sync();
+    void ShardConnection::sync( const string& db ) {
+        ClientConnections::threadInstance()->sync(db);
     }
 
     bool ShardConnection::runCommand( const string& db , const BSONObj& cmd , BSONObj& res ) {

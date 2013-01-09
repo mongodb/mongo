@@ -35,6 +35,7 @@
 
 #include "../client/connpool.h"
 #include "mongo/client/dbclientcursor.h"
+#include "mongo/db/namespacestring.h"
 
 #include "../db/dbmessage.h"
 #include "../db/commands.h"
@@ -712,13 +713,13 @@ namespace mongo {
                 if ( ! okForConfigChanges( errmsg ) )
                     return false;
 
-                ShardConnection::sync();
-
                 string ns = cmdObj.firstElement().valuestrsafe();
                 if ( ns.size() == 0 ) {
                     errmsg = "no ns";
                     return false;
                 }
+
+                ShardConnection::sync( NamespaceString(ns).db );
 
                 DBConfigPtr config = grid.getDBConfig( ns );
                 if ( ! config->isSharded( ns ) ) {
@@ -794,14 +795,15 @@ namespace mongo {
                 if ( ! okForConfigChanges( errmsg ) )
                     return false;
 
-                ShardConnection::sync();
-
-                Timer t;
                 string ns = cmdObj.firstElement().valuestrsafe();
                 if ( ns.size() == 0 ) {
                     errmsg = "no ns";
                     return false;
                 }
+
+                ShardConnection::sync( NamespaceString(ns).db );
+
+                Timer t;
 
                 DBConfigPtr config = grid.getDBConfig( ns );
                 if ( ! config->isSharded( ns ) ) {
