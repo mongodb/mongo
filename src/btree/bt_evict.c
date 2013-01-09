@@ -1102,8 +1102,10 @@ __evict_get_page(
 		 */
 		if (!WT_ATOMIC_CAS(ref->state, WT_REF_MEM, WT_REF_LOCKED) &&
 		    !WT_ATOMIC_CAS(
-		    ref->state, WT_REF_EVICT_FORCE, WT_REF_LOCKED))
+		    ref->state, WT_REF_EVICT_FORCE, WT_REF_LOCKED)) {
+			__evict_list_clr(session, evict);
 			continue;
+		}
 
 		/*
 		 * Increment the LRU count in the btree handle to prevent it
