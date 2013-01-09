@@ -1086,9 +1086,9 @@ __evict_get_page(
 		 * on, and having reconciliation be able to use a single
 		 * locked state simplifies that code.
 		 */
-		if (!WT_ATOMIC_CAS(
-		    ref->state, WT_REF_EVICT_FORCE, WT_REF_LOCKED) &&
-		    !WT_ATOMIC_CAS(ref->state, WT_REF_MEM, WT_REF_LOCKED))
+		if (!WT_ATOMIC_CAS(ref->state, WT_REF_MEM, WT_REF_LOCKED) &&
+		    !WT_ATOMIC_CAS(
+		    ref->state, WT_REF_EVICT_FORCE, WT_REF_LOCKED))
 			continue;
 
 		/*
