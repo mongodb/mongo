@@ -91,7 +91,8 @@ namespace mongo {
         if ( pos > size() )
             throw std::out_of_range( "out of range" );
 
-        if ( pos + n > size() )
+        // truncate to end of string
+        if ( n > size() - pos )
             n = size() - pos;
 
         return StringData( _data + pos, n );
