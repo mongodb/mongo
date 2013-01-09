@@ -111,6 +111,50 @@ namespace mongo_test {
         }
     }
 
+    TEST(MockDBClientConnTest, InsertAndQueryTwice) {
+        MockRemoteDBServer server("test");
+        const string ns("test.user");
+
+        server.insert(ns, BSON("x" << 1));
+
+        {
+            MockDBClientConnection conn(&server);
+            std::auto_ptr<mongo::DBClientCursor> cursor = conn.query(ns);
+
+            ASSERT(cursor->more());
+            BSONObj firstDoc = cursor->next();
+            ASSERT_EQUALS(1, firstDoc["x"].numberInt());
+        }
+
+        server.insert(ns, BSON("y" << 2));
+
+        {
+            MockDBClientConnection conn(&server);
+            std::auto_ptr<mongo::DBClientCursor> cursor = conn.query(ns);
+
+            ASSERT(cursor->more());
+            BSONObj firstDoc = cursor->next();
+            ASSERT_EQUALS(1, firstDoc["x"].numberInt());
+
+            ASSERT(cursor->more());
+            BSONObj secondDoc = cursor->next();
+            ASSERT_EQUALS(2, secondDoc["y"].numberInt());
+
+            ASSERT(!cursor->more());
+        }
+    }
+
+    TEST(MockDBClientConnTest, QueryWithNoResults) {
+        MockRemoteDBServer server("test");
+        const string ns("test.user");
+
+        server.insert(ns, BSON("x" << 1));
+        MockDBClientConnection conn(&server);
+        std::auto_ptr<mongo::DBClientCursor> cursor = conn.query("other.ns");
+
+        ASSERT(!cursor->more());
+    }
+
     TEST(MockDBClientConnTest, MultiNSInsertAndQuery) {
         MockRemoteDBServer server("test");
         const string ns1("test.user");

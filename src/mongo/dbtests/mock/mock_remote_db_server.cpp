@@ -101,12 +101,8 @@ namespace mongo {
     void MockRemoteDBServer::insert(const string &ns, BSONObj obj, int flags) {
         scoped_spinlock sLock(_lock);
 
-        if (_dataMgr.count(ns) == 0) {
-            _dataMgr[ns] = new BSONArrayBuilder();
-        }
-
-        BSONArrayBuilder* mockCollection = _dataMgr[ns];
-        mockCollection->append(obj.copy());
+        vector<BSONObj>& mockCollection = _dataMgr[ns];
+        mockCollection.push_back(obj.copy());
     }
 
     void MockRemoteDBServer::remove(const string& ns, Query query, int flags) {
@@ -115,7 +111,6 @@ namespace mongo {
             return;
         }
 
-        delete _dataMgr[ns];
         _dataMgr.erase(ns);
     }
 
@@ -180,12 +175,13 @@ namespace mongo {
         scoped_spinlock sLock(_lock);
         _queryCount++;
 
-        MockDataMgr::iterator collIter = _dataMgr.find(ns);
-        if (collIter == _dataMgr.end()) {
-            return BSONArray();
+        const vector<BSONObj>& coll = _dataMgr[ns];
+        BSONArrayBuilder result;
+        for (vector<BSONObj>::const_iterator iter = coll.begin(); iter != coll.end(); ++ iter) {
+            result.append(iter->copy());
         }
 
-        return BSONArray((collIter->second)->done().copy());
+        return BSONArray(result.obj());
     }
 
     mongo::ConnectionString::ConnectionType MockRemoteDBServer::type() const {

@@ -192,7 +192,7 @@ namespace mongo {
         void checkIfUp(InstanceID id) const;
 
         typedef unordered_map<std::string, boost::shared_ptr<CircularBSONIterator> > CmdToReplyObj;
-        typedef unordered_map<std::string, mongo::BSONArrayBuilder*> MockDataMgr;
+        typedef unordered_map<std::string, vector<BSONObj> > MockDataMgr;
 
         bool _isRunning;
 
