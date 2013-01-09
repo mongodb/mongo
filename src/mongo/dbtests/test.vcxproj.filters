@@ -1668,6 +1668,21 @@
     <ClInclude Include="..\db\ops\modifier_base.h">
       <Filter>db\ops</Filter>
     </ClInclude>
+    <ClInclude Include="..\db\stats\counters.h">
+      <Filter>db\stats</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\stats\fine_clock.h">
+      <Filter>db\stats</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\stats\snapshots.h">
+      <Filter>db\stats</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\stats\timer_stats.h">
+      <Filter>db\stats</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\stats\top.h">
+      <Filter>db\stats</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\client\connpool.cpp">
@@ -3282,6 +3297,9 @@
     </ClCompile>
     <ClCompile Include="..\db\ops\field_ref.cpp">
       <Filter>db\ops</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\stats\timer_stats.cpp">
+      <Filter>db\stats</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

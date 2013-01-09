@@ -1185,6 +1185,9 @@
     <ClCompile Include="..\db\auth\auth_server_parameters.cpp">
       <Filter>db\auth</Filter>
     </ClCompile>
+    <ClCompile Include="..\db\stats\timer_stats.cpp">
+      <Filter>db\stats</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\pch.h" />
@@ -2267,6 +2270,18 @@
     </ClInclude>
     <ClInclude Include="..\db\fts\tokenizer.h">
       <Filter>db\fts</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\stats\counters.h">
+      <Filter>db\stats</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\stats\fine_clock.h">
+      <Filter>db\stats</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\stats\timer_stats.h">
+      <Filter>db\stats</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\stats\top.h">
+      <Filter>db\stats</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

@@ -1775,6 +1775,9 @@
     <ClCompile Include="ops\field_ref.cpp">
       <Filter>db\ops</Filter>
     </ClCompile>
+    <ClCompile Include="stats\timer_stats.cpp">
+      <Filter>db\stats</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\targetver.h" />
@@ -3761,6 +3764,12 @@
     </ClInclude>
     <ClInclude Include="ops\modifier_base.h">
       <Filter>db\ops</Filter>
+    </ClInclude>
+    <ClInclude Include="stats\fine_clock.h">
+      <Filter>db\stats</Filter>
+    </ClInclude>
+    <ClInclude Include="stats\timer_stats.h">
+      <Filter>db\stats</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

@@ -759,6 +759,11 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="..\db\repl\bgsync.h" />
     <ClInclude Include="..\db\server_parameters.h" />
     <ClInclude Include="..\db\server_parameters_inline.h" />
+    <ClInclude Include="..\db\stats\counters.h" />
+    <ClInclude Include="..\db\stats\fine_clock.h" />
+    <ClInclude Include="..\db\stats\snapshots.h" />
+    <ClInclude Include="..\db\stats\timer_stats.h" />
+    <ClInclude Include="..\db\stats\top.h" />
     <ClInclude Include="..\platform\atomic_intrinsics.h" />
     <ClInclude Include="..\platform\atomic_intrinsics_win32.h" />
     <ClInclude Include="..\platform\atomic_word.h" />
@@ -2789,6 +2794,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="..\db\restapi.cpp" />
     <ClCompile Include="..\db\scanandorder.cpp" />
     <ClCompile Include="..\db\server_parameters.cpp" />
+    <ClCompile Include="..\db\stats\timer_stats.cpp" />
     <ClCompile Include="..\platform\random.cpp" />
     <ClCompile Include="..\scripting\bson_template_evaluator.cpp" />
     <ClCompile Include="..\scripting\sm_db.cpp" />
