@@ -30,6 +30,12 @@ namespace mongo {
     class ModState;
     class ModSetState;
 
+    /**
+     * a.$ -> a
+     * @return true if out is set and we made a change
+     */
+    bool getCanonicalIndexField( const StringData& fullName, string* out );
+
     /* Used for modifiers such as $inc, $set, $push, ...
      * stores the info about a single operation
      * once created should never be modified
@@ -143,6 +149,7 @@ namespace mongo {
             // check if there is an index key equal to mod
             if ( idxKeys.count(fullName) )
                 return true;
+
             // check if there is an index key that is a child of mod
             set< string >::const_iterator j = idxKeys.upper_bound( fullName );
             if ( j != idxKeys.end() && j->find( fullName ) == 0 && (*j)[fullName.size()] == '.' )
@@ -151,51 +158,21 @@ namespace mongo {
             return false;
         }
 
+        /**
+         * checks if mod is in the index by inspecting fieldName, and removing
+         * .$ or .### substrings (#=digit) with any number of digits.
+         *
+         * @return true iff the mod is indexed
+         */
         bool isIndexed( const set<string>& idxKeys ) const {
-            string fullName = fieldName;
 
-            if ( isIndexed( fullName , idxKeys ) )
+            // first, check if full name is in idxKeys
+            if ( isIndexed( fieldName , idxKeys ) )
                 return true;
 
-            if ( strstr( fieldName , "." ) ) {
-                // check for a.0.1
-                StringBuilder buf;
-                for ( size_t i=0; i<fullName.size(); i++ ) {
-                    char c = fullName[i];
-
-                    if ( c == '$' &&
-                            i > 0 && fullName[i-1] == '.' &&
-                            i+1<fullName.size() &&
-                            fullName[i+1] == '.' ) {
-                        i++;
-                        continue;
-                    }
-
-                    buf << c;
-
-                    if ( c != '.' )
-                        continue;
-
-                    if ( ! isdigit( fullName[i+1] ) )
-                        continue;
-
-                    bool possible = true;
-                    size_t j=i+2;
-                    for ( ; j<fullName.size(); j++ ) {
-                        char d = fullName[j];
-                        if ( d == '.' )
-                            break;
-                        if ( isdigit( d ) )
-                            continue;
-                        possible = false;
-                        break;
-                    }
-
-                    if ( possible )
-                        i = j;
-                }
-                string x = buf.str();
-                if ( isIndexed( x , idxKeys ) )
+            string x;
+            if ( getCanonicalIndexField( fieldName, &x ) ) {
+                if ( isIndexed( x, idxKeys ) )
                     return true;
             }
 
