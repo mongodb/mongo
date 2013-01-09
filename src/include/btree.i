@@ -26,7 +26,7 @@ static inline int
 __wt_eviction_page_force_check(WT_BTREE *btree, WT_PAGE *page)
 {
 	return (btree != NULL && !F_ISSET(btree, WT_BTREE_NO_EVICTION) &&
-            __wt_page_is_modified(page) &&
+	    __wt_page_is_modified(page) &&
 	    page->type != WT_PAGE_ROW_INT && page->type != WT_PAGE_COL_INT &&
 	    page->memory_footprint > btree->maxmempage);
 }
