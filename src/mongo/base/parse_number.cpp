@@ -74,33 +74,32 @@ namespace mongo {
      * "inputBase" is not 0, *outputBase is set to "inputBase".  Otherwise, if "stringValue" starts
      * with "0x" or "0X", sets outputBase to 16, or if it starts with 0, sets outputBase to 8.
      *
-     * Returns the substring of "stringValue" with the base-indicating prefix stripped off.
+     * Returns stringValue, unless it sets *outputBase to 16, in which case it will strip off the
+     * "0x" or "0X" prefix, if present.
      */
     static inline StringData _extractBase(
             const StringData& stringValue, int inputBase, int* outputBase) {
 
+        const StringData hexPrefixLower("0x", StringData::LiteralTag());
+        const StringData hexPrefixUpper("0X", StringData::LiteralTag());
         if (inputBase == 0) {
-            if (stringValue.size() == 0) {
-                *outputBase = inputBase;
-                return stringValue;
+            if (stringValue.size() > 2 && (stringValue.startsWith(hexPrefixLower) ||
+                                           stringValue.startsWith(hexPrefixUpper))) {
+                *outputBase = 16;
+                return stringValue.substr(2);
             }
-            if (stringValue[0] == '0') {
-                if (stringValue.size() > 1 && (stringValue[1] == 'x' || stringValue[1] == 'X')) {
-                    *outputBase = 16;
-                    return stringValue.substr(2);
-                }
+            if (stringValue.size() > 1 && stringValue[0] == '0') {
                 *outputBase = 8;
-                return stringValue.substr(1);
+                return stringValue;
             }
             *outputBase = 10;
             return stringValue;
         }
         else {
             *outputBase = inputBase;
-            if (inputBase == 16) {
-                StringData prefix = stringValue.substr(0, 2);
-                if (prefix == "0x" || prefix == "0X")
-                    return stringValue.substr(2);
+            if (inputBase == 16 && (stringValue.startsWith(hexPrefixLower) ||
+                                    stringValue.startsWith(hexPrefixUpper))) {
+                return stringValue.substr(2);
             }
             return stringValue;
         }
@@ -115,11 +114,11 @@ namespace mongo {
         if (base == 1 || base < 0 || base > 36)
             return Status(ErrorCodes::BadValue, "Invalid base", 0);
 
-        if (stringValue.size() == 0)
-            return Status(ErrorCodes::FailedToParse, "Empty string");
-
         bool isNegative = false;
         StringData str = _extractBase(_extractSign(stringValue, &isNegative), base, &base);
+
+        if (str.empty())
+            return Status(ErrorCodes::FailedToParse, "No digits");
 
         NumberType n(0);
         if (isNegative) {

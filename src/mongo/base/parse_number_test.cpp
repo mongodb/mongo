@@ -58,6 +58,7 @@ namespace {
         static void TestParsingNonNegatives() {
             ASSERT_PARSES(NumberType, "10", 10);
             ASSERT_PARSES(NumberType, "0", 0);
+            ASSERT_PARSES(NumberType, "1", 1);
             ASSERT_PARSES(NumberType, "0xff", 0xff);
             ASSERT_PARSES(NumberType, "077", 077);
         }
@@ -93,15 +94,38 @@ namespace {
             ASSERT_EQUALS(ErrorCodes::FailedToParse, parseNumberFromString("1+10", &ignored));
             ASSERT_EQUALS(ErrorCodes::FailedToParse, parseNumberFromString("1-10", &ignored));
             ASSERT_EQUALS(ErrorCodes::FailedToParse, parseNumberFromString("48*3", &ignored));
+            ASSERT_EQUALS(ErrorCodes::FailedToParse, parseNumberFromString("0x", &ignored));
+            ASSERT_EQUALS(ErrorCodes::FailedToParse, parseNumberFromString("+", &ignored));
+            ASSERT_EQUALS(ErrorCodes::FailedToParse, parseNumberFromString("-", &ignored));
+            ASSERT_EQUALS(ErrorCodes::FailedToParse, parseNumberFromString("+0x", &ignored));
+            ASSERT_EQUALS(ErrorCodes::FailedToParse, parseNumberFromString("-0x", &ignored));
         }
 
         static void TestParsingWithExplicitBase() {
-            NumberType ignored;
+            NumberType x;
             ASSERT_PARSES_WITH_BASE(NumberType, "15b", 16, 0x15b);
             ASSERT_PARSES_WITH_BASE(NumberType, "77", 8, 077);
             ASSERT_PARSES_WITH_BASE(NumberType, "z", 36, 35);
-            ASSERT_EQUALS(ErrorCodes::FailedToParse, parseNumberFromStringWithBase("1b", 10, &ignored));
-            ASSERT_EQUALS(ErrorCodes::FailedToParse, parseNumberFromStringWithBase("80", 8, &ignored));
+            ASSERT_EQUALS(ErrorCodes::FailedToParse, parseNumberFromStringWithBase("1b", 10, &x));
+            ASSERT_EQUALS(ErrorCodes::FailedToParse, parseNumberFromStringWithBase("80", 8, &x));
+            ASSERT_EQUALS(ErrorCodes::FailedToParse, parseNumberFromStringWithBase("0X", 16, &x));
+            ASSERT_EQUALS(ErrorCodes::FailedToParse, parseNumberFromStringWithBase("0x", 16, &x));
+            ASSERT_EQUALS(ErrorCodes::FailedToParse, parseNumberFromStringWithBase("0x", 8, &x));
+            ASSERT_EQUALS(ErrorCodes::FailedToParse, parseNumberFromStringWithBase("0X", 8, &x));
+            ASSERT_EQUALS(ErrorCodes::FailedToParse, parseNumberFromStringWithBase("0x", 10, &x));
+            ASSERT_EQUALS(ErrorCodes::FailedToParse, parseNumberFromStringWithBase("0X", 10, &x));
+            ASSERT_EQUALS(ErrorCodes::FailedToParse, parseNumberFromStringWithBase("+0X", 16, &x));
+            ASSERT_EQUALS(ErrorCodes::FailedToParse, parseNumberFromStringWithBase("+0x", 16, &x));
+            ASSERT_EQUALS(ErrorCodes::FailedToParse, parseNumberFromStringWithBase("+0x", 8, &x));
+            ASSERT_EQUALS(ErrorCodes::FailedToParse, parseNumberFromStringWithBase("+0X", 8, &x));
+            ASSERT_EQUALS(ErrorCodes::FailedToParse, parseNumberFromStringWithBase("+0x", 10, &x));
+            ASSERT_EQUALS(ErrorCodes::FailedToParse, parseNumberFromStringWithBase("+0X", 10, &x));
+            ASSERT_EQUALS(ErrorCodes::FailedToParse, parseNumberFromStringWithBase("-0X", 16, &x));
+            ASSERT_EQUALS(ErrorCodes::FailedToParse, parseNumberFromStringWithBase("-0x", 16, &x));
+            ASSERT_EQUALS(ErrorCodes::FailedToParse, parseNumberFromStringWithBase("-0x", 8, &x));
+            ASSERT_EQUALS(ErrorCodes::FailedToParse, parseNumberFromStringWithBase("-0X", 8, &x));
+            ASSERT_EQUALS(ErrorCodes::FailedToParse, parseNumberFromStringWithBase("-0x", 10, &x));
+            ASSERT_EQUALS(ErrorCodes::FailedToParse, parseNumberFromStringWithBase("-0X", 10, &x));
         }
 
         static void TestParsingLimits() {
