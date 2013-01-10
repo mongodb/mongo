@@ -27,6 +27,7 @@ st.printShardingStatus();
 jsTest.log("Making mongos stale...");
 
 coll.insert({ _id : 0 });
+coll.getDB().getLastErrorObj();
 
 // Make sure the stale mongos knows about the collection at the original version
 assert.neq(null, staleMongos.getCollection(coll + "").findOne());
