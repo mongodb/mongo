@@ -17,18 +17,20 @@ __wt_page_is_modified(WT_PAGE *page)
 }
 
 /*
- * __wt_eviction_page_force_check --
- *	Return if a page should be a high priority for eviction. The method
- *      does not use a session handle, since it is called from the eviction
- *      sort routine, that does not have a session easily available.
+ * __wt_eviction_page_force --
+ *      Add a page for forced eviction if it matches the criteria.
  */
 static inline int
-__wt_eviction_page_force_check(WT_BTREE *btree, WT_PAGE *page)
+__wt_eviction_page_force(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
-	return (btree != NULL && !F_ISSET(btree, WT_BTREE_NO_EVICTION) &&
-	    __wt_page_is_modified(page) &&
+	WT_BTREE *btree;
+
+	btree = session->btree;
+	if (btree != NULL && __wt_page_is_modified(page) &&
 	    page->type != WT_PAGE_ROW_INT && page->type != WT_PAGE_COL_INT &&
-	    page->memory_footprint > btree->maxmempage);
+	    (page->memory_footprint > btree->maxmempage))
+		return (__wt_evict_forced_page(session, page));
+	return (0);
 }
 
 /*

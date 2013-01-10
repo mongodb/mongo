@@ -167,9 +167,6 @@ __wt_evict_forced_page(WT_SESSION_IMPL *session, WT_PAGE *page)
 	conn = S2C(session);
 	cache = conn->cache;
 
-	if (!__wt_eviction_page_force_check(btree, page))
-		return (0);
-
 	/*
 	 * Try to lock the page.  If this succeeds, we're going to queue
 	 * it for forced eviction.  We don't go right to the EVICT_FORCED

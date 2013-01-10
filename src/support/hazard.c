@@ -153,7 +153,7 @@ __wt_hazard_clear(WT_SESSION_IMPL *session, WT_PAGE *page)
 			 * Perform the check here since we want to do it when
 			 * we are about to release the hazard reference.
 			 */
-			(void)__wt_evict_forced_page(session, page);
+			(void)__wt_eviction_page_force(session, page);
 
 			/*
 			 * We don't publish the hazard pointer clear in the
