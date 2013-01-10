@@ -157,13 +157,11 @@ __wt_evict_list_clr_page(WT_SESSION_IMPL *session, WT_PAGE *page)
 int
 __wt_evict_forced_page(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
-	WT_BTREE *btree;
 	WT_CACHE *cache;
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	u_int count;
 
-	btree = session->btree;
 	conn = S2C(session);
 	cache = conn->cache;
 
