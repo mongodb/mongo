@@ -573,8 +573,13 @@ __btree_page_sizes(WT_SESSION_IMPL *session, const char *config)
 	WT_RET(__wt_config_getones(
 	    session, config, "leaf_item_max", &cval));
 	btree->maxleafitem = (uint32_t)cval.val;
+
+	/*
+	 * When a page is forced to split, we want at least 50 entries on its
+	 * parent.
+	 */
 	WT_RET(__wt_config_getones(session, config, "memory_page_max", &cval));
-	btree->maxmempage = (uint64_t)cval.val;
+	btree->maxmempage = WT_MAX((uint64_t)cval.val, 50 * btree->maxleafpage);
 
 	/* Allocation sizes must be a power-of-two, nothing else makes sense. */
 	if (!__wt_ispo2(btree->allocsize))
