@@ -1231,12 +1231,12 @@ namespace mongo {
             if ( jsobj["scale"].isNumber() ) {
                 scale = jsobj["scale"].numberInt();
                 if ( scale <= 0 ) {
-                    errmsg = "scale has to be > 0";
+                    errmsg = "scale has to be >= 1";
                     return false;
                 }
             }
             else if ( jsobj["scale"].trueValue() ) {
-                errmsg = "scale has to be a number > 0";
+                errmsg = "scale has to be a number >= 1";
                 return false;
             }
 

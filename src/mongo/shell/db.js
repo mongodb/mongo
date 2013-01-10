@@ -486,13 +486,24 @@ DB.prototype.help = function() {
     return __magicNoPrint;
 }
 
-DB.prototype.printCollectionStats = function(scale){
-
-    /* no error checking on scale, done in stats already */
-
+DB.prototype.printCollectionStats = function(scale) { 
+    if (arguments.length > 1) { 
+        print("printCollectionStats() has a single optional argument (scale)");
+        return;
+    }
+    if (typeof scale != 'undefined') {
+        if(typeof scale != 'number') {
+            print("scale has to be a number >= 1");
+            return;
+        }
+        if (scale < 1) {
+            print("scale has to be >= 1");
+            return;
+        }
+    }
     var mydb = this;
     this.getCollectionNames().forEach(
-        function(z){
+        function(z) {
             print( z );
             printjson( mydb.getCollection(z).stats(scale) );
             print( "---" );
