@@ -15,19 +15,19 @@ t.insert({geo : roundworld2})
 // North pole
 santapoint = { "type" : "Point", "coordinates": [ 180, 90 ] }
 santa = { "type" : "Polygon",
-             "coordinates" : [ [ [179,89], [179,91], [181,91], [181,89], [179,89]]]}
+             "coordinates" : [ [ [179,89], [179,90], [181,90], [181,89], [179,89]]]}
 t.insert({geo : santa})
 santa2 = { "type" : "Polygon",
-             "coordinates" : [ [ [179,89], [181,89], [181,91], [179,91], [179,89]]]}
+             "coordinates" : [ [ [179,89], [181,89], [181,90], [179,90], [179,89]]]}
 t.insert({geo : santa2})
 
 // South pole
 penguinpoint = { "type" : "Point", "coordinates": [ 0, -90 ] }
 penguin1 = { "type" : "Polygon",
-             "coordinates" : [ [ [0,-89], [0,-91], [179,-91], [179,-89], [0,-89]]]}
+             "coordinates" : [ [ [0,-89], [0,-90], [179,-90], [179,-89], [0,-89]]]}
 t.insert({geo : penguin1})
 penguin2 = { "type" : "Polygon",
-             "coordinates" : [ [ [0,-89], [179,-89], [179,-91], [0,-91], [0,-89]]]}
+             "coordinates" : [ [ [0,-89], [179,-89], [179,-90], [0,-90], [0,-89]]]}
 t.insert({geo : penguin2})
 
 t.ensureIndex( { geo : "2dsphere", nonGeo: 1 } )

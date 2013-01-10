@@ -68,6 +68,9 @@ namespace mongo {
             for (size_t j = 0; j < thisCoord.size(); ++j) {
                 if (!thisCoord[j].isNumber()) { return false; }
             }
+            // ...where the latitude is valid
+            double lat = thisCoord[1].Number();
+            if (lat < -90 || lat > 90) { return false; }
         }
         return true;
     }
@@ -98,7 +101,9 @@ namespace mongo {
 
         const vector<BSONElement>& coordinates = coordElt.Array();
         if (coordinates.size() != 2) { return false; }
-        return coordinates[0].isNumber() && coordinates[1].isNumber();
+        if (!coordinates[0].isNumber() || !coordinates[1].isNumber()) { return false; }
+        double lat = coordinates[1].Number();
+        return lat >= -90 && lat <= 90;
     }
 
     void GeoParser::parseGeoJSONPoint(const BSONObj& obj, S2Cell* out) {

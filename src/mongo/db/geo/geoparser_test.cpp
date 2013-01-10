@@ -48,11 +48,23 @@ namespace {
         ASSERT_FALSE(GeoParser::isPoint(fromjson("{'type':'Point', 'coordinates': 40}")));
         ASSERT_FALSE(GeoParser::isPoint(
             fromjson("{'type':'Point', 'coordinates': [40, -5, 7]}")));
+
+        // Make sure lat is in range
+        ASSERT_TRUE(GeoParser::isPoint(fromjson("{'type':'Point', 'coordinates': [0, 90.0]}")));
+        ASSERT_TRUE(GeoParser::isPoint(fromjson("{'type':'Point', 'coordinates': [0, -90.0]}")));
+        ASSERT_FALSE(GeoParser::isPoint(fromjson("{'type':'Point', 'coordinates': [0, 90.1]}")));
+        ASSERT_FALSE(GeoParser::isPoint(fromjson("{'type':'Point', 'coordinates': [0, -90.1]}")));
     }
 
     TEST(GeoParser, isValidLineString) {
         ASSERT_TRUE(GeoParser::isLineString(
             fromjson("{'type':'LineString', 'coordinates':[[1,2], [3,4]]}")));
+        ASSERT_TRUE(GeoParser::isLineString(
+            fromjson("{'type':'LineString', 'coordinates':[[0,-90], [0,90]]}")));
+        ASSERT_FALSE(GeoParser::isLineString(
+            fromjson("{'type':'LineString', 'coordinates':[[0,-91], [0,90]]}")));
+        ASSERT_FALSE(GeoParser::isLineString(
+            fromjson("{'type':'LineString', 'coordinates':[[0,-90], [0,91]]}")));
         ASSERT_TRUE(GeoParser::isLineString(
             fromjson("{'type':'LineString', 'coordinates':[[1,2], [3,4], [5,6]]}")));
         ASSERT_FALSE(GeoParser::isLineString(
@@ -71,6 +83,10 @@ namespace {
         // And one with a hole.
         ASSERT_TRUE(GeoParser::isPolygon(
             fromjson("{'type':'Polygon', 'coordinates':[ [[0,0],[5,0],[5,5],[0,5],[0,0]],"
+                     " [[1,1],[4,1],[4,4],[1,4],[1,1]] ]}")));
+        // Latitudes must be OK
+        ASSERT_FALSE(GeoParser::isPolygon(
+            fromjson("{'type':'Polygon', 'coordinates':[ [[0,0],[5,0],[5,91],[0,91],[0,0]],"
                      " [[1,1],[4,1],[4,4],[1,4],[1,1]] ]}")));
         // First point must be the same as the last.
         ASSERT_FALSE(GeoParser::isPolygon(
