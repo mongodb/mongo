@@ -80,14 +80,15 @@ namespace mongo {
             errMsg = &dummy;
         }
 
-        CollectionManager* manager = new CollectionManager;
-        if (initCollection(ns, shard, oldManager, manager, errMsg)) {
+        auto_ptr<CollectionManager> manager(new CollectionManager);
+        if (initCollection(ns, shard, oldManager, manager.get(), errMsg)) {
             if (manager->getNumChunks() > 0) {
                 dassert(manager->isValid());
             }
 
-            return manager;
+            return manager.release();
         }
+
         return NULL;
     }
 
