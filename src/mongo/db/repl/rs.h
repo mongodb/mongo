@@ -539,17 +539,8 @@ namespace mongo {
         void syncRollback(OplogReader& r);
         void syncThread();
         const OpTime lastOtherOpTime() const;
-
-        /**
-         * When a member reaches its minValid optime it is in a consistent state.  Thus, minValid is
-         * set as the last step in initial sync (if no minValid is set, this indicates that initial
-         * sync is necessary). It is also used during "normal" sync: the last op in each batch is
-         * used to set minValid, to indicate that we are in a consistent state when the batch has
-         * been fully applied.
-         */
         static void setMinValid(BSONObj obj);
-        static OpTime getMinValid();
-
+        
         int oplogVersion;
     private:
         IndexPrefetchConfig _indexPrefetchConfig;

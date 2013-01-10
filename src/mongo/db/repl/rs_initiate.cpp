@@ -247,12 +247,6 @@ namespace mongo {
                 result.append("info", "Config now saved locally.  Should come online in about a minute.");
                 ReplSet::startupStatus = ReplSet::SOON;
                 ReplSet::startupStatusMsg.set("Received replSetInitiate - should come online shortly.");
-
-                // Dummy minvalid - just something non-null so we can be "up"
-                OpTime minvalid(1, 0);
-                BSONObjBuilder bob;
-                bob.appendTimestamp("ts", minvalid.asDate());
-                ReplSet::setMinValid(bob.done());
             }
             catch( DBException& e ) {
                 log() << "replSet replSetInitiate exception: " << e.what() << rsLog;
