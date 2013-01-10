@@ -26,10 +26,12 @@ __wt_eviction_page_force(WT_SESSION_IMPL *session, WT_PAGE *page)
 	WT_BTREE *btree;
 
 	btree = session->btree;
-	if (btree != NULL && __wt_page_is_modified(page) &&
+	if (btree != NULL && !F_ISSET(btree, WT_BTREE_NO_EVICTION) &&
+            __wt_page_is_modified(page) &&
 	    page->type != WT_PAGE_ROW_INT && page->type != WT_PAGE_COL_INT &&
-	    (page->memory_footprint > btree->maxmempage))
+	    page->memory_footprint > btree->maxmempage)
 		return (__wt_evict_forced_page(session, page));
+
 	return (0);
 }
 
