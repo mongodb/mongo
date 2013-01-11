@@ -25,21 +25,20 @@
 
 namespace mongo {
     S2NearCursor::S2NearCursor(const BSONObj &keyPattern, const IndexDetails *details,
-                       const BSONObj &query, const vector<QueryGeometry> &fields,
-                       const S2IndexingParams &params, int numWanted, double maxDistance)
-        : _details(details), _fields(fields), _params(params), _nscanned(0),
-          _keyPattern(keyPattern), _numToReturn(numWanted),
-          // _outerRadius can't be greater than (pi * r) or we wrap around the opposite
-          // side of the world.
-          _maxDistance(min(M_PI * _params.radius, maxDistance)) {
+                       const BSONObj &query, const NearQuery &nearQuery,
+                       const vector<GeoQuery> &indexedGeoFields,
+                       const S2IndexingParams &params, int numWanted)
+        : _details(details), _nearQuery(nearQuery), _indexedGeoFields(indexedGeoFields),
+          _params(params), _keyPattern(keyPattern), _numToReturn(numWanted),
+          _nscanned(0), _matchTested(0), _geoTested(0), _numShells(0) {
+
         BSONObjBuilder geoFieldsToNuke;
-        for (size_t i = 0; i < _fields.size(); ++i) {
-            geoFieldsToNuke.append(_fields[i].field, "");
+        for (size_t i = 0; i < _indexedGeoFields.size(); ++i) {
+            geoFieldsToNuke.append(_indexedGeoFields[i].getField(), "");
         }
         // false means we want to filter OUT geoFieldsToNuke, not filter to include only that.
         _filteredQuery = query.filterFieldsUndotted(geoFieldsToNuke.obj(), false);
-        // We match on the whole query, since it might have $within.
-        _matcher.reset(new CoveredIndexMatcher(query, keyPattern));
+        _matcher.reset(new CoveredIndexMatcher(_filteredQuery, keyPattern));
 
         // More indexing machinery.
         BSONObjBuilder specBuilder;
@@ -50,6 +49,10 @@ namespace mongo {
         }
         BSONObj spec = specBuilder.obj();
         _specForFRV = IndexSpec(spec);
+
+        // _outerRadius can't be greater than (pi * r) or we wrap around the opposite
+        // side of the world.
+        _maxDistance = min(M_PI * _params.radius, _nearQuery.maxDistance);
 
         // Start with a conservative _radiusIncrement.
         _radiusIncrement = S2::kAvgEdge.GetValue(_params.finestIndexedLevel) * _params.radius;
@@ -75,7 +78,6 @@ namespace mongo {
 
     double S2NearCursor::currentDistance() const { return _results.top().distance; }
 
-    // TODO: yielding is very un-tested.
     // This is called when we're about to yield.
     void S2NearCursor::noteLocation() { _results = priority_queue<Result>(); }
     // Called when we're un-yielding.
@@ -87,8 +89,10 @@ namespace mongo {
     void S2NearCursor::checkLocation() { if (_results.empty()) { fillResults(); } }
 
     void S2NearCursor::explainDetails(BSONObjBuilder& b) {
-        // TODO(hk): Dump more meaningful stats.
-        b << "nscanned " << _nscanned;
+        b << "nscanned" << _nscanned;
+        b << "matchTested" << _matchTested;
+        b << "geoTested" << _geoTested;
+        b << "numShells" << _numShells;
     }
 
     bool S2NearCursor::ok() {
@@ -104,6 +108,7 @@ namespace mongo {
         _outerRadius += _radiusIncrement;
         _outerRadius = min(_outerRadius, _maxDistance);
         verify(_innerRadius <= _outerRadius);
+        ++_numShells;
     }
 
     bool S2NearCursor::advance() {
@@ -114,7 +119,6 @@ namespace mongo {
             _returned.insert(_results.top().loc);
             _results.pop();
             --_numToReturn;
-            ++_nscanned;
             // Safe to grow the radius as we've returned everything in our shell.  We don't do this
             // check outside of !_results.empty() because we could have results, yield, dump them
             // (_results would be empty), then need to recreate them w/the same radii.  In that case
@@ -133,31 +137,44 @@ namespace mongo {
         frsObjBuilder.appendElements(_filteredQuery);
 
         S2RegionCoverer coverer;
-        // Step 1: Make the monstrous BSONObj that describes what keys we want.
-        for (size_t i = 0; i < _fields.size(); ++i) {
-            const QueryGeometry &field = _fields[i];
-            S2Point center = field.getCentroid();
-            BSONObj inExpr;
-            // Caps are inclusive and inverting a cap includes the border.  This means that our
-            // initial _innerRadius of 0 is OK -- we'll still find a point that is exactly at
-            // the start of our search.
-            S2Cap innerCap = S2Cap::FromAxisAngle(center, S1Angle::Radians(_innerRadius / _params.radius));
-            S2Cap invInnerCap = innerCap.Complement();
-            S2Cap outerCap = S2Cap::FromAxisAngle(center, S1Angle::Radians(_outerRadius / _params.radius));
-            vector<S2Region*> regions;
-            regions.push_back(&invInnerCap);
-            regions.push_back(&outerCap);
-            S2RegionIntersection shell(&regions);
+        // Step 1: Make the BSON'd covering for our search annulus.
+        BSONObj inExpr;
+        // Caps are inclusive and inverting a cap includes the border.  This means that our
+        // initial _innerRadius of 0 is OK -- we'll still find a point that is exactly at
+        // the start of our search.
+        S2Cap innerCap = S2Cap::FromAxisAngle(_nearQuery.centroid,
+                                              S1Angle::Radians(_innerRadius / _params.radius));
+        S2Cap invInnerCap = innerCap.Complement();
+        S2Cap outerCap = S2Cap::FromAxisAngle(_nearQuery.centroid,
+                                              S1Angle::Radians(_outerRadius / _params.radius));
+        vector<S2Region*> regions;
+        regions.push_back(&invInnerCap);
+        regions.push_back(&outerCap);
+        S2RegionIntersection shell(&regions);
+        vector<S2CellId> cover;
+        coverer.set_min_level(_coarsestLevel);
+        coverer.set_max_level(_finestLevel);
+        coverer.GetCovering(shell, &cover);
+        inExpr = S2SearchUtil::coverAsBSON(cover, _nearQuery.field,
+                                           _params.coarsestIndexedLevel);
+        // Shell takes ownership of the regions we push in, but they're local variables and
+        // deleting them would be bad.
+        shell.Release(NULL);
+        frsObjBuilder.appendElements(inExpr);
+
+        _params.configureCoverer(&coverer);
+        // Cover the indexed geo components of the query.
+        for (size_t i = 0; i < _indexedGeoFields.size(); ++i) {
             vector<S2CellId> cover;
-            coverer.set_min_level(_coarsestLevel);
-            coverer.set_max_level(_finestLevel);
-            coverer.GetCovering(shell, &cover);
-            inExpr = S2SearchUtil::coverAsBSON(cover, field.field, _params.coarsestIndexedLevel);
-            // Shell takes ownership of the regions we push in, but they're local variables and
-            // deleting them would be bad.
-            shell.Release(NULL);
-            frsObjBuilder.appendElements(inExpr);
+            coverer.GetCovering(_indexedGeoFields[i].getRegion(), &cover);
+            uassert(16682, "Couldn't generate index keys for geo field "
+                       + _indexedGeoFields[i].getField(),
+                    cover.size() > 0);
+            BSONObj fieldRange = S2SearchUtil::coverAsBSON(cover, _indexedGeoFields[i].getField(),
+                _params.coarsestIndexedLevel);
+            frsObjBuilder.appendElements(fieldRange);
         }
+
         return frsObjBuilder.obj();
     }
 
@@ -205,47 +222,67 @@ namespace mongo {
             set<DiskLoc> seen;
 
             // Do the actual search through this annulus.
-            size_t considered = 0;
             for (; cursor->ok(); cursor->advance()) {
-                ++considered;
-
+                ++_nscanned;
                 if (seen.end() != seen.find(cursor->currLoc())) { continue; }
                 seen.insert(cursor->currLoc());
 
+                // Match against non-indexed fields.
+                ++_matchTested;
                 MatchDetails details;
                 bool matched = _matcher->matchesCurrent(cursor.get(), &details);
                 if (!matched) { continue; }
 
                 const BSONObj& indexedObj = cursor->currLoc().obj();
 
+                ++_geoTested;
+                // Match against indexed geo fields.
+                size_t geoFieldsMatched = 0;
+                // OK, cool, non-geo match satisfied.  See if the object actually overlaps w/the geo
+                // query fields.
+                for (size_t i = 0; i < _indexedGeoFields.size(); ++i) {
+                    BSONElementSet geoFieldElements;
+                    indexedObj.getFieldsDotted(_indexedGeoFields[i].getField(), geoFieldElements,
+                                               false);
+                    if (geoFieldElements.empty()) { continue; }
+
+                    bool match = false;
+
+                    for (BSONElementSet::iterator oi = geoFieldElements.begin();
+                            !match && (oi != geoFieldElements.end()); ++oi) {
+                        if (!oi->isABSONObj()) { continue; }
+                        const BSONObj &geoObj = oi->Obj();
+                        match = _indexedGeoFields[i].satisfiesPredicate(geoObj);
+                    }
+
+                    if (match) { ++geoFieldsMatched; }
+                }
+
+                if (geoFieldsMatched != _indexedGeoFields.size()) { continue; }
+
+                // Finally, see if the item is in our search annulus.
                 size_t geoFieldsInRange = 0;
                 double minMatchingDistance = 1e20;
 
-                // Calculate the distance from our query point(s) to the geo field(s).
-                // For each geo field in the query...
-                for (size_t i = 0; i < _fields.size(); ++i) {
-                    const QueryGeometry& field = _fields[i];
+                // Get all the fields with that name from the document.
+                BSONElementSet geoFieldElements;
+                indexedObj.getFieldsDotted(_nearQuery.field, geoFieldElements, false);
+                if (geoFieldElements.empty()) { continue; }
 
-                    // Get all the fields with that name from the document.
-                    BSONElementSet geoFieldElements;
-                    indexedObj.getFieldsDotted(field.field, geoFieldElements, false);
-                    if (geoFieldElements.empty()) { continue; }
-
-                    // For each field with that name in the document...
-                    for (BSONElementSet::iterator oi = geoFieldElements.begin();
-                            oi != geoFieldElements.end(); ++oi) {
-                        if (!oi->isABSONObj()) { continue; }
-                        double dist = distanceBetween(field, oi->Obj());
-                        // If it satisfies our distance criteria...
-                        if (dist >= _innerRadius && dist <= _outerRadius) {
-                            // Success!  For this field.
-                            ++geoFieldsInRange;
-                            minMatchingDistance = min(dist, minMatchingDistance);
-                        }
+                // For each field with that name in the document...
+                for (BSONElementSet::iterator oi = geoFieldElements.begin();
+                        oi != geoFieldElements.end(); ++oi) {
+                    if (!oi->isABSONObj()) { continue; }
+                    double dist = distanceTo(oi->Obj());
+                    // If it satisfies our distance criteria...
+                    if (dist >= _innerRadius && dist <= _outerRadius) {
+                        // Success!  For this field.
+                        ++geoFieldsInRange;
+                        minMatchingDistance = min(dist, minMatchingDistance);
                     }
                 }
                 // If all the geo query fields had something in range
-                if (_fields.size() == geoFieldsInRange) {
+                if (geoFieldsInRange > 0) {
                     // The result is valid.  We have to de-dup ourselves here.
                     if (_returned.end() == _returned.find(cursor->currLoc())) {
                         _results.push(Result(cursor->currLoc(), cursor->currKey(),
@@ -262,8 +299,8 @@ namespace mongo {
                  && _innerRadius < _outerRadius);
     }
 
-    double S2NearCursor::distanceBetween(const QueryGeometry &field, const BSONObj &obj) {
-        S2Point us = field.getCentroid();
+    double S2NearCursor::distanceTo(const BSONObj &obj) {
+        const S2Point &us = _nearQuery.centroid;
         S2Point them;
 
         S2Polygon polygon;

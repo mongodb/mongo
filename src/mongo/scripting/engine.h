@@ -25,8 +25,6 @@ namespace mongo {
 
     class DBClientWithCommands;
 
-    static const unsigned kMaxJsFileLength = std::numeric_limits<unsigned>::max() - 1;
-
     struct JSFile {
         const char* name;
         const StringData& source;

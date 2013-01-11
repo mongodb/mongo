@@ -20,8 +20,6 @@
 #include "mongo/db/jsobj.h"
 
 namespace mongo {
-
-    // TODO(hk): move these distance things to something like geomath.h
     struct Point;
     double distance(const Point& p1, const Point &p2);
     bool distanceWithin(const Point &p1, const Point &p2, double radius);
@@ -40,6 +38,14 @@ namespace mongo {
         double y;
     };
 
+    struct Circle {
+        Circle();
+        Circle(double radius, Point center);
+
+        double radius;
+        Point center;
+    };
+
     class Box {
     public:
         Box();
@@ -51,10 +57,8 @@ namespace mongo {
 
         bool between(double min, double max, double val, double fudge = 0) const;
         bool onBoundary(double bound, double val, double fudge = 0) const;
-        // TODO(hk) comment
         bool mid(double amin, double amax, double bmin, double bmax, bool min, double* res) const;
 
-        // TODO(hk): What is the return here?  comment
         double intersects(const Box& other) const;
         double area() const;
         double maxDim() const;
@@ -65,8 +69,6 @@ namespace mongo {
         bool inside(Point p, double fudge = 0) const;
         bool inside(double x, double y, double fudge = 0) const;
         bool contains(const Box& other, double fudge = 0);
-        // TODO(hk): This could be private and Polygon could be our friend, or we could
-        // have getters/setters (lots of code change).
         Point _min;
         Point _max;
     };

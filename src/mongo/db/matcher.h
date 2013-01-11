@@ -22,7 +22,7 @@
 
 #include "jsobj.h"
 #include "pcrecpp.h"
-#include "mongo/db/geo/geoparser.h"
+#include "mongo/db/geo/geoquery.h"
 
 namespace mongo {
 
@@ -50,78 +50,19 @@ namespace mongo {
         RegexMatcher() : _isNot() {}
     };
 
-    class GeoMatcher {
-    private:
-        GeoMatcher(const string& field, bool isNot) : _isBox(false), _isCircle(false),
-                                                      _isPolygon(false), _fieldName(field),
-                                                      _isNot(isNot) {}
-        bool _isBox;
-        Box _box;
-
-        bool _isCircle;
-        Point _center;
-        double _radius;
-
-        bool _isPolygon;
-        Polygon _polygon;
-
-        string _fieldName;
-        bool _isNot;
+    struct GeoMatcher {
     public:
-        const string& getFieldName() const { return _fieldName; }
+        GeoMatcher(GeoQuery query, bool negated) : geoQuery(query), isNot(negated) {}
 
-        static GeoMatcher makeBoxMatcher(const string& field, const BSONObj &obj, bool isNot) {
-            GeoMatcher m(field, isNot);
-            m._isBox = true;
-            GeoParser::parseLegacyBox(obj, &m._box);
-            return m;
-        }
+        string getField() const { return geoQuery.getField(); }
 
-        static GeoMatcher makeCircleMatcher(const string& field, const BSONObj &obj, bool isNot) {
-            GeoMatcher m(field, isNot);
-            m._isCircle = true;
-            GeoParser::parseLegacyCenter(obj, &m._center, &m._radius);
-            return m;
+        bool matches(BSONObj obj) const {
+            bool satisfied = geoQuery.satisfiesPredicate(obj);
+            if (isNot) { return !satisfied; }
+            else { return satisfied; }
         }
-
-        static GeoMatcher makePolygonMatcher(const string& field, const BSONObj &obj, bool isNot) {
-            GeoMatcher m(field, isNot);
-            m._isPolygon = true;
-            GeoParser::parseLegacyPolygon(obj, &m._polygon);
-            return m;
-        }
-
-        bool containsPoint(Point p) const {
-            bool ret;
-            if (_isBox) {
-                ret = _box.inside(p, 0);
-            } else if (_isCircle) {
-                ret = distance(p, _center) <= _radius;
-            } else if (_isPolygon) {
-                ret = _polygon.contains(p);
-            } else {
-                ret = false;
-            }
-            return _isNot ? !ret : ret;
-        }
-
-        string toString() const {
-            stringstream ss;
-            if (_isBox) {
-                ss << "GeoMatcher Box: " << _box.toString();
-            } else if (_isCircle) {
-                ss << "GeoMatcher Circle @ " << _center.toString() << " r = " << _radius;
-            } else {
-                ss << "GeoMatcher UNKNOWN";
-            }
-            return ss.str();
-        }
-
-        static bool pointFrom(const BSONObj o, Point *p) {
-            if (!GeoParser::isLegacyPoint(o)) { return false; }
-            GeoParser::parseLegacyPoint(o, p);
-            return true;
-        }
+        GeoQuery geoQuery;
+        bool isNot;
     };
 
     struct element_lt {

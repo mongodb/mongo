@@ -9,7 +9,7 @@ db[coll].insert({loc:[0,0]});
 
 // $geoNear is only allowed as the first stage in a pipeline, nowhere else.
 assertErrorCode(db[coll],
-                [{$match: {x:1}}, {$geoNear:{near: [1,1], distanceField: 'dis'}}],
+                [{$match: {x:1}}, {$geoNear:{near: [1,1], spherical: true, distanceField: 'dis'}}],
                 16602);
 
 
@@ -77,8 +77,8 @@ function test(db, sharded, indexType) {
 
     // test with defaults
     var queryPoint = pointMaker.mkPt(0.25); // stick to center of map
-    geoCmd = {geoNear: coll, near: queryPoint, includeLocs: true};
-    aggCmd = {$geoNear: {near: queryPoint, includeLocs: 'stats.loc', distanceField: 'stats.dis'}};
+    geoCmd = {geoNear: coll, near: queryPoint, includeLocs: true, spherical: true};
+    aggCmd = {$geoNear: {near: queryPoint, includeLocs: 'stats.loc', distanceField: 'stats.dis', spherical: true}};
     checkOutput(db.runCommand(geoCmd), db[coll].aggregate(aggCmd), 100);
 
     // test with num

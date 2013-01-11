@@ -49,6 +49,11 @@ namespace mongo {
         return buf.str();
     }
 
+////////////// Circle
+
+    Circle::Circle() {}
+    Circle::Circle(double radius, Point center) : radius(radius), center(center) {}
+
 
 ////////////// Box
 

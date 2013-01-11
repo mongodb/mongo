@@ -28,6 +28,7 @@
 
 namespace mongo {
     long long Scope::_lastVersion = 1;
+    static const unsigned kMaxJsFileLength = std::numeric_limits<unsigned>::max() - 1;
 
     ScriptEngine::ScriptEngine() : _scopeInitCallback() {
     }

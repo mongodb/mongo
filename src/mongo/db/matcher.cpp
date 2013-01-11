@@ -369,35 +369,21 @@ namespace mongo {
             flags = fe.valuestrsafe();
             break;
         }
+        case BSONObj::opGEO_INTERSECTS:
         case BSONObj::opWITHIN: {
-            BSONObj shapeObj = fe.embeddedObject();
-            BSONObjIterator argIt(shapeObj);
-            uassert(16515, "Empty obj for $within: " + shapeObj.toString(), argIt.more());
-
-            BSONElement elt = argIt.next();
-            uassert(16516, "Within must be provided a BSONObj: " + elt.toString(),
-                    elt.isABSONObj());
-            BSONObj obj = elt.Obj();
-
-            if (str::equals(elt.fieldName(), "$box")) {
-                uassert(16615, "Malformed $box: " + obj.toString(), GeoParser::isLegacyBox(obj));
-                _geo.push_back(GeoMatcher::makeBoxMatcher(e.fieldName(), obj, isNot));
-            } else if (str::equals(elt.fieldName(), "$center")) {
-                uassert(16616, "Malformed $center: " + obj.toString(),
-                        GeoParser::isLegacyCenter(obj));
-                _geo.push_back(GeoMatcher::makeCircleMatcher(e.fieldName(), obj, isNot));
-            } else if (str::equals(elt.fieldName(), "$polygon")) {
-                uassert(16617, "Malformed $polygon: " + obj.toString(),
-                        GeoParser::isLegacyPolygon(obj));
-                _geo.push_back(GeoMatcher::makePolygonMatcher(e.fieldName(), obj, isNot));
-            } else {
-                uasserted(16529, "Malformed $within query, or geo index required to handle query: "
-                                 + obj.toString());
+            uassert(16516, "Within must be provided a BSONObj", e.isABSONObj());
+            BSONObj queryObj = e.Obj();
+            if (isNot) {
+                // Get to the $within/$geoIntersects hiding inside the $not.
+                queryObj = queryObj.firstElement().embeddedObject();
             }
+            GeoQuery query(e.fieldName());
+            uassert(16677, "Malformed geo query: " + queryObj.toString(),
+                    query.parseFrom(queryObj));
+            _geo.push_back(GeoMatcher(query, isNot));
             break;
         }
         case BSONObj::opNEAR:
-        case BSONObj::opGEO_INTERSECTS:
         case BSONObj::opMAX_DISTANCE:
             break;
         default:
@@ -972,13 +958,11 @@ namespace mongo {
         for (vector<GeoMatcher>::const_iterator it = _geo.begin(); it != _geo.end(); ++it) {
             verify(_constrainIndexKey.isEmpty());
             BSONElementSet s;
-            jsobj.getFieldsDotted(it->getFieldName().c_str(), s, false);
+            jsobj.getFieldsDotted(it->getField().c_str(), s, false);
             int matches = 0;
             for (BSONElementSet::const_iterator i = s.begin(); i != s.end(); ++i) {
                 if (!i->isABSONObj()) { continue; }
-                Point p;
-                if (!GeoMatcher::pointFrom(i->Obj(), &p)) { continue; }
-                if (it->containsPoint(p)) { ++matches; break; }
+                if (it->matches(i->Obj())) { ++matches; break; }
             }
             if (0 == matches) { return false; }
         }

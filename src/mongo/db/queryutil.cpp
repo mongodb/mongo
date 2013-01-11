@@ -447,16 +447,14 @@ namespace mongo {
         }
         case BSONObj::opWITHIN:
             _special.add("2d", SpecialIndices::NO_INDEX_REQUIRED);
-            // TODO(hk): make this work w/o an index too.  will require
-            // changing matcher.cpp to parse geojson stuff etc.
-            _special.add("2dsphere", SpecialIndices::INDEX_REQUIRED);
+            _special.add("2dsphere", SpecialIndices::NO_INDEX_REQUIRED);
             break;
         case BSONObj::opNEAR:
             _special.add("2d", SpecialIndices::INDEX_REQUIRED);
             _special.add("2dsphere", SpecialIndices::INDEX_REQUIRED);
             break;
         case BSONObj::opGEO_INTERSECTS:
-            _special.add("2dsphere", SpecialIndices::INDEX_REQUIRED);
+            _special.add("2dsphere", SpecialIndices::NO_INDEX_REQUIRED);
             break;
         case BSONObj::opEXISTS: {
             if ( !existsSpec ) {

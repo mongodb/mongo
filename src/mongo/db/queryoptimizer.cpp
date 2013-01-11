@@ -1007,8 +1007,6 @@ doneCheckOrder:
                 int j = i.pos();
                 IndexDetails& ii = i.next();
                 const IndexSpec& spec = ii.getSpec();
-                // TODO(hk): Make sure we can do a $near and $within query, one using
-                // the index one using the matcher.
                 if (special.has(spec.getTypeName()) &&
                     spec.suitability( _qps.frsp().frsForIndex(d, j), _qps.order() ) != USELESS ) {
                     uassert( 16330, "'special' query operator not allowed", _allowSpecial );

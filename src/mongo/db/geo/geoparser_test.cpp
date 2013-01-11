@@ -26,6 +26,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/db/geo/shapes.h"
 
 #include "third_party/s2/s2.h"
 #include "third_party/s2/s2polygon.h"
@@ -34,6 +35,7 @@
 using mongo::BSONObj;
 using mongo::fromjson;
 using mongo::GeoParser;
+using mongo::Polygon;
 
 namespace {
 
@@ -95,10 +97,10 @@ namespace {
 
     TEST(GeoParser, parsePoint) {
         S2Point point;
-        GeoParser::parsePoint(fromjson("{'type':'Point', 'coordinates': [40, 5]}"),
-                                  &point);
-        GeoParser::parsePoint(fromjson("{'type':'Point', 'coordinates': [-40.3, -5.0]}"),
-                                  &point);
+        ASSERT_TRUE(GeoParser::parsePoint(fromjson("{'type':'Point', 'coordinates': [40, 5]}"),
+                                  &point));
+        ASSERT_TRUE(GeoParser::parsePoint(fromjson("{'type':'Point', 'coordinates': [-4.3, -5.0]}"),
+                                  &point));
     }
 
     TEST(GeoParser, parseLineString) {
@@ -198,34 +200,14 @@ namespace {
     }
 
     TEST(GeoParser, parseLegacyPolygon) {
-        S2Polygon polygon;
-        ASSERT(GeoParser::parsePolygon(BSON_ARRAY(BSON_ARRAY(10 << 20) << BSON_ARRAY(10 << 40)
-                                                      << BSON_ARRAY(30 << 40)
-                                                      << BSON_ARRAY(30 << 20)),
-                                           &polygon));
-        polygon.Release(NULL);
-        ASSERT(GeoParser::parsePolygon(BSON_ARRAY(BSON_ARRAY(10 << 20) << BSON_ARRAY(10 << 40)
-                                                      << BSON_ARRAY(30 << 40)),
-                                           &polygon));
-        polygon.Release(NULL);
-        ASSERT_FALSE(GeoParser::parsePolygon(BSON_ARRAY(BSON_ARRAY(10 << 20)
-                                                            << BSON_ARRAY(10 << 40)),
-                                           &polygon));
-        polygon.Release(NULL);
-        ASSERT_FALSE(GeoParser::parsePolygon(BSON_ARRAY(BSON_ARRAY("10" << 20)
-                                                            << BSON_ARRAY(10 << 40)
-                                                            << BSON_ARRAY(30 << 40)
-                                                            << BSON_ARRAY(30 << 20)),
-                                           &polygon));
-        polygon.Release(NULL);
-        ASSERT_FALSE(GeoParser::parsePolygon(BSON_ARRAY(BSON_ARRAY(10 << 20 << 30)
-                                                            << BSON_ARRAY(10 << 40)
-                                                            << BSON_ARRAY(30 << 40)
-                                                            << BSON_ARRAY(30 << 20)),
-                                           &polygon));
-        polygon.Release(NULL);
+        Polygon polygon;
+        ASSERT(GeoParser::parsePolygon(fromjson("{$polygon: [[10,20],[10,40],[30,40],[30,20]]}"),
+                                       &polygon));
+        ASSERT(GeoParser::parsePolygon(fromjson("{$polygon: [[10,20], [10,40], [30,40]]}"), &polygon));
+        ASSERT_FALSE(GeoParser::parsePolygon(fromjson("{$polygon: [[10,20],[10,40]]}"), &polygon));
+        ASSERT_FALSE(GeoParser::parsePolygon(fromjson("{$polygon: [['10', 20],[10,40],[30,40],[30,20]]}"), &polygon));
+        ASSERT_FALSE(GeoParser::parsePolygon(fromjson("{$polygon: [[10,20,30],[10,40],[30,40],[30,20]]}"), &polygon));
         ASSERT(GeoParser::parsePolygon(
-            fromjson("{a:{x:40,y:5},b:{x:40,y:6},c:{x:41,y:6},d:{x:41,y:5}}"), &polygon));
-        polygon.Release(NULL);
+            fromjson("{$polygon: {a:{x:40,y:5},b:{x:40,y:6},c:{x:41,y:6},d:{x:41,y:5}}}"), &polygon));
     }
 }

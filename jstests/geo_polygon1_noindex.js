@@ -14,7 +14,7 @@ for ( x=1; x < 9; x++ ){
 triangle = [[0,0], [1,1], [0,2]];
 
 // Look at only a small slice of the data within a triangle
-assert.eq( 1 , t.find( { loc: { "$within": { "$polygon" : triangle }}} ).count() , "Triangle Test" );
+assert.eq( 1 , t.find({ loc: { "$within": { "$polygon" : triangle }}} ).count() , "Triangle Test" );
 
 boxBounds = [ [0,0], [0,10], [10,10], [10,0] ];
 

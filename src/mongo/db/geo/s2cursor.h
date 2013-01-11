@@ -21,6 +21,7 @@
 #include "mongo/db/diskloc.h"
 #include "mongo/db/matcher.h"
 #include "mongo/db/queryutil.h"
+#include "mongo/db/geo/geoquery.h"
 #include "mongo/db/geo/s2common.h"
 
 namespace mongo {
@@ -29,7 +30,7 @@ namespace mongo {
     class S2Cursor : public Cursor {
     public:
         S2Cursor(const BSONObj &keyPattern, const IndexDetails* details, const BSONObj &query,
-                 const vector<QueryGeometry> &regions, const S2IndexingParams &params,
+                 const vector<GeoQuery> &regions, const S2IndexingParams &params,
                  int numWanted);
         virtual ~S2Cursor(); 
         virtual CoveredIndexMatcher *matcher() const;
@@ -65,13 +66,11 @@ namespace mongo {
         // The query with the geo stuff taken out.  We use this with a matcher.
         BSONObj _filteredQuery;
         // What geo regions are we looking for?
-        vector<QueryGeometry> _fields;
+        vector<GeoQuery> _fields;
         // We use this for matching non-GEO stuff.
         shared_ptr<CoveredIndexMatcher> _matcher;
         // How were the keys created?  We need this to search for the right stuff.
         S2IndexingParams _params;
-        // How many things did we scan/look at?  Not sure exactly how this is defined.
-        long long _nscanned;
         // We have to pass this to the FieldRangeVector ctor (in modified form).
         BSONObj _keyPattern;
         // How many docs do we want to return?  Starts with the # the user requests
@@ -82,5 +81,15 @@ namespace mongo {
         set<DiskLoc> _seen;
         // This really does all the work/points into the btree.
         scoped_ptr<BtreeCursor> _btreeCursor;
+
+        // Stat counters/debug information goes below.
+        // How many items did we look at in the btree?
+        long long _nscanned;
+        // How many did we try to match?
+        long long _matchTested;
+        // How many did we geo-test?
+        long long _geoTested;
+        // How many cells were in our cover?
+        long long _cellsInCover;
     };
 }  // namespace mongo

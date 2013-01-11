@@ -21,6 +21,7 @@
 #include "mongo/db/index.h"
 #include "mongo/db/queryutil.h"
 #include "mongo/db/geo/geoparser.h"
+#include "mongo/db/geo/geoquery.h"
 #include "mongo/db/geo/s2common.h"
 #include "mongo/db/geo/s2cursor.h"
 #include "mongo/db/geo/s2nearcursor.h"
@@ -137,92 +138,16 @@ namespace mongo {
             }
         }
 
-        bool parseLegacy(const BSONObj &obj, QueryGeometry *out, bool *isNear, bool *intersect,
-                         bool *within, double *maxDistance) const {
-            // Legacy within parsing: t.find({ loc : [0,0] })
-            if (out->parseFrom(obj)) {
-                *within = true;
-                return true;
-            }
-
-            bool ret = false;
-            BSONObjIterator it(obj);
-            while (it.more()) {
-                BSONElement e = it.next();
-                if (!e.isABSONObj()) { return false; }
-                BSONObj embeddedObj = e.embeddedObject();
-                // Legacy near parsing: t.find({ loc : { $near: [0,0], $maxDistance: 3 }})
-                // Legacy near parsing: t.find({ loc : { $near: [0,0] }})
-                if (mongoutils::str::equals(e.fieldName(), "$near")) {
-                    if (out->parseFrom(embeddedObj)) {
-                        uassert(16573, "near requires point, given " + embeddedObj.toString(),
-                                GeoParser::isPoint(embeddedObj));
-                        *isNear = true;
-                        ret = true;
-                    }
-                } else if (mongoutils::str::equals(e.fieldName(), "$maxDistance")) {
-                    *maxDistance = e.Number();
-                }
-            }
-            return ret;
-        }
-
-        bool parseQuery(const BSONObj &obj, QueryGeometry *out, bool *isNear, bool *intersect,
-                        bool *within, double *maxDistance) const {
-            // pointA = { "type" : "Point", "coordinates": [ 40, 5 ] }
-            // t.find({ "geo" : { "$intersect" : { "$geometry" : pointA} } })
-            // t.find({ "geo" : { "$near" : { "$geometry" : pointA, $maxDistance : 20 }}})
-            // t.find({ "geo" : { "$within" : { "$geometry" : polygon } } })
-            // where field.name is "geo"
-            BSONElement e = obj.firstElement();
-            if (!e.isABSONObj()) { return false; }
-
-            BSONObj::MatchType matchType = static_cast<BSONObj::MatchType>(e.getGtLtOp());
-            if (BSONObj::opGEO_INTERSECTS == matchType) {
-                *intersect = true;
-            } else if (BSONObj::opNEAR == matchType) {
-                *isNear = true;
-            } else if (BSONObj::opWITHIN == matchType) {
-                *within = true;
-            } else {
-                return false;
-            }
-
-            bool ret = false;
-            BSONObjIterator argIt(e.embeddedObject());
-            while (argIt.more()) {
-                BSONElement e = argIt.next();
-                if (mongoutils::str::equals(e.fieldName(), "$geometry")) {
-                    if (e.isABSONObj()) {
-                        BSONObj embeddedObj = e.embeddedObject();
-                         if (out->parseFrom(embeddedObj)) {
-                             uassert(16570, "near requires point, given " + embeddedObj.toString(),
-                                     !(*isNear) || GeoParser::isPoint(embeddedObj));
-                             ret = true;
-                         }
-                    }
-                } else if (mongoutils::str::equals(e.fieldName(), "$maxDistance")) {
-                    if (e.isNumber()) {
-                        *maxDistance = e.Number();
-                    }
-                }
-            }
-            return ret;
-        }
-
         // Entry point for a search.
         virtual shared_ptr<Cursor> newCursor(const BSONObj& query, const BSONObj& order,
                                              int numWanted) const {
-            vector<QueryGeometry> regions;
-            double maxDistance = std::numeric_limits<double>::max();
-            // TODO(hk): Move this stuff into QueryGeometry and then double-check that
-            // the geometries in the query are all consistent.
-            bool isNear = false;
-            bool isIntersect = false;
-            bool isWithin = false;
+            vector<GeoQuery> regions;
+            bool isNearQuery = false;
+            NearQuery nearQuery;
 
-            // Go through the fields that we index, and for each geo one, make a QueryGeometry
-            // object for the S2Cursor class to do intersection testing/cover generating with.
+            // Go through the fields that we index, and for each geo one, make
+            // a GeoQuery object for the S2*Cursor class to do intersection
+            // testing/cover generating with.
             for (size_t i = 0; i < _fields.size(); ++i) {
                 const IndexedField &field = _fields[i];
                 if (IndexedField::GEO != field.type) { continue; }
@@ -232,69 +157,50 @@ namespace mongo {
                 if (!e.isABSONObj()) { continue; }
                 BSONObj obj = e.Obj();
 
-                QueryGeometry geoQueryField(field.name);
-                if (parseLegacy(obj, &geoQueryField, &isNear, &isIntersect, &isWithin, &maxDistance)) {
-                    regions.push_back(geoQueryField);
-                } else if (parseQuery(obj, &geoQueryField, &isNear, &isIntersect, &isWithin, &maxDistance)) {
-                    regions.push_back(geoQueryField);
-                } else {
-                    uasserted(16535, "can't parse query for *2d geo search: " + obj.toString());
+                if (nearQuery.parseFrom(obj)) {
+                    uassert(16685, "Only one $near clause allowed: " + query.toString(),
+                            !isNearQuery);
+                    isNearQuery = true;
+                    nearQuery.field = field.name;
+                    continue;
                 }
-            }
 
-            int queryTypes = 0;
-            if (isNear) ++queryTypes;
-            if (isIntersect) {
-                for (size_t i = 0; i < regions.size(); ++i) {
-                    regions[i].predicate = QueryGeometry::INTERSECT;
+                GeoQuery geoQueryField(field.name);
+                if (!geoQueryField.parseFrom(obj)) {
+                    uasserted(16535, "can't parse query (2dsphere): " + obj.toString());
                 }
-                ++queryTypes;
-            }
-            if (isWithin) {
-                for (size_t i = 0; i < regions.size(); ++i) {
-                    regions[i].predicate = QueryGeometry::WITHIN;
-                    // Why do we only deal with polygons?
-
-                    // 1. Finding things within a point is silly and only valid
-                    // for points and degenerate lines/polys.
-
-                    // 2. Finding points within a line is easy but that's called intersect.
-                    // Finding lines within a line is kind of tricky given what S2 gives us.
-                    // Doing line-within-line is a valid yet unsupported feature, though I wonder if we want to preserve
-                    // orientation for lines or allow (a,b),(c,d) to be within (c,d),(a,b).
-                    // Polygons aren't in lines.
-
-                    // 3. Finding <anything> in a polygon is what we support.
-
-                    uassert(16672, "$within is only supported with polygonal geometry",
-                            NULL != regions[i].polygon.get());
-                }
-                ++queryTypes;
-            }
-            if (1 != queryTypes) {
-                uasserted(16474, "Malformed query, require just one type of predicate: " +  query.toString());
+                uassert(16684, "Geometry unsupported: " + obj.toString(),
+                        geoQueryField.hasS2Region());
+                regions.push_back(geoQueryField);
             }
 
             // I copied this from 2d.cpp.  Guard against perversion.
             if (numWanted < 0) numWanted *= -1;
             if (0 == numWanted) numWanted = INT_MAX;
 
+            // Remove all the indexed geo regions from the query.  The s2*cursor will
+            // instead create a covering for that key to speed up the search.
+            //
+            // One thing to note is that we create coverings for indexed geo keys during
+            // a near search to speed it up further.
             BSONObjBuilder geoFieldsToNuke;
-            for (size_t i = 0; i < _fields.size(); ++i) {
-                const IndexedField &field = _fields[i];
-                if (IndexedField::GEO != field.type) { continue; }
-                geoFieldsToNuke.append(field.name, "");
+            if (isNearQuery) {
+                geoFieldsToNuke.append(nearQuery.field, "");
             }
+            for (size_t i = 0; i < regions.size(); ++i) {
+                geoFieldsToNuke.append(regions[i].getField(), "");
+            }
+
             // false means we want to filter OUT geoFieldsToNuke, not filter to include only that.
             BSONObj filteredQuery = query.filterFieldsUndotted(geoFieldsToNuke.obj(), false);
 
-            if (isNear) {
-                S2NearCursor *cursor = new S2NearCursor(keyPattern(), getDetails(), filteredQuery, regions,
-                                                        _params, numWanted, maxDistance);
+            if (isNearQuery) {
+                S2NearCursor *cursor = new S2NearCursor(keyPattern(), getDetails(), filteredQuery,
+                    nearQuery, regions, _params, numWanted);
                 return shared_ptr<Cursor>(cursor);
             } else {
-                S2Cursor *cursor = new S2Cursor(keyPattern(), getDetails(), filteredQuery, regions, _params,
-                                                numWanted);
+                S2Cursor *cursor = new S2Cursor(keyPattern(), getDetails(), filteredQuery, regions, 
+                                                _params, numWanted);
                 return shared_ptr<Cursor>(cursor);
             }
         }
@@ -316,14 +222,11 @@ namespace mongo {
                     case BSONObj::opNEAR:
                         return OPTIMAL;
                     case BSONObj::opWITHIN: {
-                        // This only works with $within : $geometry
-                        // TODO(hk): Have this work with $within : $centerSphere.
-                        // $within : $centerSphere could be done as a near search
-                        // or as a $within using a cap.
                         BSONElement elt = e.embeddedObject().firstElement();
                         if (Object != elt.type()) { continue; }
                         const char* fname = elt.embeddedObject().firstElement().fieldName();
-                        if (mongoutils::str::equals("$geometry", fname)) {
+                        if (mongoutils::str::equals("$geometry", fname)
+                            || mongoutils::str::equals("$centerSphere", fname)) {
                             return OPTIMAL;
                         } else {
                             return USELESS;
@@ -449,6 +352,19 @@ namespace mongo {
         S2IndexType *idxType = static_cast<S2IndexType*>(id.getSpec().getType());
         verify(&id == idxType->getDetails());
 
+        vector<string> geoFieldNames;
+        idxType->getGeoFieldNames(&geoFieldNames);
+
+        // NOTE(hk): If we add a new argument to geoNear, we could have a
+        // 2dsphere index with multiple indexed geo fields, and the geoNear
+        // could pick the one to run over.  Right now, we just require one.
+        uassert(16552, "geoNear requiers exactly one indexed geo field", 1 == geoFieldNames.size());
+        NearQuery nearQuery(geoFieldNames[0]);
+        uassert(16679, "Invalid geometry given as arguments to geoNear: " + cmdObj.toString(),
+                nearQuery.parseFromGeoNear(cmdObj));
+        uassert(16683, "geoNear on 2dsphere index requires spherical",
+                cmdObj["spherical"].trueValue());
+
         // We support both "num" and "limit" options to control limit
         int numWanted = 100;
         const char* limitName = cmdObj["num"].isNumber() ? "num" : "limit";
@@ -457,43 +373,28 @@ namespace mongo {
             verify(numWanted >= 0);
         }
 
-        // Don't count any docs twice.  Isn't this default behavior?  Or will yields screw this up?
-        //bool uniqueDocs = false;
-        //if (!cmdObj["uniqueDocs"].eoo()) uniqueDocs = cmdObj["uniqueDocs"].trueValue();
-
         // Add the location information to each result as a field with name 'loc'.
         bool includeLocs = false;
         if (!cmdObj["includeLocs"].eoo()) includeLocs = cmdObj["includeLocs"].trueValue();
 
-        // The actual query point
-        uassert(16551, "'near' param missing/invalid", !cmdObj["near"].eoo());
-        BSONObj nearObj = cmdObj["near"].embeddedObject();
-
-        // nearObj must be a point.
-        uassert(16571, "near must be called with a point, called with " + nearObj.toString(),
-                GeoParser::isPoint(nearObj));
-
         // The non-near query part.
         BSONObj query;
-        if (cmdObj["query"].isABSONObj())
+        if (cmdObj["query"].isABSONObj()) {
             query = cmdObj["query"].embeddedObject();
+        }
 
-        // The farthest away we're willing to look.
-        double maxDistance = numeric_limits<double>::max();
-        if (cmdObj["maxDistance"].isNumber())
-            maxDistance = cmdObj["maxDistance"].number();
+        double distanceMultiplier = 1.0;
+        if (cmdObj["distanceMultiplier"].isNumber()) {
+            distanceMultiplier = cmdObj["distanceMultiplier"].number();
+        }
 
-        vector<string> geoFieldNames;
-        idxType->getGeoFieldNames(&geoFieldNames);
-        uassert(16552, "geoNear called but no indexed geo fields?", 1 == geoFieldNames.size());
-        QueryGeometry queryGeo(geoFieldNames[0]);
-        uassert(16553, "geoNear couldn't parse geo: " + nearObj.toString(), queryGeo.parseFrom(nearObj));
-        vector<QueryGeometry> regions;
-        regions.push_back(queryGeo);
+        // NOTE(hk): For a speedup, we could look through the query to see if
+        // we've geo-indexed any of the fields in it.
+        vector<GeoQuery> regions;
 
-        scoped_ptr<S2NearCursor> cursor(new S2NearCursor(idxType->keyPattern(), idxType->getDetails(),
-                                                         query, regions, idxType->getParams(),
-                                                         numWanted, maxDistance));
+        scoped_ptr<S2NearCursor> cursor(new S2NearCursor(idxType->keyPattern(),
+            idxType->getDetails(), query, nearQuery, regions, idxType->getParams(),
+            numWanted));
 
         double totalDistance = 0;
         int results = 0;
@@ -502,10 +403,12 @@ namespace mongo {
 
         while (cursor->ok()) {
             double dist = cursor->currentDistance();
+            dist *= distanceMultiplier;
             totalDistance += dist;
             if (dist > farthestDist) { farthestDist = dist; }
 
-            BSONObjBuilder oneResultBuilder(resultBuilder.subobjStart(BSONObjBuilder::numStr(results)));
+            BSONObjBuilder oneResultBuilder(
+                resultBuilder.subobjStart(BSONObjBuilder::numStr(results)));
             oneResultBuilder.append("dis", dist);
             if (includeLocs) {
                 BSONElementSet geoFieldElements;
