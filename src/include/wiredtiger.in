@@ -1590,7 +1590,7 @@ struct __wt_compressor {
 	 * strings in the \c src buffer.)
 	 *
 	 * The argument \c dst points to the destination buffer with a length
-	 * of \c dst_len (the destination buffer is will be the maximum page
+	 * of \c dst_len (the destination buffer will be the maximum page
 	 * size for the page being written, less the prepended header size.
 	 * That is, when writing a row-store leaf page, the destination buffer
 	 * size will be the \c leaf_page_max configuration less the size of the
