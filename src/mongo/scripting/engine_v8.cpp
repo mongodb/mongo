@@ -298,7 +298,8 @@ namespace mongo {
 
     V8ScriptEngine::V8ScriptEngine() :
         _globalInterruptLock("GlobalV8InterruptLock"),
-        _opToScopeMap() {
+        _opToScopeMap(),
+        _deadlineMonitor() {
     }
 
     V8ScriptEngine::~V8ScriptEngine() {
@@ -850,8 +851,6 @@ namespace mongo {
         // TODO SERVER-8016: properly allocate handles on the stack
         v8::Handle<v8::Value> args[24];
 
-        // TODO SERVER-8053: implement timeoutMs
-
         const int nargs = argsObject ? argsObject->nFields() : 0;
         if (nargs) {
             BSONObjIterator it(*argsObject);
@@ -877,7 +876,15 @@ namespace mongo {
             return 1;
         }
 
+        if (timeoutMs)
+            // start the deadline timer for this script
+            _engine->getDeadlineMonitor()->startDeadline(this, timeoutMs);
+
         result = ((v8::Function*)(*funcValue))->Call(v8recv, nargs, nargs ? args : NULL);
+
+        if (timeoutMs)
+            // stop the deadline timer for this script
+            _engine->getDeadlineMonitor()->stopDeadline(this);
 
         if (!nativePrologue()) {
             _error = str::stream() << "javascript execution interrupted";
@@ -907,8 +914,6 @@ namespace mongo {
         V8_SIMPLE_HEADER
         v8::TryCatch try_catch;
 
-        // TODO SERVER-8053: implement timeoutMs
-
         v8::Handle<v8::Script> script =
                 v8::Script::Compile(v8::String::New(code.rawData(), code.size()),
                                     v8::String::New(name.c_str()));
@@ -932,7 +937,15 @@ namespace mongo {
             return false;
         }
 
+        if (timeoutMs)
+            // start the deadline timer for this script
+            _engine->getDeadlineMonitor()->startDeadline(this, timeoutMs);
+
         v8::Handle<v8::Value> result = script->Run();
+
+        if (timeoutMs)
+            // stopt the deadline timer for this script
+            _engine->getDeadlineMonitor()->stopDeadline(this);
 
         bool resultSuccess = true;
         if (!nativePrologue()) {

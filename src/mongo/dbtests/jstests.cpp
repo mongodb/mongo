@@ -751,6 +751,74 @@ namespace JSTests {
         }
     };
 
+    /**
+     * Test exec() timeout value terminates execution (SERVER-8053)
+     */
+    class ExecTimeout {
+    public:
+        void run() {
+            scoped_ptr<Scope> scope(globalScriptEngine->newScope());
+            scope->localConnect("ExecTimeoutDB");
+            // assert timeout occured
+            ASSERT(!scope->exec("var a = 1; while (true) { ; }",
+                                "ExecTimeout", false, true, false, 1));
+        }
+    };
+
+    /**
+     * Test exec() timeout value terminates execution (SERVER-8053)
+     */
+    class ExecNoTimeout {
+    public:
+        void run() {
+            scoped_ptr<Scope> scope(globalScriptEngine->newScope());
+            scope->localConnect("ExecNoTimeoutDB");
+            // assert no timeout occured
+            ASSERT(scope->exec("var a = function() { return 1; }",
+                               "ExecNoTimeout", false, true, false, 5 * 60 * 1000));
+        }
+    };
+
+    /**
+     * Test invoke() timeout value terminates execution (SERVER-8053)
+     */
+    class InvokeTimeout {
+    public:
+        void run() {
+            scoped_ptr<Scope> scope(globalScriptEngine->newScope());
+            scope->localConnect("InvokeTimeoutDB");
+
+            // scope timeout after 500ms
+            bool caught = false;
+            try {
+                scope->invokeSafe("function() {         "
+                                  "    while (true) { } "
+                                  "}                    ",
+                                  0, 0, 1);
+            } catch (const DBException& e) {
+                caught = true;
+            }
+            ASSERT(caught);
+        }
+    };
+
+    /**
+     * Test invoke() timeout value does not terminate execution (SERVER-8053)
+     */
+    class InvokeNoTimeout {
+    public:
+        void run() {
+            scoped_ptr<Scope> scope(globalScriptEngine->newScope());
+            scope->localConnect("InvokeTimeoutDB");
+
+            // invoke completes before timeout
+            scope->invokeSafe("function() { "
+                              "  for (var i=0; i<1; i++) { ; } "
+                              "} ",
+                              0, 0, 5 * 60 * 1000);
+        }
+    };
+
 
     void dummy_function_to_force_dbeval_cpp_linking() {
         BSONObj cmd;
@@ -1110,6 +1178,10 @@ namespace JSTests {
             add< SimpleFunctions >();
             add< ExecLogError >();
             add< InvokeLogError >();
+            add< ExecTimeout >();
+            add< ExecNoTimeout >();
+            add< InvokeTimeout >();
+            add< InvokeNoTimeout >();
 
             add< ObjectMapping >();
             add< ObjectDecoding >();

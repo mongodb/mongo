@@ -23,6 +23,7 @@
 #include "mongo/scripting/engine.h"
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/scripting/v8_deadline_monitor.h"
 
 /**
  * V8_SIMPLE_HEADER must be placed in any function called from a public API
@@ -358,10 +359,16 @@ namespace mongo {
 
         std::string printKnownOps_inlock();
 
+        /**
+         * Get the deadline monitor instance for the v8 ScriptEngine
+         */
+        DeadlineMonitor<V8Scope>* getDeadlineMonitor() { return &_deadlineMonitor; }
+
         typedef map<unsigned, V8Scope*> OpIdToScopeMap;
         mongo::mutex _globalInterruptLock;  // protects map of all operation ids -> scope
         OpIdToScopeMap _opToScopeMap;       // map of mongo op ids to scopes (protected by
                                             // _globalInterruptLock).
+        DeadlineMonitor<V8Scope> _deadlineMonitor;
     };
 
     extern ScriptEngine* globalScriptEngine;
