@@ -261,7 +261,6 @@ namespace mongo {
      * JavaScript binding for Mongo.prototype.find(namespace, query, fields, limit, skip)
      */
     v8::Handle<v8::Value> mongoFind(V8Scope* scope, const v8::Arguments& args) {
-        v8::HandleScope handle_scope;
         uassert(16653, "find needs 7 args", args.Length() == 7);
         uassert(16654, "needs to be an object", args[1]->IsObject());
         DBClientBase * conn = getConnection(args);
@@ -294,7 +293,7 @@ namespace mongo {
             v8::Persistent<v8::Object> c = v8::Persistent<v8::Object>::New(cons->NewInstance());
             c.MakeWeak(cursor.get(), destroyCursor);
             c->SetInternalField(0, v8::External::New(cursor.release()));
-            return handle_scope.Close(c);
+            return c;
         }
         catch (...) {
             return v8::ThrowException(v8::String::New("socket error on query"));
