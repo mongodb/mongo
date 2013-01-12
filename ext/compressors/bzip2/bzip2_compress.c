@@ -36,16 +36,16 @@
 WT_EXTENSION_API *wt_api;
 
 static int
-bzip2_compress(WT_COMPRESSOR *,
-    WT_SESSION *, uint8_t *, size_t, uint8_t *, size_t, size_t *, int *);
+bzip2_compress(WT_COMPRESSOR *, WT_SESSION *,
+    uint8_t *, size_t, uint8_t *, size_t, size_t *, int *);
 static int
-bzip2_decompress(WT_COMPRESSOR *,
-    WT_SESSION *, uint8_t *, size_t, uint8_t *, size_t, size_t *);
+bzip2_decompress(WT_COMPRESSOR *, WT_SESSION *,
+    uint8_t *, size_t, uint8_t *, size_t, size_t *);
 #ifdef WIREDTIGER_TEST_COMPRESS_RAW
 static int
 bzip2_compress_raw(WT_COMPRESSOR *, WT_SESSION *,
-    uint8_t *, uint32_t *, uint32_t,
-    uint8_t *, size_t, size_t *, uint32_t *);
+    size_t, size_t, uint8_t *, uint32_t *, uint32_t, uint8_t *, size_t,
+    size_t *, uint32_t *);
 #endif
 
 static WT_COMPRESSOR bzip2_compressor = {
@@ -209,12 +209,16 @@ __bzip2_compress_raw_random(void)
  */
 static int
 bzip2_compress_raw(WT_COMPRESSOR *compressor, WT_SESSION *session,
+    size_t page_max, size_t extra,
     uint8_t *src, uint32_t *offsets, uint32_t slots,
     uint8_t *dst, size_t dst_len,
     size_t *result_lenp, uint32_t *result_slotsp)
 {
 	uint32_t take, twenty_pct;
 	int compression_failed, ret;
+
+	__UNUSED(page_max);
+	__UNUSED(extra);
 
 	/*
 	 * This function is used by the test/format utility to test the
@@ -259,8 +263,10 @@ bzip2_compress_raw(WT_COMPRESSOR *compressor, WT_SESSION *session,
 
 #if 0
 	fprintf(stderr,
-	    "bzip2_compress_raw: slots %" PRIu32 ", take %" PRIu32 ": %" PRIu32
-	    " -> %" PRIuMAX "\n",
+	    "bzip2_compress_raw: page_max %" PRIuMAX ", extra %" PRIuMAX
+	    ", slots %" PRIu32 ", take %" PRIu32 ": %" PRIu32 " -> %"
+	    PRIuMAX "\n",
+	    (uintmax_t)page_max, (uintmax_t)extra,
 	    slots, take, offsets[take], (uintmax_t)*result_lenp);
 #endif
 

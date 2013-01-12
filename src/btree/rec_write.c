@@ -1464,18 +1464,46 @@ __rec_split_raw_worker(WT_SESSION_IMPL *session, WT_RECONCILE *r, int final)
 	    WT_PTRDIFF32(cell, dsk) - WT_BLOCK_COMPRESS_SKIP;
 
 	/*
-	 * Allocate a destination buffer and initialize it, then call the
-	 * compression function.  We document the size of the destination
-	 * buffer to be the maximum object size.
+	 * Allocate a destination buffer.  If there's a pre-size function, use
+	 * it to determine the destination buffer's minimum size, otherwise the
+	 * destination buffer is documented to be at least the maximum object
+	 * size.
+	 *
+	 * The destination buffer really only needs to be large enough for the
+	 * target block size, corrected for the requirements of the underlying
+	 * block manager.  If the target block size is 8KB, that's a multiple
+	 * of 512Band so the underlying block manager is fine with it.  But...
+	 * we don't control what the pre_size method returns us as a required
+	 * size, and we don't want to document the compress_raw method has to
+	 * skip bytes in the buffer because that's confusing, so do something
+	 * more complicated.  First, find out how much space the compress_raw
+	 * function might need, either the value returned from pre_size, or the
+	 * maximum object size.  Add the compress-skip bytes, and then correct
+	 * that value for the underlying block manager.   As a result, we have
+	 * a destination buffer that's the right "object" size when calling the
+	 * compress_raw method, and there are bytes in the header just for us.
 	 */
-	WT_RET(__wt_scr_alloc(session, r->page_size_max, &dst));
+	if (compressor->pre_size == NULL)
+		result_len = r->page_size_max;
+	else
+		WT_RET(compressor->pre_size(compressor, wt_session,
+		    (uint8_t *)dsk + WT_BLOCK_COMPRESS_SKIP,
+		    (size_t)r->raw_offsets[slots], &result_len));
+	corrected_page_size = (uint32_t)result_len + WT_BLOCK_COMPRESS_SKIP;
+	WT_RET(__wt_bm_write_size(session, &corrected_page_size));
+	WT_RET(__wt_scr_alloc(session, (size_t)corrected_page_size, &dst));
+
+	/*
+	 * Copy the header bytes into the destination buffer, then call the
+	 * compression function.
+	 */
 	memcpy(dst->mem, dsk, WT_BLOCK_COMPRESS_SKIP);
 	WT_ERR(compressor->compress_raw(compressor, wt_session,
+	    r->page_size, WT_BLOCK_COMPRESS_SKIP,
 	    (uint8_t *)dsk + WT_BLOCK_COMPRESS_SKIP,
 	    r->raw_offsets, slots,
 	    (uint8_t *)dst->mem + WT_BLOCK_COMPRESS_SKIP,
-	    r->page_size_max -
-	    WT_BLOCK_COMPRESS_SKIP, &result_len, &result_slots));
+	    result_len, &result_len, &result_slots));
 	dst->size = (uint32_t)result_len + WT_BLOCK_COMPRESS_SKIP;
 
 	if (result_slots != 0) {
