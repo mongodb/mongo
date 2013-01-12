@@ -122,6 +122,7 @@ namespace mongo {
         if (!isMongos) {
             
             if ( b["locks"].isABSONObj() ) {
+                // report either the global lock % or the db with the highest lock % + the global lock
                 NamespaceStats prevStats = parseServerStatusLocks( a );
                 NamespaceStats curStats = parseServerStatusLocks( b );
                 vector<NamespaceDiff> diffs = computeDiff( prevStats , curStats );
@@ -131,7 +132,8 @@ namespace mongo {
                 }
                 else {
 
-                    double uptimeMillis = diff( "uptimeMillis" , a , b );
+                    // diff() divides the result by _seconds, need total uptime here
+                    double uptimeMillis = diff( "uptimeMillis" , a , b ) * _seconds;
                     unsigned idx = diffs.size()-1;
                     
                     double lockToReport = diffs[idx].write;
