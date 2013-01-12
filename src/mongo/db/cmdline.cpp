@@ -143,8 +143,8 @@ namespace {
         while ( f ) {
             f.getline(line, MAX_LINE_LENGTH);
             s = line;
-            std::remove(s.begin(), s.end(), ' ');
-            std::remove(s.begin(), s.end(), '\t');
+            boost::algorithm::erase_all(s, " ");
+            boost::algorithm::erase_all(s, "\t");
             boost::to_upper(s);
 
             if ( s.find( "FASTSYNC" ) != string::npos )
