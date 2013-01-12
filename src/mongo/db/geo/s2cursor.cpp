@@ -74,10 +74,16 @@ namespace mongo {
         frsObjBuilder.appendElements(_filteredQuery);
 
         S2RegionCoverer coverer;
-        _params.configureCoverer(&coverer);
 
         for (size_t i = 0; i < _fields.size(); ++i) {
             vector<S2CellId> cover;
+            double area = _fields[i].getRegion().GetRectBound().Area();
+            // Min level is the smallest of our coarsest indexed level, or ~4x the size of the closest
+            // level to the shape we're searching in.
+            coverer.set_min_level(min(_params.coarsestIndexedLevel, 2 + S2::kAvgEdge.GetClosestLevel(area)));
+            // Max level is 16x that of the min level.
+            // NOTE(hk): Should we make this user-configurable?
+            coverer.set_max_level(4 + coverer.min_level());
             coverer.GetCovering(_fields[i].getRegion(), &cover);
             if (0 == cover.size()) { return false; }
             _cellsInCover = cover.size();
