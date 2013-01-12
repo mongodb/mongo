@@ -795,7 +795,7 @@ namespace JSTests {
                                   "    while (true) { } "
                                   "}                    ",
                                   0, 0, 1);
-            } catch (const DBException& e) {
+            } catch (const DBException&) {
                 caught = true;
             }
             ASSERT(caught);
