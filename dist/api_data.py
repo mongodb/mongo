@@ -255,9 +255,13 @@ connection_runtime_config = [
 		Config('chunk', '10MB', r'''
 			the granularity that a shared cache is redistributed''',
 			min='1MB', max='10TB'),
-		Config('min', '50MB', r'''
-			minimum amount of cache a database in a shared cache can have''',
+		Config('default_base_size', '50MB', r'''
+			amount of cache a database in a shared cache is guaranteed to
+            have available, unless a base_size is configured for a database''',
 			min='10MB', max='10TB'),
+		Config('base_size', '0', r'''
+			amount of cache this database is guaranteed to have available from
+			the shared cache'''),
 		Config('name', '', r'''
 			name of a cache that is shared between databases'''),
 		Config('size', '500MB', r'''

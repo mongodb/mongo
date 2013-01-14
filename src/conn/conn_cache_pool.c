@@ -92,12 +92,23 @@ __wt_conn_cache_pool_config(WT_SESSION_IMPL *session, const char **cfg)
 	cp->size = (uint64_t)cval.val;
 	WT_ERR(__wt_config_gets(session, cfg, "shared_cache.chunk", &cval));
 	cp->chunk = (uint64_t)cval.val;
-	WT_ERR(__wt_config_gets(session, cfg, "shared_cache.min", &cval));
-	cp->min = (uint64_t)cval.val;
+	/*
+	 * If this is the first time through use the default configuration
+	 * value for default_base_size, otherwise ignore it. The subtle
+	 * difference is that the default configuration string is always the
+	 * first entry in the configuration string array.
+	 */
+	if ((created && (ret = __wt_config_gets(
+	    session, cfg, "shared_cache.default_base_size", &cval)) == 0) ||
+	    (!created && (ret = __wt_config_gets(
+	    session, &cfg[1], "shared_cache.default_base_size", &cval)) == 0))
+		cp->default_base_size = (uint64_t)cval.val;
+	WT_ERR_NOTFOUND_OK(ret);
+
 	WT_VERBOSE_ERR(session, shared_cache,
 	    "Configured cache pool %s. Size: %" PRIu64
-	    ", chunk size: %" PRIu64 ", min: %" PRIu64,
-	    cp->name, cp->size, cp->chunk, cp->min);
+	    ", chunk size: %" PRIu64 ", default base size: %" PRIu64,
+	    cp->name, cp->size, cp->chunk, cp->default_base_size);
 
 	F_SET(conn, WT_CONN_CACHE_POOL);
 err:	__wt_spin_unlock(session, &__wt_process.spinlock);
@@ -119,9 +130,10 @@ int
 __wt_conn_cache_pool_open(WT_SESSION_IMPL *session)
 {
 	WT_CACHE_POOL *cp;
-	WT_CONNECTION_IMPL *conn;
+	WT_CONNECTION_IMPL *conn, *entry;
 	WT_DECL_RET;
 	int create_server, locked;
+	uint64_t needed, used_cache;
 
 	conn = S2C(session);
 	locked = 0;
@@ -129,14 +141,31 @@ __wt_conn_cache_pool_open(WT_SESSION_IMPL *session)
 
 	__wt_spin_lock(session, &cp->cache_pool_lock);
 	locked = 1;
-	/* Add this connection into the cache pool connection queue. */
-	WT_ERR(__wt_calloc_def(session, 1, &conn->cache));
 
 	/*
-	 * Figure out if a manager thread is needed while holding the lock.
-	 * Don't start the thread until we have released the lock.
+	 * Add this connection into the cache pool connection queue. Figure
+	 * out if a manager thread is needed while holding the lock. Don't
+	 * start the thread until we have released the lock.
 	 */
 	create_server = TAILQ_EMPTY(&cp->cache_pool_qh);
+	/* Check to make sure there is room in our pool for the new entry. */
+	needed = used_cache = 0;
+	if (!create_server) {
+		TAILQ_FOREACH(entry, &cp->cache_pool_qh, cpq) {
+			if (entry->cache->cp_base_size != 0)
+				used_cache += entry->cache->cp_base_size;
+			else
+				used_cache += cp->default_base_size;
+		}
+	}
+	needed = ((conn->cache->cp_base_size == 0) ?
+	    cp->default_base_size : conn->cache->cp_base_size);
+	if (used_cache + needed > cp->size)
+		WT_ERR_MSG(session, EINVAL,
+		    "Cache pool unable to accommodate this connection. "
+		    "Requested: %" PRIu64 ", available: %" PRIu64,
+		    needed, cp->size - used_cache);
+
 	TAILQ_INSERT_TAIL(&cp->cache_pool_qh, conn, cpq);
 	__wt_spin_unlock(session, &cp->cache_pool_lock);
 	locked = 0;
@@ -188,8 +217,7 @@ __wt_conn_cache_pool_destroy(WT_CONNECTION_IMPL *conn)
 
 	if (!found) {
 		__wt_spin_unlock(session, &cp->cache_pool_lock);
-		WT_RET_MSG(session, WT_ERROR,
-		    "Failed to find connection in shared cache pool.");
+		return (0);
 	}
 
 	WT_VERBOSE_TRET(session, shared_cache,
@@ -263,7 +291,7 @@ __cache_pool_balance(void)
 	WT_CONNECTION_IMPL *entry;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
-	uint64_t adjusted, highest, new, read_pressure;
+	uint64_t adjusted, base, highest, new, read_pressure;
 	int entries, grew;
 
 	cp = __wt_process.cache_pool;
@@ -312,6 +340,14 @@ __cache_pool_balance(void)
 
 	TAILQ_FOREACH(entry, &cp->cache_pool_qh, cpq) {
 		cache = entry->cache;
+		/*
+		 * The base size is kept separate from the default because
+		 * it is possible for the default to be re-configured during
+		 * the lifetime of an application, and we want that to be
+		 * reflected in the balancing.
+		 */
+		base = (cache->cp_base_size != 0) ?
+			cache->cp_base_size : cp->default_base_size;
 		adjusted = 0;
 		/* Allow to stabilize after changes. */
 		if (cache->cp_skip_count > 0 && --cache->cp_skip_count > 0)
@@ -324,7 +360,7 @@ __cache_pool_balance(void)
 		 */
 		if (entry->cache_size == 0) {
 			grew = 1;
-			adjusted = cp->min;
+			adjusted = base;
 		} else if (highest > 1 &&
 		    entry->cache_size < cp->size &&
 		     cache->bytes_inmem >=
@@ -336,7 +372,7 @@ __cache_pool_balance(void)
 			    cp->size - cp->currently_used);
 		} else if (read_pressure < WT_CACHE_POOL_REDUCE_THRESHOLD &&
 		    highest > 1 &&
-		    entry->cache_size > cp->min &&
+		    entry->cache_size > base &&
 		    cp->currently_used >= cp->size) {
 			/*
 			 * If a connection isn't actively using it's assigned
@@ -344,8 +380,8 @@ __cache_pool_balance(void)
 			 * it.
 			 */
 			grew = 0;
-			adjusted = (cp->chunk > entry->cache_size - cp->min) ?
-			    cp->chunk : (entry->cache_size - cp->min);
+			adjusted = (cp->chunk > entry->cache_size - base) ?
+			    cp->chunk : (entry->cache_size - base);
 		}
 		if (adjusted > 0) {
 			if (grew > 0) {
