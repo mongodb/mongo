@@ -593,6 +593,24 @@
     <ClCompile Include="..\bson\bson_validate.cpp">
       <Filter>bson</Filter>
     </ClCompile>
+    <ClCompile Include="..\scripting\bson_template_evaluator_test.cpp">
+      <Filter>scripting</Filter>
+    </ClCompile>
+    <ClCompile Include="..\scripting\engine_none.cpp">
+      <Filter>scripting</Filter>
+    </ClCompile>
+    <ClCompile Include="..\scripting\engine_v8.cpp">
+      <Filter>scripting</Filter>
+    </ClCompile>
+    <ClCompile Include="..\scripting\v8_db.cpp">
+      <Filter>scripting</Filter>
+    </ClCompile>
+    <ClCompile Include="..\scripting\v8_deadline_monitor_test.cpp">
+      <Filter>scripting</Filter>
+    </ClCompile>
+    <ClCompile Include="..\scripting\v8_utils.cpp">
+      <Filter>scripting</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="collection.js">
@@ -938,9 +956,6 @@
       <Filter>db\Header</Filter>
     </ClInclude>
     <ClInclude Include="..\db\commands.h">
-      <Filter>db\Header</Filter>
-    </ClInclude>
-    <ClInclude Include="..\db\concurrency.h">
       <Filter>db\Header</Filter>
     </ClInclude>
     <ClInclude Include="..\db\namespace-inl.h">
@@ -1402,6 +1417,18 @@
     </ClInclude>
     <ClInclude Include="..\bson\bson_validate.h">
       <Filter>bson</Filter>
+    </ClInclude>
+    <ClInclude Include="..\scripting\engine_v8.h">
+      <Filter>scripting</Filter>
+    </ClInclude>
+    <ClInclude Include="..\scripting\v8_db.h">
+      <Filter>scripting</Filter>
+    </ClInclude>
+    <ClInclude Include="..\scripting\v8_deadline_monitor.h">
+      <Filter>scripting</Filter>
+    </ClInclude>
+    <ClInclude Include="..\scripting\v8_utils.h">
+      <Filter>scripting</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
