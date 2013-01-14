@@ -205,8 +205,8 @@ namespace mongo {
             }
         }
 
-        virtual IndexSuitability suitability( const FieldRangeSet& queryConstraints ,
-                                              const BSONObj& order ) const {
+        virtual IndexSuitability suitability(const FieldRangeSet& queryConstraints,
+                                             const BSONObj& order) const {
             BSONObj query = queryConstraints.originalQuery();
 
             for (size_t i = 0; i < _fields.size(); ++i) {
@@ -235,7 +235,7 @@ namespace mongo {
                     case BSONObj::opGEO_INTERSECTS:
                         return OPTIMAL;
                     default:
-                        return HELPFUL;
+                        return USELESS;
                 }
             }
             return USELESS;
@@ -276,7 +276,8 @@ namespace mongo {
                 } else if (GeoParser::parseLineString(obj, &line)) {
                     keysFromRegion(&coverer, line, &cells);
                 } else if (GeoParser::parsePoint(obj, &point)) {
-                    keysFromRegion(&coverer, point, &cells);
+                    S2CellId parent(point.id().parent(_params.finestIndexedLevel));
+                    cells.push_back(parent.toString());
                 } else {
                     uasserted(16572, "Can't extract geo keys from object, malformed geometry?:"
                                      + obj.toString());
