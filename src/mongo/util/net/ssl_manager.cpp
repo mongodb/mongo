@@ -295,8 +295,8 @@ namespace mongo {
         case SSL_ERROR_WANT_READ:
         case SSL_ERROR_WANT_WRITE:
             // should not happen because we turned on AUTO_RETRY
-            error() << "SSL error" << endl;
-            throw SocketException(SocketException::CONNECT_ERROR, "");
+            error() << "SSL error: " << code << endl;
+            fassertFailed( 16676 );
             break;
 
         case SSL_ERROR_SYSCALL:
