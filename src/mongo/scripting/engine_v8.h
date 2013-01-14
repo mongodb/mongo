@@ -21,9 +21,8 @@
 #include <vector>
 
 #include "mongo/scripting/engine.h"
-
-#include "mongo/base/disallow_copying.h"
 #include "mongo/scripting/v8_deadline_monitor.h"
+#include "mongo/scripting/v8_profiler.h"
 
 /**
  * V8_SIMPLE_HEADER must be placed in any function called from a public API
@@ -244,6 +243,10 @@ namespace mongo {
         static v8::Handle<v8::Value> Version(V8Scope* scope, const v8::Arguments& args);
         static v8::Handle<v8::Value> GCV8(V8Scope* scope, const v8::Arguments& args);
 
+        static v8::Handle<v8::Value> startCpuProfiler(V8Scope* scope, const v8::Arguments& args);
+        static v8::Handle<v8::Value> stopCpuProfiler(V8Scope* scope, const v8::Arguments& args);
+        static v8::Handle<v8::Value> getCpuProfile(V8Scope* scope, const v8::Arguments& args);
+
         /** Signal that this scope has entered a native (C++) execution context.
          *  @return  false if execution has been interrupted
          */
@@ -288,6 +291,7 @@ namespace mongo {
         v8::Persistent<v8::ObjectTemplate> internalFieldObjects;
 
         v8::Isolate* _isolate;
+        V8CpuProfiler _cpuProfiler;
 
         mongo::mutex _interruptLock; // protects interruption-related flags
         bool _inNativeExecution;     // protected by _interruptLock

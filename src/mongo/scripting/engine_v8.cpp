@@ -428,6 +428,7 @@ namespace mongo {
     V8Scope::V8Scope(V8ScriptEngine * engine)
         : _engine(engine),
           _connectState(NOT),
+          _cpuProfiler(),
           _interruptLock("ScopeInterruptLock"),
           _inNativeExecution(true),
           _pendingKill(false) {
@@ -503,6 +504,9 @@ namespace mongo {
         injectV8Function("version", Version);
         injectV8Function("load", load);
         injectV8Function("gc", GCV8);
+        injectV8Function("startCpuProfiler", startCpuProfiler);
+        injectV8Function("stopCpuProfiler", stopCpuProfiler);
+        injectV8Function("getCpuProfile", getCpuProfile);
 
         // install db and bson types in the global scope
         installDBTypes(this, _global);
@@ -1659,6 +1663,30 @@ namespace mongo {
         // collection cycle, @see v8::V8::IdleNotification.
         v8::V8::LowMemoryNotification();
         return v8::Undefined();
+    }
+
+    v8::Handle<v8::Value> V8Scope::startCpuProfiler(V8Scope* scope, const v8::Arguments& args) {
+        if (args.Length() != 1 || !args[0]->IsString()) {
+            return v8::ThrowException(v8::String::New("startCpuProfiler takes a string argument"));
+        }
+        scope->_cpuProfiler.start(*v8::String::Utf8Value(args[0]->ToString()));
+        return v8::Undefined();
+    }
+
+    v8::Handle<v8::Value> V8Scope::stopCpuProfiler(V8Scope* scope, const v8::Arguments& args) {
+        if (args.Length() != 1 || !args[0]->IsString()) {
+            return v8::ThrowException(v8::String::New("stopCpuProfiler takes a string argument"));
+        }
+        scope->_cpuProfiler.stop(*v8::String::Utf8Value(args[0]->ToString()));
+        return v8::Undefined();
+    }
+
+    v8::Handle<v8::Value> V8Scope::getCpuProfile(V8Scope* scope, const v8::Arguments& args) {
+        if (args.Length() != 1 || !args[0]->IsString()) {
+            return v8::ThrowException(v8::String::New("getCpuProfile takes a string argument"));
+        }
+        return scope->mongoToLZV8(scope->_cpuProfiler.fetch(
+                *v8::String::Utf8Value(args[0]->ToString())));
     }
 
 } // namespace mongo

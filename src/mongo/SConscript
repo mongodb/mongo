@@ -302,7 +302,8 @@ if usesm:
 elif usev8:
     env.StaticLibrary('scripting', scripting_common_files + ['scripting/engine_v8.cpp',
                                                              'scripting/v8_db.cpp',
-                                                             'scripting/v8_utils.cpp',],
+                                                             'scripting/v8_utils.cpp',
+                                                             'scripting/v8_profiler.cpp'],
                        LIBDEPS=['bson_template_evaluator', '$BUILD_DIR/third_party/shim_v8'])
 else:
     env.StaticLibrary('scripting', scripting_common_files + ['scripting/engine_none.cpp'],
