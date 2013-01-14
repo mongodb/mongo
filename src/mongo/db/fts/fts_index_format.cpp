@@ -51,6 +51,8 @@ namespace mongo {
                 BSONElement e = obj.getFieldDotted(spec.extraBefore(i));
                 if ( e.eoo() )
                     e = nullElt;
+                uassert( 16675, "cannot have a multi-key as a prefix to a text index",
+                         e.type() != Array );
                 extrasBefore.push_back(e);
                 extraSize += e.size();
             }
