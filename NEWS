@@ -1,3 +1,49 @@
+WiredTiger release 1.4.2, 2013-01-14
+------------------------------------
+
+[#387] Fast-path "S" and "u" formats in cursor.get_key and cursor.get_value.
+
+[#407] Allow non-conflicting updates to complete concurrently.
+
+[#418] Add code in to prioritize eviction of pages that are larger than a
+certain threshold. This avoids taking a performance hit when a huge page
+needs to be reconciled.  Add a new memory_max_page configuration option.
+
+[#419] If a page splits, it potentially creates a merge-split internal page
+and we potentially walk that page during fast-delete.  The WT_REF.addr field
+doesn't point to a cell in that case and we'll drop core.
+
+[#424] Add clarification wording for boolean configuration strings.
+
+[#425] Perform checkpoints in the calling thread, don't block eviction: when
+evicting in a file that is being checkpointed, only evict clean pages.  Also
+Do compaction in the calling thread instead of interrupting the eviction
+thread to do the work.
+
+[#426] Fixes for automake 1.3.x.  Allow examples to run in parallel: give
+each a unique home directory.
+
+Make the tree build without HAVE_VERBOSE.
+
+Fix some issues with LSM rename and add a Python test.
+
+Track when cursors refer to memory returned by WiredTiger, copy it if
+required before dropping hazard pointers that might be protecting it.
+
+Verify shouldn't ever modify the file -- don't bother checking for dirty
+pages, just discard everything.
+
+When rolling forward to resolve key prefix compression, don't copy the key,
+we only need a reference to it, should speed up tables with lots of key
+prefix compression.
+
+Requested changes for the WT_COMPRESSOR::compress_raw method API: pass in the
+configured object's page size as a convenience, and if
+WT_COMPRESSOR::pre_size is set, use it to determine the size of the
+destination buffer, rather than using the object's page size as the maximum
+needed.
+
+
 WiredTiger release 1.4.1, 2012-12-12
 ------------------------------------
 
