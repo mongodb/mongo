@@ -78,14 +78,13 @@ __wt_cache_read(WT_SESSION_IMPL *session, WT_PAGE *parent, WT_REF *ref)
 	WT_CLEAR(tmp);
 
 	/*
-	 * Attempt to set the state to WT_REF_READING; if successful, we've
-	 * won the race, read the page.
+	 * Attempt to set the state to WT_REF_READING for normal reads, or
+	 * WT_REF_LOCKED, for deleted pages.  If successful, we've won the
+	 * race, read the page.
 	 */
-	if (WT_ATOMIC_CAS(ref->state, WT_REF_DISK, WT_REF_READING))
-		previous_state = WT_REF_DISK;
-	else if (WT_ATOMIC_CAS(ref->state, WT_REF_DELETED, WT_REF_READING))
-		previous_state = WT_REF_DELETED;
-	else
+	previous_state = ref->state;
+	if (!WT_ATOMIC_CAS(ref->state, WT_REF_DISK, WT_REF_READING) &&
+	    !WT_ATOMIC_CAS(ref->state, WT_REF_DELETED, WT_REF_LOCKED))
 		return (0);
 
 	/*
