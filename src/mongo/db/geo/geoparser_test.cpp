@@ -200,7 +200,7 @@ namespace {
     }
 
     TEST(GeoParser, parseLegacyPolygon) {
-        Polygon polygon;
+        mongo::Polygon polygon;
         ASSERT(GeoParser::parsePolygon(fromjson("{$polygon: [[10,20],[10,40],[30,40],[30,20]]}"),
                                        &polygon));
         ASSERT(GeoParser::parsePolygon(fromjson("{$polygon: [[10,20], [10,40], [30,40]]}"), &polygon));
