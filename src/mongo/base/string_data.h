@@ -56,7 +56,7 @@ namespace mongo {
 
         /**
          * Constructs a StringData explicitly, for the case where the length of the string is
-         * already known. 'c' must be a pointer to a null-terminated string, and strlenOfc must
+         * already known. 'c' must be a pointer to a null-terminated string, and len must
          * be the length that strlen(c) would return, a.k.a the index of the terminator in c.
          */
         StringData( const char* c, size_t len )
@@ -114,8 +114,9 @@ namespace mongo {
         //
 
         /**
-         * this is not guaranteed to be null-terminated,
-         * if you use this without all using size(), you are likely doing something wrong
+         * Get the pointer to the first byte of StringData.  This is not guaranteed to be
+         * null-terminated, so if using this without checking size(), you are likely doing
+         * something wrong.
          */
         const char* rawData() const { return _data; }
 

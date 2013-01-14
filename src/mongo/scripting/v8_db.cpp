@@ -98,7 +98,7 @@ namespace mongo {
         scope->injectV8Function("hasNext", internalCursorHasNext, icproto);
         scope->injectV8Function("objsLeftInBatch", internalCursorObjsLeftInBatch, icproto);
         scope->injectV8Function("readOnly", internalCursorReadOnly, icproto);
-        proto->Set(scope->getV8Str("internalCursor"), ic);
+        proto->Set(scope->v8StringData("internalCursor"), ic);
         return mongo;
     }
 
@@ -154,29 +154,29 @@ namespace mongo {
     void installDBTypes(V8Scope* scope, v8::Handle<v8::Object>& global) {
         v8::Handle<v8::FunctionTemplate> db = scope->createV8Function(dbInit);
         db->InstanceTemplate()->SetNamedPropertyHandler(collectionGetter, collectionSetter);
-        global->Set(scope->getV8Str("DB"), db->GetFunction());
+        global->ForceSet(scope->v8StringData("DB"), db->GetFunction());
         v8::Handle<v8::FunctionTemplate> dbCollection = scope->createV8Function(collectionInit);
         dbCollection->InstanceTemplate()->SetNamedPropertyHandler(collectionGetter,
                                                                   collectionSetter);
-        global->Set(scope->getV8Str("DBCollection"), dbCollection->GetFunction());
+        global->ForceSet(scope->v8StringData("DBCollection"), dbCollection->GetFunction());
 
         v8::Handle<v8::FunctionTemplate> dbQuery = scope->createV8Function(dbQueryInit);
         dbQuery->InstanceTemplate()->SetIndexedPropertyHandler(dbQueryIndexAccess);
-        global->Set(scope->getV8Str("DBQuery"), dbQuery->GetFunction());
+        global->ForceSet(scope->v8StringData("DBQuery"), dbQuery->GetFunction());
 
         scope->injectV8Function("ObjectId", objectIdInit, global);
         scope->injectV8Function("DBRef", dbRefInit, global);
         scope->injectV8Function("DBPointer", dbPointerInit, global);
 
-        global->Set(scope->getV8Str("BinData"), getBinDataFunctionTemplate(scope)->GetFunction());
-        global->Set(scope->getV8Str("UUID"), getUUIDFunctionTemplate(scope)->GetFunction());
-        global->Set(scope->getV8Str("MD5"), getMD5FunctionTemplate(scope)->GetFunction());
-        global->Set(scope->getV8Str("HexData"), getHexDataFunctionTemplate(scope)->GetFunction());
-        global->Set(scope->getV8Str("NumberLong"),
+        global->ForceSet(scope->v8StringData("BinData"), getBinDataFunctionTemplate(scope)->GetFunction());
+        global->ForceSet(scope->v8StringData("UUID"), getUUIDFunctionTemplate(scope)->GetFunction());
+        global->ForceSet(scope->v8StringData("MD5"), getMD5FunctionTemplate(scope)->GetFunction());
+        global->ForceSet(scope->v8StringData("HexData"), getHexDataFunctionTemplate(scope)->GetFunction());
+        global->ForceSet(scope->v8StringData("NumberLong"),
                     getNumberLongFunctionTemplate(scope)->GetFunction());
-        global->Set(scope->getV8Str("NumberInt"),
+        global->ForceSet(scope->v8StringData("NumberInt"),
                     getNumberIntFunctionTemplate(scope)->GetFunction());
-        global->Set(scope->getV8Str("Timestamp"),
+        global->ForceSet(scope->v8StringData("Timestamp"),
                     getTimestampFunctionTemplate(scope)->GetFunction());
 
         BSONObjBuilder b;
@@ -184,9 +184,9 @@ namespace mongo {
         b.appendMinKey("");
         BSONObj o = b.obj();
         BSONObjIterator i(o);
-        global->Set(scope->getV8Str("MaxKey"), scope->mongoToV8Element(i.next()));
-        global->Set(scope->getV8Str("MinKey"), scope->mongoToV8Element(i.next()));
-        global->Get(scope->getV8Str("Object"))->ToObject()->Set(scope->getV8Str("bsonsize"),
+        global->ForceSet(scope->v8StringData("MaxKey"), scope->mongoToV8Element(i.next()));
+        global->ForceSet(scope->v8StringData("MinKey"), scope->mongoToV8Element(i.next()));
+        global->Get(scope->v8StringData("Object"))->ToObject()->ForceSet(scope->v8StringData("bsonsize"),
                     scope->createV8Function(bsonsize)->GetFunction());
     }
 
@@ -223,8 +223,8 @@ namespace mongo {
         ScriptEngine::runConnectCallback(*conn);
 
         args.This()->SetInternalField(0, v8::External::New(conn));
-        args.This()->Set(scope->getV8Str("slaveOk"), v8::Boolean::New(false));
-        args.This()->Set(scope->getV8Str("host"), scope->getV8Str(host));
+        args.This()->ForceSet(scope->v8StringData("slaveOk"), v8::Boolean::New(false));
+        args.This()->ForceSet(scope->v8StringData("host"), scope->v8StringData(host));
 
         return v8::Undefined();
     }
@@ -238,8 +238,8 @@ namespace mongo {
         self.MakeWeak(conn, destroyConnection);
 
         args.This()->SetInternalField(0, v8::External::New(conn));
-        args.This()->Set(scope->getV8Str("slaveOk"), v8::Boolean::New(false));
-        args.This()->Set(scope->getV8Str("host"), scope->getV8Str("EMBEDDED"));
+        args.This()->ForceSet(scope->v8StringData("slaveOk"), v8::Boolean::New(false));
+        args.This()->ForceSet(scope->v8StringData("host"), scope->v8StringData("EMBEDDED"));
 
         return v8::Undefined();
     }
@@ -285,7 +285,7 @@ namespace mongo {
             if (!cursor.get())
                 return v8::ThrowException(v8::String::New("error doing query: failed"));
 
-            v8::Function* cons = (v8::Function*)(*(mongo->Get(scope->getV8Str("internalCursor"))));
+            v8::Function* cons = (v8::Function*)(*(mongo->Get(scope->v8StringData("internalCursor"))));
 
             if (!cons)
                 return v8::ThrowException(v8::String::New("Could not create a cursor"));
@@ -304,7 +304,7 @@ namespace mongo {
         uassert(16626, "insert needs 3 args", args.Length() == 3);
         uassert(16627, "attempted to insert a non-object", args[1]->IsObject());
 
-        if (args.This()->Get(scope->getV8Str("readOnly"))->BooleanValue())
+        if (args.This()->Get(scope->v8StringData("readOnly"))->BooleanValue())
             return v8::ThrowException(v8::String::New("js db in read only mode"));
 
         DBClientBase * conn = getConnection(args);
@@ -323,10 +323,10 @@ namespace mongo {
                 uassert(16628, "attempted to insert an array of non-object types", !el.IsEmpty());
 
                 // Set ID on the element if necessary
-                if (!el->Has(scope->getV8Str("_id"))) {
+                if (!el->Has(scope->v8StringData("_id"))) {
                     v8::Handle<v8::Value> argv[1];
-                    el->Set(scope->getV8Str("_id"),
-                            scope->getObjectIdCons()->NewInstance(0, argv));
+                    el->ForceSet(scope->v8StringData("_id"),
+                                 scope->getObjectIdCons()->NewInstance(0, argv));
                 }
                 bos.push_back(scope->v8ToMongo(el));
             }
@@ -340,9 +340,10 @@ namespace mongo {
         }
         else {
             v8::Handle<v8::Object> in = args[1]->ToObject();
-            if (!in->Has(scope->getV8Str("_id"))) {
+            if (!in->Has(scope->v8StringData("_id"))) {
                 v8::Handle<v8::Value> argv[1];
-                in->Set(scope->getV8Str("_id"), scope->getObjectIdCons()->NewInstance(0, argv));
+                in->ForceSet(scope->v8StringData("_id"),
+                             scope->getObjectIdCons()->NewInstance(0, argv));
             }
 
             BSONObj o = scope->v8ToMongo(in);
@@ -361,7 +362,7 @@ namespace mongo {
         jsassert(args.Length() == 2 || args.Length() == 3, "remove needs 2 args");
         jsassert(args[1]->IsObject(), "have to remove an object template");
 
-        if (args.This()->Get(scope->getV8Str("readOnly"))->BooleanValue())
+        if (args.This()->Get(scope->v8StringData("readOnly"))->BooleanValue())
             return v8::ThrowException(v8::String::New("js db in read only mode"));
 
         DBClientBase * conn = getConnection(args);
@@ -390,7 +391,7 @@ namespace mongo {
         jsassert(args[1]->IsObject(), "1st param to update has to be an object");
         jsassert(args[2]->IsObject(), "2nd param to update has to be an object");
 
-        if (args.This()->Get(scope->getV8Str("readOnly"))->BooleanValue())
+        if (args.This()->Get(scope->v8StringData("readOnly"))->BooleanValue())
             return v8::ThrowException(v8::String::New("js db in read only mode"));
 
         DBClientBase * conn = getConnection(args);
@@ -469,8 +470,8 @@ namespace mongo {
         BSONObj o;
         o = cursor->next();
         bool ro = false;
-        if (args.This()->Has(scope->V8STR_RO))
-            ro = args.This()->Get(scope->V8STR_RO)->BooleanValue();
+        if (args.This()->Has(v8::String::New("_ro")))
+            ro = args.This()->Get(v8::String::New("_ro"))->BooleanValue();
         return scope->mongoToLZV8(o, ro);
     }
 
@@ -504,15 +505,15 @@ namespace mongo {
      */
     v8::Handle<v8::Value> internalCursorReadOnly(V8Scope* scope, const v8::Arguments& args) {
         v8::Local<v8::Object> cursor = args.This();
-        cursor->Set(scope->V8STR_RO, v8::Boolean::New(true));
+        cursor->ForceSet(v8::String::New("_ro"), v8::Boolean::New(true));
         return cursor;
     }
 
     v8::Handle<v8::Value> dbInit(V8Scope* scope, const v8::Arguments& args) {
         uassert(16655, "db constructor requires 2 arguments", args.Length() == 2);
 
-        args.This()->Set(scope->getV8Str("_mongo"), args[0]);
-        args.This()->Set(scope->getV8Str("_name"), args[1]);
+        args.This()->ForceSet(scope->v8StringData("_mongo"), args[0]);
+        args.This()->ForceSet(scope->v8StringData("_name"), args[1]);
 
         for (int i=0; i<args.Length(); i++)
             uassert(16656, "db initializer called with undefined argument",
@@ -531,10 +532,10 @@ namespace mongo {
     v8::Handle<v8::Value> collectionInit(V8Scope* scope, const v8::Arguments& args) {
         uassert(16657, "collection constructor requires 4 arguments", args.Length() == 4);
 
-        args.This()->Set(scope->getV8Str("_mongo"), args[0]);
-        args.This()->Set(scope->getV8Str("_db"), args[1]);
-        args.This()->Set(scope->getV8Str("_shortName"), args[2]);
-        args.This()->Set(scope->V8STR_FULLNAME, args[3]);
+        args.This()->ForceSet(scope->v8StringData("_mongo"), args[0]);
+        args.This()->ForceSet(scope->v8StringData("_db"), args[1]);
+        args.This()->ForceSet(scope->v8StringData("_shortName"), args[2]);
+        args.This()->ForceSet(v8::String::New("_fullName"), args[3]);
 
         if (haveLocalShardingInfo(toSTLString(args[3])))
             return v8::ThrowException(v8::String::New("can't use sharded collection from db.eval"));
@@ -550,44 +551,44 @@ namespace mongo {
         v8::Handle<v8::Object> t = args.This();
         uassert(16658, "dbQuery constructor requires at least 4 arguments", args.Length() >= 4);
 
-        t->Set(scope->getV8Str("_mongo"), args[0]);
-        t->Set(scope->getV8Str("_db"), args[1]);
-        t->Set(scope->getV8Str("_collection"), args[2]);
-        t->Set(scope->getV8Str("_ns"), args[3]);
+        t->ForceSet(scope->v8StringData("_mongo"), args[0]);
+        t->ForceSet(scope->v8StringData("_db"), args[1]);
+        t->ForceSet(scope->v8StringData("_collection"), args[2]);
+        t->ForceSet(scope->v8StringData("_ns"), args[3]);
 
         if (args.Length() > 4 && args[4]->IsObject())
-            t->Set(scope->getV8Str("_query"), args[4]);
+            t->ForceSet(scope->v8StringData("_query"), args[4]);
         else
-            t->Set(scope->getV8Str("_query"), v8::Object::New());
+            t->ForceSet(scope->v8StringData("_query"), v8::Object::New());
 
         if (args.Length() > 5 && args[5]->IsObject())
-            t->Set(scope->getV8Str("_fields"), args[5]);
+            t->ForceSet(scope->v8StringData("_fields"), args[5]);
         else
-            t->Set(scope->getV8Str("_fields"), v8::Null());
+            t->ForceSet(scope->v8StringData("_fields"), v8::Null());
 
         if (args.Length() > 6 && args[6]->IsNumber())
-            t->Set(scope->getV8Str("_limit"), args[6]);
+            t->ForceSet(scope->v8StringData("_limit"), args[6]);
         else
-            t->Set(scope->getV8Str("_limit"), v8::Number::New(0));
+            t->ForceSet(scope->v8StringData("_limit"), v8::Number::New(0));
 
         if (args.Length() > 7 && args[7]->IsNumber())
-            t->Set(scope->getV8Str("_skip"), args[7]);
+            t->ForceSet(scope->v8StringData("_skip"), args[7]);
         else
-            t->Set(scope->getV8Str("_skip"), v8::Number::New(0));
+            t->ForceSet(scope->v8StringData("_skip"), v8::Number::New(0));
 
         if (args.Length() > 8 && args[8]->IsNumber())
-            t->Set(scope->getV8Str("_batchSize"), args[8]);
+            t->ForceSet(scope->v8StringData("_batchSize"), args[8]);
         else
-            t->Set(scope->getV8Str("_batchSize"), v8::Number::New(0));
+            t->ForceSet(scope->v8StringData("_batchSize"), v8::Number::New(0));
 
         if (args.Length() > 9 && args[9]->IsNumber())
-            t->Set(scope->getV8Str("_options"), args[9]);
+            t->ForceSet(scope->v8StringData("_options"), args[9]);
         else
-            t->Set(scope->getV8Str("_options"), v8::Number::New(0));
+            t->ForceSet(scope->v8StringData("_options"), v8::Number::New(0));
 
-        t->Set(scope->getV8Str("_cursor"), v8::Null());
-        t->Set(scope->getV8Str("_numReturned"), v8::Number::New(0));
-        t->Set(scope->getV8Str("_special"), v8::Boolean::New(false));
+        t->ForceSet(scope->v8StringData("_cursor"), v8::Null());
+        t->ForceSet(scope->v8StringData("_numReturned"), v8::Number::New(0));
+        t->ForceSet(scope->v8StringData("_special"), v8::Boolean::New(false));
 
         return v8::Undefined();
     }
@@ -688,7 +689,7 @@ namespace mongo {
             oid.init(s);
         }
 
-        it->Set(scope->getV8Str("str"), v8::String::New(oid.str().c_str()));
+        it->ForceSet(scope->v8StringData("str"), v8::String::New(oid.str().c_str()));
         return it;
     }
 
@@ -704,8 +705,8 @@ namespace mongo {
         }
 
         if (args.Length() == 2) {
-            it->Set(scope->getV8Str("$ref"), args[0]);
-            it->Set(scope->getV8Str("$id"), args[1]);
+            it->ForceSet(scope->v8StringData("$ref"), args[0]);
+            it->ForceSet(scope->v8StringData("$id"), args[1]);
         }
 
         return it;
@@ -722,9 +723,9 @@ namespace mongo {
             return v8::ThrowException(v8::String::New("DBPointer needs 2 arguments"));
         }
 
-        it->Set(scope->getV8Str("ns"), args[0]);
-        it->Set(scope->getV8Str("id"), args[1]);
-        it->SetHiddenValue(scope->getV8Str("__DBPointer"), v8::Number::New(1));
+        it->ForceSet(scope->v8StringData("ns"), args[0]);
+        it->ForceSet(scope->v8StringData("id"), args[1]);
+        it->SetHiddenValue(scope->v8StringData("__DBPointer"), v8::Number::New(1));
 
         return it;
     }
@@ -737,12 +738,12 @@ namespace mongo {
         }
 
         if (args.Length() == 0) {
-            it->Set(scope->getV8Str("t"), v8::Number::New(0));
-            it->Set(scope->getV8Str("i"), v8::Number::New(0));
+            it->ForceSet(scope->v8StringData("t"), v8::Number::New(0));
+            it->ForceSet(scope->v8StringData("i"), v8::Number::New(0));
         }
         else if (args.Length() == 2) {
-            it->Set(scope->getV8Str("t"), args[0]);
-            it->Set(scope->getV8Str("i"), args[1]);
+            it->ForceSet(scope->v8StringData("t"), args[0]);
+            it->ForceSet(scope->v8StringData("i"), args[1]);
         }
         else {
             return v8::ThrowException(v8::String::New("Timestamp needs 0 or 2 arguments"));
@@ -791,17 +792,17 @@ namespace mongo {
             return v8::ThrowException(v8::String::New("BinData needs 2 or 3 arguments"));
         }
 
-        it->Set(scope->getV8Str("len"), len);
-        it->Set(scope->getV8Str("type"), type);
-        it->SetHiddenValue(scope->V8STR_BINDATA, v8::Number::New(1));
+        it->ForceSet(scope->v8StringData("len"), len);
+        it->ForceSet(scope->v8StringData("type"), type);
+        it->SetHiddenValue(v8::String::New("__BinData"), v8::Number::New(1));
         v8::Persistent<v8::Object> res = scope->wrapArrayObject(it, data);
         return res;
     }
 
     v8::Handle<v8::Value> binDataToString(V8Scope* scope, const v8::Arguments& args) {
         v8::Handle<v8::Object> it = args.This();
-        int len = it->Get(scope->V8STR_LEN)->Int32Value();
-        int type = it->Get(scope->V8STR_TYPE)->Int32Value();
+        int len = it->Get(v8::String::New("len"))->Int32Value();
+        int type = it->Get(v8::String::New("type"))->Int32Value();
         v8::Local<v8::External> c = v8::External::Cast(*(it->GetInternalField(0)));
         char* data = (char*)(c->Value());
 
@@ -815,7 +816,7 @@ namespace mongo {
 
     v8::Handle<v8::Value> binDataToBase64(V8Scope* scope, const v8::Arguments& args) {
         v8::Handle<v8::Object> it = args.This();
-        int len = v8::Handle<v8::Number>::Cast(it->Get(scope->V8STR_LEN))->Int32Value();
+        int len = v8::Handle<v8::Number>::Cast(it->Get(v8::String::New("len")))->Int32Value();
         v8::Local<v8::External> c = v8::External::Cast(*(it->GetInternalField(0)));
         char* data = (char*)(c->Value());
         stringstream ss;
@@ -825,7 +826,7 @@ namespace mongo {
 
     v8::Handle<v8::Value> binDataToHex(V8Scope* scope, const v8::Arguments& args) {
         v8::Handle<v8::Object> it = args.This();
-        int len = v8::Handle<v8::Number>::Cast(it->Get(scope->V8STR_LEN))->Int32Value();
+        int len = v8::Handle<v8::Number>::Cast(it->Get(v8::String::New("len")))->Int32Value();
         v8::Local<v8::External> c = v8::External::Cast(*(it->GetInternalField(0)));
         char* data = (char*)(c->Value());
         stringstream ss;
@@ -848,9 +849,9 @@ namespace mongo {
             data[i] = fromHex(src + i * 2);
         }
 
-        it->Set(scope->V8STR_LEN, v8::Number::New(len));
-        it->Set(scope->V8STR_TYPE, v8::Number::New(type));
-        it->SetHiddenValue(scope->V8STR_BINDATA, v8::Number::New(1));
+        it->ForceSet(v8::String::New("len"), v8::Number::New(len));
+        it->ForceSet(v8::String::New("type"), v8::Number::New(type));
+        it->SetHiddenValue(v8::String::New("__BinData"), v8::Number::New(1));
         v8::Persistent<v8::Object> res = scope->wrapArrayObject(it, data);
         return res;
     }
@@ -905,11 +906,11 @@ namespace mongo {
         }
 
         if (args.Length() == 0) {
-            it->Set(scope->getV8Str("floatApprox"), v8::Number::New(0));
+            it->ForceSet(scope->v8StringData("floatApprox"), v8::Number::New(0));
         }
         else if (args.Length() == 1) {
             if (args[0]->IsNumber()) {
-                it->Set(scope->getV8Str("floatApprox"), args[0]);
+                it->ForceSet(scope->v8StringData("floatApprox"), args[0]);
             }
             else {
                 v8::String::Utf8Value data(args[0]);
@@ -927,24 +928,24 @@ namespace mongo {
                 // values above 2^53 are not accurately represented in JS
                 if ((long long)val ==
                     (long long)(double)(long long)(val) && val < 9007199254740992ULL) {
-                    it->Set(scope->getV8Str("floatApprox"),
+                    it->ForceSet(scope->v8StringData("floatApprox"),
                             v8::Number::New((double)(long long)(val)));
                 }
                 else {
-                    it->Set(scope->getV8Str("floatApprox"),
+                    it->ForceSet(scope->v8StringData("floatApprox"),
                             v8::Number::New((double)(long long)(val)));
-                    it->Set(scope->getV8Str("top"), v8::Integer::New(val >> 32));
-                    it->Set(scope->getV8Str("bottom"),
+                    it->ForceSet(scope->v8StringData("top"), v8::Integer::New(val >> 32));
+                    it->ForceSet(scope->v8StringData("bottom"),
                             v8::Integer::New((unsigned long)(val & 0x00000000ffffffff)));
                 }
             }
         }
         else {
-            it->Set(scope->getV8Str("floatApprox"), args[0]);
-            it->Set(scope->getV8Str("top"), args[1]);
-            it->Set(scope->getV8Str("bottom"), args[2]);
+            it->ForceSet(scope->v8StringData("floatApprox"), args[0]);
+            it->ForceSet(scope->v8StringData("top"), args[1]);
+            it->ForceSet(scope->v8StringData("bottom"), args[2]);
         }
-        it->SetHiddenValue(scope->V8STR_NUMBERLONG, v8::Number::New(1));
+        it->SetHiddenValue(v8::String::New("__NumberLong"), v8::Number::New(1));
 
         return it;
     }
@@ -996,10 +997,10 @@ namespace mongo {
         }
 
         if (args.Length() == 0) {
-            it->SetHiddenValue(scope->V8STR_NUMBERINT, v8::Number::New(0));
+            it->SetHiddenValue(v8::String::New("__NumberInt"), v8::Number::New(0));
         }
         else if (args.Length() == 1) {
-            it->SetHiddenValue(scope->V8STR_NUMBERINT, args[0]->ToInt32());
+            it->SetHiddenValue(v8::String::New("__NumberInt"), args[0]->ToInt32());
         }
 
         return it;
@@ -1007,7 +1008,7 @@ namespace mongo {
 
     v8::Handle<v8::Value> numberIntValueOf(V8Scope* scope, const v8::Arguments& args) {
         v8::Handle<v8::Object> it = args.This();
-        int val = it->GetHiddenValue(scope->V8STR_NUMBERINT)->Int32Value();
+        int val = it->GetHiddenValue(v8::String::New("__NumberInt"))->Int32Value();
         return v8::Number::New(double(val));
     }
 
@@ -1018,7 +1019,7 @@ namespace mongo {
     v8::Handle<v8::Value> numberIntToString(V8Scope* scope, const v8::Arguments& args) {
         v8::Handle<v8::Object> it = args.This();
 
-        int val = it->GetHiddenValue(scope->V8STR_NUMBERINT)->Int32Value();
+        int val = it->GetHiddenValue(v8::String::New("__NumberInt"))->Int32Value();
         string ret = str::stream() << "NumberInt(" << val << ")";
         return v8::String::New(ret.c_str());
     }
