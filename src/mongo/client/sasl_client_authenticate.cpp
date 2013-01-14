@@ -218,15 +218,20 @@ namespace {
             if (!conversationId.eoo())
                 commandBuilder.append(conversationId);
 
-            if (!client->runCommand(targetDatabase, commandBuilder.obj(), inputObj)) {
-                return Status(ErrorCodes::UnknownError,
-                              inputObj[saslCommandErrmsgFieldName].str());
-            }
+            // Server versions 2.3.2 and earlier may return "ok: 1" with a non-zero "code" field,
+            // indicating a failure.  Subsequent versions should return "ok: 0" on failure with a
+            // non-zero "code" field to indicate specific failure.  In all versions, ok: 1, code: >0
+            // and ok: 0, code optional, indicate failure.
+            bool ok = client->runCommand(targetDatabase, commandBuilder.obj(), inputObj);
+            ErrorCodes::Error code = ErrorCodes::fromInt(
+                    inputObj[saslCommandCodeFieldName].numberInt());
 
-            int statusCodeInt = inputObj[saslCommandCodeFieldName].Int();
-            if (0 != statusCodeInt)
-                return Status(ErrorCodes::fromInt(statusCodeInt),
-                              inputObj[saslCommandErrmsgFieldName].str());
+            if (!ok || code != ErrorCodes::OK) {
+                if (code == ErrorCodes::OK)
+                    code = ErrorCodes::UnknownError;
+
+                return Status(code, inputObj[saslCommandErrmsgFieldName].str());
+            }
 
             isServerDone = inputObj[saslCommandDoneFieldName].trueValue();
             saslCommandPrefix = saslFollowupCommandPrefix;
