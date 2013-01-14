@@ -81,7 +81,8 @@ namespace {
     ActionSet userAdminRoleActions;
     ActionSet dbAdminRoleActions;
     // Separate serverAdmin and clusterAdmin read-only and read-write action for backwards
-    // compatibility with old-style read-only admin users.
+    // compatibility with old-style read-only admin users.  This separation is not exposed to the
+    // user, and could go away once we stop supporting old-style privilege documents.
     ActionSet serverAdminRoleReadActions;
     ActionSet serverAdminRoleWriteActions;
     ActionSet serverAdminRoleActions;
