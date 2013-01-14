@@ -181,8 +181,8 @@ namespace mongo {
                 ms.fixedArray = BSONArray( bb.done().getOwned() );
             }
 
-            // If we're in the "push all" case with slice, we have to decide how much of each
-            // of the existing and parameter arrays to copy to the final object.
+            // If we're in the "push with a $each" case with slice, we have to decide how much
+            // of each of the existing and parameter arrays to copy to the final object.
             else if ( isSliceOnly() ) {
                 long long slice = getSlice();
                 BSONObj eachArray = getEach();
@@ -237,7 +237,6 @@ namespace mongo {
             // decide how much of each of the resulting work area to copy to the final object.
             else {
                 long long slice = getSlice();
-                BSONObj sortPattern = getSort();
 
                 // Zero slice is equivalent to resetting the array in the final object, so
                 // we only go into sorting if there is anything to sort.
@@ -251,7 +250,8 @@ namespace mongo {
                     while ( j.more() ) {
                         workArea.push_back( j.next().Obj() );
                     }
-                    sort( workArea.begin(), workArea.end(), ProjectKeyCmp( sortPattern ) );
+                    ProjectKeyCmp cmp( getSort() );
+                    sort( workArea.begin(), workArea.end(), cmp );
 
                     long long skip = std::max( 0LL,
                                                (long long)workArea.size() - slice );
@@ -1240,8 +1240,20 @@ namespace mongo {
                                                    ( fieldSortElem.type() == NumberDouble &&
                                                      fieldSortElem.numberDouble() ==
                                                      (long long) fieldSortElem.numberDouble() ) ) &&
-                                                 fieldSortElem.Number()*fieldSortElem.Number()
-                                                 == 1.0);
+                                                 ( fieldSortElem.Number() == 1 ||
+                                                   fieldSortElem.Number() == -1 ) );
+
+                                        FieldRef sortField;
+                                        sortField.parse( fieldSortElem.fieldName() );
+                                        uassert( 16675,
+                                                 "$sort field cannot be empty",
+                                                 sortField.numParts() > 0 );
+
+                                        for ( size_t i = 0; i < sortField.numParts(); i++ ) {
+                                            uassert( 16676,
+                                                     "empty field in dotted sort pattern",
+                                                     sortField.getPart( i ).size() > 0 );
+                                        }
                                     }
 
                                     // Finally, check if the $each is made of objects (as opposed
@@ -1255,6 +1267,7 @@ namespace mongo {
                                                  "$sort requires $each to be an array of objects",
                                                  eachItem.type() == Object );
                                     }
+
                                 }
                                 else {
                                     uasserted( 16643,

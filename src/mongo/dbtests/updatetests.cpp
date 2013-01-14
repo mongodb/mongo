@@ -1259,35 +1259,55 @@ namespace UpdateTests {
         }
     };
 
-    class PushSortInvalidSortPattern {
+    class PushSortInvalidSortPattern : public SetBase {
     public:
         void run() {
-            vector<BSONObj> dummy;
+            // Sort pattern validation is made during update command checking. Therefore, to
+            // catch bad patterns, we have to write updated that use them.
 
-            ASSERT_THROWS( sort( dummy.begin(),
-                                 dummy.end(),
-                                 ProjectKeyCmp( fromjson( "{'a..d':-1}" ) ) ),
-                           UserException );
+            BSONObj expected = fromjson( "{'_id':0,x:[{a:1}, {a:2}]}" );
+            client().insert( ns(), expected );
 
-            ASSERT_THROWS( sort( dummy.begin(),
-                                 dummy.end(),
-                                 ProjectKeyCmp( fromjson( "{'a.':-1}" ) ) ),
-                           UserException );
+            // { $push : { x : { $each : [ {a:3} ], $slice:-2, $sort : {a..d:1} } } }
+            BSONObj pushObj = BSON( "$each" << BSON_ARRAY( BSON( "a" << 3 ) ) <<
+                                    "$slice" << -2 <<
+                                    "$sort" << BSON( "a..d" << 1 ) );
+            client().update( ns(), Query(), BSON( "$push" << BSON( "x" << pushObj ) ) );
+            BSONObj result = client().findOne( ns(), Query() );
+            ASSERT_EQUALS( result, expected );
 
-            ASSERT_THROWS( sort( dummy.begin(),
-                                 dummy.end(),
-                                 ProjectKeyCmp( fromjson( "{'.b':-1}" ) ) ),
-                           UserException );
 
-            ASSERT_THROWS( sort( dummy.begin(),
-                                 dummy.end(),
-                                 ProjectKeyCmp( fromjson( "{'.':-1}" ) ) ),
-                           UserException );
+            // { $push : { x : { $each : [ {a:3} ], $slice:-2, $sort : {a.:1} } } }
+            pushObj = BSON( "$each" << BSON_ARRAY( BSON( "a" << 3 ) ) <<
+                                    "$slice" << -2 <<
+                                    "$sort" << BSON( "a." << 1 ) );
+            client().update( ns(), Query(), BSON( "$push" << BSON( "x" << pushObj ) ) );
+            result = client().findOne( ns(), Query() );
+            ASSERT_EQUALS( result, expected );
 
-            ASSERT_THROWS( sort( dummy.begin(),
-                                 dummy.end(),
-                                 ProjectKeyCmp( fromjson( "{'':-1}" ) ) ),
-                           UserException );
+            // { $push : { x : { $each : [ {a:3} ], $slice:-2, $sort : {.b:1} } } }
+            pushObj = BSON( "$each" << BSON_ARRAY( BSON( "a" << 3 ) ) <<
+                                    "$slice" << -2 <<
+                                    "$sort" << BSON( ".b" << 1 ) );
+            client().update( ns(), Query(), BSON( "$push" << BSON( "x" << pushObj ) ) );
+            result = client().findOne( ns(), Query() );
+            ASSERT_EQUALS( result, expected );
+
+            // { $push : { x : { $each : [ {a:3} ], $slice:-2, $sort : {.:1} } } }
+            pushObj = BSON( "$each" << BSON_ARRAY( BSON( "a" << 3 ) ) <<
+                                    "$slice" << -2 <<
+                                    "$sort" << BSON( "." << 1 ) );
+            client().update( ns(), Query(), BSON( "$push" << BSON( "x" << pushObj ) ) );
+            result = client().findOne( ns(), Query() );
+            ASSERT_EQUALS( result, expected );
+
+            // { $push : { x : { $each : [ {a:3} ], $slice:-2, $sort : {'':1} } } }
+            pushObj = BSON( "$each" << BSON_ARRAY( BSON( "a" << 3 ) ) <<
+                                    "$slice" << -2 <<
+                                    "$sort" << BSON( "" << 1 ) );
+            client().update( ns(), Query(), BSON( "$push" << BSON( "x" << pushObj ) ) );
+            result = client().findOne( ns(), Query() );
+            ASSERT_EQUALS( result, expected );
         }
     };
 

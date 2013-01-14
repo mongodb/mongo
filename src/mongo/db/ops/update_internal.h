@@ -229,7 +229,7 @@ namespace mongo {
         }
 
         long long getSlice() const {
-            // The $slice may be the second or the third elemen in the field object.
+            // The $slice may be the second or the third element in the field object.
             // { <field name>: { $each: [<each array>], $slice: -N, $sort: <pattern> } }
             // 'elt' here is the BSONElement above.
             BSONObj obj = elt.embeddedObject();
@@ -463,46 +463,12 @@ namespace mongo {
      */
     struct ProjectKeyCmp {
         BSONObj sortPattern;
-        BSONObj projectionPattern;
 
-        ProjectKeyCmp( BSONObj pattern ) : sortPattern( pattern ) {
-            BSONObjBuilder projectBuilder;
-            BSONObjIterator i( sortPattern );
-            while ( i.more() ) {
-                BSONElement elem = i.next();
-                uassert( 16645, "sort pattern must be numeric", elem.isNumber() );
+        ProjectKeyCmp( BSONObj pattern ) : sortPattern( pattern) {}
 
-                double val = elem.Number();
-                uassert( 16646, "sort pattern must contain 1 or -1", val*val == 1.0);
-
-                //
-                // If there are dots in the field name, check that they form a proper
-                // field path (e.g., no empty field parts).
-                //
-
-                StringData field( elem.fieldName() );
-                uassert( 16651, "sort pattern field name cannot be empty" , field.size() );
-
-                size_t pos = field.find('.');
-                while ( pos != string::npos ) {
-
-                    uassert( 16639,
-                             "empty field in dotted sort pattern",
-                             (pos > 0) && (pos != field.size() - 1) );
-
-                    field = field.substr( pos+1 );
-                    pos = field.find('.');
-                }
-
-                projectBuilder.append( elem.fieldName(), 1 );
-
-            }
-            projectionPattern = projectBuilder.obj();
-        }
-
-        int operator()( const BSONObj& left, const BSONObj& right ) {
-            BSONObj keyLeft = left.extractFields( projectionPattern, true );
-            BSONObj keyRight = right.extractFields( projectionPattern, true );
+        int operator()( const BSONObj& left, const BSONObj& right ) const {
+            BSONObj keyLeft = left.extractFields( sortPattern, true );
+            BSONObj keyRight = right.extractFields( sortPattern, true );
             return keyLeft.woCompare( keyRight, sortPattern ) < 0;
         }
     };
@@ -676,7 +642,6 @@ namespace mongo {
                     }
                     else if ( m.isSliceAndSort() ) {
                         long long slice = m.getSlice();
-                        BSONObj sortPattern = m.getSort();
 
                         // Sort the $each array over sortPattern.
                         vector<BSONObj> workArea;
@@ -684,7 +649,8 @@ namespace mongo {
                         while ( j.more() ) {
                             workArea.push_back( j.next().Obj() );
                         }
-                        sort( workArea.begin(), workArea.end(), ProjectKeyCmp( sortPattern) );
+                        ProjectKeyCmp cmp( m.getSort() );
+                        sort( workArea.begin(), workArea.end(), cmp );
 
                         // Slice to the appropriate size. If slice is zero, that's equivalent
                         // to resetting the array, ie, a no-op.
