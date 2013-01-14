@@ -1192,8 +1192,7 @@ namespace mongo {
 
                 int * x = (int*)(r.d().afterNS());
                 x[0] |= RemoveOption_Broadcast; // this means don't check shard version in mongod
-                // TODO: Why is this an update op here?
-                broadcastWrite( dbUpdate, r );
+                broadcastWrite(dbDelete, r);
                 return;
             }
 
