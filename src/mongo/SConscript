@@ -268,7 +268,8 @@ env.StaticLibrary("coredb", [
         ],
                   LIBDEPS=['db/auth/serverauth',
                            'server_parameters',
-                           'geoparser'])
+                           'geoparser',
+                           'geoquery'])
 
 coreServerFiles = [ "db/client_basic.cpp",
                     "db/common.cpp",
@@ -399,7 +400,6 @@ serverOnlyFiles = [ "db/curop.cpp",
                     "db/explain.cpp",
                     "db/geo/2d.cpp",
                     "db/geo/geonear.cpp",
-                    "db/geo/geoquery.cpp",
                     "db/geo/haystack.cpp",
                     "db/geo/s2common.cpp",
                     "db/geo/s2cursor.cpp",
@@ -534,6 +534,10 @@ env.StaticLibrary("geoparser", [ "db/geo/geoparser.cpp", ],
                   LIBDEPS = [ "bson",
                               "geometry",
                               '$BUILD_DIR/third_party/s2/s2' ])
+env.StaticLibrary("geoquery", [ "db/geo/geoquery.cpp", ],
+                  LIBDEPS = [ "bson",
+                              "geometry",
+                              '$BUILD_DIR/third_party/s2/s2' ])
 
 env.CppUnitTest("hash_test", [ "db/geo/hash_test.cpp" ], LIBDEPS = ["geometry" ])
 env.CppUnitTest("geoparser_test", [ "db/geo/geoparser_test.cpp" ], LIBDEPS = ["geoparser"])
@@ -546,6 +550,7 @@ env.StaticLibrary("serveronly", serverOnlyFiles,
                            "dbcmdline",
                            "defaultversion",
                            "geoparser",
+                           "geoquery",
                            '$BUILD_DIR/third_party/shim_snappy'])
 
 # These files go into mongos and mongod only, not into the shell or any tools.
