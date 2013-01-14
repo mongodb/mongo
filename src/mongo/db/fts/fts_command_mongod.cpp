@@ -120,7 +120,8 @@ namespace mongo {
             // build the results bson array shown to user
             BSONArrayBuilder a( result.subarrayStart( "results" ) );
 
-            int BSONResultSize = 1024;
+            int tempSize = 1024 * 1024; // leave a mb for other things
+            long long numReturned = 0;
 
             for ( unsigned n = 0; n < r.size(); n++ ) {
                 BSONObj obj = BSONObj::make(r[n].rec);
@@ -130,7 +131,7 @@ namespace mongo {
                     toSendBack = pr->transform(obj);
                 }
 
-                if ( ( BSONResultSize + toSendBack.objsize() ) >= BSONObjMaxUserSize ) {
+                if ( ( tempSize + toSendBack.objsize() ) >= BSONObjMaxUserSize ) {
                     break;
                 }
 
@@ -139,7 +140,9 @@ namespace mongo {
                 x.append( "obj", toSendBack );
 
                 BSONObj xobj = x.done();
-                BSONResultSize += xobj.objsize();
+                tempSize += xobj.objsize();
+
+                numReturned++;
             }
 
             a.done();
@@ -148,7 +151,8 @@ namespace mongo {
             BSONObjBuilder bb( result.subobjStart( "stats" ) );
             bb.appendNumber( "nscanned" , search.getKeysLookedAt() );
             bb.appendNumber( "nscannedObjects" , search.getObjLookedAt() );
-            bb.appendNumber( "n" , r.size() );
+            bb.appendNumber( "n" , numReturned );
+            bb.appendNumber( "nfound" , r.size() );
             bb.append( "timeMicros", (int)comm.micros() );
             bb.done();
 
