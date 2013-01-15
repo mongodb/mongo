@@ -43,7 +43,7 @@ for (var i = 0; i < 100; i++) {
 jsTestLog("Testing that temporary connections increased the current and totalCreated counters");
 assert.soon(function() {
                 currentConnInfo = db.serverStatus().connections;
-                return (originalConnInfo.current + 201 == currentConnInfo.current) &&
+                return (originalConnInfo.current + 200 == currentConnInfo.current) &&
                     (originalConnInfo.totalCreated + 200, currentConnInfo.totalCreated);
             },
            {toString: function() {
