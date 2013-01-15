@@ -71,7 +71,7 @@ struct __wt_cache {
 	uint64_t cp_saved_evict;	/* Evict count from last pass */
 	uint64_t cp_current_evict;	/* Evict count from current pass */
 	uint32_t cp_skip_count;		/* Post change stabilization */
-	uint64_t cp_base_size;		/* Base size for this cache in the pool */
+	uint64_t cp_reserved;		/* Base size for this cache in the pool */
 
 	/*
 	 * Flags.
@@ -91,7 +91,6 @@ struct __wt_cache_pool {
 	WT_SESSION_IMPL *session;
 	const char *name;
 	uint64_t size;
-	uint64_t default_base_size;		/* The minimum size per connection. */
 	uint64_t chunk;
 	uint64_t currently_used;
 	uint32_t flags;

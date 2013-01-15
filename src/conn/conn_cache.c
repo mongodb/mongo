@@ -24,16 +24,19 @@ __wt_cache_config(WT_CONNECTION_IMPL *conn, const char *cfg[])
 
 	/*
 	 * If not using a shared cache configure the cache size, otherwise
-	 * check for a base size (which is the minimum amount of cache
-	 * this connection is guaranteed from the pool).
+	 * check for a reserved size.
 	 */
 	if (!F_ISSET(conn, WT_CONN_CACHE_POOL) &&
 	    (ret = __wt_config_gets(session, cfg, "cache_size", &cval)) == 0)
 		conn->cache_size = (uint64_t)cval.val;
-	else if (F_ISSET(conn, WT_CONN_CACHE_POOL) &&
+
+	if (F_ISSET(conn, WT_CONN_CACHE_POOL) &&
 	    (ret = __wt_config_gets(session, cfg,
-	    "shared_cache.base_size", &cval)) == 0)
-		cache->cp_base_size = (uint64_t)cval.val;
+	    "shared_cache.reserved", &cval)) == 0)
+		cache->cp_reserved = (uint64_t)cval.val;
+	else if ((ret = __wt_config_gets(session, cfg,
+	    "shared_cache.chunk", &cval)) == 0)
+		cache->cp_reserved = (uint64_t)cval.val;
 	WT_RET_NOTFOUND_OK(ret);
 
 	if ((ret =
