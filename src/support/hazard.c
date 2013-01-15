@@ -87,8 +87,8 @@ __wt_hazard_set(WT_SESSION_IMPL *session, WT_REF *ref, int *busyp
 		 * publication.  It would theoretically be possible for the
 		 * page to be evicted and a different page read into the same
 		 * memory, so the pointer hasn't changed but the contents have.
-		 * That's OK, we found this page in tree's key space, whatever
-		 * page we find here is the page page for us to use.)
+		 * That's OK, we found this page using the tree's key space,
+		 * whatever page we find here is the page page for us to use.)
 		 */
 		if (ref->page == hp->page &&
 		    (ref->state == WT_REF_MEM ||
