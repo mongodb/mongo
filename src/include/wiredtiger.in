@@ -1043,10 +1043,11 @@ struct __wt_connection {
 	 * both.,a set of related configuration options defined
 	 * below.}@config{&nbsp;&nbsp;&nbsp;&nbsp;chunk, the granularity that a
 	 * shared cache is redistributed.,an integer between 1MB and 10TB;
-	 * default \c 10MB.}@config{&nbsp;&nbsp;&nbsp;&nbsp;min, minimum amount
-	 * of cache a database in a shared cache can have.,an integer between
-	 * 10MB and 10TB; default \c 50MB.}@config{&nbsp;&nbsp;&nbsp;&nbsp;name,
-	 * name of a cache that is shared between databases.,a string; default
+	 * default \c 10MB.}@config{&nbsp;&nbsp;&nbsp;&nbsp;reserve, amount of
+	 * cache this database is guaranteed to have available from the shared
+	 * cache. This setting is per database. Defaults to the chunk size..,a
+	 * string; default \c 0.}@config{&nbsp;&nbsp;&nbsp;&nbsp;name, name of a
+	 * cache that is shared between databases.,a string; default
 	 * empty.}@config{&nbsp;&nbsp;&nbsp;&nbsp;size, maximum memory to
 	 * allocate for the shared cache. Setting this will update the value if
 	 * one is already set.,an integer between 1MB and 10TB; default \c
@@ -1253,9 +1254,10 @@ struct __wt_connection {
  * related configuration options defined
  * below.}@config{&nbsp;&nbsp;&nbsp;&nbsp;chunk, the granularity that a shared
  * cache is redistributed.,an integer between 1MB and 10TB; default \c
- * 10MB.}@config{&nbsp;&nbsp;&nbsp;&nbsp;min, minimum amount of cache a database
- * in a shared cache can have.,an integer between 10MB and 10TB; default \c
- * 50MB.}@config{&nbsp;&nbsp;&nbsp;&nbsp;name, name of a cache that is shared
+ * 10MB.}@config{&nbsp;&nbsp;&nbsp;&nbsp;reserve, amount of cache this database
+ * is guaranteed to have available from the shared cache. This setting is per
+ * database. Defaults to the chunk size..,a string; default \c
+ * 0.}@config{&nbsp;&nbsp;&nbsp;&nbsp;name, name of a cache that is shared
  * between databases.,a string; default
  * empty.}@config{&nbsp;&nbsp;&nbsp;&nbsp;size, maximum memory to allocate for
  * the shared cache. Setting this will update the value if one is already

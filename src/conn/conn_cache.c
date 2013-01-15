@@ -22,10 +22,21 @@ __wt_cache_config(WT_CONNECTION_IMPL *conn, const char *cfg[])
 	session = conn->default_session;
 	cache = conn->cache;
 
-	/* Ignore the cache size if a shared cache is configured. */
+	/*
+	 * If not using a shared cache configure the cache size, otherwise
+	 * check for a reserved size.
+	 */
 	if (!F_ISSET(conn, WT_CONN_CACHE_POOL) &&
 	    (ret = __wt_config_gets(session, cfg, "cache_size", &cval)) == 0)
 		conn->cache_size = (uint64_t)cval.val;
+
+	if (F_ISSET(conn, WT_CONN_CACHE_POOL) &&
+	    (ret = __wt_config_gets(session, cfg,
+	    "shared_cache.reserved", &cval)) == 0)
+		cache->cp_reserved = (uint64_t)cval.val;
+	else if ((ret = __wt_config_gets(session, cfg,
+	    "shared_cache.chunk", &cval)) == 0)
+		cache->cp_reserved = (uint64_t)cval.val;
 	WT_RET_NOTFOUND_OK(ret);
 
 	if ((ret =
@@ -62,15 +73,16 @@ __wt_cache_create(WT_CONNECTION_IMPL *conn, const char *cfg[])
 	WT_ASSERT(session, conn->cache == NULL ||
 	    (F_ISSET(conn, WT_CONN_CACHE_POOL) && conn->cache != NULL));
 
-	if (F_ISSET(conn, WT_CONN_CACHE_POOL))
-		WT_RET(__wt_conn_cache_pool_open(session));
-	else
-		WT_RET(__wt_calloc_def(session, 1, &conn->cache));
+	WT_RET(__wt_calloc_def(session, 1, &conn->cache));
 
 	cache = conn->cache;
 
 	/* Use a common routine for run-time configuration options. */
 	WT_RET(__wt_cache_config(conn, cfg));
+
+	/* Add the configured cache to the cache pool. */
+	if (F_ISSET(conn, WT_CONN_CACHE_POOL))
+		WT_RET(__wt_conn_cache_pool_open(session));
 
 	/*
 	 * The target size must be lower than the trigger size or we will never

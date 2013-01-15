@@ -86,13 +86,13 @@ const char *
 __wt_confdfl_connection_reconfigure =
 	"cache_size=100MB,error_prefix=,eviction_dirty_target=80,"
 	"eviction_target=80,eviction_trigger=95,shared_cache=(chunk=10MB,"
-	"min=50MB,name=,size=500MB),verbose=";
+	"name=,reserve=0,size=500MB),verbose=";
 
 WT_CONFIG_CHECK
 __wt_confchk_shared_cache_subconfigs[] = {
 	{ "chunk", "int", "min=1MB,max=10TB", NULL },
-	{ "min", "int", "min=10MB,max=10TB", NULL },
 	{ "name", "string", NULL, NULL },
+	{ "reserve", "string", NULL, NULL },
 	{ "size", "int", "min=1MB,max=10TB", NULL },
 	{ NULL, NULL, NULL, NULL }
 };
@@ -427,8 +427,8 @@ __wt_confdfl_wiredtiger_open =
 	"buffer_alignment=-1,cache_size=100MB,create=0,direct_io=,"
 	"error_prefix=,eviction_dirty_target=80,eviction_target=80,"
 	"eviction_trigger=95,extensions=,hazard_max=1000,logging=0,lsm_merge="
-	",multiprocess=0,session_max=50,shared_cache=(chunk=10MB,min=50MB,"
-	"name=,size=500MB),sync=,transactional=,use_environment_priv=0,"
+	",multiprocess=0,session_max=50,shared_cache=(chunk=10MB,name=,"
+	"reserve=0,size=500MB),sync=,transactional=,use_environment_priv=0,"
 	"verbose=";
 
 WT_CONFIG_CHECK
