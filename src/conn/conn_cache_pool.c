@@ -310,13 +310,11 @@ __cache_pool_assess(uint64_t *phighest)
 	WT_CACHE *cache;
 	WT_CONNECTION_IMPL *entry;
 	WT_SESSION_IMPL *session;
-	uint64_t highest, new;
-	int entries;
+	uint64_t entries, highest, new;
 
 	cp = __wt_process.cache_pool;
 	session = cp->session;
-	entries = 0;
-	highest = 0;
+	entries = highest = 0;
 
 	/* Generate read pressure information. */
 	TAILQ_FOREACH(entry, &cp->cache_pool_qh, cpq) {
@@ -336,8 +334,8 @@ __cache_pool_assess(uint64_t *phighest)
 			highest = cache->cp_current_evict;
 	}
 	WT_VERBOSE_RET(session, shared_cache,
-	    "Highest eviction count: %d, entries: %d",
-	    (int)highest, entries);
+	    "Highest eviction count: %" PRIu64 ", entries: %" PRIu64,
+	    highest, entries);
 	/* Normalize eviction information across connections. */
 	highest = highest / (entries + 1);
 	++highest; /* Avoid divide by zero. */
