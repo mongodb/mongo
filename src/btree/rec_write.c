@@ -329,7 +329,7 @@ __rec_child_modify(WT_SESSION_IMPL *session,
 			    !F_ISSET(r, WT_EVICTION_SERVER_LOCKED));
 
 			/*
-			 * If called during checkpoint, the child can't be 
+			 * If called during checkpoint, the child can't be
 			 * evicted, it's an in-memory case.
 			 */
 			goto in_memory;
