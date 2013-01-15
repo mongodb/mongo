@@ -33,8 +33,8 @@
 
 namespace mongo {
 
-    map<string,WriteBackListener*> WriteBackListener::_cache;
-    set<string> WriteBackListener::_seenSets;
+    unordered_map<string,WriteBackListener*> WriteBackListener::_cache;
+    unordered_set<string> WriteBackListener::_seenSets;
     mongo::mutex WriteBackListener::_cacheLock("WriteBackListener");
 
     map<WriteBackListener::ConnectionIdent,WriteBackListener::WBStatus> WriteBackListener::_seenWritebacks;
@@ -58,12 +58,14 @@ namespace mongo {
             return;
         }
 
+        const string addr = conn.getServerAddress();
+
         {
             scoped_lock lk( _cacheLock );
-            if ( _seenSets.count( conn.getServerAddress() ) )
+            if ( _seenSets.count( addr ) ) {
                 return;
+            }
         }
-
         // we want to do writebacks on all rs nodes
         string errmsg;
         ConnectionString cs = ConnectionString::parse( conn.getServerAddress() , errmsg );
@@ -73,6 +75,9 @@ namespace mongo {
 
         for ( unsigned i=0; i<hosts.size(); i++ )
             init( hosts[i].toString() );
+
+        scoped_lock lk( _cacheLock );
+        _seenSets.insert( addr );
 
     }
 
