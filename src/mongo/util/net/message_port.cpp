@@ -183,7 +183,8 @@ again:
                     send( s.c_str(), s.size(), "http" );
                     return false;
                 }
-                LOG(0) << "recv(): message len " << len << " is too large" << len << endl;
+                LOG(0) << "recv(): message len " << len << " is too large. "
+                       << "Max is " << MaxMessageSizeBytes << endl;
                 return false;
             }
 
