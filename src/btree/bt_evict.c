@@ -711,8 +711,9 @@ __wt_sync_file(WT_SESSION_IMPL *session, int syncop)
 		__wt_spin_unlock(session, &cache->evict_lock);
 
 		/*
-		 * Using the EVICT_WALK state prevents eviction from getting
-		 * underneath an internal page that is being evicted.
+		 * Walk all in-cache internal pages; using the EVICT_WALK state
+		 * prevents eviction from getting underneath an internal page
+		 * that is being evicted.
 		 */
 		walk_flags |= WT_TREE_EVICT | WT_TREE_SKIP_LEAF;
 		break;
