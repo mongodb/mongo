@@ -519,7 +519,25 @@ void S2CellId::AppendAllNeighbors(int nbr_level,
   }
 }
 
+inline char intToChar(int i) {
+    return '0' + i;
+}
+
 string S2CellId::ToString() const {
+  if (!is_valid()) {
+    return StringPrintf("Invalid: %016llx", id());
+  }
+  string out;
+  out.reserve(2 + level());
+  out.push_back(intToChar(face()));
+  out.push_back('f');
+  for (int current_level = 1; current_level <= level(); ++current_level) {
+    out.push_back(intToChar(child_position(current_level)));
+  }
+  return out;
+}
+
+string S2CellId::slowToString() const {
   if (!is_valid()) {
     return StringPrintf("Invalid: %016llx", id());
   }
