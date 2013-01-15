@@ -280,11 +280,10 @@ static void __rec_dictionary_reset(WT_RECONCILE *);
  * During LRU eviction, the eviction code has already locked the subtree, so
  * locked pages should be included in the merge (WT_REF_LOCKED).
  *
- * To make this tractable, the eviction server guarantees that no thread is
- * doing LRU eviction in the tree when case (1) occurs.  That is, the only
- * state change that can occur during a sync is for a reference to a page on
- * disk to cause a page to be read (WT_REF_READING).  In the case of a read, we
- * can safely ignore those pages because they are unmodified by definition.
+ * During a checkpoint, LRU eviction is prohibited in the subtree being
+ * written, so the only state change that can occur is for a reference to a
+ * page on disk to cause a page to be read (WT_REF_READING).  We can safely
+ * ignore those pages because they are unmodified by definition.
  */
 static int
 __rec_child_modify(WT_SESSION_IMPL *session,
@@ -352,9 +351,7 @@ __rec_child_modify(WT_SESSION_IMPL *session,
 			 */
 			if (ref->page->modify != NULL)
 				*modifyp = 1;
-
-			WT_HAVE_DIAGNOSTIC_YIELD;
-			return (0);
+			/* FALLTHROUGH */
 		case WT_REF_READING:
 			/* Being read, clean by definition. */
 			WT_HAVE_DIAGNOSTIC_YIELD;

@@ -82,9 +82,11 @@ __wt_cache_read(WT_SESSION_IMPL *session, WT_PAGE *parent, WT_REF *ref)
 	 * WT_REF_LOCKED, for deleted pages.  If successful, we've won the
 	 * race, read the page.
 	 */
-	previous_state = ref->state;
-	if (!WT_ATOMIC_CAS(ref->state, WT_REF_DISK, WT_REF_READING) &&
-	    !WT_ATOMIC_CAS(ref->state, WT_REF_DELETED, WT_REF_LOCKED))
+	if (WT_ATOMIC_CAS(ref->state, WT_REF_DISK, WT_REF_READING))
+		previous_state = WT_REF_DISK;
+	else if (WT_ATOMIC_CAS(ref->state, WT_REF_DELETED, WT_REF_LOCKED))
+		previous_state = WT_REF_DELETED;
+	else
 		return (0);
 
 	/*
