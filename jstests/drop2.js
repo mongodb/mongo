@@ -26,11 +26,16 @@ function op( drop ) {
     return null;
 }
 
-s1 = startParallelShell( "db.jstests_drop2.count( { $where: function() { while( 1 ) { sleep( 1 ); } } } )" );
+s1 = startParallelShell( "print(\"Count thread started\");"
+                         + "db.jstests_drop2.count( { $where: function() {"
+                         + "while( 1 ) { sleep( 1 ); } } } );"
+                         + "print(\"Count thread terminating\");" );
 countOp = null;
 assert.soon( function() { countOp = op( false ); return countOp; } );
 
-s2 = startParallelShell( "db.jstests_drop2.drop()" );
+s2 = startParallelShell( "print(\"Drop thread started\");"
+                         + "db.jstests_drop2.drop();"
+                         + "print(\"Drop thread terminating\")" );
 dropOp = null;
 assert.soon( function() { dropOp = op( true ); return dropOp; } );
 
