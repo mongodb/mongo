@@ -1,4 +1,4 @@
-t = db.get_s2nearcomplex
+var t = db.get_s2nearcomplex
 t.drop()
 t.ensureIndex({geo: "2dsphere"})
 
@@ -11,9 +11,9 @@ var cos = Math.cos;
 var atan2 = Math.atan2
 
 
-originGeo = {type: "Point", coordinates: [20.0, 20.0]};
+var originGeo = {type: "Point", coordinates: [20.0, 20.0]};
 // Center point for all tests.
-origin = {
+var origin = {
     name: "origin",
     geo: originGeo 
 }
@@ -43,6 +43,7 @@ function coordinateEqual(first, second, threshold){
  * based on this algorithm: http://williams.best.vwh.net/avform.htm#LL
  */
 function uniformPoints(origin, count, minDist, maxDist){
+    var i;
     var lng = origin['geo']['coordinates'][0];
     var lat = origin['geo']['coordinates'][1];
     var distances = [];
@@ -52,12 +53,12 @@ function uniformPoints(origin, count, minDist, maxDist){
     }
     distances.sort();
     while(points.length < count){
-        angle = random() * 2 * PI;
-        distance = distances[points.length];
-        pointLat = asin((sin(lat) * cos(distance)) + (cos(lat) * sin(distance) * cos(angle)));
-        pointDLng = atan2(sin(angle) * sin(distance) * cos(lat), cos(distance) - sin(lat) * sin(pointLat));
-        pointLng = ((lng - pointDLng + PI) % 2*PI) - PI;
-        newPoint = {
+        var angle = random() * 2 * PI;
+        var distance = distances[points.length];
+        var pointLat = asin((sin(lat) * cos(distance)) + (cos(lat) * sin(distance) * cos(angle)));
+        var pointDLng = atan2(sin(angle) * sin(distance) * cos(lat), cos(distance) - sin(lat) * sin(pointLat));
+        var pointLng = ((lng - pointDLng + PI) % 2*PI) - PI;
+        var newPoint = {
             geo: {
                 type: "Point",
                 coordinates: [lng + pointLng, lat + pointLat]
@@ -80,9 +81,10 @@ function uniformPoints(origin, count, minDist, maxDist){
  * have `sizeOfHoles` points missing centered around a random point. 
  */
 function uniformPointsWithGaps(origin, count, minDist, maxDist, numberOfHoles, sizeOfHoles){
-    points = uniformPoints(origin, count, minDist, maxDist);
+    var points = uniformPoints(origin, count, minDist, maxDist);
+    var i;
     for(i=0; i<numberOfHoles; i++){
-        randomPoint = points[Math.floor(random() * points.length)];
+        var randomPoint = points[Math.floor(random() * points.length)];
         removeNearest(randomPoint, sizeOfHoles);
     }
 }
@@ -95,10 +97,10 @@ function uniformPointsWithGaps(origin, count, minDist, maxDist, numberOfHoles, s
  */
 function uniformPointsWithClusters(origin, count, minDist, maxDist, numberOfClusters, minClusterSize, maxClusterSize, distRatio){
     distRatio = distRatio || 10
-    points = uniformPoints(origin, count, minDist, maxDist);
+    var points = uniformPoints(origin, count, minDist, maxDist);
     for(j=0; j<numberOfClusters; j++){
-        randomPoint = points[Math.floor(random() * points.length)];
-        clusterSize = (random() * (maxClusterSize - minClusterSize)) + minClusterSize;
+        var randomPoint = points[Math.floor(random() * points.length)];
+        var clusterSize = (random() * (maxClusterSize - minClusterSize)) + minClusterSize;
         uniformPoints(randomPoint, clusterSize, minDist / distRatio, maxDist / distRatio);
     }
 }
@@ -107,8 +109,8 @@ function uniformPointsWithClusters(origin, count, minDist, maxDist, numberOfClus
  * geo objects to the specified `point`.
  */
 function removeNearest(point, number){
-    pointsToRemove = t.find({geo: {$near: {$geometry: point['geo']}}}).limit(number);
-    idsToRemove = [];
+    var pointsToRemove = t.find({geo: {$near: {$geometry: point['geo']}}}).limit(number);
+    var idsToRemove = [];
     while(pointsToRemove.hasNext()){
         point = pointsToRemove.next();
         idsToRemove.push(point['_id']);
@@ -123,10 +125,10 @@ function removeNearest(point, number){
  * we should consider that.
  */
 function validateOrdering(query){
-    near10 = t.find(query).limit(10);
-    near20 = t.find(query).limit(20);
-    near30 = t.find(query).limit(30);
-    near40 = t.find(query).limit(40);
+    var near10 = t.find(query).limit(10);
+    var near20 = t.find(query).limit(20);
+    var near30 = t.find(query).limit(30);
+    var near40 = t.find(query).limit(40);
 
     for(i=0;i<10;i++){
         assert(coordinateEqual(near10[i], near20[i]));
@@ -144,7 +146,7 @@ function validateOrdering(query){
     }
 }
 
-query = {geo: {$near: {$geometry: originGeo}}};
+var query = {geo: {$near: {$geometry: originGeo}}};
 
 // Test a uniform distribution of 10000 points.
 uniformPoints(origin, 10000, 0.5, 1.5);

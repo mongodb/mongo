@@ -1,11 +1,11 @@
-t = db.geo_s2intersectinglines
+var t = db.geo_s2intersectinglines
 t.drop()
 t.ensureIndex( { geo : "2dsphere" } );
 
 /* All the tests in this file are generally confirming intersections based upon
  * these three geo objects.
  */
-canonLine = {
+var canonLine = {
     name: 'canonLine',
     geo: {
         type: "LineString",
@@ -13,7 +13,7 @@ canonLine = {
     }
 };
 
-canonPoint = {
+var canonPoint = {
     name: 'canonPoint',
     geo: {
         type: "Point",
@@ -21,7 +21,7 @@ canonPoint = {
     }
 };
 
-canonPoly = {
+var canonPoly = {
     name: 'canonPoly',
     geo: {
         type: "Polygon",
@@ -29,7 +29,7 @@ canonPoly = {
             [[50.0, 50.0], [51.0, 50.0], [51.0, 51.0], [50.0, 51.0], [50.0, 50.0]]
        ]
     }
-}
+};
 
 t.insert(canonLine);
 t.insert(canonPoint);
@@ -37,17 +37,17 @@ t.insert(canonPoly);
 
 
 //Case 1: Basic sanity intersection.
-testLine = {type: "LineString",
+var testLine = {type: "LineString",
     coordinates: [[0.5, 0.5], [0.5, -0.5]]};
 
-result = t.find({geo: {$geoIntersects: {$geometry: testLine}}});
+var result = t.find({geo: {$geoIntersects: {$geometry: testLine}}});
 assert.eq(result.count(), 1);
 assert.eq(result[0]['name'], 'canonLine');
 
 
 //Case 2: Basic Polygon intersection.
 // we expect that the canonLine should intersect with this polygon.
-testPoly = {type: "Polygon",
+var testPoly = {type: "Polygon",
     coordinates: [
         [[0.4, -0.1],[0.4, 0.1], [0.6, 0.1], [0.6, -0.1], [0.4, -0.1]]
     ]}
@@ -82,7 +82,7 @@ assert.eq(result.count(), 0);
 testLine = {type: "LineString",
     coordinates: [[-0.5, 0.0], [0.5, 0.0]]};
 
-result = t.find({geo: {$geoIntersects: {$geometry: testLine}}});
+var result = t.find({geo: {$geoIntersects: {$geometry: testLine}}});
 assert.eq(result.count(), 1);
 assert.eq(result[0]['name'], 'canonLine');
 
@@ -125,7 +125,7 @@ assert.eq(result[0]['name'], 'canonPoint');
 
 
 //Case 10: Sanity point non-intersection.
-testPoint = {type: "Point",
+var testPoint = {type: "Point",
     coordinates: [12.0, 12.0]}
 
 result = t.find({geo: {$geoIntersects: {$geometry: testPoint}}});
