@@ -1245,12 +1245,12 @@ namespace mongo {
 
                                         FieldRef sortField;
                                         sortField.parse( fieldSortElem.fieldName() );
-                                        uassert( 16675,
+                                        uassert( 16690,
                                                  "$sort field cannot be empty",
                                                  sortField.numParts() > 0 );
 
                                         for ( size_t i = 0; i < sortField.numParts(); i++ ) {
-                                            uassert( 16676,
+                                            uassert( 16691,
                                                      "empty field in dotted sort pattern",
                                                      sortField.getPart( i ).size() > 0 );
                                         }
