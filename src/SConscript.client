@@ -13,7 +13,7 @@ env.Command(['mongo/db/auth/action_type.h', 'mongo/db/auth/action_type.cpp'],
             ['mongo/db/auth/generate_action_types.py', 'mongo/db/auth/action_types.txt'],
             '$PYTHON $SOURCES $TARGETS')
 
-clientSource = [
+clientSourceBasic = [
     'mongo/base/configuration_variable_manager.cpp',
     'mongo/base/error_codes.cpp',
     'mongo/base/global_initializer.cpp',
@@ -85,9 +85,15 @@ clientSource = [
     'mongo/util/version.cpp',
     ]
 
+clientSourceSasl = ['mongo/client/sasl_client_authenticate.cpp',
+                    'mongo/util/gsasl_session.cpp']
+
+clientSourceAll = clientSourceBasic + clientSourceSasl
+
 if env['MONGO_BUILD_SASL_CLIENT']:
-    clientSource.extend(['mongo/client/sasl_client_authenticate.cpp',
-                         'mongo/util/gsasl_session.cpp'])
+    clientSource = clientSourceAll
+else:
+    clientSource = clientSourceBasic
 
 exampleSourceMap = [
         ('authTest', 'mongo/client/examples/authTest.cpp'),
@@ -154,7 +160,7 @@ env.Install(
                  'mongo/db/auth/generate_action_types.py',
                  'mongo/db/auth/action_types.txt',
                  '#buildscripts/make_archive.py',
-                 clientSource,
+                 clientSourceAll,
                  clientHeaders,
                  [source for (target, source) in exampleSourceMap],
                  'mongo/bson/bsondemo/bsondemo.cpp',
