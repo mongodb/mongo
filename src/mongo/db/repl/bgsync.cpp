@@ -21,9 +21,12 @@
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/repl/bgsync.h"
 #include "mongo/db/repl/rs_sync.h"
+#include "mongo/util/fail_point_service.h"
 
 namespace mongo {
 namespace replset {
+    MONGO_FP_DECLARE(rsBgSyncProduce);
+
     BackgroundSync* BackgroundSync::s_instance = 0;
     boost::mutex BackgroundSync::s_mutex;
 
@@ -294,6 +297,10 @@ namespace replset {
             return;
         }
 
+        while (MONGO_FAIL_POINT(rsBgSyncProduce)) {
+            sleepmillis(0);
+        }
+
         uassert(1000, "replSet source for syncing doesn't seem to be await capable -- is it an older version of mongodb?", r.awaitCapable() );
 
         if (isRollbackRequired(r)) {
@@ -434,12 +441,17 @@ namespace replset {
         const Member *target = NULL, *stale = NULL;
         BSONObj oldest;
 
-        // then we're initial syncing and we're still waiting for this to be set
         {
             boost::unique_lock<boost::mutex> lock(_mutex);
             if (_lastOpTimeFetched.isNull()) {
+                // then we're initial syncing and we're still waiting for this to be set
                 _currentSyncTarget = NULL;
                 return;
+            }
+
+            // Wait until we've applied the ops we have before we choose a sync target
+            while (!_appliedBuffer) {
+                _condvar.wait(lock);
             }
         }
 
@@ -496,7 +508,8 @@ namespace replset {
                 }
                 OpTime theirTS = theirLastOp["ts"]._opTime();
                 if (theirTS < _lastOpTimeFetched) {
-                    log() << "replSet we are ahead of the primary, will try to roll back" << rsLog;
+                    log() << "replSet we are ahead of the sync source, will try to roll back"
+                          << rsLog;
                     theReplSet->syncRollback(r);
                     return true;
                 }

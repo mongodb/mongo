@@ -30,6 +30,7 @@
 #include "mongo/db/repl/bgsync.h"
 #include "mongo/db/repl/rs.h"
 #include "mongo/db/repl/rs_sync.h"
+#include "mongo/util/fail_point_service.h"
 
 namespace mongo {
 
@@ -37,6 +38,8 @@ namespace mongo {
     extern unsigned replSetForceInitialSyncFailure;
 
 namespace replset {
+
+    MONGO_FP_DECLARE(rsSyncApplyStop);
 
     SyncTail::SyncTail(BackgroundSyncInterface *q) :
         Sync(""), oplogVersion(0), _networkQueue(q)
@@ -407,6 +410,11 @@ namespace replset {
                         break;
                     }
                 }
+            }
+
+            // For pausing replication in tests
+            while (MONGO_FAIL_POINT(rsSyncApplyStop)) {
+                sleepmillis(0);
             }
 
             const BSONObj& lastOp = ops.getDeque().back();
