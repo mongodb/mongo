@@ -70,7 +70,7 @@ __tree_walk_delete(
 	 * unclear optimizing for overlapping range deletes is worth the effort.
 	 */
 	if (ref->state != WT_REF_DISK ||
-	    !WT_ATOMIC_CAS(ref->state, WT_REF_DISK, WT_REF_READING))
+	    !WT_ATOMIC_CAS(ref->state, WT_REF_DISK, WT_REF_LOCKED))
 		return (0);
 
 	/*
@@ -145,7 +145,7 @@ __tree_walk_read(WT_SESSION_IMPL *session, WT_REF *ref, int *skipp)
 	 * transaction ID to see if the delete is visible to us.  Lock down
 	 * the structure.
 	 */
-	if (!WT_ATOMIC_CAS(ref->state, WT_REF_DELETED, WT_REF_READING))
+	if (!WT_ATOMIC_CAS(ref->state, WT_REF_DELETED, WT_REF_LOCKED))
 		return (0);
 
 	*skipp = __wt_txn_visible(session, ref->txnid) ? 1 : 0;
@@ -286,14 +286,13 @@ retry:				if (!WT_ATOMIC_CAS(ref->state,
 				}
 			} else if (cache) {
 				/*
-				 * Only look at pages that are in memory.
+				 * Only look at unlocked pages in memory.
 				 * There is a race here, but worse case is
 				 * that the page will be read back in to cache.
 				 */
 				while (LF_ISSET(WT_TREE_WAIT) &&
 				    (ref->state == WT_REF_EVICT_FORCE ||
-				    ref->state == WT_REF_LOCKED ||
-				    ref->state == WT_REF_READING))
+				    ref->state == WT_REF_LOCKED))
 					__wt_yield();
 				if (ref->state == WT_REF_DELETED ||
 				    ref->state == WT_REF_DISK)

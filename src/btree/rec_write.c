@@ -280,16 +280,10 @@ static void __rec_dictionary_reset(WT_RECONCILE *);
  * During LRU eviction, the eviction code has already locked the subtree, so
  * locked pages should be included in the merge (WT_REF_LOCKED).
  *
- * To make this tractable, the eviction server guarantees that no thread is
- * doing LRU eviction in the tree when case (1) occurs.  That is, the only
- * state change that can occur during a sync is for a reference to a page on
- * disk to cause a page to be read (WT_REF_READING).  In the case of a read, we
- * could safely ignore those pages because they are unmodified by definition --
- * they are being read from disk, however, in the current system, that state
- * also includes fast-delete pages that are being instantiated.  Those pages
- * cannot be ignored, as they have been modified.  For this reason, we have to
- * wait for the WT_REF_READING state to be resolved to another state before we
- * proceed.
+ * During a checkpoint, LRU eviction is prohibited in the subtree being
+ * written, so the only state change that can occur is for a reference to a
+ * page on disk to cause a page to be read (WT_REF_READING).  We can safely
+ * ignore those pages because they are unmodified by definition.
  */
 static int
 __rec_child_modify(WT_SESSION_IMPL *session,
@@ -315,7 +309,7 @@ __rec_child_modify(WT_SESSION_IMPL *session,
 			 * delete is visible to us.  Lock down the structure.
 			 */
 			if (!WT_ATOMIC_CAS(
-			    ref->state, WT_REF_DELETED, WT_REF_READING))
+			    ref->state, WT_REF_DELETED, WT_REF_LOCKED))
 				break;
 			ret =
 			    __rec_page_deleted(session, r, page, ref, modifyp);
@@ -357,15 +351,11 @@ __rec_child_modify(WT_SESSION_IMPL *session,
 			 */
 			if (ref->page->modify != NULL)
 				*modifyp = 1;
-
+			/* FALLTHROUGH */
+		case WT_REF_READING:
+			/* Being read, clean by definition. */
 			WT_HAVE_DIAGNOSTIC_YIELD;
 			return (0);
-		case WT_REF_READING:
-			/*
-			 * Being read or in fast-delete, wait for the page's
-			 * state to settle.
-			 */
-			 break;
 		WT_ILLEGAL_VALUE(session);
 		}
 	/* NOTREACHED */
