@@ -677,7 +677,20 @@ __wt_sync_file(WT_SESSION_IMPL *session, int syncop)
 	cache = S2C(session)->cache;
 	page = NULL;
 
+	/*
+	 * Checkpoints and compaction want to visit all in-cache pages, so they
+	 * need to wait for any concurrent activity in a page to be resolved.
+	 */
+	walk_flags = WT_TREE_WAIT;
+
 	switch (syncop) {
+	case WT_SYNC_COMPACT:
+		/*
+		 * Walk all in-cache pages; use hazard references so we don't
+		 * block eviction.
+		 */
+		walk_flags |= WT_TREE_CACHE;
+		break;
 	case WT_SYNC_INTERNAL:
 		/*
 		 * Pages appearing in a checkpoint cannot be freed until the
@@ -698,26 +711,21 @@ __wt_sync_file(WT_SESSION_IMPL *session, int syncop)
 		__wt_spin_unlock(session, &cache->evict_lock);
 
 		/*
-		 * Checkpoints need to wait for any concurrent activity in a
-		 * page to be resolved.  Using the EVICT_WALK state prevents
-		 * eviction from getting underneath an internal page that is
-		 * being evicted.
+		 * Using the EVICT_WALK state prevents eviction from getting
+		 * underneath an internal page that is being evicted.
 		 */
-		walk_flags = WT_TREE_EVICT | WT_TREE_SKIP_LEAF | WT_TREE_WAIT;
+		walk_flags |= WT_TREE_EVICT | WT_TREE_SKIP_LEAF;
 		break;
-	case WT_SYNC_COMPACT:
 	case WT_SYNC_LEAF:
 		/*
-		 * Walk all pages (or all leaf pages), waiting for concurrent
-		 * activity to be resolved.  Use hazard references so we don't
-		 * prevent other eviction from the same subtree.
+		 * Walk all in-cache leaf pages; use hazard references so we
+		 * don't block eviction.
 		 */
-		walk_flags = WT_TREE_CACHE | WT_TREE_SKIP_INTL | WT_TREE_WAIT;
+		walk_flags |= WT_TREE_CACHE | WT_TREE_SKIP_INTL;
 		break;
 	WT_ILLEGAL_VALUE(session);
 	}
 
-	page = NULL;
 	WT_ERR(__wt_tree_walk(session, &page, walk_flags));
 	while (page != NULL) {
 		switch (syncop) {
