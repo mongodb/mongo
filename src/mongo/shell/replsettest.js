@@ -382,19 +382,21 @@ ReplSetTest.awaitRSClientHosts = function( conn, host, hostOk, rs ) {
 ReplSetTest.prototype.awaitSecondaryNodes = function( timeout ) {
   this.getMaster(); // Wait for a primary to be selected.
   var tmo = timeout || 60000;
-  jsTest.attempt({context: this, timeout: tmo, desc: "Awaiting secondaries"}, function() {
-     this.getMaster(2000); // Reload who the current slaves are.
-     var slaves = this.liveNodes.slaves;
-     var len = slaves.length;
-     var ready = true;
-     for(var i=0; i<len; i++) {
-       var isMaster = slaves[i].getDB("admin").runCommand({ismaster: 1});
-       var arbiter = isMaster['arbiterOnly'] == undefined ? false : isMaster['arbiterOnly'];
-       ready = ready && ( isMaster['secondary'] || arbiter );
-     }
-     return ready;
-  });
-}
+  var replTest = this;
+  assert.soon(
+      function() {
+          replTest.getMaster(); // Reload who the current slaves are.
+          var slaves = replTest.liveNodes.slaves;
+          var len = slaves.length;
+          var ready = true;
+          for(var i=0; i<len; i++) {
+              var isMaster = slaves[i].getDB("admin").runCommand({ismaster: 1});
+              var arbiter = isMaster['arbiterOnly'] == undefined ? false : isMaster['arbiterOnly'];
+              ready = ready && ( isMaster['secondary'] || arbiter );
+          }
+          return ready;
+      }, "Awaiting secondaries", tmo);
+};
 
 ReplSetTest.prototype.getMaster = function( timeout ) {
   var tries = 0;
