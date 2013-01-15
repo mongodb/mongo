@@ -341,10 +341,21 @@ namespace mongo {
             // We need this to do distance-related things (near queries).
             params.radius = radiusOfEarthInMeters;
             // These are not advisory.
-            params.finestIndexedLevel = S2::kAvgEdge.GetClosestLevel(100.0 / radiusOfEarthInMeters);
-            params.coarsestIndexedLevel = 
-                S2::kAvgEdge.GetClosestLevel(100 * 1000.0 / radiusOfEarthInMeters);
+            params.finestIndexedLevel = configValueWithDefault(spec, "finestIndexedLevel",
+                S2::kAvgEdge.GetClosestLevel(500.0 / radiusOfEarthInMeters));
+            params.coarsestIndexedLevel = configValueWithDefault(spec, "coarsestIndexedLevel",
+                S2::kAvgEdge.GetClosestLevel(100 * 1000.0 / radiusOfEarthInMeters));
+            uassert(16686, "coarsestIndexedLevel must be >= 0", params.coarsestIndexedLevel >= 0);
+            uassert(16687, "finestIndexedLevel must be <= 30", params.finestIndexedLevel <= 30);
+            uassert(16688, "finestIndexedLevel must be >= coarsestIndexedLevel",
+                    params.finestIndexedLevel >= params.coarsestIndexedLevel);
             return new S2IndexType(SPHERE_2D_NAME, this, spec, params);
+        }
+
+        int configValueWithDefault(const IndexSpec* spec, const string& name, int def) const {
+            BSONElement e = spec->info[name];
+            if (e.isNumber()) { return e.numberInt(); }
+            return def;
         }
     } S2IndexPluginS2D;
 

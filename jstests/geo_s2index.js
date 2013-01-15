@@ -72,3 +72,25 @@ t.insert({loc: {type:'Point', coordinates: [40, 5], crs:{ type: 'name', properti
 assert(!db.getLastError());
 t.insert({loc: {type:'Point', coordinates: [40, 5], crs:{ type: 'name', properties:{name:'urn:ogc:def:crs:OGC:1.3:CRS84'}}}})
 assert(!db.getLastError());
+
+// We can pass level parameters and we verify that they're valid.
+// 0 <= coarsestIndexedLevel <= finestIndexedLevel <= 30.
+t.drop();
+t.save({loc: [0,0]})
+t.ensureIndex({loc: "2dsphere"}, {finestIndexedLevel: 17, coarsestIndexedLevel: 5})
+assert(!db.getLastError());
+
+t.drop();
+t.save({loc: [0,0]})
+t.ensureIndex({loc: "2dsphere"}, {finestIndexedLevel: 31, coarsestIndexedLevel: 5})
+assert(db.getLastError());
+
+t.drop();
+t.save({loc: [0,0]})
+t.ensureIndex({loc: "2dsphere"}, {finestIndexedLevel: 30, coarsestIndexedLevel: 0})
+assert(!db.getLastError());
+
+t.drop();
+t.save({loc: [0,0]})
+t.ensureIndex({loc: "2dsphere"}, {finestIndexedLevel: 30, coarsestIndexedLevel: -1})
+assert(db.getLastError());
