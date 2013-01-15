@@ -24,8 +24,6 @@
 
 namespace mongo {
 
-    class BSONArray;
-
     /** Collect CPU Profiling data from v8. */
     class V8CpuProfiler {
     public:
