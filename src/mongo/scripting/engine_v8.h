@@ -180,7 +180,7 @@ namespace mongo {
                                v8::Handle<v8::Object> obj);
         void v8ToMongoRegex(BSONObjBuilder& b,
                             const string& elementName,
-                            string& regex);
+                            v8::Handle<v8::Object> v8Regex);
         void v8ToMongoDBRef(BSONObjBuilder& b,
                             const string& elementName,
                             v8::Handle<v8::Object> obj);

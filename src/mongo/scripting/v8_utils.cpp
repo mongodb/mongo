@@ -36,8 +36,8 @@ namespace mongo {
 
     std::string toSTLString(const v8::Handle<v8::Value>& o) {
         v8::String::Utf8Value str(o);
-        const char * foo = *str;
-        std::string s(foo);
+        massert(16686, "error converting js type to Utf8Value", *str);
+        std::string s(*str, str.length());
         return s;
     }
 

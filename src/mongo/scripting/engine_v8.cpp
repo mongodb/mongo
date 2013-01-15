@@ -1463,7 +1463,8 @@ namespace mongo {
 
     void V8Scope::v8ToMongoRegex(BSONObjBuilder& b,
                                  const string& elementName,
-                                 string& regex) {
+                                 v8::Handle<v8::Object> v8Regex) {
+        string regex = toSTLString(v8Regex);
         regex = regex.substr(1);
         string r = regex.substr(0 ,regex.rfind("/"));
         string o = regex.substr(regex.rfind("/") + 1);
@@ -1516,16 +1517,16 @@ namespace mongo {
             return;
         }
 
-        string s = toSTLString(value);
-        if (s.size() && s[0] == '/')
-            v8ToMongoRegex(b, elementName, s);
+        if (proto->IsRegExp())
+            v8ToMongoRegex(b, elementName, obj);
         else if (proto->IsObject() &&
                  proto->ToObject()->HasRealNamedProperty(v8::String::New("isObjectId")))
             v8ToMongoObjectID(b, elementName, obj);
         else if (!obj->GetHiddenValue(v8::String::New("__NumberLong")).IsEmpty())
             v8ToMongoNumberLong(b, elementName, obj);
         else if (!obj->GetHiddenValue(v8::String::New("__NumberInt")).IsEmpty())
-            b.append(elementName, obj->GetHiddenValue(v8::String::New("__NumberInt"))->Int32Value());
+            b.append(elementName,
+                     obj->GetHiddenValue(v8::String::New("__NumberInt"))->Int32Value());
         else if (!value->ToObject()->GetHiddenValue(v8::String::New("__DBPointer")).IsEmpty())
             v8ToMongoDBRef(b, elementName, obj);
         else if (!value->ToObject()->GetHiddenValue(v8::String::New("__BinData")).IsEmpty())
