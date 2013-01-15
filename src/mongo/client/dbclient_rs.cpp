@@ -491,7 +491,7 @@ namespace mongo {
         for ( unsigned i=0; i<_nodes.size(); i++ ) {
             if ( i > 0 )
                 ss << ",";
-            ss << _nodes[i].addr.toString();
+            _nodes[i].addr.append( ss );
         }
 
         return ss.str();
