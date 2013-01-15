@@ -1,5 +1,3 @@
-/** @file mongo/scripting/templateevaluator.cpp */
-
 /*
  *    Copyright (C) 2012 10gen Inc.
  *
