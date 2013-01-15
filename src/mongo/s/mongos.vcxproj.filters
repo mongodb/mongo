@@ -747,9 +747,6 @@
     <ClCompile Include="..\util\time_support.cpp">
       <Filter>util\Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\client\connection_factory.cpp">
-      <Filter>client</Filter>
-    </ClCompile>
     <ClCompile Include="..\scripting\sm_db.cpp">
       <Filter>scripting</Filter>
     </ClCompile>
@@ -1217,6 +1214,12 @@
     </ClCompile>
     <ClCompile Include="..\scripting\v8_profiler.cpp">
       <Filter>scripting</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\server_extra_log_context.cpp">
+      <Filter>db\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\connection_factory.cpp">
+      <Filter>db\Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

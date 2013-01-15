@@ -1805,6 +1805,9 @@
     <ClCompile Include="..\scripting\v8_profiler.cpp">
       <Filter>scripting</Filter>
     </ClCompile>
+    <ClCompile Include="server_extra_log_context.cpp">
+      <Filter>db\Source Files\o to z</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\targetver.h" />

@@ -2592,6 +2592,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="prefetch.cpp" />
     <ClCompile Include="projection.cpp" />
     <ClCompile Include="repl\bgsync.cpp" />
+    <ClCompile Include="server_extra_log_context.cpp" />
     <ClCompile Include="server_parameters.cpp" />
     <ClCompile Include="stats\timer_stats.cpp" />
     <ClCompile Include="ttl.cpp" />
