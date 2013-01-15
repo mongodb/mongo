@@ -147,6 +147,7 @@ struct __wt_dsrc_stats {
 	WT_STATS rec_split_intl;
 	WT_STATS rec_split_leaf;
 	WT_STATS rec_written;
+	WT_STATS session_compact;
 	WT_STATS txn_update_conflict;
 	WT_STATS txn_write_conflict;
 };

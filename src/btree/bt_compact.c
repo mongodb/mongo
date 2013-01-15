@@ -19,6 +19,8 @@ __wt_compact(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_PAGE *page;
 	int trigger, skip;
 
+	WT_DSTAT_INCR(session, session_compact);
+
 	WT_RET(__wt_config_gets(session, cfg, "trigger", &cval));
 	trigger = (int)cval.val;
 
