@@ -286,13 +286,12 @@ __rec_child_modify(WT_SESSION_IMPL *session,
 	 * if the child page is to be merged into its parent.
 	 *
 	 * Internal pages are reconciled for two reasons: first, when evicting
-	 * an internal page, second by the checkpoint and compaction code when
-	 * writing internal pages.  During eviction, the subtree is locked down
-	 * so all pages should be in the WT_REF_DISK or WT_REF_LOCKED state.
-	 * During checkpoint and compaction, any eviction that might affect our
-	 * review of an internal page is prohibited, however, as the subtree is
-	 * not reserved for our exclusive use, there are other page states that
-	 * must be considered.
+	 * an internal page, second by the checkpoint code when writing internal
+	 * pages.  During eviction, the subtree is locked down so all pages
+	 * should be in the WT_REF_DISK or WT_REF_LOCKED state. During
+	 * checkpoint, any eviction that might affect our review of an internal
+	 * page is prohibited, however, as the subtree is not reserved for our
+	 * exclusive use, there are other page states that must be considered.
 	 */
 	for (;; __wt_yield())
 		switch (r->tested_ref_state = ref->state) {
@@ -330,8 +329,8 @@ __rec_child_modify(WT_SESSION_IMPL *session,
 			    !F_ISSET(r, WT_EVICTION_SERVER_LOCKED));
 
 			/*
-			 * If called during checkpoint or compaction, the child
-			 * can't be evicted, it's an in-memory case.
+			 * If called during checkpoint, the child can't be 
+			 * evicted, it's an in-memory case.
 			 */
 			goto in_memory;
 
@@ -346,14 +345,14 @@ __rec_child_modify(WT_SESSION_IMPL *session,
 				goto in_memory;
 
 			/*
-			 * If called during checkpoint or compaction, the child
-			 * is either being considered by the eviction server or
-			 * the child is a fast-delete page being read.  The
-			 * eviction may have started before the checkpoint or
-			 * compaction and so we must wait for the eviction to
-			 * be resolved.  I suspect we could handle fast-delete
-			 * reads, but we can't distinguish between the two and
-			 * fast-delete reads aren't expected to be common.
+			 * If called during checkpoint, the child is being
+			 * considered by the eviction server or the child is a
+			 * fast-delete page being read.  The eviction may have
+			 * started before the checkpoint and so we must wait
+			 * for the eviction to be resolved.  I suspect we could
+			 * handle fast-delete reads, but we can't distinguish
+			 * between the two and fast-delete reads aren't expected
+			 * to be common.
 			 */
 			break;
 
@@ -368,8 +367,8 @@ __rec_child_modify(WT_SESSION_IMPL *session,
 			    !F_ISSET(r, WT_EVICTION_SERVER_LOCKED));
 
 			/*
-			 * If called during checkpoint or compaction, the child
-			 * can't be evicted, it's an in-memory case.
+			 * If called during checkpoint, the child can't be
+			 * evicted, it's an in-memory case.
 			 */
 			goto in_memory;
 
@@ -384,8 +383,8 @@ __rec_child_modify(WT_SESSION_IMPL *session,
 
 		case WT_REF_EVICT_WALK:
 			/*
-			 * The child is locked by a checkpoint, compaction or
-			 * eviction server walk of the tree.
+			 * The child is locked by a checkpoint or eviction walk
+			 * of the tree.
 			 *
 			 * We should not be here if called by the eviction
 			 * server (the eviction server doesn't evict the page
@@ -397,10 +396,9 @@ __rec_child_modify(WT_SESSION_IMPL *session,
 			    !F_ISSET(r, WT_EVICTION_SERVER_LOCKED));
 
 			/*
-			 * We should not be here if called by checkpoint or
-			 * compaction, only the top-level reconciled page
-			 * should have its state set to WT_REF_EVICT_WALK by
-			 * an internal-page checkpoint.
+			 * We should not be here if called by checkpoint, only
+			 * the top-level reconciled page should have its state
+			 * set to WT_REF_EVICT_WALK by the checkpoint walk.
 			 */
 			 goto in_memory;		/* XXX */
 			 /* FALLTHROUGH */
