@@ -450,6 +450,10 @@ namespace mongo {
             cx.ctx().db()->flushFiles(true);
         }
 
+        // If we just cloned & there were no ops applied, we still want the primary to know where
+        // we're up to
+        replset::BackgroundSync::notify();
+
         changeState(MemberState::RS_RECOVERING);
         sethbmsg("initial sync done",0);
     }

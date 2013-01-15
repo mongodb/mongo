@@ -98,8 +98,6 @@ namespace mongo {
                 theReplSet->lastOpTimeWritten = ts;
                 theReplSet->lastH = h;
                 ctx.getClient()->setLastOp( ts );
-
-                replset::BackgroundSync::notify();
             }
         }
     }
