@@ -321,10 +321,10 @@ __rec_review(WT_SESSION_IMPL *session,
 	 * we find a page which can't be merged into its parent, and failing if
 	 * we never find such a page.
 	 */
-	if (btree->checkpointing && __wt_page_is_modified(page))
+	if (btree->internal_lockdown && __wt_page_is_modified(page))
 		return (EBUSY);
 
-	if (btree->checkpointing && top)
+	if (btree->internal_lockdown && top)
 		for (t = page->parent;; t = t->parent) {
 			if (t == NULL || t->ref == NULL)	/* root */
 				return (EBUSY);
@@ -398,7 +398,7 @@ __rec_review(WT_SESSION_IMPL *session,
 			 * a checkpoint is running: we know that will pass.
 			 */
 			if (F_ISSET(txn, TXN_RUNNING) &&
-			    !btree->checkpointing &&
+			    !btree->internal_lockdown &&
 			    ++txn->eviction_fails >= 100) {
 				txn->eviction_fails = 0;
 				ret = WT_DEADLOCK;

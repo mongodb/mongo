@@ -569,7 +569,7 @@ __checkpoint_worker(
 
 	/* Flush the file from the cache, creating the checkpoint. */
 	if (is_checkpoint)
-		WT_ERR(__wt_bt_cache_op(session, ckptbase, WT_SYNC_INTERNAL));
+		WT_ERR(__wt_bt_cache_op(session, ckptbase, WT_SYNC_CHECKPOINT));
 	else {
 		txn->isolation = TXN_ISO_READ_UNCOMMITTED;
 

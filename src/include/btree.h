@@ -132,7 +132,7 @@ struct __wt_btree {
 	uint64_t evict_priority;	/* Relative priority of cached pages. */
 	volatile uint32_t lru_count;	/* Count of threads in LRU eviction */
 
-	volatile int checkpointing;	/* Checkpoint in progress */
+	volatile int internal_lockdown;	/* Checkpoint/compaction in progress */
 
 #define	WT_BTREE_BULK		0x0001	/* Bulk-load handle */
 #define	WT_BTREE_DISCARD	0x0002	/* Discard on release */

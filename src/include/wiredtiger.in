@@ -1957,7 +1957,7 @@ extern int wiredtiger_extension_init(WT_SESSION *session,
 #define	WT_STAT_DSRC_BTREE_COLUMN_INTERNAL		18
 /*! column-store variable-size leaf pages */
 #define	WT_STAT_DSRC_BTREE_COLUMN_VARIABLE		19
-/*! tree pages rewritten by compaction */
+/*! pages rewritten by compaction */
 #define	WT_STAT_DSRC_BTREE_COMPACT_REWRITE		20
 /*! total LSM, table or file object key/value pairs */
 #define	WT_STAT_DSRC_BTREE_ENTRIES			21

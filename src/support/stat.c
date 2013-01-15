@@ -33,8 +33,7 @@ __wt_stat_alloc_dsrc_stats(WT_SESSION_IMPL *session, WT_DSRC_STATS **statsp)
 	stats->btree_column_internal.desc = "column-store internal pages";
 	stats->btree_column_variable.desc =
 	    "column-store variable-size leaf pages";
-	stats->btree_compact_rewrite.desc =
-	    "tree pages rewritten by compaction";
+	stats->btree_compact_rewrite.desc = "pages rewritten by compaction";
 	stats->btree_entries.desc =
 	    "total LSM, table or file object key/value pairs";
 	stats->btree_fixed_len.desc = "fixed-record size";
