@@ -1004,6 +1004,9 @@
     <ClCompile Include="..\scripting\v8_deadline_monitor_test.cpp">
       <Filter>scripting</Filter>
     </ClCompile>
+    <ClCompile Include="..\scripting\v8_profiler.cpp">
+      <Filter>scripting</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="collection.js">
@@ -2361,6 +2364,9 @@
       <Filter>scripting</Filter>
     </ClInclude>
     <ClInclude Include="..\scripting\v8_deadline_monitor.h">
+      <Filter>scripting</Filter>
+    </ClInclude>
+    <ClInclude Include="..\scripting\v8_profiler.h">
       <Filter>scripting</Filter>
     </ClInclude>
   </ItemGroup>

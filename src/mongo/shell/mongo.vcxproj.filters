@@ -611,6 +611,9 @@
     <ClCompile Include="..\scripting\v8_utils.cpp">
       <Filter>scripting</Filter>
     </ClCompile>
+    <ClCompile Include="..\scripting\v8_profiler.cpp">
+      <Filter>scripting</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="collection.js">
@@ -1428,6 +1431,9 @@
       <Filter>scripting</Filter>
     </ClInclude>
     <ClInclude Include="..\scripting\v8_utils.h">
+      <Filter>scripting</Filter>
+    </ClInclude>
+    <ClInclude Include="..\scripting\v8_profiler.h">
       <Filter>scripting</Filter>
     </ClInclude>
   </ItemGroup>

@@ -1206,6 +1206,18 @@
     <ClCompile Include="..\scripting\v8_utils.cpp">
       <Filter>scripting</Filter>
     </ClCompile>
+    <ClCompile Include="..\db\geo\geoparser_test.cpp">
+      <Filter>db\geo</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\geo\geoquery.cpp">
+      <Filter>db\geo</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\geo\hash_test.cpp">
+      <Filter>db\geo</Filter>
+    </ClCompile>
+    <ClCompile Include="..\scripting\v8_profiler.cpp">
+      <Filter>scripting</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\pch.h" />
@@ -2311,6 +2323,12 @@
       <Filter>scripting</Filter>
     </ClInclude>
     <ClInclude Include="..\scripting\v8_utils.h">
+      <Filter>scripting</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\geo\geoquery.h">
+      <Filter>db\geo</Filter>
+    </ClInclude>
+    <ClInclude Include="..\scripting\v8_profiler.h">
       <Filter>scripting</Filter>
     </ClInclude>
   </ItemGroup>

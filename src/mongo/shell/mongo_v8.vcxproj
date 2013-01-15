@@ -1110,6 +1110,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">true</ExcludedFromBuild>
     </ClCompile>
+    <ClCompile Include="..\scripting\v8_profiler.cpp" />
     <ClCompile Include="..\scripting\v8_utils.cpp" />
     <ClCompile Include="..\util\concurrency\mutexdebugger.cpp" />
     <ClCompile Include="..\util\fail_point.cpp" />
@@ -1645,6 +1646,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="..\scripting\engine_v8.h" />
     <ClInclude Include="..\scripting\v8_db.h" />
     <ClInclude Include="..\scripting\v8_deadline_monitor.h" />
+    <ClInclude Include="..\scripting\v8_profiler.h" />
     <ClInclude Include="..\scripting\v8_utils.h" />
     <ClInclude Include="..\util\bson_util.h" />
     <ClInclude Include="..\util\elapsed_tracker.h" />
