@@ -1627,29 +1627,31 @@ namespace mongo {
     }
 
     v8::Handle<v8::Value> V8Scope::Print(V8Scope* scope, const v8::Arguments& args) {
+        stringstream ss;
         v8::HandleScope handle_scope;
         bool first = true;
         for (int i = 0; i < args.Length(); i++) {
             if (first)
                 first = false;
             else
-                printf(" ");
+                ss << " ";
 
             if (!*args[i]) {
                 // failed to get object to convert
-                printf("[unknown type]");
-                break;
+                ss << "[unknown type]";
+                continue;
             }
             if (args[i]->IsExternal()) {
                 // object is External
-                printf("[mongo internal]");
-                break;
+                ss << "[mongo internal]";
+                continue;
             }
 
             v8::String::Utf8Value str(args[i]);
-            printf("%s", *str);
+            ss << *str;
         }
-        printf("\n");
+        ss << "\n";
+        Logstream::logLockless(ss.str());
         return handle_scope.Close(v8::Undefined());
     }
 
