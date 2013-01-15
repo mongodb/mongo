@@ -33,6 +33,10 @@ namespace {
     // them.
     MONGO_EXPORT_SERVER_PARAMETER(logUserIds, int, 0);
 
+    /**
+     * Note: When appending new strings to the builder, make sure to pass false to the
+     * includeEndingNull parameter.
+     */
     void appendServerExtraLogContext(BufBuilder& builder) {
         ClientBasic* clientBasic = ClientBasic::getCurrent();
         if (!clientBasic)
@@ -47,7 +51,7 @@ namespace {
             return;
 
         builder.appendStr("user:", false);
-        builder.appendStr(principals.next().toString());
+        builder.appendStr(principals.next().toString(), false);
         while (principals.more()) {
             builder.appendChar(',');
             builder.appendStr(principals.next().toString(), false);
