@@ -274,7 +274,6 @@ __cache_pool_balance(void)
 	WT_CACHE_POOL *cp;
 	WT_CONNECTION_IMPL *entry;
 	WT_DECL_RET;
-	WT_SESSION_IMPL *session;
 	uint64_t highest;
 
 	cp = __wt_process.cache_pool;
@@ -294,7 +293,6 @@ __cache_pool_balance(void)
 	    (ret = __wt_open_session(entry, 1, NULL, NULL, &cp->session)) != 0)
 		WT_ERR_MSG(NULL, ret,
 		    "Failed to create session for cache pool");
-	session = cp->session;
 
 	WT_ERR(__cache_pool_assess(&highest));
 	WT_ERR(__cache_pool_adjust(highest, 0));
@@ -383,7 +381,7 @@ __cache_pool_adjust(uint64_t highest, int force)
 		 */
 		if (entry->cache_size < reserved) {
 			grew = 1;
-			adjusted = reserved;
+			adjusted = reserved - entry->cache_size;
 		} else if ((force && entry->cache_size > reserved) ||
 		    (read_pressure < WT_CACHE_POOL_REDUCE_THRESHOLD &&
 		     highest > 1 && entry->cache_size > reserved &&
