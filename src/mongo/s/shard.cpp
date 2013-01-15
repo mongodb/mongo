@@ -308,6 +308,14 @@ namespace mongo {
 
         if ( _cs.type() == ConnectionString::SET ) {
             ReplicaSetMonitorPtr rs = ReplicaSetMonitor::get( _cs.getSetName(), true );
+
+            if (!rs) {
+                warning() << "Monitor not found for " << _cs.getSetName()
+                          << ". Shard was either removed or "
+                          << "monitor is still initializing." << endl;
+                return false;
+            }
+
             return rs->contains( node );
         }
 
