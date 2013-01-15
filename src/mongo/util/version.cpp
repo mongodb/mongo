@@ -28,7 +28,7 @@
 #include "mongo/base/parse_number.h"
 #include "mongo/db/cmdline.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/pdfile.h"
+#include "mongo/db/pdfile_version.h"
 //#include "mongo/scripting/engine.h"
 #include "mongo/util/file.h"
 #include "mongo/util/processinfo.h"

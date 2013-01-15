@@ -82,6 +82,7 @@ clientSource = [
     'mongo/util/timer.cpp',
     'mongo/util/trace.cpp',
     'mongo/util/util.cpp',
+    'mongo/util/version.cpp',
     ]
 
 if env['MONGO_BUILD_SASL_CLIENT']:

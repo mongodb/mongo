@@ -33,15 +33,12 @@
 #include "mongo/db/namespace-inl.h"
 #include "mongo/db/namespace_details-inl.h"
 #include "mongo/db/namespacestring.h"
+#include "mongo/db/pdfile_version.h"
 #include "mongo/platform/cstdint.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mmap.h"
 
 namespace mongo {
-
-    // pdfile versions
-    const int PDFILE_VERSION = 4;
-    const int PDFILE_VERSION_MINOR = 5;
 
     class Cursor;
     class DataFileHeader;
