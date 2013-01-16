@@ -335,6 +335,8 @@ static void processCommandLineOptions(const std::vector<std::string>& argv) {
     ( "ipv6", "enable IPv6 support (disabled by default)" )
     ( "jsonp","allow JSONP access via http (has security implications)" )
     ( "noscripting", "disable scripting engine" )
+    ( "maxSpareConnPools" , po::value<int>(), "maximum number of DB connection pools" )
+    ( "connPoolTimeout"   , po::value<int>(), "Limit of the idling time for DB connection pools" )
     ;
 
     visible_options.add(general_options);
@@ -371,6 +373,19 @@ static void processCommandLineOptions(const std::vector<std::string>& argv) {
     if ( params.count( "version" ) ) {
         printShardingVersionInfo(true);
         ::_exit(EXIT_SUCCESS);
+    }
+
+    if ( params.count( "connPoolTimeout" ) ) {
+        int cpooltimeout = params["connPoolTimeout"].as<int>();
+        if ( cpooltimeout > 0 ) {
+          PoolForHost::setConnPoolTimeout(cpooltimeout);
+        }
+    }
+    if ( params.count( "maxSpareConnPools" ) ) {
+        int maxsparecpools = params["maxSpareConnPools"].as<int>();
+        if ( maxsparecpools > 0 ) {
+          PoolForHost::setMaxSpareConnPools(maxsparecpools);
+        }
     }
 
     if ( params.count( "chunkSize" ) ) {
