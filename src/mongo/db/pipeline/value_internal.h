@@ -119,7 +119,9 @@ namespace mongo {
         void putDocument(const Document& d);
         void putRegEx(const BSONRegEx& re);
         void putBinData(const BSONBinData& bd) {
-            putString(StringData(static_cast<const char*>(bd.data), bd.length));
+            putRefCountable(
+                RCString::create(
+                    StringData(static_cast<const char*>(bd.data), bd.length)));
             binSubType = bd.type;
         }
 
@@ -211,12 +213,12 @@ namespace mongo {
                         char shortStrStorage[16/*total bytes*/ - 3/*offset*/ - 1/*NUL byte*/];
                         union {
                             char nulTerminator;
-                            unsigned char binSubType; // type always goes here even if !shortStr
                         };
                     };
 
                     struct {
                         union {
+                            unsigned char binSubType;
                             char pad[6];
                             char stringCache[6]; // TODO copy first few bytes of strings in here
                         };

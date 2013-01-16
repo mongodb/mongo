@@ -335,6 +335,7 @@ namespace DocumentTests {
                 append("filledArray", BSON("" << BSON_ARRAY(1 << "a")).firstElement());
                 append("binData", BSONBinData("a\0b", 3, BinDataGeneral));
                 append("binDataCustom", BSONBinData("a\0b", 3, bdtCustom));
+                append("binDataUUID", BSONBinData("123456789\0abcdef", 16, bdtUUID));
                 append("undefined", BSONUndefined);
                 append("oid", OID());
                 append("true", true);
