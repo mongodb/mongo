@@ -28,30 +28,27 @@ namespace mongo {
     }
 
     void DocumentSourceFilterBase::findNext() {
-        /* only do this the first time */
-        if (unstarted) {
-            hasNext = !pSource->eof();
-            unstarted = false;
-        }
+        unstarted = false;
 
-        while(hasNext) {
-            boost::intrusive_ptr<Document> pDocument(pSource->getCurrent());
-            hasNext = pSource->advance();
-
-            if (accept(pDocument)) {
-                pCurrent = pDocument;
+        for(bool hasDoc = !pSource->eof(); hasDoc; hasDoc = pSource->advance()) {
+            pCurrent = pSource->getCurrent();
+            if (accept(pCurrent)) {
+                pSource->advance(); // Start next call at correct position
+                hasCurrent = true;
                 return;
             }
         }
 
-        pCurrent.reset();
+        // Nothing matched
+        pCurrent = Document();
+        hasCurrent = false;
     }
 
     bool DocumentSourceFilterBase::eof() {
         if (unstarted)
             findNext();
 
-        return (pCurrent.get() == NULL);
+        return !hasCurrent;
     }
 
     bool DocumentSourceFilterBase::advance() {
@@ -68,14 +65,11 @@ namespace mongo {
          */
         findNext();
 
-        return (pCurrent.get() != NULL);
+        return hasCurrent;
     }
 
-    boost::intrusive_ptr<Document> DocumentSourceFilterBase::getCurrent() {
-        if (unstarted)
-            findNext();
-
-        verify(pCurrent.get() != NULL);
+    Document DocumentSourceFilterBase::getCurrent() {
+        verify(hasCurrent);
         return pCurrent;
     }
 
@@ -83,7 +77,7 @@ namespace mongo {
         const intrusive_ptr<ExpressionContext> &pExpCtx):
         DocumentSource(pExpCtx),
         unstarted(true),
-        hasNext(false),
+        hasCurrent(false),
         pCurrent() {
     }
 }

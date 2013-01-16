@@ -35,9 +35,9 @@ s.stopBalancer();
 db.adminCommand({split : "test.foo", middle : { a:1, b:10}});
 db.adminCommand({split : "test.foo", middle : { a:3, b:0}});
 
-db.adminCommand({moveChunk : "test.foo", find : {a:1, b:0}, to : "shard0000"});
-db.adminCommand({moveChunk : "test.foo", find : {a:1, b:15}, to : "shard0001"});
-db.adminCommand({moveChunk : "test.foo", find : {a:3, b:15}, to : "shard0002"});
+db.adminCommand({moveChunk : "test.foo", find : {a:1, b:0}, to : "shard0000", _waitForDelete : true});
+db.adminCommand({moveChunk : "test.foo", find : {a:1, b:15}, to : "shard0001", _waitForDelete : true});
+db.adminCommand({moveChunk : "test.foo", find : {a:3, b:15}, to : "shard0002", _waitForDelete : true});
 
 // Now make sure we get the same results from sharded and unsharded query.
 

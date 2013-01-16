@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "../bson/stringdata.h"
+#include "mongo/base/string_data.h"
 
 namespace mongo {
 
@@ -88,7 +88,7 @@ namespace mongo {
         void appendStr(const StringData &str , bool includeEOO = true ) {
             const unsigned len = str.size() + ( includeEOO ? 1 : 0 );
             verify( len < (unsigned) BSONObjMaxUserSize );
-            memcpy(grow(len), str.data(), len);
+            str.copyTo( grow(len), includeEOO );
         }
 
         /** @return the in-use length */

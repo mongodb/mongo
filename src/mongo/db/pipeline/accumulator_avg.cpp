@@ -26,8 +26,7 @@ namespace mongo {
     const char AccumulatorAvg::subTotalName[] = "subTotal";
     const char AccumulatorAvg::countName[] = "count";
 
-    intrusive_ptr<const Value> AccumulatorAvg::evaluate(
-        const intrusive_ptr<Document> &pDocument) const {
+    Value AccumulatorAvg::evaluate(const Document& pDocument) const {
         if (!pCtx->getDoingMerge()) {
             Super::evaluate(pDocument);
         }
@@ -37,20 +36,19 @@ namespace mongo {
               both a subtotal and a count.  This is what getValue() produced
               below.
              */
-            intrusive_ptr<const Value> prhs(vpOperand[0]->evaluate(pDocument));
-            verify(prhs->getType() == Object);
-            intrusive_ptr<Document> pShardDoc(prhs->getDocument());
+            Value shardOut = vpOperand[0]->evaluate(pDocument);
+            verify(shardOut.getType() == Object);
 
-            intrusive_ptr<const Value> pSubTotal(pShardDoc->getValue(subTotalName));
-            verify(pSubTotal.get());
-            doubleTotal += pSubTotal->getDouble();
+            Value subTotal = shardOut[subTotalName];
+            verify(!subTotal.missing());
+            doubleTotal += subTotal.getDouble();
                 
-            intrusive_ptr<const Value> pCount(pShardDoc->getValue(countName));
-            verify(pCount.get());
-            count += pCount->getLong();
+            Value subCount = shardOut[countName];
+            verify(!subCount.missing());
+            count += subCount.getLong();
         }
 
-        return Value::getZero();
+        return Value();
     }
 
     intrusive_ptr<Accumulator> AccumulatorAvg::create(
@@ -59,7 +57,7 @@ namespace mongo {
         return pA;
     }
 
-    intrusive_ptr<const Value> AccumulatorAvg::getValue() const {
+    Value AccumulatorAvg::getValue() const {
         if (!pCtx->getInShard()) {
             double avg = 0;
             if (count)
@@ -68,11 +66,11 @@ namespace mongo {
             return Value::createDouble(avg);
         }
 
-        intrusive_ptr<Document> pDocument(Document::create());
-        pDocument->addField(subTotalName, Value::createDouble(doubleTotal));
-        pDocument->addField(countName, Value::createLong(count));
+        MutableDocument out;
+        out.addField(subTotalName, Value::createDouble(doubleTotal));
+        out.addField(countName, Value::createLong(count));
 
-        return Value::createDocument(pDocument);
+        return Value::createDocument(out.freeze());
     }
 
     AccumulatorAvg::AccumulatorAvg(

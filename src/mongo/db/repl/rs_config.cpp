@@ -32,6 +32,7 @@ using namespace bson;
 namespace mongo {
 
     mongo::mutex ReplSetConfig::groupMx("RS tag group");
+    const int ReplSetConfig::DEFAULT_HB_TIMEOUT = 10;
 
     void logOpInitiate(const bo&);
 
@@ -114,22 +115,39 @@ namespace mongo {
             a.append( members[i].asBson() );
         b.append("members", a.arr());
 
-        if( !ho.isDefault() || !getLastErrorDefaults.isEmpty() || !rules.empty()) {
-            bob settings;
-            if( !rules.empty() ) {
-                bob modes;
-                for (map<string,TagRule*>::const_iterator it = rules.begin(); it != rules.end(); it++) {
-                    bob clauses;
-                    vector<TagClause*> r = (*it).second->clauses;
-                    for (vector<TagClause*>::iterator it2 = r.begin(); it2 < r.end(); it2++) {
-                        clauses << (*it2)->name << (*it2)->target;
-                    }
-                    modes << (*it).first << clauses.obj();
+        BSONObjBuilder settings;
+        bool empty = true;
+
+        if (!rules.empty()) {
+            bob modes;
+            for (map<string,TagRule*>::const_iterator it = rules.begin(); it != rules.end(); it++) {
+                bob clauses;
+                vector<TagClause*> r = (*it).second->clauses;
+                for (vector<TagClause*>::iterator it2 = r.begin(); it2 < r.end(); it2++) {
+                    clauses << (*it2)->name << (*it2)->target;
                 }
-                settings << "getLastErrorModes" << modes.obj();
+                modes << (*it).first << clauses.obj();
             }
-            if( !getLastErrorDefaults.isEmpty() )
-                settings << "getLastErrorDefaults" << getLastErrorDefaults;
+            settings << "getLastErrorModes" << modes.obj();
+            empty = false;
+        }
+
+        if (!getLastErrorDefaults.isEmpty()) {
+            settings << "getLastErrorDefaults" << getLastErrorDefaults;
+            empty = false;
+        }
+
+        if (_heartbeatTimeout != DEFAULT_HB_TIMEOUT) {
+            settings << "heartbeatTimeoutSecs" << _heartbeatTimeout;
+            empty = false;
+        }
+
+        if (!_chainingAllowed) {
+            settings << "chainingAllowed" << _chainingAllowed;
+            empty = false;
+        }
+
+        if (!empty) {
             b << "settings" << settings.obj();
         }
 
@@ -144,7 +162,7 @@ namespace mongo {
         mchk(_id >= 0 && _id <= 255);
         mchk(priority >= 0 && priority <= 1000);
         mchk(votes <= 100); // votes >= 0 because it is unsigned
-        uassert(13419, "priorities must be between 0.0 and 100.0", priority >= 0.0 && priority <= 100.0);
+        uassert(13419, "priorities must be between 0.0 and 1000", priority >= 0.0 && priority <= 1000);
         uassert(13437, "slaveDelay requires priority be zero", slaveDelay == 0 || priority == 0);
         uassert(13438, "bad slaveDelay value", slaveDelay >= 0 && slaveDelay <= 3600 * 24 * 366);
         uassert(13439, "priority must be 0 when hidden=true", priority == 0 || !hidden);
@@ -556,19 +574,51 @@ namespace mongo {
             ho.check();
             try { getLastErrorDefaults = settings["getLastErrorDefaults"].Obj().copy(); }
             catch(...) { }
+
+            if (settings.hasField("heartbeatTimeoutSecs")) {
+                int timeout = settings["heartbeatTimeoutSecs"].numberInt();
+                uassert(16438, "Heartbeat timeout must be non-negative", timeout >= 0);
+                _heartbeatTimeout = timeout;
+            }
+
+            // If the config explicitly sets chaining to false, turn it off.
+            if (settings.hasField("chainingAllowed") &&
+                !settings["chainingAllowed"].trueValue()) {
+                _chainingAllowed = false;
+            }
         }
 
         // figure out the majority for this config
         setMajority();
     }
 
+    bool ReplSetConfig::chainingAllowed() const {
+        return _chainingAllowed;
+    }
+
+    int ReplSetConfig::getHeartbeatTimeout() const {
+        return _heartbeatTimeout;
+    }
+
     static inline void configAssert(bool expr) {
         uassert(13122, "bad repl set config?", expr);
     }
 
-    ReplSetConfig::ReplSetConfig(BSONObj cfg, bool force) :
-        _ok(false),_majority(-1)
-    {
+    ReplSetConfig::ReplSetConfig() :
+        version(EMPTYCONFIG),
+        _chainingAllowed(true),
+        _majority(-1),
+        _ok(false),
+        _heartbeatTimeout(DEFAULT_HB_TIMEOUT) {
+    }
+
+    ReplSetConfig* ReplSetConfig::make(BSONObj cfg, bool force) {
+        auto_ptr<ReplSetConfig> ret(new ReplSetConfig());
+        ret->init(cfg, force);
+        return ret.release();
+    }
+
+    void ReplSetConfig::init(BSONObj cfg, bool force) {
         _constructed = false;
         clear();
         from(cfg);
@@ -582,9 +632,25 @@ namespace mongo {
         _constructed = true;
     }
 
-    ReplSetConfig::ReplSetConfig(const HostAndPort& h) :
-      _ok(false),_majority(-1)
-    {
+    ReplSetConfig* ReplSetConfig::make(const HostAndPort& h) {
+        auto_ptr<ReplSetConfig> ret(new ReplSetConfig());
+        ret->init(h);
+        return ret.release();
+    }
+
+    ReplSetConfig* ReplSetConfig::makeDirect() {
+        DBDirectClient cli;
+        BSONObj config = cli.findOne(rsConfigNs, Query()).getOwned();
+
+        // Check for no local config
+        if (config.isEmpty()) {
+            return new ReplSetConfig();
+        }
+
+        return make(config, false);
+    }
+
+    void ReplSetConfig::init(const HostAndPort& h) {
         LOG(2) << "ReplSetConfig load " << h.toString() << rsLog;
 
         _constructed = false;
@@ -655,14 +721,14 @@ namespace mongo {
         }
         catch( DBException& e) {
             version = v;
-            log(level) << "replSet load config couldn't get from " << h.toString() << ' ' << e.what() << rsLog;
+            LOG(level) << "replSet load config couldn't get from " << h.toString() << ' ' << e.what() << rsLog;
             return;
         }
 
         from(cfg);
         checkRsConfig();
         _ok = true;
-        log(level) << "replSet load config ok from " << (h.isSelf() ? "self" : h.toString()) << rsLog;
+        LOG(level) << "replSet load config ok from " << (h.isSelf() ? "self" : h.toString()) << rsLog;
         _constructed = true;
     }
 

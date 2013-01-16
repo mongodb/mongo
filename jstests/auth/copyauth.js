@@ -1,3 +1,4 @@
+if (0) { // SERVER-7864
 // test copyDatabase from an auth enabled source
 
 ports = allocatePorts( 2 );
@@ -27,3 +28,5 @@ target.getDB( "admin" ).auth( "super1", "super1" );
 target.getDB( baseName ).copyDatabase( baseName, baseName, source.host, "foo", "bar" );
 assert.eq( 1, target.getDB( baseName )[ baseName ].count() );
 assert.eq( 1, target.getDB( baseName )[ baseName ].findOne().i );
+
+}

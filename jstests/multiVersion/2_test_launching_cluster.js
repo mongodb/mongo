@@ -2,17 +2,11 @@
 // Tests launching multi-version ShardingTest clusters
 //
 
-var verifyVersion = function( mongo, version ){
-    
-    var result = mongo.getDB( "admin" ).runCommand({ serverStatus : 1 })
-    
-    if( result.version != version ) printjson( result  )
-    
-    assert.eq( result.version, version )
-}
+load('./jstests/multiVersion/libs/verify_versions.js');
 
-var versionsToCheck = [ "1.8.5",
-                        "2.0.6" ]
+// Check our latest versions
+var versionsToCheck = [ "last-stable",
+                        "latest" ];
                        
 jsTest.log( "Testing legacy versions..." )
 
@@ -36,9 +30,9 @@ for( var i = 0; i < versionsToCheck.length; i++ ){
     var configs = [ st.config0 ]
     
     // Make sure the started versions are actually the correct versions
-    for( var j = 0; j < shards.length; j++ ) verifyVersion( shards[j], version )
-    for( var j = 0; j < mongoses.length; j++ ) verifyVersion( mongoses[j], version )
-    for( var j = 0; j < configs.length; j++ ) verifyVersion( configs[j], version )
+    for( var j = 0; j < shards.length; j++ ) assert.binVersion( shards[j], version );
+    for( var j = 0; j < mongoses.length; j++ ) assert.binVersion( mongoses[j], version );
+    for( var j = 0; j < configs.length; j++ ) assert.binVersion( configs[j], version );
     
     st.stop()
 }
@@ -65,34 +59,24 @@ var shards = [ st.shard0, st.shard1 ]
 var mongoses = [ st.s0, st.s1 ]
 var configs = [ st.config0, st.config1, st.config2 ]
 
-var getVersion = function( mongo ){
-    var result = mongo.getDB( "admin" ).runCommand({ serverStatus : 1 })
-    return result.version
-}
-
-var verifyAllVersionsFound = function( versionsFound ){
-    for( var j = 0; j < versionsToCheck.length; j++ )
-        assert( versionsFound[ versionsToCheck[j] ] )
-}
-
 // Make sure we have hosts of all the different versions
-var versionsFound = {}
+var versionsFound = [];
 for( var j = 0; j < shards.length; j++ ) 
-    versionsFound[ getVersion( shards[j] ) ] = true
+    versionsFound.push( shards[j].getBinVersion() );
 
-verifyAllVersionsFound( versionsFound )
+assert.allBinVersions( versionsToCheck, versionsFound );
 
-versionsFound = {}
+versionsFound = [];
 for( var j = 0; j < mongoses.length; j++ ) 
-    versionsFound[ getVersion( mongoses[j] ) ] = true
+    versionsFound.push( mongoses[j].getBinVersion() );
 
-verifyAllVersionsFound( versionsFound )
+assert.allBinVersions( versionsToCheck, versionsFound );
     
-versionsFound = {}
+versionsFound = [];
 for( var j = 0; j < configs.length; j++ ) 
-    versionsFound[ getVersion( configs[j] ) ] = true
+    versionsFound.push( configs[j].getBinVersion() );
     
-verifyAllVersionsFound( versionsFound )
+assert.allBinVersions( versionsToCheck, versionsFound );
     
 st.stop()
 
@@ -128,39 +112,34 @@ var getVersion = function( mongo ){
     return result.version
 }
 
-var verifyAllVersionsFound = function( versionsFound ){
-    for( var j = 0; j < versionsToCheck.length; j++ )
-        assert( versionsFound[ versionsToCheck[j] ] )
-}
-
 // Make sure we have hosts of all the different versions
-var versionsFound = {}
+versionsFound = []
 for( var j = 0; j < nodesA.length; j++ ) 
-    versionsFound[ getVersion( nodesA[j] ) ] = true
+    versionsFound.push( nodesA[j].getBinVersion() );
 
-verifyAllVersionsFound( versionsFound )
+assert.allBinVersions( versionsToCheck, versionsFound );
 
-versionsFound = {}
+versionsFound = []
 for( var j = 0; j < nodesB.length; j++ ) 
-    versionsFound[ getVersion( nodesA[j] ) ] = true
+    versionsFound.push( nodesB[j].getBinVersion() );
 
-verifyAllVersionsFound( versionsFound )
+assert.allBinVersions( versionsToCheck, versionsFound );( versionsFound )
 
-versionsFound = {}
-for( var j = 0; j < mongoses.length; j++ ) 
-    versionsFound[ getVersion( mongoses[j] ) ] = true
+versionsFound = [];
+for( var j = 0; j < mongoses.length; j++ )
+    versionsFound.push( mongoses[j].getBinVersion() );
 
-verifyAllVersionsFound( versionsFound )
-    
-versionsFound = {}
-for( var j = 0; j < configs.length; j++ ) 
-    versionsFound[ getVersion( configs[j] ) ] = true
-    
-verifyAllVersionsFound( versionsFound )
-    
+assert.allBinVersions( versionsToCheck, versionsFound );
+
+versionsFound = [];
+for( var j = 0; j < configs.length; j++ )
+    versionsFound.push( configs[j].getBinVersion() );
+
+assert.allBinVersions( versionsToCheck, versionsFound );
+
+jsTest.log("DONE!");
+   
 st.stop()
-
-jsTest.log( "Done!" )
 
 //
 // End

@@ -33,31 +33,10 @@
 
 namespace mongo {
 
-    struct ShardNS {
-        static string shard;
-
-        static string database;
-        static string collection;
-        static string chunk;
-        static string tags;
-
-        static string mongos;
-        static string settings;
-    };
-
-    /**
-     * Field names used in the 'shards' collection.
-     */
-    struct ShardFields {
-        static BSONField<bool> draining;      // is it draining chunks?
-        static BSONField<long long> maxSize;  // max allowed disk space usage
-    };
-
     class ConfigServer;
 
     class DBConfig;
     typedef boost::shared_ptr<DBConfig> DBConfigPtr;
-    typedef shared_ptr<Shard> ShardPtr;
 
     extern DBConfigPtr configServerPtr;
     extern ConfigServer& configServer;
@@ -133,7 +112,20 @@ namespace mongo {
         }
 
         void enableSharding( bool save = true );
-        ChunkManagerPtr shardCollection( const string& ns , ShardKeyPattern fieldsAndOrder , bool unique , vector<BSONObj>* initPoints=0, vector<Shard>* initShards=0 );
+
+        /* Makes all the configuration changes necessary to shard a new collection.
+         * Optionally, chunks will be created based on a set of specified initial split points, and
+         * distributed in a round-robin fashion onto a set of initial shards.  If no initial shards
+         * are specified, only the primary will be used.
+         *
+         * WARNING: It's not safe to place initial chunks onto non-primary shards using this method.
+         * The initShards parameter allows legacy behavior expected by map-reduce.
+         */
+        ChunkManagerPtr shardCollection( const string& ns ,
+                                         ShardKeyPattern fieldsAndOrder ,
+                                         bool unique ,
+                                         vector<BSONObj>* initPoints = 0,
+                                         vector<Shard>* initShards = 0 );
 
         /**
            @return true if there was sharding info to remove
@@ -164,7 +156,7 @@ namespace mongo {
             return _primary;
         }
 
-        void setPrimary( string s );
+        void setPrimary( const std::string& s );
 
         bool load();
         bool reload();
@@ -226,7 +218,7 @@ namespace mongo {
         */
         bool init( vector<string> configHosts );
 
-        bool init( string s );
+        bool init( const std::string& s );
 
         bool allUp();
         bool allUp( string& errmsg );
@@ -235,11 +227,6 @@ namespace mongo {
         int dbConfigVersion( DBClientBase& conn );
 
         void reloadSettings();
-
-        /**
-         * @return 0 = ok, otherwise error #
-         */
-        int checkConfigVersion( bool upgrade );
 
         /**
          * Create a metadata change log entry in the config.changelog collection.
@@ -268,7 +255,7 @@ namespace mongo {
         bool checkConfigServersConsistent( string& errmsg , int tries = 4 ) const;
 
     private:
-        string getHost( string name , bool withPort );
+        string getHost( const std::string& name , bool withPort );
         vector<string> _config;
     };
 

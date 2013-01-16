@@ -20,6 +20,7 @@
 #include "pch.h"
 #include <boost/date_time/posix_time/posix_time.hpp>
 
+#include "mongo/base/initializer.h"
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/json.h"
@@ -758,7 +759,9 @@ namespace Misc {
     } all;
 }
 
-int main( int argc, char **argv ) {
+int main( int argc, char **argv, char** envp ) {
+    mongo::runGlobalInitializersOrDie(argc, argv, envp);
+
     logLevel = -1;
     client_ = new DBDirectClient();
 

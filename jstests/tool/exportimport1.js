@@ -19,7 +19,12 @@ assert.eq( 1 , c.count() , "after restore 2" );
 var doc = c.findOne();
 assert.eq( 22 , doc.a , "after restore 2" );
 for (var i=0; i<arr.length; i++) {
-    assert.eq( arr[i], doc.b[i] , "after restore array: "+i );
+    if (typeof arr[i] == 'undefined') {
+        // null should be { "$undefined" : true }, but this is a workaround for SERVER-6102
+        assert.eq( null, doc.b[i] , "after restore array: "+i );
+    } else {
+        assert.eq( arr[i], doc.b[i] , "after restore array: "+i );
+    }
 }
 
 // now with --jsonArray
@@ -49,7 +54,12 @@ assert.soon( "c.findOne()" , "no data after sleep" );
 assert.eq( 1 , c.count() , "after restore 2" );
 var doc = c.findOne();
 for (var i=0; i<arr.length; i++) {
-    assert.eq( arr[i], doc.a[i] , "after restore array: "+i );
+    if (typeof arr[i] == 'undefined') {
+        // null should be { "$undefined" : true }, but this is a workaround for SERVER-6102
+        assert.eq( null, doc.a[i] , "after restore array: "+i );
+    } else {
+        assert.eq( arr[i], doc.a[i] , "after restore array: "+i );
+    }
 }
 
 

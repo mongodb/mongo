@@ -23,6 +23,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "mongo/base/initializer.h"
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/cmdline.h"
 #include "mongo/db/repl/rs_member.h"
@@ -34,9 +35,11 @@
 #include "mongo/util/password.h"
 #include "mongo/util/stacktrace.h"
 #include "mongo/util/startup_test.h"
+#include "mongo/util/text.h"
 #include "mongo/util/version.h"
 
 #ifdef _WIN32
+#include <io.h>
 #define isatty _isatty
 #else
 #include <unistd.h>
@@ -243,7 +246,7 @@ void setupSignals() {
     set_terminate( myterminate );
 }
 
-string fixHost( string url , string host , string port ) {
+string fixHost( const std::string& url, const std::string& host, const std::string& port ) {
     //cout << "fixHost url: " << url << " host: " << host << " port: " << port << endl;
 
     if ( host.size() == 0 && port.size() == 0 ) {
@@ -264,10 +267,7 @@ string fixHost( string url , string host , string port ) {
         ::_exit(-1);
     }
 
-    if ( host.size() == 0 )
-        host = "127.0.0.1";
-
-    string newurl = host;
+    string newurl( ( host.size() == 0 ) ? "127.0.0.1" : host );
     if ( port.size() > 0 )
         newurl += ":" + port;
     else if ( host.find(':') == string::npos ) {
@@ -288,17 +288,18 @@ bool isOpSymbol( char c ) {
     return false;
 }
 
-bool isUseCmd( string code ) {
+bool isUseCmd( const std::string& code ) {
     string cmd = code;
     if ( cmd.find( " " ) > 0 )
         cmd = cmd.substr( 0 , cmd.find( " " ) );
     return cmd == "use";
 }
 
-bool isBalanced( string code ) {
+bool isBalanced( const std::string& code ) {
     if (isUseCmd( code ))
         return true;  // don't balance "use <dbname>" in case dbname contains special chars
-    int brackets = 0;
+    int curlyBrackets = 0;
+    int squareBrackets = 0;
     int parens = 0;
     bool danglingOp = false;
 
@@ -310,10 +311,30 @@ bool isBalanced( string code ) {
                     i++;
             }
             continue;
-        case '{': brackets++; break;
-        case '}': if ( brackets <= 0 ) return true; brackets--; break;
-        case '(': parens++; break;
-        case ')': if ( parens <= 0 ) return true; parens--; break;
+        case '{':
+            curlyBrackets++;
+            break;
+        case '}':
+            if ( curlyBrackets <= 0 )
+                return true;
+            curlyBrackets--;
+            break;
+        case '[':
+            squareBrackets++;
+            break;
+        case ']':
+            if ( squareBrackets <= 0 )
+                return true;
+            squareBrackets--;
+            break;
+        case '(':
+            parens++;
+            break;
+        case ')':
+            if ( parens <= 0 )
+                return true;
+            parens--;
+            break;
         case '"':
             i++;
             while ( i < code.size() && code[i] != '"' ) i++;
@@ -341,7 +362,7 @@ bool isBalanced( string code ) {
         else if ( !std::isspace( static_cast<unsigned char>( code[i] ) ) ) danglingOp = false;
     }
 
-    return brackets == 0 && parens == 0 && !danglingOp;
+    return curlyBrackets == 0 && squareBrackets == 0 && parens == 0 && !danglingOp;
 }
 
 struct BalancedTest : public mongo::StartupTest {
@@ -469,6 +490,12 @@ static void edit( const string& whatToEdit ) {
 
     string js;
     if ( editingVariable ) {
+        // If "whatToEdit" is undeclared or uninitialized, declare 
+        int varType = shellMainScope->type( whatToEdit.c_str() );
+        if ( varType == Undefined ) {
+            shellMainScope->exec( "var " + whatToEdit , "(shell)", false, true, false );
+        }
+
         // Convert "whatToEdit" to JavaScript (JSON) text
         if ( !shellMainScope->exec( "__jsout__ = tojson(" + whatToEdit + ")", "tojs", false, false, false ) )
             return; // Error already printed
@@ -568,15 +595,17 @@ static void edit( const string& whatToEdit ) {
     if ( editingVariable ) {
         // Try to execute assignment to copy edited value back into the variable
         const string code = whatToEdit + string( " = " ) + sb.str();
-        if ( !shellMainScope->exec( code, "tojs", false, false, false ) )
-            return; // Error already printed
+        if ( !shellMainScope->exec( code, "tojs", false, true, false ) ) {
+            cout << "error executing assignment: " << code << endl;
+        }
     }
     else {
         linenoisePreloadBuffer( sb.str().c_str() );
     }
 }
 
-int _main( int argc, char* argv[] ) {
+int _main( int argc, char* argv[], char **envp ) {
+    mongo::runGlobalInitializersOrDie(argc, argv, envp);
     mongo::isShell = true;
     setupSignals();
 
@@ -589,6 +618,11 @@ int _main( int argc, char* argv[] ) {
 
     string username;
     string password;
+    string authenticationMechanism;
+
+    std::string sslPEMKeyFile;
+    std::string sslPEMKeyPassword;
+    std::string sslCAFile;
 
     bool runShell = false;
     bool nodb = false;
@@ -611,12 +645,19 @@ int _main( int argc, char* argv[] ) {
     ( "eval", po::value<string>( &script ), "evaluate javascript" )
     ( "username,u", po::value<string>(&username), "username for authentication" )
     ( "password,p", new mongo::PasswordValue( &password ), "password for authentication" )
+    ("authenticationMechanism",
+     po::value<string>(&authenticationMechanism)->default_value("MONGO-CR"),
+     "authentication mechanism")
     ( "help,h", "show this usage information" )
     ( "version", "show version information" )
     ( "verbose", "increase verbosity" )
     ( "ipv6", "enable IPv6 support (disabled by default)" )
 #ifdef MONGO_SSL
     ( "ssl", "use SSL for all connections" )
+    ( "sslCAFile", po::value<std::string>(&sslCAFile), "Certificate Authority for SSL" )
+    ( "sslPEMKeyFile", po::value<std::string>(&sslPEMKeyFile), "PEM certificate/key file for SSL" )
+    ( "sslPEMKeyPassword", po::value<std::string>(&sslPEMKeyFile), 
+      "password for key in PEM file for SSL" )
 #endif
     ;
 
@@ -690,6 +731,15 @@ int _main( int argc, char* argv[] ) {
     if ( params.count( "ssl" ) ) {
         mongo::cmdLine.sslOnNormalPorts = true;
     }
+    if (params.count("sslPEMKeyFile")) {
+        mongo::cmdLine.sslPEMKeyFile = params["sslPEMKeyFile"].as<std::string>();
+    }
+    if (params.count("sslPEMKeyPassword")) {
+        mongo::cmdLine.sslPEMKeyPassword = params["sslPEMKeyPassword"].as<std::string>();
+    }
+    if (params.count("sslCAFile")) {
+        mongo::cmdLine.sslCAFile = params["sslCAFile"].as<std::string>();
+    }
 #endif
     if ( params.count( "nokillop" ) ) {
         mongo::shell_utils::_nokillop = true;
@@ -752,11 +802,32 @@ int _main( int argc, char* argv[] ) {
         if ( params.count( "password" ) && password.empty() )
             password = mongo::askPassword();
 
-        if ( username.size() && password.size() ) {
-            stringstream ss;
-            ss << "if ( ! db.auth( \"" << username << "\" , \"" << password << "\" ) ){ throw 'login failed'; }";
-            mongo::shell_utils::_dbAuth = ss.str();
+        // Construct the authentication-related code to execute on shell startup.
+        //
+        // This constructs and immediately executes an anonymous function, to avoid
+        // the shell's default behavior of printing statement results to the console.
+        //
+        // It constructs a statement of the following form:
+        //
+        // (function() {
+        //    // Set default authentication mechanism and, maybe, authenticate.
+        //  }())
+        stringstream authStringStream;
+        authStringStream << "(function() { " << endl;
+        if ( !authenticationMechanism.empty() ) {
+            authStringStream << "DB.prototype._defaultAuthenticationMechanism = \"" <<
+                authenticationMechanism << "\";" << endl;
         }
+
+        if ( username.size() ) {
+            authStringStream << "var username = \"" << username << "\";" << endl;
+            authStringStream << "var password = \"" << password << "\";" << endl;
+            authStringStream << "if (!db.auth(username, password)) { throw 'login failed'; }"
+                             << endl;
+        }
+        authStringStream << "}())";
+
+        mongo::shell_utils::_dbAuth = authStringStream.str();
     }
 
     mongo::ScriptEngine::setConnectCallback( mongo::shell_utils::onConnect );
@@ -804,7 +875,7 @@ int _main( int argc, char* argv[] ) {
 #endif
             if ( !rcLocation.empty() && fileExists(rcLocation) ) {
                 hasMongoRC = true;
-                if ( ! scope->execFile( rcLocation , false , true , false , 0 ) ) {
+                if ( ! scope->execFile( rcLocation , false , true ) ) {
                     cout << "The \".mongorc.js\" file located in your home folder could not be executed" << endl;
                     return -5;
                 }
@@ -819,6 +890,10 @@ int _main( int argc, char* argv[] ) {
            fstream f;
            f.open(rcLocation.c_str(), ios_base::out );
            f.close();
+        }
+
+        if ( !nodb ) {
+            scope->exec( "shellHelper( 'show', 'startupWarnings' )", "(shellwarnings", false, true, false );
         }
 
         shellHistoryInit();
@@ -959,7 +1034,7 @@ int wmain( int argc, wchar_t* argvW[] ) {
     int returnValue = -1;
     try {
         WindowsCommandLine wcl( argc, argvW );
-        returnValue = _main( argc, wcl.argv() );
+        returnValue = _main( argc, wcl.argv(), NULL );  // TODO: Convert wide env to utf8 env.
     }
     catch ( mongo::DBException& e ) {
         cerr << "exception: " << e.what() << endl;
@@ -969,11 +1044,11 @@ int wmain( int argc, wchar_t* argvW[] ) {
     ::_exit(returnValue);
 }
 #else // #ifdef _WIN32
-int main( int argc, char* argv[] ) {
+int main( int argc, char* argv[], char **envp ) {
     static mongo::StaticObserver staticObserver;
     int returnCode;
     try {
-        returnCode = _main( argc , argv );
+        returnCode = _main( argc , argv, envp );
     }
     catch ( mongo::DBException& e ) {
         cerr << "exception: " << e.what() << endl;

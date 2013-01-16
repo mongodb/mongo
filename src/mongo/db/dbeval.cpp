@@ -1,8 +1,7 @@
-/* commands.cpp
-   db "commands" (sent via db.$cmd.findOne(...))
- */
+// commands.cpp
 
 /**
+*    Copyright (C) 2012 10gen Inc.
 *
 *    This program is free software: you can redistribute it and/or  modify
 *    it under the terms of the GNU Affero General Public License, version 3,
@@ -23,7 +22,6 @@
 #include "../bson/util/builder.h"
 #include <time.h>
 #include "introspect.h"
-#include "btree.h"
 #include "../util/lruishmap.h"
 #include "json.h"
 #include "repl.h"
@@ -115,21 +113,20 @@ namespace mongo {
             help << "Evaluate javascript at the server.\n" "http://dochub.mongodb.org/core/serversidecodeexecution";
         }
         virtual LockType locktype() const { return NONE; }
+        virtual void addRequiredPrivileges(const std::string& dbname,
+                                           const BSONObj& cmdObj,
+                                           std::vector<Privilege>* out) {
+            // $eval can do pretty much anything, so require all privileges.
+            out->push_back(Privilege(PrivilegeSet::WILDCARD_RESOURCE,
+                                     AuthorizationManager::getAllUserActions()));
+        }
         CmdEval() : Command("eval", false, "$eval") { }
         bool run(const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-
-            AuthenticationInfo *ai = cc().getAuthenticationInfo();
-            uassert( 12598 , "$eval reads unauthorized", ai->isAuthorizedReads(dbname.c_str()) );
-
             if ( cmdObj["nolock"].trueValue() ) {
                 return dbEval(dbname, cmdObj, result, errmsg);
             }
 
-            // write security will be enforced in DBDirectClient
-            // TODO: should this be a db lock?
-            scoped_ptr<Lock::ScopedLock> lk( ai->isAuthorized( dbname.c_str() ) ? 
-                                             static_cast<Lock::ScopedLock*>( new Lock::GlobalWrite() ) : 
-                                             static_cast<Lock::ScopedLock*>( new Lock::GlobalRead() ) );
+            Lock::GlobalWrite lk;
             Client::Context ctx( dbname );
 
             return dbEval(dbname, cmdObj, result, errmsg);

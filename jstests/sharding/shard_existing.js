@@ -3,31 +3,28 @@ s = new ShardingTest( "shard_existing" , 2 /* numShards */, 1 /* verboseLevel */
 
 db = s.getDB( "test" )
 
-stringSize = 10000
+var stringSize = 10000;
+var numDocs = 2000;
 
 // we want a lot of data, so lets make a string to cheat :)
-bigString = "";
-while ( bigString.length < stringSize )
-    bigString += "this is a big string. ";
+var bigString = new Array(stringSize).toString();
+var docSize = Object.bsonsize({ _id: numDocs, s: bigString });
+var totalSize = docSize * numDocs;
+print("NumDocs: " + numDocs + " DocSize: " + docSize + " TotalSize: " + totalSize);
 
-dataSize = 20 * 1024 * 1024;
-
-numToInsert = dataSize / stringSize 
-print( "numToInsert: " + numToInsert )
-
-for ( i=0; i<(dataSize/stringSize); i++ ) {
-    db.data.insert( { _id : i , s : bigString } )
+for (i=0; i<numDocs; i++) {
+    db.data.insert({_id: i, s: bigString});
 }
-
 db.getLastError();
 
-assert.lt( dataSize , db.data.stats().size )
+assert.lt(totalSize, db.data.stats().size);
 
 s.adminCommand( { enablesharding : "test" } );
 res = s.adminCommand( { shardcollection : "test.data" , key : { _id : 1 } } );
-printjson( res );
+printjson(res);
 
-assert.eq( 40 , s.config.chunks.find().itcount() , "not right number of chunks" );
-
+// number of chunks should be approx equal to the total data size / half the chunk size
+assert.eq(Math.ceil(totalSize / (512 * 1024)), s.config.chunks.find().itcount(),
+          "not right number of chunks" );
 
 s.stop();

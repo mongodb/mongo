@@ -180,7 +180,7 @@
     <ClCompile>
       <Optimization>Disabled</Optimization>
       <AdditionalIncludeDirectories>..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>BOOST_ALL_NO_LIB;MONGO_EXPOSE_MACROS;OLDJS;STATIC_JS_API;XP_WIN;_DEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;HAVE_CONFIG_H;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>BOOST_ALL_NO_LIB;MONGO_EXPOSE_MACROS;OLDJS;STATIC_JS_API;XP_WIN;_DEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;_SCL_SECURE_NO_WARNINGS;HAVE_CONFIG_H;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <MinimalRebuild>No</MinimalRebuild>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
@@ -202,17 +202,20 @@
       <LargeAddressAware>true</LargeAddressAware>
     </Link>
     <PreBuildEvent>
-      <Command>"$(ProjectDir)..\..\third_party\js-1.7\jskwgen.exe" "$(ProjectDir)..\..\third_party\js-1.7\jsautokw.h"
-cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
+      <Command>cscript //Nologo "$(ProjectDir)..\..\third_party\run_if_newer.js" /path:"$(ProjectDir)..\..\third_party\js-1.7" /input:"jskwgen.exe" /output:"jsautokw.h" /command:"jskwgen jsautokw.h"
+cscript //Nologo "$(ProjectDir)..\..\third_party\run_if_newer.js" /path:"$(ProjectDir)..\base" /input:"generate_error_codes.py,error_codes.err" /output:"error_codes.h,error_codes.cpp" /command:"python generate_error_codes.py error_codes.err error_codes.h error_codes.cpp"
+cscript //Nologo "$(ProjectDir)..\..\third_party\run_if_newer.js" /path:"$(ProjectDir)..\db\auth" /input:"generate_action_types.py,action_types.txt" /output:"action_type.h,action_type.cpp" /command:"python generate_action_types.py action_types.txt action_type.h action_type.cpp"
+cscript //Nologo "$(ProjectDir)..\..\third_party\run_if_newer.js" /path:"$(ProjectDir)..\db\fts" /input:"generate_stop_words.py,stop_words_danish.txt,stop_words_dutch.txt,stop_words_english.txt,stop_words_finnish.txt,stop_words_french.txt,stop_words_german.txt,stop_words_hungarian.txt,stop_words_italian.txt,stop_words_norwegian.txt,stop_words_portuguese.txt,stop_words_romanian.txt,stop_words_russian.txt,stop_words_spanish.txt,stop_words_swedish.txt,stop_words_turkish.txt" /output:"stop_words_list.h,stop_words_list.cpp" /command:"python generate_stop_words.py stop_words_danish.txt stop_words_dutch.txt stop_words_english.txt stop_words_finnish.txt stop_words_french.txt stop_words_german.txt stop_words_hungarian.txt stop_words_italian.txt stop_words_norwegian.txt stop_words_portuguese.txt stop_words_romanian.txt stop_words_russian.txt stop_words_spanish.txt stop_words_swedish.txt stop_words_turkish.txt stop_words_list.h stop_words_list.cpp"
+cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(ProjectDir).."
 </Command>
-      <Message>Build jsautokw.h for SpiderMonkey, create mongo.cpp and mongo-server.cpp from JavaScript source files</Message>
+      <Message>Run pre-build commands</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">
     <ClCompile>
       <Optimization>Disabled</Optimization>
       <AdditionalIncludeDirectories>..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>BOOST_ALL_NO_LIB;MONGO_EXPOSE_MACROS;OLDJS;STATIC_JS_API;XP_WIN;_DEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;HAVE_CONFIG_H;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>BOOST_ALL_NO_LIB;MONGO_EXPOSE_MACROS;OLDJS;STATIC_JS_API;XP_WIN;_DEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;_SCL_SECURE_NO_WARNINGS;HAVE_CONFIG_H;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <MinimalRebuild>No</MinimalRebuild>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
@@ -234,17 +237,20 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
       <LargeAddressAware>true</LargeAddressAware>
     </Link>
     <PreBuildEvent>
-      <Command>"$(ProjectDir)..\..\third_party\js-1.7\jskwgen.exe" "$(ProjectDir)..\..\third_party\js-1.7\jsautokw.h"
-cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
+      <Command>cscript //Nologo "$(ProjectDir)..\..\third_party\run_if_newer.js" /path:"$(ProjectDir)..\..\third_party\js-1.7" /input:"jskwgen.exe" /output:"jsautokw.h" /command:"jskwgen jsautokw.h"
+cscript //Nologo "$(ProjectDir)..\..\third_party\run_if_newer.js" /path:"$(ProjectDir)..\base" /input:"generate_error_codes.py,error_codes.err" /output:"error_codes.h,error_codes.cpp" /command:"python generate_error_codes.py error_codes.err error_codes.h error_codes.cpp"
+cscript //Nologo "$(ProjectDir)..\..\third_party\run_if_newer.js" /path:"$(ProjectDir)..\db\auth" /input:"generate_action_types.py,action_types.txt" /output:"action_type.h,action_type.cpp" /command:"python generate_action_types.py action_types.txt action_type.h action_type.cpp"
+cscript //Nologo "$(ProjectDir)..\..\third_party\run_if_newer.js" /path:"$(ProjectDir)..\db\fts" /input:"generate_stop_words.py,stop_words_danish.txt,stop_words_dutch.txt,stop_words_english.txt,stop_words_finnish.txt,stop_words_french.txt,stop_words_german.txt,stop_words_hungarian.txt,stop_words_italian.txt,stop_words_norwegian.txt,stop_words_portuguese.txt,stop_words_romanian.txt,stop_words_russian.txt,stop_words_spanish.txt,stop_words_swedish.txt,stop_words_turkish.txt" /output:"stop_words_list.h,stop_words_list.cpp" /command:"python generate_stop_words.py stop_words_danish.txt stop_words_dutch.txt stop_words_english.txt stop_words_finnish.txt stop_words_french.txt stop_words_german.txt stop_words_hungarian.txt stop_words_italian.txt stop_words_norwegian.txt stop_words_portuguese.txt stop_words_romanian.txt stop_words_russian.txt stop_words_spanish.txt stop_words_swedish.txt stop_words_turkish.txt stop_words_list.h stop_words_list.cpp"
+cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(ProjectDir).."
 </Command>
-      <Message>Build jsautokw.h for SpiderMonkey, create mongo.cpp and mongo-server.cpp from JavaScript source files</Message>
+      <Message>Run pre-build commands</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
       <Optimization>Disabled</Optimization>
       <AdditionalIncludeDirectories>..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>MONGOD_CONCURRENCY_LEVEL=1;BOOST_ALL_NO_LIB;MONGO_EXPOSE_MACROS;OLDJS;STATIC_JS_API;XP_WIN;_DEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;HAVE_CONFIG_H;;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>MONGOD_CONCURRENCY_LEVEL=1;BOOST_ALL_NO_LIB;MONGO_EXPOSE_MACROS;OLDJS;STATIC_JS_API;XP_WIN;_DEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;_SCL_SECURE_NO_WARNINGS;HAVE_CONFIG_H;;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
@@ -264,17 +270,20 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
       <SubSystem>Console</SubSystem>
     </Link>
     <PreBuildEvent>
-      <Command>"$(ProjectDir)..\..\third_party\js-1.7\jskwgen.exe" "$(ProjectDir)..\..\third_party\js-1.7\jsautokw.h"
-cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
+      <Command>cscript //Nologo "$(ProjectDir)..\..\third_party\run_if_newer.js" /path:"$(ProjectDir)..\..\third_party\js-1.7" /input:"jskwgen.exe" /output:"jsautokw.h" /command:"jskwgen jsautokw.h"
+cscript //Nologo "$(ProjectDir)..\..\third_party\run_if_newer.js" /path:"$(ProjectDir)..\base" /input:"generate_error_codes.py,error_codes.err" /output:"error_codes.h,error_codes.cpp" /command:"python generate_error_codes.py error_codes.err error_codes.h error_codes.cpp"
+cscript //Nologo "$(ProjectDir)..\..\third_party\run_if_newer.js" /path:"$(ProjectDir)..\db\auth" /input:"generate_action_types.py,action_types.txt" /output:"action_type.h,action_type.cpp" /command:"python generate_action_types.py action_types.txt action_type.h action_type.cpp"
+cscript //Nologo "$(ProjectDir)..\..\third_party\run_if_newer.js" /path:"$(ProjectDir)..\db\fts" /input:"generate_stop_words.py,stop_words_danish.txt,stop_words_dutch.txt,stop_words_english.txt,stop_words_finnish.txt,stop_words_french.txt,stop_words_german.txt,stop_words_hungarian.txt,stop_words_italian.txt,stop_words_norwegian.txt,stop_words_portuguese.txt,stop_words_romanian.txt,stop_words_russian.txt,stop_words_spanish.txt,stop_words_swedish.txt,stop_words_turkish.txt" /output:"stop_words_list.h,stop_words_list.cpp" /command:"python generate_stop_words.py stop_words_danish.txt stop_words_dutch.txt stop_words_english.txt stop_words_finnish.txt stop_words_french.txt stop_words_german.txt stop_words_hungarian.txt stop_words_italian.txt stop_words_norwegian.txt stop_words_portuguese.txt stop_words_romanian.txt stop_words_russian.txt stop_words_spanish.txt stop_words_swedish.txt stop_words_turkish.txt stop_words_list.h stop_words_list.cpp"
+cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(ProjectDir).."
 </Command>
-      <Message>Build jsautokw.h for SpiderMonkey, create mongo.cpp and mongo-server.cpp from JavaScript source files</Message>
+      <Message>Run pre-build commands</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">
     <ClCompile>
       <Optimization>Disabled</Optimization>
       <AdditionalIncludeDirectories>..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>BOOST_ALL_NO_LIB;MONGO_EXPOSE_MACROS;OLDJS;STATIC_JS_API;XP_WIN;_DEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;HAVE_CONFIG_H;;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>BOOST_ALL_NO_LIB;MONGO_EXPOSE_MACROS;OLDJS;STATIC_JS_API;XP_WIN;_DEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;_SCL_SECURE_NO_WARNINGS;HAVE_CONFIG_H;;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
@@ -294,10 +303,13 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
       <SubSystem>Console</SubSystem>
     </Link>
     <PreBuildEvent>
-      <Command>"$(ProjectDir)..\..\third_party\js-1.7\jskwgen.exe" "$(ProjectDir)..\..\third_party\js-1.7\jsautokw.h"
-cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
+      <Command>cscript //Nologo "$(ProjectDir)..\..\third_party\run_if_newer.js" /path:"$(ProjectDir)..\..\third_party\js-1.7" /input:"jskwgen.exe" /output:"jsautokw.h" /command:"jskwgen jsautokw.h"
+cscript //Nologo "$(ProjectDir)..\..\third_party\run_if_newer.js" /path:"$(ProjectDir)..\base" /input:"generate_error_codes.py,error_codes.err" /output:"error_codes.h,error_codes.cpp" /command:"python generate_error_codes.py error_codes.err error_codes.h error_codes.cpp"
+cscript //Nologo "$(ProjectDir)..\..\third_party\run_if_newer.js" /path:"$(ProjectDir)..\db\auth" /input:"generate_action_types.py,action_types.txt" /output:"action_type.h,action_type.cpp" /command:"python generate_action_types.py action_types.txt action_type.h action_type.cpp"
+cscript //Nologo "$(ProjectDir)..\..\third_party\run_if_newer.js" /path:"$(ProjectDir)..\db\fts" /input:"generate_stop_words.py,stop_words_danish.txt,stop_words_dutch.txt,stop_words_english.txt,stop_words_finnish.txt,stop_words_french.txt,stop_words_german.txt,stop_words_hungarian.txt,stop_words_italian.txt,stop_words_norwegian.txt,stop_words_portuguese.txt,stop_words_romanian.txt,stop_words_russian.txt,stop_words_spanish.txt,stop_words_swedish.txt,stop_words_turkish.txt" /output:"stop_words_list.h,stop_words_list.cpp" /command:"python generate_stop_words.py stop_words_danish.txt stop_words_dutch.txt stop_words_english.txt stop_words_finnish.txt stop_words_french.txt stop_words_german.txt stop_words_hungarian.txt stop_words_italian.txt stop_words_norwegian.txt stop_words_portuguese.txt stop_words_romanian.txt stop_words_russian.txt stop_words_spanish.txt stop_words_swedish.txt stop_words_turkish.txt stop_words_list.h stop_words_list.cpp"
+cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(ProjectDir).."
 </Command>
-      <Message>Build jsautokw.h for SpiderMonkey, create mongo.cpp and mongo-server.cpp from JavaScript source files</Message>
+      <Message>Run pre-build commands</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -305,7 +317,7 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
       <Optimization>MaxSpeed</Optimization>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <AdditionalIncludeDirectories>..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>BOOST_ALL_NO_LIB;MONGO_EXPOSE_MACROS;OLDJS;STATIC_JS_API;XP_WIN;NDEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;HAVE_CONFIG_H;;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>BOOST_ALL_NO_LIB;MONGO_EXPOSE_MACROS;OLDJS;STATIC_JS_API;XP_WIN;NDEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;_SCL_SECURE_NO_WARNINGS;HAVE_CONFIG_H;;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
@@ -328,10 +340,13 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
       <LargeAddressAware>true</LargeAddressAware>
     </Link>
     <PreBuildEvent>
-      <Command>"$(ProjectDir)..\..\third_party\js-1.7\jskwgen.exe" "$(ProjectDir)..\..\third_party\js-1.7\jsautokw.h"
-cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
+      <Command>cscript //Nologo "$(ProjectDir)..\..\third_party\run_if_newer.js" /path:"$(ProjectDir)..\..\third_party\js-1.7" /input:"jskwgen.exe" /output:"jsautokw.h" /command:"jskwgen jsautokw.h"
+cscript //Nologo "$(ProjectDir)..\..\third_party\run_if_newer.js" /path:"$(ProjectDir)..\base" /input:"generate_error_codes.py,error_codes.err" /output:"error_codes.h,error_codes.cpp" /command:"python generate_error_codes.py error_codes.err error_codes.h error_codes.cpp"
+cscript //Nologo "$(ProjectDir)..\..\third_party\run_if_newer.js" /path:"$(ProjectDir)..\db\auth" /input:"generate_action_types.py,action_types.txt" /output:"action_type.h,action_type.cpp" /command:"python generate_action_types.py action_types.txt action_type.h action_type.cpp"
+cscript //Nologo "$(ProjectDir)..\..\third_party\run_if_newer.js" /path:"$(ProjectDir)..\db\fts" /input:"generate_stop_words.py,stop_words_danish.txt,stop_words_dutch.txt,stop_words_english.txt,stop_words_finnish.txt,stop_words_french.txt,stop_words_german.txt,stop_words_hungarian.txt,stop_words_italian.txt,stop_words_norwegian.txt,stop_words_portuguese.txt,stop_words_romanian.txt,stop_words_russian.txt,stop_words_spanish.txt,stop_words_swedish.txt,stop_words_turkish.txt" /output:"stop_words_list.h,stop_words_list.cpp" /command:"python generate_stop_words.py stop_words_danish.txt stop_words_dutch.txt stop_words_english.txt stop_words_finnish.txt stop_words_french.txt stop_words_german.txt stop_words_hungarian.txt stop_words_italian.txt stop_words_norwegian.txt stop_words_portuguese.txt stop_words_romanian.txt stop_words_russian.txt stop_words_spanish.txt stop_words_swedish.txt stop_words_turkish.txt stop_words_list.h stop_words_list.cpp"
+cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(ProjectDir).."
 </Command>
-      <Message>Build jsautokw.h for SpiderMonkey, create mongo.cpp and mongo-server.cpp from JavaScript source files</Message>
+      <Message>Run pre-build commands</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">
@@ -339,7 +354,7 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
       <Optimization>MaxSpeed</Optimization>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <AdditionalIncludeDirectories>..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>BOOST_ALL_NO_LIB;MONGO_EXPOSE_MACROS;OLDJS;STATIC_JS_API;XP_WIN;NDEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;HAVE_CONFIG_H;;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>BOOST_ALL_NO_LIB;MONGO_EXPOSE_MACROS;OLDJS;STATIC_JS_API;XP_WIN;NDEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;_SCL_SECURE_NO_WARNINGS;HAVE_CONFIG_H;;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
@@ -362,10 +377,13 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
       <LargeAddressAware>true</LargeAddressAware>
     </Link>
     <PreBuildEvent>
-      <Command>"$(ProjectDir)..\..\third_party\js-1.7\jskwgen.exe" "$(ProjectDir)..\..\third_party\js-1.7\jsautokw.h"
-cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
+      <Command>cscript //Nologo "$(ProjectDir)..\..\third_party\run_if_newer.js" /path:"$(ProjectDir)..\..\third_party\js-1.7" /input:"jskwgen.exe" /output:"jsautokw.h" /command:"jskwgen jsautokw.h"
+cscript //Nologo "$(ProjectDir)..\..\third_party\run_if_newer.js" /path:"$(ProjectDir)..\base" /input:"generate_error_codes.py,error_codes.err" /output:"error_codes.h,error_codes.cpp" /command:"python generate_error_codes.py error_codes.err error_codes.h error_codes.cpp"
+cscript //Nologo "$(ProjectDir)..\..\third_party\run_if_newer.js" /path:"$(ProjectDir)..\db\auth" /input:"generate_action_types.py,action_types.txt" /output:"action_type.h,action_type.cpp" /command:"python generate_action_types.py action_types.txt action_type.h action_type.cpp"
+cscript //Nologo "$(ProjectDir)..\..\third_party\run_if_newer.js" /path:"$(ProjectDir)..\db\fts" /input:"generate_stop_words.py,stop_words_danish.txt,stop_words_dutch.txt,stop_words_english.txt,stop_words_finnish.txt,stop_words_french.txt,stop_words_german.txt,stop_words_hungarian.txt,stop_words_italian.txt,stop_words_norwegian.txt,stop_words_portuguese.txt,stop_words_romanian.txt,stop_words_russian.txt,stop_words_spanish.txt,stop_words_swedish.txt,stop_words_turkish.txt" /output:"stop_words_list.h,stop_words_list.cpp" /command:"python generate_stop_words.py stop_words_danish.txt stop_words_dutch.txt stop_words_english.txt stop_words_finnish.txt stop_words_french.txt stop_words_german.txt stop_words_hungarian.txt stop_words_italian.txt stop_words_norwegian.txt stop_words_portuguese.txt stop_words_romanian.txt stop_words_russian.txt stop_words_spanish.txt stop_words_swedish.txt stop_words_turkish.txt stop_words_list.h stop_words_list.cpp"
+cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(ProjectDir).."
 </Command>
-      <Message>Build jsautokw.h for SpiderMonkey, create mongo.cpp and mongo-server.cpp from JavaScript source files</Message>
+      <Message>Run pre-build commands</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -373,7 +391,7 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
       <Optimization>MaxSpeed</Optimization>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <AdditionalIncludeDirectories>..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>BOOST_ALL_NO_LIB;MONGO_EXPOSE_MACROS;OLDJS;STATIC_JS_API;XP_WIN;NDEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;HAVE_CONFIG_H;;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>BOOST_ALL_NO_LIB;MONGO_EXPOSE_MACROS;OLDJS;STATIC_JS_API;XP_WIN;NDEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;_SCL_SECURE_NO_WARNINGS;HAVE_CONFIG_H;;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
@@ -393,10 +411,13 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(ProjectDir)..\..\third_party\js-1.7\jskwgen.exe" "$(ProjectDir)..\..\third_party\js-1.7\jsautokw.h"
-cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
+      <Command>cscript //Nologo "$(ProjectDir)..\..\third_party\run_if_newer.js" /path:"$(ProjectDir)..\..\third_party\js-1.7" /input:"jskwgen.exe" /output:"jsautokw.h" /command:"jskwgen jsautokw.h"
+cscript //Nologo "$(ProjectDir)..\..\third_party\run_if_newer.js" /path:"$(ProjectDir)..\base" /input:"generate_error_codes.py,error_codes.err" /output:"error_codes.h,error_codes.cpp" /command:"python generate_error_codes.py error_codes.err error_codes.h error_codes.cpp"
+cscript //Nologo "$(ProjectDir)..\..\third_party\run_if_newer.js" /path:"$(ProjectDir)..\db\auth" /input:"generate_action_types.py,action_types.txt" /output:"action_type.h,action_type.cpp" /command:"python generate_action_types.py action_types.txt action_type.h action_type.cpp"
+cscript //Nologo "$(ProjectDir)..\..\third_party\run_if_newer.js" /path:"$(ProjectDir)..\db\fts" /input:"generate_stop_words.py,stop_words_danish.txt,stop_words_dutch.txt,stop_words_english.txt,stop_words_finnish.txt,stop_words_french.txt,stop_words_german.txt,stop_words_hungarian.txt,stop_words_italian.txt,stop_words_norwegian.txt,stop_words_portuguese.txt,stop_words_romanian.txt,stop_words_russian.txt,stop_words_spanish.txt,stop_words_swedish.txt,stop_words_turkish.txt" /output:"stop_words_list.h,stop_words_list.cpp" /command:"python generate_stop_words.py stop_words_danish.txt stop_words_dutch.txt stop_words_english.txt stop_words_finnish.txt stop_words_french.txt stop_words_german.txt stop_words_hungarian.txt stop_words_italian.txt stop_words_norwegian.txt stop_words_portuguese.txt stop_words_romanian.txt stop_words_russian.txt stop_words_spanish.txt stop_words_swedish.txt stop_words_turkish.txt stop_words_list.h stop_words_list.cpp"
+cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(ProjectDir).."
 </Command>
-      <Message>Build jsautokw.h for SpiderMonkey, create mongo.cpp and mongo-server.cpp from JavaScript source files</Message>
+      <Message>Run pre-build commands</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">
@@ -404,7 +425,7 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
       <Optimization>MaxSpeed</Optimization>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <AdditionalIncludeDirectories>..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>BOOST_ALL_NO_LIB;MONGO_EXPOSE_MACROS;OLDJS;STATIC_JS_API;XP_WIN;NDEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;HAVE_CONFIG_H;;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>BOOST_ALL_NO_LIB;MONGO_EXPOSE_MACROS;OLDJS;STATIC_JS_API;XP_WIN;NDEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;_SCL_SECURE_NO_WARNINGS;HAVE_CONFIG_H;;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
@@ -424,10 +445,13 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(ProjectDir)..\..\third_party\js-1.7\jskwgen.exe" "$(ProjectDir)..\..\third_party\js-1.7\jsautokw.h"
-cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
+      <Command>cscript //Nologo "$(ProjectDir)..\..\third_party\run_if_newer.js" /path:"$(ProjectDir)..\..\third_party\js-1.7" /input:"jskwgen.exe" /output:"jsautokw.h" /command:"jskwgen jsautokw.h"
+cscript //Nologo "$(ProjectDir)..\..\third_party\run_if_newer.js" /path:"$(ProjectDir)..\base" /input:"generate_error_codes.py,error_codes.err" /output:"error_codes.h,error_codes.cpp" /command:"python generate_error_codes.py error_codes.err error_codes.h error_codes.cpp"
+cscript //Nologo "$(ProjectDir)..\..\third_party\run_if_newer.js" /path:"$(ProjectDir)..\db\auth" /input:"generate_action_types.py,action_types.txt" /output:"action_type.h,action_type.cpp" /command:"python generate_action_types.py action_types.txt action_type.h action_type.cpp"
+cscript //Nologo "$(ProjectDir)..\..\third_party\run_if_newer.js" /path:"$(ProjectDir)..\db\fts" /input:"generate_stop_words.py,stop_words_danish.txt,stop_words_dutch.txt,stop_words_english.txt,stop_words_finnish.txt,stop_words_french.txt,stop_words_german.txt,stop_words_hungarian.txt,stop_words_italian.txt,stop_words_norwegian.txt,stop_words_portuguese.txt,stop_words_romanian.txt,stop_words_russian.txt,stop_words_spanish.txt,stop_words_swedish.txt,stop_words_turkish.txt" /output:"stop_words_list.h,stop_words_list.cpp" /command:"python generate_stop_words.py stop_words_danish.txt stop_words_dutch.txt stop_words_english.txt stop_words_finnish.txt stop_words_french.txt stop_words_german.txt stop_words_hungarian.txt stop_words_italian.txt stop_words_norwegian.txt stop_words_portuguese.txt stop_words_romanian.txt stop_words_russian.txt stop_words_spanish.txt stop_words_swedish.txt stop_words_turkish.txt stop_words_list.h stop_words_list.cpp"
+cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(ProjectDir).."
 </Command>
-      <Message>Build jsautokw.h for SpiderMonkey, create mongo.cpp and mongo-server.cpp from JavaScript source files</Message>
+      <Message>Run pre-build commands</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -1003,6 +1027,60 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
       <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">4355;4800;4267;4244;4334</DisableSpecificWarnings>
       <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">4355;4800;4267;4244;4334</DisableSpecificWarnings>
     </ClCompile>
+    <ClCompile Include="..\..\third_party\libstemmer_c\examples\stemwords.c">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\libstemmer_c\libstemmer\libstemmer.c">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\libstemmer_c\libstemmer\libstemmer_utf8.c" />
+    <ClCompile Include="..\..\third_party\libstemmer_c\runtime\api.c" />
+    <ClCompile Include="..\..\third_party\libstemmer_c\runtime\utilities.c" />
+    <ClCompile Include="..\..\third_party\libstemmer_c\src_c\stem_ISO_8859_1_danish.c" />
+    <ClCompile Include="..\..\third_party\libstemmer_c\src_c\stem_ISO_8859_1_dutch.c" />
+    <ClCompile Include="..\..\third_party\libstemmer_c\src_c\stem_ISO_8859_1_english.c" />
+    <ClCompile Include="..\..\third_party\libstemmer_c\src_c\stem_ISO_8859_1_finnish.c" />
+    <ClCompile Include="..\..\third_party\libstemmer_c\src_c\stem_ISO_8859_1_french.c" />
+    <ClCompile Include="..\..\third_party\libstemmer_c\src_c\stem_ISO_8859_1_german.c" />
+    <ClCompile Include="..\..\third_party\libstemmer_c\src_c\stem_ISO_8859_1_hungarian.c" />
+    <ClCompile Include="..\..\third_party\libstemmer_c\src_c\stem_ISO_8859_1_italian.c" />
+    <ClCompile Include="..\..\third_party\libstemmer_c\src_c\stem_ISO_8859_1_norwegian.c" />
+    <ClCompile Include="..\..\third_party\libstemmer_c\src_c\stem_ISO_8859_1_porter.c" />
+    <ClCompile Include="..\..\third_party\libstemmer_c\src_c\stem_ISO_8859_1_portuguese.c" />
+    <ClCompile Include="..\..\third_party\libstemmer_c\src_c\stem_ISO_8859_1_spanish.c" />
+    <ClCompile Include="..\..\third_party\libstemmer_c\src_c\stem_ISO_8859_1_swedish.c" />
+    <ClCompile Include="..\..\third_party\libstemmer_c\src_c\stem_ISO_8859_2_romanian.c" />
+    <ClCompile Include="..\..\third_party\libstemmer_c\src_c\stem_KOI8_R_russian.c" />
+    <ClCompile Include="..\..\third_party\libstemmer_c\src_c\stem_UTF_8_danish.c" />
+    <ClCompile Include="..\..\third_party\libstemmer_c\src_c\stem_UTF_8_dutch.c" />
+    <ClCompile Include="..\..\third_party\libstemmer_c\src_c\stem_UTF_8_english.c" />
+    <ClCompile Include="..\..\third_party\libstemmer_c\src_c\stem_UTF_8_finnish.c" />
+    <ClCompile Include="..\..\third_party\libstemmer_c\src_c\stem_UTF_8_french.c" />
+    <ClCompile Include="..\..\third_party\libstemmer_c\src_c\stem_UTF_8_german.c" />
+    <ClCompile Include="..\..\third_party\libstemmer_c\src_c\stem_UTF_8_hungarian.c" />
+    <ClCompile Include="..\..\third_party\libstemmer_c\src_c\stem_UTF_8_italian.c" />
+    <ClCompile Include="..\..\third_party\libstemmer_c\src_c\stem_UTF_8_norwegian.c" />
+    <ClCompile Include="..\..\third_party\libstemmer_c\src_c\stem_UTF_8_porter.c" />
+    <ClCompile Include="..\..\third_party\libstemmer_c\src_c\stem_UTF_8_portuguese.c" />
+    <ClCompile Include="..\..\third_party\libstemmer_c\src_c\stem_UTF_8_romanian.c" />
+    <ClCompile Include="..\..\third_party\libstemmer_c\src_c\stem_UTF_8_russian.c" />
+    <ClCompile Include="..\..\third_party\libstemmer_c\src_c\stem_UTF_8_spanish.c" />
+    <ClCompile Include="..\..\third_party\libstemmer_c\src_c\stem_UTF_8_swedish.c" />
+    <ClCompile Include="..\..\third_party\libstemmer_c\src_c\stem_UTF_8_turkish.c" />
     <ClCompile Include="..\..\third_party\murmurhash3\MurmurHash3.cpp">
       <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">4355;4800;4267;4244;4141</DisableSpecificWarnings>
       <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">4355;4800;4267;4244;4141</DisableSpecificWarnings>
@@ -1013,14 +1091,305 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
       <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">4355;4800;4267;4244;4141</DisableSpecificWarnings>
       <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">4355;4800;4267;4244;4141</DisableSpecificWarnings>
     </ClCompile>
-    <ClCompile Include="..\bson\oid.cpp" />
-    <ClCompile Include="..\client\authentication_table.cpp" />
-    <ClCompile Include="..\client\dbclientcursor.cpp" />
-    <ClCompile Include="..\client\dbclient_rs.cpp" />
-    <ClCompile Include="..\client\distlock.cpp" />
-    <ClCompile Include="..\client\distlock_test.cpp" />
-    <ClCompile Include="..\client\model.cpp" />
-    <ClCompile Include="..\scripting\sm_db.cpp">
+    <ClCompile Include="..\..\third_party\s2\base\int128.cc">
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">..\..;..\..\third_party\s2;..\..\third_party\boost</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">..\..;..\..\third_party\s2;..\..\third_party\boost</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">..\..;..\..\third_party\s2;..\..\third_party\boost</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">..\..;..\..\third_party\s2;..\..\third_party\boost</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">..\..;..\..\third_party\s2;..\..\third_party\boost</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|x64'">..\..;..\..\third_party\s2;..\..\third_party\boost</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">..\..;..\..\third_party\s2;..\..\third_party\boost</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">..\..;..\..\third_party\s2;..\..\third_party\boost</AdditionalIncludeDirectories>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\s2\base\logging.cc">
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">..\..;..\..\third_party\s2;..\..\third_party\boost</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">..\..;..\..\third_party\s2;..\..\third_party\boost</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">..\..;..\..\third_party\s2;..\..\third_party\boost</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">..\..;..\..\third_party\s2;..\..\third_party\boost</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">..\..;..\..\third_party\s2;..\..\third_party\boost</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|x64'">..\..;..\..\third_party\s2;..\..\third_party\boost</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">..\..;..\..\third_party\s2;..\..\third_party\boost</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">..\..;..\..\third_party\s2;..\..\third_party\boost</AdditionalIncludeDirectories>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\s2\base\stringprintf.cc">
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">..\..;..\..\third_party\s2;..\..\third_party\boost</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">..\..;..\..\third_party\s2;..\..\third_party\boost</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">..\..;..\..\third_party\s2;..\..\third_party\boost</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">..\..;..\..\third_party\s2;..\..\third_party\boost</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">..\..;..\..\third_party\s2;..\..\third_party\boost</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|x64'">..\..;..\..\third_party\s2;..\..\third_party\boost</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">..\..;..\..\third_party\s2;..\..\third_party\boost</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">..\..;..\..\third_party\s2;..\..\third_party\boost</AdditionalIncludeDirectories>
+      <ObjectFileName Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(IntDir)base_stringprintf.obj</ObjectFileName>
+      <ObjectFileName Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">$(IntDir)base_stringprintf.obj</ObjectFileName>
+      <ObjectFileName Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">$(IntDir)base_stringprintf.obj</ObjectFileName>
+      <ObjectFileName Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">$(IntDir)base_stringprintf.obj</ObjectFileName>
+      <ObjectFileName Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(IntDir)base_stringprintf.obj</ObjectFileName>
+      <ObjectFileName Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(IntDir)base_stringprintf.obj</ObjectFileName>
+      <ObjectFileName Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">$(IntDir)base_stringprintf.obj</ObjectFileName>
+      <ObjectFileName Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">$(IntDir)base_stringprintf.obj</ObjectFileName>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\s2\base\strtoint.cc">
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">..\..;..\..\third_party\s2;..\..\third_party\boost</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">..\..;..\..\third_party\s2;..\..\third_party\boost</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">..\..;..\..\third_party\s2;..\..\third_party\boost</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">..\..;..\..\third_party\s2;..\..\third_party\boost</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">..\..;..\..\third_party\s2;..\..\third_party\boost</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|x64'">..\..;..\..\third_party\s2;..\..\third_party\boost</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">..\..;..\..\third_party\s2;..\..\third_party\boost</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">..\..;..\..\third_party\s2;..\..\third_party\boost</AdditionalIncludeDirectories>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\s2\s1angle.cc">
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\s2\s1interval.cc">
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\s2\s2.cc">
+      <PreprocessorDefinitions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">DEBUG_MODE=false;MONGOD_CONCURRENCY_LEVEL=1;BOOST_ALL_NO_LIB;MONGO_EXPOSE_MACROS;OLDJS;STATIC_JS_API;XP_WIN;_DEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;_SCL_SECURE_NO_WARNINGS;HAVE_CONFIG_H;;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">DEBUG_MODE=false;BOOST_ALL_NO_LIB;MONGO_EXPOSE_MACROS;OLDJS;STATIC_JS_API;XP_WIN;NDEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;_SCL_SECURE_NO_WARNINGS;HAVE_CONFIG_H;;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">DEBUG_MODE=false;BOOST_ALL_NO_LIB;MONGO_EXPOSE_MACROS;OLDJS;STATIC_JS_API;XP_WIN;_DEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;_SCL_SECURE_NO_WARNINGS;HAVE_CONFIG_H;;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">DEBUG_MODE=false;BOOST_ALL_NO_LIB;MONGO_EXPOSE_MACROS;OLDJS;STATIC_JS_API;XP_WIN;NDEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;_SCL_SECURE_NO_WARNINGS;HAVE_CONFIG_H;;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">DEBUG_MODE=false;BOOST_ALL_NO_LIB;MONGO_EXPOSE_MACROS;OLDJS;STATIC_JS_API;XP_WIN;NDEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;_SCL_SECURE_NO_WARNINGS;HAVE_CONFIG_H;;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">DEBUG_MODE=false;BOOST_ALL_NO_LIB;MONGO_EXPOSE_MACROS;OLDJS;STATIC_JS_API;XP_WIN;_DEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;_SCL_SECURE_NO_WARNINGS;HAVE_CONFIG_H;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">DEBUG_MODE=false;BOOST_ALL_NO_LIB;MONGO_EXPOSE_MACROS;OLDJS;STATIC_JS_API;XP_WIN;NDEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;_SCL_SECURE_NO_WARNINGS;HAVE_CONFIG_H;;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">DEBUG_MODE=false;BOOST_ALL_NO_LIB;MONGO_EXPOSE_MACROS;OLDJS;STATIC_JS_API;XP_WIN;_DEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;_SCL_SECURE_NO_WARNINGS;HAVE_CONFIG_H;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\s2\s2cap.cc">
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\s2\s2cell.cc">
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\s2\s2cellid.cc">
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\s2\s2cellunion.cc">
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\s2\s2edgeindex.cc">
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\s2\s2edgeutil.cc">
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\s2\s2latlng.cc">
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\s2\s2latlngrect.cc">
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">4355;4800;4267;4244;4146;4996</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">4355;4800;4267;4244;4146;4996</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">4355;4800;4267;4244;4146;4996</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">4355;4800;4267;4244;4146;4996</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">4355;4800;4267;4244;4146;4996</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|x64'">4355;4800;4267;4244;4146;4996</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">4355;4800;4267;4244;4146;4996</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">4355;4800;4267;4244;4146;4996</DisableSpecificWarnings>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\s2\s2loop.cc">
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">4355;4800;4267;4244;4146;4996</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">4355;4800;4267;4244;4146;4996</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">4355;4800;4267;4244;4146;4996</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">4355;4800;4267;4244;4146;4996</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">4355;4800;4267;4244;4146;4996</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|x64'">4355;4800;4267;4244;4146;4996</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">4355;4800;4267;4244;4146;4996</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">4355;4800;4267;4244;4146;4996</DisableSpecificWarnings>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\s2\s2pointregion.cc">
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">4355;4800;4267;4244;4146;4996</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">4355;4800;4267;4244;4146;4996</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">4355;4800;4267;4244;4146;4996</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">4355;4800;4267;4244;4146;4996</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">4355;4800;4267;4244;4146;4996</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|x64'">4355;4800;4267;4244;4146;4996</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">4355;4800;4267;4244;4146;4996</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">4355;4800;4267;4244;4146;4996</DisableSpecificWarnings>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\s2\s2polygon.cc">
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">4355;4800;4267;4244;4146;4996</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">4355;4800;4267;4244;4146;4996</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">4355;4800;4267;4244;4146;4996</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">4355;4800;4267;4244;4146;4996</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">4355;4800;4267;4244;4146;4996</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|x64'">4355;4800;4267;4244;4146;4996</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">4355;4800;4267;4244;4146;4996</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">4355;4800;4267;4244;4146;4996</DisableSpecificWarnings>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\s2\s2polygonbuilder.cc">
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\s2\s2polyline.cc">
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">4355;4800;4267;4244;4146;4996</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">4355;4800;4267;4244;4146;4996</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">4355;4800;4267;4244;4146;4996</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">4355;4800;4267;4244;4146;4996</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">4355;4800;4267;4244;4146;4996</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|x64'">4355;4800;4267;4244;4146;4996</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">4355;4800;4267;4244;4146;4996</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">4355;4800;4267;4244;4146;4996</DisableSpecificWarnings>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\s2\s2r2rect.cc">
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\s2\s2region.cc">
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\s2\s2regioncoverer.cc">
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\s2\s2regionintersection.cc">
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\s2\s2regionunion.cc">
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\s2\strings\ascii_ctype.cc">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">true</ExcludedFromBuild>
@@ -1030,6 +1399,272 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">true</ExcludedFromBuild>
     </ClCompile>
+    <ClCompile Include="..\..\third_party\s2\strings\split.cc">
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">..\..;..\..\third_party\s2;..\..\third_party\boost</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">..\..;..\..\third_party\s2;..\..\third_party\boost</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">..\..;..\..\third_party\s2;..\..\third_party\boost</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">..\..;..\..\third_party\s2;..\..\third_party\boost</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">..\..;..\..\third_party\s2;..\..\third_party\boost</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|x64'">..\..;..\..\third_party\s2;..\..\third_party\boost</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">..\..;..\..\third_party\s2;..\..\third_party\boost</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">..\..;..\..\third_party\s2;..\..\third_party\boost</AdditionalIncludeDirectories>
+      <ObjectFileName Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(IntDir)s2_split.obj</ObjectFileName>
+      <ObjectFileName Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">$(IntDir)s2_split.obj</ObjectFileName>
+      <ObjectFileName Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">$(IntDir)s2_split.obj</ObjectFileName>
+      <ObjectFileName Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">$(IntDir)s2_split.obj</ObjectFileName>
+      <ObjectFileName Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(IntDir)s2_split.obj</ObjectFileName>
+      <ObjectFileName Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(IntDir)s2_split.obj</ObjectFileName>
+      <ObjectFileName Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">$(IntDir)s2_split.obj</ObjectFileName>
+      <ObjectFileName Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">$(IntDir)s2_split.obj</ObjectFileName>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\s2\strings\stringprintf.cc">
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">..\..;..\..\third_party\s2;..\..\third_party\boost</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">..\..;..\..\third_party\s2;..\..\third_party\boost</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">..\..;..\..\third_party\s2;..\..\third_party\boost</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">..\..;..\..\third_party\s2;..\..\third_party\boost</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">..\..;..\..\third_party\s2;..\..\third_party\boost</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|x64'">..\..;..\..\third_party\s2;..\..\third_party\boost</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">..\..;..\..\third_party\s2;..\..\third_party\boost</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">..\..;..\..\third_party\s2;..\..\third_party\boost</AdditionalIncludeDirectories>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\s2\strings\strutil.cc">
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">..\..;..\..\third_party\s2;..\..\third_party\boost</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">..\..;..\..\third_party\s2;..\..\third_party\boost</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">..\..;..\..\third_party\s2;..\..\third_party\boost</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">..\..;..\..\third_party\s2;..\..\third_party\boost</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">..\..;..\..\third_party\s2;..\..\third_party\boost</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|x64'">..\..;..\..\third_party\s2;..\..\third_party\boost</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">..\..;..\..\third_party\s2;..\..\third_party\boost</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">..\..;..\..\third_party\s2;..\..\third_party\boost</AdditionalIncludeDirectories>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\s2\util\coding\coder.cc">
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">..\..;..\..\third_party\s2;..\..\third_party\boost</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">..\..;..\..\third_party\s2;..\..\third_party\boost</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">..\..;..\..\third_party\s2;..\..\third_party\boost</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">..\..;..\..\third_party\s2;..\..\third_party\boost</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">..\..;..\..\third_party\s2;..\..\third_party\boost</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|x64'">..\..;..\..\third_party\s2;..\..\third_party\boost</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">..\..;..\..\third_party\s2;..\..\third_party\boost</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">..\..;..\..\third_party\s2;..\..\third_party\boost</AdditionalIncludeDirectories>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">4355;4800;4267;4244;4146;4996</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">4355;4800;4267;4244;4146;4996</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">4355;4800;4267;4244;4146;4996</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">4355;4800;4267;4244;4146;4996</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">4355;4800;4267;4244;4146;4996</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|x64'">4355;4800;4267;4244;4146;4996</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">4355;4800;4267;4244;4146;4996</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">4355;4800;4267;4244;4146;4996</DisableSpecificWarnings>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\s2\util\coding\varint.cc">
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">..\..;..\..\third_party\s2;..\..\third_party\boost</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">..\..;..\..\third_party\s2;..\..\third_party\boost</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">..\..;..\..\third_party\s2;..\..\third_party\boost</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">..\..;..\..\third_party\s2;..\..\third_party\boost</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">..\..;..\..\third_party\s2;..\..\third_party\boost</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|x64'">..\..;..\..\third_party\s2;..\..\third_party\boost</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">..\..;..\..\third_party\s2;..\..\third_party\boost</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">..\..;..\..\third_party\s2;..\..\third_party\boost</AdditionalIncludeDirectories>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\s2\util\math\exactfloat\exactfloat.cc">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">true</ExcludedFromBuild>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">..\..;..\..\third_party\s2;..\..\third_party\boost</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">..\..;..\..\third_party\s2;..\..\third_party\boost</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">..\..;..\..\third_party\s2;..\..\third_party\boost</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">..\..;..\..\third_party\s2;..\..\third_party\boost</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">..\..;..\..\third_party\s2;..\..\third_party\boost</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|x64'">..\..;..\..\third_party\s2;..\..\third_party\boost</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">..\..;..\..\third_party\s2;..\..\third_party\boost</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">..\..;..\..\third_party\s2;..\..\third_party\boost</AdditionalIncludeDirectories>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\s2\util\math\mathlimits.cc">
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">..\..;..\..\third_party\s2;..\..\third_party\boost</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">..\..;..\..\third_party\s2;..\..\third_party\boost</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">..\..;..\..\third_party\s2;..\..\third_party\boost</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">..\..;..\..\third_party\s2;..\..\third_party\boost</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">..\..;..\..\third_party\s2;..\..\third_party\boost</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|x64'">..\..;..\..\third_party\s2;..\..\third_party\boost</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">..\..;..\..\third_party\s2;..\..\third_party\boost</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">..\..;..\..\third_party\s2;..\..\third_party\boost</AdditionalIncludeDirectories>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">true</ExcludedFromBuild>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\s2\util\math\mathutil.cc">
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">..\..;..\..\third_party\s2;..\..\third_party\boost</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">..\..;..\..\third_party\s2;..\..\third_party\boost</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">..\..;..\..\third_party\s2;..\..\third_party\boost</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">..\..;..\..\third_party\s2;..\..\third_party\boost</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">..\..;..\..\third_party\s2;..\..\third_party\boost</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|x64'">..\..;..\..\third_party\s2;..\..\third_party\boost</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">..\..;..\..\third_party\s2;..\..\third_party\boost</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">..\..;..\..\third_party\s2;..\..\third_party\boost</AdditionalIncludeDirectories>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+    </ClCompile>
+    <ClCompile Include="..\base\configuration_variable_manager.cpp" />
+    <ClCompile Include="..\base\error_codes.cpp" />
+    <ClCompile Include="..\base\global_initializer.cpp" />
+    <ClCompile Include="..\base\global_initializer_registerer.cpp" />
+    <ClCompile Include="..\base\init.cpp" />
+    <ClCompile Include="..\base\initializer.cpp" />
+    <ClCompile Include="..\base\initializer_context.cpp" />
+    <ClCompile Include="..\base\initializer_dependency_graph.cpp" />
+    <ClCompile Include="..\base\make_string_vector.cpp" />
+    <ClCompile Include="..\base\parse_number.cpp" />
+    <ClCompile Include="..\base\status.cpp" />
+    <ClCompile Include="..\base\string_data.cpp" />
+    <ClCompile Include="..\bson\bson_validate.cpp" />
+    <ClCompile Include="..\bson\mutable\mutable_bson.cpp" />
+    <ClCompile Include="..\bson\mutable\mutable_bson_builder.cpp" />
+    <ClCompile Include="..\bson\mutable\mutable_bson_heap.cpp" />
+    <ClCompile Include="..\bson\mutable\mutable_bson_internal.cpp" />
+    <ClCompile Include="..\bson\oid.cpp" />
+    <ClCompile Include="..\bson\util\bson_extract.cpp" />
+    <ClCompile Include="..\client\dbclientcursor.cpp" />
+    <ClCompile Include="..\client\dbclient_rs.cpp" />
+    <ClCompile Include="..\client\distlock.cpp" />
+    <ClCompile Include="..\client\distlock_test.cpp" />
+    <ClCompile Include="..\client\model.cpp" />
+    <ClCompile Include="..\platform\random.cpp" />
+    <ClCompile Include="..\scripting\bson_template_evaluator.cpp" />
+    <ClCompile Include="..\scripting\bson_template_evaluator_test.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="..\scripting\engine_none.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="..\scripting\engine_v8.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="..\scripting\sm_db.cpp" />
+    <ClCompile Include="..\scripting\v8_db.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="..\scripting\v8_deadline_monitor_test.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="..\scripting\v8_profiler.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="..\scripting\v8_utils.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="..\s\collection_manager.cpp" />
     <ClCompile Include="..\s\default_version.cpp" />
     <ClCompile Include="..\..\third_party\pcre-8.30\pcrecpp.cc" />
     <ClCompile Include="..\..\third_party\pcre-8.30\pcre_chartables.c" />
@@ -1062,12 +1697,25 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClCompile Include="..\s\d_split.cpp" />
     <ClCompile Include="..\s\d_state.cpp" />
     <ClCompile Include="..\s\d_writeback.cpp" />
+    <ClCompile Include="..\s\field_parser.cpp" />
     <ClCompile Include="..\s\grid.cpp" />
+    <ClCompile Include="..\s\metadata_loader.cpp" />
     <ClCompile Include="..\s\shard.cpp" />
     <ClCompile Include="..\s\shardconnection.cpp" />
     <ClCompile Include="..\s\shardkey.cpp" />
     <ClCompile Include="..\..\third_party\snappy\snappy-sinksource.cc" />
     <ClCompile Include="..\..\third_party\snappy\snappy.cc" />
+    <ClCompile Include="..\s\type_changelog.cpp" />
+    <ClCompile Include="..\s\type_chunk.cpp" />
+    <ClCompile Include="..\s\type_collection.cpp" />
+    <ClCompile Include="..\s\type_config_version.cpp" />
+    <ClCompile Include="..\s\type_database.cpp" />
+    <ClCompile Include="..\s\type_lockpings.cpp" />
+    <ClCompile Include="..\s\type_locks.cpp" />
+    <ClCompile Include="..\s\type_mongos.cpp" />
+    <ClCompile Include="..\s\type_settings.cpp" />
+    <ClCompile Include="..\s\type_shard.cpp" />
+    <ClCompile Include="..\s\type_tags.cpp" />
     <ClCompile Include="..\util\alignedbuilder.cpp" />
     <ClCompile Include="..\util\compress.cpp" />
     <ClCompile Include="..\util\concurrency\mutexdebugger.cpp" />
@@ -1077,16 +1725,34 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClCompile Include="..\util\concurrency\task.cpp" />
     <ClCompile Include="..\util\concurrency\thread_pool.cpp" />
     <ClCompile Include="..\util\debug_util.cpp" />
+    <ClCompile Include="..\util\elapsed_tracker.cpp" />
+    <ClCompile Include="..\util\exception_filter_win32.cpp" />
+    <ClCompile Include="..\util\fail_point.cpp" />
+    <ClCompile Include="..\util\fail_point_registry.cpp" />
+    <ClCompile Include="..\util\fail_point_service.cpp" />
+    <ClCompile Include="..\util\file.cpp" />
     <ClCompile Include="..\util\file_allocator.cpp" />
     <ClCompile Include="..\util\histogram.cpp" />
-    <ClCompile Include="..\util\intrusive_counter.cpp" />
+    <ClCompile Include="..\util\intrusive_counter.cpp">
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">4355;4800;4267;4244;4291</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">4355;4800;4267;4244;4291</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">4355;4800;4267;4244;4291</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">4355;4800;4267;4244;4291</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">4355;4800;4267;4244;4291</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|x64'">4355;4800;4267;4244;4291</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">4355;4800;4267;4244;4291</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">4355;4800;4267;4244;4291</DisableSpecificWarnings>
+    </ClCompile>
     <ClCompile Include="..\util\log.cpp" />
     <ClCompile Include="..\util\logfile.cpp" />
     <ClCompile Include="..\util\net\listen.cpp" />
     <ClCompile Include="..\util\net\miniwebserver.cpp" />
+    <ClCompile Include="..\util\net\ssl_manager.cpp" />
+    <ClCompile Include="..\util\platform_init.cpp" />
     <ClCompile Include="..\util\processinfo.cpp" />
     <ClCompile Include="..\util\progress_meter.cpp" />
     <ClCompile Include="..\util\ramlog.cpp" />
+    <ClCompile Include="..\util\safe_num.cpp" />
     <ClCompile Include="..\util\signal_handlers.cpp" />
     <ClCompile Include="..\util\stacktrace.cpp" />
     <ClCompile Include="..\util\stack_introspect.cpp" />
@@ -1099,9 +1765,363 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClCompile Include="..\util\touch_pages.cpp" />
     <ClCompile Include="..\util\trace.cpp" />
     <ClCompile Include="..\util\version.cpp" />
+    <ClCompile Include="auth\action_set.cpp" />
+    <ClCompile Include="auth\action_type.cpp" />
+    <ClCompile Include="auth\authorization_manager.cpp" />
+    <ClCompile Include="auth\auth_external_state.cpp" />
+    <ClCompile Include="auth\auth_external_state_d.cpp" />
+    <ClCompile Include="auth\auth_external_state_server_common.cpp" />
+    <ClCompile Include="auth\auth_index_d.cpp" />
+    <ClCompile Include="auth\auth_server_parameters.cpp" />
+    <ClCompile Include="auth\mongo_authentication_session.cpp" />
+    <ClCompile Include="auth\principal.cpp" />
+    <ClCompile Include="auth\principal_set.cpp" />
+    <ClCompile Include="auth\privilege.cpp" />
+    <ClCompile Include="auth\privilege_set.cpp" />
+    <ClCompile Include="auth\security_key.cpp" />
     <ClCompile Include="btreebuilder.cpp" />
+    <ClCompile Include="btreeposition.cpp" />
+    <ClCompile Include="btree_stats.cpp" />
     <ClCompile Include="cap.cpp" />
+    <ClCompile Include="client_basic.cpp" />
+    <ClCompile Include="commands\authentication_commands.cpp" />
+    <ClCompile Include="commands\connection_status.cpp" />
     <ClCompile Include="commands\distinct.cpp" />
+    <ClCompile Include="commands\fail_point_cmd.cpp" />
+    <ClCompile Include="commands\find_and_modify_common.cpp" />
+    <ClCompile Include="commands\index_stats.cpp" />
+    <ClCompile Include="commands\mr_common.cpp" />
+    <ClCompile Include="commands\parameters.cpp" />
+    <ClCompile Include="commands\rename_collection_common.cpp" />
+    <ClCompile Include="commands\server_status.cpp" />
+    <ClCompile Include="commands\storage_details.cpp">
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">4355;4800;4267;4244;4351</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">4355;4800;4267;4244;4351</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">4355;4800;4267;4244;4351</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">4355;4800;4267;4244;4351</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">4355;4800;4267;4244;4351</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|x64'">4355;4800;4267;4244;4351</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">4355;4800;4267;4244;4351</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">4355;4800;4267;4244;4351</DisableSpecificWarnings>
+    </ClCompile>
+    <ClCompile Include="fts\fts_command.cpp">
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="fts\fts_command_mongod.cpp">
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="fts\fts_command_mongos.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">true</ExcludedFromBuild>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">..\..;..\..\third_party\libstemmer_c\include;..\..\third_party\boost</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">..\..;..\..\third_party\libstemmer_c\include;..\..\third_party\boost</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">..\..;..\..\third_party\libstemmer_c\include;..\..\third_party\boost</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">..\..;..\..\third_party\libstemmer_c\include;..\..\third_party\boost</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">..\..;..\..\third_party\libstemmer_c\include;..\..\third_party\boost</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|x64'">..\..;..\..\third_party\libstemmer_c\include;..\..\third_party\boost</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">..\..;..\..\third_party\libstemmer_c\include;..\..\third_party\boost</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">..\..;..\..\third_party\libstemmer_c\include;..\..\third_party\boost</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="fts\fts_enabled.cpp">
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="fts\fts_index.cpp">
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="fts\fts_index_format.cpp">
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="fts\fts_index_format_test.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="fts\fts_matcher.cpp">
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="fts\fts_matcher_test.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="fts\fts_query.cpp">
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="fts\fts_query_test.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="fts\fts_search.cpp">
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="fts\fts_spec.cpp">
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="fts\fts_spec_test.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="fts\fts_util.cpp">
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="fts\fts_util_test.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="fts\stemmer.cpp">
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="fts\stemmer_test.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="fts\stop_words.cpp">
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="fts\stop_words_list.cpp" />
+    <ClCompile Include="fts\stop_words_test.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="fts\tokenizer.cpp">
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">..\..;..\..\third_party\pcre-8.30;..\..\third_party\boost;..\..\third_party\libstemmer_c\include</AdditionalIncludeDirectories>
+    </ClCompile>
+    <ClCompile Include="fts\tokenizer_test.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="geo\geonear.cpp">
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">4355;4800;4267;4244;4146;4200</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">4355;4800;4267;4244;4146;4200</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">4355;4800;4267;4244;4146;4200</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">4355;4800;4267;4244;4146;4200</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">4355;4800;4267;4244;4146;4200</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|x64'">4355;4800;4267;4244;4146;4200</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">4355;4800;4267;4244;4146;4200</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">4355;4800;4267;4244;4146;4200</DisableSpecificWarnings>
+    </ClCompile>
+    <ClCompile Include="geo\geoparser.cpp">
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+    </ClCompile>
+    <ClCompile Include="geo\geoparser_test.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="geo\geoquery.cpp" />
+    <ClCompile Include="geo\hash.cpp" />
+    <ClCompile Include="geo\hash_test.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="geo\s2common.cpp">
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+    </ClCompile>
+    <ClCompile Include="geo\s2cursor.cpp">
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+    </ClCompile>
+    <ClCompile Include="geo\s2index.cpp">
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+    </ClCompile>
+    <ClCompile Include="geo\s2nearcursor.cpp">
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">4355;4800;4267;4244;4146</DisableSpecificWarnings>
+    </ClCompile>
+    <ClCompile Include="geo\shapes.cpp" />
+    <ClCompile Include="index_rebuilder.cpp" />
+    <ClCompile Include="initialize_server_global_state.cpp" />
+    <ClCompile Include="intervalbtreecursor.cpp" />
+    <ClCompile Include="keypattern.cpp" />
+    <ClCompile Include="kill_current_op.cpp" />
+    <ClCompile Include="ops\field_ref.cpp" />
     <ClCompile Include="pipeline\document_source_cursor.cpp" />
     <ClCompile Include="commands\find_and_modify.cpp" />
     <ClCompile Include="commands\fsync.cpp" />
@@ -1110,6 +2130,7 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClCompile Include="commands\isself.cpp" />
     <ClCompile Include="commands\mr.cpp" />
     <ClCompile Include="commands\pipeline_command.cpp" />
+    <ClCompile Include="pipeline\document_source_geo_near.cpp" />
     <ClCompile Include="pipeline\pipeline.cpp" />
     <ClCompile Include="pipeline\pipeline_d.cpp" />
     <ClCompile Include="commands\touch.cpp" />
@@ -1179,7 +2200,11 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClCompile Include="prefetch.cpp" />
     <ClCompile Include="projection.cpp" />
     <ClCompile Include="repl\bgsync.cpp" />
+    <ClCompile Include="server_extra_log_context.cpp" />
+    <ClCompile Include="server_parameters.cpp" />
+    <ClCompile Include="stats\timer_stats.cpp" />
     <ClCompile Include="ttl.cpp" />
+    <ClInclude Include="..\..\third_party\boost\boost\smart_ptr\scoped_ptr.hpp" />
     <ClInclude Include="..\..\third_party\js-1.7\jsarena.h" />
     <ClInclude Include="..\..\third_party\js-1.7\jsarray.h" />
     <ClInclude Include="..\..\third_party\js-1.7\jsatom.h" />
@@ -1227,41 +2252,308 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClInclude Include="..\..\third_party\js-1.7\jsxml.h" />
     <ClInclude Include="..\..\third_party\js-1.7\prmjtime.h" />
     <ClInclude Include="..\..\third_party\js-1.7\resource.h" />
+    <ClInclude Include="..\..\third_party\libstemmer_c\include\libstemmer.h" />
+    <ClInclude Include="..\..\third_party\libstemmer_c\libstemmer\modules.h" />
+    <ClInclude Include="..\..\third_party\libstemmer_c\libstemmer\modules_utf8.h" />
+    <ClInclude Include="..\..\third_party\libstemmer_c\runtime\api.h" />
+    <ClInclude Include="..\..\third_party\libstemmer_c\runtime\header.h" />
+    <ClInclude Include="..\..\third_party\libstemmer_c\src_c\stem_ISO_8859_1_danish.h" />
+    <ClInclude Include="..\..\third_party\libstemmer_c\src_c\stem_ISO_8859_1_dutch.h" />
+    <ClInclude Include="..\..\third_party\libstemmer_c\src_c\stem_ISO_8859_1_english.h" />
+    <ClInclude Include="..\..\third_party\libstemmer_c\src_c\stem_ISO_8859_1_finnish.h" />
+    <ClInclude Include="..\..\third_party\libstemmer_c\src_c\stem_ISO_8859_1_french.h" />
+    <ClInclude Include="..\..\third_party\libstemmer_c\src_c\stem_ISO_8859_1_german.h" />
+    <ClInclude Include="..\..\third_party\libstemmer_c\src_c\stem_ISO_8859_1_hungarian.h" />
+    <ClInclude Include="..\..\third_party\libstemmer_c\src_c\stem_ISO_8859_1_italian.h" />
+    <ClInclude Include="..\..\third_party\libstemmer_c\src_c\stem_ISO_8859_1_norwegian.h" />
+    <ClInclude Include="..\..\third_party\libstemmer_c\src_c\stem_ISO_8859_1_porter.h" />
+    <ClInclude Include="..\..\third_party\libstemmer_c\src_c\stem_ISO_8859_1_portuguese.h" />
+    <ClInclude Include="..\..\third_party\libstemmer_c\src_c\stem_ISO_8859_1_spanish.h" />
+    <ClInclude Include="..\..\third_party\libstemmer_c\src_c\stem_ISO_8859_1_swedish.h" />
+    <ClInclude Include="..\..\third_party\libstemmer_c\src_c\stem_ISO_8859_2_romanian.h" />
+    <ClInclude Include="..\..\third_party\libstemmer_c\src_c\stem_KOI8_R_russian.h" />
+    <ClInclude Include="..\..\third_party\libstemmer_c\src_c\stem_UTF_8_danish.h" />
+    <ClInclude Include="..\..\third_party\libstemmer_c\src_c\stem_UTF_8_dutch.h" />
+    <ClInclude Include="..\..\third_party\libstemmer_c\src_c\stem_UTF_8_english.h" />
+    <ClInclude Include="..\..\third_party\libstemmer_c\src_c\stem_UTF_8_finnish.h" />
+    <ClInclude Include="..\..\third_party\libstemmer_c\src_c\stem_UTF_8_french.h" />
+    <ClInclude Include="..\..\third_party\libstemmer_c\src_c\stem_UTF_8_german.h" />
+    <ClInclude Include="..\..\third_party\libstemmer_c\src_c\stem_UTF_8_hungarian.h" />
+    <ClInclude Include="..\..\third_party\libstemmer_c\src_c\stem_UTF_8_italian.h" />
+    <ClInclude Include="..\..\third_party\libstemmer_c\src_c\stem_UTF_8_norwegian.h" />
+    <ClInclude Include="..\..\third_party\libstemmer_c\src_c\stem_UTF_8_porter.h" />
+    <ClInclude Include="..\..\third_party\libstemmer_c\src_c\stem_UTF_8_portuguese.h" />
+    <ClInclude Include="..\..\third_party\libstemmer_c\src_c\stem_UTF_8_romanian.h" />
+    <ClInclude Include="..\..\third_party\libstemmer_c\src_c\stem_UTF_8_russian.h" />
+    <ClInclude Include="..\..\third_party\libstemmer_c\src_c\stem_UTF_8_spanish.h" />
+    <ClInclude Include="..\..\third_party\libstemmer_c\src_c\stem_UTF_8_swedish.h" />
+    <ClInclude Include="..\..\third_party\libstemmer_c\src_c\stem_UTF_8_turkish.h" />
     <ClInclude Include="..\..\third_party\murmurhash3\MurmurHash3.h" />
-    <ClInclude Include="..\client\authentication_table.h" />
+    <ClInclude Include="..\..\third_party\s2\base\basictypes.h" />
+    <ClInclude Include="..\..\third_party\s2\base\casts.h" />
+    <ClInclude Include="..\..\third_party\s2\base\commandlineflags.h" />
+    <ClInclude Include="..\..\third_party\s2\base\definer.h" />
+    <ClInclude Include="..\..\third_party\s2\base\docid.h" />
+    <ClInclude Include="..\..\third_party\s2\base\int128.h" />
+    <ClInclude Include="..\..\third_party\s2\base\integral_types.h" />
+    <ClInclude Include="..\..\third_party\s2\base\logging.h" />
+    <ClInclude Include="..\..\third_party\s2\base\macros.h" />
+    <ClInclude Include="..\..\third_party\s2\base\port.h" />
+    <ClInclude Include="..\..\third_party\s2\base\scoped_ptr.h" />
+    <ClInclude Include="..\..\third_party\s2\base\stl_decl.h" />
+    <ClInclude Include="..\..\third_party\s2\base\stl_decl_msvc.h" />
+    <ClInclude Include="..\..\third_party\s2\base\stl_decl_osx.h" />
+    <ClInclude Include="..\..\third_party\s2\base\stringprintf.h" />
+    <ClInclude Include="..\..\third_party\s2\base\strtoint.h" />
+    <ClInclude Include="..\..\third_party\s2\base\template_util.h" />
+    <ClInclude Include="..\..\third_party\s2\base\type_traits.h" />
+    <ClInclude Include="..\..\third_party\s2\hash.h" />
+    <ClInclude Include="..\..\third_party\s2\r1interval.h" />
+    <ClInclude Include="..\..\third_party\s2\s1angle.h" />
+    <ClInclude Include="..\..\third_party\s2\s1interval.h" />
+    <ClInclude Include="..\..\third_party\s2\s2.h" />
+    <ClInclude Include="..\..\third_party\s2\s2cap.h" />
+    <ClInclude Include="..\..\third_party\s2\s2cell.h" />
+    <ClInclude Include="..\..\third_party\s2\s2cellid.h" />
+    <ClInclude Include="..\..\third_party\s2\s2cellunion.h" />
+    <ClInclude Include="..\..\third_party\s2\s2edgeindex.h" />
+    <ClInclude Include="..\..\third_party\s2\s2edgeutil.h" />
+    <ClInclude Include="..\..\third_party\s2\s2latlng.h" />
+    <ClInclude Include="..\..\third_party\s2\s2latlngrect.h" />
+    <ClInclude Include="..\..\third_party\s2\s2loop.h" />
+    <ClInclude Include="..\..\third_party\s2\s2pointregion.h" />
+    <ClInclude Include="..\..\third_party\s2\s2polygon.h" />
+    <ClInclude Include="..\..\third_party\s2\s2polygonbuilder.h" />
+    <ClInclude Include="..\..\third_party\s2\s2polyline.h" />
+    <ClInclude Include="..\..\third_party\s2\s2r2rect.h" />
+    <ClInclude Include="..\..\third_party\s2\s2region.h" />
+    <ClInclude Include="..\..\third_party\s2\s2regioncoverer.h" />
+    <ClInclude Include="..\..\third_party\s2\s2regionintersection.h" />
+    <ClInclude Include="..\..\third_party\s2\s2regionunion.h" />
+    <ClInclude Include="..\..\third_party\s2\strings\ascii_ctype.h" />
+    <ClInclude Include="..\..\third_party\s2\strings\split.h" />
+    <ClInclude Include="..\..\third_party\s2\strings\stringprintf.h" />
+    <ClInclude Include="..\..\third_party\s2\strings\strutil.h" />
+    <ClInclude Include="..\..\third_party\s2\util\coding\coder.h" />
+    <ClInclude Include="..\..\third_party\s2\util\coding\varint.h" />
+    <ClInclude Include="..\..\third_party\s2\util\endian\endian.h" />
+    <ClInclude Include="..\..\third_party\s2\util\hash\hash_jenkins_lookup2.h" />
+    <ClInclude Include="..\..\third_party\s2\util\math\exactfloat\exactfloat.h" />
+    <ClInclude Include="..\..\third_party\s2\util\math\mathlimits.h" />
+    <ClInclude Include="..\..\third_party\s2\util\math\mathutil.h" />
+    <ClInclude Include="..\..\third_party\s2\util\math\matrix3x3-inl.h" />
+    <ClInclude Include="..\..\third_party\s2\util\math\matrix3x3.h" />
+    <ClInclude Include="..\..\third_party\s2\util\math\vector2-inl.h" />
+    <ClInclude Include="..\..\third_party\s2\util\math\vector2.h" />
+    <ClInclude Include="..\..\third_party\s2\util\math\vector3-inl.h" />
+    <ClInclude Include="..\..\third_party\s2\util\math\vector3.h" />
+    <ClInclude Include="..\..\third_party\s2\util\math\vector4-inl.h" />
+    <ClInclude Include="..\..\third_party\s2\util\math\vector4.h" />
+    <ClInclude Include="..\base\configuration_variable_manager.h" />
+    <ClInclude Include="..\base\counter.h" />
+    <ClInclude Include="..\base\disallow_copying.h" />
+    <ClInclude Include="..\base\error_codes.h" />
+    <ClInclude Include="..\base\global_initializer.h" />
+    <ClInclude Include="..\base\global_initializer_registerer.h" />
+    <ClInclude Include="..\base\init.h" />
+    <ClInclude Include="..\base\initializer.h" />
+    <ClInclude Include="..\base\initializer_context.h" />
+    <ClInclude Include="..\base\initializer_dependency_graph.h" />
+    <ClInclude Include="..\base\initializer_function.h" />
+    <ClInclude Include="..\base\make_string_vector.h" />
+    <ClInclude Include="..\base\owned_pointer_map.h" />
+    <ClInclude Include="..\base\owned_pointer_vector.h" />
+    <ClInclude Include="..\base\parse_number.h" />
+    <ClInclude Include="..\base\status.h" />
+    <ClInclude Include="..\base\string_data-inl.h" />
+    <ClInclude Include="..\bson\bson_builder_base.h" />
+    <ClInclude Include="..\bson\bson_field.h" />
+    <ClInclude Include="..\bson\bson_validate.h" />
+    <ClInclude Include="..\bson\mutable\mutable_bson.h" />
+    <ClInclude Include="..\bson\mutable\mutable_bson_builder.h" />
+    <ClInclude Include="..\bson\mutable\mutable_bson_heap.h" />
+    <ClInclude Include="..\bson\mutable\mutable_bson_internal.h" />
+    <ClInclude Include="..\bson\util\bson_extract.h" />
+    <ClInclude Include="..\client\authlevel.h" />
     <ClInclude Include="..\platform\atomic_intrinsics.h" />
     <ClInclude Include="..\platform\atomic_intrinsics_win32.h" />
     <ClInclude Include="..\platform\atomic_word.h" />
     <ClInclude Include="..\platform\basic.h" />
+    <ClInclude Include="..\platform\bits.h" />
     <ClInclude Include="..\platform\compiler.h" />
     <ClInclude Include="..\platform\compiler_msvc.h" />
+    <ClInclude Include="..\platform\cstdint.h" />
     <ClInclude Include="..\platform\float_utils.h" />
+    <ClInclude Include="..\platform\random.h" />
+    <ClInclude Include="..\platform\strtoll.h" />
+    <ClInclude Include="..\platform\unordered_map.h" />
+    <ClInclude Include="..\platform\unordered_set.h" />
     <ClInclude Include="..\platform\windows_basic.h" />
     <ClInclude Include="..\scripting\bench.h" />
+    <ClInclude Include="..\scripting\bson_template_evaluator.h" />
+    <ClInclude Include="..\scripting\engine_spidermonkey_internal.h" />
+    <ClInclude Include="..\scripting\v8_deadline_monitor.h">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">true</ExcludedFromBuild>
+    </ClInclude>
+    <ClInclude Include="..\scripting\v8_profiler.h">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">true</ExcludedFromBuild>
+    </ClInclude>
     <ClInclude Include="..\s\chunk.h" />
+    <ClInclude Include="..\s\collection_manager.h" />
+    <ClInclude Include="..\s\config.h" />
+    <ClInclude Include="..\s\d_chunk_manager.h" />
     <ClInclude Include="..\s\d_writeback.h" />
+    <ClInclude Include="..\s\field_parser.h" />
+    <ClInclude Include="..\s\grid.h" />
+    <ClInclude Include="..\s\metadata_loader.h" />
+    <ClInclude Include="..\s\type_changelog.h" />
+    <ClInclude Include="..\s\type_chunk.h" />
+    <ClInclude Include="..\s\type_collection.h" />
+    <ClInclude Include="..\s\type_database.h" />
+    <ClInclude Include="..\s\type_lockpings.h" />
+    <ClInclude Include="..\s\type_locks.h" />
+    <ClInclude Include="..\s\type_settings.h" />
+    <ClInclude Include="..\s\type_shard.h" />
+    <ClInclude Include="..\util\admin_access.h" />
+    <ClInclude Include="..\util\bson_util.h" />
+    <ClInclude Include="..\util\bufreader.h" />
+    <ClInclude Include="..\util\checksum.h" />
+    <ClInclude Include="..\util\compress.h" />
     <ClInclude Include="..\util\concurrency\mutexdebugger.h" />
     <ClInclude Include="..\util\concurrency\simplerwlock.h" />
+    <ClInclude Include="..\util\descriptive_stats-inl.h" />
+    <ClInclude Include="..\util\descriptive_stats.h" />
+    <ClInclude Include="..\util\elapsed_tracker.h" />
+    <ClInclude Include="..\util\exception_filter_win32.h" />
+    <ClInclude Include="..\util\exit_code.h" />
+    <ClInclude Include="..\util\fail_point.h" />
+    <ClInclude Include="..\util\fail_point_registry.h" />
+    <ClInclude Include="..\util\fail_point_service.h" />
+    <ClInclude Include="..\util\gsasl_session.h" />
+    <ClInclude Include="..\util\heapcheck.h" />
     <ClInclude Include="..\util\histogram.h" />
+    <ClInclude Include="..\util\map_util.h" />
+    <ClInclude Include="..\util\moveablebuffer.h" />
+    <ClInclude Include="..\util\net\ssl_manager.h" />
+    <ClInclude Include="..\util\password.h" />
     <ClInclude Include="..\util\progress_meter.h" />
+    <ClInclude Include="..\util\safe_num.h" />
+    <ClInclude Include="..\util\scopeguard.h" />
     <ClInclude Include="..\util\signal_handlers.h" />
     <ClInclude Include="..\util\stacktrace.h" />
     <ClInclude Include="..\util\stack_introspect.h" />
+    <ClInclude Include="..\util\stringutils.h" />
+    <ClInclude Include="..\util\string_map.h" />
+    <ClInclude Include="..\util\string_map_internal.h" />
+    <ClInclude Include="..\util\string_writer.h" />
+    <ClInclude Include="..\util\timer-inl.h" />
     <ClInclude Include="..\util\timer-win32-inl.h" />
     <ClInclude Include="..\util\timer.h" />
     <ClInclude Include="..\util\touch_pages.h" />
+    <ClInclude Include="..\util\unordered_fast_key_table.h" />
+    <ClInclude Include="..\util\unordered_fast_key_table_internal.h" />
+    <ClInclude Include="..\util\version.h" />
+    <ClInclude Include="..\util\winutil.h" />
+    <ClInclude Include="auth\action_set.h" />
+    <ClInclude Include="auth\action_type.h" />
+    <ClInclude Include="auth\authentication_session.h" />
+    <ClInclude Include="auth\authorization_manager.h" />
+    <ClInclude Include="auth\auth_external_state.h" />
+    <ClInclude Include="auth\auth_external_state_d.h" />
+    <ClInclude Include="auth\auth_external_state_server_common.h" />
+    <ClInclude Include="auth\auth_index_d.h" />
+    <ClInclude Include="auth\mongo_authentication_session.h" />
+    <ClInclude Include="auth\principal.h" />
+    <ClInclude Include="auth\principal_name.h" />
+    <ClInclude Include="auth\principal_set.h" />
+    <ClInclude Include="auth\privilege.h" />
+    <ClInclude Include="auth\privilege_set.h" />
+    <ClInclude Include="auth\security_key.h" />
+    <ClInclude Include="btreebuilder.h" />
+    <ClInclude Include="btreecursor.h" />
+    <ClInclude Include="btreeposition.h" />
+    <ClInclude Include="btree_stats.h" />
+    <ClInclude Include="cc_by_loc.h" />
+    <ClInclude Include="client_basic.h" />
+    <ClInclude Include="cloner.h" />
+    <ClInclude Include="collection.h" />
+    <ClInclude Include="commands\authentication_commands.h" />
+    <ClInclude Include="commands\find_and_modify.h" />
+    <ClInclude Include="commands\fsync.h" />
+    <ClInclude Include="commands\mr.h" />
+    <ClInclude Include="commands\rename_collection.h" />
+    <ClInclude Include="commands\server_status.h" />
+    <ClInclude Include="curop-inl.h" />
+    <ClInclude Include="dbwebserver.h" />
+    <ClInclude Include="dur.h" />
+    <ClInclude Include="dur_recover.h" />
     <ClInclude Include="explain.h" />
+    <ClInclude Include="extsort.h" />
+    <ClInclude Include="filever.h" />
+    <ClInclude Include="fts\fts_command.h" />
+    <ClInclude Include="fts\fts_enabled.h" />
+    <ClInclude Include="fts\fts_index.h" />
+    <ClInclude Include="fts\fts_index_format.h" />
+    <ClInclude Include="fts\fts_matcher.h" />
+    <ClInclude Include="fts\fts_query.h" />
+    <ClInclude Include="fts\fts_search.h" />
+    <ClInclude Include="fts\fts_spec.h" />
+    <ClInclude Include="fts\fts_util.h" />
+    <ClInclude Include="fts\stemmer.h" />
+    <ClInclude Include="fts\stop_words.h" />
+    <ClInclude Include="fts\stop_words_list.h" />
+    <ClInclude Include="fts\tokenizer.h" />
+    <ClInclude Include="geo\2d.h" />
+    <ClInclude Include="geo\geoparser.h" />
+    <ClInclude Include="geo\geoquery.h" />
+    <ClInclude Include="geo\hash.h" />
+    <ClInclude Include="geo\s2common.h" />
+    <ClInclude Include="geo\s2cursor.h" />
+    <ClInclude Include="geo\s2index.h" />
+    <ClInclude Include="geo\s2nearcursor.h" />
+    <ClInclude Include="geo\shapes.h" />
     <ClInclude Include="hasher.h" />
     <ClInclude Include="hashindex.h" />
     <ClInclude Include="index_insertion_continuation.h" />
+    <ClInclude Include="index_rebuilder.h" />
     <ClInclude Include="index_update.h" />
+    <ClInclude Include="initialize_server_global_state.h" />
+    <ClInclude Include="intervalbtreecursor.h" />
+    <ClInclude Include="jsobjmanipulator.h" />
+    <ClInclude Include="key.h" />
+    <ClInclude Include="keypattern.h" />
+    <ClInclude Include="kill_current_op.h" />
     <ClInclude Include="lockstat.h" />
     <ClInclude Include="lockstate.h" />
+    <ClInclude Include="memconcept.h" />
+    <ClInclude Include="minilex.h" />
+    <ClInclude Include="module.h" />
     <ClInclude Include="namespace_details-inl.h" />
     <ClInclude Include="namespace_details.h" />
+    <ClInclude Include="oplog.h" />
+    <ClInclude Include="ops\field_ref.h" />
+    <ClInclude Include="ops\modifier_base.h" />
     <ClInclude Include="ops\query.h" />
     <ClInclude Include="ops\update_internal.h" />
+    <ClInclude Include="pdfile_private.h" />
+    <ClInclude Include="pipeline\document_internal.h" />
+    <ClInclude Include="pipeline\value_internal.h" />
     <ClInclude Include="prefetch.h" />
+    <ClInclude Include="queryoptimizercursor.h" />
     <ClInclude Include="queryoptimizercursorimpl.h" />
     <ClCompile Include="queryoptimizercursorimpl.cpp" />
     <ClCompile Include="querypattern.cpp" />
@@ -1305,17 +2597,12 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClCompile Include="matcher.cpp" />
     <ClCompile Include="matcher_covered.cpp" />
     <ClCompile Include="..\util\mmap_win.cpp" />
-    <ClCompile Include="modules\mms.cpp" />
     <ClCompile Include="module.cpp" />
     <ClCompile Include="namespace.cpp" />
-    <ClCompile Include="nonce.cpp" />
     <ClCompile Include="..\client\parallel.cpp" />
     <ClCompile Include="pdfile.cpp" />
     <ClCompile Include="queryoptimizer.cpp" />
     <ClCompile Include="scanandorder.cpp" />
-    <ClCompile Include="security.cpp" />
-    <ClCompile Include="security_commands.cpp" />
-    <ClCompile Include="security_common.cpp" />
     <ClCompile Include="stats\service_stats.cpp" />
     <ClCompile Include="tests.cpp" />
     <ClCompile Include="cmdline.cpp">
@@ -1356,20 +2643,64 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClCompile Include="repl\rs.cpp" />
     <ClCompile Include="repl\replset_commands.cpp" />
     <ClCompile Include="repl\rs_config.cpp" />
+    <ClInclude Include="querypattern.h" />
+    <ClInclude Include="queryutil-inl.h" />
+    <ClInclude Include="record.h" />
+    <ClInclude Include="replutil.h" />
+    <ClInclude Include="repl\bgsync.h" />
+    <ClInclude Include="repl\rs_exception.h" />
+    <ClInclude Include="repl\rs_member.h" />
+    <ClInclude Include="repl\rs_sync.h" />
+    <ClInclude Include="repl_block.h" />
+    <ClInclude Include="restapi.h" />
+    <ClInclude Include="server_parameters.h" />
+    <ClInclude Include="server_parameters_inline.h" />
+    <ClInclude Include="sort_phase_one.h" />
+    <ClInclude Include="stats\fine_clock.h" />
+    <ClInclude Include="stats\timer_stats.h" />
+    <ClInclude Include="taskqueue.h" />
     <ClInclude Include="ttl.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\third_party\js-1.7\jskeyword.tbl" />
     <None Include="..\..\third_party\js-1.7\jsopcode.tbl" />
+    <None Include="..\..\third_party\libstemmer_c\libstemmer\libstemmer_c.in" />
+    <None Include="..\..\third_party\libstemmer_c\libstemmer\modules.txt" />
+    <None Include="..\..\third_party\libstemmer_c\libstemmer\modules_utf8.txt" />
+    <None Include="..\..\third_party\libstemmer_c\SConscript" />
+    <None Include="..\..\third_party\run_if_newer.js" />
+    <None Include="..\..\third_party\s2\LICENSE-2.0.txt" />
+    <None Include="..\base\error_codes.err" />
+    <None Include="..\base\generate_error_codes.py" />
     <None Include="..\util\mongoutils\README" />
+    <None Include="auth\action_types.txt" />
+    <None Include="auth\generate_action_types.py" />
+    <None Include="fts\generate_stop_words.py" />
+    <None Include="fts\SConscript" />
+    <None Include="fts\stop_words_danish.txt" />
+    <None Include="fts\stop_words_dutch.txt" />
+    <None Include="fts\stop_words_english.txt" />
+    <None Include="fts\stop_words_finnish.txt" />
+    <None Include="fts\stop_words_french.txt" />
+    <None Include="fts\stop_words_german.txt" />
+    <None Include="fts\stop_words_hungarian.txt" />
+    <None Include="fts\stop_words_italian.txt" />
+    <None Include="fts\stop_words_norwegian.txt" />
+    <None Include="fts\stop_words_portuguese.txt" />
+    <None Include="fts\stop_words_romanian.txt" />
+    <None Include="fts\stop_words_russian.txt" />
+    <None Include="fts\stop_words_spanish.txt" />
+    <None Include="fts\stop_words_swedish.txt" />
+    <None Include="fts\stop_words_turkish.txt" />
     <None Include="mongo.ico" />
+    <None Include="ops\SConscript" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\bson\bson-inl.h" />
     <ClInclude Include="..\bson\bson.h" />
     <ClInclude Include="..\bson\bson_db.h" />
     <ClInclude Include="..\bson\inline_decls.h" />
-    <ClInclude Include="..\bson\stringdata.h" />
+    <ClInclude Include="..\base\string_data.h" />
     <ClInclude Include="..\bson\util\atomic_int.h" />
     <ClInclude Include="..\bson\util\builder.h" />
     <ClInclude Include="..\bson\util\misc.h" />
@@ -1421,13 +2752,10 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClInclude Include="d_concurrency.h" />
     <ClInclude Include="d_globals.h" />
     <ClInclude Include="geo\core.h" />
-    <ClInclude Include="globals.h" />
-    <ClInclude Include="helpers\dblogger.h" />
     <ClInclude Include="instance.h" />
     <ClInclude Include="interrupt_status.h" />
     <ClInclude Include="interrupt_status_mongod.h" />
     <ClInclude Include="mongommf.h" />
-    <ClInclude Include="mongomutex.h" />
     <ClInclude Include="namespace-inl.h" />
     <ClInclude Include="namespacestring.h" />
     <ClInclude Include="oplogreader.h" />
@@ -1449,7 +2777,6 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClInclude Include="repl.h" />
     <ClInclude Include="repl\connections.h" />
     <ClInclude Include="repl\multicmd.h" />
-    <ClInclude Include="repl\rsmember.h" />
     <ClInclude Include="repl\rs_optime.h" />
     <ClInclude Include="stats\counters.h" />
     <ClInclude Include="stats\service_stats.h" />
@@ -1484,7 +2811,6 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClInclude Include="queryoptimizer.h" />
     <ClInclude Include="resource.h" />
     <ClInclude Include="scanandorder.h" />
-    <ClInclude Include="security.h" />
     <ClInclude Include="..\util\allocator.h" />
     <ClInclude Include="..\util\array.h" />
     <ClInclude Include="..\util\assert_util.h" />
@@ -1515,10 +2841,36 @@ cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."
     <ClInclude Include="..\util\net\sock.h" />
     <ClInclude Include="..\scripting\engine.h" />
     <ClInclude Include="..\scripting\engine_spidermonkey.h" />
-    <ClInclude Include="..\scripting\engine_v8.h" />
-    <ClInclude Include="..\scripting\v8_db.h" />
-    <ClInclude Include="..\scripting\v8_utils.h" />
-    <ClInclude Include="..\scripting\v8_wrapper.h" />
+    <ClInclude Include="..\scripting\engine_v8.h">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">true</ExcludedFromBuild>
+    </ClInclude>
+    <ClInclude Include="..\scripting\v8_db.h">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">true</ExcludedFromBuild>
+    </ClInclude>
+    <ClInclude Include="..\scripting\v8_utils.h">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">true</ExcludedFromBuild>
+    </ClInclude>
     <ClInclude Include="btree.h" />
     <ClInclude Include="repl\health.h" />
     <ClInclude Include="repl\rs.h" />

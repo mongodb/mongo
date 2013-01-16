@@ -18,7 +18,6 @@
 
 #include "mongo/client/connpool.h"
 #include "mongo/db/client.h"
-#include "mongo/db/security.h"
 
 // This file contains the server-only (mongod and mongos) implementation of the factory functions
 // for getting ScopedDbConnections.  Handles setting authentication info on the underlying
@@ -27,41 +26,35 @@ namespace mongo {
 
     ScopedDbConnection* ScopedDbConnection::getScopedDbConnection() {
         ScopedDbConnection* conn = new ScopedDbConnection();
-        if ( !noauth ) {
-            conn->_conn->setAuthenticationTable(
-                    ClientBasic::getCurrent()->getAuthenticationInfo()->getAuthTable() );
-        }
         return conn;
     }
 
     ScopedDbConnection* ScopedDbConnection::getScopedDbConnection(const string& host,
                                                                   double socketTimeout) {
         ScopedDbConnection* conn = new ScopedDbConnection(host, socketTimeout);
-        if ( !noauth ) {
-            conn->_conn->setAuthenticationTable(
-                    ClientBasic::getCurrent()->getAuthenticationInfo()->getAuthTable() );
-        }
         return conn;
+    }
+
+    ScopedDbConnection* ScopedDbConnection::getScopedDbConnection(const ConnectionString& host,
+                                                                  double socketTimeout) {
+        return getScopedDbConnection(host.toString());
     }
 
 
     ScopedDbConnection* ScopedDbConnection::getInternalScopedDbConnection() {
         ScopedDbConnection* conn = new ScopedDbConnection();
-        if ( !noauth ) {
-            conn->_conn->setAuthenticationTable(
-                    AuthenticationTable::getInternalSecurityAuthenticationTable() );
-        }
         return conn;
     }
 
     ScopedDbConnection* ScopedDbConnection::getInternalScopedDbConnection(const string& host,
                                                                           double socketTimeout) {
         ScopedDbConnection* conn = new ScopedDbConnection(host, socketTimeout);
-        if ( !noauth ) {
-            conn->_conn->setAuthenticationTable(
-                    AuthenticationTable::getInternalSecurityAuthenticationTable() );
-        }
         return conn;
+    }
+
+    ScopedDbConnection* ScopedDbConnection::getInternalScopedDbConnection(const ConnectionString& host,
+                                                                          double socketTimeout) {
+        return getInternalScopedDbConnection(host.toString());
     }
 
 }

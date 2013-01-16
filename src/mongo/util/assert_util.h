@@ -21,6 +21,7 @@
 #include <typeinfo>
 #include <string>
 
+#include "mongo/base/status.h" // NOTE: This is safe as utils depend on base
 #include "mongo/bson/inline_decls.h"
 #include "mongo/platform/compiler.h"
 
@@ -95,11 +96,23 @@ namespace mongo {
 
         virtual const char* what() const throw() { return _ei.msg.c_str(); }
         virtual int getCode() const { return _ei.code; }
-
         virtual void appendPrefix( std::stringstream& ss ) const { }
         virtual void addContext( const std::string& str ) {
             _ei.msg = str + causedBy( _ei.msg );
         }
+
+        // Utilities for the migration to Status objects
+        static ErrorCodes::Error convertExceptionCode(int exCode);
+
+        Status toStatus(const std::string& context) const {
+            return Status(convertExceptionCode(getCode()), context + causedBy(*this));
+        }
+        Status toStatus() const {
+            return Status(convertExceptionCode(getCode()), this->toString());
+        }
+
+        // context when applicable. otherwise ""
+        std::string _shard;
 
         virtual std::string toString() const;
 
@@ -173,13 +186,24 @@ namespace mongo {
     inline std::string causedBy( const DBException& e ){ return causedBy( e.toString().c_str() ); }
     inline std::string causedBy( const std::exception& e ){ return causedBy( e.what() ); }
     inline std::string causedBy( const std::string& e ){ return causedBy( e.c_str() ); }
+    inline std::string causedBy( const std::string* e ){
+        return (e && *e != "") ? causedBy(*e) : "";
+    }
+    inline std::string causedBy( const Status& e ){ return causedBy( e.reason() ); }
 
-    /** abends on condition failure */
-    inline void fassert( int msgid , bool testOK ) { if ( ! testOK ) fassertFailed( msgid ); }
+    /** aborts on condition failure */
+    inline void fassert(int msgid, bool testOK) {if (MONGO_unlikely(!testOK)) fassertFailed(msgid);}
 
 
     /* "user assert".  if asserts, user did something wrong, not our code */
 #define MONGO_uassert(msgid, msg, expr) (void)( MONGO_likely(!!(expr)) || (mongo::uasserted(msgid, msg), 0) )
+
+#define MONGO_uassertStatusOK(expr) do {                                  \
+        Status status = (expr);                                         \
+        if (!status.isOK())                                             \
+            uasserted(status.location() != 0 ? status.location() : status.code(), \
+                      status.reason());                                 \
+    } while(0)
 
     /* warning only - keeps going */
 #define MONGO_wassert(_Expression) (void)( MONGO_likely(!!(_Expression)) || (mongo::wasserted(#_Expression, __FILE__, __LINE__), 0) )
@@ -202,11 +226,21 @@ namespace mongo {
 # define MONGO_dassert(x)
 #endif
 
+    /** Allows to jump code during exeuction. */
+    inline bool debugCompare(bool inDebug, bool condition) { return inDebug && condition; }
+
+#if defined(_DEBUG)
+# define MONGO_debug_and(x) debugCompare(true, (x))
+#else
+# define MONGO_debug_and(x) debugCompare(false, (x))
+#endif
 
 #ifdef MONGO_EXPOSE_MACROS
+# define dcompare MONGO_debug_and
 # define dassert MONGO_dassert
 # define verify MONGO_verify
 # define uassert MONGO_uassert
+# define uassertStatusOK MONGO_uassertStatusOK
 # define wassert MONGO_wassert
 # define massert MONGO_massert
 #endif
@@ -219,9 +253,9 @@ namespace mongo {
     enum { ASSERT_ID_DUPKEY = 11000 };
 
     /* throws a uassertion with an appropriate msg */
-    MONGO_COMPILER_NORETURN void streamNotGood( int code , std::string msg , std::ios& myios );
+    MONGO_COMPILER_NORETURN void streamNotGood( int code, const std::string& msg, std::ios& myios );
 
-    inline void assertStreamGood(unsigned msgid, std::string msg, std::ios& myios) {
+    inline void assertStreamGood(unsigned msgid, const std::string& msg, std::ios& myios) {
         if( !myios.good() ) streamNotGood(msgid, msg, myios);
     }
 

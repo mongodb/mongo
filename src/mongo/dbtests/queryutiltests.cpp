@@ -129,6 +129,29 @@ namespace QueryUtilTests {
             virtual bool mustBeExactMatchRepresentation() { return true; }
         };
 
+        class LtDate : public Base {
+        public:
+            LtDate() :
+                _o( BSON( "" << Date_t( 5000 ) ) ),
+                _o2( BSON( "" << true ) ) {
+            }
+            virtual BSONObj query() { return BSON( "a" << LT << _o.firstElement() ); }
+            virtual BSONElement lower() {
+                // $lt:date is bounded from below by 'true', the highest value of the next lowest
+                // canonical type.
+                return _o2.firstElement();
+            }
+            virtual bool lowerInclusive() {
+                // 'true' should not match $lt:date, so the bound is exclusive.
+                return false;
+            }
+            virtual BSONElement upper() { return _o.firstElement(); }
+            virtual bool upperInclusive() { return false; }
+            virtual bool mustBeExactMatchRepresentation() { return true; }
+        private:
+            BSONObj _o, _o2;
+        };
+
         class Gt : public NumericBase {
         public:
             Gt() : o_( BSON( "-" << 1 ) ) {}
@@ -143,6 +166,29 @@ namespace QueryUtilTests {
             virtual BSONObj query() { return BSON( "a" << GTE << 1 ); }
             virtual bool mustBeExactMatchRepresentation() { return true; }
             virtual bool lowerInclusive() { return true; }
+        };
+
+        class GtString : public Base {
+        public:
+            GtString() :
+                _o( BSON( "" << "abc" ) ),
+                _o2( BSON( "" << BSONObj() ) ) {
+            }
+            virtual BSONObj query() { return BSON( "a" << GT << _o.firstElement() ); }
+            virtual BSONElement lower() { return _o.firstElement(); }
+            virtual bool lowerInclusive() { return false; }
+            virtual BSONElement upper() {
+                // $gt:string is bounded from above by '{}', the lowest value of the next highest
+                // canonical type.
+                return _o2.firstElement();
+            }
+            virtual bool upperInclusive() {
+                // '{}' should not match $gt:string, so the bound is exclusive.
+                return false;
+            }
+            virtual bool mustBeExactMatchRepresentation() { return true; }
+        private:
+            BSONObj _o, _o2;
         };
 
         class TwoLt : public Lt {
@@ -359,31 +405,6 @@ namespace QueryUtilTests {
                 FieldRangeSet s6( "ns", BSON( "a" << GTE << 1 << LTE << 1 << LT << 1 ), true,
                                   true );
                 ASSERT( !s6.range( "a" ).equality() );
-            }
-        };
-
-        class SimplifiedQuery {
-        public:
-            void run() {
-                FieldRangeSet frs( "ns",
-                                  BSON( "a" << GT << 1 << GT << 5 << LT << 10 <<
-                                       "b" << 4 <<
-                                       "c" << LT << 4 << LT << 6 <<
-                                       "d" << GTE << 0 << GT << 0 <<
-                                       "e" << GTE << 0 << LTE << 10 <<
-                                       "f" << NE << 9 ),
-                                  true, true );
-                BSONObj simple = frs.simplifiedQuery();
-                ASSERT_EQUALS( fromjson( "{$gt:5,$lt:10}" ), simple.getObjectField( "a" ) );
-                ASSERT_EQUALS( 4, simple.getIntField( "b" ) );
-                ASSERT_EQUALS( BSON("$gte" << -numeric_limits<double>::max() << "$lt" << 4 ),
-                              simple.getObjectField( "c" ) );
-                ASSERT_EQUALS( BSON("$gt" << 0 << "$lte" << numeric_limits<double>::max() ),
-                              simple.getObjectField( "d" ) );
-                ASSERT_EQUALS( fromjson( "{$gte:0,$lte:10}" ),
-                              simple.getObjectField( "e" ) );
-                ASSERT_EQUALS( BSON( "$gte" << MINKEY << "$lte" << MAXKEY ),
-                              simple.getObjectField( "f" ) );
             }
         };
 
@@ -990,9 +1011,57 @@ namespace QueryUtilTests {
         class ElemMatchRegex {
         public:
             void run() {
-                FieldRangeSet frs( "", fromjson( "{a:{$elemMatch:{$regex:'^x'}}}" ), true, true );
+                FieldRangeSet frs( "", BSON( "a" << BSON( "$elemMatch" << BSON("$regex" << "^x") ) ), true, true );
                 ASSERT( !frs.range( "a" ).universal() );
                 ASSERT_EQUALS( "x", frs.range( "a" ).min().String() );
+            }
+        };
+
+        /**
+         * The elemMatchContext is preserved when two FieldRanges are intersected, singleKey ==
+         * false, and the resulting FieldRange is an unmodified copy of one of the original two
+         * FieldRanges.  For example, if FieldRange a == [[1, 10]] is intersected with FieldRange b
+         * == [[5, 5]], a will be replaced with b.  In this case, because a becomes an exact copy of
+         * b, b's elemMatchContext will be copied to a.
+         */
+        class PreserveNonUniversalElemMatchContext {
+        public:
+            void run() {
+                BSONObj query = fromjson( "{a:{$elemMatch:{b:1}},c:{$lt:5},d:1}" );
+                _expectedElemMatchContext = query.firstElement().Obj().firstElement();
+
+                // The elemMatchContext is set properly for the 'a.b' field.
+                FieldRangeSet frs( "", query, true, true );
+                assertElemMatchContext( frs.range( "a.b" ) );
+
+                // The elemMatchContext is preserved after intersecting with a superset range.
+                frs.range( "a.b" ).intersect( frs.range( "c" ), false );
+                assertElemMatchContext( frs.range( "a.b" ) );
+
+                // The elemMatchContext is forwarded after intersecting with a subset range.
+                frs.range( "c" ).intersect( frs.range( "a.b" ), false );
+                assertElemMatchContext( frs.range( "c" ) );
+
+                // The elemMatchContext is cleared after a _single key_ intersection.
+                frs.range( "a.b" ).intersect( frs.range( "d" ), true /* singleKey */ );
+                ASSERT( frs.range( "a.b" ).elemMatchContext().eoo() );
+            }
+        private:
+            void assertElemMatchContext( const FieldRange& range ) {
+                ASSERT_EQUALS( _expectedElemMatchContext.rawdata(),
+                               range.elemMatchContext().rawdata() );
+            }
+            BSONElement _expectedElemMatchContext;
+        };
+
+        /** Intersect two universal ranges, one special. */
+        class IntersectSpecial {
+        public:
+            void run() {
+                FieldRangeSet frs( "", fromjson( "{loc:{$near:[0,0],$maxDistance:5}}" ), true,
+                                   true );
+                // The intersection is special.
+                ASSERT( !frs.range( "loc" ).getSpecial().empty() );
             }
         };
         
@@ -1020,6 +1089,10 @@ namespace QueryUtilTests {
                 EqualEmptyArray() : NotExactMatchRepresentation( fromjson( "{a:[]}" ) ) {}
             };
             
+            struct EqualNull : public NotExactMatchRepresentation {
+                EqualNull() : NotExactMatchRepresentation( fromjson( "{a:null}" ) ) {}
+            };
+
             struct InArray : public NotExactMatchRepresentation {
                 InArray() : NotExactMatchRepresentation( fromjson( "{a:{$in:[[1]]}}" ) ) {}
             };
@@ -1028,12 +1101,20 @@ namespace QueryUtilTests {
                 InRegex() : NotExactMatchRepresentation( fromjson( "{a:{$in:[/^a/]}}" ) ) {}
             };
             
+            struct InNull : public NotExactMatchRepresentation {
+                InNull() : NotExactMatchRepresentation( fromjson( "{a:{$in:[null]}}" ) ) {}
+            };
+
             struct Exists : public NotExactMatchRepresentation {
                 Exists() : NotExactMatchRepresentation( fromjson( "{a:{$exists:false}}" ) ) {}
             };
 
             struct UntypedRegex : public NotExactMatchRepresentation {
-                UntypedRegex() : NotExactMatchRepresentation( fromjson( "{a:{$regex:/^a/}}" ) ) {}
+                UntypedRegex() : NotExactMatchRepresentation( BSON( "a" << BSONObjBuilder().appendRegex("$regex", "^a", "").obj() ) ) {}
+            };
+
+            struct UntypedRegexString : public NotExactMatchRepresentation {
+                UntypedRegexString() : NotExactMatchRepresentation( BSON( "a" << BSON( "$regex" << "^a" ) ) ) {}
             };
 
             struct NotIn : public NotExactMatchRepresentation {
@@ -1048,6 +1129,14 @@ namespace QueryUtilTests {
                 GtArray() : NotExactMatchRepresentation( fromjson( "{a:{$gt:[0]}}" ) ) {}
             };
             
+            struct GtNull : public NotExactMatchRepresentation {
+                GtNull() : NotExactMatchRepresentation( fromjson( "{a:{$gt:null}}" ) ) {}
+            };
+
+            struct LtObject : public NotExactMatchRepresentation {
+                LtObject() : NotExactMatchRepresentation( fromjson( "{a:{$lt:{}}}" ) ) {}
+            };
+
             /** Descriptive test - behavior could potentially be different. */
             struct NotNe : public NotExactMatchRepresentation {
                 NotNe() : NotExactMatchRepresentation( fromjson( "{a:{$not:{$ne:4}}}" ) ) {}
@@ -1146,7 +1235,9 @@ namespace QueryUtilTests {
                 FieldRangeSet frs2( "", fromjson( "{a:1,b:5,c:{$in:[7,8]},d:{$in:[8,9]},e:10}" ),
                                     true, true );
                 frs1 &= frs2;
-                ASSERT_EQUALS( fromjson( "{a:1,b:5,c:7,d:{$gte:8,$lte:9},e:10}" ), frs1.simplifiedQuery( BSONObj() ) );
+                FieldRangeSet expectedResult( "", fromjson( "{a:1,b:5,c:7,d:{$in:[8,9]},e:10}" ),
+                                              true, true );
+                ASSERT_EQUALS( frs1.toString(), expectedResult.toString() );
             }
         };
         
@@ -1158,18 +1249,15 @@ namespace QueryUtilTests {
                 FieldRangeSet frs3( "", BSON( "a" << LT << 6 ), false, true );
                 // An intersection with a universal range is allowed.
                 frs1 &= frs2;
-                ASSERT_EQUALS( frs2.simplifiedQuery( BSONObj() ),
-                              frs1.simplifiedQuery( BSONObj() ) );
+                ASSERT_EQUALS( frs2.toString(), frs1.toString() );
                 // An intersection with non universal range is not allowed, as it might prevent a
                 // valid multikey match.
                 frs1 &= frs3;
-                ASSERT_EQUALS( frs2.simplifiedQuery( BSONObj() ),
-                              frs1.simplifiedQuery( BSONObj() ) );
+                ASSERT_EQUALS( frs2.toString(), frs1.toString() );
                 // Now intersect with a fully contained range.
                 FieldRangeSet frs4( "", BSON( "a" << GT << 6 ), false, true );
                 frs1 &= frs4;
-                ASSERT_EQUALS( frs4.simplifiedQuery( BSONObj() ),
-                              frs1.simplifiedQuery( BSONObj() ) );                
+                ASSERT_EQUALS( frs4.toString(), frs1.toString() );
             }
         };
 
@@ -1192,7 +1280,8 @@ namespace QueryUtilTests {
                 FieldRangeSet frs2( "", BSON( "a" << GT << 6 ), false, true );
                 // Range subtraction is no different for multikey ranges.
                 frs1 -= frs2;
-                ASSERT_EQUALS( BSON( "a" << GT << 4 << LTE << 6 ), frs1.simplifiedQuery( BSONObj() ) );
+                FieldRangeSet expectedResult( "", BSON( "a" << GT << 4 << LTE << 6 ), true, true );
+                ASSERT_EQUALS( frs1.toString(), expectedResult.toString() );
             }
         };
         
@@ -1266,6 +1355,18 @@ namespace QueryUtilTests {
                 ASSERT( prefixed->singleKey() );
                 ASSERT( prefixed->range( "a" ).universal() );
                 ASSERT( prefixed->range( "prefix.a" ).equality() );
+            }
+        };
+
+        /** No field range is generated for an $atomic field.  SERVER-5354 */
+        class Atomic {
+        public:
+            void run() {
+                FieldRangeSet ranges( "", BSON( "a" << 1 << "$atomic" << 1 ), true, true );
+                // No range is computed for the '$atomic' field.
+                ASSERT( ranges.range( "$atomic" ).universal() );
+                // A standard equality range is computed for the 'a' field.
+                ASSERT( ranges.range( "a" ).equality() );
             }
         };
 
@@ -1436,9 +1537,13 @@ namespace QueryUtilTests {
             struct Regex : public NotExactMatchRepresentation {
                 Regex() : NotExactMatchRepresentation( fromjson( "{a:/^a/}" ) ) {}
             };
-            
+
             struct UntypedRegex : public NotExactMatchRepresentation {
-                UntypedRegex() : NotExactMatchRepresentation( fromjson( "{a:{$regex:'^a'}}" ) ) {}
+                UntypedRegex() : NotExactMatchRepresentation( BSON( "a" << BSONObjBuilder().appendRegex("$regex", "^a", "").obj() ) ) {}
+            };
+
+            struct UntypedRegexString : public NotExactMatchRepresentation {
+                UntypedRegexString() : NotExactMatchRepresentation( BSON( "a" << BSON( "$regex" << "^a" ) ) ) {}
             };
             
             struct And : public ExactMatchRepresentation {
@@ -1647,6 +1752,7 @@ namespace QueryUtilTests {
     } // namespace FieldRangeSetPairTests
     
     namespace FieldRangeVectorTests {
+
         class ToString {
         public:
             void run() {
@@ -1657,6 +1763,306 @@ namespace QueryUtilTests {
                 fieldRangeVector.toString(); // Just test that we don't crash.
             }
         };
+
+        /**
+         * Check FieldRangeVector::hasAllIndexedRanges(), indicating when all indexed field ranges
+         * in a field range set are represented in a field range vector (and none are excluded due
+         * to multikey index field name conflicts).
+         */
+        class HasAllIndexedRanges {
+        public:
+            void run() {
+                // Single key index.
+                ASSERT( rangesRepresented( BSON( "a" << 1 ), true, BSON( "a" << 1 ) ) );
+                // Multikey index, but no unrepresented ranges.
+                ASSERT( rangesRepresented( BSON( "a" << 1 ), false, BSON( "a" << 1 ) ) );
+                // Multikey index, but no unrepresented ranges in the index.
+                ASSERT( rangesRepresented( BSON( "a" << 1 ), false,
+                                           BSON( "a" << 1 << "b" << 2 ) ) );
+                // Compound multikey index with no unrepresented ranges.
+                ASSERT( rangesRepresented( BSON( "a" << 1 << "b" << 1 ), false,
+                                           BSON( "a" << 2 << "b" << 3 ) ) );
+                // Compound multikey index with range 'a.c' unrepresented because of a conflict
+                // with range 'a.b', hence 'false' expected.
+                ASSERT( !rangesRepresented( BSON( "a.b" << 1 << "a.c" << 1 ), false,
+                                            BSON( "a.b" << 2 << "a.c" << 3 ) ) );
+                // Compound multikey index without conflicts due to use of the $elemMatch operator.
+                ASSERT( rangesRepresented( BSON( "a.b" << 1 << "a.c" << 1 ), false,
+                                           BSON( "a" << BSON( "$elemMatch" <<
+                                                              BSON( "b" << 2 << "c" << 3 ) ) ) ) );
+                // Single key index.
+                ASSERT( rangesRepresented( BSON( "a.b" << 1 << "a.c" << 1 ), true,
+                                           BSON( "a.b" << 2 << "a.c" << 3 ) ) );
+            }
+        private:
+            bool rangesRepresented( const BSONObj& index, bool singleKey, const BSONObj& query ) {
+                FieldRangeSet fieldRangeSet( "", query, singleKey, true );
+                IndexSpec indexSpec( index );
+                FieldRangeVector fieldRangeVector( fieldRangeSet, indexSpec, 1 );
+                return fieldRangeVector.hasAllIndexedRanges();
+            }
+        };
+
+        /** Detecting cases where a FieldRangeVector describes a single btree interval. */
+        class SingleInterval {
+        public:
+            void run() {
+                // Equality on a single field is a single interval.
+                FieldRangeVector frv1( FieldRangeSet( "dummy", BSON( "a" << 5 ), true, true ),
+                                       IndexSpec( BSON( "a" << 1 ) ),
+                                       1 );
+                ASSERT( frv1.isSingleInterval() );
+                // Single interval on a single field is a single interval.
+                FieldRangeVector frv2( FieldRangeSet( "dummy", BSON( "a" << GT << 5 ), true, true ),
+                                       IndexSpec( BSON( "a" << 1 ) ),
+                                       1 );
+                ASSERT( frv2.isSingleInterval() );
+                // Multiple intervals on a single field is not a single interval.
+                FieldRangeVector frv3( FieldRangeSet( "dummy",
+                                                      fromjson( "{a:{$in:[4,5]}}" ),
+                                                      true,
+                                                      true ),
+                                      IndexSpec( BSON( "a" << 1 ) ),
+                                      1 );
+                ASSERT( !frv3.isSingleInterval() );
+
+                // Equality on two fields is a compound single interval.
+                FieldRangeVector frv4( FieldRangeSet( "dummy",
+                                                      BSON( "a" << 5 << "b" << 6 ),
+                                                      true,
+                                                      true ),
+                                       IndexSpec( BSON( "a" << 1 << "b" << 1 ) ),
+                                       1 );
+                ASSERT( frv4.isSingleInterval() );
+                // Equality on first field and single interval on second field is a compound
+                // single interval.
+                FieldRangeVector frv5( FieldRangeSet( "dummy",
+                                                      BSON( "a" << 5 << "b" << GT << 6 ),
+                                                      true,
+                                                      true ),
+                                       IndexSpec( BSON( "a" << 1 << "b" << 1 ) ),
+                                       1 );
+                ASSERT( frv5.isSingleInterval() );
+                // Single interval on first field and single interval on second field is not a
+                // compound single interval.
+                FieldRangeVector frv6( FieldRangeSet( "dummy",
+                                                      BSON( "a" << LT << 5 << "b" << GT << 6 ),
+                                                      true,
+                                                      true ),
+                                       IndexSpec( BSON( "a" << 1 << "b" << 1 ) ),
+                                       1 );
+                ASSERT( !frv6.isSingleInterval() );
+                // Multiple intervals on two fields is not a compound single interval.
+                FieldRangeVector frv7( FieldRangeSet( "dummy",
+                                                      fromjson( "{a:{$in:[4,5]},b:{$in:[7,8]}}" ),
+                                                      true,
+                                                      true ),
+                                       IndexSpec( BSON( "a" << 1 << "b" << 1 ) ),
+                                       1 );
+                ASSERT( !frv7.isSingleInterval() );
+
+                // With missing second field is still a single compound interval.
+                FieldRangeVector frv8( FieldRangeSet( "dummy",
+                                                      BSON( "a" << 5 ),
+                                                      true,
+                                                      true ),
+                                       IndexSpec( BSON( "a" << 1 << "b" << 1 ) ),
+                                       1 );
+                ASSERT( frv8.isSingleInterval() );
+                // With missing second field is still a single compound interval.
+                FieldRangeVector frv9( FieldRangeSet( "dummy",
+                                                      BSON( "b" << 5 ),
+                                                      true,
+                                                      true ),
+                                       IndexSpec( BSON( "a" << 1 << "b" << 1 ) ),
+                                       1 );
+                ASSERT( !frv9.isSingleInterval() );
+
+                // Equality on first two fields and single interval on third field is a compound
+                // single interval.
+                FieldRangeVector frv10( FieldRangeSet( "dummy",
+                                                       fromjson( "{a:5,b:6,c:{$gt:7}}" ),
+                                                       true,
+                                                       true ),
+                                        IndexSpec( BSON( "a" << 1 << "b" << 1 << "c" << 1 ) ),
+                                        1 );
+                ASSERT( frv10.isSingleInterval() );
+
+                // Equality, then single interval, then missing is a compound single interval.
+                FieldRangeVector frv11( FieldRangeSet( "dummy",
+                                                       fromjson( "{a:5,b:{$gt:7}}" ),
+                                                       true,
+                                                       true ),
+                                        IndexSpec( BSON( "a" << 1 << "b" << 1 << "c" << 1 ) ),
+                                        1 );
+                ASSERT( frv11.isSingleInterval() );
+                // Equality, then single interval, then missing, then missing is a compound single
+                // interval.
+                FieldRangeVector frv12( FieldRangeSet( "dummy",
+                                                       fromjson( "{a:5,b:{$gt:7}}" ),
+                                                       true,
+                                                       true ),
+                                        IndexSpec( BSON( "a" << 1 <<
+                                                         "b" << 1 <<
+                                                         "c" << 1 <<
+                                                         "d" << 1 ) ),
+                                        1 );
+                ASSERT( frv12.isSingleInterval() );
+                // Equality, then single interval, then missing, then missing, with mixed order
+                // fields is a compound single interval.
+                FieldRangeVector frv13( FieldRangeSet( "dummy",
+                                                       fromjson( "{a:5,b:{$gt:7}}" ),
+                                                       true,
+                                                       true ),
+                                        IndexSpec( BSON( "a" << 1 <<
+                                                         "b" << 1 <<
+                                                         "c" << 1 <<
+                                                         "d" << -1 ) ),
+                                        1 );
+                ASSERT( frv13.isSingleInterval() );
+                // Equality, then single interval, then missing, then single interval is not a
+                // compound single interval.
+                FieldRangeVector frv14( FieldRangeSet( "dummy",
+                                                       fromjson( "{a:5,b:{$gt:7},d:{$gt:1}}" ),
+                                                       true,
+                                                       true ),
+                                        IndexSpec( BSON( "a" << 1 <<
+                                                         "b" << 1 <<
+                                                         "c" << 1 <<
+                                                         "d" << 1 ) ),
+                                        1 );
+                ASSERT( !frv14.isSingleInterval() );
+            }
+        };
+
+        /** Check start and end key values. */
+        class StartEndKey {
+        public:
+            void run() {
+                // Equality on a single field.
+                FieldRangeVector frv1( FieldRangeSet( "dummy", BSON( "a" << 5 ), true, true ),
+                                       IndexSpec( BSON( "a" << 1 ) ),
+                                       1 );
+                ASSERT_EQUALS( BSON( "" << 5 ), frv1.startKey() );
+                ASSERT( frv1.startKeyInclusive() );
+                ASSERT_EQUALS( BSON( "" << 5 ), frv1.endKey() );
+                ASSERT( frv1.endKeyInclusive() );
+                // Single interval on a single field.
+                FieldRangeVector frv2( FieldRangeSet( "dummy", BSON( "a" << GT << 5 ), true, true ),
+                                       IndexSpec( BSON( "a" << 1 ) ),
+                                       1 );
+                ASSERT_EQUALS( BSON( "" << 5 ), frv2.startKey() );
+                ASSERT( !frv2.startKeyInclusive() );
+                ASSERT_EQUALS( BSON( "" << numeric_limits<double>::max() ), frv2.endKey() );
+                ASSERT( frv2.endKeyInclusive() );
+
+                // Equality on two fields.
+                FieldRangeVector frv3( FieldRangeSet( "dummy",
+                                                      BSON( "a" << 5 << "b" << 6 ),
+                                                      true,
+                                                      true ),
+                                       IndexSpec( BSON( "a" << 1 << "b" << 1 ) ),
+                                       1 );
+                ASSERT_EQUALS( BSON( "" << 5 << "" << 6 ), frv3.startKey() );
+                ASSERT( frv3.startKeyInclusive() );
+                ASSERT_EQUALS( BSON( "" << 5 << "" << 6 ), frv3.endKey() );
+                ASSERT( frv3.endKeyInclusive() );
+                // Equality on first field and single interval on second field.
+                FieldRangeVector frv4( FieldRangeSet( "dummy",
+                                                      BSON( "a" << 5 << "b" << LT << 6 ),
+                                                      true,
+                                                      true ),
+                                       IndexSpec( BSON( "a" << 1 << "b" << 1 ) ),
+                                       1 );
+                ASSERT_EQUALS( BSON( "" << 5 << "" << -numeric_limits<double>::max() ),
+                               frv4.startKey() );
+                ASSERT( frv4.startKeyInclusive() );
+                ASSERT_EQUALS( BSON( "" << 5 << "" << 6 ),
+                               frv4.endKey() );
+                ASSERT( !frv4.endKeyInclusive() );
+
+                // With missing second field.
+                FieldRangeVector frv5( FieldRangeSet( "dummy",
+                                                      BSON( "a" << 5 ),
+                                                      true,
+                                                      true ),
+                                       IndexSpec( BSON( "a" << 1 << "b" << 1 ) ),
+                                       1 );
+                ASSERT_EQUALS( BSON( "" << 5 << "" << MINKEY ), frv5.startKey() );
+                ASSERT( frv5.startKeyInclusive() );
+                ASSERT_EQUALS( BSON( "" << 5 << "" << MAXKEY ), frv5.endKey() );
+                ASSERT( frv5.endKeyInclusive() );
+                // Equality, then single interval, then missing.
+                FieldRangeVector frv6( FieldRangeSet( "dummy",
+                                                      fromjson( "{a:5,b:{$gt:7}}" ),
+                                                      true,
+                                                      true ),
+                                       IndexSpec( BSON( "a" << 1 << "b" << 1 << "c" << 1 ) ),
+                                       1 );
+                ASSERT_EQUALS( BSON( "" << 5 << "" << 7 << "" << MAXKEY ), frv6.startKey() );
+                ASSERT( !frv6.startKeyInclusive() );
+                ASSERT_EQUALS( BSON( "" << 5 <<
+                                     "" << numeric_limits<double>::max() <<
+                                     "" << MAXKEY ),
+                               frv6.endKey() );
+                ASSERT( frv6.endKeyInclusive() );
+                // Equality, then single interval, then missing, then missing.
+                FieldRangeVector frv7( FieldRangeSet( "dummy",
+                                                      fromjson( "{a:5,b:{$gt:7}}" ),
+                                                      true,
+                                                      true ),
+                                       IndexSpec( BSON( "a" << 1 <<
+                                                        "b" << 1 <<
+                                                        "c" << 1 <<
+                                                        "d" << 1 ) ),
+                                       1 );
+                ASSERT_EQUALS( BSON( "" << 5 << "" << 7 << "" << MAXKEY << "" << MAXKEY ),
+                               frv7.startKey() );
+                ASSERT( !frv7.startKeyInclusive() );
+                ASSERT_EQUALS( BSON( "" << 5 <<
+                                     "" << numeric_limits<double>::max() <<
+                                     "" << MAXKEY <<
+                                     "" << MAXKEY ),
+                               frv7.endKey() );
+                ASSERT( frv7.endKeyInclusive() );
+
+                // Equality, then single exclusive interval on both ends, then missing, then
+                // missing with mixed direction index ordering.
+                FieldRangeVector frv8( FieldRangeSet( "dummy",
+                                                      fromjson( "{a:5,b:{$gt:7,$lt:10}}" ),
+                                                      true,
+                                                      true ),
+                                       IndexSpec( BSON( "a" << 1 <<
+                                                        "b" << 1 <<
+                                                        "c" << 1 <<
+                                                        "d" << -1 ) ),
+                                       1 );
+                ASSERT_EQUALS( BSON( "" << 5 << "" << 7 << "" << MAXKEY << "" << MINKEY ),
+                               frv8.startKey() );
+                ASSERT( !frv8.startKeyInclusive() );
+                ASSERT_EQUALS( BSON( "" << 5 << "" << 10 << "" << MINKEY << "" << MAXKEY ),
+                               frv8.endKey() );
+                ASSERT( !frv8.endKeyInclusive() );
+                // Equality, then single exclusive interval on both ends, then missing, then
+                // missing with mixed direction index ordering and reverse direction traversal.
+                FieldRangeVector frv9( FieldRangeSet( "dummy",
+                                                      fromjson( "{a:5,b:{$gt:7,$lt:10}}" ),
+                                                      true,
+                                                      true ),
+                                       IndexSpec( BSON( "a" << 1 <<
+                                                        "b" << 1 <<
+                                                        "c" << 1 <<
+                                                        "d" << -1 ) ),
+                                       -1 );
+                ASSERT_EQUALS( BSON( "" << 5 << "" << 10 << "" << MINKEY << "" << MAXKEY ),
+                               frv9.startKey() );
+                ASSERT( !frv9.startKeyInclusive() );
+                ASSERT_EQUALS( BSON( "" << 5 << "" << 7 << "" << MAXKEY << "" << MINKEY ),
+                               frv9.endKey() );
+                ASSERT( !frv9.endKeyInclusive() );
+            }
+        };
+
     } // namespace FieldRangeVectorTests
     
     // These are currently descriptive, not normative tests.  SERVER-5450
@@ -2473,8 +2879,10 @@ namespace QueryUtilTests {
             add<FieldRangeTests::DupEq>();
             add<FieldRangeTests::Lt>();
             add<FieldRangeTests::Lte>();
+            add<FieldRangeTests::LtDate>();
             add<FieldRangeTests::Gt>();
             add<FieldRangeTests::Gte>();
+            add<FieldRangeTests::GtString>();
             add<FieldRangeTests::TwoLt>();
             add<FieldRangeTests::TwoGt>();
             add<FieldRangeTests::EqGte>();
@@ -2489,7 +2897,6 @@ namespace QueryUtilTests {
             add<FieldRangeTests::NonSingletonOr>();
             add<FieldRangeTests::Empty>();
             add<FieldRangeTests::Equality>();
-            add<FieldRangeTests::SimplifiedQuery>();
             add<FieldRangeTests::QueryPatternTest>();
             add<FieldRangeTests::QueryPatternEmpty>();
             add<FieldRangeTests::QueryPatternNeConstraint>();
@@ -2571,15 +2978,22 @@ namespace QueryUtilTests {
             add<FieldRangeTests::DiffMulti2>();
             add<FieldRangeTests::Universal>();
             add<FieldRangeTests::ElemMatchRegex>();
+            add<FieldRangeTests::PreserveNonUniversalElemMatchContext>();
+            add<FieldRangeTests::IntersectSpecial>();
             add<FieldRangeTests::ExactMatchRepresentation::EqualArray>();
             add<FieldRangeTests::ExactMatchRepresentation::EqualEmptyArray>();
+            add<FieldRangeTests::ExactMatchRepresentation::EqualNull>();
             add<FieldRangeTests::ExactMatchRepresentation::InArray>();
             add<FieldRangeTests::ExactMatchRepresentation::InRegex>();
+            add<FieldRangeTests::ExactMatchRepresentation::InNull>();
             add<FieldRangeTests::ExactMatchRepresentation::Exists>();
             add<FieldRangeTests::ExactMatchRepresentation::UntypedRegex>();
+            add<FieldRangeTests::ExactMatchRepresentation::UntypedRegexString>();
             add<FieldRangeTests::ExactMatchRepresentation::NotIn>();
             add<FieldRangeTests::ExactMatchRepresentation::NotGt>();
             add<FieldRangeTests::ExactMatchRepresentation::GtArray>();
+            add<FieldRangeTests::ExactMatchRepresentation::GtNull>();
+            add<FieldRangeTests::ExactMatchRepresentation::LtObject>();
             add<FieldRangeTests::ExactMatchRepresentation::NotNe>();
             add<FieldRangeTests::ExactMatchRepresentation::MultikeyIntersection>();
             add<FieldRangeTests::ExactMatchRepresentation::Intersection>();
@@ -2595,6 +3009,7 @@ namespace QueryUtilTests {
             add<FieldRangeSetTests::MatchPossibleForIndex>();
             add<FieldRangeSetTests::Subset>();
             add<FieldRangeSetTests::Prefixed>();
+            add<FieldRangeSetTests::Atomic>();
             add<FieldRangeSetTests::ElemMatch::Ranges>();
             add<FieldRangeSetTests::ElemMatch::TopLevelElements>();
             add<FieldRangeSetTests::ElemMatch::TopLevelNotElement>();
@@ -2609,6 +3024,7 @@ namespace QueryUtilTests {
             add<FieldRangeSetTests::ExactMatchRepresentation::Not>();
             add<FieldRangeSetTests::ExactMatchRepresentation::Regex>();
             add<FieldRangeSetTests::ExactMatchRepresentation::UntypedRegex>();
+            add<FieldRangeSetTests::ExactMatchRepresentation::UntypedRegexString>();
             add<FieldRangeSetTests::ExactMatchRepresentation::And>();
             add<FieldRangeSetTests::ExactMatchRepresentation::Or>();
             add<FieldRangeSetTests::ExactMatchRepresentation::All>();
@@ -2622,6 +3038,9 @@ namespace QueryUtilTests {
             add<FieldRangeSetPairTests::ClearIndexesForPatterns>();
             add<FieldRangeSetPairTests::BestIndexForPatterns>();
             add<FieldRangeVectorTests::ToString>();
+            add<FieldRangeVectorTests::HasAllIndexedRanges>();
+            add<FieldRangeVectorTests::SingleInterval>();
+            add<FieldRangeVectorTests::StartEndKey>();
             add<FieldRangeVectorIteratorTests::AdvanceToNextIntervalEquality>();
             add<FieldRangeVectorIteratorTests::AdvanceToNextIntervalExclusiveInequality>();
             add<FieldRangeVectorIteratorTests::AdvanceToNextIntervalEqualityReverse>();

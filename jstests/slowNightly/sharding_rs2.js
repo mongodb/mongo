@@ -125,7 +125,7 @@ s.adminCommand( { split : "test.foo" , middle : { x : 50 } } )
 db.printShardingStatus()
 
 other = s.config.shards.findOne( { _id : { $ne : serverName } } );
-s.adminCommand( { moveChunk : "test.foo" , find : { x : 10 } , to : other._id } )
+s.adminCommand( { moveChunk : "test.foo" , find : { x : 10 } , to : other._id, _waitForDelete : true } )
 assert.eq( 100 , t.count() , "C3" )
 
 assert.eq( 50 , rs.test.getMaster().getDB( "test" ).foo.count() , "C4" )

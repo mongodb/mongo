@@ -18,10 +18,10 @@
 
 #pragma once
 
-#include "../pch.h"
+#include "mongo/pch.h"
 
-#include "../db/jsobj.h"
-#include "util.h"
+#include "mongo/db/jsobj.h"
+#include "mongo/s/chunk_version.h"
 
 namespace mongo {
 
@@ -62,7 +62,7 @@ namespace mongo {
         /**
          * Same as the regular constructor but used in unittest (no access to configDB required).
          *
-         * @param collectionDoc simulates config.collection's entry for one colleciton
+         * @param collectionDoc simulates config.collection's entry for one collection
          * @param chunksDocs simulates config.chunks' entries for one collection's shard
          */
         ShardChunkManager( const BSONObj& collectionDoc , const BSONArray& chunksDoc );
@@ -77,7 +77,7 @@ namespace mongo {
          *        When cloning away the last chunk, verstion must be 0.
          * @return a new ShardChunkManager, to be owned by the caller
          */
-        ShardChunkManager* cloneMinus( const BSONObj& min , const BSONObj& max , const ShardChunkVersion& version );
+        ShardChunkManager* cloneMinus( const BSONObj& min , const BSONObj& max , const ChunkVersion& version );
 
         /**
          * Generates a new manager based on 'this's state plus a given chunk.
@@ -86,7 +86,7 @@ namespace mongo {
          * @param version that the resulting manager should be at. It can never be 0, though (see CloneMinus).
          * @return a new ShardChunkManager, to be owned by the caller
          */
-        ShardChunkManager* clonePlus( const BSONObj& min , const BSONObj& max , const ShardChunkVersion& version );
+        ShardChunkManager* clonePlus( const BSONObj& min , const BSONObj& max , const ChunkVersion& version );
 
         /**
          * Generates a new manager by splitting an existing chunk at one or more points.
@@ -97,7 +97,7 @@ namespace mongo {
          * @return a new ShardChunkManager with the chunk split, to be owned by the caller
          */
         ShardChunkManager* cloneSplit( const BSONObj& min , const BSONObj& max , const vector<BSONObj>& splitKeys ,
-                                       const ShardChunkVersion& version );
+                                       const ChunkVersion& version );
 
         /**
          * Checks whether a document belongs to this shard.
@@ -105,12 +105,13 @@ namespace mongo {
          * @param obj document containing sharding keys (and, optionally, other attributes)
          * @return true if shards hold the object
          */
-        bool belongsToMe( const BSONObj& obj ) const;
+        bool belongsToMe( const BSONObj& doc ) const;
 
         /**
-         * Checks whether a document belongs to this shard.
+         * Checks whether the document currently pointed to by this cursor belongs to this shard.
+         * This version of the function will use a covered index if there is one in the cursor.
          *
-         * @param obj document containing sharding keys (and, optionally, other attributes)
+         * @param cc cursor pointing to an object
          * @return true if shards hold the object
          */
         bool belongsToMe( ClientCursor* cc ) const;
@@ -127,8 +128,8 @@ namespace mongo {
 
         // accessors
 
-        ShardChunkVersion getVersion() const { return _version; }
-        ShardChunkVersion getCollVersion() const { return _collVersion; }
+        ChunkVersion getVersion() const { return _version; }
+        ChunkVersion getCollVersion() const { return _collVersion; }
         BSONObj getKey() const { return _key.getOwned(); }
         unsigned getNumChunks() const { return _chunksMap.size(); }
 
@@ -137,13 +138,13 @@ namespace mongo {
         void _init( const string& configServer , const string& ns , const string& shardName, ShardChunkManagerPtr oldManager = ShardChunkManagerPtr() );
 
         /**
-         * @same as belongsToMe to but key has to be the shard key
+         * @same as belongsToMe but point is the extracted shard key
          */
-        bool _belongsToMe( const BSONObj& key ) const;
+        bool _belongsToMe( const BSONObj& point ) const;
 
-        ShardChunkVersion _collVersion;
-        // highest ShardChunkVersion for which this ShardChunkManager's information is accurate
-        ShardChunkVersion _version;
+        ChunkVersion _collVersion;
+        // highest ChunkVersion for which this ShardChunkManager's information is accurate
+        ChunkVersion _version;
 
         // key pattern for chunks under this range
         BSONObj _key;

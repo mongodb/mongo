@@ -36,7 +36,7 @@ namespace mongo {
         virtual void close();
 
         /** @return true if opened ok. */
-        bool open(string fname, bool sequentialHint /*typically we open with this false*/);
+        bool open(const std::string& fname, bool sequentialHint /*typically we open with this false*/);
 
         /** @return file length */
         unsigned long long length() const { return MemoryMappedFile::length(); }
@@ -50,7 +50,7 @@ namespace mongo {
            @param sequentialHint if true will be sequentially accessed
            @return true for ok
         */
-        bool create(string fname, unsigned long long& len, bool sequentialHint);
+        bool create(const std::string& fname, unsigned long long& len, bool sequentialHint);
 
         /* Get the "standard" view (which is the private one).
            @return the private view.
@@ -101,7 +101,7 @@ namespace mongo {
         RelativePath _p;   // e.g. "somepath/dbname"
         int _fileSuffixNo;  // e.g. 3.  -1="ns"
 
-        void setPath(string pathAndFileName);
+        void setPath(const std::string& pathAndFileName);
         bool finishOpening();
     };
 

@@ -103,10 +103,10 @@ s.printChunks();
 
 
 print("---------- Verifying that both codepaths resulted in splits...");
-assert.gt( s.config.chunks.count({ "ns": "test." + col_fam }), minChunks, "findAndModify update code path didn't result in splits" );
-assert.gt( s.config.chunks.count({ "ns": "test." + col_fam_upsert }), minChunks, "findAndModify upsert code path didn't result in splits" );
-assert.gt( s.config.chunks.count({ "ns": "test." + col_update }), minChunks, "update code path didn't result in splits" );
-assert.gt( s.config.chunks.count({ "ns": "test." + col_update_upsert }), minChunks, "upsert code path didn't result in splits" );
+assert.gte( s.config.chunks.count({ "ns": "test." + col_fam }), minChunks, "findAndModify update code path didn't result in splits" );
+assert.gte( s.config.chunks.count({ "ns": "test." + col_fam_upsert }), minChunks, "findAndModify upsert code path didn't result in splits" );
+assert.gte( s.config.chunks.count({ "ns": "test." + col_update }), minChunks, "update code path didn't result in splits" );
+assert.gte( s.config.chunks.count({ "ns": "test." + col_update_upsert }), minChunks, "upsert code path didn't result in splits" );
 
 printjson( db[col_update].stats() );
 

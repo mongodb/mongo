@@ -20,6 +20,7 @@
 #define S_BALANCER_POLICY_HEADER
 
 #include "mongo/db/jsobj.h"
+#include "mongo/s/type_chunk.h"
 
 namespace mongo {
 
@@ -30,11 +31,12 @@ namespace mongo {
         
         ChunkInfo( const BSONObj& a_min, const BSONObj& a_max ) 
             : min( a_min.getOwned() ), max( a_max.getOwned() ){}
-        
-        ChunkInfo( const BSONObj& chunk ) 
-            : min( chunk["min"].Obj().getOwned() ), max( chunk["max"].Obj().getOwned() ) {
+
+        ChunkInfo( const BSONObj& chunk )
+            : min(chunk[ChunkType::min()].Obj().getOwned()),
+              max(chunk[ChunkType::max()].Obj().getOwned()) {
         }
-        
+
         string toString() const;
     };
 
@@ -63,7 +65,7 @@ namespace mongo {
         bool hasTag( const string& tag ) const;
         
         /**
-         * @return true if a shard cannot receive any new chunks bacause it reache 'shardLimits'.
+         * @return true if a shard cannot receive any new chunks because it reaches 'shardLimits'.
          * Expects the optional fields "maxSize", can in size in MB, and "usedSize", currently used size
          * in MB, on 'shardLimits'.
          */
@@ -80,6 +82,10 @@ namespace mongo {
          */
         bool hasOpsQueued() const { return _hasOpsQueued; }
         
+        long long getMaxSize() const { return _maxSize; }
+
+        long long getCurrSize() const { return _currSize; }
+
         string toString() const;
         
     private:
@@ -183,11 +189,12 @@ namespace mongo {
          * @returns NULL or MigrateInfo of the best move to make towards balacing the collection.
          *          caller owns the MigrateInfo instance
          */
-        static MigrateInfo* balance( const string& ns, 
+        static MigrateInfo* balance( const string& ns,
                                      const DistributionStatus& distribution,
                                      int balancedLastTime );
-        
 
+    private:
+        static bool _isJumbo( const BSONObj& chunk );
     };
 
 

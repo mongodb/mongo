@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/platform/atomic_word.h"
 
 namespace mongo {

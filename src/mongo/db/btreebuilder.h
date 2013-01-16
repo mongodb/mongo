@@ -1,3 +1,19 @@
+/**
+*    Copyright (C) 2012 10gen Inc.
+*
+*    This program is free software: you can redistribute it and/or  modify
+*    it under the terms of the GNU Affero General Public License, version 3,
+*    as published by the Free Software Foundation.
+*
+*    This program is distributed in the hope that it will be useful,
+*    but WITHOUT ANY WARRANTY; without even the implied warranty of
+*    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+*    GNU Affero General Public License for more details.
+*
+*    You should have received a copy of the GNU Affero General Public License
+*    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+*/
+
 #pragma once
 
 #include "btree.h"
@@ -27,12 +43,10 @@ namespace mongo {
         BtreeBucket<V> *b;
 
         void newBucket();
-        void buildNextLevel(DiskLoc);
+        void buildNextLevel(DiskLoc loc, bool mayInterrupt);
         void mayCommitProgressDurably();
 
     public:
-        ~BtreeBuilder();
-
         BtreeBuilder(bool _dupsAllowed, IndexDetails& _idx);
 
         /**
@@ -45,7 +59,7 @@ namespace mongo {
          * commit work.  if not called, destructor will clean up partially completed work
          *  (in case exception has happened).
          */
-        void commit();
+        void commit(bool mayInterrupt);
 
         unsigned long long getn() { return n; }
     };

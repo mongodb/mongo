@@ -21,36 +21,32 @@
 #include "db/pipeline/value.h"
 
 namespace mongo {
-    intrusive_ptr<const Value> AccumulatorAddToSet::evaluate(
-        const intrusive_ptr<Document> &pDocument) const {
+    Value AccumulatorAddToSet::evaluate(const Document& pDocument) const {
         verify(vpOperand.size() == 1);
-        intrusive_ptr<const Value> prhs(vpOperand[0]->evaluate(pDocument));
+        Value prhs(vpOperand[0]->evaluate(pDocument));
 
-        if (prhs->getType() == Undefined)
-            ; /* nothing to add to the array */
-        else if (!pCtx->getDoingMerge())
-            set.insert(prhs);
-        else {
+        if (!pCtx->getDoingMerge()) {
+            if (!prhs.missing()) {
+                set.insert(prhs);
+            }
+        } else {
             /*
               If we're in the router, we need to take apart the arrays we
               receive and put their elements into the array we are collecting.
               If we didn't, then we'd get an array of arrays, with one array
               from each shard that responds.
              */
-            verify(prhs->getType() == Array);
+            verify(prhs.getType() == Array);
             
-            intrusive_ptr<ValueIterator> pvi(prhs->getArray());
-            while(pvi->more()) {
-                intrusive_ptr<const Value> pElement(pvi->next());
-                set.insert(pElement);
-            }
+            const vector<Value>& array = prhs.getArray();
+            set.insert(array.begin(), array.end());
         }
 
-        return Value::getNull();
+        return Value();
     }
 
-    intrusive_ptr<const Value> AccumulatorAddToSet::getValue() const {
-        vector<intrusive_ptr<const Value> > valVec;
+    Value AccumulatorAddToSet::getValue() const {
+        vector<Value> valVec;
 
         for (itr = set.begin(); itr != set.end(); ++itr) {
             valVec.push_back(*itr);

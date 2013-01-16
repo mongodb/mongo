@@ -30,6 +30,7 @@
 #include "mongo/db/repl/bgsync.h"
 #include "mongo/db/repl/rs.h"
 #include "mongo/db/repl/rs_sync.h"
+#include "mongo/util/fail_point_service.h"
 
 namespace mongo {
 
@@ -38,8 +39,10 @@ namespace mongo {
 
 namespace replset {
 
+    MONGO_FP_DECLARE(rsSyncApplyStop);
+
     SyncTail::SyncTail(BackgroundSyncInterface *q) :
-        Sync(""), _networkQueue(q)
+        Sync(""), oplogVersion(0), _networkQueue(q)
     {}
 
     SyncTail::~SyncTail() {}
@@ -50,7 +53,7 @@ namespace replset {
     /* apply the log op that is in param o
        @return bool success (true) or failure (false)
     */
-    bool SyncTail::syncApply(const BSONObj &op) {
+    bool SyncTail::syncApply(const BSONObj &op, bool convertUpdateToUpsert) {
         const char *ns = op.getStringField("ns");
         verify(ns);
 
@@ -77,9 +80,11 @@ namespace replset {
             lk.reset(new Lock::DBWrite(ns)); 
         }
 
-        Client::Context ctx(ns, dbpath, false);
+        Client::Context ctx(ns, dbpath);
         ctx.getClient()->curop()->reset();
-        bool ok = !applyOperation_inlock(op);
+        // For non-initial-sync, we convert updates to upserts
+        // to suppress errors when replaying oplog entries.
+        bool ok = !applyOperation_inlock(op, true, convertUpdateToUpsert);
         getDur().commitIfNeeded();
 
         return ok;
@@ -107,11 +112,16 @@ namespace replset {
     // This free function is used by the writer threads to apply each op
     void multiSyncApply(const std::vector<BSONObj>& ops, SyncTail* st) {
         initializeWriterThread();
+
+        // convert update operations only for 2.2.1 or greater, because we need guaranteed
+        // idempotent operations for this to work.  See SERVER-6825
+        bool convertUpdatesToUpserts = theReplSet->oplogVersion > 1 ? true : false;
+
         for (std::vector<BSONObj>::const_iterator it = ops.begin();
              it != ops.end();
              ++it) {
             try {
-                fassert(16359, st->syncApply(*it));
+                fassert(16359, st->syncApply(*it, convertUpdatesToUpserts));
             } catch (DBException& e) {
                 error() << "writer worker caught exception: " << e.what() 
                         << " on: " << it->toString() << endl;
@@ -143,13 +153,6 @@ namespace replset {
                 }
             }
             catch (DBException& e) {
-                // Skip duplicate key exceptions.
-                // These are relatively common on initial sync: if a document is inserted
-                // early in the clone step, the insert will be replayed but the document
-                // will probably already have been cloned over.
-                if( e.getCode() == 11000 || e.getCode() == 11001 || e.getCode() == 12582) {
-                    return; // ignore
-                }
                 error() << "exception: " << e.what() << " on: " << it->toString() << endl;
                 fassertFailed(16361);
             }
@@ -164,6 +167,8 @@ namespace replset {
         const char *ns = op.getStringField("ns");
         if (ns && (ns[0] != '\0')) {
             try {
+                // one possible tweak here would be to stay in the read lock for this database 
+                // for multiple prefetches if they are for the same database.
                 Client::ReadContext ctx(ns);
                 prefetchPagesForReplicatedOp(op);
             }
@@ -245,49 +250,46 @@ namespace replset {
 
     InitialSync::~InitialSync() {}
 
-
-    /* initial oplog application, during initial sync, after cloning.
-    */
-    void InitialSync::oplogApplication(const BSONObj& applyGTEObj, const BSONObj& minValidObj) {
+    BSONObj SyncTail::oplogApplySegment(const BSONObj& applyGTEObj, const BSONObj& minValidObj,
+                                     MultiSyncApplyFunc func) {
         OpTime applyGTE = applyGTEObj["ts"]._opTime();
         OpTime minValid = minValidObj["ts"]._opTime();
 
-        if (replSetForceInitialSyncFailure > 0) {
-            log() << "replSet test code invoked, forced InitialSync failure: " << replSetForceInitialSyncFailure << rsLog;
-            replSetForceInitialSyncFailure--;
-            throw DBException("forced error",0);
-        }
+        // We have to keep track of the last op applied to the data, because there's no other easy
+        // way of getting this data synchronously.  Batches may go past minValidObj, so we need to
+        // know to bump minValid past minValidObj.
+        BSONObj lastOp = applyGTEObj;
+        OpTime ts = applyGTE;
 
-        syncApply(applyGTEObj);
-        _logOpObjRS(applyGTEObj);
-
-
-        // if there were no writes during the initial sync, there will be nothing in the queue so
-        // just go live
-        if (minValid == applyGTE) {
-            return;
-        }
-
-        OpTime ts;
         time_t start = time(0);
+        time_t now = start;
+
         unsigned long long n = 0, lastN = 0;
-        
+
         while( ts < minValid ) {
             OpQueue ops;
 
-            while (ops.getSize() < replBatchSizeBytes) {
+            while (ops.getSize() < replBatchLimitBytes) {
                 if (tryPopAndWaitForMore(&ops)) {
                     break;
                 }
-            }
 
+                // apply replication batch limits
+                now = time(0);
+                if (!ops.empty()) {
+                    if (now > replBatchLimitSeconds)
+                        break;
+                    if (ops.getDeque().size() > replBatchLimitOperations)
+                        break;
+                }
+            }
+            setOplogVersion(ops.getDeque().front());
             
-            multiApply(ops.getDeque(), multiInitialSyncApply);
+            multiApply(ops.getDeque(), func);
 
             n += ops.getDeque().size();
 
             if ( n > lastN + 1000 ) {
-                time_t now = time(0);
                 if (now - start > 10) {
                     // simple progress metering
                     log() << "replSet initialSyncOplogApplication applied " << n << " operations, synced to "
@@ -298,11 +300,46 @@ namespace replset {
             }
 
             // we want to keep a record of the last op applied, to compare with minvalid
-            const BSONObj& lastOp = ops.getDeque().back();
+            lastOp = ops.getDeque().back();
             OpTime tempTs = lastOp["ts"]._opTime();
             applyOpsToOplog(&ops.getDeque());
 
             ts = tempTs;
+        }
+
+        return lastOp;
+    }
+
+    /* initial oplog application, during initial sync, after cloning.
+    */
+    BSONObj InitialSync::oplogApplication(const BSONObj& applyGTEObj, const BSONObj& minValidObj) {
+        if (replSetForceInitialSyncFailure > 0) {
+            log() << "replSet test code invoked, forced InitialSync failure: " << replSetForceInitialSyncFailure << rsLog;
+            replSetForceInitialSyncFailure--;
+            throw DBException("forced error",0);
+        }
+
+        // create the initial oplog entry
+        syncApply(applyGTEObj);
+        _logOpObjRS(applyGTEObj);
+
+        return oplogApplySegment(applyGTEObj, minValidObj, multiInitialSyncApply);
+    }
+
+    BSONObj SyncTail::oplogApplication(const BSONObj& applyGTEObj, const BSONObj& minValidObj) {
+        return oplogApplySegment(applyGTEObj, minValidObj, multiSyncApply);
+    }
+
+    void SyncTail::setOplogVersion(const BSONObj& op) {
+        BSONElement version = op["v"];
+        // old primaries do not get the unique index ignoring feature
+        // because some of their ops are not imdepotent, see
+        // SERVER-7186
+        if (version.eoo()) {
+            theReplSet->oplogVersion = 1;
+            RARELY log() << "warning replset primary is an older version than we are; upgrade recommended" << endl;
+        } else {
+            theReplSet->oplogVersion = version.Int();
         }
     }
 
@@ -310,20 +347,31 @@ namespace replset {
     void SyncTail::oplogApplication() {
         while( 1 ) {
             OpQueue ops;
-            time_t lastTimeChecked = time(0);
 
             verify( !Lock::isLocked() );
 
+            Timer batchTimer;
+            int lastTimeChecked = 0;
+
             // always fetch a few ops first
-            
             // tryPopAndWaitForMore returns true when we need to end a batch early
             while (!tryPopAndWaitForMore(&ops) && 
-                   (ops.getSize() < replBatchSizeBytes)) {
+                   (ops.getSize() < replBatchLimitBytes)) {
 
                 if (theReplSet->isPrimary()) {
+                    massert(16620, "there are ops to sync, but I'm primary", ops.empty());
                     return;
                 }
-                time_t now = time(0);
+
+                int now = batchTimer.seconds();
+
+                // apply replication batch limits
+                if (!ops.empty()) {
+                    if (now > replBatchLimitSeconds)
+                        break;
+                    if (ops.getDeque().size() > replBatchLimitOperations)
+                        break;
+                }
                 // occasionally check some things
                 if (ops.empty() || now > lastTimeChecked) {
                     lastTimeChecked = now;
@@ -344,20 +392,40 @@ namespace replset {
                         // When would mgr be null?  During replsettest'ing.
                         if (mgr) mgr->send(boost::bind(&Manager::msgCheckNewState, theReplSet->mgr));
                         sleepsecs(1);
+                        // There should never be ops to sync in a 1-member set, anyway
                         return;
                     }
                 }
+
+                const int slaveDelaySecs = theReplSet->myConfig().slaveDelay;
+                if (!ops.empty() && slaveDelaySecs > 0) {
+                    const BSONObj& lastOp = ops.getDeque().back();
+                    const unsigned int opTimestampSecs = lastOp["ts"]._opTime().getSecs();
+
+                    // Stop the batch as the lastOp is too new to be applied. If we continue
+                    // on, we can get ops that are way ahead of the delay and this will
+                    // make this thread sleep longer when handleSlaveDelay is called
+                    // and apply ops much sooner than we like.
+                    if (opTimestampSecs > static_cast<unsigned int>(time(0) - slaveDelaySecs)) {
+                        break;
+                    }
+                }
             }
+
+            // For pausing replication in tests
+            while (MONGO_FAIL_POINT(rsSyncApplyStop)) {
+                sleepmillis(0);
+            }
+
             const BSONObj& lastOp = ops.getDeque().back();
+            setOplogVersion(lastOp);
             handleSlaveDelay(lastOp);
 
             // Set minValid to the last op to be applied in this next batch.
             // This will cause this node to go into RECOVERING state
             // if we should crash and restart before updating the oplog
-            { 
-                Client::WriteContext cx( "local" );
-                Helpers::putSingleton("local.replset.minvalid", lastOp);
-            }
+            theReplSet->setMinValid(lastOp);
+
             multiApply(ops.getDeque(), multiSyncApply);
 
             applyOpsToOplog(&ops.getDeque());
@@ -379,7 +447,7 @@ namespace replset {
         if (!peek_success) {
             // if we don't have anything in the queue, wait a bit for something to appear
             if (ops->empty()) {
-                // block 1 second
+                // block up to 1 second
                 _networkQueue->waitForMore();
                 return false;
             }
@@ -387,6 +455,7 @@ namespace replset {
             // otherwise, apply what we have
             return true;
         }
+
         // check for commands
         if ((op["op"].valuestrsafe()[0] == 'c') ||
             // Index builds are acheived through the use of an insert op, not a command op.
@@ -402,6 +471,28 @@ namespace replset {
             return true;
         }
 
+        // check for oplog version change
+        BSONElement elemVersion = op["v"];
+        int curVersion = 0;
+        if (elemVersion.eoo())
+            // missing version means version 1
+            curVersion = 1;
+        else
+            curVersion = elemVersion.Int();
+
+        if (curVersion != oplogVersion) {
+            // Version changes cause us to end a batch.
+            // If we are starting a new batch, reset version number
+            // and continue.
+            if (ops->empty()) {
+                oplogVersion = curVersion;
+            } 
+            else {
+                // End batch early
+                return true;
+            }
+        }
+    
         // Copy the op to the deque and remove it from the bgsync queue.
         ops->push_back(op);
         _networkQueue->consume();
@@ -486,21 +577,15 @@ namespace replset {
             }
         }
 
-        {
-            Lock::DBRead lk("local.replset.minvalid");
-            BSONObj mv;
-            if( Helpers::getSingleton("local.replset.minvalid", mv) ) {
-                minvalid = mv["ts"]._opTime();
-                if( minvalid <= lastOpTimeWritten ) {
-                    golive=true;
-                }
-                else {
-                    sethbmsg(str::stream() << "still syncing, not yet to minValid optime " << minvalid.toString());
-                }
-            }
-            else
-                golive = true; /* must have been the original member */
+        minvalid = getMinValid();
+        if( minvalid <= lastOpTimeWritten ) {
+            golive=true;
         }
+        else {
+            sethbmsg(str::stream() << "still syncing, not yet to minValid optime " <<
+                     minvalid.toString());
+        }
+
         if( golive ) {
             sethbmsg("");
             changeState(MemberState::RS_SECONDARY);
@@ -515,6 +600,14 @@ namespace replset {
         // initial sanity check
         if (iAmArbiterOnly()) {
             errmsg = "arbiters don't sync";
+            return false;
+        }
+        if (box.getState().primary()) {
+            errmsg = "primaries don't sync";
+            return false;
+        }
+        if (_self != NULL && host == _self->fullName()) {
+            errmsg = "I cannot sync from myself";
             return false;
         }
 
@@ -560,7 +653,7 @@ namespace replset {
         }
 
         // record the previous member we were syncing from
-        Member *prev = replset::BackgroundSync::get()->getSyncTarget();
+        const Member *prev = replset::BackgroundSync::get()->getSyncTarget();
         if (prev) {
             result.append("prevSyncTarget", prev->fullName());
         }
@@ -575,6 +668,16 @@ namespace replset {
         return _forceSyncTarget != 0;
     }
 
+    bool ReplSetImpl::shouldChangeSyncTarget(const OpTime& targetOpTime) const {
+        for (Member *m = _members.head(); m; m = m->next()) {
+            if (m->syncable() && targetOpTime.getSecs()+30 < m->hbinfo().opTime.getSecs()) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     void ReplSetImpl::_syncThread() {
         StateBox::SP sp = box.get();
         if( sp.state.primary() ) {
@@ -587,7 +690,7 @@ namespace replset {
         }
 
         /* do we have anything at all? */
-        if( lastOpTimeWritten.isNull() ) {
+        if (getMinValid().isNull() || lastOpTimeWritten.isNull()) {
             syncDoInitialSync();
             return; // _syncThread will be recalled, starts from top again in case sync failed.
         }
@@ -638,7 +741,6 @@ namespace replset {
         n++;
 
         Client::initThread("rsSync");
-        cc().iAmSyncThread(); // for isSyncThread() (which is used not used much, is used in secondary create index code
         replLocalAuth();
         theReplSet->syncThread();
         cc().shutdown();
@@ -737,6 +839,11 @@ namespace replset {
                     return;
                 }
                 slave->reader.ghostQueryGTE(rsoplog, last);
+                // if we lose the connection between connecting and querying, the cursor may not
+                // exist so we have to check again before using it.
+                if (!slave->reader.haveCursor()) {
+                    return;
+                }
             }
 
             LOG(1) << "replSet last: " << slave->last.toString() << " to " << last.toString() << rsLog;

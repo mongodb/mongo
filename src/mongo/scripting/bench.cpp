@@ -25,6 +25,7 @@
 #include <boost/thread/thread.hpp>
 
 #include "mongo/client/dbclientcursor.h"
+#include "mongo/scripting/bson_template_evaluator.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/util/md5.h"
 #include "mongo/util/timer.h"
@@ -285,61 +286,12 @@ namespace mongo {
         return false;
     }
 
-    static void _fixField( BSONObjBuilder& b , const BSONElement& e ) {
-        verify( e.type() == Object );
-
-        BSONObj sub = e.Obj();
-        verify( sub.nFields() == 1 );
-
-        BSONElement f = sub.firstElement();
-        if ( str::equals( "#RAND_INT" , f.fieldName() ) ) {
-            BSONObjIterator i( f.Obj() );
-            int min = i.next().numberInt();
-            int max = i.next().numberInt();
-
-            int x = min + ( rand() % ( max - min ) );
-
-            if ( i.more() )
-                x *= i.next().numberInt();
-
-            b.append( e.fieldName() , x );
-        }
-        else {
-            uasserted( 14811 , str::stream() << "invalid bench dynamic piece: " << f.fieldName() );
-        }
-
-    }
-
-    static void fixQuery( BSONObjBuilder& b  , const BSONObj& obj ) {
-        BSONObjIterator i( obj );
-        while ( i.more() ) {
-            BSONElement e = i.next();
-
-            if ( ! e.isABSONObj() ) {
-                b.append( e );
-                continue;
-            }
-
-            BSONObj sub = e.Obj();
-            if ( sub.firstElement().fieldName()[0] == '#' ) {
-                _fixField( b , e );
-            }
-            else {
-                BSONObjBuilder xx( e.type() == Object ? b.subobjStart( e.fieldName() ) : b.subarrayStart( e.fieldName() ) );
-                fixQuery( xx , sub );
-                xx.done();
-            }
-
-        }
-    }
-
-    static BSONObj fixQuery( const BSONObj& obj ) {
-
+    static BSONObj fixQuery( const BSONObj& obj, BsonTemplateEvaluator& btl ) {
         if ( ! _hasSpecial( obj ) ) 
             return obj;
-
         BSONObjBuilder b( obj.objsize() + 128 );
-        fixQuery( b , obj );
+
+        verify(BsonTemplateEvaluator::StatusSuccess == btl.evaluate(obj, b));
         return b.obj();
     }
 
@@ -363,6 +315,8 @@ namespace mongo {
         verify( conn );
         long long count = 0;
         mongo::Timer timer;
+
+        BsonTemplateEvaluator bsonTemplateEvaluator;
 
         while ( !shouldStop() ) {
             BSONObjIterator i( _config->ops );
@@ -419,7 +373,8 @@ namespace mongo {
                         BSONObj result;
                         {
                             BenchRunEventTrace _bret(&_stats.findOneCounter);
-                            result = conn->findOne( ns , fixQuery( e["query"].Obj() ) );
+                            result = conn->findOne( ns , fixQuery( e["query"].Obj(),
+                                                                   bsonTemplateEvaluator ) );
                         }
 
                         if( check ){
@@ -439,8 +394,8 @@ namespace mongo {
                     else if ( op == "command" ) {
 
                         BSONObj result;
-                        // TODO
-                        /* bool ok = */ conn->runCommand( ns , fixQuery( e["command"].Obj() ), result, e["options"].numberInt() );
+                        conn->runCommand( ns, fixQuery( e["command"].Obj(), bsonTemplateEvaluator ),
+                                          result, e["options"].numberInt() );
 
                         if( check ){
                             int err = scope->invoke( scopeFunc , 0 , &result,  1000 * 60 , false );
@@ -468,7 +423,7 @@ namespace mongo {
                         auto_ptr<DBClientCursor> cursor;
                         int count;
 
-                        BSONObj fixedQuery = fixQuery(e["query"].Obj());
+                        BSONObj fixedQuery = fixQuery(e["query"].Obj(), bsonTemplateEvaluator);
 
                         // use special query function for exhaust query option
                         if (options & QueryOption_Exhaust) {
@@ -478,7 +433,8 @@ namespace mongo {
                         }
                         else {
                             BenchRunEventTrace _bret(&_stats.queryCounter);
-                            cursor = conn->query( ns, fixedQuery, limit, skip, &filter, options, batchSize );
+                            cursor = conn->query(ns, fixedQuery, limit, skip, &filter, options,
+                                                 batchSize);
                             count = cursor->itcount();
                         }
 
@@ -513,7 +469,8 @@ namespace mongo {
 
                         {
                             BenchRunEventTrace _bret(&_stats.updateCounter);
-                            conn->update( ns, fixQuery( query ), update, upsert , multi );
+                            conn->update( ns, fixQuery( query, bsonTemplateEvaluator ), update,
+                                          upsert , multi );
                             if (safe)
                                 result = conn->getLastErrorDetailed();
                         }
@@ -542,7 +499,7 @@ namespace mongo {
                         BSONObj result;
                         {
                             BenchRunEventTrace _bret(&_stats.insertCounter);
-                            conn->insert( ns, fixQuery( e["doc"].Obj() ) );
+                            conn->insert( ns, fixQuery( e["doc"].Obj(), bsonTemplateEvaluator ) );
                             if (safe)
                                 result = conn->getLastErrorDetailed();
                         }
@@ -575,7 +532,7 @@ namespace mongo {
 
                         {
                             BenchRunEventTrace _bret(&_stats.deleteCounter);
-                            conn->remove( ns, fixQuery( query ), ! multi );
+                            conn->remove( ns, fixQuery( query, bsonTemplateEvaluator ), ! multi );
                             if (safe)
                                 result = conn->getLastErrorDetailed();
                         }

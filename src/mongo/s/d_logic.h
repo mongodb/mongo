@@ -18,12 +18,11 @@
 
 #pragma once
 
-#include "../pch.h"
+#include "mongo/pch.h"
 
-#include "../db/jsobj.h"
-
-#include "d_chunk_manager.h"
-#include "util.h"
+#include "mongo/db/jsobj.h"
+#include "mongo/s/d_chunk_manager.h"
+#include "mongo/s/chunk_version.h"
 #include "mongo/util/concurrency/ticketholder.h"
 
 namespace mongo {
@@ -31,7 +30,7 @@ namespace mongo {
     class Database;
     class DiskLoc;
 
-    typedef ShardChunkVersion ConfigVersion;
+    typedef ChunkVersion ConfigVersion;
 
     // --------------
     // --- global state ---
@@ -82,7 +81,7 @@ namespace mongo {
          * the newest one.
          *
          * @param ns collection to be accessed
-         * @param version (IN) the client belive this collection is on and (OUT) the version the manager is actually in
+         * @param version (IN) the client believe this collection is on and (OUT) the version the manager is actually in
          * @return true if the access can be allowed at the provided version
          */
         bool trySetVersion( const string& ns , ConfigVersion& version );
@@ -107,7 +106,7 @@ namespace mongo {
          * @param min max the chunk to eliminate from the current manager
          * @param version at which the new manager should be at
          */
-        void donateChunk( const string& ns , const BSONObj& min , const BSONObj& max , ShardChunkVersion version );
+        void donateChunk( const string& ns , const BSONObj& min , const BSONObj& max , ChunkVersion version );
 
         /**
          * Creates and installs a new chunk manager for a given collection by reclaiming a previously donated chunk.
@@ -120,7 +119,7 @@ namespace mongo {
          * @param min max the chunk to reclaim and add to the current manager
          * @param version at which the new manager should be at
          */
-        void undoDonateChunk( const string& ns , const BSONObj& min , const BSONObj& max , ShardChunkVersion version );
+        void undoDonateChunk( const string& ns , const BSONObj& min , const BSONObj& max , ChunkVersion version );
 
         /**
          * Creates and installs a new chunk manager for a given collection by splitting one of its chunks in two or more.
@@ -136,9 +135,14 @@ namespace mongo {
          * @param version at which the new manager should be at
          */
         void splitChunk( const string& ns , const BSONObj& min , const BSONObj& max , const vector<BSONObj>& splitKeys ,
-                         ShardChunkVersion version );
+                         ChunkVersion version );
 
         bool inCriticalMigrateSection();
+
+        /**
+         * @return true if we are NOT in the critical section
+         */
+        bool waitTillNotInCriticalSection( int maxSecondsToWait );
 
     private:
         bool _enabled;
@@ -164,7 +168,7 @@ namespace mongo {
 
     /**
      * one per connection from mongos
-     * holds version state for each namesapce
+     * holds version state for each namespace
      */
     class ShardedConnectionInfo {
     public:
@@ -227,7 +231,7 @@ namespace mongo {
 
     /**
      * @return true if the current threads shard version is ok, or not in sharded version
-     * Also returns an error message and the Config/ShardChunkVersions causing conflicts
+     * Also returns an error message and the Config/ChunkVersions causing conflicts
      */
     bool shardVersionOk( const string& ns , string& errmsg, ConfigVersion& received, ConfigVersion& wanted );
 

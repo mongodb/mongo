@@ -114,12 +114,25 @@ namespace mongo {
     typedef long long NumberVal;
     template <typename Variant>
     Variant getSysctlByName( const char * sysctlName ) {
-        char value[256];
-        size_t len = sizeof(value);
-        if ( sysctlbyname(sysctlName, &value, &len, NULL, 0) < 0 ) {
-            log() << "Unable to resolve sysctl " << sysctlName << " (string) " << endl;
+        string value;
+        size_t len;
+        int status;
+        // NB: sysctlbyname is called once to determine the buffer length, and once to copy
+        //     the sysctl value.  Retry if the buffer length grows between calls.
+        do {
+            status = sysctlbyname(sysctlName, NULL, &len, NULL, 0);
+            if (status == -1)
+                break;
+            value.resize(len);
+            status = sysctlbyname(sysctlName, &*value.begin(), &len, NULL, 0);
+        } while (status == -1 && errno == ENOMEM);
+        if (status == -1) {
+            // unrecoverable error from sysctlbyname
+            log() << sysctlName << " unavailable" << endl;
+            return "";
         }
-        return string(value, len - 1);        
+        value.resize(len);
+        return value;
     }
 
     /**
@@ -145,6 +158,7 @@ namespace mongo {
         addrSize = (getSysctlByName< NumberVal >( "hw.cpu64bit_capable" ) ? 64 : 32);
         memSize = getSysctlByName< NumberVal >( "hw.memsize" );
         numCores = getSysctlByName< NumberVal >( "hw.ncpu" ); // includes hyperthreading cores
+        pageSize = static_cast<unsigned long long>(sysconf( _SC_PAGESIZE ));
         cpuArch = getSysctlByName< string >( "hw.machine" );
         hasNuma = checkNumaEnabled();
         
@@ -171,18 +185,25 @@ namespace mongo {
         return true;
     }
 
-    bool ProcessInfo::blockInMemory( char * start ) {
-        static long pageSize = 0;
-        if ( pageSize == 0 ) {
-            pageSize = sysconf( _SC_PAGESIZE );
-        }
-        start = start - ( (unsigned long long)start % pageSize );
+    bool ProcessInfo::blockInMemory(const void* start) {
         char x = 0;
-        if ( mincore( start , 128 , &x ) ) {
+        if (mincore(alignToStartOfPage(start), getPageSize(), &x)) {
             log() << "mincore failed: " << errnoWithDescription() << endl;
             return 1;
         }
         return x & 0x1;
+    }
+
+    bool ProcessInfo::pagesInMemory(const void* start, size_t numPages, vector<char>* out) {
+        out->resize(numPages);
+        if (mincore(alignToStartOfPage(start), numPages * getPageSize(), &out->front())) {
+            log() << "mincore failed: " << errnoWithDescription() << endl;
+            return false;
+        }
+        for (size_t i = 0; i < numPages; ++i) {
+            (*out)[i] &= 0x1;
+        }
+        return true;
     }
 
 }

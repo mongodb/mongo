@@ -1,5 +1,6 @@
 // $ifNull returns the result of the first expression if not null or undefined, otherwise of the
 // second expression.
+load('jstests/aggregation/extras/utils.js');
 
 t = db.jstests_aggregation_ifnull;
 t.drop();
@@ -7,8 +8,7 @@ t.drop();
 t.save( {} );
 
 function assertError( expectedErrorCode, ifNullSpec ) {
-    assert.eq( expectedErrorCode,
-               t.aggregate( { $project:{ a:{ $ifNull:ifNullSpec } } } ).code );    
+    assertErrorCode(t, {$project: {a: {$ifNull: ifNullSpec}}}, expectedErrorCode)
 }
 
 function assertResult( expectedResult, arg0, arg1 ) {
@@ -51,8 +51,9 @@ assertResult( undefined, undefined, undefined );
 assertResult( 3, { $add:[ 1, 2 ] }, 5 );
 assertResult( 20, '$missingField', { $multiply:[ 4, 5 ] } );
 
-// Divide by 0.
-assertResult( 'div0', { $divide:[ 1, 0 ] }, 'div0' );
+// Divide/mod by 0.
+assertError(16608 , [{$divide: [1, 0]}, 0]);
+assertError(16610 , [{$mod: [1, 0]}, 0]);
 
 // Nested.
 t.drop();

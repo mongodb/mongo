@@ -1,6 +1,6 @@
 // Test persistence of list of dbs to add.
 
-doTest = function( signal ) {
+doTest = function(signal, extraOpts) {
 
     rt = new ReplTest( "repl7tests" );
     
@@ -10,7 +10,7 @@ doTest = function( signal ) {
         m.getDB( n ).a.save( {x:1} );
     }
 
-    s = rt.start( false );    
+    s = rt.start(false, extraOpts);
     
     assert.soon( function() {
                 return -1 != s.getDBNames().indexOf( "aa" );
@@ -18,7 +18,7 @@ doTest = function( signal ) {
     
     rt.stop( false, signal );
 
-    s = rt.start( false, null, signal );
+    s = rt.start(false, extraOpts, signal);
     
     assert.soon( function() {
                 for( n = "a"; n != "aaaaa"; n += "a" ) {
@@ -42,4 +42,4 @@ doTest = function( signal ) {
 }
 
 doTest( 15 ); // SIGTERM
-doTest( 9 );  // SIGKILL
+doTest(9, { journal: null });  // SIGKILL

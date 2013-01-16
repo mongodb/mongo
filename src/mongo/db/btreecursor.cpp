@@ -1,5 +1,3 @@
-// btreecursor.cpp
-
 /**
 *    Copyright (C) 2008 10gen Inc.
 *
@@ -16,12 +14,15 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "pch.h"
-#include "btree.h"
-#include "pdfile.h"
-#include "jsobj.h"
-#include "curop-inl.h"
-#include "queryutil.h"
+#include "mongo/pch.h"
+
+#include "mongo/db/btreecursor.h"
+
+#include "mongo/db/btree.h"
+#include "mongo/db/curop-inl.h"
+#include "mongo/db/kill_current_op.h"
+#include "mongo/db/pdfile.h"
+#include "mongo/db/queryutil.h"
 
 namespace mongo {
 
@@ -88,7 +89,7 @@ namespace mongo {
                 //++_nscanned;
             }
             if ( u > 10 )
-                OCCASIONALLY log() << "btree unused skipped:" << u << '\n';
+                OCCASIONALLY log() << "btree unused skipped:" << u << endl;
             return u;
         }
 
@@ -188,21 +189,6 @@ namespace mongo {
     template class BtreeCursorImpl<V0>;
     template class BtreeCursorImpl<V1>;
 
-    BtreeCursor* BtreeCursor::make(
-        NamespaceDetails *_d, const IndexDetails& _id,
-        const shared_ptr< FieldRangeVector > &_bounds, int _direction )
-    {
-        return make( _d, _d->idxNo( (IndexDetails&) _id), _id, _bounds, 0, _direction );
-    }
-
-    BtreeCursor* BtreeCursor::make(
-        NamespaceDetails *_d, const IndexDetails& _id,
-        const BSONObj &startKey, const BSONObj &endKey, bool endKeyInclusive, int direction)
-    {
-        return make( _d, _d->idxNo( (IndexDetails&) _id), _id, startKey, endKey, endKeyInclusive, direction );
-    }
-
-
     BtreeCursor* BtreeCursor::make( NamespaceDetails * nsd , int idxNo , const IndexDetails& indexDetails ) {
         int v = indexDetails.version();
         
@@ -217,29 +203,37 @@ namespace mongo {
         return 0; // not reachable
     }
     
-    BtreeCursor* BtreeCursor::make(
-        NamespaceDetails *d, int idxNo, const IndexDetails& id, 
-        const BSONObj &startKey, const BSONObj &endKey, bool endKeyInclusive, int direction) 
-    { 
-        BtreeCursor *c = make( d , idxNo , id );
+    BtreeCursor* BtreeCursor::make( NamespaceDetails* namespaceDetails,
+                                    const IndexDetails& id,
+                                    const BSONObj& startKey,
+                                    const BSONObj& endKey,
+                                    bool endKeyInclusive,
+                                    int direction ) {
+        auto_ptr<BtreeCursor> c( make( namespaceDetails, namespaceDetails->idxNo( id ), id ) );
         c->init(startKey,endKey,endKeyInclusive,direction);
         c->initWithoutIndependentFieldRanges();
         dassert( c->_dups.size() == 0 );
-        return c;
+        return c.release();
     }
 
-    BtreeCursor* BtreeCursor::make(
-        NamespaceDetails *d, int idxNo, const IndexDetails& id, 
-        const shared_ptr< FieldRangeVector > &bounds, int singleIntervalLimit, int direction )
+    BtreeCursor* BtreeCursor::make( NamespaceDetails* namespaceDetails,
+                                    const IndexDetails& id,
+                                    const shared_ptr<FieldRangeVector>& bounds,
+                                    int singleIntervalLimit,
+                                    int direction )
     {
-        BtreeCursor *c = make( d , idxNo , id );
+        auto_ptr<BtreeCursor> c( make( namespaceDetails, namespaceDetails->idxNo( id ), id ) );
         c->init(bounds,singleIntervalLimit,direction);
-        return c;
+        return c.release();
     }
 
-    BtreeCursor::BtreeCursor( NamespaceDetails* nsd , int theIndexNo, const IndexDetails& id ) 
-        : d( nsd ) , idxNo( theIndexNo ) , indexDetails( id ) , _ordering(Ordering::make(BSONObj())){
-        _nscanned = 0;
+    BtreeCursor::BtreeCursor( NamespaceDetails* nsd, int theIndexNo, const IndexDetails& id ) :
+        d( nsd ),
+        idxNo( theIndexNo ),
+        indexDetails( id ),
+        _ordering( Ordering::make( BSONObj() ) ),
+        _boundsMustMatch( true ),
+        _nscanned() {
     }
 
     void BtreeCursor::_finishConstructorInit() {
@@ -302,8 +296,17 @@ namespace mongo {
                 break;
             }
             do {
+                // If nscanned is increased by more than 20 before a matching key is found, abort
+                // skipping through the btree to find a matching key.  This iteration cutoff
+                // prevents unbounded internal iteration within BtreeCursor::init() and
+                // BtreeCursor::advance() (the callers of skipAndCheck()).  See SERVER-3448.
                 if ( _nscanned > startNscanned + 20 ) {
                     skipUnusedKeys();
+                    // If iteration is aborted before a key matching _bounds is identified, the
+                    // cursor may be left pointing at a key that is not within bounds
+                    // (_bounds->matchesKey( currKey() ) may be false).  Set _boundsMustMatch to
+                    // false accordingly.
+                    _boundsMustMatch = false;
                     return;
                 }
             } while( skipOutOfRangeKeysAndCheckEnd() );
@@ -355,6 +358,9 @@ namespace mongo {
     }
 
     bool BtreeCursor::advance() {
+        // Reset this flag at the start of a new iteration.
+        _boundsMustMatch = true;
+
         killCurrentOp.checkForInterrupt();
         if ( bucket.isNull() )
             return false;
@@ -396,7 +402,17 @@ namespace mongo {
         else {
             return _bounds->obj();
         }
-    }    
+    }
+
+    bool BtreeCursor::currentMatches( MatchDetails* details ) {
+        // If currKey() might not match the specified _bounds, check whether or not it does.
+        if ( !_boundsMustMatch && _bounds && !_bounds->matchesKey( currKey() ) ) {
+            // If the key does not match _bounds, it does not match the query.
+            return false;
+        }
+        // Forward to the base class implementation, which may utilize a Matcher.
+        return Cursor::currentMatches( details );
+    }
 
     /* ----------------------------------------------------------------------------- */
 

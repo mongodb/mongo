@@ -17,27 +17,27 @@
 
 #pragma once
 
-#include <v8.h>
-
-#include <cstring>
 #include <cstdio>
 #include <cstdlib>
-#include <assert.h>
 #include <iostream>
+#include <string>
+#include <v8.h>
 
 namespace mongo {
 
     void ReportException(v8::TryCatch* handler);
 
-#define jsassert(x,msg) verify(x)
+#define jsassert(x,msg) uassert(16664, msg, x)
 
-    std::ostream& operator<<( std::ostream &s, const v8::Handle<v8::Value> & o );
-    std::ostream& operator<<( std::ostream &s, const v8::Handle<v8::TryCatch> * try_catch );
+    std::ostream& operator<<(std::ostream& s, const v8::Handle<v8::Value>& o);
+    std::ostream& operator<<(std::ostream& s, const v8::Handle<v8::TryCatch>* try_catch);
 
-    std::string toSTLString( const v8::Handle<v8::Value> & o );
-    std::string toSTLString( const v8::TryCatch * try_catch );
+    std::string toSTLString(const v8::Handle<v8::Value>& o);
+    std::string toSTLString(const v8::TryCatch* try_catch);
 
     class V8Scope;
-    void installFork( V8Scope* scope, v8::Handle< v8::Object > &global, v8::Handle< v8::Context > &context );
+    void installFork(V8Scope* scope,
+                     v8::Handle<v8::Object>& global,
+                     v8::Handle<v8::Context>& context);
 }
 

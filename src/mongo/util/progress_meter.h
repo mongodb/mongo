@@ -25,14 +25,17 @@ namespace mongo {
 
     class ProgressMeter : boost::noncopyable {
     public:
-        ProgressMeter( unsigned long long total , int secondsBetween = 3 , int checkInterval = 100 , std::string units = "" ) : _units(units) {
+        ProgressMeter(unsigned long long total,
+                      int secondsBetween = 3,
+                      int checkInterval = 100,
+                      std::string units = "",
+                      std::string name = "Progress")
+                : _units(units)
+                , _name(name) {
             reset( total , secondsBetween , checkInterval );
         }
 
-        ProgressMeter() {
-            _active = 0;
-            _units = "";
-        }
+        ProgressMeter() : _active(0), _units(""), _name("Progress") {}
 
         // typically you do ProgressMeterHolder
         void reset( unsigned long long total , int secondsBetween = 3 , int checkInterval = 100 );
@@ -46,8 +49,11 @@ namespace mongo {
          */
         bool hit( int n = 1 );
 
-        void setUnits( std::string units ) { _units = units; }
+        void setUnits( const std::string& units ) { _units = units; }
         std::string getUnit() const { return _units; }
+
+        void setName(std::string name) { _name = name; }
+        std::string getName() const { return _name; }
 
         void setTotalWhileRunning( unsigned long long total ) {
             _total = total;
@@ -76,11 +82,12 @@ namespace mongo {
         int _lastTime;
 
         std::string _units;
+        std::string _name;
     };
 
     // e.g.: 
     // CurOp * op = cc().curop();
-    // ProgressMeterHolder pm( op->setMessage( "index: (1/3) external sort" , d->stats.nrecords , 10 ) );
+    // ProgressMeterHolder pm(op->setMessage("index: (1/3) external sort", "Index: External Sort Progress", d->stats.nrecords, 10));
     // loop { pm.hit(); }
     class ProgressMeterHolder : boost::noncopyable {
     public:
@@ -93,6 +100,8 @@ namespace mongo {
         }
 
         ProgressMeter* operator->() { return &_pm; }
+
+        ProgressMeter* get() { return &_pm; }
         
         bool hit( int n = 1 ) { return _pm.hit( n ); }
 

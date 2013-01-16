@@ -225,7 +225,7 @@ namespace CountTests {
         }
     private:
         int numYields() const {
-            return cc().curop()->infoNoauth()[ "numYields" ].Int();
+            return cc().curop()->info()[ "numYields" ].Int();
         }
         // A writer client is registered while the test runs, causing runCount() to yield.
         WriterClientScope _writer;

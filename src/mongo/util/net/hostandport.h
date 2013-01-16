@@ -17,9 +17,10 @@
 
 #pragma once
 
-#include "sock.h"
-#include "../../db/cmdline.h"
-#include "../mongoutils/str.h"
+#include "mongo/bson/util/builder.h"
+#include "mongo/db/cmdline.h"
+#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/net/sock.h"
 
 namespace mongo {
 
@@ -33,10 +34,10 @@ namespace mongo {
         /** From a string hostname[:portnumber]
             Throws user assertion if bad config string or bad port #.
         */
-        HostAndPort(string s);
+        HostAndPort(const std::string& s);
 
         /** @param p port number. -1 is ok to use default. */
-        HostAndPort(string h, int p /*= -1*/) : _host(h), _port(p) { 
+        HostAndPort(const std::string& h, int p /*= -1*/) : _host(h), _port(p) { 
             verify( !str::startsWith(h, '#') );
         }
 
@@ -71,6 +72,8 @@ namespace mongo {
         string toString( bool includePort=true ) const;
 
         operator string() const { return toString(); }
+
+        void append( StringBuilder& ss ) const;
 
         bool empty() const {
             return _host.empty() && _port < 0;
@@ -122,14 +125,19 @@ namespace mongo {
     }
 
     inline string HostAndPort::toString( bool includePort ) const {
-        string h = host();
+        if ( ! includePort )
+            return host();
+
+        StringBuilder ss;
+        append( ss );
+        return ss.str();
+    }
+
+    inline void HostAndPort::append( StringBuilder& ss ) const {
+        ss << host();
+
         int p = port();
 
-        if ( ! includePort )
-            return h;
-
-        stringstream ss;
-        ss << h;
         if ( p != -1 ) {
             ss << ':';
 #if defined(_DEBUG)
@@ -143,8 +151,9 @@ namespace mongo {
             ss << p;
 #endif
         }
-        return ss.str();
+
     }
+
 
     inline bool HostAndPort::isLocalHost() const {
         string _host = host();
@@ -172,7 +181,7 @@ namespace mongo {
         }
     }
 
-    inline HostAndPort::HostAndPort(string s) {
+    inline HostAndPort::HostAndPort(const std::string& s) {
         init(s.c_str());
     }
 

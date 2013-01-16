@@ -163,6 +163,9 @@ namespace mongo {
         const char * const _name;
         RWLockRecursive(const char *name) : _name(name) { }
 
+        void assertAtLeastReadLocked() { 
+            verify( _state.get() != 0 );
+        }
         void assertExclusivelyLocked() { 
             verify( _state.get() < 0 );
         }

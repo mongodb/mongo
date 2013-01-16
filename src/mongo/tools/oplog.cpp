@@ -17,6 +17,7 @@
 */
 
 #include "pch.h"
+#include "mongo/base/initializer.h"
 #include "db/json.h"
 #include "db/oplogreader.h"
 
@@ -34,7 +35,6 @@ namespace po = boost::program_options;
 class OplogTool : public Tool {
 public:
     OplogTool() : Tool( "oplog" ) {
-        addFieldOptions();
         add_options()
         ("seconds,s" , po::value<int>() , "seconds to go back default:86400" )
         ("from", po::value<string>() , "host to pull from" )
@@ -105,7 +105,8 @@ public:
     }
 };
 
-int main( int argc , char** argv ) {
+int main( int argc , char** argv, char** envp ) {
+    mongo::runGlobalInitializersOrDie(argc, argv, envp);
     OplogTool t;
     return t.main( argc , argv );
 }

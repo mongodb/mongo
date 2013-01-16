@@ -11,6 +11,7 @@ doTest = function (signal) {
     var config = replTest.getReplSetConfig();
     config.settings = {};
     config.settings.getLastErrorDefaults = { 'w': 3, 'wtimeout': 20000 };
+    config.settings.heartbeatTimeoutSecs = 15;
 
     replTest.initiate(config);
 
@@ -63,6 +64,9 @@ doTest = function (signal) {
 
     print("replset5.js reconfigure with hidden=1");
     config = master.getDB("local").system.replset.findOne();
+
+    assert.eq(15, config.settings.heartbeatTimeoutSecs);
+
     config.version++;
     config.members[2].priority = 0;
     config.members[2].hidden = 1;

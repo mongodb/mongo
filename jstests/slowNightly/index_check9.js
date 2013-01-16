@@ -57,38 +57,53 @@ function check() {
     }
     var spec = {};
     for( var i = 0; i < n; ++i ) {
-        if ( Random.rand() > 0.5 ) {
+        var predicateType = Random.randInt( 4 );
+        switch( predicateType ) {
+        case 0 /* range */ : {
             var bounds = [ r( alphas[ i ] ), r( alphas[ i ] ) ];
             if ( bounds[ 0 ] > bounds[ 1 ] ) {
                 bounds.reverse();
             }
-	    var s = {};
-	    if ( Random.rand() > 0.5 ) {
-		s[ "$gte" ] = bounds[ 0 ];
-	    } else {
-		s[ "$gt" ] = bounds[ 0 ];
-	    }
-	    if ( Random.rand() > 0.5 ) {
-		s[ "$lte" ] = bounds[ 1 ];
-	    } else {
-		s[ "$lt" ] = bounds[ 1 ];
-	    }
+            var s = {};
+            if ( Random.rand() > 0.5 ) {
+                s[ "$gte" ] = bounds[ 0 ];
+            } else {
+                s[ "$gt" ] = bounds[ 0 ];
+            }
+            if ( Random.rand() > 0.5 ) {
+                s[ "$lte" ] = bounds[ 1 ];
+            } else {
+                s[ "$lt" ] = bounds[ 1 ];
+            }
             spec[ fields[ i ] ] = s;
-        } else {
+            break;
+        }
+        case 1 /* $in */ : {
             var vals = []
-            for( var j = 0; j < Random.randInt( 15 ); ++j ) {
+            var inLength = Random.randInt( 15 );
+            for( var j = 0; j < inLength; ++j ) {
                 vals.push( r( alphas[ i ] ) );
             }
             spec[ fields[ i ] ] = { $in: vals };
+            break;
+        }
+        case 2 /* equality */ : {
+            spec[ fields[ i ] ] = r( alphas[ i ] );
+            break;
+        }
+        default /* no predicate */ :
+            break;
         }
     }
     s = sort();
     c1 = t.find( spec, { _id:null } ).sort( s ).hint( idx ).toArray();
     c2 = t.find( spec ).sort( s ).explain().nscanned;
     c3 = t.find( spec, { _id:null } ).sort( s ).hint( {$natural:1} ).toArray();
+    count = t.count( spec );
     //    assert.eq( c1, c3, "spec: " + tojson( spec ) + ", sort: " + tojson( s ) );
     //    assert.eq( c1.length, c2 );
     assert.eq( c1, c3 );
+    assert.eq( c3.length, count );
 }
 
 for( var i = 0; i < 10000; ++i ) {

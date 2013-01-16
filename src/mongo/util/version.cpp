@@ -15,24 +15,28 @@
  *    limitations under the License.
  */
 
-#include "pch.h"
+
 #include <cstdlib>
 #include <iostream>
 #include <iomanip>
 #include <sstream>
 #include <string>
 #include <fstream>
-#include "mongo/util/startup_test.h"
-#include "version.h"
-#include "stringutils.h"
-#include "../db/jsobj.h"
-#include "file.h"
-#include "ramlog.h"
-#include "../db/cmdline.h"
-#include "processinfo.h"
-#include "mongo/db/pdfile.h"
 
 #include <boost/filesystem/operations.hpp>
+
+#include "mongo/base/parse_number.h"
+#include "mongo/db/cmdline.h"
+#include "mongo/db/jsobj.h"
+#include "mongo/db/pdfile.h"
+//#include "mongo/scripting/engine.h"
+#include "mongo/util/file.h"
+#include "mongo/util/processinfo.h"
+#include "mongo/util/ramlog.h"
+#include "mongo/util/startup_test.h"
+#include "mongo/util/stringutils.h"
+#include "mongo/util/version.h"
+
 
 namespace mongo {
 
@@ -43,7 +47,7 @@ namespace mongo {
      *      1.2.3-rc4-pre-
      * If you really need to do something else you'll need to fix _versionArray()
      */
-    const char versionString[] = "2.2.0-rc1-pre-";
+    const char versionString[] = "2.3.3-pre-";
 
     // See unit test for example outputs
     static BSONArray _versionArray(const char* version){
@@ -58,23 +62,23 @@ namespace mongo {
                 continue;
             }
 
-            try {
-                unsigned num = stringToNum(curPart.c_str());
-                b.append((int) num);
+            int num;
+            if ( parseNumberFromString( curPart, &num ).isOK() ) {
+                b.append(num);
             }
-            catch (...){ // not a number
-                if (curPart.empty()){
-                    verify(*c == '\0');
-                    break;
-                }
-                else if (startsWith(curPart, "rc")){
-                    finalPart = -10 + stringToNum(curPart.c_str()+2);
-                    break;
-                }
-                else if (curPart == "pre"){
-                    finalPart = -100;
-                    break;
-                }
+            else if (curPart.empty()){
+                verify(*c == '\0');
+                break;
+            }
+            else if (startsWith(curPart, "rc")){
+                num = 0;
+                verify( parseNumberFromString( curPart.substr(2), &num ).isOK() );
+                finalPart = -10 + num;
+                break;
+            }
+            else if (curPart == "pre"){
+                finalPart = -100;
+                break;
             }
 
             curPart = "";
@@ -95,6 +99,10 @@ namespace mongo {
 #ifndef _SCONS
     // only works in scons
     const char * gitVersion() { return "not-scons"; }
+    const char * compiledJSEngine() { return ""; }
+    const char * allocator() { return ""; }
+    const char * loaderFlags() { return ""; }
+    const char * compilerFlags() { return ""; }
 #endif
 
     void printGitVersion() { log() << "git version: " << gitVersion() << endl; }
@@ -114,6 +122,7 @@ namespace mongo {
     }
 #else
     string sysInfo() { return ""; }
+
 #endif
 #endif
 
@@ -121,8 +130,28 @@ namespace mongo {
         log() << "build info: " << sysInfo() << endl;
     }
 
+    void printAllocator() {
+        log() << "allocator: " << allocator() << endl;
+    }
 
-    Tee * startupWarningsLog = new RamLog("startupWarnings"); //intentionally leaked
+    void appendBuildInfo(BSONObjBuilder& result) {
+       result << "version" << versionString
+              << "gitVersion" << gitVersion()
+              << "sysInfo" << sysInfo()
+              << "loaderFlags" << loaderFlags()
+              << "compilerFlags" << compilerFlags()
+              << "allocator" << allocator()
+              << "versionArray" << versionArray
+              << "javascriptEngine" << compiledJSEngine()
+/*TODO: add this back once the module system is in place -- maybe once we do something like serverstatus with callbacks*/
+//              << "interpreterVersion" << globalScriptEngine->getInterpreterVersionString()
+              << "bits" << ( sizeof( int* ) == 4 ? 32 : 64 );
+       result.appendBool( "debug" , debug );
+       result.appendNumber("maxBsonObjectSize", BSONObjMaxUserSize);
+    }
+
+
+    Tee* const startupWarningsLog = new RamLog("startupWarnings"); //intentionally leaked
 
     //
     // system warnings
@@ -144,9 +173,12 @@ namespace mongo {
 
         if ( sizeof(int*) == 4 ) {
             log() << startupWarningsLog;
-            log() << "** NOTE: when using MongoDB 32 bit, you are limited to about 2 gigabytes of data" << startupWarningsLog;
-            log() << "**       see http://blog.mongodb.org/post/137788967/32-bit-limitations" << startupWarningsLog;
-            log() << "**       with --journal, the limit is lower" << startupWarningsLog;
+            log() << "** NOTE: This is a 32 bit MongoDB binary." << startupWarningsLog;
+            log() << "**       32 bit builds are limited to less than 2GB of data (or less with --journal)." << startupWarningsLog;
+            if( !cmdLine.dur ) { 
+                log() << "**       Note that journaling defaults to off for 32 bit and is currently off." << startupWarningsLog;
+            }
+            log() << "**       See http://www.mongodb.org/display/DOCS/32+bit" << startupWarningsLog;
             warned = true;
         }
 
@@ -176,12 +208,13 @@ namespace mongo {
             // $ numactl --interleave=all cat /proc/self/numa_maps
             // 00400000 interleave:0-7 file=/bin/cat mapped=6 N4=6
 
-            File f;
-            f.open("/proc/self/numa_maps", /*read_only*/true);
-            if ( f.is_open() && ! f.bad() ) {
+            std::ifstream f("/proc/self/numa_maps", std::ifstream::in);
+            if (f.is_open()) {
                 char line[100]; //we only need the first line
-                if (read(f.fd, line, sizeof(line)) < 0){
-                    warning() << "failed to read from /proc/self/numa_maps: " << errnoWithDescription() << startupWarningsLog;
+                f.getline(line, sizeof(line));
+                if (f.fail()) {
+                    warning() << "failed to read from /proc/self/numa_maps: "
+                              << errnoWithDescription() << startupWarningsLog;
                     warned = true;
                 }
                 else {
@@ -275,41 +308,6 @@ namespace mongo {
         }
     }
 
-    int versionCmp(StringData rhs, StringData lhs) {
-        if (strcmp(rhs.data(),lhs.data()) == 0)
-            return 0;
-
-        // handle "1.2.3-" and "1.2.3-pre"
-        if (rhs.size() < lhs.size()) {
-            if (strncmp(rhs.data(), lhs.data(), rhs.size()) == 0 && lhs.data()[rhs.size()] == '-')
-                return +1;
-        }
-        else if (rhs.size() > lhs.size()) {
-            if (strncmp(rhs.data(), lhs.data(), lhs.size()) == 0 && rhs.data()[lhs.size()] == '-')
-                return -1;
-        }
-
-        return LexNumCmp::cmp(rhs.data(), lhs.data(), false);
-    }
-
-    class VersionCmpTest : public StartupTest {
-    public:
-        void run() {
-            verify( versionCmp("1.2.3", "1.2.3") == 0 );
-            verify( versionCmp("1.2.3", "1.2.4") < 0 );
-            verify( versionCmp("1.2.3", "1.2.20") < 0 );
-            verify( versionCmp("1.2.3", "1.20.3") < 0 );
-            verify( versionCmp("2.2.3", "10.2.3") < 0 );
-            verify( versionCmp("1.2.3", "1.2.3-") > 0 );
-            verify( versionCmp("1.2.3", "1.2.3-pre") > 0 );
-            verify( versionCmp("1.2.3", "1.2.4-") < 0 );
-            verify( versionCmp("1.2.3-", "1.2.3") < 0 );
-            verify( versionCmp("1.2.3-pre", "1.2.3") < 0 );
-
-            log(1) << "versionCmpTest passed" << endl;
-        }
-    } versionCmpTest;
-
     class VersionArrayTest : public StartupTest {
     public:
         void run() {
@@ -330,7 +328,7 @@ namespace mongo {
             verify( _versionArray("1.2.0-rc4-pre-") == BSON_ARRAY(1 << 2 << 0 << -6) );
             verify( _versionArray("2.0.0-rc5-pre-") == BSON_ARRAY(2 << 0 << 0 << -5) );
 
-            log(1) << "versionArrayTest passed" << endl;
+            LOG(1) << "versionArrayTest passed" << endl;
         }
     } versionArrayTest;
 }

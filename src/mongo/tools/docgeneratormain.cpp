@@ -25,6 +25,7 @@
 
 #include <boost/program_options.hpp>
 
+#include "mongo/base/initializer.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/tools/docgenerator.h"
@@ -90,8 +91,8 @@ int parseCmdLineOptions( int argc, char **argv ) {
 }
 
 
-int main( int argc, char* argv[] ) {
-
+int main( int argc, char* argv[], char* envp[] ) {
+    mongo::runGlobalInitializersOrDie(argc, argv, envp);
     if( parseCmdLineOptions( argc, argv) )
         return 1;
 

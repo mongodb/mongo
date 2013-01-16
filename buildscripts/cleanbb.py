@@ -30,6 +30,9 @@ def shouldKill( c ):
     if ( c.find( "buildbot" ) >= 0 or c.find( "slave" ) ) and c.find( "/mongo/" ) >= 0:
         return True
 
+    if c.find( "xml-data/build-dir" ) >= 0: # for bamboo
+        return True
+
     return False
 
 def killprocs( signal="" ):

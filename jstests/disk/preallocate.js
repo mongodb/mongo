@@ -6,7 +6,16 @@ var baseName = "jstests_preallocate";
 
 var m = startMongod( "--port", port, "--dbpath", "/data/db/" + baseName );
 
-assert.eq( 0, m.getDBs().totalSize );
+var getTotalNonLocalSize = function() {
+    var totalNonLocalDBSize = 0;
+    m.getDBs().databases.forEach( function(dbStats) {
+            if (dbStats.name != "local")
+                totalNonLocalDBSize += dbStats.sizeOnDisk;
+    });
+    return totalNonLocalDBSize;
+}
+
+assert.eq( 0, getTotalNonLocalSize() );
 
 m.getDB( baseName ).createCollection( baseName + "1" );
 
@@ -15,16 +24,18 @@ expectedMB = ( _isWindows() ? 70 : 100 );
 if ( m.getDB( baseName ).serverBits() < 64 )
     expectedMB /= 4;
 
-assert.soon( function() { return m.getDBs().totalSize > expectedMB * 1000000; }, "\n\n\nFAIL preallocate.js expected second file to bring total size over " + expectedMB + "MB" );
+assert.soon(function() { return getTotalNonLocalSize() > expectedMB * 1000000; },
+            "\n\n\nFAIL preallocate.js expected second file to bring total size over " +
+            expectedMB + "MB" );
 
 stopMongod( port );
 
 var m = startMongoProgram( "mongod", "--port", port, "--dbpath", "/data/db/" + baseName );
 
-size = m.getDBs().totalSize;
+size = getTotalNonLocalSize();
 
 m.getDB( baseName ).createCollection( baseName + "2" );
 
 sleep( 2000 ); // give prealloc a chance
 
-assert.eq( size, m.getDBs().totalSize );
+assert.eq( size, getTotalNonLocalSize() );

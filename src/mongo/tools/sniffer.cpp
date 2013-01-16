@@ -18,7 +18,7 @@
 
 /*
   TODO:
-    large messages - need to track what's left and ingore
+    large messages - need to track what's left and ignore
     single object over packet size - can only display begging of object
 
     getmore
@@ -34,6 +34,7 @@
 #undef max
 #endif
 
+#include "mongo/base/initializer.h"
 #include "../bson/util/builder.h"
 #include "../util/net/message.h"
 #include "../util/mmap.h"
@@ -90,7 +91,7 @@ struct sniff_ip {
     u_short ip_id;                  /* identification */
     u_short ip_off;                 /* fragment offset field */
 #define IP_RF 0x8000            /* reserved fragment flag */
-#define IP_DF 0x4000            /* dont fragment flag */
+#define IP_DF 0x4000            /* don't fragment flag */
 #define IP_MF 0x2000            /* more fragments flag */
 #define IP_OFFMASK 0x1fff       /* mask for fragmenting bits */
     u_char  ip_ttl;                 /* time to live */
@@ -444,7 +445,8 @@ void usage() {
          << endl;
 }
 
-int main(int argc, char **argv) {
+int main(int argc, char **argv, char** envp) {
+    mongo::runGlobalInitializersOrDie(argc, argv, envp);
 
     stringstream nullStream;
     nullStream.clear(ios::failbit);

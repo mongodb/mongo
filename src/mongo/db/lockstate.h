@@ -50,7 +50,7 @@ namespace mongo {
         bool isLocked( const StringData& ns ); // rwRW
 
         /** pending means we are currently trying to get a lock */
-        bool hasLockPending() const { return _lockPending; }
+        bool hasLockPending() const { return _lockPending || _lockPendingParallelWriter; }
 
         // ----
 
@@ -68,7 +68,7 @@ namespace mongo {
         int nestableCount() const { return _nestableCount; }
         
         int otherCount() const { return _otherCount; }
-        string otherName() const { return _otherName; }
+        const string& otherName() const { return _otherName; }
         WrapperForRWLock* otherLock() const { return _otherLock; }
         
         void enterScopedLock( Lock::ScopedLock* lock );
@@ -76,7 +76,7 @@ namespace mongo {
 
         void lockedNestable( Lock::Nestable what , int type );
         void unlockedNestable();
-        void lockedOther( const string& db , int type , WrapperForRWLock* lock );
+        void lockedOther( const StringData& db , int type , WrapperForRWLock* lock );
         void lockedOther( int type );  // "same lock as last time" case 
         void unlockedOther();
         bool _batchWriter;
@@ -105,8 +105,10 @@ namespace mongo {
         Lock::ScopedLock* _scopedLk;   
         
         bool _lockPending;
+        bool _lockPendingParallelWriter;
 
         friend class Acquiring;
+        friend class AcquiringParallelWriter;
     };
 
     class WrapperForRWLock : boost::noncopyable { 
@@ -114,7 +116,7 @@ namespace mongo {
     public:
         string name() const { return r.name; }
         LockStat stats;
-        WrapperForRWLock(const char *name) : r(name) { }
+        WrapperForRWLock(const StringData& name) : r(name) { }
         void lock()          { r.lock(); }
         void lock_shared()   { r.lock_shared(); }
         void unlock()        { r.unlock(); }
@@ -132,7 +134,14 @@ namespace mongo {
         LockState& _ls;
     };
         
+    class AcquiringParallelWriter {
+    public:
+        AcquiringParallelWriter( LockState& ls );
+        ~AcquiringParallelWriter();
 
+    private:
+        LockState& _ls;
+    };
 
 
 }

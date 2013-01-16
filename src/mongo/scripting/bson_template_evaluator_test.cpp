@@ -1,5 +1,3 @@
-/** @file mongo/scripting/bson_template_evaluator_tests : tests related to bson template language */
-
 /**
  *    Copyright (C) 2012 10gen Inc.
  *

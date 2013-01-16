@@ -22,6 +22,7 @@
 #include "mongo/db/instance.h"
 #include "mongo/db/pipeline/document.h"
 #include "mongo/s/d_logic.h"
+#include "mongo/s/stale_exception.h" // for SendStaleConfigException
 
 namespace mongo {
 
@@ -37,28 +38,25 @@ namespace mongo {
 
     bool DocumentSourceCursor::eof() {
         /* if we haven't gotten the first one yet, do so now */
-        if (!pCurrent.get())
+        if (unstarted)
             findNext();
 
-        return (pCurrent.get() == NULL);
+        return !hasCurrent;
     }
 
     bool DocumentSourceCursor::advance() {
         DocumentSource::advance(); // check for interrupts
 
         /* if we haven't gotten the first one yet, do so now */
-        if (!pCurrent.get())
+        if (unstarted)
             findNext();
 
         findNext();
-        return (pCurrent.get() != NULL);
+        return hasCurrent;
     }
 
-    intrusive_ptr<Document> DocumentSourceCursor::getCurrent() {
-        /* if we haven't gotten the first one yet, do so now */
-        if (!pCurrent.get())
-            findNext();
-
+    Document DocumentSourceCursor::getCurrent() {
+        verify(hasCurrent);
         return pCurrent;
     }
 
@@ -98,9 +96,11 @@ namespace mongo {
     }
 
     void DocumentSourceCursor::findNext() {
+        unstarted = false;
 
         if ( !_cursorWithContext ) {
-            pCurrent.reset();
+            pCurrent = Document();
+            hasCurrent = false;
             return;
         }
 
@@ -116,34 +116,63 @@ namespace mongo {
                 continue;
 
             // grab the matching document
-            BSONObj documentObj;
             if (canUseCoveredIndex()) {
                 // Can't have a Chunk Manager if we are here
-                documentObj = cursor()->c()->keyFieldsOnly()->hydrate(cursor()->currKey());
+                BSONObj indexKey = cursor()->currKey();
+                pCurrent = Document(cursor()->c()->keyFieldsOnly()->hydrate(indexKey));
             }
             else {
-                documentObj = cursor()->current();
+                BSONObj next = cursor()->current();
 
                 // check to see if this is a new object we don't own yet
                 // because of a chunk migration
-                if ( chunkMgr() && ! chunkMgr()->belongsToMe(documentObj) )
+                if (chunkMgr() && ! chunkMgr()->belongsToMe(next))
                     continue;
 
-                if (_projection) {
-                    documentObj = _projection->transform(documentObj);
+                if (!_projection) {
+                    pCurrent = Document(next);
+                }
+                else {
+                    pCurrent = documentFromBsonWithDeps(next, _dependencies);
+
+                    if (debug && !_dependencies.empty()) {
+                        // Make sure we behave the same as Projection.  Projection doesn't have a
+                        // way to specify "no fields needed" so we skip the test in that case.
+
+                        MutableDocument byAggo(pCurrent);
+                        MutableDocument byProj(Document(_projection->transform(next)));
+
+                        if (_dependencies["_id"].getType() == Object) {
+                            // We handle subfields of _id identically to other fields.
+                            // Projection doesn't handle them correctly.
+
+                            byAggo.remove("_id");
+                            byProj.remove("_id");
+                        }
+
+                        if (Document::compare(byAggo.peek(), byProj.peek()) != 0) {
+                            PRINT(next);
+                            PRINT(_dependencies);
+                            PRINT(_projection->getSpec());
+                            PRINT(byAggo.peek());
+                            PRINT(byProj.peek());
+                            verify(false);
+                        }
+                    }
                 }
             }
 
-            pCurrent = Document::createFromBsonObj(&documentObj);
-
+            hasCurrent = true;
             cursor()->advance();
+
             return;
         }
 
         // If we got here, there aren't any more documents.
         // The CursorWithContext (and its read lock) must be released, see SERVER-6123.
         dispose();
-        pCurrent.reset();
+        pCurrent = Document();
+        hasCurrent = false;
     }
 
     void DocumentSourceCursor::setSource(DocumentSource *pSource) {
@@ -193,7 +222,8 @@ namespace mongo {
         const shared_ptr<CursorWithContext>& cursorWithContext,
         const intrusive_ptr<ExpressionContext> &pCtx):
         DocumentSource(pCtx),
-        pCurrent(),
+        unstarted(true),
+        hasCurrent(false),
         _cursorWithContext( cursorWithContext )
     {}
 
@@ -219,10 +249,12 @@ namespace mongo {
         pSort = pBsonObj;
     }
 
-    void DocumentSourceCursor::setProjection(BSONObj projection) {
+    void DocumentSourceCursor::setProjection(const BSONObj& projection, const ParsedDeps& deps) {
         verify(!_projection);
         _projection.reset(new Projection);
         _projection->init(projection);
         cursor()->fields = _projection;
+
+        _dependencies = deps;
     }
 }

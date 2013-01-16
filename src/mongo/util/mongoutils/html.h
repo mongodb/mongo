@@ -1,5 +1,21 @@
 // @file html.h
 
+/**
+*    Copyright (C) 2012 10gen Inc.
+*
+*    This program is free software: you can redistribute it and/or  modify
+*    it under the terms of the GNU Affero General Public License, version 3,
+*    as published by the Free Software Foundation.
+*
+*    This program is distributed in the hope that it will be useful,
+*    but WITHOUT ANY WARRANTY; without even the implied warranty of
+*    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+*    GNU Affero General Public License for more details.
+*
+*    You should have received a copy of the GNU Affero General Public License
+*    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+*/
+
 #pragma once
 
 /* Things in the mongoutils namespace
@@ -8,21 +24,6 @@
    (3) may require boost headers, but not libs
    (4) are clean and easy to use in any c++ project without pulling in lots of other stuff
 */
-
-/*    Copyright 2010 10gen Inc.
- *
- *    Licensed under the Apache License, Version 2.0 (the "License");
- *    you may not use this file except in compliance with the License.
- *    You may obtain a copy of the License at
- *
- *    http://www.apache.org/licenses/LICENSE-2.0
- *
- *    Unless required by applicable law or agreed to in writing, software
- *    distributed under the License is distributed on an "AS IS" BASIS,
- *    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *    See the License for the specific language governing permissions and
- *    limitations under the License.
- */
 
 #include <sstream>
 
@@ -37,7 +38,7 @@ namespace mongoutils {
         inline string _tr() { return "</tr>\n"; }
 
         inline string tr() { return "<tr>"; }
-        inline string tr(string a, string b) {
+        inline string tr(const std::string& a, const std::string& b) {
             stringstream ss;
             ss << "<tr><td>" << a << "</td><td>" << b << "</td></tr>\n";
             return ss.str();
@@ -48,10 +49,10 @@ namespace mongoutils {
             ss << "<td>" << x << "</td>";
             return ss.str();
         }
-        inline string td(string x) {
+        inline string td(const std::string& x) {
             return "<td>" + x + "</td>";
         }
-        inline string th(string x) {
+        inline string th(const std::string& x) {
             return "<th>" + x + "</th>";
         }
 
@@ -80,7 +81,7 @@ namespace mongoutils {
             return ss.str();
         }
 
-        inline string start(string title) {
+        inline string start(const std::string& title) {
             stringstream ss;
             ss << "<html><head>\n<title>";
             ss << title;
@@ -97,51 +98,53 @@ namespace mongoutils {
             return ss.str();
         }
 
-        inline string red(string contentHtml, bool color=true) {
+        inline string red(const std::string& contentHtml, bool color=true) {
             if( !color ) return contentHtml;
             stringstream ss;
             ss << "<span style=\"color:#A00;\">" << contentHtml << "</span>";
             return ss.str();
         }
-        inline string grey(string contentHtml, bool color=true) {
+        inline string grey(const std::string& contentHtml, bool color=true) {
             if( !color ) return contentHtml;
             stringstream ss;
             ss << "<span style=\"color:#888;\">" << contentHtml << "</span>";
             return ss.str();
         }
-        inline string blue(string contentHtml, bool color=true) {
+        inline string blue(const std::string& contentHtml, bool color=true) {
             if( !color ) return contentHtml;
             stringstream ss;
             ss << "<span style=\"color:#00A;\">" << contentHtml << "</span>";
             return ss.str();
         }
-        inline string yellow(string contentHtml, bool color=true) {
+        inline string yellow(const std::string& contentHtml, bool color=true) {
             if( !color ) return contentHtml;
             stringstream ss;
             ss << "<span style=\"color:#A80;\">" << contentHtml << "</span>";
             return ss.str();
         }
-        inline string green(string contentHtml, bool color=true) {
+        inline string green(const std::string& contentHtml, bool color=true) {
             if( !color ) return contentHtml;
             stringstream ss;
             ss << "<span style=\"color:#0A0;\">" << contentHtml << "</span>";
             return ss.str();
         }
 
-        inline string p(string contentHtml) {
+        inline string p(const std::string& contentHtml) {
             stringstream ss;
             ss << "<p>" << contentHtml << "</p>\n";
             return ss.str();
         }
 
-        inline string h2(string contentHtml) {
+        inline string h2(const std::string& contentHtml) {
             stringstream ss;
             ss << "<h2>" << contentHtml << "</h2>\n";
             return ss.str();
         }
 
         /* does NOT escape the strings. */
-        inline string a(string href, string title="", string contentHtml = "") {
+        inline string a(const std::string& href,
+                        const std::string& title="",
+                        const std::string& contentHtml = "") {
             stringstream ss;
             ss << "<a";
             if( !href.empty() ) ss << " href=\"" << href << '"';

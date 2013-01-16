@@ -42,6 +42,7 @@ import re
 import shutil
 import shlex
 import socket
+import stat
 from subprocess import (Popen,
                         PIPE,
                         call)
@@ -58,6 +59,20 @@ try:
 except ImportError:
     import pickle
 
+try:
+    from hashlib import md5 # new in 2.5
+except ImportError:
+    from md5 import md5 # deprecated in 2.5
+
+try:
+    import json
+except:
+    try:
+        import simplejson as json
+    except:
+        json = None
+
+
 # TODO clean this up so we don't need globals...
 mongo_repo = os.getcwd() #'./'
 failfile = os.path.join(mongo_repo, 'failfile.smoke')
@@ -67,6 +82,7 @@ mongod_port = None
 shell_executable = None
 continue_on_failure = None
 file_of_commands_mode = False
+start_mongod = True
 
 tests = []
 winners = []
@@ -82,6 +98,8 @@ screwy_in_slave = {}
 smoke_db_prefix = ''
 small_oplog = False
 small_oplog_rs = False
+
+all_test_results = []
 
 # This class just implements the with statement API, for a sneaky
 # purpose below.
@@ -178,6 +196,8 @@ class mongod(object):
             call(argv)
         utils.ensureDir(dir_name)
         argv = [mongod_executable, "--port", str(self.port), "--dbpath", dir_name]
+        # This should always be set for tests
+        argv += ['--setParameter', 'enableTestCommands=1']
         if self.kwargs.get('small_oplog'):
             argv += ["--master", "--oplogSize", "511"]
         if self.kwargs.get('small_oplog_rs'):
@@ -190,7 +210,15 @@ class mongod(object):
             argv += ['--nopreallocj']
         if self.kwargs.get('auth'):
             argv += ['--auth']
+            authMechanism = self.kwargs.get('authMechanism', 'MONGO-CR')
+            if authMechanism != 'MONGO-CR':
+                argv.append('--setParameter=authenticationMechanisms=' + authMechanism)
             self.auth = True
+        if self.kwargs.get('use_ssl'):
+            argv += ['--sslOnNormalPorts',
+                     '--sslPEMKeyFile', 'jstests/libs/server.pem',
+                     '--sslCAFile', 'jstests/libs/ca.pem']
+        
         print "running " + " ".join(argv)
         self.proc = self._start(buildlogger(argv, is_global=True))
 
@@ -325,20 +353,36 @@ def ternary( b , l="true", r="false" ):
 # Blech.
 def skipTest(path):
     basename = os.path.basename(path)
-    parentDir = os.path.basename(os.path.dirname(path))
+    parentPath = os.path.dirname(path)
+    parentDir = os.path.basename(parentPath)
     if small_oplog: # For tests running in parallel
         if basename in ["cursor8.js", "indexh.js", "dropdb.js"]:
             return True
     if auth or keyFile: # For tests running with auth
         # Skip any tests that run with auth explicitly
-        if parentDir == "auth" or "auth" in basename or parentDir == "tool": # SERVER-6368
+        if parentDir == "auth" or "auth" in basename:
             return True
-        # These tests don't pass with authentication due to limitations of the test infrastructure,
-        # not due to actual bugs.
-        if os.path.join(parentDir,basename) in ["sharding/sync3.js", "sharding/sync6.js", "sharding/parallel.js", "jstests/bench_test1.js", "jstests/bench_test2.js", "jstests/bench_test3.js"]:
+        if parentPath == mongo_repo: # Skip client tests
             return True
-        # These tests fail due to bugs
-        if os.path.join(parentDir,basename) in ["sharding/sync_conn_cmd.js"]:
+        if parentDir == "tool": # SERVER-6368
+            return True
+        if parentDir == "dur": # SERVER-7317
+            return True
+        if parentDir == "disk": # SERVER-7356
+            return True
+
+        authTestsToSkip = [("sharding", "read_pref_rs_client.js"), # SERVER-6972
+                           ("sharding", "sync_conn_cmd.js"), #SERVER-6327
+                           ("sharding", "gle_with_conf_servers.js"), # SERVER-6972
+                           ("jstests", "copydb.js"), # SERVER-7864
+                           ("sharding", "sync3.js"), # SERVER-6388 for this and those below
+                           ("sharding", "sync6.js"),
+                           ("sharding", "parallel.js"),
+                           ("jstests", "bench_test1.js"),
+                           ("jstests", "bench_test2.js"),
+                           ("jstests", "bench_test3.js")]
+
+        if os.path.join(parentDir,basename) in [ os.path.join(*test) for test in authTestsToSkip ]:
             return True
 
     return False
@@ -365,11 +409,15 @@ def runTest(test):
         if os.path.basename(path) in ('python', 'python.exe'):
             path = argv[1]
     elif ext == ".js":
-        argv = [shell_executable, "--port", mongod_port]
+        argv = [shell_executable, "--port", mongod_port, '--authenticationMechanism', authMechanism]
         if not usedb:
             argv += ["--nodb"]
         if small_oplog or small_oplog_rs:
             argv += ["--eval", 'testingReplication = true;']
+        if use_ssl:
+            argv += ["--ssl",
+                     "--sslPEMKeyFile", "jstests/libs/client.pem",
+                     "--sslCAFile", "jstests/libs/ca.pem"]
         argv += [path]
     elif ext in ["", ".exe"]:
         # Blech.
@@ -382,12 +430,13 @@ def runTest(test):
             argv = [test_path and os.path.abspath(os.path.join(test_path, path)) or path,
                     "--port", mongod_port]
     else:
-        raise Bug("fell off in extenstion case: %s" % path)
+        raise Bug("fell off in extension case: %s" % path)
 
     if keyFile:
         f = open(keyFile, 'r')
         keyFileData = re.sub(r'\s', '', f.read()) # Remove all whitespace
         f.close()
+        os.chmod(keyFile, stat.S_IRUSR | stat.S_IWUSR)
     else:
         keyFileData = None
 
@@ -435,16 +484,30 @@ def runTest(test):
     t2 = time.time()
     del os.environ['MONGO_TEST_FILENAME']
 
-    sys.stdout.write("                %fms\n" % ((t2 - t1) * 1000))
+    timediff = t2 - t1
+    # timediff is seconds by default
+    scale = 1
+    suffix = "seconds"
+    # if timediff is less than 10 seconds use ms
+    if timediff < 10:
+        scale = 1000
+        suffix = "ms"
+    # if timediff is more than 60 seconds use minutes
+    elif timediff > 60:
+        scale = 1.0 / 60.0
+        suffix = "minutes"
+    sys.stdout.write("                %10.4f %s\n" % ((timediff) * scale, suffix))
     sys.stdout.flush()
 
     if r != 0:
         raise TestExitFailure(path, r)
     
-    try:
-        c = Connection( "127.0.0.1" , int(mongod_port) )
-    except Exception,e:
-        raise TestServerFailure(path)
+    if start_mongod:
+        try:
+            c = Connection(host="127.0.0.1", port=int(mongod_port), ssl=use_ssl)
+        except Exception,e:
+            print "Exception from pymongo: ", e
+            raise TestServerFailure(path)
 
     print ""
 
@@ -457,12 +520,28 @@ def run_tests(tests):
     # The reason we want to use "with" is so that we get __exit__ semantics
     # but "with" is only supported on Python 2.5+
 
-    master = mongod(small_oplog_rs=small_oplog_rs,small_oplog=small_oplog,no_journal=no_journal,no_preallocj=no_preallocj,auth=auth).__enter__()
+    if start_mongod:
+        master = mongod(small_oplog_rs=small_oplog_rs,
+                        small_oplog=small_oplog,
+                        no_journal=no_journal,
+                        no_preallocj=no_preallocj,
+                        auth=auth,
+                        authMechanism=authMechanism,
+                        use_ssl=use_ssl).__enter__()
+    else:
+        master = Nothing()
     try:
         if small_oplog:
             slave = mongod(slave=True).__enter__()
         elif small_oplog_rs:
-            slave = mongod(slave=True,small_oplog_rs=small_oplog_rs,small_oplog=small_oplog,no_journal=no_journal,no_preallocj=no_preallocj,auth=auth).__enter__()
+            slave = mongod(slave=True,
+                           small_oplog_rs=small_oplog_rs,
+                           small_oplog=small_oplog,
+                           no_journal=no_journal,
+                           no_preallocj=no_preallocj,
+                           auth=auth,
+                           authMechanism=authMechanism,
+                           use_ssl=use_ssl).__enter__()
             primary = Connection(port=master.port, slave_okay=True);
 
             primary.admin.command({'replSetInitiate' : {'_id' : 'foo', 'members' : [
@@ -483,21 +562,36 @@ def run_tests(tests):
 
             tests_run = 0
             for tests_run, test in enumerate(tests):
+                test_result = { "test": test[0], "start": time.time() }
                 try:
                     fails.append(test)
                     runTest(test)
                     fails.pop()
                     winners.append(test)
 
+                    test_result["passed"] = True
+                    test_result["end"] = time.time()
+                    all_test_results.append( test_result )
+
                     if small_oplog or small_oplog_rs:
                         master.wait_for_repl()
-                    elif test[1]: # reach inside test and see if startmongod is true
+                    elif test[1]: # reach inside test and see if "usedb" is true
                         if (tests_run+1) % 20 == 0:
                             # restart mongo every 20 times, for our 32-bit machines
                             master.__exit__(None, None, None)
-                            master = mongod(small_oplog_rs=small_oplog_rs,small_oplog=small_oplog,no_journal=no_journal,no_preallocj=no_preallocj,auth=auth).__enter__()
+                            master = mongod(small_oplog_rs=small_oplog_rs,
+                                            small_oplog=small_oplog,
+                                            no_journal=no_journal,
+                                            no_preallocj=no_preallocj,
+                                            auth=auth,
+                                            authMechanism=authMechanism,
+                                            use_ssl=use_ssl).__enter__()
 
                 except TestFailure, f:
+                    test_result["passed"] = False
+                    test_result["end"] = time.time()
+                    test_result["error"] = str(f)
+                    all_test_results.append( test_result )
                     try:
                         print f
                         # Record the failing test and re-raise.
@@ -545,6 +639,8 @@ at the end of testing:"""
     if losers or lost_in_slave or lost_in_master or screwy_in_slave:
         raise Exception("Test failures")
 
+# Keys are the suite names (passed on the command line to smoke.py)
+# Values are pairs: (filenames, <start mongod before running tests>)
 suiteGlobalConfig = {"js": ("[!_]*.js", True),
                      "quota": ("quota/*.js", True),
                      "jsPerf": ("perf/*.js", True),
@@ -560,7 +656,9 @@ suiteGlobalConfig = {"js": ("[!_]*.js", True),
                      "sharding": ("sharding/*.js", False),
                      "tool": ("tool/*.js", False),
                      "aggregation": ("aggregation/*.js", True),
-                     "multiVersion": ("multiVersion/*.js", True )
+                     "multiVersion": ("multiVersion/*.js", True),
+                     "failPoint": ("fail_point/*.js", False),
+                     "ssl": ("ssl/*.js", True)
                      }
 
 def expand_suites(suites,expandUseDB=True):
@@ -628,8 +726,13 @@ def add_exe(e):
     return e
 
 def set_globals(options, tests):
-    global mongod_executable, mongod_port, shell_executable, continue_on_failure, small_oplog, small_oplog_rs, no_journal, no_preallocj, auth, keyFile, smoke_db_prefix, test_path
+    global mongod_executable, mongod_port, shell_executable, continue_on_failure, small_oplog, small_oplog_rs
+    global no_journal, no_preallocj, auth, authMechanism, keyFile, smoke_db_prefix, test_path, start_mongod
+    global use_ssl
     global file_of_commands_mode
+    start_mongod = options.start_mongod
+    if hasattr(options, 'use_ssl'):
+        use_ssl = options.use_ssl
     #Careful, this can be called multiple times
     test_path = options.test_path
 
@@ -656,8 +759,10 @@ def set_globals(options, tests):
             print "Not running client suite with auth even though --auth was provided"
         auth = False;
         keyFile = False;
+        authMechanism = None
     else:
         auth = options.auth
+        authMechanism = options.authMechanism
         keyFile = options.keyFile
 
     if auth and not keyFile:
@@ -669,6 +774,9 @@ def set_globals(options, tests):
     # file (or stdin) rather than running a suite of js tests
     file_of_commands_mode = options.File and options.mode == 'files'
 
+def file_version():
+    return md5(open(__file__, 'r').read()).hexdigest()
+
 def clear_failfile():
     if os.path.exists(failfile):
         os.remove(failfile)
@@ -678,7 +786,7 @@ def run_old_fails():
 
     try:
         f = open(failfile, 'r')
-        testsAndOptions = pickle.load(f)
+        state = pickle.load(f)
         f.close()
     except Exception:
         try:
@@ -688,6 +796,12 @@ def run_old_fails():
         clear_failfile()
         return # This counts as passing so we will run all tests
 
+    if ('version' not in state or state['version'] != file_version()):
+        print "warning: old version of failfile.smoke detected. skipping recent fails"
+        clear_failfile()
+        return
+
+    testsAndOptions = state['testsAndOptions']
     tests = [x[0] for x in testsAndOptions]
     passed = []
     try:
@@ -715,7 +829,8 @@ def run_old_fails():
 
         if testsAndOptions:
             f = open(failfile, 'w')
-            pickle.dump(testsAndOptions, f)
+            state = {'version':file_version(), 'testsAndOptions':testsAndOptions}
+            pickle.dump(state, f)
         else:
             clear_failfile()
 
@@ -724,7 +839,7 @@ def run_old_fails():
 def add_to_failfile(tests, options):
     try:
         f = open(failfile, 'r')
-        testsAndOptions = pickle.load(f)
+        testsAndOptions = pickle.load(f)["testsAndOptions"]
     except Exception:
         testsAndOptions = []
 
@@ -732,8 +847,9 @@ def add_to_failfile(tests, options):
         if (test, options) not in testsAndOptions:
             testsAndOptions.append( (test, options) )
 
+    state = {'version':file_version(), 'testsAndOptions':testsAndOptions}
     f = open(failfile, 'w')
-    pickle.dump(testsAndOptions, f)
+    pickle.dump(state, f)
 
 
 
@@ -776,6 +892,8 @@ def main():
     parser.add_option('--auth', dest='auth', default=False,
                       action="store_true",
                       help='Run standalone mongods in tests with authentication enabled')
+    parser.add_option('--authMechanism', dest='authMechanism', default='MONGO-CR',
+                      help='Use the given authentication mechanism, when --auth is used.')
     parser.add_option('--keyFile', dest='keyFile', default=None,
                       help='Path to keyFile to use to run replSet and sharding tests with authentication enabled')
     parser.add_option('--ignore', dest='ignore_files', default=None,
@@ -789,6 +907,12 @@ def main():
     parser.add_option('--with-cleanbb', dest='with_cleanbb', default=False,
                       action="store_true",
                       help='Clear database files from previous smoke.py runs')
+    parser.add_option('--dont-start-mongod', dest='start_mongod', default=True, 
+                      action='store_false',
+                      help='Do not start mongod before commencing test running')
+    parser.add_option('--use-ssl', dest='use_ssl', default=False,
+                      action='store_true',
+                      help='Run mongo shell and mongod instances with SSL encryption')
 
     # Buildlogger invocation from command line
     parser.add_option('--buildlogger-builder', dest='buildlogger_builder', default=None,
@@ -836,11 +960,20 @@ def main():
     if options.mode == 'suite':
         tests = expand_suites(tests)
     elif options.mode == 'files':
-        tests = [(os.path.abspath(test), True) for test in tests]
+        tests = [(os.path.abspath(test), start_mongod) for test in tests]
 
     if options.ignore_files != None :
         ignore_patt = re.compile( options.ignore_files )
-        tests = filter( lambda x : ignore_patt.search( x[0] ) == None, tests )
+        print "Ignoring files with pattern: ", ignore_patt
+	
+        def ignore_test( test ):
+            if ignore_patt.search( test[0] ) != None:
+                print "Ignoring test ", test[0]
+                return False
+            else:
+                return True
+
+        tests = filter( ignore_test, tests )
 
     if not tests:
         print "warning: no tests specified"
@@ -854,8 +987,12 @@ def main():
         run_tests(tests)
     finally:
         add_to_failfile(fails, options)
-        report()
 
+        f = open( "smoke-last.json", "wb" )
+        f.write( json.dumps( { "results" : all_test_results } ) )
+        f.close()
+
+        report()
 
 if __name__ == "__main__":
     main()

@@ -20,7 +20,7 @@
 namespace mongo {
 
     size_t SystemInfo::getPhysicalRam() {
-	return 0;
+        return 0;
     }
 
 }

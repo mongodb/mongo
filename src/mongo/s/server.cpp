@@ -20,6 +20,8 @@
 
 #include <boost/thread/thread.hpp>
 
+#include "mongo/base/initializer.h"
+#include "mongo/db/initialize_server_global_state.h"
 #include "../util/net/message.h"
 #include "../util/startup_test.h"
 #include "../client/connpool.h"
@@ -41,23 +43,29 @@
 #include "balance.h"
 #include "grid.h"
 #include "cursors.h"
-#include "shard_version.h"
 #include "../util/processinfo.h"
 #include "mongo/db/lasterror.h"
+#include "mongo/s/config_upgrade.h"
 #include "mongo/util/stacktrace.h"
+#include "mongo/util/exception_filter_win32.h"
 
 #if defined(_WIN32)
 # include "../util/ntservice.h"
 #endif
 
+namespace {
+    bool _isUpgradeSwitchSet = false;
+}
+
 namespace mongo {
 
 #if defined(_WIN32)
-    ntServiceDefaultStrings defaultServiceStrings = {
+    ntservice::NtServiceDefaultStrings defaultServiceStrings = {
         L"MongoS",
         L"Mongo DB Router",
         L"Mongo DB Sharding Router"
     };
+    static void initService();
 #endif
 
     CmdLine cmdLine;
@@ -86,10 +94,7 @@ namespace mongo {
         virtual ~ShardedMessageHandler() {}
 
         virtual void connected( AbstractMessagingPort* p ) {
-            ClientInfo *c = ClientInfo::get();
-            massert(15849, "client info not defined", c);
-            if( p->remote().isLocalHost() )
-                c->getAuthenticationInfo()->setIsALocalHostConnectionWithSpecialAuthPowers();
+            ClientInfo::create(p);
         }
 
         virtual void process( Message& m , AbstractMessagingPort* p , LastError * le) {
@@ -104,7 +109,7 @@ namespace mongo {
                 r.process();
             }
             catch ( AssertionException & e ) {
-                log( e.isUserAssertion() ? 1 : 0 ) << "AssertionException while processing op type : " << m.operation() << " to : " << r.getns() << causedBy(e) << endl;
+                LOG( e.isUserAssertion() ? 1 : 0 ) << "AssertionException while processing op type : " << m.operation() << " to : " << r.getns() << causedBy(e) << endl;
 
                 le->raiseError( e.getCode() , e.what() );
 
@@ -116,6 +121,9 @@ namespace mongo {
                 }
             }
             catch ( DBException& e ) {
+                // note that e.toString() is more detailed on a SocketException than 
+                // e.what().  we should think about what is the right level of detail both 
+                // for logging and return code.
                 log() << "DBException in process: " << e.what() << endl;
 
                 le->raiseError( e.getCode() , e.what() );
@@ -123,8 +131,12 @@ namespace mongo {
                 m.header()->id = r.id();
 
                 if ( r.expectResponse() ) {
-                    BSONObj err = BSON( "$err" << e.what() << "code" << e.getCode() );
-                    replyToQuery( ResultFlag_ErrSet, p , m , err );
+                    BSONObjBuilder b;
+                    b.append("$err",e.what()).append("code",e.getCode());
+                    if( !e._shard.empty() ) {
+                        b.append("shard",e._shard);
+                    }
+                    replyToQuery( ResultFlag_ErrSet, p , m , b.obj() );
                 }
             }
         }
@@ -158,7 +170,11 @@ namespace mongo {
 #if defined(SIGBUS)
         signal( SIGBUS , printStackAndExit );
 #endif
+#if defined(SIGPIPE)
+        signal( SIGPIPE , SIG_IGN );
+#endif
 
+        setWindowsUnhandledExceptionFilter();
         set_new_handler( my_new_handler );
     }
 
@@ -245,16 +261,22 @@ static bool runMongosServer( bool doUpgrade ) {
         task::repeat(new CheckConfigServers, 60*1000);
     }
 
-    int configError = configServer.checkConfigVersion( doUpgrade );
-    if ( configError ) {
-        if ( configError > 0 ) {
-            log() << "upgrade success!" << endl;
-        }
-        else {
-            log() << "config server error: " << configError << endl;
-        }
+    VersionType initVersionInfo;
+    VersionType versionInfo;
+    string errMsg;
+    bool upgraded = checkAndUpgradeConfigVersion(ConnectionString(configServer.getPrimary()
+                                                         .getConnString()),
+                                                 doUpgrade,
+                                                 &initVersionInfo,
+                                                 &versionInfo,
+                                                 &errMsg);
+
+    if (!upgraded) {
+        error() << "error upgrading config database to v" << CURRENT_CONFIG_VERSION
+                << causedBy(errMsg) << endl;
         return false;
     }
+
     configServer.reloadSettings();
 
     init();
@@ -280,10 +302,7 @@ static bool runMongosServer( bool doUpgrade ) {
 
 namespace po = boost::program_options;
 
-int _main(int argc, char* argv[]) {
-    static StaticObserver staticObserver;
-    mongosCommand = argv[0];
-
+static void processCommandLineOptions(const std::vector<std::string>& argv) {
     po::options_description general_options("General options");
 #if defined(_WIN32)
     po::options_description windows_scm_options("Windows Service Control Manager options");
@@ -334,8 +353,13 @@ int _main(int argc, char* argv[]) {
 
     // parse options
     po::variables_map params;
-    if ( ! CmdLine::store( argc, argv, visible_options, hidden_options, positional_options, params ) )
-        return 0;
+    if (!CmdLine::store(argv,
+                        visible_options,
+                        hidden_options,
+                        positional_options,
+                        params)) {
+        ::_exit(EXIT_FAILURE);
+    }
 
     // The default value may vary depending on compile options, but for mongos
     // we want durability to be disabled.
@@ -343,12 +367,12 @@ int _main(int argc, char* argv[]) {
 
     if ( params.count( "help" ) ) {
         cout << visible_options << endl;
-        return 0;
+        ::_exit(EXIT_SUCCESS);
     }
 
     if ( params.count( "version" ) ) {
         printShardingVersionInfo(true);
-        return 0;
+        ::_exit(EXIT_SUCCESS);
     }
 
     if ( params.count( "connPoolTimeout" ) ) {
@@ -370,7 +394,7 @@ int _main(int argc, char* argv[]) {
         // validate chunksize before proceeding
         if ( csize == 0 ) {
             out() << "error: need a non-zero chunksize" << endl;
-            return 11;
+            ::_exit(EXIT_FAILURE);
         }
 
         Chunk::MaxChunkSize = csize * 1024 * 1024;
@@ -392,7 +416,7 @@ int _main(int argc, char* argv[]) {
         logLevel = 5;
         StartupTest::runTests();
         cout << "tests passed" << endl;
-        return 0;
+        ::_exit(EXIT_SUCCESS);
     }
 
     if (params.count("noscripting")) {
@@ -410,18 +434,36 @@ int _main(int argc, char* argv[]) {
 
     if ( ! params.count( "configdb" ) ) {
         out() << "error: no args for --configdb" << endl;
-        return 4;
+        ::_exit(EXIT_FAILURE);
     }
 
     splitStringDelim( params["configdb"].as<string>() , &configdbs , ',' );
     if ( configdbs.size() != 1 && configdbs.size() != 3 ) {
         out() << "need either 1 or 3 configdbs" << endl;
-        return 5;
+        ::_exit(EXIT_FAILURE);
     }
 
     if( configdbs.size() == 1 ) {
         warning() << "running with 1 config server should be done only for testing purposes and is not recommended for production" << endl;
     }
+
+    _isUpgradeSwitchSet = params.count("upgrade");
+
+#if defined(_WIN32)
+    vector<string> disallowedOptions;
+    disallowedOptions.push_back( "upgrade" );
+    ntservice::configureService(initService,
+                                params,
+                                defaultServiceStrings,
+                                disallowedOptions,
+                                argv);
+#endif
+}
+
+static int _main() {
+
+    if (!initializeServerGlobalState())
+        return EXIT_FAILURE;
 
     // we either have a setting where all processes are in localhost or none are
     for ( vector<string>::const_iterator it = configdbs.begin() ; it != configdbs.end() ; ++it ) {
@@ -446,37 +488,39 @@ int _main(int argc, char* argv[]) {
     }
 
 #if defined(_WIN32)
-    vector<string> disallowedOptions;
-    disallowedOptions.push_back( "upgrade" );
-    if ( serviceParamsCheck( params, "", defaultServiceStrings, disallowedOptions, argc, argv ) ) {
-        return 0;   // this means that we are running as a service, and we won't
-                    // reach this statement until initService() has run and returned,
-                    // but it usually exits directly so we never actually get here
+    if (ntservice::shouldStartService()) {
+        ntservice::startService();
+        // if we reach here, then we are not running as a service.  service installation
+        // exits directly and so never reaches here either.
     }
-    // if we reach here, then we are not running as a service.  service installation
-    // exits directly and so never reaches here either.
 #endif
 
-    runMongosServer( params.count( "upgrade" ) > 0 );
+    runMongosServer(_isUpgradeSwitchSet);
     return 0;
 }
 
 #if defined(_WIN32)
 namespace mongo {
-
-    bool initService() {
-        ServiceController::reportStatus( SERVICE_RUNNING );
+    static void initService() {
+        ntservice::reportStatus( SERVICE_RUNNING );
         log() << "Service running" << endl;
         runMongosServer( false );
-        return true;
     }
-
-} // namespace mongo
+}  // namespace mongo
 #endif
 
-int main(int argc, char* argv[]) {
+int main(int argc, char* argv[], char** envp) {
+    static StaticObserver staticObserver;
+    if (argc < 1)
+        ::_exit(EXIT_FAILURE);
+
+    mongosCommand = argv[0];
+
+    processCommandLineOptions(std::vector<std::string>(argv, argv + argc));
+    mongo::runGlobalInitializersOrDie(argc, argv, envp);
+    CmdLine::censor(argc, argv);
     try {
-        int exitCode = _main(argc, argv);
+        int exitCode = _main();
         ::_exit(exitCode);
     }
     catch(SocketException& e) {

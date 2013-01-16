@@ -18,11 +18,15 @@
 
 #include "mongo/db/client.h"
 #include "mongo/db/commands/fsync.h"
+#include "mongo/db/commands/server_status.h"
 #include "mongo/db/repl/bgsync.h"
 #include "mongo/db/repl/rs_sync.h"
+#include "mongo/util/fail_point_service.h"
 
 namespace mongo {
 namespace replset {
+    MONGO_FP_DECLARE(rsBgSyncProduce);
+
     BackgroundSync* BackgroundSync::s_instance = 0;
     boost::mutex BackgroundSync::s_mutex;
 
@@ -36,6 +40,8 @@ namespace replset {
                                        _lastOpTimeFetched(0, 0),
                                        _lastH(0),
                                        _pause(true),
+                                       _appliedBuffer(true),
+                                       _assumingPrimary(false),
                                        _currentSyncTarget(NULL),
                                        _oplogMarkerTarget(NULL),
                                        _oplogMarker(true /* doHandshake */),
@@ -70,13 +76,27 @@ namespace replset {
     }
 
     void BackgroundSync::notify() {
-        boost::unique_lock<boost::mutex> lock(s_mutex);
-        if (s_instance == NULL) {
-            return;
+        {
+            boost::unique_lock<boost::mutex> lock(s_mutex);
+            if (s_instance == NULL) {
+                return;
+            }
         }
 
-        boost::unique_lock<boost::mutex> opLock(s_instance->_lastOpMutex);
-        s_instance->_lastOpCond.notify_all();
+        {
+            boost::unique_lock<boost::mutex> opLock(s_instance->_lastOpMutex);
+            s_instance->_lastOpCond.notify_all();
+        }
+
+        {
+            boost::unique_lock<boost::mutex> lock(s_instance->_mutex);
+
+            // If all ops in the buffer have been applied, unblock waitForRepl (if it's waiting)
+            if (s_instance->_buffer.empty()) {
+                s_instance->_appliedBuffer = true;
+                s_instance->_condvar.notify_all();
+            }
+        }
     }
 
     void BackgroundSync::notifierThread() {
@@ -222,7 +242,7 @@ namespace replset {
         MemberState state = theReplSet->state();
 
         // we want to pause when the state changes to primary
-        if (state.primary()) {
+        if (isAssumingPrimary() || state.primary()) {
             if (!_pause) {
                 stop();
             }
@@ -277,6 +297,10 @@ namespace replset {
             return;
         }
 
+        while (MONGO_FAIL_POINT(rsBgSyncProduce)) {
+            sleepmillis(0);
+        }
+
         uassert(1000, "replSet source for syncing doesn't seem to be await capable -- is it an older version of mongodb?", r.awaitCapable() );
 
         if (isRollbackRequired(r)) {
@@ -291,15 +315,13 @@ namespace replset {
                         return;
                     }
 
-                    if (theReplSet->isPrimary()) {
+                    if (isAssumingPrimary() || theReplSet->isPrimary()) {
                         return;
                     }
 
-                    {
-                        boost::unique_lock<boost::mutex> lock(_mutex);
-                        if (!_currentSyncTarget || !_currentSyncTarget->hbinfo().hbstate.readable()) {
-                            return;
-                        }
+                    // re-evaluate quality of sync target
+                    if (shouldChangeSyncTarget()) {
+                        return;
                     }
 
                     r.more();
@@ -309,6 +331,11 @@ namespace replset {
                     break;
 
                 BSONObj o = r.nextSafe().getOwned();
+
+                {
+                    boost::unique_lock<boost::mutex> lock(_mutex);
+                    _appliedBuffer = false;
+                }
 
                 Timer timer;
                 // the blocking queue will wait (forever) until there's room for us to push
@@ -345,6 +372,20 @@ namespace replset {
             // looping back is ok because this is a tailable cursor
         }
     }
+
+    bool BackgroundSync::shouldChangeSyncTarget() {
+        boost::unique_lock<boost::mutex> lock(_mutex);
+
+        // is it even still around?
+        if (!_currentSyncTarget || !_currentSyncTarget->hbinfo().hbstate.readable()) {
+            return true;
+        }
+
+        // check other members: is any member's optime more than 30 seconds ahead of the guy we're
+        // syncing from?
+        return theReplSet->shouldChangeSyncTarget(_currentSyncTarget->hbinfo().opTime);
+    }
+
 
     bool BackgroundSync::peek(BSONObj* op) {
         {
@@ -397,15 +438,20 @@ namespace replset {
     }
 
     void BackgroundSync::getOplogReader(OplogReader& r) {
-        Member *target = NULL, *stale = NULL;
+        const Member *target = NULL, *stale = NULL;
         BSONObj oldest;
 
-        // then we're initial syncing and we're still waiting for this to be set
         {
             boost::unique_lock<boost::mutex> lock(_mutex);
             if (_lastOpTimeFetched.isNull()) {
+                // then we're initial syncing and we're still waiting for this to be set
                 _currentSyncTarget = NULL;
                 return;
+            }
+
+            // Wait until we've applied the ops we have before we choose a sync target
+            while (!_appliedBuffer) {
+                _condvar.wait(lock);
             }
         }
 
@@ -415,7 +461,7 @@ namespace replset {
             string current = target->fullName();
 
             if (!r.connect(current)) {
-                log(2) << "replSet can't connect to " << current << " to read operations" << rsLog;
+                LOG(2) << "replSet can't connect to " << current << " to read operations" << rsLog;
                 r.resetConnection();
                 theReplSet->veto(current);
                 continue;
@@ -462,7 +508,8 @@ namespace replset {
                 }
                 OpTime theirTS = theirLastOp["ts"]._opTime();
                 if (theirTS < _lastOpTimeFetched) {
-                    log() << "replSet we are ahead of the primary, will try to roll back" << rsLog;
+                    log() << "replSet we are ahead of the sync source, will try to roll back"
+                          << rsLog;
                     theReplSet->syncRollback(r);
                     return true;
                 }
@@ -490,29 +537,20 @@ namespace replset {
         return false;
     }
 
-    Member* BackgroundSync::getSyncTarget() {
+    const Member* BackgroundSync::getSyncTarget() {
         boost::unique_lock<boost::mutex> lock(_mutex);
         return _currentSyncTarget;
     }
 
     void BackgroundSync::stop() {
-        {
-            boost::unique_lock<boost::mutex> lock(_mutex);
+        boost::unique_lock<boost::mutex> lock(_mutex);
 
-            _pause = true;
-            _currentSyncTarget = NULL;
-            _lastOpTimeFetched = OpTime(0,0);
-            _lastH = 0;
-            _queueCounter.numElems = 0;
-        }
-
-        if (!_buffer.empty()) {
-            log() << "replset " << _buffer.size() << " ops were not applied from buffer, this should "
-                  << "cause a rollback on the former primary" << rsLog;
-        }
-
-        // get rid of pending ops
-        _buffer.clear();
+        _pause = true;
+        _currentSyncTarget = NULL;
+        _lastOpTimeFetched = OpTime(0,0);
+        _lastH = 0;
+        _queueCounter.numElems = 0;
+        _condvar.notify_all();
     }
 
     void BackgroundSync::start() {
@@ -526,7 +564,41 @@ namespace replset {
         _lastH = theReplSet->lastH;
 
         LOG(1) << "replset bgsync fetch queue set to: " << _lastOpTimeFetched << " " << _lastH << rsLog;
-   }
+    }
+
+    bool BackgroundSync::isAssumingPrimary() {
+        boost::unique_lock<boost::mutex> lck(_mutex);
+        return _assumingPrimary;
+    }
+
+    void BackgroundSync::stopReplicationAndFlushBuffer() {
+        boost::unique_lock<boost::mutex> lck(_mutex);
+
+        // 1. Tell syncing to stop
+        _assumingPrimary = true;
+
+        // 2. Wait for syncing to stop and buffer to be applied
+        while (!(_pause && _appliedBuffer)) {
+            _condvar.wait(lck);
+        }
+
+        // 3. Now actually become primary
+        _assumingPrimary = false;
+    }
+
+    class ReplNetworkQueueSSS : public ServerStatusSection {
+    public:
+        ReplNetworkQueueSSS() : ServerStatusSection( "replNetworkQueue" ){}
+        virtual bool includeByDefault() const { return true; }
+
+        BSONObj generateSection(const BSONElement& configElement) const {
+            if ( ! theReplSet )
+                return BSONObj();
+            
+            return replset::BackgroundSync::get()->getCounters();
+        }
+
+    } replNetworkQueueSSS;
 
 } // namespace replset
 } // namespace mongo

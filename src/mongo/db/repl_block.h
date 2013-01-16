@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "../pch.h"
+#include "mongo/pch.h"
 #include "client.h"
 #include "curop.h"
 
@@ -35,6 +35,8 @@ namespace mongo {
     bool opReplicatedEnough( OpTime op , BSONElement w );
 
     bool waitForReplication( OpTime op , int w , int maxSecondsToWait );
+
+    std::vector<std::string> getHostsReplicatedTo(OpTime& op);
 
     void resetSlaveCache();
     unsigned getSlaveCount();

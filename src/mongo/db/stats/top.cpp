@@ -16,10 +16,15 @@
  */
 
 
-#include "pch.h"
-#include "top.h"
-#include "../../util/net/message.h"
-#include "../commands.h"
+#include "mongo/pch.h"
+
+#include "mongo/db/stats/top.h"
+
+#include "mongo/db/auth/action_set.h"
+#include "mongo/db/auth/action_type.h"
+#include "mongo/db/auth/privilege.h"
+#include "mongo/util/net/message.h"
+#include "mongo/db/commands.h"
 
 namespace mongo {
 
@@ -43,18 +48,18 @@ namespace mongo {
     }
 
     void Top::record( const StringData& ns , int op , int lockType , long long micros , bool command ) {
-        if ( ns.data()[0] == '?' )
+        if ( ns[0] == '?' )
             return;
 
         //cout << "record: " << ns << "\t" << op << "\t" << command << endl;
         SimpleMutex::scoped_lock lk(_lock);
 
-        if ( ( command || op == dbQuery ) && str::equals( ns.data(), _lastDropped.c_str() ) ) {
+        if ( ( command || op == dbQuery ) && ns == _lastDropped ) {
             _lastDropped = "";
             return;
         }
 
-        CollectionData& coll = _usage[ns.data()];
+        CollectionData& coll = _usage[ns];
         _record( coll , op , lockType , micros , command );
         _record( _global , op , lockType , micros , command );
     }
@@ -119,10 +124,19 @@ namespace mongo {
     }
 
     void Top::_appendToUsageMap( BSONObjBuilder& b , const UsageMap& map ) const {
-        for ( UsageMap::const_iterator i=map.begin(); i!=map.end(); i++ ) {
-            BSONObjBuilder bb( b.subobjStart( i->first ) );
+        // pull all the names into a vector so we can sort them for the user
+        
+        vector<string> names;
+        for ( UsageMap::const_iterator i = map.begin(); i != map.end(); ++i ) {
+            names.push_back( i->first );
+        }
+        
+        std::sort( names.begin(), names.end() );
 
-            const CollectionData& coll = i->second;
+        for ( size_t i=0; i<names.size(); i++ ) {
+            BSONObjBuilder bb( b.subobjStart( names[i] ) );
+
+            const CollectionData& coll = map.find(names[i])->second;
 
             _appendStatsEntry( b , "total" , coll.total );
 
@@ -153,9 +167,15 @@ namespace mongo {
 
         virtual bool slaveOk() const { return true; }
         virtual bool adminOnly() const { return true; }
-        virtual LockType locktype() const { return READ; }
+        virtual LockType locktype() const { return NONE; }
         virtual void help( stringstream& help ) const { help << "usage by collection, in micros "; }
-
+        virtual void addRequiredPrivileges(const std::string& dbname,
+                                           const BSONObj& cmdObj,
+                                           std::vector<Privilege>* out) {
+            ActionSet actions;
+            actions.addAction(ActionType::top);
+            out->push_back(Privilege(AuthorizationManager::SERVER_RESOURCE_NAME, actions));
+        }
         virtual bool run(const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             {
                 BSONObjBuilder b( result.subobjStart( "totals" ) );

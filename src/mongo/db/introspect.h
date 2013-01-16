@@ -19,7 +19,7 @@
 
 #pragma once
 
-#include "../pch.h"
+#include "mongo/pch.h"
 #include "jsobj.h"
 #include "pdfile.h"
 
@@ -29,7 +29,7 @@ namespace mongo {
        do when database->profile is set
     */
 
-    void profile( const Client& c , CurOp& currentOp );
+    void profile(const Client& c, int op, CurOp& currentOp);
 
     /**
      * Get (or create) the profile collection
@@ -38,6 +38,6 @@ namespace mongo {
      * @param   force   Always create the collection if it does not exist
      * @return  NamespaceDetails for the newly created collection, or NULL on error
     **/
-    NamespaceDetails* getOrCreateProfileCollection(Database *db, bool force = false);
+    NamespaceDetails* getOrCreateProfileCollection(Database *db, bool force = false, string* errmsg = NULL);
 
 } // namespace mongo

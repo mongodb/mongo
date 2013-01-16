@@ -22,10 +22,12 @@
 #ifdef MONGO_MACROS_PUSHED
 
 // util/allocator.h
+#ifdef MONGO_MALLOC
 #undef malloc
 #pragma pop_macro("malloc")
 #undef realloc
 #pragma pop_macro("realloc")
+#endif
 
 // util/assert_util.h
 #undef dassert
@@ -36,6 +38,8 @@
 #pragma pop_macro("massert")
 #undef uassert
 #pragma pop_macro("uassert")
+#undef uassertStatusOK
+#pragma pop_macro("uassertStatusOK")
 #undef verify
 #pragma pop_macro("verify")
 #undef DESTRUCTOR_GUARD

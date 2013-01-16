@@ -1,5 +1,5 @@
 function testInvalidDBNameThrowsExceptionWithConstructor() {
-    assert.throws( function() { return new DB( null, "*?" ); } );
+    assert.throws( function() { return new DB( null, "/\\" ); } );
 }
 
 function testInvalidDBNameThrowsExceptionWithSibling() {

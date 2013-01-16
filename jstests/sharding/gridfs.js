@@ -19,12 +19,7 @@ function testGridFS(name) {
     var rawmd5 = md5sumFile(filename)
 
     // upload file (currently calls filemd5 internally)
-    var mongofiles_args = ["mongofiles", "--port", mongos.port, "put", filename, '--db', name];
-    if (jsTestOptions().auth) { // SERVER-4237
-        mongofiles_args.push.apply(mongofiles_args, ['-u', jsTestOptions().adminUser,
-                                                     "-p", jsTestOptions().adminPassword]);
-    }
-    runMongoProgram.apply(null, mongofiles_args);
+    runMongoProgram.apply(null, ["mongofiles", "--port", mongos.port, "put", filename, '--db', name]);
 
     assert.eq(d.fs.files.count(), 1)
     var fileObj = d.fs.files.findOne()

@@ -25,7 +25,7 @@
 #include <vector>
 
 #include "mongo/bson/bsonelement.h"
-#include "mongo/bson/stringdata.h"
+#include "mongo/base/string_data.h"
 #include "mongo/bson/util/atomic_int.h"
 #include "mongo/bson/util/builder.h"
 
@@ -224,9 +224,9 @@ namespace mongo {
         }
 
         /** @return true if field exists */
-        bool hasField( const char * name ) const { return !getField(name).eoo(); }
+        bool hasField( const StringData& name ) const { return !getField(name).eoo(); }
         /** @return true if field exists */
-        bool hasElement(const char *name) const { return hasField(name); }
+        bool hasElement(const StringData& name) const { return hasField(name); }
 
         /** @return "" if DNE or wrong type */
         const char * getStringField(const char *name) const;
@@ -331,6 +331,14 @@ namespace mongo {
          */
         bool isPrefixOf( const BSONObj& otherObj ) const;
 
+        /**
+         * @param otherObj
+         * @return returns true if the list of field names in 'this' is a prefix
+         * of the list of field names in otherObj.  Similar to 'isPrefixOf',
+         * but ignores the field values and only looks at field names.
+         */
+        bool isFieldNamePrefixOf( const BSONObj& otherObj ) const;
+
         /** This is "shallow equality" -- ints and doubles won't match.  for a
            deep equality test use woCompare (which is slower).
         */
@@ -412,7 +420,8 @@ namespace mongo {
             opELEM_MATCH = 0x12,
             opNEAR = 0x13,
             opWITHIN = 0x14,
-            opMAX_DISTANCE=0x15
+            opMAX_DISTANCE = 0x15,
+            opGEO_INTERSECTS = 0x16,
         };
 
         /** add all elements of the object to the specified vector */
@@ -456,6 +465,8 @@ namespace mongo {
             verify( objsize() );
             b.appendBuf(reinterpret_cast<const void *>( objdata() ), objsize());
         }
+
+        template<typename T> bool coerceVector( std::vector<T>* out ) const;
 
 #pragma pack(1)
         class Holder : boost::noncopyable {

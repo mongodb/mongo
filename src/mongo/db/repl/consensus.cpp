@@ -27,6 +27,13 @@ namespace mongo {
     class CmdReplSetFresh : public ReplSetCommand {
     public:
         CmdReplSetFresh() : ReplSetCommand("replSetFresh") { }
+        virtual void addRequiredPrivileges(const std::string& dbname,
+                                           const BSONObj& cmdObj,
+                                           std::vector<Privilege>* out) {
+            ActionSet actions;
+            actions.addAction(ActionType::replSetFresh);
+            out->push_back(Privilege(AuthorizationManager::SERVER_RESOURCE_NAME, actions));
+        }
     private:
 
         bool shouldVeto(const BSONObj& cmdObj, string& errmsg) {
@@ -41,29 +48,37 @@ namespace mongo {
             const Member* hopeful = theReplSet->findById(id);
             const Member *highestPriority = theReplSet->getMostElectable();
 
-            if( !hopeful ) {
+            if (!hopeful) {
                 errmsg = str::stream() << "replSet couldn't find member with id " << id;
                 return true;
             }
-            else if( theReplSet->isPrimary() && theReplSet->lastOpTimeWritten >= hopeful->hbinfo().opTime ) {
+
+            if (theReplSet->isPrimary() &&
+                theReplSet->lastOpTimeWritten >= hopeful->hbinfo().opTime) {
                 // hbinfo is not updated, so we have to check the primary's last optime separately
                 errmsg = str::stream() << "I am already primary, " << hopeful->fullName() <<
                     " can try again once I've stepped down";
                 return true;
             }
-            else if( primary && primary->hbinfo().opTime >= hopeful->hbinfo().opTime ) {
+
+            if (primary && primary->hbinfo().opTime >= hopeful->hbinfo().opTime) {
                 // other members might be aware of more up-to-date nodes
-                errmsg = str::stream() << hopeful->fullName() << " is trying to elect itself but " <<
-                    primary->fullName() << " is already primary and more up-to-date";
-                return true;
-            }
-            else if( highestPriority && highestPriority->config().priority > hopeful->config().priority) {
-                errmsg = str::stream() << hopeful->fullName() << " has lower priority than " << highestPriority->fullName();
+                errmsg = str::stream() << hopeful->fullName() <<
+                    " is trying to elect itself but " << primary->fullName() <<
+                    " is already primary and more up-to-date";
                 return true;
             }
 
-            if ( !theReplSet->isElectable(id) ||
-                (highestPriority && highestPriority->config().priority > hopeful->config().priority)) {
+            if (highestPriority &&
+                highestPriority->config().priority > hopeful->config().priority) {
+                errmsg = str::stream() << hopeful->fullName() << " has lower priority than " <<
+                    highestPriority->fullName();
+                return true;
+            }
+
+            if (!theReplSet->isElectable(id)) {
+                errmsg = str::stream() << "I don't think " << hopeful->fullName() <<
+                    " is electable";
                 return true;
             }
 
@@ -95,7 +110,12 @@ namespace mongo {
             }
             result.appendDate("opTime", theReplSet->lastOpTimeWritten.asDate());
             result.append("fresher", weAreFresher);
-            result.append("veto", shouldVeto(cmdObj, errmsg));
+
+            bool veto = shouldVeto(cmdObj, errmsg);
+            result.append("veto", veto);
+            if (veto) {
+                result.append("errmsg", errmsg);
+            }
 
             return true;
         }
@@ -104,6 +124,13 @@ namespace mongo {
     class CmdReplSetElect : public ReplSetCommand {
     public:
         CmdReplSetElect() : ReplSetCommand("replSetElect") { }
+        virtual void addRequiredPrivileges(const std::string& dbname,
+                                           const BSONObj& cmdObj,
+                                           std::vector<Privilege>* out) {
+            ActionSet actions;
+            actions.addAction(ActionType::replSetElect);
+            out->push_back(Privilege(AuthorizationManager::SERVER_RESOURCE_NAME, actions));
+        }
     private:
         virtual bool run(const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             if( !check(errmsg, result) )
@@ -132,11 +159,10 @@ namespace mongo {
 
     bool Consensus::shouldRelinquish() const {
         int vUp = rs._self->config().votes;
-        const long long T = rs.config().ho.heartbeatTimeoutMillis * rs.config().ho.heartbeatConnRetries;
         for( Member *m = rs.head(); m; m=m->next() ) {
-            long long dt = m->hbinfo().timeDown();
-            if( dt < T )
+            if (m->hbinfo().up()) {
                 vUp += m->config().votes;
+            }
         }
 
         // the manager will handle calling stepdown if another node should be
@@ -415,7 +441,7 @@ namespace mongo {
                 }
                 else {
                     /* succeeded. */
-                    log(1) << "replSet election succeeded, assuming primary role" << rsLog;
+                    LOG(1) << "replSet election succeeded, assuming primary role" << rsLog;
                     success = true;
                     rs.assumePrimary();
                 }

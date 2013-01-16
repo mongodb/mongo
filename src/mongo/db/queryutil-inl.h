@@ -74,7 +74,7 @@ namespace mongo {
         return true;
     }
 
-    inline unsigned FieldRangeVector::size() {
+    inline unsigned FieldRangeVector::size() const {
         unsigned ret = 1;
         for( vector<FieldRange>::const_iterator i = _ranges.begin(); i != _ranges.end(); ++i ) {
             unsigned long long product =

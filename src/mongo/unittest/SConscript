@@ -6,7 +6,8 @@ env.StaticLibrary("unittest", ['unittest.cpp'],
                   LIBDEPS=['$BUILD_DIR/mongo/foundation'])
 
 env.StaticLibrary("unittest_main", ['unittest_main.cpp'],
-                  LIBDEPS=['unittest'])
+                  LIBDEPS=['unittest',
+                           '$BUILD_DIR/mongo/base/base'])
 
 env.StaticLibrary("unittest_crutch", ['crutch.cpp'])
 

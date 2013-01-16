@@ -20,13 +20,15 @@
 
 #include <string>
 
+#include "mongo/util/assert_util.h"
+
 namespace mongo {
 
     using std::string;
 
     /* in the mongo source code, "client" means "database". */
 
-    const int MaxDatabaseNameLen = 128; // max str len for the db name, including null char
+    const size_t MaxDatabaseNameLen = 128; // max str len for the db name, including null char
 
     /* e.g.
        NamespaceString ns("acme.orders");
@@ -98,7 +100,13 @@ namespace mongo {
         static bool validDBName( const string& db ) {
             if ( db.size() == 0 || db.size() > 64 )
                 return false;
+#ifdef _WIN32
+            // We prohibit all FAT32-disallowed characters on Windows
             size_t good = strcspn( db.c_str() , "/\\. \"*<>:|?" );
+#else
+            // For non-Windows platforms we are much more lenient
+            size_t good = strcspn( db.c_str() , "/\\. \"" );
+#endif
             return good == db.size();
         }
 
@@ -113,8 +121,8 @@ namespace mongo {
          * @return if db.coll is an allowed collection name
          */
         static bool validCollectionName(const char* dbcoll){
-          const char *c = strchr( dbcoll, '.' ) + 1;
-          return normal(dbcoll) && c && *c;
+            const char *c = strchr( dbcoll, '.' );
+            return (c != NULL) && (c[1] != '\0') && normal(dbcoll);
         }
 
     private:
@@ -127,31 +135,90 @@ namespace mongo {
     };
 
     // "database.a.b.c" -> "database"
-    inline void nsToDatabase(const char *ns, char *database) {
-        for( int i = 0; i < MaxDatabaseNameLen; i++ ) {
-            database[i] = ns[i];
-            if( database[i] == '.' ) {
-                database[i] = 0;
-                return;
-            }
-            if( database[i] == 0 ) {
-                return;
-            }
-        }
-        // other checks should have happened already, this is defensive. thus massert not uassert
-        massert(10078, "nsToDatabase: ns too long", false);
-    }
-    inline string nsToDatabase(const char *ns) {
-        char buf[MaxDatabaseNameLen];
-        nsToDatabase(ns, buf);
-        return buf;
-    }
-    inline string nsToDatabase(const string& ns) {
+    inline StringData nsToDatabaseSubstring( const StringData& ns ) {
         size_t i = ns.find( '.' );
-        if ( i == string::npos )
+        if ( i == string::npos ) {
+            massert(10078, "nsToDatabase: ns too long", ns.size() < MaxDatabaseNameLen );
             return ns;
-        massert(10088, "nsToDatabase: ns too long", i < (size_t)MaxDatabaseNameLen);
-        return ns.substr( 0 , i );
+        }
+        massert(10088, "nsToDatabase: ns too long", i < static_cast<size_t>(MaxDatabaseNameLen));
+        return ns.substr( 0, i );
     }
 
+    // "database.a.b.c" -> "database"
+    inline void nsToDatabase(const StringData& ns, char *database) {
+        StringData db = nsToDatabaseSubstring( ns );
+        db.copyTo( database, true );
+    }
+
+    // TODO: make this return a StringData
+    inline string nsToDatabase(const StringData& ns) {
+        return nsToDatabaseSubstring( ns ).toString();
+    }
+
+    /**
+     * NamespaceDBHash and NamespaceDBEquals allow you to do something like
+     * unordered_map<string,int,NamespaceDBHash,NamespaceDBEquals>
+     * and use the full namespace for the string
+     * but comparisons are done only on the db piece
+     */
+    
+    /**
+     * this can change, do not store on disk
+     */
+    inline int nsDBHash( const string& ns ) {
+        int hash = 7;
+        for ( size_t i = 0; i < ns.size(); i++ ) {
+            if ( ns[i] == '.' )
+                break;
+            hash += 11 * ( ns[i] );
+            hash *= 3;
+        }
+        return hash;
+    }
+
+    inline bool nsDBEquals( const string& a, const string& b ) {
+        for ( size_t i = 0; i < a.size(); i++ ) {
+            
+            if ( a[i] == '.' ) {
+                // b has to either be done or a '.'
+                
+                if ( b.size() == i )
+                    return true;
+
+                if ( b[i] == '.' ) 
+                    return true;
+
+                return false;
+            }
+            
+            // a is another character
+            if ( b.size() == i )
+                return false;
+            
+            if ( b[i] != a[i] )
+                    return false;
+        }
+        
+        // a is done
+        // make sure b is done 
+        if ( b.size() == a.size() || 
+             b[a.size()] == '.' )
+            return true;
+
+        return false;
+    }
+    
+    struct NamespaceDBHash {
+        int operator()( const string& ns ) const {
+            return nsDBHash( ns );
+        }
+    };
+
+    struct NamespaceDBEquals {
+        bool operator()( const string& a, const string& b ) const {
+            return nsDBEquals( a, b );
+        }
+    };
+    
 }

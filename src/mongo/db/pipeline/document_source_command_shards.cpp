@@ -26,25 +26,25 @@ namespace mongo {
 
     bool DocumentSourceCommandShards::eof() {
         /* if we haven't even started yet, do so */
-        if (!pCurrent.get())
+        if (unstarted)
             getNextDocument();
 
-        return (pCurrent.get() == NULL);
+        return !hasCurrent;
     }
 
     bool DocumentSourceCommandShards::advance() {
         DocumentSource::advance(); // check for interrupts
 
-        if (eof())
-            return false;
+        if (unstarted)
+            getNextDocument(); // skip first
 
         /* advance */
         getNextDocument();
 
-        return (pCurrent.get() != NULL);
+        return hasCurrent;
     }
 
-    intrusive_ptr<Document> DocumentSourceCommandShards::getCurrent() {
+    Document DocumentSourceCommandShards::getCurrent() {
         verify(!eof());
         return pCurrent;
     }
@@ -64,6 +64,8 @@ namespace mongo {
         const ShardOutput& shardOutput,
         const intrusive_ptr<ExpressionContext> &pExpCtx):
         DocumentSource(pExpCtx),
+        unstarted(true),
+        hasCurrent(false),
         newSource(false),
         pBsonSource(),
         pCurrent(),
@@ -81,11 +83,17 @@ namespace mongo {
     }
 
     void DocumentSourceCommandShards::getNextDocument() {
+        if (unstarted) {
+            unstarted = false;
+            hasCurrent = true;
+        }
+
         while(true) {
             if (!pBsonSource.get()) {
                 /* if there aren't any more futures, we're done */
                 if (iterator == listEnd) {
-                    pCurrent.reset();
+                    pCurrent = Document();
+                    hasCurrent = false;
                     return;
                 }
 

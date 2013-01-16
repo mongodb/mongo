@@ -132,6 +132,44 @@ namespace MatcherTests {
         }
     };
 
+    class WithinBox {
+    public:
+        void run() {
+            Matcher m(fromjson("{loc:{$within:{$box:[{x: 4, y:4},[6,6]]}}}"));
+            ASSERT(!m.matches(fromjson("{loc: [3,4]}")));
+            ASSERT(m.matches(fromjson("{loc: [4,4]}")));
+            ASSERT(m.matches(fromjson("{loc: [5,5]}")));
+            ASSERT(m.matches(fromjson("{loc: [5,5.1]}")));
+            ASSERT(m.matches(fromjson("{loc: {x: 5, y:5.1}}")));
+        }
+    };
+
+    class WithinPolygon {
+    public:
+        void run() {
+            Matcher m(fromjson("{loc:{$within:{$polygon:[{x:0,y:0},[0,5],[5,5],[5,0]]}}}"));
+            ASSERT(m.matches(fromjson("{loc: [3,4]}")));
+            ASSERT(m.matches(fromjson("{loc: [4,4]}")));
+            ASSERT(m.matches(fromjson("{loc: {x:5,y:5}}")));
+            ASSERT(!m.matches(fromjson("{loc: [5,5.1]}")));
+            ASSERT(!m.matches(fromjson("{loc: {}}")));
+        }
+    };
+
+    class WithinCenter {
+    public:
+        void run() {
+            Matcher m(fromjson("{loc:{$within:{$center:[{x:30,y:30},10]}}}"));
+            ASSERT(!m.matches(fromjson("{loc: [3,4]}")));
+            ASSERT(m.matches(fromjson("{loc: {x:30,y:30}}")));
+            ASSERT(m.matches(fromjson("{loc: [20,30]}")));
+            ASSERT(m.matches(fromjson("{loc: [30,20]}")));
+            ASSERT(m.matches(fromjson("{loc: [40,30]}")));
+            ASSERT(m.matches(fromjson("{loc: [30,40]}")));
+            ASSERT(!m.matches(fromjson("{loc: [31,40]}")));
+        }
+    };
+
     /** Test that MatchDetails::elemMatchKey() is set correctly after a match. */
     class ElemMatchKey {
     public:
@@ -371,6 +409,9 @@ namespace MatcherTests {
             add<Covered::ElemMatchKeyIndexedSingleKey>();
             add<AllTiming>();
             add<Visit>();
+            add<WithinBox>();
+            add<WithinCenter>();
+            add<WithinPolygon>();
         }
     } dball;
 

@@ -62,6 +62,13 @@ namespace mongo {
         WordType load() const { return AtomicIntrinsics<WordType>::load(&_value); }
 
         /**
+         * Gets the current value of this AtomicWord.
+         *
+         * Has relaxed semantics.
+         */
+        WordType loadRelaxed() const { return AtomicIntrinsics<WordType>::loadRelaxed(&_value); }
+
+        /**
          * Sets the value of this AtomicWord to "newValue".
          *
          * Has acquire and release semantics.

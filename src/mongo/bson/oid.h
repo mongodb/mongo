@@ -43,12 +43,17 @@ namespace mongo {
     public:
         OID() : a(0), b(0) { }
 
+        enum {
+            kOIDSize = 12,
+            kIncSize = 3
+        };
+
         /** init from a 24 char hex string */
         explicit OID(const std::string &s) { init(s); }
 
         /** init from a reference to a 12-byte array */
-        explicit OID(const unsigned char (&arr)[12]) {
-            memcpy(data, arr, 12);
+        explicit OID(const unsigned char (&arr)[kOIDSize]) {
+            memcpy(data, arr, sizeof(arr));
         }
 
         /** initialize to 'null' */
@@ -58,13 +63,15 @@ namespace mongo {
 
         bool operator==(const OID& r) const { return a==r.a && b==r.b; }
         bool operator!=(const OID& r) const { return a!=r.a || b!=r.b; }
-        int compare( const OID& other ) const { return memcmp( data , other.data , 12 ); }
+        int compare( const OID& other ) const { return memcmp( data , other.data , kOIDSize ); }
         bool operator<( const OID& other ) const { return compare( other ) < 0; }
         bool operator<=( const OID& other ) const { return compare( other ) <= 0; }
 
         /** @return the object ID output as 24 hex digits */
-        std::string str() const { return toHexLower(data, 12); }
+        std::string str() const { return toHexLower(data, kOIDSize); }
         std::string toString() const { return str(); }
+        /** @return the random/sequential part of the object ID as 6 hex digits */
+        std::string toIncString() const { return toHexLower(_inc, kIncSize); }
 
         static OID gen() { OID o; o.init(); return o; }
 
@@ -79,7 +86,7 @@ namespace mongo {
         void initSequential();
 
         /** init from a 24 char hex string */
-        void init( std::string s );
+        void init( const std::string& s );
 
         /** Set to the min/max OID that could be generated at given timestamp. */
         void init( Date_t date, bool max=false );
@@ -127,7 +134,7 @@ namespace mongo {
                 int y;
                 int z;
             };
-            unsigned char data[12];
+            unsigned char data[kOIDSize];
         };
 
         static unsigned ourPid();

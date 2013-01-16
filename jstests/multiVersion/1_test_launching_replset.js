@@ -2,18 +2,12 @@
 // Tests launching multi-version ReplSetTest replica sets
 //
 
-var verifyVersion = function( mongo, version ){
-    
-    var result = mongo.getDB( "admin" ).runCommand({ serverStatus : 1 })
-    
-    if( result.version != version ) printjson( result  )
-    
-    assert.eq( result.version, version )
-}
+// Check our latest versions
+var versionsToCheck = [ "last-stable",
+                        "latest" ];
 
-var versionsToCheck = [ "1.8.5",
-                        "2.0.6" ]
-                       
+load('./jstests/multiVersion/libs/verify_versions.js');
+
 jsTest.log( "Testing legacy versions..." )
 
 for( var i = 0; i < versionsToCheck.length; i++ ){
@@ -29,7 +23,7 @@ for( var i = 0; i < versionsToCheck.length; i++ ){
     var nodes = rst.nodes
     
     // Make sure the started versions are actually the correct versions
-    for( var j = 0; j < nodes.length; j++ ) verifyVersion( nodes[j], version )
+    for( var j = 0; j < nodes.length; j++ ) assert.binVersion(nodes[j], version);
     
     rst.stopSet()
 }
@@ -44,29 +38,16 @@ rst.startSet({ binVersion : versionsToCheck })
 
 var nodes = rst.nodes
 
-var getVersion = function( mongo ){
- var result = mongo.getDB( "admin" ).runCommand({ serverStatus : 1 })
- return result.version
-}
-
-var verifyAllVersionsFound = function( versionsFound ){
- for( var j = 0; j < versionsToCheck.length; j++ )
-     assert( versionsFound[ versionsToCheck[j] ] )
-}
-
 //Make sure we have hosts of all the different versions
-var versionsFound = {}
-for( var j = 0; j < nodes.length; j++ ) 
-    versionsFound[ getVersion( nodes[j] ) ] = true
+var versionsFound = []
+for( var j = 0; j < nodes.length; j++ )
+    versionsFound.push(nodes[j].getBinVersion());
 
-verifyAllVersionsFound( versionsFound )
+assert.allBinVersions(versionsToCheck, versionsFound);
 
 rst.stopSet()
 
 jsTest.log( "Done!" )
-
-
-
 
 //
 // End

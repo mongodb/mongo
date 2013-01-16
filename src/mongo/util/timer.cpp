@@ -15,8 +15,6 @@
  *    limitations under the License.
  */
 
-#include "pch.h"  // TODO: Replace with platform/base.h after it's checked in.
-
 #include "mongo/util/timer.h"
 
 #include <limits>

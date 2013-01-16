@@ -16,7 +16,7 @@
 
 #pragma once
 
-#include "pch.h"
+#include "mongo/pch.h"
 #include "db/interrupt_status.h"
 
 namespace mongo {

@@ -67,7 +67,7 @@ namespace QueryOptimizerCursorTests {
                 c.setMatch( false );
                 ASSERT( c.knowMatch() );
 
-                c.countMatch( DiskLoc() );
+                c.incMatch( DiskLoc() );
                 ASSERT_EQUALS( 0, c.count() );
                 ASSERT_EQUALS( 0, c.cumulativeCount() );
                 
@@ -77,19 +77,19 @@ namespace QueryOptimizerCursorTests {
                 c.setMatch( true );
                 ASSERT( c.knowMatch() );
                 
-                c.countMatch( DiskLoc() );
+                c.incMatch( DiskLoc() );
                 ASSERT_EQUALS( 1, c.count() );
                 ASSERT_EQUALS( 1, c.cumulativeCount() );
 
                 // Don't count the same match twice, without checking the document location.
-                c.countMatch( DiskLoc( 1, 1 ) );
+                c.incMatch( DiskLoc( 1, 1 ) );
                 ASSERT_EQUALS( 1, c.count() );
                 ASSERT_EQUALS( 1, c.cumulativeCount() );
 
                 // Reset and count another match.
                 c.resetMatch();
                 c.setMatch( true );
-                c.countMatch( DiskLoc( 1, 1 ) );
+                c.incMatch( DiskLoc( 1, 1 ) );
                 ASSERT_EQUALS( 2, c.count() );
                 ASSERT_EQUALS( 2, c.cumulativeCount() );
             }
@@ -104,7 +104,7 @@ namespace QueryOptimizerCursorTests {
                 ASSERT_EQUALS( 10, c.cumulativeCount() );
                 
                 c.setMatch( true );
-                c.countMatch( DiskLoc() );
+                c.incMatch( DiskLoc() );
                 ASSERT_EQUALS( 1, c.count() );
                 ASSERT_EQUALS( 11, c.cumulativeCount() );
             }
@@ -118,12 +118,12 @@ namespace QueryOptimizerCursorTests {
 
                 c.setCheckDups( true );
                 c.setMatch( true );
-                c.countMatch( DiskLoc() );
+                c.incMatch( DiskLoc() );
                 ASSERT_EQUALS( 1, c.count() );
 
                 c.resetMatch();
                 c.setMatch( true );
-                c.countMatch( DiskLoc() );
+                c.incMatch( DiskLoc() );
                 ASSERT_EQUALS( 1, c.count() );
             }
         };
@@ -637,7 +637,6 @@ namespace QueryOptimizerCursorTests {
             // _id 10 {_id:1}
             ASSERT_EQUALS( 10, c->current().getIntField( "_id" ) );
             ASSERT( !c->matcher()->matchesCurrent( c.get() ) );
-            ASSERT( !c->matcherPtr()->matchesCurrent( c.get() ) );
             ASSERT( c->advance() );
             
             // _id 0 {a:1}
@@ -653,7 +652,6 @@ namespace QueryOptimizerCursorTests {
             // _id 11 {_id:1}
             ASSERT_EQUALS( BSON( "_id" << 11 << "a" << 12 ), c->current() );
             ASSERT( c->matcher()->matchesCurrent( c.get() ) );
-            ASSERT( c->matcherPtr()->matchesCurrent( c.get() ) );
             ASSERT( !c->getsetdup( c->currLoc() ) );
             ASSERT( c->advance() );
             
@@ -998,7 +996,7 @@ namespace QueryOptimizerCursorTests {
                                       BSON( "$query" << query << "$orderby" << order ),
                                       BSONObj() ) );
             return NamespaceDetailsTransient::getCursor( ns(), query, order,
-                                                        QueryPlanSelectionPolicy::any(), 0,
+                                                        QueryPlanSelectionPolicy::any(),
                                                         parsedQuery, false );
         }
     };
@@ -1767,7 +1765,7 @@ namespace QueryOptimizerCursorTests {
             }
         };
         
-        /** Yield with BacicCursor takeover cursor. */
+        /** Yield with BasicCursor takeover cursor. */
         class TakeoverBasic : public Base {
         public:
             void run() {
@@ -2846,7 +2844,7 @@ namespace QueryOptimizerCursorTests {
                                       BSONObj() ) );
             shared_ptr<Cursor> cursor =
             NamespaceDetailsTransient::getCursor( ns(), query, order,
-                                                  QueryPlanSelectionPolicy::any(), 0, parsedQuery,
+                                                  QueryPlanSelectionPolicy::any(), parsedQuery,
                                                   false );
             shared_ptr<QueryOptimizerCursor> ret =
             dynamic_pointer_cast<QueryOptimizerCursor>( cursor );
@@ -2899,7 +2897,7 @@ namespace QueryOptimizerCursorTests {
                                       BSON( "b" << 1 ) ) );
             shared_ptr<Cursor> cursor =
             NamespaceDetailsTransient::getCursor( ns(), BSON( "a" << 4 ), BSONObj(),
-                                                  QueryPlanSelectionPolicy::any(), 0, parsedQuery,
+                                                  QueryPlanSelectionPolicy::any(), parsedQuery,
                                                   false );
             while( cursor->advance() );
             // No plan recorded when a hint is used.
@@ -2913,7 +2911,7 @@ namespace QueryOptimizerCursorTests {
             shared_ptr<Cursor> cursor2 =
             NamespaceDetailsTransient::getCursor( ns(), BSON( "a" << 4 ),
                                                  BSON( "b" << 1 << "c" << 1 ),
-                                                 QueryPlanSelectionPolicy::any(), 0,
+                                                 QueryPlanSelectionPolicy::any(),
                                                  parsedQuery2, false );
             while( cursor2->advance() );
             // Plan recorded was for a different query pattern (different sort spec).
@@ -3499,11 +3497,10 @@ namespace QueryOptimizerCursorTests {
             void run() {
                 Lock::GlobalWrite lk;
                 Client::Context ctx( ns() );
-                bool simpleEqualityMatch;
                 if ( expectException() ) {
                     ASSERT_THROWS
                     ( NamespaceDetailsTransient::getCursor
-                     ( ns(), query(), order(), planPolicy(), &simpleEqualityMatch ),
+                     ( ns(), query(), order(), planPolicy() ),
                      MsgAssertionException );
                     return;
                 }
@@ -3516,8 +3513,7 @@ namespace QueryOptimizerCursorTests {
                 }
                 shared_ptr<Cursor> c =
                 NamespaceDetailsTransient::getCursor( ns(), extractedQuery, order(), planPolicy(),
-                                                      &simpleEqualityMatch, _parsedQuery, false );
-                ASSERT_EQUALS( expectSimpleEquality(), simpleEqualityMatch );
+                                                      _parsedQuery, false );
                 string type = c->toString().substr( 0, expectedType().length() );
                 ASSERT_EQUALS( expectedType(), type );
                 check( c );
@@ -3525,7 +3521,6 @@ namespace QueryOptimizerCursorTests {
         protected:
             virtual string expectedType() const { return "TESTDUMMY"; }
             virtual bool expectException() const { return false; }
-            virtual bool expectSimpleEquality() const { return false; }
             virtual BSONObj query() const { return BSONObj(); }
             virtual BSONObj order() const { return BSONObj(); }
             virtual int skip() const { return 0; }
@@ -3586,7 +3581,6 @@ namespace QueryOptimizerCursorTests {
                 _cli.update( ns(), BSONObj(), BSON( "$set" << BSON( "a" << true ) ) );
             }
             string expectedType() const { return "BtreeCursor a_1"; }
-            bool expectSimpleEquality() const { return true; }
             BSONObj query() const { return BSON( "a" << true ); }
             virtual void check( const shared_ptr<Cursor> &c ) {
                 ASSERT( c->ok() );
@@ -3657,7 +3651,7 @@ namespace QueryOptimizerCursorTests {
                                           BSONObj() ) );
                 shared_ptr<Cursor> c =
                 NamespaceDetailsTransient::getCursor( ns(), BSONObj(), BSON( "a" << 1 ),
-                                                     QueryPlanSelectionPolicy::any(), 0,
+                                                     QueryPlanSelectionPolicy::any(),
                                                      parsedQuery, false );
                 ASSERT( c );
             }
@@ -3972,31 +3966,111 @@ namespace QueryOptimizerCursorTests {
             void run() {
                 // Matcher validation with an empty collection.
                 _cli.remove( ns(), BSONObj() );
-                // The historical behavior has been to generate a MsgAssertionException for the
-                // multiple cursors case, but it should be a UserException.
-                checkInvalidQueryAssertions<MsgAssertionException>();
+                checkInvalidQueryAssertions();
                 
                 // Matcher validation with a missing collection.
                 _cli.dropCollection( ns() );
-                checkInvalidQueryAssertions<UserException>();
+                checkInvalidQueryAssertions();
             }
         private:
-            template<class MultipleCursorException>
             static void checkInvalidQueryAssertions() {
                 Client::ReadContext ctx( ns() );
                 
-                // An invalid query generaing a single query plan asserts.
+                // An invalid query generating a single query plan asserts.
                 BSONObj invalidQuery = fromjson( "{$and:[{$atomic:true}]}" );
-                assertInvalidQueryAssertion<UserException>( invalidQuery );
+                assertInvalidQueryAssertion( invalidQuery );
                 
                 // An invalid query generating multiple query plans asserts.
                 BSONObj invalidIdQuery = fromjson( "{_id:0,$and:[{$atomic:true}]}" );
-                assertInvalidQueryAssertion<MultipleCursorException>( invalidIdQuery );                
+                assertInvalidQueryAssertion( invalidIdQuery );
             }
-            template<class Exception>
             static void assertInvalidQueryAssertion( const BSONObj &query ) {
                 ASSERT_THROWS( NamespaceDetailsTransient::getCursor( ns(), query, BSONObj() ),
-                              Exception );
+                               UserException );
+            }
+        };
+
+        class RequestMatcherFalse : public QueryPlanSelectionPolicy {
+            virtual string name() const { return "RequestMatcherFalse"; }
+            virtual bool requestMatcher() const { return false; }
+        } _requestMatcherFalse;
+
+        /**
+         * A Cursor returned by NamespaceDetailsTransient::getCursor() may or may not have a
+         * matcher().  A Matcher will generally exist if required to match the provided query or
+         * if specifically requested.
+         */
+        class MatcherSet : public Base {
+        public:
+            MatcherSet() {
+                _cli.insert( ns(), BSON( "a" << 2 << "b" << 3 ) );
+                _cli.ensureIndex( ns(), BSON( "a" << 1 ) );
+            }
+            void run() {
+                // No matcher is set for an empty query.
+                ASSERT( !hasMatcher( BSONObj(), false ) );
+                // No matcher is set for an empty query, even if a matcher is requested.
+                ASSERT( !hasMatcher( BSONObj(), true ) );
+                // No matcher is set for an exact key match indexed query.
+                ASSERT( !hasMatcher( BSON( "a" << 2 ), false ) );
+                // No matcher is set for an exact key match indexed query, unless one is requested.
+                ASSERT( hasMatcher( BSON( "a" << 2 ), true ) );
+                // A matcher is set for a non exact key match indexed query.
+                ASSERT( hasMatcher( BSON( "a" << 2 << "b" << 3 ), false ) );
+            }
+        private:
+            bool hasMatcher( const BSONObj& query, bool requestMatcher ) {
+                Client::ReadContext ctx( ns() );
+                shared_ptr<Cursor> cursor =
+                        NamespaceDetailsTransient::getCursor( ns(),
+                                                              query,
+                                                              BSONObj(),
+                                                              requestMatcher ?
+                                                                  QueryPlanSelectionPolicy::any() :
+                                                                  _requestMatcherFalse );
+                return cursor->matcher();
+            }
+        };
+
+        /**
+         * Even though a Matcher may not be used to perform matching when requestMatcher == false, a
+         * Matcher must be created because the Matcher's constructor performs query validation.
+         */
+        class MatcherValidate : public Base {
+        public:
+            void run() {
+                Client::ReadContext ctx( ns() );
+                // An assertion is triggered because { a:undefined } is an invalid query, even
+                // though no matcher is required.
+                ASSERT_THROWS
+                        ( NamespaceDetailsTransient::getCursor( ns(),
+                                                                fromjson( "{a:undefined}" ),
+                                                                BSONObj(),
+                                                                _requestMatcherFalse ),
+                          UserException );
+            }
+        };
+
+        class RequestIntervalCursorTrue : public QueryPlanSelectionPolicy {
+            virtual string name() const { return "RequestIntervalCursorTrue"; }
+            virtual bool requestIntervalCursor() const { return true; }
+        } _requestIntervalCursorTrue;
+
+        /** An IntervalBtreeCursor is selected when requested by a QueryPlanSelectionPolicy. */
+        class IntervalCursor : public Base {
+        public:
+            IntervalCursor() {
+                _cli.insert( ns(), BSON( "a" << 2 << "b" << 3 ) );
+                _cli.ensureIndex( ns(), BSON( "a" << 1 ) );
+            }
+            void run() {
+                Client::ReadContext ctx( ns() );
+                shared_ptr<Cursor> cursor =
+                        NamespaceDetailsTransient::getCursor( ns(),
+                                                              BSON( "a" << 1 ),
+                                                              BSONObj(),
+                                                              _requestIntervalCursorTrue );
+                ASSERT_EQUALS( "IntervalBtreeCursor", cursor->toString() );
             }
         };
         
@@ -4022,7 +4096,8 @@ namespace QueryOptimizerCursorTests {
                         ( new ParsedQuery( ns(), 0, 0, 0,
                                           BSON( "$query" << query << "$explain" << true ),
                                           BSONObj() ) );
-                c = NamespaceDetailsTransient::getCursor( ns(), query, BSONObj(), QueryPlanSelectionPolicy::any(), 0,
+                c = NamespaceDetailsTransient::getCursor( ns(), query, BSONObj(),
+                                                          QueryPlanSelectionPolicy::any(),
                                                           parsedQuery, false );
                 set<BSONObj> indexKeys;
                 while( c->ok() ) {
@@ -4047,7 +4122,8 @@ namespace QueryOptimizerCursorTests {
                                           fields() ) );
                 _cursor =
                 dynamic_pointer_cast<QueryOptimizerCursor>
-                ( NamespaceDetailsTransient::getCursor( ns(), query(), BSONObj(), QueryPlanSelectionPolicy::any(), 0,
+                ( NamespaceDetailsTransient::getCursor( ns(), query(), BSONObj(),
+                                                        QueryPlanSelectionPolicy::any(),
                                                         parsedQuery, false ) );
                 ASSERT( _cursor );
                 
@@ -4636,7 +4712,7 @@ namespace QueryOptimizerCursorTests {
         /** nYields reporting of a QueryOptimizerCursor before it enters takeover mode. */
         class NYieldsAdvanceBasic : public NYieldsAdvanceBase {
             virtual int aValueToDelete() const {
-                // Before the MutiCursor takes over at 101 matches.
+                // Before the MultiCursor takes over at 101 matches.
                 return 50;
             }
         };
@@ -4859,6 +4935,9 @@ namespace QueryOptimizerCursorTests {
             //add<GetCursor::IdElseNatural::HintedNaturalForQuery>( BSON( "a" << 1 ) );
             //add<GetCursor::IdElseNatural::HintedNaturalForQuery>( BSON( "_id" << 1 << "a" << 1 ) );
             add<GetCursor::MatcherValidation>();
+            add<GetCursor::MatcherSet>();
+            add<GetCursor::MatcherValidate>();
+            add<GetCursor::IntervalCursor>();
             add<Explain::ClearRecordedIndex>();
             add<Explain::Initial>();
             add<Explain::Empty>();

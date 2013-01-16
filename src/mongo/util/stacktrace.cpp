@@ -8,11 +8,16 @@
 #include <map>
 #include <vector>
 
+#include "mongo/util/log.h"
+
 #ifdef _WIN32
+#include <sstream>
 #include <stdio.h>
+#include <boost/filesystem/operations.hpp>
 #include <boost/smart_ptr/scoped_array.hpp>
 #include "mongo/platform/windows_basic.h"
 #include <DbgHelp.h>
+#include "mongo/util/assert_util.h"
 #endif
 
 #ifdef MONGO_HAVE_EXECINFO_BACKTRACE
@@ -39,6 +44,12 @@ namespace mongo {
         char **strings;
         
         strings = ::backtrace_symbols( b, size );
+        if (strings == NULL) {
+            const int err = errno;
+            os << "Unable to collect backtrace symbols (" << errnoWithDescription(err) << ")"
+               << std::endl;
+            return;
+        }
         for ( int i = 0; i < size; i++ )
             os << ' ' << strings[i] << '\n';
         os.flush();
@@ -49,6 +60,26 @@ namespace mongo {
 #elif defined(_WIN32)
 
 namespace mongo {
+
+    /**
+     * Get the path string to be used when searching for PDB files.
+     * 
+     * @param process        Process handle
+     * @return searchPath    Returned search path string
+     */
+    static const char* getSymbolSearchPath(HANDLE process) {
+        static std::string symbolSearchPath;
+
+        if (symbolSearchPath.empty()) {
+            static const size_t bufferSize = 1024;
+            boost::scoped_array<char> pathBuffer(new char[bufferSize]);
+            GetModuleFileNameA(NULL, pathBuffer.get(), bufferSize);
+            boost::filesystem::path exePath(pathBuffer.get());
+            symbolSearchPath = exePath.parent_path().string();
+            symbolSearchPath += ";C:\\Windows\\System32;C:\\Windows";
+        }
+        return symbolSearchPath.c_str();
+    }
 
     /**
      * Get the display name of the executable module containing the specified address.
@@ -158,6 +189,8 @@ namespace mongo {
         printWindowsStackTrace( context, os );
     }
 
+    static SimpleMutex _stackTraceMutex( "stackTraceMutex" );
+
     /**
      * Print stack trace (using a specified stack context) to "os"
      * 
@@ -165,11 +198,12 @@ namespace mongo {
      * @param os        ostream& to receive printed stack backtrace
      */
     void printWindowsStackTrace( CONTEXT& context, std::ostream& os ) {
+        SimpleMutex::scoped_lock lk(_stackTraceMutex);
         HANDLE process = GetCurrentProcess();
-        BOOL ret = SymInitialize( process, NULL, TRUE );
+        BOOL ret = SymInitialize(process, getSymbolSearchPath(process), TRUE);
         if ( ret == FALSE ) {
             DWORD dosError = GetLastError();
-            os << "Stack trace failed, SymInitialize failed with error " <<
+            log() << "Stack trace failed, SymInitialize failed with error " <<
                     std::dec << dosError << std::endl;
             return;
         }
@@ -244,22 +278,33 @@ namespace mongo {
         ++sourceWidth;
         size_t frameCount = traceList.size();
         for ( size_t i = 0; i < frameCount; ++i ) {
-            os << traceList[i].moduleName << " ";
+            std::stringstream ss;
+            ss << traceList[i].moduleName << " ";
             size_t width = traceList[i].moduleName.length();
             while ( width < moduleWidth ) {
-                os << " ";
+                ss << " ";
                 ++width;
             }
-            os << traceList[i].sourceAndLine << " ";
+            ss << traceList[i].sourceAndLine << " ";
             width = traceList[i].sourceAndLine.length();
             while ( width < sourceWidth ) {
-                os << " ";
+                ss << " ";
                 ++width;
             }
-            os << traceList[i].symbolAndOffset;
-            os << std::endl;
+            ss << traceList[i].symbolAndOffset;
+            log() << ss.str() << std::endl;
         }
     }
+
+    // Print error message from C runtime followed by stack trace
+    int crtDebugCallback(int, char* originalMessage, int*) {
+        StringData message(originalMessage);
+        log() << "*** C runtime error: "
+              << message.substr(0, message.find('\n')) << std::endl;
+        printStackTrace();
+        return 1;           // 0 == not handled, non-0 == handled
+    }
+
 }
 
 #else

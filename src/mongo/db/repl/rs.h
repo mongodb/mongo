@@ -19,6 +19,7 @@
 #pragma once
 
 #include "mongo/db/commands.h"
+#include "mongo/db/index.h"
 #include "mongo/db/oplog.h"
 #include "mongo/db/oplogreader.h"
 #include "mongo/db/repl/rs_config.h"
@@ -46,11 +47,12 @@
 
 namespace mongo {
 
-    struct HowToFixUp;
-    struct Target;
+    class Cloner;
     class DBClientConnection;
-    class ReplSetImpl;
+    struct HowToFixUp;
     class OplogReader;
+    class ReplSetImpl;
+    struct Target;
     extern bool replSet; // true if using repl sets
     extern class ReplSet *theReplSet; // null until initialized
     extern Tee *rsLog;
@@ -75,6 +77,9 @@ namespace mongo {
 
         bool potentiallyHot() const { return _config.potentiallyHot(); } // not arbiter, not priority 0
         void summarizeMember(stringstream& s) const;
+        // If we could sync from this member.  This doesn't tell us anything about the quality of
+        // this member, just if they are a possible sync target.
+        bool syncable() const;
 
     private:
         friend class ReplSetImpl;
@@ -145,8 +150,6 @@ namespace mongo {
         void associateSlave(const BSONObj& rid, const int memberId);
         void updateSlave(const mongo::OID& id, const OpTime& last);
     };
-
-    struct Target;
 
     class Consensus {
         ReplSetImpl &rs;
@@ -294,14 +297,17 @@ namespace mongo {
         SP sp;
     };
 
-    void parseReplsetCmdLine(string cfgString, string& setname, vector<HostAndPort>& seeds, set<HostAndPort>& seedSet );
+    void parseReplsetCmdLine(const std::string& cfgString,
+                             string& setname,
+                             vector<HostAndPort>& seeds,
+                             set<HostAndPort>& seedSet);
 
     /** Parameter given to the --replSet command line option (parsed).
         Syntax is "<setname>/<seedhost1>,<seedhost2>"
         where setname is a name and seedhost is "<host>[:<port>]" */
     class ReplSetCmdline {
     public:
-        ReplSetCmdline(string cfgString) { parseReplsetCmdLine(cfgString, setname, seeds, seedSet); }
+        ReplSetCmdline(const std::string& cfgString) { parseReplsetCmdLine(cfgString, setname, seeds, seedSet); }
         string setname;
         vector<HostAndPort> seeds;
         set<HostAndPort> seedSet;
@@ -330,11 +336,14 @@ namespace mongo {
         OpTime lastOpTimeWritten;
         long long lastH; // hash we use to make sure we are reading the right flow of ops and aren't on an out-of-date "fork"
         bool forceSyncFrom(const string& host, string& errmsg, BSONObjBuilder& result);
+        // Check if the current sync target is suboptimal. This must be called while holding a mutex
+        // that prevents the sync source from changing.
+        bool shouldChangeSyncTarget(const OpTime& target) const;
 
         /**
          * Find the closest member (using ping time) with a higher latest optime.
          */
-        Member* getMemberToSyncTo();
+        const Member* getMemberToSyncTo();
         void veto(const string& host, unsigned secs=10);
         bool gotForceSync();
         void goStale(const Member* m, const BSONObj& o);
@@ -367,7 +376,7 @@ namespace mongo {
         char _hbmsg[256]; // we change this unlocked, thus not an stl::string
         time_t _hbmsgTime; // when it was logged
     public:
-        void sethbmsg(string s, int logLevel = 0);
+        void sethbmsg(const std::string& s, int logLevel = 0);
 
         /**
          * Election with Priorities
@@ -426,11 +435,6 @@ namespace mongo {
         void _summarizeAsHtml(stringstream&) const;
         void _summarizeStatus(BSONObjBuilder&) const; // for replSetGetStatus command
 
-        /* throws exception if a problem initializing. */
-        ReplSetImpl(ReplSetCmdline&);
-        // used for testing
-        ReplSetImpl();
-
         /* call afer constructing to start - returns fairly quickly after launching its threads */
         void _go();
 
@@ -443,7 +447,7 @@ namespace mongo {
          * Finds the configuration with the highest version number and attempts
          * load it.
          */
-        bool _loadConfigFinish(vector<ReplSetConfig>& v);
+        bool _loadConfigFinish(vector<ReplSetConfig*>& v);
         /**
          * Gather all possible configs (from command line seeds, our own config
          * doc, and any hosts listed therein) and try to initiate from the most
@@ -461,6 +465,11 @@ namespace mongo {
     protected:
         Member *_self;
         bool _buildIndexes;       // = _self->config().buildIndexes
+
+        ReplSetImpl();
+        /* throws exception if a problem initializing. */
+        void init(ReplSetCmdline&);
+
         void setSelfTo(Member *); // use this as it sets buildIndexes var
     private:
         List1<Member> _members; // all members of the set EXCEPT _self.
@@ -484,6 +493,7 @@ namespace mongo {
         Member* head() const { return _members.head(); }
     public:
         const Member* findById(unsigned id) const;
+        Member* findByName(const std::string& hostname) const;
     private:
         void _getTargets(list<Target>&, int &configVersion);
         void getTargets(list<Target>&, int &configVersion);
@@ -496,9 +506,10 @@ namespace mongo {
         friend class Consensus;
 
     private:
-        bool _syncDoInitialSync_clone( const char *master, const list<string>& dbs , bool dataPass );
-        bool _syncDoInitialSync_applyToHead( replset::InitialSync& init, OplogReader* r , 
-                                             const Member* source, const BSONObj& lastOp, 
+        bool _syncDoInitialSync_clone(Cloner &cloner, const char *master,
+                                      const list<string>& dbs, bool dataPass);
+        bool _syncDoInitialSync_applyToHead( replset::SyncTail& syncer, OplogReader* r ,
+                                             const Member* source, const BSONObj& lastOp,
                                              BSONObj& minValidOut);
         void _syncDoInitialSync();
         void syncDoInitialSync();
@@ -515,22 +526,48 @@ namespace mongo {
         threadpool::ThreadPool _prefetcherPool;
 
     public:
+        // Allow index prefetching to be turned on/off
+        enum IndexPrefetchConfig {
+            PREFETCH_NONE=0, PREFETCH_ID_ONLY=1, PREFETCH_ALL=2
+        };
+
+        void setIndexPrefetchConfig(const IndexPrefetchConfig cfg) {
+            _indexPrefetchConfig = cfg;
+        }
+        IndexPrefetchConfig getIndexPrefetchConfig() {
+            return _indexPrefetchConfig;
+        }
+            
         static const int replWriterThreadCount;
         static const int replPrefetcherThreadCount;
         threadpool::ThreadPool& getPrefetchPool() { return _prefetcherPool; }
         threadpool::ThreadPool& getWriterPool() { return _writerPool; }
+
 
         const ReplSetConfig::MemberCfg& myConfig() const { return _config; }
         bool tryToGoLiveAsASecondary(OpTime&); // readlocks
         void syncRollback(OplogReader& r);
         void syncThread();
         const OpTime lastOtherOpTime() const;
+
+        /**
+         * When a member reaches its minValid optime it is in a consistent state.  Thus, minValid is
+         * set as the last step in initial sync (if no minValid is set, this indicates that initial
+         * sync is necessary). It is also used during "normal" sync: the last op in each batch is
+         * used to set minValid, to indicate that we are in a consistent state when the batch has
+         * been fully applied.
+         */
+        static void setMinValid(BSONObj obj);
+        static OpTime getMinValid();
+
+        int oplogVersion;
+    private:
+        IndexPrefetchConfig _indexPrefetchConfig;
     };
 
     class ReplSet : public ReplSetImpl {
     public:
-        ReplSet();
-        ReplSet(ReplSetCmdline& replSetCmdline);
+        static ReplSet* make(ReplSetCmdline& replSetCmdline);
         virtual ~ReplSet() {}
 
         // for the replSetStepDown command
@@ -586,6 +623,9 @@ namespace mongo {
             if( time(0)-_hbmsgTime > 120 ) return "";
             return _hbmsg;
         }
+
+    protected:
+        ReplSet();
     };
 
     /**
@@ -600,22 +640,6 @@ namespace mongo {
         virtual bool logTheOp() { return false; }
         virtual LockType locktype() const { return NONE; }
         virtual void help( stringstream &help ) const { help << "internal"; }
-
-        /**
-         * Some replica set commands call this and then call check(). This is
-         * intentional, as they might do things before theReplSet is initialized
-         * that still need to be checked for auth.
-         */
-        bool checkAuth(string& errmsg, BSONObjBuilder& result) {
-            if( !noauth ) {
-                AuthenticationInfo *ai = cc().getAuthenticationInfo();
-                if (!ai->isAuthorizedForLock("admin", locktype())) {
-                    errmsg = "replSet command unauthorized";
-                    return false;
-                }
-            }
-            return true;
-        }
 
         bool check(string& errmsg, BSONObjBuilder& result) {
             if( !replSet ) {
@@ -635,7 +659,7 @@ namespace mongo {
                 return false;
             }
 
-            return checkAuth(errmsg, result);
+            return true;
         }
     };
 
@@ -652,6 +676,33 @@ namespace mongo {
         verify(c);
         if( self )
             _hbinfo.health = 1.0;
+    }
+
+    inline bool ignoreUniqueIndex(IndexDetails& idx) {
+        if (!idx.unique()) {
+            return false;
+        }
+        if (!theReplSet) {
+            return false;
+        }
+        // see SERVER-6671
+        MemberState ms = theReplSet->state();
+        if (! ((ms == MemberState::RS_STARTUP2) ||
+               (ms == MemberState::RS_RECOVERING) ||
+               (ms == MemberState::RS_ROLLBACK))) {
+            return false;
+        }
+        // 2 is the oldest oplog version where operations
+        // are fully idempotent.
+        if (theReplSet->oplogVersion < 2) {
+            return false;
+        }
+        // Never ignore _id index
+        if (idx.isIdIndex()) {
+            return false;
+        }
+        
+        return true;
     }
 
 }

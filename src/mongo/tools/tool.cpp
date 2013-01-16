@@ -72,8 +72,8 @@ namespace mongo {
              "files in the given path, instead of connecting to a mongod  "
              "server - needs to lock the data directory, so cannot be "
              "used if a mongod is currently accessing the same path" )
-            ("directoryperdb", "if dbpath specified, each db is in a separate directory" )
-            ("journal", "enable journaling" )
+            ("directoryperdb", "each db is in a separate directly (relevant only if dbpath specified)" )
+            ("journal", "enable journaling (relevant only if dbpath specified)" )
             ;
 
         if ( access & SPECIFY_DBCOL )
@@ -118,12 +118,6 @@ namespace mongo {
         // we want durability to be disabled.
         cmdLine.dur = false;
 
-#if( BOOST_VERSION >= 104500 )
-    boost::filesystem::path::default_name_check( boost::filesystem2::no_check );
-#else
-    boost::filesystem::path::default_name_check( boost::filesystem::no_check );
-#endif
-
         _name = argv[0];
 
         /* using the same style as db.cpp */
@@ -145,7 +139,7 @@ namespace mongo {
         catch (po::error &e) {
             cerr << "ERROR: " << e.what() << endl << endl;
             printHelp(cerr);
-            return EXIT_BADOPTIONS;
+            ::_exit(EXIT_BADOPTIONS);
         }
 
         // hide password from ps output
@@ -160,12 +154,12 @@ namespace mongo {
 
         if ( _params.count( "help" ) ) {
             printHelp(cout);
-            return 0;
+            ::_exit(0);
         }
 
         if ( _params.count( "version" ) ) {
             printVersion(cout);
-            return 0;
+            ::_exit(0);
         }
 
         if ( _params.count( "verbose" ) ) {
@@ -206,13 +200,13 @@ namespace mongo {
                 ConnectionString cs = ConnectionString::parse( _host , errmsg );
                 if ( ! cs.isValid() ) {
                     cerr << "invalid hostname [" << _host << "] " << errmsg << endl;
-                    return -1;
+                    ::_exit(-1);
                 }
 
                 _conn = cs.connect( errmsg );
                 if ( ! _conn ) {
                     cerr << "couldn't connect to [" << _host << "] " << errmsg << endl;
-                    return -1;
+                    ::_exit(-1);
                 }
 
                 (_usesstdout ? cout : cerr ) << "connected to: " << _host << endl;
@@ -241,8 +235,8 @@ namespace mongo {
                 cerr << endl << "If you are running a mongod on the same "
                      "path you should connect to that instead of direct data "
                      "file access" << endl << endl;
-                dbexit( EXIT_CLEAN );
-                return -1;
+                dbexit( EXIT_FS );
+                ::_exit(EXIT_FAILURE);
             }
 
             FileAllocator::get()->start();
@@ -275,46 +269,51 @@ namespace mongo {
             cerr << "assertion: " << e.toString() << endl;
             ret = -1;
         }
-	catch(const boost::filesystem::filesystem_error &fse) {
-	    /*
-	      https://jira.mongodb.org/browse/SERVER-2904
+        catch(const boost::filesystem::filesystem_error &fse) {
+            /*
+              https://jira.mongodb.org/browse/SERVER-2904
 
-	      Simple tools that don't access the database, such as
-	      bsondump, aren't throwing DBExceptions, but are throwing
-	      boost exceptions.
+              Simple tools that don't access the database, such as
+              bsondump, aren't throwing DBExceptions, but are throwing
+              boost exceptions.
 
-	      The currently available set of error codes don't seem to match
-	      boost documentation.  boost::filesystem::not_found_error
-	      (from http://www.boost.org/doc/libs/1_31_0/libs/filesystem/doc/exception.htm)
-	      doesn't seem to exist in our headers.  Also, fse.code() isn't
-	      boost::system::errc::no_such_file_or_directory when this
-	      happens, as you would expect.  And, determined from
-	      experimentation that the command-line argument gets turned into
-	      "\\?" instead of "/?" !!!
-	     */
+              The currently available set of error codes don't seem to match
+              boost documentation.  boost::filesystem::not_found_error
+              (from http://www.boost.org/doc/libs/1_31_0/libs/filesystem/doc/exception.htm)
+              doesn't seem to exist in our headers.  Also, fse.code() isn't
+              boost::system::errc::no_such_file_or_directory when this
+              happens, as you would expect.  And, determined from
+              experimentation that the command-line argument gets turned into
+              "\\?" instead of "/?" !!!
+             */
 #if defined(_WIN32)
-	    if (/*(fse.code() == boost::system::errc::no_such_file_or_directory) &&*/
-		(fse.path1() == "\\?"))
-		printHelp(cerr);
-	    else
+            if (/*(fse.code() == boost::system::errc::no_such_file_or_directory) &&*/
+                (fse.path1() == "\\?"))
+                printHelp(cerr);
+            else
 #endif // _WIN32
-		cerr << "error: " << fse.what() << endl;
+                cerr << "error: " << fse.what() << endl;
 
-	    ret = -1;
-	}
+            ret = -1;
+        }
 
         if ( currentClient.get() )
             currentClient.get()->shutdown();
 
         if ( useDirectClient )
             dbexit( EXIT_CLEAN );
-        return ret;
+
+        fflush(stdout);
+        fflush(stderr);
+        ::_exit(ret);
     }
 
     DBClientBase& Tool::conn( bool slaveIfPaired ) {
         if ( slaveIfPaired && _conn->type() == ConnectionString::SET ) {
-            if (!_slaveConn)
-                _slaveConn = &((DBClientReplicaSet*)_conn)->slaveConn();
+            if (!_slaveConn) {
+                DBClientReplicaSet* rs = static_cast<DBClientReplicaSet*>(_conn);
+                _slaveConn = &rs->slaveConn();
+            }
             return *_slaveConn;
         }
         return *_conn;
@@ -423,8 +422,10 @@ namespace mongo {
         }
 
         string errmsg;
-        if ( _conn->auth( dbname , _username , _password , errmsg, true, level ) ) {
-            return;
+        if (dbname.size()) {
+            if ( _conn->auth( dbname , _username , _password , errmsg, true, level ) ) {
+                return;
+            }
         }
 
         // try against the admin db
@@ -440,13 +441,17 @@ namespace mongo {
 
         add_options()
         ("objcheck" , "validate object before inserting" )
+        ("noobjcheck" , "validate object before inserting" )
         ("filter" , po::value<string>() , "filter to apply before inserting" )
         ;
     }
 
 
     int BSONTool::run() {
-        _objcheck = hasParam( "objcheck" );
+        if ( hasParam( "objcheck" ) )
+            _objcheck = true;
+        else if ( hasParam( "noobjcheck" ) )
+            _objcheck = false;
 
         if ( hasParam( "filter" ) )
             _matcher.reset( new Matcher( fromjson( getParam( "filter" ) ) ) );
@@ -475,7 +480,7 @@ namespace mongo {
         posix_fadvise(fileno(file), 0, fileLength, POSIX_FADV_SEQUENTIAL);
 #endif
 
-        log(1) << "\t file size: " << fileLength << endl;
+        LOG(1) << "\t file size: " << fileLength << endl;
 
         unsigned long long read = 0;
         unsigned long long num = 0;

@@ -17,7 +17,7 @@
 
 #pragma once
 
-#include "pch.h"
+#include "mongo/pch.h"
 
 #include <stack>
 
@@ -167,6 +167,8 @@ namespace mongo {
         void attach( AScopedConnection * conn );
 
         string originalHost() const { return _originalHost; }
+
+        string getns() const { return ns; }
 
         Message* getMessage(){ return batch.m.get(); }
 

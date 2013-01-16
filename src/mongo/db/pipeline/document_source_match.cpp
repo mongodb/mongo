@@ -40,8 +40,7 @@ namespace mongo {
         pBuilder->append(matchName, *pQuery);
     }
 
-    bool DocumentSourceMatch::accept(
-        const intrusive_ptr<Document> &pDocument) const {
+    bool DocumentSourceMatch::accept(const Document& pDocument) const {
 
         /*
           The matcher only takes BSON documents, so we have to make one.
@@ -66,11 +65,9 @@ namespace mongo {
             // can't use the Matcher API because this would segfault the constructor
             uassert(16395, "$where is not allowed inside of a $match aggregation expression",
                     ! str::equals(e.fieldName(), "$where"));
-            // geo breaks if it is not the first portion of the pipline
+            // geo breaks if it is not the first portion of the pipeline
             uassert(16424, "$near is not allowed inside of a $match aggregation expression",
                     ! str::equals(e.fieldName(), "$near"));
-            uassert(16425, "$within is not allowed inside of a $match aggregation expression",
-                    ! str::equals(e.fieldName(), "$within"));
             uassert(16426, "$nearSphere is not allowed inside of a $match aggregation expression",
                     ! str::equals(e.fieldName(), "$nearSphere"));
             if (e.isABSONObj())

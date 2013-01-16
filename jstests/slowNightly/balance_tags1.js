@@ -1,5 +1,5 @@
 
-s = new ShardingTest( "balance_tags1" , 3 , 1 , 1 , { chunksize : 1 , nopreallocj : true } )
+s = new ShardingTest( "balance_tags1" , 3 , 1 , 1 , { sync:true, chunksize : 1 , nopreallocj : true } )
 s.config.settings.update( { _id: "balancer" }, { $set : { stopped: false, _nosleep: true } } , true );
 
 db = s.getDB( "test" );
@@ -11,8 +11,12 @@ db.getLastError();
 s.adminCommand( { enablesharding : "test" } )
 s.adminCommand( { shardcollection : "test.foo" , key : { _id : 1 } } );
 
+s.stopBalancer();
+
 for ( i=0; i<20; i++ )
     s.adminCommand( { split : "test.foo" , middle : { _id : i } } );
+
+s.startBalancer();
 
 sh.status( true )
 assert.soon( function() {
@@ -42,6 +46,7 @@ assert.soon( function() {
     return counts["shard0002"] == 0;
 } , "balance 2 didn't happen" , 1000 * 60 * 10 , 1000 )
 
+printjson(sh.status());
 
 s.stop();
 

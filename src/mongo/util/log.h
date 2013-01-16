@@ -25,6 +25,7 @@
 #include <boost/scoped_ptr.hpp>
 #include <boost/thread/tss.hpp>
 
+#include "mongo/base/status.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/debug_util.h"
@@ -94,7 +95,7 @@ namespace mongo {
             return LabeledLevel( _label + string("::") + label, _level );
         }
 
-        LabeledLevel operator+( string& label ) const {
+        LabeledLevel operator+( const std::string& label ) const {
             return LabeledLevel( _label + string("::") + label, _level );
         }
 
@@ -109,6 +110,17 @@ namespace mongo {
         string _label;
         int _level;
     };
+
+    inline bool operator<( const LabeledLevel& ll, const int i ) { return ll.getLevel() < i; }
+    inline bool operator<( const int i, const LabeledLevel& ll ) { return i < ll.getLevel(); }
+    inline bool operator>( const LabeledLevel& ll, const int i ) { return ll.getLevel() > i; }
+    inline bool operator>( const int i, const LabeledLevel& ll ) { return i > ll.getLevel(); }
+    inline bool operator<=( const LabeledLevel& ll, const int i ) { return ll.getLevel() <= i; }
+    inline bool operator<=( const int i, const LabeledLevel& ll ) { return i <= ll.getLevel(); }
+    inline bool operator>=( const LabeledLevel& ll, const int i ) { return ll.getLevel() >= i; }
+    inline bool operator>=( const int i, const LabeledLevel& ll ) { return i >= ll.getLevel(); }
+    inline bool operator==( const LabeledLevel& ll, const int i ) { return ll.getLevel() == i; }
+    inline bool operator==( const int i, const LabeledLevel& ll ) { return i == ll.getLevel(); }
 
     class LazyString {
     public:
@@ -236,6 +248,10 @@ namespace mongo {
         static std::vector<Tee*> * globalTees;
         static bool isSyslog;
     public:
+        // Type for optional function for inserting context information in log messages.  See
+        // registerExtraLogContextFn, below.
+        typedef void (*ExtraLogContextFn)(BufBuilder& builder);
+
         static void logLockless( const StringData& s );
 
         static void setLogFile(FILE* f);
@@ -277,7 +293,7 @@ namespace mongo {
         /** note these are virtual */
         Logstream& operator<<(const char *x) { ss << x; return *this; }
         Logstream& operator<<(const string& x) { ss << x; return *this; }
-        Logstream& operator<<(const StringData& x) { ss << x.data(); return *this; }
+        Logstream& operator<<(const StringData& x) { ss << x; return *this; }
         Logstream& operator<<(char *x)       { ss << x; return *this; }
         Logstream& operator<<(char x)        { ss << x; return *this; }
         Logstream& operator<<(int x)         { ss << x; return *this; }
@@ -328,6 +344,11 @@ namespace mongo {
         void indentDec(){ indent--; }
         int getIndent() const { return indent; }
 
+        // Replace any pre-existing function for appending context information to log lines with
+        // "contextFn".  Returns Status::OK on first call, and ErrorCodes::AlreadyInitialized if
+        // called more than once.  Returns ErrorCodes::BadValue if contextFn is NULL.
+        static Status registerExtraLogContextFn(ExtraLogContextFn contextFn);
+
     private:
         static boost::thread_specific_ptr<Logstream> tsp;
         Logstream() {
@@ -338,6 +359,7 @@ namespace mongo {
             ss.str("");
             logLevel = LL_INFO;
         }
+
     public:
         static Logstream& get();
     };
@@ -376,36 +398,21 @@ namespace mongo {
         return nullstream;
     }
 
-    inline Nullstream& log( int level ) {
-        if ( level > logLevel )
-            return nullstream;
-        return Logstream::get().prolog();
-    }
-
-#define MONGO_LOG(level) if ( MONGO_likely(logLevel < (level)) ) { } else log( level )
+#define MONGO_LOG(requiredLevel) \
+    ( MONGO_likely( ::mongo::logLevel < (requiredLevel) ) ) \
+    ? ::mongo::log() : ::mongo::log()
 #define LOG MONGO_LOG
-
-    inline Nullstream& log( LogLevel l ) {
-        return Logstream::get().prolog().setLogLevel( l );
-    }
-
-    inline Nullstream& log( const LabeledLevel& ll ) {
-        Nullstream& stream = log( ll.getLevel() );
-        if( ll.getLabel() != "" )
-            stream << "[" << ll.getLabel() << "] ";
-        return stream;
-    }
 
     inline Nullstream& log() {
         return Logstream::get().prolog();
     }
 
     inline Nullstream& error() {
-        return log( LL_ERROR );
+        return MONGO_LOG( LL_ERROR );
     }
 
     inline Nullstream& warning() {
-        return log( LL_WARNING );
+        return MONGO_LOG( LL_WARNING );
     }
 
     /* default impl returns "" -- mongod overrides */
@@ -443,7 +450,7 @@ namespace mongo {
     };
 
     extern Tee* const warnings; // Things put here go in serverStatus
-    extern Tee* startupWarningsLog;
+    extern Tee* const startupWarningsLog; // Things put here get reported in MMS
 
     string errnoWithDescription(int errorcode = -1);
     void rawOut( const string &s );

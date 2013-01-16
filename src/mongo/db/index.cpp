@@ -16,17 +16,22 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include "mongo/pch.h"
+
+#include "mongo/db/index.h"
+
 #include <boost/checked_delete.hpp>
 
-#include "pch.h"
-#include "namespace-inl.h"
-#include "index.h"
-#include "btree.h"
-#include "background.h"
-#include "repl/rs.h"
-#include "ops/delete.h"
+#include "mongo/db/auth/action_type.h"
+#include "mongo/db/auth/authorization_manager.h"
+#include "mongo/db/background.h"
+#include "mongo/db/btree.h"
+#include "mongo/db/index_update.h"
+#include "mongo/db/namespace-inl.h"
+#include "mongo/db/ops/delete.h"
+#include "mongo/db/repl/rs.h"
 #include "mongo/util/scopeguard.h"
-
+#include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 
@@ -206,7 +211,7 @@ namespace mongo {
                 dropNS(ns.c_str());
             }
             catch(DBException& ) {
-                log(2) << "IndexDetails::kill(): couldn't drop ns " << ns << endl;
+                LOG(2) << "IndexDetails::kill(): couldn't drop ns " << ns << endl;
             }
             head.setInvalid();
             info.setInvalid();
@@ -245,7 +250,7 @@ namespace mongo {
 
     void getIndexChanges(vector<IndexChanges>& v, const char *ns, NamespaceDetails& d,
                          BSONObj newObj, BSONObj oldObj, bool &changedId) {
-        int z = d.nIndexesBeingBuilt();
+        int z = d.getTotalIndexCount();
         v.resize(z);
         for( int i = 0; i < z; i++ ) {
             IndexDetails& idx = d.idx(i);
@@ -264,7 +269,7 @@ namespace mongo {
     }
 
     void dupCheck(vector<IndexChanges>& v, NamespaceDetails& d, DiskLoc curObjLoc) {
-        int z = d.nIndexesBeingBuilt();
+        int z = d.getTotalIndexCount();
         for( int i = 0; i < z; i++ ) {
             IndexDetails& idx = d.idx(i);
             v[i].dupCheck(idx, curObjLoc);
@@ -282,32 +287,28 @@ namespace mongo {
         return true;
     }
 
-    /* Prepare to build an index.  Does not actually build it (except for a special _id case).
-       - We validate that the params are good
-       - That the index does not already exist
-       - Creates the source collection if it DNE
-
-       example of 'io':
-         { ns : 'test.foo', name : 'z', key : { z : 1 } }
-
-       throws DBException
-
-       @param sourceNS - source NS we are indexing
-       @param sourceCollection - its details ptr
-       @return true if ok to continue.  when false we stop/fail silently (index already exists)
-    */
-    bool prepareToBuildIndex(const BSONObj& io, bool god, string& sourceNS, NamespaceDetails *&sourceCollection, BSONObj& fixedIndexObject ) {
+    bool prepareToBuildIndex(const BSONObj& io,
+                             bool mayInterrupt,
+                             bool god,
+                             string& sourceNS,
+                             NamespaceDetails*& sourceCollection,
+                             BSONObj& fixedIndexObject) {
         sourceCollection = 0;
-
-        // logical name of the index.  todo: get rid of the name, we don't need it!
-        const char *name = io.getStringField("name");
-        uassert(12523, "no index name specified", *name);
 
         // the collection for which we are building an index
         sourceNS = io.getStringField("ns");
         uassert(10096, "invalid ns to index", sourceNS.find( '.' ) != string::npos);
         massert(10097, str::stream() << "bad table to index name on add index attempt current db: " << cc().database()->name << "  source: " << sourceNS ,
-                cc().database()->name == nsToDatabase(sourceNS.c_str()));
+                cc().database()->name == nsToDatabase(sourceNS));
+
+        uassert(16548,
+                mongoutils::str::stream() << "not authorized to create index on " << sourceNS,
+                cc().getAuthorizationManager()->checkAuthorization(sourceNS,
+                                                                   ActionType::ensureIndex));
+
+        // logical name of the index.  todo: get rid of the name, we don't need it!
+        const char *name = io.getStringField("name");
+        uassert(12523, "no index name specified", *name);
 
         BSONObj key = io.getObjectField("key");
         uassert(12524, "index key pattern too large", key.objsize() <= 2048);
@@ -317,13 +318,13 @@ namespace mongo {
         }
 
         if ( sourceNS.empty() || key.isEmpty() ) {
-            log(2) << "bad add index attempt name:" << (name?name:"") << "\n  ns:" <<
+            LOG(2) << "bad add index attempt name:" << (name?name:"") << "\n  ns:" <<
                    sourceNS << "\n  idxobj:" << io.toString() << endl;
             string s = "bad add index attempt " + sourceNS + " key:" + key.toString();
             uasserted(12504, s);
         }
 
-        sourceCollection = nsdetails(sourceNS.c_str());
+        sourceCollection = nsdetails(sourceNS);
         if( sourceCollection == 0 ) {
             // try to create it
             string err;
@@ -331,7 +332,7 @@ namespace mongo {
                 problem() << "ERROR: failed to create collection while adding its index. " << sourceNS << endl;
                 return false;
             }
-            sourceCollection = nsdetails(sourceNS.c_str());
+            sourceCollection = nsdetails(sourceNS);
             tlog() << "info: creating collection " << sourceNS << " on add index" << endl;
             verify( sourceCollection );
         }
@@ -341,7 +342,7 @@ namespace mongo {
             return false;
         }
         if( sourceCollection->findIndexByKeyPattern(key) >= 0 ) {
-            log(2) << "index already exists with diff name " << name << ' ' << key.toString() << endl;
+            LOG(2) << "index already exists with diff name " << name << ' ' << key.toString() << endl;
             return false;
         }
 
@@ -349,22 +350,16 @@ namespace mongo {
             stringstream ss;
             ss << "add index fails, too many indexes for " << sourceNS << " key:" << key.toString();
             string s = ss.str();
-            log() << s << '\n';
+            log() << s << endl;
             uasserted(12505,s);
         }
-
-        /* we can't build a new index for the ns if a build is already in progress in the background -
-           EVEN IF this is a foreground build.
-           */
-        uassert(12588, "cannot add index with a background operation in progress",
-                !BackgroundOperation::inProgForNs(sourceNS.c_str()));
 
         /* this is because we want key patterns like { _id : 1 } and { _id : <someobjid> } to
            all be treated as the same pattern.
         */
         if ( IndexDetails::isIdIndexPattern(key) ) {
             if( !god ) {
-                ensureHaveIdIndex( sourceNS.c_str() );
+                ensureHaveIdIndex( sourceNS.c_str(), mayInterrupt );
                 return false;
             }
         }
@@ -434,4 +429,15 @@ namespace mongo {
         _init();
     }
 
+    void IndexChanges::dupCheck(IndexDetails& idx, DiskLoc curObjLoc) {
+        if (added.empty() || 
+            !idx.unique() || 
+            ignoreUniqueIndex(idx)) {
+            return;
+        }
+        const Ordering ordering = Ordering::make(idx.keyPattern());
+
+        // "E11001 duplicate key on update"
+        idx.idxInterface().uassertIfDups(idx, added, idx.head, curObjLoc, ordering);
+    }
 }

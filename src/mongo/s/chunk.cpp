@@ -1,7 +1,7 @@
 // @file chunk.cpp
 
 /**
- *    Copyright (C) 2008 10gen Inc.
+ *    Copyright (C) 2008-2012 10gen Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -18,20 +18,24 @@
 
 #include "pch.h"
 
-#include "../client/connpool.h"
-#include "../db/queryutil.h"
-#include "../util/startup_test.h"
-#include "../util/timer.h"
-#include "mongo/client/dbclientcursor.h"
+#include "mongo/s/chunk.h"
 
-#include "chunk.h"
-#include "chunk_diff.h"
-#include "config.h"
-#include "cursors.h"
-#include "grid.h"
-#include "strategy.h"
-#include "client_info.h"
+#include "mongo/client/connpool.h"
+#include "mongo/client/dbclientcursor.h"
+#include "mongo/db/queryutil.h"
+#include "mongo/platform/random.h"
+#include "mongo/s/chunk_diff.h"
+#include "mongo/s/chunk_version.h"
+#include "mongo/s/client_info.h"
+#include "mongo/s/config.h"
+#include "mongo/s/cursors.h"
+#include "mongo/s/grid.h"
+#include "mongo/s/strategy.h"
+#include "mongo/s/type_collection.h"
+#include "mongo/s/type_settings.h"
 #include "mongo/util/concurrency/ticketholder.h"
+#include "mongo/util/startup_test.h"
+#include "mongo/util/timer.h"
 
 namespace mongo {
 
@@ -46,8 +50,6 @@ namespace mongo {
 
     // -------  Shard --------
 
-    string Chunk::chunkMetadataNS = "config.chunks";
-
     int Chunk::MaxChunkSize = 1024 * 1024 * 64;
     int Chunk::MaxObjectPerChunk = 250000;
 
@@ -57,16 +59,16 @@ namespace mongo {
     Chunk::Chunk(const ChunkManager * manager, BSONObj from)
         : _manager(manager), _lastmod(0, OID()), _dataWritten(mkDataWritten())
     {
-        string ns = from.getStringField( "ns" );
-        _shard.reset( from.getStringField( "shard" ) );
+        string ns = from.getStringField(ChunkType::ns().c_str());
+        _shard.reset(from.getStringField(ChunkType::shard().c_str()));
 
-        _lastmod = ShardChunkVersion::fromBSON( from["lastmod"] );
+        _lastmod = ChunkVersion::fromBSON(from[ChunkType::DEPRECATED_lastmod()]);
         verify( _lastmod.isSet() );
 
-        _min = from.getObjectField( "min" ).getOwned();
-        _max = from.getObjectField( "max" ).getOwned();
+        _min = from.getObjectField(ChunkType::min().c_str()).getOwned();
+        _max = from.getObjectField(ChunkType::max().c_str()).getOwned();
         
-        _jumbo = from["jumbo"].trueValue();
+        _jumbo = from[ChunkType::jumbo()].trueValue();
 
         uassert( 10170 ,  "Chunk needs a ns" , ! ns.empty() );
         uassert( 13327 ,  "Chunk ns must match server ns" , ns == _manager->getns() );
@@ -77,12 +79,13 @@ namespace mongo {
         uassert( 10173 ,  "Chunk needs a max" , ! _max.isEmpty() );
     }
 
-    Chunk::Chunk(const ChunkManager * info , const BSONObj& min, const BSONObj& max, const Shard& shard, ShardChunkVersion lastmod)
+    Chunk::Chunk(const ChunkManager * info , const BSONObj& min, const BSONObj& max, const Shard& shard, ChunkVersion lastmod)
         : _manager(info), _min(min), _max(max), _shard(shard), _lastmod(lastmod), _jumbo(false), _dataWritten(mkDataWritten())
     {}
 
-    long Chunk::mkDataWritten() {
-        return rand() % ( MaxChunkSize / ChunkManager::SplitHeuristics::splitTestFactor );
+    int Chunk::mkDataWritten() {
+        PseudoRandom r(static_cast<int64_t>(time(0)));
+        return r.nextInt32( MaxChunkSize / ChunkManager::SplitHeuristics::splitTestFactor );
     }
 
     string Chunk::getns() const {
@@ -90,17 +93,13 @@ namespace mongo {
         return _manager->getns();
     }
 
-    bool Chunk::contains( const BSONObj& obj ) const {
-        return
-            _manager->getShardKey().compare( getMin() , obj ) <= 0 &&
-            _manager->getShardKey().compare( obj , getMax() ) < 0;
+    bool Chunk::containsPoint( const BSONObj& point ) const {
+        return getMin().woCompare( point ) <= 0 && point.woCompare( getMax() ) < 0;
     }
 
-    bool ChunkRange::contains(const BSONObj& obj) const {
+    bool ChunkRange::containsPoint( const BSONObj& point ) const {
         // same as Chunk method
-        return
-            _manager->getShardKey().compare( getMin() , obj ) <= 0 &&
-            _manager->getShardKey().compare( obj , getMax() ) < 0;
+        return getMin().woCompare( point ) <= 0 && point.woCompare( getMax() ) < 0;
     }
 
     bool Chunk::minIsInf() const {
@@ -228,22 +227,27 @@ namespace mongo {
                 splitPoint.push_back( medianKey );
         }
 
-        // We assume that if the chunk being split is the first (or last) one on the collection, this chunk is
-        // likely to see more insertions. Instead of splitting mid-chunk, we use the very first (or last) key
-        // as a split point.
-        if ( minIsInf() ) {
-            splitPoint.clear();
-            BSONObj key = _getExtremeKey( 1 );
-            if ( ! key.isEmpty() ) {
-                splitPoint.push_back( key );
+        // We assume that if the chunk being split is the first (or last) one on the collection,
+        // this chunk is likely to see more insertions. Instead of splitting mid-chunk, we use
+        // the very first (or last) key as a split point.
+        // This heuristic is skipped for "special" shard key patterns that are not likely to
+        // produce monotonically increasing or decreasing values (e.g. hashed shard keys).
+        // TODO: need better way to detect when shard keys vals are increasing/decreasing, and
+        // use that better method to determine whether to apply heuristic here.
+        if ( ! skey().isSpecial() ){
+            if ( minIsInf() ) {
+                splitPoint.clear();
+                BSONObj key = _getExtremeKey( 1 );
+                if ( ! key.isEmpty() ) {
+                    splitPoint.push_back( key );
+                }
             }
-
-        }
-        else if ( maxIsInf() ) {
-            splitPoint.clear();
-            BSONObj key = _getExtremeKey( -1 );
-            if ( ! key.isEmpty() ) {
-                splitPoint.push_back( key );
+            else if ( maxIsInf() ) {
+                splitPoint.clear();
+                BSONObj key = _getExtremeKey( -1 );
+                if ( ! key.isEmpty() ) {
+                    splitPoint.push_back( key );
+                }
             }
         }
 
@@ -301,7 +305,12 @@ namespace mongo {
         return true;
     }
 
-    bool Chunk::moveAndCommit( const Shard& to , long long chunkSize /* bytes */, bool secondaryThrottle, BSONObj& res ) const {
+    bool Chunk::moveAndCommit(const Shard& to,
+                              long long chunkSize /* bytes */,
+                              bool secondaryThrottle,
+                              bool waitForDelete,
+                              BSONObj& res) const
+    {
         uassert( 10167 ,  "can't move shard to its current location!" , getShard() != to );
 
         log() << "moving chunk ns: " << _manager->getns() << " moving ( " << toString() << ") " << _shard.toString() << " -> " << to.toString() << endl;
@@ -324,13 +333,14 @@ namespace mongo {
                                                          "maxChunkSizeBytes" << chunkSize <<
                                                          "shardId" << genID() <<
                                                          "configdb" << configServer.modelServer() <<
-                                                         "secondaryThrottle" << secondaryThrottle
+                                                         "secondaryThrottle" << secondaryThrottle <<
+                                                         "waitForDelete" << waitForDelete
                                                          ) ,
                                                    res
                                                    );
         fromconn->done();
 
-        log( worked ) << "moveChunk result: " << res << endl;
+        LOG( worked ? 1 : 0 ) << "moveChunk result: " << res << endl;
 
         // if succeeded, needs to reload to pick up the new location
         // if failed, mongos may be stale
@@ -354,7 +364,7 @@ namespace mongo {
                 return false;
             
             if ( ! getManager()->_splitHeuristics._splitTickets.tryAcquire() ) {
-                LOG(1) << "won't auto split becaue not enough tickets: " << getManager()->getns() << endl;
+                LOG(1) << "won't auto split because not enough tickets: " << getManager()->getns() << endl;
                 return false;
             }
             TicketHolderReleaser releaser( &(getManager()->_splitHeuristics._splitTickets) );
@@ -410,7 +420,7 @@ namespace mongo {
                 }
 
                 ChunkManagerPtr cm = _manager->reload(false/*just reloaded in mulitsplit*/);
-                ChunkPtr toMove = cm->findChunk(min);
+                ChunkPtr toMove = cm->findIntersectingChunk(min);
 
                 if ( ! (toMove->getMin() == min && toMove->getMax() == max) ){
                     LOG(1) << "recently split chunk: " << range << " modified before we could migrate " << toMove << endl;
@@ -425,6 +435,7 @@ namespace mongo {
                          toMove->moveAndCommit( newLocation , 
                                                 MaxChunkSize , 
                                                 false , /* secondaryThrottle - small chunk, no need */
+                                                false, /* waitForDelete - small chunk, no need */
                                                 res ) );
                 
                 // update our config
@@ -466,36 +477,33 @@ namespace mongo {
 
     void Chunk::appendShortVersion( const char * name , BSONObjBuilder& b ) const {
         BSONObjBuilder bb( b.subobjStart( name ) );
-        bb.append( "min" , _min );
-        bb.append( "max" , _max );
+        bb.append(ChunkType::min(), _min);
+        bb.append(ChunkType::max(), _max);
         bb.done();
     }
 
     bool Chunk::operator==( const Chunk& s ) const {
-        return
-            _manager->getShardKey().compare( _min , s._min ) == 0 &&
-            _manager->getShardKey().compare( _max , s._max ) == 0
-            ;
+        return _min.woCompare( s._min ) == 0 && _max.woCompare( s._max ) == 0;
     }
 
-    void Chunk::serialize(BSONObjBuilder& to,ShardChunkVersion myLastMod) {
+    void Chunk::serialize(BSONObjBuilder& to,ChunkVersion myLastMod) {
 
         to.append( "_id" , genID( _manager->getns() , _min ) );
 
         if ( myLastMod.isSet() ) {
-            myLastMod.addToBSON( to, "lastmod" );
+            myLastMod.addToBSON(to, ChunkType::DEPRECATED_lastmod());
         }
         else if ( _lastmod.isSet() ) {
-            _lastmod.addToBSON( to, "lastmod" );
+            _lastmod.addToBSON(to, ChunkType::DEPRECATED_lastmod());
         }
         else {
             verify(0);
         }
 
-        to << "ns" << _manager->getns();
-        to << "min" << _min;
-        to << "max" << _max;
-        to << "shard" << _shard.getName();
+        to << ChunkType::ns(_manager->getns());
+        to << ChunkType::min(_min);
+        to << ChunkType::max(_max);
+        to << ChunkType::shard(_shard.getName());
     }
 
     string Chunk::genID( const string& ns , const BSONObj& o ) {
@@ -513,7 +521,11 @@ namespace mongo {
 
     string Chunk::toString() const {
         stringstream ss;
-        ss << "ns:" << _manager->getns() << " at: " << _shard.toString() << " lastmod: " << _lastmod.toString() << " min: " << _min << " max: " << _max;
+        ss << ChunkType::ns() << ":" << _manager->getns() <<
+              ChunkType::shard()   << ": " << _shard.toString() <<
+              ChunkType::DEPRECATED_lastmod() << ": " << _lastmod.toString() <<
+              ChunkType::min()     << ": " << _min <<
+              ChunkType::max()     << ": " << _max;
         return ss.str();
     }
 
@@ -529,11 +541,12 @@ namespace mongo {
 
         try {
             scoped_ptr<ScopedDbConnection> conn(
-                    ScopedDbConnection::getInternalScopedDbConnection( configServer.modelServer() ) );
+                    ScopedDbConnection::getInternalScopedDbConnection(
+                            configServer.modelServer(), 30));
 
-            conn->get()->update( chunkMetadataNS,
-                                 BSON( "_id" << genID() ),
-                                 BSON( "$set" << BSON( "jumbo" << true ) ) );
+            conn->get()->update(ChunkType::ConfigNS,
+                                BSON(ChunkType::name(genID())),
+                                BSON("$set" << BSON(ChunkType::jumbo(true))));
             conn->done();
         }
         catch ( DBException& e ) {
@@ -548,7 +561,7 @@ namespace mongo {
            return;
         }
 
-        int csize = o["value"].numberInt();
+        int csize = o[SettingsType::chunksize()].numberInt();
 
         // validate chunksize before proceeding
         if ( csize == 0 ) {
@@ -587,9 +600,13 @@ namespace mongo {
     ChunkManager::ChunkManager( const BSONObj& collDoc ) :
         // Need the ns early, to construct the lock
         // TODO: Construct lock on demand?  Not sure why we need to keep it around
-        _ns( collDoc["_id"].type() == String ? collDoc["_id"].String() : "" ),
-        _key( collDoc["key"].type() == Object ? collDoc["key"].Obj().getOwned() : BSONObj() ),
-        _unique( collDoc["unique"].trueValue() ),
+        _ns(collDoc[CollectionType::ns()].type() == String ?
+                                                        collDoc[CollectionType::ns()].String() :
+                                                        ""),
+        _key(collDoc[CollectionType::keyPattern()].type() == Object ?
+                                                        collDoc[CollectionType::keyPattern()].Obj().getOwned() :
+                                                        BSONObj()),
+        _unique(collDoc[CollectionType::unique()].trueValue()),
         _chunkRanges(),
         _mutex("ChunkManager"),
         // The shard versioning mechanism hinges on keeping track of the number of times we reloaded ChunkManager's.
@@ -605,7 +622,7 @@ namespace mongo {
         verify( _ns != ""  );
         verify( ! _key.key().isEmpty() );
 
-        _version = ShardChunkVersion::fromBSON( collDoc );
+        _version = ChunkVersion::fromBSON( collDoc );
     }
 
     ChunkManager::ChunkManager( ChunkManagerPtr oldManager ) :
@@ -723,8 +740,8 @@ namespace mongo {
     {
 
         // Reset the max version, but not the epoch, when we aren't loading from the oldManager
-        _version = ShardChunkVersion( 0, _version.epoch() );
-        set<ShardChunkVersion> minorVersions;
+        _version = ChunkVersion( 0, _version.epoch() );
+        set<ChunkVersion> minorVersions;
 
         // If we have a previous version of the ChunkManager to work from, use that info to reduce
         // our config query
@@ -787,7 +804,7 @@ namespace mongo {
             // Set all our data to empty
             chunkMap.clear();
             shardVersions.clear();
-            _version = ShardChunkVersion( 0, OID() );
+            _version = ChunkVersion( 0, OID() );
 
             return true;
         }
@@ -811,7 +828,7 @@ namespace mongo {
             // Set all our data to empty to be extra safe
             chunkMap.clear();
             shardVersions.clear();
-            _version = ShardChunkVersion( 0, OID() );
+            _version = ChunkVersion( 0, OID() );
 
             return allInconsistent;
         }
@@ -822,15 +839,15 @@ namespace mongo {
         return grid.getDBConfig(getns())->getChunkManager(getns(), force);
     }
 
-    void ChunkManager::markMinorForReload( ShardChunkVersion majorVersion ) const {
+    void ChunkManager::markMinorForReload( ChunkVersion majorVersion ) const {
         _splitHeuristics.markMinorForReload( getns(), majorVersion );
     }
 
-    void ChunkManager::getMarkedMinorVersions( set<ShardChunkVersion>& minorVersions ) const {
+    void ChunkManager::getMarkedMinorVersions( set<ChunkVersion>& minorVersions ) const {
         _splitHeuristics.getMarkedMinorVersions( minorVersions );
     }
 
-    void ChunkManager::SplitHeuristics::markMinorForReload( const string& ns, ShardChunkVersion majorVersion ) {
+    void ChunkManager::SplitHeuristics::markMinorForReload( const string& ns, ChunkVersion majorVersion ) {
 
         // When we get a stale minor version, it means that some *other* mongos has just split a
         // chunk into a number of smaller parts, so we shouldn't need reload the data needed to
@@ -868,9 +885,9 @@ namespace mongo {
             grid.getDBConfig( ns )->getChunkManagerIfExists( ns, true, true );
     }
 
-    void ChunkManager::SplitHeuristics::getMarkedMinorVersions( set<ShardChunkVersion>& minorVersions ) {
+    void ChunkManager::SplitHeuristics::getMarkedMinorVersions( set<ChunkVersion>& minorVersions ) {
         scoped_lock lk( _staleMinorSetMutex );
-        for( set<ShardChunkVersion>::iterator it = _staleMinorSet.begin(); it != _staleMinorSet.end(); it++ ){
+        for( set<ChunkVersion>::iterator it = _staleMinorSet.begin(); it != _staleMinorSet.end(); it++ ){
             minorVersions.insert( *it );
         }
     }
@@ -952,14 +969,11 @@ namespace mongo {
             }
 
             if ( !initShards || !initShards->size() ) {
-                // use all shards, starting with primary
+                // If not specified, only use the primary shard (note that it's not safe for mongos
+                // to put initial chunks on other shards without the primary mongod knowing).
                 shards->push_back( primary );
-                vector<Shard> tmp;
-                primary.getAllShards( tmp );
-                for ( unsigned i = 0; i < tmp.size(); ++i ) {
-                    if ( tmp[i] != primary )
-                        shards->push_back( tmp[i] );
-                }
+            } else {
+                std::copy( initShards->begin() , initShards->end() , std::back_inserter(*shards) );
             }
         }
     }
@@ -980,7 +994,7 @@ namespace mongo {
                                  &splitPoints, &shards );
 
         // this is the first chunk; start the versioning from scratch
-        ShardChunkVersion version;
+        ChunkVersion version;
         version.incEpoch();
         version.incMajor();
         
@@ -988,11 +1002,11 @@ namespace mongo {
               << " using new epoch " << version.epoch() << endl;
         
         scoped_ptr<ScopedDbConnection> conn(
-                ScopedDbConnection::getInternalScopedDbConnection( config ) );
+                ScopedDbConnection::getInternalScopedDbConnection(config, 30));
 
         // Make sure we don't have any chunks that already exist here
         unsigned long long existingChunks =
-            conn->get()->count( Chunk::chunkMetadataNS, BSON( "ns" << _ns ) );
+            conn->get()->count(ChunkType::ConfigNS, BSON(ChunkType::ns(_ns)));
 
         uassert( 13449 , str::stream() << "collection " << _ns << " already sharded with "
                                        << existingChunks << " chunks", existingChunks == 0 );
@@ -1006,12 +1020,12 @@ namespace mongo {
             BSONObjBuilder chunkBuilder;
             temp.serialize( chunkBuilder );
             BSONObj chunkObj = chunkBuilder.obj();
-        
-            conn->get()->update( Chunk::chunkMetadataNS,
-                                 QUERY( "_id" << temp.genID() ),
-                                 chunkObj,
-                                 true,
-                                 false );
+
+            conn->get()->update(ChunkType::ConfigNS,
+                                QUERY(ChunkType::name(temp.genID())),
+                                chunkObj,
+                                true,
+                                false );
 
             version.incMinor();
         }
@@ -1025,17 +1039,15 @@ namespace mongo {
         
         conn->done();
 
-        _version = ShardChunkVersion( 0, version.epoch() );
+        _version = ChunkVersion( 0, version.epoch() );
     }
 
-    ChunkPtr ChunkManager::findChunk( const BSONObj & obj ) const {
-        BSONObj key = _key.extractKey(obj);
-
+    ChunkPtr ChunkManager::findIntersectingChunk( const BSONObj& point ) const {
         {
             BSONObj foo;
             ChunkPtr c;
             {
-                ChunkMap::const_iterator it = _chunkMap.upper_bound(key);
+                ChunkMap::const_iterator it = _chunkMap.upper_bound( point );
                 if (it != _chunkMap.end()) {
                     foo = it->first;
                     c = it->second;
@@ -1043,14 +1055,14 @@ namespace mongo {
             }
 
             if ( c ) {
-                if ( c->contains( key ) ){
-                    dassert(c->contains(key)); // doesn't use fast-path in extractKey
+                if ( c->containsPoint( point ) ){
+                    dassert( c->containsPoint( point ) ); // doesn't use fast-path in extractKey
                     return c;
                 }
 
                 PRINT(foo);
                 PRINT(*c);
-                PRINT(key);
+                PRINT( point );
 
                 reload();
                 massert(13141, "Chunk map pointed to incorrect chunk", false);
@@ -1058,7 +1070,12 @@ namespace mongo {
         }
 
         msgasserted( 8070 ,
-                     str::stream() << "couldn't find a chunk which should be impossible: " << key );
+                     str::stream() << "couldn't find a chunk which should be impossible: " << point );
+    }
+
+    ChunkPtr ChunkManager::findChunkForDoc( const BSONObj& doc ) const {
+        BSONObj key = _key.extractKey( doc );
+        return findIntersectingChunk( key );
     }
 
     ChunkPtr ChunkManager::findChunkOnServer( const Shard& shard ) const {
@@ -1075,8 +1092,8 @@ namespace mongo {
         // TODO Determine if the third argument to OrRangeGenerator() is necessary, see SERVER-5165.
         OrRangeGenerator org(_ns.c_str(), query, false);
 
-        const string special = org.getSpecial();
-        if (special == "2d") {
+        const SpecialIndices special = org.getSpecial();
+        if (special.has("2d") || special.has("2dsphere")) {
             BSONForEach(field, query) {
                 if (getGtLtOp(field) == BSONObj::opNEAR) {
                     uassert(13501, "use geoNear command rather than $near query", false);
@@ -1084,9 +1101,8 @@ namespace mongo {
                 }
                 // $within queries are fine
             }
-        }
-        else if (!special.empty()) {
-            uassert(13502, "unrecognized special query type: " + special, false);
+        } else if (!special.empty()) {
+            uassert(13502, "unrecognized special query type: " + special.toString(), false);
         }
 
         do {
@@ -1100,15 +1116,11 @@ namespace mongo {
                 return;
             }
             
-            if ( frsp->matchPossibleForShardKey( _key.key() ) ) {
-                BoundList ranges = frsp->shardKeyIndexBounds(_key.key());
-                for (BoundList::const_iterator it=ranges.begin(), end=ranges.end();
-                     it != end; ++it) {
+            if ( frsp->matchPossibleForSingleKeyFRS( _key.key() ) ) {
+                BoundList ranges = _key.keyBounds( frsp->getSingleKeyFRS() );
+                for ( BoundList::const_iterator it=ranges.begin(); it != ranges.end(); ++it ){
 
-                    BSONObj minObj = it->first.replaceFieldNames(_key.key());
-                    BSONObj maxObj = it->second.replaceFieldNames(_key.key());
-
-                    getShardsForRange( shards, minObj, maxObj, false );
+                    getShardsForRange( shards, it->first /*min*/, it->second /*max*/ );
 
                     // once we know we need to visit all shards no need to keep looping
                     if( shards.size() == _shards.size() ) return;
@@ -1130,12 +1142,9 @@ namespace mongo {
         }
     }
 
-    void ChunkManager::getShardsForRange(set<Shard>& shards, const BSONObj& min, const BSONObj& max, bool fullKeyReq ) const {
-
-        if( fullKeyReq ){
-            uassert(13405, str::stream() << "min value " << min << " does not have shard key", hasShardKey(min));
-            uassert(13406, str::stream() << "max value " << max << " does not have shard key", hasShardKey(max));
-        }
+    void ChunkManager::getShardsForRange( set<Shard>& shards,
+                                          const BSONObj& min,
+                                          const BSONObj& max ) const {
 
         ChunkRangeMap::const_iterator it = _chunkRanges.upper_bound(min);
         ChunkRangeMap::const_iterator end = _chunkRanges.upper_bound(max);
@@ -1165,11 +1174,11 @@ namespace mongo {
 
     bool ChunkManager::compatibleWith( const Chunk& other ) const {
 
-        // Do this first, b/c findChunk asserts if the key isn't similar
+        // Do this first, b/c findIntersectingChunk asserts if the key isn't similar
         if( ! this->_key.hasShardKey( other.getMin() ) ) return false;
         // We assume here that chunks will have consistent fields in min/max
 
-        ChunkPtr myChunk = this->findChunk( other.getMin() );
+        ChunkPtr myChunk = this->findIntersectingChunk( other.getMin() );
 
         if( other.getMin() != myChunk->getMin() ) return false;
         if( other.getMax() != myChunk->getMax() ) return false;
@@ -1239,7 +1248,7 @@ namespace mongo {
         // remove chunk data
         scoped_ptr<ScopedDbConnection> conn(
                 ScopedDbConnection::getInternalScopedDbConnection( configServer.modelServer() ) );
-        conn->get()->remove( Chunk::chunkMetadataNS , BSON( "ns" << _ns ) );
+        conn->get()->remove(ChunkType::ConfigNS, BSON(ChunkType::ns(_ns)));
         conn->done();
         LOG(1) << "ChunkManager::drop : " << _ns << "\t removed chunk data" << endl;
 
@@ -1252,8 +1261,15 @@ namespace mongo {
             // we need a special command for dropping on the d side
             // this hack works for the moment
 
-            if ( ! setShardVersion( conn->conn(), _ns, ShardChunkVersion( 0, OID() ), true, res ) )
+            if ( ! setShardVersion( conn->conn(),
+                                    _ns,
+                                    ChunkVersion( 0, OID() ),
+                                    ChunkManagerPtr(),
+                                    true, res ) )
+            {
                 throw UserException( 8071 , str::stream() << "cleaning up after drop failed: " << res );
+            }
+
             conn->get()->simpleCommand( "admin", 0, "unsetSharding" );
             conn->done();
         }
@@ -1262,15 +1278,21 @@ namespace mongo {
         configServer.logChange( "dropCollection" , _ns , BSONObj() );
     }
 
-    ShardChunkVersion ChunkManager::getVersion( const Shard& shard ) const {
+    ChunkVersion ChunkManager::getVersion( const Shard& shard ) const {
         ShardVersionMap::const_iterator i = _shardVersions.find( shard );
         if ( i == _shardVersions.end() )
-            return ShardChunkVersion( 0, OID() );
+            return ChunkVersion( 0, OID() );
         return i->second;
     }
 
-    ShardChunkVersion ChunkManager::getVersion() const {
+    ChunkVersion ChunkManager::getVersion() const {
         return _version;
+    }
+
+    void ChunkManager::getInfo( BSONObjBuilder& b ) const {
+        b.append(CollectionType::keyPattern(), _key.key());
+        b.appendBool(CollectionType::unique(), _unique);
+        _version.addEpochToBSON(b, CollectionType::DEPRECATED_lastmod());
     }
 
     string ChunkManager::toString() const {
@@ -1320,13 +1342,13 @@ namespace mongo {
                 verify(max != _ranges.end());
                 verify(min == max);
                 verify(min->second->getShard() == chunk->getShard());
-                verify(min->second->contains( chunk->getMin() ));
-                verify(min->second->contains( chunk->getMax() ) || (min->second->getMax() == chunk->getMax()));
+                verify(min->second->containsPoint( chunk->getMin() ));
+                verify(min->second->containsPoint( chunk->getMax() ) || (min->second->getMax() == chunk->getMax()));
             }
 
         }
         catch (...) {
-            log( LL_ERROR ) << "\t invalid ChunkRangeMap! printing ranges:" << endl;
+            LOG( LL_ERROR ) << "\t invalid ChunkRangeMap! printing ranges:" << endl;
 
             for (ChunkRangeMap::const_iterator it=_ranges.begin(), end=_ranges.end(); it != end; ++it)
                 cout << it->first << ": " << *it->second << endl;
@@ -1388,12 +1410,12 @@ namespace mongo {
 
     class ChunkObjUnitTest : public StartupTest {
     public:
-        void runShardChunkVersion() {
-            vector<ShardChunkVersion> all;
-            all.push_back( ShardChunkVersion(1,1, OID()) );
-            all.push_back( ShardChunkVersion(1,2, OID()) );
-            all.push_back( ShardChunkVersion(2,1, OID()) );
-            all.push_back( ShardChunkVersion(2,2, OID()) );
+        void runChunkVersion() {
+            vector<ChunkVersion> all;
+            all.push_back( ChunkVersion(1,1, OID()) );
+            all.push_back( ChunkVersion(1,2, OID()) );
+            all.push_back( ChunkVersion(2,1, OID()) );
+            all.push_back( ChunkVersion(2,2, OID()) );
 
             for ( unsigned i=0; i<all.size(); i++ ) {
                 for ( unsigned j=i+1; j<all.size(); j++ ) {
@@ -1404,7 +1426,7 @@ namespace mongo {
         }
 
         void run() {
-            runShardChunkVersion();
+            runChunkVersion();
             LOG(1) << "shardObjTest passed" << endl;
         }
     } shardObjTest;
@@ -1416,7 +1438,13 @@ namespace mongo {
     // NOTE (careful when deprecating)
     //   currently the sharding is enabled because of a write or read (as opposed to a split or migrate), the shard learns
     //   its name and through the 'setShardVersion' command call
-    bool setShardVersion( DBClientBase & conn , const string& ns , ShardChunkVersion version , bool authoritative , BSONObj& result ) {
+    bool setShardVersion( DBClientBase & conn,
+                          const string& ns,
+                          ChunkVersion version,
+                          ChunkManagerPtr manager, // Used only for reporting!
+                          bool authoritative ,
+                          BSONObj& result )
+    {
         BSONObjBuilder cmdBuilder;
         cmdBuilder.append( "setShardVersion" , ns.c_str() );
         cmdBuilder.append( "configdb" , configServer.modelServer() );
@@ -1430,13 +1458,16 @@ namespace mongo {
         cmdBuilder.append( "shardHost" , s.getConnString() );
         BSONObj cmd = cmdBuilder.obj();
 
-        LOG(1) << "    setShardVersion  " << s.getName() << " " << conn.getServerAddress() << "  " << ns << "  " << cmd << " " << &conn << endl;
+        LOG(1) << "    setShardVersion  " << s.getName()
+               << " " << conn.getServerAddress()
+               << "  " << ns
+               << "  " << cmd
+               << " " << &conn
+               << (manager.get() ? string(str::stream() << " " << manager->getSequenceNumber()) :
+                                   "")
+               << endl;
 
-        return conn.runCommand( "admin",
-                                cmd,
-                                result,
-                                0,
-                                &AuthenticationTable::getInternalSecurityAuthenticationTable() );
+        return conn.runCommand("admin", cmd, result, 0);
     }
 
 } // namespace mongo

@@ -21,20 +21,23 @@
 
 namespace mongo {
 
-    intrusive_ptr<const Value> AccumulatorFirst::evaluate(
-        const intrusive_ptr<Document> &pDocument) const {
+    Value AccumulatorFirst::evaluate(const Document& pDocument) const {
         verify(vpOperand.size() == 1);
 
         /* only remember the first value seen */
-        if (!pValue.get())
+        if (!_haveFirst) {
+            // can't use pValue.missing() since we want the first value even if missing
+            _haveFirst = true;
             pValue = vpOperand[0]->evaluate(pDocument);
+        }
 
         return pValue;
     }
 
-    AccumulatorFirst::AccumulatorFirst():
-        AccumulatorSingleValue() {
-    }
+    AccumulatorFirst::AccumulatorFirst()
+        : AccumulatorSingleValue()
+        , _haveFirst(false)
+    {}
 
     intrusive_ptr<Accumulator> AccumulatorFirst::create(
         const intrusive_ptr<ExpressionContext> &pCtx) {

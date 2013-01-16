@@ -20,7 +20,7 @@
 #include "db.h"
 #include "dbhelpers.h"
 #include "json.h"
-#include "btree.h"
+#include "mongo/db/btreecursor.h"
 #include "pdfile.h"
 #include "oplog.h"
 #include "ops/update.h"
@@ -29,6 +29,7 @@
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/pagefault.h"
 #include "mongo/db/repl_block.h"
+#include "mongo/s/d_logic.h"
 
 #include <fstream>
 
@@ -85,7 +86,7 @@ namespace mongo {
     */
     DiskLoc Helpers::findOne(const StringData& ns, const BSONObj &query, bool requireIndex) {
         shared_ptr<Cursor> c =
-            NamespaceDetailsTransient::getCursor( ns.data() , query, BSONObj(),
+            NamespaceDetailsTransient::getCursor( ns, query, BSONObj(),
                                                   requireIndex ?
                                                   QueryPlanSelectionPolicy::indexOnly() :
                                                   QueryPlanSelectionPolicy::any() );
@@ -154,8 +155,8 @@ namespace mongo {
         return all;
     }
 
-    bool Helpers::isEmpty(const char *ns, bool doAuth) {
-        Client::Context context(ns, dbpath, doAuth);
+    bool Helpers::isEmpty(const char *ns) {
+        Client::Context context(ns, dbpath);
         shared_ptr<Cursor> c = DataFileMgr::findAll(ns);
         return !c->ok();
     }
@@ -212,52 +213,20 @@ namespace mongo {
         context.getClient()->curop()->done();
     }
 
-    BSONObj Helpers::toKeyFormat( const BSONObj& o , BSONObj& key ) {
-        BSONObjBuilder me;
-        BSONObjBuilder k;
-
-        BSONObjIterator i( o );
-        while ( i.more() ) {
-            BSONElement e = i.next();
-            k.append( e.fieldName() , 1 );
-            me.appendAs( e , "" );
+    BSONObj Helpers::toKeyFormat( const BSONObj& o ) {
+        BSONObjBuilder keyObj( o.objsize() );
+        BSONForEach( e , o ) {
+            keyObj.appendAs( e , "" );
         }
-        key = k.obj();
-        return me.obj();
+        return keyObj.obj();
     }
 
-    BSONObj Helpers::modifiedRangeBound( const BSONObj& bound ,
-                                         const BSONObj& keyPattern ,
-                                         int minOrMax ){
-        BSONObjBuilder newBound;
-
-        BSONObjIterator src( bound );
-        BSONObjIterator pat( keyPattern );
-
-        while( src.more() ){
-            massert( 16341 ,
-                     str::stream() << "keyPattern " << keyPattern
-                                   << " shorter than bound " << bound ,
-                     pat.more() );
-            BSONElement srcElt = src.next();
-            BSONElement patElt = pat.next();
-            massert( 16333 ,
-                     str::stream() << "field names of bound " << bound
-                                   << " do not match those of keyPattern " << keyPattern ,
-                     str::equals( srcElt.fieldName() , patElt.fieldName() ) );
-            newBound.appendAs( srcElt , "" );
+    BSONObj Helpers::inferKeyPattern( const BSONObj& o ) {
+        BSONObjBuilder kpBuilder;
+        BSONForEach( e , o ) {
+            kpBuilder.append( e.fieldName() , 1 );
         }
-        while( pat.more() ){
-            BSONElement patElt = pat.next();
-            verify( patElt.isNumber() );
-            if( minOrMax * patElt.numberInt() == 1){
-                newBound.appendMaxKey("");
-            }
-            else {
-                newBound.appendMinKey("");
-            }
-        }
-        return newBound.obj();
+        return kpBuilder.obj();
     }
 
     long long Helpers::removeRange( const string& ns ,
@@ -267,8 +236,14 @@ namespace mongo {
                                     bool maxInclusive ,
                                     bool secondaryThrottle ,
                                     RemoveCallback * callback,
-                                    bool fromMigrate ) {
-        
+                                    bool fromMigrate,
+                                    bool onlyRemoveOrphanedDocs ) {
+
+        Timer rangeRemoveTimer;
+
+        LOG(1) << "begin removal of " << min << " to " << max << " in " << ns
+               << (secondaryThrottle ? " (waiting for secondaries)" : "" ) << endl;
+
         Client& c = cc();
 
         long long numDeleted = 0;
@@ -280,11 +255,11 @@ namespace mongo {
             try {
 
                 Client::WriteContext ctx(ns);
-                
+
                 scoped_ptr<Cursor> c;
                 
                 {
-                    NamespaceDetails* nsd = nsdetails( ns.c_str() );
+                    NamespaceDetails* nsd = nsdetails( ns );
                     if ( ! nsd )
                         break;
                     
@@ -293,10 +268,14 @@ namespace mongo {
                     
                     IndexDetails& i = nsd->idx( ii );
 
-                    BSONObj newMin = Helpers::modifiedRangeBound( min , keyPattern , -1 );
-                    BSONObj newMax = Helpers::modifiedRangeBound( max , keyPattern , 1 );
+                    // Extend min to get (min, MinKey, MinKey, ....)
+                    KeyPattern kp( keyPattern );
+                    BSONObj newMin = Helpers::toKeyFormat( kp.extendRangeBound( min, false ) );
+                    // If upper bound is included, extend max to get (max, MaxKey, MaxKey, ...)
+                    // If not included, extend max to get (max, MinKey, MinKey, ....)
+                    BSONObj newMax = Helpers::toKeyFormat( kp.extendRangeBound(max, maxInclusive) );
                     
-                    c.reset( BtreeCursor::make( nsd , ii , i , newMin , newMax , maxInclusive , 1 ) );
+                    c.reset( BtreeCursor::make( nsd, i, newMin, newMax, maxInclusive, 1 ) );
                 }
                 
                 if ( ! c->ok() ) {
@@ -306,9 +285,33 @@ namespace mongo {
                 
                 DiskLoc rloc = c->currLoc();
                 BSONObj obj = c->current();
-                
+
                 // this is so that we don't have to handle this cursor in the delete code
                 c.reset(0);
+
+                if (fromMigrate && onlyRemoveOrphanedDocs) {
+
+                    // Do a final check in the write lock to make absolutely sure that our
+                    // collection hasn't been modified in a way that invalidates our migration
+                    // cleanup.
+
+                    // We should never be able to turn off the sharding state once enabled, but
+                    // in the future we might want to.
+                    verify(shardingState.enabled());
+
+                    // In write lock, so will be the most up-to-date version
+                    ShardChunkManagerPtr managerNow = shardingState.getShardChunkManager(ns);
+
+                    if (!managerNow || managerNow->belongsToMe(obj)) {
+
+                        warning() << "aborting migration cleanup for chunk "
+                                  << min << " to " << max
+                                  << (managerNow ? (string)" at document " + obj.toString() : "")
+                                  << ", collection " << ns << " has changed " << endl;
+
+                        break;
+                    }
+                }
                 
                 if ( callback )
                     callback->goingToDelete( obj );
@@ -324,7 +327,7 @@ namespace mongo {
 
             Timer secondaryThrottleTime;
 
-            if ( secondaryThrottle ) {
+            if ( secondaryThrottle && numDeleted > 0 ) {
                 if ( ! waitForReplication( c.getLastOp(), 2, 60 /* seconds to wait */ ) ) {
                     warning() << "replication to secondaries for removeRange at least 60 seconds behind" << endl;
                 }
@@ -345,6 +348,9 @@ namespace mongo {
             log() << "Helpers::removeRangeUnlocked time spent waiting for replication: "  
                   << millisWaitingForReplication << "ms" << endl;
         
+        LOG(1) << "end removal of " << min << " to " << max << " in " << ns
+               << " (took " << rangeRemoveTimer.millis() << "ms)" << endl;
+
         return numDeleted;
     }
 
@@ -385,7 +391,7 @@ namespace mongo {
             _out = new ofstream();
             _out->open( _file.string().c_str() , ios_base::out | ios_base::binary );
             if ( ! _out->good() ) {
-                log( LL_WARNING ) << "couldn't create file: " << _file.string() << " for remove saving" << endl;
+                LOG( LL_WARNING ) << "couldn't create file: " << _file.string() << " for remove saving" << endl;
                 delete _out;
                 _out = 0;
                 return;

@@ -7,18 +7,20 @@ function test(date, testSynthetics) {
     c.drop();
     c.save( {date: date} );
 
-    res = c.aggregate( { $project:{ _id: 0
+    // Can't use aggregate helper or assertErrorCode because we need to handle multiple error types
+    var res = c.runCommand('aggregate', {pipeline: [
+                     {$project: { _id: 0
                                 , year:{ $year: '$date' }
                                 , month:{ $month: '$date' }
                                 , dayOfMonth:{ $dayOfMonth: '$date' }
                                 , hour:{ $hour: '$date' }
                                 , minute:{ $minute: '$date' }
                                 , second:{ $second: '$date' }
-                                //, millisecond:{ $millisecond: '$date' } // server-6666
+                                , millisecond:{ $millisecond: '$date' } // server-6666
 
                                 // $substr will call coerceToString
                                 , string: {$substr: ['$date', 0,1000]}
-                                }} );
+                                }}]});
 
     if (date.valueOf() < 0 && _isWindows() && res.code == 16422) {
         // some versions of windows (but not all) fail with dates before 1970
@@ -39,7 +41,7 @@ function test(date, testSynthetics) {
                              , hour: date.getUTCHours()
                              , minute: date.getUTCMinutes()
                              , second: date.getUTCSeconds()
-                             //, millisecond: date.getUTCMilliseconds() // server-6666
+                             , millisecond: date.getUTCMilliseconds() // server-6666
                              , string: date.tojson().slice(9,28)
                              } );
 
@@ -75,6 +77,13 @@ test(ISODate('1860-01-02 03:04:05.006Z'), false);
 // Test with time_t == -1 and 0
 test(new Date(-1000), false);
 test(new Date(0), false);
+
+// Testing dates between 1970 and 2000
+test(ISODate('1970-01-01 00:00:00.000Z'), false);
+test(ISODate('1970-01-01 00:00:00.999Z'), false);
+test(ISODate('1980-05-20 12:53:64.834Z'), false);
+test(ISODate('1999-12-31 00:00:00.000Z'), false);
+test(ISODate('1999-12-31 23:59:59.999Z'), false);
 
 // Test date > 2000 for completeness (using now)
 test(new Date(), false);

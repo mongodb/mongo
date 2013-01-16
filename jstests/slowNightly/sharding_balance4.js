@@ -3,6 +3,7 @@
 // check that doing updates done during a migrate all go to the right place
 
 s = new ShardingTest( "slow_sharding_balance4" , 2 , 1 , 1 , { chunksize : 1 } )
+s.stopBalancer();
 
 s.adminCommand( { enablesharding : "test" } );
 s.adminCommand( { shardcollection : "test.foo" , key : { _id : 1 } } );
@@ -22,19 +23,37 @@ num = 0;
 
 counts = {}
 
-function doUpdate( includeString ){
+//
+// TODO: Rewrite to make much clearer.
+//
+// The core behavior of this test is to add a bunch of documents to a sharded collection, then
+// incrementally update each document and make sure the counts in the document match our update
+// counts while balancing occurs (doUpdate()).  Every once in a while we also check (check())
+// our counts via a query.
+//
+// If during a chunk migration an update is missed, we trigger an assertion and fail.
+//
+
+
+function doUpdate( includeString, optionalId ){
     var up = { $inc : { x : 1 } }
     if ( includeString )
         up["$set"] = { s : bigString };
-    var myid = Random.randInt( N )
+    var myid = optionalId == undefined ? Random.randInt( N ) : optionalId
     db.foo.update( { _id : myid } , up , true );
 
     counts[myid] = ( counts[myid] ? counts[myid] : 0 ) + 1;
     return myid;
 }
 
-for ( i=0; i<N*10; i++ ){
-    doUpdate( true )
+// Initially update all documents from 1 to N, otherwise later checks can fail because no document
+// previously existed
+for ( i = 0; i < N; i++ ){
+    doUpdate( true, i )
+}
+
+for ( i=0; i<N*9; i++ ){
+    doUpdate( false )
 }
 db.getLastError();
 
@@ -63,7 +82,11 @@ function check( msg , dontAssert ){
             print( "not asserting for key failure: " + x + " want: " + e + " got: " + tojson(z) )
             return false;
         }
-
+        
+        s.s.getDB("admin").runCommand({ setParameter : 1, logLevel : 2 })
+        
+        printjson( db.foo.findOne( { _id : parseInt( x ) } ) )
+        
         // we will assert past this point but wait a bit to see if it is because the missing update
         // was being held in the writeback roundtrip
         sleep( 10000 );
@@ -84,6 +107,9 @@ function check( msg , dontAssert ){
 }
 
 function diff1(){
+    
+    jsTest.log("Running diff1...")
+    
     var myid = doUpdate( false )
     var le = db.getLastErrorCmd();
 
@@ -109,13 +135,10 @@ function diff1(){
     return Math.max( x.shard0000 , x.shard0001 ) - Math.min( x.shard0000 , x.shard0001 );
 }
 
-function sum(){
-    var x = s.chunkCounts( "foo" )
-    return x.shard0000 + x.shard0001;
-}
-
 assert.lt( 20 , diff1() ,"initial load" );
 print( diff1() )
+
+s.startBalancer();
 
 assert.soon( function(){
     

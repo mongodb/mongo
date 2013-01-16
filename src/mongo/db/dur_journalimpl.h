@@ -73,10 +73,8 @@ namespace mongo {
 
             unsigned long long _written; // bytes written so far to the current journal (log) file
             unsigned _nextFileNumber;
-        public:
+
             SimpleMutex _curLogFileMutex;
-            bool _ageOut;
-        private:
 
             LogFile *_curLogFile; // use _curLogFileMutex
             unsigned long long _curFileId; // current file id see JHeader::fileId

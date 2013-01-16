@@ -15,9 +15,9 @@
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "mongo/pch.h"
 
-#include "pch.h"
-#include "module.h"
+#include "mongo/db/module.h"
 
 namespace mongo {
 

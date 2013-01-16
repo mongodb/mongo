@@ -17,10 +17,12 @@
 
 #pragma once
 
-#include "pch.h"
+#include "mongo/pch.h"
 
 #include <limits>
 #include <queue>
+
+#include <boost/thread/condition.hpp>
 
 #include "mongo/util/timer.h"
 
@@ -59,7 +61,7 @@ namespace mongo {
         void push(T const& t) {
             scoped_lock l( _lock );
             size_t tSize = _getSize(t);
-            while (_queue.size()+tSize >= _maxSize) {
+            while (_currentSize + tSize >= _maxSize) {
                 _cvNoLongerFull.wait( l.boost() );
             }
             _queue.push( t );

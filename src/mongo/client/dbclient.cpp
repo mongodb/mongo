@@ -26,7 +26,7 @@
 #include "mongo/db/json.h"
 #include "mongo/db/namespace-inl.h"
 #include "mongo/db/namespacestring.h"
-#include "mongo/s/util.h"
+#include "mongo/s/stale_exception.h"  // for RecvStaleConfigException
 #include "mongo/util/md5.hpp"
 
 #ifdef MONGO_SSL
@@ -35,6 +35,15 @@
 #endif  // defined MONGO_SSL
 
 namespace mongo {
+
+    AtomicInt64 DBClientBase::ConnectionIdSequence;
+
+    bool hasReadPreference(const BSONObj& queryObj) {
+        const bool isQueryEmbedded = strcmp(queryObj.firstElement().fieldName(), "query") == 0;
+        const bool hasReadPrefOption = queryObj["$queryOptions"].isABSONObj() &&
+                        queryObj["$queryOptions"].Obj().hasField("$readPreference");
+        return (isQueryEmbedded && queryObj.hasField("$readPreference")) || hasReadPrefOption;
+    }
 
     void ConnectionString::_fillServers( string s ) {
         
@@ -94,12 +103,12 @@ namespace mongo {
         case MASTER: {
             DBClientConnection * c = new DBClientConnection(true);
             c->setSoTimeout( socketTimeout );
-            log(1) << "creating new connection to:" << _servers[0] << endl;
+            LOG(1) << "creating new connection to:" << _servers[0] << endl;
             if ( ! c->connect( _servers[0] , errmsg ) ) {
                 delete c;
                 return 0;
             }
-            log(1) << "connected connection!" << endl;
+            LOG(1) << "connected connection!" << endl;
             return c;
         }
 
@@ -108,7 +117,7 @@ namespace mongo {
             DBClientReplicaSet * set = new DBClientReplicaSet( _setName , _servers , socketTimeout );
             if( ! set->connect() ) {
                 delete set;
-                errmsg = "connect failed to set ";
+                errmsg = "connect failed to replica set ";
                 errmsg += toString();
                 return 0;
             }
@@ -150,6 +159,45 @@ namespace mongo {
 
         verify( 0 );
         return 0;
+    }
+
+    bool ConnectionString::sameLogicalEndpoint( const ConnectionString& other ) const {
+        if ( _type != other._type )
+            return false;
+
+        switch ( _type ) {
+        case INVALID:
+            return true;
+        case MASTER:
+            return _servers[0] == other._servers[0];
+        case PAIR:
+            if ( _servers[0] == other._servers[0] )
+                return _servers[1] == other._servers[1];
+            return
+                ( _servers[0] == other._servers[1] ) &&
+                ( _servers[1] == other._servers[0] );
+        case SET:
+            return _setName == other._setName;
+        case SYNC:
+            // The servers all have to be the same in each, but not in the same order.
+            if ( _servers.size() != other._servers.size() )
+                return false;
+            for ( unsigned i = 0; i < _servers.size(); i++ ) {
+                bool found = false;
+                for ( unsigned j = 0; j < other._servers.size(); j++ ) {
+                    if ( _servers[i] == other._servers[j] ) {
+                        found = true;
+                        break;
+                    }
+                }
+                if ( ! found )
+                    return false;
+            }
+            return true;
+        case CUSTOM:
+            return _string == other._string;
+        }
+        verify( false );
     }
 
     ConnectionString ConnectionString::parse( const string& host , string& errmsg ) {
@@ -320,38 +368,12 @@ namespace mongo {
         return QueryOptions(0);
     }
 
-    void DBClientWithCommands::setAuthenticationTable( const AuthenticationTable& auth ) {
-        _authTable = auth;
-        _hasAuthentication = true;
-    }
-
-    void DBClientWithCommands::clearAuthenticationTable() {
-        _authTable.clearAuth(); // This probably isn't necessary, but better to be safe.
-        _hasAuthentication = false;
-    }
-
-    bool DBClientWithCommands::hasAuthenticationTable() {
-        return _hasAuthentication;
-    }
-
-    AuthenticationTable& DBClientWithCommands::getAuthenticationTable() {
-        return _authTable;
-    }
-
     inline bool DBClientWithCommands::runCommand(const string &dbname,
                                                  const BSONObj& cmd,
                                                  BSONObj &info,
-                                                 int options,
-                                                 const AuthenticationTable* auth) {
+                                                 int options) {
         string ns = dbname + ".$cmd";
-        BSONObj actualCmd = cmd;
-        if ( _hasAuthentication || auth ) {
-            const AuthenticationTable* authTable = (auth ? auth : &_authTable);
-            LOG(4) << "Sending command " << cmd << " to " << getServerAddress() <<
-                    " with $auth: " << authTable->toBSON() << endl;
-            actualCmd = authTable->copyCommandObjAddingAuth( cmd );
-        }
-        info = findOne(ns, actualCmd, 0 , options);
+        info = findOne(ns, cmd, 0 , options);
         return isOk(info);
     }
 
@@ -389,6 +411,14 @@ namespace mongo {
     }
 
     BSONObj DBClientWithCommands::getLastErrorDetailed(bool fsync, bool j, int w, int wtimeout) {
+        return getLastErrorDetailed("admin", fsync, j, w, wtimeout);
+    }
+
+    BSONObj DBClientWithCommands::getLastErrorDetailed(const std::string& db,
+                                                       bool fsync,
+                                                       bool j,
+                                                       int w,
+                                                       int wtimeout) {
         BSONObj info;
         BSONObjBuilder b;
         b.append( "getlasterror", 1 );
@@ -407,13 +437,21 @@ namespace mongo {
         if ( wtimeout > 0 )
             b.append( "wtimeout", wtimeout );
 
-        runCommand("admin", b.obj(), info);
+        runCommand(db, b.obj(), info);
 
         return info;
     }
 
     string DBClientWithCommands::getLastError(bool fsync, bool j, int w, int wtimeout) {
-        BSONObj info = getLastErrorDetailed(fsync, j, w, wtimeout);
+        return getLastError("admin", fsync, j, w, wtimeout);
+    }
+
+    string DBClientWithCommands::getLastError(const std::string& db,
+                                              bool fsync,
+                                              bool j,
+                                              int w,
+                                              int wtimeout) {
+        BSONObj info = getLastErrorDetailed(db, fsync, j, w, wtimeout);
         return getLastErrorString( info );
     }
 
@@ -519,7 +557,7 @@ namespace mongo {
         BSONObj o;
         if ( info == 0 )    info = &o;
         BSONObjBuilder b;
-        string db = nsToDatabase(ns.c_str());
+        string db = nsToDatabase(ns);
         b.append("create", ns.c_str() + db.length() + 1);
         if ( size ) b.append("size", size);
         if ( capped ) b.append("capped", true);
@@ -728,9 +766,8 @@ namespace mongo {
     inline bool DBClientConnection::runCommand(const string &dbname,
                                                const BSONObj& cmd,
                                                BSONObj &info,
-                                               int options,
-                                               const AuthenticationTable* auth) {
-        if ( DBClientWithCommands::runCommand( dbname , cmd , info , options , auth ) )
+                                               int options) {
+        if (DBClientWithCommands::runCommand(dbname, cmd, info, options))
             return true;
         
         if ( clientSet && isNotMasterErrorString( info["errmsg"] ) ) {
@@ -753,24 +790,43 @@ namespace mongo {
             throw SocketException( SocketException::FAILED_STATE , toString() );
 
         lastReconnectTry = time(0);
-        log(_logLevel) << "trying reconnect to " << _serverString << endl;
+        LOG(_logLevel) << "trying reconnect to " << _serverString << endl;
         string errmsg;
         _failed = false;
         if ( ! _connect(errmsg) ) {
             _failed = true;
-            log(_logLevel) << "reconnect " << _serverString << " failed " << errmsg << endl;
+            LOG(_logLevel) << "reconnect " << _serverString << " failed " << errmsg << endl;
             throw SocketException( SocketException::CONNECT_ERROR , toString() );
         }
 
-        log(_logLevel) << "reconnect " << _serverString << " ok" << endl;
+        LOG(_logLevel) << "reconnect " << _serverString << " ok" << endl;
         for( map< string, pair<string,string> >::iterator i = authCache.begin(); i != authCache.end(); i++ ) {
             const char *dbname = i->first.c_str();
             const char *username = i->second.first.c_str();
             const char *password = i->second.second.c_str();
             if( !DBClientBase::auth(dbname, username, password, errmsg, false) )
-                log(_logLevel) << "reconnect: auth failed db:" << dbname << " user:" << username << ' ' << errmsg << '\n';
+                LOG(_logLevel) << "reconnect: auth failed db:" << dbname << " user:" << username << ' ' << errmsg << '\n';
         }
     }
+
+    void DBClientConnection::setSoTimeout(double timeout) {
+        _so_timeout = timeout;
+        if (p) {
+            p->setSocketTimeout(timeout);
+        }
+    }
+
+    uint64_t DBClientConnection::getSockCreationMicroSec() const {
+        if (p) {
+            return p->getSockCreationMicroSec();
+        }
+        else {
+            return INVALID_SOCK_CREATION_TIME;
+        }
+    }
+
+    const uint64_t DBClientBase::INVALID_SOCK_CREATION_TIME =
+            static_cast<uint64_t>(0xFFFFFFFFFFFFFFFFULL);
 
     auto_ptr<DBClientCursor> DBClientBase::query(const string &ns, Query query, int nToReturn,
             int nToSkip, const BSONObj *fieldsToReturn, int queryOptions , int batchSize ) {
@@ -826,6 +882,10 @@ namespace mongo {
             n += i.n();
         }
         return n;
+    }
+
+    void DBClientConnection::setReplSetClientCallback(DBClientReplicaSet* rsClient) {
+        clientSet = rsClient;
     }
 
     unsigned long long DBClientConnection::query(
@@ -989,10 +1049,10 @@ namespace mongo {
 
     void DBClientWithCommands::dropIndex( const string& ns , const string& indexName ) {
         BSONObj info;
-        if ( ! runCommand( nsToDatabase( ns.c_str() ) ,
+        if ( ! runCommand( nsToDatabase( ns ) ,
                            BSON( "deleteIndexes" << NamespaceString( ns ).coll << "index" << indexName ) ,
                            info ) ) {
-            log(_logLevel) << "dropIndex failed: " << info << endl;
+            LOG(_logLevel) << "dropIndex failed: " << info << endl;
             uassert( 10007 ,  "dropIndex failed" , 0 );
         }
         resetIndexCache();
@@ -1000,7 +1060,7 @@ namespace mongo {
 
     void DBClientWithCommands::dropIndexes( const string& ns ) {
         BSONObj info;
-        uassert( 10008 ,  "dropIndexes failed" , runCommand( nsToDatabase( ns.c_str() ) ,
+        uassert( 10008 ,  "dropIndexes failed" , runCommand( nsToDatabase( ns ) ,
                  BSON( "deleteIndexes" << NamespaceString( ns ).coll << "index" << "*") ,
                  info ) );
         resetIndexCache();
@@ -1044,7 +1104,14 @@ namespace mongo {
         return ss.str();
     }
 
-    bool DBClientWithCommands::ensureIndex( const string &ns , BSONObj keys , bool unique, const string & name , bool cache, bool background, int version ) {
+    bool DBClientWithCommands::ensureIndex( const string &ns,
+                                            BSONObj keys,
+                                            bool unique,
+                                            const string & name,
+                                            bool cache,
+                                            bool background,
+                                            int version,
+                                            int ttl ) {
         BSONObjBuilder toSave;
         toSave.append( "ns" , ns );
         toSave.append( "key" , keys );
@@ -1076,6 +1143,9 @@ namespace mongo {
 
         if ( cache )
             _seenIndexes.insert( cacheKey );
+
+        if ( ttl > 0 )
+            toSave.append( "expireAfterSeconds", ttl );
 
         insert( Namespace( ns.c_str() ).getSisterNS( "system.indexes"  ).c_str() , toSave.obj() );
         return 1;
@@ -1124,7 +1194,12 @@ namespace mongo {
     }
 
     bool DBClientConnection::recv( Message &m ) {
-        return port().recv(m);
+        if (port().recv(m)) {
+            return true;
+        }
+
+        _failed = true;
+        return false;
     }
 
     bool DBClientConnection::call( Message &toSend, Message &response, bool assertOk , string * actualServer ) {
@@ -1204,16 +1279,23 @@ namespace mongo {
     }
 
 #ifdef MONGO_SSL
-    SSLManager* DBClientConnection::sslManager() {
-        if ( _sslManager )
-            return _sslManager;
-        
-        SSLManager* s = new SSLManager(true);
-        _sslManager = s;
-        return s;
-    }
+    static SimpleMutex s_mtx("SSLManager");
+    static SSLManager* s_sslMgr(NULL);
 
-    SSLManager* DBClientConnection::_sslManager = 0;
+    SSLManager* DBClientConnection::sslManager() {
+        SimpleMutex::scoped_lock lk(s_mtx);
+        if (s_sslMgr) 
+            return s_sslMgr;
+        const SSLParams params(cmdLine.sslPEMKeyFile, 
+                               cmdLine.sslPEMKeyPassword,
+                               cmdLine.sslCAFile,
+                               cmdLine.sslCRLFile,
+                               cmdLine.sslForceCertificateValidation);
+        s_sslMgr = new SSLManager(params);
+        
+
+        return s_sslMgr;
+    }
 #endif
 
     AtomicUInt DBClientConnection::_numConnections;

@@ -24,6 +24,7 @@
 #include "mongo/db/cmdline.h"
 #include "mongo/db/namespace.h"
 #include "mongo/util/concurrency/rwlock.h"
+#include "mongo/util/map_util.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/progress_meter.h"
@@ -38,13 +39,15 @@ namespace mongo {
         fassert( 16327, (minOSPageSizeBytes & (minOSPageSizeBytes - 1)) == 0);
     }
 
-    set<MongoFile*> MongoFile::mmfiles;
-    map<string,MongoFile*> MongoFile::pathToFile;
+namespace {
+    set<MongoFile*> mmfiles;
+    map<string,MongoFile*> pathToFile;
+}  // namespace
 
     /* Create. Must not exist.
     @param zero fill file with zeros when true
     */
-    void* MemoryMappedFile::create(string filename, unsigned long long len, bool zero) {
+    void* MemoryMappedFile::create(const std::string& filename, unsigned long long len, bool zero) {
         uassert( 13468, string("can't create file already exists ") + filename, ! boost::filesystem::exists(filename) );
         void *p = map(filename.c_str(), len);
         if( p && zero ) {
@@ -91,6 +94,8 @@ namespace mongo {
     RWLockRecursiveNongreedy LockMongoFilesShared::mmmutex("mmmutex",10*60*1000 /* 10 minutes */);
     unsigned LockMongoFilesShared::era = 99; // note this rolls over
 
+    set<MongoFile*>& MongoFile::getAllFiles() { return mmfiles; }
+
     /* subclass must call in destructor (or at close).
         removes this from pathToFile and other maps
         safe to call more than once, albeit might be wasted work
@@ -113,7 +118,7 @@ namespace mongo {
 
         LockMongoFilesExclusive lk;
 
-        ProgressMeter pm( mmfiles.size() , 2 , 1 );
+        ProgressMeter pm(mmfiles.size(), 2, 1, "File Closing Progress");
         set<MongoFile*> temp = mmfiles;
         for ( set<MongoFile*>::iterator i = temp.begin(); i != temp.end(); i++ ) {
             (*i)->close(); // close() now removes from mmfiles
@@ -166,18 +171,16 @@ namespace mongo {
         set<MongoFile*> seen;
         while ( true ) {
             auto_ptr<Flushable> f;
-            {
-                LockMongoFilesShared lk;
-                for ( set<MongoFile*>::iterator i = mmfiles.begin(); i != mmfiles.end(); i++ ) {
-                    MongoFile * mmf = *i;
-                    if ( ! mmf )
-                        continue;
-                    if ( seen.count( mmf ) )
-                        continue;
-                    f.reset( mmf->prepareFlush() );
-                    seen.insert( mmf );
-                    break;
-                }
+            LockMongoFilesShared lk;
+            for ( set<MongoFile*>::iterator i = mmfiles.begin(); i != mmfiles.end(); i++ ) {
+                MongoFile * mmf = *i;
+                if ( ! mmf )
+                    continue;
+                if ( seen.count( mmf ) )
+                    continue;
+                f.reset( mmf->prepareFlush() );
+                seen.insert( mmf );
+                break;
             }
             if ( ! f.get() )
                 break;
@@ -192,14 +195,34 @@ namespace mongo {
         mmfiles.insert(this);
     }
 
-    void MongoFile::setFilename(string fn) {
+    void MongoFile::setFilename(const std::string& fn) {
         LockMongoFilesExclusive lk;
         verify( _filename.empty() );
-        _filename = fn;
-        MongoFile *&ptf = pathToFile[fn];
+        _filename = boost::filesystem::absolute(fn).generic_string();
+        MongoFile *&ptf = pathToFile[_filename];
         massert(13617, "MongoFile : multiple opens of same filename", ptf == 0);
         ptf = this;
     }
 
+    MongoFile* MongoFileFinder::findByPath(const std::string& path) const {
+        return mapFindWithDefault(pathToFile,
+                                  boost::filesystem::absolute(path).generic_string(),
+                                  static_cast<MongoFile*>(NULL));
+    }
+
+
+    void printMemInfo( const char * where ) {
+        cout << "mem info: ";
+        if ( where )
+            cout << where << " ";
+
+        ProcessInfo pi;
+        if ( ! pi.supported() ) {
+            cout << " not supported" << endl;
+            return;
+        }
+
+        cout << "vsize: " << pi.getVirtualMemorySize() << " resident: " << pi.getResidentSize() << " mapped: " << ( MemoryMappedFile::totalMappedLength() / ( 1024 * 1024 ) ) << endl;
+    }
 
 } // namespace mongo

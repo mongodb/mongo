@@ -63,7 +63,7 @@ assert.eq( 6 , db.foo.find().count() , "basic count after split " );
 assert.eq( 6 , db.foo.find().sort( { name : 1 } ).count() , "basic count after split sorted " );
 
 // part 4
-s.adminCommand( { movechunk : "test.foo" , find : { name : "allan" } , to : secondary.getMongo().name } );
+s.adminCommand( { movechunk : "test.foo" , find : { name : "allan" } , to : secondary.getMongo().name , _waitForDelete : true } );
 
 assert.eq( 3 , primary.foo.find().toArray().length , "primary count" );
 assert.eq( 3 , secondary.foo.find().toArray().length , "secondary count" );
@@ -163,12 +163,10 @@ var badCmdResult = db.runCommand({ count: 'foo', query: { $c: { $abc: 3 }}});
 assert( ! badCmdResult.ok , "invalid query syntax didn't return error" );
 assert( badCmdResult.errmsg.length > 0 , "no error msg for invalid query" );
 
-/* uncomment when SERVER-6634 is fixed:
 // Negative skip values should return error
 var negSkipResult = db.runCommand({ count: 'foo', skip : -2 });
 assert( ! negSkipResult.ok , "negative skip value shouldn't work" );
 assert( negSkipResult.errmsg.length > 0 , "no error msg for negative skip" );
-*/
 
 // Negative skip values with positive limit should return error
 var negSkipLimitResult = db.runCommand({ count: 'foo', skip : -2, limit : 1 });

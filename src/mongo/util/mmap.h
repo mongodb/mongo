@@ -51,6 +51,7 @@ namespace mongo {
         static unsigned getEra() { return era; }
 
         static void assertExclusivelyLocked() { mmmutex.assertExclusivelyLocked(); }
+        static void assertAtLeastReadLocked() { mmmutex.assertAtLeastReadLocked(); }
     };
 
     class LockMongoFilesExclusive { 
@@ -79,14 +80,14 @@ namespace mongo {
         };
 
         /** @param fun is called for each MongoFile.
-            calledl from within a mutex that MongoFile uses. so be careful not to deadlock.
+            called from within a mutex that MongoFile uses. so be careful not to deadlock.
         */
         template < class F >
         static void forEach( F fun );
 
         /** note: you need to be in mmmutex when using this. forEach (above) handles that for you automatically. 
 */
-        static set<MongoFile*>& getAllFiles()  { return mmfiles; }
+        static set<MongoFile*>& getAllFiles();
 
         // callbacks if you need them
         static void (*notifyPreFlush)();
@@ -99,7 +100,7 @@ namespace mongo {
         virtual bool isMongoMMF() { return false; }
 
         string filename() const { return _filename; }
-        void setFilename(string fn);
+        void setFilename(const std::string& fn);
 
     private:
         string _filename;
@@ -123,10 +124,6 @@ namespace mongo {
         void destroyed(); 
 
         virtual unsigned long long length() const = 0;
-
-        static set<MongoFile*> mmfiles;
-    public:
-        static map<string,MongoFile*> pathToFile;
     };
 
     /** look up a MMF by filename. scoped mutex locking convention.
@@ -137,15 +134,10 @@ namespace mongo {
     */
     class MongoFileFinder : boost::noncopyable {
     public:
-        MongoFileFinder() { }
-
         /** @return The MongoFile object associated with the specified file name.  If no file is open
                     with the specified name, returns null.
         */
-        MongoFile* findByPath(string path) {
-            map<string,MongoFile*>::iterator i = MongoFile::pathToFile.find(path);
-            return  i == MongoFile::pathToFile.end() ? NULL : i->second;
-        }
+        MongoFile* findByPath(const std::string& path) const;
 
     private:
         LockMongoFilesShared _lk;
@@ -185,7 +177,7 @@ namespace mongo {
         /* Create. Must not exist.
            @param zero fill file with zeros when true
         */
-        void* create(string filename, unsigned long long len, bool zero);
+        void* create(const std::string& filename, unsigned long long len, bool zero);
 
         void flush(bool sync);
         virtual Flushable * prepareFlush();
@@ -237,7 +229,8 @@ namespace mongo {
     template < class F >
     inline void MongoFile::forEach( F p ) {
         LockMongoFilesShared lklk;
-        for ( set<MongoFile*>::iterator i = mmfiles.begin(); i != mmfiles.end(); i++ )
+        const set<MongoFile*>& mmfiles = MongoFile::getAllFiles();
+        for ( set<MongoFile*>::const_iterator i = mmfiles.begin(); i != mmfiles.end(); i++ )
             p(*i);
     }
 

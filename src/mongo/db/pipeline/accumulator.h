@@ -16,7 +16,7 @@
 
 #pragma once
 
-#include "pch.h"
+#include "mongo/pch.h"
 
 #include <boost/unordered_set.hpp>
 #include "db/pipeline/value.h"
@@ -31,9 +31,9 @@ namespace mongo {
     public:
         // virtuals from ExpressionNary
         virtual void addOperand(const intrusive_ptr<Expression> &pExpression);
-        virtual void addToBsonObj(
-            BSONObjBuilder *pBuilder, string fieldName,
-            bool requireExpression) const;
+        virtual void addToBsonObj(BSONObjBuilder *pBuilder,
+                                  StringData fieldName,
+                                  bool requireExpression) const;
         virtual void addToBsonArray(BSONArrayBuilder *pBuilder) const;
 
         /*
@@ -41,7 +41,7 @@ namespace mongo {
 
           @returns the accumulated value
          */
-        virtual intrusive_ptr<const Value> getValue() const = 0;
+        virtual Value getValue() const = 0;
 
     protected:
         Accumulator();
@@ -55,8 +55,8 @@ namespace mongo {
           @param fieldName the projected name
           @param opName the operator name
          */
-        void opToBson(
-            BSONObjBuilder *pBuilder, string fieldName, string opName) const;
+        void opToBson(BSONObjBuilder *pBuilder, StringData opName,
+                      StringData fieldName, bool requireExpression) const;
     };
 
 
@@ -64,9 +64,8 @@ namespace mongo {
         public Accumulator {
     public:
         // virtuals from Expression
-        virtual intrusive_ptr<const Value> evaluate(
-            const intrusive_ptr<Document> &pDocument) const;
-        virtual intrusive_ptr<const Value> getValue() const;
+        virtual Value evaluate(const Document& pDocument) const;
+        virtual Value getValue() const;
         virtual const char *getOpName() const;
 
         /*
@@ -80,7 +79,7 @@ namespace mongo {
 
     private:
         AccumulatorAddToSet(const intrusive_ptr<ExpressionContext> &pTheCtx);
-        typedef boost::unordered_set<intrusive_ptr<const Value>, Value::Hash > SetType;
+        typedef boost::unordered_set<Value, Value::Hash > SetType;
         mutable SetType set;
         mutable SetType::iterator itr; 
         intrusive_ptr<ExpressionContext> pCtx;
@@ -97,12 +96,12 @@ namespace mongo {
         public Accumulator {
     public:
         // virtuals from Expression
-        virtual intrusive_ptr<const Value> getValue() const;
+        virtual Value getValue() const;
 
     protected:
         AccumulatorSingleValue();
 
-        mutable intrusive_ptr<const Value> pValue; /* current min/max */
+        mutable Value pValue; /* current min/max */
     };
 
 
@@ -110,8 +109,7 @@ namespace mongo {
         public AccumulatorSingleValue {
     public:
         // virtuals from Expression
-        virtual intrusive_ptr<const Value> evaluate(
-            const intrusive_ptr<Document> &pDocument) const;
+        virtual Value evaluate(const Document& pDocument) const;
         virtual const char *getOpName() const;
 
         /*
@@ -123,6 +121,7 @@ namespace mongo {
             const intrusive_ptr<ExpressionContext> &pCtx);
 
     private:
+        mutable bool _haveFirst;
         AccumulatorFirst();
     };
 
@@ -131,8 +130,7 @@ namespace mongo {
         public AccumulatorSingleValue {
     public:
         // virtuals from Expression
-        virtual intrusive_ptr<const Value> evaluate(
-            const intrusive_ptr<Document> &pDocument) const;
+        virtual Value evaluate(const Document& pDocument) const;
         virtual const char *getOpName() const;
 
         /*
@@ -152,9 +150,8 @@ namespace mongo {
         public Accumulator {
     public:
         // virtuals from Accumulator
-        virtual intrusive_ptr<const Value> evaluate(
-            const intrusive_ptr<Document> &pDocument) const;
-        virtual intrusive_ptr<const Value> getValue() const;
+        virtual Value evaluate(const Document& pDocument) const;
+        virtual Value getValue() const;
         virtual const char *getOpName() const;
 
         /*
@@ -181,8 +178,7 @@ namespace mongo {
         public AccumulatorSingleValue {
     public:
         // virtuals from Expression
-        virtual intrusive_ptr<const Value> evaluate(
-            const intrusive_ptr<Document> &pDocument) const;
+        virtual Value evaluate(const Document& pDocument) const;
         virtual const char *getOpName() const;
 
         /*
@@ -206,9 +202,8 @@ namespace mongo {
         public Accumulator {
     public:
         // virtuals from Expression
-        virtual intrusive_ptr<const Value> evaluate(
-            const intrusive_ptr<Document> &pDocument) const;
-        virtual intrusive_ptr<const Value> getValue() const;
+        virtual Value evaluate(const Document& pDocument) const;
+        virtual Value getValue() const;
         virtual const char *getOpName() const;
 
         /*
@@ -223,7 +218,7 @@ namespace mongo {
     private:
         AccumulatorPush(const intrusive_ptr<ExpressionContext> &pTheCtx);
 
-        mutable vector<intrusive_ptr<const Value> > vpValue;
+        mutable vector<Value> vpValue;
         intrusive_ptr<ExpressionContext> pCtx;
     };
 
@@ -233,9 +228,8 @@ namespace mongo {
         typedef AccumulatorSum Super;
     public:
         // virtuals from Accumulator
-        virtual intrusive_ptr<const Value> evaluate(
-            const intrusive_ptr<Document> &pDocument) const;
-        virtual intrusive_ptr<const Value> getValue() const;
+        virtual Value evaluate(const Document& pDocument) const;
+        virtual Value getValue() const;
         virtual const char *getOpName() const;
 
         /*

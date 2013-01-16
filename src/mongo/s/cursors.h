@@ -18,13 +18,15 @@
 
 #pragma once
 
-#include "../pch.h"
+#include "mongo/pch.h"
 
-#include "../db/jsobj.h"
-#include "../db/dbmessage.h"
-#include "../client/parallel.h"
+#include <string>
 
-#include "request.h"
+#include "mongo/client/parallel.h"
+#include "mongo/db/dbmessage.h"
+#include "mongo/db/jsobj.h"
+#include "mongo/platform/random.h"
+#include "mongo/s/request.h"
 
 namespace mongo {
 
@@ -65,6 +67,8 @@ namespace mongo {
         /** @return idle time in ms */
         long long idleTime( long long now );
 
+        std::string getNS() { return _cursor->getNS(); }
+
         // The default initial buffer size for sending responses.
         static const int INIT_REPLY_BUFFER_SIZE;
 
@@ -100,10 +104,12 @@ namespace mongo {
         void store( ShardedClientCursorPtr cursor );
         void remove( long long id );
 
-        void storeRef( const string& server , long long id );
+        void storeRef(const std::string& server, long long id, const std::string& ns);
 
         /** @return the server for id or "" */
         string getRef( long long id ) const ;
+        /** @return the ns for id or "" */
+        std::string getRefNS(long long id) const ;
         
         void gotKillCursors(Message& m );
 
@@ -116,9 +122,12 @@ namespace mongo {
     private:
         mutable mongo::mutex _mutex;
 
-        MapSharded _cursors;
-        MapNormal _refs;
+        PseudoRandom _random;
 
+        MapSharded _cursors;
+        MapNormal _refs; // Maps cursor ID to shard name
+        MapNormal _refsNS; // Maps cursor ID to namespace
+        
         long long _shardedTotal;
 
         static const int _myLogLevel;

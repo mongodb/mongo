@@ -23,7 +23,7 @@ namespace mongo {
 
     /*
      * An AdminAccess is an interface class used to determine if certain users have
-     * priviledges to a given resource.
+     * privileges to a given resource.
      *
      */
     class AdminAccess {
@@ -35,7 +35,7 @@ namespace mongo {
          */
         virtual bool haveAdminUsers() const = 0;
 
-        /** @return priviledged user with this name. This should not block
+        /** @return privileged user with this name. This should not block
          *          for long and throw if can't get a lock if needed
          */
         virtual BSONObj getAdminUser( const string& username ) const = 0;

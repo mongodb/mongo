@@ -84,7 +84,7 @@ namespace mongo {
         throw bson::assertion( msgid , s );
     }
 
-    inline void uassert(unsigned msgid, std::string msg, bool expr) {
+    inline void uassert(unsigned msgid, const std::string& msg, bool expr) {
         if( !expr )
             uasserted( msgid , msg );
     }
@@ -94,7 +94,7 @@ namespace mongo {
     MONGO_COMPILER_NORETURN inline void msgasserted(int msgid, const std::string &msg) {
         msgasserted(msgid, msg.c_str());
     }
-    inline void massert(int msgid, std::string msg, bool expr) {
+    inline void massert(int msgid, const std::string& msg, bool expr) {
         if(!expr) {
             std::cout << "assertion failure in bson library: " << msgid << ' ' << msg << std::endl;
             throw bson::assertion( msgid , msg );

@@ -3,7 +3,7 @@
  * will be fully operational after the execution of this constructor function.
  * 
  * @param {Object} testName Contains the key value pair for the cluster
- *   configuration. Accpeted keys are:
+ *   configuration. Accepted keys are:
  * 
  *   {
  *     name {string}: name for this test
@@ -274,6 +274,7 @@ ShardingTest = function( testName , numShards , verboseLevel , numMongos , other
         
         rs.getMaster().getDB( "admin" ).foo.save( { x : 1 } )
         rs.awaitReplication();
+        rs.awaitSecondaryNodes();
         
         var rsConn = new Mongo( rs.getURL() );
         rsConn.name = rs.getURL();
@@ -661,8 +662,10 @@ printShardingStatus = function( configDB , verbose ){
                     RegExp.escape(db._id) + "\\." ) } ).
                     sort( { _id : 1 } ).forEach( function( coll ){
                         if ( coll.dropped == false ){
-                            output("\t\t" + coll._id + " chunks:");
-                            
+                            output( "\t\t" + coll._id );
+                            output( "\t\t\tshard key: " + tojson(coll.key) );
+                            output( "\t\t\tchunks:" );
+
                             res = configDB.chunks.group( { cond : { ns : coll._id } , key : { shard : 1 },
                                 reduce : function( doc , out ){ out.nChunks++; } , initial : { nChunks : 0 } } );
                             var totalChunks = 0;
@@ -970,6 +973,19 @@ ShardingTest.prototype.startBalancer = function( timeout, interval ) {
     db = this.config
     sh.waitForBalancer( true, timeout, interval )
     db = oldDB
+}
+
+ShardingTest.prototype.isAnyBalanceInFlight = function() {
+    if ( this.config.locks.find({ _id : { $ne : "balancer" }, state : 2 }).count() > 0 )
+        return true;
+
+    var allCurrent = this.s.getDB( "admin" ).currentOp().inprog;
+    for ( var i = 0; i < allCurrent.length; i++ ) {
+        if ( allCurrent[i].desc &&
+             allCurrent[i].desc.indexOf( "cleanupOldData" ) == 0 )
+            return true;
+    }
+    return false;
 }
 
 /**

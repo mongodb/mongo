@@ -65,6 +65,10 @@ namespace mongo {
             return result;
         }
 
+        static T loadRelaxed(volatile const T* value) {
+            return *value;
+        }
+
         static void store(volatile T* dest, T newValue) {
             asm volatile ("mfence" ::: "memory");
             *dest = newValue;

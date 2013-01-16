@@ -1,10 +1,30 @@
 // record.cpp
 
+/**
+*    Copyright (C) 2012 10gen Inc.
+*
+*    This program is free software: you can redistribute it and/or  modify
+*    it under the terms of the GNU Affero General Public License, version 3,
+*    as published by the Free Software Foundation.
+*
+*    This program is distributed in the hope that it will be useful,
+*    but WITHOUT ANY WARRANTY; without even the implied warranty of
+*    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+*    GNU Affero General Public License for more details.
+*
+*    You should have received a copy of the GNU Affero General Public License
+*    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+*/
+
 #include "pch.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/databaseholder.h"
 #include "mongo/db/pagefault.h"
 #include "mongo/db/pdfile.h"
 #include "mongo/db/record.h"
+#include "mongo/db/commands/server_status.h"
+#include "mongo/platform/bits.h"
+#include "mongo/platform/unordered_set.h"
 #include "mongo/util/net/listen.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/stack_introspect.h"
@@ -51,7 +71,7 @@ namespace mongo {
                 
         /**
          * simple hash map for region -> status
-         * this constitures a single region of time
+         * this constitutes a single region of time
          * it does chaining, but very short chains
          */
         class Slice {
@@ -78,7 +98,7 @@ namespace mongo {
                 if ( ! e )
                     return Unk;
                 
-                return ( e->value & ( ((unsigned long long)1) << offset ) ) ? In : Out;
+                return ( e->value & ( 1ULL << offset ) ) ? In : Out;
             }
             
             /**
@@ -91,8 +111,24 @@ namespace mongo {
                 if ( ! e )
                     return false;
                 
-                e->value |= ((unsigned long long)1) << offset;
+                e->value |= 1ULL << offset;
                 return true;
+            }
+
+
+            void addPages( unordered_set<size_t>* pages ) {
+                for ( int i = 0; i < SliceSize; i++ ) {
+                    unsigned long long v = _data[i].value;
+                    
+                    while ( v ) {
+                        int offset = firstBitSet( v ) - 1;
+                        
+                        size_t page = ( _data[i].region << 6 | offset );
+                        pages->insert( page );
+
+                        v &= ~( 1ULL << offset );
+                    }
+                }
             }
 
         private:
@@ -147,7 +183,7 @@ namespace mongo {
                 SimpleMutex::scoped_lock lk( _lock );
 
                 static int rarely_count = 0;
-                if ( rarely_count++ % 2048 == 0 ) {
+                if ( rarely_count++ % ( 2048 / BigHashSize ) == 0 ) {
                     long long now = Listener::getElapsedTimeMillis();
                     RARELY if ( now == 0 ) {
                         tlog() << "warning Listener::getElapsedTimeMillis returning 0ms" << endl;
@@ -179,7 +215,24 @@ namespace mongo {
                 }
                 return false;
             }
-            
+
+            /**
+             * @param pages OUT adds each page to the set
+             * @param mySlices temporary space for copy
+             */
+            void addPages( unordered_set<size_t>* pages, Slice* mySlices ) {
+                {
+                    // by doing this, we're in the lock only about half as long as the naive way
+                    // that's measure with a small data set
+                    // Assumption is that with a large data set, actually adding to set may get more costly
+                    // so this way the time in lock should be totally constant
+                    SimpleMutex::scoped_lock lk( _lock );
+                    memcpy( mySlices, _slices, NumSlices * sizeof(Slice) );
+                }
+                for ( int i = 0; i < NumSlices; i++ ) {
+                    mySlices[i].addPages( pages );
+                }
+            }
         private:
             
             void _rotate() {
@@ -200,7 +253,134 @@ namespace mongo {
         int bigHash( size_t region ) {
             return hash( region ) % BigHashSize;
         }
+
+        namespace PointerTable {
+
+            /* A "superpage" is a group of 16 contiguous pages that differ
+             * only in the low-order 16 bits. This means that there is
+             * enough room in the low-order bits to store a bitmap for each
+             * page in the superpage.
+             */
+            static const size_t superpageMask = ~0xffffLL;
+            static const size_t superpageShift = 16;
+            static const size_t pageSelectorMask = 0xf000LL; // selects a page in a superpage
+            static const int pageSelectorShift = 12;
+                
+            // Tunables
+            static const int capacity = 128; // in superpages
+            static const int bucketSize = 4; // half cache line
+            static const int buckets = capacity/bucketSize;
+            
+            struct Data {
+                /** organized similar to a CPU cache
+                 *  bucketSize-way set associative
+                 *  least-recently-inserted replacement policy
+                 */
+                size_t _table[buckets][bucketSize];
+                long long _lastReset; // time in millis
+            };
+
+            void reset(Data* data) {
+                memset(data->_table, 0, sizeof(data->_table));
+                data->_lastReset = Listener::getElapsedTimeMillis();
+            }
+
+            inline void resetIfNeeded( Data* data ) {
+                const long long now = Listener::getElapsedTimeMillis();
+                if (MONGO_unlikely(now - data->_lastReset > RotateTimeSecs*1000))
+                    reset(data);
+            }
+
+            inline size_t pageBitOf(size_t ptr) {
+                return 1LL << ((ptr & pageSelectorMask) >> pageSelectorShift);
+            }
+            
+            inline size_t superpageOf(size_t ptr) {
+                return ptr & superpageMask;
+            }
+
+            inline size_t bucketFor(size_t ptr) {
+                return (ptr >> superpageShift) % buckets;
+            }
+
+            inline bool haveSeenPage(size_t superpage, size_t ptr) {
+                return superpage & pageBitOf(ptr);
+            }
+
+            inline void markPageSeen(size_t& superpage, size_t ptr) {
+                superpage |= pageBitOf(ptr);
+            }
+
+            /** call this to check a page has been seen yet. */
+            inline bool seen(Data* data, size_t ptr) {
+                resetIfNeeded(data);
+
+                // A bucket contains 4 superpages each containing 16 contiguous pages
+                // See below for a more detailed explanation of superpages
+                size_t* bucket = data->_table[bucketFor(ptr)];
+
+                for (int i = 0; i < bucketSize; i++) {
+                    if (superpageOf(ptr) == superpageOf(bucket[i])) {
+                        if (haveSeenPage(bucket[i], ptr))
+                            return true;
+
+                        markPageSeen(bucket[i], ptr);
+                        return false;
+                    }
+                }
+
+                // superpage isn't in thread-local cache
+                // slide bucket forward and add new superpage at front
+                for (int i = bucketSize-1; i > 0; i--)
+                    bucket[i] = bucket[i-1];
+
+                bucket[0] = superpageOf(ptr);
+                markPageSeen(bucket[0], ptr);
+
+                return false;
+            }
+
+            Data* getData();
+
+        };
+     
+        void appendWorkingSetInfo( BSONObjBuilder& b ) {
+            
+            boost::scoped_array<Slice> mySlices( new Slice[NumSlices] );
+            
+            unordered_set<size_t> totalPages;
+            Timer t;
+            
+            for ( int i = 0; i < BigHashSize; i++ ) {
+                rolling[i].addPages( &totalPages, mySlices.get() );
+            }
+            
+            b.append( "note", "thisIsAnEstimate" );
+            b.appendNumber( "pagesInMemory", totalPages.size() );
+            b.appendNumber( "computationTimeMicros", static_cast<long long>(t.micros()) );
+
+        }
+        
     }
+
+    
+    // These need to be outside the ps namespace due to the way they are defined
+#if defined(__linux__) && defined(__GNUC__)
+    __thread ps::PointerTable::Data _pointerTableData;
+    ps::PointerTable::Data* ps::PointerTable::getData() { 
+        return &_pointerTableData; 
+    }
+#elif defined(_WIN32)
+    __declspec( thread ) ps::PointerTable::Data _pointerTableData;
+    ps::PointerTable::Data* ps::PointerTable::getData() { 
+        return &_pointerTableData; 
+    }
+#else
+    TSP_DEFINE(ps::PointerTable::Data, _pointerTableData);
+    ps::PointerTable::Data* ps::PointerTable::getData() { 
+        return _pointerTableData.getMake();
+    }
+#endif
 
     bool Record::MemoryTrackingEnabled = true;
     
@@ -226,6 +406,15 @@ namespace mongo {
     }
 
     const bool blockSupported = ProcessInfo::blockCheckSupported();
+
+    void Record::appendWorkingSetInfo( BSONObjBuilder& b ) {
+        if ( ! blockSupported ) {
+            b.append( "info", "not supported" );
+            return;
+        }
+        
+        ps::appendWorkingSetInfo( b );
+    }
 
     bool Record::blockCheckSupported() { 
         return ProcessInfo::blockCheckSupported();
@@ -268,9 +457,11 @@ namespace mongo {
         const size_t region = page >> 6;
         const size_t offset = page & 0x3f;
 
-        if ( ps::rolling[ps::bigHash(region)].access( region , offset , false ) ) {
+        const bool seen = ps::PointerTable::seen( ps::PointerTable::getData(), reinterpret_cast<size_t>(data));
+        if (seen || ps::rolling[ps::bigHash(region)].access( region , offset , false ) ) {
+        
 #ifdef _DEBUG
-            if ( blockSupported && ! ProcessInfo::blockInMemory( const_cast<char*>(data) ) ) {
+            if ( blockSupported && ! ProcessInfo::blockInMemory(data) ) {
                 warning() << "we think data is in ram but system says no"  << endl;
             }
 #endif
@@ -289,10 +480,14 @@ namespace mongo {
 
 
     Record* Record::accessed() {
-        const size_t page = (size_t)_data >> 12;
-        const size_t region = page >> 6;
-        const size_t offset = page & 0x3f;        
-        ps::rolling[ps::bigHash(region)].access( region , offset , true );
+        const bool seen = ps::PointerTable::seen( ps::PointerTable::getData(), reinterpret_cast<size_t>(_data));
+        if (!seen){
+            const size_t page = (size_t)_data >> 12;
+            const size_t region = page >> 6;
+            const size_t offset = page & 0x3f;        
+            ps::rolling[ps::bigHash(region)].access( region , offset , true );
+        }
+
         return this;
     }
     
@@ -334,4 +529,49 @@ namespace mongo {
 
     }
 
+    namespace {
+        
+        class WorkingSetSSS : public ServerStatusSection {
+        public:
+            WorkingSetSSS() : ServerStatusSection( "workingSet" ){}
+            virtual bool includeByDefault() const { return false; }
+            
+            BSONObj generateSection(const BSONElement& configElement) const {
+                BSONObjBuilder b;
+                Record::appendWorkingSetInfo( b );
+                return b.obj();
+            }
+                
+        } asserts;
+
+        class RecordStats : public ServerStatusSection {
+        public:
+            RecordStats() : ServerStatusSection( "recordStats" ){}
+            virtual bool includeByDefault() const { return true; }
+            
+            BSONObj generateSection(const BSONElement& configElement) const {
+                BSONObjBuilder record;
+                
+                Record::appendStats( record );
+
+                set<string> dbs;
+                {
+                    Lock::DBRead read( "local" );
+                    dbHolder().getAllShortNames( dbs );
+                }
+
+                for ( set<string>::iterator i = dbs.begin(); i != dbs.end(); ++i ) {
+                    string db = *i;
+                    Client::ReadContext ctx( db );
+                    BSONObjBuilder temp( record.subobjStart( db ) );
+                    ctx.ctx().db()->recordStats().record( temp );
+                    temp.done();
+                }
+
+                return record.obj();
+            }
+                
+        } recordStats;
+
+    }
 }

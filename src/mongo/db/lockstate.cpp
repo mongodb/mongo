@@ -35,7 +35,8 @@ namespace mongo {
           _otherCount(0), 
           _otherLock(NULL),
           _scopedLk(NULL),
-          _lockPending(false)
+          _lockPending(false),
+          _lockPendingParallelWriter(false)
     {
     }
 
@@ -57,7 +58,7 @@ namespace mongo {
 
     bool LockState::isLocked( const StringData& ns ) {
         char db[MaxDatabaseNameLen];
-        nsToDatabase(ns.data(), db);
+        nsToDatabase(ns, db);
         
         DEV verify( _otherName.find( '.' ) == string::npos ); // XXX this shouldn't be here, but somewhere
         if ( _otherCount && db == _otherName )
@@ -202,9 +203,9 @@ namespace mongo {
         _otherCount = type;
     }
 
-    void LockState::lockedOther( const string& other , int type , WrapperForRWLock* lock ) {
+    void LockState::lockedOther( const StringData& other , int type , WrapperForRWLock* lock ) {
         fassert( 16170 , _otherCount == 0 );
-        _otherName = other;
+        _otherName = other.toString();
         _otherCount = type;
         _otherLock = lock;
     }
@@ -241,4 +242,13 @@ namespace mongo {
             stat->recordAcquireTimeMicros( _ls.threadState(), _lock->acquireFinished( stat ) );
     }
     
+    AcquiringParallelWriter::AcquiringParallelWriter( LockState& ls )
+        : _ls( ls ) {
+        _ls._lockPendingParallelWriter = true;
+    }
+    
+    AcquiringParallelWriter::~AcquiringParallelWriter() {
+        _ls._lockPendingParallelWriter = false;
+    }
+
 }

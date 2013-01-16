@@ -1,4 +1,5 @@
 /build
+/src/mongo/db/modules
 /.jsdbshell
 /.dbshell
 /.sconsign.dblite
@@ -6,6 +7,7 @@
 /perf.data
 /massif.out.*
 .scons
+/smoke-last.json
 
 *~
 *.swp
@@ -38,15 +40,16 @@
 *#
 .#*
 
-/src/mongo/*/*Debug/
-/src/mongo/*/*/*Debug/
-/src/mongo/*/*Release/
-/src/mongo/*/*/*Release/
+/src/mongo/*/*Debug*/
+/src/mongo/*/*/*Debug*/
+/src/mongo/*/*Release*/
+/src/mongo/*/*/*Release*/
 /src/mongo/*/ipch
 /src/mongo/*/*/ipch
 /src/mongo/db/.gdb*
 /src/mongo/db/makefile.local
 /src/mongo/db/_ReSharper.db
+/src/third_party/*/*.cache
 /src/third_party/*/*.tlog
 /src/third_party/*/*.lastbuildstate
 config.log
@@ -96,7 +99,6 @@ scratch
 /libmongotestfiles.*
 /libmongoshellfiles.*
 
-
 /emr.jar
 *.class
 
@@ -134,15 +136,24 @@ debian/mongodb
 *.includes
 *.orig
 
+#built by Visual Studio
+src/mongo/base/error_codes.cpp
+src/mongo/base/error_codes.h
+src/mongo/db/auth/action_type.cpp
+src/mongo/db/auth/action_type.h
+src/mongo/db/fts/stop_words_list.cpp
+src/mongo/db/fts/stop_words_list.h
+src/mongo/shell/mongo-server.cpp
+src/mongo/shell/mongo.cpp
+src/third_party/js-1.7/jsautocfg.h
+src/third_party/js-1.7/jsautokw.h
+src/third_party/v8/src/experimental-libraries.cc
+src/third_party/v8/src/libraries.cc
 
 # old things that should be removed
 # maybe remove this mid 2012
 src/third_party/js-1.7/jscpucfg
 src/third_party/js-1.7/jskwgen
 src/mongo/buildinfo.cpp
-src/mongo/shell/mongo-server.cpp
-src/mongo/shell/mongo.cpp
-src/third_party/js-1.7/jsautocfg.h
-src/third_party/js-1.7/jsautokw.h
 buildinfo.cpp
 /.settings/

@@ -5,10 +5,30 @@
 
 Import('env clientEnv')
 
+env.Command(['mongo/base/error_codes.h', 'mongo/base/error_codes.cpp',],
+            ['mongo/base/generate_error_codes.py', 'mongo/base/error_codes.err'],
+            '$PYTHON $SOURCES $TARGETS')
+
+env.Command(['mongo/db/auth/action_type.h', 'mongo/db/auth/action_type.cpp'], 
+            ['mongo/db/auth/generate_action_types.py', 'mongo/db/auth/action_types.txt'],
+            '$PYTHON $SOURCES $TARGETS')
+
 clientSource = [
+    'mongo/base/configuration_variable_manager.cpp',
+    'mongo/base/error_codes.cpp',
+    'mongo/base/global_initializer.cpp',
+    'mongo/base/global_initializer_registerer.cpp',
+    'mongo/base/init.cpp',
+    'mongo/base/initializer.cpp',
+    'mongo/base/initializer_context.cpp',
+    'mongo/base/initializer_dependency_graph.cpp',
+    'mongo/base/make_string_vector.cpp',
+    'mongo/base/parse_number.cpp',
+    'mongo/base/status.cpp',
+    'mongo/base/string_data.cpp',
+    'mongo/bson/bson_validate.cpp',
     'mongo/bson/oid.cpp',
     'mongo/buildinfo.cpp',
-    "mongo/client/authentication_table.cpp",
     'mongo/client/clientAndShell.cpp',
     'mongo/client/clientOnly.cpp',
     'mongo/client/connection_factory.cpp',
@@ -24,9 +44,9 @@ clientSource = [
     'mongo/db/json.cpp',
     'mongo/db/lasterror.cpp',
     'mongo/db/namespace.cpp',
-    'mongo/db/nonce.cpp',
     'mongo/db/dbmessage.cpp',
     'mongo/pch.cpp',
+    'mongo/platform/random.cpp',
     'mongo/util/assert_util.cpp',
     'mongo/util/background.cpp',
     'mongo/util/base64.cpp',
@@ -39,6 +59,9 @@ clientSource = [
     'mongo/util/debug_util.cpp',
     'mongo/util/stacktrace.cpp',
     'mongo/util/file_allocator.cpp',
+    'mongo/util/fail_point.cpp',
+    'mongo/util/fail_point_registry.cpp',
+    'mongo/util/fail_point_service.cpp',
     'mongo/util/histogram.cpp',
     'mongo/util/intrusive_counter.cpp',
     'mongo/util/log.cpp',
@@ -49,6 +72,7 @@ clientSource = [
     'mongo/util/net/message.cpp',
     'mongo/util/net/message_port.cpp',
     'mongo/util/net/sock.cpp',
+    'mongo/util/net/ssl_manager.cpp',
     'mongo/util/password.cpp',
     'mongo/util/ramlog.cpp',
     'mongo/util/signal_handlers.cpp',
@@ -59,6 +83,10 @@ clientSource = [
     'mongo/util/trace.cpp',
     'mongo/util/util.cpp',
     ]
+
+if env['MONGO_BUILD_SASL_CLIENT']:
+    clientSource.extend(['mongo/client/sasl_client_authenticate.cpp',
+                         'mongo/util/gsasl_session.cpp'])
 
 exampleSourceMap = [
         ('authTest', 'mongo/client/examples/authTest.cpp'),
@@ -72,10 +100,12 @@ exampleSourceMap = [
         ]
 
 clientHeaderDirectories = [
+    "base/",
     "bson/",
     "bson/util/",
     "client/",
     "db/",
+    "db/auth/",
     "db/stats/",
     "db/repl/",
     "db/ops/",
@@ -118,6 +148,10 @@ env.Install(
                  '$CLIENT_SCONSTRUCT',
                  '$CLIENT_LICENSE',
                  'SConscript.client',
+                 'mongo/base/generate_error_codes.py',
+                 'mongo/base/error_codes.err',
+                 'mongo/db/auth/generate_action_types.py',
+                 'mongo/db/auth/action_types.txt',
                  '#buildscripts/make_archive.py',
                  clientSource,
                  clientHeaders,
@@ -137,5 +171,6 @@ prefix = GetOption("prefix")
 env.Install(prefix + "/lib", '${LIBPREFIX}mongoclient${LIBSUFFIX}')
 
 for x in clientHeaderDirectories:
-    env.Install(prefix + "/include/mongo/" + x,
-                [Glob('mongo/%s*.h' % x), Glob('mongo/%s*.hpp' % x)])
+    inst = env.Install(prefix + "/include/mongo/" + x,
+                       [Glob('mongo/%s*.h' % x), Glob('mongo/%s*.hpp' % x)])
+    env.AddPostAction(inst, Chmod('$TARGET', 0644))

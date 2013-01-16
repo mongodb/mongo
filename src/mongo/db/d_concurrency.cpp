@@ -31,6 +31,7 @@
 #include "server.h"
 #include "dur.h"
 #include "lockstat.h"
+#include "mongo/db/commands/server_status.h"
 
 // oplog locking
 // no top level read locks
@@ -60,8 +61,8 @@ namespace mongo {
 
     class DBTryLockTimeoutException : public std::exception {
     public:
-    	DBTryLockTimeoutException() {}
-    	virtual ~DBTryLockTimeoutException() throw() { }
+        DBTryLockTimeoutException() {}
+        virtual ~DBTryLockTimeoutException() throw() { }
     };
 
     namespace dur { 
@@ -82,7 +83,8 @@ namespace mongo {
        in different directories with the same name, it will be ok but they are sharing a lock 
        then.
     */
-    static mapsf<string,WrapperForRWLock*> dblocks;
+    typedef mapsf< StringMap<WrapperForRWLock*> > DBLocksMap;
+    static DBLocksMap dblocks;
 
     /* we don't want to touch dblocks too much as a mutex is involved.  thus party for that, 
        this is here...
@@ -200,20 +202,6 @@ namespace mongo {
         return &qlk.stats;
     }
     
-    void reportLockStats(BSONObjBuilder& result) {
-        BSONObjBuilder b;
-        b.append(".", qlk.stats.report());
-        b.append("admin", nestableLocks[Lock::admin]->stats.report());
-        b.append("local", nestableLocks[Lock::local]->stats.report());
-        {
-            mapsf<string,WrapperForRWLock*>::ref r(dblocks);
-            for( map<string,WrapperForRWLock*>::const_iterator i = r.r.begin(); i != r.r.end(); i++ ) {
-                b.append(i->first, i->second->stats.report());
-            }
-        }
-        result.append("locks", b.obj());
-    }
-
     int Lock::isLocked() {
         return threadState();
     }
@@ -278,10 +266,23 @@ namespace mongo {
     void Lock::ParallelBatchWriterMode::iAmABatchParticipant() {
         lockState()._batchWriter = true;
     }
-    Lock::ParallelBatchWriterSupport::ParallelBatchWriterSupport() :
-        _lk( lockState()._batchWriter ? 0 : new RWLockRecursive::Shared(ParallelBatchWriterMode::_batchLock) )
-    {
+
+    Lock::ParallelBatchWriterSupport::ParallelBatchWriterSupport() {
+        relock();
     }
+
+    void Lock::ParallelBatchWriterSupport::tempRelease() {
+        _lk.reset( 0 );
+    }
+
+    void Lock::ParallelBatchWriterSupport::relock() {
+        LockState& ls = lockState();
+        if ( ! ls._batchWriter ) {
+            AcquiringParallelWriter a(ls);
+            _lk.reset( new RWLockRecursive::Shared(ParallelBatchWriterMode::_batchLock) );
+        }
+    }
+
 
     Lock::ScopedLock::ScopedLock( char type ) 
         : _type(type), _stat(0) {
@@ -306,6 +307,7 @@ namespace mongo {
     void Lock::ScopedLock::tempRelease() {
         long long micros = _timer.micros();
         _tempRelease();
+        _pbws_lk.tempRelease();
         _recordTime( micros ); // might as well do after we unlock
     }
 
@@ -324,6 +326,7 @@ namespace mongo {
     }
     
     void Lock::ScopedLock::relock() {
+        _pbws_lk.relock();
         _relock();
         resetTime();
     }
@@ -505,7 +508,7 @@ namespace mongo {
         }
     }
 
-    void Lock::DBWrite::lockOther(const string& db) {
+    void Lock::DBWrite::lockOther(const StringData& db) {
         fassert( 16252, !db.empty() );
         LockState& ls = lockState();
 
@@ -522,10 +525,10 @@ namespace mongo {
 
         if( db != ls.otherName() )
         {
-            mapsf<string,WrapperForRWLock*>::ref r(dblocks);
+            DBLocksMap::ref r(dblocks);
             WrapperForRWLock*& lock = r[db];
             if( lock == 0 )
-                lock = new WrapperForRWLock(db.c_str());
+                lock = new WrapperForRWLock(db);
             ls.lockedOther( db , 1 , lock );
         }
         else { 
@@ -538,10 +541,10 @@ namespace mongo {
         _weLocked = ls.otherLock();
     }
 
-    static Lock::Nestable n(const char *db) { 
-        if( str::equals(db, "local") )
+    static Lock::Nestable n(const StringData& db) { 
+        if( db == "local" )
             return Lock::local;
-        if( str::equals(db, "admin") )
+        if( db == "admin" )
             return Lock::admin;
         return Lock::notnestable;
     }
@@ -561,8 +564,7 @@ namespace mongo {
             return;
 
         if (DB_LEVEL_LOCKING_ENABLED) {
-            char db[MaxDatabaseNameLen];
-            nsToDatabase(ns.data(), db);
+            StringData db = nsToDatabaseSubstring( ns );
             Nestable nested = n(db);
             if( nested == admin ) { 
                 // we can't nestedly lock both admin and local as implemented. so lock_W.
@@ -593,8 +595,7 @@ namespace mongo {
         if ( ls.isRW() )
             return;
         if (DB_LEVEL_LOCKING_ENABLED) {
-            char db[MaxDatabaseNameLen];
-            nsToDatabase(ns.data(), db);
+            StringData db = nsToDatabaseSubstring(ns);
             Nestable nested = n(db);
             if( !nested )
                 lockOther(db);
@@ -608,13 +609,13 @@ namespace mongo {
         }
     }
 
-    Lock::DBWrite::DBWrite( const StringData& ns ) 
-        : ScopedLock( 'w' ), _what(ns.data()), _nested(false) {
+    Lock::DBWrite::DBWrite( const StringData& ns )
+        : ScopedLock( 'w' ), _what(ns.toString()), _nested(false) {
         lockDB( _what );
     }
 
-    Lock::DBRead::DBRead( const StringData& ns )   
-        : ScopedLock( 'r' ), _what(ns.data()), _nested(false) {
+    Lock::DBRead::DBRead( const StringData& ns )
+        : ScopedLock( 'r' ), _what(ns.toString()), _nested(false) {
         lockDB( _what );
     }
 
@@ -697,7 +698,7 @@ namespace mongo {
         }
     }
 
-    void Lock::DBRead::lockOther(const string& db) {
+    void Lock::DBRead::lockOther(const StringData& db) {
         fassert( 16255, !db.empty() );
         LockState& ls = lockState();
 
@@ -714,10 +715,10 @@ namespace mongo {
 
         if( db != ls.otherName() )
         {
-            mapsf<string,WrapperForRWLock*>::ref r(dblocks);
+            DBLocksMap::ref r(dblocks);
             WrapperForRWLock*& lock = r[db];
             if( lock == 0 )
-                lock = new WrapperForRWLock(db.c_str());
+                lock = new WrapperForRWLock(db);
             ls.lockedOther( db , -1 , lock );
         }
         else { 
@@ -797,5 +798,68 @@ namespace mongo {
     void unlocking_W() {
         dur::releasingWriteLock();
     }
+
+    class GlobalLockServerStatusSection : public ServerStatusSection {
+    public:
+        GlobalLockServerStatusSection() : ServerStatusSection( "globalLock" ){
+            _started = curTimeMillis64();
+        }
+
+        virtual bool includeByDefault() const { return true; }
+
+        virtual BSONObj generateSection( const BSONElement& configElement ) const {
+            BSONObjBuilder t;
+
+            t.append( "totalTime" , (long long)(1000 * ( curTimeMillis64() - _started ) ) );
+            t.append( "lockTime" , Lock::globalLockStat()->getTimeLocked( 'W' ) );
+
+            {
+                BSONObjBuilder ttt( t.subobjStart( "currentQueue" ) );
+                int w=0, r=0;
+                Client::recommendedYieldMicros( &w , &r, true );
+                ttt.append( "total" , w + r );
+                ttt.append( "readers" , r );
+                ttt.append( "writers" , w );
+                ttt.done();
+            }
+
+            {
+                BSONObjBuilder ttt( t.subobjStart( "activeClients" ) );
+                int w=0, r=0;
+                Client::getActiveClientCount( w , r );
+                ttt.append( "total" , w + r );
+                ttt.append( "readers" , r );
+                ttt.append( "writers" , w );
+                ttt.done();
+            }
+
+            return t.obj();
+        }
+
+    private:
+        unsigned long long _started;
+
+    } globalLockServerStatusSection;
+
+    class LockStatsServerStatusSection : public ServerStatusSection {
+    public:
+        LockStatsServerStatusSection() : ServerStatusSection( "locks" ){}
+        virtual bool includeByDefault() const { return true; }
+
+        BSONObj generateSection( const BSONElement& configElement ) const {
+            BSONObjBuilder b;
+            b.append(".", qlk.stats.report());
+            b.append("admin", nestableLocks[Lock::admin]->stats.report());
+            b.append("local", nestableLocks[Lock::local]->stats.report());
+            {
+                DBLocksMap::ref r(dblocks);
+                for( DBLocksMap::const_iterator i = r.r.begin(); i != r.r.end(); ++i ) {
+                    b.append(i->first, i->second->stats.report());
+                }
+            }
+            return b.obj();
+        }
+
+    } lockStatsServerStatusSection;
 
 }

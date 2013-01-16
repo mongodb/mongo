@@ -26,9 +26,13 @@ doTest = function( signal ) {
     replTest.stop( s2Id );
     
     assert.soon(function() {
+        try {
             var status = master.getDB("admin").runCommand({replSetGetStatus: 1});
             return status.members[1].state == 8 && status.members[2].state == 8;
-        });
+        } catch (x) {
+            return false;
+        }
+    });
 
     
     replTest.stop( mId );

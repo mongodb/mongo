@@ -57,10 +57,10 @@ placeCheck( 2 );
 // NOTE: at this point we have 2 shard on 1 server
 
 // test move shard
-assert.throws( function(){ s.adminCommand( { movechunk : "test.foo" , find : { num : 1 } , to : primary.getMongo().name } ); } );
-assert.throws( function(){ s.adminCommand( { movechunk : "test.foo" , find : { num : 1 } , to : "adasd" } ) } );
+assert.throws( function(){ s.adminCommand( { movechunk : "test.foo" , find : { num : 1 } , to : primary.getMongo().name, _waitForDelete : true } ); } );
+assert.throws( function(){ s.adminCommand( { movechunk : "test.foo" , find : { num : 1 } , to : "adasd", _waitForDelete : true } ) } );
 
-s.adminCommand( { movechunk : "test.foo" , find : { num : 1 } , to : secondary.getMongo().name } );
+s.adminCommand( { movechunk : "test.foo" , find : { num : 1 } , to : secondary.getMongo().name, _waitForDelete : true } );
 assert.eq( 2 , secondary.foo.find().length() , "secondary should have 2 after move shard" );
 assert.eq( 1 , primary.foo.find().length() , "primary should only have 1 after move shard" );
 
@@ -221,10 +221,10 @@ assert.eq( 2 , s.onNumShards( "foo" ) , "on 2 shards" );
 
 secondary.foo.insert( { num : -3 } );
 
-s.adminCommand( { movechunk : "test.foo" , find : { num : -2 } , to : secondary.getMongo().name } );
+s.adminCommand( { movechunk : "test.foo" , find : { num : -2 } , to : secondary.getMongo().name, _waitForDelete : true } );
 assert.eq( 1 , s.onNumShards( "foo" ) , "on 1 shards" );
 
-s.adminCommand( { movechunk : "test.foo" , find : { num : -2 } , to : primary.getMongo().name } );
+s.adminCommand( { movechunk : "test.foo" , find : { num : -2 } , to : primary.getMongo().name, _waitForDelete : true } );
 assert.eq( 2 , s.onNumShards( "foo" ) , "on 2 shards again" );
 assert.eq( 3 , s.config.chunks.count() , "only 3 chunks" );
 

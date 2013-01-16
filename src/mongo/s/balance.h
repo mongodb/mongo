@@ -18,9 +18,11 @@
 
 #pragma once
 
-#include "../pch.h"
-#include "../util/background.h"
-#include "balancer_policy.h"
+#include "mongo/pch.h"
+
+#include "mongo/client/dbclientinterface.h"
+#include "mongo/s/balancer_policy.h"
+#include "mongo/util/background.h"
 
 namespace mongo {
 
@@ -82,9 +84,13 @@ namespace mongo {
          * Issues chunk migration request, one at a time.
          *
          * @param candidateChunks possible chunks to move
+         * @param secondaryThrottle wait for secondaries to catch up before pushing more deletes
+         * @param waitForDelete wait for deletes to complete after each chunk move
          * @return number of chunks effectively moved
          */
-        int _moveChunks( const vector<CandidateChunkPtr>* candidateChunks , bool secondaryThrottle );
+        int _moveChunks(const vector<CandidateChunkPtr>* candidateChunks,
+                        bool secondaryThrottle,
+                        bool waitForDelete);
 
         /**
          * Marks this balancer as being live on the config server(s).

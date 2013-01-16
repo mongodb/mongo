@@ -25,7 +25,7 @@ m = runMongoProgram( "mongod", "--keyFile", path+"key1", "--port", port[0], "--d
 
 
 print("should fail with wrong permissions");
-assert.eq(m, _isWindows()? 100 : 2, "mongod should exit w/ 2: permissions too open");
+assert.eq(m, _isWindows()? 100 : 1, "mongod should exit w/ 1 (EXIT_FAILURE): permissions too open");
 stopMongod(port[0]);
 
 
@@ -46,12 +46,16 @@ if ( !_isWindows() ) {  // SERVER-5024
 
 print("start up rs");
 var rs = new ReplSetTest({"name" : name, "nodes" : 3, "startPort" : port[0]});
+print("restart 0 with keyFile");
 m = rs.restart(0, {"keyFile" : path+"key1"});
+print("restart 1 with keyFile");
 var s = rs.start(1, {"keyFile" : path+"key1"});
+print("restart 2 with keyFile");
 var s2 = rs.start(2, {"keyFile" : path+"key1"});
 
 var result = m.getDB("admin").auth("foo", "bar");
 assert.eq(result, 1, "login failed");
+print("Initializing replSet with config: " + tojson(rs.getReplSetConfig()));
 result = m.getDB("admin").runCommand({replSetInitiate : rs.getReplSetConfig()});
 assert.eq(result.ok, 1, "couldn't initiate: "+tojson(result));
 
@@ -81,11 +85,11 @@ function doQueryOn(p) {
         if (typeof(JSON) != "undefined") {
             err = JSON.parse(e.substring(6));
         }
-        else if (e.indexOf("10057") > 0) {
-            err.code = 10057;
+        else if (e.indexOf("16550") > 0) {
+            err.code = 16550;
         }
     }
-    assert.eq(err.code, 10057);
+    assert.eq(err.code, 16550);
 };
 
 doQueryOn(slave);

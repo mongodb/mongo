@@ -42,21 +42,21 @@ namespace AccumulatorTests {
                 _router->setDoingMerge( true );
         }
     protected:
-        intrusive_ptr<Document> fromjson( const string& json ) {
+        Document fromjson( const string& json ) {
             return frombson( mongo::fromjson( json ) );
         }
-        intrusive_ptr<Document> frombson( const BSONObj& bson ) {
+        Document frombson( const BSONObj& bson ) {
             BSONObj myBson = bson;
             return Document::createFromBsonObj( &myBson );
         }
-        BSONObj fromDocument( const intrusive_ptr<Document>& document ) {
+        BSONObj fromDocument( const Document& document ) {
             BSONObjBuilder bob;
             document->toBson( &bob );
             return bob.obj();
         }
-        BSONObj fromValue( const intrusive_ptr<const Value>& value ) {
+        BSONObj fromValue( const Value& value ) {
             BSONObjBuilder bob;
-            value->addToBsonObj( &bob, "" );
+            value.addToBsonObj( &bob, "" );
             return bob.obj();
         }
         /** Check binary equality, ensuring use of the same numeric types. */
@@ -102,7 +102,7 @@ namespace AccumulatorTests {
         public:
             void run() {
                 createAccumulator();
-                ASSERT_EQUALS( 0, accumulator()->getValue()->getDouble() );
+                ASSERT_EQUALS( 0, accumulator()->getValue().getDouble() );
             }
         };
         
@@ -112,7 +112,7 @@ namespace AccumulatorTests {
             void run() {
                 createAccumulator();
                 accumulator()->evaluate( frombson( BSON( "d" << 3 ) ) );
-                ASSERT_EQUALS( 3, accumulator()->getValue()->getDouble() );
+                ASSERT_EQUALS( 3, accumulator()->getValue().getDouble() );
             }
         };
         
@@ -122,7 +122,7 @@ namespace AccumulatorTests {
             void run() {
                 createAccumulator();
                 accumulator()->evaluate( frombson( BSON( "d" << -4LL ) ) );
-                ASSERT_EQUALS( -4, accumulator()->getValue()->getDouble() );
+                ASSERT_EQUALS( -4, accumulator()->getValue().getDouble() );
             }
         };
         
@@ -132,7 +132,7 @@ namespace AccumulatorTests {
             void run() {
                 createAccumulator();
                 accumulator()->evaluate( frombson( BSON( "d" << 22.6 ) ) );
-                ASSERT_EQUALS( 22.6, accumulator()->getValue()->getDouble() );
+                ASSERT_EQUALS( 22.6, accumulator()->getValue().getDouble() );
             }
         };
         
@@ -143,7 +143,7 @@ namespace AccumulatorTests {
                 createAccumulator();
                 accumulator()->evaluate( frombson( BSON( "d" << 10 ) ) );
                 accumulator()->evaluate( frombson( BSON( "d" << 11 ) ) );
-                ASSERT_EQUALS( 10.5, accumulator()->getValue()->getDouble() );
+                ASSERT_EQUALS( 10.5, accumulator()->getValue().getDouble() );
             }
         };        
         
@@ -154,7 +154,7 @@ namespace AccumulatorTests {
                 createAccumulator();
                 accumulator()->evaluate( frombson( BSON( "d" << 10 ) ) );
                 accumulator()->evaluate( frombson( BSON( "d" << 11.0 ) ) );
-                ASSERT_EQUALS( 10.5, accumulator()->getValue()->getDouble() );
+                ASSERT_EQUALS( 10.5, accumulator()->getValue().getDouble() );
             }
         };        
         
@@ -165,7 +165,7 @@ namespace AccumulatorTests {
                 createAccumulator();
                 accumulator()->evaluate( frombson( BSON( "d" << numeric_limits<int>::max() ) ) );
                 accumulator()->evaluate( frombson( BSON( "d" << numeric_limits<int>::max() ) ) );
-                ASSERT_EQUALS( numeric_limits<int>::max(), accumulator()->getValue()->getDouble() );
+                ASSERT_EQUALS( numeric_limits<int>::max(), accumulator()->getValue().getDouble() );
             }
         };        
         
@@ -180,7 +180,7 @@ namespace AccumulatorTests {
                         ( frombson( BSON( "d" << numeric_limits<long long>::max() ) ) );
                 ASSERT_EQUALS( ( (double)numeric_limits<long long>::max() +
                                  numeric_limits<long long>::max() ) / 2.0,
-                               accumulator()->getValue()->getDouble() );
+                               accumulator()->getValue().getDouble() );
             }
         };
 
@@ -196,7 +196,7 @@ namespace AccumulatorTests {
                     createAccumulator();
                     accumulator()->evaluate( frombson( operand() ) );
                     assertBinaryEqual( expectedResult(),
-                                       fromDocument( accumulator()->getValue()->getDocument() ) );
+                                       fromDocument( accumulator()->getValue().getDocument() ) );
                 }
             protected:
                 virtual BSONObj operand() = 0;
@@ -237,7 +237,7 @@ namespace AccumulatorTests {
                     accumulator()->evaluate( frombson( a ) );
                     accumulator()->evaluate( frombson( b ) );
                     assertBinaryEqual( expectedResult(),
-                                       fromDocument( accumulator()->getValue()->getDocument() ) );
+                                       fromDocument( accumulator()->getValue().getDocument() ) );
                 }
             };
 
@@ -280,7 +280,7 @@ namespace AccumulatorTests {
                     accumulator()->evaluate( frombson( BSON( "d" << 2LL ) ) );
                     accumulator()->evaluate( frombson( BSON( "d" << 4.0 ) ) );
                     assertBinaryEqual( BSON( "subTotal" << 7.0 << "count" << 3LL ),
-                                       fromDocument( accumulator()->getValue()->getDocument() ) );
+                                       fromDocument( accumulator()->getValue().getDocument() ) );
                 }
             };
 
@@ -345,7 +345,7 @@ namespace AccumulatorTests {
             void run() {
                 createAccumulator();
                 // The accumulator returns no value in this case.
-                ASSERT( !accumulator()->getValue() );
+                ASSERT( accumulator()->getValue().missing() );
             }
         };
 
@@ -355,17 +355,17 @@ namespace AccumulatorTests {
             void run() {
                 createAccumulator();
                 accumulator()->evaluate( fromjson( "{a:5}" ) );
-                ASSERT_EQUALS( 5, accumulator()->getValue()->getInt() );
+                ASSERT_EQUALS( 5, accumulator()->getValue().getInt() );
             }
         };
         
-        /* The accumulator evaluates one document with the field missing retains undefined. */
+        /* The accumulator evaluates one document with the field missing, returns missing value. */
         class Missing : public Base {
         public:
             void run() {
                 createAccumulator();
                 accumulator()->evaluate( fromjson( "{}" ) );
-                ASSERT_EQUALS( Undefined, accumulator()->getValue()->getType() );
+                ASSERT_EQUALS( EOO, accumulator()->getValue().getType() );
             }
         };
         
@@ -376,18 +376,18 @@ namespace AccumulatorTests {
                 createAccumulator();
                 accumulator()->evaluate( fromjson( "{a:5}" ) );
                 accumulator()->evaluate( fromjson( "{a:7}" ) );
-                ASSERT_EQUALS( 5, accumulator()->getValue()->getInt() );
+                ASSERT_EQUALS( 5, accumulator()->getValue().getInt() );
             }
         };
         
-        /* The accumulator evaluates two documents and retains the undefined value in the first. */
+        /* The accumulator evaluates two documents and retains the missing value in the first. */
         class FirstMissing : public Base {
         public:
             void run() {
                 createAccumulator();
                 accumulator()->evaluate( fromjson( "{}" ) );
                 accumulator()->evaluate( fromjson( "{a:7}" ) );
-                ASSERT_EQUALS( Undefined, accumulator()->getValue()->getType() );
+                ASSERT_EQUALS( EOO, accumulator()->getValue().getType() );
             }
         };
         
@@ -413,7 +413,7 @@ namespace AccumulatorTests {
             void run() {
                 createAccumulator();
                 // The accumulator returns no value in this case.
-                ASSERT( !accumulator()->getValue() );
+                ASSERT( accumulator()->getValue().missing() );
             }
         };
         
@@ -423,7 +423,7 @@ namespace AccumulatorTests {
             void run() {
                 createAccumulator();
                 accumulator()->evaluate( fromjson( "{b:5}" ) );
-                ASSERT_EQUALS( 5, accumulator()->getValue()->getInt() );
+                ASSERT_EQUALS( 5, accumulator()->getValue().getInt() );
             }
         };
         
@@ -433,7 +433,7 @@ namespace AccumulatorTests {
             void run() {
                 createAccumulator();
                 accumulator()->evaluate( fromjson( "{}" ) );
-                ASSERT_EQUALS( Undefined, accumulator()->getValue()->getType() );
+                ASSERT_EQUALS( EOO , accumulator()->getValue().getType() );
             }
         };
         
@@ -444,7 +444,7 @@ namespace AccumulatorTests {
                 createAccumulator();
                 accumulator()->evaluate( fromjson( "{b:5}" ) );
                 accumulator()->evaluate( fromjson( "{b:7}" ) );
-                ASSERT_EQUALS( 7, accumulator()->getValue()->getInt() );
+                ASSERT_EQUALS( 7, accumulator()->getValue().getInt() );
             }
         };
         
@@ -455,7 +455,7 @@ namespace AccumulatorTests {
                 createAccumulator();
                 accumulator()->evaluate( fromjson( "{b:7}" ) );
                 accumulator()->evaluate( fromjson( "{}" ) );
-                ASSERT_EQUALS( Undefined, accumulator()->getValue()->getType() );
+                ASSERT_EQUALS( EOO , accumulator()->getValue().getType() );
             }
         };
         
@@ -481,7 +481,7 @@ namespace AccumulatorTests {
             void run() {
                 createAccumulator();
                 // The accumulator returns no value in this case.
-                ASSERT( !accumulator()->getValue() );
+                ASSERT( accumulator()->getValue().missing() );
             }
         };
         
@@ -491,7 +491,7 @@ namespace AccumulatorTests {
             void run() {
                 createAccumulator();
                 accumulator()->evaluate( fromjson( "{c:5}" ) );
-                ASSERT_EQUALS( 5, accumulator()->getValue()->getInt() );
+                ASSERT_EQUALS( 5, accumulator()->getValue().getInt() );
             }
         };
         
@@ -501,7 +501,7 @@ namespace AccumulatorTests {
             void run() {
                 createAccumulator();
                 accumulator()->evaluate( fromjson( "{}" ) );
-                ASSERT_EQUALS( Undefined, accumulator()->getValue()->getType() );
+                ASSERT_EQUALS( EOO , accumulator()->getValue().getType() );
             }
         };
         
@@ -512,7 +512,7 @@ namespace AccumulatorTests {
                 createAccumulator();
                 accumulator()->evaluate( fromjson( "{c:5}" ) );
                 accumulator()->evaluate( fromjson( "{c:7}" ) );
-                ASSERT_EQUALS( 5, accumulator()->getValue()->getInt() );
+                ASSERT_EQUALS( 5, accumulator()->getValue().getInt() );
             }
         };
         
@@ -523,7 +523,7 @@ namespace AccumulatorTests {
                 createAccumulator();
                 accumulator()->evaluate( fromjson( "{c:7}" ) );
                 accumulator()->evaluate( fromjson( "{}" ) );
-                ASSERT_EQUALS( Undefined, accumulator()->getValue()->getType() );
+                ASSERT_EQUALS( 7 , accumulator()->getValue().getInt() );
             }
         };
         
@@ -549,7 +549,7 @@ namespace AccumulatorTests {
             void run() {
                 createAccumulator();
                 // The accumulator returns no value in this case.
-                ASSERT( !accumulator()->getValue() );
+                ASSERT( accumulator()->getValue().missing() );
             }
         };
         
@@ -559,7 +559,7 @@ namespace AccumulatorTests {
             void run() {
                 createAccumulator();
                 accumulator()->evaluate( fromjson( "{d:5}" ) );
-                ASSERT_EQUALS( 5, accumulator()->getValue()->getInt() );
+                ASSERT_EQUALS( 5, accumulator()->getValue().getInt() );
             }
         };
         
@@ -569,7 +569,7 @@ namespace AccumulatorTests {
             void run() {
                 createAccumulator();
                 accumulator()->evaluate( fromjson( "{}" ) );
-                ASSERT_EQUALS( Undefined, accumulator()->getValue()->getType() );
+                ASSERT_EQUALS( EOO, accumulator()->getValue().getType() );
             }
         };
         
@@ -580,7 +580,7 @@ namespace AccumulatorTests {
                 createAccumulator();
                 accumulator()->evaluate( fromjson( "{d:5}" ) );
                 accumulator()->evaluate( fromjson( "{d:7}" ) );
-                ASSERT_EQUALS( 7, accumulator()->getValue()->getInt() );
+                ASSERT_EQUALS( 7, accumulator()->getValue().getInt() );
             }
         };
         
@@ -591,7 +591,7 @@ namespace AccumulatorTests {
                 createAccumulator();
                 accumulator()->evaluate( fromjson( "{d:7}" ) );
                 accumulator()->evaluate( fromjson( "{}" ) );
-                ASSERT_EQUALS( 7, accumulator()->getValue()->getInt() );
+                ASSERT_EQUALS( 7, accumulator()->getValue().getInt() );
             }
         };
         
@@ -616,7 +616,7 @@ namespace AccumulatorTests {
         public:
             void run() {
                 createAccumulator();
-                ASSERT_EQUALS( 0, accumulator()->getValue()->getInt() );
+                ASSERT_EQUALS( 0, accumulator()->getValue().getInt() );
             }
         };
 
@@ -626,7 +626,7 @@ namespace AccumulatorTests {
             void run() {
                 createAccumulator();
                 accumulator()->evaluate( frombson( BSON( "d" << 5 ) ) );
-                ASSERT_EQUALS( 5, accumulator()->getValue()->getInt() );
+                ASSERT_EQUALS( 5, accumulator()->getValue().getInt() );
             }
         };
 
@@ -636,7 +636,7 @@ namespace AccumulatorTests {
             void run() {
                 createAccumulator();
                 accumulator()->evaluate( frombson( BSON( "d" << 6LL ) ) );
-                ASSERT_EQUALS( 6, accumulator()->getValue()->getLong() );
+                ASSERT_EQUALS( 6, accumulator()->getValue().getLong() );
             }
         };
         
@@ -646,7 +646,7 @@ namespace AccumulatorTests {
             void run() {
                 createAccumulator();
                 accumulator()->evaluate( frombson( BSON( "d" << 60000000000LL ) ) );
-                ASSERT_EQUALS( 60000000000LL, accumulator()->getValue()->getLong() );
+                ASSERT_EQUALS( 60000000000LL, accumulator()->getValue().getLong() );
             }
         };
         
@@ -656,7 +656,7 @@ namespace AccumulatorTests {
             void run() {
                 createAccumulator();
                 accumulator()->evaluate( frombson( BSON( "d" << 7.0 ) ) );
-                ASSERT_EQUALS( 7.0, accumulator()->getValue()->getDouble() );
+                ASSERT_EQUALS( 7.0, accumulator()->getValue().getDouble() );
             }
         };
 
@@ -666,7 +666,7 @@ namespace AccumulatorTests {
             void run() {
                 createAccumulator();
                 accumulator()->evaluate( frombson( BSON( "d" << 7.5 ) ) );
-                ASSERT_EQUALS( 7.5, accumulator()->getValue()->getDouble() );
+                ASSERT_EQUALS( 7.5, accumulator()->getValue().getDouble() );
             }
         };
 
@@ -678,8 +678,8 @@ namespace AccumulatorTests {
                 accumulator()->evaluate
                         ( frombson( BSON( "d" << numeric_limits<double>::quiet_NaN() ) ) );
                 // NaN is unequal to itself.
-                ASSERT_NOT_EQUALS( accumulator()->getValue()->getDouble(),
-                                   accumulator()->getValue()->getDouble() );
+                ASSERT_NOT_EQUALS( accumulator()->getValue().getDouble(),
+                                   accumulator()->getValue().getDouble() );
             }
         };
         
@@ -696,8 +696,8 @@ namespace AccumulatorTests {
             virtual BSONObj summand2() { verify( false ); }
             virtual BSONObj expectedSum() = 0;
             void checkPairSum( BSONObj first, BSONObj second ) {
-                intrusive_ptr<Document> firstDocument = Document::createFromBsonObj( &first );
-                intrusive_ptr<Document> secondDocument = Document::createFromBsonObj( &second );
+                Document firstDocument = Document::createFromBsonObj( &first );
+                Document secondDocument = Document::createFromBsonObj( &second );
                 createAccumulator();
                 accumulator()->evaluate( firstDocument );
                 accumulator()->evaluate( secondDocument );
@@ -705,7 +705,7 @@ namespace AccumulatorTests {
             }
             void checkSum() {
                 BSONObjBuilder resultBuilder;
-                accumulator()->getValue()->addToBsonObj( &resultBuilder, "" );
+                accumulator()->getValue().addToBsonObj( &resultBuilder, "" );
                 BSONObj result = resultBuilder.obj();
                 ASSERT_EQUALS( expectedSum().firstElement(), result.firstElement() );                
                 ASSERT_EQUALS( expectedSum().firstElement().type(), result.firstElement().type() );
@@ -728,7 +728,7 @@ namespace AccumulatorTests {
             }
         };
 
-        /** Two ints nagative overflow. */
+        /** Two ints negative overflow. */
         class IntIntNegativeOverflow : public TypeConversionBase {
             BSONObj summand1() { return BSON( "d" << -numeric_limits<int>::max() ); }
             BSONObj summand2() { return BSON( "d" << -10 ); }

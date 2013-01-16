@@ -18,9 +18,13 @@
 
 #pragma once
 
+#include "mongo/base/string_data.h"
+#include "mongo/db/keypattern.h"
+
 namespace mongo {
 
     class Chunk;
+    class FieldRangeSet;
 
     /* A ShardKeyPattern is a pattern indicating what data to extract from the object to make the shard key from.
        Analogous to an index key pattern.
@@ -52,13 +56,6 @@ namespace mongo {
             return isGlobalMin( k ) || isGlobalMax( k );
         }
 
-        /** compare shard keys from the objects specified
-           l < r negative
-           l == r 0
-           l > r positive
-         */
-        int compare( const BSONObj& l , const BSONObj& r ) const;
-
         /**
            @return whether or not obj has all fields in this shard key pattern
            e.g.
@@ -73,32 +70,77 @@ namespace mongo {
          */
         bool hasShardKey( const BSONObj& obj ) const;
 
-        BSONObj key() const { return pattern; }
+        BSONObj key() const { return pattern.toBSON(); }
 
         string toString() const;
 
         BSONObj extractKey(const BSONObj& from) const;
 
-        bool partOfShardKey(const char* key ) const {
+        bool partOfShardKey(const StringData& key ) const {
             return pattern.hasField(key);
         }
-        bool partOfShardKey(const string& key ) const {
-            return pattern.hasField(key.c_str());
+
+        BSONObj extendRangeBound( const BSONObj& bound , bool makeUpperInclusive ) const {
+            return pattern.extendRangeBound( bound , makeUpperInclusive );
         }
 
         /**
          * @return
          * true if 'this' is a prefix (not necessarily contained) of 'otherPattern'.
          */
-        bool isPrefixOf( const BSONObj& otherPattern ) const;
+        bool isPrefixOf( const KeyPattern& otherPattern ) const;
+
+        /**
+         * @return
+         * true if this shard key is compatible with a unique index on 'uniqueIndexPattern'.
+         *      Primarily this just checks whether 'this' is a prefix of 'uniqueIndexPattern',
+         *      However it does not need to be an exact syntactic prefix due to "hashed"
+         *      indexes or mismatches in ascending/descending order.  Also, uniqueness of the
+         *      _id field is guaranteed by the generation process (or by the user) so every
+         *      index that begins with _id is unique index compatible with any shard key.
+         *      Examples:
+         *        shard key {a : 1} is compatible with a unique index on {_id : 1}
+         *        shard key {a : 1} is compatible with a unique index on {a : 1 , b : 1}
+         *        shard key {a : 1} is compatible with a unique index on {a : -1 , b : 1 }
+         *        shard key {a : "hashed"} is compatible with a unique index on {a : 1}
+         *        shard key {a : 1} is not compatible with a unique index on {b : 1}
+         *        shard key {a : "hashed" , b : 1 } is not compatible with unique index on { b : 1 }
+         *      Note:
+         *        this method assumes that 'uniqueIndexPattern' is a valid index pattern,
+         *        and is capable of being a unique index.  A pattern like { k : "hashed" }
+         *        is never capable of being a unique index, and thus is an invalid setting
+         *        for the 'uniqueIndexPattern' argument.
+         */
+        bool isUniqueIndexCompatible( const KeyPattern& uniqueIndexPattern ) const;
+
+        /**
+         * @return
+         * true if keyPattern contains any computed values, (e.g. {a : "hashed"})
+         * false if keyPattern consists of only ascending/descending fields (e.g. {a : 1, b : -1})
+         *       With our current index expression language, "special" shard keys are any keys
+         *       that are not a simple list of field names and 1/-1 values.
+         */
+        bool isSpecial() const { return pattern.isSpecial(); }
 
         /**
          * @return BSONObj with _id and shardkey at front. May return original object.
          */
         BSONObj moveToFront(const BSONObj& obj) const;
 
+        /**@param queryConstraints a FieldRangeSet formed from parsing a query
+         * @return an ordered list of bounds generated using this KeyPattern
+         * and the constraints from the FieldRangeSet
+         *
+         * The value of frsp->matchPossibleForSingleKeyFRS(fromQuery) should be true,
+         * otherwise this function could throw.
+         *
+         */
+        BoundList keyBounds( const FieldRangeSet& queryConstraints ) const{
+            return pattern.keyBounds( queryConstraints );
+        }
+
     private:
-        BSONObj pattern;
+        KeyPattern pattern;
         BSONObj gMin;
         BSONObj gMax;
 
@@ -107,21 +149,7 @@ namespace mongo {
     };
 
     inline BSONObj ShardKeyPattern::extractKey(const BSONObj& from) const {
-        BSONObj k = from;
-        bool needExtraction = false;
-
-        BSONObjIterator a(from);
-        BSONObjIterator b(pattern);
-        while (a.more() && b.more()){
-            if (strcmp(a.next().fieldName(), b.next().fieldName()) != 0){
-                needExtraction = true;
-                break;
-            }
-        }
-
-        if (needExtraction || a.more() != b.more())
-            k = from.extractFields(pattern);
-
+        BSONObj k = pattern.extractSingleKey( from );
         uassert(13334, "Shard Key must be less than 512 bytes", k.objsize() < 512);
         return k;
     }

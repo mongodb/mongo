@@ -14,7 +14,7 @@
  */
 
 #include "mongo/platform/basic.h"
-
+#include "mongo/platform/cstdint.h"
 #include "mongo/util/time_support.h"
 
 #include <cstdio>
@@ -26,6 +26,11 @@
 
 #include "mongo/util/assert_util.h"
 
+#ifdef _WIN32
+#include <boost/date_time/filetime_functions.hpp>
+#include "mongo/util/concurrency/mutex.h"
+#include "mongo/util/timer.h"
+#endif
 
 namespace mongo {
 
@@ -48,6 +53,26 @@ namespace mongo {
             gmtime_r(&t, buf);
 #endif
     }
+
+#if defined(_WIN32)
+    void curTimeString(char* timeStr) {
+        boost::xtime xt;
+        boost::xtime_get(&xt, MONGO_BOOST_TIME_UTC);
+        time_t_to_String(xt.sec, timeStr);
+
+        char* milliSecStr = timeStr + 19;
+        _snprintf(milliSecStr, 5, ".%03d", static_cast<int32_t>(xt.nsec / 1000000));
+    }
+#else
+    void curTimeString(char* timeStr) {
+        struct timeval tv;
+        gettimeofday(&tv, NULL);
+        time_t_to_String(tv.tv_sec, timeStr);
+
+        char* milliSecStr = timeStr + 19;
+        snprintf(milliSecStr, 5, ".%03d", static_cast<int32_t>(tv.tv_usec / 1000));
+    }
+#endif
 
     // uses ISO 8601 dates without trailing Z
     // colonsOk should be false when creating filenames
@@ -247,12 +272,79 @@ namespace mongo {
         unsigned long long t = xt.nsec / 1000000;
         return ((unsigned long long) xt.sec * 1000) + t + getJSTimeVirtualSkew() + getJSTimeVirtualThreadSkew();
     }
+
+    static unsigned long long getFiletime() {
+        FILETIME ft;
+        GetSystemTimeAsFileTime(&ft);
+        return *reinterpret_cast<unsigned long long*>(&ft);
+    }
+
+    static unsigned long long getPerfCounter() {
+        LARGE_INTEGER li;
+        QueryPerformanceCounter(&li);
+        return li.QuadPart;
+    }
+
+    static unsigned long long baseFiletime = 0;
+    static unsigned long long basePerfCounter = 0;
+    static unsigned long long resyncInterval = 0;
+    static SimpleMutex _curTimeMicros64ReadMutex("curTimeMicros64Read");
+    static SimpleMutex _curTimeMicros64ResyncMutex("curTimeMicros64Resync");
+
+    static unsigned long long resyncTime() {
+        SimpleMutex::scoped_lock lkResync(_curTimeMicros64ResyncMutex);
+        unsigned long long ftOld;
+        unsigned long long ftNew;
+        ftOld = ftNew = getFiletime();
+        do {
+            ftNew = getFiletime();
+        } while (ftOld == ftNew);   // wait for filetime to change
+
+        unsigned long long newPerfCounter = getPerfCounter();
+
+        // Make sure that we use consistent values for baseFiletime and basePerfCounter.
+        //
+        SimpleMutex::scoped_lock lkRead(_curTimeMicros64ReadMutex);
+        baseFiletime = ftNew;
+        basePerfCounter = newPerfCounter;
+        resyncInterval = 60 * Timer::_countsPerSecond;
+        return newPerfCounter;
+    }
+
     unsigned long long curTimeMicros64() {
-        boost::xtime xt;
-        boost::xtime_get(&xt, MONGO_BOOST_TIME_UTC);
-        unsigned long long t = xt.nsec / 1000;
-        return (((unsigned long long) xt.sec) * 1000000) + t;
-    }    
+
+        // Get a current value for QueryPerformanceCounter; if it is not time to resync we will
+        // use this value.
+        //
+        unsigned long long perfCounter = getPerfCounter();
+
+        // Periodically resync the timer so that we don't let timer drift accumulate.  Testing
+        // suggests that we drift by about one microsecond per minute, so resynching once per
+        // minute should keep drift to no more than one microsecond.
+        //
+        if ((perfCounter - basePerfCounter) > resyncInterval) {
+            perfCounter = resyncTime();
+        }
+
+        // Make sure that we use consistent values for baseFiletime and basePerfCounter.
+        //
+        SimpleMutex::scoped_lock lkRead(_curTimeMicros64ReadMutex);
+
+        // Compute the current time in FILETIME format by adding our base FILETIME and an offset
+        // from that time based on QueryPerformanceCounter.  The math is (logically) to compute the
+        // fraction of a second elapsed since 'baseFiletime' by taking the difference in ticks
+        // and dividing by the tick frequency, then scaling this fraction up to units of 100
+        // nanoseconds to match the FILETIME format.  We do the multiplication first to avoid
+        // truncation while using only integer instructions.
+        //
+        unsigned long long computedTime = baseFiletime +
+                ((perfCounter - basePerfCounter) * 10 * 1000 * 1000) / Timer::_countsPerSecond;
+
+        // Convert the computed FILETIME into microseconds since the Unix epoch (1/1/1970).
+        //
+        return boost::date_time::winapi::file_time_to_microseconds(computedTime);
+    }
+
     unsigned curTimeMicros() {
         boost::xtime xt;
         boost::xtime_get(&xt, MONGO_BOOST_TIME_UTC);

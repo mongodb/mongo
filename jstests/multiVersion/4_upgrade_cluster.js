@@ -6,8 +6,8 @@ load( './jstests/multiVersion/libs/multi_rs.js' )
 load( './jstests/multiVersion/libs/multi_cluster.js' )
 load( './jstests/libs/test_background_ops.js' )
 
-var oldVersion = "2.0.6"
-var newVersion = "latest"
+var oldVersion = "2.0"
+var newVersion = "2.2"
 
 // BIG OUTER LOOP, RS CLUSTER OR NOT!
 for( var test = 0; test < 1; test++ ){
@@ -110,16 +110,21 @@ var joinShardedFindInsert =
 
 jsTest.log( "Upgrading cluster..." )
 
+var startTime = new Date();
+
 st.upgradeCluster( newVersion )
+
+var endTime = new Date();
 
 jsTest.log( "Cluster upgraded." )
 
 st.printShardingStatus()
 
+jsTest.log( "Cluster upgrade took " + ((endTime - startTime) / 1000) + 
+            " secs, sleeping for valid inserts" )
 
-// Allow more valid writes to go through
-sleep( 10 * 1000 )
-
+// Allow enough time for more valid writes to go through.
+sleep((endTime - startTime) * 3)
 
 joinFindInsert()
 joinShardedFindInsert()

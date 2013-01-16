@@ -20,6 +20,9 @@
  * For examples of basic usage, see mongo/unittest/unittest_test.cpp.
  */
 
+#pragma once
+
+#include <cmath>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -41,9 +44,19 @@
 /**
  * Fails unless "EXPRESSION" is true.
  */
-#define ASSERT_TRUE(EXPRESSION) ::mongo::unittest::TestAssertion( __FILE__, __LINE__ ).failUnless( \
-            (EXPRESSION), "Expected: " #EXPRESSION )
+#define ASSERT_TRUE(EXPRESSION) ::mongo::unittest::TestAssertion( __FILE__, __LINE__ ).failIf( \
+            !(EXPRESSION), "Expected: " #EXPRESSION )
 #define ASSERT(EXPRESSION) ASSERT_TRUE(EXPRESSION)
+
+/**
+ * Assert that a Status code is OK.
+ */
+#define ASSERT_OK(EXPRESSION) ASSERT_EQUALS(Status::OK(), (EXPRESSION))
+
+/**
+ * Assert that a status code is anything but OK.
+ */
+#define ASSERT_NOT_OK(EXPRESSION) ASSERT_NOT_EQUALS(Status::OK(), (EXPRESSION))
 
 /**
  * Fails if "EXPRESSION" is true.
@@ -68,6 +81,13 @@
  */
 #define _ASSERT_COMPARISON(COMPARISON, a, b) mongo::unittest::ComparisonAssertion( \
             #a, #b , __FILE__ , __LINE__ ).assert##COMPARISON( (a), (b) )
+
+/**
+ * Approximate equality assertion. Useful for comparisons on limited precision floating point
+ * values.
+ */
+#define ASSERT_APPROX_EQUAL(a,b,ABSOLUTE_ERR) ::mongo::unittest::assertApproxEqual( \
+            #a, #b, a, b, ABSOLUTE_ERR, __FILE__, __LINE__)
 
 /**
  * Verify that the evaluation of "EXPRESSION" throws an exception of type EXCEPTION_TYPE.
@@ -335,9 +355,6 @@ namespace mongo {
             void failIf( bool flag, const std::string &message ) const {
                 if ( flag ) fail( message );
             }
-            void failUnless( bool flag, const std::string& message ) const {
-                failIf( !flag, message );
-            }
 
         private:
             const std::string _file;
@@ -354,32 +371,44 @@ namespace mongo {
 
             template<typename A,typename B>
             void assertEqual( const A& a , const B& b ) {
-                failUnless(a == b, getComparisonFailureMessage("==", a, b));
+                if ( a == b )
+                    return;
+                fail(getComparisonFailureMessage("==", a, b));
             }
 
             template<typename A,typename B>
             void assertNotEqual( const A& a , const B& b ) {
-                failUnless(a != b, getComparisonFailureMessage("!=", a, b));
+                if ( a != b )
+                    return;
+                fail(getComparisonFailureMessage("!=", a, b));
             }
 
             template<typename A,typename B>
             void assertLessThan( const A& a , const B& b ) {
-                failUnless(a < b, getComparisonFailureMessage("<", a, b));
+                if ( a < b )
+                    return;
+                fail(getComparisonFailureMessage("<", a, b));
             }
 
             template<typename A,typename B>
             void assertNotLessThan( const A& a , const B& b ) {
-                failUnless(a >= b, getComparisonFailureMessage(">=", a, b));
+                if ( a >= b )
+                    return;
+                fail(getComparisonFailureMessage(">=", a, b));
             }
 
             template<typename A,typename B>
             void assertGreaterThan( const A& a , const B& b ) {
-                failUnless(a > b, getComparisonFailureMessage(">", a, b));
+                if ( a > b )
+                    return;
+                fail(getComparisonFailureMessage(">", a, b));
             }
 
             template<typename A,typename B>
             void assertNotGreaterThan( const A& a , const B& b ) {
-                failUnless(a <= b, getComparisonFailureMessage("<=", a, b));
+                if ( a <= b )
+                    return;
+                fail(getComparisonFailureMessage("<=", a, b));
             }
 
         private:
@@ -390,6 +419,20 @@ namespace mongo {
             std::string _aexp;
             std::string _bexp;
         };
+
+        /**
+         * Helper for ASSERT_APPROX_EQUAL to ensure that the arguments are evaluated only once.
+         */
+        template < typename A, typename B, typename ABSOLUTE_ERR >
+        inline void assertApproxEqual(const std::string& aexp, const std::string& bexp,
+                                      const A& a, const B& b, const ABSOLUTE_ERR& absoluteErr,
+                                      const std::string& file , unsigned line) {
+            if (std::abs(a - b) <= absoluteErr)
+                return;
+            TestAssertion(file, line).fail(mongoutils::str::stream()
+                    << "Expected " << aexp << " and " << bexp << " to be within " << absoluteErr
+                    << " of each other ((" << a << ") - (" << b << ") = " << (a - b) << ")");
+        }
 
         /**
          * Hack to support the runaway test observer in dbtests.  This is a hook that

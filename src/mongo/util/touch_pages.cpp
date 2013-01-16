@@ -23,6 +23,7 @@
 #include <string>
 
 #include "mongo/db/curop.h"
+#include "mongo/db/kill_current_op.h"
 #include "mongo/db/pdfile.h"
 #include "mongo/db/database.h"
 #include "mongo/util/mmap.h"
@@ -41,7 +42,7 @@ namespace mongo {
         Client::ReadContext ctx(ns);
         {
 
-            NamespaceDetails *nsd = nsdetails(ns.c_str());
+            NamespaceDetails *nsd = nsdetails(ns);
             uassert( 16154, "namespace does not exist", nsd );
             
             for( DiskLoc L = nsd->firstExtent; !L.isNull(); L = L.ext()->xnext )  {
@@ -60,7 +61,9 @@ namespace mongo {
         LockMongoFilesShared lk;
         Lock::TempRelease tr;
         std::string progress_msg = "touch " + ns + " extents";
-        ProgressMeterHolder pm( cc().curop()->setMessage( progress_msg.c_str() , ranges.size() ) );
+        ProgressMeterHolder pm(cc().curop()->setMessage(progress_msg.c_str(),
+                                                        "Touch Progress",
+                                                        ranges.size()));
         for ( std::vector< touch_location >::iterator it = ranges.begin(); it != ranges.end(); ++it ) {
             touch_pages( it->fd, it->offset, it->length, it->ext );
             pm.hit();

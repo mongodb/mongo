@@ -45,7 +45,7 @@ namespace mongo {
          * removes db entry.
          * on next getDBConfig call will fetch from db
          */
-        void removeDB( string db );
+        void removeDB( const std::string& db );
 
         /**
          * removes db entry - only this DBConfig object will be removed,
@@ -76,10 +76,10 @@ namespace mongo {
 
         /**
          *
-         * addShard will create a new shard in the grid. It expects a mongod process to be runing
+         * addShard will create a new shard in the grid. It expects a mongod process to be running
          * on the provided address. Adding a shard that is a replica set is supported.
          *
-         * @param name is an optional string with the name of the shard. if ommited, grid will
+         * @param name is an optional string with the name of the shard. if omitted, grid will
          *        generate one and update the parameter.
          * @param servers is the connection string of the shard being added
          * @param maxSize is the optional space quota in bytes. Zeros means there's no limitation to
@@ -106,7 +106,7 @@ namespace mongo {
          * @param name identifies a particular type of configuration data.
          * @return a BSON object containing the requested data.
          */
-        BSONObj getConfigSetting( string name ) const;
+        BSONObj getConfigSetting( const std::string& name ) const;
 
         unsigned long long getNextOpTime() const;
         

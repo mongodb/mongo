@@ -53,7 +53,7 @@ function jsToH( fso, outputFileNameString, inputFileNameStringArray ) {
     }
     displayString += '] );'
     WScript.Echo( displayString );
-    var h = ['#include "bson/stringdata.h"'
+    var h = ['#include "mongo/base/string_data.h"'
          , 'namespace mongo {'
          , 'struct JSFile{ const char* name; const StringData& source; };'
          , 'namespace JSFiles{'

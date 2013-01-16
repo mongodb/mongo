@@ -22,6 +22,7 @@
 
 #include "jsobj.h"
 #include "pcrecpp.h"
+#include "mongo/db/geo/geoquery.h"
 
 namespace mongo {
 
@@ -33,6 +34,13 @@ namespace mongo {
 
     class RegexMatcher {
     public:
+        /**
+         * Maximum pattern size which pcre v8.3 can do matches correctly with
+         * LINK_SIZE define macro set to 2 @ pcre's config.h (based on
+         * experiments)
+         */
+        static const size_t MaxPatternSize = 32764;
+
         const char *_fieldName;
         const char *_regex;
         const char *_flags;
@@ -40,6 +48,21 @@ namespace mongo {
         shared_ptr< pcrecpp::RE > _re;
         bool _isNot;
         RegexMatcher() : _isNot() {}
+    };
+
+    struct GeoMatcher {
+    public:
+        GeoMatcher(GeoQuery query, bool negated) : geoQuery(query), isNot(negated) {}
+
+        string getField() const { return geoQuery.getField(); }
+
+        bool matches(BSONObj obj) const {
+            bool satisfied = geoQuery.satisfiesPredicate(obj);
+            if (isNot) { return !satisfied; }
+            else { return satisfied; }
+        }
+        GeoQuery geoQuery;
+        bool isNot;
     };
 
     struct element_lt {
@@ -213,13 +236,25 @@ namespace mongo {
          * value as the provided doc matcher.
          */
         bool keyMatch( const Matcher &docMatcher ) const;
-        
+
         bool singleSimpleCriterion() const {
-            return false; // TODO SERVER-958
-//            // TODO Really check, especially if all basics are ok.
-//            // $all, etc
-//            // _orConstraints?
-//            return ( ( basics.size() + nRegex ) < 2 ) && !where && !_orMatchers.size() && !_norMatchers.size();
+            if ( _where ||
+                 _basics.size() > 1 ||
+                 _haveNeg ||
+                 _haveSize ||
+                 _regexs.size() > 0 )
+                return false;
+
+            if ( _jsobj.nFields() > 1 )
+                return false;
+
+            if ( _basics.size() != 1 )
+                return false;
+
+            if ( strchr( _jsobj.firstElement().fieldName(), '.' ) )
+                return false;
+
+            return _basics[0]._compareOp == BSONObj::Equality;
         }
 
         const BSONObj *getQuery() const { return &_jsobj; };
@@ -266,6 +301,7 @@ namespace mongo {
         bool _atomic;
 
         vector<RegexMatcher> _regexs;
+        vector<GeoMatcher> _geo;
 
         // so we delete the mem when we're done:
         vector< shared_ptr< BSONObjBuilder > > _builders;

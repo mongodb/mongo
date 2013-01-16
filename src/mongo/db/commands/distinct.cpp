@@ -1,6 +1,7 @@
 // distinct.cpp
 
 /**
+*    Copyright (C) 2012 10gen Inc.
 *
 *    This program is free software: you can redistribute it and/or  modify
 *    it under the terms of the GNU Affero General Public License, version 3,
@@ -15,11 +16,19 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-//#include "pch.h"
-#include "../commands.h"
-#include "../instance.h"
-#include "../clientcursor.h"
-#include "../../util/timer.h"
+#include <string>
+#include <vector>
+
+#include "mongo/db/auth/action_set.h"
+#include "mongo/db/auth/action_type.h"
+#include "mongo/db/auth/authorization_manager.h"
+#include "mongo/db/auth/privilege.h"
+#include "mongo/db/clientcursor.h"
+#include "mongo/db/commands.h"
+#include "mongo/db/instance.h"
+#include "mongo/db/jsobj.h"
+#include "mongo/db/kill_current_op.h"
+#include "mongo/util/timer.h"
 
 namespace mongo {
 
@@ -28,6 +37,13 @@ namespace mongo {
         DistinctCommand() : Command("distinct") {}
         virtual bool slaveOk() const { return true; }
         virtual LockType locktype() const { return READ; }
+        virtual void addRequiredPrivileges(const std::string& dbname,
+                                           const BSONObj& cmdObj,
+                                           std::vector<Privilege>* out) {
+            ActionSet actions;
+            actions.addAction(ActionType::find);
+            out->push_back(Privilege(parseNs(dbname, cmdObj), actions));
+        }
         virtual void help( stringstream &help ) const {
             help << "{ distinct : 'collection name' , key : 'a.b' , query : {} }";
         }
@@ -53,7 +69,7 @@ namespace mongo {
             long long n = 0; // matches
             MatchDetails md;
 
-            NamespaceDetails * d = nsdetails( ns.c_str() );
+            NamespaceDetails * d = nsdetails( ns );
 
             if ( ! d ) {
                 result.appendArray( "values" , BSONObj() );

@@ -55,8 +55,9 @@ MongodRunner.prototype.port = function() { return this.port_; }
 
 MongodRunner.prototype.toString = function() { return [ this.port_, this.dbpath_, this.peer_, this.arbiter_ ].toString(); }
 
-ToolTest = function( name ){
+ToolTest = function( name, extraOptions ){
     this.name = name;
+    this.options = extraOptions;
     this.port = allocatePorts(1)[0];
     this.baseName = "jstests_tool_" + name;
     this.root = "/data/db/" + this.baseName;
@@ -69,8 +70,17 @@ ToolTest = function( name ){
 
 ToolTest.prototype.startDB = function( coll ){
     assert( ! this.m , "db already running" );
- 
-    this.m = startMongoProgram( "mongod" , "--port", this.port , "--dbpath" , this.dbpath , "--nohttpinterface", "--noprealloc" , "--smallfiles" , "--bind_ip", "127.0.0.1" );
+
+    var options = {port : this.port,
+                   dbpath : this.dbpath,
+                   nohttpinterface : "",
+                   noprealloc : "",
+                   smallfiles : "",
+                   bind_ip : "127.0.0.1"};
+
+    Object.extend(options, this.options);
+
+    this.m = startMongoProgram.apply(null, MongoRunner.arrOptions("mongod", options));
     this.db = this.m.getDB( this.baseName );
     if ( coll )
         return this.db.getCollection( coll );
@@ -258,14 +268,19 @@ function startParallelShell( jsCode, port ){
         args.push("--port", port);
     }
 
+    if (typeof(db) == "object") {
+        jsCode = "db = db.getSiblingDB('" + db.getName() + "');" + jsCode;
+    }
+
     if (TestData) {
-        jsCode = "TestData = " + tojson(TestData) + ";jsTest.authenticate(db.getMongo());" + jsCode;
+        jsCode = "TestData = " + tojson(TestData) + ";" + jsCode;
     }
 
     args.push("--eval", jsCode);
 
     if (typeof db == "object") {
-        args.push(db.getMongo().host);
+        // Must start connected to admin DB so auth works when running tests with auth.
+        args.push(db.getMongo().host + "/admin");
     }
 
     x = startMongoProgramNoConnect.apply(null, args);

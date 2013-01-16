@@ -618,15 +618,15 @@ namespace ThreadedTests {
             sleepmillis(100*x);
 
             int Z = 1;
-            log(Z) << x << ' ' << what[x] << " request" << endl;
+            LOG(Z) << x << ' ' << what[x] << " request" << endl;
             char ch = what[x];
             switch( ch ) { 
             case 'w':
                 {
                     m.lock();
-                    log(Z) << x << " w got" << endl;
+                    LOG(Z) << x << " w got" << endl;
                     sleepmillis(100);
-                    log(Z) << x << " w unlock" << endl;
+                    LOG(Z) << x << " w unlock" << endl;
                     m.unlock();
                 }
                 break;
@@ -635,7 +635,7 @@ namespace ThreadedTests {
                 {
                     Timer t;
                     RWLock::Upgradable u(m);
-                    log(Z) << x << ' ' << ch << " got" << endl;
+                    LOG(Z) << x << ' ' << ch << " got" << endl;
                     if( ch == 'U' ) {
 #ifdef MONGO_USE_SRW_ON_WINDOWS
                         // SRW locks are neither fair nor FIFO, as per docs
@@ -654,7 +654,7 @@ namespace ThreadedTests {
                         }
                     }
                     sleepsecs(1);
-                    log(Z) << x << ' ' << ch << " unlock" << endl;
+                    LOG(Z) << x << ' ' << ch << " unlock" << endl;
                 }
                 break;
             case 'r':
@@ -662,7 +662,7 @@ namespace ThreadedTests {
                 {
                     Timer t;
                     m.lock_shared();
-                    log(Z) << x << ' ' << ch << " got " << endl;
+                    LOG(Z) << x << ' ' << ch << " got " << endl;
                     if( what[x] == 'R' ) {
                         if( t.millis() > 15 ) { 
                             // commented out for less chatter, we aren't using upgradeable anyway right now: 
@@ -670,7 +670,7 @@ namespace ThreadedTests {
                         }
                     }
                     sleepmillis(200);
-                    log(Z) << x << ' ' << ch << " unlock" << endl;
+                    LOG(Z) << x << ' ' << ch << " unlock" << endl;
                     m.unlock_shared();
                 }
                 break;
@@ -822,24 +822,24 @@ namespace ThreadedTests {
             int Z = 0;
             Client::initThread("utest");
             if( x == 1 ) { 
-                log(Z) << mongo::curTimeMillis64() % 10000 << " 1" << endl;
+                LOG(Z) << mongo::curTimeMillis64() % 10000 << " 1" << endl;
                 rwlock_shared lk(m);
                 sleepmillis(300);
-                log(Z) << mongo::curTimeMillis64() % 10000 << " 1x" << endl;
+                LOG(Z) << mongo::curTimeMillis64() % 10000 << " 1x" << endl;
             }
             if( x == 2 ) {
                 sleepmillis(100);
-                log(Z) << mongo::curTimeMillis64() % 10000 << " 2" << endl;
+                LOG(Z) << mongo::curTimeMillis64() % 10000 << " 2" << endl;
                 rwlock lk(m, true);
-                log(Z) << mongo::curTimeMillis64() % 10000 << " 2x" << endl;
+                LOG(Z) << mongo::curTimeMillis64() % 10000 << " 2x" << endl;
             }
             if( x == 3 ) {
                 sleepmillis(200);
                 Timer t;
-                log(Z) << mongo::curTimeMillis64() % 10000 << " 3" << endl;
+                LOG(Z) << mongo::curTimeMillis64() % 10000 << " 3" << endl;
                 rwlock_shared lk(m);
-                log(Z) << mongo::curTimeMillis64() % 10000 << " 3x" << endl;
-                log(Z) << t.millis() << endl;
+                LOG(Z) << mongo::curTimeMillis64() % 10000 << " 3x" << endl;
+                LOG(Z) << t.millis() << endl;
                 ASSERT( t.millis() > 50 );
             }
             cc().shutdown();
@@ -859,18 +859,18 @@ namespace ThreadedTests {
             int Z = 0;
             Client::initThread("qtest");
             if( x == 1 ) { 
-                log(Z) << mongo::curTimeMillis64() % 10000 << " 1 lock_r()..." << endl;
+                LOG(Z) << mongo::curTimeMillis64() % 10000 << " 1 lock_r()..." << endl;
                 m.lock_r();
-                log(Z) << mongo::curTimeMillis64() % 10000 << " 1            got" << endl;
+                LOG(Z) << mongo::curTimeMillis64() % 10000 << " 1            got" << endl;
                 sleepmillis(300);
                 m.unlock_r();
-                log(Z) << mongo::curTimeMillis64() % 10000 << " 1 unlock_r()" << endl;
+                LOG(Z) << mongo::curTimeMillis64() % 10000 << " 1 unlock_r()" << endl;
             }
             if( x == 2 || x == 4 ) {
                 sleepmillis(x*50);
-                log(Z) << mongo::curTimeMillis64() % 10000 << " 2 lock_W()..." << endl;
+                LOG(Z) << mongo::curTimeMillis64() % 10000 << " 2 lock_W()..." << endl;
                 m.lock_W();
-                log(Z) << mongo::curTimeMillis64() % 10000 << " 2            got" << endl;
+                LOG(Z) << mongo::curTimeMillis64() % 10000 << " 2            got" << endl;
                 gotW = true;
                 m.unlock_W();
             }
@@ -878,12 +878,12 @@ namespace ThreadedTests {
                 sleepmillis(200);
 
                 Timer t;
-                log(Z) << mongo::curTimeMillis64() % 10000 << " 3 lock_r()..." << endl;
+                LOG(Z) << mongo::curTimeMillis64() % 10000 << " 3 lock_r()..." << endl;
                 m.lock_r();
                 verify( gotW );
-                log(Z) << mongo::curTimeMillis64() % 10000 << " 3            got" << gotW << endl;
+                LOG(Z) << mongo::curTimeMillis64() % 10000 << " 3            got" << gotW << endl;
                 m.unlock_r();
-                log(Z) << t.millis() << endl;
+                LOG(Z) << t.millis() << endl;
                 ASSERT( t.millis() > 50 );
             }
             cc().shutdown();

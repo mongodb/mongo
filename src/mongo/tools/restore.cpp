@@ -25,10 +25,11 @@
 #include <fstream>
 #include <set>
 
+#include "mongo/base/initializer.h"
 #include "mongo/db/namespacestring.h"
 #include "mongo/tools/tool.h"
 #include "mongo/util/mmap.h"
-#include "mongo/util/version.h"
+#include "mongo/util/stringutils.h"
 #include "mongo/db/json.h"
 #include "mongo/client/dbclientcursor.h"
 
@@ -78,9 +79,14 @@ public:
     virtual int doRun() {
 
         // authenticate
-        enum Auth::Level authLevel = Auth::NONE;
-        auth("", &authLevel);
-        uassert(15935, "user does not have write access", authLevel == Auth::WRITE);
+        if (hasParam("dbpath")) {
+            warning() << "Skipping authentication checks because we are restoring directly to the "
+                "file system using --dbpath" << endl;
+        } else {
+            enum Auth::Level authLevel = Auth::NONE;
+            auth("", &authLevel);
+            uassert(15935, "user does not have write access", authLevel == Auth::WRITE);
+        }
 
         boost::filesystem::path root = getParam("dir");
 
@@ -98,7 +104,7 @@ public:
         _keepIndexVersion = hasParam("keepIndexVersion");
         _restoreOptions = !hasParam("noOptionsRestore");
         _restoreIndexes = !hasParam("noIndexRestore");
-        _w = getParam( "w" , 1 );
+        _w = getParam( "w" , 0 );
 
         bool doOplog = hasParam( "oplogReplay" );
 
@@ -159,7 +165,7 @@ public:
         drillDown(root, _db != "", _coll != "", true);
 
         // should this happen for oplog replay as well?
-        conn().getLastError();
+        conn().getLastError(_db == "" ? "admin" : _db);
 
         if (doOplog) {
             log() << "\t Replaying oplog" << endl;
@@ -171,10 +177,11 @@ public:
     }
 
     void drillDown( boost::filesystem::path root, bool use_db, bool use_coll, bool top_level=false ) {
-        log(2) << "drillDown: " << root.string() << endl;
+        bool json_metadata = false;
+        LOG(2) << "drillDown: " << root.string() << endl;
 
         // skip hidden files and directories
-        if (root.leaf()[0] == '.' && root.leaf() != ".")
+        if (root.leaf().string()[0] == '.' && root.leaf().string() != ".")
             return;
 
         if ( is_directory( root ) ) {
@@ -203,6 +210,11 @@ public:
                     }
                 }
 
+                // Ignore system.indexes.bson if we have *.metadata.json files
+                if ( endsWith( p.string().c_str() , ".metadata.json" ) ) {
+                    json_metadata = true;
+                }
+
                 // don't insert oplog
                 if (top_level && !use_db && p.leaf() == "oplog.bson")
                     continue;
@@ -214,8 +226,9 @@ public:
                 }
             }
 
-            if (!indexes.empty())
+            if (!indexes.empty() && !json_metadata) {
                 drillDown(indexes, use_db, use_coll);
+            }
 
             return;
         }
@@ -243,19 +256,14 @@ public:
             ns += _db;
         }
         else {
-            string dir = root.branch_path().string();
-            if ( dir.find( "/" ) == string::npos )
-                ns += dir;
-            else
-                ns += dir.substr( dir.find_last_of( "/" ) + 1 );
-
-            if ( ns.size() == 0 )
+            ns = root.parent_path().filename().string();
+            if (ns.empty())
                 ns = "test";
         }
 
         verify( ns.size() );
 
-        string oldCollName = root.leaf(); // Name of the collection that was dumped from
+        string oldCollName = root.leaf().string(); // Name of the collection that was dumped from
         oldCollName = oldCollName.substr( 0 , oldCollName.find_last_of( "." ) );
         if (use_coll) {
             ns += "." + _coll;
@@ -287,7 +295,7 @@ public:
             if (!boost::filesystem::exists(metadataFile.string())) {
                 // This is fine because dumps from before 2.1 won't have a metadata file, just print a warning.
                 // System collections shouldn't have metadata so don't warn if that file is missing.
-                if (!startsWith(metadataFile.leaf(), "system.")) {
+                if (!startsWith(metadataFile.leaf().string(), "system.")) {
                     log() << metadataFile.string() << " not found. Skipping." << endl;
                 }
             } else {
@@ -352,8 +360,8 @@ public:
             conn().runCommand(db, cmd, out);
 
             // wait for ops to propagate to "w" nodes (doesn't warn if w used without replset)
-            if ( _w > 1 ) {
-                conn().getLastError(false, false, _w);
+            if ( _w > 0 ) {
+                conn().getLastError(db, false, false, _w);
             }
         }
         else if ( endsWith( _curns.c_str() , ".system.indexes" )) {
@@ -369,8 +377,8 @@ public:
             conn().insert( _curns , obj );
 
             // wait for insert to propagate to "w" nodes (doesn't warn if w used without replset)
-            if ( _w > 1 ) {
-                conn().getLastErrorDetailed(false, false, _w);
+            if ( _w > 0 ) {
+                conn().getLastErrorDetailed(_curdb, false, false, _w);
             }
         }
     }
@@ -474,28 +482,37 @@ private:
             }
         }
         BSONObj o = bo.obj();
-        log(0) << "\tCreating index: " << o << endl;
+        LOG(0) << "\tCreating index: " << o << endl;
         conn().insert( _curdb + ".system.indexes" ,  o );
 
         // We're stricter about errors for indexes than for regular data
-        BSONObj err = conn().getLastErrorDetailed(false, false, _w);
+        BSONObj err = conn().getLastErrorDetailed(_curdb, false, false, _w);
 
-        if ( ! ( err["err"].isNull() ) ) {
-            if (err["err"].String() == "norepl" && _w > 1) {
+        if (err.hasField("err") && !err["err"].isNull()) {
+            if (err["err"].str() == "norepl" && _w > 1) {
                 error() << "Cannot specify write concern for non-replicas" << endl;
             }
             else {
-                error() << "Error creating index " << o["ns"].String();
-                error() << ": " << err["code"].Int() << " " << err["err"].String() << endl;
-                error() << "To resume index restoration, run " << _name << " on file" << _fileName << " manually." << endl;
+                string errCode;
+
+                if (err.hasField("code")) {
+                    errCode = str::stream() << err["code"].numberInt();
+                }
+
+                error() << "Error creating index " << o["ns"].String() << ": "
+                        << errCode << " " << err["err"] << endl;
             }
 
             ::abort();
         }
+
+        massert(16441, str::stream() << "Error calling getLastError: " << err["errmsg"],
+                err["ok"].trueValue());
     }
 };
 
-int main( int argc , char ** argv ) {
+int main( int argc , char ** argv, char ** envp ) {
+    mongo::runGlobalInitializersOrDie(argc, argv, envp);
     Restore restore;
     return restore.main( argc , argv );
 }
