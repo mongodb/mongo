@@ -64,26 +64,33 @@ __wt_col_append_serial(
 
 	__wt_spin_lock(session, &S2C(session)->serial_lock);
 	ret = __wt_col_append_serial_func(session, args);
-	__wt_spin_unlock(session, &S2C(session)->serial_lock);
 
+	/* Increment in-memory footprint before decrement is possible. */
 	incr_mem = 0;
 	if (args->new_inslist_taken) {
 		WT_ASSERT(session, new_inslist_size != 0);
 		incr_mem += new_inslist_size;
-	} else
-		__wt_free(session, args->new_inslist);
+	}
 	if (args->new_inshead_taken) {
 		WT_ASSERT(session, new_inshead_size != 0);
 		incr_mem += new_inshead_size;
-	} else
-		__wt_free(session, args->new_inshead);
+	}
 	if (args->new_ins_taken) {
 		WT_ASSERT(session, new_ins_size != 0);
 		incr_mem += new_ins_size;
-	} else
-		__wt_free(session, args->new_ins);
+	}
 	if (incr_mem != 0)
 		__wt_cache_page_inmem_incr(session, page, incr_mem);
+
+	__wt_spin_unlock(session, &S2C(session)->serial_lock);
+
+	/* Free any unused memory after releasing serialization mutex. */
+	if (!args->new_inslist_taken)
+		__wt_free(session, args->new_inslist);
+	if (!args->new_inshead_taken)
+		__wt_free(session, args->new_inshead);
+	if (!args->new_ins_taken)
+		__wt_free(session, args->new_ins);
 
 	return (ret);
 }
@@ -196,26 +203,33 @@ __wt_insert_serial(
 
 	__wt_spin_lock(session, &S2C(session)->serial_lock);
 	ret = __wt_insert_serial_func(session, args);
-	__wt_spin_unlock(session, &S2C(session)->serial_lock);
 
+	/* Increment in-memory footprint before decrement is possible. */
 	incr_mem = 0;
 	if (args->new_inslist_taken) {
 		WT_ASSERT(session, new_inslist_size != 0);
 		incr_mem += new_inslist_size;
-	} else
-		__wt_free(session, args->new_inslist);
+	}
 	if (args->new_inshead_taken) {
 		WT_ASSERT(session, new_inshead_size != 0);
 		incr_mem += new_inshead_size;
-	} else
-		__wt_free(session, args->new_inshead);
+	}
 	if (args->new_ins_taken) {
 		WT_ASSERT(session, new_ins_size != 0);
 		incr_mem += new_ins_size;
-	} else
-		__wt_free(session, args->new_ins);
+	}
 	if (incr_mem != 0)
 		__wt_cache_page_inmem_incr(session, page, incr_mem);
+
+	__wt_spin_unlock(session, &S2C(session)->serial_lock);
+
+	/* Free any unused memory after releasing serialization mutex. */
+	if (!args->new_inslist_taken)
+		__wt_free(session, args->new_inslist);
+	if (!args->new_inshead_taken)
+		__wt_free(session, args->new_inshead);
+	if (!args->new_ins_taken)
+		__wt_free(session, args->new_ins);
 
 	return (ret);
 }
@@ -279,7 +293,6 @@ __wt_sync_file_serial(
 	__wt_spin_lock(session, &S2C(session)->serial_lock);
 	ret = __wt_sync_file_serial_func(session, args);
 	__wt_spin_unlock(session, &S2C(session)->serial_lock);
-
 	return (ret);
 }
 
@@ -342,21 +355,27 @@ __wt_update_serial(
 
 	__wt_spin_lock(session, &S2C(session)->serial_lock);
 	ret = __wt_update_serial_func(session, args);
-	__wt_spin_unlock(session, &S2C(session)->serial_lock);
 
+	/* Increment in-memory footprint before decrement is possible. */
 	incr_mem = 0;
 	if (args->new_upd_taken) {
 		WT_ASSERT(session, new_upd_size != 0);
 		incr_mem += new_upd_size;
-	} else
-		__wt_free(session, args->new_upd);
+	}
 	if (args->upd_taken) {
 		WT_ASSERT(session, upd_size != 0);
 		incr_mem += upd_size;
-	} else
-		__wt_free(session, args->upd);
+	}
 	if (incr_mem != 0)
 		__wt_cache_page_inmem_incr(session, page, incr_mem);
+
+	__wt_spin_unlock(session, &S2C(session)->serial_lock);
+
+	/* Free any unused memory after releasing serialization mutex. */
+	if (!args->new_upd_taken)
+		__wt_free(session, args->new_upd);
+	if (!args->upd_taken)
+		__wt_free(session, args->upd);
 
 	return (ret);
 }

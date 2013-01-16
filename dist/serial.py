@@ -86,7 +86,6 @@ typedef struct {
 			f.write('\tint ' + l.name + '_taken;\n')
 	f.write('} __wt_' + entry.name + '_args;\n\n')
 
-	# pack function
 	f.write('static inline int\n__wt_' + entry.name + '_serial(\n')
 	o = 'WT_SESSION_IMPL *session'
 	for l in entry.args:
@@ -118,9 +117,11 @@ typedef struct {
 			f.write('\targs->' + l.name + ' = ' + l.name + ';\n\n')
 	f.write('\t__wt_spin_lock(session, &S2C(session)->serial_lock);\n')
 	f.write('\tret = __wt_' + entry.name + '_serial_func(session, args);\n')
-	f.write('\t__wt_spin_unlock(session, &S2C(session)->serial_lock);\n\n')
 
 	if sizes:
+		f.write('''
+\t/* Increment in-memory footprint before decrement is possible. */
+''')
 		f.write('\tincr_mem = 0;\n')
 		for l in entry.args:
 			if not l.sized:
@@ -129,13 +130,24 @@ typedef struct {
 			f.write('\t\tWT_ASSERT(session, ' +
 			    l.name + '_size != 0);\n')
 			f.write('\t\tincr_mem += ' + l.name + '_size;\n')
-			f.write('\t} else\n')
-			f.write(
-			    '\t\t__wt_free(session, args->' + l.name + ');\n')
+			f.write('\t}\n')
 		f.write('''\tif (incr_mem != 0)
 \t\t__wt_cache_page_inmem_incr(session, page, incr_mem);
 
 ''')
+	f.write('\t__wt_spin_unlock(session, &S2C(session)->serial_lock);\n')
+
+	if sizes:
+		f.write('''
+\t/* Free any unused memory after releasing serialization mutex. */
+''')
+		for l in entry.args:
+			if not l.sized:
+				continue
+			f.write('\tif (!args->' + l.name + '_taken)\n')
+			f.write(
+			    '\t\t__wt_free(session, args->' + l.name + ');\n')
+		f.write('\n')
 
 	f.write('\treturn (ret);\n')
 	f.write('}\n\n')
