@@ -355,18 +355,20 @@ methods = {
 		number key; valid only for cursors with record number keys''',
 		type='boolean'),
 	Config('bulk', 'false', r'''
-		configure the cursor for bulk loads, a fast load path that may
-		only be used for newly created objects. Cursors configured for
-		bulk load only support the WT_CURSOR::insert and
-		WT_CURSOR::close methods.  The value is usually a true/false
-		flag, but the the special value \c "bitmap" is for use with
-		fixed-length column stores, and allows chunks of a memory
-		resident bitmap to be loaded directly into a file by passing a
-		\c WT_ITEM to WT_CURSOR::set_value where the \c size field
-		indicates the number of records in the bitmap (as specified by
-		the file's \c value_format). Bulk load bitmap values must end
-		on a byte boundary relative to the bit count - except for the
-		last set of values loaded''',
+		configure the cursor for bulk loads, a fast, initial load
+		path.  Bulk load may only be used for newly created objects,
+		and in the case of row-store objects, key/value items must
+		be loaded in sorted order.  Cursors configured for bulk load
+		only support the WT_CURSOR::insert and WT_CURSOR::close
+		methods.  The value is usually a true/false flag, but the the
+		special value \c "bitmap" is for use with fixed-length column
+		stores, and allows chunks of a memory resident bitmap to be
+		loaded directly into a file by passing a \c WT_ITEM to
+		WT_CURSOR::set_value where the \c size field indicates the
+		number of records in the bitmap (as specified by the file's
+		\c value_format). Bulk load bitmap values must end on a byte
+		boundary relative to the bit count (except for the last set
+		of values loaded)''',
 		type='string'),
 	Config('checkpoint', '', r'''
 		the name of a checkpoint to open (the reserved name
