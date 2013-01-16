@@ -2507,7 +2507,7 @@ namespace mongo {
         else {
             if (rhs.getType()) {
                 uasserted(16614, str::stream() << "cant $subtract a Date from a "
-                                               << typeName(rhs.getType()));
+                                               << typeName(lhs.getType()));
             }
 
             uasserted(16556, "$subtract only supports numeric or Date types");

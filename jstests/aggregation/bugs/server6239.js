@@ -32,3 +32,11 @@ test({$add: ['$num', '$date']}, new Date(millis + num));
 // addition supports any number of arguments
 test({$add: ['$date']}, new Date(millis));
 test({$add: ['$num', '$date', '$num']}, new Date(millis + num + num));
+
+// test error message
+var errmsg = db.runCommand({aggregate: "s6239", pipeline: [
+  {$project: {error:
+    {$subtract: ['$num', '$date']}
+  }}
+]}).errmsg;
+assert.eq(errmsg, "exception: cant $subtract a Date from a NumberDouble")
