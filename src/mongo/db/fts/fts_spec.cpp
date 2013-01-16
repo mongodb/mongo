@@ -265,13 +265,13 @@ namespace mongo {
                 if ( e.eoo() )
                     return Status( ErrorCodes::BadValue,
                                    str::stream()
-                                   << "need have an eaulity filter on: "
+                                   << "need have an equality filter on: "
                                    << extraBefore(i) );
 
                 if ( e.isABSONObj() && e.Obj().firstElement().getGtLtOp( -1 ) != -1 )
                     return Status( ErrorCodes::BadValue,
                                    str::stream()
-                                   << "need have an eaulity filter on: "
+                                   << "need have an equality filter on: "
                                    << extraBefore(i) );
 
                 b.append( e );
