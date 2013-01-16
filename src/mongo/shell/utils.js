@@ -1598,6 +1598,9 @@ shellHelper.show = function (what) {
         if (dbDeclared) {
             var res = db.adminCommand( { getLog : "startupWarnings" } );
             if ( res.ok ) {
+                if (res.log.length == 0) {
+                    return "";
+                }
                 print( "Server has startup warnings: " );
                 for ( var i=0; i<res.log.length; i++){
                     print( res.log[i] )
