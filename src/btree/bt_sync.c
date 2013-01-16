@@ -61,18 +61,11 @@ __wt_bt_cache_op(WT_SESSION_IMPL *session, WT_CKPT *ckptbase, int op)
 	WT_PUBLISH(btree->ckpt, ckptbase);
 
 	switch (op) {
+	case WT_SYNC_CHECKPOINT:
+		WT_ERR(__wt_sync_file(session, WT_SYNC_CHECKPOINT));
+		break;
 	case WT_SYNC_COMPACT:
 		WT_ERR(__wt_sync_file(session, WT_SYNC_COMPACT));
-		break;
-	case WT_SYNC_INTERNAL:
-	case WT_SYNC_LEAF:
-		/*
-		 * For ordinary checkpoints, first write the dirty leaf pages
-		 * before doing the full flush of internal pages later (which
-		 * locks out eviction of dirty pages).
-		 */
-		WT_ERR(__wt_sync_file(session, WT_SYNC_LEAF));
-		WT_ERR(__wt_sync_file(session, WT_SYNC_INTERNAL));
 		break;
 	case WT_SYNC_DISCARD:
 	case WT_SYNC_DISCARD_NOWRITE:

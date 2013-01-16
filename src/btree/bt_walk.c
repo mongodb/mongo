@@ -245,18 +245,16 @@ descend:	for (;;) {
 			/*
 			 * There are several reasons to walk an in-memory tree:
 			 *
-			 * (1) to write all dirty leaf nodes;
-			 * (2) to find pages to evict;
-			 * (3) to find pages for compaction; and
-			 * (4) to write internal nodes (creating a checkpoint);
-			 * (5) to close a file, discarding pages;
-			 * (6) to perform cursor scans.
+			 * (1) to find pages to evict;
+			 * (2) to write internal nodes (checkpoint, compaction);
+			 * (3) to write all dirty leaf nodes;
+			 * (4) to close a file, discarding pages;
+			 * (5) to perform cursor scans.
 			 *
-			 * For cases (2)-(4), we want all ordinary in-memory
-			 * pages, and we swap the state to WT_REF_EVICT_WALK
-			 * temporarily to avoid the page being evicted by
-			 * another thread while it is being evaluated.  The
-			 * other cases use __wt_page_in to get hazard pointers
+			 * For cases 1 and 2, "eviction" is configured and we
+			 * swap the state to WT_REF_EVICT_WALK temporarily to
+			 * mark the page and to avoid the page being evicted by
+			 * another thread.  The other cases get hazard pointers
 			 * and protect the page from eviction that way.
 			 */
 			set_read_gen = 0;

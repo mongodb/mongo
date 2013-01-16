@@ -97,6 +97,7 @@ dsrc_stats = [
 	Stat('cursor_search_near', 'cursor search near calls'),
 	Stat('cursor_update', 'cursor update calls'),
 	Stat('cursor_update_bytes', 'cursor-update value bytes updated'),
+	Stat('session_compact', 'object compaction'),
 
 	##########################################
 	# Btree statistics
@@ -106,7 +107,7 @@ dsrc_stats = [
 	Stat('btree_column_fix', 'column-store fixed-size leaf pages'),
 	Stat('btree_column_internal', 'column-store internal pages'),
 	Stat('btree_column_variable', 'column-store variable-size leaf pages'),
-	Stat('btree_compact_rewrite', 'tree pages rewritten by compaction'),
+	Stat('btree_compact_rewrite', 'pages rewritten by compaction'),
 	Stat('btree_entries',
 	    'total LSM, table or file object key/value pairs'),
 	Stat('btree_fixed_len', 'fixed-record size'),

@@ -9,11 +9,10 @@ flags = {
 # Internal routine flag declarations
 ###################################################
 	'cache_flush' : [
+		'SYNC_CHECKPOINT',
 		'SYNC_COMPACT',
 		'SYNC_DISCARD',
 		'SYNC_DISCARD_NOWRITE',
-		'SYNC_INTERNAL',
-		'SYNC_LEAF',
 	],
 	'direct_io' : [
 		'DIRECTIO_DATA',

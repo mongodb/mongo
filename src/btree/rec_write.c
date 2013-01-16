@@ -271,19 +271,6 @@ static void __rec_dictionary_reset(WT_RECONCILE *);
 /*
  * __rec_child_modify --
  *	Return if the internal page's child references any modifications.
- *
- * The complexity is checking the page state of child pages when looking for
- * pages to merge.
- *
- * We clearly want to consider all normal, in-memory pages (WT_REF_MEM).
- *
- * During LRU eviction, the eviction code has already locked the subtree, so
- * locked pages should be included in the merge (WT_REF_LOCKED).
- *
- * During a checkpoint, LRU eviction is prohibited in the subtree being
- * written, so the only state change that can occur is for a reference to a
- * page on disk to cause a page to be read (WT_REF_READING).  We can safely
- * ignore those pages because they are unmodified by definition.
  */
 static int
 __rec_child_modify(WT_SESSION_IMPL *session,
@@ -292,16 +279,29 @@ __rec_child_modify(WT_SESSION_IMPL *session,
 	WT_DECL_RET;
 
 	*modifyp = 0;
+
+	/*
+	 * This function is called when walking an internal page to decide how
+	 * to handle child pages referenced by the internal page, specifically
+	 * if the child page is to be merged into its parent.
+	 *
+	 * Internal pages are reconciled for two reasons: first, when evicting
+	 * an internal page, second by the checkpoint code when writing internal
+	 * pages.  During eviction, the subtree is locked down so all pages
+	 * should be in the WT_REF_DISK or WT_REF_LOCKED state. During
+	 * checkpoint, any eviction that might affect our review of an internal
+	 * page is prohibited, however, as the subtree is not reserved for our
+	 * exclusive use, there are other page states that must be considered.
+	 */
 	for (;; __wt_yield())
 		switch (r->tested_ref_state = ref->state) {
 		case WT_REF_DISK:
-			WT_HAVE_DIAGNOSTIC_YIELD;
-
 			/* On disk, not modified by definition. */
-			return (0);
+			goto done;
+
 		case WT_REF_DELETED:
 			/*
-			 * The WT_REF entry is in a deleted state.
+			 * The child is in a deleted state.
 			 *
 			 * It's possible the state is changing underneath us and
 			 * we can race between checking for a deleted state and
@@ -314,51 +314,109 @@ __rec_child_modify(WT_SESSION_IMPL *session,
 			ret =
 			    __rec_page_deleted(session, r, page, ref, modifyp);
 			WT_PUBLISH(ref->state, WT_REF_DELETED);
+			goto done;
 
-			WT_HAVE_DIAGNOSTIC_YIELD;
-			return (ret);
 		case WT_REF_EVICT_FORCE:
-		case WT_REF_LOCKED:
 			/*
-			 * If being called by the eviction server, the page was
-			 * selected for eviction by us and the state is stable
-			 * until we reset it, treat it as an in-memory state.
-			 *
-			 * If being called by a checkpoint thread, the page is
-			 * being considered by the eviction server, and we have
-			 * to wait until the eviction server finishes evicting
-			 * it or decides to move on.
+			 * The child was entered onto the eviction queue by an
+			 * application thread, and is waiting to be forcibly
+			 * evicted.  We should not be here if called by the
+			 * eviction server, a child page in this state within
+			 * an evicted page's subtree would cause the eviction
+			 * review process to fail.
 			 */
-			if (!F_ISSET(r, WT_EVICTION_SERVER_LOCKED))
-				break;
-			/* FALLTHROUGH */
+			WT_ASSERT(session,
+			    !F_ISSET(r, WT_EVICTION_SERVER_LOCKED));
+
+			/*
+			 * If called during checkpoint, the child can't be
+			 * evicted, it's an in-memory case.
+			 */
+			goto in_memory;
+
 		case WT_REF_EVICT_WALK:
 			/*
-			 * The tree is being walked by internal-page checkpoint
-			 * (NOT eviction), and the page is being written.  The
-			 * state is in-memory and stable, the checkpoint thread
-			 * will reset the state after the write.
+			 * The child is locked by a checkpoint or eviction walk
+			 * of the tree.
+			 *
+			 * We should not be here if called by the eviction
+			 * server (the eviction server doesn't evict the page
+			 * that marks its walk in the tree, further, a child
+			 * page in this state within an evicted page's subtree
+			 * would cause the eviction review process to fail).
 			 */
-			/* FALLTHROUGH */
+			WT_ASSERT(session,
+			    !F_ISSET(r, WT_EVICTION_SERVER_LOCKED));
+
+			/*
+			 * We can be here if called by checkpoint (for example,
+			 * the leaf page pass of checkpoint is based on hazard
+			 * references, and so it can collide with the eviction
+			 * server's walk).  The child can't be evicted, it's an
+			 * in-memory case.
+			 */
+			 goto in_memory;
+
+		case WT_REF_LOCKED:
+			/*
+			 * If being called by the eviction server, the evicted
+			 * page's subtree, including this child, was selected
+			 * for eviction by us and the state is stable until we
+			 * reset it, it's an in-memory state.
+			 */
+			if (F_ISSET(r, WT_EVICTION_SERVER_LOCKED))
+				goto in_memory;
+
+			/*
+			 * If called during checkpoint, the child is being
+			 * considered by the eviction server or the child is a
+			 * fast-delete page being read.  The eviction may have
+			 * started before the checkpoint and so we must wait
+			 * for the eviction to be resolved.  I suspect we could
+			 * handle fast-delete reads, but we can't distinguish
+			 * between the two and fast-delete reads aren't expected
+			 * to be common.
+			 */
+			break;
+
 		case WT_REF_MEM:
 			/*
-			 * The tree is being walked by leaf-page checkpoint and
-			 * the page is being written.   The state is in-memory
-			 * and stable, we're holding a hazard reference.
-			 *
-			 * In-memory states: set modify based on the existence
-			 * of the page's modify structure.
+			 * In memory.  We should not be here if called by the
+			 * eviction server, a child page in this state within
+			 * an evicted page's subtree would have been set to
+			 * WT_REF_LOCKED.
 			 */
-			if (ref->page->modify != NULL)
-				*modifyp = 1;
-			/* FALLTHROUGH */
+			WT_ASSERT(session,
+			    !F_ISSET(r, WT_EVICTION_SERVER_LOCKED));
+
+			/*
+			 * If called during checkpoint, the child can't be
+			 * evicted, it's an in-memory case.
+			 */
+			goto in_memory;
+
 		case WT_REF_READING:
-			/* Being read, clean by definition. */
-			WT_HAVE_DIAGNOSTIC_YIELD;
-			return (0);
+			/*
+			 * Being read, not modified by definition.  We should
+			 * never be here if called by the eviction server.
+			 */
+			WT_ASSERT(session,
+			    !F_ISSET(r, WT_EVICTION_SERVER_LOCKED));
+			goto done;
+
 		WT_ILLEGAL_VALUE(session);
 		}
-	/* NOTREACHED */
+
+in_memory:
+	/*
+	 * In-memory states: set modify based on the existence of the page's
+	 * modify structure.
+	 */
+	if (ref->page->modify != NULL)
+		*modifyp = 1;
+
+done:	WT_HAVE_DIAGNOSTIC_YIELD;
+	return (ret);
 }
 
 /*

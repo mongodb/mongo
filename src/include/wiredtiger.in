@@ -1957,7 +1957,7 @@ extern int wiredtiger_extension_init(WT_SESSION *session,
 #define	WT_STAT_DSRC_BTREE_COLUMN_INTERNAL		18
 /*! column-store variable-size leaf pages */
 #define	WT_STAT_DSRC_BTREE_COLUMN_VARIABLE		19
-/*! tree pages rewritten by compaction */
+/*! pages rewritten by compaction */
 #define	WT_STAT_DSRC_BTREE_COMPACT_REWRITE		20
 /*! total LSM, table or file object key/value pairs */
 #define	WT_STAT_DSRC_BTREE_ENTRIES			21
@@ -2046,10 +2046,12 @@ extern int wiredtiger_extension_init(WT_SESSION *session,
 #define	WT_STAT_DSRC_REC_SPLIT_LEAF			62
 /*! reconciliation pages written */
 #define	WT_STAT_DSRC_REC_WRITTEN			63
+/*! object compaction */
+#define	WT_STAT_DSRC_SESSION_COMPACT			64
 /*! update conflicts */
-#define	WT_STAT_DSRC_TXN_UPDATE_CONFLICT		64
+#define	WT_STAT_DSRC_TXN_UPDATE_CONFLICT		65
 /*! write generation conflicts */
-#define	WT_STAT_DSRC_TXN_WRITE_CONFLICT			65
+#define	WT_STAT_DSRC_TXN_WRITE_CONFLICT			66
 /*! @} */
 /*
  * Statistics section: END

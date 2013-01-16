@@ -33,8 +33,7 @@ __wt_stat_alloc_dsrc_stats(WT_SESSION_IMPL *session, WT_DSRC_STATS **statsp)
 	stats->btree_column_internal.desc = "column-store internal pages";
 	stats->btree_column_variable.desc =
 	    "column-store variable-size leaf pages";
-	stats->btree_compact_rewrite.desc =
-	    "tree pages rewritten by compaction";
+	stats->btree_compact_rewrite.desc = "pages rewritten by compaction";
 	stats->btree_entries.desc =
 	    "total LSM, table or file object key/value pairs";
 	stats->btree_fixed_len.desc = "fixed-record size";
@@ -84,6 +83,7 @@ __wt_stat_alloc_dsrc_stats(WT_SESSION_IMPL *session, WT_DSRC_STATS **statsp)
 	stats->rec_split_intl.desc = "reconciliation internal pages split";
 	stats->rec_split_leaf.desc = "reconciliation leaf pages split";
 	stats->rec_written.desc = "reconciliation pages written";
+	stats->session_compact.desc = "object compaction";
 	stats->txn_update_conflict.desc = "update conflicts";
 	stats->txn_write_conflict.desc = "write generation conflicts";
 
@@ -161,6 +161,7 @@ __wt_stat_clear_dsrc_stats(WT_STATS *stats_arg)
 	stats->rec_split_intl.v = 0;
 	stats->rec_split_leaf.v = 0;
 	stats->rec_written.v = 0;
+	stats->session_compact.v = 0;
 	stats->txn_update_conflict.v = 0;
 	stats->txn_write_conflict.v = 0;
 }

@@ -558,11 +558,7 @@ __evict_file_request_walk(WT_SESSION_IMPL *session)
 	 */
 	__evict_list_clr_range(session, 0);
 
-	/*
-	 * Wait for LRU eviction activity to drain; if discarding or compacting
-	 * pages, or checkpointing internal pages for a file, we don't want any
-	 * application threads underneath us doing eviction.
-	 */
+	/* Wait for LRU eviction activity to drain. */
 	while (request_session->btree->lru_count > 0) {
 		__wt_spin_unlock(session, &cache->evict_lock);
 		__wt_yield();
@@ -662,7 +658,8 @@ err:		/* On error, clear any left-over tree walk. */
 
 /*
  * __wt_sync_file --
- *	Flush pages for a specific file as part of a checkpoint operation.
+ *	Flush pages for a specific file as part of a checkpoint or compaction
+ * operation.
  */
 int
 __wt_sync_file(WT_SESSION_IMPL *session, int syncop)
@@ -671,90 +668,88 @@ __wt_sync_file(WT_SESSION_IMPL *session, int syncop)
 	WT_CACHE *cache;
 	WT_DECL_RET;
 	WT_PAGE *page;
-	uint32_t walk_flags;
+	uint32_t flags;
 
 	btree = session->btree;
 	cache = S2C(session)->cache;
 	page = NULL;
 
 	switch (syncop) {
-	case WT_SYNC_INTERNAL:
+	case WT_SYNC_CHECKPOINT:
 		/*
-		 * Pages appearing in a checkpoint cannot be freed until the
-		 * block lists for the checkpoint are stable.  Eviction is
-		 * disabled in the subtree of any internal node being
-		 * reconciled, including eventually the whole tree when the
-		 * root page is written.  Set the checkpointing flag, it is
-		 * checked in __rec_review before any page is evicted.
+		 * The first pass walks all cache leaf pages, waiting for
+		 * concurrent activity in a page to be resolved, acquiring
+		 * hazard references to prevent eviction.
+		 */
+		flags = WT_TREE_CACHE | WT_TREE_SKIP_INTL | WT_TREE_WAIT;
+		WT_ERR(__wt_tree_walk(session, &page, flags));
+		while (page != NULL) {
+			/* Write dirty pages. */
+			if (__wt_page_is_modified(page))
+				WT_ERR(__wt_rec_write(session, page, NULL, 0));
+			WT_ERR(__wt_tree_walk(session, &page, flags));
+		}
+
+		/*
+		 * Pages cannot disappear from underneath internal pages when
+		 * internal pages are being reconciled by checkpoint; also,
+		 * pages in a checkpoint cannot be freed until the block lists
+		 * for the checkpoint are stable.  Eviction is disabled in the
+		 * subtree of any internal page being reconciled, including,
+		 * eventually, the whole tree when the root page is written.
 		 *
-		 * If any thread is in the progress of evicting a page, it
-		 * will have switched the ref state to WT_REF_LOCKED while
+		 * Set the checkpointing flag, it is checked in __rec_review
+		 * before any page is evicted.
+		 *
+		 * If any thread is already in the progress of evicting a page,
+		 * it will have switched the ref state to WT_REF_LOCKED while
 		 * holding evict_lock inside __evict_get_page, and the
-		 * checkpoint walk will notice that and wait for the eviction
-		 * to complete before proceeding.
+		 * checkpoint will notice and wait for eviction to complete
+		 * before proceeding.
 		 */
 		__wt_spin_lock(session, &cache->evict_lock);
 		btree->checkpointing = 1;
 		__wt_spin_unlock(session, &cache->evict_lock);
 
 		/*
-		 * Checkpoints need to wait for any concurrent activity in a
-		 * page to be resolved.  Using the EVICT_WALK state prevents
+		 * The second pass walks all cache internal pages, waiting for
+		 * concurrent activity to be resolved.  We don't acquire hazard
+		 * references in this pass, using the EVICT_WALK state prevents
 		 * eviction from getting underneath an internal page that is
 		 * being evicted.
 		 */
-		walk_flags = WT_TREE_EVICT | WT_TREE_SKIP_LEAF | WT_TREE_WAIT;
+		flags = WT_TREE_EVICT | WT_TREE_SKIP_LEAF | WT_TREE_WAIT;
+		WT_ERR(__wt_tree_walk(session, &page, flags));
+		while (page != NULL) {
+			/* Write dirty pages. */
+			if (__wt_page_is_modified(page))
+				WT_ERR(__wt_rec_write(session, page, NULL, 0));
+			WT_ERR(__wt_tree_walk(session, &page, flags));
+		}
 		break;
 	case WT_SYNC_COMPACT:
-	case WT_SYNC_LEAF:
 		/*
-		 * Walk all pages (or all leaf pages), waiting for concurrent
-		 * activity to be resolved.  Use hazard references so we don't
-		 * prevent other eviction from the same subtree.
+		 * Compaction requires only a single pass (we don't have to turn
+		 * eviction off when visiting internal nodes, so we don't bother
+		 * breaking the work into two separate passes).   Wait for
+		 * concurrent activity in a page to be resolved, acquire hazard
+		 * references to prevent eviction.
 		 */
-		walk_flags = WT_TREE_CACHE | WT_TREE_SKIP_INTL | WT_TREE_WAIT;
-		break;
-	WT_ILLEGAL_VALUE(session);
-	}
-
-	page = NULL;
-	WT_ERR(__wt_tree_walk(session, &page, walk_flags));
-	while (page != NULL) {
-		switch (syncop) {
-		case WT_SYNC_COMPACT:
+		flags = WT_TREE_CACHE | WT_TREE_WAIT;
+		WT_ERR(__wt_tree_walk(session, &page, flags));
+		while (page != NULL) {
 			WT_ERR(__wt_compact_evict(session, page));
-			break;
-		case WT_SYNC_LEAF:
-			/* First pass: skip internal pages. */
-			WT_ASSERT(session, page->type != WT_PAGE_ROW_INT &&
-			    page->type != WT_PAGE_COL_INT);
-
-			/* Write dirty pages. */
-			if (__wt_page_is_modified(page))
-				WT_ERR(__wt_rec_write(session, page, NULL, 0));
-			break;
-		case WT_SYNC_INTERNAL:
-			/* Second pass: skip leaf pages. */
-			WT_ASSERT(session, page->type == WT_PAGE_ROW_INT ||
-			    page->type == WT_PAGE_COL_INT);
-
-			/* Write dirty pages. */
-			if (__wt_page_is_modified(page))
-				WT_ERR(__wt_rec_write(session, page, NULL, 0));
-			break;
+			WT_ERR(__wt_tree_walk(session, &page, flags));
 		}
-
-		WT_ERR(__wt_tree_walk(session, &page, walk_flags));
+		break;
+	WT_ILLEGAL_VALUE_ERR(session);
 	}
 
-	if (0) {
-err:		/* On error, clear any left-over tree walk. */
-		if (page != NULL)
-			__wt_evict_clear_tree_walk(session, page);
-	}
+err:	/* On error, clear any left-over tree walk. */
+	if (page != NULL)
+		__wt_evict_clear_tree_walk(session, page);
 
-	if (syncop == WT_SYNC_INTERNAL) {
-		/* Re-enable writes to the file. */
+	if (btree->checkpointing) {
 		btree->checkpointing = 0;
 
 		/*
