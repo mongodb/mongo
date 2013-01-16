@@ -118,10 +118,6 @@ namespace mongo {
         // annulus and find no results.
         double _radiusIncrement;
         set<DiskLoc> _returned;
-        // We modify the size of the cells created by the coverer so that when
-        // our search annulus gets big, we don't have too many cells.
-        int _coarsestLevel;
-        int _finestLevel;
 
         // Stat counters/debug information goes below.
         // How many items did we look at in the btree?

@@ -23,6 +23,12 @@ namespace mongo {
         return ss.str();
     }
 
+    void S2SearchUtil::setCoverLimitsBasedOnArea(double area, S2RegionCoverer *coverer, int coarsestIndexedLevel) {
+        area = sqrt(area);
+        coverer->set_min_level(min(coarsestIndexedLevel, 2 + S2::kAvgEdge.GetClosestLevel(area)));
+        coverer->set_max_level(4 + coverer->min_level());
+    }
+
     BSONObj S2SearchUtil::coverAsBSON(const vector<S2CellId> &cover, const string& field,
                                       const int coarsestIndexedLevel) {
         BSONObjBuilder queryBuilder;

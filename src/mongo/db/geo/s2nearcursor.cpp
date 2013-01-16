@@ -59,8 +59,6 @@ namespace mongo {
         _innerRadius = _outerRadius = 0;
         // We might want to adjust the sizes of our coverings if our search
         // isn't local to the start point.
-        _finestLevel = _params.finestIndexedLevel;
-        _coarsestLevel = _params.coarsestIndexedLevel;
         // Set up _outerRadius with proper checks (maybe maxDistance is really small?)
         nextAnnulus();
     }
@@ -152,8 +150,8 @@ namespace mongo {
         regions.push_back(&outerCap);
         S2RegionIntersection shell(&regions);
         vector<S2CellId> cover;
-        coverer.set_min_level(_coarsestLevel);
-        coverer.set_max_level(_finestLevel);
+        double area = outerCap.area() - innerCap.area();
+        S2SearchUtil::setCoverLimitsBasedOnArea(area, &coverer, _params.coarsestIndexedLevel);
         coverer.GetCovering(shell, &cover);
         inExpr = S2SearchUtil::coverAsBSON(cover, _nearQuery.field,
                                            _params.coarsestIndexedLevel);
@@ -188,18 +186,6 @@ namespace mongo {
 
         // We iterate until 1. our search radius is too big or 2. we find results.
         do {
-            // We want the size of our coverings to be proportional to the size of the annulus
-            // we're looking at, otherwise we may generate a covering set that is enormous.
-            //
-            // This penalizes users who start their searches far away from
-            // dense pockets of data and then encounter those dense pockets,
-            // but hey, you can't make every distribution of data work well.
-            S1Angle innerAngle = S1Angle::Radians(_innerRadius / _params.radius);
-            S1Angle outerAngle = S1Angle::Radians(_outerRadius / _params.radius);
-            S1Angle diff = outerAngle - innerAngle;
-            _coarsestLevel = S2::kAvgEdge.GetClosestLevel(diff.radians());
-            _finestLevel = _coarsestLevel + 1;
-
             // Some of these arguments are opaque, look at the definitions of the involved classes.
             FieldRangeSet frs(_details->parentNS().c_str(), makeFRSObject(), false, false);
             shared_ptr<FieldRangeVector> frv(new FieldRangeVector(frs, _specForFRV, 1));

@@ -32,6 +32,7 @@ namespace mongo {
         // FieldRangeSet so that we only examine the keys that the provided region may intersect.
         static BSONObj coverAsBSON(const vector<S2CellId> &cover, const string& field,
                                    const int coarsestIndexedLevel);
+        static void setCoverLimitsBasedOnArea(double area, S2RegionCoverer *coverer, int coarsestIndexedLevel);
     };
 
     struct S2IndexingParams {
