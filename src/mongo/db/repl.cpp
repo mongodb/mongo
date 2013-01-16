@@ -157,7 +157,7 @@ namespace mongo {
         return replSettings.slave || replSettings.master || theReplSet;
     }
 
-    bool replAuthenticate(DBClientBase *conn);
+    bool replAuthenticate(DBClientBase *conn, bool skipAuthCheck);
 
     void appendReplicationInfo(BSONObjBuilder& result, int level) {
         if ( replSet ) {
@@ -220,7 +220,7 @@ namespace mongo {
                     scoped_ptr<ScopedDbConnection> conn( ScopedDbConnection::getInternalScopedDbConnection( s["host"].valuestr() ) );
                     
                     DBClientConnection *cliConn = dynamic_cast< DBClientConnection* >( &conn->conn() );
-                    if ( cliConn && replAuthenticate( cliConn ) ) {
+                    if ( cliConn && replAuthenticate(cliConn, false) ) {
                         BSONObj first = conn->get()->findOne( (string)"local.oplog.$" + sourcename,
                                                               Query().sort( BSON( "$natural" << 1 ) ) );
                         BSONObj last = conn->get()->findOne( (string)"local.oplog.$" + sourcename,
@@ -1122,11 +1122,18 @@ namespace mongo {
 
     BSONObj userReplQuery = fromjson("{\"user\":\"repl\"}");
 
-    bool replAuthenticate(DBClientBase *conn) {
+    /* Generally replAuthenticate will only be called within system threads to fully authenticate
+     * connections to other nodes in the cluster that will be used as part of internal operations.
+     * If a user-initiated action results in needing to call replAuthenticate, you can call it
+     * with skipAuthCheck set to false. Only do this if you are certain that the proper auth
+     * checks have already run to ensure that the user is authorized to do everything that this
+     * connection will be used for!
+     */
+    bool replAuthenticate(DBClientBase *conn, bool skipAuthCheck) {
         if( noauth ) {
             return true;
         }
-        if (!cc().getAuthorizationManager()->hasInternalAuthorization()) {
+        if (!skipAuthCheck && !cc().getAuthorizationManager()->hasInternalAuthorization()) {
             log() << "replauthenticate: requires internal authorization, failing" << endl;
             return false;
         }
@@ -1218,7 +1225,7 @@ namespace mongo {
             string errmsg;
             ReplInfo r("trying to connect to sync source");
             if ( !_conn->connect(hostName.c_str(), errmsg) ||
-                 (!noauth && !replAuthenticate(_conn.get())) ) {
+                 (!noauth && !replAuthenticate(_conn.get(), true)) ) {
                 resetConnection();
                 log() << "repl: " << errmsg << endl;
                 return false;
