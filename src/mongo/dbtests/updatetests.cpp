@@ -2326,6 +2326,19 @@ namespace UpdateTests {
                 fixedMods->prepare( querySpec ); // Does not throw.
             }
         };
+
+        class CreateNewFromQueryExcludeNot {
+        public:
+            void run() {
+                BSONObj querySpec = BSON( "a" << BSON( "$not" << BSON( "$lt" << 1 ) ) );
+                BSONObj modSpec = BSON( "$set" << BSON( "b" << 1 ) );
+                ModSet modSet( modSpec );
+
+                // Because a $not operator is applied to the 'a' field, the 'a' field is excluded
+                // from the resulting document.
+                ASSERT_EQUALS( BSON( "b" << 1 ), modSet.createNewFromQuery( querySpec ) );
+            }
+        };
     };
 
     namespace basic {
@@ -2716,6 +2729,7 @@ namespace UpdateTests {
             add< ModSetTests::DbrefPassesPositionalValidation >();
             add< ModSetTests::NoPositionalValidationOnReplication >();
             add< ModSetTests::NoPositionalValidationOnPartialFixedArrayReplication >();
+            add< ModSetTests::CreateNewFromQueryExcludeNot >();
 
             add< basic::inc1 >();
             add< basic::inc2 >();

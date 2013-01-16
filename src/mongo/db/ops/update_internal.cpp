@@ -1106,9 +1106,16 @@ namespace mongo {
                     // this can be a query piece
                     // or can be a dbref or something
 
-                    int op = e.embeddedObject().firstElement().getGtLtOp( -1 );
-                    if ( op >= 0 ) {
-                        // this means this is a $gt type filter, so don't make part of the new object
+                    int op = e.embeddedObject().firstElement().getGtLtOp();
+                    if ( op > 0 ) {
+                        // This means this is a $gt type filter, so don't make it part of the new
+                        // object.
+                        continue;
+                    }
+
+                    if ( str::equals( e.embeddedObject().firstElement().fieldName(), "$not" ) ) {
+                        // A $not filter operator is not detected in getGtLtOp() and should not
+                        // become part of the new object.
                         continue;
                     }
                 }
