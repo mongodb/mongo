@@ -157,7 +157,7 @@ namespace mongo {
                 if (!e.isABSONObj()) { continue; }
                 BSONObj obj = e.Obj();
 
-                if (nearQuery.parseFrom(obj)) {
+                if (nearQuery.parseFrom(obj, _params.radius)) {
                     uassert(16685, "Only one $near clause allowed: " + query.toString(),
                             !isNearQuery);
                     isNearQuery = true;
@@ -336,15 +336,13 @@ namespace mongo {
             params.maxKeysPerInsert = 200;
             // This is advisory.
             params.maxCellsInCovering = 50;
-            // Thanks, Wikipedia.
-            const double radiusOfEarthInMeters = 6378.1 * 1000.0;
-            // We need this to do distance-related things (near queries).
-            params.radius = radiusOfEarthInMeters;
+            // Near distances are specified in meters...sometimes.
+            params.radius = S2IndexingParams::kRadiusOfEarthInMeters;
             // These are not advisory.
             params.finestIndexedLevel = configValueWithDefault(spec, "finestIndexedLevel",
-                S2::kAvgEdge.GetClosestLevel(500.0 / radiusOfEarthInMeters));
+                S2::kAvgEdge.GetClosestLevel(500.0 / params.radius));
             params.coarsestIndexedLevel = configValueWithDefault(spec, "coarsestIndexedLevel",
-                S2::kAvgEdge.GetClosestLevel(100 * 1000.0 / radiusOfEarthInMeters));
+                S2::kAvgEdge.GetClosestLevel(100 * 1000.0 / params.radius));
             uassert(16687, "coarsestIndexedLevel must be >= 0", params.coarsestIndexedLevel >= 0);
             uassert(16688, "finestIndexedLevel must be <= 30", params.finestIndexedLevel <= 30);
             uassert(16689, "finestIndexedLevel must be >= coarsestIndexedLevel",
@@ -373,7 +371,7 @@ namespace mongo {
         uassert(16552, "geoNear requiers exactly one indexed geo field", 1 == geoFieldNames.size());
         NearQuery nearQuery(geoFieldNames[0]);
         uassert(16679, "Invalid geometry given as arguments to geoNear: " + cmdObj.toString(),
-                nearQuery.parseFromGeoNear(cmdObj));
+                nearQuery.parseFromGeoNear(cmdObj, idxType->getParams().radius));
         uassert(16683, "geoNear on 2dsphere index requires spherical",
                 cmdObj["spherical"].trueValue());
 
@@ -415,6 +413,8 @@ namespace mongo {
 
         while (cursor->ok()) {
             double dist = cursor->currentDistance();
+            // If we got the distance in radians, output it in radians too.
+            if (nearQuery.fromRadians) { dist /= idxType->getParams().radius; }
             dist *= distanceMultiplier;
             totalDistance += dist;
             if (dist > farthestDist) { farthestDist = dist; }

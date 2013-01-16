@@ -18,43 +18,59 @@
 
 namespace mongo {
 
-    bool NearQuery::parseFromGeoNear(const BSONObj &obj) {
+    bool NearQuery::parseFromGeoNear(const BSONObj &obj, double radius) {
+        if (obj["near"].eoo()) { return false; }
+        BSONObj nearObj = obj["near"].embeddedObject();
+        // The CRS for the legacy points dictates that distances are in radians.
+        fromRadians = GeoParser::isLegacyPoint(nearObj);
+        if (!GeoParser::parsePoint(nearObj, &centroid)) { return false; }
+
         if (!obj["maxDistance"].eoo()) {
             if (obj["maxDistance"].isNumber()) {
-                maxDistance = obj["maxDistance"].number();
+                double distArg = obj["maxDistance"].number();
+                if (fromRadians) {
+                    maxDistance = distArg * radius;
+                } else {
+                    maxDistance = distArg;
+                }
             } else {
                 return false;
             }
         }
-
-        if (obj["near"].eoo()) { return false; }
-        BSONObj nearObj = obj["near"].embeddedObject();
-        return GeoParser::parsePoint(nearObj, &centroid);
+        return true;
     }
 
-    bool NearQuery::parseFrom(const BSONObj &obj) {
+    bool NearQuery::parseFrom(const BSONObj &obj, double radius) {
         bool hasGeometry = false;
 
         // First, try legacy near.
         // Legacy near parsing: t.find({ loc : { $nearSphere: [0,0], $maxDistance: 3 }})
         // Legacy near parsing: t.find({ loc : { $nearSphere: [0,0] }})
-        // Legacy near parsing: t.find({ loc : { $near: [0,0] }})
+        // Legacy near parsing: t.find({ loc : { $near: { someGeoJSONPoint}})
         BSONObjIterator it(obj);
         while (it.more()) {
             BSONElement e = it.next();
-            if (!e.isABSONObj()) { return false; }
-            BSONObj embeddedObj = e.embeddedObject();
             bool isNearSphere = mongoutils::str::equals(e.fieldName(), "$nearSphere");
-            // TODO(hk): CRS-wise, do we require nearSphere, error on $near?
-            // Or do we let the user continue using what he's used to and hope
-            // that nearSphere dies, since $near + $geometry = spherical anyway?
-            bool isNear = mongoutils::str::equals(e.fieldName(), "$near");
             bool isMaxDistance = mongoutils::str::equals(e.fieldName(), "$maxDistance");
-            if ((isNear || isNearSphere) && GeoParser::isPoint(embeddedObj)) {
-                GeoParser::parsePoint(embeddedObj, &centroid);
-                hasGeometry = true;
+            bool isNear = mongoutils::str::equals(e.fieldName(), "$near");
+            if (isNearSphere || isNear) {
+                if (!e.isABSONObj()) { return false; }
+                BSONObj embeddedObj = e.embeddedObject();
+                if (isNearSphere && GeoParser::isPoint(embeddedObj)) {
+                    fromRadians = GeoParser::isLegacyPoint(embeddedObj);
+                    GeoParser::parsePoint(embeddedObj, &centroid);
+                    hasGeometry = true;
+                } else if (isNear && GeoParser::isGeoJSONPoint(embeddedObj)) {
+                    GeoParser::parseGeoJSONPoint(embeddedObj, &centroid);
+                    hasGeometry = true;
+                }
             } else if (isMaxDistance) {
-                maxDistance = e.Number();
+                double distArg = e.Number();
+                if (fromRadians) {
+                    maxDistance = distArg * radius;
+                } else {
+                    maxDistance = distArg;
+                }
             }
         }
 
@@ -74,7 +90,7 @@ namespace mongo {
             if (mongoutils::str::equals(e.fieldName(), "$geometry")) {
                 if (e.isABSONObj()) {
                     BSONObj embeddedObj = e.embeddedObject();
-                    uassert(16681, "$near requires point, given " + embeddedObj.toString(),
+                    uassert(16681, "$near requires geojson point, given " + embeddedObj.toString(),
                             GeoParser::isGeoJSONPoint(embeddedObj));
                     GeoParser::parseGeoJSONPoint(embeddedObj, &centroid);
                     hasGeometry = true;

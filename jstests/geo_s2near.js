@@ -59,3 +59,26 @@ t.insert({geo: { "type" : "Point", "coordinates" : [-180, 90]}})
 res = t.find({ "geo" : { "$near" : { "$geometry" : origin } } }).limit(10000)
 resNear = db.runCommand({geoNear : t.getName(), near: [0,0], num: 10000, spherical: true})
 assert.eq(res.itcount(), resNear.results.length, (2 * points) * (2 * points) + 4)
+
+function testRadAndDegreesOK(distance) {
+    // Distance for old style points is radians.
+    resRadians = t.find({geo: {$nearSphere: [0,0], $maxDistance: (distance / (6378.1 * 1000))}})
+    // Distance for new style points is meters.
+    resMeters = t.find({ "geo" : { "$near" : { "$geometry" : origin, $maxDistance: distance} } })
+    // And we should get the same # of results no matter what.
+    assert.eq(resRadians.itcount(), resMeters.itcount())
+
+    // Also, geoNear should behave the same way.
+    resGNMeters = db.runCommand({geoNear : t.getName(), near: origin, maxDistance: distance, spherical: true})
+    resGNRadians = db.runCommand({geoNear : t.getName(), near: [0,0], maxDistance: (distance / (6378.1 * 1000)), spherical: true})
+    assert.eq(resGNRadians.results.length, resGNMeters.results.length)
+    for (var i = 0; i < resGNRadians.length; ++i) {
+        // Radius of earth * radians = distance in meters.
+        assert.close(resGNRadians.results[i].dis * 6378.1 * 1000, resGNMeters.results[i].dis)
+    }
+}
+
+testRadAndDegreesOK(1);
+testRadAndDegreesOK(10)
+testRadAndDegreesOK(50)
+testRadAndDegreesOK(10000)

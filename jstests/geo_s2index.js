@@ -21,10 +21,16 @@ t.insert( {geo : pointC} )
 pointE = { "type" : "Point", "coordinates": [ 40.6, 5.4 ] }
 t.insert( {geo : pointE} )
 
+// Make sure we can index this without error.
+t.insert({nonGeo: "noGeoField!"})
+
 somepoly = { "type" : "Polygon",
              "coordinates" : [ [ [40,5], [40,6], [41,6], [41,5], [40,5]]]}
 t.insert( {geo : somepoly, nonGeo: "somepoly" })
+
 t.ensureIndex( { geo : "2dsphere", nonGeo: 1 } )
+// We have a point without any geo data.  Don't error.
+assert(!db.getLastError())
 
 res = t.find({ "geo" : { "$geoIntersects" : { "$geometry" : pointA} } });
 assert.eq(res.count(), 3);
