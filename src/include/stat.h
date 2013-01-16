@@ -106,6 +106,7 @@ struct __wt_dsrc_stats {
 	WT_STATS btree_compact_rewrite;
 	WT_STATS btree_entries;
 	WT_STATS btree_fixed_len;
+	WT_STATS btree_maximum_depth;
 	WT_STATS btree_maxintlitem;
 	WT_STATS btree_maxintlpage;
 	WT_STATS btree_maxleafitem;

@@ -37,6 +37,7 @@ __wt_stat_alloc_dsrc_stats(WT_SESSION_IMPL *session, WT_DSRC_STATS **statsp)
 	stats->btree_entries.desc =
 	    "total LSM, table or file object key/value pairs";
 	stats->btree_fixed_len.desc = "fixed-record size";
+	stats->btree_maximum_depth.desc = "maximum tree depth";
 	stats->btree_maxintlitem.desc = "maximum internal page item size";
 	stats->btree_maxintlpage.desc = "maximum internal page size";
 	stats->btree_maxleafitem.desc = "maximum leaf page item size";
@@ -120,6 +121,7 @@ __wt_stat_clear_dsrc_stats(WT_STATS *stats_arg)
 	stats->btree_compact_rewrite.v = 0;
 	stats->btree_entries.v = 0;
 	stats->btree_fixed_len.v = 0;
+	stats->btree_maximum_depth.v = 0;
 	stats->btree_maxintlitem.v = 0;
 	stats->btree_maxintlpage.v = 0;
 	stats->btree_maxleafitem.v = 0;

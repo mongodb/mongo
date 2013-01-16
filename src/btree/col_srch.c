@@ -23,6 +23,7 @@ __wt_col_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 	WT_REF *ref;
 	uint64_t recno;
 	uint32_t base, indx, limit;
+	int depth;
 
 	__cursor_search_clear(cbt);
 
@@ -32,7 +33,8 @@ __wt_col_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 	ref = NULL;
 
 	/* Search the internal pages of the tree. */
-	for (page = btree->root_page; page->type == WT_PAGE_COL_INT;) {
+	for (depth = 2,
+	    page = btree->root_page; page->type == WT_PAGE_COL_INT; ++depth) {
 		WT_ASSERT(session, ref == NULL ||
 		    ref->u.recno == page->u.intl.recno);
 
@@ -72,6 +74,13 @@ __wt_col_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 		WT_ERR(__wt_page_in(session, page, ref));
 		page = ref->page;
 	}
+
+	/*
+	 * We want to know how deep the tree gets because excessive depth can
+	 * happen because of how WiredTiger splits.
+	 */
+	if (depth > btree->maximum_depth)
+		btree->maximum_depth = depth;
 
 	/*
 	 * Copy the leaf page's write generation value before reading the page.

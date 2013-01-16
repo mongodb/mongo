@@ -73,6 +73,7 @@ struct __wt_btree {
 	const char *config;		/* Configuration string */
 
 	WT_DSRC_STATS *stats;		/* Data-source statistics */
+	int maximum_depth;		/* Maximum tree depth */
 
 	/*
 	 * XXX Everything above here should move into the session-level

@@ -111,6 +111,7 @@ dsrc_stats = [
 	Stat('btree_entries',
 	    'total LSM, table or file object key/value pairs'),
 	Stat('btree_fixed_len', 'fixed-record size'),
+	Stat('btree_maximum_depth', 'maximum tree depth'),
 	Stat('btree_maxintlitem', 'maximum internal page item size'),
 	Stat('btree_maxintlpage', 'maximum internal page size'),
 	Stat('btree_maxleafitem', 'maximum leaf page item size'),
