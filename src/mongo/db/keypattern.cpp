@@ -17,13 +17,28 @@
 */
 
 #include "mongo/db/keypattern.h"
-#include "mongo/util/mongoutils/str.h"
+
 #include "mongo/db/hasher.h"
 #include "mongo/db/queryutil.h"
+#include "mongo/util/mongoutils/str.h"
 
 using namespace mongoutils;
 
 namespace mongo {
+
+    KeyPattern::KeyPattern( const BSONObj& pattern ): _pattern( pattern ) {
+
+        // Extract all prefixes of each field in pattern.
+        BSONForEach( field, _pattern ) {
+            StringData fieldName = field.fieldName();
+            size_t pos = fieldName.find( '.' );
+            while ( pos != string::npos ) {
+                _prefixes.insert( StringData( field.fieldName(), pos ) );
+                pos = fieldName.find( '.', pos+1 );
+            }
+            _prefixes.insert( fieldName );
+        }
+    }
 
     BSONObj KeyPattern::extractSingleKey(const BSONObj& doc ) const {
         if ( _pattern.isEmpty() )

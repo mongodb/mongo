@@ -1,9 +1,0 @@
-# -*- mode: python -*-
-
-Import("env")
-
-env.StaticLibrary('update', ['field_ref.cpp'],
-                  LIBDEPS=['$BUILD_DIR/mongo/bson',
-                           '$BUILD_DIR/mongo/foundation'])
-
-env.CppUnitTest('field_ref_test', ['field_ref_test.cpp'], LIBDEPS=['update'])

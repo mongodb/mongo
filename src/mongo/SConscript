@@ -17,7 +17,7 @@ Import("darwin windows solaris linux nix")
 env.SConscript(['base/SConscript',
                 'db/auth/SConscript',
                 'db/fts/SConscript',
-                'db/ops/SConscript',
+                'db/SConscript',
                 'platform/SConscript',
                 's/SConscript',
                 'unittest/SConscript'])
@@ -267,9 +267,11 @@ env.StaticLibrary("coredb", [
         "s/shardconnection.cpp",
         ],
                   LIBDEPS=['db/auth/serverauth',
+                           'db/common',
                            'server_parameters',
                            'geoparser',
-                           'geoquery'])
+                           'geoquery',
+                           '$BUILD_DIR/mongo/foundation'])
 
 coreServerFiles = [ "db/client_basic.cpp",
                     "db/common.cpp",
@@ -547,7 +549,7 @@ env.StaticLibrary("serveronly", serverOnlyFiles,
                   LIBDEPS=["coreshard",
                            "db/auth/authmongod",
                            "db/fts/ftsmongod",
-                           "db/ops/update",
+                           "db/common",
                            "dbcmdline",
                            "defaultversion",
                            "geoparser",

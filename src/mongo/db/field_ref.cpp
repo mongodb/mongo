@@ -14,7 +14,7 @@
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "mongo/db/ops/field_ref.h"
+#include "mongo/db/field_ref.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {

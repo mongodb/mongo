@@ -61,8 +61,11 @@ namespace mongo {
             dest[size()] = 0;
     }
 
-    inline size_t StringData::find( char c ) const {
-        const void* x = memchr( _data, c, size() );
+    inline size_t StringData::find( char c, size_t fromPos ) const {
+        if ( fromPos >= size() )
+            return string::npos;
+
+        const void* x = memchr( _data + fromPos, c, _size - fromPos );
         if ( x == 0 )
             return string::npos;
         return static_cast<size_t>( static_cast<const char*>(x) - _data );

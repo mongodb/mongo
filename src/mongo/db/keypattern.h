@@ -20,6 +20,7 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/platform/unordered_set.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
@@ -47,7 +48,10 @@ namespace mongo {
      */
     class KeyPattern {
     public:
-        KeyPattern( const BSONObj& pattern ): _pattern( pattern ) {}
+        /*
+         * We are allowing implicit conversion from BSON
+         */
+        KeyPattern( const BSONObj& pattern );
 
         /*
          *  Returns a BSON representation of this KeyPattern.
@@ -55,10 +59,12 @@ namespace mongo {
         BSONObj toBSON() const { return _pattern; }
 
         /*
-         * Returns true if the given fieldname is the name of one element of the (potentially)
-         * compound key described by this KeyPattern.
+         * Returns true if the given fieldname is the (dotted prefix of the) name of one
+         * element of the (potentially) compound key described by this KeyPattern.
          */
-        bool hasField( const StringData& fieldname ) const { return _pattern.hasField( fieldname ); }
+        bool hasField( const StringData& fieldname ) const {
+            return _prefixes.find( fieldname ) != _prefixes.end();
+        }
 
         /*
          * Gets the element of this pattern corresponding to the given fieldname.
@@ -159,12 +165,33 @@ namespace mongo {
 
     private:
         BSONObj _pattern;
+
+        // Each field in the '_pattern' may be itself a dotted field. We store all the prefixes
+        // of each field here. For instance, if a pattern is { 'a.b.c': 1, x: 1 }, we'll store
+        // here 'a', 'a.b', 'a.b.c', and 'x'.
+        //
+        // Since we're indexing into '_pattern's field names, it must stay constant after
+        // constructed.
+        struct PrefixHasher {
+            size_t operator()( const StringData& strData ) const {
+                size_t result = 0;
+                const char* p = strData.rawData();
+                for (size_t len = strData.size(); len > 0; len-- ) {
+                    result = ( result * 131 ) + *p++;
+                }
+                return result;
+            }
+        };
+        unordered_set<StringData, PrefixHasher> _prefixes;
+
         bool isAscending( const BSONElement& fieldExpression ) const {
             return ( fieldExpression.isNumber()  && fieldExpression.numberInt() == 1 );
         }
+
         bool isDescending( const BSONElement& fieldExpression ) const {
             return ( fieldExpression.isNumber()  && fieldExpression.numberInt() == -1 );
         }
+
         bool isHashed( const BSONElement& fieldExpression ) const {
             return mongoutils::str::equals( fieldExpression.valuestrsafe() , "hashed" );
         }
@@ -177,6 +204,5 @@ namespace mongo {
                                          const BSONElement& field ) const;
 
     };
-
 
 } // namespace mongo
