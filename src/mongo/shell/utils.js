@@ -1048,11 +1048,18 @@ tojsonObject = function( x, indent , nolint ){
         return x.constructor.tojson( x, indent , nolint );
     }
 
-    if ( x.toString() == "[object MaxKey]" )
-        return "{ $maxKey : 1 }";
-    if ( x.toString() == "[object MinKey]" )
-        return "{ $minKey : 1 }";
-    
+    try {
+        // modify display of min/max key for spidermonkey
+        if ( x.toString() == "[object MaxKey]" )
+            return "{ $maxKey : 1 }";
+        if ( x.toString() == "[object MinKey]" )
+            return "{ $minKey : 1 }";
+    }
+    catch(e) {
+        // toString not callable
+        return "[object]";
+    }
+
     var s = "{" + lineEnding;
 
     // push one level of indent
