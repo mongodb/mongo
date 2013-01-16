@@ -202,7 +202,7 @@ namespace mongo {
                      theEnd - nextjsobj >= 5 );
 
             if ( cmdLine.objcheck ) {
-                Status status = validateBSON( nextjsobj, theEnd - nextjsobj, NULL );
+                Status status = validateBSON( nextjsobj, theEnd - nextjsobj );
                 massert( 10307,
                          str::stream() << "Client Error: bad object in message: " << status.reason(),
                          status.isOK() );

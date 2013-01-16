@@ -15,6 +15,8 @@
  *    limitations under the License.
  */
 
+#include <deque>
+
 #include "mongo/bson/bson_validate.h"
 #include "mongo/bson/oid.h"
 
@@ -92,143 +94,219 @@ namespace mongo {
             uint64_t _maxLength;
         };
 
-        Status validateBSONInternal( Buffer* buffer, int* bsonLength ) {
-            const int start = buffer->position();
+        struct ValidationState {
+            enum State {
+                BeginObj = 1,
+                WithinObj,
+                EndObj,
+                BeginCodeWScope,
+                EndCodeWScope,
+                Done
+            };
+        };
 
-            int supposedSize;
-            if ( !buffer->readNumber<int>(&supposedSize) )
-                return Status( ErrorCodes::InvalidBSON, "bson size is larger than buffer size" );
+        class ValidationObjectFrame {
+        public:
+            int startPosition() const { return _startPosition & ~(1 << 31); }
+            bool isCodeWithScope() const { return _startPosition & (1 << 31); }
 
-            Status status = Status::OK();
-
-            while ( true ) {
-                char type;
-                if ( !buffer->readNumber<char>(&type) )
-                    return Status( ErrorCodes::InvalidBSON, "invalid bson" );
-
-                if ( type == EOO )
-                    break;
-
-                StringData name;
-                status = buffer->readCString( &name );
-                if ( !status.isOK() )
-                    return status;
-
-                switch ( type ) {
-                case MinKey:
-                case MaxKey:
-                case jstNULL:
-                case Undefined:
-                    break;
-
-                case jstOID:
-                    if ( !buffer->skip( sizeof(OID) ) )
-                        return Status( ErrorCodes::InvalidBSON, "invalid bson" );
-                    break;
-
-                case NumberInt:
-                    if ( !buffer->skip( sizeof(int32_t) ) )
-                        return Status( ErrorCodes::InvalidBSON, "invalid bson" );
-                    break;
-
-                case Bool:
-                    if ( !buffer->skip( sizeof(int8_t) ) )
-                        return Status( ErrorCodes::InvalidBSON, "invalid bson" );
-                    break;
-
-
-                case NumberDouble:
-                case NumberLong:
-                case Timestamp:
-                case Date:
-                    if ( !buffer->skip( sizeof(int64_t) ) )
-                        return Status( ErrorCodes::InvalidBSON, "invalid bson" );
-                    break;
-
-                case DBRef:
-                    status = buffer->readUTF8String( NULL );
-                    if ( !status.isOK() )
-                        return status;
-                    buffer->skip( sizeof(OID) );
-                    break;
-
-                case CodeWScope: {
-                    int myStart = buffer->position();
-                    int sz;
-
-                    if ( !buffer->readNumber<int>( &sz ) )
-                        return Status( ErrorCodes::InvalidBSON, "invalid bson" );
-
-                    status = buffer->readUTF8String( NULL );
-                    if ( !status.isOK() )
-                        return status;
-
-                    status = validateBSONInternal( buffer, NULL );
-                    if ( !status.isOK() )
-                        return status;
-
-                    if ( sz != static_cast<int>(buffer->position() - myStart) )
-                        return Status( ErrorCodes::InvalidBSON, "CodeWScope len is wrong" );
-
-                    break;
+            void setStartPosition(int pos) {
+                _startPosition = (_startPosition & (1 << 31)) | (pos & ~(1 << 31));
+            }
+            void setIsCodeWithScope(bool isCodeWithScope) {
+                if (isCodeWithScope) {
+                    _startPosition |= 1 << 31;
                 }
-                case RegEx:
-                    status = buffer->readCString( NULL );
-                    if ( !status.isOK() )
-                        return status;
-                    status = buffer->readCString( NULL );
-                    if ( !status.isOK() )
-                        return status;
-
-                    break;
-
-                case Code:
-                case Symbol:
-                case String:
-                    status = buffer->readUTF8String( NULL );
-                    if ( !status.isOK() )
-                        return status;
-                    break;
-
-                case BinData: {
-                    int sz;
-                    if ( !buffer->readNumber<int>( &sz ) )
-                        return Status( ErrorCodes::InvalidBSON, "invalid bson" );
-                    if ( !buffer->skip( 1 + sz ) )
-                        return Status( ErrorCodes::InvalidBSON, "invalid bson" );
-                    break;
-                }
-                case Object:
-                case Array:
-                    status = validateBSONInternal( buffer, NULL );
-                    if ( !status.isOK() )
-                        return status;
-                    break;
-
-                default:
-                    return Status( ErrorCodes::InvalidBSON, "invalid bson type" );
+                else {
+                    _startPosition &= ~(1 << 31);
                 }
             }
 
-            const int end = buffer->position();
+            int expectedSize;
+        private:
+            int _startPosition;
+        };
 
-            if ( end - start != supposedSize )
-                return Status( ErrorCodes::InvalidBSON, "bson length doesn't match what we found" );
+        Status validateElementInfo(Buffer* buffer, ValidationState::State* nextState) {
+            Status status = Status::OK();
 
-            if ( bsonLength )
-                *bsonLength = supposedSize;
+            char type;
+            if ( !buffer->readNumber<char>(&type) )
+                return Status( ErrorCodes::InvalidBSON, "invalid bson" );
+
+            if ( type == EOO ) {
+                *nextState = ValidationState::EndObj;
+                return Status::OK();
+            }
+
+            StringData name;
+            status = buffer->readCString( &name );
+            if ( !status.isOK() )
+                return status;
+
+            switch ( type ) {
+            case MinKey:
+            case MaxKey:
+            case jstNULL:
+            case Undefined:
+                return Status::OK();
+
+            case jstOID:
+                if ( !buffer->skip( sizeof(OID) ) )
+                    return Status( ErrorCodes::InvalidBSON, "invalid bson" );
+                return Status::OK();
+
+            case NumberInt:
+                if ( !buffer->skip( sizeof(int32_t) ) )
+                    return Status( ErrorCodes::InvalidBSON, "invalid bson" );
+                return Status::OK();
+
+            case Bool:
+                if ( !buffer->skip( sizeof(int8_t) ) )
+                    return Status( ErrorCodes::InvalidBSON, "invalid bson" );
+                return Status::OK();
+
+
+            case NumberDouble:
+            case NumberLong:
+            case Timestamp:
+            case Date:
+                if ( !buffer->skip( sizeof(int64_t) ) )
+                    return Status( ErrorCodes::InvalidBSON, "invalid bson" );
+                return Status::OK();
+
+            case DBRef:
+                status = buffer->readUTF8String( NULL );
+                if ( !status.isOK() )
+                    return status;
+                buffer->skip( sizeof(OID) );
+                return Status::OK();
+
+            case RegEx:
+                status = buffer->readCString( NULL );
+                if ( !status.isOK() )
+                    return status;
+                status = buffer->readCString( NULL );
+                if ( !status.isOK() )
+                    return status;
+
+                return Status::OK();
+
+            case Code:
+            case Symbol:
+            case String:
+                status = buffer->readUTF8String( NULL );
+                if ( !status.isOK() )
+                    return status;
+                return Status::OK();
+
+            case BinData: {
+                int sz;
+                if ( !buffer->readNumber<int>( &sz ) )
+                    return Status( ErrorCodes::InvalidBSON, "invalid bson" );
+                if ( !buffer->skip( 1 + sz ) )
+                    return Status( ErrorCodes::InvalidBSON, "invalid bson" );
+                return Status::OK();
+            }
+            case CodeWScope:
+                *nextState = ValidationState::BeginCodeWScope;
+                return Status::OK();
+            case Object:
+            case Array:
+                *nextState = ValidationState::BeginObj;
+                return Status::OK();
+
+            default:
+                return Status( ErrorCodes::InvalidBSON, "invalid bson type" );
+            }
+        }
+
+        Status validateBSONIterative(Buffer* buffer) {
+            std::deque<ValidationObjectFrame> frames;
+            ValidationObjectFrame* curr = NULL;
+            ValidationState::State state = ValidationState::BeginObj;
+
+            while (state != ValidationState::Done) {
+                switch (state) {
+                case ValidationState::BeginObj:
+                    frames.push_back(ValidationObjectFrame());
+                    curr = &frames.back();
+                    curr->setStartPosition(buffer->position());
+                    curr->setIsCodeWithScope(false);
+                    if (!buffer->readNumber<int>(&curr->expectedSize)) {
+                        return Status(ErrorCodes::InvalidBSON,
+                                      "bson size is larger than buffer size");
+                    }
+                    state = ValidationState::WithinObj;
+                    // fall through
+                case ValidationState::WithinObj: {
+                    Status status = validateElementInfo(buffer, &state);
+                    if (!status.isOK())
+                        return status;
+                    break;
+                }
+                case ValidationState::EndObj: {
+                    int actualLength = buffer->position() - curr->startPosition();
+                    if ( actualLength != curr->expectedSize ) {
+                        return Status( ErrorCodes::InvalidBSON,
+                                       "bson length doesn't match what we found" );
+                    }
+                    frames.pop_back();
+                    if (frames.empty()) {
+                        state = ValidationState::Done;
+                    }
+                    else {
+                        curr = &frames.back();
+                        if (curr->isCodeWithScope())
+                            state = ValidationState::EndCodeWScope;
+                        else
+                            state = ValidationState::WithinObj;
+                    }
+                    break;
+                }
+                case ValidationState::BeginCodeWScope: {
+                    frames.push_back(ValidationObjectFrame());
+                    curr = &frames.back();
+                    curr->setStartPosition(buffer->position());
+                    curr->setIsCodeWithScope(true);
+                    if ( !buffer->readNumber<int>( &curr->expectedSize ) )
+                        return Status( ErrorCodes::InvalidBSON, "invalid bson CodeWScope size" );
+                    Status status = buffer->readUTF8String( NULL );
+                    if ( !status.isOK() )
+                        return status;
+                    state = ValidationState::BeginObj;
+                    break;
+                }
+                case ValidationState::EndCodeWScope: {
+                    int actualLength = buffer->position() - curr->startPosition();
+                    if ( actualLength != curr->expectedSize ) {
+                        return Status( ErrorCodes::InvalidBSON,
+                                       "bson length for CodeWScope doesn't match what we found" );
+                    }
+                    frames.pop_back();
+                    if (frames.empty())
+                        return Status(ErrorCodes::InvalidBSON, "unnested CodeWScope");
+                    curr = &frames.back();
+                    state = ValidationState::WithinObj;
+                    break;
+                }
+                case ValidationState::Done:
+                    break;
+                }
+            }
 
             return Status::OK();
         }
-    }
 
-    Status validateBSON( const char* originalBuffer, uint64_t maxLength, int* bsonLength ) {
+    }  // namespace
+
+    Status validateBSON( const char* originalBuffer, uint64_t maxLength ) {
         if ( maxLength < 5 ) {
             return Status( ErrorCodes::InvalidBSON, "bson data has to be at least 5 bytes" );
         }
 
         Buffer buf( originalBuffer, maxLength );
-        return validateBSONInternal( &buf, bsonLength );
+        return validateBSONIterative( &buf );
     }
 
-}
+}  // namespace mongo

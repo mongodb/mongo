@@ -462,13 +462,7 @@ namespace mongo {
     }
 
     bool BSONObj::valid() const {
-        int mySize = objsize();
-        int otherSize;
-        Status status = validateBSON( objdata(), mySize, &otherSize );
-        if ( ! status.isOK() )
-            return false;
-        verify( mySize == otherSize ); // should be impossible
-        return true;
+        return validateBSON( objdata(), objsize() ).isOK();
     }
 
     int BSONObj::woCompare(const BSONObj& r, const Ordering &o, bool considerFieldName) const {

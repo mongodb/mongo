@@ -57,10 +57,10 @@ namespace {
             if ( o.valid() ) {
                 numValid++;
                 jsonSize += o.jsonString().size();
-                ASSERT( validateBSON( o.objdata(), o.objsize() ).isOK() );
+                ASSERT_OK( validateBSON( o.objdata(), o.objsize() ) );
             }
             else {
-                ASSERT( !validateBSON( o.objdata(), o.objsize() ).isOK() );
+                ASSERT_NOT_OK( validateBSON( o.objdata(), o.objsize() ) );
             }
 
             delete[] x;
@@ -104,10 +104,10 @@ namespace {
             if ( mine.valid() ) {
                 numValid++;
                 jsonSize += mine.jsonString().size();
-                ASSERT( validateBSON( mine.objdata(), mine.objsize() ).isOK() );
+                ASSERT_OK( validateBSON( mine.objdata(), mine.objsize() ) );
             }
             else {
-                ASSERT( !validateBSON( mine.objdata(), mine.objsize() ).isOK() );
+                ASSERT_NOT_OK( validateBSON( mine.objdata(), mine.objsize() ) );
             }
 
         }
@@ -161,22 +161,22 @@ namespace {
 
     TEST( BSONValidateFast, Empty ) {
         BSONObj x;
-        ASSERT( validateBSON( x.objdata(), x.objsize() ).isOK() );
+        ASSERT_OK( validateBSON( x.objdata(), x.objsize() ) );
     }
 
     TEST( BSONValidateFast, RegEx ) {
         BSONObjBuilder b;
         b.appendRegex( "foo", "i" );
         BSONObj x = b.obj();
-        ASSERT( validateBSON( x.objdata(), x.objsize() ).isOK() );
+        ASSERT_OK( validateBSON( x.objdata(), x.objsize() ) );
     }
 
     TEST(BSONValidateFast, Simple0 ) {
         BSONObj x;
-        ASSERT( validateBSON( x.objdata(), x.objsize() ).isOK() );
+        ASSERT_OK( validateBSON( x.objdata(), x.objsize() ) );
 
         x = BSON( "foo" << 17 << "bar" << "eliot" );
-        ASSERT( validateBSON( x.objdata(), x.objsize() ).isOK() );
+        ASSERT_OK( validateBSON( x.objdata(), x.objsize() ) );
 
     }
 
@@ -189,7 +189,7 @@ namespace {
             sprintf( buf, "bar%d", i );
             b.appendMaxForType( buf, i );
             BSONObj x = b.obj();
-            ASSERT( validateBSON( x.objdata(), x.objsize() ).isOK() );
+            ASSERT_OK( validateBSON( x.objdata(), x.objsize() ) );
         }
     }
 
@@ -204,8 +204,13 @@ namespace {
             b.appendMaxForType( buf, i );
         }
         BSONObj x = b.obj();
-        ASSERT( validateBSON( x.objdata(), x.objsize() ).isOK() );
+        ASSERT_OK( validateBSON( x.objdata(), x.objsize() ) );
     }
 
+    TEST(BSONValidateFast, NestedObject) {
+        BSONObj x = BSON( "a" << 1 << "b" << BSON("c" << 2 << "d" << BSONArrayBuilder().obj() << "e" << BSON_ARRAY("1" << 2 << 3)));
+        ASSERT_OK(validateBSON(x.objdata(), x.objsize()));
+        ASSERT_NOT_OK(validateBSON(x.objdata(), x.objsize() / 2));
+    }
 
 }
