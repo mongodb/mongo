@@ -1587,7 +1587,15 @@ shellHelper.show = function (what) {
     }
 
     if (what == "startupWarnings" ) {
-        if ( db ) {
+        var dbDeclared, ex;
+        try {
+            // !!db essentially casts db to a boolean
+            // Will throw a reference exception if db hasn't been declared.
+            dbDeclared = !!db;
+        } catch (ex) {
+            dbDeclared = false;
+        }
+        if (dbDeclared) {
             var res = db.adminCommand( { getLog : "startupWarnings" } );
             if ( res.ok ) {
                 print( "Server has startup warnings: " );
@@ -1595,7 +1603,13 @@ shellHelper.show = function (what) {
                     print( res.log[i] )
                 }
                 return "";
+            } else {
+                print("Error while trying to show server startup warnings: " + res.errmsg);
+                return "";
             }
+        } else {
+            print("Cannot show startupWarnings, \"db\" is not set");
+            return "";
         }
     }
 
