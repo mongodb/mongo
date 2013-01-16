@@ -129,7 +129,10 @@ namespace mongo {
 
         const vector<BSONElement>& coordinateArray = coordElt.Array();
         if (coordinateArray.size() < 2) { return false; }
-        return isArrayOfCoordinates(coordinateArray);
+        if (!isArrayOfCoordinates(coordinateArray)) { return false; }
+        vector<S2Point> vertices;
+        parsePoints(obj.getFieldDotted(GEOJSON_COORDINATES).Array(), &vertices);
+        return S2Polyline::IsValid(vertices);
     }
 
     void GeoParser::parseGeoJSONLineString(const BSONObj& obj, S2Polyline* out) {
@@ -173,29 +176,43 @@ namespace mongo {
         const vector<BSONElement>& exteriorRing = coordinates[0].Array();
         vector<S2Point> exteriorVertices;
         parsePoints(exteriorRing, &exteriorVertices);
+        // The last point is duplicated.  We drop it, since S2Loop expects no
+        // duplicate points
+        exteriorVertices.resize(exteriorVertices.size() - 1);
 
         S2PolygonBuilderOptions polyOptions;
         polyOptions.set_validate(true);
+        // Don't silently eliminate duplicate edges.
+        polyOptions.set_xor_edges(false);
         S2PolygonBuilder polyBuilder(polyOptions);
         S2Loop exteriorLoop(exteriorVertices);
+        exteriorLoop.Normalize();
         if (exteriorLoop.is_hole()) {
             exteriorLoop.Invert();
         }
+        uassert(16693, "Exterior shell of polygon is invalid: " + obj.toString(),
+                exteriorLoop.IsValid());
         polyBuilder.AddLoop(&exteriorLoop);
 
         // Subsequent arrays of coordinates are interior rings/holes.
         for (size_t i = 1; i < coordinates.size(); ++i) {
             vector<S2Point> holePoints;
             parsePoints(coordinates[i].Array(), &holePoints);
+            // Drop the duplicated last point.
+            holePoints.resize(holePoints.size() - 1);
             // Interior rings are clockwise.
             S2Loop holeLoop(holePoints);
+            holeLoop.Normalize();
+            uassert(16694, "Interior hole of polygon is invalid: " + obj.toString(),
+                    holeLoop.IsValid());
             if (!holeLoop.is_hole()) {
                 holeLoop.Invert();
             }
             polyBuilder.AddLoop(&holeLoop);
         }
 
-        polyBuilder.AssemblePolygon(out, NULL);
+        uassert(16695, "Couldn't assemble polygon: " + obj.toString(),
+                polyBuilder.AssemblePolygon(out, NULL));
     }
 
     bool GeoParser::parsePoint(const BSONObj &obj, S2Point *out) {

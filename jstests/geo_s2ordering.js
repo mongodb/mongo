@@ -25,7 +25,7 @@ function runTest(index) {
     // since the tests shouldn't take that long.
     mintime = 100000.0;
     resultcount = 0;
-    iterations = 50;
+    iterations = 10;
     for (var x = 0; x < iterations; ++x) {
         res = t.find({nongeo: needle, geo: {$within: {$centerSphere: [[0,0], Math.PI/180.0]}}})
         if (res.explain().millis < mintime) {

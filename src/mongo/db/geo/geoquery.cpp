@@ -146,6 +146,9 @@ namespace mongo {
             }
         }
 
+        // Don't want to give the error below if we could not pull any geometry out.
+        if (!hasGeometry) { return false; }
+
         if (GeoQuery::WITHIN == predicate) {
             // Why do we only deal with $within {polygon}?
             // 1. Finding things within a point is silly and only valid

@@ -55,22 +55,11 @@ var longPoly = {type: "Polygon",
         [[89.0, 1.0], [-89.0, 1.0], [-89.0, -1.0], [89.0, -1.0], [89.0, 1.0]]
     ]};
 
-//We expect that the testPoint (at the origin) will be within this poly.
-/*
- * Tests commented out because they are currently failing.  There is a
- * bug tracked https://jira.mongodb.org/browse/SERVER-8180 .
- */
-/*
+// Thanks to spherical geometry, this poly contains most of the hemisphere.
 result = t.find({geo: {$within: {$geometry: longPoly}}});
-assert.eq(result.count(), 1);
-assert.eq(result[0].name, 'origin');
-
-//We expect that the testPoint, and the testVertLine should geoIntersect
-//with this poly.
+assert.eq(result.count(), 3);
 result = t.find({geo: {$geoIntersects: {$geometry: longPoly}}});
-assert.eq(result.count(), 2);
-assert.eq(result[0].name, 'vert');
-assert.eq(result[1].name, 'origin');*/
+assert.eq(result.count(), 3);
 
 //Test a poly that is the size of half the earth.
 

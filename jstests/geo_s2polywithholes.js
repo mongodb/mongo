@@ -17,7 +17,6 @@ var polygonWithNoHole = {"type" : "Polygon", "coordinates": [
 
 // Test 1: Sanity check.  Expect all three points.
 var sanityResult = t.find({geo: {$within: {$geometry: polygonWithNoHole}}});
-
 assert.eq(sanityResult.count(), 3);
 
 // Test 2: Polygon with a hole that isn't contained byt the poly shell.
@@ -31,15 +30,13 @@ var polygonWithProtrudingHole = {"type" : "Polygon", "coordinates": [
 t.insert({geo: polygonWithProtrudingHole});
 assert(db.getLastError());
 
-// When used for a within search, the shell seems to be respected, and all points
-// are returned.  Since this errors on insert, I don't think it's behaviour
-// actually matters much.
-var protrudingResult = t.find({geo: {$within: {$geometry: polygonWithProtrudingHole}}});
-assert(protrudingResult, 3);
+// Can't search with bogus poly.
+assert.throws(function() {
+    return t.find({geo: {$within: {$geometry: polygonWithProtrudingHole}}}).count()
+})
 
 // Test 3: This test will confirm that a polygon with overlapping holes throws
 // an error.
-
 var polyWithOverlappingHoles = {"type" : "Polygon", "coordinates": [
         [[0,0], [0,1], [1, 1], [1, 0], [0, 0]],
         [[0.2,0.6], [0.2,0.9], [0.6, 0.9], [0.6, 0.6], [0.2, 0.6]],
