@@ -80,19 +80,17 @@ namespace {
     ActionSet readWriteRoleActions;
     ActionSet userAdminRoleActions;
     ActionSet dbAdminRoleActions;
-    // Separate serverAdmin and clusterAdmin read-only and read-write action for backwards
-    // compatibility with old-style read-only admin users.  This separation is not exposed to the
-    // user, and could go away once we stop supporting old-style privilege documents.
-    ActionSet serverAdminRoleReadActions;
-    ActionSet serverAdminRoleWriteActions;
     ActionSet serverAdminRoleActions;
-    ActionSet clusterAdminRoleReadActions;
-    ActionSet clusterAdminRoleWriteActions;
     ActionSet clusterAdminRoleActions;
     // Can only be performed by internal connections.  Nothing ever explicitly grants these actions,
     // but they're included when calling addAllActions on an ActionSet, which is how internal
     // connections are granted their privileges.
     ActionSet internalActions;
+    // Old-style user roles
+    ActionSet compatibilityReadOnlyActions;
+    ActionSet compatibilityReadWriteActions;
+    ActionSet compatibilityReadOnlyAdminActions;
+    ActionSet compatibilityReadWriteAdminActions;
 
     // This sets up the system role ActionSets.  This is what determines what actions each role
     // is authorized to perform
@@ -139,6 +137,14 @@ namespace {
         dbAdminRoleActions.addAction(ActionType::renameCollectionSameDB); // read_write gets this also
         dbAdminRoleActions.addAction(ActionType::storageDetails);
         dbAdminRoleActions.addAction(ActionType::validate);
+
+        // We separate serverAdmin and clusterAdmin read-only and read-write action for backwards
+        // compatibility with old-style read-only admin users.  This separation is not exposed to
+        // the user, and could go away once we stop supporting old-style privilege documents.
+        ActionSet serverAdminRoleReadActions;
+        ActionSet serverAdminRoleWriteActions;
+        ActionSet clusterAdminRoleReadActions;
+        ActionSet clusterAdminRoleWriteActions;
 
         // Server admin role
         serverAdminRoleReadActions.addAction(ActionType::connPoolStats);
@@ -200,6 +206,26 @@ namespace {
 
         clusterAdminRoleActions.addAllActionsFromSet(clusterAdminRoleReadActions);
         clusterAdminRoleActions.addAllActionsFromSet(clusterAdminRoleWriteActions);
+
+        // Old-style user actions, for backwards compatibility
+        compatibilityReadOnlyActions.addAllActionsFromSet(readRoleActions);
+
+        compatibilityReadWriteActions.addAllActionsFromSet(readWriteRoleActions);
+        compatibilityReadWriteActions.addAllActionsFromSet(dbAdminRoleActions);
+        compatibilityReadWriteActions.addAllActionsFromSet(userAdminRoleActions);
+        compatibilityReadWriteActions.addAction(ActionType::clone);
+        compatibilityReadWriteActions.addAction(ActionType::copyDBTarget);
+        compatibilityReadWriteActions.addAction(ActionType::dropDatabase);
+        compatibilityReadWriteActions.addAction(ActionType::repairDatabase);
+
+        compatibilityReadOnlyAdminActions.addAllActionsFromSet(compatibilityReadOnlyActions);
+        compatibilityReadOnlyAdminActions.addAllActionsFromSet(serverAdminRoleReadActions);
+        compatibilityReadOnlyAdminActions.addAllActionsFromSet(clusterAdminRoleReadActions);
+
+        compatibilityReadWriteAdminActions.addAllActionsFromSet(compatibilityReadWriteActions);
+        compatibilityReadWriteAdminActions.addAllActionsFromSet(compatibilityReadOnlyAdminActions);
+        compatibilityReadWriteAdminActions.addAllActionsFromSet(serverAdminRoleWriteActions);
+        compatibilityReadWriteAdminActions.addAllActionsFromSet(clusterAdminRoleWriteActions);
 
         // Internal commands
         internalActions.addAction(ActionType::clone);
@@ -444,28 +470,19 @@ namespace {
 
     ActionSet AuthorizationManager::getActionsForOldStyleUser(const std::string& dbname,
                                                               bool readOnly) {
-        ActionSet actions;
-        // Basic actions
-        if (readOnly) {
-            actions.addAllActionsFromSet(readRoleActions);
-        }
-        else {
-            actions.addAllActionsFromSet(readWriteRoleActions);
-            actions.addAllActionsFromSet(dbAdminRoleActions);
-            actions.addAllActionsFromSet(userAdminRoleActions);
-            actions.addAction(ActionType::dropDatabase);
-            actions.addAction(ActionType::repairDatabase);
-        }
-        // Admin actions
         if (dbname == ADMIN_DBNAME || dbname == LOCAL_DBNAME) {
-            actions.addAllActionsFromSet(serverAdminRoleReadActions);
-            actions.addAllActionsFromSet(clusterAdminRoleReadActions);
-            if (!readOnly) {
-                actions.addAllActionsFromSet(serverAdminRoleWriteActions);
-                actions.addAllActionsFromSet(clusterAdminRoleWriteActions);
+            if (readOnly) {
+                return compatibilityReadOnlyAdminActions;
+            } else {
+                return compatibilityReadWriteAdminActions;
+            }
+        } else {
+            if (readOnly) {
+                return compatibilityReadOnlyActions;
+            } else {
+                return compatibilityReadWriteActions;
             }
         }
-        return actions;
     }
 
     Status AuthorizationManager::acquirePrivilegesFromPrivilegeDocument(
