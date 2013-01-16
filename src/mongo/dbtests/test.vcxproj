@@ -736,7 +736,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="..\db\namespace_details.h" />
     <ClInclude Include="..\db\ops\count.h" />
     <ClInclude Include="..\db\ops\delete.h" />
-    <ClInclude Include="..\db\ops\field_ref.h" />
+    <ClInclude Include="..\db\field_ref.h" />
     <ClInclude Include="..\db\ops\modifier_base.h" />
     <ClInclude Include="..\db\ops\query.h" />
     <ClInclude Include="..\db\ops\update.h" />
@@ -2810,7 +2810,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="..\db\namespace_details.cpp" />
     <ClCompile Include="..\db\ops\count.cpp" />
     <ClCompile Include="..\db\ops\delete.cpp" />
-    <ClCompile Include="..\db\ops\field_ref.cpp" />
+    <ClCompile Include="..\db\field_ref.cpp" />
     <ClCompile Include="..\db\ops\query.cpp" />
     <ClCompile Include="..\db\ops\update.cpp" />
     <ClCompile Include="..\db\ops\update_internal.cpp" />
@@ -3211,7 +3211,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <None Include="..\db\fts\stop_words_spanish.txt" />
     <None Include="..\db\fts\stop_words_swedish.txt" />
     <None Include="..\db\fts\stop_words_turkish.txt" />
-    <None Include="..\db\ops\SConscript" />
+    <None Include="..\db\SConscript" />
     <None Include="btreetests.inl" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

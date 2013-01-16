@@ -2513,7 +2513,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="intervalbtreecursor.cpp" />
     <ClCompile Include="keypattern.cpp" />
     <ClCompile Include="kill_current_op.cpp" />
-    <ClCompile Include="ops\field_ref.cpp" />
+    <ClCompile Include="field_ref.cpp" />
     <ClCompile Include="pipeline\document_source_cursor.cpp" />
     <ClCompile Include="commands\find_and_modify.cpp" />
     <ClCompile Include="commands\fsync.cpp" />
@@ -3197,7 +3197,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="namespace_details-inl.h" />
     <ClInclude Include="namespace_details.h" />
     <ClInclude Include="oplog.h" />
-    <ClInclude Include="ops\field_ref.h" />
+    <ClInclude Include="field_ref.h" />
     <ClInclude Include="ops\modifier_base.h" />
     <ClInclude Include="ops\query.h" />
     <ClInclude Include="ops\update_internal.h" />
@@ -3361,7 +3361,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <None Include="fts\stop_words_swedish.txt" />
     <None Include="fts\stop_words_turkish.txt" />
     <None Include="mongo.ico" />
-    <None Include="ops\SConscript" />
+    <None Include="SConscript" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\bson\bson-inl.h" />
