@@ -40,8 +40,7 @@ __wt_eviction_page_force(WT_SESSION_IMPL *session, WT_PAGE *page)
  *	Increment a page's memory footprint in the cache.
  */
 static inline void
-__wt_cache_page_inmem_incr(
-    WT_SESSION_IMPL *session, WT_PAGE *page, size_t size)
+__wt_cache_page_inmem_incr(WT_SESSION_IMPL *session, WT_PAGE *page, size_t size)
 {
 	WT_CACHE *cache;
 
@@ -57,8 +56,7 @@ __wt_cache_page_inmem_incr(
  *	Decrement a page's memory footprint in the cache.
  */
 static inline void
-__wt_cache_page_inmem_decr(
-    WT_SESSION_IMPL *session, WT_PAGE *page, size_t size)
+__wt_cache_page_inmem_decr(WT_SESSION_IMPL *session, WT_PAGE *page, size_t size)
 {
 	WT_CACHE *cache;
 
@@ -75,8 +73,7 @@ __wt_cache_page_inmem_decr(
  *	be called after a reconciliation leaves a page clean.
  */
 static inline void
-__wt_cache_dirty_decr(
-    WT_SESSION_IMPL *session, size_t size)
+__wt_cache_dirty_decr(WT_SESSION_IMPL *session, size_t size)
 {
 	WT_CACHE *cache;
 
