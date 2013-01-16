@@ -130,7 +130,7 @@ namespace mongo {
             StoredConnection c = _pool.top();
             _pool.pop();
             
-            if ( c.ok( now ) )
+            if ( c.ok( now ) && all.size() < PoolForHost::_maxSpareConnPools)
                 all.push_back( c );
             else
                 stale.push_back( c.conn );
@@ -148,8 +148,7 @@ namespace mongo {
     }
 
     bool PoolForHost::StoredConnection::ok( time_t now ) {
-        // if connection has been idle for 30 minutes, kill it
-        return ( now - when ) < 1800;
+        return ( now - when ) < static_cast<signed>(PoolForHost::_connPoolTimeout);
     }
 
     void PoolForHost::createdOne( DBClientBase * base) {
@@ -165,6 +164,10 @@ namespace mongo {
     }
 
     unsigned PoolForHost::_maxPerHost = 50;
+  
+    // if connection has been idle for 30 minutes, kill it
+    unsigned PoolForHost::_connPoolTimeout = 1800; 
+    unsigned PoolForHost::_maxSpareConnPools = 50;
 
     // ------ DBConnectionPool ------
 
