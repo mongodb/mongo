@@ -2263,7 +2263,12 @@ int InputBuffer::getInputLine( PromptBase& pi ) {
             {
                 Utf32String* restoredText = killRing.yank();
                 if ( restoredText ) {
+                    bool truncated = false;
                     size_t ucharCount = restoredText->length();
+                    if (ucharCount > static_cast<size_t>(buflen - len)) {
+                        ucharCount = buflen - len;
+                        truncated = true;
+                    }
                     memmove( buf32 + pos + ucharCount, buf32 + pos, sizeof( UChar32 ) * ( len - pos + 1 ) );
                     memmove( buf32 + pos, restoredText->get(), sizeof( UChar32 ) * ucharCount );
                     pos += ucharCount;
@@ -2271,6 +2276,9 @@ int InputBuffer::getInputLine( PromptBase& pi ) {
                     refreshLine( pi );
                     killRing.lastAction = KillRing::actionYank;
                     killRing.lastYankSize = ucharCount;
+                    if (truncated) {
+                        beep();
+                    }
                 }
                 else {
                     beep();
@@ -2284,7 +2292,12 @@ int InputBuffer::getInputLine( PromptBase& pi ) {
                 historyRecallMostRecent = false;
                 Utf32String* restoredText = killRing.yankPop();
                 if ( restoredText ) {
+                    bool truncated = false;
                     size_t ucharCount = restoredText->length();
+                    if (ucharCount > static_cast<size_t>(killRing.lastYankSize + buflen - len)) {
+                        ucharCount = killRing.lastYankSize + buflen - len;
+                        truncated = true;
+                    }
                     if ( ucharCount > killRing.lastYankSize ) {
                         memmove( buf32 + pos + ucharCount - killRing.lastYankSize, buf32 + pos, sizeof( UChar32 ) * ( len - pos + 1 ) );
                         memmove( buf32 + pos - killRing.lastYankSize, restoredText->get(), sizeof( UChar32 ) * ucharCount );
@@ -2297,6 +2310,9 @@ int InputBuffer::getInputLine( PromptBase& pi ) {
                     len += ucharCount - killRing.lastYankSize;
                     killRing.lastYankSize = ucharCount;
                     refreshLine( pi );
+                    if (truncated) {
+                        beep();
+                    }
                     break;
                 }
             }
