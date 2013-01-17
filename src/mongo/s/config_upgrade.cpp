@@ -246,7 +246,7 @@ namespace mongo {
 
         // Check that the mongo version of this process hasn't been excluded from the cluster
         vector<MongoVersionRange> excludedRanges;
-        if (!MongoVersionRange::parseBSONArray(versionInfo.getExcludedRanges(),
+        if (!MongoVersionRange::parseBSONArray(versionInfo.getExcludingMongoVersions(),
                                                &excludedRanges,
                                                whyNot))
         {
