@@ -145,7 +145,6 @@ namespace {
         string errMsg;
         ASSERT(chunk.parseBSON(obj, &errMsg));
         ASSERT_EQUALS(errMsg, "");
-        ASSERT_TRUE(chunk.isValid(NULL));
         ASSERT_EQUALS(chunk.getName(), "test.mycol-a_MinKey");
         ASSERT_EQUALS(chunk.getNS(), "test.mycol");
         ASSERT_EQUALS(chunk.getMin(), BSON("a" << 10));
@@ -154,6 +153,7 @@ namespace {
         ASSERT_EQUALS(fetchedVersion._combined, 1ULL);
         ASSERT_EQUALS(fetchedVersion._epoch, epoch);
         ASSERT_EQUALS(chunk.getShard(), "shard0001");
+        ASSERT_TRUE(chunk.isValid(NULL));
     }
 
     TEST(Compatibility, OldFormatVersion) {
@@ -169,7 +169,6 @@ namespace {
         string errMsg;
         ASSERT(chunk.parseBSON(obj, &errMsg));
         ASSERT_EQUALS(errMsg, "");
-        ASSERT_TRUE(chunk.isValid(NULL));
         ASSERT_EQUALS(chunk.getName(), "test.mycol-a_MinKey");
         ASSERT_EQUALS(chunk.getNS(), "test.mycol");
         ASSERT_EQUALS(chunk.getMin(), BSON("a" << 10));
@@ -178,6 +177,7 @@ namespace {
         ASSERT_EQUALS(fetchedVersion._combined, 1ULL);
         ASSERT_EQUALS(fetchedVersion._epoch, epoch);
         ASSERT_EQUALS(chunk.getShard(), "shard0001");
+        ASSERT_TRUE(chunk.isValid(NULL));
     }
 
     TEST(Validity, BadType) {

@@ -34,20 +34,17 @@ namespace mongo {
      *
      *     // Contact the config. 'conn' has been obtained before.
      *     DBClientBase* conn;
-     *     unique_ptr<DbClientCursor> cursor;
-     *     BSONObj query = QUERY(ChunkType::ns("mydb.mycoll"));
-     *     cursor.reset(conn->query(ChunkType::ConfigNS, query, ...));
+     *     BSONObj query = QUERY(ChunkType::exampleField("exampleFieldName"));
+     *     exampleDoc = conn->findOne(ChunkType::ConfigNS, query);
      *
      *     // Process the response.
-     *     while (cursor->more()) {
-     *         chunkDoc = cursor->next();
-     *         ChunkType chunk;
-     *         chunk.fromBSON(dbDoc);
-     *         if (! chunk.isValid()) {
-     *             // Can't use 'chunk'. Take action.
-     *         }
-     *         // use 'chunk'
+     *     ChunkType exampleType;
+     *     string errMsg;
+     *     if (!exampleType.parseBSON(exampleDoc, &errMsg) || !exampleType.isValid(&errMsg)) {
+     *         // Can't use 'exampleType'. Take action.
      *     }
+     *     // use 'exampleType'
+     *
      */
     class ChunkType {
         MONGO_DISALLOW_COPYING(ChunkType);
@@ -57,25 +54,22 @@ namespace mongo {
         // schema declarations
         //
 
-        // Name of the chunk collection in the config server.
+        // Name of the chunks collection in the config server.
         static const std::string ConfigNS;
 
-        // Field names and types in the chunk collection type.
-        static BSONField<std::string> name;     // chunk's id
-        static BSONField<std::string> ns;       // namespace this chunk is in
-        static BSONField<BSONObj> min;          // first key of the chunk, including
-        static BSONField<BSONObj> max;          // last key of the chunk, non-including
-        static BSONField<BSONArray> version;    // [Date_t, OID]
-        static BSONField<std::string> shard;    // home of this chunk
-        static BSONField<bool> jumbo;           // too big to move?
-
-        // Transition to new format, 2.2 -> 2.4
-        // 2.2 can read both lastmod + lastmodEpoch format and 2.4 [ lastmod, OID ] formats.
-        static BSONField<Date_t> DEPRECATED_lastmod;  // major | minor versions
-        static BSONField<OID> DEPRECATED_epoch;       // OID, to disambiguate collection incarnations
+        // Field names and types in the chunks collection type.
+        static const BSONField<std::string> name;
+        static const BSONField<std::string> ns;
+        static const BSONField<BSONObj> min;
+        static const BSONField<BSONObj> max;
+        static const BSONField<BSONArray> version;
+        static const BSONField<std::string> shard;
+        static const BSONField<bool> jumbo;
+        static const BSONField<Date_t> DEPRECATED_lastmod;
+        static const BSONField<OID> DEPRECATED_epoch;
 
         //
-        // chunk type methods
+        // chunks type methods
         //
 
         ChunkType();
@@ -117,71 +111,136 @@ namespace mongo {
         // individual field accessors
         //
 
+        // Mandatory Fields
         void setName(const StringData& name) {
             _name = name.toString();
+            _isNameSet = true;
         }
 
-        const std::string& getName() const {
+        void unsetName() { _isNameSet = false; }
+
+        bool isNameSet() { return _isNameSet; }
+
+        // Calling get*() methods when the member is not set results in undefined behavior
+        const std::string getName() const {
+            dassert(_isNameSet);
             return _name;
         }
 
         void setNS(const StringData& ns) {
             _ns = ns.toString();
+            _isNsSet = true;
         }
 
-        const std::string& getNS() const {
+        void unsetNS() { _isNsSet = false; }
+
+        bool isNSSet() { return _isNsSet; }
+
+        // Calling get*() methods when the member is not set results in undefined behavior
+        const std::string getNS() const {
+            dassert(_isNsSet);
             return _ns;
         }
 
         void setMin(const BSONObj& min) {
             _min = min.getOwned();
+            _isMinSet = true;
         }
 
-        BSONObj getMin() const {
+        void unsetMin() { _isMinSet = false; }
+
+        bool isMinSet() { return _isMinSet; }
+
+        // Calling get*() methods when the member is not set results in undefined behavior
+        const BSONObj getMin() const {
+            dassert(_isMinSet);
             return _min;
         }
 
         void setMax(const BSONObj& max) {
             _max = max.getOwned();
+            _isMaxSet = true;
         }
 
-        BSONObj getMax() const {
+        void unsetMax() { _isMaxSet = false; }
+
+        bool isMaxSet() { return _isMaxSet; }
+
+        // Calling get*() methods when the member is not set results in undefined behavior
+        const BSONObj getMax() const {
+            dassert(_isMaxSet);
             return _max;
         }
 
         void setVersion(const ChunkVersion& version) {
             _version = version;
+            _isVersionSet = true;
         }
 
+        void unsetVersion() { _isVersionSet = false; }
+
+        bool isVersionSet() { return _isVersionSet; }
+
+        // Calling get*() methods when the member is not set results in undefined behavior
         const ChunkVersion& getVersion() const {
+            dassert(_isVersionSet);
             return _version;
         }
 
         void setShard(const StringData& shard) {
             _shard = shard.toString();
+            _isShardSet = true;
         }
 
-        const std::string& getShard() const {
+        void unsetShard() { _isShardSet = false; }
+
+        bool isShardSet() { return _isShardSet; }
+
+        // Calling get*() methods when the member is not set results in undefined behavior
+        const std::string getShard() const {
+            dassert(_isShardSet);
             return _shard;
         }
 
+        // Optional Fields
         void setJumbo(bool jumbo) {
             _jumbo = jumbo;
+            _isJumboSet = true;
         }
 
+        void unsetJumbo() { _isJumboSet = false; }
+
+        bool isJumboSet() {
+            return _isJumboSet || jumbo.hasDefault();
+        }
+
+        // Calling get*() methods when the member is not set and has no default results in undefined
+        // behavior
         bool getJumbo() const {
-            return _jumbo;
+            if (_isJumboSet) {
+                return _jumbo;
+            } else {
+                dassert(jumbo.hasDefault());
+                return jumbo.getDefault();
+            }
         }
 
     private:
         // Convention: (M)andatory, (O)ptional, (S)pecial rule.
-        string _name;          // (M) chunk's id
-        string _ns;            // (M) collection this chunk is in
-        BSONObj _min;          // (M) first key of the range, inclusive
-        BSONObj _max;          // (M) last key of the range, non-inclusive
-        ChunkVersion _version; // (M) version of this chunk
-        string _shard;         // (M) shard this chunk lives in
-        bool _jumbo;           // (O) too big to move?
+        std::string _name;     // (M)  chunk's id
+        bool _isNameSet;
+        std::string _ns;     // (M)  collection this chunk is in
+        bool _isNsSet;
+        BSONObj _min;     // (M)  first key of the range, inclusive
+        bool _isMinSet;
+        BSONObj _max;     // (M)  last key of the range, non-inclusive
+        bool _isMaxSet;
+        ChunkVersion _version;     // (M)  version of this chunk
+        bool _isVersionSet;
+        std::string _shard;     // (M)  shard this chunk lives in
+        bool _isShardSet;
+        bool _jumbo;     // (O)  too big to move?
+        bool _isJumboSet;
     };
 
 } // namespace mongo
