@@ -401,8 +401,11 @@ populate_thread(void *arg)
 		goto err;
 	}
 
+	/* Do a bulk load if populate is single-threaded. */
 	if ((ret = session->open_cursor(
-	    session, cfg->uri, NULL, NULL, &cursor)) != 0) {
+	    session, cfg->uri, NULL,
+	    cfg->populate_threads == 1 ? "bulk" : NULL,
+	    &cursor)) != 0) {
 		lprintf(cfg, ret, 0, "Error opening cursor %s", cfg->uri);
 		goto err;
 	}
