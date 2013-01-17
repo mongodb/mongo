@@ -13,7 +13,7 @@ res = t.runCommand("text", {search : "a"});
 assert.eq( 2, res.results.length );
 assert( res.results[0].obj.y, tojson(res) );
 
-res = t.runCommand("text", {search : "a", projection: {x: 1}});
+res = t.runCommand("text", {search : "a", project: {x: 1}});
 assert.eq( 2, res.results.length );
 assert( !res.results[0].obj.y, tojson(res) );
 

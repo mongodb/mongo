@@ -78,8 +78,8 @@ namespace mongo {
                 filter = cmdObj["filter"].Obj();
 
             BSONObj projection;
-            if (cmdObj["projection"].isABSONObj()) {
-                projection = cmdObj["projection"].Obj();
+            if (cmdObj["project"].isABSONObj()) {
+                projection = cmdObj["project"].Obj();
             }
 
             return _run( dbname, cmdObj, options,

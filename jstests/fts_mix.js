@@ -83,7 +83,7 @@ assert.eq( res.results[0].obj._id, res2.results[0].obj._id );
 // -------------------------------------------- PROJECTION -----------------------------------------
 
 // test projection.. show just title and id
-res = tc.runCommand( "text", { search: "Morten Jensen", projection: { title: 1 } } );
+res = tc.runCommand( "text", { search: "Morten Jensen", project: { title: 1 } } );
 assert.eq( 1, res.results.length );
 assert.eq( 5, res.results[0].obj._id );
 assert.eq( null, res.results[0].obj.text );
@@ -91,7 +91,7 @@ assert.neq( null, res.results[0].obj.title );
 assert.neq( null, res.results[0].obj._id );
 
 // test negative projection, ie. show everything but text
-res = tc.runCommand( "text", { search: "handball", projection: { text: 0 } } );
+res = tc.runCommand( "text", { search: "handball", project: { text: 0 } } );
 assert.eq( 1, res.results.length );
 assert.eq( 4, res.results[0].obj._id );
 assert.eq( null, res.results[0].obj.text );
@@ -99,7 +99,7 @@ assert.neq( null, res.results[0].obj.title );
 assert.neq( null, res.results[0].obj._id );
 
 // test projection only title, no id
-res = tc.runCommand( "text", { search: "Mahim Bora", projection: { _id: 0, title: 1 } } );
+res = tc.runCommand( "text", { search: "Mahim Bora", project: { _id: 0, title: 1 } } );
 assert.eq( 1, res.results.length );
 assert.eq( "Mahim Bora", res.results[0].obj.title );
 assert.eq( null, res.results[0].obj.text );
