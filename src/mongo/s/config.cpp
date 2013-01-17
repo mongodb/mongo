@@ -936,7 +936,9 @@ namespace mongo {
                         log() << "warning: invalid chunksize (" << csize << ") ignored" << endl;
                     } else {
                         LOG(1) << "MaxChunkSize: " << csize << endl;
-                        Chunk::MaxChunkSize = csize * 1024 * 1024;
+                        if ( !Chunk::setMaxChunkSizeSizeMB( csize ) ) {
+                            warning() << "invalid chunksize: " << csize << endl;
+                        }
                     }
                 }
                 else if ( name == "balancer" ) {

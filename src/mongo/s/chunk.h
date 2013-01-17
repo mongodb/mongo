@@ -175,7 +175,14 @@ namespace mongo {
         /**
          * Attempt to refresh maximum chunk size from config.
          */
-         static void refreshChunkSize();
+        static void refreshChunkSize();
+
+        /**
+         * sets MaxChunkSize
+         * 1 <= newMaxChunkSize <= 1024
+         * @return true if newMaxChunkSize is valid and was set
+         */
+        static bool setMaxChunkSizeSizeMB( int newMaxChunkSize );
 
         //
         // public constants
