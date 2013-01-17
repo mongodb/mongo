@@ -88,7 +88,7 @@ namespace {
     BSONField<long long> ExtractionFixture::aLong("aLong");
 
     TEST_F(ExtractionFixture, GetBool) {
-        BSONField<bool> notThere("otherBool");
+        BSONField<bool> notThere("otherBool", true);
         BSONField<bool> wrongType(anObj.name());
         bool val;
         ASSERT_TRUE(FieldParser::extract(doc, aBool, false, &val));
@@ -99,7 +99,7 @@ namespace {
     }
 
     TEST_F(ExtractionFixture, GetBSONArray) {
-        BSONField<BSONArray> notThere("otherArray");
+        BSONField<BSONArray> notThere("otherArray", BSON_ARRAY("a" << "b"));
         BSONField<BSONArray> wrongType(aString.name());
         BSONArray val;
         ASSERT_TRUE(FieldParser::extract(doc, anArray, BSONArray(), &val));
@@ -110,7 +110,7 @@ namespace {
     }
 
     TEST_F(ExtractionFixture, GetBSONObj) {
-        BSONField<BSONObj> notThere("otherObj");
+        BSONField<BSONObj> notThere("otherObj", BSON("b" << 1));
         BSONField<BSONObj> wrongType(aString.name());
         BSONObj val;
         ASSERT_TRUE(FieldParser::extract(doc, anObj, BSONObj(), &val));
@@ -121,7 +121,7 @@ namespace {
     }
 
     TEST_F(ExtractionFixture, GetDate) {
-        BSONField<Date_t> notThere("otherDate");
+        BSONField<Date_t> notThere("otherDate", 99ULL);
         BSONField<Date_t> wrongType(aString.name());
         Date_t val;
         ASSERT_TRUE(FieldParser::extract(doc, aDate, time(0), &val));
@@ -132,7 +132,7 @@ namespace {
     }
 
     TEST_F(ExtractionFixture, GetString) {
-        BSONField<string> notThere("otherString");
+        BSONField<string> notThere("otherString", "abc");
         BSONField<string> wrongType(aBool.name());
         string val;
         ASSERT_TRUE(FieldParser::extract(doc, aString, "", &val));
@@ -143,9 +143,9 @@ namespace {
     }
 
     TEST_F(ExtractionFixture, GetOID) {
-        BSONField<OID> notThere("otherOID");
-        BSONField<OID> wrongType(aString.name());
         OID defOID = OID::gen();
+        BSONField<OID> notThere("otherOID", defOID);
+        BSONField<OID> wrongType(aString.name());
         OID val;
         ASSERT_TRUE(FieldParser::extract(doc, anOID, OID(), &val));
         ASSERT_EQUALS(val, valOID);
@@ -155,7 +155,7 @@ namespace {
     }
 
     TEST_F(ExtractionFixture, GetLong) {
-        BSONField<long long> notThere("otherLong");
+        BSONField<long long> notThere("otherLong", 0);
         BSONField<long long> wrongType(aString.name());
         long long val;
         ASSERT_TRUE(FieldParser::extract(doc, aLong, 0, &val));
