@@ -661,6 +661,8 @@ extern int __wt_curfile_truncate( WT_SESSION_IMPL *session,
 extern int __wt_curfile_create(WT_SESSION_IMPL *session,
     WT_CURSOR *owner,
     const char *cfg[],
+    int bulk,
+    int bitmap,
     WT_CURSOR **cursorp);
 extern int __wt_curfile_open(WT_SESSION_IMPL *session,
     const char *uri,

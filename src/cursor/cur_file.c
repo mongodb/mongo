@@ -27,7 +27,7 @@ __curfile_compare(WT_CURSOR *a, WT_CURSOR *b, int *cmpp)
 	 */
 	if (strcmp(a->uri, b->uri) != 0)
 		WT_ERR_MSG(session, EINVAL,
-		    "comparison method cursors must reference the same object");
+		    "Cursors must reference the same object");
 
 	WT_CURSOR_NEEDKEY(a);
 	WT_CURSOR_NEEDKEY(b);
@@ -277,7 +277,8 @@ err:	API_END(session);
  */
 int
 __wt_curfile_create(WT_SESSION_IMPL *session,
-    WT_CURSOR *owner, const char *cfg[], WT_CURSOR **cursorp)
+    WT_CURSOR *owner, const char *cfg[], int bulk, int bitmap,
+    WT_CURSOR **cursorp)
 {
 	WT_CURSOR_STATIC_INIT(iface,
 	    NULL,			/* get-key */
@@ -300,21 +301,11 @@ __wt_curfile_create(WT_SESSION_IMPL *session,
 	WT_CURSOR_BTREE *cbt;
 	WT_DECL_RET;
 	size_t csize;
-	int bitmap, bulk;
 
 	cbt = NULL;
 
 	btree = session->btree;
 	WT_ASSERT(session, btree != NULL);
-
-	WT_RET(__wt_config_gets_defno(session, cfg, "bulk", &cval));
-	if ((cval.type == ITEM_ID || cval.type == ITEM_STRING) &&
-	    WT_STRING_MATCH("bitmap", cval.str, cval.len))
-		bitmap = bulk = 1;
-	else {
-		bitmap = 0;
-		bulk = (cval.val != 0);
-	}
 
 	csize = bulk ? sizeof(WT_CURSOR_BULK) : sizeof(WT_CURSOR_BTREE);
 	WT_RET(__wt_calloc(session, 1, csize, &cbt));
@@ -373,21 +364,28 @@ __wt_curfile_open(WT_SESSION_IMPL *session, const char *uri,
 {
 	WT_CONFIG_ITEM cval;
 	WT_DECL_RET;
+	int bitmap, bulk;
 	uint32_t flags;
 
-	/*
-	 * Bulk and no cache handles are exclusive and may not be used by more
-	 * than a single thread.
-	 * Additionally set the discard flag on no cache handles so they are
-	 * destroyed on close.
-	 */
 	flags = 0;
+
 	WT_RET(__wt_config_gets_defno(session, cfg, "bulk", &cval));
-	if (cval.val != 0)
-		LF_SET(WT_BTREE_EXCLUSIVE | WT_BTREE_BULK);
+	if (cval.type == ITEM_NUM && (cval.val == 0 || cval.val == 1)) {
+		bitmap = 0;
+		bulk = (cval.val != 0);
+	} else if (WT_STRING_MATCH("bitmap", cval.str, cval.len))
+		bitmap = bulk = 1;
+	else
+		WT_RET_MSG(session, EINVAL,
+		    "Value for 'bulk' must be a boolean or 'bitmap'");
+
+	/* Bulk and no cache handles require exclusive access. */
+	if (bulk)
+		LF_SET(WT_BTREE_BULK | WT_BTREE_EXCLUSIVE);
+
 	WT_RET(__wt_config_gets_defno(session, cfg, "no_cache", &cval));
 	if (cval.val != 0)
-		LF_SET(WT_BTREE_EXCLUSIVE | WT_BTREE_NO_CACHE);
+		LF_SET(WT_BTREE_NO_CACHE | WT_BTREE_EXCLUSIVE);
 
 	/* TODO: handle projections. */
 
@@ -397,7 +395,7 @@ __wt_curfile_open(WT_SESSION_IMPL *session, const char *uri,
 	else
 		WT_RET(__wt_bad_object_type(session, uri));
 
-	WT_ERR(__wt_curfile_create(session, owner, cfg, cursorp));
+	WT_ERR(__wt_curfile_create(session, owner, cfg, bulk, bitmap, cursorp));
 	return (0);
 
 err:	/* If the cursor could not be opened, release the handle. */

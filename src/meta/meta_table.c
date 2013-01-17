@@ -113,7 +113,7 @@ __wt_metadata_cursor(
 
 	session->btree = session->metafile;
 	WT_ERR(__wt_session_lock_btree(session, 0));
-	ret = __wt_curfile_create(session, NULL, cfg, cursorp);
+	ret = __wt_curfile_create(session, NULL, cfg, 0, 0, cursorp);
 
 	/* Restore the caller's btree. */
 err:	session->btree = saved_btree;
