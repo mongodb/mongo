@@ -1047,7 +1047,7 @@ struct __wt_connection {
 	 * shared cache is redistributed.,an integer between 1MB and 10TB;
 	 * default \c 10MB.}@config{&nbsp;&nbsp;&nbsp;&nbsp;reserve, amount of
 	 * cache this database is guaranteed to have available from the shared
-	 * cache. This setting is per database. Defaults to the chunk size..,a
+	 * cache. This setting is per database. Defaults to the chunk size.,a
 	 * string; default \c 0.}@config{&nbsp;&nbsp;&nbsp;&nbsp;name, name of a
 	 * cache that is shared between databases.,a string; default
 	 * empty.}@config{&nbsp;&nbsp;&nbsp;&nbsp;size, maximum memory to
@@ -1258,7 +1258,7 @@ struct __wt_connection {
  * cache is redistributed.,an integer between 1MB and 10TB; default \c
  * 10MB.}@config{&nbsp;&nbsp;&nbsp;&nbsp;reserve, amount of cache this database
  * is guaranteed to have available from the shared cache. This setting is per
- * database. Defaults to the chunk size..,a string; default \c
+ * database. Defaults to the chunk size.,a string; default \c
  * 0.}@config{&nbsp;&nbsp;&nbsp;&nbsp;name, name of a cache that is shared
  * between databases.,a string; default
  * empty.}@config{&nbsp;&nbsp;&nbsp;&nbsp;size, maximum memory to allocate for

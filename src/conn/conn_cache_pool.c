@@ -32,15 +32,17 @@ __wt_conn_cache_pool_config(WT_SESSION_IMPL *session, const char **cfg)
 {
 	WT_CACHE_POOL *cp;
 	WT_CONFIG_ITEM cval;
-	WT_CONNECTION_IMPL *conn;
+	WT_CONNECTION_IMPL *conn, *entry;
 	WT_DECL_RET;
 	char *pool_name;
 	int created, reconfiguring;
+	uint64_t chunk, reserve, size, used_cache;
 
 	conn = S2C(session);
 	created = reconfiguring = 0;
 	pool_name = NULL;
 	cp = NULL;
+	chunk = reserve = size = 0;
 
 	if (F_ISSET(conn, WT_CONN_CACHE_POOL))
 		reconfiguring = 1;
@@ -89,11 +91,60 @@ __wt_conn_cache_pool_config(WT_SESSION_IMPL *session, const char **cfg)
 	 */
 	if (!reconfiguring)
 		++cp->refs;
-	/* Configure the pool. */
-	WT_ERR(__wt_config_gets(session, cfg, "shared_cache.size", &cval));
-	cp->size = (uint64_t)cval.val;
-	WT_ERR(__wt_config_gets(session, cfg, "shared_cache.chunk", &cval));
-	cp->chunk = (uint64_t)cval.val;
+
+	/*
+	 * Retrieve the pool configuration options. The values are optional if
+	 * we are reconfiguring.
+	 */
+	ret = __wt_config_gets(session, cfg, "shared_cache.size", &cval);
+	if (reconfiguring && ret == WT_NOTFOUND)
+		/* Not being changed; use the old value. */
+		size = cp->size;
+	else {
+		WT_ERR(ret);
+		size = (uint64_t)cval.val;
+	}
+	ret = __wt_config_gets(session, cfg, "shared_cache.chunk", &cval);
+	if (reconfiguring && ret == WT_NOTFOUND)
+		/* Not being changed; use the old value. */
+		chunk = cp->chunk;
+	else {
+		WT_ERR(ret);
+		chunk = (uint64_t)cval.val;
+	}
+	/*
+	 * Retrieve the reserve size here for validation of configuration.
+	 * Don't save it yet since the connections cache is not created if
+	 * we are opening. Cache configuration is responsible for saving the
+	 * setting.
+	 */
+	ret = __wt_config_gets(session, cfg, "shared_cache.reserve", &cval);
+	if (reconfiguring && ret == WT_NOTFOUND)
+		/* It is safe to access the cache during reconfigure. */
+		reserve = conn->cache->cp_reserved;
+	else {
+		WT_ERR(ret);
+		reserve = (uint64_t)cval.val;
+	}
+
+	/*
+	 * Validate that size and reserve values don't cause the cache
+	 * pool to be over subscribed.
+	 */
+	used_cache = 0;
+	if (!created) {
+		TAILQ_FOREACH(entry, &cp->cache_pool_qh, cpq)
+			used_cache += entry->cache->cp_reserved;
+	}
+	if (used_cache + reserve > size)
+		WT_ERR_MSG(session, EINVAL,
+		    "Shared cache unable to accommodate this configuration. "
+		    "Shared cache size: %" PRIu64 ", reserved: %" PRIu64,
+		    size, used_cache + reserve);
+
+	/* The configuration is verified - it's safe to update the pool. */
+	cp->size = size;
+	cp->chunk = chunk;
 
 	WT_VERBOSE_ERR(session, shared_cache,
 	    "Configured cache pool %s. Size: %" PRIu64
@@ -120,10 +171,9 @@ int
 __wt_conn_cache_pool_open(WT_SESSION_IMPL *session)
 {
 	WT_CACHE_POOL *cp;
-	WT_CONNECTION_IMPL *conn, *entry;
+	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	int create_server, locked;
-	uint64_t needed, used_cache;
 
 	conn = S2C(session);
 	locked = 0;
@@ -138,18 +188,6 @@ __wt_conn_cache_pool_open(WT_SESSION_IMPL *session)
 	 * start the thread until we have released the lock.
 	 */
 	create_server = TAILQ_EMPTY(&cp->cache_pool_qh);
-	/* Check to make sure there is room in our pool for the new entry. */
-	needed = used_cache = 0;
-	if (!create_server) {
-		TAILQ_FOREACH(entry, &cp->cache_pool_qh, cpq)
-			used_cache += entry->cache->cp_reserved;
-	}
-	needed = conn->cache->cp_reserved;
-	if (used_cache + needed > cp->size)
-		WT_ERR_MSG(session, EINVAL,
-		    "Cache pool unable to accommodate this connection. "
-		    "Requested: %" PRIu64 ", available: %" PRIu64,
-		    needed, cp->size - used_cache);
 
 	TAILQ_INSERT_TAIL(&cp->cache_pool_qh, conn, cpq);
 	__wt_spin_unlock(session, &cp->cache_pool_lock);
