@@ -13,7 +13,6 @@
  *    You should have received a copy of the GNU Affero General Public License
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-
 #include "mongo/s/type_settings.h"
 
 #include "mongo/s/field_parser.h"
@@ -26,12 +25,12 @@ namespace mongo {
 
     const std::string SettingsType::ConfigNS = "config.settings";
 
-    BSONField<std::string> SettingsType::key("_id");
-    BSONField<int> SettingsType::chunksize("value");
-    BSONField<bool> SettingsType::balancerStopped("stopped");
-    BSONField<BSONObj> SettingsType::balancerActiveWindow("activeWindow");
-    BSONField<bool> SettingsType::shortBalancerSleep("_nosleep");
-    BSONField<bool> SettingsType::secondaryThrottle("_secondaryThrottle");
+    const BSONField<std::string> SettingsType::key("_id");
+    const BSONField<int> SettingsType::chunksize("value");
+    const BSONField<bool> SettingsType::balancerStopped("stopped");
+    const BSONField<BSONObj> SettingsType::balancerActiveWindow("activeWindow");
+    const BSONField<bool> SettingsType::shortBalancerSleep("_nosleep");
+    const BSONField<bool> SettingsType::secondaryThrottle("_secondaryThrottle");
 
     SettingsType::SettingsType() {
         clear();
@@ -46,15 +45,22 @@ namespace mongo {
             errMsg = &dummy;
         }
 
-        if (_key.empty()) {
+        // All the mandatory fields must be present.
+        if (!_isKeySet) {
             *errMsg = stream() << "missing " << key.name() << " field";
             return false;
         }
 
         if (_key == "chunksize") {
-            if (!(_chunksize > 0)) {
-                *errMsg = stream() << "chunksize specified in " << chunksize.name() <<
-                                      " field must be greater than zero";
+            if (_isChunksizeSet) {
+                if (!(_chunksize > 0)) {
+                    *errMsg = stream() << "chunksize specified in " << chunksize.name() <<
+                                          " field must be greater than zero";
+                    return false;
+                }
+            } else {
+                *errMsg = stream() << "chunksize must be specified in " << chunksize.name() <<
+                                      " field for chunksize setting";
                 return false;
             }
             return true;
@@ -72,7 +78,7 @@ namespace mongo {
 
                 // check that both 'start' and 'stop' are valid time-of-day
                 boost::posix_time::ptime startTime, stopTime;
-                if ( ! toPointInTime( start , &startTime ) || ! toPointInTime( stop , &stopTime ) ) {
+                if ( !toPointInTime( start , &startTime ) || !toPointInTime( stop , &stopTime ) ) {
                     *errMsg = stream() << balancerActiveWindow.name() <<
                                           " format is { start: \"hh:mm\" , stop: \"hh:mm\" }";
                     return false;
@@ -89,13 +95,14 @@ namespace mongo {
     BSONObj SettingsType::toBSON() const {
         BSONObjBuilder builder;
 
-        if (!_key.empty()) builder.append(key(), _key);
-        if (_chunksize > 0) builder.append(chunksize(), _chunksize);
-        builder.append(balancerStopped(), _balancerStopped);
-        if (_balancerActiveWindow.nFields()) builder.append(balancerActiveWindow(),
-                                                            _balancerActiveWindow);
-        builder.append(shortBalancerSleep(), _shortBalancerSleep);
-        builder.append(secondaryThrottle(), _secondaryThrottle);
+        if (_isKeySet) builder.append(key(), _key);
+        if (_isChunksizeSet) builder.append(chunksize(), _chunksize);
+        if (_isBalancerStoppedSet) builder.append(balancerStopped(), _balancerStopped);
+        if (_isBalancerActiveWindowSet) {
+            builder.append(balancerActiveWindow(), _balancerActiveWindow);
+        }
+        if (_isShortBalancerSleepSet) builder.append(shortBalancerSleep(), _shortBalancerSleep);
+        if (_isSecondaryThrottleSet) builder.append(secondaryThrottle(), _secondaryThrottle);
 
         return builder.obj();
     }
@@ -103,36 +110,88 @@ namespace mongo {
     bool SettingsType::parseBSON(BSONObj source, string* errMsg) {
         clear();
 
-        string dummy;
+        std::string dummy;
         if (!errMsg) errMsg = &dummy;
 
-        if (!FieldParser::extract(source, key, "", &_key, errMsg)) return false;
-        if (!FieldParser::extract(source, chunksize, 0, &_chunksize, errMsg)) return false;
-        if (!FieldParser::extract(source, balancerStopped, false, &_balancerStopped, errMsg)) return false;
-        if (!FieldParser::extract(source, balancerActiveWindow, BSONObj(), &_balancerActiveWindow, errMsg)) return false;
-        if (!FieldParser::extract(source, shortBalancerSleep, false, &_shortBalancerSleep, errMsg)) return false;
-        if (!FieldParser::extract(source, secondaryThrottle, false, &_secondaryThrottle, errMsg)) return false;
+        FieldParser::FieldState fieldState;
+        fieldState = FieldParser::extract(source, key, "", &_key, errMsg);
+        if (fieldState == FieldParser::FIELD_INVALID) return false;
+        _isKeySet = fieldState == FieldParser::FIELD_VALID;
+
+        fieldState = FieldParser::extract(source, chunksize, 0, &_chunksize, errMsg);
+        if (fieldState == FieldParser::FIELD_INVALID) return false;
+        _isChunksizeSet = fieldState == FieldParser::FIELD_VALID;
+
+        fieldState = FieldParser::extract(source, balancerStopped,
+                                          false, &_balancerStopped, errMsg);
+        if (fieldState == FieldParser::FIELD_INVALID) return false;
+        _isBalancerStoppedSet = fieldState == FieldParser::FIELD_VALID;
+
+        fieldState = FieldParser::extract(source, balancerActiveWindow,
+                                          BSONObj(), &_balancerActiveWindow, errMsg);
+        if (fieldState == FieldParser::FIELD_INVALID) return false;
+        _isBalancerActiveWindowSet = fieldState == FieldParser::FIELD_VALID;
+
+        fieldState = FieldParser::extract(source, shortBalancerSleep,
+                                          false, &_shortBalancerSleep, errMsg);
+        if (fieldState == FieldParser::FIELD_INVALID) return false;
+        _isShortBalancerSleepSet = fieldState == FieldParser::FIELD_VALID;
+
+        fieldState = FieldParser::extract(source, secondaryThrottle,
+                                          false, &_secondaryThrottle, errMsg);
+        if (fieldState == FieldParser::FIELD_INVALID) return false;
+        _isSecondaryThrottleSet = fieldState == FieldParser::FIELD_VALID;
 
         return true;
     }
 
     void SettingsType::clear() {
+
         _key.clear();
+        _isKeySet = false;
+
         _chunksize = 0;
+        _isChunksizeSet = false;
+
         _balancerStopped = false;
+        _isBalancerStoppedSet = false;
+
         _balancerActiveWindow = BSONObj();
+        _isBalancerActiveWindowSet = false;
+
         _shortBalancerSleep = false;
+        _isShortBalancerSleepSet = false;
+
         _secondaryThrottle = false;
+        _isSecondaryThrottleSet = false;
+
     }
 
-    void SettingsType::cloneTo(SettingsType* other) {
+    void SettingsType::cloneTo(SettingsType* other) const {
         other->clear();
+
         other->_key = _key;
+        other->_isKeySet = _isKeySet;
+
         other->_chunksize = _chunksize;
+        other->_isChunksizeSet = _isChunksizeSet;
+
         other->_balancerStopped = _balancerStopped;
+        other->_isBalancerStoppedSet = _isBalancerStoppedSet;
+
         other->_balancerActiveWindow = _balancerActiveWindow;
+        other->_isBalancerActiveWindowSet = _isBalancerActiveWindowSet;
+
         other->_shortBalancerSleep = _shortBalancerSleep;
+        other->_isShortBalancerSleepSet = _isShortBalancerSleepSet;
+
         other->_secondaryThrottle = _secondaryThrottle;
+        other->_isSecondaryThrottleSet = _isSecondaryThrottleSet;
+
+    }
+
+    std::string SettingsType::toString() const {
+        return toBSON().toString();
     }
 
 } // namespace mongo

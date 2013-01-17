@@ -33,22 +33,18 @@ namespace mongo {
      *
      *     // Contact the config. 'conn' has been obtained before.
      *     DBClientBase* conn;
-     *     unique_ptr<DbClientCursor> cursor;
-     *     BSONObj query = QUERY(SettingsType::key("balancer"));
-     *     cursor.reset(conn->query(SettingsType::ConfigNS, query, ...));
+     *     BSONObj query = QUERY(SettingsType::exampleField("exampleFieldName"));
+     *     exampleDoc = conn->findOne(SettingsType::ConfigNS, query);
      *
      *     // Process the response.
-     *     while (cursor->more()) {
-     *         settingsDoc = cursor->next();
-     *         SettingsType settings;
-     *         settings.fromBSON(settingsDoc);
-     *         if (! settings.isValid()) {
-     *             // Can't use 'settings'. Take action.
-     *         }
-     *         // use 'settings'
+     *     SettingsType exampleType;
+     *     string errMsg;
+     *     if (!exampleType.parseBSON(exampleDoc, &errMsg) || !exampleType.isValid(&errMsg)) {
+     *         // Can't use 'exampleType'. Take action.
      *     }
+     *     // use 'exampleType'
+     *
      */
-
     class SettingsType {
         MONGO_DISALLOW_COPYING(SettingsType);
     public:
@@ -61,21 +57,12 @@ namespace mongo {
         static const std::string ConfigNS;
 
         // Field names and types in the settings collection type.
-        static BSONField<string> key;                     // key determining the type of setting
-                                                          // document this is
-        // === chunksize options ===
-        static BSONField<int> chunksize;                  // size of the chunks in our cluster
-        // === balancer options ===
-        static BSONField<bool> balancerStopped;           // balancer enabled/disabled
-        static BSONField<BSONObj> balancerActiveWindow;   // if present, activeWindow is an interval
-                                                          // during the day when the balancer should
-                                                          // be active.
-                                                          // Format: { start: "08:00" , stop:
-                                                          // "19:30" }, strftime format is %H:%M
-        static BSONField<bool> shortBalancerSleep;        // controls how long the balancer sleeps
-                                                          // in some situations
-        static BSONField<bool> secondaryThrottle;         // only migrate chunks as fast as at least
-                                                          // one secondary can keep up with
+        static const BSONField<std::string> key;
+        static const BSONField<int> chunksize;
+        static const BSONField<bool> balancerStopped;
+        static const BSONField<BSONObj> balancerActiveWindow;
+        static const BSONField<bool> shortBalancerSleep;
+        static const BSONField<bool> secondaryThrottle;
 
         //
         // settings type methods
@@ -109,7 +96,7 @@ namespace mongo {
         /**
          * Copies all the fields present in 'this' to 'other'.
          */
-        void cloneTo(SettingsType* other);
+        void cloneTo(SettingsType* other) const;
 
         /**
          * Returns a string representation of the current internal state.
@@ -120,46 +107,151 @@ namespace mongo {
         // individual field accessors
         //
 
-        void setKey(const StringData& key) { _key = key.toString(); }
-        const std::string& getKey() const { return _key; }
-
-        void setChunksize(int chunksize) { _chunksize = chunksize; }
-        int getChunksize() const { return _chunksize; }
-
-        void setBalancerStopped(bool balancerStopped) { _balancerStopped = balancerStopped; }
-        bool getBalancerStopped() const { return _balancerStopped; }
-
-        void setBalancerActiveWindow(const BSONObj balancerActiveWindow) {
-            _balancerActiveWindow = balancerActiveWindow.getOwned();
+        // Mandatory Fields
+        void setKey(const StringData& key) {
+            _key = key.toString();
+            _isKeySet = true;
         }
-        BSONObj getBalancerActiveWindow() const { return _balancerActiveWindow; }
 
+        void unsetKey() { _isKeySet = false; }
+
+        bool isKeySet() { return _isKeySet; }
+
+        // Calling get*() methods when the member is not set results in undefined behavior
+        const std::string getKey() const {
+            dassert(_isKeySet);
+            return _key;
+        }
+
+        // Optional Fields
+        void setChunksize(int chunksize) {
+            _chunksize = chunksize;
+            _isChunksizeSet = true;
+        }
+
+        void unsetChunksize() { _isChunksizeSet = false; }
+
+        bool isChunksizeSet() {
+            return _isChunksizeSet || chunksize.hasDefault();
+        }
+
+        // Calling get*() methods when the member is not set and has no default results in undefined
+        // behavior
+        int getChunksize() const {
+            if (_isChunksizeSet) {
+                return _chunksize;
+            } else {
+                dassert(chunksize.hasDefault());
+                return chunksize.getDefault();
+            }
+        }
+        void setBalancerStopped(bool balancerStopped) {
+            _balancerStopped = balancerStopped;
+            _isBalancerStoppedSet = true;
+        }
+
+        void unsetBalancerStopped() { _isBalancerStoppedSet = false; }
+
+        bool isBalancerStoppedSet() {
+            return _isBalancerStoppedSet || balancerStopped.hasDefault();
+        }
+
+        // Calling get*() methods when the member is not set and has no default results in undefined
+        // behavior
+        bool getBalancerStopped() const {
+            if (_isBalancerStoppedSet) {
+                return _balancerStopped;
+            } else {
+                dassert(balancerStopped.hasDefault());
+                return balancerStopped.getDefault();
+            }
+        }
+        void setBalancerActiveWindow(BSONObj& balancerActiveWindow) {
+            _balancerActiveWindow = balancerActiveWindow.getOwned();
+            _isBalancerActiveWindowSet = true;
+        }
+
+        void unsetBalancerActiveWindow() { _isBalancerActiveWindowSet = false; }
+
+        bool isBalancerActiveWindowSet() {
+            return _isBalancerActiveWindowSet || balancerActiveWindow.hasDefault();
+        }
+
+        // Calling get*() methods when the member is not set and has no default results in undefined
+        // behavior
+        BSONObj getBalancerActiveWindow() const {
+            if (_isBalancerActiveWindowSet) {
+                return _balancerActiveWindow;
+            } else {
+                dassert(balancerActiveWindow.hasDefault());
+                return balancerActiveWindow.getDefault();
+            }
+        }
         void setShortBalancerSleep(bool shortBalancerSleep) {
             _shortBalancerSleep = shortBalancerSleep;
+            _isShortBalancerSleepSet = true;
         }
-        bool getShortBalancerSleep() const { return _shortBalancerSleep; }
 
+        void unsetShortBalancerSleep() { _isShortBalancerSleepSet = false; }
+
+        bool isShortBalancerSleepSet() {
+            return _isShortBalancerSleepSet || shortBalancerSleep.hasDefault();
+        }
+
+        // Calling get*() methods when the member is not set and has no default results in undefined
+        // behavior
+        bool getShortBalancerSleep() const {
+            if (_isShortBalancerSleepSet) {
+                return _shortBalancerSleep;
+            } else {
+                dassert(shortBalancerSleep.hasDefault());
+                return shortBalancerSleep.getDefault();
+            }
+        }
         void setSecondaryThrottle(bool secondaryThrottle) {
             _secondaryThrottle = secondaryThrottle;
+            _isSecondaryThrottleSet = true;
         }
-        bool getSecondaryThrottle() const { return _secondaryThrottle; }
+
+        void unsetSecondaryThrottle() { _isSecondaryThrottleSet = false; }
+
+        bool isSecondaryThrottleSet() {
+            return _isSecondaryThrottleSet || secondaryThrottle.hasDefault();
+        }
+
+        // Calling get*() methods when the member is not set and has no default results in undefined
+        // behavior
+        bool getSecondaryThrottle() const {
+            if (_isSecondaryThrottleSet) {
+                return _secondaryThrottle;
+            } else {
+                dassert(secondaryThrottle.hasDefault());
+                return secondaryThrottle.getDefault();
+            }
+        }
 
     private:
         // Convention: (M)andatory, (O)ptional, (S)pecial rule.
-        std::string _key;              // (M) key determining the type of options to use
-                                       // === chunksize options ===
-        int _chunksize;                // (S) size of the chunks in our cluster
-                                       // === balancer options ===
-        bool _balancerStopped;         // (O) balancer enabled/disabled
-        BSONObj _balancerActiveWindow; // (O) if present, activeWindow is an interval
-                                       // during the day when the balancer should
-                                       // be active.
-                                       // Format: { start: "08:00" , stop:
-                                       // "19:30" }, strftime format is %H:%M
-        bool _shortBalancerSleep;      // (O) controls how long the balancer sleeps
-                                       // in some situations
-        bool _secondaryThrottle;       // (O) only migrate chunks as fast as at least
-                                       // one secondary can keep up with
+        std::string _key;                // (M)  key determining the type of options to use
+        bool _isKeySet;
+                                         // === chunksize options ===
+        int _chunksize;                  // (O)  size of the chunks in our cluster
+        bool _isChunksizeSet;
+                                         // === balancer options ===
+        bool _balancerStopped;           // (O)  balancer enabled/disabled
+        bool _isBalancerStoppedSet;
+
+        BSONObj _balancerActiveWindow;   // (O)  if present, activeWindow is an interval
+        bool _isBalancerActiveWindowSet; // during the day when the balancer should
+                                         // be active.
+                                         // Format: { start: "08:00" , stop:
+                                         // "19:30" }, strftime format is %H:%M
+
+        bool _shortBalancerSleep;        // (O)  controls how long the balancer sleeps
+        bool _isShortBalancerSleepSet;   // in some situations
+
+        bool _secondaryThrottle;         // (O)  only migrate chunks as fast as at least
+        bool _isSecondaryThrottleSet;    // one secondary can keep up with
     };
 
-}  // namespace mongo
+} // namespace mongo
