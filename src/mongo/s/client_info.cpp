@@ -45,6 +45,9 @@ namespace mongo {
         _cur = &_a;
         _prev = &_b;
         _autoSplitOk = true;
+        if (messagingPort) {
+            _remote = messagingPort->remote();
+        }
     }
 
     ClientInfo::~ClientInfo() {
