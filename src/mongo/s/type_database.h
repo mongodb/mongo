@@ -26,23 +26,23 @@ namespace mongo {
 
     /**
      * This class represents the layout and contents of documents contained in the
-     * config.database collection. All manipulation of documents coming from that
+     * config.databases collection. All manipulation of documents coming from that
      * collection should be done with this class.
      *
      * Usage Example:
      *
      *     // Contact the config. 'conn' has been obtained before.
      *     DBClientBase* conn;
-     *     BSONObj query = QUERY(DatabaseType::name("mydb"));
-     *     dbDoc = conn->findOne(DatbaseType::ConfigNS, query);
+     *     BSONObj query = QUERY(DatabaseType::exampleField("exampleFieldName"));
+     *     exampleDoc = conn->findOne(DatabaseType::ConfigNS, query);
      *
      *     // Process the response.
-     *     DatabaseType db;
+     *     DatabaseType exampleType;
      *     string errMsg;
-     *     if (!db.parseBSON(dbDoc, &errMsg) || !db.isValid(&errMsg)) {
-     *         // Can't use 'db'. Take action.
+     *     if (!exampleType.parseBSON(exampleDoc, &errMsg) || !exampleType.isValid(&errMsg)) {
+     *         // Can't use 'exampleType'. Take action.
      *     }
-     *     // use 'db'
+     *     // use 'exampleType'
      *
      */
     class DatabaseType {
@@ -53,23 +53,19 @@ namespace mongo {
         // schema declarations
         //
 
-        // Name of the database collection in the config server.
+        // Name of the databases collection in the config server.
         static const std::string ConfigNS;
 
-        // Field names and types in the database collection type.
-        static BSONField<std::string> name;     // database's name
-        static BSONField<std::string> primary;  // primary shard for the database
-        static BSONField<bool> draining;        // is the database being removed?
-
-        // This field was last used in 2.2 series (version 3).
-        static BSONField<bool> DEPRECATED_partitioned;
-
-        // These fields were last used in 1.4 series (version 2).
-        static BSONField<std::string> DEPRECATED_name;
-        static BSONField<bool> DEPRECATED_sharded;
+        // Field names and types in the databases collection type.
+        static const BSONField<std::string> name;
+        static const BSONField<std::string> primary;
+        static const BSONField<bool> draining;
+        static const BSONField<bool> DEPRECATED_partitioned;
+        static const BSONField<std::string> DEPRECATED_name;
+        static const BSONField<bool> DEPRECATED_sharded;
 
         //
-        // database type methods
+        // databases type methods
         //
 
         DatabaseType();
@@ -111,20 +107,68 @@ namespace mongo {
         // individual field accessors
         //
 
-        void setName(const StringData& name) { _name = name.toString(); }
-        const std::string& getName() const { return _name; }
+        // Mandatory Fields
+        void setName(const StringData& name) {
+            _name = name.toString();
+            _isNameSet = true;
+        }
 
-        void setPrimary(const StringData& shard) { _primary = shard.toString(); }
-        const std::string& getPrimary() const { return _primary; }
+        void unsetName() { _isNameSet = false; }
 
-        void setDraining(bool draining) { _draining = draining; }
-        bool getDraining() const { return _draining; }
+        bool isNameSet() { return _isNameSet; }
+
+        // Calling get*() methods when the member is not set results in undefined behavior
+        const std::string& getName() const {
+            dassert(_isNameSet);
+            return _name;
+        }
+
+        void setPrimary(const StringData& primary) {
+            _primary = primary.toString();
+            _isPrimarySet = true;
+        }
+
+        void unsetPrimary() { _isPrimarySet = false; }
+
+        bool isPrimarySet() { return _isPrimarySet; }
+
+        // Calling get*() methods when the member is not set results in undefined behavior
+        const std::string& getPrimary() const {
+            dassert(_isPrimarySet);
+            return _primary;
+        }
+
+        // Optional Fields
+        void setDraining(bool draining) {
+            _draining = draining;
+            _isDrainingSet = true;
+        }
+
+        void unsetDraining() { _isDrainingSet = false; }
+
+        bool isDrainingSet() {
+            return _isDrainingSet || draining.hasDefault();
+        }
+
+        // Calling get*() methods when the member is not set and has no default results in undefined
+        // behavior
+        bool getDraining() const {
+            if (_isDrainingSet) {
+                return _draining;
+            } else {
+                dassert(draining.hasDefault());
+                return draining.getDefault();
+            }
+        }
 
     private:
         // Convention: (M)andatory, (O)ptional, (S)pecial rule.
-        string _name;     // (M) database name
-        string _primary;  // (M) primary shard for the database
-        bool _draining;   // (O) is this database about to be deleted?
+        std::string _name;     // (M)  database name
+        bool _isNameSet;
+        std::string _primary;     // (M)  primary shard for the database
+        bool _isPrimarySet;
+        bool _draining;     // (O)  is this database about to be deleted?
+        bool _isDrainingSet;
     };
 
 } // namespace mongo

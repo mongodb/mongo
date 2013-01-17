@@ -17,15 +17,16 @@
 #include "mongo/pch.h"
 
 #include "mongo/bson/oid.h"
-#include "mongo/bson/util/misc.h" // for Date_t
+#include "mongo/s/field_parser.h"
 #include "mongo/s/type_database.h"
 #include "mongo/unittest/unittest.h"
 
 namespace {
 
-    using std::string;
-    using mongo::DatabaseType;
     using mongo::BSONObj;
+    using mongo::DatabaseType;
+    using mongo::FieldParser;
+    using std::string;
 
     TEST(Validity, Empty) {
         DatabaseType db;
@@ -61,6 +62,67 @@ namespace {
         BSONObj obj = BSON(DatabaseType::name() << 0);
         string errMsg;
         ASSERT((!db.parseBSON(obj, &errMsg)) && (errMsg != ""));
+    }
+
+    TEST(Optionals, TestDefault) {
+        DatabaseType dbNotDraining;
+        BSONObj notDraining = BSON(DatabaseType::name("mydb") <<
+                                   DatabaseType::primary("shard"));
+        string errMsg;
+        ASSERT_TRUE(dbNotDraining.parseBSON(notDraining, &errMsg));
+        ASSERT_TRUE(dbNotDraining.isValid(NULL));
+        ASSERT_TRUE(dbNotDraining.isDrainingSet());
+        ASSERT_EQUALS(dbNotDraining.getDraining(), DatabaseType::draining.getDefault());
+    }
+
+    TEST(Optionals, TestSet) {
+        DatabaseType dbDraining;
+        BSONObj draining = BSON(DatabaseType::name("mydb") <<
+                                DatabaseType::primary("shard") <<
+                                DatabaseType::draining(true));
+        string errMsg;
+        ASSERT_TRUE(dbDraining.parseBSON(draining, &errMsg));
+        ASSERT_TRUE(dbDraining.isValid(NULL));
+        ASSERT_TRUE(dbDraining.isDrainingSet());
+        ASSERT_TRUE(dbDraining.getDraining());
+    }
+
+    TEST(Optionals, TestNotSet) {
+        DatabaseType dbNotDraining;
+        dbNotDraining.setName("mydb");
+        dbNotDraining.setPrimary("shard");
+        ASSERT_TRUE(dbNotDraining.isValid(NULL));
+        ASSERT_TRUE(dbNotDraining.isDrainingSet());
+        ASSERT_EQUALS(dbNotDraining.getDraining(), DatabaseType::draining.getDefault());
+        bool isDraining;
+        BSONObj genObj;
+        ASSERT_EQUALS( FieldParser::extract( genObj, DatabaseType::draining, true, &isDraining ),
+                       FieldParser::FIELD_DEFAULT );
+    }
+
+    TEST(Optionals, RoundTripOptionalOff) {
+        DatabaseType dbNotDraining;
+        BSONObj notDraining = BSON(DatabaseType::name("mydb") <<
+                                   DatabaseType::primary("shard"));
+        ASSERT_TRUE(notDraining[DatabaseType::name()].ok());
+        ASSERT_TRUE(notDraining[DatabaseType::primary()].ok());
+        ASSERT_TRUE(notDraining[DatabaseType::draining()].eoo());
+        string errMsg;
+        ASSERT_TRUE(dbNotDraining.parseBSON(notDraining, &errMsg));
+        ASSERT_EQUALS(dbNotDraining.toBSON(), notDraining);
+    }
+
+    TEST(Optionals, RoundTripOptionalOn) {
+        DatabaseType dbDraining;
+        BSONObj draining = BSON(DatabaseType::name("mydb") <<
+                                DatabaseType::primary("shard") <<
+                                DatabaseType::draining(true));
+        ASSERT_TRUE(draining[DatabaseType::name()].ok());
+        ASSERT_TRUE(draining[DatabaseType::primary()].ok());
+        ASSERT_TRUE(draining[DatabaseType::draining()].ok());
+        string errMsg;
+        ASSERT_TRUE(dbDraining.parseBSON(draining, &errMsg));
+        ASSERT_EQUALS(dbDraining.toBSON(), draining);
     }
 
 } // unnamed namespace

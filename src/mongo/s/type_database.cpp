@@ -13,7 +13,6 @@
  *    You should have received a copy of the GNU Affero General Public License
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-
 #include "mongo/s/type_database.h"
 
 #include "mongo/s/field_parser.h"
@@ -25,13 +24,12 @@ namespace mongo {
 
     const std::string DatabaseType::ConfigNS = "config.databases";
 
-    BSONField<std::string> DatabaseType::name("_id");
-    BSONField<std::string> DatabaseType::primary("primary");
-    BSONField<bool> DatabaseType::draining("draining");
-
-    BSONField<bool> DatabaseType::DEPRECATED_partitioned("partitioned");
-    BSONField<std::string> DatabaseType::DEPRECATED_name("name");
-    BSONField<bool> DatabaseType::DEPRECATED_sharded("sharded");
+    const BSONField<std::string> DatabaseType::name("_id");
+    const BSONField<std::string> DatabaseType::primary("primary");
+    const BSONField<bool> DatabaseType::draining("draining", false);
+    const BSONField<bool> DatabaseType::DEPRECATED_partitioned("partitioned");
+    const BSONField<std::string> DatabaseType::DEPRECATED_name("name");
+    const BSONField<bool> DatabaseType::DEPRECATED_sharded("sharded");
 
     DatabaseType::DatabaseType() {
         clear();
@@ -47,11 +45,11 @@ namespace mongo {
         }
 
         // All the mandatory fields must be present.
-        if (_name.empty()) {
+        if (!_isNameSet) {
             *errMsg = stream() << "missing " << name.name() << " field";
             return false;
         }
-        if (_primary.empty()) {
+        if (!_isPrimarySet) {
             *errMsg = stream() << "missing " << primary.name() << " field";
             return false;
         }
@@ -61,9 +59,11 @@ namespace mongo {
 
     BSONObj DatabaseType::toBSON() const {
         BSONObjBuilder builder;
-        if (!_name.empty()) builder.append(name(), _name);
-        if (!_primary.empty()) builder.append(primary(), _primary);
-        if (_draining) builder.append(draining(), _draining);
+
+        if (_isNameSet) builder.append(name(), _name);
+        if (_isPrimarySet) builder.append(primary(), _primary);
+        if (_isDrainingSet) builder.append(draining(), _draining);
+
         return builder.obj();
     }
 
@@ -73,33 +73,47 @@ namespace mongo {
         std::string dummy;
         if (!errMsg) errMsg = &dummy;
 
-        if (!FieldParser::extract(source, name, "", &_name, errMsg)) return false;
-        if (!FieldParser::extract(source, primary, "", &_primary, errMsg)) return false;
-        if (!FieldParser::extract(source, draining, false, &_draining, errMsg)) return false;
+        FieldParser::FieldState fieldState;
+        fieldState = FieldParser::extract(source, name, "", &_name, errMsg);
+        if (fieldState == FieldParser::FIELD_INVALID) return false;
+        _isNameSet = fieldState == FieldParser::FIELD_VALID;
 
-        //
-        // backward compatibility
-        //
+        fieldState = FieldParser::extract(source, primary, "", &_primary, errMsg);
+        if (fieldState == FieldParser::FIELD_INVALID) return false;
+        _isPrimarySet = fieldState == FieldParser::FIELD_VALID;
 
-        // There used to be a flag called "partitioned" that would allow collections
-        // under that database to be sharded. We don't require that anymore.
-        bool partitioned;
-        if (!FieldParser::extract(source, DEPRECATED_partitioned, false, &partitioned, errMsg)) return false;
+        fieldState = FieldParser::extract(source, draining, false, &_draining, errMsg);
+        if (fieldState == FieldParser::FIELD_INVALID) return false;
+        _isDrainingSet = fieldState == FieldParser::FIELD_VALID;
 
         return true;
     }
 
     void DatabaseType::clear() {
+
         _name.clear();
+        _isNameSet = false;
+
         _primary.clear();
+        _isPrimarySet = false;
+
         _draining = false;
+        _isDrainingSet = false;
+
     }
 
     void DatabaseType::cloneTo(DatabaseType* other) const {
         other->clear();
+
         other->_name = _name;
+        other->_isNameSet = _isNameSet;
+
         other->_primary = _primary;
+        other->_isPrimarySet = _isPrimarySet;
+
         other->_draining = _draining;
+        other->_isDrainingSet = _isDrainingSet;
+
     }
 
     std::string DatabaseType::toString() const {
