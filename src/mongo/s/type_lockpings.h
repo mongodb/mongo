@@ -33,22 +33,18 @@ namespace mongo {
      *
      *     // Contact the config. 'conn' has been obtained before.
      *     DBClientBase* conn;
-     *     unique_ptr<DbClientCursor> cursor;
-     *     BSONObj query = QUERY(LockpingsType::name("localhost:27017"));
-     *     cursor.reset(conn->query(LockpingsType::ConfigNS, query, ...));
+     *     BSONObj query = QUERY(LockpingsType::exampleField("exampleFieldName"));
+     *     exampleDoc = conn->findOne(LockpingsType::ConfigNS, query);
      *
      *     // Process the response.
-     *     while (cursor->more()) {
-     *         lockPingDoc = cursor->next();
-     *         LockpingsType lockPing;
-     *         lockPing.fromBSON(lockPingDoc);
-     *         if (! lockPing.isValid()) {
-     *             // Can't use 'lockPing'. Take action.
-     *         }
-     *         // use 'lockPing'
+     *     LockpingsType exampleType;
+     *     string errMsg;
+     *     if (!exampleType.parseBSON(exampleDoc, &errMsg) || !exampleType.isValid(&errMsg)) {
+     *         // Can't use 'exampleType'. Take action.
      *     }
+     *     // use 'exampleType'
+     *
      */
-
     class LockpingsType {
         MONGO_DISALLOW_COPYING(LockpingsType);
     public:
@@ -61,8 +57,8 @@ namespace mongo {
         static const std::string ConfigNS;
 
         // Field names and types in the lockpings collection type.
-        static BSONField<string> process; // string describing the process holding the lock
-        static BSONField<Date_t> ping;    // last time the holding process updated this document
+        static const BSONField<std::string> process;
+        static const BSONField<Date_t> ping;
 
         //
         // lockpings type methods
@@ -96,7 +92,7 @@ namespace mongo {
         /**
          * Copies all the fields present in 'this' to 'other'.
          */
-        void cloneTo(LockpingsType* other);
+        void cloneTo(LockpingsType* other) const;
 
         /**
          * Returns a string representation of the current internal state.
@@ -107,16 +103,45 @@ namespace mongo {
         // individual field accessors
         //
 
-        void setProcess(const StringData& process) { _process = process.toString(); }
-        const std::string& getProcess() const { return _process; }
+        // Mandatory Fields
+        void setProcess(const StringData& process) {
+            _process = process.toString();
+            _isProcessSet = true;
+        }
 
-        void setPing(const Date_t& time) { _ping = time; }
-        Date_t getPing() const { return _ping; }
+        void unsetProcess() { _isProcessSet = false; }
+
+        bool isProcessSet() { return _isProcessSet; }
+
+        // Calling get*() methods when the member is not set results in undefined behavior
+        const std::string& getProcess() const {
+            dassert(_isProcessSet);
+            return _process;
+        }
+
+        void setPing(const Date_t ping) {
+            _ping = ping;
+            _isPingSet = true;
+        }
+
+        void unsetPing() { _isPingSet = false; }
+
+        bool isPingSet() { return _isPingSet; }
+
+        // Calling get*() methods when the member is not set results in undefined behavior
+        const Date_t getPing() const {
+            dassert(_isPingSet);
+            return _ping;
+        }
+
+        // Optional Fields
 
     private:
         // Convention: (M)andatory, (O)ptional, (S)pecial rule.
-        std::string _process; // (M) string describing the process holding the lock
-        Date_t _ping;         // (M) last time the holding process updated this document
+        std::string _process;     // (M)  string describing the process holding the lock
+        bool _isProcessSet;
+        Date_t _ping;     // (M)  last time the holding process updated this document
+        bool _isPingSet;
     };
 
-}  // namespace mongo
+} // namespace mongo
