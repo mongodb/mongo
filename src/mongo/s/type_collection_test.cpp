@@ -131,7 +131,7 @@ namespace {
         ASSERT_EQUALS(errMsg, "");
         ASSERT_EQUALS(coll.getNS(), "db.coll");
         ASSERT_EQUALS(coll.getKeyPattern(), BSON("a" << 1));
-        ASSERT_EQUALS(coll.isUnique(), true);
+        ASSERT_EQUALS(coll.getUnique(), true);
         ASSERT_EQUALS(coll.getUpdatedAt(), 1ULL);
         ASSERT_EQUALS(coll.getEpoch(), epoch);
         ASSERT_TRUE(coll.isValid(NULL));

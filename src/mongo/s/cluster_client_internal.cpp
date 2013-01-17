@@ -224,7 +224,7 @@ namespace mongo {
                                            << " read from the config server" << causedBy(errMsg));
                 }
 
-                if (coll->isDropped()) {
+                if (coll->getDropped()) {
                     continue;
                 }
 

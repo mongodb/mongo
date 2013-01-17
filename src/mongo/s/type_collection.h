@@ -33,21 +33,16 @@ namespace mongo {
      *
      *     // Contact the config. 'conn' has been obtained before.
      *     DBClientBase* conn;
-     *     BSONObj query = QUERY(CollectionType::ns("db.coll") <<
-     *                           CollectionType::unique(true));
-     *     collDoc = conn->findOne(CollectionType::ConfigNS, query);
+     *     BSONObj query = QUERY(CollectionType::exampleField("exampleFieldName"));
+     *     exampleDoc = conn->findOne(CollectionType::ConfigNS, query);
      *
      *     // Process the response.
-     *     CollectionType coll;
-     *     coll.fromBSON(collDoc);
-     *     if (! coll.isValid()) {
-     *         // Can't use 'coll'. Take action.
+     *     CollectionType exampleType;
+     *     string errMsg;
+     *     if (!exampleType.parseBSON(exampleDoc, &errMsg) || !exampleType.isValid(&errMsg)) {
+     *         // Can't use 'exampleType'. Take action.
      *     }
-     *     if (coll.isDropped()) {
-     *         // Coll doesn't exist, Take action.
-     *     }
-     *
-     *     // use 'coll'
+     *     // use 'exampleType'
      *
      */
     class CollectionType {
@@ -58,26 +53,23 @@ namespace mongo {
         // schema declarations
         //
 
-        // Name of the collection in the config server.
+        // Name of the collections collection in the config server.
         static const std::string ConfigNS;
 
-        // Field names and types in the collection type.
-        static BSONField<std::string> ns;      // collection's namespace
-        static BSONField<std::string> primary; // primary db when not sharded
-        static BSONField<BSONObj> keyPattern;  // sharding key, if sharded
-        static BSONField<bool> unique;         // sharding key unique?
-        static BSONField<Date_t> updatedAt;    // when collection was created
-        static BSONField<bool> noBalance;      // true if balancing is disabled
-        static BSONField<OID> epoch;           // disambiguate ns (drop/recreate)
-        // To-be-deprecated, not yet
-        static BSONField<bool> dropped;        // true if we should ignore this collection entry
-
-        // Deprecated fields should only be used in parseBSON calls. Exposed here for testing only.
-        static BSONField<OID> DEPRECATED_lastmodEpoch;
-        static BSONField<Date_t> DEPRECATED_lastmod;
+        // Field names and types in the collections collection type.
+        static const BSONField<std::string> ns;
+        static const BSONField<std::string> primary;
+        static const BSONField<BSONObj> keyPattern;
+        static const BSONField<bool> unique;
+        static const BSONField<Date_t> updatedAt;
+        static const BSONField<bool> noBalance;
+        static const BSONField<OID> epoch;
+        static const BSONField<bool> dropped;
+        static const BSONField<OID> DEPRECATED_lastmodEpoch;
+        static const BSONField<Date_t> DEPRECATED_lastmod;
 
         //
-        // collection type methods
+        // collections type methods
         //
 
         CollectionType();
@@ -119,40 +111,177 @@ namespace mongo {
         // individual field accessors
         //
 
-        void setNS(const StringData& ns) { _ns = ns.toString(); }
-        const std::string& getNS() const { return _ns; }
+        // Mandatory Fields
+        void setNS(const StringData& ns) {
+            _ns = ns.toString();
+            _isNsSet = true;
+        }
 
-        void setPrimary(const StringData& name) { _primary = name.toString(); }
-        const std::string& getPrimary() const { return _primary; }
+        void unsetNS() { _isNsSet = false; }
 
-        void setKeyPattern(const BSONObj keyPattern) { _keyPattern = keyPattern.getOwned(); }
-        BSONObj getKeyPattern() const { return _keyPattern; }
+        bool isNSSet() { return _isNsSet; }
 
-        void setUnique(bool unique) { _unique = unique; }
-        bool isUnique() const { return _unique; }
+        // Calling get*() methods when the member is not set results in undefined behavior
+        const std::string getNS() const {
+            dassert(_isNsSet);
+            return _ns;
+        }
 
-        void setUpdatedAt(const Date_t& time) { _updatedAt = time; }
-        Date_t getUpdatedAt() const { return _updatedAt; }
+        void setUpdatedAt(const Date_t updatedAt) {
+            _updatedAt = updatedAt;
+            _isUpdatedAtSet = true;
+        }
 
-        void setNoBalance(bool noBalance) { _noBalance = noBalance; }
-        bool getNoBalance() const { return _noBalance; }
+        void unsetUpdatedAt() { _isUpdatedAtSet = false; }
 
-        void setEpoch(OID oid) { _epoch = oid; }
-        OID getEpoch() const { return _epoch; }
+        bool isUpdatedAtSet() { return _isUpdatedAtSet; }
 
-        void setDropped(bool dropped) { _dropped = dropped; }
-        bool isDropped() const { return _dropped; }
+        // Calling get*() methods when the member is not set results in undefined behavior
+        const Date_t getUpdatedAt() const {
+            dassert(_isUpdatedAtSet);
+            return _updatedAt;
+        }
+
+        void setEpoch(const OID epoch) {
+            _epoch = epoch;
+            _isEpochSet = true;
+        }
+
+        void unsetEpoch() { _isEpochSet = false; }
+
+        bool isEpochSet() { return _isEpochSet; }
+
+        // Calling get*() methods when the member is not set results in undefined behavior
+        const OID getEpoch() const {
+            dassert(_isEpochSet);
+            return _epoch;
+        }
+
+        // Optional Fields
+        void setPrimary(StringData& primary) {
+            _primary = primary.toString();
+            _isPrimarySet = true;
+        }
+
+        void unsetPrimary() { _isPrimarySet = false; }
+
+        bool isPrimarySet() {
+            return _isPrimarySet || primary.hasDefault();
+        }
+
+        // Calling get*() methods when the member is not set and has no default results in undefined
+        // behavior
+        std::string getPrimary() const {
+            if (_isPrimarySet) {
+                return _primary;
+            } else {
+                dassert(primary.hasDefault());
+                return primary.getDefault();
+            }
+        }
+        void setKeyPattern(BSONObj& keyPattern) {
+            _keyPattern = keyPattern.getOwned();
+            _isKeyPatternSet = true;
+        }
+
+        void unsetKeyPattern() { _isKeyPatternSet = false; }
+
+        bool isKeyPatternSet() {
+            return _isKeyPatternSet || keyPattern.hasDefault();
+        }
+
+        // Calling get*() methods when the member is not set and has no default results in undefined
+        // behavior
+        BSONObj getKeyPattern() const {
+            if (_isKeyPatternSet) {
+                return _keyPattern;
+            } else {
+                dassert(keyPattern.hasDefault());
+                return keyPattern.getDefault();
+            }
+        }
+        void setUnique(bool unique) {
+            _unique = unique;
+            _isUniqueSet = true;
+        }
+
+        void unsetUnique() { _isUniqueSet = false; }
+
+        bool isUniqueSet() {
+            return _isUniqueSet || unique.hasDefault();
+        }
+
+        // Calling get*() methods when the member is not set and has no default results in undefined
+        // behavior
+        bool getUnique() const {
+            if (_isUniqueSet) {
+                return _unique;
+            } else {
+                dassert(unique.hasDefault());
+                return unique.getDefault();
+            }
+        }
+        void setNoBalance(bool noBalance) {
+            _noBalance = noBalance;
+            _isNoBalanceSet = true;
+        }
+
+        void unsetNoBalance() { _isNoBalanceSet = false; }
+
+        bool isNoBalanceSet() {
+            return _isNoBalanceSet || noBalance.hasDefault();
+        }
+
+        // Calling get*() methods when the member is not set and has no default results in undefined
+        // behavior
+        bool getNoBalance() const {
+            if (_isNoBalanceSet) {
+                return _noBalance;
+            } else {
+                dassert(noBalance.hasDefault());
+                return noBalance.getDefault();
+            }
+        }
+        void setDropped(bool dropped) {
+            _dropped = dropped;
+            _isDroppedSet = true;
+        }
+
+        void unsetDropped() { _isDroppedSet = false; }
+
+        bool isDroppedSet() {
+            return _isDroppedSet || dropped.hasDefault();
+        }
+
+        // Calling get*() methods when the member is not set and has no default results in undefined
+        // behavior
+        bool getDropped() const {
+            if (_isDroppedSet) {
+                return _dropped;
+            } else {
+                dassert(dropped.hasDefault());
+                return dropped.getDefault();
+            }
+        }
 
     private:
         // Convention: (M)andatory, (O)ptional, (S)pecial rule.
-        std::string _ns;       // (M) namespace
-        std::string _primary;  // (S) either/or with _keyPattern
-        BSONObj _keyPattern;   // (S) sharding pattern if sharded
-        bool _unique;          // (S) mandatory if sharded, index is unique
-        Date_t _updatedAt;     // (M) last updated time
-        bool _noBalance;       // (S) optional if sharded, disable balancing
-        OID _epoch;            // (M) disambiguates collection incarnations
-        bool _dropped;         // (O) if true, ignore this entry
+        std::string _ns;     // (M)  namespace
+        bool _isNsSet;
+        std::string _primary;     // (O)  either/or with _keyPattern
+        bool _isPrimarySet;
+        BSONObj _keyPattern;     // (O)  sharding pattern if sharded
+        bool _isKeyPatternSet;
+        bool _unique;     // (O)  mandatory if sharded, index is unique
+        bool _isUniqueSet;
+        Date_t _updatedAt;     // (M)  last updated time
+        bool _isUpdatedAtSet;
+        bool _noBalance;     // (O)  optional if sharded, disable balancing
+        bool _isNoBalanceSet;
+        OID _epoch;     // (M)  disambiguates collection incarnations
+        bool _isEpochSet;
+        bool _dropped;     // (O)  if true, ignore this entry
+        bool _isDroppedSet;
     };
 
 } // namespace mongo

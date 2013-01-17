@@ -13,8 +13,8 @@
  *    You should have received a copy of the GNU Affero General Public License
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-
 #include "mongo/s/type_collection.h"
+
 #include "mongo/s/field_parser.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -23,18 +23,17 @@ namespace mongo {
     using mongoutils::str::stream;
 
     const std::string CollectionType::ConfigNS = "config.collections";
-    BSONField<std::string> CollectionType::ns("_id");
-    BSONField<std::string> CollectionType::primary("primary");
-    BSONField<BSONObj> CollectionType::keyPattern("key");
-    BSONField<bool> CollectionType::unique("unique");
-    BSONField<Date_t> CollectionType::updatedAt("updatedAt");
-    BSONField<bool> CollectionType::noBalance("noBalance");
-    BSONField<OID> CollectionType::epoch("epoch");
-    // To-be-deprecated, not yet
-    BSONField<bool> CollectionType::dropped("dropped");
 
-    BSONField<OID> CollectionType::DEPRECATED_lastmodEpoch("lastmodEpoch");
-    BSONField<Date_t> CollectionType::DEPRECATED_lastmod("lastmod");
+    const BSONField<std::string> CollectionType::ns("_id");
+    const BSONField<std::string> CollectionType::primary("primary");
+    const BSONField<BSONObj> CollectionType::keyPattern("key");
+    const BSONField<bool> CollectionType::unique("unique");
+    const BSONField<Date_t> CollectionType::updatedAt("updatedAt");
+    const BSONField<bool> CollectionType::noBalance("noBalance");
+    const BSONField<OID> CollectionType::epoch("epoch");
+    const BSONField<bool> CollectionType::dropped("dropped");
+    const BSONField<OID> CollectionType::DEPRECATED_lastmodEpoch("lastmodEpoch");
+    const BSONField<Date_t> CollectionType::DEPRECATED_lastmod("lastmod");
 
     CollectionType::CollectionType() {
         clear();
@@ -45,19 +44,20 @@ namespace mongo {
 
     bool CollectionType::isValid(std::string* errMsg) const {
         std::string dummy;
-
-        if (errMsg == NULL) errMsg = &dummy;
+        if (errMsg == NULL) {
+            errMsg = &dummy;
+        }
 
         // All the mandatory fields must be present.
-        if (_ns.empty()) {
+        if (!_isNsSet) {
             *errMsg = stream() << "missing " << ns.name() << " field";
             return false;
         }
-        if (_updatedAt.millis == 0) {
+        if (!_isUpdatedAtSet) {
             *errMsg = stream() << "missing " << updatedAt.name() << " field";
             return false;
         }
-        if (!_epoch.isSet()) {
+        if (!_isEpochSet) {
             *errMsg = stream() << "missing " << epoch.name() << " field";
             return false;
         }
@@ -80,82 +80,149 @@ namespace mongo {
 
     BSONObj CollectionType::toBSON() const {
         BSONObjBuilder builder;
-        builder.append(ns(), _ns);
-        if (!_primary.empty()) builder.append(primary(), _primary);
-        if (_keyPattern.nFields()) builder.append(keyPattern(), _keyPattern);
-        if (_unique) builder.append(unique(), _unique);
-        builder.append(updatedAt(), _updatedAt);
-        builder.append(DEPRECATED_lastmod(), _updatedAt);
-        if (_noBalance) builder.append(noBalance(), _noBalance);
-        if (_epoch.isSet()) {
+
+        if (_isNsSet) builder.append(ns(), _ns);
+        if (_isPrimarySet) builder.append(primary(), _primary);
+        if (_isKeyPatternSet) builder.append(keyPattern(), _keyPattern);
+        if (_isUniqueSet) builder.append(unique(), _unique);
+        if (_isUpdatedAtSet) builder.append(updatedAt(), _updatedAt);
+        if (_isNoBalanceSet) builder.append(noBalance(), _noBalance);
+
+        if (_isUpdatedAtSet) builder.append(DEPRECATED_lastmod(), _updatedAt);
+        if (_isEpochSet) {
             builder.append(epoch(), _epoch);
             builder.append(DEPRECATED_lastmodEpoch(), _epoch);
         }
+
         // Always need to write dropped for compatibility w/ 2.0/2.2
         builder.append(dropped(), _dropped);
+
         return builder.obj();
     }
 
     bool CollectionType::parseBSON(BSONObj source, string* errMsg) {
         clear();
 
-        string dummy;
+        std::string dummy;
         if (!errMsg) errMsg = &dummy;
 
-        if (!FieldParser::extract(source, ns, "", &_ns, errMsg)) return false;
-        if (!FieldParser::extract(source, primary, "", &_primary, errMsg)) return false;
-        if (!FieldParser::extract(source, keyPattern, BSONObj(), &_keyPattern, errMsg)) return false;
-        if (!FieldParser::extract(source, unique, false, &_unique, errMsg)) return false;
-        if (!FieldParser::extract(source, updatedAt, 0ULL, &_updatedAt, errMsg)) return false;
-        if (!FieldParser::extract(source, noBalance, false, &_noBalance, errMsg)) return false;
-        if (!FieldParser::extract(source, epoch, OID(), &_epoch, errMsg)) return false;
-        if (!FieldParser::extract(source, dropped, false, &_dropped, errMsg)) return false;
+        FieldParser::FieldState fieldState;
+        fieldState = FieldParser::extract(source, ns, "", &_ns, errMsg);
+        if (fieldState == FieldParser::FIELD_INVALID) return false;
+        _isNsSet = fieldState == FieldParser::FIELD_VALID;
+
+        fieldState = FieldParser::extract(source, primary, "", &_primary, errMsg);
+        if (fieldState == FieldParser::FIELD_INVALID) return false;
+        _isPrimarySet = fieldState == FieldParser::FIELD_VALID;
+
+        fieldState = FieldParser::extract(source, keyPattern, BSONObj(), &_keyPattern, errMsg);
+        if (fieldState == FieldParser::FIELD_INVALID) return false;
+        _isKeyPatternSet = fieldState == FieldParser::FIELD_VALID;
+
+        fieldState = FieldParser::extract(source, unique, false, &_unique, errMsg);
+        if (fieldState == FieldParser::FIELD_INVALID) return false;
+        _isUniqueSet = fieldState == FieldParser::FIELD_VALID;
+
+        fieldState = FieldParser::extract(source, updatedAt, 0, &_updatedAt, errMsg);
+        if (fieldState == FieldParser::FIELD_INVALID) return false;
+        _isUpdatedAtSet = fieldState == FieldParser::FIELD_VALID;
+
+        fieldState = FieldParser::extract(source, noBalance, false, &_noBalance, errMsg);
+        if (fieldState == FieldParser::FIELD_INVALID) return false;
+        _isNoBalanceSet = fieldState == FieldParser::FIELD_VALID;
+
+        fieldState = FieldParser::extract(source, epoch, OID(), &_epoch, errMsg);
+        if (fieldState == FieldParser::FIELD_INVALID) return false;
+        _isEpochSet = fieldState == FieldParser::FIELD_VALID;
+
+        fieldState = FieldParser::extract(source, dropped, false, &_dropped, errMsg);
+        if (fieldState == FieldParser::FIELD_INVALID) return false;
+        _isDroppedSet = fieldState == FieldParser::FIELD_VALID;
 
         //
         // backward compatibility
         //
 
-        // 'createAt' used to be called 'lastmod' up to 2.2.
+        // 'updatedAt' used to be called 'lastmod' up to 2.2.
 
         Date_t lastmod;
-        if (!FieldParser::extract(source, DEPRECATED_lastmod, 0ULL, &lastmod, errMsg)) return false;
+        fieldState = FieldParser::extract(source, DEPRECATED_lastmod, 0ULL, &lastmod, errMsg);
+        if (fieldState == FieldParser::FIELD_INVALID) return false;
 
-        if (lastmod != 0ULL) {
+        if (fieldState == FieldParser::FIELD_VALID && _isUpdatedAtSet == false) {
             _updatedAt = lastmod;
+            _isUpdatedAtSet = true;
         }
 
         // 'lastmodEpoch' was a transition format to 'epoch', up to 2.2
         OID lastmodEpoch;
-        if (!FieldParser::extract(source, DEPRECATED_lastmodEpoch, OID(), &lastmodEpoch, errMsg)) return false;
+        fieldState = FieldParser::extract(source, DEPRECATED_lastmodEpoch,
+                                          OID(), &lastmodEpoch, errMsg);
+        if (fieldState == FieldParser::FIELD_INVALID) return false;
 
-        if (lastmodEpoch.isSet()) {
+        if (fieldState == FieldParser::FIELD_VALID && _isEpochSet == false) {
             _epoch = lastmodEpoch;
+            _isEpochSet = true;
         }
 
         return true;
     }
 
     void CollectionType::clear() {
+
         _ns.clear();
+        _isNsSet = false;
+
         _primary.clear();
+        _isPrimarySet = false;
+
         _keyPattern = BSONObj();
+        _isKeyPatternSet = false;
+
         _unique = false;
+        _isUniqueSet = false;
+
         _updatedAt = 0ULL;
+        _isUpdatedAtSet = false;
+
         _noBalance = false;
+        _isNoBalanceSet = false;
+
         _epoch = OID();
+        _isEpochSet = false;
+
         _dropped = false;
+        _isDroppedSet = false;
+
     }
 
     void CollectionType::cloneTo(CollectionType* other) const {
         other->clear();
+
         other->_ns = _ns;
+        other->_isNsSet = _isNsSet;
+
         other->_primary = _primary;
+        other->_isPrimarySet = _isPrimarySet;
+
         other->_keyPattern = _keyPattern;
+        other->_isKeyPatternSet = _isKeyPatternSet;
+
         other->_unique = _unique;
+        other->_isUniqueSet = _isUniqueSet;
+
         other->_updatedAt = _updatedAt;
+        other->_isUpdatedAtSet = _isUpdatedAtSet;
+
         other->_noBalance = _noBalance;
+        other->_isNoBalanceSet = _isNoBalanceSet;
+
         other->_epoch = _epoch;
+        other->_isEpochSet = _isEpochSet;
+
         other->_dropped = _dropped;
+        other->_isDroppedSet = _isDroppedSet;
+
     }
 
     std::string CollectionType::toString() const {
