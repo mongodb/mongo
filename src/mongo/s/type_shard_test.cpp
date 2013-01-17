@@ -34,6 +34,24 @@ namespace {
         ASSERT_FALSE(shard.isValid(NULL));
     }
 
+    TEST(Validity, MissingName) {
+        ShardType shard;
+        BSONObj obj = BSON(ShardType::host("localhost:27017"));
+        string errMsg;
+        ASSERT(shard.parseBSON(obj, &errMsg));
+        ASSERT_EQUALS(errMsg, "");
+        ASSERT_FALSE(shard.isValid(NULL));
+    }
+
+    TEST(Validity, MissingHost) {
+        ShardType shard;
+        BSONObj obj = BSON(ShardType::name("shard0000"));
+        string errMsg;
+        ASSERT(shard.parseBSON(obj, &errMsg));
+        ASSERT_EQUALS(errMsg, "");
+        ASSERT_FALSE(shard.isValid(NULL));
+    }
+
     TEST(Validity, OnlyMandatory) {
         ShardType shard;
         BSONObj obj = BSON(ShardType::name("shard0000") <<

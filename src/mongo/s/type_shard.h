@@ -31,17 +31,18 @@ namespace mongo {
      *
      * Usage Example:
      *
+     *     // Contact the config. 'conn' has been obtained before.
      *     DBClientBase* conn;
-     *     BSONObj query = QUERY(ShardType::name("shard0000"));
-     *     shardDoc = conn->findOne(ShardType::ConfigNS, query);
+     *     BSONObj query = QUERY(ShardType::exampleField("exampleFieldName"));
+     *     exampleDoc = conn->findOne(ShardType::ConfigNS, query);
      *
      *     // Process the response.
-     *     ShardType shard;
-     *     shard.fromBSON(shardDoc);
-     *     if (! shard.isValid()) {
-     *         // Can't use 'shard'. Take action.
+     *     ShardType exampleType;
+     *     string errMsg;
+     *     if (!exampleType.parseBSON(exampleDoc, &errMsg) || !exampleType.isValid(&errMsg)) {
+     *         // Can't use 'exampleType'. Take action.
      *     }
-     *     // use 'shard'
+     *     // use 'exampleType'
      *
      */
     class ShardType {
@@ -52,18 +53,18 @@ namespace mongo {
         // schema declarations
         //
 
-        // Name of the shard collection in the config server.
+        // Name of the shards collection in the config server.
         static const std::string ConfigNS;
 
-        // Field names and types in the shard collection type.
-        static BSONField<std::string> name;     // shard's id
-        static BSONField<std::string> host;     // connection string for the host(s)
-        static BSONField<bool> draining;        // is it draining chunks?
-        static BSONField<long long> maxSize;    // max allowed disk space usage
-        static BSONField<BSONArray> tags;       // shard tags
+        // Field names and types in the shards collection type.
+        static const BSONField<std::string> name;
+        static const BSONField<std::string> host;
+        static const BSONField<bool> draining;
+        static const BSONField<long long> maxSize;
+        static const BSONField<BSONArray> tags;
 
         //
-        // shard type methods
+        // shards type methods
         //
 
         ShardType();
@@ -105,28 +106,114 @@ namespace mongo {
         // individual field accessors
         //
 
-        void setName(const StringData& name) { _name = name.toString(); }
-        const std::string& getName() const { return _name; }
+        // Mandatory Fields
+        void setName(const StringData& name) {
+            _name = name.toString();
+            _isNameSet = true;
+        }
 
-        void setHost(const StringData& host) { _host = host.toString(); }
-        const std::string& getHost() const { return _host; }
+        void unsetName() { _isNameSet = false; }
 
-        void setDraining(bool draining) { _draining = draining; }
-        bool getDraining() const { return _draining; }
+        bool isNameSet() { return _isNameSet; }
 
-        void setMaxSize(uint64_t maxSize) { _maxSize = maxSize; }
-        uint64_t getMaxSize() const { return _maxSize; }
+        // Calling get*() methods when the member is not set results in undefined behavior
+        const std::string getName() const {
+            dassert(_isNameSet);
+            return _name;
+        }
 
-        void setTags(const BSONArray& tags) { _tags = tags; }
-        BSONArray getTags() const { return _tags; }
+        void setHost(const StringData& host) {
+            _host = host.toString();
+            _isHostSet = true;
+        }
+
+        void unsetHost() { _isHostSet = false; }
+
+        bool isHostSet() { return _isHostSet; }
+
+        // Calling get*() methods when the member is not set results in undefined behavior
+        const std::string getHost() const {
+            dassert(_isHostSet);
+            return _host;
+        }
+
+        // Optional Fields
+        void setDraining(bool draining) {
+            _draining = draining;
+            _isDrainingSet = true;
+        }
+
+        void unsetDraining() { _isDrainingSet = false; }
+
+        bool isDrainingSet() {
+            return _isDrainingSet || draining.hasDefault();
+        }
+
+        // Calling get*() methods when the member is not set and has no default results in undefined
+        // behavior
+        bool getDraining() const {
+            if (_isDrainingSet) {
+                return _draining;
+            } else {
+                dassert(draining.hasDefault());
+                return draining.getDefault();
+            }
+        }
+        void setMaxSize(long long maxSize) {
+            _maxSize = maxSize;
+            _isMaxSizeSet = true;
+        }
+
+        void unsetMaxSize() { _isMaxSizeSet = false; }
+
+        bool isMaxSizeSet() {
+            return _isMaxSizeSet || maxSize.hasDefault();
+        }
+
+        // Calling get*() methods when the member is not set and has no default results in undefined
+        // behavior
+        long long getMaxSize() const {
+            if (_isMaxSizeSet) {
+                return _maxSize;
+            } else {
+                dassert(maxSize.hasDefault());
+                return maxSize.getDefault();
+            }
+        }
+        void setTags(BSONArray tags) {
+            _tags = tags;
+            _isTagsSet = true;
+        }
+
+        void unsetTags() { _isTagsSet = false; }
+
+        bool isTagsSet() {
+            return _isTagsSet || tags.hasDefault();
+        }
+
+        // Calling get*() methods when the member is not set and has no default results in undefined
+        // behavior
+        BSONArray getTags() const {
+            if (_isTagsSet) {
+                return _tags;
+            } else {
+                dassert(tags.hasDefault());
+                return tags.getDefault();
+            }
+        }
 
     private:
         // Convention: (M)andatory, (O)ptional, (S)pecial rule.
-        std::string _name;   // (M) shard's id
-        std::string _host;   // (M) connection string for the host(s)
-        bool _draining;      // (O) is it draining chunks?
-        long long _maxSize;  // (O) maximum allowed disk space in MB
-        BSONArray _tags;     // (O) shard tags
+        std::string _name;     // (M)  shard's id
+        bool _isNameSet;
+        std::string _host;     // (M)  connection string for the host(s)
+        bool _isHostSet;
+        bool _draining;     // (O)  is it draining chunks?
+        bool _isDrainingSet;
+        long long _maxSize;     // (O)  maximum allowed disk space in MB
+        bool _isMaxSizeSet;
+        BSONArray _tags;     // (O)  shard tags
+        bool _isTagsSet;
     };
 
-}  // namespace mongo
+} // namespace mongo
