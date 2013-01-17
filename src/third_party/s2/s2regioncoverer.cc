@@ -26,6 +26,7 @@ using std::vector;
 #include "s2.h"
 #include "s2cap.h"
 #include "s2cellunion.h"
+#include "mongo/base/init.h"
 
 // Define storage for header file constants (the values are not needed here).
 int const S2RegionCoverer::kDefaultMaxCells = 8;
@@ -43,25 +44,16 @@ struct S2RegionCoverer::CompareQueueEntries : public less<QueueEntry> {
 
 static S2Cell face_cells[6];
 
-static int Init() {
+static void Init() {
   for (int face = 0; face < 6; ++face) {
     face_cells[face] = S2Cell::FromFacePosLevel(face, 0, 0);
   }
-  // arbitrary value.  We want this to be called without pthread_once, so we populate
-  // a variable with the return value of this function.
-  return 5;
 }
 
-#ifndef _WIN32
-static pthread_once_t init_once = PTHREAD_ONCE_INIT;
-static void voidInit() { Init(); }
-inline static void MaybeInit() {
-  pthread_once(&init_once, voidInit);
+MONGO_INITIALIZER_WITH_PREREQUISITES(S2RegionCovererInit, ("S2CellIdInit"))(mongo::InitializerContext *context) {
+    Init();
+    return mongo::Status::OK();
 }
-#else
-static const int foo = Init();
-inline static void MaybeInit() { }
-#endif
 
 S2RegionCoverer::S2RegionCoverer() :
   min_level_(0),
@@ -71,8 +63,6 @@ S2RegionCoverer::S2RegionCoverer() :
   region_(NULL),
   result_(new vector<S2CellId>),
   pq_(new CandidateQueue) {
-  // Initialize the constants
-  MaybeInit();
 }
 
 S2RegionCoverer::~S2RegionCoverer() {
