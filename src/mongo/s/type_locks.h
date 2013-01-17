@@ -33,16 +33,16 @@ namespace mongo {
      *
      *     // Contact the config. 'conn' has been obtained before.
      *     DBClientBase* conn;
-     *     BSONObj query = QUERY(LocksType::name("balancer"));
-     *     lockDoc = conn->findOne(LocksType::ConfigNS, query);
+     *     BSONObj query = QUERY(LocksType::exampleField("exampleFieldName"));
+     *     exampleDoc = conn->findOne(LocksType::ConfigNS, query);
      *
      *     // Process the response.
-     *     LocksType lock;
-     *     lock.fromBSON(lockDoc);
-     *     if (! lock.isValid()) {
-     *         // Can't use 'lock'. Take action.
+     *     LocksType exampleType;
+     *     string errMsg;
+     *     if (!exampleType.parseBSON(exampleDoc, &errMsg) || !exampleType.isValid(&errMsg)) {
+     *         // Can't use 'exampleType'. Take action.
      *     }
-     *     // use 'lock'
+     *     // use 'exampleType'
      *
      */
     class LocksType {
@@ -53,26 +53,19 @@ namespace mongo {
         // schema declarations
         //
 
-        // Name of the collection in the config server.
+        // Name of the locks collection in the config server.
         static const std::string ConfigNS;
 
-        static BSONField<std::string> name;       // name of the lock
-        static BSONField<int> state;              // 0: Unlocked
-                                                  // 1: Locks in contention
-                                                  // 2: Lock held
-        static BSONField<std::string> process;    // the process field contains the (unique)
-                                                  // identifier for the instance of mongod/mongos
-                                                  // which has requested the lock
-        static BSONField<OID> lockID;             // a unique identifier for the instance of the
-                                                  // lock itself. Allows for safe cleanup after
-                                                  // network partitioning
-        static BSONField<std::string> who;        // a note about why the lock is held, or which
-                                                  // subcomponent is holding it
-        static BSONField<std::string> why;        // a human readable description of the purpose of
-                                                  // the lock
+        // Field names and types in the locks collection type.
+        static const BSONField<std::string> name;
+        static const BSONField<int> state;
+        static const BSONField<std::string> process;
+        static const BSONField<OID> lockID;
+        static const BSONField<std::string> who;
+        static const BSONField<std::string> why;
 
         //
-        // collection type methods
+        // locks type methods
         //
 
         LocksType();
@@ -103,7 +96,7 @@ namespace mongo {
         /**
          * Copies all the fields present in 'this' to 'other'.
          */
-        void cloneTo(LocksType* other);
+        void cloneTo(LocksType* other) const;
 
         /**
          * Returns a string representation of the current internal state.
@@ -114,39 +107,137 @@ namespace mongo {
         // individual field accessors
         //
 
-        void setName(const StringData& name) { _name = name.toString(); }
-        const std::string& getName() const { return _name; }
-
-        void setState(int state) { _state = state; }
-        int getState() const { return _state; }
-
-        void setProcess(const StringData& process) {
-            _process = process.toString();
+        // Mandatory Fields
+        void setName(const StringData& name) {
+            _name = name.toString();
+            _isNameSet = true;
         }
-        const std::string& getProcess() const { return _process; }
 
-        void setLockID(OID lockID) { _lockID = lockID; }
-        OID getLockID() const { return _lockID; }
+        void unsetName() { _isNameSet = false; }
 
-        void setWho(const StringData& who) { _who = who.toString(); }
-        const std::string& getWho() const { return _who; }
+        bool isNameSet() { return _isNameSet; }
 
-        void setWhy(const StringData& why) { _why = why.toString(); }
-        const std::string& getWhy() const { return _why; }
+        // Calling get*() methods when the member is not set results in undefined behavior
+        const std::string getName() const {
+            dassert(_isNameSet);
+            return _name;
+        }
+
+        void setState(const int state) {
+            _state = state;
+            _isStateSet = true;
+        }
+
+        void unsetState() { _isStateSet = false; }
+
+        bool isStateSet() { return _isStateSet; }
+
+        // Calling get*() methods when the member is not set results in undefined behavior
+        const int getState() const {
+            dassert(_isStateSet);
+            return _state;
+        }
+
+        // Optional Fields
+        void setProcess(StringData& process) {
+            _process = process.toString();
+            _isProcessSet = true;
+        }
+
+        void unsetProcess() { _isProcessSet = false; }
+
+        bool isProcessSet() {
+            return _isProcessSet || process.hasDefault();
+        }
+
+        // Calling get*() methods when the member is not set and has no default results in undefined
+        // behavior
+        std::string getProcess() const {
+            if (_isProcessSet) {
+                return _process;
+            } else {
+                dassert(process.hasDefault());
+                return process.getDefault();
+            }
+        }
+        void setLockID(OID lockID) {
+            _lockID = lockID;
+            _isLockIDSet = true;
+        }
+
+        void unsetLockID() { _isLockIDSet = false; }
+
+        bool isLockIDSet() {
+            return _isLockIDSet || lockID.hasDefault();
+        }
+
+        // Calling get*() methods when the member is not set and has no default results in undefined
+        // behavior
+        OID getLockID() const {
+            if (_isLockIDSet) {
+                return _lockID;
+            } else {
+                dassert(lockID.hasDefault());
+                return lockID.getDefault();
+            }
+        }
+        void setWho(StringData& who) {
+            _who = who.toString();
+            _isWhoSet = true;
+        }
+
+        void unsetWho() { _isWhoSet = false; }
+
+        bool isWhoSet() {
+            return _isWhoSet || who.hasDefault();
+        }
+
+        // Calling get*() methods when the member is not set and has no default results in undefined
+        // behavior
+        std::string getWho() const {
+            if (_isWhoSet) {
+                return _who;
+            } else {
+                dassert(who.hasDefault());
+                return who.getDefault();
+            }
+        }
+        void setWhy(StringData& why) {
+            _why = why.toString();
+            _isWhySet = true;
+        }
+
+        void unsetWhy() { _isWhySet = false; }
+
+        bool isWhySet() {
+            return _isWhySet || why.hasDefault();
+        }
+
+        // Calling get*() methods when the member is not set and has no default results in undefined
+        // behavior
+        std::string getWhy() const {
+            if (_isWhySet) {
+                return _why;
+            } else {
+                dassert(why.hasDefault());
+                return why.getDefault();
+            }
+        }
 
     private:
         // Convention: (M)andatory, (O)ptional, (S)pecial rule.
-        std::string _name;    // (M) name of the lock
-        int _state;           // (M) 0: Unlocked | 1: Locks in contention | 2: Lock held
-        std::string _process; // (S) optional if unlocked.  contains the (unique) identifier
-                              // for the instance of mongod/mongos which has requested the lock
-        OID _lockID;          // (S) optional if unlocked.  a unique identifier for the instance
-                              // of the lock itself. Allows for safe cleanup after network
-                              // partitioning
-        std::string _who;     // (S) optional if unlocked.  a note about why the lock is held,
-                              // or which subcomponent is holding it
-        std::string _why;     // (S) optional if unlocked.  a human readable description of the
-                              // purpose of the lock
+        std::string _name;     // (M)  name of the lock
+        bool _isNameSet;
+        int _state;     // (M)  0: Unlocked | 1: Locks in contention | 2: Lock held
+        bool _isStateSet;
+        std::string _process;     // (O)  optional if unlocked.  contains the (unique) identifier
+        bool _isProcessSet;
+        OID _lockID;     // (O)  optional if unlocked.  a unique identifier for the instance
+        bool _isLockIDSet;
+        std::string _who;     // (O)  optional if unlocked.  a note about why the lock is held,
+        bool _isWhoSet;
+        std::string _why;     // (O)  optional if unlocked.  a human readable description of the
+        bool _isWhySet;
     };
 
 } // namespace mongo
