@@ -25,29 +25,118 @@ namespace {
     using mongo::MongosType;
     using mongo::Date_t;
 
-    TEST(Validity, MissingFields) {
+    TEST(Validity, MissingName) {
         MongosType mongos;
-        BSONObj objNoName = BSON(MongosType::ping(time(0)) <<
-                                 MongosType::up(100) <<
-                                 MongosType::waiting(false));
         string errMsg;
-        ASSERT(mongos.parseBSON(objNoName, &errMsg));
+        BSONObj obj = BSON(MongosType::ping(1ULL) <<
+                           MongosType::up(100) <<
+                           MongosType::waiting(false) <<
+                           MongosType::mongoVersion("x.x.x") <<
+                           MongosType::configVersion(0));
+        ASSERT(mongos.parseBSON(obj, &errMsg));
         ASSERT_EQUALS(errMsg, "");
+        ASSERT_FALSE(mongos.isNameSet());
+        ASSERT_TRUE(mongos.isPingSet());
+        ASSERT_TRUE(mongos.isUpSet());
+        ASSERT_TRUE(mongos.isWaitingSet());
+        ASSERT_TRUE(mongos.isMongoVersionSet());
+        ASSERT_TRUE(mongos.isConfigVersionSet());
         ASSERT_FALSE(mongos.isValid(NULL));
+    }
 
-        BSONObj objNoPing = BSON(MongosType::name("localhost:27017") <<
-                                 MongosType::up(100) <<
-                                 MongosType::waiting(false));
-        ASSERT(mongos.parseBSON(objNoPing, &errMsg));
+    TEST(Validity, MissingPing) {
+        MongosType mongos;
+        string errMsg;
+        BSONObj obj = BSON(MongosType::name("localhost:27017") <<
+                           MongosType::up(100) <<
+                           MongosType::waiting(false) <<
+                           MongosType::mongoVersion("x.x.x") <<
+                           MongosType::configVersion(0));
+        ASSERT(mongos.parseBSON(obj, &errMsg));
         ASSERT_EQUALS(errMsg, "");
+        ASSERT_TRUE(mongos.isNameSet());
+        ASSERT_FALSE(mongos.isPingSet());
+        ASSERT_TRUE(mongos.isUpSet());
+        ASSERT_TRUE(mongos.isWaitingSet());
+        ASSERT_TRUE(mongos.isMongoVersionSet());
+        ASSERT_TRUE(mongos.isConfigVersionSet());
         ASSERT_FALSE(mongos.isValid(NULL));
+    }
 
-        BSONObj objNoUp = BSON(MongosType::name("localhost:27017") <<
-                               MongosType::ping(time(0)) <<
-                               MongosType::waiting(false));
-        ASSERT(mongos.parseBSON(objNoUp, &errMsg));
+    TEST(Validity, MissingUp) {
+        MongosType mongos;
+        string errMsg;
+        BSONObj obj = BSON(MongosType::name("localhost:27017") <<
+                           MongosType::ping(1ULL) <<
+                           MongosType::waiting(false) <<
+                           MongosType::mongoVersion("x.x.x") <<
+                           MongosType::configVersion(0));
+        ASSERT(mongos.parseBSON(obj, &errMsg));
         ASSERT_EQUALS(errMsg, "");
-        ASSERT_TRUE(mongos.isValid(NULL));
+        ASSERT_TRUE(mongos.isNameSet());
+        ASSERT_TRUE(mongos.isPingSet());
+        ASSERT_FALSE(mongos.isUpSet());
+        ASSERT_TRUE(mongos.isWaitingSet());
+        ASSERT_TRUE(mongos.isMongoVersionSet());
+        ASSERT_TRUE(mongos.isConfigVersionSet());
+        ASSERT_FALSE(mongos.isValid(NULL));
+    }
+
+    TEST(Validity, MissingWaiting) {
+        MongosType mongos;
+        string errMsg;
+        BSONObj obj = BSON(MongosType::name("localhost:27017") <<
+                           MongosType::ping(1ULL) <<
+                           MongosType::up(100) <<
+                           MongosType::mongoVersion("x.x.x") <<
+                           MongosType::configVersion(0));
+        ASSERT(mongos.parseBSON(obj, &errMsg));
+        ASSERT_EQUALS(errMsg, "");
+        ASSERT_TRUE(mongos.isNameSet());
+        ASSERT_TRUE(mongos.isPingSet());
+        ASSERT_TRUE(mongos.isUpSet());
+        ASSERT_FALSE(mongos.isWaitingSet());
+        ASSERT_TRUE(mongos.isMongoVersionSet());
+        ASSERT_TRUE(mongos.isConfigVersionSet());
+        ASSERT_FALSE(mongos.isValid(NULL));
+    }
+
+    TEST(Validity, MissingMongoVersion) {
+        MongosType mongos;
+        string errMsg;
+        BSONObj obj = BSON(MongosType::name("localhost:27017") <<
+                           MongosType::ping(1ULL) <<
+                           MongosType::up(100) <<
+                           MongosType::waiting(false) <<
+                           MongosType::configVersion(0));
+        ASSERT(mongos.parseBSON(obj, &errMsg));
+        ASSERT_EQUALS(errMsg, "");
+        ASSERT_TRUE(mongos.isNameSet());
+        ASSERT_TRUE(mongos.isPingSet());
+        ASSERT_TRUE(mongos.isUpSet());
+        ASSERT_TRUE(mongos.isWaitingSet());
+        ASSERT_FALSE(mongos.isMongoVersionSet());
+        ASSERT_TRUE(mongos.isConfigVersionSet());
+        ASSERT_FALSE(mongos.isValid(NULL));
+    }
+
+    TEST(Validity, MissingConfigVersion) {
+        MongosType mongos;
+        string errMsg;
+        BSONObj obj = BSON(MongosType::name("localhost:27017") <<
+                           MongosType::ping(1ULL) <<
+                           MongosType::up(100) <<
+                           MongosType::waiting(false) <<
+                           MongosType::mongoVersion("x.x.x"));
+        ASSERT(mongos.parseBSON(obj, &errMsg));
+        ASSERT_EQUALS(errMsg, "");
+        ASSERT_TRUE(mongos.isNameSet());
+        ASSERT_TRUE(mongos.isPingSet());
+        ASSERT_TRUE(mongos.isUpSet());
+        ASSERT_TRUE(mongos.isWaitingSet());
+        ASSERT_TRUE(mongos.isMongoVersionSet());
+        ASSERT_FALSE(mongos.isConfigVersionSet());
+        ASSERT_FALSE(mongos.isValid(NULL));
     }
 
     TEST(Validity, Valid) {
@@ -55,7 +144,9 @@ namespace {
         BSONObj obj = BSON(MongosType::name("localhost:27017") <<
                            MongosType::ping(1ULL) <<
                            MongosType::up(100) <<
-                           MongosType::waiting(false));
+                           MongosType::waiting(false) <<
+                           MongosType::mongoVersion("x.x.x") <<
+                           MongosType::configVersion(0));
         string errMsg;
         ASSERT(mongos.parseBSON(obj, &errMsg));
         ASSERT_EQUALS(errMsg, "");
@@ -64,6 +155,8 @@ namespace {
         ASSERT_EQUALS(mongos.getPing(), 1ULL);
         ASSERT_EQUALS(mongos.getUp(), 100);
         ASSERT_EQUALS(mongos.getWaiting(), false);
+        ASSERT_EQUALS(mongos.getMongoVersion(), "x.x.x");
+        ASSERT_EQUALS(mongos.getConfigVersion(), 0);
     }
 
     TEST(Validity, BadType) {

@@ -33,22 +33,18 @@ namespace mongo {
      *
      *     // Contact the config. 'conn' has been obtained before.
      *     DBClientBase* conn;
-     *     unique_ptr<DbClientCursor> cursor;
-     *     BSONObj query = QUERY(MongosType::name("localhost:27017"));
-     *     cursor.reset(conn->query(MongosType::ConfigNS, query, ...));
+     *     BSONObj query = QUERY(MongosType::exampleField("exampleFieldName"));
+     *     exampleDoc = conn->findOne(MongosType::ConfigNS, query);
      *
      *     // Process the response.
-     *     while (cursor->more()) {
-     *         mongosDoc = cursor->next();
-     *         MongosType mongos;
-     *         mongos.fromBSON(mongosDoc);
-     *         if (! mongos.isValid()) {
-     *             // Can't use 'mongos'. Take action.
-     *         }
-     *         // use 'mongos'
+     *     MongosType exampleType;
+     *     string errMsg;
+     *     if (!exampleType.parseBSON(exampleDoc, &errMsg) || !exampleType.isValid(&errMsg)) {
+     *         // Can't use 'exampleType'. Take action.
      *     }
+     *     // use 'exampleType'
+     *
      */
-
     class MongosType {
         MONGO_DISALLOW_COPYING(MongosType);
     public:
@@ -61,12 +57,12 @@ namespace mongo {
         static const std::string ConfigNS;
 
         // Field names and types in the mongos collection type.
-        static BSONField<string> name;      // "host:port" for this mongos
-        static BSONField<Date_t> ping;      // last time it was seen alive
-        static BSONField<int> up;           // uptime at the last ping
-        static BSONField<bool> waiting;     // for testing purposes
-        static BSONField<string> mongoVersion; // version of mongos
-        static BSONField<int> configVersion; // config version of mongos
+        static const BSONField<std::string> name;
+        static const BSONField<Date_t> ping;
+        static const BSONField<int> up;
+        static const BSONField<bool> waiting;
+        static const BSONField<std::string> mongoVersion;
+        static const BSONField<int> configVersion;
 
         //
         // mongos type methods
@@ -111,32 +107,113 @@ namespace mongo {
         // individual field accessors
         //
 
-        void setName(const StringData& name) { _name = name.toString(); }
-        const std::string& getName() const { return _name; }
+        // Mandatory Fields
+        void setName(const StringData& name) {
+            _name = name.toString();
+            _isNameSet = true;
+        }
 
-        void setPing(const Date_t& time) { _ping = time; }
-        Date_t getPing() const { return _ping; }
+        void unsetName() { _isNameSet = false; }
 
-        void setUp(int up) { _up = up; }
-        int getUp() const { return _up; }
+        bool isNameSet() { return _isNameSet; }
 
-        void setWaiting(bool waiting) { _waiting = waiting; }
-        bool getWaiting() const { return _waiting; }
+        // Calling get*() methods when the member is not set results in undefined behavior
+        const std::string& getName() const {
+            dassert(_isNameSet);
+            return _name;
+        }
 
-        void setMongoVersion(const std::string& mongoVersion) { _mongoVersion = mongoVersion; }
-        const std::string getMongoVersion() const { return _mongoVersion; }
+        void setPing(const Date_t ping) {
+            _ping = ping;
+            _isPingSet = true;
+        }
 
-        void setConfigVersion(int configVersion) { _configVersion = configVersion; }
-        int getConfigVersion() const { return _configVersion; }
+        void unsetPing() { _isPingSet = false; }
+
+        bool isPingSet() { return _isPingSet; }
+
+        // Calling get*() methods when the member is not set results in undefined behavior
+        const Date_t getPing() const {
+            dassert(_isPingSet);
+            return _ping;
+        }
+
+        void setUp(const int up) {
+            _up = up;
+            _isUpSet = true;
+        }
+
+        void unsetUp() { _isUpSet = false; }
+
+        bool isUpSet() { return _isUpSet; }
+
+        // Calling get*() methods when the member is not set results in undefined behavior
+        const int getUp() const {
+            dassert(_isUpSet);
+            return _up;
+        }
+
+        void setWaiting(const bool waiting) {
+            _waiting = waiting;
+            _isWaitingSet = true;
+        }
+
+        void unsetWaiting() { _isWaitingSet = false; }
+
+        bool isWaitingSet() { return _isWaitingSet; }
+
+        // Calling get*() methods when the member is not set results in undefined behavior
+        const bool getWaiting() const {
+            dassert(_isWaitingSet);
+            return _waiting;
+        }
+
+        void setMongoVersion(const StringData& mongoVersion) {
+            _mongoVersion = mongoVersion.toString();
+            _isMongoVersionSet = true;
+        }
+
+        void unsetMongoVersion() { _isMongoVersionSet = false; }
+
+        bool isMongoVersionSet() { return _isMongoVersionSet; }
+
+        // Calling get*() methods when the member is not set results in undefined behavior
+        const std::string& getMongoVersion() const {
+            dassert(_isMongoVersionSet);
+            return _mongoVersion;
+        }
+
+        void setConfigVersion(const int configVersion) {
+            _configVersion = configVersion;
+            _isConfigVersionSet = true;
+        }
+
+        void unsetConfigVersion() { _isConfigVersionSet = false; }
+
+        bool isConfigVersionSet() { return _isConfigVersionSet; }
+
+        // Calling get*() methods when the member is not set results in undefined behavior
+        const int getConfigVersion() const {
+            dassert(_isConfigVersionSet);
+            return _configVersion;
+        }
+
+        // Optional Fields
 
     private:
         // Convention: (M)andatory, (O)ptional, (S)pecial rule.
-        string _name;                // (M) "host:port" for this mongos
-        Date_t _ping;                // (M) last time it was seen alive
-        int _up;                     // (M) uptime at the last ping
-        bool _waiting;               // (M) for testing purposes
-        string _mongoVersion;        // (M) the mongodb version of the pinging mongos
-        int _configVersion;          // (M) the config version of the pinging mongos
+        std::string _name;     // (M)  "host:port" for this mongos
+        bool _isNameSet;
+        Date_t _ping;     // (M)  last time it was seen alive
+        bool _isPingSet;
+        int _up;     // (M)  uptime at the last ping
+        bool _isUpSet;
+        bool _waiting;     // (M)  for testing purposes
+        bool _isWaitingSet;
+        std::string _mongoVersion;     // (M)  the mongodb version of the pinging mongos
+        bool _isMongoVersionSet;
+        int _configVersion;     // (M)  the config version of the pinging mongos
+        bool _isConfigVersionSet;
     };
 
-}  // namespace mongo
+} // namespace mongo

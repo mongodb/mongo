@@ -13,7 +13,6 @@
  *    You should have received a copy of the GNU Affero General Public License
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-
 #include "mongo/s/type_mongos.h"
 
 #include "mongo/s/field_parser.h"
@@ -25,13 +24,12 @@ namespace mongo {
 
     const std::string MongosType::ConfigNS = "config.mongos";
 
-    BSONField<string> MongosType::name("_id");
-    BSONField<Date_t> MongosType::ping("ping");
-    BSONField<int> MongosType::up("up");
-    BSONField<bool> MongosType::waiting("waiting");
-    BSONField<string> MongosType::mongoVersion("mongoVersion");
-    BSONField<int> MongosType::configVersion("configVersion");
-
+    const BSONField<std::string> MongosType::name("_id");
+    const BSONField<Date_t> MongosType::ping("ping");
+    const BSONField<int> MongosType::up("up");
+    const BSONField<bool> MongosType::waiting("waiting");
+    const BSONField<std::string> MongosType::mongoVersion("mongoVersion");
+    const BSONField<int> MongosType::configVersion("configVersion");
 
     MongosType::MongosType() {
         clear();
@@ -46,19 +44,29 @@ namespace mongo {
             errMsg = &dummy;
         }
 
-        if (_name.empty()) {
+        // All the mandatory fields must be present.
+        if (!_isNameSet) {
             *errMsg = stream() << "missing " << name.name() << " field";
             return false;
         }
-        else {
-            // TODO: check that string has valid "host:port" format
-        }
-        if (_ping.millis == 0) {
+        if (!_isPingSet) {
             *errMsg = stream() << "missing " << ping.name() << " field";
             return false;
         }
-        if (!(_up >= 0)) {
-            *errMsg = stream() << "uptime must be positive or 0";
+        if (!_isUpSet) {
+            *errMsg = stream() << "missing " << up.name() << " field";
+            return false;
+        }
+        if (!_isWaitingSet) {
+            *errMsg = stream() << "missing " << waiting.name() << " field";
+            return false;
+        }
+        if (!_isMongoVersionSet) {
+            *errMsg = stream() << "missing " << mongoVersion.name() << " field";
+            return false;
+        }
+        if (!_isConfigVersionSet) {
+            *errMsg = stream() << "missing " << configVersion.name() << " field";
             return false;
         }
 
@@ -68,12 +76,12 @@ namespace mongo {
     BSONObj MongosType::toBSON() const {
         BSONObjBuilder builder;
 
-        if (!_name.empty()) builder.append(name(), _name);
-        if (_ping.millis > 0ULL) builder.append(ping(), _ping);
-        if (_up > 0) builder.append(up(), _up);
-        if (_waiting) builder.append(waiting(), _waiting);
-        builder.append(mongoVersion(), _mongoVersion);
-        builder.append(configVersion(), _configVersion);
+        if (_isNameSet) builder.append(name(), _name);
+        if (_isPingSet) builder.append(ping(), _ping);
+        if (_isUpSet) builder.append(up(), _up);
+        if (_isWaitingSet) builder.append(waiting(), _waiting);
+        if (_isMongoVersionSet) builder.append(mongoVersion(), _mongoVersion);
+        if (_isConfigVersionSet) builder.append(configVersion(), _configVersion);
 
         return builder.obj();
     }
@@ -81,36 +89,84 @@ namespace mongo {
     bool MongosType::parseBSON(BSONObj source, string* errMsg) {
         clear();
 
-        string dummy;
+        std::string dummy;
         if (!errMsg) errMsg = &dummy;
 
-        if (!FieldParser::extract(source, name, "", &_name, errMsg)) return false;
-        if (!FieldParser::extract(source, ping, 0ULL, &_ping, errMsg)) return false;
-        if (!FieldParser::extract(source, up, 0, &_up, errMsg)) return false;
-        if (!FieldParser::extract(source, waiting, false, &_waiting, errMsg)) return false;
-        if (!FieldParser::extract(source, mongoVersion, "", &_mongoVersion, errMsg)) return false;
-        if (!FieldParser::extract(source, configVersion, 0, &_configVersion, errMsg)) return false;
+        FieldParser::FieldState fieldState;
+        fieldState = FieldParser::extract(source, name, "", &_name, errMsg);
+        if (fieldState == FieldParser::FIELD_INVALID) return false;
+        _isNameSet = fieldState == FieldParser::FIELD_VALID;
+
+        fieldState = FieldParser::extract(source, ping, 0, &_ping, errMsg);
+        if (fieldState == FieldParser::FIELD_INVALID) return false;
+        _isPingSet = fieldState == FieldParser::FIELD_VALID;
+
+        fieldState = FieldParser::extract(source, up, 0, &_up, errMsg);
+        if (fieldState == FieldParser::FIELD_INVALID) return false;
+        _isUpSet = fieldState == FieldParser::FIELD_VALID;
+
+        fieldState = FieldParser::extract(source, waiting, false, &_waiting, errMsg);
+        if (fieldState == FieldParser::FIELD_INVALID) return false;
+        _isWaitingSet = fieldState == FieldParser::FIELD_VALID;
+
+        fieldState = FieldParser::extract(source, mongoVersion, "", &_mongoVersion, errMsg);
+        if (fieldState == FieldParser::FIELD_INVALID) return false;
+        _isMongoVersionSet = fieldState == FieldParser::FIELD_VALID;
+
+        fieldState = FieldParser::extract(source, configVersion, 0, &_configVersion, errMsg);
+        if (fieldState == FieldParser::FIELD_INVALID) return false;
+        _isConfigVersionSet = fieldState == FieldParser::FIELD_VALID;
 
         return true;
     }
 
     void MongosType::clear() {
+
         _name.clear();
+        _isNameSet = false;
+
         _ping = 0ULL;
+        _isPingSet = false;
+
         _up = 0;
+        _isUpSet = false;
+
         _waiting = false;
-        _mongoVersion = "";
+        _isWaitingSet = false;
+
+        _mongoVersion.clear();
+        _isMongoVersionSet = false;
+
         _configVersion = 0;
+        _isConfigVersionSet = false;
+
     }
 
     void MongosType::cloneTo(MongosType* other) const {
         other->clear();
+
         other->_name = _name;
+        other->_isNameSet = _isNameSet;
+
         other->_ping = _ping;
+        other->_isPingSet = _isPingSet;
+
         other->_up = _up;
+        other->_isUpSet = _isUpSet;
+
         other->_waiting = _waiting;
+        other->_isWaitingSet = _isWaitingSet;
+
         other->_mongoVersion = _mongoVersion;
+        other->_isMongoVersionSet = _isMongoVersionSet;
+
         other->_configVersion = _configVersion;
+        other->_isConfigVersionSet = _isConfigVersionSet;
+
+    }
+
+    std::string MongosType::toString() const {
+        return toBSON().toString();
     }
 
 } // namespace mongo
