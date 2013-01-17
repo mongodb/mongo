@@ -33,20 +33,17 @@ namespace mongo {
      *
      *     // Contact the config. 'conn' has been obtained before.
      *     DBClientBase* conn;
-     *     unique_ptr<DbClientCursor> cursor;
-     *     BSONObj query = QUERY(TagsType::ns("mydb.mycoll"));
-     *     cursor.reset(conn->query(TagsType::ConfigNS, query, ...));
+     *     BSONObj query = QUERY(TagsType::exampleField("exampleFieldName"));
+     *     exampleDoc = conn->findOne(TagsType::ConfigNS, query);
      *
      *     // Process the response.
-     *     while (cursor->more()) {
-     *         tagDoc = cursor->next();
-     *         TagsType tag;
-     *         tag.fromBSON(dbDoc);
-     *         if (! tag.isValid()) {
-     *             // Can't use 'tag'. Take action.
-     *         }
-     *         // use 'tag'
+     *     TagsType exampleType;
+     *     string errMsg;
+     *     if (!exampleType.parseBSON(exampleDoc, &errMsg) || !exampleType.isValid(&errMsg)) {
+     *         // Can't use 'exampleType'. Take action.
      *     }
+     *     // use 'exampleType'
+     *
      */
     class TagsType {
         MONGO_DISALLOW_COPYING(TagsType);
@@ -60,10 +57,10 @@ namespace mongo {
         static const std::string ConfigNS;
 
         // Field names and types in the tags collection type.
-        static BSONField<std::string> ns;  // namespace this tag is for
-        static BSONField<std::string> tag; // tag name
-        static BSONField<BSONObj> min;     // first key of the tag, including
-        static BSONField<BSONObj> max;     // last key of the tag, non-including
+        static const BSONField<std::string> ns;
+        static const BSONField<std::string> tag;
+        static const BSONField<BSONObj> min;
+        static const BSONField<BSONObj> max;
 
         //
         // tags type methods
@@ -97,7 +94,7 @@ namespace mongo {
         /**
          * Copies all the fields present in 'this' to 'other'.
          */
-        void cloneTo(TagsType* other);
+        void cloneTo(TagsType* other) const;
 
         /**
          * Returns a string representation of the current internal state.
@@ -108,24 +105,79 @@ namespace mongo {
         // individual field accessors
         //
 
-        void setNS(const StringData& ns) { _ns = ns.toString(); }
-        const std::string& getNS() const { return _ns; }
+        // Mandatory Fields
+        void setNS(const StringData& ns) {
+            _ns = ns.toString();
+            _isNsSet = true;
+        }
 
-        void setTag(const StringData& tag) { _tag = tag.toString(); }
-        const std::string& getTag() const { return _tag; }
+        void unsetNS() { _isNsSet = false; }
 
-        void setMin(const BSONObj& min) { _min = min.getOwned(); }
-        BSONObj getMin() const { return _min; }
+        bool isNSSet() { return _isNsSet; }
 
-        void setMax(const BSONObj& max) { _max = max.getOwned(); }
-        BSONObj getMax() const { return _max; }
+        // Calling get*() methods when the member is not set results in undefined behavior
+        const std::string& getNS() const {
+            dassert(_isNsSet);
+            return _ns;
+        }
+
+        void setTag(const StringData& tag) {
+            _tag = tag.toString();
+            _isTagSet = true;
+        }
+
+        void unsetTag() { _isTagSet = false; }
+
+        bool isTagSet() { return _isTagSet; }
+
+        // Calling get*() methods when the member is not set results in undefined behavior
+        const std::string& getTag() const {
+            dassert(_isTagSet);
+            return _tag;
+        }
+
+        void setMin(const BSONObj& min) {
+            _min = min.getOwned();
+            _isMinSet = true;
+        }
+
+        void unsetMin() { _isMinSet = false; }
+
+        bool isMinSet() { return _isMinSet; }
+
+        // Calling get*() methods when the member is not set results in undefined behavior
+        const BSONObj getMin() const {
+            dassert(_isMinSet);
+            return _min;
+        }
+
+        void setMax(const BSONObj& max) {
+            _max = max.getOwned();
+            _isMaxSet = true;
+        }
+
+        void unsetMax() { _isMaxSet = false; }
+
+        bool isMaxSet() { return _isMaxSet; }
+
+        // Calling get*() methods when the member is not set results in undefined behavior
+        const BSONObj getMax() const {
+            dassert(_isMaxSet);
+            return _max;
+        }
+
+        // Optional Fields
 
     private:
         // Convention: (M)andatory, (O)ptional, (S)pecial rule.
-        string _ns;   // (M) namespace this tag is for
-        string _tag;  // (M) tag name
-        BSONObj _min; // (M) first key of the tag, including
-        BSONObj _max; // (M) last key of the tag, non-including
+        std::string _ns;     // (M)  namespace this tag is for
+        bool _isNsSet;
+        std::string _tag;     // (M)  tag name
+        bool _isTagSet;
+        BSONObj _min;     // (M)  first key of the tag, including
+        bool _isMinSet;
+        BSONObj _max;     // (M)  last key of the tag, non-including
+        bool _isMaxSet;
     };
 
-}  // namespace mongo
+} // namespace mongo
