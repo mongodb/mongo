@@ -33,16 +33,16 @@ namespace mongo {
      *
      *     // Contact the config. 'conn' has been obtained before.
      *     DBClientBase* conn;
-     *     BSONObj query = QUERY(ChangelogType::changeID("host.local-2012-11-21T19:14:10-8"))
-     *     logEntryDoc = conn->findOne(ChangelogType::ConfigNS, query);
+     *     BSONObj query = QUERY(ChangelogType::exampleField("exampleFieldName"));
+     *     exampleDoc = conn->findOne(ChangelogType::ConfigNS, query);
      *
      *     // Process the response.
-     *     ChangelogType logEntry;
-     *     logEntry.fromBSON(logEntryDoc);
-     *     if (! logEntry.isValid()) {
-     *         // Can't use 'logEntry'. Take action.
+     *     ChangelogType exampleType;
+     *     string errMsg;
+     *     if (!exampleType.parseBSON(exampleDoc, &errMsg) || !exampleType.isValid(&errMsg)) {
+     *         // Can't use 'exampleType'. Take action.
      *     }
-     *     // use 'logEntry'
+     *     // use 'exampleType'
      *
      */
     class ChangelogType {
@@ -53,17 +53,17 @@ namespace mongo {
         // schema declarations
         //
 
-        // Name of the collection in the config server.
+        // Name of the changelog collection in the config server.
         static const std::string ConfigNS;
 
-        // Field names and types in the changelog type.
-        static BSONField<std::string> changeID;     // id for this change "<hostname>-<current_time>-<increment>"
-        static BSONField<std::string> server;       // hostname of server that we are making the change on.  Does not include port.
-        static BSONField<std::string> clientAddr;   // hostname:port of the client that made this change
-        static BSONField<Date_t> time;              // time this change was made
-        static BSONField<std::string> what;         // description of the change
-        static BSONField<std::string> ns;           // database or collection this change applies to
-        static BSONField<BSONObj> details;          // A BSONObj containing extra information about some operations
+        // Field names and types in the changelog collection type.
+        static const BSONField<std::string> changeID;
+        static const BSONField<std::string> server;
+        static const BSONField<std::string> clientAddr;
+        static const BSONField<Date_t> time;
+        static const BSONField<std::string> what;
+        static const BSONField<std::string> ns;
+        static const BSONField<BSONObj> details;
 
         //
         // changelog type methods
@@ -97,7 +97,7 @@ namespace mongo {
         /**
          * Copies all the fields present in 'this' to 'other'.
          */
-        void cloneTo(ChangelogType* other);
+        void cloneTo(ChangelogType* other) const;
 
         /**
          * Returns a string representation of the current internal state.
@@ -108,36 +108,130 @@ namespace mongo {
         // individual field accessors
         //
 
-        void setChangeID(const StringData& changeID) { _changeID = changeID.toString(); }
-        const std::string& getChangeID() const { return _changeID; }
+        // Mandatory Fields
+        void setChangeID(const StringData& changeID) {
+            _changeID = changeID.toString();
+            _isChangeIDSet = true;
+        }
 
-        void setServer(const StringData& server) { _server = server.toString(); }
-        const std::string& getServer() const { return _server; }
+        void unsetChangeID() { _isChangeIDSet = false; }
 
-        void setClientAddr(const StringData& clientAddr) { _clientAddr = clientAddr.toString(); }
-        const std::string& getClientAddr() const { return _clientAddr; }
+        bool isChangeIDSet() { return _isChangeIDSet; }
 
-        void setTime(const Date_t& time) { _time = time; }
-        Date_t getTime() const { return _time; }
+        // Calling get*() methods when the member is not set results in undefined behavior
+        const std::string& getChangeID() const {
+            dassert(_isChangeIDSet);
+            return _changeID;
+        }
 
-        void setWhat(const StringData& what) { _what = what.toString(); }
-        const std::string& getWhat() const { return _what; }
+        void setServer(const StringData& server) {
+            _server = server.toString();
+            _isServerSet = true;
+        }
 
-        void setNS(const StringData& ns) { _ns = ns.toString(); }
-        const std::string& getNS() const { return _ns; }
+        void unsetServer() { _isServerSet = false; }
 
-        void setDetails(const BSONObj details) { _details = details.getOwned(); }
-        BSONObj getDetails() const { return _details; }
+        bool isServerSet() { return _isServerSet; }
+
+        // Calling get*() methods when the member is not set results in undefined behavior
+        const std::string& getServer() const {
+            dassert(_isServerSet);
+            return _server;
+        }
+
+        void setClientAddr(const StringData& clientAddr) {
+            _clientAddr = clientAddr.toString();
+            _isClientAddrSet = true;
+        }
+
+        void unsetClientAddr() { _isClientAddrSet = false; }
+
+        bool isClientAddrSet() { return _isClientAddrSet; }
+
+        // Calling get*() methods when the member is not set results in undefined behavior
+        const std::string& getClientAddr() const {
+            dassert(_isClientAddrSet);
+            return _clientAddr;
+        }
+
+        void setTime(const Date_t time) {
+            _time = time;
+            _isTimeSet = true;
+        }
+
+        void unsetTime() { _isTimeSet = false; }
+
+        bool isTimeSet() { return _isTimeSet; }
+
+        // Calling get*() methods when the member is not set results in undefined behavior
+        const Date_t getTime() const {
+            dassert(_isTimeSet);
+            return _time;
+        }
+
+        void setWhat(const StringData& what) {
+            _what = what.toString();
+            _isWhatSet = true;
+        }
+
+        void unsetWhat() { _isWhatSet = false; }
+
+        bool isWhatSet() { return _isWhatSet; }
+
+        // Calling get*() methods when the member is not set results in undefined behavior
+        const std::string& getWhat() const {
+            dassert(_isWhatSet);
+            return _what;
+        }
+
+        void setNS(const StringData& ns) {
+            _ns = ns.toString();
+            _isNsSet = true;
+        }
+
+        void unsetNS() { _isNsSet = false; }
+
+        bool isNSSet() { return _isNsSet; }
+
+        // Calling get*() methods when the member is not set results in undefined behavior
+        const std::string& getNS() const {
+            dassert(_isNsSet);
+            return _ns;
+        }
+
+        void setDetails(const BSONObj& details) {
+            _details = details.getOwned();
+            _isDetailsSet = true;
+        }
+
+        void unsetDetails() { _isDetailsSet = false; }
+
+        bool isDetailsSet() { return _isDetailsSet; }
+
+        // Calling get*() methods when the member is not set results in undefined behavior
+        const BSONObj getDetails() const {
+            dassert(_isDetailsSet);
+            return _details;
+        }
+
+        // Optional Fields
 
     private:
         // Convention: (M)andatory, (O)ptional, (S)pecial rule.
-        std::string _changeID;   // (M) id for this change "<hostname>-<current_time>-<increment>"
-        std::string _server;     // (M) hostname of server that we are making the change on.  Does not include port.
-        std::string _clientAddr; // (M) hostname:port of the client that made this change
-        Date_t _time;            // (M) time this change was made
-        std::string _what;       // (M) description of the change
-        std::string _ns;         // (M) database or collection this change applies to
-        BSONObj _details;        // (M) A BSONObj containing extra information about some operations
+        std::string _changeID;     // (M)  id for this change "<hostname>-<current_time>-<increment>"
+        bool _isChangeIDSet;
+        std::string _server;     // (M)  hostname of server that we are making the change on.  Does not include port.
+        bool _isServerSet;
+        std::string _clientAddr;     // (M)  hostname:port of the client that made this change
+        bool _isClientAddrSet;
+        Date_t _time;     // (M)  time this change was made
+        bool _isTimeSet;
+        std::string _what;     // (M)  description of the change
+        bool _isWhatSet;
+        std::string _ns;     // (M)  database or collection this change applies to
+        bool _isNsSet;
+        BSONObj _details;     // (M)  A BSONObj containing extra information about some operations
+        bool _isDetailsSet;
     };
 
 } // namespace mongo
