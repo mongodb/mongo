@@ -310,9 +310,8 @@ namespace mongo {
             ReplicaSetMonitorPtr rs = ReplicaSetMonitor::get( _cs.getSetName(), true );
 
             if (!rs) {
-                warning() << "Monitor not found for " << _cs.getSetName()
-                          << ". Shard was either removed or "
-                          << "monitor is still initializing." << endl;
+                // Possibly still yet to be initialized. See SERVER-8194.
+                warning() << "Monitor not found for a known shard: " << _cs.getSetName() << endl;
                 return false;
             }
 
