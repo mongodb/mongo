@@ -27,9 +27,14 @@ namespace mongo {
     class DBClientBase;
 
     /**
-     * install the db related functions and objects in the given scope
+     * install database access functions
      */
-    void installDBTypes(V8Scope* scope, v8::Handle<v8::Object>& global);
+    void installDBAccess(V8Scope* scope);
+
+    /**
+     * install BSON types and helpers
+     */
+    void installBSONTypes(V8Scope* scope);
 
     /**
      * get the DBClientBase connection from JS args

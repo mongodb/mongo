@@ -24,6 +24,7 @@
 
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/client/dbclientinterface.h"
+#include "mongo/scripting/bench.h"
 #include "mongo/util/file.h"
 
 namespace mongo {
@@ -230,7 +231,6 @@ namespace mongo {
     }
 
     void Scope::execCoreFiles() {
-        // keeping same order as in SConstruct
         execSetup(JSFiles::utils);
         execSetup(JSFiles::utils_sh);
         execSetup(JSFiles::db);
@@ -238,6 +238,14 @@ namespace mongo {
         execSetup(JSFiles::mr);
         execSetup(JSFiles::query);
         execSetup(JSFiles::collection);
+    }
+
+    /** install BenchRunner suite */
+    void Scope::installBenchRun() {
+        injectNative("benchRun", BenchRunner::benchRunSync);
+        injectNative("benchRunSync", BenchRunner::benchRunSync);
+        injectNative("benchStart", BenchRunner::benchStart);
+        injectNative("benchFinish", BenchRunner::benchFinish);
     }
 
     typedef map<string, list<Scope*> > PoolToScopes;
@@ -378,6 +386,7 @@ namespace mongo {
         Scope* _real;
     };
 
+    /** Get a scope from the pool of scopes matching the supplied pool name */
     auto_ptr<Scope> ScriptEngine::getPooledScope(const string& pool) {
         if (!scopeCache.get())
             scopeCache.reset(new ScopeCache());

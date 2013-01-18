@@ -34,6 +34,7 @@ namespace mongo {
 
     std::string toSTLString(const v8::Handle<v8::Value>& o);
     std::string toSTLString(const v8::TryCatch* try_catch);
+    std::string v8ObjectToString(const v8::Handle<v8::Object>& o);
 
     class V8Scope;
     void installFork(V8Scope* scope,

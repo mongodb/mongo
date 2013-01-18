@@ -152,6 +152,7 @@ namespace mongo {
             scope.execSetup(JSFiles::servers_misc);
             scope.execSetup(JSFiles::replsettest);
             scope.execSetup(JSFiles::replsetbridge);
+            scope.installBenchRun();
 
             if ( !_dbConnect.empty() ) {
                 uassert( 12513, "connect failed", scope.exec( _dbConnect , "(connect)" , false , true , false ) );

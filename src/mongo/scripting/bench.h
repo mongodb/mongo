@@ -395,6 +395,11 @@ namespace mongo {
 
         const BenchRunConfig &config() const { return *_config; } // TODO: Remove this function.
 
+        // JS bindings
+        static BSONObj benchFinish(const BSONObj& argsFake, void* data);
+        static BSONObj benchStart(const BSONObj& argsFake, void* data);
+        static BSONObj benchRunSync(const BSONObj& argsFake, void* data);
+
     private:
         // TODO: Same as for createWithConfig.
         static boost::mutex _staticMutex;

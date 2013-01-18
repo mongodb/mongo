@@ -598,8 +598,7 @@ namespace mongo {
          */
         void State::init() {
             // setup js
-            _scope.reset(globalScriptEngine->getPooledScope( _config.dbname ).release() );
-            _scope->localConnect( _config.dbname.c_str() );
+            _scope.reset(globalScriptEngine->getPooledScope( _config.dbname + "mapreduce" ).release() );
 
             if ( ! _config.scopeSetup.isEmpty() )
                 _scope->init( &_config.scopeSetup );

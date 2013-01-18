@@ -91,9 +91,17 @@ namespace mongo {
         /** check if there is a pending killOp request */
         bool isKillPending() const;
 
+        /**
+         * Connect to a local database, create a Mongo object instance, and load any
+         * server-side js into the global object
+         */
         virtual void localConnect(const char* dbName);
 
         virtual void externalSetup();
+
+        virtual void installDBAccess();
+
+        virtual void installBSONTypes();
 
         virtual string getError() { return _error; }
 

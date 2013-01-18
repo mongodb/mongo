@@ -47,5 +47,3 @@ assert.eq( { 1 : 1 , 2 : 2 , 3 : 2 , 4 : 1 } , res.convertToSingleObject() , "A"
 res.drop()
 
 assert.throws( function(){ t.mapReduce( m_good , r , { out : "xxx" , query : "foo" } ); } )
-
-printjson( t.mapReduce( function(){ emit( 1 , db.foo.findOne() ); } , r , { out : { inline : true } } ) )

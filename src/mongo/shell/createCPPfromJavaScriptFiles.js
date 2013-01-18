@@ -101,5 +101,9 @@ var shell = new ActiveXObject( "WScript.Shell" );
 shell.CurrentDirectory = WScript.Arguments.Unnamed.Item( 0 );
 
 var fso = new ActiveXObject( "Scripting.FileSystemObject" );
-rebuildIfNeeded( fso, "shell/mongo.cpp", ["shell/utils.js", "shell/utils_sh.js", "shell/db.js", "shell/mongo.js", "shell/mr.js", "shell/query.js", "shell/collection.js"] );
-rebuildIfNeeded( fso, "shell/mongo-server.cpp", ["shell/servers.js", "shell/shardingtest.js", "shell/servers_misc.js", "shell/replsettest.js", "shell/replsetbridge.js"] );
+rebuildIfNeeded(fso, "shell/mongo.cpp", ["shell/assert.js", "shell/types.js", "shell/utils.js", "shell/utils_sh.js",
+                                         "shell/db.js", "shell/mongo.js", "shell/mr.js",
+                                         "shell/query.js", "shell/collection.js"]);
+rebuildIfNeeded(fso, "shell/mongo-server.cpp", ["shell/servers.js", "shell/shardingtest.js",
+                                                "shell/servers_misc.js", "shell/replsettest.js",
+                                                "shell/replsetbridge.js"]);

@@ -64,17 +64,8 @@ namespace mongo {
             _func = 0;
             _initCalled = false;
         }
-        
-        ~Where() {
 
-            if ( _scope.get() ){
-                try {
-                    _scope->execSetup( "_mongo.readOnly = false;" , "make not read only" );
-                }
-                catch( DBException& e ){
-                    warning() << "javascript scope cleanup interrupted" << causedBy( e ) << endl;
-                }
-            }
+        ~Where() {
             _func = 0;
         }
 
@@ -83,14 +74,12 @@ namespace mongo {
                 return;
             _initCalled = true;
 
-            _scope = globalScriptEngine->getPooledScope( _ns );
+            _scope = globalScriptEngine->getPooledScope( _ns + "where" );
             NamespaceString ns( _ns );
-            _scope->localConnect( ns.db.c_str() );
-            
+
             massert( 10341 ,  "code has to be set first!" , ! _jsCode.empty() );
 
             _func = _scope->createFunction( _jsCode.c_str() );
-            _scope->execSetup( "_mongo.readOnly = true;" , "make read only" );
         }
 
         void setScope( const BSONObj& scope ) {

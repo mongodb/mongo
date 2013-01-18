@@ -41,6 +41,14 @@ namespace mongo {
         return s;
     }
 
+    /** Get the properties of an object (and it's prototype) as a comma-delimited string */
+    std::string v8objectToString(const v8::Handle<v8::Object>& o) {
+        v8::Local<v8::Array> properties = o->GetPropertyNames();
+        v8::String::Utf8Value str(properties);
+        massert(16696 , "error converting js type to Utf8Value", *str);
+        return std::string(*str, str.length());
+    }
+
     std::string toSTLString(const v8::TryCatch* try_catch) {
         stringstream ss;
         v8::String::Utf8Value exception(try_catch->Exception());

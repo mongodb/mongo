@@ -25,6 +25,12 @@ using namespace mongoutils;
 
 namespace mongo {
 
+    // Generated symbols for JS files
+    namespace JSFiles {
+        extern const JSFile types;
+        extern const JSFile assert;
+    }
+
     /**
      * Unwraps a BSONObj from the JS wrapper
      */
@@ -501,17 +507,20 @@ namespace mongo {
         internalFieldObjects->SetInternalFieldCount(1);
 
         injectV8Function("print", Print);
-        injectV8Function("version", Version);
-        injectV8Function("load", load);
+        injectV8Function("version", Version);  // TODO: remove
         injectV8Function("gc", GCV8);
-        injectV8Function("startCpuProfiler", startCpuProfiler);
-        injectV8Function("stopCpuProfiler", stopCpuProfiler);
-        injectV8Function("getCpuProfile", getCpuProfile);
+        // injectV8Function("startCpuProfiler", startCpuProfiler);
+        // injectV8Function("stopCpuProfiler", stopCpuProfiler);
+        // injectV8Function("getCpuProfile", getCpuProfile);
 
-        // install db and bson types in the global scope
-        installDBTypes(this, _global);
+        // install BSON functions in the global object
+        installBSONTypes();
 
-        // install db/shell-specific utilities in the global scope
+        // load JS helpers (dependancy: installBSONTypes)
+        execSetup(JSFiles::assert);
+        execSetup(JSFiles::types);
+
+        // install process-specific utilities in the global scope (dependancy: types.js, assert.js)
         if (_engine->_scopeInitCallback)
             _engine->_scopeInitCallback(*this);
 
@@ -728,6 +737,40 @@ namespace mongo {
             return BSONObj();
         uassert(10231,  "not an object", v->IsObject());
         return v8ToMongo(v->ToObject());
+    }
+
+    v8::Handle<v8::FunctionTemplate> getNumberLongFunctionTemplate(V8Scope* scope) {
+        v8::Handle<v8::FunctionTemplate> numberLong = scope->createV8Function(numberLongInit);
+        v8::Local<v8::Template> proto = numberLong->PrototypeTemplate();
+        scope->injectV8Function("valueOf", numberLongValueOf, proto);
+        scope->injectV8Function("toNumber", numberLongToNumber, proto);
+        scope->injectV8Function("toString", numberLongToString, proto);
+        return numberLong;
+    }
+
+    v8::Handle<v8::FunctionTemplate> getNumberIntFunctionTemplate(V8Scope* scope) {
+        v8::Handle<v8::FunctionTemplate> numberInt = scope->createV8Function(numberIntInit);
+        v8::Local<v8::Template> proto = numberInt->PrototypeTemplate();
+        scope->injectV8Function("valueOf", numberIntValueOf, proto);
+        scope->injectV8Function("toNumber", numberIntToNumber, proto);
+        scope->injectV8Function("toString", numberIntToString, proto);
+        return numberInt;
+    }
+
+    v8::Handle<v8::FunctionTemplate> getBinDataFunctionTemplate(V8Scope* scope) {
+        v8::Handle<v8::FunctionTemplate> binData = scope->createV8Function(binDataInit);
+        binData->InstanceTemplate()->SetInternalFieldCount(1);
+        v8::Local<v8::Template> proto = binData->PrototypeTemplate();
+        scope->injectV8Function("toString", binDataToString, proto);
+        scope->injectV8Function("base64", binDataToBase64, proto);
+        scope->injectV8Function("hex", binDataToHex, proto);
+        return binData;
+    }
+
+    v8::Handle<v8::FunctionTemplate> getTimestampFunctionTemplate(V8Scope* scope) {
+        v8::Handle<v8::FunctionTemplate> ts = scope->createV8Function(dbTimestampInit);
+        ts->InstanceTemplate()->SetInternalFieldCount(1);
+        return ts;
     }
 
     // --- functions -----
@@ -1012,14 +1055,17 @@ namespace mongo {
                     return;
                 uassert(12511, "localConnect previously called with a different name", false);
             }
-            _global->ForceSet(v8StringData("Mongo"),
-                              getMongoFunctionTemplate(this, true)->GetFunction());
-            execCoreFiles();
-            exec("_mongo = new Mongo();", "local connect 2", false, true, true, 0);
-            exec((string)"db = _mongo.getDB(\"" + dbName + "\");", "local connect 3",
-                 false, true, true, 0);
-            _connectState = LOCAL;
-            _localDBName = dbName;
+
+            // NOTE: order is important here.  the following methods must be called after
+            //       the above conditional statements.
+
+            // install db access functions in the global object
+            installDBAccess();
+
+            // add global load() helper
+            injectV8Function("load", load);
+
+            // install the Mongo function object and instantiate the 'db' global
             _global->ForceSet(v8StringData("Mongo"),
                               getMongoFunctionTemplate(this, true)->GetFunction());
             execCoreFiles();
@@ -1038,12 +1084,69 @@ namespace mongo {
             return;
         if (_connectState == LOCAL)
             uassert(12512, "localConnect already called, can't call externalSetup", false);
+
+        // install db access functions in the global object
+        installDBAccess();
+
+        // install thread-related functions (e.g. _threadInject)
         installFork(this, _global, _context);
+
+        // install 'load' helper function
+        injectV8Function("load", load);
+
+        // install the Mongo function object
         _global->ForceSet(v8StringData("Mongo"),
                           getMongoFunctionTemplate(this, false)->GetFunction());
         execCoreFiles();
         _connectState = EXTERNAL;
     }
+
+    void V8Scope::installDBAccess() {
+        v8::Handle<v8::FunctionTemplate> db = createV8Function(dbInit);
+        db->InstanceTemplate()->SetNamedPropertyHandler(collectionGetter, collectionSetter);
+        _global->ForceSet(v8StringData("DB"), db->GetFunction());
+        v8::Handle<v8::FunctionTemplate> dbCollection = createV8Function(collectionInit);
+        dbCollection->InstanceTemplate()->SetNamedPropertyHandler(collectionGetter,
+                                                                  collectionSetter);
+        _global->ForceSet(v8StringData("DBCollection"), dbCollection->GetFunction());
+
+        v8::Handle<v8::FunctionTemplate> dbQuery = createV8Function(dbQueryInit);
+        dbQuery->InstanceTemplate()->SetIndexedPropertyHandler(dbQueryIndexAccess);
+        _global->ForceSet(v8StringData("DBQuery"), dbQuery->GetFunction());
+    }
+
+    void V8Scope::installBSONTypes() {
+        injectV8Function("ObjectId", objectIdInit, _global);
+        injectV8Function("DBRef", dbRefInit, _global);
+        injectV8Function("DBPointer", dbPointerInit, _global);
+
+        _global->ForceSet(v8StringData("BinData"),
+                         getBinDataFunctionTemplate(this)->GetFunction());
+        _global->ForceSet(v8StringData("UUID"),
+                         createV8Function(uuidInit)->GetFunction());
+        _global->ForceSet(v8StringData("MD5"),
+                         createV8Function(md5Init)->GetFunction());
+        _global->ForceSet(v8StringData("HexData"),
+                         createV8Function(hexDataInit)->GetFunction());
+        _global->ForceSet(v8StringData("NumberLong"),
+                         getNumberLongFunctionTemplate(this)->GetFunction());
+        _global->ForceSet(v8StringData("NumberInt"),
+                         getNumberIntFunctionTemplate(this)->GetFunction());
+        _global->ForceSet(v8StringData("Timestamp"),
+                         getTimestampFunctionTemplate(this)->GetFunction());
+
+        BSONObjBuilder b;
+        b.appendMaxKey("");
+        b.appendMinKey("");
+        BSONObj o = b.obj();
+        BSONObjIterator i(o);
+        _global->ForceSet(v8StringData("MaxKey"), mongoToV8Element(i.next()));
+        _global->ForceSet(v8StringData("MinKey"), mongoToV8Element(i.next()));
+        _global->Get(v8StringData("Object"))->ToObject()->ForceSet(
+                            v8StringData("bsonsize"),
+                            createV8Function(bsonsize)->GetFunction());
+    }
+
 
     // ----- internal -----
 

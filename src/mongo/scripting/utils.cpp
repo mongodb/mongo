@@ -21,8 +21,6 @@
 
 namespace mongo {
 
-    void installBenchmarkSystem( Scope& scope );
-
     static BSONObj native_hex_md5( const BSONObj& args, void* data ) {
         uassert( 10261,
                  "hex_md5 takes a single string argument -- hex_md5(string)",
@@ -61,8 +59,6 @@ namespace mongo {
         scope.injectNative( "hex_md5" , native_hex_md5 );
         scope.injectNative( "version" , native_version );
         scope.injectNative( "sleep" , native_sleep );
-
-        installBenchmarkSystem( scope );
     }
 
 }
