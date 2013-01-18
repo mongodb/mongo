@@ -45,12 +45,14 @@ namespace mongo {
         // You can just use these bool parsePoint(...) methods.
         static bool parsePoint(const BSONObj &obj, S2Point *out);
         static bool parsePoint(const BSONObj &obj, S2Cell *out);
+        static bool parsePoint(const BSONObj &obj, Point *out);
         // Check to see if it's GeoJSON or if it's legacy geo.
         static bool isPoint(const BSONObj &obj);
 
         static bool isGeoJSONPoint(const BSONObj &obj);
         static void parseGeoJSONPoint(const BSONObj &obj, S2Point *out);
         static void parseGeoJSONPoint(const BSONObj &obj, S2Cell *out);
+        static void parseGeoJSONPoint(const BSONObj &obj, Point *out);
 
         static bool isLegacyPoint(const BSONObj &obj);
         static void parseLegacyPoint(const BSONObj &obj, S2Point *out);

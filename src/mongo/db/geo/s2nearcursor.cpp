@@ -77,14 +77,26 @@ namespace mongo {
     double S2NearCursor::currentDistance() const { return _results.top().distance; }
 
     // This is called when we're about to yield.
-    void S2NearCursor::noteLocation() { _results = priority_queue<Result>(); }
+    void S2NearCursor::noteLocation() {
+        LOG(1) << "yielding, tossing " << _results.size() << " results" << endl;
+        _results = priority_queue<Result>();
+    }
+
     // Called when we're un-yielding.
     // Note that this is (apparently) a valid call sequence:
     // 1. noteLocation()
     // 2. ok()
     // 3. checkLocation()
     // As such we might have results and only want to fill the result queue if it's empty.
-    void S2NearCursor::checkLocation() { if (_results.empty()) { fillResults(); } }
+    void S2NearCursor::checkLocation() {
+        LOG(1) << "unyielding, have " << _results.size() << " results in queue";
+        if (_results.empty()) {
+            LOG(1) << ", filling..." << endl;
+            fillResults();
+            LOG(1) << "now have " << _results.size() << " results in queue";
+        }
+        LOG(1) << endl;
+    }
 
     void S2NearCursor::explainDetails(BSONObjBuilder& b) {
         b << "nscanned" << _nscanned;
@@ -94,24 +106,42 @@ namespace mongo {
     }
 
     bool S2NearCursor::ok() {
-        if (_numToReturn <= 0) { return false; }
-        if (_innerRadius > _maxDistance) { return false; }
-        if (_results.empty()) { fillResults(); }
+        if (_numToReturn <= 0) {
+            LOG(2) << "not OK, no more to return" << endl;
+            return false;
+        }
+        if (_innerRadius > _maxDistance) {
+            LOG(2) << "not OK, exhausted search bounds" << endl;
+            return false;
+        }
+        if (_results.empty()) {
+            LOG(2) << "results empty in OK, filling" << endl;
+            fillResults();
+        }
         // If fillResults can't find anything, we're outta results.
         return !_results.empty();
     }
 
     void S2NearCursor::nextAnnulus() {
+        LOG(1) << "growing annulus from (" << _innerRadius << ", " << _outerRadius;
         _innerRadius = _outerRadius;
         _outerRadius += _radiusIncrement;
         _outerRadius = min(_outerRadius, _maxDistance);
         verify(_innerRadius <= _outerRadius);
+        LOG(1) << ") to (" << _innerRadius << ", " << _outerRadius << ")" << endl;
         ++_numShells;
     }
 
     bool S2NearCursor::advance() {
-        if (_numToReturn <= 0) { return false; }
-        if (_innerRadius > _maxDistance) { return false; }
+        if (_numToReturn <= 0) {
+            LOG(2) << "advancing but no more to return" << endl;
+            return false;
+        }
+
+        if (_innerRadius > _maxDistance) {
+            LOG(2) << "advancing but exhausted search distance" << endl;
+            return false;
+        }
 
         if (!_results.empty()) {
             _returned.insert(_results.top().loc);
@@ -126,7 +156,7 @@ namespace mongo {
 
         if (_results.empty()) { fillResults(); }
 
-        // The only reason this should be empty is if there are no more results to be had.
+        // The only reason _results should be empty now is if there are no more possible results.
         return !_results.empty();
     }
 
@@ -153,6 +183,9 @@ namespace mongo {
         double area = outerCap.area() - innerCap.area();
         S2SearchUtil::setCoverLimitsBasedOnArea(area, &coverer, _params.coarsestIndexedLevel);
         coverer.GetCovering(shell, &cover);
+        LOG(2) << "annulus cover size is " << cover.size()
+               << ", params (" << coverer.min_level() << ", " << coverer.max_level() << ")"
+               << endl;
         inExpr = S2SearchUtil::coverAsBSON(cover, _nearQuery.field,
                                            _params.coarsestIndexedLevel);
         // Shell takes ownership of the regions we push in, but they're local variables and
@@ -207,6 +240,7 @@ namespace mongo {
             // issues if possible.
             set<DiskLoc> seen;
 
+            LOG(1) << "looking at annulus from " << _innerRadius << " to " << _outerRadius << endl;
             // Do the actual search through this annulus.
             for (; cursor->ok(); cursor->advance()) {
                 ++_nscanned;
@@ -238,7 +272,10 @@ namespace mongo {
                             !match && (oi != geoFieldElements.end()); ++oi) {
                         if (!oi->isABSONObj()) { continue; }
                         const BSONObj &geoObj = oi->Obj();
-                        match = _indexedGeoFields[i].satisfiesPredicate(geoObj);
+                        GeometryContainer geoContainer;
+                        uassert(16699, "ill-formed geometry: " + geoObj.toString(),
+                                geoContainer.parseFrom(geoObj));
+                        match = _indexedGeoFields[i].satisfiesPredicate(geoContainer);
                     }
 
                     if (match) { ++geoFieldsMatched; }
@@ -276,6 +313,7 @@ namespace mongo {
                     }
                 }
             }
+
             if (_results.empty()) {
                 _radiusIncrement *= 2;
                 nextAnnulus();
@@ -301,6 +339,7 @@ namespace mongo {
             them = point.GetCenter();
         } else {
             warning() << "unknown geometry: " << obj.toString();
+            return numeric_limits<double>::max();
         }
         S1Angle angle(us, them);
         return angle.radians() * _params.radius;

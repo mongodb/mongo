@@ -128,7 +128,10 @@ namespace mongo {
                      !match && (oi != geoFieldElements.end()); ++oi) {
                     if (!oi->isABSONObj()) { continue; }
                     const BSONObj &geoObj = oi->Obj();
-                    match = _fields[i].satisfiesPredicate(geoObj);
+                    GeometryContainer geoContainer;
+                    uassert(16698, "malformed geometry: " + geoObj.toString(),
+                            geoContainer.parseFrom(geoObj));
+                    match = _fields[i].satisfiesPredicate(geoContainer);
                 }
 
                 if (match) { ++geoFieldsMatched; }

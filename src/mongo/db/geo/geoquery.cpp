@@ -113,22 +113,19 @@ namespace mongo {
             return true;
         }
 
-        bool hasGeometry = false;
-
         BSONObjIterator it(obj);
-        while (it.more()) {
-            BSONElement e = it.next();
-            if (!e.isABSONObj()) { return false; }
-            BSONObj embeddedObj = e.embeddedObject();
-            // Legacy within #2 : t.find({ loc : { $within : { $box : ...
-            bool contains = mongoutils::str::equals(e.fieldName(), "$within");
-            if (contains && geoContainer.parseFrom(embeddedObj)) {
-                predicate = GeoQuery::WITHIN;
-                hasGeometry = true;
-            }
+        if (!it.more()) { return false; }
+        BSONElement e = it.next();
+        if (!e.isABSONObj()) { return false; }
+        BSONObj embeddedObj = e.embeddedObject();
+        // Legacy within #2 : t.find({ loc : { $within : { $box/etc : ...
+        bool contains = mongoutils::str::equals(e.fieldName(), "$within");
+        if (contains && geoContainer.parseFrom(embeddedObj)) {
+            predicate = GeoQuery::WITHIN;
+            return true;
         }
 
-        return hasGeometry;
+        return false;
     }
 
     bool GeoQuery::parseNewQuery(const BSONObj &obj) {
@@ -191,11 +188,9 @@ namespace mongo {
         return geoContainer.getRegion();
     }
 
-    bool GeoQuery::satisfiesPredicate(const BSONObj &obj) const {
+    bool GeoQuery::satisfiesPredicate(const GeometryContainer &otherContainer) const {
         verify(predicate == WITHIN || predicate == INTERSECT);
 
-        GeometryContainer otherContainer;
-        if (!otherContainer.parseFrom(obj)) { return false; }
         if (WITHIN == predicate) {
             return geoContainer.contains(otherContainer);
         } else {
@@ -306,6 +301,8 @@ namespace mongo {
     }
 
     bool GeometryContainer::parseFrom(const BSONObj& obj) {
+        // Free up any pointers we might have left over from previous parses.
+        *this = GeometryContainer();
         if (GeoParser::isGeoJSONPolygon(obj)) {
             // We can't really pass these things around willy-nilly except by ptr.
             _polygon.reset(new S2Polygon());
@@ -313,11 +310,8 @@ namespace mongo {
         } else if (GeoParser::isPoint(obj)) {
             _cell.reset(new S2Cell());
             GeoParser::parsePoint(obj, _cell.get());
-            // Old style points get upgraded to S2 points.
-            if (GeoParser::isLegacyPoint(obj)) {
-                _oldPoint.reset(new Point());
-                GeoParser::parseLegacyPoint(obj, _oldPoint.get());
-            }
+            _oldPoint.reset(new Point());
+            GeoParser::parsePoint(obj, _oldPoint.get());
         } else if (GeoParser::isLineString(obj)) {
             _line.reset(new S2Polyline());
             GeoParser::parseLineString(obj, _line.get());

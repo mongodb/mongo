@@ -950,15 +950,18 @@ namespace mongo {
             jsobj.getFieldsDotted(it->getField().c_str(), s, false);
             int matches = 0;
             for (BSONElementSet::const_iterator i = s.begin(); i != s.end(); ++i) {
-                if (!i->isABSONObj()) { continue; }
-                if (it->matches(i->Obj())) { ++matches; break; }
-                // Maybe it's an array of geometries
+                if (!i->isABSONObj()) { return false; }
+                GeometryContainer container;
+                if (container.parseFrom(i->Obj()) && it->matches(container)) {
+                    ++matches; break;
+                }
+                // Maybe it's an array of geometries.
                 BSONObjIterator geoIt(i->Obj());
                 while (geoIt.more()) {
                     BSONElement e = geoIt.next();
-                    if (e.isABSONObj() && it->matches(e.embeddedObject())) {
-                        ++matches; break;
-                    }
+                    if (!e.isABSONObj()) { return false; }
+                    if (!container.parseFrom(e.embeddedObject())) { return false; }
+                    if (it->matches(container)) { ++matches; break; }
                 }
             }
             if (0 == matches) { return false; }

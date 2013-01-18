@@ -109,6 +109,12 @@ namespace mongo {
         *out = S2Cell(point);
     }
 
+    void GeoParser::parseGeoJSONPoint(const BSONObj& obj, Point* out) {
+        const vector<BSONElement>& coords = obj.getFieldDotted(GEOJSON_COORDINATES).Array();
+        out->x = coords[0].Number();
+        out->y = coords[1].Number();
+    }
+
     void GeoParser::parseGeoJSONPoint(const BSONObj& obj, S2Point* out) {
         const vector<BSONElement>& coords = obj.getFieldDotted(GEOJSON_COORDINATES).Array();
         *out = coordsToPoint(coords);
@@ -213,6 +219,17 @@ namespace mongo {
 
         uassert(16695, "Couldn't assemble polygon: " + obj.toString(),
                 polyBuilder.AssemblePolygon(out, NULL));
+    }
+
+    bool GeoParser::parsePoint(const BSONObj &obj, Point *out) {
+        if (isGeoJSONPoint(obj)) {
+            parseGeoJSONPoint(obj, out);
+            return true;
+        } else if (isLegacyPoint(obj)) {
+            parseLegacyPoint(obj, out);
+            return true;
+        }
+        return false;
     }
 
     bool GeoParser::parsePoint(const BSONObj &obj, S2Point *out) {

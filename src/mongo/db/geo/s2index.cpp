@@ -260,7 +260,8 @@ namespace mongo {
 
             // See here for GeoJSON format: geojson.org/geojson-spec.html
             for (BSONElementSet::iterator i = elements.begin(); i != elements.end(); ++i) {
-                if (!i->isABSONObj()) { continue; }  // error?
+                uassert(16700, "Can't parse geometry from element: " + i->toString(),
+                        i->isABSONObj());
                 const BSONObj &obj = i->Obj();
 
                 vector<string> cells;

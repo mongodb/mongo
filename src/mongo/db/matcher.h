@@ -56,8 +56,8 @@ namespace mongo {
 
         string getField() const { return geoQuery.getField(); }
 
-        bool matches(BSONObj obj) const {
-            bool satisfied = geoQuery.satisfiesPredicate(obj);
+        bool matches(const GeometryContainer &container) const {
+            bool satisfied = geoQuery.satisfiesPredicate(container);
             if (isNot) { return !satisfied; }
             else { return satisfied; }
         }

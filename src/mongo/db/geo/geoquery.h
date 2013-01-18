@@ -101,7 +101,7 @@ namespace mongo {
         };
 
         bool parseFrom(const BSONObj &obj);
-        bool satisfiesPredicate(const BSONObj &obj) const;
+        bool satisfiesPredicate(const GeometryContainer &otherContainer) const;
 
         bool hasS2Region() const;
         const S2Region& getRegion() const;
