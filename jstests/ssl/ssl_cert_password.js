@@ -41,7 +41,8 @@ md = runMongoProgram("mongo", "--port", port,
 assert(md==1);
 
 
-
-// Stop the server
-var exitCode = stopMongod(port, 15);
-assert(exitCode == 0);
+if (!_isWindows()) {
+    // Stop the server
+    var exitCode = stopMongod(port, 15);
+    assert(exitCode == 0);
+}
