@@ -39,7 +39,8 @@ namespace mongo {
 
     enum ExitCode;
 
-    enum LogLevel {  LL_DEBUG , LL_INFO , LL_NOTICE , LL_WARNING , LL_ERROR , LL_SEVERE };
+    // using negative numbers so these are always less than ::mongo::loglevel (see MONGO_LOG)
+    enum LogLevel {  LL_DEBUG=-1000 , LL_INFO , LL_NOTICE , LL_WARNING , LL_ERROR , LL_SEVERE };
 
     inline const char * logLevelToString( LogLevel l ) {
         switch ( l ) {
@@ -398,21 +399,39 @@ namespace mongo {
         return nullstream;
     }
 
-#define MONGO_LOG(requiredLevel) \
-    ( MONGO_likely( ::mongo::logLevel < (requiredLevel) ) ) \
-    ? ::mongo::nullstream : ::mongo::log()
+#define MONGO_LOG(level) \
+    ( MONGO_likely( ::mongo::logLevel < (level) ) ) \
+    ? ::mongo::nullstream : ::mongo::logWithLevel(level)
 #define LOG MONGO_LOG
 
     inline Nullstream& log() {
         return Logstream::get().prolog();
     }
 
+    // Use MONGO_LOG() instead of this
+    inline Nullstream& logWithLevel( int level ) {
+        if ( level > logLevel )
+            return nullstream;
+        return Logstream::get().prolog();
+    }
+
+    inline Nullstream& logWithLevel( LogLevel l ) {
+        return Logstream::get().prolog().setLogLevel( l );
+    }
+
+    inline Nullstream& logWithLevel( const LabeledLevel& ll ) {
+        Nullstream& stream = logWithLevel( ll.getLevel() );
+        if( ll.getLabel() != "" )
+            stream << "[" << ll.getLabel() << "] ";
+        return stream;
+    }
+
     inline Nullstream& error() {
-        return MONGO_LOG( LL_ERROR );
+        return logWithLevel( LL_ERROR );
     }
 
     inline Nullstream& warning() {
-        return MONGO_LOG( LL_WARNING );
+        return logWithLevel( LL_WARNING );
     }
 
     /* default impl returns "" -- mongod overrides */
