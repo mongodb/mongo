@@ -212,7 +212,7 @@ namespace mongo {
                 coll->parseBSON(collDoc, &errMsg);
 
                 // Needed for the v3 to v4 upgrade
-                bool epochNotSet = !coll->getEpoch().isSet();
+                bool epochNotSet = !coll->isEpochSet() || !coll->getEpoch().isSet();
                 if (optionalEpochs && epochNotSet) {
                     // Set our epoch to something here, just to allow
                     coll->setEpoch(OID::gen());
@@ -224,7 +224,7 @@ namespace mongo {
                                            << " read from the config server" << causedBy(errMsg));
                 }
 
-                if (coll->getDropped()) {
+                if (coll->isDroppedSet() && coll->getDropped()) {
                     continue;
                 }
 

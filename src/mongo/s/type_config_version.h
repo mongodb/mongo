@@ -146,7 +146,7 @@ namespace mongo {
 
         void unsetExcludingMongoVersions() { _isExcludingMongoVersionsSet = false; }
 
-        bool isExcludingMongoVersionsSet() {
+        bool isExcludingMongoVersionsSet() const {
             return _isExcludingMongoVersionsSet || excludingMongoVersions.hasDefault();
         }
 
@@ -184,7 +184,7 @@ namespace mongo {
 
         void unsetUpgradeId() { _isUpgradeIdSet = false; }
 
-        bool isUpgradeIdSet() {
+        bool isUpgradeIdSet() const {
             return _isUpgradeIdSet || upgradeId.hasDefault();
         }
 

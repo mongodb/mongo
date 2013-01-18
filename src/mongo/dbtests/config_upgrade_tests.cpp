@@ -134,7 +134,7 @@ namespace mongo {
             ASSERT(savedCollection.parseBSON(collectionDoc, &errMsg));
 
             // Test this first, otherwise invalid
-            if (!savedCollection.getEpoch().isSet()) return false;
+            if (!savedCollection.isEpochSet() || !savedCollection.getEpoch().isSet()) return false;
             ASSERT(savedCollection.isValid(&errMsg));
 
             auto_ptr<DBClientCursor> cursor = client().query(ChunkType::ConfigNS,

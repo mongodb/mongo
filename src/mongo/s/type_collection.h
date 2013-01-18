@@ -149,7 +149,7 @@ namespace mongo {
 
         void unsetEpoch() { _isEpochSet = false; }
 
-        bool isEpochSet() { return _isEpochSet; }
+        bool isEpochSet() const { return _isEpochSet; }
 
         // Calling get*() methods when the member is not set results in undefined behavior
         const OID getEpoch() const {
@@ -249,7 +249,7 @@ namespace mongo {
 
         void unsetDropped() { _isDroppedSet = false; }
 
-        bool isDroppedSet() {
+        bool isDroppedSet() const {
             return _isDroppedSet || dropped.hasDefault();
         }
 

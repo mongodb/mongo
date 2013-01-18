@@ -125,7 +125,7 @@ namespace mongo {
 
         verify(lastVersionInfo.getCurrentVersion() == UpgradeHistory_NoEpochVersion);
 
-        if (lastVersionInfo.getUpgradeId().isSet()) {
+        if (lastVersionInfo.isUpgradeIdSet() && lastVersionInfo.getUpgradeId().isSet()) {
 
             //
             // Another upgrade failed, so cleanup may be necessary
