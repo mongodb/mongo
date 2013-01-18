@@ -341,7 +341,6 @@ namespace mongo {
         int getIndent() const { return indent; }
 
     private:
-        static boost::thread_specific_ptr<Logstream> tsp;
         Logstream() {
             indent = 0;
             _init();

@@ -19,6 +19,7 @@
 #include "pch.h"
 #include "assert_util.h"
 #include "time_support.h"
+#include "mongo/util/concurrency/threadlocal.h"
 #include "mongo/util/stacktrace.h"
 
 using namespace std;
@@ -52,7 +53,8 @@ namespace mongo {
     Nullstream nullstream;
     vector<Tee*>* Logstream::globalTees = 0;
 
-    thread_specific_ptr<Logstream> Logstream::tsp;
+    TSP_DECLARE(Logstream, Logstream_tsp);
+    TSP_DEFINE(Logstream, Logstream_tsp);
 
     Nullstream& tlog( int level ) {
         if ( !debug && level > tlogLevel )
@@ -408,9 +410,9 @@ namespace mongo {
         if ( StaticObserver::_destroyingStatics ) {
             cout << "Logstream::get called in uninitialized state" << endl;
         }
-        Logstream *p = tsp.get();
+        Logstream *p = Logstream_tsp.get();
         if( p == 0 )
-            tsp.reset( p = new Logstream() );
+            Logstream_tsp.reset( p = new Logstream() );
         return *p;
     }
 
