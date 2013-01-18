@@ -217,7 +217,8 @@ class mongod(object):
         if self.kwargs.get('use_ssl'):
             argv += ['--sslOnNormalPorts',
                      '--sslPEMKeyFile', 'jstests/libs/server.pem',
-                     '--sslCAFile', 'jstests/libs/ca.pem']
+                     '--sslCAFile', 'jstests/libs/ca.pem',
+                     '--sslWeakCertificateValidation']
         
         print "running " + " ".join(argv)
         self.proc = self._start(buildlogger(argv, is_global=True))

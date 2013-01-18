@@ -105,7 +105,7 @@ namespace mongo {
 
     SSLManager::SSLManager(const SSLParams& params) : 
         _validateCertificates(false),
-        _forceValidation(params.forceCertificateValidation) {
+        _weakValidation(params.weakCertificateValidation) {
         SSL_library_init();
         SSL_load_error_strings();
         ERR_load_crypto_strings();
@@ -259,12 +259,12 @@ namespace mongo {
         X509* cert = SSL_get_peer_certificate(ssl);
 
         if (cert == NULL) { // no certificate presented by peer
-            if (_forceValidation) {
-                error() << "no SSL certificate provided by peer; connection rejected" << endl;
-                throw SocketException(SocketException::CONNECT_ERROR, "");
+            if (_weakValidation) {
+                error() << "no SSL certificate provided by peer" << endl;
             }
             else {
-                error() << "no SSL certificate provided by peer" << endl;
+                error() << "no SSL certificate provided by peer; connection rejected" << endl;
+                throw SocketException(SocketException::CONNECT_ERROR, "");
             }
             return;
         }

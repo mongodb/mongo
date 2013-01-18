@@ -31,18 +31,18 @@ namespace mongo {
                   const std::string& pempwd,
                   const std::string& cafile = "",
                   const std::string& crlfile = "",
-                  bool forceCertificateValidation = false) :
+                  bool weakCertificateValidation = false) :
             pemfile(pemfile),
             pempwd(pempwd),
             cafile(cafile),
             crlfile(crlfile),
-            forceCertificateValidation(forceCertificateValidation) {};
+            weakCertificateValidation(weakCertificateValidation) {};
 
         std::string pemfile;
         std::string pempwd;
         std::string cafile;
         std::string crlfile;
-        bool forceCertificateValidation;
+        bool weakCertificateValidation;
     };
 
     class SSLManager {
@@ -80,7 +80,7 @@ namespace mongo {
         SSL_CTX* _context;
         std::string _password;
         bool _validateCertificates;
-        bool _forceValidation;
+        bool _weakValidation;
         /**
          * creates an SSL context to be used for this file descriptor.
          * caller must SSL_free it.

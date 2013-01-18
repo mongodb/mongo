@@ -103,7 +103,7 @@ namespace {
          "Certificate Authority file for SSL")
         ("sslCRLFile", po::value<std::string>(&cmdLine.sslCRLFile),
          "Certificate Revocation List file for SSL")
-        ("sslForceCertificateValidation", "require each client to present a valid certificate")
+        ("sslWeakCertificateValidation", "allow client to connect without presenting a certificate")
 #endif
         ;
         
@@ -406,8 +406,8 @@ namespace {
         }
 
 #ifdef MONGO_SSL
-        if (params.count("sslForceCertificateValidation")) {
-            cmdLine.sslForceCertificateValidation = true;
+        if (params.count("sslWeakCertificateValidation")) {
+            cmdLine.sslWeakCertificateValidation = true;
         }
         if (params.count("sslOnNormalPorts")) {
             cmdLine.sslOnNormalPorts = true;
@@ -415,9 +415,9 @@ namespace {
                 log() << "need sslPEMKeyFile" << endl;
                 return false;
             }
-            if (cmdLine.sslForceCertificateValidation &&
+            if (cmdLine.sslWeakCertificateValidation &&
                 cmdLine.sslCAFile.empty()) {
-                log() << "need sslCAFile with sslForceCertificateValidation" << endl;
+                log() << "need sslCAFile with sslWeakCertificateValidation" << endl;
                 return false;
             }
         }
@@ -425,7 +425,7 @@ namespace {
                  cmdLine.sslPEMKeyPassword.size() ||
                  cmdLine.sslCAFile.size() ||
                  cmdLine.sslCRLFile.size() ||
-                 cmdLine.sslForceCertificateValidation) {
+                 cmdLine.sslWeakCertificateValidation) {
             log() << "need to enable sslOnNormalPorts" << endl;
             return false;
         }
