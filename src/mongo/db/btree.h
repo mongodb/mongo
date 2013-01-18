@@ -625,12 +625,12 @@ namespace mongo {
         friend class BtreeCursor;
         friend struct IndexInsertionContinuationImpl<V>;
     public:
-	// make compiler happy:
+        // make compiler happy:
         typedef typename V::Key Key;
         typedef typename V::KeyOwned KeyOwned;
-	typedef typename BucketBasics<V>::KeyNode KeyNode;
-	typedef typename BucketBasics<V>::_KeyNode _KeyNode;
-	typedef typename BucketBasics<V>::Loc Loc;
+        typedef typename BucketBasics<V>::KeyNode KeyNode;
+        typedef typename BucketBasics<V>::_KeyNode _KeyNode;
+        typedef typename BucketBasics<V>::Loc Loc;
         const _KeyNode& k(int i) const     { return static_cast< const BucketBasics<V> * >(this)->k(i); }
     protected:
         _KeyNode& k(int i)                 { return static_cast< BucketBasics<V> * >(this)->_k(i); }
