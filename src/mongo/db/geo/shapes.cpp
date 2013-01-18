@@ -360,7 +360,6 @@ namespace mongo {
 
     /////// Other methods
 
-    // TODO(hk): is this really worthwhile?
     /**
      * Distance method that compares x or y coords when other direction is zero,
      * avoids numerical error when distances are very close to radius but axis-aligned.
@@ -455,7 +454,6 @@ namespace mongo {
         double b = p1.y - p2.y;
 
         // Avoid numerical error if possible...
-        // TODO(hk): not convinced this is worth it
         if (a == 0) return abs(b);
         if (b == 0) return abs(a);
 

@@ -218,7 +218,9 @@ namespace mongo {
         }
         if (NULL != _oldCircle) {
             if (NULL == otherContainer._oldPoint) { return false; }
-            return distance(_oldCircle->center, *otherContainer._oldPoint) <= _oldCircle->radius;
+            // Let's be as consistent epsilon-wise as we can with the '2d' indextype.
+            return distanceWithin(_oldCircle->center, *otherContainer._oldPoint,
+                                  _oldCircle->radius);
         }
         if (NULL != _polygon) {
             if (NULL != otherContainer._cell) {
