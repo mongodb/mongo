@@ -138,6 +138,7 @@ namespace mongo {
             fieldsToReturn(_fieldsToReturn),
             opts(queryOptions),
             batchSize(bs==1?2:bs),
+            resultFlags(0),
             cursorId(),
             _ownCursor( true ),
             wasError( false ) {
@@ -149,9 +150,14 @@ namespace mongo {
             ns(_ns),
             nToReturn( _nToReturn ),
             haveLimit( _nToReturn > 0 && !(options & QueryOption_CursorTailable)),
+            nToSkip(0),
+            fieldsToReturn(0),
             opts( options ),
+            batchSize(0),
+            resultFlags(0),
             cursorId(_cursorId),
-            _ownCursor( true ) {
+            _ownCursor(true),
+            wasError(false) {
             _finishConsInit();
         }
 

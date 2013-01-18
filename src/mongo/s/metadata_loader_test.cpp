@@ -18,6 +18,7 @@
 
 #include <vector>
 
+#include "mongo/client/connpool.h"
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/dbtests/mock/mock_conn_registry.h"
@@ -47,6 +48,7 @@ namespace {
     using mongo::OID;
     using mongo::MockConnRegistry;
     using mongo::MockRemoteDBServer;
+    using mongo::ScopedDbConnection;
     using std::string;
     using std::vector;
 
@@ -79,6 +81,7 @@ namespace {
         ASSERT_FALSE(errmsg.empty());
 
         MockConnRegistry::get()->clear();
+        ScopedDbConnection::clearPool();
     }
 
     class NoChunkFixture : public mongo::unittest::Test {
@@ -100,6 +103,7 @@ namespace {
 
         void tearDown() {
             MockConnRegistry::get()->clear();
+            ScopedDbConnection::clearPool();
         }
 
     private:
