@@ -963,6 +963,14 @@ namespace mongo {
             for (BSONElementSet::const_iterator i = s.begin(); i != s.end(); ++i) {
                 if (!i->isABSONObj()) { continue; }
                 if (it->matches(i->Obj())) { ++matches; break; }
+                // Maybe it's an array of geometries
+                BSONObjIterator geoIt(i->Obj());
+                while (geoIt.more()) {
+                    BSONElement e = geoIt.next();
+                    if (e.isABSONObj() && it->matches(e.embeddedObject())) {
+                        ++matches; break;
+                    }
+                }
             }
             if (0 == matches) { return false; }
         }
