@@ -237,9 +237,22 @@ namespace mongo {
         return ssl;
     }
 
+    int SSLManager::_ssl_connect(SSL* ssl) {
+        for (int i=0; i<3; ++i) {
+            int ret = SSL_connect(ssl);
+            if (ret == 1) 
+                return ret;
+            int code = SSL_get_error(ssl, ret);
+            // Call SSL_connect again if we get SSL_ERROR_WANT_READ;
+            // otherwise return error to caller.
+            if (code != SSL_ERROR_WANT_READ)
+                return ret;
+        }
+        fassertFailed(16697);
+    }
     SSL* SSLManager::connect(int fd) {
         SSL* ssl = _secure(fd);
-        int ret = SSL_connect(ssl);
+        int ret = _ssl_connect(ssl);
         if (ret != 1)
             _handleSSLError(SSL_get_error(ssl, ret));
         return ssl;

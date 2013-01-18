@@ -111,6 +111,12 @@ namespace mongo {
          * for use with validating certificates
          */
         bool _setupCRL(const std::string& crlFile);
+
+        /*
+         * Wrapper for SSL_Connect() that handles SSL_ERROR_WANT_READ,
+         * see SERVER-7940
+         */
+        int _ssl_connect(SSL* ssl);
     };
 }
 #endif
