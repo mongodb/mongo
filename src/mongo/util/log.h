@@ -400,7 +400,7 @@ namespace mongo {
 
 #define MONGO_LOG(requiredLevel) \
     ( MONGO_likely( ::mongo::logLevel < (requiredLevel) ) ) \
-    ? ::mongo::log() : ::mongo::log()
+    ? ::mongo::nullstream : ::mongo::log()
 #define LOG MONGO_LOG
 
     inline Nullstream& log() {
