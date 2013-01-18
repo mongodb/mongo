@@ -195,10 +195,12 @@ ReplTest.prototype.start = function( master , options , restart, norepl ){
         return startMongoProgram.apply(null, o);
     } else {
         var conn = startMongod.apply(null, o);
-        if (master) {
-            jsTest.addAuth(conn);
+        if (jsTestOptions().keyFile || jsTestOptions().auth) {
+            if (master) {
+                jsTest.addAuth(conn);
+            }
+            jsTest.authenticate(conn);
         }
-        jsTest.authenticate(conn);
         return conn;
     }
 }
