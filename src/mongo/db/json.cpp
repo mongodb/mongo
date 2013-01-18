@@ -725,7 +725,7 @@ namespace mongo {
         std::size_t i;
         for (i = 0; i < opt.size(); i++) {
             if (!match(opt[i], JOPTIONS)) {
-                return parseError("Bad regex option: " + opt[i]);
+                return parseError(string("Bad regex option: ") + opt[i]);
             }
         }
         return Status::OK();
