@@ -92,7 +92,7 @@ assert.eq(version.version, 3);
 assert.eq(version.minCompatibleVersion, 3);
 assert.eq(version.currentVersion, 4);
 assert(version.clusterId);
-assert.eq(version.excluding.length, 0);
+assert.eq(version.excluding, undefined);
 
 jsTest.log("Ensuring config.version collection only written once...");
 
