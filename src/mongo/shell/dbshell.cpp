@@ -1031,17 +1031,18 @@ int wmain( int argc, wchar_t* argvW[] ) {
     UINT initialConsoleOutputCodePage = GetConsoleOutputCP();
     SetConsoleCP( CP_UTF8 );
     SetConsoleOutputCP( CP_UTF8 );
-    int returnValue = -1;
+    int returnCode;
     try {
         WindowsCommandLine wcl( argc, argvW );
-        returnValue = _main( argc, wcl.argv(), NULL );  // TODO: Convert wide env to utf8 env.
+        returnCode = _main( argc, wcl.argv(), NULL );  // TODO: Convert wide env to utf8 env.
     }
     catch ( mongo::DBException& e ) {
         cerr << "exception: " << e.what() << endl;
+        returnCode = 1;
     }
     SetConsoleCP( initialConsoleInputCodePage );
     SetConsoleOutputCP( initialConsoleOutputCodePage );
-    ::_exit(returnValue);
+    ::_exit(returnCode);
 }
 #else // #ifdef _WIN32
 int main( int argc, char* argv[], char **envp ) {
