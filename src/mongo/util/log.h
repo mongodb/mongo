@@ -351,7 +351,6 @@ namespace mongo {
         static Status registerExtraLogContextFn(ExtraLogContextFn contextFn);
 
     private:
-        static boost::thread_specific_ptr<Logstream> tsp;
         Logstream() {
             indent = 0;
             _init();
