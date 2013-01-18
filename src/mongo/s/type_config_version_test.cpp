@@ -70,7 +70,7 @@ namespace {
         ASSERT(result);
         ASSERT_EQUALS(versionInfo.getMinCompatibleVersion(), 2);
         ASSERT_EQUALS(versionInfo.getCurrentVersion(), 2);
-        ASSERT_EQUALS(versionInfo.getClusterId(), OID());
+        ASSERT(!versionInfo.isClusterIdSet());
 
         result = versionInfo.isValid(&errMsg);
         ASSERT_EQUALS(errMsg, "");
