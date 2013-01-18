@@ -94,7 +94,7 @@ __wt_conn_cache_pool_config(WT_SESSION_IMPL *session, const char **cfg)
 
 	/*
 	 * Retrieve the pool configuration options. The values are optional if
-	 * we are reconfiguring.
+	 * we are re-configuring.
 	 */
 	ret = __wt_config_gets(session, cfg, "shared_cache.size", &cval);
 	if (reconfiguring && ret == WT_NOTFOUND)
