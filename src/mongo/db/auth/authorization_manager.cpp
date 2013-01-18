@@ -396,6 +396,10 @@ namespace {
     }
 
     void AuthorizationManager::addAuthorizedPrincipal(Principal* principal) {
+
+        // Log out any already-logged-in user on the same database as "principal".
+        logoutDatabase(principal->getName().getDB().toString());  // See SERVER-8144.
+
         _authenticatedPrincipals.add(principal);
         if (!principal->isImplicitPrivilegeAcquisitionEnabled())
             return;
