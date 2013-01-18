@@ -104,8 +104,8 @@ namespace mongo {
     }
 
     void OID::init() {
-        scoped_ptr<SecureRandom> sr( SecureRandom::create() );
-        static AtomicUInt inc = static_cast<unsigned>( sr->nextInt64() );
+        static AtomicUInt inc = static_cast<unsigned>(
+            scoped_ptr<SecureRandom>(SecureRandom::create())->nextInt64());
 
         {
             unsigned t = (unsigned) time(0);
