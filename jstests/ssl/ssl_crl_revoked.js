@@ -3,7 +3,7 @@
 // This test should test that the user cannot connect with client.pem certificate.
 
 port = allocatePorts( 1 )[ 0 ];
-var baseName = "jstests_ssl_ssl_crl";
+var baseName = "jstests_ssl_ssl_crl_revoked";
 
 
 var md = startMongod( "--port", port, "--dbpath", "/data/db/" + baseName, "--sslOnNormalPorts",
