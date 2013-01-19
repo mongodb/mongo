@@ -82,9 +82,8 @@ var p = { key : { i : true } ,
           initial: { count: 0 }
         };
 
-// this no longer throws (but the saves silently fail) SERVER-5228
-//assert.throws( function() { return t.group( p ) }, null , "write reduce didn't fail" );
-assert.eq( 1000, tRO.group( p ).length , "C2" );
+
+assert.throws( function() { return t.group( p ) }, null , "write reduce didn't fail" );
 assert.eq( 1000, dbRO.jstests_auth_auth1.count() , "C3" );
 
 
