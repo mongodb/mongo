@@ -109,6 +109,8 @@ __wt_bt_read(WT_SESSION_IMPL *session,
 
 	WT_CSTAT_INCR(session, cache_read);
 	WT_DSTAT_INCR(session, cache_read);
+	if (F_ISSET(dsk, WT_PAGE_COMPRESSED))
+		WT_DSTAT_INCR(session, compress_read);
 	WT_CSTAT_INCRV(session, cache_bytes_read, addr_size);
 	WT_DSTAT_INCRV(session, cache_bytes_read, addr_size);
 
@@ -177,9 +179,10 @@ __wt_bt_write(WT_SESSION_IMPL *session, WT_ITEM *buf,
 	 */
 	if (buf->size <= btree->allocsize ||
 	    btree->compressor == NULL ||
-	    btree->compressor->compress == NULL || compressed)
+	    btree->compressor->compress == NULL || compressed) {
 		ip = buf;
-	else {
+		WT_DSTAT_INCR(session, compress_write_too_small);
+	} else {
 		/* Skip the header bytes of the source data. */
 		src = (uint8_t *)buf->mem + WT_BLOCK_COMPRESS_SKIP;
 		src_len = buf->size - WT_BLOCK_COMPRESS_SKIP;
@@ -220,10 +223,12 @@ __wt_bt_write(WT_SESSION_IMPL *session, WT_ITEM *buf,
 		    src, src_len,
 		    dst, dst_len,
 		    &result_len, &compression_failed));
-		if (compression_failed)
+		if (compression_failed) {
 			ip = buf;
-		else {
+			WT_DSTAT_INCR(session, compress_write_fail);
+		} else {
 			compressed = 1;
+			WT_DSTAT_INCR(session, compress_write);
 
 			/*
 			 * Copy in the skipped header bytes, set the final data

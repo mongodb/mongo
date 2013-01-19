@@ -510,6 +510,7 @@ __rec_txn_read(
 		WT_PANIC_RETX(
 		    session, "reconciliation illegally skipped an update");
 	case WT_SKIP_UPDATE_QUIT:
+		WT_DSTAT_INCR(session, rec_skipped_update);
 		return (EBUSY);
 	case 0:
 	default:
@@ -529,11 +530,6 @@ __wt_rec_write(WT_SESSION_IMPL *session,
 	WT_RECONCILE *r;
 	WT_DECL_RET;
 
-	WT_VERBOSE_RET(session, reconcile,
-	    "page %p %s", page, __wt_page_type_string(page->type));
-
-	WT_DSTAT_INCR(session, rec_written);
-
 	/* We're shouldn't get called with a clean page, that's an error. */
 	WT_ASSERT_RET(session, __wt_page_is_modified(page));
 
@@ -543,6 +539,12 @@ __wt_rec_write(WT_SESSION_IMPL *session,
 	 */
 	if (F_ISSET(page->modify, WT_PM_REC_SPLIT_MERGE))
 		return (0);
+
+	WT_VERBOSE_RET(
+	    session, reconcile, "%s", __wt_page_type_string(page->type));
+	WT_DSTAT_INCR(session, rec_pages);
+	if (LF_ISSET(WT_EVICTION_SERVER_LOCKED))
+		WT_DSTAT_INCR(session, rec_pages_eviction);
 
 	/* Initialize the reconciliation structure for each new run. */
 	WT_RET(__rec_write_init(session, page, flags, &session->reconcile));
@@ -1555,6 +1557,8 @@ __rec_split_raw_worker(WT_SESSION_IMPL *session, WT_RECONCILE *r, int final)
 	dst->size = (uint32_t)result_len + WT_BLOCK_COMPRESS_SKIP;
 
 	if (result_slots != 0) {
+		WT_DSTAT_INCR(session, compress_raw_ok);
+
 		/*
 		 * Compression succeeded: finalize the header information.
 		 */
@@ -1595,6 +1599,8 @@ __rec_split_raw_worker(WT_SESSION_IMPL *session, WT_RECONCILE *r, int final)
 
 		bnd->already_compressed = 1;
 	} else if (final) {
+		WT_DSTAT_INCR(session, compress_raw_fail);
+
 too_small:	/*
 		 * Compression wasn't even attempted, or failed and there are no
 		 * more rows to accumulate, write the original buffer instead.
@@ -1620,6 +1626,8 @@ too_small:	/*
 
 		bnd->already_compressed = 0;
 	} else {
+		WT_DSTAT_INCR(session, compress_raw_fail_temporary);
+
 more_rows:	/*
 		 * Compression failed, increase the size of the "page" and try
 		 * again after we accumulate some more rows.

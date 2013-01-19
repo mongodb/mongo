@@ -125,6 +125,13 @@ struct __wt_dsrc_stats {
 	WT_STATS cache_read;
 	WT_STATS cache_read_overflow;
 	WT_STATS cache_write;
+	WT_STATS compress_raw_fail;
+	WT_STATS compress_raw_fail_temporary;
+	WT_STATS compress_raw_ok;
+	WT_STATS compress_read;
+	WT_STATS compress_write;
+	WT_STATS compress_write_fail;
+	WT_STATS compress_write_too_small;
 	WT_STATS cursor_insert;
 	WT_STATS cursor_insert_bulk;
 	WT_STATS cursor_insert_bytes;
@@ -145,9 +152,11 @@ struct __wt_dsrc_stats {
 	WT_STATS rec_ovfl_value;
 	WT_STATS rec_page_delete;
 	WT_STATS rec_page_merge;
+	WT_STATS rec_pages;
+	WT_STATS rec_pages_eviction;
+	WT_STATS rec_skipped_update;
 	WT_STATS rec_split_intl;
 	WT_STATS rec_split_leaf;
-	WT_STATS rec_written;
 	WT_STATS session_compact;
 	WT_STATS txn_update_conflict;
 	WT_STATS txn_write_conflict;
