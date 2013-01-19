@@ -36,7 +36,7 @@ namespace mongo {
     };
 
     struct S2IndexingParams {
-        const static double kRadiusOfEarthInMeters;
+        static const double kRadiusOfEarthInMeters;
 
         // Since we take the cartesian product when we generate keys for an insert,
         // we need a cap.
