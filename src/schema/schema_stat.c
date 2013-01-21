@@ -93,8 +93,8 @@ __curstat_table_init(WT_SESSION_IMPL *session,
 
 		WT_ERR(__wt_buf_fmt(
 		    session, buf, "statistics:%s", colgroup->name));
-		ret = __wt_curstat_open(
-		    session, buf->data, cfg, &stat_cursor);
+		WT_ERR(__wt_curstat_open(
+		    session, buf->data, cfg, &stat_cursor));
 
 		while ((ret = stat_cursor->next(stat_cursor)) == 0) {
 			WT_ERR(stat_cursor->get_key(stat_cursor, &stat_key));
@@ -113,8 +113,8 @@ __curstat_table_init(WT_SESSION_IMPL *session,
 
 		WT_ERR(__wt_buf_fmt(
 		    session, buf, "statistics:%s", idx->name));
-		ret = __wt_curstat_open(
-		    session, buf->data, cfg, &stat_cursor);
+		WT_ERR(__wt_curstat_open(
+		    session, buf->data, cfg, &stat_cursor));
 
 		while ((ret = stat_cursor->next(stat_cursor)) == 0) {
 			WT_ERR(stat_cursor->get_key(stat_cursor, &stat_key));
