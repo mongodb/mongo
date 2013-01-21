@@ -53,7 +53,9 @@
 	EXTPATH "compressors/snappy/.libs/libwiredtiger_snappy.so"
 #define	REVERSE_PATH							\
 	EXTPATH "collators/reverse/.libs/libwiredtiger_reverse_collator.so"
-#define	FC_PATH	".libs/raw_compress.so"
+
+#define	LZO_PATH	".libs/lzo_compress.so"
+#define	RAW_PATH	".libs/raw_compress.so"
 
 #define	M(v)		((v) * 1000000)		/* Million */
 #define	UNUSED(var)	(void)(var)		/* Quiet unused var warnings */
@@ -97,8 +99,9 @@ typedef struct {
 
 #define	COMPRESS_NONE	1
 #define	COMPRESS_BZIP	2
-#define	COMPRESS_RAW	3
-#define	COMPRESS_SNAPPY	4
+#define	COMPRESS_LZO	3
+#define	COMPRESS_RAW	4
+#define	COMPRESS_SNAPPY	5
 	u_int compression;			/* Compression type */
 
 	char *config_open;			/* Command-line configuration */

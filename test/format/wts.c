@@ -76,12 +76,14 @@ wts_open(void)
 	 */
 	snprintf(config, sizeof(config),
 	    "create,error_prefix=\"%s\",cache_size=%" PRIu32 "MB,sync=false,"
-	    "extensions=[\"%s\", \"%s\", \"%s\", \"%s\"],%s,%s",
+	    "extensions=[\"%s\", \"%s\", \"%s\", \"%s\", \"%s\"],%s,%s",
 	    g.progname, g.c_cache,
-	    access(BZIP_PATH, R_OK) == 0 ? BZIP_PATH : "",
-	    access(SNAPPY_PATH, R_OK) == 0 ? SNAPPY_PATH : "",
-	    access(BZIP_PATH, R_OK) == 0 ? FC_PATH : "",
 	    REVERSE_PATH,
+	    access(BZIP_PATH, R_OK) == 0 ? BZIP_PATH : "",
+	    access(LZO_PATH, R_OK) == 0 ? LZO_PATH : "",
+	    (access(RAW_PATH, R_OK) == 0 &&
+	    access(BZIP_PATH, R_OK) == 0) ? RAW_PATH : "",
+	    access(SNAPPY_PATH, R_OK) == 0 ? SNAPPY_PATH : "",
 	    g.c_config_open == NULL ? "" : g.c_config_open,
 	    g.config_open == NULL ? "" : g.config_open);
 
@@ -169,6 +171,10 @@ wts_open(void)
 	case COMPRESS_BZIP:
 		p += snprintf(p, (size_t)(end - p),
 		    ",block_compressor=\"bzip2\"");
+		break;
+	case COMPRESS_LZO:
+		p += snprintf(p, (size_t)(end - p),
+		    ",block_compressor=\"LZO1B-6\"");
 		break;
 	case COMPRESS_RAW:
 		p += snprintf(p, (size_t)(end - p),

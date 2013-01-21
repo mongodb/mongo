@@ -79,8 +79,8 @@ static CONFIG c[] = {
 	  0, 0, 1, 100, &g.c_cache, NULL },
 
 	{ "compression",
-	  "type of compression (none | bzip | raw | snappy)",
-	  0, C_IGNORE|C_STRING, 1, 4, NULL, &g.c_compression },
+	  "type of compression (none | bzip | lzo | raw | snappy)",
+	  0, C_IGNORE|C_STRING, 1, 5, NULL, &g.c_compression },
 
 	{ "data_source",
 	  "type of data source to create (file | table | lsm)",

@@ -133,11 +133,8 @@ config_setup(void)
 				*cp->v = 0;
 
 	/* Multi-threaded runs cannot be replayed. */
-	if (g.replay && !SINGLETHREADED) {
-		fprintf(stderr,
-		    "%s: -r is incompatible with threaded runs\n", g.progname);
-		exit(EXIT_FAILURE);
-	}
+	if (g.replay && !SINGLETHREADED)
+		die(0, "%s: -r is incompatible with threaded runs", g.progname);
 
 	/*
 	 * Periodically, set the delete percentage to 0 so salvage gets run,
@@ -167,6 +164,8 @@ config_compression(void)
 	/*
 	 * Compression: choose something if compression wasn't specified,
 	 * otherwise confirm the appropriate shared library is available.
+	 * We don't include LZO in the test compression choices, we don't
+	 * yet have an LZO module of our own.
 	 */
 	cp = config_find("compression", strlen("compression"));
 	if (!(cp->flags & C_PERM)) {
@@ -196,18 +195,16 @@ config_compression(void)
 	switch (g.compression) {
 	case COMPRESS_BZIP:
 	case COMPRESS_RAW:
-		if (access(BZIP_PATH, R_OK) != 0) {
-			fprintf(stderr,
-			    "bzip library not found or not readable\n");
-			exit(EXIT_FAILURE);
-		}
+		if (access(BZIP_PATH, R_OK) != 0)
+			die(0, "bzip library not found or not readable");
+		break;
+	case COMPRESS_LZO:
+		if (access(LZO_PATH, R_OK) != 0)
+			die(0, "LZO library not found or not readable");
 		break;
 	case COMPRESS_SNAPPY:
-		if (access(SNAPPY_PATH, R_OK) != 0) {
-			fprintf(stderr,
-			    "snappy library not found or not readable\n");
-			exit(EXIT_FAILURE);
-		}
+		if (access(SNAPPY_PATH, R_OK) != 0)
+			die(0, "snappy library not found or not readable");
 	}
 }
 
@@ -403,6 +400,8 @@ config_translate(const char *s)
 		return (COMPRESS_NONE);
 	if (strcmp(s, "bzip") == 0)
 		return (COMPRESS_BZIP);
+	if (strcmp(s, "lzo") == 0)
+		return (COMPRESS_LZO);
 	if (strcmp(s, "raw") == 0)
 		return (COMPRESS_RAW);
 	if (strcmp(s, "snappy") == 0)
