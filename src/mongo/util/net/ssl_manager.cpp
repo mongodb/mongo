@@ -273,7 +273,7 @@ namespace mongo {
 
         if (cert == NULL) { // no certificate presented by peer
             if (_weakValidation) {
-                error() << "no SSL certificate provided by peer" << endl;
+                warning() << "no SSL certificate provided by peer" << endl;
             }
             else {
                 error() << "no SSL certificate provided by peer; connection rejected" << endl;
