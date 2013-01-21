@@ -134,7 +134,7 @@ config_setup(void)
 
 	/* Multi-threaded runs cannot be replayed. */
 	if (g.replay && !SINGLETHREADED)
-		die(0, "%s: -r is incompatible with threaded runs", g.progname);
+		die(0, "-r is incompatible with threaded runs");
 
 	/*
 	 * Periodically, set the delete percentage to 0 so salvage gets run,
