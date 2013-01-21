@@ -147,7 +147,7 @@ var checkUpgraded = function() {
     assert.eq(version.minCompatibleVersion, 3);
     assert.eq(version.currentVersion, 4);
     assert(version.clusterId);
-    assert.eq(version.excluding.length, 0);
+    assert.eq(version.excluding, undefined);
 }
 
 checkUpgraded();
