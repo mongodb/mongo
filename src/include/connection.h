@@ -38,7 +38,8 @@ struct __wt_named_collator {
 struct __wt_named_compressor {
 	const char *name;		/* Name of compressor */
 	WT_COMPRESSOR *compressor;	/* User supplied callbacks */
-	TAILQ_ENTRY(__wt_named_compressor) q;	/* Linked list of compressors */
+					/* Linked list of compressors */
+	TAILQ_ENTRY(__wt_named_compressor) q;
 };
 
 /*
@@ -46,9 +47,10 @@ struct __wt_named_compressor {
  *	A data source list entry
  */
 struct __wt_named_data_source {
-	const char *prefix;		/* Name of compressor */
+	const char *prefix;		/* Name of data source */
 	WT_DATA_SOURCE *dsrc;		/* User supplied callbacks */
-	TAILQ_ENTRY(__wt_named_data_source) q;	/* Linked list of compressors */
+					/* Linked list of data sources */
+	TAILQ_ENTRY(__wt_named_data_source) q;
 };
 
 /*
