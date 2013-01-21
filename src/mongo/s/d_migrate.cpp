@@ -1091,6 +1091,12 @@ namespace mongo {
                 startingVersion = maxVersion;
                 shardingState.trySetVersion( ns , startingVersion /* will return updated */ );
 
+                if (startingVersion.majorVersion() == 0) {
+                   // It makes no sense to migrate if our version is zero and we have no chunks, so return
+                   warning() << "moveChunk cannot start migration with zero version" << endl;
+                   return false;
+                }
+
                 log() << "moveChunk request accepted at version " << startingVersion << migrateLog;
             }
 
