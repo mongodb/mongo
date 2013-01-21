@@ -112,6 +112,7 @@ LSB
 LSM
 LSN
 LSNs
+LZO
 LeafGreen
 Llqr
 Llqrt
@@ -485,6 +486,7 @@ lru
 lsm
 lsn
 lu
+lzo
 majorp
 malloc
 maxintlitem
