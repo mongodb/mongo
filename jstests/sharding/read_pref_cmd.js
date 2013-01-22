@@ -1,4 +1,29 @@
+load("jstests/replsets/rslib.js");
+
 var NODE_COUNT = 2;
+
+/**
+ * Prepare to call testReadPreference() or assertFailure().
+ */
+var setUp = function() {
+    var configDB = st.s.getDB('config');
+    configDB.adminCommand({ enableSharding: 'test' });
+    configDB.adminCommand({ shardCollection: 'test.user', key: { x: 1 }});
+
+    // Each time we drop the 'test' DB we have to re-enable profiling
+    st.rs0.nodes.forEach(function(node) {
+        node.getDB('test').setProfilingLevel(2);
+    });
+};
+
+/**
+ * Clean up after testReadPreference() or testBadMode(), prepare to call setUp() again.
+ */
+var tearDown = function() {
+    st.s.getDB('test').dropDatabase();
+    // Hack until SERVER-7739 gets fixed
+    st.rs0.awaitReplication();
+};
 
 /**
  * Performs a series of tests on commands with read preference.
@@ -7,11 +32,15 @@ var NODE_COUNT = 2;
  *     preference functionality.
  * @param hostList {Array.<Mongo>} list of the replica set host members.
  * @param isMongos {boolean} true if conn is a mongos connection.
+ * @param mode {string} a read preference mode like 'secondary'
+ * @param tagSets {Array.<Object>} list of tag sets to use
+ * @param secExpected {boolean} true if we expect to run any commands on secondary
  */
-var doTest = function(conn, hostList, isMongos) {
+var testReadPreference = function(conn, hostList, isMongos, mode, tagSets, secExpected) {
     var testDB = conn.getDB('test');
     conn.setSlaveOk(false); // purely rely on readPref
-    conn.setReadPref('secondary');
+    jsTest.log('Testing mode: ' + mode + ', tag sets: ' + tojson(tagSets));
+    conn.setReadPref(mode, tagSets);
 
     /**
      * Performs the command and checks whether the command was routed to the
@@ -23,6 +52,7 @@ var doTest = function(conn, hostList, isMongos) {
      *     look for the cmd just sent.
      */
     var cmdTest = function(cmdObj, secOk, profileQuery) {
+        jsTest.log('about to do: ' + tojson(cmdObj));
         var cmdResult = testDB.runCommand(cmdObj);
         jsTest.log('cmd result: ' + tojson(cmdResult));
         assert(cmdResult.ok);
@@ -36,10 +66,14 @@ var doTest = function(conn, hostList, isMongos) {
             var result = testDB.system.profile.findOne(query);
 
             if (result != null) {
-                if (secOk) {
+                if (secOk && secExpected) {
+                    // The command obeys read prefs and we expect to run
+                    // commands on secondaries with this mode and tag sets
                     assert(testDB.adminCommand({ isMaster: 1 }).secondary);
                 }
                 else {
+                    // The command does not obey read prefs, or we expect to run
+                    // commands on primary with this mode or tag sets
                     assert(testDB.adminCommand({ isMaster: 1 }).ismaster);
                 }
 
@@ -108,9 +142,20 @@ var doTest = function(conn, hostList, isMongos) {
     cmdTest({ dbStats: 1 }, true, formatProfileQuery({ dbStats: 1 }, !isMongos));
 
     testDB.user.ensureIndex({ loc: '2d' });
+    testDB.user.ensureIndex({ position: 'geoHaystack', type:1 }, { bucketSize: 10 });
     testDB.runCommand({ getLastError: 1, w: NODE_COUNT });
     cmdTest({ geoNear: 'user', near: [1, 1] }, true,
         formatProfileQuery({ geoNear: 'user' }, !isMongos));
+
+    // Mongos doesn't implement geoSearch; test it only with ReplicaSetConnection.
+    // We'll omit geoWalk, it's not a public command.
+    if (!isMongos) {
+        cmdTest(
+            {
+                geoSearch: 'user', near: [1, 1],
+                search: { type: 'restaurant'}, maxDistance: 10
+            }, true, formatProfileQuery({ geoSearch: 'user'}, true));
+    }
 
     // Test on sharded
     cmdTest({ aggregate: 'user', pipeline: [{ $project: { x: 1 }}] }, true,
@@ -121,18 +166,155 @@ var doTest = function(conn, hostList, isMongos) {
         formatProfileQuery({ aggregate: 'mrIn' }, !isMongos));
 };
 
+/**
+ * Verify that commands fail with the given combination of mode and tags.
+ *
+ * @param conn {Mongo} the connection object of which to test the read
+ *     preference functionality.
+ * @param hostList {Array.<Mongo>} list of the replica set host members.
+ * @param isMongos {boolean} true if conn is a mongos connection.
+ * @param mode {string} a read preference mode like 'secondary'
+ * @param tagSets {Array.<Object>} list of tag sets to use
+ */
+var testBadMode = function(conn, hostList, isMongos, mode, tagSets) {
+    var failureMsg, testDB, cmdResult;
+
+    jsTest.log('Expecting failure for mode: ' + mode + ', tag sets: ' + tojson(tagSets));
+    conn.setReadPref(mode, tagSets);
+    testDB = conn.getDB('test');
+
+    // Test that a command that could be routed to a secondary fails with bad mode / tags.
+    if (isMongos) {
+        // Command result should have ok: 0.
+        cmdResult = testDB.runCommand({ distinct: 'user', key: { x: 1 } });
+        jsTest.log('cmd result: ' + tojson(cmdResult));
+        assert(!cmdResult.ok);
+    } else {
+        try {
+            // conn should throw error
+            testDB.runCommand({ distinct: 'user', key: { x: 1 } });
+            failureMsg = "Unexpected success running distinct!";
+        }
+        catch (e) {
+            jsTest.log(e);
+        }
+
+        if (failureMsg) throw failureMsg;
+    }
+
+    // Can't be routed to secondary, succeeds by ignoring mode and tags
+    testDB.runCommand({ create: 'quux' });
+};
+
+var testAllModes = function(conn, hostList, isMongos) {
+
+    // The primary is tagged with { tag: 'one' } and the secondary with
+    // { tag: 'two' } so we can test the interaction of modes and tags. Test
+    // a bunch of combinations.
+    [
+        // mode, tagSets, expectedHost
+        ['primary', undefined, false],
+        //['primary', [{}], false], // TODO: Uncomment once SERVER-8219 is fixed
+
+        ['primaryPreferred', undefined, false],
+        ['primaryPreferred', [{tag: 'one'}], false],
+        // Correctly uses primary and ignores the tag
+        ['primaryPreferred', [{tag: 'two'}], false],
+
+        ['secondary', undefined, true],
+        ['secondary', [{tag: 'two'}], true],
+        ['secondary', [{tag: 'doesntexist'}, {}], true],
+        ['secondary', [{tag: 'doesntexist'}, {tag:'two'}], true],
+
+        ['secondaryPreferred', undefined, true],
+        ['secondaryPreferred', [{tag: 'one'}], false],
+        ['secondaryPreferred', [{tag: 'two'}], true],
+
+        // We don't have a way to alter ping times so we can't predict where an
+        // untagged 'nearest' command should go, hence only test with tags.
+        ['nearest', [{tag: 'one'}], false],
+        ['nearest', [{tag: 'two'}], true]
+
+    ].forEach(function(args) {
+        var mode = args[0], tagSets = args[1], secExpected = args[2];
+
+        setUp();
+        testReadPreference(conn, hostList, isMongos, mode, tagSets, secExpected);
+        tearDown();
+    });
+
+    [
+        // Tags not allowed with primary
+        ['primary', [{dc: 'doesntexist'}]],
+        ['primary', [{dc: 'ny'}]],
+        ['primary', [{dc: 'one'}]],
+
+        // No matching node
+        ['secondary', [{tag: 'one'}]],
+        ['nearest', [{tag: 'doesntexist'}]],
+
+        ['invalid-mode', undefined],
+        ['secondary', ['misformatted-tags']]
+
+    ].forEach(function(args) {
+        var mode = args[0], tagSets = args[1];
+
+        setUp();
+        testBadMode(conn, hostList, isMongos, mode, tagSets);
+        tearDown();
+    });
+};
+
 var st = new ShardingTest({ shards: { rs0: { nodes: NODE_COUNT }}});
 st.stopBalancer();
 
-var configDB = st.s.getDB('config');
-configDB.adminCommand({ enableSharding: 'test' });
-configDB.adminCommand({ shardCollection: 'test.user', key: { x: 1 }});
-
 ReplSetTest.awaitRSClientHosts(st.s, st.rs0.nodes);
 
-st.rs0.nodes.forEach(function(node) {
-    node.getDB('test').setProfilingLevel(2);
+// Tag primary with { dc: 'ny', tag: 'one' }, secondary with { dc: 'ny', tag: 'two' }
+var primary = st.rs0.getPrimary();
+var secondary = st.rs0.getSecondary();
+var rsConfig = primary.getDB("local").system.replset.findOne();
+jsTest.log('got rsconf ' + tojson(rsConfig));
+rsConfig.members.forEach(function(member) {
+    if (member.host == primary.host) {
+        member.tags = { dc: 'ny', tag: 'one' }
+    } else {
+        member.tags = { dc: 'ny', tag: 'two' }
+    }
 });
+
+rsConfig.version++;
+
+
+jsTest.log('new rsconf ' + tojson(rsConfig));
+
+try {
+    primary.adminCommand({ replSetReconfig: rsConfig });
+}
+catch(e) {
+    jsTest.log('replSetReconfig error: ' + e);
+}
+
+st.rs0.awaitSecondaryNodes();
+
+// Force mongos to reconnect after our reconfig
+assert.soon(function() {
+    try {
+        st.s.getDB('foo').runCommand({ create: 'foo' });
+        return true;
+    }
+    catch (x) {
+        // Intentionally caused an error that forces mongos's monitor to refresh.
+        jsTest.log('Caught exception while doing dummy command: ' + tojson(x));
+        return false;
+    }
+});
+
+reconnect(primary);
+reconnect(secondary);
+
+rsConfig = primary.getDB("local").system.replset.findOne();
+jsTest.log('got rsconf ' + tojson(rsConfig));
 
 var replConn = new Mongo(st.rs0.getURL());
 
@@ -152,22 +334,11 @@ assert.soon(function() {
     }
 });
 
-doTest(new Mongo(st.rs0.getURL()), st.rs0.nodes, false);
-
-st.s.getDB('test').dropDatabase();
-// Hack until SERVER-7739 gets fixed
-st.rs0.awaitReplication();
-
-configDB.adminCommand({ enableSharding: 'test' });
-configDB.adminCommand({ shardCollection: 'test.user', key: { x: 1 }});
-
-st.rs0.nodes.forEach(function(node) {
-    node.getDB('test').setProfilingLevel(2);
-});
+testAllModes(replConn, st.rs0.nodes, false);
 
 jsTest.log('Starting test for mongos connection');
 
-doTest(st.s, st.rs0.nodes, true);
+testAllModes(st.s, st.rs0.nodes, true);
 
 st.stop();
 
