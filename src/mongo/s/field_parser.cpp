@@ -34,7 +34,6 @@ namespace mongo {
 
     FieldParser::FieldState FieldParser::extract(BSONObj doc,
                               const BSONField<bool>& field,
-                              bool def,
                               bool* out,
                               string* errMsg)
     {
@@ -60,7 +59,6 @@ namespace mongo {
 
     FieldParser::FieldState FieldParser::extract(BSONObj doc,
                               const BSONField<BSONArray>& field,
-                              const BSONArray& def,
                               BSONArray* out,
                               string* errMsg)
     {
@@ -86,7 +84,6 @@ namespace mongo {
 
     FieldParser::FieldState FieldParser::extract(BSONObj doc,
                               const BSONField<BSONObj>& field,
-                              const BSONObj& def,
                               BSONObj* out,
                               string* errMsg)
     {
@@ -112,7 +109,6 @@ namespace mongo {
 
     FieldParser::FieldState FieldParser::extract(BSONObj doc,
                               const BSONField<Date_t>& field,
-                              const Date_t def,
                               Date_t* out,
                               string* errMsg)
     {
@@ -138,7 +134,6 @@ namespace mongo {
 
     FieldParser::FieldState FieldParser::extract(BSONObj doc,
                               const BSONField<string>& field,
-                              const string& def,
                               string* out,
                               string* errMsg)
     {
@@ -164,7 +159,6 @@ namespace mongo {
 
     FieldParser::FieldState FieldParser::extract(BSONObj doc,
                               const BSONField<OID>& field,
-                              const OID& def,
                               OID* out,
                               string* errMsg)
     {
@@ -190,7 +184,6 @@ namespace mongo {
 
     FieldParser::FieldState FieldParser::extract(BSONObj doc,
                               const BSONField<int>& field,
-                              const int& def,
                               int* out,
                               string* errMsg)
     {
@@ -216,7 +209,6 @@ namespace mongo {
 
     FieldParser::FieldState FieldParser::extractNumber(BSONObj doc,
                                     const BSONField<int>& field,
-                                    const int& def,
                                     int* out,
                                     string* errMsg)
     {
@@ -242,7 +234,6 @@ namespace mongo {
 
     FieldParser::FieldState FieldParser::extract(BSONObj doc,
                               const BSONField<long long>& field,
-                              const long long& def,
                               long long* out,
                               string* errMsg)
     {
@@ -268,7 +259,6 @@ namespace mongo {
 
     FieldParser::FieldState FieldParser::extractNumber(BSONObj doc,
                                     const BSONField<long long>& field,
-                                    const long long& def,
                                     long long* out,
                                     string* errMsg)
     {

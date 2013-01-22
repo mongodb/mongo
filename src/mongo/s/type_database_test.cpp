@@ -96,7 +96,7 @@ namespace {
         ASSERT_EQUALS(dbNotDraining.getDraining(), DatabaseType::draining.getDefault());
         bool isDraining;
         BSONObj genObj;
-        ASSERT_EQUALS( FieldParser::extract( genObj, DatabaseType::draining, true, &isDraining ),
+        ASSERT_EQUALS( FieldParser::extract( genObj, DatabaseType::draining, &isDraining ),
                        FieldParser::FIELD_DEFAULT );
     }
 

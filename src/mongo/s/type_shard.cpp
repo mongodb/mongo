@@ -75,23 +75,23 @@ namespace mongo {
         if (!errMsg) errMsg = &dummy;
 
         FieldParser::FieldState fieldState;
-        fieldState = FieldParser::extract(source, name, "", &_name, errMsg);
+        fieldState = FieldParser::extract(source, name, &_name, errMsg);
         if (fieldState == FieldParser::FIELD_INVALID) return false;
         _isNameSet = fieldState == FieldParser::FIELD_SET;
 
-        fieldState = FieldParser::extract(source, host, "", &_host, errMsg);
+        fieldState = FieldParser::extract(source, host, &_host, errMsg);
         if (fieldState == FieldParser::FIELD_INVALID) return false;
         _isHostSet = fieldState == FieldParser::FIELD_SET;
 
-        fieldState = FieldParser::extract(source, draining, false, &_draining, errMsg);
+        fieldState = FieldParser::extract(source, draining, &_draining, errMsg);
         if (fieldState == FieldParser::FIELD_INVALID) return false;
         _isDrainingSet = fieldState == FieldParser::FIELD_SET;
 
-        fieldState = FieldParser::extract(source, maxSize, 0, &_maxSize, errMsg);
+        fieldState = FieldParser::extract(source, maxSize, &_maxSize, errMsg);
         if (fieldState == FieldParser::FIELD_INVALID) return false;
         _isMaxSizeSet = fieldState == FieldParser::FIELD_SET;
 
-        fieldState = FieldParser::extract(source, tags, BSONArray(), &_tags, errMsg);
+        fieldState = FieldParser::extract(source, tags, &_tags, errMsg);
         if (fieldState == FieldParser::FIELD_INVALID) return false;
         _isTagsSet = fieldState == FieldParser::FIELD_SET;
 

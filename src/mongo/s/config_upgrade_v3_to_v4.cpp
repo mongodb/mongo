@@ -136,7 +136,6 @@ namespace mongo {
             bool inCriticalSection;
             if (!FieldParser::extract(lastUpgradeState,
                                       inCriticalSectionField,
-                                      false, // UNUSED!!!!
                                       &inCriticalSection,
                                       errMsg))
             {

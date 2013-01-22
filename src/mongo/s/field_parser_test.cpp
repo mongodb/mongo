@@ -91,55 +91,55 @@ namespace {
         BSONField<bool> notThere("otherBool", true);
         BSONField<bool> wrongType(anObj.name());
         bool val;
-        ASSERT_TRUE(FieldParser::extract(doc, aBool, false, &val));
+        ASSERT_TRUE(FieldParser::extract(doc, aBool, &val));
         ASSERT_EQUALS(val, valBool);
-        ASSERT_TRUE(FieldParser::extract(doc, notThere, true, &val));
+        ASSERT_TRUE(FieldParser::extract(doc, notThere, &val));
         ASSERT_EQUALS(val, true);
-        ASSERT_FALSE(FieldParser::extract(doc, wrongType, true, &val));
+        ASSERT_FALSE(FieldParser::extract(doc, wrongType, &val));
     }
 
     TEST_F(ExtractionFixture, GetBSONArray) {
         BSONField<BSONArray> notThere("otherArray", BSON_ARRAY("a" << "b"));
         BSONField<BSONArray> wrongType(aString.name());
         BSONArray val;
-        ASSERT_TRUE(FieldParser::extract(doc, anArray, BSONArray(), &val));
+        ASSERT_TRUE(FieldParser::extract(doc, anArray, &val));
         ASSERT_EQUALS(val, valArray);
-        ASSERT_TRUE(FieldParser::extract(doc, notThere, BSON_ARRAY("a" << "b"), &val));
+        ASSERT_TRUE(FieldParser::extract(doc, notThere, &val));
         ASSERT_EQUALS(val, BSON_ARRAY("a" << "b"));
-        ASSERT_FALSE(FieldParser::extract(doc, wrongType, BSON_ARRAY("a" << "b"), &val));
+        ASSERT_FALSE(FieldParser::extract(doc, wrongType, &val));
     }
 
     TEST_F(ExtractionFixture, GetBSONObj) {
         BSONField<BSONObj> notThere("otherObj", BSON("b" << 1));
         BSONField<BSONObj> wrongType(aString.name());
         BSONObj val;
-        ASSERT_TRUE(FieldParser::extract(doc, anObj, BSONObj(), &val));
+        ASSERT_TRUE(FieldParser::extract(doc, anObj, &val));
         ASSERT_EQUALS(val, valObj);
-        ASSERT_TRUE(FieldParser::extract(doc, notThere, BSON("b" << 1), &val));
+        ASSERT_TRUE(FieldParser::extract(doc, notThere, &val));
         ASSERT_EQUALS(val, BSON("b" << 1));
-        ASSERT_FALSE(FieldParser::extract(doc, wrongType, BSON("b" << 1), &val));
+        ASSERT_FALSE(FieldParser::extract(doc, wrongType, &val));
     }
 
     TEST_F(ExtractionFixture, GetDate) {
         BSONField<Date_t> notThere("otherDate", 99ULL);
         BSONField<Date_t> wrongType(aString.name());
         Date_t val;
-        ASSERT_TRUE(FieldParser::extract(doc, aDate, time(0), &val));
+        ASSERT_TRUE(FieldParser::extract(doc, aDate, &val));
         ASSERT_EQUALS(val, valDate);
-        ASSERT_TRUE(FieldParser::extract(doc, notThere, 99ULL, &val));
+        ASSERT_TRUE(FieldParser::extract(doc, notThere, &val));
         ASSERT_EQUALS(val, 99ULL);
-        ASSERT_FALSE(FieldParser::extract(doc, wrongType, 99ULL, &val));
+        ASSERT_FALSE(FieldParser::extract(doc, wrongType, &val));
     }
 
     TEST_F(ExtractionFixture, GetString) {
         BSONField<string> notThere("otherString", "abc");
         BSONField<string> wrongType(aBool.name());
         string val;
-        ASSERT_TRUE(FieldParser::extract(doc, aString, "", &val));
+        ASSERT_TRUE(FieldParser::extract(doc, aString, &val));
         ASSERT_EQUALS(val, valString);
-        ASSERT_TRUE(FieldParser::extract(doc, notThere, "abc", &val));
+        ASSERT_TRUE(FieldParser::extract(doc, notThere, &val));
         ASSERT_EQUALS(val, "abc");
-        ASSERT_FALSE(FieldParser::extract(doc, wrongType, "abc", &val));
+        ASSERT_FALSE(FieldParser::extract(doc, wrongType, &val));
     }
 
     TEST_F(ExtractionFixture, GetOID) {
@@ -147,58 +147,58 @@ namespace {
         BSONField<OID> notThere("otherOID", defOID);
         BSONField<OID> wrongType(aString.name());
         OID val;
-        ASSERT_TRUE(FieldParser::extract(doc, anOID, OID(), &val));
+        ASSERT_TRUE(FieldParser::extract(doc, anOID, &val));
         ASSERT_EQUALS(val, valOID);
-        ASSERT_TRUE(FieldParser::extract(doc, notThere, defOID, &val));
+        ASSERT_TRUE(FieldParser::extract(doc, notThere, &val));
         ASSERT_EQUALS(val, defOID);
-        ASSERT_FALSE(FieldParser::extract(doc, wrongType, defOID, &val));
+        ASSERT_FALSE(FieldParser::extract(doc, wrongType, &val));
     }
 
     TEST_F(ExtractionFixture, GetLong) {
         BSONField<long long> notThere("otherLong", 0);
         BSONField<long long> wrongType(aString.name());
         long long val;
-        ASSERT_TRUE(FieldParser::extract(doc, aLong, 0, &val));
+        ASSERT_TRUE(FieldParser::extract(doc, aLong, &val));
         ASSERT_EQUALS(val, valLong);
-        ASSERT_TRUE(FieldParser::extract(doc, notThere, 0, &val));
+        ASSERT_TRUE(FieldParser::extract(doc, notThere, &val));
         ASSERT_EQUALS(val, 0);
-        ASSERT_FALSE(FieldParser::extract(doc, wrongType, 0, &val));
+        ASSERT_FALSE(FieldParser::extract(doc, wrongType, &val));
     }
 
     TEST_F(ExtractionFixture, IsFound) {
         bool bool_val;
         BSONField<bool> aBoolMissing("aBoolMissing");
-        ASSERT_EQUALS(FieldParser::extract(doc, aBool, 0, &bool_val, NULL),
+        ASSERT_EQUALS(FieldParser::extract(doc, aBool, &bool_val, NULL),
                       FieldParser::FIELD_SET);
-        ASSERT_EQUALS(FieldParser::extract(doc, aBoolMissing, 0, &bool_val, NULL),
+        ASSERT_EQUALS(FieldParser::extract(doc, aBoolMissing, &bool_val, NULL),
                       FieldParser::FIELD_NONE);
 
         Date_t Date_t_val;
         BSONField<Date_t> aDateMissing("aDateMissing");
-        ASSERT_EQUALS(FieldParser::extract(doc, aDate, 0, &Date_t_val, NULL),
+        ASSERT_EQUALS(FieldParser::extract(doc, aDate, &Date_t_val, NULL),
                       FieldParser::FIELD_SET);
-        ASSERT_EQUALS(FieldParser::extract(doc, aDateMissing, 0, &Date_t_val, NULL),
+        ASSERT_EQUALS(FieldParser::extract(doc, aDateMissing, &Date_t_val, NULL),
                       FieldParser::FIELD_NONE);
 
         string string_val;
         BSONField<string> aStringMissing("aStringMissing");
-        ASSERT_EQUALS(FieldParser::extract(doc, aString, "", &string_val, NULL),
+        ASSERT_EQUALS(FieldParser::extract(doc, aString, &string_val, NULL),
                       FieldParser::FIELD_SET);
-        ASSERT_EQUALS(FieldParser::extract(doc, aStringMissing, "", &string_val, NULL),
+        ASSERT_EQUALS(FieldParser::extract(doc, aStringMissing, &string_val, NULL),
                       FieldParser::FIELD_NONE);
 
         OID OID_val;
         BSONField<OID> anOIDMissing("anOIDMissing");
-        ASSERT_EQUALS(FieldParser::extract(doc, anOID, OID(), &OID_val, NULL),
+        ASSERT_EQUALS(FieldParser::extract(doc, anOID, &OID_val, NULL),
                       FieldParser::FIELD_SET);
-        ASSERT_EQUALS(FieldParser::extract(doc, anOIDMissing, OID(), &OID_val, NULL),
+        ASSERT_EQUALS(FieldParser::extract(doc, anOIDMissing, &OID_val, NULL),
                       FieldParser::FIELD_NONE);
 
         long long long_long_val;
         BSONField<long long> aLongMissing("aLongMissing");
-        ASSERT_EQUALS(FieldParser::extract(doc, aLong, 0, &long_long_val, NULL),
+        ASSERT_EQUALS(FieldParser::extract(doc, aLong, &long_long_val, NULL),
                       FieldParser::FIELD_SET);
-        ASSERT_EQUALS(FieldParser::extract(doc, aLongMissing, 0, &long_long_val, NULL),
+        ASSERT_EQUALS(FieldParser::extract(doc, aLongMissing, &long_long_val, NULL),
                       FieldParser::FIELD_NONE);
     }
 
@@ -213,7 +213,7 @@ namespace {
 
         vector<string> parsedVector;
 
-        ASSERT(FieldParser::extract(obj, vectorField, parsedVector, &parsedVector));
+        ASSERT(FieldParser::extract(obj, vectorField, &parsedVector));
         ASSERT_EQUALS("a", parsedVector[0]);
         ASSERT_EQUALS("b", parsedVector[1]);
         ASSERT_EQUALS("c", parsedVector[2]);
@@ -231,7 +231,7 @@ namespace {
 
         vector<BSONObj> parsedVector;
 
-        ASSERT(FieldParser::extract(obj, vectorField, parsedVector, &parsedVector));
+        ASSERT(FieldParser::extract(obj, vectorField, &parsedVector));
         ASSERT_EQUALS(BSON("a" << 1), parsedVector[0]);
         ASSERT_EQUALS(BSON("b" << 1), parsedVector[1]);
         ASSERT_EQUALS(BSON("c" << 1), parsedVector[2]);
@@ -250,7 +250,7 @@ namespace {
         vector<BSONObj> parsedVector;
 
         string errMsg;
-        ASSERT(!FieldParser::extract(obj, vectorField, parsedVector, &parsedVector, &errMsg));
+        ASSERT(!FieldParser::extract(obj, vectorField, &parsedVector, &errMsg));
         ASSERT_NOT_EQUALS(errMsg, "");
     }
 
@@ -267,7 +267,7 @@ namespace {
         }
 
         vector<string> parsedVector;
-        ASSERT(FieldParser::extract(obj, vectorField, parsedVector, &parsedVector));
+        ASSERT(FieldParser::extract(obj, vectorField, &parsedVector));
 
         {
             BSONObjBuilder bob;
@@ -276,7 +276,7 @@ namespace {
         }
 
         parsedVector.clear();
-        ASSERT(FieldParser::extract(obj, vectorField, parsedVector, &parsedVector));
+        ASSERT(FieldParser::extract(obj, vectorField, &parsedVector));
 
         ASSERT_EQUALS("a", parsedVector[0]);
         ASSERT_EQUALS("b", parsedVector[1]);
@@ -295,7 +295,7 @@ namespace {
 
         map<string, string> parsedMap;
 
-        ASSERT(FieldParser::extract(obj, mapField, parsedMap, &parsedMap));
+        ASSERT(FieldParser::extract(obj, mapField, &parsedMap));
         ASSERT_EQUALS("a", parsedMap["a"]);
         ASSERT_EQUALS("b", parsedMap["b"]);
         ASSERT_EQUALS("c", parsedMap["c"]);
@@ -315,7 +315,7 @@ namespace {
 
         map<string, BSONObj> parsedMap;
 
-        ASSERT(FieldParser::extract(obj, mapField, parsedMap, &parsedMap));
+        ASSERT(FieldParser::extract(obj, mapField, &parsedMap));
         ASSERT_EQUALS(BSON("a" << "a"), parsedMap["a"]);
         ASSERT_EQUALS(BSON("b" << "b"), parsedMap["b"]);
         ASSERT_EQUALS(BSON("c" << "c"), parsedMap["c"]);
@@ -334,7 +334,7 @@ namespace {
         map<string, string> parsedMap;
 
         string errMsg;
-        ASSERT(!FieldParser::extract(obj, mapField, parsedMap, &parsedMap, &errMsg));
+        ASSERT(!FieldParser::extract(obj, mapField, &parsedMap, &errMsg));
         ASSERT_NOT_EQUALS(errMsg, "");
     }
 
@@ -351,7 +351,7 @@ namespace {
         }
 
         map<string, string> parsedMap;
-        ASSERT(FieldParser::extract(obj, mapField, parsedMap, &parsedMap));
+        ASSERT(FieldParser::extract(obj, mapField, &parsedMap));
 
         {
             BSONObjBuilder bob;
@@ -360,7 +360,7 @@ namespace {
         }
 
         parsedMap.clear();
-        ASSERT(FieldParser::extract(obj, mapField, parsedMap, &parsedMap));
+        ASSERT(FieldParser::extract(obj, mapField, &parsedMap));
 
         ASSERT_EQUALS("a", parsedMap["a"]);
         ASSERT_EQUALS("b", parsedMap["b"]);
@@ -381,7 +381,7 @@ namespace {
 
         vector<map<string, string> > parsed;
 
-        ASSERT(FieldParser::extract(obj, nestedField, parsed, &parsed));
+        ASSERT(FieldParser::extract(obj, nestedField, &parsed));
         ASSERT_EQUALS(parsed.size(), static_cast<size_t>(3));
         for (int i = 0; i < 3; i++) {
             map<string, string>& parsedMap = parsed[i];
@@ -406,7 +406,7 @@ namespace {
         vector<map<string, string> > parsed;
 
         string errMsg;
-        ASSERT(!FieldParser::extract(obj, nestedField, parsed, &parsed, &errMsg));
+        ASSERT(!FieldParser::extract(obj, nestedField, &parsed, &errMsg));
         ASSERT_NOT_EQUALS(errMsg, "");
     }
 

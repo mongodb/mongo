@@ -94,19 +94,18 @@ namespace mongo {
 
         FieldParser::FieldState fieldState;
         fieldState = FieldParser::extractNumber(source, minCompatibleVersion,
-                                                -1, &_minCompatibleVersion, errMsg);
+                                                &_minCompatibleVersion, errMsg);
         if (fieldState == FieldParser::FIELD_INVALID) return false;
         _isMinCompatibleVersionSet = fieldState == FieldParser::FIELD_SET;
 
         if (!_isMinCompatibleVersionSet) {
             fieldState = FieldParser::extractNumber(source, version_DEPRECATED,
-                                                    -1, &_minCompatibleVersion, errMsg);
+                                                    &_minCompatibleVersion, errMsg);
             if (fieldState == FieldParser::FIELD_INVALID) return false;
             _isMinCompatibleVersionSet = fieldState == FieldParser::FIELD_SET;
         }
 
-        fieldState = FieldParser::extractNumber(source, currentVersion,
-                                                -1, &_currentVersion, errMsg);
+        fieldState = FieldParser::extractNumber(source, currentVersion, &_currentVersion, errMsg);
         if (fieldState == FieldParser::FIELD_INVALID) return false;
         _isCurrentVersionSet = fieldState == FieldParser::FIELD_SET;
 
@@ -116,19 +115,19 @@ namespace mongo {
         }
 
         fieldState = FieldParser::extract(source, excludingMongoVersions,
-                                          BSONArray(), &_excludingMongoVersions, errMsg);
+                                          &_excludingMongoVersions, errMsg);
         if (fieldState == FieldParser::FIELD_INVALID) return false;
         _isExcludingMongoVersionsSet = fieldState == FieldParser::FIELD_SET;
 
-        fieldState = FieldParser::extract(source, clusterId, OID(), &_clusterId, errMsg);
+        fieldState = FieldParser::extract(source, clusterId, &_clusterId, errMsg);
         if (fieldState == FieldParser::FIELD_INVALID) return false;
         _isClusterIdSet = fieldState == FieldParser::FIELD_SET;
 
-        fieldState = FieldParser::extract(source, upgradeId, OID(), &_upgradeId, errMsg);
+        fieldState = FieldParser::extract(source, upgradeId, &_upgradeId, errMsg);
         if (fieldState == FieldParser::FIELD_INVALID) return false;
         _isUpgradeIdSet = fieldState == FieldParser::FIELD_SET;
 
-        fieldState = FieldParser::extract(source, upgradeState, BSONObj(), &_upgradeState, errMsg);
+        fieldState = FieldParser::extract(source, upgradeState, &_upgradeState, errMsg);
         if (fieldState == FieldParser::FIELD_INVALID) return false;
         _isUpgradeStateSet = fieldState == FieldParser::FIELD_SET;
 

@@ -99,31 +99,31 @@ namespace mongo {
         if (!errMsg) errMsg = &dummy;
 
         FieldParser::FieldState fieldState;
-        fieldState = FieldParser::extract(source, changeID, "", &_changeID, errMsg);
+        fieldState = FieldParser::extract(source, changeID, &_changeID, errMsg);
         if (fieldState == FieldParser::FIELD_INVALID) return false;
         _isChangeIDSet = fieldState == FieldParser::FIELD_SET;
 
-        fieldState = FieldParser::extract(source, server, "", &_server, errMsg);
+        fieldState = FieldParser::extract(source, server, &_server, errMsg);
         if (fieldState == FieldParser::FIELD_INVALID) return false;
         _isServerSet = fieldState == FieldParser::FIELD_SET;
 
-        fieldState = FieldParser::extract(source, clientAddr, "", &_clientAddr, errMsg);
+        fieldState = FieldParser::extract(source, clientAddr, &_clientAddr, errMsg);
         if (fieldState == FieldParser::FIELD_INVALID) return false;
         _isClientAddrSet = fieldState == FieldParser::FIELD_SET;
 
-        fieldState = FieldParser::extract(source, time, 0, &_time, errMsg);
+        fieldState = FieldParser::extract(source, time, &_time, errMsg);
         if (fieldState == FieldParser::FIELD_INVALID) return false;
         _isTimeSet = fieldState == FieldParser::FIELD_SET;
 
-        fieldState = FieldParser::extract(source, what, "", &_what, errMsg);
+        fieldState = FieldParser::extract(source, what, &_what, errMsg);
         if (fieldState == FieldParser::FIELD_INVALID) return false;
         _isWhatSet = fieldState == FieldParser::FIELD_SET;
 
-        fieldState = FieldParser::extract(source, ns, "", &_ns, errMsg);
+        fieldState = FieldParser::extract(source, ns, &_ns, errMsg);
         if (fieldState == FieldParser::FIELD_INVALID) return false;
         _isNsSet = fieldState == FieldParser::FIELD_SET;
 
-        fieldState = FieldParser::extract(source, details, BSONObj(), &_details, errMsg);
+        fieldState = FieldParser::extract(source, details, &_details, errMsg);
         if (fieldState == FieldParser::FIELD_INVALID) return false;
         _isDetailsSet = fieldState == FieldParser::FIELD_SET;
 

@@ -107,35 +107,35 @@ namespace mongo {
         if (!errMsg) errMsg = &dummy;
 
         FieldParser::FieldState fieldState;
-        fieldState = FieldParser::extract(source, ns, "", &_ns, errMsg);
+        fieldState = FieldParser::extract(source, ns, &_ns, errMsg);
         if (fieldState == FieldParser::FIELD_INVALID) return false;
         _isNsSet = fieldState == FieldParser::FIELD_SET;
 
-        fieldState = FieldParser::extract(source, primary, "", &_primary, errMsg);
+        fieldState = FieldParser::extract(source, primary, &_primary, errMsg);
         if (fieldState == FieldParser::FIELD_INVALID) return false;
         _isPrimarySet = fieldState == FieldParser::FIELD_SET;
 
-        fieldState = FieldParser::extract(source, keyPattern, BSONObj(), &_keyPattern, errMsg);
+        fieldState = FieldParser::extract(source, keyPattern, &_keyPattern, errMsg);
         if (fieldState == FieldParser::FIELD_INVALID) return false;
         _isKeyPatternSet = fieldState == FieldParser::FIELD_SET;
 
-        fieldState = FieldParser::extract(source, unique, false, &_unique, errMsg);
+        fieldState = FieldParser::extract(source, unique, &_unique, errMsg);
         if (fieldState == FieldParser::FIELD_INVALID) return false;
         _isUniqueSet = fieldState == FieldParser::FIELD_SET;
 
-        fieldState = FieldParser::extract(source, updatedAt, 0, &_updatedAt, errMsg);
+        fieldState = FieldParser::extract(source, updatedAt, &_updatedAt, errMsg);
         if (fieldState == FieldParser::FIELD_INVALID) return false;
         _isUpdatedAtSet = fieldState == FieldParser::FIELD_SET;
 
-        fieldState = FieldParser::extract(source, noBalance, false, &_noBalance, errMsg);
+        fieldState = FieldParser::extract(source, noBalance, &_noBalance, errMsg);
         if (fieldState == FieldParser::FIELD_INVALID) return false;
         _isNoBalanceSet = fieldState == FieldParser::FIELD_SET;
 
-        fieldState = FieldParser::extract(source, epoch, OID(), &_epoch, errMsg);
+        fieldState = FieldParser::extract(source, epoch, &_epoch, errMsg);
         if (fieldState == FieldParser::FIELD_INVALID) return false;
         _isEpochSet = fieldState == FieldParser::FIELD_SET;
 
-        fieldState = FieldParser::extract(source, dropped, false, &_dropped, errMsg);
+        fieldState = FieldParser::extract(source, dropped, &_dropped, errMsg);
         if (fieldState == FieldParser::FIELD_INVALID) return false;
         _isDroppedSet = fieldState == FieldParser::FIELD_SET;
 
@@ -146,7 +146,7 @@ namespace mongo {
         // 'updatedAt' used to be called 'lastmod' up to 2.2.
 
         Date_t lastmod;
-        fieldState = FieldParser::extract(source, DEPRECATED_lastmod, 0ULL, &lastmod, errMsg);
+        fieldState = FieldParser::extract(source, DEPRECATED_lastmod, &lastmod, errMsg);
         if (fieldState == FieldParser::FIELD_INVALID) return false;
 
         if (fieldState == FieldParser::FIELD_SET && _isUpdatedAtSet == false) {
@@ -156,8 +156,7 @@ namespace mongo {
 
         // 'lastmodEpoch' was a transition format to 'epoch', up to 2.2
         OID lastmodEpoch;
-        fieldState = FieldParser::extract(source, DEPRECATED_lastmodEpoch,
-                                          OID(), &lastmodEpoch, errMsg);
+        fieldState = FieldParser::extract(source, DEPRECATED_lastmodEpoch, &lastmodEpoch, errMsg);
         if (fieldState == FieldParser::FIELD_INVALID) return false;
 
         if (fieldState == FieldParser::FIELD_SET && _isEpochSet == false) {
