@@ -54,7 +54,7 @@ namespace mongo {
     static const char* minMongoProcessVersion = "2.2";
 
     // Custom field used in upgrade state to determine if/where we failed on last upgrade
-    const BSONField<bool> inCriticalSectionField(string("inCriticalSection", false));
+    const BSONField<bool> inCriticalSectionField(string("inCriticalSection"), false);
 
     bool _cleanupUpgradeState(const ConnectionString& configLoc,
                               const OID& lastUpgradeId,
