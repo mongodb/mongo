@@ -57,6 +57,7 @@
 #include "mongo/db/stats/counters.h"
 #include "mongo/s/d_logic.h"
 #include "mongo/s/stale_exception.h" // for SendStaleConfigException
+#include "mongo/util/fail_point_service.h"
 #include "mongo/util/file_allocator.h"
 #include "mongo/util/goodies.h"
 #include "mongo/util/mongoutils/str.h"
@@ -86,6 +87,8 @@ namespace mongo {
 #ifdef _WIN32
     HANDLE lockFileHandle;
 #endif
+
+    MONGO_FP_DECLARE(rsStopGetMore);
 
     /*static*/ OpTime OpTime::_now() {
         OpTime result;
@@ -675,6 +678,10 @@ namespace mongo {
                 uassert(16543, status.reason(), status.isOK());
 
                 if (str::startsWith(ns, "local.oplog.")){
+                    while (MONGO_FAIL_POINT(rsStopGetMore)) {
+                        sleepmillis(0);
+                    }
+
                     if (pass == 0) {
                         mutex::scoped_lock lk(OpTime::m);
                         last = OpTime::getLast(lk);
