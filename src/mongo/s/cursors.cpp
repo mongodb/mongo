@@ -293,7 +293,8 @@ namespace mongo {
 
                 MapSharded::iterator i = _cursors.find( id );
                 if ( i != _cursors.end() ) {
-                    if (authManager->checkAuthorization(i->second->getNS(), ActionType::find)) {
+                    if (authManager->checkAuthorization(i->second->getNS(),
+                                                        ActionType::killCursors)) {
                         _cursors.erase( i );
                     }
                     continue;
@@ -306,7 +307,7 @@ namespace mongo {
                     continue;
                 }
                 verify(refsNSIt != _refsNS.end());
-                if (!authManager->checkAuthorization(refsNSIt->second, ActionType::find)) {
+                if (!authManager->checkAuthorization(refsNSIt->second, ActionType::killCursors)) {
                     continue;
                 }
                 server = refsIt->second;

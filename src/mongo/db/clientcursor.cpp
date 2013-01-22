@@ -873,7 +873,8 @@ namespace mongo {
             return false;
         }
 
-        if (!cc().getAuthorizationManager()->checkAuthorization(cursor->ns(), ActionType::find)) {
+        if (!cc().getAuthorizationManager()->checkAuthorization(cursor->ns(),
+                                                                ActionType::killCursors)) {
             return false;
         }
 

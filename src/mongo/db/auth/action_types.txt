@@ -44,6 +44,7 @@
 "indexStats",
 "inprog",
 "insert",
+"killCursors",
 "killop",
 "listDatabases",
 "listShards",
