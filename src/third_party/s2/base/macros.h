@@ -10,6 +10,8 @@
 #ifndef BASE_MACROS_H_
 #define BASE_MACROS_H_
 
+#include "base/definer.h"   // For OS_WINDOWS
+
 #include <stddef.h>         // For size_t
 
 // We use our own  local  version of type traits while we're waiting
