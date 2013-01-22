@@ -124,9 +124,8 @@ __wt_row_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 	btree = session->btree;
 	rip = NULL;
 
-	cmp = -1;				/* Assume we don't match. */
-
 	/* Search the internal pages of the tree. */
+	cmp = -1;
 	item = &_item;
 	for (depth = 2,
 	    page = btree->root_page; page->type == WT_PAGE_ROW_INT; ++depth) {
@@ -195,7 +194,11 @@ __wt_row_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 		WT_ORDERED_READ(cbt->write_gen, page->modify->write_gen);
 	}
 
-	/* Do a binary search of the leaf page. */
+	/*
+	 * Do a binary search of the leaf page; the page might be empty, reset
+	 * the comparison value.
+	 */
+	cmp = -1;
 	for (base = 0, limit = page->entries; limit != 0; limit >>= 1) {
 		indx = base + (limit >> 1);
 		rip = page->u.row.d + indx;
