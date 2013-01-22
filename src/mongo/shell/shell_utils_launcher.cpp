@@ -720,7 +720,8 @@ namespace mongo {
 
         /** stopMongoProgram(port[, signal]) */
         BSONObj StopMongoProgram( const BSONObj &a, void* data ) {
-            verify( a.nFields() >= 1 || a.nFields() <= 3 );
+            int nFields = a.nFields();
+            verify( nFields >= 1 && nFields <= 3 );
             uassert( 15853 , "stopMongo needs a number" , a.firstElement().isNumber() );
             int port = int( a.firstElement().number() );
             int code = killDb( port, 0, getSignal( a ), getStopMongodOpts( a ));
