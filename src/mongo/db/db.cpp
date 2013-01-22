@@ -79,7 +79,8 @@ namespace mongo {
     extern int lockFile;
     extern string repairpath;
 
-    void setupSignals( bool inFork );
+    static void setupSignalHandlers();
+    static void startInterruptThread();
     void startReplication();
     void exitCleanly( ExitCode code );
 
@@ -1265,8 +1266,7 @@ static int mongoDbMain(int argc, char* argv[], char **envp) {
 
     getcurns = ourgetns;
 
-    setupCoreSignals();
-    setupSignals( false );
+    setupSignalHandlers();
 
     dbExecCommand = argv[0];
 
@@ -1291,6 +1291,10 @@ static int mongoDbMain(int argc, char* argv[], char **envp) {
 
     if (!initializeServerGlobalState())
         ::_exit(EXIT_FAILURE);
+
+    // Per SERVER-7434, startInterruptThread() must run after any forks
+    // (initializeServerGlobalState()) and before creation of any other threads.
+    startInterruptThread();
 
     dataFileSync.go();
 
@@ -1386,7 +1390,9 @@ namespace mongo {
 
     void setupSignals_ignoreHelper( int signal ) {}
 
-    void setupSignals( bool inFork ) {
+    void setupSignalHandlers() {
+        setupCoreSignals();
+
         struct sigaction addrSignals;
         memset( &addrSignals, 0, sizeof( struct sigaction ) );
         addrSignals.sa_sigaction = abruptQuitWithAddrSignal;
@@ -1404,20 +1410,20 @@ namespace mongo {
 
         setupSIGTRAPforGDB();
 
+        // asyncSignals is a global variable listing the signals that should be handled by the
+        // interrupt thread, once it is started via startInterruptThread().
         sigemptyset( &asyncSignals );
-
-        if ( inFork )
-            verify( signal( SIGHUP , setupSignals_ignoreHelper ) != SIG_ERR );
-        else
-            sigaddset( &asyncSignals, SIGHUP );
-
+        sigaddset( &asyncSignals, SIGHUP );
         sigaddset( &asyncSignals, SIGINT );
         sigaddset( &asyncSignals, SIGTERM );
-        verify( pthread_sigmask( SIG_SETMASK, &asyncSignals, 0 ) == 0 );
-        boost::thread it( interruptThread );
 
         set_terminate( myterminate );
         set_new_handler( my_new_handler );
+    }
+
+    void startInterruptThread() {
+        verify( pthread_sigmask( SIG_SETMASK, &asyncSignals, 0 ) == 0 );
+        boost::thread it( interruptThread );
     }
 
 #else   // WIN32
@@ -1483,7 +1489,7 @@ namespace mongo {
         mongoAbort("pure virtual");
     }
 
-    void setupSignals( bool inFork ) {
+    void setupSignalHandlers() {
         reportEventToSystem = reportEventToSystemImpl;
         setWindowsUnhandledExceptionFilter();
         massert(10297,
@@ -1491,6 +1497,8 @@ namespace mongo {
                 SetConsoleCtrlHandler(static_cast<PHANDLER_ROUTINE>(CtrlHandler), TRUE));
         _set_purecall_handler( myPurecallHandler );
     }
+
+    void startInterruptThread() {}
 
 #endif  // if !defined(_WIN32)
 

@@ -36,8 +36,6 @@ namespace fs = boost::filesystem;
 
 namespace mongo {
 
-    void setupSignals( bool inFork );
-
 #ifndef _WIN32
     // support for exit value propagation with fork
     void launchSignal( int sig ) {
@@ -158,9 +156,6 @@ namespace mongo {
                 cout << "Cant reassign stdin while forking server process: " << strerror(errno) << endl;
                 return false;
             }
-
-            setupCoreSignals();
-            setupSignals( true );
         }
 
         if (cmdLine.logWithSyslog) {

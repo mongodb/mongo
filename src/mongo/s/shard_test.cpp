@@ -28,8 +28,6 @@ namespace mongo {
         return false;
     }
 
-    void setupSignals(bool inFork) {}
-
     DBClientBase *createDirectClient() { return NULL; }
 
     void dbexit(ExitCode rc, const char *why){

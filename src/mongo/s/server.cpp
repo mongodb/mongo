@@ -157,7 +157,10 @@ namespace mongo {
         ::_exit(EXIT_ABRUPT);
     }
 
-    void setupSignals( bool inFork ) {
+    void setupSignalHandlers() {
+        setupSIGTRAPforGDB();
+        setupCoreSignals();
+
         signal(SIGTERM, sighandler);
         signal(SIGINT, sighandler);
 
@@ -180,9 +183,7 @@ namespace mongo {
 
     void init() {
         serverID.init();
-        setupSIGTRAPforGDB();
-        setupCoreSignals();
-        setupSignals( false );
+        setupSignalHandlers();
         Logstream::get().addGlobalTee( new RamLog("global") );
     }
 
