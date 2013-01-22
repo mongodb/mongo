@@ -18,7 +18,7 @@
 
 #include "mongo/util/touch_pages.h"
 
-#include <boost/scoped_ptr.h>
+#include <boost/scoped_ptr.hpp>
 #include <fcntl.h>
 #include <list>
 #include <string>
