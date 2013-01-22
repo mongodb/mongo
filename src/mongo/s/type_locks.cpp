@@ -93,7 +93,7 @@ namespace mongo {
         return builder.obj();
     }
 
-    bool LocksType::parseBSON(BSONObj source, string* errMsg) {
+    bool LocksType::parseBSON(const BSONObj& source, string* errMsg) {
         clear();
 
         std::string dummy;

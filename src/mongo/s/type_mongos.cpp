@@ -86,7 +86,7 @@ namespace mongo {
         return builder.obj();
     }
 
-    bool MongosType::parseBSON(BSONObj source, string* errMsg) {
+    bool MongosType::parseBSON(const BSONObj& source, string* errMsg) {
         clear();
 
         std::string dummy;

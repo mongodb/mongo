@@ -99,7 +99,7 @@ namespace mongo {
         return builder.obj();
     }
 
-    bool TagsType::parseBSON(BSONObj source, string* errMsg) {
+    bool TagsType::parseBSON(const BSONObj& source, string* errMsg) {
         clear();
 
         std::string dummy;

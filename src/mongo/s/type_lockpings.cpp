@@ -62,7 +62,7 @@ namespace mongo {
         return builder.obj();
     }
 
-    bool LockpingsType::parseBSON(BSONObj source, string* errMsg) {
+    bool LockpingsType::parseBSON(const BSONObj& source, string* errMsg) {
         clear();
 
         std::string dummy;

@@ -92,7 +92,7 @@ namespace mongo {
         return builder.obj();
     }
 
-    bool ChangelogType::parseBSON(BSONObj source, string* errMsg) {
+    bool ChangelogType::parseBSON(const BSONObj& source, string* errMsg) {
         clear();
 
         std::string dummy;

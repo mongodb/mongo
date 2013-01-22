@@ -123,7 +123,7 @@ namespace mongo {
         return builder.obj();
     }
 
-    bool ChunkType::parseBSON(BSONObj source, string* errMsg) {
+    bool ChunkType::parseBSON(const BSONObj& source, string* errMsg) {
         clear();
 
         std::string dummy;
