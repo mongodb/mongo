@@ -1,3 +1,6 @@
+// Verify that odd polygons (huge or "narrow") behave as we expect.
+// Note that since 2dsphere is spherical, polygons that seem narrow are actually
+// rather wide if their latitude (or longitude) range is large.
 var t = db.geo_s2oddshapes
 t.drop()
 t.ensureIndex( { geo : "2dsphere" } );

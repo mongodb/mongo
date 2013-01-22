@@ -1,4 +1,5 @@
-t = db.geo_s2index
+// Queries on exact geometry should return the exact geometry.
+t = db.geo_s2exact
 t.drop()
 
 function test(geometry) {

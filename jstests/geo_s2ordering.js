@@ -1,5 +1,7 @@
 // This tests that 2dsphere indices can be ordered arbitrarily, and that the ordering
-// actually matters for lookup speed.
+// actually matters for lookup speed.  That is, if we're looking for a non-geo key of which
+// there are not many, the index order (nongeo, geo) should be faster than (geo, nongeo)
+// for 2dsphere.
 t = db.geo_s2ordering
 t.drop();
 

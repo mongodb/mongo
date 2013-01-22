@@ -1,4 +1,5 @@
-// Make sure that the 2dsphere index can deal with non-GeoJSON data.
+// Make sure that the 2dsphere index can deal with non-GeoJSON points.
+// 2dsphere does not accept legacy shapes, only legacy points.
 t = db.geo_s2indexoldformat
 t.drop()
 
