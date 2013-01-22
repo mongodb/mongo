@@ -8,8 +8,8 @@
 #include "wt_internal.h"
 
 static void __evict_dirty_validate(WT_CONNECTION_IMPL *);
-static int  __evict_file_request_walk(WT_SESSION_IMPL *);
 static int  __evict_file(WT_SESSION_IMPL *, int);
+static int  __evict_file_request_walk(WT_SESSION_IMPL *);
 static int  __evict_init_candidate(
     WT_SESSION_IMPL *, WT_EVICT_ENTRY *, WT_PAGE *);
 static int  __evict_lru(WT_SESSION_IMPL *, int);
@@ -772,6 +772,7 @@ static int
 __evict_lru(WT_SESSION_IMPL *session, int clean)
 {
 	WT_CACHE *cache;
+	WT_DECL_RET;
 	uint64_t cutoff;
 	uint32_t i, candidates;
 
@@ -814,11 +815,13 @@ __evict_lru(WT_SESSION_IMPL *session, int clean)
 	cache->evict_current = cache->evict;
 	__wt_spin_unlock(session, &cache->evict_lock);
 
-	/* Reconcile and discard some pages. */
-	while (__wt_evict_lru_page(session, 0) == 0)
+	/*
+	 * Reconcile and discard some pages: EBUSY is returned if a page fails
+	 * eviction because it's unavailable, continue in that case.
+	 */
+	while ((ret = __wt_evict_lru_page(session, 0)) == 0 || ret == EBUSY)
 		;
-
-	return (0);
+	return (ret == WT_NOTFOUND ? 0 : ret);
 }
 
 /*
