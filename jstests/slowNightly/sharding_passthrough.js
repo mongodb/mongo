@@ -72,7 +72,7 @@ files.forEach(
 	    return;
 	}
 	// These aren't supposed to get run under sharding:
-	if (/[\/\\](dbadmin|error1|fsync|fsync2|geo.*|indexh|remove5|update4|loglong|logpath|notablescan|compact.*|check_shard_index|bench_test.*|mr_replaceIntoDB|mr_auth|queryoptimizera|indexStatsCommand|reversecursor|connections_opened)\.js$/.test(x.name)) {
+	if (/[\/\\](dbadmin|error1|fsync|fsync2|geo.*|indexh|remove5|update4|loglong|logpath|notablescan|compact.*|check_shard_index|bench_test.*|mr_replaceIntoDB|mr_auth|queryoptimizera|indexStatsCommand|reversecursor)\.js$/.test(x.name)) {
 	    print(" >>>>>>>>>>>>>>> skipping test that would correctly fail under sharding " + x.name)	    
 	    return;
 	}

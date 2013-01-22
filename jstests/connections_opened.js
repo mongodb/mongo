@@ -16,6 +16,20 @@ function createTemporaryConnection() {
     return startParallelShell(pollString);
 }
 
+function waitForConnections(expectedCurrentConnections, expectedTotalConnections) {
+    assert.soon(function() {
+                    currentConnInfo = db.serverStatus().connections;
+                    return (expectedCurrentConnections == currentConnInfo.current) &&
+                        (expectedTotalConnections, currentConnInfo.totalCreated);
+                },
+                {toString: function() {
+                     return "Incorrect connection numbers. Expected " + expectedCurrentConnections +
+                         " current connections and " + expectedTotalConnections + " total" +
+                         " connections. Connection info from serverStatus: " +
+                         tojson(db.serverStatus().connections); } });
+
+}
+
 
 var originalConnInfo = db.serverStatus().connections;
 assert.gt(originalConnInfo.current, 0);
@@ -28,8 +42,7 @@ for (var i = 0; i < 100; i++) {
 
 jsTestLog("Testing that persistent connections increased the current and totalCreated counters");
 var currentConnInfo = db.serverStatus().connections;
-assert.eq(originalConnInfo.current + 100, currentConnInfo.current);
-assert.eq(originalConnInfo.totalCreated + 100, currentConnInfo.totalCreated);
+waitForConnections(originalConnInfo.current + 100, originalConnInfo.totalCreated + 100);
 
 jsTestLog("Creating temporary connections");
 db.getSiblingDB(testDB).dropDatabase();
@@ -41,14 +54,7 @@ for (var i = 0; i < 100; i++) {
 }
 
 jsTestLog("Testing that temporary connections increased the current and totalCreated counters");
-assert.soon(function() {
-                currentConnInfo = db.serverStatus().connections;
-                return (originalConnInfo.current + 200 == currentConnInfo.current) &&
-                    (originalConnInfo.totalCreated + 200, currentConnInfo.totalCreated);
-            },
-           {toString: function() {
-                return "Temp connections didn't increase connection counters."
-                       + " serverStatus.connections: " + tojson(db.serverStatus().connections); } });
+waitForConnections(originalConnInfo.current + 200, originalConnInfo.totalCreated + 200);
 
 jsTestLog("Waiting for all temporary connections to be closed");
 // Notify waiting parallel shells to terminate, causing the connection count to go back down.
