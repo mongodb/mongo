@@ -278,6 +278,16 @@ namespace mongo {
         void unregisterOpId();
 
         /**
+        * Creates a new instance of the MinKey object
+        */
+        v8::Local<v8::Object> newMinKeyInstance();
+
+        /**
+         * Creates a new instance of the MaxKey object
+         */
+        v8::Local<v8::Object> newMaxKeyInstance();
+
+        /**
          * Create a new function; primarily used for BSON/V8 conversion.
          */
         v8::Local<v8::Value> newFunction(const char *code);

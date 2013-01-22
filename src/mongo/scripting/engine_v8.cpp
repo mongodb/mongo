@@ -1140,8 +1140,8 @@ namespace mongo {
         b.appendMinKey("");
         BSONObj o = b.obj();
         BSONObjIterator i(o);
-        _global->ForceSet(v8StringData("MaxKey"), mongoToV8Element(i.next()));
-        _global->ForceSet(v8StringData("MinKey"), mongoToV8Element(i.next()));
+        _global->ForceSet(v8StringData("MaxKey"), mongoToV8Element(i.next()), v8::ReadOnly);
+        _global->ForceSet(v8StringData("MinKey"), mongoToV8Element(i.next()), v8::ReadOnly);
         _global->Get(v8StringData("Object"))->ToObject()->ForceSet(
                             v8StringData("bsonsize"),
                             createV8Function(bsonsize)->GetFunction());
@@ -1338,19 +1338,11 @@ namespace mongo {
                 break;
             }
             case mongo::MinKey: {
-                v8::Local<v8::Object> sub = readOnly ? readOnlyObjects->NewInstance() :
-                                                       internalFieldObjects->NewInstance();
-                sub->ForceSet(v8::String::New("$MinKey"), v8::Boolean::New(true));
-                sub->SetInternalField(0, v8::Uint32::New(f.type()));
-                o->ForceSet(name, sub);
+                o->ForceSet(name, newMinKeyInstance());
                 break;
             }
             case mongo::MaxKey: {
-                v8::Local<v8::Object> sub = readOnly ? readOnlyObjects->NewInstance() :
-                                                       internalFieldObjects->NewInstance();
-                sub->ForceSet(v8::String::New("$MaxKey"), v8::Boolean::New(true));
-                sub->SetInternalField(0, v8::Uint32::New(f.type()));
-                o->ForceSet(name, sub);
+                o->ForceSet(name, newMaxKeyInstance());
                 break;
             }
             case mongo::DBRef: {
@@ -1412,6 +1404,52 @@ namespace mongo {
 
         return wrapBSONObject(o, own);
 
+    }
+
+    v8::Handle<v8::Value> minKeyToJson(const v8::Arguments& args) {
+        return v8::String::New("{ \"$minKey\" : 1 }");
+    }
+
+    v8::Handle<v8::Value> minKeyToString(const v8::Arguments& args) {
+        return v8::String::New("[object MinKey]");
+    }
+
+    v8::Local<v8::Object> V8Scope::newMinKeyInstance() {
+        v8::Local<v8::ObjectTemplate> myTemplate = v8::Local<v8::ObjectTemplate>::New(
+                v8::ObjectTemplate::New());
+        myTemplate->SetInternalFieldCount(1);
+        myTemplate->SetCallAsFunctionHandler(minKeyToJson);
+
+        v8::Local<v8::Object> instance = myTemplate->NewInstance();
+        instance->ForceSet(v8::String::New("tojson"),
+                           v8::FunctionTemplate::New(minKeyToJson)->GetFunction(), v8::ReadOnly);
+        instance->ForceSet(v8::String::New("toString"),
+                           v8::FunctionTemplate::New(minKeyToJson)->GetFunction(), v8::ReadOnly);
+        instance->SetInternalField(0, v8::Uint32::New( mongo::MinKey ));
+        return instance;
+    }
+
+    v8::Handle<v8::Value> maxKeyToJson(const v8::Arguments& args) {
+        return v8::String::New("{ \"$maxKey\" : 1 }");
+    }
+
+    v8::Handle<v8::Value> maxKeyToString(const v8::Arguments& args) {
+        return v8::String::New("[object MaxKey]");
+    }
+
+    v8::Local<v8::Object> V8Scope::newMaxKeyInstance() {
+        v8::Local<v8::ObjectTemplate> myTemplate = v8::Local<v8::ObjectTemplate>::New(
+                v8::ObjectTemplate::New());
+        myTemplate->SetInternalFieldCount(1);
+        myTemplate->SetCallAsFunctionHandler(maxKeyToJson);
+
+        v8::Local<v8::Object> instance = myTemplate->NewInstance();
+        instance->ForceSet(v8::String::New("tojson"),
+                           v8::FunctionTemplate::New(maxKeyToJson)->GetFunction(), v8::ReadOnly);
+        instance->ForceSet(v8::String::New("toString"),
+                           v8::FunctionTemplate::New(maxKeyToJson)->GetFunction(), v8::ReadOnly);
+        instance->SetInternalField(0, v8::Uint32::New( mongo::MaxKey ));
+        return instance;
     }
 
     v8::Handle<v8::Value> V8Scope::mongoToV8Element(const BSONElement &elem, bool readOnly) {
@@ -1486,15 +1524,9 @@ namespace mongo {
                 return getNamedCons("NumberLong")->NewInstance(3, argv);
             }
         case mongo::MinKey:
-            instance = internalFieldObjects->NewInstance();
-            instance->ForceSet(v8::String::New("$MinKey"), v8::Boolean::New(true));
-            instance->SetInternalField(0, v8::Uint32::New(elem.type()));
-            return instance;
+            return newMinKeyInstance();
         case mongo::MaxKey:
-            instance = internalFieldObjects->NewInstance();
-            instance->ForceSet(v8::String::New("$MaxKey"), v8::Boolean::New(true));
-            instance->SetInternalField(0, v8::Uint32::New(elem.type()));
-            return instance;
+            return newMaxKeyInstance();
         case mongo::DBRef:
             argv[0] = v8StringData(elem.dbrefNS());
             argv[1] = newId(elem.dbrefOID());
