@@ -971,7 +971,7 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, int clean)
 		}
 
 		/*
-		 * Skip root pages and split-merge pages they can't be evicted.
+		 * Skip root pages and split-merge pages: they can't be evicted.
 		 * (Split-merge pages are always merged into their parents.)
 		 * Don't skip empty pages split pages: updates after their last
 		 * reconciliation may have changed their state and only the
