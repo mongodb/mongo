@@ -46,7 +46,7 @@ namespace mongo {
         strings = ::backtrace_symbols( b, size );
         if (strings == NULL) {
             const int err = errno;
-            os << "Unable to collect backtrace symbols (" << errnoWithDescription(err) << ")"
+            log() << "Unable to collect backtrace symbols (" << errnoWithDescription(err) << ")"
                << std::endl;
             return;
         }
