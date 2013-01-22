@@ -414,6 +414,10 @@ __rec_review(WT_SESSION_IMPL *session,
 				__wt_txn_read_first(session);
 			}
 
+			/* 
+			 * We may be able to discard any "update" memory the
+			 * page no longer needs.
+			 */
 			switch (page->type) {
 			case WT_PAGE_COL_FIX:
 			case WT_PAGE_COL_VAR:
