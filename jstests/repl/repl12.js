@@ -39,9 +39,15 @@ function countHave(){
 
 assert.soon( 
     function() { 
-        var c = countHave();
-        debug( "count: " + c ); 
-        return c == 3; } 
+        try {
+            var c = countHave();
+            debug( "count: " + c );
+            return c == 3;
+        } catch (e) {
+            printjson(e);
+            return false;
+        }
+    }
 );
 
 //printjson(s.getDBNames());
