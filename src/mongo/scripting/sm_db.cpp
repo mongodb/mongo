@@ -33,6 +33,12 @@ namespace mongo {
 
     bool haveLocalShardingInfo( const string& ns );
 
+    // Generated symbols for JS files
+    namespace JSFiles {
+        extern const JSFile types;
+        extern const JSFile assert;
+    }
+
 namespace spidermonkey {
 
     JSFunctionSpec bson_functions[] = {
@@ -1649,6 +1655,9 @@ zzz
         static const char *dbrefName = "DBRef";
         dbref_class.name = dbrefName;
         verify( JS_InitClass( cx , global , 0 , &dbref_class , dbref_constructor , 2 , 0 , bson_functions , 0 , 0 ) );
+
+        scope->execSetup(JSFiles::assert);
+        scope->execSetup(JSFiles::types);
 
         scope->execCoreFiles();
     }
