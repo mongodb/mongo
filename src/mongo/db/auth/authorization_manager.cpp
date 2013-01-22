@@ -158,11 +158,6 @@ namespace {
         serverAdminRoleReadActions.addAction(ActionType::hostInfo);
         serverAdminRoleReadActions.addAction(ActionType::listDatabases);
         serverAdminRoleReadActions.addAction(ActionType::logRotate);
-        serverAdminRoleReadActions.addAction(ActionType::replSetFreeze);
-        serverAdminRoleReadActions.addAction(ActionType::replSetGetStatus);
-        serverAdminRoleReadActions.addAction(ActionType::replSetMaintenance);
-        serverAdminRoleReadActions.addAction(ActionType::replSetStepDown);
-        serverAdminRoleReadActions.addAction(ActionType::replSetSyncFrom);
         serverAdminRoleReadActions.addAction(ActionType::setParameter);
         serverAdminRoleReadActions.addAction(ActionType::serverStatus);
         serverAdminRoleReadActions.addAction(ActionType::shutdown);
@@ -179,9 +174,6 @@ namespace {
         serverAdminRoleWriteActions.addAction(ActionType::inprog);
         serverAdminRoleWriteActions.addAction(ActionType::killop);
         serverAdminRoleWriteActions.addAction(ActionType::repairDatabase);
-        serverAdminRoleWriteActions.addAction(ActionType::replSetInitiate);
-        serverAdminRoleWriteActions.addAction(ActionType::replSetReconfig);
-        serverAdminRoleWriteActions.addAction(ActionType::resync);
 
         serverAdminRoleActions.addAllActionsFromSet(serverAdminRoleReadActions);
         serverAdminRoleActions.addAllActionsFromSet(serverAdminRoleWriteActions);
@@ -191,6 +183,11 @@ namespace {
         clusterAdminRoleReadActions.addAction(ActionType::getShardVersion);
         clusterAdminRoleReadActions.addAction(ActionType::listShards);
         clusterAdminRoleReadActions.addAction(ActionType::netstat);
+        clusterAdminRoleReadActions.addAction(ActionType::replSetFreeze);
+        clusterAdminRoleReadActions.addAction(ActionType::replSetGetStatus);
+        clusterAdminRoleReadActions.addAction(ActionType::replSetMaintenance);
+        clusterAdminRoleReadActions.addAction(ActionType::replSetStepDown);
+        clusterAdminRoleReadActions.addAction(ActionType::replSetSyncFrom);
         clusterAdminRoleReadActions.addAction(ActionType::setShardVersion); // TODO: should this be internal?
         clusterAdminRoleReadActions.addAction(ActionType::splitVector);
         clusterAdminRoleReadActions.addAction(ActionType::unsetSharding);
@@ -202,6 +199,9 @@ namespace {
         clusterAdminRoleWriteActions.addAction(ActionType::moveChunk);
         clusterAdminRoleWriteActions.addAction(ActionType::movePrimary);
         clusterAdminRoleWriteActions.addAction(ActionType::removeShard);
+        clusterAdminRoleWriteActions.addAction(ActionType::replSetInitiate);
+        clusterAdminRoleWriteActions.addAction(ActionType::replSetReconfig);
+        clusterAdminRoleWriteActions.addAction(ActionType::resync);
         clusterAdminRoleWriteActions.addAction(ActionType::shardCollection);
         clusterAdminRoleWriteActions.addAction(ActionType::shardingState);
         clusterAdminRoleWriteActions.addAction(ActionType::split);
