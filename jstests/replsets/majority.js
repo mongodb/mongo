@@ -46,6 +46,8 @@ var result = testInsert();
 assert.eq(result.err, null);
 // majority should be primary + 2 secondaries
 assert.eq(result.replicatedTo.length, 2);
+assert.contains(config.members[1], result);
+assert.contains(config.members[2], result);
 
 print("start up some of the arbiters again");
 replTest.restart(3);
@@ -77,6 +79,8 @@ print("makes sure majority works");
 result = testInsert();
 assert.eq(result.err, null);
 assert.eq(result.replicatedTo.length, 2);
+assert.contains(config.members[1], result);
+assert.contains(config.members[2], result);
 
 print("setup: 0,1 | 2,3,4");
 replTest.partition(0,2);
@@ -92,6 +96,7 @@ master = replTest.getMaster();
 result = testInsert();
 assert.eq(result.err, "timeout");
 assert.eq(result.replicatedTo.length, 1);
+assert.contains(config.members[1], result);
 
 print("bring set back together");
 replTest.unPartition(0,2);
@@ -104,6 +109,8 @@ print("make sure majority works");
 result = testInsert();
 assert.eq(result.err, null);
 assert.eq(result.replicatedTo.length, 2);
+assert.contains(config.members[1], result);
+assert.contains(config.members[2], result);
 
 replTest.stopSet();
 }

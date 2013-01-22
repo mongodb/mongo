@@ -44,10 +44,10 @@ namespace mongo {
 
         struct Ident {
 
-            Ident(const BSONObj& r, const string& h, const string& n) {
+            Ident(const BSONObj& r, const BSONObj& config, const string& n) {
                 BSONObjBuilder b;
                 b.appendElements( r );
-                b.append( "host" , h );
+                b.append( "config" , config );
                 b.append( "ns" , n );
                 obj = b.obj();
             }
@@ -115,10 +115,10 @@ namespace mongo {
             _slaves.clear();
         }
 
-        void update( const BSONObj& rid , const string& host , const string& ns , OpTime last ) {
-            REPLDEBUG( host << " " << rid << " " << ns << " " << last );
+        void update( const BSONObj& rid , const BSONObj config , const string& ns , OpTime last ) {
+            REPLDEBUG( config << " " << rid << " " << ns << " " << last );
 
-            Ident ident(rid,host,ns);
+            Ident ident(rid, config, ns);
 
             scoped_lock mylk(_mutex);
 
@@ -206,14 +206,14 @@ namespace mongo {
             return numSlaves <= 0;
         }
 
-        std::vector<std::string> getSlavesAtOp(OpTime& op) {
-            std::vector<std::string> result;
+        std::vector<BSONObj> getSlavesAtOp(OpTime& op) {
+            std::vector<BSONObj> result;
 
             scoped_lock mylk(_mutex);
             for (map<Ident,OpTime>::iterator i = _slaves.begin(); i != _slaves.end(); i++) {
                 OpTime replicatedTo = i->second;
                 if (replicatedTo >= op) {
-                    result.push_back(i->first.obj["host"].String());
+                    result.push_back(i->first.obj["config"].Obj());
                 }
             }
 
@@ -251,7 +251,16 @@ namespace mongo {
         if ( rid.isEmpty() )
             return;
 
-        slaveTracking.update( rid , curop.getRemoteString( false ) , ns , lastOp );
+        BSONObj handshake = c->getHandshake();
+        if (handshake.hasField("config")) {
+            slaveTracking.update( rid , handshake["config"].Obj() , ns , lastOp );
+        }
+        else {
+            BSONObjBuilder bob;
+            bob.append("host", curop.getRemoteString());
+            bob.append("upgradeNeeded", true);
+            slaveTracking.update( rid , bob.done() , ns , lastOp );
+        }
 
         if (theReplSet && !theReplSet->isPrimary()) {
             // we don't know the slave's port, so we make the replica set keep
@@ -273,7 +282,7 @@ namespace mongo {
         return slaveTracking.waitForReplication( op, w, maxSecondsToWait );
     }
 
-    vector<string> getHostsReplicatedTo(OpTime& op) {
+    vector<BSONObj> getHostsReplicatedTo(OpTime& op) {
         return slaveTracking.getSlavesAtOp(op);
     }
 
