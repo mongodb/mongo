@@ -141,18 +141,6 @@ namespace {
         ASSERT(!privilegeSet.hasPrivilege(Privilege("test", ActionType::find)));
     }
 
-    TEST_F(PrivilegeDocumentParsing, VerifyCannotGrantServerAdminRoleFromNonAdminDatabase) {
-        ASSERT_NOT_OK(AuthorizationManager::buildPrivilegeSet(
-                              "test",
-                              user,
-                              BSON("user" << "spencer" << "pwd" << "" <<
-                                   "roles" << BSON_ARRAY("read" << "serverAdmin")),
-                              &privilegeSet));
-        ASSERT(!privilegeSet.hasPrivilege(Privilege("test", ActionType::find)));
-        ASSERT(!privilegeSet.hasPrivilege(Privilege("test", ActionType::shutdown)));
-        ASSERT(!privilegeSet.hasPrivilege(Privilege("test", ActionType::dropDatabase)));
-    }
-
     TEST_F(PrivilegeDocumentParsing, VerifyCannotGrantClusterAdminRoleFromNonAdminDatabase) {
         ASSERT_NOT_OK(AuthorizationManager::buildPrivilegeSet(
                               "test",
@@ -346,13 +334,13 @@ namespace {
         ASSERT(!privilegeSet.hasPrivilege(Privilege("admin", ActionType::insert)));
     }
 
-    TEST_F(PrivilegeDocumentParsing, GrantClusterAndServerAdmin) {
-        // Grant cluster and server admin
+    TEST_F(PrivilegeDocumentParsing, GrantClusterAdmin) {
+        // Grant cluster admin
         ASSERT_OK(AuthorizationManager::buildPrivilegeSet(
                           "admin",
                           user,
                           BSON("user" << "spencer" << "pwd" << "" <<
-                               "roles" << BSON_ARRAY("clusterAdmin" << "serverAdmin")),
+                               "roles" << BSON_ARRAY("clusterAdmin")),
                           &privilegeSet));
         ASSERT(privilegeSet.hasPrivilege(Privilege("test", ActionType::dropDatabase)));
         ASSERT(privilegeSet.hasPrivilege(Privilege("test2", ActionType::dropDatabase)));
@@ -555,7 +543,7 @@ namespace {
         state->addPrivilegeDocument("admin", PrincipalName("andy", "test"),
                                     BSON("user" << "andy" <<
                                          "userSource" << "test" <<
-                                         "roles" << BSON_ARRAY("serverAdmin") <<
+                                         "roles" << BSON_ARRAY("clusterAdmin") <<
                                          "otherDBRoles" << BSON("test3" << BSON_ARRAY("dbAdmin"))));
 
         ASSERT(!authman->checkAuthorization("test.foo", ActionType::find));

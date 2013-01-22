@@ -65,7 +65,6 @@ namespace {
     const std::string SYSTEM_ROLE_READ_WRITE = "readWrite";
     const std::string SYSTEM_ROLE_USER_ADMIN = "userAdmin";
     const std::string SYSTEM_ROLE_DB_ADMIN = "dbAdmin";
-    const std::string SYSTEM_ROLE_SERVER_ADMIN = "serverAdmin";
     const std::string SYSTEM_ROLE_CLUSTER_ADMIN = "clusterAdmin";
     const std::string SYSTEM_ROLE_READ_ANY_DB = "readAnyDB";
     const std::string SYSTEM_ROLE_READ_WRITE_ANY_DB = "readWriteAnyDatabase";
@@ -80,7 +79,6 @@ namespace {
     ActionSet readWriteRoleActions;
     ActionSet userAdminRoleActions;
     ActionSet dbAdminRoleActions;
-    ActionSet serverAdminRoleActions;
     ActionSet clusterAdminRoleActions;
     // Can only be performed by internal connections.  Nothing ever explicitly grants these actions,
     // but they're included when calling addAllActions on an ActionSet, which is how internal
@@ -140,65 +138,56 @@ namespace {
         dbAdminRoleActions.addAction(ActionType::storageDetails);
         dbAdminRoleActions.addAction(ActionType::validate);
 
-        // We separate serverAdmin and clusterAdmin read-only and read-write action for backwards
+        // We separate clusterAdmin read-only and read-write actions for backwards
         // compatibility with old-style read-only admin users.  This separation is not exposed to
         // the user, and could go away once we stop supporting old-style privilege documents.
-        ActionSet serverAdminRoleReadActions;
-        ActionSet serverAdminRoleWriteActions;
         ActionSet clusterAdminRoleReadActions;
         ActionSet clusterAdminRoleWriteActions;
 
-        // Server admin role
-        serverAdminRoleReadActions.addAction(ActionType::connPoolStats);
-        serverAdminRoleReadActions.addAction(ActionType::connPoolSync);
-        serverAdminRoleReadActions.addAction(ActionType::getCmdLineOpts);
-        serverAdminRoleReadActions.addAction(ActionType::getLog);
-        serverAdminRoleReadActions.addAction(ActionType::getParameter);
-        serverAdminRoleReadActions.addAction(ActionType::getShardMap);
-        serverAdminRoleReadActions.addAction(ActionType::hostInfo);
-        serverAdminRoleReadActions.addAction(ActionType::listDatabases);
-        serverAdminRoleReadActions.addAction(ActionType::logRotate);
-        serverAdminRoleReadActions.addAction(ActionType::setParameter);
-        serverAdminRoleReadActions.addAction(ActionType::serverStatus);
-        serverAdminRoleReadActions.addAction(ActionType::shutdown);
-        serverAdminRoleReadActions.addAction(ActionType::top);
-        serverAdminRoleReadActions.addAction(ActionType::touch);
-        serverAdminRoleReadActions.addAction(ActionType::unlock);
-
-        serverAdminRoleWriteActions.addAction(ActionType::applyOps);
-        serverAdminRoleWriteActions.addAction(ActionType::closeAllDatabases);
-        serverAdminRoleWriteActions.addAction(ActionType::cpuProfiler);
-        serverAdminRoleWriteActions.addAction(ActionType::cursorInfo);
-        serverAdminRoleWriteActions.addAction(ActionType::diagLogging);
-        serverAdminRoleWriteActions.addAction(ActionType::fsync);
-        serverAdminRoleWriteActions.addAction(ActionType::inprog);
-        serverAdminRoleWriteActions.addAction(ActionType::killop);
-        serverAdminRoleWriteActions.addAction(ActionType::repairDatabase);
-
-        serverAdminRoleActions.addAllActionsFromSet(serverAdminRoleReadActions);
-        serverAdminRoleActions.addAllActionsFromSet(serverAdminRoleWriteActions);
-        serverAdminRoleActions.addAction(ActionType::killCursors);
-
         // Cluster admin role
+        clusterAdminRoleReadActions.addAction(ActionType::connPoolStats);
+        clusterAdminRoleReadActions.addAction(ActionType::connPoolSync);
+        clusterAdminRoleReadActions.addAction(ActionType::getCmdLineOpts);
+        clusterAdminRoleReadActions.addAction(ActionType::getLog);
+        clusterAdminRoleReadActions.addAction(ActionType::getParameter);
+        clusterAdminRoleReadActions.addAction(ActionType::getShardMap);
         clusterAdminRoleReadActions.addAction(ActionType::getShardVersion);
+        clusterAdminRoleReadActions.addAction(ActionType::hostInfo);
+        clusterAdminRoleReadActions.addAction(ActionType::listDatabases);
         clusterAdminRoleReadActions.addAction(ActionType::listShards);
+        clusterAdminRoleReadActions.addAction(ActionType::logRotate);
         clusterAdminRoleReadActions.addAction(ActionType::netstat);
         clusterAdminRoleReadActions.addAction(ActionType::replSetFreeze);
         clusterAdminRoleReadActions.addAction(ActionType::replSetGetStatus);
         clusterAdminRoleReadActions.addAction(ActionType::replSetMaintenance);
         clusterAdminRoleReadActions.addAction(ActionType::replSetStepDown);
         clusterAdminRoleReadActions.addAction(ActionType::replSetSyncFrom);
+        clusterAdminRoleReadActions.addAction(ActionType::setParameter);
         clusterAdminRoleReadActions.addAction(ActionType::setShardVersion); // TODO: should this be internal?
+        clusterAdminRoleReadActions.addAction(ActionType::serverStatus);
         clusterAdminRoleReadActions.addAction(ActionType::splitVector);
+        clusterAdminRoleReadActions.addAction(ActionType::shutdown);
+        clusterAdminRoleReadActions.addAction(ActionType::top);
+        clusterAdminRoleReadActions.addAction(ActionType::touch);
+        clusterAdminRoleReadActions.addAction(ActionType::unlock);
         clusterAdminRoleReadActions.addAction(ActionType::unsetSharding);
 
         clusterAdminRoleWriteActions.addAction(ActionType::addShard);
+        clusterAdminRoleWriteActions.addAction(ActionType::applyOps);
+        clusterAdminRoleWriteActions.addAction(ActionType::closeAllDatabases);
+        clusterAdminRoleWriteActions.addAction(ActionType::cpuProfiler);
+        clusterAdminRoleWriteActions.addAction(ActionType::cursorInfo);
+        clusterAdminRoleWriteActions.addAction(ActionType::diagLogging);
         clusterAdminRoleWriteActions.addAction(ActionType::dropDatabase); // TODO: Should there be a CREATE_DATABASE also?
         clusterAdminRoleWriteActions.addAction(ActionType::enableSharding);
         clusterAdminRoleWriteActions.addAction(ActionType::flushRouterConfig);
+        clusterAdminRoleWriteActions.addAction(ActionType::fsync);
+        clusterAdminRoleWriteActions.addAction(ActionType::inprog);
+        clusterAdminRoleWriteActions.addAction(ActionType::killop);
         clusterAdminRoleWriteActions.addAction(ActionType::moveChunk);
         clusterAdminRoleWriteActions.addAction(ActionType::movePrimary);
         clusterAdminRoleWriteActions.addAction(ActionType::removeShard);
+        clusterAdminRoleWriteActions.addAction(ActionType::repairDatabase);
         clusterAdminRoleWriteActions.addAction(ActionType::replSetInitiate);
         clusterAdminRoleWriteActions.addAction(ActionType::replSetReconfig);
         clusterAdminRoleWriteActions.addAction(ActionType::resync);
@@ -209,6 +198,7 @@ namespace {
 
         clusterAdminRoleActions.addAllActionsFromSet(clusterAdminRoleReadActions);
         clusterAdminRoleActions.addAllActionsFromSet(clusterAdminRoleWriteActions);
+        clusterAdminRoleActions.addAction(ActionType::killCursors);
 
         // Old-style user actions, for backwards compatibility
         compatibilityReadOnlyActions.addAllActionsFromSet(readRoleActions);
@@ -222,12 +212,10 @@ namespace {
         compatibilityReadWriteActions.addAction(ActionType::repairDatabase);
 
         compatibilityReadOnlyAdminActions.addAllActionsFromSet(compatibilityReadOnlyActions);
-        compatibilityReadOnlyAdminActions.addAllActionsFromSet(serverAdminRoleReadActions);
         compatibilityReadOnlyAdminActions.addAllActionsFromSet(clusterAdminRoleReadActions);
 
         compatibilityReadWriteAdminActions.addAllActionsFromSet(compatibilityReadWriteActions);
         compatibilityReadWriteAdminActions.addAllActionsFromSet(compatibilityReadOnlyAdminActions);
-        compatibilityReadWriteAdminActions.addAllActionsFromSet(serverAdminRoleWriteActions);
         compatibilityReadWriteAdminActions.addAllActionsFromSet(clusterAdminRoleWriteActions);
 
         // Internal commands
@@ -389,7 +377,6 @@ namespace {
         allActions.addAllActionsFromSet(readWriteRoleActions);
         allActions.addAllActionsFromSet(userAdminRoleActions);
         allActions.addAllActionsFromSet(dbAdminRoleActions);
-        allActions.addAllActionsFromSet(serverAdminRoleActions);
         allActions.addAllActionsFromSet(clusterAdminRoleActions);
         return allActions;
     }
@@ -604,10 +591,6 @@ namespace {
         else if (isAdminDB && role == SYSTEM_ROLE_DB_ADMIN_ANY_DB) {
             outPrivileges->push_back(
                     Privilege(PrivilegeSet::WILDCARD_RESOURCE, dbAdminRoleActions));
-        }
-        else if (isAdminDB && role == SYSTEM_ROLE_SERVER_ADMIN) {
-            outPrivileges->push_back(
-                    Privilege(PrivilegeSet::WILDCARD_RESOURCE, serverAdminRoleActions));
         }
         else if (isAdminDB && role == SYSTEM_ROLE_CLUSTER_ADMIN) {
             outPrivileges->push_back(

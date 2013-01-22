@@ -46,7 +46,6 @@ assertInsertSucceeds(admin.system.users,
                      { user: 'root',
                        pwd: hex_md5('root:mongo:a'),
                        roles: ["clusterAdmin",
-                               "serverAdmin",
                                "readWriteAnyDatabase",
                                "dbAdminAnyDatabase",
                                "userAdminAnyDatabase"]
