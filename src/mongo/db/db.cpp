@@ -76,7 +76,8 @@ namespace mongo {
     extern bool checkNsFilesOnLoad;
     extern string repairpath;
 
-    void setupSignals( bool inFork );
+    void setupQuittingSignals();
+    void setupSignals( bool ignored );
     void startReplication();
     void exitCleanly( ExitCode code );
 
@@ -743,7 +744,7 @@ static int mongoDbMain(int argc, char* argv[]) {
 
 
     setupCoreSignals();
-    setupSignals( false );
+    setupQuittingSignals();
 
     dbExecCommand = argv[0];
 
@@ -1229,7 +1230,7 @@ namespace mongo {
 
     void setupSignals_ignoreHelper( int signal ) {}
 
-    void setupSignals( bool inFork ) {
+    void setupQuittingSignals() {
         struct sigaction addrSignals;
         memset( &addrSignals, 0, sizeof( struct sigaction ) );
         addrSignals.sa_sigaction = abruptQuitWithAddrSignal;
@@ -1247,20 +1248,16 @@ namespace mongo {
 
         setupSIGTRAPforGDB();
 
+        set_terminate( myterminate );
+        set_new_handler( my_new_handler );
+    }
+
+    void setupSignals( bool ignored ) {
         sigemptyset( &asyncSignals );
-
-        if ( inFork )
-            verify( signal( SIGHUP , setupSignals_ignoreHelper ) != SIG_ERR );
-        else
-            sigaddset( &asyncSignals, SIGHUP );
-
         sigaddset( &asyncSignals, SIGINT );
         sigaddset( &asyncSignals, SIGTERM );
         verify( pthread_sigmask( SIG_SETMASK, &asyncSignals, 0 ) == 0 );
         boost::thread it( interruptThread );
-
-        set_terminate( myterminate );
-        set_new_handler( my_new_handler );
     }
 
 #else   // WIN32
@@ -1414,7 +1411,9 @@ namespace mongo {
         mongoAbort("pure virtual");
     }
 
-    void setupSignals( bool inFork ) {
+    void setupSignals( bool inFork ) { }
+
+    void setupQuittingSignals() {
         reportEventToSystem = reportEventToSystemImpl;
         filtLast = SetUnhandledExceptionFilter(exceptionFilter);
         massert(10297 , "Couldn't register Windows Ctrl-C handler", SetConsoleCtrlHandler((PHANDLER_ROUTINE) CtrlHandler, TRUE));

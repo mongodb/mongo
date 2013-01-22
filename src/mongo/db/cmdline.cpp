@@ -384,11 +384,9 @@ namespace mongo {
                 cout << "Cant reassign stdin while forking server process: " << strerror(errno) << endl;
                 ::_exit(-1);
             }
-
-            setupCoreSignals();
-            setupSignals( true );
         }
-        
+        setupSignals( true );
+
         if (params.count("syslog")) {
             StringBuilder sb;
             sb << cmdLine.binaryName << "." << cmdLine.port;
