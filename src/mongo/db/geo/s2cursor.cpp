@@ -25,9 +25,9 @@
 namespace mongo {
     S2Cursor::S2Cursor(const BSONObj &keyPattern, const IndexDetails *details,
                        const BSONObj &query, const vector<GeoQuery> &fields,
-                       const S2IndexingParams &params, int numWanted)
+                       const S2IndexingParams &params)
         : _details(details), _fields(fields), _params(params), _keyPattern(keyPattern),
-          _numToReturn(numWanted), _nscanned(0), _matchTested(0), _geoTested(0) {
+          _nscanned(0), _matchTested(0), _geoTested(0) {
 
         BSONObjBuilder geoFieldsToNuke;
         for (size_t i = 0; i < _fields.size(); ++i) {
@@ -100,7 +100,6 @@ namespace mongo {
 
     // This is the actual search.
     bool S2Cursor::advance() {
-        if (_numToReturn <= 0) { return false; }
         for (; _btreeCursor->ok(); _btreeCursor->advance()) {
             ++_nscanned;
             if (_seen.end() != _seen.find(_btreeCursor->currLoc())) { continue; }
@@ -139,7 +138,6 @@ namespace mongo {
 
             if (geoFieldsMatched == _fields.size()) {
                 // We have a winner!  And we point at it.
-                --_numToReturn;
                 return true;
             }
         }

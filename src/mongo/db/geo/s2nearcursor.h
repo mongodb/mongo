@@ -30,7 +30,7 @@ namespace mongo {
     public:
         S2NearCursor(const BSONObj &keyPattern, const IndexDetails* details, const BSONObj &query,
                      const NearQuery &nearQuery, const vector<GeoQuery> &indexedGeoRegions,
-                     const S2IndexingParams &params, int numWanted);
+                     const S2IndexingParams &params);
         virtual ~S2NearCursor(); 
         virtual CoveredIndexMatcher *matcher() const;
 
@@ -103,8 +103,6 @@ namespace mongo {
         BSONObj _keyPattern;
         // We also pass this to the FieldRangeVector ctor.
         IndexSpec _specForFRV;
-        // How many docs do we want to return?  Starts with the # the user requests and goes down.
-        int _numToReturn;
 
         // Geo-related variables.
         // What's the max distance (arc length) we're willing to look for results?

@@ -27,9 +27,9 @@ namespace mongo {
     S2NearCursor::S2NearCursor(const BSONObj &keyPattern, const IndexDetails *details,
                        const BSONObj &query, const NearQuery &nearQuery,
                        const vector<GeoQuery> &indexedGeoFields,
-                       const S2IndexingParams &params, int numWanted)
+                       const S2IndexingParams &params)
         : _details(details), _nearQuery(nearQuery), _indexedGeoFields(indexedGeoFields),
-          _params(params), _keyPattern(keyPattern), _numToReturn(numWanted),
+          _params(params), _keyPattern(keyPattern),
           _nscanned(0), _matchTested(0), _geoTested(0), _numShells(0) {
 
         BSONObjBuilder geoFieldsToNuke;
@@ -106,10 +106,6 @@ namespace mongo {
     }
 
     bool S2NearCursor::ok() {
-        if (_numToReturn <= 0) {
-            LOG(2) << "not OK, no more to return" << endl;
-            return false;
-        }
         if (_innerRadius > _maxDistance) {
             LOG(2) << "not OK, exhausted search bounds" << endl;
             return false;
@@ -133,11 +129,6 @@ namespace mongo {
     }
 
     bool S2NearCursor::advance() {
-        if (_numToReturn <= 0) {
-            LOG(2) << "advancing but no more to return" << endl;
-            return false;
-        }
-
         if (_innerRadius > _maxDistance) {
             LOG(2) << "advancing but exhausted search distance" << endl;
             return false;
@@ -146,7 +137,6 @@ namespace mongo {
         if (!_results.empty()) {
             _returned.insert(_results.top().loc);
             _results.pop();
-            --_numToReturn;
             // Safe to grow the radius as we've returned everything in our shell.  We don't do this
             // check outside of !_results.empty() because we could have results, yield, dump them
             // (_results would be empty), then need to recreate them w/the same radii.  In that case
@@ -215,7 +205,6 @@ namespace mongo {
         verify(_results.empty());
         if (_innerRadius >= _outerRadius) { return; }
         if (_innerRadius > _maxDistance) { return; }
-        if (0 == _numToReturn) { return; }
 
         // We iterate until 1. our search radius is too big or 2. we find results.
         do {

@@ -30,8 +30,7 @@ namespace mongo {
     class S2Cursor : public Cursor {
     public:
         S2Cursor(const BSONObj &keyPattern, const IndexDetails* details, const BSONObj &query,
-                 const vector<GeoQuery> &regions, const S2IndexingParams &params,
-                 int numWanted);
+                 const vector<GeoQuery> &regions, const S2IndexingParams &params);
         virtual ~S2Cursor(); 
         virtual CoveredIndexMatcher *matcher() const;
 
@@ -73,9 +72,6 @@ namespace mongo {
         S2IndexingParams _params;
         // We have to pass this to the FieldRangeVector ctor (in modified form).
         BSONObj _keyPattern;
-        // How many docs do we want to return?  Starts with the # the user requests
-        // and goes down.
-        int _numToReturn;
 
         // What have we checked so we don't repeat it and waste time?
         set<DiskLoc> _seen;

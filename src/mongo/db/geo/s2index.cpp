@@ -174,10 +174,6 @@ namespace mongo {
                 regions.push_back(geoQueryField);
             }
 
-            // I copied this from 2d.cpp.  Guard against perversion.
-            if (numWanted < 0) numWanted *= -1;
-            if (0 == numWanted) numWanted = INT_MAX;
-
             // Remove all the indexed geo regions from the query.  The s2*cursor will
             // instead create a covering for that key to speed up the search.
             //
@@ -196,11 +192,11 @@ namespace mongo {
 
             if (isNearQuery) {
                 S2NearCursor *cursor = new S2NearCursor(keyPattern(), getDetails(), filteredQuery,
-                    nearQuery, regions, _params, numWanted);
+                    nearQuery, regions, _params);
                 return shared_ptr<Cursor>(cursor);
             } else {
                 S2Cursor *cursor = new S2Cursor(keyPattern(), getDetails(), filteredQuery, regions, 
-                                                _params, numWanted);
+                                                _params);
                 return shared_ptr<Cursor>(cursor);
             }
         }
@@ -404,15 +400,14 @@ namespace mongo {
         vector<GeoQuery> regions;
 
         scoped_ptr<S2NearCursor> cursor(new S2NearCursor(idxType->keyPattern(),
-            idxType->getDetails(), query, nearQuery, regions, idxType->getParams(),
-            numWanted));
+            idxType->getDetails(), query, nearQuery, regions, idxType->getParams()));
 
         double totalDistance = 0;
         int results = 0;
         BSONObjBuilder resultBuilder(result.subarrayStart("results"));
         double farthestDist = 0;
 
-        while (cursor->ok()) {
+        for (int i = 0; i < numWanted && cursor->ok(); ++i) {
             double dist = cursor->currentDistance();
             // If we got the distance in radians, output it in radians too.
             if (nearQuery.fromRadians) { dist /= idxType->getParams().radius; }
