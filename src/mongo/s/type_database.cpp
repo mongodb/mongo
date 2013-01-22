@@ -76,15 +76,15 @@ namespace mongo {
         FieldParser::FieldState fieldState;
         fieldState = FieldParser::extract(source, name, "", &_name, errMsg);
         if (fieldState == FieldParser::FIELD_INVALID) return false;
-        _isNameSet = fieldState == FieldParser::FIELD_VALID;
+        _isNameSet = fieldState == FieldParser::FIELD_SET;
 
         fieldState = FieldParser::extract(source, primary, "", &_primary, errMsg);
         if (fieldState == FieldParser::FIELD_INVALID) return false;
-        _isPrimarySet = fieldState == FieldParser::FIELD_VALID;
+        _isPrimarySet = fieldState == FieldParser::FIELD_SET;
 
         fieldState = FieldParser::extract(source, draining, false, &_draining, errMsg);
         if (fieldState == FieldParser::FIELD_INVALID) return false;
-        _isDrainingSet = fieldState == FieldParser::FIELD_VALID;
+        _isDrainingSet = fieldState == FieldParser::FIELD_SET;
 
         return true;
     }

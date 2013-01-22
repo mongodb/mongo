@@ -44,7 +44,7 @@ namespace mongo {
             FIELD_INVALID = 0,
 
             // The field is present and has the correct type
-            FIELD_VALID,
+            FIELD_SET,
 
             // The field is absent in the BSON object but set from default
             FIELD_DEFAULT,

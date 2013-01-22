@@ -51,7 +51,7 @@ namespace mongo {
 
         if (elem.type() == Bool) {
             *out = elem.boolean();
-            return FIELD_VALID;
+            return FIELD_SET;
         }
 
         _genFieldErrMsg(doc, field, "boolean", errMsg);
@@ -77,7 +77,7 @@ namespace mongo {
 
         if (elem.type() == Array) {
             *out = BSONArray(elem.embeddedObject().getOwned());
-            return FIELD_VALID;
+            return FIELD_SET;
         }
 
         _genFieldErrMsg(doc, field, "array", errMsg);
@@ -103,7 +103,7 @@ namespace mongo {
 
         if (elem.type() == Object) {
             *out = elem.embeddedObject().getOwned();
-            return FIELD_VALID;
+            return FIELD_SET;
         }
 
         _genFieldErrMsg(doc, field, "object", errMsg);
@@ -129,7 +129,7 @@ namespace mongo {
 
         if (elem.type() == Date) {
             *out = elem.date();
-            return FIELD_VALID;
+            return FIELD_SET;
         }
 
         _genFieldErrMsg(doc, field, "date or timestamp", errMsg);
@@ -155,7 +155,7 @@ namespace mongo {
 
         if (elem.type() == String) {
             *out = elem.valuestr();
-            return FIELD_VALID;
+            return FIELD_SET;
         }
 
         _genFieldErrMsg(doc, field, "string", errMsg);
@@ -181,7 +181,7 @@ namespace mongo {
 
         if (elem.type() == jstOID) {
             *out = elem.__oid();
-            return FIELD_VALID;
+            return FIELD_SET;
         }
 
         _genFieldErrMsg(doc, field, "OID", errMsg);
@@ -207,7 +207,7 @@ namespace mongo {
 
         if (elem.type() == NumberInt) {
             *out = elem.numberInt();
-            return FIELD_VALID;
+            return FIELD_SET;
         }
 
         _genFieldErrMsg(doc, field, "integer", errMsg);
@@ -233,7 +233,7 @@ namespace mongo {
 
         if (elem.isNumber()) {
             *out = elem.numberInt();
-            return FIELD_VALID;
+            return FIELD_SET;
         }
 
         _genFieldErrMsg(doc, field, "number", errMsg);
@@ -259,7 +259,7 @@ namespace mongo {
 
         if (elem.type() == NumberLong) {
             *out = elem.numberLong();
-            return FIELD_VALID;
+            return FIELD_SET;
         }
 
         _genFieldErrMsg(doc, field, "long", errMsg);
@@ -285,7 +285,7 @@ namespace mongo {
 
         if (elem.isNumber()) {
             *out = elem.numberLong();
-            return FIELD_VALID;
+            return FIELD_SET;
         }
 
         _genFieldErrMsg(doc, field, "number", errMsg);

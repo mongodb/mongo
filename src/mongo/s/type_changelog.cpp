@@ -101,31 +101,31 @@ namespace mongo {
         FieldParser::FieldState fieldState;
         fieldState = FieldParser::extract(source, changeID, "", &_changeID, errMsg);
         if (fieldState == FieldParser::FIELD_INVALID) return false;
-        _isChangeIDSet = fieldState == FieldParser::FIELD_VALID;
+        _isChangeIDSet = fieldState == FieldParser::FIELD_SET;
 
         fieldState = FieldParser::extract(source, server, "", &_server, errMsg);
         if (fieldState == FieldParser::FIELD_INVALID) return false;
-        _isServerSet = fieldState == FieldParser::FIELD_VALID;
+        _isServerSet = fieldState == FieldParser::FIELD_SET;
 
         fieldState = FieldParser::extract(source, clientAddr, "", &_clientAddr, errMsg);
         if (fieldState == FieldParser::FIELD_INVALID) return false;
-        _isClientAddrSet = fieldState == FieldParser::FIELD_VALID;
+        _isClientAddrSet = fieldState == FieldParser::FIELD_SET;
 
         fieldState = FieldParser::extract(source, time, 0, &_time, errMsg);
         if (fieldState == FieldParser::FIELD_INVALID) return false;
-        _isTimeSet = fieldState == FieldParser::FIELD_VALID;
+        _isTimeSet = fieldState == FieldParser::FIELD_SET;
 
         fieldState = FieldParser::extract(source, what, "", &_what, errMsg);
         if (fieldState == FieldParser::FIELD_INVALID) return false;
-        _isWhatSet = fieldState == FieldParser::FIELD_VALID;
+        _isWhatSet = fieldState == FieldParser::FIELD_SET;
 
         fieldState = FieldParser::extract(source, ns, "", &_ns, errMsg);
         if (fieldState == FieldParser::FIELD_INVALID) return false;
-        _isNsSet = fieldState == FieldParser::FIELD_VALID;
+        _isNsSet = fieldState == FieldParser::FIELD_SET;
 
         fieldState = FieldParser::extract(source, details, BSONObj(), &_details, errMsg);
         if (fieldState == FieldParser::FIELD_INVALID) return false;
-        _isDetailsSet = fieldState == FieldParser::FIELD_VALID;
+        _isDetailsSet = fieldState == FieldParser::FIELD_SET;
 
         return true;
     }

@@ -132,27 +132,27 @@ namespace mongo {
         FieldParser::FieldState fieldState;
         fieldState = FieldParser::extract(source, name, "", &_name, errMsg);
         if (fieldState == FieldParser::FIELD_INVALID) return false;
-        _isNameSet = fieldState == FieldParser::FIELD_VALID;
+        _isNameSet = fieldState == FieldParser::FIELD_SET;
 
         fieldState = FieldParser::extract(source, ns, "", &_ns, errMsg);
         if (fieldState == FieldParser::FIELD_INVALID) return false;
-        _isNsSet = fieldState == FieldParser::FIELD_VALID;
+        _isNsSet = fieldState == FieldParser::FIELD_SET;
 
         fieldState = FieldParser::extract(source, min, BSONObj(), &_min, errMsg);
         if (fieldState == FieldParser::FIELD_INVALID) return false;
-        _isMinSet = fieldState == FieldParser::FIELD_VALID;
+        _isMinSet = fieldState == FieldParser::FIELD_SET;
 
         fieldState = FieldParser::extract(source, max, BSONObj(), &_max, errMsg);
         if (fieldState == FieldParser::FIELD_INVALID) return false;
-        _isMaxSet = fieldState == FieldParser::FIELD_VALID;
+        _isMaxSet = fieldState == FieldParser::FIELD_SET;
 
         fieldState = FieldParser::extract(source, shard, "", &_shard, errMsg);
         if (fieldState == FieldParser::FIELD_INVALID) return false;
-        _isShardSet = fieldState == FieldParser::FIELD_VALID;
+        _isShardSet = fieldState == FieldParser::FIELD_SET;
 
         fieldState = FieldParser::extract(source, jumbo, false, &_jumbo, errMsg);
         if (fieldState == FieldParser::FIELD_INVALID) return false;
-        _isJumboSet = fieldState == FieldParser::FIELD_VALID;
+        _isJumboSet = fieldState == FieldParser::FIELD_SET;
 
         //
         // ChunkVersion backward compatibility logic contained in ChunkVersion

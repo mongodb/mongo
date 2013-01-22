@@ -102,27 +102,27 @@ namespace mongo {
         FieldParser::FieldState fieldState;
         fieldState = FieldParser::extract(source, name, "", &_name, errMsg);
         if (fieldState == FieldParser::FIELD_INVALID) return false;
-        _isNameSet = fieldState == FieldParser::FIELD_VALID;
+        _isNameSet = fieldState == FieldParser::FIELD_SET;
 
         fieldState = FieldParser::extract(source, state, 0, &_state, errMsg);
         if (fieldState == FieldParser::FIELD_INVALID) return false;
-        _isStateSet = fieldState == FieldParser::FIELD_VALID;
+        _isStateSet = fieldState == FieldParser::FIELD_SET;
 
         fieldState = FieldParser::extract(source, process, "", &_process, errMsg);
         if (fieldState == FieldParser::FIELD_INVALID) return false;
-        _isProcessSet = fieldState == FieldParser::FIELD_VALID;
+        _isProcessSet = fieldState == FieldParser::FIELD_SET;
 
         fieldState = FieldParser::extract(source, lockID, OID(), &_lockID, errMsg);
         if (fieldState == FieldParser::FIELD_INVALID) return false;
-        _isLockIDSet = fieldState == FieldParser::FIELD_VALID;
+        _isLockIDSet = fieldState == FieldParser::FIELD_SET;
 
         fieldState = FieldParser::extract(source, who, "", &_who, errMsg);
         if (fieldState == FieldParser::FIELD_INVALID) return false;
-        _isWhoSet = fieldState == FieldParser::FIELD_VALID;
+        _isWhoSet = fieldState == FieldParser::FIELD_SET;
 
         fieldState = FieldParser::extract(source, why, "", &_why, errMsg);
         if (fieldState == FieldParser::FIELD_INVALID) return false;
-        _isWhySet = fieldState == FieldParser::FIELD_VALID;
+        _isWhySet = fieldState == FieldParser::FIELD_SET;
 
         return true;
     }

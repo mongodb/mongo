@@ -71,11 +71,11 @@ namespace mongo {
         FieldParser::FieldState fieldState;
         fieldState = FieldParser::extract(source, process, "", &_process, errMsg);
         if (fieldState == FieldParser::FIELD_INVALID) return false;
-        _isProcessSet = fieldState == FieldParser::FIELD_VALID;
+        _isProcessSet = fieldState == FieldParser::FIELD_SET;
 
         fieldState = FieldParser::extract(source, ping, 0, &_ping, errMsg);
         if (fieldState == FieldParser::FIELD_INVALID) return false;
-        _isPingSet = fieldState == FieldParser::FIELD_VALID;
+        _isPingSet = fieldState == FieldParser::FIELD_SET;
 
         return true;
     }

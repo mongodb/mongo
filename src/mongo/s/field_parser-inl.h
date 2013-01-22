@@ -69,7 +69,7 @@ namespace mongo {
                 i++;
             }
 
-            return FIELD_VALID;
+            return FIELD_SET;
         }
 
         if (errMsg) {
@@ -117,7 +117,7 @@ namespace mongo {
                 }
             }
 
-            return FIELD_VALID;
+            return FIELD_SET;
         }
 
         if (errMsg) {

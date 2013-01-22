@@ -109,35 +109,35 @@ namespace mongo {
         FieldParser::FieldState fieldState;
         fieldState = FieldParser::extract(source, ns, "", &_ns, errMsg);
         if (fieldState == FieldParser::FIELD_INVALID) return false;
-        _isNsSet = fieldState == FieldParser::FIELD_VALID;
+        _isNsSet = fieldState == FieldParser::FIELD_SET;
 
         fieldState = FieldParser::extract(source, primary, "", &_primary, errMsg);
         if (fieldState == FieldParser::FIELD_INVALID) return false;
-        _isPrimarySet = fieldState == FieldParser::FIELD_VALID;
+        _isPrimarySet = fieldState == FieldParser::FIELD_SET;
 
         fieldState = FieldParser::extract(source, keyPattern, BSONObj(), &_keyPattern, errMsg);
         if (fieldState == FieldParser::FIELD_INVALID) return false;
-        _isKeyPatternSet = fieldState == FieldParser::FIELD_VALID;
+        _isKeyPatternSet = fieldState == FieldParser::FIELD_SET;
 
         fieldState = FieldParser::extract(source, unique, false, &_unique, errMsg);
         if (fieldState == FieldParser::FIELD_INVALID) return false;
-        _isUniqueSet = fieldState == FieldParser::FIELD_VALID;
+        _isUniqueSet = fieldState == FieldParser::FIELD_SET;
 
         fieldState = FieldParser::extract(source, updatedAt, 0, &_updatedAt, errMsg);
         if (fieldState == FieldParser::FIELD_INVALID) return false;
-        _isUpdatedAtSet = fieldState == FieldParser::FIELD_VALID;
+        _isUpdatedAtSet = fieldState == FieldParser::FIELD_SET;
 
         fieldState = FieldParser::extract(source, noBalance, false, &_noBalance, errMsg);
         if (fieldState == FieldParser::FIELD_INVALID) return false;
-        _isNoBalanceSet = fieldState == FieldParser::FIELD_VALID;
+        _isNoBalanceSet = fieldState == FieldParser::FIELD_SET;
 
         fieldState = FieldParser::extract(source, epoch, OID(), &_epoch, errMsg);
         if (fieldState == FieldParser::FIELD_INVALID) return false;
-        _isEpochSet = fieldState == FieldParser::FIELD_VALID;
+        _isEpochSet = fieldState == FieldParser::FIELD_SET;
 
         fieldState = FieldParser::extract(source, dropped, false, &_dropped, errMsg);
         if (fieldState == FieldParser::FIELD_INVALID) return false;
-        _isDroppedSet = fieldState == FieldParser::FIELD_VALID;
+        _isDroppedSet = fieldState == FieldParser::FIELD_SET;
 
         //
         // backward compatibility
@@ -149,7 +149,7 @@ namespace mongo {
         fieldState = FieldParser::extract(source, DEPRECATED_lastmod, 0ULL, &lastmod, errMsg);
         if (fieldState == FieldParser::FIELD_INVALID) return false;
 
-        if (fieldState == FieldParser::FIELD_VALID && _isUpdatedAtSet == false) {
+        if (fieldState == FieldParser::FIELD_SET && _isUpdatedAtSet == false) {
             _updatedAt = lastmod;
             _isUpdatedAtSet = true;
         }
@@ -160,7 +160,7 @@ namespace mongo {
                                           OID(), &lastmodEpoch, errMsg);
         if (fieldState == FieldParser::FIELD_INVALID) return false;
 
-        if (fieldState == FieldParser::FIELD_VALID && _isEpochSet == false) {
+        if (fieldState == FieldParser::FIELD_SET && _isEpochSet == false) {
             _epoch = lastmodEpoch;
             _isEpochSet = true;
         }
