@@ -32,8 +32,8 @@
 
 namespace mongo {
 
-    unordered_map<string,WriteBackListener*> WriteBackListener::_cache;
-    unordered_set<string> WriteBackListener::_seenSets;
+    map<string,WriteBackListener*> WriteBackListener::_cache;
+    set<string> WriteBackListener::_seenSets;
     mongo::mutex WriteBackListener::_cacheLock("WriteBackListener");
 
     map<WriteBackListener::ConnectionIdent,WriteBackListener::WBStatus> WriteBackListener::_seenWritebacks;

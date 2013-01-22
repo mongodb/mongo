@@ -20,8 +20,6 @@
 
 #include "mongo/pch.h"
 
-#include "mongo/platform/unordered_map.h"
-#include "mongo/platform/unordered_set.h"
 #include "../client/connpool.h"
 #include "../util/background.h"
 #include "../db/client.h"
@@ -74,8 +72,8 @@ namespace mongo {
         string _name;
 
         static mongo::mutex _cacheLock; // protects _cache
-        static unordered_map<string,WriteBackListener*> _cache; // server to listener
-        static unordered_set<string> _seenSets; // cache of set urls we've seen - note this is ever expanding for order, case, changes
+        static map<string,WriteBackListener*> _cache; // server to listener
+        static set<string> _seenSets; // cache of set urls we've seen - note this is ever expanding for order, case, changes
 
         struct WBStatus {
             OID id;

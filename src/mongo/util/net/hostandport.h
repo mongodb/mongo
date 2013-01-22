@@ -17,10 +17,10 @@
 
 #pragma once
 
-#include "mongo/bson/util/builder.h"
 #include "mongo/db/cmdline.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/net/sock.h"
+#include "mongo/bson/util/builder.h"
 
 namespace mongo {
 
