@@ -3,7 +3,8 @@ t.drop()
 t.ensureIndex({geo: "2dsphere"})
 
 /* Short names for math operations */
-var random = Math.random;
+Random.setRandomSeed();
+var random = Random.rand;
 var PI = Math.PI;
 var asin = Math.asin;
 var sin = Math.sin;
@@ -235,3 +236,23 @@ validateOrdering({geo: {$near: {$geometry: originGeo}}})
 print("Millis for uniform on negative meridian:");
 print(t.find({geo: {$near: {$geometry: originGeo}}}).explain().millis);
 assert.eq(t.find({geo: {$near: {$geometry: originGeo}}}).count(), 50);
+
+// Near search with points that are really far away.
+t.drop()
+t.ensureIndex({geo: "2dsphere"})
+originGeo = {type: "Point", coordinates: [0.0, 0.0]};
+origin = {
+    name: "origin",
+    geo: originGeo
+}
+
+uniformPoints(origin, 10, 89, 90);
+
+cur = t.find({geo: {$near: {$geometry: originGeo}}})
+
+assert.eq(cur.count(), 10);
+
+print("Near search on very distant points:");
+print(t.find({geo: {$near: {$geometry: originGeo}}}).explain().millis);
+pt = cur.next();
+assert(pt)
