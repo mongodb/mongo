@@ -18,6 +18,7 @@
 
 #include "mongo/util/touch_pages.h"
 
+#include <boost/scoped_ptr.h>
 #include <fcntl.h>
 #include <list>
 #include <string>
@@ -39,9 +40,9 @@ namespace mongo {
         
     void touchNs( const std::string& ns ) { 
         std::vector< touch_location > ranges;
-        Client::ReadContext ctx(ns);
+        boost::scoped_ptr<LockMongoFilesShared> mongoFilesLock;
         {
-
+            Client::ReadContext ctx(ns);
             NamespaceDetails *nsd = nsdetails(ns);
             uassert( 16154, "namespace does not exist", nsd );
             
@@ -56,10 +57,10 @@ namespace mongo {
                 
                 ranges.push_back(tl);                
             }
-
+            mongoFilesLock.reset(new LockMongoFilesShared());
         }
-        LockMongoFilesShared lk;
-        Lock::TempRelease tr;
+        // DB read lock is dropped; no longer needed after this point.
+
         std::string progress_msg = "touch " + ns + " extents";
         ProgressMeterHolder pm(cc().curop()->setMessage(progress_msg.c_str(),
                                                         "Touch Progress",
