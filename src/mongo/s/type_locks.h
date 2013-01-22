@@ -115,7 +115,7 @@ namespace mongo {
 
         void unsetName() { _isNameSet = false; }
 
-        bool isNameSet() { return _isNameSet; }
+        bool isNameSet() const { return _isNameSet; }
 
         // Calling get*() methods when the member is not set results in undefined behavior
         const std::string getName() const {
@@ -130,7 +130,7 @@ namespace mongo {
 
         void unsetState() { _isStateSet = false; }
 
-        bool isStateSet() { return _isStateSet; }
+        bool isStateSet() const { return _isStateSet; }
 
         // Calling get*() methods when the member is not set results in undefined behavior
         const int getState() const {
@@ -146,7 +146,7 @@ namespace mongo {
 
         void unsetProcess() { _isProcessSet = false; }
 
-        bool isProcessSet() {
+        bool isProcessSet() const {
             return _isProcessSet || process.hasDefault();
         }
 
@@ -167,7 +167,7 @@ namespace mongo {
 
         void unsetLockID() { _isLockIDSet = false; }
 
-        bool isLockIDSet() {
+        bool isLockIDSet() const {
             return _isLockIDSet || lockID.hasDefault();
         }
 
@@ -188,7 +188,7 @@ namespace mongo {
 
         void unsetWho() { _isWhoSet = false; }
 
-        bool isWhoSet() {
+        bool isWhoSet() const {
             return _isWhoSet || who.hasDefault();
         }
 
@@ -209,7 +209,7 @@ namespace mongo {
 
         void unsetWhy() { _isWhySet = false; }
 
-        bool isWhySet() {
+        bool isWhySet() const {
             return _isWhySet || why.hasDefault();
         }
 

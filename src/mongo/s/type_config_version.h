@@ -116,7 +116,7 @@ namespace mongo {
 
         void unsetMinCompatibleVersion() { _isMinCompatibleVersionSet = false; }
 
-        bool isMinCompatibleVersionSet() { return _isMinCompatibleVersionSet; }
+        bool isMinCompatibleVersionSet() const { return _isMinCompatibleVersionSet; }
 
         // Calling get*() methods when the member is not set results in undefined behavior
         const int getMinCompatibleVersion() const {
@@ -131,7 +131,7 @@ namespace mongo {
 
         void unsetCurrentVersion() { _isCurrentVersionSet = false; }
 
-        bool isCurrentVersionSet() { return _isCurrentVersionSet; }
+        bool isCurrentVersionSet() const { return _isCurrentVersionSet; }
 
         // Calling get*() methods when the member is not set results in undefined behavior
         const int getCurrentVersion() const {
@@ -168,7 +168,7 @@ namespace mongo {
 
         void unsetClusterId() { _isClusterIdSet = false; }
 
-        bool isClusterIdSet() { return _isClusterIdSet; }
+        bool isClusterIdSet() const { return _isClusterIdSet; }
 
         // Calling get*() methods when the member is not set results in undefined behavior
         const OID getClusterId() const {
@@ -205,7 +205,7 @@ namespace mongo {
 
         void unsetUpgradeState() { _isUpgradeStateSet = false; }
 
-        bool isUpgradeStateSet() {
+        bool isUpgradeStateSet() const {
             return _isUpgradeStateSet || upgradeState.hasDefault();
         }
 

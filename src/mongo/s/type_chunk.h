@@ -119,7 +119,7 @@ namespace mongo {
 
         void unsetName() { _isNameSet = false; }
 
-        bool isNameSet() { return _isNameSet; }
+        bool isNameSet() const { return _isNameSet; }
 
         // Calling get*() methods when the member is not set results in undefined behavior
         const std::string getName() const {
@@ -134,7 +134,7 @@ namespace mongo {
 
         void unsetNS() { _isNsSet = false; }
 
-        bool isNSSet() { return _isNsSet; }
+        bool isNSSet() const { return _isNsSet; }
 
         // Calling get*() methods when the member is not set results in undefined behavior
         const std::string getNS() const {
@@ -149,7 +149,7 @@ namespace mongo {
 
         void unsetMin() { _isMinSet = false; }
 
-        bool isMinSet() { return _isMinSet; }
+        bool isMinSet() const { return _isMinSet; }
 
         // Calling get*() methods when the member is not set results in undefined behavior
         const BSONObj getMin() const {
@@ -164,7 +164,7 @@ namespace mongo {
 
         void unsetMax() { _isMaxSet = false; }
 
-        bool isMaxSet() { return _isMaxSet; }
+        bool isMaxSet() const { return _isMaxSet; }
 
         // Calling get*() methods when the member is not set results in undefined behavior
         const BSONObj getMax() const {
@@ -179,7 +179,7 @@ namespace mongo {
 
         void unsetVersion() { _isVersionSet = false; }
 
-        bool isVersionSet() { return _isVersionSet; }
+        bool isVersionSet() const { return _isVersionSet; }
 
         // Calling get*() methods when the member is not set results in undefined behavior
         const ChunkVersion& getVersion() const {
@@ -194,7 +194,7 @@ namespace mongo {
 
         void unsetShard() { _isShardSet = false; }
 
-        bool isShardSet() { return _isShardSet; }
+        bool isShardSet() const { return _isShardSet; }
 
         // Calling get*() methods when the member is not set results in undefined behavior
         const std::string getShard() const {
@@ -210,7 +210,7 @@ namespace mongo {
 
         void unsetJumbo() { _isJumboSet = false; }
 
-        bool isJumboSet() {
+        bool isJumboSet() const {
             return _isJumboSet || jumbo.hasDefault();
         }
 

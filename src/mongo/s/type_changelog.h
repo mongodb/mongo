@@ -116,7 +116,7 @@ namespace mongo {
 
         void unsetChangeID() { _isChangeIDSet = false; }
 
-        bool isChangeIDSet() { return _isChangeIDSet; }
+        bool isChangeIDSet() const { return _isChangeIDSet; }
 
         // Calling get*() methods when the member is not set results in undefined behavior
         const std::string& getChangeID() const {
@@ -131,7 +131,7 @@ namespace mongo {
 
         void unsetServer() { _isServerSet = false; }
 
-        bool isServerSet() { return _isServerSet; }
+        bool isServerSet() const { return _isServerSet; }
 
         // Calling get*() methods when the member is not set results in undefined behavior
         const std::string& getServer() const {
@@ -146,7 +146,7 @@ namespace mongo {
 
         void unsetClientAddr() { _isClientAddrSet = false; }
 
-        bool isClientAddrSet() { return _isClientAddrSet; }
+        bool isClientAddrSet() const { return _isClientAddrSet; }
 
         // Calling get*() methods when the member is not set results in undefined behavior
         const std::string& getClientAddr() const {
@@ -161,7 +161,7 @@ namespace mongo {
 
         void unsetTime() { _isTimeSet = false; }
 
-        bool isTimeSet() { return _isTimeSet; }
+        bool isTimeSet() const { return _isTimeSet; }
 
         // Calling get*() methods when the member is not set results in undefined behavior
         const Date_t getTime() const {
@@ -176,7 +176,7 @@ namespace mongo {
 
         void unsetWhat() { _isWhatSet = false; }
 
-        bool isWhatSet() { return _isWhatSet; }
+        bool isWhatSet() const { return _isWhatSet; }
 
         // Calling get*() methods when the member is not set results in undefined behavior
         const std::string& getWhat() const {
@@ -191,7 +191,7 @@ namespace mongo {
 
         void unsetNS() { _isNsSet = false; }
 
-        bool isNSSet() { return _isNsSet; }
+        bool isNSSet() const { return _isNsSet; }
 
         // Calling get*() methods when the member is not set results in undefined behavior
         const std::string& getNS() const {
@@ -206,7 +206,7 @@ namespace mongo {
 
         void unsetDetails() { _isDetailsSet = false; }
 
-        bool isDetailsSet() { return _isDetailsSet; }
+        bool isDetailsSet() const { return _isDetailsSet; }
 
         // Calling get*() methods when the member is not set results in undefined behavior
         const BSONObj getDetails() const {

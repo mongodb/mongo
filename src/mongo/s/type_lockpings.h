@@ -111,7 +111,7 @@ namespace mongo {
 
         void unsetProcess() { _isProcessSet = false; }
 
-        bool isProcessSet() { return _isProcessSet; }
+        bool isProcessSet() const { return _isProcessSet; }
 
         // Calling get*() methods when the member is not set results in undefined behavior
         const std::string& getProcess() const {
@@ -126,7 +126,7 @@ namespace mongo {
 
         void unsetPing() { _isPingSet = false; }
 
-        bool isPingSet() { return _isPingSet; }
+        bool isPingSet() const { return _isPingSet; }
 
         // Calling get*() methods when the member is not set results in undefined behavior
         const Date_t getPing() const {

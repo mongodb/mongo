@@ -114,7 +114,7 @@ namespace mongo {
 
         void unsetName() { _isNameSet = false; }
 
-        bool isNameSet() { return _isNameSet; }
+        bool isNameSet() const { return _isNameSet; }
 
         // Calling get*() methods when the member is not set results in undefined behavior
         const std::string getName() const {
@@ -129,7 +129,7 @@ namespace mongo {
 
         void unsetHost() { _isHostSet = false; }
 
-        bool isHostSet() { return _isHostSet; }
+        bool isHostSet() const { return _isHostSet; }
 
         // Calling get*() methods when the member is not set results in undefined behavior
         const std::string getHost() const {
@@ -145,7 +145,7 @@ namespace mongo {
 
         void unsetDraining() { _isDrainingSet = false; }
 
-        bool isDrainingSet() {
+        bool isDrainingSet() const {
             return _isDrainingSet || draining.hasDefault();
         }
 
@@ -166,7 +166,7 @@ namespace mongo {
 
         void unsetMaxSize() { _isMaxSizeSet = false; }
 
-        bool isMaxSizeSet() {
+        bool isMaxSizeSet() const {
             return _isMaxSizeSet || maxSize.hasDefault();
         }
 
@@ -187,7 +187,7 @@ namespace mongo {
 
         void unsetTags() { _isTagsSet = false; }
 
-        bool isTagsSet() {
+        bool isTagsSet() const {
             return _isTagsSet || tags.hasDefault();
         }
 

@@ -115,7 +115,7 @@ namespace mongo {
 
         void unsetKey() { _isKeySet = false; }
 
-        bool isKeySet() { return _isKeySet; }
+        bool isKeySet() const { return _isKeySet; }
 
         // Calling get*() methods when the member is not set results in undefined behavior
         const std::string getKey() const {
@@ -131,7 +131,7 @@ namespace mongo {
 
         void unsetChunksize() { _isChunksizeSet = false; }
 
-        bool isChunksizeSet() {
+        bool isChunksizeSet() const {
             return _isChunksizeSet || chunksize.hasDefault();
         }
 
@@ -152,7 +152,7 @@ namespace mongo {
 
         void unsetBalancerStopped() { _isBalancerStoppedSet = false; }
 
-        bool isBalancerStoppedSet() {
+        bool isBalancerStoppedSet() const {
             return _isBalancerStoppedSet || balancerStopped.hasDefault();
         }
 
@@ -173,7 +173,7 @@ namespace mongo {
 
         void unsetBalancerActiveWindow() { _isBalancerActiveWindowSet = false; }
 
-        bool isBalancerActiveWindowSet() {
+        bool isBalancerActiveWindowSet() const {
             return _isBalancerActiveWindowSet || balancerActiveWindow.hasDefault();
         }
 
@@ -194,7 +194,7 @@ namespace mongo {
 
         void unsetShortBalancerSleep() { _isShortBalancerSleepSet = false; }
 
-        bool isShortBalancerSleepSet() {
+        bool isShortBalancerSleepSet() const {
             return _isShortBalancerSleepSet || shortBalancerSleep.hasDefault();
         }
 
@@ -215,7 +215,7 @@ namespace mongo {
 
         void unsetSecondaryThrottle() { _isSecondaryThrottleSet = false; }
 
-        bool isSecondaryThrottleSet() {
+        bool isSecondaryThrottleSet() const {
             return _isSecondaryThrottleSet || secondaryThrottle.hasDefault();
         }
 

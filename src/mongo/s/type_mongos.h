@@ -115,7 +115,7 @@ namespace mongo {
 
         void unsetName() { _isNameSet = false; }
 
-        bool isNameSet() { return _isNameSet; }
+        bool isNameSet() const { return _isNameSet; }
 
         // Calling get*() methods when the member is not set results in undefined behavior
         const std::string& getName() const {
@@ -130,7 +130,7 @@ namespace mongo {
 
         void unsetPing() { _isPingSet = false; }
 
-        bool isPingSet() { return _isPingSet; }
+        bool isPingSet() const { return _isPingSet; }
 
         // Calling get*() methods when the member is not set results in undefined behavior
         const Date_t getPing() const {
@@ -145,7 +145,7 @@ namespace mongo {
 
         void unsetUp() { _isUpSet = false; }
 
-        bool isUpSet() { return _isUpSet; }
+        bool isUpSet() const { return _isUpSet; }
 
         // Calling get*() methods when the member is not set results in undefined behavior
         const int getUp() const {
@@ -160,7 +160,7 @@ namespace mongo {
 
         void unsetWaiting() { _isWaitingSet = false; }
 
-        bool isWaitingSet() { return _isWaitingSet; }
+        bool isWaitingSet() const { return _isWaitingSet; }
 
         // Calling get*() methods when the member is not set results in undefined behavior
         const bool getWaiting() const {
@@ -175,7 +175,7 @@ namespace mongo {
 
         void unsetMongoVersion() { _isMongoVersionSet = false; }
 
-        bool isMongoVersionSet() { return _isMongoVersionSet; }
+        bool isMongoVersionSet() const { return _isMongoVersionSet; }
 
         // Calling get*() methods when the member is not set results in undefined behavior
         const std::string& getMongoVersion() const {
@@ -190,7 +190,7 @@ namespace mongo {
 
         void unsetConfigVersion() { _isConfigVersionSet = false; }
 
-        bool isConfigVersionSet() { return _isConfigVersionSet; }
+        bool isConfigVersionSet() const { return _isConfigVersionSet; }
 
         // Calling get*() methods when the member is not set results in undefined behavior
         const int getConfigVersion() const {

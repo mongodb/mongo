@@ -119,7 +119,7 @@ namespace mongo {
 
         void unsetNS() { _isNsSet = false; }
 
-        bool isNSSet() { return _isNsSet; }
+        bool isNSSet() const { return _isNsSet; }
 
         // Calling get*() methods when the member is not set results in undefined behavior
         const std::string getNS() const {
@@ -134,7 +134,7 @@ namespace mongo {
 
         void unsetUpdatedAt() { _isUpdatedAtSet = false; }
 
-        bool isUpdatedAtSet() { return _isUpdatedAtSet; }
+        bool isUpdatedAtSet() const { return _isUpdatedAtSet; }
 
         // Calling get*() methods when the member is not set results in undefined behavior
         const Date_t getUpdatedAt() const {
@@ -165,7 +165,7 @@ namespace mongo {
 
         void unsetPrimary() { _isPrimarySet = false; }
 
-        bool isPrimarySet() {
+        bool isPrimarySet() const {
             return _isPrimarySet || primary.hasDefault();
         }
 
@@ -186,7 +186,7 @@ namespace mongo {
 
         void unsetKeyPattern() { _isKeyPatternSet = false; }
 
-        bool isKeyPatternSet() {
+        bool isKeyPatternSet() const {
             return _isKeyPatternSet || keyPattern.hasDefault();
         }
 
@@ -207,7 +207,7 @@ namespace mongo {
 
         void unsetUnique() { _isUniqueSet = false; }
 
-        bool isUniqueSet() {
+        bool isUniqueSet() const {
             return _isUniqueSet || unique.hasDefault();
         }
 
@@ -228,7 +228,7 @@ namespace mongo {
 
         void unsetNoBalance() { _isNoBalanceSet = false; }
 
-        bool isNoBalanceSet() {
+        bool isNoBalanceSet() const {
             return _isNoBalanceSet || noBalance.hasDefault();
         }
 
