@@ -12,7 +12,7 @@ function createTemporaryConnection() {
     // terminate.
     var pollString = "assert.soon(function() {"
         + "return db.getSiblingDB('" + testDB + "').getCollection('" + signalCollection + "')"
-        + ".findOne().stop;});";
+        + ".findOne().stop;}, \"Parallel shell never told to terminate\", 60000);";
     return startParallelShell(pollString);
 }
 
