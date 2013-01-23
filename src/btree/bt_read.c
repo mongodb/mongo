@@ -111,7 +111,7 @@ __wt_cache_read(WT_SESSION_IMPL *session, WT_PAGE *parent, WT_REF *ref)
 		 * been written, so the checkpoint should treat this new
 		 * in-memory page as empty and skip over it.
 		 */
-		WT_RET(__wt_page_modify_init(session, page));
+		WT_ERR(__wt_page_modify_init(session, page));
 		if (session->btree->modified)
 			__wt_page_modify_set(session, page);
 		F_SET(page->modify, WT_PM_REC_EMPTY);
