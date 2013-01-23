@@ -12,7 +12,7 @@ function createTemporaryConnection() {
     // terminate.
     var pollString = "assert.soon(function() {"
         + "return db.getSiblingDB('" + testDB + "').getCollection('" + signalCollection + "')"
-        + ".findOne().stop;}, \"Parallel shell never told to terminate\", 60000);";
+        + ".findOne().stop;}, \"Parallel shell never told to terminate\", 10 * 60000);";
     return startParallelShell(pollString);
 }
 
@@ -26,7 +26,8 @@ function waitForConnections(expectedCurrentConnections, expectedTotalConnections
                      return "Incorrect connection numbers. Expected " + expectedCurrentConnections +
                          " current connections and " + expectedTotalConnections + " total" +
                          " connections. Connection info from serverStatus: " +
-                         tojson(db.serverStatus().connections); } });
+                         tojson(db.serverStatus().connections); } },
+               5 * 60000);
 
 }
 
