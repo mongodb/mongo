@@ -100,21 +100,6 @@ __wt_cache_read(WT_SESSION_IMPL *session, WT_PAGE *parent, WT_REF *ref)
 		WT_ASSERT(session, previous_state == WT_REF_DELETED);
 
 		WT_ERR(__wt_btree_leaf_create(session, parent, ref, &page));
-
-		/*
-		 * Give the page a modify structure and mark it empty.  If the
-		 * tree is already dirty and so will be written, mark the page
-		 * dirty.
-		 *
-		 * We do this in case the parent page is being checkpointed as
-		 * this page is read.  In that case, leaf pages have already
-		 * been written, so the checkpoint should treat this new
-		 * in-memory page as empty and skip over it.
-		 */
-		WT_ERR(__wt_page_modify_init(session, page));
-		if (session->btree->modified)
-			__wt_page_modify_set(session, page);
-		F_SET(page->modify, WT_PM_REC_EMPTY);
 	} else {
 		/* Read the backing disk page. */
 		WT_ERR(__wt_bt_read(session, &tmp, addr, size));
