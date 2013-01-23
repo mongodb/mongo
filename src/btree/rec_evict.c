@@ -174,11 +174,18 @@ __rec_page_dirty_update(WT_SESSION_IMPL *session, WT_PAGE *page)
 		/*
 		 * Update the parent to reference an empty page.
 		 *
+		 * Set the transaction ID to WT_TXN_NONE because the fact that
+		 * reconciliation left the page "empty" means there's no older
+		 * transaction in the system that might need to see an earlier
+		 * version of the page.  It isn't necessary (WT_TXN_NONE is 0),
+		 * but it's the right thing to do.
+		 *
 		 * Publish: a barrier to ensure the structure fields are set
 		 * before the state change makes the page available to readers.
 		 */
 		parent_ref->page = NULL;
 		parent_ref->addr = NULL;
+		parent_ref->txnid = WT_TXN_NONE;
 		WT_PUBLISH(parent_ref->state, WT_REF_DELETED);
 		break;
 	case WT_PM_REC_REPLACE: 			/* 1-for-1 page swap */
