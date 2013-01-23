@@ -90,9 +90,6 @@ namespace mongo {
         static void setConnPoolTimeout( unsigned timeout ) { _connPoolTimeout = timeout; }
         static unsigned getConnPoolTimeout() { return _connPoolTimeout; }
 
-        static void setMaxSpareConnPools( unsigned max ) { _maxSpareConnPools = max; }
-        static unsigned getMaxSpareConnPools() { return _maxSpareConnPools; }
-
     private:
 
         struct StoredConnection {
