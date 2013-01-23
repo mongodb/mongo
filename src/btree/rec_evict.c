@@ -434,14 +434,12 @@ __rec_review(WT_SESSION_IMPL *session,
 			 * abort the transaction to give up all hazard
 			 * references before trying again.
 			 */
-			if (F_ISSET(txn, TXN_RUNNING)) {
-				__wt_txn_get_oldest(session);
-				if (txn->snap_min == txn->oldest_snap_min &&
-				    ++txn->eviction_fails >= 100) {
-					txn->eviction_fails = 0;
-					ret = WT_DEADLOCK;
-					WT_CSTAT_INCR(session, txn_fail_cache);
-				}
+			if (F_ISSET(txn, TXN_RUNNING) &&
+			    __wt_txn_am_oldest(session) &&
+			    ++txn->eviction_fails >= 100) {
+				txn->eviction_fails = 0;
+				ret = WT_DEADLOCK;
+				WT_CSTAT_INCR(session, txn_fail_cache);
 			}
 
 			/* 
