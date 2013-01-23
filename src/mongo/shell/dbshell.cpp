@@ -236,7 +236,12 @@ void setupSignals() {
     signal( SIGFPE , quitAbruptly );
 
 #if !defined(_WIN32) // surprisingly these are the only ones that don't work on windows
-    signal( SIGPIPE , ignoreSignal ); // errors are handled in socket code directly
+    struct sigaction sigactionSignals;
+    sigactionSignals.sa_handler = ignoreSignal;
+    sigemptyset(&sigactionSignals.sa_mask);
+    sigactionSignals.sa_flags = 0;
+    sigaction(SIGPIPE, &sigactionSignals, NULL); // errors are handled in socket code directly
+
     signal( SIGBUS , quitAbruptly );
 #endif
 
