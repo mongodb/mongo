@@ -29,6 +29,7 @@
 #include "mongo/util/concurrency/msg.h"
 #include "mongo/util/concurrency/task.h"
 #include "mongo/util/concurrency/value.h"
+#include "mongo/util/fail_point_service.h"
 #include "mongo/util/goodies.h"
 #include "mongo/util/mongoutils/html.h"
 #include "mongo/util/ramlog.h"
@@ -36,6 +37,9 @@
 namespace mongo {
 
     using namespace bson;
+
+    MONGO_FP_DECLARE(rsDelayHeartbeatResponse);
+    MONGO_FP_DECLARE(rsStopHeartbeatRequest);
 
     extern bool replSetBlind;
 
@@ -65,6 +69,11 @@ namespace mongo {
                     errmsg = str::stream() << theReplSet->selfFullName() << " is blind";
                 }
                 return false;
+            }
+
+            MONGO_FAIL_POINT_BLOCK(rsDelayHeartbeatResponse, delay) {
+                const BSONObj& data = delay.getData();
+                sleep(data["delay"].numberInt());
             }
 
             /* we don't call ReplSetCommand::check() here because heartbeat
@@ -157,6 +166,15 @@ namespace mongo {
                           bool checkEmpty) {
         if( replSetBlind ) {
             return false;
+        }
+
+        MONGO_FAIL_POINT_BLOCK(rsStopHeartbeatRequest, member) {
+            const BSONObj& data = member.getData();
+            const std::string& stopMember = data["member"].str();
+
+            if (memberFullName == stopMember) {
+                return false;
+            }
         }
 
         BSONObj cmd = BSON( "replSetHeartbeat" << setName <<

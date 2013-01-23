@@ -1061,16 +1061,30 @@ ReplSetTest.prototype.bridge = function( opts ) {
  * the connection between nodes 0 and 2 by calling replTest.partition(0,2) or
  * replTest.partition(2,0) (either way is identical). Then the replica set would
  * have the following bridges: 0->1, 1->0, 1->2, 2->1.
+ *
+ * The bidirectional parameter, which defaults to true, determines whether
+ * replTest.partition(0,2) will stop the bridges for 0->2 and 2->0 (true), or
+ * just 0->2 (false).
  */
-ReplSetTest.prototype.partition = function(from, to) {
+ReplSetTest.prototype.partition = function(from, to, bidirectional) {
+    bidirectional = typeof bidirectional !== 'undefined' ? bidirectional : true;
+
     this.bridges[from][to].stop();
-    this.bridges[to][from].stop();
+
+    if (bidirectional) {
+        this.bridges[to][from].stop();
+    }
 };
 
 /**
  * This reverses a partition created by partition() above.
  */
-ReplSetTest.prototype.unPartition = function(from, to) {
+ReplSetTest.prototype.unPartition = function(from, to, bidirectional) {
+    bidirectional = typeof bidirectional !== 'undefined' ? bidirectional : true;
+
     this.bridges[from][to].start();
-    this.bridges[to][from].start();
+
+    if (bidirectional) {
+        this.bridges[to][from].start();
+    }
 };
