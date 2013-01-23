@@ -429,27 +429,19 @@ __rec_review(WT_SESSION_IMPL *session,
 			    "eviction failed, reconciled page not clean");
 
 			/*
-			 * A pathological case: if we're in the middle of a
-			 * transaction and we're stuck trying to find space,
+			 * A pathological case: if we're the oldest transaction
+			 * in the system and we're stuck trying to find space,
 			 * abort the transaction to give up all hazard
-			 * references before trying again.  Don't fail while
-			 * a checkpoint is running: we know that will pass.
+			 * references before trying again.
 			 */
-			if (F_ISSET(txn, TXN_RUNNING) &&
-			    !btree->checkpointing &&
-			    ++txn->eviction_fails >= 100) {
-				txn->eviction_fails = 0;
-				ret = WT_DEADLOCK;
-				WT_CSTAT_INCR(session, txn_fail_cache);
-			}
-
-			/*
-			 * If there aren't multiple cursors active, there
-			 * are no consistency issues: try to bump our snapshot.
-			 */
-			if (session->ncursors <= 1) {
-				__wt_txn_read_last(session);
-				__wt_txn_read_first(session);
+			if (F_ISSET(txn, TXN_RUNNING)) {
+				__wt_txn_get_oldest(session);
+				if (txn->snap_min == txn->oldest_snap_min &&
+				    ++txn->eviction_fails >= 100) {
+					txn->eviction_fails = 0;
+					ret = WT_DEADLOCK;
+					WT_CSTAT_INCR(session, txn_fail_cache);
+				}
 			}
 
 			/* 
