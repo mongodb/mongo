@@ -241,7 +241,11 @@ namespace mongo {
 
         void ProgramRunner::start() {
             int pipeEnds[ 2 ];
-            verify( pipe( pipeEnds ) != -1 );
+            int status = pipe(pipeEnds);
+            if (status != 0) {
+                error() << "failed to create pipe: " << errnoWithDescription() << endl;
+                fassertFailed(16701);
+            }
 
             fflush( 0 );
             launchProcess(pipeEnds[1]); //sets _pid
