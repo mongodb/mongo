@@ -24,6 +24,9 @@ p = startParallelShell(
                        'for( i = 20000; i < 40000; ++i ) {' +
                        '    db.jstests_removeb.insert( { a:i } );' +
                        '    db.getLastError();' +
+                       '    if (i % 1000 == 0) {' +
+                       '        print( i-20000 + \" of 20000 documents inserted\" );' +
+                       '    }' +
                        '}'
                        );
 
