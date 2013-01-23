@@ -230,8 +230,6 @@ static int  __rec_cell_build_val(WT_SESSION_IMPL *,
 		WT_RECONCILE *, const void *, uint32_t, uint64_t);
 static int  __rec_child_deleted(
 		WT_SESSION_IMPL *, WT_RECONCILE *, WT_PAGE *, WT_REF *, int *);
-static int  __rec_child_modify(
-		WT_SESSION_IMPL *, WT_RECONCILE *, WT_PAGE *, WT_REF *, int *);
 static int  __rec_col_fix(WT_SESSION_IMPL *, WT_RECONCILE *, WT_PAGE *);
 static int  __rec_col_fix_slvg(WT_SESSION_IMPL *,
 		WT_RECONCILE *, WT_PAGE *, WT_SALVAGE_COOKIE *);
@@ -267,282 +265,6 @@ static int  __rec_dictionary_init(WT_SESSION_IMPL *, WT_RECONCILE *, u_int);
 static int  __rec_dictionary_lookup(
 		WT_SESSION_IMPL *, WT_RECONCILE *, WT_KV *, WT_DICTIONARY **);
 static void __rec_dictionary_reset(WT_RECONCILE *);
-
-/*
- * __rec_txn_skip_chk --
- *	Found an update we can't write: if that's not OK, fail.
- */
-static inline int
-__rec_txn_skip_chk(WT_SESSION_IMPL *session, WT_RECONCILE *r)
-{
-	r->upd_skipped = 1;
-
-	switch (F_ISSET(r, WT_SKIP_UPDATE_ERR | WT_SKIP_UPDATE_QUIT)) {
-	case WT_SKIP_UPDATE_ERR:
-		WT_PANIC_RETX(
-		    session, "reconciliation illegally skipped an update");
-	case WT_SKIP_UPDATE_QUIT:
-		WT_DSTAT_INCR(session, rec_skipped_update);
-		return (EBUSY);
-	case 0:
-	default:
-		break;
-	}
-	return (0);
-}
-
-/*
- * __rec_txn_read --
- *	Return the update structure that's visible, or fail if there's a change
- * that's not globally visible and we can't skip changes.
- */
-static inline int
-__rec_txn_read(
-    WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_UPDATE *upd, WT_UPDATE **updp)
-{
-	int skip;
-
-	*updp = __wt_txn_read_skip(session, upd, &skip);
-	if (skip == 0)
-		return (0);
-
-	return (__rec_txn_skip_chk(session, r));
-}
-
-/*
- * __rec_child_modify --
- *	Return if the internal page's child references any modifications.
- */
-static int
-__rec_child_modify(WT_SESSION_IMPL *session,
-    WT_RECONCILE *r, WT_PAGE *page, WT_REF *ref, int *statep)
-{
-	WT_DECL_RET;
-	WT_PAGE_MODIFY *mod;
-
-#define	WT_CHILD_IGNORE		1		/* Deleted child: ignore */
-#define	WT_CHILD_MODIFIED	2		/* Modified child */
-#define	WT_CHILD_PROXY		3		/* Deleted child: proxy */
-	*statep = 0;
-
-	/*
-	 * This function is called when walking an internal page to decide how
-	 * to handle child pages referenced by the internal page, specifically
-	 * if the child page is to be merged into its parent.
-	 *
-	 * Internal pages are reconciled for two reasons: first, when evicting
-	 * an internal page, second by the checkpoint code when writing internal
-	 * pages.  During eviction, the subtree is locked down so all pages
-	 * should be in the WT_REF_DISK or WT_REF_LOCKED state. During
-	 * checkpoint, any eviction that might affect our review of an internal
-	 * page is prohibited, however, as the subtree is not reserved for our
-	 * exclusive use, there are other page states that must be considered.
-	 */
-	for (;; __wt_yield())
-		switch (r->tested_ref_state = ref->state) {
-		case WT_REF_DISK:
-			/* On disk, not modified by definition. */
-			goto done;
-
-		case WT_REF_DELETED:
-			/*
-			 * The child is in a deleted state.
-			 *
-			 * It's possible the state is changing underneath us and
-			 * we can race between checking for a deleted state and
-			 * looking at the stored transaction ID to see if the
-			 * delete is visible to us.  Lock down the structure.
-			 */
-			if (!WT_ATOMIC_CAS(
-			    ref->state, WT_REF_DELETED, WT_REF_LOCKED))
-				break;
-			ret =
-			    __rec_child_deleted(session, r, page, ref, statep);
-			WT_PUBLISH(ref->state, WT_REF_DELETED);
-			goto done;
-
-		case WT_REF_EVICT_FORCE:
-			/*
-			 * The child was entered onto the eviction queue by an
-			 * application thread, and is waiting to be forcibly
-			 * evicted.  We should not be here if called by the
-			 * eviction server, a child page in this state within
-			 * an evicted page's subtree would cause the eviction
-			 * review process to fail.
-			 */
-			WT_ASSERT(session,
-			    !F_ISSET(r, WT_EVICTION_SERVER_LOCKED));
-
-			/*
-			 * If called during checkpoint, the child can't be
-			 * evicted, it's an in-memory case.
-			 */
-			goto in_memory;
-
-		case WT_REF_EVICT_WALK:
-			/*
-			 * The child is locked by a checkpoint or eviction walk
-			 * of the tree.
-			 *
-			 * We should not be here if called by the eviction
-			 * server (the eviction server doesn't evict the page
-			 * that marks its walk in the tree, further, a child
-			 * page in this state within an evicted page's subtree
-			 * would cause the eviction review process to fail).
-			 */
-			WT_ASSERT(session,
-			    !F_ISSET(r, WT_EVICTION_SERVER_LOCKED));
-
-			/*
-			 * We can be here if called by checkpoint (for example,
-			 * the leaf page pass of checkpoint is based on hazard
-			 * references, and so it can collide with the eviction
-			 * server's walk).  The child can't be evicted, it's an
-			 * in-memory case.
-			 */
-			 goto in_memory;
-
-		case WT_REF_LOCKED:
-			/*
-			 * If being called by the eviction server, the evicted
-			 * page's subtree, including this child, was selected
-			 * for eviction by us and the state is stable until we
-			 * reset it, it's an in-memory state.
-			 */
-			if (F_ISSET(r, WT_EVICTION_SERVER_LOCKED))
-				goto in_memory;
-
-			/*
-			 * If called during checkpoint, the child is being
-			 * considered by the eviction server or the child is a
-			 * fast-delete page being read.  The eviction may have
-			 * started before the checkpoint and so we must wait
-			 * for the eviction to be resolved.  I suspect we could
-			 * handle fast-delete reads, but we can't distinguish
-			 * between the two and fast-delete reads aren't expected
-			 * to be common.
-			 */
-			break;
-
-		case WT_REF_MEM:
-			/*
-			 * In memory.  We should not be here if called by the
-			 * eviction server, a child page in this state within
-			 * an evicted page's subtree would have been set to
-			 * WT_REF_LOCKED.
-			 */
-			WT_ASSERT(session,
-			    !F_ISSET(r, WT_EVICTION_SERVER_LOCKED));
-
-			/*
-			 * If called during checkpoint, the child can't be
-			 * evicted, it's an in-memory case.
-			 */
-			goto in_memory;
-
-		case WT_REF_READING:
-			/*
-			 * Being read, not modified by definition.  We should
-			 * never be here if called by the eviction server.
-			 */
-			WT_ASSERT(session,
-			    !F_ISSET(r, WT_EVICTION_SERVER_LOCKED));
-			goto done;
-
-		WT_ILLEGAL_VALUE(session);
-		}
-
-in_memory:
-	/*
-	 * In-memory states: the child is potentially modified if the page's
-	 * modify structure has been instantiated.   If the modify structure
-	 * exists and the page has actually been modified, set that state.
-	 * If that's not the case, we would normally using the original cell's
-	 * disk address as our reference, but, if we're forced to instantiate
-	 * a deleted child page and it's never modified, we end up here with
-	 * a page that has a modify structure, no modifications, and no disk
-	 * address.  Ignore those pages, they're not modified and there is no
-	 * reason to write the cell.
-	 */
-	mod = ref->page->modify;
-	if (mod != NULL && mod->flags != 0)
-		*statep = WT_CHILD_MODIFIED;
-	else if (ref->addr == NULL)
-		*statep = WT_CHILD_IGNORE;
-
-done:	WT_HAVE_DIAGNOSTIC_YIELD;
-	return (ret);
-}
-
-/*
- * __rec_child_deleted --
- *	Handle pages with leaf pages in the WT_REF_DELETED state.
- */
-static int
-__rec_child_deleted(WT_SESSION_IMPL *session,
-    WT_RECONCILE *r, WT_PAGE *page, WT_REF *ref, int *statep)
-{
-	uint32_t size;
-	const uint8_t *addr;
-
-	/*
-	 * Internal pages with child leaf pages in the WT_REF_DELETED state are
-	 * a special case during reconciliation.  First, if the deletion was a
-	 * result of a session truncate call, the deletion may not be visible to
-	 * us.  In that case, we proceed as with any change that's not visible
-	 * during reconciliation by setting the skipped flag and ignoring the
-	 * change for the purposes of writing the internal page.
-	 */
-	if (!__wt_txn_visible(session, ref->txnid))
-		return (__rec_txn_skip_chk(session, r));
-
-	/*
-	 * Deal with any underlying disk blocks.  First, check to see if there
-	 * is an address associated with this leaf: if there isn't, we're done.
-	 *
-	 * Check for any transactions in the system that might want to see the
-	 * page's state before the deletion.
-	 *
-	 * If any such transactions exist, we cannot discard the underlying leaf
-	 * page to the block manager because the transaction may eventually read
-	 * it.  However, this write might be part of a checkpoint, and should we
-	 * recover to that checkpoint, we'll need to delete the leaf page, else
-	 * we'd leak it.  The solution is to write a proxy cell on the internal
-	 * page ensuring the leaf page is eventually discarded.
-	 *
-	 * If no such transactions exist, we can discard the leaf page to the
-	 * block manager and no cell needs to be written at all.  We do this
-	 * outside of the underlying tracking routines because this action is
-	 * permanent and irrevocable.  (Setting the WT_REF.addr value to NULL
-	 * means we've lost track of the disk address in a permanent way.  If
-	 * we ever read into this chunk of the name space again, the cache read
-	 * function instantiates a new page.)
-	 *
-	 * One final note: if the WT_REF transaction ID is set to WT_TXN_NONE,
-	 * it means this WT_REF is the re-creation of a deleted node (we wrote
-	 * out the deleted node after the deletion became visible, but before
-	 * we could delete the leaf page, and subsequently crashed, then read
-	 * the page and re-created the WT_REF_DELETED state).   In other words,
-	 * the delete is visible to all (it became visible), and by definition
-	 * there are no older transactions needing to see previous versions of
-	 * the page.
-	 */
-	if (ref->addr != NULL &&
-	    (ref->txnid == WT_TXN_NONE ||
-	    __wt_txn_visible_all(session, ref->txnid))) {
-		__wt_get_addr(page, ref, &addr, &size);
-		WT_RET(__wt_bm_free(session, addr, size));
-
-		ref->addr = NULL;
-	}
-
-	/*
-	 * If there's still a disk address, then we have to write a proxy
-	 * record, otherwise, we can safely ignore this child page.
-	 */
-	*statep = ref->addr == NULL ? WT_CHILD_IGNORE : WT_CHILD_PROXY;
-	return (0);
-}
 
 /*
  * __wt_rec_write --
@@ -836,6 +558,282 @@ __wt_rec_destroy(WT_SESSION_IMPL *session, void *retp)
 
 	__wt_free(session, r);
 	*(WT_RECONCILE **)retp = NULL;
+}
+
+/*
+ * __rec_txn_skip_chk --
+ *	Found an update we can't write: if that's not OK, fail.
+ */
+static inline int
+__rec_txn_skip_chk(WT_SESSION_IMPL *session, WT_RECONCILE *r)
+{
+	r->upd_skipped = 1;
+
+	switch (F_ISSET(r, WT_SKIP_UPDATE_ERR | WT_SKIP_UPDATE_QUIT)) {
+	case WT_SKIP_UPDATE_ERR:
+		WT_PANIC_RETX(
+		    session, "reconciliation illegally skipped an update");
+	case WT_SKIP_UPDATE_QUIT:
+		WT_DSTAT_INCR(session, rec_skipped_update);
+		return (EBUSY);
+	case 0:
+	default:
+		break;
+	}
+	return (0);
+}
+
+/*
+ * __rec_txn_read --
+ *	Return the update structure that's visible, or fail if there's a change
+ * that's not globally visible and we can't skip changes.
+ */
+static inline int
+__rec_txn_read(
+    WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_UPDATE *upd, WT_UPDATE **updp)
+{
+	int skip;
+
+	*updp = __wt_txn_read_skip(session, upd, &skip);
+	if (skip == 0)
+		return (0);
+
+	return (__rec_txn_skip_chk(session, r));
+}
+
+/*
+ * __rec_child_modify --
+ *	Return if the internal page's child references any modifications.
+ */
+static int
+__rec_child_modify(WT_SESSION_IMPL *session,
+    WT_RECONCILE *r, WT_PAGE *page, WT_REF *ref, int *statep)
+{
+	WT_DECL_RET;
+	WT_PAGE_MODIFY *mod;
+
+#define	WT_CHILD_IGNORE		1		/* Deleted child: ignore */
+#define	WT_CHILD_MODIFIED	2		/* Modified child */
+#define	WT_CHILD_PROXY		3		/* Deleted child: proxy */
+	*statep = 0;
+
+	/*
+	 * This function is called when walking an internal page to decide how
+	 * to handle child pages referenced by the internal page, specifically
+	 * if the child page is to be merged into its parent.
+	 *
+	 * Internal pages are reconciled for two reasons: first, when evicting
+	 * an internal page, second by the checkpoint code when writing internal
+	 * pages.  During eviction, the subtree is locked down so all pages
+	 * should be in the WT_REF_DISK or WT_REF_LOCKED state. During
+	 * checkpoint, any eviction that might affect our review of an internal
+	 * page is prohibited, however, as the subtree is not reserved for our
+	 * exclusive use, there are other page states that must be considered.
+	 */
+	for (;; __wt_yield())
+		switch (r->tested_ref_state = ref->state) {
+		case WT_REF_DISK:
+			/* On disk, not modified by definition. */
+			goto done;
+
+		case WT_REF_DELETED:
+			/*
+			 * The child is in a deleted state.
+			 *
+			 * It's possible the state is changing underneath us and
+			 * we can race between checking for a deleted state and
+			 * looking at the stored transaction ID to see if the
+			 * delete is visible to us.  Lock down the structure.
+			 */
+			if (!WT_ATOMIC_CAS(
+			    ref->state, WT_REF_DELETED, WT_REF_LOCKED))
+				break;
+			ret =
+			    __rec_child_deleted(session, r, page, ref, statep);
+			WT_PUBLISH(ref->state, WT_REF_DELETED);
+			goto done;
+
+		case WT_REF_EVICT_FORCE:
+			/*
+			 * The child was entered onto the eviction queue by an
+			 * application thread, and is waiting to be forcibly
+			 * evicted.  We should not be here if called by the
+			 * eviction server, a child page in this state within
+			 * an evicted page's subtree would cause the eviction
+			 * review process to fail.
+			 */
+			WT_ASSERT(session,
+			    !F_ISSET(r, WT_EVICTION_SERVER_LOCKED));
+
+			/*
+			 * If called during checkpoint, the child can't be
+			 * evicted, it's an in-memory case.
+			 */
+			goto in_memory;
+
+		case WT_REF_EVICT_WALK:
+			/*
+			 * The child is locked by a checkpoint or eviction walk
+			 * of the tree.
+			 *
+			 * We should not be here if called by the eviction
+			 * server (the eviction server doesn't evict the page
+			 * that marks its walk in the tree, further, a child
+			 * page in this state within an evicted page's subtree
+			 * would cause the eviction review process to fail).
+			 */
+			WT_ASSERT(session,
+			    !F_ISSET(r, WT_EVICTION_SERVER_LOCKED));
+
+			/*
+			 * We can be here if called by checkpoint (for example,
+			 * the leaf page pass of checkpoint is based on hazard
+			 * references, and so it can collide with the eviction
+			 * server's walk).  The child can't be evicted, it's an
+			 * in-memory case.
+			 */
+			 goto in_memory;
+
+		case WT_REF_LOCKED:
+			/*
+			 * If being called by the eviction server, the evicted
+			 * page's subtree, including this child, was selected
+			 * for eviction by us and the state is stable until we
+			 * reset it, it's an in-memory state.
+			 */
+			if (F_ISSET(r, WT_EVICTION_SERVER_LOCKED))
+				goto in_memory;
+
+			/*
+			 * If called during checkpoint, the child is being
+			 * considered by the eviction server or the child is a
+			 * fast-delete page being read.  The eviction may have
+			 * started before the checkpoint and so we must wait
+			 * for the eviction to be resolved.  I suspect we could
+			 * handle fast-delete reads, but we can't distinguish
+			 * between the two and fast-delete reads aren't expected
+			 * to be common.
+			 */
+			break;
+
+		case WT_REF_MEM:
+			/*
+			 * In memory.  We should not be here if called by the
+			 * eviction server, a child page in this state within
+			 * an evicted page's subtree would have been set to
+			 * WT_REF_LOCKED.
+			 */
+			WT_ASSERT(session,
+			    !F_ISSET(r, WT_EVICTION_SERVER_LOCKED));
+
+			/*
+			 * If called during checkpoint, the child can't be
+			 * evicted, it's an in-memory case.
+			 */
+			goto in_memory;
+
+		case WT_REF_READING:
+			/*
+			 * Being read, not modified by definition.  We should
+			 * never be here if called by the eviction server.
+			 */
+			WT_ASSERT(session,
+			    !F_ISSET(r, WT_EVICTION_SERVER_LOCKED));
+			goto done;
+
+		WT_ILLEGAL_VALUE(session);
+		}
+
+in_memory:
+	/*
+	 * In-memory states: the child is potentially modified if the page's
+	 * modify structure has been instantiated.   If the modify structure
+	 * exists and the page has actually been modified, set that state.
+	 * If that's not the case, we would normally using the original cell's
+	 * disk address as our reference, but, if we're forced to instantiate
+	 * a deleted child page and it's never modified, we end up here with
+	 * a page that has a modify structure, no modifications, and no disk
+	 * address.  Ignore those pages, they're not modified and there is no
+	 * reason to write the cell.
+	 */
+	mod = ref->page->modify;
+	if (mod != NULL && mod->flags != 0)
+		*statep = WT_CHILD_MODIFIED;
+	else if (ref->addr == NULL)
+		*statep = WT_CHILD_IGNORE;
+
+done:	WT_HAVE_DIAGNOSTIC_YIELD;
+	return (ret);
+}
+
+/*
+ * __rec_child_deleted --
+ *	Handle pages with leaf pages in the WT_REF_DELETED state.
+ */
+static int
+__rec_child_deleted(WT_SESSION_IMPL *session,
+    WT_RECONCILE *r, WT_PAGE *page, WT_REF *ref, int *statep)
+{
+	uint32_t size;
+	const uint8_t *addr;
+
+	/*
+	 * Internal pages with child leaf pages in the WT_REF_DELETED state are
+	 * a special case during reconciliation.  First, if the deletion was a
+	 * result of a session truncate call, the deletion may not be visible to
+	 * us.  In that case, we proceed as with any change that's not visible
+	 * during reconciliation by setting the skipped flag and ignoring the
+	 * change for the purposes of writing the internal page.
+	 */
+	if (!__wt_txn_visible(session, ref->txnid))
+		return (__rec_txn_skip_chk(session, r));
+
+	/*
+	 * Deal with any underlying disk blocks.  First, check to see if there
+	 * is an address associated with this leaf: if there isn't, we're done.
+	 *
+	 * Check for any transactions in the system that might want to see the
+	 * page's state before the deletion.
+	 *
+	 * If any such transactions exist, we cannot discard the underlying leaf
+	 * page to the block manager because the transaction may eventually read
+	 * it.  However, this write might be part of a checkpoint, and should we
+	 * recover to that checkpoint, we'll need to delete the leaf page, else
+	 * we'd leak it.  The solution is to write a proxy cell on the internal
+	 * page ensuring the leaf page is eventually discarded.
+	 *
+	 * If no such transactions exist, we can discard the leaf page to the
+	 * block manager and no cell needs to be written at all.  We do this
+	 * outside of the underlying tracking routines because this action is
+	 * permanent and irrevocable.  (Setting the WT_REF.addr value to NULL
+	 * means we've lost track of the disk address in a permanent way.  If
+	 * we ever read into this chunk of the name space again, the cache read
+	 * function instantiates a new page.)
+	 *
+	 * One final note: if the WT_REF transaction ID is set to WT_TXN_NONE,
+	 * it means this WT_REF is the re-creation of a deleted node (we wrote
+	 * out the deleted node after the deletion became visible, but before
+	 * we could delete the leaf page, and subsequently crashed, then read
+	 * the page and re-created the WT_REF_DELETED state).   In other words,
+	 * the delete is visible to all (it became visible), and by definition
+	 * there are no older transactions needing to see previous versions of
+	 * the page.
+	 */
+	if (ref->addr != NULL &&
+	    (ref->txnid == WT_TXN_NONE ||
+	    __wt_txn_visible_all(session, ref->txnid))) {
+		__wt_get_addr(page, ref, &addr, &size);
+		WT_RET(__wt_bm_free(session, addr, size));
+
+		ref->addr = NULL;
+	}
+
+	/*
+	 * If there's still a disk address, then we have to write a proxy
+	 * record, otherwise, we can safely ignore this child page.
+	 */
+	*statep = ref->addr == NULL ? WT_CHILD_IGNORE : WT_CHILD_PROXY;
+	return (0);
 }
 
 /*
