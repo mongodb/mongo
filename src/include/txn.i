@@ -343,4 +343,3 @@ __wt_txn_am_oldest(WT_SESSION_IMPL *session)
 	F_SET(txn, TXN_OLDEST);
 	return (1);
 }
-
