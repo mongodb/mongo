@@ -62,10 +62,14 @@ namespace mongo {
             return false;
         }
 
-        // Either sharding or primary information should be filled.
-        if (_primary.empty() == (_keyPattern.nFields() == 0)) {
-            *errMsg = stream() << "either " << primary.name() << " or " << keyPattern.name()
-                               << " should be filled";
+        // Either sharding or primary information or dropped should be filled.
+        int numSet = 0;
+        if (_isPrimarySet && !_primary.empty()) numSet++;
+        if (_isKeyPatternSet && !(_keyPattern.nFields() == 0)) numSet++;
+        if (_isDroppedSet && _dropped) numSet++;
+        if (numSet != 1) {
+            *errMsg = stream() << "one of " << primary.name() << " or " << keyPattern.name()
+                               << " or " << dropped.name() << " should be filled";
             return false;
         }
 

@@ -104,10 +104,9 @@ namespace {
     TEST(Compatibility, OldDroppedTrue) {
         // The 'dropped' field creates a special case. We still validly parse the document
         // containing it but we need to ignore dropped collections in code which uses this.
+        // Dropped collections should not have sharding information.
         CollectionType coll;
         BSONObj obj = BSON(CollectionType::ns("db.coll") <<
-                           CollectionType::keyPattern(BSON("a" << 1)) <<
-                           CollectionType::unique(false) <<
                            CollectionType::DEPRECATED_lastmod(1ULL) <<
                            CollectionType::DEPRECATED_lastmodEpoch(OID::gen()) <<
                            CollectionType::dropped(true));

@@ -166,7 +166,8 @@ resetBackupDBs();
 
 jsTest.log("Adding bad (dropped) sharded collection data...")
 
-config.collections.update({ _id : coll + "" }, { $set : { dropped : true }});
+printjson(coll.drop());
+printjson(config.collections.find().toArray());
 
 // Make sure up
 var mongosNew = MongoRunner.runMongos({ binVersion : "2.4", configdb : configConnStr, upgrade : "" })
