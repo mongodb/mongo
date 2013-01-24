@@ -53,15 +53,17 @@ namespace mongo {
 
                 MongosType ping;
                 string errMsg;
-                if (!ping.parseBSON(pingDoc, &errMsg) || !ping.isValid(&errMsg)) {
+                // NOTE: We don't care if the ping is invalid, legacy stuff will be
+                if (!ping.parseBSON(pingDoc, &errMsg)) {
                     warning() << "could not parse ping document: " << pingDoc << causedBy(errMsg)
                               << endl;
+                    continue;
                 }
 
                 string mongoVersion = "2.0";
                 // Hack to determine older mongos versions from ping format
-                if (!pingDoc[MongosType::waiting()].eoo()) mongoVersion = "2.2";
-                if (ping.getMongoVersion() != "") {
+                if (ping.isWaitingSet()) mongoVersion = "2.2";
+                if (ping.isMongoVersionSet() && ping.getMongoVersion() != "") {
                     mongoVersion = ping.getMongoVersion();
                 }
 
