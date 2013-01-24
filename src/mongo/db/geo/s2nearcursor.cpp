@@ -32,7 +32,7 @@ namespace mongo {
           _params(params), _keyPattern(keyPattern),
           _nscanned(0), _matchTested(0), _geoMatchTested(0), _numShells(0), _keyGeoSkip(0),
           _nearFieldIndex(0), _numReturned(0), _returnSkip(0),
-          _btreeDups(0), _inAnnulusTested(0) {
+          _btreeDups(0), _inAnnulusTested(0), _returnedDistance(0) {
 
         BSONObjBuilder geoFieldsToNuke;
         for (size_t i = 0; i < _indexedGeoFields.size(); ++i) {
@@ -151,6 +151,7 @@ namespace mongo {
         }
 
         if (!_results.empty()) {
+            _returnedDistance = _results.top().distance;
             _returned.insert(_results.top().loc);
             _results.pop();
             ++_numReturned;
@@ -329,6 +330,11 @@ namespace mongo {
                     double dist = distanceTo(oi->Obj());
                     minDistance = min(dist, minDistance);
                 }
+
+                // We could be in an annulus, yield, add new points closer to
+                // query point than the last point we returned, then unyield.
+                // This would return points out of order.
+                if (minDistance < _returnedDistance) { continue; }
 
                 // If the min. distance satisfies our distance criteria
                 if (minDistance >= _innerRadius && minDistance < _outerRadius) {

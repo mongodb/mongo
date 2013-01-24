@@ -141,5 +141,6 @@ namespace mongo {
         long long _returnSkip;
         long long _btreeDups;
         long long _inAnnulusTested;
+        double _returnedDistance;
     };
 }  // namespace mongo
