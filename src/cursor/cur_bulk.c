@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -31,8 +31,8 @@ __curbulk_insert(WT_CURSOR *cursor)
 		WT_CURSOR_NEEDKEY(cursor);
 	WT_CURSOR_NEEDVALUE(cursor);
 	WT_ERR(__wt_bulk_insert(cbulk));
-err:	API_END(session);
 
+err:	API_END(session);
 	return (ret);
 }
 
@@ -60,8 +60,8 @@ __curbulk_close(WT_CURSOR *cursor)
 	/* The URI is owned by the btree handle. */
 	cursor->uri = NULL;
 	WT_TRET(__wt_cursor_close(cursor));
-	API_END(session);
 
+err:	API_END(session);
 	return (ret);
 }
 

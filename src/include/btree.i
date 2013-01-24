@@ -1,20 +1,54 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
  */
 
 /*
+ * __wt_page_is_modified --
+ *	Return if the page is dirty.
+ */
+static inline int
+__wt_page_is_modified(WT_PAGE *page)
+{
+	return (page->modify != NULL &&
+	    page->modify->write_gen != page->modify->disk_gen ? 1 : 0);
+}
+
+/*
+ * __wt_eviction_page_force --
+ *      Add a page for forced eviction if it matches the criteria.
+ */
+static inline int
+__wt_eviction_page_force(WT_SESSION_IMPL *session, WT_PAGE *page)
+{
+	WT_BTREE *btree;
+
+	btree = session->btree;
+	if (btree != NULL && !F_ISSET(btree, WT_BTREE_NO_EVICTION) &&
+	    __wt_page_is_modified(page) &&
+	    page->type != WT_PAGE_ROW_INT && page->type != WT_PAGE_COL_INT &&
+	    page->memory_footprint > btree->maxmempage)
+		return (__wt_evict_forced_page(session, page));
+
+	return (0);
+}
+
+/*
  * __wt_cache_page_inmem_incr --
  *	Increment a page's memory footprint in the cache.
  */
 static inline void
-__wt_cache_page_inmem_incr(
-    WT_SESSION_IMPL *session, WT_PAGE *page, size_t size)
+__wt_cache_page_inmem_incr(WT_SESSION_IMPL *session, WT_PAGE *page, size_t size)
 {
-	(void)WT_ATOMIC_ADD(S2C(session)->cache->bytes_inmem, size);
+	WT_CACHE *cache;
+
+	cache = S2C(session)->cache;
+	(void)WT_ATOMIC_ADD(cache->bytes_inmem, size);
 	(void)WT_ATOMIC_ADD(page->memory_footprint, WT_STORE_SIZE(size));
+	if (__wt_page_is_modified(page))
+		(void)WT_ATOMIC_ADD(cache->bytes_dirty, size);
 }
 
 /*
@@ -22,11 +56,42 @@ __wt_cache_page_inmem_incr(
  *	Decrement a page's memory footprint in the cache.
  */
 static inline void
-__wt_cache_page_inmem_decr(
-    WT_SESSION_IMPL *session, WT_PAGE *page, size_t size)
+__wt_cache_page_inmem_decr(WT_SESSION_IMPL *session, WT_PAGE *page, size_t size)
 {
-	(void)WT_ATOMIC_SUB(S2C(session)->cache->bytes_inmem, size);
+	WT_CACHE *cache;
+
+	cache = S2C(session)->cache;
+	(void)WT_ATOMIC_SUB(cache->bytes_inmem, size);
 	(void)WT_ATOMIC_SUB(page->memory_footprint, WT_STORE_SIZE(size));
+	if (__wt_page_is_modified(page))
+		(void)WT_ATOMIC_SUB(cache->bytes_dirty, size);
+}
+
+/*
+ * __wt_cache_dirty_decr --
+ *	Decrement a page's memory footprint from the cache dirty count. Will
+ *	be called after a reconciliation leaves a page clean.
+ */
+static inline void
+__wt_cache_dirty_decr(WT_SESSION_IMPL *session, size_t size)
+{
+	WT_CACHE *cache;
+
+	cache = S2C(session)->cache;
+	if (cache->bytes_dirty < size || cache->pages_dirty == 0) {
+		if (WT_VERBOSE_ISSET(session, evictserver))
+			(void)__wt_verbose(session,
+			    "Cache dirty decrement failed: %" PRIu64
+			    " pages dirty, %" PRIu64
+			    " bytes dirty, decrement size %" PRIuMAX,
+			    cache->pages_dirty,
+			    cache->bytes_dirty, (uintmax_t)size);
+		cache->bytes_dirty = 0;
+		cache->pages_dirty = 0;
+	} else {
+		(void)WT_ATOMIC_SUB(cache->bytes_dirty, size);
+		(void)WT_ATOMIC_SUB(cache->pages_dirty, 1);
+	}
 }
 
 /*
@@ -39,12 +104,19 @@ __wt_cache_page_read(WT_SESSION_IMPL *session, WT_PAGE *page, size_t size)
 	WT_CACHE *cache;
 
 	cache = S2C(session)->cache;
-
 	WT_ASSERT(session, size != 0);
-
 	(void)WT_ATOMIC_ADD(cache->pages_read, 1);
 	(void)WT_ATOMIC_ADD(cache->bytes_read, size);
 	(void)WT_ATOMIC_ADD(page->memory_footprint, WT_STORE_SIZE(size));
+
+	/*
+	 * It's unusual, but possible, that the page is already dirty.
+	 * For example, when reading an in-memory page with references to
+	 * deleted leaf pages, the internal page may be marked dirty.  If so,
+	 * update the total bytes dirty here.
+	 */
+	if (__wt_page_is_modified(page))
+		(void)WT_ATOMIC_ADD(cache->bytes_dirty, size);
 }
 
 /*
@@ -57,9 +129,7 @@ __wt_cache_page_evict(WT_SESSION_IMPL *session, WT_PAGE *page)
 	WT_CACHE *cache;
 
 	cache = S2C(session)->cache;
-
 	WT_ASSERT(session, page->memory_footprint != 0);
-
 	(void)WT_ATOMIC_ADD(cache->pages_evict, 1);
 	(void)WT_ATOMIC_ADD(cache->bytes_evict, page->memory_footprint);
 
@@ -113,6 +183,16 @@ __wt_cache_bytes_inuse(WT_CACHE *cache)
 }
 
 /*
+ * __wt_cache_dirty_bytes --
+ *	Return the number of bytes in cache marked dirty.
+ */
+static inline uint64_t
+__wt_cache_dirty_bytes(WT_CACHE *cache)
+{
+	return (cache->bytes_dirty);
+}
+
+/*
  * __wt_page_modify_init --
  *	A page is about to be modified, allocate the modification structure.
  */
@@ -140,8 +220,13 @@ __wt_page_modify_init(WT_SESSION_IMPL *session, WT_PAGE *page)
  *	Mark the page dirty.
  */
 static inline void
-__wt_page_modify_set(WT_PAGE *page)
+__wt_page_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
+	if (!__wt_page_is_modified(page)) {
+		(void)WT_ATOMIC_ADD(S2C(session)->cache->pages_dirty, 1);
+		(void)WT_ATOMIC_ADD(
+		    S2C(session)->cache->bytes_dirty, page->memory_footprint);
+	}
 	/*
 	 * Publish: there must be a barrier to ensure all changes to the page
 	 * are flushed before we update the page's write generation, otherwise
@@ -171,18 +256,26 @@ __wt_page_and_tree_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 */
 	btree->modified = 1;
 
-	__wt_page_modify_set(page);
+	__wt_page_modify_set(session, page);
 }
 
 /*
- * __wt_page_is_modified --
- *	Return if the page is dirty.
+ * __wt_page_write_gen_wrapped_check --
+ *	Confirm the page's write generation number hasn't wrapped.
  */
 static inline int
-__wt_page_is_modified(WT_PAGE *page)
+__wt_page_write_gen_wrapped_check(WT_PAGE *page)
 {
-	return (page->modify != NULL &&
-	    page->modify->write_gen != page->modify->disk_gen ? 1 : 0);
+	WT_PAGE_MODIFY *mod;
+
+	mod = page->modify;
+
+	/* 
+	 * If the page's write generation has wrapped and caught up with the
+	 * disk generation (wildly unlikely but technically possible as it
+	 * implies 4B updates between page reconciliations), fail the update.
+	 */
+	return (mod->write_gen + 1 == mod->disk_gen ? WT_RESTART : 0);
 }
 
 /*
@@ -195,7 +288,7 @@ __wt_page_write_gen_check(
 {
 	WT_PAGE_MODIFY *mod;
 
-	mod = page->modify;
+	WT_RET(__wt_page_write_gen_wrapped_check(page));
 
 	/*
 	 * If the page's write generation matches the search generation, we can
@@ -204,10 +297,11 @@ __wt_page_write_gen_check(
 	 * possible as it implies 4B updates between page reconciliations), fail
 	 * the update.
 	 */
-	if (mod->write_gen == write_gen && mod->write_gen + 1 != mod->disk_gen)
+	mod = page->modify;
+	if (mod->write_gen == write_gen)
 		return (0);
 
-	WT_BSTAT_INCR(session, txn_write_conflict);
+	WT_DSTAT_INCR(session, txn_write_conflict);
 	return (WT_RESTART);
 }
 
@@ -307,7 +401,7 @@ __wt_get_addr(
  * __wt_page_release --
  *	Release a reference to a page.
  */
-static inline void
+static inline int
 __wt_page_release(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_BTREE *btree;
@@ -319,39 +413,40 @@ __wt_page_release(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * in memory, regardless.
 	 */
 	if (page == NULL || WT_PAGE_IS_ROOT(page))
-		return;
+		return (0);
 
-	/* If this is a non cached page, discard it. */
+	/* If this page isn't cached, discard it. */
 	if (F_ISSET(btree, WT_BTREE_NO_CACHE)) {
 		page->ref->page = NULL;
 		page->ref->state = WT_REF_DISK;
 		__wt_page_out(session, &page, 0);
-		return;
+		return (0);
 	}
 
-	/* Discard our hazard reference. */
-	__wt_hazard_clear(session, page);
+	/* Discard our hazard pointer. */
+	return (__wt_hazard_clear(session, page));
 }
 
 /*
  * __wt_stack_release --
  *	Release references to a page stack.
  */
-static inline void
+static inline int
 __wt_stack_release(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_PAGE *next;
 
 	while (page != NULL && !WT_PAGE_IS_ROOT(page)) {
 		next = page->parent;
-		__wt_page_release(session, page);
+		WT_RET(__wt_page_release(session, page));
 		page = next;
 	}
+	return (0);
 }
 
 /*
  * __wt_page_hazard_check --
- *	Return if there's a hazard reference to the page in the system.
+ *	Return if there's a hazard pointer to the page in the system.
  */
 static inline WT_HAZARD *
 __wt_page_hazard_check(WT_SESSION_IMPL *session, WT_PAGE *page)
@@ -366,7 +461,7 @@ __wt_page_hazard_check(WT_SESSION_IMPL *session, WT_PAGE *page)
 	/*
 	 * No lock is required because the session array is fixed size, but it
 	 * it may contain inactive entries.  We must review any active session
-	 * that might contain a hazard reference, so insert a barrier before
+	 * that might contain a hazard pointer, so insert a barrier before
 	 * reading the active session count.  That way, no matter what sessions
 	 * come or go, we'll check the slots for all of the sessions that could
 	 * have been active when we started our check.

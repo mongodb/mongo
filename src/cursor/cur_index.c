@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -38,8 +38,8 @@ __curindex_get_value(WT_CURSOR *cursor, ...)
 		ret = __wt_schema_project_out(session,
 		    cindex->cg_cursors, cindex->value_plan, ap);
 	va_end(ap);
-err:	API_END(session);
 
+err:	API_END(session);
 	return (ret);
 }
 
@@ -54,8 +54,8 @@ __curindex_set_value(WT_CURSOR *cursor, ...)
 	WT_SESSION_IMPL *session;
 
 	CURSOR_API_CALL(cursor, session, set_value, NULL);
-	WT_UNUSED(ret);
-	cursor->saved_err = ENOTSUP;
+	ret = ENOTSUP;
+err:	cursor->saved_err = ret;
 	F_CLR(cursor, WT_CURSTD_VALUE_SET);
 	API_END(session);
 }
@@ -69,15 +69,15 @@ static int
 __curindex_move(WT_CURSOR_INDEX *cindex)
 {
 	WT_CURSOR **cp, *first;
-	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
-	int i;
+	u_int i;
 
 	session = (WT_SESSION_IMPL *)cindex->iface.session;
 	first = NULL;
 
 	/* Point the public cursor to the key in the child. */
 	__wt_cursor_set_raw_key(&cindex->iface, &cindex->child->key);
+	F_CLR(&cindex->iface, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
 
 	for (i = 0, cp = cindex->cg_cursors;
 	    i < WT_COLGROUPS(cindex->table);
@@ -90,7 +90,7 @@ __curindex_move(WT_CURSOR_INDEX *cindex)
 			 * key columns, so we have to use the full key format,
 			 * not just the public columns.
 			 */
-			WT_ERR(__wt_schema_project_slice(session,
+			WT_RET(__wt_schema_project_slice(session,
 			    cp, cindex->index->key_plan,
 			    1, cindex->index->key_format,
 			    &cindex->iface.key));
@@ -100,15 +100,12 @@ __curindex_move(WT_CURSOR_INDEX *cindex)
 			(*cp)->key.size = first->key.size;
 			(*cp)->recno = first->recno;
 		}
-		F_SET(*cp, WT_CURSTD_KEY_SET);
-		WT_ERR((*cp)->search(*cp));
+		F_SET(*cp, WT_CURSTD_KEY_APP);
+		WT_RET((*cp)->search(*cp));
 	}
 
-	F_SET(&cindex->iface, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
-	if (0) {
-err:		F_CLR(&cindex->iface, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
-	}
-	return (ret);
+	F_SET(&cindex->iface, WT_CURSTD_KEY_RET | WT_CURSTD_VALUE_RET);
+	return (0);
 }
 
 /*
@@ -124,12 +121,12 @@ __curindex_next(WT_CURSOR *cursor)
 
 	cindex = (WT_CURSOR_INDEX *)cursor;
 	CURSOR_API_CALL(cursor, session, next, NULL);
+	F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
+
 	if ((ret = cindex->child->next(cindex->child)) == 0)
 		ret = __curindex_move(cindex);
-	else
-		F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
-	API_END(session);
 
+err:	API_END(session);
 	return (ret);
 }
 
@@ -146,12 +143,12 @@ __curindex_prev(WT_CURSOR *cursor)
 
 	cindex = (WT_CURSOR_INDEX *)cursor;
 	CURSOR_API_CALL(cursor, session, prev, NULL);
+	F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
+
 	if ((ret = cindex->child->prev(cindex->child)) == 0)
 		ret = __curindex_move(cindex);
-	else
-		F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
-	API_END(session);
 
+err:	API_END(session);
 	return (ret);
 }
 
@@ -166,12 +163,13 @@ __curindex_reset(WT_CURSOR *cursor)
 	WT_CURSOR_INDEX *cindex;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
-	int i;
+	u_int i;
 
 	cindex = (WT_CURSOR_INDEX *)cursor;
 	CURSOR_API_CALL(cursor, session, reset, NULL);
-	WT_TRET(cindex->child->reset(cindex->child));
+	F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
 
+	WT_TRET(cindex->child->reset(cindex->child));
 	for (i = 0, cp = cindex->cg_cursors;
 	    i < WT_COLGROUPS(cindex->table);
 	    i++, cp++) {
@@ -179,8 +177,8 @@ __curindex_reset(WT_CURSOR *cursor)
 			continue;
 		WT_TRET((*cp)->reset(*cp));
 	}
-	API_END(session);
 
+err:	API_END(session);
 	return (ret);
 }
 
@@ -227,10 +225,10 @@ __curindex_search(WT_CURSOR *cursor)
 	WT_ERR(__curindex_move(cindex));
 
 	if (0) {
-err:		F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
+err:		F_CLR(cursor, WT_CURSTD_KEY_RET | WT_CURSTD_VALUE_RET);
 	}
-	API_END(session);
 
+	API_END(session);
 	return (ret);
 }
 
@@ -251,9 +249,9 @@ __curindex_search_near(WT_CURSOR *cursor, int *exact)
 	if ((ret = cindex->child->search_near(cindex->child, exact)) == 0)
 		ret = __curindex_move(cindex);
 	else
-		F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
-	API_END(session);
+		F_CLR(cursor, WT_CURSTD_KEY_RET | WT_CURSTD_VALUE_RET);
 
+err:	API_END(session);
 	return (ret);
 }
 
@@ -269,19 +267,20 @@ __curindex_close(WT_CURSOR *cursor)
 	WT_DECL_RET;
 	WT_INDEX *idx;
 	WT_SESSION_IMPL *session;
-	int i;
+	u_int i;
 
 	cindex = (WT_CURSOR_INDEX *)cursor;
 	idx = cindex->index;
 
 	CURSOR_API_CALL(cursor, session, close, NULL);
 
-	for (i = 0, cp = (cindex)->cg_cursors;
-	    i < WT_COLGROUPS(cindex->table); i++, cp++)
-		if (*cp != NULL) {
-			WT_TRET((*cp)->close(*cp));
-			*cp = NULL;
-		}
+	if ((cp = cindex->cg_cursors) != NULL)
+		for (i = 0, cp = cindex->cg_cursors;
+		    i < WT_COLGROUPS(cindex->table); i++, cp++)
+			if (*cp != NULL) {
+				WT_TRET((*cp)->close(*cp));
+				*cp = NULL;
+			}
 
 	__wt_free(session, cindex->cg_cursors);
 	if (cindex->key_plan != idx->key_plan)
@@ -296,8 +295,8 @@ __curindex_close(WT_CURSOR *cursor)
 	/* The URI is owned by the index. */
 	cursor->uri = NULL;
 	WT_TRET(__wt_cursor_close(cursor));
-	API_END(session);
 
+err:	API_END(session);
 	return (ret);
 }
 
@@ -338,33 +337,21 @@ int
 __wt_curindex_open(WT_SESSION_IMPL *session,
     const char *uri, const char *cfg[], WT_CURSOR **cursorp)
 {
-	static WT_CURSOR iface = {
-		NULL,
-		NULL,
-		NULL,
-		NULL,
-		NULL,
-		__curindex_get_value,
-		NULL,
-		__curindex_set_value,
-		NULL,			/* compare */
-		__curindex_next,
-		__curindex_prev,
-		__curindex_reset,
-		__curindex_search,
-		__curindex_search_near,
-		__wt_cursor_notsup,	/* insert */
-		__wt_cursor_notsup,	/* update */
-		__wt_cursor_notsup,	/* remove */
-		__curindex_close,
-		{ NULL, NULL },		/* TAILQ_ENTRY q */
-		0,			/* recno key */
-		{ 0 },			/* recno raw buffer */
-		{ NULL, 0, 0, NULL, 0 },/* WT_ITEM key */
-		{ NULL, 0, 0, NULL, 0 },/* WT_ITEM value */
-		0,			/* int saved_err */
-		0			/* uint32_t flags */
-	};
+	WT_CURSOR_STATIC_INIT(iface,
+	    NULL,			/* get-key */
+	    __curindex_get_value,	/* get-value */
+	    NULL,			/* set-key */
+	    __curindex_set_value,	/* set-value */
+	    NULL,			/* compare */
+	    __curindex_next,		/* next */
+	    __curindex_prev,		/* prev */
+	    __curindex_reset,		/* reset */
+	    __curindex_search,		/* search */
+	    __curindex_search_near,	/* search-near */
+	    __wt_cursor_notsup,		/* insert */
+	    __wt_cursor_notsup,		/* update */
+	    __wt_cursor_notsup,		/* remove */
+	    __curindex_close);		/* close */
 	WT_CURSOR_INDEX *cindex;
 	WT_CURSOR *cursor;
 	WT_DECL_RET;
@@ -443,7 +430,7 @@ __wt_curindex_open(WT_SESSION_IMPL *session,
 	WT_ERR(__wt_cursor_init(cursor, cursor->uri, NULL, cfg, cursorp));
 
 	if (0) {
-err:		(void)__curindex_close(cursor);
+err:		WT_TRET(__curindex_close(cursor));
 	}
 
 	return (ret);

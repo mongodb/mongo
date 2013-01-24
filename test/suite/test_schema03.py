@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Public Domain 2008-2012 WiredTiger, Inc.
+# Public Domain 2008-2013 WiredTiger, Inc.
 #
 # This is free and unencumbered software released into the public domain.
 #
@@ -405,7 +405,7 @@ class test_schema03(wttest.WiredTigerTestCase):
             #     colgroups named 'g0' --> 'g<N>'
             #     indices named 'i0' --> 'i<N>'
 
-            config = "";
+            config = ""
             config += "key_format=" + tc.keyformats
             config += ",value_format=" + tc.valueformats
             config += ",columns=("

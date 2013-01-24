@@ -1,5 +1,5 @@
 /*-
- * Public Domain 2008-2012 WiredTiger, Inc.
+ * Public Domain 2008-2013 WiredTiger, Inc.
  *
  * This is free and unencumbered software released into the public domain.
  *
@@ -25,8 +25,9 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include <signal.h>
 #include "wt_internal.h"
+
+#include <signal.h>
 
 typedef struct {
 	char *progname;				/* Program name */

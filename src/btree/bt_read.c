@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -33,7 +33,7 @@ __cache_read_row_deleted(
 	WT_RET(__wt_page_modify_init(session, page));
 	page->modify->first_id = ref->txnid;
 	if (btree->modified)
-		__wt_page_modify_set(page);
+		__wt_page_modify_set(session, page);
 
 	/* Allocate the update array. */
 	WT_RET(__wt_calloc_def(session, page->entries, &upd_array));
@@ -78,12 +78,13 @@ __wt_cache_read(WT_SESSION_IMPL *session, WT_PAGE *parent, WT_REF *ref)
 	WT_CLEAR(tmp);
 
 	/*
-	 * Attempt to set the state to WT_REF_READING; if successful, we've
-	 * won the race, read the page.
+	 * Attempt to set the state to WT_REF_READING for normal reads, or
+	 * WT_REF_LOCKED, for deleted pages.  If successful, we've won the
+	 * race, read the page.
 	 */
 	if (WT_ATOMIC_CAS(ref->state, WT_REF_DISK, WT_REF_READING))
 		previous_state = WT_REF_DISK;
-	else if (WT_ATOMIC_CAS(ref->state, WT_REF_DELETED, WT_REF_READING))
+	else if (WT_ATOMIC_CAS(ref->state, WT_REF_DELETED, WT_REF_LOCKED))
 		previous_state = WT_REF_DELETED;
 	else
 		return (0);

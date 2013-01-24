@@ -1,5 +1,5 @@
 /*-
- * Public Domain 2008-2012 WiredTiger, Inc.
+ * Public Domain 2008-2013 WiredTiger, Inc.
  *
  * This is free and unencumbered software released into the public domain.
  *
@@ -82,7 +82,7 @@ wts_ops(void)
 		for (;;) {
 			total.search =
 			    total.insert = total.remove = total.update = 0;
-			for (i = running = 0; i < g.c_threads; ++i) {
+			for (i = 0, running = 0; i < g.c_threads; ++i) {
 				total.search += tinfo[i].search;
 				total.insert += tinfo[i].insert;
 				total.remove += tinfo[i].remove;
@@ -123,7 +123,7 @@ ops(void *arg)
 	WT_CURSOR *cursor, *cursor_insert;
 	WT_SESSION *session;
 	WT_ITEM key, value;
-	uint64_t cnt, keyno, ckpt_op, session_period, thread_ops;
+	uint64_t cnt, keyno, ckpt_op, compact_op, session_period, thread_ops;
 	uint32_t op;
 	uint8_t *keybuf, *valbuf;
 	u_int np;
@@ -151,8 +151,9 @@ ops(void *arg)
 	cursor = cursor_insert = NULL;
 	session_period = 100 * MMRAND(1, 50);
 
-	/* Pick an operation where we'll do a checkpoint. */
+	/* Pick an operation where we'll do a checkpoint, compaction. */
 	ckpt_op = MMRAND(1, thread_ops);
+	compact_op = MMRAND(1, thread_ops);
 
 	for (cnt = 0; cnt < thread_ops; ++cnt) {
 		/*
@@ -215,6 +216,9 @@ ops(void *arg)
 			 */
 			ckpt_op += MMRAND(1, thread_ops) / 5;
 		}
+		if (cnt == compact_op &&
+		    (ret = session->compact(session, g.uri, NULL)) != 0)
+			die(ret, "session.compact");
 
 		insert = notfound = 0;
 

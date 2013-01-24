@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -76,7 +76,7 @@ __conn_load_extension(
 
 	if (0) {
 err:		if (dlh != NULL)
-			(void)__wt_dlclose(session, dlh);
+			WT_TRET(__wt_dlclose(session, dlh));
 	}
 	__wt_free(session, entry_name);
 
@@ -304,9 +304,9 @@ __conn_close(WT_CONNECTION *wt_conn, const char *config)
 
 	/*
 	 * Close open, external sessions.
-	 * Additionally, the session's hazard reference memory isn't discarded
+	 * Additionally, the session's hazard pointer memory isn't discarded
 	 * during normal session close because access to it isn't serialized.
-	 * Discard it now.  Note the loop for the hazard reference memory, it's
+	 * Discard it now.  Note the loop for the hazard pointer memory, it's
 	 * the entire session array, not only the active session count, as the
 	 * active session count may be less than the maximum session count.
 	 */
@@ -368,6 +368,10 @@ __conn_reconfigure(WT_CONNECTION *wt_conn, const char *config)
 	WT_ERR(__wt_conn_cache_pool_config(session, cfg));
 	WT_ERR(__wt_cache_config(conn, raw_cfg));
 	WT_ERR(__conn_verbose_config(session, cfg));
+	/* Wake up the cache pool server so any changes are noticed. */
+	if (F_ISSET(conn, WT_CONN_CACHE_POOL))
+		WT_ERR(__wt_cond_signal(
+		    session, __wt_process.cache_pool->cache_pool_cond));
 
 err:	API_END(session);
 	return (ret);
@@ -707,7 +711,7 @@ __conn_single(WT_SESSION_IMPL *session, const char **cfg)
 	return (0);
 
 err:	if (conn->lock_fh != NULL) {
-		(void)__wt_close(session, conn->lock_fh);
+		WT_TRET(__wt_close(session, conn->lock_fh));
 		conn->lock_fh = NULL;
 	}
 	return (ret);
@@ -720,7 +724,6 @@ err:	if (conn->lock_fh != NULL) {
 static int
 __conn_verbose_config(WT_SESSION_IMPL *session, const char *cfg[])
 {
-#ifdef HAVE_VERBOSE
 	WT_CONFIG_ITEM cval, sval;
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
@@ -738,7 +741,6 @@ __conn_verbose_config(WT_SESSION_IMPL *session, const char *cfg[])
 		{ "lsm",	WT_VERB_lsm },
 		{ "mutex",	WT_VERB_mutex },
 		{ "read",	WT_VERB_read },
-		{ "readserver",	WT_VERB_readserver },
 		{ "reconcile",	WT_VERB_reconcile },
 		{ "salvage",	WT_VERB_salvage },
 		{ "verify",	WT_VERB_verify },
@@ -758,8 +760,6 @@ __conn_verbose_config(WT_SESSION_IMPL *session, const char *cfg[])
 
 		WT_RET_NOTFOUND_OK(ret);
 	}
-#endif
-
 	return (0);
 }
 
@@ -959,7 +959,7 @@ err:	if (cbuf != NULL)
 	__wt_buf_free(session, &exconfig);
 
 	if (ret != 0 && conn != NULL)
-		__wt_connection_destroy(conn);
+		WT_TRET(__wt_connection_destroy(conn));
 
 	return (ret);
 }

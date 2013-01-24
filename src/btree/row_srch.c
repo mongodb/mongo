@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -32,7 +32,7 @@ __wt_search_insert(WT_SESSION_IMPL *session,
 	/* Fast-path appends. */
 	insert_key.data = WT_INSERT_KEY(ret_ins);
 	insert_key.size = WT_INSERT_KEY_SIZE(ret_ins);
-	(void)WT_BTREE_CMP(session, btree, srch_key, &insert_key, cmp);
+	WT_RET(WT_BTREE_CMP(session, btree, srch_key, &insert_key, cmp));
 	if (cmp >= 0) {
 		/*
 		 * XXX We may race with another appending thread.
@@ -115,7 +115,7 @@ __wt_row_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 	WT_REF *ref;
 	WT_ROW *rip;
 	uint32_t base, indx, limit;
-	int cmp;
+	int cmp, depth;
 
 	__cursor_search_clear(cbt);
 
@@ -124,11 +124,11 @@ __wt_row_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 	btree = session->btree;
 	rip = NULL;
 
-	cmp = -1;				/* Assume we don't match. */
-
 	/* Search the internal pages of the tree. */
+	cmp = -1;
 	item = &_item;
-	for (page = btree->root_page; page->type == WT_PAGE_ROW_INT;) {
+	for (depth = 2,
+	    page = btree->root_page; page->type == WT_PAGE_ROW_INT; ++depth) {
 		/* Binary search of internal pages. */
 		for (base = 0, ref = NULL,
 		    limit = page->entries; limit != 0; limit >>= 1) {
@@ -176,6 +176,13 @@ __wt_row_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 	}
 
 	/*
+	 * We want to know how deep the tree gets because excessive depth can
+	 * happen because of how WiredTiger splits.
+	 */
+	if (depth > btree->maximum_depth)
+		btree->maximum_depth = depth;
+
+	/*
 	 * Copy the leaf page's write generation value before reading the page.
 	 * Use a read memory barrier to ensure we read the value before we read
 	 * any of the page's contents.
@@ -187,7 +194,11 @@ __wt_row_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 		WT_ORDERED_READ(cbt->write_gen, page->modify->write_gen);
 	}
 
-	/* Do a binary search of the leaf page. */
+	/*
+	 * Do a binary search of the leaf page; the page might be empty, reset
+	 * the comparison value.
+	 */
+	cmp = -1;
 	for (base = 0, limit = page->entries; limit != 0; limit >>= 1) {
 		indx = base + (limit >> 1);
 		rip = page->u.row.d + indx;
@@ -259,7 +270,7 @@ __wt_row_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 	WT_ERR(__wt_search_insert(session, cbt, cbt->ins_head, srch_key));
 	return (0);
 
-err:	__wt_stack_release(session, page);
+err:	WT_TRET(__wt_stack_release(session, page));
 	return (ret);
 }
 
@@ -326,6 +337,6 @@ __wt_row_random(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 
 	return (0);
 
-err:	__wt_stack_release(session, page);
+err:	WT_TRET(__wt_stack_release(session, page));
 	return (ret);
 }

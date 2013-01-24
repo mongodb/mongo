@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Public Domain 2008-2012 WiredTiger, Inc.
+# Public Domain 2008-2013 WiredTiger, Inc.
 #
 # This is free and unencumbered software released into the public domain.
 #
@@ -45,7 +45,7 @@ class test_empty(wttest.WiredTigerTestCase):
     def test_empty_create(self):
         uri = self.type + self.name
         self.session.create(uri, 'key_format=' + self.fmt)
-        self.session.close();
+        self.session.close()
         name = self.name
         if self.type == "table:":
             name = name + '.wt'
@@ -62,20 +62,20 @@ class test_empty(wttest.WiredTigerTestCase):
         # Add a few records to the object and remove them.
         cursor = self.session.open_cursor(uri, None, None)
         for i in range(1,5):
-            cursor.set_key(key_populate(cursor, i));
-            cursor.set_value("XXX");
-            cursor.insert();
-            cursor.remove();
+            cursor.set_key(key_populate(cursor, i))
+            cursor.set_value("XXX")
+            cursor.insert()
+            cursor.remove()
 
         # Perform a checkpoint (we shouldn't write any underlying pages because
         # of a checkpoint, either).
-        self.session.checkpoint("name=ckpt");
+        self.session.checkpoint("name=ckpt")
 
         # Open and close a checkpoint cursor.
         cursor = self.session.open_cursor(uri, None, "checkpoint=ckpt")
         cursor.close()
 
-        self.session.close();
+        self.session.close()
 
         # The file should not have grown.
         name = self.name

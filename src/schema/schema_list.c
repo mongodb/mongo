@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -117,7 +117,7 @@ __wt_schema_destroy_table(WT_SESSION_IMPL *session, WT_TABLE *table)
 {
 	WT_COLGROUP *colgroup;
 	WT_INDEX *idx;
-	int i;
+	u_int i;
 
 	__wt_free(session, table->name);
 	__wt_free(session, table->config);

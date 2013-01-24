@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -25,34 +25,21 @@ int
 __wt_curconfig_open(WT_SESSION_IMPL *session,
     const char *uri, const char *cfg[], WT_CURSOR **cursorp)
 {
-	static WT_CURSOR iface = {
-		NULL,
-		NULL,
-		NULL,
-		NULL,
-		NULL,
-		NULL,
-		NULL,
-		NULL,
-		NULL,			/* compare */
-		__wt_cursor_notsup,	/* next */
-		__wt_cursor_notsup,	/* prev */
-		__wt_cursor_notsup,	/* reset */
-		__wt_cursor_notsup,	/* search */
-					/* search-near */
-		(int (*)(WT_CURSOR *, int *))__wt_cursor_notsup,
-		__wt_cursor_notsup,	/* insert */
-		__wt_cursor_notsup,	/* update */
-		__wt_cursor_notsup,	/* remove */
-		__curconfig_close,
-		{ NULL, NULL },		/* TAILQ_ENTRY q */
-		0,			/* recno key */
-		{ 0 },			/* recno raw buffer */
-		{ NULL, 0, 0, NULL, 0 },/* WT_ITEM key */
-		{ NULL, 0, 0, NULL, 0 },/* WT_ITEM value */
-		0,			/* int saved_err */
-		0			/* uint32_t flags */
-	};
+	WT_CURSOR_STATIC_INIT(iface,
+	    NULL,			/* get-key */
+	    NULL,			/* get-value */
+	    NULL,			/* set-key */
+	    NULL,			/* set-value */
+	    NULL,			/* compare */
+	    __wt_cursor_notsup,		/* next */
+	    __wt_cursor_notsup,		/* prev */
+	    __wt_cursor_notsup,		/* reset */
+	    __wt_cursor_notsup,		/* search */
+	    __wt_cursor_notsup,		/* search-near */
+	    __wt_cursor_notsup,		/* insert */
+	    __wt_cursor_notsup,		/* update */
+	    __wt_cursor_notsup,		/* remove */
+	    __curconfig_close);
 	WT_CURSOR_CONFIG *cconfig;
 	WT_CURSOR *cursor;
 	WT_DECL_RET;

@@ -6,6 +6,7 @@
 # If the directory exists, it is added to AUTO_SUBDIRS.
 # If a condition is included, the subdir is made conditional via AM_CONDITIONAL
 bench/tcbench
+bench/wtperf
 examples/c
 ext/collators/reverse
 ext/compressors/bzip2 BZIP2

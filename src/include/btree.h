@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -72,6 +72,9 @@ struct __wt_btree {
 	const char *checkpoint;		/* Checkpoint name (or NULL) */
 	const char *config;		/* Configuration string */
 
+	WT_DSRC_STATS *stats;		/* Data-source statistics */
+	int maximum_depth;		/* Maximum tree depth */
+
 	/*
 	 * XXX Everything above here should move into the session-level
 	 * handle structure.
@@ -98,6 +101,7 @@ struct __wt_btree {
 	uint32_t maxintlitem;		/* Internal page max item size */
 	uint32_t maxleafpage;		/* Leaf page max size */
 	uint32_t maxleafitem;		/* Leaf page max item size */
+	uint64_t maxmempage;		/* In memory page max size */
 
 	void *huffman_key;		/* Key huffman encoding */
 	void *huffman_value;		/* Value huffman encoding */
@@ -123,11 +127,13 @@ struct __wt_btree {
 	void *block;			/* Block manager */
 	u_int block_header;		/* Block manager header length */
 
+	uint64_t write_gen;		/* Write generation */
+
 	WT_PAGE *evict_page;		/* Eviction thread's location */
 	uint64_t evict_priority;	/* Relative priority of cached pages. */
 	volatile uint32_t lru_count;	/* Count of threads in LRU eviction */
 
-	WT_DSRC_STATS *stats;		/* Btree statistics */
+	volatile int checkpointing;	/* Checkpoint in progress */
 
 #define	WT_BTREE_BULK		0x0001	/* Bulk-load handle */
 #define	WT_BTREE_DISCARD	0x0002	/* Discard on release */
@@ -135,7 +141,7 @@ struct __wt_btree {
 #define	WT_BTREE_LOCK_ONLY	0x0008	/* Handle is only needed for locking */
 #define	WT_BTREE_NO_CACHE	0x0010	/* Disable caching */
 #define	WT_BTREE_NO_EVICTION	0x0020	/* Disable eviction */
-#define	WT_BTREE_NO_HAZARD	0x0040	/* Disable hazard references */
+#define	WT_BTREE_NO_HAZARD	0x0040	/* Disable hazard pointers */
 #define	WT_BTREE_OPEN		0x0080	/* Handle is open */
 #define	WT_BTREE_SALVAGE	0x0100	/* Handle is for salvage */
 #define	WT_BTREE_UPGRADE	0x0200	/* Handle is for upgrade */

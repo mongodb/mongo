@@ -5,6 +5,7 @@ WiredTiger applications:
 
 - @subpage basic_api
 - @subpage config_strings
+- @subpage error_handling
 
 - @subpage cursors
 - @subpage threads

@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Public Domain 2008-2012 WiredTiger, Inc.
+# Public Domain 2008-2013 WiredTiger, Inc.
 #
 # This is free and unencumbered software released into the public domain.
 #
@@ -58,11 +58,11 @@ class test_rename(wttest.WiredTigerTestCase):
 
         self.session.rename(uri1, uri2, None)
         confirm_does_not_exist(self, uri1)
-        check(self, uri2)
+        check(self, uri2, 10)
 
         self.session.rename(uri2, uri1, None)
         confirm_does_not_exist(self, uri2)
-        check(self, uri1)
+        check(self, uri1, 10)
 
         self.session.drop(uri1)
 

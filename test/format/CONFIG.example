@@ -1,11 +1,11 @@
 #bitcnt
 #	number of bits for fixed-length column-store files
 
-#bzip
-#	if blocks are BZIP2 encoded
-
 #cache
 #	size of the cache in MB
+
+#compression
+#	type of compression (none | bzip | raw | snappy)
 
 #data_source
 #	type of data source to create (file | table | lsm)
@@ -28,8 +28,14 @@
 #insert_pct
 #	percent operations that are inserts
 
+#internal_key_truncation
+#	if values are huffman encoded
+
 #internal_page_max
 #	maximum size of Btree internal nodes
+
+#key_gap
+#	gap between instantiated keys on a Btree page
 
 #key_max
 #	maximum size of keys
@@ -43,6 +49,9 @@
 #ops
 #	the number of modification operations done per run
 
+#prefix
+#	if keys are prefix compressed
+
 #repeat_data_pct
 #	percent duplicate values in row- or variable-length column-stores
 
@@ -55,6 +64,9 @@
 #runs
 #	the number of runs
 
+#split_pct
+#	Btree page split size as a percentage of the maximum page size
+
 #threads
 #	the number of threads
 
@@ -63,6 +75,9 @@
 
 #value_min
 #	minimum size of values
+
+#wiredtiger_config
+#	configuration string used to wiredtiger_open
 
 #write_pct
 #	percent operations that are writes

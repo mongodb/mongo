@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -66,7 +66,7 @@ __wt_session_lock_btree(WT_SESSION_IMPL *session, uint32_t flags)
 	} else if (F_ISSET(btree, WT_BTREE_SPECIAL_FLAGS))
 		return (EBUSY);
 	else
-		__wt_readlock(session, btree->rwlock);
+		WT_RET(__wt_readlock(session, btree->rwlock));
 
 	/*
 	 * At this point, we have the requested lock -- if that is all that was
@@ -83,7 +83,7 @@ __wt_session_lock_btree(WT_SESSION_IMPL *session, uint32_t flags)
 	 */
 	if (!LF_ISSET(WT_BTREE_EXCLUSIVE) || special_flags == 0) {
 		F_CLR(btree, WT_BTREE_EXCLUSIVE);
-		__wt_rwunlock(session, btree->rwlock);
+		WT_RET(__wt_rwunlock(session, btree->rwlock));
 	}
 
 	/* Treat an unopened handle just like a non-existent handle. */
@@ -106,10 +106,11 @@ __wt_session_release_btree(WT_SESSION_IMPL *session)
 	 * If we had no cache flag set, close and free the btree handle. It was
 	 * never added to the handle cache.
 	 */
-	if (F_ISSET(btree, WT_BTREE_NO_CACHE))
+	if (F_ISSET(btree, WT_BTREE_NO_CACHE)) {
+		/* A write lock has been held since the handle was created. */
+		WT_RET(__wt_rwunlock(session, btree->rwlock));
 		WT_RET(__wt_conn_btree_discard_single(session, btree));
-	else {
-
+	} else {
 		/*
 		 * If we had special flags set, close the handle so that future
 		 * access can get a handle without special flags.
@@ -124,7 +125,7 @@ __wt_session_release_btree(WT_SESSION_IMPL *session)
 		if (F_ISSET(btree, WT_BTREE_EXCLUSIVE))
 			F_CLR(btree, WT_BTREE_EXCLUSIVE);
 
-		__wt_rwunlock(session, btree->rwlock);
+		ret = __wt_rwunlock(session, btree->rwlock);
 	}
 	session->btree = NULL;
 

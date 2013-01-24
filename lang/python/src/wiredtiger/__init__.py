@@ -1,6 +1,6 @@
 #
 #
-# Copyright (c) 2008-2012 WiredTiger, Inc.
+# Copyright (c) 2008-2013 WiredTiger, Inc.
 #	All rights reserved.
 #
 # See the file LICENSE for redistribution information.

@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -14,10 +14,11 @@
  */
 int
 __wt_lsm_merge_update_tree(WT_SESSION_IMPL *session,
-    WT_LSM_TREE *lsm_tree, int start_chunk, int nchunks, WT_LSM_CHUNK *chunk)
+    WT_LSM_TREE *lsm_tree, u_int start_chunk, u_int nchunks,
+    WT_LSM_CHUNK *chunk)
 {
 	size_t chunk_sz, chunks_after_merge;
-	int i, j;
+	u_int i, j;
 
 	WT_ASSERT(session, start_chunk + nchunks <= lsm_tree->nchunks);
 
@@ -28,9 +29,9 @@ __wt_lsm_merge_update_tree(WT_SESSION_IMPL *session,
 		    &lsm_tree->old_alloc,
 		    chunk_sz * WT_MAX(10, lsm_tree->nold_chunks + 2 * nchunks),
 		    &lsm_tree->old_chunks));
-		lsm_tree->old_avail += (int)(lsm_tree->old_alloc / chunk_sz) -
+		lsm_tree->old_avail += (u_int)(lsm_tree->old_alloc / chunk_sz) -
 		    lsm_tree->nold_chunks;
-		lsm_tree->nold_chunks = (int)(lsm_tree->old_alloc / chunk_sz);
+		lsm_tree->nold_chunks = (u_int)(lsm_tree->old_alloc / chunk_sz);
 	}
 	/* Copy entries one at a time, so we can reuse gaps in the list. */
 	for (i = j = 0; j < nchunks && i < lsm_tree->nold_chunks; i++) {
@@ -64,7 +65,7 @@ __wt_lsm_merge_update_tree(WT_SESSION_IMPL *session,
  */
 int
 __wt_lsm_merge(
-    WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, uint32_t id, int stalls)
+    WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, u_int id, int stalls)
 {
 	WT_BLOOM *bloom;
 	WT_CURSOR *src, *dest;
@@ -78,12 +79,12 @@ __wt_lsm_merge(
 	    "checkpoint=WiredTigerCheckpoint,next_random");
 	uint32_t generation, start_id;
 	uint64_t insert_count, record_count, r;
-	int create_bloom, dest_id, end_chunk, i;
-	int max_chunks, nchunks, start_chunk;
+	u_int dest_id, end_chunk, i, max_chunks, nchunks, start_chunk;
+	int create_bloom;
 
 	src = dest = NULL;
 	bloom = NULL;
-	max_chunks = (int)lsm_tree->merge_max;
+	max_chunks = lsm_tree->merge_max;
 	create_bloom = 0;
 
 	/*
@@ -100,7 +101,7 @@ __wt_lsm_merge(
 	 * avoid holding it while the merge is in progress: that may take a
 	 * long time.
 	 */
-	__wt_writelock(session, lsm_tree->rwlock);
+	WT_RET(__wt_writelock(session, lsm_tree->rwlock));
 
 	/*
 	 * Only include chunks that are stable on disk and not involved in a
@@ -129,7 +130,7 @@ __wt_lsm_merge(
 	for (start_chunk = end_chunk + 1, record_count = 0;
 	    start_chunk > 0; ) {
 		chunk = lsm_tree->chunk[start_chunk - 1];
-		nchunks = end_chunk - start_chunk + 1;
+		nchunks = (end_chunk - start_chunk) + 1;
 
 		/* If the chunk is already involved in a merge, stop. */
 		if (F_ISSET(chunk, WT_LSM_CHUNK_MERGING))
@@ -170,24 +171,25 @@ __wt_lsm_merge(
 		}
 	}
 
-	nchunks = end_chunk - start_chunk + 1;
+	nchunks = (end_chunk - start_chunk) + 1;
 	WT_ASSERT(session, nchunks <= max_chunks);
 
 	/* Don't do small merges unless we have waited for 2s. */
 	if (nchunks <= 1 ||
 	    (id == 0 && stalls < 2 && nchunks < max_chunks / 2)) {
-		for (i = start_chunk; i <= end_chunk; i++)
-			F_CLR(lsm_tree->chunk[i], WT_LSM_CHUNK_MERGING);
+		for (i = 0; i < nchunks; i++)
+			F_CLR(lsm_tree->chunk[start_chunk + i],
+			    WT_LSM_CHUNK_MERGING);
 		nchunks = 0;
 	}
 
 	/* Find the merge generation. */
 	for (generation = 0, i = 0; i < nchunks; i++)
-		if (lsm_tree->chunk[start_chunk + i]->generation > generation)
-			generation = lsm_tree->chunk[i]->generation;
+		generation = WT_MAX(generation,
+		    lsm_tree->chunk[start_chunk + i]->generation + 1);
 
 	start_id = lsm_tree->chunk[start_chunk]->id;
-	__wt_rwunlock(session, lsm_tree->rwlock);
+	WT_RET(__wt_rwunlock(session, lsm_tree->rwlock));
 
 	if (nchunks == 0)
 		return (WT_NOTFOUND);
@@ -288,7 +290,7 @@ __wt_lsm_merge(
 	dest = NULL;
 	WT_ERR_NOTFOUND_OK(ret);
 
-	__wt_writelock(session, lsm_tree->rwlock);
+	WT_ERR(__wt_writelock(session, lsm_tree->rwlock));
 
 	/*
 	 * Check whether we raced with another merge, and adjust the chunk
@@ -308,11 +310,11 @@ __wt_lsm_merge(
 	if (create_bloom)
 		F_SET(chunk, WT_LSM_CHUNK_BLOOM);
 	chunk->count = insert_count;
-	chunk->generation = ++generation;
+	chunk->generation = generation;
 	F_SET(chunk, WT_LSM_CHUNK_ONDISK);
 
 	ret = __wt_lsm_meta_write(session, lsm_tree);
-	__wt_rwunlock(session, lsm_tree->rwlock);
+	WT_TRET(__wt_rwunlock(session, lsm_tree->rwlock));
 
 err:	if (src != NULL)
 		WT_TRET(src->close(src));
@@ -333,11 +335,12 @@ err:	if (src != NULL)
 		__wt_free(session, chunk->bloom_uri);
 		__wt_free(session, chunk->uri);
 		__wt_free(session, chunk);
+
 		if (ret == EINTR)
-			WT_VERBOSE_VOID(session, lsm,
+			WT_VERBOSE_TRET(session, lsm,
 			    "Merge aborted due to close");
 		else
-			WT_VERBOSE_VOID(session, lsm,
+			WT_VERBOSE_TRET(session, lsm,
 			    "Merge failed with %s", wiredtiger_strerror(ret));
 	}
 	return (ret);

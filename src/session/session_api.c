@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -91,7 +91,7 @@ __session_close(WT_SESSION *wt_session, const char *config)
 	/* Free transaction information. */
 	__wt_txn_destroy(session);
 
-	/* Confirm we're not holding any hazard references. */
+	/* Confirm we're not holding any hazard pointers. */
 	__wt_hazard_close(session);
 
 	/* Free the reconciliation information. */
@@ -102,7 +102,7 @@ __session_close(WT_SESSION *wt_session, const char *config)
 
 	/* Destroy the thread's mutex. */
 	if (session->cond != NULL)
-		(void)__wt_cond_destroy(session, session->cond);
+		WT_TRET(__wt_cond_destroy(session, session->cond));
 
 	/* The API lock protects opening and closing of sessions. */
 	__wt_spin_lock(session, &conn->api_lock);
@@ -112,12 +112,12 @@ __session_close(WT_SESSION *wt_session, const char *config)
 	 * field to 0, which will exclude the hazard array from review by the
 	 * eviction thread.   Note: there's no serialization support around the
 	 * review of the hazard array, which means threads checking for hazard
-	 * references first check the active field (which may be 0) and then use
+	 * pointers first check the active field (which may be 0) and then use
 	 * the hazard pointer (which cannot be NULL).  For this reason, clear
 	 * the session structure carefully.
 	 *
 	 * We don't need to publish here, because regardless of the active field
-	 * being non-zero, the hazard reference is always valid.
+	 * being non-zero, the hazard pointer is always valid.
 	 */
 	WT_SESSION_CLEAR(session);
 	session = conn->default_session;
@@ -627,7 +627,7 @@ __session_commit_transaction(WT_SESSION *wt_session, const char *config)
 	if (ret == 0)
 		ret = __wt_txn_commit(session, cfg);
 	else
-		(void)__wt_txn_rollback(session, cfg);
+		WT_TRET(__wt_txn_rollback(session, cfg));
 
 err:	API_END(session);
 	return (ret);
@@ -669,7 +669,7 @@ __session_checkpoint(WT_SESSION *wt_session, const char *config)
 	session = (WT_SESSION_IMPL *)wt_session;
 	txn = &session->txn;
 
-	WT_CSTAT_INCR(session, checkpoint);
+	WT_CSTAT_INCR(session, txn_checkpoint);
 	SESSION_API_CALL(session, checkpoint, config, cfg);
 
 	/*
@@ -793,7 +793,7 @@ __wt_open_session(WT_CONNECTION_IMPL *conn, int internal,
 	WT_ERR(__wt_txn_init(session_ret));
 
 	/*
-	 * The session's hazard reference memory isn't discarded during normal
+	 * The session's hazard pointer memory isn't discarded during normal
 	 * session close because access to it isn't serialized.  Allocate the
 	 * first time we open this session.
 	 */

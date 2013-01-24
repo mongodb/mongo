@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Public Domain 2008-2012 WiredTiger, Inc.
+# Public Domain 2008-2013 WiredTiger, Inc.
 #
 # This is free and unencumbered software released into the public domain.
 #
@@ -377,8 +377,8 @@ class test_checkpoint_empty(wttest.WiredTigerTestCase):
         cursor.close()
 
         cursor = self.session.open_cursor(self.uri, None)
-        cursor.set_key("key");
-        cursor.set_value("value");
+        cursor.set_key("key")
+        cursor.set_value("value")
         cursor.insert()
         self.session.checkpoint()
 
@@ -394,8 +394,8 @@ class test_checkpoint_empty(wttest.WiredTigerTestCase):
         cursor.close()
 
         cursor = self.session.open_cursor(self.uri, None)
-        cursor.set_key("key");
-        cursor.set_value("value");
+        cursor.set_key("key")
+        cursor.set_value("value")
         cursor.insert()
         self.session.checkpoint('name=ckpt')
 

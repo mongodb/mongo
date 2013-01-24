@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -105,7 +105,7 @@ __wt_bulk_insert(WT_CURSOR_BULK *cbulk)
 	WT_ILLEGAL_VALUE(session);
 	}
 
-	WT_BSTAT_INCR(session, file_bulk_loaded);
+	WT_DSTAT_INCR(session, cursor_insert_bulk);
 	return (0);
 }
 

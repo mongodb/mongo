@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -111,8 +111,8 @@ __drop_table(
 	WT_DECL_RET;
 	WT_INDEX *idx;
 	WT_TABLE *table;
-	int i;
 	const char *name;
+	u_int i;
 
 	name = uri;
 	(void)WT_PREFIX_SKIP(name, "table:");

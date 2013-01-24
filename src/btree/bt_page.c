@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -15,7 +15,7 @@ static int  __inmem_row_leaf(WT_SESSION_IMPL *, WT_PAGE *, size_t *);
 
 /*
  * __wt_page_in --
- *	Acquire a hazard reference to a page; if the page is not in-memory,
+ *	Acquire a hazard pointer to a page; if the page is not in-memory,
  *	read it from the disk and build an in-memory version.
  */
 int
@@ -42,6 +42,7 @@ __wt_page_in_func(
 			WT_RET(__wt_cache_full_check(session));
 			WT_RET(__wt_cache_read(session, parent, ref));
 			continue;
+		case WT_REF_EVICT_FORCE:
 		case WT_REF_LOCKED:
 		case WT_REF_READING:
 			/*
@@ -52,9 +53,9 @@ __wt_page_in_func(
 		case WT_REF_EVICT_WALK:
 		case WT_REF_MEM:
 			/*
-			 * The page is in memory: get a hazard reference, update
+			 * The page is in memory: get a hazard pointer, update
 			 * the page's LRU and return.  The expected reason we
-			 * can't get a hazard reference is because the page is
+			 * can't get a hazard pointer is because the page is
 			 * being evicted; yield and try again.
 			 */
 #ifdef HAVE_DIAGNOSTIC
@@ -79,14 +80,14 @@ __wt_page_in_func(
 			if (page->modify != NULL &&
 			    __wt_txn_ancient(session, page->modify->first_id)) {
 				page->read_gen = 0;
-				__wt_hazard_clear(session, page);
-				__wt_evict_server_wake(session);
+				WT_RET(__wt_hazard_clear(session, page));
+				WT_RET(__wt_evict_server_wake(session));
 				break;
 			}
 
 			/* Check if we need an autocommit transaction. */
 			if ((ret = __wt_txn_autocommit_check(session)) != 0) {
-				__wt_hazard_clear(session, page);
+				WT_TRET(__wt_hazard_clear(session, page));
 				return (ret);
 			}
 
@@ -389,7 +390,7 @@ __inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *inmem_sizep)
 				WT_ERR(__wt_page_modify_init(session, page));
 				page->modify->first_id = WT_TXN_NONE;
 				if (btree->modified)
-					__wt_page_modify_set(page);
+					__wt_page_modify_set(session, page);
 			}
 
 			++ref;

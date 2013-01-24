@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Public Domain 2008-2012 WiredTiger, Inc.
+# Public Domain 2008-2013 WiredTiger, Inc.
 #
 # This is free and unencumbered software released into the public domain.
 #
@@ -86,7 +86,7 @@ class test_index01(wttest.WiredTigerTestCase):
     def insert(self, *cols):
         self.pr('insert')
         cursor = self.cursor()
-        cursor.set_key(*cols[:2]);
+        cursor.set_key(*cols[:2])
         cursor.set_value(*cols[2:])
         self.assertEqual(cursor.insert(), 0)
         cursor.close()
@@ -94,7 +94,7 @@ class test_index01(wttest.WiredTigerTestCase):
     def insert_overwrite(self, *cols):
         self.pr('insert')
         cursor = self.cursor(config='overwrite')
-        cursor.set_key(*cols[:2]);
+        cursor.set_key(*cols[:2])
         cursor.set_value(*cols[2:])
         self.assertEqual(cursor.insert(), 0)
         cursor.close()
@@ -102,7 +102,7 @@ class test_index01(wttest.WiredTigerTestCase):
     def update(self, *cols):
         self.pr('update')
         cursor = self.cursor()
-        cursor.set_key(*cols[:2]);
+        cursor.set_key(*cols[:2])
         cursor.set_value(*cols[2:])
         self.assertEqual(cursor.update(), 0)
         cursor.close()
@@ -110,7 +110,7 @@ class test_index01(wttest.WiredTigerTestCase):
     def update_nonexistent(self, *cols):
         self.pr('update')
         cursor = self.cursor()
-        cursor.set_key(*cols[:2]);
+        cursor.set_key(*cols[:2])
         cursor.set_value(*cols[2:])
         self.assertEqual(cursor.update(), wiredtiger.WT_NOTFOUND)
         cursor.close()
@@ -118,7 +118,7 @@ class test_index01(wttest.WiredTigerTestCase):
     def remove(self, name, ID):
         self.pr('remove')
         cursor = self.cursor()
-        cursor.set_key(name, ID);
+        cursor.set_key(name, ID)
         self.assertEqual(cursor.remove(), 0)
         cursor.close()
 

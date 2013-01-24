@@ -1,5 +1,5 @@
 /*-
- * Public Domain 2008-2012 WiredTiger, Inc.
+ * Public Domain 2008-2013 WiredTiger, Inc.
  *
  * This is free and unencumbered software released into the public domain.
  *
@@ -133,11 +133,8 @@ config_setup(void)
 				*cp->v = 0;
 
 	/* Multi-threaded runs cannot be replayed. */
-	if (g.replay && !SINGLETHREADED) {
-		fprintf(stderr,
-		    "%s: -r is incompatible with threaded runs\n", g.progname);
-		exit(EXIT_FAILURE);
-	}
+	if (g.replay && !SINGLETHREADED)
+		die(0, "-r is incompatible with threaded runs");
 
 	/*
 	 * Periodically, set the delete percentage to 0 so salvage gets run,
@@ -167,6 +164,8 @@ config_compression(void)
 	/*
 	 * Compression: choose something if compression wasn't specified,
 	 * otherwise confirm the appropriate shared library is available.
+	 * We don't include LZO in the test compression choices, we don't
+	 * yet have an LZO module of our own.
 	 */
 	cp = config_find("compression", strlen("compression"));
 	if (!(cp->flags & C_PERM)) {
@@ -196,18 +195,16 @@ config_compression(void)
 	switch (g.compression) {
 	case COMPRESS_BZIP:
 	case COMPRESS_RAW:
-		if (access(BZIP_PATH, R_OK) != 0) {
-			fprintf(stderr,
-			    "bzip library not found or not readable\n");
-			exit(EXIT_FAILURE);
-		}
+		if (access(BZIP_PATH, R_OK) != 0)
+			die(0, "bzip library not found or not readable");
+		break;
+	case COMPRESS_LZO:
+		if (access(LZO_PATH, R_OK) != 0)
+			die(0, "LZO library not found or not readable");
 		break;
 	case COMPRESS_SNAPPY:
-		if (access(SNAPPY_PATH, R_OK) != 0) {
-			fprintf(stderr,
-			    "snappy library not found or not readable\n");
-			exit(EXIT_FAILURE);
-		}
+		if (access(SNAPPY_PATH, R_OK) != 0)
+			die(0, "snappy library not found or not readable");
 	}
 }
 
@@ -258,10 +255,11 @@ config_print(int error_display)
 
 	/* Display configuration values. */
 	for (cp = c; cp->name != NULL; ++cp)
-		if (cp->type_mask != 0 &&
+		if ((cp->type_mask != 0 &&
 		    ((g.type == FIX && !(cp->type_mask & C_FIX)) ||
 		    (g.type == ROW && !(cp->type_mask & C_ROW)) ||
-		    (g.type == VAR && !(cp->type_mask & C_VAR))))
+		    (g.type == VAR && !(cp->type_mask & C_VAR)))) ||
+		    (cp->flags & C_STRING && *(cp->vstr) == NULL))
 			fprintf(fp,
 			    "# %s not applicable to this run\n", cp->name);
 		else if (cp->flags & C_STRING)
@@ -340,23 +338,21 @@ config_single(const char *s, int perm)
 	++ep;
 
 	if (cp->flags & C_STRING) {
-		if (strncmp(s, "data_source", strlen("data_source")) == 0) {
-			if (strncmp("file", ep, strlen("file")) != 0 &&
-			    strncmp("table", ep, strlen("table")) != 0 &&
-			    strncmp("lsm", ep, strlen("lsm")) != 0) {
+		if (strncmp(s, "data_source", strlen("data_source")) == 0 &&
+		    strncmp("file", ep, strlen("file")) != 0 &&
+		    strncmp("table", ep, strlen("table")) != 0 &&
+		    strncmp("lsm", ep, strlen("lsm")) != 0) {
 			    fprintf(stderr,
-				"Invalid file type option: %s\n", ep);
+				"Invalid data source option: %s\n", ep);
 			    exit(EXIT_FAILURE);
-			}
-			*cp->vstr = strdup(ep);
 		}
-		else if (strncmp(s, "file_type", strlen("file_type")) == 0)
+		if (strncmp(s, "file_type", strlen("file_type")) == 0)
 			*cp->vstr = strdup(
 			    config_file_type(config_translate(ep)));
-		else if (strncmp(s, "compression", strlen("compression")) == 0)
+		else
 			*cp->vstr = strdup(ep);
 		if (*cp->vstr == NULL)
-			syserr("strdup");
+			syserr("Config string parsing");
 		return;
 	}
 
@@ -404,6 +400,8 @@ config_translate(const char *s)
 		return (COMPRESS_NONE);
 	if (strcmp(s, "bzip") == 0)
 		return (COMPRESS_BZIP);
+	if (strcmp(s, "lzo") == 0)
+		return (COMPRESS_LZO);
 	if (strcmp(s, "raw") == 0)
 		return (COMPRESS_RAW);
 	if (strcmp(s, "snappy") == 0)

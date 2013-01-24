@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -337,16 +337,16 @@ __wt_bm_salvage_start(WT_SESSION_IMPL *session)
  *	Return the next block from the file.
  */
 int
-__wt_bm_salvage_next(WT_SESSION_IMPL *session,
-    uint8_t *addr, uint32_t *addr_sizep, uint64_t *write_genp, int *eofp)
+__wt_bm_salvage_next(
+    WT_SESSION_IMPL *session, uint8_t *addr, uint32_t *addr_sizep, int *eofp)
 {
 	WT_BLOCK *block;
 
 	if ((block = session->btree->block) == NULL)
 		return (__bm_invalid(session));
 
-	return (__wt_block_salvage_next(
-	    session, block, addr, addr_sizep, write_genp, eofp));
+	return (
+	    __wt_block_salvage_next(session, block, addr, addr_sizep, eofp));
 }
 
 /*

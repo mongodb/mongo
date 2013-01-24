@@ -1,5 +1,5 @@
 /*-
- * Public Domain 2008-2012 WiredTiger, Inc.
+ * Public Domain 2008-2013 WiredTiger, Inc.
  *
  * This is free and unencumbered software released into the public domain.
  *
@@ -65,22 +65,26 @@ wts_open(void)
 	WT_SESSION *session;
 	uint32_t maxintlpage, maxintlitem, maxleafpage, maxleafitem;
 	int ret;
-	char config[1024], *end, *p;
+	char config[2048], *end, *p;
 
 	/*
 	 * Open configuration.
 	 *
-	 * Put command line configuration options at the end so they override
-	 * the standard configuration.
+	 * Put configuration file configuration options second to last. Put
+	 * command line configuration options at the end. Do this so they
+	 * override the standard configuration.
 	 */
 	snprintf(config, sizeof(config),
 	    "create,error_prefix=\"%s\",cache_size=%" PRIu32 "MB,sync=false,"
-	    "extensions=[\"%s\", \"%s\", \"%s\", \"%s\"], %s",
+	    "extensions=[\"%s\", \"%s\", \"%s\", \"%s\", \"%s\"],%s,%s",
 	    g.progname, g.c_cache,
-	    access(BZIP_PATH, R_OK) == 0 ? BZIP_PATH : "",
-	    access(SNAPPY_PATH, R_OK) == 0 ? SNAPPY_PATH : "",
-	    access(BZIP_PATH, R_OK) == 0 ? FC_PATH : "",
 	    REVERSE_PATH,
+	    access(BZIP_PATH, R_OK) == 0 ? BZIP_PATH : "",
+	    access(LZO_PATH, R_OK) == 0 ? LZO_PATH : "",
+	    (access(RAW_PATH, R_OK) == 0 &&
+	    access(BZIP_PATH, R_OK) == 0) ? RAW_PATH : "",
+	    access(SNAPPY_PATH, R_OK) == 0 ? SNAPPY_PATH : "",
+	    g.c_config_open == NULL ? "" : g.c_config_open,
 	    g.config_open == NULL ? "" : g.config_open);
 
 	if ((ret =
@@ -146,7 +150,7 @@ wts_open(void)
 		break;
 	}
 
-	/* Configure checksums. */
+	/* Configure checksums (not configurable from the command line). */
 	switch MMRAND(1, 10) {
 	case 1:						/* 10% */
 		p += snprintf(p, (size_t)(end - p), ",checksum=\"on\"");
@@ -168,6 +172,10 @@ wts_open(void)
 		p += snprintf(p, (size_t)(end - p),
 		    ",block_compressor=\"bzip2\"");
 		break;
+	case COMPRESS_LZO:
+		p += snprintf(p, (size_t)(end - p),
+		    ",block_compressor=\"LZO1B-6\"");
+		break;
 	case COMPRESS_RAW:
 		p += snprintf(p, (size_t)(end - p),
 		    ",block_compressor=\"raw\"");
@@ -177,6 +185,17 @@ wts_open(void)
 		    ",block_compressor=\"snappy\"");
 		break;
 	}
+
+	/* Configure internal key truncation. */
+	p += snprintf(
+	    p, (size_t)(end - p), ",internal_key_truncate=%s",
+	    g.c_internal_key_truncation ? "true" : "false");
+
+	/* Configure Btree page key gap. */
+	p += snprintf(p, (size_t)(end - p), ",key_gap=%u", g.c_key_gap);
+
+	/* Configure Btree split page percentage. */
+	p += snprintf(p, (size_t)(end - p), ",split_pct=%u", g.c_split_pct);
 
 	if ((ret = session->create(session, g.uri, config)) != 0)
 		die(ret, "session.create: %s", g.uri);
@@ -315,15 +334,8 @@ wts_stats(void)
 	if ((ret = cursor->close(cursor)) != 0)
 		die(ret, "cursor.close");
 
-	/*
-	 * XXX
-	 * WiredTiger only supports file object statistics.
-	 */
-	if (strcmp(g.c_data_source, "file") != 0)
-		goto skip;
-
-	/* File statistics. */
-	fprintf(fp, "\n\n====== File statistics:\n");
+	/* Data source statistics. */
+	fprintf(fp, "\n\n====== Data source statistics:\n");
 	if ((stat_name =
 	    malloc(strlen("statistics:") + strlen(g.uri) + 1)) == NULL)
 		syserr("malloc");
@@ -343,7 +355,7 @@ wts_stats(void)
 	if ((ret = cursor->close(cursor)) != 0)
 		die(ret, "cursor.close");
 
-skip:	if ((ret = fclose(fp)) != 0)
+	if ((ret = fclose(fp)) != 0)
 		die(ret, "fclose");
 
 	if ((ret = session->close(session, NULL)) != 0)

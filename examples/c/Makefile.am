@@ -13,10 +13,12 @@ noinst_PROGRAMS = \
 	ex_process \
 	ex_schema \
 	ex_stat \
-	ex_test_perf \
 	ex_thread
 
 # The examples can be run with no arguments as simple smoke tests
 TESTS = $(noinst_PROGRAMS)
 
-TESTS_ENVIRONMENT = rm -rf WT_TEST ; mkdir WT_TEST ;
+TESTS_ENVIRONMENT = WIREDTIGER_HOME=`mktemp -d WT_TEST.XXXX` ; export WIREDTIGER_HOME ; rm -rf $$WIREDTIGER_HOME ; mkdir $$WIREDTIGER_HOME ;
+
+clean-local:
+	rm -rf WT_TEST*

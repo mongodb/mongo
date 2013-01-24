@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -107,8 +107,12 @@ __wt_bt_read(WT_SESSION_IMPL *session,
 		WT_ERR(__wt_verify_dsk(session, (const char *)tmp->data, buf));
 	}
 
-	WT_BSTAT_INCR(session, page_read);
-	WT_BSTAT_INCRV(session, byte_read, addr_size);
+	WT_CSTAT_INCR(session, cache_read);
+	WT_DSTAT_INCR(session, cache_read);
+	if (F_ISSET(dsk, WT_PAGE_COMPRESSED))
+		WT_DSTAT_INCR(session, compress_read);
+	WT_CSTAT_INCRV(session, cache_bytes_read, addr_size);
+	WT_DSTAT_INCRV(session, cache_bytes_read, addr_size);
 
 err:	__wt_scr_free(&tmp);
 	return (ret);
@@ -175,9 +179,10 @@ __wt_bt_write(WT_SESSION_IMPL *session, WT_ITEM *buf,
 	 */
 	if (buf->size <= btree->allocsize ||
 	    btree->compressor == NULL ||
-	    btree->compressor->compress == NULL || compressed)
+	    btree->compressor->compress == NULL || compressed) {
 		ip = buf;
-	else {
+		WT_DSTAT_INCR(session, compress_write_too_small);
+	} else {
 		/* Skip the header bytes of the source data. */
 		src = (uint8_t *)buf->mem + WT_BLOCK_COMPRESS_SKIP;
 		src_len = buf->size - WT_BLOCK_COMPRESS_SKIP;
@@ -218,10 +223,12 @@ __wt_bt_write(WT_SESSION_IMPL *session, WT_ITEM *buf,
 		    src, src_len,
 		    dst, dst_len,
 		    &result_len, &compression_failed));
-		if (compression_failed)
+		if (compression_failed) {
 			ip = buf;
-		else {
+			WT_DSTAT_INCR(session, compress_write_fail);
+		} else {
 			compressed = 1;
+			WT_DSTAT_INCR(session, compress_write);
 
 			/*
 			 * Copy in the skipped header bytes, set the final data
@@ -233,12 +240,28 @@ __wt_bt_write(WT_SESSION_IMPL *session, WT_ITEM *buf,
 			ip = tmp;
 		}
 	}
+	dsk = ip->mem;
 
 	/* If the buffer is compressed, set the flag. */
-	if (compressed) {
-		dsk = ip->mem;
+	if (compressed)
 		F_SET(dsk, WT_PAGE_COMPRESSED);
-	}
+
+	/*
+	 * We increment the block's write generation so it's easy to identify
+	 * newer versions of blocks during salvage.  (It's common in WiredTiger,
+	 * at least for the default block manager, for multiple blocks to be
+	 * internally consistent with identical first and last keys, so we need
+	 * a way to know the most recent state of the block.  We could check
+	 * which leaf is referenced by a valid internal page, but that implies
+	 * salvaging internal pages, which I don't want to do, and it's not
+	 * as good anyway, because the internal page may not have been written
+	 * after the leaf page was updated.  So, write generations it is.
+	 *
+	 * Nothing is locked at this point but two versions of a page with the
+	 * same generation is pretty unlikely, and if we did, they're going to
+	 * be roughly identical for the purposes of salvage, anyway.
+	 */
+	dsk->write_gen = ++btree->write_gen;
 
 	/*
 	 * Checksum the data if the buffer isn't compressed or checksums are
@@ -262,8 +285,10 @@ __wt_bt_write(WT_SESSION_IMPL *session, WT_ITEM *buf,
 	    __wt_bm_checkpoint(session, ip, btree->ckpt, data_cksum) :
 	    __wt_bm_write(session, ip, addr, addr_size, data_cksum));
 
-	WT_BSTAT_INCR(session, page_write);
-	WT_BSTAT_INCRV(session, byte_write, ip->size);
+	WT_CSTAT_INCR(session, cache_write);
+	WT_DSTAT_INCR(session, cache_write);
+	WT_CSTAT_INCRV(session, cache_bytes_write, ip->size);
+	WT_DSTAT_INCRV(session, cache_bytes_write, ip->size);
 
 err:	__wt_scr_free(&tmp);
 	return (ret);

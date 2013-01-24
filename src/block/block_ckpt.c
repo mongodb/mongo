@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -133,7 +133,7 @@ __wt_block_checkpoint_load(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	}
 
 	if (0) {
-err:		(void)__wt_block_checkpoint_unload(session, block);
+err:		WT_TRET(__wt_block_checkpoint_unload(session, block));
 	}
 
 	__wt_scr_free(&tmp);
@@ -150,8 +150,7 @@ __wt_block_checkpoint_unload(WT_SESSION_IMPL *session, WT_BLOCK *block)
 	WT_BLOCK_CKPT *ci;
 	WT_DECL_RET;
 
-	WT_VERBOSE_RETVAL(
-	    session, ckpt, ret, "%s: unload checkpoint", block->name);
+	WT_VERBOSE_TRET(session, ckpt, "%s: unload checkpoint", block->name);
 
 	ci = &block->live;
 
@@ -362,8 +361,8 @@ __ckpt_process(
 	 * underneath us.  I suspect we'll tighten this if checkpoints take too
 	 * much time away from real work: we read the historic checkpoint
 	 * information without a lock, but we could also merge and re-write the
-	 * delete checkpoint information without a lock, except for ranges
-	 * merged into the live tree.
+	 * deleted and merged checkpoint information without a lock, except for
+	 * the final merge of ranges into the live tree.
 	 */
 	__wt_spin_lock(session, &block->live_lock);
 	locked = 1;
@@ -745,10 +744,7 @@ __ckpt_string(WT_SESSION_IMPL *session,
 		    (uintmax_t)(ci->discard.offset + ci->discard.size),
 		    ci->discard.size, ci->discard.cksum));
 	WT_RET(__wt_buf_catfmt(session, buf,
-	    ", file size=%" PRIuMAX
-	    ", write generation=%" PRIu64,
-	    (uintmax_t)ci->file_size,
-	    ci->write_gen));
+	    ", file size=%" PRIuMAX, (uintmax_t)ci->file_size));
 
 	__wt_block_ckpt_destroy(session, ci);
 

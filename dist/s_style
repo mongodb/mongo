@@ -6,7 +6,7 @@ trap 'rm -f $t; exit 0' 0 1 2 3 13 15
 
 cd ..
 
-# Returns in functions after a jump to the error lable.
+# Returns in functions after a jump to the error label.
 for f in `find examples ext src test -name '*.[ci]'`; do
 	sed -n \
 	    -e '/^{$/,/^}$/{=;p;}' $f |
@@ -43,6 +43,16 @@ for f in `find examples ext src test -name '*.[chisy]' -o -name '*.in' |
 		echo "$f: old-style type declaration: u_XXX_t or u_quad"
 		cat $t
 	}
+
+	# Direct calls to strtouq, not __wt_strtouq
+	if ! expr "$f" : '.*/os_strtouq.c' > /dev/null; then
+		egrep strtouq $f | egrep -v __wt_strtouq | \
+		egrep -v '^[[:space:]].*\*' > $t
+		test -s $t && {
+			echo "$f: explicit call to strtouq"
+			cat $t
+		}
+	fi
 
 	if ! expr "$f" : 'examples/.*' > /dev/null &&
 	   ! expr "$f" : 'test/.*' > /dev/null &&
@@ -99,5 +109,11 @@ egrep '	' test/suite/*.py |
     sed 's/^/	/' > $t
 test -s $t && {
 	echo '[tab] characters appear in test suite scripts:'
+	cat $t
+}
+# Check for trailing semi-colons.
+egrep ';$' test/suite/*.py > $t
+test -s $t && {
+	echo 'trailing semi-colon characters appear in test suite scripts:'
 	cat $t
 }

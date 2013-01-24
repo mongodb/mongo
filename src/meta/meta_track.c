@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -189,7 +189,6 @@ __wt_meta_track_off(WT_SESSION_IMPL *session, int unroll)
 	WT_BTREE *saved_btree;
 	WT_DECL_RET;
 	WT_META_TRACK *trk, *trk_orig;
-	const char *ckpt_cfg[] = API_CONF_DEFAULTS(session, checkpoint, NULL);
 
 	WT_ASSERT(session,
 	    WT_META_TRACKING(session) && session->meta_track_nest > 0);
@@ -209,7 +208,7 @@ __wt_meta_track_off(WT_SESSION_IMPL *session, int unroll)
 	if (!unroll && ret == 0 && session->metafile != NULL) {
 		saved_btree = session->btree;
 		session->btree = session->metafile;
-		ret = __wt_checkpoint(session, ckpt_cfg);
+		ret = __wt_checkpoint(session, NULL);
 		session->btree = saved_btree;
 	}
 

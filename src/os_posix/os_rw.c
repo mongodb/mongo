@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -15,7 +15,7 @@ int
 __wt_read(WT_SESSION_IMPL *session,
     WT_FH *fh, off_t offset, uint32_t bytes, void *buf)
 {
-	WT_CSTAT_INCR(session, total_read_io);
+	WT_CSTAT_INCR(session, read_io);
 
 	WT_VERBOSE_RET(session, fileops,
 	    "%s: read %" PRIu32 " bytes at offset %" PRIuMAX,
@@ -38,7 +38,7 @@ int
 __wt_write(WT_SESSION_IMPL *session,
     WT_FH *fh, off_t offset, uint32_t bytes, const void *buf)
 {
-	WT_CSTAT_INCR(session, total_write_io);
+	WT_CSTAT_INCR(session, write_io);
 
 	WT_VERBOSE_RET(session, fileops,
 	    "%s: write %" PRIu32 " bytes at offset %" PRIuMAX,

@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -125,11 +125,11 @@ static int  __slvg_trk_free(WT_SESSION_IMPL *, WT_TRACK **, uint32_t);
 static int  __slvg_trk_init(WT_SESSION_IMPL *, uint8_t *,
 		uint32_t, uint32_t, uint64_t, WT_STUFF *, WT_TRACK **);
 static int  __slvg_trk_leaf(WT_SESSION_IMPL *,
-		WT_PAGE_HEADER *, uint8_t *, uint32_t, uint64_t, WT_STUFF *);
+		WT_PAGE_HEADER *, uint8_t *, uint32_t, WT_STUFF *);
 static int  __slvg_trk_leaf_ovfl(
 		WT_SESSION_IMPL *, WT_PAGE_HEADER *, WT_TRACK *);
 static int  __slvg_trk_ovfl(WT_SESSION_IMPL *,
-		WT_PAGE_HEADER *, uint8_t *, uint32_t, uint64_t, WT_STUFF *);
+		WT_PAGE_HEADER *, uint8_t *, uint32_t, WT_STUFF *);
 
 /*
  * __wt_bt_salvage --
@@ -312,7 +312,6 @@ __slvg_read(WT_SESSION_IMPL *session, WT_STUFF *ss)
 	WT_DECL_ITEM(buf);
 	WT_DECL_RET;
 	WT_PAGE_HEADER *dsk;
-	uint64_t gen;
 	uint32_t addrbuf_size;
 	uint8_t addrbuf[WT_BTREE_MAX_ADDR_COOKIE];
 	int eof;
@@ -323,7 +322,7 @@ __slvg_read(WT_SESSION_IMPL *session, WT_STUFF *ss)
 	for (;;) {
 		/* Get the next block address from the block manager. */
 		WT_ERR(__wt_bm_salvage_next(
-		    session, addrbuf, &addrbuf_size, &gen, &eof));
+		    session, addrbuf, &addrbuf_size, &eof));
 		if (eof)
 			break;
 
@@ -388,7 +387,7 @@ __slvg_read(WT_SESSION_IMPL *session, WT_STUFF *ss)
 
 		WT_VERBOSE_ERR(session, salvage,
 		    "tracking %s page, generation %" PRIu64 " %s",
-		    __wt_page_type_string(dsk->type), gen,
+		    __wt_page_type_string(dsk->type), dsk->write_gen,
 		    (const char *)as->data);
 
 		switch (dsk->type) {
@@ -405,11 +404,11 @@ __slvg_read(WT_SESSION_IMPL *session, WT_STUFF *ss)
 				    __wt_page_type_string(dsk->type));
 
 			WT_ERR(__slvg_trk_leaf(
-			    session, dsk, addrbuf, addrbuf_size, gen, ss));
+			    session, dsk, addrbuf, addrbuf_size, ss));
 			break;
 		case WT_PAGE_OVFL:
 			WT_ERR(__slvg_trk_ovfl(
-			    session, dsk, addrbuf, addrbuf_size, gen, ss));
+			    session, dsk, addrbuf, addrbuf_size, ss));
 			break;
 		}
 	}
@@ -455,8 +454,8 @@ err:	if (trk->addr.addr != NULL)
  *	Track a leaf page.
  */
 static int
-__slvg_trk_leaf(WT_SESSION_IMPL *session, WT_PAGE_HEADER *dsk,
-    uint8_t *addr, uint32_t size, uint64_t gen, WT_STUFF *ss)
+__slvg_trk_leaf(WT_SESSION_IMPL *session,
+    WT_PAGE_HEADER *dsk, uint8_t *addr, uint32_t size, WT_STUFF *ss)
 {
 	WT_BTREE *btree;
 	WT_CELL *cell;
@@ -478,8 +477,8 @@ __slvg_trk_leaf(WT_SESSION_IMPL *session, WT_PAGE_HEADER *dsk,
 		   (ss->pages_next + 1000) * sizeof(WT_TRACK *), &ss->pages));
 
 	/* Allocate a WT_TRACK entry for this new page and fill it in. */
-	WT_RET(
-	    __slvg_trk_init(session, addr, size, dsk->mem_size, gen, ss, &trk));
+	WT_RET(__slvg_trk_init(
+	    session, addr, size, dsk->mem_size, dsk->write_gen, ss, &trk));
 
 	switch (dsk->type) {
 	case WT_PAGE_COL_FIX:
@@ -573,8 +572,8 @@ err:		__wt_free(session, trk);
  *	Track an overflow page.
  */
 static int
-__slvg_trk_ovfl(WT_SESSION_IMPL *session, WT_PAGE_HEADER *dsk,
-    uint8_t *addr, uint32_t size, uint64_t gen, WT_STUFF *ss)
+__slvg_trk_ovfl(WT_SESSION_IMPL *session,
+    WT_PAGE_HEADER *dsk, uint8_t *addr, uint32_t size, WT_STUFF *ss)
 {
 	WT_TRACK *trk;
 
@@ -586,8 +585,8 @@ __slvg_trk_ovfl(WT_SESSION_IMPL *session, WT_PAGE_HEADER *dsk,
 		WT_RET(__wt_realloc(session, &ss->ovfl_allocated,
 		   (ss->ovfl_next + 1000) * sizeof(WT_TRACK *), &ss->ovfl));
 
-	WT_RET(
-	    __slvg_trk_init(session, addr, size, dsk->mem_size, gen, ss, &trk));
+	WT_RET(__slvg_trk_init(
+	    session, addr, size, dsk->mem_size, dsk->write_gen, ss, &trk));
 	ss->ovfl[ss->ovfl_next++] = trk;
 
 	return (0);
@@ -1063,7 +1062,7 @@ __slvg_modify_init(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 	/* The page is dirty. */
 	WT_RET(__wt_page_modify_init(session, page));
-	__wt_page_modify_set(page);
+	__wt_page_modify_set(session, page);
 
 	return (0);
 }
@@ -1215,17 +1214,18 @@ __slvg_col_build_leaf(
 
 	/* Write the new version of the leaf page to disk. */
 	WT_ERR(__slvg_modify_init(session, page));
-	WT_ERR(__wt_rec_write(session, page, cookie, 0));
+	WT_ERR(__wt_rec_write(session, page, cookie, WT_SKIP_UPDATE_ERR));
 
 	/* Reset the page. */
 	page->u.col_var.d = save_col_var;
 	page->entries = save_entries;
 
-	__wt_page_release(session, page);
-	ret = __wt_rec_evict(session, page, 1);
+	ret = __wt_page_release(session, page);
+	if (ret == 0)
+		ret = __wt_rec_evict(session, page, 1);
 
 	if (0) {
-err:		__wt_page_release(session, page);
+err:		WT_TRET(__wt_page_release(session, page));
 	}
 
 	return (ret);
@@ -1868,21 +1868,23 @@ __slvg_row_build_leaf(WT_SESSION_IMPL *session,
 
 		/* Write the new version of the leaf page to disk. */
 		WT_ERR(__slvg_modify_init(session, page));
-		WT_ERR(__wt_rec_write(session, page, cookie, 0));
+		WT_ERR(__wt_rec_write(
+		    session, page, cookie, WT_SKIP_UPDATE_ERR));
 
 		/* Reset the page. */
 		page->entries += skip_stop;
 	}
 
 	/*
-	 * Discard our hazard reference and evict the page, updating the
+	 * Discard our hazard pointer and evict the page, updating the
 	 * parent's reference.
 	 */
-	__wt_page_release(session, page);
-	ret = __wt_rec_evict(session, page, 1);
+	ret = __wt_page_release(session, page);
+	if (ret == 0)
+		ret = __wt_rec_evict(session, page, 1);
 
 	if (0) {
-err:		__wt_page_release(session, page);
+err:		WT_TRET(__wt_page_release(session, page));
 	}
 	__wt_scr_free(&key);
 
@@ -2115,6 +2117,12 @@ __slvg_trk_compare_key(const void *a, const void *b)
 		break;
 	case WT_PAGE_ROW_LEAF:
 		btree = a_trk->ss->btree;
+		/*
+		 * XXX
+		 * WT_BTREE_CMP can potentially fail, and we're ignoring that
+		 * error because this routine is called as an underlying qsort
+		 * routine.
+		 */
 		(void)WT_BTREE_CMP(a_trk->ss->session, btree,
 		    &a_trk->row_start, &b_trk->row_start, cmp);
 		if (cmp != 0)

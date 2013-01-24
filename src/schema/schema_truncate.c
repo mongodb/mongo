@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -41,7 +41,7 @@ __truncate_table(WT_SESSION_IMPL *session, const char *name)
 	WT_DECL_ITEM(namebuf);
 	WT_DECL_RET;
 	WT_TABLE *table;
-	int i;
+	u_int i;
 
 	WT_RET(__wt_schema_get_table(session, name, strlen(name), 0, &table));
 	WT_RET(__wt_scr_alloc(session, 0, &namebuf));
@@ -74,11 +74,6 @@ __truncate_table(WT_SESSION_IMPL *session, const char *name)
 		    session, namebuf, btree->name, strlen(btree->name) + 1));
 		WT_ERR(__truncate_file(session, namebuf->data));
 	}
-
-	table->idx_complete = 0;
-
-	/* Reopen the column groups. */
-	ret = __wt_schema_open_colgroups(session, table);
 
 err:	__wt_scr_free(&namebuf);
 	return (ret);

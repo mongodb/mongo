@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Public Domain 2008-2012 WiredTiger, Inc.
+# Public Domain 2008-2013 WiredTiger, Inc.
 #
 # This is free and unencumbered software released into the public domain.
 #
@@ -176,17 +176,18 @@ class test_truncate_fast_delete(wttest.WiredTigerTestCase):
             cursor.close()
 
         # A cursor involved in the transaction should see the deleted records.
-        # The number 18 comes from deleting row 10 (inclusive), to row N - 10,
-        # inclusive, or 9 + 9 == 18.
+        # The number 19 comes from deleting row 10 (inclusive), to row N - 10,
+        # exclusive, or 9 + 10 == 19.
+        remaining = 19
         cursor = self.session.open_cursor(uri, None)
-        self.cursor_count(cursor, 18)
+        self.cursor_count(cursor, remaining)
         cursor.close()
 
         # A separate, read_committed cursor should not see the deleted records.
-        self.outside_count("isolation=read-committed", self.nentries - 1)
+        self.outside_count("isolation=read-committed", self.nentries)
 
         # A separate, read_uncommitted cursor should see the deleted records.
-        self.outside_count("isolation=read-uncommitted", 18)
+        self.outside_count("isolation=read-uncommitted", remaining)
 
         # Commit/rollback the transaction.
         if self.commit:
@@ -197,9 +198,9 @@ class test_truncate_fast_delete(wttest.WiredTigerTestCase):
         # Check a read_committed cursor sees the right records.
         cursor = self.session.open_cursor(uri, None)
         if self.commit:
-                self.cursor_count(cursor, 18)
+                self.cursor_count(cursor, remaining)
         else:
-                self.cursor_count(cursor, self.nentries -1)
+                self.cursor_count(cursor, self.nentries)
         cursor.close()
 
 

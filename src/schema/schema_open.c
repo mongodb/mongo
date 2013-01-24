@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -41,7 +41,7 @@ __wt_schema_open_colgroups(WT_SESSION_IMPL *session, WT_TABLE *table)
 	WT_DECL_RET;
 	WT_DECL_ITEM(buf);
 	const char *cgconfig;
-	int i;
+	u_int i;
 
 	if (table->cg_complete)
 		return (0);
@@ -120,8 +120,7 @@ __open_index(WT_SESSION_IMPL *session, WT_TABLE *table, WT_INDEX *idx)
 	WT_DECL_ITEM(buf);
 	WT_DECL_ITEM(plan);
 	WT_DECL_RET;
-	u_int cursor_key_cols;
-	int i;
+	u_int cursor_key_cols, i;
 
 	WT_ERR(__wt_scr_alloc(session, 0, &buf));
 
@@ -200,7 +199,6 @@ __open_index(WT_SESSION_IMPL *session, WT_TABLE *table, WT_INDEX *idx)
 
 err:	__wt_scr_free(&buf);
 	__wt_scr_free(&plan);
-
 	return (ret);
 }
 
@@ -216,7 +214,8 @@ __wt_schema_open_index(WT_SESSION_IMPL *session,
 	WT_DECL_ITEM(tmp);
 	WT_DECL_RET;
 	WT_INDEX *idx;
-	int cmp, i, match;
+	u_int i;
+	int cmp, match;
 	const char *idxconf, *name, *tablename, *uri;
 
 	/* Check if we've already done the work. */
@@ -418,14 +417,16 @@ __wt_schema_get_colgroup(WT_SESSION_IMPL *session,
 	WT_COLGROUP *colgroup;
 	WT_TABLE *table;
 	const char *tablename, *tend;
-	int i;
+	u_int i;
 
 	*colgroupp = NULL;
 
 	tablename = uri;
-	if (!WT_PREFIX_SKIP(tablename, "colgroup:") ||
-	    (tend = strchr(tablename, ':')) == NULL)
+	if (!WT_PREFIX_SKIP(tablename, "colgroup:"))
 		return (__wt_bad_object_type(session, uri));
+
+	if ((tend = strchr(tablename, ':')) == NULL)
+		tend = tablename + strlen(tablename);
 
 	WT_RET(__wt_schema_get_table(session,
 	    tablename, WT_PTRDIFF(tend, tablename), 0, &table));
@@ -455,7 +456,7 @@ __wt_schema_get_index(WT_SESSION_IMPL *session,
 	WT_INDEX *idx;
 	WT_TABLE *table;
 	const char *tablename, *tend;
-	int i;
+	u_int i;
 
 	*indexp = NULL;
 

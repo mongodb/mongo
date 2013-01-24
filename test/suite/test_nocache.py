@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Public Domain 2008-2012 WiredTiger, Inc.
+# Public Domain 2008-2013 WiredTiger, Inc.
 #
 # This is free and unencumbered software released into the public domain.
 #
@@ -58,7 +58,7 @@ class test_no_cache(wttest.WiredTigerTestCase):
         for key,val in cursor:
             i += 1
             if i > 2000:
-                break;
+                break
             self.assertEqual(key, key_populate(cursor, i))
             self.assertEqual(val, value_populate(cursor, i))
         cursor.close()

@@ -1,5 +1,5 @@
 /*-
- * Public Domain 2008-2012 WiredTiger, Inc.
+ * Public Domain 2008-2013 WiredTiger, Inc.
  *
  * This is free and unencumbered software released into the public domain.
  *
@@ -102,6 +102,9 @@ main(int argc, char *argv[])
 	argv += optind;
 	if (argc != 0)
 		return (usage());
+
+	/* Use line buffering on stdout so status updates aren't buffered. */
+	(void)setvbuf(stdout, NULL, _IOLBF, 0);
 
 	/* Clean up on signal. */
 	(void)signal(SIGINT, onint);

@@ -33,9 +33,14 @@ if test $# -ne 0; then
 fi
 
 ext="\"$top/ext/collators/reverse/.libs/libwiredtiger_reverse_collator.so\""
+
 bzip2_ext="$top/ext/compressors/bzip2/.libs/libwiredtiger_bzip2.so"
 if test -e $bzip2_ext ; then
         ext="$ext,\"$bzip2_ext\""
+fi
+lzo_ext=".libs/lzo_compress.so"
+if test -e $lzo_ext ; then
+        ext="$ext,\"$lzo_ext\""
 fi
 raw_ext=".libs/raw_compress.so"
 if test -e $raw_ext ; then

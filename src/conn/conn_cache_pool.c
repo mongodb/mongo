@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -19,6 +19,8 @@
 /* Balancing passes after a reduction before a connection is a candidate. */
 #define	WT_CACHE_POOL_REDUCE_SKIPS	5
 
+static int __cache_pool_adjust(uint64_t, int);
+static int __cache_pool_assess(uint64_t *);
 static int  __cache_pool_balance(void);
 
 /*
@@ -30,15 +32,17 @@ __wt_conn_cache_pool_config(WT_SESSION_IMPL *session, const char **cfg)
 {
 	WT_CACHE_POOL *cp;
 	WT_CONFIG_ITEM cval;
-	WT_CONNECTION_IMPL *conn;
+	WT_CONNECTION_IMPL *conn, *entry;
 	WT_DECL_RET;
 	char *pool_name;
 	int created, reconfiguring;
+	uint64_t chunk, reserve, size, used_cache;
 
 	conn = S2C(session);
 	created = reconfiguring = 0;
 	pool_name = NULL;
 	cp = NULL;
+	chunk = reserve = size = 0;
 
 	if (F_ISSET(conn, WT_CONN_CACHE_POOL))
 		reconfiguring = 1;
@@ -87,17 +91,65 @@ __wt_conn_cache_pool_config(WT_SESSION_IMPL *session, const char **cfg)
 	 */
 	if (!reconfiguring)
 		++cp->refs;
-	/* Configure the pool. */
-	WT_ERR(__wt_config_gets(session, cfg, "shared_cache.size", &cval));
-	cp->size = (uint64_t)cval.val;
-	WT_ERR(__wt_config_gets(session, cfg, "shared_cache.chunk", &cval));
-	cp->chunk = (uint64_t)cval.val;
-	WT_ERR(__wt_config_gets(session, cfg, "shared_cache.min", &cval));
-	cp->min = (uint64_t)cval.val;
+
+	/*
+	 * Retrieve the pool configuration options. The values are optional if
+	 * we are re-configuring.
+	 */
+	ret = __wt_config_gets(session, cfg, "shared_cache.size", &cval);
+	if (reconfiguring && ret == WT_NOTFOUND)
+		/* Not being changed; use the old value. */
+		size = cp->size;
+	else {
+		WT_ERR(ret);
+		size = (uint64_t)cval.val;
+	}
+	ret = __wt_config_gets(session, cfg, "shared_cache.chunk", &cval);
+	if (reconfiguring && ret == WT_NOTFOUND)
+		/* Not being changed; use the old value. */
+		chunk = cp->chunk;
+	else {
+		WT_ERR(ret);
+		chunk = (uint64_t)cval.val;
+	}
+	/*
+	 * Retrieve the reserve size here for validation of configuration.
+	 * Don't save it yet since the connections cache is not created if
+	 * we are opening. Cache configuration is responsible for saving the
+	 * setting.
+	 */
+	ret = __wt_config_gets(session, cfg, "shared_cache.reserve", &cval);
+	if (reconfiguring && ret == WT_NOTFOUND)
+		/* It is safe to access the cache during reconfigure. */
+		reserve = conn->cache->cp_reserved;
+	else {
+		WT_ERR(ret);
+		reserve = (uint64_t)cval.val;
+	}
+
+	/*
+	 * Validate that size and reserve values don't cause the cache
+	 * pool to be over subscribed.
+	 */
+	used_cache = 0;
+	if (!created) {
+		TAILQ_FOREACH(entry, &cp->cache_pool_qh, cpq)
+			used_cache += entry->cache->cp_reserved;
+	}
+	if (used_cache + reserve > size)
+		WT_ERR_MSG(session, EINVAL,
+		    "Shared cache unable to accommodate this configuration. "
+		    "Shared cache size: %" PRIu64 ", reserved: %" PRIu64,
+		    size, used_cache + reserve);
+
+	/* The configuration is verified - it's safe to update the pool. */
+	cp->size = size;
+	cp->chunk = chunk;
+
 	WT_VERBOSE_ERR(session, shared_cache,
 	    "Configured cache pool %s. Size: %" PRIu64
-	    ", chunk size: %" PRIu64 ", min: %" PRIu64,
-	    cp->name, cp->size, cp->chunk, cp->min);
+	    ", chunk size: %" PRIu64,
+	    cp->name, cp->size, cp->chunk);
 
 	F_SET(conn, WT_CONN_CACHE_POOL);
 err:	__wt_spin_unlock(session, &__wt_process.spinlock);
@@ -105,7 +157,7 @@ err:	__wt_spin_unlock(session, &__wt_process.spinlock);
 		__wt_free(session, pool_name);
 	if (ret != 0 && created) {
 		__wt_free(session, cp->name);
-		(void)__wt_cond_destroy(session, cp->cache_pool_cond);
+		WT_TRET(__wt_cond_destroy(session, cp->cache_pool_cond));
 		__wt_free(session, cp);
 	}
 	return (ret);
@@ -129,14 +181,14 @@ __wt_conn_cache_pool_open(WT_SESSION_IMPL *session)
 
 	__wt_spin_lock(session, &cp->cache_pool_lock);
 	locked = 1;
-	/* Add this connection into the cache pool connection queue. */
-	WT_ERR(__wt_calloc_def(session, 1, &conn->cache));
 
 	/*
-	 * Figure out if a manager thread is needed while holding the lock.
-	 * Don't start the thread until we have released the lock.
+	 * Add this connection into the cache pool connection queue. Figure
+	 * out if a manager thread is needed while holding the lock. Don't
+	 * start the thread until we have released the lock.
 	 */
 	create_server = TAILQ_EMPTY(&cp->cache_pool_qh);
+
 	TAILQ_INSERT_TAIL(&cp->cache_pool_qh, conn, cpq);
 	__wt_spin_unlock(session, &cp->cache_pool_lock);
 	locked = 0;
@@ -146,11 +198,11 @@ __wt_conn_cache_pool_open(WT_SESSION_IMPL *session)
 	/* Start the cache pool server if required. */
 	if (create_server) {
 		F_SET(cp, WT_CACHE_POOL_RUN);
-		WT_ERR(__wt_thread_create(
+		WT_ERR(__wt_thread_create(session,
 		    &cp->cache_pool_tid, __wt_cache_pool_server, NULL));
 	}
 	/* Wake up the cache pool server to get our initial chunk. */
-	__wt_cond_signal(session, cp->cache_pool_cond);
+	WT_ERR(__wt_cond_signal(session, cp->cache_pool_cond));
 
 err:	if (locked)
 		__wt_spin_unlock(session, &cp->cache_pool_lock);
@@ -188,12 +240,10 @@ __wt_conn_cache_pool_destroy(WT_CONNECTION_IMPL *conn)
 
 	if (!found) {
 		__wt_spin_unlock(session, &cp->cache_pool_lock);
-		WT_RET_MSG(session, WT_ERROR,
-		    "Failed to find connection in shared cache pool.");
+		return (0);
 	}
 
-	/* Ignore any errors - we want to continue closing things down. */
-	WT_VERBOSE_VOID(session, shared_cache,
+	WT_VERBOSE_TRET(session, shared_cache,
 	    "Removing %s from cache pool.", entry->home);
 	TAILQ_REMOVE(&cp->cache_pool_qh, entry, cpq);
 
@@ -209,7 +259,7 @@ __wt_conn_cache_pool_destroy(WT_CONNECTION_IMPL *conn)
 	 * connection. A new one will be created by the next balance pass.
 	 */
 	if (cp->session != NULL && entry == S2C(cp->session)) {
-		WT_VERBOSE_VOID(cp->session, shared_cache,
+		WT_VERBOSE_TRET(cp->session, shared_cache,
 		    "Freeing a cache pool session due to connection close.");
 		wt_session = &cp->session->iface;
 		WT_TRET(wt_session->close(wt_session, NULL));
@@ -224,8 +274,8 @@ __wt_conn_cache_pool_destroy(WT_CONNECTION_IMPL *conn)
 	if (F_ISSET(cp, WT_CACHE_POOL_RUN))
 		__wt_spin_unlock(session, &cp->cache_pool_lock);
 	else {
-		WT_VERBOSE_VOID(session, shared_cache,
-		    "Destroying cache pool.");
+		WT_VERBOSE_TRET(
+		    session, shared_cache, "Destroying cache pool.");
 		__wt_spin_lock(session, &__wt_process.spinlock);
 		cp = __wt_process.cache_pool;
 		/*
@@ -236,9 +286,10 @@ __wt_conn_cache_pool_destroy(WT_CONNECTION_IMPL *conn)
 		__wt_process.cache_pool = NULL;
 		__wt_spin_unlock(session, &__wt_process.spinlock);
 		__wt_spin_unlock(session, &cp->cache_pool_lock);
+
 		/* Shut down the cache pool worker. */
-		__wt_cond_signal(session, cp->cache_pool_cond);
-		WT_TRET(__wt_thread_join(cp->cache_pool_tid));
+		WT_TRET(__wt_cond_signal(session, cp->cache_pool_cond));
+		WT_TRET(__wt_thread_join(session, cp->cache_pool_tid));
 
 		/* Now free the pool. */
 		__wt_free(session, cp->name);
@@ -259,16 +310,12 @@ int
 __cache_pool_balance(void)
 {
 	WT_CACHE_POOL *cp;
-	WT_CACHE *cache;
 	WT_CONNECTION_IMPL *entry;
 	WT_DECL_RET;
-	WT_SESSION_IMPL *session;
-	uint64_t adjusted, highest, new, read_pressure;
-	int entries, grew;
+	uint64_t highest;
 
 	cp = __wt_process.cache_pool;
-	entries = grew = 0;
-	adjusted = highest = 0;
+	highest = 0;
 
 	__wt_spin_lock(NULL, &cp->cache_pool_lock);
 	/* If the queue is empty there is nothing to do. */
@@ -284,7 +331,28 @@ __cache_pool_balance(void)
 	    (ret = __wt_open_session(entry, 1, NULL, NULL, &cp->session)) != 0)
 		WT_ERR_MSG(NULL, ret,
 		    "Failed to create session for cache pool");
+
+	WT_ERR(__cache_pool_assess(&highest));
+	WT_ERR(__cache_pool_adjust(highest, 0));
+	while (cp->currently_used > cp->size)
+		WT_ERR(__cache_pool_adjust(highest, 1));
+
+err:	__wt_spin_unlock(NULL, &cp->cache_pool_lock);
+	return (ret);
+}
+
+static int
+__cache_pool_assess(uint64_t *phighest)
+{
+	WT_CACHE_POOL *cp;
+	WT_CACHE *cache;
+	WT_CONNECTION_IMPL *entry;
+	WT_SESSION_IMPL *session;
+	uint64_t entries, highest, new;
+
+	cp = __wt_process.cache_pool;
 	session = cp->session;
+	entries = highest = 0;
 
 	/* Generate read pressure information. */
 	TAILQ_FOREACH(entry, &cp->cache_pool_qh, cpq) {
@@ -303,15 +371,40 @@ __cache_pool_balance(void)
 		if (cache->cp_current_evict > highest)
 			highest = cache->cp_current_evict;
 	}
-	WT_VERBOSE_ERR(session, shared_cache,
-	    "Highest eviction count: %d, entries: %d",
-	    (int)highest, entries);
+	WT_VERBOSE_RET(session, shared_cache,
+	    "Highest eviction count: %" PRIu64 ", entries: %" PRIu64,
+	    highest, entries);
 	/* Normalize eviction information across connections. */
-	highest = highest / 10;
+	highest = highest / (entries + 1);
 	++highest; /* Avoid divide by zero. */
+
+	*phighest = highest;
+	return (0);
+}
+
+/*
+ * Adjust the allocation of cache to each connection. If force is set ignore
+ * cache load information, and reduce the allocation for every connection
+ * allocated more than their reserved size.
+ */
+static int
+__cache_pool_adjust(uint64_t highest, int force)
+{
+	WT_CACHE_POOL *cp;
+	WT_CACHE *cache;
+	WT_CONNECTION_IMPL *entry;
+	WT_SESSION_IMPL *session;
+	uint64_t adjusted, reserved, read_pressure;
+	int grew;
+
+	cp = __wt_process.cache_pool;
+	session = cp->session;
+	adjusted = reserved = read_pressure = 0;
+	grew = 0;
 
 	TAILQ_FOREACH(entry, &cp->cache_pool_qh, cpq) {
 		cache = entry->cache;
+		reserved = cache->cp_reserved;
 		adjusted = 0;
 		/* Allow to stabilize after changes. */
 		if (cache->cp_skip_count > 0 && --cache->cp_skip_count > 0)
@@ -322,9 +415,21 @@ __cache_pool_balance(void)
 		 * TODO: Use __wt_cache_bytes_inuse instead of eviction_target
 		 * which doesn't do the right thing at the moment.
 		 */
-		if (entry->cache_size == 0) {
+		if (entry->cache_size < reserved) {
 			grew = 1;
-			adjusted = cp->min;
+			adjusted = reserved - entry->cache_size;
+		} else if ((force && entry->cache_size > reserved) ||
+		    (read_pressure < WT_CACHE_POOL_REDUCE_THRESHOLD &&
+		     highest > 1 && entry->cache_size > reserved &&
+		     cp->currently_used >= cp->size)) {
+			/*
+			 * If a connection isn't actively using it's assigned
+			 * cache and is assigned a reasonable amount - reduce
+			 * it.
+			 */
+			grew = 0;
+			adjusted = (cp->chunk > entry->cache_size - reserved) ?
+			    cp->chunk : (entry->cache_size - reserved);
 		} else if (highest > 1 &&
 		    entry->cache_size < cp->size &&
 		     cache->bytes_inmem >=
@@ -334,18 +439,6 @@ __cache_pool_balance(void)
 			grew = 1;
 			adjusted = WT_MIN(cp->chunk,
 			    cp->size - cp->currently_used);
-		} else if (read_pressure < WT_CACHE_POOL_REDUCE_THRESHOLD &&
-		    highest > 1 &&
-		    entry->cache_size > cp->min &&
-		    cp->currently_used >= cp->size) {
-			/*
-			 * If a connection isn't actively using it's assigned
-			 * cache and is assigned a reasonable amount - reduce
-			 * it.
-			 */
-			grew = 0;
-			adjusted = (cp->chunk > entry->cache_size - cp->min) ?
-			    cp->chunk : (entry->cache_size - cp->min);
 		}
 		if (adjusted > 0) {
 			if (grew > 0) {
@@ -358,7 +451,7 @@ __cache_pool_balance(void)
 				entry->cache_size -= adjusted;
 				cp->currently_used -= adjusted;
 			}
-			WT_VERBOSE_ERR(session, shared_cache,
+			WT_VERBOSE_RET(session, shared_cache,
 			    "Allocated %" PRId64 " to %s",
 			    adjusted, entry->home);
 			/*
@@ -367,8 +460,7 @@ __cache_pool_balance(void)
 			 */
 		}
 	}
-err:	__wt_spin_unlock(NULL, &cp->cache_pool_lock);
-	return (ret);
+	return (0);
 }
 
 /*
@@ -379,11 +471,18 @@ void *
 __wt_cache_pool_server(void *arg)
 {
 	WT_CACHE_POOL *cp;
+	WT_DECL_RET;
+	WT_SESSION_IMPL *session;
+
+	WT_UNUSED(arg);
 
 	cp = __wt_process.cache_pool;
+	session = cp->session;
 
 	while (F_ISSET(cp, WT_CACHE_POOL_RUN)) {
-		__wt_cond_wait(cp->session, cp->cache_pool_cond, 1000000);
+		if (cp->currently_used <= cp->size)
+			WT_ERR(__wt_cond_wait(
+			    session, cp->cache_pool_cond, 1000000));
 		/*
 		 * Re-check pool run flag - since we want to avoid getting the
 		 * lock on shutdown.
@@ -396,5 +495,9 @@ __wt_cache_pool_server(void *arg)
 		 */
 		(void)__cache_pool_balance();
 	}
-	return (arg);
+
+	if (0) {
+err:		__wt_err(session, ret, "cache pool manager server error");
+	}
+	return (NULL);
 }

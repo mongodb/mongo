@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -22,7 +22,8 @@ __wt_lsm_merge_worker(void *vargs)
 	WT_LSM_WORKER_ARGS *args;
 	WT_LSM_TREE *lsm_tree;
 	WT_SESSION_IMPL *session;
-	int id, progress, stalls;
+	u_int id;
+	int progress, stalls;
 
 	args = vargs;
 	lsm_tree = args->lsm_tree;
@@ -72,11 +73,12 @@ __wt_lsm_merge_worker(void *vargs)
 void *
 __wt_lsm_bloom_worker(void *arg)
 {
+	WT_DECL_RET;
 	WT_LSM_CHUNK *chunk;
 	WT_LSM_TREE *lsm_tree;
 	WT_LSM_WORKER_COOKIE cookie;
 	WT_SESSION_IMPL *session;
-	int i, j;
+	u_int i, j;
 
 	lsm_tree = arg;
 	session = lsm_tree->bloom_session;
@@ -84,8 +86,8 @@ __wt_lsm_bloom_worker(void *arg)
 	WT_CLEAR(cookie);
 
 	for (;;) {
-		/* Ignore the return value - it is discarded anyway. */
-		if (__wt_lsm_copy_chunks(session, lsm_tree, &cookie) != 0)
+		WT_ERR(__wt_lsm_copy_chunks(session, lsm_tree, &cookie));
+		if (!F_ISSET(lsm_tree, WT_LSM_TREE_WORKING))
 			goto err;
 
 		/* Create bloom filters in all checkpointed chunks. */
@@ -118,6 +120,14 @@ __wt_lsm_bloom_worker(void *arg)
 	}
 
 err:	__wt_free(session, cookie.chunk_array);
+	/*
+	 * The thread will only exit with failure if we run out of memory or
+	 * there is some other system driven failure. We can't keep going
+	 * after such a failure - ensure WiredTiger shuts down.
+	 */
+	if (ret != 0)
+		WT_PANIC_ERR(session, ret,
+		    "Shutting down LSM bloom utility thread");
 	return (NULL);
 }
 
@@ -134,8 +144,7 @@ __wt_lsm_checkpoint_worker(void *arg)
 	WT_LSM_TREE *lsm_tree;
 	WT_LSM_WORKER_COOKIE cookie;
 	WT_SESSION_IMPL *session;
-	const char *cfg[] = API_CONF_DEFAULTS(session, checkpoint, NULL);
-	int i, j;
+	u_int i, j;
 
 	lsm_tree = arg;
 	session = lsm_tree->ckpt_session;
@@ -144,6 +153,8 @@ __wt_lsm_checkpoint_worker(void *arg)
 
 	for (;;) {
 		WT_ERR(__wt_lsm_copy_chunks(session, lsm_tree, &cookie));
+		if (!F_ISSET(lsm_tree, WT_LSM_TREE_WORKING))
+			goto err;
 
 		/* Write checkpoints in all completed files. */
 		for (i = 0, j = 0; i < cookie.nchunks - 1; i++) {
@@ -158,13 +169,9 @@ __wt_lsm_checkpoint_worker(void *arg)
 			if (F_ISSET(chunk, WT_LSM_CHUNK_ONDISK))
 				continue;
 
-			/*
-			 * NOTE: we pass a non-NULL config, because otherwise
-			 * __wt_checkpoint thinks we're closing the file.
-			 */
 			WT_WITH_SCHEMA_LOCK(session,
 			    ret = __wt_schema_worker(session,
-			    chunk->uri, __wt_checkpoint, cfg, 0));
+			    chunk->uri, __wt_checkpoint, NULL, 0));
 
 			if (ret != 0) {
 				__wt_err(session, ret,
@@ -173,11 +180,11 @@ __wt_lsm_checkpoint_worker(void *arg)
 			}
 
 			++j;
-			__wt_writelock(session, lsm_tree->rwlock);
+			WT_ERR(__wt_writelock(session, lsm_tree->rwlock));
 			F_SET(chunk, WT_LSM_CHUNK_ONDISK);
 			++lsm_tree->dsk_gen;
 			ret = __wt_lsm_meta_write(session, lsm_tree);
-			__wt_rwunlock(session, lsm_tree->rwlock);
+			WT_TRET(__wt_rwunlock(session, lsm_tree->rwlock));
 
 			if (ret != 0) {
 				__wt_err(session, ret,
@@ -186,13 +193,20 @@ __wt_lsm_checkpoint_worker(void *arg)
 			}
 
 			WT_VERBOSE_ERR(session, lsm,
-			     "LSM worker checkpointed %d.", i);
+			     "LSM worker checkpointed %u", i);
 		}
 		if (j == 0)
 			__wt_sleep(0, 10000);
 	}
-
 err:	__wt_free(session, cookie.chunk_array);
+	/*
+	 * The thread will only exit with failure if we run out of memory or
+	 * there is some other system driven failure. We can't keep going
+	 * after such a failure - ensure WiredTiger shuts down.
+	 */
+	if (ret != 0 && ret != WT_NOTFOUND)
+		WT_PANIC_ERR(session, ret,
+		    "Shutting down LSM checkpoint utility thread");
 	return (NULL);
 }
 
@@ -206,17 +220,14 @@ __wt_lsm_copy_chunks(WT_SESSION_IMPL *session,
     WT_LSM_TREE *lsm_tree, WT_LSM_WORKER_COOKIE *cookie)
 {
 	WT_DECL_RET;
-	int nchunks;
+	u_int nchunks;
 
 	/* Always return zero chunks on error. */
 	cookie->nchunks = 0;
 
-	__wt_readlock(session, lsm_tree->rwlock);
-	if (!F_ISSET(lsm_tree, WT_LSM_TREE_WORKING)) {
-		__wt_rwunlock(session, lsm_tree->rwlock);
-		/* The actual error value is ignored. */
-		return (WT_ERROR);
-	}
+	WT_RET(__wt_readlock(session, lsm_tree->rwlock));
+	if (!F_ISSET(lsm_tree, WT_LSM_TREE_WORKING))
+		return (__wt_rwunlock(session, lsm_tree->rwlock));
 
 	/* Take a copy of the current state of the LSM tree. */
 	nchunks = lsm_tree->nchunks;
@@ -226,13 +237,14 @@ __wt_lsm_copy_chunks(WT_SESSION_IMPL *session,
 	 * increase the size of our current buffer to match.
 	 */
 	if (cookie->chunk_alloc < lsm_tree->chunk_alloc)
-		ret = __wt_realloc(session,
+		WT_ERR(__wt_realloc(session,
 		    &cookie->chunk_alloc, lsm_tree->chunk_alloc,
-		    &cookie->chunk_array);
-	if (ret == 0 && nchunks > 0)
+		    &cookie->chunk_array));
+	if (nchunks > 0)
 		memcpy(cookie->chunk_array, lsm_tree->chunk,
 		    nchunks * sizeof(*lsm_tree->chunk));
-	__wt_rwunlock(session, lsm_tree->rwlock);
+
+err:	WT_TRET(__wt_rwunlock(session, lsm_tree->rwlock));
 
 	if (ret == 0)
 		cookie->nchunks = nchunks;
@@ -301,10 +313,10 @@ __lsm_bloom_create(WT_SESSION_IMPL *session,
 	F_SET(chunk, WT_LSM_CHUNK_BLOOM);
 
 	/* Ensure the bloom filter is in the metadata. */
-	__wt_writelock(session, lsm_tree->rwlock);
+	WT_ERR(__wt_writelock(session, lsm_tree->rwlock));
 	++lsm_tree->dsk_gen;
 	ret = __wt_lsm_meta_write(session, lsm_tree);
-	__wt_rwunlock(session, lsm_tree->rwlock);
+	WT_TRET(__wt_rwunlock(session, lsm_tree->rwlock));
 
 	if (ret != 0)
 		WT_ERR_MSG(session, ret,
@@ -321,7 +333,8 @@ __lsm_free_chunks(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	WT_DECL_RET;
 	WT_LSM_CHUNK *chunk;
 	const char *drop_cfg[] = API_CONF_DEFAULTS(session, drop, NULL);
-	int locked, progress, i;
+	u_int i;
+	int locked, progress;
 
 	locked = progress = 0;
 	for (i = 0; i < lsm_tree->nold_chunks; i++) {
@@ -330,7 +343,7 @@ __lsm_free_chunks(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 		if (!locked) {
 			locked = 1;
 			/* TODO: Do we need the lsm_tree lock for all drops? */
-			__wt_writelock(session, lsm_tree->rwlock);
+			WT_ERR(__wt_writelock(session, lsm_tree->rwlock));
 		}
 		if (F_ISSET(chunk, WT_LSM_CHUNK_BLOOM)) {
 			WT_WITH_SCHEMA_LOCK(session, ret = __wt_schema_drop(
@@ -371,10 +384,10 @@ __lsm_free_chunks(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 		__wt_free(session, lsm_tree->old_chunks[i]);
 		++lsm_tree->old_avail;
 	}
-	if (locked) {
-err:		WT_TRET(__wt_lsm_meta_write(session, lsm_tree));
-		__wt_rwunlock(session, lsm_tree->rwlock);
-	}
+err:	if (progress)
+		WT_TRET(__wt_lsm_meta_write(session, lsm_tree));
+	if (locked)
+		WT_TRET(__wt_rwunlock(session, lsm_tree->rwlock));
 
 	/* Returning non-zero means there is no work to do. */
 	if (!progress)

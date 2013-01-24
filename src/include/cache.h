@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -30,6 +30,8 @@ struct __wt_cache {
 	uint64_t bytes_inmem;		/* Bytes/pages created in memory */
 	uint64_t bytes_evict;		/* Bytes/pages discarded by eviction */
 	uint64_t pages_evict;
+	uint64_t bytes_dirty;		/* Bytes/pages currently dirty */
+	uint64_t pages_dirty;
 
 	/*
 	 * Read information.
@@ -40,10 +42,12 @@ struct __wt_cache {
 	 * Eviction thread information.
 	 */
 	WT_CONDVAR *evict_cond;		/* Cache eviction server mutex */
-	WT_SPINLOCK evict_lock;		/* Eviction serialization */
+	WT_SPINLOCK evict_lock;		/* Eviction LRU queue */
+	WT_SPINLOCK evict_walk_lock;	/* Eviction walk location */
 
-	u_int eviction_trigger;		/* Percent to trigger eviction. */
+	u_int eviction_trigger;		/* Percent to trigger eviction */
 	u_int eviction_target;		/* Percent to end eviction */
+	u_int eviction_dirty_target;    /* Percent to allow dirty */
 
 	/*
 	 * LRU eviction list information.
@@ -67,6 +71,13 @@ struct __wt_cache {
 	uint64_t cp_saved_evict;	/* Evict count from last pass */
 	uint64_t cp_current_evict;	/* Evict count from current pass */
 	uint32_t cp_skip_count;		/* Post change stabilization */
+	uint64_t cp_reserved;		/* Base size for this cache */
+
+	/*
+	 * Flags.
+	 */
+#define	WT_EVICT_FORCE_PASS	0x01	/* Ignore the eviction trigger */
+	uint32_t flags;
 };
 
 /*
@@ -80,7 +91,6 @@ struct __wt_cache_pool {
 	WT_SESSION_IMPL *session;
 	const char *name;
 	uint64_t size;
-	uint64_t min;		/* The minimum size per connection. */
 	uint64_t chunk;
 	uint64_t currently_used;
 	uint32_t flags;

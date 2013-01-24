@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 #
-# Copyright (c) 2008-2012 WiredTiger, Inc.
-#   All rights reserved.
+# Copyright (c) 2008-2013 WiredTiger, Inc.
+#	All rights reserved.
 #
 # See the file LICENSE for redistribution information.
 
@@ -13,16 +13,17 @@ from distutils.core import setup, Extension
 if not 'ARCHFLAGS' in os.environ:
     os.environ['ARCHFLAGS'] = ''
 
-# Suppress warnings building SWIG code on OS X 10.8
-extra_cflags = []
+# Suppress warnings building SWIG generated code
+extra_cflags = [
+				'-Wno-unused-value',
+]
 if sys.platform == 'darwin':
     kernel_version = os.uname()[2] # e.g. 12.0.0 is Mountain Lion
     major_version = int(kernel_version.split('.')[0])
     if major_version >= 12:
         extra_cflags += [
 				'-Wno-self-assign',
-				'-Wno-unused-value',
-				'-Qunused-arguments'
+				'-Qunused-arguments',
 		]
 
 dir = os.path.dirname(__file__)

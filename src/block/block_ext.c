@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -9,6 +9,8 @@
 
 static int __block_ext_overlap(WT_SESSION_IMPL *,
 	WT_BLOCK *, WT_EXTLIST *, WT_EXT **, WT_EXTLIST *, WT_EXT **);
+static int __block_extlist_dump(
+	WT_SESSION_IMPL *, const char *, WT_EXTLIST *, int);
 static int __block_merge(WT_SESSION_IMPL *, WT_EXTLIST *, off_t, off_t);
 
 /*
@@ -376,6 +378,50 @@ __wt_block_off_remove_overlap(
 }
 
 /*
+ * __block_extend --
+ *	Extend the file to allocate space.
+ */
+static int
+__block_extend(
+    WT_SESSION_IMPL *session, WT_BLOCK *block, off_t *offp, off_t size)
+{
+	WT_FH *fh;
+
+	fh = block->fh;
+
+	/*
+	 * Callers of this function are expected to have already acquired any
+	 * locks required to extend the file.
+	 *
+	 * We should never be allocating from an empty file.
+	 */
+	if (fh->file_size < WT_BLOCK_DESC_SECTOR)
+		WT_RET_MSG(session, EINVAL,
+		    "cannot allocate from a file with no description "
+		    "information");
+
+	/*
+	 * Make sure we don't allocate past the maximum file size.  There's no
+	 * easy way to know the maximum off_t on a system, limit growth to 8B
+	 * bits (we currently check an off_t is 8B in verify_build.h).  I don't
+	 * think we're likely to see anything bigger for awhile.
+	 */
+	if (fh->file_size > (off_t)INT64_MAX - size)
+		WT_RET_MSG(session, WT_ERROR,
+		    "block allocation failed, file cannot grow further");
+
+	*offp = fh->file_size;
+	fh->file_size += size;
+
+	WT_DSTAT_INCR(session, block_extension);
+	WT_VERBOSE_RET(session, block,
+	    "file extend %" PRIdMAX "B @ %" PRIdMAX,
+	    (intmax_t)size, (intmax_t)*offp);
+
+	return (0);
+}
+
+/*
  * __wt_block_alloc --
  *	Alloc a chunk of space from the underlying file.
  */
@@ -386,7 +432,7 @@ __wt_block_alloc(
 	WT_EXT *ext;
 	WT_SIZE *szp, **sstack[WT_SKIP_MAXDEPTH];
 
-	WT_BSTAT_INCR(session, block_alloc);
+	WT_DSTAT_INCR(session, block_alloc);
 	if (size % block->allocsize != 0)
 		WT_RET_MSG(session, EINVAL,
 		    "cannot allocate a block size %" PRIdMAX " that is not "
@@ -403,7 +449,7 @@ __wt_block_alloc(
 	__block_size_srch(block->live.avail.sz, size, sstack);
 	szp = *sstack[0];
 	if (szp == NULL) {
-		WT_RET(__wt_block_extend(session, block, offp, size));
+		WT_RET(__block_extend(session, block, offp, size));
 		goto done;
 	}
 
@@ -439,50 +485,6 @@ done:	/* Add the newly allocated extent to the list of allocations. */
 }
 
 /*
- * __wt_block_extend --
- *	Extend the file to allocate space.
- */
-int
-__wt_block_extend(
-    WT_SESSION_IMPL *session, WT_BLOCK *block, off_t *offp, off_t size)
-{
-	WT_FH *fh;
-
-	fh = block->fh;
-
-	/*
-	 * Callers of this function are expected to have already acquired any
-	 * locks required to extend the file.
-	 *
-	 * We should never be allocating from an empty file.
-	 */
-	if (fh->file_size < WT_BLOCK_DESC_SECTOR)
-		WT_RET_MSG(session, EINVAL,
-		    "cannot allocate from a file with no description "
-		    "information");
-
-	/*
-	 * Make sure we don't allocate past the maximum file size.  There's no
-	 * easy way to know the maximum off_t on a system, limit growth to 8B
-	 * bits (we currently check an off_t is 8B in verify_build.h).  I don't
-	 * think we're likely to see anything bigger for awhile.
-	 */
-	if (fh->file_size > (off_t)INT64_MAX - size)
-		WT_RET_MSG(session, WT_ERROR,
-		    "block allocation failed, file cannot grow further");
-
-	*offp = fh->file_size;
-	fh->file_size += size;
-
-	WT_BSTAT_INCR(session, block_extend);
-	WT_VERBOSE_RET(session, block,
-	    "file extend %" PRIdMAX "B @ %" PRIdMAX,
-	    (intmax_t)size, (intmax_t)*offp);
-
-	return (0);
-}
-
-/*
  * __wt_block_free --
  *	Free a cookie-referenced chunk of space to the underlying file.
  */
@@ -495,7 +497,7 @@ __wt_block_free(WT_SESSION_IMPL *session,
 	uint32_t cksum, size;
 
 	WT_UNUSED(addr_size);
-	WT_BSTAT_INCR(session, block_free);
+	WT_DSTAT_INCR(session, block_free);
 
 	/* Crack the cookie. */
 	WT_RET(__wt_block_buffer_to_addr(block, addr, &offset, &size, &cksum));
@@ -1015,7 +1017,7 @@ corrupted:		WT_ERR_MSG(session, WT_ERROR,
 	}
 
 	if (WT_VERBOSE_ISSET(session, block))
-		WT_ERR(__wt_block_extlist_dump(session, "read extlist", el, 0));
+		WT_ERR(__block_extlist_dump(session, "read extlist", el, 0));
 
 err:	__wt_scr_free(&tmp);
 	return (ret);
@@ -1037,8 +1039,7 @@ __wt_block_extlist_write(WT_SESSION_IMPL *session,
 	uint8_t *p;
 
 	if (WT_VERBOSE_ISSET(session, block))
-		WT_RET(
-		    __wt_block_extlist_dump(session, "write extlist", el, 0));
+		WT_RET(__block_extlist_dump(session, "write extlist", el, 0));
 
 	/*
 	 * Figure out how many entries we're writing -- if there aren't any
@@ -1194,9 +1195,8 @@ __wt_block_extlist_free(WT_SESSION_IMPL *session, WT_EXTLIST *el)
 	memset(el, 0, sizeof(*el));
 }
 
-#ifdef HAVE_VERBOSE
-int
-__wt_block_extlist_dump(
+static int
+__block_extlist_dump(
     WT_SESSION_IMPL *session, const char *tag, WT_EXTLIST *el, int show_size)
 {
 	WT_EXT *ext;
@@ -1231,4 +1231,3 @@ __wt_block_extlist_dump(
 	}
 	return (0);
 }
-#endif

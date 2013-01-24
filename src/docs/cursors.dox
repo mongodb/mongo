@@ -20,7 +20,7 @@ WT_SESSION::commit_transaction, or discarded by calling
 WT_SESSION::rollback_transaction.
 
 If no transaction is active, cursor reads are performed at the isolation
-level of the session, set with the \c isolation key to
+level of the session, set with the \c isolation configuration key to
 WT_CONNECTION::open_session and successful updates are automatically
 committed before the update operation completes.
 
@@ -35,7 +35,7 @@ cursors in a session read from a stable snapshot while any cursor in the
 session remains positioned.
 
 Cursor positions do not survive transaction boundaries.  When a
-transaction is started with the WT_SESSION:begin_transaction or ended
+transaction is started with the WT_SESSION::begin_transaction or ended
 with either WT_SESSION::commit_transaction or
 WT_SESSION::rollback_transaction, all open cursors are reset, as if the
 WT_CURSOR::reset method was called.  The cursor reset discards any
@@ -51,23 +51,28 @@ See @ref transactions for more information.
 
 @section cursor_types Cursor types
 
-The following are some of common builtin cursor types:
+The following are some of the common builtin cursor types:
 
 <table>
-  @hrow{URI, Type}
+  @hrow{URI, Type, Notes}
+   @row{<tt>backup:</tt>,
+hot backup cursor, See also: @ref hot_backup}
    @row{<tt>colgroup:\<tablename\>.\<columnset\></tt>,
-column group cursor}
-  @row{<tt>table:\<tablename\></tt>,
-table cursor (key=table key\, value=table value)}
+column group cursor,}
+   @row{<tt>config:[\<uri\>]</tt>,
+object configuration cursor, (key=config string\,
+value=config value)}
   @row{<tt>file:\<filename\></tt>,
-file cursor (key=file key\, value=file value)}
+file cursor (key=file key\, value=file value),}
   @row{<tt>index:\<tablename\>.\<indexname\></tt>,
-index cursor (key=index key\, value=table value)}
+index cursor (key=index key\, value=table value),}
   @row{<tt>lsm:\<name\></tt>,
-LSM cursor (key=LSM key\, value=LSM value), see @ref lsm}
+LSM cursor (key=LSM key\, value=LSM value), See also: @ref lsm}
   @row{<tt>statistics:[file</tt><tt>:\<filename\>]</tt>,
-  database or file statistics (key=(int)\,
-  value=(string)description\, (string)value\, (uint64_t)value)}
+database or file statistics (key=(int)\,
+value=(string)description\, (string)value\, (uint64_t)value),}
+  @row{<tt>table:\<tablename\></tt>,
+table cursor (key=table key\, value=table value),}
 </table>
 
 See @subpage data_sources for the full list.
@@ -81,8 +86,9 @@ from the listed columns are returned by WT_CURSOR::get_value.
 
 This is particularly useful with index cursors, because if all columns in
 the projection are available in the index (including primary key columns,
-which are the values of the index), there is no need to access any column
-groups.
+which are the values of the index), the data can be read from the index
+without accessing any column groups.  See @ref schema_indices for more
+details.
 
 @section cursor_raw Raw mode
 
@@ -98,10 +104,5 @@ cursor's \c key_format or \c value_format, respectively.  For
 WT_CURSOR::set_key and WT_CURSOR::set_value in raw mode, the WT_ITEM
 should be equivalent to calling ::wiredtiger_struct_pack for the
 cursor's \c key_format or \c value_format, respectively.
-
-@section cursor_random Random lookup
-
-Cursors can be configured to return pseudo-random records from row-store
-objects.  See @subpage cursor_random for details.
 
 */

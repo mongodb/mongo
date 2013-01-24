@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -99,23 +99,6 @@ __wt_block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	memset((uint8_t *)buf->mem + buf->size, 0, align_size - buf->size);
 
 	/*
-	 * We increment the block's write generation so it's easy to identify
-	 * newer versions of blocks during salvage: it's common in WiredTiger
-	 * for multiple blocks to be internally consistent with identical
-	 * first and last keys, so we need a way to know the most recent state
-	 * of the block.  (We could check to see which leaf is referenced by
-	 * by the internal page, which implies salvaging internal pages (which
-	 * I don't want to do), and it's not quite as good anyway, because the
-	 * internal page may not have been written to disk after the leaf page
-	 * was updated.  So, write generations it is.
-	 *
-	 * Nothing is locked at this point but two versions of a page with the
-	 * same generation is pretty unlikely, and if we did, they're going to
-	 * be roughly identical for the purposes of salvage, anyway.
-	 */
-	blk->write_gen = ++block->live.write_gen;
-
-	/*
 	 * Set the disk size so we don't have to incrementally read blocks
 	 * during salvage.
 	 */
@@ -152,14 +135,15 @@ __wt_block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	    session, block->fh, offset, align_size, buf->mem)) != 0) {
 		if (!locked)
 			__wt_spin_lock(session, &block->live_lock);
-		(void)__wt_block_off_free(session, block, offset, align_size);
+		WT_TRET(
+		    __wt_block_off_free(session, block, offset, align_size));
 		if (!locked)
 			__wt_spin_unlock(session, &block->live_lock);
 		WT_RET(ret);
 	}
 
 	WT_CSTAT_INCR(session, block_write);
-	WT_CSTAT_INCRV(session, byte_write, align_size);
+	WT_CSTAT_INCRV(session, block_byte_write, align_size);
 
 	WT_VERBOSE_RET(session, write,
 	    "off %" PRIuMAX ", size %" PRIu32 ", cksum %" PRIu32,

@@ -98,6 +98,7 @@ src/os_posix/os_remove.c
 src/os_posix/os_rename.c
 src/os_posix/os_rw.c
 src/os_posix/os_sleep.c
+src/os_posix/os_strtouq.c
 src/os_posix/os_thread.c
 src/os_posix/os_time.c
 src/os_posix/os_yield.c
@@ -110,6 +111,7 @@ src/schema/schema_open.c
 src/schema/schema_plan.c
 src/schema/schema_project.c
 src/schema/schema_rename.c
+src/schema/schema_stat.c
 src/schema/schema_truncate.c
 src/schema/schema_util.c
 src/schema/schema_worker.c

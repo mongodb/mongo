@@ -130,27 +130,29 @@ turning off checksum support when calling the WT_SESSION::create method.
 @section tuning_statistics Performance monitoring with statistics
 
 WiredTiger maintains a variety of statistics that can be read with a
-cursor.  The statistics are at two levels: per-database statistics and
-per-underlying file statistics.  The database statistics are the
-default; the underlying file statistics are available by specifying the
-appropriate uri.
+cursor.  See @ref data_statistics for general information about accessing
+statistics.
 
-The following is an example of printing run-time statistics about the
-WiredTiger engine:
+The statistics gathered by WiredTiger can be combined to derive information
+about the system's behavior.  For example, a cursor can be opened on the
+statistics for a table:
 
-@snippet ex_stat.c statistics database function
+@snippet ex_stat.c statistics calculate open table stats
 
-The following is an example of printing statistics about an underlying
-file:
+Then this code calculates the "fragmentation" of a table, defined
+here as the percentage of the table that is not part of the current
+checkpoint:
 
-@snippet ex_stat.c statistics file function
+@snippet ex_stat.c statistics calculate table fragmentation
 
-Both examples can use a common display routine that iterates through the
-statistics until the cursor returns the end of the list.
+The following example calculates the "write amplification", defined here as
+the ratio of bytes written to the filesystem versus the total bytes
+inserted, updated and removed by the application.
 
-@snippet ex_stat.c statistics display function
+@snippet ex_stat.c statistics calculate write amplification
 
-Note the raw value of the statistic is available from the \c value
-field, as well as a printable string version of the value.
+Both examples use this helper function to retrieve statistics values from a
+cursor:
 
+@snippet ex_stat.c statistics calculation helper function
  */

@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -262,8 +262,8 @@ make_table(WT_SESSION_IMPL *session, uint8_t *code2symbol,
 		 */
 		c = codes[i].pattern;
 		shift = max_depth - len;
-		c1 = c << shift;
-		c2 = (c + 1) << shift;
+		c1 = (uint32_t)c << shift;
+		c2 = (uint32_t)(c + 1) << shift;
 		for (j = c1; j < c2; j++) {
 			WT_ASSERT(session, code2symbol[j] == 0);
 			code2symbol[j] = i;
@@ -755,7 +755,7 @@ __wt_huffman_decode(WT_SESSION_IMPL *session, void *huffman_arg,
 	padding_info = (*from & 0xE0) >> (8 - WT_HUFFMAN_HEADER);
 	from_len_bits = from_len * 8;
 	if (padding_info != 0)
-		from_len_bits -= 8 - padding_info;
+		from_len_bits -= 8U - padding_info;
 
 	/* Number of bits that have codes. */
 	from_len_bits -= WT_HUFFMAN_HEADER;

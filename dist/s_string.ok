@@ -10,6 +10,7 @@ AJZ
 API
 APIs
 ARGS
+Addr
 Alakuijala
 Alloc
 Athlon
@@ -39,6 +40,7 @@ CELLs
 CKPT
 CLMPRSTdehikrsuv
 CLR
+CMP
 COL's
 CONCAT
 CONFIG
@@ -111,6 +113,7 @@ LSB
 LSM
 LSN
 LSNs
+LZO
 LeafGreen
 Llqr
 Llqrt
@@ -175,6 +178,7 @@ SSq
 STAILQ
 SYS
 Sevii
+SiH
 Skiplist
 Solaris
 Split's
@@ -302,6 +306,7 @@ connectionp
 cp
 crc
 cref
+ctime
 ctype
 curbackup
 curbtree
@@ -472,6 +477,7 @@ llll
 llu
 lno
 loadtext
+lockdown
 logf
 logput
 lookup
@@ -481,6 +487,7 @@ lru
 lsm
 lsn
 lu
+lzo
 majorp
 malloc
 maxintlitem
@@ -550,6 +557,7 @@ patchp
 pathnames
 perf
 pfx
+poptable
 posint
 posix
 pre
@@ -574,6 +582,7 @@ rdlock
 readlock
 readnear
 readnext
+readonly
 readprev
 readserver
 realloc
@@ -687,6 +696,7 @@ treplacement
 trk
 trk's
 troot
+trywrlock
 tsalvage
 tsplit
 tstat

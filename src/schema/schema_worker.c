@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -23,7 +23,7 @@ __wt_schema_worker(WT_SESSION_IMPL *session,
 	WT_INDEX *idx;
 	WT_TABLE *table;
 	const char *tablename;
-	int i;
+	u_int i;
 
 	tablename = uri;
 

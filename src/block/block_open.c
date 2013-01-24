@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -55,7 +55,7 @@ __wt_block_create(WT_SESSION_IMPL *session, const char *filename)
 
 	/* Undo any create on error. */
 	if (ret != 0)
-		(void)__wt_remove(session, filename);
+		WT_TRET(__wt_remove(session, filename));
 
 	return (ret);
 }
@@ -104,7 +104,7 @@ __wt_block_open(WT_SESSION_IMPL *session, const char *filename,
 	*(void **)blockp = block;
 	return (0);
 
-err:	(void)__wt_block_close(session, block);
+err:	WT_TRET(__wt_block_close(session, block));
 	return (ret);
 }
 
@@ -117,9 +117,9 @@ __wt_block_close(WT_SESSION_IMPL *session, WT_BLOCK *block)
 {
 	WT_DECL_RET;
 
-	WT_VERBOSE_RETVAL(session, block, ret, "close");
+	WT_VERBOSE_TRET(session, block, "close");
 
-	ret = __wt_block_checkpoint_unload(session, block);
+	WT_TRET(__wt_block_checkpoint_unload(session, block));
 
 	if (block->name != NULL)
 		__wt_free(session, block->name);
@@ -226,9 +226,18 @@ err:	__wt_scr_free(&buf);
 void
 __wt_block_stat(WT_SESSION_IMPL *session, WT_BLOCK *block)
 {
-	WT_BSTAT_SET(session, ckpt_size, block->live.ckpt_size);
-	WT_BSTAT_SET(session, file_size, block->fh->file_size);
-	WT_BSTAT_SET(session, file_magic, WT_BLOCK_MAGIC);
-	WT_BSTAT_SET(session, file_major, WT_BLOCK_MAJOR_VERSION);
-	WT_BSTAT_SET(session, file_minor, WT_BLOCK_MINOR_VERSION);
+	/*
+	 * We're looking inside the live system's structure, which normally
+	 * requires locking: the chances of a corrupted read are probably
+	 * non-existent, and it's statistics information regardless, but it
+	 * isn't like this is a common function for an application to call.
+	 */
+	__wt_spin_lock(session, &block->live_lock);
+	WT_DSTAT_SET(session, block_allocsize, block->allocsize);
+	WT_DSTAT_SET(session, block_checkpoint_size, block->live.ckpt_size);
+	WT_DSTAT_SET(session, block_magic, WT_BLOCK_MAGIC);
+	WT_DSTAT_SET(session, block_major, WT_BLOCK_MAJOR_VERSION);
+	WT_DSTAT_SET(session, block_minor, WT_BLOCK_MINOR_VERSION);
+	WT_DSTAT_SET(session, block_size, block->fh->file_size);
+	__wt_spin_unlock(session, &block->live_lock);
 }

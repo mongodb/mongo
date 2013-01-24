@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -92,7 +92,7 @@ __wt_block_read_off(WT_SESSION_IMPL *session,
 	}
 
 	WT_CSTAT_INCR(session, block_read);
-	WT_CSTAT_INCRV(session, byte_read, size);
+	WT_CSTAT_INCRV(session, block_byte_read, size);
 
 	return (0);
 }

@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -23,7 +23,7 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int op)
 	WT_INSERT_HEAD **inshead, *new_inshead, **new_inslist;
 	WT_ITEM *value, _value;
 	WT_PAGE *page;
-	WT_UPDATE *upd, *upd_obsolete;
+	WT_UPDATE *old_upd, *upd, *upd_obsolete;
 	size_t ins_size, new_inshead_size, new_inslist_size, upd_size;
 	uint64_t recno;
 	u_int skipdepth;
@@ -81,7 +81,8 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int op)
 	 */
 	if (cbt->compare == 0 && cbt->ins != NULL) {
 		/* Make sure the update can proceed. */
-		WT_ERR(__wt_update_check(session, page, cbt->ins->upd));
+		WT_ERR(
+		    __wt_update_check(session, page, old_upd = cbt->ins->upd));
 
 		/* Allocate the WT_UPDATE structure and transaction ID. */
 		WT_ERR(__wt_update_alloc(session, value, &upd, &upd_size));
@@ -90,8 +91,8 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int op)
 
 		/* Serialize the update. */
 		WT_ERR(__wt_update_serial(session, page,
-		    cbt->write_gen, &cbt->ins->upd, NULL, 0, &upd, upd_size,
-		    &upd_obsolete));
+		    cbt->write_gen, &cbt->ins->upd, old_upd,
+		    NULL, 0, &upd, upd_size, &upd_obsolete));
 
 		/* Discard any obsolete WT_UPDATE structures. */
 		if (upd_obsolete != NULL)
@@ -285,7 +286,7 @@ __wt_col_append_serial_func(WT_SESSION_IMPL *session, void *args)
 		*ins_stack[i] = new_ins;
 	}
 
-	__wt_col_append_new_ins_taken(session, args, page);
+	__wt_col_append_new_ins_taken(args);
 
 	/*
 	 * If the insert head does not yet have an insert list, our caller
@@ -296,7 +297,7 @@ __wt_col_append_serial_func(WT_SESSION_IMPL *session, void *args)
 	 */
 	if (*insheadp == NULL) {
 		WT_PUBLISH(*insheadp, new_inshead);
-		__wt_col_append_new_inshead_taken(session, args, page);
+		__wt_col_append_new_inshead_taken(args);
 	}
 
 	/*
@@ -308,7 +309,7 @@ __wt_col_append_serial_func(WT_SESSION_IMPL *session, void *args)
 	 */
 	if (page->modify->append == NULL) {
 		page->modify->append = new_inslist;
-		__wt_col_append_new_inslist_taken(session, args, page);
+		__wt_col_append_new_inslist_taken(args);
 	}
 
 	/*

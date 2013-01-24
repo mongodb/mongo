@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -92,7 +92,7 @@
 #define	WT_CELL_VALUE_OVFL	(8 << 4)	/* Removed overflow value */
 #define	WT_CELL_VALUE_OVFL_RM	(9 << 4)	/* Cached overflow value */
 
-#define	WT_CELL_TYPE_MASK	(0x0f << 4)
+#define	WT_CELL_TYPE_MASK	(0x0fU << 4)
 #define	WT_CELL_TYPE(v)		((v) & WT_CELL_TYPE_MASK)
 
 /*

@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -12,8 +12,8 @@
 #define	WT_KILOBYTE	(1024)
 #define	WT_MEGABYTE	(1048576)
 #define	WT_GIGABYTE	(1073741824)
-#define	WT_TERABYTE	(1099511627776)
-#define	WT_PETABYTE	(1125899906842624)
+#define	WT_TERABYTE	((uint64_t)1099511627776)
+#define	WT_PETABYTE	((uint64_t)1125899906842624)
 
 /*
  * Sizes that cannot be larger than 2**32 are stored in uint32_t fields in
@@ -52,7 +52,7 @@
 #define	WT_SKIP_MAXDEPTH	10
 #define	WT_SKIP_PROBABILITY	(UINT32_MAX >> 2)
 
-/* The number of hazard references that can be in use is grown dynamically. */
+/* The number of hazard pointers that can be in use is grown dynamically. */
 #define	WT_HAZARD_INCR		10
 
 /*
@@ -121,8 +121,7 @@
 #define	FLD_ISSET(field, mask)	((field) & ((uint32_t)(mask)))
 #define	FLD_SET(field, mask)	((field) |= ((uint32_t)(mask)))
 
-/* Output a verbose message. */
-#ifdef HAVE_VERBOSE
+/* Verbose messages. */
 #define	WT_VERBOSE_ISSET(session, f)					\
 	(FLD_ISSET(S2C(session)->verbose, WT_VERB_##f))
 #define	WT_VERBOSE_ERR(session, f, ...) do {				\
@@ -133,21 +132,10 @@
 	if (WT_VERBOSE_ISSET(session, f))				\
 		WT_RET(__wt_verbose(session, #f ": " __VA_ARGS__));	\
 } while (0)
-#define	WT_VERBOSE_RETVAL(session, f, ret, ...) do {			\
+#define	WT_VERBOSE_TRET(session, f, ...) do {				\
 	if (WT_VERBOSE_ISSET(session, f))				\
-		(ret) = __wt_verbose(session, #f ": " __VA_ARGS__);	\
+		WT_TRET(__wt_verbose(session, #f ": " __VA_ARGS__));	\
 } while (0)
-#define	WT_VERBOSE_VOID(session, f, ...) do {				\
-	if (WT_VERBOSE_ISSET(session, f))				\
-		(void)__wt_verbose(session, #f ": " __VA_ARGS__);	\
-} while (0)
-#else
-#define	WT_VERBOSE_ISSET(session, f)	0
-#define	WT_VERBOSE_ERR(session, f, ...)
-#define	WT_VERBOSE_RET(session, f, ...)
-#define	WT_VERBOSE_RETVAL(session, f, ret, ...)
-#define	WT_VERBOSE_VOID(session, f, ...)
-#endif
 
 /* Clear a structure. */
 #define	WT_CLEAR(s)							\
@@ -173,14 +161,8 @@
 #define	WT_DECL_ITEM(i)	WT_ITEM *i = NULL
 #define	WT_DECL_RET	int ret = 0
 
-/* Flags for the tree-walk function. */
-#define	WT_TREE_COMPACT	0x01			/* Compaction */
-#define	WT_TREE_DISCARD	0x02			/* Discarding */
-#define	WT_TREE_EVICT	0x04			/* Eviction */
-#define	WT_TREE_PREV	0x08			/* Backward walk */
-
 /*
- * In diagnostic mode we track the locations from which hazard references and
+ * In diagnostic mode we track the locations from which hazard pointers and
  * scratch buffers were acquired.
  */
 #ifdef HAVE_DIAGNOSTIC

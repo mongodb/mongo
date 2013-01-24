@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -195,8 +195,8 @@ __wt_debug_addr(WT_SESSION_IMPL *session,
 	WT_ERR(__wt_block_read(
 	    session, session->btree->block, buf, addr, addr_size));
 	ret = __wt_debug_disk(session, buf->mem, ofile);
-err:	__wt_scr_free(&buf);
 
+err:	__wt_scr_free(&buf);
 	return (ret);
 }
 
@@ -780,6 +780,9 @@ __debug_ref(WT_DBG *ds, WT_REF *ref, WT_PAGE *page)
 		break;
 	case WT_REF_DELETED:
 		__dmsg(ds, "deleted");
+		break;
+	case WT_REF_EVICT_FORCE:
+		__dmsg(ds, "evict-force %p", ref->page);
 		break;
 	case WT_REF_EVICT_WALK:
 		__dmsg(ds, "evict-walk %p", ref->page);

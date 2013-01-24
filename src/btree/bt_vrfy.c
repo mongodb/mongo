@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -99,8 +99,8 @@ __wt_verify(WT_SESSION_IMPL *session, const char *cfg[])
 			    session, root_addr, root_addr_size)) == 0) {
 				ret = __verify_tree(
 				    session, btree->root_page, vs);
-				WT_TRET(__wt_bt_cache_flush(
-				    session, NULL, WT_SYNC_DISCARD));
+				WT_TRET(__wt_bt_cache_op(
+				    session, NULL, WT_SYNC_DISCARD_NOWRITE));
 			}
 		}
 
@@ -373,7 +373,7 @@ recno_chk:	if (recno != vs->record_total + 1)
 			/* Verify the subtree. */
 			WT_RET(__wt_page_in(session, page, ref));
 			ret = __verify_tree(session, ref->page, vs);
-			__wt_page_release(session, ref->page);
+			WT_TRET(__wt_page_release(session, ref->page));
 			WT_RET(ret);
 
 			__wt_cell_unpack(ref->addr, unpack);
@@ -401,7 +401,7 @@ recno_chk:	if (recno != vs->record_total + 1)
 			/* Verify the subtree. */
 			WT_RET(__wt_page_in(session, page, ref));
 			ret = __verify_tree(session, ref->page, vs);
-			__wt_page_release(session, ref->page);
+			WT_TRET(__wt_page_release(session, ref->page));
 			WT_RET(ret);
 
 			__wt_cell_unpack(ref->addr, unpack);
