@@ -858,11 +858,35 @@ namespace mongo {
         cc().getAuthorizationManager()->grantInternalAuthorization("_repl");
     }
 
+    const char* ReplSetImpl::_initialSyncFlagString = "doingInitialSync";
+    const BSONObj ReplSetImpl::_initialSyncFlag(BSON(_initialSyncFlagString << true));
+
+    void ReplSetImpl::clearInitialSyncFlag() {
+        Lock::DBWrite lk( "local" );
+        Helpers::putSingleton("local.replset.minvalid", BSON( "$unset" << _initialSyncFlag ));
+    }
+
+    void ReplSetImpl::setInitialSyncFlag() {
+        Lock::DBWrite lk( "local" );
+        Helpers::putSingleton("local.replset.minvalid", BSON( "$set" << _initialSyncFlag ));
+    }
+
+    bool ReplSetImpl::getInitialSyncFlag() {
+        Lock::DBRead lk ( "local" );
+        BSONObj mv;
+        if (Helpers::getSingleton("local.replset.minvalid", mv)) {
+            return mv[_initialSyncFlagString].trueValue();
+        }
+        return false;
+    }
+
     void ReplSetImpl::setMinValid(BSONObj obj) {
         BSONObjBuilder builder;
-        builder.appendTimestamp("ts", obj["ts"].date());
-        builder.append("h", obj["h"]);
-        Lock::DBWrite cx( "local" );
+        BSONObjBuilder subobj(builder.subobjStart("$set"));
+        subobj.appendTimestamp("ts", obj["ts"].date());
+        subobj.append("h", obj["h"]);
+        subobj.done();
+        Lock::DBWrite lk( "local" );
         Helpers::putSingleton("local.replset.minvalid", builder.obj());
     }
 

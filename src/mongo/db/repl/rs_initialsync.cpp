@@ -323,6 +323,8 @@ namespace mongo {
     /**
      * Do the initial sync for this member.  There are several steps to this process:
      *
+     *     0. Add _initialSyncFlag to minValid to tell us to restart initial sync if we
+     *        crash in the middle of this procedure
      *     1. Record start time.
      *     2. Clone.
      *     3. Set minValid1 to sync target's latest op time.
@@ -332,6 +334,7 @@ namespace mongo {
      *     7. Build indexes.
      *     8. Set minValid3 to sync target's latest op time.
      *     9. Apply ops from minValid2 to minValid3.
+          10. Clean up minValid and remove _initialSyncFlag field
      *
      * At that point, initial sync is finished.  Note that the oplog from the sync target is applied
      * three times: step 4, 6, and 8.  4 may involve refetching, 6 should not.  By the end of 6,
@@ -383,6 +386,9 @@ namespace mongo {
             return;
         }
         else {
+            // Add field to minvalid document to tell us to restart initial sync if we crash
+            theReplSet->setInitialSyncFlag();
+
             sethbmsg("initial sync drop all databases", 0);
             dropAllDatabasesExceptLocal();
 
@@ -432,7 +438,6 @@ namespace mongo {
         
         // ---------
 
-
         sethbmsg("initial sync finishing up",0);
 
         verify( !box.getState().primary() ); // wouldn't make sense if we were.
@@ -445,7 +450,12 @@ namespace mongo {
             }
             catch(...) { }
 
+            // Initial sync is now complete.  Flag this by setting minValid to the last thing
+            // we synced.
             theReplSet->setMinValid(minValid);
+
+            // Clear the initial sync flag.
+            theReplSet->clearInitialSyncFlag();
 
             cx.ctx().db()->flushFiles(true);
         }

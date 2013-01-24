@@ -689,8 +689,10 @@ namespace replset {
             return;
         }
 
-        /* do we have anything at all? */
-        if (getMinValid().isNull() || lastOpTimeWritten.isNull()) {
+        // Check criteria for doing an initial sync:
+        // 1. If the oplog is empty, do an initial sync
+        // 2. If minValid has _initialSyncFlag set, do an initial sync
+        if (lastOpTimeWritten.isNull() || getInitialSyncFlag()) {
             syncDoInitialSync();
             return; // _syncThread will be recalled, starts from top again in case sync failed.
         }
