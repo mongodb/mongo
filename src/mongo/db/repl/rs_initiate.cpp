@@ -257,16 +257,13 @@ namespace mongo {
                 Lock::GlobalWrite lk;
                 bo comment = BSON( "msg" << "initiating set");
                 newConfig->saveConfigLocally(comment);
-                log() << "replSet replSetInitiate config now saved locally.  Should come online in about a minute." << rsLog;
-                result.append("info", "Config now saved locally.  Should come online in about a minute.");
+                log() << "replSet replSetInitiate config now saved locally.  "
+                    "Should come online in about a minute." << rsLog;
+                result.append("info", "Config now saved locally.  Should come online "
+                              "in about a minute.");
                 ReplSet::startupStatus = ReplSet::SOON;
-                ReplSet::startupStatusMsg.set("Received replSetInitiate - should come online shortly.");
-
-                // Dummy minvalid - just something non-null so we can be "up"
-                OpTime minvalid(1, 0);
-                BSONObjBuilder bob;
-                bob.appendTimestamp("ts", minvalid.asDate());
-                ReplSet::setMinValid(bob.done());
+                ReplSet::startupStatusMsg.set("Received replSetInitiate - "
+                                              "should come online shortly.");
             }
             catch( DBException& e ) {
                 log() << "replSet replSetInitiate exception: " << e.what() << rsLog;

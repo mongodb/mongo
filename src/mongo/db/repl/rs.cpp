@@ -884,7 +884,6 @@ namespace mongo {
         BSONObjBuilder builder;
         BSONObjBuilder subobj(builder.subobjStart("$set"));
         subobj.appendTimestamp("ts", obj["ts"].date());
-        subobj.append("h", obj["h"]);
         subobj.done();
         Lock::DBWrite lk( "local" );
         Helpers::putSingleton("local.replset.minvalid", builder.obj());
