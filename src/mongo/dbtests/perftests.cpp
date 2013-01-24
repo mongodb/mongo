@@ -40,6 +40,7 @@
 #include "../db/key.h"
 #include "../util/compress.h"
 #include "../util/concurrency/qlock.h"
+#include "../util/fail_point.h"
 #include <boost/filesystem/operations.hpp>
 
 using namespace bson;
@@ -1088,6 +1089,78 @@ namespace PerfTests {
         }
     };
 
+    // Tests what the worst case is for the overhead of enabling a fail point. If 'fpInjected'
+    // is false, then the fail point will be compiled out. If 'fpInjected' is true, then the
+    // fail point will be compiled in. Since the conditioned block is more or less trivial, any
+    // difference in performance is almost entirely attributable to the cost of checking
+    // whether the failpoint is enabled.
+    //
+    // If fpEnabled is true, then the failpoint will be enabled, using the 'nTimes' model since
+    // this looks to be the most expensive code path through the fail point enable detection
+    // logic.
+    //
+    // It makes no sense to trigger the slow path if the fp is not injected, so that will fail
+    // to compile.
+    template <bool fpInjected, bool fpEnabled>
+    class FailPointTest : public B {
+    public:
+
+        BOOST_STATIC_ASSERT(fpInjected || !fpEnabled);
+
+        FailPointTest()
+            : B()
+            , _value(0) {
+            if (fpEnabled) {
+                _fp.setMode(
+                    FailPoint::nTimes,
+                    std::numeric_limits<FailPoint::ValType>::max());
+                verify(_fp.shouldFail());
+            } else {
+                verify(!_fp.shouldFail());
+            }
+        }
+
+        virtual string name() {
+            return std::string("failpoint")
+                + (fpInjected ? "-present" : "-absent")
+                + (fpInjected ? (fpEnabled ? "-enabled" : "-disabled") : "");
+        }
+
+        virtual int howLongMillis() { return 5000; }
+        virtual bool showDurStats() { return false; }
+
+        virtual void timed() {
+            if (MONGO_unlikely(_value != 0) || (fpInjected && MONGO_FAIL_POINT(_fp))) {
+                // We should only get here if the failpoint is enabled.
+                verify(fpEnabled);
+            }
+        }
+
+        virtual string name2() {
+            // Will inhibit running 'timed2' as its own test, but will cause it to be run as a
+            // threaded test.
+            return name();
+        }
+
+        virtual void timed2(DBClientBase&) {
+            // We just want to re-run 'timed' when timed2 is invoked as a threaded test, so it
+            // invoke 'timed' statically to avoid overhead of virtual function call.
+            this->FailPointTest::timed();
+        }
+
+        virtual bool testThreaded() {
+            return true;
+        }
+
+    private:
+        // The failpoint under test.
+        FailPoint _fp;
+
+        // _value should always be zero for this test to behave as expected, but we don't want
+        // the compiler exploiting this fact to compile out our check, so mark it volatile.
+        const volatile int _value;
+    };
+
     void t() {
         for( int i = 0; i < 20; i++ ) {
             sleepmillis(21);
@@ -1175,6 +1248,9 @@ namespace PerfTests {
                 add< Update1 >();
                 add< MoreIndexes<Update1> >();
                 add< InsertBig >();
+                add< FailPointTest<false, false> >();
+                add< FailPointTest<true, false> >();
+                add< FailPointTest<true, true> >();
             }
         }
     } myall;
