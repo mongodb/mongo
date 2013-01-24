@@ -1,7 +1,8 @@
-INCLUDES = -I$(abs_top_builddir)
+AM_CPPFLAGS = -I$(abs_top_builddir)
 
 JAVASRC = $(top_srcdir)/lang/java
-JAVADEST = $(JAVASRC)/src/com/wiredtiger/db
+JAVADEST = src/com/wiredtiger/db
+JAVADESTFULL = $(JAVASRC)/$(JAVADEST)
 BUILT_SOURCES = $(JAVASRC)/wiredtiger_wrap.c
 SWIG_SOURCES = $(JAVASRC)/wiredtiger.i
 
@@ -10,14 +11,14 @@ java_DATA = $(JDOCDIR)/index.html
 
 javadir = $(datadir)/java
 dist_java_JAVA = \
-		$(JAVADEST)/Connection.java \
-		$(JAVADEST)/Cursor.java \
-		$(JAVADEST)/DbException.java \
-		$(JAVADEST)/SearchStatus.java \
-		$(JAVADEST)/Session.java \
-		$(JAVADEST)/wiredtiger.java \
-		$(JAVADEST)/wiredtigerConstants.java \
-		$(JAVADEST)/wiredtigerJNI.java
+		$(JAVADESTFULL)/Connection.java \
+		$(JAVADESTFULL)/Cursor.java \
+		$(JAVADESTFULL)/DbException.java \
+		$(JAVADESTFULL)/SearchStatus.java \
+		$(JAVADESTFULL)/Session.java \
+		$(JAVADESTFULL)/wiredtiger.java \
+		$(JAVADESTFULL)/wiredtigerConstants.java \
+		$(JAVADESTFULL)/wiredtigerJNI.java
 java_LTLIBRARIES = libwiredtiger_java.la
 
 CPPFLAGS += $(JNI_CPPFLAGS)
@@ -33,4 +34,4 @@ $(JAVASRC)/wiredtiger_wrap.c: $(top_srcdir)/src/include/wiredtiger.in $(SWIG_SOU
 
 $(JDOCDIR)/index.html:	$(dist_java_JAVA)
 	mkdir -p $(JDOCDIR)
-	javadoc -public -d $(JDOCDIR) -link http://docs.oracle.com/javase/6/docs/api $(JAVADEST)/wiredtiger.java $(JAVADEST)/wiredtigerConstants.java $(JAVADEST)/[A-Z]*.java
+	javadoc -public -d $(JDOCDIR) -link http://docs.oracle.com/javase/6/docs/api $(JAVADESTFULL)/wiredtiger.java $(JAVADESTFULL)/wiredtigerConstants.java $(JAVADESTFULL)/[A-Z]*.java
