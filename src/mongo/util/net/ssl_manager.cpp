@@ -294,6 +294,10 @@ namespace mongo {
         // TODO: check optional cipher restriction, using cert.
     }
 
+    void SSLManager::cleanupThreadLocals() {
+        ERR_remove_state(0);
+    }
+
     std::string SSLManager::_getSSLErrorMessage(int code) {
         // 120 from the SSL documentation for ERR_error_string
         static const size_t msglen = 120;

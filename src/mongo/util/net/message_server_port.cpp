@@ -30,6 +30,7 @@
 #include "../../db/lasterror.h"
 #include "../../db/stats/counters.h"
 #include "mongo/util/concurrency/ticketholder.h"
+#include "mongo/util/net/ssl_manager.h"
 
 #ifdef __linux__  // TODO: consider making this ifndef _WIN32
 # include <sys/resource.h>
@@ -227,7 +228,12 @@ namespace mongo {
                 dbexit( EXIT_UNCAUGHT );
             }
 
+            // Normal disconnect path.
+#ifdef MONGO_SSL
+            SSLManager::cleanupThreadLocals();
+#endif
             handler->disconnected( p.get() );
+
             return NULL;
         }
     };

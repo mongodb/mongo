@@ -71,6 +71,12 @@ namespace mongo {
         void validatePeerCertificate(const SSL* ssl);
 
         /**
+         * Cleans up SSL thread local memory; use at thread exit
+         * to avoid memory leaks
+         */
+        static void cleanupThreadLocals();
+
+        /**
          * Callbacks for SSL functions
          */
         static int password_cb( char *buf,int num, int rwflag,void *userdata );
