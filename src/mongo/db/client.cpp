@@ -80,7 +80,7 @@ namespace mongo {
         void init() { 
             memset(buf, 42, sizeof(buf)); 
         }
-        static void check(const char *tname) { 
+        static void check(StringData tname) {
             static int max;
             StackChecker *sc = checker.get();
             const char *p = sc->buf;
@@ -184,7 +184,7 @@ namespace mongo {
 #if defined(_DEBUG)
         {
             if( sizeof(void*) == 8 ) {
-                StackChecker::check( desc().c_str() );
+                StackChecker::check( desc() );
             }
         }
 #endif

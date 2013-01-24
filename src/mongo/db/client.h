@@ -84,7 +84,7 @@ namespace mongo {
         Context* getContext() const { return _context; }
         Database* database() const {  return _context ? _context->db() : 0; }
         const char *ns() const { return _context->ns(); }
-        const std::string desc() const { return _desc; }
+        const StringData desc() const { return _desc; }
         void setLastOp( OpTime op ) { _lastOp = op; }
         OpTime getLastOp() const { return _lastOp; }
 
