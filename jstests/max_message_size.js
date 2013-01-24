@@ -54,7 +54,7 @@ function go() { // using a function to ensure that all resources can be freed af
             var error = db.getLastErrorObj();
         } catch (e) {
             // A string is thrown rather than an object
-            if (! /^socket error/.test(e))
+            if (! (/^socket error/.test(e) || /socket exception/.test(e)))
                 throw e;
 
             sleep(3000); // shell won't reconnect within 2 second window
