@@ -195,7 +195,33 @@ assert.eq(null, config.getLastError());
 // Make sure down
 var mongosNew = MongoRunner.runMongos({ binVersion : "2.4", configdb : configConnStr, upgrade : "" })
 assert.eq(null, mongosNew);
-resetBackupDBs();
+
+//
+// Upgrade with modified old upgrade data
+//
+
+jsTest.log("Fiddling with data from last failed upgrade...")
+
+var upgradeCollRegex = /^collections-upgrade/;
+var configColls = config.getCollectionNames();
+for (var i = 0; i < configColls.length; i++) {
+    var configColl = configColls[i];
+    if (upgradeCollRegex.test(configColl)) {
+        print("Dropping collection: " + configColl);
+        config.getCollection(configColl).drop();
+        break;
+    }
+}
+
+// Fix chunk data
+config.chunks.update({}, { $unset : { versionEpoch : 1 }, $unset : { lastmodEpoch : 1 }}, false, true);
+assert.eq(null, config.getLastError());
+
+// Make sure up
+var mongosNew = MongoRunner.runMongos({ binVersion : "2.4", configdb : configConnStr, upgrade : "" })
+assert.neq(null, mongosNew);
+MongoRunner.stopMongos(mongosNew);
+checkUpgraded();
 
 jsTest.log("DONE!")
 

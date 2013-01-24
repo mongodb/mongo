@@ -156,7 +156,12 @@ namespace mongo {
             }
 
             if (!_cleanupUpgradeState(configLoc, lastVersionInfo.getUpgradeId(), errMsg)) {
-                return false;
+                
+                // If we can't cleanup the old upgrade state, the user might have done it for us,
+                // not a fatal problem (we'll just end up with extra collections).
+                
+                warning() << "could not cleanup previous upgrade state" << causedBy(errMsg) << endl;
+                *errMsg = "";
             }
         }
 
