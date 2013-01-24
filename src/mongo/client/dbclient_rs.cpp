@@ -20,6 +20,7 @@
 #include "mongo/client/dbclient_rs.h"
 
 #include <fstream>
+#include <memory>
 
 #include "mongo/base/init.h"
 #include "mongo/bson/util/builder.h"
@@ -244,14 +245,19 @@ namespace mongo {
             }
 
             if (prefDoc.hasField("tags")) {
-                uassert(16384, "Cannot specify tags for primary only read preference",
-                        *pref != mongo::ReadPreference_PrimaryOnly);
+
 
                 const BSONElement& tagsElem = prefDoc["tags"];
                 uassert(16385, "tags for read preference should be an array",
                         tagsElem.type() == mongo::Array);
 
-                return new TagSet(BSONArray(tagsElem.Obj()));
+                std::auto_ptr<TagSet> tags(new TagSet(BSONArray(tagsElem.Obj())));
+                if (*pref == mongo::ReadPreference_PrimaryOnly && !tags->isExhausted()) {
+                    uassert(16384, "Only empty tags are allowed with primary read preference",
+                            tags->getCurrentTag().isEmpty());
+                }
+
+                return tags.release();
             }
         }
 

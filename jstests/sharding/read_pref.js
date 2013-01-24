@@ -100,8 +100,16 @@ assert.eq( 1, explain.n );
 
 // Cannot use tags with primaryOnly
 assert.throws( function() {
-    coll.find().readPref( "primaryOnly", [] ).explain();
+    coll.find().readPref( "primary", [{ s: "2" }] ).explain();
 });
+
+
+// Ok to use empty tags on primaryOnly
+explain = coll.find().readPref("primary", [{}]).explain();
+assert.eq(primaryNode.name, explain.server);
+
+explain = coll.find().readPref("primary", []).explain();
+assert.eq(primaryNode.name, explain.server);
 
 // Check that mongos will try the next tag if nothing matches the first
 explain = coll.find().readPref( "secondary", [{ z: "3" }, { dc: "jp" }] ).explain();

@@ -214,7 +214,7 @@ var testAllModes = function(conn, hostList, isMongos) {
     [
         // mode, tagSets, expectedHost
         ['primary', undefined, false],
-        //['primary', [{}], false], // TODO: Uncomment once SERVER-8219 is fixed
+        ['primary', [{}], false],
 
         ['primaryPreferred', undefined, false],
         ['primaryPreferred', [{tag: 'one'}], false],
