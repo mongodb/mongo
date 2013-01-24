@@ -14,6 +14,7 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include "mongo/db/diskloc.h"
 #include "mongo/db/geo/geoparser.h"
 #include "third_party/s2/s2.h"
 #include "third_party/s2/s2regioncoverer.h"
@@ -23,6 +24,21 @@
 #include "third_party/s2/s2regioncoverer.h"
 
 #pragma once
+
+#ifdef _WIN32
+namespace std {
+#else
+namespace std { namespace tr1 {
+#endif
+template<> class hash<mongo::DiskLoc> {
+public:
+    size_t operator()(mongo::DiskLoc const& dl) const;
+};
+#ifdef _WIN32
+}  // namespace std
+#else
+}}  // namespace tr1, std
+#endif
 
 namespace mongo {
     // This is used by both s2cursor and s2nearcursor.

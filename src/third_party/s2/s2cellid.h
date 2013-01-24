@@ -241,6 +241,7 @@ class S2CellId {
   string ToString() const;
   string toString() const { return ToString(); }
   string slowToString() const;
+  static S2CellId FromString(const string& str);
 
   // Return the four cells that are adjacent across the cell's four edges.
   // Neighbors are returned in the order defined by S2Cell::GetEdge.  All

@@ -24,6 +24,9 @@
 #include "mongo/db/queryutil.h"
 #include "mongo/db/geo/s2common.h"
 #include "mongo/db/geo/geoquery.h"
+#include "mongo/platform/unordered_set.h"
+#include "third_party/s2/s2cap.h"
+#include "third_party/s2/s2regionintersection.h"
 
 namespace mongo {
     class S2NearCursor : public Cursor {
@@ -109,13 +112,14 @@ namespace mongo {
         double _maxDistance;
         // We compute an annulus of results and cache it here.
         priority_queue<Result> _results;
-        // These radii define the annulus.
+        // These radii define the annulus we're currently looking at.
         double _innerRadius;
         double _outerRadius;
         // When we search the next annulus, what to adjust our radius by?  Grows when we search an
         // annulus and find no results.
         double _radiusIncrement;
-        set<DiskLoc> _returned;
+        // What have we returned already?
+        unordered_set<DiskLoc> _returned;
 
         // Stat counters/debug information goes below.
         // How many items did we look at in the btree?
@@ -123,8 +127,19 @@ namespace mongo {
         // How many did we try to match?
         long long _matchTested;
         // How many did we geo-test?
-        long long _geoTested;
+        long long _geoMatchTested;
         // How many search shells did we use?
         long long _numShells;
+        // How many did we skip due to key-geo check?
+        long long _keyGeoSkip;
+
+        S2Cap _innerCap;
+        S2Cap _outerCap;
+        S2RegionIntersection _annulus;
+        int _nearFieldIndex;
+        uint64 _numReturned;
+        long long _returnSkip;
+        long long _btreeDups;
+        long long _inAnnulusTested;
     };
 }  // namespace mongo

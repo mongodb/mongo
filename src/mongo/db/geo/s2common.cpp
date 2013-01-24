@@ -16,6 +16,21 @@
 
 #include "mongo/db/geo/s2common.h"
 
+#ifdef _WIN32
+namespace std {
+#else
+namespace std { namespace tr1 {
+#endif
+size_t hash<mongo::DiskLoc>::operator()(mongo::DiskLoc const& dl) const {
+    hash<int> foo;
+    return foo(dl.getOfs() + dl.a());
+}
+#ifdef _WIN32
+}  // namespace std
+#else
+}}  // namespace tr1, std
+#endif
+
 namespace mongo {
     // Thanks, Wikipedia.
     const double S2IndexingParams::kRadiusOfEarthInMeters = (6378.1 * 1000);
@@ -70,7 +85,7 @@ namespace mongo {
             // And we've already looked at points with the cell id 211111 from the regex search
             // created above, so we only want things where the value of the last digit is not
             // stored (and therefore could be 1).
-            set<S2CellId> parents;
+            unordered_set<S2CellId> parents;
             for (size_t i = 0; i < cover.size(); ++i) {
                 for (S2CellId id = cover[i].parent(); id.level() >= coarsestIndexedLevel;
                         id = id.parent()) {
@@ -78,7 +93,7 @@ namespace mongo {
                 }
             }
 
-            for (set<S2CellId>::const_iterator it = parents.begin(); it != parents.end(); ++it) {
+            for (unordered_set<S2CellId>::const_iterator it = parents.begin(); it != parents.end(); ++it) {
                 inArrayBuilder.append(myitoa(arrayPos++), it->toString());
             }
         }
