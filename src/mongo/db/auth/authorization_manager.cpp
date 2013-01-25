@@ -66,7 +66,7 @@ namespace {
     const std::string SYSTEM_ROLE_USER_ADMIN = "userAdmin";
     const std::string SYSTEM_ROLE_DB_ADMIN = "dbAdmin";
     const std::string SYSTEM_ROLE_CLUSTER_ADMIN = "clusterAdmin";
-    const std::string SYSTEM_ROLE_READ_ANY_DB = "readAnyDB";
+    const std::string SYSTEM_ROLE_READ_ANY_DB = "readAnyDatabase";
     const std::string SYSTEM_ROLE_READ_WRITE_ANY_DB = "readWriteAnyDatabase";
     const std::string SYSTEM_ROLE_USER_ADMIN_ANY_DB = "userAdminAnyDatabase";
     const std::string SYSTEM_ROLE_DB_ADMIN_ANY_DB = "dbAdminAnyDatabase";
