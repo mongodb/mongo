@@ -219,6 +219,7 @@ bzip2_compress_raw(WT_COMPRESSOR *compressor, WT_SESSION *session,
 
 	__UNUSED(page_max);
 	__UNUSED(extra);
+	__UNUSED(final);
 
 	/*
 	 * This function is used by the test/format utility to test the
