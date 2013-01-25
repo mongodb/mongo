@@ -168,6 +168,7 @@ namespace mongo {
             return _waiting;
         }
 
+        // Optional Fields
         void setMongoVersion(const StringData& mongoVersion) {
             _mongoVersion = mongoVersion.toString();
             _isMongoVersionSet = true;
@@ -175,14 +176,20 @@ namespace mongo {
 
         void unsetMongoVersion() { _isMongoVersionSet = false; }
 
-        bool isMongoVersionSet() const { return _isMongoVersionSet; }
-
-        // Calling get*() methods when the member is not set results in undefined behavior
-        const std::string& getMongoVersion() const {
-            dassert(_isMongoVersionSet);
-            return _mongoVersion;
+        bool isMongoVersionSet() const {
+            return _isMongoVersionSet || mongoVersion.hasDefault();
         }
 
+        // Calling get*() methods when the member is not set and has no default results in undefined
+        // behavior
+        std::string getMongoVersion() const {
+            if (_isMongoVersionSet) {
+                return _mongoVersion;
+            } else {
+                dassert(mongoVersion.hasDefault());
+                return mongoVersion.getDefault();
+            }
+        }
         void setConfigVersion(const int configVersion) {
             _configVersion = configVersion;
             _isConfigVersionSet = true;
@@ -190,15 +197,20 @@ namespace mongo {
 
         void unsetConfigVersion() { _isConfigVersionSet = false; }
 
-        bool isConfigVersionSet() const { return _isConfigVersionSet; }
-
-        // Calling get*() methods when the member is not set results in undefined behavior
-        const int getConfigVersion() const {
-            dassert(_isConfigVersionSet);
-            return _configVersion;
+        bool isConfigVersionSet() const {
+            return _isConfigVersionSet || configVersion.hasDefault();
         }
 
-        // Optional Fields
+        // Calling get*() methods when the member is not set and has no default results in undefined
+        // behavior
+        int getConfigVersion() const {
+            if (_isConfigVersionSet) {
+                return _configVersion;
+            } else {
+                dassert(configVersion.hasDefault());
+                return configVersion.getDefault();
+            }
+        }
 
     private:
         // Convention: (M)andatory, (O)ptional, (S)pecial rule.
@@ -210,9 +222,9 @@ namespace mongo {
         bool _isUpSet;
         bool _waiting;     // (M)  for testing purposes
         bool _isWaitingSet;
-        std::string _mongoVersion;     // (M)  the mongodb version of the pinging mongos
+        std::string _mongoVersion;     // (O)  the mongodb version of the pinging mongos
         bool _isMongoVersionSet;
-        int _configVersion;     // (M)  the config version of the pinging mongos
+        int _configVersion;     // (O)  the config version of the pinging mongos
         bool _isConfigVersionSet;
     };
 

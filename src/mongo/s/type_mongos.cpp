@@ -61,14 +61,6 @@ namespace mongo {
             *errMsg = stream() << "missing " << waiting.name() << " field";
             return false;
         }
-        if (!_isMongoVersionSet) {
-            *errMsg = stream() << "missing " << mongoVersion.name() << " field";
-            return false;
-        }
-        if (!_isConfigVersionSet) {
-            *errMsg = stream() << "missing " << configVersion.name() << " field";
-            return false;
-        }
 
         return true;
     }

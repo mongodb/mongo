@@ -117,7 +117,9 @@ namespace {
         ASSERT_TRUE(mongos.isWaitingSet());
         ASSERT_FALSE(mongos.isMongoVersionSet());
         ASSERT_TRUE(mongos.isConfigVersionSet());
-        ASSERT_FALSE(mongos.isValid(NULL));
+        /* NOTE: mongoVersion should eventually become mandatory, but is optional now for backward
+         * compatibility reasons */
+        ASSERT_TRUE(mongos.isValid(NULL));
     }
 
     TEST(Validity, MissingConfigVersion) {
@@ -136,7 +138,9 @@ namespace {
         ASSERT_TRUE(mongos.isWaitingSet());
         ASSERT_TRUE(mongos.isMongoVersionSet());
         ASSERT_FALSE(mongos.isConfigVersionSet());
-        ASSERT_FALSE(mongos.isValid(NULL));
+        /* NOTE: configVersion should eventually become mandatory, but is optional now for backward
+         * compatibility reasons */
+        ASSERT_TRUE(mongos.isValid(NULL));
     }
 
     TEST(Validity, Valid) {
