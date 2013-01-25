@@ -261,7 +261,7 @@ bzip2_compress_raw(WT_COMPRESSOR *compressor, WT_SESSION *session,
 	if (take == 0)
 		*result_lenp = 0;
 
-#if 1
+#if 0
 	fprintf(stderr,
 	    "bzip2_compress_raw (%s): page_max %" PRIuMAX ", extra %" PRIuMAX
 	    ", slots %" PRIu32 ", take %" PRIu32 ": %" PRIu32 " -> %"
