@@ -161,13 +161,6 @@ namespace mongo {
                             "checkEmpty" << checkEmpty <<
                             "from" << from );
 
-        // generally not a great idea to do outbound waiting calls in a
-        // write lock. heartbeats can be slow (multisecond to respond), so
-        // generally we don't want to be locked, at least not without
-        // thinking acarefully about it first.
-        massert(15900, "can't heartbeat: too much lock",
-                !Lock::somethingWriteLocked() || theReplSet == 0 || !theReplSet->lockedByMe() );
-
         ScopedConn conn(memberFullName);
         return conn.runCommand("admin", cmd, result, 0);
     }
@@ -216,7 +209,7 @@ namespace mongo {
 
         string name() const { return "rsHealthPoll"; }
 
-        void setUp() { Client::initThread( name().c_str() ); }
+        void setUp() { }
 
         void doWork() {
             if ( !theReplSet ) {
