@@ -1576,7 +1576,7 @@ __rec_split_raw_worker(WT_SESSION_IMPL *session, WT_RECONCILE *r, int final)
 	    (uint8_t *)dsk + WT_BLOCK_COMPRESS_SKIP,
 	    r->raw_offsets, slots,
 	    (uint8_t *)dst->mem + WT_BLOCK_COMPRESS_SKIP,
-	    result_len, &result_len, &result_slots));
+	    result_len, final, &result_len, &result_slots));
 	dst->size = (uint32_t)result_len + WT_BLOCK_COMPRESS_SKIP;
 
 	if (result_slots != 0) {

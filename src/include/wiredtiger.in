@@ -1627,6 +1627,15 @@ struct __wt_compressor {
 	 * accumulate, WiredTiger writes the remaining rows without further
 	 * calls to the callback.
 	 *
+	 * On entry, \c final is zero if there are more rows to be written as
+	 * part of this page (if there will be additional data provided to the
+	 * callback), and non-zero if there are no more rows to be written as
+	 * part of this page.  If \c final is set and the callback fails to
+	 * encode any rows, WiredTiger writes the remaining rows without further
+	 * calls to the callback.  If \c final is set and the callback encodes
+	 * any number of rows, WiredTiger continues to call the callback until
+	 * all of the rows are encoded or the callback fails to encode any rows.
+	 *
 	 * The WT_COMPRESSOR::compress_raw callback is intended for applications
 	 * wanting to create disk blocks in specific sizes.
 	 * WT_COMPRESSOR::compress_raw is not a replacement for
@@ -1651,6 +1660,7 @@ struct __wt_compressor {
 	 * @param[in] slots the number of entries in offsets
 	 * @param[in] dst the destination buffer
 	 * @param[in] dst_len the length of the destination buffer
+	 * @param[in] final non-zero if there are no more rows to accumulate
 	 * @param[out] result_lenp the length of the compressed data
 	 * @param[out] result_slotsp the number of byte offsets taken
 	 * @returns zero for success, non-zero to indicate an error.
@@ -1659,6 +1669,7 @@ struct __wt_compressor {
 	    size_t page_max, size_t extra,
 	    uint8_t *src, uint32_t *offsets, uint32_t slots,
 	    uint8_t *dst, size_t dst_len,
+	    int final,
 	    size_t *result_lenp, uint32_t *result_slotsp);
 
 	/*! Callback to decompress a chunk of data.
