@@ -115,6 +115,10 @@ env.CppUnitTest('descriptive_stats_test',
                 ['util/descriptive_stats_test.cpp'],
                 LIBDEPS=['foundation', 'bson']);
 
+env.CppUnitTest('sock_test', ['util/net/sock_test.cpp'],
+                LIBDEPS=['mongocommon', 'notmongodormongos'],
+                NO_CRUTCH=True)
+
 env.StaticLibrary( 'mongohasher', [ "db/hasher.cpp" ] )
 
 
