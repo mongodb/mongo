@@ -47,7 +47,7 @@ assert.soon(
 	c1 = c2;        
         return ! db.concflag.findOne().inprog;
     } , 
-    "update never finished" , 3600 * 1000 , 10 );
+    "update never finished" , 2 * 60 * 60 * 1000 , 10 );
 
 print(querycount + " queries, " + decrements + " decrements, " + misses + " misses");
 
