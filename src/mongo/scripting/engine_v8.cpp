@@ -559,8 +559,7 @@ namespace mongo {
         for (int i = 0; i < args.Length(); ++i) {
             std::string filename(toSTLString(args[i]));
             if (!scope->execFile(filename, false, true, false)) {
-                return v8::ThrowException(v8::String::New((string("error loading file: ") +
-                                                           filename).c_str()));
+                return v8AssertionException(string("error loading js file: ") + filename);
             }
         }
         return v8::True();
@@ -568,7 +567,7 @@ namespace mongo {
 
     v8::Handle<v8::Value> V8Scope::nativeCallback(V8Scope* scope, const v8::Arguments &args) {
         BSONObj ret;
-        string exception;
+        string exceptionText;
         v8::HandleScope handle_scope;
         try {
             v8::Local<v8::External> f =
@@ -577,22 +576,20 @@ namespace mongo {
             v8::Local<v8::External> data =
                     v8::External::Cast(*args.Callee()->Get(v8::String::New("_native_data")));
             BSONObjBuilder b;
-            for(int i = 0; i < args.Length(); ++i)
+            for (int i = 0; i < args.Length(); ++i)
                 scope->v8ToMongoElement(b, str::stream() << i, args[i]);
             BSONObj nativeArgs = b.obj();
             ret = function(nativeArgs, data->Value());
         }
-        catch(const std::exception &e) {
-            exception = e.what();
+        catch (const std::exception &e) {
+            exceptionText = e.what();
         }
-        catch(...) {
-            exception = "unknown exception";
+        catch (...) {
+            exceptionText = "unknown exception in V8Scope::nativeCallback";
         }
-
-        if (!exception.empty())
-            return v8::ThrowException(v8::String::New(string("exception during callback: ").
-                                                      append(exception).c_str()));
-
+        if (!exceptionText.empty()) {
+            return v8AssertionException(exceptionText);
+        }
         return handle_scope.Close(scope->mongoToV8Element(ret.firstElement()));
     }
 
@@ -609,26 +606,26 @@ namespace mongo {
                 v8::External::Cast(*args.Callee()->Get(v8::String::New("_v8_function")));
         v8Function function = (v8Function)(f->Value());
         v8::Handle<v8::Value> ret;
-        string exception;
+        string exceptionText;
 
         try {
             // execute the native function
             ret = function(scope, args);
         }
-        catch(const std::exception &e) {
-            exception = e.what();
+        catch (const std::exception& e) {
+            exceptionText = e.what();
         }
-        catch(...) {
-            exception = "unknown exception";
+        catch (...) {
+            exceptionText = "unknown exception in V8Scope::v8Callback";
         }
 
         if (!scope->nativeEpilogue())
             // execution terminated
             return v8::Undefined();
 
-        if (!exception.empty())
-            return v8::ThrowException(v8::String::New(exception.c_str()));
-
+        if (!exceptionText.empty()) {
+            return v8AssertionException(exceptionText);
+        }
         return handle_scope.Close(ret);
     }
 
@@ -814,14 +811,14 @@ namespace mongo {
         }
 
         if (!nativeEpilogue()) {
-            _error = str::stream() << "javascript execution terminated ";
+            _error = "JavaScript execution terminated";
             return handle_scope.Close(v8::Handle<v8::Function>());
         }
 
         v8::Local<v8::Value> result = script->Run();
 
         if (!nativePrologue()) {
-            _error = str::stream() << "javascript execution terminated ";
+            _error = "JavaScript execution terminated";
             return handle_scope.Close(v8::Handle<v8::Function>());
         }
 
@@ -890,7 +887,7 @@ namespace mongo {
             v8recv = _global;
 
         if (!nativeEpilogue()) {
-            _error = str::stream() << "javascript execution terminated (before call) ";
+            _error = "JavaScript execution terminated";
             log() << _error << endl;
             return 1;
         }
@@ -906,17 +903,21 @@ namespace mongo {
             _engine->getDeadlineMonitor()->stopDeadline(this);
 
         if (!nativePrologue()) {
-            _error = str::stream() << "javascript execution interrupted";
+            _error = "JavaScript execution interrupted";
             log() << _error << endl;
             return 1;
         }
 
         if (result.IsEmpty()) {
-            _error = str::stream() << "javascript execution failed: ";
-            if (try_catch.HasCaught())
-                _error += toSTLString(&try_catch);
-            if (hasOutOfMemoryException())
-                _error += "v8 out of memory";
+            if (try_catch.HasCaught() && try_catch.CanContinue()) {
+                _error = toSTLString(&try_catch);
+            }
+            else {
+                _error = "JavaScript execution failed";
+            }
+            if (hasOutOfMemoryException()) {
+                _error += " -- v8 is out of memory";
+            }
             log() << _error << endl;
             return 1;
         }
@@ -943,16 +944,16 @@ namespace mongo {
             if (reportError)
                 log() << _error << endl;
             if (assertOnError)
-                uassert(10233,  _error, 0);
+                uasserted(10233, _error);
             return false;
         }
 
         if (!nativeEpilogue()) {
-            _error = str::stream() << "javascript execution terminated (before call) ";
+            _error = "JavaScript execution terminated";
             if (reportError)
                 log() << _error << endl;
             if (assertOnError)
-                uassert(13475,  _error, 0);
+                uasserted(13475, _error);
             return false;
         }
 
@@ -969,21 +970,28 @@ namespace mongo {
         bool resultSuccess = true;
         if (!nativePrologue()) {
             resultSuccess = false;
-            _error = str::stream() << "javascript execution interrupted "
+            _error = str::stream() << "JavaScript execution interrupted "
                                    << (try_catch.HasCaught() && try_catch.CanContinue() ?
                                             toSTLString(&try_catch) : "");
         }
-        if (result.IsEmpty()) {
+        else if (result.IsEmpty()) {
             resultSuccess = false;
-            _error = str::stream() << "javascript execution failed "
-                                   << (try_catch.HasCaught() && try_catch.CanContinue() ?
-                                            toSTLString(&try_catch) : "");
+            if (try_catch.HasCaught() && try_catch.CanContinue()) {
+                _error = toSTLString(&try_catch);
+            }
+            else {
+                _error = "JavaScript execution failed";
+            }
+            if (hasOutOfMemoryException()) {
+                _error += " -- v8 is out of memory";
+            }
         }
+
         if (!resultSuccess) {
             if (reportError)
                 log() << _error << endl;
             if (assertOnError)
-                uassert(10234,  _error, 0);
+                uasserted(10234, _error);
             return false;
         }
 
@@ -1049,11 +1057,13 @@ namespace mongo {
         {
             V8_SIMPLE_HEADER
             if (_connectState == EXTERNAL)
-                uassert(12510, "externalSetup already called, can't call localConnect", false);
+                uasserted(12510, "externalSetup already called, can't call localConnect");
             if (_connectState ==  LOCAL) {
                 if (_localDBName == dbName)
                     return;
-                uassert(12511, "localConnect previously called with a different name", false);
+                uasserted(12511,
+                          str::stream() << "localConnect previously called with name "
+                                        << _localDBName);
             }
 
             // NOTE: order is important here.  the following methods must be called after
@@ -1083,7 +1093,7 @@ namespace mongo {
         if (_connectState == EXTERNAL)
             return;
         if (_connectState == LOCAL)
-            uassert(12512, "localConnect already called, can't call externalSetup", false);
+            uasserted(12512, "localConnect already called, can't call externalSetup");
 
         // install db access functions in the global object
         installDBAccess();
@@ -1105,6 +1115,7 @@ namespace mongo {
         v8::Handle<v8::FunctionTemplate> db = createV8Function(dbInit);
         db->InstanceTemplate()->SetNamedPropertyHandler(collectionGetter, collectionSetter);
         _global->ForceSet(v8StringData("DB"), db->GetFunction());
+
         v8::Handle<v8::FunctionTemplate> dbCollection = createV8Function(collectionInit);
         dbCollection->InstanceTemplate()->SetNamedPropertyHandler(collectionGetter,
                                                                   collectionSetter);
@@ -1121,19 +1132,19 @@ namespace mongo {
         injectV8Function("DBPointer", dbPointerInit, _global);
 
         _global->ForceSet(v8StringData("BinData"),
-                         getBinDataFunctionTemplate(this)->GetFunction());
+                          getBinDataFunctionTemplate(this)->GetFunction());
         _global->ForceSet(v8StringData("UUID"),
-                         createV8Function(uuidInit)->GetFunction());
+                          createV8Function(uuidInit)->GetFunction());
         _global->ForceSet(v8StringData("MD5"),
-                         createV8Function(md5Init)->GetFunction());
+                          createV8Function(md5Init)->GetFunction());
         _global->ForceSet(v8StringData("HexData"),
-                         createV8Function(hexDataInit)->GetFunction());
+                          createV8Function(hexDataInit)->GetFunction());
         _global->ForceSet(v8StringData("NumberLong"),
-                         getNumberLongFunctionTemplate(this)->GetFunction());
+                          getNumberLongFunctionTemplate(this)->GetFunction());
         _global->ForceSet(v8StringData("NumberInt"),
-                         getNumberIntFunctionTemplate(this)->GetFunction());
+                          getNumberIntFunctionTemplate(this)->GetFunction());
         _global->ForceSet(v8StringData("Timestamp"),
-                         getTimestampFunctionTemplate(this)->GetFunction());
+                          getTimestampFunctionTemplate(this)->GetFunction());
 
         BSONObjBuilder b;
         b.appendMaxKey("");
@@ -1170,15 +1181,14 @@ namespace mongo {
         uassert(16670, errStr, !compiled.IsEmpty());
 
         if (!nativeEpilogue()) {
-            _error = str::stream()
-                    << "javascript execution terminated during newFunction compilation";
+            _error = "JavaScript execution terminated";
             return handle_scope.Close(v8::Handle<v8::Value>());
         }
 
         v8::Local<v8::Value> ret = compiled->Run();
 
         if (!nativePrologue()) {
-            _error = str::stream() << "javascript execution terminated";
+            _error = "JavaScript execution terminated";
             if (!ret.IsEmpty())
                 return handle_scope.Close(ret);
             return handle_scope.Close(v8::Handle<v8::Value>());
@@ -1805,7 +1815,7 @@ namespace mongo {
 
     v8::Handle<v8::Value> V8Scope::startCpuProfiler(V8Scope* scope, const v8::Arguments& args) {
         if (args.Length() != 1 || !args[0]->IsString()) {
-            return v8::ThrowException(v8::String::New("startCpuProfiler takes a string argument"));
+            return v8AssertionException("startCpuProfiler takes a string argument");
         }
         scope->_cpuProfiler.start(*v8::String::Utf8Value(args[0]->ToString()));
         return v8::Undefined();
@@ -1813,7 +1823,7 @@ namespace mongo {
 
     v8::Handle<v8::Value> V8Scope::stopCpuProfiler(V8Scope* scope, const v8::Arguments& args) {
         if (args.Length() != 1 || !args[0]->IsString()) {
-            return v8::ThrowException(v8::String::New("stopCpuProfiler takes a string argument"));
+            return v8AssertionException("stopCpuProfiler takes a string argument");
         }
         scope->_cpuProfiler.stop(*v8::String::Utf8Value(args[0]->ToString()));
         return v8::Undefined();
@@ -1821,7 +1831,7 @@ namespace mongo {
 
     v8::Handle<v8::Value> V8Scope::getCpuProfile(V8Scope* scope, const v8::Arguments& args) {
         if (args.Length() != 1 || !args[0]->IsString()) {
-            return v8::ThrowException(v8::String::New("getCpuProfile takes a string argument"));
+            return v8AssertionException("getCpuProfile takes a string argument");
         }
         return scope->mongoToLZV8(scope->_cpuProfiler.fetch(
                 *v8::String::Utf8Value(args[0]->ToString())));

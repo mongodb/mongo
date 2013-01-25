@@ -51,32 +51,15 @@ namespace mongo {
 
     std::string toSTLString(const v8::TryCatch* try_catch) {
         stringstream ss;
-        v8::String::Utf8Value exception(try_catch->Exception());
+        v8::String::Utf8Value exceptionText(try_catch->Exception());
+        ss << *exceptionText;
         v8::Handle<v8::Message> message = try_catch->Message();
-
-        if (message.IsEmpty()) {
-            ss << *exception << endl;
-        }
-        else {
+        if (!message.IsEmpty()) {
             v8::String::Utf8Value filename(message->GetScriptResourceName());
             if (*filename) {
                 int linenum = message->GetLineNumber();
-                ss << *filename << ":" << linenum << " ";
+                ss << " " << *filename << ":" << linenum;
             }
-            ss << *exception << endl;
-
-            v8::String::Utf8Value sourceline(message->GetSourceLine());
-            ss << *sourceline << endl;
-
-            int start = message->GetStartColumn();
-            for (int i = 0; i < start; i++)
-                ss << " ";
-
-            int end = message->GetEndColumn();
-            for (int i = start; i < end; i++)
-                ss << "^";
-
-            ss << endl;
         }
         return ss.str();
     }
@@ -89,16 +72,16 @@ namespace mongo {
 
     std::ostream& operator<<(std::ostream& s, const v8::TryCatch* try_catch) {
         v8::HandleScope handle_scope;
-        v8::String::Utf8Value exception(try_catch->Exception());
+        v8::String::Utf8Value exceptionText(try_catch->Exception());
         v8::Handle<v8::Message> message = try_catch->Message();
 
         if (message.IsEmpty()) {
-            s << *exception << endl;
+            s << *exceptionText << endl;
         }
         else {
             v8::String::Utf8Value filename(message->GetScriptResourceName());
             int linenum = message->GetLineNumber();
-            cout << *filename << ":" << linenum << " " << *exception << endl;
+            cout << *filename << ":" << linenum << " " << *exceptionText << endl;
 
             v8::String::Utf8Value sourceline(message->GetSourceLine());
             cout << *sourceline << endl;
@@ -114,10 +97,6 @@ namespace mongo {
             cout << endl;
         }
         return s;
-    }
-
-    void ReportException(v8::TryCatch* try_catch) {
-        cout << try_catch << endl;
     }
 
     class JSThreadConfig {
@@ -285,4 +264,10 @@ namespace mongo {
         scope->injectV8Function("_scopedThreadInject", ScopedThreadInject, global);
     }
 
+    v8::Handle<v8::Value> v8AssertionException(const char* errorMessage) {
+        return v8::ThrowException(v8::Exception::Error(v8::String::New(errorMessage)));
+    }
+    v8::Handle<v8::Value> v8AssertionException(const std::string& errorMessage) {
+        return v8AssertionException(errorMessage.c_str());
+    }
 }

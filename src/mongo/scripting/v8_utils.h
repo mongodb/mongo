@@ -25,9 +25,12 @@
 
 namespace mongo {
 
-    void ReportException(v8::TryCatch* handler);
+#define jsassert(x,msg) uassert(16664, (msg), (x))
 
-#define jsassert(x,msg) uassert(16664, msg, x)
+#define argumentCheck(mustBeTrue, errorMessage)         \
+    if (!(mustBeTrue)) {                                \
+        return v8AssertionException((errorMessage));    \
+    }
 
     std::ostream& operator<<(std::ostream& s, const v8::Handle<v8::Value>& o);
     std::ostream& operator<<(std::ostream& s, const v8::Handle<v8::TryCatch>* try_catch);
@@ -40,5 +43,20 @@ namespace mongo {
     void installFork(V8Scope* scope,
                      v8::Handle<v8::Object>& global,
                      v8::Handle<v8::Context>& context);
+
+    /** Throw a V8 exception from Mongo callback code; message text will be preceded by "Error: ".
+     *   Note: this function should be used for text that did not originate from the JavaScript
+     *         engine.  Errors from the JavaScript engine will already have a prefix such as
+     *         ReferenceError, TypeError or SyntaxError.
+     *   Note: call only from a native function called from JavaScript (a callback).
+     *         The V8 ThrowException routine will note a JavaScript exception that will be
+     *         "thrown" in JavaScript when we return from the native function.
+     *   Note: it's required to return immediately to V8's execution control without calling any
+     *         V8 API functions.  In this state, an empty handle may (will) be returned.
+     *  @param   errorMessage Error message text.
+     *  @return  Empty handle to be returned from callback function.
+     */
+    v8::Handle<v8::Value> v8AssertionException(const char* errorMessage);
+    v8::Handle<v8::Value> v8AssertionException(const std::string& errorMessage);
 }
 
