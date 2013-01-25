@@ -412,7 +412,8 @@ namespace mongo {
         _assertChunkExists( min , max );
         for ( vector<BSONObj>::const_iterator it = splitKeys.begin() ; it != splitKeys.end() ; ++it ) {
             if ( ! contains( min , max , *it ) ) {
-                uasserted( 14040 , str::stream() << "can split " << min << " -> " << max << " on " << *it );
+                uasserted(14040, str::stream() << "cannot split " << min << " -> " << max
+                        << " on " << *it);
             }
         }
 
