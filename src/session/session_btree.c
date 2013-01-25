@@ -110,7 +110,22 @@ __wt_session_release_btree(WT_SESSION_IMPL *session)
 		/* A write lock has been held since the handle was created. */
 		WT_RET(__wt_rwunlock(session, btree->rwlock));
 		WT_RET(__wt_conn_btree_discard_single(session, btree));
+	} else if (F_ISSET(btree, WT_BTREE_DISCARD_CLOSE)) {
+		/*
+		 * If configured to discard on last close, attempt to trade our
+		 * read lock for an exclusive lock. If that succeeds it is safe
+		 * to discard. It is expected for the write lock to fail
+		 * sometimes since the handle may still be in use - we've done
+		 * the right thing then.
+		 */
+		WT_RET(__wt_rwunlock(session, btree->rwlock));
+		ret = __wt_try_writelock(session, btree->rwlock);
+		if (ret == 0)
+			WT_RET(__wt_conn_btree_sync_and_close(session));
+		else if (ret == EBUSY)
+			ret = 0;
 	} else {
+
 		/*
 		 * If we had special flags set, close the handle so that future
 		 * access can get a handle without special flags.

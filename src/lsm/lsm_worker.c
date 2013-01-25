@@ -179,6 +179,15 @@ __wt_lsm_checkpoint_worker(void *arg)
 				break;
 			}
 
+			/*
+			 * Now that the chunk has been checkpointed, set up
+			 * the handle so that it is discarded once all active
+			 * cursors have moved onto using the checkpoint.
+			 */
+			WT_ERR(__wt_session_get_btree(
+			    session, chunk->uri, NULL, NULL, 0));
+			F_SET(session->btree, WT_BTREE_DISCARD_CLOSE);
+			__wt_session_release_btree(session);
 			++j;
 			WT_ERR(__wt_writelock(session, lsm_tree->rwlock));
 			F_SET(chunk, WT_LSM_CHUNK_ONDISK);
