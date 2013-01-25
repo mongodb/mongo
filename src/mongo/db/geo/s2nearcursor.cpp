@@ -29,10 +29,7 @@ namespace mongo {
                        const vector<GeoQuery> &indexedGeoFields,
                        const S2IndexingParams &params)
         : _details(details), _nearQuery(nearQuery), _indexedGeoFields(indexedGeoFields),
-          _params(params), _keyPattern(keyPattern),
-          _nscanned(0), _matchTested(0), _geoMatchTested(0), _numShells(0), _keyGeoSkip(0),
-          _nearFieldIndex(0), _numReturned(0), _returnSkip(0),
-          _btreeDups(0), _inAnnulusTested(0), _returnedDistance(0) {
+          _params(params), _keyPattern(keyPattern), _nearFieldIndex(0), _returnedDistance(0) {
 
         BSONObjBuilder geoFieldsToNuke;
         for (size_t i = 0; i < _indexedGeoFields.size(); ++i) {
@@ -84,7 +81,7 @@ namespace mongo {
     DiskLoc S2NearCursor::currLoc() { return _results.top().loc; }
     BSONObj S2NearCursor::currKey() const { return _results.top().key; }
     DiskLoc S2NearCursor::refLoc() { return DiskLoc(); }
-    long long S2NearCursor::nscanned() { return _nscanned; }
+    long long S2NearCursor::nscanned() { return _stats._nscanned; }
 
     double S2NearCursor::currentDistance() const { return _results.top().distance; }
 
@@ -111,14 +108,14 @@ namespace mongo {
     }
 
     void S2NearCursor::explainDetails(BSONObjBuilder& b) {
-        b << "nscanned" << _nscanned;
-        b << "matchTested" << _matchTested;
-        b << "geoMatchTested" << _geoMatchTested;
-        b << "numShells" << _numShells;
-        b << "keyGeoSkip" << _keyGeoSkip;
-        b << "returnSkip" << _returnSkip;
-        b << "btreeDups" << _btreeDups;
-        b << "inAnnulusTested" << _inAnnulusTested;
+        b << "nscanned" << _stats._nscanned;
+        b << "matchTested" << _stats._matchTested;
+        b << "geoMatchTested" << _stats._geoMatchTested;
+        b << "numShells" << _stats._numShells;
+        b << "keyGeoSkip" << _stats._keyGeoSkip;
+        b << "returnSkip" << _stats._returnSkip;
+        b << "btreeDups" << _stats._btreeDups;
+        b << "inAnnulusTested" << _stats._inAnnulusTested;
     }
 
     bool S2NearCursor::ok() {
@@ -141,7 +138,7 @@ namespace mongo {
         _outerRadius = min(_outerRadius, _maxDistance);
         verify(_innerRadius <= _outerRadius);
         LOG(1) << ") to (" << _innerRadius << ", " << _outerRadius << ")" << endl;
-        ++_numShells;
+        ++_stats._numShells;
     }
 
     bool S2NearCursor::advance() {
@@ -154,7 +151,7 @@ namespace mongo {
             _returnedDistance = _results.top().distance;
             _returned.insert(_results.top().loc);
             _results.pop();
-            ++_numReturned;
+            ++_stats._numReturned;
             // Safe to grow the radius as we've returned everything in our shell.  We don't do this
             // check outside of !_results.empty() because we could have results, yield, dump them
             // (_results would be empty), then need to recreate them w/the same radii.  In that case
@@ -243,21 +240,21 @@ namespace mongo {
             // the distance from the query point to the indexed geo to be
             // within our 'current' annulus, and I want to dodge all yield
             // issues if possible.
-            unordered_set<DiskLoc> seen;
+            unordered_set<DiskLoc, DiskLoc::Hasher> seen;
 
             LOG(1) << "looking at annulus from " << _innerRadius << " to " << _outerRadius << endl;
-            LOG(1) << "Total # returned: " << _numReturned << endl;
+            LOG(1) << "Total # returned: " << _stats._numReturned << endl;
             // Do the actual search through this annulus.
             for (; cursor->ok(); cursor->advance()) {
                 // Don't bother to look at anything we've returned.
                 if (_returned.end() != _returned.find(cursor->currLoc())) {
-                    ++_returnSkip;
+                    ++_stats._returnSkip;
                      continue;
                 }
 
-                ++_nscanned;
+                ++_stats._nscanned;
                 if (seen.end() != seen.find(cursor->currLoc())) {
-                    ++_btreeDups;
+                    ++_stats._btreeDups;
                     continue;
                 }
 
@@ -273,12 +270,12 @@ namespace mongo {
 
                 S2Cell keyCell = S2Cell(S2CellId::FromString(geoKey.String()));
                 if (!_annulus.MayIntersect(keyCell)) {
-                    ++_keyGeoSkip;
+                    ++_stats._keyGeoSkip;
                     continue;
                 }
 
                 // Match against non-indexed fields.
-                ++_matchTested;
+                ++_stats._matchTested;
                 MatchDetails details;
                 if (!_matcher->matchesCurrent(cursor.get(), &details)) {
                     continue;
@@ -287,7 +284,7 @@ namespace mongo {
                 const BSONObj& indexedObj = cursor->currLoc().obj();
 
                 // Match against indexed geo fields.
-                ++_geoMatchTested;
+                ++_stats._geoMatchTested;
                 size_t geoFieldsMatched = 0;
                 // OK, cool, non-geo match satisfied.  See if the object actually overlaps w/the geo
                 // query fields.
@@ -321,7 +318,7 @@ namespace mongo {
                 indexedObj.getFieldsDotted(_nearQuery.field, geoFieldElements, false);
                 if (geoFieldElements.empty()) { continue; }
 
-                ++_inAnnulusTested;
+                ++_stats._inAnnulusTested;
                 double minDistance = 1e20;
                 // Look at each field in the document and take the min. distance.
                 for (BSONElementSet::iterator oi = geoFieldElements.begin();

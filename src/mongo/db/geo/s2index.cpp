@@ -403,11 +403,11 @@ namespace mongo {
             idxType->getDetails(), query, nearQuery, regions, idxType->getParams()));
 
         double totalDistance = 0;
-        int results = 0;
         BSONObjBuilder resultBuilder(result.subarrayStart("results"));
         double farthestDist = 0;
 
-        for (int i = 0; i < numWanted && cursor->ok(); ++i) {
+        int results;
+        for (results = 0; results < numWanted && cursor->ok(); ++results) {
             double dist = cursor->currentDistance();
             // If we got the distance in radians, output it in radians too.
             if (nearQuery.fromRadians) { dist /= idxType->getParams().radius; }
@@ -431,7 +431,6 @@ namespace mongo {
 
             oneResultBuilder.append("obj", cursor->current());
             oneResultBuilder.done();
-            ++results;
             cursor->advance();
         }
 

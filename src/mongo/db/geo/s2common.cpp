@@ -16,21 +16,6 @@
 
 #include "mongo/db/geo/s2common.h"
 
-#ifdef _WIN32
-namespace std {
-#else
-namespace std { namespace tr1 {
-#endif
-size_t hash<mongo::DiskLoc>::operator()(mongo::DiskLoc const& dl) const {
-    hash<int> foo;
-    return foo(dl.getOfs() + dl.a());
-}
-#ifdef _WIN32
-}  // namespace std
-#else
-}}  // namespace tr1, std
-#endif
-
 namespace mongo {
     // Thanks, Wikipedia.
     const double S2IndexingParams::kRadiusOfEarthInMeters = (6378.1 * 1000);
