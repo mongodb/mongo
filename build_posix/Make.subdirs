@@ -8,6 +8,7 @@
 bench/tcbench
 bench/wtperf
 examples/c
+examples/java JAVA
 ext/collators/reverse
 ext/compressors/bzip2 BZIP2
 ext/compressors/nop

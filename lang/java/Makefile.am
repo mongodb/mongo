@@ -19,6 +19,7 @@ dist_java_JAVA = \
 		$(JAVADESTFULL)/wiredtiger.java \
 		$(JAVADESTFULL)/wiredtigerConstants.java \
 		$(JAVADESTFULL)/wiredtigerJNI.java
+
 java_LTLIBRARIES = libwiredtiger_java.la
 
 CPPFLAGS += $(JNI_CPPFLAGS)
@@ -28,6 +29,7 @@ libwiredtiger_java_la_SOURCES = $(BUILT_SOURCES) $(SWIG_SOURCES)
 #libwiredtiger_java_la_LDFLAGS = -module
 libwiredtiger_java_la_LIBADD = $(abs_top_builddir)/libwiredtiger.la
 
+all-local: wiredtiger.jar
 $(JAVASRC)/wiredtiger_wrap.c: $(top_srcdir)/src/include/wiredtiger.in $(SWIG_SOURCES)
 	(cd $(JAVASRC) && \
 	    $(SWIG) -Wall -v -java -nodefaultctor -nodefaultdtor -package com.wiredtiger.db -I$(abs_top_builddir) -outdir $(JAVADEST) -o wiredtiger_wrap.c wiredtiger.i)
@@ -35,3 +37,8 @@ $(JAVASRC)/wiredtiger_wrap.c: $(top_srcdir)/src/include/wiredtiger.in $(SWIG_SOU
 $(JDOCDIR)/index.html:	$(dist_java_JAVA)
 	mkdir -p $(JDOCDIR)
 	javadoc -public -d $(JDOCDIR) -link http://docs.oracle.com/javase/6/docs/api $(JAVADESTFULL)/wiredtiger.java $(JAVADESTFULL)/wiredtigerConstants.java $(JAVADESTFULL)/[A-Z]*.java
+
+wiredtiger.jar: $(dist_java_JAVA)
+	(cd $(top_builddir) && \
+	$(JAR) -cf wiredtiger.jar com/)
+

@@ -1,3 +1,4 @@
+package com.wiredtiger.examples;
 import com.wiredtiger.db.*;
 
 public class ex_access {

@@ -59,6 +59,7 @@ fi
 if test "$wt_cv_enable_java" = "yes"; then
 	JAVAC=${JAVAC-javac}
 	AX_PROG_JAVAC
+	AX_PROG_JAR
 	AX_JNI_INCLUDE_DIR
 	for JNI_INCLUDE_DIR in $JNI_INCLUDE_DIRS ; do
 		JNI_CPPFLAGS="$JNI_CPPFLAGS -I$JNI_INCLUDE_DIR"
