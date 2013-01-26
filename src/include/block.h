@@ -131,16 +131,77 @@ struct __wt_block_ckpt {
 };
 
 /*
+ * WT_BM --
+ *	Block manager handle, references a single checkpoint in a file.
+ */
+struct __wt_bm {
+						/* Methods */
+	int (*addr_string)
+	    (WT_BM *, WT_SESSION_IMPL *, WT_ITEM *, const uint8_t *, uint32_t);
+	int (*addr_valid)
+	    (WT_BM *, WT_SESSION_IMPL *, const uint8_t *, uint32_t);
+	u_int (*block_header)(WT_BM *);
+	int (*checkpoint)
+	    (WT_BM *, WT_SESSION_IMPL *, WT_ITEM *, WT_CKPT *, int);
+	int (*checkpoint_load)(WT_BM *, WT_SESSION_IMPL *,
+	    const uint8_t *, uint32_t, uint8_t *, uint32_t *, int);
+	int (*checkpoint_resolve)(WT_BM *, WT_SESSION_IMPL *);
+	int (*checkpoint_unload)(WT_BM *, WT_SESSION_IMPL *);
+	int (*close)(WT_BM *, WT_SESSION_IMPL *);
+	int (*compact_page_skip)
+	    (WT_BM *, WT_SESSION_IMPL *, const uint8_t *, uint32_t, int *);
+	int (*compact_skip)(WT_BM *, WT_SESSION_IMPL *, int, int *);
+	int (*free)(WT_BM *, WT_SESSION_IMPL *, const uint8_t *, uint32_t);
+	int (*read)
+	    (WT_BM *, WT_SESSION_IMPL *, WT_ITEM *, const uint8_t *, uint32_t);
+	int (*salvage_end)(WT_BM *, WT_SESSION_IMPL *);
+	int (*salvage_next)
+	    (WT_BM *, WT_SESSION_IMPL *, uint8_t *, uint32_t *, int *);
+	int (*salvage_start)(WT_BM *, WT_SESSION_IMPL *);
+	int (*salvage_valid)(WT_BM *, WT_SESSION_IMPL *, uint8_t *, uint32_t);
+	int (*stat)(WT_BM *, WT_SESSION_IMPL *);
+	int (*verify_addr)
+	    (WT_BM *, WT_SESSION_IMPL *, const uint8_t *, uint32_t);
+	int (*verify_end)(WT_BM *, WT_SESSION_IMPL *);
+	int (*verify_start)(WT_BM *, WT_SESSION_IMPL *, WT_CKPT *);
+	int (*write) (WT_BM *,
+	    WT_SESSION_IMPL *, WT_ITEM *, uint8_t *, uint32_t *, int);
+	int (*write_size)(WT_BM *, WT_SESSION_IMPL *, size_t *);
+
+	WT_BLOCK *block;			/* Underlying file */
+
+	void *map;				/* Mapped region */
+
+	/*
+	 * There's only a single block manager handle that can be written, all
+	 * others are checkpoints.
+	 */
+	int is_checkpoint;			/* Not the live system */
+};
+
+/*
  * WT_BLOCK --
- *	Encapsulation of the standard WiredTiger block manager.
+ *	Block manager handle, references a single file.
  */
 struct __wt_block {
 	const char *name;		/* Name */
 
+	/* A list of block manager handles, sharing a file descriptor. */
+	uint32_t ref;			/* References */
 	WT_FH	*fh;			/* Backing file handle */
+	TAILQ_ENTRY(__wt_block) q;	/* Linked list of handles */
 
+	/* Configuration information, set when the file is opened. */
 	uint32_t allocsize;		/* Allocation size */
+	u_int block_header;		/* Header length */
 
+	/*
+	 * There is only a single checkpoint in a file that can be written.  The
+	 * information could logically live in the WT_BM structure, but then we
+	 * would be re-creating it every time we opened a new checkpoint and I'd
+	 * rather not do that.  So, it's stored here, only accessed by one WT_BM
+	 * handle.
+	 */
 	WT_SPINLOCK	live_lock;	/* Live checkpoint lock */
 	WT_BLOCK_CKPT	live;		/* Live checkpoint */
 	int		live_load;	/* Live checkpoint loaded */

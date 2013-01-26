@@ -33,13 +33,16 @@
 
 /*
  * Align an unsigned value of any type to a specified power-of-2, including the
- * offset result of a pointer subtraction.  Do the calculation using the largest
- * unsigned integer type available, which results in conversion complaints; cast
- * the result to a uint32_t because that's the size of a piece of data in the
- * WiredTiger engine.
+ * offset result of a pointer subtraction; do the calculation using the largest
+ * unsigned integer type available.
+ *
+ * Optionally cast the result to a uint32_t because that's the size of a piece
+ * of data in the WiredTiger engine.
  */
 #define	WT_ALIGN(n, v)							\
-	((uint32_t)((((uintmax_t)(n)) + ((v) - 1)) & ~(((uintmax_t)(v)) - 1)))
+	((((uintmax_t)(n)) + ((v) - 1)) & ~(((uintmax_t)(v)) - 1))
+#define	WT_ALIGN32(n, v)						\
+	((uint32_t)WT_ALIGN(n, v))
 
 /* Min, max. */
 #define	WT_MIN(a, b)	((a) < (b) ? (a) : (b))

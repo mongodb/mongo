@@ -37,6 +37,15 @@ __wt_connection_init(WT_CONNECTION_IMPL *conn)
 	__wt_spin_init(session, &conn->schema_lock);
 	__wt_spin_init(session, &conn->serial_lock);
 
+	/*
+	 * Block manager.
+	 * XXX
+	 * If there's ever a second block manager, we'll want to make this
+	 * more opaque, but for now this is simpler.
+	 */
+	__wt_spin_init(session, &conn->block_lock);
+	TAILQ_INIT(&conn->blockqh);		/* Block manager list */
+
 	return (0);
 }
 
@@ -77,6 +86,7 @@ __wt_connection_destroy(WT_CONNECTION_IMPL *conn)
 	__wt_spin_destroy(session, &conn->metadata_lock);
 	__wt_spin_destroy(session, &conn->schema_lock);
 	__wt_spin_destroy(session, &conn->serial_lock);
+	__wt_spin_destroy(session, &conn->block_lock);
 
 	/* Free allocated memory. */
 	__wt_free(session, conn->home);

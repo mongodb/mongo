@@ -66,20 +66,33 @@ __wt_block_create(WT_SESSION_IMPL *session, const char *filename)
  */
 int
 __wt_block_open(WT_SESSION_IMPL *session, const char *filename,
-    const char *config, const char *cfg[], int forced_salvage, void *blockp)
+    const char *config, const char *cfg[], int forced_salvage,
+    WT_BLOCK **blockp)
 {
 	WT_BLOCK *block;
 	WT_CONFIG_ITEM cval;
+	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 
 	WT_UNUSED(cfg);
-	*(void **)blockp = NULL;
+	WT_VERBOSE_TRET(session, block, "open: %s", filename);
 
-	/*
-	 * Allocate the structure, connect (so error close works), copy the
-	 * name.
-	 */
-	WT_RET(__wt_calloc_def(session, 1, &block));
+	conn = S2C(session);
+	*blockp = NULL;
+
+	__wt_spin_lock(session, &conn->block_lock);
+	TAILQ_FOREACH(block, &conn->blockqh, q)
+		if (strcmp(filename, block->name) == 0) {
+			++block->ref;
+			*blockp = block;
+			__wt_spin_unlock(session, &conn->block_lock);
+			return (0);
+		}
+
+	/* Basic structure allocation, initialization. */
+	WT_ERR(__wt_calloc_def(session, 1, &block));
+	block->ref = 1;
+
 	WT_ERR(__wt_strdup(session, filename, &block->name));
 
 	/* Get the allocation size. */
@@ -101,10 +114,14 @@ __wt_block_open(WT_SESSION_IMPL *session, const char *filename,
 	if (!forced_salvage)
 		WT_ERR(__desc_read(session, block));
 
-	*(void **)blockp = block;
+	TAILQ_INSERT_HEAD(&conn->blockqh, block, q);
+
+	*blockp = block;
+	__wt_spin_unlock(session, &conn->block_lock);
 	return (0);
 
 err:	WT_TRET(__wt_block_close(session, block));
+	__wt_spin_unlock(session, &conn->block_lock);
 	return (ret);
 }
 
@@ -115,21 +132,34 @@ err:	WT_TRET(__wt_block_close(session, block));
 int
 __wt_block_close(WT_SESSION_IMPL *session, WT_BLOCK *block)
 {
+	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 
-	WT_VERBOSE_TRET(session, block, "close");
+	if (block == NULL)				/* Safety check */
+		return (0);
 
-	WT_TRET(__wt_block_checkpoint_unload(session, block));
+	conn = S2C(session);
 
-	if (block->name != NULL)
-		__wt_free(session, block->name);
+	WT_VERBOSE_TRET(session,
+	    block, "close: %s", block->name == NULL ? "" : block->name );
 
-	if (block->fh != NULL)
-		WT_TRET(__wt_close(session, block->fh));
+	__wt_spin_lock(session, &conn->block_lock);
+	if (block->ref > 1)
+		--block->ref;
+	else {
+		if (block->name != NULL)
+			__wt_free(session, block->name);
 
-	__wt_spin_destroy(session, &block->live_lock);
+		if (block->fh != NULL)
+			WT_TRET(__wt_close(session, block->fh));
 
-	__wt_free(session, block);
+		__wt_spin_destroy(session, &block->live_lock);
+
+		TAILQ_REMOVE(&conn->blockqh, block, q);
+
+		__wt_overwrite_and_free(session, block);
+	}
+	__wt_spin_unlock(session, &conn->block_lock);
 
 	return (ret);
 }

@@ -264,6 +264,7 @@ static int
 __checkpoint_worker(
     WT_SESSION_IMPL *session, const char *cfg[], int is_checkpoint)
 {
+	WT_BM *bm;
 	WT_BTREE *btree;
 	WT_CKPT *ckpt, *ckptbase;
 	WT_CONFIG dropconf;
@@ -278,6 +279,7 @@ __checkpoint_worker(
 
 	conn = S2C(session);
 	btree = session->btree;
+	bm = btree->bm;
 	ckpt = ckptbase = NULL;
 	name_alloc = NULL;
 	txn = &session->txn;
@@ -601,7 +603,7 @@ fake:
 		if (WT_META_TRACKING(session) && is_checkpoint)
 			WT_ERR(__wt_meta_track_checkpoint(session));
 		else
-			WT_ERR(__wt_bm_checkpoint_resolve(session));
+			WT_ERR(bm->checkpoint_resolve(bm, session));
 	}
 
 err:

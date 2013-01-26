@@ -62,9 +62,9 @@ __wt_block_ckpt_init(WT_SESSION_IMPL *session,
 int
 __wt_block_checkpoint_load(WT_SESSION_IMPL *session, WT_BLOCK *block,
     const uint8_t *addr, uint32_t addr_size,
-    uint8_t *root_addr, uint32_t *root_addr_size, int readonly)
+    uint8_t *root_addr, uint32_t *root_addr_size, int checkpoint)
 {
-	WT_BLOCK_CKPT *ci;
+	WT_BLOCK_CKPT *ci, _ci;
 	WT_DECL_ITEM(tmp);
 	WT_DECL_RET;
 	uint8_t *endp;
@@ -73,13 +73,10 @@ __wt_block_checkpoint_load(WT_SESSION_IMPL *session, WT_BLOCK *block,
 
 	/*
 	 * Sometimes we don't find a root page (we weren't given a checkpoint,
-	 * or the referenced checkpoint was empty).  In that case we return an
-	 * empty root address, set that up now.
+	 * or the checkpoint was empty).  In that case we return an empty root
+	 * address, set that up now.
 	 */
 	*root_addr_size = 0;
-
-	ci = &block->live;
-	WT_RET(__wt_block_ckpt_init(session, block, ci, "live", 1));
 
 	if (WT_VERBOSE_ISSET(session, ckpt)) {
 		if (addr != NULL) {
@@ -89,6 +86,20 @@ __wt_block_checkpoint_load(WT_SESSION_IMPL *session, WT_BLOCK *block,
 		WT_VERBOSE_ERR(session, ckpt,
 		    "%s: load-checkpoint: %s", block->name,
 		    addr == NULL ? "[Empty]" : (const char *)tmp->data);
+	}
+
+	/*
+	 * There's a single checkpoint in the file that can be written, all of
+	 * the others are read-only.  We use the same initialization calls for
+	 * readonly checkpoints, but the information doesn't persist.
+	 */
+	if (checkpoint) {
+		ci = &_ci;
+		WT_ERR(
+		    __wt_block_ckpt_init(session, block, ci, "checkpoint", 0));
+	} else {
+		ci = &block->live;
+		WT_ERR(__wt_block_ckpt_init(session, block, ci, "live", 1));
 	}
 
 	/* If not loading a checkpoint from disk, we're done. */
@@ -114,7 +125,7 @@ __wt_block_checkpoint_load(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	 * Rolling a checkpoint forward requires the avail list, the blocks from
 	 * which we can allocate.
 	 */
-	if (!readonly)
+	if (!checkpoint)
 		WT_ERR(__wt_block_extlist_read_avail(
 		    session, block, &ci->avail, ci->file_size));
 
@@ -126,7 +137,7 @@ __wt_block_checkpoint_load(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	 * checkpoint might possibly make it relevant here, but it's unlikely
 	 * enough that I'm not bothering).
 	 */
-	if (!readonly) {
+	if (!checkpoint) {
 		WT_VERBOSE_ERR(session, ckpt,
 		    "truncate file to %" PRIuMAX, (uintmax_t)ci->file_size);
 		WT_ERR(__wt_ftruncate(session, block->fh, ci->file_size));
@@ -149,8 +160,6 @@ __wt_block_checkpoint_unload(WT_SESSION_IMPL *session, WT_BLOCK *block)
 {
 	WT_BLOCK_CKPT *ci;
 	WT_DECL_RET;
-
-	WT_VERBOSE_TRET(session, ckpt, "%s: unload checkpoint", block->name);
 
 	ci = &block->live;
 
