@@ -262,7 +262,8 @@ namespace mongo {
 
                 // Get distance interval from our query point to the cell.
                 // If it doesn't overlap with our current shell, toss.
-                BSONObjIterator it(cursor->currKey());
+                BSONObj currKey(cursor->currKey());
+                BSONObjIterator it(currKey);
                 BSONElement geoKey;
                 for (int i = 0; i <= _nearFieldIndex; ++i) {
                     geoKey = it.next();
