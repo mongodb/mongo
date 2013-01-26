@@ -540,6 +540,10 @@ tojsonObject = function(x, indent, nolint){
         return x.constructor.tojson(x, indent, nolint);
     }
 
+    if (x instanceof Error) {
+        return x.toString();
+    }
+
     try {
         // modify display of min/max key for spidermonkey
         if (x.toString() == "[object MaxKey]")
