@@ -50,16 +50,33 @@ class test_bug006(wttest.WiredTigerTestCase):
             cursor.set_value(value_populate(cursor, i))
             cursor.insert()
 
-        # Salvage/Verify should fail, the cursor is open.
+        # Table operations should fail, the cursor is closed.
         self.assertRaises(
-            wiredtiger.WiredTigerError, lambda: self.session.verify(uri, None))
+            wiredtiger.WiredTigerError, lambda: self.session.drop(uri, None))
+        self.assertRaises(
+            wiredtiger.WiredTigerError,
+            lambda: self.session.rename(uri, self.uri + "new", None))
         self.assertRaises(
             wiredtiger.WiredTigerError, lambda: self.session.salvage(uri, None))
+        self.assertRaises(
+            wiredtiger.WiredTigerError,
+            lambda: self.session.truncate(uri, None, None, None))
+        self.assertRaises(
+            wiredtiger.WiredTigerError, lambda: self.session.upgrade(uri, None))
+        self.assertRaises(
+            wiredtiger.WiredTigerError, lambda: self.session.verify(uri, None))
 
         cursor.close()
 
-        # Salvage/Verify should succeed, the cursor is closed.
+        # Table operations should succeed, the cursor is closed.
+        self.session.rename(uri, self.uri + "new", None)
+        self.session.rename(self.uri + "new", uri, None)
         self.session.salvage(uri, None)
+        self.session.truncate(uri, None, None, None)
+        self.session.upgrade(uri, None)
+        self.session.verify(uri, None)
+
+        self.session.drop(uri, None)
 
 
 if __name__ == '__main__':
