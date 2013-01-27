@@ -288,7 +288,7 @@ err:	WT_TRET(bm->salvage_end(bm, session));
 
 	/* Discard any root page we created. */
 	if (ss->root_page != NULL)
-		__wt_page_out(session, &ss->root_page, 0);
+		__wt_page_out(session, &ss->root_page);
 
 	/* Discard the leaf and overflow page memory. */
 	WT_TRET(__slvg_cleanup(session, ss));
@@ -534,7 +534,7 @@ __slvg_trk_leaf(WT_SESSION_IMPL *session,
 		 * on every leaf page, and if you need to speed up the salvage,
 		 * it's probably a great place to start.
 		 */
-		WT_ERR(__wt_page_inmem(session, NULL, NULL, dsk, &page));
+		WT_ERR(__wt_page_inmem(session, NULL, NULL, dsk, 1, &page));
 		WT_ERR(__wt_row_key_copy(session,
 		    page, &page->u.row.d[0], &trk->row_start));
 		WT_ERR(__wt_row_key_copy(session,
@@ -567,7 +567,7 @@ __slvg_trk_leaf(WT_SESSION_IMPL *session,
 err:		__wt_free(session, trk);
 	}
 	if (page != NULL)
-		__wt_page_out(session, &page, WT_PAGE_FREE_IGNORE_DISK);
+		__wt_page_out(session, &page);
 	return (ret);
 }
 
@@ -1134,7 +1134,7 @@ __slvg_col_build_internal(
 	ss->root_page = page;
 
 	if (0) {
-err:		__wt_page_out(session, &page, 0);
+err:		__wt_page_out(session, &page);
 	}
 	return (ret);
 }
@@ -1596,7 +1596,7 @@ __slvg_row_trk_update_start(
 	 */
 	WT_RET(__wt_scr_alloc(session, trk->size, &dsk));
 	WT_ERR(__wt_bt_read(session, dsk, trk->addr.addr, trk->addr.size));
-	WT_ERR(__wt_page_inmem(session, NULL, NULL, dsk->mem, &page));
+	WT_ERR(__wt_page_inmem(session, NULL, NULL, dsk->mem, 1, &page));
 
 	/*
 	 * Walk the page, looking for a key sorting greater than the specified
@@ -1641,7 +1641,7 @@ __slvg_row_trk_update_start(
 		    sizeof(WT_TRACK *), __slvg_trk_compare_key);
 
 	if (page != NULL)
-		__wt_page_out(session, &page, WT_PAGE_FREE_IGNORE_DISK);
+		__wt_page_out(session, &page);
 
 err:	__wt_scr_free(&dsk);
 	__wt_scr_free(&key);
@@ -1716,7 +1716,7 @@ __slvg_row_build_internal(
 	ss->root_page = page;
 
 	if (0) {
-err:		__wt_page_out(session, &page, 0);
+err:		__wt_page_out(session, &page);
 	}
 	return (ret);
 }

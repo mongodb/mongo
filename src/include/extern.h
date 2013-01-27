@@ -134,8 +134,8 @@ extern int __wt_block_open(WT_SESSION_IMPL *session,
 extern int __wt_block_close(WT_SESSION_IMPL *session, WT_BLOCK *block);
 extern int __wt_desc_init(WT_SESSION_IMPL *session, WT_FH *fh);
 extern void __wt_block_stat(WT_SESSION_IMPL *session, WT_BLOCK *block);
-extern int __wt_block_read(WT_SESSION_IMPL *session,
-    WT_BLOCK *block,
+extern int __wt_bm_read(WT_BM *bm,
+    WT_SESSION_IMPL *session,
     WT_ITEM *buf,
     const uint8_t *addr,
     uint32_t addr_size);
@@ -248,9 +248,7 @@ extern int __wt_debug_tree(WT_SESSION_IMPL *session,
 extern int __wt_debug_page(WT_SESSION_IMPL *session,
     WT_PAGE *page,
     const char *ofile);
-extern void __wt_page_out(WT_SESSION_IMPL *session,
-    WT_PAGE **pagep,
-    uint32_t flags);
+extern void __wt_page_out(WT_SESSION_IMPL *session, WT_PAGE **pagep);
 extern void __wt_evict_list_clr_page(WT_SESSION_IMPL *session, WT_PAGE *page);
 extern int __wt_evict_forced_page(WT_SESSION_IMPL *session, WT_PAGE *page);
 extern int __wt_evict_server_wake(WT_SESSION_IMPL *session);
@@ -315,10 +313,11 @@ __wt_page_in_func(
  , const char *file, int line
 #endif
  );
-extern int __wt_page_inmem(WT_SESSION_IMPL *session,
+extern int __wt_page_inmem( WT_SESSION_IMPL *session,
     WT_PAGE *parent,
     WT_REF *parent_ref,
     WT_PAGE_HEADER *dsk,
+    int disk_not_alloc,
     WT_PAGE **pagep);
 extern int __wt_cache_read(WT_SESSION_IMPL *session,
     WT_PAGE *parent,
@@ -841,6 +840,14 @@ extern int __wt_bytelock(WT_FH *fhp, off_t byte, int lock);
 extern int __wt_fsync(WT_SESSION_IMPL *session, WT_FH *fh);
 extern int __wt_ftruncate(WT_SESSION_IMPL *session, WT_FH *fh, off_t len);
 extern int __wt_getline(WT_SESSION_IMPL *session, WT_ITEM *buf, FILE *fp);
+extern int __wt_mmap(WT_SESSION_IMPL *session,
+    WT_FH *fh,
+    void *mapp,
+    size_t *lenp);
+extern int __wt_munmap(WT_SESSION_IMPL *session,
+    WT_FH *fh,
+    void *map,
+    size_t len);
 extern int __wt_cond_alloc(WT_SESSION_IMPL *session,
     const char *name,
     int is_signalled,

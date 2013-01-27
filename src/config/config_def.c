@@ -427,7 +427,7 @@ __wt_confdfl_wiredtiger_open =
 	"buffer_alignment=-1,cache_size=100MB,create=0,direct_io=,"
 	"error_prefix=,eviction_dirty_target=80,eviction_target=80,"
 	"eviction_trigger=95,extensions=,hazard_max=1000,logging=0,lsm_merge="
-	",multiprocess=0,session_max=50,shared_cache=(chunk=10MB,name=,"
+	",mmap=,multiprocess=0,session_max=50,shared_cache=(chunk=10MB,name=,"
 	"reserve=0,size=500MB),sync=,transactional=,use_environment_priv=0,"
 	"verbose=";
 
@@ -445,6 +445,7 @@ __wt_confchk_wiredtiger_open[] = {
 	{ "hazard_max", "int", "min=15", NULL},
 	{ "logging", "boolean", NULL, NULL},
 	{ "lsm_merge", "boolean", NULL, NULL},
+	{ "mmap", "boolean", NULL, NULL},
 	{ "multiprocess", "boolean", NULL, NULL},
 	{ "session_max", "int", "min=1", NULL},
 	{ "shared_cache", "category", NULL,

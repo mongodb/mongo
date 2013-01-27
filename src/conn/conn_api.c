@@ -892,6 +892,10 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 			goto err;
 	}
 
+	/* Configure mmap. */
+	WT_ERR(__wt_config_gets(session, cfg, "mmap", &cval));
+	conn->mmap = cval.val == 0 ? 0 : 1;
+
 	/* Load any extensions referenced in the config. */
 	WT_ERR(__wt_config_gets(session, cfg, "extensions", &cval));
 	WT_ERR(__wt_config_subinit(session, &subconfig, &cval));

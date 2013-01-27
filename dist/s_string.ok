@@ -200,6 +200,7 @@ URI
 URIs
 UTF
 UnixLib
+Unmap
 VARCHAR
 Vanishingly
 Vc
@@ -509,12 +510,14 @@ mfence
 minorp
 minprefix
 mkdir
+mmap
 msg
 msgv
 mtx
 multiprocess
 multithread
 multithreaded
+munmap
 mutex
 mutexes
 myfile
@@ -725,6 +728,7 @@ uninstantiated
 unix
 unjams
 unlinked
+unmap
 unmerged
 unmodify
 unpackv

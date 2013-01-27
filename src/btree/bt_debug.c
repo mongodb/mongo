@@ -192,8 +192,7 @@ __wt_debug_addr(WT_SESSION_IMPL *session,
 	WT_DECL_RET;
 
 	WT_RET(__wt_scr_alloc(session, 1024, &buf));
-	WT_ERR(__wt_block_read(
-	    session, session->btree->bm->block, buf, addr, addr_size));
+	WT_ERR(__wt_bm_read(session->btree->bm, session, buf, addr, addr_size));
 	ret = __wt_debug_disk(session, buf->mem, ofile);
 
 err:	__wt_scr_free(&buf);

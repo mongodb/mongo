@@ -150,7 +150,8 @@ struct __wt_connection_impl {
 	/* If non-zero, all buffers used for I/O will be aligned to this. */
 	size_t buffer_alignment;
 
-	uint32_t direct_io;
+	uint32_t direct_io;		/* O_DIRECT configuration */
+	int	 mmap;			/* mmap configuration */
 	uint32_t verbose;
 
 	uint32_t flags;

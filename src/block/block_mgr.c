@@ -75,19 +75,37 @@ __bm_checkpoint_load(WT_BM *bm, WT_SESSION_IMPL *session,
     const uint8_t *addr, uint32_t addr_size,
     uint8_t *root_addr, uint32_t *root_addr_size, int checkpoint)
 {
+	WT_CONNECTION_IMPL *conn;
+
+	conn = S2C(session);
+
+	/* If not opening a checkpoint, we're opening the live system. */
+	bm->is_checkpoint = checkpoint;
 	WT_RET(__wt_block_checkpoint_load(session, bm->block,
 	    addr, addr_size, root_addr, root_addr_size, checkpoint));
 
-	/*
-	 * If not opening a checkpoint, we're opening the live system.
-	 *
-	 * If this handle is for a checkpoint, that is, read-only, there's not
-	 * a lot you can do with it.  The btree layer should prevent attempts
-	 * to write a checkpoint reference, but paranoia is healthy.
-	 */
-	bm->is_checkpoint = checkpoint;
-	if (!checkpoint)
-		__bm_method_set(bm, 0);
+	if (checkpoint) {
+		/*
+		 * Read-only objects are mapped into memory instead of being
+		 * read into cache buffers.  Ignore errors, with no mapping
+		 * we'll read into the cache.
+		 *
+		 * Turn off mapping when verifying the file, because we can't
+		 * perform checksum validation of mapped segments, and verify
+		 * has to checksum pages.
+		 */
+		if (conn->mmap && !bm->block->verify)
+			(void)__wt_mmap(
+			    session, bm->block->fh, &bm->map, &bm->maplen);
+
+		/*
+		 * If this handle is for a checkpoint, that is, read-only, there
+		 * isn't a lot you can do with it.  Although the btree layer
+		 * prevents attempts to write a checkpoint reference, paranoia
+		 * is healthy.
+		 */
+		__bm_method_set(bm, 1);
+	}
 
 	return (0);
 }
@@ -109,11 +127,19 @@ __bm_checkpoint_resolve(WT_BM *bm, WT_SESSION_IMPL *session)
 static int
 __bm_checkpoint_unload(WT_BM *bm, WT_SESSION_IMPL *session)
 {
-	/* If we're not the live system, there's no work to be done. */
-	if (bm->is_checkpoint)
-		return (0);
+	WT_DECL_RET;
 
-	return (__wt_block_checkpoint_unload(session, bm->block));
+	/* Unmap any mapped segment. */
+	if (bm->map != NULL)
+		WT_TRET(
+		    __wt_munmap(session, bm->block->fh, bm->map, bm->maplen));
+
+	/* If we're not the live system, there's no more work to be done. */
+	if (bm->is_checkpoint)
+		return (ret);
+
+	WT_TRET(__wt_block_checkpoint_unload(session, bm->block));
+	return (ret);
 }
 
 /*
@@ -166,17 +192,6 @@ __bm_free(WT_BM *bm,
     WT_SESSION_IMPL *session, const uint8_t *addr, uint32_t addr_size)
 {
 	return (__wt_block_free(session, bm->block, addr, addr_size));
-}
-
-/*
- * __bm_read --
- *	Read a address cookie-referenced block into a buffer.
- */
-static int
-__bm_read(WT_BM *bm, WT_SESSION_IMPL *session,
-    WT_ITEM *buf, const uint8_t *addr, uint32_t addr_size)
-{
-	return (__wt_block_read(session, bm->block, buf, addr, addr_size));
 }
 
 /*
@@ -294,28 +309,23 @@ static void
 __bm_method_set(WT_BM *bm, int readonly)
 {
 	if (readonly) {
-		bm->addr_string = (int (*)(WT_BM *, WT_SESSION_IMPL *,
-		    WT_ITEM *, const uint8_t *, uint32_t))__bm_readonly;
-		bm->addr_valid = (int (*)(WT_BM *, WT_SESSION_IMPL *,
-		    const uint8_t *, uint32_t))__bm_readonly;
+		bm->addr_string = __bm_addr_string;
+		bm->addr_valid = __bm_addr_valid;
 		bm->block_header = __bm_block_header;
-		bm->checkpoint = (int (*)(WT_BM *, WT_SESSION_IMPL *,
-		    WT_ITEM *, WT_CKPT *, int))__bm_readonly;
-		bm->checkpoint_load = (int (*)(WT_BM *, WT_SESSION_IMPL *,
-		    const uint8_t *, uint32_t, uint8_t *, uint32_t *,
-		    int))__bm_readonly;
+		bm->checkpoint = (int (*)(WT_BM *,
+		    WT_SESSION_IMPL *, WT_ITEM *, WT_CKPT *, int))__bm_readonly;
+		bm->checkpoint_load = __bm_checkpoint_load;
 		bm->checkpoint_resolve =
 		    (int (*)(WT_BM *, WT_SESSION_IMPL *))__bm_readonly;
-		bm->checkpoint_unload =
-		    (int (*)(WT_BM *, WT_SESSION_IMPL *))__bm_readonly;
+		bm->checkpoint_unload = __bm_checkpoint_unload;
 		bm->close = __bm_close;
-		bm->compact_page_skip = (int (*) (WT_BM *, WT_SESSION_IMPL *,
+		bm->compact_page_skip = (int (*)(WT_BM *, WT_SESSION_IMPL *,
 		    const uint8_t *, uint32_t, int *))__bm_readonly;
 		bm->compact_skip = (int (*)
 		    (WT_BM *, WT_SESSION_IMPL *, int, int *))__bm_readonly;
 		bm->free = (int (*)(WT_BM *,
 		    WT_SESSION_IMPL *, const uint8_t *, uint32_t))__bm_readonly;
-		bm->read = __bm_read;
+		bm->read = __wt_bm_read;
 		bm->salvage_end = (int (*)
 		    (WT_BM *, WT_SESSION_IMPL *))__bm_readonly;
 		bm->salvage_next = (int (*)(WT_BM *, WT_SESSION_IMPL *,
@@ -324,13 +334,10 @@ __bm_method_set(WT_BM *bm, int readonly)
 		    (WT_BM *, WT_SESSION_IMPL *))__bm_readonly;
 		bm->salvage_valid = (int (*)(WT_BM *,
 		    WT_SESSION_IMPL *, uint8_t *, uint32_t))__bm_readonly;
-		bm->stat = (int (*)(WT_BM *, WT_SESSION_IMPL *))__bm_readonly;
-		bm->verify_addr = (int (*)(WT_BM *,
-		    WT_SESSION_IMPL *, const uint8_t *, uint32_t))__bm_readonly;
-		bm->verify_end =
-		    (int (*)(WT_BM *, WT_SESSION_IMPL *))__bm_readonly;
-		bm->verify_start = (int (*)
-		    (WT_BM *, WT_SESSION_IMPL *, WT_CKPT *))__bm_readonly;
+		bm->stat = __bm_stat;
+		bm->verify_addr = __bm_verify_addr;
+		bm->verify_end = __bm_verify_end;
+		bm->verify_start = __bm_verify_start;
 		bm->write = (int (*)(WT_BM *, WT_SESSION_IMPL *,
 		    WT_ITEM *, uint8_t *, uint32_t *, int))__bm_readonly;
 		bm->write_size = (int (*)
@@ -347,7 +354,7 @@ __bm_method_set(WT_BM *bm, int readonly)
 		bm->compact_page_skip = __bm_compact_page_skip;
 		bm->compact_skip = __bm_compact_skip;
 		bm->free = __bm_free;
-		bm->read = __bm_read;
+		bm->read = __wt_bm_read;
 		bm->salvage_end = __bm_salvage_end;
 		bm->salvage_next = __bm_salvage_next;
 		bm->salvage_start = __bm_salvage_start;

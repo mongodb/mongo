@@ -18,6 +18,7 @@ extern "C" {
 /*******************************************
  * WiredTiger system include files.
  *******************************************/
+#include <sys/mman.h>
 #include <sys/stat.h>
 #include <sys/time.h>
 #include <sys/uio.h>

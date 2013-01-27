@@ -170,7 +170,8 @@ struct __wt_bm {
 
 	WT_BLOCK *block;			/* Underlying file */
 
-	void *map;				/* Mapped region */
+	void  *map;				/* Mapped region */
+	size_t maplen;
 
 	/*
 	 * There's only a single block manager handle that can be written, all

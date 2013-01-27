@@ -8,25 +8,54 @@
 #include "wt_internal.h"
 
 /*
- * __wt_block_read --
- *	Read filesystem cookie referenced block into a buffer.
+ * __wt_bm_read --
+ *	Map or read address cookie referenced block into a buffer.
  */
 int
-__wt_block_read(WT_SESSION_IMPL *session,
-    WT_BLOCK *block, WT_ITEM *buf, const uint8_t *addr, uint32_t addr_size)
+__wt_bm_read(WT_BM *bm, WT_SESSION_IMPL *session,
+    WT_ITEM *buf, const uint8_t *addr, uint32_t addr_size)
 {
+	WT_BLOCK *block;
 	off_t offset;
 	uint32_t size, cksum;
+	int mapped;
 
 	WT_UNUSED(addr_size);
+	block = bm->block;
 
 	/* Crack the cookie. */
 	WT_RET(__wt_block_buffer_to_addr(block, addr, &offset, &size, &cksum));
 
-	/* Read the block. */
-	WT_RET(__wt_block_read_off(session, block, buf, offset, size, cksum));
+	/*
+	 * Clear buffers previously used for mapped memory, we may be forced
+	 * to read into this buffer.
+	 */
+	if (F_ISSET(buf, WT_ITEM_MAPPED))
+		__wt_buf_free(session, buf);
 
-	return (0);
+	/*
+	 * If we're going to be able to return mapped memory and the buffer
+	 * has allocated memory, discard it.
+	 */
+	mapped = bm->map != NULL && offset + size <= (off_t)bm->maplen;
+	if (buf->mem != NULL && mapped)
+		__wt_buf_free(session, buf);
+
+	/* Map the block if it's possible. */
+	if (mapped) {
+		buf->mem = (uint8_t *)bm->map + offset;
+		buf->memsize = size;
+		buf->data = buf->mem;
+		buf->size = size;
+		F_SET(buf, WT_ITEM_MAPPED);
+
+		WT_CSTAT_INCR(session, block_map_read);
+		WT_CSTAT_INCRV(session, block_byte_map_read, size);
+		return (0);
+	}
+
+	/* Read the block. */
+	return (__wt_block_read_off(session, block, buf, offset, size, cksum));
 }
 
 /*
@@ -76,7 +105,6 @@ __wt_block_read_off(WT_SESSION_IMPL *session,
 	WT_RET(__wt_read(session, block->fh, offset, size, buf->mem));
 	buf->size = size;
 
-	/* Validate the checksum. */
 	blk = WT_BLOCK_HEADER_REF(buf->mem);
 	blk->cksum = 0;
 	page_cksum = __wt_cksum(buf->mem,
@@ -93,6 +121,5 @@ __wt_block_read_off(WT_SESSION_IMPL *session,
 
 	WT_CSTAT_INCR(session, block_read);
 	WT_CSTAT_INCRV(session, block_byte_read, size);
-
 	return (0);
 }

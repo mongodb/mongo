@@ -106,8 +106,9 @@ __wt_page_in_func(
  *	Build in-memory page information.
  */
 int
-__wt_page_inmem(WT_SESSION_IMPL *session,
-    WT_PAGE *parent, WT_REF *parent_ref, WT_PAGE_HEADER *dsk, WT_PAGE **pagep)
+__wt_page_inmem(
+    WT_SESSION_IMPL *session, WT_PAGE *parent, WT_REF *parent_ref,
+    WT_PAGE_HEADER *dsk, int disk_not_alloc, WT_PAGE **pagep)
 {
 	WT_DECL_RET;
 	WT_PAGE *page;
@@ -129,6 +130,8 @@ __wt_page_inmem(WT_SESSION_IMPL *session,
 	page->dsk = dsk;
 	page->read_gen = __wt_cache_read_gen(session);
 	page->type = dsk->type;
+	if (disk_not_alloc)
+		F_SET_ATOMIC(page, WT_PAGE_DISK_NOT_ALLOC);
 
 	inmem_size = 0;
 	switch (page->type) {
@@ -159,11 +162,7 @@ __wt_page_inmem(WT_SESSION_IMPL *session,
 	*pagep = page;
 	return (0);
 
-err:	/*
-	 * Our caller (specifically salvage) may have special concerns about the
-	 * underlying disk image, the caller owns that problem.
-	 */
-	__wt_page_out(session, &page, WT_PAGE_FREE_IGNORE_DISK);
+err:	__wt_page_out(session, &page);
 	return (ret);
 }
 

@@ -527,6 +527,9 @@ methods = {
 	Config('lsm_merge', 'true', r'''
 		merge LSM chunks where possible''',
 		type='boolean'),
+	Config('mmap', 'true', r'''
+		Use memory mapping to access files when possible''',
+		type='boolean'),
 	Config('multiprocess', 'false', r'''
 		permit sharing between processes (will automatically start an
 		RPC server for primary processes and use RPC for secondary

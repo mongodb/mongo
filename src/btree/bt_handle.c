@@ -370,7 +370,8 @@ __wt_btree_tree_open(
 
 	/* Read the page, then build the in-memory version of the page. */
 	WT_ERR(__wt_bt_read(session, &dsk, addr, addr_size));
-	WT_ERR(__wt_page_inmem(session, NULL, NULL, dsk.mem, &page));
+	WT_ERR(__wt_page_inmem(session,
+	    NULL, NULL, dsk.mem, F_ISSET(&dsk, WT_ITEM_MAPPED) ? 1 : 0, &page));
 	btree->root_page = page;
 
 	if (0) {
@@ -479,9 +480,9 @@ __btree_tree_open_empty(WT_SESSION_IMPL *session, int creation)
 	return (0);
 
 err:	if (leaf != NULL)
-		__wt_page_out(session, &leaf, 0);
+		__wt_page_out(session, &leaf);
 	if (root != NULL)
-		__wt_page_out(session, &root, 0);
+		__wt_page_out(session, &root);
 	return (ret);
 }
 

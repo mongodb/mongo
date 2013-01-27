@@ -198,8 +198,11 @@ __wt_stat_alloc_connection_stats(WT_SESSION_IMPL *session, WT_CONNECTION_STATS *
 
 	WT_RET(__wt_calloc_def(session, 1, &stats));
 
+	stats->block_byte_map_read.desc =
+	    "mapped bytes read by the block manager";
 	stats->block_byte_read.desc = "bytes read by the block manager";
 	stats->block_byte_write.desc = "bytes written by the block manager";
+	stats->block_map_read.desc = "mapped blocks read by the block manager";
 	stats->block_read.desc = "blocks read by the block manager";
 	stats->block_write.desc = "blocks written by the block manager";
 	stats->cache_bytes_dirty.desc =
@@ -250,8 +253,10 @@ __wt_stat_clear_connection_stats(WT_STATS *stats_arg)
 	WT_CONNECTION_STATS *stats;
 
 	stats = (WT_CONNECTION_STATS *)stats_arg;
+	stats->block_byte_map_read.v = 0;
 	stats->block_byte_read.v = 0;
 	stats->block_byte_write.v = 0;
+	stats->block_map_read.v = 0;
 	stats->block_read.v = 0;
 	stats->block_write.v = 0;
 	stats->cache_bytes_dirty.v = 0;

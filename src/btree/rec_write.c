@@ -3813,7 +3813,7 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	case WT_PM_REC_SPLIT:				/* Page split */
 		/* Discard the split page. */
 		WT_RET(__rec_split_discard(session, mod->u.split));
-		__wt_page_out(session, &mod->u.split, 0);
+		__wt_page_out(session, &mod->u.split);
 		mod->u.split = NULL;
 		break;
 	case WT_PM_REC_SPLIT_MERGE:			/* Page split */
@@ -4070,7 +4070,7 @@ __rec_split_row(
 	*splitp = page;
 	return (0);
 
-err:	__wt_page_out(session, &page, 0);
+err:	__wt_page_out(session, &page);
 	return (ret);
 }
 
@@ -4123,7 +4123,7 @@ __rec_split_col(
 	*splitp = page;
 	return (0);
 
-err:	__wt_page_out(session, &page, 0);
+err:	__wt_page_out(session, &page);
 	return (ret);
 }
 
