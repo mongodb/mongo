@@ -142,11 +142,34 @@ An example of configuring page sizes:
 
 @section tuning_checksums Checksums
 
-WiredTiger configures checksums on file reads and writes, by default.
-In read-only applications, or when file compression provides any
-necessary checksum functionality, or when using backing storage systems
-where blocks require no validation, performance can be increased by
-turning off checksum support when calling the WT_SESSION::create method.
+WiredTiger checksums file reads and writes, by default.  In read-only
+applications, or when file compression provides any necessary checksum
+functionality, or when using backing storage systems where blocks
+require no validation, performance can be increased by turning off
+checksum support when calling the WT_SESSION::create method.
+
+Checksums can be configured to be "off" or "on", as well as "uncompressed".
+The "uncompressed" configuration checksums blocks not otherwise protected
+by compression.   For example, in a system where the compression algorithms
+provide sufficient protection against corruption, and when writing a block
+which is too small to be usefully compressed, setting the checksum
+configuration value to "uncompressed" causes WiredTiger to checksum the
+blocks which are not compressed:
+
+@snippet ex_all.c Configure checksums to uncompressed
+
+@section direct_io Direct I/O
+
+WiredTiger optionally supports direct I/O, based on the non-standard \c
+O_DIRECT flag to the POSIX 1003.1 open system call.   Configuring direct
+I/O may be useful for applications wanting to minimize the operating
+system cache effects of I/O to and from WiredTiger's buffer cache.
+
+Direct I/O is configured using the "direct_io" configuration string to
+the ::wiredtiger_open function.  An example of configuring direct I/O
+for WiredTiger's data files:
+
+@snippet ex_all.c Configure direct_io for data files
 
 @section tuning_statistics Performance monitoring with statistics
 

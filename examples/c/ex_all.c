@@ -482,6 +482,11 @@ session_ops(WT_SESSION *session)
 	/*! [Create a snappy compressed table] */
 #endif
 
+	/*! [Configure checksums to uncompressed] */
+	ret = session->create(session, "table:mytable",
+	    "key_format=S,value_format=S,checksum=uncompressed");
+	/*! [Configure checksums to uncompressed] */
+
 	/*! [Create a cache-resident object] */
 	ret = session->create(session,
 	    "table:mytable", "key_format=r,value_format=S,cache_resident=true");
@@ -985,12 +990,12 @@ main(void)
 	/*! [Open a connection] */
 	}
 
+#ifdef MIGHT_NOT_RUN
 	/*
 	 * This example code gets run, and the compression libraries might not
 	 * be installed, causing the open to fail.  The documentation requires
 	 * the code snippets, use #ifdef's to avoid running it.
 	 */
-#ifdef MIGHT_NOT_RUN
 	{
 	/*! [Configure bzip2 extension] */
 	WT_CONNECTION *conn;
@@ -1010,6 +1015,15 @@ main(void)
 	    "extensions=[\"/usr/local/lib/wiredtiger_snappy.so\"]", &conn);
 	/*! [Configure snappy extension] */
 	}
+
+	/*
+	 * We're not allowed to open multiple connections, don't run more than
+	 * one wiredtiger_open call.
+	 */
+	{
+	/*! [Configure direct_io for data files] */
+	ret = wiredtiger_open(home, NULL, "create,direct_io=[data]", &conn);
+	/*! [Configure direct_io for data files] */
 #endif
 
 	/*! [Get the WiredTiger library version #1] */
