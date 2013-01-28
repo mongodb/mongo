@@ -92,6 +92,7 @@ __wt_block_open(WT_SESSION_IMPL *session, const char *filename,
 	/* Basic structure allocation, initialization. */
 	WT_ERR(__wt_calloc_def(session, 1, &block));
 	block->ref = 1;
+	TAILQ_INSERT_HEAD(&conn->blockqh, block, q);
 
 	WT_ERR(__wt_strdup(session, filename, &block->name));
 
@@ -113,8 +114,6 @@ __wt_block_open(WT_SESSION_IMPL *session, const char *filename,
 	 */
 	if (!forced_salvage)
 		WT_ERR(__desc_read(session, block));
-
-	TAILQ_INSERT_HEAD(&conn->blockqh, block, q);
 
 	*blockp = block;
 	__wt_spin_unlock(session, &conn->block_lock);
