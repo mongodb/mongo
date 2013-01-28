@@ -948,8 +948,12 @@ DB.prototype.serverBuildInfo = function(){
     return this._adminCommand( "buildinfo" );
 }
 
-DB.prototype.serverStatus = function(){
-    return this._adminCommand( "serverStatus" );
+DB.prototype.serverStatus = function( options ){
+    var cmd = { serverStatus : 1 };
+    if ( options ) {
+        Object.extend( cmd, options );
+    }
+    return this._adminCommand( cmd );
 }
 
 DB.prototype.hostInfo = function(){
