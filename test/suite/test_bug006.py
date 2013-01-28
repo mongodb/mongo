@@ -34,7 +34,6 @@ from helper import key_populate, value_populate
 # Check that verify and salvage both raise exceptions if there is an open
 # cursor.
 class test_bug006(wttest.WiredTigerTestCase):
-    # This is a btree layer test, test files, ignore tables.
     name = 'test_bug006'
     scenarios = [
         ('file', dict(uri='file:')),
