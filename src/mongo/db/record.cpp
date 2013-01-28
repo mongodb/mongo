@@ -89,6 +89,7 @@ namespace mongo {
             
             void reset() {
                 memset( _data , 0 , SliceSize * sizeof(Entry) );
+                _lastReset = time(0);
             }
 
             State get( int regionHash , size_t region  , short offset ) {
@@ -131,6 +132,7 @@ namespace mongo {
                 }
             }
 
+            time_t lastReset() const { return _lastReset; }
         private:
 
             Entry* _get( int start , size_t region , bool add ) {
@@ -154,6 +156,7 @@ namespace mongo {
             }
 
             Entry _data[SliceSize];
+            time_t _lastReset;
         };
         
         
@@ -219,8 +222,10 @@ namespace mongo {
             /**
              * @param pages OUT adds each page to the set
              * @param mySlices temporary space for copy
+             * @return the oldest timestamp we have
              */
-            void addPages( unordered_set<size_t>* pages, Slice* mySlices ) {
+            time_t addPages( unordered_set<size_t>* pages, Slice* mySlices ) {
+                time_t oldestTimestamp = std::numeric_limits<time_t>::max();
                 {
                     // by doing this, we're in the lock only about half as long as the naive way
                     // that's measure with a small data set
@@ -228,10 +233,17 @@ namespace mongo {
                     // so this way the time in lock should be totally constant
                     SimpleMutex::scoped_lock lk( _lock );
                     memcpy( mySlices, _slices, NumSlices * sizeof(Slice) );
+
+                    for ( int i = 0; i < NumSlices; i++ ) {
+                        oldestTimestamp = std::min( oldestTimestamp, _slices[i].lastReset() );
+                    }
                 }
+
                 for ( int i = 0; i < NumSlices; i++ ) {
                     mySlices[i].addPages( pages );
                 }
+
+                return oldestTimestamp;
             }
         private:
             
@@ -345,19 +357,22 @@ namespace mongo {
         };
      
         void appendWorkingSetInfo( BSONObjBuilder& b ) {
-            
             boost::scoped_array<Slice> mySlices( new Slice[NumSlices] );
-            
+
             unordered_set<size_t> totalPages;
             Timer t;
-            
+
+            time_t timestamp = 0;
+
             for ( int i = 0; i < BigHashSize; i++ ) {
-                rolling[i].addPages( &totalPages, mySlices.get() );
+                time_t myOldestTimestamp = rolling[i].addPages( &totalPages, mySlices.get() );
+                timestamp = std::max( timestamp, myOldestTimestamp );
             }
-            
+
             b.append( "note", "thisIsAnEstimate" );
             b.appendNumber( "pagesInMemory", totalPages.size() );
             b.appendNumber( "computationTimeMicros", static_cast<long long>(t.micros()) );
+            b.append( "overSeconds", static_cast<int>( time(0) - timestamp ) );
 
         }
         
