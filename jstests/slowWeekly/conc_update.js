@@ -3,7 +3,7 @@ test = new SlowWeeklyMongod( "conc_update" )
 db = test.getDB("concurrency")
 db.dropDatabase();
 
-NRECORDS=5*1024*1024 // this needs to be relatively big so that
+NRECORDS=3*1024*1024 // this needs to be relatively big so that
                       // the update() will take a while, but it could
                       // probably be smaller.
 
