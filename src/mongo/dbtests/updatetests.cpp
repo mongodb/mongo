@@ -2626,35 +2626,6 @@ namespace UpdateTests {
 
     };
 
-    class IndexFieldNameTest {
-    public:
-        void run() {
-            string x;
-
-            ASSERT_FALSE( getCanonicalIndexField( "a", &x ) );
-            ASSERT_FALSE( getCanonicalIndexField( "aaa", &x ) );
-            ASSERT_FALSE( getCanonicalIndexField( "a.b", &x ) );
-
-            ASSERT_TRUE( getCanonicalIndexField( "a.$", &x ) );
-            ASSERT_EQUALS( x, "a" );
-            ASSERT_TRUE( getCanonicalIndexField( "a.0", &x ) );
-            ASSERT_EQUALS( x, "a" );
-            ASSERT_TRUE( getCanonicalIndexField( "a.123", &x ) );
-            ASSERT_EQUALS( x, "a" );
-
-            ASSERT_TRUE( getCanonicalIndexField( "a.$.b", &x ) );
-            ASSERT_EQUALS( x, "a.b" );
-            ASSERT_TRUE( getCanonicalIndexField( "a.0.b", &x ) );
-            ASSERT_EQUALS( x, "a.b" );
-            ASSERT_TRUE( getCanonicalIndexField( "a.123.b", &x ) );
-            ASSERT_EQUALS( x, "a.b" );
-
-            ASSERT_FALSE( getCanonicalIndexField( "a.123a", &x ) );
-            ASSERT_FALSE( getCanonicalIndexField( "a.a123", &x ) );
-            ASSERT_FALSE( getCanonicalIndexField( "a.123a.b", &x ) );
-            ASSERT_FALSE( getCanonicalIndexField( "a.a123.b", &x ) );
-        }
-    };
 
     class All : public Suite {
     public:
@@ -2830,8 +2801,6 @@ namespace UpdateTests {
             add< basic::bit1 >();
             add< basic::unset >();
             add< basic::setswitchint >();
-
-            add< IndexFieldNameTest >();
         }
     } myall;
 

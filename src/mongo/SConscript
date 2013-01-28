@@ -109,6 +109,10 @@ env.CppUnitTest('bson_validate_test', ['bson/bson_validate_test.cpp'],
 env.CppUnitTest('namespacestring_test', ['db/namespacestring_test.cpp'],
                 LIBDEPS=['bson'])
 
+env.CppUnitTest('index_set_test', ['db/index_set_test.cpp'],
+                LIBDEPS=['bson','index_set'])
+
+
 env.CppUnitTest('bson_extract_test', ['bson/util/bson_extract_test.cpp'], LIBDEPS=['bson'])
 
 env.CppUnitTest('descriptive_stats_test',
@@ -334,6 +338,8 @@ coreServerFiles.append( systemInfoPlatformFile )
 
 if has_option( "asio" ):
     coreServerFiles += [ "util/net/message_server_asio.cpp" ]
+
+env.StaticLibrary('index_set', [ 'db/index_set.cpp' ] )
 
 # mongod files - also files used in tools. present in dbtests, but not in mongos and not in client libs.
 serverOnlyFiles = [ "db/curop.cpp",
@@ -571,6 +577,7 @@ env.StaticLibrary("serveronly", serverOnlyFiles,
                            "defaultversion",
                            "geoparser",
                            "geoquery",
+                           "index_set",
                            '$BUILD_DIR/third_party/shim_snappy'])
 
 # These files go into mongos and mongod only, not into the shell or any tools.

@@ -92,10 +92,11 @@ namespace mongo {
         return -1;
     }
 
-    inline NamespaceDetails::IndexIterator::IndexIterator(NamespaceDetails *_d) {
+    inline NamespaceDetails::IndexIterator::IndexIterator(NamespaceDetails *_d,
+                                                          bool includeBackgroundInProgress) {
         d = _d;
         i = 0;
-        n = d->nIndexes;
+        n = includeBackgroundInProgress ? d->getTotalIndexCount() : d->nIndexes;
     }
 
 }
