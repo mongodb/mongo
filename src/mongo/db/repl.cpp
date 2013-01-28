@@ -1198,7 +1198,6 @@ namespace mongo {
         cmd.appendAs( me["_id"] , "handshake" );
         if (theReplSet) {
             cmd.append("member", theReplSet->selfId());
-            cmd.append("config", theReplSet->myConfig().asBson());
         }
 
         BSONObj res;
@@ -1266,12 +1265,6 @@ namespace mongo {
     bool OplogReader::passthroughHandshake(const BSONObj& rid, const int f) {
         BSONObjBuilder cmd;
         cmd.appendAs( rid["_id"], "handshake" );
-        if (theReplSet) {
-            const Member* chainedMember = theReplSet->findById(f);
-            if (chainedMember != NULL) {
-                cmd.append( "config" , chainedMember->config().asBson() );
-            }
-        }
         cmd.append( "member" , f );
 
         BSONObj res;
