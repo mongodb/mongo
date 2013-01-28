@@ -720,7 +720,28 @@ namespace mongo {
         return mss;
     }
 
-    void ModState::appendForOpLog( BSONObjBuilder& b ) const {
+    const char* ModState::getOpLogName() const {
+        if ( dontApply ) {
+            return NULL;
+        }
+
+        if ( incType ) {
+            return "$set";
+        }
+
+        if ( m->op == Mod::RENAME_FROM ) {
+            return "$unset";
+        }
+
+        if ( m->op == Mod::RENAME_TO ) {
+            return "$set";
+        }
+
+        return fixedOpName ? fixedOpName : Mod::modNames[op()];
+    }
+
+
+    void ModState::appendForOpLog( BSONObjBuilder& bb ) const {
         // dontApply logic is deprecated for all but $rename.
         if ( dontApply ) {
             return;
@@ -729,23 +750,18 @@ namespace mongo {
         if ( incType ) {
             DEBUGUPDATE( "\t\t\t\t\t appendForOpLog inc fieldname: " << m->fieldName
                          << " short:" << m->shortFieldName );
-            BSONObjBuilder bb( b.subobjStart( "$set" ) );
             appendIncValue( bb , true );
-            bb.done();
             return;
         }
 
         if ( m->op == Mod::RENAME_FROM ) {
             DEBUGUPDATE( "\t\t\t\t\t appendForOpLog RENAME_FROM fieldName:" << m->fieldName );
-            BSONObjBuilder bb( b.subobjStart( "$unset" ) );
             bb.append( m->fieldName, 1 );
-            bb.done();
             return;
         }
 
         if ( m->op == Mod::RENAME_TO ) {
             DEBUGUPDATE( "\t\t\t\t\t appendForOpLog RENAME_TO fieldName:" << m->fieldName );
-            BSONObjBuilder bb( b.subobjStart( "$set" ) );
             bb.appendAs( newVal, m->fieldName );
             return;
         }
@@ -756,13 +772,10 @@ namespace mongo {
                      << " fn: " << m->fieldName );
 
         if (strcmp(name, "$unset") == 0) {
-            BSONObjBuilder bb(b.subobjStart(name));
             bb.append(m->fieldName, 1);
-            bb.done();
             return;
         }
 
-        BSONObjBuilder bb( b.subobjStart( name ) );
         if ( fixed ) {
             bb.appendAs( *fixed , m->fieldName );
         }
@@ -776,7 +789,32 @@ namespace mongo {
         else {
             bb.appendAs( m->elt , m->fieldName );
         }
-        bb.done();
+
+    }
+
+    typedef map<string, vector<ModState*> > NamedModMap;
+
+    BSONObj ModSetState::getOpLogRewrite() const {
+        NamedModMap names;
+        for ( ModStateHolder::const_iterator i = _mods.begin(); i != _mods.end(); ++i ) {
+            const char* name = i->second->getOpLogName();
+            if ( ! name )
+                continue;
+            names[name].push_back( i->second.get() );
+        }
+
+        BSONObjBuilder b;
+        for ( NamedModMap::const_iterator i = names.begin();
+              i != names.end();
+              ++i ) {
+            BSONObjBuilder bb( b.subobjStart( i->first ) );
+            const vector<ModState*>& mods = i->second;
+            for ( unsigned j = 0; j < mods.size(); j++ ) {
+                mods[j]->appendForOpLog( bb );
+            }
+            bb.doneFast();
+        }
+        return b.obj();
     }
 
     string ModState::toString() const {

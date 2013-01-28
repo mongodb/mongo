@@ -537,6 +537,7 @@ namespace mongo {
             }
         }
 
+        const char* getOpLogName() const;
         void appendForOpLog( BSONObjBuilder& b ) const;
 
         void apply( BSONBuilderBase& b , BSONElement in ) {
@@ -776,12 +777,7 @@ namespace mongo {
             return false;
         }
 
-        BSONObj getOpLogRewrite() const {
-            BSONObjBuilder b;
-            for ( ModStateHolder::const_iterator i = _mods.begin(); i != _mods.end(); i++ )
-                i->second->appendForOpLog( b );
-            return b.obj();
-        }
+        BSONObj getOpLogRewrite() const;
 
         bool DEPRECATED_haveArrayDepMod() const {
             for ( ModStateHolder::const_iterator i = _mods.begin(); i != _mods.end(); i++ )

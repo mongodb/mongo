@@ -1726,7 +1726,7 @@ namespace UpdateTests {
                 auto_ptr<ModSetState> modSetState = modSet.prepare( obj );
                 ASSERT_FALSE( modSetState->canApplyInPlace() );
                 modSetState->createNewFromMods();
-                ASSERT_EQUALS( BSON( "$set" << BSON( "a" << 3 ) << "$set" << BSON("b" << 2)),
+                ASSERT_EQUALS( BSON( "$set" << BSON( "a" << 3 << "b" << 2)),
                                modSetState->getOpLogRewrite() );
             }
         };
@@ -1740,7 +1740,7 @@ namespace UpdateTests {
                 auto_ptr<ModSetState> modSetState = modSet.prepare( obj );
                 ASSERT_FALSE( modSetState->canApplyInPlace() );
                 modSetState->createNewFromMods();
-                ASSERT_EQUALS( BSON( "$set" << BSON( "a" << 1 ) << "$set" << BSON("b" << 2)),
+                ASSERT_EQUALS( BSON( "$set" << BSON( "a" << 1 << "b" << 2)),
                                modSetState->getOpLogRewrite() );
             }
         };
@@ -2025,7 +2025,7 @@ namespace UpdateTests {
                 auto_ptr<ModSetState> modSetState = modSet.prepare( obj );
                 ASSERT_FALSE( modSetState->canApplyInPlace() );
                 modSetState->createNewFromMods();
-                ASSERT_EQUALS( fromjson( "{ $set:{ 'a.b':[ 1 ] }, $set:{ 'a.c':[ 1 ] } }" ),
+                ASSERT_EQUALS( fromjson( "{ $set:{ 'a.b':[ 1 ] , 'a.c':[ 1 ] } }" ),
                                modSetState->getOpLogRewrite() );
             }
         };
@@ -2180,7 +2180,7 @@ namespace UpdateTests {
                                 auto_ptr<ModSetState> modSetState = modSet.prepare( obj );
                 ASSERT_FALSE( modSetState->canApplyInPlace() );
                 modSetState->createNewFromMods();
-                ASSERT_EQUALS( BSON( "$unset" << BSON( "a" << 1 ) << "$set" << BSON ( "b" << 100 ) ),
+                ASSERT_EQUALS( BSON( "$set" << BSON( "b" << 100 ) << "$unset" << BSON ( "a" << 1 ) ),
                                modSetState->getOpLogRewrite() );
             }
         };
@@ -2194,7 +2194,7 @@ namespace UpdateTests {
                                 auto_ptr<ModSetState> modSetState = modSet.prepare( obj );
                 ASSERT_FALSE( modSetState->canApplyInPlace() );
                 modSetState->createNewFromMods();
-                ASSERT_EQUALS( BSON( "$unset" << BSON( "a" << 1 ) << "$set" << BSON ( "b" << 100 ) ),
+                ASSERT_EQUALS( BSON( "$set" << BSON( "b" << 100 ) << "$unset" << BSON ( "a" << 1 ) ),
                                modSetState->getOpLogRewrite() );
             }
         };
@@ -2253,6 +2253,18 @@ namespace UpdateTests {
                 modSetState->createNewFromMods();
                 ASSERT_EQUALS( BSON( "$unset" << BSON( "a" << 1 ) ),
                                modSetState->getOpLogRewrite() );
+            }
+        };
+
+        class MultiSets {
+        public:
+            void run() {
+                BSONObj obj = BSON( "_id" << 1 << "a" << 1 << "b" << 1 );
+                BSONObj mod = BSON( "$set" << BSON( "a" << 2 << "b" << 2 ) );
+                ModSet modSet( mod );
+                auto_ptr<ModSetState> modSetState = modSet.prepare( obj );
+                ASSERT_TRUE( modSetState->canApplyInPlace() );
+                ASSERT_EQUALS( mod, modSetState->getOpLogRewrite() );
             }
         };
 
@@ -2724,6 +2736,7 @@ namespace UpdateTests {
             // add< ModSetTests::BitRewriteNonExistingField >();
             add< ModSetTests::SetIsNotRewritten >();
             add< ModSetTests::UnsetIsNotRewritten >();
+            add< ModSetTests::MultiSets >();
             add< ModSetTests::PositionalWithoutElemMatchKey >();
             add< ModSetTests::PositionalWithoutNestedElemMatchKey >();
             add< ModSetTests::DbrefPassesPositionalValidation >();
