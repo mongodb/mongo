@@ -83,7 +83,7 @@ for (var i = 50; i < 75; i++) {
 var last = primary.getSisterDB("local").oplog.rs.find().sort({$natural:-1}).limit(1).next();
 
 print("waiting a bit for the secondaries to get the write");
-sleep(10000);
+sleep(20000);
 
 print("Shut down the primary");
 replSet.stop(0);
@@ -125,6 +125,7 @@ assert.soon(
     function() {
         var last3 = member3.getSisterDB("local").oplog.rs.find().sort({$natural:-1}).limit(1)
             .next();
+        print("primary: " + last.ts.t + " secondary: " + last3.ts.t);
         return last.ts.t == last3.ts.t;
     }
 );
