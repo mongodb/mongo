@@ -24,7 +24,7 @@ example, Google's
 or <a href="http://www.canonware.com/jemalloc">jemalloc</a>),
 can dramatically improve throughput.
 
-@section read_only_objects Read-only objects
+@section tuning_read_only_objects Read-only objects
 
 Cursors opened on checkpoints (either named, or using the special "last
 checkpoint" name "WiredTigerCheckpoint") are read-only objects.  Unless
@@ -158,7 +158,7 @@ blocks which are not compressed:
 
 @snippet ex_all.c Configure checksums to uncompressed
 
-@section direct_io Direct I/O
+@section tuning_direct_io Direct I/O
 
 WiredTiger optionally supports direct I/O, based on the non-standard \c
 O_DIRECT flag to the POSIX 1003.1 open system call.   Configuring direct
@@ -170,6 +170,27 @@ the ::wiredtiger_open function.  An example of configuring direct I/O
 for WiredTiger's data files:
 
 @snippet ex_all.c Configure direct_io for data files
+
+@section tuning_compression Compression
+
+WiredTiger configures key prefix compression for row-store objects, and
+column-store compression for both row-store and column-store objects,
+by default.
+These forms of compression minimize in-memory and on-disk space, but at
+some CPU cost when rows are read and written.   Turning these forms of
+compression off may increase application throughput.
+
+For example, turning off row-store key prefix compression:
+
+@snippet ex_all.c Configure key prefix compression off
+
+For example, turning off row-store or column-store dictionary compression:
+
+@snippet ex_all.c Configure dictionary compression off
+
+WiredTiger does not configure Huffman encoding or block compression by
+default, but these forms of compression can also impact overall
+throughput.  See @ref file_formats_compression for more information.
 
 @section tuning_statistics Performance monitoring with statistics
 

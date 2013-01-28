@@ -487,6 +487,16 @@ session_ops(WT_SESSION *session)
 	    "key_format=S,value_format=S,checksum=uncompressed");
 	/*! [Configure checksums to uncompressed] */
 
+	/*! [Configure dictionary compression off] */
+	ret = session->create(session, "table:mytable",
+	    "key_format=S,value_format=S,dictionary=false");
+	/*! [Configure dictionary compression off] */
+
+	/*! [Configure key prefix compression off] */
+	ret = session->create(session, "table:mytable",
+	    "key_format=S,value_format=S,prefix_compression=false");
+	/*! [Configure key prefix compression off] */
+
 	/*! [Create a cache-resident object] */
 	ret = session->create(session,
 	    "table:mytable", "key_format=r,value_format=S,cache_resident=true");
