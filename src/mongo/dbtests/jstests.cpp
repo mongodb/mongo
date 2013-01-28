@@ -18,14 +18,12 @@
  */
 
 #include "pch.h"
-#include "../db/instance.h"
+
+#include "mongo/db/instance.h"
+#include "mongo/scripting/engine.h"
+#include "mongo/util/timer.h"
+#include "mongo/dbtests/dbtests.h"
 #include "mongo/db/json.h"
-
-#include "../pch.h"
-#include "../scripting/engine.h"
-#include "../util/timer.h"
-
-#include "dbtests.h"
 
 namespace mongo {
     bool dbEval(const string& dbName , BSONObj& cmd, BSONObjBuilder& result, string& errmsg);
@@ -33,14 +31,10 @@ namespace mongo {
 
 namespace JSTests {
 
-    class Fundamental {
+    class BuiltinTests {
     public:
         void run() {
-            // By calling JavaJSImpl() inside run(), we ensure the unit test framework's
-            // signal handlers are pre-installed from JNI's perspective.  This allows
-            // JNI to catch signals generated within the JVM and forward other signals
-            // as appropriate.
-            ScriptEngine::setup();
+            // Run any tests included with the scripting engine
             globalScriptEngine->runTest();
         }
     };
@@ -48,7 +42,7 @@ namespace JSTests {
     class BasicScope {
     public:
         void run() {
-            auto_ptr<Scope> s;
+            scoped_ptr<Scope> s;
             s.reset( globalScriptEngine->newScope() );
 
             s->setNumber( "x" , 5 );
@@ -63,18 +57,15 @@ namespace JSTests {
             s->setBoolean( "b" , true );
             ASSERT( s->getBoolean( "b" ) );
 
-            if ( 0 ) {
-                s->setBoolean( "b" , false );
-                ASSERT( ! s->getBoolean( "b" ) );
-            }
+            s->setBoolean( "b" , false );
+            ASSERT( ! s->getBoolean( "b" ) );
         }
     };
 
     class ResetScope {
     public:
         void run() {
-            // Not worrying about this for now SERVER-446.
-            /*
+            /* Currently reset does not clear data in v8 or spidermonkey scopes.  See SECURITY-10
             auto_ptr<Scope> s;
             s.reset( globalScriptEngine->newScope() );
 
@@ -90,15 +81,23 @@ namespace JSTests {
     class FalseTests {
     public:
         void run() {
-            Scope * s = globalScriptEngine->newScope();
+            // Test falsy javascript values
+            scoped_ptr<Scope> s;
+            s.reset( globalScriptEngine->newScope() );
 
-            ASSERT( ! s->getBoolean( "x" ) );
+            ASSERT( ! s->getBoolean( "notSet" ) );
 
-            s->setString( "z" , "" );
-            ASSERT( ! s->getBoolean( "z" ) );
+            s->setString( "emptyString" , "" );
+            ASSERT( ! s->getBoolean( "emptyString" ) );
 
+            s->setNumber( "notANumberVal" , std::numeric_limits<double>::quiet_NaN());
+            ASSERT( ! s->getBoolean( "notANumberVal" ) );
 
-            delete s ;
+            s->setElement( "nullVal" , BSONObjBuilder().appendNull("null").obj().getField("null") );
+            ASSERT( ! s->getBoolean( "nullVal" ) );
+
+            s->setNumber( "zeroVal" , 0 );
+            ASSERT( ! s->getBoolean( "zeroVal" ) );
         }
     };
 
@@ -1094,7 +1093,7 @@ namespace JSTests {
 
             Timer t;
             double n = 0;
-            for ( ; n < 100000; n++ ) {
+            for ( ; n < 10000 ; n++ ) {
                 s->invoke( f , &empty, &start );
                 ASSERT_EQUALS( 11 , s->getNumber( "__returnValue" ) );
             }
@@ -1173,10 +1172,12 @@ namespace JSTests {
     class All : public Suite {
     public:
         All() : Suite( "js" ) {
+            // Initialize the Javascript interpreter
+            ScriptEngine::setup();
         }
 
         void setupTests() {
-            add< Fundamental >();
+            add< BuiltinTests >();
             add< BasicScope >();
             add< ResetScope >();
             add< FalseTests >();
