@@ -114,6 +114,20 @@ cursor_ops(WT_SESSION *session)
 	}
 
 	{
+	/*! [open a named checkpoint] */
+	ret = session->open_cursor(session,
+	    "table:mytable", NULL, "checkpoint=midnight", &cursor);
+	/*! [open a named checkpoint] */
+	}
+
+	{
+	/*! [open the default checkpoint] */
+	ret = session->open_cursor(session,
+	    "table:mytable", NULL, "checkpoint=WiredTigerCheckpoint", &cursor);
+	/*! [open the default checkpoint] */
+	}
+
+	{
 	/*! [Get the cursor's string key] */
 	const char *key;	/* Get the cursor's string key. */
 	ret = cursor->get_key(cursor, &key);
