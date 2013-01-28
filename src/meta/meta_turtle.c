@@ -69,7 +69,7 @@ __wt_meta_turtle_read(
 
 	/* Open the turtle file. */
 	WT_RET(__wt_filename(session, WT_METADATA_TURTLE, &path));
-	WT_ERR_TEST((fp = fopen(path, "r")) == NULL, WT_NOTFOUND);
+	WT_ERR_TEST((fp = fopen(path, "r")) == NULL, __wt_errno());
 
 	/* Search for the key. */
 	WT_ERR(__wt_scr_alloc(session, 512, &buf));
