@@ -24,12 +24,6 @@ env.Command( [ "stop_words_list.h", "stop_words_list.cpp"],
              [ "generate_stop_words.py"] + [ 'stop_words_%s.txt' % x for x in stop_word_lanages ],
              "$PYTHON $SOURCES $TARGETS" )
 
-# this is not awesome
-hack = env.Clone()
-hack.StaticLibrary( "stopwords", [ "stop_words_list.cpp" ] )
-if "-O3" in hack["CCFLAGS"]:
-    hack["CCFLAGS"].remove( "-O3" )
-
 env.StaticLibrary('base', [
         'fts_index_format.cpp',
         'fts_matcher.cpp',
@@ -38,9 +32,9 @@ env.StaticLibrary('base', [
         'fts_util.cpp',
         'stemmer.cpp',
         'stop_words.cpp',
+        'stop_words_list.cpp',
         'tokenizer.cpp',
-        ], LIBDEPS=["stopwords",
-                    "$BUILD_DIR/mongo/base/base",
+        ], LIBDEPS=["$BUILD_DIR/mongo/base/base",
                     "$BUILD_DIR/mongo/bson",
                     "$BUILD_DIR/mongo/platform/platform",
                     "$BUILD_DIR/third_party/libstemmer_c/stemmer"
