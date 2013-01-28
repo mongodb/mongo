@@ -44,11 +44,14 @@ function doTest() {
     print( "total runner time: " + ( ( runnerEnd.getTime() - runnerStart.getTime() ) / 1000 ) + "secs" )
 }
 
-if (db.serverBuildInfo().bits == 32) {
-    print("build is 32 bits -- skipping test")
+if (db.serverBuildInfo().bits == 64 &&
+    db.serverBuildInfo().debug == false &&
+    db.hostInfo().os.type == "Linux")
+{
+        doTest();
 }
 else {
-    doTest();
+    print("Skipping.  Only run this test on non-debug, 64bit, Linux builds");
 }
 
 //TODO(mathias): test recovery here
