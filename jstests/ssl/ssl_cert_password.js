@@ -4,7 +4,7 @@
 // does not return error statuses to indicate an error.
 port = allocatePorts( 1 )[ 0 ];
 var baseName = "jstests_ssl_ssl_cert_password";
-var dbpath = "/data/db" + baseName;
+var dbpath = "/data/db/" + baseName;
 resetDbpath(dbpath);
 
 // Password is correct
