@@ -50,7 +50,7 @@ namespace mongo {
     const char versionString[] = "2.4.0-rc1-pre-";
 
     // See unit test for example outputs
-    static BSONArray _versionArray(const char* version){
+    BSONArray toVersionArray(const char* version){
         // this is inefficient, but cached so it doesn't matter
         BSONArrayBuilder b;
         string curPart;
@@ -88,7 +88,24 @@ namespace mongo {
         return b.arr();
     }
 
-    const BSONArray versionArray = _versionArray(versionString);
+    bool isSameMajorVersion( const char* version ) {
+
+        BSONArray remoteVersionArray = toVersionArray( version );
+
+        BSONObjIterator remoteIt(remoteVersionArray);
+        BSONObjIterator myIt(versionArray);
+
+        // Compare only the first two fields of the version
+        int compareLen = 2;
+        while (compareLen > 0 && remoteIt.more() && myIt.more()) {
+            if (remoteIt.next().numberInt() != myIt.next().numberInt()) break;
+            compareLen--;
+        }
+
+        return compareLen == 0;
+    }
+
+    const BSONArray versionArray = toVersionArray(versionString);
 
     string mongodVersion() {
         stringstream ss;
@@ -311,22 +328,22 @@ namespace mongo {
     class VersionArrayTest : public StartupTest {
     public:
         void run() {
-            verify( _versionArray("1.2.3") == BSON_ARRAY(1 << 2 << 3 << 0) );
-            verify( _versionArray("1.2.0") == BSON_ARRAY(1 << 2 << 0 << 0) );
-            verify( _versionArray("2.0.0") == BSON_ARRAY(2 << 0 << 0 << 0) );
+            verify( toVersionArray("1.2.3") == BSON_ARRAY(1 << 2 << 3 << 0) );
+            verify( toVersionArray("1.2.0") == BSON_ARRAY(1 << 2 << 0 << 0) );
+            verify( toVersionArray("2.0.0") == BSON_ARRAY(2 << 0 << 0 << 0) );
 
-            verify( _versionArray("1.2.3-pre-") == BSON_ARRAY(1 << 2 << 3 << -100) );
-            verify( _versionArray("1.2.0-pre-") == BSON_ARRAY(1 << 2 << 0 << -100) );
-            verify( _versionArray("2.0.0-pre-") == BSON_ARRAY(2 << 0 << 0 << -100) );
+            verify( toVersionArray("1.2.3-pre-") == BSON_ARRAY(1 << 2 << 3 << -100) );
+            verify( toVersionArray("1.2.0-pre-") == BSON_ARRAY(1 << 2 << 0 << -100) );
+            verify( toVersionArray("2.0.0-pre-") == BSON_ARRAY(2 << 0 << 0 << -100) );
 
-            verify( _versionArray("1.2.3-rc0") == BSON_ARRAY(1 << 2 << 3 << -10) );
-            verify( _versionArray("1.2.0-rc1") == BSON_ARRAY(1 << 2 << 0 << -9) );
-            verify( _versionArray("2.0.0-rc2") == BSON_ARRAY(2 << 0 << 0 << -8) );
+            verify( toVersionArray("1.2.3-rc0") == BSON_ARRAY(1 << 2 << 3 << -10) );
+            verify( toVersionArray("1.2.0-rc1") == BSON_ARRAY(1 << 2 << 0 << -9) );
+            verify( toVersionArray("2.0.0-rc2") == BSON_ARRAY(2 << 0 << 0 << -8) );
 
             // Note that the pre of an rc is the same as the rc itself
-            verify( _versionArray("1.2.3-rc3-pre-") == BSON_ARRAY(1 << 2 << 3 << -7) );
-            verify( _versionArray("1.2.0-rc4-pre-") == BSON_ARRAY(1 << 2 << 0 << -6) );
-            verify( _versionArray("2.0.0-rc5-pre-") == BSON_ARRAY(2 << 0 << 0 << -5) );
+            verify( toVersionArray("1.2.3-rc3-pre-") == BSON_ARRAY(1 << 2 << 3 << -7) );
+            verify( toVersionArray("1.2.0-rc4-pre-") == BSON_ARRAY(1 << 2 << 0 << -6) );
+            verify( toVersionArray("2.0.0-rc5-pre-") == BSON_ARRAY(2 << 0 << 0 << -5) );
 
             LOG(1) << "versionArrayTest passed" << endl;
         }

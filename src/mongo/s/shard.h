@@ -183,7 +183,10 @@ namespace mongo {
 
         string toString() const {
             stringstream ss;
-            ss << "shard: " << _shard << " mapped: " << _mapped << " writeLock: " << _writeLock;
+            ss << "shard: " << _shard 
+               << " mapped: " << _mapped 
+               << " writeLock: " << _writeLock
+               << " version: " << _mongoVersion;
             return ss.str();
         }
 
@@ -203,11 +206,16 @@ namespace mongo {
             return _hasOpsQueued;
         }
 
+        string mongoVersion() const {
+            return _mongoVersion;
+        }
+
     private:
         Shard _shard;
         long long _mapped;
         bool _hasOpsQueued;  // true if 'writebacks' are pending
         double _writeLock;
+        string _mongoVersion;
     };
 
     class ChunkManager;

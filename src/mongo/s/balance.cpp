@@ -152,6 +152,29 @@ namespace mongo {
         }
         return true;
     }
+    
+    /**
+     * Occasionally prints a log message with shard versions if the versions are not the same
+     * in the cluster.
+     */
+    void warnOnMultiVersion( const ShardInfoMap& shardInfo ) {
+
+        bool isMultiVersion = false;
+        for ( ShardInfoMap::const_iterator i = shardInfo.begin(); i != shardInfo.end(); ++i ) {
+            if ( !isSameMajorVersion( i->second.getMongoVersion().c_str() ) ) {
+                isMultiVersion = true;
+                break;
+            }
+        }
+
+        // If we're all the same version, don't message
+        if ( !isMultiVersion ) return;
+
+        warning() << "multiVersion cluster detected, my version is " << versionString << endl;
+        for ( ShardInfoMap::const_iterator i = shardInfo.begin(); i != shardInfo.end(); ++i ) {
+            log() << i->first << " is at version " << i->second.getMongoVersion() << endl;
+        }        
+    }
 
     void Balancer::_doBalanceRound( DBClientBase& conn, vector<CandidateChunkPtr>* candidateChunks ) {
         verify( candidateChunks );
@@ -207,9 +230,12 @@ namespace mongo {
                                                   status.mapped(),
                                                   s.isDraining(),
                                                   status.hasOpsQueued(),
-                                                  s.tags()
+                                                  s.tags(),
+                                                  status.mongoVersion()
                                                   );
         }
+
+        OCCASIONALLY warnOnMultiVersion( shardInfo );
 
         //
         // 3. For each collection, check if the balancing policy recommends moving anything around.

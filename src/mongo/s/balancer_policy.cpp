@@ -1,5 +1,4 @@
 // balancer_policy.cpp
-
 /**
 *    Copyright (C) 2010 10gen Inc.
 *
@@ -31,7 +30,6 @@ namespace mongo {
         return str::stream() << min << " -->> " << max << "  on  " << tag;
     }
 
-
     DistributionStatus::DistributionStatus( const ShardInfoMap& shardInfo,
                                             const ShardToChunksMap& shardToChunksMap )
         : _shardInfo( shardInfo ), _shardChunks( shardToChunksMap ) {
@@ -39,7 +37,6 @@ namespace mongo {
         for ( ShardInfoMap::const_iterator i = _shardInfo.begin(); i != _shardInfo.end(); ++i ) {
             _shards.insert( i->first );
         }
-
     }
 
     const ShardInfo& DistributionStatus::shardInfo( const string& shard ) const {
@@ -397,12 +394,14 @@ namespace mongo {
 
     ShardInfo::ShardInfo( long long maxSize, long long currSize,
                           bool draining, bool opsQueued,
-                          const set<string>& tags )
+                          const set<string>& tags, 
+                          const string& mongoVersion )
         : _maxSize( maxSize ),
           _currSize( currSize ),
           _draining( draining ),
           _hasOpsQueued( opsQueued ),
-          _tags( tags ) {
+          _tags( tags ),
+          _mongoVersion( mongoVersion ) {
     }
 
     ShardInfo::ShardInfo()
@@ -441,6 +440,7 @@ namespace mongo {
             for ( set<string>::const_iterator i = _tags.begin(); i != _tags.end(); ++i )
                 ss << *i << ",";
         }
+        ss << " version: " << _mongoVersion;
         return ss.str();
     }
 
