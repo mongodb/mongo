@@ -22,6 +22,8 @@
 #include "mongo/db/repl/bgsync.h"
 #include "mongo/db/repl/rs_sync.h"
 #include "mongo/util/fail_point_service.h"
+#include "mongo/base/counter.h"
+#include "mongo/db/stats/timer_stats.h"
 
 namespace mongo {
 namespace replset {
@@ -30,13 +32,41 @@ namespace replset {
     BackgroundSync* BackgroundSync::s_instance = 0;
     boost::mutex BackgroundSync::s_mutex;
 
+    //The number and time spent reading batches off the network
+    static TimerStats getmoreReplStats;
+    static ServerStatusMetricField<TimerStats> displayBatchesRecieved(
+                                                    "repl.network.getmores",
+                                                    &getmoreReplStats );
+    //The oplog entries read via the oplog reader
+    static Counter64 opsReadStats;
+    static ServerStatusMetricField<Counter64> displayOpsRead( "repl.network.ops",
+                                                                &opsReadStats );
+    //The bytes read via the oplog reader
+    static Counter64 networkByteStats;
+    static ServerStatusMetricField<Counter64> displayBytesRead( "repl.network.bytes",
+                                                                &networkByteStats );
+
+    //The count of items in the buffer
+    static Counter64 bufferCountGauge;
+    static ServerStatusMetricField<Counter64> displayBufferCount( "repl.buffer.count",
+                                                                &bufferCountGauge );
+    //The size (bytes) of items in the buffer
+    static Counter64 bufferSizeGauge;
+    static ServerStatusMetricField<Counter64> displayBufferSize( "repl.buffer.sizeBytes",
+                                                                &bufferSizeGauge );
+    //The max size (bytes) of the buffer
+    static int bufferMaxSizeGauge = 256*1024*1024;
+    static ServerStatusMetricField<int> displayBufferMaxSize( "repl.buffer.maxSizeBytes",
+                                                                &bufferMaxSizeGauge );
+
+
     BackgroundSyncInterface::~BackgroundSyncInterface() {}
 
     size_t getSize(const BSONObj& o) {
         return o.objsize();
     }
 
-    BackgroundSync::BackgroundSync() : _buffer(256*1024*1024, &getSize),
+    BackgroundSync::BackgroundSync() : _buffer(bufferMaxSizeGauge, &getSize),
                                        _lastOpTimeFetched(0, 0),
                                        _lastH(0),
                                        _pause(true),
@@ -48,27 +78,12 @@ namespace replset {
                                        _consumedOpTime(0, 0) {
     }
 
-    BackgroundSync::QueueCounter::QueueCounter() : waitTime(0), numElems(0) {
-    }
-
     BackgroundSync* BackgroundSync::get() {
         boost::unique_lock<boost::mutex> lock(s_mutex);
         if (s_instance == NULL && !inShutdown()) {
             s_instance = new BackgroundSync();
         }
         return s_instance;
-    }
-
-    BSONObj BackgroundSync::getCounters() {
-        BSONObjBuilder counters;
-        {
-            boost::unique_lock<boost::mutex> lock(_mutex);
-            counters.appendIntOrLL("waitTimeMs", _queueCounter.waitTime);
-            counters.append("numElems", _queueCounter.numElems);
-        }
-        // _buffer is protected by its own mutex
-        counters.appendNumber("numBytes", _buffer.size());
-        return counters.obj();
     }
 
     void BackgroundSync::shutdown() {
@@ -310,6 +325,7 @@ namespace replset {
 
         while (!inShutdown()) {
             while (!inShutdown()) {
+
                 if (!r.moreInCurrentBatch()) {
                     if (theReplSet->gotForceSync()) {
                         return;
@@ -323,33 +339,37 @@ namespace replset {
                     if (shouldChangeSyncTarget()) {
                         return;
                     }
+                    //record time for each getmore
+                    {
+                        TimerHolder batchTimer(&getmoreReplStats);
+                        r.more();
+                    }
+                    //increment
+                    networkByteStats.increment(r.currentBatchMessageSize());
 
-                    r.more();
                 }
 
                 if (!r.more())
                     break;
 
                 BSONObj o = r.nextSafe().getOwned();
+                opsReadStats.increment();
 
                 {
                     boost::unique_lock<boost::mutex> lock(_mutex);
                     _appliedBuffer = false;
                 }
 
-                Timer timer;
-                // the blocking queue will wait (forever) until there's room for us to push
                 OCCASIONALLY {
                     LOG(2) << "bgsync buffer has " << _buffer.size() << " bytes" << rsLog;
                 }
+                // the blocking queue will wait (forever) until there's room for us to push
                 _buffer.push(o);
+                bufferCountGauge.increment();
+                bufferSizeGauge.increment(getSize(o));
 
                 {
                     boost::unique_lock<boost::mutex> lock(_mutex);
-
-                    // update counters
-                    _queueCounter.waitTime += timer.millis();
-                    _queueCounter.numElems++;
                     _lastH = o["h"].numberLong();
                     _lastOpTimeFetched = o["ts"]._opTime();
                 }
@@ -407,14 +427,11 @@ namespace replset {
     }
 
     void BackgroundSync::consume() {
-        // this is just to get the op off the queue, it's been peeked at 
+        // this is just to get the op off the queue, it's been peeked at
         // and queued for application already
-        _buffer.blockingPop();
-
-        {
-            boost::unique_lock<boost::mutex> lock(_mutex);
-            _queueCounter.numElems--;
-        }
+        BSONObj op = _buffer.blockingPop();
+        bufferCountGauge.increment(-1);
+        bufferSizeGauge.increment(-getSize(op));
     }
 
     bool BackgroundSync::isStale(OplogReader& r, BSONObj& remoteOldestOp) {
@@ -549,7 +566,6 @@ namespace replset {
         _currentSyncTarget = NULL;
         _lastOpTimeFetched = OpTime(0,0);
         _lastH = 0;
-        _queueCounter.numElems = 0;
         _condvar.notify_all();
     }
 
@@ -585,20 +601,6 @@ namespace replset {
         // 3. Now actually become primary
         _assumingPrimary = false;
     }
-
-    class ReplNetworkQueueSSS : public ServerStatusSection {
-    public:
-        ReplNetworkQueueSSS() : ServerStatusSection( "replNetworkQueue" ){}
-        virtual bool includeByDefault() const { return true; }
-
-        BSONObj generateSection(const BSONElement& configElement) const {
-            if ( ! theReplSet )
-                return BSONObj();
-            
-            return replset::BackgroundSync::get()->getCounters();
-        }
-
-    } replNetworkQueueSSS;
 
 } // namespace replset
 } // namespace mongo

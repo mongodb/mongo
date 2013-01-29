@@ -69,14 +69,21 @@ namespace mongo {
         string toString() const { return ns(); }
 
         /**
-         * @return true if ns is 'normal'.  $ used for collections holding index data, which do not contain BSON objects in their records.
-         * special case for the local.oplog.$main ns -- naming it as such was a mistake.
+         * @return true if ns is 'normal'.  A "$" is used for namespaces holding index data,
+         * which do not contain BSON objects in their records. ("oplog.$main" is the exception)
          */
         static bool normal(const char* ns) {
             const char *p = strchr(ns, '$');
             if( p == 0 )
                 return true;
-            return strcmp( ns, "local.oplog.$main" ) == 0;
+            return oplog(ns);
+        }
+
+        /**
+         * @return true if the ns is an oplog one, otherwise false.
+         */
+        static bool oplog(const char* ns) {
+            return StringData(ns) == StringData("local.oplog.rs") || StringData(ns) == StringData("local.oplog.$main");
         }
 
         static bool special(const char *ns) { 

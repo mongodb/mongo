@@ -106,6 +106,12 @@ namespace mongo {
             return cursor->moreInCurrentBatch();
         }
 
+        int currentBatchMessageSize() {
+            if( NULL == cursor->getMessage() )
+                return 0;
+            return cursor->getMessage()->size();
+        }
+
         /* old mongod's can't do the await flag... */
         bool awaitCapable() {
             return cursor->hasResultFlag(ResultFlag_AwaitCapable);

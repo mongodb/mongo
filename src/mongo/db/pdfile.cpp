@@ -57,11 +57,23 @@ _ disallow system* manipulations from the database.
 #include "mongo/util/hashtab.h"
 #include "mongo/util/mmap.h"
 #include "mongo/util/processinfo.h"
+#include "mongo/db/stats/timer_stats.h"
+#include "mongo/db/stats/counters.h"
 
 namespace mongo {
 
     BOOST_STATIC_ASSERT( sizeof(Extent)-4 == 48+128 );
     BOOST_STATIC_ASSERT( sizeof(DataFileHeader)-4 == 8192 );
+
+    //The oplog entries inserted
+    static TimerStats oplogInsertStats;
+    static ServerStatusMetricField<TimerStats> displayInsertedOplogEntries(
+                                                    "repl.oplog.insert",
+                                                    &oplogInsertStats );
+    static Counter64 oplogInsertBytesStats;
+    static ServerStatusMetricField<Counter64> displayInsertedOplogEntryBytes(
+                                                    "repl.oplog.insertBytes",
+                                                    &oplogInsertBytesStats );
 
     bool isValidNS( const StringData& ns ) {
         // TODO: should check for invalid characters
@@ -1768,6 +1780,14 @@ namespace mongo {
                  << "fast_oplog_insert requires a capped collection "
                  << " but " << ns << " is not capped",
                  d->isCapped() );
+
+        //record timing on oplog inserts
+        boost::optional<TimerHolder> insertTimer;
+        //skip non-oplog collections
+        if (NamespaceString::oplog(ns)) {
+            insertTimer = boost::in_place(&oplogInsertStats);
+            oplogInsertBytesStats.increment(len); //record len of inserted records for oplog
+        }
 
         int lenWHdr = len + Record::HeaderSize;
         DiskLoc loc = d->alloc(ns, lenWHdr);

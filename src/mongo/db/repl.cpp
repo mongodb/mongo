@@ -56,6 +56,7 @@
 #include "mongo/db/instance.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/queryutil.h"
+#include "mongo/base/counter.h"
 
 namespace mongo {
 
@@ -256,7 +257,6 @@ namespace mongo {
             return result.obj();
         }
     } replicationInfoServerStatus;
-
 
     class CmdIsMaster : public Command {
     public:
@@ -1207,6 +1207,13 @@ namespace mongo {
         return true;
     }
 
+    //number of readers created;
+    //  this happens when the source source changes, a reconfig/network-error or the cursor dies
+    static Counter64 readersCreatedStats;
+    static ServerStatusMetricField<Counter64> displayReadersCreated(
+                                                    "repl.network.readersCreated",
+                                                    &readersCreatedStats );
+
     OplogReader::OplogReader( bool doHandshake ) : 
         _doHandshake( doHandshake ) { 
         
@@ -1215,6 +1222,8 @@ namespace mongo {
         
         /* TODO: slaveOk maybe shouldn't use? */
         _tailingQueryOptions |= QueryOption_AwaitData;
+
+        readersCreatedStats.increment();
     }
 
     bool OplogReader::commonConnect(const string& hostName) {

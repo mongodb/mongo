@@ -25,11 +25,24 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_details.h"
 #include "mongo/db/repl/rs.h"
+#include "mongo/db/stats/timer_stats.h"
+#include "mongo/db/commands/server_status.h"
 
 namespace mongo {
 
     // todo / idea: the prefetcher, when it fetches _id, on an upsert, will see if the record exists. if it does not, 
     //              at write time, we can just do an insert, which will be faster.
+
+    //The count (of batches) and time spent fetching pages before application
+    //    -- meaning depends on the prefetch behavior: all, _id index, none, etc.)
+    static TimerStats prefetchIndexStats;
+    static ServerStatusMetricField<TimerStats> displayPrefetchIndexPages(
+                                                    "repl.preload.indexes",
+                                                    &prefetchIndexStats );
+    static TimerStats prefetchDocStats;
+    static ServerStatusMetricField<TimerStats> displayPrefetchDocPages(
+                                                    "repl.preload.docs",
+                                                    &prefetchDocStats );
 
     // prefetch for an oplog operation
     void prefetchPagesForReplicatedOp(const BSONObj& op) {
@@ -102,6 +115,7 @@ namespace mongo {
             return;
         case ReplSetImpl::PREFETCH_ID_ONLY:
         {
+            TimerHolder timer( &prefetchIndexStats);
             // on the update op case, the call to prefetchRecordPages will touch the _id index.
             // thus perhaps this option isn't very useful?
             int indexNo = nsd->findIdIndex();
@@ -126,6 +140,7 @@ namespace mongo {
             // in the process of being built
             int indexCount = nsd->getTotalIndexCount();
             for ( int indexNo = 0; indexNo < indexCount; indexNo++ ) {
+                TimerHolder timer( &prefetchIndexStats);
                 // This will page in all index pages for the given object.
                 try {
                     fetchIndexInserters(/*out*/unusedKeys, 
@@ -152,6 +167,7 @@ namespace mongo {
     void prefetchRecordPages(const char* ns, const BSONObj& obj) {
         BSONElement _id;
         if( obj.getObjectID(_id) ) {
+            TimerHolder timer(&prefetchDocStats);
             BSONObjBuilder builder;
             builder.append(_id);
             BSONObj result;

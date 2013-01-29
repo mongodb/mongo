@@ -34,9 +34,9 @@ namespace mongo {
     }
 
     /**
-     * Simple blocking queue with optional max size.
-     * A custom sizing function can optionally be given.  By default, size is calculated as
-     * _queue.size().
+     * Simple blocking queue with optional max size (by count or custom sizing function).
+     * A custom sizing function can optionally be given.  By default the getSize function
+     * returns 1 for each item, resulting in size equaling the number of items queued.
      */
     template<typename T>
     class BlockingQueue : boost::noncopyable {
@@ -74,9 +74,27 @@ namespace mongo {
             return _queue.empty();
         }
 
+        /**
+         * The size as measured by the size function. Default to counting each item
+         */
         size_t size() const {
             scoped_lock l( _lock );
             return _currentSize;
+        }
+
+        /**
+         * The max size for this queue
+         */
+        size_t maxSize() const {
+            return _maxSize;
+        }
+
+        /**
+         * The number/count of items in the queue ( _queue.size() )
+         */
+        int count() const {
+            scoped_lock l( _lock );
+            return _queue.size();
         }
 
         void clear() {

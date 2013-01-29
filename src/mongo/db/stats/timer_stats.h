@@ -53,14 +53,15 @@ namespace mongo {
      */
     class TimerHolder {
     public:
+        /** Destructor will record to TimerStats */
         TimerHolder( TimerStats* stats );
+        /** Will record stats if recordMillis hasn't (based on _recorded)  */
         ~TimerHolder();
 
         /**
          * returns elapsed millis from internal timer
          */
         int millis() const { return _t.millis(); }
-
 
         /**
          * records the time in the TimerStats and marks that we've
