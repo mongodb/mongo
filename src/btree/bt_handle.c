@@ -523,6 +523,8 @@ __wt_btree_release_memsize(WT_SESSION_IMPL *session, WT_BTREE *btree)
 {
 	WT_UNUSED(session);
 	F_CLR(btree, WT_BTREE_NO_EVICTION);
+	/* Close the handle once there are no more cursors. */
+	F_SET(btree, WT_BTREE_DISCARD_CLOSE);
 	return (0);
 }
 
