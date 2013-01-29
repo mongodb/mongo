@@ -461,6 +461,30 @@ namespace UpdateTests {
         }
     };
 
+    class PushEachSimple : public SetBase {
+    public:
+        void run() {
+            client().insert( ns(), fromjson( "{'_id':0,a:[1]}" ) );
+            // { $push : { a : { $each : [ 2, 3 ] } } }
+            BSONObj pushObj = BSON( "$each" << BSON_ARRAY( 2 << 3 ) );
+            client().update( ns(), Query(), BSON( "$push" << BSON( "a" << pushObj ) ) );
+            ASSERT_EQUALS( client().findOne( ns(), Query() ) , fromjson( "{'_id':0,a:[1,2,3]}" ) );
+        }
+
+    };
+
+    class PushEachFromEmpty : public SetBase {
+    public:
+        void run() {
+            client().insert( ns(), fromjson( "{'_id':0,a:[]}" ) );
+            // { $push : { a : { $each : [ 1, 2, 3 ] } } }
+            BSONObj pushObj = BSON( "$each" << BSON_ARRAY( 1 << 2 << 3 ) );
+            client().update( ns(), Query(), BSON( "$push" << BSON( "a" << pushObj ) ) );
+            ASSERT_EQUALS( client().findOne( ns(), Query() ) , fromjson( "{'_id':0,a:[1,2,3]}" ) );
+        }
+
+    };
+
     class PushSliceBelowFull : public SetBase {
     public:
         void run() {
@@ -2631,6 +2655,8 @@ namespace UpdateTests {
             add< CantPushTwice >();
             add< SetEncapsulationConflictsWithExistingType >();
             add< CantPushToParent >();
+            add< PushEachSimple >();
+            add< PushEachFromEmpty >();
             add< PushSliceBelowFull >();
             add< PushSliceReachedFullExact >();
             add< PushSliceReachedFullWithEach >();

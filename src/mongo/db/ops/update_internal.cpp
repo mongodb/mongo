@@ -171,7 +171,7 @@ namespace mongo {
                 while ( i.more() ) {
                     bb.append( i.next() );
                 }
-                BSONObjIterator j( elt.embeddedObject() );
+                BSONObjIterator j( getEach() );
                 while ( j.more() ) {
                     bb.append( j.next() );
                 }
