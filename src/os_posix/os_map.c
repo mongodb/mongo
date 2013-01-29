@@ -21,7 +21,10 @@ __wt_mmap(WT_SESSION_IMPL *session, WT_FH *fh, void *mapp, size_t *lenp)
 
 	if ((map = mmap(NULL, (size_t)fh->file_size,
 	    PROT_READ,
-	    MAP_NOCORE | MAP_NOSYNC | MAP_PRIVATE,
+#ifdef MAP_NOCORE
+	    MAP_NOCORE |
+#endif
+	    MAP_PRIVATE,
 	    fh->fd, (off_t)0)) == MAP_FAILED) {
 		WT_RET_MSG(session, __wt_errno(),
 		    "%s map error: failed to map %" PRIuMAX " bytes",
