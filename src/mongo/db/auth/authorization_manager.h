@@ -109,6 +109,7 @@ namespace mongo {
         // Checks if this connection has the privileges required to perform the given action
         // on the given resource.  Contains all the authorization logic including handling things
         // like the localhost exception.  Returns true if the action may proceed on the resource.
+        // Note: this may acquire a database read lock (for automatic privilege acquisition).
         bool checkAuthorization(const std::string& resource, ActionType action);
 
         // Same as above but takes an ActionSet instead of a single ActionType.  Returns true if

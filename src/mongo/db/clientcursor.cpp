@@ -668,6 +668,7 @@ namespace mongo {
     }
 
     long long ClientCursor::allocCursorId_inlock() {
+        // It is important that cursor IDs not be reused within a short period of time.
 
         if ( ! cursorGenRandom ) {
             scoped_ptr<SecureRandom> sr( SecureRandom::create() );
@@ -870,14 +871,33 @@ namespace mongo {
     }
 
     bool ClientCursor::eraseIfAuthorized(CursorId id) {
-        recursive_scoped_lock lock(ccmutex);
-        ClientCursor* cursor = find_inlock(id);
-        if (!cursor) {
+        std::string ns;
+        {
+            recursive_scoped_lock lock(ccmutex);
+            ClientCursor* cursor = find_inlock(id);
+            if (!cursor) {
+                return false;
+            }
+            ns = cursor->ns();
+        }
+
+        // Can't be in a lock when checking authorization
+        if (!cc().getAuthorizationManager()->checkAuthorization(ns, ActionType::killCursors)) {
             return false;
         }
 
-        if (!cc().getAuthorizationManager()->checkAuthorization(cursor->ns(),
-                                                                ActionType::killCursors)) {
+        // It is safe to lookup the cursor again after temporarily releasing the mutex because
+        // of 2 invariants: that the cursor ID won't be re-used in a short period of time, and that
+        // the namespace associated with a cursor cannot change.
+        recursive_scoped_lock lock(ccmutex);
+        ClientCursor* cursor = find_inlock(id);
+        if (!cursor) {
+            // Cursor was deleted in another thread since we found it earlier in this function.
+            return false;
+        }
+        if (cursor->ns() != ns) {
+            warning() << "Cursor namespace changed. Previous ns: " << ns << ", current ns: "
+                    << cursor->ns() << endl;
             return false;
         }
 

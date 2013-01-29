@@ -329,7 +329,8 @@ namespace mongo {
          */
         static bool erase(CursorId id);
         // Same as erase but checks to make sure this thread has read permission on the cursor's
-        // namespace.  This should be called when receiving killCursors from a client.
+        // namespace.  This should be called when receiving killCursors from a client.  This should
+        // not be called when ccmutex is held.
         static bool eraseIfAuthorized(CursorId id);
 
         /**
