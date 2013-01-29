@@ -55,6 +55,7 @@ namespace {
     const std::string CONFIG_HOST_PORT = "$dummy_config:27017";
 
     // TODO: Test config server down
+    // TODO: Test that you can properly load config using format with deprecated fields?
 
     TEST(MetadataLoader, DroppedColl) {
         MockRemoteDBServer dummyConfig(CONFIG_HOST_PORT);

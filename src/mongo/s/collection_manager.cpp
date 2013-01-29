@@ -43,15 +43,16 @@ namespace mongo {
         }
 
         // If left with no chunks, check that the version is zero.
-        if ((_chunksMap.size() == 1) && newShardVersion.isSet()) {
-            *errMsg = stream() << "setting version to " << newShardVersion.toString()
-                               << " on removing last chunk";
-            return NULL;
+        if (_chunksMap.size() == 1) {
+            if (newShardVersion.isSet()) {
+                *errMsg = stream() << "setting version to " << newShardVersion.toString()
+                                   << " on removing last chunk";
+                return NULL;
+            }
         }
-
         // Can't move version backwards when subtracting chunks.  This is what guarantees that
         // no read or write would be taken once we subtract data from the current shard.
-        if (newShardVersion <= _maxShardVersion) {
+        else if (newShardVersion <= _maxShardVersion) {
             *errMsg = stream() << "version " << newShardVersion.toString()
                                << " not greater than " << _maxShardVersion.toString();
             return NULL;
@@ -202,7 +203,9 @@ namespace mongo {
             return true;
         }
 
-        dassert(_rangesMap.size() > 0);
+        if (_rangesMap.size() <= 0) {
+            return false;
+        }
 
         RangeMap::const_iterator it = _rangesMap.upper_bound(point);
         if (it != _rangesMap.begin())

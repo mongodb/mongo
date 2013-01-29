@@ -47,10 +47,9 @@ namespace mongo {
         //
 
         /**
-         * Returns a new manager's instance based on 'this's state by removing 'chunk'. The new
-         * manager will be at 'newShardVersion', which should be higher than the current
-         * one. When cloning away the last chunk, 'newShardVersion' must be zero. In any case,
-         * the caller owns the new manager when the cloning is succesful.
+         * Returns a new manager's instance based on 'this's state by removing 'chunk'.
+         * When cloning away the last chunk, 'newShardVersion' must be zero. In any case,
+         * the caller owns the new manager when the cloning is successful.
          *
          * If a new manager can't be created, returns NULL and fills in 'errMsg', if it was
          * provided.
@@ -61,8 +60,7 @@ namespace mongo {
 
         /**
          * Returns a new manager's instance based on 'this's state by adding 'chunk'. The new
-         * manager will be at 'newShardVersion', which should be higher than the current
-         * one. It can never be zero, though (see cloneMinus). The caller owns the new manager.
+         * manager can never be zero, though (see cloneMinus). The caller owns the new manager.
          *
          * If a new manager can't be created, returns NULL and fills in 'errMsg', if it was
          * provided.
@@ -102,6 +100,10 @@ namespace mongo {
          * chunk following that one (the first), and fills in 'foundChunk' with those
          * boundaries.  If the next chunk happens to be the last one, returns true otherwise
          * false.
+         *
+         * @param lookupKey passing a doc that does not belong to this manager is undefined.
+         *     An empty doc is special and the chunk with the lowest range will be set on
+         *     foundChunk.
          */
         bool getNextChunk(const BSONObj& lookupKey, ChunkType* foundChunk) const;
 
@@ -129,7 +131,7 @@ namespace mongo {
         ChunkVersion _maxCollVersion;
 
         //
-        // sharded state below, for when the colelction gets sharded
+        // sharded state below, for when the collection gets sharded
         //
 
         // highest ChunkVersion for which this manager's information is accurate
