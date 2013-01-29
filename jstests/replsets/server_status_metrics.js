@@ -30,7 +30,7 @@ function testPrimaryMetrics(primary, opCount) {
     printjson(ss.metrics)
 
     assert(ss.metrics.repl.oplog.insert.num === opCount + 1, "wrong oplog insert count")
-    assert(ss.metrics.repl.oplog.insert.totalMillis > 0, "no oplog inserts time")
+    assert(ss.metrics.repl.oplog.insert.totalMillis >= 0, "no oplog inserts time")
     assert(ss.metrics.repl.oplog.insertBytes > 0, "no oplog inserted bytes")
 }
 
