@@ -29,6 +29,7 @@ _ disallow system* manipulations from the database.
 
 #include <algorithm>
 #include <boost/filesystem/operations.hpp>
+#include <boost/optional/optional.hpp>
 #include <list>
 
 #include "mongo/base/counter.h"
