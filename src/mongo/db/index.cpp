@@ -301,11 +301,6 @@ namespace mongo {
         massert(10097, str::stream() << "bad table to index name on add index attempt current db: " << cc().database()->name << "  source: " << sourceNS ,
                 cc().database()->name == nsToDatabase(sourceNS));
 
-        uassert(16548,
-                mongoutils::str::stream() << "not authorized to create index on " << sourceNS,
-                cc().getAuthorizationManager()->checkAuthorization(sourceNS,
-                                                                   ActionType::ensureIndex));
-
         // logical name of the index.  todo: get rid of the name, we don't need it!
         const char *name = io.getStringField("name");
         uassert(12523, "no index name specified", *name);

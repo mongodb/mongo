@@ -811,8 +811,10 @@ namespace mongo {
         const char *ns = d.getns();
         op.debug().ns = ns;
 
-        // Auth checking for index writes happens later.
-        if (NamespaceString(ns).coll != "system.indexes") {
+        bool isIndexWrite = NamespaceString(ns).coll == "system.indexes";
+
+        // Auth checking for index writes happens further down in this function.
+        if (!isIndexWrite) {
             Status status = cc().getAuthorizationManager()->checkAuthForInsert(ns);
             uassert(16544, status.reason(), status.isOK());
         }
@@ -821,13 +823,19 @@ namespace mongo {
             // strange.  should we complain?
             return;
         }
-        BSONObj first = d.nextJsObj();
 
         vector<BSONObj> multi;
         while (d.moreJSObjs()){
-            if (multi.empty()) // first pass
-                multi.push_back(first);
-            multi.push_back( d.nextJsObj() );
+            BSONObj obj = d.nextJsObj();
+            multi.push_back(obj);
+            if (isIndexWrite) {
+                string indexNS = obj.getStringField("ns");
+                uassert(16548,
+                        mongoutils::str::stream() << "not authorized to create index on "
+                                << indexNS,
+                        cc().getAuthorizationManager()->checkAuthorization(
+                                indexNS, ActionType::ensureIndex));
+            }
         }
 
         PageFaultRetryableSection s;
@@ -844,15 +852,14 @@ namespace mongo {
                 
                 Client::Context ctx(ns);
                 
-                if( !multi.empty() ) {
+                if (multi.size() > 1) {
                     const bool keepGoing = d.reservedField() & InsertOption_ContinueOnError;
                     insertMulti(keepGoing, ns, multi, op);
-                    return;
+                } else {
+                    checkAndInsert(ns, multi[0]);
+                    globalOpCounters.incInsertInWriteLock(1);
+                    op.debug().ninserted = 1;
                 }
-                
-                checkAndInsert(ns, first);
-                globalOpCounters.incInsertInWriteLock(1);
-                op.debug().ninserted = 1;
                 return;
             }
             catch ( PageFaultException& e ) {
