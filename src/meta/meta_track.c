@@ -92,6 +92,7 @@ __wt_meta_track_on(WT_SESSION_IMPL *session)
 static int
 __meta_track_apply(WT_SESSION_IMPL *session, WT_META_TRACK *trk, int unroll)
 {
+	WT_BM *bm;
 	WT_BTREE *saved_btree;
 	WT_DECL_RET;
 	int tret;
@@ -109,8 +110,10 @@ __meta_track_apply(WT_SESSION_IMPL *session, WT_META_TRACK *trk, int unroll)
 	case WT_ST_CHECKPOINT:	/* Checkpoint, see above */
 		saved_btree = session->btree;
 		session->btree = trk->btree;
-		if (!unroll)
-			WT_TRET(__wt_bm_checkpoint_resolve(session));
+		if (!unroll) {
+			bm = trk->btree->bm;
+			WT_TRET(bm->checkpoint_resolve(bm, session));
+		}
 		session->btree = saved_btree;
 		break;
 	case WT_ST_LOCK:	/* Handle lock, see above */

@@ -18,6 +18,7 @@ extern "C" {
 /*******************************************
  * WiredTiger system include files.
  *******************************************/
+#include <sys/mman.h>
 #include <sys/stat.h>
 #include <sys/time.h>
 #include <sys/uio.h>
@@ -64,6 +65,8 @@ struct __wt_bloom;
     typedef struct __wt_bloom WT_BLOOM;
 struct __wt_bloom_hash;
     typedef struct __wt_bloom_hash WT_BLOOM_HASH;
+struct __wt_bm;
+    typedef struct __wt_bm WT_BM;
 struct __wt_btree;
     typedef struct __wt_btree WT_BTREE;
 struct __wt_btree_session;

@@ -275,7 +275,7 @@ __rec_discard_page(WT_SESSION_IMPL *session, WT_PAGE *page, int exclusive)
 		__wt_evict_list_clr_page(session, page);
 
 	/* Discard the page. */
-	__wt_page_out(session, &page, 0);
+	__wt_page_out(session, &page);
 }
 
 /*

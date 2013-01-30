@@ -46,6 +46,7 @@ static int  __verify_tree(WT_SESSION_IMPL *, WT_PAGE *, WT_VSTUFF *);
 int
 __wt_verify(WT_SESSION_IMPL *session, const char *cfg[])
 {
+	WT_BM *bm;
 	WT_BTREE *btree;
 	WT_CKPT *ckptbase, *ckpt;
 	WT_DECL_RET;
@@ -54,6 +55,7 @@ __wt_verify(WT_SESSION_IMPL *session, const char *cfg[])
 	uint8_t root_addr[WT_BTREE_MAX_ADDR_COOKIE];
 
 	btree = session->btree;
+	bm = btree->bm;
 	ckptbase = NULL;
 
 	WT_CLEAR(_vstuff);
@@ -70,7 +72,7 @@ __wt_verify(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_ERR(__wt_meta_ckptlist_get(session, btree->name, &ckptbase));
 
 	/* Inform the underlying block manager we're verifying. */
-	WT_ERR(__wt_bm_verify_start(session, ckptbase));
+	WT_ERR(bm->verify_start(bm, session, ckptbase));
 
 	/* Loop through the file's checkpoints, verifying each one. */
 	WT_CKPT_FOREACH(ckptbase, ckpt) {
@@ -90,7 +92,7 @@ __wt_verify(WT_SESSION_IMPL *session, const char *cfg[])
 		__verify_checkpoint_reset(vs);
 
 		/* Load the checkpoint, ignore trees with no root page. */
-		WT_ERR(__wt_bm_checkpoint_load(session,
+		WT_ERR(bm->checkpoint_load(bm, session,
 		    ckpt->raw.data, ckpt->raw.size,
 		    root_addr, &root_addr_size, 1));
 		if (root_addr_size != 0) {
@@ -105,7 +107,7 @@ __wt_verify(WT_SESSION_IMPL *session, const char *cfg[])
 		}
 
 		/* Unload the checkpoint. */
-		WT_TRET(__wt_bm_checkpoint_unload(session));
+		WT_TRET(bm->checkpoint_unload(bm, session));
 		WT_ERR(ret);
 	}
 
@@ -113,7 +115,7 @@ __wt_verify(WT_SESSION_IMPL *session, const char *cfg[])
 err:	__wt_meta_ckptlist_free(session, ckptbase);
 
 	/* Inform the underlying block manager we're done. */
-	WT_TRET(__wt_bm_verify_end(session));
+	WT_TRET(bm->verify_end(bm, session));
 
 	if (vs != NULL) {
 		/* Wrap up reporting. */
@@ -198,6 +200,7 @@ __verify_checkpoint_reset(WT_VSTUFF *vs)
 static int
 __verify_tree(WT_SESSION_IMPL *session, WT_PAGE *page, WT_VSTUFF *vs)
 {
+	WT_BM *bm;
 	WT_CELL *cell;
 	WT_CELL_UNPACK *unpack, _unpack;
 	WT_COL *cip;
@@ -207,6 +210,7 @@ __verify_tree(WT_SESSION_IMPL *session, WT_PAGE *page, WT_VSTUFF *vs)
 	uint32_t entry, i;
 	int found, lno;
 
+	bm = session->btree->bm;
 	unpack = &_unpack;
 
 	WT_VERBOSE_RET(session, verify, "%s %s",
@@ -377,8 +381,8 @@ recno_chk:	if (recno != vs->record_total + 1)
 			WT_RET(ret);
 
 			__wt_cell_unpack(ref->addr, unpack);
-			WT_RET(__wt_bm_verify_addr(
-			    session, unpack->data, unpack->size));
+			WT_RET(bm->verify_addr(
+			    bm, session, unpack->data, unpack->size));
 		}
 		break;
 	case WT_PAGE_ROW_INT:
@@ -405,8 +409,8 @@ recno_chk:	if (recno != vs->record_total + 1)
 			WT_RET(ret);
 
 			__wt_cell_unpack(ref->addr, unpack);
-			WT_RET(__wt_bm_verify_addr(
-			    session, unpack->data, unpack->size));
+			WT_RET(bm->verify_addr(
+			    bm, session, unpack->data, unpack->size));
 		}
 		break;
 	}
@@ -573,7 +577,10 @@ static int
 __verify_overflow(WT_SESSION_IMPL *session,
     const uint8_t *addr, uint32_t addr_size, WT_VSTUFF *vs)
 {
+	WT_BM *bm;
 	WT_PAGE_HEADER *dsk;
+
+	bm = session->btree->bm;
 
 	/* Read and verify the overflow item. */
 	WT_RET(__wt_bt_read(session, vs->tmp1, addr, addr_size));
@@ -589,6 +596,6 @@ __verify_overflow(WT_SESSION_IMPL *session,
 		    "overflow referenced page at %s is not an overflow page",
 		    __wt_addr_string(session, vs->tmp1, addr, addr_size));
 
-	WT_RET(__wt_bm_verify_addr(session, addr, addr_size));
+	WT_RET(bm->verify_addr(bm, session, addr, addr_size));
 	return (0);
 }

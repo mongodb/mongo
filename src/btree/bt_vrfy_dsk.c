@@ -141,6 +141,7 @@ static int
 __verify_dsk_row(
     WT_SESSION_IMPL *session, const char *addr, WT_PAGE_HEADER *dsk)
 {
+	WT_BM *bm;
 	WT_BTREE *btree;
 	WT_CELL *cell;
 	WT_CELL_UNPACK *unpack, _unpack;
@@ -156,6 +157,7 @@ __verify_dsk_row(
 	int cmp;
 
 	btree = session->btree;
+	bm = btree->bm;
 	huffman = btree->huffman_key;
 	unpack = &_unpack;
 
@@ -235,7 +237,7 @@ __verify_dsk_row(
 		case WT_CELL_ADDR:
 		case WT_CELL_KEY_OVFL:
 		case WT_CELL_VALUE_OVFL:
-			if (!__wt_bm_addr_valid(
+			if (!bm->addr_valid(bm,
 			    session, unpack->data, unpack->size))
 				goto eof;
 			break;
@@ -380,6 +382,7 @@ static int
 __verify_dsk_col_int(
     WT_SESSION_IMPL *session, const char *addr, WT_PAGE_HEADER *dsk)
 {
+	WT_BM *bm;
 	WT_BTREE *btree;
 	WT_CELL *cell;
 	WT_CELL_UNPACK *unpack, _unpack;
@@ -387,6 +390,7 @@ __verify_dsk_col_int(
 	uint8_t *end;
 
 	btree = session->btree;
+	bm = btree->bm;
 	unpack = &_unpack;
 	end = (uint8_t *)dsk + dsk->mem_size;
 
@@ -405,7 +409,7 @@ __verify_dsk_col_int(
 		    session, cell_num, addr, unpack->type, dsk->type));
 
 		/* Check if any referenced item is entirely in the file. */
-		if (!__wt_bm_addr_valid(session, unpack->data, unpack->size))
+		if (!bm->addr_valid(bm, session, unpack->data, unpack->size))
 			return (__err_eof(session, cell_num, addr));
 	}
 
@@ -437,6 +441,7 @@ static int
 __verify_dsk_col_var(
     WT_SESSION_IMPL *session, const char *addr, WT_PAGE_HEADER *dsk)
 {
+	WT_BM *bm;
 	WT_BTREE *btree;
 	WT_CELL *cell;
 	WT_CELL_UNPACK *unpack, _unpack;
@@ -446,6 +451,7 @@ __verify_dsk_col_var(
 	uint8_t *end;
 
 	btree = session->btree;
+	bm = btree->bm;
 	unpack = &_unpack;
 	end = (uint8_t *)dsk + dsk->mem_size;
 
@@ -471,7 +477,7 @@ __verify_dsk_col_var(
 		/* Check if any referenced item is entirely in the file.
 		 */
 		if (cell_type == WT_CELL_VALUE_OVFL &&
-		    !__wt_bm_addr_valid(session, unpack->data, unpack->size))
+		    !bm->addr_valid(bm, session, unpack->data, unpack->size))
 			return (__err_eof(session, cell_num, addr));
 
 		/*

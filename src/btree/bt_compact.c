@@ -14,10 +14,13 @@
 int
 __wt_compact(WT_SESSION_IMPL *session, const char *cfg[])
 {
+	WT_BM *bm;
 	WT_CONFIG_ITEM cval;
 	WT_DECL_RET;
 	WT_PAGE *page;
 	int trigger, skip;
+
+	bm = session->btree->bm;
 
 	WT_DSTAT_INCR(session, session_compact);
 
@@ -25,7 +28,7 @@ __wt_compact(WT_SESSION_IMPL *session, const char *cfg[])
 	trigger = (int)cval.val;
 
 	/* Check if compaction might be useful. */
-	WT_RET(__wt_bm_compact_skip(session, trigger, &skip));
+	WT_RET(bm->compact_skip(bm, session, trigger, &skip));
 	if (skip)
 		return (0);
 
@@ -75,8 +78,11 @@ int
 __wt_compact_page_skip(
     WT_SESSION_IMPL *session, WT_PAGE *parent, WT_REF *ref, int *skipp)
 {
+	WT_BM *bm;
 	uint32_t addr_size;
 	const uint8_t *addr;
+
+	bm = session->btree->bm;
 
 	/*
 	 * There's one compaction test we do before we read the page, to see
@@ -99,7 +105,7 @@ __wt_compact_page_skip(
 		return (0);
 	}
 
-	return (__wt_bm_compact_page_skip(session, addr, addr_size, skipp));
+	return (bm->compact_page_skip(bm, session, addr, addr_size, skipp));
 }
 
 /*
@@ -110,11 +116,13 @@ __wt_compact_page_skip(
 int
 __wt_compact_evict(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
+	WT_BM *bm;
 	WT_PAGE_MODIFY *mod;
 	int skip;
 	uint32_t addr_size;
 	const uint8_t *addr;
 
+	bm = session->btree->bm;
 	mod = page->modify;
 
 	/*
@@ -152,14 +160,14 @@ disk:		__wt_get_addr(page->parent, page->ref, &addr, &addr_size);
 		if (addr == NULL)
 			return (0);
 		WT_RET(
-		    __wt_bm_compact_page_skip(session, addr, addr_size, &skip));
+		    bm->compact_page_skip(bm, session, addr, addr_size, &skip));
 		if (skip)
 			return (0);
 		break;
 	case WT_PM_REC_EMPTY:
 		return (0);
 	case WT_PM_REC_REPLACE:
-		WT_RET(__wt_bm_compact_page_skip(
+		WT_RET(bm->compact_page_skip(bm,
 		    session, mod->u.replace.addr, mod->u.replace.size, &skip));
 		if (skip)
 			return (0);

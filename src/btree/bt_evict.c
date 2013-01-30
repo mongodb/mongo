@@ -237,7 +237,7 @@ __wt_evict_server_wake(WT_SESSION_IMPL *session)
 	bytes_max = conn->cache_size;
 
 	WT_VERBOSE_RET(session, evictserver,
-	    "waking, bytes inuse %s max (%" PRIu64 "MB %s %" PRIu64 "MB), ",
+	    "waking, bytes inuse %s max (%" PRIu64 "MB %s %" PRIu64 "MB)",
 	    bytes_inuse <= bytes_max ? "<=" : ">",
 	    bytes_inuse / WT_MEGABYTE,
 	    bytes_inuse <= bytes_max ? "<=" : ">",
@@ -642,7 +642,7 @@ __evict_file(WT_SESSION_IMPL *session, int syncop)
 			 */
 			if (WT_PAGE_IS_ROOT(page))
 				session->btree->root_page = NULL;
-			__wt_page_out(session, &page, 0);
+			__wt_page_out(session, &page);
 			break;
 		WT_ILLEGAL_VALUE_ERR(session);
 		}

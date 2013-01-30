@@ -101,6 +101,7 @@ struct __wt_item {
 #ifndef DOXYGEN
 #define	WT_ITEM_ALIGNED					0x00000001
 #define	WT_ITEM_INUSE					0x00000002
+#define	WT_ITEM_MAPPED					0x00000004
 	/* This appears in the middle of the struct to avoid padding. */
 	/*! Object flags (internal use). */
 	uint32_t flags;
@@ -1245,6 +1246,8 @@ struct __wt_connection {
  * @config{logging, enable logging.,a boolean flag; default \c false.}
  * @config{lsm_merge, merge LSM chunks where possible.,a boolean flag; default
  * \c true.}
+ * @config{mmap, Use memory mapping to access files when possible.,a boolean
+ * flag; default \c true.}
  * @config{multiprocess, permit sharing between processes (will automatically
  * start an RPC server for primary processes and use RPC for secondary
  * processes). <b>Not yet supported in WiredTiger</b>.,a boolean flag; default
@@ -1627,6 +1630,15 @@ struct __wt_compressor {
 	 * accumulate, WiredTiger writes the remaining rows without further
 	 * calls to the callback.
 	 *
+	 * On entry, \c final is zero if there are more rows to be written as
+	 * part of this page (if there will be additional data provided to the
+	 * callback), and non-zero if there are no more rows to be written as
+	 * part of this page.  If \c final is set and the callback fails to
+	 * encode any rows, WiredTiger writes the remaining rows without further
+	 * calls to the callback.  If \c final is set and the callback encodes
+	 * any number of rows, WiredTiger continues to call the callback until
+	 * all of the rows are encoded or the callback fails to encode any rows.
+	 *
 	 * The WT_COMPRESSOR::compress_raw callback is intended for applications
 	 * wanting to create disk blocks in specific sizes.
 	 * WT_COMPRESSOR::compress_raw is not a replacement for
@@ -1651,6 +1663,7 @@ struct __wt_compressor {
 	 * @param[in] slots the number of entries in offsets
 	 * @param[in] dst the destination buffer
 	 * @param[in] dst_len the length of the destination buffer
+	 * @param[in] final non-zero if there are no more rows to accumulate
 	 * @param[out] result_lenp the length of the compressed data
 	 * @param[out] result_slotsp the number of byte offsets taken
 	 * @returns zero for success, non-zero to indicate an error.
@@ -1659,6 +1672,7 @@ struct __wt_compressor {
 	    size_t page_max, size_t extra,
 	    uint8_t *src, uint32_t *offsets, uint32_t slots,
 	    uint8_t *dst, size_t dst_len,
+	    int final,
 	    size_t *result_lenp, uint32_t *result_slotsp);
 
 	/*! Callback to decompress a chunk of data.
@@ -1846,72 +1860,76 @@ extern int wiredtiger_extension_init(WT_SESSION *session,
  * keys.  See @ref data_statistics for more information.
  * @{
  */
+/*! mapped bytes read by the block manager */
+#define	WT_STAT_CONN_BLOCK_BYTE_MAP_READ		0
 /*! bytes read by the block manager */
-#define	WT_STAT_CONN_BLOCK_BYTE_READ			0
+#define	WT_STAT_CONN_BLOCK_BYTE_READ			1
 /*! bytes written by the block manager */
-#define	WT_STAT_CONN_BLOCK_BYTE_WRITE			1
+#define	WT_STAT_CONN_BLOCK_BYTE_WRITE			2
+/*! mapped blocks read by the block manager */
+#define	WT_STAT_CONN_BLOCK_MAP_READ			3
 /*! blocks read by the block manager */
-#define	WT_STAT_CONN_BLOCK_READ				2
+#define	WT_STAT_CONN_BLOCK_READ				4
 /*! blocks written by the block manager */
-#define	WT_STAT_CONN_BLOCK_WRITE			3
+#define	WT_STAT_CONN_BLOCK_WRITE			5
 /*! cache: tracked dirty bytes in the cache */
-#define	WT_STAT_CONN_CACHE_BYTES_DIRTY			4
+#define	WT_STAT_CONN_CACHE_BYTES_DIRTY			6
 /*! cache: bytes currently in the cache */
-#define	WT_STAT_CONN_CACHE_BYTES_INUSE			5
+#define	WT_STAT_CONN_CACHE_BYTES_INUSE			7
 /*! cache: maximum bytes configured */
-#define	WT_STAT_CONN_CACHE_BYTES_MAX			6
+#define	WT_STAT_CONN_CACHE_BYTES_MAX			8
 /*! cache: bytes read into cache */
-#define	WT_STAT_CONN_CACHE_BYTES_READ			7
+#define	WT_STAT_CONN_CACHE_BYTES_READ			9
 /*! cache: bytes written from cache */
-#define	WT_STAT_CONN_CACHE_BYTES_WRITE			8
+#define	WT_STAT_CONN_CACHE_BYTES_WRITE			10
 /*! cache: unmodified pages evicted */
-#define	WT_STAT_CONN_CACHE_EVICTION_CLEAN		9
+#define	WT_STAT_CONN_CACHE_EVICTION_CLEAN		11
 /*! cache: modified pages evicted */
-#define	WT_STAT_CONN_CACHE_EVICTION_DIRTY		10
+#define	WT_STAT_CONN_CACHE_EVICTION_DIRTY		12
 /*! cache: pages selected for eviction unable to be evicted */
-#define	WT_STAT_CONN_CACHE_EVICTION_FAIL		11
+#define	WT_STAT_CONN_CACHE_EVICTION_FAIL		13
 /*! cache: eviction unable to acquire hazard pointer */
-#define	WT_STAT_CONN_CACHE_EVICTION_HAZARD		12
+#define	WT_STAT_CONN_CACHE_EVICTION_HAZARD		14
 /*! cache: internal pages evicted */
-#define	WT_STAT_CONN_CACHE_EVICTION_INTERNAL		13
+#define	WT_STAT_CONN_CACHE_EVICTION_INTERNAL		15
 /*! cache: eviction server unable to reach eviction goal */
-#define	WT_STAT_CONN_CACHE_EVICTION_SLOW		14
+#define	WT_STAT_CONN_CACHE_EVICTION_SLOW		16
 /*! cache: tracked dirty pages in the cache */
-#define	WT_STAT_CONN_CACHE_PAGES_DIRTY			15
+#define	WT_STAT_CONN_CACHE_PAGES_DIRTY			17
 /*! cache: pages currently held in the cache */
-#define	WT_STAT_CONN_CACHE_PAGES_INUSE			16
+#define	WT_STAT_CONN_CACHE_PAGES_INUSE			18
 /*! cache: pages read into cache */
-#define	WT_STAT_CONN_CACHE_READ				17
+#define	WT_STAT_CONN_CACHE_READ				19
 /*! cache: pages written from cache */
-#define	WT_STAT_CONN_CACHE_WRITE			18
+#define	WT_STAT_CONN_CACHE_WRITE			20
 /*! pthread mutex condition wait calls */
-#define	WT_STAT_CONN_COND_WAIT				19
+#define	WT_STAT_CONN_COND_WAIT				21
 /*! files currently open */
-#define	WT_STAT_CONN_FILE_OPEN				20
+#define	WT_STAT_CONN_FILE_OPEN				22
 /*! total heap memory allocations */
-#define	WT_STAT_CONN_MEMORY_ALLOCATION			21
+#define	WT_STAT_CONN_MEMORY_ALLOCATION			23
 /*! total heap memory frees */
-#define	WT_STAT_CONN_MEMORY_FREE			22
+#define	WT_STAT_CONN_MEMORY_FREE			24
 /*! total read I/Os */
-#define	WT_STAT_CONN_READ_IO				23
+#define	WT_STAT_CONN_READ_IO				25
 /*! pthread mutex shared lock read-lock calls */
-#define	WT_STAT_CONN_RWLOCK_READ			24
+#define	WT_STAT_CONN_RWLOCK_READ			26
 /*! pthread mutex shared lock write-lock calls */
-#define	WT_STAT_CONN_RWLOCK_WRITE			25
+#define	WT_STAT_CONN_RWLOCK_WRITE			27
 /*! ancient transactions */
-#define	WT_STAT_CONN_TXN_ANCIENT			26
+#define	WT_STAT_CONN_TXN_ANCIENT			28
 /*! transactions */
-#define	WT_STAT_CONN_TXN_BEGIN				27
+#define	WT_STAT_CONN_TXN_BEGIN				29
 /*! transaction checkpoints */
-#define	WT_STAT_CONN_TXN_CHECKPOINT			28
+#define	WT_STAT_CONN_TXN_CHECKPOINT			30
 /*! transactions committed */
-#define	WT_STAT_CONN_TXN_COMMIT				29
+#define	WT_STAT_CONN_TXN_COMMIT				31
 /*! transaction failures due to cache overflow */
-#define	WT_STAT_CONN_TXN_FAIL_CACHE			30
+#define	WT_STAT_CONN_TXN_FAIL_CACHE			32
 /*! transactions rolled-back */
-#define	WT_STAT_CONN_TXN_ROLLBACK			31
+#define	WT_STAT_CONN_TXN_ROLLBACK			33
 /*! total write I/Os */
-#define	WT_STAT_CONN_WRITE_IO				32
+#define	WT_STAT_CONN_WRITE_IO				34
 
 /*!
  * @}

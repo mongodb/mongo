@@ -104,10 +104,14 @@ const char *
 __wt_addr_string(
     WT_SESSION_IMPL *session, WT_ITEM *buf, const uint8_t *addr, uint32_t size)
 {
+	WT_BM *bm;
+
+	bm = session->btree->bm;
+
 	if (addr == NULL) {
 		buf->data = "[NoAddr]";
 		buf->size = WT_STORE_SIZE(strlen("[NoAddr]"));
-	} else if (__wt_bm_addr_string(session, buf, addr, size) != 0) {
+	} else if (bm->addr_string(bm, session, buf, addr, size) != 0) {
 		buf->data = "[Error]";
 		buf->size = WT_STORE_SIZE(strlen("[Error]"));
 	}

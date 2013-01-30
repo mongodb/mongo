@@ -114,6 +114,20 @@ cursor_ops(WT_SESSION *session)
 	}
 
 	{
+	/*! [open a named checkpoint] */
+	ret = session->open_cursor(session,
+	    "table:mytable", NULL, "checkpoint=midnight", &cursor);
+	/*! [open a named checkpoint] */
+	}
+
+	{
+	/*! [open the default checkpoint] */
+	ret = session->open_cursor(session,
+	    "table:mytable", NULL, "checkpoint=WiredTigerCheckpoint", &cursor);
+	/*! [open the default checkpoint] */
+	}
+
+	{
 	/*! [Get the cursor's string key] */
 	const char *key;	/* Get the cursor's string key. */
 	ret = cursor->get_key(cursor, &key);
@@ -467,6 +481,21 @@ session_ops(WT_SESSION *session)
 	    "block_compressor=snappy,key_format=S,value_format=S");
 	/*! [Create a snappy compressed table] */
 #endif
+
+	/*! [Configure checksums to uncompressed] */
+	ret = session->create(session, "table:mytable",
+	    "key_format=S,value_format=S,checksum=uncompressed");
+	/*! [Configure checksums to uncompressed] */
+
+	/*! [Configure dictionary compression off] */
+	ret = session->create(session, "table:mytable",
+	    "key_format=S,value_format=S,dictionary=false");
+	/*! [Configure dictionary compression off] */
+
+	/*! [Configure key prefix compression off] */
+	ret = session->create(session, "table:mytable",
+	    "key_format=S,value_format=S,prefix_compression=false");
+	/*! [Configure key prefix compression off] */
 
 	/*! [Create a cache-resident object] */
 	ret = session->create(session,
@@ -971,12 +1000,12 @@ main(void)
 	/*! [Open a connection] */
 	}
 
+#ifdef MIGHT_NOT_RUN
 	/*
 	 * This example code gets run, and the compression libraries might not
 	 * be installed, causing the open to fail.  The documentation requires
 	 * the code snippets, use #ifdef's to avoid running it.
 	 */
-#ifdef MIGHT_NOT_RUN
 	{
 	/*! [Configure bzip2 extension] */
 	WT_CONNECTION *conn;
@@ -996,6 +1025,15 @@ main(void)
 	    "extensions=[\"/usr/local/lib/wiredtiger_snappy.so\"]", &conn);
 	/*! [Configure snappy extension] */
 	}
+
+	/*
+	 * We're not allowed to open multiple connections, don't run more than
+	 * one wiredtiger_open call.
+	 */
+	{
+	/*! [Configure direct_io for data files] */
+	ret = wiredtiger_open(home, NULL, "create,direct_io=[data]", &conn);
+	/*! [Configure direct_io for data files] */
 #endif
 
 	/*! [Get the WiredTiger library version #1] */

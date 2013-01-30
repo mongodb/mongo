@@ -18,9 +18,6 @@ flags = {
 		'DIRECTIO_DATA',
 		'DIRECTIO_LOG'
 	],
-	'page_free' : [
-		'PAGE_FREE_IGNORE_DISK'
-	],
 	'rec_write' : [
 		'EVICTION_SERVER_LOCKED',
 		'SKIP_UPDATE_ERR',

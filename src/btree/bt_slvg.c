@@ -138,6 +138,7 @@ static int  __slvg_trk_ovfl(WT_SESSION_IMPL *,
 int
 __wt_bt_salvage(WT_SESSION_IMPL *session, WT_CKPT *ckptbase, const char *cfg[])
 {
+	WT_BM *bm;
 	WT_BTREE *btree;
 	WT_DECL_RET;
 	WT_STUFF *ss, stuff;
@@ -146,6 +147,7 @@ __wt_bt_salvage(WT_SESSION_IMPL *session, WT_CKPT *ckptbase, const char *cfg[])
 	WT_UNUSED(cfg);
 
 	btree = session->btree;
+	bm = btree->bm;
 
 	WT_CLEAR(stuff);
 	ss = &stuff;
@@ -161,7 +163,7 @@ __wt_bt_salvage(WT_SESSION_IMPL *session, WT_CKPT *ckptbase, const char *cfg[])
 	 * Step 1:
 	 * Inform the underlying block manager that we're salvaging the file.
 	 */
-	WT_ERR(__wt_bm_salvage_start(session));
+	WT_ERR(bm->salvage_start(bm, session));
 
 	/*
 	 * Step 2:
@@ -282,11 +284,11 @@ __wt_bt_salvage(WT_SESSION_IMPL *session, WT_CKPT *ckptbase, const char *cfg[])
 	 * Step 10:
 	 * Inform the underlying block manager that we're done.
 	 */
-err:	WT_TRET(__wt_bm_salvage_end(session));
+err:	WT_TRET(bm->salvage_end(bm, session));
 
 	/* Discard any root page we created. */
 	if (ss->root_page != NULL)
-		__wt_page_out(session, &ss->root_page, 0);
+		__wt_page_out(session, &ss->root_page);
 
 	/* Discard the leaf and overflow page memory. */
 	WT_TRET(__slvg_cleanup(session, ss));
@@ -308,6 +310,7 @@ err:	WT_TRET(__wt_bm_salvage_end(session));
 static int
 __slvg_read(WT_SESSION_IMPL *session, WT_STUFF *ss)
 {
+	WT_BM *bm;
 	WT_DECL_ITEM(as);
 	WT_DECL_ITEM(buf);
 	WT_DECL_RET;
@@ -316,13 +319,14 @@ __slvg_read(WT_SESSION_IMPL *session, WT_STUFF *ss)
 	uint8_t addrbuf[WT_BTREE_MAX_ADDR_COOKIE];
 	int eof;
 
+	bm = session->btree->bm;
 	WT_ERR(__wt_scr_alloc(session, 0, &as));
 	WT_ERR(__wt_scr_alloc(session, 0, &buf));
 
 	for (;;) {
 		/* Get the next block address from the block manager. */
-		WT_ERR(__wt_bm_salvage_next(
-		    session, addrbuf, &addrbuf_size, &eof));
+		WT_ERR(bm->salvage_next(
+		    bm, session, addrbuf, &addrbuf_size, &eof));
 		if (eof)
 			break;
 
@@ -340,10 +344,10 @@ __slvg_read(WT_SESSION_IMPL *session, WT_STUFF *ss)
 			continue;
 
 		/* Tell the block manager we're taking this one. */
-		WT_ERR(__wt_bm_salvage_valid(session, addrbuf, addrbuf_size));
+		WT_ERR(bm->salvage_valid(bm, session, addrbuf, addrbuf_size));
 
 		/* Create a printable version of the address. */
-		WT_ERR(__wt_bm_addr_string(session, as, addrbuf, addrbuf_size));
+		WT_ERR(bm->addr_string(bm, session, as, addrbuf, addrbuf_size));
 
 		/*
 		 * Make sure it's an expected page type for the file.
@@ -363,7 +367,7 @@ __slvg_read(WT_SESSION_IMPL *session, WT_STUFF *ss)
 			    "%s page ignored %s",
 			    __wt_page_type_string(dsk->type),
 			    (const char *)as->data);
-			WT_ERR(__wt_bm_free(session, addrbuf, addrbuf_size));
+			WT_ERR(bm->free(bm, session, addrbuf, addrbuf_size));
 			continue;
 		}
 
@@ -381,7 +385,7 @@ __slvg_read(WT_SESSION_IMPL *session, WT_STUFF *ss)
 			    "%s page failed verify %s",
 			    __wt_page_type_string(dsk->type),
 			    (const char *)as->data);
-			WT_ERR(__wt_bm_free(session, addrbuf, addrbuf_size));
+			WT_ERR(bm->free(bm, session, addrbuf, addrbuf_size));
 			continue;
 		}
 
@@ -530,7 +534,7 @@ __slvg_trk_leaf(WT_SESSION_IMPL *session,
 		 * on every leaf page, and if you need to speed up the salvage,
 		 * it's probably a great place to start.
 		 */
-		WT_ERR(__wt_page_inmem(session, NULL, NULL, dsk, &page));
+		WT_ERR(__wt_page_inmem(session, NULL, NULL, dsk, 1, &page));
 		WT_ERR(__wt_row_key_copy(session,
 		    page, &page->u.row.d[0], &trk->row_start));
 		WT_ERR(__wt_row_key_copy(session,
@@ -563,7 +567,7 @@ __slvg_trk_leaf(WT_SESSION_IMPL *session,
 err:		__wt_free(session, trk);
 	}
 	if (page != NULL)
-		__wt_page_out(session, &page, WT_PAGE_FREE_IGNORE_DISK);
+		__wt_page_out(session, &page);
 	return (ret);
 }
 
@@ -1130,7 +1134,7 @@ __slvg_col_build_internal(
 	ss->root_page = page;
 
 	if (0) {
-err:		__wt_page_out(session, &page, 0);
+err:		__wt_page_out(session, &page);
 	}
 	return (ret);
 }
@@ -1239,12 +1243,14 @@ static int
 __slvg_col_merge_ovfl(WT_SESSION_IMPL *session,
     WT_TRACK *trk, WT_PAGE *page, uint64_t skip, uint64_t take)
 {
+	WT_BM *bm;
 	WT_CELL_UNPACK *unpack, _unpack;
 	WT_CELL *cell;
 	WT_COL *cip;
 	uint64_t recno, start, stop;
 	uint32_t i;
 
+	bm = session->btree->bm;
 	unpack = &_unpack;
 
 	recno = page->u.col_var.recno;
@@ -1268,7 +1274,7 @@ __slvg_col_merge_ovfl(WT_SESSION_IMPL *session,
 		    __wt_addr_string(session,
 			trk->ss->tmp2, unpack->data, unpack->size));
 
-		WT_RET(__wt_bm_free(session, unpack->data, unpack->size));
+		WT_RET(bm->free(bm, session, unpack->data, unpack->size));
 	}
 	return (0);
 }
@@ -1590,7 +1596,7 @@ __slvg_row_trk_update_start(
 	 */
 	WT_RET(__wt_scr_alloc(session, trk->size, &dsk));
 	WT_ERR(__wt_bt_read(session, dsk, trk->addr.addr, trk->addr.size));
-	WT_ERR(__wt_page_inmem(session, NULL, NULL, dsk->mem, &page));
+	WT_ERR(__wt_page_inmem(session, NULL, NULL, dsk->mem, 1, &page));
 
 	/*
 	 * Walk the page, looking for a key sorting greater than the specified
@@ -1635,7 +1641,7 @@ __slvg_row_trk_update_start(
 		    sizeof(WT_TRACK *), __slvg_trk_compare_key);
 
 	if (page != NULL)
-		__wt_page_out(session, &page, WT_PAGE_FREE_IGNORE_DISK);
+		__wt_page_out(session, &page);
 
 err:	__wt_scr_free(&dsk);
 	__wt_scr_free(&key);
@@ -1710,7 +1716,7 @@ __slvg_row_build_internal(
 	ss->root_page = page;
 
 	if (0) {
-err:		__wt_page_out(session, &page, 0);
+err:		__wt_page_out(session, &page);
 	}
 	return (ret);
 }
@@ -1899,11 +1905,13 @@ static int
 __slvg_row_merge_ovfl(WT_SESSION_IMPL *session,
    WT_TRACK *trk, WT_PAGE *page, uint32_t start, uint32_t stop)
 {
+	WT_BM *bm;
 	WT_CELL *cell;
 	WT_CELL_UNPACK *unpack, _unpack;
 	WT_IKEY *ikey;
 	WT_ROW *rip;
 
+	bm = session->btree->bm;
 	unpack = &_unpack;
 
 	for (rip = page->u.row.d + start; start < stop; ++start) {
@@ -1921,8 +1929,8 @@ __slvg_row_merge_ovfl(WT_SESSION_IMPL *session,
 			    __wt_addr_string(session,
 			    trk->ss->tmp2, unpack->data, unpack->size));
 
-			WT_RET(__wt_bm_free(
-			    session, unpack->data, unpack->size));
+			WT_RET(bm->free(
+			    bm, session, unpack->data, unpack->size));
 		}
 
 		if ((cell = __wt_row_value(page, rip)) == NULL)
@@ -1936,8 +1944,8 @@ __slvg_row_merge_ovfl(WT_SESSION_IMPL *session,
 			    __wt_addr_string(session,
 			    trk->ss->tmp2, unpack->data, unpack->size));
 
-			WT_RET(__wt_bm_free(
-			    session, unpack->data, unpack->size));
+			WT_RET(bm->free(
+			    bm, session, unpack->data, unpack->size));
 		}
 	}
 	return (0);
@@ -2248,10 +2256,12 @@ __slvg_cleanup(WT_SESSION_IMPL *session, WT_STUFF *ss)
 static int
 __slvg_trk_free(WT_SESSION_IMPL *session, WT_TRACK **trkp, uint32_t flags)
 {
+	WT_BM *bm;
 	WT_ADDR *addr;
 	WT_TRACK *trk;
 	uint32_t i;
 
+	bm = session->btree->bm;
 	trk = *trkp;
 	*trkp = NULL;
 
@@ -2266,7 +2276,7 @@ __slvg_trk_free(WT_SESSION_IMPL *session, WT_TRACK **trkp, uint32_t flags)
 		    __wt_addr_string(
 		    session, trk->ss->tmp1, trk->addr.addr, trk->addr.size),
 		    trk->size);
-		WT_RET(__wt_bm_free(session, trk->addr.addr, trk->addr.size));
+		WT_RET(bm->free(bm, session, trk->addr.addr, trk->addr.size));
 	}
 	__wt_free(session, trk->addr.addr);
 
@@ -2279,7 +2289,7 @@ __slvg_trk_free(WT_SESSION_IMPL *session, WT_TRACK **trkp, uint32_t flags)
 			    trk->ss->tmp1, trk->addr.addr, trk->addr.size),
 			    __wt_addr_string(session,
 			    trk->ss->tmp2, addr->addr, addr->size));
-			WT_RET(__wt_bm_free(session, addr->addr, addr->size));
+			WT_RET(bm->free(bm, session, addr->addr, addr->size));
 		}
 		__wt_free(session, addr->addr);
 	}

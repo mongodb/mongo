@@ -175,20 +175,6 @@ class test_salvage(wttest.WiredTigerTestCase, suite_subprocess):
         self.session.salvage('file:' + self.tablename + ".wt", None)
         self.check_populate(self.tablename)
 
-    def test_salvage_api_open_handle(self):
-        """
-        Test salvage via API, with an open connection/session.
-        It should raise an exception.
-        """
-        self.session.create('table:' + self.tablename, self.session_params)
-        self.populate(self.tablename)
-        self.damage(self.tablename)
-
-        # damage() closed the session/connection, reopen them now.
-        self.open_conn()
-        self.session.salvage('file:' + self.tablename + ".wt", None)
-        self.check_damaged(self.tablename)
-
     def test_salvage_api_damaged(self):
         """
         Test salvage via API, on a damaged table.

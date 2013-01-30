@@ -12,7 +12,8 @@ static int __verify_ckptfrag_chk(WT_SESSION_IMPL *, WT_BLOCK *);
 static int __verify_filefrag_add(
 	WT_SESSION_IMPL *, WT_BLOCK *, off_t, off_t, int);
 static int __verify_filefrag_chk(WT_SESSION_IMPL *, WT_BLOCK *);
-static int __verify_start_avail(WT_SESSION_IMPL *, WT_BLOCK *, WT_CKPT *);
+static int __verify_last_avail(WT_SESSION_IMPL *, WT_BLOCK *, WT_CKPT *);
+static int __verify_last_truncate(WT_SESSION_IMPL *, WT_BLOCK *, WT_CKPT *);
 
 /* The bit list ignores the first sector: convert to/from a frag/offset. */
 #define	WT_OFF_TO_FRAG(block, off)					\
@@ -41,6 +42,9 @@ __wt_block_verify_start(
 	if (ckptbase[0].name == NULL)
 		WT_RET_MSG(session, WT_ERROR,
 		    "%s has no checkpoints to verify", block->name);
+
+	/* Truncate the file to the size of the last checkpoint. */
+	WT_RET(__verify_last_truncate(session, block, ckptbase));
 
 	/*
 	 * The file size should be a multiple of the allocsize, offset by the
@@ -81,19 +85,19 @@ __wt_block_verify_start(
 	 * The only checkpoint avail list we care about is the last one written;
 	 * get it now and initialize the list of file fragments.
 	 */
-	WT_RET(__verify_start_avail(session, block, ckptbase));
+	WT_RET(__verify_last_avail(session, block, ckptbase));
 
 	block->verify = 1;
 	return (0);
 }
 
 /*
- * __verify_start_avail --
+ * __verify_last_avail --
  *	Get the last checkpoint's avail list and load it into the list of file
  * fragments.
  */
 static int
-__verify_start_avail(
+__verify_last_avail(
     WT_SESSION_IMPL *session, WT_BLOCK *block, WT_CKPT *ckptbase)
 {
 	WT_BLOCK_CKPT *ci, _ci;
@@ -122,6 +126,34 @@ __verify_start_avail(
 			    session, block, ext->off, ext->size, 1)) != 0)
 				break;
 	}
+
+err:	__wt_block_ckpt_destroy(session, ci);
+	return (ret);
+}
+
+/*
+ * __verify_last_truncate --
+ *	Truncate the file to the last checkpoint's size.
+ */
+static int
+__verify_last_truncate(
+    WT_SESSION_IMPL *session, WT_BLOCK *block, WT_CKPT *ckptbase)
+{
+	WT_BLOCK_CKPT *ci, _ci;
+	WT_CKPT *ckpt;
+	WT_DECL_RET;
+
+	/* Get the last on-disk checkpoint, if one exists. */
+	WT_CKPT_FOREACH(ckptbase, ckpt)
+		;
+	if (ckpt == ckptbase)
+		return (0);
+	--ckpt;
+
+	ci = &_ci;
+	WT_RET(__wt_block_ckpt_init(session, block, ci, ckpt->name, 0));
+	WT_ERR(__wt_block_buffer_to_ckpt(session, block, ckpt->raw.data, ci));
+	WT_ERR(__wt_ftruncate(session, block->fh, ci->file_size));
 
 err:	__wt_block_ckpt_destroy(session, ci);
 	return (ret);

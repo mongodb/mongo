@@ -22,7 +22,7 @@ static int pse2(WT_SESSION_IMPL *, const char *, uint32_t, uint32_t, uint32_t);
 int
 __wt_btree_create(WT_SESSION_IMPL *session, const char *filename)
 {
-	return (__wt_bm_create(session, filename));
+	return (__wt_block_manager_create(session, filename));
 }
 
 /*
@@ -32,7 +32,7 @@ __wt_btree_create(WT_SESSION_IMPL *session, const char *filename)
 int
 __wt_btree_truncate(WT_SESSION_IMPL *session, const char *filename)
 {
-	return (__wt_bm_truncate(session, filename));
+	return (__wt_block_manager_truncate(session, filename));
 }
 
 /*
@@ -42,6 +42,7 @@ __wt_btree_truncate(WT_SESSION_IMPL *session, const char *filename)
 int
 __wt_btree_open(WT_SESSION_IMPL *session, const char *cfg[])
 {
+	WT_BM *bm;
 	WT_BTREE *btree;
 	WT_CKPT ckpt;
 	WT_CONFIG_ITEM cval;
@@ -52,7 +53,17 @@ __wt_btree_open(WT_SESSION_IMPL *session, const char *cfg[])
 	const char *filename;
 
 	btree = session->btree;
+	bm = NULL;
+
+	/* Checkpoint files and no-cache files are readonly. */
 	readonly = btree->checkpoint == NULL ? 0 : 1;
+	if (!readonly && cfg != NULL) {
+		ret = __wt_config_gets(session, cfg, "no_cache", &cval);
+		if (ret != 0 && ret != WT_NOTFOUND)
+			WT_RET(ret);
+		if (ret == 0 && cval.val != 0)
+			readonly = 1;
+	}
 
 	/* Get the checkpoint information for this name/checkpoint pair. */
 	WT_CLEAR(ckpt);
@@ -85,8 +96,22 @@ __wt_btree_open(WT_SESSION_IMPL *session, const char *cfg[])
 	filename = btree->name;
 	if (!WT_PREFIX_SKIP(filename, "file:"))
 		WT_ERR_MSG(session, EINVAL, "expected a 'file:' URI");
-	WT_ERR(__wt_bm_open(
-	    session, filename, btree->config, cfg, forced_salvage));
+	WT_ERR(__wt_block_manager_open(
+	    session, filename, btree->config, cfg, forced_salvage, &btree->bm));
+	bm = btree->bm;
+
+	/*
+	 * !!!
+	 * As part of block-manager configuration, we need to return the maximum
+	 * sized address cookie that a block manager will ever return.  There's
+	 * a limit of WT_BTREE_MAX_ADDR_COOKIE, but at 255B, it's too large for
+	 * a Btree with 512B internal pages.  The default block manager packs
+	 * an off_t and 2 uint32_t's into its cookie, so there's no problem now,
+	 * but when we create a block manager extension API, we need some way to
+	 * consider the block manager's maximum cookie size versus the minimum
+	 * Btree internal node size.
+	 */
+	btree->block_header = bm->block_header(bm);
 
 	/*
 	 * Open the specified checkpoint unless it's a special command (special
@@ -100,7 +125,7 @@ __wt_btree_open(WT_SESSION_IMPL *session, const char *cfg[])
 		 * being created), or the load call returns no root page (the
 		 * checkpoint is for an empty file).
 		 */
-		WT_ERR(__wt_bm_checkpoint_load(session,
+		WT_ERR(bm->checkpoint_load(bm, session,
 		    ckpt.raw.data, ckpt.raw.size,
 		    root_addr, &root_addr_size, readonly));
 		if (creation || root_addr_size == 0)
@@ -130,19 +155,24 @@ err:		WT_TRET(__wt_btree_close(session));
 int
 __wt_btree_close(WT_SESSION_IMPL *session)
 {
+	WT_BM *bm;
 	WT_BTREE *btree;
 	WT_DECL_RET;
 
 	btree = session->btree;
 
-	/* Unload the checkpoint, unless it's a special command. */
-	if (F_ISSET(btree, WT_BTREE_OPEN) &&
-	    !F_ISSET(btree,
-	    WT_BTREE_SALVAGE | WT_BTREE_UPGRADE | WT_BTREE_VERIFY))
-		WT_TRET(__wt_bm_checkpoint_unload(session));
+	if ((bm = btree->bm) != NULL) {
+		/* Unload the checkpoint, unless it's a special command. */
+		if (F_ISSET(btree, WT_BTREE_OPEN) &&
+		    !F_ISSET(btree,
+		    WT_BTREE_SALVAGE | WT_BTREE_UPGRADE | WT_BTREE_VERIFY))
+			WT_TRET(bm->checkpoint_unload(bm, session));
 
-	/* Close the underlying block manager reference. */
-	WT_TRET(__wt_bm_close(session));
+		/* Close the underlying block manager reference. */
+		WT_TRET(bm->close(bm, session));
+
+		btree->bm = NULL;
+	}
 
 	/* Close the Huffman tree. */
 	__wt_btree_huffman_close(session);
@@ -340,7 +370,8 @@ __wt_btree_tree_open(
 
 	/* Read the page, then build the in-memory version of the page. */
 	WT_ERR(__wt_bt_read(session, &dsk, addr, addr_size));
-	WT_ERR(__wt_page_inmem(session, NULL, NULL, dsk.mem, &page));
+	WT_ERR(__wt_page_inmem(session,
+	    NULL, NULL, dsk.mem, F_ISSET(&dsk, WT_ITEM_MAPPED) ? 1 : 0, &page));
 	btree->root_page = page;
 
 	if (0) {
@@ -449,9 +480,9 @@ __btree_tree_open_empty(WT_SESSION_IMPL *session, int creation)
 	return (0);
 
 err:	if (leaf != NULL)
-		__wt_page_out(session, &leaf, 0);
+		__wt_page_out(session, &leaf);
 	if (root != NULL)
-		__wt_page_out(session, &root, 0);
+		__wt_page_out(session, &root);
 	return (ret);
 }
 
