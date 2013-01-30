@@ -170,8 +170,8 @@ __wt_lsm_checkpoint_worker(void *arg)
 				continue;
 
 			WT_WITH_SCHEMA_LOCK(session,
-			    ret = __wt_schema_worker(session,
-			    chunk->uri, __wt_checkpoint, NULL, 0));
+			    ret = __wt_schema_worker(session, chunk->uri,
+			    __wt_checkpoint, NULL, WT_BTREE_DISCARD_CLOSE));
 
 			if (ret != 0) {
 				__wt_err(session, ret,
