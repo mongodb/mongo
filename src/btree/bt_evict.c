@@ -642,7 +642,7 @@ __evict_file(WT_SESSION_IMPL *session, int syncop)
 			 */
 			if (WT_PAGE_IS_ROOT(page))
 				session->btree->root_page = NULL;
-			__wt_page_out(session, &page, 0);
+			__wt_page_out(session, &page);
 			break;
 		WT_ILLEGAL_VALUE_ERR(session);
 		}

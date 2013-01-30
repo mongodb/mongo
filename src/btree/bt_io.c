@@ -15,6 +15,7 @@ int
 __wt_bt_read(WT_SESSION_IMPL *session,
     WT_ITEM *buf, const uint8_t *addr, uint32_t addr_size)
 {
+	WT_BM *bm;
 	WT_BTREE *btree;
 	WT_DECL_ITEM(tmp);
 	WT_DECL_RET;
@@ -22,6 +23,7 @@ __wt_bt_read(WT_SESSION_IMPL *session,
 	size_t result_len;
 
 	btree = session->btree;
+	bm = btree->bm;
 
 	/*
 	 * If anticipating a compressed block, read into a scratch buffer and
@@ -29,11 +31,11 @@ __wt_bt_read(WT_SESSION_IMPL *session,
 	 * caller's buffer.
 	 */
 	if (btree->compressor == NULL) {
-		WT_RET(__wt_bm_read(session, buf, addr, addr_size));
+		WT_RET(bm->read(bm, session, buf, addr, addr_size));
 		dsk = buf->mem;
 	} else {
 		WT_RET(__wt_scr_alloc(session, 0, &tmp));
-		WT_ERR(__wt_bm_read(session, tmp, addr, addr_size));
+		WT_ERR(bm->read(bm, session, tmp, addr, addr_size));
 		dsk = tmp->mem;
 	}
 
@@ -103,7 +105,7 @@ __wt_bt_read(WT_SESSION_IMPL *session,
 	if (F_ISSET(btree, WT_BTREE_VERIFY)) {
 		if (tmp == NULL)
 			WT_ERR(__wt_scr_alloc(session, 0, &tmp));
-		WT_ERR(__wt_bm_addr_string(session, tmp, addr, addr_size));
+		WT_ERR(bm->addr_string(bm, session, tmp, addr, addr_size));
 		WT_ERR(__wt_verify_dsk(session, (const char *)tmp->data, buf));
 	}
 
@@ -127,17 +129,18 @@ int
 __wt_bt_write(WT_SESSION_IMPL *session, WT_ITEM *buf,
     uint8_t *addr, uint32_t *addr_size, int checkpoint, int compressed)
 {
+	WT_BM *bm;
 	WT_BTREE *btree;
 	WT_ITEM *ip;
 	WT_DECL_ITEM(tmp);
 	WT_DECL_RET;
 	WT_PAGE_HEADER *dsk;
-	size_t len, src_len, dst_len, result_len;
-	uint32_t size;
+	size_t len, src_len, dst_len, result_len, size;
 	int data_cksum, compression_failed;
 	uint8_t *src, *dst;
 
 	btree = session->btree;
+	bm = btree->bm;
 
 	/* Checkpoint calls are different than standard calls. */
 	WT_ASSERT(session,
@@ -201,8 +204,8 @@ __wt_bt_write(WT_SESSION_IMPL *session, WT_ITEM *buf,
 			WT_ERR(btree->compressor->pre_size(btree->compressor,
 			    &session->iface, src, src_len, &len));
 
-		size = (uint32_t)len + WT_BLOCK_COMPRESS_SKIP;
-		WT_ERR(__wt_bm_write_size(session, &size));
+		size = len + WT_BLOCK_COMPRESS_SKIP;
+		WT_ERR(bm->write_size(bm, session, &size));
 		WT_ERR(__wt_scr_alloc(session, size, &tmp));
 
 		/* Skip the header bytes of the destination data. */
@@ -282,8 +285,8 @@ __wt_bt_write(WT_SESSION_IMPL *session, WT_ITEM *buf,
 
 	/* Call the block manager to write the block. */
 	WT_ERR(checkpoint ?
-	    __wt_bm_checkpoint(session, ip, btree->ckpt, data_cksum) :
-	    __wt_bm_write(session, ip, addr, addr_size, data_cksum));
+	    bm->checkpoint(bm, session, ip, btree->ckpt, data_cksum) :
+	    bm->write(bm, session, ip, addr, addr_size, data_cksum));
 
 	WT_CSTAT_INCR(session, cache_write);
 	WT_DSTAT_INCR(session, cache_write);

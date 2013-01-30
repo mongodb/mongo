@@ -18,13 +18,15 @@ static int  __stat_page_row_leaf(WT_SESSION_IMPL *, WT_PAGE *);
 int
 __wt_btree_stat_init(WT_SESSION_IMPL *session, uint32_t flags)
 {
+	WT_BM *bm;
 	WT_BTREE *btree;
 	WT_DECL_RET;
 	WT_PAGE *page;
 
 	btree = session->btree;
+	bm = btree->bm;
 
-	WT_RET(__wt_bm_stat(session));
+	WT_RET(bm->stat(bm, session));
 
 	WT_DSTAT_SET(session, btree_fixed_len, btree->bitcnt);
 	WT_DSTAT_SET(session, btree_maximum_depth, btree->maximum_depth);

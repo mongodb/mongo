@@ -419,7 +419,7 @@ __wt_page_release(WT_SESSION_IMPL *session, WT_PAGE *page)
 	if (F_ISSET(btree, WT_BTREE_NO_CACHE)) {
 		page->ref->page = NULL;
 		page->ref->state = WT_REF_DISK;
-		__wt_page_out(session, &page, 0);
+		__wt_page_out(session, &page);
 		return (0);
 	}
 

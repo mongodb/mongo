@@ -774,8 +774,11 @@ static int
 __rec_child_deleted(WT_SESSION_IMPL *session,
     WT_RECONCILE *r, WT_PAGE *page, WT_REF *ref, int *statep)
 {
+	WT_BM *bm;
 	uint32_t size;
 	const uint8_t *addr;
+
+	bm = session->btree->bm;
 
 	/*
 	 * Internal pages with child leaf pages in the WT_REF_DELETED state are
@@ -823,7 +826,7 @@ __rec_child_deleted(WT_SESSION_IMPL *session,
 	    (ref->txnid == WT_TXN_NONE ||
 	    __wt_txn_visible_all(session, ref->txnid))) {
 		__wt_get_addr(page, ref, &addr, &size);
-		WT_RET(__wt_bm_free(session, addr, size));
+		WT_RET(bm->free(bm, session, addr, size));
 
 		ref->addr = NULL;
 	}
@@ -1011,11 +1014,13 @@ static int
 __rec_split_init(WT_SESSION_IMPL *session,
     WT_RECONCILE *r, WT_PAGE *page, uint64_t recno, uint32_t max)
 {
+	WT_BM *bm;
 	WT_BTREE *btree;
 	WT_PAGE_HEADER *dsk;
-	uint32_t corrected_page_size;
+	size_t corrected_page_size;
 
 	btree = session->btree;
+	bm = btree->bm;
 
 	/*
 	 * Set the page sizes.  If we're doing the page layout, the maximum page
@@ -1034,8 +1039,8 @@ __rec_split_init(WT_SESSION_IMPL *session,
 	 * corrected by the underlying block manager.
 	 */
 	corrected_page_size = r->page_size;
-	WT_RET(__wt_bm_write_size(session, &corrected_page_size));
-	WT_RET(__wt_buf_init(session, &r->dsk, (size_t)corrected_page_size));
+	WT_RET(bm->write_size(bm, session, &corrected_page_size));
+	WT_RET(__wt_buf_init(session, &r->dsk, corrected_page_size));
 
 	/*
 	 * Clear the header and set the page type (the type doesn't change, and
@@ -1405,6 +1410,7 @@ __rec_split(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 static int
 __rec_split_raw_worker(WT_SESSION_IMPL *session, WT_RECONCILE *r, int final)
 {
+	WT_BM *bm;
 	WT_BOUNDARY *bnd;
 	WT_BTREE *btree;
 	WT_CELL *cell;
@@ -1414,13 +1420,14 @@ __rec_split_raw_worker(WT_SESSION_IMPL *session, WT_RECONCILE *r, int final)
 	WT_DECL_RET;
 	WT_PAGE_HEADER *dsk, *dsk_dst;
 	WT_SESSION *wt_session;
-	size_t result_len;
+	size_t corrected_page_size, result_len;
 	uint64_t recno;
-	uint32_t corrected_page_size, entry, i, len, result_slots, slots;
+	uint32_t entry, i, len, result_slots, slots;
 	uint8_t *dsk_start;
 
 	wt_session = (WT_SESSION *)session;
 	btree = session->btree;
+	bm = btree->bm;
 	compressor = btree->compressor;
 	unpack = &_unpack;
 	dsk = r->dsk.mem;
@@ -1562,9 +1569,9 @@ __rec_split_raw_worker(WT_SESSION_IMPL *session, WT_RECONCILE *r, int final)
 		WT_RET(compressor->pre_size(compressor, wt_session,
 		    (uint8_t *)dsk + WT_BLOCK_COMPRESS_SKIP,
 		    (size_t)r->raw_offsets[slots], &result_len));
-	corrected_page_size = (uint32_t)result_len + WT_BLOCK_COMPRESS_SKIP;
-	WT_RET(__wt_bm_write_size(session, &corrected_page_size));
-	WT_RET(__wt_scr_alloc(session, (size_t)corrected_page_size, &dst));
+	corrected_page_size = result_len + WT_BLOCK_COMPRESS_SKIP;
+	WT_RET(bm->write_size(bm, session, &corrected_page_size));
+	WT_RET(__wt_scr_alloc(session, corrected_page_size, &dst));
 
 	/*
 	 * Copy the header bytes into the destination buffer, then call the
@@ -1657,7 +1664,7 @@ more_rows:	/*
 		 */
 		len = WT_PTRDIFF32(r->first_free, r->dsk.mem);
 		corrected_page_size = r->page_size * 2;
-		WT_ERR(__wt_bm_write_size(session, &corrected_page_size));
+		WT_ERR(bm->write_size(bm, session, &corrected_page_size));
 		WT_ERR(__wt_buf_grow(session, &r->dsk, corrected_page_size));
 		r->page_size *= 2;
 		r->first_free = (uint8_t *)r->dsk.mem + len;
@@ -3753,6 +3760,7 @@ __rec_split_discard(WT_SESSION_IMPL *session, WT_PAGE *page)
 static int
 __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 {
+	WT_BM *bm;
 	WT_BTREE *btree;
 	WT_BOUNDARY *bnd;
 	WT_PAGE_MODIFY *mod;
@@ -3760,6 +3768,7 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	int was_modified;
 
 	btree = session->btree;
+	bm = btree->bm;
 	mod = page->modify;
 
 	/*
@@ -3804,7 +3813,7 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	case WT_PM_REC_SPLIT:				/* Page split */
 		/* Discard the split page. */
 		WT_RET(__rec_split_discard(session, mod->u.split));
-		__wt_page_out(session, &mod->u.split, 0);
+		__wt_page_out(session, &mod->u.split);
 		mod->u.split = NULL;
 		break;
 	case WT_PM_REC_SPLIT_MERGE:			/* Page split */
@@ -3835,7 +3844,7 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		/* If this is the root page, we need to create a sync point. */
 		if (WT_PAGE_IS_ROOT(page))
 			WT_RET(
-			    __wt_bm_checkpoint(session, NULL, btree->ckpt, 0));
+			    bm->checkpoint(bm, session, NULL, btree->ckpt, 0));
 
 		/*
 		 * If the page was empty, we want to discard it from the tree
@@ -3974,9 +3983,12 @@ err:			__wt_scr_free(&tkey);
 static int
 __rec_write_wrapup_err(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 {
+	WT_BM *bm;
 	WT_BOUNDARY *bnd;
 	WT_DECL_RET;
 	uint32_t i;
+
+	bm = session->btree->bm;
 
 	/*
 	 * On error, discard pages we've written, they're unreferenced by the
@@ -3986,8 +3998,8 @@ __rec_write_wrapup_err(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	WT_TRET(__wt_rec_track_wrapup_err(session, page));
 	for (bnd = r->bnd, i = 0; i < r->bnd_next; ++bnd, ++i)
 		if (bnd->addr.addr != NULL) {
-			WT_TRET(__wt_bm_free(
-			    session, bnd->addr.addr, bnd->addr.size));
+			WT_TRET(bm->free(
+			    bm, session, bnd->addr.addr, bnd->addr.size));
 			bnd->addr.addr = NULL;
 		}
 	return (ret);
@@ -4058,7 +4070,7 @@ __rec_split_row(
 	*splitp = page;
 	return (0);
 
-err:	__wt_page_out(session, &page, 0);
+err:	__wt_page_out(session, &page);
 	return (ret);
 }
 
@@ -4111,7 +4123,7 @@ __rec_split_col(
 	*splitp = page;
 	return (0);
 
-err:	__wt_page_out(session, &page, 0);
+err:	__wt_page_out(session, &page);
 	return (ret);
 }
 
@@ -4288,16 +4300,19 @@ static int
 __rec_cell_build_ovfl(WT_SESSION_IMPL *session,
     WT_RECONCILE *r, WT_KV *kv, uint8_t type, uint64_t rle)
 {
+	WT_BM *bm;
 	WT_BTREE *btree;
 	WT_DECL_ITEM(tmp);
 	WT_DECL_RET;
 	WT_PAGE *page;
 	WT_PAGE_HEADER *dsk;
+	size_t alloc_size;
 	uint32_t size;
 	int found;
 	uint8_t *addr, buf[WT_BTREE_MAX_ADDR_COOKIE];
 
 	btree = session->btree;
+	bm = btree->bm;
 	page = r->page;
 
 	/* Track if page has overflow items. */
@@ -4311,9 +4326,9 @@ __rec_cell_build_ovfl(WT_SESSION_IMPL *session,
 	    session, page, kv->buf.data, kv->buf.size, &addr, &size, &found));
 	if (!found) {
 		/* Allocate a buffer big enough to write the overflow record. */
-		size = kv->buf.size;
-		WT_RET(__wt_bm_write_size(session, &size));
-		WT_RET(__wt_scr_alloc(session, size, &tmp));
+		alloc_size = kv->buf.size;
+		WT_RET(bm->write_size(bm, session, &alloc_size));
+		WT_RET(__wt_scr_alloc(session, alloc_size, &tmp));
 
 		/* Initialize the buffer: disk header and overflow record. */
 		dsk = tmp->mem;
@@ -4327,6 +4342,7 @@ __rec_cell_build_ovfl(WT_SESSION_IMPL *session,
 
 		/* Write the buffer. */
 		addr = buf;
+		size = (uint32_t)alloc_size;
 		WT_ERR(__wt_bt_write(session, tmp, addr, &size, 0, 0));
 
 		/* Track the overflow record. */

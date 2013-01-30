@@ -192,8 +192,7 @@ __wt_debug_addr(WT_SESSION_IMPL *session,
 	WT_DECL_RET;
 
 	WT_RET(__wt_scr_alloc(session, 1024, &buf));
-	WT_ERR(__wt_block_read(
-	    session, session->btree->block, buf, addr, addr_size));
+	WT_ERR(__wt_bm_read(session->btree->bm, session, buf, addr, addr_size));
 	ret = __wt_debug_disk(session, buf->mem, ofile);
 
 err:	__wt_scr_free(&buf);
@@ -892,9 +891,8 @@ __debug_cell(WT_DBG *ds, WT_PAGE_HEADER *dsk, WT_CELL_UNPACK *unpack)
 	case WT_CELL_VALUE_OVFL_RM:
 		type = "ovfl";
 addr:		WT_RET(__wt_scr_alloc(session, 128, &buf));
-		if ((ret = __wt_bm_addr_string(
-		    session, buf, unpack->data, unpack->size)) == 0)
-			__dmsg(ds, ", %s %s", type, (const char *)buf->data);
+		__dmsg(ds, ", %s %s", type,
+		    __wt_addr_string(session, buf, unpack->data, unpack->size));
 		__wt_scr_free(&buf);
 		WT_RET(ret);
 		break;

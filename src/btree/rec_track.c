@@ -352,9 +352,12 @@ __wt_rec_track_init(WT_SESSION_IMPL *session, WT_PAGE *page)
 int
 __wt_rec_track_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
+	WT_BM *bm;
 	WT_PAGE_MODIFY *mod;
 	WT_PAGE_TRACK *track;
 	uint32_t i;
+
+	bm = session->btree->bm;
 
 	if (WT_VERBOSE_ISSET(session, reconcile))
 		WT_RET(__track_dump(session, page, "reconcile wrapup"));
@@ -404,7 +407,7 @@ __wt_rec_track_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 		if (WT_VERBOSE_ISSET(session, reconcile))
 			WT_RET(__track_msg(session, page, "discard", track));
 		WT_RET(
-		    __wt_bm_free(session, track->addr.addr, track->addr.size));
+		    bm->free(bm, session, track->addr.addr, track->addr.size));
 
 		/*
 		 * There are page and overflow blocks we track anew as part of
@@ -431,10 +434,13 @@ __wt_rec_track_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 int
 __wt_rec_track_wrapup_err(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
+	WT_BM *bm;
 	WT_DECL_RET;
 	WT_PAGE_MODIFY *mod;
 	WT_PAGE_TRACK *track;
 	uint32_t i;
+
+	bm = session->btree->bm;
 
 	/*
 	 * After a failed reconciliation of a page, discard entries added in the
@@ -451,7 +457,7 @@ __wt_rec_track_wrapup_err(WT_SESSION_IMPL *session, WT_PAGE *page)
 			 * discard them on error.
 			 */
 			if (F_ISSET(track, WT_TRK_INUSE))
-				WT_TRET(__wt_bm_free(session,
+				WT_TRET(bm->free(bm, session,
 				    track->addr.addr, track->addr.size));
 
 			__wt_free(session, track->addr.addr);

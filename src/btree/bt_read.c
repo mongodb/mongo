@@ -105,7 +105,8 @@ __wt_cache_read(WT_SESSION_IMPL *session, WT_PAGE *parent, WT_REF *ref)
 		WT_ERR(__wt_bt_read(session, &tmp, addr, size));
 
 		/* Build the in-memory version of the page. */
-		WT_ERR(__wt_page_inmem(session, parent, ref, tmp.mem, &page));
+		WT_ERR(__wt_page_inmem(session, parent, ref,
+		    tmp.mem, F_ISSET(&tmp, WT_ITEM_MAPPED) ? 1 : 0, &page));
 
 		/* If the page was deleted, instantiate that information. */
 		if (previous_state == WT_REF_DELETED)
@@ -127,7 +128,7 @@ err:	WT_PUBLISH(ref->state, previous_state);
 	 * and separately discard the disk image in all cases.
 	 */
 	if (page != NULL)
-		__wt_page_out(session, &page, WT_PAGE_FREE_IGNORE_DISK);
+		__wt_page_out(session, &page);
 	__wt_buf_free(session, &tmp);
 
 	return (ret);

@@ -166,8 +166,10 @@ struct __wt_dsrc_stats {
  * Statistics entries for connections.
  */
 struct __wt_connection_stats {
+	WT_STATS block_byte_map_read;
 	WT_STATS block_byte_read;
 	WT_STATS block_byte_write;
+	WT_STATS block_map_read;
 	WT_STATS block_read;
 	WT_STATS block_write;
 	WT_STATS cache_bytes_dirty;

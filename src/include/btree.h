@@ -44,7 +44,7 @@
  * a new entry is added, so we split to a smaller-than-maximum page size.
  */
 #define	WT_SPLIT_PAGE_SIZE(pagesize, allocsize, pct)			\
-	WT_ALIGN(((uintmax_t)(pagesize) * (pct)) / 100, allocsize)
+	WT_ALIGN32(((uintmax_t)(pagesize) * (pct)) / 100, allocsize)
 
 /*
  * XXX
@@ -124,8 +124,8 @@ struct __wt_btree {
 	int modified;			/* If the tree ever modified */
 	int bulk_load_ok;		/* Bulk-load is a possibility */
 
-	void *block;			/* Block manager */
-	u_int block_header;		/* Block manager header length */
+	WT_BM	*bm;			/* Block manager reference */
+	u_int	 block_header;		/* WT_PAGE_HEADER_BYTE_SIZE */
 
 	uint64_t write_gen;		/* Write generation */
 
