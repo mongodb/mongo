@@ -116,10 +116,16 @@ namespace mongo {
                 continue;
             }
 
-            /* check for explain option */
-            if (!strcmp(pFieldName, explainName)) {
-                pPipeline->explain = cmdElement.Bool();
-                continue;
+            //
+            // Disables explain option from mongodb for 2.2 release build instead of being a secret option
+            //
+
+            DEV {
+                /* check for explain option */
+                if (!strcmp(pFieldName, explainName)) {
+                    pPipeline->explain = cmdElement.Bool();
+                    continue;
+                }
             }
 
             /* if the request came from the router, we're in a shard */
