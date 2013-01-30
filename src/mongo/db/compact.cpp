@@ -195,7 +195,7 @@ namespace mongo {
         log() << "compact " << extents.size() << " extents" << endl;
 
         ProgressMeterHolder pm(cc().curop()->setMessage("compact extent",
-                                                        "Extent Compating Progress",
+                                                        "Extent Compacting Progress",
                                                         extents.size()));
 
         // same data, but might perform a little different after compact?
