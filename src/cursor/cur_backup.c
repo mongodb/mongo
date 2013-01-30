@@ -489,7 +489,7 @@ __backup_file_create(WT_SESSION_IMPL *session, FILE **fpp)
 
 	/* Open the hot backup file. */
 	WT_RET(__wt_filename(session, WT_METADATA_BACKUP, &path));
-	WT_ERR_TEST((*fpp = fopen(path, "w")) == NULL, WT_NOTFOUND);
+	WT_ERR_TEST((*fpp = fopen(path, "w")) == NULL, __wt_errno());
 
 err:	__wt_free(session, path);
 	return (ret);
