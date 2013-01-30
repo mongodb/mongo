@@ -201,6 +201,27 @@ err:	__wt_scr_free(&buf);
 }
 
 /*
+ * __wt_debug_offset --
+ *	Read and dump a disk page in debugging mode, using an
+ * offset/size/checksum triplet.
+ */
+int
+__wt_debug_offset(WT_SESSION_IMPL *session,
+     off_t offset, uint32_t size, uint32_t cksum, const char *ofile)
+{
+	WT_DECL_ITEM(buf);
+	WT_DECL_RET;
+
+	WT_RET(__wt_scr_alloc(session, 1024, &buf));
+	WT_ERR(__wt_block_read_off(
+	    session, session->btree->block, buf, offset, size, cksum));
+	ret = __wt_debug_disk(session, buf->mem, ofile);
+
+err:	__wt_scr_free(&buf);
+	return (ret);
+}
+
+/*
  * __wt_debug_disk --
  *	Dump a disk page in debugging mode.
  */

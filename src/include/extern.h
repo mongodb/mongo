@@ -291,6 +291,11 @@ extern int __wt_debug_addr(WT_SESSION_IMPL *session,
     const uint8_t *addr,
     uint32_t addr_size,
     const char *ofile);
+extern int __wt_debug_offset(WT_SESSION_IMPL *session,
+    off_t offset,
+    uint32_t size,
+    uint32_t cksum,
+    const char *ofile);
 extern int __wt_debug_disk( WT_SESSION_IMPL *session,
     WT_PAGE_HEADER *dsk,
     const char *ofile);

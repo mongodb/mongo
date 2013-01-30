@@ -8,6 +8,7 @@ __wt_bm_addr_stderr
 __wt_btree_lex_compare
 __wt_config_getone
 __wt_debug_addr
+__wt_debug_offset
 __wt_debug_tree
 __wt_debug_tree_all
 __wt_fsync
