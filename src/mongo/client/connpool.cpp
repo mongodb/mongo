@@ -41,13 +41,34 @@ namespace mongo {
     }
 
     void PoolForHost::done( DBConnectionPool * pool, DBClientBase * c ) {
-        if ( _pool.size() >= _maxPerHost ) {
-            pool->onDestroy( c );
+        if (c->isFailed()) {
+            reportBadConnectionAt(c->getSockCreationMicroSec());
+            pool->onDestroy(c);
+            delete c;
+        }
+        else if (_pool.size() >= _maxPerHost ||
+                c->getSockCreationMicroSec() < _minValidCreationTimeMicroSec) {
+            pool->onDestroy(c);
             delete c;
         }
         else {
             _pool.push(c);
         }
+    }
+
+    void PoolForHost::reportBadConnectionAt(uint64_t microSec) {
+        if (microSec != DBClientBase::INVALID_SOCK_CREATION_TIME &&
+                microSec > _minValidCreationTimeMicroSec) {
+            _minValidCreationTimeMicroSec = microSec;
+            log() << "Detected bad connection created at " << _minValidCreationTimeMicroSec
+                    << " microSec, clearing pool for " << _hostName << endl;
+            clear();
+        }
+    }
+
+    bool PoolForHost::isBadSocketCreationTime(uint64_t microSec) {
+        return microSec != DBClientBase::INVALID_SOCK_CREATION_TIME &&
+                microSec <= _minValidCreationTimeMicroSec;
     }
 
     DBClientBase * PoolForHost::get( DBConnectionPool * pool , double socketTimeout ) {
@@ -80,10 +101,6 @@ namespace mongo {
             _pool.pop();
             bool res;
             bool alive = false;
-            // When a connection is in the pool it doesn't have an AuthenticationTable set.
-            // Set the table temporarily for the isMaster command.
-            c.conn->setAuthenticationTable(
-                    AuthenticationTable::getInternalSecurityAuthenticationTable() );
             try {
                 c.conn->isMaster( res );
                 alive = true;
@@ -96,7 +113,6 @@ namespace mongo {
                 c.conn = NULL;
             }
             if ( alive ) {
-                c.conn->clearAuthenticationTable();
                 all.push_back( c );
             }
         }
@@ -142,6 +158,12 @@ namespace mongo {
         _created++;
     }
 
+    void PoolForHost::initializeHostName(const std::string& hostName) {
+        if (_hostName.empty()) {
+            _hostName = hostName;
+        }
+    }
+
     unsigned PoolForHost::_maxPerHost = 50;
 
     // ------ DBConnectionPool ------
@@ -158,6 +180,7 @@ namespace mongo {
         verify( ! inShutdown() );
         scoped_lock L(_mutex);
         PoolForHost& p = _pools[PoolKey(ident,socketTimeout)];
+        p.initializeHostName(ident);
         return p.get( this , socketTimeout );
     }
 
@@ -165,6 +188,7 @@ namespace mongo {
         {
             scoped_lock L(_mutex);
             PoolForHost& p = _pools[PoolKey(host,socketTimeout)];
+            p.initializeHostName(host);
             p.createdOne( conn );
         }
         
@@ -224,11 +248,6 @@ namespace mongo {
     }
 
     void DBConnectionPool::release(const string& host, DBClientBase *c) {
-        if ( c->isFailed() ) {
-            onDestroy( c );
-            delete c;
-            return;
-        }
         scoped_lock L(_mutex);
         _pools[PoolKey(host,c->getSoTimeout())].done(this,c);
     }
@@ -243,6 +262,14 @@ namespace mongo {
         for ( PoolMap::iterator i = _pools.begin(); i != _pools.end(); i++ ) {
             PoolForHost& p = i->second;
             p.flush();
+        }
+    }
+
+    void DBConnectionPool::clear() {
+        scoped_lock L(_mutex);
+        LOG(2) << "Removing connections on all pools owned by " << _name  << endl;
+        for (PoolMap::iterator iter = _pools.begin(); iter != _pools.end(); ++iter) {
+            iter->second.clear();
         }
     }
 
@@ -318,18 +345,12 @@ namespace mongo {
 
                 long long& x = createdByType[i->second.type()];
                 x += i->second.numCreated();
-
-                {
-                    string setName = i->first.ident;
-                    if ( setName.find( "/" ) != string::npos ) {
-                        setName = setName.substr( 0 , setName.find( "/" ) );
-                        replicaSets.insert( setName );
-                    }
-                }
             }
         }
         bb.done();
         
+        // Always report all replica sets being tracked
+        ReplicaSetMonitor::getAllTrackedSets(&replicaSets);
         
         BSONObjBuilder setBuilder( b.subobjStart( "replicaSets" ) );
         for ( set<string>::iterator i=replicaSets.begin(); i!=replicaSets.end(); ++i ) {
@@ -394,6 +415,25 @@ namespace mongo {
         return a.timeout < b.timeout;
     }
 
+    bool DBConnectionPool::isConnectionGood(const string& hostName, DBClientBase* conn) {
+        if (conn == NULL) {
+            return false;
+        }
+
+        if (conn->isFailed()) {
+            return false;
+        }
+
+        {
+            scoped_lock sl(_mutex);
+            PoolForHost& pool = _pools[PoolKey(hostName, conn->getSoTimeout())];
+            if (pool.isBadSocketCreationTime(conn->getSockCreationMicroSec())) {
+                return false;
+            }
+        }
+
+        return true;
+    }
 
     void DBConnectionPool::taskDoWork() { 
         vector<DBClientBase*> toDelete;
@@ -430,12 +470,28 @@ namespace mongo {
 
     ScopedDbConnection::~ScopedDbConnection() {
         if ( _conn ) {
-            if ( ! _conn->isFailed() ) {
-                /* see done() comments above for why we log this line */
-                log() << "scoped connection to " << _conn->getServerAddress() << " not being returned to the pool" << endl;
+            if (_conn->isFailed()) {
+                if (_conn->getSockCreationMicroSec() ==
+                        DBClientBase::INVALID_SOCK_CREATION_TIME) {
+                    kill();
+                }
+                else {
+                    // The pool takes care of deleting the failed connection - this
+                    // will also trigger disposal of older connections in the pool
+                    done();
+                }
             }
-            kill();
+            else {
+                /* see done() comments above for why we log this line */
+                log() << "scoped connection to " << _conn->getServerAddress()
+                        << " not being returned to the pool" << endl;
+                kill();
+            }
         }
+    }
+
+    void ScopedDbConnection::clearPool() {
+        pool.clear();
     }
 
     AtomicUInt AScopedConnection::_numConnections;

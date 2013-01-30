@@ -18,22 +18,23 @@
 
 #include "pch.h"
 
-#include "../util/timer.h"
-
-#include "config.h"
-#include "grid.h"
-#include "request.h"
-#include "server.h"
-#include "shard.h"
-#include "util.h"
-#include "client_info.h"
-
 #include "writeback_listener.h"
+
+#include "mongo/db/auth/authorization_manager.h"
+#include "mongo/s/chunk_version.h"
+#include "mongo/s/client_info.h"
+#include "mongo/s/config.h"
+#include "mongo/s/grid.h"
+#include "mongo/s/request.h"
+#include "mongo/s/server.h"
+#include "mongo/s/shard.h"
+#include "mongo/s/version_manager.h"
+#include "mongo/util/timer.h"
 
 namespace mongo {
 
-    map<string,WriteBackListener*> WriteBackListener::_cache;
-    set<string> WriteBackListener::_seenSets;
+    unordered_map<string,WriteBackListener*> WriteBackListener::_cache;
+    unordered_set<string> WriteBackListener::_seenSets;
     mongo::mutex WriteBackListener::_cacheLock("WriteBackListener");
 
     map<WriteBackListener::ConnectionIdent,WriteBackListener::WBStatus> WriteBackListener::_seenWritebacks;
@@ -57,12 +58,14 @@ namespace mongo {
             return;
         }
 
+        const string addr = conn.getServerAddress();
+
         {
             scoped_lock lk( _cacheLock );
-            if ( _seenSets.count( conn.getServerAddress() ) )
+            if ( _seenSets.count( addr ) ) {
                 return;
+            }
         }
-
         // we want to do writebacks on all rs nodes
         string errmsg;
         ConnectionString cs = ConnectionString::parse( conn.getServerAddress() , errmsg );
@@ -72,6 +75,9 @@ namespace mongo {
 
         for ( unsigned i=0; i<hosts.size(); i++ )
             init( hosts[i].toString() );
+
+        scoped_lock lk( _cacheLock );
+        _seenSets.insert( addr );
 
     }
 
@@ -87,11 +93,15 @@ namespace mongo {
 
     /* static */
     BSONObj WriteBackListener::waitFor( const ConnectionIdent& ident, const OID& oid ) {
+
         Timer t;
+        Timer lastMessageTimer;
+
         while ( t.minutes() < 60 ) {
             {
                 scoped_lock lk( _seenWritebacksLock );
                 WBStatus s = _seenWritebacks[ident];
+
                 if ( oid < s.id ) {
                     // this means we're waiting for a GLE that already passed.
                     // it should be impossible because once we call GLE, no other
@@ -104,18 +114,34 @@ namespace mongo {
                     return s.gle;
                 }
 
+                // Stay in lock so we can use the status
+                if( lastMessageTimer.seconds() > 10 ){
+
+                    warning() << "waiting for writeback " << oid
+                              << " from connection " << ident.toString()
+                              << " for " << t.seconds() << " secs"
+                              << ", currently at id " << s.id << endl;
+
+                    lastMessageTimer.reset();
+                }
             }
+
             sleepmillis( 10 );
         }
-        uasserted( 13403 , str::stream() << "didn't get writeback for: " << oid << " after: " << t.millis() << " ms" );
+
+        uasserted( 13403 , str::stream() << "didn't get writeback for: " << oid
+                                         << " after: " << t.millis() << " ms"
+                                         << " from connection " << ident.toString() );
+
         throw 1; // never gets here
     }
 
     void WriteBackListener::run() {
 
         int secsToSleep = 0;
-        scoped_ptr<ShardChunkVersion> lastNeededVersion;
+        scoped_ptr<ChunkVersion> lastNeededVersion;
         int lastNeededCount = 0;
+        bool needsToReloadShardInfo = false;
 
         while ( ! inShutdown() ) {
 
@@ -126,6 +152,12 @@ namespace mongo {
             }
 
             try {
+                if (needsToReloadShardInfo) {
+                    // It's possible this shard was removed
+                    Shard::reloadShardInfo();
+                    needsToReloadShardInfo = false;
+                }
+
                 scoped_ptr<ScopedDbConnection> conn(
                         ScopedDbConnection::getInternalScopedDbConnection( _addr ) );
 
@@ -168,7 +200,7 @@ namespace mongo {
                     massert( 10427 ,  "invalid writeback message" , msg.header()->valid() );
 
                     DBConfigPtr db = grid.getDBConfig( ns );
-                    ShardChunkVersion needVersion = ShardChunkVersion::fromBSON( data, "version" );
+                    ChunkVersion needVersion = ChunkVersion::fromBSON( data, "version" );
 
                     //
                     // TODO: Refactor the sharded strategy to correctly handle all sharding state changes itself,
@@ -181,7 +213,7 @@ namespace mongo {
                     ShardPtr primary;
                     db->getChunkManagerOrPrimary( ns, manager, primary );
 
-                    ShardChunkVersion currVersion;
+                    ChunkVersion currVersion;
                     if( manager ) currVersion = manager->getVersion();
 
                     LOG(1) << "connectionId: " << cid << " writebackId: " << wid << " needVersion : " << needVersion.toString()
@@ -215,7 +247,7 @@ namespace mongo {
                     // Set our lastNeededVersion for next time
                     //
 
-                    lastNeededVersion.reset( new ShardChunkVersion( needVersion ) );
+                    lastNeededVersion.reset( new ChunkVersion( needVersion ) );
                     lastNeededCount++;
 
                     //
@@ -266,21 +298,52 @@ namespace mongo {
 
                             ClientInfo * ci = r.getClientInfo();
                             if (!noauth) {
-                                // TODO: Figure out why this is 'admin' instead of 'local'.
-                                ci->getAuthenticationInfo()->authorize("admin", internalSecurity.user);
+                                ci->getAuthorizationManager()->grantInternalAuthorization(
+                                        "_writebackListener");
                             }
                             ci->noAutoSplit();
 
-                            r.process();
+                            r.process( attempts );
 
                             ci->newRequest(); // this so we flip prev and cur shards
 
                             BSONObjBuilder b;
-                            if ( ! ci->getLastError( "admin", BSON( "getLastError" << 1 ) , b ,
-                                                     true ) ) {
+                            string errmsg;
+                            if ( ! ci->getLastError( "admin",
+                                                     BSON( "getLastError" << 1 ),
+                                                     b,
+                                                     errmsg,
+                                                     true ) )
+                            {
                                 b.appendBool( "commandFailed" , true );
+                                if( ! b.hasField( "errmsg" ) ){
+
+                                    b.append( "errmsg", errmsg );
+                                    gle = b.obj();
+                                }
+                                else if( errmsg.size() > 0 ){
+
+                                    // Rebuild GLE object with errmsg
+                                    // TODO: Make this less clumsy by improving GLE interface
+                                    gle = b.obj();
+
+                                    if( gle["errmsg"].type() == String ){
+
+                                        BSONObj gleNoErrmsg =
+                                                gle.filterFieldsUndotted( BSON( "errmsg" << 1 ),
+                                                                          false );
+                                        BSONObjBuilder bb;
+                                        bb.appendElements( gleNoErrmsg );
+                                        bb.append( "errmsg", gle["errmsg"].String() +
+                                                             " ::and:: " +
+                                                             errmsg );
+                                        gle = bb.obj().getOwned();
+                                    }
+                                }
                             }
-                            gle = b.obj();
+                            else{
+                                gle = b.obj();
+                            }
 
                             if ( gle["code"].numberInt() == 9517 ) {
 
@@ -346,6 +409,8 @@ namespace mongo {
                 continue;
             }
             catch ( std::exception& e ) {
+                // Attention! Do not call any method that would throw an exception
+                // (or assert) in this block.
 
                 if ( inShutdown() ) {
                     // we're shutting down, so just clean up
@@ -354,8 +419,7 @@ namespace mongo {
 
                 log() << "WriteBackListener exception : " << e.what() << endl;
 
-                // It's possible this shard was removed
-                Shard::reloadShardInfo();
+                needsToReloadShardInfo = true;
             }
             catch ( ... ) {
                 log() << "WriteBackListener uncaught exception!" << endl;

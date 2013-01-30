@@ -16,21 +16,24 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "pch.h"
-#include "db.h"
-#include "btree.h"
-#include "index_insertion_continuation.h"
-#include "pdfile.h"
-#include "json.h"
-#include "clientcursor.h"
-#include "client.h"
-#include "dbhelpers.h"
-#include "curop-inl.h"
-#include "stats/counters.h"
-#include "dur_commitjob.h"
-#include "btreebuilder.h"
+#include "mongo/pch.h"
+
+#include "mongo/db/btree.h"
+#include "mongo/db/btree_stats.h"
+#include "mongo/db/btreebuilder.h"
+#include "mongo/db/client.h"
+#include "mongo/db/clientcursor.h"
+#include "mongo/db/curop-inl.h"
+#include "mongo/db/db.h"
+#include "mongo/db/dbhelpers.h"
+#include "mongo/db/dur_commitjob.h"
+#include "mongo/db/index_insertion_continuation.h"
+#include "mongo/db/json.h"
+#include "mongo/db/kill_current_op.h"
+#include "mongo/db/pdfile.h"
+#include "mongo/db/stats/counters.h"
+#include "mongo/server.h"
 #include "mongo/util/startup_test.h"
-#include "../server.h"
 
 namespace mongo {
 
@@ -90,7 +93,7 @@ namespace mongo {
     template< class V >
     void BucketBasics<V>::assertWritable() {
         if( cmdLine.dur )
-	  dur::assertAlreadyDeclared(this, V::BucketSize);
+            dur::assertAlreadyDeclared(this, V::BucketSize);
     }
 
     template< class V >
@@ -138,12 +141,6 @@ namespace mongo {
 
     template< class V >
     long long BtreeBucket<V>::fullValidate(const DiskLoc& thisLoc, const BSONObj &order, long long *unusedCount, bool strict, unsigned depth) const {
-        {
-            bool f = false;
-            verify( f = true );
-            massert( 10281 , "verify is misdefined", f);
-        }
-
         killCurrentOp.checkForInterrupt();
         this->assertValid(order, true);
 
@@ -179,7 +176,7 @@ namespace mongo {
             }
         }
         if ( !this->nextChild.isNull() ) {
-	    DiskLoc ll = this->nextChild;
+            DiskLoc ll = this->nextChild;
             const BtreeBucket *b = ll.btree<V>();
             if ( strict ) {
                 verify( b->parent == thisLoc );
@@ -434,7 +431,7 @@ namespace mongo {
     template< class V >
     int BucketBasics<V>::packedDataSize( int refPos ) const {
         if ( this->flags & Packed ) {
-	  return V::BucketSize - this->emptySize - headerSize();
+            return V::BucketSize - this->emptySize - headerSize();
         }
         int size = 0;
         for( int j = 0; j < this->n; ++j ) {
@@ -745,7 +742,7 @@ namespace mongo {
     bool guessIncreasing = false;
     template< class V >
     bool BtreeBucket<V>::find(const IndexDetails& idx, const Key& key, const DiskLoc &rl, 
-			      const Ordering &order, int& pos, bool assertIfDup) const {
+                              const Ordering &order, int& pos, bool assertIfDup) const {
         Loc recordLoc;
         recordLoc = rl;
         globalIndexCounters.btree( (char*)this );
@@ -824,7 +821,7 @@ namespace mongo {
         ClientCursor::informAboutToDeleteBucket(thisLoc); // slow...
         verify( !isHead() );
 
-	DiskLoc ll = this->parent;
+        DiskLoc ll = this->parent;
         const BtreeBucket *p = ll.btree<V>();
         int parentIdx = indexInParent( thisLoc );
         p->childForPos( parentIdx ).writing().Null();
@@ -843,7 +840,7 @@ namespace mongo {
         // defensive:
         this->parent.Null();
         string ns = id.indexNamespace();
-        theDataFileMgr._deleteRecord(nsdetails(ns.c_str()), ns.c_str(), thisLoc.rec(), thisLoc);
+        theDataFileMgr._deleteRecord(nsdetails(ns), ns.c_str(), thisLoc.rec(), thisLoc);
 #endif
     }
 
@@ -897,6 +894,11 @@ namespace mongo {
      * This function is only needed in cases where k has a left or right child;
      * in other cases a simpler key removal implementation is possible.
      *
+     * NOTE on noncompliant BtreeBuilder btrees:
+     * It is possible (though likely rare) for btrees created by BtreeBuilder to
+     * have k' that is not a leaf, see SERVER-2732.  These cases are handled in
+     * the same manner as described in the "legacy btree structures" note below.
+     *
      * NOTE on legacy btree structures:
      * In legacy btrees, k' can be a nonleaf.  In such a case we 'delete' k by
      * marking it as an unused node rather than replacing it with k'.  Also, k'
@@ -944,7 +946,7 @@ namespace mongo {
             id.head.writing() = this->nextChild;
         }
         else {
-	    DiskLoc ll = this->parent;
+            DiskLoc ll = this->parent;
             ll.btree<V>()->childForPos( indexInParent( thisLoc ) ).writing() = this->nextChild;
         }
         BTREE(this->nextChild)->parent.writing() = this->parent;
@@ -1330,7 +1332,7 @@ namespace mongo {
                 verify( kn->prevChildBucket == lchild );
                 this->nextChild.writing() = rchild;
                 if ( !rchild.isNull() )
-		    BTREE(rchild)->parent.writing() = thisLoc;
+                    BTREE(rchild)->parent.writing() = thisLoc;
             }
             else {
                 kn->prevChildBucket = lchild;
@@ -1436,7 +1438,7 @@ namespace mongo {
     template< class V >
     DiskLoc BtreeBucket<V>::addBucket(const IndexDetails& id) {
         string ns = id.indexNamespace();
-        DiskLoc loc = theDataFileMgr.insert(ns.c_str(), 0, V::BucketSize, true);
+        DiskLoc loc = theDataFileMgr.insert(ns.c_str(), 0, V::BucketSize, false, true);
         BtreeBucket *b = BTREEMOD(loc);
         b->init();
         return loc;
@@ -1593,15 +1595,15 @@ namespace mongo {
         }
         else {
             // go up parents until rightmost/leftmost node is >=/<= target or at top
-	    while( !BTREE(thisLoc)->parent.isNull() ) {
-	        thisLoc = BTREE(thisLoc)->parent;
+            while( !BTREE(thisLoc)->parent.isNull() ) {
+                thisLoc = BTREE(thisLoc)->parent;
                 if ( direction > 0 ) {
-		  if ( customBSONCmp( BTREE(thisLoc)->keyNode( BTREE(thisLoc)->n - 1 ).key.toBson(), keyBegin, keyBeginLen, afterKey, keyEnd, keyEndInclusive, order, direction ) >= 0 ) {
+                    if ( customBSONCmp( BTREE(thisLoc)->keyNode( BTREE(thisLoc)->n - 1 ).key.toBson(), keyBegin, keyBeginLen, afterKey, keyEnd, keyEndInclusive, order, direction ) >= 0 ) {
                         break;
                     }
                 }
                 else {
-		  if ( customBSONCmp( BTREE(thisLoc)->keyNode( 0 ).key.toBson(), keyBegin, keyBeginLen, afterKey, keyEnd, keyEndInclusive, order, direction ) <= 0 ) {
+                    if ( customBSONCmp( BTREE(thisLoc)->keyNode( 0 ).key.toBson(), keyBegin, keyBeginLen, afterKey, keyEnd, keyEndInclusive, order, direction ) <= 0 ) {
                         break;
                     }
                 }
@@ -1709,7 +1711,7 @@ namespace mongo {
         if ( found ) {
             const _KeyNode& kn = k(pos);
             if ( kn.isUnused() ) {
-                log(4) << "btree _insert: reusing unused key" << endl;
+                LOG(4) << "btree _insert: reusing unused key" << endl;
                 c.b = this;
                 c.pos = pos;
                 c.op = IndexInsertionContinuation::SetUsed;
@@ -1764,7 +1766,7 @@ namespace mongo {
         if ( found ) {
             const _KeyNode& kn = k(pos);
             if ( kn.isUnused() ) {
-                log(4) << "btree _insert: reusing unused key" << endl;
+                LOG(4) << "btree _insert: reusing unused key" << endl;
                 massert( 10285 , "_insert: reuse key but lchild is not null", lChild.isNull());
                 massert( 10286 , "_insert: reuse key but rchild is not null", rChild.isNull());
                 kn.writing().setUsed();

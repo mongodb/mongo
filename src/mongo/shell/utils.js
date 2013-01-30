@@ -50,267 +50,6 @@ setVerboseShell = function( value ) {
     _verboseShell = value; 
 }
 
-doassert = function (msg) {
-    if (msg.indexOf("assert") == 0)
-        print(msg);
-    else
-        print("assert: " + msg);
-    printStackTrace();
-    throw msg;
-}
-
-assert = function( b , msg ){
-    if ( assert._debug && msg ) print( "in assert for: " + msg );
-    if ( b )
-        return;    
-    doassert( msg == undefined ? "assert failed" : "assert failed : " + msg );
-}
-
-// the mongo code uses verify
-// so this is to be nice to mongo devs
-verify = assert;
-
-assert.automsg = function( b ) {
-    assert( eval( b ), b );
-}
-
-assert._debug = false;
-
-assert.eq = function( a , b , msg ){
-    if ( assert._debug && msg ) print( "in assert for: " + msg );
-
-    if ( a == b )
-        return;
-
-    if ( ( a != null && b != null ) && friendlyEqual( a , b ) )
-        return;
-
-    doassert( "[" + tojson( a ) + "] != [" + tojson( b ) + "] are not equal : " + msg );
-}
-
-assert.eq.automsg = function( a, b ) {
-    assert.eq( eval( a ), eval( b ), "[" + a + "] != [" + b + "]" );
-}
-
-assert.neq = function( a , b , msg ){
-    if ( assert._debug && msg ) print( "in assert for: " + msg );
-    if ( a != b )
-        return;
-
-    doassert( "[" + a + "] != [" + b + "] are equal : " + msg );
-}
-
-assert.contains = function( o, arr, msg ){
-    var wasIn = false
-    
-    if( ! arr.length ){
-        for( var i in arr ){
-            wasIn = arr[i] == o || ( ( arr[i] != null && o != null ) && friendlyEqual( arr[i] , o ) )
-                return;
-            if( wasIn ) break
-        }
-    }
-    else {
-        for( var i = 0; i < arr.length; i++ ){
-            wasIn = arr[i] == o || ( ( arr[i] != null && o != null ) && friendlyEqual( arr[i] , o ) )
-            if( wasIn ) break
-        }
-    }
-    
-    if( ! wasIn ) doassert( tojson( o ) + " was not in " + tojson( arr ) + " : " + msg )
-}
-
-assert.repeat = function( f, msg, timeout, interval ) {
-    if ( assert._debug && msg ) print( "in assert for: " + msg );
-
-    var start = new Date();
-    timeout = timeout || 30000;
-    interval = interval || 200;
-    var last;
-    while( 1 ) {
-        
-        if ( typeof( f ) == "string" ){
-            if ( eval( f ) )
-                return;
-        }
-        else {
-            if ( f() )
-                return;
-        }
-        
-        if ( ( new Date() ).getTime() - start.getTime() > timeout )
-            break;
-        sleep( interval );
-    }
-}
-    
-assert.soon = function( f, msg, timeout /*ms*/, interval ) {
-    if ( assert._debug && msg ) print( "in assert for: " + msg );
-
-    var start = new Date();
-    timeout = timeout || 30000;
-    interval = interval || 200;
-    var last;
-    while( 1 ) {
-        
-        if ( typeof( f ) == "string" ){
-            if ( eval( f ) )
-                return;
-        }
-        else {
-            if ( f() )
-                return;
-        }
-       
-        diff = ( new Date() ).getTime() - start.getTime();
-        if ( diff > timeout )
-            doassert( "assert.soon failed: " + f + ", msg:" + msg );
-        sleep( interval );
-    }
-}
-
-assert.time = function( f, msg, timeout /*ms*/ ) {
-    if ( assert._debug && msg ) print( "in assert for: " + msg );
-
-    var start = new Date();
-    timeout = timeout || 30000;
-        
-        if ( typeof( f ) == "string" ){
-            res = eval( f );
-        }
-        else {
-            res = f();
-        }
-       
-        diff = ( new Date() ).getTime() - start.getTime();
-        if ( diff > timeout )
-            doassert( "assert.time failed timeout " + timeout + "ms took " + diff + "ms : " + f + ", msg:" + msg );
-        return res;
-}
-
-assert.throws = function( func , params , msg ){
-    if ( assert._debug && msg ) print( "in assert for: " + msg );
-    
-    if ( params && typeof( params ) == "string" )
-        throw "2nd argument to assert.throws has to be an array"
-    
-    try {
-        func.apply( null , params );
-    }
-    catch ( e ){
-        return e;
-    }
-
-    doassert( "did not throw exception: " + msg );
-}
-
-assert.throws.automsg = function( func, params ) {
-    assert.throws( func, params, func.toString() );
-}
-
-assert.commandWorked = function( res , msg ){
-    if ( assert._debug && msg ) print( "in assert for: " + msg );
-
-    if ( res.ok == 1 )
-        return;
-    
-    doassert( "command failed: " + tojson( res ) + " : " + msg );
-}
-
-assert.commandFailed = function( res , msg ){
-    if ( assert._debug && msg ) print( "in assert for: " + msg );
-
-    if ( res.ok == 0 )
-        return;
-    
-    doassert( "command worked when it should have failed: " + tojson( res ) + " : " + msg );
-}
-
-assert.isnull = function( what , msg ){
-    if ( assert._debug && msg ) print( "in assert for: " + msg );
-
-    if ( what == null )
-        return;
-    
-    doassert( "supposed to be null (" + ( msg || "" ) + ") was: " + tojson( what ) );
-}
-
-assert.lt = function( a , b , msg ){
-    if ( assert._debug && msg ) print( "in assert for: " + msg );
-
-    if ( a < b )
-        return;
-    doassert( a + " is not less than " + b + " : " + msg );
-}
-
-assert.gt = function( a , b , msg ){
-    if ( assert._debug && msg ) print( "in assert for: " + msg );
-
-    if ( a > b )
-        return;
-    doassert( a + " is not greater than " + b + " : " + msg );
-}
-
-assert.lte = function( a , b , msg ){
-    if ( assert._debug && msg ) print( "in assert for: " + msg );
-
-    if ( a <= b )
-        return;
-    doassert( a + " is not less than or eq " + b + " : " + msg );
-}
-
-assert.gte = function( a , b , msg ){
-    if ( assert._debug && msg ) print( "in assert for: " + msg );
-
-    if ( a >= b )
-        return;
-    doassert( a + " is not greater than or eq " + b + " : " + msg );
-}
-
-assert.between = function( a, b, c, msg, inclusive ){
-    if ( assert._debug && msg ) print( "in assert for: " + msg );
-
-    if( ( inclusive == undefined || inclusive == true ) &&
-        a <= b && b <= c ) return;
-    else if( a < b && b < c ) return;
-    
-    doassert( b + " is not between " + a + " and " + c + " : " + msg );
-}
-
-assert.betweenIn = function( a, b, c, msg ){ assert.between( a, b, c, msg, true ) }
-assert.betweenEx = function( a, b, c, msg ){ assert.between( a, b, c, msg, false ) }
-
-assert.close = function( a , b , msg , places ){
-    if (places === undefined) {
-        places = 4;
-    }
-    if (Math.round((a - b) * Math.pow(10, places)) === 0) {
-        return;
-    }
-    doassert( a + " is not equal to " + b + " within " + places +
-              " places, diff: " + (a-b) + " : " + msg );
-};
-
-Object.extend = function( dst , src , deep ){
-    for ( var k in src ){
-        var v = src[k];
-        if ( deep && typeof(v) == "object" ){
-            if ( "floatApprox" in v ) { // convert NumberLong properly
-                eval( "v = " + tojson( v ) );
-            } else {
-                v = Object.extend( typeof ( v.length ) == "number" ? [] : {} , v , true );
-            }
-        }
-        dst[k] = v;
-    }
-    return dst;
-}
-
-Object.merge = function( dst, src, deep ){
-    var clone = Object.extend( {}, dst, deep )
-    return Object.extend( clone, src, deep )
-}
-
 argumentsToArray = function( a ){
     var arr = [];
     for ( var i=0; i<a.length; i++ )
@@ -318,228 +57,29 @@ argumentsToArray = function( a ){
     return arr;
 }
 
-isString = function( x ){
-    return typeof( x ) == "string";
-}
-
-isNumber = function(x){
-    return typeof( x ) == "number";
-}
-
-isObject = function( x ){
-    return typeof( x ) == "object";
-}
-
-String.prototype.trim = function() {
-    return this.replace(/^\s+|\s+$/g,"");
-}
-String.prototype.ltrim = function() {
-    return this.replace(/^\s+/,"");
-}
-String.prototype.rtrim = function() {
-    return this.replace(/\s+$/,"");
-}
-
-String.prototype.startsWith = function (str){
-    return this.indexOf(str) == 0
-}
-
-String.prototype.endsWith = function (str){
-    return new RegExp( RegExp.escape(str) + "$" ).test( this )
-}
-
-Number.prototype.zeroPad = function(width) {
-    var str = this + '';
-    while (str.length < width)
-        str = '0' + str;
-    return str;
-}
-
-Date.timeFunc = function( theFunc , numTimes ){
-
-    var start = new Date();
-    
-    numTimes = numTimes || 1;
-    for ( var i=0; i<numTimes; i++ ){
-        theFunc.apply( null , argumentsToArray( arguments ).slice( 2 ) );
-    }
-
-    return (new Date()).getTime() - start.getTime();
-}
-
-Date.prototype.tojson = function(){
-
-    var UTC = Date.printAsUTC ? 'UTC' : '';
-
-    var year = this['get'+UTC+'FullYear']().zeroPad(4);
-    var month = (this['get'+UTC+'Month']() + 1).zeroPad(2);
-    var date = this['get'+UTC+'Date']().zeroPad(2);
-    var hour = this['get'+UTC+'Hours']().zeroPad(2);
-    var minute = this['get'+UTC+'Minutes']().zeroPad(2);
-    var sec = this['get'+UTC+'Seconds']().zeroPad(2)
-
-    if (this['get'+UTC+'Milliseconds']())
-        sec += '.' + this['get'+UTC+'Milliseconds']().zeroPad(3)
-
-    var ofs = 'Z';
-    if (!Date.printAsUTC){
-        var ofsmin = this.getTimezoneOffset();
-        if (ofsmin != 0){
-            ofs = ofsmin > 0 ? '-' : '+'; // This is correct
-            ofs += (ofsmin/60).zeroPad(2)
-            ofs += (ofsmin%60).zeroPad(2)
+// Formats a simple stacked horizontal histogram bar in the shell.
+// @param data array of the form [[ratio, symbol], ...] where ratio is between 0 and 1 and
+//             symbol is a string of length 1
+// @param width width of the bar (excluding the left and right delimiters [ ] )
+// e.g. _barFormat([[.3, "="], [.5, '-']], 80) returns
+//      "[========================----------------------------------------                ]"
+_barFormat = function(data, width) {
+    var remaining = width;
+    var res = "[";
+    for (var i = 0; i < data.length; i++) {
+        for (var x = 0; x < data[i][0] * width; x++) {
+            if (remaining-- > 0) {
+                res += data[i][1];
+            }
         }
     }
-
-    return 'ISODate("'+year+'-'+month+'-'+date+'T'+hour+':'+minute+':'+sec+ofs+'")';
-}
-
-Date.printAsUTC = true;
-
-
-ISODate = function(isoDateStr){
-    if (!isoDateStr)
-        return new Date();
-
-    var isoDateRegex = /(\d{4})-?(\d{2})-?(\d{2})([T ](\d{2})(:?(\d{2})(:?(\d{2}(\.\d+)?))?)?(Z|([+-])(\d{2}):?(\d{2})?)?)?/;
-    var res = isoDateRegex.exec(isoDateStr);
-
-    if (!res)
-        throw "invalid ISO date";
-
-    var year = parseInt(res[1],10) || 1970; // this should always be present
-    var month = (parseInt(res[2],10) || 1) - 1;
-    var date = parseInt(res[3],10) || 0;
-    var hour = parseInt(res[5],10) || 0;
-    var min = parseInt(res[7],10) || 0;
-    var sec = parseFloat(res[9]) || 0;
-    var ms = Math.round((sec%1) * 1000)
-    sec -= ms/1000
-
-    var time = Date.UTC(year, month, date, hour, min, sec, ms);
-
-    if (res[11] && res[11] != 'Z'){
-        var ofs = 0;
-        ofs += (parseInt(res[13],10) || 0) * 60*60*1000; // hours
-        ofs += (parseInt(res[14],10) || 0) *    60*1000; // mins
-        if (res[12] == '+') // if ahead subtract
-            ofs *= -1;
-
-        time += ofs
+    while (remaining-- > 0) {
+        res += " ";
     }
-
-    return new Date(time);
+    res += "]";
+    return res;
 }
 
-RegExp.escape = function( text ){
-    return text.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, "\\$&");
-}
-
-RegExp.prototype.tojson = RegExp.prototype.toString;
-
-Array.contains = function( a  , x ){
-    for ( var i=0; i<a.length; i++ ){
-        if ( a[i] == x )
-            return true;
-    }
-    return false;
-}
-
-Array.unique = function( a ){
-    var u = [];
-    for ( var i=0; i<a.length; i++){
-        var o = a[i];
-        if ( ! Array.contains( u , o ) ){
-            u.push( o );
-        }
-    }
-    return u;
-}
-
-Array.shuffle = function( arr ){
-    for ( var i=0; i<arr.length-1; i++ ){
-        var pos = i+Random.randInt(arr.length-i);
-        var save = arr[i];
-        arr[i] = arr[pos];
-        arr[pos] = save;
-    }
-    return arr;
-}
-
-
-Array.tojson = function( a , indent , nolint ){
-    var lineEnding = nolint ? " " : "\n";
-
-    if (!indent) 
-        indent = "";
-    
-    if ( nolint )
-        indent = "";
-
-    if (a.length == 0) {
-        return "[ ]";
-    }
-
-    var s = "[" + lineEnding;
-    indent += "\t";
-    for ( var i=0; i<a.length; i++){
-        s += indent + tojson( a[i], indent , nolint );
-        if ( i < a.length - 1 ){
-            s += "," + lineEnding;
-        }
-    }
-    if ( a.length == 0 ) {
-        s += indent;
-    }
-
-    indent = indent.substring(1);
-    s += lineEnding+indent+"]";
-    return s;
-}
-
-Array.fetchRefs = function( arr , coll ){
-    var n = [];
-    for ( var i=0; i<arr.length; i ++){
-        var z = arr[i];
-        if ( coll && coll != z.getCollection() )
-            continue;
-        n.push( z.fetch() );
-    }
-    
-    return n;
-}
-
-Array.sum = function( arr ){
-    if ( arr.length == 0 )
-        return null;
-    var s = arr[0];
-    for ( var i=1; i<arr.length; i++ )
-        s += arr[i];
-    return s;
-}
-
-Array.avg = function( arr ){
-    if ( arr.length == 0 )
-        return null;
-    return Array.sum( arr ) / arr.length;
-}
-
-Array.stdDev = function( arr ){
-    var avg = Array.avg( arr );
-    var sum = 0;
-
-    for ( var i=0; i<arr.length; i++ ){
-        sum += Math.pow( arr[i] - avg , 2 );
-    }
-
-    return Math.sqrt( sum / arr.length );
-}
-
-if( typeof Array.isArray != "function" ){
-    Array.isArray = function( arr ){
-        return arr != undefined && arr.constructor == Array
-    }
-}
 
 //these two are helpers for Array.sort(func)
 compare = function(l, r){ return (l == r ? 0 : (l < r ? -1 : 1)); }
@@ -547,155 +87,6 @@ compare = function(l, r){ return (l == r ? 0 : (l < r ? -1 : 1)); }
 // arr.sort(compareOn('name'))
 compareOn = function(field){
     return function(l, r) { return compare(l[field], r[field]); }
-}
-
-Object.keySet = function( o ) {
-    var ret = new Array();
-    for( var i in o ) {
-        if ( !( i in o.__proto__ && o[ i ] === o.__proto__[ i ] ) ) {
-            ret.push( i );
-        }
-    }
-    return ret;
-}
-
-if ( ! NumberLong.prototype ) {
-    NumberLong.prototype = {}
-}
-
-NumberLong.prototype.tojson = function() {
-    return this.toString();
-}
-
-if ( ! NumberInt.prototype ) {
-    NumberInt.prototype = {}
-}
-
-NumberInt.prototype.tojson = function() {
-    return this.toString();
-}
-
-if ( ! ObjectId.prototype )
-    ObjectId.prototype = {}
-
-ObjectId.prototype.toString = function(){
-    return "ObjectId(" + tojson(this.str) + ")";
-}
-
-ObjectId.prototype.tojson = function(){
-    return this.toString();
-}
-
-ObjectId.prototype.valueOf = function(){
-    return this.str;
-}
-
-ObjectId.prototype.isObjectId = true;
-
-ObjectId.prototype.getTimestamp = function(){
-    return new Date(parseInt(this.valueOf().slice(0,8), 16)*1000);
-}
-
-ObjectId.prototype.equals = function( other){
-    return this.str == other.str;
-}
-
-if ( typeof( DBPointer ) != "undefined" ){
-    DBPointer.prototype.fetch = function(){
-        assert( this.ns , "need a ns" );
-        assert( this.id , "need an id" );
-        
-        return db[ this.ns ].findOne( { _id : this.id } );
-    }
-    
-    DBPointer.prototype.tojson = function(indent){
-        return this.toString();
-    }
-
-    DBPointer.prototype.getCollection = function(){
-        return this.ns;
-    }
-    
-    DBPointer.prototype.getId = function(){
-        return this.id;
-    }
- 
-     DBPointer.prototype.toString = function(){
-        return "DBPointer(" + tojson(this.ns) + ", " + tojson(this.id) + ")";
-    }
-}
-else {
-    print( "warning: no DBPointer" );
-}
-
-if ( typeof( DBRef ) != "undefined" ){
-    DBRef.prototype.fetch = function(){
-        assert( this.$ref , "need a ns" );
-        assert( this.$id , "need an id" );
-        
-        return db[ this.$ref ].findOne( { _id : this.$id } );
-    }
-    
-    DBRef.prototype.tojson = function(indent){
-        return this.toString();
-    }
-
-    DBRef.prototype.getCollection = function(){
-        return this.$ref;
-    }
-    
-    DBRef.prototype.getRef = function(){
-        return this.$ref;
-    }
-
-    DBRef.prototype.getId = function(){
-        return this.$id;
-    }
-
-    DBRef.prototype.toString = function(){
-        return "DBRef(" + tojson(this.$ref) + ", " + tojson(this.$id) + ")";
-    }
-}
-else {
-    print( "warning: no DBRef" );
-}
-
-if ( typeof( Timestamp ) != "undefined" ){
-    Timestamp.prototype.tojson = function () {
-        return this.toString();
-    }
-
-    Timestamp.prototype.getTime = function () {
-        return this.t;
-    }
-
-    Timestamp.prototype.getInc = function () {
-        return this.i;
-    }
-
-    Timestamp.prototype.toString = function () {
-        return "Timestamp(" + this.t + ", " + this.i + ")";
-    }
-}
-else {
-    print( "warning: no Timestamp class" );
-}
-
-if ( typeof( BinData ) != "undefined" ){
-    BinData.prototype.tojson = function () {
-        return this.toString();
-    }
-    
-    BinData.prototype.subtype = function () {
-        return this.type;
-    }
-    
-    BinData.prototype.length = function () {
-        return this.len;
-    } 
-}
-else {
-    print( "warning: no BinData class" );
 }
 
 if ( typeof _threadInject != "undefined" ){
@@ -829,8 +220,9 @@ if ( typeof _threadInject != "undefined" ){
                                    "jstests/bench_test1.js",
                                    "jstests/padding.js",
                                    "jstests/queryoptimizera.js",
-                                   "jstests/loglong.js" // log might overflow before 
+                                   "jstests/loglong.js",// log might overflow before 
                                                         // this has a chance to see the message
+                                   "jstests/connections_opened.js" // counts connections, globally
                                   ] );
         
         // some tests can't be run in parallel with each other
@@ -930,119 +322,6 @@ if ( typeof _threadInject != "undefined" ){
     }
 }
 
-tojsononeline = function( x ){
-    return tojson( x , " " , true );
-}
-
-tojson = function( x, indent , nolint ){
-    if ( x === null )
-        return "null";
-    
-    if ( x === undefined )
-        return "undefined";
-    
-    if (!indent) 
-        indent = "";
-
-    switch ( typeof x ) {
-    case "string": {
-        var s = "\"";
-        for ( var i=0; i<x.length; i++ ){
-            switch (x[i]){
-                case '"': s += '\\"'; break;
-                case '\\': s += '\\\\'; break;
-                case '\b': s += '\\b'; break;
-                case '\f': s += '\\f'; break;
-                case '\n': s += '\\n'; break;
-                case '\r': s += '\\r'; break;
-                case '\t': s += '\\t'; break;
-
-                default: {
-                    var code = x.charCodeAt(i);
-                    if (code < 0x20){
-                        s += (code < 0x10 ? '\\u000' : '\\u00') + code.toString(16);
-                    } else {
-                        s += x[i];
-                    }
-                }
-            }
-        }
-        return s + "\"";
-    }
-    case "number": 
-    case "boolean":
-        return "" + x;
-    case "object":{
-        var s = tojsonObject( x, indent , nolint );
-        if ( ( nolint == null || nolint == true ) && s.length < 80 && ( indent == null || indent.length == 0 ) ){
-            s = s.replace( /[\s\r\n ]+/gm , " " );
-        }
-        return s;
-    }
-    case "function":
-        return x.toString();
-    default:
-        throw "tojson can't handle type " + ( typeof x );
-    }
-    
-}
-
-tojsonObject = function( x, indent , nolint ){
-    var lineEnding = nolint ? " " : "\n";
-    var tabSpace = nolint ? "" : "\t";
-    
-    assert.eq( ( typeof x ) , "object" , "tojsonObject needs object, not [" + ( typeof x ) + "]" );
-
-    if (!indent) 
-        indent = "";
-    
-    if ( typeof( x.tojson ) == "function" && x.tojson != tojson ) {
-        return x.tojson(indent,nolint);
-    }
-    
-    if ( x.constructor && typeof( x.constructor.tojson ) == "function" && x.constructor.tojson != tojson ) {
-        return x.constructor.tojson( x, indent , nolint );
-    }
-
-    if ( x.toString() == "[object MaxKey]" )
-        return "{ $maxKey : 1 }";
-    if ( x.toString() == "[object MinKey]" )
-        return "{ $minKey : 1 }";
-    
-    var s = "{" + lineEnding;
-
-    // push one level of indent
-    indent += tabSpace;
-    
-    var total = 0;
-    for ( var k in x ) total++;
-    if ( total == 0 ) {
-        s += indent + lineEnding;
-    }
-
-    var keys = x;
-    if ( typeof( x._simpleKeys ) == "function" )
-        keys = x._simpleKeys();
-    var num = 1;
-    for ( var k in keys ){
-        
-        var val = x[k];
-        if ( val == DB.prototype || val == DBCollection.prototype )
-            continue;
-
-        s += indent + "\"" + k + "\" : " + tojson( val, indent , nolint );
-        if (num != total) {
-            s += ",";
-            num++;
-        }
-        s += lineEnding;
-    }
-
-    // pop one level of indent
-    indent = indent.substring(1);
-    return s + indent + "}";
-}
-
 shellPrint = function( x ){
     it = x;
     if ( x != undefined )
@@ -1087,16 +366,25 @@ jsTestPath = function(){
     return "__unknown_path__"
 }
 
+var _jsTestOptions = { enableTestCommands : true }; // Test commands should be enabled by default
+
 jsTestOptions = function(){
-    if( TestData ) return { noJournal : TestData.noJournal,
-                            noJournalPrealloc : TestData.noJournalPrealloc,
-                            auth : TestData.auth,
-                            keyFile : TestData.keyFile,
-                            authUser : "__system",
-                            authPassword : TestData.keyFileData,
-                            adminUser : "admin",
-                            adminPassword : "password" }
-    return {}
+    if( TestData ) {
+        return Object.merge(_jsTestOptions,
+                            { noJournal : TestData.noJournal,
+                              noJournalPrealloc : TestData.noJournalPrealloc,
+                              auth : TestData.auth,
+                              keyFile : TestData.keyFile,
+                              authUser : "__system",
+                              authPassword : TestData.keyFileData,
+                              adminUser : TestData.adminUser || "admin",
+                              adminPassword : TestData.adminPassword || "password" });
+    }
+    return _jsTestOptions;
+}
+
+setJsTestOption = function(name, value) {
+    _jsTestOptions[name] = value;
 }
 
 jsTestLog = function(msg){
@@ -1109,6 +397,7 @@ jsTest.name = jsTestName
 jsTest.file = jsTestFile
 jsTest.path = jsTestPath
 jsTest.options = jsTestOptions
+jsTest.setOption = setJsTestOption
 jsTest.log = jsTestLog
 
 jsTest.dir = function(){
@@ -1137,15 +426,37 @@ jsTest.addAuth = function(conn) {
         localconn = new Mongo(hosts.join(','));
     }
     print ("Adding admin user on connection: " + localconn);
-    return localconn.getDB('admin').addUser(jsTestOptions().adminUser, jsTestOptions().adminPassword);
+    return localconn.getDB('admin').addUser(jsTestOptions().adminUser, jsTestOptions().adminPassword,
+                                            false, 'majority', 60000);
 }
 
 jsTest.authenticate = function(conn) {
-    conn.authenticated = true;
-    if (jsTest.options().auth || jsTest.options().keyFile) {
-        print ("Authenticating to admin user on connection: " + conn);
-        return conn.getDB('admin').auth(jsTestOptions().adminUser, jsTestOptions().adminPassword);
+    if (!jsTest.options().auth && !jsTest.options().keyFile) {
+        conn.authenticated = true;
+        return true;
     }
+
+    try {
+        jsTest.attempt({timeout:5000, sleepTime:1000, desc: "Authenticating connection: " + conn},
+                       function() {
+                           // Set authenticated to stop an infinite recursion from getDB calling
+                           // back into authenticate.
+                           conn.authenticated = true;
+                           print ("Authenticating to admin database as " +
+                                  jsTestOptions().adminUser + " with mechanism " +
+                                  DB.prototype._defaultAuthenticationMechanism +
+                                  " on connection: " + conn);
+                           conn.authenticated = conn.getDB('admin').auth({
+                               user: jsTestOptions().adminUser,
+                               pwd: jsTestOptions().adminPassword
+                           });
+                           return conn.authenticated;
+                       });
+    } catch (e) {
+        print("Caught exception while authenticating connection: " + tojson(e));
+        conn.authenticated = false;
+    }
+    return conn.authenticated;
 }
 
 jsTest.authenticateNodes = function(nodes) {
@@ -1174,7 +485,7 @@ jsTest.isMongos = function(conn) {
 jsTest.attempt = function( opts, func ) {
     var timeout = opts.timeout || 1000;
     var tries   = 0;
-    var sleepTime = 2000;
+    var sleepTime = opts.sleepTime || 2000;
     var result = null;
     var context = opts.context || this;
 
@@ -1269,7 +580,7 @@ shellAutocomplete = function ( /*prefix*/ ) { // outer scope function called on 
     builtinMethods[Mongo] = "find update insert remove".split( ' ' );
     builtinMethods[BinData] = "hex base64 length subtype".split( ' ' );
 
-    var extraGlobals = "Infinity NaN undefined null true false decodeURI decodeURIComponent encodeURI encodeURIComponent escape eval isFinite isNaN parseFloat parseInt unescape Array Boolean Date Math Number RegExp String print load gc MinKey MaxKey Mongo NumberInt NumberLong ObjectId DBPointer UUID BinData HexData MD5 Map".split( ' ' );
+    var extraGlobals = "Infinity NaN undefined null true false decodeURI decodeURIComponent encodeURI encodeURIComponent escape eval isFinite isNaN parseFloat parseInt unescape Array Boolean Date Math Number RegExp String print load gc MinKey MaxKey Mongo NumberInt NumberLong ObjectId DBPointer UUID BinData HexData MD5 Map Timestamp".split( ' ' );
 
     var isPrivate = function( name ) {
         if ( shellAutocomplete.showPrivate ) return false;
@@ -1467,7 +778,7 @@ shellHelper.show = function (what) {
         return "";
     }
 
-    if (what == "dbs") {
+    if (what == "dbs" || what == "databases") {
         var dbs = db.getMongo().getDBs();
         var size = {};
         dbs.databases.forEach(function (x) { size[x.name] = x.sizeOnDisk; });
@@ -1503,81 +814,39 @@ shellHelper.show = function (what) {
         return ""
     }
 
+    if (what == "startupWarnings" ) {
+        var dbDeclared, ex;
+        try {
+            // !!db essentially casts db to a boolean
+            // Will throw a reference exception if db hasn't been declared.
+            dbDeclared = !!db;
+        } catch (ex) {
+            dbDeclared = false;
+        }
+        if (dbDeclared) {
+            var res = db.adminCommand( { getLog : "startupWarnings" } );
+            if ( res.ok ) {
+                if (res.log.length == 0) {
+                    return "";
+                }
+                print( "Server has startup warnings: " );
+                for ( var i=0; i<res.log.length; i++){
+                    print( res.log[i] )
+                }
+                return "";
+            } else {
+                print("Error while trying to show server startup warnings: " + res.errmsg);
+                return "";
+            }
+        } else {
+            print("Cannot show startupWarnings, \"db\" is not set");
+            return "";
+        }
+    }
 
     throw "don't know how to show [" + what + "]";
 
 }
-
-if ( typeof( Map ) == "undefined" ){
-    Map = function(){
-        this._data = {};
-    }
-}
-
-Map.hash = function( val ){
-    if ( ! val )
-        return val;
-
-    switch ( typeof( val ) ){
-    case 'string':
-    case 'number':
-    case 'date':
-        return val.toString();
-    case 'object':
-    case 'array':
-        var s = "";
-        for ( var k in val ){
-            s += k + val[k];
-        }
-        return s;
-    }
-
-    throw "can't hash : " + typeof( val );
-}
-
-Map.prototype.put = function( key , value ){
-    var o = this._get( key );
-    var old = o.value;
-    o.value = value;
-    return old;
-}
-
-Map.prototype.get = function( key ){
-    return this._get( key ).value;
-}
-
-Map.prototype._get = function( key ){
-    var h = Map.hash( key );
-    var a = this._data[h];
-    if ( ! a ){
-        a = [];
-        this._data[h] = a;
-    }
-    
-    for ( var i=0; i<a.length; i++ ){
-        if ( friendlyEqual( key , a[i].key ) ){
-            return a[i];
-        }
-    }
-    var o = { key : key , value : null };
-    a.push( o );
-    return o;
-}
-
-Map.prototype.values = function(){
-    var all = [];
-    for ( var k in this._data ){
-        this._data[k].forEach( function(z){ all.push( z.value ); } );
-    }
-    return all;
-}
-
-if ( typeof( gc ) == "undefined" ){
-    gc = function(){
-        print( "warning: using noop gc()" );
-    }
-}
-   
 
 Math.sigFig = function( x , N ){
     if ( ! N ){
@@ -1606,7 +875,14 @@ Random.setRandomSeed = function( s ) {
 
 // generate a random value from the exponential distribution with the specified mean
 Random.genExp = function( mean ) {
-    return -Math.log( Random.rand() ) * mean;
+    var r = Random.rand();
+    if ( r == 0 ) {
+        r = Random.rand();
+        if ( r == 0 ) {
+            r = 0.000001;
+        }
+    }
+    return -Math.log( r ) * mean;
 }
 
 Geo = {};
@@ -1692,6 +968,7 @@ rs.help = function () {
     print("\trs.slaveOk()                    shorthand for db.getMongo().setSlaveOk()");
     print();
     print("\tdb.isMaster()                   check who is primary");
+    print("\tdb.printReplicationInfo()       check oplog size and time range");
     print();
     print("\treconfiguration helpers disconnect from the database so the shell will display");
     print("\tan error, even if the command succeeds.");
@@ -1872,7 +1149,7 @@ help = shellHelper.help = function (x) {
         print();
         print("\to = new ObjectId()                  create a new ObjectId");
         print("\to.getTimestamp()                    return timestamp derived from first 32 bits of the OID");
-        print("\to.isObjectId()");
+        print("\to.isObjectId");
         print("\to.toString()");
         print("\to.equals(otherid)");
         print();

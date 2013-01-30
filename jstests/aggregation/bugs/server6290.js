@@ -1,26 +1,27 @@
 // The $isoDate operator is not available.  SERVER-6290
 
-t = db.jstests_aggregation_server6290;
+// load the test utilities
+load('jstests/aggregation/extras/utils.js');
+
+var t = db.jstests_aggregation_server6290;
 t.drop();
 
 t.save( {} );
 
-function assertInvalidOperator( pipeline ) {
-    assert.eq( 15999, // exception: invalid operator
-               t.aggregate( pipeline ).code );
-}
+// code 15999: invalid operator
+var error = 15999;
 
 // $isoDate is an invalid operator.
-assertInvalidOperator( { $project:{ a:{ $isoDate:[ { year:1 } ] } } } );
+assertErrorCode(t, {$project:{ a:{ $isoDate:[ { year:1 } ] } } }, error);
 // $date is an invalid operator.
-assertInvalidOperator( { $project:{ a:{ $date:[ { year:1 } ] } } } );
+assertErrorCode(t, { $project:{ a:{ $date:[ { year:1 } ] } } }, error);
 
 // Alternative operands.
-assertInvalidOperator( { $project:{ a:{ $isoDate:[] } } } );
-assertInvalidOperator( { $project:{ a:{ $date:[] } } } );
-assertInvalidOperator( { $project:{ a:{ $isoDate:'foo' } } } );
-assertInvalidOperator( { $project:{ a:{ $date:'foo' } } } );
+assertErrorCode(t, { $project:{ a:{ $isoDate:[] } } }, error);
+assertErrorCode(t, { $project:{ a:{ $date:[] } } }, error);
+assertErrorCode(t, { $project:{ a:{ $isoDate:'foo' } } }, error);
+assertErrorCode(t, { $project:{ a:{ $date:'foo' } } }, error);
 
 // Test with $group.
-assertInvalidOperator( { $group:{ _id:0, a:{ $first:{ $isoDate:[ { year:1 } ] } } } } );
-assertInvalidOperator( { $group:{ _id:0, a:{ $first:{ $date:[ { year:1 } ] } } } } );
+assertErrorCode(t, { $group:{ _id:0, a:{ $first:{ $isoDate:[ { year:1 } ] } } } }, error);
+assertErrorCode(t, { $group:{ _id:0, a:{ $first:{ $date:[ { year:1 } ] } } } }, error);

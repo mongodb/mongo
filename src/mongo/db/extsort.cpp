@@ -16,36 +16,37 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "pch.h"
+#include "mongo/pch.h"
+
+#include "mongo/db/extsort.h"
 
 #if defined(_WIN32)
 #   include <io.h>
 #endif
 
-#include "extsort.h"
-#include "namespace-inl.h"
-#include "../util/file.h"
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <fcntl.h>
-#include <fstream>
 #include <boost/filesystem/convenience.hpp>
 #include <boost/filesystem/operations.hpp>
+#include <fcntl.h>
+#include <fstream>
+#include <sys/stat.h>
+#include <sys/types.h>
 
-
+#include "mongo/db/kill_current_op.h"
+#include "mongo/db/namespace-inl.h"
+#include "mongo/util/file.h"
 
 namespace mongo {
 
     HLMutex BSONObjExternalSorter::_extSortMutex("s");
     IndexInterface *BSONObjExternalSorter::extSortIdxInterface;
     Ordering BSONObjExternalSorter::extSortOrder( Ordering::make(BSONObj()) );
+    bool BSONObjExternalSorter::extSortMayInterrupt( false );
     unsigned long long BSONObjExternalSorter::_compares = 0;
     unsigned long long BSONObjExternalSorter::_uniqueNumber = 0;
     static SimpleMutex _uniqueNumberMutex( "uniqueNumberMutex" );
 
     /*static*/
     int BSONObjExternalSorter::_compare(IndexInterface& i, const Data& l, const Data& r, const Ordering& order) { 
-        RARELY killCurrentOp.checkForInterrupt();
         _compares++;
         int x = i.keyCompare(l.first, r.first, order);
         if ( x )
@@ -58,6 +59,10 @@ namespace mongo {
         DEV RARELY {
             _extSortMutex.dassertLocked(); // must be as we use a global var
         }
+#ifndef __sunos__
+        // Some solaris gnu qsort implementations do not support callback exceptions.
+        RARELY killCurrentOp.checkForInterrupt(!extSortMayInterrupt);
+#endif
         Data * l = (Data*)lv;
         Data * r = (Data*)rv;
         return _compare(*extSortIdxInterface, *l, *r, extSortOrder);
@@ -81,7 +86,7 @@ namespace mongo {
         rootpath << "_tmp/esort." << time(0) << "." << thisUniqueNumber << "/";
         _root = rootpath.str();
 
-        log(1) << "external sort root: " << _root.string() << endl;
+        LOG(1) << "external sort root: " << _root.string() << endl;
 
         create_directories( _root );
         _compares = 0;
@@ -96,28 +101,29 @@ namespace mongo {
         wassert( removed == 1 + _files.size() );
     }
 
-    void BSONObjExternalSorter::_sortInMem() {
+    void BSONObjExternalSorter::_sortInMem( bool mayInterrupt ) {
         // extSortComp needs to use glpbals
         // qsort_r only seems available on bsd, which is what i really want to use
         HLMutex::scoped_lock lk(_extSortMutex);
         extSortIdxInterface = &_idxi;
         extSortOrder = Ordering::make(_order);
+        extSortMayInterrupt = mayInterrupt;
         _cur->sort( BSONObjExternalSorter::extSortComp );
     }
 
-    void BSONObjExternalSorter::sort() {
+    void BSONObjExternalSorter::sort( bool mayInterrupt ) {
         uassert( 10048 ,  "already sorted" , ! _sorted );
 
         _sorted = true;
 
         if ( _cur && _files.size() == 0 ) {
-            _sortInMem();
-            log(1) << "\t\t not using file.  size:" << _curSizeSoFar << " _compares:" << _compares << endl;
+            _sortInMem( mayInterrupt );
+            LOG(1) << "\t\t not using file.  size:" << _curSizeSoFar << " _compares:" << _compares << endl;
             return;
         }
 
         if ( _cur ) {
-            finishMap();
+            finishMap( mayInterrupt );
         }
 
         if ( _cur ) {
@@ -130,7 +136,7 @@ namespace mongo {
 
     }
 
-    void BSONObjExternalSorter::add( const BSONObj& o , const DiskLoc & loc ) {
+    void BSONObjExternalSorter::add( const BSONObj& o, const DiskLoc& loc, bool mayInterrupt ) {
         uassert( 10049 ,  "sorted already" , ! _sorted );
 
         if ( ! _cur ) {
@@ -145,20 +151,20 @@ namespace mongo {
         _curSizeSoFar += size + sizeof( DiskLoc ) + sizeof( BSONObj );
 
         if (  _cur->hasSpace() == false ||  _curSizeSoFar > _maxFilesize ) {
-            finishMap();
-            log(1) << "finishing map" << endl;
+            finishMap( mayInterrupt );
+            LOG(1) << "finishing map" << endl;
         }
 
     }
 
-    void BSONObjExternalSorter::finishMap() {
+    void BSONObjExternalSorter::finishMap( bool mayInterrupt ) {
         uassert( 10050 ,  "bad" , _cur );
 
         _curSizeSoFar = 0;
         if ( _cur->size() == 0 )
             return;
 
-        _sortInMem();
+        _sortInMem( mayInterrupt );
 
         stringstream ss;
         ss << _root.string() << "/file." << _files.size();
@@ -186,7 +192,7 @@ namespace mongo {
         _files.push_back( file );
         out.close();
 
-        log(2) << "Added file: " << file << " with " << num << "objects for external sort" << endl;
+        LOG(2) << "Added file: " << file << " with " << num << "objects for external sort" << endl;
     }
 
     // ---------------------------------
@@ -260,10 +266,13 @@ namespace mongo {
 
     // -----------------------------------
 
-    BSONObjExternalSorter::FileIterator::FileIterator( string file ) {
+    BSONObjExternalSorter::FileIterator::FileIterator( const std::string& file ) {
 #ifdef _WIN32
         _file = ::_open( file.c_str(), _O_BINARY | _O_RDWR | _O_CREAT , _S_IREAD | _S_IWRITE );
 #else
+#ifndef O_NOATIME
+#define O_NOATIME 0
+#endif
         _file = ::open( file.c_str(), O_CREAT | O_RDWR | O_NOATIME , S_IRUSR | S_IWUSR );
 #endif
         massert( 16392, 

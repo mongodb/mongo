@@ -22,7 +22,6 @@
 #include "../db/d_concurrency.h"
 #include "../db/memconcept.h"
 #include "mongo/util/timer.h"
-#include "mongo/util/concurrency/remap_lock.h"
 #include "mongo/util/file_allocator.h"
 
 namespace mongo {
@@ -42,17 +41,6 @@ namespace mongo {
 
     MAdvise::MAdvise(void *,unsigned, Advice) { }
     MAdvise::~MAdvise() { }
-
-    // SERVER-2942 -- We do it this way because RemapLock is used in both mongod and mongos but
-    // we need different effects.  When called in mongod it needs to be a mutex and in mongos it
-    // needs to be a no-op.  This is the mongod version, the no-op mongos version is in server.cpp.
-    SimpleMutex _remapLock( "remapLock" );
-    RemapLock::RemapLock() {
-        _remapLock.lock();
-    }
-    RemapLock::~RemapLock() {
-        _remapLock.unlock();
-    }
 
     static unsigned long long _nextMemoryMappedFileLocation = 256LL * 1024LL * 1024LL * 1024LL;
     static SimpleMutex _nextMemoryMappedFileLocationMutex( "nextMemoryMappedFileLocationMutex" );
@@ -310,8 +298,6 @@ namespace mongo {
 
         LockMongoFilesExclusive lockMongoFiles;
 
-        RemapLock remapLock;
-
         clearWritableBits(oldPrivateAddr);
         if( !UnmapViewOfFile(oldPrivateAddr) ) {
             DWORD dosError = GetLastError();
@@ -340,9 +326,15 @@ namespace mongo {
         return newPrivateView;
     }
 
+    // prevent WRITETODATAFILES() from running at the same time as FlushViewOfFile()
+    SimpleMutex globalFlushMutex("globalFlushMutex");
+
     class WindowsFlushable : public MemoryMappedFile::Flushable {
     public:
-        WindowsFlushable( void * view , HANDLE fd , string filename , boost::shared_ptr<mutex> flushMutex )
+        WindowsFlushable( void * view,
+                          HANDLE fd,
+                          const std::string& filename,
+                          boost::shared_ptr<mutex> flushMutex )
             : _view(view) , _fd(fd) , _filename(filename) , _flushMutex(flushMutex)
         {}
 
@@ -350,6 +342,7 @@ namespace mongo {
             if (!_view || !_fd)
                 return;
 
+            SimpleMutex::scoped_lock _globalFlushMutex(globalFlushMutex);
             scoped_lock lk(*_flushMutex);
 
             int loopCount = 0;

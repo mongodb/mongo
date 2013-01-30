@@ -16,9 +16,9 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "mongo/db/btree.h"
 #include "mongo/db/hasher.h"
 #include "mongo/db/index.h"
+#include "mongo/db/keypattern.h"
 #include "mongo/db/matcher.h"
 #include "mongo/db/namespace-inl.h"
 #include "mongo/db/pdfile.h"
@@ -74,7 +74,8 @@ namespace mongo {
          *   {b : 3} USELESS
          *   {a : {$gt : 3}} USELESS
          */
-        IndexSuitability suitability( const BSONObj& query , const BSONObj& order ) const;
+        IndexSuitability suitability( const FieldRangeSet& queryConstraints ,
+                                      const BSONObj& order ) const;
 
         /* The input is "obj" which should have a field corresponding to the hashedfield.
          * The output is a BSONObj with a single BSONElement whose value is the hash
@@ -110,7 +111,7 @@ namespace mongo {
 
     private:
         string _hashedField;
-        BSONObj _keyPattern;
+        KeyPattern _keyPattern;
         HashSeed _seed; //defaults to zero if not in the IndexSpec
         HashVersion _hashVersion; //defaults to zero if not in the IndexSpec
         bool _isSparse;

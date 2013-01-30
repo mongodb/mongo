@@ -139,6 +139,24 @@ int main( int argc, const char **argv ) {
     }
 
     {
+        // 5 second TTL index
+        const char * ttlns = "test.ttltest1";
+        conn.dropCollection( ttlns );
+
+        {
+            mongo::BSONObjBuilder b;
+            b.appendTimeT("ttltime", time(0));
+            b.append("name", "foo");
+            conn.insert(ttlns, b.obj());
+        }
+        conn.ensureIndex(ttlns, BSON("ttltime" << 1), false, "", true, false, -1, 5);
+        verify(!conn.findOne(ttlns, BSONObjBuilder().append("name", "foo").obj()).isEmpty());
+        // Sleep 66 seconds, 60 seconds for the TTL loop, 5 seconds for the TTL and 1 to ensure
+        sleepsecs(66);
+        verify(conn.findOne(ttlns, BSONObjBuilder().append("name", "foo").obj()).isEmpty());
+    }
+
+    {
         // hint related tests
         verify( conn.findOne(ns, "{}")["name"].str() == "sara" );
 

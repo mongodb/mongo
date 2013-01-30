@@ -28,6 +28,7 @@ s.printShardingStatus();
 
 // Make sure we can't move when our clock skew is so high
 result = otherMongos.getDB( "admin" ).runCommand( { moveprimary : "test1", to : to.name } );
+printjson(result);
 s.printShardingStatus();
 assert.eq( result.ok, 0, "Move command should not have succeeded!" )
 
@@ -39,6 +40,7 @@ print("  Collection Sharded! ")
 
 // Make sure we can't split when our clock skew is so high
 result = otherMongos.getDB( "admin" ).runCommand( { split : "test1.foo", find : { a : 2 } } );
+printjson(result);
 assert.eq( result.ok, 0, "Split command should not have succeeded!")
 
 // Adjust clock back in bounds
@@ -48,16 +50,19 @@ print("  Clock adjusted back to in-bounds. ");
 // Make sure we can now split
 result = otherMongos.getDB( "admin" ).runCommand( { split : "test1.foo", find : { a : 2 } } );
 s.printShardingStatus();
+printjson(result);
 assert.eq( result.ok, 1, "Split command should have succeeded!")
 
 // Make sure we can now move
 result = otherMongos.getDB( "admin" ).runCommand( { moveprimary : "test1", to : to.name } );
 s.printShardingStatus();
+printjson(result);
 assert.eq( result.ok, 1, "Move command should have succeeded!" )
 
 // Make sure we can now move again (getting the lock twice)
 result = otherMongos.getDB( "admin" ).runCommand( { moveprimary : "test1", to : from.name } );
 s.printShardingStatus();
+printjson(result);
 assert.eq( result.ok, 1, "Move command should have succeeded again!" )
 
 s.stop();

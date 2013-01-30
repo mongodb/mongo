@@ -14,17 +14,21 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "pch.h"
-#include "curop.h"
-#include "database.h"
+#include "mongo/pch.h"
+
+#include "mongo/base/counter.h"
+#include "mongo/db/commands/server_status.h"
+#include "mongo/db/curop.h"
+#include "mongo/db/database.h"
+#include "mongo/db/kill_current_op.h"
 
 namespace mongo {
 
     // todo : move more here
 
-    CurOp::CurOp( Client * client , CurOp * wrapped ) : 
-        _client(client), 
-        _wrapped(wrapped) 
+    CurOp::CurOp( Client * client , CurOp * wrapped ) :
+        _client(client),
+        _wrapped(wrapped)
     {
         if ( _wrapped )
             _client->_curOp = this;
@@ -32,6 +36,7 @@ namespace mongo {
         _active = false;
         _reset();
         _op = 0;
+        _opNum = _nextOpNum++;
         // These addresses should never be written to again.  The zeroes are
         // placed here as a precaution because currentOp may be accessed
         // without the db mutex.
@@ -45,7 +50,8 @@ namespace mongo {
         _end = 0;
         _message = "";
         _progressMeter.finished();
-        _killed = false;
+        _killPending.store(0);
+        killCurrentOp.notifyAllWaiters();
         _numYields = 0;
         _expectedLatencyMs = 0;
         _lockStat.reset();
@@ -69,14 +75,18 @@ namespace mongo {
         }
         _op = op;
     }
-        
-    ProgressMeter& CurOp::setMessage( const char * msg , unsigned long long progressMeterTotal , int secondsBetween ) {
+
+    ProgressMeter& CurOp::setMessage(const char * msg,
+                                     std::string name,
+                                     unsigned long long progressMeterTotal,
+                                     int secondsBetween) {
         if ( progressMeterTotal ) {
             if ( _progressMeter.isActive() ) {
                 cout << "about to assert, old _message: " << _message << " new message:" << msg << endl;
                 verify( ! _progressMeter.isActive() );
             }
             _progressMeter.reset( progressMeterTotal , secondsBetween );
+            _progressMeter.setName(name);
         }
         else {
             _progressMeter.finished();
@@ -85,17 +95,9 @@ namespace mongo {
         return _progressMeter;
     }
 
-
-    BSONObj CurOp::info() {
-        if( ! cc().getAuthenticationInfo()->isAuthorized("admin") ) {
-            BSONObjBuilder b;
-            b.append("err", "unauthorized");
-            return b.obj();
-        }
-        return infoNoauth();
-    }
-
     CurOp::~CurOp() {
+        killCurrentOp.notifyAllWaiters();
+
         if ( _wrapped ) {
             scoped_lock bl(Client::clientsMutex);
             _client->_curOp = _wrapped;
@@ -114,9 +116,9 @@ namespace mongo {
         strncpy( _ns, context->ns(), Namespace::MaxNsLen);
         _ns[Namespace::MaxNsLen] = 0;
 
-        _dbprofile = std::max( context->_db ? context->_db->profile : 0 , _dbprofile );
+        _dbprofile = std::max( context->_db ? context->_db->getProfilingLevel() : 0 , _dbprofile );
     }
-    
+
     void CurOp::leave( Client::Context * context ) {
     }
 
@@ -128,7 +130,7 @@ namespace mongo {
         }
     }
 
-    BSONObj CurOp::infoNoauth() {
+    BSONObj CurOp::info() {
         BSONObjBuilder b;
         b.append("opid", _opNum);
         bool a = _active && _start;
@@ -142,7 +144,12 @@ namespace mongo {
 
         b.append("ns", _ns);
 
-        _query.append( b , "query" );
+        if (_op == dbInsert) {
+            _query.append(b, "insert");
+        }
+        else {
+            _query.append(b , "query");
+        }
 
         if( !_remote.empty() ) {
             b.append("client", _remote.toString());
@@ -150,13 +157,13 @@ namespace mongo {
 
         if ( _client ) {
             b.append( "desc" , _client->desc() );
-            if ( _client->_threadId.size() ) 
+            if ( _client->_threadId.size() )
                 b.append( "threadId" , _client->_threadId );
             if ( _client->_connectionId )
                 b.appendNumber( "connectionId" , _client->_connectionId );
             _client->_ls.reportState(b);
         }
-        
+
         if ( ! _message.empty() ) {
             if ( _progressMeter.isActive() ) {
                 StringBuilder buf;
@@ -172,36 +179,67 @@ namespace mongo {
             }
         }
 
-        if( killed() ) 
-            b.append("killed", true);
-        
+        if( killPending() )
+            b.append("killPending", true);
+
         b.append( "numYields" , _numYields );
         b.append( "lockStats" , _lockStat.report() );
 
         return b.obj();
     }
 
-    void KillCurrentOp::checkForInterrupt( bool heedMutex ) {
-        Client& c = cc();
-        if ( heedMutex && Lock::somethingWriteLocked() && c.hasWrittenThisPass() )
-            return;
-        if( _globalKill )
-            uasserted(11600,"interrupted at shutdown");
-        if( c.curop()->killed() ) {
-            uasserted(11601,"operation was interrupted");
-        }
-    }
-    
-    const char * KillCurrentOp::checkForInterruptNoAssert() {
-        Client& c = cc();
-        if( _globalKill )
-            return "interrupted at shutdown";
-        if( c.curop()->killed() )
-            return "interrupted";
-        return "";
+    void CurOp::setKillWaiterFlags() {
+        for (size_t i = 0; i < _notifyList.size(); ++i)
+            *(_notifyList[i]) = true;
+        _notifyList.clear();
     }
 
+    void CurOp::kill(bool* pNotifyFlag /* = NULL */) {
+        _killPending.store(1);
+        if (pNotifyFlag) {
+            _notifyList.push_back(pNotifyFlag);
+        }
+    }
 
     AtomicUInt CurOp::_nextOpNum;
 
+    static Counter64 returnedCounter;
+    static Counter64 insertedCounter;
+    static Counter64 updatedCounter;
+    static Counter64 deletedCounter;
+    static Counter64 scannedCounter;
+
+    static ServerStatusMetricField<Counter64> displayReturned( "document.returned", &returnedCounter );
+    static ServerStatusMetricField<Counter64> displayUpdated( "document.updated", &updatedCounter );
+    static ServerStatusMetricField<Counter64> displayInserted( "document.inserted", &insertedCounter );
+    static ServerStatusMetricField<Counter64> displayDeleted( "document.deleted", &deletedCounter );
+    static ServerStatusMetricField<Counter64> displayScanned( "document.scanned", &scannedCounter );
+
+    static Counter64 idhackCounter;
+    static Counter64 scanAndOrderCounter;
+    static Counter64 fastmodCounter;
+
+    static ServerStatusMetricField<Counter64> displayIdhack( "operation.idhack", &idhackCounter );
+    static ServerStatusMetricField<Counter64> displayScanAndOrder( "operation.scanAndOrder", &scanAndOrderCounter );
+    static ServerStatusMetricField<Counter64> displayFastMod( "operation.fastmod", &fastmodCounter );
+
+    void OpDebug::recordStats() {
+        if ( nreturned > 0 )
+            returnedCounter.increment( nreturned );
+        if ( ninserted > 0 )
+            insertedCounter.increment( ninserted );
+        if ( nupdated > 0 )
+            updatedCounter.increment( nupdated );
+        if ( ndeleted > 0 )
+            deletedCounter.increment( ndeleted );
+        if ( nscanned > 0 )
+            scannedCounter.increment( nscanned );
+
+        if ( idhack )
+            idhackCounter.increment();
+        if ( scanAndOrder )
+            scanAndOrderCounter.increment();
+        if ( fastmod )
+            fastmodCounter.increment();
+    }
 }

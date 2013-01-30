@@ -2,23 +2,26 @@
 
 /*    Copyright 2009 10gen Inc.
  *
- *    Licensed under the Apache License, Version 2.0 (the "License");
- *    you may not use this file except in compliance with the License.
- *    You may obtain a copy of the License at
+ *    This program is free software: you can redistribute it and/or modify
+ *    it under the terms of the GNU Affero General Public License, version 3,
+ *    as published by the Free Software Foundation.
  *
- *    http://www.apache.org/licenses/LICENSE-2.0
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU Affero General Public License for more details.
  *
- *    Unless required by applicable law or agreed to in writing, software
- *    distributed under the License is distributed on an "AS IS" BASIS,
- *    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *    See the License for the specific language governing permissions and
- *    limitations under the License.
+ *    You should have received a copy of the GNU Affero General Public License
+ *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-// hacked in right now from engine_spidermonkey.cpp
+//#include <third_party/js-1.7/jsapi.h>
 
+#include "mongo/base/init.h"
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/db/namespacestring.h"
+#include "mongo/scripting/engine_spidermonkey.h"
+#include "mongo/scripting/engine_spidermonkey_internal.h"
 #include "mongo/util/base64.h"
 #include "mongo/util/text.h"
 
@@ -30,12 +33,28 @@ namespace mongo {
 
     bool haveLocalShardingInfo( const string& ns );
 
+    // Generated symbols for JS files
+    namespace JSFiles {
+        extern const JSFile types;
+        extern const JSFile assert;
+    }
+
+namespace spidermonkey {
+
+    JSFunctionSpec bson_functions[] = {
+        { 0 }
+    };
+
+    JSBool bson_cons( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval ) {
+        JS_ReportError( cx , "can't construct bson object" );
+        return JS_FALSE;
+    }
+
     // ------------    some defs needed ---------------
 
     JSObject * doCreateCollection( JSContext * cx , JSObject * db , const string& shortName );
 
     // ------------     utils          ------------------
-
 
     bool isSpecialName( const string& name ) {
         static set<string> names;
@@ -276,7 +295,8 @@ namespace mongo {
 
     DBClientWithCommands *getConnection( JSContext *cx, JSObject *obj ) {
         shared_ptr< DBClientWithCommands > * connHolder = (shared_ptr< DBClientWithCommands >*)JS_GetPrivate( cx , obj );
-        uassert( 10239 ,  "no connection!" , connHolder && connHolder->get() );
+        if (!connHolder)
+            return NULL;
         return connHolder->get();
     }
 
@@ -316,9 +336,8 @@ namespace mongo {
     JSBool mongo_auth(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval) {
         try {
             smuassert( cx , "mongo_auth needs 3 args" , argc == 3 );
-            shared_ptr< DBClientWithCommands > * connHolder = (shared_ptr< DBClientWithCommands >*)JS_GetPrivate( cx , obj );
-            smuassert( cx ,  "no connection!" , connHolder && connHolder->get() );
-            DBClientWithCommands *conn = connHolder->get();
+            DBClientWithCommands *conn = getConnection(cx, obj);
+            smuassert(cx , "no connection!", conn);
 
             Convertor c( cx );
 
@@ -479,7 +498,7 @@ namespace mongo {
 
     JSBool mongo_insert(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval) {
         try {
-            smuassert( cx ,  "mongo_insert needs 2 args" , argc == 2 );
+            smuassert( cx ,  "mongo_insert needs 3 args" , argc == 3 );
             smuassert( cx ,  "2nd param to insert has to be an object" , JSVAL_IS_OBJECT( argv[1] ) );
 
             Convertor c( cx );
@@ -494,6 +513,8 @@ namespace mongo {
             string ns = c.toString( argv[0] );
 
             JSObject * insertObj = JSVAL_TO_OBJECT( argv[1] );
+
+            int flags = static_cast<int>( c.toNumber( argv[2] ) );
 
             if( JS_IsArrayObject( cx, insertObj ) ){
                 vector<BSONObj> bos;
@@ -511,7 +532,7 @@ namespace mongo {
                     bos.push_back( c.toObject( el ) );
                 }
 
-                conn->insert( ns, bos );
+                conn->insert( ns, bos, flags );
             }
             else {
                 BSONObj o = c.toObject( argv[1] );
@@ -580,15 +601,44 @@ namespace mongo {
         return JS_TRUE;
     }
 
-    JSFunctionSpec mongo_functions[] = {
-        { "auth" , mongo_auth , 0 , JSPROP_READONLY | JSPROP_PERMANENT, 0 } ,
-        { "logout", mongo_logout, 0, JSPROP_READONLY | JSPROP_PERMANENT, 0 },
-        { "find" , mongo_find , 0 , JSPROP_READONLY | JSPROP_PERMANENT, 0 } ,
-        { "update" , mongo_update , 0 , JSPROP_READONLY | JSPROP_PERMANENT, 0 } ,
-        { "insert" , mongo_insert , 0 , JSPROP_READONLY | JSPROP_PERMANENT, 0 } ,
-        { "remove" , mongo_remove , 0 , JSPROP_READONLY | JSPROP_PERMANENT, 0 } ,
-        { 0 }
-    };
+namespace {
+    std::vector<JSFunctionSpec>* mongoFunctionsVector;
+    JSFunctionSpec* mongo_functions;
+
+    MONGO_INITIALIZER(SmMongoFunctionsRegistry)(InitializerContext* context) {
+        static const JSFunctionSpec mongoFunctionsStandard[] = {
+            { "auth" , mongo_auth , 0 , JSPROP_READONLY | JSPROP_PERMANENT, 0 } ,
+            { "logout", mongo_logout, 0, JSPROP_READONLY | JSPROP_PERMANENT, 0 },
+            { "find" , mongo_find , 0 , JSPROP_READONLY | JSPROP_PERMANENT, 0 } ,
+            { "update" , mongo_update , 0 , JSPROP_READONLY | JSPROP_PERMANENT, 0 } ,
+            { "insert" , mongo_insert , 0 , JSPROP_READONLY | JSPROP_PERMANENT, 0 } ,
+            { "remove" , mongo_remove , 0 , JSPROP_READONLY | JSPROP_PERMANENT, 0 }
+        };
+        mongoFunctionsVector = new std::vector<JSFunctionSpec>;
+        std::copy(mongoFunctionsStandard,
+                  mongoFunctionsStandard + boost::size(mongoFunctionsStandard),
+                  std::back_inserter(*mongoFunctionsVector));
+        return Status::OK();
+    }
+
+    MONGO_INITIALIZER_WITH_PREREQUISITES(
+            SmMongoFunctionRegistrationDone, ("SmMongoFunctionsRegistry"))(InitializerContext* cx) {
+
+        static const JSFunctionSpec nullSpec = { 0 };
+        mongo_functions = new JSFunctionSpec[mongoFunctionsVector->size() + 1];
+        std::copy(mongoFunctionsVector->begin(), mongoFunctionsVector->end(), mongo_functions);
+        mongo_functions[mongoFunctionsVector->size()] = nullSpec;
+        delete mongoFunctionsVector;
+        mongoFunctionsVector = NULL;
+        return Status::OK();
+    }
+
+}  // namespace
+
+    void registerMongoFunction(const JSFunctionSpec& functionSpec) {
+        fassert(16466, mongoFunctionsVector != NULL);
+        mongoFunctionsVector->push_back(functionSpec);
+    }
 
     // -------------  db_collection -------------
 
@@ -1606,6 +1656,9 @@ zzz
         dbref_class.name = dbrefName;
         verify( JS_InitClass( cx , global , 0 , &dbref_class , dbref_constructor , 2 , 0 , bson_functions , 0 , 0 ) );
 
+        scope->execSetup(JSFiles::assert);
+        scope->execSetup(JSFiles::types);
+
         scope->execCoreFiles();
     }
 
@@ -1713,4 +1766,5 @@ zzz
 #endif
     }
 
-}
+}  // namespace spidermonkey
+}  // namespace mongo

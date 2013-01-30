@@ -5,7 +5,6 @@ t.drop();
 
 function assertAggregationResults( expected, aggregation ) {
     ret = t.aggregate( aggregation );
-    assert( ret.ok );
     assert.eq( expected, ret.result );
 }
 

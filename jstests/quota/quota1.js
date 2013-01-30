@@ -1,8 +1,9 @@
 t = db.quota1;
 
 print( "starting quota1.a" );
-/*
-assert.throws( 
+
+// Test that db.eval() times out if quotas are enabled
+assert.throws(
     function(z){
         db.eval(
             function(){
@@ -15,7 +16,7 @@ assert.throws(
         )
     }
 );
-*/
+
 print( "done quota1.a" );
 
 //print( "starting quota1.b" );

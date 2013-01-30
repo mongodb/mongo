@@ -27,21 +27,16 @@ waitParallel = function() {
     assert.soon( function() { return doneParallel(); }, "parallel did not finish in time", 300000, 1000 );
 }
 
-// waiting on SERVER-620
-
-print( "index11.js host:" );
-print( db.getMongo().host );
-
 size = 500000;
 while( 1 ) { // if indexing finishes before we can run checks, try indexing w/ more data
     print( "size: " + size );
-    baseName = "jstests_index11";
+    baseName = "jstests_indexbg1";
     fullName = "db." + baseName;
     t = db[ baseName ];
     t.drop();
 
     for( i = 0; i < size; ++i ) {
-        db.jstests_index11.save( {i:i} );
+        db.jstests_indexbg1.save( {i:i} );
     }
     db.getLastError();
     assert.eq( size, t.count() );
@@ -71,18 +66,9 @@ while( 1 ) { // if indexing finishes before we can run checks, try indexing w/ m
         t.save( {i:size+2} );
         assert( !db.getLastError() );
 
-        print("calling ensureIndex");
-        t.ensureIndex( {i:1} );
-
-        printjson( db.getLastError() );
-        assert( db.getLastError() );
         assert.eq( size + 1, t.count() );
         assert( !db.getLastError() );
 
-        print("calling dropIndex");
-        t.dropIndex( {i:1} );
-        printjson( db.getLastError() );
-        assert( db.getLastError() );        
     } catch( e ) {
         // only a failure if we're still indexing
         // wait for parallel status to update to reflect indexing status

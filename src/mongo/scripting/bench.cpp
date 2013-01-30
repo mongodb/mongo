@@ -25,6 +25,7 @@
 #include <boost/thread/thread.hpp>
 
 #include "mongo/client/dbclientcursor.h"
+#include "mongo/scripting/bson_template_evaluator.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/util/md5.h"
 #include "mongo/util/timer.h"
@@ -285,61 +286,12 @@ namespace mongo {
         return false;
     }
 
-    static void _fixField( BSONObjBuilder& b , const BSONElement& e ) {
-        verify( e.type() == Object );
-
-        BSONObj sub = e.Obj();
-        verify( sub.nFields() == 1 );
-
-        BSONElement f = sub.firstElement();
-        if ( str::equals( "#RAND_INT" , f.fieldName() ) ) {
-            BSONObjIterator i( f.Obj() );
-            int min = i.next().numberInt();
-            int max = i.next().numberInt();
-
-            int x = min + ( rand() % ( max - min ) );
-
-            if ( i.more() )
-                x *= i.next().numberInt();
-
-            b.append( e.fieldName() , x );
-        }
-        else {
-            uasserted( 14811 , str::stream() << "invalid bench dynamic piece: " << f.fieldName() );
-        }
-
-    }
-
-    static void fixQuery( BSONObjBuilder& b  , const BSONObj& obj ) {
-        BSONObjIterator i( obj );
-        while ( i.more() ) {
-            BSONElement e = i.next();
-
-            if ( ! e.isABSONObj() ) {
-                b.append( e );
-                continue;
-            }
-
-            BSONObj sub = e.Obj();
-            if ( sub.firstElement().fieldName()[0] == '#' ) {
-                _fixField( b , e );
-            }
-            else {
-                BSONObjBuilder xx( e.type() == Object ? b.subobjStart( e.fieldName() ) : b.subarrayStart( e.fieldName() ) );
-                fixQuery( xx , sub );
-                xx.done();
-            }
-
-        }
-    }
-
-    static BSONObj fixQuery( const BSONObj& obj ) {
-
+    static BSONObj fixQuery( const BSONObj& obj, BsonTemplateEvaluator& btl ) {
         if ( ! _hasSpecial( obj ) ) 
             return obj;
-
         BSONObjBuilder b( obj.objsize() + 128 );
-        fixQuery( b , obj );
+
+        verify(BsonTemplateEvaluator::StatusSuccess == btl.evaluate(obj, b));
         return b.obj();
     }
 
@@ -357,10 +309,14 @@ namespace mongo {
         return _brState->shouldWorkerFinish();
     }
 
+    void doNothing(const BSONObj&) { }
+
     void BenchRunWorker::generateLoadOnConnection( DBClientBase* conn ) {
         verify( conn );
         long long count = 0;
         mongo::Timer timer;
+
+        BsonTemplateEvaluator bsonTemplateEvaluator;
 
         while ( !shouldStop() ) {
             BSONObjIterator i( _config->ops );
@@ -391,7 +347,7 @@ namespace mongo {
                 bool check = ! e["check"].eoo();
                 if( check ){
                     if ( e["check"].type() == CodeWScope || e["check"].type() == Code || e["check"].type() == String ) {
-                        scope = globalScriptEngine->getPooledScope( ns );
+                        scope = globalScriptEngine->getPooledScope( ns + "benchrun" );
                         verify( scope.get() );
 
                         if ( e.type() == CodeWScope ) {
@@ -417,7 +373,8 @@ namespace mongo {
                         BSONObj result;
                         {
                             BenchRunEventTrace _bret(&_stats.findOneCounter);
-                            result = conn->findOne( ns , fixQuery( e["query"].Obj() ) );
+                            result = conn->findOne( ns , fixQuery( e["query"].Obj(),
+                                                                   bsonTemplateEvaluator ) );
                         }
 
                         if( check ){
@@ -437,8 +394,8 @@ namespace mongo {
                     else if ( op == "command" ) {
 
                         BSONObj result;
-                        // TODO
-                        /* bool ok = */ conn->runCommand( ns , fixQuery( e["command"].Obj() ), result, e["options"].numberInt() );
+                        conn->runCommand( ns, fixQuery( e["command"].Obj(), bsonTemplateEvaluator ),
+                                          result, e["options"].numberInt() );
 
                         if( check ){
                             int err = scope->invoke( scopeFunc , 0 , &result,  1000 * 60 , false );
@@ -464,16 +421,25 @@ namespace mongo {
                         int expected = e["expected"].eoo() ? -1 : e["expected"].Int();
 
                         auto_ptr<DBClientCursor> cursor;
+                        int count;
 
-                        {
+                        BSONObj fixedQuery = fixQuery(e["query"].Obj(), bsonTemplateEvaluator);
+
+                        // use special query function for exhaust query option
+                        if (options & QueryOption_Exhaust) {
                             BenchRunEventTrace _bret(&_stats.queryCounter);
-                            cursor = conn->query( ns, fixQuery( e["query"].Obj() ), limit, skip, &filter, options, batchSize );
+                            boost::function<void (const BSONObj&)> castedDoNothing(doNothing);
+                            count =  conn->query(castedDoNothing, ns, fixedQuery, &filter, options);
+                        }
+                        else {
+                            BenchRunEventTrace _bret(&_stats.queryCounter);
+                            cursor = conn->query(ns, fixedQuery, limit, skip, &filter, options,
+                                                 batchSize);
+                            count = cursor->itcount();
                         }
 
-                        int count = cursor->itcount();
-
                         if ( expected >= 0 &&  count != expected ) {
-                            cout << "bench query on: " << ns << " expected: " << expected << " got: " << cout << endl;
+                            cout << "bench query on: " << ns << " expected: " << expected << " got: " << count << endl;
                             verify(false);
                         }
 
@@ -503,7 +469,8 @@ namespace mongo {
 
                         {
                             BenchRunEventTrace _bret(&_stats.updateCounter);
-                            conn->update( ns, fixQuery( query ), update, upsert , multi );
+                            conn->update( ns, fixQuery( query, bsonTemplateEvaluator ), update,
+                                          upsert , multi );
                             if (safe)
                                 result = conn->getLastErrorDetailed();
                         }
@@ -532,7 +499,7 @@ namespace mongo {
                         BSONObj result;
                         {
                             BenchRunEventTrace _bret(&_stats.insertCounter);
-                            conn->insert( ns, fixQuery( e["doc"].Obj() ) );
+                            conn->insert( ns, fixQuery( e["doc"].Obj(), bsonTemplateEvaluator ) );
                             if (safe)
                                 result = conn->getLastErrorDetailed();
                         }
@@ -565,7 +532,7 @@ namespace mongo {
 
                         {
                             BenchRunEventTrace _bret(&_stats.deleteCounter);
-                            conn->remove( ns, fixQuery( query ), ! multi );
+                            conn->remove( ns, fixQuery( query, bsonTemplateEvaluator ), ! multi );
                             if (safe)
                                 result = conn->getLastErrorDetailed();
                         }
@@ -796,10 +763,10 @@ namespace mongo {
          buf.append( "errCount", (long long) stats.errCount );
          buf.append( "trapped", "error: not implemented" );
          appendAverageMicrosIfAvailable(buf, "findOneLatencyAverageMicros", stats.findOneCounter);
-         appendAverageMicrosIfAvailable(buf, "findOneLatencyAverageMicros", stats.insertCounter);
-         appendAverageMicrosIfAvailable(buf, "findOneLatencyAverageMicros", stats.deleteCounter);
-         appendAverageMicrosIfAvailable(buf, "findOneLatencyAverageMicros", stats.updateCounter);
-         appendAverageMicrosIfAvailable(buf, "findOneLatencyAverageMicros", stats.queryCounter);
+         appendAverageMicrosIfAvailable(buf, "insertLatencyAverageMicros", stats.insertCounter);
+         appendAverageMicrosIfAvailable(buf, "deleteLatencyAverageMicros", stats.deleteCounter);
+         appendAverageMicrosIfAvailable(buf, "updateLatencyAverageMicros", stats.updateCounter);
+         appendAverageMicrosIfAvailable(buf, "queryLatencyAverageMicros", stats.queryCounter);
 
          {
              BSONObjIterator i( after );
@@ -823,7 +790,7 @@ namespace mongo {
      /**
       * benchRun( { ops : [] , host : XXX , db : XXXX , parallel : 5 , seconds : 5 }
       */
-     BSONObj benchRunSync( const BSONObj& argsFake, void* data ) {
+     BSONObj BenchRunner::benchRunSync( const BSONObj& argsFake, void* data ) {
 
          BSONObj start = benchStart( argsFake, data );
 
@@ -837,7 +804,7 @@ namespace mongo {
      /**
       * benchRun( { ops : [] , host : XXX , db : XXXX , parallel : 5 , seconds : 5 }
       */
-     BSONObj benchStart( const BSONObj& argsFake, void* data ) {
+     BSONObj BenchRunner::benchStart( const BSONObj& argsFake, void* data ) {
 
          verify( argsFake.firstElement().isABSONObj() );
          BSONObj args = argsFake.firstElement().Obj();
@@ -852,7 +819,7 @@ namespace mongo {
     /**
      * benchRun( { ops : [] , host : XXX , db : XXXX , parallel : 5 , seconds : 5 }
      */
-    BSONObj benchFinish( const BSONObj& argsFake, void* data ) {
+    BSONObj BenchRunner::benchFinish( const BSONObj& argsFake, void* data ) {
 
         OID oid = OID( argsFake.firstElement().String() );
 
@@ -864,11 +831,4 @@ namespace mongo {
         return BSON( "" << finalObj );
     }
 
-    void installBenchmarkSystem( Scope& scope ) {
-        scope.injectNative( "benchRun" , benchRunSync );
-        scope.injectNative( "benchRunSync" , benchRunSync );
-        scope.injectNative( "benchStart" , benchStart );
-        scope.injectNative( "benchFinish" , benchFinish );
-    }
-
-}
+} // namespace mongo

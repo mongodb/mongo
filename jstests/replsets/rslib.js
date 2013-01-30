@@ -45,7 +45,7 @@ var reconnect = function(a) {
         }
         db.bar.stats();
         if (jsTest.options().keyFile) { // SERVER-4241: Shell connections don't re-authenticate on reconnect
-          jsTest.authenticate(db.getMongo());
+          return jsTest.authenticate(db.getMongo());
         }
         return true;
       } catch(e) {
@@ -67,28 +67,34 @@ var getLatestOp = function(server) {
 };
 
 
-var waitForAllMembers = function(master) {
-  var ready = false;
-  var count = 0;
-  
-  outer:
-  while (count < 60) {
-    count++;
-    var state = master.getSisterDB("admin").runCommand({replSetGetStatus:1});
-    occasionally(function() { printjson(state); }, 10);
+var waitForAllMembers = function(master, timeout) {
+    var failCount = 0;
 
-    for (var m in state.members) {
-      if (state.members[m].state != 1 && // PRIMARY 
-          state.members[m].state != 2 && // SECONDARY
-          state.members[m].state != 7) { // ARBITER
-        sleep(1000);
-        continue outer;
-      }
-    }
-    return;
-  }
+    assert.soon( function() {
+        var state = null
+        try {
+            state = master.getSisterDB("admin").runCommand({replSetGetStatus:1});
+            failCount = 0;
+        } catch ( e ) {
+            // Connection can get reset on replica set failover causing a socket exception
+            print( "Calling replSetGetStatus failed" );
+            print( e );
+            return false;
+        }
+        occasionally(function() { printjson(state); }, 10);
 
-  assert(false, "all members not ready");
+        for (var m in state.members) {
+            if (state.members[m].state != 1 && // PRIMARY
+                state.members[m].state != 2 && // SECONDARY
+                state.members[m].state != 7) { // ARBITER
+                return false;
+            }
+        }
+        printjson( state );
+        return true;
+    }, "not all members ready", timeout || 60000);
+
+    print( "All members are now in state PRIMARY, SECONDARY, or ARBITER" );
 };
 
 var reconfig = function(rs, config) {

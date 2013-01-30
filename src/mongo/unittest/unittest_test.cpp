@@ -8,6 +8,7 @@
 
 #include "mongo/unittest/unittest.h"
 
+#include <limits>
 #include <string>
 
 namespace {
@@ -33,6 +34,7 @@ namespace {
         ASSERT_GREATER_THAN(5, 1);
         ASSERT_GREATER_THAN_OR_EQUALS(5, 1);
         ASSERT_GREATER_THAN_OR_EQUALS(5, 5);
+        ASSERT_APPROX_EQUAL(5, 6, 1);
     }
 
     TEST(UnitTestSelfTest, TestNumericComparisonFailures) {
@@ -42,6 +44,13 @@ namespace {
         ASSERT_TEST_FAILS(ASSERT_GREATER_THAN(10, 10LL));
         ASSERT_TEST_FAILS(ASSERT_NOT_LESS_THAN(9, 10LL));
         ASSERT_TEST_FAILS(ASSERT_NOT_GREATER_THAN(1, 0LL));
+        ASSERT_TEST_FAILS(ASSERT_APPROX_EQUAL(5.0, 6.1, 1));
+        if (std::numeric_limits<double>::has_quiet_NaN) {
+            ASSERT_TEST_FAILS(ASSERT_APPROX_EQUAL(5, std::numeric_limits<double>::quiet_NaN(), 1));
+        }
+        if (std::numeric_limits<double>::has_infinity) {
+            ASSERT_TEST_FAILS(ASSERT_APPROX_EQUAL(5, std::numeric_limits<double>::infinity(), 1));
+        }
     }
 
     TEST(UnitTestSelfTest, TestStringComparisons) {

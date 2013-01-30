@@ -29,7 +29,7 @@ var fullShard = st.getShard( coll, { _id : 1 } )
 var emptyShard = st.getShard( coll, { _id : -1 } )
 
 var admin = st.s.getDB( "admin" )
-printjson( admin.runCommand({ moveChunk : "" + coll, find : { _id : -1 }, to : fullShard.shardName }) )
+printjson( admin.runCommand({ moveChunk : "" + coll, find : { _id : -1 }, to : fullShard.shardName, _waitForDelete : true }) )
 
 jsTestLog( "Resetting shard version via first mongos..." )
 

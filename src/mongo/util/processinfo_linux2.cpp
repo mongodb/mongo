@@ -380,7 +380,7 @@ namespace mongo {
         //docs claim hblkhd is included in uordblks but it isn't
 
         LinuxProc p(_pid);
-        info.append("page_faults", (int)p._maj_flt);
+        info.appendNumber("page_faults", static_cast<long long>(p._maj_flt) );
     }
 
     /**
@@ -406,6 +406,7 @@ namespace mongo {
         memSize = LinuxSysHelper::getSystemMemorySize();
         addrSize = (string( unameData.machine ).find( "x86_64" ) != string::npos ? 64 : 32);
         numCores = cpuCount;
+        pageSize = static_cast<unsigned long long>(sysconf( _SC_PAGESIZE ));
         cpuArch = unameData.machine;
         hasNuma = checkNumaEnabled();
         
@@ -419,7 +420,7 @@ namespace mongo {
         bExtra.append( "kernelVersion", unameData.release );
         bExtra.append( "cpuFrequencyMHz", cpuFreq);
         bExtra.append( "cpuFeatures", cpuFeatures);
-        bExtra.append( "pageSize", static_cast< int >(sysconf( _SC_PAGESIZE ) ) );
+        bExtra.append( "pageSize", static_cast<long long>(pageSize) );
         bExtra.append( "numPages", static_cast< int >(sysconf( _SC_PHYS_PAGES ) ) );
         bExtra.append( "maxOpenFiles", static_cast< int >(sysconf( _SC_OPEN_MAX ) ) );
 
@@ -450,19 +451,26 @@ namespace mongo {
         return true;
     }
 
-    bool ProcessInfo::blockInMemory( char * start ) {
-        static long pageSize = 0;
-        if ( pageSize == 0 ) {
-            pageSize = sysconf( _SC_PAGESIZE );
-        }
-        start = start - ( (unsigned long long)start % pageSize );
+    bool ProcessInfo::blockInMemory(const void* start) {
         unsigned char x = 0;
-        if ( mincore( start , 128 , &x ) ) {
+        if (mincore(const_cast<void*>(alignToStartOfPage(start)), getPageSize(), &x)) {
             log() << "mincore failed: " << errnoWithDescription() << endl;
             return 1;
         }
         return x & 0x1;
     }
 
+    bool ProcessInfo::pagesInMemory(const void* start, size_t numPages, vector<char>* out) {
+        out->resize(numPages);
+        if (mincore(const_cast<void*>(alignToStartOfPage(start)), numPages * getPageSize(),
+                    reinterpret_cast<unsigned char*>(&out->front()))) {
+            log() << "mincore failed: " << errnoWithDescription() << endl;
+            return false;
+        }
+        for (size_t i = 0; i < numPages; ++i) {
+            (*out)[i] &= 0x1; 
+        }
+        return true;
+    }
 
 }

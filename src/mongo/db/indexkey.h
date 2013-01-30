@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "../pch.h"
+#include "mongo/pch.h"
 #include "diskloc.h"
 #include "jsobj.h"
 #include <map>
@@ -34,6 +34,7 @@ namespace mongo {
     class IndexType; // TODO: this name sucks
     class IndexPlugin;
     class IndexDetails;
+    class FieldRangeSet;
 
     enum IndexSuitability { USELESS = 0 , HELPFUL = 1 , OPTIMAL = 2 };
 
@@ -49,6 +50,14 @@ namespace mongo {
         virtual ~IndexType();
 
         virtual void getKeys( const BSONObj &obj, BSONObjSet &keys ) const = 0;
+        /* Full semantics of numWanted:
+         * numWanted == 0 : Return any number of results, but try to return in batches of 101.
+         * numWanted == 1 : Return exactly one result.
+         * numWanted  > 1 : Return any number of results, but try to return in batches of numWanted.
+         *
+         * In practice, your cursor can ignore numWanted, as enforcement of limits is done
+         * by the caller.
+         */
         virtual shared_ptr<Cursor> newCursor( const BSONObj& query , const BSONObj& order , int numWanted ) const = 0;
 
         /** optional op : changes query to match what's in the index */
@@ -62,7 +71,15 @@ namespace mongo {
 
         const BSONObj& keyPattern() const;
 
-        virtual IndexSuitability suitability( const BSONObj& query , const BSONObj& order ) const ;
+        /* Determines the suitability level of this index for answering a given query. The query is
+         * represented as a set of constraints given by a FieldRangeSet, and a desired ordering of
+         * the output.
+         *
+         * Note: it is the responsibility of the caller to pass in the correct FieldRangeSet, which
+         * may depend upon whether this is a single or multi-key index at the time of calling.
+         */
+        virtual IndexSuitability suitability( const FieldRangeSet& queryConstraints ,
+                                              const BSONObj& order ) const;
 
         virtual bool scanAndOrderRequired( const BSONObj& query , const BSONObj& order ) const ;
 
@@ -161,15 +178,19 @@ namespace mongo {
             return _details;
         }
 
-        IndexSuitability suitability( const BSONObj& query , const BSONObj& order ) const ;
+        IndexSuitability suitability( const FieldRangeSet& queryConstraints ,
+                                      const BSONObj& order ) const ;
 
         bool isSparse() const { return _sparse; }
+
+        string toString() const;
 
     protected:
 
         int indexVersion() const;
         
-        IndexSuitability _suitability( const BSONObj& query , const BSONObj& order ) const ;
+        IndexSuitability _suitability( const FieldRangeSet& queryConstraints ,
+                                       const BSONObj& order ) const ;
 
         BSONSizeTracker _sizeTracker;
         vector<const char*> _fieldNames;

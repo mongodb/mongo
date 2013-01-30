@@ -163,9 +163,6 @@
     <ClCompile Include="commands\distinct.cpp">
       <Filter>db\commands</Filter>
     </ClCompile>
-    <ClCompile Include="commands\document_source_cursor.cpp">
-      <Filter>db\commands</Filter>
-    </ClCompile>
     <ClCompile Include="geo\2d.cpp">
       <Filter>db\geo</Filter>
     </ClCompile>
@@ -211,7 +208,7 @@
     <ClCompile Include="pipeline\document_source_bson_array.cpp">
       <Filter>db\pipeline\Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="pipeline\document_source_command_futures.cpp">
+    <ClCompile Include="pipeline\document_source_command_shards.cpp">
       <Filter>db\pipeline\Source Files</Filter>
     </ClCompile>
     <ClCompile Include="pipeline\document_source_filter.cpp">
@@ -261,9 +258,6 @@
     </ClCompile>
     <ClCompile Include="..\s\chunk.cpp">
       <Filter>s</Filter>
-    </ClCompile>
-    <ClCompile Include="commands\cloud.cpp">
-      <Filter>db\commands</Filter>
     </ClCompile>
     <ClCompile Include="..\s\config.cpp">
       <Filter>s</Filter>
@@ -376,9 +370,6 @@
     <ClCompile Include="..\util\md5.cpp">
       <Filter>util\Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="modules\mms.cpp">
-      <Filter>db\modules</Filter>
-    </ClCompile>
     <ClCompile Include="..\util\mmap.cpp">
       <Filter>util\Source Files</Filter>
     </ClCompile>
@@ -398,13 +389,7 @@
       <Filter>util\Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\pch.cpp" />
-    <ClCompile Include="commands\pipeline.cpp">
-      <Filter>db\commands</Filter>
-    </ClCompile>
     <ClCompile Include="commands\pipeline_command.cpp">
-      <Filter>db\commands</Filter>
-    </ClCompile>
-    <ClCompile Include="commands\pipeline_d.cpp">
       <Filter>db\commands</Filter>
     </ClCompile>
     <ClCompile Include="..\util\processinfo.cpp">
@@ -632,9 +617,6 @@
     <ClCompile Include="explain.cpp">
       <Filter>db\Source Files\e to n</Filter>
     </ClCompile>
-    <ClCompile Include="nonce.cpp">
-      <Filter>db\Source Files\e to n</Filter>
-    </ClCompile>
     <ClCompile Include="extsort.cpp">
       <Filter>db\Source Files\e to n</Filter>
     </ClCompile>
@@ -726,15 +708,6 @@
       <Filter>db\Source Files\o to z</Filter>
     </ClCompile>
     <ClCompile Include="scanandorder.cpp">
-      <Filter>db\Source Files\o to z</Filter>
-    </ClCompile>
-    <ClCompile Include="security.cpp">
-      <Filter>db\Source Files\o to z</Filter>
-    </ClCompile>
-    <ClCompile Include="security_commands.cpp">
-      <Filter>db\Source Files\o to z</Filter>
-    </ClCompile>
-    <ClCompile Include="security_common.cpp">
       <Filter>db\Source Files\o to z</Filter>
     </ClCompile>
     <ClCompile Include="..\..\third_party\js-1.7\jsapi.c">
@@ -887,15 +860,6 @@
     <ClCompile Include="..\util\touch_pages.cpp">
       <Filter>util\Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\util\hook_win32.cpp">
-      <Filter>util\Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\util\hook_windows_memory.cpp">
-      <Filter>util\Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\client\authentication_table.cpp">
-      <Filter>client\Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="hashindex.cpp">
       <Filter>db\Source Files\e to n</Filter>
     </ClCompile>
@@ -904,9 +868,6 @@
     </ClCompile>
     <ClCompile Include="commands\hashcmd.cpp">
       <Filter>db\commands</Filter>
-    </ClCompile>
-    <ClCompile Include="..\client\connection_factory.cpp">
-      <Filter>client\Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\scripting\sm_db.cpp">
       <Filter>scripting</Filter>
@@ -922,6 +883,591 @@
     </ClCompile>
     <ClCompile Include="..\..\third_party\murmurhash3\MurmurHash3.cpp">
       <Filter>third_party\MurmurHash3</Filter>
+    </ClCompile>
+    <ClCompile Include="connection_factory.cpp">
+      <Filter>db\Source Files\a to d</Filter>
+    </ClCompile>
+    <ClCompile Include="pipeline\document_source_cursor.cpp">
+      <Filter>db\pipeline\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="pipeline\pipeline.cpp">
+      <Filter>db\pipeline\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="pipeline\pipeline_d.cpp">
+      <Filter>db\pipeline\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\scripting\bson_template_evaluator.cpp">
+      <Filter>scripting</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\safe_num.cpp">
+      <Filter>util\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\base\configuration_variable_manager.cpp">
+      <Filter>base</Filter>
+    </ClCompile>
+    <ClCompile Include="..\base\global_initializer.cpp">
+      <Filter>base</Filter>
+    </ClCompile>
+    <ClCompile Include="..\base\global_initializer_registerer.cpp">
+      <Filter>base</Filter>
+    </ClCompile>
+    <ClCompile Include="..\base\init.cpp">
+      <Filter>base</Filter>
+    </ClCompile>
+    <ClCompile Include="..\base\initializer.cpp">
+      <Filter>base</Filter>
+    </ClCompile>
+    <ClCompile Include="..\base\initializer_context.cpp">
+      <Filter>base</Filter>
+    </ClCompile>
+    <ClCompile Include="..\base\parse_number.cpp">
+      <Filter>base</Filter>
+    </ClCompile>
+    <ClCompile Include="..\base\status.cpp">
+      <Filter>base</Filter>
+    </ClCompile>
+    <ClCompile Include="..\base\initializer_dependency_graph.cpp">
+      <Filter>base</Filter>
+    </ClCompile>
+    <ClCompile Include="..\base\make_string_vector.cpp">
+      <Filter>base</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\fail_point.cpp">
+      <Filter>util\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\fail_point_registry.cpp">
+      <Filter>util\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="auth\action_set.cpp">
+      <Filter>db\auth</Filter>
+    </ClCompile>
+    <ClCompile Include="auth\principal.cpp">
+      <Filter>db\auth</Filter>
+    </ClCompile>
+    <ClCompile Include="auth\principal_set.cpp">
+      <Filter>db\auth</Filter>
+    </ClCompile>
+    <ClCompile Include="kill_current_op.cpp">
+      <Filter>db\Source Files\e to n</Filter>
+    </ClCompile>
+    <ClCompile Include="initialize_server_global_state.cpp">
+      <Filter>db\Source Files\e to n</Filter>
+    </ClCompile>
+    <ClCompile Include="..\platform\random.cpp">
+      <Filter>platform</Filter>
+    </ClCompile>
+    <ClCompile Include="keypattern.cpp">
+      <Filter>db\Source Files\e to n</Filter>
+    </ClCompile>
+    <ClCompile Include="geo\hash.cpp">
+      <Filter>db\geo</Filter>
+    </ClCompile>
+    <ClCompile Include="geo\shapes.cpp">
+      <Filter>db\geo</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\net\ssl_manager.cpp">
+      <Filter>util\net</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\elapsed_tracker.cpp">
+      <Filter>util\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="auth\action_type.cpp">
+      <Filter>db\auth</Filter>
+    </ClCompile>
+    <ClCompile Include="auth\mongo_authentication_session.cpp">
+      <Filter>db\auth</Filter>
+    </ClCompile>
+    <ClCompile Include="btree_stats.cpp">
+      <Filter>db\Source Files\a to d</Filter>
+    </ClCompile>
+    <ClCompile Include="commands\server_status.cpp">
+      <Filter>db\commands</Filter>
+    </ClCompile>
+    <ClCompile Include="auth\authorization_manager.cpp">
+      <Filter>db\auth</Filter>
+    </ClCompile>
+    <ClCompile Include="..\bson\mutable\mutable_bson.cpp">
+      <Filter>bson\mutable</Filter>
+    </ClCompile>
+    <ClCompile Include="..\bson\mutable\mutable_bson_builder.cpp">
+      <Filter>bson\mutable</Filter>
+    </ClCompile>
+    <ClCompile Include="..\bson\mutable\mutable_bson_heap.cpp">
+      <Filter>bson\mutable</Filter>
+    </ClCompile>
+    <ClCompile Include="..\bson\mutable\mutable_bson_internal.cpp">
+      <Filter>bson\mutable</Filter>
+    </ClCompile>
+    <ClCompile Include="geo\s2cursor.cpp">
+      <Filter>db\geo</Filter>
+    </ClCompile>
+    <ClCompile Include="geo\s2index.cpp">
+      <Filter>db\geo</Filter>
+    </ClCompile>
+    <ClCompile Include="commands\fail_point_cmd.cpp">
+      <Filter>db\commands</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\fail_point_service.cpp">
+      <Filter>util\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\base\error_codes.cpp">
+      <Filter>base</Filter>
+    </ClCompile>
+    <ClCompile Include="..\bson\util\bson_extract.cpp">
+      <Filter>bson\util</Filter>
+    </ClCompile>
+    <ClCompile Include="auth\privilege.cpp">
+      <Filter>db\auth</Filter>
+    </ClCompile>
+    <ClCompile Include="auth\privilege_set.cpp">
+      <Filter>db\auth</Filter>
+    </ClCompile>
+    <ClCompile Include="auth\auth_external_state.cpp">
+      <Filter>db\auth</Filter>
+    </ClCompile>
+    <ClCompile Include="..\s\field_parser.cpp">
+      <Filter>s</Filter>
+    </ClCompile>
+    <ClCompile Include="..\s\type_collection.cpp">
+      <Filter>s</Filter>
+    </ClCompile>
+    <ClCompile Include="index_rebuilder.cpp">
+      <Filter>db\Source Files\e to n</Filter>
+    </ClCompile>
+    <ClCompile Include="geo\s2common.cpp">
+      <Filter>db\geo</Filter>
+    </ClCompile>
+    <ClCompile Include="geo\s2nearcursor.cpp">
+      <Filter>db\geo</Filter>
+    </ClCompile>
+    <ClCompile Include="..\s\type_chunk.cpp">
+      <Filter>s</Filter>
+    </ClCompile>
+    <ClCompile Include="..\s\type_database.cpp">
+      <Filter>s</Filter>
+    </ClCompile>
+    <ClCompile Include="btreeposition.cpp">
+      <Filter>db\Source Files\a to d</Filter>
+    </ClCompile>
+    <ClCompile Include="intervalbtreecursor.cpp">
+      <Filter>db\Source Files\e to n</Filter>
+    </ClCompile>
+    <ClCompile Include="..\s\type_shard.cpp">
+      <Filter>s</Filter>
+    </ClCompile>
+    <ClCompile Include="commands\parameters.cpp">
+      <Filter>db\commands</Filter>
+    </ClCompile>
+    <ClCompile Include="server_parameters.cpp">
+      <Filter>db\Source Files\o to z</Filter>
+    </ClCompile>
+    <ClCompile Include="auth\auth_external_state_d.cpp">
+      <Filter>db\auth</Filter>
+    </ClCompile>
+    <ClCompile Include="auth\auth_external_state_server_common.cpp">
+      <Filter>db\auth</Filter>
+    </ClCompile>
+    <ClCompile Include="..\s\collection_manager.cpp">
+      <Filter>s</Filter>
+    </ClCompile>
+    <ClCompile Include="..\s\metadata_loader.cpp">
+      <Filter>s</Filter>
+    </ClCompile>
+    <ClCompile Include="commands\find_and_modify_common.cpp">
+      <Filter>db\commands</Filter>
+    </ClCompile>
+    <ClCompile Include="commands\mr_common.cpp">
+      <Filter>db\commands</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\exception_filter_win32.cpp">
+      <Filter>util\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\base\string_data.cpp">
+      <Filter>base</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\file.cpp">
+      <Filter>util\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="pipeline\document_source_geo_near.cpp">
+      <Filter>db\pipeline\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\platform_init.cpp">
+      <Filter>util\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="geo\geonear.cpp">
+      <Filter>db\geo</Filter>
+    </ClCompile>
+    <ClCompile Include="geo\geoparser.cpp">
+      <Filter>db\geo</Filter>
+    </ClCompile>
+    <ClCompile Include="..\s\type_locks.cpp">
+      <Filter>s</Filter>
+    </ClCompile>
+    <ClCompile Include="client_basic.cpp">
+      <Filter>db\Source Files\a to d</Filter>
+    </ClCompile>
+    <ClCompile Include="server_extra_log_context.cpp">
+      <Filter>db\Source Files\o to z</Filter>
+    </ClCompile>
+    <ClCompile Include="..\s\type_changelog.cpp">
+      <Filter>s</Filter>
+    </ClCompile>
+    <ClCompile Include="..\s\type_lockpings.cpp">
+      <Filter>s</Filter>
+    </ClCompile>
+    <ClCompile Include="..\s\type_settings.cpp">
+      <Filter>s</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\s2\s1angle.cc">
+      <Filter>third_party\s2</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\s2\s1interval.cc">
+      <Filter>third_party\s2</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\s2\s2.cc">
+      <Filter>third_party\s2</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\s2\s2cap.cc">
+      <Filter>third_party\s2</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\s2\s2cell.cc">
+      <Filter>third_party\s2</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\s2\s2cellid.cc">
+      <Filter>third_party\s2</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\s2\s2cellunion.cc">
+      <Filter>third_party\s2</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\s2\s2edgeindex.cc">
+      <Filter>third_party\s2</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\s2\s2edgeutil.cc">
+      <Filter>third_party\s2</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\s2\s2latlng.cc">
+      <Filter>third_party\s2</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\s2\s2latlngrect.cc">
+      <Filter>third_party\s2</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\s2\s2loop.cc">
+      <Filter>third_party\s2</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\s2\s2pointregion.cc">
+      <Filter>third_party\s2</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\s2\s2polygon.cc">
+      <Filter>third_party\s2</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\s2\s2polygonbuilder.cc">
+      <Filter>third_party\s2</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\s2\s2polyline.cc">
+      <Filter>third_party\s2</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\s2\s2r2rect.cc">
+      <Filter>third_party\s2</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\s2\s2region.cc">
+      <Filter>third_party\s2</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\s2\s2regioncoverer.cc">
+      <Filter>third_party\s2</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\s2\s2regionintersection.cc">
+      <Filter>third_party\s2</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\s2\s2regionunion.cc">
+      <Filter>third_party\s2</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\s2\base\int128.cc">
+      <Filter>third_party\s2\base</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\s2\base\logging.cc">
+      <Filter>third_party\s2\base</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\s2\base\stringprintf.cc">
+      <Filter>third_party\s2\base</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\s2\base\strtoint.cc">
+      <Filter>third_party\s2\base</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\s2\strings\split.cc">
+      <Filter>third_party\s2\strings</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\s2\strings\stringprintf.cc">
+      <Filter>third_party\s2\strings</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\s2\strings\strutil.cc">
+      <Filter>third_party\s2\strings</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\s2\util\coding\coder.cc">
+      <Filter>third_party\s2\util\coding</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\s2\util\coding\varint.cc">
+      <Filter>third_party\s2\util\coding</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\s2\util\math\mathlimits.cc">
+      <Filter>third_party\s2\util\math</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\s2\util\math\mathutil.cc">
+      <Filter>third_party\s2\util\math</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\s2\util\math\exactfloat\exactfloat.cc">
+      <Filter>third_party\s2\util\math\exactfloat</Filter>
+    </ClCompile>
+    <ClCompile Include="..\s\type_config_version.cpp">
+      <Filter>s</Filter>
+    </ClCompile>
+    <ClCompile Include="..\s\type_mongos.cpp">
+      <Filter>s</Filter>
+    </ClCompile>
+    <ClCompile Include="..\s\type_tags.cpp">
+      <Filter>s</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\s2\strings\ascii_ctype.cc">
+      <Filter>third_party\s2\strings</Filter>
+    </ClCompile>
+    <ClCompile Include="commands\index_stats.cpp">
+      <Filter>db\commands</Filter>
+    </ClCompile>
+    <ClCompile Include="commands\rename_collection_common.cpp">
+      <Filter>db\commands</Filter>
+    </ClCompile>
+    <ClCompile Include="commands\storage_details.cpp">
+      <Filter>db\commands</Filter>
+    </ClCompile>
+    <ClCompile Include="..\bson\bson_validate.cpp">
+      <Filter>bson</Filter>
+    </ClCompile>
+    <ClCompile Include="commands\connection_status.cpp">
+      <Filter>db\commands</Filter>
+    </ClCompile>
+    <ClCompile Include="auth\auth_index_d.cpp">
+      <Filter>db\auth</Filter>
+    </ClCompile>
+    <ClCompile Include="auth\security_key.cpp">
+      <Filter>db\auth</Filter>
+    </ClCompile>
+    <ClCompile Include="commands\authentication_commands.cpp">
+      <Filter>db\commands</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\libstemmer_c\examples\stemwords.c">
+      <Filter>third_party\libstemmer_c\examples</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\libstemmer_c\libstemmer\libstemmer.c">
+      <Filter>third_party\libstemmer_c\libstemmer</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\libstemmer_c\libstemmer\libstemmer_utf8.c">
+      <Filter>third_party\libstemmer_c\libstemmer</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\libstemmer_c\src_c\stem_ISO_8859_1_danish.c">
+      <Filter>third_party\libstemmer_c\src_c</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\libstemmer_c\src_c\stem_ISO_8859_1_dutch.c">
+      <Filter>third_party\libstemmer_c\src_c</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\libstemmer_c\src_c\stem_ISO_8859_1_english.c">
+      <Filter>third_party\libstemmer_c\src_c</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\libstemmer_c\src_c\stem_ISO_8859_1_finnish.c">
+      <Filter>third_party\libstemmer_c\src_c</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\libstemmer_c\src_c\stem_ISO_8859_1_french.c">
+      <Filter>third_party\libstemmer_c\src_c</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\libstemmer_c\src_c\stem_ISO_8859_1_german.c">
+      <Filter>third_party\libstemmer_c\src_c</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\libstemmer_c\src_c\stem_ISO_8859_1_hungarian.c">
+      <Filter>third_party\libstemmer_c\src_c</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\libstemmer_c\src_c\stem_ISO_8859_1_italian.c">
+      <Filter>third_party\libstemmer_c\src_c</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\libstemmer_c\src_c\stem_ISO_8859_1_norwegian.c">
+      <Filter>third_party\libstemmer_c\src_c</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\libstemmer_c\src_c\stem_ISO_8859_1_porter.c">
+      <Filter>third_party\libstemmer_c\src_c</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\libstemmer_c\src_c\stem_ISO_8859_1_portuguese.c">
+      <Filter>third_party\libstemmer_c\src_c</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\libstemmer_c\src_c\stem_ISO_8859_1_spanish.c">
+      <Filter>third_party\libstemmer_c\src_c</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\libstemmer_c\src_c\stem_ISO_8859_1_swedish.c">
+      <Filter>third_party\libstemmer_c\src_c</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\libstemmer_c\src_c\stem_ISO_8859_2_romanian.c">
+      <Filter>third_party\libstemmer_c\src_c</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\libstemmer_c\src_c\stem_KOI8_R_russian.c">
+      <Filter>third_party\libstemmer_c\src_c</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\libstemmer_c\src_c\stem_UTF_8_danish.c">
+      <Filter>third_party\libstemmer_c\src_c</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\libstemmer_c\src_c\stem_UTF_8_dutch.c">
+      <Filter>third_party\libstemmer_c\src_c</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\libstemmer_c\src_c\stem_UTF_8_english.c">
+      <Filter>third_party\libstemmer_c\src_c</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\libstemmer_c\src_c\stem_UTF_8_finnish.c">
+      <Filter>third_party\libstemmer_c\src_c</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\libstemmer_c\src_c\stem_UTF_8_french.c">
+      <Filter>third_party\libstemmer_c\src_c</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\libstemmer_c\src_c\stem_UTF_8_german.c">
+      <Filter>third_party\libstemmer_c\src_c</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\libstemmer_c\src_c\stem_UTF_8_hungarian.c">
+      <Filter>third_party\libstemmer_c\src_c</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\libstemmer_c\src_c\stem_UTF_8_italian.c">
+      <Filter>third_party\libstemmer_c\src_c</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\libstemmer_c\src_c\stem_UTF_8_norwegian.c">
+      <Filter>third_party\libstemmer_c\src_c</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\libstemmer_c\src_c\stem_UTF_8_porter.c">
+      <Filter>third_party\libstemmer_c\src_c</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\libstemmer_c\src_c\stem_UTF_8_portuguese.c">
+      <Filter>third_party\libstemmer_c\src_c</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\libstemmer_c\src_c\stem_UTF_8_romanian.c">
+      <Filter>third_party\libstemmer_c\src_c</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\libstemmer_c\src_c\stem_UTF_8_russian.c">
+      <Filter>third_party\libstemmer_c\src_c</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\libstemmer_c\src_c\stem_UTF_8_spanish.c">
+      <Filter>third_party\libstemmer_c\src_c</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\libstemmer_c\src_c\stem_UTF_8_swedish.c">
+      <Filter>third_party\libstemmer_c\src_c</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\libstemmer_c\src_c\stem_UTF_8_turkish.c">
+      <Filter>third_party\libstemmer_c\src_c</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\libstemmer_c\runtime\api.c">
+      <Filter>third_party\libstemmer_c\runtime</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\libstemmer_c\runtime\utilities.c">
+      <Filter>third_party\libstemmer_c\runtime</Filter>
+    </ClCompile>
+    <ClCompile Include="fts\fts_command.cpp">
+      <Filter>db\fts</Filter>
+    </ClCompile>
+    <ClCompile Include="fts\fts_command_mongod.cpp">
+      <Filter>db\fts</Filter>
+    </ClCompile>
+    <ClCompile Include="fts\fts_command_mongos.cpp">
+      <Filter>db\fts</Filter>
+    </ClCompile>
+    <ClCompile Include="fts\fts_enabled.cpp">
+      <Filter>db\fts</Filter>
+    </ClCompile>
+    <ClCompile Include="fts\fts_index.cpp">
+      <Filter>db\fts</Filter>
+    </ClCompile>
+    <ClCompile Include="fts\fts_index_format.cpp">
+      <Filter>db\fts</Filter>
+    </ClCompile>
+    <ClCompile Include="fts\fts_matcher.cpp">
+      <Filter>db\fts</Filter>
+    </ClCompile>
+    <ClCompile Include="fts\fts_query.cpp">
+      <Filter>db\fts</Filter>
+    </ClCompile>
+    <ClCompile Include="fts\fts_search.cpp">
+      <Filter>db\fts</Filter>
+    </ClCompile>
+    <ClCompile Include="fts\fts_spec.cpp">
+      <Filter>db\fts</Filter>
+    </ClCompile>
+    <ClCompile Include="fts\fts_util.cpp">
+      <Filter>db\fts</Filter>
+    </ClCompile>
+    <ClCompile Include="fts\stemmer.cpp">
+      <Filter>db\fts</Filter>
+    </ClCompile>
+    <ClCompile Include="fts\stop_words.cpp">
+      <Filter>db\fts</Filter>
+    </ClCompile>
+    <ClCompile Include="fts\tokenizer.cpp">
+      <Filter>db\fts</Filter>
+    </ClCompile>
+    <ClCompile Include="fts\fts_index_format_test.cpp">
+      <Filter>db\fts\test</Filter>
+    </ClCompile>
+    <ClCompile Include="fts\fts_matcher_test.cpp">
+      <Filter>db\fts\test</Filter>
+    </ClCompile>
+    <ClCompile Include="fts\fts_query_test.cpp">
+      <Filter>db\fts\test</Filter>
+    </ClCompile>
+    <ClCompile Include="fts\fts_spec_test.cpp">
+      <Filter>db\fts\test</Filter>
+    </ClCompile>
+    <ClCompile Include="fts\fts_util_test.cpp">
+      <Filter>db\fts\test</Filter>
+    </ClCompile>
+    <ClCompile Include="fts\stop_words_test.cpp">
+      <Filter>db\fts\test</Filter>
+    </ClCompile>
+    <ClCompile Include="fts\tokenizer_test.cpp">
+      <Filter>db\fts\test</Filter>
+    </ClCompile>
+    <ClCompile Include="fts\stemmer_test.cpp">
+      <Filter>db\fts\test</Filter>
+    </ClCompile>
+    <ClCompile Include="fts\stop_words_list.cpp">
+      <Filter>db\fts</Filter>
+    </ClCompile>
+    <ClCompile Include="auth\auth_server_parameters.cpp">
+      <Filter>db\auth</Filter>
+    </ClCompile>
+    <ClCompile Include="stats\timer_stats.cpp">
+      <Filter>db\stats</Filter>
+    </ClCompile>
+    <ClCompile Include="..\scripting\bson_template_evaluator_test.cpp">
+      <Filter>scripting</Filter>
+    </ClCompile>
+    <ClCompile Include="..\scripting\engine_none.cpp">
+      <Filter>scripting</Filter>
+    </ClCompile>
+    <ClCompile Include="..\scripting\engine_v8.cpp">
+      <Filter>scripting</Filter>
+    </ClCompile>
+    <ClCompile Include="..\scripting\v8_db.cpp">
+      <Filter>scripting</Filter>
+    </ClCompile>
+    <ClCompile Include="..\scripting\v8_deadline_monitor_test.cpp">
+      <Filter>scripting</Filter>
+    </ClCompile>
+    <ClCompile Include="..\scripting\v8_utils.cpp">
+      <Filter>scripting</Filter>
+    </ClCompile>
+    <ClCompile Include="geo\geoquery.cpp">
+      <Filter>db\geo</Filter>
+    </ClCompile>
+    <ClCompile Include="geo\geoparser_test.cpp">
+      <Filter>db\geo</Filter>
+    </ClCompile>
+    <ClCompile Include="geo\hash_test.cpp">
+      <Filter>db\geo</Filter>
+    </ClCompile>
+    <ClCompile Include="..\scripting\v8_profiler.cpp">
+      <Filter>scripting</Filter>
+    </ClCompile>
+    <ClCompile Include="field_ref.cpp">
+      <Filter>db\Source Files\e to n</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -986,9 +1532,6 @@
     <ClInclude Include="..\bson\bsonelement.h">
       <Filter>bson</Filter>
     </ClInclude>
-    <ClInclude Include="..\bson\bsoninlines.h">
-      <Filter>bson</Filter>
-    </ClInclude>
     <ClInclude Include="..\bson\bsonmisc.h">
       <Filter>bson</Filter>
     </ClInclude>
@@ -1024,9 +1567,6 @@
     </ClInclude>
     <ClInclude Include="pipeline\builder.h">
       <Filter>db\pipeline\Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="helpers\dblogger.h">
-      <Filter>db\helpers</Filter>
     </ClInclude>
     <ClInclude Include="..\util\debug_util.h">
       <Filter>util\Header Files</Filter>
@@ -1158,12 +1698,6 @@
     <ClInclude Include="..\util\optime.h">
       <Filter>util\Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="commands\pipeline.h">
-      <Filter>db\commands</Filter>
-    </ClInclude>
-    <ClInclude Include="commands\pipeline_d.h">
-      <Filter>db\commands</Filter>
-    </ClInclude>
     <ClInclude Include="..\util\processinfo.h">
       <Filter>util\Header Files</Filter>
     </ClInclude>
@@ -1181,9 +1715,6 @@
     </ClInclude>
     <ClInclude Include="..\util\queue.h">
       <Filter>util\Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\util\concurrency\remap_lock.h">
-      <Filter>util\concurrency</Filter>
     </ClInclude>
     <ClInclude Include="..\client\connpool.h">
       <Filter>client\Header Files</Filter>
@@ -1209,9 +1740,6 @@
     <ClInclude Include="..\client\redef_macros.h">
       <Filter>client\Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="repl\rsmember.h">
-      <Filter>db\repl</Filter>
-    </ClInclude>
     <ClInclude Include="repl\rs.h">
       <Filter>db\repl</Filter>
     </ClInclude>
@@ -1236,8 +1764,8 @@
     <ClInclude Include="..\util\mongoutils\str.h">
       <Filter>util\mongoutils</Filter>
     </ClInclude>
-    <ClInclude Include="..\bson\stringdata.h">
-      <Filter>bson</Filter>
+    <ClInclude Include="..\base\string_data.h">
+      <Filter>base</Filter>
     </ClInclude>
     <ClInclude Include="..\util\stacktrace.h">
       <Filter>util\Header Files</Filter>
@@ -1275,9 +1803,6 @@
     <ClInclude Include="ops\update.h">
       <Filter>db\ops</Filter>
     </ClInclude>
-    <ClInclude Include="..\scripting\v8_wrapper.h">
-      <Filter>scripting</Filter>
-    </ClInclude>
     <ClInclude Include="..\scripting\v8_db.h">
       <Filter>scripting</Filter>
     </ClInclude>
@@ -1314,9 +1839,6 @@
     <ClInclude Include="commands.h">
       <Filter>db\Header Files\a to d</Filter>
     </ClInclude>
-    <ClInclude Include="concurrency.h">
-      <Filter>db\Header Files\a to d</Filter>
-    </ClInclude>
     <ClInclude Include="curop.h">
       <Filter>db\Header Files\a to d</Filter>
     </ClInclude>
@@ -1339,9 +1861,6 @@
       <Filter>db\Header Files\a to d</Filter>
     </ClInclude>
     <ClInclude Include="dbhelpers.h">
-      <Filter>db\Header Files\a to d</Filter>
-    </ClInclude>
-    <ClInclude Include="dbinfo.h">
       <Filter>db\Header Files\a to d</Filter>
     </ClInclude>
     <ClInclude Include="dbmessage.h">
@@ -1369,9 +1888,6 @@
       <Filter>db\Header Files\e to n</Filter>
     </ClInclude>
     <ClInclude Include="namespacestring.h">
-      <Filter>db\Header Files\e to n</Filter>
-    </ClInclude>
-    <ClInclude Include="globals.h">
       <Filter>db\Header Files\e to n</Filter>
     </ClInclude>
     <ClInclude Include="index.h">
@@ -1413,9 +1929,6 @@
     <ClInclude Include="mongommf.h">
       <Filter>db\Header Files\e to n</Filter>
     </ClInclude>
-    <ClInclude Include="mongomutex.h">
-      <Filter>db\Header Files\e to n</Filter>
-    </ClInclude>
     <ClInclude Include="namespace-inl.h">
       <Filter>db\Header Files\e to n</Filter>
     </ClInclude>
@@ -1431,9 +1944,6 @@
     <ClInclude Include="oplogreader.h">
       <Filter>db\Header Files\o to z</Filter>
     </ClInclude>
-    <ClInclude Include="security.h">
-      <Filter>db\Header Files\o to z</Filter>
-    </ClInclude>
     <ClInclude Include="pagefault.h">
       <Filter>db\Header Files\o to z</Filter>
     </ClInclude>
@@ -1441,9 +1951,6 @@
       <Filter>db\Header Files\o to z</Filter>
     </ClInclude>
     <ClInclude Include="projection.h">
-      <Filter>db\Header Files\o to z</Filter>
-    </ClInclude>
-    <ClInclude Include="query.h">
       <Filter>db\Header Files\o to z</Filter>
     </ClInclude>
     <ClInclude Include="queryoptimizer.h">
@@ -1456,9 +1963,6 @@
       <Filter>db\Header Files\o to z</Filter>
     </ClInclude>
     <ClInclude Include="repl.h">
-      <Filter>db\Header Files\o to z</Filter>
-    </ClInclude>
-    <ClInclude Include="replpair.h">
       <Filter>db\Header Files\o to z</Filter>
     </ClInclude>
     <ClInclude Include="resource.h">
@@ -1635,15 +2139,6 @@
     <ClInclude Include="..\util\touch_pages.h">
       <Filter>util\Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\util\hook_win32.h">
-      <Filter>util\Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\util\hook_windows_memory.h">
-      <Filter>util\Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\client\authentication_table.h">
-      <Filter>client\Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="hashindex.h">
       <Filter>db\Header Files\e to n</Filter>
     </ClInclude>
@@ -1698,6 +2193,813 @@
     <ClInclude Include="..\..\third_party\murmurhash3\MurmurHash3.h">
       <Filter>third_party\MurmurHash3</Filter>
     </ClInclude>
+    <ClInclude Include="pipeline\pipeline.h">
+      <Filter>db\pipeline\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="pipeline\pipeline_d.h">
+      <Filter>db\pipeline\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\scripting\bson_template_evaluator.h">
+      <Filter>scripting</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\safe_num.h">
+      <Filter>util\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\base\configuration_variable_manager.h">
+      <Filter>base</Filter>
+    </ClInclude>
+    <ClInclude Include="..\base\global_initializer.h">
+      <Filter>base</Filter>
+    </ClInclude>
+    <ClInclude Include="..\base\global_initializer_registerer.h">
+      <Filter>base</Filter>
+    </ClInclude>
+    <ClInclude Include="..\base\init.h">
+      <Filter>base</Filter>
+    </ClInclude>
+    <ClInclude Include="..\base\initializer.h">
+      <Filter>base</Filter>
+    </ClInclude>
+    <ClInclude Include="..\base\initializer_context.h">
+      <Filter>base</Filter>
+    </ClInclude>
+    <ClInclude Include="..\base\parse_number.h">
+      <Filter>base</Filter>
+    </ClInclude>
+    <ClInclude Include="..\platform\strtoll.h">
+      <Filter>platform</Filter>
+    </ClInclude>
+    <ClInclude Include="..\base\status.h">
+      <Filter>base</Filter>
+    </ClInclude>
+    <ClInclude Include="..\base\disallow_copying.h">
+      <Filter>base</Filter>
+    </ClInclude>
+    <ClInclude Include="..\base\error_codes.h">
+      <Filter>base</Filter>
+    </ClInclude>
+    <ClInclude Include="..\base\initializer_dependency_graph.h">
+      <Filter>base</Filter>
+    </ClInclude>
+    <ClInclude Include="..\base\initializer_function.h">
+      <Filter>base</Filter>
+    </ClInclude>
+    <ClInclude Include="..\base\make_string_vector.h">
+      <Filter>base</Filter>
+    </ClInclude>
+    <ClInclude Include="..\base\owned_pointer_vector.h">
+      <Filter>base</Filter>
+    </ClInclude>
+    <ClInclude Include="..\bson\bson_builder_base.h">
+      <Filter>bson</Filter>
+    </ClInclude>
+    <ClInclude Include="..\bson\bson_field.h">
+      <Filter>bson</Filter>
+    </ClInclude>
+    <ClInclude Include="..\platform\bits.h">
+      <Filter>platform</Filter>
+    </ClInclude>
+    <ClInclude Include="..\platform\unordered_map.h">
+      <Filter>platform</Filter>
+    </ClInclude>
+    <ClInclude Include="..\platform\unordered_set.h">
+      <Filter>platform</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\fail_point.h">
+      <Filter>util\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\fail_point_registry.h">
+      <Filter>util\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="auth\action_set.h">
+      <Filter>db\auth</Filter>
+    </ClInclude>
+    <ClInclude Include="auth\principal.h">
+      <Filter>db\auth</Filter>
+    </ClInclude>
+    <ClInclude Include="auth\principal_set.h">
+      <Filter>db\auth</Filter>
+    </ClInclude>
+    <ClInclude Include="kill_current_op.h">
+      <Filter>db\Header Files\e to n</Filter>
+    </ClInclude>
+    <ClInclude Include="initialize_server_global_state.h">
+      <Filter>db\Header Files\e to n</Filter>
+    </ClInclude>
+    <ClInclude Include="..\platform\random.h">
+      <Filter>platform</Filter>
+    </ClInclude>
+    <ClInclude Include="keypattern.h">
+      <Filter>db\Header Files\e to n</Filter>
+    </ClInclude>
+    <ClInclude Include="..\platform\cstdint.h">
+      <Filter>platform</Filter>
+    </ClInclude>
+    <ClInclude Include="geo\hash.h">
+      <Filter>db\geo</Filter>
+    </ClInclude>
+    <ClInclude Include="geo\shapes.h">
+      <Filter>db\geo</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\net\ssl_manager.h">
+      <Filter>util\net</Filter>
+    </ClInclude>
+    <ClInclude Include="memconcept.h">
+      <Filter>db\Header Files\e to n</Filter>
+    </ClInclude>
+    <ClInclude Include="..\s\config.h">
+      <Filter>s</Filter>
+    </ClInclude>
+    <ClInclude Include="..\s\d_chunk_manager.h">
+      <Filter>s</Filter>
+    </ClInclude>
+    <ClInclude Include="..\s\grid.h">
+      <Filter>s</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\elapsed_tracker.h">
+      <Filter>util\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="auth\action_type.h">
+      <Filter>db\auth</Filter>
+    </ClInclude>
+    <ClInclude Include="..\base\counter.h">
+      <Filter>base</Filter>
+    </ClInclude>
+    <ClInclude Include="auth\authentication_session.h">
+      <Filter>db\auth</Filter>
+    </ClInclude>
+    <ClInclude Include="auth\mongo_authentication_session.h">
+      <Filter>db\auth</Filter>
+    </ClInclude>
+    <ClInclude Include="btree_stats.h">
+      <Filter>db\Header Files\a to d</Filter>
+    </ClInclude>
+    <ClInclude Include="commands\fsync.h">
+      <Filter>db\commands</Filter>
+    </ClInclude>
+    <ClInclude Include="commands\mr.h">
+      <Filter>db\commands</Filter>
+    </ClInclude>
+    <ClInclude Include="commands\server_status.h">
+      <Filter>db\commands</Filter>
+    </ClInclude>
+    <ClInclude Include="dur.h">
+      <Filter>db\Header Files\a to d</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\boost\boost\smart_ptr\scoped_ptr.hpp">
+      <Filter>Boost</Filter>
+    </ClInclude>
+    <ClInclude Include="auth\authorization_manager.h">
+      <Filter>db\auth</Filter>
+    </ClInclude>
+    <ClInclude Include="..\bson\mutable\mutable_bson.h">
+      <Filter>bson\mutable</Filter>
+    </ClInclude>
+    <ClInclude Include="..\bson\mutable\mutable_bson_builder.h">
+      <Filter>bson\mutable</Filter>
+    </ClInclude>
+    <ClInclude Include="..\bson\mutable\mutable_bson_heap.h">
+      <Filter>bson\mutable</Filter>
+    </ClInclude>
+    <ClInclude Include="..\bson\mutable\mutable_bson_internal.h">
+      <Filter>bson\mutable</Filter>
+    </ClInclude>
+    <ClInclude Include="geo\s2common.h">
+      <Filter>db\geo</Filter>
+    </ClInclude>
+    <ClInclude Include="geo\s2cursor.h">
+      <Filter>db\geo</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\fail_point_service.h">
+      <Filter>util\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\bson\util\bson_extract.h">
+      <Filter>bson\util</Filter>
+    </ClInclude>
+    <ClInclude Include="auth\privilege.h">
+      <Filter>db\auth</Filter>
+    </ClInclude>
+    <ClInclude Include="auth\privilege_set.h">
+      <Filter>db\auth</Filter>
+    </ClInclude>
+    <ClInclude Include="auth\auth_external_state.h">
+      <Filter>db\auth</Filter>
+    </ClInclude>
+    <ClInclude Include="..\s\field_parser.h">
+      <Filter>s</Filter>
+    </ClInclude>
+    <ClInclude Include="..\s\type_collection.h">
+      <Filter>s</Filter>
+    </ClInclude>
+    <ClInclude Include="btreebuilder.h">
+      <Filter>db\Header Files\a to d</Filter>
+    </ClInclude>
+    <ClInclude Include="btreecursor.h">
+      <Filter>db\Header Files\a to d</Filter>
+    </ClInclude>
+    <ClInclude Include="cc_by_loc.h">
+      <Filter>db\Header Files\a to d</Filter>
+    </ClInclude>
+    <ClInclude Include="index_rebuilder.h">
+      <Filter>db\Header Files\e to n</Filter>
+    </ClInclude>
+    <ClInclude Include="geo\s2nearcursor.h">
+      <Filter>db\geo</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\string_map.h">
+      <Filter>util\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\string_map_internal.h">
+      <Filter>util\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\string_writer.h">
+      <Filter>util\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\stringutils.h">
+      <Filter>util\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\unordered_fast_key_table.h">
+      <Filter>util\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\unordered_fast_key_table_internal.h">
+      <Filter>util\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\version.h">
+      <Filter>util\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\winutil.h">
+      <Filter>util\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\admin_access.h">
+      <Filter>util\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\bson_util.h">
+      <Filter>util\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\bufreader.h">
+      <Filter>util\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\checksum.h">
+      <Filter>util\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\compress.h">
+      <Filter>util\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\descriptive_stats.h">
+      <Filter>util\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\descriptive_stats-inl.h">
+      <Filter>util\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\exit_code.h">
+      <Filter>util\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\gsasl_session.h">
+      <Filter>util\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\heapcheck.h">
+      <Filter>util\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\map_util.h">
+      <Filter>util\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\moveablebuffer.h">
+      <Filter>util\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\password.h">
+      <Filter>util\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\scopeguard.h">
+      <Filter>util\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\timer-inl.h">
+      <Filter>util\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="pipeline\document_internal.h">
+      <Filter>db\pipeline\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="pipeline\value_internal.h">
+      <Filter>db\pipeline\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\client\authlevel.h">
+      <Filter>client\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\s\type_chunk.h">
+      <Filter>s</Filter>
+    </ClInclude>
+    <ClInclude Include="..\s\type_database.h">
+      <Filter>s</Filter>
+    </ClInclude>
+    <ClInclude Include="btreeposition.h">
+      <Filter>db\Header Files\a to d</Filter>
+    </ClInclude>
+    <ClInclude Include="intervalbtreecursor.h">
+      <Filter>db\Header Files\e to n</Filter>
+    </ClInclude>
+    <ClInclude Include="..\s\type_shard.h">
+      <Filter>s</Filter>
+    </ClInclude>
+    <ClInclude Include="server_parameters.h">
+      <Filter>db\Header Files\o to z</Filter>
+    </ClInclude>
+    <ClInclude Include="server_parameters_inline.h">
+      <Filter>db\Header Files\o to z</Filter>
+    </ClInclude>
+    <ClInclude Include="auth\auth_external_state_d.h">
+      <Filter>db\auth</Filter>
+    </ClInclude>
+    <ClInclude Include="auth\auth_external_state_server_common.h">
+      <Filter>db\auth</Filter>
+    </ClInclude>
+    <ClInclude Include="..\s\collection_manager.h">
+      <Filter>s</Filter>
+    </ClInclude>
+    <ClInclude Include="..\s\metadata_loader.h">
+      <Filter>s</Filter>
+    </ClInclude>
+    <ClInclude Include="commands\find_and_modify.h">
+      <Filter>db\commands</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\exception_filter_win32.h">
+      <Filter>util\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\base\string_data-inl.h">
+      <Filter>base</Filter>
+    </ClInclude>
+    <ClInclude Include="..\base\owned_pointer_map.h">
+      <Filter>base</Filter>
+    </ClInclude>
+    <ClInclude Include="auth\principal_name.h">
+      <Filter>db\auth</Filter>
+    </ClInclude>
+    <ClInclude Include="sort_phase_one.h">
+      <Filter>db\Header Files\o to z</Filter>
+    </ClInclude>
+    <ClInclude Include="geo\2d.h">
+      <Filter>db\geo</Filter>
+    </ClInclude>
+    <ClInclude Include="geo\geoparser.h">
+      <Filter>db\geo</Filter>
+    </ClInclude>
+    <ClInclude Include="geo\s2index.h">
+      <Filter>db\geo</Filter>
+    </ClInclude>
+    <ClInclude Include="..\s\type_locks.h">
+      <Filter>s</Filter>
+    </ClInclude>
+    <ClInclude Include="..\s\type_changelog.h">
+      <Filter>s</Filter>
+    </ClInclude>
+    <ClInclude Include="..\s\type_lockpings.h">
+      <Filter>s</Filter>
+    </ClInclude>
+    <ClInclude Include="..\s\type_settings.h">
+      <Filter>s</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\s2\hash.h">
+      <Filter>third_party\s2</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\s2\r1interval.h">
+      <Filter>third_party\s2</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\s2\s1angle.h">
+      <Filter>third_party\s2</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\s2\s1interval.h">
+      <Filter>third_party\s2</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\s2\s2.h">
+      <Filter>third_party\s2</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\s2\s2cap.h">
+      <Filter>third_party\s2</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\s2\s2cell.h">
+      <Filter>third_party\s2</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\s2\s2cellid.h">
+      <Filter>third_party\s2</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\s2\s2cellunion.h">
+      <Filter>third_party\s2</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\s2\s2edgeindex.h">
+      <Filter>third_party\s2</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\s2\s2edgeutil.h">
+      <Filter>third_party\s2</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\s2\s2latlng.h">
+      <Filter>third_party\s2</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\s2\s2latlngrect.h">
+      <Filter>third_party\s2</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\s2\s2loop.h">
+      <Filter>third_party\s2</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\s2\s2pointregion.h">
+      <Filter>third_party\s2</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\s2\s2polygon.h">
+      <Filter>third_party\s2</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\s2\s2polygonbuilder.h">
+      <Filter>third_party\s2</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\s2\s2polyline.h">
+      <Filter>third_party\s2</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\s2\s2r2rect.h">
+      <Filter>third_party\s2</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\s2\s2region.h">
+      <Filter>third_party\s2</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\s2\s2regioncoverer.h">
+      <Filter>third_party\s2</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\s2\s2regionintersection.h">
+      <Filter>third_party\s2</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\s2\s2regionunion.h">
+      <Filter>third_party\s2</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\s2\base\basictypes.h">
+      <Filter>third_party\s2\base</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\s2\base\casts.h">
+      <Filter>third_party\s2\base</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\s2\base\commandlineflags.h">
+      <Filter>third_party\s2\base</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\s2\base\definer.h">
+      <Filter>third_party\s2\base</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\s2\base\docid.h">
+      <Filter>third_party\s2\base</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\s2\base\int128.h">
+      <Filter>third_party\s2\base</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\s2\base\integral_types.h">
+      <Filter>third_party\s2\base</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\s2\base\logging.h">
+      <Filter>third_party\s2\base</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\s2\base\macros.h">
+      <Filter>third_party\s2\base</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\s2\base\port.h">
+      <Filter>third_party\s2\base</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\s2\base\scoped_ptr.h">
+      <Filter>third_party\s2\base</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\s2\base\stl_decl.h">
+      <Filter>third_party\s2\base</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\s2\base\stl_decl_msvc.h">
+      <Filter>third_party\s2\base</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\s2\base\stl_decl_osx.h">
+      <Filter>third_party\s2\base</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\s2\base\stringprintf.h">
+      <Filter>third_party\s2\base</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\s2\base\strtoint.h">
+      <Filter>third_party\s2\base</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\s2\base\template_util.h">
+      <Filter>third_party\s2\base</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\s2\base\type_traits.h">
+      <Filter>third_party\s2\base</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\s2\strings\ascii_ctype.h">
+      <Filter>third_party\s2\strings</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\s2\strings\split.h">
+      <Filter>third_party\s2\strings</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\s2\strings\stringprintf.h">
+      <Filter>third_party\s2\strings</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\s2\strings\strutil.h">
+      <Filter>third_party\s2\strings</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\s2\util\coding\coder.h">
+      <Filter>third_party\s2\util\coding</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\s2\util\coding\varint.h">
+      <Filter>third_party\s2\util\coding</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\s2\util\endian\endian.h">
+      <Filter>third_party\s2\util\endian</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\s2\util\hash\hash_jenkins_lookup2.h">
+      <Filter>third_party\s2\util\hash</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\s2\util\math\mathlimits.h">
+      <Filter>third_party\s2\util\math</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\s2\util\math\mathutil.h">
+      <Filter>third_party\s2\util\math</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\s2\util\math\matrix3x3.h">
+      <Filter>third_party\s2\util\math</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\s2\util\math\matrix3x3-inl.h">
+      <Filter>third_party\s2\util\math</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\s2\util\math\vector2.h">
+      <Filter>third_party\s2\util\math</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\s2\util\math\vector2-inl.h">
+      <Filter>third_party\s2\util\math</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\s2\util\math\vector3.h">
+      <Filter>third_party\s2\util\math</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\s2\util\math\vector3-inl.h">
+      <Filter>third_party\s2\util\math</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\s2\util\math\vector4.h">
+      <Filter>third_party\s2\util\math</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\s2\util\math\vector4-inl.h">
+      <Filter>third_party\s2\util\math</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\s2\util\math\exactfloat\exactfloat.h">
+      <Filter>third_party\s2\util\math\exactfloat</Filter>
+    </ClInclude>
+    <ClInclude Include="commands\rename_collection.h">
+      <Filter>db\commands</Filter>
+    </ClInclude>
+    <ClInclude Include="..\bson\bson_validate.h">
+      <Filter>bson</Filter>
+    </ClInclude>
+    <ClInclude Include="auth\auth_index_d.h">
+      <Filter>db\auth</Filter>
+    </ClInclude>
+    <ClInclude Include="repl\bgsync.h">
+      <Filter>db\repl</Filter>
+    </ClInclude>
+    <ClInclude Include="repl\rs_exception.h">
+      <Filter>db\repl</Filter>
+    </ClInclude>
+    <ClInclude Include="repl\rs_member.h">
+      <Filter>db\repl</Filter>
+    </ClInclude>
+    <ClInclude Include="repl\rs_sync.h">
+      <Filter>db\repl</Filter>
+    </ClInclude>
+    <ClInclude Include="auth\security_key.h">
+      <Filter>db\auth</Filter>
+    </ClInclude>
+    <ClInclude Include="commands\authentication_commands.h">
+      <Filter>db\commands</Filter>
+    </ClInclude>
+    <ClInclude Include="client_basic.h">
+      <Filter>db\Header Files\a to d</Filter>
+    </ClInclude>
+    <ClInclude Include="cloner.h">
+      <Filter>db\Header Files\a to d</Filter>
+    </ClInclude>
+    <ClInclude Include="collection.h">
+      <Filter>db\Header Files\a to d</Filter>
+    </ClInclude>
+    <ClInclude Include="curop-inl.h">
+      <Filter>db\Header Files\a to d</Filter>
+    </ClInclude>
+    <ClInclude Include="dbwebserver.h">
+      <Filter>db\Header Files\a to d</Filter>
+    </ClInclude>
+    <ClInclude Include="dur_recover.h">
+      <Filter>db\Header Files\a to d</Filter>
+    </ClInclude>
+    <ClInclude Include="extsort.h">
+      <Filter>db\Header Files\e to n</Filter>
+    </ClInclude>
+    <ClInclude Include="filever.h">
+      <Filter>db\Header Files\e to n</Filter>
+    </ClInclude>
+    <ClInclude Include="jsobjmanipulator.h">
+      <Filter>db\Header Files\e to n</Filter>
+    </ClInclude>
+    <ClInclude Include="key.h">
+      <Filter>db\Header Files\e to n</Filter>
+    </ClInclude>
+    <ClInclude Include="minilex.h">
+      <Filter>db\Header Files\e to n</Filter>
+    </ClInclude>
+    <ClInclude Include="module.h">
+      <Filter>db\Header Files\e to n</Filter>
+    </ClInclude>
+    <ClInclude Include="oplog.h">
+      <Filter>db\Header Files\o to z</Filter>
+    </ClInclude>
+    <ClInclude Include="pdfile_private.h">
+      <Filter>db\Header Files\o to z</Filter>
+    </ClInclude>
+    <ClInclude Include="queryoptimizercursor.h">
+      <Filter>db\Header Files\o to z</Filter>
+    </ClInclude>
+    <ClInclude Include="querypattern.h">
+      <Filter>db\Header Files\o to z</Filter>
+    </ClInclude>
+    <ClInclude Include="queryutil-inl.h">
+      <Filter>db\Header Files\o to z</Filter>
+    </ClInclude>
+    <ClInclude Include="record.h">
+      <Filter>db\Header Files\o to z</Filter>
+    </ClInclude>
+    <ClInclude Include="repl_block.h">
+      <Filter>db\Header Files\o to z</Filter>
+    </ClInclude>
+    <ClInclude Include="replutil.h">
+      <Filter>db\Header Files\o to z</Filter>
+    </ClInclude>
+    <ClInclude Include="restapi.h">
+      <Filter>db\Header Files\o to z</Filter>
+    </ClInclude>
+    <ClInclude Include="taskqueue.h">
+      <Filter>db\Header Files\o to z</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\libstemmer_c\include\libstemmer.h">
+      <Filter>third_party\libstemmer_c\include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\libstemmer_c\libstemmer\modules.h">
+      <Filter>third_party\libstemmer_c\libstemmer</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\libstemmer_c\libstemmer\modules_utf8.h">
+      <Filter>third_party\libstemmer_c\libstemmer</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\libstemmer_c\src_c\stem_ISO_8859_1_danish.h">
+      <Filter>third_party\libstemmer_c\src_c</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\libstemmer_c\src_c\stem_ISO_8859_1_dutch.h">
+      <Filter>third_party\libstemmer_c\src_c</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\libstemmer_c\src_c\stem_ISO_8859_1_english.h">
+      <Filter>third_party\libstemmer_c\src_c</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\libstemmer_c\src_c\stem_ISO_8859_1_finnish.h">
+      <Filter>third_party\libstemmer_c\src_c</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\libstemmer_c\src_c\stem_ISO_8859_1_french.h">
+      <Filter>third_party\libstemmer_c\src_c</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\libstemmer_c\src_c\stem_ISO_8859_1_german.h">
+      <Filter>third_party\libstemmer_c\src_c</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\libstemmer_c\src_c\stem_ISO_8859_1_hungarian.h">
+      <Filter>third_party\libstemmer_c\src_c</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\libstemmer_c\src_c\stem_ISO_8859_1_italian.h">
+      <Filter>third_party\libstemmer_c\src_c</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\libstemmer_c\src_c\stem_ISO_8859_1_norwegian.h">
+      <Filter>third_party\libstemmer_c\src_c</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\libstemmer_c\src_c\stem_ISO_8859_1_porter.h">
+      <Filter>third_party\libstemmer_c\src_c</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\libstemmer_c\src_c\stem_ISO_8859_1_portuguese.h">
+      <Filter>third_party\libstemmer_c\src_c</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\libstemmer_c\src_c\stem_ISO_8859_1_spanish.h">
+      <Filter>third_party\libstemmer_c\src_c</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\libstemmer_c\src_c\stem_ISO_8859_1_swedish.h">
+      <Filter>third_party\libstemmer_c\src_c</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\libstemmer_c\src_c\stem_ISO_8859_2_romanian.h">
+      <Filter>third_party\libstemmer_c\src_c</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\libstemmer_c\src_c\stem_KOI8_R_russian.h">
+      <Filter>third_party\libstemmer_c\src_c</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\libstemmer_c\src_c\stem_UTF_8_danish.h">
+      <Filter>third_party\libstemmer_c\src_c</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\libstemmer_c\src_c\stem_UTF_8_dutch.h">
+      <Filter>third_party\libstemmer_c\src_c</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\libstemmer_c\src_c\stem_UTF_8_english.h">
+      <Filter>third_party\libstemmer_c\src_c</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\libstemmer_c\src_c\stem_UTF_8_finnish.h">
+      <Filter>third_party\libstemmer_c\src_c</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\libstemmer_c\src_c\stem_UTF_8_french.h">
+      <Filter>third_party\libstemmer_c\src_c</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\libstemmer_c\src_c\stem_UTF_8_german.h">
+      <Filter>third_party\libstemmer_c\src_c</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\libstemmer_c\src_c\stem_UTF_8_hungarian.h">
+      <Filter>third_party\libstemmer_c\src_c</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\libstemmer_c\src_c\stem_UTF_8_italian.h">
+      <Filter>third_party\libstemmer_c\src_c</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\libstemmer_c\src_c\stem_UTF_8_norwegian.h">
+      <Filter>third_party\libstemmer_c\src_c</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\libstemmer_c\src_c\stem_UTF_8_porter.h">
+      <Filter>third_party\libstemmer_c\src_c</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\libstemmer_c\src_c\stem_UTF_8_portuguese.h">
+      <Filter>third_party\libstemmer_c\src_c</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\libstemmer_c\src_c\stem_UTF_8_romanian.h">
+      <Filter>third_party\libstemmer_c\src_c</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\libstemmer_c\src_c\stem_UTF_8_russian.h">
+      <Filter>third_party\libstemmer_c\src_c</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\libstemmer_c\src_c\stem_UTF_8_spanish.h">
+      <Filter>third_party\libstemmer_c\src_c</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\libstemmer_c\src_c\stem_UTF_8_swedish.h">
+      <Filter>third_party\libstemmer_c\src_c</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\libstemmer_c\src_c\stem_UTF_8_turkish.h">
+      <Filter>third_party\libstemmer_c\src_c</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\libstemmer_c\runtime\api.h">
+      <Filter>third_party\libstemmer_c\runtime</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\libstemmer_c\runtime\header.h">
+      <Filter>third_party\libstemmer_c\runtime</Filter>
+    </ClInclude>
+    <ClInclude Include="fts\fts_command.h">
+      <Filter>db\fts</Filter>
+    </ClInclude>
+    <ClInclude Include="fts\fts_enabled.h">
+      <Filter>db\fts</Filter>
+    </ClInclude>
+    <ClInclude Include="fts\fts_index.h">
+      <Filter>db\fts</Filter>
+    </ClInclude>
+    <ClInclude Include="fts\fts_index_format.h">
+      <Filter>db\fts</Filter>
+    </ClInclude>
+    <ClInclude Include="fts\fts_matcher.h">
+      <Filter>db\fts</Filter>
+    </ClInclude>
+    <ClInclude Include="fts\fts_query.h">
+      <Filter>db\fts</Filter>
+    </ClInclude>
+    <ClInclude Include="fts\fts_search.h">
+      <Filter>db\fts</Filter>
+    </ClInclude>
+    <ClInclude Include="fts\fts_spec.h">
+      <Filter>db\fts</Filter>
+    </ClInclude>
+    <ClInclude Include="fts\fts_util.h">
+      <Filter>db\fts</Filter>
+    </ClInclude>
+    <ClInclude Include="fts\stemmer.h">
+      <Filter>db\fts</Filter>
+    </ClInclude>
+    <ClInclude Include="fts\stop_words.h">
+      <Filter>db\fts</Filter>
+    </ClInclude>
+    <ClInclude Include="fts\tokenizer.h">
+      <Filter>db\fts</Filter>
+    </ClInclude>
+    <ClInclude Include="fts\stop_words_list.h">
+      <Filter>db\fts</Filter>
+    </ClInclude>
+    <ClInclude Include="ops\modifier_base.h">
+      <Filter>db\ops</Filter>
+    </ClInclude>
+    <ClInclude Include="..\scripting\engine_spidermonkey_internal.h">
+      <Filter>scripting</Filter>
+    </ClInclude>
+    <ClInclude Include="stats\fine_clock.h">
+      <Filter>db\stats</Filter>
+    </ClInclude>
+    <ClInclude Include="stats\timer_stats.h">
+      <Filter>db\stats</Filter>
+    </ClInclude>
+    <ClInclude Include="..\scripting\v8_deadline_monitor.h">
+      <Filter>scripting</Filter>
+    </ClInclude>
+    <ClInclude Include="geo\geoquery.h">
+      <Filter>db\geo</Filter>
+    </ClInclude>
+    <ClInclude Include="..\scripting\v8_profiler.h">
+      <Filter>scripting</Filter>
+    </ClInclude>
+    <ClInclude Include="field_ref.h">
+      <Filter>db\Header Files\e to n</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="mongo.ico">
@@ -1711,6 +3013,90 @@
     </None>
     <None Include="..\..\third_party\js-1.7\jsopcode.tbl">
       <Filter>third_party\SpiderMonkey\Header Files</Filter>
+    </None>
+    <None Include="auth\action_types.txt">
+      <Filter>db\auth</Filter>
+    </None>
+    <None Include="auth\generate_action_types.py">
+      <Filter>db\auth</Filter>
+    </None>
+    <None Include="..\base\generate_error_codes.py">
+      <Filter>base</Filter>
+    </None>
+    <None Include="..\base\error_codes.err">
+      <Filter>base</Filter>
+    </None>
+    <None Include="..\..\third_party\run_if_newer.js">
+      <Filter>third_party</Filter>
+    </None>
+    <None Include="..\..\third_party\s2\LICENSE-2.0.txt">
+      <Filter>third_party\s2</Filter>
+    </None>
+    <None Include="..\..\third_party\libstemmer_c\libstemmer\libstemmer_c.in">
+      <Filter>third_party\libstemmer_c\libstemmer</Filter>
+    </None>
+    <None Include="..\..\third_party\libstemmer_c\libstemmer\modules.txt">
+      <Filter>third_party\libstemmer_c\libstemmer</Filter>
+    </None>
+    <None Include="..\..\third_party\libstemmer_c\libstemmer\modules_utf8.txt">
+      <Filter>third_party\libstemmer_c\libstemmer</Filter>
+    </None>
+    <None Include="..\..\third_party\libstemmer_c\SConscript">
+      <Filter>third_party\libstemmer_c</Filter>
+    </None>
+    <None Include="fts\generate_stop_words.py">
+      <Filter>db\fts</Filter>
+    </None>
+    <None Include="fts\SConscript">
+      <Filter>db\fts</Filter>
+    </None>
+    <None Include="fts\stop_words_danish.txt">
+      <Filter>db\fts\stop_words</Filter>
+    </None>
+    <None Include="fts\stop_words_turkish.txt">
+      <Filter>db\fts\stop_words</Filter>
+    </None>
+    <None Include="fts\stop_words_dutch.txt">
+      <Filter>db\fts\stop_words</Filter>
+    </None>
+    <None Include="fts\stop_words_english.txt">
+      <Filter>db\fts\stop_words</Filter>
+    </None>
+    <None Include="fts\stop_words_finnish.txt">
+      <Filter>db\fts\stop_words</Filter>
+    </None>
+    <None Include="fts\stop_words_french.txt">
+      <Filter>db\fts\stop_words</Filter>
+    </None>
+    <None Include="fts\stop_words_german.txt">
+      <Filter>db\fts\stop_words</Filter>
+    </None>
+    <None Include="fts\stop_words_hungarian.txt">
+      <Filter>db\fts\stop_words</Filter>
+    </None>
+    <None Include="fts\stop_words_italian.txt">
+      <Filter>db\fts\stop_words</Filter>
+    </None>
+    <None Include="fts\stop_words_norwegian.txt">
+      <Filter>db\fts\stop_words</Filter>
+    </None>
+    <None Include="fts\stop_words_portuguese.txt">
+      <Filter>db\fts\stop_words</Filter>
+    </None>
+    <None Include="fts\stop_words_romanian.txt">
+      <Filter>db\fts\stop_words</Filter>
+    </None>
+    <None Include="fts\stop_words_russian.txt">
+      <Filter>db\fts\stop_words</Filter>
+    </None>
+    <None Include="fts\stop_words_spanish.txt">
+      <Filter>db\fts\stop_words</Filter>
+    </None>
+    <None Include="fts\stop_words_swedish.txt">
+      <Filter>db\fts\stop_words</Filter>
+    </None>
+    <None Include="SConscript">
+      <Filter>db</Filter>
     </None>
   </ItemGroup>
   <ItemGroup>
@@ -1783,9 +3169,6 @@
     <Filter Include="db\stats">
       <UniqueIdentifier>{da58c1f7-ec48-4d5a-a63e-822a1f6f3900}</UniqueIdentifier>
     </Filter>
-    <Filter Include="db\helpers">
-      <UniqueIdentifier>{38d78620-c5c4-498c-a44c-46e263e563df}</UniqueIdentifier>
-    </Filter>
     <Filter Include="db\Resource Files">
       <UniqueIdentifier>{d3338818-34d0-4575-96a7-917f44ba2f91}</UniqueIdentifier>
     </Filter>
@@ -1797,9 +3180,6 @@
     </Filter>
     <Filter Include="util\concurrency">
       <UniqueIdentifier>{97d24b2e-60a3-41d4-a9d5-97c05002e0a5}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="db\modules">
-      <UniqueIdentifier>{787b60d2-85bd-44dd-9e9a-8d225053043d}</UniqueIdentifier>
     </Filter>
     <Filter Include="third_party\SpiderMonkey">
       <UniqueIdentifier>{95737c65-b228-499d-b975-f4113dae1d0d}</UniqueIdentifier>
@@ -1839,6 +3219,69 @@
     </Filter>
     <Filter Include="third_party\MurmurHash3">
       <UniqueIdentifier>{7034e006-ad70-4939-9b1b-cf2b448eec6b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="base">
+      <UniqueIdentifier>{54fa01f6-b02c-4626-9752-9b4ac1c73994}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="db\auth">
+      <UniqueIdentifier>{9431025a-8834-44a1-b94a-8a20c616206d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="bson\mutable">
+      <UniqueIdentifier>{e1d472aa-0af3-48c4-9f3a-b06ee57d2db4}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="third_party\s2">
+      <UniqueIdentifier>{fcf379fd-83ef-44b4-b382-f15fb5fc3fec}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="third_party\s2\base">
+      <UniqueIdentifier>{df60ef6a-2ce0-4423-a9a7-759d05f690ff}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="third_party\s2\strings">
+      <UniqueIdentifier>{03508fec-3cea-45a4-861f-7dd6990852a3}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="third_party\s2\util">
+      <UniqueIdentifier>{a7beaf14-1c40-48d2-832d-b0886e77da91}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="third_party\s2\util\coding">
+      <UniqueIdentifier>{b5f90eeb-6f5d-457e-9d87-024af0c1332e}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="third_party\s2\util\endian">
+      <UniqueIdentifier>{1786ad44-ef64-4aa9-8ebb-4107b1c9eefa}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="third_party\s2\util\hash">
+      <UniqueIdentifier>{43f20e5d-d0cd-441a-84a0-ae367722fb31}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="third_party\s2\util\math">
+      <UniqueIdentifier>{88e5cd26-90ee-41af-81e5-7bbae49e86c7}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="third_party\s2\util\math\exactfloat">
+      <UniqueIdentifier>{b1afa496-4d7e-42ab-a37e-68409d21f2b4}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="third_party\libstemmer_c">
+      <UniqueIdentifier>{1725ebab-8d00-4103-8937-59541a620407}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="third_party\libstemmer_c\examples">
+      <UniqueIdentifier>{016bbeaf-e0b8-4aba-93c2-529392fae2da}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="third_party\libstemmer_c\include">
+      <UniqueIdentifier>{c38eff83-5451-4ed9-b552-4e71bd6cc21f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="third_party\libstemmer_c\libstemmer">
+      <UniqueIdentifier>{3d2e6175-acf6-4f67-896e-f93a5cbbacd4}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="third_party\libstemmer_c\runtime">
+      <UniqueIdentifier>{577a305b-b943-4eba-85a6-2ffd2b4c64af}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="third_party\libstemmer_c\src_c">
+      <UniqueIdentifier>{918ec912-403b-4139-9770-0ceb5f223a24}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="db\fts">
+      <UniqueIdentifier>{42a6fb8f-f3b9-455c-b68e-692222790ffc}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="db\fts\test">
+      <UniqueIdentifier>{b55142e9-7e40-4ad4-900d-a6cfe453a232}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="db\fts\stop_words">
+      <UniqueIdentifier>{05758f9d-1e84-47c7-9819-8ddc7ad18174}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>

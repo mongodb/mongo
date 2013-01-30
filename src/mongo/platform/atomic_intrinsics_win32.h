@@ -21,6 +21,8 @@
 
 #include <boost/utility.hpp>
 
+#include "mongo/platform/windows_basic.h"
+
 namespace mongo {
 
     /**
@@ -55,6 +57,10 @@ namespace mongo {
             T result = *value;
             MemoryBarrier();
             return result;
+        }
+
+        static T loadRelaxed(volatile const T* value) {
+            return *value;
         }
 
         static void store(volatile T* dest, T newValue) {

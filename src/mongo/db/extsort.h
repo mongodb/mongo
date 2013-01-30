@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "pch.h"
+#include "mongo/pch.h"
 
 #include "mongo/db/index.h"
 #include "mongo/db/jsobj.h"
@@ -36,6 +36,8 @@ namespace mongo {
         BSONObjExternalSorter( IndexInterface &i, const BSONObj & order = BSONObj() , long maxFileSize = 1024 * 1024 * 100 );
         ~BSONObjExternalSorter();
         typedef pair<BSONObj,DiskLoc> Data;
+        /** @return the IndexInterface used to perform key comparisons. */
+        const IndexInterface& getIndexInterface() const { return _idxi; }
  
     private:
         static HLMutex _extSortMutex;
@@ -56,11 +58,12 @@ namespace mongo {
 
         static IndexInterface *extSortIdxInterface;
         static Ordering extSortOrder;
+        static bool extSortMayInterrupt;
         static int extSortComp( const void *lv, const void *rv );
 
         class FileIterator : boost::noncopyable {
         public:
-            FileIterator( string file );
+            FileIterator( const std::string& file );
             ~FileIterator();
             bool more();
             Data next();
@@ -94,13 +97,10 @@ namespace mongo {
 
         };
 
-        void add( const BSONObj& o , const DiskLoc & loc );
-        void add( const BSONObj& o , int a , int b ) {
-            add( o , DiskLoc( a , b ) );
-        }
+        void add( const BSONObj& o, const DiskLoc& loc, bool mayInterrupt );
 
         /* call after adding values, and before fetching the iterator */
-        void sort();
+        void sort( bool mayInterrupt );
 
         auto_ptr<Iterator> iterator() {
             uassert( 10052 ,  "not sorted" , _sorted );
@@ -120,10 +120,10 @@ namespace mongo {
 
     private:
 
-        void _sortInMem();
+        void _sortInMem( bool mayInterrupt );
 
-        void sort( string file );
-        void finishMap();
+        void sort( const std::string& file );
+        void finishMap( bool mayInterrupt );
 
         BSONObj _order;
         long _maxFilesize;

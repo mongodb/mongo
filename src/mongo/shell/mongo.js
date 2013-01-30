@@ -77,6 +77,27 @@ Mongo.prototype.toString = function(){
 }
 Mongo.prototype.tojson = Mongo.prototype.toString;
 
+/**
+ * Sets the read preference.
+ *
+ * @param mode {string} read prefrence mode to use. Pass null to disable read
+ *     preference.
+ * @param tagSet {Array.<Object>} optional. The list of tags to use, order matters.
+ *     Note that this object only keeps a shallow copy of this array.
+ */
+Mongo.prototype.setReadPref = function (mode, tagSet) {
+    this._readPrefMode = mode;
+    this._readPrefTagSet = tagSet;
+};
+
+Mongo.prototype.getReadPrefMode = function () {
+    return this._readPrefMode;
+};
+
+Mongo.prototype.getReadPrefTagSet = function () {
+    return this._readPrefTagSet;
+};
+
 connect = function( url , user , pass ){
     chatty( "connecting to: " + url )
 

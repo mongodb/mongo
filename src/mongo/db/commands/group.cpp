@@ -1,6 +1,7 @@
 // group.cpp
 
 /**
+*    Copyright (C) 2012 10gen Inc.
 *
 *    This program is free software: you can redistribute it and/or  modify
 *    it under the terms of the GNU Affero General Public License, version 3,
@@ -16,10 +17,16 @@
 */
 
 #include "pch.h"
-#include "../commands.h"
-#include "../instance.h"
-#include "../../scripting/engine.h"
-#include "../clientcursor.h"
+
+#include <vector>
+
+#include "mongo/db/auth/action_set.h"
+#include "mongo/db/auth/action_type.h"
+#include "mongo/db/auth/privilege.h"
+#include "mongo/db/commands.h"
+#include "mongo/db/instance.h"
+#include "mongo/scripting/engine.h"
+#include "mongo/db/clientcursor.h"
 
 namespace mongo {
 
@@ -32,7 +39,13 @@ namespace mongo {
         virtual void help( stringstream &help ) const {
             help << "http://dochub.mongodb.org/core/aggregation";
         }
-
+        virtual void addRequiredPrivileges(const std::string& dbname,
+                                           const BSONObj& cmdObj,
+                                           std::vector<Privilege>* out) {
+            ActionSet actions;
+            actions.addAction(ActionType::find);
+            out->push_back(Privilege(parseNs(dbname, cmdObj), actions));
+        }
         BSONObj getKey( const BSONObj& obj , const BSONObj& keyPattern , ScriptingFunction func , double avgSize , Scope * s ) {
             if ( func ) {
                 BSONObjBuilder b( obj.objsize() + 32 );
@@ -47,14 +60,19 @@ namespace mongo {
             return obj.extractFields( keyPattern , true ).getOwned();
         }
 
-        bool group( string realdbname , const string& ns , const BSONObj& query ,
-                    BSONObj keyPattern , string keyFunctionCode , string reduceCode , const char * reduceScope ,
-                    BSONObj initial , string finalize ,
-                    string& errmsg , BSONObjBuilder& result ) {
+        bool group( const std::string& realdbname,
+                    const std::string& ns,
+                    const BSONObj& query,
+                    BSONObj keyPattern,
+                    const std::string& keyFunctionCode,
+                    const std::string& reduceCode,
+                    const char * reduceScope,
+                    BSONObj initial,
+                    const std::string& finalize,
+                    string& errmsg,
+                    BSONObjBuilder& result ) {
 
-
-            auto_ptr<Scope> s = globalScriptEngine->getPooledScope( realdbname );
-            s->localConnect( realdbname.c_str() );
+            auto_ptr<Scope> s = globalScriptEngine->getPooledScope( realdbname + "group");
 
             if ( reduceScope )
                 s->init( reduceScope );

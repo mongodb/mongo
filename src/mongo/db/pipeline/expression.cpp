@@ -46,11 +46,18 @@ namespace mongo {
         return ((options & TOP_LEVEL) != 0);
     }
 
+    bool Expression::ObjectCtx::inclusionOk() const {
+        return ((options & INCLUSION_OK) != 0);
+    }
+
     string Expression::removeFieldPrefix(const string &prefixedField) {
+        uassert(16419, str::stream()<<"field path must not contain embedded null characters" << prefixedField.find("\0") << "," ,
+                prefixedField.find('\0') == string::npos);
+
         const char *pPrefixedField = prefixedField.c_str();
         uassert(15982, str::stream() <<
-                "field path references must be prefixed with a '$' (\"" <<
-                prefixedField << "\"", pPrefixedField[0] == '$');
+                "field path references must be prefixed with a '$' ('" <<
+                prefixedField << "'", pPrefixedField[0] == '$');
 
         return string(pPrefixedField + 1);
     }
@@ -79,8 +86,8 @@ namespace mongo {
 
             if (pFieldName[0] == '$') {
                 uassert(15983, str::stream() <<
-                        "the operator must be the only field in a pipeline object (at \""
-                        << pFieldName << "\"",
+                        "the operator must be the only field in a pipeline object (at '"
+                        << pFieldName << "'",
                         fieldCount == 0);
 
                 uassert(16404, "$expressions are not allowed at the top-level of $project",
@@ -92,8 +99,8 @@ namespace mongo {
                 pExpression = parseExpression(pFieldName, &fieldElement);
             }
             else {
-                uassert(15990, str::stream() << "this object is already an operator expression, and can't be used as a document expression (at \"" <<
-                        pFieldName << "\")",
+                uassert(15990, str::stream() << "this object is already an operator expression, and can't be used as a document expression (at '" <<
+                        pFieldName << "')",
                         kind != OPERATOR);
 
                 uassert(16405, "dotted field names are only allowed at the top level",
@@ -117,7 +124,8 @@ namespace mongo {
                     case Object: {
                         /* it's a nested document */
                         ObjectCtx oCtx(
-                            (pCtx->documentOk() ? ObjectCtx::DOCUMENT_OK : 0));
+                            (pCtx->documentOk() ? ObjectCtx::DOCUMENT_OK : 0)
+                             | (pCtx->inclusionOk() ? ObjectCtx::INCLUSION_OK : 0));
                         intrusive_ptr<Expression> pNested(
                             parseObject(&fieldElement, &oCtx));
                         pExpressionObject->addField(fieldName, pNested);
@@ -128,7 +136,7 @@ namespace mongo {
                         // CW TODO could also be a constant
                         intrusive_ptr<Expression> pPath(
                             ExpressionFieldPath::create(
-                                removeFieldPrefix(fieldElement.String())));
+                                removeFieldPrefix(fieldElement.str())));
                         pExpressionObject->addField(fieldName, pPath);
                         break;
                     }
@@ -138,6 +146,8 @@ namespace mongo {
                     case NumberInt: {
                         /* it's an inclusion specification */
                         if (fieldElement.trueValue()) {
+                            uassert(16420, "field inclusion is not allowed inside of $expressions",
+                                    pCtx->inclusionOk());
                             pExpressionObject->includePath(fieldName);
                         }
                         else {
@@ -151,8 +161,8 @@ namespace mongo {
                     default:
                         uassert(15992, str::stream() <<
                                 "disallowed field type " << typeName(fieldType) <<
-                                " in object expression (at \"" <<
-                                fieldName << "\")", false);
+                                " in object expression (at '" <<
+                                fieldName << "')", false);
                 }
             }
         }
@@ -184,7 +194,9 @@ namespace mongo {
         {"$add", ExpressionAdd::create, 0},
         {"$and", ExpressionAnd::create, 0},
         {"$cmp", ExpressionCompare::createCmp, OpDesc::FIXED_COUNT, 2},
+        {"$concat", ExpressionConcat::create, 0},
         {"$cond", ExpressionCond::create, OpDesc::FIXED_COUNT, 3},
+        // $const handled specially in parseExpression
         {"$dayOfMonth", ExpressionDayOfMonth::create, OpDesc::FIXED_COUNT, 1},
         {"$dayOfWeek", ExpressionDayOfWeek::create, OpDesc::FIXED_COUNT, 1},
         {"$dayOfYear", ExpressionDayOfYear::create, OpDesc::FIXED_COUNT, 1},
@@ -194,15 +206,14 @@ namespace mongo {
         {"$gte", ExpressionCompare::createGte, OpDesc::FIXED_COUNT, 2},
         {"$hour", ExpressionHour::create, OpDesc::FIXED_COUNT, 1},
         {"$ifNull", ExpressionIfNull::create, OpDesc::FIXED_COUNT, 2},
-        {"$literal", ExpressionLiteral::create, OpDesc::FIXED_COUNT, 1},
         {"$lt", ExpressionCompare::createLt, OpDesc::FIXED_COUNT, 2},
         {"$lte", ExpressionCompare::createLte, OpDesc::FIXED_COUNT, 2},
+        {"$millisecond", ExpressionMillisecond::create, OpDesc::FIXED_COUNT, 1},
         {"$minute", ExpressionMinute::create, OpDesc::FIXED_COUNT, 1},
         {"$mod", ExpressionMod::create, OpDesc::FIXED_COUNT, 2},
         {"$month", ExpressionMonth::create, OpDesc::FIXED_COUNT, 1},
         {"$multiply", ExpressionMultiply::create, 0},
         {"$ne", ExpressionCompare::createNe, OpDesc::FIXED_COUNT, 2},
-        {"$noOp", ExpressionNoOp::create, OpDesc::FIXED_COUNT, 1},
         {"$not", ExpressionNot::create, OpDesc::FIXED_COUNT, 1},
         {"$or", ExpressionOr::create, 0},
         {"$second", ExpressionSecond::create, OpDesc::FIXED_COUNT, 1},
@@ -220,13 +231,18 @@ namespace mongo {
     intrusive_ptr<Expression> Expression::parseExpression(
         const char *pOpName, BSONElement *pBsonElement) {
         /* look for the specified operator */
+
+        if (str::equals(pOpName, "$const")) {
+            return ExpressionConstant::createFromBsonElement(pBsonElement);
+        }
+
         OpDesc key;
         key.pName = pOpName;
         const OpDesc *pOp = (const OpDesc *)bsearch(
                                 &key, OpTable, NOp, sizeof(OpDesc), OpDescCmp);
 
-        uassert(15999, str::stream() << "invalid operator \"" <<
-                pOpName << "\"", pOp);
+        uassert(15999, str::stream() << "invalid operator '" <<
+                pOpName << "'", pOp);
 
         /* make the expression node */
         intrusive_ptr<ExpressionNary> pExpression((*pOp->pFactory)());
@@ -285,53 +301,21 @@ namespace mongo {
         return pExpression;
     }
 
-    intrusive_ptr<Expression> Expression::parseOperand(
-        BSONElement *pBsonElement) {
+    intrusive_ptr<Expression> Expression::parseOperand(BSONElement *pBsonElement) {
         BSONType type = pBsonElement->type();
 
-        switch(type) {
-        case String: {
-            /*
-              This could be a field path, or it could be a constant
-              string.
-
-              We make a copy of the BSONElement reader so we can read its
-              value without advancing its state, in case we need to read it
-              again in the constant code path.
-            */
-            BSONElement opCopy(*pBsonElement);
-            string value(opCopy.String());
-
-            /* check for a field path */
-            if (value[0] != '$')
-                goto ExpectConstant;  // assume plain string constant
-
+        if (type == String && pBsonElement->valuestr()[0] == '$') {
             /* if we got here, this is a field path expression */
-            string fieldPath(removeFieldPrefix(value));
-            intrusive_ptr<Expression> pFieldExpr(
-                ExpressionFieldPath::create(fieldPath));
-            return pFieldExpr;
+            string fieldPath = removeFieldPrefix(pBsonElement->str());
+            return ExpressionFieldPath::create(fieldPath);
         }
-
-        case Object: {
+        else if (type == Object) {
             ObjectCtx oCtx(ObjectCtx::DOCUMENT_OK);
-            intrusive_ptr<Expression> pSubExpression(
-                Expression::parseObject(pBsonElement, &oCtx));
-            return pSubExpression;
+            return Expression::parseObject(pBsonElement, &oCtx);
         }
-
-        default:
-        ExpectConstant: {
-                intrusive_ptr<Expression> pOperand(
-                    ExpressionConstant::createFromBsonElement(pBsonElement));
-                return pOperand;
-            }
-
-        } // switch(type)
-
-        /* NOTREACHED */
-        verify(false);
-        return intrusive_ptr<Expression>();
+        else {
+            return ExpressionConstant::createFromBsonElement(pBsonElement);
+        }
     }
 
     /* ------------------------- ExpressionAdd ----------------------------- */
@@ -339,83 +323,12 @@ namespace mongo {
     ExpressionAdd::~ExpressionAdd() {
     }
 
-    intrusive_ptr<Expression> ExpressionAdd::optimize() {
-        intrusive_ptr<Expression> pE(ExpressionNary::optimize());
-        ExpressionAdd *pA = dynamic_cast<ExpressionAdd *>(pE.get());
-        if (pA) {
-            /* don't create a circular reference */
-            if (pA != this)
-                pA->pAdd = this;
-        }
-
-        return pE;
-    }
-
     intrusive_ptr<ExpressionNary> ExpressionAdd::create() {
         intrusive_ptr<ExpressionAdd> pExpression(new ExpressionAdd());
         return pExpression;
     }
 
-    ExpressionAdd::ExpressionAdd():
-        ExpressionNary(),
-        useOriginal(false) {
-    }
-
-    intrusive_ptr<const Value> ExpressionAdd::evaluate(
-        const intrusive_ptr<Document> &pDocument) const {
-        unsigned stringCount = 0;
-        unsigned nonConstStringCount = 0;
-        unsigned dateCount = 0;
-        const size_t n = vpOperand.size();
-        vector<intrusive_ptr<const Value> > vpValue; /* evaluated operands */
-
-        /* use the original, if we've been told to do so */
-        if (useOriginal) {
-            return pAdd->evaluate(pDocument);
-        }
-
-        for (size_t i = 0; i < n; ++i) {
-            intrusive_ptr<const Value> pValue(
-                vpOperand[i]->evaluate(pDocument));
-            vpValue.push_back(pValue);
-
-            BSONType valueType = pValue->getType();
-            if (valueType == String) {
-                ++stringCount;
-                if (!dynamic_cast<ExpressionConstant *>(vpOperand[i].get()))
-                    ++nonConstStringCount;
-            }
-            else if (valueType == Date)
-                ++dateCount;
-        }
-
-        uassert(16377, "$add does not support dates", !dateCount);
-
-        /*
-          If there are non-constant strings, and we've got a copy of the
-          original, then use that from this point forward.  This is necessary
-          to keep the order of strings the same for string concatenation;
-          constant-folding would violate the order preservation.
-
-          This is a one-way conversion we do if we see one of these.  It is
-          possible that these could vary from document to document, but any
-          sane schema probably isn't going to do that, so once we see a string,
-          we can probably assume they're going to be strings all the way down.
-         */
-        if (nonConstStringCount && pAdd.get()) {
-            useOriginal = true;
-            return pAdd->evaluate(pDocument);
-        }
-
-        if (stringCount) {
-            stringstream stringTotal;
-            for (size_t i = 0; i < n; ++i) {
-                intrusive_ptr<const Value> pValue(vpValue[i]);
-                stringTotal << pValue->coerceToString();
-            }
-
-            return Value::createString(stringTotal.str());
-        }
+    Value ExpressionAdd::evaluate(const Document& pDocument) const {
 
         /*
           We'll try to return the narrowest possible result value.  To do that
@@ -426,19 +339,54 @@ namespace mongo {
         double doubleTotal = 0;
         long long longTotal = 0;
         BSONType totalType = NumberInt;
-        for(size_t i = 0; i < n; ++i) {
-            intrusive_ptr<const Value> pValue(vpValue[i]);
+        bool haveDate = false;
 
-            totalType = Value::getWidestNumeric(totalType, pValue->getType());
-            doubleTotal += pValue->coerceToDouble();
-            longTotal += pValue->coerceToLong();
+        const size_t n = vpOperand.size();
+        for (size_t i = 0; i < n; ++i) {
+            Value val = vpOperand[i]->evaluate(pDocument);
+
+            if (val.numeric()) {
+                totalType = Value::getWidestNumeric(totalType, val.getType());
+
+                doubleTotal += val.coerceToDouble();
+                longTotal += val.coerceToLong();
+            }
+            else if (val.getType() == Date) {
+                uassert(16612, "only one Date allowed in an $add expression",
+                        !haveDate);
+                haveDate = true;
+
+                // We don't manipulate totalType here.
+
+                longTotal += val.getDate();
+                doubleTotal += val.getDate();
+            }
+            else if (val.nullish()) {
+                return Value(BSONNULL);
+            }
+            else {
+                uasserted(16554, str::stream() << "$add only supports numeric or date types, not "
+                                               << typeName(val.getType()));
+            }
         }
 
-        if (totalType == NumberDouble)
-            return Value::createDouble(doubleTotal);
-        if (totalType == NumberLong)
+        if (haveDate) {
+            if (totalType == NumberDouble)
+                longTotal = static_cast<long long>(doubleTotal);
+            return Value::createDate(longTotal);
+        }
+        else if (totalType == NumberLong) {
             return Value::createLong(longTotal);
-        return Value::createInt((int)longTotal);
+        }
+        else if (totalType == NumberDouble) {
+            return Value::createDouble(doubleTotal);
+        }
+        else if (totalType == NumberInt) {
+            return Value::createIntOrLong(longTotal);
+        }
+        else {
+            massert(16417, "$add resulted in a non-numeric type", false);
+        }
     }
 
     const char *ExpressionAdd::getOpName() const {
@@ -448,16 +396,6 @@ namespace mongo {
     intrusive_ptr<ExpressionNary> (*ExpressionAdd::getFactory() const)() {
         return ExpressionAdd::create;
     }
-
-    void ExpressionAdd::toBson(
-        BSONObjBuilder *pBuilder, const char *pOpName) const {
-
-        if (pAdd)
-            pAdd->toBson(pBuilder, pOpName);
-        else
-            ExpressionNary::toBson(pBuilder, pOpName);
-    }
-
 
     /* ------------------------- ExpressionAnd ----------------------------- */
 
@@ -488,6 +426,8 @@ namespace mongo {
           we can do.
         */
         const size_t n = pAnd->vpOperand.size();
+        // ExpressionNary::optimize() generates an ExpressionConstant for {$and:[]}.
+        verify(n > 0);
         intrusive_ptr<Expression> pLast(pAnd->vpOperand[n - 1]);
         const ExpressionConstant *pConst =
             dynamic_cast<ExpressionConstant *>(pLast.get());
@@ -498,10 +438,10 @@ namespace mongo {
           Evaluate and coerce the last argument to a boolean.  If it's false,
           then we can replace this entire expression.
          */
-        bool last = pLast->evaluate(intrusive_ptr<Document>())->coerceToBool();
+        bool last = pLast->evaluate(Document()).coerceToBool();
         if (!last) {
             intrusive_ptr<ExpressionConstant> pFinal(
-                ExpressionConstant::create(Value::getFalse()));
+                ExpressionConstant::create(Value(false)));
             return pFinal;
         }
 
@@ -528,16 +468,15 @@ namespace mongo {
         return pE;
     }
 
-    intrusive_ptr<const Value> ExpressionAnd::evaluate(
-        const intrusive_ptr<Document> &pDocument) const {
+    Value ExpressionAnd::evaluate(const Document& pDocument) const {
         const size_t n = vpOperand.size();
         for(size_t i = 0; i < n; ++i) {
-            intrusive_ptr<const Value> pValue(vpOperand[i]->evaluate(pDocument));
-            if (!pValue->coerceToBool())
-                return Value::getFalse();
+            Value pValue(vpOperand[i]->evaluate(pDocument));
+            if (!pValue.coerceToBool())
+                return Value(false);
         }
 
-        return Value::getTrue();
+        return Value(true);
     }
 
     const char *ExpressionAnd::getOpName() const {
@@ -598,25 +537,33 @@ namespace mongo {
         pExpression->addDependencies(deps);
     }
 
-    intrusive_ptr<const Value> ExpressionCoerceToBool::evaluate(
-        const intrusive_ptr<Document> &pDocument) const {
-
-        intrusive_ptr<const Value> pResult(pExpression->evaluate(pDocument));
-        bool b = pResult->coerceToBool();
+    Value ExpressionCoerceToBool::evaluate(const Document& pDocument) const {
+        Value pResult(pExpression->evaluate(pDocument));
+        bool b = pResult.coerceToBool();
         if (b)
-            return Value::getTrue();
-        return Value::getFalse();
+            return Value(true);
+        return Value(false);
     }
 
-    void ExpressionCoerceToBool::addToBsonObj(
-        BSONObjBuilder *pBuilder, string fieldName,
-        bool requireExpression) const {
-        verify(false && "not possible"); // no equivalent of this
+    void ExpressionCoerceToBool::addToBsonObj(BSONObjBuilder *pBuilder,
+                                              StringData fieldName,
+                                              bool requireExpression) const {
+        // Serializing as an $and expression which will become a CoerceToBool
+        BSONObjBuilder sub (pBuilder->subobjStart(fieldName));
+        BSONArrayBuilder arr (sub.subarrayStart("$and"));
+        pExpression->addToBsonArray(&arr);
+        arr.doneFast();
+        sub.doneFast();
     }
 
     void ExpressionCoerceToBool::addToBsonArray(
-        BSONArrayBuilder *pBuilder) const {
-        verify(false && "not possible"); // no equivalent of this
+            BSONArrayBuilder *pBuilder) const {
+        // Serializing as an $and expression which will become a CoerceToBool
+        BSONObjBuilder sub (pBuilder->subobjStart());
+        BSONArrayBuilder arr (sub.subarrayStart("$and"));
+        pExpression->addToBsonArray(&arr);
+        arr.doneFast();
+        sub.doneFast();
     }
 
     /* ----------------------- ExpressionCompare --------------------------- */
@@ -689,10 +636,10 @@ namespace mongo {
         /*             -1      0      1      reverse          name   */
         /* EQ  */ { { false, true,  false }, Expression::EQ,  "$eq"  },
         /* NE  */ { { true,  false, true },  Expression::NE,  "$ne"  },
-        /* GT  */ { { false, false, true },  Expression::LTE, "$gt"  },
-        /* GTE */ { { false, true,  true },  Expression::LT,  "$gte" },
-        /* LT  */ { { true,  false, false }, Expression::GTE, "$lt"  },
-        /* LTE */ { { true,  true,  false }, Expression::GT,  "$lte" },
+        /* GT  */ { { false, false, true },  Expression::LT,  "$gt"  },
+        /* GTE */ { { false, true,  true },  Expression::LTE, "$gte" },
+        /* LT  */ { { true,  false, false }, Expression::GT,  "$lt"  },
+        /* LTE */ { { true,  true,  false }, Expression::GTE, "$lte" },
         /* CMP */ { { false, false, false }, Expression::CMP, "$cmp" },
     };
 
@@ -752,90 +699,56 @@ namespace mongo {
             pFieldPath, newOp, pConstant->getValue());
     }
 
-    intrusive_ptr<const Value> ExpressionCompare::evaluate(
-        const intrusive_ptr<Document> &pDocument) const {
+    Value ExpressionCompare::evaluate(const Document& pDocument) const {
         checkArgCount(2);
-        intrusive_ptr<const Value> pLeft(vpOperand[0]->evaluate(pDocument));
-        intrusive_ptr<const Value> pRight(vpOperand[1]->evaluate(pDocument));
+        Value pLeft(vpOperand[0]->evaluate(pDocument));
+        Value pRight(vpOperand[1]->evaluate(pDocument));
 
-        /* TODO look into collapsing by using Value::compare() */
-
-        BSONType leftType = pLeft->getType();
-        BSONType rightType = pRight->getType();
-        uassert(15994, str::stream() << getOpName() <<
-                ":  no automatic conversion for types " <<
-                typeName(leftType) << " and " << typeName(rightType),
-                leftType == rightType);
-        // CW TODO at least for now.  later, handle automatic conversions
-
-        int cmp = 0;
-        switch(leftType) {
-        case NumberDouble: {
-            double left = pLeft->getDouble();
-            double right = pRight->getDouble();
-
-            if (left < right)
-                cmp = -1;
-            else if (left > right)
-                cmp = 1;
-            break;
-        }
-
-        case NumberInt: {
-            int left = pLeft->getInt();
-            int right = pRight->getInt();
-
-            if (left < right)
-                cmp = -1;
-            else if (left > right)
-                cmp = 1;
-            break;
-        }
-
-        case String: {
-            string left(pLeft->getString());
-            string right(pRight->getString());
-            cmp = signum(left.compare(right));
-            break;
-        }
-
-        case Date:
-            cmp = signum(Value::compare(pLeft, pRight));
-            break;
-
-        case Timestamp:
-            cmp = signum(Value::compare(pLeft, pRight));
-            break;
-
-        default:
-            uassert(15995, str::stream() <<
-                    "can't compare values of type " << typeName(leftType), false);
-            break;
-        }
+        int cmp = signum(Value::compare(pLeft, pRight));
 
         if (cmpOp == CMP) {
             switch(cmp) {
             case -1:
-                return Value::getMinusOne();
             case 0:
-                return Value::getZero();
             case 1:
-                return Value::getOne();
+                return Value(cmp);
 
             default:
                 verify(false); // CW TODO internal error
-                return Value::getNull();
             }
         }
 
         bool returnValue = cmpLookup[cmpOp].truthValue[cmp + 1];
-        if (returnValue)
-            return Value::getTrue();
-        return Value::getFalse();
+        return Value(returnValue);
     }
 
     const char *ExpressionCompare::getOpName() const {
         return cmpLookup[cmpOp].name;
+    }
+
+    /* ------------------------- ExpressionConcat ----------------------------- */
+
+    ExpressionConcat::~ExpressionConcat() {
+    }
+
+    intrusive_ptr<ExpressionNary> ExpressionConcat::create() {
+        return new ExpressionConcat();
+    }
+
+    Value ExpressionConcat::evaluate(const Document& input) const {
+        const size_t n = vpOperand.size();
+
+        StringBuilder result;
+        for (size_t i = 0; i < n; ++i) {
+            Value val = vpOperand[i]->evaluate(input);
+            result << val.coerceToString();
+        }
+
+        return Value::createString(result.str());
+    }
+
+    const char *ExpressionConcat::getOpName() const {
+        return "$concat";
     }
 
     /* ----------------------- ExpressionCond ------------------------------ */
@@ -858,11 +771,10 @@ namespace mongo {
         ExpressionNary::addOperand(pExpression);
     }
 
-    intrusive_ptr<const Value> ExpressionCond::evaluate(
-        const intrusive_ptr<Document> &pDocument) const {
+    Value ExpressionCond::evaluate(const Document& pDocument) const {
         checkArgCount(3);
-        intrusive_ptr<const Value> pCond(vpOperand[0]->evaluate(pDocument));
-        int idx = pCond->coerceToBool() ? 1 : 2;
+        Value pCond(vpOperand[0]->evaluate(pDocument));
+        int idx = pCond.coerceToBool() ? 1 : 2;
         return vpOperand[idx]->evaluate(pDocument);
     }
 
@@ -886,16 +798,12 @@ namespace mongo {
         pValue(Value::createFromBsonElement(pBsonElement)) {
     }
 
-    intrusive_ptr<ExpressionConstant> ExpressionConstant::create(
-        const intrusive_ptr<const Value> &pValue) {
+    intrusive_ptr<ExpressionConstant> ExpressionConstant::create(const Value& pValue) {
         intrusive_ptr<ExpressionConstant> pEC(new ExpressionConstant(pValue));
         return pEC;
     }
 
-    ExpressionConstant::ExpressionConstant(
-        const intrusive_ptr<const Value> &pTheValue):
-        pValue(pTheValue) {
-    }
+    ExpressionConstant::ExpressionConstant(const Value& pTheValue): pValue(pTheValue) {}
 
 
     intrusive_ptr<Expression> ExpressionConstant::optimize() {
@@ -907,14 +815,13 @@ namespace mongo {
         /* nothing to do */
     }
 
-    intrusive_ptr<const Value> ExpressionConstant::evaluate(
-        const intrusive_ptr<Document> &pDocument) const {
+    Value ExpressionConstant::evaluate(const Document& pDocument) const {
         return pValue;
     }
 
-    void ExpressionConstant::addToBsonObj(
-        BSONObjBuilder *pBuilder, string fieldName,
-        bool requireExpression) const {
+    void ExpressionConstant::addToBsonObj(BSONObjBuilder *pBuilder,
+                                          StringData fieldName,
+                                          bool requireExpression) const {
         /*
           If we don't need an expression, but can use a naked scalar,
           do the regular thing.
@@ -924,7 +831,7 @@ namespace mongo {
           inclusion (or exclusion):
           { $project : {
               x : true, // include
-              y : { $noOp: true }
+              y : { $const: true }
           }}
 
           This can happen as a result of optimizations.  For example, the
@@ -940,26 +847,19 @@ namespace mongo {
           which will look like an inclusion rather than a computed field.
         */
         if (!requireExpression) {
-            pValue->addToBsonObj(pBuilder, fieldName);
+            pValue.addToBsonObj(pBuilder, fieldName);
             return;
         }
 
-        /*
-          We require an expression, so build one here, and use that.
-
-          Note we emit a $noOp expression.  This is because the table-driven
-          expression parser requires an ExpressionNary factory, and
-          ExpressionConstant isn't an ExpressionNary.  However, the generated
-          NoOp will go away in its ::optimize() phase.
-        */
-        BSONObjBuilder constBuilder;
-        pValue->addToBsonObj(&constBuilder, "$noOp");
-        pBuilder->append(fieldName, constBuilder.done());
+        // We require an expression, so build one here, and use that.
+        BSONObjBuilder constBuilder (pBuilder->subobjStart(fieldName));
+        pValue.addToBsonObj(&constBuilder, getOpName());
+        constBuilder.done();
     }
 
     void ExpressionConstant::addToBsonArray(
         BSONArrayBuilder *pBuilder) const {
-        pValue->addToBsonArray(pBuilder);
+        pValue.addToBsonArray(pBuilder);
     }
 
     const char *ExpressionConstant::getOpName() const {
@@ -986,12 +886,10 @@ namespace mongo {
         ExpressionNary::addOperand(pExpression);
     }
 
-    intrusive_ptr<const Value> ExpressionDayOfMonth::evaluate(
-        const intrusive_ptr<Document> &pDocument) const {
+    Value ExpressionDayOfMonth::evaluate(const Document& pDocument) const {
         checkArgCount(1);
-        intrusive_ptr<const Value> pDate(vpOperand[0]->evaluate(pDocument));
-        tm date;
-        (pDate->coerceToDate()).toTm(&date);
+        Value pDate(vpOperand[0]->evaluate(pDocument));
+        tm date = pDate.coerceToTm();
         return Value::createInt(date.tm_mday); 
     }
 
@@ -1018,12 +916,10 @@ namespace mongo {
         ExpressionNary::addOperand(pExpression);
     }
 
-    intrusive_ptr<const Value> ExpressionDayOfWeek::evaluate(
-        const intrusive_ptr<Document> &pDocument) const {
+    Value ExpressionDayOfWeek::evaluate(const Document& pDocument) const {
         checkArgCount(1);
-        intrusive_ptr<const Value> pDate(vpOperand[0]->evaluate(pDocument));
-        tm date;
-        (pDate->coerceToDate()).toTm(&date);
+        Value pDate(vpOperand[0]->evaluate(pDocument));
+        tm date = pDate.coerceToTm();
         return Value::createInt(date.tm_wday+1); // MySQL uses 1-7 tm uses 0-6
     }
 
@@ -1050,12 +946,10 @@ namespace mongo {
         ExpressionNary::addOperand(pExpression);
     }
 
-    intrusive_ptr<const Value> ExpressionDayOfYear::evaluate(
-        const intrusive_ptr<Document> &pDocument) const {
+    Value ExpressionDayOfYear::evaluate(const Document& pDocument) const {
         checkArgCount(1);
-        intrusive_ptr<const Value> pDate(vpOperand[0]->evaluate(pDocument));
-        tm date;
-        (pDate->coerceToDate()).toTm(&date);
+        Value pDate(vpOperand[0]->evaluate(pDocument));
+        tm date = pDate.coerceToTm();
         return Value::createInt(date.tm_yday+1); // MySQL uses 1-366 tm uses 0-365
     }
 
@@ -1083,23 +977,28 @@ namespace mongo {
         ExpressionNary::addOperand(pExpression);
     }
 
-    intrusive_ptr<const Value> ExpressionDivide::evaluate(
-        const intrusive_ptr<Document> &pDocument) const {
+    Value ExpressionDivide::evaluate(const Document& pDocument) const {
         checkArgCount(2);
-        intrusive_ptr<const Value> pLeft(vpOperand[0]->evaluate(pDocument));
-        intrusive_ptr<const Value> pRight(vpOperand[1]->evaluate(pDocument));
+        Value lhs = vpOperand[0]->evaluate(pDocument);
+        Value rhs = vpOperand[1]->evaluate(pDocument);
 
-        uassert(16373,
-                "$divide does not support dates",
-                pLeft->getType() != Date && pRight->getType() != Date);
+        if (lhs.numeric() && rhs.numeric()) {
+            double numer = lhs.coerceToDouble();
+            double denom = rhs.coerceToDouble();
+            uassert(16608, "can't $divide by zero",
+                    denom != 0);
 
-        double right = pRight->coerceToDouble();
-        if (right == 0)
-            return Value::getUndefined();
-
-        double left = pLeft->coerceToDouble();
-
-        return Value::createDouble(left / right);
+            return Value::createDouble(numer / denom);
+        }
+        else if (lhs.nullish() || rhs.nullish()) {
+            return Value(BSONNULL);
+        }
+        else {
+            uasserted(16609, str::stream() << "$divide only supports numeric types, not "
+                                           << typeName(lhs.getType())
+                                           << " and "
+                                           << typeName(rhs.getType()));
+        }
     }
 
     const char *ExpressionDivide::getOpName() const {
@@ -1127,6 +1026,7 @@ namespace mongo {
 
         return intrusive_ptr<Expression>(this);
     }
+
     bool ExpressionObject::isSimple() {
         for (ExpressionMap::iterator it(_expressions.begin()); it!=_expressions.end(); ++it) {
             if (it->second && !it->second->isSimple())
@@ -1139,7 +1039,7 @@ namespace mongo {
         string pathStr;
         if (path) {
             if (path->empty()) {
-                // we are in the top-level so _id is implicit
+                // we are in the top level of a projection so _id is implicit
                 if (!_excludeId)
                     deps.insert("_id");
             }
@@ -1149,6 +1049,10 @@ namespace mongo {
                 pathStr += '.';
             }
         }
+        else {
+            verify(!_excludeId);
+        }
+        
 
         for (ExpressionMap::const_iterator it(_expressions.begin()); it!=_expressions.end(); ++it) {
             if (it->second) {
@@ -1157,7 +1061,6 @@ namespace mongo {
                 if (path) path->pop_back();
             }
             else { // inclusion
-                // TODO move this assert into parsing stage
                 uassert(16407, "inclusion not supported in objects nested in $expressions",
                         path);
 
@@ -1167,9 +1070,9 @@ namespace mongo {
     }
 
     void ExpressionObject::addToDocument(
-        const intrusive_ptr<Document> &pResult,
-        const intrusive_ptr<Document> &pDocument,
-        const intrusive_ptr<Document> &rootDoc
+        MutableDocument& out,
+        const Document& pDocument,
+        const Document& rootDoc
         ) const
     {
         const bool atRoot = (pDocument == rootDoc);
@@ -1183,14 +1086,16 @@ namespace mongo {
         while(fields.more()) {
             Document::FieldPair field (fields.next());
 
-            ExpressionMap::const_iterator exprIter = _expressions.find(field.first);
+            // TODO don't make a new string here
+            const string fieldName = field.first.toString();
+            ExpressionMap::const_iterator exprIter = _expressions.find(fieldName);
 
             // This field is not supposed to be in the output (unless it is _id)
             if (exprIter == end) {
                 if (!_excludeId && atRoot && field.first == "_id") {
                     // _id from the root doc is always included (until exclusion is supported)
                     // not updating doneFields since "_id" isn't in _expressions
-                    pResult->addField(field.first, field.second);
+                    out.addField(field.first, field.second);
                 }
                 continue;
             }
@@ -1202,30 +1107,28 @@ namespace mongo {
 
             if (!expr) {
                 // This means pull the matching field from the input document
-                pResult->addField(field.first, field.second);
+                out.addField(field.first, field.second);
                 continue;
             }
 
             ExpressionObject* exprObj = dynamic_cast<ExpressionObject*>(expr);
-            BSONType valueType = field.second->getType();
+            BSONType valueType = field.second.getType();
             if ((valueType != Object && valueType != Array) || !exprObj ) {
                 // This expression replace the whole field
                 
-                intrusive_ptr<const Value> pValue(expr->evaluate(rootDoc));
+                Value pValue(expr->evaluate(rootDoc));
 
                 // don't add field if nothing was found in the subobject
-                if (exprObj && pValue->getDocument()->getFieldCount() == 0)
+                if (exprObj && pValue.getDocument()->getFieldCount() == 0)
                     continue;
 
                 /*
-                   Don't add non-existent values (note:  different from NULL);
+                   Don't add non-existent values (note:  different from NULL or Undefined);
                    this is consistent with existing selection syntax which doesn't
-                   force the appearnance of non-existent fields.
+                   force the appearance of non-existent fields.
                    */
-                // TODO make missing distinct from Undefined
-                if (pValue->getType() != Undefined)
-                    pResult->addField(field.first, pValue);
-
+                if (!pValue.missing())
+                    out.addField(field.first, pValue);
 
                 continue;
             }
@@ -1236,11 +1139,9 @@ namespace mongo {
                 add it to the result.
             */
             if (valueType == Object) {
-                intrusive_ptr<Document> doc = Document::create(exprObj->getSizeHint());
-                exprObj->addToDocument(doc,
-                                       field.second->getDocument(),
-                                       rootDoc);
-                pResult->addField(field.first, Value::createDocument(doc));
+                MutableDocument sub (exprObj->getSizeHint());
+                exprObj->addToDocument(sub, field.second.getDocument(), rootDoc);
+                out.addField(field.first, Value(sub.freeze()));
             }
             else if (valueType == Array) {
                 /*
@@ -1248,24 +1149,22 @@ namespace mongo {
                     but to each array element.  Then, add the array
                     of results to the current document.
                 */
-                vector<intrusive_ptr<const Value> > result;
-                intrusive_ptr<ValueIterator> pVI(field.second->getArray());
-                while(pVI->more()) {
-                    intrusive_ptr<const Value> next =  pVI->next();
-
+                vector<Value> result;
+                const vector<Value>& input = field.second.getArray();
+                for (size_t i=0; i < input.size(); i++) {
                     // can't look for a subfield in a non-object value.
-                    if (next->getType() != Object)
+                    if (input[i].getType() != Object)
                         continue;
 
-                    intrusive_ptr<Document> doc = Document::create(exprObj->getSizeHint());
-                    exprObj->addToDocument(doc,
-                                           next->getDocument(),
-                                           rootDoc);
-                    result.push_back(Value::createDocument(doc));
+                    MutableDocument doc (exprObj->getSizeHint());
+                    exprObj->addToDocument(doc, input[i].getDocument(), rootDoc);
+                    result.push_back(Value(doc.freeze()));
                 }
 
-                pResult->addField(field.first,
-                                    Value::createArray(result));
+                out.addField(field.first, Value(result));
+            }
+            else {
+                verify( false );
             }
         }
 
@@ -1285,23 +1184,23 @@ namespace mongo {
             if (!it->second)
                 continue;
 
-            intrusive_ptr<const Value> pValue(it->second->evaluate(rootDoc));
+            Value pValue(it->second->evaluate(rootDoc));
 
             /*
-              Don't add non-existent values (note:  different from NULL);
+              Don't add non-existent values (note:  different from NULL or Undefined);
               this is consistent with existing selection syntax which doesn't
               force the appearnance of non-existent fields.
             */
-            if (pValue->getType() == Undefined)
+            if (pValue.missing())
                 continue;
 
             // don't add field if nothing was found in the subobject
             if (dynamic_cast<ExpressionObject*>(it->second.get())
-                    && pValue->getDocument()->getFieldCount() == 0)
+                    && pValue.getDocument()->getFieldCount() == 0)
                 continue;
 
 
-            pResult->addField(fieldName, pValue);
+            out.addField(fieldName, pValue);
         }
     }
 
@@ -1310,24 +1209,22 @@ namespace mongo {
         return _expressions.size() + (_excludeId ? 0 : 1);
     }
 
-    intrusive_ptr<Document> ExpressionObject::evaluateDocument(
-        const intrusive_ptr<Document> &pDocument) const {
+    Document ExpressionObject::evaluateDocument(const Document& pDocument) const {
         /* create and populate the result */
-        intrusive_ptr<Document> pResult(
-            Document::create(getSizeHint()));
-        addToDocument(pResult, Document::create(), pDocument);
-        return pResult;
+        MutableDocument out (getSizeHint());
+        
+        addToDocument(out,
+                      Document(), // No inclusion field matching.
+                      pDocument);
+        return out.freeze();
     }
 
-    intrusive_ptr<const Value> ExpressionObject::evaluate(
-        const intrusive_ptr<Document> &pDocument) const {
+    Value ExpressionObject::evaluate(const Document& pDocument) const {
         return Value::createDocument(evaluateDocument(pDocument));
     }
 
     void ExpressionObject::addField(const FieldPath &fieldPath,
                                     const intrusive_ptr<Expression> &pExpression) {
-        verify(fieldPath.getPathLength() > 0); // sanity check
-
         const string fieldPart = fieldPath.getFieldName(0);
         const bool haveExpr = _expressions.count(fieldPart);
 
@@ -1369,6 +1266,7 @@ namespace mongo {
         }
 
         if (fieldPath.getPathLength() == 1) {
+            verify(!haveExpr); // haveExpr case handled above.
             expr = pExpression;
             return;
         }
@@ -1384,6 +1282,9 @@ namespace mongo {
     }
 
     void ExpressionObject::documentToBson(BSONObjBuilder *pBuilder, bool requireExpression) const {
+        if (_excludeId)
+            pBuilder->appendBool("_id", false);
+
         for (vector<string>::const_iterator it(_order.begin()); it!=_order.end(); ++it) {
             string fieldName = *it;
             verify(_expressions.find(fieldName) != _expressions.end());
@@ -1399,9 +1300,9 @@ namespace mongo {
         }
     }
 
-    void ExpressionObject::addToBsonObj(
-        BSONObjBuilder *pBuilder, string fieldName,
-        bool requireExpression) const {
+    void ExpressionObject::addToBsonObj(BSONObjBuilder *pBuilder,
+                                        StringData fieldName,
+                                        bool requireExpression) const {
 
         BSONObjBuilder objBuilder (pBuilder->subobjStart(fieldName));
         documentToBson(&objBuilder, requireExpression);
@@ -1414,11 +1315,6 @@ namespace mongo {
         BSONObjBuilder objBuilder (pBuilder->subobjStart());
         documentToBson(&objBuilder, false);
         objBuilder.done();
-    }
-
-    void ExpressionObject::BuilderPathSink::path(
-        const string &path, bool include) {
-        pBuilder->append(path, include);
     }
 
     /* --------------------- ExpressionFieldPath --------------------------- */
@@ -1447,74 +1343,52 @@ namespace mongo {
         deps.insert(fieldPath.getPath(false));
     }
 
-    intrusive_ptr<const Value> ExpressionFieldPath::evaluatePath(
-        size_t index, const size_t pathLength,
-        intrusive_ptr<Document> pDocument) const {
-        intrusive_ptr<const Value> pValue; /* the return value */
+    Value ExpressionFieldPath::evaluatePathArray(size_t index, const Value& input) const {
+        dassert(input.getType() == Array);
 
-        pValue = pDocument->getValue(fieldPath.getFieldName(index));
+        // Check for remaining path in each element of array
+        vector<Value> result;
+        const vector<Value>& array = input.getArray();
+        for (size_t i=0; i < array.size(); i++) {
+            if (array[i].getType() != Object)
+                continue;
 
-        /* if the field doesn't exist, quit with an undefined value */
-        if (!pValue.get())
-            return Value::getUndefined();
+            const Value nested = evaluatePath(index, array[i].getDocument());
+            if (!nested.missing())
+                result.push_back(nested);
+        }
+
+        return Value::createArray(result);
+    }
+    Value ExpressionFieldPath::evaluatePath(size_t index, const Document& input) const {
+        // Note this function is very hot so it is important that is is well optimized.
+        // In particular, all return paths should support RVO.
 
         /* if we've hit the end of the path, stop */
-        ++index;
-        if (index >= pathLength)
-            return pValue;
+        if (index == fieldPath.getPathLength() - 1)
+            return input[fieldPath.getFieldName(index)];
 
-        /*
-          We're diving deeper.  If the value was null, return null.
-        */
-        BSONType type = pValue->getType();
-        if ((type == Undefined) || (type == jstNULL))
-            return Value::getUndefined();
+        // Try to dive deeper
+        const Value val = input[fieldPath.getFieldName(index)];
+        switch (val.getType()) {
+        case Object:
+            return evaluatePath(index+1, val.getDocument());
 
-        if (type == Object) {
-            /* extract from the next level down */
-            return evaluatePath(index, pathLength, pValue->getDocument());
+        case Array:
+            return evaluatePathArray(index+1, val);
+
+        default:
+            return Value();
         }
-
-        if (type == Array) {
-            /*
-              We're going to repeat this for each member of the array,
-              building up a new array as we go.
-            */
-            vector<intrusive_ptr<const Value> > result;
-            intrusive_ptr<ValueIterator> pIter(pValue->getArray());
-            while(pIter->more()) {
-                intrusive_ptr<const Value> pItem(pIter->next());
-                BSONType iType = pItem->getType();
-                if ((iType == Undefined) || (iType == jstNULL)) {
-                    result.push_back(pItem);
-                    continue;
-                }
-
-                uassert(16014, str::stream() << 
-                        "the element \"" << fieldPath.getFieldName(index) <<
-                        "\" along the dotted path \"" <<
-                        fieldPath.getPath(false) <<
-                        "\" is not an object, and cannot be navigated",
-                        iType == Object);
-                intrusive_ptr<const Value> itemResult(
-                    evaluatePath(index, pathLength, pItem->getDocument()));
-                result.push_back(itemResult);
-            }
-
-            return Value::createArray(result);
-        }
-        // subdocument field does not exist, return undefined
-        return Value::getUndefined();
     }
 
-    intrusive_ptr<const Value> ExpressionFieldPath::evaluate(
-        const intrusive_ptr<Document> &pDocument) const {
-        return evaluatePath(0, fieldPath.getPathLength(), pDocument);
+    Value ExpressionFieldPath::evaluate(const Document& pDocument) const {
+        return evaluatePath(0, pDocument);
     }
 
-    void ExpressionFieldPath::addToBsonObj(
-        BSONObjBuilder *pBuilder, string fieldName,
-        bool requireExpression) const {
+    void ExpressionFieldPath::addToBsonObj(BSONObjBuilder *pBuilder,
+                                           StringData fieldName,
+                                           bool requireExpression) const {
         pBuilder->append(fieldName, fieldPath.getPath(true));
     }
 
@@ -1531,15 +1405,15 @@ namespace mongo {
     intrusive_ptr<Expression> ExpressionFieldRange::optimize() {
         /* if there is no range to match, this will never evaluate true */
         if (!pRange.get())
-            return ExpressionConstant::create(Value::getFalse());
+            return ExpressionConstant::create(Value(false));
 
         /*
           If we ended up with a double un-ended range, anything matches.  I
           don't know how that can happen, given intersect()'s interface, but
           here it is, just in case.
         */
-        if (!pRange->pBottom.get() && !pRange->pTop.get())
-            return ExpressionConstant::create(Value::getTrue());
+        if (pRange->pBottom.missing() && pRange->pTop.missing())
+            return ExpressionConstant::create(Value(true));
 
         /*
           In all other cases, we have to test candidate values.  The
@@ -1553,20 +1427,19 @@ namespace mongo {
         pFieldPath->addDependencies(deps);
     }
 
-    intrusive_ptr<const Value> ExpressionFieldRange::evaluate(
-        const intrusive_ptr<Document> &pDocument) const {
+    Value ExpressionFieldRange::evaluate(const Document& pDocument) const {
         /* if there's no range, there can't be a match */
         if (!pRange.get())
-            return Value::getFalse();
+            return Value(false);
 
         /* get the value of the specified field */
-        intrusive_ptr<const Value> pValue(pFieldPath->evaluate(pDocument));
+        Value pValue(pFieldPath->evaluate(pDocument));
 
         /* see if it fits within any of the ranges */
         if (pRange->contains(pValue))
-            return Value::getTrue();
+            return Value(true);
 
-        return Value::getFalse();
+        return Value(false);
     }
 
     void ExpressionFieldRange::addToBson(Builder *pBuilder) const {
@@ -1576,16 +1449,19 @@ namespace mongo {
             return;
         }
 
-        if (!pRange->pTop.get() && !pRange->pBottom.get()) {
+        if (pRange->pTop.missing() && pRange->pBottom.missing()) {
             /* any value will satisfy this predicate */
             pBuilder->append(true);
             return;
         }
 
-        if (pRange->pTop.get() == pRange->pBottom.get()) {
+        // FIXME Append constant values using the $const operator.  SERVER-6769
+
+        // FIXME This checks pointer equality not value equality.
+        if (pRange->pTop == pRange->pBottom) {
             BSONArrayBuilder operands;
             pFieldPath->addToBsonArray(&operands);
-            pRange->pTop->addToBsonArray(&operands);
+            pRange->pTop.addToBsonArray(&operands);
             
             BSONObjBuilder equals;
             equals.append("$eq", operands.arr());
@@ -1594,30 +1470,30 @@ namespace mongo {
         }
 
         BSONObjBuilder leftOperator;
-        if (pRange->pBottom.get()) {
+        if (!pRange->pBottom.missing()) {
             BSONArrayBuilder leftOperands;
             pFieldPath->addToBsonArray(&leftOperands);
-            pRange->pBottom->addToBsonArray(&leftOperands);
+            pRange->pBottom.addToBsonArray(&leftOperands);
             leftOperator.append(
                 (pRange->bottomOpen ? "$gt" : "$gte"),
                 leftOperands.arr());
 
-            if (!pRange->pTop.get()) {
+            if (pRange->pTop.missing()) {
                 pBuilder->append(&leftOperator);
                 return;
             }
         }
 
         BSONObjBuilder rightOperator;
-        if (pRange->pTop.get()) {
+        if (!pRange->pTop.missing()) {
             BSONArrayBuilder rightOperands;
             pFieldPath->addToBsonArray(&rightOperands);
-            pRange->pTop->addToBsonArray(&rightOperands);
+            pRange->pTop.addToBsonArray(&rightOperands);
             rightOperator.append(
                 (pRange->topOpen ? "$lt" : "$lte"),
                 rightOperands.arr());
 
-            if (!pRange->pBottom.get()) {
+            if (pRange->pBottom.missing()) {
                 pBuilder->append(&rightOperator);
                 return;
             }
@@ -1631,9 +1507,9 @@ namespace mongo {
         pBuilder->append(&andOperator);
     }
 
-    void ExpressionFieldRange::addToBsonObj(
-        BSONObjBuilder *pBuilder, string fieldName,
-        bool requireExpression) const {
+    void ExpressionFieldRange::addToBsonObj(BSONObjBuilder *pBuilder,
+                                            StringData fieldName,
+                                            bool requireExpression) const {
         BuilderObj builder(pBuilder, fieldName);
         addToBson(&builder);
     }
@@ -1649,26 +1525,26 @@ namespace mongo {
         verify(pRange.get()); // otherwise, we can't do anything
 
         /* if there are no endpoints, then every value is accepted */
-        if (!pRange->pBottom.get() && !pRange->pTop.get())
+        if (pRange->pBottom.missing() && pRange->pTop.missing())
             return; // nothing to add to the predicate
 
         /* we're going to need the field path */
         string fieldPath(pFieldPath->getFieldPath(false));
 
         BSONObjBuilder range;
-        if (pRange->pBottom.get()) {
+        if (!pRange->pBottom.missing()) {
             /* the test for equality doesn't generate a subobject */
-            if (pRange->pBottom.get() == pRange->pTop.get()) {
-                pRange->pBottom->addToBsonObj(pBuilder, fieldPath);
+            if (pRange->pBottom == pRange->pTop) {
+                pRange->pBottom.addToBsonObj(pBuilder, fieldPath);
                 return;
             }
 
-            pRange->pBottom->addToBsonObj(
+            pRange->pBottom.addToBsonObj(
                 pBuilder, (pRange->bottomOpen ? "$gt" : "$gte"));
         }
 
-        if (pRange->pTop.get()) {
-            pRange->pTop->addToBsonObj(
+        if (!pRange->pTop.missing()) {
+            pRange->pTop.addToBsonObj(
                 pBuilder, (pRange->topOpen ? "$lt" : "$lte"));
         }
 
@@ -1677,7 +1553,7 @@ namespace mongo {
 
     intrusive_ptr<ExpressionFieldRange> ExpressionFieldRange::create(
         const intrusive_ptr<ExpressionFieldPath> &pFieldPath, CmpOp cmpOp,
-        const intrusive_ptr<const Value> &pValue) {
+        const Value& pValue) {
         intrusive_ptr<ExpressionFieldRange> pE(
             new ExpressionFieldRange(pFieldPath, cmpOp, pValue));
         return pE;
@@ -1685,13 +1561,12 @@ namespace mongo {
 
     ExpressionFieldRange::ExpressionFieldRange(
         const intrusive_ptr<ExpressionFieldPath> &pTheFieldPath, CmpOp cmpOp,
-        const intrusive_ptr<const Value> &pValue):
+        const Value& pValue):
         pFieldPath(pTheFieldPath),
         pRange(new Range(cmpOp, pValue)) {
     }
 
-    void ExpressionFieldRange::intersect(
-        CmpOp cmpOp, const intrusive_ptr<const Value> &pValue) {
+    void ExpressionFieldRange::intersect(CmpOp cmpOp, const Value& pValue) {
 
         /* create the new range */
         scoped_ptr<Range> pNew(new Range(cmpOp, pValue));
@@ -1705,16 +1580,13 @@ namespace mongo {
         pRange.reset(pRange->intersect(pNew.get()));
     }
 
-    ExpressionFieldRange::Range::Range(
-        CmpOp cmpOp, const intrusive_ptr<const Value> &pValue):
+    ExpressionFieldRange::Range::Range(CmpOp cmpOp, const Value& pValue):
         bottomOpen(false),
         topOpen(false),
         pBottom(),
         pTop() {
         switch(cmpOp) {
-        case NE:
-            bottomOpen = topOpen = true;
-            /* FALLTHROUGH */
+
         case EQ:
             pBottom = pTop = pValue;
             break;
@@ -1735,6 +1607,7 @@ namespace mongo {
             pTop = pValue;
             break;
 
+        case NE:
         case CMP:
             verify(false); // not allowed
             break;
@@ -1749,14 +1622,14 @@ namespace mongo {
     }
 
     ExpressionFieldRange::Range::Range(
-        const intrusive_ptr<const Value> &pTheBottom, bool theBottomOpen,
-        const intrusive_ptr<const Value> &pTheTop, bool theTopOpen):
+        const Value& pTheBottom, bool theBottomOpen,
+        const Value& pTheTop, bool theTopOpen):
         bottomOpen(theBottomOpen),
         topOpen(theTopOpen),
         pBottom(pTheBottom),
         pTop(pTheTop) {
     }
-        
+
     ExpressionFieldRange::Range *ExpressionFieldRange::Range::intersect(
         const Range *pRange) const {
         /*
@@ -1765,10 +1638,10 @@ namespace mongo {
           Start by assuming the maximum is from pRange.  Then, if we have
           values of our own, see if they're greater.
         */
-        intrusive_ptr<const Value> pMaxBottom(pRange->pBottom);
+        Value pMaxBottom(pRange->pBottom);
         bool maxBottomOpen = pRange->bottomOpen;
-        if (pBottom.get()) {
-            if (!pRange->pBottom.get()) {
+        if (!pBottom.missing()) {
+            if (pRange->pBottom.missing()) {
                 pMaxBottom = pBottom;
                 maxBottomOpen = bottomOpen;
             }
@@ -1789,10 +1662,10 @@ namespace mongo {
           Start by assuming the minimum is from pRange.  Then, if we have
           values of our own, see if they are less.
         */
-        intrusive_ptr<const Value> pMinTop(pRange->pTop);
+        Value pMinTop(pRange->pTop);
         bool minTopOpen = pRange->topOpen;
-        if (pTop.get()) {
-            if (!pRange->pTop.get()) {
+        if (!pTop.missing()) {
+            if (pRange->pTop.missing()) {
                 pMinTop = pTop;
                 minTopOpen = topOpen;
             }
@@ -1818,9 +1691,8 @@ namespace mongo {
         return NULL;
     }
 
-    bool ExpressionFieldRange::Range::contains(
-        const intrusive_ptr<const Value> &pValue) const {
-        if (pBottom.get()) {
+    bool ExpressionFieldRange::Range::contains(const Value& pValue) const {
+        if (!pBottom.missing()) {
             const int cmp = Value::compare(pValue, pBottom);
             if (cmp < 0)
                 return false;
@@ -1828,7 +1700,7 @@ namespace mongo {
                 return false;
         }
 
-        if (pTop.get()) {
+        if (!pTop.missing()) {
             const int cmp = Value::compare(pValue, pTop);
             if (cmp > 0)
                 return false;
@@ -1839,38 +1711,34 @@ namespace mongo {
         return true;
     }
 
-    /* ------------------------- ExpressionLiteral -------------------------- */
+    /* ------------------------- ExpressionMillisecond ----------------------------- */
 
-    ExpressionLiteral::~ExpressionLiteral() {
+    ExpressionMillisecond::~ExpressionMillisecond() {
     }
 
-    intrusive_ptr<ExpressionNary> ExpressionLiteral::create() {
-        intrusive_ptr<ExpressionLiteral> pExpression(new ExpressionLiteral());
+    intrusive_ptr<ExpressionNary> ExpressionMillisecond::create() {
+        intrusive_ptr<ExpressionMillisecond> pExpression(new ExpressionMillisecond());
         return pExpression;
     }
 
-    ExpressionLiteral::ExpressionLiteral():
+    ExpressionMillisecond::ExpressionMillisecond():
         ExpressionNary() {
     }
 
-    void ExpressionLiteral::addOperand(
-        const intrusive_ptr<Expression> &pExpression) {
+    void ExpressionMillisecond::addOperand(const intrusive_ptr<Expression>& pExpression) {
         checkArgLimit(1);
         ExpressionNary::addOperand(pExpression);
     }
 
-    intrusive_ptr<const Value> ExpressionLiteral::evaluate(
-        const intrusive_ptr<Document> &pDocument) const {
+    Value ExpressionMillisecond::evaluate(const Document& document) const {
         checkArgCount(1);
-        BSONObjBuilder extractor;
-        vpOperand[0]->addToBsonObj( &extractor, string("literal"), false );
-        BSONObj extractedObject = extractor.obj();
-        string str(extractedObject.getStringField("literal"));
-        return Value::createString(str);
+        Value date(vpOperand[0]->evaluate(document));
+        const int ms = date.coerceToDate() % 1000LL;
+        return Value::createInt( ms >= 0 ? ms : 1000 + ms );
     }
 
-    const char *ExpressionLiteral::getOpName() const {
-        return "$literal";
+    const char *ExpressionMillisecond::getOpName() const {
+        return "$millisecond";
     }
 
     /* ------------------------- ExpressionMinute -------------------------- */
@@ -1893,12 +1761,10 @@ namespace mongo {
         ExpressionNary::addOperand(pExpression);
     }
 
-    intrusive_ptr<const Value> ExpressionMinute::evaluate(
-        const intrusive_ptr<Document> &pDocument) const {
+    Value ExpressionMinute::evaluate(const Document& pDocument) const {
         checkArgCount(1);
-        intrusive_ptr<const Value> pDate(vpOperand[0]->evaluate(pDocument));
-        tm date;
-        (pDate->coerceToDate()).toTm(&date);
+        Value pDate(vpOperand[0]->evaluate(pDocument));
+        tm date = pDate.coerceToTm();
         return Value::createInt(date.tm_min);
     }
 
@@ -1926,49 +1792,51 @@ namespace mongo {
         ExpressionNary::addOperand(pExpression);
     }
 
-    intrusive_ptr<const Value> ExpressionMod::evaluate(
-        const intrusive_ptr<Document> &pDocument) const {
+    Value ExpressionMod::evaluate(const Document& pDocument) const {
         checkArgCount(2);
-        intrusive_ptr<const Value> pLeft(vpOperand[0]->evaluate(pDocument));
-        intrusive_ptr<const Value> pRight(vpOperand[1]->evaluate(pDocument));
+        Value lhs = vpOperand[0]->evaluate(pDocument);
+        Value rhs = vpOperand[1]->evaluate(pDocument);
 
-        BSONType leftType = pLeft->getType();
-        BSONType rightType = pRight->getType();
+        BSONType leftType = lhs.getType();
+        BSONType rightType = rhs.getType();
 
-        uassert(16374, "$mod does not support dates", leftType != Date && rightType != Date);
+        if (lhs.numeric() && rhs.numeric()) {
+            // ensure we aren't modding by 0
+            double right = rhs.coerceToDouble();
 
-        // pass along jstNULLs and Undefineds
-        if (leftType == jstNULL || leftType == Undefined)
-            return pLeft;
-        if (rightType == jstNULL || rightType == Undefined)
-            return pRight;
-        // ensure we aren't modding by 0
-        double right = pRight->coerceToDouble();
-        if (right == 0)
-            return Value::getUndefined();
+            uassert(16610, "can't $mod by 0",
+                    right != 0);
 
-        if (leftType == NumberDouble) {
-            // left is a double, return a double
-            double left = pLeft->coerceToDouble();
-            return Value::createDouble(fmod(left, right));
+            if (leftType == NumberDouble
+                || (rightType == NumberDouble && rhs.coerceToInt() != right)) {
+                // the shell converts ints to doubles so if right is larger than int max or
+                // if right truncates to something other than itself, it is a real double.
+                // Integer-valued double case is handled below
+
+                double left = lhs.coerceToDouble();
+                return Value::createDouble(fmod(left, right));
+            }
+            else if (leftType == NumberLong || rightType == NumberLong) {
+                // if either is long, return long
+                long long left = lhs.coerceToLong();
+                long long rightLong = rhs.coerceToLong();
+                return Value::createLong(left % rightLong);
+            }
+
+            // lastly they must both be ints, return int
+            int left = lhs.coerceToInt();
+            int rightInt = rhs.coerceToInt();
+            return Value::createInt(left % rightInt);
         }
-        else if (rightType == NumberDouble && pRight->coerceToInt() != right) {
-            // the shell converts ints to doubles so if right is larger than int max or
-            // if right truncates to something other than itself, it is a real double.
-            // Integer-valued double case is handled below
-            double left = pLeft->coerceToDouble();
-            return Value::createDouble(fmod(left, right));
+        else if (lhs.nullish() || rhs.nullish()) {
+            return Value(BSONNULL);
         }
-        if (leftType == NumberLong || rightType == NumberLong) {
-            // if either is long, return long
-            long long left = pLeft->coerceToLong();
-            long long rightLong = pRight->coerceToLong();
-            return Value::createLong(left % rightLong);
+        else {
+            uasserted(16611, str::stream() << "$mod only supports numeric types, not "
+                                           << typeName(lhs.getType())
+                                           << " and "
+                                           << typeName(rhs.getType()));
         }
-        // lastly they must both be ints, return int
-        int left = pLeft->coerceToInt();
-        int rightInt = pRight->coerceToInt();
-        return Value::createInt(left % rightInt);
     }
 
     const char *ExpressionMod::getOpName() const {
@@ -1994,12 +1862,10 @@ namespace mongo {
         ExpressionNary::addOperand(pExpression);
     }
 
-    intrusive_ptr<const Value> ExpressionMonth::evaluate(
-        const intrusive_ptr<Document> &pDocument) const {
+    Value ExpressionMonth::evaluate(const Document& pDocument) const {
         checkArgCount(1);
-        intrusive_ptr<const Value> pDate(vpOperand[0]->evaluate(pDocument));
-        tm date;
-        (pDate->coerceToDate()).toTm(&date);
+        Value pDate(vpOperand[0]->evaluate(pDocument));
+        tm date = pDate.coerceToTm();
         return Value::createInt(date.tm_mon + 1); // MySQL uses 1-12 tm uses 0-11
     }
 
@@ -2021,8 +1887,7 @@ namespace mongo {
         ExpressionNary() {
     }
 
-    intrusive_ptr<const Value> ExpressionMultiply::evaluate(
-        const intrusive_ptr<Document> &pDocument) const {
+    Value ExpressionMultiply::evaluate(const Document& pDocument) const {
         /*
           We'll try to return the narrowest possible result value.  To do that
           without creating intermediate Values, do the arithmetic for double
@@ -2035,20 +1900,31 @@ namespace mongo {
 
         const size_t n = vpOperand.size();
         for(size_t i = 0; i < n; ++i) {
-            intrusive_ptr<const Value> pValue(vpOperand[i]->evaluate(pDocument));
+            Value val = vpOperand[i]->evaluate(pDocument);
 
-            uassert(16375, "$multiply does not support dates", pValue->getType() != Date);
+            if (val.numeric()) {
+                productType = Value::getWidestNumeric(productType, val.getType());
 
-            productType = Value::getWidestNumeric(productType, pValue->getType());
-            doubleProduct *= pValue->coerceToDouble();
-            longProduct *= pValue->coerceToLong();
+                doubleProduct *= val.coerceToDouble();
+                longProduct *= val.coerceToLong();
+            }
+            else if (val.nullish()) {
+                return Value(BSONNULL);
+            }
+            else {
+                uasserted(16555, str::stream() << "$multiply only supports numeric types, not "
+                                               << typeName(val.getType()));
+            }
         }
 
         if (productType == NumberDouble)
             return Value::createDouble(doubleProduct);
-        if (productType == NumberLong)
+        else if (productType == NumberLong)
             return Value::createLong(longProduct);
-        return Value::createInt((int)longProduct);
+        else if (productType == NumberInt)
+            return Value::createIntOrLong(longProduct);
+        else
+            massert(16418, "$multiply resulted in a non-numeric type", false);
     }
 
     const char *ExpressionMultiply::getOpName() const {
@@ -2078,12 +1954,10 @@ namespace mongo {
         ExpressionNary::addOperand(pExpression);
     }
 
-    intrusive_ptr<const Value> ExpressionHour::evaluate(
-        const intrusive_ptr<Document> &pDocument) const {
+    Value ExpressionHour::evaluate(const Document& pDocument) const {
         checkArgCount(1);
-        intrusive_ptr<const Value> pDate(vpOperand[0]->evaluate(pDocument));
-        tm date;
-        (pDate->coerceToDate()).toTm(&date);
+        Value pDate(vpOperand[0]->evaluate(pDocument));
+        tm date = pDate.coerceToTm();
         return Value::createInt(date.tm_hour);
     }
 
@@ -2111,16 +1985,14 @@ namespace mongo {
         ExpressionNary::addOperand(pExpression);
     }
 
-    intrusive_ptr<const Value> ExpressionIfNull::evaluate(
-        const intrusive_ptr<Document> &pDocument) const {
+    Value ExpressionIfNull::evaluate(const Document& pDocument) const {
         checkArgCount(2);
-        intrusive_ptr<const Value> pLeft(vpOperand[0]->evaluate(pDocument));
-        BSONType leftType = pLeft->getType();
 
-        if ((leftType != Undefined) && (leftType != jstNULL))
+        Value pLeft(vpOperand[0]->evaluate(pDocument));
+        if (!pLeft.nullish())
             return pLeft;
 
-        intrusive_ptr<const Value> pRight(vpOperand[1]->evaluate(pDocument));
+        Value pRight(vpOperand[1]->evaluate(pDocument));
         return pRight;
     }
 
@@ -2149,7 +2021,7 @@ namespace mongo {
                 dynamic_cast<ExpressionConstant *>(pNew.get());
             if (pConst) {
                 ++constCount;
-                if (pConst->getValue()->getType() == String)
+                if (pConst->getValue().getType() == String)
                     ++stringCount;
             }
         }
@@ -2161,8 +2033,7 @@ namespace mongo {
           ExpressionConstant never refers to the argument Document.
         */
         if (constCount == n) {
-            intrusive_ptr<const Value> pResult(
-                evaluate(intrusive_ptr<Document>()));
+            Value pResult(evaluate(Document()));
             intrusive_ptr<Expression> pReplacement(
                 ExpressionConstant::create(pResult));
             return pReplacement;
@@ -2258,8 +2129,7 @@ namespace mongo {
               together before adding the result to the end of the expression
               operand vector.
             */
-            intrusive_ptr<const Value> pResult(
-                pConst->evaluate(intrusive_ptr<Document>()));
+            Value pResult(pConst->evaluate(Document()));
             pNew->addOperand(ExpressionConstant::create(pResult));
         }
 
@@ -2282,26 +2152,19 @@ namespace mongo {
         return NULL;
     }
 
-    void ExpressionNary::toBson(
-        BSONObjBuilder *pBuilder, const char *pOpName) const {
+    void ExpressionNary::toBson(BSONObjBuilder *pBuilder, const char *pOpName) const {
         const size_t nOperand = vpOperand.size();
-        verify(nOperand > 0);
-        if (nOperand == 1) {
-            vpOperand[0]->addToBsonObj(pBuilder, pOpName, false);
-            return;
-        }
 
         /* build up the array */
-        BSONArrayBuilder arrBuilder;
+        BSONArrayBuilder arrBuilder (pBuilder->subarrayStart(pOpName));
         for(size_t i = 0; i < nOperand; ++i)
             vpOperand[i]->addToBsonArray(&arrBuilder);
-
-        pBuilder->append(pOpName, arrBuilder.arr());
+        arrBuilder.doneFast();
     }
 
-    void ExpressionNary::addToBsonObj(
-        BSONObjBuilder *pBuilder, string fieldName,
-        bool requireExpression) const {
+    void ExpressionNary::addToBsonObj(BSONObjBuilder *pBuilder,
+                                      StringData fieldName,
+                                      bool requireExpression) const {
         BSONObjBuilder exprBuilder;
         toBson(&exprBuilder, getOpName());
         pBuilder->append(fieldName, exprBuilder.done());
@@ -2328,43 +2191,6 @@ namespace mongo {
                 vpOperand.size() == reqArgs);
     }
 
-    /* ----------------------- ExpressionNoOp ------------------------------ */
-
-    ExpressionNoOp::~ExpressionNoOp() {
-    }
-
-    intrusive_ptr<ExpressionNary> ExpressionNoOp::create() {
-        intrusive_ptr<ExpressionNoOp> pExpression(new ExpressionNoOp());
-        return pExpression;
-    }
-
-    intrusive_ptr<Expression> ExpressionNoOp::optimize() {
-        checkArgCount(1);
-        intrusive_ptr<Expression> pR(vpOperand[0]->optimize());
-        return pR;
-    }
-
-    ExpressionNoOp::ExpressionNoOp():
-        ExpressionNary() {
-    }
-
-    void ExpressionNoOp::addOperand(
-        const intrusive_ptr<Expression> &pExpression) {
-        checkArgLimit(1);
-        ExpressionNary::addOperand(pExpression);
-    }
-
-    intrusive_ptr<const Value> ExpressionNoOp::evaluate(
-        const intrusive_ptr<Document> &pDocument) const {
-        checkArgCount(1);
-        intrusive_ptr<const Value> pValue(vpOperand[0]->evaluate(pDocument));
-        return pValue;
-    }
-
-    const char *ExpressionNoOp::getOpName() const {
-        return "$noOp";
-    }
-
     /* ------------------------- ExpressionNot ----------------------------- */
 
     ExpressionNot::~ExpressionNot() {
@@ -2384,15 +2210,12 @@ namespace mongo {
         ExpressionNary::addOperand(pExpression);
     }
 
-    intrusive_ptr<const Value> ExpressionNot::evaluate(
-        const intrusive_ptr<Document> &pDocument) const {
+    Value ExpressionNot::evaluate(const Document& pDocument) const {
         checkArgCount(1);
-        intrusive_ptr<const Value> pOp(vpOperand[0]->evaluate(pDocument));
+        Value pOp(vpOperand[0]->evaluate(pDocument));
 
-        bool b = pOp->coerceToBool();
-        if (b)
-            return Value::getFalse();
-        return Value::getTrue();
+        bool b = pOp.coerceToBool();
+        return Value(!b);
     }
 
     const char *ExpressionNot::getOpName() const {
@@ -2413,16 +2236,15 @@ namespace mongo {
         ExpressionNary() {
     }
 
-    intrusive_ptr<const Value> ExpressionOr::evaluate(
-        const intrusive_ptr<Document> &pDocument) const {
+    Value ExpressionOr::evaluate(const Document& pDocument) const {
         const size_t n = vpOperand.size();
         for(size_t i = 0; i < n; ++i) {
-            intrusive_ptr<const Value> pValue(vpOperand[i]->evaluate(pDocument));
-            if (pValue->coerceToBool())
-                return Value::getTrue();
+            Value pValue(vpOperand[i]->evaluate(pDocument));
+            if (pValue.coerceToBool())
+                return Value(true);
         }
 
-        return Value::getFalse();
+        return Value(false);
     }
 
     void ExpressionOr::toMatcherBson(
@@ -2443,7 +2265,7 @@ namespace mongo {
         /* optimize the disjunction as much as possible */
         intrusive_ptr<Expression> pE(ExpressionNary::optimize());
 
-        /* if the result isn't a conjunction, we can't do anything */
+        /* if the result isn't a disjunction, we can't do anything */
         ExpressionOr *pOr = dynamic_cast<ExpressionOr *>(pE.get());
         if (!pOr)
             return pE;
@@ -2454,6 +2276,8 @@ namespace mongo {
           we can do.
         */
         const size_t n = pOr->vpOperand.size();
+        // ExpressionNary::optimize() generates an ExpressionConstant for {$or:[]}.
+        verify(n > 0);
         intrusive_ptr<Expression> pLast(pOr->vpOperand[n - 1]);
         const ExpressionConstant *pConst =
             dynamic_cast<ExpressionConstant *>(pLast.get());
@@ -2464,10 +2288,10 @@ namespace mongo {
           Evaluate and coerce the last argument to a boolean.  If it's true,
           then we can replace this entire expression.
          */
-        bool last = pLast->evaluate(intrusive_ptr<Document>())->coerceToBool();
+        bool last = pLast->evaluate(Document()).coerceToBool();
         if (last) {
             intrusive_ptr<ExpressionConstant> pFinal(
-                ExpressionConstant::create(Value::getTrue()));
+                ExpressionConstant::create(Value(true)));
             return pFinal;
         }
 
@@ -2513,12 +2337,10 @@ namespace mongo {
         ExpressionNary::addOperand(pExpression);
     }
 
-    intrusive_ptr<const Value> ExpressionSecond::evaluate(
-        const intrusive_ptr<Document> &pDocument) const {
+    Value ExpressionSecond::evaluate(const Document& pDocument) const {
         checkArgCount(1);
-        intrusive_ptr<const Value> pDate(vpOperand[0]->evaluate(pDocument));
-        tm date;
-        (pDate->coerceToDate()).toTm(&date);
+        Value pDate(vpOperand[0]->evaluate(pDocument));
+        tm date = pDate.coerceToTm();
         return Value::createInt(date.tm_sec);
     }
 
@@ -2546,22 +2368,22 @@ namespace mongo {
         ExpressionNary::addOperand(pExpression);
     }
 
-    intrusive_ptr<const Value> ExpressionStrcasecmp::evaluate(
-        const intrusive_ptr<Document> &pDocument) const {
+    Value ExpressionStrcasecmp::evaluate(const Document& pDocument) const {
         checkArgCount(2);
-        intrusive_ptr<const Value> pString1(vpOperand[0]->evaluate(pDocument));
-        intrusive_ptr<const Value> pString2(vpOperand[1]->evaluate(pDocument));
+        Value pString1(vpOperand[0]->evaluate(pDocument));
+        Value pString2(vpOperand[1]->evaluate(pDocument));
 
         /* boost::iequals returns a bool not an int so strings must actually be allocated */
-        string str1 = boost::to_upper_copy( pString1->coerceToString() );
-        string str2 = boost::to_upper_copy( pString2->coerceToString() );
+        string str1 = boost::to_upper_copy( pString1.coerceToString() );
+        string str2 = boost::to_upper_copy( pString2.coerceToString() );
         int result = str1.compare(str2);
 
         if (result == 0)
-            return Value::getZero();
-        if (result > 0)
-            return Value::getOne();
-        return Value::getMinusOne();
+            return Value(0);
+        else if (result > 0)
+            return Value(1);
+        else
+            return Value(-1);
     }
 
     const char *ExpressionStrcasecmp::getOpName() const {
@@ -2588,28 +2410,27 @@ namespace mongo {
         ExpressionNary::addOperand(pExpression);
     }
 
-    intrusive_ptr<const Value> ExpressionSubstr::evaluate(
-        const intrusive_ptr<Document> &pDocument) const {
+    Value ExpressionSubstr::evaluate(const Document& pDocument) const {
         checkArgCount(3);
-        intrusive_ptr<const Value> pString(vpOperand[0]->evaluate(pDocument));
-        intrusive_ptr<const Value> pLower(vpOperand[1]->evaluate(pDocument));
-        intrusive_ptr<const Value> pLength(vpOperand[2]->evaluate(pDocument));
+        Value pString(vpOperand[0]->evaluate(pDocument));
+        Value pLower(vpOperand[1]->evaluate(pDocument));
+        Value pLength(vpOperand[2]->evaluate(pDocument));
 
-        string str = pString->coerceToString();
+        string str = pString.coerceToString();
         uassert(16034, str::stream() << getOpName() <<
                 ":  starting index must be a numeric type (is BSON type " <<
-                typeName(pLower->getType()) << ")",
-                (pLower->getType() == NumberInt 
-                 || pLower->getType() == NumberLong 
-                 || pLower->getType() == NumberDouble));
+                typeName(pLower.getType()) << ")",
+                (pLower.getType() == NumberInt 
+                 || pLower.getType() == NumberLong 
+                 || pLower.getType() == NumberDouble));
         uassert(16035, str::stream() << getOpName() <<
                 ":  length must be a numeric type (is BSON type " <<
-                typeName(pLength->getType() )<< ")",
-                (pLength->getType() == NumberInt 
-                 || pLength->getType() == NumberLong 
-                 || pLength->getType() == NumberDouble));
-        string::size_type lower = static_cast< string::size_type >( pLower->coerceToLong() );
-        string::size_type length = static_cast< string::size_type >( pLength->coerceToLong() );
+                typeName(pLength.getType() )<< ")",
+                (pLength.getType() == NumberInt 
+                 || pLength.getType() == NumberLong 
+                 || pLength.getType() == NumberDouble));
+        string::size_type lower = static_cast< string::size_type >( pLower.coerceToLong() );
+        string::size_type length = static_cast< string::size_type >( pLength.coerceToLong() );
         if ( lower >= str.length() ) {
             // If lower > str.length() then string::substr() will throw out_of_range, so return an
             // empty string if lower is not a valid string index.
@@ -2642,31 +2463,52 @@ namespace mongo {
         ExpressionNary::addOperand(pExpression);
     }
 
-    intrusive_ptr<const Value> ExpressionSubtract::evaluate(
-        const intrusive_ptr<Document> &pDocument) const {
-        BSONType productType;
+    Value ExpressionSubtract::evaluate(const Document& pDocument) const {
         checkArgCount(2);
-        intrusive_ptr<const Value> pLeft(vpOperand[0]->evaluate(pDocument));
-        intrusive_ptr<const Value> pRight(vpOperand[1]->evaluate(pDocument));
+        Value lhs = vpOperand[0]->evaluate(pDocument);
+        Value rhs = vpOperand[1]->evaluate(pDocument);
             
-        productType = Value::getWidestNumeric(
-            pRight->getType(), pLeft->getType());
-        
-        uassert(16376,
-                "$subtract does not support dates",
-                pLeft->getType() != Date && pRight->getType() != Date);
+        BSONType diffType = Value::getWidestNumeric(rhs.getType(), lhs.getType());
 
-        if (productType == NumberDouble) {
-            double right = pRight->coerceToDouble();
-            double left = pLeft->coerceToDouble();
+        if (diffType == NumberDouble) {
+            double right = rhs.coerceToDouble();
+            double left = lhs.coerceToDouble();
             return Value::createDouble(left - right);
         } 
-
-        long long right = pRight->coerceToLong();
-        long long left = pLeft->coerceToLong();
-        if (productType == NumberLong)
+        else if (diffType == NumberLong) {
+            long long right = rhs.coerceToLong();
+            long long left = lhs.coerceToLong();
             return Value::createLong(left - right);
-        return Value::createInt((int)(left - right));
+        }
+        else if (diffType == NumberInt) {
+            long long right = rhs.coerceToLong();
+            long long left = lhs.coerceToLong();
+            return Value::createIntOrLong(left - right);
+        }
+        else if (lhs.nullish() || rhs.nullish()) {
+            return Value(BSONNULL);
+        }
+        else if (lhs.getType() == Date) {
+            if (rhs.getType() == Date) {
+                long long timeDelta = lhs.getDate() - rhs.getDate();
+                return Value(timeDelta);
+            }
+            else if (rhs.numeric()) {
+                long long millisSinceEpoch = lhs.getDate() - rhs.coerceToLong();
+                return Value(Date_t(millisSinceEpoch));
+            }
+            else {
+                uasserted(16613, str::stream() << "cant $subtract a "
+                                               << typeName(rhs.getType())
+                                               << " from a Date");
+            }
+        }
+        else {
+            uasserted(16556, str::stream() << "cant $subtract a"
+                                           << typeName(rhs.getType())
+                                           << " from a "
+                                           << typeName(lhs.getType()));
+        }
     }
 
     const char *ExpressionSubtract::getOpName() const {
@@ -2692,11 +2534,10 @@ namespace mongo {
         ExpressionNary::addOperand(pExpression);
     }
 
-    intrusive_ptr<const Value> ExpressionToLower::evaluate(
-        const intrusive_ptr<Document> &pDocument) const {
+    Value ExpressionToLower::evaluate(const Document& pDocument) const {
         checkArgCount(1);
-        intrusive_ptr<const Value> pString(vpOperand[0]->evaluate(pDocument));
-        string str = pString->coerceToString();
+        Value pString(vpOperand[0]->evaluate(pDocument));
+        string str = pString.coerceToString();
         boost::to_lower(str);
         return Value::createString(str);
     }
@@ -2725,11 +2566,10 @@ namespace mongo {
         ExpressionNary::addOperand(pExpression);
     }
 
-    intrusive_ptr<const Value> ExpressionToUpper::evaluate(
-        const intrusive_ptr<Document> &pDocument) const {
+    Value ExpressionToUpper::evaluate(const Document& pDocument) const {
         checkArgCount(1);
-        intrusive_ptr<const Value> pString(vpOperand[0]->evaluate(pDocument));
-        string str(pString->coerceToString());
+        Value pString(vpOperand[0]->evaluate(pDocument));
+        string str(pString.coerceToString());
         boost::to_upper(str);
         return Value::createString(str);
     }
@@ -2757,12 +2597,10 @@ namespace mongo {
         ExpressionNary::addOperand(pExpression);
     }
 
-    intrusive_ptr<const Value> ExpressionWeek::evaluate(
-        const intrusive_ptr<Document> &pDocument) const {
+    Value ExpressionWeek::evaluate(const Document& pDocument) const {
         checkArgCount(1);
-        intrusive_ptr<const Value> pDate(vpOperand[0]->evaluate(pDocument));
-        tm date;
-        (pDate->coerceToDate()).toTm(&date);
+        Value pDate(vpOperand[0]->evaluate(pDocument));
+        tm date = pDate.coerceToTm();
         int dayOfWeek = date.tm_wday;
         int dayOfYear = date.tm_yday;
         int prevSundayDayOfYear = dayOfYear - dayOfWeek; // may be negative
@@ -2806,12 +2644,10 @@ namespace mongo {
         ExpressionNary::addOperand(pExpression);
     }
 
-    intrusive_ptr<const Value> ExpressionYear::evaluate(
-        const intrusive_ptr<Document> &pDocument) const {
+    Value ExpressionYear::evaluate(const Document& pDocument) const {
         checkArgCount(1);
-        intrusive_ptr<const Value> pDate(vpOperand[0]->evaluate(pDocument));
-        tm date;
-        (pDate->coerceToDate()).toTm(&date);
+        Value pDate(vpOperand[0]->evaluate(pDocument));
+        tm date = pDate.coerceToTm();
         return Value::createInt(date.tm_year + 1900); // tm_year is years since 1900
     }
 

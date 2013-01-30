@@ -21,7 +21,6 @@
 #include "rs.h"
 #include "connections.h"
 #include "../client.h"
-#include "mongo/db/security.h"
 
 namespace mongo {
 
@@ -131,12 +130,7 @@ namespace mongo {
                 BSONObj result;
 
                 try {
-                    if (!conn.runCommand(
-                            "admin",
-                            cmd,
-                            result,
-                            0,
-                            &AuthenticationTable::getInternalSecurityAuthenticationTable())) {
+                    if (!conn.runCommand("admin", cmd, result, 0)) {
                         log() << "stepping down " << primary->fullName()
                               << " failed: " << result << endl;
                     }
@@ -252,7 +246,7 @@ namespace mongo {
                 int ll = 0;
                 if( ++n > 5 ) ll++;
                 if( last + 60 > time(0 ) ) ll++;
-                log(ll) << "replSet can't see a majority, will not try to elect self" << rsLog;
+                LOG(ll) << "replSet can't see a majority, will not try to elect self" << rsLog;
                 last = time(0);
                 return;
             }

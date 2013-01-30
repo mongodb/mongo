@@ -37,6 +37,7 @@
 #include "../util/progress_meter.h"
 #include "../server.h"
 #include "../util/mmap.h"
+#include "mongo/platform/random.h"
 
 using namespace mongoutils;
 
@@ -46,7 +47,6 @@ namespace mongo {
 
     class AlignedBuilder;
 
-    unsigned goodRandomNumberSlow();
 
     namespace dur {
         // Rotate after reaching this data size in a journal (j._<n>) file
@@ -126,6 +126,17 @@ namespace mongo {
             return false;
         }
 
+        namespace {
+            SecureRandom* mySecureRandom = NULL;
+            mongo::mutex mySecureRandomMutex( "JHeader-SecureRandom" );
+            int64_t getMySecureRandomNumber() {
+                scoped_lock lk( mySecureRandomMutex );
+                if ( ! mySecureRandom )
+                    mySecureRandom = SecureRandom::create();
+                return mySecureRandom->nextInt64();
+            }
+        }
+
         JHeader::JHeader(string fname) {
             magic[0] = 'j'; magic[1] = '\n';
             _version = CurrentVersion;
@@ -136,7 +147,7 @@ namespace mongo {
             strncpy(dbpath, fname.c_str(), sizeof(dbpath)-1);
             {
                 fileId = t&0xffffffff;
-                fileId |= ((unsigned long long)goodRandomNumberSlow()) << 32;
+                fileId |= static_cast<unsigned long long>( getMySecureRandomNumber() ) << 32;
             }
             memset(reserved3, 0, sizeof(reserved3));
             txt2[0] = txt2[1] = '\n';
@@ -149,7 +160,6 @@ namespace mongo {
 
         Journal::Journal() :
             _curLogFileMutex("JournalLfMutex") {
-            _ageOut = true;
             _written = 0;
             _nextFileNumber = 0;
             _curLogFile = 0;
@@ -176,12 +186,14 @@ namespace mongo {
                 for ( boost::filesystem::directory_iterator i( getJournalDir() );
                         i != boost::filesystem::directory_iterator();
                         ++i ) {
-                    string fileName = boost::filesystem::path(*i).leaf();
+                    string fileName = boost::filesystem::path(*i).leaf().string();
                     if( anyFiles || str::startsWith(fileName, "j._") )
                         return true;
                 }
             }
-            catch(...) { }
+            catch(const std::exception& e) {
+                log() << "Unable to check for journal files due to: " << e.what() << endl;
+            }
             return false;
         }
 
@@ -192,7 +204,7 @@ namespace mongo {
                 for ( boost::filesystem::directory_iterator i( getJournalDir() );
                         i != boost::filesystem::directory_iterator();
                         ++i ) {
-                    string fileName = boost::filesystem::path(*i).leaf();
+                    string fileName = boost::filesystem::path(*i).leaf().string();
                     if( str::startsWith(fileName, "j._") ) {
                         try {
                             removeOldJournalFile(*i);
@@ -207,6 +219,7 @@ namespace mongo {
                     boost::filesystem::remove(lsnPath());
                 }
                 catch(...) {
+                    // std::exception details logged in catch below
                     log() << "couldn't remove " << lsnPath().string() << endl;
                     throw;
                 }
@@ -219,7 +232,7 @@ namespace mongo {
 
             flushMyDirectory(getJournalDir() / "file"); // flushes parent of argument (in this case journal dir)
 
-            log(1) << "removeJournalFiles end" << endl;
+            LOG(1) << "removeJournalFiles end" << endl;
         }
 
         /** at clean shutdown */
@@ -245,7 +258,14 @@ namespace mongo {
         bool _preallocateIsFaster() {
             bool faster = false;
             boost::filesystem::path p = getJournalDir() / "tempLatencyTest";
-            try { remove(p); } catch(...) { }
+            if (boost::filesystem::exists(p)) {
+                try {
+                    remove(p);
+                }
+                catch(const std::exception& e) {
+                    log() << "Unable to remove temporary file due to: " << e.what() << endl;
+                }
+            }
             try {
                 AlignedBuilder b(8192);
                 int millis[2];
@@ -266,10 +286,18 @@ namespace mongo {
                     log() << "preallocateIsFaster=true " << diff / (1.0*N) << endl;
                 }
             }
-            catch(...) {
-                log() << "info preallocateIsFaster couldn't run; returning false" << endl;
+            catch (const std::exception& e) {
+                log() << "info preallocateIsFaster couldn't run due to: " << e.what()
+                      << "; returning false" << endl;
             }
-            try { remove(p); } catch(...) { }
+            if (boost::filesystem::exists(p)) {
+                try {
+                    remove(p);
+                }
+                catch(const std::exception& e) {
+                    log() << "Unable to remove temporary file due to: " << e.what() << endl;
+                }
+            }
             return faster;
         }
         bool preallocateIsFaster() {
@@ -300,6 +328,7 @@ namespace mongo {
             memset((void*)b.buf(), 0, BLKSZ);
 
             ProgressMeter m(len, 3/*secs*/, 10/*hits between time check (once every 6.4MB)*/);
+            m.setName("File Preallocator Progress");
 
             File f;
             f.open( p.string().c_str() , /*read-only*/false , /*direct-io*/false );
@@ -369,8 +398,9 @@ namespace mongo {
                     try {
                         _preallocateFiles();
                     }
-                    catch(...) {
-                        log() << "warning caught exception in preallocateFiles, continuing" << endl;
+                    catch (const std::exception& e) {
+                        log() << "warning caught exception (" << e.what()
+                              << ") in preallocateFiles, continuing" << endl;
                     }
             }
             j.open();
@@ -399,8 +429,9 @@ namespace mongo {
                             return;
                         }
                     }
-                } catch(...) { 
-                    log() << "warning exception in dur::removeOldJournalFile " << p.string() << endl;
+                } catch (const std::exception& e) {
+                    log() << "warning exception in dur::removeOldJournalFile " << p.string()
+                          << ": " <<  e.what() << endl;
                     // fall through and try to delete the file
                 }
             }
@@ -409,8 +440,8 @@ namespace mongo {
             try {
                 boost::filesystem::remove(p);
             }
-            catch(...) { 
-                log() << "warning exception removing " << p.string() << endl;
+            catch (const std::exception& e) {
+                log() << "warning exception removing " << p.string() << ": " << e.what() << endl;
             }
         }
 
@@ -422,8 +453,8 @@ namespace mongo {
                     if( boost::filesystem::exists(filepath) )
                         return filepath;
                 }
-            } catch(...) { 
-                log() << "warning exception in dur::findPrealloced()" << endl;
+            } catch (const std::exception& e) {
+                log() << "warning exception in dur::findPrealloced(): " << e.what() << endl;
             }
             return boost::filesystem::path();
         }
@@ -466,8 +497,9 @@ namespace mongo {
                         }
                         boost::filesystem::rename(p, fname);
                     }
-                    catch(...) { 
-                        log() << "warning couldn't write to / rename file " << p.string() << endl;
+                    catch (const std::exception& e) {
+                        log() << "warning couldn't write to / rename file " << p.string()
+                              << ": " << e.what() << endl;
                     }
                 }
             }
@@ -570,8 +602,8 @@ namespace mongo {
                 LSNFile lsnf;
                 lsnf.set(_lastFlushTime);
                 f.write(0, (char*)&lsnf, sizeof(lsnf));
-				// do we want to fsync here? if we do it probably needs to be async so the durthread
-				// is not delayed.
+                // do we want to fsync here? if we do it probably needs to be async so the durthread
+                // is not delayed.
             }
             catch(std::exception& e) {
                 log() << "warning: write to lsn file failed " << e.what() << endl;
@@ -622,17 +654,6 @@ namespace mongo {
 
                 _oldJournalFiles.pop_front();
             }
-        }
-
-        /*int getAgeOutJournalFiles() {
-            mutex::try_lock lk(j._curLogFileMutex, 4000);
-            if( !lk.ok )
-                return -1;
-            return j._ageOut ? 1 : 0;
-        }*/
-        void setAgeOutJournalFiles(bool a) {
-            SimpleMutex::scoped_lock lk(j._curLogFileMutex);
-            j._ageOut = a;
         }
 
         void Journal::_rotate() {

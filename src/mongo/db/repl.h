@@ -94,7 +94,7 @@ namespace mongo {
     class ReplSource {
         shared_ptr<ThreadPool> tp;
 
-        void resync(string db);
+        void resync(const std::string& dbName);
 
         /** @param alreadyLocked caller already put us in write lock if true */
         void sync_pullOpLog_applyOperation(BSONObj& op, bool alreadyLocked);
@@ -176,7 +176,6 @@ namespace mongo {
     };
 
     bool anyReplEnabled();
-    void appendReplicationInfo( BSONObjBuilder& result , bool authed , int level = 0 );
 
     /**
      * Helper class used to set and query an ignore state for a named database.

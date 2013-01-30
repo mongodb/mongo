@@ -18,16 +18,15 @@
 #include "pch.h"
 
 #include <boost/filesystem/convenience.hpp>
-
 #include <fstream>
 
-#include "mongo/util/net/sock.h"
-
+#include "mongo/scripting/engine.h"
 #include "mongo/shell/shell_utils.h"
 #include "mongo/shell/shell_utils_launcher.h"
-#include "mongo/util/md5.hpp"
 #include "mongo/util/file.h"
-#include "mongo/scripting/engine.h"
+#include "mongo/util/md5.hpp"
+#include "mongo/util/net/sock.h"
+#include "mongo/util/text.h"
 
 namespace mongo {
 
@@ -59,7 +58,7 @@ namespace mongo {
             while ( i != end ) {
                 boost::filesystem::path p = *i;
                 BSONObjBuilder b;
-                b << "name" << p.string();
+                b << "name" << p.generic_string();
                 b.appendBool( "isDirectory", is_directory( p ) );
                 if ( ! boost::filesystem::is_directory( p ) ) {
                     try {

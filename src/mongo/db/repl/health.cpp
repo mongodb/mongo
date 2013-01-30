@@ -14,22 +14,23 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "pch.h"
-#include "rs.h"
-#include "health.h"
-#include "../../util/background.h"
-#include "../../client/connpool.h"
-#include "../commands.h"
-#include "../../util/concurrency/value.h"
-#include "../../util/concurrency/task.h"
-#include "../../util/mongoutils/html.h"
-#include "../../util/goodies.h"
-#include "../../util/ramlog.h"
-#include "../helpers/dblogger.h"
-#include "connections.h"
-#include "../../util/startup_test.h"
-#include "../dbhelpers.h"
+#include "mongo/pch.h"
+
+#include "mongo/db/repl/health.h"
+
+#include "mongo/client/connpool.h"
+#include "mongo/db/commands.h"
+#include "mongo/db/dbhelpers.h"
 #include "mongo/db/repl/bgsync.h"
+#include "mongo/db/repl/connections.h"
+#include "mongo/db/repl/rs.h"
+#include "mongo/util/background.h"
+#include "mongo/util/concurrency/task.h"
+#include "mongo/util/concurrency/value.h"
+#include "mongo/util/goodies.h"
+#include "mongo/util/mongoutils/html.h"
+#include "mongo/util/ramlog.h"
+#include "mongo/util/startup_test.h"
 
 namespace mongo {
     /* decls for connections.h */
@@ -348,6 +349,20 @@ namespace mongo {
         return 0;
     }
 
+    Member* ReplSetImpl::findByName(const std::string& hostname) const {
+        if (_self && hostname == _self->fullName()) {
+            return _self;
+        }
+
+        for (Member *m = head(); m; m = m->next()) {
+            if (m->fullName() == hostname) {
+                return m;
+            }
+        }
+
+        return NULL;
+    }
+
     const OpTime ReplSetImpl::lastOtherOpTime() const {
         OpTime closest(0,0);
 
@@ -421,10 +436,11 @@ namespace mongo {
                 bb.appendDate("optimeDate", m->hbinfo().opTime.getSecs() * 1000LL);
             }
             bb.appendTimeT("lastHeartbeat", m->hbinfo().lastHeartbeat);
+            bb.appendTimeT("lastHeartbeatRecv", m->hbinfo().lastHeartbeatRecv);
             bb.append("pingMs", m->hbinfo().ping);
             string s = m->lhb();
             if( !s.empty() )
-                bb.append("errmsg", s);
+                bb.append("lastHeartbeatMessage", s);
 
             if (m->hbinfo().authIssue) {
                 bb.append("authenticated", false);

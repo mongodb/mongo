@@ -16,10 +16,7 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "../pch.h"
-#include "../db/db.h"
-#include "mongo/client/dbclientcursor.h"
-#include "tool.h"
+#include "mongo/pch.h"
 
 #include <fcntl.h>
 #include <map>
@@ -27,6 +24,11 @@
 
 #include <boost/filesystem/operations.hpp>
 #include <boost/filesystem/convenience.hpp>
+
+#include "mongo/base/initializer.h"
+#include "mongo/client/dbclientcursor.h"
+#include "mongo/db/db.h"
+#include "mongo/tools/tool.h"
 
 using namespace mongo;
 
@@ -96,8 +98,9 @@ public:
         int queryOptions = QueryOption_SlaveOk | QueryOption_NoCursorTimeout;
         if (startsWith(coll.c_str(), "local.oplog."))
             queryOptions |= QueryOption_OplogReplay;
-        else if ( _query.isEmpty() && !hasParam("dbpath") && !hasParam("forceTableScan") )
+        else if ( _query.isEmpty() && !hasParam("dbpath") && !hasParam("forceTableScan") ) {
             q.snapshot();
+        }
         
         DBClientBase& connBase = conn(true);
         Writer writer(out, m);
@@ -123,7 +126,8 @@ public:
         FilePtr f (fopen(outputFile.string().c_str(), "wb"));
         uassert(10262, errnoWithPrefix("couldn't open file"), f);
 
-        ProgressMeter m( conn( true ).count( coll.c_str() , BSONObj() , QueryOption_SlaveOk ) );
+        ProgressMeter m(conn(true).count(coll.c_str(), BSONObj(), QueryOption_SlaveOk));
+        m.setName("Collection File Writing Progress");
         m.setUnits("objects");
 
         doCollection(coll, f, &m);
@@ -135,33 +139,32 @@ public:
                             map<string, BSONObj> options, multimap<string, BSONObj> indexes ) {
         log() << "\tMetadata for " << coll << " to " << outputFile.string() << endl;
 
-        ofstream file (outputFile.string().c_str());
-        uassert(15933, "Couldn't open file: " + outputFile.string(), file.is_open());
-
         bool hasOptions = options.count(coll) > 0;
         bool hasIndexes = indexes.count(coll) > 0;
 
-        if (hasOptions) {
-            file << "{options : " << options.find(coll)->second.jsonString();
+        BSONObjBuilder metadata;
 
-            if (hasIndexes) {
-                file << ", ";
-            }
-        } else {
-            file << "{";
+        if (hasOptions) {
+            metadata << "options" << options.find(coll)->second;
         }
 
         if (hasIndexes) {
-            file << "indexes:[";
-            for (multimap<string, BSONObj>::iterator it=indexes.equal_range(coll).first; it!=indexes.equal_range(coll).second; ++it) {
-                if (it != indexes.equal_range(coll).first) {
-                    file << ", ";
-                }
-                file << (*it).second.jsonString();
+            BSONArrayBuilder indexesOutput (metadata.subarrayStart("indexes"));
+
+            // I'd kill for C++11 auto here...
+            const pair<multimap<string, BSONObj>::iterator, multimap<string, BSONObj>::iterator>
+                range = indexes.equal_range(coll);
+
+            for (multimap<string, BSONObj>::iterator it=range.first; it!=range.second; ++it) {
+                 indexesOutput << it->second;
             }
-            file << "]";
+
+            indexesOutput.done();
         }
-        file << "}";
+
+        ofstream file (outputFile.string().c_str());
+        uassert(15933, "Couldn't open file: " + outputFile.string(), file.is_open());
+        file << metadata.done().jsonString();
     }
 
 
@@ -194,12 +197,12 @@ public:
             BSONObj obj = cursor->nextSafe();
             const string name = obj.getField( "name" ).valuestr();
             if (obj.hasField("options")) {
-                collectionOptions.insert( pair<string,BSONObj> (name, obj.getField("options").embeddedObject()) );
+                collectionOptions[name] = obj.getField("options").embeddedObject().getOwned();
             }
 
             // skip namespaces with $ in them only if we don't specify a collection to dump
             if ( _coll == "" && name.find( ".$" ) != string::npos ) {
-                log(1) << "\tskipping collection: " << name << endl;
+                LOG(1) << "\tskipping collection: " << name << endl;
                 continue;
             }
 
@@ -215,9 +218,12 @@ public:
               error() << "Cannot dump "  << name << ". Collection has '/' or null in the collection name." << endl;
               continue;
             }
-            
-            // Don't dump indexes
+
             if ( endsWith(name.c_str(), ".system.indexes") ) {
+              // Create system.indexes.bson for compatibility with pre 2.2 mongorestore
+              const string filename = name.substr( db.size() + 1 );
+              writeCollectionFile( name.c_str() , outdir / ( filename + ".bson" ) );
+              // Don't dump indexes as *.metadata.json
               continue;
             }
             
@@ -243,7 +249,7 @@ public:
         }
         
         if ( ! hasParam( "db" ) ){
-            log() << "repair mode only works on 1 db right at a time right now" << endl;
+            log() << "repair mode only works on 1 db at a time right now" << endl;
             return -1;
         }
 
@@ -279,7 +285,7 @@ public:
         while ( ! loc.isNull() ){
             
             if ( ! seen.insert( loc ).second ) {
-                error() << "infinite loop in extend, seen: " << loc << " before" << endl;
+                error() << "infinite loop in extent, seen: " << loc << " before" << endl;
                 break;
             }
 
@@ -287,7 +293,7 @@ public:
                 error() << "offset is 0 for record which should be impossible" << endl;
                 break;
             }
-            log(1) << loc << endl;
+            LOG(1) << loc << endl;
             Record* rec = loc.rec();
             BSONObj obj;
             try {
@@ -306,17 +312,25 @@ public:
                         log() << ss.str();
                     }
                     catch ( std::exception& ) {
+                        log() << "unable to log invalid document @ " << loc << endl;
                     }
                 }
             }
             loc = forward ? rec->getNext( loc ) : rec->getPrev( loc );
+
+            // break when new loc is outside current extent boundary
+            if ( ( forward && loc.compare( e->lastRecord ) > 0 ) || 
+                 ( ! forward && loc.compare( e->firstRecord ) < 0 ) ) 
+            {
+                break;
+            }
         }
+        log() << "wrote " << seen.size() << " documents" << endl;
         return forward ? e->xnext : e->xprev;
-        
     }
 
     void _repair( Database* db , string ns , boost::filesystem::path outfile ){
-        NamespaceDetails * nsd = nsdetails( ns.c_str() );
+        NamespaceDetails * nsd = nsdetails( ns );
         log() << "nrecords: " << nsd->stats.nrecords 
               << " datasize: " << nsd->stats.datasize 
               << " firstExtent: " << nsd->firstExtent 
@@ -337,7 +351,9 @@ public:
         
         FilePtr f (fopen(outfile.string().c_str(), "wb"));
 
+        // init with double the docs count because we make two passes 
         ProgressMeter m( nsd->stats.nrecords * 2 );
+        m.setName("Repair Progress");
         m.setUnits("objects");
         
         Writer w( f , &m );
@@ -477,6 +493,11 @@ public:
         string db = _db;
 
         if ( db == "" ) {
+            if ( _coll != "" ) {
+                error() << "--db must be specified with --collection" << endl;
+                return -1;
+            }
+
             log() << "all dbs" << endl;
             auth( "admin" );
 
@@ -526,7 +547,8 @@ public:
     BSONObj _query;
 };
 
-int main( int argc , char ** argv ) {
+int main( int argc , char ** argv, char ** envp ) {
+    mongo::runGlobalInitializersOrDie(argc, argv, envp);
     Dump d;
     return d.main( argc , argv );
 }

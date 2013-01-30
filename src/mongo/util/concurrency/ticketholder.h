@@ -95,6 +95,21 @@ namespace mongo {
         boost::condition_variable_any _newTicket;
     };
 
+    class ScopedTicket {
+    public:
+
+        ScopedTicket(TicketHolder* holder) : _holder(holder) {
+            _holder->waitForTicket();
+        }
+
+        ~ScopedTicket() {
+            _holder->release();
+        }
+
+    private:
+        TicketHolder* _holder;
+    };
+
     class TicketHolderReleaser {
     public:
         TicketHolderReleaser( TicketHolder * holder ) {

@@ -19,12 +19,18 @@
 
 #include "pch.h"
 
+#include "mongo/base/initializer.h"
+#include "mongo/db/commands.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/dbtests/framework.h"
+#include "mongo/util/exception_filter_win32.h"
 #include "mongo/util/startup_test.h"
 
-int main( int argc, char** argv ) {
+int main( int argc, char** argv, char** envp ) {
     static StaticObserver StaticObserver;
+    setWindowsUnhandledExceptionFilter();
+    Command::testCommandsEnabled = 1;
+    mongo::runGlobalInitializersOrDie(argc, argv, envp);
     StartupTest::runTests();
     _exit(mongo::dbtests::runDbTests( argc, argv, "/tmp/unittest" ));
 }

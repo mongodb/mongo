@@ -16,8 +16,10 @@
 
 #include "pch.h"
 
-#include "db/interrupt_status_mongod.h"
-#include "db/curop.h"
+#include "mongo/db/interrupt_status_mongod.h"
+
+#include "mongo/db/curop.h"
+#include "mongo/db/kill_current_op.h"
 
 namespace mongo {
 

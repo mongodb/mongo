@@ -1,4 +1,4 @@
-/**
+1/**
  * This tests whether slaveOk reads are properly routed through mongos in
  * an authenticated environment. This test also includes restarting the
  * entire set, then querying afterwards.
@@ -38,7 +38,7 @@ var nodeCount = replTest.nodes.length;
  * is no admin user.
  */
 var adminDB = mongos.getDB( 'admin' )
-adminDB.addUser( 'user', 'password', false, 3 );
+adminDB.addUser('user', 'password', false);
 adminDB.auth( 'user', 'password' );
 var priAdminDB = replTest.getPrimary().getDB( 'admin' );
 priAdminDB.addUser( 'user', 'password', false, 3 );
@@ -84,6 +84,12 @@ coll.setSlaveOk( true );
  */
 ReplSetTest.awaitRSClientHosts( mongos, replTest.getSecondaries(),
     { ok : true, secondary : true });
+//
+// We also need to wait for the primary, it's possible that the mongos may think a node is a 
+// secondary but it actually changed to a primary before we send our final query.
+//
+ReplSetTest.awaitRSClientHosts( mongos, replTest.getPrimary(),
+    { ok : true, ismaster : true });
 
 // Recheck if we can still query secondaries after refreshing connections.
 jsTest.log( 'Final query to SEC' );

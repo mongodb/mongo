@@ -17,33 +17,36 @@
 */
 
 #include "pch.h"
-#include "../util/net/message.h"
-#include "../db/dbmessage.h"
-#include "../client/connpool.h"
-#include "../client/parallel.h"
-#include "../db/commands.h"
-#include "../db/commands/pipeline.h"
-#include "../db/pipeline/document_source.h"
-#include "../db/pipeline/expression_context.h"
-#include "../db/queryutil.h"
-#include "s/interrupt_status_mongos.h"
-#include "../scripting/engine.h"
-#include "../util/timer.h"
+
+#include "mongo/base/init.h"
+#include "mongo/client/connpool.h"
+#include "mongo/client/parallel.h"
+#include "mongo/db/auth/action_set.h"
+#include "mongo/db/auth/action_type.h"
+#include "mongo/db/auth/authorization_manager.h"
+#include "mongo/db/auth/privilege.h"
+#include "mongo/db/commands/find_and_modify.h"
+#include "mongo/db/commands/mr.h"
+#include "mongo/db/commands/rename_collection.h"
+#include "mongo/db/commands.h"
+#include "mongo/db/dbmessage.h"
 #include "mongo/db/lasterror.h"
-
-
-#include "config.h"
-#include "chunk.h"
-#include "strategy.h"
-#include "grid.h"
-#include "client_info.h"
+#include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/pipeline/document_source.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/queryutil.h"
+#include "mongo/s/client_info.h"
+#include "mongo/s/chunk.h"
+#include "mongo/s/config.h"
+#include "mongo/s/grid.h"
+#include "mongo/s/interrupt_status_mongos.h"
+#include "mongo/s/strategy.h"
+#include "mongo/s/version_manager.h"
+#include "mongo/scripting/engine.h"
+#include "mongo/util/net/message.h"
+#include "mongo/util/timer.h"
 
 namespace mongo {
-
-    bool setParmsMongodSpecific(const string& dbname, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result, bool fromRepl )
-    { 
-        return true;
-    }
 
     namespace dbgrid_pub_cmds {
 
@@ -208,12 +211,38 @@ namespace mongo {
         class DropIndexesCmd : public AllShardsCollectionCommand {
         public:
             DropIndexesCmd() :  AllShardsCollectionCommand("dropIndexes", "deleteIndexes") {}
+            virtual void addRequiredPrivileges(const std::string& dbname,
+                                               const BSONObj& cmdObj,
+                                               std::vector<Privilege>* out) {
+                ActionSet actions;
+                actions.addAction(ActionType::dropIndexes);
+                out->push_back(Privilege(parseNs(dbname, cmdObj), actions));
+            }
         } dropIndexesCmd;
 
         class ReIndexCmd : public AllShardsCollectionCommand {
         public:
             ReIndexCmd() :  AllShardsCollectionCommand("reIndex") {}
+            virtual void addRequiredPrivileges(const std::string& dbname,
+                                               const BSONObj& cmdObj,
+                                               std::vector<Privilege>* out) {
+                ActionSet actions;
+                actions.addAction(ActionType::reIndex);
+                out->push_back(Privilege(parseNs(dbname, cmdObj), actions));
+            }
         } reIndexCmd;
+
+        class CollectionModCmd : public AllShardsCollectionCommand {
+        public:
+            CollectionModCmd() :  AllShardsCollectionCommand("collMod") {}
+            virtual void addRequiredPrivileges(const std::string& dbname,
+                                               const BSONObj& cmdObj,
+                                               std::vector<Privilege>* out) {
+                ActionSet actions;
+                actions.addAction(ActionType::collMod);
+                out->push_back(Privilege(parseNs(dbname, cmdObj), actions));
+            }
+        } collectionModCmd;
 
         class ProfileCmd : public PublicGridCommand {
         public:
@@ -222,12 +251,27 @@ namespace mongo {
                 errmsg = "profile currently not supported via mongos";
                 return false;
             }
+            virtual void addRequiredPrivileges(const std::string& dbname,
+                                               const BSONObj& cmdObj,
+                                               std::vector<Privilege>* out) {
+                ActionSet actions;
+                actions.addAction(ActionType::profileEnable);
+                out->push_back(Privilege(dbname, actions));
+            }
         } profileCmd;
         
 
         class ValidateCmd : public AllShardsCollectionCommand {
         public:
             ValidateCmd() :  AllShardsCollectionCommand("validate") {}
+            virtual void addRequiredPrivileges(const std::string& dbname,
+                                               const BSONObj& cmdObj,
+                                               std::vector<Privilege>* out) {
+                ActionSet actions;
+                actions.addAction(ActionType::validate);
+                // TODO: should the resource needed be the collection name instead of the db name?
+                out->push_back(Privilege(dbname, actions));
+            }
             virtual void aggregateResults(const vector<BSONObj>& results, BSONObjBuilder& output) {
                 for (vector<BSONObj>::const_iterator it(results.begin()), end(results.end()); it!=end; it++){
                     const BSONObj& result = *it;
@@ -255,14 +299,29 @@ namespace mongo {
         class RepairDatabaseCmd : public RunOnAllShardsCommand {
         public:
             RepairDatabaseCmd() :  RunOnAllShardsCommand("repairDatabase") {}
+            virtual void addRequiredPrivileges(const std::string& dbname,
+                                               const BSONObj& cmdObj,
+                                               std::vector<Privilege>* out) {
+                ActionSet actions;
+                actions.addAction(ActionType::repairDatabase);
+                out->push_back(Privilege(dbname, actions));
+            }
         } repairDatabaseCmd;
 
         class DBStatsCmd : public RunOnAllShardsCommand {
         public:
             DBStatsCmd() :  RunOnAllShardsCommand("dbStats", "dbstats") {}
+            virtual void addRequiredPrivileges(const std::string& dbname,
+                                               const BSONObj& cmdObj,
+                                               std::vector<Privilege>* out) {
+                ActionSet actions;
+                actions.addAction(ActionType::dbStats);
+                out->push_back(Privilege(dbname, actions));
+            }
 
             virtual void aggregateResults(const vector<BSONObj>& results, BSONObjBuilder& output) {
                 long long objects = 0;
+                long long unscaledDataSize = 0;
                 long long dataSize = 0;
                 long long storageSize = 0;
                 long long numExtents = 0;
@@ -273,6 +332,7 @@ namespace mongo {
                 for (vector<BSONObj>::const_iterator it(results.begin()), end(results.end()); it != end; ++it) {
                     const BSONObj& b = *it;
                     objects     += b["objects"].numberLong();
+                    unscaledDataSize    += b["avgObjSize"].numberLong() * b["objects"].numberLong();
                     dataSize    += b["dataSize"].numberLong();
                     storageSize += b["storageSize"].numberLong();
                     numExtents  += b["numExtents"].numberLong();
@@ -283,7 +343,10 @@ namespace mongo {
 
                 //result.appendNumber( "collections" , ncollections ); //TODO: need to find a good way to get this
                 output.appendNumber( "objects" , objects );
-                output.append      ( "avgObjSize" , double(dataSize) / double(objects) );
+                /* avgObjSize on mongod is not scaled based on the argument to db.stats(), so we use
+                 * unscaledDataSize here for consistency.  See SERVER-7347. */
+                output.append      ( "avgObjSize" , objects == 0 ? 0 : double(unscaledDataSize) /
+                                                                       double(objects) );
                 output.appendNumber( "dataSize" , dataSize );
                 output.appendNumber( "storageSize" , storageSize);
                 output.appendNumber( "numExtents" , numExtents );
@@ -296,6 +359,13 @@ namespace mongo {
         class CreateCmd : public PublicGridCommand {
         public:
             CreateCmd() : PublicGridCommand( "create" ) {}
+            virtual void addRequiredPrivileges(const std::string& dbname,
+                                               const BSONObj& cmdObj,
+                                               std::vector<Privilege>* out) {
+                ActionSet actions;
+                actions.addAction(ActionType::createCollection);
+                out->push_back(Privilege(dbname, actions));
+            }
             bool run(const string& dbName,
                      BSONObj& cmdObj,
                      int,
@@ -310,6 +380,13 @@ namespace mongo {
         class DropCmd : public PublicGridCommand {
         public:
             DropCmd() : PublicGridCommand( "drop" ) {}
+            virtual void addRequiredPrivileges(const std::string& dbname,
+                                               const BSONObj& cmdObj,
+                                               std::vector<Privilege>* out) {
+                ActionSet actions;
+                actions.addAction(ActionType::dropCollection);
+                out->push_back(Privilege(parseNs(dbname, cmdObj), actions));
+            }
             bool run(const string& dbName , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
                 string collection = cmdObj.firstElement().valuestrsafe();
                 string fullns = dbName + "." + collection;
@@ -347,6 +424,13 @@ namespace mongo {
         class DropDBCmd : public PublicGridCommand {
         public:
             DropDBCmd() : PublicGridCommand( "dropDatabase" ) {}
+            virtual void addRequiredPrivileges(const std::string& dbname,
+                                               const BSONObj& cmdObj,
+                                               std::vector<Privilege>* out) {
+                ActionSet actions;
+                actions.addAction(ActionType::dropDatabase);
+                out->push_back(Privilege(dbname, actions));
+            }
             bool run(const string& dbName , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
                 // disallow dropping the config database from mongos
                 if( dbName == "config" ) {
@@ -368,14 +452,6 @@ namespace mongo {
                 if ( ! conf ) {
                     result.append( "info" , "database didn't exist" );
                     return true;
-                }
-
-                // Make sure you have write auth to the database, otherwise you'll delete the
-                // database info from the config server before the command even reaches the shards.
-                if ( !ClientBasic::getCurrent()->getAuthenticationInfo()->isAuthorized( dbName ) ) {
-                    result.append( "errmsg",
-                                   str::stream() << "Not authorized to drop db: " << dbName );
-                    return false;
                 }
 
                 //
@@ -416,13 +492,18 @@ namespace mongo {
         class RenameCollectionCmd : public PublicGridCommand {
         public:
             RenameCollectionCmd() : PublicGridCommand( "renameCollection" ) {}
+            virtual void addRequiredPrivileges(const std::string& dbname,
+                                               const BSONObj& cmdObj,
+                                               std::vector<Privilege>* out) {
+                rename_collection::addPrivilegesRequiredForRenameCollection(cmdObj, out);
+            }
             bool run(const string& dbName, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
                 string fullnsFrom = cmdObj.firstElement().valuestrsafe();
-                string dbNameFrom = nsToDatabase( fullnsFrom.c_str() );
+                string dbNameFrom = nsToDatabase( fullnsFrom );
                 DBConfigPtr confFrom = grid.getDBConfig( dbNameFrom , false );
 
                 string fullnsTo = cmdObj["to"].valuestrsafe();
-                string dbNameTo = nsToDatabase( fullnsTo.c_str() );
+                string dbNameTo = nsToDatabase( fullnsTo );
                 DBConfigPtr confTo = grid.getDBConfig( dbNameTo , false );
 
                 uassert(13140, "Don't recognize source or target DB", confFrom && confTo);
@@ -441,6 +522,13 @@ namespace mongo {
         class CopyDBCmd : public PublicGridCommand {
         public:
             CopyDBCmd() : PublicGridCommand( "copydb" ) {}
+            virtual void addRequiredPrivileges(const std::string& dbname,
+                                               const BSONObj& cmdObj,
+                                               std::vector<Privilege>* out) {
+                // Should never get here because this command shouldn't get registered when auth is
+                // enabled
+                verify(0);
+            }
             bool run(const string& dbName, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
                 string todb = cmdObj.getStringField("todb");
                 uassert(13402, "need a todb argument", !todb.empty());
@@ -472,18 +560,47 @@ namespace mongo {
                 }
 
             }
-        } copyDBCmd;
+        };
+        MONGO_INITIALIZER(RegisterCopyDBCommand)(InitializerContext* context) {
+            if (noauth) {
+                // Leaked intentionally: a Command registers itself when constructed.
+                new CopyDBCmd();
+            } else {
+                new NotWithAuthCmd("copydb");
+            }
+            return Status::OK();
+        }
 
         class CountCmd : public PublicGridCommand {
         public:
             CountCmd() : PublicGridCommand( "count" ) { }
             virtual bool passOptions() const { return true; }
+            virtual void addRequiredPrivileges(const std::string& dbname,
+                                               const BSONObj& cmdObj,
+                                               std::vector<Privilege>* out) {
+                ActionSet actions;
+                actions.addAction(ActionType::find);
+                out->push_back(Privilege(parseNs(dbname, cmdObj), actions));
+            }
             bool run( const string& dbName,
                     BSONObj& cmdObj,
                     int options,
                     string& errmsg,
                     BSONObjBuilder& result,
                     bool ){
+
+                long long skip = 0;
+                if( cmdObj["skip"].isNumber() ){
+                    skip = cmdObj["skip"].numberLong();
+                    if( skip < 0 ){
+                        errmsg = "skip value is negative in count query";
+                        return false;
+                    }
+                }
+                else if( cmdObj["skip"].ok() ){
+                    errmsg = "skip value is not a valid number";
+                    return false;
+                }
 
                 const string collection = cmdObj.firstElement().valuestrsafe();
                 const string fullns = dbName + "." + collection;
@@ -505,8 +622,6 @@ namespace mongo {
                      * apply it only once we have collected all counts.
                      */
                     if( limit != 0 && cmdObj["skip"].isNumber() ){
-                        long long skip = cmdObj["skip"].numberLong();
-                        uassert( 16260 , "skip has to be positive" , skip >= 0 );
                         if ( limit > 0 )
                             limit += skip;
                         else
@@ -514,6 +629,10 @@ namespace mongo {
                     }
 
                     countCmdBuilder.append( "limit", limit );
+                }
+
+                if (cmdObj.hasField("$queryOptions")) {
+                    countCmdBuilder.append(cmdObj["$queryOptions"]);
                 }
 
                 map<Shard, BSONObj> countResult;
@@ -553,6 +672,13 @@ namespace mongo {
         class CollectionStats : public PublicGridCommand {
         public:
             CollectionStats() : PublicGridCommand("collStats", "collstats") { }
+            virtual void addRequiredPrivileges(const std::string& dbname,
+                                               const BSONObj& cmdObj,
+                                               std::vector<Privilege>* out) {
+                ActionSet actions;
+                actions.addAction(ActionType::collStats);
+                out->push_back(Privilege(parseNs(dbname, cmdObj), actions));
+            }
             bool run(const string& dbName , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
                 string collection = cmdObj.firstElement().valuestrsafe();
                 string fullns = dbName + "." + collection;
@@ -681,6 +807,11 @@ namespace mongo {
         class FindAndModifyCmd : public PublicGridCommand {
         public:
             FindAndModifyCmd() : PublicGridCommand("findAndModify", "findandmodify") { }
+            virtual void addRequiredPrivileges(const std::string& dbname,
+                                               const BSONObj& cmdObj,
+                                               std::vector<Privilege>* out) {
+                find_and_modify::addPrivilegesRequiredForFindAndModify(dbname, cmdObj, out);
+            }
             bool run(const string& dbName, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
                 string collection = cmdObj.firstElement().valuestrsafe();
                 string fullns = dbName + "." + collection;
@@ -697,7 +828,7 @@ namespace mongo {
                 BSONObj filter = cmdObj.getObjectField("query");
                 uassert(13343,  "query for sharded findAndModify must have shardkey", cm->hasShardKey(filter));
 
-                ChunkPtr chunk = cm->findChunk(filter);
+                ChunkPtr chunk = cm->findChunkForDoc(filter);
                 ShardConnection conn( chunk->getShard() , fullns );
                 BSONObj res;
                 bool ok = conn->runCommand( conf->getName() , cmdObj , res );
@@ -725,6 +856,13 @@ namespace mongo {
         class DataSizeCmd : public PublicGridCommand {
         public:
             DataSizeCmd() : PublicGridCommand("dataSize", "datasize") { }
+            virtual void addRequiredPrivileges(const std::string& dbname,
+                                               const BSONObj& cmdObj,
+                                               std::vector<Privilege>* out) {
+                ActionSet actions;
+                actions.addAction(ActionType::find);
+                out->push_back(Privilege(parseNs(dbname, cmdObj), actions));
+            }
             bool run(const string& dbName, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
                 string fullns = cmdObj.firstElement().String();
 
@@ -741,7 +879,12 @@ namespace mongo {
                 BSONObj max = cmdObj.getObjectField( "max" );
                 BSONObj keyPattern = cmdObj.getObjectField( "keyPattern" );
 
-                uassert(13408,  "keyPattern must equal shard key", cm->getShardKey().key() == keyPattern);
+                uassert( 13408, "keyPattern must equal shard key",
+                         cm->getShardKey().key() == keyPattern );
+                uassert( 13405, str::stream() << "min value " << min << " does not have shard key",
+                         cm->hasShardKey(min) );
+                uassert( 13406, str::stream() << "max value " << max << " does not have shard key",
+                         cm->hasShardKey(max) );
 
                 // yes these are doubles...
                 double size = 0;
@@ -779,6 +922,13 @@ namespace mongo {
         class ConvertToCappedCmd : public NotAllowedOnShardedCollectionCmd  {
         public:
             ConvertToCappedCmd() : NotAllowedOnShardedCollectionCmd("convertToCapped") {}
+            virtual void addRequiredPrivileges(const std::string& dbname,
+                                               const BSONObj& cmdObj,
+                                               std::vector<Privilege>* out) {
+                ActionSet actions;
+                actions.addAction(ActionType::convertToCapped);
+                out->push_back(Privilege(parseNs(dbname, cmdObj), actions));
+            }
 
             virtual string getFullNS( const string& dbName , const BSONObj& cmdObj ) {
                 return dbName + "." + cmdObj.firstElement().valuestrsafe();
@@ -790,6 +940,13 @@ namespace mongo {
         class GroupCmd : public NotAllowedOnShardedCollectionCmd  {
         public:
             GroupCmd() : NotAllowedOnShardedCollectionCmd("group") {}
+            virtual void addRequiredPrivileges(const std::string& dbname,
+                                               const BSONObj& cmdObj,
+                                               std::vector<Privilege>* out) {
+                ActionSet actions;
+                actions.addAction(ActionType::find);
+                out->push_back(Privilege(parseNs(dbname, cmdObj), actions));
+            }
             virtual bool passOptions() const { return true; }
             virtual string getFullNS( const string& dbName , const BSONObj& cmdObj ) {
                 return dbName + "." + cmdObj.firstElement().embeddedObjectUserCheck()["ns"].valuestrsafe();
@@ -801,6 +958,13 @@ namespace mongo {
         public:
             SplitVectorCmd() : NotAllowedOnShardedCollectionCmd("splitVector") {}
             virtual bool passOptions() const { return true; }
+            virtual void addRequiredPrivileges(const std::string& dbname,
+                                               const BSONObj& cmdObj,
+                                               std::vector<Privilege>* out) {
+                ActionSet actions;
+                actions.addAction(ActionType::splitVector);
+                out->push_back(Privilege(AuthorizationManager::CLUSTER_RESOURCE_NAME, actions));
+            }
             virtual bool run(const string& dbName , BSONObj& cmdObj, int options, string& errmsg, BSONObjBuilder& result, bool) {
                 string x = cmdObj.firstElement().valuestrsafe();
                 if ( ! str::startsWith( x , dbName ) ) {
@@ -823,6 +987,13 @@ namespace mongo {
                 help << "{ distinct : 'collection name' , key : 'a.b' , query : {} }";
             }
             virtual bool passOptions() const { return true; }
+            virtual void addRequiredPrivileges(const std::string& dbname,
+                                               const BSONObj& cmdObj,
+                                               std::vector<Privilege>* out) {
+                ActionSet actions;
+                actions.addAction(ActionType::find);
+                out->push_back(Privilege(parseNs(dbname, cmdObj), actions));
+            }
             bool run(const string& dbName , BSONObj& cmdObj, int options, string& errmsg, BSONObjBuilder& result, bool) {
                 string collection = cmdObj.firstElement().valuestrsafe();
                 string fullns = dbName + "." + collection;
@@ -880,6 +1051,13 @@ namespace mongo {
             FileMD5Cmd() : PublicGridCommand("filemd5") {}
             virtual void help( stringstream &help ) const {
                 help << " example: { filemd5 : ObjectId(aaaaaaa) , root : \"fs\" }";
+            }
+            virtual void addRequiredPrivileges(const std::string& dbname,
+                                               const BSONObj& cmdObj,
+                                               std::vector<Privilege>* out) {
+                ActionSet actions;
+                actions.addAction(ActionType::find);
+                out->push_back(Privilege(parseNs(dbname, cmdObj), actions));
             }
             bool run(const string& dbName , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
                 string fullns = dbName;
@@ -993,6 +1171,13 @@ namespace mongo {
             Geo2dFindNearCmd() : PublicGridCommand( "geoNear" ) {}
             void help(stringstream& h) const { h << "http://dochub.mongodb.org/core/geo#GeospatialIndexing-geoNearCommand"; }
             virtual bool passOptions() const { return true; }
+            virtual void addRequiredPrivileges(const std::string& dbname,
+                                               const BSONObj& cmdObj,
+                                               std::vector<Privilege>* out) {
+                ActionSet actions;
+                actions.addAction(ActionType::find);
+                out->push_back(Privilege(parseNs(dbname, cmdObj), actions));
+            }
             bool run(const string& dbName , BSONObj& cmdObj, int options, string& errmsg, BSONObjBuilder& result, bool) {
                 string collection = cmdObj.firstElement().valuestrsafe();
                 string fullns = dbName + "." + collection;
@@ -1010,9 +1195,11 @@ namespace mongo {
                 set<Shard> shards;
                 cm->getShardsForQuery(shards, query);
 
+                // We support both "num" and "limit" options to control limit
                 int limit = 100;
-                if (cmdObj["num"].isNumber())
-                    limit = cmdObj["num"].numberInt();
+                const char* limitName = cmdObj["num"].isNumber() ? "num" : "limit";
+                if (cmdObj[limitName].isNumber())
+                    limit = cmdObj[limitName].numberInt();
 
                 list< shared_ptr<Future::CommandResult> > futures;
                 BSONArrayBuilder shardArray;
@@ -1034,11 +1221,17 @@ namespace mongo {
                         return false;
                     }
 
-                    nearStr = res->result()["near"].String();
+                    if (res->result().hasField("near")) {
+                        nearStr = res->result()["near"].String();
+                    }
                     time += res->result()["stats"]["time"].Number();
-                    btreelocs += res->result()["stats"]["btreelocs"].Number();
+                    if (!res->result()["stats"]["btreelocs"].eoo()) {
+                        btreelocs += res->result()["stats"]["btreelocs"].Number();
+                    }
                     nscanned += res->result()["stats"]["nscanned"].Number();
-                    objectsLoaded += res->result()["stats"]["objectsLoaded"].Number();
+                    if (!res->result()["stats"]["objectsLoaded"].eoo()) {
+                        objectsLoaded += res->result()["stats"]["objectsLoaded"].Number();
+                    }
 
                     BSONForEach(obj, res->result()["results"].embeddedObject()) {
                         results.insert(make_pair(obj["dis"].Number(), obj.embeddedObject().getOwned()));
@@ -1086,6 +1279,12 @@ namespace mongo {
 
             MRCmd() : PublicGridCommand( "mapreduce" ) {}
 
+            virtual void addRequiredPrivileges(const std::string& dbname,
+                                               const BSONObj& cmdObj,
+                                               std::vector<Privilege>* out) {
+                mr::addPrivilegesRequiredForMapReduce(dbname, cmdObj, out);
+            }
+
             string getTmpName( const string& coll ) {
                 stringstream ss;
                 ss << "tmp.mrs." << coll << "_" << time(0) << "_" << JOB_NUMBER++;
@@ -1098,14 +1297,15 @@ namespace mongo {
                 while ( i.more() ) {
                     BSONElement e = i.next();
                     string fn = e.fieldName();
-                    if ( fn == "map" ||
+                    if (fn == "map" ||
                             fn == "mapreduce" ||
                             fn == "mapparams" ||
                             fn == "reduce" ||
                             fn == "query" ||
                             fn == "sort" ||
                             fn == "scope" ||
-                            fn == "verbose" ) {
+                            fn == "verbose" ||
+                            fn == "$queryOptions") {
                         b.append( e );
                     }
                     else if ( fn == "out" ||
@@ -1128,15 +1328,6 @@ namespace mongo {
                 return b.obj();
             }
 
-            ChunkPtr insertSharded( ChunkManagerPtr manager, const char* ns, BSONObj& o, int flags, bool safe ) {
-                // note here, the MR output process requires no splitting / migration during process, hence StaleConfigException should not happen
-                Strategy* s = SHARDED;
-                ChunkPtr c = manager->findChunk( o );
-                LOG(4) << "  server:" << c->getShard().toString() << " " << o << endl;
-                s->insert( c->getShard() , ns , o , flags, safe);
-                return c;
-            }
-
             void cleanUp( const set<ServerAndQuery>& servers, string dbName, string shardResultCollection ) {
                 try {
                     // drop collections with tmp results on each shard
@@ -1150,6 +1341,8 @@ namespace mongo {
                     log() << "Cannot cleanup shard results" << causedBy( e ) << endl;
                 }
             }
+
+            // TODO: implement addRequiredPrivileges
 
             bool run(const string& dbName , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
                 return run( dbName, cmdObj, errmsg, result, 0 );
@@ -1370,7 +1563,22 @@ namespace mongo {
                         // points will be properly sorted using the set
                         for ( set<BSONObj>::iterator it = splitPts.begin() ; it != splitPts.end() ; ++it )
                             sortedSplitPts.push_back( *it );
-                        confOut->shardCollection( finalColLong, sortKey, true, &sortedSplitPts );
+
+                        // pre-split the collection onto all the shards for this database.
+                        // Note that it's not completely safe to pre-split onto non-primary shards
+                        // using the shardcollection method (a conflict may result if multiple
+                        // map-reduces are writing to the same output collection, for instance).
+                        // TODO: pre-split mapReduce output in a safer way.
+                        set<Shard> shardSet;
+                        confOut->getAllShards( shardSet );
+                        vector<Shard> outShards( shardSet.begin() , shardSet.end() );
+
+                        confOut->shardCollection( finalColLong ,
+                                                  sortKey ,
+                                                  true ,
+                                                  &sortedSplitPts ,
+                                                  &outShards );
+
                     }
 
                     map<BSONObj, int> chunkSizes;
@@ -1442,7 +1650,7 @@ namespace mongo {
                         verify( size < 0x7fffffff );
 
                         // key reported should be the chunk's minimum
-                        ChunkPtr c =  cm->findChunk(key);
+                        ChunkPtr c =  cm->findIntersectingChunk(key);
                         if ( !c ) {
                             warning() << "Mongod reported " << size << " bytes inserted for key " << key << " but can't find chunk" << endl;
                         } else {
@@ -1491,6 +1699,13 @@ namespace mongo {
         class ApplyOpsCmd : public PublicGridCommand {
         public:
             ApplyOpsCmd() : PublicGridCommand( "applyOps" ) {}
+            virtual void addRequiredPrivileges(const std::string& dbname,
+                                               const BSONObj& cmdObj,
+                                               std::vector<Privilege>* out) {
+                ActionSet actions;
+                actions.addAction(ActionType::applyOps);
+                out->push_back(Privilege(AuthorizationManager::SERVER_RESOURCE_NAME, actions));
+            }
             virtual bool run(const string& dbName , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
                 errmsg = "applyOps not allowed through mongos";
                 return false;
@@ -1501,6 +1716,13 @@ namespace mongo {
         class CompactCmd : public PublicGridCommand {
         public:
             CompactCmd() : PublicGridCommand( "compact" ) {}
+            virtual void addRequiredPrivileges(const std::string& dbname,
+                                               const BSONObj& cmdObj,
+                                               std::vector<Privilege>* out) {
+                ActionSet actions;
+                actions.addAction(ActionType::compact);
+                out->push_back(Privilege(parseNs(dbname, cmdObj), actions));
+            }
             virtual bool run(const string& dbName , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
                 errmsg = "compact not allowed through mongos";
                 return false;
@@ -1510,6 +1732,13 @@ namespace mongo {
         class EvalCmd : public PublicGridCommand {
         public:
             EvalCmd() : PublicGridCommand( "$eval" ) {}
+            virtual void addRequiredPrivileges(const std::string& dbname,
+                                               const BSONObj& cmdObj,
+                                               std::vector<Privilege>* out) {
+                // $eval can do pretty much anything, so require all privileges.
+                out->push_back(Privilege(PrivilegeSet::WILDCARD_RESOURCE,
+                                         AuthorizationManager::getAllUserActions()));
+            }
             virtual bool run(const string& dbName,
                              BSONObj& cmdObj,
                              int,
@@ -1531,8 +1760,10 @@ namespace mongo {
             public PublicGridCommand {
         public:
             PipelineCommand();
-
             // virtuals from Command
+            virtual void addRequiredPrivileges(const std::string& dbname,
+                                               const BSONObj& cmdObj,
+                                               std::vector<Privilege>* out);
             virtual bool run(const string &dbName , BSONObj &cmdObj,
                              int options, string &errmsg,
                              BSONObjBuilder &result, bool fromRepl);
@@ -1548,6 +1779,14 @@ namespace mongo {
 
         PipelineCommand::PipelineCommand():
             PublicGridCommand(Pipeline::commandName) {
+        }
+
+        void PipelineCommand::addRequiredPrivileges(const std::string& dbname,
+                                                    const BSONObj& cmdObj,
+                                                    std::vector<Privilege>* out) {
+            ActionSet actions;
+            actions.addAction(ActionType::find);
+            out->push_back(Privilege(parseNs(dbname, cmdObj), actions));
         }
 
         bool PipelineCommand::run(const string &dbName , BSONObj &cmdObj,
@@ -1582,6 +1821,11 @@ namespace mongo {
             /* create the command for the shards */
             BSONObjBuilder commandBuilder;
             pShardPipeline->toBson(&commandBuilder);
+
+            if (cmdObj.hasField("$queryOptions")) {
+                commandBuilder.append(cmdObj["$queryOptions"]);
+            }
+
             BSONObj shardedCommand(commandBuilder.done());
 
             BSONObjBuilder shardQueryBuilder;
@@ -1598,9 +1842,10 @@ namespace mongo {
             map<Shard, BSONObj> shardResults;
             SHARDED->commandOp(dbName, shardedCommand, options, fullns, shardQuery, shardResults);
 
+            pPipeline->addInitialSource(DocumentSourceCommandShards::create(shardResults, pExpCtx));
+
             // Combine the shards' output and finish the pipeline
-            pPipeline->run(result, errmsg,
-                    DocumentSourceCommandShards::create(shardResults, pExpCtx));
+            pPipeline->run(result, errmsg);
 
             if (errmsg.length() > 0)
                 return false;
@@ -1610,81 +1855,26 @@ namespace mongo {
 
     } // namespace pub_grid_cmds
 
-    bool Command::runAgainstRegistered(const char *ns, BSONObj& jsobj, BSONObjBuilder& anObjBuilder, int queryOptions) {
-        const char *p = strchr(ns, '.');
-        if ( !p ) return false;
-        if ( strcmp(p, ".$cmd") != 0 ) return false;
-
-        bool ok = false;
+    void Command::runAgainstRegistered(const char *ns, BSONObj& jsobj, BSONObjBuilder& anObjBuilder,
+                                       int queryOptions) {
+        // It should be impossible for this uassert to fail since there should be no way to get into
+        // this function with any other collection name.
+        uassert(16618,
+                "Illegal attempt to run a command against a namespace other than $cmd.",
+                NamespaceString(ns).coll == "$cmd");
 
         BSONElement e = jsobj.firstElement();
-        map<string,Command*>::iterator i;
-
-        if ( e.eoo() )
-            ;
-        // check for properly registered command objects.
-        else if ( (i = _commands->find(e.fieldName())) != _commands->end() ) {
-            string errmsg;
-            Command *c = i->second;
-            ClientInfo *client = ClientInfo::get();
-            AuthenticationInfo *ai = client->getAuthenticationInfo();
-
-            char cl[256];
-            nsToDatabase(ns, cl);
-            if( c->requiresAuth() && !ai->isAuthorizedForLock(cl, c->locktype())) {
-                ok = false;
-                errmsg = "unauthorized";
-                anObjBuilder.append( "note" , str::stream() << "need to authorized on db: " << cl << " for command: " << e.fieldName() );
-            }
-            else if( c->adminOnly() && c->localHostOnlyIfNoAuth( jsobj ) && noauth && !ai->isLocalHost() ) {
-                ok = false;
-                errmsg = "unauthorized: this command must run from localhost when running db without auth";
-                log() << "command denied: " << jsobj.toString() << endl;
-            }
-            else if ( c->adminOnly() && !startsWith(ns, "admin.") ) {
-                ok = false;
-                errmsg = "access denied - use admin db";
-            }
-            else if ( jsobj.getBoolField( "help" ) ) {
-                stringstream help;
-                help << "help for: " << e.fieldName() << " ";
-                c->help( help );
-                anObjBuilder.append( "help" , help.str() );
-            }
-            else {
-                try {
-                    ok = c->run( nsToDatabase( ns ) , jsobj, queryOptions, errmsg, anObjBuilder, false );
-                }
-                catch (DBException& e) {
-                    int code = e.getCode();
-                    if (code == RecvStaleConfigCode) { // code for StaleConfigException
-                        throw;
-                    }
-
-                    {
-                        stringstream ss;
-                        ss << "exception: " << e.what();
-                        anObjBuilder.append( "errmsg" , ss.str() );
-                        anObjBuilder.append( "code" , code );
-                    }
-                }
-            }
-
-            BSONObj tmp = anObjBuilder.asTempObj();
-            bool have_ok = tmp.hasField("ok");
-            bool have_errmsg = tmp.hasField("errmsg");
-
-            if (!have_ok)
-                anObjBuilder.append( "ok" , ok ? 1.0 : 0.0 );
-
-            if ( !ok && !have_errmsg) {
-                anObjBuilder.append("errmsg", errmsg);
-                setLastError(0, errmsg.c_str());
-            }
-            return true;
+        std::string commandName = e.fieldName();
+        Command* c = e.type() ? Command::findCommand(commandName) : NULL;
+        if (!c) {
+            Command::appendCommandStatus(anObjBuilder,
+                                         false,
+                                         str::stream() << "no such cmd: " << commandName);
+            return;
         }
+        ClientInfo *client = ClientInfo::get();
 
-        return false;
+        execCommandClientBasic(c, *client, queryOptions, ns, jsobj, anObjBuilder, false);
     }
 
 } // namespace mongo

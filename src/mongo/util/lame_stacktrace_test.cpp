@@ -5,8 +5,10 @@
  * function, until such time as it is properly unit tested.
  */
 
+#include "mongo/base/initializer.h"
 #include "mongo/util/stacktrace.h"
 
-int main(int argc, char **argv) {
+int main(int argc, char **argv, char ** envp) {
+    mongo::runGlobalInitializersOrDie(argc, argv, envp);
     mongo::printStackTrace();
 }

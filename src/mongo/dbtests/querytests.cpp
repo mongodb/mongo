@@ -18,23 +18,21 @@
 
 #include "pch.h"
 
-#include "../db/ops/query.h"
-#include "../db/scanandorder.h"
+#include "mongo/db/ops/query.h"
 
-#include "../db/dbhelpers.h"
-#include "../db/clientcursor.h"
 #include "mongo/client/dbclientcursor.h"
-
-#include "../db/instance.h"
-#include "../db/json.h"
-#include "../db/lasterror.h"
-
-#include "../util/timer.h"
+#include "mongo/db/clientcursor.h"
+#include "mongo/db/dbhelpers.h"
+#include "mongo/db/instance.h"
+#include "mongo/db/json.h"
+#include "mongo/db/lasterror.h"
+#include "mongo/db/oplog.h"
+#include "mongo/db/scanandorder.h"
+#include "mongo/util/timer.h"
 
 #include "dbtests.h"
 
 namespace mongo {
-    extern int __findingStartInitialTimeout;
     void assembleRequest( const string &ns, BSONObj query, int nToReturn, int nToSkip,
                          const BSONObj *fieldsToReturn, int queryOptions, Message &toSend );
 }
@@ -130,9 +128,6 @@ namespace QueryTests {
     class FindOneEmptyObj : public Base {
     public:
         void run() {
-            // todo: this is BAD.
-            cc().getAuthenticationInfo()->setIsALocalHostConnectionWithSpecialAuthPowers();
-
             // We don't normally allow empty objects in the database, but test that we can find
             // an empty object (one might be allowed inside a reserved namespace at some point).
             Lock::GlobalWrite lk;
@@ -1123,13 +1118,22 @@ namespace QueryTests {
         }
     };
 
+    class ZeroFindingStartTimeout {
+    public:
+        ZeroFindingStartTimeout() :
+            _old( FindingStartCursor::getInitialTimeout() ) {
+            FindingStartCursor::setInitialTimeout( 0 );
+        }
+        ~ZeroFindingStartTimeout() {
+            FindingStartCursor::setInitialTimeout( _old );
+        }
+    private:
+        int _old;
+    };
+
     class FindingStart : public CollectionBase {
     public:
-        FindingStart() : CollectionBase( "findingstart" ), _old( __findingStartInitialTimeout ) {
-            __findingStartInitialTimeout = 0;
-        }
-        ~FindingStart() {
-            __findingStartInitialTimeout = _old;
+        FindingStart() : CollectionBase( "findingstart" ) {
         }
 
         void run() {
@@ -1156,16 +1160,12 @@ namespace QueryTests {
         }
 
     private:
-        int _old;
+        ZeroFindingStartTimeout _zeroTimeout;
     };
 
     class FindingStartPartiallyFull : public CollectionBase {
     public:
-        FindingStartPartiallyFull() : CollectionBase( "findingstart" ), _old( __findingStartInitialTimeout ) {
-            __findingStartInitialTimeout = 0;
-        }
-        ~FindingStartPartiallyFull() {
-            __findingStartInitialTimeout = _old;
+        FindingStartPartiallyFull() : CollectionBase( "findingstart" ) {
         }
 
         void run() {
@@ -1193,7 +1193,7 @@ namespace QueryTests {
         }
 
     private:
-        int _old;
+        ZeroFindingStartTimeout _zeroTimeout;
     };
     
     /**

@@ -16,27 +16,37 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "pch.h"
-#include "oplog.h"
-#include "repl_block.h"
-#include "repl.h"
-#include "commands.h"
-#include "repl/rs.h"
-#include "stats/counters.h"
-#include "../util/file.h"
-#include "../util/startup_test.h"
-#include "queryoptimizer.h"
-#include "ops/update.h"
-#include "ops/delete.h"
+#include "mongo/pch.h"
+
+#include "mongo/db/oplog.h"
+
+#include <vector>
+
+#include "mongo/db/auth/action_set.h"
+#include "mongo/db/auth/action_type.h"
+#include "mongo/db/auth/privilege.h"
+#include "mongo/db/commands.h"
+#include "mongo/db/index_update.h"
 #include "mongo/db/instance.h"
+#include "mongo/db/ops/update.h"
+#include "mongo/db/ops/delete.h"
+#include "mongo/db/queryoptimizer.h"
+#include "mongo/db/repl.h"
+#include "mongo/db/repl_block.h"
 #include "mongo/db/repl/bgsync.h"
+#include "mongo/db/repl/rs.h"
+#include "mongo/db/stats/counters.h"
+#include "mongo/util/elapsed_tracker.h"
+#include "mongo/util/file.h"
+#include "mongo/util/startup_test.h"
 
 namespace mongo {
 
     // from d_migrate.cpp
     void logOpForSharding( const char * opstr , const char * ns , const BSONObj& obj , BSONObj * patt );
 
-    int __findingStartInitialTimeout = 5; // configurable for testing
+    // Configurable for testing.
+    int FindingStartCursor::_initialTimeout = 5;
 
     // cached copies of these...so don't rename them, drop them, etc.!!!
     static NamespaceDetails *localOplogMainDetails = 0;
@@ -66,13 +76,13 @@ namespace mongo {
         {
             const char *logns = rsoplog;
             if ( rsOplogDetails == 0 ) {
-                Client::Context ctx( logns , dbpath, false);
+                Client::Context ctx(logns , dbpath);
                 localDB = ctx.db();
                 verify( localDB );
                 rsOplogDetails = nsdetails(logns);
                 massert(13389, "local.oplog.rs missing. did you drop it? if so restart server", rsOplogDetails);
             }
-            Client::Context ctx( logns , localDB, false );
+            Client::Context ctx(logns , localDB);
             {
                 int len = op.objsize();
                 Record *r = theDataFileMgr.fast_oplog_insert(rsOplogDetails, logns, len);
@@ -88,8 +98,6 @@ namespace mongo {
                 theReplSet->lastOpTimeWritten = ts;
                 theReplSet->lastH = h;
                 ctx.getClient()->setLastOp( ts );
-
-                replset::BackgroundSync::notify();
             }
         }
     }
@@ -124,10 +132,30 @@ namespace mongo {
         *b = EOO;
     }
 
+    /* we write to local.oplog.rs:
+         { ts : ..., h: ..., v: ..., op: ..., etc }
+       ts: an OpTime timestamp
+       h: hash
+       v: version
+       op:
+        "i" insert
+        "u" update
+        "d" delete
+        "c" db cmd
+        "db" declares presence of a database (ns is set to the db name + '.')
+        "n" no op
+
+       bb param:
+         if not null, specifies a boolean to pass along to the other side as b: param.
+         used for "justOne" or "upsert" flags on 'd', 'u'
+
+    */
+
     // global is safe as we are in write lock. we put the static outside the function to avoid the implicit mutex 
     // the compiler would use if inside the function.  the reason this is static is to avoid a malloc/free for this
     // on every logop call.
     static BufBuilder logopbufbuilder(8*1024);
+    static const int OPLOG_VERSION = 2;
     static void _logOpRS(const char *opstr, const char *ns, const char *logNS, const BSONObj& obj, BSONObj *o2, bool *bb, bool fromMigrate ) {
         Lock::DBWrite lk1("local");
 
@@ -159,6 +187,7 @@ namespace mongo {
         BSONObjBuilder b(logopbufbuilder);
         b.appendTimestamp("ts", ts.asDate());
         b.append("h", hashNew);
+        b.append("v", OPLOG_VERSION);
         b.append("op", opstr);
         b.append("ns", ns);
         if (fromMigrate) 
@@ -176,13 +205,13 @@ namespace mongo {
         {
             const char *logns = rsoplog;
             if ( rsOplogDetails == 0 ) {
-                Client::Context ctx( logns , dbpath, false);
+                Client::Context ctx(logns , dbpath);
                 localDB = ctx.db();
                 verify( localDB );
                 rsOplogDetails = nsdetails(logns);
                 massert(13347, "local.oplog.rs missing. did you drop it? if so restart server", rsOplogDetails);
             }
-            Client::Context ctx( logns , localDB, false );
+            Client::Context ctx(logns , localDB);
             r = theDataFileMgr.fast_oplog_insert(rsOplogDetails, logns, len);
             /* todo: now() has code to handle clock skew.  but if the skew server to server is large it will get unhappy.
                      this code (or code in now() maybe) should be improved.
@@ -201,30 +230,10 @@ namespace mongo {
         append_O_Obj(r->data(), partial, obj);
 
         if ( logLevel >= 6 ) {
-            log( 6 ) << "logOp:" << BSONObj::make(r) << endl;
+            LOG( 6 ) << "logOp:" << BSONObj::make(r) << endl;
         }
     }
 
-    /* we write to local.oplog.$main:
-         { ts : ..., op: ..., ns: ..., o: ... }
-       ts: an OpTime timestamp
-       op:
-        "i" insert
-        "u" update
-        "d" delete
-        "c" db cmd
-        "db" declares presence of a database (ns is set to the db name + '.')
-        "n" no op
-       logNS: where to log it.  0/null means "local.oplog.$main".
-       bb:
-         if not null, specifies a boolean to pass along to the other side as b: param.
-         used for "justOne" or "upsert" flags on 'd', 'u'
-       first: true
-         when set, indicates this is the first thing we have logged for this database.
-         thus, the slave does not need to copy down all the data when it sees this.
-
-       note this is used for single collection logging even when --replSet is enabled.
-    */
     static void _logOpOld(const char *opstr, const char *ns, const char *logNS, const BSONObj& obj, BSONObj *o2, bool *bb, bool fromMigrate ) {
         Lock::DBWrite lk("local");
         static BufBuilder bufbuilder(8*1024); // todo there is likely a mutex on this constructor
@@ -239,7 +248,7 @@ namespace mongo {
         mutex::scoped_lock lk2(OpTime::m);
 
         const OpTime ts = OpTime::now(lk2);
-        Client::Context context("",0,false);
+        Client::Context context("", 0);
 
         /* we jump through a bunch of hoops here to avoid copying the obj buffer twice --
            instead we do a single copy to the destination position in the memory mapped file.
@@ -265,17 +274,17 @@ namespace mongo {
         if( logNS == 0 ) {
             logNS = "local.oplog.$main";
             if ( localOplogMainDetails == 0 ) {
-                Client::Context ctx( logNS , dbpath, false);
+                Client::Context ctx(logNS , dbpath);
                 localDB = ctx.db();
                 verify( localDB );
                 localOplogMainDetails = nsdetails(logNS);
                 verify( localOplogMainDetails );
             }
-            Client::Context ctx( logNS , localDB, false );
+            Client::Context ctx(logNS , localDB);
             r = theDataFileMgr.fast_oplog_insert(localOplogMainDetails, logNS, len);
         }
         else {
-            Client::Context ctx( logNS, dbpath, false );
+            Client::Context ctx(logNS, dbpath);
             verify( nsdetails( logNS ) );
             // first we allocate the space, then we fill it below.
             r = theDataFileMgr.fast_oplog_insert( nsdetails( logNS ), logNS, len);
@@ -367,13 +376,13 @@ namespace mongo {
             sz = (double)cmdLine.oplogSize;
         else {
             /* not specified. pick a default size */
-            sz = 50.0 * 1000 * 1000;
+            sz = 50.0 * 1024 * 1024;
             if ( sizeof(int *) >= 8 ) {
 #if defined(__APPLE__)
                 // typically these are desktops (dev machines), so keep it smallish
-                sz = (256-64) * 1000 * 1000;
+                sz = (256-64) * 1024 * 1024;
 #else
-                sz = 990.0 * 1000 * 1000;
+                sz = 990.0 * 1024 * 1024;
                 boost::intmax_t free = File::freeSpace(dbpath); //-1 if call not supported.
                 double fivePct = free * 0.05;
                 if ( fivePct > sz )
@@ -432,7 +441,7 @@ namespace mongo {
                 }
                 _findingStartCursor->advance();
                 RARELY {
-                    if ( _findingStartTimer.seconds() >= __findingStartInitialTimeout ) {
+                    if ( _findingStartTimer.seconds() >= _initialTimeout ) {
                         // If we've scanned enough, switch to find extent mode.
                         createClientCursor( extentFirstLoc( _findingStartCursor->currLoc() ) );
                         _findingStartMode = FindExtent;
@@ -486,33 +495,40 @@ namespace mongo {
         return _qp.nsd()->capFirstNewRecord;
     }
     
-    void wassertExtentNonempty( const Extent *e ) {
-        // TODO ensure this requirement is clearly enforced, or fix.
-        wassert( !e->firstRecord.isNull() );
-    }
-    
-    DiskLoc FindingStartCursor::prevExtentFirstLoc( const DiskLoc &rec ) {
+    DiskLoc FindingStartCursor::prevExtentFirstLoc( const DiskLoc& rec ) const {
         Extent *e = rec.rec()->myExtent( rec );
         if ( _qp.nsd()->capLooped() ) {
-            if ( e->xprev.isNull() ) {
-                e = _qp.nsd()->lastExtent.ext();
-            }
-            else {
-                e = e->xprev.ext();
-            }
-            if ( e->myLoc != _qp.nsd()->capExtent ) {
-                wassertExtentNonempty( e );
-                return e->firstRecord;
+            while( true ) {
+                // Advance e to preceding extent (looping to lastExtent if necessary).
+                if ( e->xprev.isNull() ) {
+                    e = _qp.nsd()->lastExtent.ext();
+                }
+                else {
+                    e = e->xprev.ext();
+                }
+                if ( e->myLoc == _qp.nsd()->capExtent ) {
+                    // Reached the extent containing the oldest data in the collection.
+                    return DiskLoc();
+                }
+                if ( !e->firstRecord.isNull() ) {
+                    // Return the first record of the first non empty extent encountered.
+                    return e->firstRecord;
+                }
             }
         }
         else {
-            if ( !e->xprev.isNull() ) {
+            while( true ) {
+                if ( e->xprev.isNull() ) {
+                    // Reached the beginning of the collection.
+                    return DiskLoc();
+                }
                 e = e->xprev.ext();
-                wassertExtentNonempty( e );
-                return e->firstRecord;
+                if ( !e->firstRecord.isNull() ) {
+                    // Return the first record of the first non empty extent encountered.
+                    return e->firstRecord;
+                }
             }
         }
-        return DiskLoc(); // reached beginning of collection
     }
     
     void FindingStartCursor::createClientCursor( const DiskLoc &startLoc ) {
@@ -720,8 +736,8 @@ namespace mongo {
     /** @param fromRepl false if from ApplyOpsCmd
         @return true if was and update should have happened and the document DNE.  see replset initial sync code.
      */
-    bool applyOperation_inlock(const BSONObj& op , bool fromRepl ) {
-        LOG(6) << "applying op: " << op << endl;
+    bool applyOperation_inlock(const BSONObj& op, bool fromRepl, bool convertUpdateToUpsert) {
+        LOG(3) << "applying op: " << op << endl;
         bool failedUpdate = false;
 
         OpCounters * opCounters = fromRepl ? &replOpCounters : &globalOpCounters;
@@ -759,48 +775,49 @@ namespace mongo {
                 if( !o.getObjectID(_id) ) {
                     /* No _id.  This will be very slow. */
                     Timer t;
-                    updateObjects(ns, o, o, true, false, false, debug, false,
-                                  QueryPlanSelectionPolicy::idElseNatural() );
+                    updateObjectsForReplication(ns, o, o, true, false, false, debug, false,
+                                                QueryPlanSelectionPolicy::idElseNatural() );
                     if( t.millis() >= 2 ) {
                         RARELY OCCASIONALLY log() << "warning, repl doing slow updates (no _id field) for " << ns << endl;
                     }
                 }
                 else {
-                    /* erh 10/16/2009 - this is probably not relevant any more since its auto-created, but not worth removing */
-                    
-                    // this is the old version that doesn't create _id indexes on capped collections
-                    //RARELY if (nsd && !nsd->isCapped()) { ensureHaveIdIndex(ns); } // otherwise updates will be slow
-                    
-                    // this version creates indexes on all collections, including capped
-                    // as long we apply inserts as updates, this is needed for performance
-                    RARELY if ( nsd ) { ensureHaveIdIndex(ns); } // otherwise updates will be slow
+                    // probably don't need this since all replicated colls have _id indexes now
+                    // but keep it just in case
+                    RARELY if ( nsd && !nsd->isCapped() ) { ensureHaveIdIndex(ns, false); }
 
                     /* todo : it may be better to do an insert here, and then catch the dup key exception and do update
                               then.  very few upserts will not be inserts...
                               */
                     BSONObjBuilder b;
                     b.append(_id);
-                    updateObjects(ns, o, b.done(), true, false, false , debug, false,
-                                  QueryPlanSelectionPolicy::idElseNatural() );
+                    updateObjectsForReplication(ns, o, b.done(), true, false, false , debug, false,
+                                                QueryPlanSelectionPolicy::idElseNatural() );
                 }
             }
         }
         else if ( *opType == 'u' ) {
             opCounters->gotUpdate();
-            // dm do we create this for a capped collection?
-            //  - if not, updates would be slow
-            //    - but if were by id would be slow on primary too so maybe ok
-            //    - if on primary was by another key and there are other indexes, this could be very bad w/out an index
-            //  - if do create, odd to have on secondary but not primary.  also can cause secondary to block for
-            //    quite a while on creation.
-            RARELY if (nsd && !nsd->isCapped()) { ensureHaveIdIndex(ns); } // otherwise updates will be super slow
+
+            // probably don't need this since all replicated colls have _id indexes now
+            // but keep it just in case
+            RARELY if ( nsd && !nsd->isCapped() ) { ensureHaveIdIndex(ns, false); }
+
             OpDebug debug;
             BSONObj updateCriteria = op.getObjectField("o2");
-            bool upsert = fields[3].booleanSafe();
-            UpdateResult ur = updateObjects(ns, o, updateCriteria, upsert, /*multi*/ false,
-                                            /*logop*/ false , debug, /*fromMigrate*/ false,
+            bool upsert = fields[3].booleanSafe() || convertUpdateToUpsert;
+            UpdateResult ur =
+                updateObjectsForReplication(ns,
+                                            o,
+                                            updateCriteria,
+                                            upsert,
+                                            /*multi*/ false,
+                                            /*logop*/ false,
+                                            debug,
+                                            /*fromMigrate*/ false,
                                             QueryPlanSelectionPolicy::idElseNatural() );
-            if( ur.num == 0 ) { 
+
+            if( ur.num == 0 ) {
                 if( ur.mod ) {
                     if( updateCriteria.nFields() == 1 ) {
                         // was a simple { _id : ... } update criteria
@@ -867,6 +884,13 @@ namespace mongo {
         virtual void help( stringstream &help ) const {
             help << "internal (sharding)\n{ applyOps : [ ] , preCondition : [ { ns : ... , q : ... , res : ... } ] }";
         }
+        virtual void addRequiredPrivileges(const std::string& dbname,
+                                           const BSONObj& cmdObj,
+                                           std::vector<Privilege>* out) {
+            ActionSet actions;
+            actions.addAction(ActionType::applyOps);
+            out->push_back(Privilege(AuthorizationManager::SERVER_RESOURCE_NAME, actions));
+        }
         virtual bool run(const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
 
             if ( cmdObj.firstElement().type() != Array ) {
@@ -912,13 +936,15 @@ namespace mongo {
             
             BSONObjIterator i( ops );
             BSONArrayBuilder ab;
+            const bool alwaysUpsert = cmdObj.hasField("alwaysUpsert") ?
+                    cmdObj["alwaysUpsert"].trueValue() : true;
             
             while ( i.more() ) {
                 BSONElement e = i.next();
                 const BSONObj& temp = e.Obj();
                 
-                Client::Context ctx( temp["ns"].String() ); // this handles security
-                bool failed = applyOperation_inlock( temp , false );
+                Client::Context ctx(temp["ns"].String());
+                bool failed = applyOperation_inlock(temp, false, alwaysUpsert);
                 ab.append(!failed);
                 if ( failed )
                     errors++;
@@ -935,7 +961,19 @@ namespace mongo {
 
                 string tempNS = str::stream() << dbname << ".$cmd";
 
-                logOp( "c" , tempNS.c_str() , cmdObj.firstElement().wrap() );
+                // TODO: possibly use mutable BSON to remove preCondition field
+                // once it is available
+                BSONObjIterator iter(cmdObj);
+                BSONObjBuilder cmdBuilder;
+
+                while (iter.more()) {
+                    BSONElement elem(iter.next());
+                    if (strcmp(elem.fieldName(), "preCondition") != 0) {
+                        cmdBuilder.append(elem);
+                    }
+                }
+
+                logOp("c", tempNS.c_str(), cmdBuilder.done());
             }
 
             return errors == 0;

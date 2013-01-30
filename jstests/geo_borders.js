@@ -10,10 +10,10 @@ step = 1
 numItems = 0;
 
 for ( var x = min; x <= max; x += step ) {
-	for ( var y = min; y <= max; y += step ) {
-		t.insert( { loc : { x : x, y : y } } )
-		numItems++;
-	}
+    for ( var y = min; y <= max; y += step ) {
+        t.insert( { loc : { x : x, y : y } } )
+        numItems++;
+    }
 }
 
 overallMin = -1
@@ -33,38 +33,38 @@ assert.isnull( db.getLastError() )
 
 // If the bounds are bigger than the box itself, just clip at the borders
 assert.eq( numItems, t.find(
-		{ loc : { $within : { $box : [
-				[ overallMin - 2 * epsilon, overallMin - 2 * epsilon ],
-				[ overallMax + 2 * epsilon, overallMax + 2 * epsilon ] ] } } } ).count() );
+        { loc : { $within : { $box : [
+                [ overallMin - 2 * epsilon, overallMin - 2 * epsilon ],
+                [ overallMax + 2 * epsilon, overallMax + 2 * epsilon ] ] } } } ).count() );
 
 // Check this works also for bounds where only a single dimension is off-bounds
 assert.eq( numItems - 5, t.find(
-		{ loc : { $within : { $box : [
-				[ overallMin - 2 * epsilon, overallMin - 0.5 * epsilon ],
-				[ overallMax - epsilon, overallMax - epsilon ] ] } } } ).count() );
+        { loc : { $within : { $box : [
+                [ overallMin - 2 * epsilon, overallMin - 0.5 * epsilon ],
+                [ overallMax - epsilon, overallMax - epsilon ] ] } } } ).count() );
 
 // Make sure we can get at least close to the bounds of the index
 assert.eq( numItems, t.find(
-		{ loc : { $within : { $box : [
-				[ overallMin - epsilon / 2, overallMin - epsilon / 2 ],
-				[ overallMax + epsilon / 2, overallMax + epsilon / 2 ] ] } } } ).count() );
+        { loc : { $within : { $box : [
+                [ overallMin - epsilon / 2, overallMin - epsilon / 2 ],
+                [ overallMax + epsilon / 2, overallMax + epsilon / 2 ] ] } } } ).count() );
 
 // Make sure we can get at least close to the bounds of the index
 assert.eq( numItems, t.find(
-		{ loc : { $within : { $box : [
-				[ overallMax + epsilon / 2, overallMax + epsilon / 2 ],
-				[ overallMin - epsilon / 2, overallMin - epsilon / 2 ] ] } } } ).count() );
+        { loc : { $within : { $box : [
+                [ overallMax + epsilon / 2, overallMax + epsilon / 2 ],
+                [ overallMin - epsilon / 2, overallMin - epsilon / 2 ] ] } } } ).count() );
 
 // Check that swapping min/max has good behavior
 assert.eq( numItems, t.find(
-		{ loc : { $within : { $box : [
-				[ overallMax + epsilon / 2, overallMax + epsilon / 2 ],
-				[ overallMin - epsilon / 2, overallMin - epsilon / 2 ] ] } } } ).count() );
+        { loc : { $within : { $box : [
+                [ overallMax + epsilon / 2, overallMax + epsilon / 2 ],
+                [ overallMin - epsilon / 2, overallMin - epsilon / 2 ] ] } } } ).count() );
 
 assert.eq( numItems, t.find(
-		{ loc : { $within : { $box : [
-				[ overallMax + epsilon / 2, overallMin - epsilon / 2 ],
-				[ overallMin - epsilon / 2, overallMax + epsilon / 2 ] ] } } } ).count() );
+        { loc : { $within : { $box : [
+                [ overallMax + epsilon / 2, overallMin - epsilon / 2 ],
+                [ overallMin - epsilon / 2, overallMax + epsilon / 2 ] ] } } } ).count() );
 
 // **************
 // Circle tests
@@ -96,20 +96,20 @@ assert.eq( cornerPt.loc.y, overallMax )
 // Make sure we get correct corner point when center is on bounds
 // NOTE: Only valid points on MIN bounds
 cornerPt = t
-		.findOne( { loc : { $within : { $center : [ onBoundsNeg, Math.sqrt( 2 * epsilon * epsilon ) + ( step / 2 ) ] } } } );
+        .findOne( { loc : { $within : { $center : [ onBoundsNeg, Math.sqrt( 2 * epsilon * epsilon ) + ( step / 2 ) ] } } } );
 assert.eq( cornerPt.loc.y, overallMin )
 
 // Make sure we can't get corner point when center is over bounds
 try {
-	t.findOne( { loc : { $within : { $center : [ offBounds, Math.sqrt( 8 * epsilon * epsilon ) + ( step / 2 ) ] } } } );
-	assert( false )
+    t.findOne( { loc : { $within : { $center : [ offBounds, Math.sqrt( 8 * epsilon * epsilon ) + ( step / 2 ) ] } } } );
+    assert( false )
 } catch (e) {
 }
 
 // Make sure we can't get corner point when center is on max bounds
 try {
-	t.findOne( { loc : { $within : { $center : [ onBounds, Math.sqrt( 8 * epsilon * epsilon ) + ( step / 2 ) ] } } } );
-	assert( false )
+    t.findOne( { loc : { $within : { $center : [ onBounds, Math.sqrt( 8 * epsilon * epsilon ) + ( step / 2 ) ] } } } );
+    assert( false )
 } catch (e) {
 }
 
@@ -125,14 +125,14 @@ assert.eq( overallMin, t.find( { loc : { $near : onBoundsNeg } } ).next().loc.y 
 
 // Make sure we can't get all nearby points to point over boundary
 try {
-	t.findOne( { loc : { $near : offBounds } } )
-	assert( false )
+    t.findOne( { loc : { $near : offBounds } } )
+    assert( false )
 } catch (e) {
 }
 // Make sure we can't get all nearby points to point on max boundary
 try {
-	t.findOne( { loc : { $near : onBoundsNeg } } )
-	assert( false )
+    t.findOne( { loc : { $near : onBoundsNeg } } )
+    assert( false )
 } catch (e) {
 }
 
@@ -151,15 +151,15 @@ assert.eq( overallMin, db.runCommand( { geoNear : "borders", near : onBoundsNeg 
 
 // Make sure we can't get all nearby points to point over boundary
 try {
-	db.runCommand( { geoNear : "borders", near : offBounds } ).results.length
-	assert( false )
+    db.runCommand( { geoNear : "borders", near : offBounds } ).results.length
+    assert( false )
 } catch (e) {
 }
 
 // Make sure we can't get all nearby points to point on max boundary
 try {
-	db.runCommand( { geoNear : "borders", near : onBounds } ).results.length
-	assert( false )
+    db.runCommand( { geoNear : "borders", near : onBounds } ).results.length
+    assert( false )
 } catch (e) {
 }
 

@@ -1,5 +1,3 @@
-/** @file mongo/scripting/templateevaluator.cpp */
-
 /*
  *    Copyright (C) 2012 10gen Inc.
  *
@@ -34,6 +32,8 @@ namespace mongo {
     BsonTemplateEvaluator::BsonTemplateEvaluator() {
         initializeEvaluator();
     }
+
+    BsonTemplateEvaluator::~BsonTemplateEvaluator() { }
 
     void BsonTemplateEvaluator::addOperator(const std::string& name, const OperatorFn& op) {
         _operatorFunctions[name] = op;
@@ -78,7 +78,7 @@ namespace mongo {
        if (st != StatusSuccess)
            return st;
        return StatusSuccess;
-   }
+    }
 
     BsonTemplateEvaluator::Status BsonTemplateEvaluator::evalRandInt(BsonTemplateEvaluator* btl,
                                                                      const char* fieldName,

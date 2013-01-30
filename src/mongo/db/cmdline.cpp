@@ -16,37 +16,45 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "pch.h"
-#include "cmdline.h"
-#include "commands.h"
-#include "../util/password.h"
-#include "../util/processinfo.h"
-#include "../util/net/listen.h"
-#include "../bson/util/builder.h"
-#include "security_common.h"
+#include "mongo/pch.h"
+
+#include "mongo/db/cmdline.h"
+
+#include "mongo/base/status.h"
+#include "mongo/bson/util/builder.h"
+#include "mongo/db/server_parameters.h"
+#include "mongo/util/map_util.h"
 #include "mongo/util/mongoutils/str.h"
+#include "mongo/util/net/listen.h"
+#include "mongo/util/password.h"
+
 #ifdef _WIN32
 #include <direct.h>
-#else
-#include <sys/types.h>
-#include <sys/wait.h>
 #endif
-#include "globals.h"
 
 #define MAX_LINE_LENGTH 256
 
 #include <fstream>
-#include <boost/filesystem/operations.hpp>
 
 namespace po = boost::program_options;
-namespace fs = boost::filesystem;
 
 namespace mongo {
 
-    void setupSignals( bool inFork );
-    string getHostNameCached();
-    static BSONArray argvArray;
-    static BSONObj parsedOpts;
+    static bool _isPasswordArgument(char const* argumentName);
+    static bool _isPasswordSwitch(char const* switchName);
+
+namespace {
+    BSONArray argvArray;
+    BSONObj parsedOpts;
+}  // namespace
+
+    BSONArray CmdLine::getArgvArray() {
+        return argvArray;
+    }
+
+    BSONObj CmdLine::getParsedOpts() {
+        return parsedOpts;
+    }
 
     void CmdLine::addGlobalOptions( boost::program_options::options_description& general ,
                                     boost::program_options::options_description& hidden ,
@@ -71,11 +79,12 @@ namespace mongo {
         ("port", po::value<int>(&cmdLine.port), portInfoBuilder.str().c_str())
         ("bind_ip", po::value<string>(&cmdLine.bind_ip), "comma separated list of ip addresses to listen on - all local ips by default")
         ("maxConns",po::value<int>(), maxConnInfoBuilder.str().c_str())
-        ("objcheck", "inspect client data for validity on receipt")
         ("logpath", po::value<string>() , "log file to send write to instead of stdout - has to be a file, not directory" )
         ("logappend" , "append to logpath instead of over-writing" )
         ("pidfilepath", po::value<string>(), "full path to pidfile (if not set, no pidfile is created)")
         ("keyFile", po::value<string>(), "private key for cluster authentication")
+        ("setParameter", po::value< std::vector<std::string> >()->composing(),
+                "Set a configurable parameter")
 #ifndef _WIN32
         ("nounixsocket", "disable listening on unix sockets")
         ("unixSocketPrefix", po::value<string>(), "alternative directory for UNIX domain sockets (defaults to /tmp)")
@@ -90,9 +99,24 @@ namespace mongo {
         ("sslOnNormalPorts" , "use ssl on configured ports" )
         ("sslPEMKeyFile" , po::value<string>(&cmdLine.sslPEMKeyFile), "PEM file for ssl" )
         ("sslPEMKeyPassword" , new PasswordValue(&cmdLine.sslPEMKeyPassword) , "PEM file password" )
+        ("sslCAFile", po::value<std::string>(&cmdLine.sslCAFile), 
+         "Certificate Authority file for SSL")
+        ("sslCRLFile", po::value<std::string>(&cmdLine.sslCRLFile),
+         "Certificate Revocation List file for SSL")
+        ("sslWeakCertificateValidation", "allow client to connect without presenting a certificate")
 #endif
         ;
         
+        // Extra hidden options
+        hidden.add_options()
+        ("objcheck", "inspect client data for validity on receipt (DEFAULT)")
+        ("noobjcheck", "do NOT inspect client data for validity on receipt")
+        ("traceExceptions", "log stack traces for every exception")
+        ("enableExperimentalIndexStatsCmd", po::bool_switch(&cmdLine.experimental.indexStatsCmdEnabled),
+                "EXPERIMENTAL (UNSUPPORTED). Enable command computing aggregate statistics on indexes.")
+        ("enableExperimentalStorageDetailsCmd", po::bool_switch(&cmdLine.experimental.storageDetailsCmdEnabled),
+                "EXPERIMENTAL (UNSUPPORTED). Enable command computing aggregate statistics on storage.")
+        ;
     }
 
 #if defined(_WIN32)
@@ -137,38 +161,15 @@ namespace mongo {
         return;
     }
 
-#ifndef _WIN32
-    // support for exit value propagation with fork
-    void launchSignal( int sig ) {
-        if ( sig == SIGUSR2 ) {
-            pid_t cur = getpid();
-            
-            if ( cur == cmdLine.parentProc || cur == cmdLine.leaderProc ) {
-                // signal indicates successful start allowing us to exit
-                _exit(0);
-            } 
-        }
-    }
-
-    void setupLaunchSignals() {
-        verify( signal(SIGUSR2 , launchSignal ) != SIG_ERR );
-    }
-
-
-    void CmdLine::launchOk() {
-        if ( cmdLine.doFork ) {
-            // killing leader will propagate to parent
-            verify( kill( cmdLine.leaderProc, SIGUSR2 ) == 0 );
-        }
-    }
-#endif
-
-    bool CmdLine::store( int argc , char ** argv ,
+    bool CmdLine::store( const std::vector<std::string>& argv,
                          boost::program_options::options_description& visible,
                          boost::program_options::options_description& hidden,
                          boost::program_options::positional_options_description& positional,
                          boost::program_options::variables_map &params ) {
 
+
+        if (argv.empty())
+            return false;
 
         {
             // setup binary name
@@ -203,7 +204,8 @@ namespace mongo {
             all.add( visible );
             all.add( hidden );
 
-            po::store( po::command_line_parser(argc, argv)
+            po::store( po::command_line_parser(std::vector<std::string>(argv.begin() + 1,
+                                                                        argv.end()))
                        .options( all )
                        .positional( positional )
                        .style( style )
@@ -233,217 +235,16 @@ namespace mongo {
             return false;
         }
 
-        if (params.count("verbose")) {
-            logLevel = 1;
+        {
+            BSONArrayBuilder b;
+            std::vector<std::string> censoredArgv = argv;
+            censor(&censoredArgv);
+            for (size_t i=0; i < censoredArgv.size(); i++) {
+                b << censoredArgv[i];
+            }
+            argvArray = b.arr();
         }
 
-        for (string s = "vv"; s.length() <= 12; s.append("v")) {
-            if (params.count(s)) {
-                logLevel = s.length();
-            }
-        }
-
-        if (params.count("quiet")) {
-            cmdLine.quiet = true;
-        }
-
-        if ( params.count( "maxConns" ) ) {
-            int newSize = params["maxConns"].as<int>();
-            if ( newSize < 5 ) {
-                out() << "maxConns has to be at least 5" << endl;
-                ::_exit( EXIT_BADOPTIONS );
-            }
-            else if ( newSize >= 10000000 ) {
-                out() << "maxConns can't be greater than 10000000" << endl;
-                ::_exit( EXIT_BADOPTIONS );
-            }
-            connTicketHolder.resize( newSize );
-        }
-
-        if (params.count("objcheck")) {
-            cmdLine.objcheck = true;
-        }
-
-        if (params.count("bind_ip")) {
-            // passing in wildcard is the same as default behavior; remove and warn
-            if ( cmdLine.bind_ip ==  "0.0.0.0" ) {
-                cout << "warning: bind_ip of 0.0.0.0 is unnecessary; listens on all ips by default" << endl;
-                cmdLine.bind_ip = "";
-            }
-        }
-
-        string logpath;
-
-#ifndef _WIN32
-        if (params.count("unixSocketPrefix")) {
-            cmdLine.socket = params["unixSocketPrefix"].as<string>();
-            if (!fs::is_directory(cmdLine.socket)) {
-                cout << cmdLine.socket << " must be a directory" << endl;
-                ::_exit(-1);
-            }
-        }
-
-        if (params.count("nounixsocket")) {
-            cmdLine.noUnixSocket = true;
-        }
-
-        if (params.count("fork") && !params.count("shutdown")) {
-            cmdLine.doFork = true;
-            if ( ! params.count( "logpath" ) && ! params.count( "syslog" ) ) {
-                cout << "--fork has to be used with --logpath or --syslog" << endl;
-                ::_exit(EXIT_BADOPTIONS);
-            }
-
-            if ( params.count( "logpath" ) ) {
-                // test logpath
-                logpath = params["logpath"].as<string>();
-                verify( logpath.size() );
-                if ( logpath[0] != '/' ) {
-                    logpath = cmdLine.cwd + "/" + logpath;
-                }
-                bool exists = boost::filesystem::exists( logpath );
-                FILE * test = fopen( logpath.c_str() , "a" );
-                if ( ! test ) {
-                    cout << "can't open [" << logpath << "] for log file: " << errnoWithDescription() << endl;
-                    ::_exit(-1);
-                }
-                fclose( test );
-                // if we created a file, unlink it (to avoid confusing log rotation code)
-                if ( ! exists ) {
-                    unlink( logpath.c_str() );
-                }
-            }
-
-            cout.flush();
-            cerr.flush();
-            
-            cmdLine.parentProc = getpid();
-            
-            // facilitate clean exit when child starts successfully
-            setupLaunchSignals();
-
-            pid_t c = fork();
-            if ( c ) {
-                int pstat;
-                waitpid(c, &pstat, 0);
-
-                if ( WIFEXITED(pstat) ) {
-                    if ( ! WEXITSTATUS(pstat) ) {
-                        cout << "child process started successfully, parent exiting" << endl;
-                    }
-
-                    _exit( WEXITSTATUS(pstat) );
-                }
-
-                _exit(50);
-            }
-
-            if ( chdir("/") < 0 ) {
-                cout << "Cant chdir() while forking server process: " << strerror(errno) << endl;
-                ::_exit(-1);
-            }
-            setsid();
-            
-            cmdLine.leaderProc = getpid();
-
-            pid_t c2 = fork();
-            if ( c2 ) {
-                int pstat;
-                cout << "forked process: " << c2 << endl;
-                waitpid(c2, &pstat, 0);
-
-                if ( WIFEXITED(pstat) ) {
-                    _exit( WEXITSTATUS(pstat) );
-                }
-
-                _exit(51);
-            }
-
-            // stdout handled in initLogging
-            //fclose(stdout);
-            //freopen("/dev/null", "w", stdout);
-
-            fclose(stderr);
-            fclose(stdin);
-
-            FILE* f = freopen("/dev/null", "w", stderr);
-            if ( f == NULL ) {
-                cout << "Cant reassign stderr while forking server process: " << strerror(errno) << endl;
-                ::_exit(-1);
-            }
-
-            f = freopen("/dev/null", "r", stdin);
-            if ( f == NULL ) {
-                cout << "Cant reassign stdin while forking server process: " << strerror(errno) << endl;
-                ::_exit(-1);
-            }
-
-            setupCoreSignals();
-            setupSignals( true );
-        }
-        
-        if (params.count("syslog")) {
-            StringBuilder sb;
-            sb << cmdLine.binaryName << "." << cmdLine.port;
-            Logstream::useSyslog( sb.str().c_str() );
-        }
-#endif
-        if (params.count("logpath") && !params.count("shutdown")) {
-            if ( params.count("syslog") ) {
-                cout << "Cant use both a logpath and syslog " << endl;
-                ::_exit(EXIT_BADOPTIONS);
-            }
-            
-            if ( logpath.size() == 0 )
-                logpath = params["logpath"].as<string>();
-            uassert( 10033 ,  "logpath has to be non-zero" , logpath.size() );
-            initLogging( logpath , params.count( "logappend" ) );
-        }
-
-        if ( params.count("pidfilepath")) {
-            writePidFile( params["pidfilepath"].as<string>() );
-        }
-
-        if (params.count("keyFile")) {
-            const string f = params["keyFile"].as<string>();
-
-            if (!setUpSecurityKey(f)) {
-                // error message printed in setUpPrivateKey
-                ::_exit(EXIT_BADOPTIONS);
-            }
-
-            cmdLine.keyFile = true;
-            noauth = false;
-        }
-        else {
-            cmdLine.keyFile = false;
-        }
-
-#ifdef MONGO_SSL
-        if (params.count("sslOnNormalPorts") ) {
-            cmdLine.sslOnNormalPorts = true;
-
-            if ( cmdLine.sslPEMKeyPassword.size() == 0 ) {
-                log() << "need sslPEMKeyPassword" << endl;
-                ::_exit(EXIT_BADOPTIONS);
-            }
-            
-            if ( cmdLine.sslPEMKeyFile.size() == 0 ) {
-                log() << "need sslPEMKeyFile" << endl;
-                ::_exit(EXIT_BADOPTIONS);
-            }
-            
-            cmdLine.sslServerManager = new SSLManager( false );
-            if ( ! cmdLine.sslServerManager->setupPEM( cmdLine.sslPEMKeyFile , cmdLine.sslPEMKeyPassword ) ) {
-                ::_exit(EXIT_BADOPTIONS);
-            }
-        }
-        else if ( cmdLine.sslPEMKeyFile.size() || cmdLine.sslPEMKeyPassword.size() ) {
-            log() << "need to enable sslOnNormalPorts" << endl;
-            ::_exit(EXIT_BADOPTIONS);
-        }
-#endif
-        
         {
             BSONObjBuilder b;
             for (po::variables_map::const_iterator it(params.begin()), end(params.end()); it != end; it++){
@@ -456,7 +257,7 @@ namespace mongo {
                         if (value.as<string>().empty())
                             b.appendBool(key, true); // boost po uses empty string for flags like --quiet
                         else {
-                            if ( key == "servicePassword" || key == "sslPEMKeyPassword" ) {
+                            if ( _isPasswordArgument(key.c_str()) ) {
                                 b.append( key, "<password>" );
                             }
                             else {
@@ -485,84 +286,233 @@ namespace mongo {
             parsedOpts = b.obj();
         }
 
-        {
-            BSONArrayBuilder b;
-            for (int i=0; i < argc; i++) {
-                b << argv[i];
-                if ( mongoutils::str::equals(argv[i], "--sslPEMKeyPassword")
-                     || mongoutils::str::equals(argv[i], "-sslPEMKeyPassword")
-                     || mongoutils::str::equals(argv[i], "--servicePassword")
-                     || mongoutils::str::equals(argv[i], "-servicePassword")) {
-                    b << "<password>";
-                    i++;
-
-                    // hide password from ps output
-                    char* arg = argv[i];
-                    while (*arg) {
-                        *arg++ = 'x';
-                    }
-                }
-            }
-            argvArray = b.arr();
+        if (params.count("verbose")) {
+            logLevel = 1;
         }
 
+        for (string s = "vv"; s.length() <= 12; s.append("v")) {
+            if (params.count(s)) {
+                logLevel = s.length();
+            }
+        }
+
+        if (params.count("quiet")) {
+            cmdLine.quiet = true;
+        }
+
+        if (params.count("traceExceptions")) {
+            DBException::traceExceptions = true;
+        }
+
+        if (params.count("maxConns")) {
+            cmdLine.maxConns = params["maxConns"].as<int>();
+
+            if ( cmdLine.maxConns < 5 ) {
+                out() << "maxConns has to be at least 5" << endl;
+                return false;
+            }
+            else if ( cmdLine.maxConns > MAX_MAX_CONN ) {
+                out() << "maxConns can't be greater than " << MAX_MAX_CONN << endl;
+                return false;
+            }
+        }
+
+        if (params.count("objcheck")) {
+            cmdLine.objcheck = true;
+        }
+        if (params.count("noobjcheck")) {
+            if (params.count("objcheck")) {
+                out() << "can't have both --objcheck and --noobjcheck" << endl;
+                return false;
+            }
+            cmdLine.objcheck = false;
+        }
+
+        if (params.count("bind_ip")) {
+            // passing in wildcard is the same as default behavior; remove and warn
+            if ( cmdLine.bind_ip ==  "0.0.0.0" ) {
+                cout << "warning: bind_ip of 0.0.0.0 is unnecessary; listens on all ips by default" << endl;
+                cmdLine.bind_ip = "";
+            }
+        }
+
+#ifndef _WIN32
+        if (params.count("unixSocketPrefix")) {
+            cmdLine.socket = params["unixSocketPrefix"].as<string>();
+        }
+
+        if (params.count("nounixsocket")) {
+            cmdLine.noUnixSocket = true;
+        }
+
+        if (params.count("fork") && !params.count("shutdown")) {
+            cmdLine.doFork = true;
+        }
+#endif  // _WIN32
+
+        if (params.count("logpath")) {
+            cmdLine.logpath = params["logpath"].as<string>();
+            if (cmdLine.logpath.empty()) {
+                cout << "logpath cannot be empty if supplied" << endl;
+                return false;
+            }
+        }
+
+        cmdLine.logWithSyslog = params.count("syslog");
+        cmdLine.logAppend = params.count("logappend");
+        if (!cmdLine.logpath.empty() && cmdLine.logWithSyslog) {
+            cout << "Cant use both a logpath and syslog " << endl;
+            return false;
+        }
+
+        if (cmdLine.doFork && cmdLine.logpath.empty() && !cmdLine.logWithSyslog) {
+            cout << "--fork has to be used with --logpath or --syslog" << endl;
+            return false;
+        }
+
+        if (params.count("keyFile")) {
+            cmdLine.keyFile = params["keyFile"].as<string>();
+        }
+
+        if ( params.count("pidfilepath")) {
+            cmdLine.pidFile = params["pidfilepath"].as<string>();
+        }
+
+        if (params.count("setParameter")) {
+            std::vector<std::string> parameters =
+                params["setParameter"].as<std::vector<std::string> >();
+            for (size_t i = 0, length = parameters.size(); i < length; ++i) {
+                std::string name;
+                std::string value;
+                if (!mongoutils::str::splitOn(parameters[i], '=', name, value)) {
+                    cout << "Illegal option assignment: \"" << parameters[i] << "\"" << endl;
+                    return false;
+                }
+                ServerParameter* parameter = mapFindWithDefault(
+                        ServerParameterSet::getGlobal()->getMap(),
+                        name,
+                        static_cast<ServerParameter*>(NULL));
+                if (NULL == parameter) {
+                    cout << "Illegal --option parameter: \"" << name << "\"" << endl;
+                    return false;
+                }
+                Status status = parameter->setFromString(value);
+                if (!status.isOK()) {
+                    cout << "Bad value for parameter \"" << name << "\": " << status.reason()
+                         << endl;
+                    return false;
+                }
+            }
+        }
+
+#ifdef MONGO_SSL
+        if (params.count("sslWeakCertificateValidation")) {
+            cmdLine.sslWeakCertificateValidation = true;
+        }
+        if (params.count("sslOnNormalPorts")) {
+            cmdLine.sslOnNormalPorts = true;
+            if ( cmdLine.sslPEMKeyFile.size() == 0 ) {
+                log() << "need sslPEMKeyFile" << endl;
+                return false;
+            }
+            if (cmdLine.sslWeakCertificateValidation &&
+                cmdLine.sslCAFile.empty()) {
+                log() << "need sslCAFile with sslWeakCertificateValidation" << endl;
+                return false;
+            }
+        }
+        else if (cmdLine.sslPEMKeyFile.size() || 
+                 cmdLine.sslPEMKeyPassword.size() ||
+                 cmdLine.sslCAFile.size() ||
+                 cmdLine.sslCRLFile.size() ||
+                 cmdLine.sslWeakCertificateValidation) {
+            log() << "need to enable sslOnNormalPorts" << endl;
+            return false;
+        }
+#endif
+
         return true;
+    }
+
+    static bool _isPasswordArgument(const char* argumentName) {
+        static const char* const passwordArguments[] = {
+            "sslPEMKeyPassword",
+            "servicePassword",
+            NULL  // Last entry sentinel.
+        };
+        for (const char* const* current = passwordArguments; *current; ++current) {
+            if (mongoutils::str::equals(argumentName, *current))
+                return true;
+        }
+        return false;
+    }
+
+    static bool _isPasswordSwitch(const char* switchName) {
+        if (switchName[0] != '-')
+            return false;
+        size_t i = 1;
+        if (switchName[1] == '-')
+            i = 2;
+        switchName += i;
+
+        return _isPasswordArgument(switchName);
+    }
+
+    static void _redact(char* arg) {
+        for (; *arg; ++arg)
+            *arg = 'x';
+    }
+
+    void CmdLine::censor(std::vector<std::string>* args) {
+        for (size_t i = 0; i < args->size(); ++i) {
+            std::string& arg = args->at(i);
+            const std::string::iterator endSwitch = std::find(arg.begin(), arg.end(), '=');
+            std::string switchName(arg.begin(), endSwitch);
+            if (_isPasswordSwitch(switchName.c_str())) {
+                if (endSwitch == arg.end()) {
+                    if (i + 1 < args->size()) {
+                        args->at(i + 1) = "<password>";
+                    }
+                }
+                else {
+                    arg = switchName + "=<password>";
+                }
+            }
+        }
+    }
+
+    void CmdLine::censor(int argc, char** argv) {
+        // Algorithm:  For each arg in argv:
+        //   Look for an equal sign in arg; if there is one, temporarily nul it out.
+        //   check to see if arg is a password switch.  If so, overwrite the value
+        //     component with xs.
+        //   restore the nul'd out equal sign, if any.
+        for (int i = 0; i < argc; ++i) {
+
+            char* const arg = argv[i];
+            char* const firstEqSign = strchr(arg, '=');
+            if (NULL != firstEqSign) {
+                *firstEqSign = '\0';
+            }
+
+            if (_isPasswordSwitch(arg)) {
+                if (NULL == firstEqSign) {
+                    if (i + 1 < argc) {
+                        _redact(argv[i + 1]);
+                    }
+                }
+                else {
+                    _redact(firstEqSign + 1);
+                }
+            }
+
+            if (NULL != firstEqSign) {
+                *firstEqSign = '=';
+            }
+        }
     }
 
     void printCommandLineOpts() {
         log() << "options: " << parsedOpts << endl;
     }
-
-    void ignoreSignal( int sig ) {}
-
-    static void rotateLogsOrDie(int sig) {
-        fassert(16176, rotateLogs());
-    }
-
-    void setupCoreSignals() {
-#if !defined(_WIN32)
-        verify( signal(SIGUSR1 , rotateLogsOrDie ) != SIG_ERR );
-        verify( signal(SIGHUP , ignoreSignal ) != SIG_ERR );
-#endif
-    }
-
-    class CmdGetCmdLineOpts : Command {
-    public:
-        CmdGetCmdLineOpts(): Command("getCmdLineOpts") {}
-        void help(stringstream& h) const { h << "get argv"; }
-        virtual LockType locktype() const { return NONE; }
-        virtual bool adminOnly() const { return true; }
-        virtual bool slaveOk() const { return true; }
-
-        virtual bool run(const string&, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-            result.append("argv", argvArray);
-            result.append("parsed", parsedOpts);
-            return true;
-        }
-
-    } cmdGetCmdLineOpts;
-
-    string prettyHostName() {
-        StringBuilder s;
-        s << getHostNameCached();
-        if( cmdLine.port != CmdLine::DefaultDBPort )
-            s << ':' << mongo::cmdLine.port;
-        return s.str();
-    }
-
-    casi< map<string,ParameterValidator*> * > pv_all (NULL);
-
-    ParameterValidator::ParameterValidator( const string& name ) : _name( name ) {
-        if ( ! pv_all)
-            pv_all.ref() = new map<string,ParameterValidator*>();
-        (*pv_all.ref())[_name] = this;
-    }
-    
-    ParameterValidator * ParameterValidator::get( const string& name ) {
-        map<string,ParameterValidator*>::const_iterator i = pv_all.get()->find( name );
-        if ( i == pv_all.get()->end() )
-            return NULL;
-        return i->second;
-    }
-
 }

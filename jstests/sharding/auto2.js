@@ -41,10 +41,15 @@ function doCountsGlobal(){
     return counta + countb;
 }
 
-doCountsGlobal()
+// Wait for the chunks to distribute
+assert.soon( function(){
+    doCountsGlobal()
 
-assert( counta > 0 , "diff1" );
-assert( countb > 0 , "diff2" );
+    print( "Counts: " + counta + countb)
+    
+    return counta > 0 && countb > 0
+})
+
 
 print( "checkpoint B" )
 

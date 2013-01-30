@@ -18,11 +18,10 @@
 
 #pragma once
 
-#include "../pch.h"
+#include "mongo/pch.h"
 #include "../util/net/message.h"
 #include "../db/dbmessage.h"
 #include "config.h"
-#include "util.h"
 
 namespace mongo {
 
@@ -69,11 +68,6 @@ namespace mongo {
         ClientInfo * getClientInfo() const {
             return _clientInfo;
         }
-
-        /**
-         * @param ns - 0=use ns from message
-         */
-        void checkAuth( Auth::Level levelNeeded , const char * ns=0 ) const;
 
         // ---- remote location info -----
 

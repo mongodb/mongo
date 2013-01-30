@@ -18,7 +18,7 @@
 #include "pch.h"
 #include "mongo/util/assert_util.h"
 #include "../db/cmdline.h"
-#include "../db/client_common.h"
+#include "../db/client_basic.h"
 #include "../s/shard.h"
 #include "../util/timer.h"
 #include "clientOnly-private.h"
@@ -79,12 +79,11 @@ namespace mongo {
         return false;
     }
 
-    string prettyHostName() {
-        verify(0);
-        return "";
-    }
-
     ClientBasic* ClientBasic::getCurrent() {
         return 0;
+    }
+
+    bool ClientBasic::hasCurrent() {
+        return false;
     }
 }

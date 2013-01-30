@@ -20,6 +20,7 @@
  */
 
 #include <iostream>
+#include <cstdlib>
 
 #include "mongo/client/dbclient.h"
 
@@ -30,6 +31,11 @@ void insert( mongo::DBClientConnection & conn , const char * name , int num ) {
     obj.append( "name" , name );
     obj.append( "num" , num );
     conn.insert( "test.people" , obj.obj() );
+    std::string e = conn.getLastError();
+    if( !e.empty() ) {
+        cout << "insert failed: " << e << endl;
+        exit(EXIT_FAILURE);
+    }
 }
 
 int main( int argc, const char **argv ) {
@@ -62,6 +68,11 @@ int main( int argc, const char **argv ) {
     {
         mongo::BSONObjBuilder query;
         auto_ptr<mongo::DBClientCursor> cursor = conn.query( "test.people" , query.obj() );
+        if (!cursor.get()) {
+            cout << "query failure" << endl;
+            return EXIT_FAILURE;
+        }
+
         cout << "using cursor" << endl;
         while ( cursor->more() ) {
             mongo::BSONObj obj = cursor->next();

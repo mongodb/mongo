@@ -57,7 +57,7 @@ namespace mongo {
 
 namespace mongo {
 
-    LogFile::LogFile(string name, bool readwrite) : _name(name) {
+    LogFile::LogFile(const std::string& name, bool readwrite) : _name(name) {
         _fd = CreateFile(
                   toNativeString(name.c_str()).c_str(),
                   (readwrite?GENERIC_READ:0)|GENERIC_WRITE,
@@ -147,7 +147,7 @@ namespace mongo {
 
 namespace mongo {
 
-    LogFile::LogFile(string name, bool readwrite) : _name(name) {
+    LogFile::LogFile(const std::string& name, bool readwrite) : _name(name) {
         int options = O_CREAT
                     | (readwrite?O_RDWR:O_WRONLY)
 #if defined(O_DIRECT)

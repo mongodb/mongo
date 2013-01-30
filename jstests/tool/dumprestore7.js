@@ -43,7 +43,9 @@ var master = replTest.getMaster();
 step("try mongodump with $timestamp");
 
 var data = "/data/db/dumprestore7-dump1/";
-var query = "{\"ts\":{\"$gt\":{\"$timestamp\" : {\"t\":"+ time.ts.t + ",\"i\":" + time.ts.i +" }}}}";
+// We need to divide by 1000 here because the JSON parser interprets the first field of timestamps
+// as seconds while the shell interprets them as milliseconds.  See SERVER-7718.
+var query = "{\"ts\":{\"$gt\":{\"$timestamp\" : {\"t\":"+ time.ts.t / 1000 + ",\"i\":" + time.ts.i +" }}}}";
 
 runMongoProgram( "mongodump", "--host", "127.0.0.1:"+replTest.ports[0], "--db", "local", "--collection", "oplog.rs", "--query", query, "--out", data );
 

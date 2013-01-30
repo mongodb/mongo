@@ -17,10 +17,12 @@
 
 #pragma once
 
-#include "pch.h"
+#include "mongo/pch.h"
 
 #include <limits>
 #include <queue>
+
+#include <boost/thread/condition.hpp>
 
 #include "mongo/util/timer.h"
 
@@ -32,9 +34,9 @@ namespace mongo {
     }
 
     /**
-     * Simple blocking queue with optional max size.
-     * A custom sizing function can optionally be given.  By default, size is calculated as
-     * _queue.size().
+     * Simple blocking queue with optional max size (by count or custom sizing function).
+     * A custom sizing function can optionally be given.  By default the getSize function
+     * returns 1 for each item, resulting in size equaling the number of items queued.
      */
     template<typename T>
     class BlockingQueue : boost::noncopyable {
@@ -59,7 +61,7 @@ namespace mongo {
         void push(T const& t) {
             scoped_lock l( _lock );
             size_t tSize = _getSize(t);
-            while (_queue.size()+tSize >= _maxSize) {
+            while (_currentSize + tSize >= _maxSize) {
                 _cvNoLongerFull.wait( l.boost() );
             }
             _queue.push( t );
@@ -72,9 +74,27 @@ namespace mongo {
             return _queue.empty();
         }
 
+        /**
+         * The size as measured by the size function. Default to counting each item
+         */
         size_t size() const {
             scoped_lock l( _lock );
             return _currentSize;
+        }
+
+        /**
+         * The max size for this queue
+         */
+        size_t maxSize() const {
+            return _maxSize;
+        }
+
+        /**
+         * The number/count of items in the queue ( _queue.size() )
+         */
+        int count() const {
+            scoped_lock l( _lock );
+            return _queue.size();
         }
 
         void clear() {

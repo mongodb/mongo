@@ -51,7 +51,10 @@ namespace mongo {
          */
         SyncClusterConnection( const list<HostAndPort> &, double socketTimeout = 0);
         SyncClusterConnection( string commaSeparated, double socketTimeout = 0);
-        SyncClusterConnection( string a , string b , string c, double socketTimeout = 0 );
+        SyncClusterConnection( const std::string& a,
+                               const std::string& b,
+                               const std::string& c,
+                               double socketTimeout = 0 );
         ~SyncClusterConnection();
 
         /**
@@ -91,6 +94,11 @@ namespace mongo {
         virtual bool isFailed() const { return false; }
         virtual string toString() { return _toString(); }
 
+        virtual BSONObj getLastErrorDetailed(const std::string& db,
+                                             bool fsync=false,
+                                             bool j=false,
+                                             int w=0,
+                                             int wtimeout=0);
         virtual BSONObj getLastErrorDetailed(bool fsync=false, bool j=false, int w=0, int wtimeout=0);
 
         virtual bool callRead( Message& toSend , Message& response );
@@ -102,9 +110,6 @@ namespace mongo {
 
         virtual bool auth(const string &dbname, const string &username, const string &password_text, string& errmsg, bool digestPassword, Auth::Level* level=NULL);
 
-        virtual void setAuthenticationTable( const AuthenticationTable& auth );
-        virtual void clearAuthenticationTable();
-
         virtual bool lazySupported() const { return false; }
     private:
         SyncClusterConnection( SyncClusterConnection& prev, double socketTimeout = 0 );
@@ -114,7 +119,7 @@ namespace mongo {
                                                 const BSONObj *fieldsToReturn, int queryOptions, int batchSize );
         int _lockType( const string& name );
         void _checkLast();
-        void _connect( string host );
+        void _connect( const std::string& host );
 
         string _address;
         vector<string> _connAddresses;

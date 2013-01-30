@@ -1,4 +1,21 @@
-/* @file client_lib.cpp
+/* @file client_lib.cpp */
+
+/*    Copyright 2009 10gen Inc.
+ *
+ *    Licensed under the Apache License, Version 2.0 (the "License");
+ *    you may not use this file except in compliance with the License.
+ *    You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *    Unless required by applicable law or agreed to in writing, software
+ *    distributed under the License is distributed on an "AS IS" BASIS,
+ *    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *    See the License for the specific language governing permissions and
+ *    limitations under the License.
+ */
+
+/*
 
    MongoDB C++ Driver
 
@@ -22,21 +39,6 @@
    - Include the boost libraries directory.
    - Linker.Input.Additional Dependencies - add ws2_32.lib for the Winsock library.
 */
-
-/*    Copyright 2009 10gen Inc.
- *
- *    Licensed under the Apache License, Version 2.0 (the "License");
- *    you may not use this file except in compliance with the License.
- *    You may obtain a copy of the License at
- *
- *    http://www.apache.org/licenses/LICENSE-2.0
- *
- *    Unless required by applicable law or agreed to in writing, software
- *    distributed under the License is distributed on an "AS IS" BASIS,
- *    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *    See the License for the specific language governing permissions and
- *    limitations under the License.
- */
 
 #if defined(_WIN32)
 // C4800 forcing value to bool 'true' or 'false' (performance warning)
@@ -77,7 +79,6 @@
 #include "../db/lasterror.cpp"
 #include "../db/json.cpp"
 #include "../db/jsobj.cpp"
-#include "../db/nonce.cpp"
 #include "../db/dbmessage.cpp"
 
 #include "../pch.cpp"

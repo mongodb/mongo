@@ -24,17 +24,16 @@
 
 #pragma once
 
-#include "../pch.h"
-#include "security.h"
-#include "namespace-inl.h"
-#include "lasterror.h"
-#include "stats/top.h"
-#include "../db/client_common.h"
-#include "../util/concurrency/threadlocal.h"
-#include "../util/net/message_port.h"
-#include "../util/concurrency/rwlock.h"
-#include "d_concurrency.h"
+#include "mongo/pch.h"
+
+#include "mongo/db/client_basic.h"
+#include "mongo/db/d_concurrency.h"
+#include "mongo/db/lasterror.h"
 #include "mongo/db/lockstate.h"
+#include "mongo/db/namespace-inl.h"
+#include "mongo/db/stats/top.h"
+#include "mongo/util/concurrency/rwlock.h"
+#include "mongo/util/concurrency/threadlocal.h"
 #include "mongo/util/paths.h"
 
 namespace mongo {
@@ -55,7 +54,6 @@ namespace mongo {
 
     /** the database's concept of an outside "client" */
     class Client : public ClientBasic {
-        static Client *syncThread;
     public:
         // always be in clientsMutex when manipulating this. killop stuff uses these.
         static set<Client*>& clients;
@@ -63,8 +61,8 @@ namespace mongo {
         static int getActiveClientCount( int& writers , int& readers );
         class Context;
         ~Client();
-        static int recommendedYieldMicros( int * writers = 0 , int * readers = 0 );
-
+        static int recommendedYieldMicros( int * writers = 0 , int * readers = 0,
+                                           bool needExact = false );
         /** each thread which does db operations has a Client object in TLS.
          *  call this when your thread starts.
         */
@@ -81,23 +79,12 @@ namespace mongo {
          */
         bool shutdown();
 
-        /** set so isSyncThread() works */
-        void iAmSyncThread() {
-            wassert( syncThread == 0 );
-            syncThread = this;
-        }
-        /** @return true if this client is the replication secondary pull thread.  not used much, is used in create index sync code. */
-        bool isSyncThread() const { return this == syncThread; }
-
         string clientAddress(bool includePort=false) const;
-        const AuthenticationInfo * getAuthenticationInfo() const { return &_ai; }
-        AuthenticationInfo * getAuthenticationInfo() { return &_ai; }
-        bool isAdmin() { return _ai.isAuthorized( "admin" ); }
         CurOp* curop() const { return _curOp; }
         Context* getContext() const { return _context; }
         Database* database() const {  return _context ? _context->db() : 0; }
         const char *ns() const { return _context->ns(); }
-        const std::string desc() const { return _desc; }
+        const StringData desc() const { return _desc; }
         void setLastOp( OpTime op ) { _lastOp = op; }
         OpTime getLastOp() const { return _lastOp; }
 
@@ -110,11 +97,8 @@ namespace mongo {
         bool isGod() const { return _god; } /* this is for map/reduce writes */
         string toString() const;
         void gotHandshake( const BSONObj& o );
-        bool hasRemote() const { return _mp; }
-        HostAndPort getRemote() const { verify( _mp ); return _mp->remote(); }
         BSONObj getRemoteID() const { return _remoteId; }
         BSONObj getHandshake() const { return _handshake; }
-        AbstractMessagingPort * port() const { return _mp; }
         ConnectionId getConnectionId() const { return _connectionId; }
 
         bool inPageFaultRetryableSection() const { return _pageFaultRetryableSection != 0; }
@@ -138,11 +122,9 @@ namespace mongo {
         bool _shutdown; // to track if Client::shutdown() gets called
         std::string _desc;
         bool _god;
-        AuthenticationInfo _ai;
         OpTime _lastOp;
         BSONObj _handshake;
         BSONObj _remoteId;
-        AbstractMessagingPort * const _mp;
 
         bool _hasWrittenThisPass;
         PageFaultRetryableSection *_pageFaultRetryableSection;
@@ -168,7 +150,7 @@ namespace mongo {
          */
         class ReadContext : boost::noncopyable { 
         public:
-            ReadContext(const string& ns, string path=dbpath, bool doauth=true );
+            ReadContext(const std::string& ns, const std::string& path=dbpath);
             Context& ctx() { return *c.get(); }
         private:
             scoped_ptr<Lock::DBRead> lk;
@@ -181,16 +163,16 @@ namespace mongo {
         class Context : boost::noncopyable {
         public:
             /** this is probably what you want */
-            Context(const string& ns, string path=dbpath, bool doauth=true, bool doVersion=true );
+            Context(const string& ns, const std::string& path=dbpath, bool doVersion=true);
 
             /** note: this does not call finishInit -- i.e., does not call 
                       shardVersionOk() for example. 
                 see also: reset().
             */
-            Context( string ns , Database * db, bool doauth=true );
+            Context(const std::string& ns , Database * db);
 
             // used by ReadContext
-            Context(const string& path, const string& ns, Database *db, bool doauth);
+            Context(const string& path, const string& ns, Database *db);
 
             ~Context();
             Client* getClient() const { return _client; }
@@ -219,8 +201,7 @@ namespace mongo {
 
         private:
             friend class CurOp;
-            void _finishInit( bool doauth=true);
-            void _auth( int lockState );
+            void _finishInit();
             void checkNotStale() const;
             void checkNsAccess( bool doauth );
             void checkNsAccess( bool doauth, int lockState );
@@ -237,7 +218,7 @@ namespace mongo {
 
         class WriteContext : boost::noncopyable {
         public:
-            WriteContext(const string& ns, string path=dbpath, bool doauth=true );
+            WriteContext(const string& ns, const std::string& path=dbpath);
             Context& ctx() { return _c; }
         private:
             Lock::DBWrite _lk;

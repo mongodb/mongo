@@ -17,7 +17,7 @@
 
 #pragma once
 
-#include "pch.h"
+#include "mongo/pch.h"
 
 #include <boost/function.hpp>
 #include <boost/shared_ptr.hpp>
@@ -38,12 +38,11 @@ namespace mongo {
      * manages state about a replica set for client
      * keeps tabs on whose master and what slaves are up
      * can hand a slave to someone for SLAVE_OK
-     * one instace per process per replica set
+     * one instance per process per replica set
      * TODO: we might be able to use a regular Node * to avoid _lock
      */
     class ReplicaSetMonitor {
     public:
-
         typedef boost::function1<void,const ReplicaSetMonitor*> ConfigChangeHook;
 
         /**
@@ -99,6 +98,11 @@ namespace mongo {
             }
 
             /**
+             * Checks whether this nodes is compatible with the given readPreference and
+             * tag. Compatibility check is strict in the sense that secondary preferred
+             * is treated like secondary only and primary preferred is treated like
+             * primary only.
+             *
              * @return true if this node is compatible with the read preference and tags.
              */
             bool isCompatible(ReadPreference readPreference, const TagSet* tag) const;
@@ -128,6 +132,8 @@ namespace mongo {
 
         };
 
+        static const double SOCKET_TIMEOUT_SECS;
+
         /**
          * Selects the right node given the nodes to pick from and the preference.
          *
@@ -142,8 +148,8 @@ namespace mongo {
          *     robin, starting from the node next to this lastHost. This will be overwritten
          *     with the newly chosen host if not empty, not primary and when preference
          *     is not Nearest.
-         * @param tryRefreshing an out parameter for notifying the caller that it needs
-         *     to refresh the view of the nodes.
+         * @param isPrimarySelected out parameter that is set to true if the returned host
+         *     is a primary. Cannot be NULL and valid only if returned host is not empty.
          *
          * @return the host object of the node selected. If none of the nodes are
          *     eligible, returns an empty host.
@@ -153,7 +159,7 @@ namespace mongo {
                                       TagSet* tags,
                                       int localThresholdMillis,
                                       HostAndPort* lastHost,
-                                      bool* tryRefreshing);
+                                      bool* isPrimarySelected);
 
         /**
          * Selects the right node given the nodes to pick from and the preference. This
@@ -161,14 +167,17 @@ namespace mongo {
          * if the primary node needs to be returned but is not currently available (except
          * for ReadPrefrence_Nearest).
          *
-         * @param preference the read mode to use
-         * @param tags the tags used for filtering nodes
+         * @param preference the read mode to use.
+         * @param tags the tags used for filtering nodes.
+         * @param isPrimarySelected out parameter that is set to true if the returned host
+         *     is a primary. Cannot be NULL and valid only if returned host is not empty.
          *
          * @return the host object of the node selected. If none of the nodes are
          *     eligible, returns an empty host.
          */
         HostAndPort selectAndCheckNode(ReadPreference preference,
-                                       TagSet* tags);
+                                       TagSet* tags,
+                                       bool* isPrimarySelected);
 
         /**
          * Creates a new ReplicaSetMonitor, if it doesn't already exist.
@@ -182,6 +191,10 @@ namespace mongo {
          */
         static ReplicaSetMonitorPtr get( const string& name, const bool createFromSeed = false );
 
+        /**
+         * Populates activeSets with all the currently tracked replica set names.
+         */
+        static void getAllTrackedSets(set<string>* activeSets);
 
         /**
          * checks all sets for current master and new secondaries
@@ -259,6 +272,14 @@ namespace mongo {
          */
         bool isHostCompatible(const HostAndPort& host, ReadPreference readPreference,
                 const TagSet* tagSet) const;
+
+        /**
+         * Performs a quick check if at least one node is up based on the cached
+         * view of the set.
+         *
+         * @return true if any node is ok
+         */
+        bool isAnyNodeOk() const;
 
     private:
         /**
@@ -403,10 +424,10 @@ namespace mongo {
         DBClientReplicaSet( const string& name , const vector<HostAndPort>& servers, double so_timeout=0 );
         virtual ~DBClientReplicaSet();
 
-        /** Returns false if nomember of the set were reachable, or neither is
-         * master, although,
-         * when false returned, you can still try to use this connection object, it will
-         * try reconnects.
+        /**
+         * Returns false if no member of the set were reachable. This object
+         * can still be used even when false was returned as it will try to
+         * reconnect when you use it later.
          */
         bool connect();
 
@@ -446,6 +467,12 @@ namespace mongo {
 
         // ---- access raw connections ----
 
+        /**
+         * WARNING: this method is very dangerous - this object can decide to free the
+         *     returned master connection any time.
+         *
+         * @return the reference to the address that points to the master connection.
+         */
         DBClientConnection& masterConn();
         DBClientConnection& slaveConn();
 
@@ -507,7 +534,10 @@ namespace mongo {
          * @param tags pointer to the list of tags.
          *
          * @return a pointer to the new connection object if it can find a good connection.
-         *      Otherwise it returns NULL.
+         *     Otherwise it returns NULL.
+         *
+         * @throws DBException when an error occurred either when trying to connect to
+         *     a node that was thought to be ok or when an assertion happened.
          */
         DBClientConnection* selectNodeUsingTags(ReadPreference preference,
                                                 TagSet* tags);
@@ -517,6 +547,11 @@ namespace mongo {
          * set and can be used for the given read preference.
          */
         bool checkLastHost( ReadPreference preference, const TagSet* tags );
+
+        /**
+         * Destroys all cached information about the last slaveOk operation.
+         */
+        void invalidateLastSlaveOkCache();
 
         void _auth( DBClientConnection * conn );
 
@@ -532,12 +567,18 @@ namespace mongo {
         string _setName;
 
         HostAndPort _masterHost;
-        scoped_ptr<DBClientConnection> _master;
+        // Note: reason why this is a shared_ptr is because we want _lastSlaveOkConn to
+        // keep a reference of the _master connection when it selected a primary node.
+        // This is because the primary connection is special in mongos - it is the only
+        // connection that is versioned.
+        // WARNING: do not assign this variable (which will increment the internal ref
+        // counter) to any other variable other than _lastSlaveOkConn.
+        boost::shared_ptr<DBClientConnection> _master;
 
         // Last used host in a slaveOk query (can be a primary)
         HostAndPort _lastSlaveOkHost;
         // Last used connection in a slaveOk query (can be a primary)
-        scoped_ptr<DBClientConnection> _lastSlaveOkConn;
+        boost::shared_ptr<DBClientConnection> _lastSlaveOkConn;
         
         double _so_timeout;
 

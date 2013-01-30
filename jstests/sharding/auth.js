@@ -62,14 +62,14 @@ printjson(s.getDB("config").settings.find().toArray());
 
 print("restart mongos");
 stopMongoProgram(31000);
-var opts = { port : 31000, v : 0, configdb : s._configDB, keyFile : "jstests/libs/key1", chunkSize : 1 };
+var opts = { port : 31000, v : 2, configdb : s._configDB, keyFile : "jstests/libs/key1", chunkSize : 1 };
 var conn = startMongos( opts );
 s.s = s._mongos[0] = s["s0"] = conn;
 
 login(adminUser);
 
 d1 = new ReplSetTest({name : "d1", nodes : 3, startPort : 31100, useHostName : true });
-d1.startSet({keyFile : "jstests/libs/key2"});
+d1.startSet({keyFile : "jstests/libs/key2", verbose : 0});
 d1.initiate();
 
 print("initiated");
@@ -98,7 +98,7 @@ assert(thrown);
 
 print("start rs w/correct key");
 d1.stopSet();
-d1.startSet({keyFile : "jstests/libs/key1"});
+d1.startSet({keyFile : "jstests/libs/key1", verbose : 0});
 d1.initiate();
 var master = d1.getMaster();
 
@@ -141,8 +141,9 @@ assert.eq( 1 , s.getDB( "test" ).foo.find().itcount() , tojson(result) );
 logout(testUser);
 
 d2 = new ReplSetTest({name : "d2", nodes : 3, startPort : 31200, useHostName : true });
-d2.startSet({keyFile : "jstests/libs/key1"});
+d2.startSet({keyFile : "jstests/libs/key1", verbose : 0});
 d2.initiate();
+d2.awaitSecondaryNodes();
 
 shardName = getShardName(d2);
 
@@ -150,6 +151,9 @@ print("adding shard "+shardName);
 login(adminUser);
 print("logged in");
 result = s.getDB("admin").runCommand({addShard : shardName})
+
+ReplSetTest.awaitRSClientHosts(s.s, d1.nodes, {ok: true });
+ReplSetTest.awaitRSClientHosts(s.s, d2.nodes, {ok: true });
 
 s.getDB("test").foo.remove({})
 
@@ -276,9 +280,7 @@ assert.throws(function() {
 assert.throws(function() {
     printjson(readOnlyDB.killOp(123));
 });
-assert.throws(function() {
-    printjson(readOnlyDB.fsyncUnlock());
-});
+// fsyncUnlock doesn't work in mongos anyway, so no need check authorization for it
 
 /*
 broken because of SERVER-4156
@@ -300,8 +302,6 @@ assert.throws(function() {
 assert.throws(function() {
     printjson(readOnlyDB.killOp(123));
 });
-assert.throws(function() {
-    printjson(readOnlyDB.fsyncUnlock());
-});
+// fsyncUnlock doesn't work in mongos anyway, so no need check authorization for it
 
 s.stop();

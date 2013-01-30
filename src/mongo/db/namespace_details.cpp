@@ -23,7 +23,6 @@
 
 #include <boost/filesystem/operations.hpp>
 
-#include "mongo/db/btree.h"
 #include "mongo/db/db.h"
 #include "mongo/db/json.h"
 #include "mongo/db/mongommf.h"
@@ -37,14 +36,16 @@ namespace mongo {
 
     BSONObj idKeyPattern = fromjson("{\"_id\":1}");
 
-    /* deleted lists -- linked lists of deleted records -- are placed in 'buckets' of various sizes
-       so you can look for a deleterecord about the right size.
+    /* Deleted list buckets are used to quickly locate free space based on size.  Each bucket
+       contains records up to that size.  All records > 4mb are placed into the 16mb bucket.
     */
     int bucketSizes[] = {
-        32, 64, 128, 256, 0x200, 0x400, 0x800, 0x1000, 0x2000, 0x4000,
-        0x8000, 0x10000, 0x20000, 0x40000, 0x80000, 0x100000, 0x200000,
-        0x400000, 0x800000
-    };
+        0x20,     0x40,     0x80,     0x100,
+        0x200,    0x400,    0x800,    0x1000,
+        0x2000,   0x4000,   0x8000,   0x10000,
+        0x20000,  0x40000,  0x80000,  0x100000,
+        0x200000, 0x400000, 0x1000000,
+     };
 
     NamespaceDetails::NamespaceDetails( const DiskLoc &loc, bool capped ) {
         /* be sure to initialize new fields here -- doesn't default to zeroes the way we use it */
@@ -53,7 +54,7 @@ namespace mongo {
         lastExtentSize = 0;
         nIndexes = 0;
         _isCapped = capped;
-        _maxDocsInCapped = 0x7fffffff;
+        _maxDocsInCapped = 0x7fffffff; // no limit (value is for pre-v2.3.2 compatability)
         _paddingFactor = 1.0;
         _systemFlags = 0;
         _userFlags = 0;
@@ -69,7 +70,7 @@ namespace mongo {
         multiKeyIndexBits = 0;
         reservedA = 0;
         extraOffset = 0;
-        indexBuildInProgress = 0;
+        indexBuildsInProgress = 0;
         memset(reserved, 0, sizeof(reserved));
     }
 
@@ -115,33 +116,11 @@ namespace mongo {
         cout << "ns         " << firstExtent.toString() << ' ' << lastExtent.toString() << " nidx:" << nIndexes << '\n';
         cout << "ns         " << stats.datasize << ' ' << stats.nrecords << ' ' << nIndexes << '\n';
         cout << "ns         " << isCapped() << ' ' << _paddingFactor << ' ' << _systemFlags << ' ' << _userFlags << ' ' << dataFileVersion << '\n';
-        cout << "ns         " << multiKeyIndexBits << ' ' << indexBuildInProgress << '\n';
+        cout << "ns         " << multiKeyIndexBits << ' ' << indexBuildsInProgress << '\n';
         cout << "ns         " << (int) reserved[0] << ' ' << (int) reserved[59];
         cout << endl;
     }
 #endif
-
-    void NamespaceDetails::onLoad(const Namespace& k) {
-
-        if( k.isExtra() ) {
-            /* overflow storage for indexes - so don't treat as a NamespaceDetails object. */
-            return;
-        }
-
-        if( indexBuildInProgress ) {
-            verify( Lock::isW() ); // TODO(erh) should this be per db?
-            if( indexBuildInProgress ) {
-                log() << "indexBuildInProgress was " << indexBuildInProgress << " for " << k << ", indicating an abnormal db shutdown" << endl;
-                getDur().writingInt( indexBuildInProgress ) = 0;
-            }
-        }
-    }
-
-    static void namespaceOnLoadCallback(const Namespace& k, NamespaceDetails& v) {
-        v.onLoad(k);
-    }
-
-    bool checkNsFilesOnLoad = true;
 
     NOINLINE_DECL void NamespaceIndex::_init() {
         verify( !ht );
@@ -195,8 +174,6 @@ namespace mongo {
 
         verify( len <= 0x7fffffff );
         ht = new HashTable<Namespace,NamespaceDetails>(p, (int) len, "namespace index");
-        if( checkNsFilesOnLoad )
-            ht->iterAll(namespaceOnLoadCallback);
     }
 
     static void namespaceGetNamespacesCallback( const Namespace& k , NamespaceDetails& v , void * extra ) {
@@ -250,6 +227,27 @@ namespace mongo {
         }
     }
 
+    /* @return the size for an allocated record quantized to 1/16th of the BucketSize
+       @param allocSize    requested size to allocate
+    */
+    int NamespaceDetails::quantizeAllocationSpace(int allocSize) {
+        const int bucketIdx = bucket(allocSize);
+        int bucketSize = bucketSizes[bucketIdx];
+        int quantizeUnit = bucketSize / 16;
+        if (allocSize >= (1 << 22)) // 4mb
+            // all allocatons > 4mb result in 4mb/16 quantization units, even if allocated in
+            // the 8mb+ bucket.  idea is to reduce quantization overhead of large records at
+            // the cost of increasing the DeletedRecord size distribution in the largest bucket
+            // by factor of 4.
+            quantizeUnit = (1 << 18); // 256k
+        if (allocSize % quantizeUnit == 0)
+            // size is already quantized
+            return allocSize;
+        const int quantizedSpace = (allocSize | (quantizeUnit - 1)) + 1;
+        fassert(16484, quantizedSpace >= allocSize);
+        return quantizedSpace;
+    }
+
     /* predetermine location of the next alloc without actually doing it. 
         if cannot predetermine returns null (so still call alloc() then)
     */
@@ -263,16 +261,15 @@ namespace mongo {
 
     /** allocate space for a new record from deleted lists.
         @param lenToAlloc is WITH header
-        @param extentLoc OUT returns the extent location
         @return null diskloc if no room - allocate a new extent then
     */
-    DiskLoc NamespaceDetails::alloc(const char *ns, int lenToAlloc, DiskLoc& extentLoc) {
+    DiskLoc NamespaceDetails::alloc(const char* ns, int lenToAlloc) {
         {
             // align very slightly.  
             // note that if doing more coarse-grained quantization (really just if it isn't always
             //   a constant amount but if it varied by record size) then that quantization should 
-            //   NOT be done here but rather in __stdAlloc so that we can grab a deletedrecord that 
-            //   is just big enough if we happen to run into one.
+            //   NOT be done here but rather in getRecordAllocationSize() so that we can grab a
+            //   deletedrecord that is just big enough if we happen to run into one.
             lenToAlloc = (lenToAlloc + 3) & 0xfffffffc;
         }
 
@@ -286,10 +283,9 @@ namespace mongo {
         /* note we want to grab from the front so our next pointers on disk tend
         to go in a forward direction which is important for performance. */
         int regionlen = r->lengthWithHeaders();
-        extentLoc.set(loc.a(), r->extentOfs());
         verify( r->extentOfs() < loc.getOfs() );
 
-        DEBUGGING out() << "TEMP: alloc() returns " << loc.toString() << ' ' << ns << " lentoalloc:" << lenToAlloc << " ext:" << extentLoc.toString() << endl;
+        DEBUGGING out() << "TEMP: alloc() returns " << loc.toString() << ' ' << ns << " lentoalloc:" << lenToAlloc << endl;
 
         int left = regionlen - lenToAlloc;
         if ( ! isCapped() ) {
@@ -303,8 +299,8 @@ namespace mongo {
         getDur().writingInt(r->lengthWithHeaders()) = lenToAlloc;
         DiskLoc newDelLoc = loc;
         newDelLoc.inc(lenToAlloc);
-        DeletedRecord *newDel = DataFileMgr::makeDeletedRecord(newDelLoc, left);
-        DeletedRecord *newDelW = getDur().writing(newDel);
+        DeletedRecord* newDel = DataFileMgr::getDeletedRecord(newDelLoc);
+        DeletedRecord* newDelW = getDur().writing(newDel);
         newDelW->extentOfs() = r->extentOfs();
         newDelW->lengthWithHeaders() = left;
         newDelW->nextDeleted().Null();
@@ -330,14 +326,16 @@ namespace mongo {
         int chain = 0;
         while ( 1 ) {
             {
-                int a = cur.a();
-                if ( a < -1 || a >= 100000 ) {
-                    problem() << "~~ Assertion - cur out of range in _alloc() " << cur.toString() <<
-                              " a:" << a << " b:" << b << " chain:" << chain << '\n';
-                    logContext();
-                    if ( cur == *prev )
-                        prev->Null();
-                    cur.Null();
+                int fileNumber = cur.a();
+                int fileOffset = cur.getOfs();
+                if (fileNumber < -1 || fileNumber >= 100000 || fileOffset < 0) {
+                    StringBuilder sb;
+                    sb << "Deleted record list corrupted in bucket " << b
+                       << ", link number " << chain
+                       << ", invalid link is " << cur.toString()
+                       << ", throwing Fatal Assertion";
+                    problem() << sb.str() << endl;
+                    fassertFailed(16469);
                 }
             }
             if ( cur.isNull() ) {
@@ -359,6 +357,9 @@ namespace mongo {
                 bestmatchlen = r->lengthWithHeaders();
                 bestmatch = cur;
                 bestprev = prev;
+                if (r->lengthWithHeaders() == len)
+                    // exact match, stop searching
+                    break;
             }
             if ( bestmatchlen < 0x7fffffff && --extra <= 0 )
                 break;
@@ -516,29 +517,49 @@ namespace mongo {
         return e;
     }
 
-    void NamespaceDetails::setIndexIsMultikey(const char *thisns, int i) {
-        dassert( i < NIndexesMax );
-        unsigned long long x = ((unsigned long long) 1) << i;
-        if( multiKeyIndexBits & x ) return;
-        *getDur().writing(&multiKeyIndexBits) |= x;
+    void NamespaceDetails::setIndexIsMultikey(const char *thisns, int i, bool multikey) {
+        massert(16577, "index number greater than NIndexesMax", i < NIndexesMax );
+
+        unsigned long long mask = 1ULL << i;
+
+        if (multikey) {
+            // Shortcut if the bit is already set correctly
+            if (multiKeyIndexBits & mask) {
+                return;
+            }
+
+            *getDur().writing(&multiKeyIndexBits) |= mask;
+        }
+        else {
+            // Shortcut if the bit is already set correctly
+            if (!(multiKeyIndexBits & mask)) {
+                return;
+            }
+
+            // Invert mask: all 1's except a 0 at the ith bit
+            mask = ~mask;
+            *getDur().writing(&multiKeyIndexBits) &= mask;
+        }
+
         NamespaceDetailsTransient::get(thisns).clearQueryCache();
     }
 
-    /* you MUST call when adding an index.  see pdfile.cpp */
-    IndexDetails& NamespaceDetails::addIndex(const char *thisns, bool resetTransient) {
+    IndexDetails& NamespaceDetails::getNextIndexDetails(const char* thisns) {
         IndexDetails *id;
         try {
-            id = &idx(nIndexes,true);
+            id = &idx(getTotalIndexCount(), true);
         }
         catch(DBException&) {
-            allocExtra(thisns, nIndexes);
-            id = &idx(nIndexes,false);
+            allocExtra(thisns, getTotalIndexCount());
+            id = &idx(getTotalIndexCount(), false);
         }
-
-        (*getDur().writing(&nIndexes))++;
-        if ( resetTransient )
-            NamespaceDetailsTransient::get(thisns).addedIndex();
         return *id;
+    }
+
+    /* you MUST call when adding an index.  see pdfile.cpp */
+    void NamespaceDetails::addIndex(const char* thisns) {
+        (*getDur().writing(&nIndexes))++;
+        NamespaceDetailsTransient::get(thisns).addedIndex();
     }
 
     // must be called when renaming a NS to fix up extra
@@ -609,16 +630,38 @@ namespace mongo {
     }
 
     void NamespaceDetails::setMaxCappedDocs( long long max ) {
-        verify( max <= 0x7fffffffLL ); // TODO: this is temp
-        _maxDocsInCapped = static_cast<int>(max);
+        massert( 16499,
+                 "max in a capped collection has to be < 2^31 or -1",
+                 validMaxCappedDocs( &max ) );
+        _maxDocsInCapped = max;
+    }
+
+    bool NamespaceDetails::validMaxCappedDocs( long long* max ) {
+        if ( *max <= 0 ||
+             *max == numeric_limits<long long>::max() ) {
+            *max = 0x7fffffff;
+            return true;
+        }
+
+        if ( *max < ( 0x1LL << 31 ) ) {
+            return true;
+        }
+
+        return false;
+    }
+
+    long long NamespaceDetails::maxCappedDocs() const {
+        verify( isCapped() );
+        if ( _maxDocsInCapped == 0x7fffffff )
+            return numeric_limits<long long>::max();
+        return _maxDocsInCapped;
     }
 
     /* ------------------------------------------------------------------------- */
 
     SimpleMutex NamespaceDetailsTransient::_qcMutex("qc");
     SimpleMutex NamespaceDetailsTransient::_isMutex("is");
-    map< string, shared_ptr< NamespaceDetailsTransient > > NamespaceDetailsTransient::_nsdMap;
-    typedef map< string, shared_ptr< NamespaceDetailsTransient > >::iterator ouriter;
+    NamespaceDetailsTransient::DMap NamespaceDetailsTransient::_nsdMap;
 
     void NamespaceDetailsTransient::reset() {
         Lock::assertWriteLocked(_ns); 
@@ -627,8 +670,15 @@ namespace mongo {
         _indexSpecs.clear();
     }
 
-    /*static*/ NOINLINE_DECL NamespaceDetailsTransient& NamespaceDetailsTransient::make_inlock(const char *ns) {
-        shared_ptr< NamespaceDetailsTransient > &t = _nsdMap[ ns ];
+    NamespaceDetailsTransient::CMap& NamespaceDetailsTransient::get_cmap_inlock(const string& ns) {
+        CMap*& m = _nsdMap[ns];
+        if ( ! m )
+            m = new CMap();
+        return *m;
+    }
+
+    /*static*/ NOINLINE_DECL NamespaceDetailsTransient& NamespaceDetailsTransient::make_inlock(const string& ns) {
+        shared_ptr< NamespaceDetailsTransient > &t = get_cmap_inlock(ns)[ ns ];
         verify( t.get() == 0 );
         Database *database = cc().database();
         verify( database );
@@ -644,7 +694,7 @@ namespace mongo {
     // note with repair there could be two databases with the same ns name.
     // that is NOT handled here yet!  TODO
     // repair may not use nsdt though not sure.  anyway, requires work.
-    NamespaceDetailsTransient::NamespaceDetailsTransient(Database *db, const char *ns) : 
+    NamespaceDetailsTransient::NamespaceDetailsTransient(Database *db, const string& ns) : 
         _ns(ns), _keysComputed(false), _qcWriteCount() 
     {
         dassert(db);
@@ -652,44 +702,66 @@ namespace mongo {
 
     NamespaceDetailsTransient::~NamespaceDetailsTransient() { 
     }
-
-    void NamespaceDetailsTransient::clearForPrefix(const char *prefix) {
+    
+    void NamespaceDetailsTransient::resetCollection(const string& ns ) {
         SimpleMutex::scoped_lock lk(_qcMutex);
-        vector< string > found;
-        for( ouriter i = _nsdMap.begin(); i != _nsdMap.end(); ++i ) {
-            if ( strncmp( i->first.c_str(), prefix, strlen( prefix ) ) == 0 ) {
-                found.push_back( i->first );
-                Lock::assertWriteLocked(i->first);
-            }
-        }
-        for( vector< string >::iterator i = found.begin(); i != found.end(); ++i ) {
-            _nsdMap[ *i ].reset();
+        Lock::assertWriteLocked(ns);
+        get_cmap_inlock(ns)[ns].reset();
+    }
+        
+    void NamespaceDetailsTransient::eraseDB(const string& db) {
+        SimpleMutex::scoped_lock lk(_qcMutex);
+        Lock::assertWriteLocked(db);
+        
+        DMap::iterator i = _nsdMap.find( db );
+        if ( i != _nsdMap.end() ) {
+            delete i->second;
+            _nsdMap.erase( i );
         }
     }
-
-    void NamespaceDetailsTransient::eraseForPrefix(const char *prefix) {
+    
+    void NamespaceDetailsTransient::eraseCollection(const string& ns) {
         SimpleMutex::scoped_lock lk(_qcMutex);
-        vector< string > found;
-        for( ouriter i = _nsdMap.begin(); i != _nsdMap.end(); ++i ) {
-            if ( strncmp( i->first.c_str(), prefix, strlen( prefix ) ) == 0 ) {
-                found.push_back( i->first );
-                Lock::assertWriteLocked(i->first);
-            }
-        }
-        for( vector< string >::iterator i = found.begin(); i != found.end(); ++i ) {
-            _nsdMap.erase(*i);
-        }
+        Lock::assertWriteLocked(ns);
+        get_cmap_inlock(ns).erase(ns);
     }
+
 
     void NamespaceDetailsTransient::computeIndexKeys() {
         _indexKeys.clear();
-        NamespaceDetails *d = nsdetails(_ns.c_str());
+        NamespaceDetails *d = nsdetails(_ns);
         if ( ! d )
             return;
         NamespaceDetails::IndexIterator i = d->ii();
         while( i.more() )
             i.next().keyPattern().getFieldNames(_indexKeys);
         _keysComputed = true;
+    }
+
+    void NamespaceDetails::updateTTLIndex( int idxNo , const BSONElement& newExpireSecs ) {
+        // Need to get the actual DiskLoc of the index to update. This is embedded in the 'info'
+        // object inside the IndexDetails.
+        IndexDetails idetails = idx( idxNo );
+        BSONElement oldExpireSecs = idetails.info.obj().getField("expireAfterSeconds");
+
+        // Important that we set the new value in-place.  We are writing directly to the
+        // object here so must be careful not to overwrite with a longer numeric type.
+        massert( 16630, "new 'expireAfterSeconds' must be a number", newExpireSecs.isNumber() );
+        BSONElementManipulator manip( oldExpireSecs );
+        switch( oldExpireSecs.type() ) {
+        case EOO:
+            massert( 16631, "index does not have an 'expireAfterSeconds' field", false );
+            break;
+        case NumberInt:
+        case NumberDouble:
+            manip.SetNumber( newExpireSecs.numberDouble() );
+            break;
+        case NumberLong:
+            manip.SetLong( newExpireSecs.numberLong() );
+            break;
+        default:
+            massert( 16632, "current 'expireAfterSeconds' is not a number", false );
+        }
     }
 
     void NamespaceDetails::setSystemFlag( int flag ) {
@@ -715,7 +787,11 @@ namespace mongo {
         BSONObj newEntry = applyUpdateOperators( oldEntry , BSON( "$set" << BSON( "options.flags" << userFlags() ) ) );
         
         verify( 1 == deleteObjects( system_namespaces.c_str() , oldEntry , true , false , true ) );
-        theDataFileMgr.insert( system_namespaces.c_str() , newEntry.objdata() , newEntry.objsize() , true );
+        theDataFileMgr.insert( system_namespaces.c_str(),
+                               newEntry.objdata(),
+                               newEntry.objsize(),
+                               false,
+                               true );
     }
 
     bool NamespaceDetails::setUserFlag( int flags ) {
@@ -753,12 +829,24 @@ namespace mongo {
 
         
         if ( isUserFlagSet( Flag_UsePowerOf2Sizes ) ) {
-            int x = bucket( minRecordSize );
-            x = bucketSizes[x];
-            return x;
+            int allocationSize = bucketSizes[ bucket( minRecordSize ) ];
+            if ( allocationSize == bucketSizes[MaxBucket] ) {
+                // if we get here, it means we're allocating more than 4mb, so round
+                // to the nearest megabyte
+                allocationSize = 1 + ( minRecordSize | ( ( 1 << 20 ) - 1 ) );
+            }
+            return allocationSize;
         }
 
-        return static_cast<int>(minRecordSize * _paddingFactor);
+        // adjust for padding factor
+        int allocationSize = static_cast<int>(minRecordSize * _paddingFactor);
+
+        if (isCapped())
+            // pad record size for capped collections, but do not quantize
+            return allocationSize;
+
+        // quantize to the nearest 1/16th bucketSize
+        return quantizeAllocationSpace(allocationSize);
     }
 
     /* ------------------------------------------------------------------------- */
@@ -782,7 +870,7 @@ namespace mongo {
         char database[256];
         nsToDatabase(ns, database);
         string s = string(database) + ".system.namespaces";
-        theDataFileMgr.insert(s.c_str(), j.objdata(), j.objsize(), true);
+        theDataFileMgr.insert(s.c_str(), j.objdata(), j.objsize(), false, true);
     }
 
     void renameNamespace( const char *from, const char *to, bool stayTemp) {
@@ -796,7 +884,7 @@ namespace mongo {
         // index details across commands are in cursors and nsd
         // transient (including query cache) so clear these.
         ClientCursor::invalidate( from );
-        NamespaceDetailsTransient::eraseForPrefix( from );
+        NamespaceDetailsTransient::eraseCollection( from );
 
         NamespaceDetails *details = ni->details( from );
         ni->add_ns( to, *details );
@@ -851,7 +939,12 @@ namespace mongo {
                     newIndexSpecB << "ns" << to;
             }
             BSONObj newIndexSpec = newIndexSpecB.done();
-            DiskLoc newIndexSpecLoc = theDataFileMgr.insert( s.c_str(), newIndexSpec.objdata(), newIndexSpec.objsize(), true, false );
+            DiskLoc newIndexSpecLoc = theDataFileMgr.insert( s.c_str(),
+                                                             newIndexSpec.objdata(),
+                                                             newIndexSpec.objsize(),
+                                                             false,
+                                                             true,
+                                                             false );
             int indexI = details->findIndexByName( oldIndexSpec.getStringField( "name" ) );
             IndexDetails &indexDetails = details->idx(indexI);
             string oldIndexNs = indexDetails.indexNamespace();

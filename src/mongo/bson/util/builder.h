@@ -25,7 +25,8 @@
 #include <string.h>
 
 #include "mongo/bson/inline_decls.h"
-#include "mongo/bson/stringdata.h"
+#include "mongo/base/string_data.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
     /* Accessing unaligned doubles on ARM generates an alignment trap and aborts with SIGBUS on Linux.
@@ -189,7 +190,7 @@ namespace mongo {
 
         void appendStr(const StringData &str , bool includeEndingNull = true ) {
             const int len = str.size() + ( includeEndingNull ? 1 : 0 );
-            memcpy(grow(len), str.data(), len);
+            str.copyTo( grow(len), includeEndingNull );
         }
 
         /** @return length of current string */
@@ -247,13 +248,10 @@ namespace mongo {
         void decouple(); // not allowed. not implemented.
     };
 
-    namespace {
 #if defined(_WIN32)
-        int (*mongo_snprintf)(char *str, size_t size, const char *format, ...) = &sprintf_s;
-#else
-        int (*mongo_snprintf)(char *str, size_t size, const char *format, ...) = &snprintf;
+#pragma push_macro("snprintf")
+#define snprintf _snprintf
 #endif
-    }
 
     /** stringstream deals with locale so this is a lot faster than std::stringstream for UTF8 */
     template <typename Allocator>
@@ -301,7 +299,7 @@ namespace mongo {
             const int prev = _buf.l;
             const int maxSize = 32; 
             char * start = _buf.grow( maxSize );
-            int z = mongo_snprintf( start , maxSize , "%.16g" , x );
+            int z = snprintf( start , maxSize , "%.16g" , x );
             verify( z >= 0 );
             verify( z < maxSize );
             _buf.l = prev + z;
@@ -312,7 +310,7 @@ namespace mongo {
 
         void write( const char* buf, int len) { memcpy( _buf.grow( len ) , buf , len ); }
 
-        void append( const StringData& str ) { memcpy( _buf.grow( str.size() ) , str.data() , str.size() ); }
+        void append( const StringData& str ) { str.copyTo( _buf.grow( str.size() ), false ); }
 
         StringBuilderImpl& operator<<( const StringData& str ) {
             append( str );
@@ -322,7 +320,8 @@ namespace mongo {
         void reset( int maxSize = 0 ) { _buf.reset( maxSize ); }
 
         std::string str() const { return std::string(_buf.data, _buf.l); }
-        
+
+        /** size of current string */
         int len() const { return _buf.l; }
 
     private:
@@ -335,7 +334,7 @@ namespace mongo {
         template <typename T>
         StringBuilderImpl& SBNUM(T val,int maxSize,const char *macro)  {
             int prev = _buf.l;
-            int z = mongo_snprintf( _buf.grow(maxSize) , maxSize , macro , (val) );
+            int z = snprintf( _buf.grow(maxSize) , maxSize , macro , (val) );
             verify( z >= 0 );
             verify( z < maxSize );
             _buf.l = prev + z;
@@ -346,4 +345,8 @@ namespace mongo {
     typedef StringBuilderImpl<TrivialAllocator> StringBuilder;
     typedef StringBuilderImpl<StackAllocator> StackStringBuilder;
 
+#if defined(_WIN32)
+#undef snprintf
+#pragma pop_macro("snprintf")
+#endif
 } // namespace mongo

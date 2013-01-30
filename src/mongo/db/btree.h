@@ -18,10 +18,11 @@
 
 #pragma once
 
-#include "pch.h"
-#include "mongo/db/jsobj.h"
+#include "mongo/pch.h"
+
 #include "mongo/db/diskloc.h"
-#include "mongo/db/pdfile.h"
+#include "mongo/db/dur.h"
+#include "mongo/db/jsobj.h"
 #include "mongo/db/key.h"
 
 namespace mongo {
@@ -250,7 +251,6 @@ namespace mongo {
                 ofs = OurNullOfs;
             }
             memcpy(_a, &la, 3); // endian
-            dassert( ofs != 0 );
         }
         DiskLoc56Bit& writing() const { 
             return *((DiskLoc56Bit*) getDur().writingPtr((void*)this, 7));
@@ -377,6 +377,14 @@ namespace mongo {
         int nKeys() const { return this->n; }
         const DiskLoc getNextChild() const { return this->nextChild; }
 
+        // for tree inspection and statistical analysis
+        // NOTE: topSize and emptySize have different types in BtreeData_V0 and BtreeData_V1
+
+        /** Size used for bson storage, including storage of old keys. */
+        unsigned int getTopSize() const { return static_cast<unsigned int>(this->topSize); }
+        /** Size of the empty region. */
+        unsigned int getEmptySize() const { return static_cast<unsigned int>(this->emptySize); }
+
     protected:
         char * dataAt(short ofs) { return this->data + ofs; }
 
@@ -404,7 +412,7 @@ namespace mongo {
         /**
          * Preconditions:
          *  - key / recordLoc are > all existing keys
-         *  - The keys in prevChild and their descendents are between all existing
+         *  - The keys in prevChild and their descendants are between all existing
          *    keys and 'key'.
          * Postconditions:
          *  - If there is space for key without packing, it is inserted as the
@@ -579,8 +587,8 @@ namespace mongo {
         void setKey( int i, const DiskLoc recordLoc, const Key& key, const DiskLoc prevChildBucket );
     };
 
+    class IndexDetails;
     class IndexInsertionContinuation;
-
     template< class V>
     struct IndexInsertionContinuationImpl;
 
@@ -607,7 +615,7 @@ namespace mongo {
      * so assignment of const is sometimes nonideal.
      *
      * TODO There are several cases in which the 'this' pointer is invalidated
-     * as a result of deallocation.  A seperate class representing a btree would
+     * as a result of deallocation.  A separate class representing a btree would
      * alleviate some fragile cases where the implementation must currently
      * behave correctly if the 'this' pointer is suddenly invalidated by a
      * callee.
@@ -617,12 +625,12 @@ namespace mongo {
         friend class BtreeCursor;
         friend struct IndexInsertionContinuationImpl<V>;
     public:
-	// make compiler happy:
+        // make compiler happy:
         typedef typename V::Key Key;
         typedef typename V::KeyOwned KeyOwned;
-	typedef typename BucketBasics<V>::KeyNode KeyNode;
-	typedef typename BucketBasics<V>::_KeyNode _KeyNode;
-	typedef typename BucketBasics<V>::Loc Loc;
+        typedef typename BucketBasics<V>::KeyNode KeyNode;
+        typedef typename BucketBasics<V>::_KeyNode _KeyNode;
+        typedef typename BucketBasics<V>::Loc Loc;
         const _KeyNode& k(int i) const     { return static_cast< const BucketBasics<V> * >(this)->k(i); }
     protected:
         _KeyNode& k(int i)                 { return static_cast< BucketBasics<V> * >(this)->_k(i); }
@@ -997,174 +1005,6 @@ namespace mongo {
         static string dupKeyError( const IndexDetails& idx , const Key& key );
     };
 #pragma pack()
-
-    class FieldRangeVector;
-    class FieldRangeVectorIterator;
-    
-    /**
-     * A Cursor class for Btree iteration.
-     *
-     * A BtreeCursor can record its current btree position (noteLoc()) and then relocate this
-     * position after a write (checkLoc()).  A recorded btree position consists of a btree bucket,
-     * bucket key offset, and unique btree key.  To relocate a unique btree key, a BtreeCursor first
-     * checks the btree key at its recorded btree bucket and bucket key offset.  If the key at that
-     * location does not match the recorded btree key, and an adjacent key also fails to match,
-     * the recorded key (or the next existing key following it) is located in the btree using binary
-     * search.  If the recorded btree bucket is invalidated, the initial recorded bucket check is
-     * not attempted (see SERVER-4575).
-     */
-    class BtreeCursor : public Cursor {
-    protected:
-        BtreeCursor( NamespaceDetails* nsd , int theIndexNo, const IndexDetails& idxDetails );
-        /*
-        BtreeCursor( NamespaceDetails *_d, int _idxNo, const IndexDetails&, const BSONObj &startKey, const BSONObj &endKey, bool endKeyInclusive, int direction );
-        BtreeCursor( NamespaceDetails *_d, int _idxNo, const IndexDetails& _id,
-                    const shared_ptr< FieldRangeVector > &_bounds, int singleIntervalLimit,
-                    int _direction );
-        */
-
-        virtual void init( const BSONObj &startKey, const BSONObj &endKey, bool endKeyInclusive, int direction );
-        virtual void init( const shared_ptr< FieldRangeVector > &_bounds, int singleIntervalLimit, int _direction );
-
-    private:
-        void _finishConstructorInit();
-        static BtreeCursor* make( NamespaceDetails * nsd , int idxNo , const IndexDetails& indexDetails );
-
-    public:
-        virtual ~BtreeCursor();
-        /** makes an appropriate subclass depending on the index version */
-        static BtreeCursor* make( NamespaceDetails *_d, const IndexDetails&, const BSONObj &startKey, const BSONObj &endKey, bool endKeyInclusive, int direction );
-        static BtreeCursor* make( NamespaceDetails *_d, const IndexDetails& _id, const shared_ptr< FieldRangeVector > &_bounds, int _direction );
-        static BtreeCursor* make( NamespaceDetails *_d, int _idxNo, const IndexDetails&, const BSONObj &startKey, const BSONObj &endKey, bool endKeyInclusive, int direction );
-        static BtreeCursor* make( NamespaceDetails *_d, int _idxNo, const IndexDetails& _id,
-                                 const shared_ptr< FieldRangeVector > &_bounds,
-                                 int singleIntervalLimit, int _direction );
-
-        virtual bool ok() { return !bucket.isNull(); }
-        virtual bool advance();
-        virtual void noteLocation(); // updates keyAtKeyOfs...
-        virtual void checkLocation() = 0;
-        virtual bool supportGetMore() { return true; }
-        virtual bool supportYields() { return true; }
-
-        /**
-         * used for multikey index traversal to avoid sending back dups. see Matcher::matches().
-         * if a multikey index traversal:
-         *   if loc has already been sent, returns true.
-         *   otherwise, marks loc as sent.
-         * @return false if the loc has not been seen
-         */
-        virtual bool getsetdup(DiskLoc loc) {
-            if( _multikey ) {
-                pair<set<DiskLoc>::iterator, bool> p = _dups.insert(loc);
-                return !p.second;
-            }
-            return false;
-        }
-
-        virtual bool modifiedKeys() const { return _multikey; }
-        virtual bool isMultiKey() const { return _multikey; }
-
-        /*const _KeyNode& _currKeyNode() const {
-            verify( !bucket.isNull() );
-            const _KeyNode& kn = keyNode(keyOfs);
-            verify( kn.isUsed() );
-            return kn;
-        }*/
-
-        /** returns BSONObj() if ofs is out of range */
-        virtual BSONObj keyAt(int ofs) const = 0;
-
-        virtual BSONObj currKey() const = 0;
-        virtual BSONObj indexKeyPattern() { return _order; }
-
-        virtual void aboutToDeleteBucket(const DiskLoc& b) {
-            if ( bucket == b )
-                keyOfs = -1;
-        }
-
-        virtual DiskLoc currLoc() = 0; //  { return !bucket.isNull() ? _currKeyNode().recordLoc : DiskLoc();  }
-        virtual DiskLoc refLoc()   { return currLoc(); }
-        virtual Record* _current() { return currLoc().rec(); }
-        virtual BSONObj current()  { return BSONObj::make(_current()); }
-        virtual string toString();
-
-        BSONObj prettyKey( const BSONObj &key ) const {
-            return key.replaceFieldNames( indexDetails.keyPattern() ).clientReadable();
-        }
-
-        virtual BSONObj prettyIndexBounds() const;
-
-        virtual CoveredIndexMatcher *matcher() const { return _matcher.get(); }
-        virtual shared_ptr< CoveredIndexMatcher > matcherPtr() const { return _matcher; }
-
-        virtual void setMatcher( shared_ptr< CoveredIndexMatcher > matcher ) { _matcher = matcher;  }
-
-        virtual const Projection::KeyOnly *keyFieldsOnly() const { return _keyFieldsOnly.get(); }
-        
-        virtual void setKeyFieldsOnly( const shared_ptr<Projection::KeyOnly> &keyFieldsOnly ) {
-            _keyFieldsOnly = keyFieldsOnly;
-        }
-        
-        virtual long long nscanned() { return _nscanned; }
-
-        /** for debugging only */
-        const DiskLoc getBucket() const { return bucket; }
-        int getKeyOfs() const { return keyOfs; }
-
-        // just for unit tests
-        virtual bool curKeyHasChild() = 0;
-
-    protected:
-        /**
-         * Our btrees may (rarely) have "unused" keys when items are deleted.
-         * Skip past them.
-         */
-        virtual bool skipUnusedKeys() = 0;
-
-        bool skipOutOfRangeKeysAndCheckEnd();
-        void skipAndCheck();
-        void checkEnd();
-
-        /** selective audits on construction */
-        void audit();
-
-        virtual void _audit() = 0;
-        virtual DiskLoc _locate(const BSONObj& key, const DiskLoc& loc) = 0;
-        virtual DiskLoc _advance(const DiskLoc& thisLoc, int& keyOfs, int direction, const char *caller) = 0;
-        virtual void _advanceTo(DiskLoc &thisLoc, int &keyOfs, const BSONObj &keyBegin, int keyBeginLen, bool afterKey, const vector< const BSONElement * > &keyEnd, const vector< bool > &keyEndInclusive, const Ordering &order, int direction ) = 0;
-
-        /** set initial bucket */
-        void initWithoutIndependentFieldRanges();
-
-        /** if afterKey is true, we want the first key with values of the keyBegin fields greater than keyBegin */
-        void advanceTo( const BSONObj &keyBegin, int keyBeginLen, bool afterKey, const vector< const BSONElement * > &keyEnd, const vector< bool > &keyEndInclusive );
-
-        // these are set in the construtor
-        NamespaceDetails * const d;
-        const int idxNo;
-        const IndexDetails& indexDetails;
-
-        // these are all set in init()
-        set<DiskLoc> _dups;
-        BSONObj startKey;
-        BSONObj endKey;
-        bool _endKeyInclusive;
-        bool _multikey; // this must be updated every getmore batch in case someone added a multikey
-        BSONObj _order; // this is the same as indexDetails.keyPattern()
-        Ordering _ordering;
-        DiskLoc bucket;
-        int keyOfs;
-        int _direction; // 1=fwd,-1=reverse
-        BSONObj keyAtKeyOfs; // so we can tell if things moved around on us between the query and the getMore call
-        DiskLoc locAtKeyOfs;
-        shared_ptr< FieldRangeVector > _bounds;
-        auto_ptr< FieldRangeVectorIterator > _boundsIterator;
-        shared_ptr< CoveredIndexMatcher > _matcher;
-        shared_ptr<Projection::KeyOnly> _keyFieldsOnly;
-        bool _independentFieldRanges;
-        long long _nscanned;
-    };
 
     /**
      * give us a writable version of the btree bucket (declares write intent).

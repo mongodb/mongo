@@ -22,7 +22,9 @@
 
 #pragma once
 
-#include "jsobj.h"
+#include "mongo/db/jsobj.h"
+#include "mongo/platform/cstdint.h"
+#include "mongo/platform/unordered_set.h"
 
 namespace mongo {
 
@@ -40,7 +42,7 @@ namespace mongo {
         (such as adding a virtual function)
      */
     class DiskLoc {
-        int _a;     // this will be volume, file #, etsc. but is a logical value could be anything depending on storage engine
+        int _a;     // this will be volume, file #, etc. but is a logical value could be anything depending on storage engine
         int ofs;
 
     public:
@@ -48,7 +50,11 @@ namespace mongo {
         enum SentinelValues {
             /* note NullOfs is different. todo clean up.  see refs to NullOfs in code - use is valid but outside DiskLoc context so confusing as-is. */
             NullOfs = -1,
-            MaxFiles=16000 // thus a limit of about 32TB of data per db
+
+            // Caps the number of files that may be allocated in a database, allowing about 32TB of
+            // data per db.  Note that the DiskLoc and DiskLoc56Bit types supports more files than
+            // this value, as does the data storage format.
+            MaxFiles=16000
         };
 
         DiskLoc(int a, int Ofs) : _a(a), ofs(Ofs) { }
@@ -80,7 +86,7 @@ namespace mongo {
             if ( isNull() )
                 return "null";
             stringstream ss;
-            ss << hex << _a << ':' << ofs;
+            ss << _a << ':' << hex << ofs;
             return ss.str();
         }
 
@@ -127,6 +133,14 @@ namespace mongo {
         }
 
         /**
+         * Hash value for this disk location.  The hash implementation may be modified, and its
+         * behavior may differ across platforms.  Hash values should not be persisted.
+         */
+        struct Hasher {
+            size_t operator()( DiskLoc loc ) const;
+        };
+
+        /**
          * Marks this disk loc for writing
          * @returns a non const reference to this disk loc
          * This function explicitly signals we are writing and casts away const
@@ -154,7 +168,26 @@ namespace mongo {
     };
 #pragma pack()
 
-    const DiskLoc minDiskLoc(0, 1);
-    const DiskLoc maxDiskLoc(0x7fffffff, 0x7fffffff);
+    inline size_t DiskLoc::Hasher::operator()( DiskLoc loc ) const {
+        // Older tr1 implementations do not support hashing 64 bit integers.  This implementation
+        // delegates to hashing 32 bit integers.
+        return
+            unordered_set<uint32_t>::hasher()( loc.a() ) ^
+            unordered_set<uint32_t>::hasher()( loc.getOfs() );
+    }
+
+    inline std::ostream& operator<<( std::ostream &stream, const DiskLoc &loc ) {
+        return stream << loc.toString();
+    }
+
+    // Minimum allowed DiskLoc.  No Record may begin at this location because file and extent
+    // headers must precede Records in a file.
+    const DiskLoc minDiskLoc(0, 0);
+
+    // Maximum allowed DiskLoc.  Note that only three bytes are used to represent the file number
+    // for consistency with the v1 index DiskLoc storage format, which uses only 7 bytes total.
+    // No Record may begin at this location because the minimum size of a Record is larger than one
+    // byte.
+    const DiskLoc maxDiskLoc(0x00ffffff, 0x7fffffff);
 
 } // namespace mongo

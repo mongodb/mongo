@@ -18,16 +18,20 @@
 
 #include "pch.h"
 
-#include <iomanip>
-#include "../client/connpool.h"
-#include "../util/stringutils.h"
-#include "../util/startup_test.h"
-#include "../db/namespacestring.h"
-#include "mongo/db/json.h"
-
-#include "grid.h"
-#include "shard.h"
 #include "pcrecpp.h"
+#include <iomanip>
+
+#include "mongo/client/connpool.h"
+#include "mongo/db/json.h"
+#include "mongo/db/namespacestring.h"
+#include "mongo/s/grid.h"
+#include "mongo/s/shard.h"
+#include "mongo/s/type_collection.h"
+#include "mongo/s/type_database.h"
+#include "mongo/s/type_settings.h"
+#include "mongo/s/type_shard.h"
+#include "mongo/util/startup_test.h"
+#include "mongo/util/stringutils.h"
 
 namespace mongo {
 
@@ -78,18 +82,31 @@ namespace mongo {
                             // lets check case
                             scoped_ptr<ScopedDbConnection> conn(
                                     ScopedDbConnection::getInternalScopedDbConnection(
-                                            configServer.modelServer() ));
+                                            configServer.modelServer(), 30));
 
                             BSONObjBuilder b;
                             b.appendRegex( "_id" , (string)"^" +
                                            pcrecpp::RE::QuoteMeta( database ) + "$" , "i" );
-                            BSONObj d = conn->get()->findOne( ShardNS::database , b.obj() );
+                            BSONObj dbObj = conn->get()->findOne( DatabaseType::ConfigNS , b.obj() );
                             conn->done();
 
-                            if ( ! d.isEmpty() ) {
+                            // If our name is exactly the same as the name we want, try loading
+                            // the database again.
+                            if (!dbObj.isEmpty() &&
+                                dbObj[DatabaseType::name()].String() == database)
+                            {
+                                if (dbConfig->load()) return dbConfig;
+                            }
+
+                            // TODO: This really shouldn't fall through, but without metadata
+                            // management there's no good way to make sure this works all the time
+                            // when the database is getting rapidly created and dropped.
+                            // For now, just do exactly what we used to do.
+
+                            if ( ! dbObj.isEmpty() ) {
                                 uasserted( DatabaseDifferCaseCode, str::stream()
                                     <<  "can't have 2 databases that just differ on case "
-                                    << " have: " << d["_id"].String()
+                                    << " have: " << dbObj[DatabaseType::name()].String()
                                     << " want to add: " << database );
                             }
                         }
@@ -134,7 +151,7 @@ namespace mongo {
         return dbConfig;
     }
 
-    void Grid::removeDB( string database ) {
+    void Grid::removeDB( const std::string& database ) {
         uassert( 10186 ,  "removeDB expects db name" , database.find( '.' ) == string::npos );
         scoped_lock l( _lock );
         _databases.erase( database );
@@ -238,6 +255,18 @@ namespace mongo {
                 errMsg = ss.str();
                 newShardConn.done();
                 return false;
+            }
+
+            if( setName.empty() ) { 
+                // check this isn't a --configsvr
+                BSONObj res;
+                bool ok = newShardConn->runCommand("admin",BSON("replSetGetStatus"<<1),res);
+                ostringstream ss;
+                if( !ok && res["info"].type() == String && res["info"].String() == "configsvr" ) {
+                    errMsg = "the specified mongod is a --configsvr and should thus not be a shard server";
+                    newShardConn.done();
+                    return false;
+                }                
             }
 
             // if the shard is part of a replica set, make sure all the hosts mentioned in 'servers' are part of
@@ -352,20 +381,22 @@ namespace mongo {
 
         // build the ConfigDB shard document
         BSONObjBuilder b;
-        b.append( "_id" , *name );
-        b.append( "host" , rsMonitor ? rsMonitor->getServerAddress() : servers.toString() );
-        if ( maxSize > 0 ) {
-            b.append( ShardFields::maxSize.name() , maxSize );
+        b.append(ShardType::name(), *name);
+        b.append(ShardType::host(),
+                 rsMonitor ? rsMonitor->getServerAddress() : servers.toString());
+        if (maxSize > 0) {
+            b.append(ShardType::maxSize(), maxSize);
         }
         BSONObj shardDoc = b.obj();
 
         {
             scoped_ptr<ScopedDbConnection> conn( ScopedDbConnection::getInternalScopedDbConnection(
-                    configServer.getPrimary().getConnString() ) );
+                    configServer.getPrimary().getConnString(), 30));
 
             // check whether the set of hosts (or single host) is not an already a known shard
-            BSONObj old = conn->get()->findOne( ShardNS::shard ,
-                                                BSON( "host" << servers.toString() ) );
+            BSONObj old = conn->get()->findOne(ShardType::ConfigNS,
+                                               BSON(ShardType::host(servers.toString())));
+
             if ( ! old.isEmpty() ) {
                 errMsg = "host already used";
                 conn->done();
@@ -374,7 +405,7 @@ namespace mongo {
 
             log() << "going to add shard: " << shardDoc << endl;
 
-            conn->get()->insert( ShardNS::shard , shardDoc );
+            conn->get()->insert(ShardType::ConfigNS , shardDoc);
             errMsg = conn->get()->getLastError();
             if ( ! errMsg.empty() ) {
                 log() << "error adding shard: " << shardDoc << " err: " << errMsg << endl;
@@ -400,8 +431,8 @@ namespace mongo {
 
     bool Grid::knowAboutShard( const string& name ) const {
         scoped_ptr<ScopedDbConnection> conn( ScopedDbConnection::getInternalScopedDbConnection(
-                configServer.getPrimary().getConnString() ) );
-        BSONObj shard = conn->get()->findOne( ShardNS::shard , BSON( "host" << name ) );
+                configServer.getPrimary().getConnString(), 30));
+        BSONObj shard = conn->get()->findOne(ShardType::ConfigNS, BSON(ShardType::host(name)));
         conn->done();
         return ! shard.isEmpty();
     }
@@ -413,12 +444,12 @@ namespace mongo {
         int count = 0;
 
         scoped_ptr<ScopedDbConnection> conn( ScopedDbConnection::getInternalScopedDbConnection(
-                configServer.getPrimary().getConnString() ) );
-        BSONObj o = conn->get()->findOne( ShardNS::shard ,
-                                          Query( fromjson ( "{_id: /^shard/}" ) )
-                                              .sort(  BSON( "_id" << -1 ) ) );
+                configServer.getPrimary().getConnString(), 30));
+        BSONObj o = conn->get()->findOne(ShardType::ConfigNS,
+                                         Query(fromjson("{" + ShardType::name() + ": /^shard/}"))
+                                         .sort(BSON(ShardType::name() << -1 )));
         if ( ! o.isEmpty() ) {
-            string last = o["_id"].String();
+            string last = o[ShardType::name()].String();
             istringstream is( last.substr( 5 ) );
             is >> count;
             count++;
@@ -441,15 +472,16 @@ namespace mongo {
     bool Grid::shouldBalance( const string& ns, BSONObj* balancerDocOut ) const {
 
         scoped_ptr<ScopedDbConnection> conn( ScopedDbConnection::getInternalScopedDbConnection(
-                configServer.getPrimary().getConnString() ) );
+                configServer.getPrimary().getConnString(), 30));
         BSONObj balancerDoc;
         BSONObj collDoc;
 
         try {
             // look for the stop balancer marker
-            balancerDoc = conn->get()->findOne( ShardNS::settings, BSON( "_id" << "balancer" ) );
-            if( ns.size() > 0 ) collDoc = conn->get()->findOne( ShardNS::collection,
-                                                                BSON( "_id" << ns ) );
+            balancerDoc = conn->get()->findOne( SettingsType::ConfigNS,
+                                                BSON( SettingsType::key("balancer") ) );
+            if( ns.size() > 0 ) collDoc = conn->get()->findOne(CollectionType::ConfigNS,
+                                                               BSON( CollectionType::ns(ns)));
             conn->done();
         }
         catch( DBException& e ){
@@ -475,7 +507,7 @@ namespace mongo {
     bool Grid::_balancerStopped( const BSONObj& balancerDoc ) {
         // check the 'stopped' marker maker
         // if present, it is a simple bool
-        BSONElement stoppedElem = balancerDoc["stopped"];
+        BSONElement stoppedElem = balancerDoc[SettingsType::balancerStopped()];
         return stoppedElem.trueValue();
     }
 
@@ -483,7 +515,7 @@ namespace mongo {
         // check the 'activeWindow' marker
         // if present, it is an interval during the day when the balancer should be active
         // { start: "08:00" , stop: "19:30" }, strftime format is %H:%M
-        BSONElement windowElem = balancerDoc["activeWindow"];
+        BSONElement windowElem = balancerDoc[SettingsType::balancerActiveWindow()];
         if ( windowElem.eoo() ) {
             return true;
         }
@@ -534,7 +566,7 @@ namespace mongo {
 
     unsigned long long Grid::getNextOpTime() const {
         scoped_ptr<ScopedDbConnection> conn( ScopedDbConnection::getInternalScopedDbConnection(
-                configServer.getPrimary().getConnString() ) );
+                configServer.getPrimary().getConnString(), 30));
 
         BSONObj result;
         massert( 10421,
@@ -554,10 +586,11 @@ namespace mongo {
         _databases.clear();
     }
 
-    BSONObj Grid::getConfigSetting( string name ) const {
+    BSONObj Grid::getConfigSetting( const std::string& name ) const {
         scoped_ptr<ScopedDbConnection> conn( ScopedDbConnection::getInternalScopedDbConnection(
-                configServer.getPrimary().getConnString() ) );
-        BSONObj result = conn->get()->findOne( ShardNS::settings, BSON( "_id" << name ) );
+                configServer.getPrimary().getConnString(), 30));
+        BSONObj result = conn->get()->findOne( SettingsType::ConfigNS,
+                                               BSON( SettingsType::key(name) ) );
         conn->done();
 
         return result;
@@ -583,10 +616,18 @@ namespace mongo {
             const string T3 = "21:30";
             const string E = "28:35";
 
-            BSONObj w1 = BSON( "activeWindow" << BSON( "start" << T0 << "stop" << T1 ) ); // closed in the past
-            BSONObj w2 = BSON( "activeWindow" << BSON( "start" << T2 << "stop" << T3 ) ); // not opened until the future
-            BSONObj w3 = BSON( "activeWindow" << BSON( "start" << T1 << "stop" << T2 ) ); // open now
-            BSONObj w4 = BSON( "activeWindow" << BSON( "start" << T3 << "stop" << T2 ) ); // open since last day
+            // closed in the past
+            BSONObj w1 = BSON( SettingsType::balancerActiveWindow( BSON( "start" << T0 <<
+                                                                         "stop" << T1 ) ) );
+            // not opened until the future
+            BSONObj w2 = BSON( SettingsType::balancerActiveWindow( BSON( "start" << T2 <<
+                                                                         "stop" << T3 ) ) );
+            // open now
+            BSONObj w3 = BSON( SettingsType::balancerActiveWindow( BSON( "start" << T1 <<
+                                                                         "stop" << T2 ) ) );
+            // open since last day
+            BSONObj w4 = BSON( SettingsType::balancerActiveWindow( BSON( "start" << T3 <<
+                                                                         "stop" << T2 ) ) );
 
             verify( ! Grid::_inBalancingWindow( w1 , now ) );
             verify( ! Grid::_inBalancingWindow( w2 , now ) );
@@ -595,11 +636,21 @@ namespace mongo {
 
             // bad input should not stop the balancer
 
-            BSONObj w5; // empty window
-            BSONObj w6 = BSON( "activeWindow" << BSON( "start" << 1 ) ); // missing stop
-            BSONObj w7 = BSON( "activeWindow" << BSON( "stop" << 1 ) ); // missing start
-            BSONObj w8 = BSON( "wrongMarker" << 1 << "start" << 1 << "stop" << 1 ); // active window marker missing
-            BSONObj w9 = BSON( "activeWindow" << BSON( "start" << T3 << "stop" << E ) ); // garbage in window
+            // empty window
+            BSONObj w5;
+
+            // missing stop
+            BSONObj w6 = BSON( SettingsType::balancerActiveWindow( BSON( "start" << 1 ) ) );
+
+            // missing start
+            BSONObj w7 = BSON( SettingsType::balancerActiveWindow( BSON( "stop" << 1 ) ) );
+
+            // active window marker missing
+            BSONObj w8 = BSON( "wrongMarker" << 1 << "start" << 1 << "stop" << 1 );
+
+            // garbage in window
+            BSONObj w9 = BSON( SettingsType::balancerActiveWindow( BSON( "start" << T3 <<
+                                                                         "stop" << E ) ) );
 
             verify( Grid::_inBalancingWindow( w5 , now ) );
             verify( Grid::_inBalancingWindow( w6 , now ) );

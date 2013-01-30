@@ -1,9 +1,11 @@
 // use aggdb
 db = db.getSiblingDB("aggdb");
+var article = db.article;
 
 load('jstests/aggregation/data/articles.js');
+
 // original crash from ticket
-var r3 = db.runCommand({ aggregate:"article", pipeline:[
+var r3 = article.aggregate(
     { $project: {
         author: 1,
         _id: 0
@@ -11,7 +13,7 @@ var r3 = db.runCommand({ aggregate:"article", pipeline:[
     { $project: {
         Writer: "$author"
     }}
-]});
+);
 
 printjson(r3);
 

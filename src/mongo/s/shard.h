@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "pch.h"
+#include "mongo/pch.h"
 
 #include "mongo/client/connpool.h"
 
@@ -99,19 +99,14 @@ namespace mongo {
         }
 
         bool operator==( const Shard& s ) const {
-            bool n = _name == s._name;
-            bool a = _addr == s._addr;
-
-            verify( n == a ); // names and address are 1 to 1
-            return n;
+            if ( _name != s._name )
+                return false;
+            return _cs.sameLogicalEndpoint( s._cs );
         }
 
         bool operator!=( const Shard& s ) const {
-            bool n = _name == s._name;
-            bool a = _addr == s._addr;
-            return ! ( n && a );
+            return ! ( *this == s );
         }
-
 
         bool operator==( const string& s ) const {
             return _name == s || _addr == s;
@@ -174,6 +169,7 @@ namespace mongo {
         bool      _isDraining; // shard is currently being removed
         set<string> _tags;
     };
+    typedef shared_ptr<Shard> ShardPtr;
 
     class ShardStatus {
     public:
@@ -289,6 +285,12 @@ namespace mongo {
         /** checks all of my thread local connections for the version of this ns */
         static void checkMyConnectionVersions( const string & ns );
 
+        /**
+         * Clears all connections in the sharded pool, including connections in the
+         * thread local storage pool of the current thread.
+         */
+        static void clearPool();
+
     private:
         void _init();
         void _finishInit();
@@ -314,7 +316,6 @@ namespace mongo {
         }
 
         virtual void onCreate( DBClientBase * conn );
-        virtual void onHandedOut( DBClientBase * conn );
         virtual void onDestroy( DBClientBase * conn );
 
         bool _shardedConnections;

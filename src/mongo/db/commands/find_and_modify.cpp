@@ -1,6 +1,7 @@
 // find_and_modify.cpp
 
 /**
+*    Copyright (C) 2012 10gen Inc.
 *
 *    This program is free software: you can redistribute it and/or  modify
 *    it under the terms of the GNU Affero General Public License, version 3,
@@ -16,13 +17,17 @@
 */
 
 #include "pch.h"
-#include "../commands.h"
-#include "../instance.h"
-#include "../clientcursor.h"
-#include "../pagefault.h"
-#include "../dbhelpers.h"
-#include "../ops/delete.h"
-#include "../ops/update.h"
+
+#include "mongo/db/commands/find_and_modify.h"
+
+#include "mongo/db/commands.h"
+#include "mongo/db/instance.h"
+#include "mongo/db/clientcursor.h"
+#include "mongo/db/pagefault.h"
+#include "mongo/db/dbhelpers.h"
+#include "mongo/db/ops/delete.h"
+#include "mongo/db/ops/update.h"
+#include "mongo/db/queryutil.h"
 
 namespace mongo {
 
@@ -41,7 +46,11 @@ namespace mongo {
         virtual bool logTheOp() { return false; } // the modifications will be logged directly
         virtual bool slaveOk() const { return false; }
         virtual LockType locktype() const { return WRITE; }
-        
+        virtual void addRequiredPrivileges(const std::string& dbname,
+                                           const BSONObj& cmdObj,
+                                           std::vector<Privilege>* out) {
+            find_and_modify::addPrivilegesRequiredForFindAndModify(dbname, cmdObj, out);
+        }
         /* this will eventually replace run,  once sort is handled */
         bool runNoDirectClient( const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
             verify( cmdObj["sort"].eoo() );
@@ -77,7 +86,7 @@ namespace mongo {
                     return runNoDirectClient( ns , 
                                               query , fields , update , 
                                               upsert , returnNew , remove , 
-                                              result );
+                                              result , errmsg );
                 }
                 catch ( PageFaultException& e ) {
                     e.touch();
@@ -107,7 +116,7 @@ namespace mongo {
         bool runNoDirectClient( const string& ns , 
                                 const BSONObj& queryOriginal , const BSONObj& fields , const BSONObj& update , 
                                 bool upsert , bool returnNew , bool remove ,
-                                BSONObjBuilder& result ) {
+                                BSONObjBuilder& result , string& errmsg ) {
             
             
             Lock::DBWrite lk( ns );
@@ -118,13 +127,70 @@ namespace mongo {
             bool found = Helpers::findOne( ns.c_str() , queryOriginal , doc );
 
             BSONObj queryModified = queryOriginal;
-            if ( found && doc["_id"].type() )
-                queryModified = doc["_id"].wrap();
+            if ( found && doc["_id"].type() && ! isSimpleIdQuery( queryOriginal ) ) {
+                // we're going to re-write the query to be more efficient
+                // we have to be a little careful because of positional operators
+                // maybe we can pass this all through eventually, but right now isn't an easy way
+                
+                bool hasPositionalUpdate = false;
+                {
+                    // if the update has a positional piece ($)
+                    // then we need to pull all query parts in
+                    // so here we check for $
+                    // a little hacky
+                    BSONObjIterator i( update );
+                    while ( i.more() ) {
+                        const BSONElement& elem = i.next();
+                        
+                        if ( elem.fieldName()[0] != '$' || elem.type() != Object )
+                            continue;
+
+                        BSONObjIterator j( elem.Obj() );
+                        while ( j.more() ) {
+                            if ( str::contains( j.next().fieldName(), ".$" ) ) {
+                                hasPositionalUpdate = true;
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                BSONObjBuilder b( queryOriginal.objsize() + 10 );
+                b.append( doc["_id"] );
+                
+                bool addedAtomic = false;
+
+                BSONObjIterator i( queryOriginal );
+                while ( i.more() ) {
+                    const BSONElement& elem = i.next();
+
+                    if ( str::equals( "_id" , elem.fieldName() ) ) {
+                        // we already do _id
+                        continue;
+                    }
+                    
+                    if ( ! hasPositionalUpdate ) {
+                        // if there is a dotted field, accept we may need more query parts
+                        continue;
+                    }
+                    
+                    if ( ! addedAtomic ) {
+                        b.appendBool( "$atomic" , true );
+                        addedAtomic = true;
+                    }
+
+                    b.append( elem );
+                }
+                queryModified = b.obj();
+            }
 
             if ( remove ) {
                 _appendHelper( result , doc , found , fields );
                 if ( found ) {
                     deleteObjects( ns.c_str() , queryModified , true , true );
+                    BSONObjBuilder le( result.subobjStart( "lastErrorObject" ) );
+                    le.appendNumber( "n" , 1 );
+                    le.done();
                 }
             }
             else {
@@ -140,12 +206,33 @@ namespace mongo {
                         _appendHelper( result , doc , found , fields );
                     }
                     
-                    updateObjects( ns.c_str() , update , queryModified , upsert , false , true , cc().curop()->debug() );
+                    UpdateResult res = updateObjects( ns.c_str() , update , queryModified , upsert , false , true , cc().curop()->debug() );
                     
                     if ( returnNew ) {
-                        verify( Helpers::findOne( ns.c_str() , queryModified , doc ) );
+                        if ( res.upserted.isSet() ) {
+                            queryModified = BSON( "_id" << res.upserted );
+                        }
+                        else if ( queryModified["_id"].type() ) {
+                            // we do this so that if the update changes the fields, it still matches
+                            queryModified = queryModified["_id"].wrap();
+                        }
+                        if ( ! Helpers::findOne( ns.c_str() , queryModified , doc ) ) {
+                            errmsg = str::stream() << "can't find object after modification  " 
+                                                   << " ns: " << ns 
+                                                   << " queryModified: " << queryModified 
+                                                   << " queryOriginal: " << queryOriginal;
+                            log() << errmsg << endl;
+                            return false;
+                        }
                         _appendHelper( result , doc , true , fields );
                     }
+                    
+                    BSONObjBuilder le( result.subobjStart( "lastErrorObject" ) );
+                    le.appendBool( "updatedExisting" , res.existing );
+                    le.appendNumber( "n" , res.num );
+                    if ( res.upserted.isSet() )
+                        le.append( "upserted" , res.upserted );
+                    le.done();
                     
                 }
             }
@@ -191,7 +278,7 @@ namespace mongo {
                 uassert(13330, "upsert mode requires query field", !origQuery.isEmpty());
                 db.update(ns, origQuery, update.embeddedObjectUserCheck(), true);
 
-                BSONObj gle = db.getLastErrorDetailed();
+                BSONObj gle = db.getLastErrorDetailed(dbname);
                 result.append("lastErrorObject", gle);
                 if (gle["err"].type() == String) {
                     errmsg = gle["err"].String();
@@ -213,7 +300,7 @@ namespace mongo {
                     uassert(12515, "can't remove and update", cmdObj["update"].eoo());
                     db.remove(ns, QUERY("_id" << out["_id"]), 1);
 
-                    BSONObj gle = db.getLastErrorDetailed();
+                    BSONObj gle = db.getLastErrorDetailed(dbname);
                     result.append("lastErrorObject", gle);
                     if (gle["err"].type() == String) {
                         errmsg = gle["err"].String();
@@ -245,7 +332,7 @@ namespace mongo {
                     uassert(12516, "must specify remove or update", !update.eoo());
                     db.update(ns, q, update.embeddedObjectUserCheck());
 
-                    BSONObj gle = db.getLastErrorDetailed();
+                    BSONObj gle = db.getLastErrorDetailed(dbname);
                     result.append("lastErrorObject", gle);
                     if (gle["err"].type() == String) {
                         errmsg = gle["err"].String();

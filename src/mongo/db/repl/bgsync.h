@@ -42,7 +42,7 @@ namespace replset {
         virtual void consume() = 0;
 
         // Returns the member we're currently syncing from (or NULL)
-        virtual Member* getSyncTarget() = 0;
+        virtual const Member* getSyncTarget() = 0;
 
         // wait up to 1 second for more ops to appear
         virtual void waitForMore() = 0;
@@ -73,8 +73,11 @@ namespace replset {
         long long _lastH;
         // if produce thread should be running
         bool _pause;
+        bool _appliedBuffer;
+        bool _assumingPrimary;
+        boost::condition _condvar;
 
-        Member* _currentSyncTarget;
+        const Member* _currentSyncTarget;
 
         // Notifier thread
 
@@ -82,20 +85,13 @@ namespace replset {
         boost::condition_variable _lastOpCond;
         boost::mutex _lastOpMutex;
 
-        Member* _oplogMarkerTarget;
+        const Member* _oplogMarkerTarget;
         OplogReader _oplogMarker; // not locked, only used by notifier thread
         OpTime _consumedOpTime; // not locked, only used by notifier thread
-
-        struct QueueCounter {
-            QueueCounter();
-            unsigned long long waitTime;
-            unsigned int numElems;
-        } _queueCounter;
 
         BackgroundSync();
         BackgroundSync(const BackgroundSync& s);
         BackgroundSync operator=(const BackgroundSync& s);
-
 
         // Production thread
         void _producerThread();
@@ -104,6 +100,8 @@ namespace replset {
         // Check if rollback is necessary
         bool isRollbackRequired(OplogReader& r);
         void getOplogReader(OplogReader& r);
+        // Evaluate if the current sync target is still good
+        bool shouldChangeSyncTarget();
         // check lastOpTimeWritten against the remote's earliest op, filling in remoteOldestOp.
         bool isStale(OplogReader& r, BSONObj& remoteOldestOp);
         // stop syncing when this becomes a primary
@@ -115,6 +113,9 @@ namespace replset {
         // tells the sync target where this member is synced to
         void markOplog();
         bool hasCursor();
+
+        bool isAssumingPrimary();
+
     public:
         static BackgroundSync* get();
         static void shutdown();
@@ -131,11 +132,15 @@ namespace replset {
 
         virtual bool peek(BSONObj* op);
         virtual void consume();
-        virtual Member* getSyncTarget();
+        virtual const Member* getSyncTarget();
         virtual void waitForMore();
 
         // For monitoring
         BSONObj getCounters();
+
+        // Wait for replication to finish and buffer to be applied so that the member can become
+        // primary.
+        void stopReplicationAndFlushBuffer();
     };
 
 

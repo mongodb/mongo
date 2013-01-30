@@ -17,15 +17,17 @@
 
 
 #include "pch.h"
-#include "parallel.h"
-#include "connpool.h"
-#include "../db/dbmessage.h"
-#include "../s/util.h"
-#include "../s/shard.h"
-#include "../s/chunk.h"
-#include "../s/config.h"
-#include "../s/grid.h"
+
+#include "mongo/client/connpool.h"
 #include "mongo/client/dbclientcursor.h"
+#include "mongo/client/parallel.h"
+#include "mongo/db/dbmessage.h"
+#include "mongo/s/chunk.h"
+#include "mongo/s/chunk_version.h"
+#include "mongo/s/config.h"
+#include "mongo/s/grid.h"
+#include "mongo/s/shard.h"
+#include "mongo/s/version_manager.h"
 
 namespace mongo {
 
@@ -96,6 +98,18 @@ namespace mongo {
             BSONObj o = cursor->next();
             throw UserException( o["code"].numberInt() , o["$err"].String() );
         }
+
+        if ( NamespaceString( cursor->getns() ).isCommand() ) {
+            // For backwards compatibility with v2.0 mongods because in 2.0 commands that care about
+            // versioning (like the count command) will return with the stale config error code, but
+            // don't set the ShardConfigStale result flag on the cursor.
+            // TODO: This should probably be removed for 2.3, as we'll no longer need to support
+            // running with a 2.0 mongod.
+            BSONObj res = cursor->peekFirst();
+            if ( res.hasField( "code" ) && res["code"].Number() == SendStaleConfigCode ) {
+                throw RecvStaleConfigException( "ClusteredCursor::_checkCursor", res );
+            }
+        }
     }
 
     auto_ptr<DBClientCursor> ClusteredCursor::query( const string& server , int num , BSONObj extra , int skipLeft , bool lazy ) {
@@ -113,7 +127,7 @@ namespace mongo {
             if ( conn.setVersion() ) {
                 conn.done();
                 // Deprecated, so we don't care about versions here
-                throw RecvStaleConfigException( _ns , "ClusteredCursor::query" , ShardChunkVersion( 0, OID() ), ShardChunkVersion( 0, OID() ), true );
+                throw RecvStaleConfigException( _ns , "ClusteredCursor::query" , ChunkVersion( 0, OID() ), ChunkVersion( 0, OID() ), true );
             }
             
             LOG(5) << "ClusteredCursor::query (" << type() << ") server:" << server
@@ -725,7 +739,7 @@ namespace mongo {
                     // It's actually okay if we set the version here, since either the
                     // manager will be verified as compatible, or if the manager doesn't
                     // exist, we don't care about version consistency
-                    log( pc ) << "needed to set remote version on connection to value "
+                    LOG( pc ) << "needed to set remote version on connection to value "
                               << "compatible with " << vinfo << endl;
                 }
             } catch ( const DBException& dbEx ) {
@@ -762,9 +776,15 @@ namespace mongo {
         ShardPtr primary;
 
         string prefix;
-        if( _totalTries > 0 ) prefix = str::stream() << "retrying (" << _totalTries << " tries)";
-        else prefix = "creating";
-        log( pc ) << prefix << " pcursor over " << _qSpec << " and " << _cInfo << endl;
+        if (MONGO_unlikely(logLevel >= pc)) {
+            if( _totalTries > 0 ) {
+                prefix = str::stream() << "retrying (" << _totalTries << " tries)";
+            }
+            else {
+                prefix = "creating";
+            }
+        }
+        LOG( pc ) << prefix << " pcursor over " << _qSpec << " and " << _cInfo << endl;
 
         set<Shard> todoStorage;
         set<Shard>& todo = todoStorage;
@@ -778,8 +798,16 @@ namespace mongo {
             // Try to get either the chunk manager or the primary shard
             config->getChunkManagerOrPrimary( ns, manager, primary );
 
-            if( manager ) vinfo = ( str::stream() << "[" << manager->getns() << " @ " << manager->getVersion().toString() << "]" );
-            else vinfo = (str::stream() << "[unsharded @ " << primary->toString() << "]" );
+            if (MONGO_unlikely(logLevel >= pc)) {
+                if (manager) {
+                    vinfo = str::stream() << "[" << manager->getns() << " @ "
+                        << manager->getVersion().toString() << "]";
+                }
+                else {
+                    vinfo = str::stream() << "[unsharded @ "
+                        << primary->toString() << "]";
+                }
+            }
 
             if( manager ) manager->getShardsForQuery( todo, specialFilter ? _cInfo.cmdFilter : _qSpec.filter() );
             else if( primary ) todo.insert( *primary );
@@ -787,7 +815,8 @@ namespace mongo {
             // Close all cursors on extra shards first, as these will be invalid
             for( map< Shard, PCMData >::iterator i = _cursorMap.begin(), end = _cursorMap.end(); i != end; ++i ){
 
-                log( pc ) << "closing cursor on shard " << i->first << " as the connection is no longer required by " << vinfo << endl;
+                LOG( pc ) << "closing cursor on shard " << i->first
+                    << " as the connection is no longer required by " << vinfo << endl;
 
                 // Force total cleanup of these connections
                 if( todo.find( i->first ) == todo.end() ) i->second.cleanup();
@@ -797,13 +826,15 @@ namespace mongo {
 
             // Don't use version to get shards here
             todo = _qShards;
-            vinfo = str::stream() << "[" << _qShards.size() << " shards specified]";
-
+            if (MONGO_unlikely(logLevel >= pc)) {
+                vinfo = str::stream() << "[" << _qShards.size() << " shards specified]";
+            }
         }
 
         verify( todo.size() );
 
-        log( pc ) << "initializing over " << todo.size() << " shards required by " << vinfo << endl;
+        LOG( pc ) << "initializing over " << todo.size()
+            << " shards required by " << vinfo << endl;
 
         // Don't retry indefinitely for whatever reason
         _totalTries++;
@@ -814,7 +845,8 @@ namespace mongo {
             const Shard& shard = *i;
             PCMData& mdata = _cursorMap[ shard ];
 
-            log( pc ) << "initializing on shard " << shard << ", current connection state is " << mdata.toBSON() << endl;
+            LOG( pc ) << "initializing on shard " << shard
+                << ", current connection state is " << mdata.toBSON() << endl;
 
             // This may be the first time connecting to this shard, if so we can get an error here
             try {
@@ -939,8 +971,9 @@ namespace mongo {
                 }
 
 
-                log( pc ) << "initialized " << ( isCommand() ? "command " : "query " ) << ( lazyInit ? "(lazily) " : "(full) " ) << "on shard " << shard << ", current connection state is " << mdata.toBSON() << endl;
-
+                LOG( pc ) << "initialized " << ( isCommand() ? "command " : "query " )
+                    << ( lazyInit ? "(lazily) " : "(full) " ) << "on shard " << shard
+                    << ", current connection state is " << mdata.toBSON() << endl;
             }
             catch( StaleConfigException& e ){
 
@@ -955,7 +988,9 @@ namespace mongo {
                 _markStaleNS( staleNS, e, forceReload, fullReload );
 
                 int logLevel = fullReload ? 0 : 1;
-                log( pc + logLevel ) << "stale config of ns " << staleNS << " during initialization, will retry with forced : " << forceReload << ", full : " << fullReload << causedBy( e ) << endl;
+                LOG( pc + logLevel ) << "stale config of ns "
+                    << staleNS << " during initialization, will retry with forced : "
+                    << forceReload << ", full : " << fullReload << causedBy( e ) << endl;
 
                 // This is somewhat strange
                 if( staleNS != ns )
@@ -969,6 +1004,7 @@ namespace mongo {
             }
             catch( SocketException& e ){
                 warning() << "socket exception when initializing on " << shard << ", current connection state is " << mdata.toBSON() << causedBy( e ) << endl;
+                e._shard = shard.getName();
                 mdata.errored = true;
                 if( returnPartial ){
                     mdata.cleanup();
@@ -978,6 +1014,7 @@ namespace mongo {
             }
             catch( DBException& e ){
                 warning() << "db exception when initializing on " << shard << ", current connection state is " << mdata.toBSON() << causedBy( e ) << endl;
+                e._shard = shard.getName();
                 mdata.errored = true;
                 if( returnPartial && e.getCode() == 15925 /* From above! */ ){
                     mdata.cleanup();
@@ -1030,14 +1067,15 @@ namespace mongo {
         bool retry = false;
         map< string, StaleConfigException > staleNSExceptions;
 
-        log( pc ) << "finishing over " << _cursorMap.size() << " shards" << endl;
+        LOG( pc ) << "finishing over " << _cursorMap.size() << " shards" << endl;
 
         for( map< Shard, PCMData >::iterator i = _cursorMap.begin(), end = _cursorMap.end(); i != end; ++i ){
 
             const Shard& shard = i->first;
             PCMData& mdata = i->second;
 
-            log( pc ) << "finishing on shard " << shard << ", current connection state is " << mdata.toBSON() << endl;
+            LOG( pc ) << "finishing on shard " << shard
+                << ", current connection state is " << mdata.toBSON() << endl;
 
             // Ignore empty conns for now
             if( ! mdata.pcState ) continue;
@@ -1088,7 +1126,8 @@ namespace mongo {
                     // Finalize state
                     state->cursor->attach( state->conn.get() ); // Closes connection for us
 
-                    log( pc ) << "finished on shard " << shard << ", current connection state is " << mdata.toBSON() << endl;
+                    LOG( pc ) << "finished on shard " << shard
+                        << ", current connection state is " << mdata.toBSON() << endl;
                 }
             }
             catch( RecvStaleConfigException& e ){
@@ -1115,9 +1154,26 @@ namespace mongo {
                 throw;
             }
             catch( DBException& e ){
-                warning() << "db exception when finishing on " << shard << ", current connection state is " << mdata.toBSON() << causedBy( e ) << endl;
-                mdata.errored = true;
-                throw;
+                // NOTE: RECV() WILL NOT THROW A SOCKET EXCEPTION - WE GET THIS AS ERROR 15988 FROM
+                // ABOVE
+                if (e.getCode() == 15988) {
+
+                    warning() << "exception when receiving data from " << shard
+                              << ", current connection state is " << mdata.toBSON()
+                              << causedBy( e ) << endl;
+
+                    mdata.errored = true;
+                    if (returnPartial) {
+                        mdata.cleanup();
+                        continue;
+                    }
+                    throw;
+                }
+                else {
+                    warning() << "db exception when finishing on " << shard << ", current connection state is " << mdata.toBSON() << causedBy( e ) << endl;
+                    mdata.errored = true;
+                    throw;
+                }
             }
             catch( std::exception& e){
                 warning() << "exception when finishing on " << shard << ", current connection state is " << mdata.toBSON() << causedBy( e ) << endl;
@@ -1146,7 +1202,9 @@ namespace mongo {
                     _markStaleNS( staleNS, exception, forceReload, fullReload );
 
                     int logLevel = fullReload ? 0 : 1;
-                    log( pc + logLevel ) << "stale config of ns " << staleNS << " on finishing query, will retry with forced : " << forceReload << ", full : " << fullReload << causedBy( exception ) << endl;
+                    LOG( pc + logLevel ) << "stale config of ns "
+                        << staleNS << " on finishing query, will retry with forced : "
+                        << forceReload << ", full : " << fullReload << causedBy( exception ) << endl;
 
                     // This is somewhat strange
                     if( staleNS != ns )
@@ -1216,6 +1274,7 @@ namespace mongo {
         if( ! isVersioned() ) return false;
 
         if( _cursorMap.size() > 1 ) return true;
+        if( _cursorMap.size() == 0 ) return true;
         if( _cursorMap.begin()->second.pcState->manager ) return true;
         return false;
     }
@@ -1337,7 +1396,7 @@ namespace mongo {
                 if ( conns[i]->setVersion() ) {
                     conns[i]->done();
                     // Version is zero b/c this is deprecated codepath
-                    staleConfigExs.push_back( (string)"stale config detected for " + RecvStaleConfigException( _ns , "ParallelCursor::_init" , ShardChunkVersion( 0, OID() ), ShardChunkVersion( 0, OID() ), true ).what() + errLoc );
+                    staleConfigExs.push_back( (string)"stale config detected for " + RecvStaleConfigException( _ns , "ParallelCursor::_init" , ChunkVersion( 0, OID() ), ChunkVersion( 0, OID() ), true ).what() + errLoc );
                     break;
                 }
 
@@ -1491,7 +1550,7 @@ namespace mongo {
 
             if( throwException && staleConfigExs.size() > 0 ){
                 // Version is zero b/c this is deprecated codepath
-                throw RecvStaleConfigException( _ns , errMsg.str() , ShardChunkVersion( 0, OID() ), ShardChunkVersion( 0, OID() ), ! allConfigStale );
+                throw RecvStaleConfigException( _ns , errMsg.str() , ChunkVersion( 0, OID() ), ChunkVersion( 0, OID() ), ! allConfigStale );
             }
             else if( throwException )
                 throw DBException( errMsg.str(), 14827 );
@@ -1610,12 +1669,7 @@ namespace mongo {
             }
 
             if ( _conn->lazySupported() ) {
-                BSONObj actualCommand = _cmd;
-                if ( !noauth ) {
-                    actualCommand = ClientBasic::getCurrent()->getAuthenticationInfo()->
-                        getAuthTable().copyCommandObjAddingAuth( _cmd );
-                }
-                _cursor.reset( new DBClientCursor(_conn, _db + ".$cmd", actualCommand,
+                _cursor.reset( new DBClientCursor(_conn, _db + ".$cmd", _cmd,
                                                   -1/*limit*/, 0, NULL, _options, 0));
                 _cursor->initLazy();
             }
@@ -1625,7 +1679,7 @@ namespace mongo {
             }
         }
         catch ( std::exception& e ) {
-            error() << "Future::spawnComand (part 1) exception: " << e.what() << endl;
+            error() << "Future::spawnCommand (part 1) exception: " << e.what() << endl;
             _ok = false;
             _done = true;
         }
@@ -1664,13 +1718,13 @@ namespace mongo {
                 if( staleNS.size() == 0 ) staleNS = _db;
 
                 if( i >= maxRetries ){
-                    error() << "Future::spawnComand (part 2) stale config exception" << causedBy( e ) << endl;
+                    error() << "Future::spawnCommand (part 2) stale config exception" << causedBy( e ) << endl;
                     throw e;
                 }
 
                 if( i >= maxRetries / 2 ){
                     if( ! versionManager.forceRemoteCheckShardVersionCB( staleNS ) ){
-                        error() << "Future::spawnComand (part 2) no config detected" << causedBy( e ) << endl;
+                        error() << "Future::spawnCommand (part 2) no config detected" << causedBy( e ) << endl;
                         throw e;
                     }
                 }
@@ -1694,7 +1748,7 @@ namespace mongo {
                 continue;
             }
             catch ( std::exception& e ) {
-                error() << "Future::spawnComand (part 2) exception: " << causedBy( e ) << endl;
+                error() << "Future::spawnCommand (part 2) exception: " << causedBy( e ) << endl;
                 break;
             }
 

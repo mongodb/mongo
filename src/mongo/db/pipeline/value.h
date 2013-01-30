@@ -16,452 +16,325 @@
 
 #pragma once
 
-#include "pch.h"
-#include "bson/bsontypes.h"
-#include "bson/oid.h"
-#include "util/intrusive_counter.h"
-#include "util/optime.h"
+#include "mongo/db/pipeline/value_internal.h"
 
 namespace mongo {
     class BSONElement;
     class Builder;
-    class Document;
-    class Value;
 
-    class ValueIterator :
-        public IntrusiveCounterUnsigned {
-    public:
-        virtual ~ValueIterator();
-
-        /*
-          Ask if there are more fields to return.
-
-          @returns true if there are more fields, false otherwise
-        */
-        virtual bool more() const = 0;
-
-        /*
-          Move the iterator to point to the next field and return it.
-
-          @returns the next field's <name, Value>
-        */
-        virtual intrusive_ptr<const Value> next() = 0;
-    };
-
-
-    /*
-      Values are immutable, so these are passed around as
-      intrusive_ptr<const Value>.
+    /** A variant type that can hold any type of data representable in BSON
+     *
+     *  Small values are stored inline, but some values, such as large strings,
+     *  are heap allocated. It has smart pointer capabilities built-in so it is
+     *  safe and recommended to pass these around and return them by value.
+     *
+     *  Values are immutable, but can be assigned. This means that once you have
+     *  a Value, you can be assured that none of the data in that Value will
+     *  change. However if you have a non-const Value you replace it with
+     *  operator=. These rules are the same as BSONObj, and similar to
+     *  shared_ptr<const Object> with stronger guarantees of constness. This is
+     *  also the same as Java's String type.
+     *
+     *  Thread-safety: A single Value instance can be safely shared between
+     *  threads as long as there are no writers while other threads are
+     *  accessing the object. Any number of threads can read from a Value
+     *  concurrently. There are no restrictions on how threads access Value
+     *  instances exclusively owned by them, even if they reference the same
+     *  storage as Value in other threads.
      */
-    class Value :
-        public IntrusiveCounterUnsigned {
+    class Value {
     public:
-        ~Value();
+        /** Construct a Value
+         *
+         *  All types not listed will be rejected rather than converted (see private for why)
+         *
+         *  Note: Currently these are all explicit conversions.
+         *        I'm not sure if we want implicit or not.
+         *  //TODO decide
+         */
 
-        /*
-          Construct a Value from a BSONElement.
+        Value(): _storage() {} // "Missing" value
+        explicit Value(bool value)                : _storage(Bool, value) {}
+        explicit Value(int value)                 : _storage(NumberInt, value) {}
+        explicit Value(long long value)           : _storage(NumberLong, value) {}
+        explicit Value(double value)              : _storage(NumberDouble, value) {}
+        explicit Value(const OpTime& value)       : _storage(Timestamp, value.asDate()) {}
+        explicit Value(const OID& value)          : _storage(jstOID, value) {}
+        explicit Value(const StringData& value)   : _storage(String, value) {}
+        explicit Value(const string& value)       : _storage(String, StringData(value)) {}
+        explicit Value(const char* value)         : _storage(String, StringData(value)) {}
+        explicit Value(const Document& doc)       : _storage(Object, doc) {}
+        explicit Value(const BSONObj& obj);//     : _storage(Object, Document(obj)) {} // in cpp
+        explicit Value(const vector<Value>& vec)  : _storage(Array, new RCVector(vec)) {}
+        explicit Value(const BSONBinData& bd)     : _storage(BinData, bd) {}
+        explicit Value(const BSONRegEx& re)       : _storage(RegEx, re) {}
+        explicit Value(const BSONCodeWScope& cws) : _storage(CodeWScope, cws) {}
+        explicit Value(const BSONDBRef& dbref)    : _storage(DBRef, dbref) {}
+        explicit Value(const BSONSymbol& sym)     : _storage(Symbol, sym.symbol) {}
+        explicit Value(const BSONCode& code)      : _storage(Code, code.code) {}
+        explicit Value(const NullLabeler&)        : _storage(jstNULL) {}   // BSONNull
+        explicit Value(const UndefinedLabeler&)   : _storage(Undefined) {} // BSONUndefined
+        explicit Value(const MinKeyLabeler&)      : _storage(MinKey) {}    // MINKEY
+        explicit Value(const MaxKeyLabeler&)      : _storage(MaxKey) {}    // MAXKEY
+        explicit Value(const Date_t& date)
+            : _storage(Date, static_cast<long long>(date.millis)) // millis really signed
+        {}
 
-          This ignores the name of the element, and only uses the value,
-          whatever type it is.
+        /** Creates an empty or zero value of specified type.
+         *  This is currently the only way to create Undefined or Null Values.
+         */
+        explicit Value(BSONType type);
 
-          @returns a new Value initialized from the bsonElement
+        // TODO: add an unsafe version that can share storage with the BSONElement
+        /// Deep-convert from BSONElement to Value
+        explicit Value(const BSONElement& elem);
+
+        /** Construct a long or integer-valued Value.
+         *
+         *  Used when preforming arithmetic operations with int where the
+         *  result may be too large and need to be stored as long. The Value
+         *  will be an int if value fits, otherwise it will be a long.
         */
-        static intrusive_ptr<const Value> createFromBsonElement(
-            BSONElement *pBsonElement);
+        static Value createIntOrLong(long long value);
 
-        /*
-          Construct an integer-valued Value.
+        /** A "missing" value indicates the lack of a Value.
+         *  This is similar to undefined/null but should not appear in output to BSON.
+         *  Missing Values are returned by Document when accessing non-existent fields.
+         */
+        bool missing() const { return _storage.type == EOO; }
 
-          For commonly used values, consider using one of the singleton
-          instances defined below.
+        /// true if missing() or type is jstNULL or Undefined
+        bool nullish() const {
+            return missing()
+                || _storage.type == jstNULL
+                || _storage.type == Undefined;
+        }
 
-          @param value the value
-          @returns a Value with the given value
-        */
-        static intrusive_ptr<const Value> createInt(int value);
+        /// true if type represents a number
+        bool numeric() const {
+            return _storage.type == NumberDouble
+                || _storage.type == NumberLong
+                || _storage.type == NumberInt;
+        }
 
-        /*
-          Construct an long(long)-valued Value.
+        /// Get the BSON type of the field.
+        BSONType getType() const { return _storage.bsonType(); }
 
-          For commonly used values, consider using one of the singleton
-          instances defined below.
-
-          @param value the value
-          @returns a Value with the given value
-        */
-        static intrusive_ptr<const Value> createLong(long long value);
-
-        /*
-          Construct a double-valued Value.
-
-          @param value the value
-          @returns a Value with the given value
-        */
-        static intrusive_ptr<const Value> createDouble(double value);
-
-        /*
-          Construct a string-valued Value.
-
-          @param value the value
-          @returns a Value with the given value
-        */
-        static intrusive_ptr<const Value> createString(const string &value);
-
-        /*
-          Construct a date-valued Value.
-
-          @param value the value
-          @returns a Value with the given value
-        */
-        static intrusive_ptr<const Value> createDate(const Date_t &value);
-
-        static intrusive_ptr<const Value> createTimestamp(const OpTime& value);
-
-        /*
-          Construct a document-valued Value.
-
-          @param value the value
-          @returns a Value with the given value
-        */
-        static intrusive_ptr<const Value> createDocument(
-            const intrusive_ptr<Document> &pDocument);
-
-        /*
-          Construct an array-valued Value.
-
-          @param value the value
-          @returns a Value with the given value
-        */
-        static intrusive_ptr<const Value> createArray(
-            const vector<intrusive_ptr<const Value> > &vpValue);
-
-        /*
-          Get the BSON type of the field.
-
-          If the type is jstNULL, no value getter will work.
-
-          @return the BSON type of the field.
-        */
-        BSONType getType() const;
-
-        /*
-          Getters.
-
-          @returns the Value's value; asserts if the requested value type is
-          incorrect.
-        */
+        /** Exact type getters.
+         *  Asserts if the requested value type is not exactly correct.
+         *  See coerceTo methods below for a more type-flexible alternative.
+         */
         double getDouble() const;
         string getString() const;
-        intrusive_ptr<Document> getDocument() const;
-        intrusive_ptr<ValueIterator> getArray() const;
+        Document getDocument() const;
         OID getOid() const;
         bool getBool() const;
-        Date_t getDate() const;
+        long long getDate() const; // in milliseconds
         OpTime getTimestamp() const;
-        string getRegex() const;
+        const char* getRegex() const;
+        const char* getRegexFlags() const;
         string getSymbol() const;
+        string getCode() const;
         int getInt() const;
         long long getLong() const;
-
-        /*
-          Get the length of an array value.
-
-          @returns the length of the array, if this is array-valued; otherwise
-             throws an error
-        */
+        const vector<Value>& getArray() const { return _storage.getArray(); }
         size_t getArrayLength() const;
 
-        /*
-          Add this value to the BSON object under construction.
-        */
-        void addToBsonObj(BSONObjBuilder *pBuilder, string fieldName) const;
+        /// Access an element of a subarray. Returns Value() if missing or getType() != Array
+        Value operator[] (size_t index) const;
 
-        /*
-          Add this field to the BSON array under construction.
+        /// Access a field of a subdocument. Returns Value() if missing or getType() != Object
+        Value operator[] (StringData name) const;
 
-          As part of an array, the Value's name will be ignored.
-        */
-        void addToBsonArray(BSONArrayBuilder *pBuilder) const;
+        /// Add this value to the BSON object under construction.
+        void addToBsonObj(BSONObjBuilder* pBuilder, StringData fieldName) const;
 
-        /*
-          Get references to singleton instances of commonly used field values.
-         */
-        static intrusive_ptr<const Value> getUndefined();
-        static intrusive_ptr<const Value> getNull();
-        static intrusive_ptr<const Value> getTrue();
-        static intrusive_ptr<const Value> getFalse();
-        static intrusive_ptr<const Value> getMinusOne();
-        static intrusive_ptr<const Value> getZero();
-        static intrusive_ptr<const Value> getOne();
+        /// Add this field to the BSON array under construction.
+        void addToBsonArray(BSONArrayBuilder* pBuilder) const;
 
-        /**
-         * Coerce (cast) a value to a native bool using BSONElement::trueValue() rules, but with
-         * some types unsupported.  SERVER-6120
-         * @return the bool value
+        // Support BSONObjBuilder and BSONArrayBuilder "stream" API
+        friend BSONObjBuilder& operator << (BSONObjBuilderValueStream& builder, const Value& val);
+
+        /** Coerce a value to a bool using BSONElement::trueValue() rules.
+         *  Some types unsupported.  SERVER-6120
          */
         bool coerceToBool() const;
 
-        /*
-          Coerce (cast) a value to an int, using JSON rules.
-
-          @returns the int value
-        */
-        int coerceToInt() const;
-
-        /*
-          Coerce (cast) a value to a long long, using JSON rules.
-
-          @returns the long value
-        */
-        long long coerceToLong() const;
-
-        /*
-          Coerce (cast) a value to a double, using JSON rules.
-
-          @returns the double value
-        */
-        double coerceToDouble() const;
-
-        /*
-          Coerce (cast) a value to a date, using JSON rules.
-
-          @returns the date value
-        */
-        Date_t coerceToDate() const;
-
-        OpTime coerceToTimestamp() const;
-
-        /*
-          Coerce (cast) a value to a string, using JSON rules.
-
-          @returns the date value
-        */
-        string coerceToString() const;
-
-        /*
-          Compare two Values.
-
-          @param rL left value
-          @param rR right value
-          @returns an integer less than zero, zero, or an integer greater than
-            zero, depending on whether rL < rR, rL == rR, or rL > rR
+        /** Coercion operators to extract values with fuzzy type logic.
+         *
+         *  These currently assert if called on an unconvertible type.
+         *  TODO: decided how to handle unsupported types.
          */
-        static int compare(const intrusive_ptr<const Value> &rL,
-                           const intrusive_ptr<const Value> &rR);
+        string coerceToString() const;
+        int coerceToInt() const;
+        long long coerceToLong() const;
+        double coerceToDouble() const;
+        OpTime coerceToTimestamp() const;
+        long long coerceToDate() const;
+        time_t coerceToTimeT() const;
+        tm coerceToTm() const; // broken-out time struct (see man gmtime)
 
 
-        /*
-          Figure out what the widest of two numeric types is.
+        /** Compare two Values.
+         *  @returns an integer less than zero, zero, or an integer greater than
+         *           zero, depending on whether lhs < rhs, lhs == rhs, or lhs > rhs
+         *  Warning: may return values other than -1, 0, or 1
+         */
+        static int compare(const Value& lhs, const Value& rhs);
 
-          Widest can be thought of as "most capable," or "able to hold the
-          largest or most precise value."  The progression is Int, Long, Double.
+        friend
+        bool operator==(const Value& v1, const Value& v2) {
+            if (v1._storage.identical(v2._storage)) {
+                // Simple case
+                return true;
+            }
+            return (Value::compare(v1, v2) == 0);
+        }
 
-          @param rL left value
-          @param rR right value
-          @returns a BSONType of NumberInt, NumberLong, or NumberDouble
-        */
+        /// This is for debugging, logging, etc. See getString() for how to extract a string.
+        string toString() const;
+        friend ostream& operator << (ostream& out, const Value& v);
+
+        void swap(Value& rhs) {
+            _storage.swap(rhs._storage);
+        }
+
+        /** Figure out what the widest of two numeric types is.
+         *
+         *  Widest can be thought of as "most capable," or "able to hold the
+         *  largest or most precise value."  The progression is Int, Long, Double.
+         */
         static BSONType getWidestNumeric(BSONType lType, BSONType rType);
 
-        /*
-          Get the approximate storage size of the value, in bytes.
-
-          @returns approximate storage size of the value.
-         */
+        /// Get the approximate memory size of the value, in bytes. Includes sizeof(Value)
         size_t getApproximateSize() const;
 
-        /*
-          Calculate a hash value.
+        /** Calculate a hash value.
+         *
+         *  Meant to be used to create composite hashes suitable for
+         *  hashed container classes such as unordered_map<>.
+         */
+        void hash_combine(size_t& seed) const;
 
-          Meant to be used to create composite hashes suitable for
-          boost classes such as unordered_map<>.
-
-          @param seed value to augment with this' hash
-        */
-        void hash_combine(size_t &seed) const;
-
-        /*
-          struct Hash is defined to enable the use of Values as
-          keys in boost::unordered_map<>.
-
-          Values are always referenced as immutables in the form
-          intrusive_ptr<const Value>, so these operate on that construction.
-        */
-        struct Hash :
-            unary_function<intrusive_ptr<const Value>, size_t> {
-            size_t operator()(const intrusive_ptr<const Value> &rV) const;
+        /// struct Hash is defined to enable the use of Values as keys in unordered_map.
+        struct Hash : unary_function<const Value&, size_t> {
+            size_t operator()(const Value& rV) const;
         };
 
-    protected:
-        Value(); // creates null value
-        Value(BSONType type); // creates an empty (unitialized value) of type
-                                                // mostly useful for Undefined
-        Value(bool boolValue);
-        Value(int intValue);
+        /// Call this after memcpying to update ref counts if needed
+        void memcpyed() const { _storage.memcpyed(); }
+
+        // LEGACY creation functions
+        static Value createFromBsonElement(const BSONElement* pBsonElement);
+        static Value createInt(int value) { return Value(value); }
+        static Value createLong(long long value) { return Value(value); }
+        static Value createDouble(double value) { return Value(value); }
+        static Value createTimestamp(const OpTime& value) { return Value(value); }
+        static Value createString(const string& value) { return Value(value); }
+        static Value createDocument(const Document& doc) { return Value(doc); }
+        static Value createArray(const vector<Value>& vec) { return Value(vec); }
+        static Value createDate(const long long value);
 
     private:
-        Value(BSONElement *pBsonElement);
+        /** This is a "honeypot" to prevent unexpected implicit conversions to the accepted argument
+         *  types. bool is especially bad since without this it will accept any pointer.
+         *
+         *  Template argument name was chosen to make produced error easier to read.
+         */
+        template <typename InvalidArgumentType>
+        explicit Value(const InvalidArgumentType& invalidArgument);
 
-        Value(long long longValue);
-        Value(double doubleValue);
-        Value(const Date_t &dateValue);
-        Value(const OpTime& timestampValue);
-        Value(const string &stringValue);
-        Value(const intrusive_ptr<Document> &pDocument);
-        Value(const vector<intrusive_ptr<const Value> > &vpValue);
+        // does no type checking
+        StringData getStringData() const; // May contain embedded NUL bytes
 
-        void addToBson(Builder *pBuilder) const;
-
-        BSONType type;
-
-        /* store value in one of these */
-        union {
-            double doubleValue;
-            bool boolValue;
-            int intValue;
-            long long longValue;
-        } simple; // values that don't need a ctor/dtor
-        OID oidValue;
-        Date_t dateValue;
-        string stringValue; // String, Regex, Symbol
-        OpTime timestampValue;
-        intrusive_ptr<Document> pDocumentValue;
-        vector<intrusive_ptr<const Value> > vpValue; // for arrays
-
-
-        /*
-        These are often used as the result of boolean or comparison
-        expressions.
-
-        These are obtained via public static getters defined above.
-        */
-        static const intrusive_ptr<const Value> pFieldUndefined;
-        static const intrusive_ptr<const Value> pFieldNull;
-        static const intrusive_ptr<const Value> pFieldTrue;
-        static const intrusive_ptr<const Value> pFieldFalse;
-        static const intrusive_ptr<const Value> pFieldMinusOne;
-        static const intrusive_ptr<const Value> pFieldZero;
-        static const intrusive_ptr<const Value> pFieldOne;
-
-        /* this implementation is used for getArray() */
-        class vi :
-            public ValueIterator {
-        public:
-            // virtuals from ValueIterator
-            virtual ~vi();
-            virtual bool more() const;
-            virtual intrusive_ptr<const Value> next();
-
-        private:
-            friend class Value;
-            vi(const intrusive_ptr<const Value> &pSource,
-               const vector<intrusive_ptr<const Value> > *pvpValue);
-
-            size_t size;
-            size_t nextIndex;
-            const vector<intrusive_ptr<const Value> > *pvpValue;
-        }; /* class vi */
-
+        ValueStorage _storage;
+        friend class MutableValue; // gets and sets _storage.genericRCPtr
     };
+    BOOST_STATIC_ASSERT(sizeof(Value) == 16);
+}
 
-    /*
-      Equality operator for values.
-
-      Useful for unordered_map<>, etc.
-     */
-    inline bool operator==(const intrusive_ptr<const Value> &v1,
-                    const intrusive_ptr<const Value> &v2) {
-        return (Value::compare(v1, v2) == 0);
-    }
-
-    /*
-      For performance reasons, there are various sharable static values
-      defined in class Value, obtainable by methods such as getUndefined(),
-      getTrue(), getOne(), etc.  We don't want these to go away as they are
-      used by a multitude of threads evaluating pipelines.  In order to avoid
-      having to use atomic integers in the intrusive reference counter, this
-      class overrides the reference counting methods to do nothing, making it
-      safe to use for static Values.
-
-      At this point, only the constructors necessary for the static Values in
-      common use have been defined.  The remainder can be defined if necessary.
-     */
-    class ValueStatic :
-        public Value {
-    public:
-        // virtuals from IntrusiveCounterUnsigned
-        virtual void addRef() const;
-        virtual void release() const;
-
-        // constructors
-        ValueStatic();
-        ValueStatic(BSONType type);
-        ValueStatic(bool boolValue);
-        ValueStatic(int intValue);
-    };
+namespace std {
+    // This is used by std::sort and others
+    template <>
+    inline void swap(mongo::Value& lhs, mongo::Value& rhs) { lhs.swap(rhs); }
 }
 
 /* ======================= INLINED IMPLEMENTATIONS ========================== */
 
 namespace mongo {
 
-    inline BSONType Value::getType() const {
-        return type;
-    }
-
     inline size_t Value::getArrayLength() const {
         verify(getType() == Array);
-        return vpValue.size();
+        return getArray().size();
     }
 
-    inline intrusive_ptr<const Value> Value::getUndefined() {
-        return pFieldUndefined;
-    }
-
-    inline intrusive_ptr<const Value> Value::getNull() {
-        return pFieldNull;
-    }
-
-    inline intrusive_ptr<const Value> Value::getTrue() {
-        return pFieldTrue;
-    }
-
-    inline intrusive_ptr<const Value> Value::getFalse() {
-        return pFieldFalse;
-    }
-
-    inline intrusive_ptr<const Value> Value::getMinusOne() {
-        return pFieldMinusOne;
-    }
-
-    inline intrusive_ptr<const Value> Value::getZero() {
-        return pFieldZero;
-    }
-
-    inline intrusive_ptr<const Value> Value::getOne() {
-        return pFieldOne;
-    }
-
-    inline size_t Value::Hash::operator()(
-        const intrusive_ptr<const Value> &rV) const {
+    inline size_t Value::Hash::operator()(const Value& v) const {
         size_t seed = 0xf0afbeef;
-        rV->hash_combine(seed);
+        v.hash_combine(seed);
         return seed;
     }
 
-    inline ValueStatic::ValueStatic():
-        Value() {
+    inline StringData Value::getStringData() const {
+        return _storage.getString();
     }
 
-    inline ValueStatic::ValueStatic(BSONType type):
-        Value(type) {
+    inline string Value::getString() const {
+        verify(getType() == String);
+        return _storage.getString().toString();
     }
 
-    inline ValueStatic::ValueStatic(bool boolValue):
-        Value(boolValue) {
+    inline OID Value::getOid() const {
+        verify(getType() == jstOID);
+        return OID(_storage.oid);
     }
 
-    inline ValueStatic::ValueStatic(int intValue):
-        Value(intValue) {
+    inline bool Value::getBool() const {
+        verify(getType() == Bool);
+        return _storage.boolValue;
     }
 
+    inline long long Value::getDate() const {
+        verify(getType() == Date);
+        return _storage.dateValue;
+    }
+
+    inline OpTime Value::getTimestamp() const {
+        verify(getType() == Timestamp);
+        return _storage.timestampValue;
+    }
+
+    inline const char* Value::getRegex() const {
+        verify(getType() == RegEx);
+        return _storage.getString().rawData(); // this is known to be NUL terminated
+    }
+    inline const char* Value::getRegexFlags() const {
+        verify(getType() == RegEx);
+        const char* pattern = _storage.getString().rawData(); // this is known to be NUL terminated
+        const char* flags = pattern + strlen(pattern) + 1; // first byte after pattern's NUL
+        dassert(flags + strlen(flags) == pattern + _storage.getString().size());
+        return flags;
+    }
+
+    inline string Value::getSymbol() const {
+        verify(getType() == Symbol);
+        return _storage.getString().toString();
+    }
+    inline string Value::getCode() const {
+        verify(getType() == Code);
+        return _storage.getString().toString();
+    }
+
+    inline int Value::getInt() const {
+        verify(getType() == NumberInt);
+        return _storage.intValue;
+    }
+
+    inline long long Value::getLong() const {
+        BSONType type = getType();
+        if (type == NumberInt)
+            return _storage.intValue;
+
+        verify(type == NumberLong);
+        return _storage.longValue;
+    }
 };

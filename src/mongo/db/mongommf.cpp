@@ -155,7 +155,7 @@ namespace mongo {
     extern string dbpath;
 
     // here so that it is precomputed...
-    void MongoMMF::setPath(string f) {
+    void MongoMMF::setPath(const std::string& f) {
         string suffix;
         string prefix;
         bool ok = str::rSplitOn(f, '.', prefix, suffix);
@@ -168,14 +168,14 @@ namespace mongo {
         _p = RelativePath::fromFullPath(prefix);
     }
 
-    bool MongoMMF::open(string fname, bool sequentialHint) {
+    bool MongoMMF::open(const std::string& fname, bool sequentialHint) {
         LOG(3) << "mmf open " << fname << endl;
         setPath(fname);
         _view_write = mapWithOptions(fname.c_str(), sequentialHint ? SEQUENTIAL : 0);
         return finishOpening();
     }
 
-    bool MongoMMF::create(string fname, unsigned long long& len, bool sequentialHint) {
+    bool MongoMMF::create(const std::string& fname, unsigned long long& len, bool sequentialHint) {
         LOG(3) << "mmf create " << fname << endl;
         setPath(fname);
         _view_write = map(fname.c_str(), len, sequentialHint ? SEQUENTIAL : 0);

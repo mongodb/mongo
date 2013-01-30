@@ -927,12 +927,11 @@ namespace NamespaceTests {
         public:
             void run() {
                 IndexSpec spec( BSON( "a" << 1 ), BSONObj() );
-                ASSERT_EQUALS( HELPFUL,
-                              spec.suitability( BSON( "a" << 2 << "b" << 3 ), BSONObj() ) );
-                ASSERT_EQUALS( USELESS,
-                              spec.suitability( BSON( "b" << 3 ), BSONObj() ) );
-                ASSERT_EQUALS( HELPFUL,
-                              spec.suitability( BSON( "b" << 3 ), BSON( "a" << 1 ) ) );
+                FieldRangeSet frs1( "", BSON( "a" << 2 << "b" << 3 ), true , true );
+                ASSERT_EQUALS( HELPFUL, spec.suitability( frs1 , BSONObj() ) );
+                FieldRangeSet frs2( "", BSON( "b" << 3 ), true , true );
+                ASSERT_EQUALS( USELESS, spec.suitability( frs2, BSONObj() ) );
+                ASSERT_EQUALS( HELPFUL, spec.suitability( frs2, BSON( "a" << 1 ) ) );
             }
         };
         
@@ -941,12 +940,12 @@ namespace NamespaceTests {
         public:
             void run() {
                 IndexSpec spec( BSON( "1" << 1 ), BSONObj() );
-                ASSERT_EQUALS( HELPFUL,
-                              spec.suitability( BSON( "1" << 2 ), BSONObj() ) );
-                ASSERT_EQUALS( USELESS,
-                              spec.suitability( BSON( "01" << 3 ), BSON( "01" << 1 ) ) );
-                ASSERT_EQUALS( HELPFUL,
-                              spec.suitability( BSONObj(), BSON( "1" << 1 ) ) );                
+                FieldRangeSet frs1( "", BSON( "1" << 2 ), true , true );
+                ASSERT_EQUALS( HELPFUL, spec.suitability( frs1, BSONObj() ) );
+                FieldRangeSet frs2( "", BSON( "01" << 3), true , true );
+                ASSERT_EQUALS( USELESS, spec.suitability( frs2, BSON( "01" << 1 ) ) );
+                FieldRangeSet frs3( "", BSONObj() , true , true );
+                ASSERT_EQUALS( HELPFUL, spec.suitability( frs3, BSON( "1" << 1 ) ) );
             }
         };
         
@@ -1090,6 +1089,76 @@ namespace NamespaceTests {
         private:
             virtual string spec() const {
                 return "{\"capped\":true,\"size\":512,\"$nExtents\":2}";
+            }
+        };
+
+
+        /**
+         * Test  Quantize record allocation size for various buckets
+         *       @see NamespaceDetails::quantizeAllocationSpace()
+         */
+        class QuantizeFixedBuckets : public Base {
+        public:
+            void run() {
+                create();
+                // explicitly test for a set of known values
+                ASSERT_EQUALS(NamespaceDetails::quantizeAllocationSpace(33),       36);
+                ASSERT_EQUALS(NamespaceDetails::quantizeAllocationSpace(1000),     1024);
+                ASSERT_EQUALS(NamespaceDetails::quantizeAllocationSpace(10001),    10240);
+                ASSERT_EQUALS(NamespaceDetails::quantizeAllocationSpace(100000),   106496);
+                ASSERT_EQUALS(NamespaceDetails::quantizeAllocationSpace(1000001),  1048576);
+                ASSERT_EQUALS(NamespaceDetails::quantizeAllocationSpace(10000000), 10223616);
+            }
+        };
+
+
+        /**
+         * Test  Quantize min/max record allocation size
+         *       @see NamespaceDetails::quantizeAllocationSpace()
+         */
+        class QuantizeMinMaxBound : public Base {
+        public:
+            void run() {
+                create();
+                // test upper and lower bound
+                const int maxSize = 16 * 1024 * 1024;
+                ASSERT_EQUALS(NamespaceDetails::quantizeAllocationSpace(1), 2);
+                ASSERT_EQUALS(NamespaceDetails::quantizeAllocationSpace(maxSize), maxSize);
+            }
+        };
+
+        /**
+         * Test  Quantize record allocation on every boundary, as well as boundary-1
+         *       @see NamespaceDetails::quantizeAllocationSpace()
+         */
+        class QuantizeRecordBoundary : public Base {
+        public:
+            void run() {
+                create();
+                for (int iBucket = 0; iBucket <= MaxBucket; ++iBucket) {
+                    // for each bucket in range [min, max)
+                    const int bucketSize = bucketSizes[iBucket];
+                    const int prevBucketSize = (iBucket - 1 >= 0) ? bucketSizes[iBucket - 1] : 0;
+                    const int intervalSize = bucketSize / 16;
+                    for (int iBoundary = prevBucketSize;
+                         iBoundary < bucketSize;
+                         iBoundary += intervalSize) {
+                        // for each quantization boundary within the bucket
+                        for (int iSize = iBoundary - 1; iSize <= iBoundary; ++iSize) {
+                            // test the quantization boundary - 1, and the boundary itself
+                            const int quantized =
+                                    NamespaceDetails::quantizeAllocationSpace(iSize);
+                            // assert quantized size is greater than or equal to requested size
+                            ASSERT(quantized >= iSize);
+                            // assert quantized size is within one quantization interval of
+                            // the requested size
+                            ASSERT(quantized - iSize <= intervalSize);
+                            // assert quantization is an idempotent operation
+                            ASSERT(quantized ==
+                                   NamespaceDetails::quantizeAllocationSpace(quantized));
+                        }
+                    }
+                }
             }
         };
 
@@ -1264,7 +1333,41 @@ namespace NamespaceTests {
                 assertCachedIndexKey( BSON( "a" << 1 ) );
             }
         };
-        
+
+        class SwapIndexEntriesTest : public Base {
+        public:
+            void run() {
+                create();
+                NamespaceDetails *nsd = nsdetails(ns());
+
+                // Set 2 & 54 as multikey
+                nsd->setIndexIsMultikey(ns(), 2, true);
+                nsd->setIndexIsMultikey(ns(), 54, true);
+                ASSERT(nsd->isMultikey(2));
+                ASSERT(nsd->isMultikey(54));
+
+                // Flip 2 & 47
+                nsd->setIndexIsMultikey(ns(), 2, false);
+                nsd->setIndexIsMultikey(ns(), 47, true);
+                ASSERT(!nsd->isMultikey(2));
+                ASSERT(nsd->isMultikey(47));
+
+                // Reset entries that are already true
+                nsd->setIndexIsMultikey(ns(), 54, true);
+                nsd->setIndexIsMultikey(ns(), 47, true);
+                ASSERT(nsd->isMultikey(54));
+                ASSERT(nsd->isMultikey(47));
+
+                // Two non-multi-key
+                nsd->setIndexIsMultikey(ns(), 2, false);
+                nsd->setIndexIsMultikey(ns(), 43, false);
+                ASSERT(!nsd->isMultikey(2));
+                ASSERT(nsd->isMultikey(54));
+                ASSERT(nsd->isMultikey(47));
+                ASSERT(!nsd->isMultikey(43));
+            }
+        };
+
     } // namespace NamespaceDetailsTests
 
     namespace NamespaceDetailsTransientTests {
@@ -1332,9 +1435,13 @@ namespace NamespaceTests {
             add< NamespaceDetailsTests::Create >();
             add< NamespaceDetailsTests::SingleAlloc >();
             add< NamespaceDetailsTests::Realloc >();
+            add< NamespaceDetailsTests::QuantizeMinMaxBound >();
+            add< NamespaceDetailsTests::QuantizeFixedBuckets >();
+            add< NamespaceDetailsTests::QuantizeRecordBoundary >();
             add< NamespaceDetailsTests::TwoExtent >();
             add< NamespaceDetailsTests::TruncateCapped >();
             add< NamespaceDetailsTests::Migrate >();
+            add< NamespaceDetailsTests::SwapIndexEntriesTest >();
             //            add< NamespaceDetailsTests::BigCollection >();
             add< NamespaceDetailsTests::Size >();
             add< NamespaceDetailsTests::SetIndexIsMultikey >();

@@ -17,19 +17,17 @@
 
 #pragma once
 
-#include <map>
-
 namespace mongo {
 
 /*
  *  If "myMap" contains "key", returns "myMap[key]".  Otherwise, returns "defaultValue."
  */
-template <typename K, typename V>
-V mapFindWithDefault(const map<K,V>& myMap, const K& key, const V& defaultValue) {
-   typename std::map<K,V>::const_iterator it = myMap.find(key);
-   if(it == myMap.end())
-       return defaultValue;
-   return it->second;
+template <typename M, typename K, typename V>
+V mapFindWithDefault(const M& myMap, const K& key, const V& defaultValue) {
+    typename M::const_iterator it = myMap.find(key);
+    if(it == myMap.end())
+        return defaultValue;
+    return it->second;
 }
 
 } // end namespace

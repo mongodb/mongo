@@ -1,5 +1,6 @@
 // $week returns a date's week of the year.  Week zero is comprised of any dates before the first
 // Sunday of the year.  SERVER-6190
+load('jstests/aggregation/extras/utils.js');
 
 t = db.jstests_aggregation_server6190;
 t.drop();
@@ -7,7 +8,8 @@ t.drop();
 t.save( {} );
 
 function week( date ) {
-    return t.aggregate( { $project:{ a:{ $week:date } } } ).result[ 0 ].a;
+    return t.aggregate( { $project:{ a:{ $week:date } } },
+                        { $match:{ a:{ $type:16 /* Int type expected */ } } } ).result[ 0 ].a;
 }
 
 function assertWeek( expectedWeek, date ) {
@@ -124,3 +126,27 @@ assertWeek( 8, new Date( 2020, 1, 28 ) );
 assertWeek( 8, new Date( 2020, 1, 29 ) );
 // Sun Mar 1 2020
 assertWeek( 9, new Date( 2020, 2, 1 ) );
+
+// Timestamp argument.
+assertWeek( 1, new Timestamp( new Date( 1984, 0, 1 ).getTime() / 1000, 0 ) );
+assertWeek( 1, new Timestamp( new Date( 1984, 0, 1 ).getTime() / 1000, 1000000000 ) );
+
+// Numeric argument not allowed.
+assertErrorCode(t, {$project: {a: {$week: 5}}}, 16006);
+
+// String argument not allowed.
+assertErrorCode(t, {$project: {a: {$week: 'foo'}}}, 16006);
+
+// Array argument format.
+assertWeek( 8, [ new Date( 2016, 1, 27 ) ] );
+
+// Wrong number of arguments.
+assertErrorCode(t, {$project: {a: {$week: []}}}, 16020);
+assertErrorCode(t, {$project: {a: {$week: [new Date(2020, 1, 28),
+                                           new Date(2020, 1, 29)]}}},
+                16020);
+
+// From a field path expression.
+t.remove();
+t.save( { a:new Date( 2020, 2, 1 ) } );
+assertWeek( 9, '$a' );

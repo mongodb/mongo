@@ -53,7 +53,8 @@ namespace mongo {
         
         if ( _total > 0 ) {
             int per = (int)( ( (double)_done * 100.0 ) / (double)_total );
-            Nullstream& out = log() << "\t\t" << _done << "/" << _total << "\t" << per << "%";
+            Nullstream& out = log() << "\t\t" << _name << ": " << _done
+                                    << '/' << _total << '\t' << per << '%';
             
             if ( ! _units.empty() ) {
                 out << "\t(" << _units << ")";
@@ -69,7 +70,7 @@ namespace mongo {
         if ( ! _active )
             return "";
         stringstream buf;
-        buf << _done << "/" << _total << " " << (_done*100)/_total << "%";
+        buf << _name << ": " << _done << '/' << _total << ' ' << (_done*100)/_total << '%';
         
         if ( ! _units.empty() ) {
             buf << "\t(" << _units << ")" << endl;

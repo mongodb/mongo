@@ -35,7 +35,13 @@ if ( db.adminCommand( "buildinfo" ).bits == 64 ){
     assert.eq( x , t.count() , "A3" )
     
     for ( i=0; i<x; i++ ){
-        o = t.findOne( { _id : 1 } )
+        o = t.findOne( { _id : i } )
+        try {
+            // test large mongo -> js conversion
+            var a = o.a;
+        } catch(e) {
+            assert(false, "Caught exception trying to insert during iteration " + i + ": " + e);
+        }
         assert( o , "B" + i );
     }
     

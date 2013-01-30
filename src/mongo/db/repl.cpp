@@ -29,7 +29,13 @@
 #include "pch.h"
 
 #include <boost/thread/thread.hpp>
+#include <string>
+#include <vector>
 
+#include "mongo/db/auth/action_set.h"
+#include "mongo/db/auth/action_type.h"
+#include "mongo/db/auth/authorization_manager.h"
+#include "mongo/db/auth/privilege.h"
 #include "jsobj.h"
 #include "../util/goodies.h"
 #include "repl.h"
@@ -39,7 +45,6 @@
 #include "pdfile.h"
 #include "db.h"
 #include "commands.h"
-#include "security.h"
 #include "cmdline.h"
 #include "repl_block.h"
 #include "repl/rs.h"
@@ -47,8 +52,11 @@
 #include "repl/connections.h"
 #include "ops/update.h"
 #include "pcrecpp.h"
+#include "mongo/db/commands/server_status.h"
 #include "mongo/db/instance.h"
+#include "mongo/db/server_parameters.h"
 #include "mongo/db/queryutil.h"
+#include "mongo/base/counter.h"
 
 namespace mongo {
 
@@ -93,6 +101,13 @@ namespace mongo {
         virtual bool logTheOp() { return false; }
         virtual bool lockGlobally() const { return true; }
         virtual LockType locktype() const { return WRITE; }
+        virtual void addRequiredPrivileges(const std::string& dbname,
+                                           const BSONObj& cmdObj,
+                                           std::vector<Privilege>* out) {
+            ActionSet actions;
+            actions.addAction(ActionType::resync);
+            out->push_back(Privilege(AuthorizationManager::SERVER_RESOURCE_NAME, actions));
+        }
         void help(stringstream&h) const { h << "resync (from scratch) an out of date replica slave.\nhttp://dochub.mongodb.org/core/masterslave"; }
         CmdResync() : Command("resync") { }
         virtual bool run(const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
@@ -143,23 +158,22 @@ namespace mongo {
         return replSettings.slave || replSettings.master || theReplSet;
     }
 
-    bool replAuthenticate(DBClientBase *conn);
+    bool replAuthenticate(DBClientBase *conn, bool skipAuthCheck);
 
-    void appendReplicationInfo( BSONObjBuilder& result , bool authed , int level ) {
-
+    void appendReplicationInfo(BSONObjBuilder& result, int level) {
         if ( replSet ) {
             if( theReplSet == 0 || theReplSet->state().shunned() ) {
                 result.append("ismaster", false);
                 result.append("secondary", false);
                 result.append("info", ReplSet::startupStatusMsg.get());
                 result.append( "isreplicaset" , true );
-                return;
             }
-
-            theReplSet->fillIsMaster(result);
+            else {
+                theReplSet->fillIsMaster(result);
+            }
             return;
         }
-
+        
         if ( replAllDead ) {
             result.append("ismaster", 0);
             string s = string("dead: ") + replAllDead;
@@ -168,24 +182,24 @@ namespace mongo {
         else {
             result.appendBool("ismaster", _isMaster() );
         }
-
+        
         if ( level && replSet ) {
             result.append( "info" , "is replica set" );
         }
         else if ( level ) {
             BSONObjBuilder sources( result.subarrayStart( "sources" ) );
-
+            
             int n = 0;
             list<BSONObj> src;
             {
-                Client::ReadContext ctx( "local.sources", dbpath, authed );
+                Client::ReadContext ctx("local.sources", dbpath);
                 shared_ptr<Cursor> c = findTableScan("local.sources", BSONObj());
                 while ( c->ok() ) {
                     src.push_back(c->current());
                     c->advance();
                 }
             }
-
+            
             for( list<BSONObj>::const_iterator i = src.begin(); i != src.end(); i++ ) {
                 BSONObj s = *i;
                 BSONObjBuilder bb;
@@ -200,15 +214,14 @@ namespace mongo {
                     t.append( "inc" , e.timestampInc() );
                     t.done();
                 }
-
+                
                 if ( level > 1 ) {
                     wassert( !Lock::isLocked() );
                     // note: there is no so-style timeout on this connection; perhaps we should have one.
-                    scoped_ptr<ScopedDbConnection> conn(
-                            ScopedDbConnection::getInternalScopedDbConnection(
-                                    s["host"].valuestr() ) );
+                    scoped_ptr<ScopedDbConnection> conn( ScopedDbConnection::getInternalScopedDbConnection( s["host"].valuestr() ) );
+                    
                     DBClientConnection *cliConn = dynamic_cast< DBClientConnection* >( &conn->conn() );
-                    if ( cliConn && replAuthenticate( cliConn ) ) {
+                    if ( cliConn && replAuthenticate(cliConn, false) ) {
                         BSONObj first = conn->get()->findOne( (string)"local.oplog.$" + sourcename,
                                                               Query().sort( BSON( "$natural" << 1 ) ) );
                         BSONObj last = conn->get()->findOne( (string)"local.oplog.$" + sourcename,
@@ -220,13 +233,30 @@ namespace mongo {
                     }
                     conn->done();
                 }
-
+                
                 sources.append( BSONObjBuilder::numStr( n++ ) , bb.obj() );
             }
-
+            
             sources.done();
         }
     }
+    
+    class ReplicationInfoServerStatus : public ServerStatusSection {
+    public:
+        ReplicationInfoServerStatus() : ServerStatusSection( "repl" ){}
+        bool includeByDefault() const { return true; }
+        
+        BSONObj generateSection(const BSONElement& configElement) const {
+            if ( ! anyReplEnabled() )
+                return BSONObj();
+            
+            int level = configElement.numberInt();
+            
+            BSONObjBuilder result;
+            appendReplicationInfo(result, level);
+            return result.obj();
+        }
+    } replicationInfoServerStatus;
 
     class CmdIsMaster : public Command {
     public:
@@ -239,17 +269,18 @@ namespace mongo {
             help << "{ isMaster : 1 }";
         }
         virtual LockType locktype() const { return NONE; }
+        virtual void addRequiredPrivileges(const std::string& dbname,
+                                           const BSONObj& cmdObj,
+                                           std::vector<Privilege>* out) {} // No auth required
         CmdIsMaster() : Command("isMaster", true, "ismaster") { }
         virtual bool run(const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool /*fromRepl*/) {
             /* currently request to arbiter is (somewhat arbitrarily) an ismaster request that is not
                authenticated.
-               we allow unauthenticated ismaster but we aren't as verbose informationally if
-               one is not authenticated for admin db to be safe.
             */
-            bool authed = cc().getAuthenticationInfo()->isAuthorizedReads("admin");
-            appendReplicationInfo( result , authed );
+            appendReplicationInfo(result, 0);
 
             result.appendNumber("maxBsonObjectSize", BSONObjMaxUserSize);
+            result.appendNumber("maxMessageSizeBytes", MaxMessageSizeBytes);
             result.appendDate("localTime", jsTime());
             return true;
         }
@@ -336,7 +367,7 @@ namespace mongo {
         BSONObj pattern = b.done();
 
         BSONObj o = jsobj();
-        log( 1 ) << "Saving repl source: " << o << endl;
+        LOG( 1 ) << "Saving repl source: " << o << endl;
 
         {
             OpDebug debug;
@@ -491,7 +522,8 @@ namespace mongo {
     }
 
     /* grab initial copy of a database from the master */
-    void ReplSource::resync(string db) {
+    void ReplSource::resync(const std::string& dbName) {
+        const std::string db(dbName);   // need local copy of the name, we're dropping the original
         string dummyNs = resyncDrop( db.c_str(), "internal" );
         Client::Context ctx( dummyNs );
         {
@@ -499,7 +531,7 @@ namespace mongo {
             ReplInfo r("resync: cloning a database");
             string errmsg;
             int errCode = 0;
-            bool ok = cloneFrom(hostName.c_str(), errmsg, cc().database()->name, false, /*slaveOk*/ true, /*replauth*/ true, /*snapshot*/false, /*mayYield*/true, /*mayBeInterrupted*/false, &errCode);
+            bool ok = Cloner::cloneFrom(hostName.c_str(), errmsg, cc().database()->name, false, /*slaveOk*/ true, /*replauth*/ true, /*snapshot*/false, /*mayYield*/true, /*mayBeInterrupted*/false, &errCode);
             if ( !ok ) {
                 if ( errCode == DatabaseDifferCaseCode ) {
                     resyncDrop( db.c_str(), "internal" );
@@ -648,7 +680,7 @@ namespace mongo {
     */
     void ReplSource::sync_pullOpLog_applyOperation(BSONObj& op, bool alreadyLocked) {
         if( logLevel >= 6 ) // op.tostring is expensive so doing this check explicitly
-            log(6) << "processing op: " << op << endl;
+            LOG(6) << "processing op: " << op << endl;
 
         if( op.getStringField("op")[0] == 'n' )
             return;
@@ -730,7 +762,7 @@ namespace mongo {
         bool incompleteClone = incompleteCloneDbs.count( clientName ) != 0;
 
         if( logLevel >= 6 )
-            log(6) << "ns: " << ns << ", justCreated: " << ctx.justCreated() << ", empty: " << empty << ", incompleteClone: " << incompleteClone << endl;
+            LOG(6) << "ns: " << ns << ", justCreated: " << ctx.justCreated() << ", empty: " << empty << ", incompleteClone: " << incompleteClone << endl;
 
         // always apply admin command command
         // this is a bit hacky -- the semantics of replication/commands aren't well specified
@@ -783,7 +815,49 @@ namespace mongo {
         }
     }
 
-    extern unsigned replApplyBatchSize;
+    class ReplApplyBatchSize : public ServerParameter {
+    public:
+        ReplApplyBatchSize()
+            : ServerParameter( ServerParameterSet::getGlobal(), "replApplyBatchSize" ),
+              _value( 1 ) {
+        }
+
+        int get() const { return _value; }
+
+        virtual void append( BSONObjBuilder& b, const string& name ) {
+            b.append( name, _value );
+        }
+
+        virtual Status set( const BSONElement& newValuElement ) {
+            return set( newValuElement.numberInt() );
+        }
+
+        virtual Status set( int b ) {
+            if( b < 1 || b > 1024 ) {
+                return Status( ErrorCodes::BadValue,
+                               "replApplyBatchSize has to be >= 1 and < 1024" );
+            }
+
+            if ( replSettings.slavedelay != 0 && b > 1 ) {
+                return Status( ErrorCodes::BadValue,
+                               "can't use a batch size > 1 with slavedelay" );
+            }
+            if ( ! replSettings.slave ) {
+                return Status( ErrorCodes::BadValue,
+                               "can't set replApplyBatchSize on a non-slave machine" );
+            }
+
+            _value = b;
+            return Status::OK();
+        }
+
+        virtual Status setFromString( const string& str ) {
+            return set( atoi( str.c_str() ) );
+        }
+
+        int _value;
+
+    } replApplyBatchSize;
 
     /* slave: pull some data from the master's oplog
        note: not yet in db mutex at this point.
@@ -794,7 +868,7 @@ namespace mongo {
     int ReplSource::sync_pullOpLog(int& nApplied) {
         int okResultCode = 1;
         string ns = string("local.oplog.$") + sourceName();
-        log(2) << "repl: sync_pullOpLog " << ns << " syncedTo:" << syncedTo.toStringLong() << '\n';
+        LOG(2) << "repl: sync_pullOpLog " << ns << " syncedTo:" << syncedTo.toStringLong() << '\n';
 
         bool tailing = true;
         oplogReader.tailCheck();
@@ -817,7 +891,7 @@ namespace mongo {
                     if ( !e.embeddedObject().getBoolField( "empty" ) ) {
                         if ( name != "local" ) {
                             if ( only.empty() || only == name ) {
-                                log( 2 ) << "adding to 'addDbNextPass': " << name << endl;
+                                LOG( 2 ) << "adding to 'addDbNextPass': " << name << endl;
                                 addDbNextPass.insert( name );
                             }
                         }
@@ -829,10 +903,10 @@ namespace mongo {
                 save();
             }
 
-            BSONObjBuilder q;
-            q.appendDate("$gte", syncedTo.asDate());
+            BSONObjBuilder gte;
+            gte.appendTimestamp("$gte", syncedTo.asDate());
             BSONObjBuilder query;
-            query.append("ts", q.done());
+            query.append("ts", gte.done());
             if ( !only.empty() ) {
                 // note we may here skip a LOT of data table scanning, a lot of work for the master.
                 // maybe append "\\." here?
@@ -845,7 +919,7 @@ namespace mongo {
             tailing = false;
         }
         else {
-            log(2) << "repl: tailing=true\n";
+            LOG(2) << "repl: tailing=true\n";
         }
 
         if( !oplogReader.haveCursor() ) {
@@ -868,13 +942,13 @@ namespace mongo {
 
         if ( !oplogReader.more() ) {
             if ( tailing ) {
-                log(2) << "repl: tailing & no new activity\n";
+                LOG(2) << "repl: tailing & no new activity\n";
                 if( oplogReader.awaitCapable() )
                     okResultCode = 0; // don't sleep
 
             }
             else {
-                log() << "repl:   " << ns << " oplog is empty\n";
+                log() << "repl:   " << ns << " oplog is empty" << endl;
             }
             {
                 Lock::GlobalWrite lk;
@@ -907,9 +981,9 @@ namespace mongo {
             }
 
             nextOpTime = OpTime( ts.date() );
-            log(2) << "repl: first op time received: " << nextOpTime.toString() << '\n';
+            LOG(2) << "repl: first op time received: " << nextOpTime.toString() << '\n';
             if ( initial ) {
-                log(1) << "repl:   initial run\n";
+                LOG(1) << "repl:   initial run\n";
             }
             if( tailing ) {
                 if( !( syncedTo < nextOpTime ) ) {
@@ -988,7 +1062,7 @@ namespace mongo {
 
                 BSONObj op = oplogReader.next();
 
-                unsigned b = replApplyBatchSize;
+                int b = replApplyBatchSize.get();
                 bool justOne = b == 1;
                 scoped_ptr<Lock::GlobalWrite> lk( justOne ? 0 : new Lock::GlobalWrite() );
                 while( 1 ) {
@@ -1048,12 +1122,19 @@ namespace mongo {
 
     BSONObj userReplQuery = fromjson("{\"user\":\"repl\"}");
 
-    bool replAuthenticate(DBClientBase *conn) {
+    /* Generally replAuthenticate will only be called within system threads to fully authenticate
+     * connections to other nodes in the cluster that will be used as part of internal operations.
+     * If a user-initiated action results in needing to call replAuthenticate, you can call it
+     * with skipAuthCheck set to false. Only do this if you are certain that the proper auth
+     * checks have already run to ensure that the user is authorized to do everything that this
+     * connection will be used for!
+     */
+    bool replAuthenticate(DBClientBase *conn, bool skipAuthCheck) {
         if( noauth ) {
             return true;
         }
-        if( ! cc().isAdmin() ) {
-            log() << "replauthenticate: requires admin permissions, failing\n";
+        if (!skipAuthCheck && !cc().getAuthorizationManager()->hasInternalAuthorization()) {
+            log() << "replauthenticate: requires internal authorization, failing" << endl;
             return false;
         }
 
@@ -1066,12 +1147,11 @@ namespace mongo {
         else {
             BSONObj user;
             {
-                Lock::GlobalWrite lk;
-                Client::Context ctxt("local.");
+                Client::ReadContext ctxt("local.");
                 if( !Helpers::findOne("local.system.users", userReplQuery, user) ||
                         // try the first user in local
                         !Helpers::getSingleton("local.system.users", user) ) {
-                    log() << "replauthenticate: no user in local.system.users to use for authentication\n";
+                    log() << "replauthenticate: no user in local.system.users to use for authentication" << endl;
                     return false;
                 }
             }
@@ -1086,10 +1166,7 @@ namespace mongo {
             log() << "replauthenticate: can't authenticate to master server, user:" << u << endl;
             return false;
         }
-        if ( internalSecurity.pwd.length() > 0 ) {
-            conn->setAuthenticationTable(
-                    AuthenticationTable::getInternalSecurityAuthenticationTable() );
-        }
+
         return true;
     }
 
@@ -1126,9 +1203,16 @@ namespace mongo {
         BSONObj res;
         bool ok = conn->runCommand( "admin" , cmd.obj() , res );
         // ignoring for now on purpose for older versions
-        log(ok) << "replHandshake res not: " << ok << " res: " << res << endl;
+        LOG( ok ? 1 : 0 ) << "replHandshake res not: " << ok << " res: " << res << endl;
         return true;
     }
+
+    //number of readers created;
+    //  this happens when the source source changes, a reconfig/network-error or the cursor dies
+    static Counter64 readersCreatedStats;
+    static ServerStatusMetricField<Counter64> displayReadersCreated(
+                                                    "repl.network.readersCreated",
+                                                    &readersCreatedStats );
 
     OplogReader::OplogReader( bool doHandshake ) : 
         _doHandshake( doHandshake ) { 
@@ -1138,15 +1222,19 @@ namespace mongo {
         
         /* TODO: slaveOk maybe shouldn't use? */
         _tailingQueryOptions |= QueryOption_AwaitData;
+
+        readersCreatedStats.increment();
     }
 
     bool OplogReader::commonConnect(const string& hostName) {
         if( conn() == 0 ) {
-            _conn = shared_ptr<DBClientConnection>(new DBClientConnection( false, 0, 60*10 /* tcp timeout */));
+            _conn = shared_ptr<DBClientConnection>(new DBClientConnection(false,
+                                                                          0,
+                                                                          30 /* tcp timeout */));
             string errmsg;
             ReplInfo r("trying to connect to sync source");
             if ( !_conn->connect(hostName.c_str(), errmsg) ||
-                 (!noauth && !replAuthenticate(_conn.get())) ) {
+                 (!noauth && !replAuthenticate(_conn.get(), true)) ) {
                 resetConnection();
                 log() << "repl: " << errmsg << endl;
                 return false;
@@ -1155,7 +1243,7 @@ namespace mongo {
         return true;
     }
     
-    bool OplogReader::connect(string hostName) {
+    bool OplogReader::connect(const std::string& hostName) {
         if (conn() != 0) {
             return true;
         }
@@ -1197,12 +1285,12 @@ namespace mongo {
         LOG(2) << "repl: " << ns << ".find(" << query.toString() << ')' << endl;
         cursor.reset( _conn->query( ns, query, 0, 0, fields, _tailingQueryOptions ).release() );
     }
-    
-    void OplogReader::tailingQueryGTE(const char *ns, OpTime t, const BSONObj* fields ) {
-        BSONObjBuilder q;
-        q.appendDate("$gte", t.asDate());
+
+    void OplogReader::tailingQueryGTE(const char *ns, OpTime optime, const BSONObj* fields ) {
+        BSONObjBuilder gte;
+        gte.appendTimestamp("$gte", optime.asDate());
         BSONObjBuilder query;
-        query.append("ts", q.done());
+        query.append("ts", gte.done());
         tailingQuery(ns, query.done(), fields);
     }
 
@@ -1232,7 +1320,7 @@ namespace mongo {
         }
 
         if ( !oplogReader.connect(hostName) ) {
-            log(4) << "repl:  can't connect to sync source" << endl;
+            LOG(4) << "repl:  can't connect to sync source" << endl;
             return -1;
         }
 
@@ -1309,7 +1397,7 @@ namespace mongo {
                     return 60;
                 }
                 else {
-                    log() << "repl: AssertionException " << e.what() << '\n';
+                    log() << "repl: AssertionException " << e.what() << endl;
                 }
                 replInfo = "replMain caught AssertionException";
             }
@@ -1353,7 +1441,7 @@ namespace mongo {
                 if( s == 1 ) {
                     if( nApplied == 0 ) s = 2;
                     else if( nApplied > 100 ) {
-                        // sleep very little - just enought that we aren't truly hammering master
+                        // sleep very little - just enough that we aren't truly hammering master
                         sleepmillis(75);
                         s = 0;
                     }
@@ -1412,7 +1500,7 @@ namespace mongo {
                     }
                 }
                 else {
-                    log(5) << "couldn't logKeepalive" << endl;
+                    LOG(5) << "couldn't logKeepalive" << endl;
                     toSleep = 1;
                 }
             }
@@ -1422,7 +1510,6 @@ namespace mongo {
     void replSlaveThread() {
         sleepsecs(1);
         Client::initThread("replslave");
-        cc().iAmSyncThread();
 
         {
             Lock::GlobalWrite lk;
@@ -1483,12 +1570,12 @@ namespace mongo {
 
         if ( replSettings.slave ) {
             verify( replSettings.slave == SimpleSlave );
-            log(1) << "slave=true" << endl;
+            LOG(1) << "slave=true" << endl;
             boost::thread repl_thread(replSlaveThread);
         }
 
         if ( replSettings.master ) {
-            log(1) << "master=true" << endl;
+            LOG(1) << "master=true" << endl;
             replSettings.master = true;
             createOplog();
             boost::thread t(replMasterThread);
@@ -1523,30 +1610,6 @@ namespace mongo {
         tp.join();
     }
 
-    class ReplApplyBatchSizeValidator : public ParameterValidator {
-    public:
-        ReplApplyBatchSizeValidator() : ParameterValidator( "replApplyBatchSize" ) {}
-
-        virtual bool isValid( BSONElement e , string& errmsg ) const {
-            int b = e.numberInt();
-            if( b < 1 || b > 1024 ) {
-                errmsg = "replApplyBatchSize has to be >= 1 and < 1024";
-                return false;
-            }
-
-            if ( replSettings.slavedelay != 0 && b > 1 ) {
-                errmsg = "can't use a batch size > 1 with slavedelay";
-                return false;
-            }
-            if ( ! replSettings.slave ) {
-                errmsg = "can't set replApplyBatchSize on a non-slave machine";
-                return false;
-            }
-
-            return true;
-        }
-    } replApplyBatchSizeValidator;
-    
     /** we allow queries to SimpleSlave's */
     void replVerifyReadsOk(const ParsedQuery* pq) {
         if( replSet ) {
@@ -1564,5 +1627,7 @@ namespace mongo {
                             replSettings.slave == SimpleSlave );
         }
     }
+
+    OpCounterServerStatusSection replOpCounterServerStatusSection( "opcountersRepl", &replOpCounters );
 
 } // namespace mongo

@@ -62,7 +62,7 @@ namespace mongo {
                     }
                 }
                 else if ( mongoutils::str::equals( e2.fieldName(), "$elemMatch" ) ) {
-                    // validate $elemMatch arguments and dependancies
+                    // validate $elemMatch arguments and dependencies
                     uassert( 16342, "elemMatch: invalid argument.  object required.",
                              e2.type() == Object );
                     uassert( 16343, "Cannot specify positional operator and $elemMatch"
@@ -75,8 +75,8 @@ namespace mongo {
 
                     // initialize new Matcher object(s)
 
-                    _matchers.insert( make_pair( mongoutils::str::before( e.fieldName(), '.' ),
-                                                 new Matcher( e.wrap(), true ) ) );
+                    _matchers[mongoutils::str::before(e.fieldName(), '.').c_str()]
+                            = boost::make_shared<Matcher>(e.wrap(), true);
                     add( e.fieldName(), true );
                 }
                 else {
@@ -126,9 +126,9 @@ namespace mongo {
             const string subfield = field.substr(0,dot);
             const string rest = (dot == string::npos ? "" : field.substr(dot+1,string::npos));
 
-            boost::shared_ptr<Projection>& fm = _fields[subfield];
+            boost::shared_ptr<Projection>& fm = _fields[subfield.c_str()];
             if (!fm)
-                fm.reset(new Projection());
+                fm = boost::make_shared<Projection>();
 
             fm->add(rest, include);
         }
@@ -146,9 +146,9 @@ namespace mongo {
             const string subfield = field.substr(0,dot);
             const string rest = (dot == string::npos ? "" : field.substr(dot+1,string::npos));
 
-            boost::shared_ptr<Projection>& fm = _fields[subfield];
+            boost::shared_ptr<Projection>& fm = _fields[subfield.c_str()];
             if (!fm)
-                fm.reset(new Projection());
+                fm = boost::make_shared<Projection>();
 
             fm->add(rest, skip, limit);
         }
@@ -176,7 +176,7 @@ namespace mongo {
                     MatchDetails arrayDetails;
                     arrayDetails.requestElemMatchKey();
                     if ( matcher->second->matches( in, &arrayDetails ) ) {
-                        log(4) << "Matched array on field: " << matcher->first  << endl
+                        LOG(4) << "Matched array on field: " << matcher->first  << endl
                                << " from array: " << in.getField( matcher->first ) << endl
                                << " in object: " << in << endl
                                << " at position: " << arrayDetails.elemMatchKey() << endl;
@@ -282,7 +282,7 @@ namespace mongo {
                 if ( details && arrayOpType == ARRAY_OP_POSITIONAL ) {
                     // $ positional operator specified
 
-                    log(4) << "projection: checking if element " << e << " matched spec: "
+                    LOG(4) << "projection: checking if element " << e << " matched spec: "
                            << getSpec() << " match details: " << *details << endl;
                     uassert( 16352, mongoutils::str::stream() << "positional operator ("
                                         << e.fieldName()
@@ -333,7 +333,7 @@ namespace mongo {
                         mongoutils::str::before( projectionElement.fieldName(), "." ) ) {
 
                     // found query spec that matches positional array projection spec
-                    log(4) << "Query specifies field named for positional operator: "
+                    LOG(4) << "Query specifies field named for positional operator: "
                            << queryElement.fieldName() << endl;
                     return;
                 }

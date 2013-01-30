@@ -18,16 +18,35 @@
  */
 
 #include "pch.h"
-#include "jsobj.h"
-#include "commands.h"
-#include "client.h"
-#include "replutil.h"
+
+#include "mongo/db/commands.h"
+
+#include <string>
+#include <vector>
+
+#include "mongo/db/auth/action_set.h"
+#include "mongo/db/auth/action_type.h"
+#include "mongo/db/auth/authorization_manager.h"
+#include "mongo/db/auth/privilege.h"
+#include "mongo/db/client.h"
+#include "mongo/db/jsobj.h"
+#include "mongo/db/replutil.h"
+#include "mongo/db/server_parameters.h"
 
 namespace mongo {
 
     map<string,Command*> * Command::_commandsByBestName;
     map<string,Command*> * Command::_webCommands;
     map<string,Command*> * Command::_commands;
+
+    int Command::testCommandsEnabled = 0;
+
+    namespace {
+        // TODO: This should only be settable at the command line, not at runtime. Need SERVER-7778
+        ExportedServerParameter<int> testCommandsParameter(ServerParameterSet::getGlobal(),
+                                                           "enableTestCommands",
+                                                           &Command::testCommandsEnabled);
+    }
 
     string Command::parseNsFullyQualified(const string& dbname, const BSONObj& cmdObj) const { 
         string s = cmdObj.firstElement().valuestr();
@@ -153,12 +172,24 @@ namespace mongo {
         return i->second;
     }
 
-
     Command::LockType Command::locktype( const string& name ) {
         Command * c = findCommand( name );
         if ( ! c )
             return WRITE;
         return c->locktype();
+    }
+
+    void Command::appendCommandStatus(BSONObjBuilder& result, bool ok, const std::string& errmsg) {
+        BSONObj tmp = result.asTempObj();
+        bool have_ok = tmp.hasField("ok");
+        bool have_errmsg = tmp.hasField("errmsg");
+
+        if (!have_ok)
+            result.append( "ok" , ok ? 1.0 : 0.0 );
+
+        if (!ok && !have_errmsg) {
+            result.append("errmsg", errmsg);
+        }
     }
 
     void Command::logIfSlow( const Timer& timer, const string& msg ) {
@@ -181,6 +212,13 @@ namespace mongo {
         PoolFlushCmd() : Command( "connPoolSync" , false , "connpoolsync" ) {}
         virtual void help( stringstream &help ) const { help<<"internal"; }
         virtual LockType locktype() const { return NONE; }
+        virtual void addRequiredPrivileges(const std::string& dbname,
+                                           const BSONObj& cmdObj,
+                                           std::vector<Privilege>* out) {
+            ActionSet actions;
+            actions.addAction(ActionType::connPoolSync);
+            out->push_back(Privilege(AuthorizationManager::SERVER_RESOURCE_NAME, actions));
+        }
         virtual bool run(const string&, mongo::BSONObj&, int, std::string&, mongo::BSONObjBuilder& result, bool) {
             pool.flush();
             return true;
@@ -196,6 +234,13 @@ namespace mongo {
         PoolStats() : Command( "connPoolStats" ) {}
         virtual void help( stringstream &help ) const { help<<"stats about connection pool"; }
         virtual LockType locktype() const { return NONE; }
+        virtual void addRequiredPrivileges(const std::string& dbname,
+                                           const BSONObj& cmdObj,
+                                           std::vector<Privilege>* out) {
+            ActionSet actions;
+            actions.addAction(ActionType::connPoolStats);
+            out->push_back(Privilege(AuthorizationManager::SERVER_RESOURCE_NAME, actions));
+        }
         virtual bool run(const string&, mongo::BSONObj&, int, std::string&, mongo::BSONObjBuilder& result, bool) {
             pool.appendInfo( result );
             result.append( "numDBClientConnection" , DBClientConnection::getNumConnections() );

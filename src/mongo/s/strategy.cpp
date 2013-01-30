@@ -18,15 +18,20 @@
 
 #include "pch.h"
 
-#include "../client/connpool.h"
-#include "../db/commands.h"
+#include "mongo/s/strategy.h"
 
-#include "grid.h"
-#include "request.h"
-#include "server.h"
-#include "writeback_listener.h"
+#include "mongo/client/connpool.h"
+#include "mongo/db/auth/action_type.h"
+#include "mongo/db/auth/authorization_manager.h"
+#include "mongo/db/commands.h"
+#include "mongo/s/chunk_version.h"
+#include "mongo/s/grid.h"
+#include "mongo/s/request.h"
+#include "mongo/s/server.h"
+#include "mongo/s/stale_exception.h"  // for SendStaleConfigException
+#include "mongo/s/writeback_listener.h"
+#include "mongo/util/mongoutils/str.h"
 
-#include "strategy.h"
 
 namespace mongo {
 
@@ -43,7 +48,7 @@ namespace mongo {
         else if ( conn.setVersion() ) {
             conn.done();
             // Version is zero b/c we don't yet have a way to get the local version conflict
-            throw RecvStaleConfigException( r.getns() , "doWrite" , ShardChunkVersion( 0, OID() ), ShardChunkVersion( 0, OID() ), true );
+            throw RecvStaleConfigException( r.getns() , "doWrite" , ChunkVersion( 0, OID() ), ChunkVersion( 0, OID() ), true );
         }
         conn->say( r.m() );
         conn.done();
@@ -58,9 +63,7 @@ namespace mongo {
     }
 
 
-    void Strategy::doQuery( Request& r , const Shard& shard ) {
-
-        r.checkAuth( Auth::READ );
+    void Strategy::doIndexQuery( Request& r , const Shard& shard ) {
 
         ShardConnection dbcon( shard , r.getns() );
         DBClientBase &c = dbcon.conn();
@@ -76,53 +79,11 @@ namespace mongo {
             if ( qr->resultFlags() & ResultFlag_ShardConfigStale ) {
                 dbcon.done();
                 // Version is zero b/c this is deprecated codepath
-                throw RecvStaleConfigException( r.getns() , "Strategy::doQuery", ShardChunkVersion( 0, OID() ), ShardChunkVersion( 0, OID() ) );
+                throw RecvStaleConfigException( r.getns() , "Strategy::doQuery", ChunkVersion( 0, OID() ), ChunkVersion( 0, OID() ) );
             }
         }
 
         r.reply( response , actualServer.size() ? actualServer : c.getServerAddress() );
-        dbcon.done();
-    }
-
-    void Strategy::insert( const Shard& shard , const char * ns , const BSONObj& obj , int flags, bool safe ) {
-        ShardConnection dbcon( shard , ns );
-        if ( dbcon.setVersion() ) {
-            dbcon.done();
-            // Version is zero b/c we don't yet have a way to get the local version conflict
-            throw RecvStaleConfigException( ns , "for insert", ShardChunkVersion( 0, OID() ), ShardChunkVersion( 0, OID() ) );
-        }
-        dbcon->insert( ns , obj , flags);
-        if (safe)
-            dbcon->getLastError();
-        dbcon.done();
-    }
-
-    void Strategy::insert( const Shard& shard , const char * ns , const vector<BSONObj>& v , int flags, bool safe ) {
-        ShardConnection dbcon( shard , ns );
-        if ( dbcon.setVersion() ) {
-            dbcon.done();
-            // Version is zero b/c we don't yet have a way to get the local version conflict
-            throw RecvStaleConfigException( ns , "for insert", ShardChunkVersion( 0, OID() ), ShardChunkVersion( 0, OID() ) );
-        }
-        dbcon->insert( ns , v , flags);
-        if (safe)
-            dbcon->getLastError();
-        dbcon.done();
-    }
-
-    void Strategy::update( const Shard& shard , const char * ns , const BSONObj& query , const BSONObj& toupdate , int flags, bool safe ) {
-        bool upsert = flags & UpdateOption_Upsert;
-        bool multi = flags & UpdateOption_Multi;
-
-        ShardConnection dbcon( shard , ns );
-        if ( dbcon.setVersion() ) {
-            dbcon.done();
-            // Version is zero b/c we don't yet have a way to get the local version conflict
-            throw RecvStaleConfigException( ns , "for insert", ShardChunkVersion( 0, OID() ), ShardChunkVersion( 0, OID() ) );
-        }
-        dbcon->update( ns , query , toupdate, upsert, multi);
-        if (safe)
-            dbcon->getLastError();
         dbcon.done();
     }
 

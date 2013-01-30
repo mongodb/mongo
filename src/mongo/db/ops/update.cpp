@@ -54,7 +54,6 @@ namespace mongo {
     static UpdateResult _updateById(bool isOperatorUpdate,
                                     int idIdxNo,
                                     ModSet* mods,
-                                    int profile,
                                     NamespaceDetails* d,
                                     NamespaceDetailsTransient *nsdt,
                                     bool su,
@@ -100,25 +99,20 @@ namespace mongo {
 
             if ( logop ) {
                 DEV verify( mods->size() );
-
                 BSONObj pattern = patternOrig;
-                if ( mss->haveArrayDepMod() ) {
-                    BSONObjBuilder patternBuilder;
-                    patternBuilder.appendElements( pattern );
-                    mss->appendSizeSpecForArrayDepMods( patternBuilder );
-                    pattern = patternBuilder.obj();
-                }
+                BSONObj logObj = mss->getOpLogRewrite();
+                DEBUGUPDATE( "\t rewrite update: " << logObj );
 
-                if( mss->needOpLogRewrite() ) {
-                    DEBUGUPDATE( "\t rewrite update: " << mss->getOpLogRewrite() );
-                    logOp("u", ns, mss->getOpLogRewrite() ,
-                          &pattern, 0, fromMigrate );
-                }
-                else {
-                    logOp("u", ns, updateobj, &pattern, 0, fromMigrate );
+                // It is possible that the entire mod set was a no-op over this document.  We
+                // would have an empty log record in that case. If we call logOp, with an empty
+                // record, that would be replicated as "clear this record", which is not what
+                // we want. Therefore, to get a no-op in the replica, we simply don't log.
+                if ( logObj.nFields() ) {
+                    logOp("u", ns, logObj, &pattern, 0, fromMigrate );
                 }
             }
             return UpdateResult( 1 , 1 , 1 , BSONObj() );
+
         } // end $operator update
 
         // regular update
@@ -142,7 +136,8 @@ namespace mongo {
                                  OpDebug& debug,
                                  RemoveSaver* rs,
                                  bool fromMigrate,
-                                 const QueryPlanSelectionPolicy& planPolicy ) {
+                                 const QueryPlanSelectionPolicy& planPolicy,
+                                 bool forReplication ) {
 
         DEBUGUPDATE( "update: " << ns
                      << " update: " << updateobj
@@ -150,7 +145,6 @@ namespace mongo {
                      << " upsert: " << upsert << " multi: " << multi );
 
         Client& client = cc();
-        int profile = client.database()->profile;
 
         debug.updateobj = updateobj;
 
@@ -165,13 +159,15 @@ namespace mongo {
         bool isOperatorUpdate = updateobj.firstElementFieldName()[0] == '$';
         int modsIsIndexed = false; // really the # of indexes
         if ( isOperatorUpdate ) {
-            if( d && d->indexBuildInProgress ) {
+            if( d && d->indexBuildsInProgress ) {
                 set<string> bgKeys;
-                d->inProgIdx().keyPattern().getFieldNames(bgKeys);
-                mods.reset( new ModSet(updateobj, nsdt->indexKeys(), &bgKeys) );
+                for (int i = 0; i < d->indexBuildsInProgress; i++) {
+                    d->idx(d->nIndexes+i).keyPattern().getFieldNames(bgKeys);
+                }
+                mods.reset( new ModSet(updateobj, nsdt->indexKeys(), &bgKeys, forReplication) );
             }
             else {
-                mods.reset( new ModSet(updateobj, nsdt->indexKeys()) );
+                mods.reset( new ModSet(updateobj, nsdt->indexKeys(), NULL, forReplication) );
             }
             modsIsIndexed = mods->isIndexed();
         }
@@ -185,7 +181,6 @@ namespace mongo {
                 UpdateResult result = _updateById( isOperatorUpdate,
                                                    idxNo,
                                                    mods.get(),
-                                                   profile,
                                                    d,
                                                    nsdt,
                                                    su,
@@ -198,12 +193,15 @@ namespace mongo {
                 if ( result.existing || ! upsert ) {
                     return result;
                 }
-                else if ( upsert && ! isOperatorUpdate && ! logop) {
+                else if ( upsert && ! isOperatorUpdate ) {
                     // this handles repl inserts
                     checkNoMods( updateobj );
                     debug.upsert = true;
                     BSONObj no = updateobj;
-                    theDataFileMgr.insertWithObjMod(ns, no, su);
+                    theDataFileMgr.insertWithObjMod(ns, no, false, su);
+                    if ( logop )
+                        logOp( "i", ns, no, 0, 0, fromMigrate );
+
                     return UpdateResult( 0 , 0 , 1 , no );
                 }
             }
@@ -254,10 +252,11 @@ namespace mongo {
                             break;
                         nsdt = &NamespaceDetailsTransient::get(ns);
                         if ( mods.get() && ! mods->isIndexed() ) {
-                            // we need to re-check indexes
                             set<string> bgKeys;
-                            if ( d->indexBuildInProgress )
-                                d->inProgIdx().keyPattern().getFieldNames(bgKeys);
+                            for (int i = 0; i < d->indexBuildsInProgress; i++) {
+                                // we need to re-check indexes
+                                d->idx(d->nIndexes+i).keyPattern().getFieldNames(bgKeys);
+                            }
                             mods->updateIsIndexed( nsdt->indexKeys() , &bgKeys );
                             modsIsIndexed = mods->isIndexed();
                         }
@@ -269,10 +268,6 @@ namespace mongo {
                 debug.nscanned++;
 
                 if ( mods.get() && mods->hasDynamicArray() ) {
-                    // The Cursor must have a Matcher to record an elemMatchKey.  But currently
-                    // a modifier on a dynamic array field may be applied even if there is no
-                    // elemMatchKey, so a matcher cannot be required.
-                    //verify( c->matcher() );
                     details.requestElemMatchKey();
                 }
 
@@ -336,13 +331,11 @@ namespace mongo {
                     const BSONObj& onDisk = loc.obj();
 
                     ModSet* useMods = mods.get();
-                    bool forceRewrite = false;
 
                     auto_ptr<ModSet> mymodset;
                     if ( details.hasElemMatchKey() && mods->hasDynamicArray() ) {
                         useMods = mods->fixDynamicArray( details.elemMatchKey() );
                         mymodset.reset( useMods );
-                        forceRewrite = true;
                     }
 
                     auto_ptr<ModSetState> mss = useMods->prepare( onDisk );
@@ -356,11 +349,17 @@ namespace mongo {
                         c->prepareToTouchEarlierIterate();
                     }
 
-                    if ( modsIsIndexed <= 0 && mss->canApplyInPlace() ) {
+                    // If we've made it this far, "ns" must contain a valid collection name, and so
+                    // is of the form "db.collection".  Therefore, the following expression must
+                    // always be valid.  "system.users" updates must never be done in place, in
+                    // order to ensure that they are validated inside DataFileMgr::updateRecord(.).
+                    bool isSystemUsersMod = (NamespaceString(ns).coll == "system.users");
+
+                    if ( modsIsIndexed <= 0 && mss->canApplyInPlace() && !isSystemUsersMod ) {
                         mss->applyModsInPlace( true );// const_cast<BSONObj&>(onDisk) );
 
                         DEBUGUPDATE( "\t\t\t doing in place update" );
-                        if ( profile && !multi )
+                        if ( !multi )
                             debug.fastmod = true;
 
                         if ( modsIsIndexed ) {
@@ -394,21 +393,16 @@ namespace mongo {
 
                     if ( logop ) {
                         DEV verify( mods->size() );
+                        BSONObj logObj = mss->getOpLogRewrite();
+                        DEBUGUPDATE( "\t rewrite update: " << logObj );
 
-                        if ( mss->haveArrayDepMod() ) {
-                            BSONObjBuilder patternBuilder;
-                            patternBuilder.appendElements( pattern );
-                            mss->appendSizeSpecForArrayDepMods( patternBuilder );
-                            pattern = patternBuilder.obj();
-                        }
-
-                        if ( forceRewrite || mss->needOpLogRewrite() ) {
-                            DEBUGUPDATE( "\t rewrite update: " << mss->getOpLogRewrite() );
-                            logOp("u", ns, mss->getOpLogRewrite() ,
-                                  &pattern, 0, fromMigrate );
-                        }
-                        else {
-                            logOp("u", ns, updateobj, &pattern, 0, fromMigrate );
+                        // It is possible that the entire mod set was a no-op over this
+                        // document.  We would have an empty log record in that case. If we
+                        // call logOp, with an empty record, that would be replicated as "clear
+                        // this record", which is not what we want. Therefore, to get a no-op
+                        // in the replica, we simply don't log.
+                        if ( logObj.nFields() ) {
+                            logOp("u", ns, logObj , &pattern, 0, fromMigrate );
                         }
                     }
                     numModded++;
@@ -444,7 +438,7 @@ namespace mongo {
                 BSONObj newObj = mods->createNewFromQuery( patternOrig );
                 checkNoMods( newObj );
                 debug.fastmodinsert = true;
-                theDataFileMgr.insertWithObjMod(ns, newObj, su);
+                theDataFileMgr.insertWithObjMod(ns, newObj, false, su);
                 if ( logop )
                     logOp( "i", ns, newObj, 0, 0, fromMigrate );
 
@@ -454,13 +448,25 @@ namespace mongo {
             checkNoMods( updateobj );
             debug.upsert = true;
             BSONObj no = updateobj;
-            theDataFileMgr.insertWithObjMod(ns, no, su);
+            theDataFileMgr.insertWithObjMod(ns, no, false, su);
             if ( logop )
                 logOp( "i", ns, no, 0, 0, fromMigrate );
             return UpdateResult( 0 , 0 , 1 , no );
         }
 
         return UpdateResult( 0 , isOperatorUpdate , 0 , BSONObj() );
+    }
+
+    void validateUpdate( const char* ns , const BSONObj& updateobj, const BSONObj& patternOrig ) {
+        uassert( 10155 , "cannot update reserved $ collection", strchr(ns, '$') == 0 );
+        if ( strstr(ns, ".system.") ) {
+            /* dm: it's very important that system.indexes is never updated as IndexDetails
+               has pointers into it */
+            uassert( 10156,
+                     str::stream() << "cannot update system collection: "
+                                   << ns << " q: " << patternOrig << " u: " << updateobj,
+                     legalClientSystemNS( ns , true ) );
+        }
     }
 
     UpdateResult updateObjects( const char* ns,
@@ -473,17 +479,39 @@ namespace mongo {
                                 bool fromMigrate,
                                 const QueryPlanSelectionPolicy& planPolicy ) {
 
-        uassert( 10155 , "cannot update reserved $ collection", strchr(ns, '$') == 0 );
-        if ( strstr(ns, ".system.") ) {
-            /* dm: it's very important that system.indexes is never updated as IndexDetails has pointers into it */
-            uassert( 10156,
-                     str::stream() << "cannot update system collection: " << ns << " q: " << patternOrig << " u: " << updateobj,
-                     legalClientSystemNS( ns , true ) );
-        }
+        validateUpdate( ns , updateobj , patternOrig );
 
         UpdateResult ur = _updateObjects(false, ns, updateobj, patternOrig,
                                          upsert, multi, logop,
-                                         debug, 0, fromMigrate, planPolicy );
+                                         debug, NULL, fromMigrate, planPolicy );
+        debug.nupdated = ur.num;
+        return ur;
+    }
+
+    UpdateResult updateObjectsForReplication( const char* ns,
+                                              const BSONObj& updateobj,
+                                              const BSONObj& patternOrig,
+                                              bool upsert,
+                                              bool multi,
+                                              bool logop ,
+                                              OpDebug& debug,
+                                              bool fromMigrate,
+                                              const QueryPlanSelectionPolicy& planPolicy ) {
+
+        validateUpdate( ns , updateobj , patternOrig );
+
+        UpdateResult ur = _updateObjects(false,
+                                         ns,
+                                         updateobj,
+                                         patternOrig,
+                                         upsert,
+                                         multi,
+                                         logop,
+                                         debug,
+                                         NULL /* no remove saver */,
+                                         fromMigrate,
+                                         planPolicy,
+                                         true /* for replication */ );
         debug.nupdated = ur.num;
         return ur;
     }

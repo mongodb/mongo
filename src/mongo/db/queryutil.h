@@ -25,6 +25,9 @@ namespace mongo {
     
     extern const int MaxBytesToReturnToClientAtOnce;
     
+    //maximum number of intervals produced by $in queries.
+    static const unsigned MAX_IN_COMBINATIONS = 4000000;
+
     /* This is for languages whose "objects" are not well ordered (JSON is well ordered).
      [ { a : ... } , { b : ... } ] -> { a : ..., b : ... }
      */
@@ -256,6 +259,55 @@ namespace mongo {
         void flipInclusive() { _inclusive = !_inclusive; }
     };
 
+    // Keep track of what special indices we're using.  This can be nontrivial
+    // because an index could be required by one operator but not by another.
+    struct SpecialIndices {
+        // Unlike true/false, this is readable.  :)
+        enum IndexRequired {
+            INDEX_REQUIRED,
+            NO_INDEX_REQUIRED,
+        };
+        map<string, bool> _indexRequired;
+
+        bool has(const string& name) const {
+            return _indexRequired.end() != _indexRequired.find(name);
+        }
+
+        SpecialIndices combineWith(const SpecialIndices& other) {
+            SpecialIndices ret = *this;
+            for (map<string, bool>::const_iterator it = other._indexRequired.begin();
+                 it != other._indexRequired.end(); ++it) {
+                ret._indexRequired[it->first] = ret._indexRequired[it->first] || it->second;
+            }
+            return ret;
+        }
+
+
+        void add(const string& name, IndexRequired req) {
+            _indexRequired[name] = _indexRequired[name] || (req == INDEX_REQUIRED);
+        }
+
+        bool allRequireIndex() const {
+            for (map<string, bool>::const_iterator it = _indexRequired.begin();
+                 it != _indexRequired.end(); ++it) {
+                if (!it->second) { return false; }
+            }
+            return true;
+        }
+
+        bool empty() const { return _indexRequired.empty(); }
+        string toString() const {
+            stringstream ss;
+            for (map<string, bool>::const_iterator it = _indexRequired.begin();
+                 it != _indexRequired.end(); ++it) {
+                ss << it->first;
+                ss << (it->second ? " (needs index)" : " (no index needed)");
+                ss << ", ";
+            }
+            return ss.str();
+        }
+    };
+
     /** An interval defined between a lower and an upper FieldBound. */
     struct FieldInterval {
         FieldInterval() : _cachedEquality( -1 ) {}
@@ -296,6 +348,10 @@ namespace mongo {
          *     TODO It is unclear why 'optimize' is optional, see SERVER-5165.
          */
         FieldRange( const BSONElement &e , bool isNot, bool optimize );
+
+        void setElemMatchContext( const BSONElement& elemMatchContext ) {
+            _elemMatchContext = elemMatchContext;
+        }
 
         /**
          * @return Range intersection with 'other'.
@@ -345,11 +401,12 @@ namespace mongo {
          *  FieldRange( {} ), isPointIntervalSet() -> false
          */
         bool isPointIntervalSet() const;
+        const BSONElement& elemMatchContext() const { return _elemMatchContext; }
         
         /** Empty the range so it includes no BSONElements. */
         void makeEmpty() { _intervals.clear(); }
         const vector<FieldInterval> &intervals() const { return _intervals; }
-        string getSpecial() const { return _special; }
+        const SpecialIndices& getSpecial() const { return _special; }
         /** Make component intervals noninclusive. */
         void setExclusiveBounds();
         /**
@@ -367,18 +424,15 @@ namespace mongo {
         vector<FieldInterval> _intervals;
         // Owns memory for our BSONElements.
         vector<BSONObj> _objData;
-        string _special;
+        SpecialIndices _special; // Index type name of a non standard (eg '2d') index required by a
+                              // parsed query operator (eg '$near').  Could be >1.
         bool _exactMatchRepresentation;
+        BSONElement _elemMatchContext; // Parent $elemMatch object of the field constraint that
+                                       // generated this FieldRange.  For example if the query is
+                                       // { a:{ $elemMatch:{ b:1, c:1 } } }, then the
+                                       // _elemMatchContext for the FieldRange on 'a.b' is the query
+                                       // element having field name '$elemMatch'.
     };
-    
-    /**
-     * A BoundList contains intervals specified by inclusive start
-     * and end bounds.  The intervals should be nonoverlapping and occur in
-     * the specified direction of traversal.  For example, given a simple index {i:1}
-     * and direction +1, one valid BoundList is: (1, 2); (4, 6).  The same BoundList
-     * would be valid for index {i:-1} with direction -1.
-     */
-    typedef vector<pair<BSONObj,BSONObj> > BoundList;
 
     class QueryPattern;
     
@@ -400,7 +454,7 @@ namespace mongo {
          *     TODO It is unclear why 'optimize' is optional, see SERVER-5165.
          */
         FieldRangeSet( const char *ns, const BSONObj &query , bool singleKey , bool optimize );
-        
+
         /** @return range for the given field. */
         const FieldRange &range( const char *fieldName ) const;
         /** @return range for the given field.  Public for testing. */
@@ -447,16 +501,8 @@ namespace mongo {
 
         const char *ns() const { return _ns.c_str(); }
         
-        /**
-         * @return a simplified query from the extreme values of the non universal
-         * fields.
-         * @param fields If specified, the fields of the returned object are
-         * ordered to match those of 'fields'.
-         */
-        BSONObj simplifiedQuery( const BSONObj &fields = BSONObj() ) const;
-        
         QueryPattern pattern( const BSONObj &sort = BSONObj() ) const;
-        string getSpecial() const;
+        SpecialIndices getSpecial() const;
 
         /**
          * @return a FieldRangeSet approximation of the documents in 'this' but
@@ -466,18 +512,6 @@ namespace mongo {
         const FieldRangeSet &operator-=( const FieldRangeSet &other );
         /** @return intersection of 'this' with 'other'. */
         const FieldRangeSet &operator&=( const FieldRangeSet &other );
-        
-        /**
-         * @return an ordered list of bounds generated using an index key pattern
-         * and traversal direction.
-         *
-         * The value of matchPossible() should be true, otherwise this function
-         * may @throw.
-         *
-         * NOTE This function is deprecated in the query optimizer and only
-         * currently used by sharding code.
-         */
-        BoundList indexBounds( const BSONObj &keyPattern, int direction ) const;
 
         /**
          * @return - A new FieldRangeSet based on this FieldRangeSet, but with only
@@ -577,7 +611,7 @@ namespace mongo {
         
         const char *ns() const { return _singleKey.ns(); }
 
-        string getSpecial() const { return _singleKey.getSpecial(); }
+        SpecialIndices getSpecial() const { return _singleKey.getSpecial(); }
 
         /** Intersect with another FieldRangeSetPair. */
         FieldRangeSetPair &operator&=( const FieldRangeSetPair &other );
@@ -586,16 +620,15 @@ namespace mongo {
          * already been scanned.
          */
         FieldRangeSetPair &operator-=( const FieldRangeSet &scanned );
-
-        BoundList shardKeyIndexBounds( const BSONObj &keyPattern ) const {
-            return _singleKey.indexBounds( keyPattern, 1 );
-        }
         
-        bool matchPossibleForShardKey( const BSONObj &keyPattern ) const {
+        bool matchPossibleForSingleKeyFRS( const BSONObj &keyPattern ) const {
             return _singleKey.matchPossibleForIndex( keyPattern );
         }
         
         BSONObj originalQuery() const { return _singleKey.originalQuery(); }
+
+        const FieldRangeSet getSingleKeyFRS() const { return _singleKey; }
+        const FieldRangeSet getMultiKeyFRS() const { return _singleKey; }
 
         string toString() const;
     private:
@@ -604,7 +637,6 @@ namespace mongo {
         void assertValidIndex( const NamespaceDetails *d, int idxNo ) const;
         void assertValidIndexOrNoIndex( const NamespaceDetails *d, int idxNo ) const;
         /** matchPossibleForIndex() must be true. */
-        BSONObj simplifiedQueryForIndex( NamespaceDetails *d, int idxNo, const BSONObj &keyPattern ) const;        
         FieldRangeSet _singleKey;
         FieldRangeSet _multiKey;
         friend class OrRangeGenerator;
@@ -627,12 +659,67 @@ namespace mongo {
          */
         FieldRangeVector( const FieldRangeSet &frs, const IndexSpec &indexSpec, int direction );
 
-        /** @return the number of index ranges represented by 'this' */
-        unsigned size();
-        /** @return starting point for an index traversal. */
+        /**
+         * Methods for identifying compound start and end btree bounds describing this field range
+         * vector.
+         *
+         * A FieldRangeVector contains the FieldRange bounds for every field of an index.  A
+         * FieldRangeVectorIterator may be used to efficiently search for btree keys within these
+         * bounds.  Alternatively, a single compound field interval of the btree may be scanned,
+         * between a compound field start point and end point.  If isSingleInterval() is true then
+         * the interval between the start and end points will be an exact description of this
+         * FieldRangeVector, otherwise the start/end interval will be a superset of this
+         * FieldRangeVector.  For example:
+         *
+         * index { a:1 }, query { a:{ $gt:2, $lte:4 } }
+         *     -> frv ( 2, 4 ]
+         *         -> start/end bounds ( { '':2 }, { '':4 } ]
+         *
+         * index { a:1, b:1 }, query { a:2, b:{ $gte:7, $lt:9 } }
+         *     -> frv [ 2, 2 ], [ 7, 9 )
+         *         -> start/end bounds [ { '':2, '':7 }, { '':2, '':9 } )
+         *
+         * index { a:1, b:-1 }, query { a:2, b:{ $gte:7, $lt:9 } }
+         *     -> frv [ 2, 2 ], ( 9, 7 ]
+         *         -> start/end bounds ( { '':2, '':9 }, { '':2, '':7 } ]
+         *
+         * index { a:1, b:1 }, query { a:{ $gte:7, $lt:9 } }
+         *     -> frv [ 7, 9 )
+         *         -> start/end bounds [ { '':7, '':MinKey }, { '':9, '':MinKey } )
+         *
+         * index { a:1, b:1 }, query { a:{ $gte:2, $lte:5 }, b:{ $gte:7, $lte:9 } }
+         *     -> frv [ 2, 5 ], [ 7, 9 ]
+         *         -> start/end bounds [ { '':2, '':7 }, { '':5, '':9 } ]
+         *            (isSingleInterval() == false)
+         */
+
+        /**
+         * @return true if this FieldRangeVector represents a single interval within a btree,
+         * comprised of all keys between a single start point and a single end point.
+         */
+        bool isSingleInterval() const;
+
+        /**
+         * @return a starting point for an index traversal, a lower bound on the ranges represented
+         * by this FieldRangeVector according to the btree's native ordering.
+         */
         BSONObj startKey() const;
-        /** @return end point for an index traversal. */
+
+        /** @return true if the startKey() bound is inclusive. */
+        bool startKeyInclusive() const;
+
+        /**
+         * @return an end point for an index traversal, an upper bound on the ranges represented
+         * by this FieldRangeVector according to the btree's native ordering.
+         */
         BSONObj endKey() const;
+
+        /** @return true if the endKey() bound is inclusive. */
+        bool endKeyInclusive() const;
+
+        /** @return the number of index ranges represented by 'this' */
+        unsigned size() const;
+
         /** @return a client readable representation of 'this' */
         BSONObj obj() const;
         
@@ -645,23 +732,43 @@ namespace mongo {
          * FieldRangeVector.  This function is used for $or clause deduping.
          */
         bool matches( const BSONObj &obj ) const;
-        
+
+        /**
+         * @return true if all values in the provided index key are contained within the field
+         * ranges of their respective fields in this FieldRangeVector.
+         *
+         * For example, given a query { a:3, b:4 } and index { a:1, b:1 }, the FieldRangeVector is
+         * [ [[ 3, 3 ]], [[ 4, 4 ]] ], consisting of field range [[ 3, 3 ]] on field 'a' and
+         * [[ 4, 4 ]] on field 'b'.  The index key { '':3, '':4 } matches, but the index key
+         * { '':3, '':5 } does not match because the value 5 in the second field is not contained in
+         * the field range [[ 4, 4 ]] for field 'b'.
+         */
+        bool matchesKey( const BSONObj& key ) const;
+
         /**
          * @return first key of 'obj' that would be encountered by a forward
          * index scan using this FieldRangeVector, BSONObj() if no such key.
          */
         BSONObj firstMatch( const BSONObj &obj ) const;
-        
+
+        /**
+         * @return true if all ranges within the field range set on fields of this index are
+         * represented in this field range vector.  May be false in certain multikey index cases
+         * when intervals on two fields cannot both be used, see comments related to SERVER-958 in
+         * FieldRangeVector().
+         */
+        bool hasAllIndexedRanges() const { return _hasAllIndexedRanges; }
+
         string toString() const;
         
     private:
         int matchingLowElement( const BSONElement &e, int i, bool direction, bool &lowEquality ) const;
         bool matchesElement( const BSONElement &e, int i, bool direction ) const;
-        bool matchesKey( const BSONObj &key ) const;
         vector<FieldRange> _ranges;
         const IndexSpec _indexSpec;
         int _direction;
         vector<BSONObj> _queries; // make sure mem owned
+        bool _hasAllIndexedRanges;
         friend class FieldRangeVectorIterator;
     };
     
@@ -825,7 +932,7 @@ namespace mongo {
          */
         FieldRangeSetPair *topFrspOriginal() const;
         
-        string getSpecial() const { return _baseSet.getSpecial(); }
+        SpecialIndices getSpecial() const { return _baseSet.getSpecial(); }
     private:
         void assertMayPopOrClause();
         void _popOrClause( const FieldRangeSet *toDiff, NamespaceDetails *d, int idxNo, const BSONObj &keyPattern );

@@ -24,54 +24,34 @@
 
 #pragma once
 
-#include "pch.h"
+#include "mongo/pch.h"
 
 #include <boost/thread/recursive_mutex.hpp>
 
 #include "cursor.h"
 #include "jsobj.h"
 #include "../util/net/message.h"
-#include "../util/net/listen.h"
 #include "../util/background.h"
+#include "cc_by_loc.h"
 #include "diskloc.h"
 #include "dbhelpers.h"
 #include "matcher.h"
 #include "projection.h"
 #include "s/d_chunk_manager.h"
+#include "mongo/db/keypattern.h"
+#include "mongo/util/elapsed_tracker.h"
 
 namespace mongo {
 
     typedef boost::recursive_mutex::scoped_lock recursive_scoped_lock;
-    typedef long long CursorId; /* passed to the client so it can send back on getMore */
-    static const CursorId INVALID_CURSOR_ID = -1; // But see SERVER-5726.
     class Cursor; /* internal server cursor base class */
     class ClientCursor;
     class ParsedQuery;
-
-    struct ByLocKey {
-
-        ByLocKey( const DiskLoc & l , const CursorId& i ) : loc(l), id(i) {}
-
-        static ByLocKey min( const DiskLoc& l ) { return ByLocKey( l , numeric_limits<long long>::min() ); }
-        static ByLocKey max( const DiskLoc& l ) { return ByLocKey( l , numeric_limits<long long>::max() ); }
-
-        bool operator<( const ByLocKey &other ) const {
-            int x = loc.compare( other.loc );
-            if ( x )
-                return x < 0;
-            return id < other.id;
-        }
-
-        DiskLoc loc;
-        CursorId id;
-
-    };
 
     /* todo: make this map be per connection.  this will prevent cursor hijacking security attacks perhaps.
      *       ERH: 9/2010 this may not work since some drivers send getMore over a different connection
     */
     typedef map<CursorId, ClientCursor*> CCById;
-    typedef map<ByLocKey, ClientCursor*> CCByLoc;
 
     extern BSONObj id_obj;
 
@@ -100,6 +80,9 @@ namespace mongo {
                 }
             }
             void release() {
+                if ( _cursorid == INVALID_CURSOR_ID ) {
+                    return;
+                }
                 ClientCursor *cursor = c();
                 _cursorid = INVALID_CURSOR_ID;
                 if ( cursor ) {
@@ -287,6 +270,13 @@ namespace mongo {
         */
         BSONObj extractFields(const BSONObj &pattern , bool fillWithNull = false) ;
 
+        /** Extract elements from the object this cursor currently points to, using the expression
+         *  specified in KeyPattern. Will use a covered index if the one in this cursor is usable.
+         *  TODO: there are some cases where a covered index could be used but is not, for instance
+         *  if both this index and the keyPattern are {a : "hashed"}
+         */
+        BSONObj extractKey( const KeyPattern& usingKeyPattern ) const;
+
         void fillQueryResultFromObj( BufBuilder &b, const MatchDetails* details = NULL ) const;
 
         bool currentIsDup() { return _c->getsetdup( _c->currLoc() ); }
@@ -306,8 +296,10 @@ namespace mongo {
         static ClientCursor* find_inlock(CursorId id, bool warn = true) {
             CCById::iterator it = clientCursorsById.find(id);
             if ( it == clientCursorsById.end() ) {
-                if ( warn )
-                    OCCASIONALLY out() << "ClientCursor::find(): cursor not found in map " << id << " (ok after a drop)\n";
+                if ( warn ) {
+                    OCCASIONALLY out() << "ClientCursor::find(): cursor not found in map '" << id
+                                       << "' (ok after a drop)" << endl;
+                }
                 return 0;
             }
             return it->second;
@@ -332,13 +324,19 @@ namespace mongo {
         /**
          * Deletes the cursor with the provided @param 'id' if one exists.
          * @throw if the cursor with the provided id is pinned.
+         * This does not do any auth checking and should be used only when erasing cursors as part
+         * of cleaning up internal operations.
          */
         static bool erase(CursorId id);
+        // Same as erase but checks to make sure this thread has read permission on the cursor's
+        // namespace.  This should be called when receiving killCursors from a client.
+        static bool eraseIfAuthorized(CursorId id);
 
         /**
          * @return number of cursors found
          */
-        static int erase( int n , long long * ids );
+        static int erase(int n, long long* ids);
+        static int eraseIfAuthorized(int n, long long* ids);
 
         void mayUpgradeStorage() {
             /* if ( !ids_.get() )
@@ -372,19 +370,20 @@ namespace mongo {
         static void appendStats( BSONObjBuilder& result );
         static unsigned numCursors() { return clientCursorsById.size(); }
         static void informAboutToDeleteBucket(const DiskLoc& b);
-        static void aboutToDelete(const DiskLoc& dl);
+        static void aboutToDelete(const NamespaceDetails* nsd, const DiskLoc& dl);
         static void find( const string& ns , set<CursorId>& all );
 
 
     private: // methods
 
-        // cursors normally timeout after an inactivy period to prevent excess memory use
+        // cursors normally timeout after an inactivity period to prevent excess memory use
         // setting this prevents timeout of the cursor in question.
         void noTimeout() { _pinValue++; }
 
         CCByLoc& byLoc() { return _db->ccByLoc; }
         
         Record* _recordForYield( RecordNeeds need );
+        static bool _erase_inlock(ClientCursor* cursor);
 
     private:
 

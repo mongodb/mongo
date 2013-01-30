@@ -122,6 +122,7 @@ namespace mongo {
         if (!isMongos) {
             
             if ( b["locks"].isABSONObj() ) {
+                // report either the global lock % or the db with the highest lock % + the global lock
                 NamespaceStats prevStats = parseServerStatusLocks( a );
                 NamespaceStats curStats = parseServerStatusLocks( b );
                 vector<NamespaceDiff> diffs = computeDiff( prevStats , curStats );
@@ -131,20 +132,21 @@ namespace mongo {
                 }
                 else {
 
-                    double globalTime = 0;
-
-                    for ( unsigned i = 0; i < diffs.size(); i++ ) {
-                        if ( diffs[i].ns != "." )
-                            continue;
-                        globalTime = diffs[i].write;
-                    }
-
-                    double uptimeMillis = diff( "uptimeMillis" , a , b );
+                    // diff() divides the result by _seconds, need total uptime here
+                    double uptimeMillis = diff( "uptimeMillis" , a , b ) * _seconds;
                     unsigned idx = diffs.size()-1;
                     
+                    double lockToReport = diffs[idx].write;
+                    if ( diffs[idx].ns != "." ) {
+                        for ( unsigned i = 0; i < diffs.size(); i++ ) {
+                            if ( diffs[i].ns == "." )
+                                lockToReport += diffs[i].write;
+                        }
+                    }
+
                     stringstream ss;
                     ss.setf( ios::fixed );
-                    ss << diffs[idx].ns << ":" << setprecision(1) << ( 100.0 * ( globalTime + diffs[idx].write ) / uptimeMillis ) << "%";
+                    ss << diffs[idx].ns << ":" << setprecision(1) << ( 100.0 * lockToReport / uptimeMillis ) << "%";
                     // set the width to be the greater of the field header size or the actual field length, e.g., 'mylongdb:89.1%' 
                     _append( result , "locked db" , ( ss.str().size() > 10 ? ss.str().size() : 10 ) , ss.str() );
                 }

@@ -16,12 +16,14 @@
 */
 
 #include "pch.h"
-#include "../client.h"
-#include "rs.h"
-#include "../repl.h"
-#include "../cloner.h"
-#include "../ops/update.h"
-#include "../ops/delete.h"
+
+#include "mongo/db/client.h"
+#include "mongo/db/cloner.h"
+#include "mongo/db/index_rebuilder.h"
+#include "mongo/db/ops/update.h"
+#include "mongo/db/ops/delete.h"
+#include "mongo/db/repl/rs.h"
+#include "mongo/db/repl.h"
 
 /* Scenarios
 
@@ -304,18 +306,6 @@ namespace mongo {
         bson::bo goodVersionOfObject;
     };
 
-    static void setMinValid(bo newMinValid) {
-        try {
-            log() << "replSet minvalid=" << newMinValid["ts"]._opTime().toStringLong() << rsLog;
-        }
-        catch(...) { }
-        {
-            Helpers::putSingleton("local.replset.minvalid", newMinValid);
-            Client::Context cx( "local." );
-            cx.db()->flushFiles(true);
-        }
-    }
-
     void ReplSetImpl::syncFixUp(HowToFixUp& h, OplogReader& r) {
         DBClientConnection *them = r.conn();
 
@@ -378,6 +368,7 @@ namespace mongo {
 
         /* we have items we are writing that aren't from a point-in-time.  thus best not to come online
            until we get to that point in freshness. */
+        log() << "replSet minvalid=" << newMinValid["ts"]._opTime().toStringLong() << rsLog;
         setMinValid(newMinValid);
 
         /** any full collection resyncs required? */
@@ -393,7 +384,7 @@ namespace mongo {
                     dropCollection(ns, errmsg, res);
                     {
                         dbtemprelease r;
-                        bool ok = copyCollectionFromRemote(them->getServerAddress(), ns, errmsg);
+                        bool ok = Cloner::copyCollectionFromRemote(them->getServerAddress(), ns, errmsg);
                         uassert(15909, str::stream() << "replSet rollback error resyncing collection " << ns << ' ' << errmsg, ok);
                     }
                 }
@@ -411,6 +402,7 @@ namespace mongo {
                         err = "can't get minvalid from primary";
                     }
                     else {
+                        log() << "replSet minvalid=" << newMinValid["ts"]._opTime().toStringLong() << rsLog;
                         setMinValid(newMinValid);
                     }
                 }
@@ -440,7 +432,7 @@ namespace mongo {
             try {
                 bob res;
                 string errmsg;
-                log(1) << "replSet rollback drop: " << *i << rsLog;
+                LOG(1) << "replSet rollback drop: " << *i << rsLog;
                 dropCollection(*i, errmsg, res);
             }
             catch(...) {
@@ -486,7 +478,7 @@ namespace mongo {
                             /* can't delete from a capped collection - so we truncate instead. if this item must go,
                             so must all successors!!! */
                             try {
-                                /** todo: IIRC cappedTrunateAfter does not handle completely empty.  todo. */
+                                /** todo: IIRC cappedTruncateAfter does not handle completely empty.  todo. */
                                 // this will crazy slow if no _id index.
                                 long long start = Listener::getElapsedTimeMillis();
                                 DiskLoc loc = Helpers::findOne(d.ns, pattern, false);
@@ -583,6 +575,29 @@ namespace mongo {
     }
 
     void ReplSetImpl::syncRollback(OplogReader&r) {
+        // If this is startup, wait for any index build retries to finish first
+        while (indexRebuilder.getState() != BackgroundJob::Done) {
+            OCCASIONALLY LOG(0) << "replSet rollback waiting for index rebuild to finish" << endl;
+            indexRebuilder.wait(1000);
+        }
+
+        // check that we are at minvalid, otherwise we cannot rollback as we may be in an
+        // inconsistent state
+        {
+            Lock::DBRead lk("local.replset.minvalid");
+            BSONObj mv;
+            if( Helpers::getSingleton("local.replset.minvalid", mv) ) {
+                OpTime minvalid = mv["ts"]._opTime();
+                if( minvalid > lastOpTimeWritten ) {
+                    log() << "replSet need to rollback, but in inconsistent state" << endl;
+                    log() << "minvalid: " << minvalid.toString() << " our last optime: "
+                          << lastOpTimeWritten.toString() << endl;
+                    changeState(MemberState::RS_FATAL);
+                    return;
+                }
+            }
+        }
+
         unsigned s = _syncRollback(r);
         if( s )
             sleepsecs(s);
@@ -601,8 +616,8 @@ namespace mongo {
         }
 
         if( state().secondary() ) {
-            /* by doing this, we will not service reads (return an error as we aren't in secondary staate.
-               that perhaps is moot becasue of the write lock above, but that write lock probably gets deferred
+            /* by doing this, we will not service reads (return an error as we aren't in secondary state.
+               that perhaps is moot because of the write lock above, but that write lock probably gets deferred
                or removed or yielded later anyway.
 
                also, this is better for status reporting - we know what is happening.

@@ -16,7 +16,7 @@
 
 #pragma once
 
-#include "pch.h"
+#include "mongo/pch.h"
 
 #include <boost/unordered_map.hpp>
 #include "util/intrusive_counter.h"
@@ -28,6 +28,7 @@
 #include "db/pipeline/value.h"
 #include "util/string_writer.h"
 #include "mongo/db/projection.h"
+#include "mongo/s/shard.h"
 
 namespace mongo {
     class Accumulator;
@@ -37,9 +38,8 @@ namespace mongo {
     class ExpressionContext;
     class ExpressionFieldPath;
     class ExpressionObject;
+    class DocumentSourceLimit;
     class Matcher;
-    class Shard;
-    class ShardChunkManager;
 
     class DocumentSource :
         public IntrusiveCounterUnsigned,
@@ -87,13 +87,16 @@ namespace mongo {
         */
         virtual bool advance();
 
-        /**
-          Advance the source, and return the next Expression.
-
-          @returns the current Document
-          TODO throws an exception if there are no more expressions to return.
-        */
-        virtual intrusive_ptr<Document> getCurrent() = 0;
+        /** @returns the current Document without advancing.
+         *
+         *  It is illegal to call this without first checking eof() == false or advance() == true.
+         *
+         *  While it is legal to call getCurrent() multiple times between calls to advance, and
+         *  you will get the same Document returned, some DocumentSources do expensive work in
+         *  getCurrent(). You are advised to cache the result if you plan to access it more than
+         *  once.
+         */
+        virtual Document getCurrent() = 0;
 
         /**
          * Inform the source that it is no longer needed and may release its resources.  After
@@ -159,11 +162,11 @@ namespace mongo {
 
         enum GetDepsReturn {
             NOT_SUPPORTED, // This means the set should be ignored
-            EXAUSTIVE, // This means that everything needed should be in the set
+            EXHAUSTIVE, // This means that everything needed should be in the set
             SEE_NEXT, // Add the next Source's deps to the set
         };
 
-        /** Get the fields this operation needs to do it's job.
+        /** Get the fields this operation needs to do its job.
          *  Deps should be in "a.b.c" notation
          *
          *  @param deps results are added here. NOT CLEARED
@@ -177,6 +180,13 @@ namespace mongo {
          */
         static BSONObj depsToProjection(const set<string>& deps);
 
+        /** These functions take the same input as depsToProjection but are able to
+         *  produce a Document from a BSONObj with the needed fields much faster.
+         */
+        typedef Document ParsedDeps; // See implementation for structure
+        static ParsedDeps parseDeps(const set<string>& deps);
+        static Document documentFromBsonWithDeps(const BSONObj& object, const ParsedDeps& deps);
+
         /**
           Add the DocumentSource to the array builder.
 
@@ -184,11 +194,13 @@ namespace mongo {
           convert the inner part of the object which will be added to the
           array being built here.
 
+          A subclass may choose to overwrite this rather than addToBsonArray
+          if it should output multiple stages.
+
           @param pBuilder the array builder to add the operation to.
           @param explain create explain output
          */
-        virtual void addToBsonArray(BSONArrayBuilder *pBuilder,
-            bool explain = false) const;
+        virtual void addToBsonArray(BSONArrayBuilder *pBuilder, bool explain=false) const;
         
     protected:
         /**
@@ -261,7 +273,7 @@ namespace mongo {
         virtual ~DocumentSourceBsonArray();
         virtual bool eof();
         virtual bool advance();
-        virtual intrusive_ptr<Document> getCurrent();
+        virtual Document getCurrent();
         virtual void setSource(DocumentSource *pSource);
 
         /**
@@ -304,7 +316,7 @@ namespace mongo {
         virtual ~DocumentSourceCommandShards();
         virtual bool eof();
         virtual bool advance();
-        virtual intrusive_ptr<Document> getCurrent();
+        virtual Document getCurrent();
         virtual void setSource(DocumentSource *pSource);
 
         /* convenient shorthand for a commonly used type */
@@ -338,9 +350,11 @@ namespace mongo {
          */
         void getNextDocument();
 
+        bool unstarted;
+        bool hasCurrent;
         bool newSource; // set to true for the first item of a new source
         intrusive_ptr<DocumentSourceBsonArray> pBsonSource;
-        intrusive_ptr<Document> pCurrent;
+        Document pCurrent;
         ShardOutput::const_iterator iterator;
         ShardOutput::const_iterator listEnd;
     };
@@ -372,7 +386,7 @@ namespace mongo {
         virtual ~DocumentSourceCursor();
         virtual bool eof();
         virtual bool advance();
-        virtual intrusive_ptr<Document> getCurrent();
+        virtual Document getCurrent();
         virtual void setSource(DocumentSource *pSource);
 
         /**
@@ -428,7 +442,7 @@ namespace mongo {
          */
         void setSort(const shared_ptr<BSONObj> &pBsonObj);
 
-        void setProjection(BSONObj projection);
+        void setProjection(const BSONObj& projection, const ParsedDeps& deps);
     protected:
         // virtuals from DocumentSource
         virtual void sourceToBson(BSONObjBuilder *pBuilder, bool explain) const;
@@ -440,7 +454,9 @@ namespace mongo {
 
         void findNext();
 
-        intrusive_ptr<Document> pCurrent;
+        bool unstarted;
+        bool hasCurrent;
+        Document pCurrent;
 
         string ns; // namespace
 
@@ -452,6 +468,7 @@ namespace mongo {
         shared_ptr<BSONObj> pQuery;
         shared_ptr<BSONObj> pSort;
         shared_ptr<Projection> _projection; // shared with pClientCursor
+        ParsedDeps _dependencies;
 
         shared_ptr<CursorWithContext> _cursorWithContext;
 
@@ -485,7 +502,7 @@ namespace mongo {
         virtual ~DocumentSourceFilterBase();
         virtual bool eof();
         virtual bool advance();
-        virtual intrusive_ptr<Document> getCurrent();
+        virtual Document getCurrent();
 
         /**
           Create a BSONObj suitable for Matcher construction.
@@ -511,15 +528,15 @@ namespace mongo {
           @param pDocument the document to test
           @returns true if the document matches the filter, false otherwise
          */
-        virtual bool accept(const intrusive_ptr<Document> &pDocument) const = 0;
+        virtual bool accept(const Document& pDocument) const = 0;
 
     private:
 
         void findNext();
 
         bool unstarted;
-        bool hasNext;
-        intrusive_ptr<Document> pCurrent;
+        bool hasCurrent;
+        Document pCurrent;
     };
 
 
@@ -574,7 +591,7 @@ namespace mongo {
         virtual void sourceToBson(BSONObjBuilder *pBuilder, bool explain) const;
 
         // virtuals from DocumentSourceFilterBase
-        virtual bool accept(const intrusive_ptr<Document> &pDocument) const;
+        virtual bool accept(const Document& pDocument) const;
 
     private:
         DocumentSourceFilter(const intrusive_ptr<Expression> &pFilter,
@@ -592,8 +609,9 @@ namespace mongo {
         virtual bool eof();
         virtual bool advance();
         virtual const char *getSourceName() const;
-        virtual intrusive_ptr<Document> getCurrent();
+        virtual Document getCurrent();
         virtual GetDepsReturn getDependencies(set<string>& deps) const;
+        virtual void dispose();
 
         /**
           Create a new grouping DocumentSource.
@@ -627,7 +645,7 @@ namespace mongo {
           @param pAccumulatorFactory used to create the accumulator for the
                 group field
          */
-        void addAccumulator(string fieldName,
+        void addAccumulator(const std::string& fieldName,
                             intrusive_ptr<Accumulator> (*pAccumulatorFactory)(
                             const intrusive_ptr<ExpressionContext> &),
                             const intrusive_ptr<Expression> &pExpression);
@@ -671,7 +689,7 @@ namespace mongo {
 
         intrusive_ptr<Expression> pIdExpression;
 
-        typedef boost::unordered_map<intrusive_ptr<const Value>,
+        typedef boost::unordered_map<Value,
             vector<intrusive_ptr<Accumulator> >, Value::Hash> GroupsType;
         GroupsType groups;
 
@@ -693,11 +711,9 @@ namespace mongo {
         vector<intrusive_ptr<Expression> > vpExpression;
 
 
-        intrusive_ptr<Document> makeDocument(
-            const GroupsType::iterator &rIter);
+        Document makeDocument(const GroupsType::iterator &rIter);
 
         GroupsType::iterator groupsIterator;
-        intrusive_ptr<Document> pCurrent;
     };
 
 
@@ -738,7 +754,7 @@ namespace mongo {
         virtual void sourceToBson(BSONObjBuilder *pBuilder, bool explain) const;
 
         // virtuals from DocumentSourceFilterBase
-        virtual bool accept(const intrusive_ptr<Document> &pDocument) const;
+        virtual bool accept(const Document& pDocument) const;
 
     private:
         DocumentSourceMatch(const BSONObj &query,
@@ -756,7 +772,7 @@ namespace mongo {
         virtual bool eof();
         virtual bool advance();
         virtual const char *getSourceName() const;
-        virtual intrusive_ptr<Document> getCurrent();
+        virtual Document getCurrent();
 
         /**
           Create a document source for output and pass-through.
@@ -792,7 +808,7 @@ namespace mongo {
         virtual bool eof();
         virtual bool advance();
         virtual const char *getSourceName() const;
-        virtual intrusive_ptr<Document> getCurrent();
+        virtual Document getCurrent();
         virtual void optimize();
 
         virtual GetDepsReturn getDependencies(set<string>& deps) const;
@@ -842,30 +858,18 @@ namespace mongo {
         virtual bool eof();
         virtual bool advance();
         virtual const char *getSourceName() const;
-        virtual intrusive_ptr<Document> getCurrent();
+        virtual Document getCurrent();
+        virtual void addToBsonArray(BSONArrayBuilder *pBuilder, bool explain=false) const;
+        virtual bool coalesce(const intrusive_ptr<DocumentSource> &pNextSource);
+        virtual void dispose();
 
         virtual GetDepsReturn getDependencies(set<string>& deps) const;
 
-        /*
-          TODO
-          Adjacent sorts should reduce to the last sort.
-        virtual bool coalesce(const intrusive_ptr<DocumentSource> &pNextSource);
-        */
-
-        /**
-          Create a new sorting DocumentSource.
-          
-          @param pExpCtx the expression context for the pipeline
-          @returns the DocumentSource
-         */
-        static intrusive_ptr<DocumentSourceSort> create(
-            const intrusive_ptr<ExpressionContext> &pExpCtx);
-
         // Virtuals for SplittableDocumentSource
-        // All work for sort is done in router currently
-        // TODO: do partial sorts on the shards then merge in the router
-        //       Not currently possible due to DocumentSource's cursor-like interface
-        virtual intrusive_ptr<DocumentSource> getShardSource() { return NULL; }
+        // All work for sort is done in router currently if there is no limit.
+        // If there is a limit, the $sort/$limit combination is performed on the
+        // shards, then the results are resorted and limited on mongos
+        virtual intrusive_ptr<DocumentSource> getShardSource() { return limitSrc ? this : NULL; }
         virtual intrusive_ptr<DocumentSource> getRouterSource() { return this; }
 
         /**
@@ -903,12 +907,23 @@ namespace mongo {
             BSONElement *pBsonElement,
             const intrusive_ptr<ExpressionContext> &pExpCtx);
 
+        /// Create a DocumentSourceSort with a given sort and (optional) limit
+        static intrusive_ptr<DocumentSourceSort> create(
+            const intrusive_ptr<ExpressionContext> &pExpCtx,
+            BSONObj sortOrder,
+            long long limit=-1);
+
+        /// returns -1 for no limit
+        long long getLimit() const;
+
+        intrusive_ptr<DocumentSourceLimit> getLimitSrc() const { return limitSrc; }
 
         static const char sortName[];
-
     protected:
         // virtuals from DocumentSource
-        virtual void sourceToBson(BSONObjBuilder *pBuilder, bool explain) const;
+        virtual void sourceToBson(BSONObjBuilder *pBuilder, bool explain) const {
+            verify(false); // should call addToBsonArray instead
+        }
 
     private:
         DocumentSourceSort(const intrusive_ptr<ExpressionContext> &pExpCtx);
@@ -921,23 +936,26 @@ namespace mongo {
          */
         void populate();
         bool populated;
-        long long count;
+
+        // These are called by populate()
+        void populateAll();  // no limit
+        void populateOne();  // limit == 1
+        void populateTopK(); // limit > 1
 
         /* these two parallel each other */
         typedef vector<intrusive_ptr<ExpressionFieldPath> > SortPaths;
         SortPaths vSortKey;
-        vector<bool> vAscending;
+        vector<char> vAscending; // used like vector<bool> but without specialization
 
-        /*
-          Compare two documents according to the specified sort key.
+        struct KeyAndDoc {
+            explicit KeyAndDoc(const Document& d, const SortPaths& sp); // extracts sort key
+            Value key; // array of keys if vSortKey.size() > 1
+            Document doc;
+        };
+        friend void swap(KeyAndDoc& l, KeyAndDoc& r);
 
-          @param rL reference to the left document
-          @param rR reference to the right document
-          @returns a number less than, equal to, or greater than zero,
-            indicating pL < pR, pL == pR, or pL > pR, respectively
-         */
-        int compare(const intrusive_ptr<Document> &pL,
-                    const intrusive_ptr<Document> &pR);
+        /// Compare two KeyAndDocs according to the specified sort key.
+        int compare(const KeyAndDoc& lhs, const KeyAndDoc& rhs) const;
 
         /*
           This is a utility class just for the STL sort that is done
@@ -945,36 +963,31 @@ namespace mongo {
          */
         class Comparator {
         public:
-            bool operator()(
-                const intrusive_ptr<Document> &pL,
-                const intrusive_ptr<Document> &pR) {
-                return (pSort->compare(pL, pR) < 0);
+            explicit Comparator(const DocumentSourceSort& source): _source(source) {}
+            bool operator()(const KeyAndDoc& lhs, const KeyAndDoc& rhs) const {
+                return (_source.compare(lhs, rhs) < 0);
             }
-
-            inline Comparator(DocumentSourceSort *pS):
-                pSort(pS) {
-            }
-
         private:
-            DocumentSourceSort *pSort;
+            const DocumentSourceSort& _source;
         };
 
-        typedef vector<intrusive_ptr<Document> > VectorType;
-        VectorType documents;
+        deque<KeyAndDoc> documents;
 
-        VectorType::iterator docIterator;
-        intrusive_ptr<Document> pCurrent;
+        intrusive_ptr<DocumentSourceLimit> limitSrc;
     };
-
+    inline void swap(DocumentSourceSort::KeyAndDoc& l, DocumentSourceSort::KeyAndDoc& r) {
+        l.key.swap(r.key);
+        l.doc.swap(r.doc);
+    }
 
     class DocumentSourceLimit :
-        public DocumentSource {
+        public SplittableDocumentSource {
     public:
         // virtuals from DocumentSource
         virtual ~DocumentSourceLimit();
         virtual bool eof();
         virtual bool advance();
-        virtual intrusive_ptr<Document> getCurrent();
+        virtual Document getCurrent();
         virtual const char *getSourceName() const;
         virtual bool coalesce(const intrusive_ptr<DocumentSource> &pNextSource);
 
@@ -989,7 +1002,16 @@ namespace mongo {
           @returns the DocumentSource
          */
         static intrusive_ptr<DocumentSourceLimit> create(
-            const intrusive_ptr<ExpressionContext> &pExpCtx);
+            const intrusive_ptr<ExpressionContext> &pExpCtx,
+            long long limit);
+
+        // Virtuals for SplittableDocumentSource
+        // Need to run on rounter. Running on shard as well is an optimization.
+        virtual intrusive_ptr<DocumentSource> getShardSource() { return this; }
+        virtual intrusive_ptr<DocumentSource> getRouterSource() { return this; }
+
+        long long getLimit() const { return limit; }
+        void setLimit(long long newLimit) { limit = newLimit; }
 
         /**
           Create a limiting DocumentSource from BSON.
@@ -1013,22 +1035,21 @@ namespace mongo {
         virtual void sourceToBson(BSONObjBuilder *pBuilder, bool explain) const;
 
     private:
-        DocumentSourceLimit(
-            const intrusive_ptr<ExpressionContext> &pExpCtx);
+        DocumentSourceLimit(const intrusive_ptr<ExpressionContext> &pExpCtx,
+                            long long limit);
 
         long long limit;
         long long count;
-        intrusive_ptr<Document> pCurrent;
     };
 
     class DocumentSourceSkip :
-        public DocumentSource {
+        public SplittableDocumentSource {
     public:
         // virtuals from DocumentSource
         virtual ~DocumentSourceSkip();
         virtual bool eof();
         virtual bool advance();
-        virtual intrusive_ptr<Document> getCurrent();
+        virtual Document getCurrent();
         virtual const char *getSourceName() const;
         virtual bool coalesce(const intrusive_ptr<DocumentSource> &pNextSource);
 
@@ -1044,6 +1065,14 @@ namespace mongo {
          */
         static intrusive_ptr<DocumentSourceSkip> create(
             const intrusive_ptr<ExpressionContext> &pExpCtx);
+
+        // Virtuals for SplittableDocumentSource
+        // Need to run on rounter. Can't run on shards.
+        virtual intrusive_ptr<DocumentSource> getShardSource() { return NULL; }
+        virtual intrusive_ptr<DocumentSource> getRouterSource() { return this; }
+
+        long long getSkip() const { return skip; }
+        void setSkip(long long newSkip) { skip = newSkip; }
 
         /**
           Create a skipping DocumentSource from BSON.
@@ -1076,7 +1105,7 @@ namespace mongo {
 
         long long skip;
         long long count;
-        intrusive_ptr<Document> pCurrent;
+        Document pCurrent;
     };
 
 
@@ -1088,7 +1117,7 @@ namespace mongo {
         virtual bool eof();
         virtual bool advance();
         virtual const char *getSourceName() const;
-        virtual intrusive_ptr<Document> getCurrent();
+        virtual Document getCurrent();
 
         virtual GetDepsReturn getDependencies(set<string>& deps) const;
 
@@ -1131,13 +1160,78 @@ namespace mongo {
         void unwindPath(const FieldPath &fieldPath);
 
         // Configuration state.
-        FieldPath _unwindPath;
+        scoped_ptr<FieldPath> _unwindPath;
 
         // Iteration state.
         class Unwinder;
         scoped_ptr<Unwinder> _unwinder;
     };
 
+    class DocumentSourceGeoNear : public SplittableDocumentSource {
+    public:
+        // virtuals from DocumentSource
+        virtual ~DocumentSourceGeoNear();
+        virtual bool eof();
+        virtual bool advance();
+        virtual Document getCurrent();
+        virtual const char *getSourceName() const;
+        virtual void setSource(DocumentSource *pSource); // errors out since this must be first
+        virtual bool coalesce(const intrusive_ptr<DocumentSource> &pNextSource);
+
+        // Virtuals for SplittableDocumentSource
+        virtual intrusive_ptr<DocumentSource> getShardSource();
+        virtual intrusive_ptr<DocumentSource> getRouterSource();
+
+        static intrusive_ptr<DocumentSource> createFromBson(
+            BSONElement *pBsonElement,
+            const intrusive_ptr<ExpressionContext> &pCtx);
+
+        static char geoNearName[];
+
+        long long getLimit() { return limit; }
+
+        // this should only be used for testing
+        static intrusive_ptr<DocumentSourceGeoNear> create(
+            const intrusive_ptr<ExpressionContext> &pCtx);
+
+    protected:
+        // virtuals from DocumentSource
+        virtual void sourceToBson(BSONObjBuilder *pBuilder, bool explain) const;
+
+    private:
+        DocumentSourceGeoNear(const intrusive_ptr<ExpressionContext> &pExpCtx);
+
+        void parseOptions(BSONObj options);
+        BSONObj buildGeoNearCmd(const StringData& collection) const;
+        void runCommand();
+
+        // These fields describe the command to run.
+        // coords and distanceField are required, rest are optional
+        BSONObj coords; // "near" option, but near is a reserved keyword on windows
+        bool coordsIsArray;
+        scoped_ptr<FieldPath> distanceField; // Using scoped_ptr because FieldPath can't be empty
+        long long limit;
+        double maxDistance;
+        BSONObj query;
+        bool spherical;
+        double distanceMultiplier;
+        scoped_ptr<FieldPath> includeLocs;
+        bool uniqueDocs;
+
+        // These fields are injected by PipelineD. This division of labor allows the
+        // DocumentSourceGeoNear class to be linked into both mongos and mongod while
+        // allowing it to run a command using DBDirectClient when in mongod.
+        string db;
+        string collection;
+        boost::scoped_ptr<DBClientWithCommands> client; // either NULL or a DBDirectClient
+        friend class PipelineD;
+
+        // these fields are used while processing the results
+        BSONObj cmdOutput;
+        boost::scoped_ptr<BSONObjIterator> resultsIterator; // iterator over cmdOutput["results"]
+        Document currentDoc;
+        bool hasCurrent;
+    };
 }
 
 

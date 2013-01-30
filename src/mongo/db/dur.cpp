@@ -73,6 +73,7 @@
 #include "mongo/util/stacktrace.h"
 #include "../server.h"
 #include "mongo/db/commands/fsync.h"
+#include "mongo/db/commands/server_status.h"
 
 using namespace mongoutils;
 
@@ -110,7 +111,7 @@ namespace mongo {
         Stats::S * Stats::other() {
             return curr == &_a ? &_b : &_a;
         }
-                        string _CSVHeader();
+        string _CSVHeader();
 
         string Stats::S::_CSVHeader() { 
             return "cmts  jrnMB\twrDFMB\tcIWLk\tearly\tprpLgB  wrToJ\twrToDF\trmpPrVw";
@@ -149,11 +150,6 @@ namespace mongo {
                              "writeToDataFiles" << (unsigned) (_writeToDataFilesMicros/1000) <<
                              "remapPrivateView" << (unsigned) (_remapPrivateViewMicros/1000)
                            );
-            /*int r = getAgeOutJournalFiles();
-            if( r == -1 )
-                b << "ageOutJournalFiles" << "mutex timeout";
-            if( r == 0 )
-                b << "ageOutJournalFiles" << false;*/
             if( cmdLine.journalCommitInterval != 0 )
                 b << "journalCommitIntervalMs" << cmdLine.journalCommitInterval;
             return b.obj();
@@ -217,7 +213,7 @@ namespace mongo {
             is created first, and the journal will just replay the creation if the create didn't
             happen because of crashing.
         */
-        void DurableImpl::createdFile(string filename, unsigned long long len) {
+        void DurableImpl::createdFile(const std::string& filename, unsigned long long len) {
             shared_ptr<DurOp> op( new FileCreatedOp(filename, len) );
             commitJob.noteOp(op);
         }
@@ -262,52 +258,61 @@ namespace mongo {
         }
 
         bool NOINLINE_DECL DurableImpl::_aCommitIsNeeded() {
-            if( !Lock::isLocked() ) {
-                DEV log() << "commitIfNeeded but we are unlocked that is ok but why do we get here" << endl;
-                Lock::GlobalRead r;
-                if( commitJob.bytes() < UncommittedBytesLimit ) {
-                    // someone else beat us to it
-                    return false;
+            switch (Lock::isLocked()) {
+                case '\0': {
+                    DEV log() << "commitIfNeeded but we are unlocked that is ok but why do we get here" << endl;
+                    Lock::GlobalRead r;
+                    if( commitJob.bytes() < UncommittedBytesLimit ) {
+                        // someone else beat us to it
+                        return false;
+                    }
+                    commitNow();
+                    return true;
                 }
-                commitNow();
-            }
-            else if( Lock::isLocked() == 'w' ) {
-                if( Lock::atLeastReadLocked("local") ) { 
-                    error() << "can't commitNow from commitIfNeeded, as we are in local db lock" << endl;
-                    printStackTrace();
-                    dassert(false); // this will make _DEBUG builds terminate. so we will notice in buildbot.
-                    return false;
-                }
-                else if( Lock::atLeastReadLocked("admin") ) { 
-                    error() << "can't commitNow from commitIfNeeded, as we are in admin db lock" << endl;
-                    printStackTrace();
-                    dassert(false);
-                    return false;
-                }
-                else {
-                    log(1) << "commitIfNeeded upgrading from shared write to exclusive write state"
+                case 'w': {
+                    if( Lock::atLeastReadLocked("local") ) {
+                        error() << "can't commitNow from commitIfNeeded, as we are in local db lock" << endl;
+                        printStackTrace();
+                        dassert(false); // this will make _DEBUG builds terminate. so we will notice in buildbot.
+                        return false;
+                    }
+                    if( Lock::atLeastReadLocked("admin") ) {
+                        error() << "can't commitNow from commitIfNeeded, as we are in admin db lock" << endl;
+                        printStackTrace();
+                        dassert(false);
+                        return false;
+                    }
+
+                    LOG(1) << "commitIfNeeded upgrading from shared write to exclusive write state"
                            << endl;
                     Lock::DBWrite::UpgradeToExclusive ex;
                     if (ex.gotUpgrade()) {
                         commitNow();
                     }
+                    return true;
                 }
+
+                case 'W':
+                case 'R':
+                    commitNow();
+                    return true;
+
+                case 'r':
+                    return false;
+
+                default:
+                    fassertFailed(16434); // unknown lock type
             }
-            else { 
-                // 'W'
-                commitNow();
-            }
-            return true;
         }
 
         /** we may need to commit earlier than normal if data are being written at 
             very high rates. 
-        
+
             note you can call this unlocked, and that is a good idea as if you are in 
             say, a 'w' lock state, we can't do the commit
 
-	        @param force force a commit now even if seemingly not needed - ie the caller may 
- 	           know something we don't such as that files will be closed
+            @param force force a commit now even if seemingly not needed - ie the caller may 
+            know something we don't such as that files will be closed
 
             perf note: this function is called a lot, on every lock_w() ... and usually returns right away
         */
@@ -770,7 +775,7 @@ namespace mongo {
 
             bool samePartition = true;
             try {
-                const string dbpathDir = boost::filesystem::path(dbpath).native_directory_string();
+                const string dbpathDir = boost::filesystem::path(dbpath).string();
                 samePartition = onSamePartition(getJournalDir().string(), dbpathDir);
             }
             catch(...) {
@@ -878,6 +883,20 @@ namespace mongo {
 
             verify(!haveJournalFiles()); // Double check post-conditions
         }
+        
+        class DurSSS : public ServerStatusSection {
+        public:
+            DurSSS() : ServerStatusSection( "dur" ){}
+            virtual bool includeByDefault() const { return true; }
+            
+            BSONObj generateSection(const BSONElement& configElement) const {
+                if ( ! cmdLine.dur )
+                    return BSONObj();
+                return dur::stats.asObj();
+            }
+                
+        } durSSS;
+
 
     } // namespace dur
 

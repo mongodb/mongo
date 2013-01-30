@@ -16,7 +16,7 @@
 
 #pragma once
 
-#include "../pch.h"
+#include "mongo/pch.h"
 #include "../util/net/message.h"
 #include "pdfile.h"
 #include "curop.h"

@@ -9,7 +9,11 @@ repairpath = dbpath + "repairDir/"
 resetDbpath( dbpath );
 resetDbpath( repairpath );
 
-m = startMongoProgram( "mongod", "--port", port, "--dbpath", dbpath, "--repairpath", repairpath, "--nohttpinterface", "--bind_ip", "127.0.0.1" );
+m = startMongodTest(port,
+                    baseName + "/",
+                    true,
+                    {repairpath : repairpath, nohttpinterface : "", bind_ip : "127.0.0.1"});
+
 db = m.getDB( baseName );
 
 big = new Array( 5000 ).toString();
@@ -24,7 +28,7 @@ function killRepair() {
             var o = p[ i ];
             printjson( o );
             // Find the active 'repairDatabase' op and kill it.
-            if ( o.active && o.query.repairDatabase ) {
+            if ( o.active && o.query && o.query.repairDatabase ) {
              	db.killOp( o.opid );
                 return;
             }

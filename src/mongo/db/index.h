@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "pch.h"
+#include "mongo/pch.h"
 
 #include <vector>
 
@@ -70,6 +70,13 @@ namespace mongo {
         virtual DiskLoc locate(const IndexDetails &idx , const DiskLoc& thisLoc, const BSONObj& key, const Ordering &order,
                                int& pos, bool& found, const DiskLoc &recordLoc, int direction=1) = 0;
         virtual DiskLoc advance(const DiskLoc& thisLoc, int& keyOfs, int direction, const char *caller) = 0;
+
+        /**
+         * @return a static IndexInterface consistent with index version DefaultIndexVersionNumber.
+         * An IndexInterface should generally not be retrieved via this function, but from the
+         * IndexDetails for an existing index.
+         */
+        static IndexInterface& defaultVersion();
     };
 
     /* Details about a particular index. There is one of these effectively for each object in
@@ -242,12 +249,7 @@ namespace mongo {
         /** @curObjLoc - the object we want to add's location.  if it is already in the
                          index, that is allowed here (for bg indexing case).
         */
-        void dupCheck(IndexDetails& idx, DiskLoc curObjLoc) {
-            if( added.empty() || !idx.unique() )
-                return;
-            const Ordering ordering = Ordering::make(idx.keyPattern());
-            idx.idxInterface().uassertIfDups(idx, added, idx.head, curObjLoc, ordering); // "E11001 duplicate key on update"
-        }
+        void dupCheck(IndexDetails& idx, DiskLoc curObjLoc);
     };
 
     class NamespaceDetails;
@@ -259,5 +261,27 @@ namespace mongo {
     void assureSysIndexesEmptied(const char *ns, IndexDetails *exceptForIdIndex);
     int removeFromSysIndexes(const char *ns, const char *idxName);
 
+    /**
+     * Prepare to build an index.  Does not actually build it (except for a special _id case).
+     * - We validate that the params are good
+     * - That the index does not already exist
+     * - Creates the source collection if it DNE
+     *
+     * example of 'io':
+     *   { ns : 'test.foo', name : 'z', key : { z : 1 } }
+     *
+     * @throws DBException
+     *
+     * @param mayInterrupt - When true, killop may interrupt the function call.
+     * @param sourceNS - source NS we are indexing
+     * @param sourceCollection - its details ptr
+     * @return true if ok to continue.  when false we stop/fail silently (index already exists)
+     */
+    bool prepareToBuildIndex(const BSONObj& io,
+                             bool mayInterrupt,
+                             bool god,
+                             string& sourceNS,
+                             NamespaceDetails*& sourceCollection,
+                             BSONObj& fixedIndexObject);
 
 } // namespace mongo

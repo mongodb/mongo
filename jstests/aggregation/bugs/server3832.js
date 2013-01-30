@@ -1,12 +1,11 @@
-db.s3832.drop();
+var s3832 = db.c;
+s3832.drop();
 
-db.s3832.save({_id: 1, a:"foo", b:"bar"});
-db.s3832.save({_id: 2, a:"feh", b:"baz"});
-db.s3832.save({_id: 3, a:"fee", b:"fum"});
+s3832.save({_id: 1, a:"foo", b:"bar"});
+s3832.save({_id: 2, a:"feh", b:"baz"});
+s3832.save({_id: 3, a:"fee", b:"fum"});
 
-var a1 = db.runCommand({ aggregate:"s3832", pipeline:[
-    { $match : { b : "baz" } }
-]});
+var a1 = s3832.aggregate( { $match : { b : "baz" } } );
 
 var a1result = [
     {
@@ -19,9 +18,7 @@ var a1result = [
 assert.eq(a1.result, a1result, 's3832.a1 failed');
 
 
-var a2 = db.runCommand({ aggregate:"s3832", pipeline:[
-    { $sort : { a : 1 } }
-]});
+var a2 = s3832.aggregate( { $sort : { a : 1 } } );
 
 var a2result = [
     {
@@ -44,34 +41,29 @@ var a2result = [
 assert.eq(a2.result, a2result, 's3832.a2 failed');
 
 
-var a3 = db.runCommand({ aggregate:"s3832", pipeline:[
+var a3 = s3832.aggregate(
     { $match : { b : "baz" } },
-    { $sort : { a : 1 } }
-]});
+    { $sort : { a : 1 } } );
 
 assert.eq(a3.result, a1result, 's3832.a3 failed');
 
 
 db.s3832.ensureIndex({ b : 1 }, { name : "s3832_b" });
 
-var a4 = db.runCommand({ aggregate:"s3832", pipeline:[
-    { $match : { b : "baz" } }
-]});
+
+var a4 = s3832.aggregate({ $match : { b : "baz" } });
 
 assert.eq(a4.result, a1result, 's3832.a4 failed');
 
 
-var a5 = db.runCommand({ aggregate:"s3832", pipeline:[
-    { $sort : { a : 1 } }
-]});
+var a5 = s3832.aggregate({ $sort : { a : 1 } });
 
 assert.eq(a5.result, a2result, 's3832.a5 failed');
 
 
-var a6 = db.runCommand({ aggregate:"s3832", pipeline:[
+var a6 = s3832.aggregate(
     { $match : { b : "baz" } },
-    { $sort : { a : 1 } }
-]});
+    { $sort : { a : 1 } } );
 
 assert.eq(a6.result, a1result, 's3832.a6 failed');
 
@@ -80,23 +72,18 @@ var dropb = db.s3832.dropIndex("s3832_b");
 
 db.s3832.ensureIndex({ a : 1 }, { name : "s3832_a" });
 
-var a7 = db.runCommand({ aggregate:"s3832", pipeline:[
-    { $match : { b : "baz" } }
-]});
+var a7 = s3832.aggregate({ $match : { b : "baz" } });
 
 assert.eq(a7.result, a1result, 's3832.a7 failed');
 
 
-var a8 = db.runCommand({ aggregate:"s3832", pipeline:[
-    { $sort : { a : 1 } }
-]});
+var a8 = s3832.aggregate({ $sort : { a : 1 } });
 
 assert.eq(a8.result, a2result, 's3832.a8 failed');
 
 
-var a9 = db.runCommand({ aggregate:"s3832", pipeline:[
+var a9 = s3832.aggregate(
     { $match : { b : "baz" } },
-    { $sort : { a : 1 } }
-]});
+    { $sort : { a : 1 } } );
 
 assert.eq(a9.result, a1result, 's3832.a9 failed');

@@ -121,24 +121,3 @@ var loop = function() {
 }
 runMRTests( loop, false );
 runFinalizeTests( loop, false );
-
-// The test will attempt to kill the mr operation making the above count call.  Sleep to
-// try and allow the test to see the mr operation (as the count operation will obscure
-// its parent mr operation).
-var loop = function() {
-    while( 1 ) {
-        db.jstests_mr_killop.count( { a:1 } );
-        sleep( 113 );
-    }
-}
-runMRTests( loop, false );
-// db can't be accessed from finalize() so not running that test
-
-// Test that we can kill the child op of a map reduce op.  The distinct command is used because
-// its currentOp() output includes namespace information, and it does not suffer from
-// SERVER-2291 as count does.
-var loop = function() {
-    db.jstests_mr_killop.distinct( { a:1 }, {$where:function() { while( 1 ) { ; } }} );
-}
-runMRTests( loop, true );
-

@@ -10,10 +10,20 @@ s.adminCommand( { shardcollection : "test.foo", key : { "_id" : 1 } } )
 jsTest.log( "Inserting a lot of documents into test.foo" )
 
 db = s.getDB( "test" );
+
 var idInc = 0;
 var valInc = 0;
 var str=""
-for (i=0;i<4*1024;i++) { str=str+"a"; }
+
+if (db.serverBuildInfo().bits == 32) {
+    // Make data ~0.5MB for 32 bit builds
+    for (var i = 0; i < 512; i++) str += "a";
+}
+else {
+    // Make data ~4MB
+    for (var i = 0; i < 4*1024; i++) str += "a";
+}
+
 for (j=0; j<100; j++) for (i=0; i<512; i++){ db.foo.save({ i : idInc++, val: valInc++, y:str})}
 
 jsTest.log( "Documents inserted, waiting for error..." )
@@ -177,7 +187,7 @@ jsTestLog( "Test G" )
 // verify that data is also on secondary
 var primary = s._rs[0].test.liveNodes.master
 var secondaries = s._rs[0].test.liveNodes.slaves
-s._rs[0].test.awaitReplication();
+s._rs[0].test.awaitReplication( 300 * 1000 ); // this can take a while since chunks are moving
 assert.eq( 51200 , primary.getDB("test")[outcol].count() , "Wrong count" );
 for (var i = 0; i < secondaries.length; ++i) {
 	assert.eq( 51200 , secondaries[i].getDB("test")[outcol].count() , "Wrong count" );

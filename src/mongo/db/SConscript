@@ -1,0 +1,15 @@
+# -*- mode: python -*-
+
+Import("env")
+
+#
+# We'd like 'common' to have the abstractions that are shared by several components of the
+# server. Ideally, many of the object in 'coredb' should be moved here when their dependencies
+# get resolved.
+#
+
+env.StaticLibrary('common', ['field_ref.cpp'],
+                  LIBDEPS=['$BUILD_DIR/mongo/bson',
+                           '$BUILD_DIR/mongo/foundation'])
+
+env.CppUnitTest('field_ref_test', ['field_ref_test.cpp'], LIBDEPS=['common'])

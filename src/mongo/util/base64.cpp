@@ -104,6 +104,11 @@ namespace mongo {
             return ss.str();
         }
 
+        const char* chars =
+            "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+            "abcdefghijklmnopqrstuvwxyz"
+            "0123456789+/=";
+
     }
 }
 

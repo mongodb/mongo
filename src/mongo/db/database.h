@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include "mongo/db/cc_by_loc.h"
 #include "mongo/db/cmdline.h"
 #include "mongo/db/namespace_details.h"
 #include "mongo/db/record.h"
@@ -26,9 +27,6 @@ namespace mongo {
 
     class Extent;
     class MongoDataFile;
-    class ClientCursor;
-    struct ByLocKey;
-    typedef map<ByLocKey, ClientCursor*> CCByLoc;
 
     /**
      * Database represents a database database
@@ -141,14 +139,15 @@ namespace mongo {
     public: // this should be private later
 
         NamespaceIndex namespaceIndex;
-        int profile; // 0=off.
         const string profileName; // "alleyinsider.system.profile"
         CCByLoc ccByLoc;
         int magic; // used for making sure the object is still loaded in memory
 
+        int getProfilingLevel() const { return _profile; }
+
     private:
         RecordStats _recordStats;
-        
+        int _profile; // 0=off.
     };
 
 } // namespace mongo

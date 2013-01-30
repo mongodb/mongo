@@ -17,21 +17,23 @@
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "pch.h"
-#include "../db/repl.h"
+#include "mongo/pch.h"
 
-#include "../db/db.h"
-#include "../db/instance.h"
-#include "../db/json.h"
+#include "mongo/db/repl.h"
 
-#include "dbtests.h"
-#include "../db/oplog.h"
-#include "../db/queryoptimizer.h"
+#include "mongo/db/db.h"
+#include "mongo/db/index_update.h"
+#include "mongo/db/instance.h"
+#include "mongo/db/json.h"
+#include "mongo/db/oplog.h"
+#include "mongo/db/queryoptimizer.h"
+#include "mongo/db/repl/rs.h"
 
-#include "../db/repl/rs.h"
+#include "mongo/dbtests/dbtests.h"
 
 namespace mongo {
     void createOplog();
+    void oldRepl();
 }
 
 namespace ReplTests {
@@ -45,9 +47,12 @@ namespace ReplTests {
         Client::Context _context;
     public:
         Base() : _context( ns() ) {
+            oldRepl();
+            cmdLine._replSet = "";
+            cmdLine.oplogSize = 5 * 1024 * 1024;
             replSettings.master = true;
             createOplog();
-            ensureHaveIdIndex( ns() );
+            ensureHaveIdIndex( ns(), false );
         }
         ~Base() {
             try {
@@ -156,7 +161,7 @@ namespace ReplTests {
         static void insert( const BSONObj &o, bool god = false ) {
             Lock::GlobalWrite lk;
             Client::Context ctx( ns() );
-            theDataFileMgr.insert( ns(), o.objdata(), o.objsize(), god );
+            theDataFileMgr.insert( ns(), o.objdata(), o.objsize(), false, god );
         }
         static BSONObj wid( const char *json ) {
             class BSONObjBuilder b;
@@ -815,6 +820,83 @@ namespace ReplTests {
             }
         };
 
+        class PushWithDollarSigns : public Base {
+            void doIt() const {
+                client()->update( ns(),
+                                  BSON( "_id" << 0),
+                                  BSON( "$push" << BSON( "a" << BSON( "$foo" << 1 ) ) ) );
+            }
+            using ReplTests::Base::check;
+            void check() const {
+                ASSERT_EQUALS( 1, count() );
+                check( fromjson( "{'_id':0, a:[0, {'$foo':1}]}"), one( fromjson( "{'_id':0}" ) ) );
+            }
+            void reset() const {
+                deleteAll( ns() );
+                insert( BSON( "_id" << 0 << "a" << BSON_ARRAY( 0 ) ) );
+            }
+        };
+
+        class PushSlice : public Base {
+            void doIt() const {
+                client()->update( ns(),
+                                  BSON( "_id" << 0),
+                                  BSON( "$push" <<
+                                        BSON( "a" <<
+                                              BSON( "$each" << BSON_ARRAY(3) <<
+                                                    "$slice" << -2 ) ) ) );
+            }
+            using ReplTests::Base::check;
+            void check() const {
+                ASSERT_EQUALS( 1, count() );
+                check( fromjson( "{'_id':0, a:[2,3]}"), one( fromjson( "{'_id':0}" ) ) );
+            }
+            void reset() const {
+                deleteAll( ns() );
+                insert( BSON( "_id" << 0 << "a" << BSON_ARRAY( 1 << 2 ) ) );
+            }
+        };
+
+        class PushSliceInitiallyInexistent : public Base {
+            void doIt() const {
+                client()->update( ns(),
+                                  BSON( "_id" << 0),
+                                  BSON( "$push" <<
+                                        BSON( "a" <<
+                                              BSON( "$each" << BSON_ARRAY(1<<2) <<
+                                                    "$slice" << -2 ) ) ) );
+            }
+            using ReplTests::Base::check;
+            void check() const {
+                ASSERT_EQUALS( 1, count() );
+                check( fromjson( "{'_id':0, a:[1,2] }"), one( fromjson( "{'_id':0}" ) ) );
+            }
+            void reset() const {
+                deleteAll( ns() );
+                insert( BSON( "_id" << 0 ) );
+            }
+        };
+
+        class PushSliceToZero : public Base {
+            void doIt() const {
+                client()->update( ns(),
+                                  BSON( "_id" << 0),
+                                  BSON( "$push" <<
+                                        BSON( "a" <<
+                                              BSON( "$each" << BSON_ARRAY(3) <<
+                                                    "$slice" << 0 ) ) ) );
+            }
+            using ReplTests::Base::check;
+            void check() const {
+                ASSERT_EQUALS( 1, count() );
+                check( fromjson( "{'_id':0, a:[]}"), one( fromjson( "{'_id':0}" ) ) );
+            }
+            void reset() const {
+                deleteAll( ns() );
+                insert( BSON( "_id" << 0 ) );
+            }
+        };
+
         class PushAllUpsert : public Base {
         public:
             void doIt() const {
@@ -1009,6 +1091,138 @@ namespace ReplTests {
             }
         };
 
+        class NestedNoRename : public Base {
+        public:
+            void doIt() const {
+                client()->update( ns(), BSON( "_id" << 0 ),
+                                  fromjson( "{$rename:{'a.b':'c.d'},$set:{z:1}}"
+                                      ) );
+            }
+            using ReplTests::Base::check;
+            void check() const {
+                ASSERT_EQUALS( 1, count() );
+                check( BSON( "_id" << 0 << "z" << 1 ) , one( fromjson("{'_id':0}" ) ) );
+            }
+            void reset() const {
+                deleteAll( ns() );
+                insert( fromjson( "{'_id':0}" ) );
+            }
+        };
+
+        class SingletonNoRename : public Base {
+        public:
+            void doIt() const {
+                client()->update( ns(), BSONObj(), fromjson("{$rename:{a:'b'}}" ) );
+
+            }
+            using ReplTests::Base::check;
+            void check() const {
+                ASSERT_EQUALS( 1, count() );
+                check( fromjson( "{_id:0,z:1}" ), one(fromjson("{'_id':0}" ) ) );
+            }
+            void reset() const {
+                deleteAll( ns() );
+                insert( fromjson( "{'_id':0,z:1}" ) );
+            }
+        };
+
+        class IndexedSingletonNoRename : public Base {
+        public:
+            void doIt() const {
+                client()->update( ns(), BSONObj(), fromjson("{$rename:{a:'b'}}" ) );
+            }
+            using ReplTests::Base::check;
+            void check() const {
+                ASSERT_EQUALS( 1, count() );
+                check( fromjson( "{_id:0,z:1}" ), one(fromjson("{'_id':0}" ) ) );
+            }
+            void reset() const {
+                deleteAll( ns() );
+                // Add an index on 'a'.  This prevents the update from running 'in place'.
+                client()->ensureIndex( ns(), BSON( "a" << 1 ) );
+                insert( fromjson( "{'_id':0,z:1}" ) );
+            }
+        };
+
+        class AddToSetEmptyMissing : public Base {
+        public:
+            void doIt() const {
+                client()->update( ns(), BSON( "_id" << 0 ), fromjson(
+                                      "{$addToSet:{a:{$each:[]}}}" ) );
+            }
+            using ReplTests::Base::check;
+            void check() const {
+                ASSERT_EQUALS( 1, count() );
+                check( fromjson( "{_id:0,a:[]}" ), one( fromjson("{'_id':0}" ) )
+                    );
+            }
+            void reset() const {
+                deleteAll( ns() );
+                insert( fromjson( "{'_id':0}" ) );
+            }
+        };
+
+        class AddToSetWithDollarSigns : public Base {
+            void doIt() const {
+                client()->update( ns(),
+                                  BSON( "_id" << 0),
+                                  BSON( "$addToSet" << BSON( "a" << BSON( "$foo" << 1 ) ) ) );
+            }
+            using ReplTests::Base::check;
+            void check() const {
+                ASSERT_EQUALS( 1, count() );
+                check( fromjson( "{'_id':0, a:[0, {'$foo':1}]}"), one( fromjson( "{'_id':0}" ) ) );
+            }
+            void reset() const {
+                deleteAll( ns() );
+                insert( BSON( "_id" << 0 << "a" << BSON_ARRAY( 0 ) ) );
+            }
+        };
+
+        //
+        // replay cases
+        //
+
+        class ReplaySetPreexistingNoOpPull : public Base {
+        public:
+            void doIt() const {
+                client()->update( ns(), BSONObj(), fromjson( "{$unset:{z:1}}" ));
+
+                // This is logged as {$set:{'a.b':[]},$set:{z:1}}, which might not be
+                // replayable against future versions of a document (here {_id:0,a:1,z:1}) due
+                // to SERVER-4781. As a result the $set:{z:1} will not be replayed in such
+                // cases (and also an exception may abort replication). If this were instead
+                // logged as {$set:{z:1}}, SERVER-4781 would not be triggered.
+                client()->update( ns(), BSONObj(), fromjson( "{$pull:{'a.b':1}, $set:{z:1}}" ) );
+                client()->update( ns(), BSONObj(), fromjson( "{$set:{a:1}}" ) );
+            }
+            using ReplTests::Base::check;
+            void check() const {
+                ASSERT_EQUALS( 1, count() );
+                check( fromjson( "{_id:0,a:1,z:1}" ), one( fromjson("{'_id':0}") ) );
+            }
+            void reset() const {
+                deleteAll( ns() );
+                insert( fromjson( "{'_id':0,a:{b:[]},z:1}" ) );
+            }
+        };
+
+        class ReplayArrayFieldNotAppended : public Base {
+        public:
+            void doIt() const {
+                client()->update( ns(), BSONObj(), fromjson( "{$push:{'a.0.b':2}}" ) );
+                client()->update( ns(), BSONObj(), fromjson( "{$set:{'a.0':1}}") );
+            }
+            using ReplTests::Base::check;
+            void check() const {
+                ASSERT_EQUALS( 1, count() );
+                check( fromjson( "{_id:0,a:[1,{b:[1]}]}" ), one(fromjson("{'_id':0}") ) );
+            }
+            void reset() const {
+                deleteAll( ns() );
+                insert( fromjson( "{'_id':0,a:[{b:[0]},{b:[1]}]}" ) );
+            }
+        };
 
     } // namespace Idempotence
 
@@ -1118,6 +1332,200 @@ namespace ReplTests {
         }
     };
 
+    class FindingStartExtentTraversalBase : public Base {
+    public:
+        FindingStartExtentTraversalBase() {
+            client()->dropCollection( ns() );
+        }
+        virtual ~FindingStartExtentTraversalBase() {
+            client()->dropCollection( ns() );
+        }
+        void run() {
+            BSONObj info;
+            // Create a capped collection ...
+            ASSERT( client()->runCommand( "unittests",
+                                          BSON( "create" << "repltests.findingstart" <<
+                                                "capped" << true <<
+                                                // ... with the specified extent sizes.
+                                                "$nExtents" << extentSizes() <<
+                                                "autoIndexId" << false ), info ) );
+            // Populate documents.
+            for( int i = 0; i < numDocs(); ++i ) {
+                client()->insert( ns(), BSON( "ts" << i << "payload" << payload8k() ) );
+            }
+            NamespaceDetails *nsd = nsdetails( ns() );
+            BSONObj query = BSON( "ts" << BSON( "$gte" << 0 ) );
+            FieldRangeSetPair frsp( ns(), query );
+            BSONObj order = BSON( "$natural" << 1 );
+            // Create a QueryPlan.
+            scoped_ptr<QueryPlan> qp( QueryPlan::make( nsd, -1, frsp, &frsp, query, order ) );
+            // Create a FindingStartCursor.
+            scoped_ptr<FindingStartCursor> fsc( FindingStartCursor::make( *qp ) );
+            // Check the result of FindingStartCursor::prevExtentFirstLoc() called on the specified
+            // target().
+            ASSERT_EQUALS( expectedPrevExtentFirstLoc().toString(),
+                           fsc->prevExtentFirstLoc( target() ).toString() );
+        }
+    protected:
+        static const char* ns() { return "unittests.repltests.findingstart"; }
+        static const NamespaceDetails* nsd() { return nsdetails( ns() ); }
+        /** Document payload. */
+        static string payload8k() { return string( 8*1024, 'a' ); }
+        /** An extent of this size is too small to contain one document containing payload8k(). */
+        static int tooSmall() { return 1*1024; }
+        /** An extent of this size fits one document. */
+        static int fitsOne() { return 10*1024; }
+        /** An extent of this size fits many documents. */
+        static int fitsMany() { return 50*1024; }
+        virtual BSONArray extentSizes() const = 0;
+        virtual int numDocs() const = 0;
+        virtual DiskLoc target() const = 0;
+        virtual DiskLoc expectedPrevExtentFirstLoc() const = 0;
+    };
+
+    class FindingStartEmptyExtentNonLoopedBase : public FindingStartExtentTraversalBase {
+        virtual int numDocs() const {
+            // Insert two documents.  Empty extents may exist betwen or preceding them depending on
+            // the test case.
+            return 2;
+        }
+        /** Target the prevExtentFirstLoc() request on the non looped collection's last record. */
+        virtual DiskLoc target() const { return nsd()->lastRecord(); }
+        virtual DiskLoc expectedPrevExtentFirstLoc() const { return nsd()->firstRecord(); }
+    };
+
+    class FindingStartEmptyExtentLoopedBase : public FindingStartExtentTraversalBase {
+        virtual int numDocs() const {
+            // Insert three documents.  Empty extents may exist betwen or preceding them depending
+            // on the test case.  Some documents may overwrite others (it is a capped collection).
+            return 3;
+        }
+        /**
+         * Target the prevExtentFirstLoc() request on the looped collection's first record.  (The
+         * most recently saved record is the first in the collection due to extent allocation
+         * looping.)
+         */
+        virtual DiskLoc target() const { return nsd()->firstRecord(); }
+        virtual DiskLoc expectedPrevExtentFirstLoc() const { return nsd()->lastRecord(); }
+    };
+    
+    /**
+     * FindingStartCursor properly skips an empty extent in 'FindExtent' mode of a non looped
+     * capped collection.
+     */
+    class FindingStartEmptyExtentNonLooped : public FindingStartEmptyExtentNonLoopedBase {
+        virtual BSONArray extentSizes() const {
+            // Iteration          2 <--------< 1 <---------< 0
+            return BSON_ARRAY( fitsOne() << tooSmall() << fitsOne() );
+        }
+    };
+
+    /** Properly skips two empty extents of a non looped capped collection. */
+    class FindingStartTwoEmptyExtentsNonLooped : public FindingStartEmptyExtentNonLoopedBase {
+        virtual BSONArray extentSizes() const {
+            // Iteration          3 <--------< 2 <---------< 1 <---------< 0
+            return BSON_ARRAY( fitsOne() << tooSmall() << tooSmall() << fitsOne() );
+        }
+    };
+
+    /** Properly stops iteration at the beginning of a non looped capped collection. */
+    class FindingStartTwoEmptyEarlyExtentsNonLooped : public FindingStartEmptyExtentNonLoopedBase {
+        virtual BSONArray extentSizes() const {
+            // Iteration          2 <---------< 1 <----------< 0
+            return BSON_ARRAY( tooSmall() << tooSmall() << fitsMany() );
+        }
+        virtual DiskLoc expectedPrevExtentFirstLoc() const { return DiskLoc(); }
+    };
+
+    /** The first record of the previous extent is returned (as opposed to some other record). */
+    class FindingStartFirstRecordNonLooped : public FindingStartExtentTraversalBase {
+        virtual int numDocs() const { return 10; }
+        virtual BSONArray extentSizes() const {
+            // Iteration          1 <--------< 0
+            return BSON_ARRAY( fitsMany() << fitsMany() );
+        }
+        virtual DiskLoc target() const { return nsd()->lastRecord(); }
+        virtual DiskLoc expectedPrevExtentFirstLoc() const { return nsd()->firstRecord(); }
+    };
+
+    /** Properly skips an empty extent of a looped capped collection. */
+    class FindingStartEmptyExtentLooped : public FindingStartEmptyExtentLoopedBase {
+        virtual BSONArray extentSizes() const {
+            // Iteration      ---< 0            2 <--------< 1 <----
+            return BSON_ARRAY( fitsOne() << fitsOne() << tooSmall() );
+        }
+    };
+
+    /** Properly skips two empty extents of a looped capped collection. */
+    class FindingStartTwoEmptyExtentsLooped : public FindingStartEmptyExtentLoopedBase {
+        virtual BSONArray extentSizes() const {
+            // Iteration      ---< 0            3 <--------< 2 <---------< 1 <---
+            return BSON_ARRAY( fitsOne() << fitsOne() << tooSmall() << tooSmall() );
+        }
+    };
+
+    /** Properly stops iteration at the loop point of a looped capped collection. */
+    class FindingStartTwoEmptyEarlyExtentsLooped : public FindingStartEmptyExtentLoopedBase {
+        virtual BSONArray extentSizes() const {
+            // Iteration      --< 0  3 <------< 2 <--------< 1 <-----
+            return BSON_ARRAY( fitsOne() << tooSmall() << tooSmall() );
+        }
+        virtual DiskLoc expectedPrevExtentFirstLoc() const { return DiskLoc(); }
+    };
+
+    /** The first record of the previous extent is returned (as opposed to some other record). */
+    class FindingStartFirstRecordLooped : public FindingStartExtentTraversalBase {
+        virtual int numDocs() const { return 35; }
+        virtual BSONArray extentSizes() const {
+            // Iteration          1 <--------< 0
+            return BSON_ARRAY( fitsMany() << fitsMany() );
+        }
+        virtual DiskLoc target() const { return nsd()->lastRecord(); }
+        virtual DiskLoc expectedPrevExtentFirstLoc() const { return nsd()->firstRecord(); }
+    };
+
+    /** Advance from the fresh side of the cap extent to its previous extent. */
+    class CapExtentFreshSidePrevExtent : public FindingStartExtentTraversalBase {
+        virtual int numDocs() const {
+            // Looped allocation with capExtent the first extent.
+            return 10;
+        }
+        virtual BSONArray extentSizes() const {
+            // Iteration      ---< 0            1 <----
+            return BSON_ARRAY( fitsMany() << fitsOne() );
+        }
+        virtual DiskLoc target() const {
+            DiskLoc lastRecord = nsd()->lastRecord();
+            // Return last record in first extent (second to last record overall).
+            return lastRecord.rec()->getPrev( lastRecord );
+        }
+        virtual DiskLoc expectedPrevExtentFirstLoc() const { return nsd()->lastRecord(); }
+    };
+    
+    /**
+     * Advance from the stale side of the cap extent to its previous extent.  This is not optimal,
+     * but good enough.  See comments in FindingStartCursor::extentFirstLoc().
+     */
+    class CapExtentStaleSidePrevExtent : public CapExtentFreshSidePrevExtent {
+        virtual DiskLoc target() const { return nsd()->firstRecord(); }
+    };
+
+    /** prevExtentFirstLoc() when there is only one extent (non looped) returns DiskLoc(). */
+    class FindingStartSingleExtentNonLooped : public FindingStartExtentTraversalBase {
+        virtual int numDocs() const { return 2; }
+        virtual BSONArray extentSizes() const { return BSON_ARRAY( fitsMany() ); }
+        virtual DiskLoc target() const { return nsd()->lastRecord(); }
+        virtual DiskLoc expectedPrevExtentFirstLoc() const { return DiskLoc(); }
+    };
+
+    /** prevExtentFirstLoc() when there is only one extent (looped) returns DiskLoc(). */
+    class FindingStartSingleExtentLooped : public FindingStartExtentTraversalBase {
+        virtual int numDocs() const { return 10; }
+        virtual BSONArray extentSizes() const { return BSON_ARRAY( fitsMany() ); }
+        virtual DiskLoc target() const { return nsd()->lastRecord(); }
+        virtual DiskLoc expectedPrevExtentFirstLoc() const { return DiskLoc(); }
+    };
+    
     /** Check ReplSetConfig::MemberCfg equality */
     class ReplSetMemberCfgEquality : public Base {
     public:
@@ -1218,6 +1626,10 @@ namespace ReplTests {
             add< Idempotence::EmptyPush >();
             add< Idempotence::EmptyPushSparseIndex >();
             add< Idempotence::PushAll >();
+            add< Idempotence::PushWithDollarSigns >();
+            add< Idempotence::PushSlice >();
+            add< Idempotence::PushSliceInitiallyInexistent >();
+            add< Idempotence::PushSliceToZero >();
             add< Idempotence::PushAllUpsert >();
             add< Idempotence::EmptyPushAll >();
             add< Idempotence::Pull >();
@@ -1230,11 +1642,30 @@ namespace ReplTests {
             add< Idempotence::RenameReplace >();
             add< Idempotence::RenameOverwrite >();
             add< Idempotence::NoRename >();
+            add< Idempotence::NestedNoRename >();
+            add< Idempotence::SingletonNoRename >();
+            add< Idempotence::IndexedSingletonNoRename >();
+            add< Idempotence::AddToSetEmptyMissing >();
+            add< Idempotence::AddToSetWithDollarSigns >();
+            add< Idempotence::ReplaySetPreexistingNoOpPull >();
+            add< Idempotence::ReplayArrayFieldNotAppended >();
             add< DeleteOpIsIdBased >();
             add< DatabaseIgnorerBasic >();
             add< DatabaseIgnorerUpdate >();
             add< FindingStartCursorStale >();
             add< FindingStartCursorYield >();
+            add< FindingStartEmptyExtentNonLooped >();
+            add< FindingStartTwoEmptyExtentsNonLooped >();
+            add< FindingStartTwoEmptyEarlyExtentsNonLooped >();
+            add< FindingStartFirstRecordNonLooped >();
+            add< FindingStartEmptyExtentLooped >();
+            add< FindingStartTwoEmptyExtentsLooped >();
+            add< FindingStartTwoEmptyEarlyExtentsLooped >();
+            add< FindingStartFirstRecordLooped >();
+            add< CapExtentFreshSidePrevExtent >();
+            add< CapExtentStaleSidePrevExtent >();
+            add< FindingStartSingleExtentNonLooped >();
+            add< FindingStartSingleExtentLooped >();
             add< ReplSetMemberCfgEquality >();
             add< ShouldRetry >();
         }

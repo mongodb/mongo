@@ -1,12 +1,4 @@
 /* linenoise.c -- guerrilla line editing library against the idea that a
- * line editing lib needs to be 20,000 lines of C code.
- *
- * You can find the latest source code at:
- * 
- *   http://github.com/antirez/linenoise
- *
- * Does a number of crazy assumptions that happen to be true in 99.9999% of
- * the 2010 UNIX computers around.
  *
  * Copyright (c) 2010, Salvatore Sanfilippo <antirez at gmail dot com>
  * Copyright (c) 2010, Pieter Noordhuis <pcnoordhuis at gmail dot com>
@@ -37,6 +29,15 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  *
+ * line editing lib needs to be 20,000 lines of C code.
+ *
+ * You can find the latest source code at:
+ * 
+ *   http://github.com/antirez/linenoise
+ *
+ * Does a number of crazy assumptions that happen to be true in 99.9999% of
+ * the 2010 UNIX computers around.
+ *
  * References:
  * - http://invisible-island.net/xterm/ctlseqs/ctlseqs.html
  * - http://www.3waylabs.com/nw/WWW/products/wizcon/vt220.html
@@ -65,7 +66,7 @@
  *    Effect: if n is 1, clear from beginning of line to cursor
  *    Effect: if n is 2, clear entire line
  *
- * CUF (CUrsor Forward)
+ * CUF (Cursor Forward)
  *    Sequence: ESC [ n C
  *    Effect: moves cursor forward of n chars
  *
@@ -2262,7 +2263,12 @@ int InputBuffer::getInputLine( PromptBase& pi ) {
             {
                 Utf32String* restoredText = killRing.yank();
                 if ( restoredText ) {
+                    bool truncated = false;
                     size_t ucharCount = restoredText->length();
+                    if (ucharCount > static_cast<size_t>(buflen - len)) {
+                        ucharCount = buflen - len;
+                        truncated = true;
+                    }
                     memmove( buf32 + pos + ucharCount, buf32 + pos, sizeof( UChar32 ) * ( len - pos + 1 ) );
                     memmove( buf32 + pos, restoredText->get(), sizeof( UChar32 ) * ucharCount );
                     pos += ucharCount;
@@ -2270,6 +2276,9 @@ int InputBuffer::getInputLine( PromptBase& pi ) {
                     refreshLine( pi );
                     killRing.lastAction = KillRing::actionYank;
                     killRing.lastYankSize = ucharCount;
+                    if (truncated) {
+                        beep();
+                    }
                 }
                 else {
                     beep();
@@ -2283,7 +2292,12 @@ int InputBuffer::getInputLine( PromptBase& pi ) {
                 historyRecallMostRecent = false;
                 Utf32String* restoredText = killRing.yankPop();
                 if ( restoredText ) {
+                    bool truncated = false;
                     size_t ucharCount = restoredText->length();
+                    if (ucharCount > static_cast<size_t>(killRing.lastYankSize + buflen - len)) {
+                        ucharCount = killRing.lastYankSize + buflen - len;
+                        truncated = true;
+                    }
                     if ( ucharCount > killRing.lastYankSize ) {
                         memmove( buf32 + pos + ucharCount - killRing.lastYankSize, buf32 + pos, sizeof( UChar32 ) * ( len - pos + 1 ) );
                         memmove( buf32 + pos - killRing.lastYankSize, restoredText->get(), sizeof( UChar32 ) * ucharCount );
@@ -2296,6 +2310,9 @@ int InputBuffer::getInputLine( PromptBase& pi ) {
                     len += ucharCount - killRing.lastYankSize;
                     killRing.lastYankSize = ucharCount;
                     refreshLine( pi );
+                    if (truncated) {
+                        beep();
+                    }
                     break;
                 }
             }

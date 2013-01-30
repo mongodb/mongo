@@ -17,6 +17,8 @@
 
 #pragma once
 
+#include "mongo/util/assert_util.h"
+
 namespace bson { }
 
 namespace mongo {
@@ -106,4 +108,52 @@ namespace mongo {
         bdtCustom=128
     };
 
+    /** Returns a number for where a given type falls in the sort order.
+     *  Elements with the same return value should be compared for value equality.
+     *  The return value is not a BSONType and should not be treated as one.
+     *  Note: if the order changes, indexes have to be re-built or than can be corruption
+     */
+    inline int canonicalizeBSONType(BSONType type) {
+        switch (type) {
+        case MinKey:
+        case MaxKey:
+            return type;
+        case EOO:
+        case Undefined:
+            return 0;
+        case jstNULL:
+            return 5;
+        case NumberDouble:
+        case NumberInt:
+        case NumberLong:
+            return 10;
+        case mongo::String:
+        case Symbol:
+            return 15;
+        case Object:
+            return 20;
+        case mongo::Array:
+            return 25;
+        case BinData:
+            return 30;
+        case jstOID:
+            return 35;
+        case mongo::Bool:
+            return 40;
+        case mongo::Date:
+        case Timestamp:
+            return 45;
+        case RegEx:
+            return 50;
+        case DBRef:
+            return 55;
+        case Code:
+            return 60;
+        case CodeWScope:
+            return 65;
+        default:
+            verify(0);
+            return -1;
+        }
+    }
 }

@@ -140,6 +140,10 @@ namespace mongo {
         ports.insert(this);
     }
 
+    void MessagingPort::setSocketTimeout(double timeout) {
+        psock->setTimeout(timeout);
+    }
+
     void MessagingPort::shutdown() {
         psock->close();
     }
@@ -161,7 +165,7 @@ again:
             int lft = 4;
             psock->recv( lenbuf, lft );
 
-            if ( len < 16 || len > 48000000 ) { // messages must be large enough for headers
+            if ( len < 16 || len > MaxMessageSizeBytes ) { // messages must be large enough for headers
                 if ( len == -1 ) {
                     // Endian check from the client, after connecting, to see what mode server is running in.
                     unsigned foo = 0x10203040;
@@ -171,7 +175,7 @@ again:
 
                 if ( len == 542393671 ) {
                     // an http GET
-                    log( psock->getLogLevel() ) << "looks like you're trying to access db over http on native driver port.  please add 1000 for webserver" << endl;
+                    LOG( psock->getLogLevel() ) << "looks like you're trying to access db over http on native driver port.  please add 1000 for webserver" << endl;
                     string msg = "You are trying to access MongoDB on the native driver port. For http diagnostic access, add 1000 to the port number\n";
                     stringstream ss;
                     ss << "HTTP/1.0 200 OK\r\nConnection: close\r\nContent-Type: text/plain\r\nContent-Length: " << msg.size() << "\r\n\r\n" << msg;
@@ -179,7 +183,8 @@ again:
                     send( s.c_str(), s.size(), "http" );
                     return false;
                 }
-                log(0) << "recv(): message len " << len << " is too large" << len << endl;
+                LOG(0) << "recv(): message len " << len << " is too large. "
+                       << "Max is " << MaxMessageSizeBytes << endl;
                 return false;
             }
 
@@ -201,7 +206,7 @@ again:
 
         }
         catch ( const SocketException & e ) {
-            log(psock->getLogLevel() + (e.shouldPrint() ? 0 : 1) ) << "SocketException: remote: " << remote() << " error: " << e << endl;
+            LOG(psock->getLogLevel() + (e.shouldPrint() ? 0 : 1) ) << "SocketException: remote: " << remote() << " error: " << e << endl;
             m.reset();
             return false;
         }

@@ -20,7 +20,7 @@
 
 namespace mongo {
 
-    /* DONT USE THIS.  it was a dumb idea.
+    /* DON'T USE THIS.  it was a dumb idea.
     
        this class uses a mutex for writes, but not for reads.
        we can get fancier later...
@@ -87,7 +87,7 @@ namespace mongo {
             }
             prev = t->_next;
             if( ++_orphans > 500 )
-                log() << "warning List1 orphans=" << _orphans << '\n';
+                log() << "warning List1 orphans=" << _orphans << endl;
         }
 
     private:

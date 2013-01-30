@@ -77,6 +77,11 @@ namespace mongo {
         const unsigned getNumCores() const { return sysInfo().numCores; }
 
         /**
+         * Get the system page size in bytes.
+         */
+        static unsigned long long getPageSize() { return systemInfo->pageSize; }
+
+        /**
          * Get the CPU architecture (e.g. x86, x86_64)
          */
         const string& getArch() const { return sysInfo().cpuArch; }
@@ -102,7 +107,27 @@ namespace mongo {
 
         static bool blockCheckSupported();
 
-        static bool blockInMemory( char * start );
+        static bool blockInMemory(const void* start);
+
+        /**
+         * @return a pointer aligned to the start of the page the provided pointer belongs to.
+         *
+         * NOTE requires blockCheckSupported() == true
+         */
+        inline static const void* alignToStartOfPage(const void* ptr) {
+            return reinterpret_cast<const void*>(
+                    reinterpret_cast<unsigned long long>(ptr) & ~(getPageSize() - 1));
+        }
+
+        /**
+         * Sets i-th element of 'out' to non-zero if the i-th page starting from the one containing
+         * 'start' is in memory.
+         * The 'out' vector will be resized to fit the requested number of pages.
+         * @return true on success, false otherwise
+         *
+         * NOTE: requires blockCheckSupported() == true
+         */
+        static bool pagesInMemory(const void* start, size_t numPages, vector<char>* out);
 
     private:
         /**
@@ -116,6 +141,7 @@ namespace mongo {
             unsigned addrSize;
             unsigned long long memSize;
             unsigned numCores;
+            unsigned long long pageSize;
             string cpuArch;
             bool hasNuma;
             BSONObj _extraStats;
@@ -123,6 +149,7 @@ namespace mongo {
                     addrSize( 0 ),
                     memSize( 0 ),
                     numCores( 0 ),
+                    pageSize( 0 ),
                     hasNuma( false ) { 
                 // populate SystemInfo during construction
                 collectSystemInfo();
@@ -137,18 +164,14 @@ namespace mongo {
 
         static bool checkNumaEnabled();
 
-        const SystemInfo& sysInfo() const {
-            // initialize and collect sysInfo on first call
-            // TODO: SERVER-5112
-            static ProcessInfo::SystemInfo *initSysInfo = NULL;
-            if ( ! initSysInfo ) {
-                scoped_lock lk( _sysInfoLock );
-                if ( ! initSysInfo ) {
-                    initSysInfo = new SystemInfo();
-                }
-            }
-            return *initSysInfo;
+        static ProcessInfo::SystemInfo* systemInfo;
+
+        inline const SystemInfo& sysInfo() const {
+            return *systemInfo;
         }
+
+    public:
+        static void initializeSystemInfo();
 
     };
 

@@ -44,13 +44,17 @@ function assertNoNewWarnings() {
 }
 
 function assertNewWarning() {
-    ++oldNumWarnings;
-    assert.eq( oldNumWarnings, numWarnings() );
+    newNumWarnings = numWarnings();
+    // Ensure that newNumWarnings > oldNumWarnings.  It's not safe to test that oldNumWarnings + 1
+    // == newNumWarnings, because a (simulated) page fault exception may cause multiple messages to
+    // be logged instead of only one.
+    assert.lt( oldNumWarnings, newNumWarnings );
+    oldNumWarnings = newNumWarnings;
 }
 
-// Simple _id query without an _id index.
+// Simple _id query
 t.find( { _id:0 } ).itcount();
-assertNewWarning();
+assertNoNewWarnings();
 
 // Simple _id query without an _id index, on a non capped collection.
 notCapped.find( { _id:0 } ).itcount();
@@ -58,7 +62,7 @@ assertNoNewWarnings();
 
 // A multi field query, including _id.
 t.find( { _id:0, a:0 } ).itcount();
-assertNewWarning();
+assertNoNewWarnings();
 
 // An unsatisfiable query.
 t.find( { _id:0, a:{$in:[]} } ).itcount();
@@ -70,7 +74,7 @@ assertNoNewWarnings();
 
 // Retry a multi field query.
 t.find( { _id:0, a:0 } ).itcount();
-assertNewWarning();
+assertNoNewWarnings();
 
 // Warnings should not be printed when an index is added on _id.
 t.ensureIndex( { _id:1 } );

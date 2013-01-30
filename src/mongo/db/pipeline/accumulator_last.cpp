@@ -21,8 +21,7 @@
 
 namespace mongo {
 
-    intrusive_ptr<const Value> AccumulatorLast::evaluate(
-        const intrusive_ptr<Document> &pDocument) const {
+    Value AccumulatorLast::evaluate(const Document& pDocument) const {
         verify(vpOperand.size() == 1);
 
         /* always remember the last value seen */

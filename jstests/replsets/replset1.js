@@ -1,5 +1,5 @@
-load("jstests/replsets/rslib.js")
-
+load("jstests/replsets/rslib.js");
+var ssl_options;
 doTest = function( signal ) {
 
     // Test basic replica set functionality.
@@ -8,7 +8,7 @@ doTest = function( signal ) {
 
     // Replica set testing API
     // Create a new replica set test. Specify set name and the number of nodes you want.
-    var replTest = new ReplSetTest( {name: 'testSet', nodes: 3} );
+    var replTest = new ReplSetTest( {name: 'testSet', nodes: 3, nodeOptions: ssl_options} );
 
     // call startSet() to start each mongod in the replica set
     // this returns a list of nodes
@@ -71,7 +71,7 @@ doTest = function( signal ) {
     new_master.getDB("admin").runCommand({getlasterror: 1});
 
     // Here's how to restart the old master node:
-    slave = replTest.restart( master_id );
+    slave = replTest.restart(master_id);
 
 
     // Now, let's make sure that the old master comes up as a slave

@@ -25,18 +25,21 @@
 #include "pch.h"
 #include <map>
 #include <string>
+#include <vector>
 
-#include "../db/commands.h"
-#include "../db/jsobj.h"
-#include "../db/db.h"
-#include "../db/replutil.h"
-#include "../client/connpool.h"
-
-#include "../util/queue.h"
-
-#include "shard.h"
-#include "d_logic.h"
-#include "config.h"
+#include "mongo/db/auth/action_set.h"
+#include "mongo/db/auth/action_type.h"
+#include "mongo/db/auth/privilege.h"
+#include "mongo/db/commands.h"
+#include "mongo/db/jsobj.h"
+#include "mongo/db/db.h"
+#include "mongo/db/replutil.h"
+#include "mongo/client/connpool.h"
+#include "mongo/s/chunk_version.h"
+#include "mongo/s/config.h"
+#include "mongo/s/d_logic.h"
+#include "mongo/s/shard.h"
+#include "mongo/util/queue.h"
 #include "mongo/util/concurrency/ticketholder.h"
 
 using namespace std;
@@ -144,7 +147,7 @@ namespace mongo {
         }
     }
 
-    void ShardingState::donateChunk( const string& ns , const BSONObj& min , const BSONObj& max , ShardChunkVersion version ) {
+    void ShardingState::donateChunk( const string& ns , const BSONObj& min , const BSONObj& max , ChunkVersion version ) {
         scoped_lock lk( _mutex );
 
         ChunkManagersMap::const_iterator it = _chunks.find( ns );
@@ -152,7 +155,7 @@ namespace mongo {
         ShardChunkManagerPtr p = it->second;
 
         // empty shards should have version 0
-        version = ( p->getNumChunks() > 1 ) ? version : ShardChunkVersion( 0 , OID() );
+        version = ( p->getNumChunks() > 1 ) ? version : ChunkVersion( 0 , OID() );
 
         ShardChunkManagerPtr cloned( p->cloneMinus( min , max , version ) );
         // TODO: a bit dangerous to have two different zero-version states - no-manager and
@@ -160,8 +163,9 @@ namespace mongo {
         _chunks[ns] = cloned;
     }
 
-    void ShardingState::undoDonateChunk( const string& ns , const BSONObj& min , const BSONObj& max , ShardChunkVersion version ) {
+    void ShardingState::undoDonateChunk( const string& ns , const BSONObj& min , const BSONObj& max , ChunkVersion version ) {
         scoped_lock lk( _mutex );
+        log() << "ShardingState::undoDonateChunk acquired _mutex" << endl;
 
         ChunkManagersMap::const_iterator it = _chunks.find( ns );
         verify( it != _chunks.end() ) ;
@@ -170,7 +174,7 @@ namespace mongo {
     }
 
     void ShardingState::splitChunk( const string& ns , const BSONObj& min , const BSONObj& max , const vector<BSONObj>& splitKeys ,
-                                    ShardChunkVersion version ) {
+                                    ChunkVersion version ) {
         scoped_lock lk( _mutex );
 
         ChunkManagersMap::const_iterator it = _chunks.find( ns );
@@ -273,7 +277,7 @@ namespace mongo {
                 _chunks[ns] = p;
             }
 
-            ShardChunkVersion oldVersion = version;
+            ChunkVersion oldVersion = version;
             version = p->getVersion();
             return oldVersion.isEquivalentTo( version );
         }
@@ -414,6 +418,14 @@ namespace mongo {
 
         virtual bool slaveOk() const { return true; }
 
+        virtual void addRequiredPrivileges(const std::string& dbname,
+                                           const BSONObj& cmdObj,
+                                           std::vector<Privilege>* out) {
+            ActionSet actions;
+            actions.addAction(ActionType::unsetSharding);
+            out->push_back(Privilege(AuthorizationManager::CLUSTER_RESOURCE_NAME, actions));
+        }
+
         bool run(const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
             ShardedConnectionInfo::reset();
             return true;
@@ -432,6 +444,14 @@ namespace mongo {
         virtual bool slaveOk() const { return true; }
         virtual LockType locktype() const { return NONE; }
         
+        virtual void addRequiredPrivileges(const std::string& dbname,
+                                           const BSONObj& cmdObj,
+                                           std::vector<Privilege>* out) {
+            ActionSet actions;
+            actions.addAction(ActionType::setShardVersion);
+            out->push_back(Privilege(AuthorizationManager::CLUSTER_RESOURCE_NAME, actions));
+        }
+
         bool checkConfigOrInit( const string& configdb , bool authoritative , string& errmsg , BSONObjBuilder& result , bool locked=false ) const {
             if ( configdb.size() == 0 ) {
                 errmsg = "no configdb";
@@ -595,12 +615,12 @@ namespace mongo {
             
             if ( oldVersion.isSet() && ! globalVersion.isSet() ) {
                 // this had been reset
-                info->setVersion( ns , ShardChunkVersion( 0, OID() ) );
+                info->setVersion( ns , ChunkVersion( 0, OID() ) );
             }
 
             if ( ! version.isSet() && ! globalVersion.isSet() ) {
                 // this connection is cleaning itself
-                info->setVersion( ns , ShardChunkVersion( 0, OID() ) );
+                info->setVersion( ns , ChunkVersion( 0, OID() ) );
                 return true;
             }
 
@@ -617,7 +637,7 @@ namespace mongo {
                 // only setting global version on purpose
                 // need clients to re-find meta-data
                 shardingState.resetVersion( ns );
-                info->setVersion( ns , ShardChunkVersion( 0, OID() ) );
+                info->setVersion( ns , ChunkVersion( 0, OID() ) );
                 return true;
             }
 
@@ -633,9 +653,9 @@ namespace mongo {
             // TODO: Refactor all of this
             if ( version < globalVersion && version.hasCompatibleEpoch( globalVersion ) ) {
                 while ( shardingState.inCriticalMigrateSection() ) {
+                    log() << "waiting till out of critical section" << endl;
                     dbtemprelease r;
-                    sleepmillis(2);
-                    OCCASIONALLY log() << "waiting till out of critical section" << endl;
+                    shardingState.waitTillNotInCriticalSection( 10 );
                 }
                 errmsg = "shard global version for collection is higher than trying to set to '" + ns + "'";
                 result.append( "ns" , ns );
@@ -648,11 +668,10 @@ namespace mongo {
             if ( ! globalVersion.isSet() && ! authoritative ) {
                 // Needed b/c when the last chunk is moved off a shard, the version gets reset to zero, which
                 // should require a reload.
-                // TODO: Maybe a more elegant way of doing this
                 while ( shardingState.inCriticalMigrateSection() ) {
+                    log() << "waiting till out of critical section" << endl;
                     dbtemprelease r;
-                    sleepmillis(2);
-                    OCCASIONALLY log() << "waiting till out of critical section for version reset" << endl;
+                    shardingState.waitTillNotInCriticalSection( 10 );
                 }
 
                 // need authoritative for first look
@@ -666,7 +685,7 @@ namespace mongo {
             {
                 dbtemprelease unlock;
 
-                ShardChunkVersion currVersion = version;
+                ChunkVersion currVersion = version;
                 if ( ! shardingState.trySetVersion( ns , currVersion ) ) {
                     errmsg = str::stream() << "client version differs from config's for collection '" << ns << "'";
                     result.append( "ns" , ns );
@@ -704,6 +723,14 @@ namespace mongo {
 
         virtual LockType locktype() const { return NONE; }
 
+        virtual void addRequiredPrivileges(const std::string& dbname,
+                                           const BSONObj& cmdObj,
+                                           std::vector<Privilege>* out) {
+            ActionSet actions;
+            actions.addAction(ActionType::getShardVersion);
+            out->push_back(Privilege(AuthorizationManager::CLUSTER_RESOURCE_NAME, actions));
+        }
+
         bool run(const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
             string ns = cmdObj["getShardVersion"].valuestrsafe();
             if ( ns.size() == 0 ) {
@@ -732,6 +759,14 @@ namespace mongo {
         ShardingStateCmd() : MongodShardCommand( "shardingState" ) {}
 
         virtual LockType locktype() const { return WRITE; } // TODO: figure out how to make this not need to lock
+
+        virtual void addRequiredPrivileges(const std::string& dbname,
+                                           const BSONObj& cmdObj,
+                                           std::vector<Privilege>* out) {
+            ActionSet actions;
+            actions.addAction(ActionType::shardingState);
+            out->push_back(Privilege(AuthorizationManager::CLUSTER_RESOURCE_NAME, actions));
+        }
 
         bool run(const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
             shardingState.appendInfo( result );
@@ -819,7 +854,7 @@ namespace mongo {
 
     }
 
-    void ShardingConnectionHook::onHandedOut( DBClientBase * conn ) {
-        // no-op for mongod
+    void usingAShardConnection( const string& addr ) {
     }
+
 }

@@ -66,7 +66,7 @@ namespace mongo {
         size_t sold = s;
         s += Alignment - 1;
         s = (s/Alignment)*Alignment;
-        verify( s >= sold ); // begining
+        verify( s >= sold ); // beginning
         verify( (s + sz) <= (sold + sz + Alignment - 1) ); //end
         _p._data = (char *) s;
     }
@@ -102,7 +102,7 @@ namespace mongo {
         _p._allocationAddress = p;
         _p._data = (char *) p;
 #elif defined(__linux__)
-        // in theory #ifdef _POSIX_VERSION should work, but it doesn't on OS X 10.4, and needs to be testeed on solaris.
+        // in theory #ifdef _POSIX_VERSION should work, but it doesn't on OS X 10.4, and needs to be tested on solaris.
         // so for now, linux only for this.
         void *p = 0;
         int res = posix_memalign(&p, Alignment, sz);

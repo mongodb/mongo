@@ -64,17 +64,8 @@ namespace mongo {
             _func = 0;
             _initCalled = false;
         }
-        
-        ~Where() {
 
-            if ( _scope.get() ){
-                try {
-                    _scope->execSetup( "_mongo.readOnly = false;" , "make not read only" );
-                }
-                catch( DBException& e ){
-                    warning() << "javascript scope cleanup interrupted" << causedBy( e ) << endl;
-                }
-            }
+        ~Where() {
             _func = 0;
         }
 
@@ -83,14 +74,12 @@ namespace mongo {
                 return;
             _initCalled = true;
 
-            _scope = globalScriptEngine->getPooledScope( _ns );
+            _scope = globalScriptEngine->getPooledScope( _ns + "where" );
             NamespaceString ns( _ns );
-            _scope->localConnect( ns.db.c_str() );
-            
+
             massert( 10341 ,  "code has to be set first!" , ! _jsCode.empty() );
 
             _func = _scope->createFunction( _jsCode.c_str() );
-            _scope->execSetup( "_mongo.readOnly = true;" , "make read only" );
         }
 
         void setScope( const BSONObj& scope ) {
@@ -194,6 +183,9 @@ namespace mongo {
                 _myregex->push_back( RegexMatcher() );
                 RegexMatcher &rm = _myregex->back();
                 rm._re.reset( new pcrecpp::RE( ie.regex(), flags2options( ie.regexFlags() ) ) );
+                uassert(16431, "Regular expression is too long",
+                        rm._re->pattern().size() <= RegexMatcher::MaxPatternSize);
+
                 rm._fieldName = 0; // no need for field name
                 rm._regex = ie.regex();
                 rm._flags = ie.regexFlags();
@@ -261,6 +253,9 @@ namespace mongo {
 
         RegexMatcher rm;
         rm._re.reset( new pcrecpp::RE(regex, flags2options(flags)) );
+        uassert(16432, "Regular expression is too long",
+                rm._re->pattern().size() <= RegexMatcher::MaxPatternSize);
+
         rm._fieldName = fieldName;
         rm._regex = regex;
         rm._flags = flags;
@@ -363,8 +358,21 @@ namespace mongo {
             flags = fe.valuestrsafe();
             break;
         }
+        case BSONObj::opGEO_INTERSECTS:
+        case BSONObj::opWITHIN: {
+            uassert(16516, "Within must be provided a BSONObj", e.isABSONObj());
+            BSONObj queryObj = e.Obj();
+            if (isNot) {
+                // Get to the $within/$geoIntersects hiding inside the $not.
+                queryObj = queryObj.firstElement().embeddedObject();
+            }
+            GeoQuery query(e.fieldName());
+            uassert(16677, "Malformed geo query: " + queryObj.toString(),
+                    query.parseFrom(queryObj));
+            _geo.push_back(GeoMatcher(query, isNot));
+            break;
+        }
         case BSONObj::opNEAR:
-        case BSONObj::opWITHIN:
         case BSONObj::opMAX_DISTANCE:
             break;
         default:
@@ -936,6 +944,29 @@ namespace mongo {
             }
         }
 
+        for (vector<GeoMatcher>::const_iterator it = _geo.begin(); it != _geo.end(); ++it) {
+            verify(_constrainIndexKey.isEmpty());
+            BSONElementSet s;
+            jsobj.getFieldsDotted(it->getField().c_str(), s, false);
+            int matches = 0;
+            for (BSONElementSet::const_iterator i = s.begin(); i != s.end(); ++i) {
+                if (!i->isABSONObj()) { return false; }
+                GeometryContainer container;
+                if (container.parseFrom(i->Obj()) && it->matches(container)) {
+                    ++matches; break;
+                }
+                // Maybe it's an array of geometries.
+                BSONObjIterator geoIt(i->Obj());
+                while (geoIt.more()) {
+                    BSONElement e = geoIt.next();
+                    if (!e.isABSONObj()) { return false; }
+                    if (!container.parseFrom(e.embeddedObject())) { return false; }
+                    if (it->matches(container)) { ++matches; break; }
+                }
+            }
+            if (0 == matches) { return false; }
+        }
+
         for (vector<RegexMatcher>::const_iterator it = _regexs.begin();
              it != _regexs.end();
              ++it) {
@@ -1175,6 +1206,9 @@ namespace mongo {
         
         // Check that all match components are available in the index matcher.
         if ( !( _basics.size() == docMatcher._basics.size() && _regexs.size() == docMatcher._regexs.size() && !docMatcher._where ) ) {
+            return false;
+        }
+        if (_geo.size() != docMatcher._geo.size()) {
             return false;
         }
         if ( _andMatchers.size() != docMatcher._andMatchers.size() ) {

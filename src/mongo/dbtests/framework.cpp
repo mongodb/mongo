@@ -38,10 +38,6 @@
 #include "mongo/util/file_allocator.h"
 #include "mongo/util/version.h"
 
-#if defined(_WIN32)
-#include "mongo/util/hook_windows_memory.h"
-#endif
-
 namespace po = boost::program_options;
 
 namespace mongo {
@@ -203,7 +199,7 @@ namespace mongo {
                 boost::filesystem::create_directory(p);
             }
 
-            string dbpathString = p.native_directory_string();
+            string dbpathString = p.string();
             dbpath = dbpathString.c_str();
 
             cmdLine.prealloc = false;
@@ -227,20 +223,13 @@ namespace mongo {
             log() << "random seed: " << seed << endl;
 
             if( time(0) % 3 == 0 && !nodur ) {
-                cmdLine.dur = true;
-                log() << "****************" << endl;
-                log() << "running with journaling enabled to test that. dbtests will do this occasionally even if --dur is not specified." << endl;
-                log() << "****************" << endl;
+                if( !cmdLine.dur ) {
+                    cmdLine.dur = true;
+                    log() << "****************" << endl;
+                    log() << "running with journaling enabled to test that. dbtests will do this occasionally even if --dur is not specified." << endl;
+                    log() << "****************" << endl;
+                }
             }
-
-#if defined(_WIN32)
-            if ( cmdLine.dur ) {
-                // Hook Windows APIs that allocate memory so that we can RemapLock them out while
-                //  remapPrivateView() has a data file unmapped (so only needed when journaling)
-                // This is the last point where we are still single-threaded, makes hooking simpler
-                hookWindowsMemory();
-            }
-#endif
 
             FileAllocator::get()->start();
 

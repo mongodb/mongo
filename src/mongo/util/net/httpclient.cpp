@@ -29,11 +29,11 @@ namespace mongo {
 #define HD(x)
 
 
-    int HttpClient::get( string url , Result * result ) {
+    int HttpClient::get( const std::string& url , Result * result ) {
         return _go( "GET" , url , 0 , result );
     }
 
-    int HttpClient::post( string url , string data , Result * result ) {
+    int HttpClient::post( const std::string& url , const std::string& data , Result * result ) {
         return _go( "POST" , url , data.c_str() , result );
     }
 
@@ -102,8 +102,12 @@ namespace mongo {
         
         if ( ssl ) {
 #ifdef MONGO_SSL
-            _checkSSLManager();
-            sock.secure( _sslManager.get() );
+            const SSLParams params(cmdLine.sslPEMKeyFile, 
+                                   cmdLine.sslPEMKeyPassword);
+            // never deleted
+            SSLManager* mgr = new SSLManager(params);
+
+            sock.secure(mgr);
 #else
             uasserted( 15862 , "no ssl support" );
 #endif
@@ -168,11 +172,5 @@ namespace mongo {
 
         _body = entire;
     }
-
-#ifdef MONGO_SSL
-    void HttpClient::_checkSSLManager() {
-        _sslManager.reset( new SSLManager( true ) );
-    }
-#endif
 
 }

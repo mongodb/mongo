@@ -23,9 +23,13 @@ if ( doIt ) {
     d = m.getDB( "diskfulltest" );
     c = d.getCollection( "diskfulltest" );
     c.save( { a: 6 } );
-    assert.eq(d.getLastError(), "new file allocation failure"); // first fail
-    assert.soon( function() { return rawMongoProgramOutput().match( /file allocation failure/ ); }, "didn't see 'file allocation failure'" );
-    assert.isnull( c.findOne() , "shouldn't exist" );
+    assert(d.getLastError().length );
+    printjson( d.getLastErrorObj() );
+    assert.soon(
+        function() { c.save( { a : 6 } );
+                     return rawMongoProgramOutput().match( /file allocation failure/ );
+                   },
+        "didn't see 'file allocation failure'" );
     c.save( { a: 6 } );
     assert.eq(d.getLastError(), "Can't take a write lock while out of disk space"); // every following fail
 

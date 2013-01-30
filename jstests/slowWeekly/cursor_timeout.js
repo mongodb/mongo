@@ -44,8 +44,11 @@ shardedCursorWithNoTimeout.next();
 cursorWithTimeout.next();
 cursorWithNoTimeout.next();
 
-// Cursor cleanup is 10 minutes, but give a 1 min allowance
-sleep( 660000 );
+// Cursor cleanup is 10 minutes, but give a 8 min allowance --
+// NOTE: Due to inaccurate timing on non-Linux platforms, mongos tries
+// to timeout after 10 minutes but in fact is 15+ minutes;
+// SERVER-8381
+sleep( 1000 * 60 * 17 );
 
 assert.throws( function(){ shardedCursorWithTimeout.itcount(); } );
 assert.throws( function(){ cursorWithTimeout.itcount(); } );

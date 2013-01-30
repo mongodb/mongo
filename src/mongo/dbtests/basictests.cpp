@@ -27,6 +27,7 @@
 #include "../util/paths.h"
 #include "../util/stringutils.h"
 #include "../util/compress.h"
+#include "../util/time_support.h"
 #include "../db/db.h"
 
 namespace BasicTests {
@@ -260,6 +261,56 @@ namespace BasicTests {
 
     };
 
+    class SleepBackoffTest {
+    public:
+        void run() {
+
+            int maxSleepTimeMillis = 1000;
+            int lastSleepTimeMillis = -1;
+            int epsMillis = 100; // Allowable inprecision for timing
+
+            Backoff backoff( maxSleepTimeMillis, maxSleepTimeMillis * 2 );
+
+            Timer t;
+
+            // Make sure our backoff increases to the maximum value
+            int maxSleepCount = 0;
+            while( maxSleepCount < 3 ){
+
+                t.reset();
+
+                backoff.nextSleepMillis();
+
+                int elapsedMillis = t.millis();
+
+                log() << "Slept for " << elapsedMillis << endl;
+
+                ASSERT( almostGTE( elapsedMillis, lastSleepTimeMillis, epsMillis ) );
+                lastSleepTimeMillis = elapsedMillis;
+
+                if( almostEq( elapsedMillis, maxSleepTimeMillis, epsMillis ) ) maxSleepCount++;
+            }
+
+            // Make sure that our backoff gets reset if we wait much longer than the maximum wait
+            sleepmillis( maxSleepTimeMillis * 4 );
+
+            t.reset();
+            backoff.nextSleepMillis();
+
+            ASSERT( almostEq( t.millis(), 0, epsMillis ) );
+
+        }
+
+        bool almostEq( int a, int b, int eps ){
+            return std::abs( a - b ) <= eps;
+        }
+
+        bool almostGTE( int a, int b, int eps ){
+            if( almostEq( a, b, eps ) ) return true;
+            return a > b;
+        }
+    };
+
     class AssertTests {
     public:
 
@@ -332,135 +383,6 @@ namespace BasicTests {
         }
     };
 
-    class LexNumCmp {
-    public:
-        static void assertCmp( int expected, const char *s1, const char *s2,
-                              bool lexOnly = false ) {
-            mongo::LexNumCmp cmp( lexOnly );
-            ASSERT_EQUALS( expected, cmp.cmp( s1, s2, lexOnly ) );
-            ASSERT_EQUALS( expected, cmp.cmp( s1, s2 ) );
-            ASSERT_EQUALS( expected < 0, cmp( s1, s2 ) );
-            ASSERT_EQUALS( expected < 0, cmp( string( s1 ), string( s2 ) ) );
-        }
-        void run() {
-
-            ASSERT( ! isNumber( (char)255 ) );
-
-            assertCmp( 0, "a", "a" );
-            assertCmp( -1, "a", "aa" );
-            assertCmp( 1, "aa", "a" );
-            assertCmp( -1, "a", "b" );
-            assertCmp( 1, "100", "50" );
-            assertCmp( -1, "50", "100" );
-            assertCmp( 1, "b", "a" );
-            assertCmp( 0, "aa", "aa" );
-            assertCmp( -1, "aa", "ab" );
-            assertCmp( 1, "ab", "aa" );
-            assertCmp( 1, "0", "a" );
-            assertCmp( 1, "a0", "aa" );
-            assertCmp( -1, "a", "0" );
-            assertCmp( -1, "aa", "a0" );
-            assertCmp( 0, "0", "0" );
-            assertCmp( 0, "10", "10" );
-            assertCmp( -1, "1", "10" );
-            assertCmp( 1, "10", "1" );
-            assertCmp( 1, "11", "10" );
-            assertCmp( -1, "10", "11" );
-            assertCmp( 1, "f11f", "f10f" );
-            assertCmp( -1, "f10f", "f11f" );
-            assertCmp( -1, "f11f", "f111" );
-            assertCmp( 1, "f111", "f11f" );
-            assertCmp( -1, "f12f", "f12g" );
-            assertCmp( 1, "f12g", "f12f" );
-            assertCmp( 1, "aa{", "aab" );
-            assertCmp( -1, "aa{", "aa1" );
-            assertCmp( -1, "a1{", "a11" );
-            assertCmp( 1, "a1{a", "a1{" );
-            assertCmp( -1, "a1{", "a1{a" );
-            assertCmp( 1, "21", "11" );
-            assertCmp( -1, "11", "21" );
-
-            assertCmp( -1 , "a.0" , "a.1" );
-            assertCmp( -1 , "a.0.b" , "a.1" );
-
-            assertCmp( -1 , "b." , "b.|" );
-            assertCmp( -1 , "b.0e" , (string("b.") + (char)255).c_str() );
-            assertCmp( -1 , "b." , "b.0e" );
-
-            assertCmp( 0, "238947219478347782934718234", "238947219478347782934718234");
-            assertCmp( 0, "000238947219478347782934718234", "238947219478347782934718234");
-            assertCmp( 1, "000238947219478347782934718235", "238947219478347782934718234");
-            assertCmp( -1, "238947219478347782934718234", "238947219478347782934718234.1");
-            assertCmp( 0, "238", "000238");
-            assertCmp( 0, "002384", "0002384");
-            assertCmp( 0, "00002384", "0002384");
-            assertCmp( 0, "0", "0");
-            assertCmp( 0, "0000", "0");
-            assertCmp( 0, "0", "000");
-            assertCmp( -1, "0000", "0.0");
-            assertCmp( 1, "2380", "238");
-            assertCmp( 1, "2385", "2384");
-            assertCmp( 1, "2385", "02384");
-            assertCmp( 1, "2385", "002384");
-            assertCmp( -1, "123.234.4567", "00238");
-            assertCmp( 0, "123.234", "00123.234");
-            assertCmp( 0, "a.123.b", "a.00123.b");
-            assertCmp( 1, "a.123.b", "a.b.00123.b");
-            assertCmp( -1, "a.00.0", "a.0.1");
-            assertCmp( 0, "01.003.02", "1.3.2");
-            assertCmp( -1, "1.3.2", "10.300.20");
-            assertCmp( 0, "10.300.20", "000000000000010.0000300.000000020");
-            assertCmp( 0, "0000a", "0a");
-            assertCmp( -1, "a", "0a");
-            assertCmp( -1, "000a", "001a");
-            assertCmp( 0, "010a", "0010a");
-            
-            assertCmp( -1 , "a0" , "a00" );
-            assertCmp( 0 , "a.0" , "a.00" );
-            assertCmp( -1 , "a.b.c.d0" , "a.b.c.d00" );
-            assertCmp( 1 , "a.b.c.0.y" , "a.b.c.00.x" );
-            
-            assertCmp( -1, "a", "a-" );
-            assertCmp( 1, "a-", "a" );
-            assertCmp( 0, "a-", "a-" );
-
-            assertCmp( -1, "a", "a-c" );
-            assertCmp( 1, "a-c", "a" );
-            assertCmp( 0, "a-c", "a-c" );
-
-            assertCmp( 1, "a-c.t", "a.t" );
-            assertCmp( -1, "a.t", "a-c.t" );
-            assertCmp( 0, "a-c.t", "a-c.t" );
-
-            assertCmp( 1, "ac.t", "a.t" );
-            assertCmp( -1, "a.t", "ac.t" );
-            assertCmp( 0, "ac.t", "ac.t" );            
-        }
-    };
-    
-    class LexNumCmpLexOnly : public LexNumCmp {
-    public:
-        void run() {
-            assertCmp( -1, "0", "00", true );
-            assertCmp( 1, "1", "01", true );
-            assertCmp( -1, "1", "11", true );
-            assertCmp( 1, "2", "11", true );
-        }
-    };
-
-    class DatabaseValidNames {
-    public:
-        void run() {
-            ASSERT( NamespaceString::validDBName( "foo" ) );
-            ASSERT( ! NamespaceString::validDBName( "foo/bar" ) );
-            ASSERT( ! NamespaceString::validDBName( "foo bar" ) );
-            ASSERT( ! NamespaceString::validDBName( "foo.bar" ) );
-
-            ASSERT( NamespaceString::normal( "asdads" ) );
-            ASSERT( ! NamespaceString::normal( "asda$ds" ) );
-            ASSERT( NamespaceString::normal( "local.oplog.$main" ) );
-        }
-    };
 
     class DatabaseOwnsNS {
     public:
@@ -723,7 +645,6 @@ namespace BasicTests {
         Tee _tee;
     };
 
-
     class All : public Suite {
     public:
         All() : Suite( "basic" ) {
@@ -739,13 +660,11 @@ namespace BasicTests {
             add< stringbuildertests::reset2 >();
 
             add< sleeptest >();
+            add< SleepBackoffTest >();
             add< AssertTests >();
 
             add< ArrayTests::basic1 >();
-            add< LexNumCmp >();
-            add< LexNumCmpLexOnly >();
 
-            add< DatabaseValidNames >();
             add< DatabaseOwnsNS >();
 
             add< NSValidNames >();

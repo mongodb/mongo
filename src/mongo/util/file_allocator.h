@@ -15,7 +15,7 @@
  *    limitations under the License.
  */
 
-#include "pch.h"
+#include "mongo/pch.h"
 
 #include <list>
 #include <boost/filesystem/path.hpp>
@@ -56,7 +56,7 @@ namespace mongo {
 
         static void ensureLength(int fd, long size);
 
-        /** @return the singletone */
+        /** @return the singleton */
         static FileAllocator * get();
         
     private:

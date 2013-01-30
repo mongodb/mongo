@@ -21,15 +21,14 @@ db.s6127.save({foo:2});
 db.s6127.save({foo:{bar:3}});
 
 // Aggregate checking the field foo and the path foo.bar
-var s6127 = db.runCommand(
-{ aggregate: "s6127", pipeline : [
+var s6127 = db.s6127.aggregate(
     { $project : {
         _id : 0,
         'foo.bar' : 1,
         field : "$foo",
         path : "$foo.bar"
     }}
-]});
+);
 
 /*
  * The first document should contain nothing as neither field exists, the second document should

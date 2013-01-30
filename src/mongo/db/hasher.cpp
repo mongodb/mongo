@@ -22,6 +22,7 @@
 
 #include "mongo/db/hasher.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/util/startup_test.h"
 
 namespace mongo {
 
@@ -91,4 +92,11 @@ namespace mongo {
         }
     }
 
+    struct HasherUnitTest : public StartupTest {
+        void run() {
+            // Hard-coded check to ensure the hash function is consistent across platforms
+            BSONObj o = BSON( "check" << 42 );
+            verify( BSONElementHasher::hash64( o.firstElement(), 0 ) == -944302157085130861LL );
+        }
+    } hasherUnitTest;
 }

@@ -13,13 +13,7 @@ sh._checkFullName = function( fullName ) {
 
 sh._adminCommand = function( cmd , skipCheck ) {
     if ( ! skipCheck ) sh._checkMongos();
-    var res = db.getSisterDB( "admin" ).runCommand( cmd );
-
-    if ( res == null || ! res.ok ) {
-        print( "command failed: " + tojson( res ) )
-    }
-
-    return res;
+    return db.getSisterDB( "admin" ).runCommand( cmd );
 }
 
 sh._dataFormat = function( bytes ){
@@ -47,27 +41,28 @@ sh.help = function() {
     print( "\tsh.moveChunk(fullName,find,to)            move the chunk where 'find' is to 'to' (name of shard)");
     
     print( "\tsh.setBalancerState( <bool on or not> )   turns the balancer on or off true=on, false=off" );
-    print( "\tsh.getBalancerState()                     return true if on, off if not" );
-    print( "\tsh.isBalancerRunning()                    return true if the balancer is running on any mongos" );
+    print( "\tsh.getBalancerState()                     return true if enabled" );
+    print( "\tsh.isBalancerRunning()                    return true if the balancer has work in progress on any mongos" );
 
     print( "\tsh.addShardTag(shard,tag)                 adds the tag to the shard" );
     print( "\tsh.removeShardTag(shard,tag)              removes the tag from the shard" );
-    
+    print( "\tsh.addTagRange(fullName,min,max,tag)      tags the specified range of the given collection" );
+
     print( "\tsh.status()                               prints a general overview of the cluster" )
 }
 
 sh.status = function( verbose , configDB ) { 
-    // TODO: move the actual commadn here
+    // TODO: move the actual command here
     printShardingStatus( configDB , verbose );
 }
 
 sh.addShard = function( url ){
-    sh._adminCommand( { addShard : url } , true )
+    return sh._adminCommand( { addShard : url } , true );
 }
 
 sh.enableSharding = function( dbname ) { 
     assert( dbname , "need a valid dbname" )
-    sh._adminCommand( { enableSharding : dbname } )
+    return sh._adminCommand( { enableSharding : dbname } );
 }
 
 sh.shardCollection = function( fullName , key , unique ) {
@@ -79,17 +74,17 @@ sh.shardCollection = function( fullName , key , unique ) {
     if ( unique ) 
         cmd.unique = true;
 
-    sh._adminCommand( cmd )
+    return sh._adminCommand( cmd );
 }
 
 sh.splitFind = function( fullName , find ) {
     sh._checkFullName( fullName )
-    sh._adminCommand( { split : fullName , find : find } )
+    return sh._adminCommand( { split : fullName , find : find } );
 }
 
 sh.splitAt = function( fullName , middle ) {
     sh._checkFullName( fullName )
-    sh._adminCommand( { split : fullName , middle : middle } )
+    return sh._adminCommand( { split : fullName , middle : middle } );
 }
 
 sh.moveChunk = function( fullName , find , to ) {
@@ -347,8 +342,8 @@ sh.removeShardTag = function( shard, tag ) {
 
 sh.addTagRange = function( ns, min, max, tag ) {
     var config = db.getSisterDB( "config" );
-    config.tags.update( { ns : ns , min : min } , 
-                        { ns : ns , min : min , max : max , tag : tag } , 
-                        true );
+    config.tags.update( {_id: { ns : ns , min : min } } , 
+            {_id: { ns : ns , min : min }, ns : ns , min : min , max : max , tag : tag } , 
+            true );
     sh._checkLastError( config );    
 }

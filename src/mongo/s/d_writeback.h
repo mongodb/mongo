@@ -18,10 +18,11 @@
 
 #pragma once
 
-#include "../pch.h"
+#include "mongo/pch.h"
 
-#include "../util/queue.h"
-#include "../util/background.h"
+#include "mongo/db/jsobj.h"
+#include "mongo/util/queue.h"
+#include "mongo/util/background.h"
 
 namespace mongo {
 
@@ -40,7 +41,7 @@ namespace mongo {
             QueueInfo(){}
 
             BlockingQueue<BSONObj> queue;
-            long long lastCall;   // this is ellapsed millis since startup
+            long long lastCall;   // this is elapsed millis since startup
         };
 
         // a map from mongos's serverIDs to queues of "rejected" operations
@@ -56,10 +57,12 @@ namespace mongo {
          * @param remote server ID this operation came from
          * @param op the operation itself
          *
-         * Enqueues opeartion 'op' in server 'remote's queue. The operation will be written back to
-         * remote at a later stager.
+         * Enqueues operation 'op' in server 'remote's queue. The operation will be written back to
+         * remote at a later stage.
+         *
+         * @return the writebackId generated
          */
-        void queueWriteBack( const string& remote , const BSONObj& op );
+        OID queueWriteBack( const string& remote , BSONObjBuilder& opBuilder );
 
         /*
          * @param remote server ID
@@ -87,7 +90,7 @@ namespace mongo {
         
     private:
         
-        // '_writebackQueueLock' protects only the map itself, since each queue is syncrhonized.
+        // '_writebackQueueLock' protects only the map itself, since each queue is synchronized.
         mutable mongo::mutex _writebackQueueLock;
         WriteBackQueuesMap _writebackQueues;
         

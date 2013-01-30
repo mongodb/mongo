@@ -73,6 +73,10 @@ for lib in boostLibs:
                          language="C++"):
         if not win:
             Exit(1)
+
+env['MONGO_BUILD_SASL_CLIENT'] = conf.CheckLibWithHeader(
+    "gsasl", "gsasl.h", "C", "gsasl_check_version(GSASL_VERSION);", autoadd=False)
+
 conf.Finish()
 
 clientEnv = env.Clone()

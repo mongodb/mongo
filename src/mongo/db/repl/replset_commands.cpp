@@ -15,6 +15,12 @@
 */
 
 #include "pch.h"
+
+#include "mongo/base/init.h"
+#include "mongo/base/status.h"
+#include "mongo/db/auth/action_set.h"
+#include "mongo/db/auth/action_type.h"
+#include "mongo/db/auth/authorization_manager.h"
 #include "../cmdline.h"
 #include "../commands.h"
 #include "../repl.h"
@@ -39,18 +45,20 @@ namespace mongo {
     bool replSetBlind = false;
     unsigned replSetForceInitialSyncFailure = 0;
 
+    // Testing only, enabled via command-line.
     class CmdReplSetTest : public ReplSetCommand {
     public:
         virtual void help( stringstream &help ) const {
             help << "Just for regression tests.\n";
         }
+        // No auth needed because it only works when enabled via command line.
+        virtual bool requiresAuth() { return false; }
+        virtual void addRequiredPrivileges(const std::string& dbname,
+                                           const BSONObj& cmdObj,
+                                           std::vector<Privilege>* out) {}
         CmdReplSetTest() : ReplSetCommand("replSetTest") { }
         virtual bool run(const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             log() << "replSet replSetTest command received: " << cmdObj.toString() << rsLog;
-
-            if (!checkAuth(errmsg, result)) {
-                return false;
-            }
 
             if( cmdObj.hasElement("forceInitialSyncFailure") ) {
                 replSetForceInitialSyncFailure = (unsigned) cmdObj["forceInitialSyncFailure"].Number();
@@ -72,7 +80,14 @@ namespace mongo {
 
             return false;
         }
-    } cmdReplSetTest;
+    };
+    MONGO_INITIALIZER(RegisterReplSetTestCmd)(InitializerContext* context) {
+        if (Command::testCommandsEnabled) {
+            // Leaked intentionally: a Command registers itself when constructed.
+            new CmdReplSetTest();
+        }
+        return Status::OK();
+    }
 
     /** get rollback id.  used to check if a rollback happened during some interval of time.
         as consumed, the rollback id is not in any particular order, it simply changes on each rollback.
@@ -89,6 +104,13 @@ namespace mongo {
             // this is ok but micros or combo with some rand() and/or 64 bits might be better --
             // imagine a restart and a clock correction simultaneously (very unlikely but possible...)
             rbid = (int) curTimeMillis64();
+        }
+        virtual void addRequiredPrivileges(const std::string& dbname,
+                                           const BSONObj& cmdObj,
+                                           std::vector<Privilege>* out) {
+            ActionSet actions;
+            actions.addAction(ActionType::replSetGetRBID);
+            out->push_back(Privilege(AuthorizationManager::SERVER_RESOURCE_NAME, actions));
         }
         virtual bool run(const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             if( !check(errmsg, result) )
@@ -117,6 +139,13 @@ namespace mongo {
             help << "{ replSetGetStatus : 1 }";
             help << "\nhttp://dochub.mongodb.org/core/replicasetcommands";
         }
+        virtual void addRequiredPrivileges(const std::string& dbname,
+                                           const BSONObj& cmdObj,
+                                           std::vector<Privilege>* out) {
+            ActionSet actions;
+            actions.addAction(ActionType::replSetGetStatus);
+            out->push_back(Privilege(AuthorizationManager::SERVER_RESOURCE_NAME, actions));
+        }
         CmdReplSetGetStatus() : ReplSetCommand("replSetGetStatus", true) { }
         virtual bool run(const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             if ( cmdObj["forShell"].trueValue() )
@@ -137,6 +166,13 @@ namespace mongo {
             help << "{ replSetReconfig : config_object }";
             help << "\nhttp://dochub.mongodb.org/core/replicasetcommands";
         }
+        virtual void addRequiredPrivileges(const std::string& dbname,
+                                           const BSONObj& cmdObj,
+                                           std::vector<Privilege>* out) {
+            ActionSet actions;
+            actions.addAction(ActionType::replSetReconfig);
+            out->push_back(Privilege(AuthorizationManager::SERVER_RESOURCE_NAME, actions));
+        }
         CmdReplSetReconfig() : ReplSetCommand("replSetReconfig"), mutex("rsreconfig") { }
         virtual bool run(const string& a, BSONObj& b, int e, string& errmsg, BSONObjBuilder& c, bool d) {
             try {
@@ -149,10 +185,6 @@ namespace mongo {
         }
     private:
         bool _run(const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-            if ( !checkAuth(errmsg, result) ) {
-                return false;
-            }
-
             if( cmdObj["replSetReconfig"].type() != Object ) {
                 errmsg = "no configuration specified";
                 return false;
@@ -187,19 +219,21 @@ namespace mongo {
             }
 
             try {
-                ReplSetConfig newConfig(cmdObj["replSetReconfig"].Obj(), force);
+                scoped_ptr<ReplSetConfig> newConfig
+                        (ReplSetConfig::make(cmdObj["replSetReconfig"].Obj(), force));
 
-                log() << "replSet replSetReconfig config object parses ok, " << newConfig.members.size() << " members specified" << rsLog;
+                log() << "replSet replSetReconfig config object parses ok, " <<
+                        newConfig->members.size() << " members specified" << rsLog;
 
-                if( !ReplSetConfig::legalChange(theReplSet->getConfig(), newConfig, errmsg) ) {
+                if( !ReplSetConfig::legalChange(theReplSet->getConfig(), *newConfig, errmsg) ) {
                     return false;
                 }
 
-                checkMembersUpForConfigChange(newConfig, result, false);
+                checkMembersUpForConfigChange(*newConfig, result, false);
 
                 log() << "replSet replSetReconfig [2]" << rsLog;
 
-                theReplSet->haveNewConfig(newConfig, true);
+                theReplSet->haveNewConfig(*newConfig, true);
                 ReplSet::startupStatusMsg.set("replSetReconfig'd");
             }
             catch( DBException& e ) {
@@ -227,7 +261,13 @@ namespace mongo {
             help << "A process restart unfreezes the member also.\n";
             help << "\nhttp://dochub.mongodb.org/core/replicasetcommands";
         }
-
+        virtual void addRequiredPrivileges(const std::string& dbname,
+                                           const BSONObj& cmdObj,
+                                           std::vector<Privilege>* out) {
+            ActionSet actions;
+            actions.addAction(ActionType::replSetFreeze);
+            out->push_back(Privilege(AuthorizationManager::SERVER_RESOURCE_NAME, actions));
+        }
         CmdReplSetFreeze() : ReplSetCommand("replSetFreeze") { }
         virtual bool run(const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             if( !check(errmsg, result) )
@@ -251,7 +291,13 @@ namespace mongo {
             help << "(If another member with same priority takes over in the meantime, it will stay primary.)\n";
             help << "http://dochub.mongodb.org/core/replicasetcommands";
         }
-
+        virtual void addRequiredPrivileges(const std::string& dbname,
+                                           const BSONObj& cmdObj,
+                                           std::vector<Privilege>* out) {
+            ActionSet actions;
+            actions.addAction(ActionType::replSetStepDown);
+            out->push_back(Privilege(AuthorizationManager::SERVER_RESOURCE_NAME, actions));
+        }
         CmdReplSetStepDown() : ReplSetCommand("replSetStepDown") { }
         virtual bool run(const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             if( !check(errmsg, result) )
@@ -298,7 +344,13 @@ namespace mongo {
             help << "{ replSetMaintenance : bool }\n";
             help << "Enable or disable maintenance mode.";
         }
-
+        virtual void addRequiredPrivileges(const std::string& dbname,
+                                           const BSONObj& cmdObj,
+                                           std::vector<Privilege>* out) {
+            ActionSet actions;
+            actions.addAction(ActionType::replSetMaintenance);
+            out->push_back(Privilege(AuthorizationManager::SERVER_RESOURCE_NAME, actions));
+        }
         CmdReplSetMaintenance() : ReplSetCommand("replSetMaintenance") { }
         virtual bool run(const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             if( !check(errmsg, result) )
@@ -319,13 +371,15 @@ namespace mongo {
             help << "{ replSetSyncFrom : \"host:port\" }\n";
             help << "Change who this member is syncing from.";
         }
-
+        virtual void addRequiredPrivileges(const std::string& dbname,
+                                           const BSONObj& cmdObj,
+                                           std::vector<Privilege>* out) {
+            ActionSet actions;
+            actions.addAction(ActionType::replSetSyncFrom);
+            out->push_back(Privilege(AuthorizationManager::SERVER_RESOURCE_NAME, actions));
+        }
         CmdReplSetSyncFrom() : ReplSetCommand("replSetSyncFrom") { }
         virtual bool run(const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-            if (!checkAuth(errmsg, result) || !check(errmsg, result)) {
-                return false;
-            }
-
             string newTarget = cmdObj["replSetSyncFrom"].valuestrsafe();
             result.append("syncFromRequested", newTarget);
             return theReplSet->forceSyncFrom(newTarget, errmsg, result);
@@ -344,7 +398,7 @@ namespace mongo {
             return startsWith( url , "/_replSet" );
         }
 
-        virtual void handle( const char *rq, string url, BSONObj params,
+        virtual void handle( const char *rq, const std::string& url, BSONObj params,
                              string& responseMsg, int& responseCode,
                              vector<string>& headers,  const SockAddr &from ) {
 

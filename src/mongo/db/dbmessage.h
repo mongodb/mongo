@@ -23,6 +23,7 @@
 #include "../util/net/message.h"
 #include "../client/constants.h"
 #include "instance.h"
+#include "mongo/bson/bson_validate.h"
 
 namespace mongo {
 
@@ -196,14 +197,21 @@ namespace mongo {
                 nextjsobj += strlen(data) + 1; // skip namespace
                 massert( 13066 ,  "Message contains no documents", theEnd > nextjsobj );
             }
-            massert( 10304 ,  "Client Error: Remaining data too small for BSON object", theEnd - nextjsobj > 3 );
-            BSONObj js(nextjsobj);
-            massert( 10305 ,  "Client Error: Invalid object size", js.objsize() > 3 );
-            massert( 10306 ,  "Client Error: Next object larger than space left in message",
-                     js.objsize() < ( theEnd - data ) );
-            if ( cmdLine.objcheck && !js.valid() ) {
-                massert( 10307 , "Client Error: bad object in message", false);
+            massert( 10304,
+                     "Client Error: Remaining data too small for BSON object",
+                     theEnd - nextjsobj >= 5 );
+
+            if ( cmdLine.objcheck ) {
+                Status status = validateBSON( nextjsobj, theEnd - nextjsobj );
+                massert( 10307,
+                         str::stream() << "Client Error: bad object in message: " << status.reason(),
+                         status.isOK() );
             }
+
+            BSONObj js(nextjsobj);
+            verify( js.objsize() >= 5 );
+            verify( js.objsize() < ( theEnd - data ) );
+
             nextjsobj += js.objsize();
             if ( nextjsobj >= theEnd )
                 nextjsobj = 0;
@@ -212,13 +220,18 @@ namespace mongo {
 
         const Message& msg() const { return m; }
 
+        const char * markGet() {
+            return nextjsobj;
+        }
+
         void markSet() {
             mark = nextjsobj;
         }
 
-        void markReset() {
-            verify( mark );
-            nextjsobj = mark;
+        void markReset( const char * toMark = 0) {
+            if( toMark == 0 ) toMark = mark;
+            verify( toMark );
+            nextjsobj = toMark;
         }
 
     private:
@@ -266,7 +279,7 @@ namespace mongo {
     /* object reply helper. */
     void replyToQuery(int queryResultFlags,
                       AbstractMessagingPort* p, Message& requestMsg,
-                      BSONObj& responseObj);
+                      const BSONObj& responseObj);
 
     /* helper to do a reply using a DbResponse object */
     void replyToQuery( int queryResultFlags, Message& m, DbResponse& dbresponse, BSONObj obj );

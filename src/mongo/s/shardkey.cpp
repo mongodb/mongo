@@ -26,7 +26,7 @@
 namespace mongo {
 
     ShardKeyPattern::ShardKeyPattern( BSONObj p ) : pattern( p.getOwned() ) {
-        pattern.getFieldNames(patternfields);
+        pattern.toBSON().getFieldNames( patternfields );
 
         BSONObjBuilder min;
         BSONObjBuilder max;
@@ -40,16 +40,6 @@ namespace mongo {
 
         gMin = min.obj();
         gMax = max.obj();
-    }
-
-    int ShardKeyPattern::compare( const BSONObj& lObject , const BSONObj& rObject ) const {
-        BSONObj L = extractKey(lObject);
-        uassert( 10198 , str::stream() << "left object ("  << lObject << ") doesn't have full shard key (" << pattern << ')',
-                L.nFields() == (int)patternfields.size());
-        BSONObj R = extractKey(rObject);
-        uassert( 10199 , str::stream() << "right object (" << rObject << ") doesn't have full shard key (" << pattern << ')',
-                R.nFields() == (int)patternfields.size());
-        return L.woCompare(R);
     }
 
     bool ShardKeyPattern::hasShardKey( const BSONObj& obj ) const {
@@ -67,8 +57,16 @@ namespace mongo {
         return true;
     }
 
-    bool ShardKeyPattern::isPrefixOf( const BSONObj& otherPattern ) const {
+    bool ShardKeyPattern::isPrefixOf( const KeyPattern& otherPattern ) const {
         return pattern.isPrefixOf( otherPattern );
+    }
+
+    bool ShardKeyPattern::isUniqueIndexCompatible( const KeyPattern& uniqueIndexPattern ) const {
+        if ( ! uniqueIndexPattern.toBSON().isEmpty() &&
+             str::equals( uniqueIndexPattern.toBSON().firstElementFieldName(), "_id" ) ){
+            return true;
+        }
+        return pattern.toBSON().isFieldNamePrefixOf( uniqueIndexPattern.toBSON() );
     }
 
     string ShardKeyPattern::toString() const {
@@ -78,7 +76,7 @@ namespace mongo {
     BSONObj ShardKeyPattern::moveToFront(const BSONObj& obj) const {
         vector<const char*> keysToMove;
         keysToMove.push_back("_id");
-        BSONForEach(e, pattern) {
+        BSONForEach(e, pattern.toBSON()) {
             if (strchr(e.fieldName(), '.') == NULL && strcmp(e.fieldName(), "_id") != 0)
                 keysToMove.push_back(e.fieldName());
         }
@@ -179,6 +177,21 @@ namespace mongo {
             verify( k.extractKey( fromjson("{a:1,sub:{b:2,c:3}}") ).binaryEqual(x) );
             verify( k.extractKey( fromjson("{sub:{b:2,c:3},a:1}") ).binaryEqual(x) );
         }
+
+        void isSpecialTest() {
+            ShardKeyPattern k1( BSON( "a" << 1) );
+            verify( ! k1.isSpecial() );
+
+            ShardKeyPattern k2( BSON( "a" << -1 << "b" << 1 ) );
+            verify( ! k2.isSpecial() );
+
+            ShardKeyPattern k3( BSON( "a" << "hashed") );
+            verify( k3.isSpecial() );
+
+            ShardKeyPattern k4( BSON( "a" << 1 << "b" << "hashed") );
+            verify( k4.isSpecial() );
+        }
+
         void moveToFrontTest() {
             ShardKeyPattern sk (BSON("a" << 1 << "b" << 1));
 
@@ -193,6 +206,18 @@ namespace mongo {
             ret = sk.moveToFront(BSON("z" << 1 << "y" << 1 << "a" << 1 << "b" << 1 << "Z" << 1 << "Y" << 1));
             verify(ret.binaryEqual(BSON("a" << 1 << "b" << 1 << "z" << 1 << "y" << 1 << "Z" << 1 << "Y" << 1)));
 
+        }
+
+        void uniqueIndexCompatibleTest() {
+            ShardKeyPattern k1( BSON( "a" << 1 ) );
+            verify( k1.isUniqueIndexCompatible( BSON( "_id" << 1 ) ) );
+            verify( k1.isUniqueIndexCompatible( BSON( "a" << 1 << "b" << 1 ) ) );
+            verify( k1.isUniqueIndexCompatible( BSON( "a" << -1 ) ) );
+            verify( ! k1.isUniqueIndexCompatible( BSON( "b" << 1 ) ) );
+
+            ShardKeyPattern k2( BSON( "a" <<  "hashed") );
+            verify( k2.isUniqueIndexCompatible( BSON( "a" << 1 ) ) );
+            verify( ! k2.isUniqueIndexCompatible( BSON( "b" << 1 ) ) );
         }
 
         void moveToFrontBenchmark(int numFields) {
@@ -229,10 +254,9 @@ namespace mongo {
 
             BSONObj k1 = BSON( "key" << 5 );
 
-            verify( k.compare( min , max ) < 0 );
-            verify( k.compare( min , k1 ) < 0 );
-            verify( k.compare( max , min ) > 0 );
-            verify( k.compare( min , min ) == 0 );
+            verify( min < max );
+            verify( min < k.extractKey( k1 ) );
+            verify( max > min );
 
             hasshardkeytest();
             verify( k.hasShardKey( k1 ) );
@@ -241,11 +265,15 @@ namespace mongo {
             BSONObj a = k1;
             BSONObj b = BSON( "key" << 999 );
 
-            verify( k.compare(a,b) < 0 );
+            verify( k.extractKey( a ) <  k.extractKey( b ) );
+
+            isSpecialTest();
 
             // add middle multitype tests
 
             moveToFrontTest();
+
+            uniqueIndexCompatibleTest();
 
             if (0) { // toggle to run benchmark
                 moveToFrontBenchmark(0);

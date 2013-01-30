@@ -16,31 +16,34 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "pch.h"
+#include "mongo/pch.h"
 
-#include "dur.h"
-#include "dur_stats.h"
-#include "dur_recover.h"
-#include "dur_journal.h"
-#include "dur_journalformat.h"
-#include "durop.h"
-#include "namespace.h"
-#include "../util/mongoutils/str.h"
-#include "../util/bufreader.h"
-#include "../util/concurrency/race.h"
-#include "pdfile.h"
-#include "database.h"
-#include "db.h"
-#include "../util/startup_test.h"
-#include "../util/checksum.h"
-#include "cmdline.h"
-#include "curop.h"
-#include "mongommf.h"
-#include "../util/compress.h"
-#include <sys/stat.h>
-#include <fcntl.h>
-#include "dur_commitjob.h"
+#include "mongo/db/dur_recover.h"
+
 #include <boost/filesystem/operations.hpp>
+#include <fcntl.h>
+#include <sys/stat.h>
+
+#include "mongo/db/cmdline.h"
+#include "mongo/db/curop.h"
+#include "mongo/db/database.h"
+#include "mongo/db/db.h"
+#include "mongo/db/dur.h"
+#include "mongo/db/dur_commitjob.h"
+#include "mongo/db/dur_journal.h"
+#include "mongo/db/dur_journalformat.h"
+#include "mongo/db/dur_stats.h"
+#include "mongo/db/durop.h"
+#include "mongo/db/kill_current_op.h"
+#include "mongo/db/mongommf.h"
+#include "mongo/db/namespace.h"
+#include "mongo/db/pdfile.h"
+#include "mongo/util/bufreader.h"
+#include "mongo/util/checksum.h"
+#include "mongo/util/compress.h"
+#include "mongo/util/concurrency/race.h"
+#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/startup_test.h"
 
 using namespace mongoutils;
 
@@ -55,7 +58,7 @@ namespace mongo {
             // might be a pointer into mmaped Journal file
             const char *dbName;
 
-            // thse are pointers into the memory mapped journal file
+            // those are pointers into the memory mapped journal file
             const JEntry *e;  // local db sentinel is already parsed out here into dbName
 
             // if not one of the two simple JEntry's above, this is the operation:
@@ -72,7 +75,7 @@ namespace mongo {
                     i != boost::filesystem::directory_iterator();
                     ++i ) {
                 boost::filesystem::path filepath = *i;
-                string fileName = boost::filesystem::path(*i).leaf();
+                string fileName = boost::filesystem::path(*i).leaf().string();
                 if( str::startsWith(fileName, "j._") ) {
                     unsigned u = str::toUnsigned( str::after(fileName, '_') );
                     if( m.count(u) ) {
@@ -85,7 +88,7 @@ namespace mongo {
                 if( i != m.begin() && m.count(i->first - 1) == 0 ) {
                     uasserted(13532,
                     str::stream() << "unexpected file in journal directory " << dir.string()
-                      << " : " << boost::filesystem::path(i->second).leaf() << " : can't find its preceeding file");
+                      << " : " << boost::filesystem::path(i->second).leaf().string() << " : can't find its preceding file");
                 }
                 files.push_back(i->second);
             }
@@ -214,11 +217,99 @@ namespace mongo {
             _mmfs.clear();
         }
 
-        void RecoveryJob::write(const ParsedJournalEntry& entry) {
+        RecoveryJob::Last::Last() : mmf(NULL), fileNo(-1) { 
+            // we are keeping invariants so we need to be sure things aren't disappearing out from under us:
+            LockMongoFilesShared::assertAtLeastReadLocked();
+        }
+
+        MongoMMF* RecoveryJob::Last::newEntry(const dur::ParsedJournalEntry& entry, RecoveryJob& rj) {
+            int num = entry.e->getFileNo();
+            if( num == fileNo && entry.dbName == dbName )
+                return mmf;
+
+            string fn = fileName(entry.dbName, num);
+            MongoFile *file;
+            {
+                MongoFileFinder finder; // must release lock before creating new MongoMMF
+                file = finder.findByPath(fn);
+            }
+
+            if (file) {
+                verify(file->isMongoMMF());
+                mmf = (MongoMMF*)file;
+            }
+            else {
+                if( !rj._recovering ) {
+                    log() << "journal error applying writes, file " << fn << " is not open" << endl;
+                    verify(false);
+                }
+                boost::shared_ptr<MongoMMF> sp (new MongoMMF);
+                verify(sp->open(fn, false));
+                rj._mmfs.push_back(sp);
+                mmf = sp.get();
+            }
+
+            // we do this last so that if an exception were thrown, there isn't any wrong memory
+            dbName = entry.dbName;
+            fileNo = num;
+            return mmf;
+        }
+
+        void RecoveryJob::write(Last& last, const ParsedJournalEntry& entry) {
             //TODO(mathias): look into making some of these dasserts
             verify(entry.e);
             verify(entry.dbName);
-            verify(strnlen(entry.dbName, MaxDatabaseNameLen) < MaxDatabaseNameLen);
+            verify((size_t)strnlen(entry.dbName, MaxDatabaseNameLen) < MaxDatabaseNameLen);
+
+            MongoMMF *mmf = last.newEntry(entry, *this);
+
+            if ((entry.e->ofs + entry.e->len) <= mmf->length()) {
+                verify(mmf->view_write());
+                verify(entry.e->srcData());
+
+                void* dest = (char*)mmf->view_write() + entry.e->ofs;
+                memcpy(dest, entry.e->srcData(), entry.e->len);
+                stats.curr->_writeToDataFilesBytes += entry.e->len;
+            }
+            else {
+                massert(13622, "Trying to write past end of file in WRITETODATAFILES", _recovering);
+            }
+        }
+
+        void RecoveryJob::applyEntry(Last& last, const ParsedJournalEntry& entry, bool apply, bool dump) {
+            if( entry.e ) {
+                if( dump ) {
+                    stringstream ss;
+                    ss << "  BASICWRITE " << setw(20) << entry.dbName << '.';
+                    if( entry.e->isNsSuffix() )
+                        ss << "ns";
+                    else
+                        ss << setw(2) << entry.e->getFileNo();
+                    ss << ' ' << setw(6) << entry.e->len << ' ' << /*hex << setw(8) << (size_t) fqe.srcData << dec <<*/
+                       "  " << hexdump(entry.e->srcData(), entry.e->len);
+                    log() << ss.str() << endl;
+                }
+                if( apply ) {
+                    write(last, entry);
+              }
+            }
+            else if(entry.op) {
+                // a DurOp subclass operation
+                if( dump ) {
+                    log() << "  OP " << entry.op->toString() << endl;
+                }
+                if( apply ) {
+                    if( entry.op->needFilesClosed() ) {
+                        _close(); // locked in processSection
+                    }
+                    entry.op->replay();
+                }
+            }
+        }
+
+        MongoMMF* RecoveryJob::getMongoMMF(const ParsedJournalEntry& entry) {
+            verify(entry.dbName);
+            verify((size_t)strnlen(entry.dbName, MaxDatabaseNameLen) < MaxDatabaseNameLen);
 
             const string fn = fileName(entry.dbName, entry.e->getFileNo());
             MongoFile* file;
@@ -243,48 +334,7 @@ namespace mongo {
                 mmf = sp.get();
             }
 
-            if ((entry.e->ofs + entry.e->len) <= mmf->length()) {
-                verify(mmf->view_write());
-                verify(entry.e->srcData());
-
-                void* dest = (char*)mmf->view_write() + entry.e->ofs;
-                memcpy(dest, entry.e->srcData(), entry.e->len);
-                stats.curr->_writeToDataFilesBytes += entry.e->len;
-            }
-            else {
-                massert(13622, "Trying to write past end of file in WRITETODATAFILES", _recovering);
-            }
-        }
-
-        void RecoveryJob::applyEntry(const ParsedJournalEntry& entry, bool apply, bool dump) {
-            if( entry.e ) {
-                if( dump ) {
-                    stringstream ss;
-                    ss << "  BASICWRITE " << setw(20) << entry.dbName << '.';
-                    if( entry.e->isNsSuffix() )
-                        ss << "ns";
-                    else
-                        ss << setw(2) << entry.e->getFileNo();
-                    ss << ' ' << setw(6) << entry.e->len << ' ' << /*hex << setw(8) << (size_t) fqe.srcData << dec <<*/
-                       "  " << hexdump(entry.e->srcData(), entry.e->len);
-                    log() << ss.str() << endl;
-                }
-                if( apply ) {
-                    write(entry);
-                }
-            }
-            else if(entry.op) {
-                // a DurOp subclass operation
-                if( dump ) {
-                    log() << "  OP " << entry.op->toString() << endl;
-                }
-                if( apply ) {
-                    if( entry.op->needFilesClosed() ) {
-                        _close(); // locked in processSection
-                    }
-                    entry.op->replay();
-                }
-            }
+            return mmf;
         }
 
         void RecoveryJob::applyEntries(const vector<ParsedJournalEntry> &entries) {
@@ -293,8 +343,9 @@ namespace mongo {
             if( dump )
                 log() << "BEGIN section" << endl;
 
+            Last last;
             for( vector<ParsedJournalEntry>::const_iterator i = entries.begin(); i != entries.end(); ++i ) {
-                applyEntry(*i, apply, dump);
+                applyEntry(last, *i, apply, dump);
             }
 
             if( dump )
@@ -302,6 +353,7 @@ namespace mongo {
         }
 
         void RecoveryJob::processSection(const JSectHeader *h, const void *p, unsigned len, const JSectFooter *f) {
+            LockMongoFilesShared lkFiles; // for RecoveryJob::Last
             scoped_lock lk(_mx);
             RACECHECK
 
@@ -453,6 +505,7 @@ namespace mongo {
         /** @param files all the j._0 style files we need to apply for recovery */
         void RecoveryJob::go(vector<boost::filesystem::path>& files) {
             log() << "recover begin" << endl;
+            LockMongoFilesExclusive lkFiles; // for RecoveryJob::Last
             _recovering = true;
 
             // load the last sequence number synced to the datafiles on disk before the last crash
@@ -460,7 +513,7 @@ namespace mongo {
             log() << "recover lsn: " << _lastDataSyncedFromLastRun << endl;
 
             for( unsigned i = 0; i != files.size(); ++i ) {
-	      bool abruptEnd = processFile(files[i]);
+                bool abruptEnd = processFile(files[i]);
                 if( abruptEnd && i+1 < files.size() ) {
                     log() << "recover error: abrupt end to file " << files[i].string() << ", yet it isn't the last journal file" << endl;
                     close();

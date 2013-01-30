@@ -15,20 +15,21 @@
  *    limitations under the License.
  */
 
-#include "pch.h"
+#include "mongo/pch.h"
+
+#include "mongo/util/background.h"
 
 #include <boost/thread/condition.hpp>
 #include <boost/thread/thread.hpp>
 
-#include "concurrency/mutex.h"
-#include "concurrency/spin_lock.h"
+#include "mongo/util/concurrency/mutex.h"
+#include "mongo/util/concurrency/spin_lock.h"
+#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/net/ssl_manager.h"
+#include "mongo/util/time_support.h"
+#include "mongo/util/timer.h"
 
-#include "background.h"
-#include "time_support.h"
-#include "timer.h"
-
-#include "mongoutils/str.h"
-
+using namespace std;
 namespace mongo {
 
     // both the BackgroundJob and the internal thread point to JobStatus
@@ -64,10 +65,10 @@ namespace mongo {
             run();
         }
         catch ( std::exception& e ) {
-            log( LL_ERROR ) << "backgroundjob " << name() << "error: " << e.what() << endl;
+            LOG( LL_ERROR ) << "backgroundjob " << name() << "error: " << e.what() << endl;
         }
         catch(...) {
-            log( LL_ERROR ) << "uncaught exception in BackgroundJob " << name() << endl;
+            LOG( LL_ERROR ) << "uncaught exception in BackgroundJob " << name() << endl;
         }
 
         {
@@ -76,6 +77,9 @@ namespace mongo {
             status->finished.notify_all();
         }
 
+#ifdef MONGO_SSL
+        SSLManager::cleanupThreadLocals();
+#endif
         if( status->deleteSelf )
             delete this;
     }

@@ -50,7 +50,7 @@ namespace mongo {
         return digestToString( d );
     }
 
-    inline std::string md5simpledigest( string s ){
+    inline std::string md5simpledigest( const std::string& s ){
         return md5simpledigest(s.data(), s.size());
     }
 

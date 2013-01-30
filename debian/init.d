@@ -50,13 +50,12 @@ PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
 DAEMON=/usr/bin/mongod
 DESC=database
 
-# Default defaults.  Can be overridden by the /etc/default/$NAME
 NAME=mongodb
+# Defaults.  Can be overridden by the /etc/default/$NAME
+# Other configuration options are located in $CONF file. See here for more:
+# http://docs.mongodb.org/manual/reference/configuration-options/
 CONF=/etc/mongodb.conf
-DATA=/var/lib/mongodb
-LOGDIR=/var/log/mongodb
 PIDFILE=/var/run/$NAME.pid
-LOGFILE=$LOGDIR/$NAME.log  # Server logfile
 ENABLE_MONGODB=yes
 
 # Include mongodb defaults if available
@@ -83,10 +82,6 @@ if test "x$ENABLE_MONGODB" != "xyes"; then
     exit 0
 fi
 
-if test ! -x $DATA; then
-    mkdir $DATA || exit 0
-fi
-
 . /lib/lsb/init-functions
 
 STARTTIME=1
@@ -96,11 +91,9 @@ DIETIME=10                   # Time to wait for the server to die, in seconds
                             # 'restart' will not work
 
 DAEMONUSER=${DAEMONUSER:-mongodb}
-DAEMON_OPTS=${DAEMON_OPTS:-"--dbpath $DATA --logpath $LOGFILE run"}
-DAEMON_OPTS="$DAEMON_OPTS --config $CONF"
+DAEMON_OPTS=${DAEMON_OPTS:-"--config $CONF"}
 
 set -e
-
 
 running_pid() {
 # Check if a given process pid's cmdline matches a given name

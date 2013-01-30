@@ -1,4 +1,4 @@
-/* This test insures that the usePowerOf2 user flag
+/* This test ensures that the usePowerOf2 user flag
  * effectively reuses space. The test repeatedly inserts and
  * then deletes a batch of variable-length strings, then checks
  * that doing so does not cause the storageSize to grow. */

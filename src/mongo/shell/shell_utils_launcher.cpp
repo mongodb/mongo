@@ -72,6 +72,17 @@ namespace mongo {
             return _ports.find( port )->second.first;
         }
         
+        int ProgramRegistry::portForPid(pid_t pid) const {
+            boost::recursive_mutex::scoped_lock lk(_mutex);
+            for (map<int, pair<pid_t, int> >::const_iterator it = _ports.begin();
+                    it != _ports.end(); ++it)
+            {
+                if (it->second.first == pid) return it->first;
+            }
+
+            return -1;
+        }
+
         void ProgramRegistry::registerPort( int port, pid_t pid, int output ) {
             boost::recursive_mutex::scoped_lock lk( _mutex );
             verify( !isPortRegistered( port ) );
@@ -106,13 +117,16 @@ namespace mongo {
             _pids.insert( make_pair( pid, output ) );
         }
         
-        void ProgramRegistry::deletePid( pid_t pid ) {
-            boost::recursive_mutex::scoped_lock lk( _mutex );
-            if ( !isPidRegistered( pid ) ) {
+        void ProgramRegistry::deletePid(pid_t pid) {
+            boost::recursive_mutex::scoped_lock lk(_mutex);
+            if (!isPidRegistered(pid)) {
+                int port = portForPid(pid);
+                if (port < 0) return;
+                deletePort(port);
                 return;
             }
-            close( _pids.find( pid )->second );
-            _pids.erase( pid );
+            close(_pids.find(pid)->second);
+            _pids.erase(pid);
         }
         
         void ProgramRegistry::getRegisteredPids( vector<pid_t> &pids ) {
@@ -184,7 +198,7 @@ namespace mongo {
             }
 #endif
 
-            _argv.push_back( programPath.native_file_string() );
+            _argv.push_back( programPath.string() );
 
             _port = -1;
 
@@ -227,7 +241,11 @@ namespace mongo {
 
         void ProgramRunner::start() {
             int pipeEnds[ 2 ];
-            verify( pipe( pipeEnds ) != -1 );
+            int status = pipe(pipeEnds);
+            if (status != 0) {
+                error() << "failed to create pipe: " << errnoWithDescription() << endl;
+                fassertFailed(16701);
+            }
 
             fflush( 0 );
             launchProcess(pipeEnds[1]); //sets _pid
@@ -481,6 +499,13 @@ namespace mongo {
             return undefinedReturn;
         }
 
+        BSONObj CheckProgram(const BSONObj& args, void* data) {
+            int pid = singleArg(args).numberInt();
+            bool isDead = wait_for_pid(pid, false);
+            if (isDead) registry.deletePid(pid);
+            return BSON( string( "" ) << (!isDead) );
+        }
+
         BSONObj WaitProgram( const BSONObj& a, void* data ) {
             int pid = singleArg( a ).numberInt();
             BSONObj x = BSON( "" << wait_for_pid( pid ) );
@@ -699,7 +724,8 @@ namespace mongo {
 
         /** stopMongoProgram(port[, signal]) */
         BSONObj StopMongoProgram( const BSONObj &a, void* data ) {
-            verify( a.nFields() >= 1 || a.nFields() <= 3 );
+            int nFields = a.nFields();
+            verify( nFields >= 1 && nFields <= 3 );
             uassert( 15853 , "stopMongo needs a number" , a.firstElement().isNumber() );
             int port = int( a.firstElement().number() );
             int code = killDb( port, 0, getSignal( a ), getStopMongodOpts( a ));
@@ -738,13 +764,14 @@ namespace mongo {
             scope.injectNative( "_startMongoProgram", StartMongoProgram );
             scope.injectNative( "runProgram", RunProgram );
             scope.injectNative( "run", RunProgram );
-            scope.injectNative( "runMongoProgram", RunMongoProgram );
+            scope.injectNative( "_runMongoProgram", RunMongoProgram );
             scope.injectNative( "stopMongod", StopMongoProgram );
             scope.injectNative( "stopMongoProgram", StopMongoProgram );
             scope.injectNative( "stopMongoProgramByPid", StopMongoProgramByPid );
             scope.injectNative( "rawMongoProgramOutput", RawMongoProgramOutput );
             scope.injectNative( "clearRawMongoProgramOutput", ClearRawMongoProgramOutput );
             scope.injectNative( "waitProgram" , WaitProgram );
+            scope.injectNative( "checkProgram" , CheckProgram );
             scope.injectNative( "resetDbpath", ResetDbpath );
             scope.injectNative( "copyDbpath", CopyDbpath );
         }

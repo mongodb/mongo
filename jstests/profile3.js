@@ -6,10 +6,11 @@ var db = db.getSisterDB("profile3");
 t = db.profile3;
 t.drop();
 
-function profileCursor( query ) {
+profileCursor = function( query ) {
+    print( "----" );
     query = query || {};
-    Object.extend( query, { user:username } );
-    return db.system.profile.find( query );
+    Object.extend( query, { user: username + "@" + db.getName() } );
+     return db.system.profile.find( query );
 }
 
 try {

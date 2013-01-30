@@ -16,11 +16,30 @@ import subprocess
 
 def check_dir( bucket , prefix , todel ):
     
+    deleteAll = False
+
     for ( key , modify , etag , size ) in bucket.listdir( prefix=prefix ):
         if key.find( todel ) < 0:
             continue
         print( key )
-        time.sleep( 2 )
+
+        if not deleteAll:
+
+            val = raw_input( "Delete (Y,y,n,N):" ).strip()
+
+            if val == "n":
+                print( "skipping this one" )
+                continue
+            elif val == "N":
+                break
+
+            if val == "Y":
+                val = "y"
+                deleteAll = True
+                
+            if val != "y":
+                raise Exception( "invalid input :(" )
+
         bucket.delete( key )
 
 def clean( todel ):

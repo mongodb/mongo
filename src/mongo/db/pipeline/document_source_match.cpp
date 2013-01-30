@@ -40,8 +40,7 @@ namespace mongo {
         pBuilder->append(matchName, *pQuery);
     }
 
-    bool DocumentSourceMatch::accept(
-        const intrusive_ptr<Document> &pDocument) const {
+    bool DocumentSourceMatch::accept(const Document& pDocument) const {
 
         /*
           The matcher only takes BSON documents, so we have to make one.
@@ -61,13 +60,18 @@ namespace mongo {
         return matcher.matches(obj);
     }
 
-    static void uassertNoWhereClause(BSONObj query) {
+    static void uassertNoDisallowedClauses(BSONObj query) {
         BSONForEach(e, query) {
             // can't use the Matcher API because this would segfault the constructor
             uassert(16395, "$where is not allowed inside of a $match aggregation expression",
                     ! str::equals(e.fieldName(), "$where"));
+            // geo breaks if it is not the first portion of the pipeline
+            uassert(16424, "$near is not allowed inside of a $match aggregation expression",
+                    ! str::equals(e.fieldName(), "$near"));
+            uassert(16426, "$nearSphere is not allowed inside of a $match aggregation expression",
+                    ! str::equals(e.fieldName(), "$nearSphere"));
             if (e.isABSONObj())
-                uassertNoWhereClause(e.Obj());
+                uassertNoDisallowedClauses(e.Obj());
         }
     }
 
@@ -77,7 +81,7 @@ namespace mongo {
         uassert(15959, "the match filter must be an expression in an object",
                 pBsonElement->type() == Object);
 
-        uassertNoWhereClause(pBsonElement->Obj());
+        uassertNoDisallowedClauses(pBsonElement->Obj());
 
         intrusive_ptr<DocumentSourceMatch> pMatcher(
             new DocumentSourceMatch(pBsonElement->Obj(), pExpCtx));

@@ -24,7 +24,7 @@
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/namespacestring.h"
 #include "mongo/s/shard.h"
-#include "mongo/s/util.h"
+#include "mongo/s/stale_exception.h"  // for RecvStaleConfigException
 
 namespace mongo {
 
@@ -157,10 +157,11 @@ namespace mongo {
         verify( !haveLimit );
         auto_ptr<Message> response(new Message());
         verify( _client );
-        if ( _client->recv(*response) ) {
-            batch.m = response;
-            dataReceived();
+        if (!_client->recv(*response)) {
+            uasserted(16465, "recv failed while exhausting cursor");
         }
+        batch.m = response;
+        dataReceived();
     }
 
     void DBClientCursor::dataReceived( bool& retry, string& host ) {

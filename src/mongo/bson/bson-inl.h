@@ -208,10 +208,12 @@ dodouble:
     inline NOINLINE_DECL void BSONObj::_assertInvalid() const {
         StringBuilder ss;
         int os = objsize();
-        ss << "Invalid BSONObj size: " << os << " (0x" << toHex( &os, 4 ) << ')';
+        ss << "BSONObj size: " << os << " (0x" << toHex( &os, 4 ) << ") is invalid. "
+           << "Size must be between 0 and " << BSONObjMaxInternalSize
+           << "(" << ( BSONObjMaxInternalSize/(1024*1024) ) << "MB)";
         try {
             BSONElement e = firstElement();
-            ss << " first element: " << e.toString();
+            ss << " First element: " << e.toString();
         }
         catch ( ... ) { }
         massert( 10334 , ss.str() , 0 );
@@ -240,8 +242,8 @@ dodouble:
         return b.obj();
     }
 
-    inline BSONObj BSONElement::wrap( const char * newName ) const {
-        BSONObjBuilder b(size()+6+(int)strlen(newName));
+    inline BSONObj BSONElement::wrap( const StringData& newName ) const {
+        BSONObjBuilder b(size() + 6 + newName.size());
         b.appendAs(*this,newName);
         return b.obj();
     }
@@ -264,7 +266,7 @@ dodouble:
         BSONObjIterator i(*this);
         while ( i.more() ) {
             BSONElement e = i.next();
-            if ( strcmp(e.fieldName(), name.data()) == 0 )
+            if ( name == e.fieldName() )
                 return e;
         }
         return BSONElement();
@@ -331,29 +333,41 @@ dodouble:
     }
 
     inline BSONObjBuilderValueStream::BSONObjBuilderValueStream( BSONObjBuilder * builder ) {
-        _fieldName = 0;
         _builder = builder;
     }
 
     template<class T>
     inline BSONObjBuilder& BSONObjBuilderValueStream::operator<<( T value ) {
         _builder->append(_fieldName, value);
-        _fieldName = 0;
+        _fieldName = StringData();
         return *_builder;
     }
 
     inline BSONObjBuilder& BSONObjBuilderValueStream::operator<<( const BSONElement& e ) {
         _builder->appendAs( e , _fieldName );
-        _fieldName = 0;
+        _fieldName = StringData();
         return *_builder;
+    }
+
+    inline BufBuilder& BSONObjBuilderValueStream::subobjStart() {
+        StringData tmp = _fieldName;
+        _fieldName = StringData();
+        return _builder->subobjStart(tmp);
+    }
+
+    inline BufBuilder& BSONObjBuilderValueStream::subarrayStart() {
+        StringData tmp = _fieldName;
+        _fieldName = StringData();
+        return _builder->subarrayStart(tmp);
     }
 
     inline Labeler BSONObjBuilderValueStream::operator<<( const Labeler::Label &l ) {
         return Labeler( l, this );
     }
 
-    inline void BSONObjBuilderValueStream::endField( const char *nextFieldName ) {
-        if ( _fieldName && haveSubobj() ) {
+    inline void BSONObjBuilderValueStream::endField( const StringData& nextFieldName ) {
+        if ( haveSubobj() ) {
+            verify( _fieldName.rawData() );
             _builder->append( _fieldName, subobj()->done() );
         }
         _subobj.reset();
@@ -403,7 +417,7 @@ dodouble:
     inline bool BSONObjBuilder::hasField( const StringData& name ) const {
         BSONObjIterator i = iterator();
         while ( i.more() )
-            if ( strcmp( name.data() , i.next().fieldName() ) == 0 )
+            if ( name == i.next().fieldName() )
                 return true;
         return false;
     }
@@ -916,9 +930,9 @@ dodouble:
     }
 
     // used by jsonString()
-    inline std::string escape( std::string s , bool escape_slash=false) {
+    inline std::string escape( const std::string& s , bool escape_slash=false) {
         StringBuilder ret;
-        for ( std::string::iterator i = s.begin(); i != s.end(); ++i ) {
+        for ( std::string::const_iterator i = s.begin(); i != s.end(); ++i ) {
             switch ( *i ) {
             case '"':
                 ret << "\\\"";
@@ -986,15 +1000,62 @@ dodouble:
         verify( ! j.more() );
     }
 
-    inline BSONObj BSONObj::removeField(const StringData& name) const { 
+    inline BSONObj BSONObj::removeField(const StringData& name) const {
         BSONObjBuilder b;
         BSONObjIterator i(*this);
         while ( i.more() ) {
             BSONElement e = i.next();
             const char *fname = e.fieldName();
-            if( strcmp(name.data(), fname) )
+            if ( name != fname )
                 b.append(e);
         }
         return b.obj();
     }
+
+    template<typename T> bool BSONObj::coerceVector( std::vector<T>* out ) const {
+        BSONObjIterator i( *this );
+        while ( i.more() ) {
+            BSONElement e = i.next();
+            T t;
+            if ( ! e.coerce<T>( &t ) )
+                return false;
+            out->push_back( t );
+        }
+        return true;
+    }
+
+
+    template<> inline bool BSONElement::coerce<std::string>( std::string* out ) const {
+        if ( type() != mongo::String )
+            return false;
+        *out = String();
+        return true;
+    }
+
+    template<> inline bool BSONElement::coerce<int>( int* out ) const {
+        if ( !isNumber() )
+            return false;
+        *out = numberInt();
+        return true;
+    }
+
+    template<> inline bool BSONElement::coerce<double>( double* out ) const {
+        if ( !isNumber() )
+            return false;
+        *out = numberDouble();
+        return true;
+    }
+
+    template<> inline bool BSONElement::coerce<bool>( bool* out ) const {
+        *out = trueValue();
+        return true;
+    }
+
+    template<> inline bool BSONElement::coerce< std::vector<std::string> >( std::vector<std::string>* out ) const {
+        if ( type() != mongo::Array )
+            return false;
+        return Obj().coerceVector<std::string>( out );
+    }
+
+
 }
