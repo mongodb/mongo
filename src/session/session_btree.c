@@ -110,23 +110,26 @@ __wt_session_release_btree(WT_SESSION_IMPL *session)
 		/* A write lock has been held since the handle was created. */
 		WT_ERR(__wt_rwunlock(session, btree->rwlock));
 		WT_ERR(__wt_conn_btree_discard_single(session, btree));
-	} else if (F_ISSET(btree, WT_BTREE_DISCARD_CLOSE)) {
-		/*
-		 * If configured to discard on last close, attempt to trade our
-		 * read lock for an exclusive lock. If that succeeds setup for
-		 * discard. It is expected that the exlusive lock will fail
-		 * sometimes since the handle may still be in use - in that
-		 * case we've already unlocked, so we're done.
-		 */
-		WT_ERR(__wt_rwunlock(session, btree->rwlock));
-		ret = __wt_try_writelock(session, btree->rwlock);
-		if (ret == 0) {
-			WT_RET(__wt_conn_btree_sync_and_close(session));
-			ret = __wt_rwunlock(session, btree->rwlock);
-		} else if (ret == EBUSY)
-			ret = 0;
-		WT_ERR(ret);
 	} else {
+		if (F_ISSET(btree, WT_BTREE_DISCARD_CLOSE)) {
+			/*
+			 * If configured to discard on last close, attempt to
+			 * trade our read lock for an exclusive lock. If that
+			 * succeeds, setup for discard. It is expected that the
+			 * exclusive lock will fail sometimes since the handle
+			 * may still be in use - in that case we've already
+			 * unlocked, so we're done.
+			 */
+			WT_ERR(__wt_rwunlock(session, btree->rwlock));
+			ret = __wt_try_writelock(session, btree->rwlock);
+			if (ret != 0) {
+				if (ret == EBUSY)
+					ret = 0;
+				goto err;
+			}
+			F_CLR(btree, WT_BTREE_DISCARD_CLOSE);
+			F_SET(btree, WT_BTREE_DISCARD | WT_BTREE_EXCLUSIVE);
+		}
 
 		/*
 		 * If we had special flags set, close the handle so that future
@@ -136,16 +139,16 @@ __wt_session_release_btree(WT_SESSION_IMPL *session)
 			WT_ASSERT(session, F_ISSET(btree, WT_BTREE_EXCLUSIVE));
 			F_CLR(btree, WT_BTREE_DISCARD);
 
-			WT_RET(__wt_conn_btree_sync_and_close(session));
+			WT_TRET(__wt_conn_btree_sync_and_close(session));
 		}
 
 		if (F_ISSET(btree, WT_BTREE_EXCLUSIVE))
 			F_CLR(btree, WT_BTREE_EXCLUSIVE);
 
-		ret = __wt_rwunlock(session, btree->rwlock);
+		WT_TRET(__wt_rwunlock(session, btree->rwlock));
 	}
-err:	session->btree = NULL;
 
+err:	session->btree = NULL;
 	return (ret);
 }
 
