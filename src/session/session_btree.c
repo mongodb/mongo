@@ -272,9 +272,7 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 
 	WT_ASSERT(session, LF_ISSET(WT_BTREE_EXCLUSIVE) ==
 	    F_ISSET(session->btree, WT_BTREE_EXCLUSIVE));
-	LF_ISSET(WT_BTREE_DISCARD_CLOSE) ?
-		F_SET(session->btree, WT_BTREE_DISCARD_CLOSE) :
-		F_CLR(session->btree, WT_BTREE_DISCARD_CLOSE);
+	F_SET(session->btree, LF_ISSET(WT_BTREE_DISCARD_CLOSE));
 
 	return (0);
 }
