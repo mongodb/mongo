@@ -25,6 +25,7 @@
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/json.h"
+#include "mongo/db/kill_current_op.h"
 #include "mongo/db/lasterror.h"
 #include "mongo/db/oplog.h"
 #include "mongo/db/scanandorder.h"
@@ -217,6 +218,105 @@ namespace QueryTests {
         }
     };
 
+    /**
+     * An exception triggered during a get more request destroys the ClientCursor used by the get
+     * more, preventing further iteration of the cursor in subsequent get mores.
+     */
+    class GetMoreKillOp : public ClientBase {
+    public:
+        ~GetMoreKillOp() {
+            killCurrentOp.reset();
+            client().dropCollection( "unittests.querytests.GetMoreKillOp" );
+        }
+        void run() {
+            
+            // Create a collection with some data.
+            const char* ns = "unittests.querytests.GetMoreKillOp";
+            for( int i = 0; i < 1000; ++i ) {
+                insert( ns, BSON( "a" << i ) );
+            }
+
+            // Create a cursor on the collection, with a batch size of 200.
+            auto_ptr<DBClientCursor> cursor = client().query( ns, "", 0, 0, 0, 0, 200 );
+            CursorId cursorId = cursor->getCursorId();
+            
+            // Count 500 results, spanning a few batches of documents.
+            for( int i = 0; i < 500; ++i ) {
+                ASSERT( cursor->more() );
+                cursor->next();
+            }
+            
+            // Set the killop kill all flag, forcing the next get more to fail with a kill op
+            // exception.
+            killCurrentOp.killAll();
+            while( cursor->more() ) {
+                cursor->next();
+            }
+            
+            // Revert the killop kill all flag.
+            killCurrentOp.reset();
+
+            // Check that the cursor has been removed.
+            set<CursorId> ids;
+            ClientCursor::find( ns, ids );
+            ASSERT_EQUALS( 0U, ids.count( cursorId ) );
+
+            // Check that a subsequent get more fails with the cursor removed.
+            ASSERT_THROWS( client().getMore( ns, cursorId ), UserException );
+        }
+    };
+
+    /**
+     * A get more exception caused by an invalid or unauthorized get more request does not cause
+     * the get more's ClientCursor to be destroyed.  This prevents an unauthorized user from
+     * improperly killing a cursor by issuing an invalid get more request.
+     */
+    class GetMoreInvalidRequest : public ClientBase {
+    public:
+        ~GetMoreInvalidRequest() {
+            killCurrentOp.reset();
+            client().dropCollection( "unittests.querytests.GetMoreInvalidRequest" );
+        }
+        void run() {
+
+            // Create a collection with some data.
+            const char* ns = "unittests.querytests.GetMoreInvalidRequest";
+            for( int i = 0; i < 1000; ++i ) {
+                insert( ns, BSON( "a" << i ) );
+            }
+            
+            // Create a cursor on the collection, with a batch size of 200.
+            auto_ptr<DBClientCursor> cursor = client().query( ns, "", 0, 0, 0, 0, 200 );
+            CursorId cursorId = cursor->getCursorId();
+
+            // Count 500 results, spanning a few batches of documents.
+            int count = 0;
+            for( int i = 0; i < 500; ++i ) {
+                ASSERT( cursor->more() );
+                cursor->next();
+                ++count;
+            }
+
+            // Send a get more with a namespace that is incorrect ('spoofed') for this cursor id.
+            // This is the invalaid get more request described in the comment preceding this class.
+            client().getMore
+                    ( "unittests.querytests.GetMoreInvalidRequest_WRONG_NAMESPACE_FOR_CURSOR",
+                      cursor->getCursorId() );
+
+            // Check that the cursor still exists
+            set<CursorId> ids;
+            ClientCursor::find( ns, ids );
+            ASSERT_EQUALS( 1U, ids.count( cursorId ) );
+            
+            // Check that the cursor can be iterated until all documents are returned.
+            while( cursor->more() ) {
+                cursor->next();
+                ++count;
+            }
+            ASSERT_EQUALS( 1000, count );
+        }
+    };
+    
     class PositiveLimit : public ClientBase {
     public:
         const char* ns;
@@ -1569,6 +1669,8 @@ namespace QueryTests {
             add< FindOneEmptyObj >();
             add< BoundedKey >();
             add< GetMore >();
+            add< GetMoreKillOp >();
+            add< GetMoreInvalidRequest >();
             add< PositiveLimit >();
             add< ReturnOneOfManyAndTail >();
             add< TailNotAtEnd >();
