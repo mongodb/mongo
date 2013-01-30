@@ -19,6 +19,7 @@
 #include "mongo/util/net/message_port.h"
 #include "mongo/util/net/message_server.h"
 #include "mongo/util/fail_point_service.h"
+#include "mongo/util/time_support.h"
 #include "mongo/util/timer.h"
 #include "mongo/unittest/unittest.h"
 
@@ -156,8 +157,20 @@ namespace mongo_test {
                 shuttingDown = true;
             }
 
-            _serverThread.join();
             mongo::ListeningSockets::get()->closeAll();
+            _serverThread.join();
+
+            int connCount = mongo::Listener::globalTicketHolder.used();
+            size_t iterCount = 0;
+            while (connCount > 0) {
+                if ((++iterCount % 20) == 0) {
+                    mongo::log() << "DummyServer: Waiting for " << connCount
+                                 << " connections to close." << std::endl;
+                }
+
+                mongo::sleepmillis(500);
+                connCount = mongo::Listener::globalTicketHolder.used();
+            }
 
             delete _server;
             _server = NULL;
