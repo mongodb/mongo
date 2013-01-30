@@ -15,6 +15,9 @@
 */
 
 namespace mongo {
-    bool run2DGeoNear(const IndexDetails &id, BSONObj& cmdObj, string& errmsg,
+    // We need cmdObj and parsedArgs so we can print a useful error msg
+    // and pull other args out.
+    bool run2DGeoNear(const IndexDetails &id, const BSONObj& cmdObj,
+                      const GeoNearArguments &parsedArgs, string& errmsg,
                       BSONObjBuilder& result);
 }  // namespace mongo

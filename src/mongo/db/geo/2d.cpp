@@ -32,6 +32,7 @@
 #include "mongo/db/matcher.h"
 #include "mongo/db/queryutil.h"
 #include "mongo/db/geo/core.h"
+#include "mongo/db/geo/geonear.h"
 #include "mongo/db/geo/hash.h"
 #include "mongo/db/geo/shapes.h"
 #include "mongo/util/timer.h"
@@ -2387,41 +2388,23 @@ namespace mongo {
     // ------
     // commands
     // ------
-    bool run2DGeoNear(const IndexDetails &id, BSONObj& cmdObj, string& errmsg, BSONObjBuilder& result) {
+    bool run2DGeoNear(const IndexDetails &id, const BSONObj& cmdObj,
+                      const GeoNearArguments &parsedArgs, string& errmsg, BSONObjBuilder& result) {
         Geo2dType * g = (Geo2dType*)id.getSpec().getType();
         verify(&id == g->getDetails());
-
-        // We support both "num" and "limit" options to control limit
-        int numWanted = 100;
-        const char* limitName = cmdObj["num"].isNumber() ? "num" : "limit";
-        if (cmdObj[limitName].isNumber()) {
-            numWanted = cmdObj[limitName].numberInt();
-            verify(numWanted >= 0);
-        }
-
-        bool uniqueDocs = false;
-        if(! cmdObj["uniqueDocs"].eoo()) uniqueDocs = cmdObj["uniqueDocs"].trueValue();
-
-        bool includeLocs = false;
-        if(! cmdObj["includeLocs"].eoo()) includeLocs = cmdObj["includeLocs"].trueValue();
 
         uassert(13046, "'near' param missing/invalid", !cmdObj["near"].eoo());
         const Point n(cmdObj["near"]);
         result.append("near", g->getConverter().hash(cmdObj["near"]).toString());
 
-        BSONObj filter;
-        if (cmdObj["query"].type() == Object)
-            filter = cmdObj["query"].embeddedObject();
-
         double maxDistance = numeric_limits<double>::max();
         if (cmdObj["maxDistance"].isNumber())
             maxDistance = cmdObj["maxDistance"].number();
 
-        GeoDistType type = GEO_PLAIN;
-        if (cmdObj["spherical"].trueValue())
-            type = GEO_SPHERE;
+        GeoDistType type = parsedArgs.isSpherical ? GEO_SPHERE : GEO_PLAIN;
 
-        GeoSearch gs(g, n, numWanted, filter, maxDistance, type, uniqueDocs, true);
+        GeoSearch gs(g, n, parsedArgs.numWanted, parsedArgs.query, maxDistance, type,
+                     parsedArgs.uniqueDocs, true);
 
         if (cmdObj["start"].type() == String) {
             GeoHash start ((string) cmdObj["start"].valuestr());
@@ -2430,10 +2413,6 @@ namespace mongo {
 
         gs.exec();
 
-        double distanceMultiplier = 1;
-        if (cmdObj["distanceMultiplier"].isNumber())
-            distanceMultiplier = cmdObj["distanceMultiplier"].number();
-
         double totalDistance = 0;
 
         BSONObjBuilder arr(result.subarrayStart("results"));
@@ -2441,12 +2420,12 @@ namespace mongo {
         for (GeoHopper::Holder::iterator i=gs._points.begin(); i!=gs._points.end(); i++) {
 
             const GeoPoint& p = *i;
-            double dis = distanceMultiplier * p.distance();
+            double dis = parsedArgs.distanceMultiplier * p.distance();
             totalDistance += dis;
 
             BSONObjBuilder bb(arr.subobjStart(BSONObjBuilder::numStr(x++)));
             bb.append("dis", dis);
-            if(includeLocs){
+            if (parsedArgs.includeLocs) {
                 if(p._pt.couldBeArray()) bb.append("loc", BSONArray(p._pt));
                 else bb.append("loc", p._pt);
             }

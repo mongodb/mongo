@@ -20,6 +20,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/index.h"
 #include "mongo/db/queryutil.h"
+#include "mongo/db/geo/geonear.h"
 #include "mongo/db/geo/geoparser.h"
 #include "mongo/db/geo/geoquery.h"
 #include "mongo/db/geo/s2common.h"
@@ -354,7 +355,8 @@ namespace mongo {
         }
     } S2IndexPluginS2D;
 
-    bool run2DSphereGeoNear(const IndexDetails &id, BSONObj& cmdObj, string& errmsg,
+    bool run2DSphereGeoNear(const IndexDetails &id, BSONObj& cmdObj,
+                            const GeoNearArguments &parsedArgs, string& errmsg,
                             BSONObjBuilder& result) {
         S2IndexType *idxType = static_cast<S2IndexType*>(id.getSpec().getType());
         verify(&id == idxType->getDetails());
@@ -365,60 +367,37 @@ namespace mongo {
         // NOTE(hk): If we add a new argument to geoNear, we could have a
         // 2dsphere index with multiple indexed geo fields, and the geoNear
         // could pick the one to run over.  Right now, we just require one.
-        uassert(16552, "geoNear requiers exactly one indexed geo field", 1 == geoFieldNames.size());
+        uassert(16552, "geoNear requires exactly one indexed geo field", 1 == geoFieldNames.size());
         NearQuery nearQuery(geoFieldNames[0]);
         uassert(16679, "Invalid geometry given as arguments to geoNear: " + cmdObj.toString(),
                 nearQuery.parseFromGeoNear(cmdObj, idxType->getParams().radius));
         uassert(16683, "geoNear on 2dsphere index requires spherical",
-                cmdObj["spherical"].trueValue());
-
-        // We support both "num" and "limit" options to control limit
-        int numWanted = 100;
-        const char* limitName = cmdObj["num"].isNumber() ? "num" : "limit";
-        if (cmdObj[limitName].isNumber()) {
-            numWanted = cmdObj[limitName].numberInt();
-            verify(numWanted >= 0);
-        }
-
-        // Add the location information to each result as a field with name 'loc'.
-        bool includeLocs = false;
-        if (!cmdObj["includeLocs"].eoo()) includeLocs = cmdObj["includeLocs"].trueValue();
-
-        // The non-near query part.
-        BSONObj query;
-        if (cmdObj["query"].isABSONObj()) {
-            query = cmdObj["query"].embeddedObject();
-        }
-
-        double distanceMultiplier = 1.0;
-        if (cmdObj["distanceMultiplier"].isNumber()) {
-            distanceMultiplier = cmdObj["distanceMultiplier"].number();
-        }
+                parsedArgs.isSpherical);
 
         // NOTE(hk): For a speedup, we could look through the query to see if
         // we've geo-indexed any of the fields in it.
         vector<GeoQuery> regions;
 
         scoped_ptr<S2NearCursor> cursor(new S2NearCursor(idxType->keyPattern(),
-            idxType->getDetails(), query, nearQuery, regions, idxType->getParams()));
+            idxType->getDetails(), parsedArgs.query, nearQuery, regions, idxType->getParams()));
 
         double totalDistance = 0;
         BSONObjBuilder resultBuilder(result.subarrayStart("results"));
         double farthestDist = 0;
 
         int results;
-        for (results = 0; results < numWanted && cursor->ok(); ++results) {
+        for (results = 0; results < parsedArgs.numWanted && cursor->ok(); ++results) {
             double dist = cursor->currentDistance();
             // If we got the distance in radians, output it in radians too.
             if (nearQuery.fromRadians) { dist /= idxType->getParams().radius; }
-            dist *= distanceMultiplier;
+            dist *= parsedArgs.distanceMultiplier;
             totalDistance += dist;
             if (dist > farthestDist) { farthestDist = dist; }
 
             BSONObjBuilder oneResultBuilder(
                 resultBuilder.subobjStart(BSONObjBuilder::numStr(results)));
             oneResultBuilder.append("dis", dist);
-            if (includeLocs) {
+            if (parsedArgs.includeLocs) {
                 BSONElementSet geoFieldElements;
                 cursor->current().getFieldsDotted(geoFieldNames[0], geoFieldElements, false);
                 for (BSONElementSet::iterator oi = geoFieldElements.begin();

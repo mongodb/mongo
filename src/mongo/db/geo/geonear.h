@@ -1,5 +1,5 @@
 /**
-*    Copyright (C) 2012 10gen Inc.
+*    Copyright (C) 2013 10gen Inc.
 *
 *    This program is free software: you can redistribute it and/or  modify
 *    it under the terms of the GNU Affero General Public License, version 3,
@@ -14,9 +14,20 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include "mongo/db/jsobj.h"
+
 namespace mongo {
-    // We need cmdObj and parsedArgs so we can print a useful error msg.
-    bool run2DSphereGeoNear(const IndexDetails &id, BSONObj& cmdObj,
-                            const GeoNearArguments &parsedArgs, string& errmsg,
-                            BSONObjBuilder& result);
+    // Arguments in common between 2d and 2dsphere geoNear.
+    class GeoNearArguments {
+    public:
+        GeoNearArguments(const BSONObj& cmdObj);
+        int numWanted;
+        bool uniqueDocs;
+        bool includeLocs;
+        BSONObj query;
+        double distanceMultiplier;
+        bool isSpherical;
+    private:
+        GeoNearArguments() { }
+    };
 }  // namespace mongo
