@@ -2071,7 +2071,7 @@ namespace mongo {
 
         // Treat the command the same as if it has slaveOk bit on if it has a read
         // preference setting. This is to allow these commands to run on a secondary.
-        if (hasReadPreference(_cmdobj)) {
+        if (Query::hasReadPreference(_cmdobj)) {
             queryOptions |= QueryOption_SlaveOk;
         }
 

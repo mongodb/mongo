@@ -38,13 +38,6 @@ namespace mongo {
 
     AtomicInt64 DBClientBase::ConnectionIdSequence;
 
-    bool hasReadPreference(const BSONObj& queryObj) {
-        const bool isQueryEmbedded = strcmp(queryObj.firstElement().fieldName(), "query") == 0;
-        const bool hasReadPrefOption = queryObj["$queryOptions"].isABSONObj() &&
-                        queryObj["$queryOptions"].Obj().hasField("$readPreference");
-        return (isQueryEmbedded && queryObj.hasField("$readPreference")) || hasReadPrefOption;
-    }
-
     void ConnectionString::_fillServers( string s ) {
         
         //
@@ -297,20 +290,29 @@ namespace mongo {
         return *this;
     }
 
-    bool Query::isComplex( bool * hasDollar ) const {
-        if ( obj.hasElement( "query" ) ) {
-            if ( hasDollar )
-                hasDollar[0] = false;
+    bool Query::isComplex(const BSONObj& obj, bool* hasDollar) {
+        if (obj.hasElement("query")) {
+            if (hasDollar) *hasDollar = false;
             return true;
         }
 
-        if ( obj.hasElement( "$query" ) ) {
-            if ( hasDollar )
-                hasDollar[0] = true;
+        if (obj.hasElement("$query")) {
+            if (hasDollar) *hasDollar = true;
             return true;
         }
 
         return false;
+    }
+
+    bool Query::isComplex( bool * hasDollar ) const {
+        return isComplex(obj, hasDollar);
+    }
+
+    bool Query::hasReadPreference(const BSONObj& queryObj) {
+        const bool hasReadPrefOption = queryObj["$queryOptions"].isABSONObj() &&
+                        queryObj["$queryOptions"].Obj().hasField("$readPreference");
+        return (Query::isComplex(queryObj) && queryObj.hasField("$readPreference")) ||
+                hasReadPrefOption;
     }
 
     BSONObj Query::getFilter() const {
