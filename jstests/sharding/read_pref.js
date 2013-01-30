@@ -57,8 +57,19 @@ jsTest.log( 'connpool: ' + tojson(conn.getDB('admin').runCommand({ connPoolStats
 
 var coll = conn.getDB( 'test' ).user;
 
-coll.insert({ x: 1 });
-assert.eq( null, coll.getDB().getLastError( NODES ));
+assert.soon(function() {
+                coll.insert({ x: 1 });
+                var err = coll.getDB().getLastError(NODES);
+                if (err == null) {
+                    return true;
+                }
+                // Transient transport errors may be expected b/c of the replSetReconfig
+                if (err.indexOf("transport error") == -1) {
+                    throw err;
+                }
+                return false;
+});
+
 
 // Read pref should work without slaveOk
 var explain = coll.find().readPref( "secondary" ).explain();
