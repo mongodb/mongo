@@ -213,7 +213,7 @@ __wt_debug_offset(WT_SESSION_IMPL *session,
 
 	WT_RET(__wt_scr_alloc(session, 1024, &buf));
 	WT_ERR(__wt_block_read_off(
-	    session, session->btree->block, buf, offset, size, cksum));
+	    session, session->btree->bm->block, buf, offset, size, cksum));
 	ret = __wt_debug_disk(session, buf->mem, ofile);
 
 err:	__wt_scr_free(&buf);
