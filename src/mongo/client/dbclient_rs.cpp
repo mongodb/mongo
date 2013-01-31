@@ -39,19 +39,20 @@ namespace mongo {
      */
     set<string> _secOkCmdList;
 
-    MONGO_INITIALIZER(PopulateReadPrefSecOkCmdList)(::mongo::InitializerContext* context) {
-        _secOkCmdList.insert("aggregate");
-        _secOkCmdList.insert("collStats");
-        _secOkCmdList.insert("count");
-        _secOkCmdList.insert("distinct");
-        _secOkCmdList.insert("dbStats");
-        _secOkCmdList.insert("geoNear");
-        _secOkCmdList.insert("geoSearch");
-        _secOkCmdList.insert("geoWalk");
-        _secOkCmdList.insert("group");
-
-        return Status::OK();
-    }
+    class PopulateReadPrefSecOkCmdList {
+    public:
+        PopulateReadPrefSecOkCmdList() {
+            _secOkCmdList.insert("aggregate");
+            _secOkCmdList.insert("collStats");
+            _secOkCmdList.insert("count");
+            _secOkCmdList.insert("distinct");
+            _secOkCmdList.insert("dbStats");
+            _secOkCmdList.insert("geoNear");
+            _secOkCmdList.insert("geoSearch");
+            _secOkCmdList.insert("geoWalk");
+            _secOkCmdList.insert("group");
+        }
+    } _populateReadPrefSecOkCmdList;
 
     /**
      * @param ns the namespace of the query.
@@ -65,10 +66,6 @@ namespace mongo {
         if (queryOptionFlags & QueryOption_SlaveOk) {
             return true;
         }
-
-        // _secOkCmdList was not initialized! mongo::runGlobalInitializersOrDie
-        // probably was not called.
-        fassert(16464, !_secOkCmdList.empty());
 
         if (!hasReadPreference(queryObj)) {
             return false;
