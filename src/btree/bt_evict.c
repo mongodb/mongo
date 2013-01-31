@@ -372,7 +372,7 @@ __evict_worker(WT_SESSION_IMPL *session)
 		 * target dirty percentage.
 		 */
 		bytes_inuse = __wt_cache_bytes_inuse(cache);
-		dirty_inuse = __wt_cache_dirty_bytes(cache);
+		dirty_inuse = __wt_cache_bytes_dirty(cache);
 		bytes_max = conn->cache_size;
 		if (bytes_inuse < (cache->eviction_target * bytes_max) / 100 &&
 		    dirty_inuse <
@@ -1179,7 +1179,7 @@ __evict_dirty_validate(WT_CONNECTION_IMPL *conn)
 	if (!WT_VERBOSE_ISSET(session, evictserver))
 		return;
 
-	bytes_baseline = cache->bytes_dirty;
+	bytes_baseline = __wt_cache_bytes_dirty(cache);
 
 	TAILQ_FOREACH(btree, &conn->btqh, q) {
 		/* Reference the correct WT_BTREE handle. */
@@ -1196,12 +1196,12 @@ __evict_dirty_validate(WT_CONNECTION_IMPL *conn)
 	if (WT_VERBOSE_ISSET(session, evictserver) &&
 	    (ret == 0 || ret == WT_NOTFOUND) &&
 	    bytes != 0 &&
-	    (bytes < WT_MIN(bytes_baseline, cache->bytes_dirty) ||
-	    bytes > WT_MAX(bytes_baseline, cache->bytes_dirty)))
+	    (bytes < WT_MIN(bytes_baseline, __wt_cache_bytes_dirty(cache)) ||
+	    bytes > WT_MAX(bytes_baseline, __wt_cache_bytes_dirty(cache))))
 		(void)__wt_verbose(session,
 		    "Cache dirty count mismatch. Expected a value between: %"
 		    PRIu64 " and %" PRIu64 " got: %" PRIu64,
-		    bytes_baseline, cache->bytes_dirty, bytes);
+		    bytes_baseline, __wt_cache_bytes_dirty(cache), bytes);
 #else
 	WT_UNUSED(conn);
 #endif
