@@ -27,11 +27,9 @@ extern int __wt_block_ckpt_to_buffer(WT_SESSION_IMPL *session,
     WT_BLOCK *block,
     uint8_t **pp,
     WT_BLOCK_CKPT *ci);
-extern int __wt_block_ckpt_init(WT_SESSION_IMPL *session,
-    WT_BLOCK *block,
+extern int __wt_block_ckpt_init( WT_SESSION_IMPL *session,
     WT_BLOCK_CKPT *ci,
-    const char *name,
-    int is_live);
+    const char *name);
 extern int __wt_block_checkpoint_load(WT_SESSION_IMPL *session,
     WT_BLOCK *block,
     const uint8_t *addr,
@@ -39,8 +37,9 @@ extern int __wt_block_checkpoint_load(WT_SESSION_IMPL *session,
     uint8_t *root_addr,
     uint32_t *root_addr_size,
     int checkpoint);
-extern int __wt_block_checkpoint_unload(WT_SESSION_IMPL *session,
-    WT_BLOCK *block);
+extern int __wt_block_checkpoint_unload( WT_SESSION_IMPL *session,
+    WT_BLOCK *block,
+    int checkpoint);
 extern void __wt_block_ckpt_destroy(WT_SESSION_IMPL *session,
     WT_BLOCK_CKPT *ci);
 extern int __wt_block_checkpoint(WT_SESSION_IMPL *session,
@@ -113,8 +112,6 @@ extern int __wt_block_extlist_init(WT_SESSION_IMPL *session,
     const char *name,
     const char *extname);
 extern void __wt_block_extlist_free(WT_SESSION_IMPL *session, WT_EXTLIST *el);
-extern int __wt_block_manager_create(WT_SESSION_IMPL *session,
-    const char *filename);
 extern int __wt_block_manager_open(WT_SESSION_IMPL *session,
     const char *filename,
     const char *config,
@@ -123,8 +120,8 @@ extern int __wt_block_manager_open(WT_SESSION_IMPL *session,
     WT_BM **bmp);
 extern int __wt_block_manager_truncate(WT_SESSION_IMPL *session,
     const char *filename);
-extern int __wt_block_truncate(WT_SESSION_IMPL *session, const char *filename);
-extern int __wt_block_create(WT_SESSION_IMPL *session, const char *filename);
+extern int __wt_block_manager_create(WT_SESSION_IMPL *session,
+    const char *filename);
 extern int __wt_block_open(WT_SESSION_IMPL *session,
     const char *filename,
     const char *config,
@@ -163,9 +160,7 @@ extern int __wt_block_verify_end(WT_SESSION_IMPL *session, WT_BLOCK *block);
 extern int __wt_verify_ckpt_load( WT_SESSION_IMPL *session,
     WT_BLOCK *block,
     WT_BLOCK_CKPT *ci);
-extern int __wt_verify_ckpt_unload( WT_SESSION_IMPL *session,
-    WT_BLOCK *block,
-    WT_BLOCK_CKPT *ci);
+extern int __wt_verify_ckpt_unload(WT_SESSION_IMPL *session, WT_BLOCK *block);
 extern int __wt_block_verify_addr(WT_SESSION_IMPL *session,
     WT_BLOCK *block,
     const uint8_t *addr,

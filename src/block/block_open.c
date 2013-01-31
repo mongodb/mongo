@@ -10,11 +10,11 @@
 static int __desc_read(WT_SESSION_IMPL *, WT_BLOCK *);
 
 /*
- * __wt_block_truncate --
+ * __wt_block_manager_truncate --
  *	Truncate a file.
  */
 int
-__wt_block_truncate(WT_SESSION_IMPL *session, const char *filename)
+__wt_block_manager_truncate(WT_SESSION_IMPL *session, const char *filename)
 {
 	WT_DECL_RET;
 	WT_FH *fh;
@@ -35,11 +35,11 @@ err:	WT_TRET(__wt_close(session, fh));
 }
 
 /*
- * __wt_block_create --
+ * __wt_block_manager_create --
  *	Create a file.
  */
 int
-__wt_block_create(WT_SESSION_IMPL *session, const char *filename)
+__wt_block_manager_create(WT_SESSION_IMPL *session, const char *filename)
 {
 	WT_DECL_RET;
 	WT_FH *fh;
