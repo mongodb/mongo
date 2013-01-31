@@ -57,14 +57,10 @@ assert.soon( function(){
     return d < 5;
 } , "balance didn't happen" , 1000 * 60 * 6 , 5000 );
 
-s.config.settings.update( { _id: "balancer" }, { $set : { stopped: true } } , true );
+jsTest.log("Stopping balancer");
+s.stopBalancer();
 
-sleep( 1000 );
-
-while ( sh.isBalancerRunning() ){
-    sleep( 1000 );
-}
-
+jsTest.log("Balancer stopped, checking dbhashes");
 for ( i=0; i<s._rs.length; i++ ){
     r = s._rs[i];
     r.test.awaitReplication();
