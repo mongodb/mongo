@@ -188,11 +188,14 @@ int
 __wt_debug_addr(WT_SESSION_IMPL *session,
     const uint8_t *addr, uint32_t addr_size, const char *ofile)
 {
+	WT_BM *bm;
 	WT_DECL_ITEM(buf);
 	WT_DECL_RET;
 
+	bm = session->btree->bm;
+
 	WT_RET(__wt_scr_alloc(session, 1024, &buf));
-	WT_ERR(__wt_bm_read(session->btree->bm, session, buf, addr, addr_size));
+	WT_ERR(bm->read(bm, session, buf, addr, addr_size));
 	ret = __wt_debug_disk(session, buf->mem, ofile);
 
 err:	__wt_scr_free(&buf);
@@ -201,7 +204,7 @@ err:	__wt_scr_free(&buf);
 
 /*
  * __wt_debug_offset --
- *	Read and dump a disk page in debugging mode, using an
+ *	Read and dump a disk page in debugging mode, using a file
  * offset/size/checksum triplet.
  */
 int
@@ -211,6 +214,13 @@ __wt_debug_offset(WT_SESSION_IMPL *session,
 	WT_DECL_ITEM(buf);
 	WT_DECL_RET;
 
+	/*
+	 * This routine depends on the default block manager's view of files,
+	 * where an address consists of a file offset, length, and checksum.
+	 * This is for debugging only.  Other block manager's might not see a
+	 * file or address the same way, that's why there's no block manager
+	 * method.
+	 */
 	WT_RET(__wt_scr_alloc(session, 1024, &buf));
 	WT_ERR(__wt_block_read_off(
 	    session, session->btree->bm->block, buf, offset, size, cksum));
