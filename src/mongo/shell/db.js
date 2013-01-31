@@ -1019,6 +1019,47 @@ DB.autocomplete = function(obj){
     return ret;
 }
 
+//requires DBCollection.prototype.fields
+DB.prototype.grep = function(search, includeNonIndexedFields) {
+    var collections = this.getCollectionNames();
+    var ret = [];
+    if(!includeNonIndexedFields)
+        includeNonIndexedFields = false;
+    for (var i = 0; i < collections.length; i++) {
+        var col = collections[i];
+        var indexes = this.getCollection(col).getIndexKeys();
+        var findFields = {};
+        if (includeNonIndexedFields) {
+            var findFieldsArray = this.getCollection(col).fields();
+            for(var c =0;c<findFieldsArray.length;c++){
+                findFields[findFieldsArray[c]] = 1; 
+            }
+        } else {
+            for (var j = 0; j < indexes.length; j++) {
+                for (var field in indexes[j]) {
+                    findFields[field] = 1;
+                }
+            }
+        }
+        for (var field in findFields) {
+            var farr = [];
+            farr[field] = search;
+            if (this.getCollection(col).findOne(farr)) {
+                print(search + " exists in " + this + "." + col + "." + field);
+                ret.push({
+                    collection: col,
+                    field: field
+                });
+            }
+        }
+    }
+    return {
+        search: search,
+        includeNonIndexedFields: includeNonIndexedFields, 
+        results: ret
+    };
+}
+
 DB.prototype.setSlaveOk = function( value ) {
     if( value == undefined ) value = true;
     this._slaveOk = value;

@@ -1169,3 +1169,39 @@ DBCollection.prototype.getQueryOptions = function() {
     return options;
 }
 
+DBCollection.prototype.fields = function fields(rowdepth) {
+    var fields = {};
+    if (typeof rowdepth == 'undefined') 
+        depth = 101 * 2;
+    this.find().limit(rowdepth).sort({
+        _id: -1
+    }).forEach(function(x) {
+        var rowfields = dotNotateFields(x);
+        for (var i in rowfields) {
+            fields[i] = rowfields[i];
+        }
+    })
+    var ret = [];
+    for(var i in fields){
+        ret.push(i);
+    }
+    return ret;
+
+    function dotNotateFields(obj, prefix) {
+        var fields = {};
+        if (!prefix) prefix = "";
+        for (var j in obj) {
+            if (isNaN(parseInt(j))) fields[prefix + j] = 1;
+            var x = Object.prototype.toString.call(obj[j]);
+            if ((x.match(/bson_object/) || x.match(/Array/) || x.match(/object Object/)) && !x.match(/ObjectId/)) {
+                var px = isNaN(parseInt(j)) ? j + '.' : '';
+                var fieldsdot = dotNotateFields(obj[j], px);
+                for (var i in fieldsdot) {
+                    fields[prefix + i] = 1;
+                }
+            }
+        }
+        return fields;
+    }
+}
+
