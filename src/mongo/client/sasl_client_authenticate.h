@@ -19,16 +19,18 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/client/dbclientinterface.h"
 
-struct Gsasl;
-
 namespace mongo {
     class BSONObj;
 
     /**
      * Attempts to authenticate "client" using the SASL protocol.
      *
-     * Requires an initialized instance of the "gsasl" library, as the first
-     * parameter.
+     * Do not use directly in client code.  Use the DBClientWithCommands::auth(const BSONObj&)
+     * method, instead.
+     *
+     * Test against NULL for availability.  Client driver must be compiled with SASL support _and_
+     * client application must have successfully executed mongo::runGlobalInitializersOrDie() or its
+     * ilk to make this functionality available.
      *
      * The "saslParameters" BSONObj should be initialized with zero or more of the
      * fields below.  Which fields are required depends on the mechanism.  Consult the
@@ -57,10 +59,9 @@ namespace mongo {
      * rejected.  Other failures, all of which are tantamount to authentication failure, may also be
      * returned.
      */
-    Status saslClientAuthenticate(Gsasl *gsasl,
-                                  DBClientWithCommands* client,
-                                  const BSONObj& saslParameters,
-                                  void* sessionHook);
+    extern Status (*saslClientAuthenticate)(DBClientWithCommands* client,
+                                            const BSONObj& saslParameters,
+                                            void* sessionHook);
 
     /**
      * Extracts the payload field from "cmdObj", and store it into "*payload".
@@ -132,4 +133,8 @@ namespace mongo {
 
     /// Default sasl service name, "mongodb".
     extern const char* const saslDefaultServiceName;
+
+    // Field whose value should be set to true if the field in saslCommandPasswordFieldName needs to
+    // be digested.
+    extern const char* const saslCommandDigestPasswordFieldName;
 }

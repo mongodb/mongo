@@ -152,6 +152,7 @@ commonFiles = [ "pch.cpp",
                 "client/dbclient_rs.cpp",
                 "client/dbclientcursor.cpp",
                 "client/model.cpp",
+                'client/sasl_client_authenticate.cpp',
                 "client/syncclusterconnection.cpp",
                 "db/dbmessage.cpp"
                 ]
@@ -159,7 +160,7 @@ commonFiles = [ "pch.cpp",
 commonSysLibdeps = []
 
 if env['MONGO_BUILD_SASL_CLIENT']:
-    commonFiles.extend(['client/sasl_client_authenticate.cpp',
+    commonFiles.extend(['client/sasl_client_authenticate_impl.cpp',
                         'util/gsasl_session.cpp'])
     commonSysLibdeps.append('gsasl')
 

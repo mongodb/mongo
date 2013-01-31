@@ -26,6 +26,7 @@
 #include "mongo/bson/util/builder.h"
 #include "mongo/client/connpool.h"
 #include "mongo/client/dbclientcursor.h"
+#include "mongo/client/sasl_client_authenticate.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
@@ -1523,12 +1524,15 @@ namespace mongo {
     }
 
     void DBClientReplicaSet::_auth( DBClientConnection * conn ) {
-        for (map<string, AuthInfo>::const_iterator i = _auths.begin(); i != _auths.end(); ++i) {
-            const AuthInfo& a = i->second;
-            string errmsg;
-            if ( ! conn->auth( a.dbname , a.username , a.pwd , errmsg, a.digestPassword ) )
-                warning() << "cached auth failed for set: " << _setName << " db: " << a.dbname << " user: " << a.username << endl;
-
+        for (map<string, BSONObj>::const_iterator i = _auths.begin(); i != _auths.end(); ++i) {
+            try {
+                conn->auth(i->second);
+            }
+            catch (const UserException& ex) {
+                warning() << "cached auth failed for set: " << _setName <<
+                    " db: " << i->second[saslCommandPrincipalSourceFieldName].str() <<
+                    " user: " << i->second[saslCommandPrincipalFieldName].str() << endl;
+            }
         }
     }
 
@@ -1552,12 +1556,11 @@ namespace mongo {
         return _getMonitor()->isAnyNodeOk();
     }
 
-    bool DBClientReplicaSet::auth(const string &dbname, const string &username, const string &pwd, string& errmsg, bool digestPassword, Auth::Level * level) {
+    void DBClientReplicaSet::_auth(const BSONObj& params) {
         DBClientConnection * m = checkMaster();
 
         // first make sure it actually works
-        if( ! m->auth(dbname, username, pwd, errmsg, digestPassword, level ) )
-            return false;
+        m->auth(params);
 
         /* Also authenticate the cached secondary connection. Note that this is only
          * needed when we actually have something cached and is last known to be
@@ -1565,7 +1568,7 @@ namespace mongo {
          */
         if (_lastSlaveOkConn.get() != NULL && !_lastSlaveOkConn->isFailed()) {
             try {
-                _lastSlaveOkConn->auth(dbname, username, pwd, errmsg, digestPassword, level);
+                _lastSlaveOkConn->auth(params);
             }
             catch (const DBException&) {
                 /* Swallow exception. _lastSlaveOkConn is now in failed state.
@@ -1577,8 +1580,7 @@ namespace mongo {
         }
 
         // now that it does, we should save so that for a new node we can auth
-        _auths[dbname] = AuthInfo(dbname, username, pwd, digestPassword);
-        return true;
+        _auths[params[saslCommandPrincipalSourceFieldName].str()] = params.getOwned();
     }
 
     void DBClientReplicaSet::logout(const string &dbname, BSONObj& info) {

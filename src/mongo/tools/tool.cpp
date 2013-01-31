@@ -23,6 +23,7 @@
 
 #include "pcrecpp.h"
 
+#include "mongo/client/sasl_client_authenticate.h"
 #include "mongo/db/namespace_details.h"
 #include "mongo/util/file_allocator.h"
 #include "mongo/util/password.h"
@@ -64,6 +65,12 @@ namespace mongo {
 
             ("username,u",po::value<string>(), "username" )
             ("password,p", new PasswordValue( &_password ), "password" )
+            ("authenticationDatabase",
+             po::value<string>(&_authenticationDatabase)->default_value(""),
+             "user source (defaults to dbname)" )
+            ("authenticationMechanism",
+             po::value<string>(&_authenticationMechanism)->default_value("MONGO-CR"),
+             "authentication mechanism")
             ;
 
         if ( access & LOCAL_SERVER )
@@ -263,6 +270,8 @@ namespace mongo {
 
         int ret = -1;
         try {
+            if (!useDirectClient)
+                auth();
             ret = run();
         }
         catch ( DBException& e ) {
@@ -398,15 +407,11 @@ namespace mongo {
     }
 
     /**
-     * Validate authentication on the server for the given dbname.  populates
-     * level (if supplied) with the user's credentials.
+     * Validate authentication on the server for the given dbname.
      */
-    void Tool::auth( string dbname, Auth::Level * level ) {
+    void Tool::auth() {
 
-        if ( ! dbname.size() )
-            dbname = _db;
-
-        if ( ! ( _username.size() || _password.size() ) ) {
+        if ( _username.empty() ) {
             // Make sure that we don't need authentication to connect to this db
             // findOne throws an AssertionException if it's not authenticated.
             if (_coll.size() > 0) {
@@ -414,26 +419,23 @@ namespace mongo {
                 conn().findOne(getNS(), Query("{}"), 0, QueryOption_SlaveOk);
             }
 
-            // set write-level access if authentication is disabled
-            if ( level != NULL )
-                *level = Auth::WRITE;
-
             return;
         }
 
-        string errmsg;
-        if (dbname.size()) {
-            if ( _conn->auth( dbname , _username , _password , errmsg, true, level ) ) {
-                return;
+        std::string userSource = _authenticationDatabase;
+        if ( userSource.empty() ) {
+            if ( !_db.empty() ) {
+                userSource = _db;
+            }
+            else {
+                userSource = "admin";
             }
         }
 
-        // try against the admin db
-        if ( _conn->auth( "admin" , _username , _password , errmsg, true, level ) ) {
-            return;
-        }
-
-        throw UserException( 9997 , (string)"authentication failed: " + errmsg );
+        _conn->auth( BSON( saslCommandPrincipalSourceFieldName << userSource <<
+                           saslCommandPrincipalFieldName << _username <<
+                           saslCommandPasswordFieldName << _password  <<
+                           saslCommandMechanismFieldName << _authenticationMechanism ) );
     }
 
     BSONTool::BSONTool( const char * name, DBAccess access , bool objcheck )

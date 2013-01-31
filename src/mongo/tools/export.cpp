@@ -166,8 +166,6 @@ public:
             return 1;
         }
 
-        auth();
-
         if ( hasParam( "fields" ) || csv ) {
             needFields();
             

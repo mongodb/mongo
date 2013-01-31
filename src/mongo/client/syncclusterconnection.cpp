@@ -208,13 +208,7 @@ namespace mongo {
         return DBClientBase::findOne( ns , query , fieldsToReturn , queryOptions );
     }
 
-    bool SyncClusterConnection::auth(const string &dbname,
-                                     const string &username,
-                                     const string &password_text,
-                                     string& errmsg,
-                                     bool digestPassword,
-                                     Auth::Level* level)
-    {
+    void SyncClusterConnection::_auth(const BSONObj& params) {
         // A SCC is authorized if any connection has been authorized
         // Credentials are stored in the auto-reconnect connections.
 
@@ -228,20 +222,17 @@ namespace mongo {
 
             // Authorize or collect the error message
             string lastErrmsg;
-            bool authed = false;
+            bool authed;
             try{
                 // Auth errors can manifest either as exceptions or as false results
                 // TODO: Make this better
-                authed = (*it)->auth( dbname,
-                                      username,
-                                      password_text,
-                                      lastErrmsg,
-                                      digestPassword,
-                                      level );
+                (*it)->auth(params);
+                authed = true;
             }
             catch( const DBException& e ){
                 // auth will be retried on reconnect
                 lastErrmsg = e.what();
+                authed = false;
             }
 
             if( ! authed ){
@@ -259,7 +250,7 @@ namespace mongo {
             authedOnce = authedOnce || authed;
         }
 
-        if( authedOnce ) return true;
+        if( authedOnce ) return;
 
         // Assemble the error message
         str::stream errStream;
@@ -268,8 +259,7 @@ namespace mongo {
             errStream << *it;
         }
 
-        errmsg = errStream;
-        return false;
+        uasserted(ErrorCodes::AuthenticationFailed, errStream);
     }
 
     // TODO: logout is required for use of this class outside of a cluster environment

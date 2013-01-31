@@ -17,16 +17,19 @@
 
 #include "pch.h"
 
+#include "mongo/bson/util/bson_extract.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/client/constants.h"
 #include "mongo/client/dbclient_rs.h"
 #include "mongo/client/dbclientcursor.h"
+#include "mongo/client/sasl_client_authenticate.h"
 #include "mongo/client/syncclusterconnection.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
 #include "mongo/db/namespace-inl.h"
 #include "mongo/db/namespacestring.h"
 #include "mongo/s/stale_exception.h"  // for RecvStaleConfigException
+#include "mongo/util/assert_util.h"
 #include "mongo/util/md5.hpp"
 
 #ifdef MONGO_SSL
@@ -487,13 +490,77 @@ namespace mongo {
         return digestToString( d );
     }
 
-    bool DBClientWithCommands::auth(const string &dbname, const string &username, const string &password_text, string& errmsg, bool digestPassword, Auth::Level * level) {
+    void DBClientWithCommands::_auth(const BSONObj& params) {
+        std::string mechanism;
+        uassertStatusOK(bsonExtractStringField(params,
+                                               saslCommandMechanismFieldName,
+                                               &mechanism));
+
+        if (mechanism == StringData("MONGO-CR", StringData::LiteralTag())) {
+            std::string userSource;
+            uassertStatusOK(bsonExtractStringField(params,
+                                                   saslCommandPrincipalSourceFieldName,
+                                                   &userSource));
+            std::string user;
+            uassertStatusOK(bsonExtractStringField(params,
+                                                   saslCommandPrincipalFieldName,
+                                                   &user));
+            std::string password;
+            uassertStatusOK(bsonExtractStringField(params,
+                                                   saslCommandPasswordFieldName,
+                                                   &password));
+            bool digestPassword;
+            uassertStatusOK(bsonExtractBooleanFieldWithDefault(params,
+                                                               saslCommandDigestPasswordFieldName,
+                                                               true,
+                                                               &digestPassword));
+            std::string errmsg;
+            uassert(ErrorCodes::AuthenticationFailed,
+                    errmsg,
+                    _authMongoCR(userSource, user, password, errmsg, digestPassword));
+        }
+        else if (saslClientAuthenticate != NULL) {
+            uassertStatusOK(saslClientAuthenticate(this, params, NULL));
+        }
+        else {
+            uasserted(ErrorCodes::BadValue,
+                      "SASL authentication support not compiled into client library.");
+        }
+    };
+
+    void DBClientWithCommands::auth(const BSONObj& params) {
+        _auth(params);
+    }
+
+    bool DBClientWithCommands::auth(const string &dbname,
+                                    const string &username,
+                                    const string &password_text,
+                                    string& errmsg,
+                                    bool digestPassword) {
+        try {
+            _auth(BSON(saslCommandMechanismFieldName << "MONGO-CR" <<
+                       saslCommandPrincipalSourceFieldName << dbname <<
+                       saslCommandPrincipalFieldName << username <<
+                       saslCommandPasswordFieldName << password_text <<
+                       saslCommandDigestPasswordFieldName << digestPassword));
+            return true;
+        } catch(const UserException& ex) {
+            if (ex.getCode() != ErrorCodes::AuthenticationFailed)
+                throw;
+            errmsg = ex.what();
+            return false;
+        }
+    }
+
+    bool DBClientWithCommands::_authMongoCR(const string &dbname,
+                                            const string &username,
+                                            const string &password_text,
+                                            string& errmsg,
+                                            bool digestPassword) {
+
         string password = password_text;
         if( digestPassword )
             password = createPasswordDigest( username , password_text );
-
-        if ( level != NULL )
-                *level = Auth::NONE;
 
         BSONObj info;
         string nonce;
@@ -526,12 +593,6 @@ namespace mongo {
         }
 
         if( runCommand(dbname, authCmd, info) ) {
-            if ( level != NULL ) {
-                if ( info.getField("readOnly").trueValue() )
-                    *level = Auth::READ;
-                else
-                    *level = Auth::WRITE;
-            }
             return true;
         }
 
@@ -678,20 +739,16 @@ namespace mongo {
 
     /* --- dbclientconnection --- */
 
-    bool DBClientConnection::auth(const string &dbname, const string &username, const string &password_text, string& errmsg, bool digestPassword, Auth::Level* level) {
-        string password = password_text;
-        if( digestPassword )
-            password = createPasswordDigest( username , password_text );
+    void DBClientConnection::_auth(const BSONObj& params) {
 
         if( autoReconnect ) {
             /* note we remember the auth info before we attempt to auth -- if the connection is broken, we will
                then have it for the next autoreconnect attempt.
             */
-            pair<string,string> p = pair<string,string>(username, password);
-            authCache[dbname] = p;
+            authCache[params[saslCommandPrincipalSourceFieldName].str()] = params.getOwned();
         }
 
-        return DBClientBase::auth(dbname, username, password.c_str(), errmsg, false, level);
+        DBClientBase::_auth(params);
     }
 
     /** query N objects from the database into an array.  makes sense mostly when you want a small number of results.  if a huge number, use 
@@ -802,12 +859,17 @@ namespace mongo {
         }
 
         LOG(_logLevel) << "reconnect " << _serverString << " ok" << endl;
-        for( map< string, pair<string,string> >::iterator i = authCache.begin(); i != authCache.end(); i++ ) {
-            const char *dbname = i->first.c_str();
-            const char *username = i->second.first.c_str();
-            const char *password = i->second.second.c_str();
-            if( !DBClientBase::auth(dbname, username, password, errmsg, false) )
-                LOG(_logLevel) << "reconnect: auth failed db:" << dbname << " user:" << username << ' ' << errmsg << '\n';
+        for( map<string, BSONObj>::const_iterator i = authCache.begin(); i != authCache.end(); i++ ) {
+            try {
+                DBClientConnection::_auth(i->second);
+            } catch (UserException& ex) {
+                if (ex.getCode() != ErrorCodes::AuthenticationFailed)
+                    throw;
+                LOG(_logLevel) << "reconnect: auth failed db:" <<
+                    i->second[saslCommandPrincipalSourceFieldName] <<
+                    " user:" << i->second[saslCommandPrincipalFieldName] << ' ' <<
+                    ex.what() << std::endl;
+            }
         }
     }
 

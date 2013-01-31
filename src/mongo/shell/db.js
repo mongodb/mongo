@@ -219,16 +219,13 @@ DB.prototype._authOrThrow = function () {
     if (params.mechanism === undefined)
         params.mechanism = this._defaultAuthenticationMechanism;
 
-    if (params.mechanism == "MONGO-CR") {
-        this.getMongo().auth(this.getName(), params.user, params.pwd);
+    if (params.userSource !== undefined) {
+        throw Error("Do not override userSource field on db.auth().  " +
+                    "Use getMongo().auth(), instead.");
     }
-    else if (typeof(this.getMongo().saslAuthenticate == "function")) {
-        params.userSource = this.getName();
-        this.getMongo().saslAuthenticate(params);
-    }
-    else {
-        throw Error("This shell does not support sasl authentication");
-    }
+
+    params.userSource = this.getName();
+    return this.getMongo().auth(params);
 }
 
 

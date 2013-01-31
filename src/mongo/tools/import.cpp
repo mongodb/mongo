@@ -351,8 +351,6 @@ public:
 
         LOG(1) << "ns: " << ns << endl;
 
-        auth();
-
         if ( hasParam( "drop" ) ) {
             log() << "dropping: " << ns << endl;
             conn().dropCollection( ns.c_str() );

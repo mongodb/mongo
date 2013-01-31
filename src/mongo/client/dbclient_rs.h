@@ -431,10 +431,6 @@ namespace mongo {
          */
         bool connect();
 
-        /** Authorize.  Authorizes all nodes as needed
-        */
-        virtual bool auth(const string &dbname, const string &username, const string &pwd, string& errmsg, bool digestPassword = true, Auth::Level * level = NULL);
-
         /**
          * Logs out the connection for the given database.
          *
@@ -512,6 +508,10 @@ namespace mongo {
 
 
     protected:
+        /** Authorize.  Authorizes all nodes as needed
+        */
+        virtual void _auth(const BSONObj& params);
+
         virtual void sayPiggyBack( Message &toSend ) { checkMaster()->say( toSend ); }
 
     private:
@@ -582,26 +582,11 @@ namespace mongo {
         
         double _so_timeout;
 
-        /**
-         * for storing authentication info
-         * fields are exactly for DBClientConnection::auth
-         */
-        struct AuthInfo {
-            // Default constructor provided only to make it compatible with std::map::operator[]
-            AuthInfo(): digestPassword(false) { }
-            AuthInfo( string d , string u , string p , bool di )
-                : dbname( d ) , username( u ) , pwd( p ) , digestPassword( di ) {}
-            string dbname;
-            string username;
-            string pwd;
-            bool digestPassword;
-        };
-
         // we need to store so that when we connect to a new node on failure
         // we can re-auth
         // this could be a security issue, as the password is stored in memory
         // not sure if/how we should handle
-        std::map<string, AuthInfo> _auths; // dbName -> AuthInfo
+        std::map<string, BSONObj> _auths; // dbName -> auth parameters
 
     protected:
 
