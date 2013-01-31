@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -18,28 +18,9 @@ static int __ckpt_update(WT_SESSION_IMPL *,
  *	Initialize a checkpoint structure.
  */
 int
-__wt_block_ckpt_init(WT_SESSION_IMPL *session,
-    WT_BLOCK *block, WT_BLOCK_CKPT *ci, const char *name, int is_live)
+__wt_block_ckpt_init(
+    WT_SESSION_IMPL *session, WT_BLOCK_CKPT *ci, const char *name)
 {
-	WT_DECL_RET;
-
-	/*
-	 * If we're loading a new live checkpoint, there shouldn't be one
-	 * already loaded.  The btree engine should prevent this from ever
-	 * happening, but paranoia is a healthy thing.
-	 */
-	if (is_live) {
-		__wt_spin_lock(session, &block->live_lock);
-		if (block->live_load)
-			ret = EINVAL;
-		else
-			block->live_load = 1;
-		__wt_spin_unlock(session, &block->live_lock);
-		if (ret)
-			WT_RET_MSG(
-			    session, EINVAL, "checkpoint already loaded");
-	}
-
 	memset(ci, 0, sizeof(*ci));
 
 	ci->root_offset = WT_BLOCK_INVALID_OFFSET;
@@ -62,24 +43,22 @@ __wt_block_ckpt_init(WT_SESSION_IMPL *session,
 int
 __wt_block_checkpoint_load(WT_SESSION_IMPL *session, WT_BLOCK *block,
     const uint8_t *addr, uint32_t addr_size,
-    uint8_t *root_addr, uint32_t *root_addr_size, int readonly)
+    uint8_t *root_addr, uint32_t *root_addr_size, int checkpoint)
 {
-	WT_BLOCK_CKPT *ci;
+	WT_BLOCK_CKPT *ci, _ci;
 	WT_DECL_ITEM(tmp);
 	WT_DECL_RET;
 	uint8_t *endp;
 
 	WT_UNUSED(addr_size);
+	ci = NULL;
 
 	/*
 	 * Sometimes we don't find a root page (we weren't given a checkpoint,
-	 * or the referenced checkpoint was empty).  In that case we return an
-	 * empty root address, set that up now.
+	 * or the checkpoint was empty).  In that case we return an empty root
+	 * address, set that up now.
 	 */
 	*root_addr_size = 0;
-
-	ci = &block->live;
-	WT_RET(__wt_block_ckpt_init(session, block, ci, "live", 1));
 
 	if (WT_VERBOSE_ISSET(session, ckpt)) {
 		if (addr != NULL) {
@@ -91,50 +70,75 @@ __wt_block_checkpoint_load(WT_SESSION_IMPL *session, WT_BLOCK *block,
 		    addr == NULL ? "[Empty]" : (const char *)tmp->data);
 	}
 
-	/* If not loading a checkpoint from disk, we're done. */
-	if (addr == NULL || addr_size == 0)
-		return (0);
-
-	/* Crack the checkpoint cookie. */
-	WT_ERR(__wt_block_buffer_to_ckpt(session, block, addr, ci));
-
-	/* Verify sets up next. */
-	if (block->verify)
-		WT_ERR(__wt_verify_ckpt_load(session, block, ci));
-
-	/* Read any root page. */
-	if (ci->root_offset != WT_BLOCK_INVALID_OFFSET) {
-		endp = root_addr;
-		WT_ERR(__wt_block_addr_to_buffer(block, &endp,
-		    ci->root_offset, ci->root_size, ci->root_cksum));
-		*root_addr_size = WT_PTRDIFF32(endp, addr);
+	/*
+	 * There's a single checkpoint in the file that can be written, all of
+	 * the others are read-only.  We use the same initialization calls for
+	 * readonly checkpoints, but the information doesn't persist.
+	 */
+	if (checkpoint) {
+		ci = &_ci;
+		WT_ERR(__wt_block_ckpt_init(session, ci, "checkpoint"));
+	} else {
+		/*
+		 * We depend on the btree level for locking: things will go
+		 * bad fast should we open the live system in two handles, or
+		 * if we create, salvage, truncate or verify the live/running
+		 * file, for that matter.
+		 */
+		ci = &block->live;
+		WT_ERR(__wt_block_ckpt_init(session, ci, "live"));
 	}
 
-	/*
-	 * Rolling a checkpoint forward requires the avail list, the blocks from
-	 * which we can allocate.
-	 */
-	if (!readonly)
-		WT_ERR(__wt_block_extlist_read_avail(
-		    session, block, &ci->avail, ci->file_size));
+	/* If the checkpoint has an on-disk root page, load it. */
+	if (addr != NULL && addr_size != 0) {
+		/* Crack the checkpoint cookie. */
+		WT_ERR(__wt_block_buffer_to_ckpt(session, block, addr, ci));
 
-	/*
-	 * If the checkpoint can be written, that means anything written after
-	 * the checkpoint is no longer interesting, truncate the file.  Don't
-	 * bother checking the avail list for a block at the end of the file,
-	 * that was done when the checkpoint was first written (re-writing the
-	 * checkpoint might possibly make it relevant here, but it's unlikely
-	 * enough that I'm not bothering).
-	 */
-	if (!readonly) {
-		WT_VERBOSE_ERR(session, ckpt,
-		    "truncate file to %" PRIuMAX, (uintmax_t)ci->file_size);
-		WT_ERR(__wt_ftruncate(session, block->fh, ci->file_size));
+		/* Verify sets up next. */
+		if (block->verify)
+			WT_ERR(__wt_verify_ckpt_load(session, block, ci));
+
+		/* Read any root page. */
+		if (ci->root_offset != WT_BLOCK_INVALID_OFFSET) {
+			endp = root_addr;
+			WT_ERR(__wt_block_addr_to_buffer(block, &endp,
+			    ci->root_offset, ci->root_size, ci->root_cksum));
+			*root_addr_size = WT_PTRDIFF32(endp, addr);
+		}
+
+		/*
+		 * Rolling a checkpoint forward requires the avail list, the
+		 * blocks from which we can allocate.
+		 */
+		if (!checkpoint)
+			WT_ERR(__wt_block_extlist_read_avail(
+			    session, block, &ci->avail, ci->file_size));
+
+		/*
+		 * If the checkpoint can be written, that means anything written
+		 * after the checkpoint is no longer interesting, truncate the
+		 * file.  Don't bother checking the avail list for a block at
+		 * the end of the file, that was done when the checkpoint was
+		 * first written (re-writing the checkpoint might possibly make
+		 * it relevant here, but it's unlikely enough I don't bother).
+		 */
+		if (!checkpoint) {
+			WT_VERBOSE_ERR(session, ckpt,
+			    "truncate file to %" PRIuMAX,
+			    (uintmax_t)ci->file_size);
+			WT_ERR(
+			    __wt_ftruncate(session, block->fh, ci->file_size));
+		}
 	}
 
 	if (0) {
-err:		(void)__wt_block_checkpoint_unload(session, block);
+err:		WT_TRET(
+		    __wt_block_checkpoint_unload(session, block, checkpoint));
 	}
+
+	/* Checkpoints don't need the original information, discard it. */
+	if (checkpoint && ci != NULL)
+		__wt_block_ckpt_destroy(session, ci);
 
 	__wt_scr_free(&tmp);
 	return (ret);
@@ -145,23 +149,17 @@ err:		(void)__wt_block_checkpoint_unload(session, block);
  *	Unload a checkpoint.
  */
 int
-__wt_block_checkpoint_unload(WT_SESSION_IMPL *session, WT_BLOCK *block)
+__wt_block_checkpoint_unload(
+    WT_SESSION_IMPL *session, WT_BLOCK *block, int checkpoint)
 {
-	WT_BLOCK_CKPT *ci;
 	WT_DECL_RET;
-
-	WT_VERBOSE_RETVAL(
-	    session, ckpt, ret, "%s: unload checkpoint", block->name);
-
-	ci = &block->live;
 
 	/* Verify cleanup. */
 	if (block->verify)
-		WT_TRET(__wt_verify_ckpt_unload(session, block, ci));
+		WT_TRET(__wt_verify_ckpt_unload(session, block));
 
-	__wt_block_ckpt_destroy(session, ci);
-
-	block->live_load = 0;
+	if (!checkpoint)
+		__wt_block_ckpt_destroy(session, &block->live);
 
 	return (ret);
 }
@@ -248,7 +246,7 @@ __ckpt_extlist_read(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_CKPT *ckpt)
 	WT_RET(__wt_calloc(session, 1, sizeof(WT_BLOCK_CKPT), &ckpt->bpriv));
 
 	ci = ckpt->bpriv;
-	WT_RET(__wt_block_ckpt_init(session, block, ci, ckpt->name, 0));
+	WT_RET(__wt_block_ckpt_init(session, ci, ckpt->name));
 	WT_RET(__wt_block_buffer_to_ckpt(session, block, ckpt->raw.data, ci));
 	WT_RET(__wt_block_extlist_read(
 	    session, block, &ci->alloc, ci->file_size));
@@ -362,8 +360,8 @@ __ckpt_process(
 	 * underneath us.  I suspect we'll tighten this if checkpoints take too
 	 * much time away from real work: we read the historic checkpoint
 	 * information without a lock, but we could also merge and re-write the
-	 * delete checkpoint information without a lock, except for ranges
-	 * merged into the live tree.
+	 * deleted and merged checkpoint information without a lock, except for
+	 * the final merge of ranges into the live tree.
 	 */
 	__wt_spin_lock(session, &block->live_lock);
 	locked = 1;
@@ -702,7 +700,7 @@ __ckpt_string(WT_SESSION_IMPL *session,
 
 	/* Initialize the checkpoint, crack the cookie. */
 	ci = &_ci;
-	WT_RET(__wt_block_ckpt_init(session, block, ci, "string", 0));
+	WT_RET(__wt_block_ckpt_init(session, ci, "string"));
 	WT_RET(__wt_block_buffer_to_ckpt(session, block, addr, ci));
 
 	WT_RET(__wt_buf_fmt(session, buf,

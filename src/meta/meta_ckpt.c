@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -449,7 +449,6 @@ __wt_meta_ckptlist_set(
 	WT_ERR(__ckpt_set(session, fname, buf->mem));
 
 err:	__wt_scr_free(&buf);
-
 	return (ret);
 }
 

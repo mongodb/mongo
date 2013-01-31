@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -47,7 +47,6 @@ __wt_meta_turtle_init(WT_SESSION_IMPL *session, int *existp)
 
 err:	__wt_free(session, metaconf);
 	__wt_scr_free(&buf);
-
 	return (ret);
 }
 
@@ -70,7 +69,7 @@ __wt_meta_turtle_read(
 
 	/* Open the turtle file. */
 	WT_RET(__wt_filename(session, WT_METADATA_TURTLE, &path));
-	WT_ERR_TEST((fp = fopen(path, "r")) == NULL, WT_NOTFOUND);
+	WT_ERR_TEST((fp = fopen(path, "r")) == NULL, __wt_errno());
 
 	/* Search for the key. */
 	WT_ERR(__wt_scr_alloc(session, 512, &buf));
@@ -93,7 +92,7 @@ __wt_meta_turtle_read(
 	WT_ERR(__wt_strdup(session, buf->data, valuep));
 
 err:	if (fp != NULL)
-		WT_TRET(fclose(fp));
+		WT_TRET(fclose(fp) == 0 ? 0 : __wt_errno());
 	if (path != NULL)
 		__wt_free(session, path);
 	__wt_scr_free(&buf);
@@ -136,14 +135,15 @@ __wt_meta_turtle_update(
 	fp = NULL;
 	WT_ERR_TEST(ret == EOF, __wt_errno());
 
-	ret = __wt_rename(session, WT_METADATA_TURTLE_SET, WT_METADATA_TURTLE);
+	WT_ERR(
+	    __wt_rename(session, WT_METADATA_TURTLE_SET, WT_METADATA_TURTLE));
 
 	if (0) {
-err:		(void)__wt_remove(session, WT_METADATA_TURTLE_SET);
+err:		WT_TRET(__wt_remove(session, WT_METADATA_TURTLE_SET));
 	}
 
 	if  (fp != NULL)
-		(void)fclose(fp);
+		WT_TRET(fclose(fp) == 0 ? 0 : __wt_errno());
 	__wt_free(session, path);
 	__wt_scr_free(&buf);
 

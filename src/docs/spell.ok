@@ -11,6 +11,8 @@ DbCursor
 DbEnv
 DbMultiple
 EB
+EBUSY
+EINVAL
 EmpId
 FreeBSD
 GCC
@@ -25,10 +27,12 @@ MERCHANTABILITY
 MVCC's
 Makefiles
 Mewhort
+NOTFOUND
 NoSQL
 RepMgr
 Rrx
 Seward's
+SiS
 URIs
 Vv
 WiredTiger
@@ -105,6 +109,7 @@ dups
 endcode
 endcond
 endian
+endif
 endinternal
 english
 env
@@ -161,6 +166,7 @@ lmin
 loadtext
 logc
 lookup
+lookups
 lrtf
 lsm
 lsn
@@ -264,6 +270,7 @@ spinlocks
 sql
 src
 startsync
+str
 strerror
 struct
 structs

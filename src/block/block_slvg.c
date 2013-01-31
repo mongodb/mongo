@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -24,7 +24,7 @@ __wt_block_salvage_start(WT_SESSION_IMPL *session, WT_BLOCK *block)
 	 * Salvage creates a new checkpoint when it's finished, set up for
 	 * rolling an empty file forward.
 	 */
-	WT_RET(__wt_block_ckpt_init(session, block, &block->live, "live", 1));
+	WT_RET(__wt_block_ckpt_init(session, &block->live, "live"));
 
 	/*
 	 * Truncate the file to an initial sector plus N allocation size
@@ -66,7 +66,7 @@ int
 __wt_block_salvage_end(WT_SESSION_IMPL *session, WT_BLOCK *block)
 {
 	/* Discard the checkpoint. */
-	return (__wt_block_checkpoint_unload(session, block));
+	return (__wt_block_checkpoint_unload(session, block, 0));
 }
 
 /*

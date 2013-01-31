@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -188,15 +188,45 @@ int
 __wt_debug_addr(WT_SESSION_IMPL *session,
     const uint8_t *addr, uint32_t addr_size, const char *ofile)
 {
+	WT_BM *bm;
 	WT_DECL_ITEM(buf);
 	WT_DECL_RET;
 
-	WT_RET(__wt_scr_alloc(session, 1024, &buf));
-	WT_ERR(__wt_block_read(
-	    session, session->btree->block, buf, addr, addr_size));
-	ret = __wt_debug_disk(session, buf->mem, ofile);
-err:	__wt_scr_free(&buf);
+	bm = session->btree->bm;
 
+	WT_RET(__wt_scr_alloc(session, 1024, &buf));
+	WT_ERR(bm->read(bm, session, buf, addr, addr_size));
+	ret = __wt_debug_disk(session, buf->mem, ofile);
+
+err:	__wt_scr_free(&buf);
+	return (ret);
+}
+
+/*
+ * __wt_debug_offset --
+ *	Read and dump a disk page in debugging mode, using a file
+ * offset/size/checksum triplet.
+ */
+int
+__wt_debug_offset(WT_SESSION_IMPL *session,
+     off_t offset, uint32_t size, uint32_t cksum, const char *ofile)
+{
+	WT_DECL_ITEM(buf);
+	WT_DECL_RET;
+
+	/*
+	 * This routine depends on the default block manager's view of files,
+	 * where an address consists of a file offset, length, and checksum.
+	 * This is for debugging only.  Other block manager's might not see a
+	 * file or address the same way, that's why there's no block manager
+	 * method.
+	 */
+	WT_RET(__wt_scr_alloc(session, 1024, &buf));
+	WT_ERR(__wt_block_read_off(
+	    session, session->btree->bm->block, buf, offset, size, cksum));
+	ret = __wt_debug_disk(session, buf->mem, ofile);
+
+err:	__wt_scr_free(&buf);
 	return (ret);
 }
 
@@ -781,6 +811,9 @@ __debug_ref(WT_DBG *ds, WT_REF *ref, WT_PAGE *page)
 	case WT_REF_DELETED:
 		__dmsg(ds, "deleted");
 		break;
+	case WT_REF_EVICT_FORCE:
+		__dmsg(ds, "evict-force %p", ref->page);
+		break;
 	case WT_REF_EVICT_WALK:
 		__dmsg(ds, "evict-walk %p", ref->page);
 		break;
@@ -868,9 +901,8 @@ __debug_cell(WT_DBG *ds, WT_PAGE_HEADER *dsk, WT_CELL_UNPACK *unpack)
 	case WT_CELL_VALUE_OVFL_RM:
 		type = "ovfl";
 addr:		WT_RET(__wt_scr_alloc(session, 128, &buf));
-		if ((ret = __wt_bm_addr_string(
-		    session, buf, unpack->data, unpack->size)) == 0)
-			__dmsg(ds, ", %s %s", type, (const char *)buf->data);
+		__dmsg(ds, ", %s %s", type,
+		    __wt_addr_string(session, buf, unpack->data, unpack->size));
 		__wt_scr_free(&buf);
 		WT_RET(ret);
 		break;

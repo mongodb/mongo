@@ -1,5 +1,5 @@
 /*-
- * Public Domain 2008-2012 WiredTiger, Inc.
+ * Public Domain 2008-2013 WiredTiger, Inc.
  *
  * This is free and unencumbered software released into the public domain.
  *
@@ -53,7 +53,9 @@
 	EXTPATH "compressors/snappy/.libs/libwiredtiger_snappy.so"
 #define	REVERSE_PATH							\
 	EXTPATH "collators/reverse/.libs/libwiredtiger_reverse_collator.so"
-#define	FC_PATH	".libs/raw_compress.so"
+
+#define	LZO_PATH	".libs/lzo_compress.so"
+#define	RAW_PATH	".libs/raw_compress.so"
 
 #define	M(v)		((v) * 1000000)		/* Million */
 #define	UNUSED(var)	(void)(var)		/* Quiet unused var warnings */
@@ -97,8 +99,9 @@ typedef struct {
 
 #define	COMPRESS_NONE	1
 #define	COMPRESS_BZIP	2
-#define	COMPRESS_RAW	3
-#define	COMPRESS_SNAPPY	4
+#define	COMPRESS_LZO	3
+#define	COMPRESS_RAW	4
+#define	COMPRESS_SNAPPY	5
 	u_int compression;			/* Compression type */
 
 	char *config_open;			/* Command-line configuration */
@@ -114,7 +117,9 @@ typedef struct {
 	u_int c_huffman_key;
 	u_int c_huffman_value;
 	u_int c_insert_pct;
+	u_int c_internal_key_truncation;
 	u_int c_intl_page_max;
+	u_int c_key_gap;
 	u_int c_key_max;
 	u_int c_key_min;
 	u_int c_leaf_page_max;
@@ -124,6 +129,7 @@ typedef struct {
 	u_int c_reverse;
 	u_int c_rows;
 	u_int c_runs;
+	u_int c_split_pct;
 	u_int c_threads;
 	u_int c_value_max;
 	u_int c_value_min;

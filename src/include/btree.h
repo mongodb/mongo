@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -44,7 +44,7 @@
  * a new entry is added, so we split to a smaller-than-maximum page size.
  */
 #define	WT_SPLIT_PAGE_SIZE(pagesize, allocsize, pct)			\
-	WT_ALIGN(((uintmax_t)(pagesize) * (pct)) / 100, allocsize)
+	WT_ALIGN32(((uintmax_t)(pagesize) * (pct)) / 100, allocsize)
 
 /*
  * XXX
@@ -73,6 +73,7 @@ struct __wt_btree {
 	const char *config;		/* Configuration string */
 
 	WT_DSRC_STATS *stats;		/* Data-source statistics */
+	int maximum_depth;		/* Maximum tree depth */
 
 	/*
 	 * XXX Everything above here should move into the session-level
@@ -100,6 +101,7 @@ struct __wt_btree {
 	uint32_t maxintlitem;		/* Internal page max item size */
 	uint32_t maxleafpage;		/* Leaf page max size */
 	uint32_t maxleafitem;		/* Leaf page max item size */
+	uint64_t maxmempage;		/* In memory page max size */
 
 	void *huffman_key;		/* Key huffman encoding */
 	void *huffman_value;		/* Value huffman encoding */
@@ -122,8 +124,8 @@ struct __wt_btree {
 	int modified;			/* If the tree ever modified */
 	int bulk_load_ok;		/* Bulk-load is a possibility */
 
-	void *block;			/* Block manager */
-	u_int block_header;		/* Block manager header length */
+	WT_BM	*bm;			/* Block manager reference */
+	u_int	 block_header;		/* WT_PAGE_HEADER_BYTE_SIZE */
 
 	uint64_t write_gen;		/* Write generation */
 
@@ -131,17 +133,20 @@ struct __wt_btree {
 	uint64_t evict_priority;	/* Relative priority of cached pages. */
 	volatile uint32_t lru_count;	/* Count of threads in LRU eviction */
 
+	volatile int checkpointing;	/* Checkpoint in progress */
+
 #define	WT_BTREE_BULK		0x0001	/* Bulk-load handle */
 #define	WT_BTREE_DISCARD	0x0002	/* Discard on release */
-#define	WT_BTREE_EXCLUSIVE	0x0004	/* Need exclusive access to handle */
-#define	WT_BTREE_LOCK_ONLY	0x0008	/* Handle is only needed for locking */
-#define	WT_BTREE_NO_CACHE	0x0010	/* Disable caching */
-#define	WT_BTREE_NO_EVICTION	0x0020	/* Disable eviction */
-#define	WT_BTREE_NO_HAZARD	0x0040	/* Disable hazard pointers */
-#define	WT_BTREE_OPEN		0x0080	/* Handle is open */
-#define	WT_BTREE_SALVAGE	0x0100	/* Handle is for salvage */
-#define	WT_BTREE_UPGRADE	0x0200	/* Handle is for upgrade */
-#define	WT_BTREE_VERIFY		0x0400	/* Handle is for verify */
+#define	WT_BTREE_DISCARD_CLOSE	0x0004	/* Discard on last close */
+#define	WT_BTREE_EXCLUSIVE	0x0008	/* Need exclusive access to handle */
+#define	WT_BTREE_LOCK_ONLY	0x0010	/* Handle is only needed for locking */
+#define	WT_BTREE_NO_CACHE	0x0020	/* Disable caching */
+#define	WT_BTREE_NO_EVICTION	0x0040	/* Disable eviction */
+#define	WT_BTREE_NO_HAZARD	0x0080	/* Disable hazard pointers */
+#define	WT_BTREE_OPEN		0x0100	/* Handle is open */
+#define	WT_BTREE_SALVAGE	0x0200	/* Handle is for salvage */
+#define	WT_BTREE_UPGRADE	0x0400	/* Handle is for upgrade */
+#define	WT_BTREE_VERIFY		0x0800	/* Handle is for verify */
 	uint32_t flags;
 };
 

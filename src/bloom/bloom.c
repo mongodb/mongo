@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -116,6 +116,7 @@ __wt_bloom_open(WT_SESSION_IMPL *session,
 {
 	WT_BLOOM *bloom;
 	WT_CURSOR *c;
+	WT_DECL_RET;
 	const char *cfg[] = API_CONF_DEFAULTS(session, open_cursor, NULL);
 	uint64_t size;
 
@@ -123,19 +124,26 @@ __wt_bloom_open(WT_SESSION_IMPL *session,
 
 	/* Find the largest key, to get the size of the filter. */
 	cfg[1] = bloom->config;
-	WT_RET(__wt_open_cursor(session, bloom->uri, owner, cfg, &c));
+	c = NULL;
+	WT_ERR(__wt_open_cursor(session, bloom->uri, owner, cfg, &c));
 
 	/* XXX Layering violation: bump the cache priority for Bloom filters. */
 	session->btree->evict_priority = (1 << 19);
 
-	WT_RET(c->prev(c));
-	WT_RET(c->get_key(c, &size));
+	WT_ERR(c->prev(c));
+	WT_ERR(c->get_key(c, &size));
+	WT_ERR(c->reset(c));
 
 	bloom->c = c;
-	WT_RET(__bloom_setup(bloom, 0, size, factor, k));
+	WT_ERR(__bloom_setup(bloom, 0, size, factor, k));
 
 	*bloomp = bloom;
 	return (0);
+
+err:	if (c != NULL)
+		(void)c->close(c);
+	(void)__wt_bloom_close(bloom);
+	return (ret);
 }
 
 /*

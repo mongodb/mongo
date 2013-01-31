@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -12,10 +12,15 @@
  *	Create a new thread of control.
  */
 int
-__wt_thread_create(pthread_t *tidret, void *(*func)(void *), void *arg)
+__wt_thread_create(WT_SESSION_IMPL *session,
+    pthread_t *tidret, void *(*func)(void *), void *arg)
 {
+	WT_DECL_RET;
+
 	/* Spawn a new thread of control. */
-	return ((pthread_create(tidret, NULL, func, arg) == 0) ? 0 : WT_ERROR);
+	if ((ret = pthread_create(tidret, NULL, func, arg)) == 0)
+		return (0);
+	WT_RET_MSG(session, ret, "pthread_create");
 }
 
 /*
@@ -23,7 +28,20 @@ __wt_thread_create(pthread_t *tidret, void *(*func)(void *), void *arg)
  *	Wait for a thread of control to exit.
  */
 int
-__wt_thread_join(pthread_t tid)
+__wt_thread_join(WT_SESSION_IMPL *session, pthread_t tid)
 {
-	return (pthread_join(tid, NULL) == 0 ? 0 : WT_ERROR);
+	WT_DECL_RET;
+
+#ifdef HAVE_PTHREAD_TIMEDJOIN_NP
+	struct timespec abstime;
+
+	WT_RET(__wt_epoch(session, &abstime));
+	abstime.tv_sec += 60;			/* Wait a max of 60 seconds. */
+	ret = pthread_timedjoin_np(tid, NULL, &abstime);
+#else
+	ret = pthread_join(tid, NULL);
+#endif
+	if (ret == 0)
+		return (0);
+	WT_RET_MSG(session, ret, "pthread_join");
 }

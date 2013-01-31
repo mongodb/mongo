@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -257,12 +257,14 @@ __drop_to(WT_CKPT *ckptbase, const char *name, size_t len)
 }
 
 /*
- * __wt_checkpoint --
+ * __checkpoint_worker --
  *	Checkpoint a tree.
  */
-int
-__wt_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
+static int
+__checkpoint_worker(
+    WT_SESSION_IMPL *session, const char *cfg[], int is_checkpoint)
 {
+	WT_BM *bm;
 	WT_BTREE *btree;
 	WT_CKPT *ckpt, *ckptbase;
 	WT_CONFIG dropconf;
@@ -272,22 +274,17 @@ __wt_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_TXN *txn;
 	WT_TXN_ISOLATION saved_isolation;
 	const char *name;
-	int deleted, force, is_checkpoint, track_ckpt;
+	int deleted, force, track_ckpt;
 	char *name_alloc;
 
 	conn = S2C(session);
 	btree = session->btree;
+	bm = btree->bm;
 	ckpt = ckptbase = NULL;
 	name_alloc = NULL;
 	txn = &session->txn;
 	saved_isolation = txn->isolation;
 	track_ckpt = 1;
-
-	/*
-	 * We're called in two ways: either because a handle is closing or
-	 * session.checkpoint was called, figure it out.
-	 */
-	is_checkpoint = cfg == NULL ? 0 : 1;
 
 	/*
 	 * Checkpoint handles are read-only by definition and don't participate
@@ -296,7 +293,7 @@ __wt_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	 */
 	if (btree->checkpoint != NULL)
 		return (is_checkpoint ? 0 :
-		    __wt_bt_cache_flush(
+		    __wt_bt_cache_op(
 		    session, NULL, WT_SYNC_DISCARD_NOWRITE));
 
 	/*
@@ -306,7 +303,7 @@ __wt_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	 * nature of the checkpoint.
 	 */
 	if (!btree->modified && !is_checkpoint)
-		return (__wt_bt_cache_flush(
+		return (__wt_bt_cache_op(
 		    session, NULL, WT_SYNC_DISCARD_NOWRITE));
 
 	/*
@@ -316,7 +313,7 @@ __wt_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	 */
 	if ((ret = __wt_meta_ckptlist_get(
 	    session, btree->name, &ckptbase)) == WT_NOTFOUND)
-		return (__wt_bt_cache_flush(
+		return (__wt_bt_cache_op(
 		    session, NULL, WT_SYNC_DISCARD_NOWRITE));
 	WT_ERR(ret);
 
@@ -392,7 +389,7 @@ __wt_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	 * means it must exist.
 	 */
 	force = 0;
-	if (!btree->modified) {
+	if (!btree->modified && cfg != NULL) {
 		ret = __wt_config_gets(session, cfg, "force", &cval);
 		if (ret != 0 && ret != WT_NOTFOUND)
 			WT_ERR(ret);
@@ -572,13 +569,14 @@ __wt_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	btree->modified = 0;
 	WT_FULL_BARRIER();
 
-	/* If closing a handle, include everything in the checkpoint. */
-	if (!is_checkpoint)
+	/* Flush the file from the cache, creating the checkpoint. */
+	if (is_checkpoint)
+		WT_ERR(__wt_bt_cache_op(session, ckptbase, WT_SYNC_CHECKPOINT));
+	else {
 		txn->isolation = TXN_ISO_READ_UNCOMMITTED;
 
-	/* Flush the file from the cache, creating the checkpoint. */
-	WT_ERR(__wt_bt_cache_flush(session,
-	    ckptbase, is_checkpoint ? WT_SYNC : WT_SYNC_DISCARD));
+		WT_ERR(__wt_bt_cache_op(session, ckptbase, WT_SYNC_DISCARD));
+	}
 
 	/*
 	 * All blocks being written have been written; set the object's write
@@ -605,13 +603,32 @@ fake:
 		if (WT_META_TRACKING(session) && is_checkpoint)
 			WT_ERR(__wt_meta_track_checkpoint(session));
 		else
-			WT_ERR(__wt_bm_checkpoint_resolve(session));
+			WT_ERR(bm->checkpoint_resolve(bm, session));
 	}
 
 err:
 skip:	__wt_meta_ckptlist_free(session, ckptbase);
 	__wt_free(session, name_alloc);
 	txn->isolation = saved_isolation;
-
 	return (ret);
+}
+
+/*
+ * __wt_checkpoint --
+ *	Checkpoint a file.
+ */
+int
+__wt_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
+{
+	return (__checkpoint_worker(session, cfg, 1));
+}
+
+/*
+ * __wt_checkpoint_close --
+ *	Checkpoint a file as part of a close.
+ */
+int
+__wt_checkpoint_close(WT_SESSION_IMPL *session, const char *cfg[])
+{
+	return (__checkpoint_worker(session, cfg, 0));
 }

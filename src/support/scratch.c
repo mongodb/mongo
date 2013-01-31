@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -22,7 +22,11 @@ __wt_buf_clear(WT_ITEM *buf)
 	buf->mem = NULL;
 	buf->memsize = 0;
 
-	/* Note: don't clear the flags, the buffer remains marked in-use. */
+	/*
+	 * Note: don't clear the flags, the buffer remains marked for aligned
+	 * use as well as "in-use".
+	 */
+	F_CLR(buf, WT_ITEM_MAPPED);
 }
 
 /*
@@ -36,6 +40,10 @@ __wt_buf_grow(WT_SESSION_IMPL *session, WT_ITEM *buf, size_t size)
 	int set_data;
 
 	WT_ASSERT(session, size <= UINT32_MAX);
+
+	/* Clear buffers previously used for mapped returns. */
+	if (F_ISSET(buf, WT_ITEM_MAPPED))
+		__wt_buf_clear(buf);
 
 	if (size > buf->memsize) {
 		/*
@@ -132,6 +140,8 @@ __wt_buf_steal(WT_SESSION_IMPL *session, WT_ITEM *buf, uint32_t *sizep)
 {
 	void *retp;
 
+	WT_ASSERT(session, !F_ISSET(buf, WT_ITEM_MAPPED));
+
 	/*
 	 * Sometimes we steal a buffer for a different purpose, for example,
 	 * we've read in an overflow item, and now it's going to become a key
@@ -169,7 +179,8 @@ __wt_buf_steal(WT_SESSION_IMPL *session, WT_ITEM *buf, uint32_t *sizep)
 void
 __wt_buf_free(WT_SESSION_IMPL *session, WT_ITEM *buf)
 {
-	__wt_free(session, buf->mem);
+	if (!F_ISSET(buf, WT_ITEM_MAPPED))
+		__wt_free(session, buf->mem);
 	__wt_buf_clear(buf);
 }
 
@@ -183,6 +194,10 @@ __wt_buf_fmt(WT_SESSION_IMPL *session, WT_ITEM *buf, const char *fmt, ...)
 {
 	va_list ap;
 	size_t len;
+
+	/* Clear buffers previously used for mapped returns. */
+	if (F_ISSET(buf, WT_ITEM_MAPPED))
+		__wt_buf_clear(buf);
 
 	for (;;) {
 		va_start(ap, fmt);
@@ -216,6 +231,10 @@ __wt_buf_catfmt(WT_SESSION_IMPL *session, WT_ITEM *buf, const char *fmt, ...)
 	va_list ap;
 	size_t len, space;
 	char *p;
+
+	/* Clear buffers previously used for mapped returns. */
+	if (F_ISSET(buf, WT_ITEM_MAPPED))
+		__wt_buf_clear(buf);
 
 	for (;;) {
 		va_start(ap, fmt);

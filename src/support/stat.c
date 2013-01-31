@@ -33,11 +33,11 @@ __wt_stat_alloc_dsrc_stats(WT_SESSION_IMPL *session, WT_DSRC_STATS **statsp)
 	stats->btree_column_internal.desc = "column-store internal pages";
 	stats->btree_column_variable.desc =
 	    "column-store variable-size leaf pages";
-	stats->btree_compact_rewrite.desc =
-	    "tree pages rewritten by compaction";
+	stats->btree_compact_rewrite.desc = "pages rewritten by compaction";
 	stats->btree_entries.desc =
 	    "total LSM, table or file object key/value pairs";
 	stats->btree_fixed_len.desc = "fixed-record size";
+	stats->btree_maximum_depth.desc = "maximum tree depth";
 	stats->btree_maxintlitem.desc = "maximum internal page item size";
 	stats->btree_maxintlpage.desc = "maximum internal page size";
 	stats->btree_maxleafitem.desc = "maximum leaf page item size";
@@ -58,6 +58,16 @@ __wt_stat_alloc_dsrc_stats(WT_SESSION_IMPL *session, WT_DSRC_STATS **statsp)
 	stats->cache_read.desc = "pages read into cache";
 	stats->cache_read_overflow.desc = "overflow pages read into cache";
 	stats->cache_write.desc = "pages written from cache";
+	stats->compress_raw_fail.desc =
+	    "raw compression call failed (no additional data available)";
+	stats->compress_raw_fail_temporary.desc =
+	    "raw compression call failed (additional data available)";
+	stats->compress_raw_ok.desc = "raw compression call succeeded";
+	stats->compress_read.desc = "compressed pages read";
+	stats->compress_write.desc = "compressed pages written";
+	stats->compress_write_fail.desc = "page written failed to compress";
+	stats->compress_write_too_small.desc =
+	    "page written was too small to compress";
 	stats->cursor_insert.desc = "cursor insert calls";
 	stats->cursor_insert_bulk.desc = "bulk-loaded cursor-insert calls";
 	stats->cursor_insert_bytes.desc =
@@ -81,9 +91,14 @@ __wt_stat_alloc_dsrc_stats(WT_SESSION_IMPL *session, WT_DSRC_STATS **statsp)
 	stats->rec_ovfl_value.desc = "reconciliation overflow values written";
 	stats->rec_page_delete.desc = "reconciliation pages deleted";
 	stats->rec_page_merge.desc = "reconciliation pages merged";
+	stats->rec_pages.desc = "page reconciliation calls";
+	stats->rec_pages_eviction.desc =
+	    "page reconciliation calls for eviction";
+	stats->rec_skipped_update.desc =
+	    "page reconciliation failed when an update could not be included";
 	stats->rec_split_intl.desc = "reconciliation internal pages split";
 	stats->rec_split_leaf.desc = "reconciliation leaf pages split";
-	stats->rec_written.desc = "reconciliation pages written";
+	stats->session_compact.desc = "object compaction";
 	stats->txn_update_conflict.desc = "update conflicts";
 	stats->txn_write_conflict.desc = "write generation conflicts";
 
@@ -120,6 +135,7 @@ __wt_stat_clear_dsrc_stats(WT_STATS *stats_arg)
 	stats->btree_compact_rewrite.v = 0;
 	stats->btree_entries.v = 0;
 	stats->btree_fixed_len.v = 0;
+	stats->btree_maximum_depth.v = 0;
 	stats->btree_maxintlitem.v = 0;
 	stats->btree_maxintlpage.v = 0;
 	stats->btree_maxleafitem.v = 0;
@@ -138,6 +154,13 @@ __wt_stat_clear_dsrc_stats(WT_STATS *stats_arg)
 	stats->cache_read.v = 0;
 	stats->cache_read_overflow.v = 0;
 	stats->cache_write.v = 0;
+	stats->compress_raw_fail.v = 0;
+	stats->compress_raw_fail_temporary.v = 0;
+	stats->compress_raw_ok.v = 0;
+	stats->compress_read.v = 0;
+	stats->compress_write.v = 0;
+	stats->compress_write_fail.v = 0;
+	stats->compress_write_too_small.v = 0;
 	stats->cursor_insert.v = 0;
 	stats->cursor_insert_bulk.v = 0;
 	stats->cursor_insert_bytes.v = 0;
@@ -158,9 +181,12 @@ __wt_stat_clear_dsrc_stats(WT_STATS *stats_arg)
 	stats->rec_ovfl_value.v = 0;
 	stats->rec_page_delete.v = 0;
 	stats->rec_page_merge.v = 0;
+	stats->rec_pages.v = 0;
+	stats->rec_pages_eviction.v = 0;
+	stats->rec_skipped_update.v = 0;
 	stats->rec_split_intl.v = 0;
 	stats->rec_split_leaf.v = 0;
-	stats->rec_written.v = 0;
+	stats->session_compact.v = 0;
 	stats->txn_update_conflict.v = 0;
 	stats->txn_write_conflict.v = 0;
 }
@@ -172,8 +198,11 @@ __wt_stat_alloc_connection_stats(WT_SESSION_IMPL *session, WT_CONNECTION_STATS *
 
 	WT_RET(__wt_calloc_def(session, 1, &stats));
 
+	stats->block_byte_map_read.desc =
+	    "mapped bytes read by the block manager";
 	stats->block_byte_read.desc = "bytes read by the block manager";
 	stats->block_byte_write.desc = "bytes written by the block manager";
+	stats->block_map_read.desc = "mapped blocks read by the block manager";
 	stats->block_read.desc = "blocks read by the block manager";
 	stats->block_write.desc = "blocks written by the block manager";
 	stats->cache_bytes_dirty.desc =
@@ -224,8 +253,10 @@ __wt_stat_clear_connection_stats(WT_STATS *stats_arg)
 	WT_CONNECTION_STATS *stats;
 
 	stats = (WT_CONNECTION_STATS *)stats_arg;
+	stats->block_byte_map_read.v = 0;
 	stats->block_byte_read.v = 0;
 	stats->block_byte_write.v = 0;
+	stats->block_map_read.v = 0;
 	stats->block_read.v = 0;
 	stats->block_write.v = 0;
 	stats->cache_bytes_dirty.v = 0;

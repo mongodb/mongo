@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -55,12 +55,12 @@ __wt_ovfl_read(WT_SESSION_IMPL *session, WT_CELL_UNPACK *unpack, WT_ITEM *store)
 	 * row's value might have not have seen that update, so we must restart
 	 * the search from the beginning.
 	 */
-	__wt_readlock(session, btree->val_ovfl_lock);
+	WT_RET(__wt_readlock(session, btree->val_ovfl_lock));
 	if (__wt_cell_type_raw(unpack->cell) == WT_CELL_VALUE_OVFL_RM)
 		ret = WT_RESTART;
 	else
 		ret = __ovfl_read(session, store, unpack->data, unpack->size);
-	__wt_rwunlock(session, btree->val_ovfl_lock);
+	WT_TRET(__wt_rwunlock(session, btree->val_ovfl_lock));
 	return (ret);
 }
 
@@ -305,7 +305,7 @@ __wt_val_ovfl_cache(WT_SESSION_IMPL *session,
 	 */
 	if (unpack->raw == WT_CELL_VALUE_OVFL_RM)
 		return (0);
-	__wt_writelock(session, btree->val_ovfl_lock);
+	WT_RET(__wt_writelock(session, btree->val_ovfl_lock));
 	if (__wt_cell_type_raw(unpack->cell) == WT_CELL_VALUE_OVFL_RM)
 		goto err;
 
@@ -339,6 +339,6 @@ __wt_val_ovfl_cache(WT_SESSION_IMPL *session,
 	 */
 	__wt_cell_type_reset(unpack->cell, WT_CELL_VALUE_OVFL_RM);
 
-err:	__wt_rwunlock(session, btree->val_ovfl_lock);
+err:	WT_TRET(__wt_rwunlock(session, btree->val_ovfl_lock));
 	return (ret);
 }

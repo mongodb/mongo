@@ -1,5 +1,5 @@
 /*-
- * Public Domain 2008-2012 WiredTiger, Inc.
+ * Public Domain 2008-2013 WiredTiger, Inc.
  *
  * This is free and unencumbered software released into the public domain.
  *
@@ -37,7 +37,7 @@
 
 void *scan_thread(void *arg);
 
-const char *home = "WT_TEST";
+const char *home = NULL;
 #define	NUM_THREADS	10
 
 WT_CONNECTION *conn;

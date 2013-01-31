@@ -11,21 +11,23 @@ errors = [
 	Error('WT_DEADLOCK', 'conflict between concurrent operations', '''
 		This error is generated when an operation cannot be completed
 		due to a conflict with concurrent operations.  The operation
-		should be retried.  If a transaction is in progress, it should
-		be rolled back and the operation retried in a new
-		transaction.'''),
+		may be retried; if a transaction is in progress, it should be
+		rolled back and the operation retried in a new transaction.'''),
 	Error('WT_DUPLICATE_KEY', 'attempt to insert an existing key', '''
 		This error is generated when the application attempts to insert
 		a record with the same key as an existing record without the
 		'overwrite' configuration to WT_SESSION::open_cursor.'''),
 	Error('WT_ERROR', 'non-specific WiredTiger error', '''
-		This error is generated for cases that are not covered by
-		specific error returns.'''),
+		This error is returned when an error is not covered by a
+		specific error return.'''),
 	Error('WT_NOTFOUND', 'cursor item not found', '''
 		This error indicates a cursor operation did not find a
 		record to return.  This includes search and other
 		operations where no record matched the cursor's search
 		key such as WT_CURSOR::update or WT_CURSOR::remove.'''),
+	Error('WT_PANIC', 'WiredTiger library panic', '''
+		This error indicates an underlying problem that requires the
+		application exit and restart.'''),
 	Error('WT_RESTART', 'restart the operation (internal)', undoc=True),
 ]
 
@@ -201,6 +203,13 @@ file_config = format_meta + lsm_config + [
 		If zero, a size is calculated to permit at least 8 items
 		(values or row store keys) per leaf page''',
 		min=0),
+	Config('memory_page_max', '5MB', r'''
+		the maximum size a page can grow to in memory before being
+		reconciled to disk.  The specified size will be adjusted to a
+		lower bound of <code>50 * leaf_page_max</code>.  This limit is
+		soft - it is possible for pages to be temporarily larger than
+		this value''',
+		min='512B', max='10TB'),
 	Config('prefix_compression', 'true', r'''
 		configure row-store format key prefix compression''',
 		type='boolean'),
@@ -246,13 +255,15 @@ connection_runtime_config = [
 		Config('chunk', '10MB', r'''
 			the granularity that a shared cache is redistributed''',
 			min='1MB', max='10TB'),
-		Config('min', '50MB', r'''
-			minimum amount of cache a database in a shared cache can have''',
-			min='10MB', max='10TB'),
+		Config('reserve', '0', r'''
+			amount of cache this database is guaranteed to have available
+			from the shared cache. This setting is per database. Defaults
+			to the chunk size'''),
 		Config('name', '', r'''
 			name of a cache that is shared between databases'''),
 		Config('size', '500MB', r'''
-			maximum memory to allocate for the shared cache''',
+			maximum memory to allocate for the shared cache. Setting this
+			will update the value if one is already set''',
 			min='1MB', max='10TB')
 		]),
 	Config('cache_size', '100MB', r'''
@@ -344,19 +355,20 @@ methods = {
 		number key; valid only for cursors with record number keys''',
 		type='boolean'),
 	Config('bulk', 'false', r'''
-		configure the cursor for bulk loads, a fast load path that may
-		only be used for newly created objects. Cursors configured for
-		bulk load only support the WT_CURSOR::insert and
-		WT_CURSOR::close methods.  The value is usually a true/false
-		flag, but the the special value \c "bitmap" is for use with
-		fixed-length column stores, and allows chunks of a memory
-		resident bitmap to be loaded directly into a file by passing a
-		\c WT_ITEM to WT_CURSOR::set_value where the \c size field
-		indicates the number of records in the bitmap (as specified by
-		the file's \c value_format). Bulk load bitmap values must end
-		on a byte boundary relative to the bit count - except for the
-		last set of values loaded''',
-		type='string'),
+		configure the cursor for bulk loads, a fast, initial load
+		path.  Bulk load may only be used for newly created objects,
+		and in the case of row-store objects, key/value items must
+		be loaded in sorted order.  Cursors configured for bulk load
+		only support the WT_CURSOR::insert and WT_CURSOR::close
+		methods.  The value is usually a true/false flag, but the the
+		special value \c "bitmap" is for use with fixed-length column
+		stores, and allows chunks of a memory resident bitmap to be
+		loaded directly into a file by passing a \c WT_ITEM to
+		WT_CURSOR::set_value where the \c size field indicates the
+		number of records in the bitmap (as specified by the file's
+		\c value_format). Bulk load bitmap values must end on a byte
+		boundary relative to the bit count (except for the last set
+		of values loaded)'''),
 	Config('checkpoint', '', r'''
 		the name of a checkpoint to open (the reserved name
 		"WiredTigerCheckpoint" opens the most recent internal
@@ -387,9 +399,6 @@ methods = {
 	Config('raw', 'false', r'''
 		ignore the encodings for the key and value, manage data as if
 		the formats were \c "u".  See @ref cursor_raw for details''',
-		type='boolean'),
-	Config('statistics', 'false', r'''
-		configure the cursor for statistics''',
 		type='boolean'),
 	Config('statistics_clear', 'false', r'''
 		reset statistics counters when the cursor is closed; valid
@@ -518,6 +527,9 @@ methods = {
 	Config('lsm_merge', 'true', r'''
 		merge LSM chunks where possible''',
 		type='boolean'),
+	Config('mmap', 'true', r'''
+		Use memory mapping to access files when possible''',
+		type='boolean'),
 	Config('multiprocess', 'false', r'''
 		permit sharing between processes (will automatically start an
 		RPC server for primary processes and use RPC for secondary
@@ -540,47 +552,4 @@ methods = {
 		with special privileges.  See @ref home for more information''',
 		type='boolean'),
 ]),
-}
-
-flags = {
-###################################################
-# Internal routine flag declarations
-###################################################
-	'shared_cache' : [ 'CACHE_POOL_RUN' ],
-	'direct_io' : [ 'DIRECTIO_DATA', 'DIRECTIO_LOG' ],
-	'page_free' : [ 'PAGE_FREE_IGNORE_DISK' ],
-	'verbose' : [
-		'VERB_block',
-		'VERB_shared_cache',
-		'VERB_ckpt',
-		'VERB_evict',
-		'VERB_evictserver',
-		'VERB_fileops',
-		'VERB_lsm',
-		'VERB_hazard',
-		'VERB_mutex',
-		'VERB_read',
-		'VERB_readserver',
-		'VERB_reconcile',
-		'VERB_salvage',
-		'VERB_verify',
-		'VERB_write'
-	],
-
-###################################################
-# Structure flag declarations
-###################################################
-	'conn' : [
-		'CONN_CACHE_POOL',
-		'CONN_LSM_MERGE',
-		'CONN_SYNC',
-		'CONN_TRANSACTIONAL',
-		'SERVER_RUN'
-	],
-	'session' : [
-		'SESSION_INTERNAL',
-		'SESSION_NO_CACHE_CHECK',
-		'SESSION_SALVAGE_QUIET_ERR',
-		'SESSION_SCHEMA_LOCKED',
-	],
 }

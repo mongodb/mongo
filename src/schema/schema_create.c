@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -73,7 +73,6 @@ __create_file(WT_SESSION_IMPL *session,
 
 err:	__wt_scr_free(&val);
 	__wt_free(session, treeconf);
-
 	return (ret);
 }
 
@@ -195,6 +194,7 @@ __create_colgroup(WT_SESSION_IMPL *session,
 			ret = exclusive ? EEXIST : 0;
 		goto err;
 	}
+
 	WT_ERR(__wt_schema_open_colgroups(session, table));
 
 err:	__wt_free(session, cgconf);
@@ -417,7 +417,7 @@ __create_table(WT_SESSION_IMPL *session,
 
 	if (0) {
 err:		if (table != NULL)
-			(void)__wt_schema_remove_table(session, table);
+			WT_TRET(__wt_schema_remove_table(session, table));
 	}
 	__wt_free(session, cgname);
 	__wt_free(session, tableconf);

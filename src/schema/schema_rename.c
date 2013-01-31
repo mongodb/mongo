@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -66,7 +66,6 @@ __rename_file(
 
 err:	__wt_free(session, newvalue);
 	__wt_free(session, oldvalue);
-
 	return (ret);
 }
 

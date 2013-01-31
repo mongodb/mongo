@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -307,7 +307,8 @@ struct __wt_page {
 	uint8_t type;			/* Page type */
 
 #define	WT_PAGE_BUILD_KEYS	0x01	/* Keys have been built in memory */
-#define	WT_PAGE_EVICT_LRU	0x02	/* Page is on the LRU queue */
+#define	WT_PAGE_DISK_NOT_ALLOC	0x02	/* Ignore disk image on page discard */
+#define	WT_PAGE_EVICT_LRU	0x04	/* Page is on the LRU queue */
 	uint8_t flags_atomic;		/* Atomic flags, use F_*_ATOMIC */
 };
 
@@ -328,30 +329,40 @@ struct __wt_page {
  *
  * WT_REF_DISK:
  *	The initial setting before a page is brought into memory, and set as a
- * result of page eviction; the page is on disk, and must be read into memory
- * before use.  WT_REF_DISK has a value of 0 (the default state after allocating
- * cleared memory).
+ *	result of page eviction; the page is on disk, and must be read into
+ *	memory before use.  WT_REF_DISK has a value of 0 (the default state
+ *	after allocating cleared memory).
  *
  * WT_REF_DELETED:
  *	The page is on disk, but has been deleted from the tree; we can delete
- * row-store leaf pages without reading them if they don't reference overflow
- * items.
+ *	row-store leaf pages without reading them if they don't reference
+ *	overflow items.
+ *
+ * WT_REF_EVICT_FORCE:
+ *	An application thread has selected this page for eviction. No other
+ *	hazard references should be granted. If eviction fails, the eviction
+ *	server should set the state back to WT_REF_MEM.
  *
  * WT_REF_EVICT_WALK:
- *	The next page to be walked for LRU eviction.  This page is available for
- * reads but not eviction.
+ *	The next page to be walked for LRU eviction.  This page is available
+ *	for reads but not eviction.
  *
  * WT_REF_LOCKED:
- *	Set by eviction; an eviction thread has selected this page or a parent
- * for eviction.  Once hazard pointers are checked, the page will be evicted.
+ *	Locked for exclusive access.  In eviction, this page or a parent has
+ *	been selected for eviction; once hazard pointers are checked, the page
+ *	will be evicted.  When reading a page that was previously deleted, it
+ *	is locked until the page is in memory with records marked deleted.  The
+ *	thread that set the page to WT_REF_LOCKED has exclusive access, no
+ *	other thread may use the WT_REF until the state is changed.
  *
  * WT_REF_MEM:
  *	Set by a reading thread once the page has been read from disk; the page
- * is in the cache and the page reference is OK.
+ *	is in the cache and the page reference is OK.
  *
  * WT_REF_READING:
- *	Set by a reading thread before reading a page from disk; other readers
- * of the page wait until the read completes.
+ *	Set by a reading thread before reading an ordinary page from disk;
+ *	other readers of the page wait until the read completes.  Sync can
+ *	safely skip over such pages: they are clean by definition.
  *
  * The life cycle of a typical page goes like this: pages are read into memory
  * from disk and their state set to WT_REF_MEM.  When the page is selected for
@@ -374,8 +385,9 @@ struct __wt_page {
 enum __wt_page_state {
 	WT_REF_DISK=0,			/* Page is on disk */
 	WT_REF_DELETED,			/* Page is on disk, but deleted */
+	WT_REF_EVICT_FORCE,		/* Page is ready for forced eviction */
 	WT_REF_EVICT_WALK,		/* Next page for LRU eviction */
-	WT_REF_LOCKED,			/* Page being evicted */
+	WT_REF_LOCKED,			/* Page locked for exclusive access */
 	WT_REF_MEM,			/* Page is in cache and valid */
 	WT_REF_READING			/* Page being read */
 };

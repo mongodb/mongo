@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -34,7 +34,8 @@ static int __curtable_update(WT_CURSOR *cursor);
 			(*__cp)->value.data = "";			\
 			(*__cp)->value.size = 1;			\
 		}							\
-		F_SET(*__cp, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);	\
+		F_SET(*__cp, WT_CURSTD_KEY_APP |			\
+		    WT_CURSTD_VALUE_APP);				\
 		WT_ERR((*__cp)->f(*__cp));				\
 	}								\
 } while (0)
@@ -94,8 +95,8 @@ __wt_curtable_get_value(WT_CURSOR *cursor, ...)
 		ret = __wt_schema_project_out(session,
 		    ctable->cg_cursors, ctable->plan, ap);
 	va_end(ap);
-err:	API_END(session);
 
+err:	API_END(session);
 	return (ret);
 }
 
@@ -127,7 +128,7 @@ __wt_curtable_set_key(WT_CURSOR *cursor, ...)
 		(*cp)->recno = primary->recno;
 		(*cp)->key.data = primary->key.data;
 		(*cp)->key.size = primary->key.size;
-		F_SET(*cp, WT_CURSTD_KEY_SET);
+		F_SET(*cp, WT_CURSTD_KEY_APP);
 	}
 }
 
@@ -165,13 +166,13 @@ __wt_curtable_set_value(WT_CURSOR *cursor, ...)
 	for (i = 0, cp = ctable->cg_cursors;
 	    i < WT_COLGROUPS(ctable->table); i++, cp++)
 		if (ret == 0)
-			F_SET(*cp, WT_CURSTD_VALUE_SET);
+			F_SET(*cp, WT_CURSTD_VALUE_APP);
 		else {
 			(*cp)->saved_err = ret;
 			F_CLR(*cp, WT_CURSTD_VALUE_SET);
 		}
 
-	API_END(session);
+err:	API_END(session);
 }
 
 /*
@@ -200,7 +201,6 @@ __curtable_compare(WT_CURSOR *a, WT_CURSOR *b, int *cmpp)
 	    WT_CURSOR_PRIMARY(a), WT_CURSOR_PRIMARY(b), cmpp);
 
 err:	API_END(session);
-
 	return (ret);
 }
 
@@ -218,8 +218,8 @@ __curtable_next(WT_CURSOR *cursor)
 	ctable = (WT_CURSOR_TABLE *)cursor;
 	CURSOR_API_CALL(cursor, session, next, NULL);
 	APPLY_CG(ctable, next);
-	API_END(session);
 
+err:	API_END(session);
 	return (ret);
 }
 
@@ -250,12 +250,11 @@ __curtable_next_random(WT_CURSOR *cursor)
 		(*cp)->key.data = primary->key.data;
 		(*cp)->key.size = primary->key.size;
 		(*cp)->recno = primary->recno;
-		F_SET(*cp, WT_CURSTD_KEY_SET);
+		F_SET(*cp, WT_CURSTD_KEY_APP);
 		WT_ERR((*cp)->search(*cp));
 	}
 
 err:	API_END(session);
-
 	return (ret);
 }
 
@@ -273,8 +272,8 @@ __curtable_prev(WT_CURSOR *cursor)
 	ctable = (WT_CURSOR_TABLE *)cursor;
 	CURSOR_API_CALL(cursor, session, prev, NULL);
 	APPLY_CG(ctable, prev);
-	API_END(session);
 
+err:	API_END(session);
 	return (ret);
 }
 
@@ -292,8 +291,8 @@ __curtable_reset(WT_CURSOR *cursor)
 	ctable = (WT_CURSOR_TABLE *)cursor;
 	CURSOR_API_CALL(cursor, session, reset, NULL);
 	APPLY_CG(ctable, reset);
-	API_END(session);
 
+err:	API_END(session);
 	return (ret);
 }
 
@@ -311,8 +310,8 @@ __curtable_search(WT_CURSOR *cursor)
 	ctable = (WT_CURSOR_TABLE *)cursor;
 	CURSOR_API_CALL(cursor, session, search, NULL);
 	APPLY_CG(ctable, search);
-	API_END(session);
 
+err:	API_END(session);
 	return (ret);
 }
 
@@ -341,8 +340,8 @@ __curtable_search_near(WT_CURSOR *cursor, int *exact)
 		(*cp)->recno = primary->recno;
 		WT_ERR((*cp)->search(*cp));
 	}
-err:	API_END(session);
 
+err:	API_END(session);
 	return (ret);
 }
 
@@ -377,7 +376,7 @@ __curtable_insert(WT_CURSOR *cursor)
 			 * for overwrite cursors, but for now we just reset the
 			 * flags.
 			 */
-			F_SET(primary, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
+			F_SET(primary, WT_CURSTD_KEY_APP | WT_CURSTD_VALUE_APP);
 			ret = __curtable_update(cursor);
 		}
 		goto err;
@@ -389,8 +388,8 @@ __curtable_insert(WT_CURSOR *cursor)
 	}
 
 	APPLY_IDX(ctable, insert);
-err:	CURSOR_UPDATE_API_END(session, ret);
 
+err:	CURSOR_UPDATE_API_END(session, ret);
 	return (ret);
 }
 
@@ -429,8 +428,8 @@ __curtable_update(WT_CURSOR *cursor)
 	WT_ERR(ret);
 	if (ctable->idx_cursors != NULL)
 		APPLY_IDX(ctable, insert);
-err:	CURSOR_UPDATE_API_END(session, ret);
 
+err:	CURSOR_UPDATE_API_END(session, ret);
 	return (ret);
 }
 
@@ -457,8 +456,8 @@ __curtable_remove(WT_CURSOR *cursor)
 	}
 
 	APPLY_CG(ctable, remove);
-err:	CURSOR_UPDATE_API_END(session, ret);
 
+err:	CURSOR_UPDATE_API_END(session, ret);
 	return (ret);
 }
 
@@ -627,8 +626,8 @@ __curtable_close(WT_CURSOR *cursor)
 	/* The URI is owned by the table. */
 	cursor->uri = NULL;
 	WT_TRET(__wt_cursor_close(cursor));
-	API_END(session);
 
+err:	API_END(session);
 	return (ret);
 }
 
@@ -705,33 +704,21 @@ int
 __wt_curtable_open(WT_SESSION_IMPL *session,
     const char *uri, const char *cfg[], WT_CURSOR **cursorp)
 {
-	static WT_CURSOR iface = {
-		NULL,
-		NULL,
-		NULL,
-		NULL,
-		__wt_curtable_get_key,
-		__wt_curtable_get_value,
-		__wt_curtable_set_key,
-		__wt_curtable_set_value,
-		__curtable_compare,
-		__curtable_next,
-		__curtable_prev,
-		__curtable_reset,
-		__curtable_search,
-		__curtable_search_near,
-		__curtable_insert,
-		__curtable_update,
-		__curtable_remove,
-		__curtable_close,
-		{ NULL, NULL },		/* TAILQ_ENTRY q */
-		0,			/* recno key */
-		{ 0 },			/* raw recno buffer */
-		{ NULL, 0, 0, NULL, 0 },/* WT_ITEM key */
-		{ NULL, 0, 0, NULL, 0 },/* WT_ITEM value */
-		0,			/* int saved_err */
-		0			/* uint32_t flags */
-	};
+	WT_CURSOR_STATIC_INIT(iface,
+	    __wt_curtable_get_key,		/* get-key */
+	    __wt_curtable_get_value,		/* get-value */
+	    __wt_curtable_set_key,		/* set-key */
+	    __wt_curtable_set_value,		/* set-value */
+	    __curtable_compare,			/* compare */
+	    __curtable_next,			/* next */
+	    __curtable_prev,			/* prev */
+	    __curtable_reset,			/* reset */
+	    __curtable_search,			/* search */
+	    __curtable_search_near,		/* search-near */
+	    __curtable_insert,			/* insert */
+	    __curtable_update,			/* update */
+	    __curtable_remove,			/* remove */
+	    __curtable_close);			/* close */
 	WT_CONFIG_ITEM cval;
 	WT_CURSOR *cursor;
 	WT_CURSOR_TABLE *ctable;
@@ -808,7 +795,7 @@ __wt_curtable_open(WT_SESSION_IMPL *session,
 	WT_ERR(__curtable_open_colgroups(ctable, cfg));
 
 	if (0) {
-err:		(void)__curtable_close(cursor);
+err:		WT_TRET(__curtable_close(cursor));
 		*cursorp = NULL;
 	}
 

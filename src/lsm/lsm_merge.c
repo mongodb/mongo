@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -101,7 +101,7 @@ __wt_lsm_merge(
 	 * avoid holding it while the merge is in progress: that may take a
 	 * long time.
 	 */
-	__wt_writelock(session, lsm_tree->rwlock);
+	WT_RET(__wt_writelock(session, lsm_tree->rwlock));
 
 	/*
 	 * Only include chunks that are stable on disk and not involved in a
@@ -130,7 +130,7 @@ __wt_lsm_merge(
 	for (start_chunk = end_chunk + 1, record_count = 0;
 	    start_chunk > 0; ) {
 		chunk = lsm_tree->chunk[start_chunk - 1];
-		nchunks = end_chunk - start_chunk + 1;
+		nchunks = (end_chunk - start_chunk) + 1;
 
 		/* If the chunk is already involved in a merge, stop. */
 		if (F_ISSET(chunk, WT_LSM_CHUNK_MERGING))
@@ -171,7 +171,7 @@ __wt_lsm_merge(
 		}
 	}
 
-	nchunks = end_chunk - start_chunk + 1;
+	nchunks = (end_chunk - start_chunk) + 1;
 	WT_ASSERT(session, nchunks <= max_chunks);
 
 	/* Don't do small merges unless we have waited for 2s. */
@@ -189,7 +189,7 @@ __wt_lsm_merge(
 		    lsm_tree->chunk[start_chunk + i]->generation + 1);
 
 	start_id = lsm_tree->chunk[start_chunk]->id;
-	__wt_rwunlock(session, lsm_tree->rwlock);
+	WT_RET(__wt_rwunlock(session, lsm_tree->rwlock));
 
 	if (nchunks == 0)
 		return (WT_NOTFOUND);
@@ -290,7 +290,7 @@ __wt_lsm_merge(
 	dest = NULL;
 	WT_ERR_NOTFOUND_OK(ret);
 
-	__wt_writelock(session, lsm_tree->rwlock);
+	WT_ERR(__wt_writelock(session, lsm_tree->rwlock));
 
 	/*
 	 * Check whether we raced with another merge, and adjust the chunk
@@ -314,7 +314,7 @@ __wt_lsm_merge(
 	F_SET(chunk, WT_LSM_CHUNK_ONDISK);
 
 	ret = __wt_lsm_meta_write(session, lsm_tree);
-	__wt_rwunlock(session, lsm_tree->rwlock);
+	WT_TRET(__wt_rwunlock(session, lsm_tree->rwlock));
 
 err:	if (src != NULL)
 		WT_TRET(src->close(src));
@@ -335,11 +335,12 @@ err:	if (src != NULL)
 		__wt_free(session, chunk->bloom_uri);
 		__wt_free(session, chunk->uri);
 		__wt_free(session, chunk);
+
 		if (ret == EINTR)
-			WT_VERBOSE_VOID(session, lsm,
+			WT_VERBOSE_TRET(session, lsm,
 			    "Merge aborted due to close");
 		else
-			WT_VERBOSE_VOID(session, lsm,
+			WT_VERBOSE_TRET(session, lsm,
 			    "Merge failed with %s", wiredtiger_strerror(ret));
 	}
 	return (ret);

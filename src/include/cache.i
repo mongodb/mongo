@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -9,7 +9,7 @@
  * __wt_eviction_check --
  *	Wake the eviction server if necessary.
  */
-static inline void
+static inline int
 __wt_eviction_check(WT_SESSION_IMPL *session, int *read_lockoutp, int wake)
 {
 	WT_CACHE *cache;
@@ -35,7 +35,8 @@ __wt_eviction_check(WT_SESSION_IMPL *session, int *read_lockoutp, int wake)
 	if (wake &&
 	    (bytes_inuse > (cache->eviction_trigger * bytes_max) / 100 ||
 	    dirty_inuse > (cache->eviction_dirty_target * bytes_max) / 100))
-		__wt_evict_server_wake(session);
+		WT_RET(__wt_evict_server_wake(session));
+	return (0);
 }
 
 /*
@@ -49,6 +50,8 @@ __wt_cache_full_check(WT_SESSION_IMPL *session)
 	WT_DECL_RET;
 	int lockout, wake;
 
+	btree = session->btree;
+
 	/*
 	 * Only wake the eviction server the first time through here (if the
 	 * cache is too full), or every hundred times after that.  Otherwise,
@@ -56,11 +59,11 @@ __wt_cache_full_check(WT_SESSION_IMPL *session)
 	 * busier.
 	 */
 	for (wake = 0;; wake = (wake + 1) % 100) {
-		__wt_eviction_check(session, &lockout, wake == 0);
+		WT_RET(__wt_eviction_check(session, &lockout, wake == 0));
 		if (!lockout || F_ISSET(session,
 		    WT_SESSION_NO_CACHE_CHECK | WT_SESSION_SCHEMA_LOCKED))
 			return (0);
-		if ((btree = session->btree) != NULL && F_ISSET(btree,
+		if (F_ISSET(btree,
 		    WT_BTREE_BULK | WT_BTREE_NO_CACHE | WT_BTREE_NO_EVICTION))
 			return (0);
 		if ((ret = __wt_evict_lru_page(session, 1)) == EBUSY)

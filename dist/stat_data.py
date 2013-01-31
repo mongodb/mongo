@@ -35,8 +35,10 @@ connection_stats = [
 	##########################################
 	# Block manager statistics
 	##########################################
+	Stat('block_byte_map_read', 'mapped bytes read by the block manager'),
 	Stat('block_byte_read', 'bytes read by the block manager'),
 	Stat('block_byte_write', 'bytes written by the block manager'),
+	Stat('block_map_read', 'mapped blocks read by the block manager'),
 	Stat('block_read', 'blocks read by the block manager'),
 	Stat('block_write', 'blocks written by the block manager'),
 
@@ -97,6 +99,7 @@ dsrc_stats = [
 	Stat('cursor_search_near', 'cursor search near calls'),
 	Stat('cursor_update', 'cursor update calls'),
 	Stat('cursor_update_bytes', 'cursor-update value bytes updated'),
+	Stat('session_compact', 'object compaction'),
 
 	##########################################
 	# Btree statistics
@@ -106,10 +109,11 @@ dsrc_stats = [
 	Stat('btree_column_fix', 'column-store fixed-size leaf pages'),
 	Stat('btree_column_internal', 'column-store internal pages'),
 	Stat('btree_column_variable', 'column-store variable-size leaf pages'),
-	Stat('btree_compact_rewrite', 'tree pages rewritten by compaction'),
+	Stat('btree_compact_rewrite', 'pages rewritten by compaction'),
 	Stat('btree_entries',
 	    'total LSM, table or file object key/value pairs'),
 	Stat('btree_fixed_len', 'fixed-record size'),
+	Stat('btree_maximum_depth', 'maximum tree depth'),
 	Stat('btree_maxintlitem', 'maximum internal page item size'),
 	Stat('btree_maxintlpage', 'maximum internal page size'),
 	Stat('btree_maxleafitem', 'maximum leaf page item size'),
@@ -165,6 +169,20 @@ dsrc_stats = [
 	Stat('cache_write', 'pages written from cache'),
 
 	##########################################
+	# Compression statistics
+	##########################################
+	Stat('compress_raw_ok', 'raw compression call succeeded'),
+	Stat('compress_raw_fail',
+	    'raw compression call failed (no additional data available)'),
+	Stat('compress_raw_fail_temporary',
+	    'raw compression call failed (additional data available)'),
+	Stat('compress_read', 'compressed pages read'),
+	Stat('compress_write', 'compressed pages written'),
+	Stat('compress_write_fail', 'page written failed to compress'),
+	Stat('compress_write_too_small',
+	    'page written was too small to compress'),
+
+	##########################################
 	# Reconciliation statistics
 	##########################################
 	Stat('rec_dictionary', 'reconciliation dictionary matches'),
@@ -172,9 +190,12 @@ dsrc_stats = [
 	Stat('rec_ovfl_value', 'reconciliation overflow values written'),
 	Stat('rec_page_delete', 'reconciliation pages deleted'),
 	Stat('rec_page_merge', 'reconciliation pages merged'),
+	Stat('rec_pages', 'page reconciliation calls'),
+	Stat('rec_pages_eviction', 'page reconciliation calls for eviction'),
+	Stat('rec_skipped_update',
+	    'page reconciliation failed when an update could not be included'),
 	Stat('rec_split_intl', 'reconciliation internal pages split'),
 	Stat('rec_split_leaf', 'reconciliation leaf pages split'),
-	Stat('rec_written', 'reconciliation pages written'),
 
 	##########################################
 	# Transaction statistics

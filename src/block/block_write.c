@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -12,9 +12,9 @@
  *	Return the size of the block-specific header.
  */
 u_int
-__wt_block_header(WT_SESSION_IMPL *session)
+__wt_block_header(WT_BLOCK *block)
 {
-	WT_UNUSED(session);
+	WT_UNUSED(block);
 
 	return ((u_int)WT_BLOCK_HEADER_SIZE);
 }
@@ -24,8 +24,7 @@ __wt_block_header(WT_SESSION_IMPL *session)
  *	Return the buffer size required to write a block.
  */
 int
-__wt_block_write_size(
-    WT_SESSION_IMPL *session, WT_BLOCK *block, uint32_t *sizep)
+__wt_block_write_size(WT_SESSION_IMPL *session, WT_BLOCK *block, size_t *sizep)
 {
 	WT_UNUSED(session);
 
@@ -88,7 +87,7 @@ __wt_block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	 * boundary, this is one of the reasons the btree layer must find out
 	 * from the block-manager layer the maximum size of the eventual write.
 	 */
-	align_size = WT_ALIGN(buf->size, block->allocsize);
+	align_size = WT_ALIGN32(buf->size, block->allocsize);
 	if (align_size > buf->memsize) {
 		WT_ASSERT(session, align_size <= buf->memsize);
 		WT_RET_MSG(session, EINVAL,
@@ -135,7 +134,8 @@ __wt_block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	    session, block->fh, offset, align_size, buf->mem)) != 0) {
 		if (!locked)
 			__wt_spin_lock(session, &block->live_lock);
-		(void)__wt_block_off_free(session, block, offset, align_size);
+		WT_TRET(
+		    __wt_block_off_free(session, block, offset, align_size));
 		if (!locked)
 			__wt_spin_unlock(session, &block->live_lock);
 		WT_RET(ret);

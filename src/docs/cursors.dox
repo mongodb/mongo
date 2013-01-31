@@ -60,8 +60,8 @@ hot backup cursor, See also: @ref hot_backup}
    @row{<tt>colgroup:\<tablename\>.\<columnset\></tt>,
 column group cursor,}
    @row{<tt>config:[\<uri\>]</tt>,
-object configuration cursor (key=config string\,
-value=config value),}
+object configuration cursor, (key=config string\,
+value=config value)}
   @row{<tt>file:\<filename\></tt>,
 file cursor (key=file key\, value=file value),}
   @row{<tt>index:\<tablename\>.\<indexname\></tt>,
@@ -86,8 +86,9 @@ from the listed columns are returned by WT_CURSOR::get_value.
 
 This is particularly useful with index cursors, because if all columns in
 the projection are available in the index (including primary key columns,
-which are the values of the index), there is no need to access any column
-groups.
+which are the values of the index), the data can be read from the index
+without accessing any column groups.  See @ref schema_indices for more
+details.
 
 @section cursor_raw Raw mode
 
@@ -103,10 +104,5 @@ cursor's \c key_format or \c value_format, respectively.  For
 WT_CURSOR::set_key and WT_CURSOR::set_value in raw mode, the WT_ITEM
 should be equivalent to calling ::wiredtiger_struct_pack for the
 cursor's \c key_format or \c value_format, respectively.
-
-@section cursor_rand Random lookup
-
-Cursors can be configured to return pseudo-random records from row-store
-objects.  See @subpage cursor_random for details.
 
 */

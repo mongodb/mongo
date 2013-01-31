@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -42,6 +42,7 @@ __wt_page_in_func(
 			WT_RET(__wt_cache_full_check(session));
 			WT_RET(__wt_cache_read(session, parent, ref));
 			continue;
+		case WT_REF_EVICT_FORCE:
 		case WT_REF_LOCKED:
 		case WT_REF_READING:
 			/*
@@ -79,14 +80,14 @@ __wt_page_in_func(
 			if (page->modify != NULL &&
 			    __wt_txn_ancient(session, page->modify->first_id)) {
 				page->read_gen = 0;
-				__wt_hazard_clear(session, page);
-				__wt_evict_server_wake(session);
+				WT_RET(__wt_hazard_clear(session, page));
+				WT_RET(__wt_evict_server_wake(session));
 				break;
 			}
 
 			/* Check if we need an autocommit transaction. */
 			if ((ret = __wt_txn_autocommit_check(session)) != 0) {
-				__wt_hazard_clear(session, page);
+				WT_TRET(__wt_hazard_clear(session, page));
 				return (ret);
 			}
 
@@ -105,8 +106,9 @@ __wt_page_in_func(
  *	Build in-memory page information.
  */
 int
-__wt_page_inmem(WT_SESSION_IMPL *session,
-    WT_PAGE *parent, WT_REF *parent_ref, WT_PAGE_HEADER *dsk, WT_PAGE **pagep)
+__wt_page_inmem(
+    WT_SESSION_IMPL *session, WT_PAGE *parent, WT_REF *parent_ref,
+    WT_PAGE_HEADER *dsk, int disk_not_alloc, WT_PAGE **pagep)
 {
 	WT_DECL_RET;
 	WT_PAGE *page;
@@ -128,8 +130,13 @@ __wt_page_inmem(WT_SESSION_IMPL *session,
 	page->dsk = dsk;
 	page->read_gen = __wt_cache_read_gen(session);
 	page->type = dsk->type;
+	if (disk_not_alloc)
+		F_SET_ATOMIC(page, WT_PAGE_DISK_NOT_ALLOC);
 
-	inmem_size = 0;
+	inmem_size = sizeof(WT_PAGE);
+	if (!disk_not_alloc)
+		inmem_size += dsk->mem_size;
+
 	switch (page->type) {
 	case WT_PAGE_COL_FIX:
 		page->u.col_fix.recno = dsk->recno;
@@ -152,17 +159,12 @@ __wt_page_inmem(WT_SESSION_IMPL *session,
 	WT_ILLEGAL_VALUE_ERR(session);
 	}
 
-	__wt_cache_page_read(
-	    session, page, sizeof(WT_PAGE) + dsk->mem_size + inmem_size);
+	__wt_cache_page_read(session, page, inmem_size);
 
 	*pagep = page;
 	return (0);
 
-err:	/*
-	 * Our caller (specifically salvage) may have special concerns about the
-	 * underlying disk image, the caller owns that problem.
-	 */
-	__wt_page_out(session, &page, WT_PAGE_FREE_IGNORE_DISK);
+err:	__wt_page_out(session, &page);
 	return (ret);
 }
 
@@ -208,8 +210,7 @@ __inmem_col_int(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *inmem_sizep)
 	 */
 	WT_RET(__wt_calloc_def(
 	    session, (size_t)dsk->u.entries, &page->u.intl.t));
-	if (inmem_sizep != NULL)
-		*inmem_sizep += dsk->u.entries * sizeof(*page->u.intl.t);
+	*inmem_sizep += dsk->u.entries * sizeof(*page->u.intl.t);
 
 	/*
 	 * Walk the page, building references: the page contains value items.
@@ -258,8 +259,7 @@ __inmem_col_var(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *inmem_sizep)
 	 */
 	WT_RET(__wt_calloc_def(
 	    session, (size_t)dsk->u.entries, &page->u.col_var.d));
-	if (inmem_sizep != NULL)
-		*inmem_sizep += dsk->u.entries * sizeof(*page->u.col_var.d);
+	*inmem_sizep += dsk->u.entries * sizeof(*page->u.col_var.d);
 
 	/*
 	 * Walk the page, building references: the page contains unsorted value
@@ -296,8 +296,7 @@ __inmem_col_var(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *inmem_sizep)
 	page->u.col_var.repeats = repeats;
 	page->u.col_var.nrepeats = nrepeats;
 	page->entries = dsk->u.entries;
-	if (inmem_sizep != NULL)
-		*inmem_sizep += bytes_allocated;
+	*inmem_sizep += bytes_allocated;
 	return (0);
 }
 
@@ -335,8 +334,7 @@ __inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *inmem_sizep)
 	 */
 	nindx = dsk->u.entries / 2;
 	WT_ERR((__wt_calloc_def(session, (size_t)nindx, &page->u.intl.t)));
-	if (inmem_sizep != NULL)
-		*inmem_sizep += nindx * sizeof(*page->u.intl.t);
+	*inmem_sizep += nindx * sizeof(*page->u.intl.t);
 
 	/*
 	 * Set the number of elements now -- we're about to allocate memory,
@@ -451,8 +449,7 @@ __inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *inmem_sizep)
 		WT_ERR(__wt_row_ikey_alloc(session,
 		    WT_PAGE_DISK_OFFSET(page, cell),
 		    current->data, current->size, &ref->u.key));
-		if (inmem_sizep != NULL)
-			*inmem_sizep += sizeof(WT_IKEY) + current->size;
+		*inmem_sizep += sizeof(WT_IKEY) + current->size;
 
 		/*
 		 * Swap buffers if it's not an overflow key, we have a new
@@ -523,8 +520,7 @@ __inmem_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *inmem_sizep)
 	WT_ASSERT(session, cell == (WT_CELL *)((uint8_t *)dsk + dsk->mem_size));
 
 	WT_RET((__wt_calloc_def(session, (size_t)nindx, &page->u.row.d)));
-	if (inmem_sizep != NULL)
-		*inmem_sizep += nindx * sizeof(*page->u.row.d);
+	*inmem_sizep += nindx * sizeof(*page->u.row.d);
 
 	/* Walk the page again, building indices. */
 	rip = page->u.row.d;

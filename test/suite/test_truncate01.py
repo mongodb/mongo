@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Public Domain 2008-2012 WiredTiger, Inc.
+# Public Domain 2008-2013 WiredTiger, Inc.
 #
 # This is free and unencumbered software released into the public domain.
 #
@@ -431,7 +431,7 @@ class test_truncate_cursor(wttest.WiredTigerTestCase):
 
             # Create the object.
             complex_populate(
-                self, uri, self.config + self.keyfmt, self.nentries + 1)
+                self, uri, self.config + self.keyfmt, self.nentries)
 
             # Build a dictionary of what the object should look like for
             # later comparison

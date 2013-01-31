@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -42,14 +42,14 @@ err:	__wt_free(session, cond);
 }
 
 /*
- * __wt_lock
- *	Lock a mutex.
+ * __wt_cond_wait
+ *	Wait on a mutex, optionally timing out.
  */
-void
+int
 __wt_cond_wait(WT_SESSION_IMPL *session, WT_CONDVAR *cond, long usecs)
 {
-	WT_DECL_RET;
 	struct timespec ts;
+	WT_DECL_RET;
 	int locked;
 
 	locked = 0;
@@ -59,10 +59,9 @@ __wt_cond_wait(WT_SESSION_IMPL *session, WT_CONDVAR *cond, long usecs)
 	 * This function MUST handle a NULL session handle.
 	 */
 	if (session != NULL) {
-		WT_CSTAT_INCR(session, cond_wait);
-
-		WT_VERBOSE_VOID(
+		WT_VERBOSE_RET(
 		    session, mutex, "wait %s cond (%p)", cond->name, cond);
+		WT_CSTAT_INCR(session, cond_wait);
 	}
 
 	WT_ERR(pthread_mutex_lock(&cond->mtx));
@@ -100,39 +99,43 @@ __wt_cond_wait(WT_SESSION_IMPL *session, WT_CONDVAR *cond, long usecs)
 err:	if (locked)
 		WT_TRET(pthread_mutex_unlock(&cond->mtx));
 	if (ret == 0)
-		return;
-
-	__wt_err(session, ret, "cond wait failed");
-	__wt_abort(session);
+		return (0);
+	WT_RET_MSG(session, ret, "pthread_cond_wait");
 }
 
 /*
  * __wt_cond_signal --
  *	Signal a waiting thread.
  */
-void
+int
 __wt_cond_signal(WT_SESSION_IMPL *session, WT_CONDVAR *cond)
 {
 	WT_DECL_RET;
+	int locked;
+
+	locked = 0;
 
 	/*
 	 * !!!
 	 * This function MUST handle a NULL session handle.
 	 */
-	if (session != NULL)
-		WT_VERBOSE_VOID(
-		    session, mutex, "signal %s cond (%p)", cond->name, cond);
+	if (session != NULL && WT_VERBOSE_ISSET(session, mutex))
+		WT_RET(__wt_verbose(
+		    session, "signal %s cond (%p)", cond->name, cond));
 
 	WT_ERR(pthread_mutex_lock(&cond->mtx));
+	locked = 1;
+
 	if (!cond->signalled) {
 		cond->signalled = 1;
 		WT_ERR(pthread_cond_signal(&cond->cond));
 	}
-	WT_ERR(pthread_mutex_unlock(&cond->mtx));
-	return;
 
-err:	__wt_err(session, ret, "cond signal failed");
-	__wt_abort(session);
+err:	if (locked)
+		WT_TRET(pthread_mutex_unlock(&cond->mtx));
+	if (ret == 0)
+		return (0);
+	WT_RET_MSG(session, ret, "pthread_cond_signal");
 }
 
 /*
@@ -170,7 +173,7 @@ __wt_rwlock_alloc(
 	rwlock->name = name;
 	*rwlockp = rwlock;
 
-	WT_VERBOSE_VOID(session, mutex,
+	WT_VERBOSE_ERR(session, mutex,
 	    "rwlock: alloc %s (%p)", rwlock->name, rwlock);
 
 	if (0) {
@@ -183,21 +186,18 @@ err:		__wt_free(session, rwlock);
  * __wt_readlock
  *	Get a shared lock.
  */
-void
+int
 __wt_readlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 {
 	WT_DECL_RET;
 
-	WT_VERBOSE_VOID(session, mutex,
+	WT_VERBOSE_RET(session, mutex,
 	    "rwlock: readlock %s (%p)", rwlock->name, rwlock);
-
-	WT_ERR(pthread_rwlock_rdlock(&rwlock->rwlock));
 	WT_CSTAT_INCR(session, rwlock_read);
 
-	if (0) {
-err:		__wt_err(session, ret, "rwlock readlock failed");
-		__wt_abort(session);
-	}
+	if ((ret = pthread_rwlock_rdlock(&rwlock->rwlock)) == 0)
+		return (0);
+	WT_RET_MSG(session, ret, "pthread_rwlock_rdlock: %s", rwlock->name);
 }
 
 /*
@@ -209,77 +209,72 @@ __wt_try_writelock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 {
 	WT_DECL_RET;
 
-	WT_VERBOSE_VOID(session, mutex,
+	WT_VERBOSE_RET(session, mutex,
 	    "rwlock: try_writelock %s (%p)", rwlock->name, rwlock);
+	WT_CSTAT_INCR(session, rwlock_write);
 
-	if ((ret = pthread_rwlock_trywrlock(&rwlock->rwlock)) == 0)
-		WT_CSTAT_INCR(session, rwlock_write);
-	else if (ret != EBUSY) {
-		__wt_err(session, ret, "rwlock try_writelock failed");
-		__wt_abort(session);
-	}
-
-	return (ret);
+	if ((ret =
+	    pthread_rwlock_trywrlock(&rwlock->rwlock)) == 0 || ret == EBUSY)
+		return (ret);
+	WT_RET_MSG(session, ret, "pthread_rwlock_trywrlock: %s", rwlock->name);
 }
 
 /*
  * __wt_writelock
  *	Wait to get an exclusive lock.
  */
-void
+int
 __wt_writelock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 {
 	WT_DECL_RET;
 
-	WT_VERBOSE_VOID(session, mutex,
+	WT_VERBOSE_RET(session, mutex,
 	    "rwlock: writelock %s (%p)", rwlock->name, rwlock);
-
-	WT_ERR(pthread_rwlock_wrlock(&rwlock->rwlock));
 	WT_CSTAT_INCR(session, rwlock_write);
 
-	if (0) {
-err:		__wt_err(session, ret, "rwlock writelock failed");
-		__wt_abort(session);
-	}
+	if ((ret = pthread_rwlock_wrlock(&rwlock->rwlock)) == 0)
+		return (0);
+	WT_RET_MSG(session, ret, "pthread_rwlock_wrlock: %s", rwlock->name);
 }
 
 /*
  * __wt_rwunlock --
  *	Release a read/write lock.
  */
-void
+int
 __wt_rwunlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 {
 	WT_DECL_RET;
 
-	WT_VERBOSE_VOID(session, mutex,
+	WT_VERBOSE_RET(session, mutex,
 	    "rwlock: unlock %s (%p)", rwlock->name, rwlock);
 
-	WT_ERR(pthread_rwlock_unlock(&rwlock->rwlock));
-
-	if (0) {
-err:		__wt_err(session, ret, "rwlock unlock failed");
-		__wt_abort(session);
-	}
+	if ((ret = pthread_rwlock_unlock(&rwlock->rwlock)) == 0)
+		return (0);
+	WT_RET_MSG(session, ret, "pthread_rwlock_unlock: %s", rwlock->name);
 }
 
 /*
  * __wt_rwlock_destroy --
  *	Destroy a mutex.
  */
-void
+int
 __wt_rwlock_destroy(WT_SESSION_IMPL *session, WT_RWLOCK **rwlockp)
 {
+	WT_DECL_RET;
 	WT_RWLOCK *rwlock;
 
 	rwlock = *rwlockp;		/* Clear our caller's reference. */
 	*rwlockp = NULL;
 
-	WT_VERBOSE_VOID(session, mutex,
+	WT_VERBOSE_RET(session, mutex,
 	    "rwlock: destroy %s (%p)", rwlock->name, rwlock);
 
-	/* Errors are possible, but we're discarding memory, ignore them. */
-	(void)pthread_rwlock_destroy(&rwlock->rwlock);
+	if ((ret = pthread_rwlock_destroy(&rwlock->rwlock)) == 0) {
+		__wt_free(session, rwlock);
+		return (0);
+	}
 
-	__wt_free(session, rwlock);
+	/* Deliberately leak memory on error. */
+	WT_RET_MSG(session, ret, "pthread_rwlock_destroy: %s", rwlock->name);
 }

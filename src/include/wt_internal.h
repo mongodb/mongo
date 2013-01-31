@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -18,6 +18,7 @@ extern "C" {
 /*******************************************
  * WiredTiger system include files.
  *******************************************/
+#include <sys/mman.h>
 #include <sys/stat.h>
 #include <sys/time.h>
 #include <sys/uio.h>
@@ -29,6 +30,9 @@ extern "C" {
 #include <inttypes.h>
 #include <limits.h>
 #include <pthread.h>
+#ifdef HAVE_PTHREAD_NP_H
+#include <pthread_np.h>
+#endif
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
@@ -61,6 +65,8 @@ struct __wt_bloom;
     typedef struct __wt_bloom WT_BLOOM;
 struct __wt_bloom_hash;
     typedef struct __wt_bloom_hash WT_BLOOM_HASH;
+struct __wt_bm;
+    typedef struct __wt_bm WT_BM;
 struct __wt_btree;
     typedef struct __wt_btree WT_BTREE;
 struct __wt_btree_session;
@@ -193,47 +199,49 @@ struct __wt_update;
 /*******************************************
  * WiredTiger internal include files.
  *******************************************/
-#include "posix.h"
 #include "misc.h"
 #include "mutex.h"
-#include "txn.h"
+#include "posix.h"
 
+#include "txn.h"			/* typedef for wt_txnid_t */
+
+#include "api.h"
 #include "block.h"
+#include "bloom.h"
 #include "btmem.h"
 #include "btree.h"
 #include "cache.h"
 #include "config.h"
+#include "cursor.h"
 #include "dlh.h"
 #include "error.h"
+#include "flags.h"
 #include "log.h"
-#include "os.h"
-#include "stat.h"
-
-#include "api.h"
-#include "bloom.h"
-#include "cursor.h"
 #include "lsm.h"
 #include "meta.h"
+#include "os.h"
 #include "schema.h"
+#include "stat.h"
+
+#include "session.h"			/* required by connection.h */
+#include "connection.h"
 
 #include "extern.h"
 #include "verify_build.h"
 
-/* Required by cell.i */
-#include "intpack.i"
+#include "intpack.i"			/* required by cell.i, packing.i */
+#include "packing.i"
 #include "cell.i"
 
-/* Required by cursor.i */
-#include "txn.i"
+#include "btree.i"			/* required by cursor.i */
+#include "cache.i"			/* required by cursor.i */
+#include "txn.i"			/* required by cursor.i */
+#include "cursor.i"
 
 #include "bitstring.i"
-#include "btree.i"
-#include "cache.i"
 #include "column.i"
-#include "cursor.i"
 #include "log.i"
 #include "mutex.i"
-#include "packing.i"
 #include "serial_funcs.i"
 
 #if defined(__cplusplus)

@@ -1,16 +1,76 @@
-# Read the api_flags file and output a C header file using the minimum
-# number of distinct bits to ensure flags don't collide.
-#
-# The format of the api_flags file:
-#	Name (usually a method name)
-#	<tab>	Flag
+# Output a C header file using the minimum number of distinct bits to ensure
+# flags don't collide.
 
 import os, re, sys
 from dist import compare_srcfile
 
-# Load the flags dictionary.
-import api_data
-flags = api_data.flags
+flags = {
+###################################################
+# Internal routine flag declarations
+###################################################
+	'cache_flush' : [
+		'SYNC_CHECKPOINT',
+		'SYNC_COMPACT',
+		'SYNC_DISCARD',
+		'SYNC_DISCARD_NOWRITE',
+	],
+	'direct_io' : [
+		'DIRECTIO_DATA',
+		'DIRECTIO_LOG'
+	],
+	'rec_write' : [
+		'EVICTION_SERVER_LOCKED',
+		'SKIP_UPDATE_ERR',
+		'SKIP_UPDATE_QUIT',
+	],
+	'shared_cache' : [
+		'CACHE_POOL_RUN'
+	],
+	'tree_walk' : [
+		'TREE_CACHE',
+		'TREE_COMPACT',
+		'TREE_DISCARD',
+		'TREE_EVICT',
+		'TREE_PREV',
+		'TREE_SKIP_INTL',
+		'TREE_SKIP_LEAF',
+		'TREE_WAIT',
+	],
+	'verbose' : [
+		'VERB_block',
+		'VERB_ckpt',
+		'VERB_evict',
+		'VERB_evictserver',
+		'VERB_fileops',
+		'VERB_hazard',
+		'VERB_lsm',
+		'VERB_mutex',
+		'VERB_read',
+		'VERB_reconcile',
+		'VERB_salvage',
+		'VERB_shared_cache',
+		'VERB_verify',
+		'VERB_write'
+	],
+
+###################################################
+# Structure flag declarations
+###################################################
+	'conn' : [
+		'CONN_CACHE_POOL',
+		'CONN_LSM_MERGE',
+		'CONN_PANIC',
+		'CONN_SERVER_RUN',
+		'CONN_SYNC',
+		'CONN_TRANSACTIONAL',
+	],
+	'session' : [
+		'SESSION_INTERNAL',
+		'SESSION_NO_CACHE_CHECK',
+		'SESSION_SALVAGE_QUIET_ERR',
+		'SESSION_SCHEMA_LOCKED',
+	],
+}
 
 flag_cnt = {}		# Dictionary [flag] : [reference count]
 flag_name = {}		# Dictionary [flag] : [name ...]
@@ -42,7 +102,7 @@ for f in sorted(flag_cnt.items(),\
 	for m in flag_name[f[0]]:
 		mask &= ~name_mask[m]
 	if mask == 0:
-		print >>sys.stder, "api_flags: ran out of flags at " + m + " method",
+		print >>sys.stder, "flags.py: ran out of flags at " + m + " method",
 		sys.exit(1)
 	for b in bits:
 		if mask & b:
@@ -65,16 +125,16 @@ for f in sorted(flag_cnt.items()):
 tmp_file = '__tmp'
 tfile = open(tmp_file, 'w')
 skip = 0
-for line in open('../src/include/api.h', 'r'):
+for line in open('../src/include/flags.h', 'r'):
 	if skip:
-		if line.count('API flags section: END'):
+		if line.count('flags section: END'):
 			tfile.write('/*\n' + line)
 			skip = 0
 	else:
 		tfile.write(line)
-	if line.count('API flags section: BEGIN'):
+	if line.count('flags section: BEGIN'):
 		skip = 1
 		tfile.write(' */\n')
 		tfile.write(flag_info)
 tfile.close()
-compare_srcfile(tmp_file, '../src/include/api.h')
+compare_srcfile(tmp_file, '../src/include/flags.h')

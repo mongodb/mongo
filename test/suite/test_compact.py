@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Public Domain 2008-2012 WiredTiger, Inc.
+# Public Domain 2008-2013 WiredTiger, Inc.
 #
 # This is free and unencumbered software released into the public domain.
 #
@@ -56,9 +56,9 @@ class test_compact(wttest.WiredTigerTestCase, suite_subprocess):
         # Populate an object
         uri = self.uri + self.name
         if self.uri == "file:":
-            simple_populate(self, uri, self.config, self.nentries)
+            simple_populate(self, uri, self.config, self.nentries - 1)
         else:
-            complex_populate(self, uri, self.config, self.nentries)
+            complex_populate(self, uri, self.config, self.nentries - 1)
 
         # Reopen the connection to force the object to disk.
         self.reopen_conn()

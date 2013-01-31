@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -19,7 +19,7 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 	WT_INSERT_HEAD **inshead, *new_inshead, **new_inslist;
 	WT_ITEM *key, *value;
 	WT_PAGE *page;
-	WT_UPDATE **new_upd, *upd, **upd_entry, *upd_obsolete;
+	WT_UPDATE **new_upd, *old_upd, *upd, **upd_entry, *upd_obsolete;
 	size_t ins_size, upd_size;
 	size_t new_inshead_size, new_inslist_size, new_upd_size;
 	uint32_t ins_slot;
@@ -67,7 +67,7 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 			upd_entry = &cbt->ins->upd;
 
 		/* Make sure the update can proceed. */
-		WT_ERR(__wt_update_check(session, page, *upd_entry));
+		WT_ERR(__wt_update_check(session, page, old_upd = *upd_entry));
 
 		/* Allocate the WT_UPDATE structure and transaction ID. */
 		WT_ERR(__wt_update_alloc(session, value, &upd, &upd_size));
@@ -76,7 +76,7 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 
 		/* Serialize the update. */
 		WT_ERR(__wt_update_serial(session, page, cbt->write_gen,
-		    upd_entry, &new_upd, new_upd_size, &upd, upd_size,
+		    upd_entry, old_upd, &new_upd, new_upd_size, &upd, upd_size,
 		    &upd_obsolete));
 
 		/* Discard any obsolete WT_UPDATE structures. */
@@ -225,8 +225,7 @@ __wt_insert_serial_func(WT_SESSION_IMPL *session, void *args)
 	 * are still in the expected position, and no item has been added where
 	 * our insert belongs.
 	 */
-	if (page->modify->write_gen + 1 == page->modify->disk_gen)
-		return (WT_RESTART);
+	WT_RET(__wt_page_write_gen_wrapped_check(page));
 
 	if (page->modify->write_gen != write_gen) {
 		for (i = 0; i < skipdepth; i++) {
@@ -257,7 +256,7 @@ __wt_insert_serial_func(WT_SESSION_IMPL *session, void *args)
 		*ins_stack[i] = new_ins;
 	}
 
-	__wt_insert_new_ins_taken(session, args, page);
+	__wt_insert_new_ins_taken(args);
 
 	/*
 	 * If the insert head does not yet have an insert list, our caller
@@ -268,7 +267,7 @@ __wt_insert_serial_func(WT_SESSION_IMPL *session, void *args)
 	 */
 	if (*insheadp == NULL) {
 		WT_PUBLISH(*insheadp, new_inshead);
-		__wt_insert_new_inshead_taken(session, args, page);
+		__wt_insert_new_inshead_taken(args);
 	}
 
 	/*
@@ -281,12 +280,12 @@ __wt_insert_serial_func(WT_SESSION_IMPL *session, void *args)
 	if (page->type == WT_PAGE_ROW_LEAF) {
 		if (page->u.row.ins == NULL) {
 			page->u.row.ins = new_inslist;
-			__wt_insert_new_inslist_taken(session, args, page);
+			__wt_insert_new_inslist_taken(args);
 		}
 	} else
 		if (page->modify->update == NULL) {
 			page->modify->update = new_inslist;
-			__wt_insert_new_inslist_taken(session, args, page);
+			__wt_insert_new_inslist_taken(args);
 		}
 	__wt_page_and_tree_modify_set(session, page);
 	return (0);
@@ -342,8 +341,7 @@ __wt_update_alloc(WT_SESSION_IMPL *session,
 	}
 
 	*updp = upd;
-	if (sizep != NULL)
-		*sizep = sizeof(WT_UPDATE) + size;
+	*sizep = sizeof(WT_UPDATE) + size;
 	return (0);
 }
 
@@ -455,14 +453,21 @@ int
 __wt_update_serial_func(WT_SESSION_IMPL *session, void *args)
 {
 	WT_PAGE *page;
-	WT_UPDATE **new_upd, *upd, **upd_entry, **upd_obsolete;
+	WT_UPDATE **new_upd, *old_upd, *upd, **upd_entry, **upd_obsolete;
 	uint32_t write_gen;
 
-	__wt_update_unpack(
-	    args, &page, &write_gen, &upd_entry, &new_upd, &upd, &upd_obsolete);
+	__wt_update_unpack(args, &page, &write_gen,
+	    &upd_entry, &old_upd, &new_upd, &upd, &upd_obsolete);
 
-	/* Check the page's write-generation. */
-	WT_RET(__wt_page_write_gen_check(session, page, write_gen));
+	/*
+	 * Ignore the page's write-generation (other than the special case of
+	 * it wrapping).  If we're still in the expected position, we're good
+	 * to go and no update has been added where ours belongs.  If a new
+	 * update has been added, check if our update is still permitted.
+	 */
+	WT_RET(__wt_page_write_gen_wrapped_check(page));
+	if (old_upd != *upd_entry)
+		WT_RET(__wt_update_check(session, page, *upd_entry));
 
 	upd->next = *upd_entry;
 	/*
@@ -470,7 +475,7 @@ __wt_update_serial_func(WT_SESSION_IMPL *session, void *args)
 	 * pointer is set before we update the linked list.
 	 */
 	WT_PUBLISH(*upd_entry, upd);
-	__wt_update_upd_taken(session, args, page);
+	__wt_update_upd_taken(args);
 
 	/*
 	 * If the page needs an update array (column-store pages and inserts on
@@ -483,7 +488,7 @@ __wt_update_serial_func(WT_SESSION_IMPL *session, void *args)
 	 */
 	if (new_upd != NULL && page->u.row.upd == NULL) {
 		page->u.row.upd = new_upd;
-		__wt_update_new_upd_taken(session, args, page);
+		__wt_update_new_upd_taken(args);
 	}
 
 	/* Discard obsolete WT_UPDATE structures. */

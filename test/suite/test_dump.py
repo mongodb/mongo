@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Public Domain 2008-2012 WiredTiger, Inc.
+# Public Domain 2008-2013 WiredTiger, Inc.
 #
 # This is free and unencumbered software released into the public domain.
 #
@@ -54,14 +54,14 @@ class test_dump(wttest.WiredTigerTestCase, suite_subprocess):
     ]
     types = [
         ('file', dict(type='file:',
-        populate=simple_populate,
-        populate_check=simple_populate_check_cursor)),
+          populate=simple_populate,
+          populate_check=simple_populate_check_cursor)),
         ('table-simple', dict(type='table:',
-        populate=simple_populate,
-        populate_check=simple_populate_check_cursor)),
+          populate=simple_populate,
+          populate_check=simple_populate_check_cursor)),
         ('table-complex', dict(type='table:',
-        populate=complex_populate,
-        populate_check=complex_populate_check_cursor))
+          populate=complex_populate,
+          populate_check=complex_populate_check_cursor))
     ]
     scenarios = number_scenarios(
         multiply_scenarios('.', types, keyfmt, dumpfmt))
@@ -84,7 +84,7 @@ class test_dump(wttest.WiredTigerTestCase, suite_subprocess):
         conn = wiredtiger.wiredtiger_open(self.dir)
         session = conn.open_session()
         cursor = session.open_cursor(uri, None, None)
-        self.populate_check(self, cursor)
+        self.populate_check(self, cursor, self.nentries)
         conn.close()
 
 

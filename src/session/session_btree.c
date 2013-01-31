@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -66,7 +66,7 @@ __wt_session_lock_btree(WT_SESSION_IMPL *session, uint32_t flags)
 	} else if (F_ISSET(btree, WT_BTREE_SPECIAL_FLAGS))
 		return (EBUSY);
 	else
-		__wt_readlock(session, btree->rwlock);
+		WT_RET(__wt_readlock(session, btree->rwlock));
 
 	/*
 	 * At this point, we have the requested lock -- if that is all that was
@@ -83,7 +83,7 @@ __wt_session_lock_btree(WT_SESSION_IMPL *session, uint32_t flags)
 	 */
 	if (!LF_ISSET(WT_BTREE_EXCLUSIVE) || special_flags == 0) {
 		F_CLR(btree, WT_BTREE_EXCLUSIVE);
-		__wt_rwunlock(session, btree->rwlock);
+		WT_RET(__wt_rwunlock(session, btree->rwlock));
 	}
 
 	/* Treat an unopened handle just like a non-existent handle. */
@@ -106,9 +106,30 @@ __wt_session_release_btree(WT_SESSION_IMPL *session)
 	 * If we had no cache flag set, close and free the btree handle. It was
 	 * never added to the handle cache.
 	 */
-	if (F_ISSET(btree, WT_BTREE_NO_CACHE))
-		WT_RET(__wt_conn_btree_discard_single(session, btree));
-	else {
+	if (F_ISSET(btree, WT_BTREE_NO_CACHE)) {
+		/* A write lock has been held since the handle was created. */
+		WT_ERR(__wt_rwunlock(session, btree->rwlock));
+		WT_ERR(__wt_conn_btree_discard_single(session, btree));
+	} else {
+		if (F_ISSET(btree, WT_BTREE_DISCARD_CLOSE)) {
+			/*
+			 * If configured to discard on last close, attempt to
+			 * trade our read lock for an exclusive lock. If that
+			 * succeeds, setup for discard. It is expected that the
+			 * exclusive lock will fail sometimes since the handle
+			 * may still be in use - in that case we've already
+			 * unlocked, so we're done.
+			 */
+			WT_ERR(__wt_rwunlock(session, btree->rwlock));
+			ret = __wt_try_writelock(session, btree->rwlock);
+			if (ret != 0) {
+				if (ret == EBUSY)
+					ret = 0;
+				goto err;
+			}
+			F_CLR(btree, WT_BTREE_DISCARD_CLOSE);
+			F_SET(btree, WT_BTREE_DISCARD | WT_BTREE_EXCLUSIVE);
+		}
 
 		/*
 		 * If we had special flags set, close the handle so that future
@@ -118,16 +139,16 @@ __wt_session_release_btree(WT_SESSION_IMPL *session)
 			WT_ASSERT(session, F_ISSET(btree, WT_BTREE_EXCLUSIVE));
 			F_CLR(btree, WT_BTREE_DISCARD);
 
-			WT_RET(__wt_conn_btree_sync_and_close(session));
+			WT_TRET(__wt_conn_btree_sync_and_close(session));
 		}
 
 		if (F_ISSET(btree, WT_BTREE_EXCLUSIVE))
 			F_CLR(btree, WT_BTREE_EXCLUSIVE);
 
-		__wt_rwunlock(session, btree->rwlock);
+		WT_TRET(__wt_rwunlock(session, btree->rwlock));
 	}
-	session->btree = NULL;
 
+err:	session->btree = NULL;
 	return (ret);
 }
 
@@ -200,9 +221,11 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 	WT_BTREE *btree;
 	WT_BTREE_SESSION *btree_session;
 	WT_DECL_RET;
+	int candidate;
 
 	btree = NULL;
 	btree_session = NULL;
+	candidate = 0;
 
 	/*
 	 * If the no cache flag is set, we never use the handle cache to
@@ -218,42 +241,41 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 			    strcmp(checkpoint, btree->checkpoint) == 0))
 				break;
 		}
-
-		if (btree_session == NULL)
-			session->btree = NULL;
-		else {
-			session->btree = btree;
-
-			/*
-			 * Try and lock the file; if we succeed, our "exclusive"
-			 * state must match.
-			 */
-			if ((ret = __wt_session_lock_btree(
-			    session, flags)) != WT_NOTFOUND) {
-				WT_ASSERT(session, ret != 0 ||
-				    LF_ISSET(WT_BTREE_EXCLUSIVE) == F_ISSET(
-				    session->btree, WT_BTREE_EXCLUSIVE));
-				return (ret);
-			}
-			ret = 0;
-		}
 	}
 
-	/*
-	 * If we don't already hold the schema lock, get it now so that we
-	 * can find and/or open the handle.
-	 */
-	WT_WITH_SCHEMA_LOCK_OPT(session,
-	    ret = __wt_conn_btree_get(session, uri, checkpoint, cfg, flags));
-	WT_RET(ret);
+	if (btree_session != NULL) {
+		candidate = 1;
+		session->btree = btree;
 
-	if (btree_session == NULL && !LF_ISSET(WT_BTREE_NO_CACHE))
-		WT_RET(__wt_session_add_btree(session, NULL));
+		/*
+		 * Try and lock the file; if we succeed, our "exclusive"
+		 * state must match.
+		 */
+		ret = __wt_session_lock_btree(session, flags);
+		if (ret == WT_NOTFOUND)
+			btree_session = NULL;
+		else if (ret != 0)
+			return (ret);
+	}
 
-	WT_ASSERT(session, LF_ISSET(WT_BTREE_LOCK_ONLY) ||
-	    F_ISSET(session->btree, WT_BTREE_OPEN));
+	if (btree_session == NULL) {
+		/*
+		 * If we don't already hold the schema lock, get it now so that
+		 * we can find and/or open the handle.
+		 */
+		WT_WITH_SCHEMA_LOCK_OPT(session, ret =
+		    __wt_conn_btree_get(session, uri, checkpoint, cfg, flags));
+		WT_RET(ret);
+
+		if (!candidate && !LF_ISSET(WT_BTREE_NO_CACHE))
+			WT_RET(__wt_session_add_btree(session, NULL));
+		WT_ASSERT(session, LF_ISSET(WT_BTREE_LOCK_ONLY) ||
+		    F_ISSET(session->btree, WT_BTREE_OPEN));
+	}
+
 	WT_ASSERT(session, LF_ISSET(WT_BTREE_EXCLUSIVE) ==
 	    F_ISSET(session->btree, WT_BTREE_EXCLUSIVE));
+	F_SET(session->btree, LF_ISSET(WT_BTREE_DISCARD_CLOSE));
 
 	return (0);
 }

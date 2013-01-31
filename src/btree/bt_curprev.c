@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -498,7 +498,7 @@ __wt_btcur_prev(WT_CURSOR_BTREE *cbt, int discard)
 	if (discard)
 		LF_SET(WT_TREE_DISCARD);
 
-retry:	__cursor_func_init(cbt, 0);
+retry:	WT_RET(__cursor_func_init(cbt, 0));
 	__cursor_position_clear(cbt);
 
 	/*
@@ -586,6 +586,6 @@ retry:	__cursor_func_init(cbt, 0);
 
 err:	if (ret == WT_RESTART)
 		goto retry;
-	__cursor_func_resolve(cbt, ret);
+	WT_TRET(__cursor_func_resolve(cbt, ret));
 	return (ret);
 }

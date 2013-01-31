@@ -1,5 +1,5 @@
 /*-
- * Public Domain 2008-2012 WiredTiger, Inc.
+ * Public Domain 2008-2013 WiredTiger, Inc.
  *
  * This is free and unencumbered software released into the public domain.
  *
@@ -33,7 +33,7 @@
 
 #include <wiredtiger.h>
 
-const char *home = "WT_TEST";
+const char *home = NULL;
 
 int main(void)
 {

@@ -10,6 +10,7 @@ AJZ
 API
 APIs
 ARGS
+Addr
 Alakuijala
 Alloc
 Athlon
@@ -39,6 +40,7 @@ CELLs
 CKPT
 CLMPRSTdehikrsuv
 CLR
+CMP
 COL's
 CONCAT
 CONFIG
@@ -111,6 +113,7 @@ LSB
 LSM
 LSN
 LSNs
+LZO
 LeafGreen
 Llqr
 Llqrt
@@ -175,6 +178,7 @@ SSq
 STAILQ
 SYS
 Sevii
+SiH
 Skiplist
 Solaris
 Split's
@@ -196,6 +200,7 @@ URI
 URIs
 UTF
 UnixLib
+Unmap
 VARCHAR
 Vanishingly
 Vc
@@ -473,6 +478,7 @@ llll
 llu
 lno
 loadtext
+lockdown
 logf
 logput
 lookup
@@ -482,6 +488,7 @@ lru
 lsm
 lsn
 lu
+lzo
 majorp
 malloc
 maxintlitem
@@ -503,12 +510,14 @@ mfence
 minorp
 minprefix
 mkdir
+mmap
 msg
 msgv
 mtx
 multiprocess
 multithread
 multithreaded
+munmap
 mutex
 mutexes
 myfile
@@ -551,6 +560,7 @@ patchp
 pathnames
 perf
 pfx
+poptable
 posint
 posix
 pre
@@ -575,6 +585,7 @@ rdlock
 readlock
 readnear
 readnext
+readonly
 readprev
 readserver
 realloc
@@ -688,6 +699,7 @@ treplacement
 trk
 trk's
 troot
+trywrlock
 tsalvage
 tsplit
 tstat
@@ -716,6 +728,7 @@ uninstantiated
 unix
 unjams
 unlinked
+unmap
 unmerged
 unmodify
 unpackv

@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Public Domain 2008-2012 WiredTiger, Inc.
+# Public Domain 2008-2013 WiredTiger, Inc.
 #
 # This is free and unencumbered software released into the public domain.
 #
@@ -66,7 +66,7 @@ class test_shared_cache(wttest.WiredTigerTestCase):
     def openConnections(
             self,
             connections,
-            pool_opts = ',shared_cache=(name=pool,size=200M,chunk=10M,min=30M),',
+            pool_opts = ',shared_cache=(name=pool,size=200M,chunk=10M,reserve=30M),',
             extra_opts = '',
             add=0):
         if add == 0:

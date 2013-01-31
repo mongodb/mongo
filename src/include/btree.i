@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2008-2012 WiredTiger, Inc.
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
@@ -17,12 +17,30 @@ __wt_page_is_modified(WT_PAGE *page)
 }
 
 /*
+ * __wt_eviction_page_force --
+ *      Add a page for forced eviction if it matches the criteria.
+ */
+static inline int
+__wt_eviction_page_force(WT_SESSION_IMPL *session, WT_PAGE *page)
+{
+	WT_BTREE *btree;
+
+	btree = session->btree;
+	if (btree != NULL && !F_ISSET(btree, WT_BTREE_NO_EVICTION) &&
+	    __wt_page_is_modified(page) &&
+	    page->type != WT_PAGE_ROW_INT && page->type != WT_PAGE_COL_INT &&
+	    page->memory_footprint > btree->maxmempage)
+		return (__wt_evict_forced_page(session, page));
+
+	return (0);
+}
+
+/*
  * __wt_cache_page_inmem_incr --
  *	Increment a page's memory footprint in the cache.
  */
 static inline void
-__wt_cache_page_inmem_incr(
-    WT_SESSION_IMPL *session, WT_PAGE *page, size_t size)
+__wt_cache_page_inmem_incr(WT_SESSION_IMPL *session, WT_PAGE *page, size_t size)
 {
 	WT_CACHE *cache;
 
@@ -38,8 +56,7 @@ __wt_cache_page_inmem_incr(
  *	Decrement a page's memory footprint in the cache.
  */
 static inline void
-__wt_cache_page_inmem_decr(
-    WT_SESSION_IMPL *session, WT_PAGE *page, size_t size)
+__wt_cache_page_inmem_decr(WT_SESSION_IMPL *session, WT_PAGE *page, size_t size)
 {
 	WT_CACHE *cache;
 
@@ -53,19 +70,22 @@ __wt_cache_page_inmem_decr(
 /*
  * __wt_cache_dirty_decr --
  *	Decrement a page's memory footprint from the cache dirty count. Will
- *      be called after a reconciliation leaves a page clean.
+ *	be called after a reconciliation leaves a page clean.
  */
 static inline void
-__wt_cache_dirty_decr(
-    WT_SESSION_IMPL *session, size_t size)
+__wt_cache_dirty_decr(WT_SESSION_IMPL *session, size_t size)
 {
 	WT_CACHE *cache;
 
 	cache = S2C(session)->cache;
 	if (cache->bytes_dirty < size || cache->pages_dirty == 0) {
-		WT_VERBOSE_VOID(session, evictserver,
-		    "Cache dirty count. Needed: %" PRIu64 " have: %" PRIu64,
-		    (uint64_t)size, cache->bytes_dirty);
+		if (WT_VERBOSE_ISSET(session, evictserver))
+			(void)__wt_verbose(session,
+			    "Cache dirty decrement failed: %" PRIu64
+			    " pages dirty, %" PRIu64
+			    " bytes dirty, decrement size %" PRIuMAX,
+			    cache->pages_dirty,
+			    cache->bytes_dirty, (uintmax_t)size);
 		cache->bytes_dirty = 0;
 		cache->pages_dirty = 0;
 	} else {
@@ -250,6 +270,25 @@ __wt_page_and_tree_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page)
 }
 
 /*
+ * __wt_page_write_gen_wrapped_check --
+ *	Confirm the page's write generation number hasn't wrapped.
+ */
+static inline int
+__wt_page_write_gen_wrapped_check(WT_PAGE *page)
+{
+	WT_PAGE_MODIFY *mod;
+
+	mod = page->modify;
+
+	/* 
+	 * If the page's write generation has wrapped and caught up with the
+	 * disk generation (wildly unlikely but technically possible as it
+	 * implies 4B updates between page reconciliations), fail the update.
+	 */
+	return (mod->write_gen + 1 == mod->disk_gen ? WT_RESTART : 0);
+}
+
+/*
  * __wt_page_write_gen_check --
  *	Confirm the page's write generation number is correct.
  */
@@ -259,7 +298,7 @@ __wt_page_write_gen_check(
 {
 	WT_PAGE_MODIFY *mod;
 
-	mod = page->modify;
+	WT_RET(__wt_page_write_gen_wrapped_check(page));
 
 	/*
 	 * If the page's write generation matches the search generation, we can
@@ -268,7 +307,8 @@ __wt_page_write_gen_check(
 	 * possible as it implies 4B updates between page reconciliations), fail
 	 * the update.
 	 */
-	if (mod->write_gen == write_gen && mod->write_gen + 1 != mod->disk_gen)
+	mod = page->modify;
+	if (mod->write_gen == write_gen)
 		return (0);
 
 	WT_DSTAT_INCR(session, txn_write_conflict);
@@ -371,7 +411,7 @@ __wt_get_addr(
  * __wt_page_release --
  *	Release a reference to a page.
  */
-static inline void
+static inline int
 __wt_page_release(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_BTREE *btree;
@@ -383,34 +423,35 @@ __wt_page_release(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * in memory, regardless.
 	 */
 	if (page == NULL || WT_PAGE_IS_ROOT(page))
-		return;
+		return (0);
 
-	/* If this is a non cached page, discard it. */
+	/* If this page isn't cached, discard it. */
 	if (F_ISSET(btree, WT_BTREE_NO_CACHE)) {
 		page->ref->page = NULL;
 		page->ref->state = WT_REF_DISK;
-		__wt_page_out(session, &page, 0);
-		return;
+		__wt_page_out(session, &page);
+		return (0);
 	}
 
 	/* Discard our hazard pointer. */
-	__wt_hazard_clear(session, page);
+	return (__wt_hazard_clear(session, page));
 }
 
 /*
  * __wt_stack_release --
  *	Release references to a page stack.
  */
-static inline void
+static inline int
 __wt_stack_release(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_PAGE *next;
 
 	while (page != NULL && !WT_PAGE_IS_ROOT(page)) {
 		next = page->parent;
-		__wt_page_release(session, page);
+		WT_RET(__wt_page_release(session, page));
 		page = next;
 	}
+	return (0);
 }
 
 /*
