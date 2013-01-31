@@ -194,7 +194,7 @@ __wt_cache_bytes_dirty(WT_CACHE *cache)
 
 /*
  * __wt_cache_pages_dirty --
- *	Return the number of bytes in cache marked dirty.
+ *	Return the number of pages in cache marked dirty.
  */
 static inline uint64_t
 __wt_cache_pages_dirty(WT_CACHE *cache)
