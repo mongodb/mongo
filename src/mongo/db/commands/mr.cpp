@@ -746,7 +746,7 @@ namespace mongo {
             BSONList all;
 
             verify(pm == op->setMessage("m/r: (3/3) final reduce to collection",
-                                        "M/R Final Reduce Progress",
+                                        "M/R: (3/3) Final Reduce Progress",
                                         _db.count(_config.incLong, BSONObj(), QueryOption_SlaveOk)));
 
             shared_ptr<Cursor> temp =
@@ -1059,7 +1059,7 @@ namespace mongo {
                     state.init();
                     state.prepTempCollection();
                     ProgressMeterHolder pm(op->setMessage("m/r: (1/3) emit phase",
-                                                          "M/R: Emit Progress",
+                                                          "M/R: (1/3) Emit Progress",
                                                           state.incomingDocuments()));
 
                     wassert( config.limit < 0x4000000 ); // see case on next line to 32 bit unsigned
@@ -1142,7 +1142,7 @@ namespace mongo {
                     timingBuilder.append( "emitLoop" , t.millis() );
 
                     op->setMessage("m/r: (2/3) final reduce in memory",
-                                   "M/R Final In-Memory Reduce Progress");
+                                   "M/R: (2/3) Final In-Memory Reduce Progress");
                     Timer rt;
                     // do reduce in memory
                     // this will be the last reduce needed for inline mode
