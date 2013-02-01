@@ -18,6 +18,7 @@
 
 #include "mongo/db/instance.h"
 #include "mongo/db/pdfile.h"
+#include "mongo/util/scopeguard.h"
 
 namespace mongo {
 
@@ -29,7 +30,24 @@ namespace mongo {
         return "IndexRebuilder";
     }
 
+    /**
+     * This resets memory tracking to its original value after all indexes are rebuilt.
+     *
+     * Before the server starts listening, all memory accesses are counted as taking 0 time (because
+     * the timer hasn't started yet).  The Record class warns about these 0-time accesses (actually,
+     * the warning is in Rolling, which is used by Record) so run() turns off the tracking to
+     * silence these warnings.  We want to make sure that they're turned back on, though, no matter
+     * how run() exits.
+     */
+    static void resetMemoryTracking(bool originalTracking) {
+        Record::MemoryTrackingEnabled = originalTracking;
+    }
+
     void IndexRebuilder::run() {
+        // Disable record access timer warnings
+        ON_BLOCK_EXIT(resetMemoryTracking, Record::MemoryTrackingEnabled);
+        Record::MemoryTrackingEnabled = false;
+
         Client::initThread(name().c_str());
         Lock::GlobalWrite lk;
         Client::GodScope gs;
