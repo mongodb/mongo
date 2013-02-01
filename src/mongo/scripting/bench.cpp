@@ -149,7 +149,7 @@ namespace mongo {
         if ( args["username"].type() == String )
             this->username = args["username"].String();
         if ( args["password"].type() == String )
-            this->db = args["password"].String();
+            this->password = args["password"].String();
 
         if ( args["parallel"].isNumber() )
             this->parallel = args["parallel"].numberInt();
