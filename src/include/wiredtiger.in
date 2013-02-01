@@ -652,8 +652,10 @@ struct __wt_session {
 	 * Permitted values are empty (off)\, \c "english"\, \c "utf8<file>" or
 	 * \c "utf16<file>".  See @ref huffman for more information.,a string;
 	 * default empty.}
-	 * @config{internal_item_max, the maximum key size stored on internal
-	 * nodes\, in bytes.  If zero\, a maximum is calculated to permit at
+	 * @config{internal_item_max, the largest key stored within an internal
+	 * node\, in bytes.  If non-zero\, any key larger than the specified
+	 * size will be stored as an overflow item (which may require additional
+	 * I/O to access).  If zero\, a default size is chosen that permits at
 	 * least 8 keys per internal page.,an integer greater than or equal to
 	 * 0; default \c 0.}
 	 * @config{internal_key_truncate, configure internal key truncation\,
@@ -677,10 +679,12 @@ struct __wt_session {
 	 * leaf page\, constraining the number of keys processed to instantiate
 	 * a random Btree leaf page key.,an integer greater than or equal to 0;
 	 * default \c 10.}
-	 * @config{leaf_item_max, the maximum key or value size stored on leaf
-	 * nodes\, in bytes. If zero\, a size is calculated to permit at least 8
-	 * items (values or row store keys) per leaf page.,an integer greater
-	 * than or equal to 0; default \c 0.}
+	 * @config{leaf_item_max, the largest key or value stored within a leaf
+	 * node\, in bytes. If non-zero\, any key or value larger than the
+	 * specified size will be stored as an overflow item (which may require
+	 * additional I/O to access).  If zero\, a default size is chosen that
+	 * permits at least 4 key and value pairs per leaf page.,an integer
+	 * greater than or equal to 0; default \c 0.}
 	 * @config{leaf_page_max, the maximum page size for leaf nodes\, in
 	 * bytes; the size must be a multiple of the allocation size\, and is
 	 * significant for applications wanting to maximize sequential data
