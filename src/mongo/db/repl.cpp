@@ -1198,6 +1198,7 @@ namespace mongo {
         cmd.appendAs( me["_id"] , "handshake" );
         if (theReplSet) {
             cmd.append("member", theReplSet->selfId());
+            cmd.append("config", theReplSet->myConfig().asBson());
         }
 
         BSONObj res;
@@ -1271,13 +1272,19 @@ namespace mongo {
         return false;
     }
 
-    bool OplogReader::passthroughHandshake(const BSONObj& rid, const int f) {
+    bool OplogReader::passthroughHandshake(const BSONObj& rid, const int nextOnChainId) {
         BSONObjBuilder cmd;
-        cmd.appendAs( rid["_id"], "handshake" );
-        cmd.append( "member" , f );
+        cmd.appendAs(rid["_id"], "handshake");
+        if (theReplSet) {
+            const Member* chainedMember = theReplSet->findById(nextOnChainId);
+            if (chainedMember != NULL) {
+                cmd.append("config", chainedMember->config().asBson());
+            }
+        }
+        cmd.append("member", nextOnChainId);
 
         BSONObj res;
-        return conn()->runCommand( "admin" , cmd.obj() , res );
+        return conn()->runCommand("admin", cmd.obj(), res);
     }
 
     void OplogReader::tailingQuery(const char *ns, const BSONObj& query, const BSONObj* fields ) {
