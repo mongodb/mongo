@@ -404,7 +404,14 @@ ReplSetTest.prototype.getMaster = function( timeout ) {
   var tmo = timeout || 60000;
   var master = null;
 
-  master = jsTest.attempt({context: this, timeout: tmo, desc: "Finding master"}, this.callIsMaster);
+  try {
+    master = jsTest.attempt({context: this, timeout: tmo, desc: "Finding master"}, this.callIsMaster);
+  }
+  catch (err) {
+    print("ReplSetTest getMaster failed: " + tojson(err));
+    printStackTrace();
+    throw err;
+  }
   return master;
 }
 
