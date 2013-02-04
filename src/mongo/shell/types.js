@@ -483,28 +483,45 @@ tojson = function(x, indent, nolint){
 
     switch (typeof x) {
     case "string": {
-        var s = "\"";
+        var out = new Array(x.length+1);
+        out[0] = '"';
         for (var i=0; i<x.length; i++){
-            switch (x[i]){
-                case '"': s += '\\"'; break;
-                case '\\': s += '\\\\'; break;
-                case '\b': s += '\\b'; break;
-                case '\f': s += '\\f'; break;
-                case '\n': s += '\\n'; break;
-                case '\r': s += '\\r'; break;
-                case '\t': s += '\\t'; break;
+            switch (x[i]) {
+                case '"':
+                  out[out.length] = '\\"';
+                  break;
+                case '\\':
+                  out[out.length] = '\\\\';
+                  break;
+                case '\b':
+                  out[out.length] = '\\b';
+                  break;
+                case '\f':
+                  out[out.length] = '\\f';
+                  break;
+                case '\n':
+                  out[out.length] = '\\n';
+                  break;
+                case '\r':
+                  out[out.length] = '\\r';
+                  break;
+                case '\t':
+                  out[out.length] = '\\t';
+                  break;
 
                 default: {
                     var code = x.charCodeAt(i);
                     if (code < 0x20){
-                        s += (code < 0x10 ? '\\u000' : '\\u00') + code.toString(16);
+                        out[out.length] =
+                          (code < 0x10 ? '\\u000' : '\\u00') + code.toString(16);
                     } else {
-                        s += x[i];
+                        out[out.length] = x[i];
                     }
                 }
             }
         }
-        return s + "\"";
+
+        return out.join('') + "\"";
     }
     case "number":
     case "boolean":
