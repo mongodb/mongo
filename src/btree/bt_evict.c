@@ -50,8 +50,10 @@ __evict_read_gen(const WT_EVICT_ENTRY *entry)
 		return (0);
 
 	read_gen = page->read_gen + entry->btree->evict_priority;
-	if (page->type == WT_PAGE_ROW_INT ||
-	    page->type == WT_PAGE_COL_INT)
+	if ((page->type == WT_PAGE_ROW_INT ||
+	    page->type == WT_PAGE_COL_INT) &&
+	    (page->modify == NULL ||
+	    !F_ISSET(page->modify, WT_PM_REC_SPLIT_MERGE)))
 		read_gen += WT_EVICT_INT_SKEW;
 
 	return (read_gen);
@@ -160,10 +162,28 @@ __wt_evict_forced_page(WT_SESSION_IMPL *session, WT_PAGE *page)
 	WT_CACHE *cache;
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
-	u_int count;
+	WT_PAGE *top;
+	u_int count, levels;
 
 	conn = S2C(session);
 	cache = conn->cache;
+
+	/* Don't queue a page for forced eviction if we already have one. */
+	if (F_ISSET(cache, WT_EVICT_FORCE_PASS))
+		return (EBUSY);
+
+	/*
+	 * Check if there is a stack of split-merge pages: if so, lock the
+	 * top instead.
+	 */
+	for (top = page, levels = 0;
+	    top->parent->modify != NULL &&
+	    F_ISSET(top->parent->modify, WT_PM_REC_SPLIT_MERGE);
+	    ++levels)
+		top = top->parent;
+
+	if (levels > 3)
+		page = top;
 
 	/*
 	 * Try to lock the page.  If this succeeds, we're going to queue
@@ -213,7 +233,7 @@ err:	__wt_spin_unlock(session, &cache->evict_lock);
 	 * Otherwise, unlock it.
 	 */
 	if (ret == 0) {
-		F_SET(S2C(session)->cache, WT_EVICT_FORCE_PASS);
+		F_SET(cache, WT_EVICT_FORCE_PASS);
 		ret = __wt_evict_server_wake(session);
 	} else
 		page->ref->state = WT_REF_MEM;
@@ -667,12 +687,12 @@ __wt_sync_file(WT_SESSION_IMPL *session, int syncop)
 	WT_BTREE *btree;
 	WT_CACHE *cache;
 	WT_DECL_RET;
-	WT_PAGE *page;
+	WT_PAGE *page, *last_page;
 	uint32_t flags;
 
 	btree = session->btree;
 	cache = S2C(session)->cache;
-	page = NULL;
+	last_page = page = NULL;
 
 	switch (syncop) {
 	case WT_SYNC_CHECKPOINT:
@@ -687,6 +707,8 @@ __wt_sync_file(WT_SESSION_IMPL *session, int syncop)
 			/* Write dirty pages. */
 			if (__wt_page_is_modified(page))
 				WT_ERR(__wt_rec_write(session, page, NULL, 0));
+			last_page = page;
+			WT_UNUSED(last_page);
 			WT_ERR(__wt_tree_walk(session, &page, flags));
 		}
 
@@ -981,10 +1003,13 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, int clean)
 		 * Use the EVICT_LRU flag to avoid putting pages onto the list
 		 * multiple times.
 		 */
-		if (WT_PAGE_IS_ROOT(page) ||
+		if (WT_PAGE_IS_ROOT(page))
+			continue;
+		if (F_ISSET_ATOMIC(page, WT_PAGE_EVICT_LRU) ||
 		    (page->modify != NULL &&
-		    F_ISSET(page->modify, WT_PM_REC_SPLIT_MERGE)) ||
-		    F_ISSET_ATOMIC(page, WT_PAGE_EVICT_LRU))
+		    (F_ISSET(page->modify, WT_PM_REC_SPLIT_MERGE) &&
+		    page->parent->modify != NULL &&
+		    F_ISSET(page->parent->modify, WT_PM_REC_SPLIT_MERGE))))
 			continue;
 
 		/*

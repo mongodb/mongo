@@ -13,7 +13,7 @@ static void __rec_discard_tree(WT_SESSION_IMPL *, WT_PAGE *, int);
 static void __rec_excl_clear(WT_SESSION_IMPL *);
 static void __rec_page_clean_update(WT_SESSION_IMPL *, WT_PAGE *);
 static int  __rec_page_dirty_update(WT_SESSION_IMPL *, WT_PAGE *);
-static int  __rec_review(WT_SESSION_IMPL *, WT_REF *, WT_PAGE *, int, int);
+static int  __rec_review(WT_SESSION_IMPL *, WT_REF *, WT_PAGE *, int, int, int);
 static void __rec_root_update(WT_SESSION_IMPL *);
 
 /*
@@ -25,6 +25,7 @@ __wt_rec_evict(WT_SESSION_IMPL *session, WT_PAGE *page, int exclusive)
 {
 	WT_DECL_RET;
 	WT_PAGE_MODIFY *mod;
+	int merge;
 
 	WT_VERBOSE_RET(session, evict,
 	    "page %p (%s)", page, __wt_page_type_string(page->type));
@@ -32,17 +33,12 @@ __wt_rec_evict(WT_SESSION_IMPL *session, WT_PAGE *page, int exclusive)
 	WT_ASSERT(session, session->excl_next == 0);
 
 	/*
-	 * Split-merge pages cannot be evicted, they're always merged into their
-	 * parent; split-merge pages are ignored by the eviction thread, we
-	 * never get a split-merge page to evict.  Check out of sheer paranoia.
-	 * Split pages are NOT included in this test, because a split page can
-	 * be separately evicted, at which point it's replaced in its parent by
-	 * a reference to a split-merge page.  That's a normal part of the leaf
-	 * page life-cycle if it grows too large and must be pushed out of the
-	 * cache.
+	 * If we get a split-merge page during normal eviction, try to collapse
+	 * it.  During close, it will be merged into its parent.
 	 */
 	mod = page->modify;
-	if (mod != NULL && F_ISSET(mod, WT_PM_REC_SPLIT_MERGE))
+	merge = (mod != NULL && F_ISSET(mod, WT_PM_REC_SPLIT_MERGE));
+	if (merge && exclusive)
 		return (EBUSY);
 
 	/*
@@ -57,7 +53,15 @@ __wt_rec_evict(WT_SESSION_IMPL *session, WT_PAGE *page, int exclusive)
 	 * or during salvage).  That's OK if WT_REC_SINGLE is set: we won't
 	 * check hazard pointers in that case.
 	 */
-	WT_ERR(__rec_review(session, page->ref, page, exclusive, 1));
+	WT_ERR(__rec_review(session, page->ref, page, exclusive, merge, 1));
+
+	/* Try to merge internal pages. */
+	if (merge) {
+		WT_ERR(__wt_merge_tree(session, page));
+
+		WT_CSTAT_INCR(session, cache_eviction_merge);
+		WT_DSTAT_INCR(session, cache_eviction_merge);
+	}
 
 	/*
 	 * Update the page's modification reference, reconciliation might have
@@ -66,7 +70,7 @@ __wt_rec_evict(WT_SESSION_IMPL *session, WT_PAGE *page, int exclusive)
 	mod = page->modify;
 
 	/* Count evictions of internal pages during normal operation. */
-	if (!exclusive &&
+	if (!exclusive && !merge &&
 	    (page->type == WT_PAGE_COL_INT || page->type == WT_PAGE_ROW_INT)) {
 		WT_CSTAT_INCR(session, cache_eviction_internal);
 		WT_DSTAT_INCR(session, cache_eviction_internal);
@@ -211,6 +215,9 @@ __rec_page_dirty_update(WT_SESSION_IMPL *session, WT_PAGE *page)
 		WT_PUBLISH(parent_ref->state, WT_REF_DISK);
 		break;
 	case WT_PM_REC_SPLIT:				/* Page split */
+		/* In case promotion worked, update to the new parent. */
+		parent_ref = page->ref;
+
 		/*
 		 * Update the parent to reference new internal page(s).
 		 *
@@ -291,7 +298,7 @@ __rec_discard_page(WT_SESSION_IMPL *session, WT_PAGE *page, int exclusive)
  */
 static int
 __rec_review(WT_SESSION_IMPL *session,
-    WT_REF *ref, WT_PAGE *page, int exclusive, int top)
+    WT_REF *ref, WT_PAGE *page, int exclusive, int merge, int top)
 {
 	WT_BTREE *btree;
 	WT_DECL_RET;
@@ -322,8 +329,8 @@ __rec_review(WT_SESSION_IMPL *session,
 			case WT_REF_DELETED:		/* On-disk, deleted */
 				break;
 			case WT_REF_MEM:		/* In-memory */
-				WT_RET(__rec_review(
-				    session, ref, ref->page, exclusive, 0));
+				WT_RET(__rec_review(session,
+				    ref, ref->page, exclusive, merge, 0));
 				break;
 			case WT_REF_EVICT_WALK:		/* Walk point */
 			case WT_REF_EVICT_FORCE:	/* Forced evict */
@@ -388,6 +395,13 @@ __rec_review(WT_SESSION_IMPL *session,
 			    WT_PM_REC_SPLIT | WT_PM_REC_SPLIT_MERGE))
 				break;
 		}
+
+	/*
+	 * If we are merging internal pages, we just need exclusive access, we
+	 * don't need to write everything.
+	 */
+	if (merge)
+		return (0);
 
 	/*
 	 * Fail if any page in the top-level page's subtree won't be merged into

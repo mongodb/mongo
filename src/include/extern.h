@@ -319,6 +319,7 @@ extern int __wt_page_inmem( WT_SESSION_IMPL *session,
     WT_PAGE_HEADER *dsk,
     int disk_not_alloc,
     WT_PAGE **pagep);
+extern int __wt_merge_tree(WT_SESSION_IMPL *session, WT_PAGE *top);
 extern int __wt_cache_read(WT_SESSION_IMPL *session,
     WT_PAGE *parent,
     WT_REF *ref);
