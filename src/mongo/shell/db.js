@@ -1038,6 +1038,7 @@ DB.prototype.grep = function(search, includeNonIndexedFields) {
             for (var j = 0; j < indexes.length; j++) {
                 for (var field in indexes[j]) {
                     findFields[field] = 1;
+                    break;
                 }
             }
         }
