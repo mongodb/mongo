@@ -595,11 +595,11 @@ __btree_page_sizes(WT_SESSION_IMPL *session, const char *config)
 	btree->maxmempage = WT_MAX((uint64_t)cval.val, 50 * btree->maxleafpage);
 
 	/*
-	 * Limit allocation units to 128MB, and page sizes to 512MB.  There's
-	 * no reason we couldn't support larger sizes (any sizes up to the
-	 * smaller of an off_t and a size_t should work), but an application
-	 * specifying larger allocation or page sizes would likely be making
-	 * as mistake.  The API checked this, but we assert it anyway.
+	 * Limit allocation units to 128MB, and page sizes to 512MB.  There's no
+	 * reason we couldn't support larger values (any value up to the smaller
+	 * of an off_t and a size_t should work), but an application specifying
+	 * larger allocation units or page sizes is likely making a mistake. The
+	 * API checked this, but we assert it anyway.
 	 */
 	WT_ASSERT(session, btree->allocsize >= WT_BTREE_ALLOCATION_SIZE_MIN);
 	WT_ASSERT(session, btree->allocsize <= WT_BTREE_ALLOCATION_SIZE_MAX);
