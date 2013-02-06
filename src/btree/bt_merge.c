@@ -58,8 +58,8 @@ typedef struct {
 	WT_PAGE *current, *lchild, *rchild;
 	WT_REF *ref;
 
-	uint64_t refcnt, split;
-	uint64_t first_live, last_live;
+	uint32_t refcnt, split;
+	uint32_t first_live, last_live;
 	u_int maxdepth;
 	int seen_live;
 } WT_VISIT_STATE;
@@ -79,7 +79,10 @@ __merge_count(WT_REF *ref, u_int depth, void *cookie)
 		state->last_live = state->refcnt;
 		state->seen_live = 1;
 	}
-	++state->refcnt;
+
+	/* Sanity check that we don't have more than 2**32 refs. */
+	if (++state->refcnt == 0)
+		return (ENOMEM);
 	return (0);
 }
 
@@ -113,17 +116,17 @@ __merge_move_ref(WT_REF *ref, u_int depth, void *cookie)
 
 static int
 __merge_new_page(WT_SESSION_IMPL *session,
-	uint8_t type, uint64_t refcnt, int merge, WT_PAGE **pagep)
+	uint8_t type, uint32_t entries, int merge, WT_PAGE **pagep)
 {
 	WT_DECL_RET;
 	WT_PAGE *newpage;
 
 	WT_RET(__wt_calloc_def(session, 1, &newpage));
-	WT_ERR(__wt_calloc_def(session, (size_t)refcnt, &newpage->u.intl.t));
+	WT_ERR(__wt_calloc_def(session, (size_t)entries, &newpage->u.intl.t));
 
 	/* Fill it in. */
 	newpage->read_gen = __wt_cache_read_gen(session);
-	newpage->entries = refcnt;
+	newpage->entries = entries;
 	newpage->type = type;
 
 	WT_ERR(__wt_page_modify_init(session, newpage));
@@ -180,7 +183,7 @@ __wt_merge_tree(WT_SESSION_IMPL *session, WT_PAGE *top)
 	WT_PAGE *newtop;
 	WT_REF *newref;
 	WT_VISIT_STATE visit_state;
-	uint64_t refcnt, split;
+	uint32_t refcnt, split;
 	int promote;
 	uint8_t page_type;
 
@@ -266,7 +269,7 @@ __wt_merge_tree(WT_SESSION_IMPL *session, WT_PAGE *top)
 
 	WT_VERBOSE_ERR(session, evict,
 	    "Successfully %s %" PRIu32
-	    " split-merge pages containing %" PRIu64 " keys\n",
+	    " split-merge pages containing %" PRIu32 " keys\n",
 	    promote ? "promoted" : "merged", visit_state.maxdepth, refcnt);
 
 	return (0);
@@ -274,7 +277,7 @@ __wt_merge_tree(WT_SESSION_IMPL *session, WT_PAGE *top)
 err:
 	WT_VERBOSE_TRET(session, evict,
 	    "Failed to merge %" PRIu32
-	    " split-merge pages containing %" PRIu64 " keys\n",
+	    " split-merge pages containing %" PRIu32 " keys\n",
 	    visit_state.maxdepth, refcnt);
 
 	WT_ASSERT(session, 0);
