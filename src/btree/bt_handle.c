@@ -7,7 +7,7 @@
 
 #include "wt_internal.h"
 
-static int __btree_conf(WT_SESSION_IMPL *, WT_CKPT *ckpt, const char *[]);
+static int __btree_conf(WT_SESSION_IMPL *, WT_CKPT *ckpt);
 static int __btree_get_last_recno(WT_SESSION_IMPL *);
 static int __btree_page_sizes(WT_SESSION_IMPL *, const char *);
 static int __btree_tree_open_empty(WT_SESSION_IMPL *, int);
@@ -55,15 +55,8 @@ __wt_btree_open(WT_SESSION_IMPL *session, const char *cfg[])
 	btree = session->btree;
 	bm = NULL;
 
-	/* Checkpoint files and no-cache files are readonly. */
+	/* Checkpoint files are readonly. */
 	readonly = btree->checkpoint == NULL ? 0 : 1;
-	if (!readonly && cfg != NULL) {
-		ret = __wt_config_gets(session, cfg, "no_cache", &cval);
-		if (ret != 0 && ret != WT_NOTFOUND)
-			WT_RET(ret);
-		if (ret == 0 && cval.val != 0)
-			readonly = 1;
-	}
 
 	/* Get the checkpoint information for this name/checkpoint pair. */
 	WT_CLEAR(ckpt);
@@ -90,7 +83,7 @@ __wt_btree_open(WT_SESSION_IMPL *session, const char *cfg[])
 	}
 
 	/* Initialize and configure the WT_BTREE structure. */
-	WT_ERR(__btree_conf(session, &ckpt, cfg));
+	WT_ERR(__btree_conf(session, &ckpt));
 
 	/* Connect to the underlying block manager. */
 	filename = btree->name;
@@ -194,12 +187,11 @@ __wt_btree_close(WT_SESSION_IMPL *session)
  *	Configure a WT_BTREE structure.
  */
 static int
-__btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt, const char *cfg[])
+__btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
 {
 	WT_BTREE *btree;
 	WT_CONFIG_ITEM cval;
 	WT_CONNECTION_IMPL *conn;
-	WT_DECL_RET;
 	WT_NAMED_COLLATOR *ncoll;
 	WT_NAMED_COMPRESSOR *ncomp;
 	uint32_t bitcnt;
@@ -268,16 +260,6 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt, const char *cfg[])
 			F_SET(btree, WT_BTREE_NO_EVICTION | WT_BTREE_NO_HAZARD);
 		else
 			F_CLR(btree, WT_BTREE_NO_EVICTION);
-	}
-
-	/* No-cache files are never evicted or cached. */
-	if (cfg != NULL) {
-		ret = __wt_config_gets(session, cfg, "no_cache", &cval);
-		if (ret != 0 && ret != WT_NOTFOUND)
-			WT_RET(ret);
-		if (ret == 0 && cval.val != 0)
-			F_SET(session->btree, WT_BTREE_NO_CACHE |
-			    WT_BTREE_NO_EVICTION | WT_BTREE_NO_HAZARD);
 	}
 
 	/* Checksums */
@@ -575,7 +557,7 @@ __btree_get_last_recno(WT_SESSION_IMPL *session)
 		return (WT_NOTFOUND);
 
 	btree->last_recno = __col_last_recno(page);
-	return (__wt_stack_release(session, page));
+	return (__wt_page_release(session, page));
 }
 
 /*

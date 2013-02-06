@@ -170,8 +170,17 @@ __wt_row_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 		if (cmp != 0)
 			ref = page->u.intl.t + (base - 1);
 
-		/* Move to the child page. */
-		WT_ERR(__wt_page_in(session, page, ref));
+		/*
+		 * Swap the parent page for the child page; return on error,
+		 * the swap function ensures we're holding nothing on failure.
+		 *
+		 * !!!
+		 * Don't use WT_RET, we've already used WT_ERR, and the style
+		 * checking code complains if we use WT_RET after a jump to an
+		 * error label.
+		 */
+		if ((ret = __wt_page_swap(session, page, page, ref)) != 0)
+			return (ret);
 		page = ref->page;
 	}
 
@@ -270,7 +279,7 @@ __wt_row_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 	WT_ERR(__wt_search_insert(session, cbt, cbt->ins_head, srch_key));
 	return (0);
 
-err:	WT_TRET(__wt_stack_release(session, page));
+err:	WT_TRET(__wt_page_release(session, page));
 	return (ret);
 }
 
@@ -295,8 +304,11 @@ __wt_row_random(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 	for (page = btree->root_page; page->type == WT_PAGE_ROW_INT;) {
 		ref = page->u.intl.t + __wt_random() % page->entries;
 
-		/* Swap the parent page for the child page. */
-		WT_ERR(__wt_page_in(session, page, ref));
+		/*
+		 * Swap the parent page for the child page; return on error,
+		 * the swap function ensures we're holding nothing on failure.
+		 */
+		WT_RET(__wt_page_swap(session, page, page, ref));
 		page = ref->page;
 	}
 
@@ -337,6 +349,6 @@ __wt_row_random(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 
 	return (0);
 
-err:	WT_TRET(__wt_stack_release(session, page));
+err:	WT_TRET(__wt_page_release(session, page));
 	return (ret);
 }

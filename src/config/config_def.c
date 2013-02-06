@@ -320,8 +320,8 @@ __wt_confchk_session_log_printf[] = {
 
 const char *
 __wt_confdfl_session_open_cursor =
-	"append=0,bulk=0,checkpoint=,dump=,next_random=0,no_cache=0,"
-	"overwrite=0,raw=0,statistics_clear=0,statistics_fast=0,target=";
+	"append=0,bulk=0,checkpoint=,dump=,next_random=0,overwrite=0,raw=0,"
+	"statistics_clear=0,statistics_fast=0,target=";
 
 WT_CONFIG_CHECK
 __wt_confchk_session_open_cursor[] = {
@@ -330,7 +330,6 @@ __wt_confchk_session_open_cursor[] = {
 	{ "checkpoint", "string", NULL, NULL},
 	{ "dump", "string", "choices=[\"hex\",\"print\"]", NULL},
 	{ "next_random", "boolean", NULL, NULL},
-	{ "no_cache", "boolean", NULL, NULL},
 	{ "overwrite", "boolean", NULL, NULL},
 	{ "raw", "boolean", NULL, NULL},
 	{ "statistics_clear", "boolean", NULL, NULL},

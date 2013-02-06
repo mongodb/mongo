@@ -102,51 +102,40 @@ __wt_session_release_btree(WT_SESSION_IMPL *session)
 
 	btree = session->btree;
 
-	/*
-	 * If we had no cache flag set, close and free the btree handle. It was
-	 * never added to the handle cache.
-	 */
-	if (F_ISSET(btree, WT_BTREE_NO_CACHE)) {
-		/* A write lock has been held since the handle was created. */
-		WT_ERR(__wt_rwunlock(session, btree->rwlock));
-		WT_ERR(__wt_conn_btree_discard_single(session, btree));
-	} else {
-		if (F_ISSET(btree, WT_BTREE_DISCARD_CLOSE)) {
-			/*
-			 * If configured to discard on last close, attempt to
-			 * trade our read lock for an exclusive lock. If that
-			 * succeeds, setup for discard. It is expected that the
-			 * exclusive lock will fail sometimes since the handle
-			 * may still be in use - in that case we've already
-			 * unlocked, so we're done.
-			 */
-			WT_ERR(__wt_rwunlock(session, btree->rwlock));
-			ret = __wt_try_writelock(session, btree->rwlock);
-			if (ret != 0) {
-				if (ret == EBUSY)
-					ret = 0;
-				goto err;
-			}
-			F_CLR(btree, WT_BTREE_DISCARD_CLOSE);
-			F_SET(btree, WT_BTREE_DISCARD | WT_BTREE_EXCLUSIVE);
-		}
-
+	if (F_ISSET(btree, WT_BTREE_DISCARD_CLOSE)) {
 		/*
-		 * If we had special flags set, close the handle so that future
-		 * access can get a handle without special flags.
+		 * If configured to discard on last close, attempt to trade our
+		 * read lock for an exclusive lock. If that succeeds, setup for
+		 * discard. It is expected that the exclusive lock will fail
+		 * sometimes since the handle may still be in use: in that case
+		 * we've already unlocked, so we're done.
 		 */
-		if (F_ISSET(btree, WT_BTREE_DISCARD | WT_BTREE_SPECIAL_FLAGS)) {
-			WT_ASSERT(session, F_ISSET(btree, WT_BTREE_EXCLUSIVE));
-			F_CLR(btree, WT_BTREE_DISCARD);
-
-			WT_TRET(__wt_conn_btree_sync_and_close(session));
+		WT_ERR(__wt_rwunlock(session, btree->rwlock));
+		ret = __wt_try_writelock(session, btree->rwlock);
+		if (ret != 0) {
+			if (ret == EBUSY)
+				ret = 0;
+			goto err;
 		}
-
-		if (F_ISSET(btree, WT_BTREE_EXCLUSIVE))
-			F_CLR(btree, WT_BTREE_EXCLUSIVE);
-
-		WT_TRET(__wt_rwunlock(session, btree->rwlock));
+		F_CLR(btree, WT_BTREE_DISCARD_CLOSE);
+		F_SET(btree, WT_BTREE_DISCARD | WT_BTREE_EXCLUSIVE);
 	}
+
+	/*
+	 * If we had special flags set, close the handle so that future access
+	 * can get a handle without special flags.
+	 */
+	if (F_ISSET(btree, WT_BTREE_DISCARD | WT_BTREE_SPECIAL_FLAGS)) {
+		WT_ASSERT(session, F_ISSET(btree, WT_BTREE_EXCLUSIVE));
+		F_CLR(btree, WT_BTREE_DISCARD);
+
+		WT_TRET(__wt_conn_btree_sync_and_close(session));
+	}
+
+	if (F_ISSET(btree, WT_BTREE_EXCLUSIVE))
+		F_CLR(btree, WT_BTREE_EXCLUSIVE);
+
+	WT_TRET(__wt_rwunlock(session, btree->rwlock));
 
 err:	session->btree = NULL;
 	return (ret);
@@ -227,20 +216,14 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 	btree_session = NULL;
 	candidate = 0;
 
-	/*
-	 * If the no cache flag is set, we never use the handle cache to
-	 * store or retrieve the handle.
-	 */
-	if (!LF_ISSET(WT_BTREE_NO_CACHE)) {
-		TAILQ_FOREACH(btree_session, &session->btrees, q) {
-			btree = btree_session->btree;
-			if (strcmp(uri, btree->name) != 0)
-				continue;
-			if ((checkpoint == NULL && btree->checkpoint == NULL) ||
-			    (checkpoint != NULL && btree->checkpoint != NULL &&
-			    strcmp(checkpoint, btree->checkpoint) == 0))
-				break;
-		}
+	TAILQ_FOREACH(btree_session, &session->btrees, q) {
+		btree = btree_session->btree;
+		if (strcmp(uri, btree->name) != 0)
+			continue;
+		if ((checkpoint == NULL && btree->checkpoint == NULL) ||
+		    (checkpoint != NULL && btree->checkpoint != NULL &&
+		    strcmp(checkpoint, btree->checkpoint) == 0))
+			break;
 	}
 
 	if (btree_session != NULL) {
@@ -267,7 +250,7 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 		    __wt_conn_btree_get(session, uri, checkpoint, cfg, flags));
 		WT_RET(ret);
 
-		if (!candidate && !LF_ISSET(WT_BTREE_NO_CACHE))
+		if (!candidate)
 			WT_RET(__wt_session_add_btree(session, NULL));
 		WT_ASSERT(session, LF_ISSET(WT_BTREE_LOCK_ONLY) ||
 		    F_ISSET(session->btree, WT_BTREE_OPEN));
