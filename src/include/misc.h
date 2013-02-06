@@ -180,6 +180,6 @@
 	__wt_scr_alloc_func(session, size, scratchp)
 #define	__wt_page_in(session, parent, ref)				\
 	__wt_page_in_func(session, parent, ref)
-#define	__wt_page_swap(session, out, in, inref)
-	__wt_page_swap_func(session, out, int, inref)
+#define	__wt_page_swap(session, out, in, inref)				\
+	__wt_page_swap_func(session, out, in, inref)
 #endif
