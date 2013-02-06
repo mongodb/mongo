@@ -118,7 +118,7 @@ __clsm_open_cursors(
 	const char *ckpt_cfg[] = API_CONF_DEFAULTS(session, open_cursor,
 	    "checkpoint=WiredTigerCheckpoint,raw");
 	const char *merge_cfg[] = API_CONF_DEFAULTS(session, open_cursor,
-	    "checkpoint=WiredTigerCheckpoint,no_cache,raw");
+	    "checkpoint=WiredTigerCheckpoint,raw");
 	u_int i, nchunks;
 
 	session = (WT_SESSION_IMPL *)clsm->iface.session;

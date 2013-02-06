@@ -140,20 +140,18 @@ struct __wt_btree {
 #define	WT_BTREE_DISCARD_CLOSE	0x0004	/* Discard on last close */
 #define	WT_BTREE_EXCLUSIVE	0x0008	/* Need exclusive access to handle */
 #define	WT_BTREE_LOCK_ONLY	0x0010	/* Handle is only needed for locking */
-#define	WT_BTREE_NO_CACHE	0x0020	/* Disable caching */
-#define	WT_BTREE_NO_EVICTION	0x0040	/* Disable eviction */
-#define	WT_BTREE_NO_HAZARD	0x0080	/* Disable hazard pointers */
-#define	WT_BTREE_OPEN		0x0100	/* Handle is open */
-#define	WT_BTREE_SALVAGE	0x0200	/* Handle is for salvage */
-#define	WT_BTREE_UPGRADE	0x0400	/* Handle is for upgrade */
-#define	WT_BTREE_VERIFY		0x0800	/* Handle is for verify */
+#define	WT_BTREE_NO_EVICTION	0x0020	/* Disable eviction */
+#define	WT_BTREE_NO_HAZARD	0x0040	/* Disable hazard pointers */
+#define	WT_BTREE_OPEN		0x0080	/* Handle is open */
+#define	WT_BTREE_SALVAGE	0x0100	/* Handle is for salvage */
+#define	WT_BTREE_UPGRADE	0x0200	/* Handle is for upgrade */
+#define	WT_BTREE_VERIFY		0x0400	/* Handle is for verify */
 	uint32_t flags;
 };
 
 /* Flags that make a btree handle special (not for normal use). */
 #define	WT_BTREE_SPECIAL_FLAGS	 					\
-	(WT_BTREE_BULK | WT_BTREE_NO_CACHE |				\
-	WT_BTREE_SALVAGE | WT_BTREE_UPGRADE | WT_BTREE_VERIFY)
+	(WT_BTREE_BULK | WT_BTREE_SALVAGE | WT_BTREE_UPGRADE | WT_BTREE_VERIFY)
 
 /*
  * WT_SALVAGE_COOKIE --

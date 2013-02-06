@@ -59,7 +59,7 @@ __wt_compact(WT_SESSION_IMPL *session, const char *cfg[])
 		 * we want to re-write; mark the page and tree dirty.
 		 */
 		if ((ret = __wt_page_modify_init(session, page)) != 0) {
-			WT_TRET(__wt_stack_release(session, page));
+			WT_TRET(__wt_page_release(session, page));
 			WT_RET(ret);
 		}
 		__wt_page_and_tree_modify_set(session, page);

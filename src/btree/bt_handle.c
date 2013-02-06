@@ -7,7 +7,7 @@
 
 #include "wt_internal.h"
 
-static int __btree_conf(WT_SESSION_IMPL *, WT_CKPT *ckpt, const char *[]);
+static int __btree_conf(WT_SESSION_IMPL *, WT_CKPT *ckpt);
 static int __btree_get_last_recno(WT_SESSION_IMPL *);
 static int __btree_page_sizes(WT_SESSION_IMPL *, const char *);
 static int __btree_tree_open_empty(WT_SESSION_IMPL *, int);
@@ -55,15 +55,8 @@ __wt_btree_open(WT_SESSION_IMPL *session, const char *cfg[])
 	btree = session->btree;
 	bm = NULL;
 
-	/* Checkpoint files and no-cache files are readonly. */
+	/* Checkpoint files are readonly. */
 	readonly = btree->checkpoint == NULL ? 0 : 1;
-	if (!readonly && cfg != NULL) {
-		ret = __wt_config_gets(session, cfg, "no_cache", &cval);
-		if (ret != 0 && ret != WT_NOTFOUND)
-			WT_RET(ret);
-		if (ret == 0 && cval.val != 0)
-			readonly = 1;
-	}
 
 	/* Get the checkpoint information for this name/checkpoint pair. */
 	WT_CLEAR(ckpt);
@@ -90,7 +83,7 @@ __wt_btree_open(WT_SESSION_IMPL *session, const char *cfg[])
 	}
 
 	/* Initialize and configure the WT_BTREE structure. */
-	WT_ERR(__btree_conf(session, &ckpt, cfg));
+	WT_ERR(__btree_conf(session, &ckpt));
 
 	/* Connect to the underlying block manager. */
 	filename = btree->name;
@@ -194,12 +187,11 @@ __wt_btree_close(WT_SESSION_IMPL *session)
  *	Configure a WT_BTREE structure.
  */
 static int
-__btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt, const char *cfg[])
+__btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
 {
 	WT_BTREE *btree;
 	WT_CONFIG_ITEM cval;
 	WT_CONNECTION_IMPL *conn;
-	WT_DECL_RET;
 	WT_NAMED_COLLATOR *ncoll;
 	WT_NAMED_COMPRESSOR *ncomp;
 	uint32_t bitcnt;
@@ -268,16 +260,6 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt, const char *cfg[])
 			F_SET(btree, WT_BTREE_NO_EVICTION | WT_BTREE_NO_HAZARD);
 		else
 			F_CLR(btree, WT_BTREE_NO_EVICTION);
-	}
-
-	/* No-cache files are never evicted or cached. */
-	if (cfg != NULL) {
-		ret = __wt_config_gets(session, cfg, "no_cache", &cval);
-		if (ret != 0 && ret != WT_NOTFOUND)
-			WT_RET(ret);
-		if (ret == 0 && cval.val != 0)
-			F_SET(session->btree, WT_BTREE_NO_CACHE |
-			    WT_BTREE_NO_EVICTION | WT_BTREE_NO_HAZARD);
 	}
 
 	/* Checksums */
@@ -575,7 +557,7 @@ __btree_get_last_recno(WT_SESSION_IMPL *session)
 		return (WT_NOTFOUND);
 
 	btree->last_recno = __col_last_recno(page);
-	return (__wt_stack_release(session, page));
+	return (__wt_page_release(session, page));
 }
 
 /*
@@ -612,6 +594,18 @@ __btree_page_sizes(WT_SESSION_IMPL *session, const char *config)
 	WT_RET(__wt_config_getones(session, config, "memory_page_max", &cval));
 	btree->maxmempage = WT_MAX((uint64_t)cval.val, 50 * btree->maxleafpage);
 
+	/*
+	 * Limit allocation units to 128MB, and page sizes to 512MB.  There's no
+	 * reason we couldn't support larger values (any value up to the smaller
+	 * of an off_t and a size_t should work), but an application specifying
+	 * larger allocation units or page sizes is likely making a mistake. The
+	 * API checked this, but we assert it anyway.
+	 */
+	WT_ASSERT(session, btree->allocsize >= WT_BTREE_ALLOCATION_SIZE_MIN);
+	WT_ASSERT(session, btree->allocsize <= WT_BTREE_ALLOCATION_SIZE_MAX);
+	WT_ASSERT(session, btree->maxintlpage <= WT_BTREE_PAGE_SIZE_MAX);
+	WT_ASSERT(session, btree->maxleafpage <= WT_BTREE_PAGE_SIZE_MAX);
+
 	/* Allocation sizes must be a power-of-two, nothing else makes sense. */
 	if (!__wt_ispo2(btree->allocsize))
 		WT_RET_MSG(session,
@@ -627,9 +621,8 @@ __btree_page_sizes(WT_SESSION_IMPL *session, const char *config)
 		    "size (%" PRIu32 "B)", btree->allocsize);
 
 	/*
-	 * Set the split percentage: reconciliation splits to a
-	 * smaller-than-maximum page size so we don't split every time a new
-	 * entry is added.
+	 * Set the split percentage: reconciliation splits to a smaller-than-
+	 * maximum page size so we don't split every time a new entry is added.
 	 */
 	WT_RET(__wt_config_getones(session, config, "split_pct", &cval));
 	split_pct = (uint32_t)cval.val;
@@ -646,6 +639,15 @@ __btree_page_sizes(WT_SESSION_IMPL *session, const char *config)
 		    btree->maxintlitem = intl_split_size / 8;
 	if (btree->maxleafitem == 0)
 		    btree->maxleafitem = leaf_split_size / 8;
+
+	/*
+	 * If raw compression is configured, the application owns page layout,
+	 * it's not our problem.   Hopefully the application chose well.
+	 */
+	if (btree->compressor != NULL &&
+	    btree->compressor->compress_raw != NULL)
+		return (0);
+
 	/* Check we can fit at least 2 items on a page. */
 	if (btree->maxintlitem > btree->maxintlpage / 2)
 		return (pse1(session, "internal",
@@ -665,18 +667,6 @@ __btree_page_sizes(WT_SESSION_IMPL *session, const char *config)
 	if (btree->maxleafitem > leaf_split_size / 2)
 		return (pse2(session, "leaf",
 		    btree->maxleafpage, btree->maxleafitem, split_pct));
-
-	/*
-	 * Limit allocation units to 128MB, and page sizes to 512MB.  There's
-	 * no reason we couldn't support larger sizes (any sizes up to the
-	 * smaller of an off_t and a size_t should work), but an application
-	 * specifying larger allocation or page sizes would likely be making
-	 * as mistake.  The API checked this, but we assert it anyway.
-	 */
-	WT_ASSERT(session, btree->allocsize >= WT_BTREE_ALLOCATION_SIZE_MIN);
-	WT_ASSERT(session, btree->allocsize <= WT_BTREE_ALLOCATION_SIZE_MAX);
-	WT_ASSERT(session, btree->maxintlpage <= WT_BTREE_PAGE_SIZE_MAX);
-	WT_ASSERT(session, btree->maxleafpage <= WT_BTREE_PAGE_SIZE_MAX);
 
 	return (0);
 }

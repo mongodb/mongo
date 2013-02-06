@@ -322,17 +322,6 @@ __wt_curfile_create(WT_SESSION_IMPL *session,
 		WT_ERR(__wt_curbulk_init((WT_CURSOR_BULK *)cbt, bitmap));
 
 	/*
-	 * no_cache
-	 * No cache cursors are read-only.
-	 */
-	WT_ERR(__wt_config_gets_defno(session, cfg, "no_cache", &cval));
-	if (cval.val != 0) {
-		cursor->insert = __wt_cursor_notsup;
-		cursor->update = __wt_cursor_notsup;
-		cursor->remove = __wt_cursor_notsup;
-	}
-
-	/*
 	 * random_retrieval
 	 * Random retrieval cursors only support next, reset and close.
 	 */
@@ -379,13 +368,9 @@ __wt_curfile_open(WT_SESSION_IMPL *session, const char *uri,
 		WT_RET_MSG(session, EINVAL,
 		    "Value for 'bulk' must be a boolean or 'bitmap'");
 
-	/* Bulk and no cache handles require exclusive access. */
+	/* Bulk handles require exclusive access. */
 	if (bulk)
 		LF_SET(WT_BTREE_BULK | WT_BTREE_EXCLUSIVE);
-
-	WT_RET(__wt_config_gets_defno(session, cfg, "no_cache", &cval));
-	if (cval.val != 0)
-		LF_SET(WT_BTREE_NO_CACHE | WT_BTREE_EXCLUSIVE);
 
 	/* TODO: handle projections. */
 

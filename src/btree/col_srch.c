@@ -70,8 +70,11 @@ __wt_col_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 			ref = page->u.intl.t + (base - 1);
 		}
 
-		/* Move to the child page. */
-		WT_ERR(__wt_page_in(session, page, ref));
+		/*
+		 * Swap the parent page for the child page; return on error,
+		 * the swap function ensures we're holding nothing on failure.
+		 */
+		WT_RET(__wt_page_swap(session, page, page, ref));
 		page = ref->page;
 	}
 
@@ -167,6 +170,6 @@ past_end:
 		F_SET(cbt, WT_CBT_MAX_RECORD);
 	return (0);
 
-err:	WT_TRET(__wt_stack_release(session, page));
+err:	WT_TRET(__wt_page_release(session, page));
 	return (ret);
 }
