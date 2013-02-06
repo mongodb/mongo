@@ -177,6 +177,7 @@ __wt_evict_forced_page(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * top instead.
 	 */
 	for (top = page, levels = 0;
+	    top->parent != NULL &&
 	    top->parent->modify != NULL &&
 	    F_ISSET(top->parent->modify, WT_PM_REC_SPLIT_MERGE);
 	    ++levels)
