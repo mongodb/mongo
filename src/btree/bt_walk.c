@@ -162,7 +162,7 @@ int
 __wt_tree_walk(WT_SESSION_IMPL *session, WT_PAGE **pagep, uint32_t flags)
 {
 	WT_BTREE *btree;
-	WT_PAGE *page, *t;
+	WT_PAGE *page, *parent;
 	WT_REF *ref;
 	uint32_t slot;
 	int cache, compact, discard, eviction, prev, set_read_gen;
@@ -180,10 +180,7 @@ __wt_tree_walk(WT_SESSION_IMPL *session, WT_PAGE **pagep, uint32_t flags)
 	skip_intl = LF_ISSET(WT_TREE_SKIP_INTL) ? 1 : 0;
 	skip_leaf = LF_ISSET(WT_TREE_SKIP_LEAF) ? 1 : 0;
 
-	/*
-	 * Take a copy of any returned page; we have a hazard pointer on the
-	 * page, by definition.
-	 */
+	/* Take a copy of any held page and clear the return value. */
 	page = *pagep;
 	*pagep = NULL;
 
@@ -200,18 +197,39 @@ ascend:	/* If the active page was the root, we've reached the walk's end. */
 		return (0);
 
 	/* Figure out the current slot in the parent page's WT_REF array. */
-	t = page->parent;
-	slot = (uint32_t)(page->ref - t->u.intl.t);
+	parent = page->parent;
+	slot = (uint32_t)(page->ref - parent->u.intl.t);
 
-	/* If not the eviction thread, release the page's hazard pointer. */
-	if (eviction) {
+	/* If the eviction thread, clear the page's walk status. */
+	if (eviction)
 		if (page->ref->state == WT_REF_EVICT_WALK)
 			page->ref->state = WT_REF_MEM;
-	} else
-		WT_RET(__wt_page_release(session, page));
 
-	/* Switch to the parent. */
-	page = t;
+	/*
+	 * Move to the parent.
+	 *
+	 * If not the eviction thread, swap our hazard pointer for the hazard
+	 * pointer of our parent, if it's not the root page (we could access
+	 * it directly because we know it's in memory, but we need a hazard as
+	 * we climb the tree).  Don't leave a hazard pointer dangling on error.
+	 *
+	 * We're hazard-pointer coupling up the tree and that's OK: first,
+	 * hazard pointers can't deadlock, so there's none of the usual
+	 * problems found when logically locking up a Btree; second, we don't
+	 * release our current hazard pointer until we have our parent's
+	 * hazard pointer.  If the eviction thread tries to evict the active
+	 * page, that fails because of our hazard pointer.  If eviction tries
+	 * to evict our parent, that fails because the parent has a child page
+	 * that can't be discarded.
+	 */
+	if (!eviction) {
+		if (WT_PAGE_IS_ROOT(parent))
+			WT_RET(__wt_page_release(session, page));
+		else
+			WT_RET(
+			    __wt_page_swap(session, page, parent, parent->ref));
+	}
+	page = parent;
 
 	/*
 	 * If we're at the last/first slot on the page, return this page in
@@ -296,8 +314,8 @@ retry:				if (ref->state != WT_REF_MEM ||
 				if (ref->state == WT_REF_DELETED ||
 				    ref->state == WT_REF_DISK)
 					break;
-				/* Grab a hazard pointer. */
-				WT_RET(__wt_page_in(session, page, ref));
+				WT_RET(
+				    __wt_page_swap(session, page, page, ref));
 			} else if (discard) {
 				/*
 				 * If deleting a range, try to delete the page
@@ -307,7 +325,8 @@ retry:				if (ref->state != WT_REF_MEM ||
 				    session, page, ref, &skip));
 				if (skip)
 					break;
-				WT_RET(__wt_page_in(session, page, ref));
+				WT_RET(
+				    __wt_page_swap(session, page, page, ref));
 			} else {
 				/*
 				 * If iterating a cursor (or doing compaction),
@@ -337,14 +356,13 @@ retry:				if (ref->state != WT_REF_MEM ||
 					set_read_gen =
 					    ref->state == WT_REF_DISK ? 1 : 0;
 				}
-
-				WT_RET(__wt_page_in(session, page, ref));
+				WT_RET(
+				    __wt_page_swap(session, page, page, ref));
 				if (set_read_gen)
 					page->read_gen = 0;
 			}
 
 			page = ref->page;
-			WT_ASSERT(session, page != NULL);
 			slot = prev ? page->entries - 1 : 0;
 		}
 	}
