@@ -594,6 +594,18 @@ __btree_page_sizes(WT_SESSION_IMPL *session, const char *config)
 	WT_RET(__wt_config_getones(session, config, "memory_page_max", &cval));
 	btree->maxmempage = WT_MAX((uint64_t)cval.val, 50 * btree->maxleafpage);
 
+	/*
+	 * Limit allocation units to 128MB, and page sizes to 512MB.  There's
+	 * no reason we couldn't support larger sizes (any sizes up to the
+	 * smaller of an off_t and a size_t should work), but an application
+	 * specifying larger allocation or page sizes would likely be making
+	 * as mistake.  The API checked this, but we assert it anyway.
+	 */
+	WT_ASSERT(session, btree->allocsize >= WT_BTREE_ALLOCATION_SIZE_MIN);
+	WT_ASSERT(session, btree->allocsize <= WT_BTREE_ALLOCATION_SIZE_MAX);
+	WT_ASSERT(session, btree->maxintlpage <= WT_BTREE_PAGE_SIZE_MAX);
+	WT_ASSERT(session, btree->maxleafpage <= WT_BTREE_PAGE_SIZE_MAX);
+
 	/* Allocation sizes must be a power-of-two, nothing else makes sense. */
 	if (!__wt_ispo2(btree->allocsize))
 		WT_RET_MSG(session,
@@ -609,9 +621,8 @@ __btree_page_sizes(WT_SESSION_IMPL *session, const char *config)
 		    "size (%" PRIu32 "B)", btree->allocsize);
 
 	/*
-	 * Set the split percentage: reconciliation splits to a
-	 * smaller-than-maximum page size so we don't split every time a new
-	 * entry is added.
+	 * Set the split percentage: reconciliation splits to a smaller-than-
+	 * maximum page size so we don't split every time a new entry is added.
 	 */
 	WT_RET(__wt_config_getones(session, config, "split_pct", &cval));
 	split_pct = (uint32_t)cval.val;
@@ -628,6 +639,15 @@ __btree_page_sizes(WT_SESSION_IMPL *session, const char *config)
 		    btree->maxintlitem = intl_split_size / 8;
 	if (btree->maxleafitem == 0)
 		    btree->maxleafitem = leaf_split_size / 8;
+
+	/*
+	 * If raw compression is configured, the application owns page layout,
+	 * it's not our problem.   Hopefully the application chose well.
+	 */
+	if (btree->compressor != NULL &&
+	    btree->compressor->compress_raw != NULL)
+		return (0);
+
 	/* Check we can fit at least 2 items on a page. */
 	if (btree->maxintlitem > btree->maxintlpage / 2)
 		return (pse1(session, "internal",
@@ -647,18 +667,6 @@ __btree_page_sizes(WT_SESSION_IMPL *session, const char *config)
 	if (btree->maxleafitem > leaf_split_size / 2)
 		return (pse2(session, "leaf",
 		    btree->maxleafpage, btree->maxleafitem, split_pct));
-
-	/*
-	 * Limit allocation units to 128MB, and page sizes to 512MB.  There's
-	 * no reason we couldn't support larger sizes (any sizes up to the
-	 * smaller of an off_t and a size_t should work), but an application
-	 * specifying larger allocation or page sizes would likely be making
-	 * as mistake.  The API checked this, but we assert it anyway.
-	 */
-	WT_ASSERT(session, btree->allocsize >= WT_BTREE_ALLOCATION_SIZE_MIN);
-	WT_ASSERT(session, btree->allocsize <= WT_BTREE_ALLOCATION_SIZE_MAX);
-	WT_ASSERT(session, btree->maxintlpage <= WT_BTREE_PAGE_SIZE_MAX);
-	WT_ASSERT(session, btree->maxleafpage <= WT_BTREE_PAGE_SIZE_MAX);
 
 	return (0);
 }
