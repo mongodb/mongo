@@ -104,6 +104,7 @@ namespace {
         ("sslCRLFile", po::value<std::string>(&cmdLine.sslCRLFile),
          "Certificate Revocation List file for SSL")
         ("sslWeakCertificateValidation", "allow client to connect without presenting a certificate")
+        ("sslFIPSMode", "activate FIPS 140-2 mode at startup")
 #endif
         ;
         
@@ -420,12 +421,16 @@ namespace {
                 log() << "need sslCAFile with sslWeakCertificateValidation" << endl;
                 return false;
             }
+            if (params.count("sslFIPSMode")) {
+                cmdLine.sslFIPSMode = true;
+            }
         }
         else if (cmdLine.sslPEMKeyFile.size() || 
                  cmdLine.sslPEMKeyPassword.size() ||
                  cmdLine.sslCAFile.size() ||
                  cmdLine.sslCRLFile.size() ||
-                 cmdLine.sslWeakCertificateValidation) {
+                 cmdLine.sslWeakCertificateValidation ||
+                 cmdLine.sslFIPSMode) {
             log() << "need to enable sslOnNormalPorts" << endl;
             return false;
         }

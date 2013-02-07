@@ -109,6 +109,11 @@ namespace mongo {
         SSL_library_init();
         SSL_load_error_strings();
         ERR_load_crypto_strings();
+
+        if (params.fipsMode) {
+            _setupFIPS();
+        }
+
         // Add all digests and ciphers to OpenSSL's internal table
         // so that encryption/decryption is backwards compatible
         OpenSSL_add_all_algorithms();
@@ -156,6 +161,25 @@ namespace mongo {
 
     int SSLManager::verify_cb(int ok, X509_STORE_CTX *ctx) {
 	return 1; // always succeed; we will catch the error in our get_verify_result() call
+    }
+
+    static mongo::mutex fipsMtx("FIPS");
+    static bool fipsActivated(false);
+
+    void SSLManager::_setupFIPS() {
+        // Turn on FIPS mode if requested.
+        scoped_lock lk(fipsMtx);
+        if (fipsActivated) {
+            return;
+        }
+        int status = FIPS_mode_set(1);
+        if (!status) {
+            error() << "can't activate FIPS mode: " << 
+                _getSSLErrorMessage(ERR_get_error()) << endl;
+            fassertFailed(16703);
+        }
+        log() << "FIPS 140-2 mode activated" << endl;
+        fipsActivated = true;
     }
 
     bool SSLManager::_setupPEM(const std::string& keyFile , const std::string& password) {

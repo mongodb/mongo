@@ -31,18 +31,21 @@ namespace mongo {
                   const std::string& pempwd,
                   const std::string& cafile = "",
                   const std::string& crlfile = "",
-                  bool weakCertificateValidation = false) :
+                  bool weakCertificateValidation = false,
+                  bool fipsMode = false) :
             pemfile(pemfile),
             pempwd(pempwd),
             cafile(cafile),
             crlfile(crlfile),
-            weakCertificateValidation(weakCertificateValidation) {};
+            weakCertificateValidation(weakCertificateValidation),
+            fipsMode(fipsMode) {};
 
         std::string pemfile;
         std::string pempwd;
         std::string cafile;
         std::string crlfile;
         bool weakCertificateValidation;
+        bool fipsMode;
     };
 
     class SSLManager {
@@ -117,6 +120,12 @@ namespace mongo {
          * for use with validating certificates
          */
         bool _setupCRL(const std::string& crlFile);
+
+        /*
+         * Activate FIPS 140-2 mode, if the server started with a command line
+         * parameter.
+         */
+        void _setupFIPS();
 
         /*
          * Wrapper for SSL_Connect() that handles SSL_ERROR_WANT_READ,

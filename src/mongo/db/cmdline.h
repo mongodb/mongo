@@ -138,6 +138,7 @@ namespace mongo {
         std::string sslCAFile;      // --sslCAFile
         std::string sslCRLFile;     // --sslCRLFile
         bool sslWeakCertificateValidation;
+        bool sslFIPSMode;
 #endif
 
         /**

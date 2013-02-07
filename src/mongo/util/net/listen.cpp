@@ -102,7 +102,8 @@ namespace mongo {
                                    cmdLine.sslPEMKeyPassword,
                                    cmdLine.sslCAFile,
                                    cmdLine.sslCRLFile,
-                                   cmdLine.sslWeakCertificateValidation);
+                                   cmdLine.sslWeakCertificateValidation,
+                                   cmdLine.sslFIPSMode);
             _ssl = new SSLManager(params);
         }
 #endif
