@@ -524,10 +524,20 @@ namespace mongo {
     // sends all data or throws an exception
     void Socket::send( const char * data , int len, const char *context ) {
         while( len > 0 ) {
-            int ret = _send( data , len  );
-            if (ret == -1 || MONGO_FAIL_POINT(throwSockExcep)) {
-                _handleSendError(ret, context);
+            int ret = -1;
+            if (MONGO_FAIL_POINT(throwSockExcep)) {
+#if defined(_WIN32)
+                WSASetLastError(WSAENETUNREACH);
+#else
+                errno = ENETUNREACH;
+#endif
             }
+            else {
+                ret = _send(data, len);
+            }
+
+            if (ret == -1)
+                _handleSendError(ret, context);
 
             _bytesOut += ret;
 
@@ -582,8 +592,19 @@ namespace mongo {
         meta.msg_iovlen = d.size();
 
         while( meta.msg_iovlen > 0 ) {
-            int ret = ::sendmsg( _fd , &meta , portSendFlags );
-            if ( ret == -1 || MONGO_FAIL_POINT(throwSockExcep)) {
+            int ret = -1;
+            if (MONGO_FAIL_POINT(throwSockExcep)) {
+#if defined(_WIN32)
+                WSASetLastError(WSAENETUNREACH);
+#else
+                errno = ENETUNREACH;
+#endif
+            }
+            else {
+                ret = ::sendmsg(_fd, &meta, portSendFlags);
+            }
+
+            if (ret == -1) {
                 if ( errno != EAGAIN || _timeout == 0 ) {
                     LOG(_logLevel) << "Socket " << context << 
                         " send() " << errnoWithDescription() << ' ' << remoteString() << endl;
@@ -617,14 +638,24 @@ namespace mongo {
     void Socket::recv( char * buf , int len ) {
         int retries = 0;
         while( len > 0 ) {
-            int ret = unsafe_recv( buf , len );
-            if ( ret <= 0 || MONGO_FAIL_POINT(throwSockExcep)) {
+            int ret = -1;
+            if (MONGO_FAIL_POINT(throwSockExcep)) {
+#if defined(_WIN32)
+                WSASetLastError(WSAENETUNREACH);
+#else
+                errno = ENETUNREACH;
+#endif
+            }
+            else {
+                ret = unsafe_recv(buf, len);
+            }
+            if (ret <= 0) {
                 _handleRecvError(ret, len, &retries);
                 continue;
             }
-            
+
             if ( len <= 4 && ret != len )
-                LOG(_logLevel) << "Socket recv() got " << ret << 
+                LOG(_logLevel) << "Socket recv() got " << ret <<
                     " bytes wanted len=" << len << endl;
             fassert(16508, ret <= len);
             len -= ret;

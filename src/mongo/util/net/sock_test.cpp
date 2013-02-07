@@ -234,6 +234,15 @@ namespace {
             return true;
         }
 
+        // You must queue at least one byte on the send socket before calling this function.
+        size_t countRecvable(size_t max) {
+            std::vector<char> buf(max);
+            // This isn't great, because we don't have a guarantee that multiple sends will be
+            // captured in one recv. However, sock doesn't let us pass flags into recv, so we
+            // can't make this non blocking, and therefore can't risk another call.
+            return _sockets.second->unsafe_recv(&buf[0], max);
+        }
+
         FailPoint* const _failPoint;
         const SocketPair _sockets;
     };
@@ -286,5 +295,47 @@ namespace {
         ASSERT_TRUE(trySend()); // data for recv
         ASSERT_TRUE(tryRecv());
     }
+
+    TEST_F(SocketFailPointTest, TestFailedSendsDontSend) {
+        ASSERT_TRUE(trySend());
+        ASSERT_TRUE(tryRecv());
+        {
+            ASSERT_TRUE(trySend()); // queue 1 byte
+            const ScopedFailPointEnabler enabled(*_failPoint);
+            // Fail to queue another byte
+            ASSERT_THROWS(trySend(), SocketException);
+        }
+        // Failed byte should not have been transmitted.
+        ASSERT_EQUALS(size_t(1), countRecvable(2));
+    }
+
+    // Ensure that calling send doesn't actually enqueue data to the socket
+    TEST_F(SocketFailPointTest, TestFailedVectorSendsDontSend) {
+        ASSERT_TRUE(trySend());
+        ASSERT_TRUE(tryRecv());
+        {
+            ASSERT_TRUE(trySend()); // queue 1 byte
+            const ScopedFailPointEnabler enabled(*_failPoint);
+            // Fail to queue another byte
+            ASSERT_THROWS(trySendVector(), SocketException);
+        }
+        // Failed byte should not have been transmitted.
+        ASSERT_EQUALS(size_t(1), countRecvable(2));
+    }
+
+    TEST_F(SocketFailPointTest, TestFailedRecvsDontRecv) {
+        ASSERT_TRUE(trySend());
+        ASSERT_TRUE(tryRecv());
+        {
+            ASSERT_TRUE(trySend());
+            const ScopedFailPointEnabler enabled(*_failPoint);
+            // Fail to recv that byte
+            ASSERT_THROWS(tryRecv(), SocketException);
+        }
+        ASSERT_TRUE(trySend());
+        // Failed byte and additional byte should still be queued to recv.
+        ASSERT_EQUALS(size_t(2), countRecvable(2));
+    }
+
 
 } // namespace
