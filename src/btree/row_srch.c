@@ -129,9 +129,23 @@ __wt_row_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 	item = &_item;
 	for (depth = 2,
 	    page = btree->root_page; page->type == WT_PAGE_ROW_INT; ++depth) {
+		/* Fast-path appends. */
+		ref = &page->u.intl.t[page->entries - 1];
+		ikey = ref->u.key;
+		ikey = ref->u.key;
+		item->data = WT_IKEY_DATA(ikey);
+		item->size = ikey->size;
+
+		WT_ERR(WT_BTREE_CMP(
+		    session, btree, srch_key, item, cmp));
+		if (cmp >= 0) {
+			base = page->entries;
+			goto descend;
+		}
+
 		/* Binary search of internal pages. */
 		for (base = 0, ref = NULL,
-		    limit = page->entries; limit != 0; limit >>= 1) {
+		    limit = page->entries - 1; limit != 0; limit >>= 1) {
 			indx = base + (limit >> 1);
 			ref = page->u.intl.t + indx;
 
@@ -157,7 +171,8 @@ __wt_row_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 			base = indx + 1;
 			--limit;
 		}
-		WT_ASSERT(session, ref != NULL);
+
+descend:	WT_ASSERT(session, ref != NULL);
 
 		/*
 		 * Reference the slot used for next step down the tree.
