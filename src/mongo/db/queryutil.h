@@ -20,6 +20,7 @@
 #include "jsobj.h"
 #include "indexkey.h"
 #include "projection.h"
+#include "mongo/client/dbclientinterface.h"
 
 namespace mongo {
     
@@ -156,7 +157,7 @@ namespace mongo {
 
             _filter = _filter.getOwned();
 
-            _hasReadPref = q.hasField("$readPreference");
+            _hasReadPref = q.hasField(Query::ReadPrefField.name());
         }
         
         void _reset() {

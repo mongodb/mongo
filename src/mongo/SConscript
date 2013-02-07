@@ -487,6 +487,18 @@ env.CppUnitTest( "balancer_policy_test" , [ "s/balancer_policy_tests.cpp" ] ,
                  LIBDEPS=["mongoscore", "coreshard", "mongocommon","coreserver","coredb","dbcmdline","mongodandmongos"] ,
                  NO_CRUTCH=True)
 
+env.CppUnitTest("dbclient_rs_test", [ "client/dbclient_rs_test.cpp" ],
+                 LIBDEPS=[
+                    "coredb",
+                    "coreserver",
+                    "coreshard",
+                    "dbcmdline",
+                    "mocklib",
+                    "mongocommon",
+                    "mongodandmongos",
+                    "mongoscore"],
+                 NO_CRUTCH=True)
+
 env.CppUnitTest("scoped_db_conn_test", [ "client/scoped_db_conn_test.cpp" ],
                  LIBDEPS=[
                     "coredb",

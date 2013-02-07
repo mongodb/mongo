@@ -192,76 +192,71 @@ namespace mongo {
      * { <actual query>, $queryOptions: { $readPreference: <read pref obj> }}
      *
      * @param query the raw query document
-     * @param pref an out parameter and will contain the read preference mode extracted
-     *      from the query object.
      *
-     * @return the tag set list. If the tags field was not present, it will contain one
-     *      empty tag document {} which matches any tag. Caller owns the TagSet object
-     *      and is responsible for deletion.
+     * @return the read preference setting. If the tags field was not present, it will contain one
+     *      empty tag document {} which matches any tag.
      *
      * @throws AssertionException if the read preference object is malformed
      */
-    TagSet* _extractReadPref(const BSONObj& query, ReadPreference* pref) {
-        if (!Query::hasReadPreference(query)) {
-            *pref = mongo::ReadPreference_SecondaryPreferred;
-        }
-        else {
+    ReadPreferenceSetting* _extractReadPref(const BSONObj& query) {
+        ReadPreference pref = mongo::ReadPreference_SecondaryPreferred;
+
+        if (Query::hasReadPreference(query)) {
             BSONElement readPrefElement;
 
-            if (query.hasField("$readPreference")) {
-                readPrefElement = query["$readPreference"];
+            if (query.hasField(Query::ReadPrefField.name())) {
+                readPrefElement = query[Query::ReadPrefField.name()];
             }
             else {
-                readPrefElement = query["$queryOptions"]["$readPreference"];
+                readPrefElement = query["$queryOptions"][Query::ReadPrefField.name()];
             }
 
             uassert(16381, "$readPreference should be an object",
                     readPrefElement.isABSONObj());
             const BSONObj& prefDoc = readPrefElement.Obj();
 
-            uassert(16382, "mode not specified for read preference", prefDoc.hasField("mode"));
+            uassert(16382, "mode not specified for read preference",
+                    prefDoc.hasField(Query::ReadPrefModeField.name()));
 
-            const string mode = prefDoc["mode"].String();
+            const string mode = prefDoc[Query::ReadPrefModeField.name()].String();
 
             if (mode == "primary") {
-                *pref = mongo::ReadPreference_PrimaryOnly;
+                pref = mongo::ReadPreference_PrimaryOnly;
             }
             else if (mode == "primaryPreferred") {
-                *pref = mongo::ReadPreference_PrimaryPreferred;
+                pref = mongo::ReadPreference_PrimaryPreferred;
             }
             else if (mode == "secondary") {
-                *pref = mongo::ReadPreference_SecondaryOnly;
+                pref = mongo::ReadPreference_SecondaryOnly;
             }
             else if (mode == "secondaryPreferred") {
-                *pref = mongo::ReadPreference_SecondaryPreferred;
+                pref = mongo::ReadPreference_SecondaryPreferred;
             }
             else if (mode == "nearest") {
-                *pref = mongo::ReadPreference_Nearest;
+                pref = mongo::ReadPreference_Nearest;
             }
             else {
                 uasserted(16383, str::stream() << "Unknown read preference mode: " << mode);
             }
 
-            if (prefDoc.hasField("tags")) {
-
-
-                const BSONElement& tagsElem = prefDoc["tags"];
+            if (prefDoc.hasField(Query::ReadPrefTagsField.name())) {
+                const BSONElement& tagsElem = prefDoc[Query::ReadPrefTagsField.name()];
                 uassert(16385, "tags for read preference should be an array",
                         tagsElem.type() == mongo::Array);
 
                 std::auto_ptr<TagSet> tags(new TagSet(BSONArray(tagsElem.Obj())));
-                if (*pref == mongo::ReadPreference_PrimaryOnly && !tags->isExhausted()) {
+                if (pref == mongo::ReadPreference_PrimaryOnly && !tags->isExhausted()) {
                     uassert(16384, "Only empty tags are allowed with primary read preference",
                             tags->getCurrentTag().isEmpty());
                 }
 
-                return tags.release();
+                return new ReadPreferenceSetting(pref, tags.release());
             }
         }
 
         BSONArrayBuilder arrayBuilder;
         arrayBuilder.append(BSONObj());
-        return new TagSet(arrayBuilder.arr());
+        return new ReadPreferenceSetting(pref, new TagSet(arrayBuilder.arr()));
     }
 
     /**
@@ -1508,7 +1503,7 @@ namespace mongo {
         return _master.get();
     }
 
-    bool DBClientReplicaSet::checkLastHost(ReadPreference preference, const TagSet* tags) {
+    bool DBClientReplicaSet::checkLastHost(const ReadPreferenceSetting* readPref) {
         if (_lastSlaveOkHost.empty()) {
             return false;
         }
@@ -1520,7 +1515,7 @@ namespace mongo {
             return false;
         }
 
-        return _lastSlaveOkConn && monitor->isHostCompatible(_lastSlaveOkHost, preference, tags);
+        return _lastSlaveOkConn && _lastReadPref && _lastReadPref->equals(*readPref);
     }
 
     void DBClientReplicaSet::_auth( DBClientConnection * conn ) {
@@ -1542,9 +1537,10 @@ namespace mongo {
 
     DBClientConnection& DBClientReplicaSet::slaveConn() {
         BSONArray emptyArray;
-        TagSet tags( emptyArray );
-        DBClientConnection* conn = selectNodeUsingTags( ReadPreference_SecondaryPreferred,
-                &tags );
+        TagSet tags(emptyArray);
+        shared_ptr<ReadPreferenceSetting> readPref(new ReadPreferenceSetting(
+                ReadPreference_SecondaryPreferred, new TagSet(emptyArray)));
+        DBClientConnection* conn = selectNodeUsingTags(readPref);
 
         uassert( 16369, str::stream() << "No good nodes available for set: "
                  << _getMonitor()->getName(), conn != NULL );
@@ -1631,12 +1627,11 @@ namespace mongo {
                                                        int queryOptions,
                                                        int batchSize) {
         if (_isQueryOkToSecondary(ns, queryOptions, query.obj)) {
-            ReadPreference pref;
-            scoped_ptr<TagSet> tags(_extractReadPref(query.obj, &pref));
+            shared_ptr<ReadPreferenceSetting> readPref(_extractReadPref(query.obj));
 
             for (size_t retry = 0; retry < MAX_RETRY; retry++) {
                 try {
-                    DBClientConnection* conn = selectNodeUsingTags(pref, tags.get());
+                    DBClientConnection* conn = selectNodeUsingTags(readPref);
 
                     if (conn == NULL) {
                         break;
@@ -1668,12 +1663,11 @@ namespace mongo {
                                         const BSONObj *fieldsToReturn,
                                         int queryOptions) {
         if (_isQueryOkToSecondary(ns, queryOptions, query.obj)) {
-            ReadPreference pref;
-            scoped_ptr<TagSet> tags(_extractReadPref(query.obj, &pref));
+            shared_ptr<ReadPreferenceSetting> readPref(_extractReadPref(query.obj));
 
             for (size_t retry = 0; retry < MAX_RETRY; retry++) {
                 try {
-                    DBClientConnection* conn = selectNodeUsingTags(pref, tags.get());
+                    DBClientConnection* conn = selectNodeUsingTags(readPref);
 
                     if (conn == NULL) {
                         break;
@@ -1741,19 +1735,22 @@ namespace mongo {
         _lastSlaveOkConn.reset();
     }
 
-    DBClientConnection* DBClientReplicaSet::selectNodeUsingTags(ReadPreference preference,
-                                                                TagSet* tags) {
-        if (checkLastHost(preference, tags)) {
+    DBClientConnection* DBClientReplicaSet::selectNodeUsingTags(
+            shared_ptr<ReadPreferenceSetting> readPref) {
+        if (checkLastHost(readPref.get())) {
             return _lastSlaveOkConn.get();
         }
 
         ReplicaSetMonitorPtr monitor = _getMonitor();
         bool isPrimarySelected = false;
-        _lastSlaveOkHost = monitor->selectAndCheckNode(preference, tags, &isPrimarySelected);
+        _lastSlaveOkHost = monitor->selectAndCheckNode(readPref->pref, readPref->tags,
+                &isPrimarySelected);
 
         if ( _lastSlaveOkHost.empty() ){
             return NULL;
         }
+
+        _lastReadPref = readPref;
 
         // Primary connection is special because it is the only connection that is
         // versioned in mongos. Therefore, we have to make sure that this object
@@ -1802,13 +1799,12 @@ namespace mongo {
 
             const bool slaveOk = qm.queryOptions & QueryOption_SlaveOk;
             if (_isQueryOkToSecondary(qm.ns, qm.queryOptions, qm.query)) {
-                ReadPreference pref;
-                scoped_ptr<TagSet> tags(_extractReadPref(qm.query, &pref));
+                shared_ptr<ReadPreferenceSetting> readPref(_extractReadPref(qm.query));
 
                 for (size_t retry = 0; retry < MAX_RETRY; retry++) {
                     _lazyState._retries = retry;
                     try {
-                        DBClientConnection* conn = selectNodeUsingTags(pref, tags.get());
+                        DBClientConnection* conn = selectNodeUsingTags(readPref);
 
                         if (conn == NULL) {
                             break;
@@ -1945,12 +1941,11 @@ namespace mongo {
             ns = qm.ns;
 
             if (_isQueryOkToSecondary(ns, qm.queryOptions, qm.query)) {
-                ReadPreference pref;
-                scoped_ptr<TagSet> tags(_extractReadPref(qm.query, &pref));
+                shared_ptr<ReadPreferenceSetting> readPref(_extractReadPref(qm.query));
 
                 for (size_t retry = 0; retry < MAX_RETRY; retry++) {
                     try {
-                        DBClientConnection* conn = selectNodeUsingTags(pref, tags.get());
+                        DBClientConnection* conn = selectNodeUsingTags(readPref);
 
                         if (conn == NULL) {
                             return false;
@@ -2045,5 +2040,13 @@ namespace mongo {
 
     BSONObjIterator* TagSet::getIterator() const {
         return new BSONObjIterator(_tags);
+    }
+
+    TagSet* TagSet::clone() const {
+        return new TagSet(BSONArray(_tags.copy()));
+    }
+
+    bool TagSet::equals(const TagSet& other) const {
+        return _tags.equal(other._tags);
     }
 }
