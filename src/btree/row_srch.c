@@ -132,12 +132,10 @@ __wt_row_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 		/* Fast-path appends. */
 		ref = &page->u.intl.t[page->entries - 1];
 		ikey = ref->u.key;
-		ikey = ref->u.key;
 		item->data = WT_IKEY_DATA(ikey);
 		item->size = ikey->size;
 
-		WT_ERR(WT_BTREE_CMP(
-		    session, btree, srch_key, item, cmp));
+		WT_ERR(WT_BTREE_CMP(session, btree, srch_key, item, cmp));
 		if (cmp >= 0) {
 			base = page->entries;
 			goto descend;
