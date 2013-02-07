@@ -673,6 +673,14 @@ namespace mongo {
 
          {
              boost::scoped_ptr<DBClientBase> conn( _config->createConnection() );
+             // If they are authenticating to test DB then we are running with --auth and must
+             // authenticate to admin db in order to run serverStatus command
+             if (_config->username != "") {
+                 string errmsg;
+                 if (!conn->auth("admin", _config->username, _config->password, errmsg)) {
+                     uasserted(16702, str::stream() << "User " << _config->username << "could not authenticate to admin db; admin db access is required to use benchRun with auth enabled");
+                 }
+             }
              // Get initial stats
              conn->simpleCommand( "admin" , &before , "serverStatus" );
              before = before.getOwned();
@@ -694,6 +702,13 @@ namespace mongo {
 
          {
              boost::scoped_ptr<DBClientBase> conn( _config->createConnection() );
+             if (_config->username != "") {
+                 string errmsg;
+                 // theoretically this can only fail if admin access was revoked since start of run
+                 if (!conn->auth("admin", _config->username, _config->password, errmsg)) {
+                     uasserted(16703, str::stream() << "User " << _config->username << "could not authenticate to admin db second time; admin db access is required to use benchRun with auth enabled");
+                 }
+             }
              // Get final stats
              conn->simpleCommand( "admin" , &after , "serverStatus" );
              after = after.getOwned();
