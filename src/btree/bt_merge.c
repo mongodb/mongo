@@ -20,7 +20,7 @@ __merge_walk(WT_SESSION_IMPL *session, WT_PAGE *page, u_int depth,
 	WT_REF *ref;
 	uint32_t i;
 
-	WT_REF_FOREACH(page, ref, i) {
+	WT_REF_FOREACH(page, ref, i)
 		switch (ref->state) {
 		case WT_REF_LOCKED:
 			/*
@@ -45,9 +45,12 @@ __merge_walk(WT_SESSION_IMPL *session, WT_PAGE *page, u_int depth,
 			WT_RET((*visit)(ref, depth, cookie));
 			break;
 
+		case WT_REF_EVICT_FORCE:
+		case WT_REF_EVICT_WALK:
+		case WT_REF_MEM:
+		case WT_REF_READING:
 		WT_ILLEGAL_VALUE(session);
 		}
-	}
 
 	return (0);
 }
