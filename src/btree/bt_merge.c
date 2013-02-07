@@ -9,8 +9,8 @@
 
 /*
  * __merge_walk --
- *	Visit all of the child WT_REFs in a locked subtree and apply
- *	a callback function to them.
+ *	Visit all of the child references in a locked subtree and apply a
+ *	callback function to them.
  */
 static int
 __merge_walk(WT_SESSION_IMPL *session, WT_PAGE *page, u_int depth,
@@ -240,19 +240,39 @@ __wt_merge_tree(WT_SESSION_IMPL *session, WT_PAGE *top)
 		WT_ERR(__merge_new_page(session, page_type, 2, 1, &newtop));
 
 		/*
-		 * Create two child pages.
-		 * Set SPLIT_MERGE if there are any live children.
+		 * In the normal case where there are live children spread
+		 * through the subtree, create two child pages.
+		 *
+		 * Handle the case where the only live child is first / last
+		 * specially: put the live child into the top-level page.
+		 *
+		 * Set SPLIT_MERGE on the internal pages if there are any live
+		 * children: they can't be evicted, so there is no point
+		 * permanently deepening the tree.
 		 */
-		visit_state.split = split = (refcnt + 1) / 2;
-		WT_ERR(__merge_new_page(session, page_type,
-		    split, visit_state.first_live <= split,
-		    &visit_state.lchild));
+		if ((split = visit_state.first_live) != visit_state.last_live ||
+		    split != 0 || split != refcnt - 1)
+			visit_state.split = split = (refcnt + 1) / 2;
 
-		WT_ERR(__merge_new_page(session, page_type,
-		    refcnt - split, visit_state.last_live >= split,
-		    &visit_state.rchild));
+		/* Left split. */
+		if (split == 0) {
+			visit_state.split = split = 1;
+			visit_state.current = visit_state.lchild = newtop;
+		} else {
+			WT_ERR(__merge_new_page(session, page_type,
+			    split, visit_state.first_live < split,
+			    &visit_state.lchild));
+			visit_state.current = visit_state.lchild;
+		}
 
-		visit_state.current = visit_state.lchild;
+		/* Right split. */
+		if (split == refcnt - 1) {
+			visit_state.split = refcnt - 1;
+			visit_state.rchild = newtop;
+		} else
+			WT_ERR(__merge_new_page(session, page_type,
+			    refcnt - split, visit_state.last_live >= split,
+			    &visit_state.rchild));
 	} else {
 		WT_ERR(__merge_new_page(
 		    session, page_type, refcnt, 1, &newtop));
@@ -277,9 +297,9 @@ __wt_merge_tree(WT_SESSION_IMPL *session, WT_PAGE *top)
 		WT_ERR(__merge_promote_key(session, newref));
 
 		/* Queue new pages for forced eviction. */
-		if (visit_state.first_live > split)
+		if (!F_ISSET(visit_state.lchild->modify, WT_PM_REC_SPLIT_MERGE))
 			__wt_evict_forced_page(session, visit_state.lchild);
-		else if (visit_state.last_live < split)
+		if (!F_ISSET(visit_state.rchild->modify, WT_PM_REC_SPLIT_MERGE))
 			__wt_evict_forced_page(session, visit_state.rchild);
 	}
 
