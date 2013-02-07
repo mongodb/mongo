@@ -183,7 +183,7 @@ __wt_evict_forced_page(WT_SESSION_IMPL *session, WT_PAGE *page)
 	    ++levels)
 		top = top->parent;
 
-	if (levels >= WT_MERGE_STACK_MIN)
+	if (levels > WT_MERGE_STACK_MIN)
 		page = top;
 
 	/*
