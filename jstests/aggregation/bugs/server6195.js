@@ -1,13 +1,32 @@
 // ensure $concat asserts on string
+
+load('jstests/aggregation/extras/utils.js')
+
 c = db.s6570;
 c.drop();
-c.save({x:17, y:"foo"});
+c.save({x:"foo", y:"bar"});
 
-assert.eq(c.aggregate({$project:{_id:0, num : { $concat:[1, "$x", 2, "$x"] }}}).result, [{num:"117217"}] );
-assert.eq(c.aggregate({$project:{_id:0, num : { $concat:[3, "$y", 4, "$y"] }}}).result, [{num:"3foo4foo"}]);
-assert.eq(c.aggregate({$project:{_id:0, num : { $concat:["a", "$x", "b", "$x"] }}}).result, [{num:"a17b17"}]);
-assert.eq(c.aggregate({$project:{_id:0, num : { $concat:["c", "$y", "d", "$y"] }}}).result, [{num:"cfoodfoo"}]);
-assert.eq(c.aggregate({$project:{_id:0, num : { $concat:[5, "$y", "e", "$x"] }}}).result, [{num:"5fooe17"}]);
-assert.eq(c.aggregate({$project:{_id:0, num : { $concat:[6, "$x", "f", "$y"] }}}).result, [{num:"617ffoo"}]);
-assert.eq(c.aggregate({$project:{_id:0, num : { $concat:["g", "$y", 7, "$x"] }}}).result, [{num:"gfoo717"}]);
-assert.eq(c.aggregate({$project:{_id:0, num : { $concat:["h", "$x", 8, "$y"] }}}).result, [{num:"h178foo"}]);
+assert.eq(c.aggregate({$project:{str:{$concat:["X", "$x", "Y", "$y"]}}}).result[0].str, "XfooYbar");
+
+// Nullish (both with and without other strings)
+assert.isnull(c.aggregate({$project:{str:{$concat: ["$missing"] }}}).result[0].str);
+assert.isnull(c.aggregate({$project:{str:{$concat: [null] }}}).result[0].str);
+assert.isnull(c.aggregate({$project:{str:{$concat: [undefined] }}}).result[0].str);
+assert.isnull(c.aggregate({$project:{str:{$concat: ["$x", "$missing", "$y"] }}}).result[0].str);
+assert.isnull(c.aggregate({$project:{str:{$concat: ["$x", null, "$y"] }}}).result[0].str);
+assert.isnull(c.aggregate({$project:{str:{$concat: ["$x", undefined, "$y"] }}}).result[0].str);
+
+// assert fail for all other types
+assertErrorCode(c, {$project:{str:{$concat: [MinKey]}}}, 16702);
+assertErrorCode(c, {$project:{str:{$concat: [1]}}}, 16702);
+assertErrorCode(c, {$project:{str:{$concat: [NumberInt(1)]}}}, 16702);
+assertErrorCode(c, {$project:{str:{$concat: [NumberLong(1)]}}}, 16702);
+assertErrorCode(c, {$project:{str:{$concat: [true]}}}, 16702);
+assertErrorCode(c, {$project:{str:{$concat: [function(){}]}}}, 16702);
+assertErrorCode(c, {$project:{str:{$concat: [{}]}}}, 16702);
+assertErrorCode(c, {$project:{str:{$concat: [[]]}}}, 16702);
+assertErrorCode(c, {$project:{str:{$concat: [new Timestamp(0,0)]}}}, 16702);
+assertErrorCode(c, {$project:{str:{$concat: [new Date(0)]}}}, 16702);
+assertErrorCode(c, {$project:{str:{$concat: [new BinData(0,"")]}}}, 16702);
+assertErrorCode(c, {$project:{str:{$concat: [/asdf/]}}}, 16702);
+assertErrorCode(c, {$project:{str:{$concat: [MaxKey]}}}, 16702);

@@ -1118,37 +1118,6 @@ assert.eq(p19.result, p19result, 'p19 failed');
 db.vartype.drop();
 db.vartype.save({ x : 17, y : "foo"});
 
-// just passing through fields
-var p20 = db.runCommand(
-{ aggregate : "vartype", pipeline : [
-    { $project : {
-        all_numbers : { $add:[1, "$x", 2, "$x"] },
-        string_fields : { $concat:[3, "$y", 4, "$y"] },
-        number_fields : { $concat:["a", "$x", "b", "$x"] },
-        all_strings : { $concat:["c", "$y", "d", "$y"] },
-        potpourri_1 : { $concat:[5, "$y", "e", "$x"] },
-        potpourri_2 : { $concat:[6, "$x", "f", "$y"] },
-        potpourri_3 : { $concat:["g", "$y", 7, "$x"] },
-        potpourri_4 : { $concat:["h", "$x", 8, "$y"] },
-        _id: 0
-    }}
-]});
-
-var p20result = [
-    {
-        "all_numbers" : 37,
-        "string_fields" : "3foo4foo",
-        "number_fields" : "a17b17",
-        "all_strings" : "cfoodfoo",
-        "potpourri_1" : "5fooe17",
-        "potpourri_2" : "617ffoo",
-        "potpourri_3" : "gfoo717",
-        "potpourri_4" : "h178foo"
-    }
-];
-
-assert.eq(p20.result, p20result, 'p20 failed');
-
 // ternary conditional operator
 var p21 = db.runCommand(
 { aggregate : "article", pipeline : [

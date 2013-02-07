@@ -2,8 +2,8 @@
 c = db.c;
 c.drop();
 
-c.save( { x:3 } );
+c.save( { x:'3' } );
 
-project = { $project:{ a:{ $concat:[ 1, 2, { $concat:[ 'foo', '$x' ] } ] } } };
+project = { $project:{ a:{ $concat:[ '1', { $concat:[ 'foo', '$x', 'bar' ] }, '2' ] } } };
 
-assert.eq( '12foo3', c.aggregate( project ).result[ 0 ].a );
+assert.eq( '1foo3bar2', c.aggregate( project ).result[ 0 ].a );

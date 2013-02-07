@@ -790,8 +790,16 @@ namespace DocumentSourceTests {
         /** A complex _id expression. */
         class ComplexId : public CheckResultsBase {
             void populateData() {
-                client.insert( ns, BSON( "a" << "de" << "b" << "ad" << "c" << "beef" ) );
-                client.insert( ns, BSON( "a" << "d" << "b" << "eadbe" << "d" << "ef" ) );
+                client.insert( ns, BSON( "a" << "de"
+                                      << "b" << "ad"
+                                      << "c" << "beef"
+                                      << "d" << ""
+                                      ));
+                client.insert( ns, BSON( "a" << "d"
+                                      << "b" << "eadbe"
+                                      << "c" << ""
+                                      << "d" << "ef"
+                                      ));
             }
             virtual BSONObj groupSpec() {
                 return BSON( "_id" << BSON( "$concat"
