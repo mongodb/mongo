@@ -206,8 +206,11 @@ namespace mongo {
             return numSlaves <= 0;
         }
 
-        std::vector<BSONObj> getSlavesAtOp(OpTime& op) {
+        std::vector<BSONObj> getHostsAtOp(OpTime& op) {
             std::vector<BSONObj> result;
+            if (theReplSet) {
+                result.push_back(theReplSet->myConfig().asBson());
+            }
 
             scoped_lock mylk(_mutex);
             for (map<Ident,OpTime>::iterator i = _slaves.begin(); i != _slaves.end(); i++) {
@@ -282,8 +285,8 @@ namespace mongo {
         return slaveTracking.waitForReplication( op, w, maxSecondsToWait );
     }
 
-    vector<BSONObj> getHostsReplicatedTo(OpTime& op) {
-        return slaveTracking.getSlavesAtOp(op);
+    vector<BSONObj> getHostsWrittenTo(OpTime& op) {
+        return slaveTracking.getHostsAtOp(op);
     }
 
     void resetSlaveCache() {

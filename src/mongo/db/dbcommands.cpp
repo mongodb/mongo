@@ -246,7 +246,7 @@ namespace mongo {
                         result.append( "wtimeout" , true );
                         errmsg = "timed out waiting for slaves";
                         result.append( "waited" , timer.millis() );
-                        result.append("replicatedTo", getHostsReplicatedTo(op));
+                        result.append("writtenTo", getHostsWrittenTo(op));
                         result.append( "err" , "timeout" );
                         return true;
                     }
@@ -257,7 +257,7 @@ namespace mongo {
                     killCurrentOp.checkForInterrupt();
                 }
 
-                result.append("replicatedTo", getHostsReplicatedTo(op));
+                result.append("writtenTo", getHostsWrittenTo(op));
                 int myMillis = timer.recordMillis();
                 result.appendNumber( "wtime" , myMillis );
             }

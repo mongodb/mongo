@@ -45,7 +45,8 @@ print("should still be able to write to a majority");
 var result = testInsert();
 assert.eq(result.err, null);
 // majority should be primary + 2 secondaries
-assert.eq(result.replicatedTo.length, 2);
+assert.eq(result.writtenTo.length, 3);
+assert.contains(config.members[0], result);
 assert.contains(config.members[1], result);
 assert.contains(config.members[2], result);
 
@@ -78,7 +79,8 @@ replTest.awaitReplication();
 print("makes sure majority works");
 result = testInsert();
 assert.eq(result.err, null);
-assert.eq(result.replicatedTo.length, 2);
+assert.eq(result.writtenTo.length, 3);
+assert.contains(config.members[0], result);
 assert.contains(config.members[1], result);
 assert.contains(config.members[2], result);
 
@@ -95,7 +97,8 @@ print("make sure majority doesn't work");
 master = replTest.getMaster();
 result = testInsert();
 assert.eq(result.err, "timeout");
-assert.eq(result.replicatedTo.length, 1);
+assert.eq(result.writtenTo.length, 2);
+assert.contains(config.members[0], result);
 assert.contains(config.members[1], result);
 
 print("bring set back together");
@@ -108,7 +111,8 @@ master = replTest.getMaster();
 print("make sure majority works");
 result = testInsert();
 assert.eq(result.err, null);
-assert.eq(result.replicatedTo.length, 2);
+assert.eq(result.writtenTo.length, 3);
+assert.contains(config.members[0], result);
 assert.contains(config.members[1], result);
 assert.contains(config.members[2], result);
 
