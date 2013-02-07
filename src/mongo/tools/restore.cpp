@@ -168,7 +168,10 @@ public:
         drillDown(root, _db != "", _coll != "", true);
 
         // should this happen for oplog replay as well?
-        conn().getLastError(_db == "" ? "admin" : _db);
+        string err = conn().getLastError(_db == "" ? "admin" : _db);
+        if (!err.empty()) {
+            error() << err;
+        }
 
         if (doOplog) {
             log() << "\t Replaying oplog" << endl;
@@ -364,7 +367,10 @@ public:
 
             // wait for ops to propagate to "w" nodes (doesn't warn if w used without replset)
             if ( _w > 0 ) {
-                conn().getLastError(db, false, false, _w);
+                string err = conn().getLastError(db, false, false, _w);
+                if (!err.empty()) {
+                    error() << "Error while replaying oplog: " << err;
+                }
             }
         }
         else if ( endsWith( _curns.c_str() , ".system.indexes" )) {
@@ -381,7 +387,10 @@ public:
 
             // wait for insert to propagate to "w" nodes (doesn't warn if w used without replset)
             if ( _w > 0 ) {
-                conn().getLastErrorDetailed(_curdb, false, false, _w);
+                string err = conn().getLastError(_curdb, false, false, _w);
+                if (!err.empty()) {
+                    error() << err;
+                }
             }
         }
     }
