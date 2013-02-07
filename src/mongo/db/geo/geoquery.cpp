@@ -65,13 +65,12 @@ namespace mongo {
                     hasGeometry = true;
                 }
             } else if (isMaxDistance) {
-                double distArg = e.Number();
-                if (fromRadians) {
-                    maxDistance = distArg * radius;
-                } else {
-                    maxDistance = distArg;
-                }
+                maxDistance = e.Number();
             }
+        }
+
+        if (fromRadians) {
+            maxDistance *= radius;
         }
 
         if (hasGeometry) { return true; }
