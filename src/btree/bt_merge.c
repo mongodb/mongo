@@ -7,13 +7,11 @@
 
 #include "wt_internal.h"
 
-/* Link a page into a parent. */
-#define	WT_LINK_PAGE(ppage, pref, cpage) do {				\
-	(pref)->page = (cpage);						\
-	(cpage)->parent = (ppage);					\
-	(cpage)->ref = (pref);						\
-} while (0)
-
+/*
+ * __merge_walk --
+ *	Visit all of the child WT_REFs in a locked subtree and apply
+ *	a callback function to them.
+ */
 static int
 __merge_walk(WT_SESSION_IMPL *session, WT_PAGE *page, u_int depth,
 	int (*visit)(WT_REF *, u_int, void *), void *cookie)
@@ -54,16 +52,27 @@ __merge_walk(WT_SESSION_IMPL *session, WT_PAGE *page, u_int depth,
 	return (0);
 }
 
+/*
+ * WT_VISIT_STATE --
+ *	The state maintained across calls to the "visit" callback functions:
+ *	the number of refs visited, the maximum depth, and the current page and
+ *	reference when moving reference into the new tree.
+ */
 typedef struct {
-	WT_PAGE *current, *lchild, *rchild;
-	WT_REF *ref;
+	WT_PAGE *current, *lchild, *rchild;	/* New pages to be populated. */
+	WT_REF *ref;				/* Current insert point. */
 
-	uint32_t refcnt, split;
-	uint32_t first_live, last_live;
-	u_int maxdepth;
-	int seen_live;
+	uint32_t refcnt, split;			/* Ref count, split point. */
+	uint32_t first_live, last_live;		/* First/last in-memory ref. */
+	u_int maxdepth;				/* Maximum subtree depth. */
+	int seen_live;				/* Has a ref been live? */
 } WT_VISIT_STATE;
 
+/*
+ * __merge_count --
+ *	A callback function that counts the number of references as well as
+ *	the first/last "live" reference.
+ */
 static int
 __merge_count(WT_REF *ref, u_int depth, void *cookie)
 {
@@ -86,6 +95,10 @@ __merge_count(WT_REF *ref, u_int depth, void *cookie)
 	return (0);
 }
 
+/*
+ * __merge_move_ref --
+ *	Move a child ref from the locked subtree to a new page.
+ */
 static int
 __merge_move_ref(WT_REF *ref, u_int depth, void *cookie)
 {
@@ -114,6 +127,10 @@ __merge_move_ref(WT_REF *ref, u_int depth, void *cookie)
 	return (0);
 }
 
+/*
+ * __merge_new_page --
+ *	Create a new in-memory internal page.
+ */
 static int
 __merge_new_page(WT_SESSION_IMPL *session,
 	uint8_t type, uint32_t entries, int merge, WT_PAGE **pagep)
@@ -143,6 +160,11 @@ err:	__wt_free(session, newpage->u.intl.t);
 	return (ret);
 }
 
+/*
+ * __merge_promote_key --
+ *	Copy a key from a child page into the reference in its parent, so it
+ *	can be found by searches.
+ */
 static int
 __merge_promote_key(WT_SESSION_IMPL *session, WT_REF *ref)
 {
@@ -188,6 +210,7 @@ __wt_merge_tree(WT_SESSION_IMPL *session, WT_PAGE *top)
 	uint8_t page_type;
 
 	WT_CLEAR(visit_state);
+	newtop = NULL;
 	page_type = top->type;
 
 	WT_ASSERT(session, !WT_PAGE_IS_ROOT(top));
@@ -197,7 +220,7 @@ __wt_merge_tree(WT_SESSION_IMPL *session, WT_PAGE *top)
 	WT_RET(__merge_walk(session, top, 0, __merge_count, &visit_state));
 
 	/* If there aren't enough useful levels or refs, stop. */
-	if (visit_state.maxdepth < 3)
+	if (visit_state.maxdepth < WT_MERGE_STACK_MIN)
 		return (EBUSY);
 
 	/*
@@ -264,6 +287,10 @@ __wt_merge_tree(WT_SESSION_IMPL *session, WT_PAGE *top)
 	newtop->parent = top->parent;
 	newtop->ref = top->ref;
 
+	/*
+	 * Set up the new top-level page as a split so that it will be swapped
+	 * into place by __wt_evict_page.
+	 */
 	top->modify->u.split = newtop;
 	top->modify->flags = WT_PM_REC_SPLIT;
 
@@ -280,8 +307,11 @@ err:
 	    " split-merge pages containing %" PRIu32 " keys\n",
 	    visit_state.maxdepth, refcnt);
 
-	WT_ASSERT(session, 0);
-
-	/* XXX free allocated memory everything. */
+	if (newtop != NULL)
+		__wt_page_out(session, &newtop);
+	if (visit_state.lchild != NULL)
+		__wt_page_out(session, &visit_state.lchild);
+	if (visit_state.rchild != NULL)
+		__wt_page_out(session, &visit_state.rchild);
 	return (ret);
 }

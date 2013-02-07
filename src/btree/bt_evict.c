@@ -183,7 +183,7 @@ __wt_evict_forced_page(WT_SESSION_IMPL *session, WT_PAGE *page)
 	    ++levels)
 		top = top->parent;
 
-	if (levels > 3)
+	if (levels >= WT_MERGE_STACK_MIN)
 		page = top;
 
 	/*
@@ -688,12 +688,12 @@ __wt_sync_file(WT_SESSION_IMPL *session, int syncop)
 	WT_BTREE *btree;
 	WT_CACHE *cache;
 	WT_DECL_RET;
-	WT_PAGE *page, *last_page;
+	WT_PAGE *page;
 	uint32_t flags;
 
 	btree = session->btree;
 	cache = S2C(session)->cache;
-	last_page = page = NULL;
+	page = NULL;
 
 	switch (syncop) {
 	case WT_SYNC_CHECKPOINT:
@@ -708,8 +708,6 @@ __wt_sync_file(WT_SESSION_IMPL *session, int syncop)
 			/* Write dirty pages. */
 			if (__wt_page_is_modified(page))
 				WT_ERR(__wt_rec_write(session, page, NULL, 0));
-			last_page = page;
-			WT_UNUSED(last_page);
 			WT_ERR(__wt_tree_walk(session, &page, flags));
 		}
 
