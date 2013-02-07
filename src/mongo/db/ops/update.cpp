@@ -84,7 +84,7 @@ namespace mongo {
            regular ones at the moment. */
         if ( isOperatorUpdate ) {
             const BSONObj& onDisk = loc.obj();
-            auto_ptr<ModSetState> mss = mods->prepare( onDisk );
+            auto_ptr<ModSetState> mss = mods->prepare( onDisk, false /* not an insertion */ );
 
             if( mss->canApplyInPlace() ) {
                 mss->applyModsInPlace(true);
@@ -338,7 +338,8 @@ namespace mongo {
                         mymodset.reset( useMods );
                     }
 
-                    auto_ptr<ModSetState> mss = useMods->prepare( onDisk );
+                    auto_ptr<ModSetState> mss = useMods->prepare( onDisk,
+                                                                  false /* not an insertion */ );
 
                     bool willAdvanceCursor = multi && c->ok() && ( modsIsIndexed || ! mss->canApplyInPlace() );
 
@@ -518,7 +519,7 @@ namespace mongo {
 
     BSONObj applyUpdateOperators( const BSONObj& from, const BSONObj& operators ) {
         ModSet mods( operators );
-        return mods.prepare( from )->createNewFromMods();
+        return mods.prepare( from, false /* not an insertion */ )->createNewFromMods();
     }
     
 }  // namespace mongo

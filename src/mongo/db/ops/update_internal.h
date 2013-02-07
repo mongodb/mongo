@@ -418,8 +418,10 @@ namespace mongo {
         /**
          * creates a ModSetState suitable for operation on obj
          * doesn't change or modify this ModSet or any underlying Mod
+         *
+         * flag 'insertion' differentiates between obj existing prior to this update.
          */
-        auto_ptr<ModSetState> prepare( const BSONObj& obj ) const;
+        auto_ptr<ModSetState> prepare( const BSONObj& obj, bool insertion = false ) const;
 
         /**
          * given a query pattern, builds an object suitable for an upsert
