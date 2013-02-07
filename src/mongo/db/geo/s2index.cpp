@@ -306,9 +306,18 @@ namespace mongo {
                 b.appendNull("");
                 out->insert(b.obj());
             } else if (1 == elements.size()) {
-                BSONObjBuilder b;
-                b.appendAs(*elements.begin(), "");
-                out->insert(b.obj());
+                if (Array == elements.begin()->type()) {
+                    const vector<BSONElement> elts = elements.begin()->Array();
+                    for (size_t i = 0; i < elts.size(); ++i) {
+                        BSONObjBuilder b;
+                        b.appendAs(elts[i], "");
+                        out->insert(b.obj());
+                    }
+                } else {
+                    BSONObjBuilder b;
+                    b.appendAs(*elements.begin(), "");
+                    out->insert(b.obj());
+                }
             } else {
                 BSONArrayBuilder aBuilder;
                 for (BSONElementSet::iterator i = elements.begin(); i != elements.end(); ++i) {
