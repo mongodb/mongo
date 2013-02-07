@@ -50,8 +50,8 @@ __wt_rec_evict(WT_SESSION_IMPL *session, WT_PAGE *page, int exclusive)
 	 * not disallowed anywhere.
 	 *
 	 * Note that page->ref may be NULL in some cases (e.g., for root pages
-	 * or during salvage).  That's OK if WT_REC_SINGLE is set: we won't
-	 * check hazard pointers in that case.
+	 * or during salvage).  That's OK if exclusive is set: we won't check
+	 * hazard pointers in that case.
 	 */
 	WT_ERR(__rec_review(session, page->ref, page, exclusive, merge, 1));
 
