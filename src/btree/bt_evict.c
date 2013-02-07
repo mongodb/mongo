@@ -10,7 +10,7 @@
 static void __evict_dirty_validate(WT_CONNECTION_IMPL *);
 static int  __evict_file(WT_SESSION_IMPL *, int);
 static int  __evict_file_request_walk(WT_SESSION_IMPL *);
-static int  __evict_init_candidate(
+static void __evict_init_candidate(
     WT_SESSION_IMPL *, WT_EVICT_ENTRY *, WT_PAGE *);
 static int  __evict_lru(WT_SESSION_IMPL *, int);
 static int  __evict_lru_cmp(const void *, const void *);
@@ -209,7 +209,8 @@ __wt_evict_forced_page(WT_SESSION_IMPL *session, WT_PAGE *page)
 		    count * sizeof(WT_EVICT_ENTRY), &cache->evict));
 		cache->evict_entries = count;
 	}
-	WT_ERR(__evict_init_candidate(session, cache->evict, page));
+	__evict_init_candidate(session, cache->evict, page);
+
 	/* Set the location in the eviction queue to the new entry. */
 	cache->evict_current = cache->evict;
 	/*
@@ -936,7 +937,7 @@ err:		__wt_spin_unlock(session, &cache->evict_lock);
  * __evict_init_candidate --
  *	Initialize a WT_EVICT_ENTRY structure with a given page.
  */
-static int
+static void
 __evict_init_candidate(
     WT_SESSION_IMPL *session, WT_EVICT_ENTRY *evict, WT_PAGE *page)
 {
@@ -947,7 +948,6 @@ __evict_init_candidate(
 
 	/* Mark the page on the list */
 	F_SET_ATOMIC(page, WT_PAGE_EVICT_LRU);
-	return (0);
 }
 
 /*
@@ -1033,8 +1033,7 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, int clean)
 			continue;
 
 		WT_ASSERT(session, evict->page == NULL);
-		if (__evict_init_candidate(session, evict, page) != 0)
-			continue;
+		__evict_init_candidate(session, evict, page);
 		++evict;
 
 		WT_VERBOSE_RET(session, evictserver,
