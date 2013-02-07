@@ -68,7 +68,8 @@ __wt_page_in_func(
 				break;
 
 			page = ref->page;
-			WT_ASSERT(session, !WT_PAGE_IS_ROOT(page));
+			WT_ASSERT(session,
+			    page != NULL && !WT_PAGE_IS_ROOT(page));
 
 			/*
 			 * Ensure the page doesn't have ancient updates on it.
