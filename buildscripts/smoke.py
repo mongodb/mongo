@@ -373,6 +373,7 @@ def skipTest(path):
             return True
 
         authTestsToSkip = [("sharding", "gle_with_conf_servers.js"), # SERVER-6972
+                           ("sharding", "read_pref.js"), # SERVER-6972
                            ("sharding", "read_pref_cmd.js"), # SERVER-6972
                            ("sharding", "read_pref_rs_client.js"), # SERVER-6972
                            ("sharding", "sync_conn_cmd.js"), #SERVER-6327
