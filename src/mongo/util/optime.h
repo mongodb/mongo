@@ -42,9 +42,15 @@ namespace mongo {
     public:
         static void setLast(const Date_t &date) {
             mutex::scoped_lock lk(m);
-            notifier.notify_all(); // won't really do anything until write-lock released
             last = OpTime(date);
+            notifier.notify_all();
         }
+        static void setLast(const OpTime &new_last) {
+            mutex::scoped_lock lk(m);
+            last = new_last;
+            notifier.notify_all();
+        }
+
         unsigned getSecs() const {
             return secs;
         }

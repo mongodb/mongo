@@ -100,6 +100,8 @@ namespace mongo {
                 ctx.getClient()->setLastOp( ts );
             }
         }
+
+        OpTime::setLast( ts );
     }
 
     /** given a BSON object, create a new one at dst which is the existing (partial) object
