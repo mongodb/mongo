@@ -183,7 +183,11 @@ namespace mongo {
         */
         bool haveJournalFiles(bool anyFiles) {
             try {
-                for ( boost::filesystem::directory_iterator i( getJournalDir() );
+                boost::filesystem::path jdir = getJournalDir();
+                if ( !boost::filesystem::exists( jdir ) )
+                    return false;
+
+                for ( boost::filesystem::directory_iterator i( jdir );
                         i != boost::filesystem::directory_iterator();
                         ++i ) {
                     string fileName = boost::filesystem::path(*i).leaf().string();
