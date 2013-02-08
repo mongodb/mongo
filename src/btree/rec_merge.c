@@ -205,6 +205,7 @@ __wt_merge_tree(WT_SESSION_IMPL *session, WT_PAGE *top)
 	WT_VISIT_STATE visit_state;
 	uint32_t refcnt, split;
 	int promote;
+	u_int levels;
 	uint8_t page_type;
 
 	WT_CLEAR(visit_state);
@@ -331,13 +332,24 @@ __wt_merge_tree(WT_SESSION_IMPL *session, WT_PAGE *top)
 	    " split-merge pages containing %" PRIu32 " keys\n",
 	    promote ? "promoted" : "merged", visit_state.maxdepth, refcnt);
 
+	/* Update statistics. */
+	WT_CSTAT_INCR(session, cache_eviction_merge);
+	WT_DSTAT_INCR(session, cache_eviction_merge);
+
+	/* How many levels did we remove? */
+	levels = visit_state.maxdepth - (promote ? 2 : 1);
+	WT_CSTAT_INCRV(session, cache_eviction_merge_levels, levels);
+	WT_DSTAT_INCRV(session, cache_eviction_merge_levels, levels);
+
 	return (0);
 
-err:
-	WT_VERBOSE_TRET(session, evict,
+err:	WT_VERBOSE_TRET(session, evict,
 	    "Failed to merge %" PRIu32
 	    " split-merge pages containing %" PRIu32 " keys\n",
 	    visit_state.maxdepth, refcnt);
+
+	WT_CSTAT_INCR(session, cache_eviction_merge_fail);
+	WT_DSTAT_INCR(session, cache_eviction_merge_fail);
 
 	if (newtop != NULL)
 		__wt_page_out(session, &newtop);

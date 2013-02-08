@@ -56,12 +56,8 @@ __wt_rec_evict(WT_SESSION_IMPL *session, WT_PAGE *page, int exclusive)
 	WT_ERR(__rec_review(session, page->ref, page, exclusive, merge, 1));
 
 	/* Try to merge internal pages. */
-	if (merge) {
+	if (merge)
 		WT_ERR(__wt_merge_tree(session, page));
-
-		WT_CSTAT_INCR(session, cache_eviction_merge);
-		WT_DSTAT_INCR(session, cache_eviction_merge);
-	}
 
 	/*
 	 * Update the page's modification reference, reconciliation might have
