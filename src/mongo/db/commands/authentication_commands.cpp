@@ -68,11 +68,6 @@ namespace mongo {
                                            const BSONObj& cmdObj,
                                            std::vector<Privilege>* out) {} // No auth required
         bool run(const string&, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-            if (!_areNonceAuthenticateCommandsEnabled) {
-                errmsg = _nonceAuthenticateCommandsDisabledMessage;
-                return false;
-            }
-
             nonce64 n = _random->nextInt64();
             stringstream ss;
             ss << hex << n;
@@ -86,14 +81,21 @@ namespace mongo {
     } cmdGetNonce;
 
     bool CmdAuthenticate::run(const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-        if (!_areNonceAuthenticateCommandsEnabled) {
-            errmsg = _nonceAuthenticateCommandsDisabledMessage;
-            return false;
-        }
 
         log() << " authenticate db: " << dbname << " " << cmdObj << endl;
 
         string user = cmdObj.getStringField("user");
+
+        if (!_areNonceAuthenticateCommandsEnabled) {
+            // SERVER-8461, MONGO-CR must be enabled for authenticating the internal user, so that
+            // cluster members may communicate with each other.
+            if (dbname != StringData("local", StringData::LiteralTag()) ||
+                user != internalSecurity.user) {
+                errmsg = _nonceAuthenticateCommandsDisabledMessage;
+                return false;
+            }
+        }
+
         string key = cmdObj.getStringField("key");
         string received_nonce = cmdObj.getStringField("nonce");
 

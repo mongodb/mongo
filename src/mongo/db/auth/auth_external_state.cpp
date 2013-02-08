@@ -28,7 +28,9 @@ namespace mongo {
     Status AuthExternalState::getPrivilegeDocument(const std::string& dbname,
                                                    const PrincipalName& principalName,
                                                    BSONObj* result) {
-        if (principalName.getUser() == internalSecurity.user) {
+        if (dbname == StringData("local", StringData::LiteralTag()) &&
+            principalName.getUser() == internalSecurity.user) {
+
             if (internalSecurity.pwd.empty()) {
                 return Status(ErrorCodes::UserNotFound,
                               "key file must be used to log in with internal user",
