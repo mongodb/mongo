@@ -49,11 +49,11 @@ namespace mongo {
         Record::MemoryTrackingEnabled = false;
 
         Client::initThread(name().c_str());
+        Client::GodScope gs;
         std::vector<std::string> dbNames;
 
         {
             Lock::GlobalWrite lk;
-            Client::GodScope gs;
             getDatabaseNames(dbNames);
         }
 
