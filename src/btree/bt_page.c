@@ -126,8 +126,6 @@ __wt_page_inmem(
 	 * generation wasn't set, that is, remained 0).
 	 */
 	WT_RET(__wt_calloc_def(session, 1, &page));
-	page->parent = parent;
-	page->ref = parent_ref;
 	page->dsk = dsk;
 	page->read_gen = __wt_cache_read_gen(session);
 	page->type = dsk->type;
@@ -161,6 +159,10 @@ __wt_page_inmem(
 	}
 
 	__wt_cache_page_read(session, page, inmem_size);
+
+	/* Link the new page into the parent. */
+	if (parent_ref != NULL)
+		WT_LINK_PAGE(parent, parent_ref, page);
 
 	*pagep = page;
 	return (0);

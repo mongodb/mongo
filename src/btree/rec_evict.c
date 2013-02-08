@@ -215,9 +215,6 @@ __rec_page_dirty_update(WT_SESSION_IMPL *session, WT_PAGE *page)
 		WT_PUBLISH(parent_ref->state, WT_REF_DISK);
 		break;
 	case WT_PM_REC_SPLIT:				/* Page split */
-		/* In case promotion worked, update to the new parent. */
-		parent_ref = page->ref;
-
 		/*
 		 * Update the parent to reference new internal page(s).
 		 *

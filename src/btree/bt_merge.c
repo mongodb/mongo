@@ -62,8 +62,8 @@ __merge_walk(WT_SESSION_IMPL *session, WT_PAGE *page, u_int depth,
  *	reference when moving reference into the new tree.
  */
 typedef struct {
-	WT_PAGE *current, *lchild, *rchild;	/* New pages to be populated. */
-	WT_REF *ref;				/* Current insert point. */
+	WT_PAGE *page, *second;			/* New pages to be populated. */
+	WT_REF *ref, *second_ref;		/* Insert and split point. */
 
 	uint32_t refcnt, split;			/* Ref count, split point. */
 	uint32_t first_live, last_live;		/* First/last in-memory ref. */
@@ -86,14 +86,18 @@ __merge_count(WT_REF *ref, u_int depth, void *cookie)
 	if (depth > state->maxdepth)
 		state->maxdepth = depth;
 	if (ref->state == WT_REF_LOCKED) {
-		if (!state->seen_live)
+		if (!state->seen_live) {
 			state->first_live = state->refcnt;
+			state->seen_live = 1;
+		}
 		state->last_live = state->refcnt;
-		state->seen_live = 1;
 	}
 
-	/* Sanity check that we don't have more than 2**32 refs. */
-	if (++state->refcnt == 0)
+	/*
+	 * Sanity check that we don't overflow the counts.  We can't put more
+	 * than 2**32 keys on one page anyway.
+	 */
+	if (++state->refcnt == UINT32_MAX)
 		return (ENOMEM);
 	return (0);
 }
@@ -112,20 +116,18 @@ __merge_move_ref(WT_REF *ref, u_int depth, void *cookie)
 	state = cookie;
 
 	if (state->split != 0 && state->refcnt++ == state->split) {
-		state->current = state->rchild;
-		state->ref = &state->rchild->u.intl.t[0];
+		state->page = state->second;
+		state->ref = state->second_ref;
 	}
 
 	/* Move a ref from the old tree to the new tree. */
 	newref = state->ref++;
 	*newref = *ref;
 	WT_CLEAR(*ref);
-	if (newref->page != NULL)
-		WT_LINK_PAGE(state->current, newref, newref->page);
-	if (newref->state == WT_REF_LOCKED)
+	if (newref->state == WT_REF_LOCKED) {
+		WT_LINK_PAGE(state->page, newref, newref->page);
 		newref->state = WT_REF_MEM;
-	else
-		WT_ASSERT(NULL, newref->page == NULL);
+	}
 
 	return (0);
 }
@@ -205,7 +207,7 @@ int
 __wt_merge_tree(WT_SESSION_IMPL *session, WT_PAGE *top)
 {
 	WT_DECL_RET;
-	WT_PAGE *newtop;
+	WT_PAGE *lchild, *newtop, *rchild;
 	WT_REF *newref;
 	WT_VISIT_STATE visit_state;
 	uint32_t refcnt, split;
@@ -213,16 +215,19 @@ __wt_merge_tree(WT_SESSION_IMPL *session, WT_PAGE *top)
 	uint8_t page_type;
 
 	WT_CLEAR(visit_state);
-	newtop = NULL;
+	lchild = newtop = rchild = NULL;
 	page_type = top->type;
 
 	WT_ASSERT(session, !WT_PAGE_IS_ROOT(top));
 	WT_ASSERT(session, top->ref->state == WT_REF_LOCKED);
 
-	/* Check how big the stack of pages is. */
+	/*
+	 * Walk the subtree, count the references at the bottom level and
+	 * calculate the maximum depth.
+	 */
 	WT_RET(__merge_walk(session, top, 0, __merge_count, &visit_state));
 
-	/* If there aren't enough useful levels or refs, stop. */
+	/* If there aren't enough useful levels, give up. */
 	if (visit_state.maxdepth < WT_MERGE_STACK_MIN)
 		return (EBUSY);
 
@@ -239,7 +244,7 @@ __wt_merge_tree(WT_SESSION_IMPL *session, WT_PAGE *top)
 	promote = (refcnt > 100);
 
 	if (promote) {
-		/* Create a new top-level split-merge page with two children. */
+		/* Create a new top-level split-merge page with two entries. */
 		WT_ERR(__merge_new_page(session, page_type, 2, 1, &newtop));
 
 		/*
@@ -253,57 +258,68 @@ __wt_merge_tree(WT_SESSION_IMPL *session, WT_PAGE *top)
 		 * children: they can't be evicted, so there is no point
 		 * permanently deepening the tree.
 		 */
-		if ((split = visit_state.first_live) != visit_state.last_live ||
-		    split != 0 || split != refcnt - 1)
+
+		if (visit_state.first_live == visit_state.last_live &&
+		    (visit_state.first_live == 0 ||
+		    visit_state.first_live == refcnt - 1))
+			visit_state.split = split =
+			    (visit_state.first_live == 0) ? 1 : refcnt - 1;
+		else
 			visit_state.split = split = (refcnt + 1) / 2;
 
 		/* Left split. */
-		if (split == 0) {
-			visit_state.split = split = 1;
-			visit_state.current = visit_state.lchild = newtop;
-		} else {
-			WT_ERR(__merge_new_page(session, page_type,
-			    split, visit_state.first_live < split,
-			    &visit_state.lchild));
-			visit_state.current = visit_state.lchild;
+		if (split == 1)
+			visit_state.page = newtop;
+		else {
+			WT_ERR(__merge_new_page(session, page_type, split,
+			    visit_state.first_live < split, &lchild));
+			visit_state.page = lchild;
 		}
 
 		/* Right split. */
 		if (split == refcnt - 1) {
-			visit_state.split = refcnt - 1;
-			visit_state.rchild = newtop;
-		} else
+			visit_state.second = newtop;
+			visit_state.second_ref = &newtop->u.intl.t[1];
+		} else {
 			WT_ERR(__merge_new_page(session, page_type,
 			    refcnt - split, visit_state.last_live >= split,
-			    &visit_state.rchild));
+			    &rchild));
+			visit_state.second = rchild;
+			visit_state.second_ref =
+			    &visit_state.second->u.intl.t[0];
+		}
 	} else {
 		WT_ERR(__merge_new_page(
 		    session, page_type, refcnt, 1, &newtop));
 
-		visit_state.current = newtop;
+		visit_state.page = newtop;
 	}
 
-	visit_state.ref = visit_state.current->u.intl.t;
+	visit_state.ref = visit_state.page->u.intl.t;
 	visit_state.refcnt = 0;
 	WT_ERR(__merge_walk(session, top, 0, __merge_move_ref, &visit_state));
 
 	if (promote) {
 		/* Promote keys into the top-level page. */
-		newref = &newtop->u.intl.t[0];
-		WT_LINK_PAGE(newtop, newref, visit_state.lchild);
-		newref->state = WT_REF_MEM;
-		WT_ERR(__merge_promote_key(session, newref));
+		if (lchild != NULL) {
+			newref = &newtop->u.intl.t[0];
+			WT_LINK_PAGE(newtop, newref, lchild);
+			newref->state = WT_REF_MEM;
+			WT_ERR(__merge_promote_key(session, newref));
 
-		++newref;
-		WT_LINK_PAGE(newtop, newref, visit_state.rchild);
-		newref->state = WT_REF_MEM;
-		WT_ERR(__merge_promote_key(session, newref));
+			if (!F_ISSET(lchild->modify, WT_PM_REC_SPLIT_MERGE))
+				__wt_evict_forced_page(session, lchild);
+		}
 
-		/* Queue new pages for forced eviction. */
-		if (!F_ISSET(visit_state.lchild->modify, WT_PM_REC_SPLIT_MERGE))
-			__wt_evict_forced_page(session, visit_state.lchild);
-		if (!F_ISSET(visit_state.rchild->modify, WT_PM_REC_SPLIT_MERGE))
-			__wt_evict_forced_page(session, visit_state.rchild);
+		if (rchild != NULL) {
+			newref = &newtop->u.intl.t[1];
+			WT_LINK_PAGE(newtop, newref, rchild);
+			newref->state = WT_REF_MEM;
+			WT_ERR(__merge_promote_key(session, newref));
+
+			if (!F_ISSET(rchild->modify, WT_PM_REC_SPLIT_MERGE))
+				__wt_evict_forced_page(session, rchild);
+		}
 	}
 
 	newtop->u.intl.recno = top->u.intl.recno;
@@ -312,7 +328,7 @@ __wt_merge_tree(WT_SESSION_IMPL *session, WT_PAGE *top)
 
 	/*
 	 * Set up the new top-level page as a split so that it will be swapped
-	 * into place by __wt_evict_page.
+	 * into place by our caller.
 	 */
 	top->modify->u.split = newtop;
 	top->modify->flags = WT_PM_REC_SPLIT;
@@ -332,9 +348,9 @@ err:
 
 	if (newtop != NULL)
 		__wt_page_out(session, &newtop);
-	if (visit_state.lchild != NULL)
-		__wt_page_out(session, &visit_state.lchild);
-	if (visit_state.rchild != NULL)
-		__wt_page_out(session, &visit_state.rchild);
+	if (lchild != NULL)
+		__wt_page_out(session, &lchild);
+	if (rchild != NULL)
+		__wt_page_out(session, &rchild);
 	return (ret);
 }

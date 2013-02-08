@@ -153,32 +153,32 @@ __wt_evict_list_clr_page(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 /*
  * __wt_evict_forced_page --
- *	If a page matches the force criteria add it to the eviction queue and
- *	trigger the eviction server.
+ *	If a page matches the force criteria,try to add it to the eviction
+ *	queue and trigger the eviction server.  Best effort only, so no error
+ *	is returned if the page is busy.
  */
-int
+void
 __wt_evict_forced_page(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_CACHE *cache;
 	WT_CONNECTION_IMPL *conn;
-	WT_DECL_RET;
 	WT_PAGE *top;
-	u_int count, levels;
+	u_int levels;
 
 	conn = S2C(session);
 	cache = conn->cache;
 
 	/* Don't queue a page for forced eviction if we already have one. */
 	if (F_ISSET(cache, WT_EVICT_FORCE_PASS))
-		return (EBUSY);
+		return;
 
 	/*
-	 * Check if there is a stack of split-merge pages: if so, lock the
-	 * top instead.
+	 * Check if the page we have been asked to forcefully evict is at the
+	 * bottom of a stack of split-merge pages.  If so, lock the top of the
+	 * stack instead.
 	 */
 	for (top = page, levels = 0;
-	    top->parent != NULL &&
-	    top->parent->modify != NULL &&
+	    !WT_PAGE_IS_ROOT(top) && top->parent->modify != NULL &&
 	    F_ISSET(top->parent->modify, WT_PM_REC_SPLIT_MERGE);
 	    ++levels)
 		top = top->parent;
@@ -192,23 +192,14 @@ __wt_evict_forced_page(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * state, because that is cleared by __wt_evict_list_clr_page.
 	 */
 	if (!WT_ATOMIC_CAS(page->ref->state, WT_REF_MEM, WT_REF_LOCKED))
-		return (EBUSY);
+		return;
 
 	/* If the page is already queued for ordinary eviction, clear it. */
 	__wt_evict_list_clr_page(session, page);
 
 	__wt_spin_lock(session, &cache->evict_lock);
 
-	/*
-	 * Add the page to the head of the eviction queue. Initialize the
-	 * eviction array if necessary.
-	 */
-	if (cache->evict_allocated == 0) {
-		count = WT_EVICT_WALK_BASE + WT_EVICT_WALK_INCR;
-		WT_ERR(__wt_realloc(session, &cache->evict_allocated,
-		    count * sizeof(WT_EVICT_ENTRY), &cache->evict));
-		cache->evict_entries = count;
-	}
+	/* Add the page to the head of the eviction queue. */
 	__evict_init_candidate(session, cache->evict, page);
 
 	/* Set the location in the eviction queue to the new entry. */
@@ -225,21 +216,13 @@ __wt_evict_forced_page(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * page - which makes it more likely that the next pass of the eviction
 	 * server will successfully evict the page.
 	 */
-	if (!WT_ATOMIC_CAS(page->ref->state, WT_REF_LOCKED, WT_REF_EVICT_FORCE))
-		WT_ERR(EBUSY);
+	WT_PUBLISH(page->ref->state, WT_REF_EVICT_FORCE);
 
-err:	__wt_spin_unlock(session, &cache->evict_lock);
+	__wt_spin_unlock(session, &cache->evict_lock);
 
-	/*
-	 * Only wake the server if the page was successfully queued.
-	 * Otherwise, unlock it.
-	 */
-	if (ret == 0) {
-		F_SET(cache, WT_EVICT_FORCE_PASS);
-		ret = __wt_evict_server_wake(session);
-	} else
-		page->ref->state = WT_REF_MEM;
-	return (ret);
+	/* Wake the server, but don't worry if that fails. */
+	F_SET(cache, WT_EVICT_FORCE_PASS);
+	(void)__wt_evict_server_wake(session);
 }
 
 /*
@@ -309,6 +292,9 @@ __wt_cache_evict_server(void *arg)
 	session = arg;
 	conn = S2C(session);
 	cache = conn->cache;
+
+	cache->evict_entries = WT_EVICT_WALK_BASE + WT_EVICT_WALK_INCR;
+	WT_ERR(__wt_calloc_def(session, cache->evict_entries, &cache->evict));
 
 	while (F_ISSET(conn, WT_CONN_SERVER_RUN)) {
 		/* Evict pages from the cache as needed. */
@@ -857,29 +843,11 @@ __evict_walk(WT_SESSION_IMPL *session, u_int *entriesp, int clean)
 	WT_CACHE *cache;
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
-	u_int elem, file_count, i, retries;
+	u_int file_count, i, retries;
 
 	conn = S2C(session);
 	cache = S2C(session)->cache;
 	retries = 0;
-
-	/*
-	 * Resize the array in which we're tracking pages, as necessary, then
-	 * get some pages from each underlying file.  In practice, a realloc
-	 * is rarely needed, so it is worth avoiding the LRU lock.
-	 */
-	elem = WT_EVICT_WALK_BASE + WT_EVICT_WALK_INCR;
-	if (elem > cache->evict_entries) {
-		__wt_spin_lock(session, &cache->evict_lock);
-		/* Save the offset of the eviction point. */
-		i = (u_int)(cache->evict_current - cache->evict);
-		WT_ERR(__wt_realloc(session, &cache->evict_allocated,
-		    elem * sizeof(WT_EVICT_ENTRY), &cache->evict));
-		cache->evict_entries = elem;
-		if (cache->evict_current != NULL)
-			cache->evict_current = cache->evict + i;
-		__wt_spin_unlock(session, &cache->evict_lock);
-	}
 
 	/*
 	 * NOTE: we don't hold the schema lock: files can't be removed without
@@ -927,9 +895,6 @@ retry:	file_count = 0;
 		goto retry;
 
 	*entriesp = i;
-	if (0) {
-err:		__wt_spin_unlock(session, &cache->evict_lock);
-	}
 	return (ret);
 }
 
@@ -992,23 +957,28 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, int clean)
 		}
 
 		/*
-		 * Skip root pages and split-merge pages: they can't be evicted.
-		 * (Split-merge pages are always merged into their parents.)
+		 * Use the EVICT_LRU flag to avoid putting pages onto the list
+		 * multiple times.
+		 */
+		if (F_ISSET_ATOMIC(page, WT_PAGE_EVICT_LRU))
+			continue;
+
+		/*
+		 * Skip root pages, and split-merge pages that have split-merge
+		 * pages as their parents (we're only interested in the top-most
+		 * split-merge page).
+		 *
 		 * Don't skip empty or split pages: updates after their last
 		 * reconciliation may have changed their state and only the
 		 * reconciliation/eviction code can confirm if they should be
 		 * skipped.
-		 *
-		 * Use the EVICT_LRU flag to avoid putting pages onto the list
-		 * multiple times.
 		 */
 		if (WT_PAGE_IS_ROOT(page))
 			continue;
-		if (F_ISSET_ATOMIC(page, WT_PAGE_EVICT_LRU) ||
-		    (page->modify != NULL &&
+		if (page->modify != NULL &&
 		    (F_ISSET(page->modify, WT_PM_REC_SPLIT_MERGE) &&
 		    page->parent->modify != NULL &&
-		    F_ISSET(page->parent->modify, WT_PM_REC_SPLIT_MERGE))))
+		    F_ISSET(page->parent->modify, WT_PM_REC_SPLIT_MERGE)))
 			continue;
 
 		/*
