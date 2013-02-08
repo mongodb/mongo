@@ -46,7 +46,7 @@ namespace mongo {
     const char* const saslCommandServiceHostnameFieldName = "serviceHostname";
     const char* const saslCommandServiceNameFieldName = "serviceName";
     const char* const saslCommandDigestPasswordFieldName = "digestPassword";
-    const char* const saslDefaultDBName = "$sasl";
+    const char* const saslDefaultDBName = "$external";
     const char* const saslDefaultServiceName = "mongodb";
 
     Status saslExtractPayload(const BSONObj& cmdObj, std::string* payload, BSONType* type) {
