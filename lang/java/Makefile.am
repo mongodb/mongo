@@ -3,6 +3,8 @@ AM_CPPFLAGS = -I$(abs_top_builddir)
 JAVASRC = $(top_srcdir)/lang/java
 JAVADEST = src/com/wiredtiger/db
 JAVADESTFULL = $(JAVASRC)/$(JAVADEST)
+JAVAEXAMPLES = $(top_srcdir)/examples/java/com/wiredtiger/examples
+JAVATEST = $(top_srcdir)/test/java/com/wiredtiger/test
 BUILT_SOURCES = $(JAVASRC)/wiredtiger_wrap.c
 SWIG_SOURCES = $(JAVASRC)/wiredtiger.i
 
@@ -13,12 +15,19 @@ javadir = $(datadir)/java
 dist_java_JAVA = \
 		$(JAVADESTFULL)/Connection.java \
 		$(JAVADESTFULL)/Cursor.java \
-		$(JAVADESTFULL)/DbException.java \
 		$(JAVADESTFULL)/SearchStatus.java \
+		$(JAVADESTFULL)/PackFormatOutputStream.java \
+		$(JAVADESTFULL)/PackInputStream.java \
+		$(JAVADESTFULL)/PackOutputStream.java \
+		$(JAVADESTFULL)/PackUtil.java \
 		$(JAVADESTFULL)/Session.java \
+		$(JAVADESTFULL)/WiredTigerException.java \
+		$(JAVADESTFULL)/WiredTigerPackingException.java \
 		$(JAVADESTFULL)/wiredtiger.java \
 		$(JAVADESTFULL)/wiredtigerConstants.java \
-		$(JAVADESTFULL)/wiredtigerJNI.java
+		$(JAVADESTFULL)/wiredtigerJNI.java \
+		$(JAVAEXAMPLES)/ex_access.java \
+		$(JAVATEST)/PackTest.java
 
 java_LTLIBRARIES = libwiredtiger_java.la
 

@@ -128,6 +128,8 @@ SELFHELPER(struct __wt_cursor, cursor)
 %rename (next_wrap) __wt_cursor::next;
 %javamethodmodifiers __wt_cursor::prev "protected";
 %rename (prev_wrap) __wt_cursor::prev;
+%javamethodmodifiers __wt_cursor::key_format "protected";
+%javamethodmodifiers __wt_cursor::value_format "protected";
 
 %ignore __wt_cursor::compare(WT_CURSOR *, WT_CURSOR *, int *);
 %rename (compare_wrap) __wt_cursor::compare;
@@ -142,6 +144,7 @@ enum SearchStatus { FOUND, NOTFOUND, SMALLER, LARGER };
 %}
 
 %extend __wt_cursor {
+
 	%javamethodmodifiers get_key_wrap "protected";
 	WT_ITEM *get_key_wrap(JNIEnv *jenv) {
 		WT_ITEM k;
@@ -211,25 +214,115 @@ enum SearchStatus { FOUND, NOTFOUND, SMALLER, LARGER };
 	}
 }
 
+/* Cache key/value formats in Cursor */
+%typemap(javabody) struct __wt_cursor %{
+ private long swigCPtr;
+ protected boolean swigCMemOwn;
+ protected String key_format;
+ protected String value_format;
+
+ protected $javaclassname(long cPtr, boolean cMemoryOwn) {
+   swigCMemOwn = cMemoryOwn;
+   swigCPtr = cPtr;
+   key_format = getKey_format();
+   value_format = getKey_format();
+ }
+
+ protected static long getCPtr($javaclassname obj) {
+   return (obj == null) ? 0 : obj.swigCPtr;
+ }
+%}
+
 %typemap(javacode) struct __wt_cursor %{
 	protected byte[] key;
 	protected byte[] value;
+        /* For users who iterate through key/value fields. */
+        protected int currentKeyField = -1;
+        protected int currentValueField = -1;
 
-	public void set_key(String key) {
-		this.key = key.getBytes();
+        public String getKeyFormat() {
+                return key_format;
+        }
+        public String getValueFormat() {
+                return value_format;
+        }
+
+        // Raw key/value accessors, for applications that do their own
+        // decoding.
+	public void setKeyRaw(byte[] key) {
+                currentKeyField = -1;
+		this.key = key;
 	}
 
-	public String get_key() {
-		return new String(key);
+	public byte[] getKeyRaw() {
+		return key;
 	}
 
-	public void set_value(byte[] value) {
+	public void setValueRaw(byte[] value) {
+                currentValueField = -1;
 		this.value = value;
 	}
 
-	public byte[] get_value() {
+	public byte[] getValueRaw() {
 		return this.value;
 	}
+
+        // Key/value accessors that decode based on format.
+        public void setKeyFieldBool(int index, boolean value) {
+        }
+
+        public void setKeyFieldByte(int index, byte value) {
+        }
+
+        public void setKeyFieldByteArray(int index, byte[] value) {
+        }
+
+        public void setKeyFieldChar(int index, char value) {
+        }
+
+        public void setKeyFieldInt(int index, int value) {
+        }
+
+        public void setKeyFieldLong(int index, long value) {
+        }
+
+        public void setKeyFieldShort(int index, int value) {
+        }
+
+        public void setKeyFieldString(int index, String value) {
+        }
+
+        public boolean getKeyFieldBool(int index) {
+                return false;
+        }
+
+        public byte getKeyFieldByte(int index) {
+                return 'b';
+        }
+
+        public byte[] getKeyFieldByteArray(int indexvalue) {
+                return "bytearray".getBytes();
+        }
+
+        public char getKeyFieldChar(int index) {
+                return 'c';
+        }
+
+        public int getKeyFieldInt(int index) {
+                return 1;
+        }
+
+        public long getKeyFieldLong(int index) {
+                return 2;
+        }
+
+        public int getKeyFieldShort(int index) {
+                return 3;
+        }
+
+        public String getKeyFieldString(int index) {
+                return "string";
+        }
 
 	public int insert() {
 		return insert_wrap(key, value);
