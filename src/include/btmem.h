@@ -420,6 +420,23 @@ struct __wt_ref {
 	    (ref) = (page)->u.intl.t; (i) > 0; ++(ref), --(i))
 
 /*
+ * WT_LINK_PAGE --
+ * Link a child page into a reference in its parent.
+ */
+#define	WT_LINK_PAGE(ppage, pref, cpage) do {				\
+	(pref)->page = (cpage);						\
+	(cpage)->parent = (ppage);					\
+	(cpage)->ref = (pref);						\
+} while (0)
+
+/*
+ * WT_MERGE_STACK_MIN --
+ * When stacks of in-memory pages become this deep, they are considered for
+ * merging.
+ */
+#define	WT_MERGE_STACK_MIN	3
+
+/*
  * WT_ROW --
  * Each in-memory page row-store leaf page has an array of WT_ROW structures:
  * this is created from on-page data when a page is read from the file.  It's

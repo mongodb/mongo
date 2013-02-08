@@ -20,7 +20,7 @@ __wt_page_is_modified(WT_PAGE *page)
  * __wt_eviction_page_force --
  *      Add a page for forced eviction if it matches the criteria.
  */
-static inline int
+static inline void
 __wt_eviction_page_force(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_BTREE *btree;
@@ -30,9 +30,7 @@ __wt_eviction_page_force(WT_SESSION_IMPL *session, WT_PAGE *page)
 	    __wt_page_is_modified(page) &&
 	    page->type != WT_PAGE_ROW_INT && page->type != WT_PAGE_COL_INT &&
 	    page->memory_footprint > btree->maxmempage)
-		return (__wt_evict_forced_page(session, page));
-
-	return (0);
+		__wt_evict_forced_page(session, page);
 }
 
 /*

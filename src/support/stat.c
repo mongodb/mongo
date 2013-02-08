@@ -54,6 +54,12 @@ __wt_stat_alloc_dsrc_stats(WT_SESSION_IMPL *session, WT_DSRC_STATS **statsp)
 	stats->cache_eviction_hazard.desc =
 	    "eviction unable to acquire hazard pointer";
 	stats->cache_eviction_internal.desc = "internal pages evicted";
+	stats->cache_eviction_merge.desc =
+	    "cache: internal page merge operations completed";
+	stats->cache_eviction_merge_fail.desc =
+	    "cache: internal page merge attempts that could not complete";
+	stats->cache_eviction_merge_levels.desc =
+	    "cache: internal levels merged";
 	stats->cache_overflow_value.desc = "overflow values cached in memory";
 	stats->cache_read.desc = "pages read into cache";
 	stats->cache_read_overflow.desc = "overflow pages read into cache";
@@ -150,6 +156,9 @@ __wt_stat_clear_dsrc_stats(WT_STATS *stats_arg)
 	stats->cache_eviction_fail.v = 0;
 	stats->cache_eviction_hazard.v = 0;
 	stats->cache_eviction_internal.v = 0;
+	stats->cache_eviction_merge.v = 0;
+	stats->cache_eviction_merge_fail.v = 0;
+	stats->cache_eviction_merge_levels.v = 0;
 	stats->cache_overflow_value.v = 0;
 	stats->cache_read.v = 0;
 	stats->cache_read_overflow.v = 0;
@@ -218,6 +227,12 @@ __wt_stat_alloc_connection_stats(WT_SESSION_IMPL *session, WT_CONNECTION_STATS *
 	stats->cache_eviction_hazard.desc =
 	    "cache: eviction unable to acquire hazard pointer";
 	stats->cache_eviction_internal.desc = "cache: internal pages evicted";
+	stats->cache_eviction_merge.desc =
+	    "cache: internal page merge operations completed";
+	stats->cache_eviction_merge_fail.desc =
+	    "cache: internal page merge attempts that could not complete";
+	stats->cache_eviction_merge_levels.desc =
+	    "cache: internal levels merged";
 	stats->cache_eviction_slow.desc =
 	    "cache: eviction server unable to reach eviction goal";
 	stats->cache_pages_dirty.desc =
@@ -267,6 +282,9 @@ __wt_stat_clear_connection_stats(WT_STATS *stats_arg)
 	stats->cache_eviction_fail.v = 0;
 	stats->cache_eviction_hazard.v = 0;
 	stats->cache_eviction_internal.v = 0;
+	stats->cache_eviction_merge.v = 0;
+	stats->cache_eviction_merge_fail.v = 0;
+	stats->cache_eviction_merge_levels.v = 0;
 	stats->cache_eviction_slow.v = 0;
 	stats->cache_pages_dirty.v = 0;
 	stats->cache_read.v = 0;

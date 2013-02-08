@@ -54,7 +54,6 @@ struct __wt_cache {
 	 */
 	WT_EVICT_ENTRY *evict;		/* LRU pages being tracked */
 	WT_EVICT_ENTRY *evict_current;	/* LRU current page to be evicted */
-	size_t   evict_allocated;	/* LRU list bytes allocated */
 	uint32_t evict_entries;		/* LRU list eviction slots */
 	uint32_t evict_candidates;	/* LRU list pages to evict */
 	u_int    evict_file_next;	/* LRU: next file to search */
