@@ -39,11 +39,10 @@ __wt_col_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 		    ref->u.recno == page->u.intl.recno);
 
 		/* Fast path appends. */
-		ref = &page->u.intl.t[page->entries - 1];
-		if (recno >= ref->u.recno) {
-			base = page->entries;
+		base = page->entries;
+		ref = &page->u.intl.t[base - 1];
+		if (recno >= ref->u.recno)
 			goto descend;
-		}
 
 		/* Binary search of internal pages. */
 		for (base = 0, ref = NULL,
