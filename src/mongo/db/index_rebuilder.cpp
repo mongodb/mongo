@@ -49,10 +49,13 @@ namespace mongo {
         Record::MemoryTrackingEnabled = false;
 
         Client::initThread(name().c_str());
-        Lock::GlobalWrite lk;
-        Client::GodScope gs;
         std::vector<std::string> dbNames;
-        getDatabaseNames(dbNames);
+
+        {
+            Lock::GlobalWrite lk;
+            Client::GodScope gs;
+            getDatabaseNames(dbNames);
+        }
 
         for (std::vector<std::string>::const_iterator it = dbNames.begin();
              it < dbNames.end();
@@ -73,7 +76,7 @@ namespace mongo {
             BSONObj nsDoc = cursor->next();
             const char* ns = nsDoc["name"].valuestrsafe();
 
-            Client::Context ctx(ns, dbpath, false);
+            Client::WriteContext ctx(ns);
             NamespaceDetails* nsd = nsdetails(ns);
 
             if (!nsd || !nsd->indexBuildsInProgress) {
