@@ -133,11 +133,12 @@ __wt_row_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 		 * Fast-path internal pages with one child, a common case for
 		 * the root page in new trees.
 		 */
-		if ((base = page->entries) == 1)
+		base = page->entries;
+		ref = &page->u.intl.t[base - 1];
+		if (base == 1)
 			goto descend;
 
 		/* Fast-path appends. */
-		ref = &page->u.intl.t[base - 1];
 		ikey = ref->u.key;
 		item->data = WT_IKEY_DATA(ikey);
 		item->size = ikey->size;
