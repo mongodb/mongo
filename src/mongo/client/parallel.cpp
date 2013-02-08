@@ -1564,12 +1564,21 @@ namespace mongo {
     }
 
     ParallelSortClusteredCursor::~ParallelSortClusteredCursor() {
-        // Clear out our metadata before removing legacy cursor data
-        _cursorMap.clear();
-        for( int i = 0; i < _numServers; i++ ) _cursors[i].release();
+
+        // WARNING: Commands (in particular M/R) connect via _oldInit() directly to shards
+        bool isDirectShardCursor = _cursorMap.empty();
+
+        // Non-direct shard cursors are owned by the _cursorMap, so we release
+        // them in the array here.  Direct shard cursors clean themselves.
+        if (!isDirectShardCursor) {
+            for( int i = 0; i < _numServers; i++ ) _cursors[i].release();
+        }
 
         delete [] _cursors;
         _cursors = 0;
+
+        // Clear out our metadata after removing legacy cursor data
+        _cursorMap.clear();
     }
 
     bool ParallelSortClusteredCursor::more() {
