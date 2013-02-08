@@ -88,6 +88,7 @@ namespace mongo {
 
             if( mss->canApplyInPlace() ) {
                 mss->applyModsInPlace(true);
+                debug.fastmod = true;
                 DEBUGUPDATE( "\t\t\t updateById doing in place update" );
             }
             else {
