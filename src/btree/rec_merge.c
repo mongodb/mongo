@@ -8,54 +8,6 @@
 #include "wt_internal.h"
 
 /*
- * __merge_walk --
- *	Visit all of the child references in a locked subtree and apply a
- *	callback function to them.
- */
-static int
-__merge_walk(WT_SESSION_IMPL *session, WT_PAGE *page, u_int depth,
-	int (*visit)(WT_REF *, u_int, void *), void *cookie)
-{
-	WT_PAGE *child;
-	WT_REF *ref;
-	uint32_t i;
-
-	WT_REF_FOREACH(page, ref, i)
-		switch (ref->state) {
-		case WT_REF_LOCKED:
-			/*
-			 * Don't allow eviction until it is properly hooked
-			 * into the tree.
-			 */
-			__wt_evict_list_clr_page(session, ref->page);
-
-			child = ref->page;
-			/* Visit internal pages recursively. */
-			if (child->type == page->type &&
-			    child->modify != NULL &&
-			    F_ISSET(child->modify, WT_PM_REC_SPLIT_MERGE)) {
-				WT_RET(__merge_walk(
-				    session, child, depth + 1, visit, cookie));
-				break;
-			}
-			/* FALLTHROUGH */
-
-		case WT_REF_DELETED:
-		case WT_REF_DISK:
-			WT_RET((*visit)(ref, depth, cookie));
-			break;
-
-		case WT_REF_EVICT_FORCE:
-		case WT_REF_EVICT_WALK:
-		case WT_REF_MEM:
-		case WT_REF_READING:
-		WT_ILLEGAL_VALUE(session);
-		}
-
-	return (0);
-}
-
-/*
  * WT_VISIT_STATE --
  *	The state maintained across calls to the "visit" callback functions:
  *	the number of refs visited, the maximum depth, and the current page and
@@ -72,19 +24,64 @@ typedef struct {
 } WT_VISIT_STATE;
 
 /*
+ * __merge_walk --
+ *	Visit all of the child references in a locked subtree and apply a
+ *	callback function to them.
+ */
+static int
+__merge_walk(WT_SESSION_IMPL *session, WT_PAGE *page, u_int depth,
+	int (*visit)(WT_REF *, WT_VISIT_STATE *), WT_VISIT_STATE *state)
+{
+	WT_PAGE *child;
+	WT_REF *ref;
+	uint32_t i;
+
+	if (depth > state->maxdepth)
+		state->maxdepth = depth;
+
+	WT_REF_FOREACH(page, ref, i)
+		switch (ref->state) {
+		case WT_REF_LOCKED:
+			/*
+			 * Don't allow eviction until it is properly hooked
+			 * into the tree.
+			 */
+			__wt_evict_list_clr_page(session, ref->page);
+
+			child = ref->page;
+			/* Visit internal pages recursively. */
+			if (child->type == page->type &&
+			    child->modify != NULL &&
+			    F_ISSET(child->modify, WT_PM_REC_SPLIT_MERGE)) {
+				WT_RET(__merge_walk(
+				    session, child, depth + 1, visit, state));
+				break;
+			}
+			/* FALLTHROUGH */
+
+		case WT_REF_DELETED:
+		case WT_REF_DISK:
+			WT_RET((*visit)(ref, state));
+			break;
+
+		case WT_REF_EVICT_FORCE:
+		case WT_REF_EVICT_WALK:
+		case WT_REF_MEM:
+		case WT_REF_READING:
+		WT_ILLEGAL_VALUE(session);
+		}
+
+	return (0);
+}
+
+/*
  * __merge_count --
  *	A callback function that counts the number of references as well as
  *	the first/last "live" reference.
  */
 static int
-__merge_count(WT_REF *ref, u_int depth, void *cookie)
+__merge_count(WT_REF *ref, WT_VISIT_STATE *state)
 {
-	WT_VISIT_STATE *state;
-
-	state = cookie;
-
-	if (depth > state->maxdepth)
-		state->maxdepth = depth;
 	if (ref->state == WT_REF_LOCKED) {
 		if (!state->seen_live) {
 			state->first_live = state->refcnt;
@@ -107,13 +104,9 @@ __merge_count(WT_REF *ref, u_int depth, void *cookie)
  *	Move a child ref from the locked subtree to a new page.
  */
 static int
-__merge_move_ref(WT_REF *ref, u_int depth, void *cookie)
+__merge_move_ref(WT_REF *ref, WT_VISIT_STATE *state)
 {
 	WT_REF *newref;
-	WT_VISIT_STATE *state;
-
-	WT_UNUSED(depth);
-	state = cookie;
 
 	if (state->split != 0 && state->refcnt++ == state->split) {
 		state->page = state->second;
