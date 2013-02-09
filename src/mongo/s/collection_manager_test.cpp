@@ -458,7 +458,7 @@ namespace {
         version.incMinor(); /* second chunk 1|100, first split point */
         version.incMinor(); /* third chunk 1|101, second split point */
         ASSERT_EQUALS(cloned->getMaxShardVersion().toLong(), version.toLong() /* 1|101 */ );
-        // TODO: test maxCollVersion
+        ASSERT_EQUALS(cloned->getMaxCollVersion().toLong(), version.toLong());
         ASSERT_EQUALS(getCollManager()->getNumChunks(), 2u);
         ASSERT_EQUALS(cloned->getNumChunks(), 4u);
         ASSERT(cloned->belongsToMe(min));
