@@ -798,7 +798,9 @@ namespace mongo {
                 conn->done();
             }
             catch ( const DBException& e ) {
-                conn->kill();
+                if (conn) {
+                    conn->kill();
+                }
 
                 // We need to catch DBExceptions b/c sometimes we throw them
                 // instead of socket exceptions when findN fails
