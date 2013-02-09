@@ -31,8 +31,15 @@ for( var i = 0; i < stopOrder.length; i++ ){
     
     var mongosWithAuth = MongoRunner.runMongos({ keyFile : "jstests/libs/key1",
                                                  configdb : mongos.savedOptions.configdb })
-                                                 
-    assert.neq( null, mongosWithAuth.getCollection( "foo.bar" ).findOne() )
+
+    var res = null;
+    try {
+        res = mongosWithAuth.getCollection("foo.bar").findOne();
+    }
+    catch (e) {
+        print("Caught exception: " + tojson(e));
+    }
+    assert.neq(null, res, "Test FAILED: unable to find document using mongos with auth");
 }
 
 jsTest.log( "DONE!" )
