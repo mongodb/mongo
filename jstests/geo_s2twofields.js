@@ -62,10 +62,3 @@ var smallQuery = timeWithoutAndWithAnIndex({from: "2dsphere"},
     {from: {$within: {$centerSphere: [nyc.coordinates, maxQueryRad]}}, to: {$within: {$centerSphere: [miami.coordinates, maxQueryRad]}}});
 print("Indexed time " + smallQuery[1] + " unindexed " + smallQuery[0]);
 assert(smallQuery[0] > smallQuery[1]);
-
-// When we look at ALL the data, it should be slower to use the index.
-var maxQueryRad = degrees * 2 * PI / 180.0
-var smallQuery = timeWithoutAndWithAnIndex({to: "2dsphere", from: "2dsphere"},
-    {from: {$within: {$centerSphere: [nyc.coordinates, maxQueryRad]}}, to: {$within: {$centerSphere: [miami.coordinates, maxQueryRad]}}});
-print("Indexed time " + smallQuery[1] + " unindexed " + smallQuery[0]);
-assert(smallQuery[0] < smallQuery[1]);
