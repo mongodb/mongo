@@ -706,9 +706,12 @@ namespace mongo {
              boost::scoped_ptr<DBClientBase> conn( _config->createConnection() );
              if (_config->username != "") {
                  string errmsg;
-                 // theoretically this can only fail if admin access was revoked since start of run
+                 // this can only fail if admin access was revoked since start of run
                  if (!conn->auth("admin", _config->username, _config->password, errmsg)) {
-                     uasserted(16703, str::stream() << "User " << _config->username << "could not authenticate to admin db second time; admin db access is required to use benchRun with auth enabled");
+                     uasserted(16705,
+                               str::stream() << "User " << _config->username 
+                               << " could not authenticate to admin db; admin db access is "
+                               "still required to use benchRun with auth enabled");
                  }
              }
              // Get final stats
