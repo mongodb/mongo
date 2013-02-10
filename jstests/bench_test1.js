@@ -25,9 +25,13 @@ assert.lte( seconds * res.update , t.findOne( { _id : 1 } ).x * 1.05 , "A1" )
 
 
 assert.eq( 1 , t.getIndexes().length , "B1" )
-benchRun( { ops :  [ { op : "createIndex" , ns : t.getFullName() , key : { x : 1 } } ] , parallel : 1 , seconds : 1 , host : db.getMongo().host } )
+benchArgs['ops']=[ { op : "createIndex" , ns : t.getFullName() , key : { x : 1 } } ];
+benchArgs['parallel']=1;
+benchArgs['seconds']=1;
+benchRun( benchArgs ); 
 assert.eq( 2 , t.getIndexes().length , "B2" )
-benchRun( { ops :  [ { op : "dropIndex" , ns : t.getFullName() , key : { x : 1 } } ] , parallel : 1 , seconds : 1 , host : db.getMongo().host } )
+benchArgs['ops']=[ { op : "dropIndex" , ns : t.getFullName() , key : { x : 1 } } ];
+benchRun( benchArgs ); 
 assert.soon( function(){ return t.getIndexes().length == 1; } );
 
 
