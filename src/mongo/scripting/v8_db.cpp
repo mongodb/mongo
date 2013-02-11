@@ -636,17 +636,7 @@ namespace mongo {
         v8::Handle<v8::Value> len;
         int rlen;
         char* data;
-        if (args.Length() == 3) {
-            // 3 args: len, type, data
-            len = args[0];
-            rlen = len->IntegerValue();
-            type = args[1];
-            v8::String::Utf8Value utf(args[2]);
-            char* tmp = *utf;
-            data = new char[rlen];
-            memcpy(data, tmp, rlen);
-        }
-        else if (args.Length() == 2) {
+        if (args.Length() == 2) {
             // 2 args: type, base64 string
             type = args[0];
             v8::String::Utf8Value utf(args[1]);
@@ -662,7 +652,7 @@ namespace mongo {
             return it;
         }
         else {
-            return v8AssertionException("BinData needs 2 or 3 arguments");
+            return v8AssertionException("BinData takes 2 arguments -- BinData(subtype,data)");
         }
 
         it->ForceSet(scope->v8StringData("len"), len);

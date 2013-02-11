@@ -19,6 +19,7 @@
 
 #include "mongo/scripting/v8_db.h"
 #include "mongo/scripting/v8_utils.h"
+#include "mongo/util/base64.h"
 #include "mongo/util/mongoutils/str.h"
 
 using namespace mongoutils;
@@ -1314,11 +1315,11 @@ namespace mongo {
             case mongo::BinData: {
                 int len;
                 const char *data = f.binData(len);
-                v8::Function* binData = getNamedCons("BinData");
-                argv[0] = v8::Number::New(len);
-                argv[1] = v8::Number::New(f.binDataType());
-                argv[2] = v8::String::New(data, len);
-                o->ForceSet(name, binData->NewInstance(3, argv));
+                stringstream ss;
+                base64::encode(ss, data, len);
+                argv[0] = v8::Number::New(f.binDataType());
+                argv[1] = v8::String::New(ss.str().c_str());
+                o->ForceSet(name, getNamedCons("BinData")->NewInstance(2, argv));
                 break;
             }
             case mongo::Timestamp: {
@@ -1506,10 +1507,11 @@ namespace mongo {
         case mongo::BinData: {
             int len;
             const char *data = elem.binData(len);
-            argv[0] = v8::Number::New(len);
-            argv[1] = v8::Number::New(elem.binDataType());
-            argv[2] = v8::String::New(data, len);
-            return getNamedCons("BinData")->NewInstance(3, argv);
+            stringstream ss;
+            base64::encode(ss, data, len);
+            argv[0] = v8::Number::New(elem.binDataType());
+            argv[1] = v8::String::New(ss.str().c_str());
+            return getNamedCons("BinData")->NewInstance(2, argv);
         }
         case mongo::Timestamp:
             instance = internalFieldObjects->NewInstance();
