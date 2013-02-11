@@ -49,10 +49,14 @@ __merge_walk(WT_SESSION_IMPL *session, WT_PAGE *page, u_int depth,
 			__wt_evict_list_clr_page(session, ref->page);
 
 			child = ref->page;
-			/* Visit internal pages recursively. */
-			if (child->type == page->type &&
-			    child->modify != NULL &&
-			    F_ISSET(child->modify, WT_PM_REC_SPLIT_MERGE)) {
+
+			/*
+			 * Visit internal pages recursively.  This must match
+			 * the walk in __rec_review: if the merge succeeds, we
+			 * have to unlock everything.
+			 */
+			if (child->type == WT_PAGE_COL_INT ||
+			    child->type == WT_PAGE_ROW_INT) {
 				WT_RET(__merge_walk(
 				    session, child, depth + 1, visit, state));
 				break;
@@ -106,6 +110,8 @@ __merge_count(WT_REF *ref, WT_VISIT_STATE *state)
 static int
 __merge_move_ref(WT_REF *ref, WT_VISIT_STATE *state)
 {
+	WT_PAGE *child;
+	WT_PAGE_MODIFY *modify;
 	WT_REF *newref;
 
 	if (state->split != 0 && state->refcnt++ == state->split) {
@@ -118,7 +124,21 @@ __merge_move_ref(WT_REF *ref, WT_VISIT_STATE *state)
 	*newref = *ref;
 	WT_CLEAR(*ref);
 	if (newref->state == WT_REF_LOCKED) {
-		WT_LINK_PAGE(state->page, newref, newref->page);
+		child = newref->page;
+
+		/*
+		 * If the child has been split, update the split page to point
+		 * into the new tree.  That way, if the split-merge page is
+		 * later swapped into place, it will point to the new parent.
+		 *
+		 * The order here is important: the parent page should point to
+		 * the original child page, so we link that in last.
+		 */
+		if ((modify = child->modify) != NULL &&
+		   F_ISSET(modify, WT_PM_REC_SPLIT))
+			WT_LINK_PAGE(state->page, newref, modify->u.split);
+
+		WT_LINK_PAGE(state->page, newref, child);
 		newref->state = WT_REF_MEM;
 	}
 
@@ -224,6 +244,12 @@ __wt_merge_tree(WT_SESSION_IMPL *session, WT_PAGE *top)
 	/* If there aren't enough useful levels, give up. */
 	if (visit_state.maxdepth < WT_MERGE_STACK_MIN)
 		return (EBUSY);
+
+	/* Make sure the top page isn't queued for eviction. */
+	__wt_evict_list_clr_page(session, top);
+
+	/* Clear the eviction walk: it may be in our subtree. */
+	__wt_evict_clear_tree_walk(session, NULL);
 
 	/*
 	 * Now we either collapse the internal pages into one split-merge page,
