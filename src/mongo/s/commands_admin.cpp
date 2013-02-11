@@ -669,9 +669,6 @@ namespace mongo {
                     // we need to move them around to balance.
                     ChunkManagerPtr chunkManager = config->getChunkManager( ns , true );
                     ChunkMap chunkMap = chunkManager->getChunkMap();
-                    if ( chunkMap.size() == 1 )
-                        return true;
-
                     // 2. Move and commit each "big chunk" to a different shard.
                     int i = 0;
                     for ( ChunkMap::const_iterator c = chunkMap.begin(); c != chunkMap.end(); ++c,++i ){
@@ -689,6 +686,10 @@ namespace mongo {
                                       << " while sharding collection " << ns << ". Reason: "
                                       <<  moveResult << endl;
                         }
+                    }
+
+                    if (allSplits.empty()) {
+                        return true;
                     }
 
                     // Reload the config info, after all the migrations
