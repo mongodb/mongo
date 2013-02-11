@@ -173,7 +173,6 @@ namespace {
         clusterAdminRoleReadActions.addAction(ActionType::unsetSharding);
 
         clusterAdminRoleWriteActions.addAction(ActionType::addShard);
-        clusterAdminRoleWriteActions.addAction(ActionType::applyOps);
         clusterAdminRoleWriteActions.addAction(ActionType::closeAllDatabases);
         clusterAdminRoleWriteActions.addAction(ActionType::cpuProfiler);
         clusterAdminRoleWriteActions.addAction(ActionType::cursorInfo);

@@ -1702,9 +1702,9 @@ namespace mongo {
             virtual void addRequiredPrivileges(const std::string& dbname,
                                                const BSONObj& cmdObj,
                                                std::vector<Privilege>* out) {
-                ActionSet actions;
-                actions.addAction(ActionType::applyOps);
-                out->push_back(Privilege(AuthorizationManager::SERVER_RESOURCE_NAME, actions));
+                // applyOps can do pretty much anything, so require all privileges.
+                out->push_back(Privilege(PrivilegeSet::WILDCARD_RESOURCE,
+                                         AuthorizationManager::getAllUserActions()));
             }
             virtual bool run(const string& dbName , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
                 errmsg = "applyOps not allowed through mongos";

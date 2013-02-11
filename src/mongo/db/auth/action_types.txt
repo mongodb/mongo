@@ -5,7 +5,6 @@
 # This means that the integer value assigned to each ActionType and used internally in ActionSet
 # also may change between versions.
 ["addShard",
-"applyOps",
 "captrunc",
 "clean",
 "clone",
