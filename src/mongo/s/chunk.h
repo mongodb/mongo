@@ -97,6 +97,11 @@ namespace mongo {
         // split support
         //
 
+        long getBytesWritten() const { return _dataWritten; }
+        // Const since _dataWritten is mutable and a heuristic
+        // TODO: Split data tracking and chunk information
+        void setBytesWritten( long bytesWritten ) const { _dataWritten = bytesWritten; }
+
         /**
          * if the amount of data written nears the max size of a shard
          * then we check the real size, and if its too big, we split

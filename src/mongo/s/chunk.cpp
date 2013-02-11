@@ -777,6 +777,8 @@ namespace mongo {
                                              oldC->getShard(),
                                              oldC->getLastmod() ) );
 
+                c->setBytesWritten( oldC->getBytesWritten() );
+
                 chunkMap.insert( make_pair( oldC->getMax(), c ) );
             }
 
