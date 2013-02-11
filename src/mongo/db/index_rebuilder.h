@@ -17,11 +17,10 @@
 #pragma once
 
 #include "mongo/db/namespace_details.h"
-#include "mongo/util/background.h"
 
 namespace mongo {
 
-    class IndexRebuilder : public BackgroundJob {
+    class IndexRebuilder {
     public:
         IndexRebuilder();
 

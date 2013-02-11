@@ -663,7 +663,7 @@ namespace mongo {
         /* this is for security on certain platforms (nonce generation) */
         srand((unsigned) (curTimeMicros() ^ startupSrandTimer.micros()));
 
-        indexRebuilder.go();
+        indexRebuilder.run();
 
         snapshotThread.go();
         d.clientCursorMonitor.go();

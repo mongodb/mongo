@@ -26,10 +26,6 @@ namespace mongo {
 
     IndexRebuilder::IndexRebuilder() {}
 
-    std::string IndexRebuilder::name() const {
-        return "IndexRebuilder";
-    }
-
     /**
      * This resets memory tracking to its original value after all indexes are rebuilt.
      *
@@ -48,14 +44,11 @@ namespace mongo {
         ON_BLOCK_EXIT(resetMemoryTracking, Record::MemoryTrackingEnabled);
         Record::MemoryTrackingEnabled = false;
 
-        Client::initThread(name().c_str());
         Client::GodScope gs;
-        std::vector<std::string> dbNames;
+        Lock::GlobalWrite lk;
 
-        {
-            Lock::GlobalWrite lk;
-            getDatabaseNames(dbNames);
-        }
+        std::vector<std::string> dbNames;
+        getDatabaseNames(dbNames);
 
         for (std::vector<std::string>::const_iterator it = dbNames.begin();
              it < dbNames.end();
