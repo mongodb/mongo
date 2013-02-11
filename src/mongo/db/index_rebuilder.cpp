@@ -47,19 +47,20 @@ namespace mongo {
         Client::GodScope gs;
         Lock::GlobalWrite lk;
 
+        bool firstTime = true;
         std::vector<std::string> dbNames;
         getDatabaseNames(dbNames);
 
         for (std::vector<std::string>::const_iterator it = dbNames.begin();
              it < dbNames.end();
              it++) {
-            checkDB(*it);
+            checkDB(*it, &firstTime);
         }
 
         cc().shutdown();
     }
 
-    void IndexRebuilder::checkDB(const std::string& dbName) {
+    void IndexRebuilder::checkDB(const std::string& dbName, bool* firstTime) {
         const std::string systemNS = dbName + ".system.namespaces";
         DBDirectClient cli;
         scoped_ptr<DBClientCursor> cursor(cli.query(systemNS, Query()));
@@ -77,6 +78,11 @@ namespace mongo {
             }
 
             log() << "Found interrupted index build on " << ns << endl;
+            if (*firstTime) {
+                log() << "Restart the server with --noIndexBuildRetry to skip index rebuilds"
+                      << endl;
+                *firstTime = false;
+            }
 
             // If the indexBuildRetry flag isn't set, just clear the inProg flag
             if (!cmdLine.indexBuildRetry) {

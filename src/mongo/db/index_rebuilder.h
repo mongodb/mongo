@@ -32,7 +32,7 @@ namespace mongo {
          * Check each collection in a database to see if it has any in-progress index builds that
          * need to be retried.  If so, calls retryIndexBuild.
          */
-        void checkDB(const std::string& dbname);
+        void checkDB(const std::string& dbname, bool* firstTime);
 
         /**
          * Actually retry an index build on a given namespace.
