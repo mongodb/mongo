@@ -135,7 +135,7 @@ __merge_move_ref(WT_REF *ref, WT_VISIT_STATE *state)
 		 * the original child page, so we link that in last.
 		 */
 		if ((modify = child->modify) != NULL &&
-		   F_ISSET(modify, WT_PM_REC_SPLIT))
+		    F_ISSET(modify, WT_PM_REC_SPLIT))
 			WT_LINK_PAGE(state->page, newref, modify->u.split);
 
 		WT_LINK_PAGE(state->page, newref, child);
