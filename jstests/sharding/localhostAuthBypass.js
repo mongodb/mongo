@@ -64,7 +64,7 @@ var assertCannotRunCommands = function(mongo, st) {
 
     // Config
     assert.throws(function() {
-        mongo.getDB("config").findOne();
+        mongo.getDB("config").shards.findOne();
     });
 
     var to = findEmptyShard(st, "test.foo");
@@ -104,7 +104,7 @@ var assertCanRunCommands = function(mongo, st) {
 
     // Config
     // this will throw if it fails
-    mongo.getDB("config").findOne();
+    mongo.getDB("config").shards.findOne();
 
     to = findEmptyShard(st, "test.foo");
     var res = mongo.getDB("admin").runCommand({
