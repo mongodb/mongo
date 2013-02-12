@@ -55,7 +55,7 @@ namespace mongo {
 #endif
     };
 
-#if (!defined(_DEBUG) && defined(_WIN32))
+#if !(defined(_DEBUG) && defined(_WIN32))
     inline void SimpleRWLock::lock()          { m.lock(); }
     inline void SimpleRWLock::unlock()        { m.unlock(); }
     inline void SimpleRWLock::lock_shared()   { m.lock_shared(); }
