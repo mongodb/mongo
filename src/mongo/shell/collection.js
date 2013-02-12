@@ -196,10 +196,11 @@ DBCollection.prototype.insert = function( obj , options, _allow_dot ){
             obj[key] = tmp[key];
         }
     }
-    this._db._initExtraInfo();
+    var startTime = (typeof(_verboseShell) === 'undefined' ||
+                     !_verboseShell) ? 0 : new Date().getTime();
     this._mongo.insert( this._fullName , obj, options );
     this._lastID = obj._id;
-    this._db._getExtraInfo("Inserted");
+    this._printExtraInfo("Inserted", startTime);
 }
 
 DBCollection.prototype.remove = function( t , justOne ){
@@ -208,9 +209,10 @@ DBCollection.prototype.remove = function( t , justOne ){
             throw "can't have _id set to undefined in a remove expression"
         }
     }
-    this._db._initExtraInfo();
+    var startTime = (typeof(_verboseShell) === 'undefined' ||
+                     !_verboseShell) ? 0 : new Date().getTime();
     this._mongo.remove( this._fullName , this._massageObject( t ) , justOne ? true : false );
-    this._db._getExtraInfo("Removed");
+    this._printExtraInfo("Removed", startTime);
 }
 
 DBCollection.prototype.update = function( query , obj , upsert , multi ){
@@ -237,9 +239,10 @@ DBCollection.prototype.update = function( query , obj , upsert , multi ){
         upsert = opts.upsert;
     }
 
-    this._db._initExtraInfo();
+    var startTime = (typeof(_verboseShell) === 'undefined' ||
+                     !_verboseShell) ? 0 : new Date().getTime();
     this._mongo.update( this._fullName , query , obj , upsert ? true : false , multi ? true : false );
-    this._db._getExtraInfo("Updated");
+    this._printExtraInfo("Updated", startTime);
 }
 
 DBCollection.prototype.save = function( obj ){
@@ -402,6 +405,34 @@ DBCollection.prototype.renameCollection = function( newName , dropTarget ){
     return this._db._adminCommand( { renameCollection : this._fullName , 
                                      to : this._db._name + "." + newName , 
                                      dropTarget : dropTarget } )
+}
+
+// Display verbose information about the operation
+DBCollection.prototype._printExtraInfo = function(action, startTime) {
+    if ( typeof _verboseShell === 'undefined' || !_verboseShell ) {
+        __callLastError = true;
+        return;
+    }
+
+    // explicit w:1 so that replset getLastErrorDefaults aren't used here which would be bad.
+    var res = this._db.getLastErrorCmd(1);
+    if (res) {
+        if (res.err != undefined && res.err != null) {
+            // error occurred, display it
+            print(res.err);
+            return;
+        }
+
+        var info = action + " ";
+        // hack for inserted because res.n is 0
+        info += action != "Inserted" ? res.n : 1;
+        if (res.n > 0 && res.updatedExisting != undefined)
+            info += " " + (res.updatedExisting ? "existing" : "new")
+        info += " record(s)";
+        var time = new Date().getTime() - startTime;
+        info += " in " + time + "ms";
+        print(info);
+    }
 }
 
 DBCollection.prototype.validate = function(full) {
