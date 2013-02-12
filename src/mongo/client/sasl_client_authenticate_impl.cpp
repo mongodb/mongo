@@ -40,7 +40,7 @@ namespace {
     Gsasl* _gsaslLibraryContext = NULL;
 
     MONGO_INITIALIZER(SaslClientContext)(InitializerContext* context) {
-        fassert(0, _gsaslLibraryContext == NULL);
+        fassert(16710, _gsaslLibraryContext == NULL);
 
         if (!gsasl_check_version(GSASL_VERSION))
             return Status(ErrorCodes::UnknownError, "Incompatible gsasl library.");
