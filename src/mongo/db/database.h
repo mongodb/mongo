@@ -46,6 +46,7 @@ namespace mongo {
         static void closeDatabase( const char *db, const string& path );
 
         void openAllFiles();
+        void clearTmpCollections();
 
         /**
          * tries to make sure that this hasn't been deleted

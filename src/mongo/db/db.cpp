@@ -400,27 +400,6 @@ namespace mongo {
         return 0;
     }
 
-    void clearTmpCollections() {
-        Lock::GlobalWrite lk; // this is helpful for the query below to work as you can't open files when readlocked
-        Client::GodScope gs;
-        vector< string > toDelete;
-        DBDirectClient cli;
-        vector< string > dbNames;
-        getDatabaseNames( dbNames );
-        for (vector<string>::const_iterator it(dbNames.begin()), end(dbNames.end()); it != end; ++it){
-            const string coll = *it + ".system.namespaces";
-            scoped_ptr< DBClientCursor > c (cli.query(coll, Query( fromjson( "{'options.temp': {$in: [true, 1]}}" ) ) ));
-            while( c->more() ) {
-                BSONObj o = c->next();
-                toDelete.push_back( o.getStringField( "name" ) );
-            }
-        }
-        for( vector< string >::iterator i = toDelete.begin(); i != toDelete.end(); ++i ) {
-            log() << "Dropping old temporary collection: " << *i << endl;
-            cli.dropCollection( *i );
-        }
-    }
-
     /**
      * does background async flushes of mmapped files
      */
@@ -624,9 +603,6 @@ namespace mongo {
 
         if( cmdLine.durOptions & CmdLine::DurRecoverOnly )
             return;
-
-        // comes after getDur().startup() because this reads from the database
-        clearTmpCollections();
 
         unsigned long long missingRepl = checkIfReplMissingFromCommandLine();
         if (missingRepl) {
