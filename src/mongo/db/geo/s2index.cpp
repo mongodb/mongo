@@ -298,34 +298,45 @@ namespace mongo {
             }
         }
 
+        void getLiteralKeysArray(BSONObj obj, BSONObjSet *out) const {
+            BSONObjIterator objIt(obj);
+            if (!objIt.more()) {
+                // Empty arrays are indexed as undefined.
+                BSONObjBuilder b;
+                b.appendUndefined("");
+                out->insert(b.obj());
+            } else {
+                // Non-empty arrays are exploded.
+                while (objIt.more()) {
+                    BSONObjBuilder b;
+                    b.appendAs(objIt.next(), "");
+                    out->insert(b.obj());
+                }
+            }
+        }
+
+        void getOneLiteralKey(BSONElement elt, BSONObjSet *out) const {
+            if (Array == elt.type()) {
+                getLiteralKeysArray(elt.Obj(), out);
+            } else {
+                // One thing, not an array, index as-is.
+                BSONObjBuilder b;
+                b.appendAs(elt, "");
+                out->insert(b.obj());
+            }
+        }
 
         // elements is a non-geo field.  Add the values literally, expanding arrays.
         void getLiteralKeys(const BSONElementSet &elements, BSONObjSet *out) const {
             if (0 == elements.size()) {
+                // Missing fields are indexed as null.
                 BSONObjBuilder b;
                 b.appendNull("");
                 out->insert(b.obj());
-            } else if (1 == elements.size()) {
-                if (Array == elements.begin()->type()) {
-                    const vector<BSONElement> elts = elements.begin()->Array();
-                    for (size_t i = 0; i < elts.size(); ++i) {
-                        BSONObjBuilder b;
-                        b.appendAs(elts[i], "");
-                        out->insert(b.obj());
-                    }
-                } else {
-                    BSONObjBuilder b;
-                    b.appendAs(*elements.begin(), "");
-                    out->insert(b.obj());
-                }
             } else {
-                BSONArrayBuilder aBuilder;
                 for (BSONElementSet::iterator i = elements.begin(); i != elements.end(); ++i) {
-                    aBuilder.append(*i);
+                    getOneLiteralKey(*i, out);
                 }
-                BSONObjBuilder b;
-                b.append("", aBuilder.arr());
-                out->insert(b.obj());
             }
         }
 

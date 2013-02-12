@@ -4,17 +4,25 @@ t = db.geo_s2nongeoarray
 
 oldPoint = [40,5]
 
-t.insert({geo: oldPoint, nonGeo: [123,456]});
-assert.eq(t.find({nonGeo: 123 }).itcount(), 1);
-t.ensureIndex({geo: "2d", nonGeo: 1})
+var data = {geo: oldPoint, nonGeo: [123,456], otherNonGeo: [{b:[1,2]},{b:[3,4]}]};
+
+t.drop();
+t.insert(data);
+assert(!db.getLastError());
+t.ensureIndex({otherNonGeo: 1});
+assert(!db.getLastError());
+assert.eq(1, t.find({otherNonGeo: {b:[1,2]}}).itcount());
+assert.eq(0, t.find({otherNonGeo: 1}).itcount());
+assert.eq(1, t.find({'otherNonGeo.b': 1}).itcount());
+
+t.drop();
+t.insert(data);
+t.ensureIndex({geo: "2d", nonGeo: 1, otherNonGeo: 1})
 assert.eq(t.find({nonGeo: 123, geo: {$nearSphere: oldPoint}}).itcount(), 1);
+assert.eq(t.find({'otherNonGeo.b': 1, geo: {$nearSphere: oldPoint}}).itcount(), 1);
 
 t.drop()
-t.insert({geo: oldPoint, nonGeo: [123,456]});
-t.ensureIndex({geo: "2dsphere", nonGeo: 1})
+t.insert(data);
+t.ensureIndex({geo: "2dsphere", nonGeo: 1, otherNonGeo: 1})
 assert.eq(t.find({nonGeo: 123, geo: {$nearSphere: oldPoint}}).itcount(), 1);
-
-t.drop()
-t.insert({geo: oldPoint, nonGeo: [123,456]});
-t.ensureIndex({nonGeo: 1, geo: "2dsphere"})
-assert.eq(t.find({nonGeo: 123, geo: {$nearSphere: oldPoint}}).itcount(), 1);
+assert.eq(t.find({'otherNonGeo.b': 1, geo: {$nearSphere: oldPoint}}).itcount(), 1);
