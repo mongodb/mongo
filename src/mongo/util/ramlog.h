@@ -35,6 +35,7 @@ namespace mongo {
         static void getNames( vector<string>& names );
 
         time_t lastWrite() { return _lastWrite; } // 0 if no writes
+        long long getTotalLinesWritten() const { return _totalLinesWritten; }
 
     protected:
         static int repeats(const vector<const char *>& v, int i);
@@ -48,13 +49,14 @@ namespace mongo {
         ~RamLog(); // want this private as we want to leak so we can use them till the very end
 
         enum {
-            N = 128, // number of links
-            C = 256 // max size of line
+            N = 1024, // number of lines
+            C = 512 // max size of line
         };
         char lines[N][C];
         unsigned h; // current position
         unsigned n; // number of lines stores 0 o N
         string _name;
+        long long _totalLinesWritten;
 
         typedef map<string,RamLog*> RM;
         static mongo::mutex* _namedLock;

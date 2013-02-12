@@ -364,10 +364,12 @@ namespace mongo {
                     errmsg = str::stream() << "no RamLog named: " << p;
                     return false;
                 }
-                
+
+                result.appendNumber( "totalLinesWritten", rl->getTotalLinesWritten() );
+
                 vector<const char*> lines;
                 rl->get( lines );
-                
+
                 BSONArrayBuilder arr( result.subarrayStart( "log" ) );
                 for ( unsigned i=0; i<lines.size(); i++ )
                     arr.append( lines[i] );

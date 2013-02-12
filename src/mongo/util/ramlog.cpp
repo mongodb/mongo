@@ -25,7 +25,7 @@ namespace mongo {
 
     using namespace mongoutils;
 
-    RamLog::RamLog( const std::string& name ) : _name(name), _lastWrite(0) {
+    RamLog::RamLog( const std::string& name ) : _name(name), _totalLinesWritten(0), _lastWrite(0) {
         h = 0; n = 0;
         for( int i = 0; i < N; i++ )
             lines[i][C-1] = 0;
@@ -49,6 +49,7 @@ namespace mongo {
 
     void RamLog::write(LogLevel ll, const std::string& str) {
         _lastWrite = time(0);
+        _totalLinesWritten++;
 
         char *p = lines[(h+n)%N];
         
