@@ -178,7 +178,6 @@ add_option( "usev8" , "use v8 for javascript" , 0 , True )
 # mongo feature options
 add_option( "noshell", "don't build shell" , 0 , True )
 add_option( "safeshell", "don't let shell scripts run programs (still, don't run untrusted scripts)" , 0 , True )
-add_option( "win2008plus", "use newer operating system API features" , 0 , False )
 
 # dev options
 add_option( "d", "debug build no optimization, etc..." , 0 , True , "debugBuild" )
@@ -557,9 +556,6 @@ elif "win32" == os.sys.platform:
     windows = True
 
     env['DIST_ARCHIVE_SUFFIX'] = '.zip'
-
-    if has_option( "win2008plus" ):
-        env.Append( CPPDEFINES=[ "MONGO_USE_SRW_ON_WINDOWS" ] )
 
     for pathdir in env['ENV']['PATH'].split(os.pathsep):
         if os.path.exists(os.path.join(pathdir, 'cl.exe')):

@@ -80,6 +80,7 @@ namespace mongo {
         return _wconvertmtos( pmc.WorkingSetSize );
     }
 
+    extern string rwlockImpl;
     void ProcessInfo::getExtraInfo(BSONObjBuilder& info) {
         MEMORYSTATUSEX mse;
         mse.dwLength = sizeof(mse);
@@ -93,6 +94,7 @@ namespace mongo {
             info.append("availPageFileMB", static_cast<int>(mse.ullAvailPageFile / 1024 / 1024));
             info.append("ramMB", static_cast<int>(mse.ullTotalPhys / 1024 / 1024));
         }
+        info.append("rwlockImpl", rwlockImpl);
     }
 
     void ProcessInfo::SystemInfo::collectSystemInfo() {
