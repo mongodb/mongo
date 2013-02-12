@@ -888,7 +888,7 @@ namespace mongo {
         if (!nativeEpilogue()) {
             _error = "JavaScript execution terminated";
             log() << _error << endl;
-            return 1;
+            uasserted(16711, _error);
         }
 
         if (timeoutMs)
@@ -904,21 +904,26 @@ namespace mongo {
         if (!nativePrologue()) {
             _error = "JavaScript execution interrupted";
             log() << _error << endl;
-            return 1;
+            uasserted(16712, _error);
         }
 
-        if (result.IsEmpty()) {
-            if (try_catch.HasCaught() && try_catch.CanContinue()) {
-                _error = toSTLString(&try_catch);
-            }
-            else {
-                _error = "JavaScript execution failed";
-            }
-            if (hasOutOfMemoryException()) {
-                _error += " -- v8 is out of memory";
-            }
+        if (try_catch.HasCaught() && try_catch.CanContinue()) {
+            // normal JS exception
+            _error = toSTLString(&try_catch);
             log() << _error << endl;
-            return 1;
+            uasserted(16713, _error);
+        }
+        else if (hasOutOfMemoryException()) {
+            // out of memory exception (treated as terminal)
+            _error = "JavaScript execution failed -- v8 is out of memory";
+            log() << _error << endl;
+            msgasserted(16714, _error);
+        }
+        else if (result.IsEmpty() || try_catch.HasCaught()) {
+            // terminal exception (due to empty handle, termination, etc.)
+            _error = "JavaScript execution failed";
+            log() << _error << endl;
+            msgasserted(16715, _error);
         }
 
         if (!ignoreReturn) {
@@ -1702,7 +1707,7 @@ namespace mongo {
             return;
         }
         if (value->IsFunction()) {
-            uassert(16707, "cannot convert native function to BSON",
+            uassert(16716, "cannot convert native function to BSON",
                     !value->ToObject()->Has(v8StringData("_v8_function")));
             b.appendCode(sname, toSTLString(value));
             return;

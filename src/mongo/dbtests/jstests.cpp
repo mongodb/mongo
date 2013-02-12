@@ -194,7 +194,12 @@ namespace JSTests {
             ASSERT( !_logger.logged() );
 
             // An error is logged for an invalid statement.
-            ASSERT_NOT_EQUALS( 0, scope->invoke( "notAFunction()", 0, 0 ) );
+            try {
+                scope->invoke( "notAFunction()", 0, 0 );
+            }
+            catch(const DBException&) {
+                // ignore the exception; just test that we logged something
+            }
             ASSERT( _logger.logged() );
         }
     private:
