@@ -768,10 +768,12 @@ namespace mongo {
             verify( pm == op->setMessage( "m/r: (3/3) final reduce to collection" , _safeCount( _db, _config.incLong, BSONObj(), QueryOption_SlaveOk ) ) );
 
             shared_ptr<Cursor> temp =
-            NamespaceDetailsTransient::bestGuessCursor( _config.incLong.c_str() , BSONObj() ,
-                                                       sortKey );
-            auto_ptr<ClientCursor> cursor( new ClientCursor( QueryOption_NoCursorTimeout , temp , _config.incLong.c_str() ) );
-
+            NamespaceDetailsTransient::bestGuessCursor(_config.incLong.c_str(),
+                                                       BSONObj(),
+                                                       sortKey);
+            ClientCursor::Holder cursor(new ClientCursor(QueryOption_NoCursorTimeout,
+                                                         temp,
+                                                         _config.incLong.c_str()));
             // iterate over all sorted objects
             while ( cursor->ok() ) {
                 BSONObj o = cursor->current().getOwned();
@@ -784,7 +786,6 @@ namespace mongo {
                     all.push_back( o );
                     if ( pm->hits() % 100 == 0 ) {
                         if ( ! cursor->yield() ) {
-                            cursor.release();
                             break;
                         }
                         killCurrentOp.checkForInterrupt();
@@ -800,7 +801,6 @@ namespace mongo {
                 }
                 catch (...) {
                     yield.relock();
-                    cursor.release();
                     throw;
                 }
 
@@ -809,15 +809,11 @@ namespace mongo {
                 all.push_back( o );
 
                 if ( ! yield.stillOk() ) {
-                    cursor.release();
                     break;
                 }
 
                 killCurrentOp.checkForInterrupt();
             }
-            
-            // we need to release here since we temp release below
-            cursor.release();
 
             {
                 dbtempreleasecond tl;
@@ -1091,7 +1087,9 @@ namespace mongo {
                         // obtain full cursor on data to apply mr to
                         shared_ptr<Cursor> temp = NamespaceDetailsTransient::getCursor( config.ns.c_str(), config.filter, config.sort );
                         uassert( 16052, str::stream() << "could not create cursor over " << config.ns << " for query : " << config.filter << " sort : " << config.sort, temp.get() );
-                        auto_ptr<ClientCursor> cursor( new ClientCursor( QueryOption_NoCursorTimeout , temp , config.ns.c_str() ) );
+                        ClientCursor::Holder cursor(new ClientCursor(QueryOption_NoCursorTimeout,
+                                                                     temp,
+                                                                     config.ns.c_str()));
                         uassert( 16053, str::stream() << "could not create client cursor over " << config.ns << " for query : " << config.filter << " sort : " << config.sort, cursor.get() );
 
                         Timer mt;
@@ -1132,7 +1130,6 @@ namespace mongo {
                                 inReduce += t.micros();
 
                                 if ( ! yield.stillOk() ) {
-                                    cursor.release();
                                     break;
                                 }
 
