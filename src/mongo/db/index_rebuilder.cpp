@@ -22,7 +22,9 @@
 
 namespace mongo {
 
-    IndexRebuilder indexRebuilder;
+    // Disabled until locking at startup can be ironed out.
+    // See SERVER-8344 and SERVER-8536
+    //IndexRebuilder indexRebuilder;
 
     IndexRebuilder::IndexRebuilder() {}
 
