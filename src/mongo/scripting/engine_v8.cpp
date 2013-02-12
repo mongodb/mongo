@@ -1702,7 +1702,7 @@ namespace mongo {
             return;
         }
         if (value->IsFunction()) {
-            uassert(16704, "cannot convert native function to BSON",
+            uassert(16707, "cannot convert native function to BSON",
                     !value->ToObject()->Has(v8StringData("_v8_function")));
             b.appendCode(sname, toSTLString(value));
             return;
