@@ -42,6 +42,17 @@ namespace mongo {
 
     typedef v8::Handle<v8::Value> (*v8Function)(V8Scope* scope, const v8::Arguments& args);
 
+    /**
+     * v8 callback for persistent handles that are to be freed by the GC
+     */
+    template <typename _T>
+    void deleteOnCollect(v8::Persistent<v8::Value> objHandle, void* obj) {
+        if (!objHandle.IsNearDeath())
+            return;
+        delete static_cast<_T*>(obj);
+        objHandle.Dispose();
+    }
+
     class BSONHolder {
     public:
         BSONHolder(BSONObj obj) {

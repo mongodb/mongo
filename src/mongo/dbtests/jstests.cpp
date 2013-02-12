@@ -111,22 +111,22 @@ namespace JSTests {
             ASSERT( 5 == s->getNumber( "x" ) );
 
             s->invoke( "return 17;" , 0, 0 );
-            ASSERT( 17 == s->getNumber( "return" ) );
+            ASSERT( 17 == s->getNumber( "__returnValue" ) );
 
             s->invoke( "function(){ return 17; }" , 0, 0 );
-            ASSERT( 17 == s->getNumber( "return" ) );
+            ASSERT( 17 == s->getNumber( "__returnValue" ) );
 
             s->setNumber( "x" , 1.76 );
             s->invoke( "return x == 1.76; " , 0, 0 );
-            ASSERT( s->getBoolean( "return" ) );
+            ASSERT( s->getBoolean( "__returnValue" ) );
 
             s->setNumber( "x" , 1.76 );
             s->invoke( "return x == 1.79; " , 0, 0 );
-            ASSERT( ! s->getBoolean( "return" ) );
+            ASSERT( ! s->getBoolean( "__returnValue" ) );
 
             BSONObj obj = BSON( "" << 11.0 );
             s->invoke( "function( z ){ return 5 + z; }" , &obj, 0 );
-            ASSERT_EQUALS( 16 , s->getNumber( "return" ) );
+            ASSERT_EQUALS( 16 , s->getNumber( "__returnValue" ) );
 
             delete s;
         }
@@ -210,45 +210,45 @@ namespace JSTests {
             s->setObject( "blah" , o );
 
             s->invoke( "return blah.x;" , 0, 0 );
-            ASSERT_EQUALS( 17 , s->getNumber( "return" ) );
+            ASSERT_EQUALS( 17 , s->getNumber( "__returnValue" ) );
             s->invoke( "return blah.y;" , 0, 0 );
-            ASSERT_EQUALS( "eliot" , s->getString( "return" ) );
+            ASSERT_EQUALS( "eliot" , s->getString( "__returnValue" ) );
 
             s->invoke( "return this.z;" , 0, &o );
-            ASSERT_EQUALS( "sara" , s->getString( "return" ) );
+            ASSERT_EQUALS( "sara" , s->getString( "__returnValue" ) );
 
             s->invoke( "return this.z == 'sara';" , 0, &o );
-            ASSERT_EQUALS( true , s->getBoolean( "return" ) );
+            ASSERT_EQUALS( true , s->getBoolean( "__returnValue" ) );
 
             s->invoke( "this.z == 'sara';" , 0, &o );
-            ASSERT_EQUALS( true , s->getBoolean( "return" ) );
+            ASSERT_EQUALS( true , s->getBoolean( "__returnValue" ) );
 
             s->invoke( "this.z == 'asara';" , 0, &o );
-            ASSERT_EQUALS( false , s->getBoolean( "return" ) );
+            ASSERT_EQUALS( false , s->getBoolean( "__returnValue" ) );
 
             s->invoke( "return this.x == 17;" , 0, &o );
-            ASSERT_EQUALS( true , s->getBoolean( "return" ) );
+            ASSERT_EQUALS( true , s->getBoolean( "__returnValue" ) );
 
             s->invoke( "return this.x == 18;" , 0, &o );
-            ASSERT_EQUALS( false , s->getBoolean( "return" ) );
+            ASSERT_EQUALS( false , s->getBoolean( "__returnValue" ) );
 
             s->invoke( "function(){ return this.x == 17; }" , 0, &o );
-            ASSERT_EQUALS( true , s->getBoolean( "return" ) );
+            ASSERT_EQUALS( true , s->getBoolean( "__returnValue" ) );
 
             s->invoke( "function(){ return this.x == 18; }" , 0, &o );
-            ASSERT_EQUALS( false , s->getBoolean( "return" ) );
+            ASSERT_EQUALS( false , s->getBoolean( "__returnValue" ) );
 
             s->invoke( "function (){ return this.x == 17; }" , 0, &o );
-            ASSERT_EQUALS( true , s->getBoolean( "return" ) );
+            ASSERT_EQUALS( true , s->getBoolean( "__returnValue" ) );
 
             s->invoke( "function z(){ return this.x == 18; }" , 0, &o );
-            ASSERT_EQUALS( false , s->getBoolean( "return" ) );
+            ASSERT_EQUALS( false , s->getBoolean( "__returnValue" ) );
 
             s->invoke( "function (){ this.x == 17; }" , 0, &o );
-            ASSERT_EQUALS( false , s->getBoolean( "return" ) );
+            ASSERT_EQUALS( false , s->getBoolean( "__returnValue" ) );
 
             s->invoke( "function z(){ this.x == 18; }" , 0, &o );
-            ASSERT_EQUALS( false , s->getBoolean( "return" ) );
+            ASSERT_EQUALS( false , s->getBoolean( "__returnValue" ) );
 
             s->invoke( "x = 5; for( ; x <10; x++){ a = 1; }" , 0, &o );
             ASSERT_EQUALS( 10 , s->getNumber( "x" ) );
@@ -399,7 +399,7 @@ namespace JSTests {
                 s->setObject( "x" , o );
 
                 s->invoke( "return x.d.getTime() != 12;" , 0, 0 );
-                ASSERT_EQUALS( true, s->getBoolean( "return" ) );
+                ASSERT_EQUALS( true, s->getBoolean( "__returnValue" ) );
 
                 s->invoke( "z = x.d.getTime();" , 0, 0 );
                 ASSERT_EQUALS( 123456789 , s->getNumber( "z" ) );
@@ -507,7 +507,7 @@ namespace JSTests {
 
             s->setObject( "z" , o );
             s->invoke( "return z" , 0, 0 );
-            BSONObj out = s->getObject( "return" );
+            BSONObj out = s->getObject( "__returnValue" );
             ASSERT_EQUALS( 5 , out["a"].number() );
             ASSERT_EQUALS( 5.6 , out["b"].number() );
 
@@ -525,7 +525,7 @@ namespace JSTests {
 
             s->setObject( "z" , o , false );
             s->invoke( "return z" , 0, 0 );
-            out = s->getObject( "return" );
+            out = s->getObject( "__returnValue" );
             ASSERT_EQUALS( 5 , out["a"].number() );
             ASSERT_EQUALS( 5.6 , out["b"].number() );
 
@@ -575,7 +575,7 @@ namespace JSTests {
 //
 //            s->setObject( "z" , o , false );
 //            s->invoke( "return z" , BSONObj() );
-//            out = s->getObject( "return" );
+//            out = s->getObject( "__returnValue" );
 //            ASSERT_EQUALS( 3 , out["a"].number() );
 //            ASSERT_EQUALS( 4.5 , out["b"].number() );
 //
@@ -1091,7 +1091,7 @@ namespace JSTests {
             double n = 0;
             for ( ; n < 100000; n++ ) {
                 s->invoke( f , &empty, &start );
-                ASSERT_EQUALS( 11 , s->getNumber( "return" ) );
+                ASSERT_EQUALS( 11 , s->getNumber( "__returnValue" ) );
             }
             //cout << "speed1: " << ( n / t.millis() ) << " ops/ms" << endl;
         }

@@ -1715,7 +1715,7 @@ namespace spidermonkey {
             }
 
             if ( ! ignoreReturn ) {
-                verify( JS_SetProperty( _context , _global , "return" , &rval ) );
+                verify( JS_SetProperty( _context , _global , "__returnValue" , &rval ) );
             }
 
             return 0;

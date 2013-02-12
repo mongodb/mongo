@@ -103,11 +103,6 @@ namespace mongo {
         return mongo;
     }
 
-    void destroyConnection(v8::Persistent<v8::Value> self, void* parameter) {
-        delete static_cast<DBClientBase*>(parameter);
-        self.Dispose();
-        self.Clear();
-    }
 
     v8::Handle<v8::Value> mongoConsExternal(V8Scope* scope, const v8::Arguments& args) {
         char host[255];
@@ -132,7 +127,7 @@ namespace mongo {
         }
 
         v8::Persistent<v8::Object> self = v8::Persistent<v8::Object>::New(args.Holder());
-        self.MakeWeak(conn, destroyConnection);
+        self.MakeWeak(conn, deleteOnCollect<DBClientWithCommands>);
 
         ScriptEngine::runConnectCallback(*conn);
 
@@ -148,7 +143,7 @@ namespace mongo {
 
         DBClientBase* conn = createDirectClient();
         v8::Persistent<v8::Object> self = v8::Persistent<v8::Object>::New(args.This());
-        self.MakeWeak(conn, destroyConnection);
+        self.MakeWeak(conn, deleteOnCollect<DBClientBase>);
 
         args.This()->SetInternalField(0, v8::External::New(conn));
         args.This()->ForceSet(scope->v8StringData("slaveOk"), v8::Boolean::New(false));
@@ -162,12 +157,6 @@ namespace mongo {
         DBClientBase* conn = (DBClientBase*)(c->Value());
         massert(16667, "Unable to get db client connection", conn);
         return conn;
-    }
-
-    void destroyCursor(v8::Persistent<v8::Value> self, void* parameter) {
-        delete static_cast<mongo::DBClientCursor*>(parameter);
-        self.Dispose();
-        self.Clear();
     }
 
     /**
@@ -204,8 +193,8 @@ namespace mongo {
         }
 
         v8::Persistent<v8::Object> c = v8::Persistent<v8::Object>::New(cons->NewInstance());
-        c.MakeWeak(cursor.get(), destroyCursor);
-        c->SetInternalField(0, v8::External::New(cursor.release()));
+        c->SetInternalField(0, v8::External::New(cursor.get()));
+        c.MakeWeak(cursor.release(), deleteOnCollect<DBClientCursor>);
         return c;
     }
 

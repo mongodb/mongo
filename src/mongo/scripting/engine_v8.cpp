@@ -52,22 +52,11 @@ namespace mongo {
       return (BSONHolder*)ptr;
     }
 
-    static void weakRefBSONCallback(v8::Persistent<v8::Value> p, void* scope) {
-        v8::HandleScope handle_scope;
-        if (!p.IsNearDeath())
-            return;
-        v8::Handle<v8::External> field =
-                v8::Handle<v8::External>::Cast(p->ToObject()->GetInternalField(0));
-        BSONHolder* data = (BSONHolder*) field->Value();
-        delete data;
-        p.Dispose();
-    }
-
     v8::Persistent<v8::Object> V8Scope::wrapBSONObject(v8::Local<v8::Object> obj,
                                                        BSONHolder* data) {
         obj->SetInternalField(0, v8::External::New(data));
         v8::Persistent<v8::Object> p = v8::Persistent<v8::Object>::New(obj);
-        p.MakeWeak(this, weakRefBSONCallback);
+        p.MakeWeak(data, deleteOnCollect<BSONHolder>);
         return p;
     }
 
@@ -943,7 +932,7 @@ namespace mongo {
             else {
                 _lastRetIsNativeCode = false;
             }
-            _global->ForceSet(v8::String::New("return"), result);
+            _global->ForceSet(v8::String::New("__returnValue"), result);
         }
 
         return 0;
@@ -1709,7 +1698,7 @@ namespace mongo {
                                    v8::Handle<v8::Value> value, int depth,
                                    BSONObj* originalParent) {
         if (value->IsString()) {
-            b.append(sname, toSTLString(value).c_str());
+            b.append(sname, toSTLString(value));
             return;
         }
         if (value->IsFunction()) {

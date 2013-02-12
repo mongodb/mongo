@@ -120,7 +120,7 @@ namespace mongo {
         private:
 
             /**
-             * result in "return"
+             * result in "__returnValue"
              * @param key OUT
              * @param endSizeEstimate OUT
             */

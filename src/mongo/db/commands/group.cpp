@@ -53,9 +53,9 @@ namespace mongo {
                 const BSONObj& key = b.obj();
                 int res = s->invoke( func , &key, 0 );
                 uassert( 10041 ,  (string)"invoke failed in $keyf: " + s->getError() , res == 0 );
-                int type = s->type("return");
+                int type = s->type("__returnValue");
                 uassert( 10042 ,  "return of $key has to be an object" , type == Object );
-                return s->getObject( "return" );
+                return s->getObject( "__returnValue" );
             }
             return obj.extractFields( keyPattern , true ).getOwned();
         }

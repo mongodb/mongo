@@ -101,7 +101,7 @@ namespace mongo {
             return false;
         }
 
-        s->append( result , "retval" , "return" );
+        s->append( result , "retval" , "__returnValue" );
 
         return true;
     }
