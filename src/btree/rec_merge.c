@@ -347,9 +347,6 @@ __wt_merge_tree(WT_SESSION_IMPL *session, WT_PAGE *top)
 			WT_LINK_PAGE(newtop, newref, lchild);
 			newref->state = WT_REF_MEM;
 			WT_ERR(__merge_promote_key(session, newref));
-
-			if (!F_ISSET(lchild->modify, WT_PM_REC_SPLIT_MERGE))
-				__wt_evict_forced_page(session, lchild);
 		}
 
 		if (rchild != NULL) {
@@ -357,9 +354,6 @@ __wt_merge_tree(WT_SESSION_IMPL *session, WT_PAGE *top)
 			WT_LINK_PAGE(newtop, newref, rchild);
 			newref->state = WT_REF_MEM;
 			WT_ERR(__merge_promote_key(session, newref));
-
-			if (!F_ISSET(rchild->modify, WT_PM_REC_SPLIT_MERGE))
-				__wt_evict_forced_page(session, rchild);
 		}
 	}
 
@@ -394,6 +388,12 @@ __wt_merge_tree(WT_SESSION_IMPL *session, WT_PAGE *top)
 	    "Successfully %s %" PRIu32
 	    " split-merge pages containing %" PRIu32 " keys\n",
 	    promote ? "promoted" : "merged", visit_state.maxdepth, refcnt);
+
+	/* Queue new child pages for forced eviction, if possible. */
+	if (lchild != NULL && !F_ISSET(lchild->modify, WT_PM_REC_SPLIT_MERGE))
+		__wt_evict_forced_page(session, lchild);
+	if (rchild != NULL && !F_ISSET(rchild->modify, WT_PM_REC_SPLIT_MERGE))
+		__wt_evict_forced_page(session, rchild);
 
 	/* Update statistics. */
 	WT_CSTAT_INCR(session, cache_eviction_merge);
