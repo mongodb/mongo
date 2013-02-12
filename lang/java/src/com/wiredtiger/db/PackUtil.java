@@ -32,6 +32,6 @@ class PackUtil {
     public static byte GET_BITS(long x, int start, int end) {
         return (byte)((x & ((1 << start) - 1)) >> end);
     }
-    
+
 
 }

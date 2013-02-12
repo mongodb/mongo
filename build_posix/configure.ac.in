@@ -61,6 +61,9 @@ if test "$wt_cv_enable_java" = "yes"; then
 	AX_PROG_JAVAC
 	AX_PROG_JAR
 	AX_JNI_INCLUDE_DIR
+	if test "$wt_cv_enable_debug" = "yes"; then
+		AX_CHECK_JUNIT
+	fi
 	for JNI_INCLUDE_DIR in $JNI_INCLUDE_DIRS ; do
 		JNI_CPPFLAGS="$JNI_CPPFLAGS -I$JNI_INCLUDE_DIR"
 	done

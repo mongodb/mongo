@@ -17,6 +17,5 @@ lang/python PYTHON
 test/bloom
 test/fops
 test/format HAVE_BDB
-test/packing
 test/salvage
 test/thread

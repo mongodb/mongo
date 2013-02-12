@@ -1,26 +1,20 @@
 package com.wiredtiger.db;
 
-import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.lang.StringBuffer;
-import com.wiredtiger.db.PackUtil;
 import com.wiredtiger.db.WiredTigerPackingException;
 
 public class PackOutputStream {
 
-    protected PackFormatOutputStream format;
-    protected byte[] value;
-    protected int valueOff;
-    protected int valueLen;
+    final static int MAX_INT_BYTES = 21;
+    protected PackFormatInputStream format;
+    protected ByteArrayOutputStream packed;
+    protected byte[] intBuf;
 
-    public PackOutputStream(String format, byte[] value) {
-        this(format, value, 0, value.length);
-    }
-
-    public PackOutputStream(String format, byte[] value, int off, int len) {
-        this.format = new PackFormatOutputStream(format);
-        this.value = value;
-        this.valueOff = off;
-        this.valueLen = len;
+    public PackOutputStream(String format) {
+        this.format = new PackFormatInputStream(format);
+        intBuf = new byte[MAX_INT_BYTES];
+        packed = new ByteArrayOutputStream(100);
     }
 
     public String getFormat() {
@@ -28,190 +22,137 @@ public class PackOutputStream {
     }
 
     public byte[] getValue() {
-        return value;
+        return packed.toByteArray();
     }
 
-    public byte getFieldByte()
-        throws WiredTigerPackingException {
-        format.checkFieldType('b', false);
-        format.consumeField();
-        return (byte)(value[valueOff++] - 0x80);
+    public void addFieldByte(byte value)
+    throws WiredTigerPackingException {
+        format.checkFieldType('b', true);
+        /* Translate to maintain ordering with the sign bit. */
+        byte input = (byte)(value + 0x80);
+        packed.write(input);
     }
 
-    /*
-     * Adds a byte array as part of a complex format (which stores the size in
-     * the encoding).
-     * Format strings that consist solely of a byte array should use the 
-     * addFieldByteArrayRaw method.
-     */
-    public void getFieldByteArray(byte[] dest)
-        throws WiredTigerPackingException {
-        this.getFieldByteArray(dest, 0, dest.length);
+    public void addFieldByteArray(byte[] value)
+    throws WiredTigerPackingException {
+        this.addFieldByteArray(value, 0, value.length);
     }
 
-    public void getFieldByteArray(byte[] dest, int off, int len)
-        throws WiredTigerPackingException {
-        int itemLen = 0;
-        format.checkFieldType('U', false);
-        /* The rest of the buffer is a byte array. */
-        if (format.getFieldType() == 'U') {
-            itemLen = valueLen - valueOff;
-        } else {
-            /* Check for a 'u' after the length */
-            itemLen = format.getLengthFromFormat(true);
-        }
+    public void addFieldByteArray(byte[] value, int off, int len)
+    throws WiredTigerPackingException {
+        format.checkFieldType('U', true);
+        // If this is not the last item, store the size.
+        if (format.available() > 0)
+            packLong(len, false);
 
+        packed.write(value, off, len);
         /* TODO: padding. */
-        if (itemLen > len)
-            itemLen = len;
-        format.consumeField();
-        System.arraycopy(value, valueOff, dest, off, itemLen);
-        valueOff += itemLen;
     }
 
-    public byte[] getFieldByteArray()
-        throws WiredTigerPackingException {
-        int itemLen;
-        if (format.getFieldType() == 'U')
-            itemLen = valueLen - valueOff;
-        else
-            itemLen = format.getLengthFromFormat(false);
-        byte[] unpacked = new byte[itemLen];
-        getFieldByteArray(unpacked, 0, unpacked.length);
-        return unpacked;
+    public void addFieldInt(int value)
+    throws WiredTigerPackingException {
+        format.checkFieldType('i', true);
+        packLong(value, true);
     }
 
-    public int getFieldInt()
-        throws WiredTigerPackingException {
-        boolean signed = false;
-        format.checkFieldType('i', false);
-        if (format.getFieldType() == 'I' ||
-            format.getFieldType() == 'L')
-            signed = true;
-        format.consumeField();
-        return unpackInt(signed);
+    public void addFieldLong(long value)
+    throws WiredTigerPackingException {
+        format.checkFieldType('q', true);
+        packLong(value, true);
     }
 
-    public long getFieldLong()
-        throws WiredTigerPackingException {
-        boolean signed = false;
-        format.checkFieldType('q', false);
-        if (format.getFieldType() == 'Q')
-            signed = true;
-        format.consumeField();
-        return unpackLong(signed);
+    public void addFieldRecord(long value)
+    throws WiredTigerPackingException {
+        format.checkFieldType('r', true);
+        packLong(value, true);
     }
 
-    public long getFieldRecord()
-        throws WiredTigerPackingException {
-        format.checkFieldType('r', false);
-        format.consumeField();
-        return unpackLong(false);
+    public void addFieldShort(short value)
+    throws WiredTigerPackingException {
+        format.checkFieldType('h', true);
+        packLong(value, true);
     }
 
-    public short getFieldShort()
-        throws WiredTigerPackingException {
-        boolean signed = false;
-        format.checkFieldType('h', false);
-        if (format.getFieldType() == 'H')
-            signed = true;
-        format.consumeField();
-        return unpackShort(signed);
-    }
-
-    public String getFieldString()
-        throws WiredTigerPackingException {
-        int stringLength = 0;
-        format.checkFieldType('S', false);
-        // Get the length for a fixed length string
-        if (format.getFieldType() != 'S') {
-            stringLength = format.getLengthFromFormat(true);
+    //
+    // Strings have two possible encodings. A lower case 's' is not null
+    // terminated, and has a length define in the format (default 1). An
+    // upper case 'S' is variable length and has a null terminator.
+    public void addFieldString(String value)
+    throws WiredTigerPackingException {
+        format.checkFieldType('s', false);
+        char fieldFormat = format.getFieldType();
+        int stringLen = 0;
+        int padBytes = 0;
+        if (fieldFormat == 's') {
+            stringLen = format.getLengthFromFormat(true);
+            if (stringLen > value.length())
+                padBytes = stringLen - value.length();
         } else {
-            // The string is null terminated, but we need to know how many
-            // bytes are consumed - which won't necessarily match up to the
-            // string length.
-            for (; valueOff + stringLength < value.length &&
-                    value[valueOff + stringLength] != 0; stringLength++) {}
+            stringLen = value.length();
+            padBytes = 1; // Null terminator
         }
+        // We're done pulling information from the field now.
         format.consumeField();
-        String result = new String(value, valueOff, stringLength);
-        valueOff += stringLength;
-        return result;
+
+        // Use the default Charset.
+        packed.write(value.getBytes(), 0, stringLen);
+        while(padBytes-- > 0)
+            packed.write(0);
     }
 
-    private short unpackShort(boolean signed)
-        throws WiredTigerPackingException {
-        long ret = unpackLong(true);
-        if ((signed && (ret > Short.MAX_VALUE || ret > Short.MIN_VALUE)) ||
-            (!signed && (short)ret < 0))
-            throw new WiredTigerPackingException("Overflow unpacking short.");
-        return (short)ret;
-    }
+    private void packLong(long x, boolean signed)
+    throws WiredTigerPackingException {
+        int offset = 0;
 
-    private int unpackInt(boolean signed)
-        throws WiredTigerPackingException {
-        long ret = unpackLong(true);
-        if ((signed && (ret > Integer.MAX_VALUE || ret > Integer.MIN_VALUE)) ||
-            (!signed && (int)ret < 0))
-            throw new WiredTigerPackingException("Overflow unpacking integer.");
-        return (int)ret;
-    }
+        if (!signed && x < 0)
+            throw new WiredTigerPackingException("Overflow packing long.");
 
-    private long unpackLong(boolean signed)
-        throws WiredTigerPackingException {
-        int len;
-        long unpacked = 0;
-        switch (value[valueOff] & 0xf0) {
-        case PackUtil.NEG_MULTI_MARKER & 0xff:
-            len = (int)PackUtil.SIZEOF_LONG - (value[valueOff++] & 0xf);
+        if (x < PackUtil.NEG_2BYTE_MIN) {
+            intBuf[offset] = PackUtil.NEG_MULTI_MARKER;
+            int lz = Long.numberOfLeadingZeros(~x) / 8;
+            int len = PackUtil.SIZEOF_LONG  - lz;
 
-            for (unpacked = 0xffffffff; len != 0; --len)
-                unpacked = (unpacked << 8) | value[valueOff++] & 0xff;
-            break;
-        case PackUtil.NEG_2BYTE_MARKER & 0xff:
-        case (PackUtil.NEG_2BYTE_MARKER | 0x10) & 0xff:
-            unpacked = PackUtil.GET_BITS(value[valueOff], 5, 0) << 8;
-            unpacked |= value[valueOff + 1] & 0xff;
-            unpacked += PackUtil.NEG_2BYTE_MIN;
-            break;
-        case PackUtil.NEG_1BYTE_MARKER & 0xff:
-        case (PackUtil.NEG_1BYTE_MARKER | 0x10) & 0xff:
-        case (PackUtil.NEG_1BYTE_MARKER | 0x20) & 0xff:
-        case (PackUtil.NEG_1BYTE_MARKER | 0x30) & 0xff:
-            unpacked = PackUtil.NEG_1BYTE_MIN +
-                PackUtil.GET_BITS(value[valueOff], 6, 0);
-            break;
-        case PackUtil.POS_1BYTE_MARKER & 0xff:
-        case (PackUtil.POS_1BYTE_MARKER | 0x10) & 0xff:
-        case (PackUtil.POS_1BYTE_MARKER | 0x20) & 0xff:
-        case (PackUtil.POS_1BYTE_MARKER | 0x30) & 0xff:
-            unpacked = PackUtil.GET_BITS(value[valueOff], 6, 0);
-            break;
-        case PackUtil.POS_2BYTE_MARKER & 0xff:
-        case (PackUtil.POS_2BYTE_MARKER | 0x10) & 0xff:
-            unpacked = PackUtil.GET_BITS(value[valueOff++], 5, 0) << 8;
-            unpacked |= value[valueOff++] & 0xff;
-            unpacked += PackUtil.POS_1BYTE_MAX + 1;
-            break;
-        case PackUtil.POS_MULTI_MARKER & 0xff:
-            /* There are four length bits in the first byte. */
-            len = (value[valueOff++] & 0xf);
+            //
+            // There are four size bits we can use in the first
+            // byte. For negative numbers, we store the number of
+            // leading 0xff byes to maintain ordering (if this is
+            // not obvious, it may help to remember that -1 is the
+            // largest negative number).
+            intBuf[offset++] |= (lz & 0xf);
 
-            for (unpacked = 0; len != 0; --len)
-                unpacked = (unpacked << 8) | value[valueOff++] & 0xff;
-            unpacked += PackUtil.POS_2BYTE_MAX + 1;
-            break;
-        default:
-            throw new WiredTigerPackingException(
-                "Error decoding packed value.");
+            for (int shift = (len - 1) << 3;
+                    len != 0; shift -= 8, --len)
+                intBuf[offset++] = (byte)(x >> shift);
+        } else if (x < PackUtil.NEG_1BYTE_MIN) {
+            x -= PackUtil.NEG_2BYTE_MIN;
+            intBuf[offset++] =
+                (byte)(PackUtil.NEG_2BYTE_MARKER | PackUtil.GET_BITS(x, 13, 8));
+            intBuf[offset++] = PackUtil.GET_BITS(x, 8, 0);
+        } else if (x < 0) {
+            x -= PackUtil.NEG_1BYTE_MIN;
+            intBuf[offset++] =
+                (byte)(PackUtil.NEG_1BYTE_MARKER | PackUtil.GET_BITS(x, 6, 0));
+        } else if (x <= PackUtil.POS_1BYTE_MAX) {
+            intBuf[offset++] =
+                (byte)(PackUtil.POS_1BYTE_MARKER | PackUtil.GET_BITS(x, 6, 0));
+        } else if (x <= PackUtil.POS_2BYTE_MAX) {
+            x -= PackUtil.POS_1BYTE_MAX + 1;
+            intBuf[offset++] =
+                (byte)(PackUtil.POS_2BYTE_MARKER | PackUtil.GET_BITS(x, 13, 8));
+            intBuf[offset++] = PackUtil.GET_BITS(x, 8, 0);
+        } else {
+            x -= PackUtil.POS_2BYTE_MAX + 1;
+            intBuf[offset] = PackUtil.POS_MULTI_MARKER;
+            int lz = Long.numberOfLeadingZeros(x) / 8;
+            int len = PackUtil.SIZEOF_LONG - lz;
+
+            // There are four bits we can use in the first byte.
+            intBuf[offset++] |= (len & 0xf);
+
+            for (int shift = (len - 1) << 3;
+                    len != 0; --len, shift -= 8)
+                intBuf[offset++] = (byte)(x >> shift);
         }
-        /* Check for overflow if decoding an unsigned value - since Java only
-         * supports signed values.
-         */
-        if (!signed && unpacked < 0)
-            throw new WiredTigerPackingException("Overflow unpacking long.");
-
-        return (unpacked);
+        packed.write(intBuf, 0, offset);
     }
 }
-

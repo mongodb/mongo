@@ -5,35 +5,39 @@ import java.lang.StringBuffer;
 import com.wiredtiger.db.PackUtil;
 import com.wiredtiger.db.WiredTigerPackingException;
 
-public class PackFormatOutputStream {
+public class PackFormatInputStream {
 
     protected String format;
     protected int formatOff;
     protected int formatRepeatCount;
 
-    protected PackFormatOutputStream(String format) {
-            this.format = format;
-            formatOff = 0;
-            formatRepeatCount = 0;
+    protected PackFormatInputStream(String format) {
+        this.format = format;
+        formatOff = 0;
+        formatRepeatCount = 0;
     }
 
     public String toString() {
         return format;
     }
 
+    public int available() {
+        return format.length() - formatOff + formatRepeatCount;
+    }
+
     protected char getFieldType()
-        throws WiredTigerPackingException {
+    throws WiredTigerPackingException {
         if (formatOff > format.length())
-                throw new WiredTigerPackingException(
-                    "No more fields in format.");
+            throw new WiredTigerPackingException(
+                "No more fields in format.");
 
         String fieldName;
         boolean lenOK = false;
         int countOff = 0;
 
         while (PackUtil.PackSpecialCharacters.indexOf(
-            format.charAt(formatOff + countOff)) != -1)
-                countOff++;
+                    format.charAt(formatOff + countOff)) != -1)
+            countOff++;
         // Skip repeat counts and sizes
         while (Character.isDigit(format.charAt(formatOff + countOff)))
             countOff++;
@@ -41,17 +45,17 @@ public class PackFormatOutputStream {
     }
 
     protected void checkFieldType(char asking, boolean consume)
-        throws WiredTigerPackingException {
+    throws WiredTigerPackingException {
 
         char expected = getFieldType();
         if (Character.toLowerCase(expected) != Character.toLowerCase(asking))
             throw new WiredTigerPackingException(
                 "Format mismatch. Wanted: " + asking + ", got: " + expected);
         if (consume)
-                consumeField();
+            consumeField();
     }
 
-    /* Move the format tracker ahead one slot. */
+    // Move the format tracker ahead one slot.
     protected void consumeField() {
         if (formatRepeatCount > 1)
             --formatRepeatCount;
@@ -60,28 +64,36 @@ public class PackFormatOutputStream {
             ++formatOff;
         } else {
             while (PackUtil.PackSpecialCharacters.indexOf(
-                format.charAt(formatOff)) != -1)
-                    ++formatOff;
+                        format.charAt(formatOff)) != -1)
+                ++formatOff;
 
             // Don't need to worry about String or byte array size counts
             // since they have already been consumed.
-            formatRepeatCount = getLengthFromFormat(true);
+            formatRepeatCount = getLengthFromFormatInternal(true);
             if (formatRepeatCount == 0)
                 ++formatOff;
         }
     }
 
-    protected int getLengthFromFormat(boolean advance) {
+    // The public version expects a default of 1, protected a default of 0
+    private int getLengthFromFormatInternal(boolean advance) {
         int valueLen = 0;
         int countOff;
         for (countOff = 0;
-            Character.isDigit(format.charAt(formatOff + countOff));
-            countOff++) {
+                Character.isDigit(format.charAt(formatOff + countOff));
+                countOff++) {
             valueLen *= 10;
             valueLen += Character.digit(format.charAt(formatOff + countOff), 10);
         }
         if (advance)
             formatOff += countOff;
+        return valueLen;
+    }
+
+    protected int getLengthFromFormat(boolean advance) {
+        int valueLen = getLengthFromFormatInternal(advance);
+        if (valueLen == 0)
+            valueLen = 1;
         return valueLen;
     }
 }

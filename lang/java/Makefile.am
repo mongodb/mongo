@@ -12,11 +12,11 @@ JDOCDIR = $(top_srcdir)/docs/java
 java_DATA = $(JDOCDIR)/index.html
 
 javadir = $(datadir)/java
-dist_java_JAVA = \
+JAVA_SRC = \
 		$(JAVADESTFULL)/Connection.java \
 		$(JAVADESTFULL)/Cursor.java \
 		$(JAVADESTFULL)/SearchStatus.java \
-		$(JAVADESTFULL)/PackFormatOutputStream.java \
+		$(JAVADESTFULL)/PackFormatInputStream.java \
 		$(JAVADESTFULL)/PackInputStream.java \
 		$(JAVADESTFULL)/PackOutputStream.java \
 		$(JAVADESTFULL)/PackUtil.java \
@@ -26,10 +26,23 @@ dist_java_JAVA = \
 		$(JAVADESTFULL)/wiredtiger.java \
 		$(JAVADESTFULL)/wiredtigerConstants.java \
 		$(JAVADESTFULL)/wiredtigerJNI.java \
-		$(JAVAEXAMPLES)/ex_access.java \
+		$(JAVAEXAMPLES)/ex_access.java
+
+JAVA_JUNIT = \
 		$(JAVATEST)/PackTest.java
 
+dist_java_JAVA = $(JAVA_SRC) $(JAVA_JUNIT)
+
 java_LTLIBRARIES = libwiredtiger_java.la
+
+TESTS_JUNIT = AllJunitTests
+
+TESTS       = @TESTS_JUNIT@
+
+AllJunitTests:
+	echo "#! /bin/sh" > $@
+	echo "@JUNIT@ com.wiredtiger.test.PackTest" >> $@
+	chmod +x $@
 
 CPPFLAGS += $(JNI_CPPFLAGS)
 # Some warnings when compiling the generated code are unavoidable
