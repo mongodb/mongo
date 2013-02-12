@@ -319,6 +319,10 @@ namespace mongo {
                 return BSONObj::opWITHIN;
             else if (mongoutils::str::equals(fn + 1, "geoIntersects"))
                 return BSONObj::opGEO_INTERSECTS;
+            else if (mongoutils::str::equals(fn + 1, "geoNear"))
+                return BSONObj::opNEAR;
+            else if (mongoutils::str::equals(fn + 1, "geoWithin"))
+                return BSONObj::opWITHIN;
         }
         return def;
     }

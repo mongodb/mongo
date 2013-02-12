@@ -49,33 +49,33 @@ geojsonPoint2 = { "type" : "Point", "coordinates": [ 0, 0.001 ] };
 t.insert({gjp: geojsonPoint2})
 
 // We convert between old and new style points.
-assert.eq(1, t.find({gjp: {$within: {$box: oldBox}}}).itcount());
-assert.eq(1, t.find({gjp: {$within: {$polygon: oldPolygon}}}).itcount());
-assert.eq(1, t.find({gjp: {$within: {$center: oldCenter}}}).itcount());
-assert.eq(1, t.find({gjp: {$within: {$centerSphere: oldCenterSphere}}}).itcount())
+assert.eq(1, t.find({gjp: {$geoWithin: {$box: oldBox}}}).itcount());
+assert.eq(1, t.find({gjp: {$geoWithin: {$polygon: oldPolygon}}}).itcount());
+assert.eq(1, t.find({gjp: {$geoWithin: {$center: oldCenter}}}).itcount());
+assert.eq(1, t.find({gjp: {$geoWithin: {$centerSphere: oldCenterSphere}}}).itcount())
 
 function runTests() {
     // Each find the box, the polygon, and the old point.
-    assert.eq(1, t.find({geo: {$within: {$box: oldBox}}}).itcount())
-    assert.eq(1, t.find({geo: {$within: {$polygon: oldPolygon}}}).itcount())
+    assert.eq(1, t.find({geo: {$geoWithin: {$box: oldBox}}}).itcount())
+    assert.eq(1, t.find({geo: {$geoWithin: {$polygon: oldPolygon}}}).itcount())
     // Each find the old point.
-    assert.eq(1, t.find({geo: {$within: {$center: oldCenter}}}).itcount())
-    assert.eq(1, t.find({geo: {$within: {$centerSphere: oldCenterSphere}}}).itcount())
-    // Using geojson with 2d-style within syntax should choke.
-    assert.throws(function() { return t.find({geo: {$within: {$polygon: geojsonPoly}}})
+    assert.eq(1, t.find({geo: {$geoWithin: {$center: oldCenter}}}).itcount())
+    assert.eq(1, t.find({geo: {$geoWithin: {$centerSphere: oldCenterSphere}}}).itcount())
+    // Using geojson with 2d-style geoWithin syntax should choke.
+    assert.throws(function() { return t.find({geo: {$geoWithin: {$polygon: geojsonPoly}}})
                                        .itcount();})
     // Using old polygon w/new syntax should choke too.
-    assert.throws(function() { return t.find({geo: {$within: {$geometry: oldPolygon}}})
+    assert.throws(function() { return t.find({geo: {$geoWithin: {$geometry: oldPolygon}}})
                                        .itcount();})
-    assert.throws(function() { return t.find({geo: {$within: {$geometry: oldBox}}})
+    assert.throws(function() { return t.find({geo: {$geoWithin: {$geometry: oldBox}}})
                                        .itcount();})
-    assert.throws(function() { return t.find({geo: {$within: {$geometry: oldCenter}}})
+    assert.throws(function() { return t.find({geo: {$geoWithin: {$geometry: oldCenter}}})
                                        .itcount();})
-    assert.throws(function() { return t.find({geo: {$within: {$geometry: oldCenterSphere}}})
+    assert.throws(function() { return t.find({geo: {$geoWithin: {$geometry: oldCenterSphere}}})
                                        .itcount();})
     // Even if we only have a 2d index, the 2d suitability function should
     // allow the matcher to deal with this.  If we have a 2dsphere index we use it.
-    assert.eq(1, t.find({geo: {$within: {$geometry: geojsonPoly}}}).itcount())
+    assert.eq(1, t.find({geo: {$geoWithin: {$geometry: geojsonPoly}}}).itcount())
     assert.eq(1, t.find({geo: {$geoIntersects: {$geometry: geojsonPoly}}}).itcount())
     assert.eq(1, t.find({geo: {$geoIntersects: {$geometry: oldPoint}}}).itcount())
     assert.eq(1, t.find({geo: {$geoIntersects: {$geometry: geojsonPoint}}}).itcount())
