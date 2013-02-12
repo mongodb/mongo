@@ -153,10 +153,6 @@ namespace mongo {
     RWLockBase::RWLockBase() : i( getBestRWLock() ) { }
     RWLockBase::~RWLockBase() {}
 
-    SimpleRWLock::SimpleRWLock(const StringData& p) :
-        name(p.toString()) 
-    { }
-
 #if defined(_DEBUG)
     // the code below in _DEBUG build will check that we don't try to recursively lock, 
     // which is not supported by this class.  also checks that you don't unlock without 
