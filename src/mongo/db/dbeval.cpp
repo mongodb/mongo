@@ -91,10 +91,13 @@ namespace mongo {
                 else OCCASIONALLY log() << code << endl;
             }
         }
-        if ( res ) {
+        if (res || s->isLastRetNativeCode()) {
             result.append("errno", (double) res);
             errmsg = "invoke failed: ";
-            errmsg += s->getError();
+            if (s->isLastRetNativeCode())
+                errmsg += "cannot return native function";
+            else
+                errmsg += s->getError();
             return false;
         }
 

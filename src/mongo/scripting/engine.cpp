@@ -39,7 +39,8 @@ namespace mongo {
 
     Scope::Scope() : _localDBName(""),
                      _loadedVersion(0),
-                     _numTimeUsed(0) {
+                     _numTimeUsed(0),
+                     _lastRetIsNativeCode(false) {
     }
 
     Scope::~Scope() {
@@ -357,6 +358,8 @@ namespace mongo {
         void setObject(const char* field, const BSONObj& obj, bool readOnly = true) {
             _real->setObject(field, obj, readOnly);
         }
+        bool isLastRetNativeCode() { return _real->isLastRetNativeCode(); }
+
         void setBoolean(const char* field, bool val) { _real->setBoolean(field, val); }
         void setFunction(const char* field, const char* code) { _real->setFunction(field, code); }
         ScriptingFunction createFunction(const char* code) { return _real->createFunction(code); }

@@ -92,30 +92,39 @@ namespace mongo {
     static v8::Handle<v8::Value> namedGet(v8::Local<v8::String> name,
                                           const v8::AccessorInfo& info) {
         v8::HandleScope handle_scope;
-        if (info.This()->HasRealNamedProperty(name)) {
-            // value already cached
-            return handle_scope.Close(info.This()->GetRealNamedProperty(name));
+        v8::Handle<v8::Value> val;
+        try {
+            if (info.This()->HasRealNamedProperty(name)) {
+                // value already cached
+                return handle_scope.Close(info.This()->GetRealNamedProperty(name));
+            }
+
+            string key = toSTLString(name);
+            BSONHolder* holder = unwrapHolder(info.Holder());
+            if (holder->_removed.count(key))
+                return handle_scope.Close(v8::Handle<v8::Value>());
+
+            BSONObj obj = holder->_obj;
+            BSONElement elmt = obj.getField(key.c_str());
+            if (elmt.eoo())
+                return handle_scope.Close(v8::Handle<v8::Value>());
+
+            v8::Local<v8::External> scp = v8::External::Cast(*info.Data());
+            V8Scope* scope = (V8Scope*)(scp->Value());
+            val = scope->mongoToV8Element(elmt, false);
+            info.This()->ForceSet(name, val, v8::DontEnum);
+
+            if (elmt.type() == mongo::Object || elmt.type() == mongo::Array) {
+              // if accessing a subobject, it may get modified and base obj would not know
+              // have to set base as modified, which means some optim is lost
+              unwrapHolder(info.Holder())->_modified = true;
+            }
         }
-
-        string key = toSTLString(name);
-        BSONHolder* holder = unwrapHolder(info.Holder());
-        if (holder->_removed.count(key))
-            return handle_scope.Close(v8::Handle<v8::Value>());
-
-        BSONObj obj = holder->_obj;
-        BSONElement elmt = obj.getField(key.c_str());
-        if (elmt.eoo())
-            return handle_scope.Close(v8::Handle<v8::Value>());
-
-        v8::Local<v8::External> scp = v8::External::Cast(*info.Data());
-        V8Scope* scope = (V8Scope*)(scp->Value());
-        v8::Handle<v8::Value> val = scope->mongoToV8Element(elmt, false);
-        info.This()->ForceSet(name, val, v8::DontEnum);
-
-        if (elmt.type() == mongo::Object || elmt.type() == mongo::Array) {
-          // if accessing a subobject, it may get modified and base obj would not know
-          // have to set base as modified, which means some optim is lost
-          unwrapHolder(info.Holder())->_modified = true;
+        catch (const DBException &dbEx) {
+            return v8AssertionException(dbEx.toString());
+        }
+        catch (...) {
+            return v8AssertionException(string("error getting property ") + toSTLString(name));
         }
         return handle_scope.Close(val);
     }
@@ -923,7 +932,17 @@ namespace mongo {
             return 1;
         }
 
-        if (! ignoreReturn) {
+        if (!ignoreReturn) {
+            v8::Handle<v8::Object> resultObject = result->ToObject();
+            // must validate the handle because TerminateExecution may have
+            // been thrown after the above checks
+            if (!resultObject.IsEmpty() && resultObject->Has(v8StringData("_v8_function"))) {
+                log() << "storing native function as return value" << endl;
+                _lastRetIsNativeCode = true;
+            }
+            else {
+                _lastRetIsNativeCode = false;
+            }
             _global->ForceSet(v8::String::New("return"), result);
         }
 
@@ -1176,7 +1195,8 @@ namespace mongo {
         stringstream codeSS;
         codeSS << "____MongoToV8_newFunction_temp = " << code;
         string codeStr = codeSS.str();
-        string errStr = str::stream() << "could not compile function: " << codeStr;
+        string errStr = str::stream() << "unable to convert JavaScript function from BSON: "
+                                      << codeStr;
 
         v8::Local<v8::Script> compiled = v8::Script::New(v8::String::New(codeStr.c_str()));
         uassert(16670, errStr, !compiled.IsEmpty());
@@ -1693,6 +1713,8 @@ namespace mongo {
             return;
         }
         if (value->IsFunction()) {
+            uassert(16704, "cannot convert native function to BSON",
+                    !value->ToObject()->Has(v8StringData("_v8_function")));
             b.appendCode(sname, toSTLString(value));
             return;
         }
