@@ -35,8 +35,6 @@ namespace mongo {
     */
     class Database {
     public:
-        static bool _openAllFiles;
-
         // you probably need to be in dbHolderMutex when constructing this
         Database(const char *nm, /*out*/ bool& newDb, const string& _path = dbpath);
     private:

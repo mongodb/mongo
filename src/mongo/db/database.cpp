@@ -31,8 +31,6 @@
 
 namespace mongo {
 
-    bool Database::_openAllFiles = true;
-
     void assertDbAtLeastReadLocked(const Database *db) { 
         if( db ) { 
             Lock::assertAtLeastReadLocked(db->name);
@@ -97,8 +95,7 @@ namespace mongo {
             // there's a write, then open.
             if (!newDb) {
                 namespaceIndex.init();
-                if( _openAllFiles )
-                    openAllFiles();
+                openAllFiles();
             }
             magic = 781231;
         } catch(std::exception& e) {
@@ -256,7 +253,7 @@ namespace mongo {
                 if( !Lock::isWriteLocked(this->name) ) {
                     log() << "error: getFile() called in a read lock, yet file to return is not yet open" << endl;
                     log() << "       getFile(" << n << ") _files.size:" <<_files.size() << ' ' << fileName(n).string() << endl;
-                    log() << "       context ns: " << cc().ns() << " openallfiles:" << _openAllFiles << endl;
+                    log() << "       context ns: " << cc().ns() << endl;
                     verify(false);
                 }
                 _files.push_back(0);

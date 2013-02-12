@@ -391,7 +391,7 @@ namespace mongo {
      *          --replset.
      */
     unsigned long long checkIfReplMissingFromCommandLine() {
-        Lock::GlobalWrite lk; // _openAllFiles is false at this point, so this is helpful for the query below to work as you can't open files when readlocked
+        Lock::GlobalWrite lk; // this is helpful for the query below to work as you can't open files when readlocked
         if( !cmdLine.usingReplSets() ) {
             Client::GodScope gs;
             DBDirectClient c;
@@ -401,7 +401,7 @@ namespace mongo {
     }
 
     void clearTmpCollections() {
-        Lock::GlobalWrite lk; // _openAllFiles is false at this point, so this is helpful for the query below to work as you can't open files when readlocked
+        Lock::GlobalWrite lk; // this is helpful for the query below to work as you can't open files when readlocked
         Client::GodScope gs;
         vector< string > toDelete;
         DBDirectClient cli;
@@ -570,8 +570,6 @@ namespace mongo {
 
         Client::initThread("initandlisten");
 
-        Database::_openAllFiles = false;
-
         Logstream::get().addGlobalTee( new RamLog("global") );
 
         bool is32bit = sizeof(int*) == 4;
@@ -651,11 +649,6 @@ namespace mongo {
         }
 
         repairDatabasesAndCheckVersion();
-
-        /* we didn't want to pre-open all files for the repair check above. for regular
-           operation we do for read/write lock concurrency reasons.
-        */
-        Database::_openAllFiles = true;
 
         if ( shouldRepairDatabases )
             return;
