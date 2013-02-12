@@ -765,7 +765,7 @@ namespace {
             newActions.removeAction(ActionType::update);
             newActions.removeAction(ActionType::remove);
             newActions.addAction(ActionType::userAdmin);
-        } else if (collectionName == "system.profle" && newActions.contains(ActionType::find)) {
+        } else if (collectionName == "system.profile" && newActions.contains(ActionType::find)) {
             newActions.removeAction(ActionType::find);
             newActions.addAction(ActionType::profileRead);
         }
