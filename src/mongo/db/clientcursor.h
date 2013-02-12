@@ -123,6 +123,7 @@ namespace mongo {
             ~Holder() {
                 DESTRUCTOR_GUARD ( reset(); );
             }
+            ClientCursor* get() { return _c; }
             operator bool() { return _c; }
             ClientCursor * operator-> () { return _c; }
             const ClientCursor * operator-> () const { return _c; }
