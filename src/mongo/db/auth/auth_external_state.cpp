@@ -28,6 +28,11 @@ namespace mongo {
     Status AuthExternalState::getPrivilegeDocument(const std::string& dbname,
                                                    const PrincipalName& principalName,
                                                    BSONObj* result) {
+        if (dbname.empty()) {
+            return Status(ErrorCodes::BadValue,
+                          "empty database names are illegal");
+        }
+
         if (dbname == StringData("local", StringData::LiteralTag()) &&
             principalName.getUser() == internalSecurity.user) {
 

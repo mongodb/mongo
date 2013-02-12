@@ -1486,7 +1486,11 @@ namespace mongo {
             ActionSet targetActions;
             targetActions.addAction(ActionType::insert);
             targetActions.addAction(ActionType::ensureIndex);
-            std::string targetNs = dbname + "." + cmdObj.getStringField("toCollection");
+            std::string collection = cmdObj.getStringField("toCollection");
+            uassert(16708, "bad 'toCollection' value", !collection.empty());
+
+            std::string targetNs = dbname + "." + collection;
+
             out->push_back(Privilege(targetNs, targetActions));
         }
         bool run(const string& dbname, BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
