@@ -14,11 +14,11 @@
  *	reference when moving reference into the new tree.
  */
 typedef struct {
-	WT_PAGE *page, *second;			/* New pages to be populated. */
+	WT_PAGE *first, *page, *second;		/* New pages to be populated. */
 	WT_REF *ref, *second_ref;		/* Insert and split point. */
 
-	uint32_t refcnt, split;			/* Ref count, split point. */
-	uint32_t first_live, last_live;		/* First/last in-memory ref. */
+	uint64_t refcnt, split;			/* Ref count, split point. */
+	uint64_t first_live, last_live;		/* First/last in-memory ref. */
 	u_int maxdepth;				/* Maximum subtree depth. */
 	int seen_live;				/* Has a ref been live? */
 } WT_VISIT_STATE;
@@ -30,7 +30,7 @@ typedef struct {
  */
 static int
 __merge_walk(WT_SESSION_IMPL *session, WT_PAGE *page, u_int depth,
-	int (*visit)(WT_REF *, WT_VISIT_STATE *), WT_VISIT_STATE *state)
+	void (*visit)(WT_REF *, WT_VISIT_STATE *), WT_VISIT_STATE *state)
 {
 	WT_PAGE *child;
 	WT_REF *ref;
@@ -65,7 +65,7 @@ __merge_walk(WT_SESSION_IMPL *session, WT_PAGE *page, u_int depth,
 
 		case WT_REF_DELETED:
 		case WT_REF_DISK:
-			WT_RET((*visit)(ref, state));
+			(*visit)(ref, state);
 			break;
 
 		case WT_REF_EVICT_FORCE:
@@ -83,7 +83,7 @@ __merge_walk(WT_SESSION_IMPL *session, WT_PAGE *page, u_int depth,
  *	A callback function that counts the number of references as well as
  *	the first/last "live" reference.
  */
-static int
+static void
 __merge_count(WT_REF *ref, WT_VISIT_STATE *state)
 {
 	if (ref->state == WT_REF_LOCKED) {
@@ -98,17 +98,30 @@ __merge_count(WT_REF *ref, WT_VISIT_STATE *state)
 	 * Sanity check that we don't overflow the counts.  We can't put more
 	 * than 2**32 keys on one page anyway.
 	 */
-	if (++state->refcnt == UINT32_MAX)
-		return (ENOMEM);
-	return (0);
+	++state->refcnt;
 }
 
 /*
- * __merge_move_ref --
- *	Move a child ref from the locked subtree to a new page.
+ * __merge_copy_ref --
+ *	Copy a child reference from the locked subtree to a new page.
  */
-static int
-__merge_move_ref(WT_REF *ref, WT_VISIT_STATE *state)
+static void
+__merge_copy_ref(WT_REF *ref, WT_VISIT_STATE *state)
+{
+	if (state->split != 0 && state->refcnt++ == state->split) {
+		state->page = state->second;
+		state->ref = state->second_ref;
+	}
+
+	*state->ref++ = *ref;
+}
+
+/*
+ * __merge_switch_page --
+ *	Switch a page from the locked tree into the new tree.
+ */
+static void
+__merge_switch_page(WT_REF *ref, WT_VISIT_STATE *state)
 {
 	WT_PAGE *child;
 	WT_PAGE_MODIFY *modify;
@@ -119,12 +132,9 @@ __merge_move_ref(WT_REF *ref, WT_VISIT_STATE *state)
 		state->ref = state->second_ref;
 	}
 
-	/* Move a ref from the old tree to the new tree. */
 	newref = state->ref++;
-	*newref = *ref;
-	WT_CLEAR(*ref);
-	if (newref->state == WT_REF_LOCKED) {
-		child = newref->page;
+	if (ref->state == WT_REF_LOCKED) {
+		child = ref->page;
 
 		/*
 		 * If the child has been split, update the split page to point
@@ -141,8 +151,7 @@ __merge_move_ref(WT_REF *ref, WT_VISIT_STATE *state)
 		WT_LINK_PAGE(state->page, newref, child);
 		newref->state = WT_REF_MEM;
 	}
-
-	return (0);
+	WT_CLEAR(*ref);
 }
 
 /*
@@ -209,12 +218,13 @@ __merge_promote_key(WT_SESSION_IMPL *session, WT_REF *ref)
 }
 
 /*
- * Attempt to collapse a stack of split-merge pages in memory into a shallow
- * tree.  If enough keys are found, create a real internal node that can be
- * evicted (and, if necessary, split further).
+ * __wt_merge_tree --
+ *	Attempt to collapse a stack of split-merge pages in memory into a
+ *	shallow tree.  If enough keys are found, create a real internal node
+ *	that can be evicted (and, if necessary, split further).
  *
- * This code is designed to deal with the case of append-only workloads that
- * otherwise create arbitrarily deep (and slow) trees in memory.
+ *	This code is designed to deal with workloads that otherwise create
+ *	arbitrarily deep (and slow) trees in memory.
  */
 int
 __wt_merge_tree(WT_SESSION_IMPL *session, WT_PAGE *top)
@@ -245,6 +255,10 @@ __wt_merge_tree(WT_SESSION_IMPL *session, WT_PAGE *top)
 	if (visit_state.maxdepth < WT_MERGE_STACK_MIN)
 		return (EBUSY);
 
+	/* Pages cannot grow larger than 2**32, but that should never happen. */
+	if (visit_state.refcnt > UINT32_MAX)
+		return (ENOMEM);
+
 	/* Make sure the top page isn't queued for eviction. */
 	__wt_evict_list_clr_page(session, top);
 
@@ -260,7 +274,7 @@ __wt_merge_tree(WT_SESSION_IMPL *session, WT_PAGE *top)
 	 * isn't big enough to justify the cost of evicting it.  If splits
 	 * continue, it will be merged again until it gets over this limit.
 	 */
-	refcnt = visit_state.refcnt;
+	refcnt = (uint32_t)visit_state.refcnt;
 	promote = (refcnt > 100);
 
 	if (promote) {
@@ -289,11 +303,11 @@ __wt_merge_tree(WT_SESSION_IMPL *session, WT_PAGE *top)
 
 		/* Left split. */
 		if (split == 1)
-			visit_state.page = newtop;
+			visit_state.first = newtop;
 		else {
 			WT_ERR(__merge_new_page(session, page_type, split,
 			    visit_state.first_live < split, &lchild));
-			visit_state.page = lchild;
+			visit_state.first = lchild;
 		}
 
 		/* Right split. */
@@ -312,12 +326,19 @@ __wt_merge_tree(WT_SESSION_IMPL *session, WT_PAGE *top)
 		WT_ERR(__merge_new_page(
 		    session, page_type, refcnt, 1, &newtop));
 
-		visit_state.page = newtop;
+		visit_state.first = newtop;
 	}
 
+	/*
+	 * Copy the references into the new tree, but don't update anything in
+	 * the locked tree in case there is an error and we need to back out.
+	 * We do this in a separate pass so that we can figure out the key for
+	 * the split point: that allocates memory and so it could still fail.
+	 */
+	visit_state.page = visit_state.first;
 	visit_state.ref = visit_state.page->u.intl.t;
 	visit_state.refcnt = 0;
-	WT_ERR(__merge_walk(session, top, 0, __merge_move_ref, &visit_state));
+	WT_ERR(__merge_walk(session, top, 0, __merge_copy_ref, &visit_state));
 
 	if (promote) {
 		/* Promote keys into the top-level page. */
@@ -341,6 +362,22 @@ __wt_merge_tree(WT_SESSION_IMPL *session, WT_PAGE *top)
 				__wt_evict_forced_page(session, rchild);
 		}
 	}
+
+	/*
+	 * We have copied everything into place and allocated all of the memory
+	 * we need.  Now link all pages into the new tree and unlock them.
+	 *
+	 * The only way this could fail is if a reference state has been
+	 * changed by another thread since they were locked.  Panic in that
+	 * case: that should never happen.
+	 */
+	visit_state.page = visit_state.first;
+	visit_state.ref = visit_state.page->u.intl.t;
+	visit_state.refcnt = 0;
+	ret = __merge_walk(session, top, 0, __merge_switch_page, &visit_state);
+
+	if (ret != 0)
+		WT_ERR(__wt_illegal_value(session, "__wt_merge_tree"));
 
 	newtop->u.intl.recno = top->u.intl.recno;
 	newtop->parent = top->parent;
