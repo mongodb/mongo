@@ -25,6 +25,11 @@ public class PackOutputStream {
         return packed.toByteArray();
     }
 
+    public void reset() {
+        format.reset();
+        packed.reset();
+    }
+
     public void addFieldByte(byte value)
     throws WiredTigerPackingException {
         format.checkFieldType('b', true);

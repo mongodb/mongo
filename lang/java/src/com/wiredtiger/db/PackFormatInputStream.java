@@ -25,6 +25,11 @@ public class PackFormatInputStream {
         return format.length() - formatOff + formatRepeatCount;
     }
 
+    public void reset() {
+        formatOff = 0;
+        formatRepeatCount = 0;
+    }
+
     protected char getFieldType()
     throws WiredTigerPackingException {
         if (formatOff > format.length())

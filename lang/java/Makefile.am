@@ -29,7 +29,9 @@ JAVA_SRC = \
 		$(JAVAEXAMPLES)/ex_access.java
 
 JAVA_JUNIT = \
-		$(JAVATEST)/PackTest.java
+		$(JAVATEST)/CursorTest.java \
+		$(JAVATEST)/PackTest.java \
+		$(JAVATEST)/WiredTigerSuite.java
 
 dist_java_JAVA = $(JAVA_SRC) $(JAVA_JUNIT)
 
@@ -41,8 +43,10 @@ TESTS       = @TESTS_JUNIT@
 
 AllJunitTests:
 	echo "#! /bin/sh" > $@
-	echo "@JUNIT@ com.wiredtiger.test.PackTest" >> $@
+	echo 'SCRIPT_DIR=`dirname $$0`' >> $@
+	echo 'env LD_LIBRARY_PATH=$$SCRIPT_DIR/../../.libs DYLD_LIBRARY_PATH=$$SCRIPT_DIR/../../.libs JAVA_LIBRARY_PATH=$$SCRIPT_DIR/.libs @JUNIT@ com.wiredtiger.test.WiredTigerSuite' >> $@
 	chmod +x $@
+	mkdir -p WT_HOME
 
 CPPFLAGS += $(JNI_CPPFLAGS)
 # Some warnings when compiling the generated code are unavoidable

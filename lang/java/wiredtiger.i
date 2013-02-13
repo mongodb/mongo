@@ -27,8 +27,8 @@
 %{
 typedef int bool;
 
-static void throwDbException(JNIEnv *jenv, const char *msg) {
-	jclass excep = (*jenv)->FindClass(jenv, "com/wiredtiger/db/DbException");
+static void throwWiredTigerException(JNIEnv *jenv, const char *msg) {
+	jclass excep = (*jenv)->FindClass(jenv, "com/wiredtiger/db/WiredTigerException");
 	if (excep)
 		(*jenv)->ThrowNew(jenv, excep, msg);
 }
@@ -88,7 +88,7 @@ static void throwDbException(JNIEnv *jenv, const char *msg) {
 
 %typemap(out) int %{
 	if ($1 != 0 && $1 != WT_NOTFOUND) {
-		throwDbException(jenv, wiredtiger_strerror($1));
+		throwWiredTigerException(jenv, wiredtiger_strerror($1));
 		return $null;
 	}
 	$result = $1;
@@ -150,7 +150,7 @@ enum SearchStatus { FOUND, NOTFOUND, SMALLER, LARGER };
 		WT_ITEM k;
 		int ret;
 		if ((ret = $self->get_key($self, &k)) != 0) {
-			throwDbException(jenv, wiredtiger_strerror(ret));
+			throwWiredTigerException(jenv, wiredtiger_strerror(ret));
 			return NULL;
 		}
 		return &$self->key;
@@ -161,7 +161,7 @@ enum SearchStatus { FOUND, NOTFOUND, SMALLER, LARGER };
 		WT_ITEM v;
 		int ret;
 		if ((ret = $self->get_value($self, &v)) != 0) {
-			throwDbException(jenv, wiredtiger_strerror(ret));
+			throwWiredTigerException(jenv, wiredtiger_strerror(ret));
 			return NULL;
 		}
 		return &$self->value;
@@ -193,7 +193,7 @@ enum SearchStatus { FOUND, NOTFOUND, SMALLER, LARGER };
 		$self->set_key($self, k);
 		ret = $self->search_near(self, &cmp);
 		if (ret != 0 && ret != WT_NOTFOUND)
-			throwDbException(jenv, wiredtiger_strerror(ret));
+			throwWiredTigerException(jenv, wiredtiger_strerror(ret));
 		if (ret == 0)
 			return (cmp == 0 ? FOUND : cmp < 0 ? SMALLER : LARGER);
 		return (NOTFOUND);
@@ -209,7 +209,7 @@ enum SearchStatus { FOUND, NOTFOUND, SMALLER, LARGER };
 	int compare_wrap(JNIEnv *jenv, WT_CURSOR *other) {
 		int cmp, ret = $self->compare($self, other, &cmp);
 		if (ret != 0)
-			throwDbException(jenv, wiredtiger_strerror(ret));
+			throwWiredTigerException(jenv, wiredtiger_strerror(ret));
 		return cmp;
 	}
 }
@@ -218,14 +218,20 @@ enum SearchStatus { FOUND, NOTFOUND, SMALLER, LARGER };
 %typemap(javabody) struct __wt_cursor %{
  private long swigCPtr;
  protected boolean swigCMemOwn;
- protected String key_format;
- protected String value_format;
+ protected String keyFormat;
+ protected String valueFormat;
+ protected PackOutputStream keyPacker;
+ protected PackOutputStream valuePacker;
+ protected PackInputStream keyUnpacker;
+ protected PackInputStream valueUnpacker;
 
  protected $javaclassname(long cPtr, boolean cMemoryOwn) {
    swigCMemOwn = cMemoryOwn;
    swigCPtr = cPtr;
-   key_format = getKey_format();
-   value_format = getKey_format();
+   keyFormat = getKey_format();
+   valueFormat = getValue_format();
+   keyPacker = new PackOutputStream(keyFormat);
+   valuePacker = new PackOutputStream(valueFormat);
  }
 
  protected static long getCPtr($javaclassname obj) {
@@ -234,105 +240,185 @@ enum SearchStatus { FOUND, NOTFOUND, SMALLER, LARGER };
 %}
 
 %typemap(javacode) struct __wt_cursor %{
-	protected byte[] key;
-	protected byte[] value;
-        /* For users who iterate through key/value fields. */
-        protected int currentKeyField = -1;
-        protected int currentValueField = -1;
 
         public String getKeyFormat() {
-                return key_format;
+                return keyFormat;
         }
         public String getValueFormat() {
-                return value_format;
+                return valueFormat;
         }
-
-        // Raw key/value accessors, for applications that do their own
-        // decoding.
-	public void setKeyRaw(byte[] key) {
-                currentKeyField = -1;
-		this.key = key;
-	}
-
-	public byte[] getKeyRaw() {
-		return key;
-	}
-
-	public void setValueRaw(byte[] value) {
-                currentValueField = -1;
-		this.value = value;
-	}
-
-	public byte[] getValueRaw() {
-		return this.value;
-	}
 
         // Key/value accessors that decode based on format.
-        public void setKeyFieldBool(int index, boolean value) {
+        public void addKeyFieldByte(byte value)
+        throws WiredTigerPackingException {
+                keyPacker.addFieldByte(value);
         }
 
-        public void setKeyFieldByte(int index, byte value) {
+        public void addKeyFieldByteArray(byte[] value)
+        throws WiredTigerPackingException {
+                this.addKeyFieldByteArray(value, 0, value.length);
         }
 
-        public void setKeyFieldByteArray(int index, byte[] value) {
+        public void addKeyFieldByteArray(byte[] value, int off, int len)
+        throws WiredTigerPackingException {
+                keyPacker.addFieldByteArray(value, off, len);
         }
 
-        public void setKeyFieldChar(int index, char value) {
+        public void addKeyFieldInt(int value)
+        throws WiredTigerPackingException {
+                keyPacker.addFieldInt(value);
         }
 
-        public void setKeyFieldInt(int index, int value) {
+        public void addKeyFieldLong(long value)
+        throws WiredTigerPackingException {
+                keyPacker.addFieldLong(value);
         }
 
-        public void setKeyFieldLong(int index, long value) {
+        public void addKeyFieldShort(short value)
+        throws WiredTigerPackingException {
+                keyPacker.addFieldShort(value);
         }
 
-        public void setKeyFieldShort(int index, int value) {
+        public void addKeyFieldString(String value)
+        throws WiredTigerPackingException {
+                keyPacker.addFieldString(value);
         }
 
-        public void setKeyFieldString(int index, String value) {
+        public void addValueFieldByte(byte value)
+        throws WiredTigerPackingException {
+                valuePacker.addFieldByte(value);
         }
 
-        public boolean getKeyFieldBool(int index) {
-                return false;
+        public void addValueFieldByteArray(byte[] value)
+        throws WiredTigerPackingException {
+                this.addValueFieldByteArray(value, 0, value.length);
         }
 
-        public byte getKeyFieldByte(int index) {
-                return 'b';
+        public void addValueFieldByteArray(byte[] value, int off, int len)
+        throws WiredTigerPackingException {
+                valuePacker.addFieldByteArray(value, off, len);
         }
 
-        public byte[] getKeyFieldByteArray(int indexvalue) {
-                return "bytearray".getBytes();
+        public void addValueFieldInt(int value)
+        throws WiredTigerPackingException {
+                valuePacker.addFieldInt(value);
         }
 
-        public char getKeyFieldChar(int index) {
-                return 'c';
+        public void addValueFieldLong(long value)
+        throws WiredTigerPackingException {
+                valuePacker.addFieldLong(value);
         }
 
-        public int getKeyFieldInt(int index) {
-                return 1;
+        public void addValueFieldShort(short value)
+        throws WiredTigerPackingException {
+                valuePacker.addFieldShort(value);
         }
 
-        public long getKeyFieldLong(int index) {
-                return 2;
+        public void addValueFieldString(String value)
+        throws WiredTigerPackingException {
+                valuePacker.addFieldString(value);
         }
 
-        public int getKeyFieldShort(int index) {
-                return 3;
+        // TODO: Verify that there is an unpacker available.
+        public byte getKeyFieldByte()
+        throws WiredTigerPackingException {
+                return keyUnpacker.getFieldByte();
         }
 
-        public String getKeyFieldString(int index) {
-                return "string";
+        public void getKeyFieldByteArray(byte[] output)
+        throws WiredTigerPackingException {
+                this.getKeyFieldByteArray(output, 0, output.length);
+        }
+
+        public void getKeyFieldByteArray(byte[] output, int off, int len)
+        throws WiredTigerPackingException {
+                keyUnpacker.getFieldByteArray(output, off, len);
+        }
+
+        public byte[] getKeyFieldByteArray()
+        throws WiredTigerPackingException {
+                return keyUnpacker.getFieldByteArray();
+        }
+
+        public int getKeyFieldInt()
+        throws WiredTigerPackingException {
+                return keyUnpacker.getFieldInt();
+        }
+
+        public long getKeyFieldLong()
+        throws WiredTigerPackingException {
+                return keyUnpacker.getFieldLong();
+        }
+
+        public short getKeyFieldShort()
+        throws WiredTigerPackingException {
+                return keyUnpacker.getFieldShort();
+        }
+
+        public String getKeyFieldString()
+        throws WiredTigerPackingException {
+                return keyUnpacker.getFieldString();
+        }
+
+        public byte getValueFieldByte()
+        throws WiredTigerPackingException {
+                return valueUnpacker.getFieldByte();
+        }
+
+        public void getValueFieldByteArray(byte[] output)
+        throws WiredTigerPackingException {
+                this.getValueFieldByteArray(output, 0, output.length);
+        }
+
+        public void getValueFieldByteArray(byte[] output, int off, int len)
+        throws WiredTigerPackingException {
+                valueUnpacker.getFieldByteArray(output, off, len);
+        }
+
+        public byte[] getValueFieldByteArray()
+        throws WiredTigerPackingException {
+                return valueUnpacker.getFieldByteArray();
+        }
+
+        public int getValueFieldInt()
+        throws WiredTigerPackingException {
+                return valueUnpacker.getFieldInt();
+        }
+
+        public long getValueFieldLong()
+        throws WiredTigerPackingException {
+                return valueUnpacker.getFieldLong();
+        }
+
+        public short getValueFieldShort()
+        throws WiredTigerPackingException {
+                return valueUnpacker.getFieldShort();
+        }
+
+        public String getValueFieldString()
+        throws WiredTigerPackingException {
+                return valueUnpacker.getFieldString();
         }
 
 	public int insert() {
+                byte[] key = keyPacker.getValue();
+                byte[] value = valuePacker.getValue();
+                keyPacker.reset();
+                valuePacker.reset();
 		return insert_wrap(key, value);
 	}
 
 	public int update() {
+                byte[] key = keyPacker.getValue();
+                byte[] value = valuePacker.getValue();
+                keyPacker.reset();
+                valuePacker.reset();
 		return update_wrap(key, value);
 	}
 
 	public int remove() {
+                byte[] key = keyPacker.getValue();
+                keyPacker.reset();
 		return remove_wrap(key);
 	}
 
@@ -342,28 +428,36 @@ enum SearchStatus { FOUND, NOTFOUND, SMALLER, LARGER };
 
 	public int next() {
 		int ret = next_wrap();
-		key = (ret == 0) ? get_key_wrap() : null;
-		value = (ret == 0) ? get_value_wrap() : null;
+		keyUnpacker = (ret == 0) ?
+                    new PackInputStream(keyFormat, get_key_wrap()) : null;
+		valueUnpacker = (ret == 0) ?
+                    new PackInputStream(valueFormat, get_value_wrap()) : null;
 		return ret;
 	}
 
 	public int prev() {
 		int ret = prev_wrap();
-		key = (ret == 0) ? get_key_wrap() : null;
-		value = (ret == 0) ? get_value_wrap() : null;
+		keyUnpacker = (ret == 0) ?
+                    new PackInputStream(keyFormat, get_key_wrap()) : null;
+		valueUnpacker = (ret == 0) ?
+                    new PackInputStream(valueFormat, get_value_wrap()) : null;
 		return ret;
 	}
 	public int search() {
-		int ret = search_wrap(key);
-		key = (ret == 0) ? get_key_wrap() : null;
-		value = (ret == 0) ? get_value_wrap() : null;
+		int ret = search_wrap(keyPacker.getValue());
+		keyUnpacker = (ret == 0) ?
+                    new PackInputStream(keyFormat, get_key_wrap()) : null;
+		valueUnpacker = (ret == 0) ?
+                    new PackInputStream(valueFormat, get_value_wrap()) : null;
 		return ret;
 	}
 
 	public SearchStatus search_near() {
-		SearchStatus ret = search_near_wrap(key);
-		key = (ret != SearchStatus.NOTFOUND) ? get_key_wrap() : null;
-		value = (ret != SearchStatus.NOTFOUND) ? get_value_wrap() : null;
+		SearchStatus ret = search_near_wrap(keyPacker.getValue());
+		keyUnpacker = (ret != SearchStatus.NOTFOUND) ?
+                    new PackInputStream(keyFormat, get_key_wrap()) : null;
+		valueUnpacker = (ret != SearchStatus.NOTFOUND) ?
+                    new PackInputStream(valueFormat, get_value_wrap()) : null;
 		return ret;
 	}
 %}
@@ -417,7 +511,7 @@ WT_CONNECTION *wiredtiger_open_wrap(JNIEnv *jenv, const char *home, const char *
 	WT_CONNECTION *conn = NULL;
 	int ret;
 	if ((ret = wiredtiger_open(home, NULL, config, &conn)) != 0)
-		throwDbException(jenv, wiredtiger_strerror(ret));
+		throwWiredTigerException(jenv, wiredtiger_strerror(ret));
 	return conn;
 }
 }
@@ -427,7 +521,7 @@ WT_CONNECTION *wiredtiger_open_wrap(JNIEnv *jenv, const char *home, const char *
 		WT_SESSION *session = NULL;
 		int ret;
 		if ((ret = $self->open_session($self, NULL, config, &session)) != 0)
-			throwDbException(jenv, wiredtiger_strerror(ret));
+			throwWiredTigerException(jenv, wiredtiger_strerror(ret));
 		return session;
 	}
 }
@@ -437,7 +531,7 @@ WT_CONNECTION *wiredtiger_open_wrap(JNIEnv *jenv, const char *home, const char *
 		WT_CURSOR *cursor = NULL;
 		int ret;
 		if ((ret = $self->open_cursor($self, uri, to_dup, config, &cursor)) != 0)
-			throwDbException(jenv, wiredtiger_strerror(ret));
+			throwWiredTigerException(jenv, wiredtiger_strerror(ret));
 		else
 			cursor->flags |= WT_CURSTD_RAW;
 		return cursor;
