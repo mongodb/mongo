@@ -103,9 +103,14 @@ namespace mongo {
     
     ////////////////////////////////////////////////////////////////
 
-    SSLManager::SSLManager(const SSLParams& params) : 
-        _validateCertificates(false),
-        _weakValidation(params.weakCertificateValidation) {
+    static mongo::mutex sslInitMtx("SSL Initialization");
+    static bool sslInitialized(false);
+
+    void SSLManager::_initializeSSL(const SSLParams& params) {
+        scoped_lock lk(sslInitMtx);
+        if (sslInitialized) 
+            return;  // already done
+
         SSL_library_init();
         SSL_load_error_strings();
         ERR_load_crypto_strings();
@@ -117,7 +122,16 @@ namespace mongo {
         // Add all digests and ciphers to OpenSSL's internal table
         // so that encryption/decryption is backwards compatible
         OpenSSL_add_all_algorithms();
+
+        sslInitialized = true;
+    }
+
+    SSLManager::SSLManager(const SSLParams& params) : 
+        _validateCertificates(false),
+        _weakValidation(params.weakCertificateValidation) {
         
+        _initializeSSL(params);
+  
         _context = SSL_CTX_new(SSLv23_method());
         massert(15864, 
                 mongoutils::str::stream() << "can't create SSL Context: " << 
@@ -163,15 +177,8 @@ namespace mongo {
 	return 1; // always succeed; we will catch the error in our get_verify_result() call
     }
 
-    static mongo::mutex fipsMtx("FIPS");
-    static bool fipsActivated(false);
-
     void SSLManager::_setupFIPS() {
         // Turn on FIPS mode if requested.
-        scoped_lock lk(fipsMtx);
-        if (fipsActivated) {
-            return;
-        }
         int status = FIPS_mode_set(1);
         if (!status) {
             error() << "can't activate FIPS mode: " << 
@@ -179,7 +186,6 @@ namespace mongo {
             fassertFailed(16703);
         }
         log() << "FIPS 140-2 mode activated" << endl;
-        fipsActivated = true;
     }
 
     bool SSLManager::_setupPEM(const std::string& keyFile , const std::string& password) {
