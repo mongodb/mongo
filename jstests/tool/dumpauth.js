@@ -14,15 +14,27 @@ for(var i = 0; i < 100; i++) {
 }
 
 users = db.getCollection( "system.users" );
-users.remove( {} );
 
 db.addUser( "testuser" , "testuser" );
 
 assert( db.auth( "testuser" , "testuser" ) , "auth failed" );
 
-x = runMongoProgram( "mongodump", "--db", baseName, "-u", "testuser", "-p", "testuser", "-h", "127.0.0.1:"+port, "--collection", "testcol" );
+x = runMongoProgram( "mongodump",
+                     "--db", baseName,
+                     "--authenticationDatabase=admin",
+                     "-u", "testuser",
+                     "-p", "testuser",
+                     "-h", "127.0.0.1:"+port,
+                     "--collection", "testcol" );
 assert.eq(x, 0, "mongodump should succeed with authentication");
 
 // SERVER-5233: mongodump with authentication breaks when using "--out -"
-x = runMongoProgram( "mongodump", "--db", baseName, "-u", "testuser", "-p", "testuser", "-h", "127.0.0.1:"+port, "--collection", "testcol", "--out", "-" );
+x = runMongoProgram( "mongodump",
+                     "--db", baseName,
+                     "--authenticationDatabase=admin",
+                     "-u", "testuser",
+                     "-p", "testuser",
+                     "-h", "127.0.0.1:"+port,
+                     "--collection", "testcol",
+                     "--out", "-" );
 assert.eq(x, 0, "mongodump should succeed with authentication while using '--out'");
