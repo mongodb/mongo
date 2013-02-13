@@ -1528,7 +1528,7 @@ namespace mongo {
             try {
                 conn->auth(i->second);
             }
-            catch (const UserException& ex) {
+            catch (const UserException&) {
                 warning() << "cached auth failed for set: " << _setName <<
                     " db: " << i->second[saslCommandPrincipalSourceFieldName].str() <<
                     " user: " << i->second[saslCommandPrincipalFieldName].str() << endl;
