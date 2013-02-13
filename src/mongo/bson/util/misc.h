@@ -97,6 +97,9 @@ namespace mongo {
             verify(((long long)millis/1000) < (std::numeric_limits<time_t>::max)());
             return millis / 1000;
         }
+        int64_t asInt64() {
+            return static_cast<int64_t>(millis);
+        }
     };
 
     // Like strlen, but only scans up to n bytes.
