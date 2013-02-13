@@ -2190,6 +2190,9 @@
     <ClInclude Include="..\..\third_party\s2\s2testing.h">
       <Filter>third_party\s2</Filter>
     </ClInclude>
+    <ClInclude Include="..\client\sasl_client_authenticate.h">
+      <Filter>client</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\client\connpool.cpp">
@@ -4177,6 +4180,9 @@
       <Filter>third_party\v8\src\Source Files\o to z</Filter>
     </ClCompile>
     <ClCompile Include="..\pch.cpp" />
+    <ClCompile Include="..\client\sasl_client_authenticate.cpp">
+      <Filter>client</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="btreetests.inl">

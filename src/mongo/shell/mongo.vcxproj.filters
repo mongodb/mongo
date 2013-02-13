@@ -614,6 +614,9 @@
     <ClCompile Include="..\scripting\v8_profiler.cpp">
       <Filter>scripting</Filter>
     </ClCompile>
+    <ClCompile Include="..\client\sasl_client_authenticate.cpp">
+      <Filter>client</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="collection.js">
@@ -1435,6 +1438,9 @@
     </ClInclude>
     <ClInclude Include="..\scripting\v8_profiler.h">
       <Filter>scripting</Filter>
+    </ClInclude>
+    <ClInclude Include="..\client\sasl_client_authenticate.h">
+      <Filter>client</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

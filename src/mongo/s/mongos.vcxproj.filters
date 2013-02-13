@@ -1221,6 +1221,9 @@
     <ClCompile Include="..\db\connection_factory.cpp">
       <Filter>db\Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\client\sasl_client_authenticate.cpp">
+      <Filter>client</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\pch.h" />
@@ -2333,6 +2336,9 @@
     </ClInclude>
     <ClInclude Include="..\scripting\v8_profiler.h">
       <Filter>scripting</Filter>
+    </ClInclude>
+    <ClInclude Include="..\client\sasl_client_authenticate.h">
+      <Filter>client</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

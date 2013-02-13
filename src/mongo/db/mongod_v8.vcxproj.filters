@@ -1808,6 +1808,9 @@
     <ClCompile Include="field_ref.cpp">
       <Filter>db\Source Files\e to n</Filter>
     </ClCompile>
+    <ClCompile Include="..\client\sasl_client_authenticate.cpp">
+      <Filter>client\Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\targetver.h" />
@@ -3815,6 +3818,9 @@
     </ClInclude>
     <ClInclude Include="field_ref.h">
       <Filter>db\Header Files\e to n</Filter>
+    </ClInclude>
+    <ClInclude Include="..\client\sasl_client_authenticate.h">
+      <Filter>client\Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
