@@ -576,23 +576,22 @@ namespace replset {
     bool ReplSetImpl::tryToGoLiveAsASecondary(OpTime& /*out*/ minvalid) {
         bool golive = false;
 
-        // make sure we're not primary or secondary already
-        if (box.getState().primary() || box.getState().secondary()) {
+        lock rsLock( this );
+        Lock::GlobalWrite writeLock;
+
+        // make sure we're not primary, secondary, or fatal already
+        if (box.getState().primary() || box.getState().secondary() || box.getState().fatal()) {
             return false;
         }
 
-        {
-            lock lk( this );
+        if (_maintenanceMode > 0) {
+            // we're not actually going live
+            return true;
+        }
 
-            if (_maintenanceMode > 0) {
-                // we're not actually going live
-                return true;
-            }
-
-            // if we're blocking sync, don't change state
-            if (_blockSync) {
-                return false;
-            }
+        // if we're blocking sync, don't change state
+        if (_blockSync) {
+            return false;
         }
 
         minvalid = getMinValid();
@@ -772,6 +771,7 @@ namespace replset {
     }
 
     void ReplSetImpl::blockSync(bool block) {
+        // RS lock is already taken in Manager::checkAuth
         _blockSync = block;
         if (_blockSync) {
             // syncing is how we get into SECONDARY state, so we'll be stuck in

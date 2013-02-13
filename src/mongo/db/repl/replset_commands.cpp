@@ -355,12 +355,12 @@ namespace mongo {
         virtual bool run(const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             if( !check(errmsg, result) )
                 return false;
-            if( theReplSet->box.getState().primary() ) {
+
+            if (!theReplSet->setMaintenanceMode(cmdObj["replSetMaintenance"].trueValue())) {
                 errmsg = "primaries can't modify maintenance mode";
                 return false;
             }
 
-            theReplSet->setMaintenanceMode(cmdObj["replSetMaintenance"].trueValue());
             return true;
         }
     } cmdReplSetMaintenance;
