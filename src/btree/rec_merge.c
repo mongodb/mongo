@@ -30,7 +30,8 @@ typedef struct {
  */
 static int
 __merge_walk(WT_SESSION_IMPL *session, WT_PAGE *page, u_int depth,
-	void (*visit)(WT_REF *, WT_VISIT_STATE *), WT_VISIT_STATE *state)
+	void (*visit)(WT_PAGE *, WT_REF *, WT_VISIT_STATE *),
+	WT_VISIT_STATE *state)
 {
 	WT_PAGE *child;
 	WT_REF *ref;
@@ -65,7 +66,7 @@ __merge_walk(WT_SESSION_IMPL *session, WT_PAGE *page, u_int depth,
 
 		case WT_REF_DELETED:
 		case WT_REF_DISK:
-			(*visit)(ref, state);
+			(*visit)(page, ref, state);
 			break;
 
 		case WT_REF_EVICT_FORCE:
@@ -84,8 +85,10 @@ __merge_walk(WT_SESSION_IMPL *session, WT_PAGE *page, u_int depth,
  *	the first/last "live" reference.
  */
 static void
-__merge_count(WT_REF *ref, WT_VISIT_STATE *state)
+__merge_count(WT_PAGE *parent, WT_REF *ref, WT_VISIT_STATE *state)
 {
+	WT_UNUSED(parent);
+
 	if (ref->state == WT_REF_LOCKED) {
 		if (!state->seen_live) {
 			state->first_live = state->refcnt;
@@ -106,14 +109,49 @@ __merge_count(WT_REF *ref, WT_VISIT_STATE *state)
  *	Copy a child reference from the locked subtree to a new page.
  */
 static void
-__merge_copy_ref(WT_REF *ref, WT_VISIT_STATE *state)
+__merge_copy_ref(WT_PAGE *parent, WT_REF *ref, WT_VISIT_STATE *state)
 {
-	if (state->split != 0 && state->refcnt++ == state->split) {
-		state->page = state->second;
-		state->ref = state->second_ref;
-	}
+	WT_REF *newref;
 
-	*state->ref++ = *ref;
+	if (state->split != 0 && state->refcnt++ == state->split)
+		state->ref = state->second_ref;
+
+	newref = state->ref++;
+	*newref = *ref;
+
+	/*
+	 * There's one special case we have to handle here: the internal page
+	 * being merged has a potentially incorrect first key and we need to
+	 * replace it with the one we have.  The problem is caused by the fact
+	 * that the page search algorithm coerces the 0th key on any internal
+	 * page to be smaller than any search key.  We do that because we don't
+	 * want to have to update the internal pages every time a new
+	 * "smallest" key is inserted into the tree.  But, if a new "smallest"
+	 * key is inserted into our split-created subtree, and we don't update
+	 * the internal page, when we merge that internal page into its parent
+	 * page, the key may be incorrect (or more likely, have been coerced to
+	 * a single byte because it's an internal page's 0th key).
+	 * Imagine the following tree:
+	 *
+	 *      2       5       40      internal page
+	 *              |
+	 *          10  | 20            split-created internal page
+	 *          |
+	 *          6                   inserted smallest key
+	 *
+	 * after a simple merge, we'd have corruption:
+	 *
+	 *      2    10    20   40      merged internal page
+	 *           |
+	 *           6                  key sorts before parent's key
+	 *
+	 * To fix this problem, we take the higher-level page's key as our
+	 * first key, because that key sorts before any possible key inserted
+	 * into the subtree, and discard whatever 0th key is on the
+	 * split-created internal page.
+	 */
+	if (parent->type == WT_PAGE_ROW_INT && ref == parent->u.intl.t)
+		newref->u.key = parent->ref->u.key;
 }
 
 /*
@@ -121,7 +159,7 @@ __merge_copy_ref(WT_REF *ref, WT_VISIT_STATE *state)
  *	Switch a page from the locked tree into the new tree.
  */
 static void
-__merge_switch_page(WT_REF *ref, WT_VISIT_STATE *state)
+__merge_switch_page(WT_PAGE *parent, WT_REF *ref, WT_VISIT_STATE *state)
 {
 	WT_PAGE *child;
 	WT_PAGE_MODIFY *modify;
@@ -133,6 +171,7 @@ __merge_switch_page(WT_REF *ref, WT_VISIT_STATE *state)
 	}
 
 	newref = state->ref++;
+
 	if (ref->state == WT_REF_LOCKED) {
 		child = ref->page;
 
@@ -151,6 +190,14 @@ __merge_switch_page(WT_REF *ref, WT_VISIT_STATE *state)
 		WT_LINK_PAGE(state->page, newref, child);
 		newref->state = WT_REF_MEM;
 	}
+
+	/*
+	 * Clear out the parent key if we took it above.  Swap in the old child
+	 * key before we clear it, so any allocated memory is freed.
+	 */
+	if (parent->type == WT_PAGE_ROW_INT && ref == parent->u.intl.t)
+		parent->ref->u.key = ref->u.key;
+
 	WT_CLEAR(*ref);
 }
 
