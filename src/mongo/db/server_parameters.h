@@ -36,6 +36,8 @@ namespace mongo {
     public:
         typedef std::map< std::string, ServerParameter* > Map;
 
+        ServerParameter( ServerParameterSet* sps, const std::string& name,
+                         bool allowedToChangeAtStartup, bool allowedToChangeAtRuntime );
         ServerParameter( ServerParameterSet* sps, const std::string& name );
         virtual ~ServerParameter();
 
@@ -44,12 +46,12 @@ namespace mongo {
         /**
          * @return if you can set on command line or config file
          */
-        virtual bool allowedToChangeAtStartup() const { return true; }
+        bool allowedToChangeAtStartup() const { return _allowedToChangeAtStartup; }
 
         /**
          * @param if you can use (get|set)Parameter
          */
-        virtual bool allowedToChangeAtRuntime() const { return true; }
+        bool allowedToChangeAtRuntime() const { return _allowedToChangeAtRuntime; }
 
 
         virtual void append( BSONObjBuilder& b, const string& name ) = 0;
@@ -60,6 +62,8 @@ namespace mongo {
 
     private:
         string _name;
+        bool _allowedToChangeAtStartup;
+        bool _allowedToChangeAtRuntime;
     };
 
     class ServerParameterSet {
@@ -76,11 +80,26 @@ namespace mongo {
         Map _map;
     };
 
+    /**
+     * Implementation of ServerParameter for reading and writing a server parameter with a given
+     * name and type into a specific C++ variable.
+     */
     template<typename T>
     class ExportedServerParameter : public ServerParameter {
     public:
-        ExportedServerParameter( ServerParameterSet* sps, const std::string& name, T* value )
-            : ServerParameter( sps, name ), _value( value ) {}
+
+        /**
+         * Construct an ExportedServerParameter in parameter set "sps", named "name", whose storage
+         * is at "value".
+         *
+         * If allowedToChangeAtStartup is true, the parameter may be set at the command line,
+         * e.g. via the --setParameter switch.  If allowedToChangeAtRuntime is true, the parameter
+         * may be set at runtime, e.g.  via the setParameter command.
+         */
+        ExportedServerParameter( ServerParameterSet* sps, const std::string& name, T* value,
+                                 bool allowedToChangeAtStartup, bool allowedToChangeAtRuntime)
+            : ServerParameter( sps, name, allowedToChangeAtStartup, allowedToChangeAtRuntime ),
+              _value( value ) {}
         virtual ~ExportedServerParameter() {}
 
         virtual void append( BSONObjBuilder& b, const string& name ) {
@@ -100,11 +119,31 @@ namespace mongo {
 
         T* _value; // owned elsewhere
     };
-
-#define MONGO_EXPORT_SERVER_PARAMETER( NAME, TYPE, INITIAL_VALUE ) \
-    TYPE NAME = INITIAL_VALUE; \
-    ExportedServerParameter<TYPE> _##NAME( ServerParameterSet::getGlobal(), #NAME, &NAME )
-
 }
+
+#define MONGO_EXPORT_SERVER_PARAMETER_IMPL( NAME, TYPE, INITIAL_VALUE, \
+                                            CHANGE_AT_STARTUP, CHANGE_AT_RUNTIME ) \
+    TYPE NAME = INITIAL_VALUE;                                          \
+    ExportedServerParameter<TYPE> _##NAME(\
+            ServerParameterSet::getGlobal(), #NAME, &NAME, CHANGE_AT_STARTUP, CHANGE_AT_RUNTIME )
+
+/**
+ * Create a global variable of type "TYPE" named "NAME" with the given INITIAL_VALUE.  The
+ * value may be set at startup or at runtime.
+ */
+#define MONGO_EXPORT_SERVER_PARAMETER( NAME, TYPE, INITIAL_VALUE ) \
+    MONGO_EXPORT_SERVER_PARAMETER_IMPL( NAME, TYPE, INITIAL_VALUE, true, true )
+
+/**
+ * Like MONGO_EXPORT_SERVER_PARAMETER, but the value may only be set at startup.
+ */
+#define MONGO_EXPORT_STARTUP_SERVER_PARAMETER( NAME, TYPE, INITIAL_VALUE ) \
+    MONGO_EXPORT_SERVER_PARAMETER_IMPL( NAME, TYPE, INITIAL_VALUE, true, false )
+
+/**
+ * Like MONGO_EXPORT_SERVER_PARAMETER, but the value may only be set at runtime.
+ */
+#define MONGO_EXPORT_RUNTIME_SERVER_PARAMETER( NAME, TYPE, INITIAL_VALUE ) \
+    MONGO_EXPORT_SERVER_PARAMETER_IMPL( NAME, TYPE, INITIAL_VALUE, false, true )
 
 #include "server_parameters_inline.h"

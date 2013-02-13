@@ -394,7 +394,12 @@ namespace {
                         name,
                         static_cast<ServerParameter*>(NULL));
                 if (NULL == parameter) {
-                    cout << "Illegal --option parameter: \"" << name << "\"" << endl;
+                    cout << "Illegal --setParameter parameter: \"" << name << "\"" << endl;
+                    return false;
+                }
+                if (!parameter->allowedToChangeAtStartup()) {
+                    cout << "Cannot use --setParameter to set \"" << name << "\" at startup" <<
+                        endl;
                     return false;
                 }
                 Status status = parameter->setFromString(value);

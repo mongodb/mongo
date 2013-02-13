@@ -26,8 +26,21 @@ namespace mongo {
         ServerParameterSet* GLOBAL = NULL;
     }
 
+    ServerParameter::ServerParameter( ServerParameterSet* sps, const std::string& name,
+                                      bool allowedToChangeAtStartup, bool allowedToChangeAtRuntime )
+        : _name( name ),
+          _allowedToChangeAtStartup( allowedToChangeAtStartup ),
+          _allowedToChangeAtRuntime( allowedToChangeAtRuntime ) {
+
+        if ( sps ) {
+            sps->add( this );
+        }
+    }
+
     ServerParameter::ServerParameter( ServerParameterSet* sps, const std::string& name )
-        : _name( name ) {
+        : _name( name ),
+          _allowedToChangeAtStartup( true ),
+          _allowedToChangeAtRuntime( true ) {
 
         if ( sps ) {
             sps->add( this );
