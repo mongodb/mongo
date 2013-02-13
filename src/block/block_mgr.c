@@ -80,7 +80,7 @@ __bm_checkpoint_load(WT_BM *bm, WT_SESSION_IMPL *session,
 	conn = S2C(session);
 
 	/* If not opening a checkpoint, we're opening the live system. */
-	bm->is_checkpoint = checkpoint;
+	bm->is_live = !checkpoint;
 	WT_RET(__wt_block_checkpoint_load(session, bm->block,
 	    addr, addr_size, root_addr, root_addr_size, checkpoint));
 
@@ -134,11 +134,9 @@ __bm_checkpoint_unload(WT_BM *bm, WT_SESSION_IMPL *session)
 		WT_TRET(
 		    __wt_munmap(session, bm->block->fh, bm->map, bm->maplen));
 
-	/* If we're not the live system, there's no more work to be done. */
-	if (bm->is_checkpoint)
-		return (ret);
+	/* Unload the checkpoint. */
+	WT_TRET(__wt_block_checkpoint_unload(session, bm->block, !bm->is_live));
 
-	WT_TRET(__wt_block_checkpoint_unload(session, bm->block));
 	return (ret);
 }
 
@@ -369,16 +367,6 @@ __bm_method_set(WT_BM *bm, int readonly)
 }
 
 /*
- * __wt_block_manager_create --
- *	Create a file.
- */
-int
-__wt_block_manager_create(WT_SESSION_IMPL *session, const char *filename)
-{
-	return (__wt_block_create(session, filename));
-}
-
-/*
  * __wt_block_manager_open --
  *	Open a file.
  */
@@ -402,14 +390,4 @@ __wt_block_manager_open(WT_SESSION_IMPL *session, const char *filename,
 
 err:	WT_TRET(bm->close(bm, session));
 	return (ret);
-}
-
-/*
- * __wt_block_manager_truncate --
- *	Truncate a file.
- */
-int
-__wt_block_manager_truncate(WT_SESSION_IMPL *session, const char *filename)
-{
-	return (__wt_block_truncate(session, filename));
 }

@@ -114,7 +114,7 @@ __verify_last_avail(
 	--ckpt;
 
 	ci = &_ci;
-	WT_RET(__wt_block_ckpt_init(session, block, ci, ckpt->name, 0));
+	WT_RET(__wt_block_ckpt_init(session, ci, ckpt->name));
 	WT_ERR(__wt_block_buffer_to_ckpt(session, block, ckpt->raw.data, ci));
 
 	el = &ci->avail;
@@ -151,7 +151,7 @@ __verify_last_truncate(
 	--ckpt;
 
 	ci = &_ci;
-	WT_RET(__wt_block_ckpt_init(session, block, ci, ckpt->name, 0));
+	WT_RET(__wt_block_ckpt_init(session, ci, ckpt->name));
 	WT_ERR(__wt_block_buffer_to_ckpt(session, block, ckpt->raw.data, ci));
 	WT_ERR(__wt_ftruncate(session, block->fh, ci->file_size));
 
@@ -273,12 +273,9 @@ __wt_verify_ckpt_load(
  *	Verify work done when a checkpoint is unloaded.
  */
 int
-__wt_verify_ckpt_unload(
-    WT_SESSION_IMPL *session, WT_BLOCK *block, WT_BLOCK_CKPT *ci)
+__wt_verify_ckpt_unload(WT_SESSION_IMPL *session, WT_BLOCK *block)
 {
 	WT_DECL_RET;
-
-	WT_UNUSED(ci);
 
 	/* Confirm we verified every checkpoint block. */
 	ret = __verify_ckptfrag_chk(session, block);

@@ -20,7 +20,7 @@ __wt_page_is_modified(WT_PAGE *page)
  * __wt_eviction_page_force --
  *      Add a page for forced eviction if it matches the criteria.
  */
-static inline int
+static inline void
 __wt_eviction_page_force(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_BTREE *btree;
@@ -30,9 +30,7 @@ __wt_eviction_page_force(WT_SESSION_IMPL *session, WT_PAGE *page)
 	    __wt_page_is_modified(page) &&
 	    page->type != WT_PAGE_ROW_INT && page->type != WT_PAGE_COL_INT &&
 	    page->memory_footprint > btree->maxmempage)
-		return (__wt_evict_forced_page(session, page));
-
-	return (0);
+		__wt_evict_forced_page(session, page);
 }
 
 /*
@@ -183,13 +181,23 @@ __wt_cache_bytes_inuse(WT_CACHE *cache)
 }
 
 /*
- * __wt_cache_dirty_bytes --
+ * __wt_cache_bytes_dirty --
  *	Return the number of bytes in cache marked dirty.
  */
 static inline uint64_t
-__wt_cache_dirty_bytes(WT_CACHE *cache)
+__wt_cache_bytes_dirty(WT_CACHE *cache)
 {
 	return (cache->bytes_dirty);
+}
+
+/*
+ * __wt_cache_pages_dirty --
+ *	Return the number of pages in cache marked dirty.
+ */
+static inline uint64_t
+__wt_cache_pages_dirty(WT_CACHE *cache)
+{
+	return (cache->pages_dirty);
 }
 
 /*
@@ -404,44 +412,48 @@ __wt_get_addr(
 static inline int
 __wt_page_release(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
-	WT_BTREE *btree;
-
-	btree = session->btree;
-
 	/*
-	 * Fast-track pages we don't have and the root page, which sticks
-	 * in memory, regardless.
+	 * Discard our hazard pointer.  Ignore pages we don't have and the root
+	 * page, which sticks in memory, regardless.
 	 */
-	if (page == NULL || WT_PAGE_IS_ROOT(page))
-		return (0);
-
-	/* If this page isn't cached, discard it. */
-	if (F_ISSET(btree, WT_BTREE_NO_CACHE)) {
-		page->ref->page = NULL;
-		page->ref->state = WT_REF_DISK;
-		__wt_page_out(session, &page);
-		return (0);
-	}
-
-	/* Discard our hazard pointer. */
-	return (__wt_hazard_clear(session, page));
+	return (page == NULL ||
+	    WT_PAGE_IS_ROOT(page) ? 0 : __wt_hazard_clear(session, page));
 }
 
 /*
- * __wt_stack_release --
- *	Release references to a page stack.
+ * __wt_page_swap_func --
+ *	Swap one page's hazard pointer for another one when hazard pointer
+ * coupling up/down the tree.
  */
 static inline int
-__wt_stack_release(WT_SESSION_IMPL *session, WT_PAGE *page)
+__wt_page_swap_func(
+    WT_SESSION_IMPL *session, WT_PAGE *out, WT_PAGE *in, WT_REF *inref
+#ifdef HAVE_DIAGNOSTIC
+    , const char *file, int line
+#endif
+    )
 {
-	WT_PAGE *next;
+	WT_DECL_RET;
+	int acquired;
 
-	while (page != NULL && !WT_PAGE_IS_ROOT(page)) {
-		next = page->parent;
-		WT_RET(__wt_page_release(session, page));
-		page = next;
-	}
-	return (0);
+	/*
+	 * This function is here to simplify the error handling during hazard
+	 * pointer coupling so we never leave a hazard pointer dangling.  The
+	 * assumption is we're holding a hazard pointer on "out", and want to
+	 * read page "in", acquiring a hazard pointer on it, then release page
+	 * "out" and its hazard pointer.  If something fails, discard it all.
+	 */
+	ret = __wt_page_in_func(session, in, inref
+#ifdef HAVE_DIAGNOSTIC
+	    , file, line
+#endif
+	    );
+	acquired = ret == 0;
+	WT_TRET(__wt_page_release(session, out));
+
+	if (ret != 0 && acquired)
+		WT_TRET(__wt_page_release(session, inref->page));
+	return (ret);
 }
 
 /*

@@ -26,7 +26,7 @@ __wt_eviction_check(WT_SESSION_IMPL *session, int *read_lockoutp, int wake)
 	 * don't run on the edge all the time.
 	 */
 	bytes_inuse = __wt_cache_bytes_inuse(cache);
-	dirty_inuse = __wt_cache_dirty_bytes(cache);
+	dirty_inuse = __wt_cache_bytes_dirty(cache);
 	bytes_max = conn->cache_size;
 	if (read_lockoutp != NULL)
 		*read_lockoutp = (bytes_inuse > bytes_max);
@@ -63,8 +63,7 @@ __wt_cache_full_check(WT_SESSION_IMPL *session)
 		if (!lockout || F_ISSET(session,
 		    WT_SESSION_NO_CACHE_CHECK | WT_SESSION_SCHEMA_LOCKED))
 			return (0);
-		if (F_ISSET(btree,
-		    WT_BTREE_BULK | WT_BTREE_NO_CACHE | WT_BTREE_NO_EVICTION))
+		if (F_ISSET(btree, WT_BTREE_BULK | WT_BTREE_NO_EVICTION))
 			return (0);
 		if ((ret = __wt_evict_lru_page(session, 1)) == EBUSY)
 			__wt_yield();

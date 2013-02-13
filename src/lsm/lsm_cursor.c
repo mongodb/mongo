@@ -118,7 +118,7 @@ __clsm_open_cursors(
 	const char *ckpt_cfg[] = API_CONF_DEFAULTS(session, open_cursor,
 	    "checkpoint=WiredTigerCheckpoint,raw");
 	const char *merge_cfg[] = API_CONF_DEFAULTS(session, open_cursor,
-	    "checkpoint=WiredTigerCheckpoint,no_cache,raw");
+	    "checkpoint=WiredTigerCheckpoint,raw");
 	u_int i, nchunks;
 
 	session = (WT_SESSION_IMPL *)clsm->iface.session;
@@ -829,17 +829,6 @@ __clsm_put(
 	if ((memsizep = lsm_tree->memsizep) != NULL &&
 	    *memsizep > lsm_tree->chunk_size) {
 		/*
-		 * Close our cursors: if we are the only open cursor, this
-		 * means the btree handle is unlocked.
-		 *
-		 * XXX this is insufficient if multiple cursors are open, need
-		 * to move some operations (such as clearing the
-		 * "cache_resident" flag) into the worker thread.
-		 */
-		btree = ((WT_CURSOR_BTREE *)primary)->btree;
-		WT_RET(__wt_btree_release_memsize(session, btree));
-
-		/*
 		 * Take the LSM lock first: we can't acquire it while
 		 * holding the schema lock, or we will deadlock.
 		 */
@@ -848,6 +837,17 @@ __clsm_put(
 		if (clsm->dsk_gen == lsm_tree->dsk_gen)
 			WT_WITH_SCHEMA_LOCK(session,
 			    ret = __wt_lsm_tree_switch(session, lsm_tree));
+
+		/*
+		 * Clear the "cache resident" flag so the primary can be
+		 * evicted and eventually closed.  Make sure we succeeded
+		 * in switching: if something went wrong, we should keep
+		 * trying to switch.
+		 */
+		btree = ((WT_CURSOR_BTREE *)primary)->btree;
+		if (ret == 0)
+			ret = __wt_btree_release_memsize(session, btree);
+
 		WT_TRET(__wt_rwunlock(session, lsm_tree->rwlock));
 	}
 

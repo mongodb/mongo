@@ -177,7 +177,7 @@ struct __wt_bm {
 	 * There's only a single block manager handle that can be written, all
 	 * others are checkpoints.
 	 */
-	int is_checkpoint;			/* Not the live system */
+	int is_live;				/* The live system */
 };
 
 /*
@@ -205,7 +205,6 @@ struct __wt_block {
 	 */
 	WT_SPINLOCK	live_lock;	/* Live checkpoint lock */
 	WT_BLOCK_CKPT	live;		/* Live checkpoint */
-	int		live_load;	/* Live checkpoint loaded */
 
 				/* Salvage support */
 	off_t	slvg_off;		/* Salvage file offset */

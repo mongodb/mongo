@@ -116,7 +116,6 @@ __wt_cache_read(WT_SESSION_IMPL *session, WT_PAGE *parent, WT_REF *ref)
 	WT_VERBOSE_ERR(session, read,
 	    "page %p: %s", page, __wt_page_type_string(page->type));
 
-	ref->page = page;
 	WT_PUBLISH(ref->state, WT_REF_MEM);
 	return (0);
 

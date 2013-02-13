@@ -126,9 +126,9 @@ __wt_cache_stats_update(WT_CONNECTION_IMPL *conn, uint32_t flags)
 	WT_STAT_SET(
 	    conn->stats, cache_pages_inuse, __wt_cache_pages_inuse(cache));
 	WT_STAT_SET(
-	    conn->stats, cache_bytes_dirty, __wt_cache_dirty_bytes(cache));
+	    conn->stats, cache_bytes_dirty, __wt_cache_bytes_dirty(cache));
 	WT_STAT_SET(
-	    conn->stats, cache_pages_dirty, cache->pages_dirty);
+	    conn->stats, cache_pages_dirty, __wt_cache_pages_dirty(cache));
 }
 
 /*

@@ -95,18 +95,15 @@ __conn_btree_get(WT_SESSION_IMPL *session,
 	WT_ASSERT(session, F_ISSET(session, WT_SESSION_SCHEMA_LOCKED));
 
 	/* Increment the reference count if we already have the btree open. */
-	if (!LF_ISSET(WT_BTREE_NO_CACHE)) {
-		TAILQ_FOREACH(btree, &conn->btqh, q) {
-			if (strcmp(name, btree->name) == 0 &&
-			    ((ckpt == NULL && btree->checkpoint == NULL) ||
-			    (ckpt != NULL && btree->checkpoint != NULL &&
-			    strcmp(ckpt, btree->checkpoint) == 0))) {
-				++btree->refcnt;
-				session->btree = btree;
-				return (__conn_btree_open_lock(session, flags));
-			}
+	TAILQ_FOREACH(btree, &conn->btqh, q)
+		if (strcmp(name, btree->name) == 0 &&
+		    ((ckpt == NULL && btree->checkpoint == NULL) ||
+		    (ckpt != NULL && btree->checkpoint != NULL &&
+		    strcmp(ckpt, btree->checkpoint) == 0))) {
+			++btree->refcnt;
+			session->btree = btree;
+			return (__conn_btree_open_lock(session, flags));
 		}
-	}
 
 	/*
 	 * Allocate the WT_BTREE structure, its lock, and set the name so we
@@ -123,11 +120,9 @@ __conn_btree_get(WT_SESSION_IMPL *session,
 	    (ret = __wt_writelock(session, btree->rwlock)) == 0) {
 		F_SET(btree, WT_BTREE_EXCLUSIVE);
 
-		if (!LF_ISSET(WT_BTREE_NO_CACHE)) {
-			/* Add to the connection list. */
-			btree->refcnt = 1;
-			TAILQ_INSERT_TAIL(&conn->btqh, btree, q);
-		}
+		/* Add to the connection list. */
+		btree->refcnt = 1;
+		TAILQ_INSERT_TAIL(&conn->btqh, btree, q);
 	}
 
 	if (ret == 0)

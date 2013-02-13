@@ -181,9 +181,11 @@ file_config = format_meta + lsm_config + [
 		block compression is done''',
 		min='512B', max='512MB'),
 	Config('internal_item_max', '0', r'''
-		the maximum key size stored on internal nodes, in bytes.  If
-		zero, a maximum is calculated to permit at least 8 keys per
-		internal page''',
+		the largest key stored within an internal node, in bytes.  If
+		non-zero, any key larger than the specified size will be
+		stored as an overflow item (which may require additional I/O
+		to access).  If zero, a default size is chosen that permits at
+		least 8 keys per internal page''',
 		min=0),
 	Config('key_gap', '10', r'''
 		the maximum gap between instantiated keys in a Btree leaf page,
@@ -199,9 +201,11 @@ file_config = format_meta + lsm_config + [
 		is done''',
 		min='512B', max='512MB'),
 	Config('leaf_item_max', '0', r'''
-		the maximum key or value size stored on leaf nodes, in bytes.
-		If zero, a size is calculated to permit at least 8 items
-		(values or row store keys) per leaf page''',
+		the largest key or value stored within a leaf node, in bytes.
+		If non-zero, any key or value larger than the specified size
+		will be stored as an overflow item (which may require additional
+		I/O to access).  If zero, a default size is chosen that permits
+		at least 4 key and value pairs per leaf page''',
 		min=0),
 	Config('memory_page_max', '5MB', r'''
 		the maximum size a page can grow to in memory before being
@@ -388,10 +392,6 @@ methods = {
 		and WT_CURSOR::close methods.  See @ref cursor_random for
 		details''',
 		type='boolean'),
-	Config('no_cache', 'false', r'''
-		do not cache pages from the underlying object.  The cursor
-		does not support data modification''',
-		type='boolean', undoc=True),
 	Config('overwrite', 'false', r'''
 		change the behavior of the cursor's insert method to overwrite
 		previously existing values''',
