@@ -210,6 +210,8 @@ __wt_metadata_read(
 	WT_DECL_RET;
 	const char *value;
 
+	*valuep = NULL;
+
 	if (__metadata_turtle(key))
 		return (__wt_meta_turtle_read(session, key, valuep));
 
