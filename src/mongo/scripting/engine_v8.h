@@ -39,6 +39,8 @@ namespace mongo {
 
     class V8ScriptEngine;
     class V8Scope;
+    std::string toSTLString(const v8::TryCatch* try_catch);
+
 
     typedef v8::Handle<v8::Value> (*v8Function)(V8Scope* scope, const v8::Arguments& args);
 
@@ -303,6 +305,12 @@ namespace mongo {
          */
         v8::Local<v8::Value> newFunction(const char *code);
 
+        template <typename _HandleType>
+        bool checkV8ErrorState(const _HandleType& resultHandle,
+                               const v8::TryCatch& try_catch,
+                               bool reportError = true,
+                               bool assertOnError = true);
+
         V8ScriptEngine* _engine;
 
         v8::Persistent<v8::Context> _context;
@@ -367,6 +375,51 @@ namespace mongo {
                                             // _globalInterruptLock).
         DeadlineMonitor<V8Scope> _deadlineMonitor;
     };
+
+    /**
+     * Check for an error condition (e.g. empty handle, JS exception, OOM) after executing
+     * a v8 operation.
+     * @resultHandle         handle storing the result of the preceeding v8 operation
+     * @try_catch            the active v8::TryCatch exception handler
+     * @param reportError    if true, log an error message
+     * @param assertOnError  if true, throw an exception if an error is detected
+     *                       if false, return value indicates error state
+     * @return true if an error was detected and assertOnError is set to false
+     *         false if no error was detected
+     */
+    template <typename _HandleType>
+    bool V8Scope::checkV8ErrorState(const _HandleType& resultHandle,
+                                    const v8::TryCatch& try_catch,
+                                    bool reportError,
+                                    bool assertOnError) {
+        bool haveError = false;
+
+        if (try_catch.HasCaught() && try_catch.CanContinue()) {
+            // normal JS exception
+            _error = string("JavaScript execution failed: ") + toSTLString(&try_catch);
+            haveError = true;
+        }
+        else if (hasOutOfMemoryException()) {
+            // out of memory exception (treated as terminal)
+            _error = "JavaScript execution failed -- v8 is out of memory";
+            haveError = true;
+        }
+        else if (resultHandle.IsEmpty() || try_catch.HasCaught()) {
+            // terminal exception (due to empty handle, termination, etc.)
+            _error = "JavaScript execution failed";
+            haveError = true;
+        }
+
+        if (haveError) {
+            if (reportError)
+                log() << _error << endl;
+            if (assertOnError)
+                uasserted(16722, _error);
+            return true;
+        }
+
+        return false;
+    }
 
     extern ScriptEngine* globalScriptEngine;
 
