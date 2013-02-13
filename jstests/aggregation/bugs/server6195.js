@@ -4,9 +4,11 @@ load('jstests/aggregation/extras/utils.js')
 
 c = db.s6570;
 c.drop();
-c.save({x:"foo", y:"bar"});
+c.save({v:"$", w:".", x:"foo", y:"bar"});
 
 assert.eq(c.aggregate({$project:{str:{$concat:["X", "$x", "Y", "$y"]}}}).result[0].str, "XfooYbar");
+assert.eq(c.aggregate({$project:{str:{$concat:["$v", "X", "$w", "Y"]}}}).result[0].str, "$X.Y");
+assert.eq(c.aggregate({$project:{str:{$concat:["$w", "X", "$v", "Y"]}}}).result[0].str, ".X$Y");
 
 // Nullish (both with and without other strings)
 assert.isnull(c.aggregate({$project:{str:{$concat: ["$missing"] }}}).result[0].str);
@@ -30,3 +32,4 @@ assertErrorCode(c, {$project:{str:{$concat: [new Date(0)]}}}, 16702);
 assertErrorCode(c, {$project:{str:{$concat: [new BinData(0,"")]}}}, 16702);
 assertErrorCode(c, {$project:{str:{$concat: [/asdf/]}}}, 16702);
 assertErrorCode(c, {$project:{str:{$concat: [MaxKey]}}}, 16702);
+assertErrorCode(c, {$project:{str:{$concat: [new ObjectId()]}}}, 16702);
