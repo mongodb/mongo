@@ -1289,19 +1289,28 @@ namespace mongo {
     }
 #endif
 #pragma pack(1)
-    struct IDToInsert_ {
+    struct IDToInsert {
         char type;
-        char _id[4];
+        char id[4];
         OID oid;
-        IDToInsert_() {
-            type = (char) jstOID;
-            strcpy(_id, "_id");
-            verify( sizeof(IDToInsert_) == 17 );
+
+        IDToInsert() {
+            type = 0;
         }
-    } idToInsert_;
-    struct IDToInsert : public BSONElement {
-        IDToInsert() : BSONElement( ( char * )( &idToInsert_ ) ) {}
-    } idToInsert;
+
+        bool needed() const { return type > 0; }
+
+        void init() {
+            type = static_cast<char>(jstOID);
+            strcpy( id, "_id" );
+            oid.init();
+            verify( size() == 17 );
+        }
+
+        int size() const { return sizeof( IDToInsert ); }
+
+        const char* rawdata() const { return reinterpret_cast<const char*>( this ); }
+    };
 #pragma pack()
 
     void DataFileMgr::insertAndLog( const char *ns, const BSONObj &o, bool god, bool fromMigrate ) {
@@ -1627,7 +1636,8 @@ namespace mongo {
             }
         }
 
-        int addID = 0; // 0 if not adding _id; if adding, the length of that new element
+        IDToInsert idToInsert; // only initialized if needed
+
         if( !god ) {
             /* Check if we have an _id field. If we don't, we'll add it.
                Note that btree buckets which we insert aren't BSONObj's, but in that case god==true.
@@ -1643,8 +1653,8 @@ namespace mongo {
 
                 if( addedID )
                     *addedID = true;
-                addID = len;
-                idToInsert_.oid.init();
+
+                idToInsert.init();
                 len += idToInsert.size();
             }
 
@@ -1664,7 +1674,7 @@ namespace mongo {
 
         bool earlyIndex = true;
         DiskLoc loc;
-        if( addID || tableToIndex || d->isCapped() ) {
+        if( idToInsert.needed() || tableToIndex || d->isCapped() ) {
             // if need id, we don't do the early indexing. this is not the common case so that is sort of ok
             earlyIndex = false;
             loc = allocateSpaceForANewRecord(ns, d, lenWHdr, god);
@@ -1707,11 +1717,12 @@ namespace mongo {
         {
             verify( r->lengthWithHeaders() >= lenWHdr );
             r = (Record*) getDur().writingPtr(r, lenWHdr);
-            if( addID ) {
+            if( idToInsert.needed() ) {
                 /* a little effort was made here to avoid a double copy when we add an ID */
-                ((int&)*r->data()) = *((int*) obuf) + idToInsert.size();
+                int originalSize = *((int*) obuf);
+                ((int&)*r->data()) = originalSize + idToInsert.size();
                 memcpy(r->data()+4, idToInsert.rawdata(), idToInsert.size());
-                memcpy(r->data()+4+idToInsert.size(), ((char *)obuf)+4, addID-4);
+                memcpy(r->data()+4+idToInsert.size(), ((char*)obuf)+4, originalSize-4);
             }
             else {
                 if( obuf ) // obuf can be null from internal callers

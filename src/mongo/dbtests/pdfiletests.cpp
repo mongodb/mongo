@@ -292,6 +292,16 @@ namespace PdfileTests {
             Client::Context _context;
         };
 
+        class InsertAddId : public Base {
+        public:
+            void run() {
+                BSONObj x = BSON( "x" << 1 );
+                ASSERT( x["_id"].type() == 0 );
+                theDataFileMgr.insertWithObjMod( ns(), x );
+                ASSERT( x["_id"].type() == jstOID );
+            }
+        };
+
         class UpdateDate : public Base {
         public:
             void run() {
@@ -397,6 +407,7 @@ namespace PdfileTests {
             add< ScanCapped::AloneInExtent >();
             add< ScanCapped::FirstInExtent >();
             add< ScanCapped::LastInExtent >();
+            add< Insert::InsertAddId >();
             add< Insert::UpdateDate >();
             add< ExtentSizing >();
             add< ExtentAllocOrder >();
