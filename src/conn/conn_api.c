@@ -936,7 +936,8 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 		 * appropriately synchronized.
 		 */
 		WT_WITH_SCHEMA_LOCK(session,
-		    ret = __wt_schema_create(session, WT_METADATA_URI, NULL));
+		    ret = __wt_schema_create(
+			session, WT_METADATA_URI, WT_METADATA_CONFIG));
 		WT_ERR(ret);
 	}
 	WT_ERR(__wt_metadata_open(session));

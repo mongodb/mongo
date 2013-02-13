@@ -93,8 +93,7 @@ __block_destroy(WT_SESSION_IMPL *session, WT_BLOCK *block)
  */
 int
 __wt_block_open(WT_SESSION_IMPL *session, const char *filename,
-    const char *config, const char *cfg[], int forced_salvage,
-    WT_BLOCK **blockp)
+    const char *cfg[], int forced_salvage, WT_BLOCK **blockp)
 {
 	WT_BLOCK *block;
 	WT_CONFIG_ITEM cval;
@@ -124,7 +123,7 @@ __wt_block_open(WT_SESSION_IMPL *session, const char *filename,
 	WT_ERR(__wt_strdup(session, filename, &block->name));
 
 	/* Get the allocation size. */
-	WT_ERR(__wt_config_getones(session, config, "allocation_size", &cval));
+	WT_ERR(__wt_config_gets(session, cfg, "allocation_size", &cval));
 	block->allocsize = (uint32_t)cval.val;
 
 	/* Open the underlying file handle. */

@@ -504,6 +504,7 @@ memcpy
 memfree
 memmove
 memsize
+metaconf
 metadata
 metafile
 mfence
