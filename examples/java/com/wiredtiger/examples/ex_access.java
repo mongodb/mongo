@@ -9,12 +9,15 @@ public class ex_access {
         Cursor c = s.open_cursor("table:t", null, null);
         System.out.println("Key format: " + c.getKeyFormat());
         System.out.println("Value format: " + c.getValueFormat());
-        c.setKeyRaw("foo".getBytes());
-        c.setValueRaw("bar".getBytes());
-        c.insert();
-        c.reset();
-        while (c.next() == 0)
-            System.out.println("Got: " + new String(c.getKeyRaw()));
+        try {
+            c.addKeyFieldString("foo");
+            c.addValueFieldByteArray("bar".getBytes());
+            c.insert();
+            c.reset();
+            while (c.next() == 0)
+                System.out.println("Got: " + c.getKeyFieldString());
+        } catch (WiredTigerPackingException wtpe) {
+        }
         conn.close(null);
     }
 }
