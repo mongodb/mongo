@@ -17,7 +17,7 @@ files.forEach(
 
 	// Notes:
 
-	// apply_ops1: nothing works, dunno why yet. SERVER-1439
+	// apply_ops1, apply_ops2: nothing works, dunno why yet. SERVER-1439
 
 	// copydb, copydb2: copyDatabase seems not to work at all in
 	//                  the ShardingTest setup.  SERVER-1440
@@ -67,7 +67,7 @@ files.forEach(
 	    return;
 	}
 	// These are bugs (some might be fixed now):
-	if (/[\/\\](apply_ops1|count5|cursor8|or4|shellkillop|update4|profile\d*)\.js$/.test(x.name)) {
+	if (/[\/\\](apply_ops[12]|count5|cursor8|or4|shellkillop|update4|profile\d*)\.js$/.test(x.name)) {
 	    print(" !!!!!!!!!!!!!!! skipping test that has failed under sharding but might not anymore " + x.name)	    
 	    return;
 	}
