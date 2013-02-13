@@ -223,7 +223,8 @@ __wt_insert_serial_func(WT_SESSION_IMPL *session, void *args)
 	/*
 	 * Check the page's write-generation: if that fails, check whether we
 	 * are still in the expected position, and no item has been added where
-	 * our insert belongs.
+	 * our insert belongs.  Take extra care at the beginning and end of the
+	 * list (at each level): retry if we race there.
 	 */
 	WT_RET(__wt_page_write_gen_wrapped_check(page));
 
@@ -233,8 +234,8 @@ __wt_insert_serial_func(WT_SESSION_IMPL *session, void *args)
 			    *ins_stack[i] != next_stack[i])
 				return (WT_RESTART);
 			if (next_stack[i] == NULL &&
-			    inshead->tail[i] != NULL &&
-			    ins_stack[i] != &inshead->tail[i]->next[i])
+			    (inshead->tail[i] == NULL ||
+			    ins_stack[i] != &inshead->tail[i]->next[i]))
 				return (WT_RESTART);
 		}
 	}
