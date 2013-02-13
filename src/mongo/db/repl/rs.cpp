@@ -109,8 +109,14 @@ namespace mongo {
 
     void ReplSetImpl::changeState(MemberState s) { box.change(s, _self); }
 
-    void ReplSetImpl::setMaintenanceMode(const bool inc) {
-        lock lk(this);
+    bool ReplSetImpl::setMaintenanceMode(const bool inc) {
+        lock replLock(this);
+        // Lock here to prevent state from changing between checking the state and changing it
+        Lock::GlobalWrite writeLock;
+
+        if (box.getState().primary()) {
+            return false;
+        }
 
         if (inc) {
             log() << "replSet going into maintenance mode (" << _maintenanceMode << " other tasks)" << rsLog;
@@ -124,6 +130,8 @@ namespace mongo {
 
             log() << "leaving maintenance mode (" << _maintenanceMode << " other tasks)" << rsLog;
         }
+
+        return true;
     }
 
     Member* ReplSetImpl::getMostElectable() {
@@ -150,31 +158,31 @@ namespace mongo {
     }
 
     void ReplSetImpl::relinquish() {
-        LOG(2) << "replSet attempting to relinquish" << endl;
-        if( box.getState().primary() ) {
-            {
-                Lock::DBWrite lk("admin."); // so we are synchronized with _logOp()
-            
+        {
+            Lock::GlobalWrite lk; // so we are synchronized with _logOp()
+
+            LOG(2) << "replSet attempting to relinquish" << endl;
+            if( box.getState().primary() ) {
                 log() << "replSet relinquishing primary state" << rsLog;
                 changeState(MemberState::RS_SECONDARY);
 
-                /* close sockets that were talking to us so they don't blithly send many writes that will fail
-                   with "not master" (of course client could check result code, but in case they are not)
-                */
+                // close sockets that were talking to us so they don't blithly send many writes that
+                // will fail with "not master" (of course client could check result code, but in
+                // case they are not)
                 log() << "replSet closing client sockets after relinquishing primary" << rsLog;
                 MessagingPort::closeAllSockets(1);
             }
-
-            // now that all connections were closed, strip this mongod from all sharding details
-            // if and when it gets promoted to a primary again, only then it should reload the sharding state
-            // the rationale here is that this mongod won't bring stale state when it regains primaryhood
-            shardingState.resetShardingState();
-
+            else if( box.getState().startup2() ) {
+                // This block probably isn't necessary
+                changeState(MemberState::RS_RECOVERING);
+                return;
+            }
         }
-        else if( box.getState().startup2() ) {
-            // ? add comment
-            changeState(MemberState::RS_RECOVERING);
-        }
+
+        // now that all connections were closed, strip this mongod from all sharding details
+        // if and when it gets promoted to a primary again, only then it should reload the sharding state
+        // the rationale here is that this mongod won't bring stale state when it regains primaryhood
+        shardingState.resetShardingState();
     }
 
     /* look freshly for who is primary - includes relinquishing ourself. */
