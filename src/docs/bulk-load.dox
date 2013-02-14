@@ -1,4 +1,4 @@
-/*! @page bulk_load Bulk-load configuration
+/*! @page bulk_load Bulk-load
 
 WiredTiger cursors can be configured for bulk-load using the \c bulk
 configuration keyword to WT_SESSION::open_cursor.  Bulk-load is a "fast
