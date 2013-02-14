@@ -655,7 +655,7 @@ namespace mongo {
 
         DbMessage d(m);
 
-        const char *ns = d.getns();
+        const char * const ns = d.getns();
         int ntoreturn = d.pullInt();
         long long cursorid = d.pullInt64();
 
@@ -669,11 +669,10 @@ namespace mongo {
         bool exhaust = false;
         QueryResult* msgdata = 0;
         OpTime last;
+        const NamespaceString nsString( ns );
+        uassert( 16258, str::stream() << "Invalid ns [" << ns << "]", nsString.isValid() );
         while( 1 ) {
             try {
-                const NamespaceString nsString( ns );
-                uassert( 16258, str::stream() << "Invalid ns [" << ns << "]", nsString.isValid() );
-
                 Status status = cc().getAuthorizationManager()->checkAuthForGetMore(ns);
                 uassert(16543, status.reason(), status.isOK());
 
