@@ -64,6 +64,8 @@ __wt_meta_turtle_read(
 	int match;
 	const char *path;
 
+	*valuep = NULL;
+
 	fp = NULL;
 	path = NULL;
 

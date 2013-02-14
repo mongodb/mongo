@@ -56,8 +56,9 @@ __merge_walk(WT_SESSION_IMPL *session, WT_PAGE *page, u_int depth,
 			 * the walk in __rec_review: if the merge succeeds, we
 			 * have to unlock everything.
 			 */
-			if (child->type == WT_PAGE_COL_INT ||
-			    child->type == WT_PAGE_ROW_INT) {
+			if (child->type == page->type &&
+			    child->modify != NULL &&
+			    F_ISSET(child->modify, WT_PM_REC_SPLIT_MERGE)) {
 				WT_RET(__merge_walk(
 				    session, child, depth + 1, visit, state));
 				break;
@@ -155,6 +156,23 @@ __merge_copy_ref(WT_PAGE *parent, WT_REF *ref, WT_VISIT_STATE *state)
 }
 
 /*
+ * __merge_unlock --
+ *	Unlock all pages under an internal page being merged.
+ */
+static void
+__merge_unlock(WT_PAGE *page)
+{
+	WT_REF *ref;
+	uint32_t i;
+
+	WT_REF_FOREACH(page, ref, i)
+		if (ref->state == WT_REF_LOCKED) {
+			__merge_unlock(ref->page);
+			WT_PUBLISH(ref->state, WT_REF_MEM);
+		}
+}
+
+/*
  * __merge_switch_page --
  *	Switch a page from the locked tree into the new tree.
  */
@@ -188,6 +206,16 @@ __merge_switch_page(WT_PAGE *parent, WT_REF *ref, WT_VISIT_STATE *state)
 			WT_LINK_PAGE(state->page, newref, modify->u.split);
 
 		WT_LINK_PAGE(state->page, newref, child);
+
+		/*
+		 * If we have a child that is a live internal page, its subtree
+		 * was locked by __rec_review.  We're swapping it into the new
+		 * tree, unlock it now.
+		 */
+		if (child->type == WT_PAGE_ROW_INT ||
+		    child->type == WT_PAGE_COL_INT)
+			__merge_unlock(child);
+
 		newref->state = WT_REF_MEM;
 	}
 

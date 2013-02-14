@@ -257,8 +257,11 @@ __desc_read(WT_SESSION_IMPL *session, WT_BLOCK *block)
 	    (desc->majorv == WT_BLOCK_MAJOR_VERSION &&
 	    desc->minorv > WT_BLOCK_MINOR_VERSION))
 		WT_ERR_MSG(session, WT_ERROR,
-		    "%s is an unsupported version of a WiredTiger file",
-		    block->name);
+		    "unsupported WiredTiger file version: this build only "
+		    "supports major/minor versions up to %d/%d, and the file "
+		    "is version %d/%d",
+		    WT_BLOCK_MAJOR_VERSION, WT_BLOCK_MINOR_VERSION,
+		    desc->majorv, desc->minorv);
 
 err:	__wt_scr_free(&buf);
 	return (ret);
