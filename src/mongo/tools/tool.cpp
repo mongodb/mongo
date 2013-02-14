@@ -442,8 +442,8 @@ namespace mongo {
         : Tool( name , access , "" , "" , false ) , _objcheck( objcheck ) {
 
         add_options()
-        ("objcheck" , "validate object before inserting" )
-        ("noobjcheck" , "validate object before inserting" )
+        ("objcheck" , "validate object before inserting (default)" )
+        ("noobjcheck" , "don't validate object before inserting" )
         ("filter" , po::value<string>() , "filter to apply before inserting" )
         ;
     }
