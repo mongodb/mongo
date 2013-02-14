@@ -246,6 +246,8 @@ namespace mongo {
         if ( lastOp.isNull() )
             return;
 
+        RARELY RARELY log() << "updateslavelocation " << ns << endl;
+
         verify( str::startsWith(ns, "local.oplog.") );
 
         Client * c = curop.getClient();

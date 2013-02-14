@@ -1018,6 +1018,7 @@ namespace mongo {
 
         // apply operations
         {
+            bool sleep = false;
             int n = 0;
             time_t saveLast = time(0);
             while ( 1 ) {
@@ -1060,6 +1061,10 @@ namespace mongo {
                     n = 0;
                 }
 
+                if( sleep ) { 
+                    sleep = false;
+                    sleepmillis(SleepToAllowBatchingMillis);
+                }
                 BSONObj op = oplogReader.next();
 
                 int b = replApplyBatchSize.get();
@@ -1103,11 +1108,22 @@ namespace mongo {
                     sync_pullOpLog_applyOperation(op, !justOne);
                     n++;
 
-                    if( --b == 0 )
+                    if( --b == 0 ) {
+                        if( !oplogReader.moreInCurrentBatch() ) {
+                            // break if no more in batch so we release lock while reading from the master
+                            int bs = oplogReader.currentBatchMessageSize();
+                            sleep = bs > 0 && bs < 100000;
+                            SOMETIMES(z, 1024) 
+                                log() << "z " << sleep << ' ' << bs << endl;
+                        }
                         break;
+                    }
                     // if to here, we are doing mulpile applications in a singel write lock acquisition
                     if( !oplogReader.moreInCurrentBatch() ) {
                         // break if no more in batch so we release lock while reading from the master
+                        int bs = oplogReader.currentBatchMessageSize();
+                        sleep = bs > 0 && bs < BatchIsSmallish;
+                        log() << "??? " << sleep << ' ' << bs << endl;
                         break;
                     }
                     op = oplogReader.next();

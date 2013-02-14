@@ -678,6 +678,7 @@ namespace mongo {
 
                 if (str::startsWith(ns, "local.oplog.")){
                     while (MONGO_FAIL_POINT(rsStopGetMore)) {
+                        log() << "hm 2" << endl;
                         sleepmillis(0);
                     }
 
@@ -686,13 +687,19 @@ namespace mongo {
                         last = OpTime::getLast(lk);
                     }
                     else {
+                        RARELY log() << "waitfordifferent" << endl;
                         last.waitForDifferent(1000/*ms*/);
                     }
                 }
 
                 msgdata = processGetMore(ns, ntoreturn, cursorid, curop, pass, exhaust);
+                /*if( msgdata && msgdata->nReturned < 100 && msgdata->nReturned != 0 ) {
+                    sleepmillis(2);
+                }ZZZ*/
+
             }
             catch ( AssertionException& e ) {
+                log() << "asserted" << endl;
                 ex.reset( new AssertionException( e.getInfo().msg, e.getCode() ) );
                 ok = false;
                 break;
@@ -713,6 +720,7 @@ namespace mongo {
                     }
                 }
                 pass++;
+                RARELY log() << "sleep" << endl;
                 if (debug)
                     sleepmillis(20);
                 else
@@ -739,6 +747,7 @@ namespace mongo {
             curop.debug().exceptionInfo = ex->getInfo();
 
             if (ex->getCode() == 13436) {
+                log() << "hmmm" << endl;
                 replyToQuery(ResultFlag_ErrSet, m, dbresponse, errObj);
                 curop.debug().responseLength = dbresponse.response->header()->dataLen();
                 curop.debug().nreturned = 1;

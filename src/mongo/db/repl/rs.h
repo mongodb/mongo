@@ -713,4 +713,7 @@ namespace mongo {
         return true;
     }
 
+    const int SleepToAllowBatchingMillis = 2;
+    const int BatchIsSmallish = 80000; // bytes
+
 }
