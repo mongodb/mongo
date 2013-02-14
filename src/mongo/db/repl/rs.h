@@ -543,6 +543,7 @@ namespace mongo {
         threadpool::ThreadPool& getPrefetchPool() { return _prefetcherPool; }
         threadpool::ThreadPool& getWriterPool() { return _writerPool; }
 
+        static const int maxSyncSourceLagSecs;
 
         const ReplSetConfig::MemberCfg& myConfig() const { return _config; }
         bool tryToGoLiveAsASecondary(OpTime&); // readlocks

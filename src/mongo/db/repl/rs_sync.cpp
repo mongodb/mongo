@@ -42,6 +42,8 @@ namespace mongo {
     using namespace bson;
     extern unsigned replSetForceInitialSyncFailure;
 
+    const int ReplSetImpl::maxSyncSourceLagSecs = 30;
+
 namespace replset {
 
     MONGO_FP_DECLARE(rsSyncApplyStop);
@@ -687,7 +689,8 @@ namespace replset {
 
     bool ReplSetImpl::shouldChangeSyncTarget(const OpTime& targetOpTime) const {
         for (Member *m = _members.head(); m; m = m->next()) {
-            if (m->syncable() && targetOpTime.getSecs()+30 < m->hbinfo().opTime.getSecs()) {
+            if (m->syncable() &&
+                targetOpTime.getSecs()+maxSyncSourceLagSecs < m->hbinfo().opTime.getSecs()) {
                 return true;
             }
         }
