@@ -205,9 +205,11 @@ dsrc_stats = [
 	Stat('rec_pages', 'page reconciliation calls'),
 	Stat('rec_pages_eviction', 'page reconciliation calls for eviction'),
 	Stat('rec_skipped_update',
-	    'page reconciliation failed when an update could not be included'),
+	    'reconciliation failed because an update could not be included'),
 	Stat('rec_split_intl', 'reconciliation internal pages split'),
 	Stat('rec_split_leaf', 'reconciliation leaf pages split'),
+	Stat('rec_split_max',
+	    'reconciliation maximum number of splits created by for a page'),
 
 	##########################################
 	# Transaction statistics

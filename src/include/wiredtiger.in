@@ -2096,18 +2096,20 @@ extern int wiredtiger_extension_init(WT_SESSION *session,
 #define	WT_STAT_DSRC_REC_PAGES				72
 /*! page reconciliation calls for eviction */
 #define	WT_STAT_DSRC_REC_PAGES_EVICTION			73
-/*! page reconciliation failed when an update could not be included */
+/*! reconciliation failed because an update could not be included */
 #define	WT_STAT_DSRC_REC_SKIPPED_UPDATE			74
 /*! reconciliation internal pages split */
 #define	WT_STAT_DSRC_REC_SPLIT_INTL			75
 /*! reconciliation leaf pages split */
 #define	WT_STAT_DSRC_REC_SPLIT_LEAF			76
+/*! reconciliation maximum number of splits created by for a page */
+#define	WT_STAT_DSRC_REC_SPLIT_MAX			77
 /*! object compaction */
-#define	WT_STAT_DSRC_SESSION_COMPACT			77
+#define	WT_STAT_DSRC_SESSION_COMPACT			78
 /*! update conflicts */
-#define	WT_STAT_DSRC_TXN_UPDATE_CONFLICT		78
+#define	WT_STAT_DSRC_TXN_UPDATE_CONFLICT		79
 /*! write generation conflicts */
-#define	WT_STAT_DSRC_TXN_WRITE_CONFLICT			79
+#define	WT_STAT_DSRC_TXN_WRITE_CONFLICT			80
 /*! @} */
 /*
  * Statistics section: END
