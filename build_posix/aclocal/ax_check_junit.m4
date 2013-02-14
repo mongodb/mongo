@@ -53,7 +53,7 @@ AU_ALIAS([AC_CHECK_JUNIT], [AX_CHECK_JUNIT])
 AC_DEFUN([AX_CHECK_JUNIT],[
 AC_CACHE_VAL(ac_cv_prog_JUNIT,[
 AC_CHECK_CLASS(org.junit.runner.JUnitCore)
-if test x"`eval 'echo $ac_cv_class_junit_runner_junitcore'`" != xno ; then
+if test x"`eval 'echo $ac_cv_class_org_junit_runner_JUnitCore'`" != xno ; then
   ac_cv_prog_JUNIT='$(CLASSPATH_ENV) $(JAVA) $(JAVAFLAGS) org.junit.runner.JUnitCore'
 fi])
 AC_MSG_CHECKING([for junit])

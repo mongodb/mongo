@@ -33,7 +33,9 @@ JAVA_JUNIT = \
 		$(JAVATEST)/PackTest.java \
 		$(JAVATEST)/WiredTigerSuite.java
 
-dist_java_JAVA = $(JAVA_SRC) $(JAVA_JUNIT)
+dist_java_JAVA = $(JAVA_SRC) @JAVA_JUNIT@
+
+EXTRA_JAVA = $(JAVA_JUNIT)
 
 java_LTLIBRARIES = libwiredtiger_java.la
 
@@ -64,7 +66,7 @@ $(JDOCDIR)/index.html:	$(dist_java_JAVA)
 	mkdir -p $(JDOCDIR)
 	javadoc -public -d $(JDOCDIR) -link http://docs.oracle.com/javase/6/docs/api $(JAVADESTFULL)/wiredtiger.java $(JAVADESTFULL)/wiredtigerConstants.java $(JAVADESTFULL)/[A-Z]*.java
 
-wiredtiger.jar: $(dist_java_JAVA)
+wiredtiger.jar: $(dist_java_JAVA) classjava.stamp
 	(cd $(top_builddir) && \
 	$(JAR) -cf wiredtiger.jar com/)
 
