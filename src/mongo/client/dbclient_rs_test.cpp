@@ -25,12 +25,13 @@
 #include "mongo/dbtests/mock/mock_conn_registry.h"
 #include "mongo/dbtests/mock/mock_replica_set.h"
 #include "mongo/unittest/unittest.h"
-//#include "mongo/util/mongoutils/str.h"
 
 #include <map>
+#include <memory>
 #include <string>
 #include <vector>
 
+using std::auto_ptr;
 using std::map;
 using std::make_pair;
 using std::pair;
@@ -43,6 +44,7 @@ using mongo::BSONObj;
 using mongo::BSONArray;
 using mongo::BSONElement;
 using mongo::ConnectionString;
+using mongo::DBClientCursor;
 using mongo::DBClientReplicaSet;
 using mongo::HostAndPort;
 using mongo::MockReplicaSet;
@@ -177,14 +179,16 @@ namespace mongo_test {
         {
             Query query;
             query.readPref(mongo::ReadPreference_PrimaryPreferred, BSONArray());
-            BSONObj doc = replConn.query(IdentityNS, query)->next();
+            auto_ptr<DBClientCursor> cursor = replConn.query(IdentityNS, query);
+            BSONObj doc = cursor->next();
             dest = doc[HostField.name()].str();
         }
 
         {
             Query query;
             query.readPref(mongo::ReadPreference_PrimaryPreferred, BSONArray());
-            BSONObj doc = replConn.query(IdentityNS, query)->next();
+            auto_ptr<DBClientCursor> cursor = replConn.query(IdentityNS, query);
+            BSONObj doc = cursor->next();
             const string newDest = doc[HostField.name()].str();
             ASSERT_EQUALS(dest, newDest);
         }
@@ -201,7 +205,8 @@ namespace mongo_test {
         {
             Query query;
             query.readPref(mongo::ReadPreference_SecondaryPreferred, BSONArray());
-            BSONObj doc = replConn.query(IdentityNS, query)->next();
+            auto_ptr<DBClientCursor> cursor = replConn.query(IdentityNS, query);
+            BSONObj doc = cursor->next();
             dest = doc[HostField.name()].str();
             ASSERT_NOT_EQUALS(dest, replSet->getPrimary());
         }
@@ -209,7 +214,8 @@ namespace mongo_test {
         {
             Query query;
             query.readPref(mongo::ReadPreference_SecondaryOnly, BSONArray());
-            BSONObj doc = replConn.query(IdentityNS, query)->next();
+            auto_ptr<DBClientCursor> cursor = replConn.query(IdentityNS, query);
+            BSONObj doc = cursor->next();
             const string newDest = doc[HostField.name()].str();
             ASSERT_NOT_EQUALS(dest, newDest);
         }
@@ -227,7 +233,8 @@ namespace mongo_test {
             Query query;
             query.readPref(mongo::ReadPreference_SecondaryPreferred,
                     BSON_ARRAY(BSON("dc" << "sf")));
-            BSONObj doc = replConn.query(IdentityNS, query)->next();
+            auto_ptr<DBClientCursor> cursor = replConn.query(IdentityNS, query);
+            BSONObj doc = cursor->next();
             dest = doc[HostField.name()].str();
             ASSERT_NOT_EQUALS(dest, replSet->getPrimary());
         }
@@ -237,7 +244,8 @@ namespace mongo_test {
             vector<pair<string, string> > tagSet;
             query.readPref(mongo::ReadPreference_SecondaryPreferred,
                     BSON_ARRAY(BSON("group" << 1)));
-            BSONObj doc = replConn.query(IdentityNS, query)->next();
+            auto_ptr<DBClientCursor> cursor = replConn.query(IdentityNS, query);
+            BSONObj doc = cursor->next();
             const string newDest = doc[HostField.name()].str();
             ASSERT_NOT_EQUALS(dest, newDest);
         }
