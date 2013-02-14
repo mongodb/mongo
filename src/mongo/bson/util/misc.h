@@ -23,6 +23,7 @@
 #include <limits>
 #include <string>
 
+#include "mongo/platform/cstdint.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
