@@ -19,6 +19,7 @@
 #include "mongo/base/status.h"
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/auth/authorization_manager.h"
+#include "mongo/db/namespacestring.h"
 
 namespace mongo {
 
@@ -28,9 +29,14 @@ namespace mongo {
     Status AuthExternalState::getPrivilegeDocument(const std::string& dbname,
                                                    const PrincipalName& principalName,
                                                    BSONObj* result) {
-        if (dbname.empty()) {
-            return Status(ErrorCodes::BadValue,
-                          "empty database names are illegal");
+
+        if (dbname == StringData("$external", StringData::LiteralTag())) {
+            return Status(ErrorCodes::UserNotFound,
+                          "No privilege documents stored in the $external user source.");
+        }
+
+        if (!NamespaceString::validDBName(dbname)) {
+            return Status(ErrorCodes::BadValue, "Bad database name \"" + dbname + "\"");
         }
 
         if (dbname == StringData("local", StringData::LiteralTag()) &&
