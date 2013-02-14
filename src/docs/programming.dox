@@ -9,17 +9,17 @@ WiredTiger applications:
 
 - @subpage cursors
 - @subpage threads
+- @subpage transactions
+- @subpage checkpoints
 
 - @subpage schema
 - @subpage file_formats
 - @subpage lsm
 
-- @subpage transactions
+- @subpage bulk_load
 - @subpage cache_configuration
-- @subpage checkpoints
-- @subpage hot_backup
-
 - @subpage compression
+- @subpage hot_backup
 
 - @subpage home
 - @subpage database_config
