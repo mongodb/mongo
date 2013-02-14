@@ -70,6 +70,46 @@ assertResultsAndIndexBounds( { 'a.b':[[ 1, 1 ]], 'a.c':[[ 1, 1 ]] },
 assertResultsAndIndexBounds( { 'a.b':[[ 1, 1 ]], 'a.c':[[ 1, 1 ]] },
                              { a:{ $elemMatch:{ b:1, c:1 } }, 'a.b':{ $gt:0 } } );
 
+// Cases with $elemMatch on multiple fields.
+t.remove(); 
+index = { 'a.b':1, 'a.c':1, 'd.e':1, 'd.f':1 };
+t.ensureIndex( index );
+t.insert( { a:[ { b:1 }, { c:1 } ], d: { e:1, f:1 } } );
+t.insert( { a:[ { b:1, c:1 } ], d: { e:1, f:1 }  } );
+t.insert( { a:{ b:1, c:1 }, d:[ { e:1, f:1 } ] } );
+t.insert( { a:{ b:1, c:1 }, d:[ { e:1 }, { f:1 } ] } );
+
+assert.eq( 4, t.count() );
+
+// Without $elemMatch.
+assertResultsAndIndexBounds( { 'a.b':[[ 1, 1 ]], 'a.c':[[ MIN, MAX ]], 'd.e':[[ 1, 1 ]], 'd.f':[[ MIN, MAX ]]  },
+                             { 'a.b':1, 'a.c':1, 'd.e':1, 'd.f':1 } );
+// With $elemMatch on two fields
+assertResultsAndIndexBounds( { 'a.b':[[ 1, 1 ]], 'a.c':[[ 1, 1 ]], 'd.e':[[ 1, 1 ]], 'd.f':[[ 1, 1 ]] },
+                             { a:{ $elemMatch:{ b:1, c:1 } }, 'd': { $elemMatch:{ e:1, f:1 } } } );
+
+// With $elemMatch on first field but not the second
+assertResultsAndIndexBounds( { 'a.b':[[ 1, 1 ]], 'a.c':[[ 1, 1 ]], 'd.e':[[ 1, 1 ]], 'd.f':[[ MIN, MAX ]] },
+                             { a:{ $elemMatch:{ b:1, c:1 } }, 'd.e': 1, 'd.f' : 1 } );
+
+// With $elemMatch on second field but not the first
+assertResultsAndIndexBounds( { 'a.b':[[ 1, 1 ]], 'a.c':[[ MIN, MAX ]], 'd.e':[[ 1, 1 ]], 'd.f':[[ 1, 1 ]] },
+                             { 'a.b': 1, 'a.c' : 1, 'd': { $elemMatch:{ e:1, f:1 } } } );
+
+
+// Cases with nested $elemMatch.
+t.remove()
+index = { 'a.b.c':1, 'a.b.d' :1 };
+t.ensureIndex( index );
+t.insert( { a:[ { b: [ { c : 1, d : 1 } ] } ] } ) ;
+t.insert( { a:[ { b: [ { c : 1 } , { d : 1 } ] } ] } ) ;
+assert.eq( 2, t.count() );
+// Without $elemMatch.
+assertResultsAndIndexBounds( { 'a.b.c':[[ 1, 1 ]], 'a.b.d':[[ MIN, MAX ]] },
+                             { 'a.b.c':1, 'a.b.d':1 } );
+// With $elemMatch.
+assertResultsAndIndexBounds( { 'a.b.c':[[ 1, 1 ]], 'a.b.d':[[ 1, 1 ]] },
+                             { "a" : { $elemMatch : { "b" : { $elemMatch : { c : 1, d : 1 } } } } } );
 
 // Cases with double dotted index field names.
 t.drop();
