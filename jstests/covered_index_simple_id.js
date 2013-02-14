@@ -1,6 +1,6 @@
 // Simple covered index query test
 
-var coll = testDB.getCollection("covered_simple_id")
+var coll = db.getCollection("covered_simple_id")
 coll.drop()
 for (i=0;i<10;i++) {
     coll.insert({_id:i})

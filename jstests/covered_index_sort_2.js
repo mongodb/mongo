@@ -1,6 +1,6 @@
 // Simple covered index query test with sort on _id
 
-var coll = testDB.getCollection("covered_sort_2")
+var coll = db.getCollection("covered_sort_2")
 coll.drop()
 for (i=0;i<10;i++) {
     coll.insert({_id:i})

@@ -1,6 +1,6 @@
 // Simple covered index query test with unique index
 
-var coll = testDB.getCollection("covered_simple_2")
+var coll = db.getCollection("covered_simple_2")
 coll.drop()
 for (i=0;i<10;i++) {
     coll.insert({foo:i})
