@@ -600,7 +600,7 @@ namespace replset {
             golive=true;
         }
         else {
-            if( str::contains(hbmsg(), "RS102" ) { 
+            if( str::contains(_hbmsg, "RS102") ) { 
                 // don't stomp on that more important message...
             }
             else {
