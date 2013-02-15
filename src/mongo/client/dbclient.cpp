@@ -536,7 +536,7 @@ namespace mongo {
                                                saslCommandMechanismFieldName,
                                                &mechanism));
 
-        if (mechanism == StringData("MONGO-CR", StringData::LiteralTag())) {
+        if (mechanism == StringData("MONGODB-CR", StringData::LiteralTag())) {
             std::string userSource;
             uassertStatusOK(bsonExtractStringField(params,
                                                    saslCommandPrincipalSourceFieldName,
@@ -578,7 +578,7 @@ namespace mongo {
                                     string& errmsg,
                                     bool digestPassword) {
         try {
-            _auth(BSON(saslCommandMechanismFieldName << "MONGO-CR" <<
+            _auth(BSON(saslCommandMechanismFieldName << "MONGODB-CR" <<
                        saslCommandPrincipalSourceFieldName << dbname <<
                        saslCommandPrincipalFieldName << username <<
                        saslCommandPasswordFieldName << password_text <<

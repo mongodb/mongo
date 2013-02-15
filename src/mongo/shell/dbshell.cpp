@@ -653,7 +653,7 @@ int _main( int argc, char* argv[], char **envp ) {
      po::value<string>(&authenticationDatabase)->default_value(""),
      "user source (defaults to dbname)" )
     ("authenticationMechanism",
-     po::value<string>(&authenticationMechanism)->default_value("MONGO-CR"),
+     po::value<string>(&authenticationMechanism)->default_value("MONGODB-CR"),
      "authentication mechanism")
     ( "help,h", "show this usage information" )
     ( "version", "show version information" )

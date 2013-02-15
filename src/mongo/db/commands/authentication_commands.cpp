@@ -87,7 +87,7 @@ namespace mongo {
         string user = cmdObj.getStringField("user");
 
         if (!_areNonceAuthenticateCommandsEnabled) {
-            // SERVER-8461, MONGO-CR must be enabled for authenticating the internal user, so that
+            // SERVER-8461, MONGODB-CR must be enabled for authenticating the internal user, so that
             // cluster members may communicate with each other.
             if (dbname != StringData("local", StringData::LiteralTag()) ||
                 user != internalSecurity.user) {

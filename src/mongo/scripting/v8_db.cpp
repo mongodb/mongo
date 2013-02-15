@@ -302,7 +302,7 @@ namespace mongo {
             params = scope->v8ToMongo(args[0]->ToObject());
             break;
         case 3:
-            params = BSON(saslCommandMechanismFieldName << "MONGO-CR" <<
+            params = BSON(saslCommandMechanismFieldName << "MONGODB-CR" <<
                           saslCommandPrincipalSourceFieldName << toSTLString(args[0]) <<
                           saslCommandPrincipalFieldName << toSTLString(args[1]) <<
                           saslCommandPasswordFieldName << toSTLString(args[2]));

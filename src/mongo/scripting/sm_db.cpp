@@ -346,7 +346,7 @@ namespace spidermonkey {
                 params = c.toObject(argv[0]);
                 break;
             case 3:
-                params = BSON(saslCommandMechanismFieldName << "MONGO-CR" <<
+                params = BSON(saslCommandMechanismFieldName << "MONGODB-CR" <<
                               saslCommandPrincipalSourceFieldName << c.toString(argv[0]) <<
                               saslCommandPrincipalFieldName << c.toString(argv[1]) <<
                               saslCommandPasswordFieldName << c.toString(argv[2]));

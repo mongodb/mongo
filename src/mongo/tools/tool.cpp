@@ -69,7 +69,7 @@ namespace mongo {
              po::value<string>(&_authenticationDatabase)->default_value(""),
              "user source (defaults to dbname)" )
             ("authenticationMechanism",
-             po::value<string>(&_authenticationMechanism)->default_value("MONGO-CR"),
+             po::value<string>(&_authenticationMechanism)->default_value("MONGODB-CR"),
              "authentication mechanism")
             ;
 

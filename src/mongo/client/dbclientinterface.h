@@ -968,7 +968,7 @@ namespace mongo {
         virtual void _auth(const BSONObj& params);
 
         /**
-         * Use the MONGO-CR protocol to authenticate as "username" against the database "dbname",
+         * Use the MONGODB-CR protocol to authenticate as "username" against the database "dbname",
          * with the given password.  If digestPassword is false, the password is assumed to be
          * pre-digested.  Returns false on failure, and sets "errmsg".
          */
