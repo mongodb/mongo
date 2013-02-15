@@ -199,7 +199,7 @@ DB.prototype.__pwHash = function( nonce, username, pass ) {
     return hex_md5(nonce + username + _hashPassword(username, pass));
 }
 
-DB.prototype._defaultAuthenticationMechanism = "MONGO-CR";
+DB.prototype._defaultAuthenticationMechanism = "MONGODB-CR";
 
 DB.prototype._authOrThrow = function () {
     var params;
