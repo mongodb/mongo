@@ -245,9 +245,15 @@ namespace mongo {
             if ( !e.trueValue() )
                 continue;
 
+            string ns = x["name"].String();
+
+            // Do not attempt to drop indexes
+            if ( !NamespaceString::normal(ns.c_str()) )
+                continue;
+
             string errmsg;
             BSONObjBuilder result;
-            dropCollection( x["name"].String(), errmsg, result );
+            dropCollection( ns, errmsg, result );
 
             if ( errmsg.size() > 0 ) {
                 warning() << "could not delete temp collection: " << x
