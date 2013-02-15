@@ -939,70 +939,168 @@ namespace JSTests {
         }
     };
 
-    class DBRefTest {
-    public:
-        DBRefTest() {
-            _a = "unittest.dbref.a";
-            _b = "unittest.dbref.b";
-            reset();
-        }
-        ~DBRefTest() {
-            //reset();
-        }
+    namespace RoundTripTests {
 
-        void run() {
+        // Inherit from this class to test round tripping of JSON objects
+        class TestRoundTrip {
+        public:
+            virtual ~TestRoundTrip() {}
+            void run() {
 
-            client.insert( _a , BSON( "a" << "17" ) );
+                // Insert in Javascript -> Find using DBDirectClient
 
-            {
-                BSONObj fromA = client.findOne( _a , BSONObj() );
-                verify( fromA.valid() );
-                //cout << "Froma : " << fromA << endl;
-                BSONObjBuilder b;
-                b.append( "b" , 18 );
-                b.appendDBRef( "c" , "dbref.a" , fromA["_id"].__oid() );
-                client.insert( _b , b.obj() );
+                // Drop the collection
+                client.dropCollection( "unittest.testroundtrip" );
+
+                // Insert in Javascript
+                stringstream jsInsert;
+                jsInsert << "db.testroundtrip.insert(" << jsonIn() << ")";
+                ASSERT_TRUE( client.eval( "unittest" , jsInsert.str() ) );
+
+                // Find using DBDirectClient
+                BSONObj excludeIdProjection = BSON( "_id" << 0 );
+                BSONObj directFind = client.findOne( "unittest.testroundtrip",
+                                                                "",
+                                                                &excludeIdProjection);
+                bsonEquals( bson(), directFind );
+
+
+                // Insert using DBDirectClient -> Find in Javascript
+
+                // Drop the collection
+                client.dropCollection( "unittest.testroundtrip" );
+
+                // Insert using DBDirectClient
+                client.insert( "unittest.testroundtrip" , bson() );
+
+                // Find in Javascript
+                stringstream jsFind;
+                jsFind << "dbref = db.testroundtrip.findOne( { } , { _id : 0 } )\n"
+                                << "assert.eq(dbref, " << jsonOut() << ")";
+                ASSERT_TRUE( client.eval( "unittest" , jsFind.str() ) );
+            }
+        protected:
+
+            // Methods that must be defined by child classes
+            virtual BSONObj bson() const = 0;
+            virtual string json() const = 0;
+
+            // This can be overriden if a different meaning of equality besides woCompare is needed
+            virtual void bsonEquals( const BSONObj &expected, const BSONObj &actual ) {
+                if ( expected.woCompare( actual ) ) {
+                    out() << "want:" << expected.jsonString() << " size: " << expected.objsize() << endl;
+                    out() << "got :" << actual.jsonString() << " size: " << actual.objsize() << endl;
+                    out() << expected.hexDump() << endl;
+                    out() << actual.hexDump() << endl;
+                }
+                ASSERT( !expected.woCompare( actual ) );
             }
 
-            ASSERT( client.eval( "unittest" , "x = db.dbref.b.findOne(); assert.eq( 17 , x.c.fetch().a , 'ref working' );" ) );
+            // This can be overriden if the JSON representation is altered on the round trip
+            virtual string jsonIn() const {
+                return json();
+            }
+            virtual string jsonOut() const {
+                return json();
+            }
+        };
 
-            // BSON DBRef <=> JS DBPointer
-            ASSERT( client.eval( "unittest", "x = db.dbref.b.findOne(); db.dbref.b.drop(); x.c = new DBPointer( x.c.ns, x.c.id ); db.dbref.b.insert( x );" ) );
-            ASSERT_EQUALS( DBRef, client.findOne( "unittest.dbref.b", "" )[ "c" ].type() );
+        class DBRefTest : public TestRoundTrip {
+            virtual BSONObj bson() const {
+                BSONObjBuilder b;
+                OID o;
+                memset( &o, 0, 12 );
+                BSONObjBuilder subBuilder(b.subobjStart("a"));
+                subBuilder.append("$ref", "ns");
+                subBuilder.append("$id", o);
+                subBuilder.done();
+                return b.obj();
+            }
+            virtual string json() const {
+                return "{ \"a\" : DBRef( \"ns\", ObjectId( \"000000000000000000000000\" ) ) }";
+            }
 
-            // BSON Object <=> JS DBRef
-            ASSERT( client.eval( "unittest", "x = db.dbref.b.findOne(); db.dbref.b.drop(); x.c = new DBRef( x.c.ns, x.c.id ); db.dbref.b.insert( x );" ) );
-            ASSERT_EQUALS( Object, client.findOne( "unittest.dbref.b", "" )[ "c" ].type() );
-            ASSERT_EQUALS( string( "dbref.a" ), client.findOne( "unittest.dbref.b", "" )[ "c" ].embeddedObject().getStringField( "$ref" ) );
-        }
+            // A "fetch" function is added to the DBRef object when it is inserted using the
+            // constructor, so we need to compare the fields individually
+            virtual void bsonEquals( const BSONObj &expected, const BSONObj &actual ) {
+                ASSERT_EQUALS( expected["a"].type() , actual["a"].type() );
+                ASSERT_EQUALS( expected["a"]["$id"].OID() , actual["a"]["$id"].OID() );
+                ASSERT_EQUALS( expected["a"]["$ref"].String() , actual["a"]["$ref"].String() );
+            }
+        };
 
-        void reset() {
-            client.dropCollection( _a );
-            client.dropCollection( _b );
-        }
+        class DBPointerTest : public TestRoundTrip {
+            virtual BSONObj bson() const {
+                BSONObjBuilder b;
+                OID o;
+                memset( &o, 0, 12 );
+                b.appendDBRef( "a" , "ns" , o );
+                return b.obj();
+            }
+            virtual string json() const {
+                return "{ \"a\" : DBPointer( \"ns\", ObjectId( \"000000000000000000000000\" ) ) }";
+            }
+        };
 
-        const char * _a;
-        const char * _b;
-    };
+        class InformalDBRefTest : public TestRoundTrip {
+            virtual BSONObj bson() const {
+                BSONObjBuilder b;
+                OID o;
+                memset( &o, 0, 12 );
+                BSONObjBuilder subBuilder(b.subobjStart("a"));
+                subBuilder.append("$ref", "ns");
+                subBuilder.append("$id", o);
+                subBuilder.done();
+                return b.obj();
+            }
 
-    class InformalDBRef {
-    public:
-        void run() {
-            client.insert( ns(), BSON( "i" << 1 ) );
-            BSONObj obj = client.findOne( ns(), BSONObj() );
-            client.remove( ns(), BSONObj() );
-            client.insert( ns(), BSON( "r" << BSON( "$ref" << "jstests.informaldbref" << "$id" << obj["_id"].__oid() << "foo" << "bar" ) ) );
-            obj = client.findOne( ns(), BSONObj() );
-            ASSERT_EQUALS( "bar", obj[ "r" ].embeddedObject()[ "foo" ].str() );
+            // Don't need to return anything because we are overriding both jsonOut and jsonIn
+            virtual string json() const { return ""; }
 
-            ASSERT( client.eval( "unittest", "x = db.jstests.informaldbref.findOne(); y = { r:x.r }; db.jstests.informaldbref.drop(); y.r[ \"a\" ] = \"b\"; db.jstests.informaldbref.save( y );" ) );
-            obj = client.findOne( ns(), BSONObj() );
-            ASSERT_EQUALS( "bar", obj[ "r" ].embeddedObject()[ "foo" ].str() );
-            ASSERT_EQUALS( "b", obj[ "r" ].embeddedObject()[ "a" ].str() );
-        }
-    private:
-        static const char *ns() { return "unittest.jstests.informaldbref"; }
-    };
+            // Need to override these because the JSON doesn't actually round trip.
+            // An object with "$ref" and "$id" fields is handled specially and different on the way out.
+            virtual string jsonOut() const {
+                return "{ \"a\" : DBRef( \"ns\", ObjectId( \"000000000000000000000000\" ) ) }";
+            }
+            virtual string jsonIn() const {
+                stringstream ss;
+                ss << "{ \"a\" : { \"$ref\" : \"ns\" , " <<
+                                "\"$id\" : ObjectId( \"000000000000000000000000\" ) } }";
+                return ss.str();
+            }
+        };
+
+        class InformalDBRefExtraFieldTest : public TestRoundTrip {
+            virtual BSONObj bson() const {
+                BSONObjBuilder b;
+                OID o;
+                memset( &o, 0, 12 );
+                BSONObjBuilder subBuilder(b.subobjStart("a"));
+                subBuilder.append("$ref", "ns");
+                subBuilder.append("$id", o);
+                subBuilder.append("otherfield", "value");
+                subBuilder.done();
+                return b.obj();
+            }
+
+            // Don't need to return anything because we are overriding both jsonOut and jsonIn
+            virtual string json() const { return ""; }
+
+            // Need to override these because the JSON doesn't actually round trip.
+            // An object with "$ref" and "$id" fields is handled specially and different on the way out.
+            virtual string jsonOut() const {
+                return "{ \"a\" : DBRef( \"ns\", ObjectId( \"000000000000000000000000\" ) ) }";
+            }
+            virtual string jsonIn() const {
+                stringstream ss;
+                ss << "{ \"a\" : { \"$ref\" : \"ns\" , " <<
+                                "\"$id\" : ObjectId( \"000000000000000000000000\" ) , " <<
+                                "\"otherfield\" : \"value\" } }";
+                return ss.str();
+            }
+        };
+
+    } // namespace RoundTripTests
 
     class BinDataType {
     public:
@@ -1203,8 +1301,6 @@ namespace JSTests {
 
             add< WeirdObjects >();
             add< CodeTests >();
-            add< DBRefTest >();
-            add< InformalDBRef >();
             add< BinDataType >();
 
             add< VarTests >();
@@ -1217,6 +1313,11 @@ namespace JSTests {
 
             add< ScopeOut >();
             add< InvalidStoredJS >();
+
+            add< RoundTripTests::DBRefTest >();
+            add< RoundTripTests::DBPointerTest >();
+            add< RoundTripTests::InformalDBRefTest >();
+            add< RoundTripTests::InformalDBRefExtraFieldTest >();
         }
     } myall;
 
