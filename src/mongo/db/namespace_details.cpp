@@ -265,11 +265,7 @@ namespace mongo {
     */
     DiskLoc NamespaceDetails::alloc(const char* ns, int lenToAlloc) {
         {
-            // align very slightly.  
-            // note that if doing more coarse-grained quantization (really just if it isn't always
-            //   a constant amount but if it varied by record size) then that quantization should 
-            //   NOT be done here but rather in getRecordAllocationSize() so that we can grab a
-            //   deletedrecord that is just big enough if we happen to run into one.
+            // align very slightly.
             lenToAlloc = (lenToAlloc + 3) & 0xfffffffc;
         }
 
@@ -293,6 +289,17 @@ namespace mongo {
                 // you get the whole thing.
                 return loc;
             }
+        }
+
+        // don't quantize:
+        //   - capped collections: just wastes space
+        //   - $ collections (indexes) as we already have those alligned the way we want SERVER-8425
+        if ( !isCapped() && NamespaceString::normal( ns ) ) {
+            // we quantize here so that it only impacts newly sized records
+            // this prevents oddities with older records and space re-use SERVER-8435
+            lenToAlloc = std::min( r->lengthWithHeaders(),
+                                   NamespaceDetails::quantizeAllocationSpace( lenToAlloc ) );
+            left = regionlen - lenToAlloc;
         }
 
         /* split off some for further use. */
@@ -325,7 +332,7 @@ namespace mongo {
         int extra = 5; // look for a better fit, a little.
         int chain = 0;
         while ( 1 ) {
-            {
+            { // defensive check
                 int fileNumber = cur.a();
                 int fileOffset = cur.getOfs();
                 if (fileNumber < -1 || fileNumber >= 100000 || fileOffset < 0) {
@@ -848,14 +855,7 @@ namespace mongo {
         }
 
         // adjust for padding factor
-        int allocationSize = static_cast<int>(minRecordSize * _paddingFactor);
-
-        if (isCapped())
-            // pad record size for capped collections, but do not quantize
-            return allocationSize;
-
-        // quantize to the nearest 1/16th bucketSize
-        return quantizeAllocationSpace(allocationSize);
+        return static_cast<int>(minRecordSize * _paddingFactor);
     }
 
     /* ------------------------------------------------------------------------- */
