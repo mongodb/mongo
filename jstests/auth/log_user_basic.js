@@ -16,7 +16,7 @@
  *     }
  */
 var parseLog = function(line) {
-    var THREAD_ID_PATTERN = / [12]?\d:\d\d:\d\d\.\d\d\d \[(.+)\] /;
+    var THREAD_ID_PATTERN = / [01]?\d:\d\d:\d\d\.\d\d\d \[(.+)\] /;
     var ID_USER_PATTERN = new RegExp(THREAD_ID_PATTERN.source + 'user:([^ ]*) ');
     var res = THREAD_ID_PATTERN.exec(line);
 
