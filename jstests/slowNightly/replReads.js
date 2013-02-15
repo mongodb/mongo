@@ -2,7 +2,8 @@
 
 function testReadLoadBalancing(numReplicas) {
 
-    s = new ShardingTest( "replReads" , 1 /* numShards */, 0 /* verboseLevel */, 1 /* numMongos */, { rs : true , numReplicas : numReplicas, chunksize : 1 } )
+    var s = new ShardingTest({ shards: { rs0: { nodes: numReplicas }},
+        verbose: 2, other: { chunksize: 1 }});
 
     s.adminCommand({enablesharding : "test"})
     s.config.settings.find().forEach(printjson)
@@ -15,7 +16,7 @@ function testReadLoadBalancing(numReplicas) {
     secondaries = s._rs[0].test.liveNodes.slaves
 
     function rsStats() {
-        return s.getDB( "admin" ).runCommand( "connPoolStats" )["replicaSets"]["replReads-rs0"];
+        return s.getDB("admin").runCommand("connPoolStats")["replicaSets"][s.rs0.name];
     }
     
     assert.eq( numReplicas , rsStats().hosts.length );
