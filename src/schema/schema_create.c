@@ -14,7 +14,6 @@ __create_file(WT_SESSION_IMPL *session,
 	WT_DECL_ITEM(val);
 	WT_DECL_RET;
 	int is_metadata;
-	const char *cfg[] = API_CONF_DEFAULTS(session, create, config);
 	const char *filecfg[4] = API_CONF_DEFAULTS(file, meta, config);
 	const char *filename, *treeconf;
 
@@ -59,13 +58,16 @@ __create_file(WT_SESSION_IMPL *session,
 	}
 
 	/*
-	 * Open the file to check that it was setup correctly.
+	 * Open the file to check that it was setup correctly.   We don't need
+	 * to pass the configuration, we just wrote the collapsed configuration
+	 * into the metadata file, and it's going to be read/used by underlying
+	 * functions.
 	 *
 	 * Keep the handle exclusive until it is released at the end of the
 	 * call, otherwise we could race with a drop.
 	 */
 	WT_ERR(__wt_conn_btree_get(
-	    session, uri, NULL, cfg, WT_BTREE_EXCLUSIVE));
+	    session, uri, NULL, NULL, WT_BTREE_EXCLUSIVE));
 	if (WT_META_TRACKING(session))
 		WT_ERR(__wt_meta_track_handle_lock(session, 1));
 	else
